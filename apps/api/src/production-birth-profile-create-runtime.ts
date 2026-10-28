@@ -1,3 +1,4 @@
+import type { createAdminAnalyticsVerifiedBirthAdapterV1 } from './admin-analytics-verified-birth-v1.js';
 import { randomUUID } from 'node:crypto';
 import { handleBirthProfileCreateRequestV1 } from './birth-profile-create-http.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
@@ -30,6 +31,8 @@ export interface CreateProductionBirthProfileCreateRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** No default analytics activation. Only a server-installed, consent-bound adapter may be supplied. */
   readonly onBirthProfileCommitted?: (input: { readonly request: Request; readonly revisionId: string }) => Promise<void>;
+  /** Opt-in: validated current self-birth revision, active consent and approved event policy required. */
+  readonly verifiedBirthAnalytics?: Pick<ReturnType<typeof createAdminAnalyticsVerifiedBirthAdapterV1>, 'record'>;
 }
 
 /**
@@ -61,6 +64,13 @@ export function createProductionBirthProfileCreateRuntimeV1(
     nextBirthRevisionId: randomUUID,
   });
 
+  if(input.verifiedBirthAnalytics!==undefined&&input.onBirthProfileCommitted!==undefined)
+    throw Error('Ambiguous birth analytics observer configuration');
+  const observer=input.verifiedBirthAnalytics===undefined?input.onBirthProfileCommitted:
+    async ({request,revisionId}:{readonly request:Request;readonly revisionId:string})=>{
+      await input.verifiedBirthAnalytics!.record(request,revisionId);
+    };
+
   return Object.freeze({
     handleRequest(requestInput: ProductionBirthProfileCreateRequestV1) {
       return handleBirthProfileCreateRequestV1({
@@ -71,7 +81,7 @@ export function createProductionBirthProfileCreateRuntimeV1(
         pool: poolLease.pool,
         idPort,
         fingerprintPort,
-        ...(input.onBirthProfileCommitted === undefined ? {} : { onBirthProfileCommitted: input.onBirthProfileCommitted }),
+        ...(observer === undefined ? {} : { onBirthProfileCommitted: observer }),
       });
     },
     close() {
