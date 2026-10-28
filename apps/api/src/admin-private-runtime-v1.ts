@@ -17,6 +17,7 @@ import type { OpenAiCostsObservationV1 } from './admin-openai-costs-source-v1.js
 import {createAdminCreditPostgresV1} from './admin-credit-postgres-v1.js';
 import {createAdminAiBudgetReadV1,createAdminAiBudgetHttpV1} from './admin-ai-budget-read-v1.js';
 import {createAdminReadingGenerationCostReadV1,createAdminReadingGenerationCostHttpV1} from './admin-reading-generation-cost-v1.js';
+import {createAdminReadingGenerationMonthReadV1,createAdminReadingGenerationMonthHttpV1} from './admin-reading-generation-month-v1.js';
 import type{AdminAnalyticsCollectionPolicyV1,AdminAnalyticsCoverageV1}from'./admin-analytics-pipeline-v1.js';
 
 export interface AdminPrivateRuntimeEnvV1 {
@@ -84,11 +85,13 @@ export function createAdminPrivateRuntimeV1(input: CreateAdminPrivateRuntimeInpu
   const finance = createAdminAiFinanceHttpHandlerV1({auth,audit,reads:createAdminAiFinanceReadPortV1({pool:input.readPool,...(input.aiFinanceEvidence??{})})});
   const budget=createAdminAiBudgetHttpV1({auth,audit,read:createAdminAiBudgetReadV1({pool:input.readPool,...(input.aiBudgetEvidence??{})})});
   const readingGenerationCost=createAdminReadingGenerationCostHttpV1({auth,audit,read:createAdminReadingGenerationCostReadV1(input.readPool)});
+  const readingGenerationMonth=createAdminReadingGenerationMonthHttpV1({auth,audit,read:createAdminReadingGenerationMonthReadV1(input.readPool)});
   return Object.freeze({
     handleRequest(request:Request):Promise<Response> {
       const path=new URL(request.url).pathname;
       if(path.startsWith('/api/admin/commands/')||path==='/api/admin/presentations'||path==='/api/admin/presentations/history'||path==='/api/admin/credits/history')return commands(request);
       if(path==='/api/admin/ai-budget')return budget(request);
+      if(path==='/api/admin/reading-generation-cost/monthly')return readingGenerationMonth(request);
       if(/^\/api\/admin\/readings\/[^/]+\/generation-cost$/u.test(path))return readingGenerationCost(request);
       if(path==='/api/admin/analytics-dashboard')return analytics(request);
       if(path.startsWith('/api/admin/ai-finance/'))return finance(request);
