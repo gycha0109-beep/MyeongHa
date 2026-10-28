@@ -95,6 +95,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     const sql = ADMIN_READ_SQL_V1.overview ?? '';
     expect(sql).toContain("s.kind='member' AND s.status='active'");
     expect(sql).toContain("r.verification_status='verified'");
+    expect(sql.match(/r\.environment='production'/gu)).toHaveLength(3);
     expect(sql).toContain("r.execution_status='succeeded'");
     expect(sql).toContain("r.execution_status='failed'");
     expect(sql).toContain("l.status IN ('failed','blocked')");

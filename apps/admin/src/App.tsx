@@ -22,9 +22,9 @@ const sectionDetails: Record<Exclude<AdminSection, 'overview'>, readonly string[
 
 const metrics = [
   { key: 'members_active', title: '현재 활성 회원', note: '현재 활성 회원 계정 기준' },
-  { key: 'verified_receipts_7d', title: '최근 7일 검증 영수증', note: '서버 검증 상태 verified 기준' },
-  { key: 'verified_krw_minor_7d', title: '최근 7일 검증 KRW 금액', note: '기록된 검증 영수증 합계 · 정산/순매출이 아님' },
-  { key: 'verified_money_missing_7d', title: '최근 7일 결제 금액 근거 결측', note: '검증 영수증 중 금액 또는 통화 기록이 없는 건수' },
+  { key: 'verified_receipts_7d', title: '최근 7일 운영 검증 영수증', note: '운영(production) 결제·서버 검증 상태 verified 기준 · 샌드박스 제외' },
+  { key: 'verified_krw_minor_7d', title: '최근 7일 운영 검증 KRW 금액', note: '운영 결제 영수증의 기록 합계 · 샌드박스 제외 · 정산/순매출이 아님' },
+  { key: 'verified_money_missing_7d', title: '최근 7일 운영 결제 금액 근거 결측', note: '운영 검증 영수증 중 금액 또는 통화 기록이 없는 건수' },
   { key: 'completed_readings_7d', title: '최근 7일 완료 Reading', note: '완료 처리 시각 기준' },
   { key: 'ai_calls_7d', title: '최근 7일 AI 호출', note: '실행 로그 기준 · 원가가 아님' },
   { key: 'reading_failures_7d', title: '최근 7일 Reading 실패', note: '실패 완료된 Reading 수' },
