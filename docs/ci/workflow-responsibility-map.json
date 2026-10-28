@@ -20,6 +20,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "none"
     },
+    "character-c1-three-five-approved-main-once-20261028.yml": {
+      "responsibility": "character-memory-owner-approved-public-three-character-five-turn-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "ci-db-track.yml": {
       "responsibility": "db-suite-verification",
       "prMode": "routed-via-ci",
