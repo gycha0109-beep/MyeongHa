@@ -49,6 +49,10 @@ const dbSnapshot = {
 };
 const dbHash = hashSajuHeldSourceProofRequestV1(dbSnapshot);
 const storedHash = 'sha256:v1:' + dbHash;
+const executedRequest = {
+  birth: { calendarType: 'solar' as const, date: '2001-07-14', time: '15:20', sex: 'female' as const },
+  reading: { text: '전체 사주' },
+};
 
 function ports() {
   const sourceVerifier = {
@@ -83,7 +87,7 @@ function ports() {
 function input(port: ReturnType<typeof ports>, response: unknown = native) {
   return {
     subjectId, readingId, readingSessionId, executionAttemptId, outboxEventId,
-    sourceBirthRevisionId, sourceResponse: response,
+    sourceBirthRevisionId, sourceResponse: response, executedRequest,
     ...port,
   };
 }
@@ -277,7 +281,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
   it('does not invoke any issuer, mapping, rights or DB writes when the approved ports are not installed', async () => {
     await expect(persistIssuedSajuOfficialReadingV1({
       subjectId, readingId, readingSessionId, executionAttemptId, outboxEventId,
-      sourceBirthRevisionId, sourceResponse: native,
+      sourceBirthRevisionId, sourceResponse: native, executedRequest,
     })).resolves.toEqual({
       contractVersion: 'saju-official-db-issuance-handoff-v1',
       state: 'held', reason: 'production_source_unverified',
@@ -294,6 +298,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       replayed: false, canDisclose: false, canSell: false,
     });
     expect(p.sourceVerifier.verifyProductionIssue).toHaveBeenCalledTimes(1);
+    expect(p.sourceVerifier.verifyProductionIssue).toHaveBeenCalledWith(expect.objectContaining({ executedRequest }));
     expect(p.mappingVerifier.verifyIssuedReadingMapping).toHaveBeenCalledTimes(1);
     expect(p.currentAuthority.admitCurrentIssue).toHaveBeenCalledTimes(1);
     expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
@@ -327,7 +332,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     ]) {
       const p = ports();
       const original = await p.sourceVerifier.verifyProductionIssue({
-        sourceResponse: native, subjectId, dbReadingId: readingId,
+        sourceResponse: native, executedRequest, subjectId, dbReadingId: readingId,
         readingSessionId, sourceBirthRevisionId,
       });
       p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({ ...original, ...wrong });
