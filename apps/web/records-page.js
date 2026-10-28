@@ -218,6 +218,10 @@ function renderCurrentBirthProfile(birth) {
 function renderLifeFacts(payload) {
   const target = byId('life-records-list');
   clear(target);
+  if (payload?.status === 'unavailable') {
+    target.append(uiElement('p', 'muted records-empty', '현세록을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
+    return;
+  }
   const facts = requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact));
   if (facts.length === 0) {
     target.append(uiElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
@@ -409,6 +413,15 @@ function renderSajuReadingSamples(target, lifeFactsPayload) {
 function renderSajuReadings(readingPayload, lifeFactsPayload) {
   const target = byId('saju-records-list');
   clear(target);
+  if (readingPayload?.status === 'unavailable') {
+    byId('saju-records-count').textContent = uiText('조회할 수 없음');
+    const failure = document.createElement('article');
+    failure.className = 'records-reading-empty records-reading-unavailable';
+    failure.append(uiElement('h3', '', '저장된 사주 보고서를 지금 확인할 수 없습니다.'));
+    failure.append(uiElement('p', 'muted', '조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다. 나중에 다시 확인해 주세요.'));
+    target.append(failure);
+    return;
+  }
   const readings = requireArray(readingPayload, 'readings');
   // Only the authorized Reading History collection contributes to the count.
   // Development-only fixture cards must never be counted as saved reports.
@@ -417,7 +430,7 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
-  if (allowsDevelopmentSajuSamples()) {
+  if (allowsDevelopmentSajuSamples() && lifeFactsPayload?.status !== 'unavailable') {
     renderSajuReadingSamples(target, lifeFactsPayload);
     return;
   }
@@ -427,6 +440,10 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
 function renderMemories(payload, subjectKind) {
   const target = byId('memory-records-list');
   clear(target);
+  if (payload?.status === 'unavailable') {
+    target.append(uiElement('p', 'muted records-empty', '저장된 기억을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
+    return;
+  }
   const memories = requireArray(payload, 'memories');
   if (memories.length === 0) {
     const empty = document.createElement('div');
