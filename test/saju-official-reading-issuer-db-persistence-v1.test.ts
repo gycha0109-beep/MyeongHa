@@ -134,7 +134,10 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       { nativeReadingId: 'other_native_reading' },
     ]) {
       const p = ports();
-      const original = await p.sourceVerifier.verifyProductionIssue(input(p));
+      const original = await p.sourceVerifier.verifyProductionIssue({
+        sourceResponse: native, subjectId, dbReadingId: readingId,
+        readingSessionId, sourceBirthRevisionId,
+      });
       p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({ ...original, ...wrong });
       const result = await persistIssuedSajuOfficialReadingV1(input(p));
       expect(result.state).toBe('held');
@@ -220,7 +223,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     ]]) {
       const port = createPostgresSajuOfficialImmutableCommitPortV1({
         query: vi.fn(async () => ({ rows })),
-      });
+      } as unknown as PostgresTransactionQueryV1);
       await expect(port.finalizeSuccess({
         subjectId, readingId, executionAttemptId, outboxEventId,
         externalRequestRef: null, engineVersion: 'saju-engine-v1',
