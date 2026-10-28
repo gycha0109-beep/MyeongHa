@@ -95,9 +95,11 @@ const persist = () => {
   state.candidateCount=done.length;
   state.independentReviewCount=state.records.filter(r=>r.reviewer?.status==='COMPLETED').length;
   state.paidCallsAttempted=state.records.reduce((v,r)=>v+Number(!!r.generator)+Number(!!r.reviewer),0);
+  state.providerCallsCompleted=state.records.reduce((v,r)=>v+Number(r.generator?.status==='COMPLETED')+Number(r.reviewer?.status==='COMPLETED'),0);
   const used=state.records.reduce((v,r)=>v+
     (r.generator?.recordedOrReservedUsd??0)+(r.reviewer?.recordedOrReservedUsd??0),0);
   state.reservedOrEstimatedCostUsd=Number(used.toFixed(9));
+  state.estimatedOrReportedCostUsd=state.reservedOrEstimatedCostUsd;
   const tmp=target+'.tmp';
   writeFileSync(tmp,JSON.stringify(state,null,2),'utf8');
   renameSync(tmp,target);
@@ -108,6 +110,7 @@ const persist = () => {
     '- 호출 시도: '+state.paidCallsAttempted+'/30',
     '- 생성 초안: '+state.candidateCount+'/15',
     '- 완료 검토: '+state.independentReviewCount+'/15',
+    '- 모델 검토 실패: '+state.records.filter(r=>r.review?.verdict==='FAIL').length,'',
     '- 보고/예약 비용(청구서 아님): $'+state.reservedOrEstimatedCostUsd,
     '- 최대 승인 비용: $'+CAP_USD,
     '- 실제 Canon/관계/장기기억/Production DB 검증: 미실행',
@@ -365,9 +368,11 @@ for (const profile of profiles){
     }
     record.review=reviewed;
     record.status=reviewed.verdict==='PASS'?'REVIEW_PASSED':'REVIEW_FAILED_HELD_AS_RESEARCH_ONLY';
-    // Never feed a rejected reply into the next research dialogue turn.
-    if (reviewed.verdict!=='PASS') fail('INDEPENDENT_SEMANTIC_REVIEW_FAILED');
-    // Next turn uses only this character's exact reviewed utterance.
+    // Research-only: collect a full 5-turn trajectory even if the reviewer
+    // flags a QUALITY defect. This draft is never authorized/published as fact.
+    // The next turn receives the character's exact prior generated utterance,
+    // so the experiment can measure recovery and longitudinal inconsistency.
+    // The independent review verdict is retained, not promoted to a guard PASS.
     history.push({role:'user',text:userText});
     history.push({role:'assistant',text:generation.draft.utterance});
     if (seenResults.has(profile.characterId+':'+i)) fail('DUPLICATE_CASE');
