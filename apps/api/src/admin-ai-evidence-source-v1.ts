@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { AdminAiFxEvidenceV1 } from './admin-ai-cost-finance-v1.js';
+import type { AdminAiBillingEvidencePortV1, AdminAiBillingEvidenceV1, AdminAiFxEvidenceV1 } from './admin-ai-cost-finance-v1.js';
 import type { AdminAiBudgetBillingV1, AdminAiBudgetWindowV1 } from './admin-ai-budget-v1.js';
 
 /**
@@ -94,6 +94,54 @@ export function createAdminAiBudgetEvidenceSourcesV1(input:{
       const parsed=input.fx.parse(verified.bytes,window);
       validFx(parsed,window,verified.sha256);
       return Object.freeze(parsed);
+    },
+  });
+}
+
+/**
+ * Optional exact-call billing evidence for the existing bounded AI finance call
+ * reader. The caller's server-owned loader must authenticate the provider
+ * transport AND independently pin its digest; a SHA256 value alone does not
+ * establish that the provider issued these lines or that the call mapping is
+ * legitimate. Never source this from a browser upload or project cost totals.
+ *
+ * This does not create Reading-generation usage events: Reading is eligible
+ * only after its own authoritative provider-call ledger supplies exact IDs.
+ */
+export function createAdminAiExactCallBillingEvidenceSourceV1(input?:{
+  readonly load:(callIds:readonly string[])=>Promise<AdminAiSourceArtifactV1|null>;
+  readonly parse:(bytes:Uint8Array,callIds:readonly string[])=>readonly AdminAiBillingEvidenceV1[];
+}):AdminAiBillingEvidencePortV1 {
+  const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+  const IDENTIFIER=/^[A-Za-z0-9_.:/-]{1,256}$/u;
+  return Object.freeze({
+    async lookup(callIds:readonly string[]):Promise<readonly AdminAiBillingEvidenceV1[]> {
+      if(!Array.isArray(callIds)||callIds.length>50||
+        callIds.some(id=>typeof id!=='string'||!UUID.test(id))||
+        new Set(callIds).size!==callIds.length)throw Error('Invalid exact-call billing cohort');
+      if(callIds.length===0||input===undefined)return Object.freeze([]);
+      const requested=Object.freeze([...callIds]);
+      const artifact=await input.load(requested);
+      if(artifact===null)return Object.freeze([]);
+      const verified=verifiedBytes(artifact,'authenticated_provider_billing_export');
+      const lines=input.parse(verified.bytes,requested);
+      if(!Array.isArray(lines)||lines.length>requested.length)throw Error('Unbound exact-call billing export');
+      const accepted=new Set(requested),seen=new Set<string>();
+      const result:AdminAiBillingEvidenceV1[]=[];
+      for(const line of lines){
+        if(!line||typeof line.callId!=='string'||!accepted.has(line.callId)||seen.has(line.callId)||
+          !IDENTIFIER.test(line.provider)||!IDENTIFIER.test(line.model)||
+          line.source!=='provider_billing_export'||line.match!=='exact_call'||line.currency!=='USD'||
+          line.evidenceSha256!==verified.sha256||
+          typeof line.amountMicroUsd!=='number'||!Number.isSafeInteger(line.amountMicroUsd)||line.amountMicroUsd<0||
+          typeof line.billedFrom!=='string'||typeof line.billedTo!=='string'||
+          requireTime(line.billedFrom)>=requireTime(line.billedTo)) {
+          throw Error('Unbound exact-call billing export');
+        }
+        seen.add(line.callId);
+        result.push(Object.freeze({...line}));
+      }
+      return Object.freeze(result);
     },
   });
 }
