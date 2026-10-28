@@ -8,6 +8,10 @@
 
 ---
 
+## 기록 · 공식 사주 보고서 구현 로드맵 (2026-10-27)
+
+기록 탭의 **첫 유료 사주 보고서 보관·상세 재열람·구매권·첫 Reader 연결** 구현은 [Records 공식 보고서 구현 로드맵](implementation/RECORDS_OFFICIAL_REPORT_IMPLEMENTATION_ROADMAP_20261027.md)을 따릅니다. 기존 Records 조회 API와 Web 화면을 재사용하며, Saju Production Interpretation 및 Commerce Product/Offer **HOLD**를 해제한 것으로 간주하지 않습니다. **S0 출시 필수 / S1 출시 권장 / S2~S4 출시 후 확장**을 분리합니다.
+
 ## 일반 Security 실행 진입점 (2026-10-24)
 
 일반 `security` 트랙은 [Security 실행 로드맵](security/SECURITY_EXECUTION_ROADMAP_V1.md)에서 진행합니다. 구현 90 / 검증 10을 작업 배분 기준으로 적용하며, API 남용 방지·보안 이벤트·공급망·운영 복구 증거를 기존 이슈와 연결합니다. 인증·권한·DB·운영 변경의 개별 승인 경계는 유지합니다.
