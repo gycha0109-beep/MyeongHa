@@ -15,6 +15,8 @@ skip_staged_portone_migration_from_historical_fixture() {
       expected='5e5db487aa8a155cfded83b8d58c363e20f1a7b0' ;;
     20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql)
       expected='b5a47d794c8ffb0e62fecfb25d81c0b6c9312f70' ;;
+    20261027185000_owner_kcp_sandbox_private_prepare_v1.sql)
+      expected='3f2d10daa1b7a22b647d50bd4498408c58e1639b' ;;
     20261027054525_digital_reading_checkout_notice_evidence_v1.sql)
       expected='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
     *) return 1 ;;
