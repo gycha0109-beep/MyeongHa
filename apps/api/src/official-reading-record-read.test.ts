@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import {
   getOfficialReadingRecord,
   OfficialReadingRecordReadAuthorityPortErrorV1,
@@ -68,6 +69,44 @@ describe('Official Reading Records read contract', () => {
     expect(admitted).not.toHaveProperty('responseHash');
     await expect(read('sha256:wrong-reader-row')).rejects.toThrow('stored hash differs');
     await expect(read('')).rejects.toThrow('stored hash differs');
+  });
+
+  it('rereads an issuer-hashed official report only when the stored body still matches the immutable digest', async () => {
+    const immutable = {
+      ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
+      reading: {
+        readingId: READING_ID,
+        sections: [
+          { sectionType: 'overview', state: 'complete', title: '공식 결과',
+            blocks: [{ type: 'paragraph', text: '인증된 서버 원본입니다.' }] },
+        ],
+        disclosures: [{ type: 'scope_limitation', text: '검증 가능한 범위만 제공합니다.' }],
+      },
+    };
+    const issued = {
+      ...ROW,
+      responseSnapshotJsonb: immutable,
+      responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(immutable),
+    };
+    const admitted = await getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID, authorityPort: port(issued),
+    });
+    expect(admitted.reading).toEqual(immutable);
+
+    const modified = {
+      ...immutable,
+      reading: {
+        ...(immutable.reading as Record<string, unknown>),
+        sections: [
+          { sectionType: 'overview', state: 'complete', title: '공식 결과',
+            blocks: [{ type: 'paragraph', text: '원본을 변경한 내용입니다.' }] },
+        ],
+      },
+    };
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
+      authorityPort: port({ ...issued, responseSnapshotJsonb: modified }),
+    })).rejects.toThrow('source response hash mismatch');
   });
 
   it('fails closed when the owner-scoped record does not exist', async () => {
