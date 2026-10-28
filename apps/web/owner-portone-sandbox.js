@@ -105,9 +105,12 @@ function loadPortOneSdk(){
  if(scriptPromise)return scriptPromise;
  scriptPromise=new Promise((resolve,reject)=>{
   const el=document.createElement('script');
+  // PortOne's documented V2 CDN entry is a classic script without crossorigin.
+  // A crossorigin=anonymous attribute forces CORS for this vendor script,
+  // which can reject the load before window.PortOne is available.
+  // Keep the SDK origin restricted by the Owner-only page CSP instead.
   el.src='https://cdn.portone.io/v2/browser-sdk.js';
   el.async=true;
-  el.crossOrigin='anonymous';
   el.onload=()=>{
    if(window.PortOne&&typeof window.PortOne.requestPayment==='function')
     resolve(window.PortOne);
