@@ -1,4 +1,5 @@
 import { ApiCommandError } from './api-error.js';
+import type { createAdminAnalyticsVerifiedReadingAdapterV1 } from './admin-analytics-verified-reading-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
   getOfficialReadingRecord,
@@ -159,6 +160,10 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  /** Opt-in after an authorized Official archive read. Reads the persisted
+   * succeeded Reading again and requires consent before backfilling its
+   * completion event. This does not claim complete runtime coverage. */
+  readonly verifiedReadingAnalytics?: Pick<ReturnType<typeof createAdminAnalyticsVerifiedReadingAdapterV1>, 'record'>;
 }): Promise<Response> {
   const readingId = requestedReadingId(input.request);
   if (readingId === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } });
@@ -184,6 +189,17 @@ export async function handleOfficialReadingRecordRequestV1(input: {
           authorityPort: new TransactionOfficialReadingRecordPortV1(client),
         }),
     });
+    // The DB transaction has committed and the owner-scoped archive was
+    // admitted. Optional analytics must independently verify committed
+    // Reading completion and consent; failure cannot deny the reading.
+    if (input.verifiedReadingAnalytics !== undefined) {
+      try {
+        await input.verifiedReadingAnalytics.record(input.request, data.readingId);
+      } catch {
+        // Withheld consent, unapproved collection, old completions and
+        // unavailable analytics never affect the Official Reading response.
+      }
+    }
     return successResponse(data, requestId, serverTime);
   } catch (error) {
     if (!(error instanceof ApiCommandError)) throw error;
