@@ -10,7 +10,7 @@ begin
   or p_to<>((date_trunc('month',p_from at time zone 'Asia/Seoul')+interval '1 month') at time zone 'Asia/Seoul') then
   raise exception 'Exact Seoul calendar month required';end if;
  return query select jsonb_build_object('workload','character_chat','feature',e.phase,'provider',e.provider_key,'model',e.model_key,
-  'calls',count(*)::text,'unknownCostCalls',count(*) filter(where e.cost_status<>'estimated' or e.estimated_cost_micro_usd is null)::text,
+  'calls',count(*)::text,'unknownCostCalls',count(*) filter(where e.cost_status is distinct from 'estimated' or e.estimated_cost_micro_usd is null)::text,
   'estimateMicroUsd',coalesce(sum(e.estimated_cost_micro_usd) filter(where e.cost_status='estimated'),0)::text)
  from public.seyeon_ai_call_cost_events e where e.created_at>=p_from and e.created_at<p_to and e.created_at<=current_timestamp
  group by e.phase,e.provider_key,e.model_key order by e.phase,e.provider_key,e.model_key limit 501;
