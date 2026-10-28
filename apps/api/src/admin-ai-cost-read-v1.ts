@@ -73,7 +73,16 @@ export function createAdminAiFinanceReadPortV1(input: {
         const page = result.rows.slice(0,filters.limit);
         let rows: readonly Readonly<Record<string, Primitive>>[];
         if (filters.mode === 'calls') {
-          const billing = input.billing === undefined ? [] : await input.billing.lookup(page.map(row => str(row,'callId')));
+          const selectedIds=page.map(row=>str(row,'callId'));
+          if(new Set(selectedIds).size!==selectedIds.length)throw Error('Duplicate AI finance source calls');
+          const billing = input.billing === undefined ? [] : await input.billing.lookup(selectedIds);
+          // A custom provider port is not trusted to widen the selected DB cohort.
+          // Reject even one unrelated or duplicated line instead of silently ignoring it.
+          const selected=new Set(selectedIds),reconciled=new Set<string>();
+          for(const bill of billing){
+            if(!selected.has(bill.callId)||reconciled.has(bill.callId))throw Error('Unbound AI finance billing lookup');
+            reconciled.add(bill.callId);
+          }
           rows = page.map(row => {
             const call: AdminAiFinanceCallV1 = {
               callId:str(row,'callId'),subjectId:str(row,'subjectId'),attemptId:str(row,'attemptId'),turnId:str(row,'turnId'),
