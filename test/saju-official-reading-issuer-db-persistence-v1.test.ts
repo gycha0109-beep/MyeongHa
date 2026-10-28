@@ -225,6 +225,32 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(requestReading).not.toHaveBeenCalled();
   });
 
+  it('denies malformed prepared identities before the Saju network or DB transaction', async () => {
+    for (const badId of ['subjectId', 'readingId', 'readingSessionId',
+      'executionAttemptId', 'outboxEventId', 'sourceBirthRevisionId'] as const) {
+      const p = ports();
+      const requestReading = vi.fn(async () => native);
+      const dbTransaction = {
+        run: vi.fn(async (args: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) =>
+          args.commit({ currentAuthority: p.currentAuthority, commitPort: p.commitPort })),
+      };
+      const invalid = {
+        profile: profileFixture(), readingText: '전체 사주',
+        adapter: { requestReading }, subjectId, readingId, readingSessionId,
+        executionAttemptId, outboxEventId, sourceBirthRevisionId,
+        sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+        dbTransaction, [badId]: 'not-a-prepared-uuid',
+      };
+      const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1(invalid);
+      expect(result).toMatchObject({
+        state: 'held', canDisclose: false, canSell: false,
+      });
+      expect(requestReading).not.toHaveBeenCalled();
+      expect(dbTransaction.run).not.toHaveBeenCalled();
+      expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
+    }
+  });
+
   it('requires the DB-pinned current Birth revision before the Saju network or DB transaction', async () => {
     const p = ports();
     const requestReading = vi.fn(async () => native);
@@ -345,6 +371,27 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     const denied = await persistIssuedSajuOfficialReadingV1(input(p, badResponse));
     expect(denied.state).toBe('held');
     expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
+  });
+
+  it('rejects an invalid Production issuer Birth input digest before mapping or commit', async () => {
+    for (const badHash of ['not-a-hash', 'b'.repeat(64), 'sha256:v1:' + 'g'.repeat(64)]) {
+      const p = ports();
+      const verified = await p.sourceVerifier.verifyProductionIssue({
+        sourceResponse: native, executedRequest, subjectId, dbReadingId: readingId,
+        readingSessionId, sourceBirthRevisionId,
+      });
+      p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({
+        ...verified, sourceBirthInputHash: badHash,
+      });
+      const result = await persistIssuedSajuOfficialReadingV1(input(p));
+      expect(result).toMatchObject({
+        state: 'held', reason: 'production_source_unverified',
+        canDisclose: false, canSell: false,
+      });
+      expect(p.mappingVerifier.verifyIssuedReadingMapping).not.toHaveBeenCalled();
+      expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
+      expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+    }
   });
 
   it('rejects non-ID payload changes or DB mapping with a different subject, hash or session', async () => {
