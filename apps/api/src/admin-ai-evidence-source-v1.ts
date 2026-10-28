@@ -77,7 +77,7 @@ export function createAdminAiBudgetEvidenceSourcesV1(input:{
   };
 }={}):AdminAiBudgetEvidenceSourcesV1 {
   return Object.freeze({
-    async billing(window){
+    async billing(window: AdminAiBudgetWindowV1){
       if(!input.billing)return undefined;
       const artifact=await input.billing.load(window);
       if(artifact===null)return undefined;
@@ -86,7 +86,7 @@ export function createAdminAiBudgetEvidenceSourcesV1(input:{
       validBilling(parsed,window,verified.sha256);
       return Object.freeze(parsed);
     },
-    async fx(window){
+    async fx(window: AdminAiBudgetWindowV1){
       if(!input.fx)return undefined;
       const artifact=await input.fx.load(window);
       if(artifact===null)return undefined;
