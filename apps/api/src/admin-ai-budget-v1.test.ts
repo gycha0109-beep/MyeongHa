@@ -16,7 +16,7 @@ describe('approved Seoul monthly budget policy',()=>{
   expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:[]})).toThrow('Invalid budget workload coverage');
   expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:['character_chat','character_chat']})).toThrow('Invalid budget workload coverage');
   expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,workload:'reading'}]})).toThrow('Invalid budget usage coverage');
-  expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,calls:0}]})).toThrow('Invalid budget usage coverage');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,calls:0,unknownCostCalls:1}]})).toThrow('Invalid budget usage coverage');
   expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,calls:0,unknownCostCalls:0}]})).toThrow('Unbound budget estimate');
  });
  it('keeps USD amounts and leaves KRW and warnings unmeasured without billing and FX',()=>{
