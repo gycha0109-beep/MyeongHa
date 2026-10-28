@@ -29,7 +29,10 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(runtime).toContain("myeongha:credit-shortage");
     expect(runtime).toContain('turnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("messageInput.value = ''");
-    expect(runtime.indexOf("messageInput.value = ''")).toBeLessThan(runtime.indexOf('} catch (error) {\n    const code = error instanceof Error ? error.message'));
+    const runtimeNormalized = runtime.replace(/\r\n/gu, '\n');
+    expect(runtimeNormalized.indexOf("messageInput.value = ''")).toBeLessThan(
+      runtimeNormalized.indexOf('} catch (error) {\n    const code = error instanceof Error ? error.message'),
+    );
     expect(dialog).not.toContain('requestPayment(');
     expect(dialog).not.toContain('purchase-intent');
   });
