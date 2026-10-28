@@ -1,0 +1,12 @@
+owner-approved-paid-research
+original-approval=2026-10-28
+experiment=public-c1-typed-authoring-three-characters-five-turns
+characters=seyeon,yeoul,taegyeom
+max-generated-answers=15
+max-independent-reviews=15
+max-provider-attempts=30
+upper-budget-usd=0.30
+public-synthetic-only=true
+allow-production-runtime-mutation=false
+allow-replay=false
+source-commit=9037ecebad184af0cbf6196953c06dcb3b13538a
