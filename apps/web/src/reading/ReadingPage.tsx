@@ -1,7 +1,6 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
-import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
 const productPreviewTopics = [
   { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
