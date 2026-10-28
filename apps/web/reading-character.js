@@ -432,7 +432,13 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
   if (!payload || typeof payload !== 'object' || payload.ok !== true) return null;
   const data = payload.data;
   if (!data || typeof data !== 'object' || data.lifecycle !== 'preview') return null;
-  const response = data.reading;
+  return stepsFromIssuedProductResponse(data.reading);
+}
+
+// The official archive is already an authorized persisted source. Parse its
+// actual Product Reading envelope directly; never wrap it in a fake Preview
+// lifecycle just to reuse the renderer.
+function stepsFromIssuedProductResponse(response) {
   if (!response || typeof response !== 'object') return null;
   if (!['delivered', 'delivered_with_fallback'].includes(response.state)) return null;
   const reading = response.reading;
@@ -978,10 +984,7 @@ async function loadPersistedReading() {
       return;
     }
 
-    const readingView = previewStepsFromPayload({
-      ok: true,
-      data: { lifecycle: 'preview', reading: record.reading },
-    });
+    const readingView = stepsFromIssuedProductResponse(record.reading);
     if (!readingView) {
       renderPersistedReadingFailure(
         '저장된 풀이를 표시할 수 없습니다.',
