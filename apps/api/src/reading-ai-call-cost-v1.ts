@@ -41,7 +41,7 @@ function timestamp(value:string):string{
   if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u.test(value)||
     !Number.isFinite(Date.parse(value)))throw Error('Invalid Reading AI observation time');
   const date=new Date(value).toISOString();
-  if(new Date(date).getTime()!==Date.parse(value))throw Error('Invalid Reading AI observation time');
+  if(date!== (value.includes('.')?value:value.replace('Z','.000Z')))throw Error('Invalid Reading AI observation time');
   return date;
 }
 const outcomes:readonly SeyeonAiCallOutcomeV1[]=[
@@ -79,6 +79,11 @@ export function buildReadingAiCallCostV1(input:ReadingAiProviderCallObservationV
     outcome:input.outcome,
     ...input.usage,
     ...estimate,
+    // Persist the exact rated quote alongside its version. The usage estimate
+    // must be independently reproducible by the private DB write boundary.
+    appliedInputRateMicroUsdPerMillion:input.price?.inputMicroUsdPerMillion??null,
+    appliedCachedInputRateMicroUsdPerMillion:input.price?.cachedInputMicroUsdPerMillion??null,
+    appliedOutputRateMicroUsdPerMillion:input.price?.outputMicroUsdPerMillion??null,
     invoiceReconciled:false as const,
   });
 }
