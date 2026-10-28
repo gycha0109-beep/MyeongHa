@@ -62,6 +62,12 @@ grant select (id, subject_id, source_kind, source_ref, credits_issued, credits_r
 grant select (reservation_id, lot_id, credits) on public.chat_credit_turn_allocations_v1 to myeongha_admin_reader;
 grant select (id, subject_id, thread_id, client_turn_id, required_credits, state, delivered_turn_id, created_at, finalized_at)
   on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
+-- Only self birth revision identity/timestamp for consented funnel verification;
+-- never grant birth_date, birth_time, sex, input_hash or raw revision payload.
+grant select (id, subject_id, birth_profile_id, created_at)
+  on public.birth_profile_revisions to myeongha_admin_reader;
+grant select (id, subject_id, profile_kind, archived_at, current_revision_id)
+  on public.birth_profiles to myeongha_admin_reader;
 grant select (id, created_at, subject_id, turn_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
   on public.ai_execution_logs to myeongha_admin_reader;
 -- Exact Reading-grounding linkage only, never source prose or AI input/output JSON.
@@ -111,6 +117,10 @@ create policy admin_read_credit_lot_metadata_v1 on public.chat_credit_lots_v1
 create policy admin_read_credit_allocations_v1 on public.chat_credit_turn_allocations_v1
   for select to myeongha_admin_reader using (true);
 create policy admin_read_credit_reservations_v1 on public.chat_credit_turn_reservations_v1
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_birth_revision_identity_v1 on public.birth_profile_revisions
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_birth_profile_identity_v1 on public.birth_profiles
   for select to myeongha_admin_reader using (true);
 create policy admin_read_ai_execution_metadata_v1 on public.ai_execution_logs
   for select to myeongha_admin_reader using (true);
