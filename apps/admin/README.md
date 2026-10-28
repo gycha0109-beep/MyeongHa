@@ -150,6 +150,13 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 호스팅 기본 필수 이름은 `deployment-check.mjs`의 `ADMIN_HOSTED_REQUIRED_V1`에 있습니다: 관리자 origin, Access issuer/AUD, Owner 이메일/Auth UUID, 고정 Supabase origin/publishable API key, 기존 회원 인증 origin, 서로 다른 Reader/Audit Writer Hyperdrive ID. 현재 실제 전용 역할·감사 테이블·Access 앱·관리자 Worker가 없어 배포와 활성화를 수행하지 않았습니다. 이 미연결 상태는 코드·로컬 테스트 통과와 별개입니다.
 
 
+## 2026-10-28 source-linked AI / consented analytics implementation
+
+- Reading detail now exposes `GET /api/admin/readings/:id/ai-usage` for **AI calls that actually referenced the selected Reading grounding**. It does not claim the price of Reading generation; unverified KRW costs remain `null`. New read-only grounding link grants are offline candidates only.
+- Three server-only A5 adapters validate source evidence before a cohort event can be admitted: `admin-analytics-verified-purchase-v1.ts` (verified paid Reading receipt), `admin-analytics-verified-reading-v1.ts` (committed Reading completion), and `admin-analytics-verified-birth-v1.ts` (persisted current self birth revision; no birth values selected).
+- Each requires an authenticated Subject, active consent/session, matching durable pseudonymous Subject link, and **consent granted before the actual domain event**. Stable server event IDs deduplicate repeated processing. No conversion is inferred from browser success screens or a purchase intent.
+- These adapters are not attached to Production command handlers or event collectors. The separate analytics writer, consent runtime, complete observability coverage, deletion binding and explicit collection activation remain prerequisites. Billing exports, verified FX and Reading-generation costs are still unconnected.
+
 ## workers.dev without a purchased domain (2026-10-28)
 
 The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Zero Trust registration is complete but there is not yet a dedicated Access application, Admin Worker, dedicated Hyperdrive, or Admin Postgres role.
