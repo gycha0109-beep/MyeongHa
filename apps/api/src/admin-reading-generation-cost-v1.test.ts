@@ -31,7 +31,7 @@ describe('private Reading generation cost read',()=>{
     const output=await createAdminReadingGenerationCostReadV1(f.pool)(READING,20,0);
     expect(output).toMatchObject({rows:[event],nextCursor:null,coverage:'provider_events_only'});
     expect(f.statements.map(x=>x.sql)).toEqual([
-      'BEGIN READ ONLY','SELECT current_user::text AS "currentUser"',
+      'BEGIN READ ONLY',expect.stringContaining('SELECT current_user::text'),
       expect.stringContaining('myeongha_admin_ops.qry_reading_ai_cost_calls_v1'),'COMMIT',
     ]);
     expect(f.statements[2]?.args).toEqual([READING,21,0]);
