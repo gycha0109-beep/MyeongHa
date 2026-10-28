@@ -1,0 +1,234 @@
+import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
+import {
+  persistIssuedSajuOfficialReadingV1,
+  type SajuOfficialImmutableCommitPortV1,
+  type SajuOfficialSourceVerificationPortV1,
+  type SajuOfficialDbMappingVerificationPortV1,
+  type SajuOfficialCurrentAuthorityPortV1,
+} from '../apps/api/src/saju-official-reading-issuer-db-persistence-v1.js';
+import {
+  createPostgresSajuOfficialImmutableCommitPortV1,
+  SAJU_OFFICIAL_DB_FINALIZE_AUTHORITY_V1,
+} from '../apps/api/src/postgres-saju-official-immutable-commit-v1.js';
+import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
+
+const subjectId = '11111111-1111-4111-8111-111111111111';
+const readingId = '22222222-2222-4222-8222-222222222222';
+const readingSessionId = '33333333-3333-4333-8333-333333333333';
+const executionAttemptId = '44444444-4444-4444-8444-444444444444';
+const outboxEventId = '55555555-5555-4555-8555-555555555555';
+const sourceBirthRevisionId = '66666666-6666-4666-8666-666666666666';
+const nativeReadingId = 'official_reading_native_v1';
+
+const native = Object.freeze({
+  responseId: 'reading_response_' + 'a'.repeat(24),
+  responseVersion: 'myeonghwa-product-reading-response-v2',
+  state: 'delivered',
+  messageCode: 'READING_DELIVERED',
+  requiredAction: 'none',
+  reading: Object.freeze({
+    readingId: nativeReadingId,
+    sections: [
+      { sectionType: 'personality', state: 'complete', title: '원국',
+        blocks: [{ type: 'paragraph', text: '승인된 원문만 보존합니다.' }] },
+    ],
+    disclosures: [{ type: 'scope_limitation', text: '확인 가능한 범위만 제공합니다.' }],
+  }),
+});
+const sourceHash = hashSajuHeldSourceProofRequestV1(native);
+const dbSnapshot = {
+  ...native,
+  reading: { ...native.reading, readingId },
+};
+const dbHash = hashSajuHeldSourceProofRequestV1(dbSnapshot);
+const storedHash = 'sha256:v1:' + dbHash;
+
+function ports() {
+  const sourceVerifier = {
+    verifyProductionIssue: vi.fn(async () => ({
+      state: 'production_source_verified' as const,
+      nativeReadingId,
+      sourceResponseHash: sourceHash,
+      sourceBirthRevisionId,
+      sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+      engineVersion: 'saju-engine-v1',
+      externalRequestRef: 'internal-only-ref',
+    })),
+  } satisfies SajuOfficialSourceVerificationPortV1;
+  const mappingVerifier = {
+    verifyIssuedReadingMapping: vi.fn(async () => ({
+      state: 'approved_mapping' as const,
+      subjectId, dbReadingId: readingId, readingSessionId,
+      sourceBirthRevisionId, nativeReadingId,
+      originalResponseHash: sourceHash, storedResponseHash: dbHash,
+    })),
+  } satisfies SajuOfficialDbMappingVerificationPortV1;
+  const currentAuthority = {
+    admitCurrentIssue: vi.fn(async () => true),
+  } satisfies SajuOfficialCurrentAuthorityPortV1;
+  const commitPort = {
+    finalizeSuccess: vi.fn(async () => ({
+      readingId, executionAttemptId, responseHash: storedHash, replayed: false,
+    })),
+  } satisfies SajuOfficialImmutableCommitPortV1;
+  return { sourceVerifier, mappingVerifier, currentAuthority, commitPort };
+}
+function input(port: ReturnType<typeof ports>, response: unknown = native) {
+  return {
+    subjectId, readingId, readingSessionId, executionAttemptId, outboxEventId,
+    sourceBirthRevisionId, sourceResponse: response,
+    ...port,
+  };
+}
+
+describe('Saju issued official Reading -> DB immutable commit boundary', () => {
+  it('does not invoke any issuer, mapping, rights or DB writes when the approved ports are not installed', async () => {
+    await expect(persistIssuedSajuOfficialReadingV1({
+      subjectId, readingId, readingSessionId, executionAttemptId, outboxEventId,
+      sourceBirthRevisionId, sourceResponse: native,
+    })).resolves.toEqual({
+      contractVersion: 'saju-official-db-issuance-handoff-v1',
+      state: 'held', reason: 'production_source_unverified',
+      canDisclose: false, canSell: false,
+    });
+  });
+
+  it('commits only when Production source, exact ID mapping and current DB authority independently approve', async () => {
+    const p = ports();
+    const result = await persistIssuedSajuOfficialReadingV1(input(p));
+    expect(result).toEqual({
+      contractVersion: 'saju-official-db-issuance-handoff-v1',
+      state: 'committed', readingId, responseHash: storedHash,
+      replayed: false, canDisclose: false, canSell: false,
+    });
+    expect(p.sourceVerifier.verifyProductionIssue).toHaveBeenCalledTimes(1);
+    expect(p.mappingVerifier.verifyIssuedReadingMapping).toHaveBeenCalledTimes(1);
+    expect(p.currentAuthority.admitCurrentIssue).toHaveBeenCalledTimes(1);
+    expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
+    const args = p.commitPort.finalizeSuccess.mock.calls[0]?.[0];
+    expect(args?.storedSnapshot).toEqual(dbSnapshot);
+    expect(args?.nativeReadingId).toBe(nativeReadingId);
+    expect(args?.storedResponseHash).toBe(storedHash);
+    expect(args?.sourceBirthInputHash).toBe('sha256:v1:' + 'b'.repeat(64));
+    // Never mutate the source-issued response or lose disclosures.
+    expect(native.reading.readingId).toBe(nativeReadingId);
+    expect(hashSajuHeldSourceProofRequestV1(native)).toBe(sourceHash);
+    expect(args?.storedSnapshot.reading).toEqual(dbSnapshot.reading);
+  });
+
+  it('fails closed for missing Production verification and never asks DB mapping to authorize a Preview', async () => {
+    const p = ports();
+    p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce(null as never);
+    const result = await persistIssuedSajuOfficialReadingV1(input(p));
+    expect(result).toMatchObject({ state: 'held', reason: 'production_source_unverified' });
+    expect(p.mappingVerifier.verifyIssuedReadingMapping).not.toHaveBeenCalled();
+    expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
+  it('rejects forged response hashes, a different birth revision and malformed delivered responses before storage', async () => {
+    for (const wrong of [
+      { sourceResponseHash: 'a'.repeat(64) },
+      { sourceBirthRevisionId: '77777777-7777-4777-8777-777777777777' },
+      { nativeReadingId: 'other_native_reading' },
+    ]) {
+      const p = ports();
+      const original = await p.sourceVerifier.verifyProductionIssue(input(p));
+      p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({ ...original, ...wrong });
+      const result = await persistIssuedSajuOfficialReadingV1(input(p));
+      expect(result.state).toBe('held');
+      expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+    }
+    const p = ports();
+    const badResponse = { ...native, reading: { ...native.reading, sections: [{ sectionType: 'custom', state: 'complete', title: '불명확한 출처', blocks: [{ type: 'invented_claim', text: '무근거' }] }] } };
+    const denied = await persistIssuedSajuOfficialReadingV1(input(p, badResponse));
+    expect(denied.state).toBe('held');
+    expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
+  });
+
+  it('rejects non-ID payload changes or DB mapping with a different subject, hash or session', async () => {
+    for (const wrong of [
+      { subjectId: '88888888-8888-4888-8888-888888888888' },
+      { readingSessionId: '99999999-9999-4999-8999-999999999999' },
+      { originalResponseHash: 'c'.repeat(64) },
+      { storedResponseHash: 'd'.repeat(64) },
+      { nativeReadingId: 'replaced_reading' },
+    ]) {
+      const p = ports();
+      const original = await p.mappingVerifier.verifyIssuedReadingMapping(input(p) as never);
+      p.mappingVerifier.verifyIssuedReadingMapping.mockResolvedValueOnce({ ...original, ...wrong });
+      const result = await persistIssuedSajuOfficialReadingV1(input(p));
+      expect(result).toMatchObject({ state: 'held', reason: 'db_mapping_unverified' });
+      expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
+      expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+    }
+  });
+
+  it('rechecks current subject/birth/Grant/Privacy admission before DB commit', async () => {
+    const p = ports();
+    p.currentAuthority.admitCurrentIssue.mockResolvedValueOnce(false);
+    const result = await persistIssuedSajuOfficialReadingV1(input(p));
+    expect(result).toMatchObject({ state: 'held', reason: 'current_authority_unavailable' });
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
+  it('refuses a DB receipt with changed committed identity or response hash', async () => {
+    for (const wrong of [
+      { readingId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+      { executionAttemptId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' },
+      { responseHash: 'sha256:v1:' + 'a'.repeat(64) },
+    ]) {
+      const p = ports();
+      p.commitPort.finalizeSuccess.mockResolvedValueOnce({
+        readingId, executionAttemptId, responseHash: storedHash, replayed: false,
+        ...wrong,
+      });
+      await expect(persistIssuedSajuOfficialReadingV1(input(p))).rejects.toThrow(/commit receipt/);
+    }
+  });
+
+  it('uses existing atomic PostgreSQL finalize command, never writing readings/refs directly', async () => {
+    const query = vi.fn(async () => ({ rows: [{
+      readingId, executionAttemptId, responseHash: storedHash, replayed: true,
+    }] }));
+    const port = createPostgresSajuOfficialImmutableCommitPortV1({
+      query,
+    } as unknown as PostgresTransactionQueryV1);
+    const p = ports();
+    const result = await persistIssuedSajuOfficialReadingV1({
+      ...input(p), commitPort: port,
+    });
+    expect(result).toMatchObject({ state: 'committed', replayed: true });
+    expect(SAJU_OFFICIAL_DB_FINALIZE_AUTHORITY_V1).toBe('public.cmd_finalize_reading_transport_success_v1');
+    expect(query).toHaveBeenCalledTimes(1);
+    const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
+    expect(sql).toContain('from public.cmd_finalize_reading_transport_success_v1(');
+    expect(sql).not.toMatch(/update public\.readings|insert into public\.reading_refs/iu);
+    expect(params).toHaveLength(16);
+    expect(params.slice(0, 4)).toEqual([subjectId, readingId, executionAttemptId, outboxEventId]);
+    expect(params[6]).toBe(nativeReadingId);
+    expect(params[8]).toBeNull();
+    expect(params[14]).toBe(JSON.stringify(dbSnapshot));
+    expect(params[15]).toBe(storedHash);
+  });
+
+  it('rejects missing or multiple PostgreSQL finalize receipts', async () => {
+    for (const rows of [[], [
+      { readingId, executionAttemptId, responseHash: storedHash, replayed: false },
+      { readingId, executionAttemptId, responseHash: storedHash, replayed: false },
+    ]]) {
+      const port = createPostgresSajuOfficialImmutableCommitPortV1({
+        query: vi.fn(async () => ({ rows })),
+      });
+      await expect(port.finalizeSuccess({
+        subjectId, readingId, executionAttemptId, outboxEventId,
+        externalRequestRef: null, engineVersion: 'saju-engine-v1',
+        nativeReadingId, sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+        readingContractVersion: 'myeonghwa-product-reading-response-v2',
+        productResponseState: 'delivered', storedSnapshot: dbSnapshot,
+        storedResponseHash: storedHash,
+      })).rejects.toThrow(/exactly one receipt/);
+    }
+  });
+});
