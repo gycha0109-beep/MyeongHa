@@ -1,4 +1,9 @@
 import type { BirthProfileReadResponseV1 } from './birth-profile-read.js';
+
+// Reject malformed prepared identities before any paid Saju network execution.
+// The canonical owner, attempt and session are still rechecked by the governed DB transaction.
+const OFFICIAL_ISSUE_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 import { bindCurrentBirthProfileRevisionForSajuV1 } from './saju-production-calculation-execution.js';
 import {
   buildSajuProductionReadingRequestV1,
@@ -93,6 +98,13 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // Never charge an upstream call without a wired Production issuer + DB scope.
   const { sourceVerifier, mappingVerifier, dbTransaction } = input;
   if (!sourceVerifier || !mappingVerifier || !dbTransaction) {
+    return unavailable;
+  }
+
+  if (![input.subjectId, input.readingId, input.readingSessionId,
+    input.executionAttemptId, input.outboxEventId,
+    input.sourceBirthRevisionId].every((value) =>
+    typeof value === 'string' && OFFICIAL_ISSUE_UUID_V1.test(value))) {
     return unavailable;
   }
 
