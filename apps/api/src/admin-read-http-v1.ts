@@ -91,6 +91,10 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
     kind = 'user-detail';
     subjectId = fragments[1].toLowerCase();
+  } else if (fragments.length === 3 && fragments[0] === 'readings' && fragments[2] === 'ai-usage' &&
+    typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
+    kind = 'reading-ai-usage';
+    recordId = fragments[1].toLowerCase();
   } else if (fragments.length === 3 && fragments[0] === 'readings' && fragments[2] === 'attempts' &&
     typeof fragments[1] === 'string' && UUID.test(fragments[1])) {
     kind = 'reading-attempts';
@@ -130,14 +134,14 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Administrator cursor is invalid.');
   }
   const querySubject = url.searchParams.get('subjectId');
-  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts'))) {
+  if (querySubject !== null && (!UUID.test(querySubject) || (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts' || kind === 'reading-ai-usage'))) {
     throw new Error('Administrator subject reference is invalid.');
   }
   subjectId ??= querySubject?.toLowerCase() ?? null;
   if (subjectId !== null && ['overview','issues','audit','analytics','catalog','characters','content-releases'].includes(kind)) {
     throw new Error('Subject filter is not supported by the requested authority.');
   }
-  if (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts') {
+  if (kind === 'user-detail' || kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts' || kind === 'reading-ai-usage') {
     if (url.searchParams.has('from') || url.searchParams.has('to')) {
       throw new Error('Detail route does not support date filters.');
     }

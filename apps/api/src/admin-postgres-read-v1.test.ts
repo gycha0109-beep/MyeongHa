@@ -117,7 +117,7 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
       const arg = {
         ...filters(kind),
         ...(kind === 'user-detail' ? { subjectId: SUBJECT } : {}),
-        ...(kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts' ? { recordId: SUBJECT } : {}),
+        ...(kind === 'commerce-detail' || kind === 'reading-detail' || kind === 'reading-attempts' || kind === 'reading-ai-usage' ? { recordId: SUBJECT } : {}),
       };
       await h.port.read(arg);
       const sql = h.sql[2] ?? '';
@@ -166,6 +166,16 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).toContain('s.kind=$6::text');
     expect(h.sql[2]).toContain('s.status=$7::text');
     expect(h.params[2]).toEqual([21, null, null, null, 0, 'guest', 'merged']);
+  });
+  it('exposes source-linked AI usage without invented Reading costs or raw prompts',async()=>{
+    const h=harness();
+    await h.port.read({...filters('reading-ai-usage'),recordId:SUBJECT});
+    expect(h.params[2]).toEqual([21,SUBJECT,0]);
+    expect(h.sql[2]).toContain('rg.reading_id=$2::uuid');
+    expect(h.sql[2]).toContain('g.ai_execution_log_id=l.id AND g.grounding_id=rg.id');
+    expect(h.sql[2]).toContain('ORDER BY rg2.id LIMIT 1');
+    expect(h.sql[2]).toContain('NULL::text AS "costKrw"');
+    expect(h.sql[2]).not.toMatch(/input_ref_jsonb|output_ref_jsonb|response_snapshot_jsonb/iu);
   });
   it('reads Reading attempt metadata without response snapshots, birth input or prompts', async () => {
     const query = ADMIN_READ_SQL_V1['reading-detail'] ?? '';

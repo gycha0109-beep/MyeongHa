@@ -1,5 +1,5 @@
 export const ADMIN_READ_KINDS_V1 = [
-  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'entitlements', 'entitlement-events', 'provider-events', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'reading-attempts', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
+  'overview', 'users', 'user-detail', 'commerce', 'commerce-detail', 'commerce-alerts', 'entitlements', 'entitlement-events', 'provider-events', 'credits', 'credit-reservations', 'credit-allocations', 'readings', 'reading-detail', 'reading-attempts', 'reading-ai-usage', 'ai-costs', 'ai-errors', 'ai-estimates', 'analytics', 'issues', 'audit', 'catalog', 'characters', 'content-releases', 'deletion-jobs',
 ] as const;
 
 export type AdminReadKindV1 = (typeof ADMIN_READ_KINDS_V1)[number];
@@ -61,6 +61,7 @@ const SAFE_COLUMNS: Readonly<Record<AdminReadKindV1, readonly string[]>> = Objec
   'credit-allocations': ['reservationId','lotId','subjectId','allocatedCredits','reservationState','lotSource','createdAt'],
   credits: ['eventId', 'subjectId', 'creditDelta', 'creditsRemaining', 'expiresAt', 'validity', 'createdAt', 'eventKind', 'balanceAfter', 'correlationId'],
   'reading-attempts': ['attemptId','readingId','subjectId','attemptNo','state','engineKey','requestedEngineVersion','resolvedEngineVersion','errorCode','startedAt','finishedAt'],
+  'reading-ai-usage': ['executionId','readingId','subjectId','feature','model','status','inputTokens','outputTokens','latencyMs','createdAt','attribution','costKrw'],
   'reading-detail': ['readingId','subjectId','status','domain','createdAt','completedAt','engineVersion','contractVersion','requestContractVersion','engineKey','responseState','committedAttemptId','attemptState','attemptCount','errorCode','startedAt','finishedAt'],
   readings: ['readingId', 'subjectId', 'status', 'productKey', 'domain', 'engineVersion', 'contractVersion', 'createdAt', 'errorCode'],
   'ai-costs': ['day', 'feature', 'model', 'requests', 'successes', 'failures', 'characterChatCalls', 'unclassifiedCalls', 'totalTokens', 'unknownTokenCalls', 'blocked', 'costKrw', 'avgLatencyMs', 'latencySamples', 'p95LatencyMs'],

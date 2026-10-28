@@ -64,6 +64,9 @@ grant select (id, subject_id, thread_id, client_turn_id, required_credits, state
   on public.chat_credit_turn_reservations_v1 to myeongha_admin_reader;
 grant select (id, created_at, subject_id, turn_id, stage, model, status, error_code, input_tokens, output_tokens, latency_ms)
   on public.ai_execution_logs to myeongha_admin_reader;
+-- Exact Reading-grounding linkage only, never source prose or AI input/output JSON.
+grant select (id, reading_id, subject_id) on public.reading_groundings to myeongha_admin_reader;
+grant select (ai_execution_log_id, grounding_id, subject_id) on public.ai_execution_groundings to myeongha_admin_reader;
 grant select (created_at, subject_id, phase, model_key, outcome, cost_status, estimated_cost_micro_usd)
   on public.seyeon_ai_call_cost_events to myeongha_admin_reader;
 grant select (id, event_type, status, last_error_code, attempt_count, available_at, lease_expires_at, created_at) on public.outbox_events to myeongha_admin_reader;
@@ -110,6 +113,10 @@ create policy admin_read_credit_allocations_v1 on public.chat_credit_turn_alloca
 create policy admin_read_credit_reservations_v1 on public.chat_credit_turn_reservations_v1
   for select to myeongha_admin_reader using (true);
 create policy admin_read_ai_execution_metadata_v1 on public.ai_execution_logs
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_reading_grounding_links_v1 on public.reading_groundings
+  for select to myeongha_admin_reader using (true);
+create policy admin_read_ai_grounding_links_v1 on public.ai_execution_groundings
   for select to myeongha_admin_reader using (true);
 create policy admin_read_ai_cost_metadata_v1 on public.seyeon_ai_call_cost_events
   for select to myeongha_admin_reader using (true);

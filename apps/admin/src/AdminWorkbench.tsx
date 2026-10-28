@@ -6,7 +6,7 @@ import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
-type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'entitlements' | 'entitlement-events' | 'provider-events' | 'credits' | 'readings' | 'reading-attempts' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
+type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'entitlements' | 'entitlement-events' | 'provider-events' | 'credits' | 'readings' | 'reading-attempts' | 'reading-ai-usage' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
 const DATA_PATHS: Record<ListSection, string> = {
   users: 'users',
   commerce: 'commerce',
@@ -88,6 +88,9 @@ const LABELS: Record<string, string> = {
   linkedCreditLotCount: '연계 충전 Lot 수',
   linkedCreditRemaining: '연계 Lot 잔여',
   readingId: 'Reading 참조',
+  attribution: 'Reading attribution',
+  inputTokens: 'Input tokens',
+  outputTokens: 'Output tokens',
   attemptId: '시도 참조',
   attemptNo: '시도 번호',
   engineKey: '사주 엔진',
@@ -161,10 +164,10 @@ function isSubjectId(value: string): boolean {
 }
 
 export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = '', providerEventStatus: string = 'all'): string {
-  if (tab === 'reading-attempts' && isSubjectId(attemptReadingId)) {
+  if (['reading-attempts','reading-ai-usage'].includes(tab) && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
-    return '/api/admin/readings/' + attemptReadingId + '/attempts?' + params.toString();
+    return '/api/admin/readings/' + attemptReadingId + (tab === 'reading-ai-usage' ? '/ai-usage?' : '/attempts?') + params.toString();
   }
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
@@ -598,7 +601,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           </select>
         </label>}
       {['entitlement-events','provider-events'].includes(tab) && receiptId !== '' && detail === null && <p>영수증 {receiptId}에 직접 연결된 이력만 조회합니다.</p>}
-      {tab === 'reading-attempts' && attemptReadingId !== '' && detail === null &&
+      {['reading-attempts','reading-ai-usage'].includes(tab) && attemptReadingId !== '' && detail === null &&
         <button type="button" onClick={() => {
           setTab('readings');
           setDetail(attemptReadingId);
@@ -619,9 +622,10 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
                setDetail(null);
                setCursor(null);
              }}>전체 실행 시도</button>}
+            {section === 'readings' && <button type="button" onClick={() => { setAttemptReadingId(detail); setTab('reading-ai-usage'); setDetail(null); setCursor(null); }}>Reading-linked AI usage</button>}
             {section === 'users' && onNavigate && <><button type="button" onClick={() => onNavigate('/admin/readings?subjectId=' + detail)}>Reading 조회</button><button type="button" onClick={() => onNavigate('/admin/commerce?subjectId=' + detail)}>결제 조회</button></>}</>
         : <>
-          {section !== 'issues' && section !== 'analytics' && tab !== 'reading-attempts' && <form onSubmit={e => {
+          {section !== 'issues' && section !== 'analytics' && !['reading-attempts','reading-ai-usage'].includes(tab) && <form onSubmit={e => {
             e.preventDefault();
             if (pendingSubject !== '' && !isSubjectId(pendingSubject)) {
               setError('사용자 참조는 UUID 형식이어야 합니다.');
@@ -656,7 +660,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             });
         }}>운영 이슈 CSV (최대 50건)</button>}
       <button type="button" onClick={onSessionExpired}>로그아웃</button>
-      {detail === null && !['reading-attempts','catalog','characters','content-releases'].includes(tab) && <form className="date-range-form" onSubmit={e => {
+      {detail === null && !['reading-attempts','reading-ai-usage','catalog','characters','content-releases'].includes(tab) && <form className="date-range-form" onSubmit={e => {
         e.preventDefault();
         if ((draftFrom !== '' && draftTo === '') || (draftFrom === '' && draftTo !== '')) {
           setError('시작일과 종료일을 함께 지정해야 합니다.');
@@ -682,6 +686,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     {(tab === 'credit-reservations' || tab === 'credit-allocations') && <p className="readiness-explainer">reserved는 선예약, settled는 전달 참조가 있는 정산, released는 미전달 해제·Lot 복원 상태입니다. 복원 후 Lot의 만료 여부는 별도로 적용됩니다. 요청 멱등성 참조는 같은 사용자·대화 내 client_turn_id이며 원문 대화나 비밀 키가 아닙니다.</p>}
     {tab === 'entitlements' && <p className="readiness-explainer">저장된 권한 투영입니다. 실제 접근 허용은 도메인 Access Gate가 현재 유효성·범위를 다시 검사합니다.</p>}
     {['ai-costs','ai-errors','ai-estimates'].includes(tab) && <p className="readiness-explainer">일별 기준은 UTC입니다. 대화 참조가 있는 호출과 용도 미분류 호출을 구분하며, 미분류 호출을 사주 비용으로 합산하지 않습니다. 사주 Reading 전용 비용은 적재 근거가 없어 미측정입니다. Se-yeon 비용은 별도 추정 USD 원장이고 공급사 확정 청구액·원화 원가가 아닙니다. 응답당 3~5원·상한 10원은 미확정 연구 가정입니다.</p>}
+    {tab === 'reading-ai-usage' && <p className="readiness-explainer">Reading-linked character AI usage is not the cost of generating a Reading. KRW cost remains unmeasured; only recorded calls within 90 days are shown.</p>}
     {tab === 'catalog' && <p className="readiness-explainer">상품·제안 활성 플래그와 폐기 시각의 읽기 전용 관측입니다. 실제 판매·가격·PSP 출시 허가는 별도 게이트입니다.</p>}
     {tab === 'issues' && <p className="readiness-explainer">저장된 실패·시도·임대 상태입니다. 재시도 가능 여부, 최종 실패 분류 또는 재실행 권한으로 해석하지 않습니다.</p>}
     {tab === 'provider-events' && <p className="readiness-explainer">수신·검증·처리 상태와 정확히 결속된 영수증만 표시합니다. 결제사 이벤트 유형 또는 revoked 상태만으로 실제 환불 완료를 선언하지 않습니다. 외부 거래 ID·원본 영수증·결제사 payload는 조회하지 않습니다.</p>}
