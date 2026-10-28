@@ -244,7 +244,7 @@ function readingPresentation(sajuDomain) {
 function productResponseStateLabel(value) {
   if (value === 'delivered' || value === 'delivered_with_fallback') return '완료';
   if (value === 'clarification_required') return '추가 확인 필요';
-  return '저장됨';
+  return '상태 확인 불가';
 }
 
 let displayedRecords = null;
