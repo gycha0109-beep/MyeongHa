@@ -113,8 +113,8 @@ begin
   sum(case when jsonb_typeof(e.event_jsonb->'reasoningTokens')='number' then (e.event_jsonb->>'reasoningTokens')::numeric else null end)::text,
   count(*) filter(where jsonb_typeof(e.event_jsonb->'inputTokens') is distinct from 'number' or jsonb_typeof(e.event_jsonb->'outputTokens') is distinct from 'number' or jsonb_typeof(e.event_jsonb->'cachedInputTokens') is distinct from 'number')::text,
   coalesce(sum(e.estimated_cost_micro_usd) filter(where e.cost_status='estimated'),0)::text,
-  case when count(*) filter(where e.cost_status<>'estimated')=0 then coalesce(sum(e.estimated_cost_micro_usd),0)::text else null::text end,
-  count(*) filter(where e.cost_status<>'estimated')::text,null::text,'provider_invoice_cohort_unconnected'::text,
+  case when count(*) filter(where (e.cost_status is distinct from 'estimated' or e.estimated_cost_micro_usd is null))=0 then coalesce(sum(e.estimated_cost_micro_usd),0)::text else null::text end,
+  count(*) filter(where (e.cost_status is distinct from 'estimated' or e.estimated_cost_micro_usd is null))::text,null::text,'provider_invoice_cohort_unconnected'::text,
   null::text,null::text,null::text,null::text
  from public.seyeon_ai_call_cost_events e
  where e.created_at>=(p_from::timestamp at time zone 'UTC') and e.created_at<((p_to+1)::timestamp at time zone 'UTC')
