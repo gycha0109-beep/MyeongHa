@@ -1,27 +1,37 @@
-name: '[WT:character-memory] C1 three characters x five turns paid research once (2026-10-28)'
+name: '[WT:character-memory] C1 approved 3x5 public model study (max $0.30)'
+
 on:
-  push:
-    branches:
-      - feat/character-memory/c08-local-one-call-shadow-v1
-    paths:
-      - '.github/character-c1-three-five-20261028-one-shot.trigger'
+  workflow_dispatch:
+    inputs:
+      confirm_budget_usd_0_30:
+        description: 'Owner has approved max $0.30, 15 generation and 15 independent review calls, without retry'
+        type: boolean
+        required: true
+        default: false
+      watchtower_track:
+        description: 'Watchtower-Track'
+        required: false
+        type: string
+        default: 'character-memory'
 
 permissions:
   contents: read
   actions: read
 
 concurrency:
-  group: c1-three-five-paid-20261028-one-shot
+  group: c1-three-five-paid-lifetime-one-manual-dispatch
   cancel-in-progress: false
 
 jobs:
   research:
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/feat/character-memory/c08-local-one-call-shadow-v1' && github.run_attempt == 1 }}
+    # Existing protected Production environment grants credential only to main.
+    # Do NOT move its secrets to a less-restricted environment for a research PR.
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && github.run_attempt == 1 && inputs.confirm_budget_usd_0_30 == true }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 16
     steps:
-      - name: Checkout exact research branch commit without persisted credentials
+      - name: Checkout immutable reviewed main source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.sha }}
@@ -31,38 +41,53 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Verify TypeScript and targeted model adapter tests before payment
+      - name: Verify first and only main workflow_dispatch before any model call
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MY_GITHUB_RUN_ID: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/character-c1-three-five-paid-20261028.yml/runs?event=workflow_dispatch&branch=main&per_page=100")"
+          RESPONSE="$response" node -e '
+            const x=JSON.parse(process.env.RESPONSE||"null");
+            if(x?.total_count!==1||x?.workflow_runs?.length!==1||
+               String(x.workflow_runs[0]?.id)!==process.env.MY_GITHUB_RUN_ID||
+               x.workflow_runs[0]?.run_attempt!==1)
+              process.exit(1);
+          '
+      - name: Check shared TypeScript, public C1 plan and model adapters before payment
         run: |
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
           npx tsc -p tsconfig.json --noEmit
-          npx vitest run test/character-dialogue-live-model-shadow-v1.test.ts test/character-dialogue-multiturn-offline-shadow-v1.test.ts
+          npx vitest run test/character-dialogue-live-model-shadow-v1.test.ts test/character-dialogue-multiturn-offline-shadow-v1.test.ts test/character-c1-three-five-public-profile-adapter-v1.test.ts
           node --check scripts/character-c1-three-five-paid-eval-20261028.mjs
-      - name: Bundle exact authored public C1 runtime projection
+      - name: Build exact public C1 authoring projection
         run: |
           set -euo pipefail
           npx rolldown scripts/character-c1-three-five-public-profile-adapter-v1.ts --platform node --format esm --file "$RUNNER_TEMP/c1-three-five-profiles.mjs"
           test -s "$RUNNER_TEMP/c1-three-five-profiles.mjs"
-      - name: Verify exact roster matrix with no provider calls
+      - name: Verify research-only roster and five-turn matrix (no network)
         env:
           MYEONGHA_C1_EVAL_PROFILES_MODULE: ${{ runner.temp }}/c1-three-five-profiles.mjs
-          MYEONGHA_C1_EVAL_OUTPUT_DIR: ${{ runner.temp }}/character-c1-three-five-20261028
         run: node scripts/character-c1-three-five-paid-eval-20261028.mjs --dry-run
-      - name: Explicit owner-approved 15 candidate and 15 independent review paid calls maximum
+      - name: Run approved maximum 30 metered requests on synthetic public input
         env:
           MYEONGHA_C1_EVAL_PROFILES_MODULE: ${{ runner.temp }}/c1-three-five-profiles.mjs
           MYEONGHA_C1_EVAL_OUTPUT_DIR: ${{ runner.temp }}/character-c1-three-five-20261028
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        shell: bash
         run: |
           set -euo pipefail
           set +x
           test -n "${OPENROUTER_API_KEY:-}"
           node scripts/character-c1-three-five-paid-eval-20261028.mjs --execute --approved-three-five-20261028
-      - name: Retain synthetic transcripts and bounded spend evidence
+      - name: Save bounded research transcripts and numeric usage evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: c1-three-character-five-turn-${{ github.run_id }}-${{ github.run_attempt }}
+          name: c1-three-five-public-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/character-c1-three-five-20261028/
           if-no-files-found: warn
           retention-days: 14
