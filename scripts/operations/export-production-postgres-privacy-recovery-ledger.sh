@@ -377,7 +377,7 @@ echo "captured_at_utc=$captured_at_utc" >> "$GITHUB_OUTPUT"
   printf -- '- backup cutoff: `%s`\n' "$BACKUP_COMPLETED_AT_UTC"
   printf -- '- captured at: `%s`\n' "$captured_at_utc"
   printf -- '- replay-supported event count: `%s`\n' "$(jq -r '.eventCount' "$public_manifest")"
-  printf -- '- prior snapshot overlap: %s\\n' "$(jq -r '.snapshot_overlap.snapshotOverlapStatus' "$public_manifest")"
+  printf -- '- prior snapshot overlap: %s\n' "$(jq -r '.snapshot_overlap.snapshotOverlapStatus' "$public_manifest")"
   echo
   echo 'This encrypted artifact is authoritative only for the exact governed backup cutoff through captured-at window recorded above. Recovery must fail closed when its incident reference is later than captured-at. Snapshot comparison does not establish independent continuous capture or future-safe privacy authority. Snapshot cadence is operational mechanics, not an approved RPO. Authoritative reconciliation, RPO/RTO, and DR Ready remain separately gated.'
 } >> "$GITHUB_STEP_SUMMARY"
