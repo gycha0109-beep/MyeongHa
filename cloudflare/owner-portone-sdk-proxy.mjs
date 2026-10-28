@@ -32,7 +32,9 @@ function unavailable(reason,status){
 export async function serveOwnerPortOneSdkV1(fetchSdk=fetch){
  try{
   const upstream=await fetchSdk(PORTONE_V2_SDK_ORIGIN,{
-   method:'GET',redirect:'error',
+   // Workers supports follow/manual only; error throws before network I/O.
+   // Return redirects untouched, then reject every non-200 below.
+   method:'GET',redirect:'manual',
    headers:{Accept:'application/javascript, text/javascript;q=0.9'},
   });
   const type=upstream.headers.get('Content-Type')??'';

@@ -26,7 +26,7 @@ describe('Owner KCP sandbox fixed first-party SDK relay',()=>{
   expect(upstream).toHaveBeenCalledOnce();
   expect(upstream.mock.calls[0][0]).toBe(PORTONE_V2_SDK_ORIGIN);
   expect(upstream.mock.calls[0][1]).toEqual({
-   method:'GET',redirect:'error',
+   method:'GET',redirect:'manual',
    headers:{Accept:'application/javascript, text/javascript;q=0.9'},
   });
   expect(response.status).toBe(200);
@@ -34,6 +34,24 @@ describe('Owner KCP sandbox fixed first-party SDK relay',()=>{
   expect(response.headers.get('Cache-Control')).toBe('no-store');
   expect(response.headers.get('Cross-Origin-Resource-Policy')).toBe('same-origin');
   expect(await response.text()).toContain('window.PortOne');
+ });
+ it('works with the Workers redirect contract and never follows a redirect',async()=>{
+  // Workers throws at Request construction for redirect:error; Node does not.
+  const workerFetch=vi.fn(async(_url,init)=>{
+   if(init.redirect!=='manual')throw new TypeError('Unsupported redirect mode');
+   return new Response('window.PortOne={requestPayment(){}}',{
+    headers:{'Content-Type':'application/javascript'},
+   });
+  });
+  expect((await serveOwnerPortOneSdkV1(workerFetch)).status).toBe(200);
+  expect(workerFetch).toHaveBeenCalledOnce();
+  const redirect=await serveOwnerPortOneSdkV1(async()=>new Response(null,{
+   status:307,headers:{Location:'https://untrusted.example/sdk.js'},
+  }));
+  expect(redirect.status).toBe(503);
+  expect(redirect.headers.get('X-Myeongha-Sdk-Failure')).toBe('upstream-status');
+  expect(redirect.headers.get('X-Myeongha-Sdk-Upstream-Status')).toBe('307');
+  expect(redirect.headers.get('Location')).toBeNull();
  });
  it('fails closed for errors, CDN HTML, redirects and unavailable source',async()=>{
   for(const response of [
