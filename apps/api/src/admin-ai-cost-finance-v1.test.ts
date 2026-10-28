@@ -55,6 +55,27 @@ describe('AI cost finance source boundaries',()=>{
     expect((await make(true,true)(new Request('https://admin.test/api/admin/ai-finance/calls',{method:'POST'}))).status).toBe(405);expect(reads).toBe(0);
     expect((await make(true,false)(new Request('https://admin.test/api/admin/ai-finance/calls'))).status).toBe(503);
   });
+  it('rejects foreign and duplicate authenticated billing lines before any cost page is returned',async()=>{
+    const stored={callId:OWNER,subjectId:OWNER,attemptId:OWNER,turnId:OWNER,createdAt:call.createdAt,
+      priceAppliedAt:call.createdAt,feature:'chat',provider:call.provider,model:call.model,
+      outcome:call.outcome,priceVersion:null,recordedEstimateMicroUsd:null,
+      inputTokens:null,outputTokens:null,cachedInputTokens:null,reasoningTokens:null,
+      appliedInputRate:null,appliedCachedInputRate:null,appliedOutputRate:null};
+    const pool:PostgresSubjectPoolV1={async connect(){return{
+      async query<Row>(sql:string){return{rows:(sql.startsWith('SELECT current_user')?
+        [{currentUser:'myeongha_admin_reader'}]:sql.includes('qry_ai_finance_calls_v1')?[stored]:[]) as Row[]};},
+      release(){},
+    };}};
+    const filters=parseAdminAiFinanceFiltersV1(new URL('https://admin.test/api/admin/ai-finance/calls'),now);
+    const reader=(bills:readonly AdminAiBillingEvidenceV1[])=>createAdminAiFinanceReadPortV1({
+      pool,billing:{async lookup(ids){expect(ids).toEqual([OWNER]);return bills;}},
+    }).read(filters);
+    await expect(reader([{...bill,callId:'123e4567-e89b-42d3-a456-426614174001'}])).rejects.toThrow('Unbound');
+    await expect(reader([bill,bill])).rejects.toThrow('Unbound');
+    const matched=await reader([bill]);
+    expect(matched.rows).toHaveLength(1);
+    expect(matched.rows[0]?.confirmedMicroUsd).toBe('900');
+  });
   it('uses only bounded read RPCs and refuses ordinary DB identities before reading cost sources',async()=>{
     const seen:{sql:string;args:readonly unknown[]|undefined}[]=[];
     const pool=(role:string):PostgresSubjectPoolV1=>({async connect(){return {async query<Row>(sql:string,args?:readonly unknown[]){seen.push({sql,args});return {rows:(sql.startsWith('SELECT current_user')?[{currentUser:role}]:[]) as Row[]};},release(){}};}});
