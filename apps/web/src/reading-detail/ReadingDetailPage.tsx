@@ -19,7 +19,7 @@ export function ReadingDetailPage() {
       <article className="official-report-view" data-official-report hidden aria-label="저장된 공식 사주 보고서">
         <header className="official-report-head">
           <span className="reading-route-kicker">OFFICIAL READING</span>
-          <h1>저장된 공식 사주 보고서</h1>
+          <h1 data-official-report-heading tabIndex={-1}>저장된 공식 사주 보고서</h1>
           <p>기록에 저장된 해석을 원래 내용 그대로 한 번에 읽습니다.</p>
           <dl className="official-report-meta">
             <div><dt>발행일</dt><dd data-official-report-date>—</dd></div>
@@ -106,7 +106,7 @@ export function ReadingDetailPage() {
             <section className="reading-block reading-block-primary">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
-                <h2 data-reading-step-title>지금 읽히는 흐름</h2>
+                <h2 data-reading-step-title tabIndex={-1}>지금 읽히는 흐름</h2>
                 <p data-reading-step-body>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
               </div>
             </section>

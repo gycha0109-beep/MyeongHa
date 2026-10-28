@@ -67,6 +67,21 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain("if (first) first.hidden = true;");
   });
 
+  it('focuses owner-authorized report sections and restores keyboard focus on mode changes', () => {
+    expect(jsx).toContain('data-official-report-heading tabIndex={-1}');
+    expect(jsx).toContain('data-reading-step-title tabIndex={-1}');
+    expect(runtime).toContain('section.tabIndex = -1;');
+    expect(runtime).toContain("section.setAttribute('aria-labelledby', heading.id);");
+    expect(runtime).toContain("anchor.addEventListener('click', (event) => {");
+    expect(runtime).toContain('event.preventDefault();');
+    expect(runtime).toContain('section.focus({ preventScroll: true });');
+    expect(runtime).toContain('const requestedSection = /^#official-report-section-');
+    expect(runtime).toContain("section.scrollIntoView({ block: 'start' });");
+    expect(runtime).toContain('stepTitle?.focus();');
+    expect(runtime).toContain('reportHeading?.focus();');
+    expect(css).toContain('.official-report-section:focus-visible');
+  });
+
   it('has five-locale fixed controls without translating report source text', () => {
     for (const source of [
       '저장된 공식 사주 보고서', '발행일', '해석 버전',

@@ -579,12 +579,23 @@ function renderAuthorizedStoredReport(preview, record) {
     const section = document.createElement('section');
     section.className = 'official-report-section';
     section.id = `official-report-section-${index + 1}`;
+    // Hash targets must also accept keyboard and screen-reader focus.
+    section.tabIndex = -1;
     const kicker = document.createElement('span');
     kicker.className = 'official-report-section-number';
     kicker.textContent = String(index + 1).padStart(2, '0');
     const heading = document.createElement('h2');
+    heading.id = `official-report-heading-${index + 1}`;
     heading.dataset.officialReading = '';
     heading.textContent = step.title;
+    section.setAttribute('aria-labelledby', heading.id);
+    anchor.addEventListener('click', (event) => {
+      if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) {
+        event.preventDefault();
+        return;
+      }
+      section.focus({ preventScroll: true });
+    });
     const primary = document.createElement('p');
     primary.className = 'official-report-primary';
     primary.dataset.officialReading = '';
@@ -642,6 +653,15 @@ function renderAuthorizedStoredReport(preview, record) {
     noticeText.textContent = preview.notice;
   }
   report.hidden = false;
+  // Authorized content arrives after the browser's initial fragment navigation.
+  const requestedSection = /^#official-report-section-([1-9]\d*)$/u.exec(window.location.hash);
+  if (requestedSection) {
+    const section = sections.querySelector(`#official-report-section-${Number(requestedSection[1])}`);
+    if (section) {
+      section.focus({ preventScroll: true });
+      section.scrollIntoView({ block: 'start' });
+    }
+  }
 }
 
 function activatePreviewReading(preview) {
@@ -650,6 +670,7 @@ function activatePreviewReading(preview) {
   const report = document.querySelector('[data-official-report]');
   const reportStepMode = document.querySelector('[data-official-report-step-mode]');
   const reportReturn = document.querySelector('[data-official-report-return]');
+  const reportHeading = document.querySelector('[data-official-report-heading]');
   let activeIndex = 0;
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
@@ -796,12 +817,14 @@ function activatePreviewReading(preview) {
       if (report) report.hidden = true;
       if (stage) stage.hidden = false;
       root.dataset.readingRecordMode = 'step_by_step';
+      stepTitle?.focus();
     });
     reportReturn?.addEventListener('click', () => {
       if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) return;
       if (stage) stage.hidden = true;
       if (report) report.hidden = false;
       root.dataset.readingRecordMode = 'official_archive';
+      reportHeading?.focus();
     });
   }
   renderCalculationSummary(preview.calculationSummary);

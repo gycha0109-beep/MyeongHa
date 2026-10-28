@@ -137,6 +137,7 @@
 .official-report-toc a:hover,.official-report-toc a:focus-visible{border-color:var(--mh-brass-strong);outline-offset:3px}
 .official-report-sections{padding:0 clamp(20px,5vw,58px)}
 .official-report-section{padding:34px 0 40px;border-bottom:1px solid var(--mh-brass-faint);scroll-margin-top:22px}
+.official-report-section:focus-visible,.official-report-head h1:focus-visible,.reading-block-primary h2:focus-visible{outline:2px solid var(--mh-brass-strong);outline-offset:5px;border-radius:4px}
 .official-report-section-number{color:var(--mh-brass-strong);font-family:Georgia,serif;font-size:12px;letter-spacing:.12em}
 .official-report-section h2{margin:10px 0 20px;font-family:var(--mh-serif);font-size:clamp(22px,3vw,29px);font-weight:650;line-height:1.4}
 .official-report-section p{white-space:pre-wrap;overflow-wrap:anywhere}
