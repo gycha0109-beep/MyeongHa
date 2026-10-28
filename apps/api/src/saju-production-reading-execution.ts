@@ -104,14 +104,17 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     });
   }
 
-  const response = await executeCurrentBirthProfileSajuReadingV1({
-    profile: input.profile,
+  // Build once from the authenticated Birth revision, then pass the exact
+  // executed request to the Saju issuer proof verifier. Do not reconstruct
+  // a request digest from browser data or a later Birth profile.
+  const executedRequest = buildSajuProductionReadingRequestV1({
+    birthRevision: birth,
     readingText: input.readingText,
-    adapter: input.adapter,
     ...(input.targetPersonRef === undefined
       ? {}
       : { targetPersonRef: input.targetPersonRef }),
   });
+  const response = await input.adapter.requestReading(executedRequest);
   return dbTransaction.run({
     subjectId: input.subjectId,
     commit: ({ currentAuthority, commitPort }) =>
@@ -123,6 +126,7 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
         outboxEventId: input.outboxEventId,
         sourceBirthRevisionId: input.sourceBirthRevisionId,
         sourceResponse: response,
+        executedRequest,
         sourceVerifier,
         mappingVerifier,
         currentAuthority,
