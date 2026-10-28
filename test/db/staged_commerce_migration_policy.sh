@@ -5,6 +5,8 @@
 skip_staged_portone_migration_from_historical_fixture() {
   local migration="$1" expected
   case "${migration##*/}" in
+    20261028125751_commerce_verified_credit_receipt_fulfillment_v1.sql)
+      expected='9c8f500a528c0cd5f52a0b5d60e47caacf2fb918' ;;
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
     20261026110300_owner_admin_credit_testing_v1.sql)

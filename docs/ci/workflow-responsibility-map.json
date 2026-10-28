@@ -14,6 +14,12 @@
     ]
   },
   "workflows": {
+    "production-commerce-credit-fulfillment.yml": {
+      "responsibility": "production-commerce-verified-receipt-credit-fulfillment",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "none"
+    },
     "account-deletion-hosted-auth-canary.yml": {
       "responsibility": "privacy-operations",
       "prMode": "none",

@@ -1,0 +1,40 @@
+name: Production Commerce Receipt Fulfillment
+on:
+  workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact reviewed main commit
+        required: true
+        type: string
+      confirmation:
+        description: ACTIVATE_VERIFIED_RECEIPT_FULFILLMENT_ONLY
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: production-commerce-receipt-fulfillment-v1
+  cancel-in-progress: false
+jobs:
+  rollout:
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.expected_head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply only pinned verified-credit functions and ACL atomically
+        env:
+          COMMERCE_ROLLOUT_HEAD_SHA: ${{ inputs.expected_head_sha }}
+          COMMERCE_ROLLOUT_CONFIRM: ${{ inputs.confirmation }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+          SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+        run: node scripts/operations/commerce/rollout-verified-credit-receipt-fulfillment-v1.mjs

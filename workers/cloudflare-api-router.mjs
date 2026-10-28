@@ -26,6 +26,7 @@ export const CLOUDFLARE_REWRITE_ROUTES = Object.freeze([
   Object.freeze({ id: "rewrite.social.start", source: "/api/auth/social/start", destination: "/api/auth/sign-in?__myeongha_social_auth_start=1" }),
   Object.freeze({ id: "rewrite.contact.inquiry", source: "/api/contact", destination: "/api/me?__myeongha_contact_inquiry=1" }),
   Object.freeze({ id: "rewrite.chat.credit-wallet", source: "/api/me/credits", destination: "/api/me?__myeongha_chat_credit_wallet=1" }),
+  Object.freeze({ id: "rewrite.commerce.credit-receipt-fulfill", source: "/api/me/credits/portone/fulfill", destination: "/api/me?__myeongha_credit_receipt_fulfill=1" }),
   Object.freeze({ id: "rewrite.commerce.owner-sandbox-checkout", source: "/api/me/credits/portone/test-checkout", destination: "/api/me?__myeongha_portone_owner_sandbox_checkout=1" }),
   Object.freeze({ id: "rewrite.commerce.owner-sandbox-prepare", source: "/api/me/credits/portone/test-prepare", destination: "/api/me?__myeongha_portone_owner_sandbox_prepare=1" }),
   Object.freeze({ id: "rewrite.commerce.owner-sandbox-verify", source: "/api/me/credits/portone/test-verify", destination: "/api/me?__myeongha_portone_owner_sandbox_verify=1" }),

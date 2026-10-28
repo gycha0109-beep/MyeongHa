@@ -53,6 +53,13 @@ Do not create fake server PAID or Receipt evidence to close this boundary.
 
 ## Product and lifecycle gates
 
+**Correction from the user's 2026-10-28 confirmation:** credit SKU/price/quantity
+and purchased-credit non-expiry were already approved, including PR #2635.
+The historical pending-policy wording below must not block credit fulfillment.
+Use [the confirmed contract](../COMMERCE_CHAT_CREDIT_CONTRACT_V1.md). LIVE payment
+HOLD and conditional credit fulfillment activation are distinct. Missing technical
+implementation/runtime evidence is not an unmade product-policy decision.
+
 `P0-CM-03` remains OPEN-P0 for activation. The Decision Register specifies inactive
 `standard.love_relationship`, one Reader-bound unit, KRW 8,900 list price, with
 no executable Offer/Charge Terms. Do not activate it from payment work.

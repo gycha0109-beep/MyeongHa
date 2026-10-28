@@ -15,7 +15,7 @@ function request(path, method = 'GET', headers = {}) {
 }
 
 describe('Cloudflare Phase 4 strict API dispatcher', () => {
-  it('matches all 12 direct API entries and 24 Cloudflare-owned rewrites with no widening', () => {
+  it('matches 12 direct API entries and 25 explicit Cloudflare-owned rewrites', () => {
     const direct = [
       '/api/health', '/api/readiness', '/api/session/bootstrap',
       '/api/auth/sign-in', '/api/auth/sign-up', '/api/auth/sign-out',
@@ -28,7 +28,7 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
     const rewrites = new Map(CLOUDFLARE_REWRITE_ROUTES.map(
       ({ source, destination }) => [source, destination],
     ));
-    expect(rewrites.size).toBe(24);
+    expect(rewrites.size).toBe(25);
     for (const route of CLOUDFLARE_REWRITE_ROUTES) {
       expect(route.source.startsWith('/api/')).toBe(true);
       expect(route.destination.startsWith('/api/')).toBe(true);
@@ -38,6 +38,8 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
       .toBe('/api/birth-profiles?__myeongha_birth_profile_id=:id');
     expect(rewrites.get('/api/me/credits'))
       .toBe('/api/me?__myeongha_chat_credit_wallet=1');
+    expect(rewrites.get('/api/me/credits/portone/fulfill'))
+      .toBe('/api/me?__myeongha_credit_receipt_fulfill=1');
     expect(rewrites.get('/api/me/credits/portone/test-checkout'))
       .toBe('/api/me?__myeongha_portone_owner_sandbox_checkout=1');
     expect(rewrites.get('/api/me/credits/portone/test-prepare'))
@@ -52,9 +54,9 @@ describe('Cloudflare Phase 4 strict API dispatcher', () => {
       .toBe('/api/me?__myeongha_records_read=memories');
     expect(rewrites.get('/api/chat/:threadId/turns'))
       .toBe('/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId');
-    expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(24);
+    expect(CLOUDFLARE_REWRITE_ROUTES).toHaveLength(25);
     expect(new Set(CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.id)).size).toBe(12);
-    expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(24);
+    expect(new Set(CLOUDFLARE_REWRITE_ROUTES.map(route => route.id)).size).toBe(25);
     for (const route of CLOUDFLARE_DIRECT_API_ROUTES) {
       const match = matchCloudflareApiRoute(route.path);
       expect(match).toMatchObject({ id: route.id, kind: 'direct' });

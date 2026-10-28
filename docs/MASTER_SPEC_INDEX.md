@@ -16,7 +16,7 @@
 - 캐릭터 9명 일반 출시 결정은 [캐릭터 정본](source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md), Reader 초기 **세연 1명 프리뷰**와 유료 Reader 별도 HOLD는 [Reader 단계적 개방](WEB_READER_STAGED_ROLLOUT_SEYEON_FIRST_V1.md) 및 서버 권한이 기준입니다. 이는 상충하는 캐릭터 수 결정이 아닙니다.
 - 신규 제품 공개 Origin은 [Cloudflare 기본 경로](operations/VERCEL_ORIGIN_DEPENDENCY_CLEANUP_20261026.md); Vercel은 종료되지 않은 대기 경로입니다. 9월 [운영 아키텍처](architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 Vercel “현재” 설명은 그때의 실측 기록이고 오늘의 기본 경로 지정이 아닙니다. 별도 Saju 엔진 및 Supabase Auth/Storage는 Cloudflare로 자동 이전되지 않습니다. 무료 플랜 외 신규 유료 인프라 활성화는 미승인입니다.
 - 일반 회원 사주 통합은 [기존 권한 재사용 V2](SAJU_BRIDGE_EXISTING_AUTHORITIES_NO_NEW_ROLES_V2_20261016.md)를 따릅니다. 과거 S3A Permit과 SO-4의 3DB 고격리 리허설은 다른 보안/실행 프로파일이며 일반 사주 제품의 공통 선행 조건이 아닙니다.
-- 결제는 [P0 결정 원장](P0_DECISION_REGISTER.md)의 Web one-off·PortOne V2를 따르되 판매 Offer/Entitlement 공개는 별도 HOLD입니다. [DR 최신 상태](operations/POSTGRES_DR_READINESS_STATUS_V1.md)의 10월 한정 성공은 9월 `1310` 증거를 현재 상태로 만들지 않으며, `dr_ready=false`와 Hosted Auth/Storage 복구 보류를 유지합니다. DR 검사기 변경은 운영·DR 트랙만 담당합니다.
+- 결제는 [P0 결정 원장](P0_DECISION_REGISTER.md)의 Web one-off·PortOne V2를 따릅니다. LIVE 결제와 유료 Reader 공개 HOLD를 [확정 크레딧 계약](COMMERCE_CHAT_CREDIT_CONTRACT_V1.md)의 정책 미정으로 확대하지 않습니다. 검증된 Production Receipt의 운영 크레딧 지급은 구현·필수 검증 후 활성화하며, 샌드박스 지급과 LIVE 결제 호출은 금지합니다. [DR 최신 상태](operations/POSTGRES_DR_READINESS_STATUS_V1.md)의 10월 한정 성공은 9월 `1310` 증거를 현재 상태로 만들지 않으며, `dr_ready=false`와 Hosted Auth/Storage 복구 보류를 유지합니다. DR 검사기 변경은 운영·DR 트랙만 담당합니다.
 
 
 

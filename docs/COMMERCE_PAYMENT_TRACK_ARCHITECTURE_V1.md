@@ -4,7 +4,10 @@
 > statuses below are historical. Follow the current code, Decision Register and
 > [Commerce continuation evidence](operations/COMMERCE_PAYMENT_CONTINUATION_20261028.md)
 > for the Owner KCP sandbox path. #680 is now CLOSED; that does not authorize
-> LIVE checkout, paid credit issuance, public webhooks or refund activation.
+> LIVE checkout or public webhooks. The confirmed credit terms and conditional
+> Production receipt fulfillment authorization are recorded in
+> [the current credit contract](COMMERCE_CHAT_CREDIT_CONTRACT_V1.md); do not
+> reopen these as policy decisions. Technical rollout/verification remains separate.
 
 > Status: **CURRENT IMPLEMENTATION / PRE-PRODUCTION HOLD**  
 > Track lineage: **결제 권한 / Commerce 결제 연속 트랙**  

@@ -64,10 +64,10 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Install pinned PG17 runtime dependencies
-        # PG17 includes the real S0 TypeScript/pg/HTTP path. Install the
-        # existing pinned lockfile once; other suites remain psql-only.
-        if: inputs.suite == 'postgres17'
+      - name: Install pinned DB runtime dependencies
+        # PG17 and Commerce receipt concurrency tests use the existing pg
+        # dependency. Install the pinned lockfile; other suites stay psql-only.
+        if: inputs.suite == 'postgres17' || inputs.suite == 'commerce-payment'
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run isolated cases on one runner per DB suite
         env:
