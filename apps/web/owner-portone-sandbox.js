@@ -105,11 +105,9 @@ function loadPortOneSdk(){
  if(scriptPromise)return scriptPromise;
  scriptPromise=new Promise((resolve,reject)=>{
   const el=document.createElement('script');
-  // PortOne's documented V2 CDN entry is a classic script without crossorigin.
-  // A crossorigin=anonymous attribute forces CORS for this vendor script,
-  // which can reject the load before window.PortOne is available.
-  // Keep the SDK origin restricted by the Owner-only page CSP instead.
-  el.src='https://cdn.portone.io/v2/browser-sdk.js';
+  // The Worker serves the fixed PortOne V2 SDK under this first-party path.
+  // Client-side CDN failures must not create payment attempts.
+  el.src='/owner-portone-sdk-v2.js';
   el.async=true;
   el.onload=()=>{
    if(window.PortOne&&typeof window.PortOne.requestPayment==='function')
@@ -146,8 +144,12 @@ async function beginTest(){
  if(!allowed||busy)return;
  setBusy(true);
  try{
+  phase='sdk_load';
+  DIAGNOSTIC.textContent='결제창 진단 · 포트원 SDK 사전 로딩 중';
+  status('포트원 테스트 SDK를 먼저 확인 중…');
+  const sdk=await loadPortOneSdk();
+  DIAGNOSTIC.textContent='결제창 진단 · 포트원 SDK 준비 완료';
   phase='prepare';
-  DIAGNOSTIC.textContent='결제창 진단 · 구매 의도 생성 중';
   status('관리자 전용 구매 의도 생성 중…');
   const prep=await serverRequest('/api/me/credits/portone/test-prepare',{
    idempotencyToken:obtainRetryToken(),
@@ -160,8 +162,6 @@ async function beginTest(){
    paymentAttemptId:prepared.paymentAttemptId,
   });
   const checkout=requireOwnerSandboxCheckoutV1(handoff,prepared.paymentAttemptId);
-  phase='sdk_load';
-  const sdk=await loadPortOneSdk();
   status('KCP 테스트 결제창을 진행해 주세요…');
   // The payment callback is an untrusted hint. Never inspect its paymentId
   // or treat it as a Receipt. Verification uses our original DB-owned UUID.
