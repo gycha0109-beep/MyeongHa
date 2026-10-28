@@ -148,7 +148,15 @@ export function createAdminAnalyticsPostgresEventStoreV1(pool:PostgresSubjectPoo
           WHERE visitor_ref=$1 AND version=$2 AND policy_version=$3 AND withdrawn_at IS NULL AND expires_at>CURRENT_TIMESTAMP FOR SHARE`,[event.anonymousOrSubjectRef,event.consentVersion,event.policyVersion]);
         if(consent.rows.length!==1)throw Error('Analytics consent revoked or missing.');
         if(Date.parse(event.expiresAt)>Date.parse(consent.rows[0]!.expiresAt))throw Error('Analytics event exceeds consent lifetime.');
-        const fingerprint=createHash('sha256').update(canonical(event)).digest('hex');
+        // Server-verified domain events use a deterministic identity from their
+        // persisted source. A later tab/session may retry the *same* event,
+        // but must never change its original session attribution or owner.
+        // Exclude only the volatile sessionRef from its replay fingerprint;
+        // client events still require an exact session match on replay.
+        const replayFingerprintInput=event.authority==='server_verified'
+          ? Object.fromEntries(Object.entries(event).filter(([key])=>key!=='sessionRef'))
+          : event;
+        const fingerprint=createHash('sha256').update(canonical(replayFingerprintInput)).digest('hex');
         const inserted=await client.query<{eventId:string}>(`INSERT INTO myeongha_admin_analytics.events_v1
           (event_id,event_name,event_schema_version,visitor_ref,session_ref,client,authority,consent_version,policy_version,
            valid_visitor,paid_purchase,occurred_at,expires_at,product_key,page_key,campaign_key,channel_key,purchase_ref,score,event_fingerprint)
