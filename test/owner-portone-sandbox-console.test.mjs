@@ -94,6 +94,11 @@ describe('Owner KCP TEST console: no browser monetary authority',()=>{
    expect(client).toContain("requireOwnerSandboxWalletV1(data)");
    expect(client).toContain('crypto.getRandomValues(b)');
    expect(client).toContain("sdk.requestPayment(checkout)");
+   expect(client).toContain("el.src='https://cdn.portone.io/v2/browser-sdk.js'");
+   expect(client).toContain("el.async=true");
+   expect(client).not.toContain("el.crossOrigin=");
+   expect(client).not.toContain("el.setAttribute('crossorigin'");
+   expect(page).not.toContain('crossorigin=');
    expect(client).not.toContain('window.location.search');
    expect(page).toContain('owner-test-diagnostic');
    expect(client).toContain("phase='sdk_request'");
