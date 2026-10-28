@@ -48,6 +48,8 @@ describe('historical privacy canary completed evidence is read-only and exact-sc
       evidenceOrigin: 'read_only_completed_canary_attestation_v1',
       canaryOperation: 'attest_completed',
       resumedFromCanaryRunId: 40468086758,
+      hostedAuthDeletionInvoked: false,
+      hostedAuthDeletionOutcome: 'already_absent_verified',
       workerStatus: 'completed',
       authoritativePrivacyReconciliation: false,
       futureSafePrivacyReconciliation: false,

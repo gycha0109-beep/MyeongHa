@@ -211,7 +211,8 @@ export async function attestCompletedPrivacyCanaryReadOnlyV1(query, input) {
     accountDeletionStartAuthority: 'ephemeral-canary-login->myeongha_api_executor/cmd_start_account_deletion_runtime_v1',
     workerAuthority: 'myeongha_worker_runtime->myeongha_system_executor',
     workerStatus: 'completed',
-    hostedAuthDeletionInvoked: true,
+    // This operation only observes prior deletion; it does not call Hosted Auth Admin.
+    hostedAuthDeletionInvoked: false,
     hostedAuthDeletionOutcome: 'already_absent_verified',
     databaseFinalization: 'pass',
     completionAck: 'pass',
