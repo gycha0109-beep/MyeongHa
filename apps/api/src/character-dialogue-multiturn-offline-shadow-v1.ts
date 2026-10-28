@@ -80,6 +80,7 @@ export interface CharacterMultiturnDecisionProviderShadowV1 extends ShadowProvid
   decide(input: Readonly<{
     plan: CharacterDialogueContinuityPlanShadowV1;
     conversation: readonly CharacterDialogueMessageShadowV1[];
+    allowedEmotionIds: readonly string[];
   }>): unknown | Promise<unknown>;
 }
 
@@ -332,6 +333,7 @@ export async function runCharacterDialogueMultiturnOfflineShadowV1(input: Readon
     };
     const decision = guardDecision(await input.decider.decide({
       plan, conversation: input.recentConversation,
+      allowedEmotionIds: Object.freeze([...input.runtime.rendererPolicy.allowedEmotionIds]),
     }), plan);
     // Recheck actual DB-owned message bodies after an awaited decision stage.
     await recheck();
