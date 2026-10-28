@@ -8,7 +8,7 @@ const ATTEMPT='123e4567-e89b-42d3-a456-426614174002';
 const OWNER='123e4567-e89b-42d3-a456-426614174000';
 const event={
   callId:CALL,readingId:READING,executionAttemptId:ATTEMPT,
-  observedAt:'2026-10-28T09:00:00+00',provider:'provider-fixture',model:'model-v1',
+  observedAt:'2026-10-28T09:00:00Z',provider:'provider-fixture',model:'model-v1',
   outcome:'response_received',source:'provider_response_usage',
   inputTokens:'1000',outputTokens:'100',cachedInputTokens:'200',reasoningTokens:'20',
   priceVersion:'rate-v1',estimatedMicroUsd:'1020',costStatus:'estimated',
