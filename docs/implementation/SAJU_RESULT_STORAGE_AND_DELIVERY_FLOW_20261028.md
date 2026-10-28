@@ -51,10 +51,25 @@
 - 변경된 Birth Profile: 과거 결과 원문 불변. 발행 당시 revision 미확정이면 비교/오래됨 판정 금지.
 - 권한 철회·환불·개인정보 삭제: 기존 Privacy/Commerce 정책과 일치하게 보호 조회를 차단하고, 보존·삭제는 정본 retention 정책 확정 후 구현. 프런트에서 임의 삭제/유지 결정 금지.
 
-## 5. 구현·검증 체크포인트
+## 5. Saju Production 발행 → DB 불변 저장 연결부 (2026-10-28 구현)
+
+현재 코드에 아래 **서버 내부 구성 요소**를 추가했다. Product/Offer 활성화, 별도 Production issuer 인증, DB/Privacy 역할 승격은 여전히 포함하지 않는다.
+
+- `apps/api/src/saju-production-reading-execution.ts`: 기존 `executeCurrentBirthProfileSajuReadingV1`가 **권한 있는 Saju 서버 요청**을 실행한 뒤에만 DB Subject 트랜잭션 콜백으로 진입한다. 승인 Source/ID Mapping/DB Transaction 포트가 없으면 Saju 외부 요청도 수행하지 않고 `held`를 반환한다. API가 생성 시 고정한 Birth revision과 현재 서버 Birth revision이 다르면 네트워크·DB 쓰기 모두 차단한다.
+- `apps/api/src/saju-official-reading-issuer-db-persistence-v1.ts`: 원본 ProductReadingResponse v2의 delivered 상태와 섹션/Disclosure 구조를 검사하고, Saju **Production issuer 서명·의미 권한을 검증한 별도 verifier** 및 DB Owner가 검증한 native Reading ID→DB UUID 매핑을 독립적으로 요구한다. 기존 Preview HMAC이나 동일 문장 비교는 자격이 아니다. ID만 변경한 저장용 JSON의 정규 해시를 계산해 매핑 승인 해시와 비교한다.
+- 동일 경로에서 **현재 Subject×출생 revision×정확한 구매 Grant×Privacy**를 DB 트랜잭션 안에서 재검증하는 포트가 반드시 true를 반환해야 기존 writer를 호출한다. 인증 불충분·다른 Birth·native/DB ID·해시·owner·session 불일치는 저장하지 않는다.
+- `apps/api/src/postgres-saju-official-immutable-commit-v1.ts`: 새 SQL INSERT/UPDATE나 별도 발행 테이블 없이 기존 `public.cmd_finalize_reading_transport_success_v1`의 **원자적 상태 전이+Reading Ref+Outbox**를 호출한다. `reading_refs.external_reading_ref`에 Saju native ID를, `reading_execution_attempts.external_request_ref`에 Production issuer 증명 참조를 전달하고, `reading_refs.response_snapshot_jsonb/response_hash`에 승인된 DB ID 버전 원문과 해시를 전달한다. 커밋 직후 **같은 DB 트랜잭션**에서 native ID·issuer ref·Birth input hash·계약/응답 상태·JSONB 원문 해시를 다시 확인한다. 저장 원본의 Reading ID만 되돌려 Saju 출처 digest와 일치해야 하며, 재시도 재생에서도 동일하게 확인한다.
+- `test/saju-official-reading-issuer-db-persistence-v1.test.ts`: 미승인/누락·변조·출생 revision 불일치·거부된 현재 권한·저장 해시/원본 불일치·재시도 계보 변조를 거부하는 회귀 계약.
+
+**실행 경계:** 위 모듈은 새로운 공개 POST/발행 API로 등록하지 않는다. 현행 Saju `/api/internal/preview/source-readings`는 `state=held`, `canPublish=false`여서 Production verifier를 충족하지 못한다. DB 마이그레이션 `1000_reading_transport_executor_authority_guard.sql`은 일반 API executor의 transport prepare/finalize 실행 권한을 계속 거부한다. **이 두 승인 포트의 Production 구현·운영 증명이 없는 동안 실제 공식 발행·저장 성공은 미완료**다. 개발/TEST fixture의 positive 실행은 운영 승인이 아니다.
+
+최종 연결 시에는 서버 내부 인증·Source Signature/Meaning 검증 구현, 승인된 읽기 ID 변환 영수증, DB current Grant/Privacy 재조회 포트 및 **최소권한 내부 writer의 권한 인수**를 공급하고, `executePostgresSubjectTransactionV1`로 결속된 한 DB 트랜잭션 내 저장·원본 재조회 검증을 수행한다. 고객에게는 완료 커밋 및 보호 재열람 검증 이후에만 공개한다.
+
+## 6. 구현·검증 체크포인트
 
 - **현재 구현**: 전체·직업·재물·연애 상품 탐색과 무료 계산 결과/기록 허브, owner 검증 공식 단건 보고서, 다국어/모바일, 조회 부분 장애 구분.
-- **다음 실제 연결**: Product/Offer·Entitlement 계약 및 Saju Production issuer의 정본 게이트 확인 → 기존 writer 및 Native→DB Reading ID 매핑 → 동일 구매 중복 요청/실패/환불/재조회 E2E.
+- **구현된 연결부**: 서버 Saju 요청 → Production source verifier → DB 원본 ID 매핑 승인 → 최신 권한 → 원자적 finalize 및 저장 후 출처 검증. 실제 issuer/DB 실행 권한은 아직 HOLD.
+- **다음 실제 연결**: 승인된 Production Source/DB·Privacy 권한 포트 실구현 → 실제 TEST 구매권/발행과 중복 요청/실패/환불/재조회 E2E.
 - **통합 병합**: 전체 구현과 필수 게이트 확인 뒤 PR #2670에서 한 번만. 상위 승인 미충족 상태에서 판매·발행 기능을 열거나 완료라고 보고하지 않는다.
 
 관련 정본: `docs/P0_DECISION_REGISTER.md` (P0-CM-03), `docs/implementation/RECORDS_OFFICIAL_REPORT_IMPLEMENTATION_ROADMAP_20261027.md`, `apps/api/src/official-reading-record-http.ts`.
