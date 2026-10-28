@@ -1,6 +1,25 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
+import { resolveReadingAvailabilityV1 } from './reading-availability.js';
+
+const productPreviewTopics = [
+  { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
+  { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
+  { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
+  { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
+] as const;
+
+const additionalReadingTopics = [
+  ['사업', 'reading-detail.html?topic=business'],
+  ['가족', 'reading-detail.html?topic=family'],
+  ['삶의 단계', 'reading-detail.html?topic=life-stage'],
+  ['올해', 'reading-detail.html?scope=year'],
+  ['이번 달', 'reading-detail.html?scope=month'],
+  ['배우자 · 관계', 'reading-detail.html?topic=spouse'],
+  ['궁합', 'reading-detail.html?topic=compatibility'],
+  ['지금 고민으로 보기', 'reading-detail.html?topic=question-specific'],
+] as const;
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
@@ -79,7 +98,7 @@ export function ReadingPage() {
           <div className="saju-design-hero-text">
             <span className="saju-design-eyebrow">SAJU PREVIEW</span>
             <h2>나의 사주 기본 정보</h2>
-            <p>입력하신 생년월일시를 기준으로 계산한 기본 명식입니다.<br />현재 확인 가능한 계산 결과만 표시하며, 공식 해석 상품은 준비 상태에 따라 별도 제공됩니다.</p>
+            <p>입력하신 생년월일시를 기준으로 계산한 기본 명식입니다.<br />아래에서 주제별 공식 사주 해석 상품을 선택하고 보고서 구성도 살펴볼 수 있습니다.</p>
           </div>
         </div>
 
@@ -126,25 +145,43 @@ export function ReadingPage() {
           </section>
         </div>
 
-        <section className="saju-design-products saju-current-service" aria-labelledby="saju-current-service-title">
-          <h2 id="saju-current-service-title">지금 이용할 수 있는 사주 기능</h2>
-          <p>입력한 출생정보를 바탕으로 계산된 명식을 확인하고, 제공 가능한 범위의 무료 풀이를 읽을 수 있습니다. 정식 유료 해석은 상품별 준비 상태를 확인한 뒤 별도로 안내합니다.</p>
+        <section className="saju-design-products" aria-labelledby="saju-design-products-title">
+          <h2 id="saju-design-products-title">사주 해석 상품</h2>
+          <p>원하는 주제를 선택하면 해석 범위와 제공 내용을 확인하고, 대리자를 선택해 구매와 공식 보고서 발행으로 이어집니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
-            <article className="saju-design-product-card">
-              <header><span className="saju-design-topic-symbol" aria-hidden="true">命</span><h3>내 사주 명식</h3></header>
-              <p>출생정보와 서버 계산 결과를 확인합니다. 출생시간이 없거나 계산이 제한된 항목은 그대로 표시합니다.</p>
-              <a href="records.html?tab=birth">저장된 명식 확인하기</a>
-            </article>
-            <article className="saju-design-product-card">
-              <header><span className="saju-design-topic-symbol" aria-hidden="true">▤</span><h3>나의 사주 기록</h3></header>
-              <p>발행되어 저장된 공식 풀이가 있다면 원문과 근거를 다시 읽을 수 있습니다. 저장된 결과가 없다면 빈 기록으로 표시합니다.</p>
-              <a href="records.html?tab=saju">사주 기록 열기</a>
-            </article>
+            {productPreviewTopics.map((topic) => (
+              <article className="saju-design-product-card" key={topic.title}>
+                <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
+                <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
+                <a href={topic.href}>이 해석 선택하기</a>
+              </article>
+            ))}
           </div>
-          <p className="saju-service-hold">유료 상품의 가격·제공 범위·결제 가능 여부는 상품별 확정 전까지 안내하거나 구매받지 않습니다.</p>
+        </section>
+
+        <section className="saju-design-example" aria-labelledby="saju-design-example-title">
+          <div className="saju-design-example-copy">
+            <h2 id="saju-design-example-title">보고서 구성 미리보기 <span>구성 예시</span></h2>
+            <p>공식 보고서는 구매한 상품의 해석 범위에 따라 목차와 근거가 구성됩니다. 이 영역은 실제 개인별 결과가 아닌 문서 구성 안내입니다.</p>
+          </div>
+          <div className="saju-design-example-sheet" aria-label="공식 보고서 구성 예시. 개인별 해석이 아닙니다.">
+            <h3>1. 핵심 해석 및 명식 근거</h3>
+            <p>개인별 공식 해석 · 주제별 상세 내용 · 근거와 한계 · 발행 버전 · 기록 재열람</p>
+          </div>
         </section>
 
         <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
+        <details className="saju-design-more">
+          <summary>다른 사주 주제 둘러보기</summary>
+          <div className="saju-design-more-grid">
+            {additionalReadingTopics.map(([title, href]) => (
+              <a href={href} key={href}>
+                <strong>{title}</strong>
+                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</span>
+              </a>
+            ))}
+          </div>
+        </details>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>
