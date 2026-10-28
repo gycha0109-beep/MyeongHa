@@ -97,7 +97,9 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // The existing current Saju proof endpoint only emits Preview/HELD.
   // Never charge an upstream call without a wired Production issuer + DB scope.
   const { sourceVerifier, mappingVerifier, dbTransaction } = input;
-  if (!sourceVerifier || !mappingVerifier || !dbTransaction) {
+  if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
+    || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
+    || typeof dbTransaction?.run !== 'function') {
     return unavailable;
   }
 
