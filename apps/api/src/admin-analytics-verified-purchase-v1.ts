@@ -15,6 +15,7 @@ FROM public.commerce_receipts r
 JOIN public.product_offers po ON po.id=r.product_offer_id
 JOIN public.products p ON p.id=po.product_id
 WHERE r.id=$1::uuid AND r.subject_id=$2::uuid AND r.verification_status='verified'
+  AND r.environment='production'
   AND r.verified_at IS NOT NULL AND r.verified_amount_minor>0
   AND r.verified_currency IS NOT NULL AND p.product_type='reading'
 LIMIT 1`;

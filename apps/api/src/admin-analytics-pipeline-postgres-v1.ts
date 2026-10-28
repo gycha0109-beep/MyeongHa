@@ -19,6 +19,7 @@ FROM public.commerce_receipts r
 LEFT JOIN public.product_offers po ON po.id=r.product_offer_id
 LEFT JOIN public.products p ON p.id=po.product_id
 WHERE r.verification_status='verified'
+AND r.environment='production'
 AND r.verified_at>=($1::date::timestamp AT TIME ZONE 'UTC')
 AND r.verified_at<(($2::date+INTERVAL '1 day') AT TIME ZONE 'UTC')
 GROUP BY 1,2,3 ORDER BY 1 DESC,2,3 NULLS LAST LIMIT $4::int`;
@@ -84,7 +85,7 @@ export function createAdminAnalyticsPipelineReadPortV1(input: {
           collectionStatus:!approved?'disabled':partial?'source_partial':coverage===null?'configured_source_unverified':'source_covered',
           analytics:aggregateAdminAnalyticsEventsV1(events.rows.slice(0,5000).map(eventFromRow),period,coverage,(input.now??(()=>new Date()))()),
           finance:financial.rows.slice(0,500),financialStatus:financial.rows.length>500?'partial_verified_receipt_facts':'verified_receipt_facts',
-          financialDefinition:'동일 UTC 검증 기간·상품·통화별 현재 verified 영수증의 기록 금액. 순매출·정산·환불 완료·고유 방문자 전환율이 아니며, 영수증 소유자 수는 사람이 아닌 저장된 subject 참조의 중복 제거 수입니다. 캠페인 귀속은 없으므로 캠페인 선택과 독립된 재무 근거입니다.'};
+          financialDefinition:'동일 UTC 검증 기간·상품·통화별 운영(production) 환경의 verified 영수증 기록 금액. 샌드박스 거래는 제외합니다. 순매출·정산·환불 완료·고유 방문자 전환율이 아니며, 영수증 소유자 수는 사람이 아닌 저장된 subject 참조의 중복 제거 수입니다. 캠페인 귀속은 없으므로 캠페인 선택과 독립된 재무 근거입니다.'};
         await connection.query('COMMIT');active=false;return Object.freeze(result);
       } catch(error) { if(active)try{await connection.query('ROLLBACK');}catch(failure){discard=failure;}throw error; }
       finally {connection.release(discard);}

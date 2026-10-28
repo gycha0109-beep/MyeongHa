@@ -46,6 +46,8 @@ describe('consented verified Reading purchase bridge',()=>{
     expect(h.args.filter((_,i)=>h.sql[i]===ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1)).toEqual([[RECEIPT,SUBJECT],[RECEIPT,SUBJECT]]);
     expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).toContain("p.product_type='reading'");
     expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).toContain("r.verification_status='verified'");
+    expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).toContain("r.environment='production'");
+    expect(ADMIN_ANALYTICS_FINANCIAL_SQL_V1).toContain("r.environment='production'");
     expect(ADMIN_ANALYTICS_VERIFIED_PURCHASE_SQL_V1).not.toMatch(/verified_payload_jsonb|external_transaction_id|offer_snapshot_jsonb/iu);
   });
   it('refuses checkout intent, unverified source, different owner, or missing active consent',async()=>{
