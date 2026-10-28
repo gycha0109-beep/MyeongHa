@@ -144,7 +144,7 @@ export default {
       headers.set('Content-Security-Policy',
         "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "+
         "script-src 'self' https://cdn.portone.io; style-src 'self'; "+
-        "connect-src 'self' https://*.portone.io https://*.kcp.co.kr; "+
+        "connect-src 'self' https://checkout-service.prod.iamport.co https://*.portone.io https://*.kcp.co.kr; "+
         "img-src 'self' data: https:; font-src 'self'; "+
         "frame-src https:; form-action 'self' https:");
       headers.set('Cache-Control','no-store');
