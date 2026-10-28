@@ -246,6 +246,24 @@ function clearPersistedReadingPresentation() {
   if (reader) reader.textContent = '—';
   const notice = document.querySelector('[data-official-report-notice]');
   if (notice) notice.hidden = true;
+  // The report and step scene share the same persisted source. When the
+  // account changes, remove both visible and hidden source-bearing nodes.
+  for (const selector of [
+    '[data-official-report-notice-text]', '[data-official-report-date]',
+    '[data-official-report-version]', '[data-reading-step-title]',
+    '[data-reading-step-body]', '[data-reading-structure-body]',
+    '[data-reader-step-line]', '[data-reading-authority-note]',
+    '[data-chart-pillar-year]', '[data-chart-pillar-month]',
+    '[data-chart-pillar-day]', '[data-chart-pillar-hour]',
+  ]) {
+    const element = document.querySelector(selector);
+    if (element) {
+      element.textContent = '';
+      if (selector === '[data-reading-authority-note]') element.removeAttribute('title');
+    }
+  }
+  document.querySelector('[data-chart-five-elements]')?.replaceChildren();
+  document.querySelector('[data-chart-ten-gods]')?.replaceChildren();
   delete root.dataset.reader;
   delete root.dataset.readerSelection;
   delete root.dataset.readerAuthority;
@@ -693,7 +711,13 @@ function activatePreviewReading(preview) {
   const replayButton = document.querySelector('[data-reading-replay]');
   let completed = false;
 
+  function mayRenderCurrentStoredRecord() {
+    return !isStoredRecord
+      || (activeReadingOwner !== null && ensureResponseOwnerCurrent(activeReadingOwner));
+  }
+
   function completeReadingExperience() {
+    if (!mayRenderCurrentStoredRecord()) return;
     completed = true;
     root.dataset.readingExperience = 'complete';
     if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
@@ -714,6 +738,7 @@ function activatePreviewReading(preview) {
   }
 
   function replayReadingExperience() {
+    if (!mayRenderCurrentStoredRecord()) return;
     completed = false;
     activeIndex = 0;
     root.dataset.readingExperience = 'reading';
@@ -723,6 +748,7 @@ function activatePreviewReading(preview) {
   }
 
   function renderStep() {
+    if (!mayRenderCurrentStoredRecord()) return;
     const step = steps[activeIndex];
     if (!step) return;
     const structureParts = [...step.structure, ...step.supporting];
@@ -768,6 +794,7 @@ function activatePreviewReading(preview) {
   });
   replayButton?.addEventListener('click', replayReadingExperience);
   document.addEventListener('myeongha:localechange', () => {
+    if (!mayRenderCurrentStoredRecord()) return;
     renderStep();
     if (completed) completeReadingExperience();
     if (isStoredRecord && preview.record) {
