@@ -26,7 +26,7 @@ jobs:
           set -euo pipefail
           npm ci --ignore-scripts --no-audit --no-fund
           npx tsc -p tsconfig.json --noEmit
-          npx vitest run test/character-dialogue-live-model-shadow-v1.test.ts test/character-dialogue-multiturn-offline-shadow-v1.test.ts
+          npx vitest run test/character-dialogue-live-model-shadow-v1.test.ts test/character-dialogue-multiturn-offline-shadow-v1.test.ts test/character-c1-three-five-public-profile-adapter-v1.test.ts
           node --check scripts/character-c1-three-five-paid-eval-20261028.mjs
       - name: Bundle public C1 persona without secrets
         run: |
