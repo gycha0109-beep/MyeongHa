@@ -158,6 +158,7 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 
 - Reading detail now exposes `GET /api/admin/readings/:id/ai-usage` for **AI calls that actually referenced the selected Reading grounding**. It does not claim the price of Reading generation; unverified KRW costs remain `null`. New read-only grounding link grants are offline candidates only.
 - Verified server event deduplication tolerates a new tab session for the same source/visitor/consent, preserves the first attribution, and still rejects conflicting subject, purchase or client-origin event data.
+- 관리자 Worker 예약 정리는 두 작업의 전용 연결을 모두 사전 확인하고, Reader/Audit/Command 또는 서로의 DB 연결 문자열 재사용을 거부한 뒤에만 시작합니다. 운영 정리 플래그 기본값은 false입니다.
 - Analytics TTL maintenance has a separate disabled-by-default Worker schedule gate and a dedicated analytics-writer Hyperdrive; each run deletes at most 1000 events plus 1000 drained consents per transaction, independent of audit retention. No DB role or Cloudflare binding has been installed.
 - The offline Reader role includes only the receipt `environment` metadata needed for that production-only filter; it does not grant access to payment provider payloads.
 - The existing claimed account-deletion worker accepts an optional dedicated analytics erasure store; when configured it erases subject analytics before DB finalization and before completion acknowledgement. Failure blocks completion for retry. Production remains unconfigured by default.

@@ -6,22 +6,39 @@ import { createAdminPrivateRuntimeV1 } from '../apps/api/src/admin-private-runti
 import {createAdminAuditRetentionMaintenanceV1} from '../apps/api/src/admin-audit-retention-v1.ts';
 import {createAdminAnalyticsPostgresEventStoreV1} from '../apps/api/src/admin-analytics-pipeline-postgres-v1.ts';
 
+/** Check *all* selected maintenance origins before the first SQL query starts.
+ * Different bindings that resolve to the same privileged DB connection are
+ * not a valid substitute for dedicated least-privilege retention roles. */
+export function validateAdminMaintenanceBindingsV1(env) {
+  const auditEnabled=env.MYEONGHA_ADMIN_RETENTION_ENABLED==='true';
+  const analyticsEnabled=env.MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED==='true';
+  if(!auditEnabled&&!analyticsEnabled)return{auditEnabled,analyticsEnabled};
+  if(env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY!=='dedicated-admin-verify-full-v1')
+    throw Error('Dedicated retention policy unavailable');
+  const audit=env.ADMIN_RETENTION_HYPERDRIVE?.connectionString;
+  const analytics=env.ADMIN_ANALYTICS_RETENTION_HYPERDRIVE?.connectionString;
+  if(auditEnabled&&!audit)throw Error('Dedicated audit retention origin unavailable');
+  if(analyticsEnabled&&!analytics)throw Error('Dedicated analytics retention origin unavailable');
+  const selected=[...(auditEnabled?[audit]:[]),...(analyticsEnabled?[analytics]:[])];
+  const other=[env.ADMIN_READ_HYPERDRIVE?.connectionString,env.ADMIN_AUDIT_HYPERDRIVE?.connectionString,
+    env.ADMIN_COMMAND_HYPERDRIVE?.connectionString].filter(Boolean);
+  if(new Set(selected).size!==selected.length || selected.some(v=>other.includes(v)))
+    throw Error('Retention origin reuses another admin database principal');
+  return{auditEnabled,analyticsEnabled};
+}
+
 export default {
   async scheduled(_event,env,ctx){
-    const auditEnabled=env.MYEONGHA_ADMIN_RETENTION_ENABLED==='true';
-    const analyticsEnabled=env.MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED==='true';
+    const {auditEnabled,analyticsEnabled}=validateAdminMaintenanceBindingsV1(env);
     if(!auditEnabled&&!analyticsEnabled)return;
-    if(env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY!=='dedicated-admin-verify-full-v1')throw Error('Dedicated retention policy unavailable');
     const jobs=[];
     if(auditEnabled){
-      if(!env.ADMIN_RETENTION_HYPERDRIVE?.connectionString)throw Error('Dedicated audit retention origin unavailable');
       jobs.push((async()=>{const pool=new Pool({connectionString:env.ADMIN_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
         try{const purge=createAdminAuditRetentionMaintenanceV1(pool);for(let batch=0;batch<10;batch++){
           const result=await purge(1000);if(result.deleted<1000)return;
         }throw Error('Audit retention backlog requires another bounded run');}finally{await pool.end();}})());
     }
     if(analyticsEnabled){
-      if(!env.ADMIN_ANALYTICS_RETENTION_HYPERDRIVE?.connectionString)throw Error('Dedicated analytics retention origin unavailable');
       jobs.push((async()=>{const pool=new Pool({connectionString:env.ADMIN_ANALYTICS_RETENTION_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
         try{const store=createAdminAnalyticsPostgresEventStoreV1(pool);for(let batch=0;batch<10;batch++){
           const deleted=await store.purgeExpired(new Date().toISOString());
