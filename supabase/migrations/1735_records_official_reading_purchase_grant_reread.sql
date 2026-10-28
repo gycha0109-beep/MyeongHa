@@ -107,7 +107,14 @@ begin
       )
       -- Legacy reader-bound purchase lineage stays independently gated by
       -- its exact consumed Grant, never by an aggregate current entitlement.
-      or exists (
+      or (
+        -- Once a Reading has a Reader-independent official binding, a legacy
+        -- unit binding must never bypass its v2 exact-Grant revocation.
+        not exists (
+          select 1 from public.standard_reading_official_bindings official
+          where official.reading_id = r.id
+        )
+        and exists (
         select 1
         from public.standard_reading_unit_bindings b
         cross join lateral public.internal_qry_standard_reading_artifact_source_v1(
@@ -122,6 +129,7 @@ begin
           and paid.reading_contract_version = rr.reading_contract_version
           and paid.product_response_state = rr.product_response_state
           and paid.response_hash = rr.response_hash
+        )
       )
     );
 end
