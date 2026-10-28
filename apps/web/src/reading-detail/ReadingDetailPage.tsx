@@ -24,8 +24,28 @@ export function ReadingDetailPage() {
           <dl className="official-report-meta">
             <div><dt>발행일</dt><dd data-official-report-date>—</dd></div>
             <div><dt>해석 버전</dt><dd data-official-report-version>—</dd></div>
+            <div><dt>기록된 대리자</dt><dd data-official-report-reader>—</dd></div>
+            <div><dt>발행 당시 출생정보 차수</dt><dd>이 기록에 제공되지 않음</dd></div>
           </dl>
         </header>
+        <section className="official-report-provenance-note" aria-label="원문과 출생정보 기준">
+          <p>이 보고서는 발행 당시 저장된 공식 결과입니다. 현재 명식록은 별도로 관리되며, 발행 차수가 없어 변경 여부는 확인할 수 없습니다.</p>
+          <p>기록된 대리자 정보는 과거 참여 이력입니다. 현재 해설 및 대화 접근권을 의미하지 않습니다.</p>
+          <a href="records.html?tab=birth">현재 명식록 확인하기 →</a>
+        </section>
+        <div className="official-report-keypoints" data-official-report-first hidden>
+          <span className="records-kicker">HIGHLIGHT</span>
+          <h2>보고서 첫 해석</h2>
+          <p data-official-report-first-text data-official-reading />
+        </div>
+        <section className="official-report-facts" data-official-report-facts hidden aria-label="저장된 명식 근거" data-official-reading>
+          <h2>저장된 명식 근거</h2>
+          <div className="official-report-pillars" data-official-report-pillars />
+          <h3>오행 근거</h3>
+          <div className="official-report-evidence" data-official-report-elements />
+          <h3>십성 근거</h3>
+          <div className="official-report-evidence" data-official-report-gods />
+        </section>
         <nav className="official-report-toc" aria-label="보고서 목차" data-official-report-toc />
         <div className="official-report-sections" data-official-report-sections />
         <aside className="official-report-notice" data-official-report-notice hidden>
@@ -35,6 +55,7 @@ export function ReadingDetailPage() {
         <footer className="official-report-actions">
           <button type="button" data-official-report-step-mode>단계별 읽기</button>
           <a href="records.html?tab=saju">사주 보고서 보관함으로 돌아가기</a>
+          <a href="chat-hub.html">대화 상대 선택 (별도 이용)</a>
         </footer>
       </article>
 
