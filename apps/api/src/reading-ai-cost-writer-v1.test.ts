@@ -81,7 +81,7 @@ describe('dedicated Reading provider usage writer',()=>{
     const writer=createReadingAiCostWriterV1({pool:h.pool});
     await writer.recordOpenAi({
       binding,providerResponse:{...providerResponse,usage:undefined},
-      expectedModelKey:'fixture-model',
+      expectedModelKey:'fixture-model',price,
     });
     const payload=JSON.parse(h.statements[2]?.values?.[3] as string) as Record<string,unknown>;
     expect(payload).toMatchObject({
