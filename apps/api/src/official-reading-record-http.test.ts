@@ -92,6 +92,7 @@ async function invoke(input: {
   readonly request?: Request;
   readonly authenticated?: boolean;
   readonly pool?: PostgresSubjectPoolV1;
+  readonly verifiedReadingAnalytics?: { record(request:Request,readingId:string):Promise<'inserted'|'replayed'> };
 } = {}): Promise<Response> {
   return handleOfficialReadingRecordRequestV1({
     request: input.request ?? request(),
@@ -99,6 +100,7 @@ async function invoke(input: {
     serverTime: '2026-09-23T00:02:00.000Z',
     identityEvidenceVerifier: verifier(input.authenticated ?? true),
     pool: input.pool ?? fakePool(),
+    ...(input.verifiedReadingAnalytics===undefined?{}:{verifiedReadingAnalytics:input.verifiedReadingAnalytics}),
   });
 }
 
@@ -176,6 +178,35 @@ describe('Official Reading record HTTP adapter', () => {
     expect(payload.data).not.toHaveProperty('responseHash');
     expect(payload.data).not.toHaveProperty('threadId');
     expect(onAuthorityQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('opt-in completion backfill is attempted only after a successful authorized archive read',async()=>{
+    const record=vi.fn(async (_request:Request,_readingId:string):Promise<'inserted'>=>'inserted');
+    const response=await invoke({verifiedReadingAnalytics:{record}});
+    expect(response.status).toBe(200);
+    expect(record).toHaveBeenCalledTimes(1);
+    expect(record).toHaveBeenCalledWith(expect.any(Request),READING_ID);
+    const unauthorized=await invoke({authenticated:false,verifiedReadingAnalytics:{record}});
+    expect(unauthorized.status).toBe(401);
+    expect(record).toHaveBeenCalledTimes(1);
+    const invalid=await invoke({request:request('readingId=invalid'),verifiedReadingAnalytics:{record}});
+    expect(invalid.status).toBe(404);
+    expect(record).toHaveBeenCalledTimes(1);
+    const missing=await invoke({pool:fakePool({rows:[]}),verifiedReadingAnalytics:{record}});
+    expect(missing.status).toBe(404);
+    expect(record).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not turn an already successful official archive read into a failure when optional analytics is disabled or rejects',async()=>{
+    const record=vi.fn(async (_request:Request,_readingId:string):Promise<'inserted'>=>{
+      throw Error('Consent not granted / analytics unavailable');
+    });
+    const result=await invoke({verifiedReadingAnalytics:{record}});
+    expect(result.status).toBe(200);
+    expect((await result.json() as {ok:boolean}).ok).toBe(true);
+    expect(record).toHaveBeenCalledTimes(1);
+    const inactive=await invoke();
+    expect(inactive.status).toBe(200);
   });
 
   it('fails closed and rolls back when owner-scoped archive authority returns duplicate rows', async () => {
