@@ -112,9 +112,7 @@ assert.throws(
   /authority does not match/u,
 );
 assert.throws(
-  () => validatePrivacyLedgerSnapshotOverlap(first, {
-    ...second, incidentReferenceUtc: first.incidentReferenceUtc,
-  }),
+  () => validatePrivacyLedgerSnapshotOverlap(first, first),
   /current capturedAt must advance/u,
 );
 assert.throws(
