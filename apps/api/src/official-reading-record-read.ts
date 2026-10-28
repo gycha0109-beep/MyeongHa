@@ -1,5 +1,6 @@
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
 export const OFFICIAL_READING_RECORD_READ_AUTHORITY_BINDING_V1 =
   'public.qry_official_reading_record_runtime_v1' as const;
@@ -206,6 +207,18 @@ export async function getOfficialReadingRecord(input: {
       readingContractVersion,
       productResponseState,
     });
+    // A source-issued, canonical v2 hash is checked again at the last
+    // disclosure boundary. Immutable DB storage is not evidence that its
+    // body remained intact. Keep older noncanonical fixture/historical hashes
+    // on their existing owner/grant policy until source migration is approved.
+    if (
+      readingContractVersion === 'myeonghwa-product-reading-response-v2'
+      && /^sha256:v1:[a-f0-9]{64}$/u.test(storedResponseHash)
+      && hashSajuHeldSourceProofRequestV1(reading)
+        !== storedResponseHash.slice('sha256:v1:'.length)
+    ) {
+      throw new Error('Official Reading archive source response hash mismatch.');
+    }
 
     return Object.freeze({
       readingId,
