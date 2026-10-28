@@ -1,5 +1,7 @@
 # 세연 C09 — 대화 내 판단 연속성 Shadow 연결 v1
 
+> **2026-10-28 공통화 후속:** 본 문서는 최초 세연 전용 구현의 이력입니다. 현재 공통 연속성·판단 입력·스레드 검증은 `packages/domain/src/character-dialogue-continuity-shadow-v1.ts`에 있고, 세연 C09는 연결 어댑터입니다. `docs/character-memory-common-dialogue-continuity-shadow-refactor-20261028.md`를 참조하세요.
+
 Watchtower-Track: `character-memory`
 상태: **오프라인 코드 구현 / Shadow 전용 / Production 미연결 / 모델 유료 실측 전**
 

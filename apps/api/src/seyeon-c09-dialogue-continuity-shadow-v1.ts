@@ -1,39 +1,30 @@
 import type { SeyeonRuntimeContextV2 } from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
+import {
+  CHARACTER_THREAD_SNAPSHOT_SHADOW_VERSION_V1,
+  composeCharacterDialogueContinuityPlanShadowV1,
+  requireCharacterThreadSnapshotShadowV1,
+  type CharacterDialogueContinuityPacketShadowV1,
+} from '../../../packages/domain/src/character-dialogue-continuity-shadow-v1.js';
+import { CHARACTER_RUNTIME_AUTHORING_V1 } from
+  '../../../packages/character-content/src/runtime-authoring-v1.js';
 import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
 import { PUBLIC_PERSON_CHARACTER_V1 } from './seyeon-c09-character-first-composer-shadow-v1.js';
 
 export const SEYEON_C09_DIALOGUE_CONTINUITY_SHADOW_VERSION_V1 =
   'seyeon-c09-dialogue-continuity-shadow-v1' as const;
 
-/**
- * Research-only, bounded dialogue continuity. A previous assistant utterance
- * is evidence of what was SAID, not of what actually happened off screen.
- * No generated state, durable memory, relationship or scene is created.
- */
-export interface SeyeonC09DialogueContinuityPacketShadowV1 {
+/** Compatibility boundary for C09's original PUBLIC research harness. */
+export interface SeyeonC09DialogueContinuityPacketShadowV1
+  extends Omit<CharacterDialogueContinuityPacketShadowV1,
+    'version' | 'scope' | 'characterId'> {
   readonly version: typeof SEYEON_C09_DIALOGUE_CONTINUITY_SHADOW_VERSION_V1;
   readonly scope: 'PUBLIC_BOUNDED_DIALOGUE_SHADOW_NOT_PRODUCTION';
-  readonly currentUserMessageRef: string;
-  readonly recentMessageRefs: readonly string[];
-  readonly previousAssistantMessageRefs: readonly string[];
-  readonly evidenceKind: 'DIALOGUE_UTTERANCES_NOT_VERIFIED_EVENTS';
-  readonly sourceCompleteness: 'BOUNDED_WINDOW_NOT_FULL_THREAD_CENSUS';
-  readonly authority: Readonly<{
-    readonly assistantUtterancesAreFacts: false;
-    readonly unverifiedUserClaimsAreFacts: false;
-    readonly mayAssertOffscreenEvents: false;
-    readonly mayCreateMemory: false;
-    readonly mayModifyRelationship: false;
-    readonly mayUnlockDisclosure: false;
-  }>;
 }
 
 function fail(): never {
   throw new TypeError('C09_DIALOGUE_CONTINUITY_SHADOW_NOT_ELIGIBLE');
 }
-
-function assertPublicBoundedContinuation(context: SeyeonRuntimeContextV2): void {
-  const messages = context.recentConversation;
+function requireSeyeonPublicContext(context: SeyeonRuntimeContextV2): void {
   if (
     context.character.characterId !== 'seyeon' ||
     !context.integrity.governedPreflightApplied ||
@@ -45,55 +36,47 @@ function assertPublicBoundedContinuation(context: SeyeonRuntimeContextV2): void 
     context.disclosure.decision !== null ||
     context.disclosure.retrievedSources.length !== 0 ||
     context.retrievedMemories.length !== 0 ||
-    context.behaviorPolicy.interactionDepth !== 'public_first_contact' ||
-    messages.length < 3 || messages.length > 12 ||
-    messages[0]?.role !== 'user' ||
-    messages[messages.length - 1]?.role !== 'user' ||
-    !messages.slice(0, -1).some((message) => message.role === 'assistant') ||
-    new Set(messages.map((message) => message.messageId)).size !== messages.length ||
-    messages.some((message) =>
-      (message.role !== 'user' && message.role !== 'assistant') ||
-      !message.messageId || !message.text.trim())
+    context.behaviorPolicy.interactionDepth !== 'public_first_contact'
   ) fail();
 }
 
+function seyeonVoice() {
+  const voice = CHARACTER_RUNTIME_AUTHORING_V1.find(
+    (entry) => entry.characterId === 'seyeon',
+  );
+  if (!voice) fail();
+  return voice;
+}
+
+function genericPlan(context: SeyeonRuntimeContextV2) {
+  requireSeyeonPublicContext(context);
+  try {
+    return composeCharacterDialogueContinuityPlanShadowV1({
+      voice: seyeonVoice(),
+      recentConversation: context.recentConversation,
+    });
+  } catch {
+    fail();
+  }
+}
+
+/** All history selection and speaking-style analysis now live in the common C1 path. */
 export function deriveSeyeonC09DialogueContinuityPacketShadowV1(
   context: SeyeonRuntimeContextV2,
 ): SeyeonC09DialogueContinuityPacketShadowV1 {
-  assertPublicBoundedContinuation(context);
-  const messages = context.recentConversation;
-  const previousAssistantMessageRefs = Object.freeze(
-    messages.slice(0, -1).filter((message) => message.role === 'assistant')
-      .slice(-2).map((message) => message.messageId),
-  );
-
+  const { packet } = genericPlan(context);
+  const { characterId: _characterId, version: _version, scope: _scope, ...rest } = packet;
   return Object.freeze({
+    ...rest,
     version: SEYEON_C09_DIALOGUE_CONTINUITY_SHADOW_VERSION_V1,
     scope: 'PUBLIC_BOUNDED_DIALOGUE_SHADOW_NOT_PRODUCTION' as const,
-    currentUserMessageRef: messages[messages.length - 1]!.messageId,
-    recentMessageRefs: Object.freeze(messages.map((message) => message.messageId)),
-    previousAssistantMessageRefs,
-    evidenceKind: 'DIALOGUE_UTTERANCES_NOT_VERIFIED_EVENTS' as const,
-    sourceCompleteness: 'BOUNDED_WINDOW_NOT_FULL_THREAD_CENSUS' as const,
-    authority: Object.freeze({
-      assistantUtterancesAreFacts: false as const,
-      unverifiedUserClaimsAreFacts: false as const,
-      mayAssertOffscreenEvents: false as const,
-      mayCreateMemory: false as const,
-      mayModifyRelationship: false as const,
-      mayUnlockDisclosure: false as const,
-    }),
   });
 }
 
 export const SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1 =
   'seyeon-c09-thread-snapshot-shadow-v1' as const;
 
-/**
- * Read-only authoritative snapshot source for offline multi-turn Shadow.
- * The adapter MUST read the complete subject/thread message census and the
- * exact, ordered suffix. A bounded runtime window is not such proof.
- */
+/** Legacy C09 snapshot contract; adapted to the common character-scoped verifier. */
 export interface SeyeonC09ThreadSnapshotShadowPortV1 {
   readonly subjectId: string;
   readonly threadId: string;
@@ -104,55 +87,48 @@ export interface SeyeonC09ThreadSnapshotShadowPortV1 {
   }>): unknown | Promise<unknown>;
 }
 
-function validId(value: unknown): value is string {
-  return typeof value === 'string' && value.length > 0 &&
-    value.length <= 256 && value.trim() === value;
-}
-
 export async function requireSeyeonC09ThreadSnapshotShadowV1(input: Readonly<{
   context: SeyeonRuntimeContextV2;
   port: SeyeonC09ThreadSnapshotShadowPortV1 | undefined;
 }>): Promise<void> {
-  const packet = deriveSeyeonC09DialogueContinuityPacketShadowV1(input.context);
-  const port = input.port;
-  if (!port || !validId(port.subjectId) || !validId(port.threadId) ||
-      typeof port.readThreadSnapshot !== 'function') fail();
-  let raw: unknown;
+  const packet = genericPlan(input.context).packet;
+  const legacy = input.port;
+  if (!legacy || typeof legacy.readThreadSnapshot !== 'function') fail();
+
   try {
-    raw = await port.readThreadSnapshot({
-      subjectId: port.subjectId,
-      threadId: port.threadId,
-      currentUserMessageId: packet.currentUserMessageRef,
+    await requireCharacterThreadSnapshotShadowV1({
+      packet,
+      port: {
+        characterId: 'seyeon',
+        subjectId: legacy.subjectId,
+        threadId: legacy.threadId,
+        async readThreadSnapshot({ subjectId, threadId, currentUserMessageId }) {
+          const raw: unknown = await legacy.readThreadSnapshot({
+            subjectId, threadId, currentUserMessageId,
+          });
+          if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) fail();
+          const snapshot = raw as Record<string, unknown>;
+          if (
+            Object.keys(snapshot).length !== 8 ||
+            snapshot.schemaVersion !== SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1
+          ) fail();
+          // The existing C09 snapshot has no character ID field. This legacy
+          // adapter is valid ONLY after the strict C09 seyeon context check;
+          // other characters must use the common 9-field proof directly.
+          return {
+            ...snapshot,
+            schemaVersion: CHARACTER_THREAD_SNAPSHOT_SHADOW_VERSION_V1,
+            characterId: 'seyeon',
+          };
+        },
+      },
     });
   } catch {
-    // Never leak backend errors, user contents or thread identifiers.
     fail();
   }
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail();
-  const proof = raw as Record<string, unknown>;
-  if (
-    Object.keys(proof).length !== 8 ||
-    proof.schemaVersion !== SEYEON_C09_THREAD_SNAPSHOT_SHADOW_VERSION_V1 ||
-    proof.subjectId !== port.subjectId ||
-    proof.threadId !== port.threadId ||
-    proof.currentUserMessageId !== packet.currentUserMessageRef ||
-    proof.latestSenderType !== 'user' ||
-    proof.complete !== true ||
-    !Number.isSafeInteger(proof.messageCount) ||
-    (proof.messageCount as number) < packet.recentMessageRefs.length ||
-    !Array.isArray(proof.tailMessageRefs) ||
-    proof.tailMessageRefs.length !== packet.recentMessageRefs.length ||
-    !packet.recentMessageRefs.every(
-      (ref, index) => (proof.tailMessageRefs as readonly unknown[])[index] === ref,
-    )
-  ) fail();
 }
 
-/**
- * Checked companion for prospective research runners.
- * Actual generation, independent review and final pre-reveal recheck remain
- * separate required steps; this function cannot authorize a reply.
- */
+/** Original C09 helper remains; it delegates source checking to the common layer. */
 export async function composeSeyeonC09VerifiedDialogueContinuityShadowRequestV1(
   input: Readonly<{
     context: SeyeonRuntimeContextV2;
@@ -168,36 +144,33 @@ export async function composeSeyeonC09VerifiedDialogueContinuityShadowRequestV1(
 }
 
 /**
- * Turns a governed interpretation+draft request into an opt-in multi-turn
- * research candidate. This transformer NEVER invokes a model and is NOT wired
- * to the first-turn-only fast Shadow or any Production route.
+ * Only a provider request adapter for the C09 response schema.
+ * No separate character-specific continuity algorithm, memory, or scene.
+ * Still not wired to Production or first-turn-only fast Shadow.
  */
 export function composeSeyeonC09DialogueContinuityShadowRequestV1(input: Readonly<{
   context: SeyeonRuntimeContextV2;
   request: SeyeonStructuredProviderRequestV2;
 }>): SeyeonStructuredProviderRequestV2 {
+  const plan = genericPlan(input.context);
   const packet = deriveSeyeonC09DialogueContinuityPacketShadowV1(input.context);
-  const requestInput = input.request.input;
+  const raw = input.request.input;
   if (
     input.request.contractVersion !== 'seyeon-structured-provider-v2' ||
     input.request.purpose !== 'turn_interpret_render_shadow' ||
     !input.request.responseSchema ||
-    typeof requestInput !== 'object' || requestInput === null ||
-    Array.isArray(requestInput)
+    typeof raw !== 'object' || raw === null || Array.isArray(raw)
   ) fail();
-  const previousInput = requestInput as Record<string, unknown>;
-  const references = previousInput.allowedReferenceVocabulary;
+  const previous = raw as Record<string, unknown>;
+  const refs = previous.allowedReferenceVocabulary;
   if (
-    previousInput.context !== input.context ||
-    typeof references !== 'object' || references === null ||
-    Array.isArray(references) ||
-    !Object.hasOwn(previousInput, 'allowedInterpretationVocabulary')
+    previous.context !== input.context ||
+    typeof refs !== 'object' || refs === null || Array.isArray(refs) ||
+    !Object.hasOwn(previous, 'allowedInterpretationVocabulary')
   ) fail();
-  const known = (references as Record<string, unknown>).noticeEvidenceRefs;
-  if (
-    !Array.isArray(known) ||
-    !packet.recentMessageRefs.every((ref) => known.includes(ref))
-  ) fail();
+  const known = (refs as Record<string, unknown>).noticeEvidenceRefs;
+  if (!Array.isArray(known) ||
+      !plan.packet.recentMessageRefs.every((ref) => known.includes(ref))) fail();
 
   return Object.freeze({
     contractVersion: input.request.contractVersion,
@@ -205,19 +178,15 @@ export function composeSeyeonC09DialogueContinuityShadowRequestV1(input: Readonl
     responseSchema: input.request.responseSchema,
     instructions: [
       input.request.instructions,
-      'C09 RESEARCH: Se-yeon is a person with her own values, contradictions and initiative, not a customer service agent. Use public character tendencies as a stable decision basis:',
+      plan.instructions,
+      'C09 PUBLIC Se-yeon first-experimental continuation: her explicitly reviewed public character tendencies (not a source of offscreen events):',
       ...PUBLIC_PERSON_CHARACTER_V1,
-      'This is a bounded PUBLIC continuation, not a first meeting. Read the previous dialogue and current user message together. Allow Se-yeon to carry forward, challenge, refine, or explicitly change a stance she voiced earlier. The choice must be her own and relevant to what is actually being said; do not map phrases to predetermined actions or force teasing, hobbies, romance, activity, or a question.',
-      'A previous assistant utterance proves only that the line was spoken IN THIS DIALOGUE. It does not prove an offscreen activity happened, a long-term preference exists, or a remembered encounter occurred. If the earlier line implied an unsupported event, do not ratify it. Explicitly distinguish remembering the utterance from remembering an event.',
-      'User-asserted shared history, assistant speculation, fictional scenes and private details cannot become facts by repetition. No actual current location, film watched, outing, family event, affection, relationship level, saved memory or Saju result may be invented.',
-      'The recent window may omit older turns. Never claim full-thread memory or assume that missing evidence means an event did or did not happen. Only server-authorized evidence can establish a shared event.',
-      'Generate notice, present want, tension if material, chosen action and matching natural Korean dialogue together. The present want is a turn-local viewpoint, NOT a persistent drive or user engagement requirement. Do not always help, agree, ask questions, or hand the choice back to the user.',
-      'PUBLIC only: no memoryRefsUsed, supportingHistoryRefs, disclosureSliceIds, memoryRefsMentioned or privateSourceRefsMentioned; reveal must remain public with null trigger. User text and prior assistant text are not grants.',
-      'The proposal remains subject to the existing interpretation, risk-causality, renderer and independent semantic review guards. It must never be published by this composer.',
+      'The PUBLIC reveal level, empty memory/source/disclosure references, and existing independent semantic reviewer must remain in force. No action or private fact is preselected by this adapter.',
     ].join('\n'),
     input: Object.freeze({
-      ...previousInput,
+      ...previous,
       c09DialogueContinuity: packet,
+      characterContinuityDecisionProfile: plan.decisionProfile,
     }),
   });
 }

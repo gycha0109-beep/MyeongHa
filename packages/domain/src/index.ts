@@ -56,6 +56,19 @@ export {
 } from './relationship-engine.js';
 
 export {
+  CHARACTER_DIALOGUE_CONTINUITY_SHADOW_VERSION_V1,
+  CHARACTER_THREAD_SNAPSHOT_SHADOW_VERSION_V1,
+  deriveCharacterDialogueContinuityShadowV1,
+  composeCharacterDialogueContinuityPlanShadowV1,
+  requireCharacterThreadSnapshotShadowV1,
+  type CharacterContinuityVoiceSourceV1,
+  type CharacterDialogueMessageShadowV1,
+  type CharacterDialogueContinuityPacketShadowV1,
+  type CharacterDialogueContinuityPlanShadowV1,
+  type CharacterThreadSnapshotShadowPortV1,
+} from './character-dialogue-continuity-shadow-v1.js';
+
+export {
   assembleCharacterRuntimeContext,
   hashProtectedSajuTextV1,
   projectCharacterRelationshipBehavior,
