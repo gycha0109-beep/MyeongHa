@@ -83,9 +83,10 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
  if(evidence.environment!=='sandbox'||evidence.provider!=='portone_v2'||
     evidence.platform!=='web'||evidence.currentState!=='active'||
     evidence.ownerBinding.kind!=='purchase_intent'||
-    evidence.ownerBinding.purchaseIntentId!==context.purchaseIntentId||
     evidence.verifiedAmountMinor!==1900||evidence.verifiedCurrency!=='KRW')
     return deny();
+ if(evidence.ownerBinding.kind!=='purchase_intent'||
+    evidence.ownerBinding.purchaseIntentId!==context.purchaseIntentId)return deny();
  const payload=JSON.stringify({
   schemaVersion:'owner-kcp-sandbox-signed-receipt-v1',
   subjectId:canonical.subjectId.toLowerCase(),
@@ -109,7 +110,7 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
        typeof row.providerEventId!=='string'||!UUID.test(row.providerEventId)||
        typeof row.replayed!=='boolean')return deny();
     return {receiptId:row.receiptId.toLowerCase(),
-      providerEventId:row.providerEventId.toLowerCase(),replayed:row.replayed};
+      providerEventId:row.providerEventId.toLowerCase(),replayed:row.replayed as boolean};
   },
  });
  return Object.freeze({
