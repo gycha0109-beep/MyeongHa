@@ -12,7 +12,7 @@
 
 **HISTORICAL 결정 시점 / CANDIDATE·HOLD 운영 활성화:** 아래 Cloud Run 선택은 2026-09-04 당시의 **별도 Saju Calculation Service 호스팅 선택안**입니다. 실제 배포, 비용 승인, 서비스 URL, 현재 운영 상태를 증명하지 않으며 신규 유료 리소스 생성 근거로 사용하면 안 됩니다. 사용자는 당분간 Cloudflare **무료 플랜**을 제품 운영 기준으로 사용하며 추가 유료 인프라를 승인하지 않았습니다. Cloud Run이 무료로 유지될 수 있는지/사주 서비스가 실제 호출되는지/호출 비용은 현재 근거 없이 확정하지 않습니다.
 
-MyeongHa 클라이언트·제품 API의 기본 공개 Origin은 `https://myeongha.gycha0109.workers.dev`로 변경되었습니다([Cloudflare 전환 현황](../operations/VERCEL_ORIGIN_DEPENDENCY_CLEANUP_20261026.md), [Worker 구성](../../wrangler.jsonc)). Vercel은 별도 대기 서비스로 남아 있고 종료 승인은 없습니다. **Cloudflare Worker가 Supabase Auth/Storage 또는 별도 HTTPS 사주 계산 서비스를 대체하거나, Cloud Run 사주 런타임을 자동 실행한다는 뜻이 아닙니다.** 본문 §1의 Cloud Run 선택·§7의 Vercel→Cloud Run 호출도 해당 시점 설계/가정으로 분류하며, 실제 현재 경로는 코드/시크릿 없는 운영 증거로 재검증해야 합니다.
+MyeongHa 클라이언트·제품 API의 기본 공개 Origin은 `https://myeongha.gycha0109.workers.dev`로 변경되었습니다([Cloudflare 전환 현황](../operations/VERCEL_ORIGIN_DEPENDENCY_CLEANUP_20261026.md), [Worker 구성](../../wrangler.jsonc)). 2026-10-28 사용자 운영 지시에 따라 **Vercel은 현재 제품의 사용·신규 배포·자동 대체 경로에서 제외**됩니다. 과거 Vercel 대기 서비스 리소스·콜백이 물리적으로 남아 있더라도 사용 승인 또는 종료 완료로 해석하지 않으며, 실제 종료·이관은 운영 트랙의 별도 수락 조건을 따릅니다. **Cloudflare Worker가 Supabase Auth/Storage 또는 별도 HTTPS 사주 계산 서비스를 대체하거나, Cloud Run 사주 런타임을 자동 실행한다는 뜻이 아닙니다.** 본문 §1의 Cloud Run 선택·§7의 Vercel→Cloud Run 호출도 해당 시점 설계/가정으로 분류하며, 실제 현재 경로는 코드/시크릿 없는 운영 증거로 재검증해야 합니다.
 
 [설계 충돌 원장](ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md) AR-04/05를 참조합니다. 실제 배포/결제/인프라 변경은 이 문서 정정의 범위 밖이며, 본문의 보안·검증 조건은 폐기하지 않습니다.
 
