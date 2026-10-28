@@ -28,7 +28,7 @@ describe('Records official-report-first entry', () => {
   it('counts only authenticated Reading History and does not treat fixture cards as purchased reports', () => {
     expect(page).toContain("byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());");
     expect(page).toContain("const readings = requireArray(readingPayload, 'readings');");
-    expect(page).toContain("if (allowsDevelopmentSajuSamples() && lifeFactsPayload?.status !== 'unavailable')");
+    expect(page).toContain("if (allowsDevelopmentSajuSamples())");
     expect(page).toContain("explore.href = 'reading.html'");
     expect(page).not.toContain('records-report-purchase-count');
     expect(page).not.toContain('records-report-price');
@@ -39,7 +39,7 @@ describe('Records official-report-first entry', () => {
     expect(page).toContain("byId('saju-records-count').textContent = uiText('조회할 수 없음');");
     expect(page).toContain('조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다.');
     expect(page).toContain("if (payload?.status === 'unavailable')");
-    expect(page).toContain("lifeFactsPayload?.status !== 'unavailable'");
+    expect(page).toContain("lifeFactsPayload?.status === 'unavailable'");
   });
 
   it('formats verified saved-record count for every supported locale', () => {
