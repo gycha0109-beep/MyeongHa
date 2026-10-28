@@ -179,9 +179,22 @@ describe('historical privacy canary completed evidence is read-only and exact-sc
     })).toThrow('COMPLETED_CANARY_ORIGINAL_ARTIFACT_BOUNDARY_DRIFT');
   });
 
-  it('cannot be invoked by the existing resume workflow without new protected approval', () => {
+  it('isolates historical read-only attestation from the destructive fresh/resume job', () => {
     const workflow = readFileSync('.github/workflows/production-privacy-recovery-canary.yml', 'utf8');
-    expect(workflow).not.toContain('attest_completed');
-    // This must remain staging-only until a reviewed protected execution path exists.
+    expect(workflow).toContain("if: inputs.operation != 'attest_completed'");
+    expect(workflow).toContain("if: inputs.operation == 'attest_completed'");
+    expect(workflow).toContain("name: historical-completed-canary-read-only-attestation");
+    expect(workflow).toContain("actions: read");
+    expect(workflow).toContain("MYEONGHA_PRIVACY_CANARY_ATTEST_LEDGER_RUN_ID: ${{ inputs.attest_ledger_run_id }}");
+    expect(workflow).toContain("ATTEST_COMPLETED_40468086758_READ_ONLY");
+    expect(workflow).toContain("MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID\" == '40468086758'");
+    expect(workflow).toContain("MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID\" == '40468157715'");
+    expect(workflow).toContain("MYEONGHA_PRIVACY_CANARY_ATTEST_LEDGER_RUN_ID\" == '40468500587'");
+    expect(workflow).toContain("node scripts/run-production-privacy-recovery-canary.mjs attest-completed");
+    expect(workflow).toContain("verify-completed-privacy-canary-artifact-pair.py");
+    expect(workflow).toContain("production-privacy-recovery-canary-${{ github.run_id }}");
+    const candidate = readFileSync('scripts/run-production-privacy-recovery-canary.mjs', 'utf8');
+    expect(candidate).toContain("'ATTEST_COMPLETED_40468086758_READ_ONLY'");
+    expect(candidate).toContain("await client.query('BEGIN READ ONLY')");
   });
 });

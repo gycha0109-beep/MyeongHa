@@ -105,6 +105,7 @@ def verify(backup_zip, ledger_zip):
         "backupMigrationFrontier": backup.get("migration_frontier"),
         "backupCompletedAtUtc": backup["created_at_utc"],
         "ledgerCapturedAtUtc": ledger["capturedAt"],
+        "ledgerEventCount": ledger["eventCount"],
         "accountDeletionStartedEventCount": ledger["eventTypeCounts"]["ACCOUNT_DELETION_STARTED"],
         "missingSuccessfulCanaryEvidenceArtifact": True,
         "authoritativeRecoveredStateReplayed": False,

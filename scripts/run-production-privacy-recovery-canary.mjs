@@ -1359,7 +1359,7 @@ async function cleanupPrestart() {
 }
 
 async function attestCompletedCanary() {
-  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== 'ATTEST_COMPLETED_40468086758_READ_ONLY'
       || requiredEnv('MYEONGHA_PRIVACY_CANARY_OPERATION') !== 'attest_completed') {
     fail('COMPLETED_CANARY_ATTESTATION_CONFIRMATION_REQUIRED');
   }
