@@ -21,12 +21,46 @@ The existing isolated restore provenance resolver intentionally requires **a suc
 
 ## Prepared, unreleased path
 
-- `scripts/attest-completed-production-privacy-canary.mjs` is a candidate, strictly pinned to the three run IDs. It validates only read-only terminal DB and Hosted Auth state and never performs deletion.
-- `scripts/run-production-privacy-recovery-canary.mjs attest-completed` is a CLI candidate only: the protected GitHub Actions workflow **does not expose the operation**. Its execution route cannot be treated as approved, run or as a successful production proof.
+- `scripts/attest-completed-production-privacy-canary.mjs` is a candidate, strictly pinned to the three run IDs. It verifies historical run/job provenance and live GitHub artifact listings (exact IDs, archive digest, original-parent artifact absence and unexpired P30D evidence), then validates only read-only terminal DB and Hosted Auth state. It never performs deletion.
+- Verified GitHub artifact metadata on 2026-10-28 KST: backup artifact `12717562316` (digest `sha256:ba8035581d928091abe9b3f6e49f079368898a9782735cc70653946d4a182506`, expires 2026-11-26T07:39:49Z); ledger artifact `12716914499` (digest `sha256:e381ce4d061da400215987d7ccb4919a0712abf236ee871eb4b0fd8f009018c6`, expires 2026-11-26T07:40:35Z). Parent had zero uploaded artifacts. Expiry and metadata integrity are not actual restoration evidence.
+- The existing `.github/workflows/production-privacy-recovery-canary.yml` now has a **branch-local, unmerged** `attest_completed` candidate. Its separate protected job is read-only and has `actions: read`; the existing destructive `fresh`/`resume` job explicitly skips it. This is **not yet an available option on Production `main`**.
+- The new job requires the exact three run IDs `40468086758` / `40468157715` / `40468500587`, `watchtower_track=ops`, `worker_credential_action=verify_only`, the exact dedicated confirmation `ATTEST_COMPLETED_40468086758_READ_ONLY`, a manual `main` dispatch by the named operator, and the protected `production` environment.
+- It checks GitHub execution and artifact provenance, reads the terminal Production state in a `BEGIN READ ONLY` transaction, validates the original encrypted artifact pair without decryption, then constructs a distinct identifier-free attestation artifact. It does **not** rerun the failed parent or upload a synthetic claim of historical success.
 - `scripts/operations/verify-completed-privacy-canary-artifact-pair.py` validates only public manifest/archive integrity and excludes raw row payloads. It cannot establish completed canary execution by itself.
 
-**Operational blocker:** The protected Production Actions workflow requires a reviewed, strictly bounded read-only attestation branch that binds the original failed-run successful deletion step, original backup and exact ledger, verifies terminal DB/Auth state, uploads a valid identifier-free canary proof, and never issues a new deletion. This workflow change was **blocked by execution safety checks** in the current session and is not included.
+**Operational blocker:** The prior workflow-edit safety refusal was reattempted on the same authorized Windows worktree without switching tools or credentials; this time the source edit succeeded. The job is still a **reviewed-code candidate, not an executed or approved Production proof**. Deploy to `main`, a successful explicit protected read-only dispatch, a correct uploaded artifact, and an exact evidence-linked isolated restore remain outstanding. Do not run either `fresh` or `resume` for this completed case.
 
-After that protected proof exists, the established `postgres-isolated-restore-drill.yml` manual workflow can use the exact backup/ledger/new-successful-proof IDs and a reference UTC within the captured ledger window. Only a real successful isolated replay and verified evidence may advance *bounded* authoritative reconciliation; full hosted Auth/Storage provider recovery remains a separate unproven requirement.
+After that protected proof exists, the established `postgres-isolated-restore-drill.yml` manual workflow can use the exact backup/ledger/new-successful-proof IDs and a reference UTC within the captured ledger window. The new `scripts/operations/assert-privacy-replay-canary-evidence.mjs` restore gate explicitly distinguishes this read-only attestation from a fresh/resumed deletion. It accepts a historical completed-case proof only with the original failed run bound as `resumedFromCanaryRunId=40468086758`, the exact backup and ledger IDs, a **different** successful proof workflow run, `hostedAuthDeletionInvoked=false` in the new execution and the explicit `already_absent_verified` observation. Existing fresh/resume replay support remains unchanged. The already successful protected workflow authority and public artifact requirements are not bypassed. Only a real successful isolated replay and verified evidence may advance *bounded* authoritative reconciliation; full hosted Auth/Storage provider recovery remains a separate unproven requirement.
+
+## Protected manual execution handoff (not yet executed)
+
+After this branch's required integration checks pass and the workflow code is on `main`, use **only** the existing `Production Privacy Recovery Canary` manual dispatch with:
+- `operation = attest_completed`
+- `confirmation = ATTEST_COMPLETED_40468086758_READ_ONLY`
+- `watchtower_track = ops`
+- `resume_canary_run_id = 40468086758`
+- `resume_backup_run_id = 40468157715`
+- `attest_ledger_run_id = 40468500587`
+- `worker_credential_action = verify_only`
+- `worker_credential_confirmation` left empty.
+
+This **does not** authorize a fresh deletion, old-run rerun or credential sync. Capture the **new** run ID and verify its successful protected job, exact one non-expired public proof artifact, original failed-run provenance, terminal DB/Auth read-only result and backup/ledger encrypted integrity before attempting restore. A green PR CI is not proof of any of these.
+
+Then and only then run the existing manual `PostgreSQL Isolated Restore Drill` with:
+- `backup_run_id = 40468157715`
+- `privacy_ledger_run_id = 40468500587`
+- `production_privacy_canary_run_id = <new successful proof run ID>`
+- `incident_reference_utc = 2026-10-27T07:40:33Z` (actual ledger capture; the recovered manifest must agree exactly)
+- `watchtower_track = ops`, `seyeon_security_s0_rehearsal = false`.
+
+Require actual completed SUCCESS and inspect the identifier-free restore/reconciliation evidence. Never infer hosted provider Auth/Storage equivalence or flip `dr_ready` from a loopback restore alone.
+
+## Auth / Storage provider recovery boundary (2026-10-28 read-only inventory)
+
+A separate read-only Production PostgreSQL query observed PostgreSQL 17.6, **4** current Hosted Auth user rows, **28** current Auth session rows, **0** Storage buckets, and **0** Storage object metadata rows. The query returned counts only and performed no writes. This is the live inventory at one instant, **not** the 2026-10-27 backup-time snapshot, identity-credential recovery, or proof of physical object recovery.
+
+Hosted Auth application identity continuity on a loopback PostgreSQL restore and the present count-only snapshot do not establish usable hosted Auth recovery (configuration, credentials, session behavior, or token correctness). An empty current Storage metadata count does not prove that the historical backup had no objects, nor that a provider-restored service would recover files. The existing `provider_managed_data_full_restore=false` and `dr_ready=false` remain mandatory.
+
+The branch now builds the publicly uploaded proof through `scripts/operations/build-completed-privacy-canary-proof.mjs`, replacing an untested inline JSON expression. It explicitly allowlists non-sensitive fields, rejects unexpected/private keys and incorrect incident or ciphertext-report links, writes evidence without overwriting an existing file, and cross-checks the output against the isolated replay evidence consumer. This is still **only local/CI code verification**, not a successful protected execution.
 
 **Non-claims:** no new `fresh` canary, no Production mutation, no provider-managed full restore, no raw decrypted ledger, no published user identifiers, `futureSafePrivacyReconciliation=false`, `dr_ready=false`.

@@ -1359,13 +1359,14 @@ async function cleanupPrestart() {
 }
 
 async function attestCompletedCanary() {
-  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== CONFIRMATION
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== 'ATTEST_COMPLETED_40468086758_READ_ONLY'
       || requiredEnv('MYEONGHA_PRIVACY_CANARY_OPERATION') !== 'attest_completed') {
     fail('COMPLETED_CANARY_ATTESTATION_CONFIRMATION_REQUIRED');
   }
   const {
     attestCompletedPrivacyCanaryReadOnlyV1,
     assertCompletedCanaryHistoricalExecutionV1,
+    assertCompletedCanaryArtifactListingsV1,
   } = await import('./attest-completed-production-privacy-canary.mjs');
   const sourceCanaryRunId = requireRunId(
     requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'));
@@ -1398,6 +1399,12 @@ async function attestCompletedCanary() {
     backupRun: await readGithub(`actions/runs/${governedBackupRunId}`),
     ledgerRun: await readGithub(`actions/runs/${canonicalLedgerRunId}`),
     sourceJobs: await readGithub(`actions/runs/${sourceCanaryRunId}/jobs?per_page=10`),
+  });
+  assertCompletedCanaryArtifactListingsV1({
+    sourceArtifacts: await readGithub(`actions/runs/${sourceCanaryRunId}/artifacts?per_page=100`),
+    backupArtifacts: await readGithub(`actions/runs/${governedBackupRunId}/artifacts?per_page=100`),
+    ledgerArtifacts: await readGithub(`actions/runs/${canonicalLedgerRunId}/artifacts?per_page=100`),
+    nowUtc: new Date().toISOString(),
   });
   const pool = await createAdminPool();
   const client = await pool.connect();

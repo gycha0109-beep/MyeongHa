@@ -54,6 +54,54 @@ export function assertCompletedPrivacyCanaryAttestationInputsV1(input) {
   return source;
 }
 
+export function assertCompletedCanaryArtifactListingsV1({
+  sourceArtifacts, backupArtifacts, ledgerArtifacts, nowUtc,
+}) {
+  const now = Date.parse(nowUtc);
+  if (typeof nowUtc !== 'string' || !Number.isFinite(now)) {
+    throw new Error('COMPLETED_CANARY_ARTIFACT_CLOCK_INVALID');
+  }
+  if (sourceArtifacts?.total_count !== 0
+      || !Array.isArray(sourceArtifacts?.artifacts)
+      || sourceArtifacts.artifacts.length !== 0) {
+    throw new Error('COMPLETED_CANARY_ORIGINAL_ARTIFACT_BOUNDARY_DRIFT');
+  }
+  for (const [listing, expected] of [
+    [backupArtifacts, {
+      id: 12717562316,
+      runId: 40468157715,
+      name: 'myeongha-postgres-20261027T073720Z',
+      sha: 'ed52c0cd442dfcf4396804275da2df74321f5799',
+      digest: 'sha256:ba8035581d928091abe9b3f6e49f079368898a9782735cc70653946d4a182506',
+      expiresAt: '2026-11-26T07:39:49Z',
+    }],
+    [ledgerArtifacts, {
+      id: 12716914499,
+      runId: 40468500587,
+      name: 'myeongha-privacy-ledger-20261027T074035Z',
+      sha: '711c8719a7e7ed2d42a333ec56463f008d2e1fc5',
+      digest: 'sha256:e381ce4d061da400215987d7ccb4919a0712abf236ee871eb4b0fd8f009018c6',
+      expiresAt: '2026-11-26T07:40:35Z',
+    }],
+  ]) {
+    const artifact = listing?.artifacts?.[0];
+    if (listing?.total_count !== 1
+        || !Array.isArray(listing?.artifacts)
+        || listing.artifacts.length !== 1
+        || artifact?.id !== expected.id
+        || artifact?.name !== expected.name
+        || artifact?.digest !== expected.digest
+        || artifact?.expired !== false
+        || artifact?.expires_at !== expected.expiresAt
+        || !(Date.parse(expected.expiresAt) > now)
+        || artifact?.workflow_run?.id !== expected.runId
+        || artifact?.workflow_run?.head_sha !== expected.sha) {
+      throw new Error('COMPLETED_CANARY_ARTIFACT_PROVENANCE_NOT_APPROVED');
+    }
+  }
+  return true;
+}
+
 export function assertCompletedCanaryHistoricalExecutionV1({
   sourceRun, backupRun, ledgerRun, sourceJobs,
 }) {
@@ -81,8 +129,29 @@ export function assertCompletedCanaryHistoricalExecutionV1({
       || ledgerRun?.event !== 'workflow_dispatch'
       || ledgerRun?.head_branch !== 'main'
       || ledgerRun?.status !== 'completed'
-      || ledgerRun?.conclusion !== 'success') {
+      || ledgerRun?.conclusion !== 'success'
+      || ledgerRun?.head_sha !== '711c8719a7e7ed2d42a333ec56463f008d2e1fc5') {
     throw new Error('COMPLETED_CANARY_LEDGER_RUN_NOT_APPROVED');
+  }
+  // These are the historical protected dispatch principals, not caller claims.
+  if (sourceRun?.actor?.login !== 'gycha0109-beep'
+      || sourceRun?.triggering_actor?.login !== 'gycha0109-beep'
+      || backupRun?.actor?.login !== 'github-actions[bot]'
+      || backupRun?.triggering_actor?.login !== 'github-actions[bot]'
+      || ledgerRun?.actor?.login !== 'github-actions[bot]'
+      || ledgerRun?.triggering_actor?.login !== 'github-actions[bot]'
+      || sourceRun?.run_attempt !== 1
+      || backupRun?.run_attempt !== 1
+      || ledgerRun?.run_attempt !== 1) {
+    throw new Error('COMPLETED_CANARY_DISPATCH_PROVENANCE_NOT_APPROVED');
+  }
+  const timestamps = [sourceRun.created_at, backupRun.created_at, ledgerRun.created_at];
+  if (timestamps.some(value => typeof value !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(value)
+      || !Number.isFinite(Date.parse(value)))
+      || !(Date.parse(timestamps[0]) < Date.parse(timestamps[1])
+        && Date.parse(timestamps[1]) < Date.parse(timestamps[2]))) {
+    throw new Error('COMPLETED_CANARY_DISPATCH_ORDER_NOT_PROVEN');
   }
   const jobs = sourceJobs?.jobs;
   if (!Array.isArray(jobs) || jobs.length !== 1) {
@@ -90,6 +159,8 @@ export function assertCompletedCanaryHistoricalExecutionV1({
   }
   const job = jobs[0];
   if (job.name !== 'production-privacy-recovery-canary'
+      || job.run_id !== Number(ref.sourceCanaryRunId)
+      || job.status !== 'completed'
       || job.conclusion !== 'failure'
       || !Array.isArray(job.steps)) {
     throw new Error('COMPLETED_CANARY_SOURCE_EXECUTION_NOT_PROVEN');
@@ -140,7 +211,8 @@ export async function attestCompletedPrivacyCanaryReadOnlyV1(query, input) {
     accountDeletionStartAuthority: 'ephemeral-canary-login->myeongha_api_executor/cmd_start_account_deletion_runtime_v1',
     workerAuthority: 'myeongha_worker_runtime->myeongha_system_executor',
     workerStatus: 'completed',
-    hostedAuthDeletionInvoked: true,
+    // This operation only observes prior deletion; it does not call Hosted Auth Admin.
+    hostedAuthDeletionInvoked: false,
     hostedAuthDeletionOutcome: 'already_absent_verified',
     databaseFinalization: 'pass',
     completionAck: 'pass',
