@@ -10,6 +10,15 @@ describe('approved Seoul monthly budget policy',()=>{
   expect(adminAiBudgetWindowV1(undefined,new Date('2026-10-31T15:00:00Z')).month).toBe('2026-11');
   expect(adminAiBudgetWindowV1('2026-12',now).toExclusive).toBe('2026-12-31T15:00:00.000Z');
  });
+ it('rejects duplicate, misclassified or unsupported cost buckets before any monthly total',()=>{
+  const valid={window,buckets:[bucket],workloadCoverage:['character_chat'] as const};
+  expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[bucket,bucket]})).toThrow('Duplicate budget usage bucket');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:[]})).toThrow('Invalid budget workload coverage');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,workloadCoverage:['character_chat','character_chat']})).toThrow('Invalid budget workload coverage');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,workload:'reading'}]})).toThrow('Invalid budget usage coverage');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,calls:0}]})).toThrow('Invalid budget usage coverage');
+  expect(()=>evaluateAdminAiBudgetV1({...valid,buckets:[{...bucket,calls:0,unknownCostCalls:0}]})).toThrow('Unbound budget estimate');
+ });
  it('keeps USD amounts and leaves KRW and warnings unmeasured without billing and FX',()=>{
   const r=evaluateAdminAiBudgetV1({window,buckets:[bucket],workloadCoverage:['character_chat']});
   expect(r.knownEstimateMicroUsd).toBe('80000000');expect(r.confirmedMicroKrw).toBeNull();expect(r.knownEstimateMicroKrw).toBeNull();expect(r.warnings).toEqual([]);expect(r.missingWorkloads).toEqual(['reading']);
