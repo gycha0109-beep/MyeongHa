@@ -102,6 +102,17 @@ export function validatePrivacyLedgerSnapshotOverlap(previous, current) {
   // A newer backup can bridge timestamp windows but its own restored privacy
   // state is not independently proven by this snapshot comparison.
   const overlaps = next.backupTime < prior.captureTime;
+  const intervalMs = next.captureTime - prior.captureTime;
+  if (intervalMs % 1000 !== 0 || !Number.isSafeInteger(intervalMs / 1000)) {
+    reject('capture interval must be an exact nonnegative number of seconds');
+  }
+  // This measures successive snapshot *capture instants*, NOT completeness
+  // of events produced between them or an approved RPO threshold.
+  const captureIntervalSeconds = intervalMs / 1000;
+  const nominalScheduledIntervalSeconds = 3600;
+  const captureIntervalBeyondNominalSeconds = Math.max(
+    0, captureIntervalSeconds - nominalScheduledIntervalSeconds,
+  );
   const result = {
     schema: PRIVACY_LEDGER_SNAPSHOT_OVERLAP_SCHEMA_V1,
     previousBackupRunId: previous.backupRunId,
@@ -112,6 +123,10 @@ export function validatePrivacyLedgerSnapshotOverlap(previous, current) {
     previousEventCount: prior.events.length,
     currentEventCount: next.events.length,
     overlapEventCount: retained.length,
+    captureIntervalSeconds,
+    nominalScheduledIntervalSeconds,
+    captureIntervalBeyondNominalSeconds,
+    continuousCaptureProven: false,
     snapshotOverlapStatus: overlaps
       ? 'OVERLAPPING_CAPTURED_EVENTS_PRESERVED'
       : 'BACKUP_ADVANCED_WITHOUT_OVERLAP_PROOF',

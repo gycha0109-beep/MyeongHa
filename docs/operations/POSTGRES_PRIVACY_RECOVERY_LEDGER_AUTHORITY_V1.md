@@ -114,6 +114,35 @@ change. `future_safe_privacy_reconciliation=false` and `dr_ready=false`
 remain mandatory pending independently verified continuous source authority,
 Hosted provider equivalence, and full recovery acceptance.
 
+## 2026-10-28 — measured scheduled-capture gaps (no continuity promotion)
+
+The successful [Production read-only ledger run 40697151010](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40697151010)
+used governed backup run `40592766562`, downloaded predecessor encrypted
+ledger artifact `12796456517` from run `40643028817`, passed predecessor
+checksum/decryption/event-overlap comparison, and uploaded new encrypted artifact
+`12820520345` (30-day retention). This is runtime confirmation that the
+previously implemented snapshot-overlap code runs on the protected scheduled
+workflow. It does **not** mean its underlying backup matched the latest
+Production migration, or prove every privacy event generated between captures
+was independently durably recorded.
+
+The sanitized `snapshot_overlap` manifest now also records actual
+`captureIntervalSeconds`, the workflow's nominal hourly interval
+`nominalScheduledIntervalSeconds=3600`, and a diagnostic
+`captureIntervalBeyondNominalSeconds=max(0, actualInterval-3600)`. The GitHub
+step summary exposes these measurements without private subject or event
+identifiers. With no predecessor, interval fields are `null` and status remains
+`NO_PREDECESSOR_UNVERIFIED`. Delayed captures do **not** suppress the new
+encrypted evidence upload; the measured delay is visible and the previously
+captured event comparison still fails closed on dropped overlapping events.
+
+**No guarantee:** a 3600-second cron period is neither continuous CDC nor an
+approved RPO. Delayed scheduled runs can leave unobservable event lifetimes
+between captures. Consequently `continuousCaptureProven=false`,
+`sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`,
+and `drReady=false` remain mandatory even if interval measurements look
+regular and a bounded snapshot comparison passes.
+
 ## 2026-10-28 — encrypted snapshot overlap preservation
 
 The existing scheduled Production privacy-ledger workflow now selects the latest

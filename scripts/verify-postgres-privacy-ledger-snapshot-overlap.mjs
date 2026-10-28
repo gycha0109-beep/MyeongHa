@@ -46,6 +46,10 @@ const clean = validatePrivacyLedgerSnapshotOverlap(first, second);
 assert.equal(clean.snapshotOverlapStatus, 'OVERLAPPING_CAPTURED_EVENTS_PRESERVED');
 assert.equal(clean.overlapEventCount, 2);
 assert.equal(clean.currentEventCount, 3);
+assert.equal(clean.captureIntervalSeconds, 60);
+assert.equal(clean.nominalScheduledIntervalSeconds, 3600);
+assert.equal(clean.captureIntervalBeyondNominalSeconds, 0);
+assert.equal(clean.continuousCaptureProven, false);
 assert.equal(clean.sourceContinuityProven, false);
 assert.equal(clean.futureSafePrivacyReconciliation, false);
 assert.equal(clean.drReady, false);
@@ -121,6 +125,20 @@ assert.throws(
   }),
   /source digest differs/u,
 );
+
+// A delayed scheduled capture is measurable but NEVER evidence of missing
+// individual events or of uninterrupted independent storage. Archive creation
+// remains permitted; otherwise a delayed schedule would destroy new evidence.
+const delayed = manifest([NEW_REVOKE, REVOKE, ACCOUNT], {
+  capturedAt: '2026-09-18T16:25:00Z',
+});
+const delayedReport = validatePrivacyLedgerSnapshotOverlap(first, delayed);
+assert.equal(delayedReport.captureIntervalSeconds, 25260);
+assert.equal(delayedReport.captureIntervalBeyondNominalSeconds, 21660);
+assert.equal(delayedReport.snapshotOverlapStatus, 'OVERLAPPING_CAPTURED_EVENTS_PRESERVED');
+assert.equal(delayedReport.sourceContinuityProven, false);
+assert.equal(delayedReport.continuousCaptureProven, false);
+assert.equal(delayedReport.drReady, false);
 
 // Zero-event snapshots are valid only for their actual captured windows.
 const emptyPrev = manifest([]);
