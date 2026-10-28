@@ -173,8 +173,14 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     || native.responseVersion !== RESPONSE_VERSION
     || !STATES.has(String(native.state))
     || !id(native.responseId)
-    || !id(native.reading.readingId)
-    || projectProductReadingResponseV2(native).kind !== 'delivered') {
+    || !id(native.reading.readingId)) {
+    return held('production_source_unverified');
+  }
+  try {
+    if (projectProductReadingResponseV2(native).kind !== 'delivered') {
+      return held('production_source_unverified');
+    }
+  } catch {
     return held('production_source_unverified');
   }
 
