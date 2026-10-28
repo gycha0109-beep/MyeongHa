@@ -1,5 +1,6 @@
 import{useEffect,useState}from'react';
 import{StatusPanel}from'./StatusPanel.js';
+import {AdminReadingGenerationMonth} from './AdminReadingGenerationMonth.js';
 import type{createAdminAiBudgetReadV1}from'../../api/src/admin-ai-budget-read-v1.js';
 type Budget=Awaited<ReturnType<ReturnType<typeof createAdminAiBudgetReadV1>>>;
 const krw=(micro:string|null)=>micro===null?'미측정':(BigInt(micro)/1_000_000n).toLocaleString('ko-KR')+'원';
@@ -27,5 +28,6 @@ export function AdminAiBudget({token,onSessionExpired}:{readonly token:string;re
     <ul aria-label="월간 예산 경고">{data.warnings.map(w=><li key={w.id}><strong>{w.thresholdPercent}% 경고</strong> · {w.thresholdKrw.toLocaleString('ko-KR')}원 · {w.basis==='provider_confirmed'?'청구 확인':'사용량·단가 추정'} · {w.coverage==='complete'?'전체 관측':'부분 관측'}</li>)}</ul>}
    <p>같은 월·비용 근거·임계값의 경고는 하나의 카드로 표시합니다. 일부 청구 확인액은 월 전체 확정액이 아니며, 일부만으로 임계값을 넘은 경고는 하한 관측입니다. 추정 비용은 확정 청구액을 대체하지 않습니다.</p>
   </>}
+  <AdminReadingGenerationMonth token={token} month={month} onSessionExpired={onSessionExpired}/>
  </section>;
 }
