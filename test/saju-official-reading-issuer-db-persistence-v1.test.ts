@@ -192,6 +192,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(args?.storedSnapshot).toEqual(dbSnapshot);
     expect(args?.nativeReadingId).toBe(nativeReadingId);
     expect(args?.storedResponseHash).toBe(storedHash);
+    expect(args?.sourceResponseHash).toBe(sourceHash);
     expect(args?.sourceBirthInputHash).toBe('sha256:v1:' + 'b'.repeat(64));
     // Never mutate the source-issued response or lose disclosures.
     expect(native.reading.readingId).toBe(nativeReadingId);
@@ -274,9 +275,17 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
   });
 
   it('uses existing atomic PostgreSQL finalize command, never writing readings/refs directly', async () => {
-    const query = vi.fn(async () => ({ rows: [{
-      readingId, executionAttemptId, responseHash: storedHash, replayed: true,
-    }] }));
+    const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
+      rows: sql.includes('from public.reading_refs rr')
+        ? [{
+          nativeReadingId, externalRequestRef: 'internal-only-ref',
+          sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+          readingContractVersion: 'myeonghwa-product-reading-response-v2',
+          productResponseState: 'delivered',
+          storedSnapshot: dbSnapshot, storedResponseHash: storedHash,
+        }]
+        : [{ readingId, executionAttemptId, responseHash: storedHash, replayed: true }],
+    }));
     const port = createPostgresSajuOfficialImmutableCommitPortV1({
       query,
     } as unknown as PostgresTransactionQueryV1);
@@ -286,7 +295,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     });
     expect(result).toMatchObject({ state: 'committed', replayed: true });
     expect(SAJU_OFFICIAL_DB_FINALIZE_AUTHORITY_V1).toBe('public.cmd_finalize_reading_transport_success_v1');
-    expect(query).toHaveBeenCalledTimes(1);
+    expect(query).toHaveBeenCalledTimes(2);
     const [sql, params] = query.mock.calls[0] as unknown as [string, unknown[]];
     expect(sql).toContain('from public.cmd_finalize_reading_transport_success_v1(');
     expect(sql).not.toMatch(/update public\.readings|insert into public\.reading_refs/iu);
@@ -296,6 +305,37 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(params[8]).toBeNull();
     expect(params[14]).toBe(JSON.stringify(dbSnapshot));
     expect(params[15]).toBe(storedHash);
+    const [readSql, readParams] = query.mock.calls[1] as unknown as [string, unknown[]];
+    expect(readSql).toContain('from public.reading_refs rr');
+    expect(readSql).toContain('join public.reading_execution_attempts rea');
+    expect(readParams).toEqual([subjectId, readingId, executionAttemptId]);
+  });
+
+  it('rejects a replay with a different native Saju issuer reference or mutated DB JSONB', async () => {
+    for (const wrong of [
+      { nativeReadingId: 'other-native-id' },
+      { externalRequestRef: 'other-issuer-proof' },
+      { storedSnapshot: { ...dbSnapshot, reading: { ...dbSnapshot.reading, disclosures: [] } } },
+    ]) {
+      const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
+        rows: sql.includes('from public.reading_refs rr') ? [{
+          nativeReadingId, externalRequestRef: 'internal-only-ref',
+          sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+          readingContractVersion: 'myeonghwa-product-reading-response-v2',
+          productResponseState: 'delivered',
+          storedSnapshot: dbSnapshot, storedResponseHash: storedHash,
+          ...wrong,
+        }] : [{ readingId, executionAttemptId, responseHash: storedHash, replayed: true }],
+      }));
+      const p = ports();
+      const writer = createPostgresSajuOfficialImmutableCommitPortV1({
+        query,
+      } as unknown as PostgresTransactionQueryV1);
+      await expect(persistIssuedSajuOfficialReadingV1({
+        ...input(p), commitPort: writer,
+      })).rejects.toThrow(/stored lineage/);
+      expect(query).toHaveBeenCalledTimes(2);
+    }
   });
 
   it('rejects missing or multiple PostgreSQL finalize receipts', async () => {
@@ -308,8 +348,9 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       } as unknown as PostgresTransactionQueryV1);
       await expect(port.finalizeSuccess({
         subjectId, readingId, executionAttemptId, outboxEventId,
-        externalRequestRef: null, engineVersion: 'saju-engine-v1',
-        nativeReadingId, sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+        externalRequestRef: 'internal-only-ref', engineVersion: 'saju-engine-v1',
+        nativeReadingId, sourceResponseHash: sourceHash,
+        sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
         readingContractVersion: 'myeonghwa-product-reading-response-v2',
         productResponseState: 'delivered', storedSnapshot: dbSnapshot,
         storedResponseHash: storedHash,
