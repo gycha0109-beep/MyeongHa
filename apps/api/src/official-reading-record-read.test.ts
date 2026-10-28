@@ -73,14 +73,18 @@ describe('Official Reading Records read contract', () => {
 
   it('rereads an issuer-hashed official report only when the stored body still matches the immutable digest', async () => {
     const immutable = {
-      ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
+      responseVersion: 'myeonghwa-product-reading-response-v2',
+      responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+      state: 'delivered',
+      messageCode: 'READING_DELIVERED',
+      requiredAction: 'none',
       reading: {
         readingId: READING_ID,
         sections: [
           { sectionType: 'overview', state: 'complete', title: '공식 결과',
             blocks: [{ type: 'paragraph', text: '인증된 서버 원본입니다.' }] },
         ],
-        disclosures: [{ type: 'scope_limitation', text: '검증 가능한 범위만 제공합니다.' }],
+        disclosures: [{ type: 'scope_limitation', text: '이 명식의 출생시각은 확정되어 있습니다.' }],
       },
     };
     const issued = {
@@ -107,6 +111,33 @@ describe('Official Reading Records read contract', () => {
       resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
       authorityPort: port({ ...issued, responseSnapshotJsonb: modified }),
     })).rejects.toThrow('source response hash mismatch');
+    // Even a rehashed malformed canonical envelope cannot be disclosed as a
+    // successful official report. This guards the server's final read boundary.
+    const noInterpretation = {
+      ...immutable,
+      reading: { ...immutable.reading, sections: [] },
+    };
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
+      authorityPort: port({
+        ...issued,
+        responseSnapshotJsonb: noInterpretation,
+        responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(noInterpretation),
+      }),
+    })).rejects.toThrow('failed product admission');
+
+    const mismatchedEnvelope = {
+      ...immutable,
+      messageCode: 'READING_EVIDENCE_INSUFFICIENT',
+    };
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
+      authorityPort: port({
+        ...issued,
+        responseSnapshotJsonb: mismatchedEnvelope,
+        responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(mismatchedEnvelope),
+      }),
+    })).rejects.toThrow('failed product admission');
   });
 
   it('fails closed when the owner-scoped record does not exist', async () => {
