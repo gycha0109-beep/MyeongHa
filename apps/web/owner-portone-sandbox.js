@@ -173,6 +173,9 @@ async function beginTest(){
   }
   await verifyWithServer(prepared.paymentAttemptId);
  }catch(error){
+  // After checkout was handed off, the old idempotency token cannot start a new attempt.
+  // Keep the prior Attempt ID for read-only verification, but rotate retry identity.
+  if(phase==='sdk_load'||phase==='sdk_request'||phase==='verify')releaseRetryToken();
   showDiagnostic(phase,error);
   status('테스트 결제 진행 중 '+(PHASES[phase]||'알 수 없는 단계')+'에서 실패했습니다. 진단 코드를 확인해 주세요.');
   if(attemptId)PROVIDER.textContent='서버 결제상태 확인 필요';
@@ -194,7 +197,11 @@ async function initialize(){
   requireOwnerSandboxWalletV1(data);
   allowed=true;
   const stored=sessionStorage.getItem(ATTEMPT_KEY);
-  if(typeof stored==='string'&&UUID.test(stored))displayAttempt(stored);
+  if(typeof stored==='string'&&UUID.test(stored)){
+   displayAttempt(stored);
+   // A remembered Attempt must be verified as-is; never replay its prepare token.
+   releaseRetryToken();
+  }
   status('관리자 권한 확인 완료. KCP 테스트 결제창을 열 수 있습니다.');
  }catch{
   allowed=false;
