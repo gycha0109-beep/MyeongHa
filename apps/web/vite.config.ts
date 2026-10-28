@@ -18,6 +18,7 @@ const htmlEntries = [
   'face-reading.html',
   'reading-detail.html',
   'records.html',
+  'owner-portone-sandbox.html',
 ] as const;
 
 export default defineConfig({

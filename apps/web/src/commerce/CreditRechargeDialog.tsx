@@ -115,6 +115,14 @@ export function CreditRechargeDialog() {
             ? '관리자 계정은 AI 채팅 크레딧을 차감하지 않습니다. 모델 비용·개인정보 보호는 동일하게 적용됩니다. 포트원 결제는 별도 연결 준비 중입니다.'
             : '포트원 충전 결제는 아직 활성화되지 않았습니다. 이 화면에서 결제가 이루어지거나 크레딧이 지급되지 않습니다.'}
         </p>
+        {wallet?.isOwnerAdmin === true && wallet.creditExempt === true
+          ? <p className="credit-dialog-owner-sandbox">
+              <a href="/owner-portone-sandbox.html" target="_blank" rel="noopener noreferrer">
+                관리자 전용 KCP 테스트 결제 열기
+              </a>
+              <span>샌드박스 검증 전용 · 운영 크레딧 지급 없음</span>
+            </p>
+          : null}
         <div className="credit-dialog-actions">
           <button type="button" className="credit-dialog-buy" disabled={!CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE}
             title="정식 충전 상품과 서버 결제 연결 준비 중">크레딧 충전하기</button>

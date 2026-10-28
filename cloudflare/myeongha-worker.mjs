@@ -127,6 +127,27 @@ export default {
         : await apiRuntime.fetch(request, env, ctx);
       return withWorkerVersion(response,env);
     }
+    // This owner-only *test console* static HTML can load the official KCP
+    // SDK without relaxing the production SPA's strict CSP. All sensitive
+    // operations independently require DB-verified Owner Admin and sandbox.
+    if (url.pathname === '/owner-portone-sandbox.html' && url.search === '' &&
+        (request.method === 'GET' || request.method === 'HEAD')) {
+      const response = await sealedRuntime.fetch(request, env, ctx);
+      if (response.status !== 200) return withWorkerVersion(response, env);
+      const headers = new Headers(response.headers);
+      headers.set('Content-Security-Policy',
+        "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "+
+        "script-src 'self' https://cdn.portone.io; style-src 'self'; "+
+        "connect-src 'self' https://*.portone.io https://*.kcp.co.kr; "+
+        "img-src 'self' data: https:; font-src 'self'; "+
+        "frame-src https:; form-action 'self' https:");
+      headers.set('Cache-Control','no-store');
+      headers.set('Referrer-Policy','no-referrer');
+      headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
+      return withWorkerVersion(new Response(response.body,{
+        status:response.status,statusText:response.statusText,headers,
+      }),env);
+    }
     if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) {
       const index = new URL(url);
       index.pathname = '/index.html';
