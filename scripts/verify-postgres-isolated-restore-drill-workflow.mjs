@@ -337,9 +337,9 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  '.name == "Production PostgreSQL Privacy Recovery Ledger"',
+  '.name == "[WT:ops] Production PostgreSQL Privacy Recovery Ledger"',
   '.path == ".github/workflows/production-postgres-privacy-recovery-ledger.yml"',
-  '.name == "Production Privacy Recovery Canary"',
+  '.name == "[WT:ops] Production Privacy Recovery Canary"',
   '.path == ".github/workflows/production-privacy-recovery-canary.yml"',
   '^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$',
   'production-privacy-recovery-canary-$PRODUCTION_PRIVACY_CANARY_RUN_ID',
