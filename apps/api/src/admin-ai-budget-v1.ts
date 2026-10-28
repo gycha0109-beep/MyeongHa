@@ -32,8 +32,11 @@ export function evaluateAdminAiBudgetV1(input:{readonly window:AdminAiBudgetWind
  const estimateComplete=unknownCalls===0&&missingWorkloads.length===0&&!input.truncated;
  let confirmed:bigint|null=null;
  if(input.billing){const b=input.billing;if(b.source!=='provider_billing_export'||!/^[a-f0-9]{64}$/u.test(b.evidenceSha256)||b.from!==input.window.from||b.toExclusive!==input.window.toExclusive||!['complete','partial'].includes(b.coverage))throw Error('Unbound monthly billing evidence');confirmed=amount(b.amountMicroUsd);}
- const estimatedMicroKrw=convert(estimate,input.window,input.fx),confirmedMicroKrw=confirmed===null?null:convert(confirmed,input.window,input.fx);
- const states=[{basis:'provider_confirmed' as const,value:confirmedMicroKrw,coverage:input.billing?.coverage??'unconnected'},
+ const estimatedMicroKrw=convert(estimate,input.window,input.fx);
+ // A partial provider export proves only a lower bound, never the monthly total.
+ const knownConfirmedMicroKrw=confirmed===null?null:convert(confirmed,input.window,input.fx);
+ const confirmedMicroKrw=input.billing?.coverage==='complete'?knownConfirmedMicroKrw:null;
+ const states=[{basis:'provider_confirmed' as const,value:knownConfirmedMicroKrw,coverage:input.billing?.coverage??'unconnected'},
   {basis:'usage_price_estimate' as const,value:estimatedMicroKrw,coverage:estimateComplete?'complete':'partial'}];
  const warnings=states.flatMap(s=>s.value===null?[]:ADMIN_AI_BUDGET_THRESHOLDS_V1.filter(percent=>BigInt(s.value!)>=BigInt(ADMIN_AI_MONTHLY_BUDGET_KRW_V1)*1_000_000n*BigInt(percent)/100n).map(percent=>Object.freeze({
    id:`ai-budget:${input.window.month}:${s.basis}:${percent}`,thresholdPercent:percent,thresholdKrw:ADMIN_AI_MONTHLY_BUDGET_KRW_V1*percent/100,basis:s.basis,coverage:s.coverage,notificationOnly:true,automaticShutdown:false,
@@ -43,7 +46,8 @@ export function evaluateAdminAiBudgetV1(input:{readonly window:AdminAiBudgetWind
  return Object.freeze({version:'admin-ai-monthly-budget-v1' as const,window:input.window,timezone:ADMIN_AI_BUDGET_TIMEZONE_V1,budgetKrw:ADMIN_AI_MONTHLY_BUDGET_KRW_V1,
   thresholdsKrw:[80_000,100_000],automaticShutdown:false,observedCalls:calls,unknownCostCalls:unknownCalls,missingWorkloads,
   estimateCoverage:estimateComplete?'complete':'partial',knownEstimateMicroUsd:estimate.toString(),estimatedMicroUsd:estimateComplete?estimate.toString():null,
-  knownEstimateMicroKrw:estimatedMicroKrw,confirmedMicroUsd:confirmed?.toString()??null,confirmedMicroKrw,
+  knownEstimateMicroKrw:estimatedMicroKrw,knownConfirmedMicroUsd:confirmed?.toString()??null,
+  knownConfirmedMicroKrw,confirmedMicroUsd:input.billing?.coverage==='complete'?confirmed?.toString()??null:null,confirmedMicroKrw,
   billingStatus:input.billing?input.billing.coverage:'unconnected',fxStatus:estimatedMicroKrw===null?'unmeasured_or_out_of_scope':'verified_evidence_supplied',
   budgetStatus:confirmedMicroKrw===null?'confirmed_budget_unmeasured':'confirmed_observed',warnings,buckets:input.buckets,
  });

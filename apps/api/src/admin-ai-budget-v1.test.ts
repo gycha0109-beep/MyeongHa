@@ -22,6 +22,23 @@ describe('approved Seoul monthly budget policy',()=>{
   const c=evaluateAdminAiBudgetV1({...args,billing:{source:'provider_billing_export',evidenceSha256:'b'.repeat(64),from:window.from,toExclusive:window.toExclusive,coverage:'complete',amountMicroUsd:'80000000'}});
   expect(c.warnings.filter(w=>w.basis==='provider_confirmed').map(w=>w.thresholdPercent)).toEqual([80]);
  });
+ it('keeps incomplete provider billing as a known lower bound instead of falsely confirming the full month',()=>{
+  const billing={source:'provider_billing_export' as const,evidenceSha256:'c'.repeat(64),from:window.from,toExclusive:window.toExclusive,coverage:'partial' as const,amountMicroUsd:'90000000'};
+  const result=evaluateAdminAiBudgetV1({window,buckets:[],workloadCoverage:[],billing,fx});
+  expect(result.knownConfirmedMicroUsd).toBe('90000000');
+  expect(result.knownConfirmedMicroKrw).toBe('90000000000');
+  expect(result.confirmedMicroUsd).toBeNull();
+  expect(result.confirmedMicroKrw).toBeNull();
+  expect(result.budgetStatus).toBe('confirmed_budget_unmeasured');
+  expect(result.billingStatus).toBe('partial');
+  expect(result.warnings.filter(w=>w.basis==='provider_confirmed')).toMatchObject([
+   {thresholdPercent:80,coverage:'partial',notificationOnly:true,automaticShutdown:false},
+  ]);
+  const complete=evaluateAdminAiBudgetV1({window,buckets:[],workloadCoverage:[],billing:{...billing,coverage:'complete'},fx});
+  expect(complete.confirmedMicroUsd).toBe('90000000');
+  expect(complete.confirmedMicroKrw).toBe(complete.knownConfirmedMicroKrw);
+  expect(complete.budgetStatus).toBe('confirmed_observed');
+ });
  it('rejects an invoice from a different period and does not warn one fractional won early or use an out-of-period FX',()=>{
   const r=evaluateAdminAiBudgetV1({window,buckets:[{...bucket,estimateMicroUsd:'79999999'}],workloadCoverage:['character_chat'],fx});expect(r.warnings).toHaveLength(0);
   expect(evaluateAdminAiBudgetV1({window,buckets:[bucket],workloadCoverage:[],fx:{...fx,effectiveFrom:'2026-10-02T00:00:00Z'}}).knownEstimateMicroKrw).toBeNull();
