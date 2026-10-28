@@ -84,6 +84,26 @@ export function assertCompletedCanaryHistoricalExecutionV1({
       || ledgerRun?.conclusion !== 'success') {
     throw new Error('COMPLETED_CANARY_LEDGER_RUN_NOT_APPROVED');
   }
+  // These are the historical protected dispatch principals, not caller claims.
+  if (sourceRun?.actor?.login !== 'gycha0109-beep'
+      || sourceRun?.triggering_actor?.login !== 'gycha0109-beep'
+      || backupRun?.actor?.login !== 'github-actions[bot]'
+      || backupRun?.triggering_actor?.login !== 'github-actions[bot]'
+      || ledgerRun?.actor?.login !== 'github-actions[bot]'
+      || ledgerRun?.triggering_actor?.login !== 'github-actions[bot]'
+      || sourceRun?.run_attempt !== 1
+      || backupRun?.run_attempt !== 1
+      || ledgerRun?.run_attempt !== 1) {
+    throw new Error('COMPLETED_CANARY_DISPATCH_PROVENANCE_NOT_APPROVED');
+  }
+  const timestamps = [sourceRun.created_at, backupRun.created_at, ledgerRun.created_at];
+  if (timestamps.some(value => typeof value !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/u.test(value)
+      || !Number.isFinite(Date.parse(value)))
+      || !(Date.parse(timestamps[0]) < Date.parse(timestamps[1])
+        && Date.parse(timestamps[1]) < Date.parse(timestamps[2]))) {
+    throw new Error('COMPLETED_CANARY_DISPATCH_ORDER_NOT_PROVEN');
+  }
   const jobs = sourceJobs?.jobs;
   if (!Array.isArray(jobs) || jobs.length !== 1) {
     throw new Error('COMPLETED_CANARY_SOURCE_EXECUTION_NOT_PROVEN');

@@ -86,18 +86,24 @@ describe('historical privacy canary completed evidence is read-only and exact-sc
       path:'.github/workflows/production-privacy-recovery-canary.yml',
       event:'workflow_dispatch',head_branch:'main',status:'completed',
       conclusion:'failure',head_sha:'ed52c0cd442dfcf4396804275da2df74321f5799',
+      actor:{login:'gycha0109-beep'},triggering_actor:{login:'gycha0109-beep'},
+      run_attempt:1,created_at:'2026-10-27T07:35:58Z',
     };
     const backupRun = {
       id:40468157715,
       path:'.github/workflows/production-postgres-backup.yml',
       event:'workflow_dispatch',head_branch:'main',status:'completed',
       conclusion:'success',head_sha:sourceRun.head_sha,
+      actor:{login:'github-actions[bot]'},triggering_actor:{login:'github-actions[bot]'},
+      run_attempt:1,created_at:'2026-10-27T07:36:43Z',
     };
     const ledgerRun = {
       id:40468500587,
       path:'.github/workflows/production-postgres-privacy-recovery-ledger.yml',
       event:'workflow_dispatch',head_branch:'main',status:'completed',
       conclusion:'success',head_sha:'711c8719a7e7ed2d42a333ec56463f008d2e1fc5',
+      actor:{login:'github-actions[bot]'},triggering_actor:{login:'github-actions[bot]'},
+      run_attempt:1,created_at:'2026-10-27T07:40:10Z',
     };
     const successSteps = [
       'Create disposable hosted Auth + Production application canary state',
@@ -122,6 +128,13 @@ describe('historical privacy canary completed evidence is read-only and exact-sc
     expect(() => assertCompletedCanaryHistoricalExecutionV1({
       sourceRun,backupRun,ledgerRun:{...ledgerRun,conclusion:'failure'},sourceJobs,
     })).toThrow('COMPLETED_CANARY_LEDGER_RUN_NOT_APPROVED');
+    expect(() => assertCompletedCanaryHistoricalExecutionV1({
+      sourceRun,backupRun:{...backupRun,actor:{login:'untrusted'}},ledgerRun,sourceJobs,
+    })).toThrow('COMPLETED_CANARY_DISPATCH_PROVENANCE_NOT_APPROVED');
+    expect(() => assertCompletedCanaryHistoricalExecutionV1({
+      sourceRun,backupRun,ledgerRun:{...ledgerRun,created_at:backupRun.created_at},sourceJobs,
+    })).toThrow('COMPLETED_CANARY_DISPATCH_ORDER_NOT_PROVEN');
+
   });
 
   it('cannot be invoked by the existing resume workflow without new protected approval', () => {
