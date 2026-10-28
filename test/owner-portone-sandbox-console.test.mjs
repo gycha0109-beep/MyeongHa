@@ -71,6 +71,17 @@ describe('Owner KCP TEST console: no browser monetary authority',()=>{
    ])expect(()=>requireOwnerSandboxServerPaidV1({ok:true,data:{
      ...base,...modify,
    }},ID)).toThrow();
+   const paid={...base,receiptPersisted:true,
+     receiptId:ID,providerEventId:ID,replayed:false};
+   expect(requireOwnerSandboxServerPaidV1({ok:true,data:paid},ID))
+     .toEqual({verified:true,receiptPersisted:true,receiptId:ID,
+       replayed:false,productionCreditsIssued:false});
+   expect(()=>requireOwnerSandboxServerPaidV1({ok:true,data:{
+     ...paid,productionCreditsIssued:true,
+   }},ID)).toThrow();
+   expect(()=>requireOwnerSandboxServerPaidV1({ok:true,data:{
+     ...paid,receiptId:'forged',
+   }},ID)).toThrow();
  });
  it('isolates CDN CSP to one Owner test HTML route, without broad SPA relaxation',()=>{
    const worker=readFileSync(new URL('../cloudflare/myeongha-worker.mjs',import.meta.url),'utf8');
