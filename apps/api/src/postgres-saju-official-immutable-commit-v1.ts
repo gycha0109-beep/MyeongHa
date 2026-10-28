@@ -42,7 +42,7 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
   client: PostgresTransactionQueryV1,
 ): SajuOfficialImmutableCommitPortV1 {
   return Object.freeze({
-    async finalizeSuccess(input) {
+    async finalizeSuccess(input: Parameters<SajuOfficialImmutableCommitPortV1['finalizeSuccess']>[0]) {
       // Caller has already verified issuer provenance, exact ID mapping,
       // immutable birth revision and current Commerce/Privacy authority.
       // Do not run an open-ended UPDATE or forge a DB success state.
