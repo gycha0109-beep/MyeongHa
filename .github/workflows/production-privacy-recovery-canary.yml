@@ -468,41 +468,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          jq -n -e \
-            --slurpfile state "$RUNNER_TEMP/completed-canary-terminal-state.json" \
-            --slurpfile pair "$RUNNER_TEMP/completed-canary-artifact-report.json" '
-              ($state[0]) as $s | ($pair[0]) as $p |
-              if ($state | length) == 1 and ($pair | length) == 1
-                and $s.schema == "myeongha-production-privacy-recovery-canary-evidence-v1"
-                and $s.evidenceOrigin == "read_only_completed_canary_attestation_v1"
-                and $s.canaryOperation == "attest_completed"
-                and $s.resumedFromCanaryRunId == 40468086758
-                and $s.workerStatus == "completed"
-                and $s.databaseFinalization == "pass"
-                and $s.outputContainsIdentifiers == false
-                and $s.outputContainsRowPayloads == false
-                and $s.authoritativePrivacyReconciliation == false
-                and $s.futureSafePrivacyReconciliation == false
-                and $s.drReady == false
-                and $p.status == "PASS_PUBLIC_ARTIFACT_PAIR_INTEGRITY_ONLY"
-                and $p.sourceCanaryRunId == 40468086758
-                and $p.sourceCanaryRunConclusion == "failure"
-                and $p.governedBackupRunId == 40468157715
-                and $p.canonicalLedgerRunId == 40468500587
-                and $p.missingSuccessfulCanaryEvidenceArtifact == true
-                and $p.authoritativeRecoveredStateReplayed == false
-                and ($p.ledgerEventCount | type == "number" and . > 0)
-                and ($p.accountDeletionStartedEventCount | type == "number" and . >= 1)
-                and $p.authoritativePrivacyReconciliation == false
-                and $p.futureSafePrivacyReconciliation == false
-                and $p.drReady == false
-              then $s + {
-                governedBackupRunId: 40468157715,
-                privacyRecoveryLedgerRunId: 40468500587,
-                privacyRecoveryLedgerEventCount: $p.ledgerEventCount,
-                accountDeletionStartedEventCount: $p.accountDeletionStartedEventCount
-              } else error("COMPLETED_CANARY_PUBLIC_PROOF_NOT_ADMISSIBLE") end
-            ' > "$RUNNER_TEMP/production-privacy-canary-public-evidence.json"
+          node scripts/operations/build-completed-privacy-canary-proof.mjs \
+            "$RUNNER_TEMP/completed-canary-terminal-state.json" \
+            "$RUNNER_TEMP/completed-canary-artifact-report.json" \
+            "$RUNNER_TEMP/production-privacy-canary-public-evidence.json"
 
       - name: Upload read-only, identifier-free historical completion proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2

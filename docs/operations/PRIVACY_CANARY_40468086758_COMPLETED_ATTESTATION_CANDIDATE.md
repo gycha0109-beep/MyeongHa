@@ -38,4 +38,6 @@ A separate read-only Production PostgreSQL query observed PostgreSQL 17.6, **4**
 
 Hosted Auth application identity continuity on a loopback PostgreSQL restore and the present count-only snapshot do not establish usable hosted Auth recovery (configuration, credentials, session behavior, or token correctness). An empty current Storage metadata count does not prove that the historical backup had no objects, nor that a provider-restored service would recover files. The existing `provider_managed_data_full_restore=false` and `dr_ready=false` remain mandatory.
 
+The branch now builds the publicly uploaded proof through `scripts/operations/build-completed-privacy-canary-proof.mjs`, replacing an untested inline JSON expression. It explicitly allowlists non-sensitive fields, rejects unexpected/private keys and incorrect incident or ciphertext-report links, writes evidence without overwriting an existing file, and cross-checks the output against the isolated replay evidence consumer. This is still **only local/CI code verification**, not a successful protected execution.
+
 **Non-claims:** no new `fresh` canary, no Production mutation, no provider-managed full restore, no raw decrypted ledger, no published user identifiers, `futureSafePrivacyReconciliation=false`, `dr_ready=false`.
