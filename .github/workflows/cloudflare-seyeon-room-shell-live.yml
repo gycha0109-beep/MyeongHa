@@ -47,5 +47,5 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Verify empty response envelope and History/anonymous denial
+      - name: Verify owned room shell and read-only Member grant lifecycle
         run: node scripts/verify-cloudflare-seyeon-room-shell-live.mjs
