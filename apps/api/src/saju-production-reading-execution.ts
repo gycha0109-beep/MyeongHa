@@ -123,6 +123,13 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     return unavailable;
   }
 
+  // The official issued-Reading contract pins SELF Birth only. SRC-08 has no
+  // approved target Birth ownership/correlation contract for this issuance path.
+  // Never send a caller-supplied target reference to Production Saju as a shortcut.
+  if (input.targetPersonRef !== undefined) {
+    return unavailable;
+  }
+
   const birth = bindCurrentBirthProfileRevisionForSajuV1(input.profile);
   if (birth.birthRevisionRef !== input.sourceBirthRevisionId) {
     return Object.freeze({

@@ -174,6 +174,11 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     || !input.currentAuthority || !input.commitPort) {
     return held('production_source_unverified');
   }
+  // A direct internal caller must not bypass the SELF-only Product issuance
+  // boundary using an unapproved target reference (SRC-08 remains unresolved).
+  if (input.executedRequest.reading.targetPersonRef !== undefined) {
+    return held('production_source_unverified');
+  }
 
   const native = input.sourceResponse;
   if (!obj(native) || !obj(native.reading)

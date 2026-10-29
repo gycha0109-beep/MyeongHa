@@ -308,6 +308,50 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     }
   });
 
+  it('blocks unapproved target Birth references before entitlement preflight or Saju network execution', async () => {
+    const p = ports();
+    const requestReading = vi.fn(async () => native);
+    const dbTransaction = { run: vi.fn() };
+    const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(),
+      readingText: 'compatibility',
+      targetPersonRef: 'unapproved-second-subject',
+      adapter: { requestReading },
+      subjectId, readingId, readingSessionId, executionAttemptId,
+      outboxEventId, sourceBirthRevisionId,
+      sourceVerifier: p.sourceVerifier,
+      mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight,
+      dbTransaction,
+    });
+    expect(result).toMatchObject({
+      state: 'held', reason: 'production_source_unverified',
+      canDisclose: false, canSell: false,
+    });
+    expect(p.preflight.admitBeforeSourceCall).not.toHaveBeenCalled();
+    expect(requestReading).not.toHaveBeenCalled();
+    expect(dbTransaction.run).not.toHaveBeenCalled();
+  });
+
+  it('blocks a direct issuer-persistence caller using an unapproved target reference', async () => {
+    const p = ports();
+    const result = await persistIssuedSajuOfficialReadingV1({
+      ...input(p),
+      executedRequest: {
+        ...executedRequest,
+        reading: { ...executedRequest.reading, targetPersonRef: 'other-person' },
+      },
+    });
+    expect(result).toMatchObject({
+      state: 'held', reason: 'production_source_unverified',
+      canDisclose: false, canSell: false,
+    });
+    expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
+    expect(p.mappingVerifier.verifyIssuedReadingMapping).not.toHaveBeenCalled();
+    expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
   it('requires the DB-pinned current Birth revision before the Saju network or DB transaction', async () => {
     const p = ports();
     const requestReading = vi.fn(async () => native);
