@@ -60,7 +60,7 @@ describe('Chat Runtime authored UI locale boundary', () => {
     expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
     expect(send).toContain('renderAcknowledgedSeyeonFirstReply(acknowledgedReply)');
     expect(send).not.toContain('await loadRoomState()');
-    expect(send.indexOf('clearPendingTurn(pendingTurn.clientTurnId)')).toBeLessThan(
+    expect(send.indexOf('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)')).toBeLessThan(
       send.indexOf('const currentBearer = await getActiveBearer();'),
     );
     expect(send).toContain('currentBearer.token !== activeBearer.token');
@@ -84,6 +84,6 @@ describe('Chat Runtime authored UI locale boundary', () => {
     expect(runtime).toContain('uiText(placeholder.dataset.chatUiPlaceholder)');
     expect(translator).toContain('[data-chat-body-source]');
     expect(runtime).toContain('clientTurnId: pendingTurn.clientTurnId');
-    expect(runtime).toContain('clearPendingTurn(pendingTurn.clientTurnId)');
+    expect(runtime).toContain('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)');
   });
 });
