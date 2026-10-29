@@ -1,6 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {describe,it,expect} from 'vitest';
 import {inspectAdminHostedDeploymentV1,prepareAdminHostedConfigV1,ADMIN_HOSTED_REQUIRED_V1,ADMIN_WORKERS_DEV_ORIGIN_V1} from './deployment-check.mjs';
+import {validateAdminHttpBindingsV1} from './worker-binding-guard.mjs';
 const config=JSON.parse(readFileSync(new URL('./wrangler.jsonc',import.meta.url),'utf8'));
 describe('isolated Admin deployment configuration',()=>{
   it('reports exact missing names and never reuses the ordinary public principal',()=>{
@@ -43,4 +44,26 @@ describe('isolated Admin deployment configuration',()=>{
     expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_ANALYTICS_RETENTION_HYPERDRIVE_ID:'1ffe61390c064c0480a0a1e933e4d2c9'},config).invalid).toContain('dedicated_admin_analytics_retention_origin');
     expect(inspectAdminHostedDeploymentV1({...env,MYEONGHA_ADMIN_RETENTION_HYPERDRIVE_ID:'e'.repeat(32),MYEONGHA_ADMIN_ANALYTICS_RETENTION_HYPERDRIVE_ID:'e'.repeat(32)},config).invalid).toContain('dedicated_admin_analytics_retention_origin');
   });
+  it('rejects aliased Reader/Audit/Command/Retention Hyperdrive login credentials at runtime',()=>{
+    const env={
+      ADMIN_READ_HYPERDRIVE:{connectionString:'postgresql://reader:one@db.test/postgres'},
+      ADMIN_AUDIT_HYPERDRIVE:{connectionString:'postgresql://audit:two@db.test/postgres'},
+    };
+    expect(validateAdminHttpBindingsV1(env)).toEqual({read:true,audit:true,command:false});
+    expect(()=>validateAdminHttpBindingsV1({
+      ...env,ADMIN_AUDIT_HYPERDRIVE:env.ADMIN_READ_HYPERDRIVE,
+    })).toThrow('Private Admin DB origins must use distinct credentials');
+    expect(()=>validateAdminHttpBindingsV1({
+      ...env,ADMIN_COMMAND_HYPERDRIVE:{connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString},
+    })).toThrow('Private Admin DB origins must use distinct credentials');
+    expect(()=>validateAdminHttpBindingsV1({
+      ...env,ADMIN_ANALYTICS_RETENTION_HYPERDRIVE:{connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString},
+    })).toThrow('Private Admin DB origins must use distinct credentials');
+    expect(()=>validateAdminHttpBindingsV1({
+      ...env,ADMIN_COMMAND_HYPERDRIVE:{},
+    })).toThrow('Invalid private Admin DB binding');
+    expect(()=>validateAdminHttpBindingsV1({ADMIN_READ_HYPERDRIVE:env.ADMIN_READ_HYPERDRIVE}))
+      .toThrow('Dedicated Admin DB origin unavailable');
+  });
+
 });
