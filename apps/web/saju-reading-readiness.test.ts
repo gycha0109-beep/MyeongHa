@@ -19,12 +19,18 @@ describe('Saju hub target product discovery', () => {
 
   it('keeps full product discovery and report structure, independent of runtime activation gates', () => {
     expect(html).toContain('사주 해석 상품');
-    for (const topic of ['전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계']) {
+    for (const topic of [
+      '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
+      '사업', '가족', '삶의 단계', '올해', '이번 달',
+      '배우자', '궁합', '지금 고민으로 보기',
+    ]) {
       expect(html).toContain(topic);
     }
+    expect(html).toContain('allProductTopics.map((topic) => (');
+    expect(html).toContain('className="saju-design-product-card"');
+    expect(html).not.toContain('다른 사주 주제 둘러보기');
     expect(html).toContain('이 해석 선택하기');
     expect(html).toContain('보고서 구성 미리보기');
-    expect(html).toContain('다른 사주 주제 둘러보기');
   });
 
   it('keeps current chart, free preview and distinct actual route availability', () => {
@@ -32,6 +38,6 @@ describe('Saju hub target product discovery', () => {
     expect(html).toContain('reading-detail.html?topic=temperament&scope=original');
     expect(html).toContain('reading-detail.html?topic=love');
     expect(html).toContain('reading-detail.html?scope=year');
-    expect(html).toContain('resolveReadingAvailabilityV1(href).label');
+    expect(html).toContain('resolveReadingAvailabilityV1(topic.href).label');
   });
 });
