@@ -193,10 +193,15 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 ### A4 Saju 원천 관측 분리 PR 및 DB 실행 준비 (2026-10-29)
 
 - Saju의 실제 OpenAI Responses 호출 지점에 서버 전용 `onProviderCall`을 추가했습니다. 원천 PR: https://github.com/gycha0109-beep/Saju/pull/2739. 호출별 UUID, Saju 내부 요청 ID, 모델/결과, 공급사 응답에서 실제 확인한 토큰 수만 전달합니다. 공급사 응답 원문/출생 정보/프롬프트/해석 문장/인증 키는 전달하지 않고, 단가 없는 호출과 미수신 토큰은 `null`입니다. 이 콜백은 **기본 미설치**이며 Production Saju 생성 경로에 자동 활성화되지 않습니다.
-- 명하 `reading-ai-saju-provider-bridge-v1.ts`는 Saju 소스 이벤트를 허용된 키/모델/내부 요청 ID에 대해서만 검사하고 **이미 권위 있게 확정된 DB Subject·Reading·executionAttempt**에 묶어 전용 Writer RPC에 기록할 수 있게 합니다. Saju 자체 Reading ID와 명하 DB Reading UUID가 같다고 가정하지 않습니다. 이 원천 매핑이 실제로 연결되지 않은 구간의 비용은 계속 미측정입니다.
+- 명하 `reading-ai-saju-provider-bridge-v1.ts`는 Saju 소스 이벤트를 허용된 키/모델/내부 요청 ID에 대해서만 검사합니다. **이제 임의로 넘긴 DB Subject·Reading·executionAttempt 식별자를 사용하지 않고**, 별도 `SajuReadingProviderBindingAuthorityV1.resolve()`가 동일한 Saju 요청과 실제 DB 실행 시도의 매핑을 검증해 반환해야만 전용 Writer RPC에 기록할 수 있습니다. 해당 매핑 authority의 실제 Production 구현은 아직 없으므로 연결 전까지 비용 적재는 HOLD입니다. Saju 자체 Reading ID와 명하 DB Reading UUID가 같다고 가정하지 않습니다. 이 원천 매핑이 실제로 연결되지 않은 구간의 비용은 계속 미측정입니다.
 - `apps/admin/database/reading-ai-call-cost-offline-v1.sql`의 조회 함수 두 곳에서 잘못된 달러 문자열 본문 구분자를 바로잡고 정적 회귀 테스트를 추가했습니다. **설치 후보**이며 Supabase 운영 DB에 적용하지 않았습니다.
 - 계정 연결 오류 `link_id must identify an eligible linked account`가 지속되어 관리자 최소권한 DB 역할/Hyperdrive 설치가 차단됩니다. 기존 고객 Hyperdrive/DB 계정 재활용 금지. Cloudflare Owner 전용 Access 앱은 설치됐지만 별도 Worker는 아직 미배포입니다.
 - **활성화 게이트:** Saju Production 호출 실동작·Saju 내부 요청 ID와 DB 실행시도 매핑 증거·전용 Writer/Reader 역할·비공개 이벤트 전달·Access 로그인/감사·분석 동의/철회·Retention 실운영이 검증되어야 비용/분석 완전성을 선언할 수 있습니다. 지금은 집계에서 미확정 상태를 유지합니다.
+
+### A4 전용 원장 권한 실행 사전 검증 (2026-10-29)
+
+- `apps/admin/origin-preflight.mjs`에 선택적 `MYEONGHA_ADMIN_READING_AI_COST_WRITER_DATABASE_URL` 검사를 추가했습니다. 설정된 경우에만 전용 `myeongha_reading_ai_cost_writer_v1` 로그인 계정의 실제 TLS·계정 제한 속성·비공개 `cmd_record_reading_ai_call_v1` 실행 권한을 읽기 전용으로 확인합니다.
+- 같은 계정이 Reading 실행·회원/원장 테이블을 수정하거나 Reading AI 비용 테이블을 직접 SELECT/INSERT/UPDATE/DELETE/TRUNCATE할 수 있으면 검증을 거부합니다. 사용자 서비스 DB 계정 또는 보통 Reader/Audit 계정을 Writer로 대신 사용하지 않습니다. 미설정이면 생성·접속을 시도하지 않습니다.
 
 ### A5 실서비스 분석 수집 구성 경계 (2026-10-29)
 
