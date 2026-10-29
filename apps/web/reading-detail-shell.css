@@ -159,6 +159,9 @@
 .official-report-provenance-note{margin:0;padding:18px clamp(20px,5vw,58px);border-bottom:1px solid var(--mh-brass-faint);color:var(--mh-ink-muted);font-size:12px;line-height:1.8}
 .official-report-provenance-note p{margin:0 0 8px}
 .official-report-provenance-note a{color:var(--mh-ink-strong);font-weight:700}
+.official-report-provenance-note [data-official-report-birth-status][data-birth-revision-state="changed"]{font-weight:700;color:var(--mh-ink-strong)}
+.official-report-provenance-note [data-official-report-regenerate]{display:block;margin-top:12px;padding:8px 12px;border:1px solid var(--mh-brass-faint);border-radius:8px;background:var(--mh-paper-muted);color:var(--mh-ink-muted);font:inherit;cursor:not-allowed;opacity:.75}
+
 .official-report-keypoints{margin:26px clamp(20px,5vw,58px) 0;padding:22px 25px;border:1px solid var(--mh-brass-faint);border-radius:12px;background:var(--mh-paper-muted)}
 .official-report-keypoints h2{margin:7px 0 13px;font-family:var(--mh-serif);font-size:20px}
 .official-report-keypoints p{margin:0;font-family:var(--mh-serif);font-size:16px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}
