@@ -452,23 +452,68 @@ function renderMemories(payload, subjectKind) {
       check.type = 'button';
       const status = textElement('span', 'records-memory-grant-status', '');
       status.setAttribute('role', 'status');
+      const revoke = uiElement('button', 'records-memory-grant-revoke', '세연 접근권한 철회');
+      revoke.type = 'button';
+      revoke.hidden = true;
+      const client = createRecordsRuntimeClient();
+      let busy = false;
+      async function refreshGrant() {
+        const current = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
+        if (item.isConnected) {
+          status.textContent = uiText(current.currentlyGranted
+            ? '현재 세연의 접근이 허용되어 있습니다.'
+            : '현재 세연의 접근 권한이 없습니다.');
+          revoke.hidden = !current.currentlyGranted;
+        }
+        return current;
+      }
       check.addEventListener('click', async () => {
+        if (busy) return;
+        busy = true;
         check.disabled = true;
+        revoke.hidden = true;
         status.textContent = uiText('현재 권한 확인 중…');
         try {
-          const result = await createRecordsRuntimeClient().readSeyeonMemoryGrantStatus(memory.memoryItemId);
-          if (item.isConnected) {
-            status.textContent = uiText(result.currentlyGranted
-              ? '현재 세연의 접근이 허용되어 있습니다.'
-              : '현재 세연의 접근 권한이 없습니다.');
-          }
+          await refreshGrant();
         } catch {
           if (item.isConnected) status.textContent = uiText('현재 접근권한을 확인할 수 없습니다.');
         } finally {
+          busy = false;
           check.disabled = false;
         }
       });
-      item.append(check, status);
+      revoke.addEventListener('click', async () => {
+        if (busy || !window.confirm(uiText('세연의 이 기억 접근권한을 철회하시겠습니까?'))) return;
+        busy = true;
+        check.disabled = true;
+        revoke.disabled = true;
+        revoke.hidden = true;
+        status.textContent = uiText('철회 요청을 처리하는 중입니다…');
+        let responseConfirmed = false;
+        try {
+          const result = await client.revokeSeyeonMemoryGrant(memory.memoryItemId);
+          responseConfirmed = result.status === 'committed';
+        } catch {
+          // A failed/lost response cannot be treated as a failed DB COMMIT.
+        }
+        try {
+          const current = await refreshGrant();
+          if (item.isConnected && current.currentlyGranted) {
+            status.textContent = uiText('현재 접근권한이 남아 있습니다. 철회가 확인되지 않았습니다.');
+          } else if (item.isConnected && !responseConfirmed) {
+            status.textContent = uiText('현재 세연 접근권한이 없습니다. 철회 요청의 처리 결과는 확인되지 않았습니다.');
+          }
+        } catch {
+          if (item.isConnected) {
+            status.textContent = uiText('철회 결과를 확인할 수 없습니다. 접근권한을 다시 조회해 주세요.');
+          }
+        } finally {
+          busy = false;
+          check.disabled = false;
+          revoke.disabled = false;
+        }
+      });
+      item.append(check, revoke, status);
     }
     target.append(item);
   }
