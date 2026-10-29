@@ -37,3 +37,18 @@
 5. 현재 임시 Windows worktree가 원 저장소 `node_modules` junction을 공유해 전체 `tsc -p tsconfig.json` 에 모바일 타입 경로 중복 오류가 발생했던 별도 환경 문제가 있음. 정상 CI 전체 타입/테스트 결과로 최종 판정.
 
 **다음 단계:** 서버 소유 Read-only 실연결 검증 → 승인된 Memory Source Pin/Atomic Commit 경계로 명하의 기존 governance를 유지한 채 승격 검토 → 세션 상태와 지식 학습 구현·GLM/Luna 다중 턴 실증.
+
+
+## 실제 명하 DB 메타데이터 조회 (읽기 전용, 2026-10-29)
+
+- 운영 프로젝트의 PostgreSQL 카탈로그에서 기존 다섯 함수의 정확한 매개변수/EXECUTE 확인:
+  - qry_chat_thread_runtime_binding_v1(uuid,uuid)
+  - qry_production_relationship_runtime_v1(uuid,text)
+  - qry_seyeon_production_personal_record_context_v1(uuid,text)
+  - qry_production_relationship_history_runtime_v1(uuid,text,bigint)
+  - qry_reader_context_recent_messages_v1(uuid,uuid,integer)
+- 다섯 함수 모두 myeongha_api_executor의 EXECUTE 권한은 현재 확인됨. 기존 관계 관련 두 함수는 SECURITY DEFINER이며 **이번 작업에서 권한/정의를 변경하지 않음**.
+- conversation_messages의 id, thread_id, subject_id, sequence_no, sender_type, redacted_at, body_text 컬럼 모두 존재; 해당 테이블 RLS 활성.
+- **실제 차단 요인:** has_table_privilege('myeongha_api_executor','public.conversation_messages','SELECT') = false. 이 어댑터의 전체 메시지 직접 SELECT는 해당 역할에서 현재 실행 불가. 기존 qry_chat_thread_stream_v2도 SECURITY INVOKER이고 내부에서 동일 테이블을 직접 조회하므로 EXECUTE 부여만으로 우회 가능하다고 주장할 수 없음.
+- DB 함수의 존재·권한 메타데이터를 조회했을 뿐, **실제 Subject 트랜잭션 내 개인 행 조회, 전환, 채팅 응답·모델 호출을 실행하지 않았음**.
+- **처리:** 현재 Shadow adapter는 SQL 권한 실패를 C09_DB_AUTHORITY_UNVERIFIABLE로 fail-closed. ACL 확대·SECURITY DEFINER 신규 함수·미승인 보안 경로 신설 금지. 실제 사용 가능 판정은 기존 ACL 정책 변경·검증이 완료되고 authorized executor read-only 실험을 통과한 뒤에만 수행.
