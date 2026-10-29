@@ -29,6 +29,21 @@ describe('Paid Records archive current-Grant authority', () => {
     expect(migration).toContain('paid.response_hash = rr.response_hash');
   });
 
+  it('guards report-era Birth provenance behind the exact owner/paid Reading authority', () => {
+    expect(migration).toContain('create or replace function public.qry_official_reading_birth_revision_status_v1(');
+    expect(migration).toContain('perform public.assert_myeongha_subject_context_v1(p_subject_id);');
+    expect(migration).toContain('select 1 from public.qry_official_reading_record_runtime_v1(');
+    expect(migration).toContain('rs.source_birth_revision_id');
+    expect(migration).toContain("bp.profile_kind = 'self'");
+    expect(migration).toContain('bp.archived_at is null');
+    expect(migration).toContain('when issued.id = active.id then \'current\'::text');
+    expect(migration).toContain("else 'changed'::text");
+    expect(migration).toContain("then 'unknown'::text");
+    expect(migration).toContain('revoke all on function public.qry_official_reading_birth_revision_status_v1(uuid,uuid)');
+    expect(migration).toContain('grant execute on function public.qry_official_reading_birth_revision_status_v1(uuid,uuid)');
+    expect(migration).toContain("to myeongha_api_executor;");
+  });
+
   it('retains executor-only access and tests final revoke, B2-active and independent-reader behavior', () => {
     expect(migration).toContain('revoke all on function public.qry_official_reading_record_runtime_v1');
     expect(migration).toContain('to myeongha_api_executor;');
