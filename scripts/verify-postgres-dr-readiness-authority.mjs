@@ -137,6 +137,16 @@ for (const staleFragment of [
 }
 
 const requiredStatusFragments = [
+  'verified_isolated_restore_run_id: 40799522511',
+  'verified_isolated_restore_result: SUCCESS',
+  'verified_isolated_restore_backup_run_id: 40780751650',
+  'verified_isolated_restore_backup_migration: 20261028011357',
+  'verified_isolated_restore_artifact_id: 12865611458',
+  'verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger',
+  'verified_isolated_restore_synthetic_privacy: PASS',
+  'verified_isolated_restore_serving_gate: BLOCKED',
+  'verified_restore_matches_observed_migration_version: true',
+  'verified_full_schema_catalog_equivalence: false',
   'latest_governed_backup_run_id: 36294430134',
   'latest_governed_backup_source_sha: 1d67dda2c17d35b7bf089d733981bd2425a0a0c5',
   'latest_governed_backup_artifact_id: 10923756192',
@@ -211,12 +221,14 @@ for (const staleRuntimeFragment of [
 }
 
 console.log(
-  `PostgreSQL DR authority guard PASS (blocked): latest verified bounded restore ${currentEvidence.restoreRunId} ` +
-  `covers backup migration ${currentEvidence.restoredBackupMigration}, while the observed 2026-10-28 live ` +
-  `migration is ${currentEvidence.observedLiveMigrationAsOf20261028}; repository frontier is ` +
-  `${currentEvidence.repositoryMigrationFrontier}. Current-live-schema recovery and Hosted Auth/Storage ` +
-  `equivalence are unproven. Independent future privacy source and serving S8 remain HOLD; dr_ready=false.` +
+  `PostgreSQL DR authority guard PASS (serving BLOCKED): latest isolated restore ${currentEvidence.restoreRunId} ` +
+  `passed from backup ${currentEvidence.backupRunId} at migration ${currentEvidence.restoredBackupMigration}; ` +
+  `this matches the observed Production migration VERSION ${currentEvidence.observedLiveMigrationVersion}, ` +
+  `not full schema/ACL or Hosted Auth/Storage equivalence. Current restore exercised synthetic privacy only; ` +
+  `the older real captured-window replay remains a separate historical proof. ` +
+  `Repository frontier ${currentEvidence.repositoryMigrationFrontier}; independent future privacy ` +
+  `continuity and serving S8 HOLD; dr_ready=false.` +
   (currentEvidence.repositoryCandidateBeyondObservation
-    ? ' PR-only candidate migration advance is unverified by current production recovery evidence.'
+    ? ' PR-only candidate migration advance is unverified by current-production recovery evidence.'
     : ''),
 );
