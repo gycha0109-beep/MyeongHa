@@ -6,7 +6,14 @@ import {fileURLToPath} from 'node:url';
 const CONFIG=[
  ['myeongha_admin_reader','MYEONGHA_ADMIN_READ_DATABASE_URL'],
  ['myeongha_admin_audit_writer','MYEONGHA_ADMIN_AUDIT_DATABASE_URL'],
+];
+// Read-only Admin activation requires Reader and append-only Audit Writer.
+// A command executor is separately admitted only when that capability exists.
+const OPTIONAL=[
  ['myeongha_admin_command_executor','MYEONGHA_ADMIN_COMMAND_DATABASE_URL'],
+ ['myeongha_admin_retention_executor','MYEONGHA_ADMIN_RETENTION_DATABASE_URL'],
+ ['myeongha_analytics_writer','MYEONGHA_ADMIN_ANALYTICS_WRITER_DATABASE_URL'],
+ ['myeongha_reading_ai_cost_writer_v1','MYEONGHA_ADMIN_READING_AI_COST_WRITER_DATABASE_URL'],
 ];
 export const ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1=Object.freeze([...CONFIG.map(([,key])=>key),'MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM']);
 const PRINCIPAL=`SELECT r.rolname AS role, r.rolcanlogin AND NOT r.rolinherit AND NOT r.rolsuper AND NOT r.rolbypassrls AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid) AS restricted, s.ssl AS tls FROM pg_catalog.pg_roles r LEFT JOIN pg_catalog.pg_stat_ssl s ON s.pid=pg_backend_pid() WHERE r.rolname=current_user`;
@@ -32,7 +39,7 @@ export async function inspectAdminOriginRolesV1(env,options={}){
  const missing=ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.filter(key=>typeof env[key]!=='string'||!env[key].trim());
  if(missing.length)return {originRolesVerified:false,activationEnabled:false,missing,roles:[]};
  const results=[];
- const roles=[...CONFIG,...(env.MYEONGHA_ADMIN_RETENTION_DATABASE_URL?[['myeongha_admin_retention_executor','MYEONGHA_ADMIN_RETENTION_DATABASE_URL']]:[]),...(env.MYEONGHA_ADMIN_ANALYTICS_WRITER_DATABASE_URL?[['myeongha_analytics_writer','MYEONGHA_ADMIN_ANALYTICS_WRITER_DATABASE_URL']]:[]),...(env.MYEONGHA_ADMIN_READING_AI_COST_WRITER_DATABASE_URL?[['myeongha_reading_ai_cost_writer_v1','MYEONGHA_ADMIN_READING_AI_COST_WRITER_DATABASE_URL']]:[])];
+ const roles=[...CONFIG,...OPTIONAL.filter(([,key])=>typeof env[key]==='string'&&env[key].trim())];
  for(const[role,key]of roles){
   let pool,connection,active=false,discard;
   try{
