@@ -57,6 +57,9 @@ describe('isolated Admin deployment configuration',()=>{
       ...env,ADMIN_COMMAND_HYPERDRIVE:{connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString},
     })).toThrow('Private Admin DB origins must use distinct credentials');
     expect(()=>validateAdminHttpBindingsV1({
+      ...env,ADMIN_COMMAND_HYPERDRIVE:{connectionString:'postgresql://reader:rotated-password@DB.test:5432/postgres?sslmode=verify-full'},
+    })).toThrow('Private Admin DB origins must use distinct credentials');
+    expect(()=>validateAdminHttpBindingsV1({
       ...env,ADMIN_ANALYTICS_RETENTION_HYPERDRIVE:{connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString},
     })).toThrow('Private Admin DB origins must use distinct credentials');
     expect(()=>validateAdminHttpBindingsV1({
