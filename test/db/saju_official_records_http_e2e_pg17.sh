@@ -59,6 +59,10 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/saju_official_stored_purchase_lineage_pg17
 # Reconciliation observes only the exact current purchase and attempt state;
 # it never opens a transport retry, report body or issuer verification authority.
 psql -X -v ON_ERROR_STOP=1 -f test/db/saju_official_attempt_reconciliation_pg17.sql >/dev/null
+# A stale active Reader Grant cannot bypass a cancelled verified Purchase Intent.
+# Existing Reader-independent Records reread remains available through another
+# independently verified Reader purchase, with no new read/write ACLs.
+psql -X -v ON_ERROR_STOP=1 -f test/db/official_reader_verified_purchase_access_pg17.sql >/dev/null
 
 npm run build
 node scripts/verify-saju-official-records-http-postgres-e2e.mjs
