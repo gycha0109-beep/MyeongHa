@@ -13,13 +13,18 @@ on:
         required: true
         type: string
       operation:
-        description: 'Run a fresh canary or resume one that already reached deletion_started.'
+        description: 'Run a fresh canary, resume a pending deletion, or independently attest the one completed historical case.'
         required: true
         default: fresh
         type: choice
         options:
           - fresh
           - resume
+          - attest_completed
+      attest_ledger_run_id:
+        description: 'Only for read-only completed-case attestation: canonical historical ledger run ID.'
+        required: false
+        type: string
       resume_canary_run_id:
         description: 'Required only for resume: failed Production Privacy Recovery Canary run id.'
         required: false
@@ -51,6 +56,7 @@ concurrency:
 
 jobs:
   canary:
+    if: inputs.operation != 'attest_completed'
     name: production-privacy-recovery-canary
     runs-on: ubuntu-24.04
     timeout-minutes: 20
@@ -168,8 +174,22 @@ jobs:
 
           run_id=''
           for _ in $(seq 1 30); do
-            runs="$(gh run list               --workflow production-postgres-backup.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,headSha,createdAt)"
-            run_id="$(jq -r               --arg sha "$GITHUB_SHA"               --argjson dispatched_at "$dispatched_at"               '[.[] | select(.headSha == $sha and ((.createdAt | fromdateiso8601) >= $dispatched_at))] | sort_by(.createdAt) | last | .databaseId // empty'               <<<"$runs")"
+            runs="$(gh run list               --workflow production-postgres-backup.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,createdAt,event,headBranch)"
+            # Moving main is valid; bind an unambiguous bot-triggered child run.
+            candidates="$(jq -c --argjson dispatched_at "$dispatched_at" '[.[] | select(.event == "workflow_dispatch" and .headBranch == "main" and ((.createdAt | fromdateiso8601) >= $dispatched_at)) | .databaseId]' <<<"$runs")"
+            count="$(jq 'length' <<<"$candidates")"
+            if [[ "$count" -gt 1 ]]; then
+              echo '::error title=Ambiguous child dispatch::Multiple child runs matched; refusing to guess.' >&2
+              exit 1
+            fi
+            run_id="$(jq -r 'if length == 1 then .[0] else empty end' <<<"$candidates")"
+            if [[ -n "$run_id" ]]; then
+              child="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+              jq -e '.event == "workflow_dispatch" and .head_branch == "main" and .actor.login == "github-actions[bot]"' <<<"$child" >/dev/null || {
+                echo '::error title=Untrusted child dispatch::Child run is not a main-branch Actions-bot dispatch.' >&2
+                exit 1
+              }
+            fi
             [[ -z "$run_id" ]] || break
             sleep 2
           done
@@ -247,8 +267,22 @@ jobs:
 
           run_id=''
           for _ in $(seq 1 30); do
-            runs="$(gh run list               --workflow production-postgres-privacy-recovery-ledger.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,headSha,createdAt)"
-            run_id="$(jq -r               --arg sha "$GITHUB_SHA"               --argjson dispatched_at "$dispatched_at"               '[.[] | select(.headSha == $sha and ((.createdAt | fromdateiso8601) >= $dispatched_at))] | sort_by(.createdAt) | last | .databaseId // empty'               <<<"$runs")"
+            runs="$(gh run list               --workflow production-postgres-privacy-recovery-ledger.yml               --branch main               --event workflow_dispatch               --limit 20               --json databaseId,createdAt,event,headBranch)"
+            # Moving main is valid; bind an unambiguous bot-triggered child run.
+            candidates="$(jq -c --argjson dispatched_at "$dispatched_at" '[.[] | select(.event == "workflow_dispatch" and .headBranch == "main" and ((.createdAt | fromdateiso8601) >= $dispatched_at)) | .databaseId]' <<<"$runs")"
+            count="$(jq 'length' <<<"$candidates")"
+            if [[ "$count" -gt 1 ]]; then
+              echo '::error title=Ambiguous child dispatch::Multiple child runs matched; refusing to guess.' >&2
+              exit 1
+            fi
+            run_id="$(jq -r 'if length == 1 then .[0] else empty end' <<<"$candidates")"
+            if [[ -n "$run_id" ]]; then
+              child="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$run_id")"
+              jq -e '.event == "workflow_dispatch" and .head_branch == "main" and .actor.login == "github-actions[bot]"' <<<"$child" >/dev/null || {
+                echo '::error title=Untrusted child dispatch::Child run is not a main-branch Actions-bot dispatch.' >&2
+                exit 1
+              }
+            fi
             [[ -z "$run_id" ]] || break
             sleep 2
           done
@@ -343,3 +377,118 @@ jobs:
         if: failure() && env.MYEONGHA_PRIVACY_CANARY_OPERATION == 'fresh' && steps.prepare.outcome == 'success'
         continue-on-error: true
         run: node scripts/run-production-privacy-recovery-canary.mjs cleanup-prestart
+
+  completed-attestation:
+    if: inputs.operation == 'attest_completed'
+    name: historical-completed-canary-read-only-attestation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    permissions:
+      actions: read
+      contents: read
+    env:
+      MYEONGHA_PRIVACY_CANARY_CONFIRM: ${{ inputs.confirmation }}
+      MYEONGHA_PRIVACY_CANARY_OPERATION: attest_completed
+      MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID: ${{ inputs.resume_canary_run_id }}
+      MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID: ${{ inputs.resume_backup_run_id }}
+      MYEONGHA_PRIVACY_CANARY_ATTEST_LEDGER_RUN_ID: ${{ inputs.attest_ledger_run_id }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+      MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Require exact one-incident read-only attestation authorization
+        shell: bash
+        env:
+          WATCHTOWER_TRACK: ${{ inputs.watchtower_track }}
+          WORKER_CREDENTIAL_ACTION: ${{ inputs.worker_credential_action }}
+          WORKER_CREDENTIAL_CONFIRMATION: ${{ inputs.worker_credential_confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REPOSITORY" == 'gycha0109-beep/MyeongHa' ]]
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+          [[ "$GITHUB_ACTOR" == 'gycha0109-beep' ]]
+          [[ "$WATCHTOWER_TRACK" == 'ops' ]]
+          [[ "$MYEONGHA_PRIVACY_CANARY_CONFIRM" == 'ATTEST_COMPLETED_40468086758_READ_ONLY' ]]
+          [[ "$MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID" == '40468086758' ]]
+          [[ "$MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID" == '40468157715' ]]
+          [[ "$MYEONGHA_PRIVACY_CANARY_ATTEST_LEDGER_RUN_ID" == '40468500587' ]]
+          [[ "$WORKER_CREDENTIAL_ACTION" == 'verify_only' ]]
+          [[ -z "$WORKER_CREDENTIAL_CONFIRMATION" ]]
+          [[ -n "${SUPABASE_DB_PASSWORD:-}" ]]
+          [[ -n "${MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM:-}" ]]
+          [[ "${SUPABASE_PRODUCTION_SESSION_POOLER_HOST:-}" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
+          echo 'SCOPE_APPROVED_READ_ONLY_COMPLETED_ATTESTATION'
+
+      - name: Checkout exact repository state
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build read-only attestation runtime
+        run: npm run build
+
+      - name: Verify historical GitHub evidence and Production terminal state read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          export MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH="$RUNNER_TEMP/completed-canary-terminal-state.json"
+          node scripts/run-production-privacy-recovery-canary.mjs attest-completed
+
+      - name: Verify pinned encrypted artifact pair without decryption
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          curl --fail --silent --show-error --location --retry 0 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/12717562316/zip" \
+            --output "$RUNNER_TEMP/completed-backup.zip"
+          curl --fail --silent --show-error --location --retry 0 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/12716914499/zip" \
+            --output "$RUNNER_TEMP/completed-ledger.zip"
+          python3 scripts/operations/verify-completed-privacy-canary-artifact-pair.py \
+            --backup-zip "$RUNNER_TEMP/completed-backup.zip" \
+            --ledger-zip "$RUNNER_TEMP/completed-ledger.zip" \
+            > "$RUNNER_TEMP/completed-canary-artifact-report.json"
+
+      - name: Assemble only identifier-free historical completion proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/operations/build-completed-privacy-canary-proof.mjs \
+            "$RUNNER_TEMP/completed-canary-terminal-state.json" \
+            "$RUNNER_TEMP/completed-canary-artifact-report.json" \
+            "$RUNNER_TEMP/production-privacy-canary-public-evidence.json"
+
+      - name: Upload read-only, identifier-free historical completion proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v4.6.2
+        with:
+          name: production-privacy-recovery-canary-${{ github.run_id }}
+          path: ${{ runner.temp }}/production-privacy-canary-public-evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish explicitly bounded read-only summary
+        shell: bash
+        run: |
+          {
+            echo '### Completed historical privacy deletion — read-only proof'
+            echo '- Original failed parent: 40468086758 (not reclassified)'
+            echo '- Exact backup: 40468157715 / ledger: 40468500587'
+            echo '- No new deletion, credential mutation, or Production database write'
+            echo '- Actual isolated restore and hosted Auth/Storage equivalence: NOT PROVEN'
+            echo '- DR Ready: FALSE'
+          } >> "$GITHUB_STEP_SUMMARY"

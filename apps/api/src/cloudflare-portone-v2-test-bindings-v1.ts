@@ -108,7 +108,9 @@ export async function buildCloudflarePortOneOwnerTestCheckoutV1(
   authority: CloudflarePortOneOwnerSandboxAuthorityV1,
 ): Promise<ReturnType<typeof buildPortOneChatCreditCheckoutV1>> {
   if (serverIssued?.environment !== 'sandbox' ||
-      serverIssued.ownerAdminSandboxAllowed !== true) return fail();
+      serverIssued.ownerAdminSandboxAllowed !== true ||
+      typeof serverIssued.paymentId!=='string' ||
+      !/^[A-Za-z0-9_-]{6,40}$/.test(serverIssued.paymentId)) return fail();
   const {storeId, channelKey} = resolveCloudflarePortOneTestBindingsV1(env);
   await assertCloudflarePortOneSandboxOwnerV1(authority);
   return buildPortOneChatCreditCheckoutV1({...serverIssued,storeId,channelKey});
@@ -118,6 +120,8 @@ function checkSandboxVerificationContext(
   request: CommercePaymentVerificationAdapterRequestV1,
 ): void {
   if (request?.environment !== 'sandbox' ||
+      typeof request.providerRequestId!=='string' ||
+      !/^[A-Za-z0-9_-]{6,40}$/.test(request.providerRequestId) ||
       request.provider !== 'portone_v2' ||
       request.platform !== 'web' ||
       request.expectedExternalProductId !== CHAT_CREDIT_PORTONE_V2_OFFER_V1.externalProductId ||

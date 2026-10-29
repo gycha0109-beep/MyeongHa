@@ -284,6 +284,36 @@ jq -e '
   and .drReady == false
 ' "$summary" >/dev/null
 
+# Compare previously captured events with the latest encrypted off-DB
+# snapshot. Missing prior events in an overlapping window fail closed before
+# uploading any new authoritative ledger artifact.
+overlap_report="$work_dir/privacy-ledger-snapshot-overlap.json"
+if [[ -n "${PREVIOUS_LEDGER_ARTIFACT_DIR:-}" ]]; then
+  export CURRENT_PRIVACY_LEDGER_MANIFEST="$manifest"
+  export PRIVACY_LEDGER_SNAPSHOT_OVERLAP_REPORT="$overlap_report"
+  bash scripts/operations/verify-previous-privacy-ledger-snapshot-overlap.sh
+else
+  jq -n \
+    --argjson backup_run_id "$BACKUP_RUN_ID" \
+    --arg captured_at "$captured_at_utc" '{
+      schema: "myeongha-postgres-privacy-ledger-snapshot-overlap-v1",
+      previousBackupRunId: null,
+      currentBackupRunId: $backup_run_id,
+      previousCapturedAt: null,
+      currentCapturedAt: $captured_at,
+      overlapEventCount: 0,
+      captureIntervalSeconds: null,
+      nominalScheduledIntervalSeconds: 3600,
+      captureIntervalBeyondNominalSeconds: null,
+      continuousCaptureProven: false,
+      snapshotOverlapStatus: "NO_PREDECESSOR_UNVERIFIED",
+      sourceContinuityProven: false,
+      futureSafePrivacyReconciliation: false,
+      drReady: false,
+      outputContainsIdentifiers: false
+    }' > "$overlap_report"
+fi
+
 manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
 printf '%s  %s\n' "$manifest_sha256" "$(basename "$manifest")" > "$work_dir/plaintext-sha256.txt"
 
@@ -324,13 +354,15 @@ jq \
   --arg backup_artifact_name "$BACKUP_ARTIFACT_NAME" \
   --arg encrypted_sha256 "$encrypted_sha256" \
   --arg archive_name "$(basename "$encrypted_archive")" \
+  --slurpfile overlap "$overlap_report" \
   '. + {
     schema_version: $schema_version,
     workflow_source_sha: $source_sha,
     backup_source_sha: $backup_source_sha,
     backup_artifact_name: $backup_artifact_name,
     encrypted_sha256: $encrypted_sha256,
-    archive_name: $archive_name
+    archive_name: $archive_name,
+    snapshot_overlap: $overlap[0]
   }' "$summary" > "$public_manifest"
 
 rm -f "$summary" "$work_dir/plaintext-sha256.txt"
@@ -349,8 +381,11 @@ echo "captured_at_utc=$captured_at_utc" >> "$GITHUB_OUTPUT"
   printf -- '- backup cutoff: `%s`\n' "$BACKUP_COMPLETED_AT_UTC"
   printf -- '- captured at: `%s`\n' "$captured_at_utc"
   printf -- '- replay-supported event count: `%s`\n' "$(jq -r '.eventCount' "$public_manifest")"
+  printf -- '- prior snapshot overlap: %s\n' "$(jq -r '.snapshot_overlap.snapshotOverlapStatus' "$public_manifest")"
+  printf -- '- capture interval since predecessor (seconds; null if unavailable): %s\n' "$(jq -r '.snapshot_overlap.captureIntervalSeconds' "$public_manifest")"
+  printf -- '- capture delay beyond nominal hourly cadence (seconds; not RPO): %s\n' "$(jq -r '.snapshot_overlap.captureIntervalBeyondNominalSeconds' "$public_manifest")"
   echo
-  echo 'This encrypted artifact is authoritative only for the exact governed backup cutoff through captured-at window recorded above. Recovery must fail closed when its incident reference is later than captured-at. Snapshot cadence is operational mechanics, not an approved RPO. Authoritative reconciliation, RPO/RTO, and DR Ready remain separately gated.'
+  echo 'This encrypted artifact is authoritative only for the exact governed backup cutoff through captured-at window recorded above. Recovery must fail closed when its incident reference is later than captured-at. Measured snapshot intervals are diagnostic only; snapshot comparison does not establish independent continuous capture or future-safe privacy authority. Snapshot cadence is operational mechanics, not an approved RPO. Authoritative reconciliation, RPO/RTO, and DR Ready remain separately gated.'
 } >> "$GITHUB_STEP_SUMMARY"
 
 trap - EXIT

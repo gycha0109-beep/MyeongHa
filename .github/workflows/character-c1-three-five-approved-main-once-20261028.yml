@@ -1,0 +1,91 @@
+name: '[WT:character-memory] Approved C1 3x5 public persona comparison MAIN ONCE'
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/character-c1-three-five-main-20261028-one-shot.trigger'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: character-c1-three-five-main-20261028-lifetime-once
+  cancel-in-progress: false
+
+jobs:
+  approved-research:
+    # Protected production secret binding is permitted from trusted main only.
+    # Never run from a PR, branch push, or GitHub "Re-run" attempt.
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && github.run_attempt == 1 }}
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Verify exactly one main-branch lifetime trigger BEFORE evaluating any external code
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_RUN_ID_VERIFY: ${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/workflows/character-c1-three-five-approved-main-once-20261028.yml/runs?event=push&branch=main&per_page=100" \
+            --jq '[.total_count, .workflow_runs[0].id, .workflow_runs[0].run_attempt] | @tsv' \
+            > "$RUNNER_TEMP/first-run.txt"
+          read -r count first_run attempt < "$RUNNER_TEMP/first-run.txt"
+          test "$count" = "1"
+          test "$first_run" = "$GITHUB_RUN_ID_VERIFY"
+          test "$attempt" = "1"
+          echo "MAIN_ONLY_ONE_SHOT_ADMITTED=1"
+      - name: Checkout exact source-reviewed immutable research commit (no default credentials)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 9037ecebad184af0cbf6196953c06dcb3b13538a
+          persist-credentials: false
+      - name: Verify pinned source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "9037ecebad184af0cbf6196953c06dcb3b13538a"
+      - name: Set up Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Offline admission, TypeScript and audited research tests (no secret)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund
+          npx tsc -p tsconfig.json --noEmit
+          npx vitest run test/character-dialogue-live-model-shadow-v1.test.ts test/character-dialogue-multiturn-offline-shadow-v1.test.ts test/character-c1-three-five-public-profile-adapter-v1.test.ts
+          node --check scripts/character-c1-three-five-paid-eval-20261028.mjs
+          npx rolldown scripts/character-c1-three-five-public-profile-adapter-v1.ts --platform node --format esm --file "$RUNNER_TEMP/c1-three-five-profiles.mjs"
+          test -s "$RUNNER_TEMP/c1-three-five-profiles.mjs"
+      - name: Assert exact synthetic public 3x5 dry-run input (no secret)
+        env:
+          MYEONGHA_C1_EVAL_PROFILES_MODULE: ${{ runner.temp }}/c1-three-five-profiles.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/character-c1-three-five-paid-eval-20261028.mjs --dry-run
+      - name: Owner-approved ONE paid public-only research experiment, 30 requests / $0.30 max
+        env:
+          MYEONGHA_C1_EVAL_PROFILES_MODULE: ${{ runner.temp }}/c1-three-five-profiles.mjs
+          MYEONGHA_C1_EVAL_OUTPUT_DIR: ${{ runner.temp }}/character-c1-three-five-main-20261028
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +x
+          test -n "${OPENROUTER_API_KEY:-}"
+          node scripts/character-c1-three-five-paid-eval-20261028.mjs --execute --approved-three-five-20261028
+      - name: Upload exact generated research dialogue and usage journal even if held
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: c1-three-five-main-once-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/character-c1-three-five-main-20261028/
+          if-no-files-found: warn
+          retention-days: 14

@@ -12,6 +12,18 @@
 
 기록 탭의 **첫 유료 사주 보고서 보관·상세 재열람·구매권·첫 Reader 연결** 구현은 [Records 공식 보고서 구현 로드맵](implementation/RECORDS_OFFICIAL_REPORT_IMPLEMENTATION_ROADMAP_20261027.md)을 따릅니다. 기존 Records 조회 API와 Web 화면을 재사용하며, Saju Production Interpretation 및 Commerce Product/Offer **HOLD**를 해제한 것으로 간주하지 않습니다. **S0 출시 필수 / S1 출시 권장 / S2~S4 출시 후 확장**을 분리합니다.
 
+## 현재 설계 권위·스냅샷 적용 범위 (2026-10-28)
+
+[설계 충돌·적용 범위 원장](architecture/ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md)은 기존 정본을 대체하는 새 아키텍처가 아니라, **후속 결정이 구형 구현 전제를 덮어쓰는 지점**과 타 트랙 인계 범위의 색인입니다.
+
+- 최초 Use Case·ERD·Integration Spine의 핵심 소유권·보안·의미론 계약은 도메인별로 유효하나, 그 안의 `OPEN-P0`, 출시 인원, provider, 배포 상태, 최초 구현 순서는 **작성 당시 스냅샷**입니다. 현재 상태는 아래 P0 원장, 후속 좁은 범위의 승인 결정, 최신 `main` 코드/CI·배포 증거로 별도로 판단합니다. 코드가 존재한다는 사실은 Production 공개 승인과 다릅니다.
+- 캐릭터 9명 일반 출시 결정은 [캐릭터 정본](source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md), Reader 초기 **세연 1명 프리뷰**와 유료 Reader 별도 HOLD는 [Reader 단계적 개방](WEB_READER_STAGED_ROLLOUT_SEYEON_FIRST_V1.md) 및 서버 권한이 기준입니다. 이는 상충하는 캐릭터 수 결정이 아닙니다.
+- 현재 제품의 공개 Origin과 사용·배포 기준은 [Cloudflare Worker](operations/VERCEL_ORIGIN_DEPENDENCY_CLEANUP_20261026.md)입니다. **2026-10-28 사용자 운영 지시: Vercel은 현재 제품의 사용·신규 배포·장애 시 자동 대체 경로로 사용하지 않습니다.** 과거 [운영 아키텍처](architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 Vercel “현재” 기술과 아직 남아 있는 Vercel 리소스·콜백은 역사적/전환 미완료 상태의 기록이지 현행 사용 승인이 아닙니다. 물리적 종료·OAuth/기존 링크 이관은 별도 운영 수락 조건을 건너뛰어 실행하지 않습니다. 별도 Saju 엔진 및 Supabase Auth/Storage도 Cloudflare로 자동 이전되지 않습니다. Cloudflare 무료 플랜 외 신규 유료 인프라는 미승인입니다.
+- 일반 회원 사주 통합은 [기존 권한 재사용 V2](SAJU_BRIDGE_EXISTING_AUTHORITIES_NO_NEW_ROLES_V2_20261016.md)를 따릅니다. 과거 S3A Permit과 SO-4의 3DB 고격리 리허설은 다른 보안/실행 프로파일이며 일반 사주 제품의 공통 선행 조건이 아닙니다.
+- 결제는 [P0 결정 원장](P0_DECISION_REGISTER.md)의 Web one-off·PortOne V2를 따르되 판매 Offer/Entitlement 공개는 별도 HOLD입니다. [DR 최신 상태](operations/POSTGRES_DR_READINESS_STATUS_V1.md)의 10월 한정 성공은 9월 `1310` 증거를 현재 상태로 만들지 않으며, `dr_ready=false`와 Hosted Auth/Storage 복구 보류를 유지합니다. DR 검사기 변경은 운영·DR 트랙만 담당합니다.
+
+
+
 ## 일반 Security 실행 진입점 (2026-10-24)
 
 일반 `security` 트랙은 [Security 실행 로드맵](security/SECURITY_EXECUTION_ROADMAP_V1.md)에서 진행합니다. 구현 90 / 검증 10을 작업 배분 기준으로 적용하며, API 남용 방지·보안 이벤트·공급망·운영 복구 증거를 기존 이슈와 연결합니다. 인증·권한·DB·운영 변경의 개별 승인 경계는 유지합니다.

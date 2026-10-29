@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { setTimeout as sleepFor } from 'node:timers/promises';
 
 export const integrationContext = 'CI Integration Verify';
 export const integrationLabel = 'ci-integration-ready';
@@ -51,7 +52,10 @@ export function assertPrerequisites(required, checks, statuses) {
       .sort((a, b) => b.id - a.id);
     // Commit statuses do not expose the app binding used by rulesets.
     const matchingStatuses = app ? [] : statuses.filter(status => status.context === name);
-    if (runs.length && (runs[0].status !== 'completed' || runs[0].conclusion !== 'success')) {
+    if (runs.length && runs[0].status !== 'completed') {
+      throw new Error(`Required check is pending: ${name}`);
+    }
+    if (runs.length && runs[0].conclusion !== 'success') {
       throw new Error(`Required check is not successful: ${name}`);
     }
     if (matchingStatuses.length && matchingStatuses[0].state !== 'success') {
@@ -106,7 +110,38 @@ export function checkCandidate(candidate, repo) {
   return current;
 }
 
-function run() {
+/**
+ * GitHub Actions may register CI Verify only after the ordinary CI completes.
+ * On 2026-10-27 that took roughly four minutes after labeling PR #2669;
+ * 12 retries/96 seconds was insufficient and exhausted before CI Verify existed.
+ * Bound retry to 60 x 8s (plus API calls), with 15m job timeout.
+ * Only missing/running CI Verify is transient. Failed CI Verify and any
+ * incomplete, failed, misattributed or absent OTHER check block immediately.
+ * Re-read the complete pinned PR/ruleset/check state on every bounded retry.
+ */
+export async function waitForCiVerifyRegistration(guard, {
+  maxRetries = 60,
+  sleep = sleepFor,
+  intervalMs = 8000,
+} = {}) {
+  if (typeof guard !== 'function' || !Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 60
+      || !Number.isInteger(intervalMs) || intervalMs < 0 || intervalMs > 8000) {
+    throw new Error('Invalid CI registration retry policy');
+  }
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return guard();
+    } catch (error) {
+      if (!(error instanceof Error)
+          || !['Required check is missing: CI Verify', 'Required check is pending: CI Verify'].includes(error.message)
+          || attempt >= maxRetries) throw error;
+      process.stdout.write('CI Verify is missing or still running; rechecking pinned candidate authority.\n');
+      await sleep(intervalMs);
+    }
+  }
+}
+
+async function run() {
   const repo = process.env.GITHUB_REPOSITORY;
   if (process.argv[2] === 'policy') {
     if (process.env.CI_STAGED_VERIFICATION !== 'true') return;
@@ -128,8 +163,8 @@ function run() {
     const tree = execFileSync('git', ['rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
     process.stdout.write(`Pinned candidate tree: ${tree}\n`);
   } else if (process.argv[2] === 'guard') {
-    checkCandidate(candidate, repo);
+    await waitForCiVerifyRegistration(() => checkCandidate(candidate, repo));
   } else throw new Error('Expected policy, prepare, or guard');
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) run();
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await run();

@@ -1,5 +1,11 @@
 # 명하 Commerce Payment Track Architecture v1
 
+> **2026-10-28 current-state correction:** the September baseline and issue
+> statuses below are historical. Follow the current code, Decision Register and
+> [Commerce continuation evidence](operations/COMMERCE_PAYMENT_CONTINUATION_20261028.md)
+> for the Owner KCP sandbox path. #680 is now CLOSED; that does not authorize
+> LIVE checkout, paid credit issuance, public webhooks or refund activation.
+
 > Status: **CURRENT IMPLEMENTATION / PRE-PRODUCTION HOLD**  
 > Track lineage: **결제 권한 / Commerce 결제 연속 트랙**  
 > Baseline main: `9cb4f49e2511d2c2ff1283b63d9452d6b86c0059`  

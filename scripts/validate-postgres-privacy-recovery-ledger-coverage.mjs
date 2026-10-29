@@ -45,14 +45,46 @@ export function validatePrivacyRecoveryLedgerCoverage(summaryInput, incidentRefe
   ) {
     fail('serviceability coverage rule drifted');
   }
+  if (
+    summary.authoritativePrivacyReconciliation !== false ||
+    summary.futureSafePrivacyReconciliation !== false ||
+    summary.drReady !== false
+  ) {
+    fail('source summary attempts to promote reconciliation or DR readiness');
+  }
+  if (summary.replayPlannerAccepted !== true) {
+    fail('source summary lacks accepted replay planner evidence');
+  }
+  if (!Number.isSafeInteger(summary.backupRunId) || summary.backupRunId <= 0) {
+    fail('backupRunId must be a positive integer');
+  }
+  if (typeof summary.sourceDigest !== 'string' ||
+      !/^sha256:[a-f0-9]{64}$/u.test(summary.sourceDigest)) {
+    fail('source digest is not a canonical SHA-256 digest');
+  }
+  if (!Number.isSafeInteger(summary.eventCount) || summary.eventCount < 0) {
+    fail('eventCount must be a nonnegative integer');
+  }
+  const eventTypeCounts = requireRecord(summary.eventTypeCounts, 'eventTypeCounts');
+  const counts = Object.values(eventTypeCounts);
+  if (!counts.every((count) => Number.isSafeInteger(count) && count >= 0) ||
+      counts.reduce((total, count) => total + count, 0) !== summary.eventCount) {
+    fail('event type counts do not match eventCount');
+  }
 
   const backupCompletedAt = requireInstant(summary.backupCompletedAt, 'backupCompletedAt');
+  const capturedAt = requireInstant(summary.capturedAt, 'capturedAt');
   const coverageThrough = requireInstant(
     summary.authoritativeCoverageThrough,
     'authoritativeCoverageThrough',
   );
   const incident = requireInstant(incidentReferenceUtc, 'incidentReferenceUtc');
 
+  // The authoritative boundary is the DB capture, not a caller-editable
+  // extension of the public summary. No timestamp past capture is serviceable.
+  if (coverageThrough.milliseconds !== capturedAt.milliseconds) {
+    fail('authoritative coverage must exactly equal capturedAt');
+  }
   if (coverageThrough.milliseconds < backupCompletedAt.milliseconds) {
     fail('authoritative coverage precedes backup completion');
   }

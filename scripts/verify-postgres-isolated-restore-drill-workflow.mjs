@@ -103,6 +103,11 @@ for (const fragment of [
   'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
   'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
+  'Record fail-closed recovered service admission',
+  'node scripts/build-postgres-recovered-serving-admission.mjs',
+  'recovered-serving-admission.json',
+  '.serviceResumptionAllowed == false',
+  '.futureSafePrivacyReconciliation == false',
   'seyeon_early_history_restore_proof=\\(.seyeon_early_history_restore_proof)',
   'seyeon_early_functions_restore_proof=\\(.seyeon_early_functions_restore_proof)',
   '${{ runner.temp }}/restore-evidence/*.json',
@@ -149,12 +154,15 @@ if (onSection.includes('push:')) {
   const currentBackupApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-40232489516-20261026.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved) {
-    throw new Error('Restore one-shot push must have exactly the three reviewed historical/current source markers.');
+  const freshBackupApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-40780751650-20261029.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved) {
+    throw new Error('Restore one-shot push must have exactly the four reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 3) {
-    throw new Error('Restore one-shot push allows exactly three pinned marker paths.');
+  if (triggerMarkers.length !== 4) {
+    throw new Error('Restore one-shot push allows exactly four pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -172,6 +180,12 @@ if (onSection.includes('push:')) {
     'backup_run_id=39067271230',
     'incident_reference_utc=2026-10-18T08:00:00Z',
     "ops(dr): one-shot restore backup 40232489516",
+    "ops(dr): one-shot restore backup 40780751650",
+    'POSTGRES-RESTORE-BACKUP-40780751650-20261029-V1',
+    'backup_run_id=40780751650',
+    'incident_reference_utc=2026-10-28T22:37:00Z',
+    'now - point <= 86400',
+    'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
     'backup_run_id=40232489516',
     'incident_reference_utc=2026-10-26T00:00:00Z',
@@ -337,9 +351,9 @@ for (const fragment of [
 }
 
 for (const fragment of [
-  '.name == "Production PostgreSQL Privacy Recovery Ledger"',
+  '.name == "[WT:ops] Production PostgreSQL Privacy Recovery Ledger"',
   '.path == ".github/workflows/production-postgres-privacy-recovery-ledger.yml"',
-  '.name == "Production Privacy Recovery Canary"',
+  '.name == "[WT:ops] Production Privacy Recovery Canary"',
   '.path == ".github/workflows/production-privacy-recovery-canary.yml"',
   '^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$',
   'production-privacy-recovery-canary-$PRODUCTION_PRIVACY_CANARY_RUN_ID',

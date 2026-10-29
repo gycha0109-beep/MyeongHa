@@ -4,6 +4,22 @@
 > Scope: post-backup privacy authority replay mechanics only  
 > DR Ready: false
 
+## Runtime authority update — 2026-10-28
+
+The foundation-era `Durable-source limitation` and `Promotion path` below describe historical design gaps; they must not override the separately implemented encrypted off-primary-DB `AUTHORITATIVE_CAPTURED_WINDOW_V1` ledger. The concrete [restore 40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574) used exact backup `40468157715`, privacy ledger `40468500587`, and successful read-only completed-canary proof `40633679630` for original failed parent `40468086758`. The captured-window **one-event** replay, identical replay idempotency, finalization completion, non-resurrection and Commerce P5Y retention passed on isolated PostgreSQL 17. It did not delete another account or turn the failed parent run into SUCCESS.
+
+```ini
+authoritative_privacy_reconciliation = true
+authoritative_source_scope = captured-window-only
+replay_event_count = 1
+second_identical_replay = idempotent-pass
+completion_replay = idempotent-pass
+future_safe_privacy_reconciliation = false
+dr_ready = false
+```
+
+Read-only Production migration ledger version `20261028011357` was newer than this restored backup's `20261027043527`. Ledger capture ends at `2026-10-27T07:40:33Z`; no event-completeness guarantee beyond that instant has been proven. Any recovery reference later than its authorized captured window must fail closed. See [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887); a fresh backup and complete independent privacy source are still required for a future incident.
+
 ## Purpose
 
 A successful logical restore can resurrect state that was revoked after the backup cutoff. This foundation defines a deterministic replay-plan compiler for already-authorized privacy transitions without inventing the unresolved account-finalization or commerce-retention policy.
@@ -114,7 +130,7 @@ dr_ready = false
 
 This is a **mechanics exercise only**. It does not turn `synthetic-db-drill` into durable privacy authority and does not satisfy account-finalization or commerce-retention policy. Manual restore run `35325070718` runtime-proved the integration from main head `eddc1c331b6a8c0f47f54c150acd2f6cc5c7c0c2`: all four synthetic event types replayed, the identical second replay was idempotent, the negative terminal-state case failed closed, and the sanitized evidence recorded `authoritative_post_backup_source=false` and `dr_ready=false`.
 
-## Durable-source limitation
+## Historical foundation-era durable-source limitation (superseded for captured-window source only)
 
 This compiler does **not** establish where the post-backup manifest is stored.
 

@@ -150,7 +150,7 @@ await assertMissing(resolve('vercel.json'), 'Retired Vercel deployment configura
 // These counts and exact dispatch destinations are application ingress
 // contracts, not a provider-imposed limit on the number of API functions.
 if (CLOUDFLARE_DIRECT_API_ROUTES.length !== 12 ||
-    CLOUDFLARE_REWRITE_ROUTES.length !== 21) {
+    CLOUDFLARE_REWRITE_ROUTES.length !== 24) {
   throw new Error('Cloudflare API route inventory changed without an explicit routing migration.');
 }
 const directPaths = CLOUDFLARE_DIRECT_API_ROUTES.map(route => route.path);
@@ -177,6 +177,9 @@ const requiredRewrites = new Map([
   ['/api/readings', '/api/me?__myeongha_records_read=readings'],
   ['/api/memories', '/api/me?__myeongha_records_read=memories'],
   ['/api/me/credits', '/api/me?__myeongha_chat_credit_wallet=1'],
+  ['/api/me/credits/portone/test-checkout', '/api/me?__myeongha_portone_owner_sandbox_checkout=1'],
+  ['/api/me/credits/portone/test-prepare', '/api/me?__myeongha_portone_owner_sandbox_prepare=1'],
+  ['/api/me/credits/portone/test-verify', '/api/me?__myeongha_portone_owner_sandbox_verify=1'],
   ['/api/chat/:threadId', '/api/me?__myeongha_chat_thread_id=:threadId'],
   ['/api/chat/:threadId/turns', '/api/me?__myeongha_chat_turn_send=1&__myeongha_chat_thread_id=:threadId'],
 ]);
@@ -190,7 +193,7 @@ await assertExists(resolve('workers/cloudflare-api-router.mjs'));
 for (const path of [
   'api/birth-profiles/[id].ts',
   'api/life-record.ts', 'api/readings.ts', 'api/memories.ts',
-  'api/me/credits.ts', 'api/chat.ts', 'api/chat/[threadId].ts',
+  'api/me/credits.ts', 'api/me/credits/portone/test-checkout.ts', 'api/me/credits/portone/test-prepare.ts', 'api/me/credits/portone/test-verify.ts', 'api/chat.ts', 'api/chat/[threadId].ts',
 ]) {
   await assertMissing(resolve(path), 'Duplicate HTTP entrypoint bypasses the governed dispatcher: ' + path);
 }

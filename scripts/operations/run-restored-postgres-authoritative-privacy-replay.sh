@@ -51,6 +51,14 @@ jq -e \
     and .drReady == false
   ' "$canary_evidence" >/dev/null
 
+# Keep the existing successful protected-run requirement; additionally reject
+# misattribution of a historical read-only attestation to a fresh deletion.
+node scripts/operations/assert-privacy-replay-canary-evidence.mjs \
+  "$canary_evidence" \
+  "$PRIVACY_RECONCILIATION_BACKUP_RUN_ID" \
+  "$PRIVACY_RECONCILIATION_LEDGER_RUN_ID" \
+  "$PRODUCTION_PRIVACY_CANARY_RUN_ID"
+
 jq -e \
   --argjson backup_run_id "$PRIVACY_RECONCILIATION_BACKUP_RUN_ID" \
   --arg archive_name "$(basename "$encrypted_archive")" '

@@ -1358,6 +1358,76 @@ async function cleanupPrestart() {
   console.log('MYEONGHA_PRODUCTION_PRIVACY_CANARY_CLEANUP_PASS');
 }
 
+async function attestCompletedCanary() {
+  if (requiredEnv('MYEONGHA_PRIVACY_CANARY_CONFIRM') !== 'ATTEST_COMPLETED_40468086758_READ_ONLY'
+      || requiredEnv('MYEONGHA_PRIVACY_CANARY_OPERATION') !== 'attest_completed') {
+    fail('COMPLETED_CANARY_ATTESTATION_CONFIRMATION_REQUIRED');
+  }
+  const {
+    attestCompletedPrivacyCanaryReadOnlyV1,
+    assertCompletedCanaryHistoricalExecutionV1,
+    assertCompletedCanaryArtifactListingsV1,
+  } = await import('./attest-completed-production-privacy-canary.mjs');
+  const sourceCanaryRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_RUN_ID'));
+  const governedBackupRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_RESUME_BACKUP_RUN_ID'));
+  const canonicalLedgerRunId = requireRunId(
+    requiredEnv('MYEONGHA_PRIVACY_CANARY_ATTEST_LEDGER_RUN_ID'));
+  const repo = requiredEnv('GITHUB_REPOSITORY');
+  const githubToken = requiredEnv('GH_TOKEN');
+  if (repo !== 'gycha0109-beep/MyeongHa'
+      || requiredEnv('GITHUB_EVENT_NAME') !== 'workflow_dispatch'
+      || requiredEnv('GITHUB_REF') !== 'refs/heads/main') {
+    fail('COMPLETED_CANARY_GITHUB_EXECUTION_AUTHORITY_INVALID');
+  }
+  async function readGithub(path) {
+    const response = await fetchWithTimeout(
+      `https://api.github.com/repos/${repo}/${path}`, {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${githubToken}`,
+          accept: 'application/vnd.github+json',
+        },
+      },
+    );
+    if (response.status !== 200) fail('COMPLETED_CANARY_GITHUB_PROVENANCE_UNAVAILABLE');
+    return readBoundedJson(response);
+  }
+  assertCompletedCanaryHistoricalExecutionV1({
+    sourceRun: await readGithub(`actions/runs/${sourceCanaryRunId}`),
+    backupRun: await readGithub(`actions/runs/${governedBackupRunId}`),
+    ledgerRun: await readGithub(`actions/runs/${canonicalLedgerRunId}`),
+    sourceJobs: await readGithub(`actions/runs/${sourceCanaryRunId}/jobs?per_page=10`),
+  });
+  assertCompletedCanaryArtifactListingsV1({
+    sourceArtifacts: await readGithub(`actions/runs/${sourceCanaryRunId}/artifacts?per_page=100`),
+    backupArtifacts: await readGithub(`actions/runs/${governedBackupRunId}/artifacts?per_page=100`),
+    ledgerArtifacts: await readGithub(`actions/runs/${canonicalLedgerRunId}/artifacts?per_page=100`),
+    nowUtc: new Date().toISOString(),
+  });
+  const pool = await createAdminPool();
+  const client = await pool.connect();
+  let evidence;
+  try {
+    await client.query('BEGIN READ ONLY');
+    evidence = await attestCompletedPrivacyCanaryReadOnlyV1(
+      (text, params) => client.query(text, params),
+      { sourceCanaryRunId, governedBackupRunId, canonicalLedgerRunId },
+    );
+  } finally {
+    await client.query('ROLLBACK').catch(() => {});
+    client.release();
+    await pool.end();
+  }
+  const evidencePath = requiredEnv('MYEONGHA_PRIVACY_CANARY_EVIDENCE_PATH');
+  await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
+  console.log('PASS_PRODUCTION_PRIVACY_CANARY_READ_ONLY_COMPLETED_ATTESTATION');
+}
+
 async function main() {
   const mode = process.argv[2];
   if (mode === 'sync-worker-password') return syncWorkerPassword();
@@ -1365,6 +1435,7 @@ async function main() {
   if (mode === 'provision-api-login') return provisionApiCanaryLogin();
   if (mode === 'prepare') return prepare();
   if (mode === 'execute') return execute();
+  if (mode === 'attest-completed') return attestCompletedCanary();
   if (mode === 'recover-resume-state') return recoverResumeState();
   if (mode === 'resume') return resumeDeletion();
   if (mode === 'cleanup-api-login') return cleanupApiCanaryLogin();
