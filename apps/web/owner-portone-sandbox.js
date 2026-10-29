@@ -71,20 +71,7 @@ async function serverRequest(path,body=null){
   cache:'no-store',
   redirect:'error',
  });
- if(!response.ok){
-  let dailyLimit=false;
-  if(response.status===429){
-   try{
-    const failure=await response.json();
-    dailyLimit=failure?.error?.code==='SANDBOX_DAILY_LIMIT';
-   }catch{}
-  }
-  const failure=Error(dailyLimit
-   ? '최근 24시간 관리자 테스트 요청 10회 한도에 도달했습니다.'
-   : '서버에서 해당 관리자 테스트 요청을 허용하지 않았습니다.');
-  if(dailyLimit)failure.code='SANDBOX_DAILY_LIMIT';
-  throw failure;
- }
+ if(!response.ok)throw Error('서버에서 해당 관리자 테스트 요청을 허용하지 않았습니다.');
  const envelope=await response.json();
  if(!envelope||typeof envelope!=='object'||envelope.ok!==true)
   throw Error('서버 테스트 결과를 확인할 수 없습니다.');
