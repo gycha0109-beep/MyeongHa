@@ -26,10 +26,12 @@ describe('Saju hub target product discovery', () => {
     ]) {
       expect(html).toContain(topic);
     }
-    expect(html).toContain('allProductTopics.map((topic) => (');
+    expect(html).toContain('allProductTopics.map((topic) => {');
     expect(html).toContain('className="saju-design-product-card"');
     expect(html).not.toContain('다른 사주 주제 둘러보기');
-    expect(html).toContain('이 해석 선택하기');
+    expect(html).toContain("availability.kind === 'preview'");
+    expect(html).toContain('프리뷰 읽기');
+    expect(html).toContain('aria-disabled="true"');
     expect(html).toContain('보고서 구성 미리보기');
   });
 
@@ -38,6 +40,6 @@ describe('Saju hub target product discovery', () => {
     expect(html).toContain('reading-detail.html?topic=temperament&scope=original');
     expect(html).toContain('reading-detail.html?topic=love');
     expect(html).toContain('reading-detail.html?scope=year');
-    expect(html).toContain('resolveReadingAvailabilityV1(topic.href).label');
+    expect(html).toContain('const availability = resolveReadingAvailabilityV1(topic.href);');
   });
 });
