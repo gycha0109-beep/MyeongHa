@@ -36,6 +36,7 @@ create table myeongha_internal.character_learning_evidence_v1 (
   approved_for_character_sharing boolean not null default false,
   privacy_reviewed_at timestamptz null,
   privacy_review_ref text null,
+  sharing_consent_ref text null,
   approval_ref text not null,
   verified_at timestamptz not null,
   learned_at timestamptz not null,
@@ -51,10 +52,11 @@ create table myeongha_internal.character_learning_evidence_v1 (
   constraint c09_learning_scope_check check (
     (visibility='character_shared' and subject_id is null
       and approved_for_character_sharing=true
-      and privacy_reviewed_at is not null and privacy_review_ref is not null)
+      and privacy_reviewed_at is not null and privacy_review_ref is not null
+      and (source_kind <> 'user_taught_verified' or sharing_consent_ref is not null))
     or
     (visibility='user_private' and subject_id is not null
-      and approved_for_character_sharing=false)
+      and approved_for_character_sharing=false and sharing_consent_ref is null)
   ),
   constraint c09_learning_time_check check (
     verified_at >= learned_at

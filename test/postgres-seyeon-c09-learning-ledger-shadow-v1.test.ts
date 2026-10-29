@@ -48,6 +48,7 @@ function history(
     supersededAt: null,
     approvalRef: 'approved:owner:1',
     privacyReviewRef: 'review:privacy:1',
+    sharingConsentRef: 'consent:sharing:1',
     ...patch,
   };
 }
@@ -68,6 +69,7 @@ function verification(
     privacyReviewed: row.privacyReviewed,
     approvalRef: row.approvalRef,
     privacyReviewRef: row.privacyReviewRef,
+    sharingConsentRef: row.sharingConsentRef,
     verifiedAt: row.verifiedAt,
     validAt: row.validAt,
     learnedAt: row.learnedAt,
@@ -160,14 +162,14 @@ describe('C09 proposed learning ledger real SQL source reader (mocked schema)', 
     const privateRow = history({
       visibility: 'user_private', subjectId: SUBJECT,
       approvedForCharacterSharing: false,
-      privacyReviewed: false, privacyReviewRef: null,
+      privacyReviewed: false, privacyReviewRef: null, sharingConsentRef: null,
     });
     const { reader } = fake({
       historyRows: [privateRow],
       verificationRows: [verification({
         visibility: 'user_private', sourceSubjectId: SUBJECT,
         approvedForCharacterSharing: false,
-        privacyReviewed: false, privacyReviewRef: null,
+        privacyReviewed: false, privacyReviewRef: null, sharingConsentRef: null,
       })],
     });
     const records = await reader.readVerifiedLearningHistory({

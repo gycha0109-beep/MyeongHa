@@ -36,7 +36,7 @@ export const POSTGRES_SEYEON_C09_LEARNING_HISTORY_SQL_V1 = [
   ' learned_at as "learnedAt", valid_at as "validAt",',
   ' superseded_at as "supersededAt",',
   ' verified_at as "verifiedAt", approval_ref as "approvalRef",',
-  ' privacy_review_ref as "privacyReviewRef"',
+  ' privacy_review_ref as "privacyReviewRef", sharing_consent_ref as "sharingConsentRef"',
   'from myeongha_internal.character_learning_evidence_v1',
   'where character_id = $1::text and topic_key = $2::text',
   ' and ((visibility = \'character_shared\' and subject_id is null',
@@ -58,6 +58,7 @@ export const POSTGRES_SEYEON_C09_LEARNING_VERIFY_SQL_V1 = [
   ' approved_for_character_sharing as "approvedForCharacterSharing",',
   ' privacy_reviewed_at is not null as "privacyReviewed",',
   ' approval_ref as "approvalRef", privacy_review_ref as "privacyReviewRef",',
+  ' sharing_consent_ref as "sharingConsentRef",',
   ' verified_at as "verifiedAt", valid_at as "validAt",',
   ' learned_at as "learnedAt", superseded_at as "supersededAt",',
   ' revoked_at as "revokedAt"',
@@ -104,7 +105,10 @@ function checkEvidence(row: Row, subjectId: string, asOfTurn: string): SeyeonC09
       !TOPIC.test(String(row.topicKey)) || !SOURCES.includes(row.sourceKind as typeof SOURCES[number]) ||
       !LEVELS.includes(row.awareness as typeof LEVELS[number]) ||
       !bounded(row.authorityRef) || !bounded(row.approvalRef) ||
-      !bounded(row.privacyReviewRef) && vis === 'character_shared' ||
+      (!bounded(row.privacyReviewRef) && vis === 'character_shared') ||
+      (vis === 'character_shared' && row.sourceKind === 'user_taught_verified' &&
+        !bounded(row.sharingConsentRef)) ||
+      (vis === 'user_private' && row.sharingConsentRef !== null) ||
       !['character_shared', 'user_private'].includes(vis as string) ||
       row.approvedForCharacterSharing !== (vis === 'character_shared') ||
       row.privacyReviewed !== (vis === 'character_shared') && vis === 'character_shared' ||
