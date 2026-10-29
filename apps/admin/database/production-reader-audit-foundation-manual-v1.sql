@@ -4,6 +4,9 @@
 -- No passwords or cloud credentials are provisioned. Customer APIs and Workers stay unchanged.
 -- Exact project ref must be verified by the operator before applying.
 -- Abort on any pre-existing Admin authority to prevent privilege drift.
+-- The entire install is atomic: any failed GRANT or POLICY rolls back every new object.
+
+BEGIN;
 
 DO $admin_preflight$
 BEGIN
@@ -169,3 +172,5 @@ grant insert (request_id, actor_auth_user_id, target_ref, action, outcome, occur
   on myeongha_admin_ops.admin_audit_events_v1 to myeongha_admin_audit_writer;
 create policy admin_append_audit_v1 on myeongha_admin_ops.admin_audit_events_v1
   for insert to myeongha_admin_audit_writer with check (true);
+
+COMMIT;
