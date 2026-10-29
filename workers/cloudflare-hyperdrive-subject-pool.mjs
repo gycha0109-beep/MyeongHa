@@ -112,6 +112,25 @@ export function createCloudflareSeyeonSubjectPoolV1(bindings,options){
     expectedLoginPrincipal:'myeongha_seyeon_subject_login',
   });
 }
+// Issued-response receipts and withdrawal must remain available after an
+// emergency model/cost stop, even if the separately governed connection is
+// missing. Never create or open the governed pool in this privacy path.
+export function createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1(bindings,options){
+  const ordinary=bindings?.SEYEON_SUBJECT_HYPERDRIVE?.connectionString;
+  if(typeof ordinary!=='string'||ordinary.length<20||ordinary.length>4096){
+    throw Error('SeYeon withdrawal Subject Hyperdrive binding unavailable');
+  }
+  const governed=bindings?.SEYEON_GOVERNED_HYPERDRIVE?.connectionString;
+  if(typeof governed==='string'&&ordinary===governed){
+    throw Error('Privacy Subject and governed cost bindings must remain separate');
+  }
+  return createNodePostgresSubjectPoolFromDriverV1({
+    driverPool:createHyperdriveDriverPoolV1(
+      requireHyperdriveConnectionStringV1(ordinary),options,
+    ),
+    expectedLoginPrincipal:'myeongha_seyeon_subject_login',
+  });
+}
 export function createCloudflareSeyeonGovernedPoolV1(bindings,options){
   const target=seyeonHyperdriveBindingsV1(bindings);
   return createSeyeonGovernedPostgresPoolFromDriverV1({
