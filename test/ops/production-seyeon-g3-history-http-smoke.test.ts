@@ -61,9 +61,9 @@ describe('governed production Se-yeon G3 historical HTTP proof',()=>{
       sameWorkerVersion:true,workerVersion:VERSION,disclosureAuthorized:false,
     });
     expect(f.calls).toHaveLength(3);
-    expect(f.calls[0].url).toBe(
+    expect(f.calls[0]?.url).toBe(
       `https://myeongha.gycha0109.workers.dev/api/chat/${THREAD}?afterSequenceNo=400&pageSize=1`);
-    expect(f.calls[0].options.headers.Authorization).toBeUndefined();
+    expect(f.calls[0]?.options.headers.Authorization).toBeUndefined();
     expect(f.calls.slice(1).map(c=>c.options.headers.Authorization))
       .toEqual([`Bearer ${TOKEN}`,`Bearer ${TOKEN}`]);
     expect(f.calls.every(c=>c.options.method==='GET' && c.options.redirect==='error'))
