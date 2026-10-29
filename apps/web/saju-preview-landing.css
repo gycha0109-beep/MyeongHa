@@ -69,6 +69,7 @@ body.saju-hub-page .saju-design-chart-content [hidden] { display: none !importan
 
 .saju-design-product-card a { text-align:center; align-self:stretch; padding:8px 7px; border:1px solid #b26f7c; border-radius:8px; text-decoration:none; color:#834256; font-size:12px; font-weight:700; }
 .saju-design-product-card a:hover { background:#f7e8e6; }
+.saju-design-product-card .saju-design-product-disabled { display:block; text-align:center; align-self:stretch; padding:8px 7px; border:1px solid #d6c2bc; border-radius:8px; background:rgba(174,150,142,.09); color:#8d7771; font-size:12px; font-weight:700; cursor:default; }
 .saju-design-example { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:center; margin:19px 35px 25px; padding:15px 20px; border-radius:10px; border:1px solid #eed9d6; background:linear-gradient(110deg,#f5e0df,#f4dedd 65%,#f7e7e5); }
 .saju-design-example h2 span { display:inline-block; padding:2px 13px; margin-left:7px; border-radius:999px; background:#e5bec3; color:#fff; font:600 11px/1.6 var(--mh-sans,sans-serif); vertical-align:middle; }
 .saju-design-example-copy p { margin:9px 0 0; color:#624d4d; font-size:13px; line-height:1.65; }
@@ -84,6 +85,7 @@ html[data-theme="dark"] .saju-design-card,html[data-theme="dark"] .saju-design-p
 html[data-theme="dark"] .saju-design-hero h2,html[data-theme="dark"] .saju-design-card h3,html[data-theme="dark"] .saju-design-products h2,html[data-theme="dark"] .saju-design-product-card h3,html[data-theme="dark"] .saju-design-example h2 { color:#f4dce0; }
 html[data-theme="dark"] .saju-design-hero p,html[data-theme="dark"] .saju-design-birth-fields dd,html[data-theme="dark"] .saju-design-product-card ul { color:#ead8d7; }
 html[data-theme="dark"] .saju-design-product-card .saju-design-product-scope { color:#ead8d7; }
+html[data-theme="dark"] .saju-design-product-card .saju-design-product-disabled { border-color:#75575f; background:rgba(255,255,255,.04); color:#d9c0bb; }
 html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#82616d; }
 @media (max-width:850px) {
  .saju-design-core { padding:0 18px 11px;gap:10px; }
