@@ -464,8 +464,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await f.locked()({signal:new AbortController().signal,deliver:async text=>expect(text).toBeNull()});
   });
 
-  it('serializes two real sessions: an uncommitted issue makes revoke wait, then durably pending instead of falsely complete',async()=>{
+  it('serializes two real sessions: lifecycle stays exact through a locked issue, pending revoke, and receipt',async()=>{
     const f=await prepare(9);await f.commit();
+    expect(await readOwnerLifecycle(f)).toMatchObject({grantState:'active',currentlyGranted:true});
     let issued!:()=>void,release!:()=>void;
     const issuanceReached=new Promise<void>(resolve=>{issued=resolve;});
     const permit=new Promise<void>(resolve=>{release=resolve;});
@@ -479,11 +480,33 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await issuanceReached;
     let revokeComplete=false;
     const revoke=requestRevoke(f).then(r=>{revokeComplete=true;return r;});
-    await new Promise(resolve=>setTimeout(resolve,120));
-    expect(revokeComplete).toBe(false);release();await issuance;
-    expect(await revoke).toMatchObject({status:'pending'});
+    // Distinct PostgreSQL backend must WAIT for the issuing transaction
+    // rather than relying on a fixed sleep as a concurrency proof.
+    let observedLockWait=false;
+    for(let i=0;i<100;i++){
+      const {rows:[waiting]}=await pool.query(`select exists(
+        select 1 from pg_stat_activity
+        where datname=current_database() and wait_event_type='Lock'
+          and pid<>pg_backend_pid()) as waiting`);
+      if(waiting.waiting===true){observedLockWait=true;break;}
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    try{
+      expect(observedLockWait).toBe(true);
+      expect(revokeComplete).toBe(false);
+    }finally{
+      release();
+    }
+    await issuance;
+    expect(await revoke).toMatchObject({status:'pending',newUseBlocked:true});
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'withdrawal_pending',currentlyGranted:false,grantedAt:null,
+    });
     expect((await ack(f.attempt,receiptProof(f.assistantText,proof))).status).toBe(200);
     expect(await requestRevoke(f)).toMatchObject({status:'committed'});
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'not_granted',currentlyGranted:false,grantedAt:null,
+    });
   });
 
   it('keeps a lost/crashed Fetch issuance durable across new DB sessions; time and ordinary deletion never manufacture receipt',async()=>{
@@ -497,6 +520,45 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await expect(f.run(({client})=>client.query('update public.chat_turn_attempts set seyeon_positive_delivery_received_at=clock_timestamp() where id=$1',[f.attempt])))
       .rejects.toMatchObject({code:'42501'});
     expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
+  });
+
+  it('enforces owned-Memory lifecycle against cross-Member substitution and direct SQL roles',async()=>{
+    const owner=await prepare(11);
+    const other=await prepare(12);
+    const lifecycleSql=`select grant_state,granted_at from
+      public.qry_seyeon_memory_grant_lifecycle_v1($1::uuid,$2::uuid)`;
+    expect(await readOwnerLifecycle(owner)).toMatchObject({
+      grantState:'active',currentlyGranted:true,
+    });
+    await expect(owner.run(({client})=>client.query(lifecycleSql,[
+      owner.subject,other.memory,
+    ]))).rejects.toMatchObject({constraint:'seyeon_grant_lifecycle_memory_unavailable'});
+    await expect(owner.run(({client})=>client.query(lifecycleSql,[
+      other.subject,other.memory,
+    ]))).rejects.toMatchObject({constraint:'myeongha_subject_context_mismatch'});
+    const {rows:[acl]}=await pool.query<{
+      definer:boolean;
+      apiExecute:boolean;
+      anonDenied:boolean;
+      memberDenied:boolean;
+      serviceRoleDenied:boolean;
+      noGrantUpdates:boolean;
+      noMemoryUpdates:boolean;
+    }>(`select
+      p.prosecdef as definer,
+      has_function_privilege('myeongha_api_executor',p.oid,'EXECUTE') as "apiExecute",
+      not has_function_privilege('anon',p.oid,'EXECUTE') as "anonDenied",
+      not has_function_privilege('authenticated',p.oid,'EXECUTE') as "memberDenied",
+      not has_function_privilege('service_role',p.oid,'EXECUTE') as "serviceRoleDenied",
+      not has_table_privilege('myeongha_api_executor','public.record_access_grants','UPDATE') as "noGrantUpdates",
+      not has_table_privilege('myeongha_api_executor','public.memory_items','UPDATE') as "noMemoryUpdates"
+      from pg_proc p
+      where p.oid='public.qry_seyeon_memory_grant_lifecycle_v1(uuid,uuid)'::regprocedure`);
+    expect(acl).toMatchObject({
+      definer:true,apiExecute:true,anonDenied:true,
+      memberDenied:true,serviceRoleDenied:true,
+      noGrantUpdates:true,noMemoryUpdates:true,
+    });
   });
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {
