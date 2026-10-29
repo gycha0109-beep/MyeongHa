@@ -151,6 +151,58 @@ describe('Owner KCP TEST signed receipt persistence',()=>{
    expect(state.query).not.toHaveBeenCalled();
   }finally{warn.mockRestore();}
  });
+ it('retains generic Commerce ADAPTER_FAILED but records exact safe PortOne error',async()=>{
+  const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  try{
+   const providerError=Object.assign(new Error('private-PSP-key-and-body'),{
+    code:'HTTP_4XX',httpStatus:401,
+   });
+   const verify=vi.fn().mockRejectedValueOnce(providerError);
+   state.adapter.mockResolvedValueOnce({verify});
+   state.verified.mockImplementationOnce(async ({adapter}:{
+    adapter:{verify:(ctx:typeof context)=>Promise<unknown>};
+   })=>{
+    try{await adapter.verify(context);}catch{
+     throw Object.assign(new Error('sealed Commerce adapter failure'),{
+      code:'ADAPTER_FAILED',
+     });
+    }
+   });
+   await expect(persistCloudflareOwnerKcpSignedSandboxReceiptV1(INPUT))
+    .rejects.toMatchObject({code:'ADAPTER_FAILED'});
+   expect(verify).toHaveBeenCalledTimes(1);
+   expect(state.query).not.toHaveBeenCalled();
+   const records=warn.mock.calls
+    .filter(call=>call[0]==='MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC')
+    .map(call=>JSON.parse(call[1] as string));
+   expect(records).toEqual([
+    {stage:'provider_adapter',code:'HTTP_4XX',httpStatus:401},
+    {stage:'provider_lookup',code:'ADAPTER_FAILED'},
+   ]);
+   expect(JSON.stringify(records)).not.toContain('private-PSP-key-and-body');
+  }finally{warn.mockRestore();}
+ });
+ it('does not serialize provider-supplied error details or arbitrary codes',async()=>{
+  const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  try{
+   state.adapter.mockResolvedValueOnce({
+    verify:vi.fn().mockRejectedValueOnce(Object.assign(
+     new Error('private-Authorization-header'),
+     {code:'LEAK_PRIVATE_SECRET',httpStatus:200,token:'private'},
+    )),
+   });
+   state.verified.mockImplementationOnce(async ({adapter}:{
+    adapter:{verify:(ctx:typeof context)=>Promise<unknown>};
+   })=>adapter.verify(context));
+   await expect(persistCloudflareOwnerKcpSignedSandboxReceiptV1(INPUT))
+    .rejects.toThrow();
+   const records=warn.mock.calls
+    .filter(call=>call[0]==='MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC')
+    .map(call=>JSON.parse(call[1] as string));
+   expect(records[0]).toEqual({stage:'provider_adapter',code:'UNCLASSIFIED'});
+   expect(JSON.stringify(records)).not.toContain('private');
+  }finally{warn.mockRestore();}
+ });
  it('isolates signed receipt DB constraint and never logs private HMAC material',async()=>{
   const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
   try{
