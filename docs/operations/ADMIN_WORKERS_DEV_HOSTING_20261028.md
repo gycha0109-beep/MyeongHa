@@ -27,6 +27,13 @@
 5. Access의 로그인 차단/허용, Owner 단독 접근, 별도 Reader/Audit Writer 권한, 감사 실패 차단을 실제 서비스와 구분해 검증한 뒤에만 활성화를 결정합니다.
 6. 사용자 크레딧 지급/회수, 환불, 계정 제한·삭제 등 실제 고객에게 영향을 미치는 명령은 별도 실행 승인 없이 시도하지 않습니다.
 
+## 관리자 Worker 런타임 DB 로그인 격리 (2026-10-29)
+
+- `cloudflare/admin-worker.mjs`는 Owner Access 검증 이후, DB 연결이나 정적 자산 처리 전에 `validateAdminHttpBindingsV1`을 실행합니다.
+- Reader/Audit Writer/선택적 Command·Audit Retention·Analytics Retention Hyperdrive는 **서로 다른 PostgreSQL 로그인 + DB 조합**이어야 합니다. 동일 URL뿐 아니라 비밀번호 변경, 대소문자 호스트 변경, SSL URI 파라미터 차이로 같은 DB 역할을 재사용하는 것도 거부합니다.
+- 없는 필수 origin과 잘못된 선택적 origin은 실패 차단하며 연결 문자열을 로그·응답에 노출하지 않습니다. 이 검사는 SQL 접근 전의 선행 검사이고, 기존 원본 역할·RLS·TLS 실연결 검사와 별도로 모두 필요합니다.
+- 연결된 Windows PC의 별도 Git worktree에서 이 가드의 독립 Node smoke 검증을 수행했습니다. 전체 CI와 실제 운영 DB 검증은 별개입니다.
+
 ## 저장소의 개발·검증 경계
 
 - 브랜치 `feat/admin-console/admin-01-shell-20261026`, Draft PR #2630에서만 누적 구현합니다. 개발 단위별 브랜치·PR 분할이나 임의 병합을 하지 않습니다.
