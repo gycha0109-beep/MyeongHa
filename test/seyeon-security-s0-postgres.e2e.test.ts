@@ -17,6 +17,7 @@ import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
+import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
 import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
 import { createPostgresSeyeonProductionContextReadAuthorityPortV1 } from '../apps/api/src/postgres-seyeon-production-context-read-v1.js';
@@ -407,6 +408,18 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid) as result`,[f.subject,f.memory]);
     return r.rows[0]!.result;
   });
+  const readOwnerLifecycle=async(f:Awaited<ReturnType<typeof prepare>>)=>{
+    const response=await handleSeyeonMemberMemoryGrantStatusRequestV1({
+      request:new Request(`https://receipt.test/api/memories/${f.memory}/grants/seyeon`),
+      requestId:'s0-lifecycle',serverTime:new Date().toISOString(),
+      pool:subjectPool,
+      identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+    });
+    expect(response.status).toBe(200);
+    return (await response.json()).data as {
+      grantState:string;currentlyGranted:boolean;grantedAt:string|null;
+    };
+  };
   const ack=(attempt:string,proof:string)=>handleSeyeonPositiveReplyReceiptV1({
     request:new Request(`https://receipt.test/api/chat/delivery-receipts/${attempt}`,{method:'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify({proof})}),
@@ -419,7 +432,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(response.status).toBe(200);
     // The Fetch body is NOT consumed: this is the former R -> V -> S gap.
     expect(response.bodyUsed).toBe(false);
+    expect(await readOwnerLifecycle(f)).toMatchObject({grantState:'active',currentlyGranted:true});
     expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'withdrawal_pending',currentlyGranted:false,grantedAt:null,
+    });
     const {rows:[g]}=await pool.query(`select revoked_at,seyeon_revoke_requested_at
       from public.record_access_grants where id=$1`,[f.grant]);
     expect(g.revoked_at).toBeNull();expect(g.seyeon_revoke_requested_at).not.toBeNull();
@@ -440,6 +457,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect((await ack(receipt.attemptId,receiptProof(payload.data.assistantText,receipt.challenge))).status).toBe(200);
     const {rows:[after]}=await pool.query('select revoked_at from public.record_access_grants where id=$1',[f.grant]);
     expect(after.revoked_at).not.toBeNull();
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'not_granted',currentlyGranted:false,grantedAt:null,
+    });
     expect(await requestRevoke(f)).toMatchObject({status:'committed',replayed:true});
     await f.locked()({signal:new AbortController().signal,deliver:async text=>expect(text).toBeNull()});
   });

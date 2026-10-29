@@ -73,22 +73,29 @@ describe('Records Member Memory Grant revocation transport', () => {
     }
   });
 
-  it('preserves 202 pending even when restrictive RLS hides the current grant', () => {
-    const pending = presentSeyeonMemoryGrantStatusV1(false, true);
-    expect(pending).toMatchObject({ kind: 'withdrawal_pending', revokeAvailable: false });
-    expect(pending.message).toContain('최종 완료는 아직 확인되지');
+  it('preserves durable withdrawal on reload without trusting filtered RLS absence', () => {
+    const pending = presentSeyeonMemoryGrantStatusV1('withdrawal_pending', false);
+    expect(pending).toMatchObject({kind: 'withdrawal_pending', revokeAvailable: false});
+    expect(pending.message).toContain('철회 완료를 기다리고');
 
-    const inconsistent = presentSeyeonMemoryGrantStatusV1(true, true);
-    expect(inconsistent.kind).toBe('withdrawal_pending');
+    const inconsistent = presentSeyeonMemoryGrantStatusV1('active', true);
+    expect(inconsistent.kind).toBe('unknown');
     expect(inconsistent.revokeAvailable).toBe(false);
     expect(inconsistent.message).toContain('일치하지 않습니다');
 
-    expect(presentSeyeonMemoryGrantStatusV1(false, false)).toMatchObject({
+    expect(presentSeyeonMemoryGrantStatusV1('unknown', false)).toMatchObject({
+      kind: 'unknown', revokeAvailable: false,
+    });
+    expect(presentSeyeonMemoryGrantStatusV1('unknown', true)).toMatchObject({
+      kind: 'unknown', revokeAvailable: false,
+    });
+    expect(presentSeyeonMemoryGrantStatusV1('not_granted', true)).toMatchObject({
       kind: 'no_access', revokeAvailable: false,
     });
-    expect(presentSeyeonMemoryGrantStatusV1(true, false)).toMatchObject({
+    expect(presentSeyeonMemoryGrantStatusV1('active', false)).toMatchObject({
       kind: 'granted', revokeAvailable: true,
     });
+    expect(() => presentSeyeonMemoryGrantStatusV1('invalid' as never, false)).toThrow();
   });
 
   it('never retries an unknown 503 or accepts a mismatched receipt', async () => {
