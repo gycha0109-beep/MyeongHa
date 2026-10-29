@@ -9,16 +9,20 @@ const productPreviewTopics = [
   { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
 ] as const;
 
+// All twelve Saju topics share one product layer. A topic's current Preview
+// availability is separate from its position in the product catalog.
 const additionalReadingTopics = [
-  ['사업', 'reading-detail.html?topic=business'],
-  ['가족', 'reading-detail.html?topic=family'],
-  ['삶의 단계', 'reading-detail.html?topic=life-stage'],
-  ['올해', 'reading-detail.html?scope=year'],
-  ['이번 달', 'reading-detail.html?scope=month'],
-  ['배우자 · 관계', 'reading-detail.html?topic=spouse'],
-  ['궁합', 'reading-detail.html?topic=compatibility'],
-  ['지금 고민으로 보기', 'reading-detail.html?topic=question-specific'],
+  { symbol: '商', title: '사업', href: 'reading-detail.html?topic=business' },
+  { symbol: '家', title: '가족', href: 'reading-detail.html?topic=family' },
+  { symbol: '生', title: '삶의 단계', href: 'reading-detail.html?topic=life-stage' },
+  { symbol: '歲', title: '올해', href: 'reading-detail.html?scope=year' },
+  { symbol: '月', title: '이번 달', href: 'reading-detail.html?scope=month' },
+  { symbol: '伴', title: '배우자 · 관계', href: 'reading-detail.html?topic=spouse' },
+  { symbol: '合', title: '궁합', href: 'reading-detail.html?topic=compatibility' },
+  { symbol: '問', title: '지금 고민으로 보기', href: 'reading-detail.html?topic=question-specific' },
 ] as const;
+
+const allProductTopics = [...productPreviewTopics, ...additionalReadingTopics] as const;
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
@@ -148,10 +152,13 @@ export function ReadingPage() {
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
           <p>원하는 주제를 선택하면 해석 범위와 제공 내용을 확인하고, 대리자를 선택해 구매와 공식 보고서 발행으로 이어집니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
-            {productPreviewTopics.map((topic) => (
-              <article className="saju-design-product-card" key={topic.title}>
+            {allProductTopics.map((topic) => (
+              <article className="saju-design-product-card" key={topic.href}>
                 <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
-                <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
+                {'outline' in topic
+                  ? <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
+                  : <p className="saju-design-product-scope">선택한 주제의 현재 제공 범위를 확인합니다.</p>}
+                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(topic.href).kind}`}>{resolveReadingAvailabilityV1(topic.href).label}</span>
                 <a href={topic.href}>이 해석 선택하기</a>
               </article>
             ))}
@@ -170,17 +177,6 @@ export function ReadingPage() {
         </section>
 
         <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
-        <details className="saju-design-more">
-          <summary>다른 사주 주제 둘러보기</summary>
-          <div className="saju-design-more-grid">
-            {additionalReadingTopics.map(([title, href]) => (
-              <a href={href} key={href}>
-                <strong>{title}</strong>
-                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</span>
-              </a>
-            ))}
-          </div>
-        </details>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>
