@@ -48,6 +48,18 @@ describe('primary Worker S0 receipt routing',()=>{
    expect(receipt.status).toBe(200);
    expect(createPrivacy).toHaveBeenCalledTimes(1);
  });
+ it('keeps original-memory withdrawal independent of model/cost and available during forward stop',async()=>{
+   const bindings={...env(),MYEONGHA_CLOUDFLARE_EMERGENCY_HOLD:'true'};
+   const response=await worker.default.fetch(
+     request('/api/memories/'+id+'/grants/seyeon/revoke'),bindings,{});
+   expect(response.status).toBe(200);
+   expect(createPrivacy).toHaveBeenCalledTimes(1);
+   expect(privacyHandleRequest).toHaveBeenCalledTimes(1);
+   expect(privacyClose).toHaveBeenCalledTimes(1);
+   expect(create).not.toHaveBeenCalled();
+   expect(verifyOwnerCreditExemption).not.toHaveBeenCalled();
+   expect(bindings.AUTH_RATE_LIMITER.limit).toHaveBeenCalledTimes(1);
+ });
  it('only a verified Owner Admin can reach protected positive-model runtime',async()=>{
    verifyOwnerCreditExemption.mockResolvedValueOnce(true);
    const response=await worker.default.fetch(request('/api/chat/'+id+'/turns'),env(),{});
