@@ -1,5 +1,11 @@
 name: Admin Console Private Build
 on:
+  pull_request:
+    paths:
+      - 'apps/admin/**'
+      - 'apps/api/src/admin-*'
+      - 'cloudflare/admin-worker.mjs'
+      - '.github/workflows/admin-console-private-build.yml'
   workflow_dispatch:
     inputs:
       stage_inactive_worker:
@@ -27,7 +33,7 @@ jobs:
       - run: npm run build:private -w @myeongha/admin
   stage-inactive:
     needs: private-build
-    if: ${{ inputs.stage_inactive_worker == 'yes' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.stage_inactive_worker == 'yes' }}
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15
