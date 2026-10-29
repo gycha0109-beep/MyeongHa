@@ -23,6 +23,12 @@ sed -e "s@\\\\i test/db/standard_love_relationship_reader_authority.sql@\\\\i $t
     -e 's/12103000-0000-0000-0000-000000000001/12103000-0000-4000-8000-000000000001/g' \
     -e 's/sha256:v1:a070c64d52193e398ba24eede0370be111de9352d1f652f81c487ebfc7ca3bb0/sha256:v1:d2a541178573365041ce0ba291d38670eabd93b6ad9bae216a9f736895edcbc4/g' \
     test/db/official_standard_reading_reader_interpretation.sql > "$tmp/official.sql"
+# The exact initial purchase, prepared attempt and current SELF Birth must
+# admit source transport BEFORE the synthetic finalized Reading is persisted.
+# Inject only in disposable PG17; historical fixture remains unchanged.
+sed '/^-- Authenticated Production source signature/ r test/db/saju_official_issuance_preflight_pg17.sql' \
+  "$tmp/official.sql" > "$tmp/official-preflight.sql"
+mv "$tmp/official-preflight.sql" "$tmp/official.sql"
 psql -X -v ON_ERROR_STOP=1 -f "$tmp/official.sql" > "$tmp/fixture.stdout" 2>"$tmp/fixture.stderr" || {
   tail -95 "$tmp/fixture.stderr" >&2
   echo 'FAIL_SYNTHETIC_SAJU_ISSUANCE_FIXTURE' >&2
@@ -43,6 +49,10 @@ insert into public.guest_sessions(
   null, null, clock_timestamp()
 );
 SQL
+
+# Check that only an exact, current initial purchase Grant can expose the
+# stored source lineage to the internal executor. All mutations are rolled back.
+psql -X -v ON_ERROR_STOP=1 -f test/db/saju_official_stored_lineage_pg17.sql >/dev/null
 
 npm run build
 node scripts/verify-saju-official-records-http-postgres-e2e.mjs

@@ -82,6 +82,7 @@ export interface SajuOfficialCurrentAuthorityPortV1 {
     readonly subjectId: string;
     readonly dbReadingId: string;
     readonly readingSessionId: string;
+    readonly executionAttemptId: string;
     readonly sourceBirthRevisionId: string;
     readonly sourceResponseHash: string;
     readonly storedResponseHash: string;
@@ -237,6 +238,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   const current = await input.currentAuthority.admitCurrentIssue({
     subjectId: input.subjectId, dbReadingId: input.readingId,
     readingSessionId: input.readingSessionId,
+    executionAttemptId: input.executionAttemptId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
     sourceResponseHash: originalHash,
     storedResponseHash: storedHash,

@@ -282,3 +282,14 @@
 - [Commerce/Entitlement](../COMMERCE_ENTITLEMENT_SPEC.md)
 - [Saju ↔ Records exact source handoff](../architecture/SAJU_READER_RECORDS_EXACT_SOURCE_HANDOFF_20261022.md)
 - [Reading User Trust Language Policy](../READING_PUBLIC_TRUST_LANGUAGE_POLICY_V1.md)
+
+
+## 2026-10-29 S0 발행 연동 추가 — Saju 요청 전·저장 직전 이중 권한 경계
+
+- 기존 공식 발행 구성은 Saju 네트워크 호출 뒤에만 `currentAuthority`를 검사했다. **Saju 네트워크 실행 전에 별도 Subject-scoped DB preflight를 반드시 통과**하도록 `executeAndPersistCurrentBirthSajuOfficialReadingV1`를 수정했다. preflight 미연결·실패·잘못된 Reading/Attempt/Birth UUID는 네트워크 호출과 DB 발행 모두 수행하지 않는다.
+- 기존 원자 확정 트랜잭션 안에서 `executionAttemptId`까지 묶어 동일한 preflight 함수를 다시 실행한다. 구매권·현재 SELF Birth·Subject 상태·공식 Reading 및 실행 Attempt를 정확히 검증하고 `FOR SHARE`로 필요한 DB 행을 잠가 환불·명식 변경·발행 상태 변경과의 경쟁을 막는다. 첫 preflight 성공만으로 최종 발행·공개를 허용하지 않는다.
+- 신규 **후속 마이그레이션** `20261029111500_saju_official_issuance_preflight_v1.sql`은 `public.qry_saju_official_issuance_preflight_v1`를 제공한다. 기존 Product·Offer·Grant·Privacy·Reader 데이터는 재사용하고, 임의 유료 승인·새 테이블·원본 DB 테이블의 일반 API SELECT 권한은 부여하지 않는다.
+- 발행 직후 불변 계보 재조회에서 기존 API 역할에 없는 `reading_refs`·`reading_execution_attempts` 직접 SELECT를 제거했다. `20261029112500_saju_official_stored_lineage_v1.sql`의 **Subject + exact committed Attempt + active initial purchase Grant** 보호 RPC를 사용해 Saju native ID, issuer request ref, Birth hash, Product 응답 JSONB/hash를 같은 DB 트랜잭션에서 대조한다. 해시/출처 불일치 시 ROLLBACK한다.
+- 두 SQL 함수는 일반 `myeongha_api_executor`에만 EXECUTE를 부여하며 `PUBLIC`·`anon`·`authenticated`·`service_role` 접근을 금지한다. **기존 transport finalize writer의 EXECUTE 차단은 해제하지 않는다.**
+- **검증:** 일회용 PostgreSQL 17 `myeongha_ci_case_2902`에서 203개 마이그레이션 후 카탈로그 SHA-256 `d8c8b37d2eef0a179462be54824f8601c5a254447f71f3605852e6a20ad02131` 반영. 신규 preflight 정확한 구매권·Birth·Attempt 승인과 불일치 거부, active/revoked Grant 보호 계보 조회, 잘못된 Attempt 차단, private table 직접 SELECT 금지, 기존 공식 보고서 HTTP E2E(권한 철회 404·활성 Grant 200·Birth 변경 불변) 검증을 수행했다. 관련 Saju 발행 경계 단위 검사 24개 통과.
+- **운영 상태:** 운영 Supabase DB·Commerce·Cloudflare 설정은 변경하지 않았다. 실제 Production Source issuer/서명·의미 검증 및 Native→DB ID 승인 공급자는 여전히 미구현/HOLD다. 테스트 합성 결과는 제품 발행 권위가 아니다. 판매·공식 발행 공개·PR main 병합 금지.

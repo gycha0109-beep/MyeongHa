@@ -45,6 +45,17 @@ import {
   type SajuOfficialIssuanceResultV1,
 } from './saju-official-reading-issuer-db-persistence-v1.js';
 
+/** A separate, verified Subject-scope admission before contacting Production Saju. */
+export interface SajuOfficialIssuancePreflightPortV1 {
+  admitBeforeSourceCall(input: Readonly<{
+    subjectId: string;
+    readingId: string;
+    readingSessionId: string;
+    executionAttemptId: string;
+    sourceBirthRevisionId: string;
+  }>): Promise<boolean>;
+}
+
 /**
  * One DB subject transaction opened AFTER the upstream Saju network request.
  * The current Birth/Commerce/Privacy admission and atomic finalize port must
@@ -84,6 +95,7 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     sourceBirthRevisionId: string;
     sourceVerifier?: SajuOfficialSourceVerificationPortV1;
     mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
+    preflight?: SajuOfficialIssuancePreflightPortV1;
     dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
@@ -96,9 +108,10 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   });
   // The existing current Saju proof endpoint only emits Preview/HELD.
   // Never charge an upstream call without a wired Production issuer + DB scope.
-  const { sourceVerifier, mappingVerifier, dbTransaction } = input;
+  const { sourceVerifier, mappingVerifier, preflight, dbTransaction } = input;
   if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
     || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
+    || typeof preflight?.admitBeforeSourceCall !== 'function'
     || typeof dbTransaction?.run !== 'function') {
     return unavailable;
   }
@@ -116,6 +129,20 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
       ...unavailable,
       reason: 'current_authority_unavailable' as const,
     });
+  }
+
+  // The first rights check is a short, identity-resolved DB transaction.
+  // It does not grant production issue authority: the same exact rights must
+  // be rechecked under a locked DB row in the atomic finalize transaction.
+  const admittedBeforeSource = await preflight.admitBeforeSourceCall({
+    subjectId: input.subjectId,
+    readingId: input.readingId,
+    readingSessionId: input.readingSessionId,
+    executionAttemptId: input.executionAttemptId,
+    sourceBirthRevisionId: input.sourceBirthRevisionId,
+  });
+  if (admittedBeforeSource !== true) {
+    return Object.freeze({ ...unavailable, reason: 'current_authority_unavailable' as const });
   }
 
   // Build once from the authenticated Birth revision, then pass the exact

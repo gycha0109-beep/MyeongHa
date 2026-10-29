@@ -82,7 +82,8 @@ function ports() {
       readingId, executionAttemptId, responseHash: storedHash, replayed: false,
     })),
   } satisfies SajuOfficialImmutableCommitPortV1;
-  return { sourceVerifier, mappingVerifier, currentAuthority, commitPort };
+  const preflight = { admitBeforeSourceCall: vi.fn(async () => true) };
+  return { sourceVerifier, mappingVerifier, currentAuthority, commitPort, preflight };
 }
 function input(port: ReturnType<typeof ports>, response: unknown = native) {
   return {
@@ -122,7 +123,7 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
       rows = [{ subjectId: this.resolvedSubjectId, subjectKind: 'member' }];
     } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')) {
       rows = [{ readingId, executionAttemptId, responseHash: storedHash, replayed: false }];
-    } else if (sql.includes('from public.reading_refs rr')) {
+    } else if (sql.includes('from public.qry_saju_official_stored_lineage_v1(')) {
       rows = [{
         nativeReadingId: this.storedNativeId,
         externalRequestRef: 'internal-only-ref',
@@ -156,6 +157,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       executionAttemptId, outboxEventId, sourceBirthRevisionId,
       sourceVerifier: p.sourceVerifier,
       mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight,
       dbTransaction: transaction,
     });
     expect(result).toMatchObject({ state: 'committed', readingId });
@@ -163,7 +165,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(connection.calls[1]).toBe('SET LOCAL ROLE myeongha_api_executor');
     expect(connection.calls).toContain('select public.assert_myeongha_subject_context_v1($1::uuid)');
     const commitIndex = connection.calls.findIndex(x => x.includes('cmd_finalize_reading_transport_success_v1'));
-    const readIndex = connection.calls.findIndex(x => x.includes('from public.reading_refs rr'));
+    const readIndex = connection.calls.findIndex(x => x.includes('from public.qry_saju_official_stored_lineage_v1('));
     expect(commitIndex).toBeGreaterThan(0);
     expect(readIndex).toBeGreaterThan(commitIndex);
     expect(connection.calls.at(-1)).toBe('COMMIT');
@@ -206,6 +208,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       subjectId, readingId, readingSessionId,
       executionAttemptId, outboxEventId, sourceBirthRevisionId,
       sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight,
       dbTransaction: transaction,
     })).rejects.toThrow(/stored lineage/);
     expect(connection.calls.at(-1)).toBe('ROLLBACK');
@@ -226,7 +229,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
   });
 
   it('never contacts Saju when a configured issuer or DB dependency lacks its required method', async () => {
-    for (const brokenPort of ['sourceVerifier', 'mappingVerifier', 'dbTransaction'] as const) {
+    for (const brokenPort of ['sourceVerifier', 'mappingVerifier', 'preflight', 'dbTransaction'] as const) {
       const p = ports();
       const requestReading = vi.fn(async () => native);
       const dbTransaction = {
@@ -238,6 +241,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
         adapter: { requestReading }, subjectId, readingId, readingSessionId,
         executionAttemptId, outboxEventId, sourceBirthRevisionId,
         sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+        preflight: p.preflight,
         dbTransaction,
       };
       const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
@@ -264,7 +268,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
         adapter: { requestReading }, subjectId, readingId, readingSessionId,
         executionAttemptId, outboxEventId, sourceBirthRevisionId,
         sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
-        dbTransaction, [badId]: 'not-a-prepared-uuid',
+        preflight: p.preflight, dbTransaction, [badId]: 'not-a-prepared-uuid',
       };
       const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1(invalid);
       expect(result).toMatchObject({
@@ -289,6 +293,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       subjectId, readingId, readingSessionId, executionAttemptId,
       outboxEventId, sourceBirthRevisionId,
       sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight,
       dbTransaction,
     });
     expect(output).toMatchObject({ state: 'held', reason: 'current_authority_unavailable' });
@@ -299,6 +304,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
   it('runs authenticated Saju transport before the governed DB transaction and immutable commit', async () => {
     const p = ports();
     const sequence: string[] = [];
+    p.preflight.admitBeforeSourceCall.mockImplementation(async () => { sequence.push('preflight'); return true; });
     const requestReading = vi.fn(async (_request: unknown) => {
       sequence.push('saju');
       return native;
@@ -318,15 +324,38 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       executionAttemptId, outboxEventId, sourceBirthRevisionId,
       sourceVerifier: p.sourceVerifier,
       mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight,
       dbTransaction,
     });
     expect(result).toMatchObject({ state: 'committed', readingId });
-    expect(sequence).toEqual(['saju', 'db']);
+    expect(sequence).toEqual(['preflight', 'saju', 'db']);
     expect(requestReading).toHaveBeenCalledWith({
       birth: { calendarType: 'solar', date: '2001-07-14', time: '15:20', sex: 'female' },
       reading: { text: '전체 사주' },
     });
     expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not contact Production Saju if the exact current purchase admission is denied', async () => {
+    const p = ports();
+    p.preflight.admitBeforeSourceCall.mockResolvedValueOnce(false);
+    const requestReading = vi.fn(async () => native);
+    const dbTransaction = { run: vi.fn() };
+    const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(), readingText: 'career',
+      adapter: { requestReading }, subjectId, readingId,
+      readingSessionId, executionAttemptId, outboxEventId,
+      sourceBirthRevisionId, sourceVerifier: p.sourceVerifier,
+      mappingVerifier: p.mappingVerifier, preflight: p.preflight,
+      dbTransaction,
+    });
+    expect(result).toMatchObject({
+      state: 'held', reason: 'current_authority_unavailable',
+      canDisclose: false, canSell: false,
+    });
+    expect(requestReading).not.toHaveBeenCalled();
+    expect(dbTransaction.run).not.toHaveBeenCalled();
+    expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
   });
 
   it('does not invoke any issuer, mapping, rights or DB writes when the approved ports are not installed', async () => {
@@ -462,7 +491,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
 
   it('uses existing atomic PostgreSQL finalize command, never writing readings/refs directly', async () => {
     const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
-      rows: sql.includes('from public.reading_refs rr')
+      rows: sql.includes('from public.qry_saju_official_stored_lineage_v1(')
         ? [{
           nativeReadingId, externalRequestRef: 'internal-only-ref',
           sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
@@ -492,8 +521,8 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(params[14]).toBe(JSON.stringify(dbSnapshot));
     expect(params[15]).toBe(storedHash);
     const [readSql, readParams] = query.mock.calls[1] as unknown as [string, unknown[]];
-    expect(readSql).toContain('from public.reading_refs rr');
-    expect(readSql).toContain('join public.reading_execution_attempts rea');
+    expect(readSql).toContain('from public.qry_saju_official_stored_lineage_v1(');
+    expect(readSql).not.toContain('join public.reading_execution_attempts rea');
     expect(readParams).toEqual([subjectId, readingId, executionAttemptId]);
   });
 
@@ -504,7 +533,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       { storedSnapshot: { ...dbSnapshot, reading: { ...dbSnapshot.reading, disclosures: [] } } },
     ]) {
       const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
-        rows: sql.includes('from public.reading_refs rr') ? [{
+        rows: sql.includes('from public.qry_saju_official_stored_lineage_v1(') ? [{
           nativeReadingId, externalRequestRef: 'internal-only-ref',
           sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
           readingContractVersion: 'myeonghwa-product-reading-response-v2',

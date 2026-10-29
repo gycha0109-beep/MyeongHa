@@ -14,6 +14,9 @@ import {
   createPostgresSajuOfficialImmutableCommitPortV1,
 } from './postgres-saju-official-immutable-commit-v1.js';
 import {
+  createPostgresSajuOfficialCurrentAuthorityPortV1,
+} from './postgres-saju-official-current-authority-v1.js';
+import {
   SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1,
 } from './saju-official-reading-issuer-db-persistence-v1.js';
 
@@ -28,7 +31,7 @@ import {
 export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
-  currentAuthorityFactory: (client: PostgresTransactionQueryV1) => SajuOfficialCurrentAuthorityPortV1;
+  currentAuthorityFactory?: (client: PostgresTransactionQueryV1) => SajuOfficialCurrentAuthorityPortV1;
 }>): SajuOfficialIssuedDbTransactionPortV1 {
   return Object.freeze({
     async run(request: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) {
@@ -46,7 +49,7 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
             });
           }
           return request.commit({
-            currentAuthority: input.currentAuthorityFactory(client),
+            currentAuthority: (input.currentAuthorityFactory ?? createPostgresSajuOfficialCurrentAuthorityPortV1)(client),
             commitPort: createPostgresSajuOfficialImmutableCommitPortV1(client),
           });
         },

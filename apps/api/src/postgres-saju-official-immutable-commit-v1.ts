@@ -31,21 +31,16 @@ from public.cmd_finalize_reading_transport_success_v1(
 // identity, source proof reference or Birth hash.
 const VERIFY_STORED_LINEAGE_SQL = `
 select
-  rr.external_reading_ref as "nativeReadingId",
-  rea.external_request_ref as "externalRequestRef",
-  rr.source_birth_input_hash as "sourceBirthInputHash",
-  rr.reading_contract_version as "readingContractVersion",
-  rr.product_response_state as "productResponseState",
-  rr.response_snapshot_jsonb as "storedSnapshot",
-  rr.response_hash as "storedResponseHash"
-from public.reading_refs rr
-join public.reading_execution_attempts rea
-  on rea.id = rr.execution_attempt_id
- and rea.reading_id = rr.reading_id
- and rea.subject_id = rr.subject_id
-where rr.subject_id = $1::uuid
-  and rr.reading_id = $2::uuid
-  and rr.execution_attempt_id = $3::uuid
+  native_reading_id as "nativeReadingId",
+  external_request_ref as "externalRequestRef",
+  source_birth_input_hash as "sourceBirthInputHash",
+  reading_contract_version as "readingContractVersion",
+  product_response_state as "productResponseState",
+  stored_snapshot as "storedSnapshot",
+  stored_response_hash as "storedResponseHash"
+from public.qry_saju_official_stored_lineage_v1(
+  $1::uuid, $2::uuid, $3::uuid
+)
 `.trim();
 
 type StoredLineageRow = Readonly<{
