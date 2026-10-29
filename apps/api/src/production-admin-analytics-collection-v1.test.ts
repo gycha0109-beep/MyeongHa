@@ -80,7 +80,7 @@ describe('Production opt-in analytics composition',()=>{
   it('only composes verified domain sources when approved policy and activation both hold',async()=>{
     const f=createFixture();
     const runtime=createProductionAdminAnalyticsCollectionV1({
-      ...f.base,collectionEnabled:true,
+      ...f.base,collectionEnabled:true,retentionMaintenanceReady:true,
     });
     expect(runtime.status).toBe('configured_source_unverified');
     expect(runtime.verifiedReading).toBeDefined();
@@ -109,8 +109,13 @@ describe('Production opt-in analytics composition',()=>{
     expect(()=>createProductionAdminAnalyticsCollectionV1({
       ...f.base,writerPool:f.base.sourceReaderPool,
     })).toThrow('separate database pools');
-    const runtime=createProductionAdminAnalyticsCollectionV1({
+    const noPurge=createProductionAdminAnalyticsCollectionV1({
       ...f.base,collectionEnabled:true,
+    });
+    expect(noPurge.status).toBe('disabled');
+    expect('verifiedReading' in noPurge).toBe(false);
+    const runtime=createProductionAdminAnalyticsCollectionV1({
+      ...f.base,collectionEnabled:true,retentionMaintenanceReady:true,
       policy:{...POLICY,deletionBindingVerified:false},
     });
     expect(runtime.status).toBe('disabled');
