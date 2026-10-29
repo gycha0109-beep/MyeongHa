@@ -43,6 +43,7 @@ export function createRecordsRuntimeClient(options?: RecordsRuntimeClientOptions
     memoryItemId: string;
     currentlyGranted: boolean;
     grantedAt: string | null;
+    grantState: 'active' | 'withdrawal_pending' | 'not_granted' | 'unknown';
   }>>;
   readRecords(): Promise<RecordsRuntimeSnapshotV1>;
 }>;

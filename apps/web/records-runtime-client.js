@@ -254,20 +254,30 @@ async function readPagedCollection(fetchImpl, endpoint, bearer, field) {
 const MEMORY_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function requireSeyeonGrantStatus(payload, memoryItemId) {
+  // A legacy active-grants GET filters pending withdrawals with RLS; its
+  // false result is NOT proof that the withdrawal finished.
+  const state = payload.grantState === undefined
+    ? (payload.currentlyGranted === true ? 'active' : 'unknown')
+    : payload.grantState;
+  const validState = ['active', 'withdrawal_pending', 'not_granted', 'unknown'].includes(state);
+  const effectiveGranted = state === 'active';
   if (
     payload.memoryItemId !== memoryItemId
     || payload.characterId !== 'seyeon'
     || typeof payload.currentlyGranted !== 'boolean'
+    || !validState
+    || payload.currentlyGranted !== effectiveGranted
     || !(payload.grantedAt === null || (typeof payload.grantedAt === 'string' && Number.isFinite(Date.parse(payload.grantedAt))))
-    || (payload.currentlyGranted && payload.grantedAt === null)
-    || (!payload.currentlyGranted && payload.grantedAt !== null)
+    || (effectiveGranted && payload.grantedAt === null)
+    || (!effectiveGranted && payload.grantedAt !== null)
   ) {
-    throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', 'Current Se-yeon grant status is invalid.');
+    throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', 'Current Se-yeon grant lifecycle is invalid.');
   }
   return Object.freeze({
     memoryItemId,
-    currentlyGranted: payload.currentlyGranted,
+    currentlyGranted: effectiveGranted,
     grantedAt: payload.grantedAt,
+    grantState: state,
   });
 }
 
