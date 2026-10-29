@@ -1,6 +1,50 @@
 // Authored Records report-hub UI labels only. Do not translate stored Saju source,
 // Reader interpretation, Birth data, or any user-created records here.
 export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
+  ['현재 명식록 차수', {
+    'ja-JP': '現在の命式の版', 'zh-TW': '目前命盤版本',
+    'en-US': 'Current birth revision', 'zh-CN': '当前命盘版本',
+  }],
+  ['확인할 수 없음', {
+    'ja-JP': '確認できません', 'zh-TW': '無法確認',
+    'en-US': 'Unavailable', 'zh-CN': '无法确认',
+  }],
+  ['이 기록에 제공된 출생정보 차수가 없어 변경 여부는 확인할 수 없습니다.', {
+    'ja-JP': 'この記録に出生情報の版がないため、変更の有無を確認できません。',
+    'zh-TW': '此紀錄未提供出生資料版本，無法確認是否變更。',
+    'en-US': 'This record has no birth revision, so changes cannot be determined.',
+    'zh-CN': '此记录未提供出生信息版本，无法确认是否变更。',
+  }],
+  ['이 보고서의 본문·발행일은 현재 명식록 변경으로 다시 작성되지 않습니다.', {
+    'ja-JP': '現在の出生情報が変わっても、レポートの本文と発行日は書き換えられません。',
+    'zh-TW': '目前命盤變更不會改寫本報告內容或發行日期。',
+    'en-US': 'Changes to your current birth record do not rewrite this report or its issue date.',
+    'zh-CN': '当前命盘变更不会改写本报告内容或发行日期。',
+  }],
+  ['발행 당시 명식과 현재 명식이 같습니다.', {
+    'ja-JP': '発行時の命式と現在の命式は同じです。',
+    'zh-TW': '發行時與目前的命盤版本相同。',
+    'en-US': 'The current birth revision matches the one used for this report.',
+    'zh-CN': '发行时与当前的命盘版本相同。',
+  }],
+  ['현재 명식이 발행 당시와 다릅니다. 이 보고서는 발행 당시 명식을 기준으로 유지됩니다.', {
+    'ja-JP': '現在の命式は発行時と異なります。この報告書は発行時の命式に基づいて保持されます。',
+    'zh-TW': '目前命盤與發行時不同。本報告仍依發行時的命盤保存。',
+    'en-US': 'Your birth revision has changed. This report remains based on the revision at issue.',
+    'zh-CN': '当前命盘与发行时不同。本报告仍按发行时的命盘保存。',
+  }],
+  ['발행 당시 명식과 현재 명식의 변경 여부를 확인할 수 없습니다.', {
+    'ja-JP': '発行時の命式と現在の命式が異なるか確認できません。',
+    'zh-TW': '無法確認發行時命盤與目前命盤是否不同。',
+    'en-US': 'It cannot be determined whether the birth revision has changed since issue.',
+    'zh-CN': '无法确认发行时命盘与当前命盘是否不同。',
+  }],
+  ['새 명식 기준 재생성 준비 중', {
+    'ja-JP': '新しい命式での再発行は準備中',
+    'zh-TW': '依新命盤重新產生報告的功能準備中',
+    'en-US': 'Regeneration for the current birth revision is not yet available',
+    'zh-CN': '按新命盘重新生成报告的功能准备中',
+  }],
   ['저장된 보고서 다시 불러오기 →', {
     'ja-JP': '保存済みのレポートを再読み込み →',
     'zh-TW': '重新載入已儲存報告 →',
