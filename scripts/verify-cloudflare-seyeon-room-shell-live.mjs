@@ -98,6 +98,10 @@ const ownerMemories=jsonRecord(memories.body.data).memories;
 check(Array.isArray(ownerMemories)&&ownerMemories.length===1,
   'NO_OWNED_CURRENT_MEMORY_FOR_GRANT_CHECK');
 const ownedMemory=jsonRecord(ownerMemories[0]);
+// A current Memory is not necessarily the one approved for S0 model input.
+// Do not call an unrelated personal record a Se-yeon source verification.
+check(ownedMemory.memoryType==='conversation_recall'&&
+  ownedMemory.schemaVersion==='v1','S0_ORIGINAL_SOURCE_TYPE_MISMATCH');
 check(typeof ownedMemory.memoryItemId==='string'&&UUID.test(ownedMemory.memoryItemId),
   'OWNER_MEMORY_ID_INVALID');
 const grantPath='/api/memories/'+ownedMemory.memoryItemId+'/grants/seyeon';
