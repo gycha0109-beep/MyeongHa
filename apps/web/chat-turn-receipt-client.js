@@ -24,5 +24,7 @@ export async function sendSeyeonBrowserTurnWithReceiptV1({
   });
   // This shared helper validates the exact response and, only for a valid
   // receipt, sends the body-bound ACK before resolving to the UI.
-  return sendSeyeonChatTurnV1(client, bearer, threadId, turn);
+  return sendSeyeonChatTurnV1(client, bearer, threadId, turn, {
+    requireDeliveryReceipt: true,
+  });
 }
