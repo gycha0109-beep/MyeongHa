@@ -24,6 +24,15 @@ Node 24 / npm 11, 저장소 루트에서 의존성을 설치한 후:
 
 React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도구를 재사용합니다. 취약 버전으로 표시된 Vite를 관리자 workspace에 새 의존성으로 추가하지 않으며, 개발 서버는 127.0.0.1에서만 바인딩합니다. 결과물은 apps/admin/dist에만 저장하며, 기존 apps/web → public 빌드 및 명하 Production 배포와 결합하지 않습니다.
 
+## 관리자 전용 Worker 비활성 스테이징 (2026-10-29)
+
+`.github/workflows/admin-console-private-build.yml`의 기존 `Admin Console Private Build` 수동 실행에 `stage_inactive_worker` 선택 입력을 추가했습니다. 기본값 `no`는 기존대로 빌드·테스트·dry-run만 수행합니다. `yes`는 **관리자 전용 권한·DB 연결·빌드 검증이 실제로 통과한 경우에만** `myeongha-admin` Worker를 배포하지만, 모든 민감 기능 활성화 플래그를 `false`로 고정합니다. 고객용 `myeongha` Worker와 공개 URL을 변경하지 않습니다.
+
+- 필수 GitHub Actions Secrets: `MYEONGHA_ADMIN_CLOUDFLARE_API_TOKEN`, `MYEONGHA_ADMIN_CLOUDFLARE_ACCOUNT_ID`, `MYEONGHA_ADMIN_ACCESS_AUD`, `MYEONGHA_ADMIN_OWNER_EMAIL`, `MYEONGHA_ADMIN_OWNER_AUTH_USER_ID`, `MYEONGHA_ADMIN_SUPABASE_PUBLISHABLE_KEY`, `MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN`, `MYEONGHA_ADMIN_READ_HYPERDRIVE_ID`, `MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID`, `MYEONGHA_ADMIN_READ_DATABASE_URL`, `MYEONGHA_ADMIN_AUDIT_DATABASE_URL`, `MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM`.
+- 추가 Command DB 연결은 선택 사항입니다. **조회용 관리자 화면 개통에 Command Executor는 필수가 아닙니다.** `MYEONGHA_ADMIN_COMMAND_DATABASE_URL`을 설정하면 추가 검사하고, 미설정이면 고객 영향 명령용 권한을 요구하지 않습니다. Stage 과정에서는 Command Hyperdrive 자체를 연결하지 않습니다.
+- 기존 `verify:origins`에서 접속 계정·TLS·최소 권한을 읽기 전용으로 확인한 후, `deployment-check.mjs --write-config`가 생성한 별도 임시 Wrangler 설정만 배포합니다. Supabase Member 검증 키는 Worker Secret으로 업로드하며 구성 파일·로그에 쓰지 않습니다. 이 단계는 관리자 인증·DB 실서비스 활성화가 아니며 **Owner 로그인·Access/JWT·감사 성공 검증 후 별도로 개통**해야 합니다.
+- 수동 스테이징 입력은 해당 워크플로가 GitHub에서 수동 실행 가능한 ref에 있을 때만 사용합니다. 현 PR은 Draft이며, 운영 DB가 미설치된 동안에는 스테이징 실행을 시작하지 않습니다.
+
 ## 현재 보안 경계
 
 **Owner 확인, 감사, 읽기 전용 조회, 로컬 API 실행 후보는 코드로 구현됐지만 아직 운영 DB 권한·실제 호스팅과 연결되지 않았습니다.**
