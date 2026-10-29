@@ -1,12 +1,13 @@
 # MyeongHa PostgreSQL Backup / Restore Runbook v1
 
-## 2026-10-29 current DR follow-up — measured earlier restore; newer backup pending restore
+## 2026-10-29 current DR follow-up — latest migration-matched isolated restore SUCCESS
 
-- [Protected restore #40811556214](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40811556214) **SUCCESS** for encrypted backup `40780751650` at migration `20261028011357`; evidence artifact `12870263616` (SHA-256 `1b462330dd9346717bfe57ee903dd64a256d689ee9d7b4e0e3256dee490ca6cc`, expires `2026-11-28T03:21:49Z`).
-- Actual provider-source COPY classification in that backup: **27 skipped blocks / 92 skipped rows**; **3 projected-column blocks / 42 projected-column replayed rows**; **43 total replayed Provider rows**, including those 42. No provider row payloads were included (`provider_source_counts_include_payloads=false`).
-- This restore's privacy step was **synthetic only**; `recovered-serving-admission.json` remains `gate=BLOCKED` / `drReady=false`. Historical real-event privacy proof belongs only to its own older backup and captured window.
-- [Latest encrypted backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) **SUCCESS**, artifact `12871016812`, source migration `20261029012948`. Read-only Production migration history on 2026-10-29 independently shows `20261029012948`; repository file `20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql` has a different numeric prefix despite separately established SQL-body equivalence. The latest backup's restore and Provider row totals remain **PENDING**, not inherited from #40811556214.
-- Pending drill is constrained to exact backup run `40812111605` and artifact `12871016812` on an isolated PostgreSQL 17 target, one-shot main-push marker with fixed validity and `ops` attribution. It writes nothing to Production and must not promote Hosted recovery, DR readiness, or service admission. Remote-only `20261008090417` provenance remains OPEN in issue #1887.
+- Governed encrypted [backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605), source migration `20261029012948`, artifact `12871016812` (expires `2026-11-28T03:29:12Z`), restored successfully by [isolated PostgreSQL 17 drill #40817391430](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40817391430). Restore artifact `12872589146` (SHA-256 `38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb`, expires `2026-11-28T04:23:26Z`).
+- Latest decrypted-backup Provider source evidence: **27 skipped COPY blocks / 112 skipped rows**, **3 projected blocks / 53 projected rows**, **54 total replayed Provider rows**. The 53 projected rows are included in 54, never added to it. Counts exclude payloads and represent this exact backup, **not live Production**.
+- Earlier [restore #40811556214](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40811556214) of backup `40780751650` recorded different counts (92 skipped / 42 projected / 43 replayed) and remains historical, not today's latest backup.
+- Read-only Production migration ledger on 2026-10-29 reported `20261029012948`; repository file is differently numbered `20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql`. Their versioned SQL-body comparison is not complete DDL/ACL or remote ledger restore proof. Unresolved remote-only `20261008090417` remains tracked in #1887.
+- Synthetic privacy replay/finalization passed on the disposable PostgreSQL target. **No authoritative current-backup captured-window Production ledger**, Hosted Auth login/session/token recovery, Storage object bytes/policies, service RTO or S8 E2E was proven. `gate=BLOCKED`, `serviceResumptionAllowed=false`, `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`.
+- The drill used only isolated loopback PostgreSQL; Production was read-only and no migration repair, hosted recovery or service cutover was performed.
 
 
 > Scope: non-character production operations only  
@@ -16,7 +17,7 @@
 
 ## 2026-10-29 — latest governed migration-matched backup and actual isolated restore
 
-The **latest verified PostgreSQL-only isolation test** is [protected restore
+The **historical earlier verified PostgreSQL-only isolation test** is [protected restore
 #40799522511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40799522511),
 SUCCESS on merged main commit `cd2152d35784dc610a82fc4ccfead01ef7c84ea7`.
 It used governed encrypted Production backup

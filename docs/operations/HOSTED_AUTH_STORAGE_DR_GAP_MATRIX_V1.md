@@ -32,7 +32,19 @@ Column-projected replay includes `auth.users=4`, `auth.refresh_tokens=38`, and `
 
 The restore performed **synthetic-only privacy reconciliation**. Its recovered service admission remains `gate=BLOCKED`, `serviceResumptionAllowed=false`, `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`. It does not prove Hosted login/session/token/SSO/MFA equivalence, Storage object bytes/policies, future privacy source continuity, or S8 service resumption. Earlier real-event replay remains a separate historical captured window.
 
-**Newer backup boundary:** encrypted backup [#40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) succeeded on `20261029012948` with artifact `12871016812` (expires `2026-11-28T03:29:12Z`); its own isolated restore and row counts are **NOT YET VERIFIED**. Do not copy 92/42/43 into that backup's evidence.
+**Latest-backup verified boundary:** [encrypted backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) at migration `20261029012948` is now independently proven restorable to **isolated** PostgreSQL 17 by [run #40817391430](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40817391430), artifact `12872589146` (SHA-256 `38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb`, expires `2026-11-28T04:23:26Z`). The latest counts below are decrypted-backup source rows, not live Production counts.
+
+| Latest backup `40812111605` | Measured amount |
+| --- | ---: |
+| Provider source COPY blocks skipped on isolated PG17 | **27** |
+| Source rows in skipped blocks | **112** |
+| Provider source COPY blocks with projected columns | **3** |
+| Rows replayed with some source columns excluded | **53** |
+| All Provider source rows replayed (including 53 projected rows) | **54** |
+
+**Latest skipped Auth rows:** `auth.sessions=39`, `auth.mfa_amr_claims=39`, `auth.flow_state=21`, `auth.oauth_client_states=8`, `auth.identities=4`, `auth.custom_oauth_providers=1`; all other skipped Auth and Storage relations have zero source rows in this backup. **Latest projected Auth rows:** `auth.users=4`, `auth.refresh_tokens=49`, `auth.audit_log_entries=0`. The 53 projected rows are a **subset** of 54 replayed Provider rows. `provider_source_counts_include_payloads=false`; no tokens, identifiers, emails or row bodies were included.
+
+Unlike the older backup `40780751650` (92 skipped, 42 projected, 43 replayed), this latest backup's Provider rows are not fully restored. Synthetic privacy only passed. Latest admission explicitly reports `gate=BLOCKED`, `serviceResumptionAllowed=false`, `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`. Missing Hosted Auth/session/MFA/SSO, Storage bytes/policies, independent future-safe privacy continuity and S8 evidence are still blocking.
 
 ## 1. Scope and direct observations
 
