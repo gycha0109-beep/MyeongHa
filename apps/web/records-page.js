@@ -3,6 +3,7 @@ import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
+import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
@@ -462,14 +463,14 @@ function renderMemories(payload, subjectKind) {
       let requestInFlight = false;
       async function refreshGrant() {
         const result = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
-        if (!result.currentlyGranted) withdrawalPending = false;
         if (item.isConnected) {
-          status.textContent = uiText(!result.currentlyGranted
-            ? '현재 세연의 접근 권한이 없습니다.'
-            : withdrawalPending
-              ? '새로운 기억 사용은 차단되었으며, 이전 답변 수신 확인 후 철회 완료를 기다리고 있습니다.'
-              : '현재 세연의 접근이 허용되어 있습니다.');
-          revoke.hidden = !result.currentlyGranted || withdrawalPending;
+          // A 202 withdrawal intent disappears from ordinary current-grant
+          // reads under restrictive RLS, but is NOT a completed revoke.
+          const view = presentSeyeonMemoryGrantStatusV1(
+            result.currentlyGranted, withdrawalPending,
+          );
+          status.textContent = uiText(view.message);
+          revoke.hidden = !view.revokeAvailable;
         }
         return result;
       }
@@ -502,8 +503,12 @@ function renderMemories(payload, subjectKind) {
           // barrier blocks new use while the original Grant remains pending.
           if (acknowledgement.status === 'pending') withdrawalPending = true;
           const current = await refreshGrant();
-          if (item.isConnected && acknowledgement.status === 'committed' && current.currentlyGranted) {
-            status.textContent = uiText('철회가 아직 확인되지 않았습니다. 다시 확인해 주세요.');
+          if (item.isConnected && acknowledgement.status === 'committed') {
+            // Only an actual committed ACK PLUS a fresh negative rights read
+            // may be shown as completed. A pending ACK never gets promoted.
+            status.textContent = uiText(current.currentlyGranted
+              ? '철회 완료 응답과 현재 권한 조회가 일치하지 않습니다. 다시 확인해 주세요.'
+              : '철회가 완료되었으며 현재 세연의 접근 권한이 없습니다.');
           }
         } catch {
           // A lost 200/202 or failed current-state GET never proves COMMIT.
