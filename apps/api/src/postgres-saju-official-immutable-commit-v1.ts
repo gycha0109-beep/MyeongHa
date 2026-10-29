@@ -40,7 +40,7 @@ select
   product_response_state as "productResponseState",
   stored_snapshot as "storedSnapshot",
   stored_response_hash as "storedResponseHash"
-from public.qry_saju_official_stored_lineage_v2(
+from public.qry_saju_official_stored_lineage_v3(
   $1::uuid, $2::uuid, $3::uuid
 )
 `.trim();
