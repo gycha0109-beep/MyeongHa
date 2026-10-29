@@ -1,12 +1,13 @@
 // Watchtower-Track: security
 // Reuse canonical config, approved target and Hyperdrive pool authority.
-import {parseProductionUserDataRuntimeConfigV1} from '../apps/api/src/production-user-data-runtime-config.js';
+import {parseProductionUserDataRuntimeConfigV1,parseProductionPostgresRuntimeConfigV1} from '../apps/api/src/production-user-data-runtime-config.js';
 import {approvedCloudflarePostgresTargetV1} from './cloudflare-auth-db-api.mjs';
 import {createCloudflareSeyeonSubjectPoolV1,createCloudflareSeyeonGovernedPoolV1,createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1} from './cloudflare-hyperdrive-subject-pool.mjs';
 import {createProductionSeyeonFirstMemoryFetchRuntimeV1} from '../apps/api/src/production-seyeon-first-memory-fetch-runtime-v1.js';
 import {createProductionRequestIdentityVerifierV1} from '../apps/api/src/production-request-identity-verifier.js';
 import {readOwnerAdminAccessV1} from '../apps/api/src/myeongha-owner-admin-access-v1.js';
 import {handleSeyeonReceiptWithdrawalFetchV1} from '../apps/api/src/seyeon-receipt-withdrawal-fetch-v1.js';
+import {handleSeyeonPositiveReplyReceiptV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 const limits=Object.freeze({maxConnectionsPerRuntime:1,connectionTimeoutMs:5000,idleTimeoutMs:1000,statementTimeoutMs:5000});
 export function createCloudflareSeyeonFirstMemoryRuntimeV1(input){
  const config=parseProductionUserDataRuntimeConfigV1(input.env);
@@ -58,6 +59,29 @@ export function createCloudflareSeyeonReceiptWithdrawalRuntimeV1(input){
           {status:503,headers:{'Cache-Control':'no-store'}});
       }
       return result;
+    },
+    close(){return pool.close();},
+  });
+}
+
+
+/**
+ * Issued-reply receipt is a proof-only capability, not a Member request.
+ * Do not parse Supabase Auth API keys, create a Member verifier, or construct
+ * a governed cost pool before acknowledging an already-issued response.
+ * The S0 Subject DB checks the exact one-time attempt/proof pair.
+ */
+export function createCloudflareSeyeonIssuedReplyReceiptRuntimeV1(input){
+  const config=parseProductionPostgresRuntimeConfigV1(input.env);
+  if(!approvedCloudflarePostgresTargetV1(config,input.env)){
+    throw Error('Cloudflare requires explicitly verified receipt DB origin');
+  }
+  const pool=createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1(input.env,limits);
+  return Object.freeze({
+    handleRequest(request){
+      return handleSeyeonPositiveReplyReceiptV1({
+        request,pool,requestId:crypto.randomUUID(),
+      });
     },
     close(){return pool.close();},
   });

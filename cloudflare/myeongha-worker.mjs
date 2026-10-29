@@ -69,17 +69,21 @@ export default {
         const {
           createCloudflareSeyeonFirstMemoryRuntimeV1,
           createCloudflareSeyeonReceiptWithdrawalRuntimeV1,
+          createCloudflareSeyeonIssuedReplyReceiptRuntimeV1,
         }=await import('../workers/cloudflare-seyeon-first-memory-runtime.mjs');
-        // Privacy commands are independent of the metered provider and its
-        // governed DB. Forward-stop must preserve receipt and withdrawal.
-        runtime=firstReplyRoute
-          ?createCloudflareSeyeonFirstMemoryRuntimeV1({
-            env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
-            governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
-          })
-          :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
-            env,approvedWithdrawalWriteAdmission:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
-          });
+        // Proof-only receipt must remain available without Member Auth,
+        // whereas withdrawal still verifies the current Member and Subject.
+        // Both stay independent from the metered model/governed DB.
+        runtime=receiptRoute
+          ?createCloudflareSeyeonIssuedReplyReceiptRuntimeV1({env})
+          :firstReplyRoute
+            ?createCloudflareSeyeonFirstMemoryRuntimeV1({
+              env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+              governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
+            })
+            :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
+              env,approvedWithdrawalWriteAdmission:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+            });
         // The general paid rail remains sealed until atomic reservation and
         // delivery-receipt settlement are actually mounted. The sole DB-bound
         // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
