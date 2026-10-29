@@ -103,6 +103,8 @@ jobs:
             npm exec --yes --package=wrangler@4.152.0 -- wrangler secret put MYEONGHA_SUPABASE_API_KEY --name myeongha-admin
       - name: Verify disabled Admin Worker deployment readback
         run: node apps/admin/inactive-stage-readback.mjs
+      - name: Verify anonymous Admin page and API remain inaccessible
+        run: node apps/admin/inactive-stage-http-probe.mjs
       - name: Stage status
         shell: bash
         run: |
