@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import {
   getOfficialReadingRecord,
@@ -70,7 +70,7 @@ describe('Official Reading Records read contract', () => {
         authorityPort: port({ ...ROW, birthRevision }),
       });
       expect(result.birthRevision).toEqual(birthRevision);
-      expect(result.reading).toBe(ROW.responseSnapshotJsonb);
+      expect(result.reading).toStrictEqual(ROW.responseSnapshotJsonb);
       expect(result).not.toHaveProperty('sourceBirthRevisionId');
       expect(result).not.toHaveProperty('currentBirthRevisionId');
     }
@@ -112,10 +112,10 @@ describe('Official Reading Records read contract', () => {
       reading: {
         readingId: READING_ID,
         sections: [
-          { sectionType: 'overview', state: 'complete', title: '공식 결과',
-            blocks: [{ type: 'paragraph', text: '인증된 서버 원본입니다.' }] },
+          { sectionType: 'overview', state: 'complete', title: '怨듭떇 寃곌낵',
+            blocks: [{ type: 'paragraph', text: '?몄쬆???쒕쾭 ?먮낯?낅땲??' }] },
         ],
-        disclosures: [{ type: 'scope_limitation', text: '이 명식의 출생시각은 확정되어 있습니다.' }],
+        disclosures: [{ type: 'scope_limitation', text: '??紐낆떇??異쒖깮?쒓컖? ?뺤젙?섏뼱 ?덉뒿?덈떎.' }],
       },
     };
     const issued = {
@@ -133,8 +133,8 @@ describe('Official Reading Records read contract', () => {
       reading: {
         ...(immutable.reading as Record<string, unknown>),
         sections: [
-          { sectionType: 'overview', state: 'complete', title: '공식 결과',
-            blocks: [{ type: 'paragraph', text: '원본을 변경한 내용입니다.' }] },
+          { sectionType: 'overview', state: 'complete', title: '怨듭떇 寃곌낵',
+            blocks: [{ type: 'paragraph', text: '?먮낯??蹂寃쏀븳 ?댁슜?낅땲??' }] },
         ],
       },
     };
