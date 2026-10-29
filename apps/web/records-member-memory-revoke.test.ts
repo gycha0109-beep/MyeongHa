@@ -10,7 +10,7 @@ const member = () => ({ kind: 'member', token: 'test-member-token' });
 
 describe('Records Member Se-yeon memory access revocation', () => {
   it('sends only one bodyless POST and accepts verified committed ACK', async () => {
-    const fetchImpl = vi.fn(async () => Response.json(COMMITTED));
+    const fetchImpl = vi.fn(async (_endpoint: string, _init?: RequestInit) => Response.json(COMMITTED));
     const client = createRecordsRuntimeClient({ fetchImpl, resolveBearer: member });
     await expect(client.revokeSeyeonMemoryGrant(MEMORY_ID)).resolves.toMatchObject({ status: 'committed', revokedGrantCount: 1 });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -22,7 +22,7 @@ describe('Records Member Se-yeon memory access revocation', () => {
     expect(fetchImpl.mock.calls[0]?.[1]).not.toHaveProperty('body');
   });
   it('does not treat a pending acknowledgement as completed revocation', async () => {
-    const fetchImpl = vi.fn(async () => Response.json(PENDING, { status: 202 }));
+    const fetchImpl = vi.fn(async (_endpoint: string, _init?: RequestInit) => Response.json(PENDING, { status: 202 }));
     const client = createRecordsRuntimeClient({ fetchImpl, resolveBearer: member });
     await expect(client.revokeSeyeonMemoryGrant(MEMORY_ID)).resolves.toMatchObject({ status: 'pending', newUseBlocked: true });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -36,14 +36,14 @@ describe('Records Member Se-yeon memory access revocation', () => {
       () => Response.json({ ...COMMITTED, data: { ...COMMITTED.data, replayed: true } }),
     ];
     for (const result of results) {
-      const fetchImpl = vi.fn(async () => result());
+      const fetchImpl = vi.fn(async (_endpoint: string, _init?: RequestInit) => result());
       const client = createRecordsRuntimeClient({ fetchImpl, resolveBearer: member });
       await expect(client.revokeSeyeonMemoryGrant(MEMORY_ID)).rejects.toMatchObject({ code: 'WEB_RECORDS_REVOKE_UNCONFIRMED' });
       expect(fetchImpl).toHaveBeenCalledTimes(1);
     }
   });
   it('requires Member identity and rejects identity changes after POST', async () => {
-    const fetchImpl = vi.fn(async () => Response.json(COMMITTED));
+    const fetchImpl = vi.fn(async (_endpoint: string, _init?: RequestInit) => Response.json(COMMITTED));
     const guest = createRecordsRuntimeClient({ fetchImpl, resolveBearer: () => ({ kind: 'guest', token: 'guest-token' }) });
     await expect(guest.revokeSeyeonMemoryGrant(MEMORY_ID)).rejects.toMatchObject({ code: 'WEB_RECORDS_MEMBER_REQUIRED' });
     expect(fetchImpl).not.toHaveBeenCalled();
