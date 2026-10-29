@@ -7,12 +7,13 @@
 
 Production project `cnsfpcdiyofqvhpcegfc` was queried through read-only `SELECT` over
 `supabase_migrations.schema_migrations` on 2026-10-29.
-The latest registered migration remains `20261028011357`.
+The latest registered migration observed on 2026-10-29 is `20261029012948`; `20261028011357` is an older, separately measured entry.
 
 | Remote version | Registered name | `length(statements[1])` | `md5(statements[1])` |
 | --- | --- | ---: | --- |
 | `20261008090417` | `seyeon_runtime_1460_1510_acl_before_owner_recovery` | 104021 | `f70776d8c0f6369f6f13484ba9fa2271` |
 | `20261028011357` | `owner_sandbox_signed_receipt_persistence_v1_20261028` | 9260 | `205e865779731b90eefa39a50d893628` |
+| `20261029012948` | `owner_kcp_sandbox_remove_daily_limit_v1` | 7349 | `c13c8ae6680c9c5aef35909ba81b7b1b` |
 
 The current repository does **not** contain a migration file with version
 `20261008090417`. Its six related numbered migration files are listed below;
@@ -24,6 +25,8 @@ read-only prefix comparison found the latter remote body equal to the
 repository file up to its final local `\n\ncommit;\n` terminator, which
 explains a ten-character length difference **without** making the migration
 IDs equivalent.
+
+The registered migration catalog has `created_by` and `idempotency_key` fields. A 2026-10-29 read-only metadata check found the **same nonempty `created_by` value** on these three records, and NULL idempotency keys and empty rollback statement arrays on all three. The recorded `created_by` identifier is intentionally not copied into this document; it is only a ledger attribute, **not authenticated proof of which workflow, source commit or actor applied the SQL**. The older `20261008090417` still lacks its original bundled SQL source and trustworthy deployment chain.
 
 ## Remote-only `20261008090417` vs current repository sources
 
@@ -46,24 +49,16 @@ The remote statement's 170-character starting and ending fragments of
 1460–1500 match, but each contains intervening differences. The actual
 difference can change owner/ACL installation ordering, so do not replace
 `20261008090417` with the current six files or silently repair remote
-migration history. SQL source origin, actual deploy actor, change approval,
+migration history. A ledger `created_by` value is now observed, but SQL source origin, deployment workflow/commit, authenticated deploy actor, change approval,
 and complete DDL/ACL equivalence remain **unidentified/unproven**.
 
 ## Backup/restore provenance boundary
 
-- [Governed encrypted backup #40780751650](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40780751650)
-  recorded migration frontier `20261028011357`; a separate Production
-  read-only query on 2026-10-29 returned that same maximum version.
-- Matching **version numbers** does not prove that the repository's
-  differently numbered migration SQL is identical to the Production
-  schema/catalog, or that an isolated restore has succeeded.
-- Scoped one-shot PG17 restore is tracked in
-  [PR #2695](https://github.com/gycha0109-beep/MyeongHa/pull/2695).
-  Its result must be verified from the actual run/artifact, not inferred
-  from PR CI or successful backup.
-- `provider_managed_data_full_restore=false`,
-  `future_safe_privacy_reconciliation=false`, and `dr_ready=false`
-  remain mandatory regardless of this read-only comparison.
+- The older governed [backup #40780751650](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40780751650) recorded `20261028011357`, equal to an earlier read-only Production version observation. That snapshot is historical; it is **not** the latest observed Production migration.
+- The latest governed encrypted [backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) recorded `20261029012948`. Independent read-only Production inspection on 2026-10-29 observed the same version. Its [isolated PostgreSQL 17 restore #40817391430](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40817391430) **SUCCEEDED** with artifact `12872589146` (SHA-256 `38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb`, expires `2026-11-28T04:23:26Z`). The [DR Readiness Authority #40824378258](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40824378258) **PASSED its fail-closed checks** after [PR #2721](https://github.com/gycha0109-beep/MyeongHa/pull/2721) merged.
+- These are real current-version **PostgreSQL-only isolated restoration** results, not remote DDL/ACL equivalence, a restored live migration ledger, full Hosted Auth/Storage, captured-window authoritative future-safe privacy reconciliation, or serving approval. The repository's separately numbered `20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql` is not automatically identical to remote `20261029012948`.
+- Actual source-row measurements on the latest encrypted backup: **112 Provider rows skipped**, **53 projected-column rows**, **54 total Provider rows replayed** (53 included in 54); full Hosted provider data recovery remains disproven for this isolated route. See [gap matrix](HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md).
+- `provider_managed_data_full_restore=false`, `future_safe_privacy_reconciliation=false`, `sourceContinuityProven=false`, `continuousCaptureProven=false`, `serviceResumptionAllowed=false`, `gate=BLOCKED` and `dr_ready=false` remain mandatory.
 
 ## Required authority resolution before any mutation
 
