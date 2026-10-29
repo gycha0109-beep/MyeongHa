@@ -321,7 +321,7 @@ require_report_contract '.application_schema_policy' 'public-fail-closed' 'appli
 require_report_contract '.provider_schema_policy' 'target-compatible-column-projection' 'provider schema policy changed'
 require_report_contract '.source_copy_blocks > 0' 'true' 'source dump contained no COPY blocks'
 require_report_contract '.replayed_copy_blocks > 0' 'true' 'portable replay contained no COPY blocks'
-require_report_contract '.provider_source_counts_include_payloads' 'false' 'provider row inventory must not include payloads'
+require_report_contract '(.provider_source_counts_include_payloads == false)' 'true' 'provider row inventory must not include payloads'
 require_report_contract '[.skipped_provider_copy_blocks[] | .source_row_count | select(type != "number" or . < 0)] | length == 0' 'true' 'skipped provider source row counts invalid'
 require_report_contract '[.projected_provider_copy_blocks[] | .source_row_count | select(type != "number" or . < 0)] | length == 0' 'true' 'projected provider source row counts invalid'
 require_report_contract '(.provider_rows_skipped_in_loopback == ([.skipped_provider_copy_blocks[].source_row_count] | add // 0))' 'true' 'provider skipped row total mismatched'
