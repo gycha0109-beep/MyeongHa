@@ -28,6 +28,23 @@ export interface SajuNarrativeProviderObservationV1 {
 
 type Binding = Pick<ReadingAiProviderCallObservationV1,
   'subjectId' | 'readingId' | 'executionAttemptId'>;
+
+/**
+ * Trusted DB Owner correlation proof. The implementation must verify that an
+ * already allocated, governed Reading execution attempt is bound to EXACTLY
+ * this Saju server request. No guessed Saju/DB Reading UUID equivalence.
+ *
+ * Until Production Interpretation Authority admits an actual source request
+ * -> DB attempt mapping, the implementation must return null.
+ */
+export interface SajuReadingProviderBindingAuthorityV1 {
+  resolve(input: Readonly<{
+    sajuRequestId: string;
+    callId: string;
+    modelKey: string;
+    observedAt: string;
+  }>): Promise<Binding | null>;
+}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REQUIRED_KEYS = [
   'callId','requestId','providerKey','modelKey','source','outcome','observedAt','usage',
@@ -91,11 +108,11 @@ function validateObservation(
  */
 export function createSajuNarrativeReadingCostBridgeV1(input:{
   readonly pool:PostgresSubjectPoolV1;
+  readonly bindingAuthority:SajuReadingProviderBindingAuthorityV1;
 }){
   const writer=createReadingAiCostWriterV1({pool:input.pool});
   return Object.freeze({
     async record(inputEvent:{
-      readonly binding:Binding;
       readonly expectedSajuRequestId:string;
       readonly expectedModelKey:string;
       readonly observation:unknown;
@@ -111,8 +128,15 @@ export function createSajuNarrativeReadingCostBridgeV1(input:{
       const event=validateObservation(
         inputEvent.observation,inputEvent.expectedSajuRequestId,inputEvent.expectedModelKey,
       );
+      const binding=await input.bindingAuthority.resolve({
+        sajuRequestId:event.requestId,callId:event.callId,
+        modelKey:event.modelKey,observedAt:event.observedAt,
+      });
+      // Absence of DB Owner's authenticated correspondence is a HOLD, not
+      // license to attach a Saju-native ID to a convenient Reading row.
+      if(binding===null)throw Error('Unverified Saju to DB Reading execution mapping');
       return writer.record({
-        ...inputEvent.binding,
+        ...binding,
         callId:event.callId,
         observedAt:event.observedAt,
         providerKey:event.providerKey,
