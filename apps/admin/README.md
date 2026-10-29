@@ -203,6 +203,11 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - `apps/admin/origin-preflight.mjs`에 선택적 `MYEONGHA_ADMIN_READING_AI_COST_WRITER_DATABASE_URL` 검사를 추가했습니다. 설정된 경우에만 전용 `myeongha_reading_ai_cost_writer_v1` 로그인 계정의 실제 TLS·계정 제한 속성·비공개 `cmd_record_reading_ai_call_v1` 실행 권한을 읽기 전용으로 확인합니다.
 - 같은 계정이 Reading 실행·회원/원장 테이블을 수정하거나 Reading AI 비용 테이블을 직접 SELECT/INSERT/UPDATE/DELETE/TRUNCATE할 수 있으면 검증을 거부합니다. 사용자 서비스 DB 계정 또는 보통 Reader/Audit 계정을 Writer로 대신 사용하지 않습니다. 미설정이면 생성·접속을 시도하지 않습니다.
 
+### A5 동의 원장 재실행 무결성 (2026-10-29)
+
+- `admin-analytics-pipeline-postgres-v1.ts`에서 새 동의 저장이 성공하면 DB `RETURNING` 영수증을 확인하고, 동일한 방문자·동의 버전으로 충돌한 경우에는 기존 행의 **정책·Subject 연결·만료시각 일치, 미철회, 미만료**를 모두 DB에서 재검증합니다.
+- 철회된 동의, 다른 주체/정책/만료시각으로 바뀐 동의, 이미 만료된 동의는 새 서명 쿠키가 발급되기 전에 실패 차단합니다. 기존의 명시적 철회·삭제 우선 원칙을 유지하고, 운영 수집은 여전히 비활성입니다.
+
 ### A5 실서비스 분석 수집 구성 경계 (2026-10-29)
 
 - `production-admin-analytics-collection-v1.ts`에서 기존 명시 동의/철회/세션/이벤트 HTTP 처리기와 실제 DB 작성 원장, 검증된 Reading·결제·출생 기록 이벤트를 하나의 서버 구성으로 연결했습니다. **새로운 공개 라우트를 자동 설치하지 않습니다.**
