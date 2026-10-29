@@ -575,8 +575,11 @@ async function sendTurn(message) {
       throw new Error('INVALID_RESPONSE');
     }
 
-    // Delivery is acknowledged by the receipt endpoint. A protected history
-    // GET may legitimately return 503 and must not convert this into a retry.
+    // The receipt ACK is already complete. Retire the idempotency draft
+    // before a refresh or session change can make a successful turn retryable.
+    clearPendingTurn(pendingTurn.clientTurnId);
+    // A protected history GET may legitimately return 503. Never use it as
+    // positive receipt confirmation or as a reason to resend this turn.
     const currentBearer = await getActiveBearer();
     if (currentBearer?.kind !== 'member' ||
         currentBearer.token !== activeBearer.token ||
@@ -586,9 +589,6 @@ async function sendTurn(message) {
       throw new Error('AUTH_REQUIRED');
     }
 
-    // Once ACKed, this clientTurnId must never be sent again because a
-    // deliberately withheld history endpoint could not be re-read.
-    clearPendingTurn(pendingTurn.clientTurnId);
     if (messageInput instanceof HTMLTextAreaElement) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
