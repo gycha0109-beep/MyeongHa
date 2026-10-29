@@ -11,7 +11,7 @@ const source=readFileSync(new URL('../apps/web/owner-portone-sandbox.js',import.
  .replace(/import \{getActiveBearer\} from '\.\/product-auth\.js';/u,'')
  .replace(/import \{[\s\S]*?\} from '\.\/owner-portone-sandbox-contract\.js';/u,'');
 
-async function consoleFixture({sdkFails=false,sdkMissing=false,hint,storedAttempt=false}={}){
+async function consoleFixture({sdkFails=false,sdkMissing=false,hint,storedAttempt=false,failEndpoint=null,serverFailureCode='SANDBOX_AUTHORITY_UNAVAILABLE'}={}){
  const elements=new Map();
  const stored=new Map(storedAttempt?[['myeongha.ownerKcpSandboxAttempt.v1',ID]]:[]);
  const sdk={requestPayment:vi.fn(async()=>hint)};
@@ -32,6 +32,12 @@ async function consoleFixture({sdkFails=false,sdkMissing=false,hint,storedAttemp
   });}},
  };
  sandbox.fetch=vi.fn(async path=>{
+  if(path===failEndpoint)return {
+   ok:false,status:503,
+   json:async()=>({ok:false,error:{
+    code:serverFailureCode,message:'private-DB-secret-must-not-appear',
+   }}),
+  };
   let data;
   if(path==='/api/me/credits')data={isOwnerAdmin:true,creditExempt:true};
   else if(path.endsWith('/test-prepare'))data={purchaseIntentId:ID,paymentAttemptId:ID,
@@ -48,7 +54,7 @@ async function consoleFixture({sdkFails=false,sdkMissing=false,hint,storedAttemp
    providerVerifiedPaid:true,receiptPersisted:true,receiptId:ID,providerEventId:ID,
    replayed:true,productionCreditsIssued:false};
   else throw Error('Unexpected fixture request');
-  return {ok:true,json:async()=>({ok:true,data})};
+  return {ok:true,status:200,json:async()=>({ok:true,data})};
  });
  const client=runInNewContext(source+'\n;({beginTest,checkExisting})',sandbox);
  await vi.waitFor(()=>expect(elements.get('owner-test-pay').disabled).toBe(false));
@@ -84,6 +90,47 @@ describe('Owner sandbox console SDK/Attempt execution ordering',()=>{
   expect(f.elements.get('owner-test-diagnostic').textContent).toContain('PAY_PROCESS_CANCELED');
   await f.client.checkExisting();
   expect(JSON.parse(f.fetch.mock.calls.at(-1)[1].body)).toEqual({paymentAttemptId:ID});
+ });
+ it('shows only a fixed server error code on rejected purchase preparation',async()=>{
+  const f=await consoleFixture({
+   failEndpoint:'/api/me/credits/portone/test-prepare',
+  });
+  await f.client.beginTest();
+  const diag=f.elements.get('owner-test-diagnostic').textContent;
+  expect(diag).toContain('구매 의도 생성');
+  expect(diag).toContain('SANDBOX_AUTHORITY_UNAVAILABLE');
+  expect(diag).toContain('HTTP 503');
+  expect(diag).not.toContain('private-DB-secret-must-not-appear');
+  expect(f.sdk.requestPayment).not.toHaveBeenCalled();
+  expect(f.fetch.mock.calls.map(([path])=>path)).toEqual([
+   '/api/me/credits','/api/me/credits/portone/test-prepare',
+  ]);
+ });
+ it('reports server verification errors on the existing Attempt, without retrying checkout',async()=>{
+  const f=await consoleFixture({
+   storedAttempt:true,failEndpoint:'/api/me/credits/portone/test-verify',
+  });
+  await f.client.checkExisting();
+  const diag=f.elements.get('owner-test-diagnostic').textContent;
+  expect(diag).toContain('결제 완료 서버 검증');
+  expect(diag).toContain('SANDBOX_AUTHORITY_UNAVAILABLE');
+  expect(diag).toContain('HTTP 503');
+  expect(f.elements.get('owner-test-status').textContent).toContain('진단 코드를 확인');
+  expect(f.sdk.requestPayment).not.toHaveBeenCalled();
+  expect(f.fetch.mock.calls.map(([path])=>path)).toEqual([
+   '/api/me/credits','/api/me/credits/portone/test-verify',
+  ]);
+ });
+ it('never reflects an arbitrary server error code or private error message',async()=>{
+  const f=await consoleFixture({
+   failEndpoint:'/api/me/credits/portone/test-prepare',
+   serverFailureCode:'private-DB-secret-must-not-appear',
+  });
+  await f.client.beginTest();
+  const diag=f.elements.get('owner-test-diagnostic').textContent;
+  expect(diag).toContain('UNKNOWN');
+  expect(diag).not.toContain('private-DB-secret-must-not-appear');
+  expect(diag).toContain('HTTP 503');
  });
  it('rechecks the remembered Attempt after reload without creating another payment',async()=>{
   const f=await consoleFixture({storedAttempt:true});
