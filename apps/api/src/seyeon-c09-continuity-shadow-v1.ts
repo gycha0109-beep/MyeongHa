@@ -60,7 +60,7 @@ export interface SeyeonC09ContinuityAuthoritySnapshotV1 {
   readonly latestSenderType: 'user';
   readonly fullThreadMessageCount: number;
   readonly contextSha256: string;
-  readonly grantSetRevision: number;
+  readonly grantSetFingerprint: string;
   readonly relationshipRevision: number | null;
   readonly authorizedMemoryIds: readonly string[];
 }
@@ -119,7 +119,7 @@ function boundedIdentifier(input: string): boolean {
 async function requireCurrentAuthoritySnapshot(input: Readonly<{
   context: SeyeonRuntimeContextV2;
   port: SeyeonC09ContinuityAuthoritySnapshotPortV1 | undefined;
-  expectedRevision?: number;
+  expectedFingerprint?: string;
   expectedMessageCount?: number;
 }>): Promise<SeyeonC09ContinuityAuthoritySnapshotV1> {
   const fail = () => new SeyeonC09ContinuityShadowErrorV1('C09_AUTHORITY_SNAPSHOT_MISMATCH');
@@ -146,8 +146,8 @@ async function requireCurrentAuthoritySnapshot(input: Readonly<{
       !Number.isSafeInteger(raw.fullThreadMessageCount) ||
       (raw.fullThreadMessageCount as number) < input.context.recentConversation.length ||
       raw.contextSha256 !== fingerprintSeyeonC09ContinuityContextV1(input.context) ||
-      !Number.isSafeInteger(raw.grantSetRevision) ||
-      (raw.grantSetRevision as number) < 0 ||
+      (typeof raw.grantSetFingerprint !== 'string' ||
+        !/^sha256:[a-f0-9]{64}$/u.test(raw.grantSetFingerprint)) ||
       raw.relationshipRevision !== (input.context.relationship?.revision ?? null) ||
       !Array.isArray(raw.authorizedMemoryIds) ||
       raw.authorizedMemoryIds.length !== input.context.retrievedMemories.length ||
@@ -155,7 +155,7 @@ async function requireCurrentAuthoritySnapshot(input: Readonly<{
       new Set(raw.authorizedMemoryIds).size !== raw.authorizedMemoryIds.length ||
       !input.context.retrievedMemories.every((memory) =>
         (raw.authorizedMemoryIds as readonly string[]).includes(memory.memoryId)) ||
-      (input.expectedRevision !== undefined && raw.grantSetRevision !== input.expectedRevision) ||
+      (input.expectedFingerprint !== undefined && raw.grantSetFingerprint !== input.expectedFingerprint) ||
       (input.expectedMessageCount !== undefined && raw.fullThreadMessageCount !== input.expectedMessageCount)) {
     throw fail();
   }
@@ -240,7 +240,7 @@ export function createSeyeonC09ContinuityShadowV1(input: Readonly<{
       await requireCurrentAuthoritySnapshot({
         context,
         port: input.authoritySnapshotPort,
-        expectedRevision: source.grantSetRevision,
+        expectedFingerprint: source.grantSetFingerprint,
         expectedMessageCount: source.fullThreadMessageCount,
       });
       const semanticRequest = buildSeyeonSemanticReviewRequestV2({
@@ -263,7 +263,7 @@ export function createSeyeonC09ContinuityShadowV1(input: Readonly<{
       await requireCurrentAuthoritySnapshot({
         context,
         port: input.authoritySnapshotPort,
-        expectedRevision: source.grantSetRevision,
+        expectedFingerprint: source.grantSetFingerprint,
         expectedMessageCount: source.fullThreadMessageCount,
       });
       return Object.freeze({

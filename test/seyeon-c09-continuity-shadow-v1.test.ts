@@ -50,7 +50,7 @@ function snapshot(ctx: SeyeonRuntimeContextV2): SeyeonC09ContinuityAuthoritySnap
     latestSenderType: 'user',
     fullThreadMessageCount: 3,
     contextSha256: fingerprintSeyeonC09ContinuityContextV1(ctx),
-    grantSetRevision: 4,
+    grantSetFingerprint: 'sha256:' + 'a'.repeat(64),
     relationshipRevision: ctx.relationship?.revision ?? null,
     authorizedMemoryIds: ctx.retrievedMemories.map((m) => m.memoryId),
   };
@@ -187,7 +187,7 @@ describe('C09 governed continuity State -> Decision -> Renderer Shadow', () => {
         threadId: 'thread-1',
         readAuthoritativeSnapshot: async () => ({
           ...snapshot(ctx),
-          grantSetRevision: grantRevision,
+          grantSetFingerprint: 'sha256:' + (grantRevision === 4 ? 'a' : 'b').repeat(64),
           authorizedMemoryIds: grantRevision === 4 ? ['m1'] : [],
         }),
       },
