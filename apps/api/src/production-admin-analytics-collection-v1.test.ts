@@ -24,6 +24,8 @@ function createFixture(){
         queries.push(sql);
         if(sql.includes('SELECT current_user::text AS role'))return {rows:[{role:'myeongha_analytics_writer'}] as Row[]};
         if(sql.includes('SELECT true AS active'))return {rows:[{active:true}] as Row[]};
+        if(sql.includes('SELECT version,expires_at::text AS "expiresAt"'))
+          return {rows:[{version:'product-analytics-consent-180d-v1',expiresAt:'2027-04-27T12:00:00.000Z'}] as Row[]};
         if(sql.includes('INSERT INTO myeongha_admin_analytics.events_v1'))
           return {rows:[{eventId:'123e4567-e89b-42d3-a456-426614174002'}] as Row[]};
         return {rows:[] as Row[]};
