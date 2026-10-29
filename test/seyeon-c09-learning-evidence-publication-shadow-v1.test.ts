@@ -37,7 +37,7 @@ function revocation(overrides: Record<string, unknown> = {}) {
   return {
     subjectId: A, evidenceId: EVIDENCE,
     characterId: 'seyeon', authorityRef: 'source:lesson:1',
-    revocationApproved: true, revokedAt: WHEN,
+    revocationApproved: true, revokedAt: WHEN, revocationRef: 'revocation:approval:1', revision: 1,
     ...overrides,
   };
 }
@@ -93,13 +93,12 @@ describe('C09 learning admission: independently-approved SQL proposal only', () 
     expect(command.sql).toBe(SEYEON_C09_LEARNING_ISSUE_SQL_SHADOW_V1);
     expect(command.scope).toBe('PROPOSAL_SQL_ONLY_NO_EXECUTION');
     expect(command.mayExecuteInProduction).toBe(false);
-    expect(command.parameters).toHaveLength(16);
-    expect(command.parameters[2]).toBe('python.programming');
-    expect(command.parameters[7]).toBe(null);
-    expect(command.parameters[8]).toBe('true');
-    expect(command.parameters[9]).toBe(WHEN);
-    expect(command.parameters[11]).toBe('consent:deidentified-share-1');
-    expect(command.parameters[12]).toBe('approval:operator-1');
+    expect(command.parameters).toHaveLength(6);
+    expect(command.parameters[1]).toBe(A);
+    expect(command.parameters[2]).toBe('source:lesson:1');
+    expect(command.parameters[3]).toBe('approval:operator-1');
+    expect(command.parameters[4]).toBe('consent:deidentified-share-1');
+    expect(command.parameters[5]).toBe('1');
     expect(source.readApprovedPublication).toHaveBeenCalledTimes(2);
     expect(source.readCurrentSharingConsent).toHaveBeenCalledTimes(2);
     expect(JSON.stringify(command)).not.toContain('full lesson text');
@@ -112,10 +111,9 @@ describe('C09 learning admission: independently-approved SQL proposal only', () 
       privacyReviewedAt: null, deidentifiedForSharing: false,
     } });
     const plan = await planner.prepareIssue({ subjectId: A, sourceRef: 'source:lesson:1' });
-    expect(plan.parameters[7]).toBe(A);
-    expect(plan.parameters[8]).toBe('false');
-    expect(plan.parameters[9]).toBe(null);
-    expect(plan.parameters[11]).toBe(null);
+    expect(plan.parameters[1]).toBe(A);
+    expect(plan.parameters[4]).toBe(null);
+    expect(plan.parameters[5]).toBe(null);
     expect(source.readCurrentSharingConsent).not.toHaveBeenCalled();
   });
 
@@ -152,7 +150,7 @@ describe('C09 learning admission: independently-approved SQL proposal only', () 
     const plan = await planner.prepareRevoke({ subjectId: A, evidenceId: EVIDENCE });
     expect(plan.operation).toBe('REVOKE');
     expect(plan.sql).toBe(SEYEON_C09_LEARNING_REVOKE_SQL_SHADOW_V1);
-    expect(plan.parameters).toEqual([EVIDENCE, 'source:lesson:1', WHEN]);
+    expect(plan.parameters).toEqual([A, EVIDENCE, 'revocation:approval:1', '1']);
     expect(plan.mayExecuteInProduction).toBe(false);
     expect(source.readApprovedRevocation).toHaveBeenCalledTimes(2);
   });
@@ -163,6 +161,8 @@ describe('C09 learning admission: independently-approved SQL proposal only', () 
       { subjectId: B },
       { evidenceId: '00000000-0000-4000-8000-000000000000' },
       { authorityRef: '' },
+      { revocationRef: '' },
+      { revision: 0 },
       { revokedAt: 'not-a-date' },
     ]) {
       const { planner } = system({ revoke });

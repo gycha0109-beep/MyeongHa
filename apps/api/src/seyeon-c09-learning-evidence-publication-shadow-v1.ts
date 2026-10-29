@@ -84,24 +84,15 @@ export type SeyeonC09LearningSqlCommandShadowV1 = Readonly<{
 }>;
 
 export const SEYEON_C09_LEARNING_ISSUE_SQL_SHADOW_V1 = [
-  'insert into myeongha_internal.character_learning_evidence_v1 (',
-  ' id, character_id, topic_key, source_kind, authority_ref, awareness,',
-  ' visibility, subject_id, approved_for_character_sharing, privacy_reviewed_at,',
-  ' privacy_review_ref, sharing_consent_ref, approval_ref, verified_at, learned_at, valid_at',
-  ') values (',
-  ' $1::uuid, $2::text, $3::text, $4::text, $5::text, $6::text,',
-  ' $7::text, $8::uuid, $9::boolean, $10::timestamptz,',
-  ' $11::text, $12::text, $13::text, $14::timestamptz, $15::timestamptz, $16::timestamptz',
-  ') returning id::text as "evidenceId"',
+  'select myeongha_internal.c09_issue_learning_evidence_shadow_v1(',
+  ' $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::bigint',
+  ')::text as "evidenceId"',
 ].join('\n');
 
 export const SEYEON_C09_LEARNING_REVOKE_SQL_SHADOW_V1 = [
-  'update myeongha_internal.character_learning_evidence_v1',
-  'set revoked_at = $3::timestamptz',
-  'where id = $1::uuid and character_id = \'seyeon\'',
-  ' and authority_ref = $2::text and revoked_at is null',
-  ' and verified_at <= $3::timestamptz',
-  'returning id::text as "evidenceId"',
+  'select myeongha_internal.c09_revoke_learning_evidence_shadow_v1(',
+  ' $1::uuid,$2::uuid,$3::text,$4::bigint',
+  ')::text as "evidenceId"',
 ].join('\n');
 
 async function requireCurrentSharingConsent(input: Readonly<{
@@ -128,7 +119,7 @@ async function requireCurrentSharingConsent(input: Readonly<{
       c.topicKey !== r.topicKey || c.status !== 'active' ||
       !Number.isSafeInteger(c.revision) || (c.revision as number) < 1 ||
       !time(c.verifiedAt) ||
-      Date.parse(c.verifiedAt as string) > Date.parse(r.verifiedAt)) fail();
+      Date.parse(c.verifiedAt as string) > Date.now()) fail();
   const fingerprint = JSON.stringify(c);
   if (input.expected !== undefined && input.expected !== fingerprint) fail();
   return fingerprint;
@@ -200,11 +191,11 @@ export function createSeyeonC09LearningPublicationPlannerShadowV1(input: Readonl
         operation: 'ISSUE' as const,
         sql: SEYEON_C09_LEARNING_ISSUE_SQL_SHADOW_V1,
         parameters: Object.freeze([
-          issueId, 'seyeon', r.topicKey, r.sourceKind, r.sourceRef,
-          r.awareness, r.visibility, r.visibility === 'user_private' ? subjectId : null,
-          r.visibility === 'character_shared' ? 'true' : 'false',
-          r.privacyReviewedAt,
-          r.privacyReviewRef, r.sharingConsentRef, r.approvalRef, r.verifiedAt, r.learnedAt, r.validAt,
+          issueId, subjectId, r.sourceRef, r.approvalRef,
+          r.sharingConsentRef,
+          r.visibility === 'character_shared'
+            ? String((JSON.parse(consentSnapshot) as {revision:number}).revision)
+            : null,
         ]),
         mayExecuteInProduction: false as const,
       });
@@ -223,10 +214,12 @@ export function createSeyeonC09LearningPublicationPlannerShadowV1(input: Readonl
       } catch { return fail(); }
       if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail();
       const proof = raw as Record<string, unknown>;
-      if (Object.keys(proof).length !== 6 ||
+      if (Object.keys(proof).length !== 8 ||
           proof.subjectId !== subjectId || proof.evidenceId !== request.evidenceId ||
           proof.characterId !== 'seyeon' || proof.revocationApproved !== true ||
-          !stringRef(proof.authorityRef) || !time(proof.revokedAt)) fail();
+          !stringRef(proof.authorityRef) || !stringRef(proof.revocationRef) ||
+          !Number.isSafeInteger(proof.revision) || (proof.revision as number) < 1 ||
+          !time(proof.revokedAt)) fail();
       let current: unknown;
       try {
         current = await input.sourceAuthority.readApprovedRevocation({ subjectId, evidenceId: request.evidenceId });
@@ -237,7 +230,8 @@ export function createSeyeonC09LearningPublicationPlannerShadowV1(input: Readonl
         scope: 'PROPOSAL_SQL_ONLY_NO_EXECUTION' as const,
         operation: 'REVOKE' as const,
         sql: SEYEON_C09_LEARNING_REVOKE_SQL_SHADOW_V1,
-        parameters: Object.freeze([request.evidenceId, proof.authorityRef as string, proof.revokedAt as string]),
+        parameters: Object.freeze([subjectId, request.evidenceId,
+          proof.revocationRef as string, String(proof.revision)]),
         mayExecuteInProduction: false as const,
       });
     },
