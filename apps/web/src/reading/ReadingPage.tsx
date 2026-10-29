@@ -2,16 +2,13 @@ import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
-const productPreviewTopics = [
+// All twelve Saju topics share one product layer. Route availability is
+// independent from Product identity and never grants sale or Reader access.
+const sajuProductTopics = [
   { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
   { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
   { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
   { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
-] as const;
-
-// All twelve Saju topics share one product layer. A topic's current Preview
-// availability is separate from its position in the product catalog.
-const additionalReadingTopics = [
   { symbol: '商', title: '사업', href: 'reading-detail.html?topic=business' },
   { symbol: '家', title: '가족', href: 'reading-detail.html?topic=family' },
   { symbol: '生', title: '삶의 단계', href: 'reading-detail.html?topic=life-stage' },
@@ -21,8 +18,6 @@ const additionalReadingTopics = [
   { symbol: '合', title: '궁합', href: 'reading-detail.html?topic=compatibility' },
   { symbol: '問', title: '지금 고민으로 보기', href: 'reading-detail.html?topic=question-specific' },
 ] as const;
-
-const allProductTopics = [...productPreviewTopics, ...additionalReadingTopics] as const;
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
@@ -152,7 +147,7 @@ export function ReadingPage() {
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
           <p>원하는 주제를 선택하면 해석 범위와 제공 내용을 확인하고, 대리자를 선택해 구매와 공식 보고서 발행으로 이어집니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
-            {allProductTopics.map((topic) => {
+            {sajuProductTopics.map((topic) => {
               const availability = resolveReadingAvailabilityV1(topic.href);
               return (
                 <article className="saju-design-product-card" key={topic.href}>
