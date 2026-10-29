@@ -29,6 +29,9 @@ export function createProductionAdminAnalyticsCollectionV1(input: {
   readonly sourceReaderPool: PostgresSubjectPoolV1;
   readonly policy: AdminAnalyticsCollectionPolicyV1;
   readonly collectionEnabled?: boolean;
+  /** True only after the bounded 180-day purge is scheduled on the
+   * independently verified analytics writer, not merely documented. */
+  readonly retentionMaintenanceReady?: boolean;
   readonly allowRequest: (request: Request) => Promise<boolean>;
   readonly resolveActiveSubject: (request: Request) => Promise<string | null>;
   readonly admitVisitor: (request: Request) => Promise<boolean>;
@@ -38,6 +41,7 @@ export function createProductionAdminAnalyticsCollectionV1(input: {
     throw new Error('Analytics reader and writer must use separate database pools');
   }
   const active = input.collectionEnabled === true &&
+    input.retentionMaintenanceReady === true &&
     isAdminAnalyticsCollectionApprovedV1(input.policy);
   const store = createAdminAnalyticsPostgresEventStoreV1(input.writerPool);
   const consentRuntime = createAdminAnalyticsConsentRuntimeV1({
