@@ -223,6 +223,19 @@ describe('Character Standard Reading Reader Knowledge source', () => {
     await expect(resolveCharacterStandardReadingKnowledgeV1({
       ...args, artifactAuthorityPort: tamperedSource,
     })).rejects.toThrow(/source response hash mismatch/u);
+
+    // A malformed but identical digest in both DB access and artifact rows
+    // must not disable the canonical v2 content-addressed validation.
+    const malformedHash = 'sha256:v1:not-a-64-hex-digest';
+    await expect(resolveCharacterStandardReadingKnowledgeV1({
+      ...args,
+      accessAuthorityPort: {
+        readAccessibleReadings: async () => [{ ...access, responseHash: malformedHash }],
+      },
+      artifactAuthorityPort: {
+        readArtifactSource: async () => [{ ...artifact, responseHash: malformedHash }],
+      },
+    })).rejects.toThrow(/source response hash mismatch/u);
   });
 
   it('fails closed when metadata and raw source hashes disagree', async () => {

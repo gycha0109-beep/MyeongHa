@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   OFFICIAL_READER_ADMISSION_VERSION_V1,
   OfficialReadingReaderAdmissionErrorV1,
@@ -30,6 +31,20 @@ const BUNDLE = '55555555-5555-4555-8555-555555555555';
 const RELEASE = 'released-synthetic-character-v1';
 const TIME = '2026-10-09T08:00:00.000Z';
 
+const OFFICIAL_SNAPSHOT = {
+  responseVersion: 'myeonghwa-product-reading-response-v2',
+  state: 'delivered',
+  reading: {
+    readingId: READING,
+    sections: [{ sectionType: 'overview', title: '전체', blocks: [
+      { type: 'paragraph', text: '공식 근거를 기반으로 설명합니다.' },
+    ] }],
+    disclosures: [],
+    calculationSummary: {},
+  },
+};
+const OFFICIAL_HASH = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(OFFICIAL_SNAPSHOT);
+
 function accessRow(reader = 'seyeon') {
   return {
     subjectId: SUBJECT, readingId: READING, readerCharacterId: reader,
@@ -42,7 +57,7 @@ function accessRow(reader = 'seyeon') {
     domainCapabilityVersion: 'general-v1',
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     sajuEngineVersion: 'saju-engine-v1',
-    responseHash: 'sha256:v1:official-reading-hash',
+    responseHash: OFFICIAL_HASH,
   };
 }
 function artifactRow(reader = 'seyeon') {
@@ -50,19 +65,8 @@ function artifactRow(reader = 'seyeon') {
     readingId: READING, productId: PRODUCT, readerCharacterId: reader,
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     productResponseState: 'delivered',
-    responseSnapshotJsonb: {
-      responseVersion: 'myeonghwa-product-reading-response-v2',
-      state: 'delivered',
-      reading: {
-        readingId: READING,
-        sections: [{ sectionType: 'overview', title: '전체', blocks: [
-          { type: 'paragraph', text: '공식 근거를 기반으로 설명합니다.' },
-        ] }],
-        disclosures: [],
-        calculationSummary: {},
-      },
-    },
-    responseHash: 'sha256:v1:official-reading-hash',
+    responseSnapshotJsonb: OFFICIAL_SNAPSHOT,
+    responseHash: OFFICIAL_HASH,
     completedAt: '2026-10-09T07:30:00.000Z',
   };
 }
@@ -195,7 +199,7 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     expect(result.scope).toMatchObject({
       subjectId: SUBJECT, readerCharacterId: 'seyeon', readingId: READING,
       threadId: THREAD, contentReleaseId: RELEASE, readerContentBundleId: BUNDLE,
-      officialArtifactResponseHash: 'sha256:v1:official-reading-hash',
+      officialArtifactResponseHash: OFFICIAL_HASH,
       productRuleVersion: 'synthetic-standard-rule',
     });
     expect(Object.keys(result.ticket)).toEqual(['kind']);

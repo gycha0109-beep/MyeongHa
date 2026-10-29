@@ -367,14 +367,13 @@ export async function resolveCharacterStandardReadingArtifactAfterAccessV1(
     }
 
     const snapshot = requireArtifactSnapshot(artifact.responseSnapshotJsonb);
-    // Canonical Production v2 immutable snapshots are content addressed.
-    // Check the exact saved bytes again before they can reach the Character
-    // protected context. Historical, noncanonical hashes retain the existing
-    // separately governed Reader access policy until source migration.
+    // All Production v2 official source snapshots are content addressed.
+    // A malformed stored digest must not bypass the immutable source check.
+    // Historical non-v2 contracts retain their separately governed policy.
     if (access.readingContractVersion === 'myeonghwa-product-reading-response-v2'
-      && /^sha256:v1:[a-f0-9]{64}$/u.test(access.responseHash)
-      && 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot)
-        !== access.responseHash) {
+      && (!/^sha256:v1:[a-f0-9]{64}$/u.test(access.responseHash)
+        || 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot)
+          !== access.responseHash)) {
       throw new Error('Official Reading Reader source response hash mismatch.');
     }
 
