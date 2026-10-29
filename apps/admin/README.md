@@ -30,6 +30,7 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 
 - 필수 GitHub Actions Secrets: `MYEONGHA_ADMIN_CLOUDFLARE_API_TOKEN`, `MYEONGHA_ADMIN_CLOUDFLARE_ACCOUNT_ID`, `MYEONGHA_ADMIN_ACCESS_AUD`, `MYEONGHA_ADMIN_OWNER_EMAIL`, `MYEONGHA_ADMIN_OWNER_AUTH_USER_ID`, `MYEONGHA_ADMIN_SUPABASE_PUBLISHABLE_KEY`, `MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN`, `MYEONGHA_ADMIN_READ_HYPERDRIVE_ID`, `MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID`, `MYEONGHA_ADMIN_READ_DATABASE_URL`, `MYEONGHA_ADMIN_AUDIT_DATABASE_URL`, `MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM`.
 - 추가 Command DB 연결은 선택 사항입니다. **조회용 관리자 화면 개통에 Command Executor는 필수가 아닙니다.** `MYEONGHA_ADMIN_COMMAND_DATABASE_URL`을 설정하면 추가 검사하고, 미설정이면 고객 영향 명령용 권한을 요구하지 않습니다. Stage 과정에서는 Command Hyperdrive 자체를 연결하지 않습니다.
+- 관리자 전용 Cloudflare Access API를 읽기 전용으로 재조회하여 정확한 호스트·AUD와 **Owner 이메일 한 명만 포함하는 단일 allow 정책**을 확인합니다. 추가 bypass/everyone 정책 또는 불일치가 있으면 배포를 거부합니다.
 - 기존 `verify:origins`에서 접속 계정·TLS·최소 권한을 읽기 전용으로 확인한 후, `deployment-check.mjs --write-config`가 생성한 별도 임시 Wrangler 설정만 배포합니다. Supabase Member 검증 키는 Worker Secret으로 업로드하며 구성 파일·로그에 쓰지 않습니다. 이 단계는 관리자 인증·DB 실서비스 활성화가 아니며 **Owner 로그인·Access/JWT·감사 성공 검증 후 별도로 개통**해야 합니다.
 - 수동 스테이징 입력은 해당 워크플로가 GitHub에서 수동 실행 가능한 ref에 있을 때만 사용합니다. 현 PR은 Draft이며, 운영 DB가 미설치된 동안에는 스테이징 실행을 시작하지 않습니다.
 
