@@ -5,6 +5,7 @@ import { createAdminHostedHttpV1 } from '../apps/api/src/admin-hosted-http-v1.ts
 import { createAdminPrivateRuntimeV1 } from '../apps/api/src/admin-private-runtime-v1.ts';
 import {createAdminAuditRetentionMaintenanceV1} from '../apps/api/src/admin-audit-retention-v1.ts';
 import {createAdminAnalyticsPostgresEventStoreV1} from '../apps/api/src/admin-analytics-pipeline-postgres-v1.ts';
+import {validateAdminHttpBindingsV1} from '../apps/admin/worker-binding-guard.mjs';
 
 /** Check *all* selected maintenance origins before the first SQL query starts.
  * Different bindings that resolve to the same privileged DB connection are
@@ -58,6 +59,10 @@ export default {
         ownerEmail: env.MYEONGHA_ADMIN_OWNER_EMAIL });
       // Gate before opening any database connection, including static assets.
       if (!await gate(request)) return Response.json({ error:'ADMIN_ACCESS_REQUIRED' }, {status:403,headers:{'Cache-Control':'no-store'}});
+      // Access has authenticated the Owner. Before a single SQL query can run,
+      // reject any aliased Reader/Audit/Command/Retention credential, even
+      // when Wrangler assigned different binding names.
+      validateAdminHttpBindingsV1(env);
       reader = new Pool({connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
       audit = new Pool({connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
       if(env.ADMIN_COMMAND_HYPERDRIVE?.connectionString){
