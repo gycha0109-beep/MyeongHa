@@ -137,7 +137,7 @@ describe('PortOne V2 server payment verification adapter', () => {
     expect(capturedUrl).toBe('https://api.portone.io/payments/payment-1');
     expect(capturedInit).toMatchObject({
       method: 'GET',
-      redirect: 'error',
+      redirect: 'manual',
       headers: {
         accept: 'application/json',
         authorization: `PortOne ${API_SECRET}`,
@@ -295,6 +295,29 @@ describe('PortOne V2 server payment verification adapter', () => {
 
     await expectAdapterCode(promise, 'HTTP_4XX');
     await expect(promise).rejects.not.toThrow(new RegExp(rawBody, 'u'));
+    expect(response.text).not.toHaveBeenCalled();
+  });
+
+  it('rejects provider 302 without following redirects, reading bodies, or leaking the API key', async () => {
+    const sensitiveBody = 'provider-must-not-be-read';
+    let observedRedirect: string | undefined;
+    const response = responseFor({}, { status: 302, rawText: sensitiveBody });
+    const fetchImpl: PortOneV2PaymentHttpFetchV1 = async (_url, init) => {
+      observedRedirect = init.redirect;
+      return response;
+    };
+    const adapter = createPortOneV2PaymentVerificationAdapterV1({
+      apiSecret: API_SECRET,
+      evidenceHmacSecret: EVIDENCE_HMAC_SECRET,
+      fetchImpl,
+    });
+    const promise = adapter.verify(request);
+    await expect(promise).rejects.toMatchObject({
+      code: 'HTTP_UNEXPECTED_STATUS',
+      httpStatus: 302,
+    });
+    expect(observedRedirect).toBe('manual');
+    await expect(promise).rejects.not.toThrow(new RegExp(sensitiveBody, 'u'));
     expect(response.text).not.toHaveBeenCalled();
   });
 

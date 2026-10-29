@@ -19,7 +19,9 @@ describe('PortOne V2 payment verification adapter authority', () => {
     expect(adapter).toContain("request.provider !== 'portone_v2'");
     expect(adapter).toContain('/payments/${encodeURIComponent(paymentId)}');
     expect(adapter).toContain("method: 'GET'");
-    expect(adapter).toContain("redirect: 'error'");
+    expect(adapter).toContain("redirect: 'manual'");
+    expect(adapter).not.toContain("redirect: 'error'");
+    expect(adapter).toContain("assertSuccessfulStatus(response, status)");
     expect(adapter).toContain('authorization: `PortOne ${input.apiSecret}`');
   });
 
