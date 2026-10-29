@@ -61,6 +61,8 @@ function verification(
     characterId: row.characterId,
     topicKey: row.topicKey,
     visibility: row.visibility,
+    sourceKind: row.sourceKind,
+    awareness: row.awareness,
     sourceSubjectId: row.subjectId,
     approvedForCharacterSharing: row.approvedForCharacterSharing,
     privacyReviewed: row.privacyReviewed,
@@ -128,6 +130,7 @@ describe('C09 proposed learning ledger real SQL source reader (mocked schema)', 
       characterId: 'seyeon', evidenceId: EVIDENCE_ID,
       authorityRef: history().authorityRef,
       subjectId: SUBJECT, topicKey: 'python.programming', asOfTurn: AS_OF,
+      expectedEvidence: records[0]!,
     })).toBe(true);
     expect(query).toHaveBeenCalledTimes(3);
   });
@@ -206,10 +209,15 @@ describe('C09 proposed learning ledger real SQL source reader (mocked schema)', 
     ];
     for (const v of changed) {
       const { reader } = fake({ verificationRows: [v] });
+      const expectedEvidence = (await reader.readVerifiedLearningHistory({
+        characterId: 'seyeon', topicKey: 'python.programming',
+        subjectId: SUBJECT, asOfTurn: AS_OF,
+      }))[0]!;
       expect(await reader.verifyLearningEvidence({
         characterId: 'seyeon', evidenceId: EVIDENCE_ID,
         authorityRef: history().authorityRef,
         subjectId: SUBJECT, topicKey: 'python.programming', asOfTurn: AS_OF,
+        expectedEvidence,
       })).toBe(false);
     }
   });
@@ -288,5 +296,31 @@ describe('C09 opt-in server-classified turn + PostgreSQL learning reader composi
       code: 'C09_LEARNING_LEDGER_UNAVAILABLE',
     });
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('C09 same-evidence source consistency', () => {
+  it('rejects knowledge level or provenance changes between history and verification reads', async () => {
+    for (const mutated of [
+      verification({ awareness: 'proficient' }),
+      verification({ sourceKind: 'canon' }),
+      verification({ validAt: '2026-10-28T07:00:00.000Z' }),
+      verification({ learnedAt: '2026-10-27T06:00:00.000Z' }),
+      verification({ visibility: 'user_private', sourceSubjectId: SUBJECT,
+        approvedForCharacterSharing: false, privacyReviewed: false, privacyReviewRef: null }),
+    ]) {
+      const { reader } = fake({ verificationRows: [mutated] });
+      const expectedEvidence = (await reader.readVerifiedLearningHistory({
+        characterId: 'seyeon', topicKey: 'python.programming',
+        subjectId: SUBJECT, asOfTurn: AS_OF,
+      }))[0]!;
+      expect(await reader.verifyLearningEvidence({
+        characterId: 'seyeon', evidenceId: EVIDENCE_ID,
+        authorityRef: history().authorityRef,
+        subjectId: SUBJECT, topicKey: 'python.programming',
+        asOfTurn: AS_OF, expectedEvidence,
+      })).toBe(false);
+    }
   });
 });

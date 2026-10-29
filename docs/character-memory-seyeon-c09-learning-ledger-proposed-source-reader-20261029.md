@@ -32,3 +32,18 @@
 ## 다음 구현
 
 승인된 DB Migration 경계에서 스키마/ACL/검증 이벤트 발행을 정합하게 확정한 후, 안전한 isolated DB에서 실제 RLS·철회·공유 차단을 검증한다. 그 이전에는 기존 공개 대화 C09 Shadow 기능과 개인 메모리 승인 체계를 유지한다.
+
+## 격리 PostgreSQL 17 실 SQL 검증 (2026-10-29)
+
+- 일회용 postgres:17.6 컨테이너에서 Supabase 역할을 합성해 SQL 제안을 실행했습니다. 운영 Supabase에는 마이그레이션을 적용하지 않았습니다.
+- test/fixtures/c09-learning-ledger-isolated-prelude.sql: anon/authenticated 합성 역할 및 캐릭터 FK fixture.
+- test/fixtures/c09-learning-ledger-isolated-postgres17.sql: RLS 무정책 기본 거부, 공유 기록과 A/B 전용 기록 분리, 철회 기록 제외, 공유 개인정보 검토 없는 삽입 거부, anon/authenticated 테이블 직접 조회 미허용 검증.
+- 실제 SQL 검증 문자열: C09_ISOLATED_POSTGRES17_PROPOSAL_PASS.
+- 테스트의 app.c09_test_subject는 사용자가 변경 가능한 합성 GUC입니다. 운영 Subject 인증/RLS 정책으로 사용하면 안 됩니다. 실제 RLS는 서버가 검증한 canonical Subject를 통해 별도 승인·구현해야 합니다.
+- verifyLearningEvidence는 기존 ID·Authority Ref 외에도 최초 읽은 sourceKind, 지식 수준, 학습/유효 시점, 가시성, Subject 및 공유 승인 상태를 다시 읽은 원본과 대조합니다. 중간 변경 시 차단합니다.
+- 빌드 TypeScript PASS, 관련 7개 Vitest 파일 총 61/61 PASS. PostgreSQL 테스트와 Vitest는 별개로 실행했습니다.
+
+## 미해결 승인 게이트
+
+- 실제 DB Migration/RLS 권한 정책, 원본 학습 이벤트 검증·승인·철회 및 저장 경로는 미구현. 격리 SQL 통과를 Production 보안 승인으로 간주하지 않습니다.
+- 기존 conversation_messages 직접 SELECT ACL 문제는 별도 미해결입니다.

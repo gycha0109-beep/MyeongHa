@@ -60,6 +60,7 @@ export interface SeyeonC09ApprovedLearningReadAuthorityV1 {
     subjectId: string;
     topicKey: string;
     asOfTurn: string;
+    expectedEvidence: SeyeonC09KnowledgeEvidenceShadowV1;
   }>): Promise<boolean>;
 }
 
@@ -138,6 +139,7 @@ export function createSeyeonC09EpistemicAuthorityShadowPortV1(input: Readonly<{
             subjectId,
             topicKey: turn.topicKey,
             asOfTurn: turn.asOfTurn,
+            expectedEvidence: evidence,
           });
           if (verified !== true) fail();
         }

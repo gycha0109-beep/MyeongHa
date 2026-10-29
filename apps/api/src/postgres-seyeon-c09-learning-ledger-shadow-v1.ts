@@ -53,6 +53,7 @@ export const POSTGRES_SEYEON_C09_LEARNING_HISTORY_SQL_V1 = [
 export const POSTGRES_SEYEON_C09_LEARNING_VERIFY_SQL_V1 = [
   'select id::text as "evidenceId", authority_ref as "authorityRef",',
   ' character_id as "characterId", topic_key as "topicKey",',
+  ' source_kind as "sourceKind", awareness as "awareness",',
   ' visibility as "visibility", subject_id::text as "sourceSubjectId",',
   ' approved_for_character_sharing as "approvedForCharacterSharing",',
   ' privacy_reviewed_at is not null as "privacyReviewed",',
@@ -179,9 +180,14 @@ export function createPostgresSeyeonC09LearningLedgerReaderShadowV1(input: Reado
       } catch { return hold(); }
     },
     async verifyLearningEvidence(request) {
+      const expected = request.expectedEvidence;
       if (request.characterId !== 'seyeon' || request.subjectId !== subjectId ||
           !TOPIC.test(request.topicKey) || !id(request.evidenceId) ||
-          !bounded(request.authorityRef) || !Number.isFinite(Date.parse(request.asOfTurn))) hold();
+          !bounded(request.authorityRef) || !Number.isFinite(Date.parse(request.asOfTurn)) ||
+          !expected || expected.characterId !== 'seyeon' ||
+          expected.topicKey !== request.topicKey || expected.evidenceId !== request.evidenceId ||
+          expected.authorityRef !== request.authorityRef || expected.verifiedByServer !== true ||
+          (expected.visibility === 'user_private' && expected.subjectId !== subjectId)) hold();
       try {
         const result = await client.query<Row>(
           POSTGRES_SEYEON_C09_LEARNING_VERIFY_SQL_V1,
@@ -191,20 +197,17 @@ export function createPostgresSeyeonC09LearningLedgerReaderShadowV1(input: Reado
         const row = result.rows[0]!;
         if (row.evidenceId !== request.evidenceId || row.authorityRef !== request.authorityRef ||
             row.characterId !== 'seyeon' || row.topicKey !== request.topicKey ||
-            row.revokedAt !== null || !bounded(row.approvalRef) ||
-            timestamp(row.verifiedAt) > request.asOfTurn ||
-            timestamp(row.validAt) > request.asOfTurn ||
-            timestamp(row.learnedAt) > request.asOfTurn ||
-            (row.supersededAt !== null && timestamp(row.supersededAt) <= request.asOfTurn)) return false;
-        if (row.visibility === 'user_private') {
-          return row.sourceSubjectId === subjectId && row.approvedForCharacterSharing === false;
+            row.revokedAt !== null) return false;
+        let current: SeyeonC09KnowledgeEvidenceShadowV1;
+        try {
+          current = checkEvidence({
+            ...row,
+            subjectId: row.sourceSubjectId,
+          }, subjectId, request.asOfTurn);
+        } catch {
+          return false;
         }
-        if (row.visibility === 'character_shared') {
-          return row.sourceSubjectId === null &&
-            row.approvedForCharacterSharing === true &&
-            row.privacyReviewed === true && bounded(row.privacyReviewRef);
-        }
-        return false;
+        return JSON.stringify(current) === JSON.stringify(expected);
       } catch { return hold(); }
     },
   });
