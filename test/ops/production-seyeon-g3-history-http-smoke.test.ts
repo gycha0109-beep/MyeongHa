@@ -18,9 +18,13 @@ function fixture({
   historyBodyCanary='',
   historyCache='no-store',
 }={}){
-  const calls=[];
+  const calls: Array<{url:string;options:{
+    method:string;headers:Record<string,string>;redirect:string;signal:AbortSignal;
+  }}>=[];
   const acquireSession=vi.fn(async()=>({accessToken:TOKEN}));
-  const fetchImpl=vi.fn(async(url,options)=>{
+  const fetchImpl=vi.fn(async(url:string,options:{
+    method:string;headers:Record<string,string>;redirect:string;signal:AbortSignal;
+  })=>{
     calls.push({url,options});
     const uri=new URL(url);
     const isAuthed=options.headers.Authorization===`Bearer ${TOKEN}`;
@@ -86,8 +90,9 @@ describe('governed production Se-yeon G3 historical HTTP proof',()=>{
       });
     }catch(e){error=e;}
     expect(error).toBeInstanceOf(Error);
-    expect(error.message).toContain('expected HTTP 503');
-    expect(error.message).not.toContain(canary);
+    const message=error instanceof Error ? error.message : '';
+    expect(message).toContain('expected HTTP 503');
+    expect(message).not.toContain(canary);
     expect(f.calls).toHaveLength(3);
   });
 
