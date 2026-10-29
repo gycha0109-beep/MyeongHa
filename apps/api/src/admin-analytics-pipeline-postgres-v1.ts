@@ -137,8 +137,21 @@ export function createAdminAnalyticsPostgresEventStoreV1(pool:PostgresSubjectPoo
         if(!/^av_[0-9a-f]{64}$/u.test(consent.visitorRef)||!consent.granted||
           !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,95}$/u.test(consent.version)||!Number.isFinite(Date.parse(consent.expiresAt))||
           (subjectLinkRef!==null&&!/^ah_[0-9a-f]{64}$/u.test(subjectLinkRef)))throw Error('Invalid consent binding.');
-        await client.query(`INSERT INTO myeongha_admin_analytics.consents_v1(visitor_ref,version,policy_version,subject_link_ref,expires_at)
-          VALUES($1,$2,$3,$4,$5::timestamptz) ON CONFLICT(visitor_ref,version) DO NOTHING`,[consent.visitorRef,consent.version,policyVersion,subjectLinkRef,consent.expiresAt]);
+        const params=[consent.visitorRef,consent.version,policyVersion,subjectLinkRef,consent.expiresAt];
+        const inserted=await client.query<{visitorRef:string}>(`INSERT INTO myeongha_admin_analytics.consents_v1(visitor_ref,version,policy_version,subject_link_ref,expires_at)
+          VALUES($1,$2,$3,$4,$5::timestamptz) ON CONFLICT(visitor_ref,version) DO NOTHING
+          RETURNING visitor_ref AS "visitorRef"`,params);
+        if(inserted.rows.length===1&&inserted.rows[0]?.visitorRef===consent.visitorRef)return;
+        if(inserted.rows.length!==0)throw Error('Invalid analytics consent insert receipt.');
+        // An exact repeat grant is safe. A previously withdrawn, relinked,
+        // expired or policy-mismatched row must NEVER issue a new active cookie.
+        const existing=await client.query<{active:boolean}>(`SELECT true AS active FROM myeongha_admin_analytics.consents_v1
+          WHERE visitor_ref=$1 AND version=$2 AND policy_version=$3
+            AND subject_link_ref IS NOT DISTINCT FROM $4::text
+            AND expires_at=$5::timestamptz AND withdrawn_at IS NULL
+            AND expires_at>CURRENT_TIMESTAMP`,params);
+        if(existing.rows.length!==1||existing.rows[0]?.active!==true)
+          throw Error('Conflicting or withdrawn analytics consent cannot be re-granted.');
       });
     },
     append(event) {
