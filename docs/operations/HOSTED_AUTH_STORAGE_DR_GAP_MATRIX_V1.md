@@ -123,12 +123,41 @@ admin/service-role key, remotely hosted target, alternate port, or redirect
 fails closed. No login credentials, token, object body or identity
 are written to its output.
 
-**Prerequisites:** an existing independently managed local full-stack
-Supabase CLI instance and **pre-created synthetic fixtures** with a test
-member, a separate previously deleted synthetic member, and a private
-dr-synthetic-* Storage bucket/object with known local SHA-256. The harness
-does not provision these or create any cross-environment copies. No such
-environment or exercise is claimed by the repository change.
+**Prerequisites:** a separately started and isolated **local-only**
+Supabase CLI full-stack instance at `127.0.0.1:54321` with its **local**
+PostgreSQL port `127.0.0.1:54322`. This is a synthetic-only functional
+target, not an equivalent restoration of a real Hosted project or any
+Production identity. **No local project was provisioned as part of this PR.**
+
+A new one-shot fixture preparer
+`scripts/prepare-postgres-hosted-synthetic-local-fixtures.mjs` creates only
+the fixed local `dr-synthetic-*` member and a separate deleted member,
+a private `dr-synthetic-private` bucket and deterministic
+`probe/data.txt` object, and an `authenticated` SELECT policy restricted to
+that member's Auth UID and the exact object. Its raw bytes are the literal
+UTF-8 string `dr-synthetic-private-object-2026\n`, with SHA-256
+`641ca9086ef039b62e8bd97b5813fed6dabd847c934e5d834d5c6746a9b4fee4`.
+Set the existing `MH_DR_LOCAL_*` test variables below **plus**
+`MH_DR_LOCAL_SERVICE_ROLE_KEY` (the local CLI's service-role JWT)
+and `MH_DR_LOCAL_DB_PASSWORD` (only the local CLI database password).
+The preparer validates fixed localhost API/DB routes, local-only synthetic
+identities and the exact object hash; it rejects non-CLI JWT role/issuer,
+non-synthetic keys/names and an existing fixed policy before any new
+fixture. It never accepts a hosted URL or arbitrary DB connection string.
+Run it **only on a disposable local stack**:
+
+```bash
+node scripts/prepare-postgres-hosted-synthetic-local-fixtures.mjs
+node scripts/run-postgres-hosted-synthetic-local-acceptance.mjs
+```
+
+The bootstrap deliberately does not rerun on a previously provisioned
+fixture, or clean up partial state automatically after a failed setup.
+Dispose of the **dedicated ephemeral local instance** before reseeding.
+Do not reset any shared local database or copy Production data. Fixture
+creation changes only the local synthetic instance; the main acceptance
+runner below remains non-provisioning. CI tests use mocked HTTP/DB
+calls and do **not** create a real local service or prove Hosted recovery.
 
 When the local synthetic environment is explicitly prepared, set these
 variables only in that isolated terminal (never commit their values):
