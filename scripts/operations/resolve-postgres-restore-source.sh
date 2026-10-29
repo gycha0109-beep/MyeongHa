@@ -81,6 +81,10 @@ artifact_id="$(jq -er '.[0].id' <<<"$governed_artifacts")"
 artifact_name="$(jq -er '.[0].name' <<<"$governed_artifacts")"
 artifact_expires_at="$(jq -er '.[0].expires_at' <<<"$governed_artifacts")"
 [[ "$artifact_id" =~ ^[0-9]+$ ]]
+if [[ -n "${EXPECTED_BACKUP_ARTIFACT_ID:-}" ]]; then
+  [[ "$EXPECTED_BACKUP_ARTIFACT_ID" =~ ^[0-9]+$ ]]
+  [[ "$artifact_id" == "$EXPECTED_BACKUP_ARTIFACT_ID" ]]
+fi
 [[ "$artifact_name" =~ ^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$ ]]
 
 echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
