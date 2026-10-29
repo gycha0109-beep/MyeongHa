@@ -13,3 +13,13 @@ Watchtower-Track: security
 ## G3 운영 History 함수 장애 시 차단 정책 — 2026-10-29
 
 08 읽기 함수가 운영에 설치된 후에는 해당 함수가 미설치·누락·복구 실패인 상태에서 세연과 무관해 보이는 페이지도 안전하다고 판단할 수 없습니다. `chat-read-http.ts`는 이 경우 과거 참가 여부를 확인할 수 없으므로, 메시지 본문과 Relationship 조회 **이전**에 HTTP `503 SEYEON_HISTORY_REVEAL_HOLD`를 반환합니다. 단일 세연 방의 기존 metadata-only shell에는 추가 본문 공개가 없습니다. 함수가 정상 존재하고 소유 Thread의 이력 결과가 정확히 `false`인 경우에만 다른 캐릭터의 기존 조회를 계속 허용합니다. 전역 Chat read 완화/유료 AI 공개/개인정보 Source Registry 상태는 변경하지 않습니다.
+
+## G3 실제 인증 HTTP 경계 증거 준비 (read-only)
+
+기존 `.github/workflows/production-member-me-smoke.yml`의 수동 실행 경로에 `VERIFY_SEYEON_G3_HISTORY_HOLD`를 추가했습니다. 기존 `VERIFY_MEMBER_ME` 실행 의미는 그대로 유지합니다. 운영 환경 Secret `MYEONGHA_PRODUCTION_G3_HISTORY_THREAD_ID`는 **테스트 회원이 소유하고 과거 세연 참가 이력이 확인된 기존 Thread UUID**를 가리켜야 합니다. 새 메시지/참가/권한 부여를 만들지 않습니다.
+
+`gh workflow run production-member-me-smoke.yml --ref main -f confirm=VERIFY_SEYEON_G3_HISTORY_HOLD`
+
+검증기는 해당 Thread에 대해 무인증 `401 AUTH_REQUIRED`, 기존 테스트 Member 인증 `/api/me`의 정확한 Subject, 고정 high-cursor/pageSize=1의 이력 조회 `503 SEYEON_HISTORY_REVEAL_HOLD`, 세 응답의 `Cache-Control: no-store` 및 동일 Worker Version을 검사합니다. 테스트 응답 본문·UUID·세션 토큰·비밀번호는 로그에 남기지 않습니다. 환경 Secret이 미설정이거나 Thread가 기존 회원 소유 이력이 아니면 실패 처리하고 **PASS로 건너뛰지 않습니다.**
+
+현재 스크립트/워크플로 PR의 CI 성공은 실제 운영 HTTP 응답을 대체하지 않습니다. 실제 수동 Workflow 성공 + Worker Version 근거 전까지 G3 HTTP 실증은 HOLD입니다. 이는 G3 전체 Replay/파생 Source 공개를 승인하지 않습니다.
