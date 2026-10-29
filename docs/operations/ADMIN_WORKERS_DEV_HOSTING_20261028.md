@@ -36,6 +36,6 @@
 
 ## 알려진 남은 구현·운영 의존성
 
-- 실사용 방문 분석의 동의·수집 활성화, 실제 AI 공급사 청구·환율, Reading 비용 관측 근거.
+- 일반 방문 분석은 동의 기반 서버 조합까지 코드 구현됐지만 실제 수집·삭제 스케줄/전용 Writer 설치는 미활성입니다. Saju의 공급사 호출 관측은 [Saju PR #2739](https://github.com/gycha0109-beep/Saju/pull/2739)에서 GREEN이며, 명하 Reading 원장 연동은 [Admin PR #2630](https://github.com/gycha0109-beep/MyeongHa/pull/2630)의 DB Owner 매핑 검증을 요구합니다. 실제 공급사 청구·환율과 전체 Reading 비용 관측률은 여전히 미측정입니다.
 - 환불·계정 조치의 승인된 도메인 실행 계약. 읽기 전용 환불 검토를 환불 실행으로 오인하지 않습니다.
-- 운영 전용 Access 애플리케이션, DB 역할, Hyperdrive, 실제 서버 비밀키 및 배포 승인은 아직 완료되지 않았습니다.
+- 운영 전용 **Access 앱과 Owner 이메일 정책은 설치·재조회 완료**했습니다. 반면 DB 역할, 전용 Hyperdrive, Worker, 서버 비밀키 연결 및 Access 로그인/JWT 실동작 검증은 아직 완료되지 않았습니다. 사용자는 배포·DDL의 사전 승인을 제공했지만 운영 연결 도구에서 Supabase 계정 접근 오류가 지속됩니다.
