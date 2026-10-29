@@ -110,6 +110,41 @@ try {
   assert.equal(result.body.data.reading.reading.disclosures[0].type, 'scope_limitation');
   assert.equal(result.body.data.responseHash, undefined);
   assert.equal(result.body.data.reading.responseHash, undefined);
+  assert.deepEqual(result.body.data.birthRevision, {
+    issuedRevisionNo: 1, currentRevisionNo: 1, state: 'current',
+  });
+
+  // The official artifact is pinned to issuance revision 1. Change only the
+  // current SELF Birth revision in disposable CI and verify that the same
+  // protected Reading stays immutable, while the displayed provenance changes.
+  await pool.query(`
+    insert into public.birth_profile_revisions(
+      id, birth_profile_id, subject_id, revision_no, calendar_type,
+      birth_date, birth_time, time_known, is_leap_month, sex,
+      input_hash, created_at
+    ) values (
+      '12101100-0000-0000-0000-000000000002',
+      '12101000-0000-0000-0000-000000000001',
+      $1::uuid, 2, 'solar', date '1996-01-10',
+      time '09:30:00', true, false, 'male',
+      'sha256:test:official-standard-reading-self-v2', clock_timestamp()
+    )
+  `, [subjectId]);
+  await pool.query(`
+    update public.birth_profiles
+       set current_revision_id = '12101100-0000-0000-0000-000000000002',
+           updated_at = clock_timestamp()
+     where id = '12101000-0000-0000-0000-000000000001'
+       and subject_id = $1::uuid
+  `, [subjectId]);
+  result = await getReading();
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(result.body.data.birthRevision, {
+    issuedRevisionNo: 1, currentRevisionNo: 2, state: 'changed',
+  });
+  assert.equal(result.body.data.reading.reading.readingId, readingId);
+  await storageShape();
+  console.log('PASS: changed current Birth -> stale label only; official source stays immutable');
   console.log('PASS: B2 exact verified Grant -> intact immutable report over real HTTP adapter');
 
   const otherId = readingId.replace(/1$/u, '2');
