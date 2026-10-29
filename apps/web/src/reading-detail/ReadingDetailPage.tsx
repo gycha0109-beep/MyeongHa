@@ -25,13 +25,16 @@ export function ReadingDetailPage() {
             <div><dt>발행일</dt><dd data-official-report-date>—</dd></div>
             <div><dt>해석 버전</dt><dd data-official-report-version>—</dd></div>
             <div><dt>기록된 대리자</dt><dd data-official-report-reader>—</dd></div>
-            <div><dt>발행 당시 출생정보 차수</dt><dd>이 기록에 제공되지 않음</dd></div>
+            <div><dt>발행 당시 출생정보 차수</dt><dd data-official-report-birth-issued>이 기록에 제공되지 않음</dd></div>
+            <div><dt>현재 명식록 차수</dt><dd data-official-report-birth-current>확인할 수 없음</dd></div>
           </dl>
         </header>
         <section className="official-report-provenance-note" aria-label="원문과 출생정보 기준">
-          <p>이 보고서는 발행 당시 저장된 공식 결과입니다. 현재 명식록은 별도로 관리되며, 발행 차수가 없어 변경 여부는 확인할 수 없습니다.</p>
+          <p data-official-report-birth-status role="status">이 기록에 제공된 출생정보 차수가 없어 변경 여부는 확인할 수 없습니다.</p>
+          <p>이 보고서의 본문·발행일은 현재 명식록 변경으로 다시 작성되지 않습니다.</p>
           <p>기록된 대리자 정보는 과거 참여 이력입니다. 현재 해설 및 대화 접근권을 의미하지 않습니다.</p>
           <a href="records.html?tab=birth">현재 명식록 확인하기 →</a>
+          <button type="button" data-official-report-regenerate disabled aria-disabled="true">새 명식 기준 재생성 준비 중</button>
         </section>
         <div className="official-report-keypoints" data-official-report-first hidden>
           <span className="records-kicker">HIGHLIGHT</span>
