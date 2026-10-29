@@ -76,6 +76,34 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain("activeReadingOwner !== null && ensureResponseOwnerCurrent(activeReadingOwner)");
   });
 
+  it('displays issued/current Birth revisions only from protected archive metadata', () => {
+    expect(jsx).toContain('data-official-report-birth-issued');
+    expect(jsx).toContain('data-official-report-birth-current');
+    expect(jsx).toContain('data-official-report-birth-status');
+    expect(jsx).toContain('data-official-report-regenerate disabled');
+    expect(runtime).toContain('function renderOfficialReportBirthRevision(birthRevision)');
+    expect(runtime).toContain('renderOfficialReportBirthRevision(record.birthRevision);');
+    expect(runtime).toContain('renderOfficialReportBirthRevision(preview.record.birthRevision);');
+    expect(runtime).toContain("'[data-official-report-birth-issued]'");
+    expect(runtime).toContain("'[data-official-report-birth-current]'");
+    expect(runtime).toContain("'[data-official-report-birth-status]'");
+    expect(runtime).not.toContain("fetch('/api/me/birth-profile'");
+    expect(runtime).not.toContain('requestPaidRegeneration(');
+    for (const source of [
+      '현재 명식록 차수',
+      '발행 당시 명식과 현재 명식이 같습니다.',
+      '현재 명식이 발행 당시와 다릅니다. 이 보고서는 발행 당시 명식을 기준으로 유지됩니다.',
+      '발행 당시 명식과 현재 명식의 변경 여부를 확인할 수 없습니다.',
+      '새 명식 기준 재생성 준비 중',
+    ]) {
+      const translation = RECORDS_HUB_STATIC_UI_COPY_V1.get(source);
+      expect(translation).toBeDefined();
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+        expect(translation?.[locale]).toBeTruthy();
+      }
+    }
+  });
+
   it('focuses owner-authorized report sections and restores keyboard focus on mode changes', () => {
     expect(jsx).toContain('data-official-report-heading tabIndex={-1}');
     expect(jsx).toContain('data-reading-step-title tabIndex={-1}');
