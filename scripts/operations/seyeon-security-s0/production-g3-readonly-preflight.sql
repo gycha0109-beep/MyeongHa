@@ -16,10 +16,9 @@ with expected(signature) as (
     coalesce(pg_get_userbyid(p.proowner)='postgres',false) as owned_by_postgres,
     coalesce(p.prosecdef,false) as security_definer,
     coalesce(p.provolatile='s',false) as stable,
-    coalesce('search_path=pg_catalog,public'=any(
-      select array_agg(replace(config,' ',''))
-      from unnest(p.proconfig) config
-    ),false) as pinned_search_path,
+    coalesce(exists(select 1 from unnest(p.proconfig) config
+      where replace(config,' ','')='search_path=pg_catalog,public'),
+      false) as pinned_search_path,
     coalesce('row_security=off'=any(p.proconfig),false) as rows_bypassed_by_owned_function,
     coalesce(has_function_privilege('myeongha_api_executor',i.function_oid,'EXECUTE'),false) as api_execute,
     coalesce(has_function_privilege('anon',i.function_oid,'EXECUTE'),false) as anon_execute,
