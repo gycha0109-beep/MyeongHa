@@ -27,6 +27,7 @@ const subjectId = '11390000-0000-0000-0000-000000000001';
 const expectedHash =
   'sha256:v1:d2a541178573365041ce0ba291d38670eabd93b6ad9bae216a9f736895edcbc4';
 const purchaseB2 = '12192300-0000-0000-0000-000000000002';
+const purchaseA = '11392300-0000-0000-0000-000000000001';
 const verifiedEvidence = Object.freeze({
   kind: 'guest',
   verifiedGuestTokenHash: 'synthetic-official-http-e2e-guest-hash',
@@ -49,7 +50,7 @@ async function getReading(authenticated = true, req = request) {
   assert.equal(response.headers.get('cache-control'), 'no-store');
   return { response, body: await response.json() };
 }
-async function setGrant(status) {
+async function setGrant(status, purchaseIntentId = purchaseB2) {
   assert.ok(status === 'active' || status === 'revoked');
   const change = await pool.query(
     `update public.entitlement_grants g
@@ -59,6 +60,17 @@ async function setGrant(status) {
        where a.purchase_intent_id = $2::uuid
          and g.id = a.entitlement_grant_id
        returning g.id`,
+    [status, purchaseIntentId],
+  );
+  assert.equal(change.rowCount, 1);
+}
+async function setPurchaseIntentStatus(status) {
+  assert.ok(status === 'verified' || status === 'cancelled');
+  const change = await pool.query(
+    `update public.purchase_intents
+        set status = $1, updated_at = clock_timestamp()
+      where id = $2::uuid
+      returning id`,
     [status, purchaseB2],
   );
   assert.equal(change.rowCount, 1);
@@ -113,6 +125,38 @@ try {
   assert.deepEqual(result.body.data.birthRevision, {
     issuedRevisionNo: 1, currentRevisionNo: 1, state: 'current',
   });
+
+  // Commerce may cancel an original Purchase Intent before its Entitlement
+  // Grant is revoked. Even while the stale Grant reads "active", the actual
+  // authenticated Records API must withhold the original report body.
+  await setPurchaseIntentStatus('cancelled');
+  result = await getReading();
+  assert.equal(result.response.status, 404);
+  assert.equal(result.body.error.code, 'NOT_FOUND');
+  await storageShape();
+  console.log('PASS: cancelled Purchase Intent + stale active Grant -> official HTTP 404');
+
+  // A different, independently verified Reader purchase must still authorize
+  // the same immutable source for its owner. The cancelled Reader B2 does not
+  // invalidate A's current paid access or change the official Reading body.
+  await setGrant('active', purchaseA);
+  result = await getReading();
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.reading.reading.readingId, readingId);
+  await storageShape();
+  console.log('PASS: cancelled Reader B2 + verified Reader A -> owner HTTP 200');
+  await setGrant('revoked', purchaseA);
+  result = await getReading();
+  assert.equal(result.response.status, 404);
+  console.log('PASS: cancelled Reader B2 + revoked Reader A -> owner HTTP 404');
+
+  // Restore only the disposable fixture's original verified status; this is
+  // NOT a demonstration of a real payment cancellation reversal workflow.
+  await setPurchaseIntentStatus('verified');
+  result = await getReading();
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.data.reading.reading.readingId, readingId);
+  console.log('PASS: restored synthetic verified state -> unchanged official report');
 
   // The official artifact is pinned to issuance revision 1. Change only the
   // current SELF Birth revision in disposable CI and verify that the same
