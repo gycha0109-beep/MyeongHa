@@ -144,7 +144,7 @@ export default {
     // This owner-only *test console* static HTML can load the official KCP
     // SDK without relaxing the production SPA's strict CSP. All sensitive
     // operations independently require DB-verified Owner Admin and sandbox.
-    if (url.pathname === '/owner-portone-sandbox.html' && url.search === '' &&
+    if (url.pathname === '/owner-portone-sandbox.html' &&
         (request.method === 'GET' || request.method === 'HEAD')) {
       const response = await sealedRuntime.fetch(request, env, ctx);
       if (response.status !== 200) return withWorkerVersion(response, env);

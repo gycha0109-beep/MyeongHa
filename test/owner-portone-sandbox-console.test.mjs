@@ -83,6 +83,23 @@ describe('Owner KCP TEST console: no browser monetary authority',()=>{
      ...paid,receiptId:'forged',
    }},ID)).toThrow();
  });
+ it('applies the same Owner KCP CSP to attribution query URLs',()=>{
+   const worker=readFileSync(new URL('../cloudflare/myeongha-worker.mjs',import.meta.url),'utf8');
+   // ChatGPT navigation attaches ?utm_source=chatgpt.com to this HTML.
+   // That must not downgrade the document to the default connect-src 'self'.
+   const start=worker.indexOf("if (url.pathname === '/owner-portone-sandbox.html'");
+   expect(start).toBeGreaterThan(0);
+   const guard=worker.slice(start,worker.indexOf('{',start));
+   expect(guard).toContain("request.method === 'GET'");
+   expect(guard).toContain("request.method === 'HEAD'");
+   expect(guard).not.toContain('url.search');
+   expect(guard).not.toContain('url.searchParams');
+   const pageBlock=worker.slice(start,worker.indexOf("if (url.pathname === '/'",start));
+   expect(pageBlock).toContain("connect-src 'self' https://checkout-service.prod.iamport.co");
+   expect(pageBlock).toContain('return withWorkerVersion(new Response(response.body');
+   // This is the exact static Owner page only; never alter the SPA default.
+   expect(worker.slice(0,start)).not.toContain('https://checkout-service.prod.iamport.co');
+ });
  it('isolates CDN CSP to one Owner test HTML route, without broad SPA relaxation',()=>{
    const worker=readFileSync(new URL('../cloudflare/myeongha-worker.mjs',import.meta.url),'utf8');
    const page=readFileSync(new URL('../apps/web/owner-portone-sandbox.html',import.meta.url),'utf8');
