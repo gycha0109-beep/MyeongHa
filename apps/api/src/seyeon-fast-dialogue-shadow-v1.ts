@@ -8,6 +8,8 @@ import {
 } from './seyeon-character-runtime-v2.js';
 import { compactSeyeonShadowRequestV1 }
   from './seyeon-shadow-compact-prompts-v1.js';
+import { composeSeyeonC09StateDecisionRendererShadowRequestV1 }
+  from './seyeon-c09-state-decision-renderer-shadow-v1.js';
 import {
   admitSeyeonRendererDraftV2,
   buildSeyeonRendererPacketV2,
@@ -130,10 +132,11 @@ export function createSeyeonFastDialogueShadowV1(input: {
   readonly reviewerProvider: SeyeonStructuredProviderPortV2;
   readonly fullThreadCensus?: SeyeonFullThreadCensusShadowPortV1;
   /** Explicit evaluation only. The default/production-facing Shadow contract is unchanged. */
-  readonly promptProfile?: 'baseline' | 'compact_v1';
+  readonly promptProfile?: 'baseline' | 'compact_v1' | 'character_state_decision_v1';
 }) {
   if (input.promptProfile !== undefined &&
-      input.promptProfile !== 'baseline' && input.promptProfile !== 'compact_v1') {
+      input.promptProfile !== 'baseline' && input.promptProfile !== 'compact_v1' &&
+      input.promptProfile !== 'character_state_decision_v1') {
     throw new TypeError('FAST_SHADOW_PROMPT_PROFILE_HOLD');
   }
   return Object.freeze({
@@ -181,10 +184,12 @@ export function createSeyeonFastDialogueShadowV1(input: {
         input: request.input,
         responseSchema: SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1,
       };
-      const raw: unknown = await input.candidateProvider.generate(
-        input.promptProfile === 'compact_v1'
-          ? compactSeyeonShadowRequestV1(proposal) : proposal,
-      );
+      const candidateRequest = input.promptProfile === 'character_state_decision_v1'
+        ? composeSeyeonC09StateDecisionRendererShadowRequestV1({ context, request: proposal })
+        : input.promptProfile === 'compact_v1'
+          ? compactSeyeonShadowRequestV1(proposal)
+          : proposal;
+      const raw: unknown = await input.candidateProvider.generate(candidateRequest);
       if (typeof raw !== 'object' || raw === null || Array.isArray(raw) ||
           Object.keys(raw).length !== 2 ||
           !Object.hasOwn(raw, 'interpretation') || !Object.hasOwn(raw, 'draft')) {
