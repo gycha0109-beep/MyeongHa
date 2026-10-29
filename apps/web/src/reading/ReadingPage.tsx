@@ -145,7 +145,7 @@ export function ReadingPage() {
 
         <section className="saju-design-products" aria-labelledby="saju-design-products-title">
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
-          <p>원하는 주제를 선택하면 해석 범위와 제공 내용을 확인하고, 대리자를 선택해 구매와 공식 보고서 발행으로 이어집니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
+          <p>12개 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
             {sajuProductTopics.map((topic) => {
               const availability = resolveReadingAvailabilityV1(topic.href);
@@ -154,7 +154,7 @@ export function ReadingPage() {
                   <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
                   {'outline' in topic
                     ? <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
-                    : <p className="saju-design-product-scope">선택한 주제의 현재 제공 범위를 확인합니다.</p>}
+                    : <p className="saju-design-product-scope">이 주제의 공식 해석은 정식 읽기 연결 후 제공됩니다.</p>}
                   <span className={`reading-topic-availability is-${availability.kind}`}>{availability.label}</span>
                   {availability.kind === 'preview'
                     ? <a href={topic.href}>프리뷰 읽기</a>
