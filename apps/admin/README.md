@@ -201,7 +201,7 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 ### A5 실서비스 분석 수집 구성 경계 (2026-10-29)
 
 - `production-admin-analytics-collection-v1.ts`에서 기존 명시 동의/철회/세션/이벤트 HTTP 처리기와 실제 DB 작성 원장, 검증된 Reading·결제·출생 기록 이벤트를 하나의 서버 구성으로 연결했습니다. **새로운 공개 라우트를 자동 설치하지 않습니다.**
-- 수집은 `collectionEnabled === true`와 이미 승인된 `AdminAnalyticsCollectionPolicyV1`의 180일 보관, 삭제 연계, 승인 이벤트 검사를 **모두 충족해야만** 활성화할 수 있습니다. 불충족 시 외부 수집은 503이고 검증 이벤트 작성 어댑터도 제공하지 않습니다.
+- 수집은 `collectionEnabled === true`, 검증된 180일 폐기 스케줄의 `retentionMaintenanceReady === true`, 그리고 이미 승인된 `AdminAnalyticsCollectionPolicyV1`의 180일 보관·삭제 연계·승인 이벤트 검사를 **모두 충족해야만** 활성화할 수 있습니다. 불충족 시 외부 수집은 503이고 검증 이벤트 작성 어댑터도 제공하지 않습니다.
 - Analytics Writer와 원본 증거 Reader는 서로 다른 DB 풀이어야 합니다. 원본 조회는 전용 Admin Reader로 검증하며, 서버에서 확인한 완료 Reading, 검증 결제, 현재 출생 Revision만 분석 원장에 넣습니다. 요청자/세션 유효성, 실제 동의, 원본 생성 시점을 독립적으로 확인합니다.
 - 현재는 Supabase 관리자 역할/Analytics Writer/삭제 연계·배포 출처 실검증이 완료되지 않았으므로 수집 활성화, 180일 retention 스케줄 운영, 사용자 공개 라우트 마운트를 **수행하지 않았습니다**. 관리자 대시보드의 수집 완전성도 미측정으로 유지합니다.
 
