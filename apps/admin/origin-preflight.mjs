@@ -17,9 +17,50 @@ const OPTIONAL=[
 ];
 export const ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1=Object.freeze([...CONFIG.map(([,key])=>key),'MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM']);
 const PRINCIPAL=`SELECT r.rolname AS role, r.rolcanlogin AND NOT r.rolinherit AND NOT r.rolsuper AND NOT r.rolbypassrls AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid) AS restricted, s.ssl AS tls FROM pg_catalog.pg_roles r LEFT JOIN pg_catalog.pg_stat_ssl s ON s.pid=pg_backend_pid() WHERE r.rolname=current_user`;
+// Confirm forbidden metadata cannot become readable through a broad table
+// GRANT, a column GRANT, or a schema default-privilege change.
+export const ADMIN_READER_SENSITIVE_COLUMNS_V1=Object.freeze([
+ ['public.subjects','auth_user_id'],
+ ['public.birth_profile_revisions','birth_date'],
+ ['public.birth_profile_revisions','birth_time'],
+ ['public.birth_profile_revisions','sex'],
+ ['public.birth_profile_revisions','input_hash'],
+ ['public.readings','request_snapshot_jsonb'],
+ ['public.readings','request_hash'],
+ ['public.reading_execution_attempts','external_request_ref'],
+ ['public.reading_refs','response_snapshot_jsonb'],
+ ['public.reading_refs','source_birth_input_hash'],
+ ['public.reading_refs','required_action_jsonb'],
+ ['public.reading_groundings','approved_blocks_jsonb'],
+ ['public.reading_groundings','semantic_claims_jsonb'],
+ ['public.ai_execution_logs','input_ref_jsonb'],
+ ['public.ai_execution_logs','output_ref_jsonb'],
+ ['public.commerce_receipts','verified_payload_jsonb'],
+ ['public.commerce_receipts','receipt_fingerprint'],
+ ['public.commerce_receipts','external_transaction_id'],
+ ['public.commerce_provider_events','verified_payload_jsonb'],
+ ['public.commerce_provider_events','payload_fingerprint'],
+ ['public.entitlement_events','payload_jsonb'],
+ ['public.seyeon_ai_call_cost_events','event_jsonb'],
+ ['public.outbox_events','payload_jsonb'],
+ ['public.data_deletion_jobs','retention_exceptions_jsonb'],
+]);
+const READER_REQUIRED=[
+ "has_column_privilege(current_user,'public.subjects','id','SELECT')",
+ "has_column_privilege(current_user,'public.readings','id','SELECT')",
+ "has_column_privilege(current_user,'public.commerce_receipts','id','SELECT')",
+ "has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','SELECT')",
+ "NOT has_table_privilege(current_user,'public.subjects','INSERT,UPDATE,DELETE,TRUNCATE')",
+ "NOT has_table_privilege(current_user,'auth.users','SELECT')",
+];
+const READER_PRIVILEGES_SQL='SELECT '+[
+ ...READER_REQUIRED,
+ ...ADMIN_READER_SENSITIVE_COLUMNS_V1.map(([table,column])=>
+   `NOT has_column_privilege(current_user,'${table}','${column}','SELECT')`),
+].join(' AND ')+' AS isolated';
 const PRIVILEGES={
- myeongha_admin_reader:`SELECT has_column_privilege(current_user,'public.subjects','id','SELECT') AND NOT has_column_privilege(current_user,'public.subjects','auth_user_id','SELECT') AND NOT has_table_privilege(current_user,'public.subjects','UPDATE,DELETE') AS isolated`,
- myeongha_admin_audit_writer:`SELECT has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','INSERT') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','SELECT,UPDATE,DELETE') AS isolated`,
+ myeongha_admin_reader:READER_PRIVILEGES_SQL,
+ myeongha_admin_audit_writer:`SELECT has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','INSERT') AND NOT has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','SELECT') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','SELECT,UPDATE,DELETE,TRUNCATE') AND NOT has_table_privilege(current_user,'public.subjects','SELECT,INSERT,UPDATE,DELETE') AS isolated`,
  myeongha_admin_command_executor:`SELECT has_function_privilege(current_user,'myeongha_admin_ops.qry_presentation_entries_v1(uuid,integer)','EXECUTE') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.presentation_entries_v1','INSERT,UPDATE,DELETE') AS isolated`,
  myeongha_admin_retention_executor:`SELECT has_function_privilege(current_user,'myeongha_admin_ops.cmd_purge_expired_admin_audit_v1(integer)','EXECUTE') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','INSERT,UPDATE,DELETE') AS isolated`,
  myeongha_reading_ai_cost_writer_v1:`SELECT has_function_privilege(current_user,'myeongha_admin_ops.cmd_record_reading_ai_call_v1(uuid,uuid,uuid,jsonb)','EXECUTE') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.reading_ai_call_cost_events_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AND NOT has_table_privilege(current_user,'public.reading_execution_attempts','INSERT,UPDATE,DELETE') AND NOT has_table_privilege(current_user,'public.readings','INSERT,UPDATE,DELETE') AND NOT has_table_privilege(current_user,'public.subjects','INSERT,UPDATE,DELETE') AS isolated`,

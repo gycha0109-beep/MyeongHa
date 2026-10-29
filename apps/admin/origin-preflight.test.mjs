@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {inspectAdminOriginRolesV1,ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1} from './origin-preflight.mjs';
+import {inspectAdminOriginRolesV1,ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1,ADMIN_READER_SENSITIVE_COLUMNS_V1} from './origin-preflight.mjs';
 describe('read-only dedicated origin preflight',()=>{
  it('reports only missing names without attempting connections',async()=>{
   let connected=0;const report=await inspectAdminOriginRolesV1({}, {poolFactory(){connected++;throw Error('unexpected');}});
@@ -17,6 +17,36 @@ describe('read-only dedicated origin preflight',()=>{
   const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-secret-value']));
   const report=await inspectAdminOriginRolesV1(env,{targetFactory(){return{connectionString:'test'};},poolFactory(){return{async connect(){return{async query(sql){return{rows:sql.includes('AS restricted')?[{role:'postgres',restricted:false,tls:false}]:[]};},release(){}};},async end(){}};}});
   expect(report.originRolesVerified).toBe(false);expect(report.roles.every(r=>!r.verified)).toBe(true);
+ });
+ it('rejects a Reader with expanded sensitive-column privileges before activation',async()=>{
+  let role;let readerSql='';let auditSql='';
+  const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-value']));
+  const report=await inspectAdminOriginRolesV1(env,{
+    targetFactory(_env,currentRole){role=currentRole;return {connectionString:'postgresql://test:secret@db.invalid/postgres',ssl:{rejectUnauthorized:true}};},
+    poolFactory(){const selected=role;return {async connect(){return {
+      async query(sql){
+        if(sql.includes('AS restricted'))return {rows:[{role:selected,restricted:true,tls:true}]};
+        if(sql.startsWith('SELECT has_')){
+          if(selected==='myeongha_admin_reader')readerSql=sql;
+          if(selected==='myeongha_admin_audit_writer')auditSql=sql;
+          return {rows:[{isolated:selected!=='myeongha_admin_reader'}]};
+        }
+        return {rows:[]};
+      },release(){},
+    };},async end(){}};},
+  });
+  for(const [table,column] of ADMIN_READER_SENSITIVE_COLUMNS_V1){
+    expect(readerSql).toContain(`NOT has_column_privilege(current_user,'${table}','${column}','SELECT')`);
+  }
+  expect(readerSql).toContain("NOT has_table_privilege(current_user,'auth.users','SELECT')");
+  expect(readerSql).toContain("has_column_privilege(current_user,'public.commerce_receipts','id','SELECT')");
+  expect(auditSql).toContain("NOT has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','SELECT')");
+  expect(auditSql).toContain("NOT has_table_privilege(current_user,'public.subjects','SELECT,INSERT,UPDATE,DELETE')");
+  expect(report.originRolesVerified).toBe(false);
+  expect(report.roles).toEqual([
+    {role:'myeongha_admin_reader',verified:false},
+    {role:'myeongha_admin_audit_writer',verified:true},
+  ]);
  });
  it('validates a separate command executor when it is explicitly configured',async()=>{
   let role;
