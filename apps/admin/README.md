@@ -198,6 +198,13 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - 계정 연결 오류 `link_id must identify an eligible linked account`가 지속되어 관리자 최소권한 DB 역할/Hyperdrive 설치가 차단됩니다. 기존 고객 Hyperdrive/DB 계정 재활용 금지. Cloudflare Owner 전용 Access 앱은 설치됐지만 별도 Worker는 아직 미배포입니다.
 - **활성화 게이트:** Saju Production 호출 실동작·Saju 내부 요청 ID와 DB 실행시도 매핑 증거·전용 Writer/Reader 역할·비공개 이벤트 전달·Access 로그인/감사·분석 동의/철회·Retention 실운영이 검증되어야 비용/분석 완전성을 선언할 수 있습니다. 지금은 집계에서 미확정 상태를 유지합니다.
 
+### A5 실서비스 분석 수집 구성 경계 (2026-10-29)
+
+- `production-admin-analytics-collection-v1.ts`에서 기존 명시 동의/철회/세션/이벤트 HTTP 처리기와 실제 DB 작성 원장, 검증된 Reading·결제·출생 기록 이벤트를 하나의 서버 구성으로 연결했습니다. **새로운 공개 라우트를 자동 설치하지 않습니다.**
+- 수집은 `collectionEnabled === true`와 이미 승인된 `AdminAnalyticsCollectionPolicyV1`의 180일 보관, 삭제 연계, 승인 이벤트 검사를 **모두 충족해야만** 활성화할 수 있습니다. 불충족 시 외부 수집은 503이고 검증 이벤트 작성 어댑터도 제공하지 않습니다.
+- Analytics Writer와 원본 증거 Reader는 서로 다른 DB 풀이어야 합니다. 원본 조회는 전용 Admin Reader로 검증하며, 서버에서 확인한 완료 Reading, 검증 결제, 현재 출생 Revision만 분석 원장에 넣습니다. 요청자/세션 유효성, 실제 동의, 원본 생성 시점을 독립적으로 확인합니다.
+- 현재는 Supabase 관리자 역할/Analytics Writer/삭제 연계·배포 출처 실검증이 완료되지 않았으므로 수집 활성화, 180일 retention 스케줄 운영, 사용자 공개 라우트 마운트를 **수행하지 않았습니다**. 관리자 대시보드의 수집 완전성도 미측정으로 유지합니다.
+
 ## workers.dev without a purchased domain (2026-10-28)
 
 The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Access application `MyeongHa Admin Owner Only` exists for the isolated hostname, with one verified Owner-email allow policy. Admin Worker, dedicated Hyperdrive, and Admin Postgres roles are NOT installed. Access login/JWT live-path verification remains pending.
