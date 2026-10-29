@@ -1,10 +1,63 @@
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Historical baseline date: 2026-09-27 KST; latest bounded evidence addendum: 2026-10-28  
+> Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-10-29  
 > Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
 
-## 2026-10-28 verified restore status (latest observation)
+## 2026-10-29 verified restore status (latest observation)
+
+```yaml
+verified_isolated_restore_run_id: 40799522511
+verified_isolated_restore_result: SUCCESS
+verified_isolated_restore_head_sha: cd2152d35784dc610a82fc4ccfead01ef7c84ea7
+verified_isolated_restore_backup_run_id: 40780751650
+verified_isolated_restore_backup_source_sha: 422d5b1374157ebe0c660abda40f02c70485184d
+verified_isolated_restore_backup_migration: 20261028011357
+verified_isolated_restore_artifact_id: 12865611458
+verified_isolated_restore_artifact_sha256: 74ad1108805187228f73f124a8ddee5868e248c0b7fe451d21b25c43a5fe950e
+verified_isolated_restore_artifact_expires_at: 2026-11-28T01:18:19Z
+verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger
+verified_isolated_restore_synthetic_privacy: PASS
+verified_isolated_restore_serving_gate: BLOCKED
+observed_live_production_migration_version: 20261028011357
+repository_latest_migration_file_version: 20261028110500
+verified_restore_matches_observed_migration_version: true
+verified_full_schema_catalog_equivalence: false
+provider_managed_data_full_restore: false
+future_safe_privacy_reconciliation: false
+dr_ready: false
+```
+
+[Protected isolated restore #40799522511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40799522511)
+**SUCCESS** on merged main commit `cd2152d35784dc610a82fc4ccfead01ef7c84ea7`
+using the exact [governed encrypted Production backup #40780751650](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40780751650),
+artifact `12857586148`. Its source backup manifest/workflow recorded
+`migration_frontier=20261028011357`, matching the independent read-only
+Production migration ledger observation made on 2026-10-29. The
+isolated restore itself logged `backup_migration_frontier=20261028011357`,
+`seyeon_early_history_restore_proof=restored_scoped_version_name_snapshot_6_pass`,
+`seyeon_early_functions_restore_proof=restored_public_function_catalog_11_and_rls_6_pass`,
+and all six rate-limit schema/ownership/ACL/synthetic-admission checks passing.
+
+The restored database ran **synthetic** privacy replay and finalization,
+built the self-contained restore evidence envelope, then emitted fail-closed
+`recovered-serving-admission.json` with `gate=BLOCKED`. Immutable restore
+evidence artifact `12865611458` has SHA-256
+`74ad1108805187228f73f124a8ddee5868e248c0b7fe451d21b25c43a5fe950e`
+(expiration `2026-11-28T01:18:19Z`).
+
+**Precise scope:** this proves disposable PostgreSQL restore from a backup
+whose recorded migration *version* equals the observed Production version
+as of 2026-10-29. It does **not** prove that the actual remote migration
+ledger was restored intact, that the differently numbered repository SQL
+is DDL/ACL-equivalent, that live deletion/revocation events were reconciled
+for this incident, or that Hosted Auth login/session/token and Storage
+objects/policies or S8 service operation were recovered. The 2026-10-28
+bounded **real** privacy event replay below is retained as *separate,
+older-backup evidence*, and is not transferred to this newer restore.
+The approved RPO/RTO cannot be promoted from this isolated execution.
+
+## 2026-10-28 verified restore status (historical bounded authoritative privacy window)
 
 ```yaml
 verified_bounded_restore_run_id: 40655447574
