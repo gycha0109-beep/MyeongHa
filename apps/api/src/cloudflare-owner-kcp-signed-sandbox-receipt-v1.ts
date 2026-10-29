@@ -28,6 +28,36 @@ type SignedReceiptEnvV1=CloudflarePortOneTestBindingEnvironmentV1&{
 };
 const UUID=/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu;
 const K2=/^[a-f0-9]{96}$/u;
+const SAFE_ERROR_CODES=new Set([
+ 'INVALID_CONFIGURATION','INVALID_REQUEST','TIMEOUT','NETWORK_FAILURE',
+ 'HTTP_4XX','HTTP_5XX','HTTP_UNEXPECTED_STATUS','INVALID_CONTENT_TYPE',
+ 'RESPONSE_TOO_LARGE','INVALID_JSON','INVALID_PAYMENT',
+ 'INVALID_CONTEXT','ADAPTER_FAILED','INVALID_ADAPTER_RESULT',
+ 'REQUEST_ID_MISMATCH','INVALID_EVIDENCE','PROVIDER_MISMATCH',
+ 'PLATFORM_MISMATCH','ENVIRONMENT_MISMATCH','TRANSACTION_MISMATCH',
+ 'OWNER_MISMATCH','PRODUCT_MISMATCH','AMOUNT_MISMATCH','CURRENCY_MISMATCH',
+ '23514','23505','42501','P0001',
+]);
+function recordSafeVerificationFailure(stage:string,error:unknown):void{
+ const e=error!==null&&typeof error==='object'
+   ?error as {code?:unknown;constraint?:unknown;httpStatus?:unknown}:{};
+ const code=typeof e.code==='string'&&SAFE_ERROR_CODES.has(e.code)
+   ?e.code:'UNCLASSIFIED';
+ const constraint=typeof e.constraint==='string'&&
+   /^(?:owner_sandbox_receipt|cmd_persist_verified_payment_evidence_v1)_[a-z0-9_]{1,80}$/u.test(e.constraint)
+   ?e.constraint:undefined;
+ const httpStatus=stage==='provider_lookup'&&
+   typeof e.httpStatus==='number'&&Number.isInteger(e.httpStatus)&&
+   e.httpStatus>=400&&e.httpStatus<=599?e.httpStatus:undefined;
+ console.warn('MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC',JSON.stringify({
+  stage,code,...(constraint?{constraint}:{}),
+  ...(httpStatus?{httpStatus}:{}),
+ }));
+}
+async function observed<T>(stage:string,work:()=>Promise<T>):Promise<T>{
+ try{return await work();}
+ catch(error){recordSafeVerificationFailure(stage,error);throw error;}
+}
 const SQL=`
 select receipt_id::text as "receiptId",
        provider_event_id::text as "providerEventId",
@@ -57,12 +87,15 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
    typeof input.paymentAttemptId!=='string'||
    !UUID.test(input.paymentAttemptId))return deny();
  const k2=input.env?.MYEONGHA_COMMERCE_SANDBOX_RECEIPT_HMAC_K2_SECRET;
- if(typeof k2!=='string'||!K2.test(k2))return deny();
+ if(typeof k2!=='string'||!K2.test(k2)){
+  recordSafeVerificationFailure('attestation_binding',null);
+  return deny();
+ }
  const paymentAttemptId=input.paymentAttemptId.toLowerCase();
- const adapter=await createCloudflarePortOneOwnerTestVerifierV1(input.env,{
+ const adapter=await observed('verifier_config',()=>createCloudflarePortOneOwnerTestVerifierV1(input.env,{
    pool:input.pool,verifiedEvidence:input.verifiedEvidence,
- });
- const canonical=await executePostgresSubjectTransactionV1({
+ }));
+ const canonical=await observed('context_read',()=>executePostgresSubjectTransactionV1({
   pool:input.pool,verifiedEvidence:input.verifiedEvidence,
   execute:async scope=>({
     subjectId:scope.resolvedSubject.subjectId,
@@ -70,23 +103,31 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
       scope,paymentAttemptId,
     }),
   }),
- });
+ }));
  const context=canonical.context;
  if(typeof canonical.subjectId!=='string'||!UUID.test(canonical.subjectId)||
     context.environment!=='sandbox'||context.provider!=='portone_v2'||
     context.platform!=='web'||context.expectedAmountMinor!==1900||
     context.expectedCurrency!=='KRW'||
     context.expectedExternalProductId!=='myeongha-chat-credits-300-v1'||
-    !/^mha_pa_[a-f0-9]{32}$/u.test(context.providerRequestId))return deny();
+    !/^mha_pa_[a-f0-9]{32}$/u.test(context.providerRequestId)){
+   recordSafeVerificationFailure('context_authority',null);
+   return deny();
+ }
 
- const evidence=await executeCommercePaymentVerificationV1({context,adapter});
+ const evidence=await observed('provider_lookup',()=>executeCommercePaymentVerificationV1({context,adapter}));
  if(evidence.environment!=='sandbox'||evidence.provider!=='portone_v2'||
     evidence.platform!=='web'||evidence.currentState!=='active'||
     evidence.ownerBinding.kind!=='purchase_intent'||
-    evidence.verifiedAmountMinor!==1900||evidence.verifiedCurrency!=='KRW')
+    evidence.verifiedAmountMinor!==1900||evidence.verifiedCurrency!=='KRW'){
+    recordSafeVerificationFailure('provider_evidence_authority',null);
     return deny();
+   }
  if(evidence.ownerBinding.kind!=='purchase_intent'||
-    evidence.ownerBinding.purchaseIntentId!==context.purchaseIntentId)return deny();
+    evidence.ownerBinding.purchaseIntentId!==context.purchaseIntentId){
+   recordSafeVerificationFailure('provider_evidence_owner',null);
+   return deny();
+  }
  const payload=JSON.stringify({
   schemaVersion:'owner-kcp-sandbox-signed-receipt-v1',
   subjectId:canonical.subjectId.toLowerCase(),
@@ -94,9 +135,12 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
   providerRequestId:context.providerRequestId,
   evidence,
  });
- if(Buffer.byteLength(payload,'utf8')>4096)return deny();
+ if(Buffer.byteLength(payload,'utf8')>4096){
+  recordSafeVerificationFailure('evidence_payload_bound',null);
+  return deny();
+ }
  const signature=createHmac('sha256',k2).update(payload,'utf8').digest('hex');
- const saved=await executePostgresSubjectTransactionV1({
+ const saved=await observed('receipt_write',()=>executePostgresSubjectTransactionV1({
   pool:input.pool,verifiedEvidence:input.verifiedEvidence,
   execute:async ({client,resolvedSubject})=>{
     if(resolvedSubject.subjectId!==canonical.subjectId||
@@ -112,7 +156,7 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
     return {receiptId:row.receiptId.toLowerCase(),
       providerEventId:row.providerEventId.toLowerCase(),replayed:row.replayed as boolean};
   },
- });
+ }));
  return Object.freeze({
   paymentAttemptId,receiptId:saved.receiptId,
   providerEventId:saved.providerEventId,replayed:saved.replayed,

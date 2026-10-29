@@ -133,6 +133,53 @@ describe('Owner KCP TEST signed receipt persistence',()=>{
   }
   expect(state.query).not.toHaveBeenCalled();
  });
+ it('records only allowlisted PortOne failure stage and HTTP class',async()=>{
+  const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  try{
+   const providerError=Object.assign(new Error('secret-provider-body'),{
+    code:'HTTP_4XX',httpStatus:404,
+   });
+   state.verified.mockRejectedValueOnce(providerError);
+   await expect(persistCloudflareOwnerKcpSignedSandboxReceiptV1(INPUT))
+    .rejects.toBe(providerError);
+   const logs=warn.mock.calls.filter(call=>call[0]==='MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC');
+   expect(logs).toHaveLength(1);
+   expect(JSON.parse(logs[0]?.[1] as string)).toEqual({
+    stage:'provider_lookup',code:'HTTP_4XX',httpStatus:404,
+   });
+   expect(JSON.stringify(logs)).not.toContain('secret-provider-body');
+   expect(state.query).not.toHaveBeenCalled();
+  }finally{warn.mockRestore();}
+ });
+ it('isolates signed receipt DB constraint and never logs private HMAC material',async()=>{
+  const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  try{
+   const failure=Object.assign(new Error('private-DB-signature-key'),{
+    code:'42501',constraint:'owner_sandbox_receipt_mac_mismatch',
+   });
+   state.query.mockRejectedValueOnce(failure);
+   await expect(persistCloudflareOwnerKcpSignedSandboxReceiptV1(INPUT))
+    .rejects.toBe(failure);
+   const logs=warn.mock.calls.filter(call=>call[0]==='MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC');
+   expect(logs).toHaveLength(1);
+   expect(JSON.parse(logs[0]?.[1] as string)).toEqual({
+    stage:'receipt_write',code:'42501',
+    constraint:'owner_sandbox_receipt_mac_mismatch',
+   });
+   expect(JSON.stringify(logs)).not.toContain('private-DB-signature-key');
+   expect(JSON.stringify(logs)).not.toContain(K2);
+   warn.mockClear();
+   state.query.mockRejectedValueOnce(Object.assign(new Error('DB-private'),{
+    code:'EXPOSE_PRIVATE_KEY',constraint:'secrets_key_value',
+   }));
+   await expect(persistCloudflareOwnerKcpSignedSandboxReceiptV1(INPUT))
+    .rejects.toThrow();
+   const hidden=warn.mock.calls.filter(call=>call[0]==='MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC');
+   expect(JSON.parse(hidden[0]?.[1] as string)).toEqual({
+    stage:'receipt_write',code:'UNCLASSIFIED',
+   });
+  }finally{warn.mockRestore();}
+ });
  it('reports idempotent replay only when recorded in the DB',async()=>{
   state.query.mockResolvedValueOnce({rows:[{
    receiptId:RECEIPT,providerEventId:EVENT,replayed:true,
