@@ -4,6 +4,18 @@
 > Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-10-29  
 > Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
 
+## 2026-10-29 — new Production migration backup; isolation restoration not yet evidenced
+
+Read-only Production migration-history observation on 2026-10-29:
+`20261029012948` (`owner_kcp_sandbox_remove_daily_limit_v1`).
+The repository versioned file `20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql` has a different version number; SQL-body equivalence was checked separately without repairing remote history. The earlier remote-only `20261008090417` provenance is still unresolved under #1887.
+
+The [new encrypted backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) **SUCCEEDED** (artifact `12871016812`, SHA-256 `ac2c06f54cbe1d41538959cdbc1e70c4eab05b09f6909975fd95979c521e3cf2`, expiration `2026-11-28T03:29:12Z`), recording migration `20261029012948`. **It has not been restored successfully yet.** The dated *verified restore* YAML block below therefore correctly stays bound to the older restored backup and does **not** claim that it covers today's Production migration. DR current-evidence CI must remain strict until new restore evidence exists.
+
+[Earlier successful source-row-count restore #40811556214](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40811556214) on backup `40780751650` at `20261028011357` produced artifact `12870263616`: 27 Provider skipped COPY blocks / **92 skipped source rows**, 3 projected blocks / **42 projected-column replayed rows**, and **43 total Provider replayed rows including the projected 42**. `provider_source_counts_include_payloads=false`. This was synthetic privacy only; `gate=BLOCKED`. Its counts are historical backup-specific and must not be applied to `40812111605`.
+
+`dr_ready=false`, `future_safe_privacy_reconciliation=false`, `provider_managed_data_full_restore=false`, `sourceContinuityProven=false`, `continuousCaptureProven=false`, `serviceResumptionAllowed=false`. No Production SQL writes, migration history repair, Hosted service recovery or S8 cutover are authorized by this observation.
+
 ## 2026-10-29 verified restore status (latest observation)
 
 ```yaml

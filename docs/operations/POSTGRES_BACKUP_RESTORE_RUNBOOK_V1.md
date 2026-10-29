@@ -1,5 +1,14 @@
 # MyeongHa PostgreSQL Backup / Restore Runbook v1
 
+## 2026-10-29 current DR follow-up — measured earlier restore; newer backup pending restore
+
+- [Protected restore #40811556214](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40811556214) **SUCCESS** for encrypted backup `40780751650` at migration `20261028011357`; evidence artifact `12870263616` (SHA-256 `1b462330dd9346717bfe57ee903dd64a256d689ee9d7b4e0e3256dee490ca6cc`, expires `2026-11-28T03:21:49Z`).
+- Actual provider-source COPY classification in that backup: **27 skipped blocks / 92 skipped rows**; **3 projected-column blocks / 42 projected-column replayed rows**; **43 total replayed Provider rows**, including those 42. No provider row payloads were included (`provider_source_counts_include_payloads=false`).
+- This restore's privacy step was **synthetic only**; `recovered-serving-admission.json` remains `gate=BLOCKED` / `drReady=false`. Historical real-event privacy proof belongs only to its own older backup and captured window.
+- [Latest encrypted backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) **SUCCESS**, artifact `12871016812`, source migration `20261029012948`. Read-only Production migration history on 2026-10-29 independently shows `20261029012948`; repository file `20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql` has a different numeric prefix despite separately established SQL-body equivalence. The latest backup's restore and Provider row totals remain **PENDING**, not inherited from #40811556214.
+- Pending drill is constrained to exact backup run `40812111605` and artifact `12871016812` on an isolated PostgreSQL 17 target, one-shot main-push marker with fixed validity and `ops` attribution. It writes nothing to Production and must not promote Hosted recovery, DR readiness, or service admission. Remote-only `20261008090417` provenance remains OPEN in issue #1887.
+
+
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
 > Historical evidence baseline: 2026-09-27 KST; latest isolated restore readback: 2026-10-29  

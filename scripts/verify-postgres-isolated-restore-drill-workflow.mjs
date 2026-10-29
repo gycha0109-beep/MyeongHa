@@ -163,12 +163,15 @@ if (onSection.includes('push:')) {
   const providerRowsRetryApproved = onSection.includes(
     "'.github/ops/postgres-restore-provider-rows-retry-40780751650-20261029.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved) {
-    throw new Error('Restore one-shot push must have exactly the six reviewed historical/current source markers.');
+  const latestMigrationRestoreApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-40812111605-20261029.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved) {
+    throw new Error('Restore one-shot push must have exactly the seven reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 6) {
-    throw new Error('Restore one-shot push allows exactly six pinned marker paths.');
+  if (triggerMarkers.length !== 7) {
+    throw new Error('Restore one-shot push allows exactly seven pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -198,6 +201,11 @@ if (onSection.includes('push:')) {
     'POSTGRES-RESTORE-PROVIDER-ROWS-RETRY-40780751650-20261029-V1',
     'incident_reference_utc=2026-10-29T03:05:00Z',
     'SCOPED_RESTORE_PROVIDER_ROW_RETRY_ONLY',
+    'ops(dr): one-shot restore backup 40812111605',
+    'POSTGRES-RESTORE-BACKUP-40812111605-20261029-V1',
+    'backup_run_id=40812111605',
+    'expected_artifact_id=12871016812',
+    'incident_reference_utc=2026-10-29T03:35:00Z',
     'now - point <= 86400',
     'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
@@ -246,6 +254,8 @@ for (const fragment of [
   '.expired == false',
   '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
   'echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"',
+  'EXPECTED_BACKUP_ARTIFACT_ID',
+  '[[ "$artifact_id" == "$EXPECTED_BACKUP_ARTIFACT_ID" ]]',
   'echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"',
 ]) {
   requireFragment(sourceResolver, fragment, sourceResolverPath);

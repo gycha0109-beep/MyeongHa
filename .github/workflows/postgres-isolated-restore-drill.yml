@@ -14,6 +14,7 @@ on:
       - '.github/ops/postgres-restore-backup-40780751650-20261029.once'
       - '.github/ops/postgres-restore-provider-rows-40780751650-20261029.once'
       - '.github/ops/postgres-restore-provider-rows-retry-40780751650-20261029.once'
+      - '.github/ops/postgres-restore-backup-40812111605-20261029.once'
   workflow_dispatch:
     inputs:
       backup_run_id:
@@ -55,7 +56,7 @@ concurrency:
 jobs:
   restore-drill:
     name: isolated-supabase-postgres-17-restore
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40232489516') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory retry 40780751650'))) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40232489516') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory retry 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40812111605'))) }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
@@ -98,7 +99,17 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           [[ -z "$(git status --porcelain)" ]]
           subject="$(git show -s --format=%s HEAD)"
-          if [[ "$subject" =~ ^ops\(dr\):\ one-shot\ provider\ row\ inventory\ retry\ 40780751650(\ \(\#[0-9]+\))?$ ]]; then
+          if [[ "$subject" =~ ^ops\(dr\):\ one-shot\ restore\ backup\ 40812111605(\ \(\#[0-9]+\))?$ ]]; then
+            # One-shot migration-matched 20261029012948 encrypted backup; synthetic-only privacy.
+            [[ "$(cat .github/ops/postgres-restore-backup-40812111605-20261029.once)" == 'POSTGRES-RESTORE-BACKUP-40812111605-20261029-V1' ]]
+            point="$(date -u -d '2026-10-29T03:35:00Z' +%s)"
+            now="$(date -u +%s)"
+            (( now >= point && now - point <= 86400 ))
+            echo 'backup_run_id=40812111605' >> "$GITHUB_OUTPUT"
+            echo 'expected_artifact_id=12871016812' >> "$GITHUB_OUTPUT"
+            echo 'incident_reference_utc=2026-10-29T03:35:00Z' >> "$GITHUB_OUTPUT"
+            echo 'SCOPED_RESTORE_LATEST_MIGRATION_ONLY: backup 40812111605; artifact 12871016812; synthetic privacy only, no Production writes, no Hosted restore, dr_ready=false'
+          elif [[ "$subject" =~ ^ops\(dr\):\ one-shot\ provider\ row\ inventory\ retry\ 40780751650(\ \(\#[0-9]+\))?$ ]]; then
             # One-time rerun after correcting jq -e false predicate.
             [[ "$(cat .github/ops/postgres-restore-provider-rows-retry-40780751650-20261029.once)" == 'POSTGRES-RESTORE-PROVIDER-ROWS-RETRY-40780751650-20261029-V1' ]]
             point="$(date -u -d '2026-10-29T03:05:00Z' +%s)"
@@ -166,6 +177,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
+          EXPECTED_BACKUP_ARTIFACT_ID: ${{ github.event_name == 'push' && steps.one_shot.outputs.expected_artifact_id || '' }}
           INCIDENT_REFERENCE_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc }}
         run: bash scripts/operations/resolve-postgres-restore-source.sh
       - name: Download exact governed backup artifact

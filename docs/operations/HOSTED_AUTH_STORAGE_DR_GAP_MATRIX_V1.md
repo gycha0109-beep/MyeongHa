@@ -4,42 +4,35 @@
 > Classification: **read-only inventory and actionable recovery acceptance boundary**, not a claim of recovered Hosted services.
 > Authority: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`, `docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md`, immutable selected restore logs/evidence, and Supabase provider documentation.
 
-## 2026-10-29 — current migration-matched PostgreSQL restore and missing row-level evidence
+## 2026-10-29 — measured source-row omissions in successful restore #40811556214
 
-[Isolated PostgreSQL 17 restore #40799522511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40799522511)
-has since **succeeded** on governed encrypted backup #40780751650 at
-`migration_frontier=20261028011357`, equal to the read-only observed
-Production migration version on 2026-10-29. Evidence artifact #12865611458
-includes an isolated restore, synthetic privacy exercise and
-`recovered-serving-admission.json` with `gate=BLOCKED`. This newer
-restore did **not** replay the earlier Production nonzero privacy event
-ledger; the captured-window authoritative example below remains historical.
+The protected [isolated PostgreSQL 17 restore #40811556214](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40811556214) **SUCCEEDED** against the exact encrypted Production [backup #40780751650](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40780751650), whose recorded migration version was `20261028011357`. The sanitized evidence artifact is `12870263616` (SHA-256 `1b462330dd9346717bfe57ee903dd64a256d689ee9d7b4e0e3256dee490ca6cc`; expires `2026-11-28T03:21:49Z`).
 
-**New evidence capture implementation:** the portable data replay's
-provider-managed `COPY` classifications now count **actual input rows**
-without recording any row values. Each skipped/provider-projected/provider-
-replayed block includes `source_row_count`; the protected restore envelope
-also records `provider_rows_skipped_in_loopback`,
-`provider_rows_with_projected_columns_in_loopback` and
-`provider_rows_replayed_in_loopback`, plus
-`provider_source_counts_include_payloads=false`. Counts are measured from
-the actual decrypted source `COPY` stream **on the isolated runner**, not
-from live Production or a guessed previous schema inventory.
+| Backup-source COPY measurement | Observed row/block count |
+| --- | ---: |
+| Provider COPY blocks skipped because the isolated target lacked the relation | **27 blocks** |
+| Source rows in those skipped blocks | **92 rows** |
+| Provider COPY blocks replayed with target-compatible column projection | **3 blocks** |
+| Source rows replayed with some source columns omitted | **42 rows** |
+| All Provider source rows successfully replayed (including the above 42) | **43 rows** |
 
-The already-successful run #40799522511 **predates this implementation**,
-so it does *not* yet prove these new row-count fields. They require a
-subsequent separately verified isolated restore run. A skipped nonzero
-source-row count would quantify rows the pinned loopback target could not
-accept; a zero source-row count does **not** prove Hosted service Auth
-configuration, session validity, or Storage object bytes are recoverable.
-Likewise, projected row counts record rows with omitted provider-specific
-columns, not lost ciphertext or a proven ability to reconstruct those
-columns. The encrypted governed backup itself is not modified.
+**Never add 42 to 43.** The 42 projected-column rows are a subset of the 43 replayed Provider rows, not an additional population. These are *actual decrypted-backup input counts* for backup `40780751650`, **not current Production row counts**.
 
-**Admission remains blocked:** provider-managed row counts are diagnosis
-only; no Hosted GoTrue/Storage restoration, private file download, real
-incident-time privacy reconciliation or S8 cutover is implied.
-`provider_managed_data_full_restore=false` and `dr_ready=false`.
+| Skipped Auth source relation | Skipped rows in that backup |
+| --- | ---: |
+| `auth.sessions` | 29 |
+| `auth.mfa_amr_claims` | 29 |
+| `auth.flow_state` | 21 |
+| `auth.oauth_client_states` | 8 |
+| `auth.identities` | 4 |
+| `auth.custom_oauth_providers` | 1 |
+| All remaining skipped Auth/Storage relations (including Storage skipped relations) | 0 |
+
+Column-projected replay includes `auth.users=4`, `auth.refresh_tokens=38`, and `auth.audit_log_entries=0` source rows. Counts only were retained: `provider_source_counts_include_payloads=false`. No identifiers, tokens, row bodies or file contents are included in this matrix.
+
+The restore performed **synthetic-only privacy reconciliation**. Its recovered service admission remains `gate=BLOCKED`, `serviceResumptionAllowed=false`, `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`. It does not prove Hosted login/session/token/SSO/MFA equivalence, Storage object bytes/policies, future privacy source continuity, or S8 service resumption. Earlier real-event replay remains a separate historical captured window.
+
+**Newer backup boundary:** encrypted backup [#40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605) succeeded on `20261029012948` with artifact `12871016812` (expires `2026-11-28T03:29:12Z`); its own isolated restore and row counts are **NOT YET VERIFIED**. Do not copy 92/42/43 into that backup's evidence.
 
 ## 1. Scope and direct observations
 
