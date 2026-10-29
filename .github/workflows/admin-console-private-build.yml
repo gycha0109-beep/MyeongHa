@@ -60,6 +60,8 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile private PostgreSQL TLS verification dependencies
+        run: npm run build
       - name: Verify private deployment inputs exist
         shell: bash
         run: |
