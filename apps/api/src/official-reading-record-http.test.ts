@@ -46,7 +46,9 @@ function verifier(authenticated = true) {
 
 function fakePool(input: {
   readonly rows?: readonly typeof ROW[];
+  readonly birthRows?: readonly { issuedRevisionNo: number | null; currentRevisionNo: number | null; revisionState: string }[];
   readonly onAuthorityQuery?: (values: readonly unknown[]) => void;
+  readonly onBirthQuery?: (values: readonly unknown[]) => void;
   readonly onRollback?: () => void;
 } = {}): PostgresSubjectPoolV1 {
   return {
@@ -75,6 +77,14 @@ function fakePool(input: {
           if (text.includes('assert_myeongha_subject_context_v1')) {
             expect(values).toEqual([SUBJECT_ID]);
             return { rows: [] };
+          }
+          if (text.includes('qry_official_reading_birth_revision_status_v1')) {
+            input.onBirthQuery?.(values ?? []);
+            return {
+              rows: (input.birthRows ?? [{
+                issuedRevisionNo: 2, currentRevisionNo: 3, revisionState: 'changed',
+              }]) as readonly ResultRow[],
+            };
           }
           if (text.includes('qry_official_reading_record_runtime_v1')) {
             input.onAuthorityQuery?.(values ?? []);
@@ -175,7 +185,34 @@ describe('Official Reading record HTTP adapter', () => {
     });
     expect(payload.data).not.toHaveProperty('responseHash');
     expect(payload.data).not.toHaveProperty('threadId');
+    expect(payload.data.birthRevision).toEqual({
+      issuedRevisionNo: 2, currentRevisionNo: 3, state: 'changed',
+    });
     expect(onAuthorityQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds a second exact authorized Birth revision query in the same subject transaction', async () => {
+    const onBirthQuery = vi.fn((values: readonly unknown[]) => {
+      expect(values).toEqual([SUBJECT_ID, READING_ID]);
+    });
+    const response = await invoke({
+      pool: fakePool({ onBirthQuery, birthRows: [{
+        issuedRevisionNo: 4, currentRevisionNo: 4, revisionState: 'current',
+      }] }),
+    });
+    const payload = await response.json() as any;
+    expect(payload.data.birthRevision).toEqual({
+      issuedRevisionNo: 4, currentRevisionNo: 4, state: 'current',
+    });
+    expect(onBirthQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls back when the exact report loses birth provenance read authority', async () => {
+    const onRollback = vi.fn();
+    await expect(invoke({
+      pool: fakePool({ birthRows: [], onRollback }),
+    })).rejects.toThrow('Birth provenance authority did not admit');
+    expect(onRollback).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed and rolls back when owner-scoped archive authority returns duplicate rows', async () => {
