@@ -2,11 +2,7 @@ import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resol
 import {
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
-  type PostgresTransactionQueryV1,
 } from './postgres-subject-execution.js';
-import type {
-  SajuOfficialCurrentAuthorityPortV1,
-} from './saju-official-reading-issuer-db-persistence-v1.js';
 import type {
   SajuOfficialIssuedDbTransactionPortV1,
 } from './saju-production-reading-execution.js';
@@ -25,13 +21,12 @@ import {
  * The canonical Subject must come from already VERIFIED member/guest evidence.
  *
  * Current-Grant/Privacy admission and the existing atomic writer share a DB
- * client and transaction. DO NOT supply a stub currentAuthorityFactory in
- * Production. No route registration or executor grant is introduced here.
+ * client and transaction. The current authority cannot be replaced by a
+ * caller-supplied mock. No route registration or executor grant is introduced here.
  */
 export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
-  currentAuthorityFactory?: (client: PostgresTransactionQueryV1) => SajuOfficialCurrentAuthorityPortV1;
 }>): SajuOfficialIssuedDbTransactionPortV1 {
   return Object.freeze({
     async run(request: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) {
@@ -49,7 +44,7 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
             });
           }
           return request.commit({
-            currentAuthority: (input.currentAuthorityFactory ?? createPostgresSajuOfficialCurrentAuthorityPortV1)(client),
+            currentAuthority: createPostgresSajuOfficialCurrentAuthorityPortV1(client),
             commitPort: createPostgresSajuOfficialImmutableCommitPortV1(client),
           });
         },

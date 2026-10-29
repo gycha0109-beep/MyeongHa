@@ -114,6 +114,7 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
   released = false;
   resolvedSubjectId = subjectId;
   storedNativeId = nativeReadingId;
+  currentIssueAdmitted: unknown = true;
   async query<Row = Record<string, unknown>>(
     sql: string, _params: readonly unknown[] = [],
   ): Promise<PostgresQueryResultV1<Row>> {
@@ -121,6 +122,8 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
     let rows: readonly Record<string, unknown>[] = [];
     if (sql.includes('public.begin_member_subject_context_v1')) {
       rows = [{ subjectId: this.resolvedSubjectId, subjectKind: 'member' }];
+    } else if (sql.includes('public.qry_saju_official_issuance_preflight_v1(')) {
+      rows = [{ admitted: this.currentIssueAdmitted }];
     } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')) {
       rows = [{ readingId, executionAttemptId, responseHash: storedHash, replayed: false }];
     } else if (sql.includes('from public.qry_saju_official_stored_lineage_v1(')) {
@@ -147,7 +150,6 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     const transaction = createPostgresSajuOfficialIssuedDbTransactionPortV1({
       pool,
       verifiedEvidence: { kind: 'member', verifiedAuthUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      currentAuthorityFactory: (_client) => p.currentAuthority,
     });
     const requestReading = vi.fn(async () => native);
     const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
@@ -174,13 +176,11 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
   });
 
   it('denies cross-Subject DB transaction before any immutable artifact commit', async () => {
-    const p = ports();
     const connection = new FakeIssuedDbConnection();
     connection.resolvedSubjectId = '88888888-8888-4888-8888-888888888888';
     const transaction = createPostgresSajuOfficialIssuedDbTransactionPortV1({
       pool: { connect: () => connection },
       verifiedEvidence: { kind: 'member', verifiedAuthUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      currentAuthorityFactory: () => p.currentAuthority,
     });
     const result = await transaction.run({
       subjectId,
@@ -200,7 +200,6 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     const transaction = createPostgresSajuOfficialIssuedDbTransactionPortV1({
       pool: { connect: () => connection },
       verifiedEvidence: { kind: 'member', verifiedAuthUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
-      currentAuthorityFactory: () => p.currentAuthority,
     });
     await expect(executeAndPersistCurrentBirthSajuOfficialReadingV1({
       profile: profileFixture(), readingText: '전체 사주',
@@ -216,6 +215,35 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(connection.released).toBe(true);
   });
 
+  it('rechecks the live grant after Saju returns and refuses a refunded attempt', async () => {
+    const p = ports();
+    const connection = new FakeIssuedDbConnection();
+    connection.currentIssueAdmitted = false;
+    const transaction = createPostgresSajuOfficialIssuedDbTransactionPortV1({
+      pool: { connect: () => connection },
+      verifiedEvidence: { kind: 'member', verifiedAuthUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+    });
+    const requestReading = vi.fn(async () => native);
+    const result = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(), readingText: 'general natal',
+      adapter: { requestReading },
+      subjectId, readingId, readingSessionId,
+      executionAttemptId, outboxEventId, sourceBirthRevisionId,
+      sourceVerifier: p.sourceVerifier,
+      mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight,
+      dbTransaction: transaction,
+    });
+    expect(requestReading).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      state: 'held', reason: 'current_authority_unavailable',
+      canDisclose: false, canSell: false,
+    });
+    expect(connection.calls.some(x => x.includes('qry_saju_official_issuance_preflight_v1'))).toBe(true);
+    expect(connection.calls.some(x => x.includes('cmd_finalize_reading_transport_success_v1'))).toBe(false);
+    expect(connection.calls.at(-1)).toBe('COMMIT');
+    expect(connection.released).toBe(true);
+  });
 
   it('does not call the Saju network when Production issuer or DB transaction is not wired', async () => {
     const requestReading = vi.fn(async () => native);
