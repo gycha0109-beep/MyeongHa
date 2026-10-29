@@ -26,7 +26,8 @@ describe.skipIf(!enabled)('G3 S0 history-presence authority in real PostgreSQL 1
       ssl:false,max:3,statement_timeout:5000});
     const v=await pool.query<{version:number}>(
       "select current_setting('server_version_num')::int as version");
-    if(v.rows[0]?.version<170000||v.rows[0]?.version>=180000)
+    const serverVersion=v.rows[0]?.version;
+    if(typeof serverVersion!=='number'||serverVersion<170000||serverVersion>=180000)
       throw Error('History-presence G3 requires PostgreSQL 17');
   });
   afterAll(async()=>{await pool?.end();});
