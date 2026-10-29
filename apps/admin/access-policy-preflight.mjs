@@ -1,3 +1,5 @@
+import {resolve} from 'node:path';
+import {pathToFileURL} from 'node:url';
 /**
  * Verify the LIVE dedicated Cloudflare Access policy before staging an Admin
  * Worker. Fail closed on missing or broad access. Never logs API tokens,
@@ -5,12 +7,13 @@
  */
 const HOST='myeongha-admin.gycha0109.workers.dev';
 const APP_NAME='MyeongHa Admin Owner Only';
-const REFS=/^[a-f0-9]{32}$/iu;
+const ACCOUNT=/^[a-f0-9]{32}$/iu;
+const ID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu;
 const AUD=/^[a-f0-9]{64}$/iu;
 
 export async function verifyAdminAccessPolicyV1(input){
  const {accountId,apiToken,audience,ownerEmail,fetchImpl=fetch}=input;
- if(!REFS.test(accountId??'')||typeof apiToken!=='string'||apiToken.length<10||
+ if(!ACCOUNT.test(accountId??'')||typeof apiToken!=='string'||apiToken.length<10||
     !AUD.test(audience??'')||typeof ownerEmail!=='string'||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(ownerEmail))
    throw Error('Dedicated Admin Access verification configuration unavailable');
@@ -27,11 +30,11 @@ export async function verifyAdminAccessPolicyV1(input){
  }
  const apps=await read(base);
  const selected=apps.filter(a=>a?.name===APP_NAME&&a?.domain===HOST&&a?.type==='self_hosted');
- if(selected.length!==1||selected[0].aud!==audience||!REFS.test(selected[0].id??''))
+ if(selected.length!==1||selected[0].aud!==audience||!ID.test(selected[0].id??''))
    throw Error('Dedicated Admin Access application identity mismatch');
  const app=selected[0];
  const policies=await read(base+'/'+app.id+'/policies');
- if(policies.length!==1||!REFS.test(policies[0]?.id??'')||
+ if(policies.length!==1||!ID.test(policies[0]?.id??'')||
     policies[0].decision!=='allow'||policies[0].name!=='Owner email only'||
     !Array.isArray(policies[0].include)||policies[0].include.length!==1||
     !policies[0].include[0]?.email||
@@ -46,7 +49,7 @@ export async function verifyAdminAccessPolicyV1(input){
  return Object.freeze({appVerified:true,ownerOnlyVerified:true});
 }
 
-if(process.argv[1]&&new URL('file://'+process.argv[1].replaceAll('\\','/')).href===import.meta.url){
+if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
  try{
   const result=await verifyAdminAccessPolicyV1({
    accountId:process.env.CLOUDFLARE_ACCOUNT_ID,
