@@ -20,10 +20,11 @@ function createFixture(){
   let now=new Date('2026-10-29T12:00:00.000Z');
   const writerPool:PostgresSubjectPoolV1={
     async connect(){return {
-      async query<Row>(sql:string){
+      async query<Row>(sql:string,values?:readonly unknown[]){
         queries.push(sql);
         if(sql.includes('SELECT current_user::text AS role'))return {rows:[{role:'myeongha_analytics_writer'}] as Row[]};
         if(sql.includes('SELECT true AS active'))return {rows:[{active:true}] as Row[]};
+        if(sql.includes('INSERT INTO myeongha_admin_analytics.consents_v1'))return {rows:[{visitorRef:values?.[0]}] as Row[]};
         if(sql.includes('SELECT version,expires_at::text AS "expiresAt"'))
           return {rows:[{version:'product-analytics-consent-180d-v1',expiresAt:'2027-04-27T12:00:00.000Z'}] as Row[]};
         if(sql.includes('INSERT INTO myeongha_admin_analytics.events_v1'))
