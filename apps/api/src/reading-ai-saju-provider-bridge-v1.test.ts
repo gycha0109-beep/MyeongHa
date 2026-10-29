@@ -22,8 +22,9 @@ const price={
   cachedInputMicroUsdPerMillion:100_000,
   outputMicroUsdPerMillion:2_000_000,
 };
-function fixture(){
+function fixture(authorize=true){
   const statements:{sql:string;values?:readonly unknown[]}[]=[];
+  const resolutions:{sajuRequestId:string;callId:string;modelKey:string;observedAt:string}[]=[];
   const pool:PostgresSubjectPoolV1={async connect(){return {
     async query<Row>(sql:string,values?:readonly unknown[]){
       statements.push(values===undefined?{sql}:{sql,values});
@@ -35,10 +36,16 @@ function fixture(){
       return{rows:[] as Row[]};
     },release(){},
   };}};
-  return{statements,bridge:createSajuNarrativeReadingCostBridgeV1({pool})};
+  const bindingAuthority={
+    async resolve(value:{sajuRequestId:string;callId:string;modelKey:string;observedAt:string}){
+      resolutions.push(value);
+      return authorize?binding:null;
+    },
+  };
+  return{statements,resolutions,bridge:createSajuNarrativeReadingCostBridgeV1({pool,bindingAuthority})};
 }
 function message(overrides:Record<string,unknown>={}){
-  return {binding,expectedSajuRequestId:observation.requestId,
+  return {expectedSajuRequestId:observation.requestId,
     expectedModelKey:observation.modelKey,observation,price,...overrides};
 }
 describe('Saju source-side OpenAI usage into private Reading ledger',()=>{
@@ -59,6 +66,21 @@ describe('Saju source-side OpenAI usage into private Reading ledger',()=>{
     });
     expect(JSON.stringify(payload)).not.toContain('requestId');
     expect(JSON.stringify(payload)).not.toContain('prompt');
+  });
+  it('does not write provider usage unless the DB Owner verifies the exact Saju request-to-attempt mapping',async()=>{
+    const x=fixture(false);
+    await expect(x.bridge.record(message())).rejects.toThrow(
+      'Unverified Saju to DB Reading execution mapping',
+    );
+    expect(x.resolutions).toEqual([{
+      sajuRequestId:observation.requestId,callId:observation.callId,
+      modelKey:observation.modelKey,observedAt:observation.observedAt,
+    }]);
+    expect(x.statements).toHaveLength(0);
+    const valid=fixture();
+    await valid.bridge.record(message());
+    expect(valid.resolutions).toHaveLength(1);
+    expect(valid.statements.some(statement=>statement.sql.includes('cmd_record_reading_ai_call_v1'))).toBe(true);
   });
   it('keeps failed provider attempt usage and cost unknown',async()=>{
     const x=fixture();
