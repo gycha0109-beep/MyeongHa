@@ -158,13 +158,23 @@ if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
 
 if (workflow.includes('push:')) {
   for (const fragment of [
-    "'.github/ops/postgres-backup-frontier-1310.once'",
-    'Gate one-shot frontier-1310 backup marker',
-    'POSTGRES-BACKUP-FRONTIER-1310-V1',
+    "'.github/ops/postgres-backup-migration-20261029012948-20261029.once'",
+    'Gate one-shot deployed migration 20261029012948 backup marker',
+    'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1',
+    'ops(dr): one-shot backup migration 20261029012948',
+    "github.event_name == 'push'",
+    'now - point <= 86400',
+    "OBSERVED_MIGRATION_FRONTIER",
+    "[[ \"$OBSERVED_MIGRATION_FRONTIER\" == '20261029012948' ]]",
   ]) {
     if (!workflow.includes(fragment)) {
       throw new Error(`One-shot backup bridge missing exact authority fragment: ${fragment}`);
     }
+  }
+  const backupPaths = workflow.split('  workflow_dispatch:')[0]
+    .split('\n').filter((line) => line.trim().startsWith("- '.github/ops/"));
+  if (backupPaths.length !== 1) {
+    throw new Error('Only the exact one-shot migration backup marker may trigger Production backup on push.');
   }
 }
 
@@ -175,7 +185,12 @@ const requiredRestoreSourceResolverFragments = [
   '(.event == "schedule" or .event == "workflow_dispatch" or .event == "push")',
   '.repository.full_name == env.GITHUB_REPOSITORY',
   "if [[ \"$run_event\" == 'push' ]]",
-  '.github/ops/postgres-backup-frontier-1310.once?ref=$source_sha',
+  '$marker_path?ref=$source_sha',
+  'postgres-backup-frontier-1310.once',
+  'POSTGRES-BACKUP-FRONTIER-1310-V1',
+  'postgres-backup-migration-20261029012948-20261029.once',
+  'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1',
+  'Gate one-shot deployed migration 20261029012948 backup marker',
   '.github/workflows/production-postgres-backup.yml?ref=$source_sha',
   'POSTGRES-BACKUP-FRONTIER-1310-V1',
   'Gate one-shot frontier-1310 backup marker',
