@@ -50,6 +50,7 @@ export default {
     let url;
     try { url = new URL(request.url); }
     catch { return sealedRuntime.fetch(request, env, ctx); }
+    const memberGrantStatusRoute=/^\/api\/memories\/[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}\/grants\/seyeon$/iu.test(url.pathname);
     const receiptRoute=/^\/api\/chat\/delivery-receipts\/[a-f0-9-]+$/u.test(url.pathname);
     const revokeRoute=/^\/api\/memories\/[a-f0-9-]+\/grants\/seyeon\/revoke$/u.test(url.pathname);
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);
@@ -93,6 +94,26 @@ export default {
           {status:503,headers:HEALTH_HEADERS});
       }finally{try{await runtime?.close();}catch{ /* never replace a committed response with private diagnostics */ }}
       }});
+      return withWorkerVersion(response,env);
+    }
+    // Read-only, exact Member/Memory Grant status. No Vercel fallback and
+    // no client-controlled query marker; the shared PostgreSQL authority
+    // confirms both current Subject ownership and active Grant.
+    if (memberGrantStatusRoute && request.method==='GET' && url.search==='' &&
+        approvedCloudflareAuthOriginV1(request,env)!==null) {
+      const response=await executeSecurityObservedRequestV1({
+        request,routeId:'rewrite.seyeon.memory.grant.status',
+        execute:async()=>{
+          try{
+            const {handleCloudflareSeyeonMemberGrantStatusV1}=await import(
+              './seyeon-member-grant-status.mjs');
+            return await handleCloudflareSeyeonMemberGrantStatusV1(request,env);
+          }catch{
+            return Response.json({ok:false,error:{code:'GRANT_STATUS_UNAVAILABLE',retryable:false}},
+              {status:503,headers:HEALTH_HEADERS});
+          }
+        },
+      });
       return withWorkerVersion(response,env);
     }
     // Allow only exact room creation and owner-scoped thread re-read through
