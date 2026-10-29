@@ -46,6 +46,18 @@ begin
   ) then
     raise exception 'Ordinary API executor cannot admit the exact prepared official attempt';
   end if;
+  if not exists (
+    select 1 from public.qry_saju_official_attempt_reconciliation_status_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-4000-8000-000000000001',
+      '12104000-0000-0000-0000-000000000001'
+    ) where execution_attempt_no = 1
+      and attempt_state = 'running'
+      and reading_state = 'running'
+      and is_committed_source = false
+  ) then
+    raise exception 'Current initial purchase cannot observe pending exact attempt';
+  end if;
 end
 $executor_preflight$;
 rollback;

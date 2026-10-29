@@ -53,6 +53,9 @@ SQL
 # Check that only an exact, current initial purchase Grant can expose the
 # stored source lineage to the internal executor. All mutations are rolled back.
 psql -X -v ON_ERROR_STOP=1 -f test/db/saju_official_stored_lineage_pg17.sql >/dev/null
+# Reconciliation observes only the exact current purchase and attempt state;
+# it never opens a transport retry, report body or issuer verification authority.
+psql -X -v ON_ERROR_STOP=1 -f test/db/saju_official_attempt_reconciliation_pg17.sql >/dev/null
 
 npm run build
 node scripts/verify-saju-official-records-http-postgres-e2e.mjs
