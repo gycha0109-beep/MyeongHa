@@ -20,6 +20,7 @@ import {
   type SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
 import { SEYEON_FAST_DIALOGUE_SHADOW_RESPONSE_SCHEMA_V1 } from './seyeon-fast-dialogue-shadow-v1.js';
+import { renderSeyeonC09BoundedKnowledgeShadowV1 } from './seyeon-c09-bounded-knowledge-renderer-shadow-v1.js';
 
 export const SEYEON_C09_CONTINUITY_SHADOW_VERSION_V1 = 'seyeon-c09-continuity-shadow-v1' as const;
 
@@ -185,6 +186,7 @@ async function requireCurrentKnowledgeDecision(input: Readonly<{
   authorityPort: SeyeonC09ContinuityAuthoritySnapshotPortV1 | undefined;
   knowledgePort: SeyeonC09KnowledgeDecisionAuthorityShadowPortV1 | undefined;
   expected?: SeyeonC09KnowledgeDecisionShadowV1 | null;
+  allowRestricted?: boolean;
 }>): Promise<SeyeonC09KnowledgeDecisionShadowV1 | null> {
   if (!input.knowledgePort) return null;
   const fail = () => new SeyeonC09ContinuityShadowErrorV1('C09_KNOWLEDGE_AUTHORITY_MISMATCH');
@@ -232,12 +234,12 @@ async function requireCurrentKnowledgeDecision(input: Readonly<{
     throw fail();
   }
   const decision = raw as unknown as SeyeonC09KnowledgeDecisionShadowV1;
-  if (decision.responsePermission === 'withhold' ||
+  if (!input.allowRestricted && (decision.responsePermission === 'withhold' ||
       decision.responsePermission === 'learn' ||
       (decision.requestKind === 'technical_execution' && decision.responsePermission !== 'normal') ||
       (decision.requestKind === 'technical_execution' &&
        decision.domainPolicy !== 'ambient' &&
-       !['practiced', 'proficient'].includes(decision.characterKnowledgeLevel))) {
+       !['practiced', 'proficient'].includes(decision.characterKnowledgeLevel)))) {
     throw new SeyeonC09ContinuityShadowErrorV1('C09_KNOWLEDGE_RESTRICTED');
   }
   return decision;
@@ -294,6 +296,50 @@ export function createSeyeonC09ContinuityShadowV1(input: Readonly<{
   epistemicAuthorityPort?: SeyeonC09KnowledgeDecisionAuthorityShadowPortV1;
 }>) {
   return Object.freeze({
+    /**
+     * Separate opt-in path for unknown or forbidden specialist knowledge.
+     * No unrestricted candidate provider, free-form technical answer, or
+     * persistence. Existing production/standard evaluate path unchanged.
+     */
+    async evaluateKnowledgeBoundary(context: SeyeonRuntimeContextV2) {
+      requireContext(context);
+      if (!input.epistemicAuthorityPort) {
+        throw new SeyeonC09ContinuityShadowErrorV1('C09_KNOWLEDGE_AUTHORITY_MISMATCH');
+      }
+      const source = await requireCurrentAuthoritySnapshot({
+        context,
+        port: input.authoritySnapshotPort,
+      });
+      const knowledge = await requireCurrentKnowledgeDecision({
+        context,
+        authorityPort: input.authoritySnapshotPort,
+        knowledgePort: input.epistemicAuthorityPort,
+        allowRestricted: true,
+      });
+      if (!knowledge || !['learn', 'withhold'].includes(knowledge.responsePermission)) {
+        throw new SeyeonC09ContinuityShadowErrorV1('C09_KNOWLEDGE_RESTRICTED');
+      }
+      const bounded = renderSeyeonC09BoundedKnowledgeShadowV1({
+        context,
+        knowledge,
+      });
+      for (let i = 0; i < 2; i++) {
+        await requireCurrentAuthoritySnapshot({
+          context,
+          port: input.authoritySnapshotPort,
+          expectedFingerprint: source.grantSetFingerprint,
+          expectedMessageCount: source.fullThreadMessageCount,
+        });
+        await requireCurrentKnowledgeDecision({
+          context,
+          authorityPort: input.authoritySnapshotPort,
+          knowledgePort: input.epistemicAuthorityPort,
+          expected: knowledge,
+          allowRestricted: true,
+        });
+      }
+      return bounded;
+    },
     async evaluate(context: SeyeonRuntimeContextV2) {
       requireContext(context);
       const source = await requireCurrentAuthoritySnapshot({

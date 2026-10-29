@@ -326,3 +326,57 @@ describe('PostgreSQL C09 opt-in Shadow composition', () => {
     expect(review).toHaveBeenCalledOnce();
   });
 });
+
+
+describe('PostgreSQL C09 opt-in governed learning authority wiring', () => {
+  it('binds classified topic evidence to the verified Subject in the existing DB Shadow factory', async () => {
+    const ctx = context();
+    const { scope, query } = fakeScope();
+    const generate = vi.fn(async () => {
+      throw new Error('No unrestricted model generation for bounded knowledge');
+    });
+    const review = vi.fn(async () => {
+      throw new Error('No unrestricted semantic reviewer for source-authored bounded response');
+    });
+    const sourceRead = vi.fn(async (input: unknown) => {
+      expect(input).toEqual({ subjectId: SUBJECT, currentUserMessageId: U3 });
+      return {
+        subjectId: SUBJECT,
+        currentUserMessageId: U3,
+        topicKey: 'python.programming',
+        requestKind: 'technical_execution',
+        asOfTurn: '2026-10-29T06:50:00.000Z',
+      };
+    });
+    const authority = {
+      readServerClassifiedTurn: sourceRead,
+      readAuthoritativeTopicPolicy: vi.fn(async () => ({
+        characterId: 'seyeon' as const,
+        topicKey: 'python.programming',
+        policyVersion: 'synthetic-canon-fixture-v1',
+        authoritySourceRef: 'test:canon-fixture',
+        baseline: 'explicit_unaware' as const,
+        domainPolicy: 'bounded' as const,
+      })),
+      readVerifiedLearningHistory: vi.fn(async () => []),
+      verifyLearningEvidence: vi.fn(async () => {
+        throw new Error('No evidence, verification should not be called');
+      }),
+    };
+    const runner = createPostgresSeyeonC09ContinuityShadowV1({
+      scope, threadId: THREAD, context: ctx,
+      candidateProvider: { providerKey: 'mock', modelKey: 'mock', generate },
+      reviewerProvider: { providerKey: 'mock', modelKey: 'mock', generate: review },
+      approvedLearningAuthority: authority,
+    });
+    const bounded = await runner.evaluateKnowledgeBoundary(ctx);
+    expect(bounded.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
+    expect(bounded.kind).toBe('BOUNDED_EPISTEMIC_RESPONSE');
+    expect(bounded.utterance).toBeTruthy();
+    expect(bounded.memoryWrites).toBe(0);
+    expect(sourceRead).toHaveBeenCalledTimes(3);
+    expect(query.mock.calls).toHaveLength(15);
+    expect(generate).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
+  });
+});

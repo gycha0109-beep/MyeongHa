@@ -17,6 +17,10 @@ import {
   type SeyeonC09ContinuityAuthoritySnapshotPortV1,
 } from './seyeon-c09-continuity-shadow-v1.js';
 import type { SeyeonStructuredProviderPortV2 } from './seyeon-character-runtime-v2.js';
+import {
+  createSeyeonC09EpistemicAuthorityShadowPortV1,
+  type SeyeonC09ApprovedLearningReadAuthorityV1,
+} from './seyeon-c09-epistemic-authority-shadow-v1.js';
 
 export const POSTGRES_SEYEON_C09_CONTINUITY_SHADOW_VERSION_V1 =
   'postgres-seyeon-c09-continuity-shadow-v1' as const;
@@ -218,8 +222,16 @@ export function createPostgresSeyeonC09ContinuityShadowV1(input: Readonly<{
   candidateProvider: SeyeonStructuredProviderPortV2;
   reviewerProvider: SeyeonStructuredProviderPortV2;
   serverOwnedPersonalRecordProjectors?: readonly SeyeonProductionPersonalRecordProjectorV1[];
+  approvedLearningAuthority?: SeyeonC09ApprovedLearningReadAuthorityV1;
 }>) {
+  const subjectId = input.scope.resolvedSubject.subjectId;
   return createSeyeonC09ContinuityShadowV1({
+    ...(input.approvedLearningAuthority === undefined ? {} : {
+      epistemicAuthorityPort: createSeyeonC09EpistemicAuthorityShadowPortV1({
+        subjectId,
+        authority: input.approvedLearningAuthority,
+      }),
+    }),
     candidateProvider: input.candidateProvider,
     reviewerProvider: input.reviewerProvider,
     authoritySnapshotPort: createPostgresSeyeonC09ContinuitySnapshotPortV1({
