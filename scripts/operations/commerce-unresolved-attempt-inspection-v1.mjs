@@ -35,7 +35,8 @@ select
    where environment='production' and status='response_received'
      and missing_verified_receipt) as "productionResponseReceivedWithoutReceipt",
  (select count(*)::text from attempts
-   where environment not in ('sandbox','production') and missing_verified_receipt)
+   where (environment is null or environment not in ('sandbox','production'))
+     and missing_verified_receipt)
      as "unknownEnvironmentWithoutReceipt"
 `.trim();
 
