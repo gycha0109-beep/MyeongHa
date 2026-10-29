@@ -6,6 +6,22 @@ const marker = readFileSync('.github/ops/postgres-restore-backup-39067271230-202
 const verifier = readFileSync('scripts/verify-postgres-isolated-restore-drill-workflow.mjs', 'utf8');
 
 describe('owner-approved single-use current-frontier backup restore', () => {
+  it('requires corrected jq false guard and exact one-shot inventory retry', () => {
+    const markerPath = '.github/ops/postgres-restore-provider-rows-retry-40780751650-20261029.once';
+    expect(readFileSync(markerPath, 'utf8').trim())
+      .toBe('POSTGRES-RESTORE-PROVIDER-ROWS-RETRY-40780751650-20261029-V1');
+    expect(workflow).toContain(markerPath);
+    expect(workflow).toContain('ops(dr): one-shot provider row inventory retry 40780751650');
+    expect(workflow).toContain('incident_reference_utc=2026-10-29T03:05:00Z');
+    expect(workflow).toContain('now - point <= 86400');
+    expect(workflow).toContain('SCOPED_RESTORE_PROVIDER_ROW_RETRY_ONLY');
+    expect(verifier).toContain('triggerMarkers.length !== 6');
+    const harness = readFileSync('scripts/run-postgres-isolated-restore-drill.sh', 'utf8');
+    expect(harness).toContain(
+      "require_report_contract '(.provider_source_counts_include_payloads == false)' 'true'",
+    );
+  });
+
   it('replays existing governed backup once for payload-free provider source-row inventory', () => {
     const providerMarker = '.github/ops/postgres-restore-provider-rows-40780751650-20261029.once';
     expect(readFileSync(providerMarker, 'utf8').trim())
@@ -15,7 +31,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-29T02:18:00Z');
     expect(workflow).toContain('now - point <= 86400');
     expect(workflow).toContain('SCOPED_RESTORE_ROW_INVENTORY_ONLY: exact governed backup 40780751650');
-    expect(verifier).toContain('triggerMarkers.length !== 5');
+    expect(verifier).toContain('triggerMarkers.length !== 6');
     expect(verifier).toContain('POSTGRES-RESTORE-PROVIDER-ROWS-40780751650-20261029-V1');
   });
 
@@ -29,7 +45,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-28T22:37:00Z');
     expect(workflow).toContain('SCOPED_RESTORE_PROOF_ONLY: backup 40780751650; synthetic privacy, no Production writes, no Hosted restore');
     expect(workflow).toContain('now - point <= 86400');
-    expect(verifier).toContain('triggerMarkers.length !== 5');
+    expect(verifier).toContain('triggerMarkers.length !== 6');
     expect(verifier).toContain('backup_run_id=40780751650');
     expect(verifier).toContain('POSTGRES-RESTORE-BACKUP-40780751650-20261029-V1');
   });
@@ -44,7 +60,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-26T00:00:00Z');
     expect(workflow).toContain('now - point <= 86400');
     expect(workflow).toContain('SCOPED_RESTORE_PROOF_ONLY: backup 40232489516; no Production SQL or privacy canary');
-    expect(verifier).toContain('triggerMarkers.length !== 5');
+    expect(verifier).toContain('triggerMarkers.length !== 6');
   });
   it('binds one existing encrypted backup, exact reviewed main commit and 4-hour expiry', () => {
     expect(marker.trim()).toBe('POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1');
@@ -55,7 +71,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('backup_run_id=39067271230');
     expect(workflow).toContain('incident_reference_utc=2026-10-18T08:00:00Z');
     expect(workflow).toContain('now - point <= 14400');
-    expect(verifier).toContain('triggerMarkers.length !== 5');
+    expect(verifier).toContain('triggerMarkers.length !== 6');
   });
 
   it('retains the manual interface and isolates restoration from production SQL', () => {
