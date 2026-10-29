@@ -1,4 +1,5 @@
 import type { SajuDomain } from '../../../packages/contracts/src/index.js';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import { ApiCommandError } from './api-error.js';
 
 export const CHARACTER_STANDARD_READING_ACCESS_AUTHORITY_BINDING_V1 =
@@ -365,13 +366,25 @@ export async function resolveCharacterStandardReadingArtifactAfterAccessV1(
       );
     }
 
+    const snapshot = requireArtifactSnapshot(artifact.responseSnapshotJsonb);
+    // Canonical Production v2 immutable snapshots are content addressed.
+    // Check the exact saved bytes again before they can reach the Character
+    // protected context. Historical, noncanonical hashes retain the existing
+    // separately governed Reader access policy until source migration.
+    if (access.readingContractVersion === 'myeonghwa-product-reading-response-v2'
+      && /^sha256:v1:[a-f0-9]{64}$/u.test(access.responseHash)
+      && 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot)
+        !== access.responseHash) {
+      throw new Error('Official Reading Reader source response hash mismatch.');
+    }
+
     const { effectiveAt: _effectiveAt, ...sourceMetadata } = access;
     return Object.freeze({
       ...sourceMetadata,
       productResponseState: requireStoredString(
         'Product response state', artifact.productResponseState,
       ),
-      responseSnapshotJsonb: requireArtifactSnapshot(artifact.responseSnapshotJsonb),
+      responseSnapshotJsonb: snapshot,
       completedAt: requireTimestamp('completedAt', artifact.completedAt),
     });
   } catch (error) {

@@ -87,6 +87,7 @@ function fixtures(options: {
   threadReader?: string;
   threadParticipants?: string[];
   accessRows?: CharacterStandardReadingAccessAuthorityRowV1[];
+  accessAfterArtifact?: CharacterStandardReadingAccessAuthorityRowV1[] | 'throw';
   artifactRows?: CharacterStandardReadingArtifactAuthorityRowV1[];
   policy?: ProductReaderRuleLookupV1;
   policyAfterArtifact?: ProductReaderRuleLookupV1 | 'throw';
@@ -99,6 +100,7 @@ function fixtures(options: {
   const events: string[] = [];
   let threadReadCount = 0;
   let policyReadCount = 0;
+  let accessReadCount = 0;
   const readRuntimeBinding = vi.fn(async (_input: { subjectId: string; threadId: string }) => {
     events.push('thread');
     threadReadCount += 1;
@@ -116,6 +118,12 @@ function fixtures(options: {
     subjectId: string; readerCharacterId: string; effectiveAt: string;
   }) => {
     events.push('access');
+    accessReadCount += 1;
+    if (accessReadCount > 1) {
+      const current = options.accessAfterArtifact;
+      if (current === 'throw') throw new Error('Reader Grant authority unavailable');
+      if (current !== undefined) return current;
+    }
     return options.accessRows ?? [accessRow(reader)];
   });
   const readApprovedRule = vi.fn(async (_input: Parameters<
@@ -170,8 +178,9 @@ describe('A2-beta server-only Reading × Reader admission', () => {
   it('enforces thread -> Reader Grant -> policy -> artifact -> thread + unchanged policy recheck', async () => {
     const f = fixtures();
     const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
-    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy', 'access']);
     expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
+    expect(f.readAccessibleReadings).toHaveBeenCalledTimes(2);
     expect(f.readAccessibleReadings).toHaveBeenCalledWith({
       subjectId: SUBJECT, readerCharacterId: 'seyeon', effectiveAt: TIME,
     });
@@ -284,7 +293,28 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
     expect(result.scope.productRuleVersion).toBe('synthetic-premium-rule');
     expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
-    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy', 'access']);
+  });
+
+  it.each([
+    { label: 'refunded initial Reader access', after: [] },
+    { label: 'another Reader still has a separate grant', after: [accessRow('baekheon')] },
+    { label: 'stored official response was replaced', after: [{
+      ...accessRow(), responseHash: 'sha256:v1:changed-source',
+    }] },
+    { label: 'Reader content bundle changed', after: [{
+      ...accessRow(), readerContentBundleId: 'other-content-bundle',
+    }] },
+    { label: 'current purchase authority is unavailable', after: 'throw' as const },
+  ])('refuses to mint a Reader admission when $label after fetching the official artifact', async ({ after }) => {
+    const f = fixtures({ accessAfterArtifact: after });
+    await expect(prepareOfficialReadingReaderAdmissionV1(f.input))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(f.events).toEqual([
+      'thread', 'access', 'policy', 'artifact', 'thread', 'policy', 'access',
+    ]);
+    expect(f.readAccessibleReadings).toHaveBeenCalledTimes(2);
+    expect(f.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
   it.each([

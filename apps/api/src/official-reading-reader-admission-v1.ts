@@ -11,6 +11,7 @@ import {
   type CharacterStandardReadingAccessAuthorityPortV1,
   type CharacterStandardReadingArtifactAuthorityPortV1,
   type CharacterStandardReadingKnowledgeSourceV1,
+  type CharacterStandardReadingAccessMetadataV1,
 } from './character-standard-reading-knowledge.js';
 import {
   resolveProductReaderEligibilityV1,
@@ -129,6 +130,29 @@ function sameBinding(
     first.participantCharacterIds[0] === second.participantCharacterIds[0];
 }
 
+function sameReaderAccess(
+  before: CharacterStandardReadingAccessMetadataV1,
+  after: CharacterStandardReadingAccessMetadataV1,
+): boolean {
+  return before.subjectId === after.subjectId
+    && before.readingId === after.readingId
+    && before.readingSessionId === after.readingSessionId
+    && before.readerCharacterId === after.readerCharacterId
+    && before.readerContentBundleId === after.readerContentBundleId
+    && before.productId === after.productId
+    && before.productSpecVersion === after.productSpecVersion
+    && before.topicKey === after.topicKey
+    && before.sajuDomain === after.sajuDomain
+    && before.readingPeriod === after.readingPeriod
+    && before.readingVariant === after.readingVariant
+    && before.sourceBirthRevisionId === after.sourceBirthRevisionId
+    && before.domainCapabilityVersion === after.domainCapabilityVersion
+    && before.readingContractVersion === after.readingContractVersion
+    && before.sajuEngineVersion === after.sajuEngineVersion
+    && before.responseHash === after.responseHash
+    && before.effectiveAt === after.effectiveAt;
+}
+
 /**
  * Dormant, server-only A2-beta composer. Policy is checked AFTER the exact DB
  * purchase-backed Reader access and BEFORE raw official artifact access.
@@ -218,6 +242,26 @@ export async function prepareOfficialReadingReaderAdmissionV1(
       latestEligibility.approvedPolicyRevision !== eligibility.approvedPolicyRevision) {
     return deny('POLICY_HOLD');
   }
+
+  // The raw artifact read and Product policy check can outlive the initial
+  // Reader Grant. A refund/revoke or a different Reader purchase may change
+  // the exact entitlement while this internal admission is being assembled.
+  // Recheck the same Reader, Reading, bundle and hash BEFORE issuing a ticket.
+  // This is NOT the final disclosure/AI-context transaction lock.
+  let currentAccess: CharacterStandardReadingAccessMetadataV1;
+  try {
+    currentAccess = await resolveCharacterStandardReadingAccessMetadataV1({
+      resolvedSubjectId: access.subjectId,
+      readerCharacterId,
+      readingId: access.readingId,
+      effectiveAt: access.effectiveAt,
+      expectedReaderContentBundleId: thread.activeContentBundleId,
+      accessAuthorityPort: input.accessAuthorityPort,
+    });
+  } catch {
+    return deny('ACCESS_DENIED');
+  }
+  if (!sameReaderAccess(access, currentAccess)) return deny('ACCESS_DENIED');
 
   const scope = Object.freeze({
     subjectId: access.subjectId,
