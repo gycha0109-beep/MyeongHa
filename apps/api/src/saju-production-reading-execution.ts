@@ -122,9 +122,12 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // The existing current Saju proof endpoint only emits Preview/HELD.
   // Never charge an upstream call without a wired Production issuer + DB scope.
   const { sourceVerifier, mappingVerifier, attemptPrepare, preflight, dbTransaction } = input;
+  const hasBeforeSourceAuthority = attemptPrepare === undefined
+    ? typeof preflight?.admitBeforeSourceCall === 'function'
+    : typeof attemptPrepare.prepareBeforeSourceCall === 'function';
   if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
     || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
-    || typeof preflight?.admitBeforeSourceCall !== 'function'
+    || !hasBeforeSourceAuthority
     || typeof dbTransaction?.run !== 'function') {
     return unavailable;
   }
@@ -151,6 +154,12 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     });
   }
 
+  // Validate the exact request BEFORE a paid attempt is allocated. Invalid
+  // text must never strand a newly allocated running DB attempt.
+  const executedRequest = buildSajuProductionReadingRequestV1({
+    birthRevision: birth,
+    readingText: input.readingText,
+  });
   const exactAttempt = {
     subjectId: input.subjectId,
     readingId: input.readingId,
@@ -158,33 +167,21 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     executionAttemptId: input.executionAttemptId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
   };
-  // On a new issuance or explicit retry, prepare the DB attempt atomically
-  // with its purchased initial Reader grant. A replayed attempt must not issue
-  // another network request. Pre-existing trusted attempts use preflight only.
-  if (attemptPrepare !== undefined) {
-    if (typeof attemptPrepare.prepareBeforeSourceCall !== 'function'
-      || await attemptPrepare.prepareBeforeSourceCall(exactAttempt) !== true) {
-      return Object.freeze({ ...unavailable, reason: 'current_authority_unavailable' as const });
-    }
-  }
 
-  // Recheck current rights in a separate short transaction before Saju.
-  // The final immutable transaction repeats the same exact Grant check.
-  const admittedBeforeSource = await preflight.admitBeforeSourceCall(exactAttempt);
+  // A NEW attempt is allocated together with its exact current entitlement
+  // under one DB transaction. A separate post-allocation preflight could
+  // reject after the attempt committed and strand it in 'running'.
+  // Already-prepared trusted attempts use the standalone read-only preflight.
+  const admittedBeforeSource = attemptPrepare === undefined
+    ? await preflight?.admitBeforeSourceCall(exactAttempt)
+    : typeof attemptPrepare.prepareBeforeSourceCall === 'function'
+      && await attemptPrepare.prepareBeforeSourceCall(exactAttempt) === true;
   if (admittedBeforeSource !== true) {
     return Object.freeze({ ...unavailable, reason: 'current_authority_unavailable' as const });
   }
 
-  // Build once from the authenticated Birth revision, then pass the exact
-  // executed request to the Saju issuer proof verifier. Do not reconstruct
-  // a request digest from browser data or a later Birth profile.
-  const executedRequest = buildSajuProductionReadingRequestV1({
-    birthRevision: birth,
-    readingText: input.readingText,
-    ...(input.targetPersonRef === undefined
-      ? {}
-      : { targetPersonRef: input.targetPersonRef }),
-  });
+  // The immutable finalize transaction independently rechecks the grant,
+  // current Birth and issuer provenance before any report can be stored.
   const response = await input.adapter.requestReading(executedRequest);
   return dbTransaction.run({
     subjectId: input.subjectId,

@@ -408,6 +408,44 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
   });
 
+  it('rejects malformed Saju request text before creating a paid transport attempt', async () => {
+    for (const readingText of ['', ' '.repeat(5), 'x'.repeat(201)]) {
+      const p = ports();
+      const attemptPrepare = { prepareBeforeSourceCall: vi.fn(async () => true) };
+      const requestReading = vi.fn(async () => native);
+      const dbTransaction = { run: vi.fn() };
+      await expect(executeAndPersistCurrentBirthSajuOfficialReadingV1({
+        profile: profileFixture(),
+        readingText,
+        adapter: { requestReading },
+        subjectId, readingId, readingSessionId, executionAttemptId,
+        outboxEventId, sourceBirthRevisionId,
+        attemptPrepare, sourceVerifier: p.sourceVerifier,
+        mappingVerifier: p.mappingVerifier,
+        preflight: p.preflight, dbTransaction,
+      })).rejects.toMatchObject({ code: 'INVALID_READING_REQUEST' });
+      expect(attemptPrepare.prepareBeforeSourceCall).not.toHaveBeenCalled();
+      expect(p.preflight.admitBeforeSourceCall).not.toHaveBeenCalled();
+      expect(requestReading).not.toHaveBeenCalled();
+      expect(dbTransaction.run).not.toHaveBeenCalled();
+    }
+  });
+
+  it('rejects invalid Saju text before consulting an already prepared attempt', async () => {
+    const p = ports();
+    const requestReading = vi.fn(async () => native);
+    await expect(executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(), readingText: '',
+      adapter: { requestReading },
+      subjectId, readingId, readingSessionId, executionAttemptId,
+      outboxEventId, sourceBirthRevisionId,
+      sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+      preflight: p.preflight, dbTransaction: { run: vi.fn() },
+    })).rejects.toMatchObject({ code: 'INVALID_READING_REQUEST' });
+    expect(p.preflight.admitBeforeSourceCall).not.toHaveBeenCalled();
+    expect(requestReading).not.toHaveBeenCalled();
+  });
+
   it('stops before Saju and DB finalization if the paid attempt cannot be newly prepared', async () => {
     const p = ports();
     const order: string[] = [];
@@ -434,7 +472,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(dbTransaction.run).not.toHaveBeenCalled();
   });
 
-  it('prepares a new attempt before current grant recheck and Saju source transport', async () => {
+  it('atomically prepares the new paid attempt once before Saju, without a second dangling-attempt risk', async () => {
     const p = ports();
     const order: string[] = [];
     const attemptPrepare = { prepareBeforeSourceCall: vi.fn(async () => {
@@ -458,10 +496,51 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       preflight: p.preflight, dbTransaction,
     });
     expect(output).toMatchObject({ state: 'committed', readingId });
-    expect(order).toEqual(['prepare', 'preflight', 'saju', 'commit']);
+    expect(order).toEqual(['prepare', 'saju', 'commit']);
+    expect(p.preflight.admitBeforeSourceCall).not.toHaveBeenCalled();
     expect(attemptPrepare.prepareBeforeSourceCall).toHaveBeenCalledWith({
       subjectId, readingId, readingSessionId, executionAttemptId, sourceBirthRevisionId,
     });
+  });
+
+  it('accepts the atomic purchased-attempt check without requiring a redundant preflight', async () => {
+    const p = ports();
+    const attemptPrepare = { prepareBeforeSourceCall: vi.fn(async () => true) };
+    const requestReading = vi.fn(async () => native);
+    const dbTransaction = { run: vi.fn(async (
+      args: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0],
+    ) => args.commit({ currentAuthority: p.currentAuthority, commitPort: p.commitPort })) };
+    const output = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(), readingText: 'general natal',
+      adapter: { requestReading },
+      subjectId, readingId, readingSessionId, executionAttemptId,
+      outboxEventId, sourceBirthRevisionId,
+      attemptPrepare, sourceVerifier: p.sourceVerifier,
+      mappingVerifier: p.mappingVerifier, dbTransaction,
+    });
+    expect(output).toMatchObject({ state: 'committed', readingId });
+    expect(attemptPrepare.prepareBeforeSourceCall).toHaveBeenCalledTimes(1);
+    expect(requestReading).toHaveBeenCalledTimes(1);
+  });
+
+  it('requires one real before-source authority even when all other issuer ports exist', async () => {
+    const p = ports();
+    const requestReading = vi.fn(async () => native);
+    const dbTransaction = { run: vi.fn() };
+    const output = await executeAndPersistCurrentBirthSajuOfficialReadingV1({
+      profile: profileFixture(), readingText: 'general natal',
+      adapter: { requestReading },
+      subjectId, readingId, readingSessionId, executionAttemptId,
+      outboxEventId, sourceBirthRevisionId,
+      sourceVerifier: p.sourceVerifier, mappingVerifier: p.mappingVerifier,
+      dbTransaction,
+    });
+    expect(output).toMatchObject({
+      state: 'held', reason: 'production_source_unverified',
+      canDisclose: false, canSell: false,
+    });
+    expect(requestReading).not.toHaveBeenCalled();
+    expect(dbTransaction.run).not.toHaveBeenCalled();
   });
 
   it('does not contact Production Saju if the exact current purchase admission is denied', async () => {
