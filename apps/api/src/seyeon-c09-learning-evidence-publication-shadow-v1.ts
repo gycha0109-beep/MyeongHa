@@ -44,6 +44,13 @@ export interface SeyeonC09LearningPublicationSourceAuthorityV1 {
     subjectId: string;
     evidenceId: string;
   }>): Promise<unknown>;
+  /** Live consent status, independently read from the source owner's approval ledger. */
+  readCurrentSharingConsent(input: Readonly<{
+    subjectId: string;
+    sourceRef: string;
+    sharingConsentRef: string;
+    topicKey: string;
+  }>): Promise<unknown>;
 }
 
 export interface SeyeonC09ApprovedLearningPublicationReceiptV1 {
@@ -97,6 +104,36 @@ export const SEYEON_C09_LEARNING_REVOKE_SQL_SHADOW_V1 = [
   'returning id::text as "evidenceId"',
 ].join('\n');
 
+async function requireCurrentSharingConsent(input: Readonly<{
+  authority: SeyeonC09LearningPublicationSourceAuthorityV1;
+  receipt: SeyeonC09ApprovedLearningPublicationReceiptV1;
+  expected?: string;
+}>): Promise<string> {
+  const r = input.receipt;
+  if (r.visibility !== 'character_shared') return '';
+  let raw: unknown;
+  try {
+    raw = await input.authority.readCurrentSharingConsent({
+      subjectId: r.subjectId,
+      sourceRef: r.sourceRef,
+      sharingConsentRef: r.sharingConsentRef!,
+      topicKey: r.topicKey,
+    });
+  } catch { return fail(); }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) fail();
+  const c = raw as Record<string, unknown>;
+  if (Object.keys(c).length !== 7 ||
+      c.subjectId !== r.subjectId || c.sourceRef !== r.sourceRef ||
+      c.sharingConsentRef !== r.sharingConsentRef ||
+      c.topicKey !== r.topicKey || c.status !== 'active' ||
+      !Number.isSafeInteger(c.revision) || (c.revision as number) < 1 ||
+      !time(c.verifiedAt) ||
+      Date.parse(c.verifiedAt as string) > Date.parse(r.verifiedAt)) fail();
+  const fingerprint = JSON.stringify(c);
+  if (input.expected !== undefined && input.expected !== fingerprint) fail();
+  return fingerprint;
+}
+
 function requireReceipt(value: unknown, subjectId: string, sourceRef: string):
   SeyeonC09ApprovedLearningPublicationReceiptV1 {
   if (!value || typeof value !== 'object' || Array.isArray(value)) fail();
@@ -137,7 +174,8 @@ export function createSeyeonC09LearningPublicationPlannerShadowV1(input: Readonl
 }>) {
   if (!UUID.test(input?.subjectId ?? '') ||
       typeof input.sourceAuthority?.readApprovedPublication !== 'function' ||
-      typeof input.sourceAuthority?.readApprovedRevocation !== 'function') fail();
+      typeof input.sourceAuthority?.readApprovedRevocation !== 'function' ||
+      typeof input.sourceAuthority?.readCurrentSharingConsent !== 'function') fail();
 
   const subjectId = input.subjectId;
   return Object.freeze({
@@ -148,6 +186,13 @@ export function createSeyeonC09LearningPublicationPlannerShadowV1(input: Readonl
         received = await input.sourceAuthority.readApprovedPublication({ subjectId, sourceRef: request.sourceRef });
       } catch { return fail(); }
       const r = requireReceipt(received, subjectId, request.sourceRef);
+      const consentSnapshot = await requireCurrentSharingConsent({ authority: input.sourceAuthority, receipt: r });
+      let latest: unknown;
+      try {
+        latest = await input.sourceAuthority.readApprovedPublication({ subjectId, sourceRef: request.sourceRef });
+      } catch { return fail(); }
+      if (JSON.stringify(latest) !== JSON.stringify(received)) fail();
+      await requireCurrentSharingConsent({ authority: input.sourceAuthority, receipt: r, expected: consentSnapshot });
       const issueId = randomUUID();
       return Object.freeze({
         version: SEYEON_C09_LEARNING_PUBLICATION_SHADOW_VERSION_V1,
@@ -182,6 +227,11 @@ export function createSeyeonC09LearningPublicationPlannerShadowV1(input: Readonl
           proof.subjectId !== subjectId || proof.evidenceId !== request.evidenceId ||
           proof.characterId !== 'seyeon' || proof.revocationApproved !== true ||
           !stringRef(proof.authorityRef) || !time(proof.revokedAt)) fail();
+      let current: unknown;
+      try {
+        current = await input.sourceAuthority.readApprovedRevocation({ subjectId, evidenceId: request.evidenceId });
+      } catch { return fail(); }
+      if (JSON.stringify(current) !== JSON.stringify(raw)) fail();
       return Object.freeze({
         version: SEYEON_C09_LEARNING_PUBLICATION_SHADOW_VERSION_V1,
         scope: 'PROPOSAL_SQL_ONLY_NO_EXECUTION' as const,

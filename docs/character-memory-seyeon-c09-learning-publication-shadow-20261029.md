@@ -36,3 +36,13 @@
 4. 같은 승인 참조의 동의 철회·변경을 즉시 반영하는 신뢰 가능한 별도 Consent 원장/Revocation 조회는 추가 구현해야 합니다. 현재 Reference 존재 여부만으로 철회까지 증명하지 않습니다.
 
 **다음:** 실제 canonical Subject/Consent/Approved Source 읽기 계층을 연결하고, 권한 승인 이후 격리 DB의 실행 트랜잭션과 운영 통합을 검증합니다.
+
+## 현재 공유 동의 재검증 강화 (2026-10-29)
+
+- `seyeon-c09-learning-evidence-publication-shadow-v1.ts`의 Source Authority에 `readCurrentSharingConsent` 서버 조회 계약 추가.
+- 발행 전 공유 동의의 `subjectId / sourceRef / sharingConsentRef / topicKey / active status / revision / verifiedAt`가 원본 승인과 맞는지 확인합니다.
+- 승인 원본을 두 번 읽고 동의 활성 상태도 두 번 조회합니다. 중간에 동의 철회, revision 변화, 다른 사용자의 동의 혼입, 원본 승인 변경이 관찰되면 SQL 계획을 폐기합니다. 개인 범위 학습에는 공유 동의를 잘못 요구하지 않습니다.
+- 철회 승인 원본 역시 두 번 조회하고 바뀌면 철회 계획을 폐기합니다.
+- 운영 명하 Supabase에 대하여 **읽기 전용 카탈로그**를 조회한 결과, 현재 확인 가능한 스키마 범위에는 별도의 캐릭터 공통 학습 공유 동의·승인 원장이 존재하지 않습니다. 기존 `memory_items`는 이 원장의 대체물이 아닙니다. 서버용 `readCurrentSharingConsent`의 **실제 Production DB 구현은 아직 없습니다**.
+- 로컬 `tsc -p tsconfig.build.json --noEmit` PASS 및 C09 관련 Vitest 8파일 **72/72 PASS**. 해당 건은 원본 Authority를 모의한 테스트이며 Production RLS/권한 실측이 아닙니다.
+- 체크는 실행 직전 원자적 권한 증명이 아닙니다. 실제 발행·철회 트랜잭션의 최종 승인 검증, 동시성 잠금/Commit Gate, 감사 이벤트 및 사용자 동의 철회 효력은 기존 DB Migration/RLS 별도 승인 이후 실제 서버 Authority에 연결해야 합니다.
