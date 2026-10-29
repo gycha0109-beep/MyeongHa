@@ -198,8 +198,16 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
         if (line === '\\.') {
           if (copyBlock.replay) output.write('\\.\n');
           copyBlock = null;
-        } else if (copyBlock.replay) {
-          output.write(`${copyBlock.mode === 'project' ? projectCopyRow(line, copyBlock) : line}\n`);
+        } else {
+          for (const entry of copyBlock.providerEvidence ?? []) {
+            if (entry.source_row_count >= Number.MAX_SAFE_INTEGER) {
+              throw new Error('Provider COPY row counter overflow');
+            }
+            entry.source_row_count += 1;
+          }
+          if (copyBlock.replay) {
+            output.write(`${copyBlock.mode === 'project' ? projectCopyRow(line, copyBlock) : line}\n`);
+          }
         }
         continue;
       }
@@ -220,50 +228,64 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
       }
 
       if (compatibility.mode === 'skip') {
-        skipped.push({
+        const omitted = {
           schema: copy.schema,
           table: copy.table,
           reason: compatibility.reason,
           unsupported_source_columns: compatibility.unsupportedSourceColumns,
           required_target_columns: compatibility.requiredTargetColumns,
-        });
-        copyBlock = { replay: false, mode: 'skip', relation };
+          source_row_count: 0,
+        };
+        skipped.push(omitted);
+        copyBlock = {
+          replay: false,
+          mode: 'skip',
+          relation,
+          providerEvidence: applicationOwned ? [] : [omitted],
+        };
         continue;
       }
 
+      let projectedEntry = null;
       if (compatibility.mode === 'project') {
-        projected.push({
+        projectedEntry = {
           schema: copy.schema,
           table: copy.table,
           reason: compatibility.reason,
           dropped_source_columns: compatibility.unsupportedSourceColumns,
           replayed_columns: compatibility.replayColumns,
-        });
+          source_row_count: 0,
+        };
+        projected.push(projectedEntry);
         output.write(`${buildCopyHeader(copy, compatibility.replayColumns)}\n`);
       } else {
         output.write(`${line}\n`);
       }
 
+      let replayedProviderEntry = null;
+      replayedCopyBlocks += 1;
+      if (applicationOwned) {
+        replayedApplication.add(relation);
+      } else {
+        replayedProvider.add(relation);
+        replayedProviderEntry = {
+          schema: copy.schema,
+          table: copy.table,
+          mode: compatibility.mode,
+          replayed_columns: compatibility.replayColumns,
+          dropped_source_columns: compatibility.unsupportedSourceColumns,
+          source_row_count: 0,
+        };
+        replayedProviderBlocks.push(replayedProviderEntry);
+      }
       copyBlock = {
         replay: true,
         mode: compatibility.mode,
         relation,
         sourceColumnCount: copy.columns.length,
         replayColumnIndexes: compatibility.replayColumnIndexes,
+        providerEvidence: [projectedEntry, replayedProviderEntry].filter(Boolean),
       };
-      replayedCopyBlocks += 1;
-      if (applicationOwned) {
-        replayedApplication.add(relation);
-      } else {
-        replayedProvider.add(relation);
-        replayedProviderBlocks.push({
-          schema: copy.schema,
-          table: copy.table,
-          mode: compatibility.mode,
-          replayed_columns: compatibility.replayColumns,
-          dropped_source_columns: compatibility.unsupportedSourceColumns,
-        });
-      }
     }
 
     if (copyBlock) throw new Error(`COPY block missing terminator: ${copyBlock.relation}`);
@@ -286,6 +308,13 @@ export async function transformPortableDataReplay({ inputPath, outputPath, targe
     replayed_provider_copy_blocks: replayedProviderBlocks,
     projected_provider_copy_blocks: projected,
     skipped_provider_copy_blocks: skipped,
+    provider_rows_skipped_in_loopback: skipped.reduce((total, row) =>
+      total + row.source_row_count, 0),
+    provider_rows_with_projected_columns_in_loopback: projected.reduce((total, row) =>
+      total + row.source_row_count, 0),
+    provider_rows_replayed_in_loopback: replayedProviderBlocks.reduce((total, row) =>
+      total + row.source_row_count, 0),
+    provider_source_counts_include_payloads: false,
   };
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { mode: 0o600 });
   return report;
