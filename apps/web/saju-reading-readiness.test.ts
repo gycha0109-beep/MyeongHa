@@ -19,6 +19,7 @@ describe('Saju hub target product discovery', () => {
 
   it('keeps full product discovery and report structure, independent of runtime activation gates', () => {
     expect(html).toContain('사주 해석 상품');
+    expect(html).toContain('const sajuProductTopics = [');
     for (const topic of [
       '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
       '사업', '가족', '삶의 단계', '올해', '이번 달',
@@ -26,7 +27,7 @@ describe('Saju hub target product discovery', () => {
     ]) {
       expect(html).toContain(topic);
     }
-    expect(html).toContain('allProductTopics.map((topic) => {');
+    expect(html).toContain('sajuProductTopics.map((topic) => {');
     expect(html).toContain('className="saju-design-product-card"');
     expect(html).not.toContain('다른 사주 주제 둘러보기');
     expect(html).toContain("availability.kind === 'preview'");
