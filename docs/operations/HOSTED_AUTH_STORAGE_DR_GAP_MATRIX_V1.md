@@ -4,6 +4,43 @@
 > Classification: **read-only inventory and actionable recovery acceptance boundary**, not a claim of recovered Hosted services.
 > Authority: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`, `docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md`, immutable selected restore logs/evidence, and Supabase provider documentation.
 
+## 2026-10-29 — current migration-matched PostgreSQL restore and missing row-level evidence
+
+[Isolated PostgreSQL 17 restore #40799522511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40799522511)
+has since **succeeded** on governed encrypted backup #40780751650 at
+`migration_frontier=20261028011357`, equal to the read-only observed
+Production migration version on 2026-10-29. Evidence artifact #12865611458
+includes an isolated restore, synthetic privacy exercise and
+`recovered-serving-admission.json` with `gate=BLOCKED`. This newer
+restore did **not** replay the earlier Production nonzero privacy event
+ledger; the captured-window authoritative example below remains historical.
+
+**New evidence capture implementation:** the portable data replay's
+provider-managed `COPY` classifications now count **actual input rows**
+without recording any row values. Each skipped/provider-projected/provider-
+replayed block includes `source_row_count`; the protected restore envelope
+also records `provider_rows_skipped_in_loopback`,
+`provider_rows_with_projected_columns_in_loopback` and
+`provider_rows_replayed_in_loopback`, plus
+`provider_source_counts_include_payloads=false`. Counts are measured from
+the actual decrypted source `COPY` stream **on the isolated runner**, not
+from live Production or a guessed previous schema inventory.
+
+The already-successful run #40799522511 **predates this implementation**,
+so it does *not* yet prove these new row-count fields. They require a
+subsequent separately verified isolated restore run. A skipped nonzero
+source-row count would quantify rows the pinned loopback target could not
+accept; a zero source-row count does **not** prove Hosted service Auth
+configuration, session validity, or Storage object bytes are recoverable.
+Likewise, projected row counts record rows with omitted provider-specific
+columns, not lost ciphertext or a proven ability to reconstruct those
+columns. The encrypted governed backup itself is not modified.
+
+**Admission remains blocked:** provider-managed row counts are diagnosis
+only; no Hosted GoTrue/Storage restoration, private file download, real
+incident-time privacy reconciliation or S8 cutover is implied.
+`provider_managed_data_full_restore=false` and `dr_ready=false`.
+
 ## 1. Scope and direct observations
 
 Protected isolated PostgreSQL 17 restore **SUCCESS** `40655447574`, artifact `12801666793`, from governed backup `40468157715` at migration `20261027043527`. The selected privacy ledger `40468500587` and completed-canary read-only attestation `40633679630` passed bounded authoritative replay. The original canary `40468086758` remains FAILURE, and this evidence does not cover Production's subsequently observed migration version `20261028011357`.
