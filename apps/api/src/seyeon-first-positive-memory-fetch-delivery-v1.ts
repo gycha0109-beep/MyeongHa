@@ -114,7 +114,10 @@ export async function handleSeyeonPositiveReplyReceiptV1(input: Readonly<{
   if(input.request.method!=='POST')return new Response(null,{status:405,
     headers:{Allow:'POST','Cache-Control':'no-store'}});
   if(input.request.headers.get('content-type')?.split(';')[0]?.trim()!=='application/json')return fail(400);
-  const reader=input.request.body?.getReader();
+  // A locked or otherwise unreadable request stream is invalid input, not
+  // an unhandled Worker failure. No Subject DB call is allowed on this path.
+  let reader:ReadableStreamDefaultReader<Uint8Array>|undefined;
+  try{reader=input.request.body?.getReader();}catch{return fail(400);}
   if(!reader)return fail(400);
   let timer:ReturnType<typeof setTimeout>|undefined;
   const deadline=new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(Error('Body deadline')),1000);});
@@ -128,7 +131,10 @@ export async function handleSeyeonPositiveReplyReceiptV1(input: Readonly<{
     data=JSON.parse(new TextDecoder().decode(body));
   }catch{return fail(400);}finally{
     if(timer!==undefined)clearTimeout(timer);
-    void reader.cancel().catch(()=>undefined);reader.releaseLock();
+    // Cleanup is best effort: throwing cancel/release implementations must not
+    // replace the safe rejection or turn a valid proof into a raw HTTP error.
+    try{void reader.cancel().catch(()=>undefined);}catch{}
+    try{reader.releaseLock();}catch{}
   }
   if(typeof data!=='object'||data===null||Array.isArray(data)||
      Object.keys(data).length!==1||!('proof'in data)||typeof data.proof!=='string'||
