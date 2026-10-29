@@ -63,6 +63,8 @@ describe('Records S0 owner withdrawal lifecycle',()=>{
     expect(page).toContain("result.grantState === 'withdrawal_pending'");
     expect(page).toContain("result.grantState === 'not_granted'");
     expect(page).toContain("result.grantState === 'unknown'");
-    expect(page).toContain("revoke.hidden = result.grantState !== 'active'");
+    expect(page).toContain("presentSeyeonMemoryGrantStatusV1(");
+    expect(page).toContain("lastGrantState !== 'active'");
+    expect(page).toContain("revoke.hidden = !view.revokeAvailable");
   });
 });

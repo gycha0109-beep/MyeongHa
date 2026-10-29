@@ -157,12 +157,15 @@ if (onSection.includes('push:')) {
   const freshBackupApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-40780751650-20261029.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved) {
-    throw new Error('Restore one-shot push must have exactly the four reviewed historical/current source markers.');
+  const providerRowsApproved = onSection.includes(
+    "'.github/ops/postgres-restore-provider-rows-40780751650-20261029.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved) {
+    throw new Error('Restore one-shot push must have exactly the five reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 4) {
-    throw new Error('Restore one-shot push allows exactly four pinned marker paths.');
+  if (triggerMarkers.length !== 5) {
+    throw new Error('Restore one-shot push allows exactly five pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -184,6 +187,10 @@ if (onSection.includes('push:')) {
     'POSTGRES-RESTORE-BACKUP-40780751650-20261029-V1',
     'backup_run_id=40780751650',
     'incident_reference_utc=2026-10-28T22:37:00Z',
+    'ops(dr): one-shot provider row inventory 40780751650',
+    'POSTGRES-RESTORE-PROVIDER-ROWS-40780751650-20261029-V1',
+    'incident_reference_utc=2026-10-29T02:18:00Z',
+    'SCOPED_RESTORE_ROW_INVENTORY_ONLY',
     'now - point <= 86400',
     'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',

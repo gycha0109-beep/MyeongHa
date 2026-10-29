@@ -3,6 +3,7 @@ import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
+import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
@@ -460,22 +461,20 @@ function renderMemories(payload, subjectKind) {
       revoke.hidden = true;
       let withdrawalPending = false;
       let requestInFlight = false;
+      let lastGrantState = 'unknown';
       async function refreshGrant() {
         const result = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
-        const inconsistent = withdrawalPending && result.grantState === 'active';
-        withdrawalPending = result.grantState === 'withdrawal_pending'
-          || (withdrawalPending && result.grantState === 'unknown');
+        // Only the owner-scoped DB lifecycle (not a filtered active Grant
+        // read or volatile UI flag) can resolve a durable pending withdrawal.
+        lastGrantState = result.grantState;
+        if (result.grantState === 'withdrawal_pending') withdrawalPending = true;
+        if (result.grantState === 'not_granted') withdrawalPending = false;
         if (item.isConnected) {
-          status.textContent = uiText(inconsistent
-            ? '철회 대기와 현재 접근권한 정보가 일치하지 않습니다. 확인할 수 없습니다.'
-            : result.grantState === 'not_granted'
-              ? '현재 세연의 접근권한이 없습니다.'
-              : result.grantState === 'withdrawal_pending'
-                ? '새로운 기억 사용은 차단됐으며, 이전 답변 수신 확인 후 철회 완료를 기다리고 있습니다.'
-                : result.grantState === 'unknown'
-                  ? '현재 사용할 수 있는 권한은 확인되지 않았으나, 철회 완료 여부는 확인할 수 없습니다.'
-                  : '현재 세연의 접근이 허용되어 있습니다.');
-          revoke.hidden = result.grantState !== 'active' || withdrawalPending || inconsistent;
+          const view = presentSeyeonMemoryGrantStatusV1(
+            result.grantState, withdrawalPending,
+          );
+          status.textContent = uiText(view.message);
+          revoke.hidden = !view.revokeAvailable;
         }
         return result;
       }
@@ -495,7 +494,7 @@ function renderMemories(payload, subjectKind) {
         }
       });
       revoke.addEventListener('click', async () => {
-        if (requestInFlight || withdrawalPending) return;
+        if (requestInFlight || withdrawalPending || lastGrantState !== 'active') return;
         if (!window.confirm(uiText('세연의 이 기억 접근권한을 철회하시겠습니까?'))) return;
         requestInFlight = true;
         check.disabled = true;
@@ -508,17 +507,20 @@ function renderMemories(payload, subjectKind) {
           // barrier blocks new use while the original Grant remains pending.
           if (acknowledgement.status === 'pending') withdrawalPending = true;
           const current = await refreshGrant();
-          if (item.isConnected && acknowledgement.status === 'committed' &&
-              current.grantState !== 'not_granted') {
-            status.textContent = uiText('철회 완료 응답을 받았지만 현재 권한 상태를 확정할 수 없습니다.');
+          if (item.isConnected && acknowledgement.status === 'committed') {
+            // Neither legacy RLS-filtered false nor a missing lifecycle
+            // authority proves that the withdrawal finished.
+            status.textContent = uiText(current.grantState === 'not_granted'
+              ? '철회가 완료되었으며 현재 세연의 접근 권한이 없습니다.'
+              : '철회 완료 응답과 현재 권한 조회가 일치하지 않거나 판정할 수 없습니다.');
           }
         } catch {
           // A lost 200/202 or failed current-state GET never proves COMMIT.
           // If a verified 202 arrived, keep its new-use-blocked state.
           try {
             const current = await refreshGrant();
-            if (item.isConnected && current.grantState === 'unknown' && !withdrawalPending) {
-              status.textContent = uiText('철회 처리 결과가 불분명합니다. 서버에서 완료 여부를 확인할 수 없습니다.');
+            if (item.isConnected && current.grantState === 'unknown') {
+              status.textContent = uiText('현재 기억 사용 권한과 철회 완료 여부를 확인할 수 없습니다.');
             }
           } catch {
             if (item.isConnected) {

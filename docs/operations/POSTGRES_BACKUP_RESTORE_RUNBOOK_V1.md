@@ -2,10 +2,59 @@
 
 > Scope: non-character production operations only  
 > Issue: `#389` — authoritative persistent-data recovery  
-> Historical evidence baseline: 2026-09-27 KST; 2026-10-28 bounded restore addendum below  
-> Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY
+> Historical evidence baseline: 2026-09-27 KST; latest isolated restore readback: 2026-10-29  
+> Production state: OBSERVED-MIGRATION-VERSION-MATCHED PG17 RESTORE PROVEN / HOSTED AND DR NOT READY
 
-## 2026-10-28 — verified bounded Production privacy restore (supersedes older current-state wording)
+## 2026-10-29 — latest governed migration-matched backup and actual isolated restore
+
+The **latest verified PostgreSQL-only isolation test** is [protected restore
+#40799522511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40799522511),
+SUCCESS on merged main commit `cd2152d35784dc610a82fc4ccfead01ef7c84ea7`.
+It used governed encrypted Production backup
+[#40780751650](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40780751650)
+(artifact `12857586148`, source commit
+`422d5b1374157ebe0c660abda40f02c70485184d`).
+The backed-up and restored migration frontier is `20261028011357`; the
+read-only Production migration ledger query on 2026-10-29 returned the same
+maximum version. **This confirms migration-version agreement for this backup
+and actual loopback PG17 restore**, not byte-for-byte local migration-file or
+full Hosted schema-equivalence authority.
+
+The new immutable restore proof is artifact
+`12865611458` (`sha256:74ad1108805187228f73f124a8ddee5868e248c0b7fe451d21b25c43a5fe950e`,
+expires `2026-11-28T01:18:19Z`). Restored source snapshot 6/6, function
+catalog 11/11, RLS/ACL 6/6 and rate-limit ownership/ACL/synthetic admission
+passed. The job also exercised **synthetic** privacy replay/finalization
+and produced fail-closed `recovered-serving-admission.json`, reporting
+`gate=BLOCKED`, `drReady=false`. No real Production deletion/revocation
+ledger was replayed against this *newer* backup.
+
+The previously successful [bounded **real** privacy ledger replay
+#40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574)
+used an **older backup #40468157715** at migration
+`20261027043527`. Its one captured-window event, non-resurrection and
+Commerce P5Y checks remain valid **only for that distinct replay and backup**.
+Do not transfer its privacy authority to restore #40799522511.
+
+The repository's latest migration filename `20261028110500` differs
+from Production's observed version `20261028011357`. The remote-only
+`20261008090417` statement also differs from current repository
+1460–1500 SQL at ACL/owner ordering points. See
+[`POSTGRES_MIGRATION_PROVENANCE_COMPARISON_20261029.md`](POSTGRES_MIGRATION_PROVENANCE_COMPARISON_20261029.md)
+and [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887).
+**Never perform automatic `migration repair` or claim Hosted equivalence**
+from these comparisons.
+
+**Blocked regardless of this successful DB restore:** Hosted Auth service
+login/session/refresh-token/SSO restoration, Storage object bytes and
+metadata/policies, independent incident-time privacy continuity, whole-service
+RPO/RTO validation and S8 service resumption. RPO `PT24H` and RTO
+`PT6H` remain approved *objectives*; previous 5536s/67s measurements were
+for an earlier bounded procedure, **not** latest whole-service recovery.
+`provider_managed_data_full_restore=false`,
+`future_safe_privacy_reconciliation=false`, `dr_ready=false`.
+
+## 2026-10-28 — historical bounded Production privacy restore (older backup; not current schema)
 
 This is the latest **verified bounded authoritative privacy replay** for the specifically selected backup, not a claim that the entire live Production schema or Hosted services are recoverable. [Protected PostgreSQL 17 isolated restore run 40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574) completed **SUCCESS** on main `39fc280b393d15e39c47fa24596573eacd697f47`. The workflow resolved the protected read-only completion evidence, restored the encrypted backup, replayed the captured Production privacy ledger, and uploaded three sanitized evidence JSON files.
 
@@ -188,7 +237,7 @@ expires       2026-10-18T09:23:19Z
 retention     30 days
 ```
 
-### 4.1 Current backup freshness boundary
+### 4.1 Historical 2026-09-27 backup freshness boundary (superseded above)
 
 Production deployment run `36292944993` applied `1310_member_auth_rate_limit_runtime_authority.sql` successfully on head `b65339d2cc694e89552b0d076018b550e81e656d`. Production is therefore deployed through migration `1310`.
 
