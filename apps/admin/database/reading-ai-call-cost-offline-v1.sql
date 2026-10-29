@@ -226,7 +226,7 @@ create function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(
   "reasoningTokens" text,"priceVersion" text,"estimatedMicroUsd" text,
   "costStatus" text)
 language plpgsql stable security definer set search_path=pg_catalog,myeongha_admin_ops
-as $
+as $$
 begin
   if p_reading is null or p_limit is null or p_limit not between 1 and 51
     or p_offset is null or p_offset not between 0 and 10000 then
@@ -242,7 +242,7 @@ begin
   where c.reading_id=p_reading
     and c.observed_at>=current_timestamp-interval '90 days'
   order by c.observed_at desc,c.call_id desc limit p_limit offset p_offset;
-end $;
+end $$;
 grant create on schema myeongha_admin_ops to myeongha_reading_ai_cost_source_v1;
 alter function myeongha_admin_ops.qry_reading_ai_cost_calls_v1(uuid,integer,integer)
   owner to myeongha_reading_ai_cost_source_v1;
@@ -263,7 +263,7 @@ create function myeongha_admin_ops.qry_reading_ai_cost_month_v1(
   "unknownCostCalls" text,"missingUsageCalls" text,
   "knownEstimateMicroUsd" text)
 language plpgsql stable security definer set search_path=pg_catalog,myeongha_admin_ops
-as $
+as $$
 begin
   if p_from is null or p_to is null or p_to<=p_from
     or p_to>p_from+interval '32 days' then
@@ -277,7 +277,7 @@ begin
     coalesce(sum(c.estimated_cost_micro_usd),0)::text
   from myeongha_admin_ops.reading_ai_call_cost_events_v1 c
   where c.observed_at>=p_from and c.observed_at<p_to;
-end $;
+end $$;
 grant create on schema myeongha_admin_ops to myeongha_reading_ai_cost_source_v1;
 alter function myeongha_admin_ops.qry_reading_ai_cost_month_v1(timestamptz,timestamptz)
   owner to myeongha_reading_ai_cost_source_v1;
