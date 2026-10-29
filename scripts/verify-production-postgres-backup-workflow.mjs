@@ -190,7 +190,7 @@ if (restoreSourceResolver.includes('.name == "Production PostgreSQL Logical Back
 }
 
 const requiredRunbookFragments = [
-  'CURRENT-FRONTIER BACKUP+RESTORE PROVEN',
+  'OBSERVED-MIGRATION-VERSION-MATCHED PG17 RESTORE PROVEN',
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',
