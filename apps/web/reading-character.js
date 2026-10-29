@@ -250,7 +250,9 @@ function clearPersistedReadingPresentation() {
   // account changes, remove both visible and hidden source-bearing nodes.
   for (const selector of [
     '[data-official-report-notice-text]', '[data-official-report-date]',
-    '[data-official-report-version]', '[data-reading-step-title]',
+    '[data-official-report-version]', '[data-official-report-birth-issued]',
+    '[data-official-report-birth-current]', '[data-official-report-birth-status]',
+    '[data-reading-step-title]',
     '[data-reading-step-body]', '[data-reading-structure-body]',
     '[data-reader-step-line]', '[data-reading-authority-note]',
     '[data-chart-pillar-year]', '[data-chart-pillar-month]',
@@ -591,6 +593,32 @@ function renderStoredReportEvidence(summary) {
   section.hidden = false;
 }
 
+// Render only verified, owner-scoped Birth revision numbers returned for this
+// exact official archive. Do not infer revision from current birth input or
+// the presence of a historical Reading.
+function renderOfficialReportBirthRevision(birthRevision) {
+  const issued = document.querySelector('[data-official-report-birth-issued]');
+  const current = document.querySelector('[data-official-report-birth-current]');
+  const status = document.querySelector('[data-official-report-birth-status]');
+  const locale = getUiLocale();
+  const revisionText = (value) => value === null
+    ? translateStaticUi('확인할 수 없음', locale)
+    : new Intl.NumberFormat(locale).format(value);
+  if (issued) issued.textContent = birthRevision.issuedRevisionNo === null
+    ? translateStaticUi('이 기록에 제공되지 않음', locale)
+    : revisionText(birthRevision.issuedRevisionNo);
+  if (current) current.textContent = revisionText(birthRevision.currentRevisionNo);
+  if (status) {
+    const copy = {
+      current: '발행 당시 명식과 현재 명식이 같습니다.',
+      changed: '현재 명식이 발행 당시와 다릅니다. 이 보고서는 발행 당시 명식을 기준으로 유지됩니다.',
+      unknown: '발행 당시 명식과 현재 명식의 변경 여부를 확인할 수 없습니다.',
+    };
+    status.textContent = translateStaticUi(copy[birthRevision.state], locale);
+    status.dataset.birthRevisionState = birthRevision.state;
+  }
+}
+
 // Render only the exact owner-authorized, delivered snapshot already projected by
 // previewStepsFromPayload. This is a document layout, not a new Saju inference.
 function renderAuthorizedStoredReport(preview, record) {
@@ -663,6 +691,7 @@ function renderAuthorizedStoredReport(preview, record) {
   }).format(new Date(record.completedAt));
   const version = document.querySelector('[data-official-report-version]');
   if (version) version.textContent = record.readingContractVersion;
+  renderOfficialReportBirthRevision(record.birthRevision);
   const reader = document.querySelector('[data-official-report-reader]');
   if (reader) {
     const ids = record.readerCharacterIds;
@@ -816,6 +845,7 @@ function activatePreviewReading(preview) {
     renderStep();
     if (completed) completeReadingExperience();
     if (isStoredRecord && preview.record) {
+      renderOfficialReportBirthRevision(preview.record.birthRevision);
       renderStoredReportEvidence(preview.calculationSummary);
       const date = document.querySelector('[data-official-report-date]');
       if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
