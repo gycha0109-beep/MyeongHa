@@ -73,8 +73,8 @@ function validateObservation(
   }
   if(event.source==='provider_response_usage'){
     if(event.outcome!=='response_received'||usage.inputTokens===null||usage.outputTokens===null||
-      (usage.cachedInputTokens!==null&&usage.cachedInputTokens>Number(usage.inputTokens))||
-      (usage.reasoningTokens!==null&&usage.reasoningTokens>Number(usage.outputTokens)))
+      (usage.cachedInputTokens!==null&&Number(usage.cachedInputTokens)>Number(usage.inputTokens))||
+      (usage.reasoningTokens!==null&&Number(usage.reasoningTokens)>Number(usage.outputTokens)))
       throw Error('Unbound Saju token usage');
   } else if(USAGE_KEYS.some(field=>usage[field]!==null)){
     throw Error('Unbound Saju missing usage');
