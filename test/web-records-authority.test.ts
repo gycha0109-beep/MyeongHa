@@ -19,9 +19,12 @@ describe('web records authority boundary', () => {
     expect(html).not.toContain('관계 이벤트');
   });
 
-  it('keeps Records read-only without exposing mutation controls', () => {
+  it('keeps Records read-only except exact Member-approved Se-yeon Memory grant withdrawal', () => {
     expect(client).toContain("method: 'GET'");
-    expect(client).not.toContain("method: 'POST'");
+    expect(client.match(/method: 'POST'/gu)).toHaveLength(1);
+    expect(client).toContain("/grants/seyeon/revoke");
+    expect(client).toContain("if (bearer.kind !== 'member')");
+    expect(client).toContain("WEB_RECORDS_REVOKE_UNCONFIRMED");
     expect(client).not.toContain("method: 'PATCH'");
     expect(client).not.toContain("method: 'DELETE'");
     expect(html).not.toContain('data-record-delete');
