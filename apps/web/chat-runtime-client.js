@@ -115,10 +115,10 @@ function getOrCreatePendingTurn(message) {
   return pendingTurn;
 }
 
-function clearPendingTurn(clientTurnId) {
-  const existing = readPendingTurn(threadId);
+function clearPendingTurn(clientTurnId, targetThreadId = threadId) {
+  const existing = readPendingTurn(targetThreadId);
   if (existing?.clientTurnId !== clientTurnId) return;
-  sessionStorage.removeItem(pendingTurnKey(threadId));
+  sessionStorage.removeItem(pendingTurnKey(targetThreadId));
 }
 
 function restorePendingDraft() {
@@ -549,7 +549,7 @@ async function sendTurn(message) {
           throw new Error('AUTH_REQUIRED');
         }
         if (error.code === 'IDEMPOTENCY_CONFLICT') {
-          clearPendingTurn(pendingTurn.clientTurnId);
+          clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
           throw new Error('IDEMPOTENCY_CONFLICT');
         }
         if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'CREDIT_INSUFFICIENT') {
@@ -577,7 +577,7 @@ async function sendTurn(message) {
 
     // The receipt ACK is already complete. Retire the idempotency draft
     // before a refresh or session change can make a successful turn retryable.
-    clearPendingTurn(pendingTurn.clientTurnId);
+    clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
     // A protected history GET may legitimately return 503. Never use it as
     // positive receipt confirmation or as a reason to resend this turn.
     const currentBearer = await getActiveBearer();
