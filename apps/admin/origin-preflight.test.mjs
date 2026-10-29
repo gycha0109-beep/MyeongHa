@@ -1,6 +1,22 @@
 import {describe,it,expect} from 'vitest';
+import {readFileSync} from 'node:fs';
+import {ADMIN_READER_ALLOWED_COLUMNS_V1} from './reader-allowed-columns-v1.mjs';
+import {adminReaderExactColumnsPredicateV1} from './reader-effective-columns-v1.mjs';
 import {inspectAdminOriginRolesV1,ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1,ADMIN_READER_SENSITIVE_COLUMNS_V1} from './origin-preflight.mjs';
 describe('read-only dedicated origin preflight',()=>{
+ it('pins the exact grant columns from the reviewed offline Reader contract',()=>{
+  const sql=readFileSync(new URL('./database/operator-roles-offline-v1.sql',import.meta.url),'utf8');
+  const grants=[...sql.matchAll(/grant\s+select\s*\(([^)]*)\)\s*on\s+(\w+\.\w+)\s+to\s+myeongha_admin_reader\s*;/giu)];
+  const expected=grants.flatMap(match=>match[1].split(',').map(column=>match[2]+'.'+column.trim())).sort();
+  expect(grants).toHaveLength(28);
+  expect(ADMIN_READER_ALLOWED_COLUMNS_V1).toEqual(expected);
+  const comparison=adminReaderExactColumnsPredicateV1(ADMIN_READER_ALLOWED_COLUMNS_V1);
+  expect(comparison).toContain('pg_catalog.pg_attribute');
+  expect(comparison).toContain('has_column_privilege(current_user,c.oid,a.attnum');
+  expect(comparison).toContain('myeongha_admin_ops');
+  expect(()=>adminReaderExactColumnsPredicateV1(['public.subjects.id','public.subjects.id'])).toThrow();
+ });
+
  it('reports only missing names without attempting connections',async()=>{
   let connected=0;const report=await inspectAdminOriginRolesV1({}, {poolFactory(){connected++;throw Error('unexpected');}});
   expect(report.missing).toEqual(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1);expect(connected).toBe(0);expect(report.activationEnabled).toBe(false);

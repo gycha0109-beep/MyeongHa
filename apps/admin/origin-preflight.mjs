@@ -1,6 +1,8 @@
 // Read-only origin verification. Never installs roles, records audit or changes
 // credentials. Requires npm run build, then explicitly supplied scoped origins.
 import pg from 'pg';
+import {ADMIN_READER_ALLOWED_COLUMNS_V1} from './reader-allowed-columns-v1.mjs';
+import {adminReaderExactColumnsPredicateV1} from './reader-effective-columns-v1.mjs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const CONFIG=[
@@ -47,6 +49,7 @@ export const ADMIN_READER_SENSITIVE_COLUMNS_V1=Object.freeze([
 ]);
 const READER_REQUIRED=[
  "has_column_privilege(current_user,'public.subjects','id','SELECT')",
+ adminReaderExactColumnsPredicateV1(ADMIN_READER_ALLOWED_COLUMNS_V1),
  "has_column_privilege(current_user,'public.readings','id','SELECT')",
  "has_column_privilege(current_user,'public.commerce_receipts','id','SELECT')",
  "has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','SELECT')",
