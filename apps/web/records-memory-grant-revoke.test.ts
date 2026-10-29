@@ -76,9 +76,11 @@ describe('Records Member Memory Grant revocation transport', () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync(new URL('./records-page.js', import.meta.url), 'utf8');
     expect(source).toContain("if (acknowledgement.status === 'pending') withdrawalPending = true");
-    expect(source).toContain("revoke.hidden = !result.currentlyGranted || withdrawalPending");
+    expect(source).toContain("revoke.hidden = result.grantState !== 'active' || withdrawalPending || inconsistent");
     expect(source).toContain("if (requestInFlight || withdrawalPending) return");
-    expect(source).toContain("if (!result.currentlyGranted) withdrawalPending = false");
+    expect(source).toContain("withdrawalPending = result.grantState === 'withdrawal_pending'");
+    expect(source).toContain("result.grantState === 'unknown'");
+    expect(source).toContain("result.grantState === 'not_granted'");
   });
 
   it('never retries an unknown 503 or accepts a mismatched receipt', async () => {
