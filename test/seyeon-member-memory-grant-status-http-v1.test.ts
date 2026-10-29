@@ -67,6 +67,7 @@ function fixtures(path = url) {
     setActive(v:boolean){active=v;if(!v)lifecycleState='not_granted';},
     setInstalled(v:boolean){installed=v;},
     setLifecycle(v:'active'|'withdrawal_pending'|'not_granted'){lifecycleState=v;active=v==='active';},
+    setLifecycleOnly(v:'active'|'withdrawal_pending'|'not_granted'){lifecycleState=v;},
     setUnavailable(v:boolean){unavailable=v;},
     setIdentity(v:VerifiedSubjectIdentityEvidenceV1|null){verify=v;},
     get opens(){return opens;},
@@ -125,8 +126,8 @@ describe('Se-yeon current owner Memory consent status, mounted GET feature',()=>
 
   it('fails closed when source RLS and lifecycle authority contradict',async()=>{
     const f=fixtures();
-    f.setLifecycle('active');
     f.setActive(false);
+    f.setLifecycleOnly('active');
     const response=await handleSeyeonMemberMemoryGrantStatusRequestV1(f.input);
     expect(response.status).toBe(503);
   });
