@@ -15,6 +15,7 @@ const PRIVILEGES={
  myeongha_admin_audit_writer:`SELECT has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','INSERT') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','SELECT,UPDATE,DELETE') AS isolated`,
  myeongha_admin_command_executor:`SELECT has_function_privilege(current_user,'myeongha_admin_ops.qry_presentation_entries_v1(uuid,integer)','EXECUTE') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.presentation_entries_v1','INSERT,UPDATE,DELETE') AS isolated`,
  myeongha_admin_retention_executor:`SELECT has_function_privilege(current_user,'myeongha_admin_ops.cmd_purge_expired_admin_audit_v1(integer)','EXECUTE') AND NOT has_table_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','INSERT,UPDATE,DELETE') AS isolated`,
+ myeongha_analytics_writer:`SELECT has_table_privilege(current_user,'myeongha_admin_analytics.events_v1','INSERT') AND has_table_privilege(current_user,'myeongha_admin_analytics.events_v1','DELETE') AND NOT has_table_privilege(current_user,'myeongha_admin_analytics.events_v1','UPDATE,TRUNCATE') AND has_table_privilege(current_user,'myeongha_admin_analytics.consents_v1','INSERT') AND has_table_privilege(current_user,'myeongha_admin_analytics.consents_v1','DELETE') AND has_column_privilege(current_user,'myeongha_admin_analytics.consents_v1','withdrawn_at','UPDATE') AND NOT has_column_privilege(current_user,'myeongha_admin_analytics.consents_v1','subject_link_ref','UPDATE') AND NOT has_table_privilege(current_user,'public.subjects','INSERT,UPDATE,DELETE') AS isolated`,
 };
 async function strictTarget(env,role,key){
  const url=new URL(env[key]);
@@ -30,7 +31,7 @@ export async function inspectAdminOriginRolesV1(env,options={}){
  const missing=ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.filter(key=>typeof env[key]!=='string'||!env[key].trim());
  if(missing.length)return {originRolesVerified:false,activationEnabled:false,missing,roles:[]};
  const results=[];
- const roles=[...CONFIG,...(env.MYEONGHA_ADMIN_RETENTION_DATABASE_URL?[['myeongha_admin_retention_executor','MYEONGHA_ADMIN_RETENTION_DATABASE_URL']]:[])];
+ const roles=[...CONFIG,...(env.MYEONGHA_ADMIN_RETENTION_DATABASE_URL?[['myeongha_admin_retention_executor','MYEONGHA_ADMIN_RETENTION_DATABASE_URL']]:[]),...(env.MYEONGHA_ADMIN_ANALYTICS_WRITER_DATABASE_URL?[['myeongha_analytics_writer','MYEONGHA_ADMIN_ANALYTICS_WRITER_DATABASE_URL']]:[])];
  for(const[role,key]of roles){
   let pool,connection,active=false,discard;
   try{
