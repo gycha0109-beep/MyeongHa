@@ -78,8 +78,9 @@ describe('Web Golden Master', () => {
       '사주 해석 상품',
       '보고서 구성 미리보기',
     ]);
-    expectInOrder(page.slice(page.indexOf('const productPreviewTopics')), [
+    expectInOrder(page.slice(page.indexOf('const sajuProductTopics')), [
       '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
+      '사업', '가족', '삶의 단계', '올해', '이번 달', '배우자', '궁합', '지금 고민으로 보기',
     ]);
 
     const runtimeIds = [
