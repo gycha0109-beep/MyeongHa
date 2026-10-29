@@ -190,6 +190,14 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 - `apps/api/src/official-reading-record-http.ts`에 opt-in `verifiedReadingAnalytics` 주입을 추가했습니다. 소유자 권한으로 기존 공식 Reading 아카이브 조회가 성공한 뒤, 별도 DB 읽기로 `succeeded` Reading 및 `committed_execution_attempt_id`를 재확인하고, 분석 동의 시점 이전에 완료된 Reading은 제외하는 기존 `admin-analytics-verified-reading-v1.ts` 증거 검증을 수행합니다. 익명 요청·잘못된 Reading·실패 조회에는 적용하지 않으며 분석 실패는 원래 Reading 조회 결과를 바꾸지 않습니다.
 - `apps/api/src/production-official-reading-record-runtime-v1.ts`에는 위 후처리의 Production 구성 지점을 추가했지만 **기본적으로 analytics 주입을 하지 않습니다**. 과거 공식 기록을 다시 여는 경우에 한해 미수집 완료 이벤트를 보강할 수 있으며, 새로운 Reading이 생성되는 모든 순간을 관측한 것은 아닙니다. `READING_COMPLETED` 관측률은 미확정이고 `FIRST_READING_DELIVERED` 또는 `RESULT_VIEWED`를 완료 이벤트로 변조하지 않습니다. 기존 서비스 공개 라우트 마운트·분석 수집 활성화는 수행하지 않았습니다.
 
+### A4 Saju 원천 관측 분리 PR 및 DB 실행 준비 (2026-10-29)
+
+- Saju의 실제 OpenAI Responses 호출 지점에 서버 전용 `onProviderCall`을 추가했습니다. 원천 PR: https://github.com/gycha0109-beep/Saju/pull/2739. 호출별 UUID, Saju 내부 요청 ID, 모델/결과, 공급사 응답에서 실제 확인한 토큰 수만 전달합니다. 공급사 응답 원문/출생 정보/프롬프트/해석 문장/인증 키는 전달하지 않고, 단가 없는 호출과 미수신 토큰은 `null`입니다. 이 콜백은 **기본 미설치**이며 Production Saju 생성 경로에 자동 활성화되지 않습니다.
+- 명하 `reading-ai-saju-provider-bridge-v1.ts`는 Saju 소스 이벤트를 허용된 키/모델/내부 요청 ID에 대해서만 검사하고 **이미 권위 있게 확정된 DB Subject·Reading·executionAttempt**에 묶어 전용 Writer RPC에 기록할 수 있게 합니다. Saju 자체 Reading ID와 명하 DB Reading UUID가 같다고 가정하지 않습니다. 이 원천 매핑이 실제로 연결되지 않은 구간의 비용은 계속 미측정입니다.
+- `apps/admin/database/reading-ai-call-cost-offline-v1.sql`의 조회 함수 두 곳에서 잘못된 달러 문자열 본문 구분자를 바로잡고 정적 회귀 테스트를 추가했습니다. **설치 후보**이며 Supabase 운영 DB에 적용하지 않았습니다.
+- 계정 연결 오류 `link_id must identify an eligible linked account`가 지속되어 관리자 최소권한 DB 역할/Hyperdrive 설치가 차단됩니다. 기존 고객 Hyperdrive/DB 계정 재활용 금지. Cloudflare Owner 전용 Access 앱은 설치됐지만 별도 Worker는 아직 미배포입니다.
+- **활성화 게이트:** Saju Production 호출 실동작·Saju 내부 요청 ID와 DB 실행시도 매핑 증거·전용 Writer/Reader 역할·비공개 이벤트 전달·Access 로그인/감사·분석 동의/철회·Retention 실운영이 검증되어야 비용/분석 완전성을 선언할 수 있습니다. 지금은 집계에서 미확정 상태를 유지합니다.
+
 ## workers.dev without a purchased domain (2026-10-28)
 
 The verified account subdomain is gycha0109.workers.dev; this isolated console's intended origin is https://myeongha-admin.gycha0109.workers.dev. Cloudflare Access application `MyeongHa Admin Owner Only` exists for the isolated hostname, with one verified Owner-email allow policy. Admin Worker, dedicated Hyperdrive, and Admin Postgres roles are NOT installed. Access login/JWT live-path verification remains pending.
