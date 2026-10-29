@@ -344,7 +344,7 @@ describe('PostgreSQL C09 opt-in governed learning authority wiring', () => {
         subjectId: SUBJECT,
         currentUserMessageId: U3,
         topicKey: 'python.programming',
-        requestKind: 'technical_execution',
+        requestKind: 'technical_execution' as const,
         asOfTurn: '2026-10-29T06:50:00.000Z',
       };
     });
