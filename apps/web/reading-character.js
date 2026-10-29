@@ -262,6 +262,9 @@ function clearPersistedReadingPresentation() {
     if (element) {
       element.textContent = '';
       if (selector === '[data-reading-authority-note]') element.removeAttribute('title');
+      if (selector === '[data-official-report-birth-status]') {
+        element.removeAttribute('data-birth-revision-state');
+      }
     }
   }
   document.querySelector('[data-chart-five-elements]')?.replaceChildren();
