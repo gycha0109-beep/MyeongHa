@@ -50,7 +50,7 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           [[ -z "$(git status --porcelain)" ]]
           subject="$(git show -s --format=%s HEAD)"
-          [[ "$subject" =~ ^ops\\(dr\\):\\ one-shot\\ backup\\ migration\\ 20261029012948(\\ \\(\\#[0-9]+\\))?$ ]]
+          [[ "$subject" =~ ^ops\(dr\):\ one-shot\ backup\ migration\ 20261029012948(\ \(\#[0-9]+\))?$ ]]
           [[ "$(cat .github/ops/postgres-backup-migration-20261029012948-20261029.once)" == 'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1' ]]
           point="$(date -u -d '2026-10-29T02:50:00Z' +%s)"
           now="$(date -u +%s)"
