@@ -11,6 +11,7 @@ on:
       - '.github/ops/postgres-restore-seyeon-20261008090417.once'
       - '.github/ops/postgres-restore-backup-39067271230-20261018.once'
       - '.github/ops/postgres-restore-backup-40232489516-20261026.once'
+      - '.github/ops/postgres-restore-backup-40780751650-20261029.once'
   workflow_dispatch:
     inputs:
       backup_run_id:
@@ -52,7 +53,7 @@ concurrency:
 jobs:
   restore-drill:
     name: isolated-supabase-postgres-17-restore
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40232489516'))) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40232489516') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40780751650'))) }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
@@ -95,7 +96,18 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           [[ -z "$(git status --porcelain)" ]]
           subject="$(git show -s --format=%s HEAD)"
-          if [[ "$subject" == 'ops(dr): one-shot restore backup 40232489516' ]]; then
+          if [[ "$subject" =~ ^ops\(dr\):\ one-shot\ restore\ backup\ 40780751650(\ \(\#[0-9]+\))?$ ]]; then
+            # One-shot read-only source restore on disposable PG17 only.
+            # Exact backed-up Production migration was read-only confirmed
+            # equal to observed Production ledger 20261028011357.
+            [[ "$(cat .github/ops/postgres-restore-backup-40780751650-20261029.once)" == 'POSTGRES-RESTORE-BACKUP-40780751650-20261029-V1' ]]
+            point="$(date -u -d '2026-10-28T22:37:00Z' +%s)"
+            now="$(date -u +%s)"
+            (( now >= point && now - point <= 86400 ))
+            echo 'backup_run_id=40780751650' >> "$GITHUB_OUTPUT"
+            echo 'incident_reference_utc=2026-10-28T22:37:00Z' >> "$GITHUB_OUTPUT"
+            echo 'SCOPED_RESTORE_PROOF_ONLY: backup 40780751650; synthetic privacy, no Production writes, no Hosted restore'
+          elif [[ "$subject" == 'ops(dr): one-shot restore backup 40232489516' ]]; then
             # Explicit owner-approved, disposable loopback restore of the
             # matching governed backup. This path writes no Production DB state.
             [[ "$(cat .github/ops/postgres-restore-backup-40232489516-20261026.once)" == 'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1' ]]

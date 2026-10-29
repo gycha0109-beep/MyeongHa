@@ -38,6 +38,36 @@ The successful [protected isolated restore 40655447574](https://github.com/gycha
 
 Read-only Production ledger inspection on 2026-10-28 found `20261028011357`, newer than the selected backup's `20261027043527`. Repository filename `20261028110500` is separately observed, not assumed to match the live ledger. Consequently current-live-schema freshness, post-capture privacy completeness and future-safe DR remain **HOLD**, tracked in [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887). No migration repair/deployment or destructive canary was performed by this documentation update. Approved `PT24H`/`PT6H` and historical comparison `5536s`/`67s` remain unchanged; three-second isolated database execution is **not** service RTO.
 
+## 2026-10-29 — migration-matched governed backup available; isolated replay pending
+
+The scheduled [Production encrypted PostgreSQL backup #40780751650](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40780751650)
+completed successfully on main `422d5b1374157ebe0c660abda40f02c70485184d`,
+uploading governed artifact `12857586148`
+(`myeongha-postgres-20261028T223305Z`, expires
+`2026-11-27T22:36:09Z`). The workflow recorded
+`migration_frontier=20261028011357`. A separate **read-only**
+Production migration ledger query on 2026-10-29 again returned
+`max(version)=20261028011357`. Thus this *selected backup* matches
+the **observed Production migration version**; it does not establish DDL
+equivalence against the repository's differently numbered migration files,
+or prove restore results.
+
+A narrowly scoped one-shot isolated PG17 restore is prepared against exact
+backup run `40780751650` and fixed synthetic incident reference
+`2026-10-28T22:37:00Z` (after successful backup completion). The existing
+protected workflow only runs on the explicit reviewed main-marker merge,
+with a 24-hour self-expiring gate and no Production SQL writes.
+It exercises synthetic privacy finalization on the disposable restored DB;
+a real captured-window privacy ledger is **not** supplied as a substitute
+for independently completed recovery evidence.
+
+**Evidence boundary until runtime succeeds:** backup migration match =
+READ-ONLY OBSERVED, isolated restore on this backup = NOT YET PROVEN.
+Even a successful isolated PG17 restore cannot establish Hosted Auth/Storage,
+independent incident-time deletion/revocation completeness or final S8
+serving E2E. `provider_managed_data_full_restore=false`,
+`future_safe_privacy_reconciliation=false`, `dr_ready=false`.
+
 ## 2026-10-28 — migration frontier authority in the executable DR guard
 
 `scripts/verify-postgres-dr-readiness-authority.mjs` now reads the
