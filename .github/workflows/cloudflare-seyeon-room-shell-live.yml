@@ -11,6 +11,14 @@ on:
         description: 'Exact, independently confirmed production Worker version ID.'
         required: true
         type: string
+      scope:
+        description: 'Owner lifecycle requires a real S0 source; negative-only never reads original Memory.'
+        required: true
+        type: choice
+        default: owner-lifecycle
+        options:
+          - owner-lifecycle
+          - negative-only
 
 permissions:
   contents: read
@@ -26,6 +34,7 @@ jobs:
     environment: production
     env:
       EXPECTED_CONFIRM: ${{ inputs.confirm }}
+      SMOKE_SCOPE: ${{ inputs.scope }}
       CLOUDFLARE_EXPECTED_WORKER_VERSION: ${{ inputs.worker_version }}
       MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
@@ -36,6 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$EXPECTED_CONFIRM" = "VERIFY_SEYEON_ROOM_SHELL"
+          [[ "$SMOKE_SCOPE" = 'owner-lifecycle' || "$SMOKE_SCOPE" = 'negative-only' ]]
           [[ "$CLOUDFLARE_EXPECTED_WORKER_VERSION" =~ ^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$ ]]
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
@@ -48,4 +58,8 @@ jobs:
           node-version: '24'
           package-manager-cache: false
       - name: Verify owned room shell and read-only Member grant lifecycle
+        if: ${{ inputs.scope == 'owner-lifecycle' }}
         run: node scripts/verify-cloudflare-seyeon-room-shell-live.mjs
+      - name: Verify Member and anonymous denial without source access
+        if: ${{ inputs.scope == 'negative-only' }}
+        run: node scripts/verify-cloudflare-seyeon-grant-negative-live.mjs
