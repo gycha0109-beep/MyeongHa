@@ -469,7 +469,7 @@ function renderMemories(payload, subjectKind) {
           status.textContent = uiText(inconsistent
             ? '철회 대기와 현재 접근권한 정보가 일치하지 않습니다. 확인할 수 없습니다.'
             : result.grantState === 'not_granted'
-              ? '현재 세연의 접근권한이 철회된 상태입니다.'
+              ? '현재 세연의 접근권한이 없습니다.'
               : result.grantState === 'withdrawal_pending'
                 ? '새로운 기억 사용은 차단됐으며, 이전 답변 수신 확인 후 철회 완료를 기다리고 있습니다.'
                 : result.grantState === 'unknown'
