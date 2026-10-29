@@ -6,6 +6,15 @@
 > **출시 범위:** `saju.general_natal.deep.v1` (정밀 원국 리포트) **한 종류**를 기준으로 한다. 출생 정보 변경 시에는 같은 활성 구매권으로 신규 revision의 재생성을 허용하되 과거 결과는 보존한다. Career/Wealth/Relationship/Annual 등은 확장 후보일 뿐 최초 출시 상품에 포함하지 않는다.  
 > **원칙:** 기존 기능 중복 구현 금지 · 현재 저장소의 실제 경로 재사용 · 독립 작업부터 구현 · 기능별 1~2개 필수 테스트 · 최종 통합 검증 · HOLD 우회 금지.
 
+## 2026-10-29 S0 후속 구현 — 발행 당시 명식 / 현재 명식 비교
+
+- **확인된 실제 DB 정본:** `reading_sessions.source_birth_revision_id`는 발행 당시 참조이고, `birth_profiles.current_revision_id`는 해당 SELF 프로필의 현재 차수다. `birth_profile_revisions`의 `revision_no`를 각각 읽어 비교한다. 기존 API 실행 역할은 해당 원본 테이블을 직접 SELECT할 수 없다.
+- **최소 권한 경계:** 기존 `qry_official_reading_record_runtime_v1`의 owner/current exact Grant 검사를 먼저 통과한 경우에만 새 서버 전용 `qry_official_reading_birth_revision_status_v1`가 같은 DB Subject 트랜잭션에서 원본/현재 차수와 `current | changed | unknown`을 제공한다. 소유자/현재 Grant가 없는 보고서는 메타데이터도 공개하지 않는다. 이미 적용된 1735 마이그레이션은 그대로 두고 **새 후속 마이그레이션** `20261029094500_records_official_birth_revision_status_v1.sql`로 분리했다.
+- **정확한 구분:** 발행 당시 source와 현재 revision이 같은 SELF Birth Profile일 때만 `current` 또는 `changed`를 판정한다. 과거 기록에서 출처가 없거나 SELF 프로필이 아닌 경우 `unknown`으로 유지한다. 유효한 차수가 없다고 새로 추산하지 않으며, 내부 Birth revision UUID 및 출생 원문은 클라이언트에 노출하지 않는다.
+- **화면:** 공식 보고서의 발행 당시/현재 차수 및 변경 상태를 표기한다. 명식이 달라져도 저장된 본문·해시·발행일을 변경하지 않는다. 새 명식 기준 **유료 재생성은 승인된 구매권/발행 경로 전까지 비활성**이다. 계정 전환 시 차수 표시도 제거하며 다국어 UI 문구 5개 언어를 유지한다.
+- **회귀 검사:** API current/changed/unknown/invalid, 웹 계약, DB 권한 가드와 disposable PG17에서 변경 전후 동일 공식 보고서 확인 검사를 추가했다. **CI·스키마 카탈로그 스냅샷 갱신과 실제 PG17 통과는 미확인**이므로 완료를 주장하지 않는다. 운영 DB에는 본 트랙 마이그레이션을 적용하지 않았다.
+- **배포 기준:** 사용자 확정 Cloudflare Worker이며 과거 배포 사업자의 검사를 이 트랙 블로커로 취급하지 않는다. Saju Production issuer와 Commerce 유료 활성화 HOLD는 그대로다.
+
 ## 2026-10-29 이어서 구현 — 12개 상품 동일 진입 화면
 
 - `apps/web/src/reading/ReadingPage.tsx`의 4개 주력 상품 + 접힌 8개 추가 상품 구조를 없애고 **12개 상품을 하나의 `sajuProductTopics` 카탈로그·동일 카드 그리드**에 표시한다. 이는 판매 활성화 순서나 Saju 연구 8메뉴의 우선순위가 아니다.
