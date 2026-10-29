@@ -1,11 +1,5 @@
 name: Admin Console Private Build
 on:
-  pull_request:
-    paths:
-      - 'apps/admin/**'
-      - 'apps/api/src/admin-*'
-      - 'cloudflare/admin-worker.mjs'
-      - '.github/workflows/admin-console-private-build.yml'
   workflow_dispatch:
     inputs:
       stage_inactive_worker:
