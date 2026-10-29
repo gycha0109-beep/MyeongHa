@@ -109,12 +109,7 @@ export async function tryHandleCloudflareOwnerSandboxActionsV1(request,bindings,
       env:bindings,pool,verifiedEvidence:evidence,paymentAttemptId:body.paymentAttemptId,
      });
   return Response.json({ok:true,data},{status:200,headers:HEADERS});
- }catch(error){
-  // Only the exact PostgreSQL sandbox request-budget constraint is safe to
-  // expose as a stable diagnostic. Other DB/identity failures stay sealed.
-  if(kind==='prepare'&&error?.code==='P0001'&&
-     error?.constraint==='owner_kcp_sandbox_daily_limit')
-    return err(429,'SANDBOX_DAILY_LIMIT');
+ }catch{
   // Do not reveal Supabase secrets, PSP receipts or identity error details.
   return err(503,'SANDBOX_AUTHORITY_UNAVAILABLE');
  }finally{try{await pool?.close();}catch{}}
