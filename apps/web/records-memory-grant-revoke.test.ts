@@ -33,6 +33,54 @@ describe('Records Member Memory Grant revocation transport', () => {
     expect(fetchImpl.mock.calls[0]?.[1]).not.toHaveProperty('body');
   });
 
+  it('recognizes a durable 202 pending withdrawal as new-use-blocked but not committed', async () => {
+    const pending = {
+      ...ACK,
+      data: { status: 'pending', memoryItemId: MEMORY_ID, characterId: 'seyeon', newUseBlocked: true },
+    };
+    const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => Response.json(pending, { status: 202 }));
+    const client = createRecordsMemoryGrantRevokeClient({
+      fetchImpl, resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
+    });
+    await expect(client.revokeSeyeonMemoryGrant(MEMORY_ID)).resolves.toEqual({
+      status: 'pending', memoryItemId: MEMORY_ID, characterId: 'seyeon', newUseBlocked: true,
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(fetchImpl.mock.calls[0]?.[1]).not.toHaveProperty('body');
+  });
+
+  it('rejects status/ACK mismatches and unverified pending claims without retry', async () => {
+    const pendingData = { status: 'pending', memoryItemId: MEMORY_ID, characterId: 'seyeon', newUseBlocked: true };
+    const cases = [
+      [200, pendingData],
+      [202, ACK.data],
+      [202, { ...pendingData, newUseBlocked: false }],
+      [202, { ...pendingData, memoryItemId: '33333333-3333-4333-8333-333333333333' }],
+      [202, { ...pendingData, revokedGrantCount: 1 }],
+      [202, { ...pendingData, replayed: false }],
+    ] as const;
+    for (const [status, data] of cases) {
+      const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) =>
+        Response.json({ ...ACK, data }, { status }));
+      const client = createRecordsMemoryGrantRevokeClient({
+        fetchImpl, resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
+      });
+      await expect(client.revokeSeyeonMemoryGrant(MEMORY_ID)).rejects.toMatchObject({
+        code: 'MEMORY_REVOKE_UNCONFIRMED',
+      });
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it('keeps pending withdrawal hidden from repeat UI submissions until current grant changes', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync(new URL('./records-page.js', import.meta.url), 'utf8');
+    expect(source).toContain("if (acknowledgement.status === 'pending') withdrawalPending = true");
+    expect(source).toContain("revoke.hidden = !result.currentlyGranted || withdrawalPending");
+    expect(source).toContain("if (requestInFlight || withdrawalPending) return");
+    expect(source).toContain("if (!result.currentlyGranted) withdrawalPending = false");
+  });
+
   it('never retries an unknown 503 or accepts a mismatched receipt', async () => {
     let response: Response = new Response(null, { status: 503 });
     const fetchImpl = vi.fn(async (_url: string, _init?: RequestInit) => response);
