@@ -29,11 +29,29 @@ run_event="$(jq -er '.event' "$run_json")"
 if [[ "$run_event" == 'push' ]]; then
   marker_json="$RUNNER_TEMP/backup-one-shot-marker.json"
   workflow_json="$RUNNER_TEMP/backup-one-shot-workflow.json"
+  commit_json="$RUNNER_TEMP/backup-one-shot-commit.json"
 
   curl -fsSL \
     -H "Authorization: Bearer $GH_TOKEN" \
     -H 'Accept: application/vnd.github+json' \
-    "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/.github/ops/postgres-backup-frontier-1310.once?ref=$source_sha" \
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/commits/$source_sha" \
+    -o "$commit_json"
+  subject="$(jq -er '.commit.message | split("\\n")[0]' "$commit_json")"
+  if [[ "$subject" =~ ^ops\\(dr\\):\\ one-shot\\ backup\\ migration\\ 20261029012948(\\ \\(\\#[0-9]+\\))?$ ]]; then
+    marker_path='.github/ops/postgres-backup-migration-20261029012948-20261029.once'
+    marker_token='POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1'
+    marker_gate='Gate one-shot deployed migration 20261029012948 backup marker'
+  else
+    # Preserve historical exact 1310 one-shot provenance, not a generic push.
+    marker_path='.github/ops/postgres-backup-frontier-1310.once'
+    marker_token='POSTGRES-BACKUP-FRONTIER-1310-V1'
+    marker_gate='Gate one-shot frontier-1310 backup marker'
+  fi
+
+  curl -fsSL \
+    -H "Authorization: Bearer $GH_TOKEN" \
+    -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/$marker_path?ref=$source_sha" \
     -o "$marker_json"
   curl -fsSL \
     -H "Authorization: Bearer $GH_TOKEN" \
@@ -44,10 +62,10 @@ if [[ "$run_event" == 'push' ]]; then
   marker_content="$(jq -er '.content' "$marker_json" | tr -d '\n' | base64 --decode | tr -d '\r\n')"
   workflow_content="$(jq -er '.content' "$workflow_json" | tr -d '\n' | base64 --decode)"
 
-  [[ "$marker_content" == 'POSTGRES-BACKUP-FRONTIER-1310-V1' ]]
-  [[ "$workflow_content" == *".github/ops/postgres-backup-frontier-1310.once"* ]]
-  [[ "$workflow_content" == *"Gate one-shot frontier-1310 backup marker"* ]]
-  [[ "$workflow_content" == *"POSTGRES-BACKUP-FRONTIER-1310-V1"* ]]
+  [[ "$marker_content" == "$marker_token" ]]
+  [[ "$workflow_content" == *"$marker_path"* ]]
+  [[ "$workflow_content" == *"$marker_gate"* ]]
+  [[ "$workflow_content" == *"$marker_token"* ]]
 fi
 
 curl -fsSL \
