@@ -16,21 +16,34 @@ function sameSession(a, b) {
   return a?.kind === 'member' && b?.kind === 'member' && a.token === b.token;
 }
 
-function validateAck(payload, memoryItemId) {
-  if (payload.status !== 'committed' ||
-      payload.memoryItemId !== memoryItemId ||
-      payload.characterId !== 'seyeon' ||
+function validateAck(payload, memoryItemId, statusCode) {
+  if (payload.memoryItemId !== memoryItemId || payload.characterId !== 'seyeon') {
+    throw new MemoryGrantRevokeError(
+      'MEMORY_REVOKE_UNCONFIRMED',
+      'The server returned an unrelated Memory Grant acknowledgement.',
+    );
+  }
+  if (statusCode === 202 && payload.status === 'pending' &&
+      payload.newUseBlocked === true &&
+      !Object.prototype.hasOwnProperty.call(payload, 'revokedGrantCount') &&
+      !Object.prototype.hasOwnProperty.call(payload, 'replayed')) {
+    return Object.freeze({
+      status: 'pending', memoryItemId,
+      characterId: 'seyeon', newUseBlocked: true,
+    });
+  }
+  if (statusCode !== 200 || payload.status !== 'committed' ||
       !Number.isSafeInteger(payload.revokedGrantCount) ||
       payload.revokedGrantCount < 0 ||
       typeof payload.replayed !== 'boolean' ||
       payload.replayed !== (payload.revokedGrantCount === 0)) {
     throw new MemoryGrantRevokeError(
       'MEMORY_REVOKE_UNCONFIRMED',
-      'The server did not confirm a committed Memory Grant revocation.',
+      'The server did not confirm a valid Memory Grant revocation state.',
     );
   }
   return Object.freeze({
-    memoryItemId,
+    status: 'committed', memoryItemId,
     characterId: 'seyeon',
     revokedGrantCount: payload.revokedGrantCount,
     replayed: payload.replayed,
@@ -76,7 +89,7 @@ export function createRecordsMemoryGrantRevokeClient(options = {}) {
       if (response.status === 403) {
         throw new MemoryGrantRevokeError('MEMORY_REVOKE_MEMBER_REQUIRED', 'Member access required.');
       }
-      if (!response.ok) {
+      if (response.status !== 200 && response.status !== 202) {
         throw new MemoryGrantRevokeError('MEMORY_REVOKE_UNCONFIRMED', 'The revocation outcome is not confirmed.');
       }
       let data;
@@ -85,7 +98,7 @@ export function createRecordsMemoryGrantRevokeClient(options = {}) {
       } catch (error) {
         throw new MemoryGrantRevokeError('MEMORY_REVOKE_UNCONFIRMED', 'The server response is not a valid commit receipt.', error);
       }
-      const ack = validateAck(data, memoryItemId);
+      const ack = validateAck(data, memoryItemId, response.status);
       const latest = await resolveBearer();
       if (!sameSession(session, latest)) {
         throw new MemoryGrantRevokeError('MEMORY_REVOKE_SESSION_CHANGED', 'The active Member session changed.');
