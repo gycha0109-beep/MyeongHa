@@ -108,3 +108,59 @@ A dedicated authorized isolated Hosted project (or an approved full-stack local 
 5. Record sanitized results with target/source identifiers, dates, PASS/FAIL and actual RPO/RTO intervals (no personal identifiers/secrets), and only then reconsider `provider_managed_data_full_restore` and `dr_ready`.
 
 This document **closes the inventory/classification subtask only**. Provider-service equivalence, incident-time independent privacy continuity and S8 final E2E remain **HOLD**.
+
+
+## 5. Local synthetic-only Auth/Storage functional acceptance harness (implementation, no Hosted claim)
+
+The Phase-4 **local synthetic-only** alternative now has an executable
+operator harness at scripts/run-postgres-hosted-synthetic-local-acceptance.mjs.
+It is not run against Production, does not create accounts or target projects,
+does not copy Production provider data, and is not a substitute for the separate
+Hosted recovery route. The harness deliberately accepts **only**
+http://127.0.0.1:54321 (explicit Supabase CLI API on loopback) and only
+designated dr-synthetic-* identities, bucket and probe/ object path. An
+admin/service-role key, remotely hosted target, alternate port, or redirect
+fails closed. No login credentials, token, object body or identity
+are written to its output.
+
+**Prerequisites:** an existing independently managed local full-stack
+Supabase CLI instance and **pre-created synthetic fixtures** with a test
+member, a separate previously deleted synthetic member, and a private
+dr-synthetic-* Storage bucket/object with known local SHA-256. The harness
+does not provision these or create any cross-environment copies. No such
+environment or exercise is claimed by the repository change.
+
+When the local synthetic environment is explicitly prepared, set these
+variables only in that isolated terminal (never commit their values):
+
+- MH_DR_LOCAL_TARGET = http://127.0.0.1:54321
+- MH_DR_LOCAL_ANON_KEY = local publishable/anon API key, **not** service role
+- MH_DR_LOCAL_MEMBER_EMAIL, MH_DR_LOCAL_MEMBER_PASSWORD = dedicated dr-synthetic- test member
+- MH_DR_LOCAL_DELETED_EMAIL, MH_DR_LOCAL_DELETED_PASSWORD = different, previously deleted dr-synthetic- account
+- MH_DR_LOCAL_PRIVATE_BUCKET, MH_DR_LOCAL_OBJECT_PATH = private dr-synthetic-* bucket and probe/ object
+- MH_DR_LOCAL_OBJECT_SHA256 = expected SHA-256 of the exact synthetic object bytes
+
+Invoke node scripts/run-postgres-hosted-synthetic-local-acceptance.mjs.
+It performs actual **local** positive sign-in, wrong-password denial,
+deleted-account sign-in denial, authenticated private-object GET/checksum,
+unauthenticated private-object denial, refresh-token issuance, sign-out and
+refresh-token-after-sign-out denial. It reads only synthetic object bytes
+and makes no direct DB SQL calls. The sign-out intentionally invalidates
+only the supplied synthetic local session. It requires unambiguous
+denial codes rather than interpreting a network error, redirect or
+missing evidence as success.
+
+The returned evidence is an identifier-free, self-limiting
+myeongha-hosted-recovery-synthetic-local-v1 result with
+target=local-loopback-synthetic-only,
+hostedProviderRecoveryProven=false,
+independentPrivacyContinuityProven=false,
+s8ServingE2eProven=false, providerManagedDataFullRestore=false,
+futureSafePrivacyReconciliation=false, drReady=false,
+gate=BLOCKED and serviceResumptionAllowed=false. It does **not**
+test real Hosted SSO/MFA/settings, JWT signing migrations, historical
+Production sessions, real Storage object transfer, incident-time privacy
+ledger continuity, RPO/RTO or actual S8 cutover. CI uses only an
+in-memory mocked-HTTP verifier and **does not execute the live local
+harness or claim an actual restored service**. The protected
+Production and existing funded projects remain untouched.
