@@ -49,9 +49,9 @@
 
 ## 4. 명하 기존 설계와의 연결
 
-기존 [Character Runtime Standard v1](../character/CHARACTER_RUNTIME_STANDARD_V1.md)는 Character Bible의 WHO와 Runtime의 현재 행동을 분리하며, 4A Integrity/Claim Preflight, 4B Open-World Fact Generation, 4B.5 Unsupported Sophistication Guard, 4B.9 Commit Before Expression, Relationship/Memory authority를 명시한다.
+기존 [Character Runtime Standard v1](./character/CHARACTER_RUNTIME_STANDARD_V1.md)는 Character Bible의 WHO와 Runtime의 현재 행동을 분리하며, 4A Integrity/Claim Preflight, 4B Open-World Fact Generation, 4B.5 Unsupported Sophistication Guard, 4B.9 Commit Before Expression, Relationship/Memory authority를 명시한다.
 
-[세연 C09 상태·로드맵](../roadmaps/seyeon-c09-current-status-and-roadmap-20261029.md)은 아직 PR #2694에 있어 main 병합 전일 수 있다. 연구용 Shadow나 외부 라이브러리를 Production에 적용한 것으로 취급하지 않는다.
+[세연 C09 상태·로드맵](./roadmaps/seyeon-c09-current-status-and-roadmap-20261029.md)은 아직 PR #2694에 있어 main 병합 전일 수 있다. 연구용 Shadow나 외부 라이브러리를 Production에 적용한 것으로 취급하지 않는다.
 
 ### 권장 연결 순서 (신규 트랙 확정 아님)
 
