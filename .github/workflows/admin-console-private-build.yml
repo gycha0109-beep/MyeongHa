@@ -1,6 +1,13 @@
 name: Admin Console Private Build
 on:
   workflow_dispatch:
+    inputs:
+      stage_inactive_worker:
+        description: 'Stage a disabled, Access-protected Admin Worker after private DB-origin verification'
+        type: choice
+        options: ['no','yes']
+        default: 'no'
+        required: true
 permissions:
   contents: read
 jobs:
@@ -18,3 +25,78 @@ jobs:
       - run: npm run test -w @myeongha/admin
       - run: node apps/admin/deployment-check.mjs --allow-blocked
       - run: npm run build:private -w @myeongha/admin
+  stage-inactive:
+    needs: private-build
+    if: ${{ inputs.stage_inactive_worker == 'yes' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: myeongha-admin-inactive-stage
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.MYEONGHA_ADMIN_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.MYEONGHA_ADMIN_CLOUDFLARE_ACCOUNT_ID }}
+      MYEONGHA_ADMIN_ORIGIN: https://myeongha-admin.gycha0109.workers.dev
+      MYEONGHA_ADMIN_ACCESS_ISSUER: https://noisy-star-3d9a.cloudflareaccess.com
+      MYEONGHA_ADMIN_ACCESS_AUD: ${{ secrets.MYEONGHA_ADMIN_ACCESS_AUD }}
+      MYEONGHA_ADMIN_OWNER_EMAIL: ${{ secrets.MYEONGHA_ADMIN_OWNER_EMAIL }}
+      MYEONGHA_ADMIN_OWNER_AUTH_USER_ID: ${{ secrets.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID }}
+      MYEONGHA_ADMIN_SUPABASE_ORIGIN: https://cnsfpcdiyofqvhpcegfc.supabase.co
+      MYEONGHA_SUPABASE_API_KEY: ${{ secrets.MYEONGHA_ADMIN_SUPABASE_PUBLISHABLE_KEY }}
+      MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN: ${{ secrets.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN }}
+      MYEONGHA_ADMIN_READ_HYPERDRIVE_ID: ${{ secrets.MYEONGHA_ADMIN_READ_HYPERDRIVE_ID }}
+      MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID: ${{ secrets.MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID }}
+      MYEONGHA_ADMIN_READ_DATABASE_URL: ${{ secrets.MYEONGHA_ADMIN_READ_DATABASE_URL }}
+      MYEONGHA_ADMIN_AUDIT_DATABASE_URL: ${{ secrets.MYEONGHA_ADMIN_AUDIT_DATABASE_URL }}
+      MYEONGHA_ADMIN_COMMAND_DATABASE_URL: ${{ secrets.MYEONGHA_ADMIN_COMMAND_DATABASE_URL }}
+      MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM: ${{ secrets.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify private deployment inputs exist
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID MYEONGHA_ADMIN_ACCESS_AUD MYEONGHA_ADMIN_OWNER_EMAIL MYEONGHA_ADMIN_OWNER_AUTH_USER_ID MYEONGHA_SUPABASE_API_KEY MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN MYEONGHA_ADMIN_READ_HYPERDRIVE_ID MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID MYEONGHA_ADMIN_READ_DATABASE_URL MYEONGHA_ADMIN_AUDIT_DATABASE_URL MYEONGHA_ADMIN_COMMAND_DATABASE_URL MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM; do
+            if [[ -z "${!key:-}" ]]; then echo "::error::Missing private Admin configuration: $key"; exit 1; fi
+          done
+      - name: Verify role-restricted PostgreSQL origins
+        run: npm run verify:origins -w @myeongha/admin
+      - name: Prepare disabled Admin Worker bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck -w @myeongha/admin
+          npm run build -w @myeongha/admin
+          node apps/admin/deployment-check.mjs --write-config "$RUNNER_TEMP/admin-inactive-stage.json"
+          node --input-type=module -e "
+            import {readFileSync} from 'node:fs';
+            const x=JSON.parse(readFileSync(process.argv[1],'utf8'));
+            if(x.name!=='myeongha-admin'||x.workers_dev!==true||x.preview_urls!==false||
+              x.vars?.MYEONGHA_ADMIN_PRIVATE_ENABLED!=='false'||
+              x.vars?.MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED!=='false'||
+              x.vars?.MYEONGHA_ADMIN_RETENTION_ENABLED!=='false'||
+              x.vars?.MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED!=='false')
+              throw Error('Admin staged deployment must remain disabled');
+          " "$RUNNER_TEMP/admin-inactive-stage.json"
+      - name: Deploy isolated disabled Admin Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=wrangler@4.152.0 -- wrangler deploy --config "$RUNNER_TEMP/admin-inactive-stage.json"
+      - name: Install private Member-verification key on disabled Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$MYEONGHA_SUPABASE_API_KEY" |
+            npm exec --yes --package=wrangler@4.152.0 -- wrangler secret put MYEONGHA_SUPABASE_API_KEY --name myeongha-admin
+      - name: Stage status
+        shell: bash
+        run: |
+          echo 'Admin Worker staged with MYEONGHA_ADMIN_PRIVATE_ENABLED=false; no operational data access or customer commands activated.'
