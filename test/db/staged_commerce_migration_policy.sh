@@ -21,6 +21,8 @@ skip_staged_portone_migration_from_historical_fixture() {
       expected='59a2d005cace08cb46da9cf57351131620218d0b' ;;
     20261027054525_digital_reading_checkout_notice_evidence_v1.sql)
       expected='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
+    20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql)
+      expected='3903c37f80f860f899fb1086b4bab878e73eab1d' ;;
     *) return 1 ;;
   esac
   local actual
