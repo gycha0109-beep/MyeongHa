@@ -45,6 +45,24 @@ describe('Cloudflare web Seyeon receipt-aware send',()=>{
     expect(JSON.parse(String(observed[1].options.body))).toEqual({proof:receiptProof});
   });
 
+  it('rejects an unreceipted 200 as unconfirmed first reply without a history GET or retry',async()=>{
+    const urls=[];
+    await expect(sendSeyeonBrowserTurnWithReceiptV1({
+      origin:'https://myeongha.gycha0109.workers.dev',
+      bearer:'test-member-bearer',
+      threadId,turn:{clientTurnId,text:'원본 기억을 다시 알려줘'},
+      language:'ko-KR',localeHeaders:{},
+      fetchImpl:async(url)=>{
+        urls.push(new URL(String(url)).pathname);
+        return Response.json({ok:true,data:{
+          turnId,assistantMessageId,assistantText:'unreceipted positive',
+          sequenceNo:2,replayed:false,
+        }});
+      },
+    })).rejects.toThrow();
+    expect(urls).toEqual([`/api/chat/${threadId}/turns`]);
+  });
+
   it('never ACKs malformed replies and never repeats the model request after an ACK failure',async()=>{
     for(const mode of ['truncated','ack-failure']){
       const calls=[];
