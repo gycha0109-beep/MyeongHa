@@ -143,6 +143,26 @@ describe('strict Cloudflare Owner sandbox preparation and server receipt APIs',(
   expect(state.prep).not.toHaveBeenCalled();
   expect(state.verify).not.toHaveBeenCalled();
  });
+ it('exposes only the exact DB-backed Owner sandbox daily test budget',async()=>{
+  const limited=Object.assign(new Error('private-budget-details'),{
+   code:'P0001',constraint:'owner_kcp_sandbox_daily_limit',
+  });
+  state.prep.mockRejectedValueOnce(limited);
+  const res=await tryHandleCloudflareOwnerSandboxActionsV1(
+   req(PREP,{idempotencyToken:TOKEN}),{},rPrep);
+  expect(res.status).toBe(429);
+  expect(await res.json()).toEqual({
+   ok:false,error:{code:'SANDBOX_DAILY_LIMIT',retryable:false},
+  });
+  expect(state.close).toHaveBeenCalledTimes(1);
+  state.prep.mockRejectedValueOnce(Object.assign(new Error('other-private-error'),{
+   code:'P0001',constraint:'owner_kcp_sandbox_catalog_unavailable',
+  }));
+  const hidden=await tryHandleCloudflareOwnerSandboxActionsV1(
+   req(PREP,{idempotencyToken:TOKEN}),{},rPrep);
+  expect(hidden.status).toBe(503);
+  expect((await hidden.json()).error.code).toBe('SANDBOX_AUTHORITY_UNAVAILABLE');
+ });
  it('seals any database/PSP private failure without sensitive egress',async()=>{
   state.verify.mockRejectedValueOnce(Error('private-v2-api-secret'));
   const res=await tryHandleCloudflareOwnerSandboxActionsV1(req(VERIFY,{paymentAttemptId:ATTEMPT}),{},rVerify);
