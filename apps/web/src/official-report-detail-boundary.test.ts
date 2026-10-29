@@ -126,6 +126,17 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain("isStoredRecord ? '' : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.'");
   });
 
+  it('separates stored supplementary interpretation from provenance evidence in step mode', () => {
+    expect(jsx).toContain('data-reading-supporting hidden');
+    expect(jsx).toContain('data-reading-supporting-title');
+    expect(jsx).toContain('data-reading-supporting-body');
+    expect(runtime).toContain('readingStepSourceCategoriesV1(step, isStoredRecord)');
+    expect(runtime).toContain('const structureParts = sourceCategories.structure;');
+    expect(runtime).toContain('supportingBlock.hidden = sourceCategories.supporting.length === 0');
+    expect(runtime).toContain('sourceCategories.supporting.join');
+    expect(runtime).toContain("'[data-reading-supporting-body]'");
+    expect(css).toContain('[data-reading-supporting-body]{white-space:pre-wrap;');
+  });
   it('blocks an explicit 403 without treating revoked access as a temporary Records failure', () => {
     const ownerDenied = runtime.indexOf('if (response.status === 403)');
     const genericFailure = runtime.indexOf('if (!response.ok || !payload || payload.ok !== true)');

@@ -114,6 +114,14 @@ export function ReadingDetailPage() {
               </div>
             </section>
 
+            <section className="reading-block" data-reading-supporting hidden>
+              <span className="reading-block-icon" aria-hidden="true">✦</span>
+              <div>
+                <h2 data-reading-supporting-title>추가 해석</h2>
+                <p data-reading-supporting-body />
+              </div>
+            </section>
+
             <section className="reading-block">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>

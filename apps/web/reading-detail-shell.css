@@ -183,3 +183,5 @@
   .official-report-keypoints p{font-size:15px}
 }
 @media(prefers-reduced-motion:reduce){.official-report-view *{scroll-behavior:auto}}
+
+.reading-detail-page [data-reading-supporting-body]{white-space:pre-wrap;overflow-wrap:anywhere}

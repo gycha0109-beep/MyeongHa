@@ -15,6 +15,7 @@ import {
 } from './reading-response-owner-guard.js';
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
+import { readingStepSourceCategoriesV1 } from './reading-step-source-categories.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
 
 const readerCatalog = {
@@ -254,6 +255,7 @@ function clearPersistedReadingPresentation() {
     '[data-official-report-birth-current]', '[data-official-report-birth-status]',
     '[data-reading-step-title]',
     '[data-reading-step-body]', '[data-reading-structure-body]',
+    '[data-reading-supporting-body]',
     '[data-reader-step-line]', '[data-reading-authority-note]',
     '[data-chart-pillar-year]', '[data-chart-pillar-month]',
     '[data-chart-pillar-day]', '[data-chart-pillar-hour]',
@@ -742,6 +744,9 @@ function activatePreviewReading(preview) {
   const structureTitle = document.querySelector('[data-reading-structure-title]');
   const structureBody = document.querySelector('[data-reading-structure-body]');
   const structureBlock = structureBody?.closest('.reading-block');
+  const supportingBlock = document.querySelector('[data-reading-supporting]');
+  const supportingTitle = document.querySelector('[data-reading-supporting-title]');
+  const supportingBody = document.querySelector('[data-reading-supporting-body]');
   const readerLine = document.querySelector('[data-reader-step-line]');
   const readerComment = document.querySelector('[data-reader-comment]');
   const authorityNote = document.querySelector('[data-reading-authority-note]');
@@ -798,7 +803,10 @@ function activatePreviewReading(preview) {
     if (!mayRenderCurrentStoredRecord()) return;
     const step = steps[activeIndex];
     if (!step) return;
-    const structureParts = [...step.structure, ...step.supporting];
+    // Keep saved supplementary interpretation distinct from structural evidence.
+    // Preview retains the existing combined secondary stage.
+    const sourceCategories = readingStepSourceCategoriesV1(step, isStoredRecord);
+    const structureParts = sourceCategories.structure;
 
     const ui = readingSceneProgressV1(activeIndex, steps.length, {
       hasStructure: step.structure.length > 0,
@@ -808,6 +816,10 @@ function activatePreviewReading(preview) {
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
     if (structureTitle) structureTitle.textContent = ui.structureTitle;
+    if (supportingTitle) supportingTitle.textContent = ui.supportingTitle;
+    if (supportingBlock) supportingBlock.hidden = sourceCategories.supporting.length === 0;
+    if (supportingBody) supportingBody.textContent =
+      sourceCategories.supporting.join('\n\n');
     // The archived official report must not invent structural evidence when
     // the stored response does not contain any. Preserve Preview UI separately.
     if (structureBlock) structureBlock.hidden = isStoredRecord && structureParts.length === 0;
