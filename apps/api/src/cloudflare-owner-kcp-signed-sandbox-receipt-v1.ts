@@ -46,7 +46,7 @@ function recordSafeVerificationFailure(stage:string,error:unknown):void{
  const constraint=typeof e.constraint==='string'&&
    /^(?:owner_sandbox_receipt|cmd_persist_verified_payment_evidence_v1)_[a-z0-9_]{1,80}$/u.test(e.constraint)
    ?e.constraint:undefined;
- const httpStatus=stage==='provider_lookup'&&
+ const httpStatus=(stage==='provider_adapter'||stage==='provider_lookup')&&
    typeof e.httpStatus==='number'&&Number.isInteger(e.httpStatus)&&
    e.httpStatus>=400&&e.httpStatus<=599?e.httpStatus:undefined;
  console.warn('MYEONGHA_OWNER_KCP_VERIFY_DIAGNOSTIC',JSON.stringify({
