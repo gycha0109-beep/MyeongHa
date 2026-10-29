@@ -7,6 +7,12 @@ const query = vi.fn(async (sql, params = []) => {
   if (sql.includes('begin_member_subject_context_v1')) {
     return { rows: [{ subjectId: SUBJECT_ID, subjectKind: 'member' }] };
   }
+  if (sql.includes('to_regprocedure') && sql.includes('qry_seyeon_memory_grant_lifecycle_v1')) {
+    return { rows: [{ installed: true }] };
+  }
+  if (sql.includes('from public.qry_seyeon_memory_grant_lifecycle_v1')) {
+    return { rows: [{ grantState: 'active', grantedAt: '2026-10-20T00:00:00.000Z' }] };
+  }
   if (sql.includes('qry_memory_active_grants_v1')) {
     return { rows: [{ grantId: '33333333-3333-4333-8333-333333333333',
       characterId: 'seyeon', grantReason: 'user_choice',

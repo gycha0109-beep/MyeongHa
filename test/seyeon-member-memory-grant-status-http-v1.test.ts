@@ -20,6 +20,8 @@ function fixtures(path = url) {
     kind:'member',verifiedAuthUserId:auth,
   };
   let active = true;
+  let installed = true;
+  let lifecycleState: 'active' | 'withdrawal_pending' | 'not_granted' = 'active';
   let unavailable = false;
   let opens = 0;
   const connection:PostgresSubjectConnectionV1 = {
@@ -27,6 +29,15 @@ function fixtures(path = url) {
       queries.push({sql,params});
       if(sql.includes('begin_member_subject_context_v1')) {
         return {rows:[{subjectId:subject,subjectKind:'member'}] as unknown as Row[]};
+      }
+      if(sql.includes('to_regprocedure') && sql.includes('qry_seyeon_memory_grant_lifecycle_v1')) {
+        return {rows:[{installed}] as unknown as Row[]};
+      }
+      if(sql.includes('from public.qry_seyeon_memory_grant_lifecycle_v1')) {
+        return {rows:[{
+          grantState:lifecycleState,
+          grantedAt:lifecycleState==='active'?'2026-10-21T12:00:00.000Z':null,
+        }] as unknown as Row[]};
       }
       if(sql.includes('qry_memory_active_grants_v1')) {
         if(unavailable) throw Object.assign(new Error('private'),{
@@ -53,7 +64,9 @@ function fixtures(path = url) {
   };
   return {
     input,queries,
-    setActive(v:boolean){active=v;},
+    setActive(v:boolean){active=v;if(!v)lifecycleState='not_granted';},
+    setInstalled(v:boolean){installed=v;},
+    setLifecycle(v:'active'|'withdrawal_pending'|'not_granted'){lifecycleState=v;active=v==='active';},
     setUnavailable(v:boolean){unavailable=v;},
     setIdentity(v:VerifiedSubjectIdentityEvidenceV1|null){verify=v;},
     get opens(){return opens;},
@@ -84,6 +97,38 @@ describe('Se-yeon current owner Memory consent status, mounted GET feature',()=>
     expect((await response.json()).data).toMatchObject({
       currentlyGranted:false,grantedAt:null,
     });
+  });
+
+  it('distinguishes durable pending withdrawal from completed revocation after a new GET',async()=>{
+    const f=fixtures();
+    f.setLifecycle('withdrawal_pending');
+    const response=await handleSeyeonMemberMemoryGrantStatusRequestV1(f.input);
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toEqual({
+      memoryItemId:memory,characterId:'seyeon',
+      currentlyGranted:false,grantedAt:null,grantState:'withdrawal_pending',
+    });
+    expect(f.queries.some(x=>x.sql.includes('qry_seyeon_memory_grant_lifecycle_v1') &&
+      x.params[0]===subject && x.params[1]===memory)).toBe(true);
+  });
+
+  it('keeps uninstalled lifecycle fallback explicitly unknown rather than claiming completion',async()=>{
+    const f=fixtures();
+    f.setActive(false);
+    f.setInstalled(false);
+    const response=await handleSeyeonMemberMemoryGrantStatusRequestV1(f.input);
+    expect(response.status).toBe(200);
+    expect((await response.json()).data).toMatchObject({
+      currentlyGranted:false,grantState:'unknown',
+    });
+  });
+
+  it('fails closed when source RLS and lifecycle authority contradict',async()=>{
+    const f=fixtures();
+    f.setLifecycle('active');
+    f.setActive(false);
+    const response=await handleSeyeonMemberMemoryGrantStatusRequestV1(f.input);
+    expect(response.status).toBe(503);
   });
 
   it('never queries a Memory without verified Member identity',async()=>{
