@@ -71,6 +71,8 @@ jobs:
           done
       - name: Verify live dedicated Access Owner policy
         run: node apps/admin/access-policy-preflight.mjs
+      - name: Verify the live Hyperdrives actually bind the isolated DB roles
+        run: node apps/admin/hyperdrive-origin-preflight.mjs
       - name: Verify role-restricted PostgreSQL origins
         run: npm run verify:origins -w @myeongha/admin
       - name: Prepare disabled Admin Worker bundle
