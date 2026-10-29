@@ -7,6 +7,7 @@ const OFFICIAL_ISSUE_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab]
 import { bindCurrentBirthProfileRevisionForSajuV1 } from './saju-production-calculation-execution.js';
 import {
   buildSajuProductionReadingRequestV1,
+  SajuProductionReadingHttpAdapterErrorV1,
   type SajuProductionReadingHttpAdapterV1,
 } from './saju-production-reading-http-adapter.js';
 
@@ -87,7 +88,9 @@ export interface SajuOfficialIssuedDbTransactionPortV1 {
  * The actual Saju issuer and DB mapping verifiers have not been approved yet:
  * absent server-owned authorities => HELD without even calling Saju network.
  * 
- * A prior CREATE/transport PREPARE must have allocated exact pending identities.
+ * A prior CREATE must have allocated the logical Reading and Session IDs.
+ * A new transport attempt must then be allocated through the exact DB-grant
+ * checked, single-use prepare port before the Saju network call.
  * On completion the existing DB finalize command stores the immutable record,
  * source native ID, response hash and outbox entry as a single DB transaction.
  */
@@ -106,9 +109,8 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     sourceBirthRevisionId: string;
     sourceVerifier?: SajuOfficialSourceVerificationPortV1;
     mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
-    /** Optional when the exact attempt is already prepared by a trusted DB caller. */
+    /** Required single-use DB attempt allocation before any Saju source call. */
     attemptPrepare?: SajuOfficialAttemptPreparePortV1;
-    preflight?: SajuOfficialIssuancePreflightPortV1;
     dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
@@ -121,14 +123,12 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   });
   // The existing current Saju proof endpoint only emits Preview/HELD.
   // Never charge an upstream call without a wired Production issuer + DB scope.
-  const { sourceVerifier, mappingVerifier, attemptPrepare, preflight, dbTransaction } = input;
-  const hasBeforeSourceAuthority = attemptPrepare === undefined
-    ? typeof preflight?.admitBeforeSourceCall === 'function'
-    : typeof attemptPrepare.prepareBeforeSourceCall === 'function';
+  const { sourceVerifier, mappingVerifier, attemptPrepare, dbTransaction } = input;
   if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
     || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
-    || !hasBeforeSourceAuthority
-    || typeof dbTransaction?.run !== 'function') {
+    || typeof attemptPrepare?.prepareBeforeSourceCall !== 'function'
+    || typeof dbTransaction?.run !== 'function'
+    || typeof input.adapter?.requestReading !== 'function') {
     return unavailable;
   }
 
@@ -168,21 +168,30 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     sourceBirthRevisionId: input.sourceBirthRevisionId,
   };
 
-  // A NEW attempt is allocated together with its exact current entitlement
-  // under one DB transaction. A separate post-allocation preflight could
-  // reject after the attempt committed and strand it in 'running'.
-  // Already-prepared trusted attempts use the standalone read-only preflight.
-  const admittedBeforeSource = attemptPrepare === undefined
-    ? await preflight?.admitBeforeSourceCall(exactAttempt)
-    : typeof attemptPrepare.prepareBeforeSourceCall === 'function'
-      && await attemptPrepare.prepareBeforeSourceCall(exactAttempt) === true;
+  // The DB allocator rejects exact replays and in-flight attempts. A read-only
+  // preflight is never sufficient to claim single-use network execution.
+  // Current purchase, SELF Birth and new attempt are admitted atomically.
+  const admittedBeforeSource =
+    await attemptPrepare.prepareBeforeSourceCall(exactAttempt);
   if (admittedBeforeSource !== true) {
     return Object.freeze({ ...unavailable, reason: 'current_authority_unavailable' as const });
   }
 
   // The immutable finalize transaction independently rechecks the grant,
   // current Birth and issuer provenance before any report can be stored.
-  const response = await input.adapter.requestReading(executedRequest);
+  let response: AdmittedResponse;
+  try {
+    response = await input.adapter.requestReading(executedRequest);
+  } catch (error) {
+    // A transport error cannot prove whether the Saju issuer already generated
+    // a result. Do not finalize a failed attempt as retryable/final, reissue the
+    // same paid request, or claim a stored report without issuer reconciliation.
+    // An authorized failure policy and exact source receipt are still HOLD.
+    if (error instanceof SajuProductionReadingHttpAdapterErrorV1) {
+      return unavailable;
+    }
+    throw error;
+  }
   return dbTransaction.run({
     subjectId: input.subjectId,
     commit: ({ currentAuthority, commitPort }) =>
