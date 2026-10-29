@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { resolveSeyeonC09KnowledgeDecisionShadowV1 } from '../packages/domain/src/seyeon-c09-epistemic-resolver-shadow-v1.js';
 import {
   assembleSeyeonRuntimeContextV2,
   type SeyeonRuntimeContextV2,
@@ -260,5 +261,175 @@ describe('C09 governed continuity State -> Decision -> Renderer Shadow', () => {
       });
     }
     expect(generate).not.toHaveBeenCalled();
+  });
+});
+
+
+const EPISTEMIC_ASOF = '2026-10-29T05:00:00.000Z';
+const EPISTEMIC_LEARNED = '2026-10-28T05:00:00.000Z';
+
+function epistemicPolicyDecision(
+  requestKind: 'general_question' | 'technical_execution' | 'learning_offer',
+  learned: boolean,
+) {
+  return resolveSeyeonC09KnowledgeDecisionShadowV1({
+    policy: {
+      characterId: 'seyeon',
+      topicKey: 'python.programming',
+      policyVersion: 'c09-test-knowledge-policy',
+      authoritySourceRef: 'server:canon:test-explicit-unaware',
+      domainPolicy: 'bounded',
+      baseline: 'explicit_unaware',
+    },
+    subjectId: 'subject-1',
+    requestKind,
+    asOfTurn: EPISTEMIC_ASOF,
+    evidence: learned ? [{
+      evidenceId: 'verified-classroom-lesson',
+      characterId: 'seyeon',
+      topicKey: 'python.programming',
+      sourceKind: 'user_taught_verified',
+      authorityRef: 'server:verification:lesson1',
+      verifiedByServer: true,
+      awareness: 'heard_of',
+      visibility: 'character_shared',
+      subjectId: null,
+      approvedForCharacterSharing: true,
+      privacyReviewed: true,
+      learnedAt: EPISTEMIC_LEARNED,
+      validAt: EPISTEMIC_LEARNED,
+      supersededAt: null,
+    }] : [],
+  });
+}
+
+describe('C09 Knowledge Policy opt-in gate in multi-turn Shadow', () => {
+  it('blocks explicitly unknown specialist execution before a model call', async () => {
+    const ctx = context(false);
+    const { generate, review } = providers();
+    const epistemicRead = vi.fn(async () => epistemicPolicyDecision('technical_execution', false));
+    const shadow = createSeyeonC09ContinuityShadowV1({
+      candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
+      reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
+      authoritySnapshotPort: {
+        subjectId: 'subject-1', threadId: 'thread-1',
+        readAuthoritativeSnapshot: async () => snapshot(ctx),
+      },
+      epistemicAuthorityPort: {
+        subjectId: 'subject-1',
+        readCurrentKnowledgeDecision: epistemicRead,
+      },
+    });
+    await expect(shadow.evaluate(ctx)).rejects.toMatchObject({ code: 'C09_KNOWLEDGE_RESTRICTED' });
+    expect(epistemicRead).toHaveBeenCalledOnce();
+    expect(generate).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
+  });
+
+  it('verified heard_of only permits partial explanation, preserving the independent reviewer and triple re-read', async () => {
+    const ctx = context(false);
+    const { generate, review } = providers({ candidateResult: () => result(false) });
+    const read = vi.fn(async () => epistemicPolicyDecision('general_question', true));
+    const shadow = createSeyeonC09ContinuityShadowV1({
+      candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
+      reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
+      authoritySnapshotPort: {
+        subjectId: 'subject-1', threadId: 'thread-1',
+        readAuthoritativeSnapshot: async () => snapshot(ctx),
+      },
+      epistemicAuthorityPort: {
+        subjectId: 'subject-1',
+        readCurrentKnowledgeDecision: read,
+      },
+    });
+    const response = await shadow.evaluate(ctx);
+    expect(response.scope).toBe('SHADOW_ONLY_NOT_PRODUCTION');
+    expect(read).toHaveBeenCalledTimes(3);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(review).toHaveBeenCalledOnce();
+    const req = generate.mock.calls[0]![0] as unknown as { input: Record<string, unknown> };
+    expect(req.input.c09EpistemicDecision).toMatchObject({
+      topicKey: 'python.programming',
+      characterKnowledgeLevel: 'heard_of',
+      responsePermission: 'partial',
+      allowedEvidenceIds: ['verified-classroom-lesson'],
+    });
+  });
+
+  it('revoking shared verified knowledge after model generation discards the candidate before review', async () => {
+    const ctx = context(false);
+    let hasLearning = true;
+    const { generate, review } = providers({
+      onCandidate: () => { hasLearning = false; },
+      candidateResult: () => result(false),
+    });
+    const shadow = createSeyeonC09ContinuityShadowV1({
+      candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
+      reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
+      authoritySnapshotPort: {
+        subjectId: 'subject-1', threadId: 'thread-1',
+        readAuthoritativeSnapshot: async () => snapshot(ctx),
+      },
+      epistemicAuthorityPort: {
+        subjectId: 'subject-1',
+        readCurrentKnowledgeDecision: async () =>
+          epistemicPolicyDecision('general_question', hasLearning),
+      },
+    });
+    await expect(shadow.evaluate(ctx)).rejects.toMatchObject({
+      code: 'C09_KNOWLEDGE_AUTHORITY_MISMATCH',
+    });
+    expect(generate).toHaveBeenCalledOnce();
+    expect(review).not.toHaveBeenCalled();
+  });
+
+  it('rejects a knowledge authority port for another Subject before invoking providers', async () => {
+    const ctx = context(false);
+    const { generate, review } = providers();
+    const shadow = createSeyeonC09ContinuityShadowV1({
+      candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
+      reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
+      authoritySnapshotPort: {
+        subjectId: 'subject-1', threadId: 'thread-1',
+        readAuthoritativeSnapshot: async () => snapshot(ctx),
+      },
+      epistemicAuthorityPort: {
+        subjectId: 'subject-B',
+        readCurrentKnowledgeDecision: async () => epistemicPolicyDecision('general_question', true),
+      },
+    });
+    await expect(shadow.evaluate(ctx)).rejects.toMatchObject({
+      code: 'C09_KNOWLEDGE_AUTHORITY_MISMATCH',
+    });
+    expect(generate).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('C09 epistemic contract tampering', () => {
+  it('does not accept a forged normal permission for an explicitly unaware character', async () => {
+    const ctx = context(false);
+    const { generate, review } = providers();
+    const forged = {
+      ...epistemicPolicyDecision('general_question', false),
+      responsePermission: 'normal',
+    };
+    const shadow = createSeyeonC09ContinuityShadowV1({
+      candidateProvider: { providerKey: 'test', modelKey: 'test', generate },
+      reviewerProvider: { providerKey: 'test', modelKey: 'test', generate: review },
+      authoritySnapshotPort: {
+        subjectId: 'subject-1', threadId: 'thread-1',
+        readAuthoritativeSnapshot: async () => snapshot(ctx),
+      },
+      epistemicAuthorityPort: {
+        subjectId: 'subject-1',
+        readCurrentKnowledgeDecision: async () => forged,
+      },
+    });
+    await expect(shadow.evaluate(ctx)).rejects.toMatchObject({
+      code: 'C09_KNOWLEDGE_AUTHORITY_MISMATCH',
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(review).not.toHaveBeenCalled();
   });
 });
