@@ -50,11 +50,42 @@ describe('Official Reading Records read contract', () => {
       productResponseState: 'delivered',
       readerCharacterIds: ['seyeon'],
       completedAt: '2026-09-23T00:01:00.000Z',
+      birthRevision: { issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' },
       reading: ROW.responseSnapshotJsonb,
     });
     expect(result).not.toHaveProperty('responseHash');
     expect(result).not.toHaveProperty('threadId');
     expect(result).not.toHaveProperty('readerContext');
+  });
+
+  it('compares stored self Birth revision without reconstructing or rewriting the official result', async () => {
+    for (const birthRevision of [
+      { issuedRevisionNo: 2, currentRevisionNo: 2, state: 'current' as const },
+      { issuedRevisionNo: 2, currentRevisionNo: 3, state: 'changed' as const },
+      { issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' as const },
+    ]) {
+      const result = await getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        authorityPort: port({ ...ROW, birthRevision }),
+      });
+      expect(result.birthRevision).toEqual(birthRevision);
+      expect(result.reading).toBe(ROW.responseSnapshotJsonb);
+      expect(result).not.toHaveProperty('sourceBirthRevisionId');
+      expect(result).not.toHaveProperty('currentBirthRevisionId');
+    }
+    for (const birthRevision of [
+      { issuedRevisionNo: 1, currentRevisionNo: 2, state: 'current' as const },
+      { issuedRevisionNo: null, currentRevisionNo: 2, state: 'changed' as const },
+      { issuedRevisionNo: 1, currentRevisionNo: 1, state: 'changed' as const },
+      { issuedRevisionNo: -1, currentRevisionNo: 2, state: 'unknown' as const },
+    ]) {
+      await expect(getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        authorityPort: port({ ...ROW, birthRevision }),
+      })).rejects.toThrow('Birth revision provenance is inconsistent');
+    }
   });
 
   it('binds a server-pinned Reader hash to the Records DB row without returning the hash', async () => {
