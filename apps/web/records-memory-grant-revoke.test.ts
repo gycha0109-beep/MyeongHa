@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
+import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 
 const MEMORY_ID = '22222222-2222-4222-8222-222222222222';
 const ENDPOINT = `/api/memories/${MEMORY_ID}/grants/seyeon/revoke`;
@@ -72,13 +73,22 @@ describe('Records Member Memory Grant revocation transport', () => {
     }
   });
 
-  it('keeps pending withdrawal hidden from repeat UI submissions until current grant changes', async () => {
-    const { readFileSync } = await import('node:fs');
-    const source = readFileSync(new URL('./records-page.js', import.meta.url), 'utf8');
-    expect(source).toContain("if (acknowledgement.status === 'pending') withdrawalPending = true");
-    expect(source).toContain("revoke.hidden = !result.currentlyGranted || withdrawalPending");
-    expect(source).toContain("if (requestInFlight || withdrawalPending) return");
-    expect(source).toContain("if (!result.currentlyGranted) withdrawalPending = false");
+  it('preserves 202 pending even when restrictive RLS hides the current grant', () => {
+    const pending = presentSeyeonMemoryGrantStatusV1(false, true);
+    expect(pending).toMatchObject({ kind: 'withdrawal_pending', revokeAvailable: false });
+    expect(pending.message).toContain('최종 완료는 아직 확인되지');
+
+    const inconsistent = presentSeyeonMemoryGrantStatusV1(true, true);
+    expect(inconsistent.kind).toBe('withdrawal_pending');
+    expect(inconsistent.revokeAvailable).toBe(false);
+    expect(inconsistent.message).toContain('일치하지 않습니다');
+
+    expect(presentSeyeonMemoryGrantStatusV1(false, false)).toMatchObject({
+      kind: 'no_access', revokeAvailable: false,
+    });
+    expect(presentSeyeonMemoryGrantStatusV1(true, false)).toMatchObject({
+      kind: 'granted', revokeAvailable: true,
+    });
   });
 
   it('never retries an unknown 503 or accepts a mismatched receipt', async () => {
