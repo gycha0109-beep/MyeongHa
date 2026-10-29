@@ -25,7 +25,9 @@ with expected(signature) as (
     coalesce(has_function_privilege('anon',i.function_oid,'EXECUTE'),false) as anon_execute,
     coalesce(has_function_privilege('authenticated',i.function_oid,'EXECUTE'),false) as authenticated_execute,
     coalesce(has_function_privilege('service_role',i.function_oid,'EXECUTE'),false) as service_execute,
-    coalesce(has_function_privilege('PUBLIC',i.function_oid,'EXECUTE'),false) as public_execute
+    coalesce((select bool_or(acl.grantee=0 and acl.privilege_type='EXECUTE')
+      from aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl),true)
+      as public_execute
   from installed i left join pg_proc p on p.oid=i.function_oid
 ), baseline as (
   select
