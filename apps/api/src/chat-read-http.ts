@@ -118,6 +118,19 @@ select exists (
 ) as "hasMessages"
 `.trim();
 
+// Check every historical participant, not just the current active bundle or
+// the paginated stream. The SQL definer is Member/Subject-owned metadata only.
+// Until its separately approved SQL installs, existing per-page HOLD remains;
+// this optional guard cannot by itself certify full G3 History/Replay.
+const SEYEON_HISTORY_GUARD_AVAILABLE_SQL = `
+select to_regprocedure('public.qry_seyeon_thread_ever_involved_v1(uuid,uuid)')
+  is not null as "installed"
+`.trim();
+const SEYEON_HISTORY_GUARD_SQL = `
+select ever_involved as "everInvolved"
+from public.qry_seyeon_thread_ever_involved_v1($1::uuid,$2::uuid)
+`.trim();
+
 const READ_RELATIONSHIP_SQL = `
 select
   state_id::text as "stateId",
@@ -373,6 +386,27 @@ async function readChatState(
   if (binding.participantCharacterIds.includes('seyeon')) {
     throw new SeyeonChatHistoryRevealHoldV1();
   }
+  // A former Se-yeon participant disappears from the active binding when
+  // left_at is set or a new content bundle is selected. A page-local check
+  // cannot prove that an earlier/later page is safe to replay.
+  const capability = await client.query<{ installed: boolean }>(
+    SEYEON_HISTORY_GUARD_AVAILABLE_SQL,
+  );
+  if (capability.rows.length !== 1 ||
+      typeof capability.rows[0]?.installed !== 'boolean') {
+    throw new SeyeonChatHistoryRevealHoldV1();
+  }
+  if (capability.rows[0].installed) {
+    const history = await client.query<{ everInvolved: boolean }>(
+      SEYEON_HISTORY_GUARD_SQL, [subjectId, parsed.threadId],
+    );
+    if (history.rows.length !== 1 ||
+        typeof history.rows[0]?.everInvolved !== 'boolean' ||
+        history.rows[0].everInvolved) {
+      throw new SeyeonChatHistoryRevealHoldV1();
+    }
+  }
+
   const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
     subjectId,
     parsed.threadId,

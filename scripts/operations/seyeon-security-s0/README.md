@@ -39,3 +39,11 @@ DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실
 `07-member-withdrawal-status.sql`은 RLS가 숨기는 미완료 철회 intent를 소유자 본인에게만 `active / withdrawal_pending / not_granted` 상태로 반환하는 읽기 전용 최소 권한 함수입니다. 원본 기억 본문·Grant ID·철회 시각은 반환하지 않습니다. `myeongha_api_executor`에게 이 조회 함수 EXECUTE만 부여하며 DML·모델·공개 권한을 추가하지 않습니다.
 
 기존 S0 설치 묶음 뒤에 적용합니다. 병합만으로 운영 DB에 자동 설치되지 않으며, 실제 운영 DB 적용 전 대상 ACL·PG17 경합·운영 승인 증거가 필요합니다. 미설치 서버의 일반 GET 결과가 false여도 철회 완료를 추정하지 않고 `unknown`으로 처리합니다.
+
+## G3 과거 세연 참가 대화 이력 — 읽기 전용 차단 보강
+
+`08-historical-thread-presence.sql`은 현재 `left_at is null` 참가자 및 현 번들만 보는 `qry_chat_thread_runtime_binding_v1`만으로는 알 수 없는 과거 `seyeon` 참가 이력을, **인증된 Subject와 원본 Thread 소유권을 검증한 뒤**, 정확히 하나의 boolean으로 보고합니다. 본문·원본 기억·메시지/Grant/참가자 식별자는 반환하지 않습니다. 기존 `myeongha_api_executor`에게 해당 읽기 함수 EXECUTE만 허용하며 일반 `anon/authenticated/service_role` 호출은 불허합니다.
+
+일반 Chat GET은 함수가 설치되면 **요청 페이지의 stream SQL을 실행하기 전에** 이 이력을 검증하여 과거 세연이 있으면 메시지·Relationship 전체를 `SEYEON_HISTORY_REVEAL_HOLD`로 차단합니다. 현재 참가자가 세연인 경우 기존 single-room metadata shell / mixed-thread 전체 HOLD를 유지합니다.
+
+`main` 병합만으로 운영 DB 함수가 적용되지는 않습니다. 미설치 DB에서는 기존 페이지 단위 보호를 유지하나 전체 이력 안전성의 증거는 **아직 없으며 G3 HOLD**입니다. 함수 배포, 복구, 실제 두 세션 검증 및 이전 구성에 존재했던 별도 파생 기록 추적 없이 G3 전체 PASS라고 판정할 수 없습니다. 현재 설치 묶음은 disposable DB 전용이며 개인정보 공개 권한을 추가하지 않습니다.
