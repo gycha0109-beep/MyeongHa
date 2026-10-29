@@ -50,7 +50,28 @@ The remote statement's 170-character starting and ending fragments of
 difference can change owner/ACL installation ordering, so do not replace
 `20261008090417` with the current six files or silently repair remote
 migration history. A ledger `created_by` value is now observed, but SQL source origin, deployment workflow/commit, authenticated deploy actor, change approval,
-and complete DDL/ACL equivalence remain **unidentified/unproven**.
+and complete DDL/ACL equivalence remain **unidentified/unproven**. However, the user's 2026-10-16 [R2-G historical-actor risk-acceptance decision](SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md) **closed the actor/request-ID/COMMIT forensic pursuit as a development blocker** (`CLOSED_RISK_ACCEPTED`). Its unverified history is retained as an accepted risk, not a renewed mandate to reconstruct the original actor before further code, tests or PRs. Technical catalog/ACL parity and Production deployment authorization remain separate gates.
+
+## 2026-10-29 — bounded read-only R2 RPC technical ACL drift
+
+Using the already-reviewed read-only catalog queries
+[`seyeon-r2-rpc-set-fingerprint-readonly.sql`](../../scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql)
+and [`seyeon-r2-acl-grants-canonical-readonly.sql`](../../scripts/operations/seyeon-r2-acl-grants-canonical-readonly.sql),
+the existing **Production** project was observed again without reading function bodies, customer rows, raw ACL entries, role identities or secret values into this evidence. The comparison baseline is the **separate earlier 2026-10-13 Production observation**, not an assumption that no intervening grants/revocations were made.
+
+| Read-only comparison to 2026-10-13 Production baseline | 2026-10-29 observation |
+| --- | --- |
+| 19 RPC catalog names / resolved functions | **19/19**, none missing |
+| PostgreSQL major | **17** |
+| Function names, signatures, Owner, `pg_get_functiondef` DDL, flags aggregate fingerprints | **5/5 unchanged** |
+| `pg_proc.proacl::text` aggregate fingerprint | **CHANGED** — historical `e0576c2bcd9c0826cf2799017f1a2396a7d14a11aaf094209ea40547bb1f9e88`, current `82becfaf8de44fc8eff96bff753f969d71a5a91768a149c2f2f09d7cb3416880` |
+| Explicit grant-edge count for these RPCs | **38 → 37** |
+| Functions with per-function raw or canonical ACL digest changes | **2/19** |
+| Browser `anon` / `authenticated` effective EXECUTE | **0/19** in the current observation |
+
+The two affected public RPCs are **`assert_seyeon_chat_thread_runtime_v1`** (two explicit edges in both snapshots, but both raw and canonical ACL hashes changed) and **`cmd_mark_seyeon_chat_context_ready_runtime_v1`** (explicit edges **2 → 1**, and both ACL hashes changed). All other **17** functions matched their 2026-10-13 per-function ACL metadata. For these **two specific functions only**, current read-only effective EXECUTE checks for `service_role` and `myeongha_api_executor` both returned **false**, as did `anon` and `authenticated`. Earlier 2026-10-16 [historical management-API audit](SEYEON_R2_G_HISTORICAL_MANAGEMENT_API_LOG_AUDIT_20261016.md) had separately recorded a `service_role` direct grant on the assert helper; the **current state differs**. This is *not* evidence of which deployer, operation or incident changed the ACL, nor proof of whether a particular application caller is affected.
+
+**Decision:** `HOLD_R2_RPC_ACL_TECHNICAL_PARITY` remains for permission-sensitive operational promotion. A hash change or missing edge must not be silently classified as harmless formatting, nor fixed by guessed `GRANT` or a migration-history repair. The 2026-10-16 **historical actor-risk acceptance stays closed**; the newer **technical ACL observation** is a separate scoped acceptance item. No Production writes or privileged policy changes were made.
 
 ## Backup/restore provenance boundary
 
@@ -60,12 +81,10 @@ and complete DDL/ACL equivalence remain **unidentified/unproven**.
 - Actual source-row measurements on the latest encrypted backup: **112 Provider rows skipped**, **53 projected-column rows**, **54 total Provider rows replayed** (53 included in 54); full Hosted provider data recovery remains disproven for this isolated route. See [gap matrix](HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md).
 - `provider_managed_data_full_restore=false`, `future_safe_privacy_reconciliation=false`, `sourceContinuityProven=false`, `continuousCaptureProven=false`, `serviceResumptionAllowed=false`, `gate=BLOCKED` and `dr_ready=false` remain mandatory.
 
-## Required authority resolution before any mutation
+## Remaining technical authority before any Production mutation
 
-Preserve the original remote migration statement and metadata, compare full
-`20261008090417` against its true deployment source (including the changed
-ACL sections), and establish the actual origin of that bundled migration.
-Only then may the project owner choose an explicitly governed **forward-only**
-alignment or separately justified reconciliation. No `supabase migration repair`,
-remote history rewrite, guessed migration replay, or service promotion is
-authorized by this evidence record.
+The 2026-10-16 [user risk-acceptance decision](SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md) explicitly ended repeated historical actor/request-ID/COMMIT provenance investigation as a **development blocker**. Preserve the existing remote SQL/history unchanged, but **do not condition future code, isolated tests, documentation PRs or evidence reviews on reconstructing that accepted historical evidence**.
+
+Before any **Production** DDL/Role/ACL/history change or new migration deployment, separately establish the presently relevant **function/owner/effective-grant parity**, justify the observed 2-RPC ACL discrepancy, determine the approved forward-only migration order and rollback/restore boundary, and obtain the specific user authorization for the actual Production mutation. An isolated PostgreSQL successful replay or historical risk acceptance does not authorize `supabase migration repair`, remote history rewrite, guessed DDL/GRANT, hosted recovery or serving promotion.
+
+Maintain `dr_ready=false`, `future_safe_privacy_reconciliation=false`, `provider_managed_data_full_restore=false`, `gate=BLOCKED`, and `serviceResumptionAllowed=false` while independent Hosted Auth/Storage, privacy continuity and S8 evidence remain absent.
