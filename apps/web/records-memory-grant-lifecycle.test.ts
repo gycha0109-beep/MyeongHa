@@ -62,7 +62,7 @@ describe('Records S0 owner withdrawal lifecycle',()=>{
     const page=readFileSync(new URL('./records-page.js',import.meta.url),'utf8');
     expect(page).toContain("result.grantState === 'withdrawal_pending'");
     expect(page).toContain("result.grantState === 'not_granted'");
-    expect(page).toContain("result.grantState === 'unknown'");
+    expect(page).toContain("lastGrantState = result.grantState");
     expect(page).toContain("presentSeyeonMemoryGrantStatusV1(");
     expect(page).toContain("lastGrantState !== 'active'");
     expect(page).toContain("revoke.hidden = !view.revokeAvailable");
