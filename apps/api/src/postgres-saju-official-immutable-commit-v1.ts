@@ -34,11 +34,13 @@ select
   native_reading_id as "nativeReadingId",
   external_request_ref as "externalRequestRef",
   source_birth_input_hash as "sourceBirthInputHash",
+  saju_engine_version as "sajuEngineVersion",
+  attempt_engine_version as "attemptEngineVersion",
   reading_contract_version as "readingContractVersion",
   product_response_state as "productResponseState",
   stored_snapshot as "storedSnapshot",
   stored_response_hash as "storedResponseHash"
-from public.qry_saju_official_stored_lineage_v1(
+from public.qry_saju_official_stored_lineage_v2(
   $1::uuid, $2::uuid, $3::uuid
 )
 `.trim();
@@ -47,6 +49,8 @@ type StoredLineageRow = Readonly<{
   nativeReadingId: unknown;
   externalRequestRef: unknown;
   sourceBirthInputHash: unknown;
+  sajuEngineVersion: unknown;
+  attemptEngineVersion: unknown;
   readingContractVersion: unknown;
   productResponseState: unknown;
   storedSnapshot: unknown;
@@ -113,6 +117,8 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
         || lineage.nativeReadingId !== input.nativeReadingId
         || lineage.externalRequestRef !== input.externalRequestRef
         || lineage.sourceBirthInputHash !== input.sourceBirthInputHash
+        || lineage.sajuEngineVersion !== input.engineVersion
+        || lineage.attemptEngineVersion !== input.engineVersion
         || lineage.readingContractVersion !== input.readingContractVersion
         || lineage.productResponseState !== input.productResponseState
         || lineage.storedResponseHash !== input.storedResponseHash

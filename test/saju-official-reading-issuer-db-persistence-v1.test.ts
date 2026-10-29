@@ -115,6 +115,8 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
   released = false;
   resolvedSubjectId = subjectId;
   storedNativeId = nativeReadingId;
+  storedEngineVersion = 'saju-engine-v1';
+  storedAttemptEngineVersion = 'saju-engine-v1';
   currentIssueAdmitted: unknown = true;
   async query<Row = Record<string, unknown>>(
     sql: string, _params: readonly unknown[] = [],
@@ -127,11 +129,13 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
       rows = [{ admitted: this.currentIssueAdmitted }];
     } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')) {
       rows = [{ readingId, executionAttemptId, responseHash: storedHash, replayed: false }];
-    } else if (sql.includes('from public.qry_saju_official_stored_lineage_v1(')) {
+    } else if (sql.includes('from public.qry_saju_official_stored_lineage_v2(')) {
       rows = [{
         nativeReadingId: this.storedNativeId,
         externalRequestRef: 'internal-only-ref',
         sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+        sajuEngineVersion: this.storedEngineVersion,
+        attemptEngineVersion: this.storedAttemptEngineVersion,
         readingContractVersion: 'myeonghwa-product-reading-response-v2',
         productResponseState: 'delivered',
         storedSnapshot: dbSnapshot,
@@ -168,7 +172,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(connection.calls[1]).toBe('SET LOCAL ROLE myeongha_api_executor');
     expect(connection.calls).toContain('select public.assert_myeongha_subject_context_v1($1::uuid)');
     const commitIndex = connection.calls.findIndex(x => x.includes('cmd_finalize_reading_transport_success_v1'));
-    const readIndex = connection.calls.findIndex(x => x.includes('from public.qry_saju_official_stored_lineage_v1('));
+    const readIndex = connection.calls.findIndex(x => x.includes('from public.qry_saju_official_stored_lineage_v2('));
     expect(commitIndex).toBeGreaterThan(0);
     expect(readIndex).toBeGreaterThan(commitIndex);
     expect(connection.calls.at(-1)).toBe('COMMIT');
@@ -214,6 +218,35 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(connection.calls.at(-1)).toBe('ROLLBACK');
     expect(connection.calls).not.toContain('COMMIT');
     expect(connection.released).toBe(true);
+  });
+
+  it('rolls back when persisted source or execution attempt engine versions disagree with the verified issuer', async () => {
+    for (const changed of ['storedEngineVersion', 'storedAttemptEngineVersion'] as const) {
+      const p = ports();
+      const connection = new FakeIssuedDbConnection();
+      connection[changed] = 'other-engine-v2';
+      const transaction = createPostgresSajuOfficialIssuedDbTransactionPortV1({
+        pool: { connect: () => connection },
+        verifiedEvidence: {
+          kind: 'member',
+          verifiedAuthUserId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        },
+      });
+      await expect(executeAndPersistCurrentBirthSajuOfficialReadingV1({
+        profile: profileFixture(), readingText: 'general natal',
+        adapter: { requestReading: async () => native },
+        subjectId, readingId, readingSessionId, executionAttemptId,
+        outboxEventId, sourceBirthRevisionId,
+        sourceVerifier: p.sourceVerifier,
+        mappingVerifier: p.mappingVerifier,
+        attemptPrepare: p.attemptPrepare,
+        dbTransaction: transaction,
+      })).rejects.toThrow(/stored lineage/);
+      expect(connection.calls.some(x => x.includes('cmd_finalize_reading_transport_success_v1'))).toBe(true);
+      expect(connection.calls.at(-1)).toBe('ROLLBACK');
+      expect(connection.calls).not.toContain('COMMIT');
+      expect(connection.released).toBe(true);
+    }
   });
 
   it('rechecks the live grant after Saju returns and refuses a refunded attempt', async () => {
@@ -791,10 +824,11 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
 
   it('uses existing atomic PostgreSQL finalize command, never writing readings/refs directly', async () => {
     const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
-      rows: sql.includes('from public.qry_saju_official_stored_lineage_v1(')
+      rows: sql.includes('from public.qry_saju_official_stored_lineage_v2(')
         ? [{
           nativeReadingId, externalRequestRef: 'internal-only-ref',
           sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+          sajuEngineVersion: 'saju-engine-v1', attemptEngineVersion: 'saju-engine-v1',
           readingContractVersion: 'myeonghwa-product-reading-response-v2',
           productResponseState: 'delivered',
           storedSnapshot: dbSnapshot, storedResponseHash: storedHash,
@@ -821,7 +855,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(params[14]).toBe(JSON.stringify(dbSnapshot));
     expect(params[15]).toBe(storedHash);
     const [readSql, readParams] = query.mock.calls[1] as unknown as [string, unknown[]];
-    expect(readSql).toContain('from public.qry_saju_official_stored_lineage_v1(');
+    expect(readSql).toContain('from public.qry_saju_official_stored_lineage_v2(');
     expect(readSql).not.toContain('join public.reading_execution_attempts rea');
     expect(readParams).toEqual([subjectId, readingId, executionAttemptId]);
   });
@@ -833,9 +867,10 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       { storedSnapshot: { ...dbSnapshot, reading: { ...dbSnapshot.reading, disclosures: [] } } },
     ]) {
       const query = vi.fn(async (sql: string, _params?: readonly unknown[]) => ({
-        rows: sql.includes('from public.qry_saju_official_stored_lineage_v1(') ? [{
+        rows: sql.includes('from public.qry_saju_official_stored_lineage_v2(') ? [{
           nativeReadingId, externalRequestRef: 'internal-only-ref',
           sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
+          sajuEngineVersion: 'saju-engine-v1', attemptEngineVersion: 'saju-engine-v1',
           readingContractVersion: 'myeonghwa-product-reading-response-v2',
           productResponseState: 'delivered',
           storedSnapshot: dbSnapshot, storedResponseHash: storedHash,
