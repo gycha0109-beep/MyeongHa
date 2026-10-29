@@ -46,6 +46,17 @@ import {
 } from './saju-official-reading-issuer-db-persistence-v1.js';
 
 /** A separate, verified Subject-scope admission before contacting Production Saju. */
+export interface SajuOfficialAttemptPreparePortV1 {
+  /** Allocate one new transport attempt and admit its exact active purchase atomically. */
+  prepareBeforeSourceCall(input: Readonly<{
+    subjectId: string;
+    readingId: string;
+    readingSessionId: string;
+    executionAttemptId: string;
+    sourceBirthRevisionId: string;
+  }>): Promise<boolean>;
+}
+
 export interface SajuOfficialIssuancePreflightPortV1 {
   admitBeforeSourceCall(input: Readonly<{
     subjectId: string;
@@ -95,6 +106,8 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     sourceBirthRevisionId: string;
     sourceVerifier?: SajuOfficialSourceVerificationPortV1;
     mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
+    /** Optional when the exact attempt is already prepared by a trusted DB caller. */
+    attemptPrepare?: SajuOfficialAttemptPreparePortV1;
     preflight?: SajuOfficialIssuancePreflightPortV1;
     dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
   }>,
@@ -108,7 +121,7 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   });
   // The existing current Saju proof endpoint only emits Preview/HELD.
   // Never charge an upstream call without a wired Production issuer + DB scope.
-  const { sourceVerifier, mappingVerifier, preflight, dbTransaction } = input;
+  const { sourceVerifier, mappingVerifier, attemptPrepare, preflight, dbTransaction } = input;
   if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
     || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
     || typeof preflight?.admitBeforeSourceCall !== 'function'
@@ -138,16 +151,26 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     });
   }
 
-  // The first rights check is a short, identity-resolved DB transaction.
-  // It does not grant production issue authority: the same exact rights must
-  // be rechecked under a locked DB row in the atomic finalize transaction.
-  const admittedBeforeSource = await preflight.admitBeforeSourceCall({
+  const exactAttempt = {
     subjectId: input.subjectId,
     readingId: input.readingId,
     readingSessionId: input.readingSessionId,
     executionAttemptId: input.executionAttemptId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
-  });
+  };
+  // On a new issuance or explicit retry, prepare the DB attempt atomically
+  // with its purchased initial Reader grant. A replayed attempt must not issue
+  // another network request. Pre-existing trusted attempts use preflight only.
+  if (attemptPrepare !== undefined) {
+    if (typeof attemptPrepare.prepareBeforeSourceCall !== 'function'
+      || await attemptPrepare.prepareBeforeSourceCall(exactAttempt) !== true) {
+      return Object.freeze({ ...unavailable, reason: 'current_authority_unavailable' as const });
+    }
+  }
+
+  // Recheck current rights in a separate short transaction before Saju.
+  // The final immutable transaction repeats the same exact Grant check.
+  const admittedBeforeSource = await preflight.admitBeforeSourceCall(exactAttempt);
   if (admittedBeforeSource !== true) {
     return Object.freeze({ ...unavailable, reason: 'current_authority_unavailable' as const });
   }
