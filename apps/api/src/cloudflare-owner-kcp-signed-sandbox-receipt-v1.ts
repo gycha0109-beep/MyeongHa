@@ -115,7 +115,16 @@ export async function persistCloudflareOwnerKcpSignedSandboxReceiptV1(input:Read
    return deny();
  }
 
- const evidence=await observed('provider_lookup',()=>executeCommercePaymentVerificationV1({context,adapter}));
+ // The generic Commerce verifier intentionally seals adapter errors as
+ // ADAPTER_FAILED. Preserve that public contract but record a bounded,
+ // private PortOne adapter error code before the generic wrapper sees it.
+ const observedAdapter=Object.freeze({
+  verify:(request:Parameters<typeof adapter.verify>[0])=>
+    observed('provider_adapter',()=>adapter.verify(request)),
+ });
+ const evidence=await observed('provider_lookup',()=>executeCommercePaymentVerificationV1({
+  context,adapter:observedAdapter,
+ }));
  if(evidence.environment!=='sandbox'||evidence.provider!=='portone_v2'||
     evidence.platform!=='web'||evidence.currentState!=='active'||
     evidence.ownerBinding.kind!=='purchase_intent'||
