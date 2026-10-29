@@ -28,6 +28,11 @@ const PHASES=Object.freeze({
  sdk_load:'포트원 SDK 로딩',sdk_request:'KCP 결제창 호출',
  verify:'결제 완료 서버 검증',
 });
+const SERVER_CODES=new Set([
+ 'AUTH_REQUIRED','MEMBER_REQUIRED','CROSS_ORIGIN_DENIED',
+ 'INVALID_REQUEST','NOT_FOUND',
+ 'SANDBOX_AUTHORITY_UNAVAILABLE','SANDBOX_CHECKOUT_UNAVAILABLE',
+]);
 function safeSdkCode(value){
  return typeof value==='string'&&/^[A-Za-z][A-Za-z0-9_-]{0,63}$/u.test(value)
   ?value:'UNKNOWN';
@@ -71,7 +76,20 @@ async function serverRequest(path,body=null){
   cache:'no-store',
   redirect:'error',
  });
- if(!response.ok)throw Error('서버에서 해당 관리자 테스트 요청을 허용하지 않았습니다.');
+ if(!response.ok){
+  let serverCode='UNKNOWN';
+  try{
+   const failure=await response.json();
+   if(SERVER_CODES.has(failure?.error?.code))serverCode=failure.error.code;
+  }catch{}
+  // Display only a fixed status and a strict server-code allowlist.
+  // Never echo provider/DB messages, full payloads or untrusted fields.
+  const httpStatus=Number.isSafeInteger(response.status)&&
+   response.status>=400&&response.status<=599?response.status:'UNKNOWN';
+  const problem=Error('서버 요청 실패 (HTTP '+httpStatus+').');
+  problem.code=serverCode;
+  throw problem;
+ }
  const envelope=await response.json();
  if(!envelope||typeof envelope!=='object'||envelope.ok!==true)
   throw Error('서버 테스트 결과를 확인할 수 없습니다.');
@@ -188,9 +206,10 @@ async function checkExisting(){
  if(!allowed||busy||!attemptId)return;
  setBusy(true);
  try{await verifyWithServer(attemptId);}
- catch{
+ catch(error){
+  showDiagnostic('verify',error);
   PROVIDER.textContent='서버 PAID 확인 실패 또는 결제 미완료';
-  status('이 결제 시도의 PAID를 확인하지 못했습니다. 결제창 진단 내용은 위에 남아 있습니다.');
+  status('이 결제 시도의 PAID를 확인하지 못했습니다. 서버 검증 진단 코드를 확인해 주세요.');
  }finally{setBusy(false);}
 }
 async function initialize(){
