@@ -23,6 +23,14 @@ export interface OfficialReadingRecordAuthorityRowV1 {
   readonly responseHash: string;
   readonly readerCharacterIds: readonly string[];
   readonly completedAt: string;
+  /** Owner/Grant-gated self Birth metadata from the same DB transaction. */
+  readonly birthRevision?: OfficialReadingBirthRevisionStatusV1;
+}
+
+export interface OfficialReadingBirthRevisionStatusV1 {
+  readonly issuedRevisionNo: number | null;
+  readonly currentRevisionNo: number | null;
+  readonly state: 'current' | 'changed' | 'unknown';
 }
 
 export class OfficialReadingRecordReadAuthorityPortErrorV1 extends Error {
@@ -49,6 +57,7 @@ export interface OfficialReadingRecordV1 {
   readonly productResponseState: string;
   readonly readerCharacterIds: readonly string[];
   readonly completedAt: string;
+  readonly birthRevision: OfficialReadingBirthRevisionStatusV1;
   readonly reading: Readonly<Record<string, unknown>>;
 }
 
@@ -110,6 +119,29 @@ function requireReaderCharacterIds(value: unknown): readonly string[] {
     throw new Error('Official Reading record authority returned non-deterministic Reader provenance.');
   }
   return Object.freeze(ids);
+}
+
+function requireBirthRevisionStatus(
+  value: OfficialReadingBirthRevisionStatusV1 | undefined,
+): OfficialReadingBirthRevisionStatusV1 {
+  if (value === undefined) {
+    return Object.freeze({ issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' });
+  }
+  const validNo = (n: number | null): boolean =>
+    n === null || (Number.isSafeInteger(n) && n > 0);
+  if (!validNo(value.issuedRevisionNo) || !validNo(value.currentRevisionNo)
+    || !['current', 'changed', 'unknown'].includes(value.state)
+    || (value.state !== 'unknown'
+      && (value.issuedRevisionNo === null || value.currentRevisionNo === null))
+    || (value.state === 'current' && value.issuedRevisionNo !== value.currentRevisionNo)
+    || (value.state === 'changed' && value.issuedRevisionNo === value.currentRevisionNo)) {
+    throw new Error('Official Reading Birth revision provenance is inconsistent.');
+  }
+  return Object.freeze({
+    issuedRevisionNo: value.issuedRevisionNo,
+    currentRevisionNo: value.currentRevisionNo,
+    state: value.state,
+  });
 }
 
 function requireReadingSnapshot(
@@ -245,6 +277,7 @@ export async function getOfficialReadingRecord(input: {
       productResponseState,
       readerCharacterIds: requireReaderCharacterIds(row.readerCharacterIds),
       completedAt: requireTimestamp(row.completedAt),
+      birthRevision: requireBirthRevisionStatus(row.birthRevision),
       reading,
     });
   } catch (error) {
