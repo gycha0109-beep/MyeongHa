@@ -6,6 +6,14 @@
 > **출시 범위:** `saju.general_natal.deep.v1` (정밀 원국 리포트) **한 종류**를 기준으로 한다. 출생 정보 변경 시에는 같은 활성 구매권으로 신규 revision의 재생성을 허용하되 과거 결과는 보존한다. Career/Wealth/Relationship/Annual 등은 확장 후보일 뿐 최초 출시 상품에 포함하지 않는다.  
 > **원칙:** 기존 기능 중복 구현 금지 · 현재 저장소의 실제 경로 재사용 · 독립 작업부터 구현 · 기능별 1~2개 필수 테스트 · 최종 통합 검증 · HOLD 우회 금지.
 
+## 2026-10-29 이어서 구현 — 12개 상품 동일 진입 화면
+
+- `apps/web/src/reading/ReadingPage.tsx`의 4개 주력 상품 + 접힌 8개 추가 상품 구조를 없애고 **12개 상품을 하나의 `sajuProductTopics` 카탈로그·동일 카드 그리드**에 표시한다. 이는 판매 활성화 순서나 Saju 연구 8메뉴의 우선순위가 아니다.
+- 기존 12개 주제별 정확한 URL과 현재 Preview 허용 목록을 유지한다. **실제 허용된 Preview 5개만 읽기 링크를 제공**하고 나머지 7개는 서비스 준비 중으로 표시해 미지원 경로를 상품 구매 동작처럼 제시하지 않는다.
+- 공식 보고서의 저장·재열람 UI와 Owner/Grant 검사는 기존 계약을 유지한다. 아직 Saju Production issuer가 승인되지 않았으므로 상품 카드 추가를 공식 발행·판매 완료라고 취급하지 않는다.
+- 관련 구현·레이아웃: `apps/web/src/reading/ReadingPage.tsx`, `apps/web/saju-preview-landing.css`; 화면·라우트 표면 검사: `apps/web/saju-reading-readiness.test.ts`, `test/web-reading-availability-ux.test.ts`, `test/web-golden-master-layout.test.ts`.
+- Saju 정본 `docs/product/22-production-interpretation-authority-audit.md`는 2026-10-29 재확인 기준 **NO_BUILD / Production BLOCKED**다. 운영 발행 활성화나 중간 main 병합은 수행하지 않는다.
+
 ## 2026-10-28 제품 확정 기준 — 12개 사주 상품 동일 레이어
 
 > 이 절은 아래에 남긴 과거 첫 SKU·연애 우선·8메뉴 확대 후보 문구보다 **최신 제품 의사결정으로 우선한다**. 이전 서술은 당시 구현 이력을 설명할 뿐 현재 상품 계층이나 출시 우선순위를 결정하지 않는다.
