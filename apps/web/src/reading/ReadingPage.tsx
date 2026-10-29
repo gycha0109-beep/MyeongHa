@@ -17,7 +17,7 @@ const additionalReadingTopics = [
   { symbol: '生', title: '삶의 단계', href: 'reading-detail.html?topic=life-stage' },
   { symbol: '歲', title: '올해', href: 'reading-detail.html?scope=year' },
   { symbol: '月', title: '이번 달', href: 'reading-detail.html?scope=month' },
-  { symbol: '伴', title: '배우자 · 관계', href: 'reading-detail.html?topic=spouse' },
+  { symbol: '伴', title: '배우자', href: 'reading-detail.html?topic=spouse' },
   { symbol: '合', title: '궁합', href: 'reading-detail.html?topic=compatibility' },
   { symbol: '問', title: '지금 고민으로 보기', href: 'reading-detail.html?topic=question-specific' },
 ] as const;
