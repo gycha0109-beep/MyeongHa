@@ -54,6 +54,28 @@ describe('Chat Runtime authored UI locale boundary', () => {
     expect(runtime).toContain("setRoomLoadingStatus('대화 연결을 다시 확인하고 있습니다…')");
   });
 
+  it('renders only the newly receipt-ACKed first reply without forbidden history read or replay', () => {
+    const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'),
+      runtime.indexOf('function submitTurn(event)'));
+    expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
+    expect(send).toContain('renderAcknowledgedSeyeonFirstReply(acknowledgedReply)');
+    expect(send).not.toContain('await loadRoomState()');
+    expect(send.indexOf('clearPendingTurn(pendingTurn.clientTurnId)')).toBeLessThan(
+      send.indexOf('const currentBearer = await getActiveBearer();'),
+    );
+    expect(send).toContain('currentBearer.token !== activeBearer.token');
+    expect(send).toContain('threadId !== submittedThreadId');
+
+    const render = runtime.slice(runtime.indexOf('function renderAcknowledgedSeyeonFirstReply(result)'),
+      runtime.indexOf('function renderRoomState(state)'));
+    expect(render).toContain('result.replayed !== false');
+    expect(render).toContain('paragraph.textContent = result.assistantText');
+    expect(render).toContain('chatStream.replaceChildren(article)');
+    expect(render).not.toContain('innerHTML');
+    expect(render).not.toContain('sessionStorage');
+    expect(render).not.toContain('localStorage');
+  });
+
   it('protects persisted transcript bodies while translating only authored redaction placeholders', () => {
     expect(runtime).toContain('message.bodyText.trim().length > 0');
     expect(runtime).toContain("paragraph.dataset.chatBodySource = ''");
