@@ -63,6 +63,10 @@ body.saju-hub-page .saju-design-chart-content [hidden] { display: none !importan
 .saju-design-product-card h3 { margin:0; font:700 15px/1.4 var(--mh-serif,serif); color:#65313b; }
 .saju-design-product-card ul { margin:12px 0 15px; padding-left:16px; flex:1; color:#644f4e; font-size:12px; line-height:1.85; }
 .saju-design-product-card li::marker { color:#ad6778; }
+
+.saju-design-product-card .saju-design-product-scope { flex:1; margin:13px 0 15px; color:#644f4e; font-size:12px; line-height:1.75; }
+.saju-design-product-card .reading-topic-availability { display:block; align-self:flex-start; margin:0 0 10px; font-size:10px; }
+
 .saju-design-product-card a { text-align:center; align-self:stretch; padding:8px 7px; border:1px solid #b26f7c; border-radius:8px; text-decoration:none; color:#834256; font-size:12px; font-weight:700; }
 .saju-design-product-card a:hover { background:#f7e8e6; }
 .saju-design-example { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:20px; align-items:center; margin:19px 35px 25px; padding:15px 20px; border-radius:10px; border:1px solid #eed9d6; background:linear-gradient(110deg,#f5e0df,#f4dedd 65%,#f7e7e5); }
@@ -79,6 +83,7 @@ html[data-theme="dark"] .saju-design-hero:before { background:linear-gradient(90
 html[data-theme="dark"] .saju-design-card,html[data-theme="dark"] .saju-design-product-card,html[data-theme="dark"] .saju-design-example-sheet,html[data-theme="dark"] .saju-design-pillars { background:#393038; border-color:#75575f; }
 html[data-theme="dark"] .saju-design-hero h2,html[data-theme="dark"] .saju-design-card h3,html[data-theme="dark"] .saju-design-products h2,html[data-theme="dark"] .saju-design-product-card h3,html[data-theme="dark"] .saju-design-example h2 { color:#f4dce0; }
 html[data-theme="dark"] .saju-design-hero p,html[data-theme="dark"] .saju-design-birth-fields dd,html[data-theme="dark"] .saju-design-product-card ul { color:#ead8d7; }
+html[data-theme="dark"] .saju-design-product-card .saju-design-product-scope { color:#ead8d7; }
 html[data-theme="dark"] .saju-design-example { background:#503c45;border-color:#82616d; }
 @media (max-width:850px) {
  .saju-design-core { padding:0 18px 11px;gap:10px; }
