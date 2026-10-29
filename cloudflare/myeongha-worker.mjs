@@ -66,12 +66,20 @@ export default {
         const rejected=await rateLimitCloudflareRequestV1(request,env,
           receiptRoute?'seyeon-receipt':revokeRoute?'seyeon-withdrawal':'seyeon-turn');
         if(rejected)return rejected;
-        const {createCloudflareSeyeonFirstMemoryRuntimeV1}=await import(
-          '../workers/cloudflare-seyeon-first-memory-runtime.mjs');
-        runtime=createCloudflareSeyeonFirstMemoryRuntimeV1({
-          env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
-          governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
-        });
+        const {
+          createCloudflareSeyeonFirstMemoryRuntimeV1,
+          createCloudflareSeyeonReceiptWithdrawalRuntimeV1,
+        }=await import('../workers/cloudflare-seyeon-first-memory-runtime.mjs');
+        // Privacy commands are independent of the metered provider and its
+        // governed DB. Forward-stop must preserve receipt and withdrawal.
+        runtime=firstReplyRoute
+          ?createCloudflareSeyeonFirstMemoryRuntimeV1({
+            env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+            governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
+          })
+          :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
+            env,approvedWithdrawalWriteAdmission:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+          });
         // The general paid rail remains sealed until atomic reservation and
         // delivery-receipt settlement are actually mounted. The sole DB-bound
         // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
