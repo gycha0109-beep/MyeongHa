@@ -118,60 +118,58 @@ describe('browser Chat room read contract', () => {
       {expectedThreadId:THREAD_ID,expectedAfterSequenceNo:1})).toThrow('protected Se-yeon room shell');
   });
 
-  it('admits a private Memory offer only on the matching revealed original Se-yeon user Message', () => {
-    const original = payload();
-    const offer = Object.freeze({
-      sourceAuthority: 'server_original_message',
-      characterId: 'seyeon',
-      redacted: false,
-      threadId: THREAD_ID,
-      turnId: '97000000-0000-4000-8000-000000000001',
-      messageId: original.messages[0]!.messageId,
+  it('accepts only character-authored, server Planner pending Memory or Life Fact', () => {
+    const original=payload();
+    const proposal=Object.freeze({
+      sourceAuthority:'server_dialogue_planner',
+      characterId:'seyeon',
+      proposalId:'97000000-0000-4000-8000-000000000001',
+      proposalKind:'memory',
+      proposalState:'pending',
+      summary:'사용자는 나비라는 고양이를 키운다',
     });
-    const room = {
-      ...original, characterId: 'seyeon',
-      messages: [
-        { ...original.messages[0]!, memoryProposalOffer: offer },
-        { ...original.messages[1]!, characterId: 'seyeon' },
+    const room={
+      ...original,characterId:'seyeon',
+      messages:[
+        original.messages[0]!,
+        {...original.messages[1]!,characterId:'seyeon',memoryProposal:proposal},
       ],
     };
-    const result = parseChatRoomReadPayloadV1(room, { expectedThreadId: THREAD_ID });
-    expect(result.messages[0]?.memoryProposalOffer).toEqual(offer);
-    expect(Object.isFrozen(result.messages[0]?.memoryProposalOffer)).toBe(true);
-    expect(result.messages[1]).not.toHaveProperty('memoryProposalOffer');
-    expect(parseChatRoomReadPayloadV1(payload(), { expectedThreadId: THREAD_ID })
-      .messages[0]).not.toHaveProperty('memoryProposalOffer');
+    const result=parseChatRoomReadPayloadV1(room,{expectedThreadId:THREAD_ID});
+    expect(result.messages[1]?.memoryProposal).toEqual(proposal);
+    expect(Object.isFrozen(result.messages[1]?.memoryProposal)).toBe(true);
+    expect(result.messages[0]).not.toHaveProperty('memoryProposal');
+    const lifeFact={...proposal,proposalKind:'life_fact'};
+    expect(parseChatRoomReadPayloadV1({...room,messages:[
+      room.messages[0],{...room.messages[1],memoryProposal:lifeFact},
+    ]},{expectedThreadId:THREAD_ID}).messages[1]?.memoryProposal).toEqual(lifeFact);
 
-    for (const forged of [
-      {...offer, messageId: original.messages[1]!.messageId},
-      {...offer, threadId: '93000000-0000-4000-8000-000000000003'},
-      {...offer, turnId: 'not-a-turn'},
-      {...offer, characterId: 'other'},
-      {...offer, sourceAuthority: 'browser_original_message'},
-      {...offer, redacted: true},
-      {...offer, grantState: 'active'},
+    for(const forged of [
+      {...proposal,sourceAuthority:'server_original_message'},
+      {...proposal,proposalState:'accepted'},
+      {...proposal,proposalId:'invalid'},
+      {...proposal,characterId:'other'},
+      {...proposal,summary:''},
+      {...proposal,summary:'  spaced  '},
+      {...proposal,grantCount:1},
+      {...proposal,proposalKind:'unsupported'},
       null,
-    ]) {
-      const wrong = {
-        ...room,
-        messages: [{ ...original.messages[0]!, memoryProposalOffer: forged }, room.messages[1]],
-      };
-      expect(() => parseChatRoomReadPayloadV1(wrong, { expectedThreadId: THREAD_ID }))
-        .toThrow('original Memory offer lacks exact server-origin message authority');
+    ]){
+      expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
+        room.messages[0],{...room.messages[1],memoryProposal:forged},
+      ]},{expectedThreadId:THREAD_ID})).toThrow('Memory proposal lacks exact server Dialogue Planner authority');
     }
-    expect(() => parseChatRoomReadPayloadV1({
-      ...room, characterId: 'other',
-    }, { expectedThreadId: THREAD_ID })).toThrow('original Memory offer');
-    expect(() => parseChatRoomReadPayloadV1({
-      ...room, messages: [{ ...room.messages[0], senderType: 'character',
-        characterId: 'seyeon' }, room.messages[1]],
-    }, { expectedThreadId: THREAD_ID })).toThrow('original Memory offer');
-    expect(() => parseChatRoomReadPayloadV1({
-      ...room, messages: [{...room.messages[0], bodyText: null}, room.messages[1]],
-    }, { expectedThreadId: THREAD_ID })).toThrow('original Memory offer');
-    expect(() => parseChatRoomReadPayloadV1({
-      ...room, historyWithheld: true,
-    }, { expectedThreadId: THREAD_ID })).toThrow('protected Se-yeon room shell');
+    expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
+      {...room.messages[0],memoryProposal:proposal},room.messages[1],
+    ]},{expectedThreadId:THREAD_ID})).toThrow('Memory proposal lacks exact server Dialogue Planner authority');
+    const legacy={sourceAuthority:'server_original_message',characterId:'seyeon',
+      redacted:false,threadId:THREAD_ID,turnId:'97000000-0000-4000-8000-000000000002',
+      messageId:room.messages[0]!.messageId};
+    expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
+      {...room.messages[0],memoryProposalOffer:legacy},room.messages[1],
+    ]},{expectedThreadId:THREAD_ID})).toThrow('manual original-message Memory offer is unsupported');
+    expect(()=>parseChatRoomReadPayloadV1({...room,historyWithheld:true},
+      {expectedThreadId:THREAD_ID})).toThrow('protected Se-yeon room shell');
   });
 
   it('requires bounded pagination metadata to match the authoritative stream', () => {
