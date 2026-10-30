@@ -206,7 +206,7 @@ describe('S0 browser review surface activation boundary',()=>{
     const chat=readFileSync(new URL('./chat-runtime-client.js',import.meta.url),'utf8');
     const records=readFileSync(new URL('./records-page.js',import.meta.url),'utf8');
     const read=readFileSync(new URL('./chat-room-read-contract.js',import.meta.url),'utf8');
-    expect(chat).toContain("if (!historyProtected && authoritativeCharacterId === 'seyeon')");
+    expect(chat).toContain("if (!historyProtected && memberReadAllowed && authoritativeCharacterId === 'seyeon')");
     expect(chat).toContain('const offer = messages[i]?.memoryProposalOffer');
     expect(chat).toContain('mountSeyeonPrivateMemoryReviewV1({ container: body, originalSource: offer })');
     expect(chat).toContain('latestBearer?.token !== activeBearer.token');
