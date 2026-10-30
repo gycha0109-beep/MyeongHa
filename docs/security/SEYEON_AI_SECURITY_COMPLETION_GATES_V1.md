@@ -110,15 +110,21 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 각 Gate: `{gate, scope, owner, PR, exact_head_sha, merge_sha, CI_run_url, postgres_run_url, negative_tests, permissions_audit, open_holds, approval, final_state}`.
 증거가 없으면 `HOLD`, 운영에서 검증할 수 없으면 별도 리스크 승인 없이는 PASS 금지.
 
-## 2026-10-30 — 회원의 원본 기억 제안·비공개 수락 2단계 검토 UI (운영 비활성)
+## 2026-10-30 — UC-06/UC-07 Planner 주도 Memory 제안 복구 (운영 비활성)
 
-`apps/web/seyeon-private-memory-review-client.js`는 기존 S0의 원본 메시지 Producer(`POST /api/chat/:threadId/turns/:turnId/messages/:messageId/memory-proposal`)와 비공개 제안 수락(`POST /api/memory/proposals/:id/accept`)을 **회원의 서로 다른 두 명시적 행위**로 분리한다. 첫 행위는 pending Proposal ID만 받고, 두 번째 행위만 정확한 `{grantChoice:{mode:"private"}}`를 전송한다. 수락 성공은 DB 발행 원본 Memory ID와 `grantCount:0,replayed:false`만 허용한다. 수락 이후에도 세연 Grant는 없다.
+**설계 정본**: `Usecase_re_reviewed_v2` UC-06/UC-07 및 `MyeongHa_Character_System_Architecture_C1`의 Planner / Gate / Renderer 분리. 캐릭터가 필요한 현재 Life Fact를 질문하고, 답변에서 기억할 사실을 인식하면 Dialogue Planner/Character Runtime이 **pending Memory/Life Fact Proposal**을 만든다. 사용자는 다음 네 가지 중 하나를 명시적으로 결정한다.
 
-- API 응답/세션/UUID/Proposal·Memory 생명주기 불일치, Guest, 추가 브라우저 내용·임의 제안 ID는 모두 실패 차단한다. 영속 캐시 없이 같은 문서에서 준비된 Receipt만 수락 가능하다.
-- 네트워크 타임아웃·불확실한 수락 결과를 자동 재시도하거나 성공으로 표기하지 않는다. DB 원장 재조회가 후속 단계다.
-- `seyeon-private-memory-review-view.js`는 첫 번째 제안 만들기 버튼과 두 번째 별도의 저장 확정 버튼을 제공한다. **현재 Chat 조회 계약에는 원본 `turnId`와 서버 발행 제안 가능 증거가 없기 때문에 배포 화면에서는 미마운트**다. 클라이언트 임의 메시지 본문을 원본 기억으로 저장할 수 없다.
-- PR #2759의 source-only Producer와 기존 private accept 모두 운영에서 미마운트·기본 DENY이며, 관련 CI PASS가 이 단계를 운영 활성화하지 않는다.
+1. `session_only` — 이 대화에서만; 장기 저장 및 Grant 없음.
+2. `character_only:seyeon` — 세연만 기억; 해당 Memory/Life Fact + 명시적 Character Grant.
+3. `current_characters` — 승인 시점의 현재 캐릭터들에게 각각 명시적 Grant (대상은 서버에서 결정).
+4. `discard` — 기록하지 않음; 장기 저장 및 Grant 없음.
 
-**2026-10-30 후속 구현:** `chat-room-read-contract.js`는 서버가 실제로 제공한 메시지별 `memoryProposalOffer`를 엄격하게 파싱한다. 해당 메시지가 사용자 원문이며 redacted=false, 본문 공개가 허가됐고, 세연 단독 대화의 `threadId/turnId/messageId`가 정확히 결속되며 제공 필드가 6개 계약과 일치해야 한다. 불일치·임의 필드·타인 Character·세션 변경은 차단된다. `chat-runtime-client.js`는 검증된 offer가 있을 때만 기존 2단계 UI를 메시지 아래에 결합한다. 단, 현재 Se-yeon `chat-read-http.ts`는 이전 대화를 **metadata-only shell**로 막고 offer를 반환하지 않으므로, 현재 운영에서는 화면의 동의 버튼이 나타나지 않는다.
+이것은 사용자가 과거 User Message를 선택해 원문 전체를 `summary`로 기록하는 기능이 아니다. 원문 Message는 서버가 권한 확인을 마친 **출처 증빙**에만 사용할 수 있다. 원문을 직접 Memory로 만드는 수동 Producer PR #2759는 설계 위반으로 **병합 없이 종료**한다.
 
-**다음 연결 조건:** DB가 확인한 source Turn/Message의 정확한 회원 소유·이력 공개 허가·제안 가능한 타입/스키마를 실제 서버 응답에 담는 권한 계약과 운영 G3 History/Replay 허가가 필요하다. 그 이전에는 브라우저가 turnId를 추정하거나 저장 버튼을 강제로 켤 수 없다. SRC-25 및 운영 G0/G1/G2/G3/G5/G6 HOLD는 유지한다. 현재 PR은 데이터베이스, 모델 Projector, 유료 호출, 공개 Route, 운영 권한을 변경하지 않는다.
+- `chat-room-read-contract.js`는 서버가 세연 **캐릭터 답변**에 결속시킨 `memoryProposal`의 정확한 6필드 `sourceAuthority:'server_dialogue_planner'`, `characterId:'seyeon'`, `proposalId`, `proposalKind`, `proposalState:'pending'`, `summary`만 통과시킨다. User Message에 달린 제안, 이전 `memoryProposalOffer`, 위조 ID·스키마·상태·Character는 거부한다.
+- `seyeon-private-memory-review-view.js`는 **메시지 저장 버튼이 없고**, 서버의 기억 제안 내용과 네 가지 선택지를 보여준다. 내용은 DOM `textContent`만 사용하고 브라우저가 사실을 추출/수정하지 않는다.
+- `seyeon-private-memory-review-client.js`는 원본 사용자 메시지로 Proposal을 생성하는 POST가 없다. 서버가 발행한 Proposal ID에 대해서만 `POST /api/memory/proposals/:id/decision`으로 사용자의 명시적 `choice.mode`를 전달한다. 임의 `summary`, 원문, Grant ID, 공유 대상 목록을 전송하지 않는다. 동일 Proposal의 불명확한 결과는 자동 재요청하지 않는다.
+- `session_only`/`discard`는 영속 기록·Grant 0을, `character_only`/`current_characters`는 명시적 결정과 서버의 일치하는 결과를 요구한다. Member/세션 변경/응답 불일치 시 HOLD.
+- **운영 구현 미완료**: 서버 Planner Proposal 생성, 응답 결속, DB Atomic Scope Decision API는 아직 연결되지 않았고 `/decision`은 미마운트다. 기존 `chat-read-http.ts`의 세연 History metadata-only HOLD는 그대로이므로 위 UI는 운영에 표시되지 않는다. 유료 AI/원문 Reveal/Projector/운영 DB·ACL을 켜지 않았다.
+
+**종료 조건**: Planner의 서버 생성 사실 제안과 원문 출처 증명, UC-07 네 선택의 실제 DB/Session 처리, 동의·철회/Revocation·Replay·두 세션 경쟁 검증, 운영 G0~G6 승인 증거가 충족되어야 한다. 현재 UI staging/CI가 PASS여도 S0 운영 PASS나 전체 AI 보안 완료를 의미하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
