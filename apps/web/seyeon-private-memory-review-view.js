@@ -22,7 +22,8 @@ export function mountSeyeonPrivateMemoryReviewV1(options) {
   const panel = element('section', 's0-memory-proposal-review', '');
   panel.setAttribute('aria-label', t('기억 제안'));
   const caption = element('p', 's0-memory-proposal-description', '세연이 기억하고 싶은 내용');
-  const summary = element('p', 's0-memory-proposal-summary', plannerProposal.summary);
+  const summary = element('p', 's0-memory-proposal-summary', '');
+  summary.textContent = plannerProposal.summary;
   const status = element('p', 's0-memory-proposal-status', '');
   status.setAttribute('role', 'status');
   const choices = [
