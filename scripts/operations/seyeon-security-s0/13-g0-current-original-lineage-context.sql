@@ -23,6 +23,8 @@ declare
   v_grant uuid;
   v_record uuid;
   v_original record;
+  v_turn text;
+  v_attempt text;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_thread_id is null or p_assistant_message_id is null then
@@ -33,8 +35,9 @@ begin
 
   -- The DB committed Attempt, not a message-provided sourceRef, owns the
   -- immutable G1 Pin. Its exact Assistant ID and Character must agree.
-  select a.seyeon_personal_source_pin_jsonb->'positiveProof'
-    into v_pin
+  select a.seyeon_personal_source_pin_jsonb->'positiveProof',
+         t.id::text,a.id::text
+    into v_pin,v_turn,v_attempt
   from public.conversation_messages msg
   join public.chat_turns t
     on t.id=msg.turn_id and t.subject_id=msg.subject_id
@@ -64,6 +67,8 @@ begin
         'seyeon-positive-original-memory-source-pin-v1'
      or v_pin->>'subjectId' is distinct from p_subject_id::text
      or v_pin->>'threadId' is distinct from p_thread_id::text
+     or v_pin->>'turnId' is distinct from v_turn
+     or v_pin->>'attemptId' is distinct from v_attempt
      or v_pin->>'characterId' is distinct from 'seyeon'
      or v_pin->>'recordKind' is distinct from 'memory'
      or v_pin->>'recordId' is null
@@ -132,6 +137,7 @@ as $context_window$
 declare
   v_row record;
   v_total integer:=0;
+  v_seen_current boolean:=false;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_thread_id is null or p_current_user_message_id is null
@@ -144,7 +150,7 @@ begin
   perform 1 from public.conversation_threads t
   where t.id=p_thread_id and t.subject_id=p_subject_id
     and t.status in ('active','archived')
-  for share;
+  for update;
   if not found then
     raise exception using errcode='42501',
       constraint='seyeon_g0_context_thread_invalid',
@@ -160,7 +166,7 @@ begin
       from public.conversation_messages
       where subject_id=p_subject_id and thread_id=p_thread_id
         and redacted_at is null and body_text is not null
-      order by sequence_no desc limit p_limit
+      order by sequence_no desc limit p_limit for share
     ) m
     left join public.conversation_thread_characters c
       on c.id=m.thread_character_id and c.thread_id=m.thread_id
@@ -168,6 +174,7 @@ begin
   loop
     v_total:=v_total+1;
     if v_row.id=p_current_user_message_id then
+      v_seen_current:=true;
       if v_row.sender_type is distinct from 'user'
          or v_row.character_id is not null
          or v_row.turn_id is null then
@@ -188,7 +195,7 @@ begin
   end loop;
 
   -- A valid current user Turn must actually be among the selected rows.
-  if not exists (
+  if not v_seen_current or not exists (
     select 1 from public.conversation_messages msg
     where msg.id=p_current_user_message_id and msg.subject_id=p_subject_id
       and msg.thread_id=p_thread_id and msg.sender_type='user'
