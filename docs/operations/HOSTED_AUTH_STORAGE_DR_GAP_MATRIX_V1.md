@@ -1,3 +1,11 @@
+## 2026-10-30 — isolated local synthetic Auth/Storage functional execution (NOT Hosted DR)
+
+On a disposable, independent Supabase CLI `2.117.0` local stack using PostgreSQL 17 at `127.0.0.1:54322` and Auth/Storage API at `127.0.0.1:54321`, the fixed synthetic fixture preparer and acceptance runner completed successfully after correcting the local CLI JWT issuer expectation to `supabase-demo` (`role=service_role` retained). The generated nonidentifying fixture report confirmed `memberCreated=true`, `deletedMemberRemoved=true`, `privateBucket=true`, `privateReadPolicyInstalled=true`, and deterministic private object digest `641ca9086ef039b62e8bd97b5813fed6dabd847c934e5d834d5c6746a9b4fee4`.
+
+The actual local HTTP acceptance report showed **PASS** for positive login, wrong-password rejection, deleted synthetic account login rejection, refresh, sign-out then refresh denial, authorized private object SHA-256 parity and anonymous private object denial. It retained `target=local-loopback-synthetic-only`, `hostedProviderRecoveryProven=false`, `independentPrivacyContinuityProven=false`, `s8ServingE2eProven=false`, `wholeServiceRpoRtoProven=false`, `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`, `gate=BLOCKED`, `serviceResumptionAllowed=false` and `outputContainsIdentifiers=false`.
+
+This is **actual local functional evidence**, not a recovered Production snapshot or a compatible Hosted Auth/Storage clone. No account credentials, session tokens, personal identifiers or raw object contents are attached. Independent incident-time privacy reconciliation, Hosted service equivalence and actual S8 serving readiness remain blocked. No Production SQL, paid Hosted project or customer data was touched.
+
 # Hosted Auth / Storage DR recovery boundary — observed gap matrix (2026-10-28)
 
 > Track: `ops` | Related: [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) / [restore #40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574)
