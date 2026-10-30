@@ -40,7 +40,7 @@ export function formatStaticUi(source, params, locale = getUiLocale()) {
   return template.replace(/\{([a-zA-Z]+)\}/gu, (_, name) => String(params[name] ?? ''));
 }
 
-const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
+const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
 const trackedAttributes = new WeakMap();
 const ATTRIBUTES = ['aria-label', 'title', 'placeholder'];

@@ -154,11 +154,15 @@ describe('Records long-form official report boundary', () => {
   });
 
   it('protects supplemental and limitation source text from five-locale UI translation', () => {
+    expect(jsx).toContain('data-reading-step-title data-reading-content');
     expect(jsx).toContain('data-reading-supporting-body data-reading-content');
     expect(jsx).toContain('data-reading-step-notice-text data-reading-content');
     expect(jsx).toContain('data-reading-step-notice hidden aria-labelledby="reading-step-scope-heading"');
     expect(jsx).toContain('id="reading-step-scope-heading" data-reading-step-notice-heading');
+    expect(localeRuntime).toContain('[data-reading-step-title], [data-reading-step-body]');
     expect(localeRuntime).toContain('[data-reading-supporting-body], [data-reading-step-notice-text]');
+    expect(localeRuntime).toContain('[data-chart-five-elements], [data-chart-ten-gods]');
+    expect(localeRuntime).toContain('[data-official-report-elements], [data-official-report-gods]');
     expect(localeRuntime).toContain('[data-reading-content]');
     expect(localeRuntime).toContain('if (!parent || parent.matches(\'textarea\') || isBlocked(parent)) return;');
     expect(runtime).toContain("scopeNoticeHeading.textContent =");

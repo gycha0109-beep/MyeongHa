@@ -109,7 +109,7 @@ export function ReadingDetailPage() {
             <section className="reading-block reading-block-primary">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
-                <h2 data-reading-step-title tabIndex={-1}>지금 읽히는 흐름</h2>
+                <h2 data-reading-step-title data-reading-content tabIndex={-1}>지금 읽히는 흐름</h2>
                 <p data-reading-step-body>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
               </div>
             </section>
