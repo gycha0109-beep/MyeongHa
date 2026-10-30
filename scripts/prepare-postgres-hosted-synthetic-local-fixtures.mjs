@@ -27,7 +27,7 @@ export function validateLocalFixtureConfig(env) {
     if (parts.length !== 3) fail('local service role must be a legacy JWT for the CLI');
     payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
   } catch { fail('invalid local JWT'); }
-  if (payload?.role !== 'service_role' || payload?.iss !== 'supabase') {
+  if (payload?.role !== 'service_role' || payload?.iss !== 'supabase-demo') {
     fail('local fixture setup requires only the CLI service-role JWT');
   }
   const dbPassword = env.MH_DR_LOCAL_DB_PASSWORD;
