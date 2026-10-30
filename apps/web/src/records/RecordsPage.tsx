@@ -33,8 +33,7 @@ export function RecordsPage() {
         </section>
 
         <div className="records-tabs" role="tablist" aria-label="기록 종류">
-          <button className="records-tab records-tab--primary" type="button" role="tab" tabIndex={0} aria-selected="true" aria-controls="saju-records" id="saju-records-tab">사주 보고서</button>
-          <span className="records-tab-divider" aria-hidden="true">다른 기록</span>
+          <button className="records-tab" type="button" role="tab" tabIndex={0} aria-selected="true" aria-controls="saju-records" id="saju-records-tab">사주 보고서</button>
           <button className="records-tab" type="button" role="tab" tabIndex={-1} aria-selected="false" aria-controls="life-records" id="life-records-tab">현세록</button>
         </div>
 
@@ -50,23 +49,12 @@ export function RecordsPage() {
         </section>
 
         <section id="saju-records" className="records-tab-panel records-report-home" role="tabpanel" aria-labelledby="saju-records-tab">
-          <div className="records-report-intro">
-            <div className="records-report-intro-copy">
-              <span className="records-kicker">OFFICIAL READINGS</span>
-              <h2>나의 사주 보고서</h2>
-              <p>완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다.</p>
-              <p className="records-report-guidance">저장된 결과만 표시하며, 공식 해석과 대리자의 설명은 구분합니다.</p>
-            </div>
-            <div className="records-report-intro-mark" aria-hidden="true">命</div>
-          </div>
           <div className="records-report-toolbar">
             <h3>보관된 사주 기록</h3>
             <span id="saju-records-count" className="records-report-count" role="status" aria-live="polite">기록 확인 중…</span>
           </div>
           <div id="saju-records-list" className="records-reading-grid" />
         </section>
-
-
       </div>
     </div>
   );

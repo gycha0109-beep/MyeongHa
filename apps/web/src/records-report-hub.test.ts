@@ -20,6 +20,8 @@ describe('Records official-report-first entry', () => {
     }
     expect(page).toContain("requestedTab === 'saju'");
     expect(page).toContain("life: 'life-records-tab'");
+    expect(jsx).not.toContain('records-tab-divider');
+    expect(jsx).not.toContain('records-report-intro');
     expect(jsx).not.toContain('birth-records-tab');
     expect(jsx).not.toContain('memory-records-tab');
     expect(page).not.toContain('birth-records-tab');
@@ -57,7 +59,7 @@ describe('Records official-report-first entry', () => {
   });
 
   it('localizes only static hub labels, not user-written data or the official Reading snapshot', () => {
-    const sources = ['사주 보고서', '다른 기록', '나의 사주 보고서', '보관된 사주 기록', '기록 확인 중…'];
+    const sources = ['사주 보고서', '보관된 사주 기록', '기록 확인 중…'];
     for (const source of sources) {
       const row = RECORDS_HUB_STATIC_UI_COPY_V1.get(source);
       expect(row).toBeDefined();
