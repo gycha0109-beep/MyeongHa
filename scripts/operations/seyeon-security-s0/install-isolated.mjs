@@ -54,6 +54,10 @@ try {
     and not has_table_privilege('myeongha_api_executor','public.memory_items','UPDATE')
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','UPDATE')
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','INSERT')
+    and not has_table_privilege('myeongha_api_executor',
+      'seyeon_private.planner_memory_proposal_sources_v1','INSERT')
+    and not has_table_privilege('myeongha_api_executor',
+      'seyeon_private.planner_memory_proposal_sources_v1','SELECT')
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.qry_seyeon_pending_planner_memory_decision_v1(uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
