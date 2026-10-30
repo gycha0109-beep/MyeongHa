@@ -2,6 +2,16 @@
 
 명하 운영자 전용 콘솔의 연속 구현 브랜치(A0~A7 일부)입니다. 코드 구현과 실제 운영 활성화는 분리합니다.
 
+## 최신 운영 확인 — 2026-10-30
+
+현재 상태는 [운영 재조회 기록](../../docs/operations/ADMIN_OPERATIONS_READBACK_20261030.md)을 우선합니다. 아래 날짜별 기록의 “역할 없음”, “Supabase 연결 오류”는 과거 상태입니다. Reader/Audit 설치는 완료됐고 재적용하지 않습니다. 두 역할의 비밀번호·전용 Hyperdrive·Worker·Owner 실인증·읽기 개통은 미완료입니다.
+
+비활성 스테이징도 Access JWT를 검증하고 비허용 사용자는 403, 검증된 Owner는 `ADMIN_PRIVATE_DISABLED`를 반환합니다. DB·자산은 제공하지 않습니다. 익명 검사는 일반 503을 성공으로 인정하지 않으며 실제 빌드된 JS/CSS의 `/admin/assets/` 및 `/assets/` 주소를 모두 확인합니다.
+
+배포 워크플로의 `audit-write-preflight.mjs`는 별도 Audit Writer TLS 로그인에서 감사 INSERT, 조회/고객 UPDATE 권한 거부, 잘못된 감사 입력의 거부를 확인하고 **전체 트랜잭션을 롤백**합니다. 원문 데이터나 비밀, SQL 오류는 출력하지 않습니다. 배포 후 Access·Hyperdrive도 다시 조회합니다.
+
+`inactive-stage-owner-probe.mjs`는 실제 Owner 및 비허용 사용자의 짧은 Access 세션을 각각 `MYEONGHA_ADMIN_STAGE_OWNER_ACCESS_JWT`, `MYEONGHA_ADMIN_STAGE_DENIED_ACCESS_JWT` 환경변수로 받은 경우에만 실행합니다. 두 세션은 저장소·워크플로 Secrets·보고서에 저장하지 않습니다. 비활성 Access 검증이며 Member 인증·Production 조회 성공을 대신하지 않습니다.
+
 ## 실행
 
 Node 24 / npm 11, 저장소 루트에서 의존성을 설치한 후:
@@ -51,7 +61,7 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 
 로딩, 데이터 없음, 접근 거부, 오류에 공통 StatusPanel을 사용합니다. 뒤로 가기/앞으로 가기와 키보드 내비게이션을 지원합니다.
 
-구현 순서 정본: docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md (Admin-01 → Admin-02 → …)
+기존 `docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md` 참조는 현재 브랜치와 조회한 Git 이력에서 파일을 찾을 수 없습니다. 아래 기존 A0–A7 구현 기록과 `docs/operations/ADMIN_OPERATING_POLICY_20261027_V1.md`의 확정 범위를 따르며 새 단계를 만들지 않습니다.
 
 ## 연속 구현 현황 (2026-10-27)
 

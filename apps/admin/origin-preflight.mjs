@@ -79,6 +79,7 @@ async function strictTarget(env,role,key){
  return tls.buildProductionPostgresStrictTlsTargetV1({databaseUrl:env[key],rootCertificatePem:env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM,
   authority:{contractVersion:tls.PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,projectRef:'cnsfpcdiyofqvhpcegfc',requiredTlsMode:tls.PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,rootCertificateFingerprint256:tls.PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1}});
 }
+export {strictTarget as createAdminOriginTargetV1, PRINCIPAL as ADMIN_ORIGIN_PRINCIPAL_SQL_V1};
 export async function inspectAdminOriginRolesV1(env,options={}){
  const missing=ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.filter(key=>typeof env[key]!=='string'||!env[key].trim());
  if(missing.length)return {originRolesVerified:false,activationEnabled:false,missing,roles:[]};

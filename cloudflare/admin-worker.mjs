@@ -53,12 +53,16 @@ export default {
   async fetch(request, env, ctx) {
     let reader; let audit; let command;
     try {
-      if (env.MYEONGHA_ADMIN_PRIVATE_ENABLED !== 'true' || env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY !== 'dedicated-admin-verify-full-v1' ||
-          !env.ADMIN_READ_HYPERDRIVE?.connectionString || !env.ADMIN_AUDIT_HYPERDRIVE?.connectionString || !env.ADMIN_RATE_LIMITER) throw Error('Unconfigured');
       const gate = createAdminAccessGateV1({ issuer: env.MYEONGHA_ADMIN_ACCESS_ISSUER, audience: env.MYEONGHA_ADMIN_ACCESS_AUD,
         ownerEmail: env.MYEONGHA_ADMIN_OWNER_EMAIL });
       // Gate before opening any database connection, including static assets.
       if (!await gate(request)) return Response.json({ error:'ADMIN_ACCESS_REQUIRED' }, {status:403,headers:{'Cache-Control':'no-store'}});
+      // Inactive staging still verifies Access signatures and exact Owner claims.
+      // A verified Owner gets a distinct disabled response, with no DB or asset I/O.
+      if (env.MYEONGHA_ADMIN_PRIVATE_ENABLED !== 'true') return Response.json({error:'ADMIN_PRIVATE_DISABLED'},
+        {status:503,headers:{'Cache-Control':'no-store'}});
+      if (env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY !== 'dedicated-admin-verify-full-v1' ||
+          !env.ADMIN_READ_HYPERDRIVE?.connectionString || !env.ADMIN_AUDIT_HYPERDRIVE?.connectionString || !env.ADMIN_RATE_LIMITER) throw Error('Unconfigured');
       // Access has authenticated the Owner. Before a single SQL query can run,
       // reject any aliased Reader/Audit/Command/Retention credential, even
       // when Wrangler assigned different binding names.

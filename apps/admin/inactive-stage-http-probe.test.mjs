@@ -24,7 +24,7 @@ describe('anonymous inactive Admin Worker staging HTTP checks',()=>{
  });
  it('accepts only deny responses or genuine Access login redirects',()=>{
   const target='https://myeongha-admin.gycha0109.workers.dev/admin/';
-  for(const status of [401,403,503]){
+  for(const status of [401,403]){
    expect(assertInactiveAdminHttpDenialV1(response(status),target)).toBe(true);
   }
   expect(assertInactiveAdminHttpDenialV1(
@@ -33,7 +33,7 @@ describe('anonymous inactive Admin Worker staging HTTP checks',()=>{
   expect(assertInactiveAdminHttpDenialV1(
    response(302,'/cdn-cgi/access/login/'),target,
   )).toBe(true);
-  for(const status of [200,204,404,500,502]){
+  for(const status of [200,204,404,500,502,503]){
    expect(()=>assertInactiveAdminHttpDenialV1(response(status),target)).toThrow();
   }
   expect(()=>assertInactiveAdminHttpDenialV1(response(302,'/admin/'),target)).toThrow();
