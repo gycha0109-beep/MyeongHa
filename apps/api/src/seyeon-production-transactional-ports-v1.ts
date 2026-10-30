@@ -217,7 +217,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonPostTurnAnalysisOutboxPortV1(client)
-            .preflightClaim(request),
+            .preflightClaim!(request),
         );
       },
       findByTurn(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['findByTurn']>[0]) {
