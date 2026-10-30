@@ -12,6 +12,7 @@ const ROW={
  purchaseIntentId:'00000000-0000-4000-8000-000000000003',
  subjectId:'00000000-0000-4000-8000-000000000004',
  readerCharacterId:'seyeon',verifiedTransactionId:TX,
+ verifiedAmountMinor:'8900',verifiedCurrency:'KRW',
 };
 const NO_LINK={
  schemaVersion:'commerce-cancellation-payment-receipt-link-v1',

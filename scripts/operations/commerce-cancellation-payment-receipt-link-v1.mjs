@@ -9,7 +9,9 @@ select
   intent.id::text as "purchaseIntentId",
   attempt.subject_id::text as "subjectId",
   selection.reader_character_id as "readerCharacterId",
-  receipt.external_transaction_id as "verifiedTransactionId"
+  receipt.external_transaction_id as "verifiedTransactionId",
+  receipt.verified_amount_minor::text as "verifiedAmountMinor",
+  receipt.verified_currency as "verifiedCurrency"
 from public.commerce_payment_attempts attempt
 join public.purchase_intents intent
   on intent.id=attempt.purchase_intent_id
@@ -102,6 +104,64 @@ export async function inspectCancellationPaymentReceiptLinkReadOnlyV1(client,inp
    fullRefundProven:false,cancellationFinalityEstablished:false,
    providerRefundAuthorized:false,revocationAuthorized:false,
    writesPerformed:false,
+  });
+ }finally{
+  if(began)await client.query('rollback');
+ }
+}
+
+
+/**
+ * Trusted internal operations variant of the SAME exact receipt SQL.
+ * Returns only the attributes required by the PortOne GET shape verifier;
+ * never return this object from a public API. Full-visibility operations
+ * connection required. A missing original transaction ID is not admitted.
+ */
+export async function resolveCancellationOriginalReceiptPrivateV1(client,input){
+ if(!input||!validId(input.providerPaymentId)||
+   !(input.providerTransactionId===undefined||
+     input.providerTransactionId===null||
+     validId(input.providerTransactionId)))
+  throw Error('INVALID_PRIVATE_CANCELLATION_RECEIPT_LOOKUP');
+ let began=false;
+ try {
+  await client.query('begin isolation level repeatable read read only');
+  began=true;
+  await client.query("set local statement_timeout='10000ms'");
+  const role=await client.query(`select
+    current_setting('transaction_read_only')='on' as "readOnly",
+    (rolsuper or rolbypassrls) as "completeVisibility"
+    from pg_catalog.pg_roles where rolname=current_user`);
+  if(role.rows.length!==1||role.rows[0].readOnly!==true||
+     role.rows[0].completeVisibility!==true)
+   throw Error('CANCELLATION_RECEIPT_LINK_AUTHORITY_REQUIRED');
+  const result=await client.query(COMMERCE_CANCELLATION_PAYMENT_RECEIPT_LINK_SQL_V1,
+   [input.providerPaymentId,input.providerTransactionId??null]);
+  if(result.rows.length===0)return null;
+  if(result.rows.length!==1)
+   throw Error('AMBIGUOUS_CANCELLATION_PAYMENT_RECEIPT_LINK');
+  const row=result.rows[0];
+  if(!UUID.test(row.paymentAttemptId)||!UUID.test(row.verifiedReceiptId)||
+     !UUID.test(row.purchaseIntentId)||!UUID.test(row.subjectId)||
+     typeof row.readerCharacterId!=='string'||!row.readerCharacterId.trim()||
+     !validId(row.verifiedTransactionId)||
+     (input.providerTransactionId!=null&&
+      row.verifiedTransactionId!==input.providerTransactionId)||
+     typeof row.verifiedCurrency!=='string'||
+     !/^[A-Z]{3}$/u.test(row.verifiedCurrency)||
+     typeof row.verifiedAmountMinor!=='string'||
+     !/^[1-9][0-9]*$/u.test(row.verifiedAmountMinor))
+   throw Error('INVALID_CANCELLATION_PAYMENT_RECEIPT_LINK');
+  const amount=Number(row.verifiedAmountMinor);
+  if(!Number.isSafeInteger(amount)||amount<=0)
+   throw Error('INVALID_CANCELLATION_PAYMENT_RECEIPT_LINK');
+
+  return Object.freeze({
+   providerPaymentId:input.providerPaymentId,
+   originalTransactionId:row.verifiedTransactionId,
+   originalVerifiedPaidAmountMinor:amount,
+   originalCurrency:row.verifiedCurrency,
+   environment:'production',
   });
  }finally{
   if(began)await client.query('rollback');

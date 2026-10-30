@@ -81,3 +81,37 @@ authenticated cancellation signal contains a provider transaction ID. A
 Purchase Intent may have different payment attempts, so a same-Intent Receipt
 alone must never prove that the *particular* notified payment was charged.
 The disposable PostgreSQL fixture includes this un-attributed attempt case.
+
+## Staged internal signed-event reconciliation
+
+`scripts/operations/commerce-signed-cancellation-private-reconciliation-v1.mjs`
+is the next **unmounted, operations-only** composition, not a consumer endpoint:
+
+1. Authenticates the original signed PortOne V2 notification using the existing
+   webhook verifier, accepting only the three cancellation notification types.
+2. Resolves the exact original **verified PRODUCTION Reading Receipt** via the
+   established `commerce_payment_attempts` / Purchase Intent / Receipt /
+   pinned Reader selection query under complete-visibility READ ONLY DB access.
+   The internal variant `resolveCancellationOriginalReceiptPrivateV1` returns
+   only original provider transaction ID, verified paid amount and currency
+   to the next trusted in-process step. Missing/ambiguous evidence **prevents
+   any PortOne GET**.
+3. Calls the bounded, redirect-disabled GET `/payments/{paymentId}` adapter,
+   comparing the re-read provider state to the DB-owned paid facts.
+4. Emits only `full_cancel_review_candidate`,
+   `partial_cancel_review_candidate`, `pending_cancel_review_candidate`,
+   `no_cancel_observed`, or a denial state. No Subject, Reader, payment ID,
+   PSP secret, receipt ID, content, birth data or monetary amount is returned.
+
+This is **not** final source-event ordering or a reversible entitlement
+contract. It performs no DB write, callback persistence, PSP cancellation
+POST, Entitlement Effect or customer-facing acknowledgment. It returns
+`entitlementEffectEligible=false` for every successful classification.
+
+The optional injection ports in the unmounted script exist for deterministic
+synthetic testing. Executing it with its real runtime requires first building
+the repository `npm run build`; it loads the existing signed auth and readback
+modules from `dist/`. A complete-visibility operations identity and the
+authorized server-side secret are required, but no live credentials were used
+in these tests. Do not add a public route, scheduler or auto-revoke to this
+candidate without the previously defined LIVE and refund execution gates.
