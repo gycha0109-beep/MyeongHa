@@ -1,6 +1,7 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
+import {createInterface} from 'node:readline/promises';
 import {pathToFileURL} from 'node:url';
 
 const ACCOUNT='410d3f82ed3ccc66609a2b698803859b';
@@ -89,6 +90,18 @@ function readHidden(label){
   });
 }
 
+async function readClipboardSecret(label){
+  if(!process.stdin.isTTY)throw bootstrapError('INTERACTIVE_TERMINAL_REQUIRED');
+  const reader=createInterface({input:process.stdin,output:process.stderr,terminal:true});
+  try{await reader.question(label+' [copy locally, then press Enter]: ');}
+  finally{reader.close();}
+  const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',
+    "$v=Get-Clipboard -Raw; Set-Clipboard -Value ' '; if($null -ne $v){[Console]::Out.Write($v)}",
+  ],{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:8000,windowsHide:true,maxBuffer:8192});
+  if(result.error||result.status!==0)throw bootstrapError('CLIPBOARD_UNAVAILABLE');
+  return result.stdout.replace(/[\\r\\n]+$/u,'');
+}
+
 function checkTlsLogin(role,password,caPath,port){
   const child=spawnSync(process.env.PSQL_BIN||'psql',[
     '-X','-w','-A','-t','-h',HOST,'-p',String(port),
@@ -119,15 +132,17 @@ async function cloudflare(token,url,method='GET',body){
 
 async function main(){
   const args=process.argv.slice(2);
-  if(args.some(arg=>arg!=='--preflight-only')||args.length>1)throw bootstrapError('UNKNOWN_ARGUMENTS');
+  if(args.some(arg=>!['--preflight-only','--clipboard'].includes(arg))||new Set(args).size!==args.length)throw bootstrapError('UNKNOWN_ARGUMENTS');
   const preflightOnly=args.includes('--preflight-only');
+  const useClipboard=args.includes('--clipboard');
+  const requestSecret=useClipboard?readClipboardSecret:readHidden;
   const port=parseDedicatedAdminPoolerPortV1(process.env.MYEONGHA_ADMIN_POOLER_PORT);
   const caPath=process.env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_FILE;
   if(!caPath||!existsSync(caPath))throw bootstrapError('CA_FILE_NOT_FOUND');
   const passwords=new Map();
   try{
     for(const item of ROLES){
-      const password=await readHidden(item.role+' password');
+      const password=await requestSecret(item.role+' password');
       if(password.length<24)throw bootstrapError(password.length===0?'PASSWORD_INPUT_EMPTY':'PASSWORD_INPUT_TOO_SHORT');
       checkTlsLogin(item.role,password,caPath,port);
       passwords.set(item.role,password);
@@ -137,7 +152,7 @@ async function main(){
       process.stdout.write('Dedicated Admin TLS preflight passed; no Cloudflare changes.\n');
       return;
     }
-    const token=process.env.CLOUDFLARE_API_TOKEN||await readHidden('Cloudflare Hyperdrive Write API token');
+    const token=process.env.CLOUDFLARE_API_TOKEN||await requestSecret('Cloudflare Hyperdrive Write API token');
     if(token.length<20)throw bootstrapError('CLOUDFLARE_TOKEN_MISSING');
     const list=await cloudflare(token,API);
     if(!Array.isArray(list))throw bootstrapError('CLOUDFLARE_INVENTORY_UNAVAILABLE');
