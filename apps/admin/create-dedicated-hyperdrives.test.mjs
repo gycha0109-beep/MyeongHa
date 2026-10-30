@@ -61,6 +61,6 @@ test('Audit Writer SQL quotes the exact local clipboard password',()=>{
    "ALTER ROLE myeongha_admin_audit_writer WITH PASSWORD '"+password.replace(/'/gu,"''")+"';");
 });
 test('Audit Writer SQL rejects unsupported clipboard content',()=>{
- for(const value of ['short','A'.repeat(25)+'\\n','A'.repeat(25)+'\\u0000'])
+ for(const value of ['short','A'.repeat(25)+'\n','A'.repeat(25)+'\u0000'])
   assert.throws(()=>buildAuditRolePasswordSqlV1(value),/CLIPBOARD_SECRET_INVALID/u);
 });
