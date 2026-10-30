@@ -110,9 +110,15 @@ describe('Official Reading Records read contract', () => {
     await expect(read('')).rejects.toThrow('stored hash differs');
   });
 
-  it('rejects malformed v2 digests even when a Reader pin repeats the same invalid value', async () => {
+  it('preserves legacy owner-gated records while rejecting malformed canonical digest claims', async () => {
+    const legacyHash = 'sha256:stored-reading';
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      expectedResponseHash: legacyHash,
+      authorityPort: port({ ...ROW, responseHash: legacyHash }),
+    })).resolves.toMatchObject({ readingId: READING_ID });
     for (const malformedHash of [
-      'sha256:stored-reading',
       'sha256:v1:fake',
       'sha256:v1:' + 'G'.repeat(64),
     ]) {

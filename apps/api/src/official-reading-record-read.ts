@@ -240,11 +240,12 @@ export async function getOfficialReadingRecord(input: {
       readingContractVersion,
       productResponseState,
     });
-    // The Records disclosure boundary must enforce the same content-addressed
-    // v2 contract as the protected Reader. An unrecognized digest is NOT a
-    // historical exemption for a v2 report. Non-v2 records retain their
-    // separately governed owner/grant policy.
-    if (readingContractVersion === 'myeonghwa-product-reading-response-v2') {
+    // Modern issuer-addressed v2 snapshots must match their canonical digest.
+    // Historical records with noncanonical source hashes predate this issuer
+    // format and retain the existing owner/current-Grant archive policy.
+    // A malformed hash CLAIMING the canonical scheme cannot bypass validation.
+    if (readingContractVersion === 'myeonghwa-product-reading-response-v2'
+      && storedResponseHash.startsWith('sha256:v1:')) {
       if (!/^sha256:v1:[a-f0-9]{64}$/u.test(storedResponseHash)
         || 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(reading)
           !== storedResponseHash) {

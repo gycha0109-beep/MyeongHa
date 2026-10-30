@@ -23,6 +23,7 @@ import {
 } from '../apps/api/src/official-reading-reader-admission-v1.js';
 import { issueCharacterSajuOfficialStandardEligibilityV2 } from '../apps/api/src/character-saju-official-eligibility-v2.js';
 import { assembleOfficialStandardReaderRuntimeV2 } from '../apps/api/src/character-saju-runtime-v2-bridge.js';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import type { ProductReaderRuleLookupV1 } from '../apps/api/src/product-reader-eligibility-policy-v1.js';
 import type { ContentReleaseRuntimeEntry } from '../packages/world-content/src/index.js';
 
@@ -36,6 +37,21 @@ const EFFECTIVE = '2026-10-09T08:00:00.000Z';
 const readers = ['seyeon','baekheon','yeoul','seorin','rahyeon','mira','taegyeom','yunho','doyun'] as const;
 
 function fixture(reader: string, domain: SajuDomain) {
+  const responseSnapshot = {
+        responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+        responseVersion: 'myeonghwa-product-reading-response-v2', state: 'delivered',
+        messageCode: 'READING_DELIVERED',
+        requiredAction: 'none',
+        reading: {
+          readingId: READING,
+          sections: [{ sectionType: 'overview', state: 'complete', title: '공식', blocks: [
+            { type: 'paragraph', text: '근거를 바탕으로 설명합니다.' },
+          ] }],
+          disclosures: [{ type: 'notice', text: '불확실성을 고려해야 합니다.' }],
+          calculationSummary: {},
+        },
+      };
+  const responseHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(responseSnapshot);
   const access = {
     subjectId: SUBJECT, readingId: READING, readerCharacterId: reader,
     readerContentBundleId: BUNDLE,
@@ -47,7 +63,7 @@ function fixture(reader: string, domain: SajuDomain) {
     domainCapabilityVersion: 'general-v1',
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     sajuEngineVersion: 'saju-engine-v1',
-    responseHash: 'sha256:v1:official-fixture-hash',
+    responseHash,
   };
   const policy: ProductReaderRuleLookupV1 = {
     status: 'approved',
@@ -74,17 +90,7 @@ function fixture(reader: string, domain: SajuDomain) {
       readingId: READING, productId: PRODUCT, readerCharacterId: reader,
       readingContractVersion: access.readingContractVersion,
       productResponseState: 'delivered',
-      responseSnapshotJsonb: {
-        responseVersion: access.readingContractVersion, state: 'delivered',
-        reading: {
-          readingId: READING,
-          sections: [{ sectionType: 'overview', title: '공식', blocks: [
-            { type: 'paragraph', text: '근거를 바탕으로 설명합니다.' },
-          ] }],
-          disclosures: [{ type: 'notice', text: '불확실성을 고려해야 합니다.' }],
-          calculationSummary: {},
-        },
-      },
+      responseSnapshotJsonb: responseSnapshot,
       responseHash: access.responseHash,
       completedAt: '2026-10-09T07:30:00.000Z',
     }]) },

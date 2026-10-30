@@ -204,7 +204,7 @@ describe('Official Reading record HTTP adapter', () => {
     const onRollback = vi.fn();
     await expect(invoke({
       pool: fakePool({
-        rows: [{ ...ROW, responseHash: 'sha256:stored-reading' }],
+        rows: [{ ...ROW, responseHash: 'sha256:v1:bad' }],
         onRollback,
       }),
     })).rejects.toThrow('source response hash mismatch');

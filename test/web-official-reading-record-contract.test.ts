@@ -34,6 +34,7 @@ describe('Official Reading Records browser contract', () => {
       productResponseState: 'delivered',
       readerCharacterIds: ['seyeon'],
       completedAt: '2026-09-23T00:01:00.000Z',
+      birthRevision: { issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' },
       reading: payload.reading,
     });
     expect(result).not.toHaveProperty('responseHash');
