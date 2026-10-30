@@ -10,7 +10,12 @@ const BUNDLE_ID = '66666666-6666-4666-8666-666666666666';
 const MESSAGE_ID = '77777777-7777-4777-8777-777777777777';
 const AUTH_ID = '11111111-1111-4111-8111-111111111111';
 
-function fakePool(options: { denied?: boolean; history?: boolean; observed?: (sql: string, values: readonly unknown[]) => void } = {}): PostgresSubjectPoolV1 {
+function fakePool(options: {
+  denied?: boolean;
+  history?: boolean;
+  existenceFailure?: 'sql_error' | 'missing' | 'invalid';
+  observed?: (sql: string, values: readonly unknown[]) => void;
+} = {}): PostgresSubjectPoolV1 {
   return {
     async connect() {
       return {
@@ -41,7 +46,14 @@ function fakePool(options: { denied?: boolean; history?: boolean; observed?: (sq
             if (!sql.includes('select exists (')) {
               throw new Error('Protected message content must remain unqueried');
             }
-            return {rows:[{hasMessages:options.history===true} as Row]};
+            if (options.existenceFailure === 'sql_error') {
+              throw new Error('internal source body SQL failure');
+            }
+            if (options.existenceFailure === 'missing') return { rows: [] };
+            if (options.existenceFailure === 'invalid') {
+              return { rows: [{ hasMessages: 'true' } as Row] };
+            }
+            return { rows: [{ hasMessages: options.history === true } as Row] };
           }
           if (sql.includes('qry_character_relationship_v1')) return { rows: [] };
           throw new Error('Unexpected query in owner-only chat read test');
@@ -95,6 +107,24 @@ describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
     expect(payload.data.relationship).toBeNull();
     expect(JSON.stringify(payload)).not.toContain('안녕하세요.');
   });
+
+  it.each(['sql_error', 'missing', 'invalid'] as const)(
+    'holds Se-yeon shell metadata when the existence lookup is %s',
+    async (existenceFailure) => {
+      const reads: string[] = [];
+      const response = await invoke({ pool: fakePool({
+        existenceFailure,
+        observed: sql => reads.push(sql),
+      }) });
+      expect(response.status).toBe(503);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      const payload = await response.json() as any;
+      expect(payload.error.code).toBe('SEYEON_HISTORY_REVEAL_HOLD');
+      expect(JSON.stringify(payload)).not.toContain('internal source body');
+      expect(reads).toHaveLength(2);
+      expect(reads.every(sql => !sql.includes('qry_character_relationship_v1'))).toBe(true);
+    },
+  );
 
   it('rejects missing authentication before opening the database', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });
