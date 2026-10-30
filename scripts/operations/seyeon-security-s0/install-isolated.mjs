@@ -53,8 +53,11 @@ try {
       'seyeon_private.cmd_request_seyeon_memory_revoke_v1(uuid,uuid)','EXECUTE')
     and not has_table_privilege('myeongha_api_executor','public.memory_items','UPDATE')
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','UPDATE')
+    and not has_table_privilege('myeongha_api_executor','public.record_access_grants','INSERT')
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.lock_memory_subject_v1(uuid)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)', 'EXECUTE')
     as closed`);
   if (acl.closed !== true) throw Error('S0 installation unexpectedly enabled model use or Reveal.');
   await client.query('revoke myeongha_seyeon_chat_runtime_owner from current_user');

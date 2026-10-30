@@ -15,6 +15,7 @@ import { createSeyeonPositiveS0OwnerDbPortsV1 } from '../apps/api/src/postgres-s
 import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
+import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
@@ -72,6 +73,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       grant execute on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text) to myeongha_api_executor;
       grant execute on function public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(
+        uuid,uuid,uuid) to myeongha_api_executor;
+      grant execute on function public.cmd_grant_seyeon_owned_conversation_recall_v1(
         uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
@@ -283,6 +286,29 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(accepted).toEqual({ memoryItemId: newMemory, grantCount: 0, replayed: false });
     const { rows: [count] } = await pool.query('select count(*)::int as n from public.record_access_grants where memory_item_id=$1', [newMemory]);
     expect(count.n).toBe(0);
+    // A private receipt must never silently imply character permission.
+    // Only a distinct, explicit verified Member choice may create a Grant.
+    const approvedGrantId=uuid(29,1);
+    const issued=await f.run(({client})=>createSeyeonOwnedOriginalGrantV1(client,{
+      subjectId:f.subject,memoryItemId:newMemory,grantId:approvedGrantId,
+      grantChoice:{mode:'character_only',characterId:'seyeon'},
+    }));
+    expect(issued).toEqual({
+      memoryItemId:newMemory,grantId:approvedGrantId,characterId:'seyeon',replayed:false,
+    });
+    const {rows:[g]}=await pool.query(`select count(*)::int as n
+      from public.record_access_grants where memory_item_id=$1
+        and grantee_character_id='seyeon' and grant_reason='user_choice'
+        and revoked_at is null`,[newMemory]);
+    expect(g.n).toBe(1);
+    await expect(f.run(({client})=>createSeyeonOwnedOriginalGrantV1(client,{
+      subjectId:f.subject,memoryItemId:newMemory,grantId:uuid(29,99),
+      grantChoice:{mode:'character_only',characterId:'seyeon'},
+    }))).rejects.toMatchObject({constraint:'seyeon_owned_grant_active_exists'});
+    await expect(f.run(({client})=>createSeyeonOwnedOriginalGrantV1(client,{
+      subjectId:f.subject,memoryItemId:f.memory,grantId:uuid(29,98),
+      grantChoice:{mode:'character_only',characterId:'seyeon'},
+    }))).rejects.toMatchObject({constraint:'seyeon_owned_grant_accepted_source_required'});
     const invalidProposal = uuid(27, 99);
     await pool.query(`insert into public.memory_proposals(id,subject_id,character_id,proposal_kind,
       record_type,schema_version,proposed_value_jsonb,source_turn_id,source_message_id,
