@@ -1,9 +1,7 @@
 import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
-import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
+import { recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
-import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
-import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
 import { ensureActiveBearer, readMemberSession, readGuestBearer, PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
@@ -124,7 +122,7 @@ function setupTabs() {
   const fromReading = params.get('from') === 'reading';
   const targetTabId = fromReading || requestedTab === 'saju'
     ? 'saju-records-tab'
-    : ({ life: 'life-records-tab', birth: 'birth-records-tab', memory: 'memory-records-tab' }[requestedTab] ?? 'saju-records-tab');
+    : ({ life: 'life-records-tab' }[requestedTab] ?? 'saju-records-tab');
   const initialTab = tabs.find((tab) => tab.id === targetTabId);
   if (initialTab) activate(initialTab);
   if (fromReading || requestedTab === 'saju') {
@@ -144,73 +142,6 @@ function renderProfile(payload) {
   }
   const kind = payload?.subjectKind === 'member' ? '회원 기록' : payload?.subjectKind === 'guest' ? '게스트 기록' : '현재 기록';
   byId('records-subject-kind').textContent = uiText(kind);
-}
-
-function renderBirthProfileUnavailable(message = recordsBirthUnavailableV1(getUiLocale())) {
-  const target = byId('birth-records-list');
-  clear(target);
-  const card = textElement('article', 'panel side-card', '');
-  card.append(uiElement('h3', '', '출생 정보 확인'));
-  card.append(textElement('p', 'muted', message));
-  target.append(card);
-}
-
-function renderCurrentBirthProfile(birth) {
-  if (birth?.status !== 'ready') {
-    renderBirthProfileUnavailable();
-    return;
-  }
-
-  const target = byId('birth-records-list');
-  const profile = birth.payload?.birthProfile;
-  if (profile === null) {
-    clear(target);
-    const card = textElement('article', 'panel side-card', '');
-    card.append(uiElement('h3', '', '아직 등록된 출생 정보가 없습니다.'));
-    card.append(uiElement('p', 'muted', '현재 계정의 본인 출생 정보가 저장되면 이곳에 표시됩니다.'));
-    const link = uiElement('a', 'records-birth-link', '출생 정보 입력하기 →');
-    link.href = 'birth.html';
-    card.append(link);
-    target.append(card);
-    return;
-  }
-  if (!profile || !profile.currentRevision?.input) {
-    renderBirthProfileUnavailable();
-    return;
-  }
-
-  const { revisionNo, input } = profile.currentRevision;
-  const calendar = input.calendarType === 'solar'
-    ? '양력'
-    : input.isLeapMonth ? '음력 · 윤달' : '음력';
-  const birthTime = input.timeKnown ? input.birthTime.slice(0, 5) : '시간 모름';
-  const sex = {
-    male: '남성',
-    female: '여성',
-    unspecified: '미지정',
-  }[input.sex] ?? '미입력';
-
-  clear(target);
-  const card = textElement('article', 'panel side-card records-birth-card', '');
-  card.append(uiElement('h3', '', '현재 등록된 출생 정보'));
-  card.append(uiElement('p', 'records-birth-description',
-    '서버가 확인한 현재 본인 출생 정보입니다. 과거 수정 이력이나 사주 풀이 결과가 아닙니다.'));
-
-  const facts = document.createElement('dl');
-  facts.className = 'records-birth-facts';
-  for (const [title, value] of [
-    ['생년월일', input.birthDate.replaceAll('-', '.')],
-    ['태어난 시간', birthTime],
-    ['달력 기준', calendar],
-    ['성별 정보', sex],
-  ]) {
-    const row = document.createElement('div');
-    row.append(uiElement('dt', '', title), textElement('dd', '', uiText(value)));
-    facts.append(row);
-  }
-  card.append(facts);
-  card.append(textElement('span', 'records-birth-revision', recordsBirthRevisionV1(revisionNo, getUiLocale())));
-  target.append(card);
 }
 
 function renderLifeFacts(payload) {
@@ -277,8 +208,7 @@ function clearRecordsForSessionChange() {
   byId('records-content').hidden = true;
   for (const id of [
     'records-display-name', 'records-subject-kind', 'life-records-list',
-    'birth-records-list', 'saju-records-list', 'memory-records-list',
-    'saju-records-count',
+    'saju-records-list', 'saju-records-count',
   ]) {
     byId(id).replaceChildren();
   }
@@ -494,135 +424,6 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
   renderSajuReadingEmpty(target);
 }
 
-function renderMemories(payload, subjectKind) {
-  const target = byId('memory-records-list');
-  clear(target);
-  if (payload?.status === 'unavailable') {
-    target.append(uiElement('p', 'muted records-empty', '저장된 기억을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
-    return;
-  }
-  const memories = requireArray(payload, 'memories');
-  if (memories.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'records-memory-empty';
-
-    const rule = document.createElement('span');
-    rule.className = 'records-memory-empty-rule';
-    rule.setAttribute('aria-hidden', 'true');
-
-    const ornament = document.createElement('span');
-    ornament.className = 'records-memory-empty-ornament';
-    ornament.setAttribute('aria-hidden', 'true');
-    ornament.append(textElement('span', 'records-memory-empty-symbol', '之'));
-
-    const copy = document.createElement('div');
-    copy.className = 'records-memory-empty-copy';
-    copy.append(uiElement('h3', '', '아직 저장된 기억이 없습니다.'));
-    copy.append(uiElement('p', '', '대화와 기록이 쌓이면 이곳에서 다시 확인할 수 있습니다.'));
-
-    empty.append(rule, ornament, copy);
-    target.append(empty);
-    return;
-  }
-  for (const memory of memories) {
-    const item = document.createElement('div');
-    item.className = 'timeline-item';
-    item.append(sourceElement('strong', '', String(memory.memoryType ?? uiText('기억 항목'))));
-    item.append(sourceElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
-    const provenance = memory.createdByCharacterId ? `${memory.createdByCharacterId} · ${formatTimestamp(memory.createdAt)}` : formatTimestamp(memory.createdAt);
-    item.append(sourceElement('span', 'fine', provenance));
-    if (subjectKind === 'member' && typeof memory.memoryItemId === 'string') {
-      const check = uiElement('button', 'records-memory-grant-check', '세연 접근권한 확인');
-      check.type = 'button';
-      const status = textElement('span', 'records-memory-grant-status', '');
-      status.setAttribute('role', 'status');
-      const client = createRecordsRuntimeClient();
-      const revokeClient = createRecordsMemoryGrantRevokeClient();
-      const revoke = uiElement('button', 'records-memory-grant-revoke', '세연 접근권한 철회');
-      revoke.type = 'button';
-      revoke.hidden = true;
-      let withdrawalPending = false;
-      let requestInFlight = false;
-      let lastGrantState = 'unknown';
-      async function refreshGrant() {
-        const result = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
-        // Only the owner-scoped DB lifecycle (not a filtered active Grant
-        // read or volatile UI flag) can resolve a durable pending withdrawal.
-        lastGrantState = result.grantState;
-        if (result.grantState === 'withdrawal_pending') withdrawalPending = true;
-        if (result.grantState === 'not_granted') withdrawalPending = false;
-        if (item.isConnected) {
-          const view = presentSeyeonMemoryGrantStatusV1(
-            result.grantState, withdrawalPending,
-          );
-          status.textContent = uiText(view.message);
-          revoke.hidden = !view.revokeAvailable;
-        }
-        return result;
-      }
-      check.addEventListener('click', async () => {
-        if (requestInFlight) return;
-        requestInFlight = true;
-        check.disabled = true;
-        revoke.hidden = true;
-        status.textContent = uiText('현재 권한 확인 중…');
-        try {
-          await refreshGrant();
-        } catch {
-          if (item.isConnected) status.textContent = uiText('현재 접근권한을 확인할 수 없습니다.');
-        } finally {
-          check.disabled = false;
-          requestInFlight = false;
-        }
-      });
-      revoke.addEventListener('click', async () => {
-        if (requestInFlight || withdrawalPending || lastGrantState !== 'active') return;
-        if (!window.confirm(uiText('세연의 이 기억 접근권한을 철회하시겠습니까?'))) return;
-        requestInFlight = true;
-        check.disabled = true;
-        revoke.disabled = true;
-        revoke.hidden = true;
-        status.textContent = uiText('철회 요청을 처리하는 중입니다…');
-        try {
-          const acknowledgement = await revokeClient.revokeSeyeonMemoryGrant(memory.memoryItemId);
-          // HTTP 202 is not a completed revoke: the G3 delivery-receipt
-          // barrier blocks new use while the original Grant remains pending.
-          if (acknowledgement.status === 'pending') withdrawalPending = true;
-          const current = await refreshGrant();
-          if (item.isConnected && acknowledgement.status === 'committed') {
-            // Neither legacy RLS-filtered false nor a missing lifecycle
-            // authority proves that the withdrawal finished.
-            status.textContent = uiText(current.grantState === 'not_granted'
-              ? '철회가 완료되었으며 현재 세연의 접근 권한이 없습니다.'
-              : '철회 완료 응답과 현재 권한 조회가 일치하지 않거나 판정할 수 없습니다.');
-          }
-        } catch {
-          // A lost 200/202 or failed current-state GET never proves COMMIT.
-          // If a verified 202 arrived, keep its new-use-blocked state.
-          try {
-            const current = await refreshGrant();
-            if (item.isConnected && current.grantState === 'unknown') {
-              status.textContent = uiText('현재 기억 사용 권한과 철회 완료 여부를 확인할 수 없습니다.');
-            }
-          } catch {
-            if (item.isConnected) {
-              status.textContent = uiText(withdrawalPending
-                ? '새로운 기억 사용 차단 요청은 접수됐지만 현재 철회 완료 여부를 확인할 수 없습니다.'
-                : '철회 결과를 확인할 수 없습니다. 현재 접근권한을 다시 확인해 주세요.');
-            }
-          }
-        } finally {
-          check.disabled = false;
-          revoke.disabled = false;
-          requestInFlight = false;
-        }
-      });
-      item.append(check, revoke, status);
-    }
-    target.append(item);
-  }
-}
-
 function setReady() {
   const status = byId('records-status');
   status.hidden = true;
@@ -645,10 +446,8 @@ function setFailure(error) {
 
 function renderLoadedRecords(records) {
   renderProfile(records.profile);
-  renderCurrentBirthProfile(records.birth);
   renderLifeFacts(records.lifeFacts);
   renderSajuReadings(records.readings, records.lifeFacts);
-  renderMemories(records.memories, records.profile?.subjectKind);
 }
 
 async function boot() {

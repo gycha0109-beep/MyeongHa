@@ -1,7 +1,6 @@
 import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import { parseReadingHistoryPayloadV1, ReadingHistoryContractErrorV1 } from './reading-history-contract.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
-import { assertBirthProfile } from './my-runtime-client.js';
 import {
   PRODUCT_AUTH_STORAGE_V1,
   ensureActiveBearer,
@@ -11,10 +10,8 @@ import {
 
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
-  birthProfile: '/api/me/birth-profile',
   lifeFacts: '/api/life-record',
   readings: '/api/readings',
-  memories: '/api/memories',
 });
 const AUTHORITY_READ_ATTEMPTS = 2;
 
@@ -129,19 +126,6 @@ async function readJson(fetchImpl, endpoint, bearer) {
     throw error;
   }
 }
-async function readOptionalCurrentBirthProfile(fetchImpl, endpoint, bearer) {
-  try {
-    const payload = await readJson(fetchImpl, endpoint, bearer);
-    // Share the validated current-self Birth contract with My.
-    return Object.freeze({ status: 'ready', payload: assertBirthProfile(payload) });
-  } catch (error) {
-    // Revoked credentials cannot be downgraded into an optional-data error.
-    if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') throw error;
-    // Other failures do not hide Life Facts, Official Readings or Memories.
-    return Object.freeze({ status: 'unavailable' });
-  }
-}
-
 function projectReadingHistory(payload) {
   try {
     return parseReadingHistoryPayloadV1(payload);
@@ -251,36 +235,6 @@ async function readPagedCollection(fetchImpl, endpoint, bearer, field) {
   }
 }
 
-const MEMORY_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-function requireSeyeonGrantStatus(payload, memoryItemId) {
-  // A legacy active-grants GET filters pending withdrawals with RLS; its
-  // false result is NOT proof that the withdrawal finished.
-  const state = payload.grantState === undefined
-    ? (payload.currentlyGranted === true ? 'active' : 'unknown')
-    : payload.grantState;
-  const validState = ['active', 'withdrawal_pending', 'not_granted', 'unknown'].includes(state);
-  const effectiveGranted = state === 'active';
-  if (
-    payload.memoryItemId !== memoryItemId
-    || payload.characterId !== 'seyeon'
-    || typeof payload.currentlyGranted !== 'boolean'
-    || !validState
-    || payload.currentlyGranted !== effectiveGranted
-    || !(payload.grantedAt === null || (typeof payload.grantedAt === 'string' && Number.isFinite(Date.parse(payload.grantedAt))))
-    || (effectiveGranted && payload.grantedAt === null)
-    || (!effectiveGranted && payload.grantedAt !== null)
-  ) {
-    throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', 'Current Se-yeon grant lifecycle is invalid.');
-  }
-  return Object.freeze({
-    memoryItemId,
-    currentlyGranted: effectiveGranted,
-    grantedAt: payload.grantedAt,
-    grantState: state,
-  });
-}
-
 export function createRecordsRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
@@ -308,32 +262,16 @@ export function createRecordsRuntimeClient(options = {}) {
       projectReadingHistory(
         await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
       )),
-    readMemories: () => readStable((bearer) =>
-      readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories')),
-    readSeyeonMemoryGrantStatus(memoryItemId) {
-      if (typeof memoryItemId !== 'string' || !MEMORY_UUID_V1.test(memoryItemId)) {
-        throw new RecordsRuntimeError('WEB_RECORDS_INVALID_MEMORY_ID', 'A valid memory identity is required.');
-      }
-      const endpoint = `${endpoints.memories}/${encodeURIComponent(memoryItemId)}/grants/seyeon`;
-      return readStable(async (bearer) => {
-        if (bearer.kind !== 'member') {
-          throw new RecordsRuntimeError('WEB_RECORDS_MEMBER_REQUIRED', 'Member identity is required for Se-yeon grant status.');
-        }
-        return requireSeyeonGrantStatus(await readJson(fetchImpl, endpoint, bearer), memoryItemId);
-      });
-    },
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeResult, readingResult, memoryResult, birthResult] = await Promise.allSettled([
+        const [lifeResult, readingResult] = await Promise.allSettled([
           readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
           readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
-          readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories'),
-          readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer),
         ]);
         // Authentication or subject denial in *any* ledger invalidates the entire snapshot.
         // Non-auth transport errors are isolated: an unavailable ledger is not an empty ledger.
-        for (const result of [lifeResult, readingResult, memoryResult, birthResult]) {
+        for (const result of [lifeResult, readingResult]) {
           if (result.status === 'rejected' && result.reason instanceof RecordsRuntimeError
             && result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED') throw result.reason;
         }
@@ -341,9 +279,7 @@ export function createRecordsRuntimeClient(options = {}) {
         const lifeFacts = lifeResult.status === 'fulfilled' ? lifeResult.value : unavailable;
         const readings = readingResult.status === 'fulfilled'
           ? projectReadingHistory(readingResult.value) : unavailable;
-        const memories = memoryResult.status === 'fulfilled' ? memoryResult.value : unavailable;
-        const birth = birthResult.status === 'fulfilled' ? birthResult.value : unavailable;
-        return Object.freeze({ profile, lifeFacts, readings, memories, birth });
+        return Object.freeze({ profile, lifeFacts, readings });
       });
     },
   });

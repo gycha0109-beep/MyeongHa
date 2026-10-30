@@ -1,6 +1,4 @@
 export declare function recordsTimestampV1(value: unknown, locale?: string): string;
-export declare function recordsBirthUnavailableV1(locale?: string): string;
-export declare function recordsBirthRevisionV1(revisionNo: number, locale?: string): string;
 export declare function recordsReadingSummaryV1(input: {
   completedAt: string | null;
   title: string;

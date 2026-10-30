@@ -25,10 +25,6 @@ export function RecordsPage() {
             <div id="records-subject-kind" className="records-profile-kind">현재 기록</div>
           </div>
           <div className="records-profile-actions">
-            <a className="records-profile-action records-profile-action--primary" href="birth.html">
-              <span>명식록 추가</span>
-              <span className="records-profile-action-arrow" aria-hidden="true">→</span>
-            </a>
             <a className="records-profile-action records-profile-action--secondary" href="my.html">
               <span className="records-profile-action-icon" aria-hidden="true">♙</span>
               <span>내 정보</span>
@@ -40,8 +36,6 @@ export function RecordsPage() {
           <button className="records-tab records-tab--primary" type="button" role="tab" tabIndex={0} aria-selected="true" aria-controls="saju-records" id="saju-records-tab">사주 보고서</button>
           <span className="records-tab-divider" aria-hidden="true">다른 기록</span>
           <button className="records-tab" type="button" role="tab" tabIndex={-1} aria-selected="false" aria-controls="life-records" id="life-records-tab">현세록</button>
-          <button className="records-tab" type="button" role="tab" tabIndex={-1} aria-selected="false" aria-controls="birth-records" id="birth-records-tab">명식록</button>
-          <button className="records-tab" type="button" role="tab" tabIndex={-1} aria-selected="false" aria-controls="memory-records" id="memory-records-tab">대리가 기억</button>
         </div>
 
         <section id="life-records" className="records-tab-panel" role="tabpanel" aria-labelledby="life-records-tab" hidden>
@@ -72,27 +66,7 @@ export function RecordsPage() {
           <div id="saju-records-list" className="records-reading-grid" />
         </section>
 
-        <section id="birth-records" className="records-tab-panel" role="tabpanel" aria-labelledby="birth-records-tab" hidden>
-          <div className="records-panel-head records-panel records-birth-head">
-            <div><span className="records-kicker">BIRTH</span><h2>명식록</h2></div>
-            <p>서버에 저장된 현재 출생 정보와 입력 차수를 확인합니다. 과거 수정 이력은 표시하지 않습니다.</p>
-          </div>
-          <div id="birth-records-list" className="records-grid" />
-        </section>
 
-        <section id="memory-records" className="records-tab-panel" role="tabpanel" aria-labelledby="memory-records-tab" hidden>
-          <div className="records-panel records-memory-panel">
-            <div className="records-panel-head records-memory-head">
-              <div><span className="records-kicker">MEMORY</span><h2>대리가 기억</h2></div>
-              <p>현재 저장된 기억을 확인합니다.</p>
-            </div>
-            <div id="memory-records-list" className="timeline records-memory-list" />
-            <p className="records-memory-note">
-              <span className="records-memory-note-icon" aria-hidden="true">!</span>
-              <span>캐릭터가 삭제된 후 남는 기억 범위는 서로 다를 수 있습니다.</span>
-            </p>
-          </div>
-        </section>
       </div>
     </div>
   );
