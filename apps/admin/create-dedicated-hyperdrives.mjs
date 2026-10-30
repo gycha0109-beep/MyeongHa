@@ -1,7 +1,6 @@
 import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {resolve} from 'node:path';
-import {createInterface} from 'node:readline/promises';
 import {pathToFileURL} from 'node:url';
 
 const ACCOUNT='410d3f82ed3ccc66609a2b698803859b';
@@ -90,16 +89,71 @@ function readHidden(label){
   });
 }
 
+function waitForEnterOnly(label){
+  if(!process.stdin.isTTY||typeof process.stdin.setRawMode!=='function')
+    throw bootstrapError('INTERACTIVE_TERMINAL_REQUIRED');
+  return new Promise((resolve,reject)=>{
+    const input=process.stdin;
+    process.stderr.write(label+' [Enter only; do not paste into terminal]: ');
+    function finish(error){
+      input.off('data',onData);
+      input.setRawMode(false);
+      input.pause();
+      process.stderr.write('\n');
+      if(error)reject(error);else resolve();
+    }
+    function onData(chunk){
+      for(const char of chunk){
+        if(char==='\u0003'){finish(bootstrapError('INPUT_CANCELLED'));return;}
+        if(char==='\r'||char==='\n'){finish();return;}
+        finish(bootstrapError('TERMINAL_INPUT_NOT_ALLOWED'));
+        return;
+      }
+    }
+    input.setEncoding('utf8');
+    input.setRawMode(true);
+    input.on('data',onData);
+    input.resume();
+  });
+}
+
+function setLocalClipboard(value){
+  const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',
+    '$s=[Console]::In.ReadToEnd(); Set-Clipboard -Value $s',
+  ],{input:value,encoding:'utf8',stdio:['pipe','pipe','pipe'],
+     timeout:8000,windowsHide:true,maxBuffer:4096});
+  if(result.error||result.status!==0)throw bootstrapError('CLIPBOARD_UNAVAILABLE');
+}
+
 async function readClipboardSecret(label){
-  if(!process.stdin.isTTY)throw bootstrapError('INTERACTIVE_TERMINAL_REQUIRED');
-  const reader=createInterface({input:process.stdin,output:process.stderr,terminal:true});
-  try{await reader.question(label+' [copy locally, then press Enter]: ');}
-  finally{reader.close();}
+  await waitForEnterOnly(label+' password copied to local clipboard');
   const result=spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',
     "$v=Get-Clipboard -Raw; Set-Clipboard -Value ' '; if($null -ne $v){[Console]::Out.Write($v)}",
   ],{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:8000,windowsHide:true,maxBuffer:8192});
   if(result.error||result.status!==0)throw bootstrapError('CLIPBOARD_UNAVAILABLE');
-  return result.stdout.replace(/[\r\n]+$/u,'');
+  const value=result.stdout.replace(/[\r\n]+$/u,'');
+  if(!/^[\x20-\x7E]{24,4096}$/u.test(value))
+    throw bootstrapError(value.length<24?'PASSWORD_INPUT_TOO_SHORT':'CLIPBOARD_SECRET_INVALID');
+  return value;
+}
+
+export function buildAuditRolePasswordSqlV1(password){
+  if(typeof password!=='string'||!/^[\x20-\x7E]{24,4096}$/u.test(password))
+    throw bootstrapError('CLIPBOARD_SECRET_INVALID');
+  return "ALTER ROLE myeongha_admin_audit_writer WITH PASSWORD '"+password.replace(/'/gu,"''")+"';";
+}
+
+async function syncAuditPassword(caPath,port){
+  const password=await readClipboardSecret('Copy the chosen audit_writer password');
+  try{
+    setLocalClipboard(buildAuditRolePasswordSqlV1(password));
+    process.stderr.write('Audit Writer SQL copied locally. Paste it into Supabase SQL Editor and execute it.\n');
+    await waitForEnterOnly('After SQL Editor reports Success');
+  }finally{
+    setLocalClipboard(' ');
+  }
+  checkTlsLogin('myeongha_admin_audit_writer',password,caPath,port);
+  process.stdout.write('Audit Writer TLS verify-full OK; SQL and login used the same password.\n');
 }
 
 function checkTlsLogin(role,password,caPath,port){
@@ -132,13 +186,18 @@ async function cloudflare(token,url,method='GET',body){
 
 async function main(){
   const args=process.argv.slice(2);
-  if(args.some(arg=>!['--preflight-only','--clipboard'].includes(arg))||new Set(args).size!==args.length)throw bootstrapError('UNKNOWN_ARGUMENTS');
+  if(args.some(arg=>!['--preflight-only','--clipboard','--sync-audit-password'].includes(arg))||new Set(args).size!==args.length||
+     (args.includes('--sync-audit-password')&&args.length!==1))throw bootstrapError('UNKNOWN_ARGUMENTS');
   const preflightOnly=args.includes('--preflight-only');
   const useClipboard=args.includes('--clipboard');
   const requestSecret=useClipboard?readClipboardSecret:readHidden;
   const port=parseDedicatedAdminPoolerPortV1(process.env.MYEONGHA_ADMIN_POOLER_PORT);
   const caPath=process.env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_FILE;
   if(!caPath||!existsSync(caPath))throw bootstrapError('CA_FILE_NOT_FOUND');
+  if(args.includes('--sync-audit-password')){
+    await syncAuditPassword(caPath,port);
+    return;
+  }
   const passwords=new Map();
   try{
     for(const item of ROLES){
