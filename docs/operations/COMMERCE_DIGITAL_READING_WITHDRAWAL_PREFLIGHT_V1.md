@@ -27,3 +27,18 @@ The result always keeps `requestRecorded=false`, `providerRefundAuthorized=false
 `test/commerce-digital-reading-withdrawal-review-preflight-v1.test.ts` checks request whitelisting, exact owner binding, missing and cross-unit evidence, customer statutory reasons, unavailable authority, and false approval flags. The existing withdrawal classifier suite is run alongside it.
 
 No LIVE merchant readiness or paid Reading delivery is claimed by these tests.
+
+## Private PostgreSQL evidence integration — staged continuation
+
+The following components are now available **in the repository only**:
+
+- `apps/api/src/postgres-digital-reading-withdrawal-evidence-private-v1.ts` reads the exact production-verified PortOne Receipt, immutable owned Purchase Intent, selected Reader and historical checkout presentation under one caller-supplied operations query connection.
+- The existing `loadVerifiedDigitalReadingCheckoutNoticeV1` supplies only the matching server-approved acknowledged notice, using the same transaction.
+- `apps/api/src/commerce-digital-reading-withdrawal-private-transaction-v1.ts` owns a `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY` and mandatory rollback; it never commits an intake, writes a provider command, or publishes consumer content.
+- The delivery port deliberately returns `null` because no approved durable paid-Reading consumer-delivery source currently exists. A completed payment or T2 COMMIT is not delivery.
+- The private owned-unit resolver restricts to `portone_v2`, Web, `environment=production`, a verified Receipt and equal immutable Intent/Receipt money; **the historical 1,900 KRW sandbox purchase is excluded**. Current live Product Offer remains disabled and no Production paid Reading units are expected.
+- A historical unit without a pre-checkout presentation cannot be safely bound by this exact-unit resolver. It must not be described as ineligible for a statutory refund; a separate general claim intake and missing-notice complaint route remain necessary.
+
+The operations connection is **not** the ordinary API executor, because the current notice tables intentionally have no ordinary API SELECT privileges. This integration is unmounted and requires an independently approved trusted, complete-visibility operations reader. No execution privilege changes, public routes, grants, schema migrations, data writes, or PortOne cancellation calls were introduced.
+
+Acceptance is limited to TypeScript checks plus deterministic mock PostgreSQL query/transaction tests. Live PostgreSQL RLS/integration acceptance, durable claim recording, Legal notice, final purchased-unit authority, real delivery proof and refund-to-Grant ordering are still unresolved. Therefore **nothing above is consumer refund intake or LIVE refund readiness**.
