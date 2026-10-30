@@ -2,8 +2,9 @@
 begin;
 -- G0-D1/D2/D3 core: exact original Memory -> committed Assistant -> current
 -- original Grant/Record lineage on the SAME DB read transaction.
--- STAGED ONLY. Not in plan.mjs, auto migration or Production installation.
--- This authorizes neither old User text nor Relationship/Reader derived data.
+-- Staged only in the S0 isolated SQL plan. No auto Production migration.
+-- Historical User originals require S0/15; Relationship events require
+-- S0/14 source verification; Reader and quoted derived data remain HOLD.
 -- Unknown lineage FAILS CLOSED, rather than silently becoming NO_PERSONAL.
 
 -- Use the existing S0 runtime owner, original G1 pin and G2 validated
