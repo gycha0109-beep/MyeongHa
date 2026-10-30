@@ -15,7 +15,7 @@
     "security:baseline": "node scripts/collect-security-baseline.mjs",
     "dev": "npm run dev -w @myeongha/web",
     "start": "npm run build:web && npm run preview -w @myeongha/web",
-    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile",
+    "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile && npm run typecheck -w @myeongha/admin",
     "test": "vitest run",
     "verify:cloudflare-db-handoff": "node scripts/operations/verify-cloudflare-db-handoff.mjs",
     "stage:cloudflare-db-credential": "node scripts/operations/stage-cloudflare-db-credential-version.mjs",
@@ -41,7 +41,7 @@
     "verify:production:birth-profile-guest-create-read": "node scripts/verify-production-birth-profile-guest-create-read.mjs",
     "verify:production:saju-current-subject": "node scripts/verify-production-saju-current-subject.mjs",
     "verify:production:records-current-subject": "node scripts/verify-production-records-current-subject.mjs",
-    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config",
+    "check": "npm run typecheck && npm run test && npm run build && npm run build:web && npm run verify:deployment-config && npm run verify:supabase-deployment-config && npm run build:admin",
     "verify:production-postgres-privacy-delta-audit-workflow": "node scripts/verify-production-postgres-privacy-delta-audit-workflow.mjs",
     "verify:production-postgres-privacy-recovery-ledger-workflow": "node scripts/verify-production-postgres-privacy-recovery-ledger-workflow.mjs",
     "verify:account-deletion-finalization-policy-candidate": "node scripts/verify-account-deletion-finalization-policy-candidate.mjs",
@@ -71,7 +71,9 @@
     "verify:mobile-export-artifacts": "node scripts/verify-mobile-export-artifacts.mjs",
     "verify:mobile-push-activation-readiness": "node scripts/verify-mobile-push-activation-readiness.mjs",
     "verify:mobile-push-activation-readiness-contract": "node scripts/verify-mobile-push-activation-readiness.mjs --allow-blocked",
-    "verify:mobile-android-physical-smoke-readiness": "node scripts/verify-mobile-android-physical-smoke-readiness.mjs"
+    "verify:mobile-android-physical-smoke-readiness": "node scripts/verify-mobile-android-physical-smoke-readiness.mjs",
+    "dev:admin": "npm run dev -w @myeongha/admin",
+    "build:admin": "npm run build -w @myeongha/admin"
   },
   "dependencies": {
     "pg": "8.23.0"

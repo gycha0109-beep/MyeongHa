@@ -1,0 +1,46 @@
+{
+  "name": "myeongha-admin",
+  "main": "../../cloudflare/admin-worker.mjs",
+  "compatibility_date": "2026-10-27",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "vars": {
+    "MYEONGHA_ADMIN_PRIVATE_ENABLED": "false",
+    "MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED": "false",
+    "MYEONGHA_ADMIN_RETENTION_ENABLED": "false",
+    "MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED": "false"
+  },
+  "triggers": {
+    "crons": [
+      "20 * * * *"
+    ]
+  },
+  "ratelimits": [
+    {
+      "name": "ADMIN_RATE_LIMITER",
+      "namespace_id": "263060",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
+  }
+}

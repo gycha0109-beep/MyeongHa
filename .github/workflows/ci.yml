@@ -132,6 +132,8 @@ jobs:
           fi
       - name: Build shared TypeScript
         run: npm run build
+      - name: Check and build isolated Admin shell
+        run: npm run typecheck -w @myeongha/admin && npm run test -w @myeongha/admin && npm run build:admin
       - name: Check and build Web dependency
         if: needs.scope.outputs.web == 'true'
         run: npm run typecheck -w @myeongha/web && npm run build:web && npm run verify:deployment-config

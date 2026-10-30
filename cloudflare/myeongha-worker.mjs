@@ -11,6 +11,7 @@ import { cloudflareAuthRoute, handleCloudflareAuthRequest, rateLimitCloudflareRe
 import {approvedCloudflareAuthOriginV1} from '../workers/cloudflare-auth-db-api.mjs';
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.ts';
+import { handleCloudflarePresentationFeedV1, PUBLIC_PRESENTATION_PATH_V1 } from '../workers/cloudflare-presentation-feed.mjs';
 
 const HEALTH_HEADERS = Object.freeze({
   'Cache-Control':'no-store',
@@ -50,6 +51,7 @@ export default {
     let url;
     try { url = new URL(request.url); }
     catch { return sealedRuntime.fetch(request, env, ctx); }
+    if(url.pathname===PUBLIC_PRESENTATION_PATH_V1)return handleCloudflarePresentationFeedV1(request,env);
     const receiptRoute=/^\/api\/chat\/delivery-receipts\/[a-f0-9-]+$/u.test(url.pathname);
     const revokeRoute=/^\/api\/memories\/[a-f0-9-]+\/grants\/seyeon\/revoke$/u.test(url.pathname);
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);

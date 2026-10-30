@@ -1,3 +1,4 @@
+import type { createAdminAnalyticsVerifiedPurchaseAdapterV1 } from './admin-analytics-verified-purchase-v1.js';
 import {
   createPortOneV2PaymentVerificationAdapterV1,
   type PortOneV2PaymentVerificationAdapterConfigV1,
@@ -43,6 +44,13 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
   readonly verificationConfig: PortOneV2PaymentVerificationAdapterConfigV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Only an explicitly configured, consent-verified analytics adapter.
+   * This does not activate the presently unmounted payment route. */
+  readonly onVerifiedReceiptCommitted?: (input: {
+    readonly request: Request; readonly receiptId: string;
+  }) => Promise<void>;
+  /** Opt-in: provider-verified production Reading receipt and active consent only. */
+  readonly verifiedPurchaseAnalytics?: Pick<ReturnType<typeof createAdminAnalyticsVerifiedPurchaseAdapterV1>, 'record'>;
 }
 
 /**
@@ -55,6 +63,9 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
 export function createProductionPaymentAttemptServerVerificationRuntimeV1(
   input: CreateProductionPaymentAttemptServerVerificationRuntimeInputV1,
 ): ProductionPaymentAttemptServerVerificationRuntimeV1 {
+  if(input.verifiedPurchaseAnalytics!==undefined&&input.onVerifiedReceiptCommitted!==undefined)
+    throw Error('Ambiguous purchase analytics observer configuration');
+
   const userDataConfig = parseProductionUserDataRuntimeConfigV1(input.env);
 
   // Validate and snapshot server-side provider credentials before pool ownership.
@@ -74,6 +85,11 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
 
+  const observer=input.verifiedPurchaseAnalytics===undefined?input.onVerifiedReceiptCommitted:
+    async ({request,receiptId}:{readonly request:Request;readonly receiptId:string})=>{
+      await input.verifiedPurchaseAnalytics!.record(request,receiptId);
+    };
+
   return Object.freeze({
     handleRequest(
       requestInput: ProductionPaymentAttemptServerVerificationRequestV1,
@@ -85,6 +101,8 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         verificationAdapter,
+        ...(observer === undefined ? {} :
+          { onVerifiedReceiptCommitted: observer }),
       });
     },
     close() {

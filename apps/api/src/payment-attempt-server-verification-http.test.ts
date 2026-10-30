@@ -153,6 +153,9 @@ function invoke(input: {
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
   verificationAdapter?: CommercePaymentVerificationAdapterV1;
+  onVerifiedReceiptCommitted?: (input: {
+    readonly request: Request; readonly receiptId: string;
+  }) => Promise<void>;
 } = {}) {
   return handlePaymentAttemptServerVerificationRequestV1({
     request: input.request ?? post({ paymentAttemptId: PAYMENT_ATTEMPT_ID }),
@@ -165,6 +168,8 @@ function invoke(input: {
     ),
     pool: input.pool ?? fakePool(),
     verificationAdapter: input.verificationAdapter ?? adapter(),
+    ...(input.onVerifiedReceiptCommitted===undefined ? {} :
+      { onVerifiedReceiptCommitted: input.onVerifiedReceiptCommitted }),
   });
 }
 
@@ -281,6 +286,41 @@ describe('Payment Attempt server verification HTTP foundation', () => {
     expect(JSON.stringify(payload)).not.toContain('currency');
   });
 
+  it('invokes optional receipt analytics only after committed payment, with no provider payload',async()=>{
+    const queriedSql:string[]=[];
+    const request=post({paymentAttemptId:PAYMENT_ATTEMPT_ID});
+    const calls:Array<{receiptId:string;request:Request;committed:boolean}>=[];
+    const response=await invoke({
+      request,pool:fakePool({queriedSql}),
+      onVerifiedReceiptCommitted:async({request,receiptId})=>{
+        calls.push({request,receiptId,committed:queriedSql.filter(x=>x==='COMMIT').length===2});
+      },
+    });
+    expect(response.status).toBe(200);
+    expect(calls).toEqual([{request,receiptId:RECEIPT_ID,committed:true}]);
+    expect(Object.keys(calls[0]!)).toEqual(['request','receiptId','committed']);
+  });
+  it('does not undo a verified receipt when analytics rejects and retries on payment replay',async()=>{
+    const queriedSql:string[]=[];
+    let attempts=0;
+    const response=await invoke({
+      pool:fakePool({queriedSql,replayed:true}),
+      onVerifiedReceiptCommitted:async({receiptId})=>{
+        expect(receiptId).toBe(RECEIPT_ID);attempts++;throw Error('consent missing');
+      },
+    });
+    expect(response.status).toBe(200);
+    expect((await response.json() as {data:{replayed:boolean}}).data.replayed).toBe(true);
+    expect(attempts).toBe(1);
+    expect(queriedSql).not.toContain('ROLLBACK');
+  });
+  it('never observes rejected identity or failed receipt persistence',async()=>{
+    let attempts=0;
+    const observe=async()=>{attempts++;};
+    expect((await invoke({evidence:null,onVerifiedReceiptCommitted:observe})).status).toBe(401);
+    expect((await invoke({pool:fakePool({persistConstraint:'cmd_persist_verified_payment_evidence_v1_idempotency_conflict'}),onVerifiedReceiptCommitted:observe})).status).toBe(409);
+    expect(attempts).toBe(0);
+  });
   it('maps unavailable or cross-owner verification context to not found without provider verification', async () => {
     const verificationAdapter = adapter();
     const response = await invoke({

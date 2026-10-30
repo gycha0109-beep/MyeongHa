@@ -595,6 +595,12 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
+    },
+    "admin-console-private-build.yml": {
+      "responsibility": "Manual isolated Admin build and disabled deployment configuration verification; no deployment or secret access",
+      "prMode": "manual-only",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "admin-console"
     }
   }
 }

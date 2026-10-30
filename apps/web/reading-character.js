@@ -639,6 +639,12 @@ function activatePreviewReading(preview) {
   }
   renderCalculationSummary(preview.calculationSummary);
   renderStep();
+  // A client-intent viewing signal is emitted only after a validated, persisted
+  // Official Reading is on screen. A free preview is never a paid result view.
+  // No analytics collection is activated by emitting this DOM signal.
+  if (isStoredRecord && stage?.hidden === false) {
+    document.dispatchEvent(new Event('myeongha:official-reading-rendered'));
+  }
 
   const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
   window.setTimeout(() => {
