@@ -3,6 +3,7 @@ import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
+import { createRecordsMemoryGrantConsentClient } from './records-memory-grant-consent.js';
 import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
@@ -456,17 +457,28 @@ function renderMemories(payload, subjectKind) {
       status.setAttribute('role', 'status');
       const client = createRecordsRuntimeClient();
       const revokeClient = createRecordsMemoryGrantRevokeClient();
+      const consentClient = createRecordsMemoryGrantConsentClient();
+      const grant = uiElement('button', 'records-memory-grant-consent', '이 기억을 세연에게 공유');
+      grant.type = 'button';
+      grant.hidden = true;
       const revoke = uiElement('button', 'records-memory-grant-revoke', '세연 접근권한 철회');
       revoke.type = 'button';
       revoke.hidden = true;
       let withdrawalPending = false;
       let requestInFlight = false;
       let lastGrantState = 'unknown';
+      let grantConsentAvailable = false;
       async function refreshGrant() {
         const result = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
         // Only the owner-scoped DB lifecycle (not a filtered active Grant
         // read or volatile UI flag) can resolve a durable pending withdrawal.
         lastGrantState = result.grantState;
+        // Server-owned eligibility is an opt-in positive capability. The
+        // existing production GET has no such field and therefore stays OFF.
+        grantConsentAvailable = result.grantConsentAvailable === true
+          && result.grantState === 'not_granted'
+          && memory.memoryType === 'conversation_recall/v1'
+          && memory.createdByCharacterId === 'seyeon';
         if (result.grantState === 'withdrawal_pending') withdrawalPending = true;
         if (result.grantState === 'not_granted') withdrawalPending = false;
         if (item.isConnected) {
@@ -475,6 +487,7 @@ function renderMemories(payload, subjectKind) {
           );
           status.textContent = uiText(view.message);
           revoke.hidden = !view.revokeAvailable;
+          grant.hidden = !grantConsentAvailable || withdrawalPending;
         }
         return result;
       }
@@ -483,6 +496,7 @@ function renderMemories(payload, subjectKind) {
         requestInFlight = true;
         check.disabled = true;
         revoke.hidden = true;
+        grant.hidden = true;
         status.textContent = uiText('현재 권한 확인 중…');
         try {
           await refreshGrant();
@@ -493,6 +507,45 @@ function renderMemories(payload, subjectKind) {
           requestInFlight = false;
         }
       });
+      grant.addEventListener('click', async () => {
+        if (requestInFlight || withdrawalPending || !grantConsentAvailable ||
+            lastGrantState !== 'not_granted') return;
+        requestInFlight = true;
+        check.disabled = true;
+        grant.disabled = true;
+        grant.hidden = true;
+        revoke.hidden = true;
+        try {
+          // Re-check authorization immediately before collecting consent.
+          const current = await refreshGrant();
+          if (!current.grantConsentAvailable || current.grantState !== 'not_granted' ||
+              withdrawalPending) return;
+          if (!window.confirm(uiText('이 기억을 세연이 이후 대화에서 사용할 수 있도록 공유하시겠습니까?'))) return;
+          status.textContent = uiText('세연 공유 동의를 확인하는 중입니다…');
+          await consentClient.grantSeyeonOriginalMemory(memory.memoryItemId);
+          const verified = await refreshGrant();
+          if (item.isConnected && verified.grantState !== 'active') {
+            status.textContent = uiText('동의 응답 이후 현재 공유 권한을 확인할 수 없습니다.');
+          }
+        } catch {
+          // A lost POST acknowledgement is not proof of failure or success.
+          try {
+            await refreshGrant();
+          } catch {
+            lastGrantState = 'unknown';
+            grantConsentAvailable = false;
+            if (item.isConnected) {
+              grant.hidden = true;
+              revoke.hidden = true;
+              status.textContent = uiText('현재 공유 권한을 확인할 수 없습니다. 다시 조회해 주세요.');
+            }
+          }
+        } finally {
+          check.disabled = false;
+          grant.disabled = false;
+          requestInFlight = false;
+        }
+      });
       revoke.addEventListener('click', async () => {
         if (requestInFlight || withdrawalPending || lastGrantState !== 'active') return;
         if (!window.confirm(uiText('세연의 이 기억 접근권한을 철회하시겠습니까?'))) return;
@@ -500,6 +553,7 @@ function renderMemories(payload, subjectKind) {
         check.disabled = true;
         revoke.disabled = true;
         revoke.hidden = true;
+        grant.hidden = true;
         status.textContent = uiText('철회 요청을 처리하는 중입니다…');
         try {
           const acknowledgement = await revokeClient.revokeSeyeonMemoryGrant(memory.memoryItemId);
@@ -535,7 +589,7 @@ function renderMemories(payload, subjectKind) {
           requestInFlight = false;
         }
       });
-      item.append(check, revoke, status);
+      item.append(check, grant, revoke, status);
     }
     target.append(item);
   }

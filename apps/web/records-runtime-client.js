@@ -261,8 +261,13 @@ function requireSeyeonGrantStatus(payload, memoryItemId) {
     : payload.grantState;
   const validState = ['active', 'withdrawal_pending', 'not_granted', 'unknown'].includes(state);
   const effectiveGranted = state === 'active';
+  // Only a server-authored, explicit positive capability may expose consent.
+  // A missing field is NOT permission to use the staged POST route.
+  const grantConsentAvailable = payload.grantConsentAvailable === true;
   if (
-    payload.memoryItemId !== memoryItemId
+    (payload.grantConsentAvailable !== undefined && typeof payload.grantConsentAvailable !== 'boolean')
+    || (grantConsentAvailable && state !== 'not_granted')
+    || payload.memoryItemId !== memoryItemId
     || payload.characterId !== 'seyeon'
     || typeof payload.currentlyGranted !== 'boolean'
     || !validState
@@ -278,6 +283,7 @@ function requireSeyeonGrantStatus(payload, memoryItemId) {
     currentlyGranted: effectiveGranted,
     grantedAt: payload.grantedAt,
     grantState: state,
+    ...(grantConsentAvailable ? { grantConsentAvailable: true } : {}),
   });
 }
 
