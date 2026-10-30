@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { RECORDS_HUB_STATIC_UI_COPY_V1 } from '../ui-records-hub-copy.js';
+import { readingDomainPresentationV1 } from '../reading-domain-presentation.js';
 
 const root = resolve(process.cwd(), 'apps/web');
 const readWeb = (file: string) => readFileSync(resolve(root, file), 'utf8').replace(/\r\n/gu, '\n');
@@ -12,6 +13,16 @@ describe('Records long-form official report boundary', () => {
   const css = readWeb('reading-detail-shell.css');
   const stageCss = readWeb('reading-v3.css');
   const localeRuntime = readWeb('ui-i18n.js');
+
+  it('labels the exact stored Saju domain without inferring Product, Offer or Reader grant', () => {
+    expect(jsx).toContain('<dt>해석 영역</dt><dd data-official-report-domain>—</dd>');
+    expect(runtime).toContain('readingDomainPresentationV1(record.sajuDomain).title');
+    expect(runtime).toContain('readingDomainPresentationV1(preview.record.sajuDomain).title');
+    expect(runtime).toContain("'[data-official-report-domain]'");
+    expect(readingDomainPresentationV1('career').title).toBe('직업 · 커리어');
+    expect(readingDomainPresentationV1('general').title).toBe('전체 사주');
+    expect(readingDomainPresentationV1('unknown').title).toBe('사주 풀이');
+  });
 
   it('provides an all-at-once official Reading document without changing the preview route', () => {
     expect(jsx).toContain('data-official-report hidden');
@@ -253,7 +264,7 @@ describe('Records long-form official report boundary', () => {
   it('has five-locale fixed controls without translating report source text', () => {
     for (const source of [
       '저장된 공식 사주 보고서', '발행일', '해석 버전',
-      '보고서 목차', '해석의 적용 범위', '단계별 읽기',
+      '보고서 목차', '해석 영역', '해석의 적용 범위', '단계별 읽기',
       '보고서 전체 보기', '이 해석의 구조 보기',
     ]) {
       const translation = RECORDS_HUB_STATIC_UI_COPY_V1.get(source);

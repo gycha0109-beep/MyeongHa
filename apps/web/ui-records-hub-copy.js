@@ -129,6 +129,10 @@ export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
   ['보고서 목차', {
     'ja-JP': 'レポート目次', 'zh-TW': '報告目錄', 'en-US': 'Report contents', 'zh-CN': '报告目录',
   }],
+  ['해석 영역', {
+    'ja-JP': '鑑定分野', 'zh-TW': '解讀領域',
+    'en-US': 'Reading domain', 'zh-CN': '解读领域',
+  }],
   ['해석의 적용 범위', {
     'ja-JP': '鑑定の適用範囲', 'zh-TW': '解讀適用範圍', 'en-US': 'Reading scope', 'zh-CN': '解读适用范围',
   }],

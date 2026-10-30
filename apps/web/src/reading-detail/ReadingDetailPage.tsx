@@ -24,6 +24,7 @@ export function ReadingDetailPage() {
           <dl className="official-report-meta">
             <div><dt>발행일</dt><dd data-official-report-date>—</dd></div>
             <div><dt>해석 버전</dt><dd data-official-report-version>—</dd></div>
+            <div><dt>해석 영역</dt><dd data-official-report-domain>—</dd></div>
             <div><dt>기록된 대리자</dt><dd data-official-report-reader>—</dd></div>
             <div><dt>발행 당시 출생정보 차수</dt><dd data-official-report-birth-issued>이 기록에 제공되지 않음</dd></div>
             <div><dt>현재 명식록 차수</dt><dd data-official-report-birth-current>확인할 수 없음</dd></div>

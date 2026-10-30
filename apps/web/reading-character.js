@@ -16,6 +16,7 @@ import {
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
 import { readingStepSourceCategoriesV1 } from './reading-step-source-categories.js';
+import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
 import { blockTexts, issuedSectionSourcePartsV1 } from './reading-issued-source-projection.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
 
@@ -255,7 +256,7 @@ function clearPersistedReadingPresentation() {
   // account changes, remove both visible and hidden source-bearing nodes.
   for (const selector of [
     '[data-official-report-notice-text]', '[data-official-report-date]',
-    '[data-official-report-version]', '[data-official-report-birth-issued]',
+    '[data-official-report-version]', '[data-official-report-domain]', '[data-official-report-birth-issued]',
     '[data-official-report-birth-current]', '[data-official-report-birth-status]',
     '[data-reading-step-title]',
     '[data-reading-step-body]', '[data-reading-structure-body]',
@@ -669,6 +670,8 @@ function renderAuthorizedStoredReport(preview, record) {
   }).format(new Date(record.completedAt));
   const version = document.querySelector('[data-official-report-version]');
   if (version) version.textContent = record.readingContractVersion;
+  const domain = document.querySelector('[data-official-report-domain]');
+  if (domain) domain.textContent = translateStaticUi(readingDomainPresentationV1(record.sajuDomain).title, getUiLocale());
   renderOfficialReportBirthRevision(record.birthRevision);
   const reader = document.querySelector('[data-official-report-reader]');
   if (reader) {
@@ -849,6 +852,8 @@ function activatePreviewReading(preview) {
     if (completed) completeReadingExperience();
     if (isStoredRecord && preview.record) {
       renderOfficialReportBirthRevision(preview.record.birthRevision);
+      const domain = document.querySelector('[data-official-report-domain]');
+      if (domain) domain.textContent = translateStaticUi(readingDomainPresentationV1(preview.record.sajuDomain).title, getUiLocale());
       renderStoredReportEvidence(preview.calculationSummary);
       const date = document.querySelector('[data-official-report-date]');
       if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
