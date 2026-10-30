@@ -28,7 +28,11 @@ describe('Records v2 product surface', () => {
     expect(js).toContain('createRecordsRuntimeClient().readRecords()');
     expect(js).toContain('renderCurrentBirthProfile(records.birth)');
     expect(js).toContain('function setupTabs()');
-    expect(js).toContain("'ArrowLeft', 'ArrowRight'");
+    expect(js).toContain("event.key === 'ArrowLeft' || event.key === 'ArrowRight'");
+    expect(js).toContain("if (event.key === 'Home') targetIndex = 0;");
+    expect(js).toContain("else if (event.key === 'End') targetIndex = tabs.length - 1;");
+    expect(js).toContain('next.focus();');
+    expect(js).toContain('activate(next);');
   });
 
   it('keeps all five global destinations coherent', async () => {
