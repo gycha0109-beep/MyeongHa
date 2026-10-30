@@ -167,5 +167,6 @@ export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
   ["저장된 사주 보고서를 지금 확인할 수 없습니다.", {'ja-JP':"現在、保存済みの四柱推命レポートを表示できません。", 'zh-TW':"目前無法查看已儲存的八字報告。", 'en-US':"Saved Saju reports are currently unavailable.", 'zh-CN':"目前无法查看已保存的八字报告。"}],
   ["조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다. 나중에 다시 확인해 주세요.", {'ja-JP':"取得に失敗しました。記録がないことを意味しません。後ほど再度ご確認ください。", 'zh-TW':"查詢失敗並不代表沒有紀錄，請稍後再試。", 'en-US':"The read failed; this does not mean you have no records. Try again later.", 'zh-CN':"查询失败不代表没有记录，请稍后重试。"}],
   ["저장된 기억을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.", {'ja-JP':"現在、保存済みの記憶を確認できません。ほかの記録は引き続き表示できます。", 'zh-TW':"目前無法查看已儲存的記憶，其他紀錄仍可使用。", 'en-US':"Saved memories are unavailable now. You can still view your other records.", 'zh-CN':"目前无法查看已保存的记忆，其他记录仍可使用。"}],
+  ["계정 또는 세션이 변경되었습니다. 현재 계정의 기록을 보려면 새로고침해 주세요.", {'ja-JP':"アカウントまたはセッションが変更されました。現在のアカウントの記録を見るには再読み込みしてください。", 'zh-TW':"帳號或工作階段已變更。請重新整理以查看目前帳號的紀錄。", 'en-US':"Your account or session has changed. Reload to view records for the current account.", 'zh-CN':"账号或会话已变更。请刷新页面以查看当前账号的记录。"}],
   ["조회할 수 없음", {'ja-JP':"確認できません", 'zh-TW':"無法查詢", 'en-US':"Unable to load", 'zh-CN':"无法查询"}],
 ]);
