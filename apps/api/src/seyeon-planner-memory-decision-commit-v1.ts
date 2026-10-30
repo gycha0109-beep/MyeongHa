@@ -2,6 +2,7 @@
 // Reuse EXISTING S0 DB owner acceptance + explicit Se-yeon Grant in the
 // already-verified Member transaction. No extra DML privileges or schema.
 import { randomUUID } from 'node:crypto';
+import { resolveSeyeonNonDurablePlannerProposalV1 } from './postgres-seyeon-planner-non-durable-decision-v1.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from
   './postgres-seyeon-private-memory-proposal-accept-v1.js';
@@ -69,4 +70,26 @@ export async function commitSeyeonSingleCharacterPlannerGrantDecisionV1(input: R
     status:'resolved' as const,persisted:true as const,
     grantCount:1 as const,payloadPurged:false as const,
   });
+}
+
+/** All four UC-07 choices reach this same-transaction DB Owner dispatch.
+ * S0 still refuses multiple current Characters or Life Facts rather than
+ * silently reducing the approved grant scope.
+ */
+export async function commitSeyeonPlannerMemoryDecisionS0V1(input: Readonly<{
+  client: PostgresTransactionQueryV1;
+  canonicalMemberSubjectId: string;
+  plan: Readonly<PlannerMemoryDecisionPlanV1>;
+}>): Promise<Readonly<{
+  proposalId: string;
+  decision: PlannerMemoryChoiceV1;
+  status: 'resolved';
+  persisted: boolean;
+  grantCount: number;
+  payloadPurged: boolean;
+}>> {
+  if (input.plan.choice === 'session_only' || input.plan.choice === 'discard') {
+    return resolveSeyeonNonDurablePlannerProposalV1(input);
+  }
+  return commitSeyeonSingleCharacterPlannerGrantDecisionV1(input);
 }
