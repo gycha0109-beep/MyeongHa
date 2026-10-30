@@ -80,6 +80,17 @@ describe('Phase 11 bounded loopback-only diagnostic concurrency', () => {
     expect(JSON.stringify(result)).not.toContain('synthetic private exception');
   });
 
+  it('rejects redirected or unexpectedly large local diagnostics instead of calling them usable probes', async () => {
+    let time = 0;
+    await expect(measureControlledLoopbackCapacity(
+      { port: 4000, path: '/api/health', count: 20, concurrency: 1 },
+      async () => new Response(null, {
+        status: 302, headers: { location: 'http://example.invalid' },
+      }),
+      () => { time += 2; return time; },
+    )).rejects.toThrow('unexpected diagnostic response size or redirect');
+  });
+
   it('never reports success latency when all probes fail', async () => {
     let time = 0;
     const result = await measureControlledLoopbackCapacity(
