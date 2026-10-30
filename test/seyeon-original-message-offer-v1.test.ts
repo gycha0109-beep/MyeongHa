@@ -27,12 +27,12 @@ describe('S0 server-owned original source offer (not G3 permission)',()=>{
     expect(SEYEON_ORIGINAL_MEMORY_OFFER_V1.productionMounted).toBe(false);
     const query=vi.fn(async()=>({rows:[]}));
     const client={query};
-    await expect(readSeyeonOriginalMessageReviewOfferV1(client,input(false)))
+    await expect(readSeyeonOriginalMessageReviewOfferV1(client as never,input(false)))
       .rejects.toMatchObject({code:'SEYEON_ORIGINAL_MEMORY_OFFER_UNAVAILABLE'});
-    await expect(readSeyeonOriginalMessageReviewOfferV1(client,{
+    await expect(readSeyeonOriginalMessageReviewOfferV1(client as never,{
       ...input(),approvedHistoryReveal:()=>false,
     })).rejects.toMatchObject({code:'SEYEON_ORIGINAL_MEMORY_OFFER_UNAVAILABLE'});
-    await expect(readSeyeonOriginalMessageReviewOfferV1(client,{
+    await expect(readSeyeonOriginalMessageReviewOfferV1(client as never,{
       ...input(),approvedHistoryReveal:()=>{throw Error('G3 blocked');},
     })).rejects.toMatchObject({code:'SEYEON_ORIGINAL_MEMORY_OFFER_UNAVAILABLE'});
     expect(query).not.toHaveBeenCalled();
@@ -42,7 +42,7 @@ describe('S0 server-owned original source offer (not G3 permission)',()=>{
     const query=vi.fn(async(_sql:string,_params?:unknown[])=>({
       rows:[{threadId:THREAD,turnId:TURN,messageId:MESSAGE}],
     }));
-    const result=await readSeyeonOriginalMessageReviewOfferV1({query},input());
+    const result=await readSeyeonOriginalMessageReviewOfferV1({query} as never,input());
     expect(result).toEqual({
       sourceAuthority:'server_original_message',
       characterId:'seyeon',redacted:false,
@@ -60,7 +60,7 @@ describe('S0 server-owned original source offer (not G3 permission)',()=>{
 
   it('returns no offer on DB ineligibility and refuses corrupted identity rows',async()=>{
     const noRow={query:vi.fn(async()=>({rows:[]}))};
-    await expect(readSeyeonOriginalMessageReviewOfferV1(noRow,input())).resolves.toBeNull();
+    await expect(readSeyeonOriginalMessageReviewOfferV1(noRow as never,input())).resolves.toBeNull();
     for(const rows of [
       [{threadId:THREAD,turnId:'not-a-uuid',messageId:MESSAGE}],
       [{threadId:THREAD,turnId:TURN,messageId:SUBJECT}],
@@ -69,7 +69,7 @@ describe('S0 server-owned original source offer (not G3 permission)',()=>{
        {threadId:THREAD,turnId:TURN,messageId:MESSAGE}],
     ]){
       const client={query:vi.fn(async()=>({rows}))};
-      await expect(readSeyeonOriginalMessageReviewOfferV1(client,input()))
+      await expect(readSeyeonOriginalMessageReviewOfferV1(client as never,input()))
         .rejects.toMatchObject({code:'SEYEON_ORIGINAL_MEMORY_OFFER_UNAVAILABLE'});
     }
   });
@@ -88,7 +88,7 @@ describe('S0 server-owned original source offer (not G3 permission)',()=>{
       {...input(),revealedSource:{...input().revealedSource,memberReadAllowed:false as never}},
     ];
     for(const caseInput of unsafe){
-      await expect(readSeyeonOriginalMessageReviewOfferV1(client,caseInput))
+      await expect(readSeyeonOriginalMessageReviewOfferV1(client as never,caseInput))
         .rejects.toMatchObject({code:'SEYEON_ORIGINAL_MEMORY_OFFER_UNAVAILABLE'});
     }
     expect(query).not.toHaveBeenCalled();
