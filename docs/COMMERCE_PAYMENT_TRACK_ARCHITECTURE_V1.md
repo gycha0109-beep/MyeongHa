@@ -1,5 +1,11 @@
 # 명하 Commerce Payment Track Architecture v1
 
+> **2026-10-30 correction:** P0-PR-01 was DECIDED on 2026-09-19; the
+> approved refund/withdrawal principles are not policy-approval blockers.
+> See [current Commerce Payment gates](operations/COMMERCE_PAYMENT_CURRENT_DECISION_AND_IMPLEMENTATION_GATES_20261030.md)
+> for implementation HOLD vs independent LIVE readiness; older OPEN labels below
+> are historical snapshots, not new user-approval requests.
+>
 > **2026-10-28 current-state correction:** the September baseline and issue
 > statuses below are historical. Follow the current code, Decision Register and
 > [Commerce continuation evidence](operations/COMMERCE_PAYMENT_CONTINUATION_20261028.md)

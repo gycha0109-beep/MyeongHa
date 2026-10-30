@@ -12,7 +12,8 @@ import { createPostgresDigitalReadingWithdrawalEvidencePrivateV1 } from
 export const DIGITAL_READING_WITHDRAWAL_PRIVATE_INTAKE_V1 = Object.freeze({
   productionMounted: false,
   publicRouteMounted: false,
-  retentionPolicyApproved: false,
+  accountDeletionPolicyDecided: true,
+  claimDispositionGraphIntegrated: false,
   consumerAcknowledgmentEnabled: false,
   providerRefundEnabled: false,
   entitlementMutationEnabled: false,
@@ -151,7 +152,7 @@ function requireMatchingClaim(
 
 /**
  * Internal, entirely unmounted staging candidate. A claim cannot be durably
- * recorded until owner-approved retention and specific private operations
+ * recorded until the DECIDED P0-PR-01 graph covers this new table and specific private operations
  * authorization are supplied. The current release configuration supplies neither.
  *
  * This is not a consumer complaint endpoint. It deliberately demands exact
@@ -162,11 +163,11 @@ export async function recordPrivateDigitalReadingWithdrawalClaimCandidateV1(inpu
   pool: PostgresSubjectPoolV1;
   resolvedSubjectId: string | undefined;
   request: unknown;
-  retentionPolicyApproved: boolean;
+  claimDispositionGraphIntegrated: boolean;
   privateOperationsIntakeApproved: boolean;
   idempotencyHmacSecret: string | undefined;
 }>): Promise<PrivateDigitalReadingClaimIntakeResultV1> {
-  if (input.retentionPolicyApproved !== true ||
+  if (input.claimDispositionGraphIntegrated !== true ||
       input.privateOperationsIntakeApproved !== true) return NOT_ACTIVATED;
   const request = parseRequest(input.request);
   if (!request || !input.resolvedSubjectId || !UUID.test(input.resolvedSubjectId) ||

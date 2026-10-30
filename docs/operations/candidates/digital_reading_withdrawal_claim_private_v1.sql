@@ -1,5 +1,7 @@
 -- Commerce Payment: private, append-only customer withdrawal claim evidence.
--- P0-PR-01 retention, Legal review, final paid Unit binding, public intake and
+-- P0-PR-01 is DECIDED (2026-09-19). This NEW table is outside the approved
+-- Subject graph/disposition plan. Candidate SQL MUST remain outside migrations.
+-- Graph integration, Legal review, final paid Unit binding, public intake and
 -- provider refund authorization remain HOLD. No data is seeded and no API
 -- executor, service_role, anon or authenticated privilege is granted.
 begin;
@@ -36,7 +38,7 @@ create table public.digital_reading_withdrawal_claims_private_v1 (
 );
 
 comment on table public.digital_reading_withdrawal_claims_private_v1 is
-'Private, immutable claim-received evidence only. No legal disposition, refund, delivery, entitlement effect, or public intake authorization. P0-PR-01 retention OPEN.';
+'Private, immutable claim-received evidence only. No legal disposition, refund, delivery, entitlement effect, or public intake authorization. P0-PR-01 DECIDED; claim table deletion graph integration NOT DONE.';
 
 create function public.tr_digital_reading_withdrawal_claim_private_v1()
 returns trigger

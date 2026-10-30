@@ -103,7 +103,7 @@ function call(pool: PostgresSubjectPoolV1, overrides: Record<string, unknown> = 
     pool,
     resolvedSubjectId: SUBJECT,
     request: REQUEST,
-    retentionPolicyApproved: true,
+    claimDispositionGraphIntegrated: true,
     privateOperationsIntakeApproved: true,
     idempotencyHmacSecret: SECRET,
     ...overrides,
@@ -114,7 +114,8 @@ describe('private unmounted withdrawal claim intake candidate', () => {
   it('does not activate public checkout, customer receipt, refund or revocation', () => {
     expect(DIGITAL_READING_WITHDRAWAL_PRIVATE_INTAKE_V1).toEqual({
       productionMounted:false,publicRouteMounted:false,
-      retentionPolicyApproved:false,
+      accountDeletionPolicyDecided:true,
+      claimDispositionGraphIntegrated:false,
       consumerAcknowledgmentEnabled:false,
       providerRefundEnabled:false,
       entitlementMutationEnabled:false,
@@ -122,9 +123,9 @@ describe('private unmounted withdrawal claim intake candidate', () => {
   });
 
   it.each([
-    {retentionPolicyApproved:false},
+    {claimDispositionGraphIntegrated:false},
     {privateOperationsIntakeApproved:false},
-  ])('requires independent private intake and retention approvals: %j', async override => {
+  ])('requires private intake and existing-policy graph integration: %j', async override => {
     const {pool,connect} = fakeDb();
     expect(await call(pool,override)).toMatchObject({
       kind:'not_activated',requestRecorded:false,
