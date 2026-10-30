@@ -42,6 +42,7 @@ describe('signed cancellation paymentId to exact local verified Reading Receipt'
   expect(sql).toContain('receipt.verified_amount_minor=intent.expected_amount_minor');
   expect(sql).toContain('receipt.verified_currency=intent.expected_currency');
   expect(sql).toContain('receipt.external_transaction_id=$2::text');
+  expect(sql).toContain('(attempt.provider_transaction_id is not null or $2::text is not null)');
   expect(sql).toContain('selection.reader_character_id');
   expect(sql).toContain("product.product_type='reading'");
   expect(sql).toContain('limit 2');

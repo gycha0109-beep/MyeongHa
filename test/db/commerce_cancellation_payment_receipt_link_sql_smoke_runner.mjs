@@ -5,7 +5,7 @@ import { COMMERCE_CANCELLATION_PAYMENT_RECEIPT_LINK_SQL_V1 as SQL }
 
 const query=(paymentId,transactionId)=>SQL
  .replaceAll('$1::text',`'${paymentId}'::text`)
- .replaceAll('$2::text',`'${transactionId}'::text`);
+ .replaceAll('$2::text',transactionId===null?'null::text':`'${transactionId}'::text`);
 process.stdout.write(`
 do $$
 declare found_row record;
@@ -23,6 +23,11 @@ begin
  select * into found_row from (${query('unrecorded-payment','tx-1')}) as q;
  if found_row."verifiedReceiptId" is not null
    then raise exception 'unknown provider request was admitted';
+ end if;
+ update public.commerce_payment_attempts set provider_transaction_id=null;
+ select * into found_row from (${query('payment-1',null)}) as q;
+ if found_row."verifiedReceiptId" is not null
+   then raise exception 'unattributed payment intent was incorrectly treated as exact original payment';
  end if;
  update public.commerce_receipts set environment='sandbox';
  select * into found_row from (${query('payment-1','tx-1')}) as q;

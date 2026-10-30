@@ -75,3 +75,9 @@ customer charge took place; it requires separate provider reconciliation.
 `test/db/commerce_cancellation_payment_receipt_link_sql_smoke_runner.mjs`
 test the original payment/Reader join, mismatched transaction, unknown
 provider payment ID and sandbox exclusion against disposable PostgreSQL 17.
+
+A linkage is refused if neither the original payment Attempt nor the
+authenticated cancellation signal contains a provider transaction ID. A
+Purchase Intent may have different payment attempts, so a same-Intent Receipt
+alone must never prove that the *particular* notified payment was charged.
+The disposable PostgreSQL fixture includes this un-attributed attempt case.

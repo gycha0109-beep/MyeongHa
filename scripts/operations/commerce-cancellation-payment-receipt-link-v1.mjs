@@ -46,6 +46,7 @@ join public.commerce_receipts receipt
 where attempt.provider='portone_v2'
   and attempt.environment='production'
   and attempt.provider_request_id=$1::text
+  and (attempt.provider_transaction_id is not null or $2::text is not null)
   and ($2::text is null or receipt.external_transaction_id=$2::text)
 limit 2
 `.trim();
