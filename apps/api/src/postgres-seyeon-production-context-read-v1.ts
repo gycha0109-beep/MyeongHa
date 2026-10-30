@@ -192,6 +192,7 @@ implements SeyeonProductionContextReadAuthorityPortV1 {
     readonly subjectId: string;
     readonly threadId: string;
     readonly limit: number;
+    readonly currentUserMessageRef?: string;
   }): Promise<readonly SeyeonProductionRecentMessageAuthorityRowV1[]> {
     try {
       const result = await this.client.query<Row>(RECENT_SQL, [
