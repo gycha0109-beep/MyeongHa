@@ -42,6 +42,36 @@ describe('Web Character Room continuous open and resume', () => {
     expect(css).toContain('.character-room-loading[hidden]');
   });
 
+  it('drops stale transcript DOM when G3 history authority denies or a full reread fails', async () => {
+    const runtime = await web('chat-runtime-client.js');
+    const read = runtime.slice(
+      runtime.indexOf('async function readChatPage('),
+      runtime.indexOf('async function loadRoomState()'),
+    );
+    const reload = runtime.slice(
+      runtime.indexOf('async function loadRoomState()'),
+      runtime.indexOf('// Resolve or reuse an owner-scoped thread'),
+    );
+    const scrub = runtime.slice(
+      runtime.indexOf('function clearOwnerScopedRoomStateForAuthorityChange()'),
+      runtime.indexOf('function invalidateRejectedBearer('),
+    );
+    expect(read).toContain('if (response.status === 503)');
+    expect(read).toContain("code === 'SEYEON_HISTORY_REVEAL_HOLD'");
+    expect(read).toContain("throw new Error('SEYEON_HISTORY_REVEAL_HOLD')");
+    expect(scrub).toContain('chatStream?.replaceChildren()');
+    expect(scrub).toContain('authoritativeCharacterId = null');
+    expect(scrub).toContain('roomReady = false');
+    expect(scrub).toContain('if (chatIntro) chatIntro.hidden = true');
+    expect(scrub).toContain('if (contextPill) contextPill.hidden = true');
+    expect(reload).toContain('clearOwnerScopedRoomStateForAuthorityChange()');
+    expect(reload).toContain("error.message === 'SEYEON_HISTORY_REVEAL_HOLD'");
+    expect(reload.indexOf('clearOwnerScopedRoomStateForAuthorityChange()'))
+      .toBeLessThan(reload.lastIndexOf('return false;'));
+    expect(scrub).not.toContain('sessionStorage.setItem(');
+    expect(scrub).not.toContain('sessionStorage.removeItem(');
+  });
+
   it('sends the first composed message exactly once through the existing guarded Member turn route', async () => {
     const runtime = await web('chat-runtime-client.js');
     expect(runtime).toContain('if (queuedSubmission) return');
