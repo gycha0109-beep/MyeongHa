@@ -70,6 +70,29 @@ export async function verifyLocalSyntheticPostDeletion(env, request = fetch) {
     headers: { apikey: c.apiKey, 'Content-Type': 'application/json' },
     body: JSON.stringify({ refresh_token: tokens.refresh_token }),
   });
+  const staleBeforeRevocation = await request(objectUrl, {
+    method: 'GET', redirect: 'manual', headers: memberHeaders,
+  });
+
+  const { default: pg } = await import('pg');
+  const db = new pg.Client({
+    host: '127.0.0.1', port: 54322, database: 'postgres',
+    user: 'postgres', password: c.dbPassword, ssl: false,
+    connectionTimeoutMillis: 5000,
+  });
+  await db.connect();
+  try {
+    const dbIdentity = await db.query(
+      "select current_database() as database_name, current_user as role, to_regclass('dr_synthetic_local.revoked_subjects') is not null as revoked_table"
+    );
+    if (dbIdentity.rows.length !== 1 ||
+        dbIdentity.rows[0].database_name !== 'postgres' ||
+        dbIdentity.rows[0].role !== 'postgres' ||
+        dbIdentity.rows[0].revoked_table !== true) hold('local revocation table missing');
+    await db.query('insert into dr_synthetic_local.revoked_subjects(subject_id) values ($1)', [identity.id]);
+  } finally {
+    await db.end();
+  }
   const postStorage = await request(objectUrl, {
     method: 'GET', redirect: 'manual', headers: memberHeaders,
   });
@@ -84,6 +107,8 @@ export async function verifyLocalSyntheticPostDeletion(env, request = fetch) {
     syntheticDeletion: 'PASS',
     newLoginDenied: loginDenied ? 'PASS' : 'FAIL',
     refreshAfterDeletionDenied: refreshDenied ? 'PASS' : 'FAIL',
+    staleTokenBeforeRevocationDenied: DENIAL.has(staleBeforeRevocation.status) ? 'PASS' : 'FAIL',
+    localRevocationMarkerApplied: true,
     staleAccessTokenStorageDenied: staleStorageDenied ? 'PASS' : 'FAIL',
     independentPrivacyContinuityProven: false,
     hostedProviderRecoveryProven: false,
