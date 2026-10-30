@@ -109,3 +109,14 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 
 각 Gate: `{gate, scope, owner, PR, exact_head_sha, merge_sha, CI_run_url, postgres_run_url, negative_tests, permissions_audit, open_holds, approval, final_state}`.
 증거가 없으면 `HOLD`, 운영에서 검증할 수 없으면 별도 리스크 승인 없이는 PASS 금지.
+
+## 2026-10-30 — 회원의 원본 기억 제안·비공개 수락 2단계 검토 UI (운영 비활성)
+
+`apps/web/seyeon-private-memory-review-client.js`는 기존 S0의 원본 메시지 Producer(`POST /api/chat/:threadId/turns/:turnId/messages/:messageId/memory-proposal`)와 비공개 제안 수락(`POST /api/memory/proposals/:id/accept`)을 **회원의 서로 다른 두 명시적 행위**로 분리한다. 첫 행위는 pending Proposal ID만 받고, 두 번째 행위만 정확한 `{grantChoice:{mode:"private"}}`를 전송한다. 수락 성공은 DB 발행 원본 Memory ID와 `grantCount:0,replayed:false`만 허용한다. 수락 이후에도 세연 Grant는 없다.
+
+- API 응답/세션/UUID/Proposal·Memory 생명주기 불일치, Guest, 추가 브라우저 내용·임의 제안 ID는 모두 실패 차단한다. 영속 캐시 없이 같은 문서에서 준비된 Receipt만 수락 가능하다.
+- 네트워크 타임아웃·불확실한 수락 결과를 자동 재시도하거나 성공으로 표기하지 않는다. DB 원장 재조회가 후속 단계다.
+- `seyeon-private-memory-review-view.js`는 첫 번째 제안 만들기 버튼과 두 번째 별도의 저장 확정 버튼을 제공한다. **현재 Chat 조회 계약에는 원본 `turnId`와 서버 발행 제안 가능 증거가 없기 때문에 배포 화면에서는 미마운트**다. 클라이언트 임의 메시지 본문을 원본 기억으로 저장할 수 없다.
+- PR #2759의 source-only Producer와 기존 private accept 모두 운영에서 미마운트·기본 DENY이며, 관련 CI PASS가 이 단계를 운영 활성화하지 않는다.
+
+**다음 연결 조건:** DB가 확인한 source Turn/Message의 정확한 회원 소유·이력 공개 허가·제안 가능한 타입/스키마를 반환하는 제품 계약을 확정한 뒤, 그 증거를 사용한 단일 Chat/Records 화면에 연결한다. SRC-25 및 운영 G0/G1/G2/G3/G5/G6 HOLD는 유지한다. 현재 PR은 데이터베이스, 모델 Projector, 유료 호출, 공개 Route, 운영 권한을 변경하지 않는다.
