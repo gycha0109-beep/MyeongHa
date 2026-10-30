@@ -127,8 +127,15 @@ export async function prepareLocalSyntheticFixtures(env, request = fetch, dbFact
 
     await db.query('BEGIN');
     tx = true;
+    await db.query('create schema dr_synthetic_local');
+    await db.query('create table dr_synthetic_local.revoked_subjects (subject_id uuid primary key)');
+    await db.query('alter table dr_synthetic_local.revoked_subjects enable row level security');
+    await db.query("create policy dr_synthetic_local_self_revoked_v1 on dr_synthetic_local.revoked_subjects for select to authenticated using (subject_id = auth.uid())");
+    await db.query('grant usage on schema dr_synthetic_local to authenticated');
+    await db.query('grant select on dr_synthetic_local.revoked_subjects to authenticated');
     await db.query("create policy dr_synthetic_local_private_read_v1 on storage.objects for select to authenticated using (bucket_id = '" +
-      LOCAL_BUCKET + "' and name = '" + LOCAL_OBJECT + "' and auth.uid() = '" + memberId + "'::uuid)");
+      LOCAL_BUCKET + "' and name = '" + LOCAL_OBJECT + "' and auth.uid() = '" + memberId +
+      "'::uuid and not exists (select 1 from dr_synthetic_local.revoked_subjects where subject_id = auth.uid()))");
     await db.query('COMMIT');
     tx = false;
 
@@ -137,7 +144,7 @@ export async function prepareLocalSyntheticFixtures(env, request = fetch, dbFact
       target: 'local-loopback-synthetic-only',
       memberCreated: true, deletedMemberRemoved: true,
       privateBucket: true, objectSha256: OBJECT_SHA,
-      privateReadPolicyInstalled: true,
+      privateReadPolicyInstalled: true, revocationLedgerPolicyInstalled: true,
       productionDataUsed: false, hostedRecoveryProven: false,
       drReady: false, gate: 'BLOCKED', serviceResumptionAllowed: false,
       outputContainsIdentifiers: false,
