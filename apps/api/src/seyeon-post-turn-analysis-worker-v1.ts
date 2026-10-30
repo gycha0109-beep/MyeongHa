@@ -185,6 +185,27 @@ export interface PrepareSeyeonPostTurnAnalysisSnapshotInputV1 {
   readonly identity: SeyeonPostTurnAnalysisStableIdentityV1;
 }
 
+/** Server-only, post-commit Planner proposal port. A successful return is
+ * only a pending candidate; no Memory/Grant or Member consent is implied.
+ * Production's current-source HOLD runs BEFORE any claim or this port.
+ */
+export interface SeyeonPostTurnPlannerMemoryPortV1 {
+  propose(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+    committedTurn: Readonly<{
+      turnId: string;
+      userMessageId: string;
+      userText: string;
+      assistantMessageId: string;
+      assistantText: string;
+    }>;
+  }>): Awaitable<Readonly<
+    | { decision: 'none' }
+    | { decision: 'pending'; proposalId: string; replayed: boolean }
+  >>;
+}
+
 export interface ProcessSeyeonPostTurnAnalysisInputV1 {
   readonly subjectId: string;
   readonly outboxEventId: string;
@@ -192,6 +213,8 @@ export interface ProcessSeyeonPostTurnAnalysisInputV1 {
   readonly leaseExpiresAt: string;
   readonly outboxPort: SeyeonPostTurnAnalysisOutboxPortV1;
   readonly extractorProvider: SeyeonStructuredProviderPortV2;
+  /** Absent by default. Invoked only after a verified, new, non-OFF claim. */
+  readonly plannerMemoryPort?: SeyeonPostTurnPlannerMemoryPortV1;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;
   /** Mandatory on every Production caller; offline/synthetic fixture seam only. */
@@ -805,6 +828,33 @@ export async function processSeyeonPostTurnAnalysisV1(
       reclaimed: claimed.reclaimed,
       processedAt: done.processedAt,
     });
+  }
+
+  // Only a new, non-OFF, source-authorized post-turn claim may reach the
+  // Planner. Production currently enforces OFF-only preflight and returns
+  // before any private source text or paid Provider call. The Owner adapter
+  // itself must separately require G0/G4 approval and revalidate originals.
+  if (input.plannerMemoryPort !== undefined) {
+    const proposed = await input.plannerMemoryPort.propose({
+      subjectId: input.subjectId,
+      outboxEventId: claimed.outboxEventId,
+      committedTurn: Object.freeze({
+        turnId: claimed.turnId,
+        userMessageId: claimed.userMessageId,
+        userText: claimed.userText,
+        assistantMessageId: claimed.assistantMessageId,
+        assistantText: claimed.assistantText,
+      }),
+    });
+    const isNone = proposed?.decision === 'none' && Object.keys(proposed).length === 1;
+    const isPending = proposed?.decision === 'pending' &&
+      typeof proposed.proposalId === 'string' &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(proposed.proposalId) &&
+      typeof proposed.replayed === 'boolean' &&
+      Object.keys(proposed).length === 3;
+    if (!isNone && !isPending) {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
   }
 
   const extractionContext = Object.freeze({
