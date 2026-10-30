@@ -76,6 +76,30 @@ function requireReadingSnapshot(value, expected) {
   return Object.freeze({ ...value });
 }
 
+function requireBirthRevisionStatus(value) {
+  // Older server responses and historical records cannot assert staleness.
+  if (value === undefined) {
+    return Object.freeze({ issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' });
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    fail('birthRevision is invalid');
+  }
+  const validNo = (n) => n === null || (Number.isSafeInteger(n) && n > 0);
+  if (!validNo(value.issuedRevisionNo) || !validNo(value.currentRevisionNo)
+      || !['current', 'changed', 'unknown'].includes(value.state)
+      || (value.state !== 'unknown'
+        && (value.issuedRevisionNo === null || value.currentRevisionNo === null))
+      || (value.state === 'current' && value.issuedRevisionNo !== value.currentRevisionNo)
+      || (value.state === 'changed' && value.issuedRevisionNo === value.currentRevisionNo)) {
+    fail('birthRevision comparison is inconsistent');
+  }
+  return Object.freeze({
+    issuedRevisionNo: value.issuedRevisionNo,
+    currentRevisionNo: value.currentRevisionNo,
+    state: value.state,
+  });
+}
+
 export function parseOfficialReadingRecordPayloadV1(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) fail('payload is invalid');
 
@@ -102,6 +126,7 @@ export function parseOfficialReadingRecordPayloadV1(payload) {
     productResponseState,
     readerCharacterIds: requireReaderCharacterIds(payload.readerCharacterIds),
     completedAt: requireTimestamp(payload.completedAt, 'completedAt'),
+    birthRevision: requireBirthRevisionStatus(payload.birthRevision),
     reading,
   });
 }

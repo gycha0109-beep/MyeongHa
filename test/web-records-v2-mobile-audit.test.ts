@@ -22,13 +22,18 @@ describe('Records v2 product surface', () => {
       readFile(web('records-page.js'), 'utf8'),
     ]);
     const markup = `${html}\n${component}`;
-    for (const id of ['records-status', 'records-content', 'records-display-name', 'records-subject-kind', 'life-records-list', 'birth-records-list', 'memory-records-list']) {
+    for (const id of ['records-status', 'records-content', 'records-display-name', 'records-subject-kind', 'life-records-list', 'saju-records-list']) {
       expect(markup).toContain(`id="${id}"`);
     }
     expect(js).toContain('createRecordsRuntimeClient().readRecords()');
-    expect(js).toContain('renderCurrentBirthProfile(records.birth)');
+    expect(js).not.toContain('renderCurrentBirthProfile');
+    expect(js).not.toContain('renderMemories');
     expect(js).toContain('function setupTabs()');
-    expect(js).toContain("'ArrowLeft', 'ArrowRight'");
+    expect(js).toContain("event.key === 'ArrowLeft' || event.key === 'ArrowRight'");
+    expect(js).toContain("if (event.key === 'Home') targetIndex = 0;");
+    expect(js).toContain("else if (event.key === 'End') targetIndex = tabs.length - 1;");
+    expect(js).toContain('next.focus();');
+    expect(js).toContain('activate(next);');
   });
 
   it('keeps all five global destinations coherent', async () => {

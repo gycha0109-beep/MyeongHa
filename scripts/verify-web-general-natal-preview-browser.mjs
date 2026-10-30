@@ -187,7 +187,8 @@ try {
     'notice: document.querySelector("[data-reading-authority-note]")?.title }))()');
   assert(visible.title === '원국의 구조', 'Wrong reading title: ' + JSON.stringify(visible));
   assert(visible.text === '테스트 전용 원국 해석입니다.', 'Wrong reading content: ' + JSON.stringify(visible));
-  assert(visible.notice === '테스트 전용 프리뷰입니다.', 'Preview notice missing');
+  assert(visible.notice === '테스트 전용 프리뷰입니다.\n\n원국 범위만 표시합니다.',
+    'Preview guidance and scope limitation must both survive delivery: ' + JSON.stringify(visible));
   assert(observedRequests.length === 1, 'Expected one General Natal request');
   assert(observedRequests[0].body.readingText === '전체 사주', 'Request was not General Natal');
 

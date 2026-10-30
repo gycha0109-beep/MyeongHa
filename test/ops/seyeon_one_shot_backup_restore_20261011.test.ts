@@ -18,7 +18,9 @@ describe('single-use verified Production backup isolated restore', () => {
     expect(producer).toContain('OBSERVED_MIGRATION_FRONTIER');
     expect(producer).toContain("[[ \"$OBSERVED_MIGRATION_FRONTIER\" == '20261029012948' ]]");
     expect(producer).toContain('Guard one-shot backup actual deployed migration frontier');
-    expect(resolver).toContain('POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1');
+    expect(resolver).toContain('marker_token="$(tr -d');
+    expect(resolver).toContain('< "$marker_path")"');
+    expect(resolver).not.toContain('marker_token=' + marker.trim());
     expect(resolver).toContain('POSTGRES-BACKUP-FRONTIER-1310-V1');
     expect(resolver).toContain('$marker_path?ref=$source_sha');
   });

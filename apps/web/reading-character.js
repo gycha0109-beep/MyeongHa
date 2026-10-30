@@ -15,6 +15,9 @@ import {
 } from './reading-response-owner-guard.js';
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
+import { readingStepSourceCategoriesV1 } from './reading-step-source-categories.js';
+import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
+import { blockTexts, issuedSectionSourcePartsV1 } from './reading-issued-source-projection.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
 
 const readerCatalog = {
@@ -229,6 +232,50 @@ function renderInvalidRoute() {
 }
 
 function clearPersistedReadingPresentation() {
+  const report = document.querySelector('[data-official-report]');
+  if (report) report.hidden = true;
+  document.querySelector('[data-official-report-toc]')?.replaceChildren();
+  document.querySelector('[data-official-report-sections]')?.replaceChildren();
+  document.querySelector('[data-official-report-pillars]')?.replaceChildren();
+  document.querySelector('[data-official-report-elements]')?.replaceChildren();
+  document.querySelector('[data-official-report-gods]')?.replaceChildren();
+  document.querySelector('[data-official-report-elements-group]')?.setAttribute('hidden', '');
+  document.querySelector('[data-official-report-gods-group]')?.setAttribute('hidden', '');
+  const facts = document.querySelector('[data-official-report-facts]');
+  if (facts) facts.hidden = true;
+  const first = document.querySelector('[data-official-report-first]');
+  if (first) first.hidden = true;
+  const firstText = document.querySelector('[data-official-report-first-text]');
+  if (firstText) firstText.textContent = '';
+  const reader = document.querySelector('[data-official-report-reader]');
+  if (reader) reader.textContent = '—';
+  const notice = document.querySelector('[data-official-report-notice]');
+  if (notice) notice.hidden = true;
+  document.querySelector('[data-reading-step-notice]')?.setAttribute('hidden', '');
+  // The report and step scene share the same persisted source. When the
+  // account changes, remove both visible and hidden source-bearing nodes.
+  for (const selector of [
+    '[data-official-report-notice-text]', '[data-official-report-date]',
+    '[data-official-report-version]', '[data-official-report-domain]', '[data-official-report-birth-issued]',
+    '[data-official-report-birth-current]', '[data-official-report-birth-status]',
+    '[data-reading-step-title]',
+    '[data-reading-step-body]', '[data-reading-structure-body]',
+    '[data-reading-supporting-body]', '[data-reading-step-notice-text]',
+    '[data-reader-step-line]', '[data-reading-authority-note]',
+    '[data-chart-pillar-year]', '[data-chart-pillar-month]',
+    '[data-chart-pillar-day]', '[data-chart-pillar-hour]',
+  ]) {
+    const element = document.querySelector(selector);
+    if (element) {
+      element.textContent = '';
+      if (selector === '[data-reading-authority-note]') element.removeAttribute('title');
+      if (selector === '[data-official-report-birth-status]') {
+        element.removeAttribute('data-birth-revision-state');
+      }
+    }
+  }
+  document.querySelector('[data-chart-five-elements]')?.replaceChildren();
+  document.querySelector('[data-chart-ten-gods]')?.replaceChildren();
   delete root.dataset.reader;
   delete root.dataset.readerSelection;
   delete root.dataset.readerAuthority;
@@ -285,6 +332,12 @@ function renderPersistedReadingFailure(title, copy, state = 'persisted_record_un
   if (productTitle) productTitle.textContent = '저장된 사주 풀이';
   if (stateTitle) stateTitle.textContent = title;
   if (stateCopy) stateCopy.textContent = copy;
+  // Only transient read failures may be retried through the same owner-checked
+  // GET. Never turn permission denial into an alternate report route.
+  if (state === 'persisted_record_unavailable' && routeAction) {
+    routeAction.href = window.location.href;
+    routeAction.textContent = '저장된 보고서 다시 불러오기 →';
+  }
 }
 
 function renderAuthorityBlockedRoute() {
@@ -345,45 +398,6 @@ function publicErrorCode(payload) {
     : null;
 }
 
-function blockTexts(block) {
-  if (!block || typeof block !== 'object') return [];
-  if (block.type === 'paragraph' || block.type === 'source_hint') {
-    return typeof block.text === 'string' && block.text.trim() ? [block.text.trim()] : [];
-  }
-  if (block.type === 'key_points' && Array.isArray(block.items)) {
-    return block.items.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
-  }
-  if (block.type === 'comparison' && Array.isArray(block.perspectives)) {
-    return block.perspectives.flatMap((item) =>
-      item && typeof item === 'object' && typeof item.text === 'string'
-        ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.text}`]
-        : []);
-  }
-  if (block.type === 'ambiguity') {
-    const texts = typeof block.summary === 'string' ? [block.summary] : [];
-    if (Array.isArray(block.scenarios)) {
-      texts.push(...block.scenarios.flatMap((item) =>
-        item && typeof item === 'object' && typeof item.text === 'string'
-          ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.text}`]
-          : []));
-    }
-    return texts;
-  }
-  if (block.type === 'timeline' && Array.isArray(block.entries)) {
-    return block.entries.flatMap((item) =>
-      item && typeof item === 'object' && typeof item.text === 'string'
-        ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.text}`]
-        : []);
-  }
-  if (block.type === 'fact_table' && Array.isArray(block.rows)) {
-    return block.rows.flatMap((item) =>
-      item && typeof item === 'object' && typeof item.value === 'string'
-        ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.value}`]
-        : []);
-  }
-  return [];
-}
-
 function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = {}) {
   // Official archive reread already has its own persisted-record admission boundary.
   // This narrow browser guard applies only to the live Preview HTTP path.
@@ -391,7 +405,13 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
   if (!payload || typeof payload !== 'object' || payload.ok !== true) return null;
   const data = payload.data;
   if (!data || typeof data !== 'object' || data.lifecycle !== 'preview') return null;
-  const response = data.reading;
+  return stepsFromIssuedProductResponse(data.reading);
+}
+
+// The official archive is already an authorized persisted source. Parse its
+// actual Product Reading envelope directly; never wrap it in a fake Preview
+// lifecycle just to reuse the renderer.
+function stepsFromIssuedProductResponse(response, { isStoredRecord = false } = {}) {
   if (!response || typeof response !== 'object') return null;
   if (!['delivered', 'delivered_with_fallback'].includes(response.state)) return null;
   const reading = response.reading;
@@ -413,9 +433,8 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
       return [];
     }
 
-    const structure = texts.filter((text) => text.startsWith(STRUCTURE_PREFIX));
-    const interpretation = texts.filter((text) => !text.startsWith(STRUCTURE_PREFIX));
-    if (interpretation.length === 0) return [];
+    const { structure, interpretation } = issuedSectionSourcePartsV1(section.blocks, { isStoredRecord, structurePrefix: STRUCTURE_PREFIX });
+    if (interpretation.length === 0 && (!isStoredRecord || structure.length === 0)) return [];
 
     return [{
       title,
@@ -428,7 +447,9 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
   if (Array.isArray(reading.disclosures)) {
     for (const item of reading.disclosures) {
       if (!item || typeof item !== 'object' || typeof item.text !== 'string' || !item.text.trim()) continue;
-      if (item.type === 'scope_limitation') {
+      // An issued disclosure describes the scope or conditions of a report.
+      // It must not become the first section's source-owned interpretation.
+      if (isStoredRecord || item.type === 'scope_limitation') {
         notices.push(item.text.trim());
       } else if (steps.length > 0) {
         steps[0].supporting.push(item.text.trim());
@@ -436,10 +457,14 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
     }
   }
 
-  if (steps.length === 0) return null;
+  // An evidence-only section may accompany an issued interpretation, but
+  // a report consisting solely of provenance is not a delivered interpretation.
+  if (steps.length === 0 || (isStoredRecord && !steps.some((step) => step.primary.length > 0))) return null;
   return {
     steps,
-    notice: notices.find((text) => typeof text === 'string' && text.trim()) ?? '',
+    // Preserve every issued limitation in source order. Showing just the first
+    // could silently hide a condition in the owner-authorized archive.
+    notice: notices.filter((text) => typeof text === 'string' && text.trim()).join('\n\n'),
     calculationSummary:
       reading.calculationSummary && typeof reading.calculationSummary === 'object'
         ? reading.calculationSummary
@@ -508,15 +533,201 @@ function renderCalculationSummary(summary) {
   renderFactList(document.querySelector('[data-chart-ten-gods]'), summary.tenGods);
 }
 
+// Display only calculation facts already included in the authorized stored response.
+// Never recompute an earlier Birth revision from the current Birth Profile.
+function renderStoredReportEvidence(summary) {
+  const section = document.querySelector('[data-official-report-facts]');
+  if (!section || !summary || typeof summary !== 'object') return;
+  const pillars = summary.pillars && typeof summary.pillars === 'object' ? summary.pillars : {};
+  const validPillars = ['year', 'month', 'day', 'hour'].filter((key) => {
+    const fact = pillars[key];
+    return fact && typeof fact === 'object' && typeof fact.status === 'string';
+  });
+  const hasElements = Array.isArray(summary.fiveElements) && summary.fiveElements.length > 0;
+  const hasGods = Array.isArray(summary.tenGods) && summary.tenGods.length > 0;
+  const elementGroup = document.querySelector('[data-official-report-elements-group]');
+  const godGroup = document.querySelector('[data-official-report-gods-group]');
+  if (elementGroup) elementGroup.hidden = !hasElements;
+  if (godGroup) godGroup.hidden = !hasGods;
+  if (validPillars.length === 0 && !hasElements && !hasGods) return;
+
+  const output = document.querySelector('[data-official-report-pillars]');
+  if (output) {
+    output.replaceChildren();
+    for (const [key, label] of [['year', '연주'], ['month', '월주'], ['day', '일주'], ['hour', '시주']]) {
+      if (!validPillars.includes(key)) continue;
+      const wrapper = document.createElement('div');
+      const title = document.createElement('small');
+      title.textContent = translateStaticUi(label, getUiLocale());
+      const value = document.createElement('strong');
+      value.dataset.officialReading = '';
+      value.textContent = displayFactValue(pillars[key]);
+      wrapper.append(title, value);
+      output.append(wrapper);
+    }
+  }
+  renderFactList(document.querySelector('[data-official-report-elements]'), hasElements ? summary.fiveElements : []);
+  renderFactList(document.querySelector('[data-official-report-gods]'), hasGods ? summary.tenGods : []);
+  section.hidden = false;
+}
+
+// Render only verified, owner-scoped Birth revision numbers returned for this
+// exact official archive. Do not infer revision from current birth input or
+// the presence of a historical Reading.
+function renderOfficialReportBirthRevision(birthRevision) {
+  const issued = document.querySelector('[data-official-report-birth-issued]');
+  const current = document.querySelector('[data-official-report-birth-current]');
+  const status = document.querySelector('[data-official-report-birth-status]');
+  const locale = getUiLocale();
+  const revisionText = (value) => value === null
+    ? translateStaticUi('확인할 수 없음', locale)
+    : new Intl.NumberFormat(locale).format(value);
+  if (issued) issued.textContent = birthRevision.issuedRevisionNo === null
+    ? translateStaticUi('이 기록에 제공되지 않음', locale)
+    : revisionText(birthRevision.issuedRevisionNo);
+  if (current) current.textContent = revisionText(birthRevision.currentRevisionNo);
+  if (status) {
+    const copy = {
+      current: '발행 당시 명식과 현재 명식이 같습니다.',
+      changed: '현재 명식이 발행 당시와 다릅니다. 이 보고서는 발행 당시 명식을 기준으로 유지됩니다.',
+      unknown: '발행 당시 명식과 현재 명식의 변경 여부를 확인할 수 없습니다.',
+    };
+    status.textContent = translateStaticUi(copy[birthRevision.state], locale);
+    status.dataset.birthRevisionState = birthRevision.state;
+  }
+}
+
+// Render only the exact owner-authorized, delivered snapshot already projected by
+// previewStepsFromPayload. This is a document layout, not a new Saju inference.
+function renderAuthorizedStoredReport(preview, record) {
+  const report = document.querySelector('[data-official-report]');
+  const toc = document.querySelector('[data-official-report-toc]');
+  const sections = document.querySelector('[data-official-report-sections]');
+  if (!report || !toc || !sections) return;
+  toc.replaceChildren();
+  sections.replaceChildren();
+
+  for (const [index, step] of preview.steps.entries()) {
+    const anchor = document.createElement('a');
+    anchor.href = `#official-report-section-${index + 1}`;
+    anchor.dataset.officialReading = '';
+    anchor.textContent = `${String(index + 1).padStart(2, '0')} · ${step.title}`;
+    toc.append(anchor);
+
+    const section = document.createElement('section');
+    section.className = 'official-report-section';
+    section.id = `official-report-section-${index + 1}`;
+    // Hash targets must also accept keyboard and screen-reader focus.
+    section.tabIndex = -1;
+    const kicker = document.createElement('span');
+    kicker.className = 'official-report-section-number';
+    kicker.textContent = String(index + 1).padStart(2, '0');
+    const heading = document.createElement('h2');
+    heading.id = `official-report-heading-${index + 1}`;
+    heading.dataset.officialReading = '';
+    heading.textContent = step.title;
+    section.setAttribute('aria-labelledby', heading.id);
+    anchor.addEventListener('click', (event) => {
+      if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) {
+        event.preventDefault();
+        return;
+      }
+      section.focus({ preventScroll: true });
+    });
+    const primary = document.createElement('p');
+    primary.className = 'official-report-primary';
+    primary.dataset.officialReading = '';
+    primary.textContent = step.primary;
+    primary.hidden = step.primary.length === 0;
+    section.append(kicker, heading, primary);
+
+    for (const text of step.supporting) {
+      const extra = document.createElement('p');
+      extra.className = 'official-report-supporting';
+      extra.dataset.officialReading = '';
+      extra.textContent = text;
+      section.append(extra);
+    }
+    if (step.structure.length > 0) {
+      const details = document.createElement('details');
+      const summary = document.createElement('summary');
+      summary.textContent = '이 해석의 구조 보기';
+      details.append(summary);
+      for (const text of step.structure) {
+        const ground = document.createElement('p');
+        ground.dataset.officialReading = '';
+        ground.textContent = text;
+        details.append(ground);
+      }
+      section.append(details);
+    }
+    sections.append(section);
+  }
+
+  const date = document.querySelector('[data-official-report-date]');
+  if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
+    year: 'numeric', month: 'long', day: 'numeric',
+  }).format(new Date(record.completedAt));
+  const version = document.querySelector('[data-official-report-version]');
+  if (version) version.textContent = record.readingContractVersion;
+  const domain = document.querySelector('[data-official-report-domain]');
+  if (domain) domain.textContent = translateStaticUi(readingDomainPresentationV1(record.sajuDomain).title, getUiLocale());
+  renderOfficialReportBirthRevision(record.birthRevision);
+  const reader = document.querySelector('[data-official-report-reader]');
+  if (reader) {
+    const ids = record.readerCharacterIds;
+    reader.textContent = ids.length > 0
+      ? ids.map((id) => resolveCharacterDisplayNameV1(id, getUiLocale()) ?? id).join(', ')
+      : '—';
+  }
+  const first = document.querySelector('[data-official-report-first]');
+  const firstText = document.querySelector('[data-official-report-first-text]');
+  const firstInterpretedStep = preview.steps.find((step) => step.primary.length > 0);
+  if (first && firstText && firstInterpretedStep) {
+    firstText.textContent = firstInterpretedStep.primary;
+    first.hidden = false;
+  }
+  renderStoredReportEvidence(preview.calculationSummary);
+  const notice = document.querySelector('[data-official-report-notice]');
+  const noticeText = document.querySelector('[data-official-report-notice-text]');
+  if (notice) notice.hidden = !preview.notice;
+  if (noticeText) {
+    noticeText.dataset.officialReading = '';
+    noticeText.textContent = preview.notice;
+  }
+  report.hidden = false;
+  // Authorized content arrives after the browser's initial fragment navigation.
+  const requestedSection = /^#official-report-section-([1-9]\d*)$/u.exec(window.location.hash);
+  if (requestedSection) {
+    const section = sections.querySelector(`#official-report-section-${Number(requestedSection[1])}`);
+    if (section) {
+      section.focus({ preventScroll: true });
+      section.scrollIntoView({ block: 'start' });
+    }
+  }
+}
+
 function activatePreviewReading(preview) {
   const { steps } = preview;
   const isStoredRecord = preview.source === 'record';
+  const report = document.querySelector('[data-official-report]');
+  const reportStepMode = document.querySelector('[data-official-report-step-mode]');
+  const reportReturn = document.querySelector('[data-official-report-return]');
+  const reportHeading = document.querySelector('[data-official-report-heading]');
   let activeIndex = 0;
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
   const stepBody = document.querySelector('[data-reading-step-body]');
+  const primaryBlock = stepBody?.closest('.reading-block');
   const structureTitle = document.querySelector('[data-reading-structure-title]');
   const structureBody = document.querySelector('[data-reading-structure-body]');
+  const structureBlock = structureBody?.closest('.reading-block');
+  const supportingBlock = document.querySelector('[data-reading-supporting]');
+  const supportingTitle = document.querySelector('[data-reading-supporting-title]');
+  const supportingBody = document.querySelector('[data-reading-supporting-body]');
+  const scopeNotice = document.querySelector('[data-reading-step-notice]');
+  const scopeNoticeHeading = document.querySelector('[data-reading-step-notice-heading]');
+  const scopeNoticeText = document.querySelector('[data-reading-step-notice-text]');
   const readerLine = document.querySelector('[data-reader-step-line]');
   const readerComment = document.querySelector('[data-reader-comment]');
   const authorityNote = document.querySelector('[data-reading-authority-note]');
@@ -533,7 +744,13 @@ function activatePreviewReading(preview) {
   const replayButton = document.querySelector('[data-reading-replay]');
   let completed = false;
 
+  function mayRenderCurrentStoredRecord() {
+    return !isStoredRecord
+      || (activeReadingOwner !== null && ensureResponseOwnerCurrent(activeReadingOwner));
+  }
+
   function completeReadingExperience() {
+    if (!mayRenderCurrentStoredRecord()) return;
     completed = true;
     root.dataset.readingExperience = 'complete';
     if (readingSheet) readingSheet.dataset.readingCompleted = 'true';
@@ -554,6 +771,7 @@ function activatePreviewReading(preview) {
   }
 
   function replayReadingExperience() {
+    if (!mayRenderCurrentStoredRecord()) return;
     completed = false;
     activeIndex = 0;
     root.dataset.readingExperience = 'reading';
@@ -563,9 +781,13 @@ function activatePreviewReading(preview) {
   }
 
   function renderStep() {
+    if (!mayRenderCurrentStoredRecord()) return;
     const step = steps[activeIndex];
     if (!step) return;
-    const structureParts = [...step.structure, ...step.supporting];
+    // Keep saved supplementary interpretation distinct from structural evidence.
+    // Preview retains the existing combined secondary stage.
+    const sourceCategories = readingStepSourceCategoriesV1(step, isStoredRecord);
+    const structureParts = sourceCategories.structure;
 
     const ui = readingSceneProgressV1(activeIndex, steps.length, {
       hasStructure: step.structure.length > 0,
@@ -574,11 +796,28 @@ function activatePreviewReading(preview) {
     if (progressLabel) progressLabel.textContent = ui.progress;
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
+    if (primaryBlock) primaryBlock.hidden = isStoredRecord && step.primary.length === 0;
     if (structureTitle) structureTitle.textContent = ui.structureTitle;
+    if (supportingTitle) supportingTitle.textContent = ui.supportingTitle;
+    if (supportingBlock) supportingBlock.hidden = sourceCategories.supporting.length === 0;
+    if (supportingBody) supportingBody.textContent =
+      sourceCategories.supporting.join('\n\n');
+    // The full archive already shows every stored scope limitation. Repeat it
+    // in step mode without inventing or translating source-owned text.
+    const visibleScopeNotice = isStoredRecord
+      && typeof preview.notice === 'string' && preview.notice.trim()
+      ? preview.notice : '';
+    if (scopeNotice) scopeNotice.hidden = visibleScopeNotice.length === 0;
+    if (scopeNoticeHeading) scopeNoticeHeading.textContent =
+      translateStaticUi('해석의 적용 범위', getUiLocale());
+    if (scopeNoticeText) scopeNoticeText.textContent = visibleScopeNotice;
+    // The archived official report must not invent structural evidence when
+    // the stored response does not contain any. Preserve Preview UI separately.
+    if (structureBlock) structureBlock.hidden = isStoredRecord && structureParts.length === 0;
     if (structureBody) {
       structureBody.textContent = structureParts.length > 0
         ? structureParts.join('\n\n')
-        : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
+        : isStoredRecord ? '' : '원국에서 확인된 해석 축을 바탕으로 읽는 항목입니다.';
     }
     if (readerLine) readerLine.textContent = `${step.title} 항목을 확인합니다.`;
     if (readerComment) readerComment.textContent = previewCommentForStep();
@@ -608,8 +847,24 @@ function activatePreviewReading(preview) {
   });
   replayButton?.addEventListener('click', replayReadingExperience);
   document.addEventListener('myeongha:localechange', () => {
+    if (!mayRenderCurrentStoredRecord()) return;
     renderStep();
     if (completed) completeReadingExperience();
+    if (isStoredRecord && preview.record) {
+      renderOfficialReportBirthRevision(preview.record.birthRevision);
+      const domain = document.querySelector('[data-official-report-domain]');
+      if (domain) domain.textContent = translateStaticUi(readingDomainPresentationV1(preview.record.sajuDomain).title, getUiLocale());
+      renderStoredReportEvidence(preview.calculationSummary);
+      const date = document.querySelector('[data-official-report-date]');
+      if (date) date.textContent = new Intl.DateTimeFormat(getUiLocale(), {
+        year: 'numeric', month: 'long', day: 'numeric',
+      }).format(new Date(preview.record.completedAt));
+      const reader = document.querySelector('[data-official-report-reader]');
+      if (reader) {
+        reader.textContent = preview.record.readerCharacterIds
+          .map((id) => resolveCharacterDisplayNameV1(id, getUiLocale()) ?? id).join(', ') || '—';
+      }
+    }
   });
 
   root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview';
@@ -635,7 +890,25 @@ function activatePreviewReading(preview) {
         '이 결과는 기록에 저장된 Official Reading입니다. 대화를 시작하려면 대화 상대를 새로 선택해 주세요.';
     }
     if (productTitle) productTitle.textContent = '저장된 사주 풀이';
-    document.title = '저장된 사주 풀이 · 명하';
+    document.title = '저장된 공식 사주 보고서 · 명하';
+    if (reportReturn) reportReturn.hidden = false;
+    renderAuthorizedStoredReport(preview, preview.record);
+    if (stage && report && !report.hidden) stage.hidden = true;
+
+    reportStepMode?.addEventListener('click', () => {
+      if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) return;
+      if (report) report.hidden = true;
+      if (stage) stage.hidden = false;
+      root.dataset.readingRecordMode = 'step_by_step';
+      stepTitle?.focus();
+    });
+    reportReturn?.addEventListener('click', () => {
+      if (!activeReadingOwner || !ensureResponseOwnerCurrent(activeReadingOwner)) return;
+      if (stage) stage.hidden = true;
+      if (report) report.hidden = false;
+      root.dataset.readingRecordMode = 'official_archive';
+      reportHeading?.focus();
+    });
   }
   renderCalculationSummary(preview.calculationSummary);
   renderStep();
@@ -701,6 +974,14 @@ async function loadPersistedReading() {
       );
       return;
     }
+    if (response.status === 403) {
+      renderPersistedReadingFailure(
+        '이 공식 보고서의 열람 권한이 없습니다.',
+        '현재 계정에서 이 저장된 해석에 접근할 수 없습니다. 기록 페이지에서 이용 가능 여부를 다시 확인해 주세요.',
+        'persisted_record_access_denied',
+      );
+      return;
+    }
     if (response.status === 404 || publicErrorCode(payload) === 'NOT_FOUND') {
       renderPersistedReadingFailure(
         '저장된 풀이를 찾을 수 없습니다.',
@@ -717,7 +998,17 @@ async function loadPersistedReading() {
       return;
     }
 
-    const record = parseOfficialReadingRecordPayloadV1(payload.data);
+    let record;
+    try {
+      record = parseOfficialReadingRecordPayloadV1(payload.data);
+    } catch {
+      renderPersistedReadingFailure(
+        '저장된 보고서의 내용을 확인할 수 없습니다.',
+        '공식 기록 응답이 검증 기준을 충족하지 않았습니다. 다른 해석으로 대체하지 않습니다.',
+        'persisted_record_invalid_response',
+      );
+      return;
+    }
     if (
       record.readingId !== persistedReadingHandoff.readingId
       || record.readingSessionId !== persistedReadingHandoff.readingSessionId
@@ -731,10 +1022,7 @@ async function loadPersistedReading() {
       return;
     }
 
-    const readingView = previewStepsFromPayload({
-      ok: true,
-      data: { lifecycle: 'preview', reading: record.reading },
-    });
+    const readingView = stepsFromIssuedProductResponse(record.reading, { isStoredRecord: true });
     if (!readingView) {
       renderPersistedReadingFailure(
         '저장된 풀이를 표시할 수 없습니다.',
@@ -743,7 +1031,7 @@ async function loadPersistedReading() {
       return;
     }
 
-    activatePreviewReading({ ...readingView, source: 'record' });
+    activatePreviewReading({ ...readingView, source: 'record', record });
   } catch {
     renderPersistedReadingFailure(
       '저장된 풀이를 잠시 불러올 수 없습니다.',

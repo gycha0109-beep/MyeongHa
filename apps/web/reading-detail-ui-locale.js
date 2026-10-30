@@ -158,6 +158,7 @@ export function readingSceneProgressV1(index, total, flags, isStoredRecord, loca
   return {
     progress: copy.progress(index + 1, total),
     structureTitle: flags.hasStructure ? copy.structure : flags.hasSupporting ? copy.supporting : copy.basis,
+    supportingTitle: copy.supporting,
     nextLabel: index >= total - 1 ? copy.finish : copy.next,
     authorityNote: isStoredRecord ? copy.recordNote : copy.previewNote,
     recordsLinkLabel: isStoredRecord ? copy.recordLink : copy.otherLink,

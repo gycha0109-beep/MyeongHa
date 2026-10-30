@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import type { CharacterContentDefinition } from '../packages/character-content/src/index.js';
 import { DEV_CHARACTER_CONTENT_BUNDLE } from '../packages/test-fixtures/src/index.js';
 import {
@@ -20,14 +21,18 @@ const SUBJECT_ID = '33333333-3333-4333-8333-333333333333';
 
 function responseSnapshot() {
   return {
+    responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
     responseVersion: 'myeonghwa-product-reading-response-v2',
     state: 'delivered',
+    messageCode: 'READING_DELIVERED',
+    requiredAction: 'none',
     reading: {
       readingId: READING_ID,
       calculationSummary: {},
       sections: [
         {
           sectionType: 'career',
+          state: 'complete',
           title: '직업 · 일',
           blocks: [{ type: 'paragraph', text: '공식 직업 Reading의 핵심 내용입니다.' }],
         },
@@ -43,6 +48,7 @@ function responseSnapshot() {
 }
 
 function ports() {
+  const canonicalHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(responseSnapshot());
   const accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1 = {
     readAccessibleReadings: vi.fn(async () => [
       {
@@ -61,7 +67,7 @@ function ports() {
         domainCapabilityVersion: 'career-v1',
         readingContractVersion: 'myeonghwa-product-reading-response-v2',
         sajuEngineVersion: 'saju-engine-v1',
-        responseHash: 'sha256:v1:official-reading-response',
+        responseHash: canonicalHash,
       },
     ]),
   };
@@ -74,7 +80,7 @@ function ports() {
         readingContractVersion: 'myeonghwa-product-reading-response-v2',
         productResponseState: 'delivered',
         responseSnapshotJsonb: responseSnapshot(),
-        responseHash: 'sha256:v1:official-reading-response',
+        responseHash: canonicalHash,
         completedAt: '2026-09-21T00:00:00.000Z',
       },
     ]),

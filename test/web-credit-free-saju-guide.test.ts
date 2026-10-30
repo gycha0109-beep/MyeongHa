@@ -29,12 +29,15 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(runtime).toContain("myeongha:credit-shortage");
     expect(runtime).toContain('turnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("messageInput.value = ''");
-    expect(runtime.indexOf("messageInput.value = ''")).toBeLessThan(runtime.indexOf('} catch (error) {\n    const code = error instanceof Error ? error.message'));
+    const runtimeNormalized = runtime.replace(/\r\n/gu, '\n');
+    expect(runtimeNormalized.indexOf("messageInput.value = ''")).toBeLessThan(
+      runtimeNormalized.indexOf('} catch (error) {\n    const code = error instanceof Error ? error.message'),
+    );
     expect(dialog).not.toContain('requestPayment(');
     expect(dialog).not.toContain('purchase-intent');
   });
 
-  it('uses the existing Saju calculation display and only an explicitly non-saleable product outline', async () => {
+  it('uses the existing Saju calculation and product discovery without exposing client-side checkout authority', async () => {
     const [page, hub, admission] = await Promise.all([
       load('src/reading/ReadingPage.tsx'),
       load('saju-hub.js'),
@@ -47,11 +50,13 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(page).toContain('나의 사주 기본 정보');
     expect(page).toContain('saju-design-birth-fields');
     expect(page).toContain('saju-design-chart-tabs');
-    expect(page).toContain('유료 사주 해석에서 제공되는 내용');
-    expect(page).toContain('productPreviewTopics.map');
-    expect(page).toContain('예시 결과물 미리보기');
-    expect(page).toContain('현재 결제 기능은 준비 중입니다.');
+    expect(page).toContain('사주 해석 상품');
+    expect(page).toContain('sajuProductTopics.map');
+    expect(page).toContain('보고서 구성 미리보기');
+    expect(page).toContain('상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.');
     expect(page).toContain('reading-detail.html?topic=love');
+    expect(page).toContain('reading-topic-availability is-');
+    expect(page).not.toContain('requestPayment(');
     expect(page).not.toContain('gm-chart-details');
     expect(page).not.toContain('disabled={!CREDIT_RECHARGE_PUBLIC_CHECKOUT_ACTIVE}');
     expect(page).not.toContain('product_offer_id');

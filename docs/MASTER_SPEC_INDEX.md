@@ -8,6 +8,10 @@
 
 ---
 
+## 기록 · 공식 사주 보고서 구현 로드맵 (2026-10-27)
+
+기록 탭의 **첫 유료 사주 보고서 보관·상세 재열람·구매권·첫 Reader 연결** 구현은 [Records 공식 보고서 구현 로드맵](implementation/RECORDS_OFFICIAL_REPORT_IMPLEMENTATION_ROADMAP_20261027.md)을 따릅니다. 기존 Records 조회 API와 Web 화면을 재사용하며, Saju Production Interpretation 및 Commerce Product/Offer **HOLD**를 해제한 것으로 간주하지 않습니다. **S0 출시 필수 / S1 출시 권장 / S2~S4 출시 후 확장**을 분리합니다.
+
 ## 현재 설계 권위·스냅샷 적용 범위 (2026-10-28)
 
 [설계 충돌·적용 범위 원장](architecture/ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md)은 기존 정본을 대체하는 새 아키텍처가 아니라, **후속 결정이 구형 구현 전제를 덮어쓰는 지점**과 타 트랙 인계 범위의 색인입니다.
@@ -19,6 +23,8 @@
 - 결제는 [P0 결정 원장](P0_DECISION_REGISTER.md)의 Web one-off·PortOne V2를 따르되 판매 Offer/Entitlement 공개는 별도 HOLD입니다. [DR 최신 상태](operations/POSTGRES_DR_READINESS_STATUS_V1.md)의 10월 한정 성공은 9월 `1310` 증거를 현재 상태로 만들지 않으며, `dr_ready=false`와 Hosted Auth/Storage 복구 보류를 유지합니다. DR 검사기 변경은 운영·DR 트랙만 담당합니다.
 
 
+
+## 일반 Security 실행 진입점 (2026-10-24)
 
 일반 `security` 트랙은 [Security 실행 로드맵](security/SECURITY_EXECUTION_ROADMAP_V1.md)에서 진행합니다. 구현 90 / 검증 10을 작업 배분 기준으로 적용하며, API 남용 방지·보안 이벤트·공급망·운영 복구 증거를 기존 이슈와 연결합니다. 인증·권한·DB·운영 변경의 개별 승인 경계는 유지합니다.
 

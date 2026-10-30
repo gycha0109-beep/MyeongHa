@@ -51,8 +51,12 @@ describe('checkout notice private PostgreSQL adapter',()=>{
     const historicalPolicy = readFileSync('test/db/staged_commerce_migration_policy.sh', 'utf8');
     expect(historicalPolicy).toContain('20261027054525_digital_reading_checkout_notice_evidence_v1.sql)');
     expect(historicalPolicy).toContain(`expected='${reviewed}'`);
+    // The staged one-shot deployment policy remains pinned to its original
+    // historical catalog. Later forward-only migrations legitimately advance
+    // the current catalog snapshot and must not rewrite that policy.
     const baseline = readFileSync('test/db/catalog.expected.sha256', 'utf8').trim();
-    expect(baseline).toBe('1a4106370848c27564fd4b0d64cf84c8d30dc02b205f331fe17c46e4dc061c53');
+    expect(baseline).toMatch(/^[0-9a-f]{64}$/u);
+    expect(workflow).toContain("== '1a4106370848c27564fd4b0d64cf84c8d30dc02b205f331fe17c46e4dc061c53'");
     expect(fixture).toContain(`20261027054525_digital_reading_checkout_notice_evidence_v1.sql) reviewed_blob_sha1='${reviewed}'`);
     const scope = workflow.slice(workflow.indexOf("== 'feat(ops): stage private checkout notice provenance and prepayment acknowledgment'"));
     expect(scope).toContain("HOLD_PRIVATE_CHECKOUT_STAGING_PATH_DRIFT");
