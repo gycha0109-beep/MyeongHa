@@ -99,7 +99,7 @@ async function readClipboardSecret(label){
     "$v=Get-Clipboard -Raw; Set-Clipboard -Value ' '; if($null -ne $v){[Console]::Out.Write($v)}",
   ],{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:8000,windowsHide:true,maxBuffer:8192});
   if(result.error||result.status!==0)throw bootstrapError('CLIPBOARD_UNAVAILABLE');
-  return result.stdout.replace(/[\\r\\n]+$/u,'');
+  return result.stdout.replace(/[\r\n]+$/u,'');
 }
 
 function checkTlsLogin(role,password,caPath,port){
