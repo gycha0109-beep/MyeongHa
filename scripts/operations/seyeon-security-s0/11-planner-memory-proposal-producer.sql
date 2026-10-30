@@ -4,6 +4,29 @@
 -- memory_items record, creates NO Grant and cannot feed model context.
 begin;
 
+-- Created/maintained by SECURITY DEFINER only; a matching public Proposal
+-- row, dedupe key or assistant Message cannot forge this owner provenance.
+create table seyeon_private.planner_memory_proposal_sources_v1(
+  proposal_id uuid primary key,
+  subject_id uuid not null,
+  source_turn_id uuid not null,
+  assistant_message_id uuid not null,
+  user_message_id uuid not null,
+  created_at timestamptz not null,
+  constraint planner_memory_proposal_origin_fk
+    foreign key(proposal_id,subject_id)
+    references public.memory_proposals(id,subject_id),
+  constraint planner_memory_proposal_assistant_fk
+    foreign key(assistant_message_id,source_turn_id,subject_id)
+    references public.conversation_messages(id,turn_id,subject_id),
+  constraint planner_memory_proposal_user_fk
+    foreign key(user_message_id,source_turn_id,subject_id)
+    references public.conversation_messages(id,turn_id,subject_id)
+);
+revoke all on table seyeon_private.planner_memory_proposal_sources_v1
+  from public,anon,authenticated,service_role,myeongha_api_executor,
+    myeongha_seyeon_chat_runtime_owner;
+
 create function seyeon_private.cmd_create_pending_seyeon_planner_memory_v1(
   p_subject_id uuid, p_proposal_id uuid, p_turn_id uuid,
   p_assistant_message_id uuid, p_user_message_id uuid,
@@ -112,6 +135,29 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_planner_memory_dedupe_conflict',
       message='Existing Proposal cannot be changed or reissued';
+  end if;
+
+  if coalesce(v_created,false) then
+    insert into seyeon_private.planner_memory_proposal_sources_v1(
+      proposal_id,subject_id,source_turn_id,assistant_message_id,
+      user_message_id,created_at)
+    values(p_proposal_id,p_subject_id,p_turn_id,p_assistant_message_id,
+      p_user_message_id,clock_timestamp());
+  end if;
+
+  -- Replays must match DB-owner provenance, not merely the public Proposal
+  -- or a user-supplied fixed dedupe key.
+  perform 1
+  from seyeon_private.planner_memory_proposal_sources_v1 src
+  where src.proposal_id=p_proposal_id and src.subject_id=p_subject_id
+    and src.source_turn_id=p_turn_id
+    and src.assistant_message_id=p_assistant_message_id
+    and src.user_message_id=p_user_message_id
+  for share of src;
+  if not found then
+    raise exception using errcode='42501',
+      constraint='seyeon_planner_memory_owner_provenance_required',
+      message='No DB-owned Planner provenance for pending proposal';
   end if;
   return query select p_proposal_id,'pending'::text,not coalesce(v_created,false);
 end
