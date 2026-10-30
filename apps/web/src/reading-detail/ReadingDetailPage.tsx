@@ -130,6 +130,14 @@ export function ReadingDetailPage() {
               </div>
             </section>
 
+            <aside className="reading-block" data-reading-step-notice hidden aria-label="공식 보고서 해석의 적용 범위">
+              <span className="reading-block-icon" aria-hidden="true">※</span>
+              <div>
+                <h2 data-reading-step-notice-heading>해석의 적용 범위</h2>
+                <p data-reading-step-notice-text />
+              </div>
+            </aside>
+
             <section className="reading-block reading-character-block">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>

@@ -185,3 +185,5 @@
 @media(prefers-reduced-motion:reduce){.official-report-view *{scroll-behavior:auto}}
 
 .reading-detail-page [data-reading-supporting-body]{white-space:pre-wrap;overflow-wrap:anywhere}
+
+.reading-detail-page [data-reading-step-notice-text]{white-space:pre-wrap;overflow-wrap:anywhere}

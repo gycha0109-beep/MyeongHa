@@ -137,6 +137,21 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain("'[data-reading-supporting-body]'");
     expect(css).toContain('[data-reading-supporting-body]{white-space:pre-wrap;');
   });
+  it('keeps all stored scope limitations visible in step mode without generating new source text', () => {
+    expect(jsx).toContain('data-reading-step-notice hidden');
+    expect(jsx).toContain('data-reading-step-notice-heading');
+    expect(jsx).toContain('data-reading-step-notice-text');
+    expect(runtime).toContain("document.querySelector('[data-reading-step-notice]')?.setAttribute('hidden', '')");
+    expect(runtime).toContain("'[data-reading-step-notice-text]'");
+    expect(runtime).toContain('const visibleScopeNotice = isStoredRecord');
+    expect(runtime).toContain('scopeNotice.hidden = visibleScopeNotice.length === 0');
+    expect(runtime).toContain('scopeNoticeText.textContent = visibleScopeNotice');
+    expect(runtime).toContain("translateStaticUi('해석의 적용 범위', getUiLocale())");
+    expect(css).toContain('[data-reading-step-notice-text]{white-space:pre-wrap;');
+    expect(runtime).toContain("notices.filter((text) => typeof text === 'string' && text.trim()).join('\\n\\n')");
+    expect(runtime).toContain("if (item.type === 'scope_limitation')");
+  });
+
   it('blocks an explicit 403 without treating revoked access as a temporary Records failure', () => {
     const ownerDenied = runtime.indexOf('if (response.status === 403)');
     const genericFailure = runtime.indexOf('if (!response.ok || !payload || payload.ok !== true)');

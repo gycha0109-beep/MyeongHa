@@ -247,6 +247,7 @@ function clearPersistedReadingPresentation() {
   if (reader) reader.textContent = '—';
   const notice = document.querySelector('[data-official-report-notice]');
   if (notice) notice.hidden = true;
+  document.querySelector('[data-reading-step-notice]')?.setAttribute('hidden', '');
   // The report and step scene share the same persisted source. When the
   // account changes, remove both visible and hidden source-bearing nodes.
   for (const selector of [
@@ -255,7 +256,7 @@ function clearPersistedReadingPresentation() {
     '[data-official-report-birth-current]', '[data-official-report-birth-status]',
     '[data-reading-step-title]',
     '[data-reading-step-body]', '[data-reading-structure-body]',
-    '[data-reading-supporting-body]',
+    '[data-reading-supporting-body]', '[data-reading-step-notice-text]',
     '[data-reader-step-line]', '[data-reading-authority-note]',
     '[data-chart-pillar-year]', '[data-chart-pillar-month]',
     '[data-chart-pillar-day]', '[data-chart-pillar-hour]',
@@ -747,6 +748,9 @@ function activatePreviewReading(preview) {
   const supportingBlock = document.querySelector('[data-reading-supporting]');
   const supportingTitle = document.querySelector('[data-reading-supporting-title]');
   const supportingBody = document.querySelector('[data-reading-supporting-body]');
+  const scopeNotice = document.querySelector('[data-reading-step-notice]');
+  const scopeNoticeHeading = document.querySelector('[data-reading-step-notice-heading]');
+  const scopeNoticeText = document.querySelector('[data-reading-step-notice-text]');
   const readerLine = document.querySelector('[data-reader-step-line]');
   const readerComment = document.querySelector('[data-reader-comment]');
   const authorityNote = document.querySelector('[data-reading-authority-note]');
@@ -820,6 +824,15 @@ function activatePreviewReading(preview) {
     if (supportingBlock) supportingBlock.hidden = sourceCategories.supporting.length === 0;
     if (supportingBody) supportingBody.textContent =
       sourceCategories.supporting.join('\n\n');
+    // The full archive already shows every stored scope limitation. Repeat it
+    // in step mode without inventing or translating source-owned text.
+    const visibleScopeNotice = isStoredRecord
+      && typeof preview.notice === 'string' && preview.notice.trim()
+      ? preview.notice : '';
+    if (scopeNotice) scopeNotice.hidden = visibleScopeNotice.length === 0;
+    if (scopeNoticeHeading) scopeNoticeHeading.textContent =
+      translateStaticUi('해석의 적용 범위', getUiLocale());
+    if (scopeNoticeText) scopeNoticeText.textContent = visibleScopeNotice;
     // The archived official report must not invent structural evidence when
     // the stored response does not contain any. Preserve Preview UI separately.
     if (structureBlock) structureBlock.hidden = isStoredRecord && structureParts.length === 0;
