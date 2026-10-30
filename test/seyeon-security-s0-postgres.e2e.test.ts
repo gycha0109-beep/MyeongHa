@@ -17,6 +17,7 @@ import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
+import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
 import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
 import { createPostgresSeyeonProductionContextReadAuthorityPortV1 } from '../apps/api/src/postgres-seyeon-production-context-read-v1.js';
@@ -407,6 +408,18 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid) as result`,[f.subject,f.memory]);
     return r.rows[0]!.result;
   });
+  const readOwnerLifecycle=async(f:Awaited<ReturnType<typeof prepare>>)=>{
+    const response=await handleSeyeonMemberMemoryGrantStatusRequestV1({
+      request:new Request(`https://receipt.test/api/memories/${f.memory}/grants/seyeon`),
+      requestId:'s0-lifecycle',serverTime:new Date().toISOString(),
+      pool:subjectPool,
+      identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+    });
+    expect(response.status).toBe(200);
+    return (await response.json()).data as {
+      grantState:string;currentlyGranted:boolean;grantedAt:string|null;
+    };
+  };
   const ack=(attempt:string,proof:string)=>handleSeyeonPositiveReplyReceiptV1({
     request:new Request(`https://receipt.test/api/chat/delivery-receipts/${attempt}`,{method:'POST',
       headers:{'Content-Type':'application/json'},body:JSON.stringify({proof})}),
@@ -419,7 +432,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(response.status).toBe(200);
     // The Fetch body is NOT consumed: this is the former R -> V -> S gap.
     expect(response.bodyUsed).toBe(false);
+    expect(await readOwnerLifecycle(f)).toMatchObject({grantState:'active',currentlyGranted:true});
     expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'withdrawal_pending',currentlyGranted:false,grantedAt:null,
+    });
     const {rows:[g]}=await pool.query(`select revoked_at,seyeon_revoke_requested_at
       from public.record_access_grants where id=$1`,[f.grant]);
     expect(g.revoked_at).toBeNull();expect(g.seyeon_revoke_requested_at).not.toBeNull();
@@ -440,12 +457,16 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect((await ack(receipt.attemptId,receiptProof(payload.data.assistantText,receipt.challenge))).status).toBe(200);
     const {rows:[after]}=await pool.query('select revoked_at from public.record_access_grants where id=$1',[f.grant]);
     expect(after.revoked_at).not.toBeNull();
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'not_granted',currentlyGranted:false,grantedAt:null,
+    });
     expect(await requestRevoke(f)).toMatchObject({status:'committed',replayed:true});
     await f.locked()({signal:new AbortController().signal,deliver:async text=>expect(text).toBeNull()});
   });
 
-  it('serializes two real sessions: an uncommitted issue makes revoke wait, then durably pending instead of falsely complete',async()=>{
+  it('serializes two real sessions: lifecycle stays exact through a locked issue, pending revoke, and receipt',async()=>{
     const f=await prepare(9);await f.commit();
+    expect(await readOwnerLifecycle(f)).toMatchObject({grantState:'active',currentlyGranted:true});
     let issued!:()=>void,release!:()=>void;
     const issuanceReached=new Promise<void>(resolve=>{issued=resolve;});
     const permit=new Promise<void>(resolve=>{release=resolve;});
@@ -459,11 +480,33 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await issuanceReached;
     let revokeComplete=false;
     const revoke=requestRevoke(f).then(r=>{revokeComplete=true;return r;});
-    await new Promise(resolve=>setTimeout(resolve,120));
-    expect(revokeComplete).toBe(false);release();await issuance;
-    expect(await revoke).toMatchObject({status:'pending'});
+    // Distinct PostgreSQL backend must WAIT for the issuing transaction
+    // rather than relying on a fixed sleep as a concurrency proof.
+    let observedLockWait=false;
+    for(let i=0;i<100;i++){
+      const {rows:[waiting]}=await pool.query(`select exists(
+        select 1 from pg_stat_activity
+        where datname=current_database() and wait_event_type='Lock'
+          and pid<>pg_backend_pid()) as waiting`);
+      if(waiting.waiting===true){observedLockWait=true;break;}
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    try{
+      expect(observedLockWait).toBe(true);
+      expect(revokeComplete).toBe(false);
+    }finally{
+      release();
+    }
+    await issuance;
+    expect(await revoke).toMatchObject({status:'pending',newUseBlocked:true});
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'withdrawal_pending',currentlyGranted:false,grantedAt:null,
+    });
     expect((await ack(f.attempt,receiptProof(f.assistantText,proof))).status).toBe(200);
     expect(await requestRevoke(f)).toMatchObject({status:'committed'});
+    expect(await readOwnerLifecycle(f)).toMatchObject({
+      grantState:'not_granted',currentlyGranted:false,grantedAt:null,
+    });
   });
 
   it('keeps a lost/crashed Fetch issuance durable across new DB sessions; time and ordinary deletion never manufacture receipt',async()=>{
@@ -477,6 +520,45 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await expect(f.run(({client})=>client.query('update public.chat_turn_attempts set seyeon_positive_delivery_received_at=clock_timestamp() where id=$1',[f.attempt])))
       .rejects.toMatchObject({code:'42501'});
     expect(await requestRevoke(f)).toMatchObject({status:'pending',newUseBlocked:true});
+  });
+
+  it('enforces owned-Memory lifecycle against cross-Member substitution and direct SQL roles',async()=>{
+    const owner=await prepare(11);
+    const other=await prepare(12);
+    const lifecycleSql=`select grant_state,granted_at from
+      public.qry_seyeon_memory_grant_lifecycle_v1($1::uuid,$2::uuid)`;
+    expect(await readOwnerLifecycle(owner)).toMatchObject({
+      grantState:'active',currentlyGranted:true,
+    });
+    await expect(owner.run(({client})=>client.query(lifecycleSql,[
+      owner.subject,other.memory,
+    ]))).rejects.toMatchObject({constraint:'seyeon_grant_lifecycle_memory_unavailable'});
+    await expect(owner.run(({client})=>client.query(lifecycleSql,[
+      other.subject,other.memory,
+    ]))).rejects.toMatchObject({constraint:'myeongha_subject_context_mismatch'});
+    const {rows:[acl]}=await pool.query<{
+      definer:boolean;
+      apiExecute:boolean;
+      anonDenied:boolean;
+      memberDenied:boolean;
+      serviceRoleDenied:boolean;
+      noGrantUpdates:boolean;
+      noMemoryUpdates:boolean;
+    }>(`select
+      p.prosecdef as definer,
+      has_function_privilege('myeongha_api_executor',p.oid,'EXECUTE') as "apiExecute",
+      not has_function_privilege('anon',p.oid,'EXECUTE') as "anonDenied",
+      not has_function_privilege('authenticated',p.oid,'EXECUTE') as "memberDenied",
+      not has_function_privilege('service_role',p.oid,'EXECUTE') as "serviceRoleDenied",
+      not has_table_privilege('myeongha_api_executor','public.record_access_grants','UPDATE') as "noGrantUpdates",
+      not has_table_privilege('myeongha_api_executor','public.memory_items','UPDATE') as "noMemoryUpdates"
+      from pg_proc p
+      where p.oid='public.qry_seyeon_memory_grant_lifecycle_v1(uuid,uuid)'::regprocedure`);
+    expect(acl).toMatchObject({
+      definer:true,apiExecute:true,anonDenied:true,
+      memberDenied:true,serviceRoleDenied:true,
+      noGrantUpdates:true,noMemoryUpdates:true,
+    });
   });
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {

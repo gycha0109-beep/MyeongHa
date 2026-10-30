@@ -66,12 +66,24 @@ export default {
         const rejected=await rateLimitCloudflareRequestV1(request,env,
           receiptRoute?'seyeon-receipt':revokeRoute?'seyeon-withdrawal':'seyeon-turn');
         if(rejected)return rejected;
-        const {createCloudflareSeyeonFirstMemoryRuntimeV1}=await import(
-          '../workers/cloudflare-seyeon-first-memory-runtime.mjs');
-        runtime=createCloudflareSeyeonFirstMemoryRuntimeV1({
-          env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
-          governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
-        });
+        const {
+          createCloudflareSeyeonFirstMemoryRuntimeV1,
+          createCloudflareSeyeonReceiptWithdrawalRuntimeV1,
+          createCloudflareSeyeonIssuedReplyReceiptRuntimeV1,
+        }=await import('../workers/cloudflare-seyeon-first-memory-runtime.mjs');
+        // Proof-only receipt must remain available without Member Auth,
+        // whereas withdrawal still verifies the current Member and Subject.
+        // Both stay independent from the metered model/governed DB.
+        runtime=receiptRoute
+          ?createCloudflareSeyeonIssuedReplyReceiptRuntimeV1({env})
+          :firstReplyRoute
+            ?createCloudflareSeyeonFirstMemoryRuntimeV1({
+              env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+              governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
+            })
+            :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
+              env,approvedWithdrawalWriteAdmission:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+            });
         // The general paid rail remains sealed until atomic reservation and
         // delivery-receipt settlement are actually mounted. The sole DB-bound
         // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
@@ -136,7 +148,7 @@ export default {
     // This owner-only *test console* static HTML can load the official KCP
     // SDK without relaxing the production SPA's strict CSP. All sensitive
     // operations independently require DB-verified Owner Admin and sandbox.
-    if (url.pathname === '/owner-portone-sandbox.html' && url.search === '' &&
+    if (url.pathname === '/owner-portone-sandbox.html' &&
         (request.method === 'GET' || request.method === 'HEAD')) {
       const response = await sealedRuntime.fetch(request, env, ctx);
       if (response.status !== 200) return withWorkerVersion(response, env);

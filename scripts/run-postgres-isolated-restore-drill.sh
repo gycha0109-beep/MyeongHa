@@ -321,6 +321,12 @@ require_report_contract '.application_schema_policy' 'public-fail-closed' 'appli
 require_report_contract '.provider_schema_policy' 'target-compatible-column-projection' 'provider schema policy changed'
 require_report_contract '.source_copy_blocks > 0' 'true' 'source dump contained no COPY blocks'
 require_report_contract '.replayed_copy_blocks > 0' 'true' 'portable replay contained no COPY blocks'
+require_report_contract '(.provider_source_counts_include_payloads == false)' 'true' 'provider row inventory must not include payloads'
+require_report_contract '[.skipped_provider_copy_blocks[] | .source_row_count | select(type != "number" or . < 0)] | length == 0' 'true' 'skipped provider source row counts invalid'
+require_report_contract '[.projected_provider_copy_blocks[] | .source_row_count | select(type != "number" or . < 0)] | length == 0' 'true' 'projected provider source row counts invalid'
+require_report_contract '(.provider_rows_skipped_in_loopback == ([.skipped_provider_copy_blocks[].source_row_count] | add // 0))' 'true' 'provider skipped row total mismatched'
+require_report_contract '(.provider_rows_with_projected_columns_in_loopback == ([.projected_provider_copy_blocks[].source_row_count] | add // 0))' 'true' 'provider projected row total mismatched'
+require_report_contract '(.provider_rows_replayed_in_loopback == ([.replayed_provider_copy_blocks[].source_row_count] | add // 0))' 'true' 'provider replayed row total mismatched'
 require_report_contract '[.replayed_application_relations[] | select(. == "public.subjects")] | length == 1' 'true' 'public.subjects was not replayed exactly once'
 require_report_contract '[.replayed_provider_relations[] | select(. == "auth.users")] | length == 1' 'true' 'auth.users was not replayed exactly once'
 require_report_contract '[.replayed_provider_copy_blocks[] | select(.schema == "auth" and .table == "users" and (.replayed_columns | index("id") != null))] | length == 1' 'true' 'auth.users.id was not retained in portable replay'
@@ -460,6 +466,9 @@ provider_managed_roles_absent_json="$(printf '%s\n' "${provider_managed_roles_ab
 normalized_application_membership_grantor_count="${#normalized_application_memberships[@]}"
 provider_managed_data_projections_json="$(jq -c '.projected_provider_copy_blocks' "$portable_data_report")"
 provider_managed_data_skips_json="$(jq -c '.skipped_provider_copy_blocks' "$portable_data_report")"
+provider_rows_skipped_in_loopback="$(jq -r '.provider_rows_skipped_in_loopback' "$portable_data_report")"
+provider_rows_with_projected_columns_in_loopback="$(jq -r '.provider_rows_with_projected_columns_in_loopback' "$portable_data_report")"
+provider_rows_replayed_in_loopback="$(jq -r '.provider_rows_replayed_in_loopback' "$portable_data_report")"
 source_data_copy_blocks="$(jq -r '.source_copy_blocks' "$portable_data_report")"
 replayed_data_copy_blocks="$(jq -r '.replayed_copy_blocks' "$portable_data_report")"
 provider_managed_data_full_restore='true'
@@ -489,6 +498,9 @@ jq -n \
   --argjson provider_managed_data_projections "$provider_managed_data_projections_json" \
   --argjson provider_managed_data_blocks_skipped "$provider_managed_data_blocks_skipped" \
   --argjson provider_managed_data_skips "$provider_managed_data_skips_json" \
+  --argjson provider_rows_skipped_in_loopback "$provider_rows_skipped_in_loopback" \
+  --argjson provider_rows_with_projected_columns_in_loopback "$provider_rows_with_projected_columns_in_loopback" \
+  --argjson provider_rows_replayed_in_loopback "$provider_rows_replayed_in_loopback" \
   --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
   --argjson backup_migration_frontier "$backup_migration_frontier_json" \
   --argjson backup_ephemeral_data_exclusions "$backup_ephemeral_data_exclusions_json" \
@@ -525,6 +537,10 @@ jq -n \
     provider_managed_data_projections: $provider_managed_data_projections,
     provider_managed_data_blocks_skipped: $provider_managed_data_blocks_skipped,
     provider_managed_data_skips: $provider_managed_data_skips,
+    provider_rows_skipped_in_loopback: $provider_rows_skipped_in_loopback,
+    provider_rows_with_projected_columns_in_loopback: $provider_rows_with_projected_columns_in_loopback,
+    provider_rows_replayed_in_loopback: $provider_rows_replayed_in_loopback,
+    provider_source_counts_include_payloads: false,
     provider_managed_data_full_restore: $provider_managed_data_full_restore,
     backup_migration_frontier: $backup_migration_frontier,
     seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof,

@@ -2,6 +2,11 @@ name: Production PostgreSQL Logical Backup
 run-name: "[WT:ops] Production PostgreSQL Logical Backup"
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/ops/postgres-backup-migration-20261029012948-20261029.once'
   workflow_dispatch:
   schedule:
     # 03:17 KST. The non-round minute reduces fleet-wide scheduler contention.
@@ -23,6 +28,7 @@ env:
 jobs:
   backup:
     name: encrypted-logical-backup
+    if: "${{ github.event_name != 'push' || startsWith(github.event.head_commit.message, 'ops(dr): one-shot backup migration 20261029012948') }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
@@ -34,6 +40,22 @@ jobs:
     steps:
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Gate one-shot deployed migration 20261029012948 backup marker
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ -z "$(git status --porcelain)" ]]
+          subject="$(git show -s --format=%s HEAD)"
+          [[ "$subject" =~ ^ops\(dr\):\ one-shot\ backup\ migration\ 20261029012948(\ \(\#[0-9]+\))?$ ]]
+          [[ "$(cat .github/ops/postgres-backup-migration-20261029012948-20261029.once)" == 'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1' ]]
+          point="$(date -u -d '2026-10-29T02:50:00Z' +%s)"
+          now="$(date -u +%s)"
+          (( now >= point && now - point <= 86400 ))
+          echo 'SCOPED_READ_ONLY_PRODUCTION_BACKUP: exact deployed migration 20261029012948; encrypted artifact only; no schema modifications'
 
       - name: Fail closed unless recovery credentials are provisioned
         shell: bash
@@ -106,6 +128,16 @@ jobs:
           POOL_PORT: ${{ steps.database.outputs.pool_port }}
           POOL_DB: ${{ steps.database.outputs.pool_db }}
         run: bash scripts/operations/export-production-postgres-backup.sh
+      - name: Guard one-shot backup actual deployed migration frontier
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        env:
+          OBSERVED_MIGRATION_FRONTIER: ${{ steps.dump.outputs.migration_frontier }}
+        run: |
+          set -euo pipefail
+          [[ "$OBSERVED_MIGRATION_FRONTIER" == '20261029012948' ]]
+          echo 'PASS_ONE_SHOT_POST_MIGRATION_BACKUP: live captured frontier is the exact reviewed remote version'
+
       - name: Upload encrypted off-provider backup artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:

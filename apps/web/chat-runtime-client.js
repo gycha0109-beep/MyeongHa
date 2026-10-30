@@ -115,10 +115,10 @@ function getOrCreatePendingTurn(message) {
   return pendingTurn;
 }
 
-function clearPendingTurn(clientTurnId) {
-  const existing = readPendingTurn(threadId);
+function clearPendingTurn(clientTurnId, targetThreadId = threadId) {
+  const existing = readPendingTurn(targetThreadId);
   if (existing?.clientTurnId !== clientTurnId) return;
-  sessionStorage.removeItem(pendingTurnKey(threadId));
+  sessionStorage.removeItem(pendingTurnKey(targetThreadId));
 }
 
 function restorePendingDraft() {
@@ -283,6 +283,49 @@ document.addEventListener('myeongha:localechange', () => {
     }
   }
 });
+
+// The S0 receipt is verified and ACKed before this call. History/Replay are
+// deliberately unavailable: display only the just-received response in this
+// document, never cache it or infer an authorized transcript from it.
+function renderAcknowledgedSeyeonFirstReply(result) {
+  if (!chatStream || !result || typeof result.assistantText !== 'string' ||
+      result.assistantText.trim().length === 0 || result.replayed !== false) {
+    return false;
+  }
+  const article = document.createElement('article');
+  article.className = 'conversation-message';
+  article.dataset.sender = 'character';
+  article.dataset.messageCharacterId = 'seyeon';
+  article.dataset.acknowledgedFirstReply = '';
+
+  const avatar = document.createElement('span');
+  avatar.className = 'conversation-message-avatar';
+  avatar.setAttribute('aria-hidden', 'true');
+  avatar.dataset.character = 'runtime-character';
+  avatar.textContent = '대';
+
+  const body = document.createElement('div');
+  body.className = 'conversation-message-body';
+  const heading = document.createElement('div');
+  heading.className = 'conversation-message-heading';
+  const strong = document.createElement('strong');
+  strong.textContent = resolveCharacterDisplayNameV1('seyeon', getUiLocale())
+    ?? translateStaticUi('연결자', getUiLocale());
+  heading.append(strong);
+
+  const paragraph = document.createElement('p');
+  paragraph.dataset.chatBodySource = '';
+  paragraph.textContent = result.assistantText;
+  body.append(heading, paragraph);
+  article.append(avatar, body);
+
+  if (chatIntro) chatIntro.hidden = true;
+  // Replacing a held history with this one reply does not grant replay access.
+  chatStream.replaceChildren(article);
+  chatStream.scrollTop = chatStream.scrollHeight;
+  historyWithheld = true;
+  return true;
+}
 
 function renderRoomState(state) {
   historyWithheld = state.historyWithheld === true;
@@ -482,17 +525,19 @@ async function sendTurn(message) {
   setComposerBusy(true);
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
+  const submittedThreadId = threadId;
 
   try {
     const activeBearer = await getActiveBearer();
     if (!activeBearer || activeBearer.kind !== 'member') {
       throw new Error('MEMBER_REQUIRED');
     }
+    let acknowledgedReply;
     try {
-      await sendSeyeonBrowserTurnWithReceiptV1({
+      acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1({
         origin: window.location.origin,
         bearer: activeBearer.token,
-        threadId,
+        threadId: submittedThreadId,
         turn: { clientTurnId: pendingTurn.clientTurnId, text: pendingTurn.text },
         language: getUiLocale(),
         localeHeaders: getUiLocaleRequestHeadersV1(),
@@ -504,7 +549,7 @@ async function sendTurn(message) {
           throw new Error('AUTH_REQUIRED');
         }
         if (error.code === 'IDEMPOTENCY_CONFLICT') {
-          clearPendingTurn(pendingTurn.clientTurnId);
+          clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
           throw new Error('IDEMPOTENCY_CONFLICT');
         }
         if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'CREDIT_INSUFFICIENT') {
@@ -530,15 +575,28 @@ async function sendTurn(message) {
       throw new Error('INVALID_RESPONSE');
     }
 
-    const rereadSucceeded = await loadRoomState();
-    if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED');
+    // The receipt ACK is already complete. Retire the idempotency draft
+    // before a refresh or session change can make a successful turn retryable.
+    clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
+    // A protected history GET may legitimately return 503. Never use it as
+    // positive receipt confirmation or as a reason to resend this turn.
+    const currentBearer = await getActiveBearer();
+    if (currentBearer?.kind !== 'member' ||
+        currentBearer.token !== activeBearer.token ||
+        authoritativeCharacterId !== 'seyeon' ||
+        threadId !== submittedThreadId) {
+      // Never render a private reply into a different Member or thread.
+      throw new Error('AUTH_REQUIRED');
+    }
 
-    clearPendingTurn(pendingTurn.clientTurnId);
     if (messageInput instanceof HTMLTextAreaElement) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
     }
-    setComposeStatus('세연의 답변이 도착했습니다.');
+    const presented = renderAcknowledgedSeyeonFirstReply(acknowledgedReply);
+    setComposeStatus(presented
+      ? '세연의 답변이 도착했습니다.'
+      : '현재 대화 기록 연결을 사용할 수 없습니다.');
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {

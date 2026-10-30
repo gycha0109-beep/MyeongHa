@@ -47,7 +47,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql|20261027125500_chat_credit_delivered_ack_private_v1.sql|20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql|20261027185000_owner_kcp_sandbox_private_prepare_v1.sql|20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql|20261027054525_digital_reading_checkout_notice_evidence_v1.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql|20261027125500_chat_credit_delivered_ack_private_v1.sql|20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql|20261027185000_owner_kcp_sandbox_private_prepare_v1.sql|20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql|20261027054525_digital_reading_checkout_notice_evidence_v1.sql|20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -79,6 +79,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
              20261027185000_owner_kcp_sandbox_private_prepare_v1.sql) reviewed_blob_sha1='3f2d10daa1b7a22b647d50bd4498408c58e1639b' ;;
              20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql) reviewed_blob_sha1='59a2d005cace08cb46da9cf57351131620218d0b' ;;
             20261027054525_digital_reading_checkout_notice_evidence_v1.sql) reviewed_blob_sha1='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
+            20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql) reviewed_blob_sha1='3903c37f80f860f899fb1086b4bab878e73eab1d' ;;
           esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then

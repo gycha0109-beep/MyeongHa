@@ -30,6 +30,7 @@ try {
     '\\.',
     'COPY "auth"."required_target" ("id") FROM stdin;',
     'required-row',
+    'required-row-2',
     '\\.',
     'COPY "public"."subjects" ("id", "auth_user_id") FROM stdin;',
     'subject-id\tuser-id',
@@ -47,6 +48,21 @@ try {
   if (!output.includes('COPY "public"."subjects"') || !output.includes('subject-id')) throw new Error('Application COPY block was not preserved.');
   if (report.projected_provider_copy_blocks.length !== 2) throw new Error('Provider projection report count is incorrect.');
   if (report.skipped_provider_copy_blocks.length !== 1 || report.skipped_provider_copy_blocks[0].table !== 'required_target') throw new Error('Provider skip report is incorrect.');
+  if (report.skipped_provider_copy_blocks[0].source_row_count !== 2 ||
+      report.provider_rows_skipped_in_loopback !== 2) {
+    throw new Error('Provider skipped rows must be counted from the actual source COPY lines.');
+  }
+  if (report.projected_provider_copy_blocks.some((block) => block.source_row_count !== 1) ||
+      report.provider_rows_with_projected_columns_in_loopback !== 2 ||
+      report.provider_rows_replayed_in_loopback !== 2) {
+    throw new Error('Provider projected/replayed source row counters differ from the fixture.');
+  }
+  if (report.replayed_provider_copy_blocks.some((block) => block.source_row_count !== 1) ||
+      report.provider_source_counts_include_payloads !== false ||
+      JSON.stringify(report).includes('user@example.invalid') ||
+      JSON.stringify(report).includes('required-row')) {
+    throw new Error('Provider row evidence contains private payloads or inconsistent per-block totals.');
+  }
   const authUsersReplay = report.replayed_provider_copy_blocks.filter((block) => block.schema === 'auth' && block.table === 'users');
   if (authUsersReplay.length !== 1 || authUsersReplay[0].mode !== 'project' || !authUsersReplay[0].replayed_columns.includes('id')) throw new Error('auth.users identity-continuity projection evidence is missing.');
   if (!report.replayed_provider_relations.includes('auth.users')) throw new Error('auth.users compatibility evidence is missing.');

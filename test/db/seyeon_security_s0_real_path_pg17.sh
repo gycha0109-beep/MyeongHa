@@ -12,3 +12,5 @@ set -euo pipefail
 node scripts/operations/seyeon-security-s0/install-isolated.mjs
 SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-security-s0-postgres.e2e.test.ts --maxWorkers=1
+SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-security-s0-history-presence.e2e.test.ts --maxWorkers=1

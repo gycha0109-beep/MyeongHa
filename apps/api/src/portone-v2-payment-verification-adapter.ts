@@ -54,7 +54,7 @@ export interface PortOneV2PaymentHttpResponseV1 {
 export interface PortOneV2PaymentHttpRequestInitV1 {
   readonly method: 'GET';
   readonly headers: Readonly<Record<string, string>>;
-  readonly redirect: 'error';
+  readonly redirect: 'manual';
   readonly signal: AbortSignal;
 }
 
@@ -251,7 +251,9 @@ async function fetchWithTimeout(input: {
           accept: 'application/json',
           authorization: `PortOne ${input.apiSecret}`,
         }),
-        redirect: 'error',
+        // Cloudflare Workers rejects 'error'; 'manual' never forwards the API secret on redirects.
+        // Any 3xx response is rejected below as HTTP_UNEXPECTED_STATUS.
+        redirect: 'manual',
         signal: controller.signal,
       }),
       deadline,

@@ -2,6 +2,8 @@ import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
+import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
+import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
@@ -480,23 +482,88 @@ function renderMemories(payload, subjectKind) {
       check.type = 'button';
       const status = textElement('span', 'records-memory-grant-status', '');
       status.setAttribute('role', 'status');
+      const client = createRecordsRuntimeClient();
+      const revokeClient = createRecordsMemoryGrantRevokeClient();
+      const revoke = uiElement('button', 'records-memory-grant-revoke', '세연 접근권한 철회');
+      revoke.type = 'button';
+      revoke.hidden = true;
+      let withdrawalPending = false;
+      let requestInFlight = false;
+      let lastGrantState = 'unknown';
+      async function refreshGrant() {
+        const result = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
+        // Only the owner-scoped DB lifecycle (not a filtered active Grant
+        // read or volatile UI flag) can resolve a durable pending withdrawal.
+        lastGrantState = result.grantState;
+        if (result.grantState === 'withdrawal_pending') withdrawalPending = true;
+        if (result.grantState === 'not_granted') withdrawalPending = false;
+        if (item.isConnected) {
+          const view = presentSeyeonMemoryGrantStatusV1(
+            result.grantState, withdrawalPending,
+          );
+          status.textContent = uiText(view.message);
+          revoke.hidden = !view.revokeAvailable;
+        }
+        return result;
+      }
       check.addEventListener('click', async () => {
+        if (requestInFlight) return;
+        requestInFlight = true;
         check.disabled = true;
+        revoke.hidden = true;
         status.textContent = uiText('현재 권한 확인 중…');
         try {
-          const result = await createRecordsRuntimeClient().readSeyeonMemoryGrantStatus(memory.memoryItemId);
-          if (item.isConnected) {
-            status.textContent = uiText(result.currentlyGranted
-              ? '현재 세연의 접근이 허용되어 있습니다.'
-              : '현재 세연의 접근 권한이 없습니다.');
-          }
+          await refreshGrant();
         } catch {
           if (item.isConnected) status.textContent = uiText('현재 접근권한을 확인할 수 없습니다.');
         } finally {
           check.disabled = false;
+          requestInFlight = false;
         }
       });
-      item.append(check, status);
+      revoke.addEventListener('click', async () => {
+        if (requestInFlight || withdrawalPending || lastGrantState !== 'active') return;
+        if (!window.confirm(uiText('세연의 이 기억 접근권한을 철회하시겠습니까?'))) return;
+        requestInFlight = true;
+        check.disabled = true;
+        revoke.disabled = true;
+        revoke.hidden = true;
+        status.textContent = uiText('철회 요청을 처리하는 중입니다…');
+        try {
+          const acknowledgement = await revokeClient.revokeSeyeonMemoryGrant(memory.memoryItemId);
+          // HTTP 202 is not a completed revoke: the G3 delivery-receipt
+          // barrier blocks new use while the original Grant remains pending.
+          if (acknowledgement.status === 'pending') withdrawalPending = true;
+          const current = await refreshGrant();
+          if (item.isConnected && acknowledgement.status === 'committed') {
+            // Neither legacy RLS-filtered false nor a missing lifecycle
+            // authority proves that the withdrawal finished.
+            status.textContent = uiText(current.grantState === 'not_granted'
+              ? '철회가 완료되었으며 현재 세연의 접근 권한이 없습니다.'
+              : '철회 완료 응답과 현재 권한 조회가 일치하지 않거나 판정할 수 없습니다.');
+          }
+        } catch {
+          // A lost 200/202 or failed current-state GET never proves COMMIT.
+          // If a verified 202 arrived, keep its new-use-blocked state.
+          try {
+            const current = await refreshGrant();
+            if (item.isConnected && current.grantState === 'unknown') {
+              status.textContent = uiText('현재 기억 사용 권한과 철회 완료 여부를 확인할 수 없습니다.');
+            }
+          } catch {
+            if (item.isConnected) {
+              status.textContent = uiText(withdrawalPending
+                ? '새로운 기억 사용 차단 요청은 접수됐지만 현재 철회 완료 여부를 확인할 수 없습니다.'
+                : '철회 결과를 확인할 수 없습니다. 현재 접근권한을 다시 확인해 주세요.');
+            }
+          }
+        } finally {
+          check.disabled = false;
+          revoke.disabled = false;
+          requestInFlight = false;
+        }
+      });
+      item.append(check, revoke, status);
     }
     target.append(item);
   }

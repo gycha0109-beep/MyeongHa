@@ -157,12 +157,21 @@ if (onSection.includes('push:')) {
   const freshBackupApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-40780751650-20261029.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved) {
-    throw new Error('Restore one-shot push must have exactly the four reviewed historical/current source markers.');
+  const providerRowsApproved = onSection.includes(
+    "'.github/ops/postgres-restore-provider-rows-40780751650-20261029.once'",
+  );
+  const providerRowsRetryApproved = onSection.includes(
+    "'.github/ops/postgres-restore-provider-rows-retry-40780751650-20261029.once'",
+  );
+  const latestMigrationRestoreApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-40812111605-20261029.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved) {
+    throw new Error('Restore one-shot push must have exactly the seven reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 4) {
-    throw new Error('Restore one-shot push allows exactly four pinned marker paths.');
+  if (triggerMarkers.length !== 7) {
+    throw new Error('Restore one-shot push allows exactly seven pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -184,6 +193,19 @@ if (onSection.includes('push:')) {
     'POSTGRES-RESTORE-BACKUP-40780751650-20261029-V1',
     'backup_run_id=40780751650',
     'incident_reference_utc=2026-10-28T22:37:00Z',
+    'ops(dr): one-shot provider row inventory 40780751650',
+    'POSTGRES-RESTORE-PROVIDER-ROWS-40780751650-20261029-V1',
+    'incident_reference_utc=2026-10-29T02:18:00Z',
+    'SCOPED_RESTORE_ROW_INVENTORY_ONLY',
+    'ops(dr): one-shot provider row inventory retry 40780751650',
+    'POSTGRES-RESTORE-PROVIDER-ROWS-RETRY-40780751650-20261029-V1',
+    'incident_reference_utc=2026-10-29T03:05:00Z',
+    'SCOPED_RESTORE_PROVIDER_ROW_RETRY_ONLY',
+    'ops(dr): one-shot restore backup 40812111605',
+    'POSTGRES-RESTORE-BACKUP-40812111605-20261029-V1',
+    'backup_run_id=40812111605',
+    'expected_artifact_id=12871016812',
+    'incident_reference_utc=2026-10-29T03:35:00Z',
     'now - point <= 86400',
     'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
@@ -219,7 +241,12 @@ for (const fragment of [
   '.head_branch == "main"',
   '(.event == "schedule" or .event == "workflow_dispatch" or .event == "push")',
   "if [[ \"$run_event\" == 'push' ]]",
-  '.github/ops/postgres-backup-frontier-1310.once?ref=$source_sha',
+  '$marker_path?ref=$source_sha',
+  'postgres-backup-frontier-1310.once',
+  'POSTGRES-BACKUP-FRONTIER-1310-V1',
+  'postgres-backup-migration-20261029012948-20261029.once',
+  'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1',
+  'Gate one-shot deployed migration 20261029012948 backup marker',
   '.github/workflows/production-postgres-backup.yml?ref=$source_sha',
   'POSTGRES-BACKUP-FRONTIER-1310-V1',
   'Gate one-shot frontier-1310 backup marker',
@@ -227,6 +254,8 @@ for (const fragment of [
   '.expired == false',
   '^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$',
   'echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"',
+  'EXPECTED_BACKUP_ARTIFACT_ID',
+  '[[ "$artifact_id" == "$EXPECTED_BACKUP_ARTIFACT_ID" ]]',
   'echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"',
 ]) {
   requireFragment(sourceResolver, fragment, sourceResolverPath);
@@ -246,6 +275,10 @@ for (const fragment of [
   'roles.portable.sql',
   'target-copy-catalog.json',
   'node scripts/build-postgres-portable-data-replay.mjs',
+  'provider_rows_skipped_in_loopback',
+  'provider_rows_with_projected_columns_in_loopback',
+  'provider_rows_replayed_in_loopback',
+  'provider_source_counts_include_payloads: false',
   'auth.users',
   'prepare-postgres-isolated-restore-function-defaults.sql',
   'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',

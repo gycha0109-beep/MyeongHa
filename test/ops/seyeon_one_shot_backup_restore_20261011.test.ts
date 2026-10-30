@@ -6,6 +6,23 @@ const resolver = readFileSync('scripts/operations/resolve-postgres-restore-sourc
 const producer = readFileSync('.github/workflows/production-postgres-backup.yml','utf8');
 
 describe('single-use verified Production backup isolated restore', () => {
+  it('only admits new encrypted backup after observed remote migration 20261029012948', () => {
+    const marker = readFileSync(
+      '.github/ops/postgres-backup-migration-20261029012948-20261029.once', 'utf8',
+    );
+    expect(marker.trim()).toBe('POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1');
+    expect(producer).toContain('.github/ops/postgres-backup-migration-20261029012948-20261029.once');
+    expect(producer).toContain('Gate one-shot deployed migration 20261029012948 backup marker');
+    expect(producer).toContain('ops(dr): one-shot backup migration 20261029012948');
+    expect(producer).toContain('now - point <= 86400');
+    expect(producer).toContain('OBSERVED_MIGRATION_FRONTIER');
+    expect(producer).toContain("[[ \"$OBSERVED_MIGRATION_FRONTIER\" == '20261029012948' ]]");
+    expect(producer).toContain('Guard one-shot backup actual deployed migration frontier');
+    expect(resolver).toContain('POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1');
+    expect(resolver).toContain('POSTGRES-BACKUP-FRONTIER-1310-V1');
+    expect(resolver).toContain('$marker_path?ref=$source_sha');
+  });
+
   it('pins one source, requires an exact reviewed push title and self-expires', () => {
     expect(yaml).toContain("startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661')");
     expect(yaml).toContain("backup_run_id=38088591661");

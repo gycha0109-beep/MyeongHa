@@ -51,8 +51,12 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('getOrCreatePendingTurn(message)');
     expect(runtime).toContain('clientTurnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("authoritativeCharacterId !== 'seyeon'");
-    expect(runtime).toContain('const rereadSucceeded = await loadRoomState()');
-    expect(runtime).toContain('clearPendingTurn(pendingTurn.clientTurnId)');
+    const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'), runtime.indexOf('function submitTurn(event)'));
+    expect(send).not.toContain('await loadRoomState()');
+    expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
+    expect(send).toContain('renderAcknowledgedSeyeonFirstReply(acknowledgedReply)');
+    expect(send).toContain('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)');
+    expect(send).toContain('threadId !== submittedThreadId');
     expect(runtime).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
     expect(runtime).toContain("error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE'");
     expect(runtime).toContain("error.code === 'CREDIT_AUTHORITY_UNAVAILABLE'");

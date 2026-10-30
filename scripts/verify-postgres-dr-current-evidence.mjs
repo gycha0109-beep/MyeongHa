@@ -4,100 +4,109 @@ import { readFile } from 'node:fs/promises';
 import { validateDrCurrentEvidence } from './validate-postgres-dr-current-evidence.mjs';
 
 const status = await readFile('docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md', 'utf8');
-const frontier = 20261028110500;
+const frontier = 20261029012000;
 const result = validateDrCurrentEvidence(status, frontier);
-assert.equal(result.restoreRunId, 40655447574);
-assert.equal(result.restoredBackupMigration, 20261027043527);
-assert.equal(result.observedLiveMigrationAsOf20261028, 20261028011357);
-assert.equal(result.documentedRepositoryMigrationAsOf20261028, frontier);
-assert.equal(result.restoredBackupCoversObservedLive, false);
+assert.equal(result.latestEvidenceDate, '2026-10-29');
+assert.equal(result.restoreRunId, 40817391430);
+assert.equal(result.backupRunId, 40812111605);
+assert.equal(result.restoreArtifactId, 12872589146);
+assert.equal(result.restoredBackupMigration, 20261029012948);
+assert.equal(result.observedLiveMigrationVersion, 20261029012948);
+assert.equal(result.documentedRepositoryMigrationVersion, frontier);
+assert.equal(result.restoredBackupMatchesObservedMigrationVersion, true);
+assert.equal(result.fullSchemaCatalogEquivalenceProven, false);
+assert.equal(result.authoritativePrivacyReplayForCurrentRestoreProven, false);
+assert.equal(result.syntheticPrivacyReplayProven, true);
+assert.equal(result.serviceResumptionAllowed, false);
+assert.equal(result.servingGate, 'BLOCKED');
 assert.equal(result.providerManagedDataFullRestore, false);
 assert.equal(result.futureSafePrivacyReconciliation, false);
 assert.equal(result.drReady, false);
-assert.equal(result.admission, 'BLOCKED_STALE_SCHEMA_AND_HOSTED_PRIVACY_GAPS');
 
-// The old "1310" field is historical, and modifying it must never change
-// which Production observation defines the current bounded DR contract.
-const historicalTrap = status.replace(
-  'production_schema_latest_deployed_migration: 1310',
-  'production_schema_latest_deployed_migration: 99999999999999',
+// Prior real bounded privacy proof remains historical, and must not be used
+// as if this later synthetic-only restore had replayed those Production events.
+const oldProofTampered = status.replace(
+  'verified_bounded_privacy_replay: PASS',
+  'verified_bounded_privacy_replay: HISTORICAL_BUT_NOT_THIS_RUN',
 );
 assert.equal(
-  validateDrCurrentEvidence(historicalTrap, frontier).observedLiveMigrationAsOf20261028,
-  20261028011357,
+  validateDrCurrentEvidence(oldProofTampered, frontier)
+    .authoritativePrivacyReplayForCurrentRestoreProven,
+  false,
+);
+assert.equal(
+  validateDrCurrentEvidence(status.replace(
+    'production_schema_latest_deployed_migration: 1310',
+    'production_schema_latest_deployed_migration: 99999999999999',
+  ), frontier).observedLiveMigrationVersion,
+  20261029012948,
 );
 
 function mutate(oldText, newText, error) {
-  assert.ok(status.includes(oldText));
+  assert.ok(status.includes(oldText), 'test fixture missing: ' + oldText);
   assert.throws(
     () => validateDrCurrentEvidence(status.replace(oldText, newText), frontier),
     error,
   );
 }
+for (const field of [
+  'dr_ready',
+  'provider_managed_data_full_restore',
+  'future_safe_privacy_reconciliation',
+  'verified_full_schema_catalog_equivalence',
+]) {
+  mutate(field + ': false', field + ': true', new RegExp('latest evidence ' + field, 'u'));
+}
 mutate(
-  'verified_restore_covers_live_frontier: false',
-  'verified_restore_covers_live_frontier: true',
-  /latest evidence verified_restore_covers_live_frontier/u,
-);
-mutate('dr_ready: false', 'dr_ready: true', /latest evidence dr_ready/u);
-mutate(
-  'provider_managed_data_full_restore: false',
-  'provider_managed_data_full_restore: true',
-  /latest evidence provider_managed_data_full_restore/u,
-);
-mutate(
-  'future_safe_privacy_reconciliation: false',
-  'future_safe_privacy_reconciliation: true',
-  /latest evidence future_safe_privacy_reconciliation/u,
+  'verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger',
+  'verified_isolated_restore_authoritative_privacy: production_nonzero_captured_window_replay_proven',
+  /latest evidence verified_isolated_restore_authoritative_privacy/u,
 );
 mutate(
-  'verified_bounded_privacy_replay: PASS',
-  'verified_bounded_privacy_replay: FAIL',
-  /latest evidence verified_bounded_privacy_replay/u,
+  'verified_isolated_restore_serving_gate: BLOCKED',
+  'verified_isolated_restore_serving_gate: OPEN',
+  /latest evidence verified_isolated_restore_serving_gate/u,
 );
 mutate(
-  'verified_bounded_privacy_replay_events: 1',
-  'verified_bounded_privacy_replay_events: 0',
-  /bounded replay must have independently recorded nonzero/u,
+  'verified_isolated_restore_backup_migration: 20261029012948',
+  'verified_isolated_restore_backup_migration: 20261027043527',
+  /restored backup migration does not match/u,
 );
 mutate(
-  'verified_bounded_restore_backup_migration: 20261027043527',
-  'verified_bounded_restore_backup_migration: 20261028011357',
-  /no longer describes the older-than-observed backup/u,
-);
-mutate(
-  'verified_bounded_restore_result: SUCCESS',
-  'verified_bounded_restore_result: SUCCESS\nverified_bounded_restore_result: SUCCESS',
+  'verified_isolated_restore_result: SUCCESS',
+  'verified_isolated_restore_result: SUCCESS\nverified_isolated_restore_result: SUCCESS',
   /duplicate latest evidence key/u,
 );
 mutate(
-  'verified_bounded_restore_artifact_sha256: 59ea25bf3d29b7a06e9f26bd1616c41c10f651ee11da56a0d7342717b6b5ab6d',
-  'verified_bounded_restore_artifact_sha256: fake',
-  /restore artifact SHA-256/u,
+  'verified_isolated_restore_artifact_sha256: 38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb',
+  'verified_isolated_restore_artifact_sha256: fake',
+  /verified_isolated_restore_artifact_sha256 has invalid fingerprint/u,
+);
+mutate(
+  'verified_isolated_restore_artifact_expires_at: 2026-11-28T04:23:26Z',
+  'verified_isolated_restore_artifact_expires_at: 2026-10-29T00:00:00Z',
+  /restore artifact expiration must follow/u,
 );
 assert.throws(
   () => validateDrCurrentEvidence(status, frontier - 1),
-  /repository is behind the recorded migration/u,
+  /repository is behind the recorded migration filename frontier/u,
 );
 assert.throws(
   () => validateDrCurrentEvidence(status, frontier + 1, 'push'),
-  /repository migrations advanced beyond the dated evidence/u,
+  /repository migration advance is not covered/u,
 );
-const candidate = validateDrCurrentEvidence(status, frontier + 1, 'pull_request');
-assert.equal(candidate.repositoryCandidateBeyondObservation, true);
-assert.equal(candidate.restoredBackupCoversObservedLive, false);
-assert.equal(candidate.drReady, false);
+const prCandidate = validateDrCurrentEvidence(status, frontier + 1, 'pull_request');
+assert.equal(prCandidate.repositoryCandidateBeyondObservation, true);
+assert.equal(prCandidate.drReady, false);
 assert.throws(
   () => validateDrCurrentEvidence(status.replace(
-    '## 2026-10-28 verified restore status (latest observation)',
-    '## Old historical evidence',
+    '## 2026-10-29 verified restore status (latest observation)',
+    '## 2026-10-29 old snapshot',
   ), frontier),
   /exactly one latest dated verified restore/u,
 );
-// Exercise the complete legacy DR contract with the new latest-evidence
-// validator as part of PR governance, not only its pure parsing unit tests.
 execFileSync('node', ['scripts/verify-postgres-dr-readiness-authority.mjs'], {
   stdio: 'inherit',
   env: { ...process.env, GITHUB_EVENT_NAME: 'pull_request' },
 });
-console.log('PostgreSQL DR current evidence PASS: latest dated bounded proof is distinct from historical frontier 1310 and cannot authorize serving.');
+console.log('PostgreSQL DR current evidence PASS: backup 40812111605 restored on PG17 in run 40817391430; Provider rows are partially omitted, privacy synthetic-only, Hosted/DR serving remains BLOCKED.');
