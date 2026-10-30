@@ -24,8 +24,9 @@ describe('Records Saju history surface', () => {
     expect(html).toContain('aria-labelledby="life-records-tab" hidden');
     expect(html).toContain('완료되어 저장된 사주 풀이 이력을 삶의 사실과 분리해 확인합니다.');
     expect(html).toContain('>현세록<');
-    expect(html).toContain('>명식록<');
-    expect(html).toContain('>대리가 기억<');
+    expect(html).not.toContain('aria-controls="birth-records"');
+    expect(html).not.toContain('aria-controls="memory-records"');
+    expect(html).not.toContain('명식록 추가');
   });
 
   it('supports keyboard Home and End for the report-first tablist without breaking arrow navigation', () => {
@@ -44,11 +45,11 @@ describe('Records Saju history surface', () => {
     expect(client).toContain('readReadings: () => readStable(async (bearer) =>');
     expect(client).toContain("await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings')");
     expect(client).toContain('if (seenCursors.has(nextCursor))');
-    expect(client).toContain('const [lifeResult, readingResult, memoryResult, birthResult] = await Promise.allSettled([');
+    expect(client).toContain('const [lifeResult, readingResult] = await Promise.allSettled([');
     expect(client).toContain("result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED'");
     expect(client).toContain("const unavailable = Object.freeze({ status: 'unavailable' });");
     expect(client).toContain('projectReadingHistory(readingResult.value)');
-    expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings, memories, birth });');
+    expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings });');
   });
 
   it('renders persisted Reading history before any development-only sample fallback', () => {
@@ -74,7 +75,7 @@ describe('Records Saju history surface', () => {
     expect(page).toContain('displayedRecords = null;');
     expect(page).toContain('displayedRecordsOwner = null;');
     expect(page).toContain("byId('records-content').hidden = true;");
-    expect(page).toContain("'saju-records-list', 'memory-records-list',");
+    expect(page).toContain("'saju-records-list', 'saju-records-count',");
     expect(page).toContain('byId(id).replaceChildren();');
     expect(page).toContain('window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, onRecordsAuthChanged);');
     expect(page).toContain("window.addEventListener('pageshow', onRecordsAuthChanged);");

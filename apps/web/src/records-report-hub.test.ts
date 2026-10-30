@@ -11,17 +11,19 @@ describe('Records official-report-first entry', () => {
   const jsx = readWeb('src/records/RecordsPage.tsx');
   const page = readWeb('records-page.js');
 
-  it('opens the authoritative Reading History by default without removing other record domains', () => {
+  it('opens the authoritative Reading History by default alongside the Life Fact ledger', () => {
     expect(jsx).toContain('aria-selected="true" aria-controls="saju-records"');
     expect(jsx).toContain('id="saju-records" className="records-tab-panel records-report-home" role="tabpanel" aria-labelledby="saju-records-tab">');
-    for (const domain of ['life', 'birth', 'memory']) {
+    for (const domain of ['life']) {
       expect(jsx).toContain(`aria-controls="${domain}-records"`);
       expect(jsx).toContain(`id="${domain}-records"`);
     }
     expect(page).toContain("requestedTab === 'saju'");
     expect(page).toContain("life: 'life-records-tab'");
-    expect(page).toContain("birth: 'birth-records-tab'");
-    expect(page).toContain("memory: 'memory-records-tab'");
+    expect(jsx).not.toContain('birth-records-tab');
+    expect(jsx).not.toContain('memory-records-tab');
+    expect(page).not.toContain('birth-records-tab');
+    expect(page).not.toContain('memory-records-tab');
     expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink'");
   });
 
