@@ -21,6 +21,7 @@ function fixture(options: {
   throwProof?: boolean;
   revokeBetweenReads?: boolean;
   shared?: boolean;
+  reviewRevoked?: boolean;
 } = {}) {
   let proofReads = 0;
   const query = vi.fn(async (sql: string, params: readonly unknown[]) => {
@@ -30,6 +31,7 @@ function fixture(options: {
       if (options.throwProof) throw new Error('missing authority');
       return { rows: [{
         currentlyVerified: options.approved !== false &&
+          options.reviewRevoked !== true &&
           (!options.revokeBetweenReads || proofReads === 1),
       }] };
     }
@@ -73,6 +75,12 @@ describe('C09 private original authority: proof must be current and non-shareabl
       A, SOURCE, 'fixture:optin:A', null, null,
     ]);
     expect(query).toHaveBeenCalledTimes(6);
+    expect(POSTGRES_SEYEON_C09_PRIVATE_SOURCE_CURRENT_PROOF_SQL_V1)
+      .toContain('character_learning_original_reviews_v1');
+    expect(POSTGRES_SEYEON_C09_PRIVATE_SOURCE_CURRENT_PROOF_SQL_V1)
+      .toContain("review.state='approved'");
+    expect(POSTGRES_SEYEON_C09_PRIVATE_SOURCE_CURRENT_PROOF_SQL_V1)
+      .toContain('review.revoked_at is null');
   });
 
   it('refuses missing proof, permission failure, revoked proof and shared scope', async () => {
@@ -80,6 +88,7 @@ describe('C09 private original authority: proof must be current and non-shareabl
       { approved: false },
       { throwProof: true },
       { revokeBetweenReads: true },
+      { reviewRevoked: true },
       { shared: true },
     ]) {
       const f = fixture(options);

@@ -62,3 +62,10 @@
 - Synthetic real PostgreSQL 17: `C09_ORIGINAL_REVIEW_ISOLATED_PG17_PASS` from the committed bootstrap/assert fixtures, verifying RLS/FORCE RLS, subject separation, role ACL and review revocation. Focused API/Command tests: 73 PASS; build TypeScript check PASS.
 - **Not deployed**: the reviewed-original table does not exist in production. Neither the reviewer issuance identity nor a trusted reviewed-content approval workflow has been implemented; any stored synthetic review belongs to disposable isolation only. Receipt/audit Proposal and its privileged mutation/row-locking authority are also not deployed. Further review-revocation rechecks during later Source/Evidence reads and concurrency-safe writer admission remain required before live activation.
 - Production schema and privileges, chat HTTP mount, consent UI and durable/private/shared learning remain unchanged in this commit. Safe next implementation: approved server review issuance, separate authenticated opt-in/write role, source revalidation under concurrent redaction/revocation, and user-visible consent path.
+
+
+## 2026-10-30 independent-review revocation readback
+
+- The C09 private Source publication reader now requires BOTH the existing current original+member-opt-in Source proof and a still-approved, non-revoked independent original review at every readback, before and after Source approval retrieval.
+- The review proof is joined on canonical Member Subject, original message UUID, original hash, Character, Topic and awareness. A revoked/missing review fails closed and cannot sustain a private Source issue plan. No character-shared access is granted.
+- Relevant tests: 76 PASS; TypeScript build check PASS. This is a readback guarantee only: the future writer must still serialize approval, review revocation, original redaction and publication using governed row locks in the same transaction. The review registry, private receipt and source capture proposals are not deployed.

@@ -19,8 +19,29 @@ export class PostgresSeyeonC09PrivateSourceProofHoldV1 extends Error {
 }
 
 export const POSTGRES_SEYEON_C09_PRIVATE_SOURCE_CURRENT_PROOF_SQL_V1 = [
-  'select myeongha_internal.c09_verify_private_source_current_shadow_v1(',
-  ' $1::uuid,$2::text',
+  'select (myeongha_internal.c09_verify_private_source_current_shadow_v1(',
+  ' $1::uuid,$2::text)',
+  ' and exists (',
+  '  select 1',
+  '  from myeongha_internal.character_learning_source_approvals_v1 source',
+  '  join myeongha_internal.character_learning_private_optin_receipts_v1 action',
+  '    on action.action_ref=source.approval_ref',
+  '   and action.subject_id=source.owner_subject_id',
+  '  join myeongha_internal.character_learning_original_reviews_v1 review',
+  '    on review.owner_subject_id=source.owner_subject_id',
+  '   and review.original_message_id=action.original_message_id',
+  '   and review.original_content_hash=action.original_content_hash',
+  '   and review.character_id=source.character_id',
+  '   and review.topic_key=source.topic_key',
+  '   and review.awareness=source.awareness',
+  '  where source.owner_subject_id=$1::uuid and source.source_ref=$2::text',
+  "   and source.visibility='user_private'",
+  "   and source.source_kind='user_taught_verified'",
+  "   and review.state='approved'",
+  '   and review.revoked_at is null',
+  '   and review.reviewed_at<=clock_timestamp()',
+  '   and review.valid_at<=clock_timestamp()',
+  ' )',
   ') as "currentlyVerified"',
 ].join('\n');
 
