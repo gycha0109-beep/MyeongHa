@@ -5,6 +5,7 @@ import {
   handleSeyeonPlannerMemoryDecisionRequestV1,
   type HandleSeyeonPlannerMemoryDecisionInputV1,
 } from './seyeon-planner-memory-decision-http-v1.js';
+import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from './seyeon-planner-memory-decision-commit-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -56,9 +57,7 @@ export function createProductionSeyeonPlannerMemoryDecisionRuntimeV1(
         ...(input.loadVerifiedPlannerSource===undefined?{}:{
           loadVerifiedPlannerSource:input.loadVerifiedPlannerSource,
         }),
-        ...(input.commitDecision===undefined?{}:{
-          commitDecision:input.commitDecision,
-        }),
+        commitDecision:input.commitDecision ?? commitSeyeonSingleCharacterPlannerGrantDecisionV1,
       });
     },
     close(){return lease.close();},
