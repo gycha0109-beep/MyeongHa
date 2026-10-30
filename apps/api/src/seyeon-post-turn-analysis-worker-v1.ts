@@ -117,6 +117,17 @@ export interface SeyeonPostTurnAnalysisOutboxPortV1 {
     subjectId: string;
     outboxEventId: string;
   }>): Awaitable<'off_cleanup' | 'hold'>;
+  /** Owner-owned single DB transaction: no old message body crosses to Node. */
+  completeOffWithoutText?(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+    lockOwner: string;
+    leaseExpiresAt: string;
+  }>): Awaitable<Readonly<{
+    outboxEventId: string;
+    processedAt: string;
+    reclaimed: boolean;
+  }>>;
   findByTurn(input: Readonly<{
     subjectId: string;
     turnId: string;
@@ -703,9 +714,39 @@ export async function processSeyeonPostTurnAnalysisV1(
     } catch {
       admission = 'hold';
     }
-    if (admission !== 'off_cleanup') {
+    if (admission !== 'off_cleanup' ||
+        input.outboxPort.completeOffWithoutText === undefined) {
       throw new SeyeonPostTurnSourceAuthorityHoldV1();
     }
+
+    // OFF has no extraction or relationship write. Recheck admissibility and
+    // claim+complete under ONE DB Owner row lock without selecting userText,
+    // assistantText, snapshots or private event material into the Worker.
+    let done: Awaited<ReturnType<NonNullable<
+      SeyeonPostTurnAnalysisOutboxPortV1['completeOffWithoutText']
+    >>>;
+    try {
+      done = await input.outboxPort.completeOffWithoutText({
+        subjectId: input.subjectId,
+        outboxEventId: input.outboxEventId,
+        lockOwner: input.lockOwner,
+        leaseExpiresAt: input.leaseExpiresAt,
+      });
+    } catch {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+    if (done.outboxEventId !== input.outboxEventId ||
+        !Number.isFinite(Date.parse(done.processedAt)) ||
+        typeof done.reclaimed !== 'boolean') {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+    return Object.freeze({
+      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
+      decision: 'disabled' as const,
+      outboxEventId: done.outboxEventId,
+      reclaimed: done.reclaimed,
+      processedAt: done.processedAt,
+    });
   }
   const claimed = one(
     await input.outboxPort.claim({
@@ -730,12 +771,6 @@ export async function processSeyeonPostTurnAnalysisV1(
     throw new SeyeonPostTurnAnalysisErrorV1(
       'Committed Chat material does not match the post-turn analysis snapshot.',
     );
-  }
-
-  if (input.enforceCurrentSourceAuthority === true) {
-    // Snapshot hashes show integrity, not current original Grant/Record rights.
-    // No G3 Owner-backed authorization exists for positive or derived sources.
-    assertSeyeonPostTurnSourceAuthorityV1(snapshot.mode, claimed.checkpointJsonb);
   }
 
   if (claimed.checkpointJsonb !== null) {

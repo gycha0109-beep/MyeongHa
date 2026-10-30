@@ -36,4 +36,24 @@ describe('Production post-turn source authority', () => {
     })).rejects.toBeInstanceOf(SeyeonPostTurnSourceAuthorityHoldV1);
     expect(claimCalls).toBe(0);
   });
+
+  it('finishes OFF through the owner receipt without claiming or reading message text', async () => {
+    let claims=0;
+    const result=await processSeyeonPostTurnAnalysisV1({
+      subjectId:'subject',outboxEventId:'outbox',
+      lockOwner:'worker',leaseExpiresAt:'2026-10-30T00:01:00Z',
+      outboxPort:{
+        preflightClaim:async()=> 'off_cleanup',
+        completeOffWithoutText:async()=>({
+          outboxEventId:'outbox',processedAt:'2026-10-30T00:00:00Z',
+          reclaimed:false,
+        }),
+        claim:async()=>{claims++;throw Error('private text must stay in DB');},
+      } as never,
+      extractorProvider:{} as never,
+      enforceCurrentSourceAuthority:true,
+    });
+    expect(result.decision).toBe('disabled');
+    expect(claims).toBe(0);
+  });
 });
