@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createOpenAiSeyeonStructuredProviderV1 } from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
+import { readFileSync } from 'node:fs';
 import {
   resolveProductionSeyeonProviderConfigAtRequestV1,
   resolveProductionSeyeonRoleProviderConfigsV1,
@@ -7,6 +8,15 @@ import {
 } from '../apps/api/src/production-seyeon-turn-send-runtime-v1.js';
 
 describe('Production Seyeon provider routing', () => {
+  it('routes the default spoken reply through OpenRouter GLM instead of a native OpenAI renderer', () => {
+    expect(SEYEON_PRODUCTION_PROVIDER_ROUTING_V1.responseModel).toBe('z-ai/glm-5.3-flash');
+    const send = readFileSync(new URL('../apps/api/src/production-seyeon-turn-send-runtime-v1.ts', import.meta.url), 'utf8');
+    const runtime = readFileSync(new URL('../apps/api/src/production-seyeon-chat-runtime-v1.ts', import.meta.url), 'utf8');
+    expect(send).toContain("glmRendererConfig: { apiKey: optionalEnv(input.env, 'OPENROUTER_API_KEY') ?? '' }");
+    expect(runtime).toContain('createSeyeonGlmRendererV1({');
+    expect(runtime).toContain("if (role === 'renderer' && input.glmRendererConfig !== undefined)");
+  });
+
   it('uses the server-owned direct OpenAI key and model', async () => {
     await expect(resolveProductionSeyeonProviderConfigAtRequestV1({
       OPENAI_API_KEY: 'sk-test-direct-key-1234567890',

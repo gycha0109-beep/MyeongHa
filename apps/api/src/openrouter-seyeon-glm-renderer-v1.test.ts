@@ -1,0 +1,103 @@
+import { describe, it, expect, vi } from 'vitest';
+import {
+  createSeyeonGlmRendererV1,
+  SEYEON_GLM_RENDERER_MODEL_V1,
+  SEYEON_GLM_RENDERER_ENDPOINT_V1,
+} from './openrouter-seyeon-glm-renderer-v1.js';
+
+const key = 'sk-or-test-this-is-a-synthetic-key';
+const req = {
+  contractVersion: 'seyeon-structured-provider-v2' as const,
+  purpose: 'dialogue_render' as const,
+  instructions: 'You are Se-yeon. Speak naturally in Korean.',
+  input: { recentConversation: [{ role: 'user', text: '안녕, 세연!' }] },
+  responseSchema: {
+    type: 'object', additionalProperties: false,
+    properties: { utterance: { type: 'string' } },
+    required: ['utterance'],
+  },
+};
+
+const mockResponse = (value: unknown): Response =>
+  new Response(JSON.stringify(value), {status: 200,
+    headers: {'content-type': 'application/json'}});
+
+describe('active Se-yeon GLM renderer transport', () => {
+  it('uses GLM-5.3-Flash on OpenRouter for dialogue_render, without native OpenAI fallback', async () => {
+    const calls: {url: string; body: any; key: string}[] = [];
+    const beforeDispatch = vi.fn(async () => {});
+    const afterOutcome = vi.fn(async () => {});
+    const provider = createSeyeonGlmRendererV1({
+      apiKey: key, beforeDispatch, afterOutcome,
+      fetchImpl: async (url, init) => {
+        calls.push({
+          url: String(url), body: JSON.parse(String(init?.body)),
+          key: new Headers(init?.headers).get('Authorization') ?? '',
+        });
+        return mockResponse({
+          model: SEYEON_GLM_RENDERER_MODEL_V1,
+          choices: [{finish_reason: 'stop', message: {
+            role: 'assistant', content: JSON.stringify({utterance: '어, 왔어?'})}}],
+          usage: {prompt_tokens: 220, completion_tokens: 35},
+        });
+      },
+    });
+    expect(await provider.generate(req)).toEqual({utterance: '어, 왔어?'});
+    expect(provider.modelKey).toBe('z-ai/glm-5.3-flash');
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe(SEYEON_GLM_RENDERER_ENDPOINT_V1);
+    expect(calls[0].body.model).toBe(SEYEON_GLM_RENDERER_MODEL_V1);
+    expect(calls[0].body.response_format.type).toBe('json_schema');
+    expect(calls[0].body.messages[1].content).toContain('안녕, 세연!');
+    expect(calls[0].key).toBe('Bearer ' + key);
+    expect(beforeDispatch).toHaveBeenCalledOnce();
+    expect(afterOutcome).toHaveBeenCalledOnce();
+    expect(afterOutcome.mock.calls[0]?.[0]).toMatchObject({
+      purpose: 'dialogue_render', providerKey: 'openrouter-chat',
+      modelKey: 'z-ai/glm-5.3-flash', outcome: 'response_received',
+      inputTokens: 220, outputTokens: 35,
+    });
+  });
+
+  it('never dispatches if the cost ledger start rejects', async () => {
+    const fetchImpl = vi.fn(async () => mockResponse({}));
+    const provider = createSeyeonGlmRendererV1({
+      apiKey: key,
+      beforeDispatch: async () => {throw Error('ledger unavailable');},
+      fetchImpl,
+    });
+    await expect(provider.generate(req)).rejects.toThrow('ledger unavailable');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('rejects wrong purpose and absent credentials', async () => {
+    expect(() => createSeyeonGlmRendererV1({apiKey: ''})).toThrow();
+    const fetchImpl = vi.fn(async () => mockResponse({}));
+    const provider = createSeyeonGlmRendererV1({apiKey: key, fetchImpl});
+    await expect(provider.generate({...req, purpose: 'turn_interpretation'} as any))
+      .rejects.toThrow();
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it('refuses malformed, incomplete or non-JSON model results', async () => {
+    for (const payload of [
+      {choices:[{finish_reason:'length',message:{role:'assistant',content:'{}'}}]},
+      {choices:[{finish_reason:'stop',message:{role:'assistant',content:'not-json'}}]},
+      {choices:[]},
+    ]) {
+      const provider = createSeyeonGlmRendererV1({
+        apiKey:key, fetchImpl: async () => mockResponse(payload),
+      });
+      await expect(provider.generate(req)).rejects.toThrow();
+    }
+  });
+
+  it('does not retry or silently fall back to OpenAI after a provider failure', async () => {
+    const fetchImpl = vi.fn(async () => new Response('unavailable',{status:503}));
+    const afterOutcome = vi.fn(async () => {});
+    const provider = createSeyeonGlmRendererV1({apiKey:key,fetchImpl,afterOutcome});
+    await expect(provider.generate(req)).rejects.toThrow();
+    expect(fetchImpl).toHaveBeenCalledOnce();
+    expect(afterOutcome.mock.calls[0]?.[0]).toMatchObject({outcome:'http_failure',httpStatus:503});
+  });
+});
