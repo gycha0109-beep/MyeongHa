@@ -54,3 +54,16 @@ DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실
 `09-owned-original-memory-grant.sql`은 **기존에 승인·등록된** `conversation_recall/v1` 기억 1건에 대해 별도의 회원 선택 `character_only:seyeon`을 DB Owner가 검증해 새 Grant 1건을 원자적으로 발행하는 제한형 명령입니다. DB 원장에 있는 `accepted` 제안, 원본 Turn·Message, 내용 일치·미철회 상태, 현재 권한 및 쓰기 허용 레지스트리를 재확인합니다. 단순 개인 보관 승인으로 세연 공유가 암묵적으로 생성되지 않으며 기존 철회 대기 Grant도 다시 사용할 수 없습니다.
 
 이 SQL은 현재 `plan.mjs`의 **격리 설치 목록에만** 추가됩니다. API 역할에는 `EXECUTE`를 부여하지 않고, 공개 HTTP route·모델 호출·운영 원본 사용을 활성화하지 않습니다. 배포 대상 운영 DB나 자동 migration으로 적용하지 않습니다. 실제 회원의 명시적 선택을 전달하는 정식 소비자·SRC-25 출처 및 DB 승인·복구 근거가 준비되기 전에는 운영에 설치하지 않습니다.
+
+## 2026-10-30 — 원본 사용자 메시지에서 제한형 비공개 Proposal 생성
+
+`10-original-user-message-proposal.sql`은 기존 S0 타입 `conversation_recall/v1`의 **제안 생성** 경계입니다. 회원이 원래 세연 단독 대화의 특정 사용자 메시지를 저장 후보로 명시적으로 선택하면, DB Owner가 기존 확정 Turn과 미삭제 사용자 Message를 잠그고 **원문 `body_text`를 변경 없이** 기존 `{ "summary": "..." }` codec에 넣어 `pending` Proposal을 생성합니다. 모델 요약, 임의 개인정보 판단, 클라이언트 내용/스키마 입력 및 승인 없는 보정은 허용하지 않습니다.
+
+- 원본 `Subject → Thread → Turn → Message`와 당시 세연 참가·Turn 완료·원문 미삭제를 동일 트랜잭션 안에서 검증합니다.
+- 기존 `seyeon_positive_source_type_registry_v1`의 정확한 타입·버전·쓰기 승인 없이는 기록을 생성하지 않습니다. 실제 운영 등록값은 비어 있습니다.
+- 같은 Turn의 중복 요청은 하나의 `proposal_dedupe_key`로 제한하고 동일 제안 ID의 `pending` 재실행만 허용합니다.
+- 제안 생성은 **수락·Memory 저장·세연 Grant 발행과 별개**입니다. 사용자가 별도 private 수락을 해야 `memory_items`가 생기며, 세연 공유는 다시 별도 선택과 검증을 요구합니다.
+- `seyeon-original-message-proposal-http-v1.ts`는 Member 요청을 위한 **미마운트** 경계로 `approvedDbWriteAdmission`이 없으면 503입니다. 배포 Worker, API route, 공개 버튼은 연결하지 않았습니다.
+- 격리 설치의 API `EXECUTE` 금지와 실제 PG17의 제안→private 수락→명시 Grant 흐름을 기존 테스트에 편입했습니다. 해당 CI 확인 전 운영 검증 완료로 간주하지 않습니다.
+
+`SRC-25` 및 G0/G1/G2/G3/G5/G6 운영 승인, source registry, 유료/일반 공개/배포 HOLD는 변경되지 않습니다. 이 작업은 새로운 일반형 Memory 생성 정책을 승인하지 않으며 Production migration 파일도 추가하지 않습니다.
