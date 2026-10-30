@@ -14,7 +14,7 @@ type Row = Readonly<Record<string, unknown>>;
 export const POSTGRES_SEYEON_PRODUCTION_PERSONAL_RECORD_CONTEXT_BINDING_V1 =
   'public.qry_seyeon_production_personal_record_context_v1' as const;
 export const POSTGRES_PRODUCTION_RELATIONSHIP_HISTORY_RUNTIME_BINDING_V1 =
-  'public.qry_production_relationship_history_runtime_v1' as const;
+  'public.qry_seyeon_g0_current_source_relationship_history_v1' as const;
 export const POSTGRES_SEYEON_PRODUCTION_RECENT_MESSAGES_BINDING_V1 =
   'public.qry_seyeon_g0_current_source_recent_messages_v1' as const;
 
@@ -30,7 +30,7 @@ const PERSONAL_SQL = [
 
 const HISTORY_SQL = [
   'select history_records_jsonb as "historyRecordsJsonb"',
-  'from public.qry_production_relationship_history_runtime_v1($1::uuid,$2::text,$3::bigint)',
+  'from public.qry_seyeon_g0_current_source_relationship_history_v1($1::uuid,$2::text,$3::bigint)',
 ].join('\n');
 
 const RECENT_SQL = [
