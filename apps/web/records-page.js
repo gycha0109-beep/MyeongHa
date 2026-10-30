@@ -105,10 +105,15 @@ function setupTabs() {
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', () => activate(tab));
     tab.addEventListener('keydown', (event) => {
-      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      let targetIndex;
+      if (event.key === 'Home') targetIndex = 0;
+      else if (event.key === 'End') targetIndex = tabs.length - 1;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        const delta = event.key === 'ArrowRight' ? 1 : -1;
+        targetIndex = (index + delta + tabs.length) % tabs.length;
+      } else return;
       event.preventDefault();
-      const delta = event.key === 'ArrowRight' ? 1 : -1;
-      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      const next = tabs[targetIndex];
       next.focus();
       activate(next);
     });
