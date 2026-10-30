@@ -72,7 +72,7 @@ describe('Records long-form official report boundary', () => {
     expect(jsx).toContain('data-official-report-reader');
     expect(jsx).toContain('발행 당시 출생정보 차수');
     expect(jsx).toContain('이 기록에 제공되지 않음');
-    expect(jsx).toContain('현재 명식록 확인하기 →');
+    expect(jsx).toContain('<a href="my.html">마이페이지에서 현재 명식 확인하기 →</a>');
     expect(runtime).toContain('renderStoredReportEvidence(preview.calculationSummary)');
     expect(runtime).toContain('firstText.textContent = firstInterpretedStep.primary;');
     expect(runtime).toContain("const ids = record.readerCharacterIds;");
