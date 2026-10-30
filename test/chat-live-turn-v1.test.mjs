@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { presentChatLiveTurnV1 } from '../apps/web/chat-live-turn.js';
+import { presentAcknowledgedChatTurnV1, presentChatLiveTurnV1 } from '../apps/web/chat-live-turn.js';
 
 function fakeStream() {
   const document = {
@@ -53,5 +53,61 @@ describe('live chat bubbles for an actual pending Se-yeon reply', () => {
     const clear = presentChatLiveTurnV1(stream, { message: '  ' });
     expect(stream.children).toHaveLength(0);
     clear();
+  });
+});
+
+
+describe('acknowledged live conversation in current page', () => {
+  it('keeps multiple real user/Se-yeon pairs visible in turn order', () => {
+    const stream = fakeStream();
+    const first = { turnId: 'one', userText: '저번 얘기 기억나요?', assistantText: '어느 얘기였죠?' };
+    const second = { turnId: 'two', userText: '그 질문에 답해 주세요.', assistantText: '그 부분은 이렇게 생각해요.' };
+    expect(presentAcknowledgedChatTurnV1(stream, first)).toBe(true);
+    expect(presentAcknowledgedChatTurnV1(stream, second)).toBe(true);
+    expect(stream.children).toHaveLength(4);
+    expect(stream.children.map(x => x.dataset.sender))
+      .toEqual(['user', 'character', 'user', 'character']);
+    const texts = stream.children.map(x => x.children[1].children[1].textContent);
+    expect(texts).toEqual([
+      first.userText, first.assistantText, second.userText, second.assistantText,
+    ]);
+    expect(stream.scrollTop).toBe(300);
+    expect(stream.children.every(x => x.dataset.pending !== 'true')).toBe(true);
+    expect(stream.children[1].dataset.messageCharacterId).toBe('seyeon');
+  });
+
+  it('does not duplicate a turn when the ACK is replayed', () => {
+    const stream = fakeStream();
+    const turn = { turnId: 'same-turn', userText: '안녕', assistantText: '안녕하세요.' };
+    expect(presentAcknowledgedChatTurnV1(stream, turn)).toBe(true);
+    expect(presentAcknowledgedChatTurnV1(stream, turn)).toBe(false);
+    expect(stream.children).toHaveLength(2);
+  });
+
+  it('replaces temporary placeholders without losing already acknowledged pairs', () => {
+    const stream = fakeStream();
+    expect(presentAcknowledgedChatTurnV1(stream, {
+      turnId: 'one', userText: '첫 번째', assistantText: '첫 답장',
+    })).toBe(true);
+    const removePending = presentChatLiveTurnV1(stream, { message: '두 번째' });
+    expect(stream.children).toHaveLength(4);
+    expect(presentAcknowledgedChatTurnV1(stream, {
+      turnId: 'two', userText: '두 번째', assistantText: '두 번째 답장',
+    })).toBe(true);
+    removePending();
+    expect(stream.children).toHaveLength(4);
+    expect(stream.children.map(x => x.dataset.acknowledgedTurn))
+      .toEqual(['one', 'one', 'two', 'two']);
+  });
+
+  it('never renders a reply without a complete acknowledged turn', () => {
+    const stream = fakeStream();
+    expect(presentAcknowledgedChatTurnV1(stream, {
+      turnId: 'x', userText: '메시지', assistantText: ' ',
+    })).toBe(false);
+    expect(presentAcknowledgedChatTurnV1(stream, {
+      turnId: '', userText: '메시지', assistantText: '답장',
+    })).toBe(false);
+    expect(stream.children).toHaveLength(0);
   });
 });

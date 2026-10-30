@@ -1,4 +1,4 @@
-import { presentChatLiveTurnV1 } from './chat-live-turn.js';
+import { presentChatLiveTurnV1, presentAcknowledgedChatTurnV1 } from './chat-live-turn.js';
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
@@ -288,46 +288,22 @@ document.addEventListener('myeongha:localechange', () => {
 // The S0 receipt is verified and ACKed before this call. History/Replay are
 // deliberately unavailable: display only the just-received response in this
 // document, never cache it or infer an authorized transcript from it.
-function renderAcknowledgedSeyeonFirstReply(result) {
-  if (!chatStream || !result || typeof result.assistantText !== 'string' ||
-      result.assistantText.trim().length === 0 || result.replayed !== false) {
-    return false;
-  }
-  const article = document.createElement('article');
-  article.className = 'conversation-message';
-  article.dataset.sender = 'character';
-  article.dataset.messageCharacterId = 'seyeon';
-  article.dataset.acknowledgedFirstReply = '';
-
-  const avatar = document.createElement('span');
-  avatar.className = 'conversation-message-avatar';
-  avatar.setAttribute('aria-hidden', 'true');
-  avatar.dataset.character = 'runtime-character';
-  avatar.textContent = '대';
-
-  const body = document.createElement('div');
-  body.className = 'conversation-message-body';
-  const heading = document.createElement('div');
-  heading.className = 'conversation-message-heading';
-  const strong = document.createElement('strong');
-  strong.textContent = resolveCharacterDisplayNameV1('seyeon', getUiLocale())
-    ?? translateStaticUi('연결자', getUiLocale());
-  heading.append(strong);
-
-  const paragraph = document.createElement('p');
-  paragraph.dataset.chatBodySource = '';
-  paragraph.textContent = result.assistantText;
-  body.append(heading, paragraph);
-  article.append(avatar, body);
-
+function renderAcknowledgedSeyeonTurn(result, pendingTurn) {
+  if (!result || typeof result.assistantText !== 'string' ||
+      result.assistantText.trim().length === 0 || !pendingTurn) return false;
   if (chatIntro) chatIntro.hidden = true;
-  // Replacing a held history with this one reply does not grant replay access.
-  chatStream.replaceChildren(article);
-  chatStream.scrollTop = chatStream.scrollHeight;
-  historyWithheld = true;
-  return true;
+  // Show every receipt-confirmed turn in the active page only, including a
+  // recovered replay whose original delivery response was lost.
+  const presented = presentAcknowledgedChatTurnV1(chatStream, {
+    turnId: pendingTurn.clientTurnId,
+    userText: pendingTurn.text,
+    assistantText: result.assistantText,
+    userLabel: uiText('나'),
+    characterLabel: resolveCharacterDisplayNameV1('seyeon', getUiLocale()) ?? uiText('세연'),
+  });
+  if (presented) historyWithheld = true;
+  return presented;
 }
-
 function renderRoomState(state) {
   historyWithheld = state.historyWithheld === true;
   renderConversation(state.messages, state.characterId);
@@ -622,7 +598,7 @@ async function sendTurn(message) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
     }
-    const presented = renderAcknowledgedSeyeonFirstReply(acknowledgedReply);
+    const presented = renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn);
     setComposeStatus(presented
       ? '세연의 답변이 도착했습니다.'
       : '현재 대화 기록 연결을 사용할 수 없습니다.');
