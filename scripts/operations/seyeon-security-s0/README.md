@@ -67,3 +67,11 @@ DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실
 - 격리 설치의 API `EXECUTE` 금지와 실제 PG17의 제안→private 수락→명시 Grant 흐름을 기존 테스트에 편입했습니다. 해당 CI 확인 전 운영 검증 완료로 간주하지 않습니다.
 
 `SRC-25` 및 G0/G1/G2/G3/G5/G6 운영 승인, source registry, 유료/일반 공개/배포 HOLD는 변경되지 않습니다. 이 작업은 새로운 일반형 Memory 생성 정책을 승인하지 않으며 Production migration 파일도 추가하지 않습니다.
+
+## 2026-10-30 — 서버의 원본 메시지 출처 확인(운영 비활성)
+
+`11-original-message-offer.sql`은 정확한 세연 원본 사용자 메시지의 `threadId/turnId/messageId`만 반환하는 *DB Owner 전용, 읽기 전용* 조회입니다. 출처 타입/버전/Projector의 쓰기 허가가 없으면 원본 본문을 읽기 전에 0건으로 종료합니다. 회원 Subject → 단독 세연 Thread → 완료된 Turn → 미삭제 User Message와 당시 세연 참여 이력, 기존 codec 적격 조건을 모두 DB에서 확인하며, 요약·본문·Grant·모델 재료는 반환하지 않습니다. 실제 Proposal 생성 시 `10-original-user-message-proposal.sql`이 동일 출처를 다시 잠금 검증합니다.
+
+`postgres-seyeon-original-message-offer-v1.ts`는 **회원의 해당 사용자 메시지에 대한 현재 G3 History Reveal이 이미 별도로 허가된 상태**에서만 조회하도록 명시적인 서버 승인 callback을 요구합니다. 호출 입력에 검증된 동일 원본 Message가 없거나 보호된 역사/Guest/세연 외 캐릭터이면 DB 접근 전 거부합니다. DB 함수는 일반 API/anon/authenticated/service_role에 EXECUTE가 없으며, 현재 `chat-read-http.ts`의 세연 History HOLD를 완화하거나 API/Worker Route에 마운트하지 않았습니다. 서버가 출처를 다시 조회해 프런트의 선택적 `memoryProposalOffer` 계약에 제공할 수 있는 준비 단계이며, 승인 후 별도 G3 인수 시험 없이 UI가 보이도록 해석하지 않습니다.
+
+PG17 격리 테스트에서 원본 제안 발행 전 사용자 Message 출처가 정확하게 반환되고 assistant/타 메시지가 거부되는지 확인합니다. 실제 운영 이력 공개·DB 권한·source registry·모델 사용·제품 활성화는 모두 기존 `HOLD_FORWARD_STOPPED` 상태를 유지합니다.
