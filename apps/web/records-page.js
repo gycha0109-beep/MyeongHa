@@ -6,6 +6,8 @@ import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-rev
 import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
 import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
+import { ensureActiveBearer, readMemberSession, readGuestBearer, PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
+import { captureReadingResponseOwnerV1, isReadingResponseOwnerCurrentV1 } from './reading-response-owner-guard.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
@@ -243,7 +245,63 @@ function productResponseStateLabel(value) {
 }
 
 let displayedRecords = null;
+let displayedRecordsOwner = null;
 let recordsStatusSource = '기록을 불러오는 중입니다…';
+
+function currentRecordsOwnerEvidence() {
+  return { memberSession: readMemberSession(), guestCredential: readGuestBearer() };
+}
+
+function captureRecordsOwner(credential) {
+  const evidence = currentRecordsOwnerEvidence();
+  return captureReadingResponseOwnerV1(
+    credential, evidence.memberSession, evidence.guestCredential,
+  );
+}
+
+function isRecordsOwnerCurrent(owner) {
+  const evidence = currentRecordsOwnerEvidence();
+  return isReadingResponseOwnerCurrentV1(
+    owner, evidence.memberSession, evidence.guestCredential,
+  );
+}
+
+function clearRecordsForSessionChange() {
+  displayedRecords = null;
+  displayedRecordsOwner = null;
+  byId('records-content').hidden = true;
+  for (const id of [
+    'records-display-name', 'records-subject-kind', 'life-records-list',
+    'birth-records-list', 'saju-records-list', 'memory-records-list',
+    'saju-records-count',
+  ]) {
+    byId(id).replaceChildren();
+  }
+  recordsStatusSource = '계정 또는 세션이 변경되었습니다. 현재 계정의 기록을 보려면 새로고침해 주세요.';
+  const status = byId('records-status');
+  status.hidden = false;
+  status.textContent = uiText(recordsStatusSource);
+}
+
+function onRecordsAuthChanged() {
+  if (!displayedRecordsOwner) return;
+  try {
+    if (isRecordsOwnerCurrent(displayedRecordsOwner)) return;
+  } catch {
+    // Unreadable session evidence cannot keep the previous owner's records.
+  }
+  clearRecordsForSessionChange();
+}
+
+window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, onRecordsAuthChanged);
+window.addEventListener('storage', (event) => {
+  if (event.key === null || [
+    PRODUCT_AUTH_STORAGE_V1.memberSession,
+    PRODUCT_AUTH_STORAGE_V1.guestBearer,
+    PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer,
+  ].includes(event.key)) onRecordsAuthChanged();
+});
+window.addEventListener('pageshow', onRecordsAuthChanged);
 
 function isPersistedReadingOpenableState(value) {
   return value === 'delivered' || value === 'delivered_with_fallback';
@@ -253,6 +311,8 @@ const readerBadgeSources = new WeakMap();
 document.addEventListener('myeongha:localechange', () => {
   // Repaint only browser-authored UI from an already loaded snapshot; never refetch history.
   if (displayedRecords) {
+    onRecordsAuthChanged();
+    if (!displayedRecords) return;
     renderLoadedRecords(displayedRecords);
     return;
   }
@@ -593,8 +653,15 @@ async function boot() {
   status.textContent = uiText(recordsStatusSource);
   byId('records-content').hidden = true;
   try {
+    const bearer = await ensureActiveBearer();
+    const owner = captureRecordsOwner(bearer);
+    if (!owner) throw new RecordsRuntimeError('WEB_RECORDS_SESSION_CHANGED', 'Records owner is unavailable.');
     const records = await createRecordsRuntimeClient().readRecords();
+    if (!isRecordsOwnerCurrent(owner)) {
+      throw new RecordsRuntimeError('WEB_RECORDS_SESSION_CHANGED', 'Records owner changed during loading.');
+    }
     renderLoadedRecords(records);
+    displayedRecordsOwner = owner;
     displayedRecords = records;
     setReady();
   } catch (error) {
