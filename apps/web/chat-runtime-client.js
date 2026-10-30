@@ -243,7 +243,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
   return article;
 }
 
-function renderConversation(messages, authoritativeCharacterId, historyProtected) {
+function renderConversation(messages, authoritativeCharacterId, historyProtected, memberReadAllowed) {
   if (!chatStream) return;
   const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
   if (nodes.length === 0) {
@@ -259,7 +259,7 @@ function renderConversation(messages, authoritativeCharacterId, historyProtected
   // A verified per-message offer is required; UUIDs are never reconstructed
   // from DOM text, the turn submit draft, timestamps, or Chat message index.
   // Se-yeon's existing protected-history shell has no messages and no offers.
-  if (!historyProtected && authoritativeCharacterId === 'seyeon') {
+  if (!historyProtected && memberReadAllowed && authoritativeCharacterId === 'seyeon') {
     for (let i = 0; i < messages.length; i += 1) {
       const offer = messages[i]?.memoryProposalOffer;
       const body = nodes[i]?.querySelector('.conversation-message-body');
@@ -342,7 +342,7 @@ function renderAcknowledgedSeyeonFirstReply(result) {
 
 function renderRoomState(state) {
   historyWithheld = state.historyWithheld === true;
-  renderConversation(state.messages, state.characterId, historyWithheld);
+  renderConversation(state.messages, state.characterId, historyWithheld, state.memberReadAllowed === true);
 
   // Exact-nine product authority maps canonical Character id to the same
   // English browser presentation key. The thread read remains identity authority.
@@ -487,6 +487,7 @@ async function loadRoomState() {
       characterId,
       messages: Object.freeze(messages),
       historyWithheld:protectedHistory,
+      memberReadAllowed:activeBearer.kind === 'member',
     }));
     return true;
   } catch (error) {
