@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   createSeyeonPrivateMemoryReviewClientV1,
 } from './seyeon-private-memory-review-client.js';
+import { mountSeyeonPrivateMemoryReviewV1 } from './seyeon-private-memory-review-view.js';
+import {readFileSync} from 'node:fs';
 
 const THREAD = '11111111-1111-4111-8111-111111111111';
 const TURN = '22222222-2222-4222-8222-222222222222';
@@ -178,5 +180,31 @@ describe('S0 private Memory: two distinct Member choices, no implicit character 
     await expect(client.prepareOriginalUserMessage(SOURCE)).rejects.toMatchObject({
       code:'SEYEON_MEMORY_REVIEW_SESSION_CHANGED',
     });
+  });
+});
+
+describe('S0 browser review surface activation boundary',()=>{
+  it('cannot mount without an exact server-owned original source offer',()=>{
+    vi.stubGlobal('HTMLElement',class HTMLElement {});
+    try {
+      const instance=new (globalThis.HTMLElement as typeof HTMLElement)();
+      Object.defineProperty(instance,'isConnected',{value:true});
+      for(const originalSource of [
+        null,
+        {...SOURCE,characterId:'seyeon',redacted:false},
+        {...SOURCE,sourceAuthority:'server_original_message',characterId:'other',redacted:false},
+        {...SOURCE,sourceAuthority:'server_original_message',characterId:'seyeon',redacted:true},
+      ]){
+        expect(mountSeyeonPrivateMemoryReviewV1({
+          container:instance,originalSource,
+        } as never)).toBeNull();
+      }
+    }finally{vi.unstubAllGlobals();}
+  });
+  it('does not activate proposal creation or approval in unverified Chat history',()=>{
+    const chat=readFileSync(new URL('./chat-runtime-client.js',import.meta.url),'utf8');
+    const records=readFileSync(new URL('./records-page.js',import.meta.url),'utf8');
+    expect(chat).not.toContain('mountSeyeonPrivateMemoryReviewV1');
+    expect(records).not.toContain('mountSeyeonPrivateMemoryReviewV1');
   });
 });
