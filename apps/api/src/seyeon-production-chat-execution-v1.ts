@@ -617,6 +617,7 @@ export async function runSeyeonProductionChatExecutionV1(
           leaseExpiresAt: inlinePostTurn.leaseExpiresAt,
           outboxPort: input.postTurn.analysisOutboxPort,
           extractorProvider: inlinePostTurn.extractorProvider,
+          enforceCurrentSourceAuthority: true,
           ...(input.relationshipSyncOutboxPort === undefined
             ? {}
             : {
@@ -1011,6 +1012,7 @@ export async function runSeyeonProductionChatExecutionV1(
         leaseExpiresAt: inlinePostTurn.leaseExpiresAt,
         outboxPort: input.postTurn.analysisOutboxPort,
         extractorProvider: inlinePostTurn.extractorProvider,
+        enforceCurrentSourceAuthority: true,
         ...(input.relationshipSyncOutboxPort === undefined
           ? {}
           : {
