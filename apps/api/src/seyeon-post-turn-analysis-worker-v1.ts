@@ -112,6 +112,11 @@ export interface SeyeonPostTurnAnalysisClaimV1 {
 }
 
 export interface SeyeonPostTurnAnalysisOutboxPortV1 {
+  /** DB-owned, read-only admission BEFORE a job lease or its private texts. */
+  preflightClaim?(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+  }>): Awaitable<'off_cleanup' | 'hold'>;
   findByTurn(input: Readonly<{
     subjectId: string;
     turnId: string;
@@ -684,6 +689,24 @@ async function finishFromCheckpoint(input: {
 export async function processSeyeonPostTurnAnalysisV1(
   input: ProcessSeyeonPostTurnAnalysisInputV1,
 ): Promise<ProcessSeyeonPostTurnAnalysisResultV1> {
+  if (input.enforceCurrentSourceAuthority === true) {
+    // No Outbox lease, private assistant text, Provider, or checkpoint until
+    // an existing Subject-scoped DB Owner confirms the only safe OFF path.
+    // Missing/uninstalled authority or any SQL error cannot be inferred
+    // from a snapshot supplied by the job.
+    let admission: 'off_cleanup' | 'hold' = 'hold';
+    try {
+      admission = await input.outboxPort.preflightClaim?.({
+        subjectId: input.subjectId,
+        outboxEventId: input.outboxEventId,
+      }) ?? 'hold';
+    } catch {
+      admission = 'hold';
+    }
+    if (admission !== 'off_cleanup') {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+  }
   const claimed = one(
     await input.outboxPort.claim({
       subjectId: input.subjectId,
