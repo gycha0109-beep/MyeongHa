@@ -119,4 +119,6 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - `seyeon-private-memory-review-view.js`는 첫 번째 제안 만들기 버튼과 두 번째 별도의 저장 확정 버튼을 제공한다. **현재 Chat 조회 계약에는 원본 `turnId`와 서버 발행 제안 가능 증거가 없기 때문에 배포 화면에서는 미마운트**다. 클라이언트 임의 메시지 본문을 원본 기억으로 저장할 수 없다.
 - PR #2759의 source-only Producer와 기존 private accept 모두 운영에서 미마운트·기본 DENY이며, 관련 CI PASS가 이 단계를 운영 활성화하지 않는다.
 
-**다음 연결 조건:** DB가 확인한 source Turn/Message의 정확한 회원 소유·이력 공개 허가·제안 가능한 타입/스키마를 반환하는 제품 계약을 확정한 뒤, 그 증거를 사용한 단일 Chat/Records 화면에 연결한다. SRC-25 및 운영 G0/G1/G2/G3/G5/G6 HOLD는 유지한다. 현재 PR은 데이터베이스, 모델 Projector, 유료 호출, 공개 Route, 운영 권한을 변경하지 않는다.
+**2026-10-30 후속 구현:** `chat-room-read-contract.js`는 서버가 실제로 제공한 메시지별 `memoryProposalOffer`를 엄격하게 파싱한다. 해당 메시지가 사용자 원문이며 redacted=false, 본문 공개가 허가됐고, 세연 단독 대화의 `threadId/turnId/messageId`가 정확히 결속되며 제공 필드가 6개 계약과 일치해야 한다. 불일치·임의 필드·타인 Character·세션 변경은 차단된다. `chat-runtime-client.js`는 검증된 offer가 있을 때만 기존 2단계 UI를 메시지 아래에 결합한다. 단, 현재 Se-yeon `chat-read-http.ts`는 이전 대화를 **metadata-only shell**로 막고 offer를 반환하지 않으므로, 현재 운영에서는 화면의 동의 버튼이 나타나지 않는다.
+
+**다음 연결 조건:** DB가 확인한 source Turn/Message의 정확한 회원 소유·이력 공개 허가·제안 가능한 타입/스키마를 실제 서버 응답에 담는 권한 계약과 운영 G3 History/Replay 허가가 필요하다. 그 이전에는 브라우저가 turnId를 추정하거나 저장 버튼을 강제로 켤 수 없다. SRC-25 및 운영 G0/G1/G2/G3/G5/G6 HOLD는 유지한다. 현재 PR은 데이터베이스, 모델 Projector, 유료 호출, 공개 Route, 운영 권한을 변경하지 않는다.
