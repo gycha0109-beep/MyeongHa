@@ -13,6 +13,7 @@ import {
 import {
   createPostgresSeyeonProductionChatPersistencePortV1,
 } from './postgres-seyeon-production-chat-execution-v1.js';
+import {createPostgresSeyeonG1HistoricalModelMessagesPinPortV1} from './postgres-seyeon-g1-historical-source-pin-v1.js';
 import {
   createSeyeonPositiveS0OwnerDbPortsV1,
   type SeyeonPositiveS0OwnerDbPortsV1,
@@ -119,6 +120,13 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
         return runner.run(subjectId, (client) =>
           createPostgresSeyeonProductionChatPersistencePortV1(client)
             .allocateAttempt(request),
+        );
+      },
+      pinHistoricalModelMessages(request: NonNullable<SeyeonProductionChatPersistencePortV1['pinHistoricalModelMessages']> extends (input:infer I)=>unknown ? I : never) {
+        requireSubject(subjectId, request.subjectId);
+        return runner.run(subjectId, (client) =>
+          createPostgresSeyeonG1HistoricalModelMessagesPinPortV1(client)
+            .pinHistoricalModelMessages(request),
         );
       },
       markContextReady(request: Parameters<SeyeonProductionChatPersistencePortV1['markContextReady']>[0]) {
