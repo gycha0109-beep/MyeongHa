@@ -1,8 +1,9 @@
 -- Watchtower-Track: security
 begin;
 -- G0-D3 core: a historical Relationship Event is usable only when its
--- persisted message-origin provenance resolves to one DB-committed Se-yeon
--- Assistant, whose exact original Memory Grant remains current.
+-- persisted message-origin provenance resolves to committed original Member
+-- User and Se-yeon Assistant messages. Each Assistant still requires its
+-- exact original Memory Grant to be current.
 -- Staged S0 source, installed ONLY into the disposable S0 PostgreSQL suite.
 -- No Production migration, positive registry admission or public Reveal.
 
@@ -94,33 +95,43 @@ begin
     where p.event_id=v_event.id and p.subject_id=p_subject_id
       and p.character_id='seyeon' and p.ref_kind='source_message';
 
-    -- An event that depends on multiple messages (including historical
-    -- User input), zero sources or unknown origin is NOT a personal-free
-    -- event and cannot be returned as a partially filtered projection.
-    if v_message_count<>1 then
+    -- Every origin is checked. Zero, ambiguous/unknown or over-limit source
+    -- sets are NOT reduced to a 'no-personal' or partially filtered event.
+    if v_message_count<1 or v_message_count>32 then
       raise exception using errcode='42501',
         constraint='seyeon_g0_relationship_origin_unverifiable',
         message='Current relationship lineage is unavailable';
     end if;
 
-    select msg.id,msg.thread_id,msg.turn_id,msg.sender_type
-      into v_origin
-    from public.relationship_event_provenance_refs p
-    join public.conversation_messages msg
-      on msg.id=p.source_message_id and msg.subject_id=p.subject_id
-    where p.event_id=v_event.id and p.subject_id=p_subject_id
-      and p.character_id='seyeon' and p.ref_kind='source_message';
+    for v_origin in
+      select msg.id,msg.thread_id,msg.turn_id,msg.sender_type
+      from public.relationship_event_provenance_refs p
+      join public.conversation_messages msg
+        on msg.id=p.source_message_id and msg.subject_id=p.subject_id
+      where p.event_id=v_event.id and p.subject_id=p_subject_id
+        and p.character_id='seyeon' and p.ref_kind='source_message'
+      order by p.ordinal
+    loop
+      if v_origin.turn_id is distinct from v_event.source_turn_id then
+        raise exception using errcode='42501',
+          constraint='seyeon_g0_relationship_origin_unverifiable',
+          message='Current relationship lineage is unavailable';
+      end if;
 
-    if not found or v_origin.sender_type is distinct from 'character'
-       or v_origin.turn_id is distinct from v_event.source_turn_id then
-      raise exception using errcode='42501',
-        constraint='seyeon_g0_relationship_origin_unverifiable',
-        message='Current relationship lineage is unavailable';
-    end if;
-
-    perform seyeon_private.assert_current_original_assistant_lineage_v1(
-      p_subject_id,v_origin.thread_id,v_origin.id
-    );
+      if v_origin.sender_type='user' then
+        perform seyeon_private.assert_current_original_member_user_message_v1(
+          p_subject_id,v_origin.thread_id,v_origin.id
+        );
+      elsif v_origin.sender_type='character' then
+        perform seyeon_private.assert_current_original_assistant_lineage_v1(
+          p_subject_id,v_origin.thread_id,v_origin.id
+        );
+      else
+        raise exception using errcode='42501',
+          constraint='seyeon_g0_relationship_origin_unverifiable',
+          message='Current relationship lineage is unavailable';
+      end if;
+    end loop;
   end loop;
 
   if v_event_count<>v_entry_count then
