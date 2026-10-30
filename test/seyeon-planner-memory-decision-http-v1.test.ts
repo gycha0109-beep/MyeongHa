@@ -1,5 +1,6 @@
 // Watchtower-Track: security
 import { describe, expect, it, vi } from 'vitest';
+import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import {
   planSeyeonPlannerMemoryDecisionV1,
   type PlannerMemoryChoiceV1,
@@ -196,5 +197,93 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
     expect(response.status).toBe(503);
     expect(db.queries).toContain('ROLLBACK');
     expect(db.queries).not.toContain('COMMIT');
+  });
+});
+
+describe('S0 reuse of existing production-table DB owner commands',()=>{
+  const plan=(choice:'character_only'|'current_characters',characters=['seyeon'])=>
+    planSeyeonPlannerMemoryDecisionV1({
+      candidate:CANDIDATE,choice,canonicalMemberSubjectId:SUBJECT,
+      currentEligibleCharacterIds:characters,
+    });
+  it('performs private accept and explicit Grant sequentially in the same SQL client',async()=>{
+    const sql:string[]=[];
+    const query=vi.fn(async(statement:string,values?:readonly unknown[])=>{
+      sql.push(statement);
+      if(statement.includes('cmd_accept_seyeon_private_conversation_recall_proposal_v1')){
+        return {rows:[{memoryItemId:values?.[2],grantCount:0,replayed:false}]};
+      }
+      if(statement.includes('cmd_grant_seyeon_owned_conversation_recall_v1')){
+        return {rows:[{memoryItemId:values?.[1],grantId:values?.[2],
+          characterId:'seyeon',replayed:false}]};
+      }
+      return {rows:[]};
+    });
+    const receipt=await commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+      client:{query},canonicalMemberSubjectId:SUBJECT,plan:plan('character_only'),
+    });
+    expect(receipt).toEqual({
+      proposalId:PROPOSAL,decision:'character_only',status:'resolved',
+      persisted:true,grantCount:1,payloadPurged:false,
+    });
+    expect(sql).toHaveLength(2);
+    expect(sql[0]).toContain('cmd_accept_seyeon_private_conversation_recall_proposal_v1');
+    expect(sql[1]).toContain('cmd_grant_seyeon_owned_conversation_recall_v1');
+  });
+
+  it('single-character current share reuses the identical existing explicit Grant',async()=>{
+    const calls:string[]=[];
+    const query=vi.fn(async(statement:string,values?:readonly unknown[])=>{
+      calls.push(statement);
+      return statement.includes('cmd_accept_seyeon_private')
+        ? {rows:[{memoryItemId:values?.[2],grantCount:0,replayed:false}]}
+        : {rows:[{memoryItemId:values?.[1],grantId:values?.[2],
+          characterId:'seyeon',replayed:false}]};
+    });
+    const receipt=await commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+      client:{query},canonicalMemberSubjectId:SUBJECT,plan:plan('current_characters'),
+    });
+    expect(receipt.decision).toBe('current_characters');
+    expect(receipt.grantCount).toBe(1);
+    expect(calls).toHaveLength(2);
+  });
+
+  it('does not falsely claim life fact, multiple current characters or non-durable choices',async()=>{
+    const query=vi.fn(async()=>({rows:[]}));
+    for(const choice of ['session_only','discard'] as const){
+      const p=planSeyeonPlannerMemoryDecisionV1({
+        candidate:CANDIDATE,choice,canonicalMemberSubjectId:SUBJECT,
+        currentEligibleCharacterIds:['seyeon'],
+      });
+      await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+        client:{query},canonicalMemberSubjectId:SUBJECT,plan:p,
+      })).rejects.toThrow('only supports exactly one');
+    }
+    const multi=plan('current_characters',['seyeon','baekheon']);
+    await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+      client:{query},canonicalMemberSubjectId:SUBJECT,plan:multi,
+    })).rejects.toThrow('only supports exactly one');
+    const fact=planSeyeonPlannerMemoryDecisionV1({
+      candidate:{...CANDIDATE,proposalKind:'life_fact'},
+      choice:'character_only',canonicalMemberSubjectId:SUBJECT,
+      currentEligibleCharacterIds:['seyeon'],
+    });
+    await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+      client:{query},canonicalMemberSubjectId:SUBJECT,plan:fact,
+    })).rejects.toThrow('only supports exactly one');
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('cannot issue a Grant after an unconfirmed private Memory acceptance',async()=>{
+    const sql:string[]=[];
+    const query=vi.fn(async(statement:string)=>{
+      sql.push(statement);
+      return {rows:[{memoryItemId:'mismatched',grantCount:0,replayed:false}]};
+    });
+    await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+      client:{query},canonicalMemberSubjectId:SUBJECT,plan:plan('character_only'),
+    })).rejects.toThrow();
+    expect(sql).toHaveLength(1);
+    expect(sql[0]).toContain('cmd_accept_seyeon_private_conversation_recall_proposal_v1');
   });
 });
