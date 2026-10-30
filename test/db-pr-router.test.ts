@@ -67,6 +67,13 @@ describe('DB PR router', () => {
     });
   });
 
+  it('runs the actual disposable S0/G3 HTTP PostgreSQL case when historical test changes', () => {
+    const result = route(['test/seyeon-security-s0-history-presence.e2e.test.ts']);
+    expect(result.suites).toEqual(['postgres17']);
+    expect(result.pg17Cases).toContain('seyeon-security-s0-real-path-pg17');
+    expect(result.pg15Cases).toEqual([]);
+  });
+
   it('routes C08 two-session fixture changes to the real PG17 suite without Commerce fan-out', () => {
     for (const fixturePath of [
       'test/db/seyeon_c08_first_turn_local_pg17.sh',

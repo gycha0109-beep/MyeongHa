@@ -43,6 +43,7 @@ const postgres17Patterns = [
   /^apps\/api\/src\/(?:postgres-saju-abuse-admission|saju-abuse-admission-http|current-subject-saju-(?:calculation|preview-reading)-http|production-current-subject-saju-(?:calculation|preview-reading)-runtime)\.ts$/u,
   /^scripts\/operations\/seyeon-security-s0\//u,
   /^test\/seyeon-security-s0-postgres\.e2e\.test\.ts$/u,
+  /^test\/seyeon-security-s0-history-presence\.e2e\.test\.ts$/u,
   /^test\/db\/seyeon_security_s0_real_path_pg17\.sh$/u,
   // R5/R9 exact-original-Grant tests require the named disposable PG17
   // authority-core harness. A source-only test edit must not silently skip
