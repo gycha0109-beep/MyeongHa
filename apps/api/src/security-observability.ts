@@ -220,7 +220,14 @@ function withApiNoStore(response: Response): Response {
 }
 
 function genericInternalServerError(): Response {
-  return withApiNoStore(new Response(null, { status: 500 }));
+  return new Response(null, {
+    status: 500,
+    headers: {
+      'Cache-Control': NO_STORE,
+      'CDN-Cache-Control': NO_STORE,
+      'Vercel-CDN-Cache-Control': NO_STORE,
+    },
+  });
 }
 
 function createExecutionState(input: SecurityObservedOperationInputV1) {
