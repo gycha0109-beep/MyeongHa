@@ -16,6 +16,7 @@ import {
 import { parsePersistedReadingHandoffV1 } from './reading-history-handoff.js';
 import { parseOfficialReadingRecordPayloadV1 } from './official-reading-record-contract.js';
 import { readingStepSourceCategoriesV1 } from './reading-step-source-categories.js';
+import { blockTexts, issuedSectionSourcePartsV1 } from './reading-issued-source-projection.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
 
 const readerCatalog = {
@@ -394,45 +395,6 @@ function publicErrorCode(payload) {
     : null;
 }
 
-function blockTexts(block) {
-  if (!block || typeof block !== 'object') return [];
-  if (block.type === 'paragraph' || block.type === 'source_hint') {
-    return typeof block.text === 'string' && block.text.trim() ? [block.text.trim()] : [];
-  }
-  if (block.type === 'key_points' && Array.isArray(block.items)) {
-    return block.items.filter((item) => typeof item === 'string' && item.trim()).map((item) => item.trim());
-  }
-  if (block.type === 'comparison' && Array.isArray(block.perspectives)) {
-    return block.perspectives.flatMap((item) =>
-      item && typeof item === 'object' && typeof item.text === 'string'
-        ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.text}`]
-        : []);
-  }
-  if (block.type === 'ambiguity') {
-    const texts = typeof block.summary === 'string' ? [block.summary] : [];
-    if (Array.isArray(block.scenarios)) {
-      texts.push(...block.scenarios.flatMap((item) =>
-        item && typeof item === 'object' && typeof item.text === 'string'
-          ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.text}`]
-          : []));
-    }
-    return texts;
-  }
-  if (block.type === 'timeline' && Array.isArray(block.entries)) {
-    return block.entries.flatMap((item) =>
-      item && typeof item === 'object' && typeof item.text === 'string'
-        ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.text}`]
-        : []);
-  }
-  if (block.type === 'fact_table' && Array.isArray(block.rows)) {
-    return block.rows.flatMap((item) =>
-      item && typeof item === 'object' && typeof item.value === 'string'
-        ? [`${typeof item.label === 'string' ? `${item.label}: ` : ''}${item.value}`]
-        : []);
-  }
-  return [];
-}
-
 function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = {}) {
   // Official archive reread already has its own persisted-record admission boundary.
   // This narrow browser guard applies only to the live Preview HTTP path.
@@ -446,7 +408,7 @@ function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = 
 // The official archive is already an authorized persisted source. Parse its
 // actual Product Reading envelope directly; never wrap it in a fake Preview
 // lifecycle just to reuse the renderer.
-function stepsFromIssuedProductResponse(response) {
+function stepsFromIssuedProductResponse(response, { isStoredRecord = false } = {}) {
   if (!response || typeof response !== 'object') return null;
   if (!['delivered', 'delivered_with_fallback'].includes(response.state)) return null;
   const reading = response.reading;
@@ -468,9 +430,8 @@ function stepsFromIssuedProductResponse(response) {
       return [];
     }
 
-    const structure = texts.filter((text) => text.startsWith(STRUCTURE_PREFIX));
-    const interpretation = texts.filter((text) => !text.startsWith(STRUCTURE_PREFIX));
-    if (interpretation.length === 0) return [];
+    const { structure, interpretation } = issuedSectionSourcePartsV1(section.blocks, { isStoredRecord, structurePrefix: STRUCTURE_PREFIX });
+    if (interpretation.length === 0 && (!isStoredRecord || structure.length === 0)) return [];
 
     return [{
       title,
@@ -491,7 +452,9 @@ function stepsFromIssuedProductResponse(response) {
     }
   }
 
-  if (steps.length === 0) return null;
+  // An evidence-only section may accompany an issued interpretation, but
+  // a report consisting solely of provenance is not a delivered interpretation.
+  if (steps.length === 0 || (isStoredRecord && !steps.some((step) => step.primary.length > 0))) return null;
   return {
     steps,
     // Preserve every issued limitation in source order. Showing just the first
@@ -666,6 +629,7 @@ function renderAuthorizedStoredReport(preview, record) {
     primary.className = 'official-report-primary';
     primary.dataset.officialReading = '';
     primary.textContent = step.primary;
+    primary.hidden = step.primary.length === 0;
     section.append(kicker, heading, primary);
 
     for (const text of step.supporting) {
@@ -707,8 +671,9 @@ function renderAuthorizedStoredReport(preview, record) {
   }
   const first = document.querySelector('[data-official-report-first]');
   const firstText = document.querySelector('[data-official-report-first-text]');
-  if (first && firstText && preview.steps[0]) {
-    firstText.textContent = preview.steps[0].primary;
+  const firstInterpretedStep = preview.steps.find((step) => step.primary.length > 0);
+  if (first && firstText && firstInterpretedStep) {
+    firstText.textContent = firstInterpretedStep.primary;
     first.hidden = false;
   }
   renderStoredReportEvidence(preview.calculationSummary);
@@ -742,6 +707,7 @@ function activatePreviewReading(preview) {
   const progressLabel = document.querySelector('[data-reading-progress-label]');
   const stepTitle = document.querySelector('[data-reading-step-title]');
   const stepBody = document.querySelector('[data-reading-step-body]');
+  const primaryBlock = stepBody?.closest('.reading-block');
   const structureTitle = document.querySelector('[data-reading-structure-title]');
   const structureBody = document.querySelector('[data-reading-structure-body]');
   const structureBlock = structureBody?.closest('.reading-block');
@@ -819,6 +785,7 @@ function activatePreviewReading(preview) {
     if (progressLabel) progressLabel.textContent = ui.progress;
     if (stepTitle) stepTitle.textContent = step.title;
     if (stepBody) stepBody.textContent = step.primary;
+    if (primaryBlock) primaryBlock.hidden = isStoredRecord && step.primary.length === 0;
     if (structureTitle) structureTitle.textContent = ui.structureTitle;
     if (supportingTitle) supportingTitle.textContent = ui.supportingTitle;
     if (supportingBlock) supportingBlock.hidden = sourceCategories.supporting.length === 0;
@@ -1042,7 +1009,7 @@ async function loadPersistedReading() {
       return;
     }
 
-    const readingView = stepsFromIssuedProductResponse(record.reading);
+    const readingView = stepsFromIssuedProductResponse(record.reading, { isStoredRecord: true });
     if (!readingView) {
       renderPersistedReadingFailure(
         '저장된 풀이를 표시할 수 없습니다.',

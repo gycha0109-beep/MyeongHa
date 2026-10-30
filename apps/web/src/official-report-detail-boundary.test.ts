@@ -27,7 +27,7 @@ describe('Records long-form official report boundary', () => {
 
   it('reuses the existing current-subject exact Reading boundary and same authorized content', () => {
     expect(runtime).toContain('parseOfficialReadingRecordPayloadV1(payload.data)');
-    expect(runtime).toContain('const readingView = stepsFromIssuedProductResponse(record.reading);');
+    expect(runtime).toContain('const readingView = stepsFromIssuedProductResponse(record.reading, { isStoredRecord: true });');
     expect(runtime).not.toContain("data: { lifecycle: 'preview', reading: record.reading }");
     expect(runtime).toContain('function previewStepsFromPayload(payload, { requireBrowserAdmission = false } = {})');
     expect(runtime).toContain("record.readingId !== persistedReadingHandoff.readingId");
@@ -62,7 +62,7 @@ describe('Records long-form official report boundary', () => {
     expect(jsx).toContain('이 기록에 제공되지 않음');
     expect(jsx).toContain('현재 명식록 확인하기 →');
     expect(runtime).toContain('renderStoredReportEvidence(preview.calculationSummary)');
-    expect(runtime).toContain('firstText.textContent = preview.steps[0].primary;');
+    expect(runtime).toContain('firstText.textContent = firstInterpretedStep.primary;');
     expect(runtime).toContain("const ids = record.readerCharacterIds;");
     expect(runtime).toContain("resolveCharacterDisplayNameV1(id, getUiLocale()) ?? id");
     expect(runtime).not.toContain('currentBirthRevision ===');
@@ -170,6 +170,16 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain('scopeNoticeText.textContent = visibleScopeNotice;');
   });
 
+  it('keeps issued evidence-only sections but does not create an interpretation or preview result', () => {
+    expect(runtime).toContain('issuedSectionSourcePartsV1(section.blocks, { isStoredRecord, structurePrefix: STRUCTURE_PREFIX })');
+    expect(runtime).toContain('if (interpretation.length === 0 && (!isStoredRecord || structure.length === 0)) return [];');
+    expect(runtime).toContain('isStoredRecord && !steps.some((step) => step.primary.length > 0)');
+    expect(runtime).toContain('primary.hidden = step.primary.length === 0;');
+    expect(runtime).toContain('primaryBlock.hidden = isStoredRecord && step.primary.length === 0;');
+    expect(runtime).toContain('const firstInterpretedStep = preview.steps.find((step) => step.primary.length > 0);');
+    expect(runtime).toContain('if (first && firstText && firstInterpretedStep)');
+    expect(runtime).toContain('return stepsFromIssuedProductResponse(data.reading);');
+  });
   it('blocks an explicit 403 without treating revoked access as a temporary Records failure', () => {
     const ownerDenied = runtime.indexOf('if (response.status === 403)');
     const genericFailure = runtime.indexOf('if (!response.ok || !payload || payload.ok !== true)');
