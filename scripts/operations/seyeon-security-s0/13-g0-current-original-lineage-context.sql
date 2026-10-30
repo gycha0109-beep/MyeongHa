@@ -88,6 +88,19 @@ begin
   -- cannot retroactively authorize this committed Assistant message.
   v_record:=(v_pin->>'recordId')::uuid;
   v_grant:=(v_pin->>'originalGrantId')::uuid;
+
+  -- The original personal source type must STILL be admitted. A stopped
+  -- registry or changed projector never inherits historical permissions.
+  if not seyeon_private.lock_positive_source_registry_v1(
+      v_pin->>'recordType',
+      v_pin->>'recordSchemaVersion',
+      v_pin->>'projectorVersion'
+  ) then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_original_lineage_type_disabled',
+      message='Current source lineage is not available';
+  end if;
+
   perform seyeon_private.lock_original_memory_grant_v1(
     p_subject_id,v_record,v_grant
   );
