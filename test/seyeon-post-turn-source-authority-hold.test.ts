@@ -8,7 +8,7 @@ describe('Production post-turn source authority', () => {
   it('only permits no-source OFF cleanup without a checkpoint', () => {
     expect(() => assertSeyeonPostTurnSourceAuthorityV1('OFF', null))
       .not.toThrow();
-    for (const mode of ['SHADOW', 'WRITE'] as const) {
+    for (const mode of ['SHADOW', 'WRITE_DARK', 'BEHAVIOR_SHADOW', 'LIVE'] as const) {
       expect(() => assertSeyeonPostTurnSourceAuthorityV1(mode, null))
         .toThrow(SeyeonPostTurnSourceAuthorityHoldV1);
     }
