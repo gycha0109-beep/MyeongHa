@@ -95,11 +95,14 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
     const userText = virtual === undefined ? 'Synthetic first hello' : '내가 주말에 뭐 한다고 했지?';
+    const contentBundleHash = createHash('sha256')
+      .update('seyeon-s0-pg17-content-bundle-fixture:v1:' + String(n))
+      .digest('hex');
     const adapt = (sql: string) => sql.replaceAll('000000000001', String(n).padStart(12, '0'))
       .replaceAll('first-zero-test-v1', 'first-zero-test-v1-' + n)
       .replaceAll('first-zero-test-release', 'first-zero-test-release-' + n)
       .replaceAll('first-zero-disposable-v1', uuid(30, n))
-      .replaceAll("repeat('a',64)", "repeat('" + (n % 15 || 15).toString(16) + "',64)")
+      .replaceAll("repeat('a',64)", "'" + contentBundleHash + "'")
       .replaceAll('Synthetic first hello', userText);
     await pool.query(adapt(baseline.slice(0, seedEnd)));
     await pool.query(`insert into public.memory_items(
