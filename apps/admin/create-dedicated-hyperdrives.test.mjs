@@ -1,11 +1,11 @@
 import {test} from 'vitest';
 import {strict as assert} from 'node:assert';
-import {inspectDedicatedAdminHyperdriveV1,classifyDedicatedAdminTlsFailureV1} from './create-dedicated-hyperdrives.mjs';
+import {inspectDedicatedAdminHyperdriveV1,classifyDedicatedAdminTlsFailureV1,parseDedicatedAdminPoolerPortV1} from './create-dedicated-hyperdrives.mjs';
 
 const expected={role:'myeongha_admin_reader',name:'myeongha-admin-reader-verifyfull-20261030'};
 const valid={id:'a'.repeat(32),name:expected.name,caching:{disabled:true},
  mtls:{sslmode:'verify-full',ca_certificate_id:'d25c14bc-d654-46b8-89cf-5c4baf931771'},
- origin:{scheme:'postgres',host:'aws-0-ap-southeast-1.pooler.supabase.com',port:5432,
+ origin:{scheme:'postgres',host:'aws-0-ap-southeast-1.pooler.supabase.com',port:6543,
  database:'postgres',user:'myeongha_admin_reader.cnsfpcdiyofqvhpcegfc'}};
 test('dedicated reader TLS policy passes',()=>{
  assert.deepEqual(inspectDedicatedAdminHyperdriveV1(valid,expected),{role:expected.role,id:valid.id,verified:true});
@@ -18,7 +18,7 @@ for(const [name,change] of [
  ['wrong CA',{mtls:{...valid.mtls,ca_certificate_id:'wrong'}}],
  ['wrong name',{name:'myeongha'}],
  ['wrong host',{origin:{...valid.origin,host:'example.com'}}],
- ['wrong port',{origin:{...valid.origin,port:6432}}],
+ ['wrong port',{origin:{...valid.origin,port:5432}}],
  ['managed integration',{integration:{provider:'planetscale'}}],
  ['invalid ID',{id:'fake'}],
 ]){
@@ -39,3 +39,18 @@ for(const [name,child,expectedCode] of [
    assert.equal(classifyDedicatedAdminTlsFailureV1(child),expectedCode);
  });
 }
+
+
+test('explicit session pooler port still supported for debugging',()=>{
+ assert.deepEqual(inspectDedicatedAdminHyperdriveV1({...valid,origin:{...valid.origin,port:5432}},expected,5432),{role:expected.role,id:valid.id,verified:true});
+});
+test('pooler port defaults to proven transaction mode',()=>{
+ assert.equal(parseDedicatedAdminPoolerPortV1(undefined),6543);
+ assert.equal(parseDedicatedAdminPoolerPortV1(''),6543);
+ assert.equal(parseDedicatedAdminPoolerPortV1('6543'),6543);
+ assert.equal(parseDedicatedAdminPoolerPortV1('5432'),5432);
+});
+test('unsupported pooler port fails closed',()=>{
+ for(const value of ['6432','0','65535','foo',' 6543 '])
+  assert.throws(()=>parseDedicatedAdminPoolerPortV1(value),/POOLER_PORT_UNSUPPORTED/u);
+});
