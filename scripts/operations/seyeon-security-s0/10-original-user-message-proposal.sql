@@ -130,6 +130,13 @@ begin
     p_proposal_id,p_subject_id,'seyeon','memory','conversation_recall','v1',
     v_payload,p_turn_id,p_message_id,v_dedupe,'pending',clock_timestamp()
   );
+
+  -- The existing source-character constraint trigger is INITIALLY DEFERRED
+  -- and runs as SECURITY INVOKER. If postponed until the API transaction's
+  -- COMMIT, it would require an unsafe ordinary-API SELECT on raw messages.
+  -- Run ONLY this exact proposal constraint while the source-reading Owner
+  -- SECURITY DEFINER is active. No broader table grant or trigger change.
+  set constraints ct_memory_proposal_source_character immediate;
   return query select p_proposal_id,'pending'::text,false;
 end
 $propose$;
