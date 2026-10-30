@@ -85,7 +85,7 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
     const db=makePool();
     const verifier={verifyRequestIdentity:vi.fn(async()=>MEMBER)};
     const response=await handleSeyeonPlannerMemoryDecisionRequestV1({
-      request:send('character_only'),...metadata,pool:db.pool,
+      request:send('character_only'),...metadata,pool:db.pool as never,
       identityEvidenceVerifier:verifier,
     });
     expect(SEYEON_PLANNER_MEMORY_DECISION_HTTP_V1.publicRouteMounted).toBe(false);
@@ -106,7 +106,7 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
       const response=await handleSeyeonPlannerMemoryDecisionRequestV1({
         request:new Request(URL,{method:'POST',headers:{'Content-Type':'application/json'},
           body:JSON.stringify(body)}),
-        ...metadata,pool:db.pool,identityEvidenceVerifier:verifier,
+        ...metadata,pool:db.pool as never,identityEvidenceVerifier:verifier,
       });
       if(JSON.stringify(body)==='{"choice":{"mode":"discard"},"summary":"forged"}')
         expect(response.status).toBe(400);
@@ -120,7 +120,7 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
     for(const evidence of [null,{kind:'guest' as const,verifiedGuestTokenHash:'hash'}]){
       const db=makePool();
       const response=await handleSeyeonPlannerMemoryDecisionRequestV1({
-        request:send('discard'),...metadata,pool:db.pool,
+        request:send('discard'),...metadata,pool:db.pool as never,
         identityEvidenceVerifier:{verifyRequestIdentity:async()=>evidence},
       });
       expect(response.status).toBe(evidence===null?401:403);
@@ -141,7 +141,7 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
         payloadPurged:plan.requiresPayloadErasure,
       }));
       const response=await handleSeyeonPlannerMemoryDecisionRequestV1({
-        request:send(mode),...metadata,pool:db.pool,
+        request:send(mode),...metadata,pool:db.pool as never,
         identityEvidenceVerifier:{verifyRequestIdentity:async()=>MEMBER},
         approvedDecisionWrites:()=>true,
         loadVerifiedPlannerSource:load,commitDecision:commit,
@@ -165,7 +165,7 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
     const db=makePool();
     const commit=vi.fn();
     const response=await handleSeyeonPlannerMemoryDecisionRequestV1({
-      request:send('character_only'),...metadata,pool:db.pool,
+      request:send('character_only'),...metadata,pool:db.pool as never,
       identityEvidenceVerifier:{verifyRequestIdentity:async()=>MEMBER},
       approvedDecisionWrites:()=>true,
       loadVerifiedPlannerSource:async()=>({
@@ -183,7 +183,7 @@ describe('UC-07 verified Member HTTP + single Postgres transaction',()=>{
   it('rejects incorrect receipt and atomically rolls back instead of returning success',async()=>{
     const db=makePool();
     const response=await handleSeyeonPlannerMemoryDecisionRequestV1({
-      request:send('discard'),...metadata,pool:db.pool,
+      request:send('discard'),...metadata,pool:db.pool as never,
       identityEvidenceVerifier:{verifyRequestIdentity:async()=>MEMBER},
       approvedDecisionWrites:()=>true,
       loadVerifiedPlannerSource:async()=>({
@@ -220,7 +220,7 @@ describe('S0 reuse of existing production-table DB owner commands',()=>{
       return {rows:[]};
     });
     const receipt=await commitSeyeonSingleCharacterPlannerGrantDecisionV1({
-      client:{query},canonicalMemberSubjectId:SUBJECT,plan:plan('character_only'),
+      client:{query} as never,canonicalMemberSubjectId:SUBJECT,plan:plan('character_only'),
     });
     expect(receipt).toEqual({
       proposalId:PROPOSAL,decision:'character_only',status:'resolved',
@@ -241,7 +241,7 @@ describe('S0 reuse of existing production-table DB owner commands',()=>{
           characterId:'seyeon',replayed:false}]};
     });
     const receipt=await commitSeyeonSingleCharacterPlannerGrantDecisionV1({
-      client:{query},canonicalMemberSubjectId:SUBJECT,plan:plan('current_characters'),
+      client:{query} as never,canonicalMemberSubjectId:SUBJECT,plan:plan('current_characters'),
     });
     expect(receipt.decision).toBe('current_characters');
     expect(receipt.grantCount).toBe(1);
@@ -256,12 +256,12 @@ describe('S0 reuse of existing production-table DB owner commands',()=>{
         currentEligibleCharacterIds:['seyeon'],
       });
       await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
-        client:{query},canonicalMemberSubjectId:SUBJECT,plan:p,
+        client:{query} as never,canonicalMemberSubjectId:SUBJECT,plan:p,
       })).rejects.toThrow('only supports exactly one');
     }
     const multi=plan('current_characters',['seyeon','baekheon']);
     await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
-      client:{query},canonicalMemberSubjectId:SUBJECT,plan:multi,
+      client:{query} as never,canonicalMemberSubjectId:SUBJECT,plan:multi,
     })).rejects.toThrow('only supports exactly one');
     const fact=planSeyeonPlannerMemoryDecisionV1({
       candidate:{...CANDIDATE,proposalKind:'life_fact'},
@@ -269,7 +269,7 @@ describe('S0 reuse of existing production-table DB owner commands',()=>{
       currentEligibleCharacterIds:['seyeon'],
     });
     await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
-      client:{query},canonicalMemberSubjectId:SUBJECT,plan:fact,
+      client:{query} as never,canonicalMemberSubjectId:SUBJECT,plan:fact,
     })).rejects.toThrow('only supports exactly one');
     expect(query).not.toHaveBeenCalled();
   });
@@ -281,7 +281,7 @@ describe('S0 reuse of existing production-table DB owner commands',()=>{
       return {rows:[{memoryItemId:'mismatched',grantCount:0,replayed:false}]};
     });
     await expect(commitSeyeonSingleCharacterPlannerGrantDecisionV1({
-      client:{query},canonicalMemberSubjectId:SUBJECT,plan:plan('character_only'),
+      client:{query} as never,canonicalMemberSubjectId:SUBJECT,plan:plan('character_only'),
     })).rejects.toThrow();
     expect(sql).toHaveLength(1);
     expect(sql[0]).toContain('cmd_accept_seyeon_private_conversation_recall_proposal_v1');
