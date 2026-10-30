@@ -1,6 +1,6 @@
 import {test} from 'vitest';
 import {strict as assert} from 'node:assert';
-import {inspectDedicatedAdminHyperdriveV1,classifyDedicatedAdminTlsFailureV1,parseDedicatedAdminPoolerPortV1} from './create-dedicated-hyperdrives.mjs';
+import {inspectDedicatedAdminHyperdriveV1,classifyDedicatedAdminTlsFailureV1,parseDedicatedAdminPoolerPortV1,buildAuditRolePasswordSqlV1} from './create-dedicated-hyperdrives.mjs';
 
 const expected={role:'myeongha_admin_reader',name:'myeongha-admin-reader-verifyfull-20261030'};
 const valid={id:'a'.repeat(32),name:expected.name,caching:{disabled:true},
@@ -53,4 +53,14 @@ test('pooler port defaults to proven transaction mode',()=>{
 test('unsupported pooler port fails closed',()=>{
  for(const value of ['6432','0','65535','foo',' 6543 '])
   assert.throws(()=>parseDedicatedAdminPoolerPortV1(value),/POOLER_PORT_UNSUPPORTED/u);
+});
+
+test('Audit Writer SQL quotes the exact local clipboard password',()=>{
+ const password="A".repeat(25)+"'"+'b'.repeat(8);
+ assert.equal(buildAuditRolePasswordSqlV1(password),
+   "ALTER ROLE myeongha_admin_audit_writer WITH PASSWORD '"+password.replace(/'/gu,"''")+"';");
+});
+test('Audit Writer SQL rejects unsupported clipboard content',()=>{
+ for(const value of ['short','A'.repeat(25)+'\\n','A'.repeat(25)+'\\u0000'])
+  assert.throws(()=>buildAuditRolePasswordSqlV1(value),/CLIPBOARD_SECRET_INVALID/u);
 });
