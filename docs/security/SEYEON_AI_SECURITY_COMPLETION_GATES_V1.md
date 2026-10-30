@@ -176,3 +176,11 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **커밋:** `b1ae10fb` (worker), `05c6f3fc` (adapter), `a0b6b147` (runtime).
 - **보안·활성화:** 실제 Production Worker는 기존 `enforceCurrentSourceAuthority=true`가 **OFF-only cleanup**만 허용하여 private claim 이전에 반환/차단한다. Planner 모델/DB 승인 callback도 부여하지 않아 호출 경로는 운영에서 계속 **DENY**다. 이를 실서비스 자동 제안 활성화로 주장하지 않는다.
 - **검증/다음:** 경로·권한 회귀 테스트와 새 HEAD CI 필요. G0/G4 승인·Model 원문 접근 근거·새 purpose 예산 및 G3 응답 결속 HOLD.
+
+
+### 2026-10-30 · W03 · Post-turn 결속 검증 및 차단 회귀 테스트
+
+- **구현/검증 코드:** `test/seyeon-post-turn-source-authority-hold.test.ts`에서 기존 Production `OFF` 정리/원문 차단 시 Planner 호출 0회·private claim 0회를 검증. `test/seyeon-post-turn-planner-memory-port-v1.test.ts`에서 snapshot/claim/체크포인트/모델 추출 순서, Owner 생산 경로, Member 검증, G0/G4 미승인 시 Provider·DB 호출 0회를 검증.
+- **커밋:** `757c3b07`, 테스트 구조 수정 `55065664`, `81798f05`.
+- **현재 상태:** 신규 HEAD에서 완결된 CI 결과 **아직 미확인**. 기존 Production OFF-only 정책, 기본 DENY, 운영 ACL 미변경.
+- **후속:** 최신 `main`이 S0 `14-g0-relationship-event-original-lineage.sql`을 추가하여 `plan.mjs`가 충돌한 상황. 타 트랙 작업을 보존하는 병합과 정확한 SHA 기반 CI 재검증이 필요.
