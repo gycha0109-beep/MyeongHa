@@ -79,6 +79,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function public.cmd_grant_seyeon_owned_conversation_recall_v1(
         uuid,uuid,uuid) to myeongha_api_executor;
+      grant usage on schema seyeon_private to myeongha_api_executor;
       grant execute on function seyeon_private.qry_seyeon_pending_planner_memory_decision_v1(uuid,uuid)
         to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
