@@ -2,7 +2,9 @@ import { createHash } from 'node:crypto';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
 import {
   selectSeyeonRuntimeRetrievedMemoriesV2,
+  selectSeyeonRuntimeRecentMessagesV2,
   type SeyeonRetrievedMemoryV2,
+  type SeyeonRecentMessageV2,
 } from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {
   SeyeonPersonalRecordProjectionCandidateV1,
@@ -43,12 +45,24 @@ export interface SeyeonSelectedUnpinnedDerivedSourceV1 {
   readonly originalGrantVerified: false;
 }
 
+export interface SeyeonSelectedModelRecentMessageSourceV1 {
+  readonly messageId: string;
+  readonly role: 'user' | 'assistant';
+  readonly selectedModelMessageDigest: string;
+  /** A source census is NOT the DB-owner G1 immutable attempt Pin. */
+  readonly persistedBeforeModel: false;
+}
+
 export interface SeyeonExactModelPersonalSourceSelectionV1 {
   readonly version: typeof SEYEON_EXACT_MODEL_PERSONAL_SOURCE_SELECTION_VERSION_V1;
   readonly selectedMemoryCount: number;
   readonly selectedPersonalRecordCount: number;
   readonly selectedSources: readonly SeyeonExactSelectedPersonalSourceV1[];
   readonly selectedSourcesDigest: string;
+  /** Exact DB-original current User input selected into the model, if supplied. */
+  readonly selectedCurrentUserSource: SeyeonSelectedModelRecentMessageSourceV1 | null;
+  /** Final-model historical User/Assistant text still requiring a durable G1 Pin. */
+  readonly selectedUnpinnedRecentSources: readonly SeyeonSelectedModelRecentMessageSourceV1[];
   /** Selection-time manifest of actual model-selected derived sources. */
   readonly selectedUnpinnedDerivedSources: readonly SeyeonSelectedUnpinnedDerivedSourceV1[];
   /** Whole selected-model source census, not a DB Pin or an active Grant. */
@@ -112,6 +126,10 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
   /** Server-owned first-Memory constraint; never a client/model capability. */
   readonly requiredPersonalRecordCount?: 1;
   readonly sourceCandidates: readonly SeyeonPersonalRecordProjectionCandidateV1[];
+  readonly recentMessages?: readonly SeyeonRecentMessageV2[];
+  readonly maxRecentMessages?: number;
+  /** Actual DB-received User message ID; only the execution runner supplies it. */
+  readonly currentUserMessageId?: string;
 }): SeyeonExactModelPersonalSourceSelectionV1 {
   if (!Array.isArray(input.retrievedMemories) ||
       !Array.isArray(input.sourceCandidates)) {
@@ -127,6 +145,49 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
       }),
     });
   } catch {
+    throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
+  }
+
+  let selectedRecent: readonly SeyeonRecentMessageV2[];
+  try {
+    if ((input.recentMessages !== undefined && !Array.isArray(input.recentMessages)) ||
+        (input.currentUserMessageId !== undefined &&
+          (!UUID.test(input.currentUserMessageId) || !Array.isArray(input.recentMessages)))) {
+      throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
+    }
+    selectedRecent = selectSeyeonRuntimeRecentMessagesV2({
+      recentMessages: input.recentMessages ?? [],
+      ...(input.maxRecentMessages === undefined ? {} : {
+        maxRecentMessages: input.maxRecentMessages,
+      }),
+    });
+  } catch {
+    throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
+  }
+  const selectedUnpinnedRecentSources: SeyeonSelectedModelRecentMessageSourceV1[] = [];
+  let selectedCurrentUserSource: SeyeonSelectedModelRecentMessageSourceV1 | null = null;
+  const seenRecent = new Set<string>();
+  for (const m of selectedRecent) {
+    if (!UUID.test(m.messageId) || seenRecent.has(m.messageId)) {
+      throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
+    }
+    seenRecent.add(m.messageId);
+    const source = Object.freeze({
+      messageId: m.messageId,
+      role: m.role,
+      selectedModelMessageDigest: hash(m),
+      persistedBeforeModel: false as const,
+    });
+    if (m.messageId === input.currentUserMessageId) {
+      if (m.role !== 'user' || selectedCurrentUserSource !== null) {
+        throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
+      }
+      selectedCurrentUserSource = source;
+    } else {
+      selectedUnpinnedRecentSources.push(source);
+    }
+  }
+  if (input.currentUserMessageId !== undefined && selectedCurrentUserSource === null) {
     throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
   }
 
@@ -210,9 +271,13 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
     selectedPersonalRecordCount: selectedSources.length,
     selectedSources: Object.freeze(selectedSources),
     selectedSourcesDigest: hash(selectedSources),
+    selectedCurrentUserSource,
+    selectedUnpinnedRecentSources: Object.freeze(selectedUnpinnedRecentSources),
     selectedUnpinnedDerivedSources: Object.freeze(selectedUnpinnedDerivedSources),
     selectedModelSourceCensusDigest: hash({
       originalPersonalSources: selectedSources,
+      currentUserSource: selectedCurrentUserSource,
+      unpinnedRecentSources: selectedUnpinnedRecentSources,
       unpinnedDerivedSources: selectedUnpinnedDerivedSources,
     }),
     persistedBeforeModel: false as const,
