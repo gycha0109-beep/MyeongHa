@@ -713,6 +713,13 @@ export async function runSeyeonProductionChatExecutionV1(
           ...(contextInput.maxRetrievedMemories === undefined ? {} : {
             maxRetrievedMemories: contextInput.maxRetrievedMemories,
           }),
+          // Exact recentConversation (including current DB User Turn) follows
+          // the SAME tail selection and cap as the final model assembler.
+          recentMessages: contextInput.recentMessages,
+          ...(contextInput.maxRecentMessages === undefined ? {} : {
+            maxRecentMessages: contextInput.maxRecentMessages,
+          }),
+          currentUserMessageId: receivedTurn.userMessageId,
           sourceCandidates: productionContext.personalRecordProjectionCandidates ?? [],
         });
 
