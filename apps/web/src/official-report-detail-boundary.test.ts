@@ -10,6 +10,7 @@ describe('Records long-form official report boundary', () => {
   const jsx = readWeb('src/reading-detail/ReadingDetailPage.tsx');
   const runtime = readWeb('reading-character.js');
   const css = readWeb('reading-detail-shell.css');
+  const localeRuntime = readWeb('ui-i18n.js');
 
   it('provides an all-at-once official Reading document without changing the preview route', () => {
     expect(jsx).toContain('data-official-report hidden');
@@ -150,6 +151,19 @@ describe('Records long-form official report boundary', () => {
     expect(css).toContain('[data-reading-step-notice-text]{white-space:pre-wrap;');
     expect(runtime).toContain("notices.filter((text) => typeof text === 'string' && text.trim()).join('\\n\\n')");
     expect(runtime).toContain("if (item.type === 'scope_limitation')");
+  });
+
+  it('protects supplemental and limitation source text from five-locale UI translation', () => {
+    expect(jsx).toContain('data-reading-supporting-body data-reading-content');
+    expect(jsx).toContain('data-reading-step-notice-text data-reading-content');
+    expect(jsx).toContain('data-reading-step-notice hidden aria-labelledby="reading-step-scope-heading"');
+    expect(jsx).toContain('id="reading-step-scope-heading" data-reading-step-notice-heading');
+    expect(localeRuntime).toContain('[data-reading-supporting-body], [data-reading-step-notice-text]');
+    expect(localeRuntime).toContain('[data-reading-content]');
+    expect(localeRuntime).toContain('if (!parent || parent.matches(\'textarea\') || isBlocked(parent)) return;');
+    expect(runtime).toContain("scopeNoticeHeading.textContent =");
+    expect(runtime).toContain("translateStaticUi('해석의 적용 범위', getUiLocale())");
+    expect(runtime).toContain('scopeNoticeText.textContent = visibleScopeNotice;');
   });
 
   it('blocks an explicit 403 without treating revoked access as a temporary Records failure', () => {

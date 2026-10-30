@@ -118,7 +118,7 @@ export function ReadingDetailPage() {
               <span className="reading-block-icon" aria-hidden="true">✦</span>
               <div>
                 <h2 data-reading-supporting-title>추가 해석</h2>
-                <p data-reading-supporting-body />
+                <p data-reading-supporting-body data-reading-content />
               </div>
             </section>
 
@@ -130,11 +130,11 @@ export function ReadingDetailPage() {
               </div>
             </section>
 
-            <aside className="reading-block" data-reading-step-notice hidden aria-label="공식 보고서 해석의 적용 범위">
+            <aside className="reading-block" data-reading-step-notice hidden aria-labelledby="reading-step-scope-heading">
               <span className="reading-block-icon" aria-hidden="true">※</span>
               <div>
-                <h2 data-reading-step-notice-heading>해석의 적용 범위</h2>
-                <p data-reading-step-notice-text />
+                <h2 id="reading-step-scope-heading" data-reading-step-notice-heading>해석의 적용 범위</h2>
+                <p data-reading-step-notice-text data-reading-content />
               </div>
             </aside>
 
