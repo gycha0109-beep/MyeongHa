@@ -154,7 +154,7 @@ describe('Records long-form official report boundary', () => {
   });
 
   it('protects supplemental and limitation source text from five-locale UI translation', () => {
-    expect(jsx).toContain('data-reading-step-title data-reading-content');
+    expect(jsx).toContain('data-reading-step-title tabIndex={-1} data-reading-content');
     expect(jsx).toContain('data-reading-supporting-body data-reading-content');
     expect(jsx).toContain('data-reading-step-notice-text data-reading-content');
     expect(jsx).toContain('data-reading-step-notice hidden aria-labelledby="reading-step-scope-heading"');
