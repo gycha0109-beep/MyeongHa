@@ -114,7 +114,8 @@ begin
     and g.memory_item_id=v_record and g.life_fact_id is null
     and g.grantee_character_id='seyeon'
     and g.grant_reason='user_choice' and g.revoked_at is null
-    and g.seyeon_revoke_requested_at is null
+    -- lock_original_memory_grant_v1 already checks pending withdrawal
+    -- under a held SHARE lock; do not request extra grant-table columns.
     and m.revoked_at is null and m.source_kind='user_approved'
     and m.memory_type=v_pin->>'recordType'
     and m.schema_version=v_pin->>'recordSchemaVersion'
