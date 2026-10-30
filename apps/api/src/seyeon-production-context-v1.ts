@@ -405,6 +405,7 @@ export async function composeSeyeonProductionContextV1(
       subjectId,
       threadId,
       limit: recentLimit + 1,
+      currentUserMessageRef,
     }),
   ]);
 

@@ -333,7 +333,6 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }))).rejects.toMatchObject({ constraint: 'seyeon_private_memory_accept_summary_invalid' });
   });
 
-
   it('DB Planner Character source admits atomic Member Memory+Grant, manual UserMessage denied',async()=>{
     // Dedicated S0 Planner fixture namespace (201-202); history-presence uses 13.
     const f=await prepare(201);
@@ -480,7 +479,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const { rows: [stored] } = await pool.query(`select body_text from public.conversation_messages where id=$1`, [f.assistant]);
     expect(stored.body_text).toBe(f.assistantText);
     await f.revoke();
-    expect((await f.readContext()).retrievedMemories).toHaveLength(0);
+    await expect(f.readContext()).rejects.toMatchObject({
+      constraint: 'seyeon_source_lock_original_grant_required',
+    });
     await f.locked()({ signal: new AbortController().signal, deliver: async body => { expect(body).toBeNull(); } });
     console.info('VIRTUAL_MEMORY_E2E ' + JSON.stringify({
       case: 'approved-memory-first-reply', memory: summary,
@@ -498,7 +499,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(response.cache).toBe('no-store');
     expect(response.body).not.toContain(summary);
     expect(response.body).not.toContain(f.assistantText);
-    expect((await f.readContext()).retrievedMemories).toHaveLength(0);
+    await expect(f.readContext()).rejects.toMatchObject({
+      constraint: 'seyeon_source_lock_original_grant_required',
+    });
     console.info('VIRTUAL_MEMORY_E2E ' + JSON.stringify({
       case: 'revoke-before-first-reveal', model: 'local-synthetic-no-provider',
       httpStatus: response.status, privateBodyExposed: false,
@@ -559,7 +562,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[g]}=await pool.query(`select revoked_at,seyeon_revoke_requested_at
       from public.record_access_grants where id=$1`,[f.grant]);
     expect(g.revoked_at).toBeNull();expect(g.seyeon_revoke_requested_at).not.toBeNull();
-    expect((await f.readContext()).retrievedMemories).toHaveLength(0);
+    await expect(f.readContext()).rejects.toMatchObject({
+      constraint: 'seyeon_source_lock_original_grant_required',
+    });
     await expect(f.revoke()).rejects.toMatchObject({constraint:'seyeon_positive_delivery_receipt_pending'});
     await expect(pool.query('update public.memory_items set revoked_at=clock_timestamp() where id=$1',[f.memory]))
       .rejects.toMatchObject({constraint:'seyeon_positive_delivery_receipt_pending'});

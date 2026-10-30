@@ -84,6 +84,7 @@ describe('Se-yeon/Reader negative authority checks under synthetic prompt inject
     );
     expect(port.readRecentMessages).toHaveBeenCalledExactlyOnceWith({
       subjectId: subject, threadId: thread, limit: 13,
+      currentUserMessageRef: 'user-current',
     });
   });
 

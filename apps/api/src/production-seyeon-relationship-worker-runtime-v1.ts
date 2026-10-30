@@ -30,6 +30,26 @@ import type {
 export const PRODUCTION_SEYEON_RELATIONSHIP_WORKER_RUNTIME_VERSION_V1 =
   'production-seyeon-relationship-worker-runtime-v1' as const;
 
+/**
+ * G3: queued relationship Events may contain prior personal/derived sources.
+ * Neither event.authority nor a valid Outbox lease proves that the original
+ * Grant and each derived origin are still valid at apply time.
+ */
+export class SeyeonRelationshipSyncSourceAuthorityHoldV1 extends Error {
+  readonly code = 'SEYEON_RELATIONSHIP_SYNC_SOURCE_AUTHORITY_HOLD' as const;
+  constructor() {
+    super('Relationship sync requires current original Grant and derived-source authorization.');
+    this.name = 'SeyeonRelationshipSyncSourceAuthorityHoldV1';
+  }
+}
+
+/** Production cannot consume historical relationship Outbox material until
+ * a DB-owner current-original-Grant + derived-lineage gate is connected.
+ */
+export function assertSeyeonRelationshipSyncCurrentSourceAuthorityV1(): void {
+  throw new SeyeonRelationshipSyncSourceAuthorityHoldV1();
+}
+
 export interface RunProductionSeyeonRelationshipWorkerInputV1 {
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly outboxEventId: string;
@@ -72,6 +92,10 @@ export function createProductionSeyeonRelationshipWorkerRuntimeV1(
     async run(
       runInput: RunProductionSeyeonRelationshipWorkerInputV1,
     ): Promise<RunProductionSeyeonRelationshipWorkerResultV1> {
+      // No claim, payload read, relationship-state lock or apply is permitted
+      // merely because an old Event was enqueued before Grant revocation.
+      // This also closes queued legacy Events created before the Post-turn HOLD.
+      assertSeyeonRelationshipSyncCurrentSourceAuthorityV1();
       const runner =
         createSeyeonProductionSubjectTransactionRunnerV1({
           pool: poolLease.pool,

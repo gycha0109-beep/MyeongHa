@@ -48,6 +48,8 @@ export interface SeyeonProductionContextReadAuthorityPortV1 {
     readonly subjectId: string;
     readonly threadId: string;
     readonly limit: number;
+    /** Canonical DB-original current User message, never client provenance. */
+    readonly currentUserMessageRef?: string;
   }): Awaitable<readonly SeyeonProductionRecentMessageAuthorityRowV1[]>;
 }
 

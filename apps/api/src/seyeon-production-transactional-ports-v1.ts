@@ -8,6 +8,9 @@ import {
   createPostgresSeyeonPostTurnAnalysisOutboxPortV1,
 } from './postgres-seyeon-post-turn-analysis-worker-v1.js';
 import {
+  createPostgresSeyeonPostTurnOffWithoutTextPortV1,
+} from './postgres-seyeon-post-turn-off-no-text-v1.js';
+import {
   createPostgresSeyeonProductionChatPersistencePortV1,
 } from './postgres-seyeon-production-chat-execution-v1.js';
 import {
@@ -213,6 +216,25 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
 
   const postTurnAnalysis: SeyeonPostTurnAnalysisOutboxPortV1 =
     Object.freeze({
+      preflightClaim(request: { subjectId: string; outboxEventId: string }) {
+        requireSubject(subjectId, request.subjectId);
+        return runner.run(subjectId, (client) =>
+          createPostgresSeyeonPostTurnAnalysisOutboxPortV1(client)
+            .preflightClaim!(request),
+        );
+      },
+      completeOffWithoutText(request: {
+        subjectId: string;
+        outboxEventId: string;
+        lockOwner: string;
+        leaseExpiresAt: string;
+      }) {
+        requireSubject(subjectId, request.subjectId);
+        return runner.run(subjectId, (client) =>
+          createPostgresSeyeonPostTurnOffWithoutTextPortV1(client)
+            .completeOff(request),
+        );
+      },
       findByTurn(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['findByTurn']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>

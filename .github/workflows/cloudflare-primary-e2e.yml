@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   anonymous:
-    name: Cloudflare live E2E - anonymous ingress and HOLD
+    name: Cloudflare live E2E - read-only operations ingress admission
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -33,8 +33,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Verify exact governed Cloudflare production ingress (no secrets)
+      - name: Verify readiness, auth-denial and no-store on live Cloudflare (no secrets)
         env:
-          MYEONGHA_CLOUDFLARE_E2E_MODE: anonymous
+          MYEONGHA_CLOUDFLARE_E2E_MODE: operations
         run: node scripts/verify-cloudflare-primary-e2e.mjs
 
