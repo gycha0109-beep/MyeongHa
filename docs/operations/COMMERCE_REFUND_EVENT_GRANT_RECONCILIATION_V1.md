@@ -1,36 +1,61 @@
-# Commerce refund-tagged Provider Event / Grant reconciliation v1
+# Commerce refund/cancellation event ↔ purchase Grant audit v1
 
-Track: `commerce-payment`. Offline PostgreSQL operations inspection only.
+Track: `commerce-payment`. Offline, fully visible, read-only PostgreSQL operations inspection.
 
-## Gap addressed
+## Scope
 
-The existing general Receipt/Attempt/paid-Credit audit checks payment integrity but does not separately show which verified production Provider Events tagged `refund` already have purchase-derived Entitlement Grants and whether an exact event-to-revoked effect was recorded.
+The existing generic Receipt/Attempt/Credit audit does not separately reconcile
+verified PortOne cancellation tags with exact Receipt-backed Entitlement Grants.
+This script observes both historically used `refund` and `payment.cancelled`
+event types. Neither label independently establishes a **fully or partially
+settled refund**, nor proves that automatic purchase access revocation is lawful.
 
-This matters before designing the P4 refund/revoke connection: a Provider Event could be unrelated to an exact purchase Grant, a late replay, incomplete receipt resolution, or a **partial** refund. Never revoke access from an unverified or ambiguous external signal.
+Implementation: `scripts/operations/commerce-refund-event-grant-reconciliation-v1.mjs`,
+`reconcileRefundEventGrantsReadOnlyV1(client)`.
 
-Implementation: `scripts/operations/commerce-refund-event-grant-reconciliation-v1.mjs`, `reconcileRefundEventGrantsReadOnlyV1(client)`.
+Supply an existing approved operations connection with full RLS visibility,
+pinned TLS CA and no caller transaction. The tool starts REPEATABLE READ
+READ ONLY, checks visibility, sets a 10-second statement timeout and rolls
+back. A database failure or incomplete visibility is not a successful audit.
 
-## Operator procedure
+## Counters
 
-Use a full-visibility read-only operations connection already governed by MyeongHa Postgres CA/TLS and connection-role rules. Invoke outside another transaction. The inspector starts `REPEATABLE READ READ ONLY`, sets a 10-second statement timeout, verifies a complete-visibility role, executes only SELECT and rolls back. Restricted RLS/ACL, query error and malformed count output are not PASS.
+- `productionRefundTaggedEvents`: total matching `refund` and `payment.cancelled` PortOne production events
+- `productionLegacyRefundTaggedEvents`: matching events tagged `refund`
+- `productionPaymentCancelledTaggedEvents`: matching events tagged `payment.cancelled`
+- `refundEventsWithoutVerifiedStatus`: cancellation/refund tags not verified or processed
+- `verifiedRefundEventsWithoutExactReceipt`: verified tag lacks a precise production Receipt match by Subject, Provider, resolved Receipt and **original transaction lineage**
+- `verifiedRefundEventsWithoutPurchaseGrant`: exact Receipt exists, but no receipt-backed purchase Grant is linked
+- `activePurchaseGrantsAtRefundEvent`: active purchase Grants linked by exact Receipt/Subject
+- `revokedPurchaseGrantsAtRefundEvent`: revoked purchase Grants linked by exact Receipt/Subject
+- `exactRefundEventRevocationEffects`: linked Grants with the same Provider Event recorded as a revoked Entitlement Effect
+- `verifiedRefundEventsWithoutOrderingKey`: verified tagged events without provider ordering metadata
 
-## Aggregate counters
+Only aggregate decimal counts are returned; there are no customer, Reading,
+Reader, receipt identifiers, card data or PSP payloads. A count represents
+**current DB state**, not a chronological history of refund settlement.
 
-- `productionRefundTaggedEvents`: `portone_v2` production Provider Events with the existing `refund` tag (irrespective of verification state)
-- `refundEventsWithoutVerifiedStatus`: event tag exists but verified/processed status is absent
-- `verifiedRefundEventsWithoutExactReceipt`: verified tag lacks production verified/revoked Receipt and exact receipt-based resolution
-- `verifiedRefundEventsWithoutPurchaseGrant`: a matching Receipt exists but no receipt-owned purchase Grant is linked
-- `activePurchaseGrantsAtRefundEvent`: currently active purchase Grants linked by exact Receipt/Subject
-- `revokedPurchaseGrantsAtRefundEvent`: currently revoked purchase Grants linked by exact Receipt/Subject
-- `exactRefundEventRevocationEffects`: linked Grants for which the exact Provider Event appears as a revoked Entitlement Event source
-- `verifiedRefundEventsWithoutOrderingKey`: verified tags missing explicit provider ordering provenance
+## Reader-specific drill-down
 
-Only aggregate decimal count strings are emitted. No customer, identity, PSP token, Card data or birth/Reading content is returned. These counters describe current rows, not the historical order of refund versus grant events.
+`scripts/operations/commerce-exact-reader-cancellation-evidence-v1.mjs`
+checks one known verified production event and exact independent Reader
+purchase Grant, including official Reading, original purchase intent, transaction
+lineage, current Grant state and exact revoked-event provenance. It reports only
+whether the connection exists and how many **other purchase Grants** for that
+Reading remain active. Other purchase Grants may represent other Reader choices;
+the count alone does not prove they are different people or Readers.
 
-## Critical activation HOLD
+Both read-only auditors maintain `fullRefundProven=false` /
+`fullRefundEstablished=false`, no refund approval, no automatic revocation,
+no PG cancel, no new Entitlement Effect, and no public endpoint.
 
-**An event tagged `refund` is NOT evidence of full refund.** The exact full/partial amount and ordering authority are not implemented here. No grant is revoked, no existing Entitlement Effect is called, and no PortOne cancellation/verification call occurs. Output always carries `fullRefundProven=false`, `partialRefundResolved=false`, `eventOrderingAuthorized=false`, `revocationAuthorized=false`, `providerCancellationAuthorized=false`, `pspCallsPerformed=false`, `writesPerformed=false`.
+## Validation
 
-Before P4 refund execution: obtain exact verified provider cancellation/final-state evidence (including full/partial and amount), approved refund/chargeback provider ordering, source Receipt/subject/Grant mapping, idempotent application through the **existing** Entitlement Effect primitive, and Reader T2 locking/revoke race admission. Preserve all independent Product/Legal/Saju/Reader and LIVE HOLD gates.
+Synthetic Vitest contract tests plus disposable PostgreSQL 17 SQL parsing and
+Reader A / Reader B fixture. In the fixture, Reader A's exact revocation event is
+recorded, Reader B retains its separate active purchase Grant, and mismatched
+provider transaction lineage fails to bind.
 
-Tests are deterministic offline SQL-contract and operational-visibility checks, not live-provider reconciliation or production DB verification.
+Actual provider refund finality, exact full-versus-partial amount, source
+ordering, Reader T2 lock integration, production ledger replay verification and
+the approved Legal/Commerce contract remain release blockers.

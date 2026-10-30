@@ -1,53 +1,58 @@
 // Watchtower-Track: commerce-payment
-// Offline, complete-visibility READ ONLY Postgres inspector.
-//
-// PortOne V2 event_type='refund' is an inspection TAG, not proof that the
-// whole purchase was refunded. The existing Commerce Provider Event contract
-// lacks approved full-vs-partial refund amount semantics. Never use this
-// inspector to apply Entitlement Effects or call PortOne cancellations.
+// Offline, complete-visibility READ ONLY Postgres inspection.
+// 'refund' and 'payment.cancelled' are evidence TAGS, never full-refund proof.
 export const COMMERCE_REFUND_EVENT_GRANT_RECONCILIATION_SQL_V1 = `
 with refund_events as (
-  select event.id,
-         event.status,
-         event.resolution_source_type,
-         event.provider_ordering_key,
-         receipt.id as receipt_id,
-         coalesce(rights.grant_count,0)::bigint as grant_count,
-         coalesce(rights.active_grant_count,0)::bigint as active_grant_count,
-         coalesce(rights.revoked_grant_count,0)::bigint as revoked_grant_count,
-         coalesce(rights.exact_event_revoked_count,0)::bigint as exact_event_revoked_count
-  from public.commerce_provider_events event
-  left join public.commerce_receipts receipt
-    on receipt.id=event.resolved_receipt_id
-   and receipt.subject_id=event.resolved_subject_id
-   and receipt.provider=event.provider
-   and receipt.environment='production'
-   and receipt.verification_status in ('verified','revoked')
-  left join lateral (
-    select count(*) as grant_count,
-           count(*) filter (where grant.status='active') as active_grant_count,
-           count(*) filter (where grant.status='revoked') as revoked_grant_count,
-           count(*) filter (
-             where exists(
-               select 1 from public.entitlement_events effect
-               where effect.grant_id=grant.id
-                 and effect.source_type='provider_event'
-                 and effect.source_provider_event_id=event.id
-                 and effect.event_type='revoked'
-             )
-           ) as exact_event_revoked_count
-    from public.entitlement_grants grant
-    where grant.source_receipt_id=receipt.id
-      and grant.subject_id=receipt.subject_id
-      and grant.grant_source_type='purchase'
-  ) rights on true
-  where event.provider='portone_v2'
-    and event.environment='production'
-    and event.event_type='refund'
+ select event.id,event.event_type,event.status,
+        event.resolution_source_type,event.provider_ordering_key,
+        receipt.id as receipt_id,
+        coalesce(rights.grant_count,0)::bigint as grant_count,
+        coalesce(rights.active_grant_count,0)::bigint as active_grant_count,
+        coalesce(rights.revoked_grant_count,0)::bigint as revoked_grant_count,
+        coalesce(rights.exact_event_revoked_count,0)::bigint as exact_event_revoked_count
+ from public.commerce_provider_events event
+ left join public.commerce_receipts receipt
+   on receipt.id=event.resolved_receipt_id
+  and receipt.subject_id=event.resolved_subject_id
+  and receipt.provider=event.provider
+  and receipt.environment='production'
+  and receipt.verification_status in ('verified','revoked')
+  and (
+    event.external_transaction_id=receipt.external_transaction_id
+    or (event.external_original_transaction_id is not null
+      and event.external_original_transaction_id=receipt.external_transaction_id)
+    or (receipt.external_original_transaction_id is not null
+      and event.external_transaction_id=receipt.external_original_transaction_id)
+    or (receipt.external_original_transaction_id is not null
+      and event.external_original_transaction_id is not null
+      and event.external_original_transaction_id=receipt.external_original_transaction_id)
+  )
+ left join lateral (
+   select count(*) as grant_count,
+          count(*) filter (where g.status='active') as active_grant_count,
+          count(*) filter (where g.status='revoked') as revoked_grant_count,
+          count(*) filter (where exists(
+            select 1 from public.entitlement_events effect
+            where effect.grant_id=g.id and effect.source_type='provider_event'
+              and effect.source_provider_event_id=event.id
+              and effect.event_type='revoked'
+          )) as exact_event_revoked_count
+   from public.entitlement_grants g
+   where g.source_receipt_id=receipt.id
+     and g.subject_id=receipt.subject_id
+     and g.grant_source_type='purchase'
+ ) rights on true
+ where event.provider='portone_v2'
+   and event.environment='production'
+   and event.event_type in ('refund','payment.cancelled')
 )
 select
  (select count(*)::text from refund_events)
    as "productionRefundTaggedEvents",
+ (select count(*)::text from refund_events where event_type='refund')
+   as "productionLegacyRefundTaggedEvents",
+ (select count(*)::text from refund_events where event_type='payment.cancelled')
+   as "productionPaymentCancelledTaggedEvents",
  (select count(*)::text from refund_events
    where status not in ('verified','processed'))
    as "refundEventsWithoutVerifiedStatus",
@@ -75,6 +80,8 @@ select
 
 const FIELDS=Object.freeze([
  'productionRefundTaggedEvents',
+ 'productionLegacyRefundTaggedEvents',
+ 'productionPaymentCancelledTaggedEvents',
  'refundEventsWithoutVerifiedStatus',
  'verifiedRefundEventsWithoutExactReceipt',
  'verifiedRefundEventsWithoutPurchaseGrant',

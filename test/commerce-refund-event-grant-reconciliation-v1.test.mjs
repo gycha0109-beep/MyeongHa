@@ -6,7 +6,8 @@ import {
 } from '../scripts/operations/commerce-refund-event-grant-reconciliation-v1.mjs';
 
 const zeros=Object.freeze({
- productionRefundTaggedEvents:'0',refundEventsWithoutVerifiedStatus:'0',
+ productionRefundTaggedEvents:'0',
+ productionLegacyRefundTaggedEvents:'0',productionPaymentCancelledTaggedEvents:'0',refundEventsWithoutVerifiedStatus:'0',
  verifiedRefundEventsWithoutExactReceipt:'0',
  verifiedRefundEventsWithoutPurchaseGrant:'0',
  activePurchaseGrantsAtRefundEvent:'0',
@@ -31,11 +32,11 @@ describe('offline refund-tagged provider Event to exact purchase Grant review',(
   const sql=COMMERCE_REFUND_EVENT_GRANT_RECONCILIATION_SQL_V1;
   expect(sql).toContain("event.provider='portone_v2'");
   expect(sql).toContain("event.environment='production'");
-  expect(sql).toContain("event.event_type='refund'");
+  expect(sql).toContain("event.event_type in ('refund','payment.cancelled')");
   expect(sql).toContain("receipt.verification_status in ('verified','revoked')");
-  expect(sql).toContain("grant.source_receipt_id=receipt.id");
-  expect(sql).toContain("grant.subject_id=receipt.subject_id");
-  expect(sql).toContain("grant.grant_source_type='purchase'");
+  expect(sql).toContain("g.source_receipt_id=receipt.id");
+  expect(sql).toContain("g.subject_id=receipt.subject_id");
+  expect(sql).toContain("g.grant_source_type='purchase'");
   expect(sql).toContain('effect.source_provider_event_id=event.id');
   expect(sql).not.toMatch(/\b(insert|update|delete|grant|revoke|truncate)\s+(into|from|table|on)/i);
  });
@@ -53,6 +54,8 @@ describe('offline refund-tagged provider Event to exact purchase Grant review',(
   expect(c.query.mock.calls.at(-1)[0]).toBe('rollback');
  });
  it.each([
+  'productionLegacyRefundTaggedEvents',
+  'productionPaymentCancelledTaggedEvents',
   'refundEventsWithoutVerifiedStatus',
   'verifiedRefundEventsWithoutExactReceipt',
   'verifiedRefundEventsWithoutPurchaseGrant',
