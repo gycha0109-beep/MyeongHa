@@ -1,10 +1,10 @@
-export interface ChatRoomOriginalMemoryOfferV1 {
-  readonly sourceAuthority: 'server_original_message';
+export interface ChatRoomPlannerMemoryProposalV1 {
+  readonly sourceAuthority: 'server_dialogue_planner';
   readonly characterId: 'seyeon';
-  readonly redacted: false;
-  readonly threadId: string;
-  readonly turnId: string;
-  readonly messageId: string;
+  readonly proposalId: string;
+  readonly proposalKind: 'memory' | 'life_fact';
+  readonly proposalState: 'pending';
+  readonly summary: string;
 }
 
 export interface ChatRoomReadMessageV1 {
@@ -16,7 +16,7 @@ export interface ChatRoomReadMessageV1 {
   readonly createdAt: string;
   readonly redacted: boolean;
   readonly redactedAt: string | null;
-  readonly memoryProposalOffer?: Readonly<ChatRoomOriginalMemoryOfferV1>;
+  readonly memoryProposal?: Readonly<ChatRoomPlannerMemoryProposalV1>;
 }
 
 export interface ChatRoomReadPayloadV1 {
