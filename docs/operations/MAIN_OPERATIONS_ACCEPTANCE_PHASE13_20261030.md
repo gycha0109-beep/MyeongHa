@@ -50,3 +50,13 @@ Read-only Cloudflare API endpoints used: \`GET /accounts/{account_id}/workers/sc
 **Explicit acceptance boundary:** This evidence is only applicable to the pinned Worker version and observation time. It does not turn any of the other §33 requirements to PASS, nor supersede Phase 8 \`dr_ready=false\` and \`serviceResumptionAllowed=false\`. Real authenticated synthetic Member/Saju checks and provider-level rollback proofs remain governed, separately scoped operations. This record must not trigger production writes, external load tests, SQL repairs or release gates.
 
 Watchtower-Track: ops
+
+## Phase 13 live read-only ingress admission
+
+The existing `Cloudflare Primary Worker E2E` workflow now runs `scripts/verify-cloudflare-primary-e2e.mjs` in `operations` mode for the path-scoped PR/main triggers. The mode sends **only anonymous or deliberately invalid public diagnostic requests** to the pinned production Worker origin; no login, token, paid calculation, DB mutation, account creation, or provider chat request occurs.
+
+The probe rejects missing/mismatched Worker version headers between governed API responses. It requires health `200`, configuration readiness `200`, and `401` denials on anonymous Member and both Saju endpoints. The existing envelope still verifies no-store, no reflective cookies/CORS headers, security headers, method fencing and cross-origin login rejection. It intentionally skips the protected Chat HOLD probes, which are owned by their own security/product track rather than an operations-readiness admission.
+
+**Evidence rule:** cite an actual successful live workflow run (URL, timestamp, Worker version, request/result summaries) before marking the observed health/config readiness, negative-auth and no-store behaviors verified. A mocked unit test or this workflow definition is not live evidence. Live `readiness` is **configuration-only**, not DB/Auth/Saju connectivity proof, and this mode does not perform positive authenticated synthetic smoke, metrics inspection, rollback or DR recovery. The complete §33 Production acceptance status is still **NOT_ACCEPTED** until its independent prerequisites are satisfied. The status is tied to the observed Worker version and is invalidated by a later deployment.
+
+Watchtower-Track: ops

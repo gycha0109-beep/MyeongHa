@@ -108,4 +108,69 @@ describe('Cloudflare primary live E2E verifier (offline harness)', () => {
     })).rejects.toThrow(/pinned/);
     expect(CLOUDFLARE_PRIMARY_E2E_ORIGIN).toBe('https://myeongha.gycha0109.workers.dev');
   });
+
+  it('admits only 200 config readiness with exact Member and Saju anonymous denials', async () => {
+    const version = '123e4567-e89b-42d3-a456-426614174000';
+    const healthy = mockFetch({
+      '/api/readiness': () => Response.json({
+        status: 'ready', capabilities: { userData: 'ready' },
+      }, { status: 200, headers }),
+      '/api/me/saju/calculation': () => Response.json({
+        ok: false, error: { code: 'AUTH_REQUIRED' },
+      }, { status: 401, headers }),
+      '/api/me/saju/preview-reading': () => Response.json({
+        ok: false, error: { code: 'AUTH_REQUIRED' },
+      }, { status: 401, headers }),
+    });
+    const versionedFetch = async (url, init) => {
+      const response = await healthy.fetchImpl(url, init);
+      if (!new URL(url).pathname.startsWith('/api/')) return response;
+      const versionedHeaders = new Headers(response.headers);
+      versionedHeaders.set('x-myeongha-worker-version', version);
+      return new Response(response.body, {
+        status: response.status, headers: versionedHeaders,
+      });
+    };
+    const result = await runCloudflarePrimaryE2E({
+      mode: 'operations', fetchImpl: versionedFetch,
+    });
+    expect(result).toMatchObject({
+      result: 'PASS', mode: 'operations',
+      observedWorkerVersion: version,
+      readinessScope: 'configuration-only',
+      liveDependencyConnectivityProven: false,
+      productionAcceptanceProven: false,
+    });
+    expect(result.checks).toHaveLength(11);
+    expect(result.checks.map(x => x.name)).toContain('api.operations_config_and_auth_denial');
+    expect(healthy.visited.some(x => x.path.startsWith('/api/chat'))).toBe(false);
+    expect(healthy.visited.some(x => x.path === '/api/auth/sign-in' &&
+      x.method === 'POST')).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('AUTH_REQUIRED');
+  });
+
+  it('does not accept degraded, absent or misversioned operations readiness', async () => {
+    const version = '123e4567-e89b-42d3-a456-426614174000';
+    const wrapVersion = (wrapped, changed = false) => async (url, init) => {
+      const response = await wrapped(url, init);
+      if (!new URL(url).pathname.startsWith('/api/')) return response;
+      const h = new Headers(response.headers);
+      h.set('x-myeongha-worker-version',
+        changed && new URL(url).pathname === '/api/readiness'
+          ? '223e4567-e89b-42d3-a456-426614174000' : version);
+      return new Response(response.body, { status: response.status, headers: h });
+    };
+    const denied = mockFetch();
+    await expect(runCloudflarePrimaryE2E({
+      mode: 'operations', fetchImpl: wrapVersion(denied.fetchImpl),
+    })).rejects.toThrow(/Cloudflare operations NOT_ACCEPTED: config readiness=503/);
+    const inconsistent = mockFetch();
+    await expect(runCloudflarePrimaryE2E({
+      mode: 'operations', fetchImpl: wrapVersion(inconsistent.fetchImpl, true),
+    })).rejects.toThrow(/readiness changed Worker version/);
+    await expect(runCloudflarePrimaryE2E({
+      mode: 'operations', fetchImpl: inconsistent.fetchImpl,
+    })).rejects.toThrow(/health is missing its exact Worker version/);
+  });
+
 });
