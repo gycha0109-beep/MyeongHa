@@ -1,43 +1,46 @@
+// Watchtower-Track: security
 export class SeyeonPrivateMemoryReviewErrorV1 extends Error {
   readonly code: string;
   constructor(code: string, message: string, cause?: unknown);
 }
 
-export interface SeyeonOriginalUserMessageSourceV1 {
-  readonly threadId: string;
-  readonly turnId: string;
-  readonly messageId: string;
-}
+export type MemoryDecisionChoiceV1 =
+  | 'session_only' | 'character_only' | 'current_characters' | 'discard';
 
-export interface SeyeonPrivateMemoryProposalReceiptV1 {
+export interface ServerPlannerMemoryProposalV1 {
+  readonly sourceAuthority: 'server_dialogue_planner';
+  readonly characterId: 'seyeon';
   readonly proposalId: string;
-  readonly proposalKind: 'memory';
+  readonly proposalKind: 'memory' | 'life_fact';
   readonly proposalState: 'pending';
-  readonly shareState: 'private_not_accepted';
+  readonly summary: string;
 }
 
-export interface SeyeonPrivateMemoryAcceptedReceiptV1 {
-  readonly memoryItemId: string;
-  readonly grantCount: 0;
-  readonly shareState: 'private_not_shared';
+export interface SeyeonMemoryDecisionReceiptV1 {
+  readonly proposalId: string;
+  readonly decision: MemoryDecisionChoiceV1;
+  readonly status: 'resolved';
+  readonly persisted: boolean;
+  readonly grantCount: number;
 }
 
 export interface SeyeonPrivateMemoryReviewClientOptionsV1 {
   readonly fetchImpl?: (endpoint: string, init?: RequestInit) => Promise<Response>;
   readonly resolveBearer?: () => Promise<{ kind: string; token: string } | null> |
     { kind: string; token: string } | null;
-  readonly chatEndpoint?: string;
   readonly proposalEndpoint?: string;
 }
+
+export function isServerPlannerMemoryProposalV1(
+  value: unknown,
+): value is Readonly<ServerPlannerMemoryProposalV1>;
 
 export function createSeyeonPrivateMemoryReviewClientV1(
   options?: SeyeonPrivateMemoryReviewClientOptionsV1,
 ): Readonly<{
-  prepareOriginalUserMessage(
-    source: SeyeonOriginalUserMessageSourceV1,
-  ): Promise<Readonly<SeyeonPrivateMemoryProposalReceiptV1>>;
-  acceptPreparedPrivate(
-    receipt: SeyeonPrivateMemoryProposalReceiptV1,
-    memberConfirmed: boolean,
-  ): Promise<Readonly<SeyeonPrivateMemoryAcceptedReceiptV1>>;
+  decidePlannerProposal(
+    proposal: ServerPlannerMemoryProposalV1,
+    choice: MemoryDecisionChoiceV1,
+    confirmed: boolean,
+  ): Promise<Readonly<SeyeonMemoryDecisionReceiptV1>>;
 }>;
