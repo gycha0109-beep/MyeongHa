@@ -120,6 +120,15 @@ begin
   on conflict on constraint memory_proposals_retry_unique do nothing
   returning true into v_created;
 
+  -- The legacy source-character constraint trigger is INITIALLY DEFERRED
+  -- and runs as the transaction's ordinary API role at COMMIT. That role
+  -- must NOT get SELECT on conversation_messages. Flush the exact trigger
+  -- while still inside this postgres-owned SECURITY DEFINER invocation,
+  -- then restore its deferred mode for the rest of the transaction.
+  -- The original constraint is enforced, never disabled or skipped.
+  set constraints public.ct_memory_proposal_source_character immediate;
+  set constraints public.ct_memory_proposal_source_character deferred;
+
   select p.id,p.status,p.proposed_value_jsonb,p.source_message_id
     into v_original
   from public.memory_proposals p
