@@ -92,7 +92,8 @@ describe('S0 private Memory: two distinct Member choices, no implicit character 
 
   it('rejects extra content, invalid original IDs, and guests before transport',async()=>{
     const {client,fetchImpl}=setup();
-    await expect(client.prepareOriginalUserMessage({...SOURCE,summary:'injected'}))
+    const forgedSource = {...SOURCE,summary:'injected'};
+    await expect(client.prepareOriginalUserMessage(forgedSource))
       .rejects.toMatchObject({code:'SEYEON_MEMORY_REVIEW_SOURCE_INVALID'});
     await expect(client.prepareOriginalUserMessage({...SOURCE,messageId:'forged'}))
       .rejects.toMatchObject({code:'SEYEON_MEMORY_REVIEW_SOURCE_INVALID'});
