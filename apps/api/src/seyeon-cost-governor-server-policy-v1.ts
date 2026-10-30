@@ -60,6 +60,7 @@ const PURPOSES: ReadonlySet<SeyeonStructuredPurposeV2> = new Set([
   'dialogue_render',
   'semantic_review',
   'event_extraction',
+  'memory_proposal_extraction',
 ]);
 
 function id(value: string, label: string): void {
