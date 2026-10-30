@@ -68,7 +68,10 @@ export async function measureControlledLoopbackCapacity(
           invalid('unexpected diagnostic response size or redirect');
         }
         results[index] = { status: response.status, duration: clock() - startedAt };
-      } catch {
+      } catch (error) {
+        if (error instanceof Error && error.message.startsWith('LOCAL_CAPACITY_PROBE:')) {
+          throw error;
+        }
         results[index] = { status: null, duration: clock() - startedAt };
       } finally {
         inFlight--;
