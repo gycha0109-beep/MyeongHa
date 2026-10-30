@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assertSeyeonPostTurnSourceAuthorityV1,
+  processSeyeonPostTurnAnalysisV1,
   SeyeonPostTurnSourceAuthorityHoldV1,
 } from '../apps/api/src/seyeon-post-turn-analysis-worker-v1.js';
 
@@ -16,5 +17,23 @@ describe('Production post-turn source authority', () => {
       schemaVersion: 'seyeon-post-turn-analysis-checkpoint-v1',
       decision: 'relationship_event',
     })).toThrow(SeyeonPostTurnSourceAuthorityHoldV1);
+  });
+
+  it('refuses an unverified production job before DB claim or model input', async () => {
+    let claimCalls=0;
+    const port={
+      preflightClaim:async()=> 'hold' as const,
+      claim:async()=>{claimCalls++;throw Error('must not claim');},
+    };
+    await expect(processSeyeonPostTurnAnalysisV1({
+      subjectId:'subject',
+      outboxEventId:'outbox',
+      lockOwner:'worker',
+      leaseExpiresAt:'2026-10-30T00:00:00Z',
+      outboxPort:port as never,
+      extractorProvider:{} as never,
+      enforceCurrentSourceAuthority:true,
+    })).rejects.toBeInstanceOf(SeyeonPostTurnSourceAuthorityHoldV1);
+    expect(claimCalls).toBe(0);
   });
 });
