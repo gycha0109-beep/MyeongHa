@@ -240,20 +240,14 @@ export async function getOfficialReadingRecord(input: {
       readingContractVersion,
       productResponseState,
     });
-    // A source-issued, canonical v2 hash is checked again at the last
-    // disclosure boundary. Immutable DB storage is not evidence that its
-    // body remained intact. Keep older noncanonical fixture/historical hashes
-    // on their existing owner/grant policy until source migration is approved.
-    if (
-      readingContractVersion === 'myeonghwa-product-reading-response-v2'
-      && /^sha256:v1:[a-f0-9]{64}$/u.test(storedResponseHash)
-    ) {
-      // A canonically issuer-hashed v2 report must be both byte-identical to
-      // the committed snapshot and displayable under its actual Product Reading
-      // schema. Do not return malformed or empty v2 interpretations to the
-      // browser merely because a matching hash was stored.
-      if (hashSajuHeldSourceProofRequestV1(reading)
-        !== storedResponseHash.slice('sha256:v1:'.length)) {
+    // The Records disclosure boundary must enforce the same content-addressed
+    // v2 contract as the protected Reader. An unrecognized digest is NOT a
+    // historical exemption for a v2 report. Non-v2 records retain their
+    // separately governed owner/grant policy.
+    if (readingContractVersion === 'myeonghwa-product-reading-response-v2') {
+      if (!/^sha256:v1:[a-f0-9]{64}$/u.test(storedResponseHash)
+        || 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(reading)
+          !== storedResponseHash) {
         throw new Error('Official Reading archive source response hash mismatch.');
       }
       let display;

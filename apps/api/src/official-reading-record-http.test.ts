@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import type {
   PostgresSubjectConnectionV1,
@@ -10,21 +11,29 @@ const SUBJECT_ID = '22222222-2222-4222-8222-222222222222';
 const READING_ID = '44444444-4444-4444-8444-444444444444';
 const SESSION_ID = '55555555-5555-4555-8555-555555555555';
 
+const SNAPSHOT = Object.freeze({
+  responseVersion: 'myeonghwa-product-reading-response-v2',
+  responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+  state: 'delivered',
+  messageCode: 'READING_DELIVERED',
+  requiredAction: 'none',
+  reading: Object.freeze({
+    readingId: READING_ID,
+    sections: Object.freeze([
+      { sectionType: 'overview', state: 'complete', title: '공식 결과',
+        blocks: [{ type: 'paragraph', text: '원문 해석' }] },
+    ]),
+    disclosures: Object.freeze([{ type: 'scope_limitation', text: '검증된 범위 안에서 해석합니다.' }]),
+  }),
+});
 const ROW = Object.freeze({
   readingId: READING_ID,
   readingSessionId: SESSION_ID,
   sajuDomain: 'career',
   readingContractVersion: 'myeonghwa-product-reading-response-v2',
   productResponseState: 'delivered',
-  responseSnapshotJsonb: Object.freeze({
-    responseVersion: 'myeonghwa-product-reading-response-v2',
-    state: 'delivered',
-    reading: Object.freeze({
-      readingId: READING_ID,
-      sections: Object.freeze([]),
-    }),
-  }),
-  responseHash: 'sha256:stored-reading',
+  responseSnapshotJsonb: SNAPSHOT,
+  responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(SNAPSHOT),
   readerCharacterIds: Object.freeze(['seyeon']),
   completedAt: '2026-09-23T00:01:00.000Z',
 });
@@ -189,6 +198,17 @@ describe('Official Reading record HTTP adapter', () => {
       issuedRevisionNo: 2, currentRevisionNo: 3, state: 'changed',
     });
     expect(onAuthorityQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a malformed v2 stored hash and rolls back before disclosing an HTTP record', async () => {
+    const onRollback = vi.fn();
+    await expect(invoke({
+      pool: fakePool({
+        rows: [{ ...ROW, responseHash: 'sha256:stored-reading' }],
+        onRollback,
+      }),
+    })).rejects.toThrow('source response hash mismatch');
+    expect(onRollback).toHaveBeenCalledTimes(1);
   });
 
   it('binds a second exact authorized Birth revision query in the same subject transaction', async () => {
