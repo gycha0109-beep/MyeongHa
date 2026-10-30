@@ -12,6 +12,7 @@ import {
   type C09ReviewedOriginalSourceAuthorityShadowV1,
 } from './seyeon-c09-reviewed-original-topic-authority-shadow-v1.js';
 import { createPostgresC09PublishedKnowledgeTopicAuthorityShadowV1 } from './postgres-seyeon-c09-published-topic-authority-shadow-v1.js';
+import { createPostgresC09ReviewedOriginalSourceShadowV1 } from './postgres-seyeon-c09-reviewed-original-source-shadow-v1.js';
 
 export const SEYEON_C09_PRIVATE_OPTIN_COMMAND_SHADOW_VERSION_V1 =
   'seyeon-c09-private-optin-command-shadow-v1' as const;
@@ -134,10 +135,14 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
   topicAuthority?: C09PrivateLearningTopicAuthorityShadowV1;
   /** Actual integration seam: independently approved original plus scoped DB Topic. */
   approvedOriginals?: C09ReviewedOriginalSourceAuthorityShadowV1;
+  /** Explicit, fail-closed DB-backed proposal mode: not live-deployed. */
+  reviewedOriginalSource?: 'postgres_reviewed_original_v1';
 }>) {
   if (!input?.pool || typeof input.pool.connect !== 'function' ||
-      (typeof input.topicAuthority?.decide === 'function') ===
-      (typeof input.approvedOriginals?.readIndependentlyApprovedOriginal === 'function')) fail();
+      [typeof input.topicAuthority?.decide === 'function',
+       typeof input.approvedOriginals?.readIndependentlyApprovedOriginal === 'function',
+       input.reviewedOriginalSource === 'postgres_reviewed_original_v1']
+        .filter(Boolean).length !== 1) fail();
 
   return Object.freeze({
     async submit(request: Readonly<{
@@ -206,9 +211,12 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
           let actionRef = await findExisting();
           let decided: C09PrivateLearningTopicDecisionShadowV1 | null = null;
           if (actionRef === null) {
-            const topicAuthority = input.approvedOriginals !== undefined
+            const reviewedOriginals = input.reviewedOriginalSource === 'postgres_reviewed_original_v1'
+              ? createPostgresC09ReviewedOriginalSourceShadowV1({ scope })
+              : input.approvedOriginals;
+            const topicAuthority = reviewedOriginals !== undefined
               ? createSeyeonC09ReviewedOriginalTopicAuthorityShadowV1({
-                  approvedOriginals: input.approvedOriginals,
+                  approvedOriginals: reviewedOriginals,
                   publishedTopics: createPostgresC09PublishedKnowledgeTopicAuthorityShadowV1({ scope }),
                 })
               : input.topicAuthority!;

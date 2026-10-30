@@ -20,6 +20,9 @@ import {
 import {
   POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1,
 } from '../apps/api/src/postgres-seyeon-c09-published-topic-authority-shadow-v1.js';
+import {
+  C09_POSTGRES_REVIEWED_ORIGINAL_SQL_V1,
+} from '../apps/api/src/postgres-seyeon-c09-reviewed-original-source-shadow-v1.js';
 
 const AUTH = '91000000-0000-4000-8000-000000000001';
 const OWNER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -44,6 +47,8 @@ function fixture(options: {
   existingWithdrawn?: boolean;
   existingChangedHash?: boolean;
   reviewedOriginal?: boolean;
+  postgresReviewedOriginal?: boolean;
+  missingOriginalReview?: boolean;
 } = {}) {
   const calls: Calls[] = [];
   const releases: unknown[] = [];
@@ -78,6 +83,19 @@ function fixture(options: {
             withdrawnAt: options.existingWithdrawn ? VERIFIED : null,
           }];
         }
+      } else if (text === C09_POSTGRES_REVIEWED_ORIGINAL_SQL_V1) {
+        expect(values).toEqual([
+          options.wrongSubject ? OTHER : OWNER, MESSAGE, 'fixed-original-hash',
+        ]);
+        rows = options.missingOriginalReview ? [] : [{
+          reviewRef: 'c09:review:server-v1',
+          subjectId: options.wrongSubject ? OTHER : OWNER,
+          originalMessageId: MESSAGE, originalContentHash: 'fixed-original-hash',
+          characterId: 'seyeon', topicKey: 'python.programming', awareness: 'heard_of',
+          visibility: 'user_private', status: 'approved',
+          reviewerRef: 'reviewer:trusted-v1', reviewPolicyRef: 'review-policy:v1',
+          learnedAt: VERIFIED, validAt: VERIFIED, reviewedAt: VERIFIED, revokedAt: null,
+        }];
       } else if (text === POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1) {
         expect(values).toEqual(['python.programming']);
         rows = options.badTopic ? [] : [{
@@ -148,7 +166,8 @@ function fixture(options: {
   };
   const pool = { connect: () => connection } as PostgresSubjectPoolV1;
   const command = createSeyeonC09PrivateLearningOptinCommandShadowV1(
-    options.reviewedOriginal ? { pool, approvedOriginals } : { pool, topicAuthority },
+    options.postgresReviewedOriginal ? { pool, reviewedOriginalSource: 'postgres_reviewed_original_v1' }
+      : options.reviewedOriginal ? { pool, approvedOriginals } : { pool, topicAuthority },
   );
   const submit = (userAction: Record<string, unknown> = {
     action: 'approve_private_learning', originalMessageId: MESSAGE,
@@ -302,5 +321,32 @@ describe('C09 server-owned reviewed original integration in authenticated opt-in
     expect(f.calls.map(c => c.text)).not.toContain(POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1);
     expect(f.calls.map(c => c.text)).not.toContain(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
     expect(f.calls.at(-1)?.text).toBe('COMMIT');
+  });
+});
+
+describe('C09 persisted reviewed-original read mode', () => {
+  it('reads a reviewed original and governed Topic in the existing Subject transaction', async () => {
+    const f = fixture({ postgresReviewedOriginal: true });
+    const result = await f.submit();
+    expect(result.scope).toBe('user_private');
+    expect(result.productionActivated).toBe(false);
+    const calls = f.calls.map(x => x.text);
+    const reviewed = calls.indexOf(C09_POSTGRES_REVIEWED_ORIGINAL_SQL_V1);
+    const policy = calls.indexOf(POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1);
+    const receipt = calls.indexOf(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
+    expect(reviewed).toBeGreaterThan(-1);
+    expect(reviewed).toBeLessThan(policy);
+    expect(policy).toBeLessThan(receipt);
+    expect(calls.at(-1)).toBe('COMMIT');
+  });
+
+  it('does not fabricate a receipt for an absent independent review', async () => {
+    const f = fixture({ postgresReviewedOriginal: true, missingOriginalReview: true });
+    await expect(f.submit()).rejects.toMatchObject({
+      code: 'C09_APPROVED_ORIGINAL_TOPIC_UNVERIFIED',
+    });
+    expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
+    expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_CAPTURE_SQL_V1);
+    expect(f.calls.at(-1)?.text).toBe('ROLLBACK');
   });
 });
