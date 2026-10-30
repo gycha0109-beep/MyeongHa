@@ -1,0 +1,32 @@
+# C09 인증된 개인 학습 승인 이벤트 처리 경로 — 2026-10-30
+
+**상태: 서버 Command Shadow 구현. 운영 HTTP 라우트 미등록, DB 신규 Proposal 미적용, 영구 학습 발행 미활성.**
+
+## 입력과 신뢰 경계
+
+- `apps/api/src/seyeon-c09-private-learning-optin-command-shadow-v1.ts`는 기존 `executePostgresSubjectTransactionV1`를 사용한다.
+- **사용자 요청에서 허용하는 값은 오직 `action: "approve_private_learning"`과 `originalMessageId`**이다. `subjectId`, 공유 범위, 학습 Topic 및 승인 영수증은 요청에서 받지 않는다. 예상하지 않은 필드는 거부한다.
+- `verifiedEvidence`는 **기존 인증 체계가 검증한 회원 식별 증거**를 호출 계층에서 전달해야 한다. 새 Command는 토큰 검증 함수가 아니며, HTTP JSON을 `verifiedEvidence`로 전달하는 사용은 금지한다. Guest는 거부한다.
+- 기존 Subject 실행기가 `BEGIN → SET LOCAL ROLE myeongha_api_executor → begin_member_subject_context_v1 → assert_myeongha_subject_context_v1` 순서로 서버 정규 Subject를 확정한다. 클라이언트의 Subject ID는 입력받지 않는다.
+- 데이터베이스에서 해당 Subject의 미삭제 사용자 메시지에 대해 원문·DB 원본 해시·생성 시간을 읽는다. 별도의 서버 관리 `topicAuthority.decide`가 원문/해시를 확인하고 Topic, 수준, 기간을 승인한 경우에만 다음 단계로 간다. 아직 실제 `topicAuthority` 운영 구현은 제공되지 않으며 미설치 상태는 실행 불가능하다.
+- 동의를 명시한 현재 회원 요청마다 서버가 새로운 `actionRef`를 생성한다. DB 원본 해시가 계속 일치하는 경우에만 Proposed `character_learning_private_optin_receipts_v1`에 개인 학습 승인 영수증을 추가한다.
+- **동일 트랜잭션**에서 `c09_capture_private_approved_source_shadow_v1`를 호출해 개인 Source 승인 + 감사 기록을 캡처하고, `createPostgresSeyeonC09PrivateApprovedSourceShadowV1`로 원본/현재 승인 상태를 다시 조회한다. 검증 실패 시 트랜잭션 전체 롤백(영수증과 감사 기록 모두 무효).
+- 결과는 `scope:user_private`, `evidencePublished:false`, `productionActivated:false`다. 기존 Learning Publication Planner의 `mayExecuteInProduction=false`도 유지한다. 공유 동의·공통 캐릭터 학습 권한을 발행하지 않는다.
+
+## 현재 확인된 테스트
+
+- `test/seyeon-c09-private-learning-optin-command-shadow-v1.test.ts`: 인증된 회원의 요청에서 Subject를 확정한 뒤 영수증→원본 캡처→Source Authority 순서 및 COMMIT 검증.
+- 암묵적 기억 등록 요청, Guest, 클라이언트 Subject/visibility 위조, 잘못된 ID는 DB 연결 전 거부.
+- 원본 메시지 미존재, Topic 미승인, 영수증 INSERT 오류/누락, 캡처 오류/누락, 원본 검증 무효 시 ROLLBACK 확인.
+- 기존 독립 격리 PostgreSQL 17 SQL 검증: `C09_APPROVED_PRIVATE_ORIGINAL_AUDIT_ISOLATED_PASS` (앞선 커밋).
+- CI에 반영하여 새 Command와 테스트의 타입·회귀 상태를 검증해야 한다. 현재 PC 직접 테스트는 개발 PC 연결이 없어 수행하지 못했다.
+
+## 미완료 / 운영 전 제한
+
+1. **실제 HTTP Endpoint, 기존 인증 미들웨어에서 `verifiedEvidence` 주입, 사용자 확인 UI 및 사용자 지정 동의 문안 연결 미구현**. 현재는 서버 명령 처리 단위이며 요청 자동 수집 기능이 아니다.
+2. Production에서 `character_learning_private_optin_receipts_v1`와 캡처/현재 검증 함수 미배포. 기존 운영 API 역할에는 Proposal 테이블 INSERT와 캡처 함수 EXECUTE 권한이 없어 실행할 수 없다.
+3. 서버 통제 `topicAuthority` 구현 및 원본 내용 검증/민감정보 분류가 미완성. 모델 출력만으로 사실 승인·Canon 갱신 금지.
+4. **대화 원본과 동의 영수증의 최종 잠금**, 충돌하는 철회·삭제의 직렬화, idempotent replay, 장기적 감사·권한 격리 및 실제 승인 상태 조회가 운영 준비 요건. 운영에 역할/권한을 확장하지 않음.
+5. User-private 승인 이벤트와 Character-shared 전파는 별도 동의·비식별화·Privacy Review 체계로 계속 분리한다.
+
+현재 작업은 운영 DB를 건드리지 않으며, 테스트가 아닌 실제 사용자가 동의를 했다거나 세연이 영구 학습을 수행했다고 주장하지 않는다.
