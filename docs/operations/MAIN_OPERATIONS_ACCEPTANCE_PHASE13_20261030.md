@@ -25,3 +25,28 @@ After merging, invoke the collector for the verified merge SHA and attach its id
 This closes the **read-only exact-commit CI/deployment-workflow evidence inventory implementation** portion of Phase 13, not all of Production operational acceptance. No production changes or external provider resources are requested by this step.
 
 Watchtower-Track: ops
+
+## 2026-10-30 bounded Cloudflare provider source/deployment observation
+
+Read-only Cloudflare API queries for Worker \`myeongha\` returned the following **specific deployment and build** evidence (observation window: 2026-10-30 ~15:30 KST). This records a historical exact-version observation; it is not an ongoing health or deployment monitor.
+
+| Evidence | Verified observed value |
+|---|---|
+| Worker | \`myeongha\` |
+| Deployment | \`fb825c74-eca9-4ea5-ab64-9e3606876255\` |
+| Deployment timestamp (UTC) | \`2026-10-30T06:18:33.154265Z\` |
+| Deployed version, traffic split | \`4a548d7a-f997-4a96-9305-0ff4db4458e9\`, 100% |
+| Linked Workers Build | \`a7cf88d0-1b37-4d48-8811-eb895eaac9dc\` |
+| Build outcome | \`success\` (build status \`stopped\`, i.e. completed) |
+| Build trigger | GitHub \`push_event\`, branch \`main\` |
+| Source SHA | \`486041a9c9fc4e70d3541c57fce934a6d05374ad\` |
+| Repository main SHA at observation | \`486041a9c9fc4e70d3541c57fce934a6d05374ad\` |
+| Build deploy command | \`node scripts/cloudflare-main-web-cd.mjs\` |
+
+The source SHA matches the independently read GitHub \`main\` head **at that observation**, and the build is linked by exact deployed Worker version. This meets the **provenance evidence portion** of §33 items 1 and 2 at that historical point; a successful build and 100% allocation **do not** prove application liveness, readiness, correct runtime configuration, cross-service compatibility, privacy-safe caching, metrics, logs, rollback execution or full Production acceptance.
+
+Read-only Cloudflare API endpoints used: \`GET /accounts/{account_id}/workers/scripts/myeongha/deployments\`, \`GET /accounts/{account_id}/workers/scripts/myeongha/versions/{version_id}\` and \`GET /accounts/{account_id}/builds/builds?version_ids={version_id}\`. No Cloudflare deployment or settings mutation was performed. A local DNS request to \`https://myeongha.gycha0109.workers.dev/api/health\` and \`/api/readiness\` failed with \`Temporary failure in name resolution\`; this is **NOT_OBSERVED**, not evidence of live service failure.
+
+**Explicit acceptance boundary:** This evidence is only applicable to the pinned Worker version and observation time. It does not turn any of the other §33 requirements to PASS, nor supersede Phase 8 \`dr_ready=false\` and \`serviceResumptionAllowed=false\`. Real authenticated synthetic Member/Saju checks and provider-level rollback proofs remain governed, separately scoped operations. This record must not trigger production writes, external load tests, SQL repairs or release gates.
+
+Watchtower-Track: ops
