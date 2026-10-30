@@ -6,6 +6,8 @@
 
 추가 설치: [공지·배너 비공개 DB 설치 기록](../../docs/operations/ADMIN_PRESENTATION_PRODUCTION_INSTALL_20261030.md). 기존 A7 테이블 3개·RPC 5개·전용 역할을 Production에 설치하고 롤백 검증했습니다. 공개 서비스 권한·로그인 비밀·Worker·게시 활성화는 추가하지 않았습니다. 아래의 “표현 정보 운영 미설치”는 이 기록 이전 상태입니다.
 
+[A5 분석 비공개 원장 설치 기록](../../docs/operations/ADMIN_ANALYTICS_PRODUCTION_INSTALL_20261030.md): 기존 동의/이벤트 테이블·독립 Writer·180일 제약을 설치하고 실제 DB에서 전체 롤백 검증했습니다. public/운영 Reader 178개 컬럼은 유지하며 A5 후보의 분석 필드 23개만 별도 허용합니다. 수집·공개 라우트·스케줄·로그인은 미활성입니다.
+
 현재 상태는 [운영 재조회 기록](../../docs/operations/ADMIN_OPERATIONS_READBACK_20261030.md)을 우선합니다. 아래 날짜별 기록의 “역할 없음”, “Supabase 연결 오류”는 과거 상태입니다. Reader/Audit 설치는 완료됐고 재적용하지 않습니다. 두 역할의 비밀번호·전용 Hyperdrive·Worker·Owner 실인증·읽기 개통은 미완료입니다.
 
 비활성 스테이징도 Access JWT를 검증하고 비허용 사용자는 403, 검증된 Owner는 `ADMIN_PRIVATE_DISABLED`를 반환합니다. DB·자산은 제공하지 않습니다. 익명 검사는 일반 503을 성공으로 인정하지 않으며 실제 빌드된 JS/CSS의 `/admin/assets/` 및 `/assets/` 주소를 모두 확인합니다.
