@@ -4,7 +4,7 @@ import {
 } from '../scripts/prepare-postgres-hosted-synthetic-local-fixtures.mjs';
 
 const role = (role) => 'header.' +
-  Buffer.from(JSON.stringify({ iss: 'supabase', role })).toString('base64url') +
+  Buffer.from(JSON.stringify({ iss: 'supabase-demo', role })).toString('base64url') +
   '.signature';
 const valid = Object.freeze({
   MH_DR_LOCAL_TARGET: 'http://127.0.0.1:54321',
