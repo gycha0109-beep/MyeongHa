@@ -17,6 +17,7 @@ import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
 import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/postgres-seyeon-planner-memory-decision-source-v1.js';
+import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
@@ -81,6 +82,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         uuid,uuid,uuid) to myeongha_api_executor;
       grant usage on schema seyeon_private to myeongha_api_executor;
       grant execute on function seyeon_private.qry_seyeon_pending_planner_memory_decision_v1(uuid,uuid)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.cmd_create_pending_seyeon_planner_memory_v1(uuid,uuid,uuid,uuid,uuid,text,text)
         to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
@@ -336,13 +339,19 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const f=await prepare(201);
     await f.commit();
     const id=uuid(27,201);
-    const insert=`insert into public.memory_proposals(
-      id,subject_id,character_id,proposal_kind,record_type,schema_version,
-      proposed_value_jsonb,source_turn_id,source_message_id,proposal_dedupe_key,
-      status,created_at)
-      values($1,$2,'seyeon','memory','conversation_recall','v1',$3::jsonb,
-        $4,$5,'seyeon-dialogue-planner:v1','pending',clock_timestamp())`;
-    await pool.query(insert,[id,f.subject,JSON.stringify({summary:'synthetic Planner fact'}),f.turn,f.assistant]);
+    const producerInput={
+      canonicalMemberSubjectId:f.subject,proposalId:id,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자가 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    };
+    const created=await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,producerInput));
+    expect(created).toEqual({proposalId:id,proposalState:'pending',replayed:false});
+    const replay=await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,producerInput));
+    expect(replay).toEqual({proposalId:id,proposalState:'pending',replayed:true});
+    const {rows:[beforeConsent]}=await pool.query(
+      'select count(*)::int as n from public.memory_items where subject_id=$1 and source_turn_id=$2',
+      [f.subject,f.turn]);
+    expect(beforeConsent.n).toBe(0);
     const receipt=await f.run(async({client})=>{
       const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
         client,canonicalMemberSubjectId:f.subject,proposalId:id,
@@ -364,7 +373,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         where g.memory_item_id=m.id and g.grantee_character_id='seyeon') as grants
       from public.memory_proposals p join public.memory_items m
         on m.id=p.accepted_memory_item_id where p.id=$1`,[id]);
-    expect(record).toEqual({status:'accepted',body:{summary:'synthetic Planner fact'},grants:1});
+    expect(record).toEqual({status:'accepted',body:{summary:'사용자가 인사를 했다'},grants:1});
     await expect(f.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
       client,canonicalMemberSubjectId:f.subject,proposalId:id,
     }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
@@ -372,11 +381,19 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const other=await prepare(202);
     await other.commit();
     const manual=uuid(27,202);
-    await pool.query(insert,[manual,other.subject,JSON.stringify({summary:'synthetic user text'}),
-      other.turn,other.user]);
-    await expect(other.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
-      client,canonicalMemberSubjectId:other.subject,proposalId:manual,
-    }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    await expect(other.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:other.subject,proposalId:manual,turnId:other.turn,
+      assistantMessageId:other.user,userMessageId:other.user,
+      candidate:{summary:'사용자가 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }))).rejects.toThrow();
+    await expect(other.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:other.subject,proposalId:manual,turnId:other.turn,
+      assistantMessageId:other.assistant,userMessageId:other.user,
+      candidate:{summary:'근거 없는 사용자 정보',userEvidenceQuote:'user did not say this'},
+    }))).rejects.toThrow();
+    const {rows:[noManual]}=await pool.query(
+      'select count(*)::int as n from public.memory_proposals where id=$1',[manual]);
+    expect(noManual.n).toBe(0);
   });
 
   it('rejects a revoked original Grant at atomic Commit even after a fresh replacement Grant', async () => {
