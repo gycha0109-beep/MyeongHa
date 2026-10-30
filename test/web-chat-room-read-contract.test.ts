@@ -118,6 +118,62 @@ describe('browser Chat room read contract', () => {
       {expectedThreadId:THREAD_ID,expectedAfterSequenceNo:1})).toThrow('protected Se-yeon room shell');
   });
 
+  it('admits a private Memory offer only on the matching revealed original Se-yeon user Message', () => {
+    const original = payload();
+    const offer = Object.freeze({
+      sourceAuthority: 'server_original_message',
+      characterId: 'seyeon',
+      redacted: false,
+      threadId: THREAD_ID,
+      turnId: '97000000-0000-4000-8000-000000000001',
+      messageId: original.messages[0]!.messageId,
+    });
+    const room = {
+      ...original, characterId: 'seyeon',
+      messages: [
+        { ...original.messages[0]!, memoryProposalOffer: offer },
+        { ...original.messages[1]!, characterId: 'seyeon' },
+      ],
+    };
+    const result = parseChatRoomReadPayloadV1(room, { expectedThreadId: THREAD_ID });
+    expect(result.messages[0]?.memoryProposalOffer).toEqual(offer);
+    expect(Object.isFrozen(result.messages[0]?.memoryProposalOffer)).toBe(true);
+    expect(result.messages[1]).not.toHaveProperty('memoryProposalOffer');
+    expect(parseChatRoomReadPayloadV1(payload(), { expectedThreadId: THREAD_ID })
+      .messages[0]).not.toHaveProperty('memoryProposalOffer');
+
+    for (const forged of [
+      {...offer, messageId: original.messages[1]!.messageId},
+      {...offer, threadId: '93000000-0000-4000-8000-000000000003'},
+      {...offer, turnId: 'not-a-turn'},
+      {...offer, characterId: 'other'},
+      {...offer, sourceAuthority: 'browser_original_message'},
+      {...offer, redacted: true},
+      {...offer, grantState: 'active'},
+      null,
+    ]) {
+      const wrong = {
+        ...room,
+        messages: [{ ...original.messages[0]!, memoryProposalOffer: forged }, room.messages[1]],
+      };
+      expect(() => parseChatRoomReadPayloadV1(wrong, { expectedThreadId: THREAD_ID }))
+        .toThrow('original Memory offer lacks exact server-origin message authority');
+    }
+    expect(() => parseChatRoomReadPayloadV1({
+      ...room, characterId: 'other',
+    }, { expectedThreadId: THREAD_ID })).toThrow('original Memory offer');
+    expect(() => parseChatRoomReadPayloadV1({
+      ...room, messages: [{ ...room.messages[0], senderType: 'character',
+        characterId: 'seyeon' }, room.messages[1]],
+    }, { expectedThreadId: THREAD_ID })).toThrow('original Memory offer');
+    expect(() => parseChatRoomReadPayloadV1({
+      ...room, messages: [{...room.messages[0], bodyText: null}, room.messages[1]],
+    }, { expectedThreadId: THREAD_ID })).toThrow('original Memory offer');
+    expect(() => parseChatRoomReadPayloadV1({
+      ...room, historyWithheld: true,
+    }, { expectedThreadId: THREAD_ID })).toThrow('protected Se-yeon room shell');
+  });
+
   it('requires bounded pagination metadata to match the authoritative stream', () => {
     expect(() => parseChatRoomReadPayloadV1(
       { ...payload(), pagination: { pageSize: 51, hasMore: false, nextAfterSequenceNo: null } },
