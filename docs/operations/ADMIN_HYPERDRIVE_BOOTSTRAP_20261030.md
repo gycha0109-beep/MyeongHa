@@ -27,6 +27,24 @@ node apps/admin/create-dedicated-hyperdrives.mjs --clipboard
 
 The script requests the role passwords again and then the Cloudflare token through local clipboard input (unless the token is already in `CLOUDFLARE_API_TOKEN`). It creates or verifies only the two named Admin configurations with cache disabled and `verify-full`. Verify the resulting IDs and Worker inactivity before any Owner-gated activation. Never store the passwords in scripts or shell command lines.
 
+## Audit Writer password recovery without two independent copies
+
+If the Admin Reader passes verify-full on port 6543 but Admin Audit Writer remains rejected after a successful SQL Editor `ALTER ROLE`, do not retry the same password-entry sequence. Supavisor may log `Validation secrets changed, cache updated` while the supplied candidate password still fails SCRAM verification. That event proves the role secret changed, not that the candidate matches it.
+
+Use a **single-source password synchronization** flow on the trusted Windows machine. Start from CMD after setting the CA and `PSQL_BIN` variables shown above:
+
+```cmd
+node apps/admin/create-dedicated-hyperdrives.mjs --sync-audit-password
+```
+
+1. Copy the chosen **Audit Writer** password from your password manager. At the prompt press **Enter only**. Never type or paste the password into the terminal. The script captures this secret exactly once and replaces the clipboard with a properly quoted `ALTER ROLE myeongha_admin_audit_writer ...` statement derived from that same value.
+2. Paste the SQL into the Supabase project's SQL Editor and execute it. Return to CMD and press Enter after the SQL Editor says Success.
+3. The same Node process clears the SQL clipboard and verifies the **same in-memory password** through the selected Supabase pooler port with `verify-full`. It prints only `Audit Writer TLS verify-full OK` on success or a safe failure code. No extra password copy or reset is necessary.
+
+Do not save SQL Editor queries containing passwords in source files, and manage the SQL Editor history appropriately. The selected password must be retained in a secure password manager for future Hyperdrive bootstrap; the synchronization command neither stores a local password file nor creates Hyperdrives. If the same-source verification still fails, stop and investigate Supavisor authentication independently rather than changing the password again.
+
+The clipboard mode now rejects any characters typed or pasted at the terminal's Enter-only prompts; this prevents accidental clear-text echo.
+
 Requirements: Node.js 24, PostgreSQL 17 psql, the Supabase CA certificate on the local machine, and the two distinct Admin role passwords. Never paste passwords/API tokens in ChatGPT, source files or terminal command arguments.
 
 PowerShell, in the repository root:
