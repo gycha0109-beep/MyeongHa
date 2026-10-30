@@ -20,6 +20,7 @@ import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/
 import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
+import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
@@ -84,6 +85,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       grant execute on function seyeon_private.qry_seyeon_pending_planner_memory_decision_v1(uuid,uuid)
         to myeongha_api_executor;
       grant execute on function seyeon_private.cmd_create_pending_seyeon_planner_memory_v1(uuid,uuid,uuid,uuid,uuid,text,text)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1(uuid,uuid,text)
         to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
@@ -411,6 +414,48 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       'select count(*)::int as n from seyeon_private.planner_memory_proposal_sources_v1 where proposal_id=$1',
       [manual]);
     expect(ownerEvidence.n).toBe(0);
+  });
+
+  it('UC-07 session-only and discard resolve pending without long-term Memory or Grants',async()=>{
+    for(const [n,choice,status] of [
+      [203,'session_only','expired'],
+      [204,'discard','rejected'],
+    ] as const){
+      const f=await prepare(n);
+      await f.commit();
+      const proposalId=uuid(27,n);
+      await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+        canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+        assistantMessageId:f.assistant,userMessageId:f.user,
+        candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+      }));
+      const receipt=await f.run(async({client})=>{
+        const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+          client,canonicalMemberSubjectId:f.subject,proposalId,
+        });
+        const plan=planSeyeonPlannerMemoryDecisionV1({
+          candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+          currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+          choice,
+        });
+        return commitSeyeonPlannerMemoryDecisionS0V1({
+          client,canonicalMemberSubjectId:f.subject,plan,
+        });
+      });
+      expect(receipt).toEqual({proposalId,decision:choice,status:'resolved',
+        persisted:false,grantCount:0,payloadPurged:true});
+      const {rows:[row]}=await pool.query(`select p.status,p.proposed_value_jsonb as payload,
+        (select count(*)::int from public.memory_items m where m.subject_id=p.subject_id
+          and m.source_turn_id=p.source_turn_id) as memories,
+        (select count(*)::int from public.record_access_grants g
+          join public.memory_items m on m.id=g.memory_item_id
+          where m.subject_id=p.subject_id and m.source_turn_id=p.source_turn_id) as grants
+        from public.memory_proposals p where p.id=$1`,[proposalId]);
+      expect(row).toEqual({status,payload:{},memories:0,grants:0});
+      await expect(f.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    }
   });
 
   it('rejects a revoked original Grant at atomic Commit even after a fresh replacement Grant', async () => {
