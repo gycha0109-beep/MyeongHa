@@ -16,6 +16,7 @@ import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/sey
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
+import { proposeSeyeonOriginalUserMessageV1 } from '../apps/api/src/postgres-seyeon-original-message-proposal-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
@@ -76,6 +77,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function public.cmd_grant_seyeon_owned_conversation_recall_v1(
         uuid,uuid,uuid) to myeongha_api_executor;
+      grant execute on function seyeon_private.cmd_propose_seyeon_original_message_v1(
+        uuid,uuid,uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
         seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
@@ -274,12 +277,22 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       deliver: async body => { expect(body).toBeNull(); },
     });
     const proposal = uuid(27, 1), newMemory = uuid(28, 1);
-    await pool.query(`insert into public.memory_proposals(id,subject_id,character_id,proposal_kind,
-      record_type,schema_version,proposed_value_jsonb,source_turn_id,source_message_id,
-      proposal_dedupe_key,status,created_at)
-      values($1,$2,'seyeon','memory','conversation_recall','v1','{"summary":"private approved"}',$3,$4,
-      's0-private-proposal','pending',clock_timestamp())`,
-    [proposal, f.subject, f.turn, f.user]);
+    const source = {
+      subjectId:f.subject,threadId:f.thread,turnId:f.turn,
+      messageId:f.user,proposalId:proposal,
+    };
+    const proposed = await f.run(({client})=>proposeSeyeonOriginalUserMessageV1(client,source));
+    expect(proposed).toEqual({proposalId:proposal,proposalState:'pending',replayed:false});
+    const proposedAgain = await f.run(({client})=>proposeSeyeonOriginalUserMessageV1(client,source));
+    expect(proposedAgain).toEqual({proposalId:proposal,proposalState:'pending',replayed:true});
+    const {rows:[storedProposal]} = await pool.query(
+      `select proposed_value_jsonb as content,source_message_id as source
+         from public.memory_proposals where id=$1`,[proposal]);
+    expect(storedProposal.content).toEqual({summary:'Synthetic first hello'});
+    expect(storedProposal.source).toBe(f.user);
+    await expect(f.run(({client})=>proposeSeyeonOriginalUserMessageV1(client,{
+      ...source,proposalId:uuid(27,92),
+    }))).rejects.toMatchObject({constraint:'seyeon_original_message_proposal_duplicate'});
     const accepted = await f.run(({ client }) => acceptSeyeonPrivateConversationRecallProposalV1(client, {
       subjectId: f.subject, proposalId: proposal, memoryItemId: newMemory, grantChoice: { mode: 'private' },
     }));
