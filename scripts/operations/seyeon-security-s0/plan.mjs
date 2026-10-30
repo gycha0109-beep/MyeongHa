@@ -11,6 +11,7 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '06-attempt-receipt-progression.sql', '07-member-withdrawal-status.sql',
   '08-historical-thread-presence.sql', '09-owned-original-memory-grant.sql',
   '10-planner-memory-decision-source.sql',
+  '11-planner-memory-proposal-producer.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {
