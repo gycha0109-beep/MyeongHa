@@ -343,8 +343,11 @@ function renderRoomState(state) {
 }
 
 function clearOwnerScopedRoomStateForAuthorityChange() {
+  // Old DOM Message nodes are not durable history Reveal authority.
   chatStream?.replaceChildren();
+  if (chatIntro) chatIntro.hidden = true;
   roomReady = false;
+  authoritativeCharacterId = null;
   historyWithheld = false;
   if (contextPill) contextPill.hidden = true;
   if (contextTitle) contextTitle.textContent = '';
@@ -378,6 +381,22 @@ async function readChatPage(activeBearer, afterSequenceNo) {
   if (response.status === 401) {
     invalidateRejectedBearer(activeBearer);
     throw new Error('Character Room read requires a current session.');
+  }
+  if (response.status === 503) {
+    // A former Se-yeon participant can be absent from the requested page.
+    // Never treat a rejected historical replay as a transient empty page.
+    // Consume only the public error code; do not project private body fields.
+    let code = null;
+    try {
+      const denial = await response.json();
+      code = denial?.error?.code ?? null;
+    } catch {
+      // Malformed denial is still a failed authoritative re-read.
+    }
+    if (code === 'SEYEON_HISTORY_REVEAL_HOLD') {
+      throw new Error('SEYEON_HISTORY_REVEAL_HOLD');
+    }
+    throw new Error(`Character Room read failed with ${response.status}.`);
   }
   if (!response.ok) {
     throw new Error(`Character Room read failed with ${response.status}.`);
@@ -450,8 +469,16 @@ async function loadRoomState() {
       historyWithheld:protectedHistory,
     }));
     return true;
-  } catch {
-    setComposeStatus('현재 대화 기록 연결을 사용할 수 없습니다.');
+  } catch (error) {
+    // A failed authoritative history re-read cannot leave a previously
+    // rendered DOM transcript/Relationship-derived presentation accessible.
+    // This also applies to malformed denial envelopes and changed owners.
+    clearOwnerScopedRoomStateForAuthorityChange();
+    setComposeStatus(
+      error instanceof Error && error.message === 'SEYEON_HISTORY_REVEAL_HOLD'
+        ? '이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.'
+        : '현재 대화 기록 연결을 사용할 수 없습니다.',
+    );
     return false;
   }
 }
