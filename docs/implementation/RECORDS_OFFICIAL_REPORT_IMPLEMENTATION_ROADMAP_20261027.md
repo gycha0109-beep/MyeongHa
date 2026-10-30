@@ -1,5 +1,13 @@
 # 명하 기록 · 공식 사주 보고서 구현 로드맵 (2026-10-27)
 
+## 2026-10-30 최신 통합 PR 및 기록 화면 S0 후속 구현
+
+- 실행 트랙은 계속 `frontend-integration`이다. 기존 PR [#2670](https://github.com/gycha0109-beep/MyeongHa/pull/2670)은 긴 커밋 이력의 보안 검사 오탐을 분리하기 위해 **병합 없이 종료**되었고, 작업 파일과 HOLD 계약은 후속 단일 통합 PR [#2757](https://github.com/gycha0109-beep/MyeongHa/pull/2757)로 승계했다. 아래 #2670 참조는 당시 작업 이력이며 **현재 병합 대상은 #2757**이다.
+- PR #2757의 자동 병합을 해제했다. 본 문서의 **S0 통합 완료·실제 Production/Commerce/Reader 게이트 확인 전 main 중간 병합 금지**가 계속 우선한다.
+- 1단계 S0 권한 보호: `apps/web/records-page.js`에 로딩 시작·종료 시 동일 브라우저 owner 검사, 계정/세션 변경 이벤트·탭 복원 시 owner 재검사, 보호 목록/프로필 DOM 및 캐시 폐기를 구현했다. 이미 읽은 다른 계정의 기록을 언어 전환으로 다시 표시하지 않는다. 변경 안내는 5개 언어의 정적 UI로만 번역한다.
+- 6단계 S1 접근성: 기록 탭의 기존 좌우 화살표 탐색에 `Home`(첫 탭)·`End`(마지막 탭)를 추가했다. 기존 보고서 중심 첫 탭과 깊은 링크는 변경하지 않는다.
+- 관련 범위 회귀 검사: `apps/web/records-saju-surface.test.ts`. **이 변경의 GitHub Actions 최종 PASS 여부는 해당 PR 최신 HEAD 체크를 별도로 확인해야 한다.** 기존 Production Saju `NO_BUILD`·상품 판매 HOLD·운영 DB 미변경 원칙을 유지한다.
+
 > **트랙:** `frontend-integration` (기록 화면·보고서 읽기), 기존 Saju / DB·Privacy / Reader / Commerce 작업은 각 정본 구현을 소비한다.  
 > **목표:** 첫 유료 사주 상품의 **공식 Reading 생성 → 보호 저장 → 구매권 확인 → 기록에서 상세 보고서 재열람 → 첫 Reader 연결**을 재사용 가능한 코드로 완성한다.  
 > **현재 상태:** 기존 Records 읽기 기반은 구현되어 있으나 **첫 유료 보고서 생성·구매·재열람의 운영 종단 간 경로는 미완료**. 본 문서는 **구현 순서**이지 상품 판매·권한·운영 DB·Saju Production 활성화 승인이 아니다.  
