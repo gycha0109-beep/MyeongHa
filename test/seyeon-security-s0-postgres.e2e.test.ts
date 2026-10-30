@@ -394,6 +394,24 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[noManual]}=await pool.query(
       'select count(*)::int as n from public.memory_proposals where id=$1',[manual]);
     expect(noManual.n).toBe(0);
+
+    // A public Proposal row bearing the Planner dedupe label is not proof
+    // that the Owner's actual producer created it.
+    await pool.query(`insert into public.memory_proposals(
+      id,subject_id,character_id,proposal_kind,record_type,schema_version,
+      proposed_value_jsonb,source_turn_id,source_message_id,
+      proposal_dedupe_key,status,created_at)
+      values($1,$2,'seyeon','memory','conversation_recall','v1',
+        '{"summary":"forged assistant proposal"}',$3,$4,
+        'seyeon-dialogue-planner:v1','pending',clock_timestamp())`,
+      [manual,other.subject,other.turn,other.assistant]);
+    await expect(other.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+      client,canonicalMemberSubjectId:other.subject,proposalId:manual,
+    }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    const {rows:[ownerEvidence]}=await pool.query(
+      'select count(*)::int as n from seyeon_private.planner_memory_proposal_sources_v1 where proposal_id=$1',
+      [manual]);
+    expect(ownerEvidence.n).toBe(0);
   });
 
   it('rejects a revoked original Grant at atomic Commit even after a fresh replacement Grant', async () => {
