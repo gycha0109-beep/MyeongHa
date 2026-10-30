@@ -329,9 +329,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
 
 
   it('DB Planner Character source admits atomic Member Memory+Grant, manual UserMessage denied',async()=>{
-    const f=await prepare(6);
+    const f=await prepare(13);
     await f.commit();
-    const id=uuid(27,6);
+    const id=uuid(27,13);
     const insert=`insert into public.memory_proposals(
       id,subject_id,character_id,proposal_kind,record_type,schema_version,
       proposed_value_jsonb,source_turn_id,source_message_id,proposal_dedupe_key,
@@ -365,9 +365,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       client,canonicalMemberSubjectId:f.subject,proposalId:id,
     }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
 
-    const other=await prepare(7);
+    const other=await prepare(14);
     await other.commit();
-    const manual=uuid(27,7);
+    const manual=uuid(27,14);
     await pool.query(insert,[manual,other.subject,JSON.stringify({summary:'synthetic user text'}),
       other.turn,other.user]);
     await expect(other.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
