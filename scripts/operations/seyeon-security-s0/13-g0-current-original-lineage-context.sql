@@ -60,7 +60,7 @@ begin
       = jsonb_build_object(
         'positiveProof',a.seyeon_personal_source_pin_jsonb->'positiveProof'
       )
-  for share of msg,t,a,c;
+;
 
   if not found or jsonb_typeof(v_pin) is distinct from 'object'
      or v_pin->>'schemaVersion' is distinct from
@@ -138,6 +138,9 @@ declare
   v_row record;
   v_total integer:=0;
   v_seen_current boolean:=false;
+  v_ids uuid[]:=array[]::uuid[];
+  v_hashes text[]:=array[]::text[];
+  v_returned integer:=0;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_thread_id is null or p_current_user_message_id is null
@@ -150,7 +153,7 @@ begin
   perform 1 from public.conversation_threads t
   where t.id=p_thread_id and t.subject_id=p_subject_id
     and t.status in ('active','archived')
-  for update;
+  ;
   if not found then
     raise exception using errcode='42501',
       constraint='seyeon_g0_context_thread_invalid',
@@ -160,19 +163,21 @@ begin
   -- Select only metadata here. The source text is not touched until all
   -- selected messages and original grant rows have passed owner checks.
   for v_row in
-    select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no
+    select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no,m.content_hash
     from (
-      select id,turn_id,sender_type,thread_character_id,thread_id,sequence_no
+      select id,turn_id,sender_type,thread_character_id,thread_id,sequence_no,content_hash
       from public.conversation_messages
       where subject_id=p_subject_id and thread_id=p_thread_id
         and redacted_at is null and body_text is not null
-      order by sequence_no desc limit p_limit for share
+      order by sequence_no desc limit p_limit
     ) m
     left join public.conversation_thread_characters c
       on c.id=m.thread_character_id and c.thread_id=m.thread_id
     order by m.sequence_no asc
   loop
     v_total:=v_total+1;
+    v_ids:=array_append(v_ids,v_row.id);
+    v_hashes:=array_append(v_hashes,v_row.content_hash);
     if v_row.id=p_current_user_message_id then
       v_seen_current:=true;
       if v_row.sender_type is distinct from 'user'
@@ -206,22 +211,33 @@ begin
       message='Current model context source is unavailable';
   end if;
 
-  -- Source rows and the original Grant/Record remain locked in this same
-  -- transaction through the authorized text read.
+  -- Emit only the exact IDs and original content hashes checked above.
+  -- A concurrently inserted message cannot join this authorized window;
+  -- redactions/edits invalidate the window rather than changing its content.
+  -- Original Grant/Record SHARE locks remain held until transaction end.
   return query
-  select x.id,x.sequence_no,x.sender_type,x.character_id,
-         x.body_text,x.created_at
-  from (
-    select m.id,m.sequence_no,m.sender_type,c.character_id,
-           m.body_text,m.created_at
-    from public.conversation_messages m
-    left join public.conversation_thread_characters c
-      on c.id=m.thread_character_id and c.thread_id=m.thread_id
-    where m.subject_id=p_subject_id and m.thread_id=p_thread_id
-      and m.redacted_at is null and m.body_text is not null
-    order by m.sequence_no desc limit p_limit
-  ) x
-  order by x.sequence_no asc;
+  select m.id,m.sequence_no,m.sender_type,c.character_id,
+         m.body_text,m.created_at
+  from public.conversation_messages m
+  join unnest(v_ids,v_hashes) as pinned(id,content_hash)
+    on pinned.id=m.id and pinned.content_hash=m.content_hash
+  left join public.conversation_thread_characters c
+    on c.id=m.thread_character_id and c.thread_id=m.thread_id
+  where m.subject_id=p_subject_id and m.thread_id=p_thread_id
+    and m.redacted_at is null and m.body_text is not null
+    and (
+      (m.id=p_current_user_message_id and m.sender_type='user'
+       and c.character_id is null)
+      or (m.id<>p_current_user_message_id and m.sender_type='character'
+          and c.character_id='seyeon')
+    )
+  order by m.sequence_no asc;
+  get diagnostics v_returned=row_count;
+  if v_returned<>v_total then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_context_window_changed',
+      message='Current model context source is unavailable';
+  end if;
 end
 $context_window$;
 
