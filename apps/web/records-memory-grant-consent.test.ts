@@ -7,7 +7,7 @@ const ack={ok:true,data:{memoryItemId:MEMORY,characterId:'seyeon',
   currentlyGranted:true,grantState:'active'},
   meta:{apiContractVersion:'v0.9',requestId:'consent',serverTime:'2026-10-30T00:00:00Z'}};
 function subject(kind='member'){
-  const fetchImpl=vi.fn(async()=>Response.json(ack));
+  const fetchImpl=vi.fn(async(_url:string,_options?:RequestInit)=>Response.json(ack));
   const client=createRecordsMemoryGrantConsentClient({
     fetchImpl,resolveBearer:()=>({kind,token:'current-member-token'}),
   });
@@ -29,7 +29,7 @@ describe('S0 original Memory separate Member consent client',()=>{
       headers:{'Content-Type':'application/json',
         Authorization:'Bearer current-member-token'},
     });
-    expect(JSON.parse(options.body as string)).toEqual({
+    expect(JSON.parse(options!.body as string)).toEqual({
       grantChoice:{mode:'character_only',characterId:'seyeon'},
     });
   });
