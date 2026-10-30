@@ -1,3 +1,12 @@
+export interface ChatRoomOriginalMemoryOfferV1 {
+  readonly sourceAuthority: 'server_original_message';
+  readonly characterId: 'seyeon';
+  readonly redacted: false;
+  readonly threadId: string;
+  readonly turnId: string;
+  readonly messageId: string;
+}
+
 export interface ChatRoomReadMessageV1 {
   readonly messageId: string;
   readonly sequenceNo: number;
@@ -7,6 +16,7 @@ export interface ChatRoomReadMessageV1 {
   readonly createdAt: string;
   readonly redacted: boolean;
   readonly redactedAt: string | null;
+  readonly memoryProposalOffer?: Readonly<ChatRoomOriginalMemoryOfferV1>;
 }
 
 export interface ChatRoomReadPayloadV1 {
