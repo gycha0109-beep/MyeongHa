@@ -41,3 +41,14 @@
 - Read-only production catalog check (2026-10-30): private receipt table=false, capture audit table=false, capture function=false, current API role Source SELECT=true/INSERT=false.
 - Production `public.conversation_messages.content_hash` column SELECT=false for `myeongha_api_executor`; relevant message columns are otherwise SELECT=true and UPDATE=false. PostgreSQL `SELECT ... FOR SHARE` requires UPDATE privilege on at least one column, so the current command cannot run as that ordinary read-only executor. No privileges were modified.
 - Follow-up: design and approve a narrowly scoped verified-action writer/locking authority, independently governed Topic/Content review, and receipt/audit migration before any production route/UI is activated.
+
+
+## 2026-10-30 continuation: governed original-review and Topic authorization
+
+- Added `seyeon-c09-reviewed-original-topic-authority-shadow-v1.ts`: positive read-only authorization of one *independently reviewed* original message, bound to canonical Member Subject, message UUID, current original content hash, private visibility, valid learning dates, and current governed Topic publication. The adapter does **not** classify original text or accept LLM/topic claims as authority.
+- Added `postgres-seyeon-c09-published-topic-authority-shadow-v1.ts`: read-only Topic lookup against the **already deployed** `myeongha_internal.character_knowledge_topics_v1`, using the same existing canonical Member Subject transaction. The SQL only admits presently published, non-revoked `seyeon` topics; no privileged role or DML is created.
+- Integrated the independent-original path into the existing private opt-in Command, using the same transaction that checks the original, finds an existing approval, inserts an approval receipt, and verifies Source+Audit. Existing legacy `topicAuthority` injection remains solely for isolated Shadow tests; a real integration must use the independently approved original-source provider.
+- The independent reviewed-original **data provider is still missing**. This integration does not mean that any real original review is available or trusted. The Topic registry can be read, but an empty/nonpublished Topic or missing independent review fails closed. Existing private receipt/audit capture Proposal remains not deployed and its writer privileges are absent.
+- The HTTP Shadow is still unmounted; no consent UI, Production route, user-private durable evidence publication, shared knowledge, or Core Persona mutation is activated.
+- Focused regressions: 55 PASS (reviewed-original, Topic SQL read adapter, opt-in Command, opt-in HTTP); `tsc -p tsconfig.build.json --noEmit` PASS on pinned repository toolchain. Production database was not modified.
+- Next: durable server-governed original-content review source, approved least-privilege writer/row-lock permissions + isolated concurrency validation, then explicit user approval UX and separately authorized rollout.

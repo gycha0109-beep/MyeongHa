@@ -17,6 +17,9 @@ import {
 import {
   POSTGRES_SEYEON_C09_SOURCE_APPROVAL_SQL_V1,
 } from '../apps/api/src/postgres-seyeon-c09-publication-source-shadow-v1.js';
+import {
+  POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1,
+} from '../apps/api/src/postgres-seyeon-c09-published-topic-authority-shadow-v1.js';
 
 const AUTH = '91000000-0000-4000-8000-000000000001';
 const OWNER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -40,6 +43,7 @@ function fixture(options: {
   insertConflict?: boolean;
   existingWithdrawn?: boolean;
   existingChangedHash?: boolean;
+  reviewedOriginal?: boolean;
 } = {}) {
   const calls: Calls[] = [];
   const releases: unknown[] = [];
@@ -74,6 +78,13 @@ function fixture(options: {
             withdrawnAt: options.existingWithdrawn ? VERIFIED : null,
           }];
         }
+      } else if (text === POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1) {
+        expect(values).toEqual(['python.programming']);
+        rows = options.badTopic ? [] : [{
+          characterId: 'seyeon', topicKey: 'python.programming',
+          policyVersion: 'approved-topic-v1', authoritySourceRef: 'canon:topic',
+          publishedAt: '2026-10-28T00:00:00.000Z', revokedAt: null,
+        }];
       } else if (text === C09_PRIVATE_OPTIN_RECEIPT_SQL_V1) {
         if (options.failInsert) throw new Error('duplicate receipt');
         approval = values[0] as string;
@@ -124,10 +135,21 @@ function fixture(options: {
       };
     }),
   };
-  const command = createSeyeonC09PrivateLearningOptinCommandShadowV1({
-    pool: { connect: () => connection } as PostgresSubjectPoolV1,
-    topicAuthority,
-  });
+  const approvedOriginals = {
+    readIndependentlyApprovedOriginal: vi.fn(async () => ({
+      reviewRef: 'c09:independent-review:approved',
+      status: 'approved', visibility: 'user_private', characterId: 'seyeon',
+      subjectId: options.wrongSubject ? OTHER : OWNER,
+      originalMessageId: MESSAGE,
+      originalContentHash: 'fixed-original-hash',
+      topicKey: 'python.programming', awareness: 'heard_of',
+      learnedAt: VERIFIED, validAt: VERIFIED, reviewedAt: VERIFIED,
+    })),
+  };
+  const pool = { connect: () => connection } as PostgresSubjectPoolV1;
+  const command = createSeyeonC09PrivateLearningOptinCommandShadowV1(
+    options.reviewedOriginal ? { pool, approvedOriginals } : { pool, topicAuthority },
+  );
   const submit = (userAction: Record<string, unknown> = {
     action: 'approve_private_learning', originalMessageId: MESSAGE,
   }, evidence: Record<string, unknown> = {
@@ -136,7 +158,7 @@ function fixture(options: {
     verifiedEvidence: evidence as Parameters<typeof command.submit>[0]['verifiedEvidence'],
     userAction: userAction as unknown as Parameters<typeof command.submit>[0]['userAction'],
   });
-  return { calls, releases, submit, topicAuthority };
+  return { calls, releases, submit, topicAuthority, approvedOriginals };
 }
 
 describe('C09 auth-bound explicit private learning opt-in command shadow', () => {
@@ -241,4 +263,44 @@ describe('C09 auth-bound explicit private learning opt-in command shadow', () =>
     },
   );
 
+});
+
+describe('C09 server-owned reviewed original integration in authenticated opt-in command', () => {
+  it('reads independently approved original and governed published Topic in the same Subject transaction', async () => {
+    const f = fixture({ reviewedOriginal: true });
+    const result = await f.submit();
+    expect(result.scope).toBe('user_private');
+    expect(result.evidencePublished).toBe(false);
+    expect(f.approvedOriginals.readIndependentlyApprovedOriginal).toHaveBeenCalledExactlyOnceWith({
+      subjectId: OWNER, originalMessageId: MESSAGE,
+      originalContentHash: 'fixed-original-hash',
+    });
+    expect(f.topicAuthority.decide).not.toHaveBeenCalled();
+    const calls = f.calls.map(c => c.text);
+    expect(calls.indexOf(C09_PRIVATE_OPTIN_ORIGINAL_SQL_V1))
+      .toBeLessThan(calls.indexOf(POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1));
+    expect(calls.indexOf(POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1))
+      .toBeLessThan(calls.indexOf(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1));
+    expect(calls.at(-1)).toBe('COMMIT');
+  });
+
+  it('refuses nonexistent or unapproved Topic before any opt-in receipt or source capture', async () => {
+    const f = fixture({ reviewedOriginal: true, badTopic: true });
+    await expect(f.submit()).rejects.toMatchObject({
+      code: 'C09_APPROVED_ORIGINAL_TOPIC_UNVERIFIED',
+    });
+    expect(f.calls.map(c => c.text)).not.toContain(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
+    expect(f.calls.map(c => c.text)).not.toContain(C09_PRIVATE_OPTIN_CAPTURE_SQL_V1);
+    expect(f.calls.at(-1)?.text).toBe('ROLLBACK');
+  });
+
+  it('does not redo a review for an already-approved exact message replay', async () => {
+    const f = fixture({ reviewedOriginal: true, existing: true });
+    const response = await f.submit();
+    expect(response.actionRef).toBe('c09:member-private-optin:existing');
+    expect(f.approvedOriginals.readIndependentlyApprovedOriginal).not.toHaveBeenCalled();
+    expect(f.calls.map(c => c.text)).not.toContain(POSTGRES_C09_PUBLISHED_TOPIC_SQL_V1);
+    expect(f.calls.map(c => c.text)).not.toContain(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
+    expect(f.calls.at(-1)?.text).toBe('COMMIT');
+  });
 });

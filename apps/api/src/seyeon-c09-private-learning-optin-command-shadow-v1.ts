@@ -7,6 +7,11 @@ import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resol
 import {
   createPostgresSeyeonC09PrivateApprovedSourceShadowV1,
 } from './postgres-seyeon-c09-private-approved-source-shadow-v1.js';
+import {
+  createSeyeonC09ReviewedOriginalTopicAuthorityShadowV1,
+  type C09ReviewedOriginalSourceAuthorityShadowV1,
+} from './seyeon-c09-reviewed-original-topic-authority-shadow-v1.js';
+import { createPostgresC09PublishedKnowledgeTopicAuthorityShadowV1 } from './postgres-seyeon-c09-published-topic-authority-shadow-v1.js';
 
 export const SEYEON_C09_PRIVATE_OPTIN_COMMAND_SHADOW_VERSION_V1 =
   'seyeon-c09-private-optin-command-shadow-v1' as const;
@@ -125,10 +130,14 @@ function topicDecision(raw: unknown, originalCreatedAt: string): C09PrivateLearn
  */
 export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
-  topicAuthority: C09PrivateLearningTopicAuthorityShadowV1;
+  /** Legacy isolated-fixture/Shadow authority; not a production review source. */
+  topicAuthority?: C09PrivateLearningTopicAuthorityShadowV1;
+  /** Actual integration seam: independently approved original plus scoped DB Topic. */
+  approvedOriginals?: C09ReviewedOriginalSourceAuthorityShadowV1;
 }>) {
   if (!input?.pool || typeof input.pool.connect !== 'function' ||
-      typeof input.topicAuthority?.decide !== 'function') fail();
+      (typeof input.topicAuthority?.decide === 'function') ===
+      (typeof input.approvedOriginals?.readIndependentlyApprovedOriginal === 'function')) fail();
 
   return Object.freeze({
     async submit(request: Readonly<{
@@ -197,7 +206,13 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
           let actionRef = await findExisting();
           let decided: C09PrivateLearningTopicDecisionShadowV1 | null = null;
           if (actionRef === null) {
-            decided = topicDecision(await input.topicAuthority.decide({
+            const topicAuthority = input.approvedOriginals !== undefined
+              ? createSeyeonC09ReviewedOriginalTopicAuthorityShadowV1({
+                  approvedOriginals: input.approvedOriginals,
+                  publishedTopics: createPostgresC09PublishedKnowledgeTopicAuthorityShadowV1({ scope }),
+                })
+              : input.topicAuthority!;
+            decided = topicDecision(await topicAuthority.decide({
               subjectId,
               messageId: action.originalMessageId,
               originalContentHash: row.contentHash,
