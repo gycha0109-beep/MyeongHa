@@ -13,6 +13,23 @@ export const POSTGRES_SEYEON_RELATIONSHIP_SYNC_COMPLETE_BINDING_V1 =
 
 type Row = Readonly<Record<string, unknown>>;
 
+/**
+ * G3: an Outbox event's authority string, sourceRef or sourceMessageRefs
+ * cannot prove currently valid original Grant/Record and every derived origin.
+ * Reject BEFORE DB enqueue/claim until owner-verified source lineage exists.
+ */
+export class SeyeonRelationshipOutboxCurrentSourceHoldV1 extends Error {
+  readonly code = 'SEYEON_RELATIONSHIP_OUTBOX_SOURCE_AUTHORITY_HOLD' as const;
+  constructor() {
+    super('Current original and derived relationship source authority is unavailable.');
+    this.name = 'SeyeonRelationshipOutboxCurrentSourceHoldV1';
+  }
+}
+
+export function assertSeyeonRelationshipOutboxCurrentSourceAuthorityV1(): void {
+  throw new SeyeonRelationshipOutboxCurrentSourceHoldV1();
+}
+
 const ENQUEUE_SQL = [
   'select',
   '  outbox_event_id::text as "outboxEventId",',
@@ -104,6 +121,7 @@ class PostgresSeyeonProductionRelationshipSyncOutboxPortV1
   async enqueue(
     input: Parameters<SeyeonProductionRelationshipSyncOutboxPortV1['enqueue']>[0],
   ) {
+    assertSeyeonRelationshipOutboxCurrentSourceAuthorityV1();
     try {
       const result = await this.client.query<Row>(ENQUEUE_SQL, [
         input.subjectId,
@@ -128,6 +146,7 @@ class PostgresSeyeonProductionRelationshipSyncOutboxPortV1
   async claim(
     input: Parameters<SeyeonProductionRelationshipSyncOutboxPortV1['claim']>[0],
   ) {
+    assertSeyeonRelationshipOutboxCurrentSourceAuthorityV1();
     try {
       const result = await this.client.query<Row>(CLAIM_SQL, [
         input.subjectId,
