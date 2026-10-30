@@ -8,6 +8,8 @@
 
 [A5 분석 비공개 원장 설치 기록](../../docs/operations/ADMIN_ANALYTICS_PRODUCTION_INSTALL_20261030.md): 기존 동의/이벤트 테이블·독립 Writer·180일 제약을 설치하고 실제 DB에서 전체 롤백 검증했습니다. public/운영 Reader 178개 컬럼은 유지하며 A5 후보의 분석 필드 23개만 별도 허용합니다. 수집·공개 라우트·스케줄·로그인은 미활성입니다.
 
+[A4 Reading 비용 원장 설치 기록](../../docs/operations/ADMIN_READING_AI_COST_PRODUCTION_INSTALL_20261030.md): 실제 INSERT를 막던 중복 처리 SQL을 수정하고 전용 Source/Writer·원장·조회 RPC를 설치했습니다. 실제 Saju 실행 결속·비용 수집은 HOLD이며 월 총액·확정 비용은 계속 미측정입니다.
+
 현재 상태는 [운영 재조회 기록](../../docs/operations/ADMIN_OPERATIONS_READBACK_20261030.md)을 우선합니다. 아래 날짜별 기록의 “역할 없음”, “Supabase 연결 오류”는 과거 상태입니다. Reader/Audit 설치는 완료됐고 재적용하지 않습니다. 두 역할의 비밀번호·전용 Hyperdrive·Worker·Owner 실인증·읽기 개통은 미완료입니다.
 
 비활성 스테이징도 Access JWT를 검증하고 비허용 사용자는 403, 검증된 Owner는 `ADMIN_PRIVATE_DISABLED`를 반환합니다. DB·자산은 제공하지 않습니다. 익명 검사는 일반 503을 성공으로 인정하지 않으며 실제 빌드된 JS/CSS의 `/admin/assets/` 및 `/assets/` 주소를 모두 확인합니다.

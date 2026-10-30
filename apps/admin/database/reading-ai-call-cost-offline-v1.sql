@@ -197,7 +197,7 @@ begin
     (p_event->>'appliedOutputRateMicroUsdPerMillion')::bigint,
     (p_event->>'estimatedCostMicroUsd')::bigint,
     p_event->>'costStatus',p_event
-  ) on conflict (call_id) do nothing;
+  ) on conflict on constraint reading_ai_call_cost_events_v1_pkey do nothing;
   get diagnostics v_inserted=row_count;
   if v_inserted=0 then
     select c.event_jsonb into v_existing from myeongha_admin_ops.reading_ai_call_cost_events_v1 c
