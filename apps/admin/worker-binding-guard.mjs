@@ -23,6 +23,12 @@ function principalIdentity(connection){
   return [decodeURIComponent(url.username),url.hostname.toLowerCase(),
     url.port||'5432',decodeURIComponent(url.pathname.slice(1))].join('|');
 }
+export function validateAdminMaintenanceOriginsV1(selected,other){
+ const identities=selected.map(principalIdentity);
+ const existing=other.map(principalIdentity);
+ if(new Set(identities).size!==identities.length||identities.some(value=>existing.includes(value)))
+  throw Error('Retention origin reuses another admin database principal');
+}
 export function validateAdminHttpBindingsV1(env){
  const connections=[];
  for(const key of [...REQUIRED,...OPTIONAL]){

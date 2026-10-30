@@ -5,7 +5,7 @@ import { createAdminHostedHttpV1 } from '../apps/api/src/admin-hosted-http-v1.ts
 import { createAdminPrivateRuntimeV1 } from '../apps/api/src/admin-private-runtime-v1.ts';
 import {createAdminAuditRetentionMaintenanceV1} from '../apps/api/src/admin-audit-retention-v1.ts';
 import {createAdminAnalyticsPostgresEventStoreV1} from '../apps/api/src/admin-analytics-pipeline-postgres-v1.ts';
-import {validateAdminHttpBindingsV1} from '../apps/admin/worker-binding-guard.mjs';
+import {validateAdminHttpBindingsV1,validateAdminMaintenanceOriginsV1} from '../apps/admin/worker-binding-guard.mjs';
 
 /** Check *all* selected maintenance origins before the first SQL query starts.
  * Different bindings that resolve to the same privileged DB connection are
@@ -23,8 +23,7 @@ export function validateAdminMaintenanceBindingsV1(env) {
   const selected=[...(auditEnabled?[audit]:[]),...(analyticsEnabled?[analytics]:[])];
   const other=[env.ADMIN_READ_HYPERDRIVE?.connectionString,env.ADMIN_AUDIT_HYPERDRIVE?.connectionString,
     env.ADMIN_COMMAND_HYPERDRIVE?.connectionString].filter(Boolean);
-  if(new Set(selected).size!==selected.length || selected.some(v=>other.includes(v)))
-    throw Error('Retention origin reuses another admin database principal');
+  validateAdminMaintenanceOriginsV1(selected,other);
   return{auditEnabled,analyticsEnabled};
 }
 

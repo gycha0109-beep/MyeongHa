@@ -12,6 +12,8 @@
 
 `inactive-stage-owner-probe.mjs`는 실제 Owner 및 비허용 사용자의 짧은 Access 세션을 각각 `MYEONGHA_ADMIN_STAGE_OWNER_ACCESS_JWT`, `MYEONGHA_ADMIN_STAGE_DENIED_ACCESS_JWT` 환경변수로 받은 경우에만 실행합니다. 두 세션은 저장소·워크플로 Secrets·보고서에 저장하지 않습니다. 비활성 Access 검증이며 Member 인증·Production 조회 성공을 대신하지 않습니다.
 
+A5 동의 요청과 철회가 겹치면 진행 중인 동의 응답의 쿠키 반영 뒤 서버 철회를 실행합니다. 지원 브라우저에서는 Web Locks로 같은 출처의 여러 탭에서도 쿠키 변경 요청을 직렬화합니다. 철회 실패 중에는 명시적인 재시도가 성공할 때까지 이 탭의 수집·동의 복원을 차단합니다. 기본 수집 비활성은 유지합니다. 보존 스케줄도 연결 URL의 비밀번호·옵션 차이로 동일 로그인 계정을 재사용할 수 없도록 HTTP와 같은 계정 식별 검사를 적용합니다.
+
 ## 실행
 
 Node 24 / npm 11, 저장소 루트에서 의존성을 설치한 후:

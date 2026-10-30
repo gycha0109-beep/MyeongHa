@@ -12,14 +12,34 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
   let consent = null;
   let sessionContext = null;
   let consentGeneration=0;
+  let withdrawalPending=false;
+  let withdrawalInFlight=null;
+  const pendingGrants=new Set();
   const prepared = new Map();
   const fetchImpl = options.fetchImpl ?? ((...args) => fetch(...args));
+  let consentMutation=Promise.resolve();
+  function mutateConsent(path,body){
+    const perform=()=>{
+      const send=()=>fetchImpl(path,{method:'POST',credentials:'same-origin',cache:'no-store',
+        headers:{'Content-Type':'application/json'},body,signal:AbortSignal.timeout(8000)});
+      // An origin-scoped Web Lock orders cookie-changing requests across tabs.
+      // The in-memory queue also covers environments without Web Locks. Neither
+      // mechanism creates a visitor identifier or touches persistent storage.
+      const locks=options.lockManager??globalThis.navigator?.locks;
+      return typeof locks?.request==='function'?locks.request('myeongha.analytics.consent-mutation.v1',
+        {signal:AbortSignal.timeout(8000)},send):send();
+    };
+    const request=consentMutation.then(perform);
+    consentMutation=request.catch(()=>undefined);
+    return request;
+  }
   const sessionKey='myeongha.analytics.tab-session.v1';
   const storage=()=>options.sessionStorage??globalThis.sessionStorage;
   const validSession=value=>consent&&value&&value.visitorRef===consent.visitorRef&&value.version===consent.version&&/^as_[0-9a-f]{64}$/u.test(value.sessionRef??'')&&
     typeof value.sessionContext==='string'&&/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(value.sessionContext)&&Number.isFinite(Date.parse(value.expiresAt))&&Date.parse(value.expiresAt)>Date.now()&&Date.parse(value.expiresAt)<=Date.parse(consent.expiresAt);
   async function startSession(){
     if(!enabled)return {status:'disabled'};
+    if(withdrawalPending)return {status:'withdrawal_pending'};
     if(!consent||Date.parse(consent.expiresAt)<=Date.now())return {status:'consent_required'};
     const generation=consentGeneration;
     // Storage is touched only after a server consent grant (or a trusted
@@ -38,9 +58,16 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
     startSession,
     async grantConsent() {
       if (!enabled) return {status:'disabled'};
+      if(withdrawalPending)return {status:'withdrawal_pending'};
       const generation=++consentGeneration;consent=null;sessionContext=null;
       try {
-        const response=await fetchImpl('/api/analytics/consent',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:'grant'})});
+        // A late grant response can install its HttpOnly cookie even after the
+        // local consent generation was cancelled. Withdrawal must wait for ALL
+        // pending grant response headers before sending the server erasure.
+        const pending=mutateConsent('/api/analytics/consent',JSON.stringify({decision:'grant'}));
+        pendingGrants.add(pending);
+        let response;try{response=await pending;}finally{pendingGrants.delete(pending);}
+        if(generation!==consentGeneration)return {status:'cancelled'};
         if(!response.ok)return {status:'unavailable'};
         const data=await response.json();if(generation!==consentGeneration)return {status:'cancelled'};const value=data.consent;
         if(!value||value.granted!==true||!/^av_[0-9a-f]{64}$/u.test(value.visitorRef??'')||!KEY.test(value.version??'')||!Number.isFinite(Date.parse(value.expiresAt))||Date.parse(value.expiresAt)<=Date.now())return {status:'unavailable'};
@@ -52,6 +79,7 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
       // whether its existing HttpOnly receipt is still active. A missing or
       // revoked receipt creates no visitor, identifier, or tracked event.
       if (!enabled) return {status:'disabled'};
+      if(withdrawalPending)return {status:'withdrawal_pending'};
       const generation=++consentGeneration;
       consent=null;sessionContext=null;prepared.clear();
       try {
@@ -78,7 +106,7 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
       }catch{return{status:'unavailable'};}
     },
     setConsent(value) {
-      if (!enabled) return false;
+      if (!enabled||withdrawalPending) return false;
       if (!value || value.granted !== true || !/^av_[0-9a-f]{64}$/u.test(value.visitorRef ?? '') ||
           !KEY.test(value.version ?? '') ||
           !Number.isFinite(Date.parse(value.expiresAt)) || Date.parse(value.expiresAt) <= Date.now()) { consent = null; return false; }
@@ -117,10 +145,19 @@ export function createMyeonghaAnalyticsCollectorV1(options = {}) {
       // control must still be able to erase previously granted server consent.
       // Default unconfigured initialization still performs no request.
       if (!enabled && options.withdrawalAvailable !== true) return { status: 'local_consent_cleared' };
+      if(withdrawalInFlight!==null)return withdrawalInFlight;
+      withdrawalPending=true;
       try{storage()?.removeItem(sessionKey);}catch{/* Explicit withdrawal still continues on the server. */}
-      try { const response = await fetchImpl('/api/analytics/withdraw',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'Content-Type':'application/json'},body:'{}'});
-        return {status:response.ok?'withdrawn':'withdrawal_pending'};
-      } catch { return {status:'withdrawal_pending'}; }
+      // No collection resumes while waiting. A failed withdrawal remains
+      // locally blocked until a later explicit retry confirms server erasure.
+      withdrawalInFlight=(async()=>{
+        await Promise.allSettled([...pendingGrants]);
+        try { const response = await mutateConsent('/api/analytics/withdraw','{}');
+          if(response.ok)withdrawalPending=false;
+          return {status:response.ok?'withdrawn':'withdrawal_pending'};
+        } catch { return {status:'withdrawal_pending'}; }
+      })();
+      try{return await withdrawalInFlight;}finally{withdrawalInFlight=null;}
     },
   });
 }

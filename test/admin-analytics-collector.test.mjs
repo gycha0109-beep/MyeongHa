@@ -87,10 +87,13 @@ describe('disabled-by-default web analytics initialization',()=>{
     expect(mountMyeonghaAnalyticsConsentV1({documentImpl:doc})).toBeNull();
   });
   it('does not resume collection when a pending grant returns after withdrawal',async()=>{
-    let finish;const pending=new Promise(resolve=>{finish=resolve;});const sent=[];
+    let finish;const pending=new Promise(resolve=>{finish=resolve;});const started=Promise.withResolvers();const sent=[];
     const policy={approved:true,approvalRef:'owner-20261027',policyVersion:'product-analytics-180d-v1',retentionSeconds:180*86400,deletionBindingVerified:true,validVisitPolicyVersion:'test-admission-v1',approvedEvents:['PAGE_VIEWED']};
-    const collector=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl:async path=>{sent.push(path);return path.endsWith('/consent')?pending:Response.json({});}});
-    const grant=collector.grantConsent();await collector.withdraw();finish(Response.json({consent:{granted:true,visitorRef:'av_'+'a'.repeat(64),version:'product-analytics-consent-180d-v1',expiresAt:new Date(Date.now()+86400_000).toISOString()}}));
+    const collector=initializeMyeonghaAnalyticsV1({enabled:true,policy,fetchImpl:async path=>{sent.push(path);started.resolve();return path.endsWith('/consent')?pending:Response.json({});}});
+    const grant=collector.grantConsent();const withdrawn=collector.withdraw();
+    await started.promise;expect(sent).toEqual(['/api/analytics/consent']);
+    finish(Response.json({consent:{granted:true,visitorRef:'av_'+'a'.repeat(64),version:'product-analytics-consent-180d-v1',expiresAt:new Date(Date.now()+86400_000).toISOString()}}));
+    expect(await withdrawn).toEqual({status:'withdrawn'});
     expect(await grant).toEqual({status:'cancelled'});expect(await collector.track('PAGE_VIEWED',{pageKey:'product'})).toEqual({status:'consent_required'});expect(sent).toHaveLength(2);
   });
 });
