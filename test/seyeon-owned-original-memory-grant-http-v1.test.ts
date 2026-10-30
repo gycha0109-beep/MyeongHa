@@ -96,7 +96,8 @@ describe('unmounted S0 Member-owned original-memory Grant route', () => {
       approvedDbWriteAdmission:() => true,
       createGrant:async input => ({
         memoryItemId:input.memoryItemId,grantId:input.grantId,
-        characterId:'seyeon',replayed:true,
+        // Deliberately forged wire receipt; production type requires false.
+        characterId:'seyeon',replayed:true as false,
       }),
     });
     expect(response.status).toBe(503);
