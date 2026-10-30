@@ -389,25 +389,28 @@ async function readChatState(
   // A former Se-yeon participant disappears from the active binding when
   // left_at is set or a new content bundle is selected. A page-local check
   // cannot prove that an earlier/later page is safe to replay.
-  const capability = await client.query<{ installed: boolean }>(
-    SEYEON_HISTORY_GUARD_AVAILABLE_SQL,
-  );
-  if (capability.rows.length !== 1 ||
-      typeof capability.rows[0]?.installed !== 'boolean') {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
-  // The historical authority is now installed in Production. If a DB
-  // rollback, schema drift, or partial restore removes it, the absence of
-  // evidence must never reopen older Se-yeon pages. Fail before stream reads.
-  if (!capability.rows[0].installed) {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
-  const history = await client.query<{ everInvolved: boolean }>(
-    SEYEON_HISTORY_GUARD_SQL, [subjectId, parsed.threadId],
-  );
-  if (history.rows.length !== 1 ||
-      typeof history.rows[0]?.everInvolved !== 'boolean' ||
-      history.rows[0].everInvolved) {
+  // PostgreSQL may throw when the catalog probe or owner-scoped history
+  // function is unavailable (DDL/ACL drift, timeout or partial restore).
+  // Such failures are NOT ordinary chat errors: always return the same
+  // no-store 503 HOLD before reading body or relationship-derived material.
+  try {
+    const capability = await client.query<{ installed: boolean }>(
+      SEYEON_HISTORY_GUARD_AVAILABLE_SQL,
+    );
+    if (capability.rows.length !== 1 ||
+        typeof capability.rows[0]?.installed !== 'boolean' ||
+        !capability.rows[0].installed) {
+      throw new SeyeonChatHistoryRevealHoldV1();
+    }
+    const history = await client.query<{ everInvolved: boolean }>(
+      SEYEON_HISTORY_GUARD_SQL, [subjectId, parsed.threadId],
+    );
+    if (history.rows.length !== 1 ||
+        typeof history.rows[0]?.everInvolved !== 'boolean' ||
+        history.rows[0].everInvolved) {
+      throw new SeyeonChatHistoryRevealHoldV1();
+    }
+  } catch {
     throw new SeyeonChatHistoryRevealHoldV1();
   }
 
