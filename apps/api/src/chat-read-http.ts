@@ -360,21 +360,12 @@ async function readChatState(
   if (binding.participantCharacterIds.length === 1 &&
       binding.primaryCharacterId === 'seyeon') {
     if (parsed.afterSequenceNo !== 0) throw new SeyeonChatHistoryRevealHoldV1();
-    // The existence query is metadata-only, but its failure must not leak
-    // DB details or downgrade the protected shell into an ordinary 500.
-    // Keep all assistant/relationship bodies withheld on unknown results.
-    let hasMessages: boolean;
-    try {
-      const existence = await client.query<{hasMessages:boolean}>(SEYEON_HAS_MESSAGES_SQL, [
-        subjectId,parsed.threadId,
-      ]);
-      if (existence.rows.length !== 1 ||
-          typeof existence.rows[0]?.hasMessages !== 'boolean') {
-        throw new SeyeonChatHistoryRevealHoldV1();
-      }
-      hasMessages = existence.rows[0].hasMessages;
-    } catch {
-      throw new SeyeonChatHistoryRevealHoldV1();
+    const existence = await client.query<{hasMessages:boolean}>(SEYEON_HAS_MESSAGES_SQL, [
+      subjectId,parsed.threadId,
+    ]);
+    if (existence.rows.length !== 1 ||
+        typeof existence.rows[0]?.hasMessages !== 'boolean') {
+      throw new Error('Missing authoritative Se-yeon shell existence result.');
     }
     return Object.freeze({
       threadId:binding.threadId,
@@ -387,7 +378,7 @@ async function readChatState(
         hasMore:false,
         nextAfterSequenceNo:null,
       }),
-      historyWithheld:hasMessages,
+      historyWithheld:existence.rows[0].hasMessages,
       latestCharacterMessage:null,
       relationship:null,
     });

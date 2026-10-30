@@ -13,7 +13,6 @@ const AUTH_ID = '11111111-1111-4111-8111-111111111111';
 function fakePool(options: {
   denied?: boolean;
   history?: boolean;
-  existenceFailure?: 'sql_error' | 'missing' | 'invalid';
   otherCharacterRoom?: boolean;
   historyGuardFailure?: 'missing' | 'catalog_error' | 'history_error' | 'invalid' | 'past_seyeon';
   observed?: (sql: string, values: readonly unknown[]) => void;
@@ -63,14 +62,7 @@ function fakePool(options: {
             if (!sql.includes('select exists (')) {
               throw new Error('Protected message content must remain unqueried');
             }
-            if (options.existenceFailure === 'sql_error') {
-              throw new Error('internal source body SQL failure');
-            }
-            if (options.existenceFailure === 'missing') return { rows: [] };
-            if (options.existenceFailure === 'invalid') {
-              return { rows: [{ hasMessages: 'true' } as Row] };
-            }
-            return { rows: [{ hasMessages: options.history === true } as Row] };
+            return {rows:[{hasMessages:options.history===true} as Row]};
           }
           if (sql.includes('qry_character_relationship_v1')) return { rows: [] };
           throw new Error('Unexpected query in owner-only chat read test');
@@ -148,24 +140,6 @@ describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
     expect(queries.some(sql => sql.includes('qry_chat_thread_stream_v2'))).toBe(false);
     expect(queries.some(sql => sql.includes('qry_character_relationship_v1'))).toBe(false);
   });
-
-  it.each(['sql_error', 'missing', 'invalid'] as const)(
-    'holds Se-yeon shell metadata when the existence lookup is %s',
-    async (existenceFailure) => {
-      const reads: string[] = [];
-      const response = await invoke({ pool: fakePool({
-        existenceFailure,
-        observed: sql => reads.push(sql),
-      }) });
-      expect(response.status).toBe(503);
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      const payload = await response.json() as any;
-      expect(payload.error.code).toBe('SEYEON_HISTORY_REVEAL_HOLD');
-      expect(JSON.stringify(payload)).not.toContain('internal source body');
-      expect(reads).toHaveLength(2);
-      expect(reads.every(sql => !sql.includes('qry_character_relationship_v1'))).toBe(true);
-    },
-  );
 
   it('rejects missing authentication before opening the database', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });

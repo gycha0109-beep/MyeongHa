@@ -112,6 +112,11 @@ export interface SeyeonPostTurnAnalysisClaimV1 {
 }
 
 export interface SeyeonPostTurnAnalysisOutboxPortV1 {
+  /** DB-owned, read-only admission BEFORE a job lease or its private texts. */
+  preflightClaim?(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+  }>): Awaitable<'off_cleanup' | 'hold'>;
   findByTurn(input: Readonly<{
     subjectId: string;
     turnId: string;
@@ -178,6 +183,8 @@ export interface ProcessSeyeonPostTurnAnalysisInputV1 {
   readonly extractorProvider: SeyeonStructuredProviderPortV2;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;
+  /** Mandatory on every Production caller; offline/synthetic fixture seam only. */
+  readonly enforceCurrentSourceAuthority?: true;
 }
 
 export type ProcessSeyeonPostTurnAnalysisResultV1 =
@@ -211,6 +218,29 @@ export class SeyeonPostTurnAnalysisErrorV1 extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SeyeonPostTurnAnalysisErrorV1';
+  }
+}
+
+/** No current original-Grant/derived-source evidence is bound to a worker job. */
+export class SeyeonPostTurnSourceAuthorityHoldV1 extends Error {
+  readonly code = 'SEYEON_POST_TURN_SOURCE_AUTHORITY_HOLD' as const;
+  constructor() {
+    super('Se-yeon post-turn private source authority is unavailable.');
+    this.name = 'SeyeonPostTurnSourceAuthorityHoldV1';
+  }
+}
+
+/** Production fails closed before Provider, checkpoint replay or relationship writes.
+ * OFF jobs may finish without extracting or publishing any source content.
+ * This is not a Grant verifier; removing the HOLD needs an owner-backed
+ * current-source and derived-lineage authorization contract.
+ */
+export function assertSeyeonPostTurnSourceAuthorityV1(
+  mode: SeyeonProductionRelationshipModeV1,
+  checkpoint: unknown | null,
+): void {
+  if (mode !== 'OFF' || checkpoint !== null) {
+    throw new SeyeonPostTurnSourceAuthorityHoldV1();
   }
 }
 
@@ -659,6 +689,24 @@ async function finishFromCheckpoint(input: {
 export async function processSeyeonPostTurnAnalysisV1(
   input: ProcessSeyeonPostTurnAnalysisInputV1,
 ): Promise<ProcessSeyeonPostTurnAnalysisResultV1> {
+  if (input.enforceCurrentSourceAuthority === true) {
+    // No Outbox lease, private assistant text, Provider, or checkpoint until
+    // an existing Subject-scoped DB Owner confirms the only safe OFF path.
+    // Missing/uninstalled authority or any SQL error cannot be inferred
+    // from a snapshot supplied by the job.
+    let admission: 'off_cleanup' | 'hold' = 'hold';
+    try {
+      admission = await input.outboxPort.preflightClaim?.({
+        subjectId: input.subjectId,
+        outboxEventId: input.outboxEventId,
+      }) ?? 'hold';
+    } catch {
+      admission = 'hold';
+    }
+    if (admission !== 'off_cleanup') {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+  }
   const claimed = one(
     await input.outboxPort.claim({
       subjectId: input.subjectId,
@@ -682,6 +730,12 @@ export async function processSeyeonPostTurnAnalysisV1(
     throw new SeyeonPostTurnAnalysisErrorV1(
       'Committed Chat material does not match the post-turn analysis snapshot.',
     );
+  }
+
+  if (input.enforceCurrentSourceAuthority === true) {
+    // Snapshot hashes show integrity, not current original Grant/Record rights.
+    // No G3 Owner-backed authorization exists for positive or derived sources.
+    assertSeyeonPostTurnSourceAuthorityV1(snapshot.mode, claimed.checkpointJsonb);
   }
 
   if (claimed.checkpointJsonb !== null) {
