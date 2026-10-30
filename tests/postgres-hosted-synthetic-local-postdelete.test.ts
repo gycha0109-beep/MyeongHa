@@ -27,6 +27,7 @@ function fake(status, body = null) {
 function scenario(postStorageStatus = 403) {
   let deleted = false;
   let sourceRead = false;
+  let marker = false;
   const calls = [];
   const request = async (url, options) => {
     calls.push({ url, method: options.method });
@@ -41,7 +42,7 @@ function scenario(postStorageStatus = 403) {
       email: env.MH_DR_LOCAL_MEMBER_EMAIL, id: uuid,
     });
     if (url.includes('/storage/v1/object/')) {
-      if (deleted) return fake(postStorageStatus);
+      if (deleted) return fake(marker ? postStorageStatus : 200);
       sourceRead = true;
       return fake(200);
     }
@@ -55,30 +56,45 @@ function scenario(postStorageStatus = 403) {
     if (url.includes('/auth/v1/token?grant_type=refresh_token')) return fake(401);
     throw new Error('unexpected route');
   };
-  return { request, calls };
+  const dbFactory = async (password) => {
+    expect(password).toBe(env.MH_DR_LOCAL_DB_PASSWORD);
+    return { query: async (sql, params) => {
+      if (sql.includes('current_database()')) return { rows: [{ database_name: 'postgres', role: 'postgres', revoked_table: true }] };
+      if (sql.startsWith('insert into dr_synthetic_local.revoked_subjects')) {
+        expect(params).toEqual([uuid]);
+        marker = true;
+        return { rows: [] };
+      }
+      throw new Error('unexpected DB query');
+    }, end: async () => {} };
+  };
+  return { request, calls, dbFactory };
 }
 
 describe('Docker-local synthetic post-deletion access verification', () => {
   it('reports PASS only for denied stale-storage access and always holds DR gate', async () => {
-    const { request, calls } = scenario(403);
-    const report = await verifyLocalSyntheticPostDeletion(env, request);
+    const { request, calls, dbFactory } = scenario(403);
+    const report = await verifyLocalSyntheticPostDeletion(env, request, dbFactory);
     expect(report).toMatchObject({
       syntheticPrivateObjectBeforeDeletion: 'PASS',
       syntheticDeletion: 'PASS',
       newLoginDenied: 'PASS',
       refreshAfterDeletionDenied: 'PASS',
       staleAccessTokenStorageDenied: 'PASS',
+      staleTokenBeforeRevocationDenied: 'FAIL',
+      localRevocationMarkerApplied: true,
       drReady: false, gate: 'BLOCKED', serviceResumptionAllowed: false,
       independentPrivacyContinuityProven: false,
     });
     expect(calls.map(x => x.method)).toEqual([
-      'POST','GET','GET','DELETE','POST','POST','GET',
+      'POST','GET','GET','DELETE','POST','POST','GET','GET',
     ]);
     expect(JSON.stringify(report)).not.toContain(uuid);
     expect(JSON.stringify(report)).not.toContain('synthetic-access');
   });
   it('flags stale JWT Storage disclosure as FAIL, never a pass', async () => {
-    const report = await verifyLocalSyntheticPostDeletion(env, scenario(200).request);
+    const scene = scenario(200);
+    const report = await verifyLocalSyntheticPostDeletion(env, scene.request, scene.dbFactory);
     expect(report.staleAccessTokenStorageDenied).toBe('FAIL');
     expect(report.gate).toBe('BLOCKED');
     expect(report.drReady).toBe(false);
