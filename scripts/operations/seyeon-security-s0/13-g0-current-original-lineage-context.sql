@@ -1,4 +1,5 @@
 -- Watchtower-Track: security
+begin;
 -- G0-D1/D2/D3 core: exact original Memory -> committed Assistant -> current
 -- original Grant/Record lineage on the SAME DB read transaction.
 -- STAGED ONLY. Not in plan.mjs, auto migration or Production installation.
@@ -273,3 +274,4 @@ grant execute on function public.qry_seyeon_g0_current_source_recent_messages_v1
 revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
 revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
+commit;
