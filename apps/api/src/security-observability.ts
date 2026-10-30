@@ -200,13 +200,27 @@ function emitUnexpectedException(input: {
   );
 }
 
-function genericInternalServerError(): Response {
-  return new Response(null, {
-    status: 500,
-    headers: {
-      'Cache-Control': NO_STORE,
+function withApiNoStore(response: Response): Response {
+  const headers = new Headers(response.headers);
+  // Dynamic API responses must never inherit public/CDN caching from an
+  // upstream handler, including successful auth, redirects, and errors.
+  headers.set('Cache-Control', NO_STORE);
+  headers.set('CDN-Cache-Control', NO_STORE);
+  headers.set('Vercel-CDN-Cache-Control', NO_STORE);
+  return new Response(
+    response.status === 204 || response.status === 205 || response.status === 304
+      ? null
+      : response.body,
+    {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
     },
-  });
+  );
+}
+
+function genericInternalServerError(): Response {
+  return withApiNoStore(new Response(null, { status: 500 }));
 }
 
 function createExecutionState(input: SecurityObservedOperationInputV1) {
@@ -248,7 +262,7 @@ async function executeObservedOperationV1(
       durationMs: boundedDurationMs(state.startedAt, completedAt),
       writer: state.writer,
     });
-    return response;
+    return withApiNoStore(response);
   } catch {
     const completedAt = state.now();
     emitUnexpectedException({
@@ -310,7 +324,7 @@ export async function executeSecurityObservedNodeRequestV1(
   });
 
   try {
-    await input.writeResponse(response);
+    await input.writeResponse(withApiNoStore(response));
   } catch (error) {
     const failedAt = state.now();
     emitUnexpectedException({
