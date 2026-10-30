@@ -167,3 +167,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **작업 목표:** 실제 `seyeon-post-turn-analysis-worker-v1.ts`의 committed User/Character claim과 S0 Planner Producer 사이에 서버 소유 결속을 추가. 사용자 클릭·원문 전체 저장·무승인 영구 기록을 새로 만들지 않음.
 - **보안 전제:** 기존 Production Post-turn은 DB Owner가 검증한 OFF 정리만 허용하고, 개인 텍스트·Provider 요청은 기본 HOLD. G0~G6, 운영 개인정보·유료 호출은 변경하지 않음.
 - **미완료:** Worker 결속·테스트·충돌 해소·새 HEAD CI 및 승인 결과.
+
+
+### 2026-10-30 · W02 · Post-turn Worker 제안 포트 결속
+
+- **구현:** `seyeon-post-turn-analysis-worker-v1.ts`에 `SeyeonPostTurnPlannerMemoryPortV1`을 추가. **DB claim과 snapshot 원문 결속 검증 후**, OFF·checkpoint 재처리가 아닌 새로운 클레임에만 `propose()`를 호출한다. 응답은 `none` 또는 정확한 pending UUID/재생 여부만 허용하고 다른 반환은 HOLD한다.
+- **서버 조립:** `seyeon-post-turn-planner-memory-port-v1.ts`가 기존 `runSeyeonPostTurnPlannerMemoryV1`을 신뢰된 Subject 증빙/DB pool/provider에 연결. `production-seyeon-post-turn-worker-runtime-v1.ts`에서 포트를 구성해 Worker에 전달한다.
+- **커밋:** `b1ae10fb` (worker), `05c6f3fc` (adapter), `a0b6b147` (runtime).
+- **보안·활성화:** 실제 Production Worker는 기존 `enforceCurrentSourceAuthority=true`가 **OFF-only cleanup**만 허용하여 private claim 이전에 반환/차단한다. Planner 모델/DB 승인 callback도 부여하지 않아 호출 경로는 운영에서 계속 **DENY**다. 이를 실서비스 자동 제안 활성화로 주장하지 않는다.
+- **검증/다음:** 경로·권한 회귀 테스트와 새 HEAD CI 필요. G0/G4 승인·Model 원문 접근 근거·새 purpose 예산 및 G3 응답 결속 HOLD.
