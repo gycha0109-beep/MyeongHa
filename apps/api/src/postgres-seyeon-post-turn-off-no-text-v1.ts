@@ -36,7 +36,7 @@ export function createPostgresSeyeonPostTurnOffWithoutTextPortV1(
   client: PostgresTransactionQueryV1,
 ): SeyeonPostTurnOffWithoutTextPortV1 {
   return Object.freeze({
-    async completeOff(input) {
+    async completeOff(input: Parameters<SeyeonPostTurnOffWithoutTextPortV1['completeOff']>[0]) {
       const result = await client.query<{
         outboxEventId: unknown;
         status: unknown;
