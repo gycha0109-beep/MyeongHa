@@ -178,6 +178,8 @@ export interface ProcessSeyeonPostTurnAnalysisInputV1 {
   readonly extractorProvider: SeyeonStructuredProviderPortV2;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;
+  /** Mandatory on every Production caller; offline/synthetic fixture seam only. */
+  readonly enforceCurrentSourceAuthority?: true;
 }
 
 export type ProcessSeyeonPostTurnAnalysisResultV1 =
@@ -211,6 +213,29 @@ export class SeyeonPostTurnAnalysisErrorV1 extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SeyeonPostTurnAnalysisErrorV1';
+  }
+}
+
+/** No current original-Grant/derived-source evidence is bound to a worker job. */
+export class SeyeonPostTurnSourceAuthorityHoldV1 extends Error {
+  readonly code = 'SEYEON_POST_TURN_SOURCE_AUTHORITY_HOLD' as const;
+  constructor() {
+    super('Se-yeon post-turn private source authority is unavailable.');
+    this.name = 'SeyeonPostTurnSourceAuthorityHoldV1';
+  }
+}
+
+/** Production fails closed before Provider, checkpoint replay or relationship writes.
+ * OFF jobs may finish without extracting or publishing any source content.
+ * This is not a Grant verifier; removing the HOLD needs an owner-backed
+ * current-source and derived-lineage authorization contract.
+ */
+export function assertSeyeonPostTurnSourceAuthorityV1(
+  mode: SeyeonProductionRelationshipModeV1,
+  checkpoint: unknown | null,
+): void {
+  if (mode !== 'OFF' || checkpoint !== null) {
+    throw new SeyeonPostTurnSourceAuthorityHoldV1();
   }
 }
 
@@ -682,6 +707,12 @@ export async function processSeyeonPostTurnAnalysisV1(
     throw new SeyeonPostTurnAnalysisErrorV1(
       'Committed Chat material does not match the post-turn analysis snapshot.',
     );
+  }
+
+  if (input.enforceCurrentSourceAuthority === true) {
+    // Snapshot hashes show integrity, not current original Grant/Record rights.
+    // No G3 Owner-backed authorization exists for positive or derived sources.
+    assertSeyeonPostTurnSourceAuthorityV1(snapshot.mode, claimed.checkpointJsonb);
   }
 
   if (claimed.checkpointJsonb !== null) {
