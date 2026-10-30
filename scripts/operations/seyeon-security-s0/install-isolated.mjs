@@ -64,6 +64,10 @@ try {
       'seyeon_private.cmd_propose_seyeon_original_message_v1(uuid,uuid,uuid,uuid,uuid)', 'EXECUTE')
     and has_function_privilege('myeongha_seyeon_chat_runtime_owner',
       'seyeon_private.cmd_propose_seyeon_original_message_v1(uuid,uuid,uuid,uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_seyeon_original_message_offer_v1(uuid,uuid,uuid)', 'EXECUTE')
+    and has_function_privilege('myeongha_seyeon_chat_runtime_owner',
+      'seyeon_private.qry_seyeon_original_message_offer_v1(uuid,uuid,uuid)', 'EXECUTE')
     as closed`);
   if (acl.closed !== true) throw Error('S0 installation unexpectedly enabled model use or Reveal.');
   await client.query('revoke myeongha_seyeon_chat_runtime_owner from current_user');
