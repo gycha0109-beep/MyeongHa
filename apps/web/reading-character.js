@@ -444,7 +444,9 @@ function stepsFromIssuedProductResponse(response, { isStoredRecord = false } = {
   if (Array.isArray(reading.disclosures)) {
     for (const item of reading.disclosures) {
       if (!item || typeof item !== 'object' || typeof item.text !== 'string' || !item.text.trim()) continue;
-      if (item.type === 'scope_limitation') {
+      // An issued disclosure describes the scope or conditions of a report.
+      // It must not become the first section's source-owned interpretation.
+      if (isStoredRecord || item.type === 'scope_limitation') {
         notices.push(item.text.trim());
       } else if (steps.length > 0) {
         steps[0].supporting.push(item.text.trim());

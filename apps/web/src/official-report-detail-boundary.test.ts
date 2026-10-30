@@ -10,6 +10,7 @@ describe('Records long-form official report boundary', () => {
   const jsx = readWeb('src/reading-detail/ReadingDetailPage.tsx');
   const runtime = readWeb('reading-character.js');
   const css = readWeb('reading-detail-shell.css');
+  const stageCss = readWeb('reading-v3.css');
   const localeRuntime = readWeb('ui-i18n.js');
 
   it('provides an all-at-once official Reading document without changing the preview route', () => {
@@ -150,7 +151,7 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain("translateStaticUi('해석의 적용 범위', getUiLocale())");
     expect(css).toContain('[data-reading-step-notice-text]{white-space:pre-wrap;');
     expect(runtime).toContain("notices.filter((text) => typeof text === 'string' && text.trim()).join('\\n\\n')");
-    expect(runtime).toContain("if (item.type === 'scope_limitation')");
+    expect(runtime).toContain("if (isStoredRecord || item.type === 'scope_limitation')");
   });
 
   it('protects supplemental and limitation source text from five-locale UI translation', () => {
@@ -168,6 +169,27 @@ describe('Records long-form official report boundary', () => {
     expect(runtime).toContain("scopeNoticeHeading.textContent =");
     expect(runtime).toContain("translateStaticUi('해석의 적용 범위', getUiLocale())");
     expect(runtime).toContain('scopeNoticeText.textContent = visibleScopeNotice;');
+  });
+
+  it('keeps issued disclosures in the report notice instead of interpreting them as the first section', () => {
+    expect(runtime).toContain("if (isStoredRecord || item.type === 'scope_limitation') {");
+    expect(runtime).toContain("notices.push(item.text.trim());");
+    expect(runtime).toContain("steps[0].supporting.push(item.text.trim());");
+    expect(runtime).toContain("if (notice) notice.hidden = !preview.notice;");
+    expect(runtime).toContain("if (scopeNotice) scopeNotice.hidden = visibleScopeNotice.length === 0;");
+  });
+
+  it('centers official step-by-step rereading without reopening the preview Reader scene', () => {
+    expect(runtime).toContain("root.dataset.readingRecordMode = 'step_by_step';");
+    expect(runtime).toContain("document.querySelector('.reader-scene')?.setAttribute('hidden', '')");
+    expect(runtime).toContain("document.querySelector('.reading-character-block')?.setAttribute('hidden', '')");
+    expect(stageCss).toContain('body[data-reading-record-mode="step_by_step"] .reading-stage {');
+    expect(stageCss).toContain('body[data-reading-record-mode="step_by_step"] .reader-scene,');
+    expect(stageCss).toContain('body[data-reading-record-mode="step_by_step"] .reading-character-block {');
+    expect(stageCss).toContain('body[data-reading-record-mode="step_by_step"] .reading-sheet {');
+    expect(stageCss).toContain('grid-template-columns: minmax(0, 1fr);');
+    expect(stageCss).toContain('border-radius: 15px;');
+    expect(stageCss).not.toContain('body[data-reading-record-mode="preview"] .reader-scene');
   });
 
   it('keeps issued evidence-only sections but does not create an interpretation or preview result', () => {
