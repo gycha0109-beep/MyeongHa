@@ -57,6 +57,15 @@ export const C09_PRIVATE_OPTIN_ORIGINAL_SQL_V1 = [
   'for share',
 ].join('\n');
 
+export const C09_PRIVATE_OPTIN_EXISTING_RECEIPT_SQL_V1 = [
+  'select action_ref as "actionRef",subject_id::text as "subjectId",',
+  ' original_message_id::text as "messageId",',
+  ' original_content_hash as "contentHash",state,withdrawn_at as "withdrawnAt"',
+  'from myeongha_internal.character_learning_private_optin_receipts_v1',
+  'where subject_id=$1::uuid and original_message_id=$2::uuid',
+  'for share',
+].join('\n');
+
 export const C09_PRIVATE_OPTIN_RECEIPT_SQL_V1 = [
   'insert into myeongha_internal.character_learning_private_optin_receipts_v1',
   ' (action_ref,subject_id,original_message_id,original_content_hash,state,verified_at)',
@@ -64,6 +73,7 @@ export const C09_PRIVATE_OPTIN_RECEIPT_SQL_V1 = [
   'from public.conversation_messages m',
   "where m.id=$3::uuid and m.subject_id=$2::uuid and m.sender_type='user'",
   ' and m.redacted_at is null and m.content_hash=$4::text',
+  'on conflict (subject_id,original_message_id) do nothing',
   'returning action_ref as "actionRef",subject_id::text as "subjectId",',
   ' original_message_id::text as "messageId"',
 ].join('\n');
@@ -159,34 +169,73 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
             throw new SeyeonC09PrivateOptinCommandHoldV1();
           }
           const createdAt = iso(row.createdAt);
-          const decided = topicDecision(await input.topicAuthority.decide({
-            subjectId,
-            messageId: action.originalMessageId,
-            originalContentHash: row.contentHash,
-            originalBodyText: row.bodyText,
-            originalCreatedAt: createdAt,
-          }), createdAt);
-          const actionRef = 'c09:member-private-optin:' + randomUUID();
           const sourceRef = 'c09:conversation:' + action.originalMessageId;
-          const receipt = await scope.client.query<{
-            actionRef: unknown;
-            subjectId: unknown;
-            messageId: unknown;
-          }>(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1, [
-            actionRef, subjectId, action.originalMessageId, row.contentHash,
-          ]);
-          if (receipt.rows.length !== 1 ||
-              receipt.rows[0]?.actionRef !== actionRef ||
-              receipt.rows[0]?.subjectId !== subjectId ||
-              receipt.rows[0]?.messageId !== action.originalMessageId) fail();
 
-          const captured = await scope.client.query<{ sourceRef: unknown }>(
-            C09_PRIVATE_OPTIN_CAPTURE_SQL_V1,
-            [sourceRef, subjectId, action.originalMessageId, actionRef,
-              decided.topicKey, decided.awareness, decided.learnedAt, decided.validAt],
-          );
-          if (captured.rows.length !== 1 ||
-              captured.rows[0]?.sourceRef !== sourceRef) fail();
+          // The original message + canonical owner is the replay key.
+          // Never generate a second receipt or Source+Audit for an approved
+          // original, even after a successful COMMIT with a lost HTTP reply.
+          const findExisting = async (): Promise<string | null> => {
+            const existing = await scope.client.query<{
+              actionRef: unknown; subjectId: unknown; messageId: unknown;
+              contentHash: unknown; state: unknown; withdrawnAt: unknown;
+            }>(C09_PRIVATE_OPTIN_EXISTING_RECEIPT_SQL_V1, [
+              subjectId, action.originalMessageId,
+            ]);
+            if (existing.rows.length > 1) fail();
+            const previous = existing.rows[0];
+            if (previous === undefined) return null;
+            if (typeof previous.actionRef !== 'string' ||
+                !previous.actionRef.startsWith('c09:member-private-optin:') ||
+                previous.subjectId !== subjectId ||
+                previous.messageId !== action.originalMessageId ||
+                previous.contentHash !== row.contentHash ||
+                previous.state !== 'approved' ||
+                previous.withdrawnAt !== null) fail();
+            return previous.actionRef as string;
+          };
+
+          let actionRef = await findExisting();
+          let decided: C09PrivateLearningTopicDecisionShadowV1 | null = null;
+          if (actionRef === null) {
+            decided = topicDecision(await input.topicAuthority.decide({
+              subjectId,
+              messageId: action.originalMessageId,
+              originalContentHash: row.contentHash,
+              originalBodyText: row.bodyText,
+              originalCreatedAt: createdAt,
+            }), createdAt);
+
+            const proposedRef = 'c09:member-private-optin:' + randomUUID();
+            const receipt = await scope.client.query<{
+              actionRef: unknown; subjectId: unknown; messageId: unknown;
+            }>(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1, [
+              proposedRef, subjectId, action.originalMessageId, row.contentHash,
+            ]);
+
+            if (receipt.rows.length === 0) {
+              // Unique-key conflict: another transaction has committed
+              // the approval. Verify it rather than replaying the write.
+              actionRef = await findExisting();
+              if (actionRef === null) fail();
+              decided = null;
+            } else {
+              if (receipt.rows.length !== 1 ||
+                  receipt.rows[0]?.actionRef !== proposedRef ||
+                  receipt.rows[0]?.subjectId !== subjectId ||
+                  receipt.rows[0]?.messageId !== action.originalMessageId) fail();
+              actionRef = proposedRef;
+            }
+          }
+
+          if (decided !== null) {
+            const captured = await scope.client.query<{ sourceRef: unknown }>(
+              C09_PRIVATE_OPTIN_CAPTURE_SQL_V1,
+              [sourceRef, subjectId, action.originalMessageId, actionRef,
+                decided.topicKey, decided.awareness, decided.learnedAt, decided.validAt],
+            );
+            if (captured.rows.length !== 1 ||
+                captured.rows[0]?.sourceRef !== sourceRef) fail();
+          }
 
           const authority = createPostgresSeyeonC09PrivateApprovedSourceShadowV1({ scope });
           const rawProof = await authority.readApprovedPublication({ subjectId, sourceRef });
@@ -195,9 +244,13 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
           if (proof.sourceRef !== sourceRef || proof.approvalRef !== actionRef ||
               proof.visibility !== 'user_private' ||
               proof.sourceSubjectId !== subjectId ||
-              proof.topicKey !== decided.topicKey ||
-              proof.awareness !== decided.awareness) fail();
+              (decided !== null &&
+                (proof.topicKey !== decided.topicKey ||
+                 proof.awareness !== decided.awareness))) fail();
 
+          if (typeof actionRef !== 'string') {
+            throw new SeyeonC09PrivateOptinCommandHoldV1();
+          }
           return Object.freeze({
             version: SEYEON_C09_PRIVATE_OPTIN_COMMAND_SHADOW_VERSION_V1,
             sourceRef,

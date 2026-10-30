@@ -8,6 +8,7 @@ import {
   createSeyeonC09PrivateLearningOptinCommandShadowV1,
   C09_PRIVATE_OPTIN_ORIGINAL_SQL_V1,
   C09_PRIVATE_OPTIN_RECEIPT_SQL_V1,
+  C09_PRIVATE_OPTIN_EXISTING_RECEIPT_SQL_V1,
   C09_PRIVATE_OPTIN_CAPTURE_SQL_V1,
 } from '../apps/api/src/seyeon-c09-private-learning-optin-command-shadow-v1.js';
 import {
@@ -35,10 +36,15 @@ function fixture(options: {
   failInsert?: boolean;
   badTopic?: boolean;
   missingCapture?: boolean;
+  existing?: boolean;
+  insertConflict?: boolean;
+  existingWithdrawn?: boolean;
+  existingChangedHash?: boolean;
 } = {}) {
   const calls: Calls[] = [];
   const releases: unknown[] = [];
-  let approval = '';
+  let approval = options.existing ? 'c09:member-private-optin:existing' : '';
+  let receiptLookups = 0;
   const connection: PostgresSubjectConnectionV1 = {
     release: (reason?: unknown) => { releases.push(reason); },
     async query<Row = Record<string, unknown>>(
@@ -54,6 +60,20 @@ function fixture(options: {
           { contentHash: 'fixed-original-hash', bodyText: 'teach this private fact',
             createdAt: CREATED },
         ];
+      } else if (text === C09_PRIVATE_OPTIN_EXISTING_RECEIPT_SQL_V1) {
+        receiptLookups += 1;
+        expect(values).toEqual([options.wrongSubject ? OTHER : OWNER, MESSAGE]);
+        const exists = options.existing || (options.insertConflict && receiptLookups > 1);
+        if (exists) {
+          approval = 'c09:member-private-optin:existing';
+          rows = [{
+            actionRef: approval, subjectId: options.wrongSubject ? OTHER : OWNER,
+            messageId: MESSAGE,
+            contentHash: options.existingChangedHash ? 'other-hash' : 'fixed-original-hash',
+            state: 'approved',
+            withdrawnAt: options.existingWithdrawn ? VERIFIED : null,
+          }];
+        }
       } else if (text === C09_PRIVATE_OPTIN_RECEIPT_SQL_V1) {
         if (options.failInsert) throw new Error('duplicate receipt');
         approval = values[0] as string;
@@ -61,7 +81,7 @@ function fixture(options: {
         expect(values.slice(1)).toEqual([
           options.wrongSubject ? OTHER : OWNER, MESSAGE, 'fixed-original-hash',
         ]);
-        rows = options.missingReceipt ? [] : [{
+        rows = options.missingReceipt || options.insertConflict ? [] : [{
           actionRef: approval, subjectId: values[1], messageId: MESSAGE,
         }];
       } else if (text === C09_PRIVATE_OPTIN_CAPTURE_SQL_V1) {
@@ -135,6 +155,7 @@ describe('C09 auth-bound explicit private learning opt-in command shadow', () =>
       expect.stringContaining('begin_member_subject_context_v1'),
       'select public.assert_myeongha_subject_context_v1($1::uuid)',
       C09_PRIVATE_OPTIN_ORIGINAL_SQL_V1,
+      C09_PRIVATE_OPTIN_EXISTING_RECEIPT_SQL_V1,
       C09_PRIVATE_OPTIN_RECEIPT_SQL_V1,
       C09_PRIVATE_OPTIN_CAPTURE_SQL_V1,
       POSTGRES_SEYEON_C09_PRIVATE_SOURCE_CURRENT_PROOF_SQL_V1,
@@ -189,4 +210,35 @@ describe('C09 auth-bound explicit private learning opt-in command shadow', () =>
       .toBe(OTHER);
     expect(f.calls.at(-1)?.text).toBe('COMMIT');
   });
+  it('returns an existing private opt-in after a lost HTTP reply without a second approval or audit', async () => {
+    const f = fixture({ existing: true });
+    const result = await f.submit();
+    expect(result.actionRef).toBe('c09:member-private-optin:existing');
+    expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
+    expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_CAPTURE_SQL_V1);
+    expect(f.topicAuthority.decide).not.toHaveBeenCalled();
+    expect(f.calls.at(-1)?.text).toBe('COMMIT');
+  });
+
+  it('uses the unique-message winner under a concurrent insert conflict', async () => {
+    const f = fixture({ insertConflict: true });
+    const result = await f.submit();
+    expect(result.actionRef).toBe('c09:member-private-optin:existing');
+    expect(f.calls.filter(x => x.text === C09_PRIVATE_OPTIN_RECEIPT_SQL_V1)).toHaveLength(1);
+    expect(f.calls.filter(x => x.text === C09_PRIVATE_OPTIN_EXISTING_RECEIPT_SQL_V1)).toHaveLength(2);
+    expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_CAPTURE_SQL_V1);
+    expect(f.calls.at(-1)?.text).toBe('COMMIT');
+  });
+
+  it.each([{ existingWithdrawn: true }, { existingChangedHash: true }, { existing: true, badProof: true }])(
+    'does not resurrect withdrawn, altered or unverified previously approved messages',
+    async (options) => {
+      const f = fixture({ existing: true, ...options });
+      await expect(f.submit()).rejects.toBeDefined();
+      expect(f.calls.at(-1)?.text).toBe('ROLLBACK');
+      expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_RECEIPT_SQL_V1);
+      expect(f.calls.map(x => x.text)).not.toContain(C09_PRIVATE_OPTIN_CAPTURE_SQL_V1);
+    },
+  );
+
 });

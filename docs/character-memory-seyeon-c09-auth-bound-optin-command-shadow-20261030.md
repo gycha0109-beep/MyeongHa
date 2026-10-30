@@ -30,3 +30,14 @@
 5. User-private 승인 이벤트와 Character-shared 전파는 별도 동의·비식별화·Privacy Review 체계로 계속 분리한다.
 
 현재 작업은 운영 DB를 건드리지 않으며, 테스트가 아닌 실제 사용자가 동의를 했다거나 세연이 영구 학습을 수행했다고 주장하지 않는다.
+
+
+## 2026-10-30 follow-up: retry/idempotency and production readback
+
+- Auth-bound command shadow now treats `(canonical subject_id, original_message_id)` as its immutable private-approval replay key.
+- A retry after a committed response loss reads the existing approved receipt and checks the current Source+Audit proof, without issuing a second receipt or source capture. Concurrent unique-key winners are re-read and verified.
+- A withdrawn receipt, changed original hash, missing current Source proof, or incomplete capture fails closed; a withdrawn approval cannot be resurrected by a retry.
+- PostgreSQL receipt/capture remain PROPOSAL_NOT_APPLIED; no public HTTP mount, user UI, production private learning or character-shared publication is enabled.
+- Read-only production catalog check (2026-10-30): private receipt table=false, capture audit table=false, capture function=false, current API role Source SELECT=true/INSERT=false.
+- Production `public.conversation_messages.content_hash` column SELECT=false for `myeongha_api_executor`; relevant message columns are otherwise SELECT=true and UPDATE=false. PostgreSQL `SELECT ... FOR SHARE` requires UPDATE privilege on at least one column, so the current command cannot run as that ordinary read-only executor. No privileges were modified.
+- Follow-up: design and approve a narrowly scoped verified-action writer/locking authority, independently governed Topic/Content review, and receipt/audit migration before any production route/UI is activated.
