@@ -142,11 +142,11 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 ### UC-06 서버 Planner 후보 생성 → pending Proposal (S0 격리 구현 / 운영 HOLD)
 
 - `seyeon-planner-memory-proposal-extractor-v1.ts`: 기존 `SeyeonStructuredProviderPortV2`의 별도 `memory_proposal_extraction` 목적을 선언한다. 모델은 대화에 적합한 **한 가지 사용자 진술 후보** 또는 `none`만 제안하며, 짧은 3인칭 사실 `summary`와 실제 사용자 발언에서 연속으로 인용한 `userEvidenceQuote`를 반환해야 한다. 근거가 일치하지 않거나 원문 전체를 기억으로 복사하려 하면 거부한다. 모델 출력은 사실/승인 권위가 아니다.
-- `seyeon-post-turn-planner-memory-proposal-v1.ts`: 독립 서버 Post-turn 호출 함수. 모델+DB 명령을 수행하려면 **신뢰된 서버 내부 승인 callback**이 필요하며 기본 DENY. 승인 시에도 Member 검증/DB 트랜잭션 및 출처 재검증을 거쳐 **pending Proposal만** 만든다. 매 Subject/Turn에 대해 재시도해도 고정되는 서버 Proposal UUID를 사용한다. 본 함수는 아직 실제 Production Post-turn Worker에 설치되지 않았다.
+- `seyeon-post-turn-planner-memory-proposal-v1.ts`: 독립 서버 Post-turn 호출 함수. 모델+DB 명령을 수행하려면 **신뢰된 서버 내부 승인 callback**이 필요하며 기본 DENY. 승인 시에도 Member 검증/DB 트랜잭션 및 출처 재검증을 거쳐 **pending Proposal만** 만든다. 매 Subject/Turn에 대해 재시도해도 고정되는 서버 Proposal UUID를 사용한다. Post-turn Worker와 Production 조립부에 **호출 포트는 결속**됐으나 기존 OFF-only 원본 출처 계약 및 기본 모델·DB DENY 때문에 운영에서 실행되지 않는다.
 - `11-planner-memory-proposal-producer.sql` 및 `postgres-seyeon-planner-memory-proposal-producer-v1.ts`: S0 DB Owner의 `cmd_create_pending_seyeon_planner_memory_v1`가 확정된 세연의 Character 답변, 정확히 같은 Turn의 User Message, 원문에 실제 포함된 짧은 증거 인용을 재검증해 `memory_proposals(status=pending)`만 생성한다. `memory_items`·`life_facts`·`record_access_grants` 자동 생성 **0건**. 한 Turn당 하나, 리플레이에 다른 사실/ID를 끼워넣으면 거부한다.
 - `seyeon_private.planner_memory_proposal_sources_v1` DB Owner 전용 출처 테이블에서 **진짜 소유 함수가 생성한 제안**과 User/Assistant 메시지 및 Turn을 바인딩한다. `10-planner-memory-decision-source.sql`이 이 출처를 확인해야만 UC-07 승인 검토가 가능하다. `proposal_dedupe_key` 문구를 수동 INSERT한 것만으로는 위조할 수 없다. 일반 API·Member·Guest·service role에는 테이블/생성 RPC 직접 접근을 열지 않는다.
 - PostgreSQL 17 격리 합성 테스트는 이제 원래의 직접 `memory_proposals` INSERT 대신 DB Owner Producer를 호출하여 **제안 → 승인 전 Memory 0건 → 본인 승인 후 Memory/Grant 각 1건**, 동일 제안 재시도/근거 없는 사용자 메시지/출처 없는 가짜 Planner 행 거부를 검증한다.
-- **운영 미완료**: 실제 Dialogue Planner/후처리 Worker에 자동 후보 생성 호출 연결, 기존 AI Governor의 해당 purpose에 대한 정확한 예산/모델 승인, 개인정보 보존기간/제안 폐기, G3 현재 접근권한에 의한 제안 렌더링, G0~G6 검증/승인. 현재 `HOLD_FORWARD_STOPPED`; 새 SQL은 운영 Migration에 포함되지 않으며 DB ACL/공용 Router/유료 호출을 활성화하지 않는다.
+- **운영 미완료**: Post-turn Worker 호출 포트는 구현됐지만 **기존 OFF-only DB 출처 Gate가 개인정보 Claim 자체를 차단**하므로 실제 유료/실사용자 자동 후보 생성·공개는 여전히 실행 불가. 기존 AI Governor의 별도 purpose 예산 승인, 개인정보 보존기간/제안 폐기, G3 현재 접근권한에 의한 제안 렌더링, G0~G6 검증/승인이 필요하다. 현재 `HOLD_FORWARD_STOPPED`; 새 SQL은 운영 Migration에 포함되지 않으며 DB ACL/공용 Router/유료 호출을 활성화하지 않는다.
 
 ### UC-07 비영구 선택 2가지 S0 DB Owner 결정 (운영 HOLD)
 
@@ -184,3 +184,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **커밋:** `757c3b07`, 테스트 구조 수정 `55065664`, `81798f05`.
 - **현재 상태:** 신규 HEAD에서 완결된 CI 결과 **아직 미확인**. 기존 Production OFF-only 정책, 기본 DENY, 운영 ACL 미변경.
 - **후속:** 최신 `main`이 S0 `14-g0-relationship-event-original-lineage.sql`을 추가하여 `plan.mjs`가 충돌한 상황. 타 트랙 작업을 보존하는 병합과 정확한 SHA 기반 CI 재검증이 필요.
+
+
+### 2026-10-30 · W04 · 합성 Claim 실행 검증 / 최신 main 병합
+
+- **구현:** `test/seyeon-post-turn-planner-memory-worker-v1.test.ts`에서 검증된 Claim의 정확한 User/Assistant 원문만 후보 포트에 전달, `OFF`·완료 체크포인트에서는 호출 0회, Assistant snapshot 불일치 및 가짜 제안 응답은 관계 분석 및 체크포인트 이전 HOLD를 확인하는 합성 테스트를 추가.
+- **main 병합:** `bed9b1fe`은 최신 `main`의 보안 G0 관계 이벤트 출처 `14-g0-relationship-event-original-lineage.sql`과 기타 기존 트랙 변경을 보존하면서 `plan.mjs`에 10·11·12 Planner SQL을 함께 기록하는 병합 커밋이다. 병합 시 새 `main`의 사주·레코드 트랙 코드를 덮어쓰지 않았으며, PR은 병합 가능으로 복구.
+- **커밋:** `bed9b1fe`(main 통합), `6e6ca7a1`(합성 Worker 흐름 테스트).
+- **CI:** 작업 HEAD `6e6ca7a140eea2b5bc58ebad49b06328cd6a7e4d`에서 CI/Web/Governance가 실행 대기·진행 중으로 확인됨. 성공 판정하지 않음. [PR 검사](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks).
+- **잔여:** 실제 Production Post-turn은 Owner 출처 Gate가 OFF-only로 개인 원문을 읽지 않는다. 현 상태의 포트 결속은 운영 활성화가 아니며, G0/G4 원천 승인·budget·G3 UI 후속 권한 계약·G5/G6 승인 후에만 개인 기록을 사용할 수 있다.
