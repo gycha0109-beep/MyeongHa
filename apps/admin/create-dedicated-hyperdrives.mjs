@@ -26,9 +26,35 @@ export function inspectDedicatedAdminHyperdriveV1(config,expected){
   return Object.freeze({role:expected.role,id:config.id,verified:true});
 }
 
+function bootstrapError(code){
+  const error=new Error(code);
+  error.safeCode=code;
+  return error;
+}
+
+export function classifyDedicatedAdminTlsFailureV1(child){
+  if(child?.error?.code==='ENOENT')return 'PSQL_EXECUTABLE_NOT_FOUND';
+  if(child?.error?.code==='ETIMEDOUT')return 'PSQL_PROCESS_TIMEOUT';
+  if(child?.error)return 'PSQL_PROCESS_ERROR';
+  const stderr=String(child?.stderr||'').toLowerCase();
+  if(/password authentication failed|invalid password|authentication failed/u.test(stderr))
+    return 'DB_PASSWORD_REJECTED';
+  if(/certificate verify failed|root certificate file|could not read root certificate|certificate has expired|does not match host name|self.signed certificate|ssl error/u.test(stderr))
+    return 'TLS_CERTIFICATE_VALIDATION_FAILED';
+  if(/could not translate host name|name or service not known|no such host/u.test(stderr))
+    return 'DB_DNS_FAILURE';
+  if(/connection timed out|timeout expired|operation timed out/u.test(stderr))
+    return 'DB_CONNECT_TIMEOUT';
+  if(/connection refused|network is unreachable|no route to host/u.test(stderr))
+    return 'DB_NETWORK_UNAVAILABLE';
+  if(/no pg_hba.conf entry|role .* does not exist|permission denied/u.test(stderr))
+    return 'DB_ROLE_OR_POLICY_REJECTED';
+  return 'DB_TLS_LOGIN_FAILED';
+}
+
 function readHidden(label){
   if(!process.stdin.isTTY||typeof process.stdin.setRawMode!=='function')
-    throw Error('An interactive local terminal is required');
+    throw bootstrapError('INTERACTIVE_TERMINAL_REQUIRED');
   return new Promise((done,fail)=>{
     let secret='';
     const input=process.stdin;
@@ -42,11 +68,11 @@ function readHidden(label){
     }
     function onData(chunk){
       for(const char of chunk){
-        if(char==='\u0003'){finish(Error('Cancelled'));return;}
+        if(char==='\u0003'){finish(bootstrapError('INPUT_CANCELLED'));return;}
         if(char==='\r'||char==='\n'){finish();return;}
         if(char==='\u007f'||char==='\b'){secret=secret.slice(0,-1);continue;}
         if(char>=' '&&char<='~'&&secret.length<4096)secret+=char;
-        else {finish(Error('Unsupported password input character'));return;}
+        else {finish(bootstrapError('UNSUPPORTED_SECRET_CHARACTER'));return;}
       }
     }
     input.setEncoding('utf8');
@@ -64,8 +90,9 @@ function checkTlsLogin(role,password,caPath){
         PGSSLROOTCERT:caPath,PGCONNECT_TIMEOUT:'8'},
       stdio:['ignore','pipe','pipe'],encoding:'utf8',timeout:18000,
       windowsHide:true,maxBuffer:4096});
-  if(child.error||child.status!==0||child.stdout.trim()!==role)
-    throw Error('Dedicated role TLS verify-full login failed: '+role);
+  if(child.error||child.status!==0)
+    throw bootstrapError(classifyDedicatedAdminTlsFailureV1(child));
+  if(child.stdout.trim()!==role)throw bootstrapError('DB_ROLE_IDENTITY_MISMATCH');
 }
 
 async function cloudflare(token,url,method='GET',body){
@@ -75,24 +102,24 @@ async function cloudflare(token,url,method='GET',body){
       headers:{Authorization:'Bearer '+token,Accept:'application/json',
         ...(body?{'Content-Type':'application/json'}:{})},
       ...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(10000)});
-  }catch{throw Error('Cloudflare request unavailable');}
-  if(!response.ok)throw Error('Cloudflare Hyperdrive operation denied');
+  }catch{throw bootstrapError('CLOUDFLARE_REQUEST_UNAVAILABLE');}
+  if(!response.ok)throw bootstrapError('CLOUDFLARE_OPERATION_DENIED');
   let data;
-  try{data=await response.json();}catch{throw Error('Invalid Cloudflare response');}
-  if(data?.success!==true)throw Error('Cloudflare Hyperdrive operation rejected');
+  try{data=await response.json();}catch{throw bootstrapError('CLOUDFLARE_RESPONSE_INVALID');}
+  if(data?.success!==true)throw bootstrapError('CLOUDFLARE_OPERATION_REJECTED');
   return data.result;
 }
 
 async function main(){
   const preflightOnly=process.argv.length===3&&process.argv[2]==='--preflight-only';
-  if(process.argv.length>2&&!preflightOnly)throw Error('Unknown arguments');
+  if(process.argv.length>2&&!preflightOnly)throw bootstrapError('UNKNOWN_ARGUMENTS');
   const caPath=process.env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_FILE;
-  if(!caPath||!existsSync(caPath))throw Error('Dedicated Supabase CA file is required');
+  if(!caPath||!existsSync(caPath))throw bootstrapError('CA_FILE_NOT_FOUND');
   const passwords=new Map();
   try{
     for(const item of ROLES){
       const password=await readHidden(item.role+' password');
-      if(password.length<24)throw Error('Dedicated role password too short');
+      if(password.length<24)throw bootstrapError(password.length===0?'PASSWORD_INPUT_EMPTY':'PASSWORD_INPUT_TOO_SHORT');
       checkTlsLogin(item.role,password,caPath);
       passwords.set(item.role,password);
       process.stderr.write(item.role+': TLS verify-full OK\n');
@@ -102,13 +129,13 @@ async function main(){
       return;
     }
     const token=process.env.CLOUDFLARE_API_TOKEN||await readHidden('Cloudflare Hyperdrive Write API token');
-    if(token.length<20)throw Error('Cloudflare API token unavailable');
+    if(token.length<20)throw bootstrapError('CLOUDFLARE_TOKEN_MISSING');
     const list=await cloudflare(token,API);
-    if(!Array.isArray(list))throw Error('Cloudflare Hyperdrive inventory unavailable');
+    if(!Array.isArray(list))throw bootstrapError('CLOUDFLARE_INVENTORY_UNAVAILABLE');
     const results=[];
     for(const item of ROLES){
       const found=list.filter(entry=>entry.name===item.name);
-      if(found.length>1)throw Error('Duplicate dedicated Hyperdrive names');
+      if(found.length>1)throw bootstrapError('DUPLICATE_HYPERDRIVE_NAMES');
       let entry=found[0];
       if(!entry){
         entry=await cloudflare(token,API,'POST',{
@@ -127,5 +154,5 @@ async function main(){
 }
 
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
-  main().catch(()=>{process.stderr.write('Admin Hyperdrive bootstrap failed; no secrets printed. Check TLS, credentials and Cloudflare access.\n');process.exitCode=2;});
+  main().catch(error=>{const code=typeof error?.safeCode==='string'?error.safeCode:'UNEXPECTED_FAILURE';process.stderr.write('Admin Hyperdrive bootstrap failed ['+code+']; no secrets printed.\n');process.exitCode=2;});
 }

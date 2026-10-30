@@ -1,6 +1,6 @@
 import {test} from 'vitest';
 import {strict as assert} from 'node:assert';
-import {inspectDedicatedAdminHyperdriveV1} from './create-dedicated-hyperdrives.mjs';
+import {inspectDedicatedAdminHyperdriveV1,classifyDedicatedAdminTlsFailureV1} from './create-dedicated-hyperdrives.mjs';
 
 const expected={role:'myeongha_admin_reader',name:'myeongha-admin-reader-verifyfull-20261030'};
 const valid={id:'a'.repeat(32),name:expected.name,caching:{disabled:true},
@@ -24,4 +24,18 @@ for(const [name,change] of [
 ]){
  test('reject '+name,()=>assert.throws(
   ()=>inspectDedicatedAdminHyperdriveV1({...valid,...change},expected),/policy mismatch/u));
+}
+
+for(const [name,child,expectedCode] of [
+  ['missing psql',{error:{code:'ENOENT'}},'PSQL_EXECUTABLE_NOT_FOUND'],
+  ['psql timed out',{error:{code:'ETIMEDOUT'}},'PSQL_PROCESS_TIMEOUT'],
+  ['bad password',{status:2,stderr:'FATAL: password authentication failed for user "hidden"'},'DB_PASSWORD_REJECTED'],
+  ['bad CA',{status:2,stderr:'SSL error: certificate verify failed'},'TLS_CERTIFICATE_VALIDATION_FAILED'],
+  ['DNS failure',{status:2,stderr:'could not translate host name'},'DB_DNS_FAILURE'],
+  ['network refused',{status:2,stderr:'connection refused'},'DB_NETWORK_UNAVAILABLE'],
+  ['unknown error',{status:2,stderr:'unexpected secret-shaped message'},'DB_TLS_LOGIN_FAILED'],
+]){
+ test('safe TLS diagnostic: '+name,()=>{
+   assert.equal(classifyDedicatedAdminTlsFailureV1(child),expectedCode);
+ });
 }
