@@ -13,6 +13,7 @@ import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { MyeongHaApiClientErrorV1 } from '../../packages/api-client/src/index.ts';
 import { sendSeyeonBrowserTurnWithReceiptV1 } from './chat-turn-receipt-client.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
+import { mountSeyeonPrivateMemoryReviewV1 } from './seyeon-private-memory-review-view.js';
 
 const params = new URLSearchParams(window.location.search);
 const threadRoute = parseChatThreadRouteV1(params);
@@ -242,7 +243,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
   return article;
 }
 
-function renderConversation(messages, authoritativeCharacterId) {
+function renderConversation(messages, authoritativeCharacterId, historyProtected) {
   if (!chatStream) return;
   const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
   if (nodes.length === 0) {
@@ -255,6 +256,18 @@ function renderConversation(messages, authoritativeCharacterId) {
     return;
   }
   chatStream.replaceChildren(...nodes);
+  // A verified per-message offer is required; UUIDs are never reconstructed
+  // from DOM text, the turn submit draft, timestamps, or Chat message index.
+  // Se-yeon's existing protected-history shell has no messages and no offers.
+  if (!historyProtected && authoritativeCharacterId === 'seyeon') {
+    for (let i = 0; i < messages.length; i += 1) {
+      const offer = messages[i]?.memoryProposalOffer;
+      const body = nodes[i]?.querySelector('.conversation-message-body');
+      if (offer && body instanceof HTMLElement) {
+        mountSeyeonPrivateMemoryReviewV1({ container: body, originalSource: offer });
+      }
+    }
+  }
   chatStream.scrollTop = chatStream.scrollHeight;
 }
 
@@ -329,7 +342,7 @@ function renderAcknowledgedSeyeonFirstReply(result) {
 
 function renderRoomState(state) {
   historyWithheld = state.historyWithheld === true;
-  renderConversation(state.messages, state.characterId);
+  renderConversation(state.messages, state.characterId, historyWithheld);
 
   // Exact-nine product authority maps canonical Character id to the same
   // English browser presentation key. The thread read remains identity authority.
@@ -461,6 +474,13 @@ async function loadRoomState() {
 
     if (characterId === null) {
       throw new Error('Character Room read omitted character authority.');
+    }
+    // Current session must still match the credentials used for the entire
+    // owner-scoped read. No private body or Memory offer survives a change.
+    const latestBearer = await getActiveBearer();
+    if (latestBearer?.kind !== activeBearer.kind ||
+        latestBearer?.token !== activeBearer.token) {
+      throw new Error('Character Room Member session changed during read.');
     }
     authoritativeCharacterId = characterId;
     renderRoomState(Object.freeze({
