@@ -7,17 +7,18 @@ const ACCOUNT='410d3f82ed3ccc66609a2b698803859b';
 const PROJECT='cnsfpcdiyofqvhpcegfc';
 const HOST='aws-0-ap-southeast-1.pooler.supabase.com';
 const CA_ID='d25c14bc-d654-46b8-89cf-5c4baf931771';
+const DEFAULT_PORT=6543;
 const API='https://api.cloudflare.com/client/v4/accounts/'+ACCOUNT+'/hyperdrive/configs';
 const ROLES=Object.freeze([
   {role:'myeongha_admin_reader',name:'myeongha-admin-reader-verifyfull-20261030'},
   {role:'myeongha_admin_audit_writer',name:'myeongha-admin-audit-verifyfull-20261030'},
 ]);
 
-export function inspectDedicatedAdminHyperdriveV1(config,expected){
+export function inspectDedicatedAdminHyperdriveV1(config,expected,port=DEFAULT_PORT){
   if(!config||typeof config.id!=='string'||!/^[a-f0-9]{32}$/iu.test(config.id)||
      config.name!==expected.name||config.origin?.host!==HOST||
      config.origin?.user!==expected.role+'.'+PROJECT||
-     config.origin?.database!=='postgres'||config.origin?.port!==5432||
+     config.origin?.database!=='postgres'||config.origin?.port!==port||
      !['postgres','postgresql'].includes(config.origin?.scheme)||
      config.caching?.disabled!==true||config.mtls?.sslmode!=='verify-full'||
      config.mtls?.ca_certificate_id!==CA_ID||
@@ -52,6 +53,12 @@ export function classifyDedicatedAdminTlsFailureV1(child){
   return 'DB_TLS_LOGIN_FAILED';
 }
 
+export function parseDedicatedAdminPoolerPortV1(value){
+  if(value===undefined||value==='')return DEFAULT_PORT;
+  if(value==='5432'||value==='6543')return Number(value);
+  throw bootstrapError('POOLER_PORT_UNSUPPORTED');
+}
+
 function readHidden(label){
   if(!process.stdin.isTTY||typeof process.stdin.setRawMode!=='function')
     throw bootstrapError('INTERACTIVE_TERMINAL_REQUIRED');
@@ -82,9 +89,9 @@ function readHidden(label){
   });
 }
 
-function checkTlsLogin(role,password,caPath){
+function checkTlsLogin(role,password,caPath,port){
   const child=spawnSync(process.env.PSQL_BIN||'psql',[
-    '-X','-w','-A','-t','-h',HOST,'-p','5432',
+    '-X','-w','-A','-t','-h',HOST,'-p',String(port),
     '-U',role+'.'+PROJECT,'-d','postgres','-c','select current_user',
   ],{env:{...process.env,PGPASSWORD:password,PGSSLMODE:'verify-full',
         PGSSLROOTCERT:caPath,PGCONNECT_TIMEOUT:'8'},
@@ -111,8 +118,10 @@ async function cloudflare(token,url,method='GET',body){
 }
 
 async function main(){
-  const preflightOnly=process.argv.length===3&&process.argv[2]==='--preflight-only';
-  if(process.argv.length>2&&!preflightOnly)throw bootstrapError('UNKNOWN_ARGUMENTS');
+  const args=process.argv.slice(2);
+  if(args.some(arg=>arg!=='--preflight-only')||args.length>1)throw bootstrapError('UNKNOWN_ARGUMENTS');
+  const preflightOnly=args.includes('--preflight-only');
+  const port=parseDedicatedAdminPoolerPortV1(process.env.MYEONGHA_ADMIN_POOLER_PORT);
   const caPath=process.env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_FILE;
   if(!caPath||!existsSync(caPath))throw bootstrapError('CA_FILE_NOT_FOUND');
   const passwords=new Map();
@@ -120,7 +129,7 @@ async function main(){
     for(const item of ROLES){
       const password=await readHidden(item.role+' password');
       if(password.length<24)throw bootstrapError(password.length===0?'PASSWORD_INPUT_EMPTY':'PASSWORD_INPUT_TOO_SHORT');
-      checkTlsLogin(item.role,password,caPath);
+      checkTlsLogin(item.role,password,caPath,port);
       passwords.set(item.role,password);
       process.stderr.write(item.role+': TLS verify-full OK\n');
     }
@@ -140,14 +149,14 @@ async function main(){
       if(!entry){
         entry=await cloudflare(token,API,'POST',{
           name:item.name,
-          origin:{scheme:'postgres',host:HOST,port:5432,database:'postgres',
+          origin:{scheme:'postgres',host:HOST,port,database:'postgres',
             user:item.role+'.'+PROJECT,password:passwords.get(item.role)},
           mtls:{sslmode:'verify-full',ca_certificate_id:CA_ID},
           caching:{disabled:true},
         });
       }
       const verified=await cloudflare(token,API+'/'+encodeURIComponent(entry.id));
-      results.push(inspectDedicatedAdminHyperdriveV1(verified,item));
+      results.push(inspectDedicatedAdminHyperdriveV1(verified,item,port));
     }
     process.stdout.write(JSON.stringify({hyperdrives:results})+'\n');
   }finally{passwords.clear();}
