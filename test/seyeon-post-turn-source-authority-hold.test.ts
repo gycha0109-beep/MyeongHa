@@ -56,7 +56,7 @@ describe('Production post-turn source authority', () => {
     expect(result.decision).toBe('disabled');
     expect(claims).toBe(0);
   });
-}
+
   it('keeps Memory Planner entirely behind the Production source HOLD', async () => {
     let plannerCalls=0;
     let claimCalls=0;
