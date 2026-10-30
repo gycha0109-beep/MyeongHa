@@ -78,9 +78,10 @@ describe('web records authority boundary', () => {
   it('opens the Saju records tab for an explicit Reading completion handoff', () => {
     expect(page).toContain("const requestedTab = params.get('tab');");
     expect(page).toContain("const fromReading = params.get('from') === 'reading';");
-    expect(page).toContain("requestedTab === 'saju' || fromReading");
-    expect(page).toContain("tab.id === 'saju-records-tab'");
-    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';");
+    expect(page).toContain("const targetTabId = fromReading || requestedTab === 'saju'");
+    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink'");
+    expect(page).toContain('const initialTab = tabs.find((tab) => tab.id === targetTabId);');
+    expect(page).toContain('if (initialTab) activate(initialTab);');
   });
 
   it('links persisted Reading history by stored identifiers without inventing Reader authority', () => {

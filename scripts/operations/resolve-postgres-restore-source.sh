@@ -39,7 +39,7 @@ if [[ "$run_event" == 'push' ]]; then
   subject="$(jq -er '.commit.message | split("\n")[0]' "$commit_json")"
   if [[ "$subject" =~ ^ops\(dr\):\ one-shot\ backup\ migration\ 20261029012948(\ \(\#[0-9]+\))?$ ]]; then
     marker_path='.github/ops/postgres-backup-migration-20261029012948-20261029.once'
-    marker_token='POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1'
+    marker_token="$(tr -d '\r\n' < "$marker_path")"
     marker_gate='Gate one-shot deployed migration 20261029012948 backup marker'
   else
     # Preserve historical exact 1310 one-shot provenance, not a generic push.

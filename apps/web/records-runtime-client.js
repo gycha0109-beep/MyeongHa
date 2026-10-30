@@ -325,13 +325,24 @@ export function createRecordsRuntimeClient(options = {}) {
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeFacts, readingsPayload, memories, birth] = await Promise.all([
+        const [lifeResult, readingResult, memoryResult, birthResult] = await Promise.allSettled([
           readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
           readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
           readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories'),
           readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer),
         ]);
-        const readings = projectReadingHistory(readingsPayload);
+        // Authentication or subject denial in *any* ledger invalidates the entire snapshot.
+        // Non-auth transport errors are isolated: an unavailable ledger is not an empty ledger.
+        for (const result of [lifeResult, readingResult, memoryResult, birthResult]) {
+          if (result.status === 'rejected' && result.reason instanceof RecordsRuntimeError
+            && result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED') throw result.reason;
+        }
+        const unavailable = Object.freeze({ status: 'unavailable' });
+        const lifeFacts = lifeResult.status === 'fulfilled' ? lifeResult.value : unavailable;
+        const readings = readingResult.status === 'fulfilled'
+          ? projectReadingHistory(readingResult.value) : unavailable;
+        const memories = memoryResult.status === 'fulfilled' ? memoryResult.value : unavailable;
+        const birth = birthResult.status === 'fulfilled' ? birthResult.value : unavailable;
         return Object.freeze({ profile, lifeFacts, readings, memories, birth });
       });
     },

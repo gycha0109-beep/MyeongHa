@@ -86,6 +86,42 @@ html[data-theme="dark"] body.records-page .records-reading-badge{color:#d9a8b9;b
 .records-memory-grant-check:focus-visible{outline:2px solid var(--mh-brass-strong);outline-offset:3px}
 .records-memory-grant-status{display:block;color:var(--mh-ink-muted);font-size:12px;line-height:1.5}
 
+/* Records report hub: saved official Reading History is the default surface. */
+.records-tabs{align-items:center;gap:5px}
+.records-tab--primary{margin-right:10px;font-size:13px;font-weight:700}
+.records-tab-divider{align-self:center;margin:0 8px 0 3px;padding-left:17px;border-left:1px solid var(--records-line-strong);color:var(--mh-ink-muted);font-size:10px;letter-spacing:.06em;white-space:nowrap}
+.records-tab:focus-visible,.records-report-explore:focus-visible{outline:2px solid var(--mh-brass-strong);outline-offset:3px}
+.records-report-home{display:grid;gap:14px}
+.records-report-intro{position:relative;display:flex;align-items:center;justify-content:space-between;min-height:165px;gap:28px;overflow:hidden;padding:27px 32px;border:1px solid var(--records-line-strong);border-radius:15px;background:linear-gradient(125deg,var(--records-paper),var(--records-paper-soft));box-shadow:var(--records-shadow)}
+.records-report-intro-copy{position:relative;z-index:1;max-width:660px}
+.records-report-intro h2{margin:9px 0 10px;color:var(--mh-ink-strong);font-family:var(--mh-serif);font-size:clamp(25px,3vw,34px);font-weight:650;letter-spacing:-.04em;line-height:1.2}
+.records-report-intro p{margin:0;color:var(--mh-ink-muted);font-family:var(--mh-serif);font-size:13px;line-height:1.7}
+.records-report-intro .records-report-guidance{margin-top:8px;font-size:11px}
+.records-report-intro-mark{position:relative;display:grid;place-items:center;flex:0 0 96px;width:96px;height:96px;border:1px solid var(--mh-brass-faint);border-radius:50%;color:var(--mh-brass-strong);font-family:var(--mh-serif);font-size:38px;box-shadow:0 0 0 14px rgba(181,139,81,.035)}
+.records-report-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:7px 4px 0}
+.records-report-toolbar h3{margin:0;color:var(--mh-ink-strong);font-family:var(--mh-serif);font-size:18px}
+.records-report-count{color:var(--mh-ink-muted);font-size:12px;font-variant-numeric:tabular-nums}
+.records-report-explore{display:inline-flex;align-items:center;justify-content:center;min-height:36px;margin-top:18px;padding:0 16px;border:1px solid var(--records-line-strong);border-radius:9px;color:var(--mh-ink-strong);font-family:var(--mh-serif);font-size:12px;font-weight:700;text-decoration:none}
+.records-report-explore:hover{border-color:var(--mh-brass-strong);background:var(--records-paper-soft)}
+html[data-theme="dark"] body.records-page .records-report-intro{background:linear-gradient(125deg,rgba(14,27,34,.96),rgba(21,32,39,.94))}
+@media(max-width:767px){
+  .records-tabs{gap:1px}
+  .records-tab--primary{margin-right:4px}
+  .records-tab-divider{margin:0 4px 0 1px;padding-left:9px;font-size:10px}
+  .records-report-intro{min-height:138px;gap:12px;padding:20px 18px}
+  .records-report-intro h2{font-size:26px}
+  .records-report-intro p{font-size:12px}
+  .records-report-intro .records-report-guidance{font-size:10px}
+  .records-report-intro-mark{flex-basis:50px;width:50px;height:50px;font-size:25px;box-shadow:0 0 0 7px rgba(181,139,81,.035)}
+  .records-report-toolbar{padding-top:2px}
+  .records-report-toolbar h3{font-size:16px}
+  .records-report-count{font-size:11px}
+}
+@media(max-width:420px){
+  .records-report-intro-mark{display:none}
+  .records-tab-divider{display:none}
+  .records-tab--primary{min-width:92px}
+}
 .records-memory-grant-revoke{align-self:flex-start;margin-top:8px;margin-left:8px;padding:7px 12px;border:1px solid rgba(145,71,62,.52);border-radius:8px;background:var(--records-paper-soft);color:var(--mh-ink-strong);font:inherit;font-size:12px;cursor:pointer}
 .records-memory-grant-revoke[hidden]{display:none!important}
 .records-memory-grant-revoke:disabled{opacity:.6;cursor:wait}

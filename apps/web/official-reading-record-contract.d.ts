@@ -8,6 +8,11 @@ export interface OfficialReadingRecordBrowserPayloadV1 {
   readonly productResponseState: string;
   readonly readerCharacterIds: readonly string[];
   readonly completedAt: string;
+  readonly birthRevision: Readonly<{
+    issuedRevisionNo: number | null;
+    currentRevisionNo: number | null;
+    state: 'current' | 'changed' | 'unknown';
+  }>;
   readonly reading: Readonly<Record<string, unknown>>;
 }
 

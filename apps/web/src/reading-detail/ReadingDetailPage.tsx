@@ -16,6 +16,52 @@ export function ReadingDetailPage() {
         <a className="reading-route-action" data-reading-route-action href="reading.html">다른 사주 읽기 보기 <span aria-hidden="true">→</span></a>
       </section>
 
+      <article className="official-report-view" data-official-report hidden aria-label="저장된 공식 사주 보고서">
+        <header className="official-report-head">
+          <span className="reading-route-kicker">OFFICIAL READING</span>
+          <h1 data-official-report-heading tabIndex={-1}>저장된 공식 사주 보고서</h1>
+          <p>기록에 저장된 해석을 원래 내용 그대로 한 번에 읽습니다.</p>
+          <dl className="official-report-meta">
+            <div><dt>발행일</dt><dd data-official-report-date>—</dd></div>
+            <div><dt>해석 버전</dt><dd data-official-report-version>—</dd></div>
+            <div><dt>기록된 대리자</dt><dd data-official-report-reader>—</dd></div>
+            <div><dt>발행 당시 출생정보 차수</dt><dd data-official-report-birth-issued>이 기록에 제공되지 않음</dd></div>
+            <div><dt>현재 명식록 차수</dt><dd data-official-report-birth-current>확인할 수 없음</dd></div>
+          </dl>
+        </header>
+        <section className="official-report-provenance-note" aria-label="원문과 출생정보 기준">
+          <p data-official-report-birth-status role="status">이 기록에 제공된 출생정보 차수가 없어 변경 여부는 확인할 수 없습니다.</p>
+          <p>이 보고서의 본문·발행일은 현재 명식록 변경으로 다시 작성되지 않습니다.</p>
+          <p>기록된 대리자 정보는 과거 참여 이력입니다. 현재 해설 및 대화 접근권을 의미하지 않습니다.</p>
+          <a href="records.html?tab=birth">현재 명식록 확인하기 →</a>
+          <button type="button" data-official-report-regenerate disabled aria-disabled="true">새 명식 기준 재생성 준비 중</button>
+        </section>
+        <div className="official-report-keypoints" data-official-report-first hidden>
+          <span className="records-kicker">HIGHLIGHT</span>
+          <h2>보고서 첫 해석</h2>
+          <p data-official-report-first-text data-official-reading />
+        </div>
+        <section className="official-report-facts" data-official-report-facts hidden aria-label="저장된 명식 근거">
+          <h2>저장된 명식 근거</h2>
+          <div className="official-report-pillars" data-official-report-pillars />
+          <h3>오행 근거</h3>
+          <div className="official-report-evidence" data-official-report-elements data-official-reading />
+          <h3>십성 근거</h3>
+          <div className="official-report-evidence" data-official-report-gods data-official-reading />
+        </section>
+        <nav className="official-report-toc" aria-label="보고서 목차" data-official-report-toc />
+        <div className="official-report-sections" data-official-report-sections />
+        <aside className="official-report-notice" data-official-report-notice hidden>
+          <h2>해석의 적용 범위</h2>
+          <p data-official-report-notice-text />
+        </aside>
+        <footer className="official-report-actions">
+          <button type="button" data-official-report-step-mode>단계별 읽기</button>
+          <a href="records.html?tab=saju">사주 보고서 보관함으로 돌아가기</a>
+          <a href="chat-hub.html">대화 상대 선택 (별도 이용)</a>
+        </footer>
+      </article>
+
       <section className="reading-stage" data-reading-stage hidden aria-label="캐릭터와 함께 읽는 사주">
         <div className="reader-scene" data-reader-portrait role="img" aria-label="세연 사주 읽기 장면">
           <div className="reader-scene-art" aria-hidden="true">
@@ -63,8 +109,16 @@ export function ReadingDetailPage() {
             <section className="reading-block reading-block-primary">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
               <div>
-                <h2 data-reading-step-title>지금 읽히는 흐름</h2>
+                <h2 data-reading-step-title tabIndex={-1} data-reading-content>지금 읽히는 흐름</h2>
                 <p data-reading-step-body>검증된 Product Reading 응답이 연결된 뒤 이 영역에 표시됩니다.</p>
+              </div>
+            </section>
+
+            <section className="reading-block" data-reading-supporting hidden>
+              <span className="reading-block-icon" aria-hidden="true">✦</span>
+              <div>
+                <h2 data-reading-supporting-title>추가 해석</h2>
+                <p data-reading-supporting-body data-reading-content />
               </div>
             </section>
 
@@ -75,6 +129,14 @@ export function ReadingDetailPage() {
                 <p data-reading-structure-body>확정된 구조적 근거와 적용 범위만 표시합니다.</p>
               </div>
             </section>
+
+            <aside className="reading-block" data-reading-step-notice hidden aria-labelledby="reading-step-scope-heading">
+              <span className="reading-block-icon" aria-hidden="true">※</span>
+              <div>
+                <h2 id="reading-step-scope-heading" data-reading-step-notice-heading>해석의 적용 범위</h2>
+                <p data-reading-step-notice-text data-reading-content />
+              </div>
+            </aside>
 
             <section className="reading-block reading-character-block">
               <span className="reading-block-icon" aria-hidden="true">✿</span>
@@ -87,6 +149,7 @@ export function ReadingDetailPage() {
           </div>
 
           <footer className="reading-sheet-actions">
+            <button className="reading-secondary-action official-report-return" type="button" data-official-report-return hidden>보고서 전체 보기</button>
             <button className="reading-icon-action" type="button" data-reading-prev aria-label="이전 읽기" disabled>←</button>
             <button className="reading-secondary-action" type="button" data-chart-open>내 명식 보기</button>
             <button className="reading-primary-action" type="button" data-reading-next disabled>

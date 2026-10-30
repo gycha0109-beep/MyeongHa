@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   OFFICIAL_READER_ADMISSION_VERSION_V1,
   OfficialReadingReaderAdmissionErrorV1,
@@ -30,6 +31,20 @@ const BUNDLE = '55555555-5555-4555-8555-555555555555';
 const RELEASE = 'released-synthetic-character-v1';
 const TIME = '2026-10-09T08:00:00.000Z';
 
+const OFFICIAL_SNAPSHOT = {
+  responseVersion: 'myeonghwa-product-reading-response-v2',
+  state: 'delivered',
+  reading: {
+    readingId: READING,
+    sections: [{ sectionType: 'overview', title: '전체', blocks: [
+      { type: 'paragraph', text: '공식 근거를 기반으로 설명합니다.' },
+    ] }],
+    disclosures: [],
+    calculationSummary: {},
+  },
+};
+const OFFICIAL_HASH = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(OFFICIAL_SNAPSHOT);
+
 function accessRow(reader = 'seyeon') {
   return {
     subjectId: SUBJECT, readingId: READING, readerCharacterId: reader,
@@ -42,7 +57,7 @@ function accessRow(reader = 'seyeon') {
     domainCapabilityVersion: 'general-v1',
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     sajuEngineVersion: 'saju-engine-v1',
-    responseHash: 'sha256:v1:official-reading-hash',
+    responseHash: OFFICIAL_HASH,
   };
 }
 function artifactRow(reader = 'seyeon') {
@@ -50,19 +65,8 @@ function artifactRow(reader = 'seyeon') {
     readingId: READING, productId: PRODUCT, readerCharacterId: reader,
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     productResponseState: 'delivered',
-    responseSnapshotJsonb: {
-      responseVersion: 'myeonghwa-product-reading-response-v2',
-      state: 'delivered',
-      reading: {
-        readingId: READING,
-        sections: [{ sectionType: 'overview', title: '전체', blocks: [
-          { type: 'paragraph', text: '공식 근거를 기반으로 설명합니다.' },
-        ] }],
-        disclosures: [],
-        calculationSummary: {},
-      },
-    },
-    responseHash: 'sha256:v1:official-reading-hash',
+    responseSnapshotJsonb: OFFICIAL_SNAPSHOT,
+    responseHash: OFFICIAL_HASH,
     completedAt: '2026-10-09T07:30:00.000Z',
   };
 }
@@ -87,6 +91,7 @@ function fixtures(options: {
   threadReader?: string;
   threadParticipants?: string[];
   accessRows?: CharacterStandardReadingAccessAuthorityRowV1[];
+  accessAfterArtifact?: CharacterStandardReadingAccessAuthorityRowV1[] | 'throw';
   artifactRows?: CharacterStandardReadingArtifactAuthorityRowV1[];
   policy?: ProductReaderRuleLookupV1;
   policyAfterArtifact?: ProductReaderRuleLookupV1 | 'throw';
@@ -99,6 +104,7 @@ function fixtures(options: {
   const events: string[] = [];
   let threadReadCount = 0;
   let policyReadCount = 0;
+  let accessReadCount = 0;
   const readRuntimeBinding = vi.fn(async (_input: { subjectId: string; threadId: string }) => {
     events.push('thread');
     threadReadCount += 1;
@@ -116,6 +122,12 @@ function fixtures(options: {
     subjectId: string; readerCharacterId: string; effectiveAt: string;
   }) => {
     events.push('access');
+    accessReadCount += 1;
+    if (accessReadCount > 1) {
+      const current = options.accessAfterArtifact;
+      if (current === 'throw') throw new Error('Reader Grant authority unavailable');
+      if (current !== undefined) return current;
+    }
     return options.accessRows ?? [accessRow(reader)];
   });
   const readApprovedRule = vi.fn(async (_input: Parameters<
@@ -170,8 +182,9 @@ describe('A2-beta server-only Reading × Reader admission', () => {
   it('enforces thread -> Reader Grant -> policy -> artifact -> thread + unchanged policy recheck', async () => {
     const f = fixtures();
     const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
-    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy', 'access']);
     expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
+    expect(f.readAccessibleReadings).toHaveBeenCalledTimes(2);
     expect(f.readAccessibleReadings).toHaveBeenCalledWith({
       subjectId: SUBJECT, readerCharacterId: 'seyeon', effectiveAt: TIME,
     });
@@ -186,7 +199,7 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     expect(result.scope).toMatchObject({
       subjectId: SUBJECT, readerCharacterId: 'seyeon', readingId: READING,
       threadId: THREAD, contentReleaseId: RELEASE, readerContentBundleId: BUNDLE,
-      officialArtifactResponseHash: 'sha256:v1:official-reading-hash',
+      officialArtifactResponseHash: OFFICIAL_HASH,
       productRuleVersion: 'synthetic-standard-rule',
     });
     expect(Object.keys(result.ticket)).toEqual(['kind']);
@@ -284,7 +297,28 @@ describe('A2-beta server-only Reading × Reader admission', () => {
     const result = await prepareOfficialReadingReaderAdmissionV1(f.input);
     expect(result.scope.productRuleVersion).toBe('synthetic-premium-rule');
     expect(f.readApprovedRule).toHaveBeenCalledTimes(2);
-    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy']);
+    expect(f.events).toEqual(['thread', 'access', 'policy', 'artifact', 'thread', 'policy', 'access']);
+  });
+
+  it.each([
+    { label: 'refunded initial Reader access', after: [] },
+    { label: 'another Reader still has a separate grant', after: [accessRow('baekheon')] },
+    { label: 'stored official response was replaced', after: [{
+      ...accessRow(), responseHash: 'sha256:v1:changed-source',
+    }] },
+    { label: 'Reader content bundle changed', after: [{
+      ...accessRow(), readerContentBundleId: 'other-content-bundle',
+    }] },
+    { label: 'current purchase authority is unavailable', after: 'throw' as const },
+  ])('refuses to mint a Reader admission when $label after fetching the official artifact', async ({ after }) => {
+    const f = fixtures({ accessAfterArtifact: after });
+    await expect(prepareOfficialReadingReaderAdmissionV1(f.input))
+      .rejects.toMatchObject({ code: 'ACCESS_DENIED' });
+    expect(f.events).toEqual([
+      'thread', 'access', 'policy', 'artifact', 'thread', 'policy', 'access',
+    ]);
+    expect(f.readAccessibleReadings).toHaveBeenCalledTimes(2);
+    expect(f.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
   it.each([

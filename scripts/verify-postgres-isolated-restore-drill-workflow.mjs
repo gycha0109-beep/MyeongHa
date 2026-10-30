@@ -245,7 +245,7 @@ for (const fragment of [
   'postgres-backup-frontier-1310.once',
   'POSTGRES-BACKUP-FRONTIER-1310-V1',
   'postgres-backup-migration-20261029012948-20261029.once',
-  'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1',
+  String.raw`marker_token="$(tr -d '\r\n' < "$marker_path")"`,
   'Gate one-shot deployed migration 20261029012948 backup marker',
   '.github/workflows/production-postgres-backup.yml?ref=$source_sha',
   'POSTGRES-BACKUP-FRONTIER-1310-V1',

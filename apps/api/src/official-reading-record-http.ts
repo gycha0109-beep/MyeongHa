@@ -4,6 +4,7 @@ import {
   getOfficialReadingRecord,
   OfficialReadingRecordReadAuthorityPortErrorV1,
   type OfficialReadingRecordAuthorityRowV1,
+  type OfficialReadingBirthRevisionStatusV1,
   type OfficialReadingRecordReadAuthorityPortV1,
 } from './official-reading-record-read.js';
 import {
@@ -52,6 +53,36 @@ select
 from public.qry_official_reading_record_runtime_v1($1::uuid, $2::uuid)
 `.trim();
 
+type BirthRevisionQueryRowV1 = Readonly<{
+  issuedRevisionNo: unknown;
+  currentRevisionNo: unknown;
+  revisionState: unknown;
+}>;
+
+const READ_OFFICIAL_BIRTH_REVISION_SQL = `
+select
+  issued_revision_no as "issuedRevisionNo",
+  current_revision_no as "currentRevisionNo",
+  revision_state as "revisionState"
+from public.qry_official_reading_birth_revision_status_v1($1::uuid, $2::uuid)
+`.trim();
+
+function requireBirthRevisionRow(row: BirthRevisionQueryRowV1): OfficialReadingBirthRevisionStatusV1 {
+  const validNo = (value: unknown): value is number | null =>
+    value === null || (typeof value === 'number' && Number.isSafeInteger(value) && value > 0);
+  if (!validNo(row.issuedRevisionNo) || !validNo(row.currentRevisionNo)
+      || (row.revisionState !== 'current'
+          && row.revisionState !== 'changed'
+          && row.revisionState !== 'unknown')) {
+    throw new Error('Official Reading Birth revision query returned invalid provenance.');
+  }
+  return Object.freeze({
+    issuedRevisionNo: row.issuedRevisionNo,
+    currentRevisionNo: row.currentRevisionNo,
+    state: row.revisionState,
+  });
+}
+
 function requireString(name: string, value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`Official Reading record HTTP ${name} is invalid.`);
@@ -99,7 +130,20 @@ class TransactionOfficialReadingRecordPortV1 implements OfficialReadingRecordRea
         input.readingId,
       ]);
       if (result.rows.length > 1) throw new Error('Official Reading record authority returned duplicate rows.');
-      return result.rows[0] === undefined ? null : mapRow(result.rows[0]);
+      if (result.rows[0] === undefined) return null;
+      // Recheck the owner/exact paid Grant through the dedicated metadata
+      // authority in this SAME subject-scoped transaction. Never query the
+      // private Birth or Reading tables directly as the API executor.
+      const birth = await this.client.query<BirthRevisionQueryRowV1>(
+        READ_OFFICIAL_BIRTH_REVISION_SQL, [input.subjectId, input.readingId],
+      );
+      if (birth.rows.length !== 1 || birth.rows[0] === undefined) {
+        throw new Error('Official Reading Birth provenance authority did not admit the record.');
+      }
+      return Object.freeze({
+        ...mapRow(result.rows[0]),
+        birthRevision: requireBirthRevisionRow(birth.rows[0]),
+      });
     } catch (error) {
       if (isPostgresConstraint(error, 'qry_official_reading_record_reading_required')) {
         throw new OfficialReadingRecordReadAuthorityPortErrorV1(

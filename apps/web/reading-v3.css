@@ -812,18 +812,41 @@ body[data-reader="doyun"] { --reader-accent: #8a7967; --reader-night: #272521; -
 }
 
 
-/* Records archive reread: the stored Official Reading is not a Reader Scene. */
-body[data-reading-record-mode="official_archive"] .reading-stage {
+/* Stored Official Reading uses a centered report layout in both reading modes. */
+body[data-reading-record-mode="official_archive"] .reading-stage,
+body[data-reading-record-mode="step_by_step"] .reading-stage {
   grid-template-columns: minmax(0, 900px);
   justify-content: center;
 }
 
 body[data-reading-record-mode="official_archive"] .reader-scene,
-body[data-reading-record-mode="official_archive"] .reading-character-block {
+body[data-reading-record-mode="official_archive"] .reading-character-block,
+body[data-reading-record-mode="step_by_step"] .reader-scene,
+body[data-reading-record-mode="step_by_step"] .reading-character-block {
   display: none !important;
 }
 
-body[data-reading-record-mode="official_archive"] .reading-sheet {
+body[data-reading-record-mode="official_archive"] .reading-sheet,
+body[data-reading-record-mode="step_by_step"] .reading-sheet {
   grid-column: 1;
   width: 100%;
+}
+
+body[data-reading-record-mode="step_by_step"] .reading-stage {
+  min-height: 0;
+}
+
+body[data-reading-record-mode="step_by_step"] .reading-sheet {
+  margin: 24px 0;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  body[data-reading-record-mode="step_by_step"] .reading-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body[data-reading-record-mode="step_by_step"] .reading-sheet {
+    margin: 0;
+    border-radius: 15px;
+  }
 }

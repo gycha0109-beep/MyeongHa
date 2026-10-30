@@ -1,6 +1,6 @@
 import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
-import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
+import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
 import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
 import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
@@ -104,7 +104,10 @@ function setupTabs() {
 
   function activate(tab) {
     const targetId = tab.getAttribute('aria-controls');
-    for (const candidate of tabs) candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+    for (const candidate of tabs) {
+      candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+      candidate.tabIndex = candidate === tab ? 0 : -1;
+    }
     for (const panel of panels) panel.hidden = panel.id !== targetId;
   }
 
@@ -123,12 +126,13 @@ function setupTabs() {
   const params = new URLSearchParams(window.location.search);
   const requestedTab = params.get('tab');
   const fromReading = params.get('from') === 'reading';
-  if (requestedTab === 'saju' || fromReading) {
-    const sajuTab = tabs.find((tab) => tab.id === 'saju-records-tab');
-    if (sajuTab) {
-      activate(sajuTab);
-      document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
-    }
+  const targetTabId = fromReading || requestedTab === 'saju'
+    ? 'saju-records-tab'
+    : ({ life: 'life-records-tab', birth: 'birth-records-tab', memory: 'memory-records-tab' }[requestedTab] ?? 'saju-records-tab');
+  const initialTab = tabs.find((tab) => tab.id === targetTabId);
+  if (initialTab) activate(initialTab);
+  if (fromReading || requestedTab === 'saju') {
+    document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
   }
 }
 
@@ -216,6 +220,10 @@ function renderCurrentBirthProfile(birth) {
 function renderLifeFacts(payload) {
   const target = byId('life-records-list');
   clear(target);
+  if (payload?.status === 'unavailable') {
+    target.append(uiElement('p', 'muted records-empty', '현세록을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
+    return;
+  }
   const facts = requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact));
   if (facts.length === 0) {
     target.append(uiElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
@@ -242,7 +250,7 @@ function readingPresentation(sajuDomain) {
 function productResponseStateLabel(value) {
   if (value === 'delivered' || value === 'delivered_with_fallback') return '완료';
   if (value === 'clarification_required') return '추가 확인 필요';
-  return '저장됨';
+  return '상태 확인 불가';
 }
 
 let displayedRecords = null;
@@ -342,6 +350,9 @@ function renderSajuReadingEmpty(target) {
   empty.className = 'records-reading-empty';
   empty.append(uiElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
   empty.append(uiElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+  const explore = uiElement('a', 'records-report-explore', '다른 사주 주제 둘러보기');
+  explore.href = 'reading.html';
+  empty.append(explore);
   target.append(empty);
 }
 
@@ -404,13 +415,26 @@ function renderSajuReadingSamples(target, lifeFactsPayload) {
 function renderSajuReadings(readingPayload, lifeFactsPayload) {
   const target = byId('saju-records-list');
   clear(target);
+  if (readingPayload?.status === 'unavailable') {
+    byId('saju-records-count').textContent = uiText('조회할 수 없음');
+    const failure = document.createElement('article');
+    failure.className = 'records-reading-empty records-reading-unavailable';
+    failure.append(uiElement('h3', '', '저장된 사주 보고서를 지금 확인할 수 없습니다.'));
+    failure.append(uiElement('p', 'muted', '조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다. 나중에 다시 확인해 주세요.'));
+    target.append(failure);
+    return;
+  }
   const readings = requireArray(readingPayload, 'readings');
+  // Only the authorized Reading History collection contributes to the count.
+  // Development-only fixture cards must never be counted as saved reports.
+  byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());
   if (readings.length > 0) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
   if (allowsDevelopmentSajuSamples()) {
-    renderSajuReadingSamples(target, lifeFactsPayload);
+    if (lifeFactsPayload?.status === 'unavailable') renderSajuReadingEmpty(target);
+    else renderSajuReadingSamples(target, lifeFactsPayload);
     return;
   }
   renderSajuReadingEmpty(target);
@@ -419,6 +443,10 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
 function renderMemories(payload, subjectKind) {
   const target = byId('memory-records-list');
   clear(target);
+  if (payload?.status === 'unavailable') {
+    target.append(uiElement('p', 'muted records-empty', '저장된 기억을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
+    return;
+  }
   const memories = requireArray(payload, 'memories');
   if (memories.length === 0) {
     const empty = document.createElement('div');

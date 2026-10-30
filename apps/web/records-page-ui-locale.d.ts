@@ -6,3 +6,4 @@ export declare function recordsReadingSummaryV1(input: {
   title: string;
   openable: boolean;
 }, locale?: string): string;
+export declare function recordsReportCountV1(count: number, locale?: string): string;

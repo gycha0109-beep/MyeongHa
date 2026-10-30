@@ -392,6 +392,12 @@ try {
     readerSceneHidden: document.querySelector('.reader-scene')?.hasAttribute('hidden') ?? false,
     characterBlockHidden: document.querySelector('.reading-character-block')?.hasAttribute('hidden') ?? false,
     stageHidden: document.querySelector('[data-reading-stage]')?.hidden ?? true,
+    reportHidden: document.querySelector('[data-official-report]')?.hidden ?? true,
+    reportSections: document.querySelectorAll('.official-report-section').length,
+    reportTitle: document.querySelector('.official-report-section h2')?.textContent?.trim() ?? '',
+    reportBody: document.querySelector('.official-report-primary')?.textContent?.trim() ?? '',
+    reportDate: document.querySelector('[data-official-report-date]')?.textContent?.trim() ?? '',
+    reportVersion: document.querySelector('[data-official-report-version]')?.textContent?.trim() ?? '',
     stepTitle: document.querySelector('[data-reading-step-title]')?.textContent?.trim() ?? '',
     stepBody: document.querySelector('[data-reading-step-body]')?.textContent?.trim() ?? '',
     backHref: document.querySelector('[data-reading-back-link]')?.getAttribute('href') ?? '',
@@ -399,11 +405,29 @@ try {
   }))()`);
   assert(archiveState.reader === '' && archiveState.readerAuthority === '', `Archive mode retained Reader authority: ${JSON.stringify(archiveState)}`);
   assert(archiveState.readerSceneHidden && archiveState.characterBlockHidden, `Archive mode exposed Reader presentation: ${JSON.stringify(archiveState)}`);
-  assert(!archiveState.stageHidden, `Archive Reading stage stayed hidden: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.stageHidden && !archiveState.reportHidden, `Full official report was not the default: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportSections === 1, `Unexpected number of owner-authorized report sections: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportTitle === '직업 흐름', `Stored report title was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportBody.includes('저장된 공식 풀이의 직업 흐름'), `Stored report body was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportDate.length > 0 && archiveState.reportVersion.length > 0, `Stored report provenance was omitted: ${JSON.stringify(archiveState)}`);
   assert(archiveState.stepTitle === '직업 흐름', `Stored Reading title was not rendered: ${JSON.stringify(archiveState)}`);
   assert(archiveState.stepBody.includes('저장된 공식 풀이의 직업 흐름'), `Stored Reading body was not rendered: ${JSON.stringify(archiveState)}`);
   assert(archiveState.backHref === 'records.html?tab=saju', `Archive back action escaped Records: ${archiveState.backHref}`);
   assert(archiveState.chatHref === 'chat-hub.html', `Archive mode invented a direct Chat continuation: ${archiveState.chatHref}`);
+
+  await client.evaluate(`document.querySelector('[data-official-report-step-mode]')?.click()`);
+  await waitFor(
+    client,
+    `document.body.dataset.readingRecordMode === 'step_by_step' && document.querySelector('[data-reading-stage]')?.hidden === false && document.querySelector('[data-official-report]')?.hidden === true`,
+    'Stored report did not switch to the verified step-by-step reading',
+  );
+  await client.evaluate(`document.querySelector('[data-official-report-return]')?.click()`);
+  await waitFor(
+    client,
+    `document.body.dataset.readingRecordMode === 'official_archive' && document.querySelector('[data-reading-stage]')?.hidden === true && document.querySelector('[data-official-report]')?.hidden === false`,
+    'Stored step-by-step reading did not return to the full report',
+  );
+  await client.evaluate(`document.querySelector('[data-official-report-step-mode]')?.click()`);
 
   await client.evaluate(`document.querySelector('[data-reading-next]')?.click()`);
   await waitFor(

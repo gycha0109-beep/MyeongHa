@@ -92,6 +92,30 @@ describe('Web Records current-self Birth integration', () => {
     expect(result.memories.memories).toEqual([]);
   });
 
+  it('keeps healthy subject ledgers when the Saju report archive is temporarily unavailable', async () => {
+    const { fetchImpl } = makeFetch({
+      '/api/readings': () => Response.json({ ok: false }, { status: 503 }),
+    });
+    const result = await createRecordsRuntimeClient({
+      fetchImpl,
+      resolveBearer: async () => ({ kind: 'member', token: 'stable-member-token' }),
+    }).readRecords();
+    expect(result.readings).toEqual({ status: 'unavailable' });
+    expect(result.lifeFacts.facts).toEqual([]);
+    expect(result.memories.memories).toEqual([]);
+    expect(result.birth.status).toBe('ready');
+  });
+
+  it('hides every ledger when even one endpoint denies the current Subject', async () => {
+    const { fetchImpl } = makeFetch({
+      '/api/readings': () => Response.json({ ok: false }, { status: 403 }),
+    });
+    await expect(createRecordsRuntimeClient({
+      fetchImpl,
+      resolveBearer: async () => ({ kind: 'member', token: 'stable-member-token' }),
+    }).readRecords()).rejects.toMatchObject({ code: 'WEB_RECORDS_SESSION_REQUIRED' });
+  });
+
   it('never displays an invalid current revision as verified Birth data', async () => {
     const { fetchImpl } = makeFetch({
       '/api/me/birth-profile': () => ok({
