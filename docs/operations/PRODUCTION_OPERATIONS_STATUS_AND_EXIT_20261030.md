@@ -18,7 +18,7 @@
 - **실제 변경:** [`test/saju-production-calculation-loopback-chaos-phase7.test.ts`](../../test/saju-production-calculation-loopback-chaos-phase7.test.ts) 추가. `127.0.0.1`의 단독 Node HTTP 서버가 (1) 연결이 끊긴 Saju origin, (2) 헤더 400ms 지연, (3) 헤더 후 응답 본문 400ms 지연, (4) 틀린 합성 Bearer를 주입한다. 실제 `fetch`를 쓰는 Saju 계산 어댑터의 deadline `80ms`, `TIMEOUT`/`NETWORK_FAILURE`/`HTTP_4XX`, 오류 비밀 비반사·공개 오류 축약, 단일 요청(재시도 금지)과 **각 경우 Cloudflare Worker의 독립 `GET /api/health` 200**을 확인한다. 생년월일 등은 고정된 합성 fixture이다.
 - **실제 실행 결과:** Windows 격리 Git worktree, Node 24, Vitest 4.1.11. 기존 Saju HTTP/response cleanup/deadline/kill-switch 테스트 **5개 파일·25개 테스트 PASS** (`TEST_EXIT=0`), 신규 실제 루프백 TCP 장애 **1개 파일·4개 테스트 PASS** (`TEST_EXIT=0`). 실행 표적은 Production이 아니라 로컬 합성 HTTP 서버이다. 400ms 지연보다 짧은 80ms caller timeout 후 반환되고, core health는 계속 200이었다. 테스트 실행은 실시간 Production 서비스 장애를 발생시키지 않았다.
 - **검증 범위/미완료:** **Saju production adapter 구현의 실제 로컬 네트워크 실패 경계**만 확인했다. Cloud Run 실제 인스턴스 kill, Hosted PostgreSQL 불능/slow/exhaustion, 전체 사용자 라우트의 Saju 장애 응답, Auth/비밀 회전, Production p95 및 장애 알림/복구는 **NOT_OBSERVED**. Phase 7 전체 완료·DR readiness·서비스 재개 승격은 불가.
-- **추적:** 작업 브랜치 `ops/phase7-loopback-saju-chaos-worklog-20261030`. PR/CI 실행 근거는 이 변경의 PR 체크 및 본문에 연동한다. **다음 작업:** 안전한 격리 환경의 DB/Auth/Saju dependency 실제 실패·지연 검증과 Phase 10–12 측정. 필요한 통제 조건이 없으면 PASS가 아니라 BLOCKED로 분류한다.
+- **추적:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783), 최초 테스트/구현 커밋 `7cb9300ce5bf8d2b6e94a031f4009743107cad51`, 브랜치 `ops/phase7-loopback-saju-chaos-worklog-20261030`. [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2783/checks)는 원격 검증 증거이며, 아직 실행/완료 전에는 성공으로 간주하지 않는다. **다음 작업:** 안전한 격리 환경의 DB/Auth/Saju dependency 실제 실패·지연 검증과 Phase 10–12 측정. 필요한 통제 조건이 없으면 PASS가 아니라 BLOCKED로 분류한다.
 
 ---
 
