@@ -7,8 +7,46 @@ begin;
 
 -- DB Owner is a NOLOGIN role. Only the owner command may INSERT a Grant.
 -- A caller can never INSERT/UPDATE the grant table directly.
-grant select (source_turn_id,source_message_id,created_by_character_id)
-  on public.memory_items to myeongha_seyeon_chat_runtime_owner;
+-- The restricted runtime owner does NOT receive Memory UPDATE privileges.
+-- This private postgres-owned function obtains the exact row locks and returns
+-- only the original Turn/Message identifiers, never personal payloads.
+create function seyeon_private.lock_accepted_original_memory_for_grant_v1(
+  p_subject_id uuid,p_memory_item_id uuid
+)
+returns table(source_turn_id uuid,source_message_id uuid)
+language plpgsql security definer
+set search_path=pg_catalog,public set row_security=off
+as $locked_origin$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  return query select m.source_turn_id,m.source_message_id
+    from public.memory_items m
+    join public.memory_proposals p
+      on p.accepted_memory_item_id=m.id and p.subject_id=m.subject_id
+    where m.id=p_memory_item_id and m.subject_id=p_subject_id
+      and m.revoked_at is null and m.source_kind='user_approved'
+      and m.memory_type='conversation_recall' and m.schema_version='v1'
+      and m.created_by_character_id='seyeon'
+      and m.source_turn_id is not null
+      and p.status='accepted' and p.proposal_kind='memory'
+      and p.character_id='seyeon' and p.record_type='conversation_recall'
+      and p.schema_version='v1'
+      and p.source_turn_id=m.source_turn_id
+      and p.source_message_id is not distinct from m.source_message_id
+      and p.proposed_value_jsonb=m.content_jsonb
+    for share of m,p;
+  if not found then
+    raise exception using errcode='42501',
+      constraint='seyeon_owned_grant_accepted_source_required',
+      message='A current owner-accepted original Memory is required';
+  end if;
+end
+$locked_origin$;
+revoke all on function seyeon_private.lock_accepted_original_memory_for_grant_v1(uuid,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+grant execute on function seyeon_private.lock_accepted_original_memory_for_grant_v1(uuid,uuid)
+  to myeongha_seyeon_chat_runtime_owner;
+
 grant insert (id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
   on public.record_access_grants to myeongha_seyeon_chat_runtime_owner;
 create policy seyeon_owned_memory_explicit_grant_insert_v1
@@ -56,30 +94,14 @@ begin
       message='S0 original grant writing is disabled';
   end if;
 
-  -- Only the original DB-accepted proposal can authorize a new Grant.
-  -- The API/Member never supplies the Memory payload, type or provenance.
-  select m.source_turn_id,m.source_message_id
-    into v_source_turn,v_source_message
-  from public.memory_items m
-  join public.memory_proposals p
-    on p.accepted_memory_item_id=m.id and p.subject_id=m.subject_id
-  where m.id=p_memory_item_id and m.subject_id=p_subject_id
-    and m.revoked_at is null and m.source_kind='user_approved'
-    and m.memory_type='conversation_recall' and m.schema_version='v1'
-    and m.created_by_character_id='seyeon'
-    and m.source_turn_id is not null
-    and p.status='accepted' and p.proposal_kind='memory'
-    and p.character_id='seyeon' and p.record_type='conversation_recall'
-    and p.schema_version='v1'
-    and p.source_turn_id=m.source_turn_id
-    and p.source_message_id is not distinct from m.source_message_id
-    and p.proposed_value_jsonb=m.content_jsonb
-  for share of m,p;
-  if not found then
-    raise exception using errcode='42501',
-      constraint='seyeon_owned_grant_accepted_source_required',
-      message='A current owner-accepted original Memory is required';
-  end if;
+  -- The postgres-owned private authority obtains the real Memory and
+  -- Proposal row locks; the restricted runtime owner never gets UPDATE on
+  -- personal records. Multiple/invalid sources must fail, not be guessed.
+  select source_turn_id,source_message_id
+    into strict v_source_turn,v_source_message
+  from seyeon_private.lock_accepted_original_memory_for_grant_v1(
+    p_subject_id,p_memory_item_id
+  );
 
   perform 1 from public.chat_turns t
     join public.conversation_threads th
