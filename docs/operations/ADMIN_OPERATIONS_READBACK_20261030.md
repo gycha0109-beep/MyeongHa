@@ -2,7 +2,25 @@
 
 기존 A0–A7 잔여 작업의 실행 기록입니다. 신규 로드맵이나 기능 활성화 증거가 아닙니다. 비밀번호·Owner 이메일·세션·토큰·고객 데이터는 기록하지 않습니다.
 
-## 실제 확인
+## 추가 실행 완료 — 최신 상태
+
+후속 실행에서 아래 기존 계약의 Production 설치를 완료했습니다. 아래 초기 재조회 및 설치 전 A4–A7 표는 당시 기록이며 이 추가 설치 상태가 우선합니다.
+
+| 범위 | 실제 migration | 설치·검증 기록 |
+|---|---|---|
+| A7 공지·배너 | `20261030014708` | [비공개 표현 정보](ADMIN_PRESENTATION_PRODUCTION_INSTALL_20261030.md) |
+| A5 동의·이벤트 | `20261030015201` | [분석 원장](ADMIN_ANALYTICS_PRODUCTION_INSTALL_20261030.md) |
+| A4 Reading 비용 | `20261030015858` | [비용 원장](ADMIN_READING_AI_COST_PRODUCTION_INSTALL_20261030.md) |
+| 감사 365일 보존 | `20261030020711` | [보존·조회](ADMIN_MAINTENANCE_FINANCE_PRODUCTION_INSTALL_20261030.md) |
+| AI 재무·서울 월 예산 | `20261030021027` | [보존·조회](ADMIN_MAINTENANCE_FINANCE_PRODUCTION_INSTALL_20261030.md) |
+
+모든 설치는 완료됐으므로 재실행하지 않습니다. 기존 Reader/Audit 설치도 재실행하지 않았습니다. 기존 public/운영 Reader 허용 컬럼 178개는 그대로이며, 기존 A5 후보의 분석 전용 필드 23개만 별도 허용했습니다. 설치 후 관리 계정의 임시 INHERIT/SET 관계는 0개입니다. 로그인 역할 6개의 비밀번호는 모두 없고 관리자 Hyperdrive/Worker도 아직 없습니다.
+
+실제 PostgreSQL에서 비용 Writer의 중복 처리 이름 충돌과 선택적 AI 가격 원장 권한이 기본 조회 전체를 막던 문제를 수정했습니다. 다른 DB 역할 소유의 견적/가격 권한과 고객 Lot 제약은 변경하지 않았습니다. Production 검사는 합성 데이터·임시 역할 전환을 모두 롤백했으며 고객 Reading/결제/크레딧에는 합성 데이터를 쓰지 않았습니다. 전체 workspace 타입·공통/관리자 빌드, 관리자 설치 계약 12개·앱 61개·호스팅 5개 테스트가 통과했습니다.
+
+남은 의존성은 안전한 전용 자격증명/Secrets, 실제 TLS·Hyperdrive·Worker·Owner 검증, Saju 요청/실행 시도 정본 매핑, 분석 운영 정책·공개 라우트·삭제/보존 스케줄, 고객 명령의 실행 정본입니다. 원장 설치를 실제 수집·운영 개통으로 표시하지 않습니다.
+
+## 초기 재조회 기록
 
 - 명하 PR #2630: OPEN/Draft, 시작 HEAD `2b183e7e2f2fafa66056c19acffddabb193237da`. Governance/CI/Web PR Domain Gates/Web Auth Browser Regression 성공. 기존 관리자 worktree는 깨끗하며 지정 브랜치와 일치했습니다.
 - Saju PR #2739: OPEN/Draft, HEAD `09221bf6ecb7cf215d45a6bbd1bffe5e330df55e`, 기존 CI 성공. Saju 작업 트리에는 다른 작업의 대량 변경이 있어 수정하지 않았고 해당 커밋의 계약을 Git object로 읽었습니다. 명하 주 작업 트리의 미추적 로그도 보존했습니다.
@@ -31,7 +49,7 @@
 
 로컬 전체 workspace 타입 검사·공통 빌드·관리자 빌드와 배포 dry-run·웹 빌드/배포 구성 검사 통과. 관리자/분석/Reading 비용 관련 테스트 39개 파일 213개 통과, 관리자 전용 테스트 61개 및 호스팅 테스트 5개 통과. 새 코드 HEAD `5bdf8848`의 실제 수동 Private Build도 성공했고 `stage-inactive`는 의도대로 skipped입니다. PR CI는 각 실행 링크의 실제 상태를 따르며 다른 커밋의 성공을 최신 HEAD 결과로 대체하지 않습니다.
 
-## 기존 A4–A7의 남은 외부 의존성
+## 추가 설치 전 A4–A7 기록
 
 | 단계 | 현재 코드와 남은 정본 |
 |---|---|

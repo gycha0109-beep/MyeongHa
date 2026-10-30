@@ -20,6 +20,6 @@
 - 폐기형 PG17.6의 실제 DB에서 기록·동일 호출 재실행·사용량 미확인 실패 호출·월 집계·Writer 직접 조회 거부 통과. 합성 시나리오의 알려진 추정액과 미측정 호출은 분리됐으며 모두 롤백했습니다.
 - Production에서 실제 RPC가 존재하지 않는 실행 시도 결속을 거부하고 Writer 직접 SELECT도 차단함을 롤백 검증했습니다. Reader 월간 RPC 실행과 설치 후 카탈로그를 확인했습니다. 비용 원장은 0행이고 고객 Reading/실행 시도에는 합성 데이터를 넣지 않았습니다.
 - 공급사 호출 전체 관측·명하/Saju 요청 매핑·청구/환율은 미검증입니다. 기존 월간 응답의 `coverage=provider_events_only_unverified`, 전체 추정/확정/KRW 비용 null을 유지합니다. 원장 행 수를 실제 Reading 생성 0건·비용 0원으로 해석하지 않습니다.
-- Supabase advisor의 `rls_enabled_no_policy` INFO가 이 전용 원장에 있습니다. 기존 계약은 RLS로 일반 역할을 기본 차단하고, 비로그인 테이블 소유자의 제한된 SECURITY DEFINER RPC로만 접근합니다. Writer/Reader의 직접 테이블 권한은 없습니다. 관련 원리: [Supabase RLS](https://supabase.com/docs/guides/database/postgres/row-level-security).
+- Supabase advisor의 `rls_enabled_no_policy` INFO가 이 전용 원장에 있습니다. 기존 계약은 RLS로 일반 역할을 기본 차단하고, 비로그인 테이블 소유자의 제한된 SECURITY DEFINER RPC로만 접근합니다. Writer/Reader의 직접 테이블 권한은 없습니다. [해당 advisor 설명](https://supabase.com/docs/guides/database/database-linter?lint=0008_rls_enabled_no_policy).
 
 `SajuReadingProviderBindingAuthorityV1.resolve()`에 필요한 실제 요청 → DB Reading/실행 시도 매핑 정본은 여전히 없습니다. 이 설치로 Production Interpretation HOLD를 해제하거나 식별자 동등성을 가정하지 않습니다. 안전한 전용 Writer 자격증명과 권위 있는 호출 전달 결속이 남았습니다.

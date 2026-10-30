@@ -12,7 +12,7 @@
 
 [감사 보존·AI 조회 설치 기록](../../docs/operations/ADMIN_MAINTENANCE_FINANCE_PRODUCTION_INSTALL_20261030.md): 기본 365일/hold 보호·제한 정리 RPC와 AI 호출/집계/서울 월 예산 조회를 설치했습니다. 다른 역할 소유의 견적·단가 원장은 권한을 변경하지 않고 미연결로 유지합니다. 자동 정리·공급사 호출·Worker 활성화는 없습니다.
 
-현재 상태는 [운영 재조회 기록](../../docs/operations/ADMIN_OPERATIONS_READBACK_20261030.md)을 우선합니다. 아래 날짜별 기록의 “역할 없음”, “Supabase 연결 오류”는 과거 상태입니다. Reader/Audit 설치는 완료됐고 재적용하지 않습니다. 두 역할의 비밀번호·전용 Hyperdrive·Worker·Owner 실인증·읽기 개통은 미완료입니다.
+현재 상태는 [운영 재조회 기록의 추가 실행 결과](../../docs/operations/ADMIN_OPERATIONS_READBACK_20261030.md)를 우선합니다. 아래 날짜별 기록의 “역할 없음”, “Supabase 연결 오류”, “후보 미설치”는 과거 상태입니다. 위 5개 후속 설치와 기존 Reader/Audit는 완료됐고 재적용하지 않습니다. 비밀번호·전용 Hyperdrive·Worker·Owner 실인증·읽기 개통은 미완료입니다.
 
 비활성 스테이징도 Access JWT를 검증하고 비허용 사용자는 403, 검증된 Owner는 `ADMIN_PRIVATE_DISABLED`를 반환합니다. DB·자산은 제공하지 않습니다. 익명 검사는 일반 503을 성공으로 인정하지 않으며 실제 빌드된 JS/CSS의 `/admin/assets/` 및 `/assets/` 주소를 모두 확인합니다.
 
