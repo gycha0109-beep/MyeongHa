@@ -213,20 +213,36 @@ export function createMobileChatReadRepositoryV1(input: {
         });
         return publish(bindPage(snapshot.messages, page, cursor));
       } catch (error) {
-        publish({
-          ...snapshot,
-          status: 'error',
-          errorCode:
-            error instanceof MobileChatReadRepositoryErrorV1
-              ? error.code
-              : error instanceof MobileMemberSessionErrorV1
-                ? 'CHAT_MEMBER_SESSION_REQUIRED'
-                : error instanceof MyeongHaApiClientErrorV1
-                  ? (/^[A-Z][A-Z0-9_]{1,70}$/u.test(error.code)
-                      ? error.code
-                      : 'CHAT_API_ERROR')
-                  : 'CHAT_READ_FAILED',
-        });
+        const errorCode =
+          error instanceof MobileChatReadRepositoryErrorV1
+            ? error.code
+            : error instanceof MobileMemberSessionErrorV1
+              ? 'CHAT_MEMBER_SESSION_REQUIRED'
+              : error instanceof MyeongHaApiClientErrorV1
+                ? (/^[A-Z][A-Z0-9_]{1,70}$/u.test(error.code)
+                    ? error.code
+                    : 'CHAT_API_ERROR')
+                : 'CHAT_READ_FAILED';
+        // An earlier page is not a durable Reveal grant. If the authoritative
+        // history guard later denies the same Thread, discard every cached
+        // transcript and derived Relationship field before publishing HOLD.
+        if (errorCode === 'SEYEON_HISTORY_REVEAL_HOLD') {
+          publish({
+            status: 'error',
+            threadId: input.threadId,
+            characterId: null,
+            messages: Object.freeze([]),
+            relationship: null,
+            hasMore: false,
+            nextAfterSequenceNo: null,
+            contentReleaseId: null,
+            contentBundleId: null,
+            contentRevision: null,
+            errorCode,
+          });
+        } else {
+          publish({ ...snapshot, status: 'error', errorCode });
+        }
         throw error;
       } finally {
         inFlight = null;
