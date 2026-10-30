@@ -109,3 +109,13 @@ Watchtower-Track: security
 - **증거:** 대체 PR #2781 문서 편집 전 HEAD `e8c1d8486529f77e325314b69277d6b8d5677c01`의 Web/Governance PASS; [CI #41025182088](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41025182088)는 이 기록 작성 시 DB 작업 미종결. 문서 커밋에 따른 최종 HEAD 검사/Integration·병합은 별도 확정한다.
 - **중요한 한계:** DB 원본 User 입력이라는 증거는 복사·인용된 다른 개인정보의 Grant를 대체하지 않는다. G1 양수 모델 사용은 `seyeon-production-chat-execution-v1.ts`에서 **원본 Memory 1건·past history/Relationship 0건**으로 계속 제한. Reader/공식 Reading 아티팩트는 별도 Character/상품/구매 권한 경로이고, 세연의 현재 context 조립에 직접 Reader 데이터 유입은 확인되지 않았으므로 임의 긍정 교차 공개를 만들지 않음.
 - **남은 것/다음:** #2781 최종 HEAD CI/Integration/병합, 실제 모델에 사용되는 **전체 원본·파생 출처의 G1 선행 영속 Pin**, G2/G3 현권한 재검증, Reader 교차 인용 계약, G4 일반 크레딧 종단, G5/G6. **운영 `HOLD_FORWARD_STOPPED` 유지**, 운영 DDL/ACL/Provider·traffic 변경 없음.
+
+
+### 2026-10-30 / W04 — G1 모델 선택 과거 대화의 선행 불변 DB Pin (PR 신규)
+
+- **목적:** G0에서 출처를 확인한 과거 대화가 실제 모델 입력으로 선택되는 시점의 메시지 ID·정렬·원문 해시를 *모델 호출 이전*에 DB 원본에 영속화한다. 기존 G0 provenance가 조회 성공했다는 사실만으로 G1 완료를 주장하지 않는다.
+- **구현:** S0 source-only `16-g1-historical-message-pre-model-pin.sql`에서 `chat_turn_attempts.seyeon_g1_recent_source_pin_jsonb`와 시각을 추가하고 최초 쓰기 후 변경 금지 트리거를 설치한다. `public.cmd_pin_seyeon_g1_historical_model_messages_v1`는 DB 현재 Subject·Turn·Attempt, 정확한 현재 User 및 선택된 전체 최근 메시지 ID 배열을 검증하고, 기존 G0 `qry_seyeon_g0_current_source_recent_messages_v1`를 다시 호출해 original User / committed Assistant와 기존 원본 Grant를 검증한 뒤 **내용 본문 없이** source ID·순서·content hash와 model-selected message digest를 Attempt에 저장한다.
+- **실제 실행 연결:** `seyeon-production-chat-execution-v1.ts`가 Interpreter/Renderer/Reviewer 호출 이전 최종 최근 대화 slice를 결정해 `SeyeonProductionChatPersistencePortV1.pinHistoricalModelMessages`로 넘기고, `seyeon-production-transactional-ports-v1.ts`가 기존 canonical Member transaction runner에서 신규 `postgres-seyeon-g1-historical-source-pin-v1.ts` RPC를 실행한다. S0 `plan.mjs` 격리 설치 출처 목록에 `16` 추가. 임의 User/LLM SourceRef를 DB 권한으로 사용하지 않는다.
+- **허용되지 않은 것:** 이 Pin은 **최근 대화 메시지에 한정**되며 Relationship/Reader·preflight 파생 소스의 *전체* 최종 사용 집합 증명이나 G2 동일 트랜잭션 재검증이 아니다. 기존 양수 1 Memory + 과거 이력 0건 제한, 모델 재호출·Commit·Replay·HTTP Reveal HOLD를 **해제하지 않는다**. 관계 이벤트·Reader의 파생 원본 인가까지 커버한다고 주장하지 않는다.
+- **증거 상태:** 이 기록을 작성하는 시점에 신규 PR 및 정확한 HEAD CI·Integration/병합은 미확정이다. 선행 [#2781](https://github.com/gycha0109-beep/MyeongHa/pull/2781)의 통합 검증·병합도 별도 확인한다. 운영 DB/DDL/ACL/Model/Traffic **변경 없음**. `HOLD_FORWARD_STOPPED` 유지.
+- **다음 작업:** G1 모델 입력 전체(선택된 Relationship/Reader/인용 provenance)의 DB 원본 귀속과 G2 Commit 시 이 신규 Pin의 재검증 연결, 마지막 HTTP/G3 전송 실증. 완료되지 않은 계약은 계속 HOLD한다.
