@@ -1,3 +1,4 @@
+import { presentChatLiveTurnV1 } from './chat-live-turn.js';
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
@@ -553,6 +554,7 @@ async function sendTurn(message) {
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
   const submittedThreadId = threadId;
+  const removePendingBubbles = presentChatLiveTurnV1(chatStream, { message: pendingTurn.text });
 
   try {
     const activeBearer = await getActiveBearer();
@@ -645,6 +647,7 @@ async function sendTurn(message) {
       '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
     );
   } finally {
+    removePendingBubbles();
     sendingTurn = false;
     setComposerBusy(false);
   }
