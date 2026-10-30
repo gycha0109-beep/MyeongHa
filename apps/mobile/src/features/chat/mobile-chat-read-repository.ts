@@ -70,6 +70,17 @@ export function createMobileChatReadRepositoryV1(input: {
   });
   let inFlight: Promise<MobileChatThreadSnapshotV1> | null = null;
 
+  function invalidatesCurrentReadAuthority(error: unknown, code: string): boolean {
+    // A later denial of identity/ownership or an incompatible authoritative
+    // page invalidates all earlier transcript and relationship snapshots.
+    // Only transient transport failures retain pages for retry.
+    return code === 'SEYEON_HISTORY_REVEAL_HOLD' ||
+      error instanceof MobileMemberSessionErrorV1 ||
+      error instanceof MobileChatReadRepositoryErrorV1 ||
+      (error instanceof MyeongHaApiClientErrorV1 &&
+        (error.status === 401 || error.status === 403 || error.status === 404));
+  }
+
   function publish(next: MobileChatThreadSnapshotV1) {
     snapshot = Object.freeze({
       ...next,
@@ -223,10 +234,10 @@ export function createMobileChatReadRepositoryV1(input: {
                     ? error.code
                     : 'CHAT_API_ERROR')
                 : 'CHAT_READ_FAILED';
-        // An earlier page is not a durable Reveal grant. If the authoritative
-        // history guard later denies the same Thread, discard every cached
-        // transcript and derived Relationship field before publishing HOLD.
-        if (errorCode === 'SEYEON_HISTORY_REVEAL_HOLD') {
+        // An earlier page is not a durable Reveal grant. Discard it when
+        // a new read denies identity/ownership, changes server binding or
+        // violates pagination integrity. Transient network faults keep pages.
+        if (invalidatesCurrentReadAuthority(error, errorCode)) {
           publish({
             status: 'error',
             threadId: input.threadId,
