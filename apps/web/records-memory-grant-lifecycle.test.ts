@@ -58,6 +58,26 @@ describe('Records S0 owner withdrawal lifecycle',()=>{
       });
     }
   });
+  it('only exposes consent eligibility on a positive server-owned state',async()=>{
+    const positive=client({...base,grantState:'not_granted',grantConsentAvailable:true});
+    await expect(positive.runtime.readSeyeonMemoryGrantStatus(MEMORY)).resolves.toMatchObject({
+      grantState:'not_granted',grantConsentAvailable:true,
+    });
+    const missing=client({...base,grantState:'not_granted'});
+    const noCapability=await missing.runtime.readSeyeonMemoryGrantStatus(MEMORY);
+    expect(noCapability).not.toHaveProperty('grantConsentAvailable');
+    for(const invalid of [
+      {...base,grantState:'active',currentlyGranted:true,
+        grantedAt:'2026-10-21T00:00:00Z',grantConsentAvailable:true},
+      {...base,grantState:'withdrawal_pending',grantConsentAvailable:true},
+      {...base,grantState:'not_granted',grantConsentAvailable:'yes'},
+    ]){
+      const {runtime}=client(invalid);
+      await expect(runtime.readSeyeonMemoryGrantStatus(MEMORY)).rejects.toMatchObject({
+        code:'WEB_RECORDS_MALFORMED_RESPONSE',
+      });
+    }
+  });
   it('requires the current server state for the UI rather than session storage',()=>{
     const page=readFileSync(new URL('./records-page.js',import.meta.url),'utf8');
     expect(page).toContain("result.grantState === 'withdrawal_pending'");
@@ -66,5 +86,12 @@ describe('Records S0 owner withdrawal lifecycle',()=>{
     expect(page).toContain("presentSeyeonMemoryGrantStatusV1(");
     expect(page).toContain("lastGrantState !== 'active'");
     expect(page).toContain("revoke.hidden = !view.revokeAvailable");
+    expect(page).toContain("result.grantConsentAvailable === true");
+    expect(page).toContain("memory.memoryType === 'conversation_recall/v1'");
+    expect(page).toContain("memory.createdByCharacterId === 'seyeon'");
+    expect(page).toContain("grant.hidden = !grantConsentAvailable || withdrawalPending");
+    expect(page).toContain("await consentClient.grantSeyeonOriginalMemory");
+    expect(page).toContain("const verified = await refreshGrant()");
+
   });
 });
