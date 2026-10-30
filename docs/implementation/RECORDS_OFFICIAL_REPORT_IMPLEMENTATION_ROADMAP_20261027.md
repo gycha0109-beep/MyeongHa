@@ -1,5 +1,12 @@
 # 명하 기록 · 공식 사주 보고서 구현 로드맵 (2026-10-27)
 
+## 2026-10-30 확정된 Records 범위 — 명식록·대리가 기억 중복 제거
+
+- **최신 사용자 결정:** 기록 페이지는 `사주 보고서`와 `현세록`만 제공한다. 기존 기록 페이지의 `명식록`과 `대리가 기억`은 마이페이지에 이미 존재하므로 기록 페이지에서 **탭·본문·전용 상태·렌더러·조회 호출을 제거**한다. 아래의 4탭·명식록/기억 보존 서술은 과거 단계의 설계 기록이며 재도입 지시가 아니다.
+- **구현 정본:** `apps/web/src/records/RecordsPage.tsx`는 공식 보고서와 현세록 탭만 출력하고, `apps/web/records-page.js`는 해당 데이터만 렌더링한다. `apps/web/records-runtime-client.js`의 페이지 단위 `readRecords()`는 `/api/me`, `/api/life-record`, `/api/readings`만 조회하며, 기록 전용 출생정보·기억 조회/Grant 철회 UI는 더 이상 없다. 마이페이지·서버 API의 해당 기능은 건드리지 않는다.
+- **연동 링크:** 공식 보고서에서 현재 명식 확인은 제거된 `records.html?tab=birth`가 아닌 `my.html`로 이동한다. 공식 보고서에 표시되는 발행 당시/현재 출생정보 차수는 별도의 권한 검증된 보고서 메타데이터이며, 삭제된 기록 페이지의 현재 Birth 조회를 복구해서는 안 된다.
+- **검증:** PR [#2757](https://github.com/gycha0109-beep/MyeongHa/pull/2757)의 `7ed505cfcb022cd7b9d366d63fbd4ee4a43aa1cb`에서 관련 CI 13건 전부 GREEN. 자동 병합/중간 병합 금지와 Saju Production·Commerce·Reader HOLD는 그대로 유지한다.
+
 ## 2026-10-30 최신 통합 PR 및 기록 화면 S0 후속 구현
 
 - 실행 트랙은 계속 `frontend-integration`이다. 기존 PR [#2670](https://github.com/gycha0109-beep/MyeongHa/pull/2670)은 긴 커밋 이력의 보안 검사 오탐을 분리하기 위해 **병합 없이 종료**되었고, 작업 파일과 HOLD 계약은 후속 단일 통합 PR [#2757](https://github.com/gycha0109-beep/MyeongHa/pull/2757)로 승계했다. 아래 #2670 참조는 당시 작업 이력이며 **현재 병합 대상은 #2757**이다.
@@ -91,12 +98,12 @@
 
 | 현재 기반 | 실제 경로 / 계약 | 재사용 방식 및 아직 증명하지 못한 것 |
 |---|---|---|
-| 웹 기록 화면 | `apps/web/records.html`, `apps/web/src/records/RecordsPage.tsx`, `apps/web/records-page.js`, `apps/web/records-v2.css` | React 화면·4개 기록 영역·사주 이력 카드 재사용. **상세 장문 보고서가 완성된 것은 아님** |
+| 웹 기록 화면 | `apps/web/records.html`, `apps/web/src/records/RecordsPage.tsx`, `apps/web/records-page.js`, `apps/web/records-v2.css` | React 화면·사주 보고서/현세록 2개 기록 영역·사주 이력 카드 재사용. **상세 장문 보고서가 완성된 것은 아님** |
 | Records 세션/조회 | `apps/web/records-runtime-client.js` | 회원·게스트 현재 세션, 주체 변경 감지, 페이지네이션 활용 |
 | 저장된 Reading 이력 | `GET /api/readings`, `apps/api/src/reading-history-http.ts`, `apps/web/reading-history-contract.js` | 현재 주체의 이력/완료 상태만 목록에. 이력 조회 성공은 유료 보고서 열람권이 아님 |
 | 저장된 공식 Reading 단건 | `GET /api/readings?readingId=...`, `apps/api/src/official-reading-record-http.ts`, `apps/web/official-reading-record-contract.js` | **별도 Records owner 검증** 재사용. API 원본 스냅샷을 검증 없이 소비자 화면에 직렬화하거나 판매 권한으로 추론하지 않음 |
 | 기록에서 풀이로 이동 | `apps/web/reading-history-handoff.js`, `apps/web/reading-detail.html`, `apps/web/src/reading-detail/ReadingDetailPage.tsx` | 기존 `source=records` / Reading ID 기반 진입과 Reader 장면 재사용. 장문 공식 보고서는 별도 읽기 모드로 분리 |
-| 명식록 | `GET /api/me/birth-profile`, Records Birth UI | **현재** Birth 프로필 표시와 과거 보고서의 **발행 당시 Birth revision** 구분 |
+| 명식록 (마이페이지 소유) | `GET /api/me/birth-profile`, My Birth UI | 현재 Birth 프로필은 마이페이지에서 확인한다. Records는 보호된 공식 보고서의 발행 당시/현재 Birth revision **메타데이터만** 표시한다. |
 | 불변 보고서 근거 | `reading_sessions → readings → reading_refs.response_snapshot_jsonb / response_hash → reading_groundings` | 기존 DB 출처 계보 사용. 생성/조회 경로 전체의 실제 유료 권한 결속은 미완료 |
 | 첫 판매 상품 계약 | `docs/PAID_PRODUCT_CATALOG_V1.md` | `saju.general_natal.deep.v1` / `reading.saju.general_natal.deep.v1`; **Product/Offer disabled** |
 | Reader/구매 경계 | `docs/MyeongHa_UX_Reading_Reader_Knowledge_Spec_v1.1.md`, `docs/COMMERCE_ENTITLEMENT_SPEC.md` | 공식 결과는 Reader 독립. Reader마다 별도 정확한 접근권; 구매·환불은 서버 정본 |
@@ -117,10 +124,9 @@
 │  │    ├─ 각 항목의 승인된 근거·범위·구체적 모호성
 │  │    └─ Reader 해설 다시 보기 / 권한 있는 대화 진입
 │  └─ 생성 중 / 재시도 가능 / 정보 변경 / 접근 종료 상태
-└─ 다른 기록 (기존 기능 보존)
-   ├─ 명식록 (현재 출생 정보)
-   ├─ 현세록
-   └─ 대리가 기억
+└─ 현세록 (현재 기록 페이지의 유일한 별도 원장)
+
+※ 현재 명식록·대리가 기억은 마이페이지에서 확인하며 Records에서는 조회·표시하지 않는다.
 ```
 
 사주 목록과 본문은 같은 Source Truth를 읽지만 **일반 채팅 transcript / Reader 생성 문장 / Life Fact / Memory**를 공식 보고서 본문에 섞지 않는다. 같은 주제의 다른 Reader 해설이 추가돼도 공식 보고서를 중복 생성하지 않는다.
@@ -142,12 +148,12 @@
 
 **수정 위치:** `apps/web/src/records/RecordsPage.tsx`, `apps/web/records-page.js`, `apps/web/records-v2.css`, 관련 locale/테스트.
 
-- [ ] 현 `사주 기록`의 Reading 목록을 **첫 화면의 보고서 보관함**으로 올리고, 기존 4개 기록 데이터 및 깊은 링크·뒤로 가기를 보존한다. 명식록·현세록·대리자 기억은 `다른 기록`으로 계속 제공한다.
+- [x] 현 `사주 기록`의 Reading 목록을 **첫 화면의 보고서 보관함**으로 올린다. 최신 범위에서는 `현세록`만 별도 탭으로 유지하고 명식록·대리자 기억은 마이페이지에 맡긴다. 공식 보고서·현세록 깊은 링크와 뒤로 가기는 보존한다.
 - [ ] 실제 Reading History의 항목만 카드로 렌더링하고, 식별자/시각/상품·상태/Reader 표시는 **서버에서 검증된 필드**만 사용한다. 데이터 없는 게스트에게 미구매 보고서/생성 완료 보고서를 꾸며서 보여주지 않는다.
 - [ ] 저장된 결과/진행 중/생성 실패/정보 변경/접근 종료/조회 실패를 제품 상태로 구분한다. 서버가 상태를 아직 제공하지 않는 경우 임의로 추론하지 않고 `확인할 수 없음`으로 둔다.
 - [ ] 독립 호출 실패 시 가능한 정상 기록만 보이고, 401/403·주체 변경은 전체 보호 내용을 숨긴다. PR #2653 및 동등한 main 수정 사항은 재활용한다.
 
-**완료 조건:** 회원·게스트·빈 기록/오류/다른 주체 전환의 목록 동작 확인; 기존 기록 3영역 회귀 없음; 보고서 미생성 상태에서 유료 원문 노출 0.
+**완료 조건:** 회원·게스트·빈 기록/오류/다른 주체 전환의 목록 동작 확인; 사주 보고서·현세록의 소유자 보호 및 마이페이지 소유 데이터 중복 조회 없음; 보고서 미생성 상태에서 유료 원문 노출 0.
 
 ### 2단계 · 기존 단건 Reading을 상세 '공식 보고서'로 읽기 (S0, 지금 착수 가능 — 사용자 공개는 권한에 종속)
 
@@ -267,8 +273,8 @@
 
 | 작업 | 현재 |
 |---|---|
-| Records 기존 목록·기본 명식록·현세록·기억 조회 | **기반 구현 유지** |
-| 1단계 보고서 중심 진입 화면 | **브랜치 구현**: 보고서 기본 탭·owner 조회·실제 기록 수·부분 실패와 전체 권한 거부 구분 |
+| Records 기존 목록 | **사주 보고서·현세록 유지**. 기록 페이지의 명식록·기억은 탭·화면·조회 코드 제거(마이페이지 소유); 이력용 구 서술보다 2026-10-30 결정을 우선한다. |
+| 1단계 보고서 중심 진입 화면 | **브랜치 구현·CI GREEN**: 보고서 기본 탭·현세록·owner 조회·실제 기록 수·부분 실패와 전체 권한 거부 구분, 중복 명식록/기억 제거 |
 | 2단계 공식 장문 보고서 읽기 UX | **브랜치 구현**: 승인된 단건 원문·섹션/목차·출처·현재 계정 확인, 새로고침과 직접 링크 |
 | 3단계 Production 공식 결과 생성/불변 저장 E2E | **서버 내부 연결부 구현 / Production HOLD**: 현재 Birth→Saju 요청→Production issuer·DB ID 매핑·현재 Grant/Privacy 별도 검증→기존 원자 DB finalize 및 원문 출처 해시 재조회 경로는 코드로 연결. 실제 Saju Production issuer·DB/Privacy 권한 포트와 운영 E2E 미완료 |
 | 4단계 검증된 유료 구매·권한·재생성·환불 E2E | **HOLD / 미완료**: 상품별 활성화·Commerce Grant 및 환불 검증 필요 |
