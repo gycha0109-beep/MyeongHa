@@ -77,7 +77,7 @@ export const C09_PRIVATE_OPTIN_CAPTURE_SQL_V1 = [
 
 function iso(value: unknown): string {
   if (value instanceof Date) value = value.toISOString();
-  if (typeof value !== 'string') fail();
+  if (typeof value !== 'string') throw new SeyeonC09PrivateOptinCommandHoldV1();
   const d = new Date(value);
   if (!Number.isFinite(d.getTime()) || d.toISOString() !== value) fail();
   return value;
@@ -155,7 +155,9 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
           const row = original.rows[0]!;
           if (typeof row.contentHash !== 'string' || !row.contentHash.trim() ||
               row.contentHash.length > 512 ||
-              typeof row.bodyText !== 'string' || !row.bodyText.trim()) fail();
+              typeof row.bodyText !== 'string' || !row.bodyText.trim()) {
+            throw new SeyeonC09PrivateOptinCommandHoldV1();
+          }
           const createdAt = iso(row.createdAt);
           const decided = topicDecision(await input.topicAuthority.decide({
             subjectId,
@@ -187,7 +189,9 @@ export function createSeyeonC09PrivateLearningOptinCommandShadowV1(input: Readon
               captured.rows[0]?.sourceRef !== sourceRef) fail();
 
           const authority = createPostgresSeyeonC09PrivateApprovedSourceShadowV1({ scope });
-          const proof = await authority.readApprovedPublication({ subjectId, sourceRef });
+          const rawProof = await authority.readApprovedPublication({ subjectId, sourceRef });
+          if (!rawProof || typeof rawProof !== 'object' || Array.isArray(rawProof)) fail();
+          const proof = rawProof as Record<string, unknown>;
           if (proof.sourceRef !== sourceRef || proof.approvalRef !== actionRef ||
               proof.visibility !== 'user_private' ||
               proof.sourceSubjectId !== subjectId ||
