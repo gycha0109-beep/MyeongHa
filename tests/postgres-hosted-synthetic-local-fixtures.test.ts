@@ -93,7 +93,9 @@ describe('strict localhost-only synthetic Hosted fixture preparation', () => {
     expect(JSON.stringify(result)).not.toContain(mockUser[0]);
     expect(JSON.stringify(result)).not.toContain(valid.MH_DR_LOCAL_MEMBER_EMAIL);
     expect(requested.map(x => x.method)).toEqual(['POST','POST','DELETE','POST','POST','GET']);
-    const policy = commands.find(x => x.startsWith('create policy '));
+    const policy = commands.find(x => x.startsWith('create policy dr_synthetic_local_private_read_v1 '));
+    expect(commands.some(x => x.startsWith('create policy dr_synthetic_local_self_revoked_v1 '))).toBe(true);
+    expect(policy).toContain('not exists (select 1 from dr_synthetic_local.revoked_subjects');
     expect(policy).toContain("auth.uid() = '" + mockUser[0] + "'::uuid");
     expect(policy).toContain("bucket_id = 'dr-synthetic-private'");
     expect(commands).toContain('COMMIT');
