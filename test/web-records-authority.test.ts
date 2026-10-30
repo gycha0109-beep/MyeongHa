@@ -6,7 +6,6 @@ const webRoot = join(process.cwd(), 'apps', 'web');
 const html = `${readFileSync(join(webRoot, 'records.html'), 'utf8')}\n${readFileSync(join(webRoot, 'src', 'records', 'RecordsPage.tsx'), 'utf8')}`;
 const client = readFileSync(join(webRoot, 'records-runtime-client.js'), 'utf8');
 const page = readFileSync(join(webRoot, 'records-page.js'), 'utf8');
-const recordsLocale = readFileSync(join(webRoot, 'records-page-ui-locale.js'), 'utf8');
 const i18n = readFileSync(join(webRoot, 'ui-i18n.js'), 'utf8');
 const handoff = readFileSync(join(webRoot, 'reading-history-handoff.js'), 'utf8');
 
@@ -32,9 +31,7 @@ describe('web records authority boundary', () => {
   it('uses only canonical server-resolved current-subject reads', () => {
     expect(client).toContain("profile: '/api/me'");
     expect(client).toContain("lifeFacts: '/api/life-record'");
-    expect(client).toContain("memories: '/api/memories'");
     expect(client).not.toContain('/v1/');
-    expect(client).toContain("birthProfile: '/api/me/birth-profile'");
     expect(client).not.toContain('subjectId=');
     expect(client).not.toContain('authUserId');
     expect(client).toContain("credentials: 'same-origin'");
@@ -45,18 +42,6 @@ describe('web records authority boundary', () => {
     expect(client).toContain("from './api-envelope.js'");
     expect(client).toContain('unwrapApiSuccessEnvelope(envelope)');
     expect(client).toContain('WebApiEnvelopeError');
-  });
-
-  it('uses the verified current-self Birth Profile endpoint without inventing prior revisions', () => {
-    expect(client).toContain("birthProfile: '/api/me/birth-profile'");
-    expect(client).toContain("import { assertBirthProfile } from './my-runtime-client.js'");
-    expect(client).toContain("readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer)");
-    expect(page).toContain('function renderCurrentBirthProfile(birth)');
-    expect(page).toContain('renderCurrentBirthProfile(records.birth)');
-    expect(page).toContain('function renderBirthProfileUnavailable(');
-    expect(page).toContain('recordsBirthUnavailableV1(getUiLocale())');
-    expect(recordsLocale).toContain('확인되지 않은 정보는 대신 보여드리지 않습니다.');
-    expect(page).toContain('과거 수정 이력이나 사주 풀이 결과가 아닙니다.');
   });
 
   it('fails closed for missing session, failed transport, malformed JSON, and malformed envelopes', () => {
@@ -78,9 +63,10 @@ describe('web records authority boundary', () => {
   it('opens the Saju records tab for an explicit Reading completion handoff', () => {
     expect(page).toContain("const requestedTab = params.get('tab');");
     expect(page).toContain("const fromReading = params.get('from') === 'reading';");
-    expect(page).toContain("requestedTab === 'saju' || fromReading");
-    expect(page).toContain("tab.id === 'saju-records-tab'");
-    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';");
+    expect(page).toContain("const targetTabId = fromReading || requestedTab === 'saju'");
+    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink'");
+    expect(page).toContain('const initialTab = tabs.find((tab) => tab.id === targetTabId);');
+    expect(page).toContain('if (initialTab) activate(initialTab);');
   });
 
   it('links persisted Reading history by stored identifiers without inventing Reader authority', () => {
@@ -96,9 +82,12 @@ describe('web records authority boundary', () => {
     expect(handoff).not.toContain("params.set('threadId'");
   });
 
-  it('keeps memory grants separate instead of inventing an aggregate grant API', () => {
-    expect(html).toContain('캐릭터가 삭제된 후 남는 기억 범위는 서로 다를 수 있습니다.');
-    expect(client).not.toContain('access-grants');
-    expect(client).not.toContain('readAccessGrants');
+  it('does not request or render duplicate Birth and Character Memory data', () => {
+    expect(html).not.toContain('birth-records');
+    expect(html).not.toContain('memory-records');
+    expect(page).not.toContain('renderCurrentBirthProfile');
+    expect(page).not.toContain('renderMemories');
+    expect(client).not.toContain('/api/me/birth-profile');
+    expect(client).not.toContain('/api/memories');
   });
 });

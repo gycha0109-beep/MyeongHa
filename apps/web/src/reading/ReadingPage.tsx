@@ -2,22 +2,21 @@ import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
-const productPreviewTopics = [
+// All twelve Saju topics share one product layer. Route availability is
+// independent from Product identity and never grants sale or Reader access.
+const sajuProductTopics = [
   { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
   { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
   { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
   { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
-] as const;
-
-const additionalReadingTopics = [
-  ['사업', 'reading-detail.html?topic=business'],
-  ['가족', 'reading-detail.html?topic=family'],
-  ['삶의 단계', 'reading-detail.html?topic=life-stage'],
-  ['올해', 'reading-detail.html?scope=year'],
-  ['이번 달', 'reading-detail.html?scope=month'],
-  ['배우자 · 관계', 'reading-detail.html?topic=spouse'],
-  ['궁합', 'reading-detail.html?topic=compatibility'],
-  ['지금 고민으로 보기', 'reading-detail.html?topic=question-specific'],
+  { symbol: '商', title: '사업', href: 'reading-detail.html?topic=business' },
+  { symbol: '家', title: '가족', href: 'reading-detail.html?topic=family' },
+  { symbol: '生', title: '삶의 단계', href: 'reading-detail.html?topic=life-stage' },
+  { symbol: '歲', title: '올해', href: 'reading-detail.html?scope=year' },
+  { symbol: '月', title: '이번 달', href: 'reading-detail.html?scope=month' },
+  { symbol: '伴', title: '배우자', href: 'reading-detail.html?topic=spouse' },
+  { symbol: '合', title: '궁합', href: 'reading-detail.html?topic=compatibility' },
+  { symbol: '問', title: '지금 고민으로 보기', href: 'reading-detail.html?topic=question-specific' },
 ] as const;
 
 export function ReadingPage() {
@@ -97,7 +96,7 @@ export function ReadingPage() {
           <div className="saju-design-hero-text">
             <span className="saju-design-eyebrow">SAJU PREVIEW</span>
             <h2>나의 사주 기본 정보</h2>
-            <p>입력하신 생년월일시를 기준으로 계산한 기본 명식입니다.<br />아래는 유료 해석에서 다루는 내용과 구성 미리보기도 함께 보여드립니다.</p>
+            <p>입력하신 생년월일시를 기준으로 계산한 기본 명식입니다.<br />아래에서 주제별 공식 사주 해석 상품을 선택하고 보고서 구성도 살펴볼 수 있습니다.</p>
           </div>
         </div>
 
@@ -145,43 +144,39 @@ export function ReadingPage() {
         </div>
 
         <section className="saju-design-products" aria-labelledby="saju-design-products-title">
-          <h2 id="saju-design-products-title">유료 사주 해석에서 제공되는 내용</h2>
-          <p>구매하시면 아래와 같은 주제의 상세한 해석을 확인하실 수 있습니다. 현재 결제 기능은 준비 중입니다.</p>
+          <h2 id="saju-design-products-title">사주 해석 상품</h2>
+          <p>12개 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
-            {productPreviewTopics.map((topic) => (
-              <article className="saju-design-product-card" key={topic.title}>
-                <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
-                <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
-                <a href={topic.href}>이 해석 선택하기</a>
-              </article>
-            ))}
+            {sajuProductTopics.map((topic) => {
+              const availability = resolveReadingAvailabilityV1(topic.href);
+              return (
+                <article className="saju-design-product-card" key={topic.href}>
+                  <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
+                  {'outline' in topic
+                    ? <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
+                    : <p className="saju-design-product-scope">이 주제의 공식 해석은 정식 읽기 연결 후 제공됩니다.</p>}
+                  <span className={`reading-topic-availability is-${availability.kind}`}>{availability.label}</span>
+                  {availability.kind === 'preview'
+                    ? <a href={topic.href}>프리뷰 읽기</a>
+                    : <span className="saju-design-product-disabled" aria-disabled="true">정식 읽기 준비 중</span>}
+                </article>
+              );
+            })}
           </div>
         </section>
 
         <section className="saju-design-example" aria-labelledby="saju-design-example-title">
           <div className="saju-design-example-copy">
-            <h2 id="saju-design-example-title">예시 결과물 미리보기 <span>예시</span></h2>
-            <p>아래는 실제 결과물 형식의 예시입니다.<br />개인별 해석 내용은 구매 후 확인하실 수 있습니다.</p>
+            <h2 id="saju-design-example-title">보고서 구성 미리보기 <span>구성 예시</span></h2>
+            <p>공식 보고서는 구매한 상품의 해석 범위에 따라 목차와 근거가 구성됩니다. 이 영역은 실제 개인별 결과가 아닌 문서 구성 안내입니다.</p>
           </div>
-          <div className="saju-design-example-sheet" aria-label="예시 해석 내용. 개인별 결과가 아닙니다.">
-            <h3>1. 기본 성향과 기질</h3>
-            <p>• 예시 사용자의 명식을 바탕으로 성향과 기질을 살펴봅니다. 실제 구매 시 고객님의 사주에 맞춘 상세한 해석이 제공됩니다.</p>
+          <div className="saju-design-example-sheet" aria-label="공식 보고서 구성 예시. 개인별 해석이 아닙니다.">
+            <h3>1. 핵심 해석 및 명식 근거</h3>
+            <p>개인별 공식 해석 · 주제별 상세 내용 · 근거와 한계 · 발행 버전 · 기록 재열람</p>
           </div>
         </section>
 
         <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
-        <details className="saju-design-more">
-          <summary>다른 사주 주제 둘러보기</summary>
-          <div className="saju-design-more-grid">
-            {additionalReadingTopics.map(([title, href]) => (
-              <a href={href} key={href}>
-                <strong>{title}</strong>
-                <span className={`reading-topic-availability is-${resolveReadingAvailabilityV1(href).kind}`}>{resolveReadingAvailabilityV1(href).label}</span>
-              </a>
-            ))}
-          </div>
-          <p>추가 입력 준비 중 · 정식 읽기 준비 중인 주제는 현재 이용할 수 없습니다.</p>
-        </details>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>

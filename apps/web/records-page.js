@@ -1,26 +1,15 @@
 import { readerProvenanceLocaleLabelV1 } from './reader-provenance-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
-import { recordsBirthRevisionV1, recordsBirthUnavailableV1, recordsReadingSummaryV1, recordsTimestampV1 } from './records-page-ui-locale.js';
+import { recordsReadingSummaryV1, recordsReportCountV1, recordsTimestampV1 } from './records-page-ui-locale.js';
 import { createRecordsRuntimeClient, RecordsRuntimeError } from './records-runtime-client.js';
-import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-revoke.js';
-import { presentSeyeonMemoryGrantStatusV1 } from './records-memory-grant-presentation.js';
 import { buildPersistedReadingHandoffUrlV1 } from './reading-history-handoff.js';
+import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
+import { ensureActiveBearer, readMemberSession, readGuestBearer, PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
+import { captureReadingResponseOwnerV1, isReadingResponseOwnerCurrentV1 } from './reading-response-owner-guard.js';
 
 const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
 const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
 const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '::1', '[::1]']));
-
-const SAJU_DOMAIN_PRESENTATION = Object.freeze({
-  general: Object.freeze({ icon: '命', title: '전체 사주' }),
-  family: Object.freeze({ icon: '家', title: '가족' }),
-  relationship: Object.freeze({ icon: '緣', title: '관계' }),
-  compatibility: Object.freeze({ icon: '合', title: '궁합' }),
-  career: Object.freeze({ icon: '職', title: '직업 · 커리어' }),
-  business: Object.freeze({ icon: '商', title: '사업' }),
-  wealth: Object.freeze({ icon: '財', title: '재물' }),
-  life_stage: Object.freeze({ icon: '生', title: '삶의 단계' }),
-  question_specific: Object.freeze({ icon: '問', title: '지금 고민으로 보기' }),
-});
 
 function byId(id) {
   const element = document.getElementById(id);
@@ -104,17 +93,25 @@ function setupTabs() {
 
   function activate(tab) {
     const targetId = tab.getAttribute('aria-controls');
-    for (const candidate of tabs) candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+    for (const candidate of tabs) {
+      candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
+      candidate.tabIndex = candidate === tab ? 0 : -1;
+    }
     for (const panel of panels) panel.hidden = panel.id !== targetId;
   }
 
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', () => activate(tab));
     tab.addEventListener('keydown', (event) => {
-      if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+      let targetIndex;
+      if (event.key === 'Home') targetIndex = 0;
+      else if (event.key === 'End') targetIndex = tabs.length - 1;
+      else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        const delta = event.key === 'ArrowRight' ? 1 : -1;
+        targetIndex = (index + delta + tabs.length) % tabs.length;
+      } else return;
       event.preventDefault();
-      const delta = event.key === 'ArrowRight' ? 1 : -1;
-      const next = tabs[(index + delta + tabs.length) % tabs.length];
+      const next = tabs[targetIndex];
       next.focus();
       activate(next);
     });
@@ -123,12 +120,13 @@ function setupTabs() {
   const params = new URLSearchParams(window.location.search);
   const requestedTab = params.get('tab');
   const fromReading = params.get('from') === 'reading';
-  if (requestedTab === 'saju' || fromReading) {
-    const sajuTab = tabs.find((tab) => tab.id === 'saju-records-tab');
-    if (sajuTab) {
-      activate(sajuTab);
-      document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
-    }
+  const targetTabId = fromReading || requestedTab === 'saju'
+    ? 'saju-records-tab'
+    : ({ life: 'life-records-tab' }[requestedTab] ?? 'saju-records-tab');
+  const initialTab = tabs.find((tab) => tab.id === targetTabId);
+  if (initialTab) activate(initialTab);
+  if (fromReading || requestedTab === 'saju') {
+    document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
   }
 }
 
@@ -146,76 +144,13 @@ function renderProfile(payload) {
   byId('records-subject-kind').textContent = uiText(kind);
 }
 
-function renderBirthProfileUnavailable(message = recordsBirthUnavailableV1(getUiLocale())) {
-  const target = byId('birth-records-list');
-  clear(target);
-  const card = textElement('article', 'panel side-card', '');
-  card.append(uiElement('h3', '', '출생 정보 확인'));
-  card.append(textElement('p', 'muted', message));
-  target.append(card);
-}
-
-function renderCurrentBirthProfile(birth) {
-  if (birth?.status !== 'ready') {
-    renderBirthProfileUnavailable();
-    return;
-  }
-
-  const target = byId('birth-records-list');
-  const profile = birth.payload?.birthProfile;
-  if (profile === null) {
-    clear(target);
-    const card = textElement('article', 'panel side-card', '');
-    card.append(uiElement('h3', '', '아직 등록된 출생 정보가 없습니다.'));
-    card.append(uiElement('p', 'muted', '현재 계정의 본인 출생 정보가 저장되면 이곳에 표시됩니다.'));
-    const link = uiElement('a', 'records-birth-link', '출생 정보 입력하기 →');
-    link.href = 'birth.html';
-    card.append(link);
-    target.append(card);
-    return;
-  }
-  if (!profile || !profile.currentRevision?.input) {
-    renderBirthProfileUnavailable();
-    return;
-  }
-
-  const { revisionNo, input } = profile.currentRevision;
-  const calendar = input.calendarType === 'solar'
-    ? '양력'
-    : input.isLeapMonth ? '음력 · 윤달' : '음력';
-  const birthTime = input.timeKnown ? input.birthTime.slice(0, 5) : '시간 모름';
-  const sex = {
-    male: '남성',
-    female: '여성',
-    unspecified: '미지정',
-  }[input.sex] ?? '미입력';
-
-  clear(target);
-  const card = textElement('article', 'panel side-card records-birth-card', '');
-  card.append(uiElement('h3', '', '현재 등록된 출생 정보'));
-  card.append(uiElement('p', 'records-birth-description',
-    '서버가 확인한 현재 본인 출생 정보입니다. 과거 수정 이력이나 사주 풀이 결과가 아닙니다.'));
-
-  const facts = document.createElement('dl');
-  facts.className = 'records-birth-facts';
-  for (const [title, value] of [
-    ['생년월일', input.birthDate.replaceAll('-', '.')],
-    ['태어난 시간', birthTime],
-    ['달력 기준', calendar],
-    ['성별 정보', sex],
-  ]) {
-    const row = document.createElement('div');
-    row.append(uiElement('dt', '', title), textElement('dd', '', uiText(value)));
-    facts.append(row);
-  }
-  card.append(facts);
-  card.append(textElement('span', 'records-birth-revision', recordsBirthRevisionV1(revisionNo, getUiLocale())));
-  target.append(card);
-}
-
 function renderLifeFacts(payload) {
   const target = byId('life-records-list');
   clear(target);
+  if (payload?.status === 'unavailable') {
+    target.append(uiElement('p', 'muted records-empty', '현세록을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
+    return;
+  }
   const facts = requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact));
   if (facts.length === 0) {
     target.append(uiElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
@@ -236,17 +171,72 @@ function renderLifeFacts(payload) {
 }
 
 function readingPresentation(sajuDomain) {
-  return SAJU_DOMAIN_PRESENTATION[sajuDomain] ?? Object.freeze({ icon: '命', title: '사주 풀이' });
+  return readingDomainPresentationV1(sajuDomain);
 }
 
 function productResponseStateLabel(value) {
   if (value === 'delivered' || value === 'delivered_with_fallback') return '완료';
   if (value === 'clarification_required') return '추가 확인 필요';
-  return '저장됨';
+  return '상태 확인 불가';
 }
 
 let displayedRecords = null;
+let displayedRecordsOwner = null;
 let recordsStatusSource = '기록을 불러오는 중입니다…';
+
+function currentRecordsOwnerEvidence() {
+  return { memberSession: readMemberSession(), guestCredential: readGuestBearer() };
+}
+
+function captureRecordsOwner(credential) {
+  const evidence = currentRecordsOwnerEvidence();
+  return captureReadingResponseOwnerV1(
+    credential, evidence.memberSession, evidence.guestCredential,
+  );
+}
+
+function isRecordsOwnerCurrent(owner) {
+  const evidence = currentRecordsOwnerEvidence();
+  return isReadingResponseOwnerCurrentV1(
+    owner, evidence.memberSession, evidence.guestCredential,
+  );
+}
+
+function clearRecordsForSessionChange() {
+  displayedRecords = null;
+  displayedRecordsOwner = null;
+  byId('records-content').hidden = true;
+  for (const id of [
+    'records-display-name', 'records-subject-kind', 'life-records-list',
+    'saju-records-list', 'saju-records-count',
+  ]) {
+    byId(id).replaceChildren();
+  }
+  recordsStatusSource = '계정 또는 세션이 변경되었습니다. 현재 계정의 기록을 보려면 새로고침해 주세요.';
+  const status = byId('records-status');
+  status.hidden = false;
+  status.textContent = uiText(recordsStatusSource);
+}
+
+function onRecordsAuthChanged() {
+  if (!displayedRecordsOwner) return;
+  try {
+    if (isRecordsOwnerCurrent(displayedRecordsOwner)) return;
+  } catch {
+    // Unreadable session evidence cannot keep the previous owner's records.
+  }
+  clearRecordsForSessionChange();
+}
+
+window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, onRecordsAuthChanged);
+window.addEventListener('storage', (event) => {
+  if (event.key === null || [
+    PRODUCT_AUTH_STORAGE_V1.memberSession,
+    PRODUCT_AUTH_STORAGE_V1.guestBearer,
+    PRODUCT_AUTH_STORAGE_V1.pendingGuestBearer,
+  ].includes(event.key)) onRecordsAuthChanged();
+});
+window.addEventListener('pageshow', onRecordsAuthChanged);
 
 function isPersistedReadingOpenableState(value) {
   return value === 'delivered' || value === 'delivered_with_fallback';
@@ -256,6 +246,8 @@ const readerBadgeSources = new WeakMap();
 document.addEventListener('myeongha:localechange', () => {
   // Repaint only browser-authored UI from an already loaded snapshot; never refetch history.
   if (displayedRecords) {
+    onRecordsAuthChanged();
+    if (!displayedRecords) return;
     renderLoadedRecords(displayedRecords);
     return;
   }
@@ -342,6 +334,9 @@ function renderSajuReadingEmpty(target) {
   empty.className = 'records-reading-empty';
   empty.append(uiElement('h3', '', '아직 저장된 사주 풀이가 없습니다.'));
   empty.append(uiElement('p', 'muted', '완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.'));
+  const explore = uiElement('a', 'records-report-explore', '다른 사주 주제 둘러보기');
+  explore.href = 'reading.html';
+  empty.append(explore);
   target.append(empty);
 }
 
@@ -404,141 +399,29 @@ function renderSajuReadingSamples(target, lifeFactsPayload) {
 function renderSajuReadings(readingPayload, lifeFactsPayload) {
   const target = byId('saju-records-list');
   clear(target);
+  if (readingPayload?.status === 'unavailable') {
+    byId('saju-records-count').textContent = uiText('조회할 수 없음');
+    const failure = document.createElement('article');
+    failure.className = 'records-reading-empty records-reading-unavailable';
+    failure.append(uiElement('h3', '', '저장된 사주 보고서를 지금 확인할 수 없습니다.'));
+    failure.append(uiElement('p', 'muted', '조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다. 나중에 다시 확인해 주세요.'));
+    target.append(failure);
+    return;
+  }
   const readings = requireArray(readingPayload, 'readings');
+  // Only the authorized Reading History collection contributes to the count.
+  // Development-only fixture cards must never be counted as saved reports.
+  byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());
   if (readings.length > 0) {
     for (const reading of readings) renderPersistedReading(target, reading);
     return;
   }
   if (allowsDevelopmentSajuSamples()) {
-    renderSajuReadingSamples(target, lifeFactsPayload);
+    if (lifeFactsPayload?.status === 'unavailable') renderSajuReadingEmpty(target);
+    else renderSajuReadingSamples(target, lifeFactsPayload);
     return;
   }
   renderSajuReadingEmpty(target);
-}
-
-function renderMemories(payload, subjectKind) {
-  const target = byId('memory-records-list');
-  clear(target);
-  const memories = requireArray(payload, 'memories');
-  if (memories.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'records-memory-empty';
-
-    const rule = document.createElement('span');
-    rule.className = 'records-memory-empty-rule';
-    rule.setAttribute('aria-hidden', 'true');
-
-    const ornament = document.createElement('span');
-    ornament.className = 'records-memory-empty-ornament';
-    ornament.setAttribute('aria-hidden', 'true');
-    ornament.append(textElement('span', 'records-memory-empty-symbol', '之'));
-
-    const copy = document.createElement('div');
-    copy.className = 'records-memory-empty-copy';
-    copy.append(uiElement('h3', '', '아직 저장된 기억이 없습니다.'));
-    copy.append(uiElement('p', '', '대화와 기록이 쌓이면 이곳에서 다시 확인할 수 있습니다.'));
-
-    empty.append(rule, ornament, copy);
-    target.append(empty);
-    return;
-  }
-  for (const memory of memories) {
-    const item = document.createElement('div');
-    item.className = 'timeline-item';
-    item.append(sourceElement('strong', '', String(memory.memoryType ?? uiText('기억 항목'))));
-    item.append(sourceElement('span', 'fine', formatStoredValue(memory.contentJsonb)));
-    const provenance = memory.createdByCharacterId ? `${memory.createdByCharacterId} · ${formatTimestamp(memory.createdAt)}` : formatTimestamp(memory.createdAt);
-    item.append(sourceElement('span', 'fine', provenance));
-    if (subjectKind === 'member' && typeof memory.memoryItemId === 'string') {
-      const check = uiElement('button', 'records-memory-grant-check', '세연 접근권한 확인');
-      check.type = 'button';
-      const status = textElement('span', 'records-memory-grant-status', '');
-      status.setAttribute('role', 'status');
-      const client = createRecordsRuntimeClient();
-      const revokeClient = createRecordsMemoryGrantRevokeClient();
-      const revoke = uiElement('button', 'records-memory-grant-revoke', '세연 접근권한 철회');
-      revoke.type = 'button';
-      revoke.hidden = true;
-      let withdrawalPending = false;
-      let requestInFlight = false;
-      let lastGrantState = 'unknown';
-      async function refreshGrant() {
-        const result = await client.readSeyeonMemoryGrantStatus(memory.memoryItemId);
-        // Only the owner-scoped DB lifecycle (not a filtered active Grant
-        // read or volatile UI flag) can resolve a durable pending withdrawal.
-        lastGrantState = result.grantState;
-        if (result.grantState === 'withdrawal_pending') withdrawalPending = true;
-        if (result.grantState === 'not_granted') withdrawalPending = false;
-        if (item.isConnected) {
-          const view = presentSeyeonMemoryGrantStatusV1(
-            result.grantState, withdrawalPending,
-          );
-          status.textContent = uiText(view.message);
-          revoke.hidden = !view.revokeAvailable;
-        }
-        return result;
-      }
-      check.addEventListener('click', async () => {
-        if (requestInFlight) return;
-        requestInFlight = true;
-        check.disabled = true;
-        revoke.hidden = true;
-        status.textContent = uiText('현재 권한 확인 중…');
-        try {
-          await refreshGrant();
-        } catch {
-          if (item.isConnected) status.textContent = uiText('현재 접근권한을 확인할 수 없습니다.');
-        } finally {
-          check.disabled = false;
-          requestInFlight = false;
-        }
-      });
-      revoke.addEventListener('click', async () => {
-        if (requestInFlight || withdrawalPending || lastGrantState !== 'active') return;
-        if (!window.confirm(uiText('세연의 이 기억 접근권한을 철회하시겠습니까?'))) return;
-        requestInFlight = true;
-        check.disabled = true;
-        revoke.disabled = true;
-        revoke.hidden = true;
-        status.textContent = uiText('철회 요청을 처리하는 중입니다…');
-        try {
-          const acknowledgement = await revokeClient.revokeSeyeonMemoryGrant(memory.memoryItemId);
-          // HTTP 202 is not a completed revoke: the G3 delivery-receipt
-          // barrier blocks new use while the original Grant remains pending.
-          if (acknowledgement.status === 'pending') withdrawalPending = true;
-          const current = await refreshGrant();
-          if (item.isConnected && acknowledgement.status === 'committed') {
-            // Neither legacy RLS-filtered false nor a missing lifecycle
-            // authority proves that the withdrawal finished.
-            status.textContent = uiText(current.grantState === 'not_granted'
-              ? '철회가 완료되었으며 현재 세연의 접근 권한이 없습니다.'
-              : '철회 완료 응답과 현재 권한 조회가 일치하지 않거나 판정할 수 없습니다.');
-          }
-        } catch {
-          // A lost 200/202 or failed current-state GET never proves COMMIT.
-          // If a verified 202 arrived, keep its new-use-blocked state.
-          try {
-            const current = await refreshGrant();
-            if (item.isConnected && current.grantState === 'unknown') {
-              status.textContent = uiText('현재 기억 사용 권한과 철회 완료 여부를 확인할 수 없습니다.');
-            }
-          } catch {
-            if (item.isConnected) {
-              status.textContent = uiText(withdrawalPending
-                ? '새로운 기억 사용 차단 요청은 접수됐지만 현재 철회 완료 여부를 확인할 수 없습니다.'
-                : '철회 결과를 확인할 수 없습니다. 현재 접근권한을 다시 확인해 주세요.');
-            }
-          }
-        } finally {
-          check.disabled = false;
-          revoke.disabled = false;
-          requestInFlight = false;
-        }
-      });
-      item.append(check, revoke, status);
-    }
-    target.append(item);
-  }
 }
 
 function setReady() {
@@ -563,10 +446,8 @@ function setFailure(error) {
 
 function renderLoadedRecords(records) {
   renderProfile(records.profile);
-  renderCurrentBirthProfile(records.birth);
   renderLifeFacts(records.lifeFacts);
   renderSajuReadings(records.readings, records.lifeFacts);
-  renderMemories(records.memories, records.profile?.subjectKind);
 }
 
 async function boot() {
@@ -576,8 +457,15 @@ async function boot() {
   status.textContent = uiText(recordsStatusSource);
   byId('records-content').hidden = true;
   try {
+    const bearer = await ensureActiveBearer();
+    const owner = captureRecordsOwner(bearer);
+    if (!owner) throw new RecordsRuntimeError('WEB_RECORDS_SESSION_CHANGED', 'Records owner is unavailable.');
     const records = await createRecordsRuntimeClient().readRecords();
+    if (!isRecordsOwnerCurrent(owner)) {
+      throw new RecordsRuntimeError('WEB_RECORDS_SESSION_CHANGED', 'Records owner changed during loading.');
+    }
     renderLoadedRecords(records);
+    displayedRecordsOwner = owner;
     displayedRecords = records;
     setReady();
   } catch (error) {

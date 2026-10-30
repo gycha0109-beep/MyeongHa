@@ -60,6 +60,7 @@
     "postgres": 17,
     "cases": [
       "saju-abuse-admission-attack-e2e",
+      "saju-official-records-http-e2e",
       "guest-promotion-auth-fk",
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",

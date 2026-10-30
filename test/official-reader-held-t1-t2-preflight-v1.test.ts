@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   OfficialReaderHeldPreflightErrorV1,
   runOfficialReaderHeldT1T2PreflightV1,
@@ -87,8 +88,31 @@ function fixture(options: {
     const phase = effectiveAt === DB_TIMES[0] ? 1 : 2;
     events.push('admit:' + phase);
     if (phase === 2 && options.reuseT1 && t1Admission !== undefined) return t1Admission;
-    const hash = phase === 2 && options.sourceDriftAtT2
-      ? 'sha256:v1:changed-official' : 'sha256:v1:original-official';
+    const originalSnapshot = {
+      responseVersion: 'myeonghwa-product-reading-response-v2',
+      state: 'delivered',
+      reading: {
+        readingId: READING,
+        sections: [{
+          sectionType: 'overview', title: '전체',
+          blocks: [{ type: 'paragraph', text: '공식 근거입니다.' }],
+        }],
+        disclosures: [], calculationSummary: {},
+      },
+    };
+    const snapshot = phase === 2 && options.sourceDriftAtT2
+      ? {
+          ...originalSnapshot,
+          reading: {
+            ...originalSnapshot.reading,
+            sections: [{
+              sectionType: 'overview', title: 'Synthetic changed source',
+              blocks: [{ type: 'paragraph', text: 'Synthetic altered content' }],
+            }],
+          },
+        }
+      : originalSnapshot;
+    const hash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot);
     const readRuntimeBinding = async () => [{
       threadId: THREAD, status: 'active', activeContentReleaseId: RELEASE,
       activeContentBundleId: BUNDLE,
@@ -116,18 +140,7 @@ function fixture(options: {
         readingId: READING, productId: PRODUCT, readerCharacterId: 'seyeon',
         readingContractVersion: 'myeonghwa-product-reading-response-v2',
         productResponseState: 'delivered',
-        responseSnapshotJsonb: {
-          responseVersion: 'myeonghwa-product-reading-response-v2',
-          state: 'delivered',
-          reading: {
-            readingId: READING,
-            sections: [{
-              sectionType: 'overview', title: '전체',
-              blocks: [{ type: 'paragraph', text: '공식 근거입니다.' }],
-            }],
-            disclosures: [], calculationSummary: {},
-          },
-        },
+        responseSnapshotJsonb: snapshot,
         responseHash: hash,
         completedAt: '2026-10-10T08:00:00Z',
       }] },

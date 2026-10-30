@@ -10,7 +10,7 @@ const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
 const memberA = Object.freeze({ id: '11111111-1111-4111-8111-111111111111', email: 'records-a@example.com', token: 'records-a.payload.signature', refresh: 'records-a-refresh', name: '기록 회원 A', fact: 'member-a-private-fact' });
 const memberB = Object.freeze({ id: '22222222-2222-4222-8222-222222222222', email: 'records-b@example.com', token: 'records-b.payload.signature', refresh: 'records-b-refresh', name: '기록 회원 B', fact: 'member-b-private-fact' });
 const members = [memberA, memberB];
-const recordsPaths = new Set(['/api/me', '/api/life-record', '/api/readings', '/api/memories']);
+const recordsPaths = new Set(['/api/me', '/api/life-record', '/api/readings']);
 const mime = new Map([['.html', 'text/html; charset=utf-8'], ['.css', 'text/css; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'], ['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.webp', 'image/webp']]);
 const requests = [];
 const assert = (value, message) => { if (!value) throw new Error(message); };
@@ -40,7 +40,7 @@ function recordsPayload(member, path) {
   const pagination = { pageSize: 50, hasMore: false, nextCursor: null };
   if (path === '/api/life-record') return { facts: [{ factType: member.fact, schemaVersion: 'test.v1', valueJsonb: { owner: member.email }, confirmedAt: '2026-09-10T00:00:00.000Z', revokedAt: null }], pagination };
   if (path === '/api/readings') return { readings: [], pagination };
-  return { memories: [], pagination };
+  throw new Error(`Unexpected Records endpoint: ${path}`);
 }
 
 function json(res, status, body) {
@@ -173,8 +173,8 @@ try {
   const requestStart = requests.length;
   await tabA.send('Page.reload', { ignoreCache: true });
   const gateDeadline = Date.now() + 10_000;
-  while (blockedA < 3 && Date.now() < gateDeadline) await sleep(50);
-  assert(blockedA >= 3, 'Member A Records requests did not reach the response gate');
+  while (blockedA < 2 && Date.now() < gateDeadline) await sleep(50);
+  assert(blockedA >= 2, 'Member A Records requests did not reach the response gate');
 
   tabB = await connect(port);
   await navigate(tabB, origin, '/hall.html', '.product-profile');
@@ -196,7 +196,7 @@ try {
   const raceReads = requests.slice(requestStart).filter((request) => recordsPaths.has(request.path));
   const staleReads = raceReads.filter((request) => request.member === memberA.email).length;
   const replacementReads = raceReads.filter((request) => request.member === memberB.email).length;
-  assert(staleReads >= 4 && replacementReads >= 4, `expected both authority generations; reads=${JSON.stringify(raceReads)}`);
+  assert(staleReads >= 3 && replacementReads >= 3, `expected both authority generations; reads=${JSON.stringify(raceReads)}`);
 
   await mkdir(resolve(process.cwd(), 'artifacts'), { recursive: true });
   await writeFile(resolve(process.cwd(), 'artifacts/web-records-auth-browser-smoke-member-replacement.json'), `${JSON.stringify({ recordsLoads, blockedA, staleReads, replacementReads, finalMember: finalState.member?.accessToken ?? null, staleFactAbsent: !finalState.facts.includes(memberA.fact) }, null, 2)}\n`);

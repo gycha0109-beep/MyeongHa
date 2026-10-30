@@ -130,7 +130,7 @@ async function serve() {
         return;
       }
 
-      if (['/api/me', '/api/life-record', '/api/readings', '/api/memories'].includes(pathname) && req.method === 'GET') {
+      if (['/api/me', '/api/life-record', '/api/readings'].includes(pathname) && req.method === 'GET') {
         requests.push({ path: pathname, authorization });
         if (authorization !== `Bearer ${member.accessToken}`) {
           sendJson(res, 401, authError());
@@ -179,8 +179,7 @@ async function serve() {
           sendJson(res, 200, envelope({ readings: [reading], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
           return;
         }
-        sendJson(res, 200, envelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
-        return;
+        throw new Error(`Unexpected Records endpoint: ${pathname}`);
       }
 
       if (pathname.startsWith('/api/')) {
@@ -352,8 +351,8 @@ try {
   assert(session?.user?.id === member.id, 'Records browser stored the wrong Member identity');
   assert(session?.accessToken === member.accessToken, 'Records browser stored the wrong Member access token');
 
-  const recordsRequests = requests.filter((request) => ['/api/me', '/api/life-record', '/api/readings', '/api/memories'].includes(request.path));
-  assert(recordsRequests.length === 4, `Expected four Records API requests, received ${recordsRequests.length}`);
+  const recordsRequests = requests.filter((request) => ['/api/me', '/api/life-record', '/api/readings'].includes(request.path));
+  assert(recordsRequests.length === 3, `Expected three Records API requests, received ${recordsRequests.length}`);
   assert(recordsRequests[0].path === '/api/me', 'Records did not validate canonical /api/me before reading ledgers');
   for (const request of recordsRequests) {
     assert(request.authorization === `Bearer ${member.accessToken}`, `${request.path} did not use the active Member bearer`);
@@ -392,6 +391,12 @@ try {
     readerSceneHidden: document.querySelector('.reader-scene')?.hasAttribute('hidden') ?? false,
     characterBlockHidden: document.querySelector('.reading-character-block')?.hasAttribute('hidden') ?? false,
     stageHidden: document.querySelector('[data-reading-stage]')?.hidden ?? true,
+    reportHidden: document.querySelector('[data-official-report]')?.hidden ?? true,
+    reportSections: document.querySelectorAll('.official-report-section').length,
+    reportTitle: document.querySelector('.official-report-section h2')?.textContent?.trim() ?? '',
+    reportBody: document.querySelector('.official-report-primary')?.textContent?.trim() ?? '',
+    reportDate: document.querySelector('[data-official-report-date]')?.textContent?.trim() ?? '',
+    reportVersion: document.querySelector('[data-official-report-version]')?.textContent?.trim() ?? '',
     stepTitle: document.querySelector('[data-reading-step-title]')?.textContent?.trim() ?? '',
     stepBody: document.querySelector('[data-reading-step-body]')?.textContent?.trim() ?? '',
     backHref: document.querySelector('[data-reading-back-link]')?.getAttribute('href') ?? '',
@@ -399,11 +404,29 @@ try {
   }))()`);
   assert(archiveState.reader === '' && archiveState.readerAuthority === '', `Archive mode retained Reader authority: ${JSON.stringify(archiveState)}`);
   assert(archiveState.readerSceneHidden && archiveState.characterBlockHidden, `Archive mode exposed Reader presentation: ${JSON.stringify(archiveState)}`);
-  assert(!archiveState.stageHidden, `Archive Reading stage stayed hidden: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.stageHidden && !archiveState.reportHidden, `Full official report was not the default: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportSections === 1, `Unexpected number of owner-authorized report sections: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportTitle === '직업 흐름', `Stored report title was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportBody.includes('저장된 공식 풀이의 직업 흐름'), `Stored report body was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportDate.length > 0 && archiveState.reportVersion.length > 0, `Stored report provenance was omitted: ${JSON.stringify(archiveState)}`);
   assert(archiveState.stepTitle === '직업 흐름', `Stored Reading title was not rendered: ${JSON.stringify(archiveState)}`);
   assert(archiveState.stepBody.includes('저장된 공식 풀이의 직업 흐름'), `Stored Reading body was not rendered: ${JSON.stringify(archiveState)}`);
   assert(archiveState.backHref === 'records.html?tab=saju', `Archive back action escaped Records: ${archiveState.backHref}`);
   assert(archiveState.chatHref === 'chat-hub.html', `Archive mode invented a direct Chat continuation: ${archiveState.chatHref}`);
+
+  await client.evaluate(`document.querySelector('[data-official-report-step-mode]')?.click()`);
+  await waitFor(
+    client,
+    `document.body.dataset.readingRecordMode === 'step_by_step' && document.querySelector('[data-reading-stage]')?.hidden === false && document.querySelector('[data-official-report]')?.hidden === true`,
+    'Stored report did not switch to the verified step-by-step reading',
+  );
+  await client.evaluate(`document.querySelector('[data-official-report-return]')?.click()`);
+  await waitFor(
+    client,
+    `document.body.dataset.readingRecordMode === 'official_archive' && document.querySelector('[data-reading-stage]')?.hidden === true && document.querySelector('[data-official-report]')?.hidden === false`,
+    'Stored step-by-step reading did not return to the full report',
+  );
+  await client.evaluate(`document.querySelector('[data-official-report-step-mode]')?.click()`);
 
   await client.evaluate(`document.querySelector('[data-reading-next]')?.click()`);
   await waitFor(

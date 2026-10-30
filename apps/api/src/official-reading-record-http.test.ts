@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import type {
   PostgresSubjectConnectionV1,
@@ -10,21 +11,29 @@ const SUBJECT_ID = '22222222-2222-4222-8222-222222222222';
 const READING_ID = '44444444-4444-4444-8444-444444444444';
 const SESSION_ID = '55555555-5555-4555-8555-555555555555';
 
+const SNAPSHOT = Object.freeze({
+  responseVersion: 'myeonghwa-product-reading-response-v2',
+  responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+  state: 'delivered',
+  messageCode: 'READING_DELIVERED',
+  requiredAction: 'none',
+  reading: Object.freeze({
+    readingId: READING_ID,
+    sections: Object.freeze([
+      { sectionType: 'overview', state: 'complete', title: '공식 결과',
+        blocks: [{ type: 'paragraph', text: '원문 해석' }] },
+    ]),
+    disclosures: Object.freeze([{ type: 'scope_limitation', text: '검증된 범위 안에서 해석합니다.' }]),
+  }),
+});
 const ROW = Object.freeze({
   readingId: READING_ID,
   readingSessionId: SESSION_ID,
   sajuDomain: 'career',
   readingContractVersion: 'myeonghwa-product-reading-response-v2',
   productResponseState: 'delivered',
-  responseSnapshotJsonb: Object.freeze({
-    responseVersion: 'myeonghwa-product-reading-response-v2',
-    state: 'delivered',
-    reading: Object.freeze({
-      readingId: READING_ID,
-      sections: Object.freeze([]),
-    }),
-  }),
-  responseHash: 'sha256:stored-reading',
+  responseSnapshotJsonb: SNAPSHOT,
+  responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(SNAPSHOT),
   readerCharacterIds: Object.freeze(['seyeon']),
   completedAt: '2026-09-23T00:01:00.000Z',
 });
@@ -46,7 +55,9 @@ function verifier(authenticated = true) {
 
 function fakePool(input: {
   readonly rows?: readonly typeof ROW[];
+  readonly birthRows?: readonly { issuedRevisionNo: number | null; currentRevisionNo: number | null; revisionState: string }[];
   readonly onAuthorityQuery?: (values: readonly unknown[]) => void;
+  readonly onBirthQuery?: (values: readonly unknown[]) => void;
   readonly onRollback?: () => void;
 } = {}): PostgresSubjectPoolV1 {
   return {
@@ -75,6 +86,14 @@ function fakePool(input: {
           if (text.includes('assert_myeongha_subject_context_v1')) {
             expect(values).toEqual([SUBJECT_ID]);
             return { rows: [] };
+          }
+          if (text.includes('qry_official_reading_birth_revision_status_v1')) {
+            input.onBirthQuery?.(values ?? []);
+            return {
+              rows: (input.birthRows ?? [{
+                issuedRevisionNo: 2, currentRevisionNo: 3, revisionState: 'changed',
+              }]) as readonly ResultRow[],
+            };
           }
           if (text.includes('qry_official_reading_record_runtime_v1')) {
             input.onAuthorityQuery?.(values ?? []);
@@ -175,7 +194,45 @@ describe('Official Reading record HTTP adapter', () => {
     });
     expect(payload.data).not.toHaveProperty('responseHash');
     expect(payload.data).not.toHaveProperty('threadId');
+    expect(payload.data.birthRevision).toEqual({
+      issuedRevisionNo: 2, currentRevisionNo: 3, state: 'changed',
+    });
     expect(onAuthorityQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a malformed v2 stored hash and rolls back before disclosing an HTTP record', async () => {
+    const onRollback = vi.fn();
+    await expect(invoke({
+      pool: fakePool({
+        rows: [{ ...ROW, responseHash: 'sha256:v1:bad' }],
+        onRollback,
+      }),
+    })).rejects.toThrow('source response hash mismatch');
+    expect(onRollback).toHaveBeenCalledTimes(1);
+  });
+
+  it('binds a second exact authorized Birth revision query in the same subject transaction', async () => {
+    const onBirthQuery = vi.fn((values: readonly unknown[]) => {
+      expect(values).toEqual([SUBJECT_ID, READING_ID]);
+    });
+    const response = await invoke({
+      pool: fakePool({ onBirthQuery, birthRows: [{
+        issuedRevisionNo: 4, currentRevisionNo: 4, revisionState: 'current',
+      }] }),
+    });
+    const payload = await response.json() as any;
+    expect(payload.data.birthRevision).toEqual({
+      issuedRevisionNo: 4, currentRevisionNo: 4, state: 'current',
+    });
+    expect(onBirthQuery).toHaveBeenCalledTimes(1);
+  });
+
+  it('rolls back when the exact report loses birth provenance read authority', async () => {
+    const onRollback = vi.fn();
+    await expect(invoke({
+      pool: fakePool({ birthRows: [], onRollback }),
+    })).rejects.toThrow('Birth provenance authority did not admit');
+    expect(onRollback).toHaveBeenCalledTimes(1);
   });
 
   it('fails closed and rolls back when owner-scoped archive authority returns duplicate rows', async () => {

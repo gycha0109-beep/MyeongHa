@@ -47,7 +47,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql|20261027125500_chat_credit_delivered_ack_private_v1.sql|20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql|20261027185000_owner_kcp_sandbox_private_prepare_v1.sql|20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql|20261027054525_digital_reading_checkout_notice_evidence_v1.sql|20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql|20261027125500_chat_credit_delivered_ack_private_v1.sql|20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql|20261027185000_owner_kcp_sandbox_private_prepare_v1.sql|20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql|20261027054525_digital_reading_checkout_notice_evidence_v1.sql|20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql|20261029094500_records_official_birth_revision_status_v1.sql|20261029111500_saju_official_issuance_preflight_v1.sql|20261029112500_saju_official_stored_lineage_v1.sql|20261029145500_saju_official_attempt_reconciliation_status_v1.sql|20261029164000_saju_official_stored_engine_lineage_v2.sql|20261029175000_saju_official_stored_purchase_lineage_v3.sql|20261029185500_official_reader_verified_purchase_access_v1.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -80,6 +80,13 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
              20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql) reviewed_blob_sha1='59a2d005cace08cb46da9cf57351131620218d0b' ;;
             20261027054525_digital_reading_checkout_notice_evidence_v1.sql) reviewed_blob_sha1='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
             20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql) reviewed_blob_sha1='3903c37f80f860f899fb1086b4bab878e73eab1d' ;;
+            20261029094500_records_official_birth_revision_status_v1.sql) reviewed_blob_sha1='aaed00ca0b067071d80245fca2ccac641885638e' ;;
+            20261029111500_saju_official_issuance_preflight_v1.sql) reviewed_blob_sha1='3c1f426343b03a5c746b551420851ccc38e8f244' ;;
+            20261029112500_saju_official_stored_lineage_v1.sql) reviewed_blob_sha1='7a48bfb0cbb1fdbe72d514823730d9415ddd81ac' ;;
+            20261029145500_saju_official_attempt_reconciliation_status_v1.sql) reviewed_blob_sha1='0704f457992b2b729236ecb17c78900e0f8ca84e' ;;
+            20261029164000_saju_official_stored_engine_lineage_v2.sql) reviewed_blob_sha1='fc387a60822de352239f7bfed6eb804582e07dd0' ;;
+            20261029175000_saju_official_stored_purchase_lineage_v3.sql) reviewed_blob_sha1='92ad0bce1472dda77fd11cbe208507a7d5cd48fe' ;;
+            20261029185500_official_reader_verified_purchase_access_v1.sql) reviewed_blob_sha1='d523293ce6af2104f045f7245f727ae26c8c1bf8' ;;
           esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
@@ -154,6 +161,17 @@ case "$case_name" in
         if (result.status !== 0) process.exit(result.status ?? 1);
       }
     '
+    ;;
+  saju-official-records-http-e2e)
+    verify_pg17
+    [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_SAJU_OFFICIAL_REREAD_E2E_DISPOSABLE_DB_REQUIRED >&2
+      exit 1
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/saju_official_records_http_e2e_pg17.sh
     ;;
   seyeon-security-s0-real-path-pg17)
     verify_pg17
