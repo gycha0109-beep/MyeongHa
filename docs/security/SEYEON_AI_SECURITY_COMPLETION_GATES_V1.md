@@ -128,3 +128,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **운영 구현 미완료**: 서버 Planner Proposal 생성, 응답 결속, DB Atomic Scope Decision API는 아직 연결되지 않았고 `/decision`은 미마운트다. 기존 `chat-read-http.ts`의 세연 History metadata-only HOLD는 그대로이므로 위 UI는 운영에 표시되지 않는다. 유료 AI/원문 Reveal/Projector/운영 DB·ACL을 켜지 않았다.
 
 **종료 조건**: Planner의 서버 생성 사실 제안과 원문 출처 증명, UC-07 네 선택의 실제 DB/Session 처리, 동의·철회/Revocation·Replay·두 세션 경쟁 검증, 운영 G0~G6 승인 증거가 충족되어야 한다. 현재 UI staging/CI가 PASS여도 S0 운영 PASS나 전체 AI 보안 완료를 의미하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+### UC-07 서버 결정 경로 구현 (S0 격리 / 운영 미마운트)
+
+- `seyeon-planner-memory-decision-v1.ts`는 기존 `packages/domain/src/memory-resolution.ts`를 재사용하여 UX 네 선택을 `session_only`, `accept_long_term + character_only`, `accept_long_term + current_characters`, `reject`로 매핑한다. 공유 대상은 브라우저가 제출하지 않고 DB가 읽은 현 캐릭터 집합만 사용한다.
+- `seyeon-planner-memory-decision-http-v1.ts`는 **회원 인증, 본인 Subject DB 트랜잭션, 정확한 1개 선택, 내부 pending 제안 읽기/잠금, 단일 트랜잭션 결정, 결과 검증**을 구현한다. 클라이언트 Summary·원문·Grant ID·대상 캐릭터 목록 입력은 금지한다. 승인 callback이나 검증 가능한 DB 구현이 없으면 503이다.
+- `10-planner-memory-decision-source.sql` / `postgres-seyeon-planner-memory-decision-source-v1.ts`는 S0 단독 세연 대화의 **확정된 세연 Character Message**에 연결된 `proposal_dedupe_key='seyeon-dialogue-planner:v1'` pending Proposal만 원본 테이블에서 잠금 검증한다. 원본·제안 Summary를 반환하지 않으며, 사용자의 수동 UserMessage Proposal을 Planner 제안으로 인정하지 않는다. 기본 API 역할은 신규 RPC를 실행할 수 없다. 격리 PG17 합성 테스트에서만 제한된 권한을 임시 허용한다.
+- `seyeon-planner-memory-decision-commit-v1.ts`는 **S0 Memory 한 건, 세연 Grant 한 건**에 한하여 기존 비공개 수락 Owner RPC와 명시 Grant Owner RPC를 같은 DB 트랜잭션에서 차례로 실행한다. `current_characters`도 DB 현재 집합이 세연 단독일 때만 이 경로로 처리한다.
+- **아직 구현/승인되지 않은 부분을 지원한다고 간주하지 않는다.** `session_only`/`discard`에서 pending 제안의 개인정보 원문을 장기 보관하지 않도록 지우는 DB 동작(SRC-05), `current_characters`의 실제 다중 캐릭터 Grant, Life Fact persistence, 실제 Dialogue Planner의 fact-to-Proposal Producer, 최종 캐릭터 메시지와 pending 제안의 공개 가능한 G3 응답 결속은 미완료이다.
+- `production-seyeon-planner-memory-decision-runtime-v1.ts`는 실제 Production identity verifier/DB pool/소유 DB adapter를 조립하지만 **public router 미마운트, admission 기본 DENY, 승인 없는 운영 실행 불가** 상태다.
+- 새 S0 격리 SQL은 `supabase/migrations`에 추가하지 않았고 실제 운영 DB·ACL·registry·모델/Worker는 변경하지 않았다. G0~G6 및 SRC-25 승인 전 `HOLD_FORWARD_STOPPED`를 유지한다.
