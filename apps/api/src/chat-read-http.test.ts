@@ -14,6 +14,8 @@ function fakePool(options: {
   denied?: boolean;
   history?: boolean;
   existenceFailure?: 'sql_error' | 'missing' | 'invalid';
+  otherCharacterRoom?: boolean;
+  historyGuardFailure?: 'missing' | 'catalog_error' | 'history_error' | 'invalid' | 'past_seyeon';
   observed?: (sql: string, values: readonly unknown[]) => void;
 } = {}): PostgresSubjectPoolV1 {
   return {
@@ -37,9 +39,24 @@ function fakePool(options: {
                 activeContentReleaseId: RELEASE_ID,
                 activeContentBundleId: BUNDLE_ID,
                 contentRevision: 1,
-                participantCharacterIds: ['seyeon'],
+                participantCharacterIds: options.otherCharacterRoom ? ['yeoul'] : ['seyeon'],
               } as Row],
             };
+          }
+          if (sql.includes("to_regprocedure('public.qry_seyeon_thread_ever_involved_v1")) {
+            options.observed?.(sql, values);
+            if (options.historyGuardFailure === 'catalog_error') {
+              throw new Error('private catalog failure with sensitive SQL metadata');
+            }
+            return { rows: [{ installed: options.historyGuardFailure !== 'missing' } as Row] };
+          }
+          if (sql.includes('from public.qry_seyeon_thread_ever_involved_v1')) {
+            options.observed?.(sql, values);
+            if (options.historyGuardFailure === 'history_error') {
+              throw new Error('private history function failure');
+            }
+            if (options.historyGuardFailure === 'invalid') return { rows: [{ everInvolved: null } as Row] };
+            return { rows: [{ everInvolved: options.historyGuardFailure === 'past_seyeon' } as Row] };
           }
           if (sql.includes('qry_chat_thread_stream_v2')) {
             options.observed?.(sql, values);
@@ -106,6 +123,30 @@ describe('Seyeon empty-room initialization with historical Reveal HOLD', () => {
     expect(payload.data.historyWithheld).toBe(true);
     expect(payload.data.relationship).toBeNull();
     expect(JSON.stringify(payload)).not.toContain('안녕하세요.');
+  });
+
+  it.each([
+    'missing',
+    'catalog_error',
+    'history_error',
+    'invalid',
+    'past_seyeon',
+  ] as const)('fails closed when the former-Seyeon history authority is %s', async (historyGuardFailure) => {
+    const queries: string[] = [];
+    const response = await invoke({
+      pool: fakePool({
+        otherCharacterRoom: true,
+        historyGuardFailure,
+        observed: (sql) => queries.push(sql),
+      }),
+    });
+    const payload = await response.json() as any;
+    expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(payload.error.code).toBe('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(JSON.stringify(payload)).not.toContain('private');
+    expect(queries.some(sql => sql.includes('qry_chat_thread_stream_v2'))).toBe(false);
+    expect(queries.some(sql => sql.includes('qry_character_relationship_v1'))).toBe(false);
   });
 
   it.each(['sql_error', 'missing', 'invalid'] as const)(
