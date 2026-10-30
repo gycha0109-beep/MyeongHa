@@ -256,15 +256,15 @@ function renderConversation(messages, authoritativeCharacterId, historyProtected
     return;
   }
   chatStream.replaceChildren(...nodes);
-  // A verified per-message offer is required; UUIDs are never reconstructed
-  // from DOM text, the turn submit draft, timestamps, or Chat message index.
-  // Se-yeon's existing protected-history shell has no messages and no offers.
+  // Only a verified server Dialogue Planner pending proposal may be reviewed.
+  // Never turn a user Message into a manual Memory creation entrypoint.
+  // Protected History has no original messages or eligible proposals.
   if (!historyProtected && memberReadAllowed && authoritativeCharacterId === 'seyeon') {
     for (let i = 0; i < messages.length; i += 1) {
-      const offer = messages[i]?.memoryProposalOffer;
+      const proposal = messages[i]?.memoryProposal;
       const body = nodes[i]?.querySelector('.conversation-message-body');
-      if (offer && body instanceof HTMLElement) {
-        mountSeyeonPrivateMemoryReviewV1({ container: body, originalSource: offer });
+      if (proposal && body instanceof HTMLElement) {
+        mountSeyeonPrivateMemoryReviewV1({ container: body, plannerProposal: proposal });
       }
     }
   }
