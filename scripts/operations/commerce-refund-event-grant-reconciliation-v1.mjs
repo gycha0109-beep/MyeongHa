@@ -44,7 +44,8 @@ with refund_events as (
  ) rights on true
  where event.provider='portone_v2'
    and event.environment='production'
-   and event.event_type in ('refund','payment.cancelled')
+   and event.event_type in ('refund','payment.cancelled',
+   'Transaction.Cancelled','Transaction.PartialCancelled','Transaction.CancelPending')
 )
 select
  (select count(*)::text from refund_events)
@@ -53,6 +54,12 @@ select
    as "productionLegacyRefundTaggedEvents",
  (select count(*)::text from refund_events where event_type='payment.cancelled')
    as "productionPaymentCancelledTaggedEvents",
+ (select count(*)::text from refund_events where event_type='Transaction.Cancelled')
+   as "productionOfficialCancelledTaggedEvents",
+ (select count(*)::text from refund_events where event_type='Transaction.PartialCancelled')
+   as "productionOfficialPartialCancelledTaggedEvents",
+ (select count(*)::text from refund_events where event_type='Transaction.CancelPending')
+   as "productionOfficialCancelPendingTaggedEvents",
  (select count(*)::text from refund_events
    where status not in ('verified','processed'))
    as "refundEventsWithoutVerifiedStatus",
@@ -82,6 +89,9 @@ const FIELDS=Object.freeze([
  'productionRefundTaggedEvents',
  'productionLegacyRefundTaggedEvents',
  'productionPaymentCancelledTaggedEvents',
+ 'productionOfficialCancelledTaggedEvents',
+ 'productionOfficialPartialCancelledTaggedEvents',
+ 'productionOfficialCancelPendingTaggedEvents',
  'refundEventsWithoutVerifiedStatus',
  'verifiedRefundEventsWithoutExactReceipt',
  'verifiedRefundEventsWithoutPurchaseGrant',

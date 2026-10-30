@@ -7,7 +7,9 @@ import {
 
 const zeros=Object.freeze({
  productionRefundTaggedEvents:'0',
- productionLegacyRefundTaggedEvents:'0',productionPaymentCancelledTaggedEvents:'0',refundEventsWithoutVerifiedStatus:'0',
+ productionLegacyRefundTaggedEvents:'0',productionPaymentCancelledTaggedEvents:'0',
+ productionOfficialCancelledTaggedEvents:'0',productionOfficialPartialCancelledTaggedEvents:'0',
+ productionOfficialCancelPendingTaggedEvents:'0',refundEventsWithoutVerifiedStatus:'0',
  verifiedRefundEventsWithoutExactReceipt:'0',
  verifiedRefundEventsWithoutPurchaseGrant:'0',
  activePurchaseGrantsAtRefundEvent:'0',
@@ -32,7 +34,7 @@ describe('offline refund-tagged provider Event to exact purchase Grant review',(
   const sql=COMMERCE_REFUND_EVENT_GRANT_RECONCILIATION_SQL_V1;
   expect(sql).toContain("event.provider='portone_v2'");
   expect(sql).toContain("event.environment='production'");
-  expect(sql).toContain("event.event_type in ('refund','payment.cancelled')");
+  expect(sql).toContain("event.event_type in ('refund','payment.cancelled',");
   expect(sql).toContain("receipt.verification_status in ('verified','revoked')");
   expect(sql).toContain("g.source_receipt_id=receipt.id");
   expect(sql).toContain("g.subject_id=receipt.subject_id");
@@ -56,6 +58,9 @@ describe('offline refund-tagged provider Event to exact purchase Grant review',(
  it.each([
   'productionLegacyRefundTaggedEvents',
   'productionPaymentCancelledTaggedEvents',
+  'productionOfficialCancelledTaggedEvents',
+  'productionOfficialPartialCancelledTaggedEvents',
+  'productionOfficialCancelPendingTaggedEvents',
   'refundEventsWithoutVerifiedStatus',
   'verifiedRefundEventsWithoutExactReceipt',
   'verifiedRefundEventsWithoutPurchaseGrant',

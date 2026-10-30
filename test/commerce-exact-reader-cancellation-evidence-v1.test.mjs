@@ -39,7 +39,7 @@ describe('exact Reader cancellation event/Grant evidence inspection',()=>{
   expect(sql).toContain("event.environment='production'");
   expect(sql).toContain("receipt.environment='production'");
   expect(sql).toContain("event.status in ('verified','processed')");
-  expect(sql).toContain("event.event_type in ('refund','payment.cancelled')");
+  expect(sql).toContain("event.event_type in ('refund','payment.cancelled',");
   expect(sql).toContain('g.source_receipt_id=receipt.id');
   expect(sql).toContain('access.entitlement_grant_id=g.id');
   expect(sql).toContain('access.purchase_intent_id=receipt.purchase_intent_id');
@@ -77,6 +77,12 @@ describe('exact Reader cancellation event/Grant evidence inspection',()=>{
    fullRefundEstablished:false,revocationAuthorized:false,
   });
  });
+ it.each(['Transaction.Cancelled','Transaction.PartialCancelled','Transaction.CancelPending'])(
+  'keeps official %s tag review-only, not a revocation approval',async eventType=>{
+   const r=await inspectExactReaderCancellationEvidenceV1(db({rows:[{...ROW,eventType}]}),REQUEST);
+   expect(r).toMatchObject({kind:'linked_review_only',fullRefundEstablished:false,
+    cancellationFinalityEstablished:false,revocationAuthorized:false});
+  });
  it('a different event, grant, or absent exact Reader purchase is no match',async()=>{
   const x=await inspectExactReaderCancellationEvidenceV1(db({rows:[]}),REQUEST);
   expect(x).toEqual({
@@ -94,6 +100,7 @@ describe('exact Reader cancellation event/Grant evidence inspection',()=>{
   [{...ROW,providerEventId:GRANT}],
   [{...ROW,grantId:EVENT}],
   [{...ROW,eventStatus:'received'}],
+  [{...ROW,eventType:'Future.Unknown'}],
   [{...ROW,exactRevokeEffectExists:'true'}],
   [ROW,ROW],
  ].map(rows=>[rows]))('refuses invalid or ambiguous reader evidence %j',async rows=>{

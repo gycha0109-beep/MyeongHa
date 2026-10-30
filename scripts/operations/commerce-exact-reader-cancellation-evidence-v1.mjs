@@ -63,7 +63,8 @@ where event.id=$1::uuid
   and event.provider='portone_v2'
   and event.environment='production'
   and event.status in ('verified','processed')
-  and event.event_type in ('refund','payment.cancelled')
+  and event.event_type in ('refund','payment.cancelled',
+    'Transaction.Cancelled','Transaction.PartialCancelled','Transaction.CancelPending')
   and event.resolution_source_type='receipt'
 limit 2
 `.trim();
@@ -113,7 +114,8 @@ export async function inspectExactReaderCancellationEvidenceV1(
      !count(row.grantRevision)||!count(row.otherActiveReaderPurchaseGrants)||
      typeof row.officialReadingId!=='string'||!UUID.test(row.officialReadingId)||
      typeof row.readerCharacterId!=='string'||!row.readerCharacterId.trim()||
-     !['refund','payment.cancelled'].includes(row.eventType)||
+     !['refund','payment.cancelled','Transaction.Cancelled',
+       'Transaction.PartialCancelled','Transaction.CancelPending'].includes(row.eventType)||
      !['verified','processed'].includes(row.eventStatus)||
      (row.eventOrderingKey!==null && typeof row.eventOrderingKey!=='string')||
      typeof row.exactRevokeEffectExists!=='boolean')
