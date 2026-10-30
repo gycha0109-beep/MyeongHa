@@ -9,7 +9,7 @@ function simulatedClock() {
   let time = 0;
   return {
     now: () => time,
-    wait: async ms => { time += ms; },
+    wait: async ms => { time += ms; await new Promise(resolve => setImmediate(resolve)); },
   };
 }
 
