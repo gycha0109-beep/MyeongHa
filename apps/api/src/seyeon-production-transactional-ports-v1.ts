@@ -213,6 +213,13 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
 
   const postTurnAnalysis: SeyeonPostTurnAnalysisOutboxPortV1 =
     Object.freeze({
+      preflightClaim(request: { subjectId: string; outboxEventId: string }) {
+        requireSubject(subjectId, request.subjectId);
+        return runner.run(subjectId, (client) =>
+          createPostgresSeyeonPostTurnAnalysisOutboxPortV1(client)
+            .preflightClaim(request),
+        );
+      },
       findByTurn(request: Parameters<SeyeonPostTurnAnalysisOutboxPortV1['findByTurn']>[0]) {
         requireSubject(subjectId, request.subjectId);
         return runner.run(subjectId, (client) =>
