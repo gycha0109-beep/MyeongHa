@@ -180,11 +180,12 @@ begin
   for v_row in
     select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no,m.content_hash
     from (
-      select id,turn_id,sender_type,thread_character_id,thread_id,sequence_no,content_hash
-      from public.conversation_messages
-      where subject_id=p_subject_id and thread_id=p_thread_id
-        and redacted_at is null and body_text is not null
-      order by sequence_no desc limit p_limit
+      select src.id,src.turn_id,src.sender_type,src.thread_character_id,
+             src.thread_id,src.sequence_no,src.content_hash
+      from public.conversation_messages src
+      where src.subject_id=p_subject_id and src.thread_id=p_thread_id
+        and src.redacted_at is null and src.body_text is not null
+      order by src.sequence_no desc limit p_limit
     ) m
     left join public.conversation_thread_characters c
       on c.id=m.thread_character_id and c.thread_id=m.thread_id
