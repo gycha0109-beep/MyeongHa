@@ -328,3 +328,84 @@ describe('security observability boundary v1', () => {
     ).rejects.toBe(downstreamError);
   });
 });
+
+describe('Phase 9 dynamic API cache isolation', () => {
+  it.each([200, 302, 401, 503])(
+    'overrides upstream shared-cache headers on HTTP %i without changing body or status',
+    async (status) => {
+      const response = await executeSecurityObservedRequestV1({
+        request: new Request('https://myeongha.test/api/auth/refresh'),
+        routeId: 'api.auth.refresh',
+        eventWriter: () => undefined,
+        execute: () => new Response('synthetic-only-data', {
+          status,
+          headers: {
+            'Cache-Control': 'public, max-age=3600',
+            'CDN-Cache-Control': 'public, s-maxage=86400',
+            'Vercel-CDN-Cache-Control': 'public, s-maxage=86400',
+            'Content-Type': 'text/plain',
+            'Set-Cookie': 'synthetic-session=value; HttpOnly',
+          },
+        }),
+      });
+      expect(response.status).toBe(status);
+      expect(await response.text()).toBe('synthetic-only-data');
+      for (const header of ['cache-control', 'cdn-cache-control', 'vercel-cdn-cache-control']) {
+        expect(response.headers.get(header)).toBe('no-store');
+      }
+      expect(response.headers.get('content-type')).toBe('text/plain');
+      expect(response.headers.get('set-cookie')).toContain('synthetic-session=value');
+    },
+  );
+
+  it.each([204, 205, 304])(
+    'preserves bodyless HTTP %i while preventing caching', async (status) => {
+      const result = await executeSecurityObservedRequestV1({
+        request: new Request('https://myeongha.test/api/me'),
+        routeId: 'api.me.dispatch',
+        execute: () => new Response(null, {
+          status,
+          headers: { 'Cache-Control': 'public, max-age=600' },
+        }),
+      });
+      expect(result.status).toBe(status);
+      expect(await result.text()).toBe('');
+      expect(result.headers.get('Cache-Control')).toBe('no-store');
+    },
+  );
+
+  it('applies the same cache isolation on the Node adapter with no event side effects', async () => {
+    const written: Response[] = [];
+    const events: SecurityEventV1[] = [];
+    await executeSecurityObservedNodeRequestV1({
+      method: 'POST',
+      routeId: 'api.birth-profiles',
+      eventWriter: (event) => events.push(event),
+      execute: () => new Response('synthetic-only-data', {
+        status: 200,
+        headers: { 'Cache-Control': 'public', 'CDN-Cache-Control': 'public' },
+      }),
+      writeResponse: async (response) => { written.push(response); },
+    });
+    expect(events).toHaveLength(0);
+    expect(written).toHaveLength(1);
+    expect(written[0]?.headers.get('Cache-Control')).toBe('no-store');
+    expect(written[0]?.headers.get('CDN-Cache-Control')).toBe('no-store');
+    expect(written[0]?.headers.get('Vercel-CDN-Cache-Control')).toBe('no-store');
+    expect(await written[0]?.text()).toBe('synthetic-only-data');
+  });
+
+  it('returns cache-isolated generic 500 after a thrown runtime error', async () => {
+    const result = await executeSecurityObservedRequestV1({
+      request: new Request('https://myeongha.test/api/session/bootstrap'),
+      routeId: 'api.session.bootstrap',
+      eventWriter: () => undefined,
+      execute: () => { throw new Error('private synthetic failure'); },
+    });
+    expect(result.status).toBe(500);
+    for (const header of ['Cache-Control', 'CDN-Cache-Control', 'Vercel-CDN-Cache-Control']) {
+      expect(result.headers.get(header)).toBe('no-store');
+    }
+    expect(await result.text()).toBe('');
+  });
+});
