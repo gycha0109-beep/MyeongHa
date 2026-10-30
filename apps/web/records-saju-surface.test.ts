@@ -8,6 +8,7 @@ const readWeb = (name: string) => readFileSync(resolve(webRoot, name), 'utf8');
 describe('Records Saju history surface', () => {
   const html = `${readWeb('records.html')}\n${readWeb('src/records/RecordsPage.tsx')}`;
   const page = readWeb('records-page.js');
+  const domainPresentation = readWeb('reading-domain-presentation.js');
   const client = readWeb('records-runtime-client.js');
   const readerLocale = readWeb('reader-provenance-locale.js');
   const recordsUiLocale = readWeb('records-page-ui-locale.js');
@@ -71,10 +72,11 @@ describe('Records Saju history surface', () => {
       'life_stage',
       'question_specific',
     ]) {
-      expect(page).toContain(`${domain}: Object.freeze(`);
+      expect(domainPresentation).toContain(`${domain}: Object.freeze(`);
     }
-    expect(page).not.toContain('annual: Object.freeze(');
-    expect(page).not.toContain('monthly: Object.freeze(');
+    expect(page).toContain('readingDomainPresentationV1(sajuDomain)');
+    expect(domainPresentation).not.toContain('annual: Object.freeze(');
+    expect(domainPresentation).not.toContain('monthly: Object.freeze(');
   });
 
   it('shows archive open links only for delivered states', () => {
