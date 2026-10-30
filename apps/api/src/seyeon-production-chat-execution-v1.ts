@@ -154,6 +154,17 @@ export interface SeyeonProductionChatPersistencePortV1 {
     plannerVersion: typeof SEYEON_PRODUCTION_CHAT_PLANNER_VERSION_V1;
   }>): Awaitable<SeyeonProductionChatAttemptV1>;
 
+  /** G1 owner stores selected historic model input BEFORE any Provider.
+   * Still requires an independent G2 authority to permit Commit/Reveal. */
+  pinHistoricalModelMessages?(input: Readonly<{
+    subjectId:string;
+    threadId:string;
+    turnId:string;
+    attemptId:string;
+    currentUserMessageId:string;
+    selectedModelMessages:readonly import('../../../packages/domain/src/seyeon-runtime-context-v2.js').SeyeonRecentMessageV2[];
+  }>): Awaitable<void>;
+
   markContextReady(input: Readonly<{
     subjectId: string;
     turnId: string;
@@ -704,6 +715,27 @@ export async function runSeyeonProductionChatExecutionV1(
           userMessageId: receivedTurn.userMessageId,
           userText: receivedTurn.userText,
         });
+
+        // Pin the exact historical message subset consumed by the final
+        // model assembly. This creates no new Provider/Commit eligibility:
+        // the existing zero/positive checks below still HOLD derived usage.
+        // DB Owner verifies the entire selected window, then persists its
+        // source IDs + content hashes while the Attempt is still running.
+        const maxRecent=contextInput.maxRecentMessages??12;
+        const selectedRecent=contextInput.recentMessages.slice(-maxRecent);
+        if(selectedRecent.length>1){
+          if(!input.persistencePort.pinHistoricalModelMessages){
+            throw new SeyeonProductionChatExecutionErrorV1(
+              'G1 selected historical sources have no DB Owner Pin.',
+            );
+          }
+          await input.persistencePort.pinHistoricalModelMessages({
+            subjectId,threadId,turnId:receivedTurn.turnId,
+            attemptId:attempt.attemptId,
+            currentUserMessageId:receivedTurn.userMessageId,
+            selectedModelMessages:selectedRecent,
+          });
+        }
 
         // Exact sorted/truncated source set used by the model, not an
         // unbounded list from DB or an LLM-selected free-text sourceRef.
