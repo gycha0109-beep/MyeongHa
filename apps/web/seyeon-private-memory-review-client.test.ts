@@ -202,10 +202,15 @@ describe('S0 browser review surface activation boundary',()=>{
       }
     }finally{vi.unstubAllGlobals();}
   });
-  it('does not activate proposal creation or approval in unverified Chat history',()=>{
+  it('connects review only to a verified per-message offer outside protected history',()=>{
     const chat=readFileSync(new URL('./chat-runtime-client.js',import.meta.url),'utf8');
     const records=readFileSync(new URL('./records-page.js',import.meta.url),'utf8');
-    expect(chat).not.toContain('mountSeyeonPrivateMemoryReviewV1');
+    const read=readFileSync(new URL('./chat-room-read-contract.js',import.meta.url),'utf8');
+    expect(chat).toContain("if (!historyProtected && authoritativeCharacterId === 'seyeon')");
+    expect(chat).toContain('const offer = messages[i]?.memoryProposalOffer');
+    expect(chat).toContain('mountSeyeonPrivateMemoryReviewV1({ container: body, originalSource: offer })');
+    expect(chat).toContain('latestBearer?.token !== activeBearer.token');
+    expect(read).toContain('serverOriginalMemoryOffer(message, threadId, roomCharacterId)');
     expect(records).not.toContain('mountSeyeonPrivateMemoryReviewV1');
   });
 });
