@@ -54,6 +54,30 @@ describe('Records Saju history surface', () => {
     expect(page).toContain('renderSajuReadingEmpty(target);');
   });
 
+  it('discards cached personal Records when browser owner changes, including on locale repaint', async () => {
+    const { RECORDS_HUB_STATIC_UI_COPY_V1 } = await import('./ui-records-hub-copy.js');
+    expect(page).toContain('captureReadingResponseOwnerV1(');
+    expect(page).toContain('isReadingResponseOwnerCurrentV1(');
+    expect(page).toContain('const bearer = await ensureActiveBearer();');
+    expect(page).toContain('const owner = captureRecordsOwner(bearer);');
+    expect(page).toContain('if (!isRecordsOwnerCurrent(owner)) {');
+    expect(page).toContain('displayedRecords = null;');
+    expect(page).toContain('displayedRecordsOwner = null;');
+    expect(page).toContain("byId('records-content').hidden = true;");
+    expect(page).toContain("'saju-records-list', 'memory-records-list',");
+    expect(page).toContain('byId(id).replaceChildren();');
+    expect(page).toContain('window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, onRecordsAuthChanged);');
+    expect(page).toContain("window.addEventListener('pageshow', onRecordsAuthChanged);");
+    expect(page).toContain('onRecordsAuthChanged();\n    if (!displayedRecords) return;\n    renderLoadedRecords(displayedRecords);');
+    const copy = RECORDS_HUB_STATIC_UI_COPY_V1.get(
+      '계정 또는 세션이 변경되었습니다. 현재 계정의 기록을 보려면 새로고침해 주세요.',
+    );
+    expect(copy).toBeDefined();
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+      expect(copy?.[locale]).toBeTruthy();
+    }
+  });
+
   it('labels authoritative delivered states as completed without using the stale complete alias', () => {
     expect(page).toContain("value === 'delivered' || value === 'delivered_with_fallback'");
     expect(page).toContain("return '완료'");
