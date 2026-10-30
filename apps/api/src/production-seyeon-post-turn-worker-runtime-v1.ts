@@ -240,6 +240,7 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
         leaseExpiresAt: runInput.leaseExpiresAt,
         outboxPort: meteredOutbox,
         extractorProvider: meteredProvider,
+        enforceCurrentSourceAuthority: true,
         relationshipSyncOutboxPort:
           ports.relationshipSyncOutbox,
       });
