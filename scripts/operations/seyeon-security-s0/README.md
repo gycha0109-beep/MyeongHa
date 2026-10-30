@@ -47,3 +47,10 @@ DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실
 일반 Chat GET은 함수가 설치되면 **요청 페이지의 stream SQL을 실행하기 전에** 이 이력을 검증하여 과거 세연이 있으면 메시지·Relationship 전체를 `SEYEON_HISTORY_REVEAL_HOLD`로 차단합니다. 현재 참가자가 세연인 경우 기존 single-room metadata shell / mixed-thread 전체 HOLD를 유지합니다.
 
 `main` 병합만으로 운영 DB 함수가 적용되지는 않습니다. 미설치 DB에서는 기존 페이지 단위 보호를 유지하나 전체 이력 안전성의 증거는 **아직 없으며 G3 HOLD**입니다. 함수 배포, 복구, 실제 두 세션 검증 및 이전 구성에 존재했던 별도 파생 기록 추적 없이 G3 전체 PASS라고 판정할 수 없습니다. 현재 설치 묶음은 disposable DB 전용이며 개인정보 공개 권한을 추가하지 않습니다.
+
+
+## S0 원본 기억의 세연 전용 Grant — 격리 구현, 운영 비활성
+
+`09-owned-original-memory-grant.sql`은 **기존에 승인·등록된** `conversation_recall/v1` 기억 1건에 대해 별도의 회원 선택 `character_only:seyeon`을 DB Owner가 검증해 새 Grant 1건을 원자적으로 발행하는 제한형 명령입니다. DB 원장에 있는 `accepted` 제안, 원본 Turn·Message, 내용 일치·미철회 상태, 현재 권한 및 쓰기 허용 레지스트리를 재확인합니다. 단순 개인 보관 승인으로 세연 공유가 암묵적으로 생성되지 않으며 기존 철회 대기 Grant도 다시 사용할 수 없습니다.
+
+이 SQL은 현재 `plan.mjs`의 **격리 설치 목록에만** 추가됩니다. API 역할에는 `EXECUTE`를 부여하지 않고, 공개 HTTP route·모델 호출·운영 원본 사용을 활성화하지 않습니다. 배포 대상 운영 DB나 자동 migration으로 적용하지 않습니다. 실제 회원의 명시적 선택을 전달하는 정식 소비자·SRC-25 출처 및 DB 승인·복구 근거가 준비되기 전에는 운영에 설치하지 않습니다.
