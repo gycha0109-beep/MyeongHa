@@ -1,216 +1,151 @@
 // Watchtower-Track: security
 import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   createSeyeonPrivateMemoryReviewClientV1,
+  isServerPlannerMemoryProposalV1,
 } from './seyeon-private-memory-review-client.js';
 import { mountSeyeonPrivateMemoryReviewV1 } from './seyeon-private-memory-review-view.js';
-import {readFileSync} from 'node:fs';
 
-const THREAD = '11111111-1111-4111-8111-111111111111';
-const TURN = '22222222-2222-4222-8222-222222222222';
-const MESSAGE = '33333333-3333-4333-8333-333333333333';
 const PROPOSAL = '44444444-4444-4444-8444-444444444444';
-const MEMORY = '55555555-5555-4555-8555-555555555555';
-const SOURCE = { threadId: THREAD, turnId: TURN, messageId: MESSAGE };
-const META = {
-  apiContractVersion: 'v0.9',
-  requestId: 's0-member-review',
-  serverTime: '2026-10-30T00:00:00Z',
-};
-const pending = { proposalId: PROPOSAL, proposalKind: 'memory',
-  proposalState: 'pending', shareState: 'private_not_accepted' };
-const accepted = { memoryItemId: MEMORY, grantCount: 0, replayed: false };
-const envelope = (data:unknown, status=200) =>
-  Response.json({ ok:true, data, meta:META }, {status});
+const candidate = Object.freeze({
+  sourceAuthority: 'server_dialogue_planner' as const,
+  characterId: 'seyeon' as const,
+  proposalId: PROPOSAL,
+  proposalKind: 'memory' as const,
+  proposalState: 'pending' as const,
+  summary: '사용자는 나비라는 고양이를 키운다',
+});
+const META = { apiContractVersion: 'v0.9', requestId: 'planner-decision',
+  serverTime: '2026-10-30T00:00:00Z' };
+const envelope = (data: unknown, status=200) =>
+  Response.json({ok:true,data,meta:META},{status});
+const ack = (decision: string) => ({
+  proposalId:PROPOSAL,decision,status:'resolved',
+  persisted:decision==='character_only'||decision==='current_characters',
+  grantCount:decision==='character_only'?1:decision==='current_characters'?2:0,
+});
 
-function setup() {
-  const fetchImpl = vi.fn(async (_url:string, _init?:RequestInit) =>
-    envelope(pending, 201));
-  const client = createSeyeonPrivateMemoryReviewClientV1({
-    fetchImpl, resolveBearer: () => ({ kind:'member', token:'member-v1' }),
-  });
-  return {client,fetchImpl};
-}
-
-describe('S0 private Memory: two distinct Member choices, no implicit character Grant', () => {
-  it('creates an original-source pending proposal, never an approved Memory or Grant', async () => {
-    const {client,fetchImpl} = setup();
-    const receipt = await client.prepareOriginalUserMessage(SOURCE);
-    expect(receipt).toEqual(pending);
-    expect(Object.isFrozen(receipt)).toBe(true);
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchImpl.mock.calls[0]!;
-    expect(url).toBe(`/api/chat/${THREAD}/turns/${TURN}/messages/${MESSAGE}/memory-proposal`);
-    expect(init).toMatchObject({
-      method:'POST', cache:'no-store', credentials:'same-origin',
-      headers:{Authorization:'Bearer member-v1','Content-Type':'application/json'},
-    });
-    expect(JSON.parse(init!.body as string)).toEqual({
-      proposalChoice:'private_original_message',
-    });
-    expect(receipt).not.toHaveProperty('memoryItemId');
-    expect(receipt).not.toHaveProperty('grantId');
+describe('UC-06/07 server Planner Memory Proposal decisions', () => {
+  it('does not create candidates from user Message text, IDs or browser summary', () => {
+    expect(isServerPlannerMemoryProposalV1(candidate)).toBe(true);
+    for (const wrong of [
+      null,
+      { ...candidate, sourceAuthority:'server_original_message' },
+      { ...candidate, proposalState:'accepted' },
+      { ...candidate, proposalId:'not-a-uuid' },
+      { ...candidate, summary:' ' },
+      { ...candidate, summary:'<fake>', rawBody:'client injected' },
+      { ...candidate, characterId:'other' },
+    ]) expect(isServerPlannerMemoryProposalV1(wrong)).toBe(false);
   });
 
-  it('demands a SECOND explicit Member choice and sends private-only accept',async()=>{
-    const {client,fetchImpl}=setup();
-    const receipt=await client.prepareOriginalUserMessage(SOURCE);
-    fetchImpl.mockImplementationOnce(async()=>envelope(accepted));
-    await expect(client.acceptPreparedPrivate(receipt, false)).rejects.toMatchObject({
-      code:'SEYEON_PRIVATE_MEMORY_NOT_APPROVED',
+  for(const choice of ['session_only','character_only','current_characters','discard'] as const) {
+    it(`accepts explicit ${choice} only with exact server receipt, without user content`,async()=>{
+      const fetchImpl=vi.fn(async(_path:string,_init?:RequestInit)=>envelope(ack(choice)));
+      const client=createSeyeonPrivateMemoryReviewClientV1({
+        fetchImpl, resolveBearer:()=>({kind:'member',token:'member-a'}),
+      });
+      const receipt=await client.decidePlannerProposal(candidate,choice,true);
+      expect(receipt).toEqual(ack(choice));
+      const [url,init]=fetchImpl.mock.calls[0]!;
+      expect(url).toBe(`/api/memory/proposals/${PROPOSAL}/decision`);
+      expect(init).toMatchObject({ method:'POST',cache:'no-store',
+        credentials:'same-origin',headers:{Authorization:'Bearer member-a'} });
+      expect(JSON.parse(init!.body as string)).toEqual({
+        choice:{mode:choice,...(choice==='character_only'?{characterId:'seyeon'}:{})},
+      });
+      expect(init!.body).not.toContain(candidate.summary);
+      await expect(client.decidePlannerProposal(candidate,choice,true))
+        .rejects.toMatchObject({code:'MEMORY_DECISION_NOT_APPROVED'});
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
     });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-    await expect(client.acceptPreparedPrivate(receipt, true)).resolves.toEqual({
-      memoryItemId:MEMORY, grantCount:0, shareState:'private_not_shared',
-    });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-    const [url,init]=fetchImpl.mock.calls[1]!;
-    expect(url).toBe(`/api/memory/proposals/${PROPOSAL}/accept`);
-    expect(init).toMatchObject({
-      method:'POST',cache:'no-store',credentials:'same-origin',
-      headers:{Authorization:'Bearer member-v1'},
-    });
-    expect(JSON.parse(init!.body as string)).toEqual({
-      grantChoice:{mode:'private'},
-    });
-    expect(await Promise.resolve(client.acceptPreparedPrivate(receipt,true))
-      .then(()=>null,e=>e.code)).toBe('SEYEON_PRIVATE_MEMORY_NOT_APPROVED');
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-  });
+  }
 
-  it('rejects forged proposal receipts even with a real pending id',async()=>{
-    const {client,fetchImpl}=setup();
-    const receipt=await client.prepareOriginalUserMessage(SOURCE);
-    await expect(client.acceptPreparedPrivate({...receipt},true)).rejects.toMatchObject({
-      code:'SEYEON_PRIVATE_MEMORY_NOT_APPROVED',
-    });
-    await expect(client.acceptPreparedPrivate({
-      ...receipt,shareState:'active' as never,
-    },true)).rejects.toMatchObject({code:'SEYEON_PRIVATE_MEMORY_NOT_APPROVED'});
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-  });
-
-  it('rejects extra content, invalid original IDs, and guests before transport',async()=>{
-    const {client,fetchImpl}=setup();
-    const forgedSource = {...SOURCE,summary:'injected'};
-    await expect(client.prepareOriginalUserMessage(forgedSource))
-      .rejects.toMatchObject({code:'SEYEON_MEMORY_REVIEW_SOURCE_INVALID'});
-    await expect(client.prepareOriginalUserMessage({...SOURCE,messageId:'forged'}))
-      .rejects.toMatchObject({code:'SEYEON_MEMORY_REVIEW_SOURCE_INVALID'});
-    expect(fetchImpl).not.toHaveBeenCalled();
+  it('rejects guest, invalid choice, unconfirmed approval and fake origin before transport',async()=>{
+    const fetchImpl=vi.fn(async()=>envelope(ack('discard')));
     const guest=createSeyeonPrivateMemoryReviewClientV1({
-      fetchImpl,resolveBearer:()=>({kind:'guest',token:'guest-v1'}),
+      fetchImpl,resolveBearer:()=>({kind:'guest',token:'guest-a'}),
     });
-    await expect(guest.prepareOriginalUserMessage(SOURCE)).rejects.toMatchObject({
-      code:'SEYEON_MEMORY_REVIEW_MEMBER_REQUIRED',
+    await expect(guest.decidePlannerProposal(candidate,'discard',true))
+      .rejects.toMatchObject({code:'MEMORY_DECISION_MEMBER_REQUIRED'});
+    const member=createSeyeonPrivateMemoryReviewClientV1({
+      fetchImpl,resolveBearer:()=>({kind:'member',token:'member-a'}),
     });
+    await expect(member.decidePlannerProposal(candidate,'discard',false))
+      .rejects.toMatchObject({code:'MEMORY_DECISION_NOT_APPROVED'});
+    await expect(member.decidePlannerProposal(candidate,'private' as never,true))
+      .rejects.toMatchObject({code:'MEMORY_DECISION_INVALID_PROPOSAL'});
+    await expect(member.decidePlannerProposal({...candidate,sourceAuthority:'server_original_message'} as never,'discard',true))
+      .rejects.toMatchObject({code:'MEMORY_DECISION_INVALID_PROPOSAL'});
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it('fails closed if server has no mounted route or returns a forged proposal',async()=>{
-    for(const response of [
+  it('rejects unmounted routes and mismatched/optimistic decision acknowledgements',async()=>{
+    const responses=[
       new Response(null,{status:404}),
       new Response(null,{status:503}),
-      envelope({...pending,proposalState:'accepted'},201),
-      envelope({...pending,shareState:'granted'},201),
-      envelope({...pending,memoryItemId:MEMORY},201),
-      Response.json({ok:false,error:{code:'HOLD'},meta:META},{status:201}),
-    ]){
+      envelope({...ack('character_only'),grantCount:0}),
+      envelope({...ack('character_only'),persisted:false}),
+      envelope({...ack('character_only'),grantId:PROPOSAL}),
+      envelope({...ack('discard'),decision:'character_only'}),
+      envelope({...ack('discard'),personalContent:'fake'}),
+    ];
+    for(const response of responses){
       const fetchImpl=vi.fn(async()=>response);
       const client=createSeyeonPrivateMemoryReviewClientV1({
         fetchImpl,resolveBearer:()=>({kind:'member',token:'member'}),
       });
-      await expect(client.prepareOriginalUserMessage(SOURCE)).rejects.toMatchObject({
-        code:'SEYEON_MEMORY_PROPOSAL_UNCONFIRMED',
-      });
+      await expect(client.decidePlannerProposal(candidate,'discard',true))
+        .rejects.toMatchObject({code:'MEMORY_DECISION_UNCONFIRMED'});
+      await expect(client.decidePlannerProposal(candidate,'discard',true))
+        .rejects.toMatchObject({code:'MEMORY_DECISION_NOT_APPROVED'});
       expect(fetchImpl).toHaveBeenCalledTimes(1);
     }
   });
 
-  it('never accepts a forged zero-Grant success or retries an uncertain acceptance',async()=>{
-    for(const value of [
-      {...accepted,grantCount:1},
-      {...accepted,replayed:true},
-      {...accepted,characterId:'seyeon'},
-      {...accepted,grantId:PROPOSAL},
-      {...accepted,memoryItemId:'wrong'},
-    ]){
-      const {client,fetchImpl}=setup();
-      const receipt=await client.prepareOriginalUserMessage(SOURCE);
-      fetchImpl.mockImplementationOnce(async()=>envelope(value));
-      await expect(client.acceptPreparedPrivate(receipt,true)).rejects.toMatchObject({
-        code:'SEYEON_PRIVATE_MEMORY_ACCEPT_UNCONFIRMED',
-      });
-      await expect(client.acceptPreparedPrivate(receipt,true)).rejects.toMatchObject({
-        code:'SEYEON_PRIVATE_MEMORY_NOT_APPROVED',
-      });
-      expect(fetchImpl).toHaveBeenCalledTimes(2);
-    }
-    const {client,fetchImpl}=setup();
-    const receipt=await client.prepareOriginalUserMessage(SOURCE);
-    fetchImpl.mockImplementationOnce(async()=>{throw Error('lost acknowledgement');});
-    await expect(client.acceptPreparedPrivate(receipt,true)).rejects.toMatchObject({
-      code:'SEYEON_PRIVATE_MEMORY_ACCEPT_UNCONFIRMED',
-    });
-    await expect(client.acceptPreparedPrivate(receipt,true)).rejects.toMatchObject({
-      code:'SEYEON_PRIVATE_MEMORY_NOT_APPROVED',
-    });
-    expect(fetchImpl).toHaveBeenCalledTimes(2);
-  });
-
-  it('does not accept if the Member session changes after proposal creation',async()=>{
-    let current='member-a';
-    const fetchImpl=vi.fn(async(_url:string,_init?:RequestInit)=>envelope(pending,201));
-    const client=createSeyeonPrivateMemoryReviewClientV1({
-      fetchImpl,resolveBearer:()=>({kind:'member',token:current}),
-    });
-    const receipt=await client.prepareOriginalUserMessage(SOURCE);
-    current='member-b';
-    await expect(client.acceptPreparedPrivate(receipt,true)).rejects.toMatchObject({
-      code:'SEYEON_MEMORY_REVIEW_SESSION_CHANGED',
-    });
-    expect(fetchImpl).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not acknowledge a response after the Member session rotates',async()=>{
+  it('refuses a success ACK after Member identity rotated',async()=>{
     let calls=0;
     const client=createSeyeonPrivateMemoryReviewClientV1({
-      fetchImpl:async()=>envelope(pending,201),
-      resolveBearer:()=>({kind:'member',token:++calls===1?'member-a':'member-b'}),
+      fetchImpl:async()=>envelope(ack('discard')),
+      resolveBearer:()=>({kind:'member',token:++calls===1?'a':'b'}),
     });
-    await expect(client.prepareOriginalUserMessage(SOURCE)).rejects.toMatchObject({
-      code:'SEYEON_MEMORY_REVIEW_SESSION_CHANGED',
-    });
+    await expect(client.decidePlannerProposal(candidate,'discard',true))
+      .rejects.toMatchObject({code:'MEMORY_DECISION_SESSION_CHANGED'});
   });
 });
 
-describe('S0 browser review surface activation boundary',()=>{
-  it('cannot mount without an exact server-owned original source offer',()=>{
+describe('UC-07 browser review surface',()=>{
+  it('does not mount from an original user message or forged candidate',()=>{
     vi.stubGlobal('HTMLElement',class HTMLElement {});
     try {
       const instance=new (globalThis.HTMLElement as typeof HTMLElement)();
       Object.defineProperty(instance,'isConnected',{value:true});
-      for(const originalSource of [
+      for(const plannerProposal of [
         null,
-        {...SOURCE,characterId:'seyeon',redacted:false},
-        {...SOURCE,sourceAuthority:'server_original_message',characterId:'other',redacted:false},
-        {...SOURCE,sourceAuthority:'server_original_message',characterId:'seyeon',redacted:true},
+        {sourceAuthority:'server_original_message',characterId:'seyeon'},
+        {...candidate,summary:'',},
       ]){
         expect(mountSeyeonPrivateMemoryReviewV1({
-          container:instance,originalSource,
+          container:instance,plannerProposal,
         } as never)).toBeNull();
       }
     }finally{vi.unstubAllGlobals();}
   });
-  it('connects review only to a verified per-message offer outside protected history',()=>{
+  it('Chat mounts only from server-owned Planner proposal with protected-history hold',()=>{
     const chat=readFileSync(new URL('./chat-runtime-client.js',import.meta.url),'utf8');
-    const records=readFileSync(new URL('./records-page.js',import.meta.url),'utf8');
     const read=readFileSync(new URL('./chat-room-read-contract.js',import.meta.url),'utf8');
+    const view=readFileSync(new URL('./seyeon-private-memory-review-view.js',import.meta.url),'utf8');
     expect(chat).toContain("if (!historyProtected && memberReadAllowed && authoritativeCharacterId === 'seyeon')");
-    expect(chat).toContain('const offer = messages[i]?.memoryProposalOffer');
-    expect(chat).toContain('mountSeyeonPrivateMemoryReviewV1({ container: body, originalSource: offer })');
-    expect(chat).toContain('latestBearer?.token !== activeBearer.token');
-    expect(read).toContain('serverOriginalMemoryOffer(message, threadId, roomCharacterId)');
-    expect(records).not.toContain('mountSeyeonPrivateMemoryReviewV1');
+    expect(chat).toContain('const proposal = messages[i]?.memoryProposal');
+    expect(chat).toContain('plannerProposal: proposal');
+    expect(chat).not.toContain('memoryProposalOffer');
+    expect(read).toContain('serverPlannerMemoryProposal(message, roomCharacterId)');
+    expect(read).toContain("fail('manual original-message Memory offer is unsupported')");
+    expect(view).toContain("'session_only'");
+    expect(view).toContain("'character_only'");
+    expect(view).toContain("'current_characters'");
+    expect(view).toContain("'discard'");
+    expect(view).not.toContain('prepareOriginalUserMessage');
   });
 });
