@@ -21,11 +21,11 @@ do $$ begin
  if (select count(*) from pg_catalog.pg_attribute where attrelid='public.seyeon_ai_call_cost_events'::regclass and not attisdropped and attname in ('governor_price_version','governor_receipt_pinned_at','governor_input_rate_micro_usd_per_million','governor_cached_input_rate_micro_usd_per_million','governor_output_rate_micro_usd_per_million'))=5 then
   execute 'grant select(governor_price_version,governor_receipt_pinned_at,governor_input_rate_micro_usd_per_million,governor_cached_input_rate_micro_usd_per_million,governor_output_rate_micro_usd_per_million) on public.seyeon_ai_call_cost_events to myeongha_admin_finance_source_reader';
  end if;
- if to_regclass('public.seyeon_ai_provider_receipt_queue_v1') is not null then
+ if exists(select 1 from pg_class where oid=to_regclass('public.seyeon_ai_provider_receipt_queue_v1') and relowner=(select oid from pg_roles where rolname=current_user)) then
   execute 'grant select(call_id,subject_id,provider_key,model_key,price_version,input_rate,cached_input_rate,output_rate) on public.seyeon_ai_provider_receipt_queue_v1 to myeongha_admin_finance_source_reader';
   execute 'create policy admin_finance_quote_source_v1 on public.seyeon_ai_provider_receipt_queue_v1 for select to myeongha_admin_finance_source_reader using(true)';
  end if;
- if to_regclass('public.seyeon_ai_governor_model_policies_v1') is not null then
+ if exists(select 1 from pg_class where oid=to_regclass('public.seyeon_ai_governor_model_policies_v1') and relowner=(select oid from pg_roles where rolname=current_user)) then
   execute 'grant select(provider_key,model_key,policy_version,price_version,input_micro_usd_per_million,cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active) on public.seyeon_ai_governor_model_policies_v1 to myeongha_admin_finance_source_reader';
   execute 'create policy admin_finance_price_source_v1 on public.seyeon_ai_governor_model_policies_v1 for select to myeongha_admin_finance_source_reader using(true)';
  end if;
@@ -57,7 +57,7 @@ begin
     and e.created_at>=CURRENT_TIMESTAMP-interval '90 days'
     and (p_subject is null or e.subject_id=p_subject) and (p_feature is null or e.phase=p_feature) and (p_model is null or e.model_key=p_model)
   order by e.created_at desc,e.call_id desc limit p_limit offset p_offset;
-  elsif to_regclass('public.seyeon_ai_provider_receipt_queue_v1') is not null then
+  elsif has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'call_id','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'subject_id','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'provider_key','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'model_key','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'price_version','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'input_rate','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'cached_input_rate','SELECT') and has_column_privilege(current_user,to_regclass('public.seyeon_ai_provider_receipt_queue_v1'),'output_rate','SELECT') then
   return query
   select e.call_id::text,e.subject_id::text,e.attempt_id::text,e.turn_id::text,e.created_at::text,
     e.phase,e.provider_key,e.model_key,e.outcome,e.price_version,
@@ -130,7 +130,7 @@ returns table(provider text,model text,"policyVersion" text,"priceVersion" text,
 language plpgsql stable security definer set search_path=pg_catalog,public as $$
 begin
  if p_limit is null or p_offset is null or p_limit not between 1 and 51 or p_offset not between 0 and 10000 or (p_model is not null and p_model !~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$') then raise exception 'Invalid bounded AI price read';end if;
- if to_regclass('public.seyeon_ai_governor_model_policies_v1') is null then raise exception 'AI rate source unavailable';end if;
+ if has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'provider_key','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'model_key','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'policy_version','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'price_version','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'input_micro_usd_per_million','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'cached_input_micro_usd_per_million','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'output_micro_usd_per_million','SELECT') is not true or has_column_privilege(current_user,to_regclass('public.seyeon_ai_governor_model_policies_v1'),'is_active','SELECT') is not true then raise exception 'AI rate source unavailable';end if;
  return query select p.provider_key,p.model_key,p.policy_version,p.price_version,p.input_micro_usd_per_million::text,
   p.cached_input_micro_usd_per_million::text,p.output_micro_usd_per_million::text,p.is_active,null::text,null::text,
   'stored_policy_version_effective_dates_unrecorded'::text from public.seyeon_ai_governor_model_policies_v1 p

@@ -22,6 +22,12 @@ do $$ declare result record;begin
   perform * from myeongha_admin_ops.qry_ai_finance_calls_v1(null,0,current_date-1,current_date,null,null,null);
   raise exception 'Unbounded null limit accepted';
  exception when others then if SQLERRM<>'Invalid bounded AI finance read' then raise;end if;end;
+ if has_column_privilege('myeongha_admin_finance_source_reader',to_regclass('public.seyeon_ai_governor_model_policies_v1'),'model_key','SELECT') is not true then
+  begin
+   perform * from myeongha_admin_ops.qry_ai_finance_prices_v1(20,0,null);
+   raise exception 'Unconnected price authority was reported as readable';
+  exception when raise_exception then if SQLERRM<>'AI rate source unavailable' then raise;end if;end;
+ end if;
  raise notice 'PASS AI finance nonempty cohort, missing cost, no false invoice/FX, raw JSON ACL and null-limit denial';
 end $$;
 rollback;
