@@ -42,7 +42,7 @@ function scenario(postStorageStatus = 403) {
       email: env.MH_DR_LOCAL_MEMBER_EMAIL, id: uuid,
     });
     if (url.includes('/storage/v1/object/')) {
-      if (deleted) return fake(marker ? postStorageStatus : 200);
+      if (marker) return fake(postStorageStatus);
       sourceRead = true;
       return fake(200);
     }
