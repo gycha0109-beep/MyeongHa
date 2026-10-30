@@ -17,6 +17,7 @@ import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
 import { proposeSeyeonOriginalUserMessageV1 } from '../apps/api/src/postgres-seyeon-original-message-proposal-v1.js';
+import { readSeyeonOriginalMessageReviewOfferV1 } from '../apps/api/src/postgres-seyeon-original-message-offer-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
@@ -79,6 +80,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function seyeon_private.cmd_propose_seyeon_original_message_v1(
         uuid,uuid,uuid,uuid,uuid) to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_original_message_offer_v1(
+        uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
         seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
@@ -281,6 +284,35 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       subjectId:f.subject,threadId:f.thread,turnId:f.turn,
       messageId:f.user,proposalId:proposal,
     };
+    // No public History Reveal. Test injection below represents an already
+    // approved, exact owner-scoped User Message; the DB verifies provenance.
+    const offerInput = {
+      subjectId:f.subject,threadId:f.thread,messageId:f.user,
+      revealedSource:{
+        threadId:f.thread,messageId:f.user,
+        senderType:'user' as const,characterId:'seyeon' as const,
+        redacted:false as const,historyWithheld:false as const,
+        memberReadAllowed:true as const,
+      },
+      approvedHistoryReveal:()=>true,
+    };
+    await expect(f.run(({client})=>readSeyeonOriginalMessageReviewOfferV1(client,{
+      ...offerInput,approvedHistoryReveal:()=>false,
+    }))).rejects.toMatchObject({code:'SEYEON_ORIGINAL_MEMORY_OFFER_UNAVAILABLE'});
+    const verifiedOffer=await f.run(({client})=>readSeyeonOriginalMessageReviewOfferV1(client,offerInput));
+    expect(verifiedOffer).toEqual({
+      sourceAuthority:'server_original_message',
+      characterId:'seyeon',redacted:false,threadId:f.thread,
+      turnId:f.turn,messageId:f.user,
+    });
+    expect(await f.run(({client})=>readSeyeonOriginalMessageReviewOfferV1(client,{
+      ...offerInput,messageId:f.assistant,
+      revealedSource:{...offerInput.revealedSource,messageId:f.assistant},
+    }))).toBeNull();
+    expect(await f.run(({client})=>readSeyeonOriginalMessageReviewOfferV1(client,{
+      ...offerInput,messageId:uuid(18,99),
+      revealedSource:{...offerInput.revealedSource,messageId:uuid(18,99)},
+    }))).toBeNull();
     const proposed = await f.run(({client})=>proposeSeyeonOriginalUserMessageV1(client,source));
     expect(proposed).toEqual({proposalId:proposal,proposalState:'pending',replayed:false});
     const proposedAgain = await f.run(({client})=>proposeSeyeonOriginalUserMessageV1(client,source));
