@@ -28,6 +28,16 @@ describe('Records Saju history surface', () => {
     expect(html).toContain('>대리가 기억<');
   });
 
+  it('supports keyboard Home and End for the report-first tablist without breaking arrow navigation', () => {
+    expect(page).toContain("if (event.key === 'Home') targetIndex = 0;");
+    expect(page).toContain("else if (event.key === 'End') targetIndex = tabs.length - 1;");
+    expect(page).toContain("event.key === 'ArrowLeft' || event.key === 'ArrowRight'");
+    expect(page).toContain("targetIndex = (index + delta + tabs.length) % tabs.length;");
+    expect(page).toContain('const next = tabs[targetIndex];');
+    expect(page).toContain('next.focus();');
+    expect(page).toContain('activate(next);');
+  });
+
   it('loads persisted Reading History with the same Records bearer', () => {
     expect(client).toContain("readings: '/api/readings'");
     expect(client).toContain("parseReadingHistoryPayloadV1");
