@@ -12,7 +12,7 @@ describe('Post-turn no-text OFF cleanup receipt', () => {
         return { rows: [{
           outboxEventId:'outbox',status:'processed',
           processedAt:'2026-10-30T00:00:00Z',reclaimed:false,
-        }] as Row[] };
+        }] as unknown as Row[] };
       },
     });
     await expect(port.completeOff({
