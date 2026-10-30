@@ -320,6 +320,16 @@ export class SeyeonProductionChatExecutionErrorV1 extends Error {
   }
 }
 
+/** A committed answer is not current permission to reveal its old bytes. */
+export class SeyeonCommittedReplayRevealHoldV1 extends SeyeonProductionChatExecutionErrorV1 {
+  readonly code = 'SEYEON_REPLAY_REVEAL_HOLD' as const;
+
+  constructor() {
+    super('Committed Chat replay reveal requires current source authorization.');
+    this.name = 'SeyeonCommittedReplayRevealHoldV1';
+  }
+}
+
 function boundedText(value: string, path: string, max: number): string {
   const normalized = value.trim();
   if (normalized.length === 0 || normalized.length > max) {
@@ -395,9 +405,7 @@ export function resolveSeyeonProductionCommittedReplayV1(
     }
     // G0/G3 have no current exact-Grant / derived-source revalidation at Reveal.
     // Committed material is not permission to send it again, even for old zero Pins.
-    throw new SeyeonProductionChatExecutionErrorV1(
-      'Committed Chat replay reveal requires current source authorization.',
-    );
+    throw new SeyeonCommittedReplayRevealHoldV1();
   }
 
   if (

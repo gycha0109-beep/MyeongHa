@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   resolveSeyeonProductionCommittedReplayV1,
   SeyeonProductionChatExecutionErrorV1,
+  SeyeonCommittedReplayRevealHoldV1,
   type SeyeonProductionChatReceivedTurnV1,
 } from '../apps/api/src/seyeon-production-chat-execution-v1.js';
 
@@ -42,7 +43,9 @@ describe('Se-yeon Production committed replay Reveal HOLD', () => {
         resolveSeyeonProductionCommittedReplayV1(candidate);
         throw new Error('Expected replay hold');
       } catch (error) {
-        expect(error).toBeInstanceOf(SeyeonProductionChatExecutionErrorV1);
+        expect(error).toBeInstanceOf(SeyeonCommittedReplayRevealHoldV1);
+        expect((error as SeyeonCommittedReplayRevealHoldV1).code)
+          .toBe('SEYEON_REPLAY_REVEAL_HOLD');
         expect((error as Error).message).toContain('requires current source authorization');
         expect((error as Error).message).not.toContain(secret);
       }
