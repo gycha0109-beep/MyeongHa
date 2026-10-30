@@ -135,7 +135,7 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - `seyeon-planner-memory-decision-http-v1.ts`는 **회원 인증, 본인 Subject DB 트랜잭션, 정확한 1개 선택, 내부 pending 제안 읽기/잠금, 단일 트랜잭션 결정, 결과 검증**을 구현한다. 클라이언트 Summary·원문·Grant ID·대상 캐릭터 목록 입력은 금지한다. 승인 callback이나 검증 가능한 DB 구현이 없으면 503이다.
 - `10-planner-memory-decision-source.sql` / `postgres-seyeon-planner-memory-decision-source-v1.ts`는 S0 단독 세연 대화의 **확정된 세연 Character Message**에 연결된 `proposal_dedupe_key='seyeon-dialogue-planner:v1'` pending Proposal만 원본 테이블에서 잠금 검증한다. 원본·제안 Summary를 반환하지 않으며, 사용자의 수동 UserMessage Proposal을 Planner 제안으로 인정하지 않는다. 기본 API 역할은 신규 RPC를 실행할 수 없다. 격리 PG17 합성 테스트에서만 제한된 권한을 임시 허용한다.
 - `seyeon-planner-memory-decision-commit-v1.ts`는 **S0 Memory 한 건, 세연 Grant 한 건**에 한하여 기존 비공개 수락 Owner RPC와 명시 Grant Owner RPC를 같은 DB 트랜잭션에서 차례로 실행한다. `current_characters`도 DB 현재 집합이 세연 단독일 때만 이 경로로 처리한다.
-- **아직 구현/승인되지 않은 부분을 지원한다고 간주하지 않는다.** `session_only`/`discard`에서 pending 제안의 개인정보를 장기 보관하지 않도록 지우는 DB 동작(SRC-05), `current_characters`의 실제 다중 캐릭터 Grant, Life Fact persistence, 실제 대화 Post-turn Worker에서의 Planner 추출 실행 연결, 최종 캐릭터 메시지와 pending 제안의 공개 가능한 G3 응답 결속은 미완료이다.
+- **아직 구현/승인되지 않은 부분을 지원한다고 간주하지 않는다.** `session_only`/`discard`의 비영구 처리는 S0 격리 DB Owner 명령으로 구현했으나 운영 및 전체 개인정보 보존 계약(SRC-05)은 미완료이다. `current_characters`의 실제 다중 캐릭터 Grant, Life Fact persistence, 실제 대화 Post-turn Worker의 Planner 추출 실행 연결, 최종 캐릭터 메시지와 pending 제안의 G3 공개 권한 연결은 여전히 HOLD다.
 - `production-seyeon-planner-memory-decision-runtime-v1.ts`는 실제 Production identity verifier/DB pool/소유 DB adapter를 조립하지만 **public router 미마운트, admission 기본 DENY, 승인 없는 운영 실행 불가** 상태다.
 - 새 S0 격리 SQL은 `supabase/migrations`에 추가하지 않았고 실제 운영 DB·ACL·registry·모델/Worker는 변경하지 않았다. G0~G6 및 SRC-25 승인 전 `HOLD_FORWARD_STOPPED`를 유지한다.
 
@@ -147,3 +147,11 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - `seyeon_private.planner_memory_proposal_sources_v1` DB Owner 전용 출처 테이블에서 **진짜 소유 함수가 생성한 제안**과 User/Assistant 메시지 및 Turn을 바인딩한다. `10-planner-memory-decision-source.sql`이 이 출처를 확인해야만 UC-07 승인 검토가 가능하다. `proposal_dedupe_key` 문구를 수동 INSERT한 것만으로는 위조할 수 없다. 일반 API·Member·Guest·service role에는 테이블/생성 RPC 직접 접근을 열지 않는다.
 - PostgreSQL 17 격리 합성 테스트는 이제 원래의 직접 `memory_proposals` INSERT 대신 DB Owner Producer를 호출하여 **제안 → 승인 전 Memory 0건 → 본인 승인 후 Memory/Grant 각 1건**, 동일 제안 재시도/근거 없는 사용자 메시지/출처 없는 가짜 Planner 행 거부를 검증한다.
 - **운영 미완료**: 실제 Dialogue Planner/후처리 Worker에 자동 후보 생성 호출 연결, 기존 AI Governor의 해당 purpose에 대한 정확한 예산/모델 승인, 개인정보 보존기간/제안 폐기, G3 현재 접근권한에 의한 제안 렌더링, G0~G6 검증/승인. 현재 `HOLD_FORWARD_STOPPED`; 새 SQL은 운영 Migration에 포함되지 않으며 DB ACL/공용 Router/유료 호출을 활성화하지 않는다.
+
+### UC-07 비영구 선택 2가지 S0 DB Owner 결정 (운영 HOLD)
+
+- `12-planner-memory-non-durable-decision.sql`의 `seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1`는 DB Owner가 확인한 **진짜 pending Planner 제안**에 대해서만 `session_only` / `discard` 결정이 가능하다. 동일 Subject/Turn의 원본 캐릭터·사용자 메시지와 Owner 발급 출처가 일치해야 한다.
+- `session_only`는 장기 Memory/Grant 없이 제안 상태를 `expired`로 확정하고 `proposed_value_jsonb={}`로 지운다. 원래 대화 자체는 기존 채팅 Session/History 계약을 따른다. `discard`는 `rejected`로 확정하고 같은 방식으로 후보 내용을 지운다.
+- `postgres-seyeon-planner-non-durable-decision-v1.ts` 및 `commitSeyeonPlannerMemoryDecisionS0V1`는 기존 Character-only 수락·Grant Owner 경로와 함께 네 가지 UX 선택을 하나의 DB 트랜잭션 결정 분기로 연결한다. 복수 캐릭터와 Life Fact 수락은 여전히 명시적으로 HOLD한다.
+- 합성 PostgreSQL 17 테스트에서 두 선택의 **제안 내용 삭제, 새 Memory 0건, Grant 0건, Replay 차단**을 검증하도록 추가했다. 일반 API EXECUTE는 기본 DENY, Producer/Decision/RPC는 운영 Migration 및 공용 Router에 마운트하지 않았다.
+- `session_only`의 현 대화 Context 반영과 정책적 보존기간/TTL, 과거 G3 권한 검증, 실제 Renderer/UI 공개와 실제 Post-turn Worker 자동 실행은 미완료이다. 테스트 GREEN만으로 구현 전체 또는 운영 승인 완료라고 간주하지 않는다.
