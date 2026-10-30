@@ -46,7 +46,7 @@ export class SeyeonRelationshipSyncSourceAuthorityHoldV1 extends Error {
 /** Production cannot consume historical relationship Outbox material until
  * a DB-owner current-original-Grant + derived-lineage gate is connected.
  */
-export function assertSeyeonRelationshipSyncCurrentSourceAuthorityV1(): never {
+export function assertSeyeonRelationshipSyncCurrentSourceAuthorityV1(): void {
   throw new SeyeonRelationshipSyncSourceAuthorityHoldV1();
 }
 
