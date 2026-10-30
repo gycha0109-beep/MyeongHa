@@ -129,6 +129,59 @@ describe('mobile Chat read repository', () => {
     expect(calls).toEqual([0, 2]);
   });
 
+  it.each([
+    ['AUTH_REQUIRED', 401],
+    ['FORBIDDEN', 403],
+    ['NOT_FOUND', 404],
+  ] as const)('discards cached owner data on subsequent %s (%i) denial', async (code, status) => {
+    const privateCanary = 'PREVIOUS_OWNER_PRIVATE_CHAT';
+    let calls = 0;
+    const service: MobileChatReadServiceV1 = {
+      async readThreadPage(_threadId, options = {}) {
+        calls++;
+        if ((options.afterSequenceNo ?? 0) !== 0) {
+          throw new MyeongHaApiClientErrorV1(
+            'http', code, 'Current authorization denied.', status, false,
+          );
+        }
+        return {
+          ...threadPage(0, [{ ...msg(1), bodyText: privateCanary }, msg(2)], true),
+          relationship: {
+            stateId: 'prior-owner-relationship',
+            characterId: 'baekheon',
+            closeness: 1,
+            trust: 1,
+            friction: 0,
+            relationshipStage: 'private',
+            policyVersion: 'v1',
+            revision: 1,
+            lastInteractionAt: null,
+            updatedAt: '2026-10-30T00:00:00.000Z',
+          },
+        };
+      },
+    };
+    const repository = createMobileChatReadRepositoryV1({ threadId, service, pageSize: 2 });
+    await repository.loadInitial();
+    await expect(repository.loadMore()).rejects.toMatchObject({ code });
+    expect(repository.getSnapshot()).toMatchObject({
+      status: 'error',
+      errorCode: code,
+      messages: [],
+      characterId: null,
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+      contentReleaseId: null,
+      contentBundleId: null,
+      contentRevision: null,
+    });
+    expect(JSON.stringify(repository.getSnapshot())).not.toContain(privateCanary);
+    expect(JSON.stringify(repository.getSnapshot())).not.toContain('prior-owner-relationship');
+    await repository.loadMore();
+    expect(calls).toBe(2);
+  });
+
   it('keeps previously verified pages for ordinary transient continuation errors', async () => {
     const service: MobileChatReadServiceV1 = {
       async readThreadPage(_threadId, options = {}) {
@@ -174,6 +227,11 @@ describe('mobile Chat read repository', () => {
     expect(repository.getSnapshot()).toMatchObject({
       status: 'error',
       errorCode: 'CHAT_PAGINATION_PROTOCOL_ERROR',
+      characterId: null,
+      messages: [],
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
     });
   });
 
@@ -191,6 +249,16 @@ describe('mobile Chat read repository', () => {
     await repository.loadInitial();
     await expect(repository.loadMore()).rejects.toMatchObject({
       code: 'CHAT_THREAD_BINDING_CHANGED',
+    });
+    expect(repository.getSnapshot()).toMatchObject({
+      status: 'error',
+      errorCode: 'CHAT_THREAD_BINDING_CHANGED',
+      characterId: null,
+      messages: [],
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+      contentReleaseId: null,
     });
   });
 
