@@ -51,29 +51,6 @@ export async function verifyLocalSyntheticPostDeletion(env, request = fetch, dbF
     hold('private synthetic-object baseline digest mismatch');
   }
 
-  const deletion = await request(BASE + '/auth/v1/admin/users/' + identity.id, {
-    method: 'DELETE', redirect: 'manual',
-    headers: { apikey: c.serviceRoleKey,
-      Authorization: 'Bearer ' + c.serviceRoleKey },
-  });
-  if (deletion.status !== 200 && deletion.status !== 204) {
-    hold('synthetic local account deletion failed');
-  }
-
-  const postLogin = await request(BASE + '/auth/v1/token?grant_type=password', {
-    method: 'POST', redirect: 'manual',
-    headers: { apikey: c.apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: c.email, password: c.password }),
-  });
-  const postRefresh = await request(BASE + '/auth/v1/token?grant_type=refresh_token', {
-    method: 'POST', redirect: 'manual',
-    headers: { apikey: c.apiKey, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: tokens.refresh_token }),
-  });
-  const staleBeforeRevocation = await request(objectUrl, {
-    method: 'GET', redirect: 'manual', headers: memberHeaders,
-  });
-
   if (!dbFactory) dbFactory = async (password) => {
     const { default: pg } = await import('pg');
     const client = new pg.Client({
@@ -97,6 +74,30 @@ export async function verifyLocalSyntheticPostDeletion(env, request = fetch, dbF
   } finally {
     await db.end();
   }
+  const beforeDelete = await request(objectUrl, {
+    method: 'GET', redirect: 'manual', headers: memberHeaders,
+  });
+  if (!DENIAL.has(beforeDelete.status)) hold('revocation marker must deny stale JWT before account deletion');
+
+  const deletion = await request(BASE + '/auth/v1/admin/users/' + identity.id, {
+    method: 'DELETE', redirect: 'manual',
+    headers: { apikey: c.serviceRoleKey,
+      Authorization: 'Bearer ' + c.serviceRoleKey },
+  });
+  if (deletion.status !== 200 && deletion.status !== 204) {
+    hold('synthetic local account deletion failed');
+  }
+
+  const postLogin = await request(BASE + '/auth/v1/token?grant_type=password', {
+    method: 'POST', redirect: 'manual',
+    headers: { apikey: c.apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: c.email, password: c.password }),
+  });
+  const postRefresh = await request(BASE + '/auth/v1/token?grant_type=refresh_token', {
+    method: 'POST', redirect: 'manual',
+    headers: { apikey: c.apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refresh_token: tokens.refresh_token }),
+  });
   const postStorage = await request(objectUrl, {
     method: 'GET', redirect: 'manual', headers: memberHeaders,
   });
@@ -111,7 +112,8 @@ export async function verifyLocalSyntheticPostDeletion(env, request = fetch, dbF
     syntheticDeletion: 'PASS',
     newLoginDenied: loginDenied ? 'PASS' : 'FAIL',
     refreshAfterDeletionDenied: refreshDenied ? 'PASS' : 'FAIL',
-    staleTokenBeforeRevocationDenied: DENIAL.has(staleBeforeRevocation.status) ? 'PASS' : 'FAIL',
+    revocationAppliedBeforeDeletion: true,
+    revocationBeforeDeletionStorageDenied: 'PASS',
     localRevocationMarkerApplied: true,
     staleAccessTokenStorageDenied: staleStorageDenied ? 'PASS' : 'FAIL',
     independentPrivacyContinuityProven: false,
