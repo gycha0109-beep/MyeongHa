@@ -99,7 +99,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       .replaceAll('first-zero-test-v1', 'first-zero-test-v1-' + n)
       .replaceAll('first-zero-test-release', 'first-zero-test-release-' + n)
       .replaceAll('first-zero-disposable-v1', uuid(30, n))
-      .replaceAll("repeat('a',64)", "repeat('" + n.toString(16) + "',64)")
+      .replaceAll("repeat('a',64)", "repeat('" + (n % 15 || 15).toString(16) + "',64)")
       .replaceAll('Synthetic first hello', userText);
     await pool.query(adapt(baseline.slice(0, seedEnd)));
     await pool.query(`insert into public.memory_items(
@@ -329,9 +329,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
 
 
   it('DB Planner Character source admits atomic Member Memory+Grant, manual UserMessage denied',async()=>{
-    const f=await prepare(13);
+    // Dedicated S0 Planner fixture namespace (201-202); history-presence uses 13.
+    const f=await prepare(201);
     await f.commit();
-    const id=uuid(27,13);
+    const id=uuid(27,201);
     const insert=`insert into public.memory_proposals(
       id,subject_id,character_id,proposal_kind,record_type,schema_version,
       proposed_value_jsonb,source_turn_id,source_message_id,proposal_dedupe_key,
@@ -365,9 +366,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       client,canonicalMemberSubjectId:f.subject,proposalId:id,
     }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
 
-    const other=await prepare(14);
+    const other=await prepare(202);
     await other.commit();
-    const manual=uuid(27,14);
+    const manual=uuid(27,202);
     await pool.query(insert,[manual,other.subject,JSON.stringify({summary:'synthetic user text'}),
       other.turn,other.user]);
     await expect(other.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
