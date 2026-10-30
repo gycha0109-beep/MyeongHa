@@ -29,7 +29,7 @@ describe('UC-06 server Dialogue Planner Memory candidate',()=>{
   it('returns none without a Memory decision or a storage request',async()=>{
     const provider={
       providerKey:'synthetic',modelKey:'synthetic',
-      generate:vi.fn(async()=>({decision:'none'})),
+      generate:vi.fn(async(_request:{purpose:string})=>({decision:'none'})),
     };
     expect(await extractSeyeonPlannerMemoryCandidateV1({...source,provider}))
       .toEqual({decision:'none'});
@@ -97,13 +97,13 @@ describe('UC-06 server Dialogue Planner Memory candidate',()=>{
       // The producer enforces shape; model-origin quote grounding is checked
       // separately by extractor and DB original-row lookup.
       if(incorrect.summary===source.userText)continue;
-      await expect(createPendingSeyeonPlannerMemoryProposalV1({query},{
+      await expect(createPendingSeyeonPlannerMemoryProposalV1({query:query as never},{
         canonicalMemberSubjectId:SUBJECT,proposalId:PROPOSAL,turnId:TURN,
         userMessageId:USER,assistantMessageId:ASSISTANT,
         candidate:incorrect,
       })).rejects.toThrow();
     }
-    await expect(createPendingSeyeonPlannerMemoryProposalV1({query},{
+    await expect(createPendingSeyeonPlannerMemoryProposalV1({query:query as never},{
       canonicalMemberSubjectId:SUBJECT,proposalId:PROPOSAL,turnId:TURN,
       userMessageId:USER,assistantMessageId:USER,candidate,
     })).rejects.toThrow();
