@@ -67,7 +67,33 @@ export function parseChatThreadRouteV1(search) {
     : Object.freeze({ state: 'ready', threadId });
 }
 
-function parseMessage(message, previousSequenceNo, seenMessageIds) {
+function serverOriginalMemoryOffer(message, threadId, roomCharacterId) {
+  if (!Object.prototype.hasOwnProperty.call(message, 'memoryProposalOffer')) return undefined;
+  const offer = message.memoryProposalOffer;
+  if (offer === null || typeof offer !== 'object' || Array.isArray(offer) ||
+      Object.keys(offer).length !== 6 ||
+      !['sourceAuthority', 'characterId', 'redacted', 'threadId', 'turnId', 'messageId']
+        .every((key) => Object.prototype.hasOwnProperty.call(offer, key)) ||
+      offer.sourceAuthority !== 'server_original_message' ||
+      offer.characterId !== 'seyeon' || offer.redacted !== false ||
+      roomCharacterId !== 'seyeon' || message.senderType !== 'user' ||
+      message.redacted !== false ||
+      typeof message.bodyText !== 'string' || !message.bodyText.trim() ||
+      offer.threadId !== threadId || offer.messageId !== message.messageId ||
+      !UUID_V1.test(offer.turnId)) {
+    fail('original Memory offer lacks exact server-origin message authority');
+  }
+  return Object.freeze({
+    sourceAuthority: 'server_original_message',
+    characterId: 'seyeon',
+    redacted: false,
+    threadId,
+    turnId: offer.turnId,
+    messageId: message.messageId,
+  });
+}
+
+function parseMessage(message, previousSequenceNo, seenMessageIds, threadId, roomCharacterId) {
   if (!message || typeof message !== 'object' || Array.isArray(message)) {
     fail('message is invalid');
   }
@@ -98,6 +124,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
     fail('visible message contains redactedAt');
   }
 
+  const memoryProposalOffer = serverOriginalMemoryOffer(message, threadId, roomCharacterId);
   seenMessageIds.add(messageId);
   return Object.freeze({
     messageId,
@@ -108,6 +135,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
     createdAt,
     redacted: message.redacted,
     redactedAt,
+    ...(memoryProposalOffer === undefined ? {} : { memoryProposalOffer }),
   });
 }
 
@@ -179,7 +207,7 @@ export function parseChatRoomReadPayloadV1(payload, options) {
   let previousSequenceNo = afterSequenceNo;
   const seenMessageIds = new Set();
   const messages = payload.messages.map((message) => {
-    const parsed = parseMessage(message, previousSequenceNo, seenMessageIds);
+    const parsed = parseMessage(message, previousSequenceNo, seenMessageIds, threadId, characterId);
     previousSequenceNo = parsed.sequenceNo;
     return parsed;
   });
