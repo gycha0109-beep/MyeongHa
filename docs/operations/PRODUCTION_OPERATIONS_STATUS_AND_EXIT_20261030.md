@@ -8,6 +8,21 @@
 >
 > 최종 판정: **코드·배포·익명 운영 점검 일부 확인 / 전체 Production Operations ACCEPTANCE = 미완료**. `dr_ready=false`, `serviceResumptionAllowed=false` 상태를 변경하지 않음.
 
+## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
+
+**이 절은 아래 §3.2와 §5의 구버전/미수용 항목 중 같은 엔드포인트·같은 조건을 대상으로 한 과거 상태보다 최신 증거**이다. 현재 운영 준비 전체가 완료되었다는 뜻이 아니라 **배포된 정확한 버전에 연결한 검증 부분집합**의 최신 관측이다.
+
+- **고정 소스:** 병합된 \`main\` \`c49d9815f0ddce16afd086528529ddac2674e149\` — [CI #41020132039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41020132039) SUCCESS, [Governance #41020132023](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41020132023) SUCCESS.
+- **공급자 배포:** Worker \`myeongha\`, deployment \`b09a6c35-43db-463b-9d9e-254e467fd869\`, 2026-10-30T07:27:43.958354Z, exact version **\`f549bc9f-eb92-4f7d-a65c-c71a4b4568f0\`** 100%. Linked Workers Build \`5a8676b5-5b61-4ef6-b765-200fcf598ebb\`, outcome SUCCESS, pushed \`main\` source SHA exactly matching the above.
+- **양성 로그인/DB/Saju:** [governed Production workflow #41022084481](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41022084481), completed SUCCESS, 2026-10-30T07:46:25Z. Workflow input was the independently read exact version \`f549bc9f-...\` (version header enforced before Member credential use). The sanitized actual verifier result is \`mode=authenticated\`, \`result=PASS\`, **18 checks**. Positive: Member sign-in \`200\`, authoritative current-subject DB read \`200\`, Birth Profile revision \`200\`, calculation-only Saju \`200\`. Negative: anonymous Member/Saju/preview \`401\`, cross-origin sign-in \`403\`, guarded Chat HOLD \`503\`, plus health/readiness/security fencing. No real payment, interpretation or chat output was requested. This proves successful live **calculation-only** integration at this version; not all Saju interpretation contracts or infrastructure capacity.
+- **같은 배포 버전의 익명 ingress:** [governed Production workflow #41022755702](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41022755702), completed SUCCESS, 2026-10-30T07:52:40Z. Sanitized actual \`mode=operations\`, \`result=PASS\`, header \`observedWorkerVersion=f549bc9f-eb92-4f7d-a65c-c71a4b4568f0\`, **11 checks**: static root/hall \`200\`, health \`200\`, POST health \`405\`, configuration readiness \`200\`, anonymous Member/Saju/preview \`401\`, cross-origin sign-in \`403\`, unknown API \`404\`, operations admission \`PASS\`; applicable API no-store, security headers and non-reflection gates enforced.
+- **한정된 실제 메트릭:** Cloudflare GraphQL Workers adaptive dataset, script \`myeongha\`, exact version \`f549bc9f-...\`, window \`2026-10-30T07:27:43Z..07:54:00Z\` returned \`sum.requests=108\`, \`sum.errors=0\`, \`sum.subrequests=89\`. Aggregated provider sample; 0 errors in this bounded query **does not prove** zero user-visible 4xx/5xx, DB/Saju latency, capacity threshold or SLO compliance.
+- **롤백 후보 인벤토리(실행하지 않음):** 직전 Worker deployment \`66739717-fe96-4103-9b25-6d63f2b007bf\` at \`2026-10-30T07:22:50Z\`, version \`9c79b61f-69b5-42e5-a5fa-a46257fafa03\` previously 100%, build \`e433919f-5f6e-4ba0-8aef-848f1e57d15d\` SUCCESS from \`main\` \`80268c01913d33bf6a68f1d230a7f4766aeca4e3\`. **되돌릴 후보의 식별만 완료**, 그 버전의 종속성·스키마 호환성 및 실제 복귀 drill은 미실증이며 즉시 롤백을 승인하는 근거가 아님.
+
+**이번 실제로 진전된 §33 범위:** ① 주 Worker 소스/버전 연결, ② 배포 상태, ④ live liveness, ⑤ *설정 기반* readiness, ⑥ 익명 음성 인증, ⑦ 합성/전용 Member를 이용한 양성 로그인·DB·Saju 계산, ⑧ 위 경로에서의 실제 의존성 호출, ⑨ *계산-only* Saju 연동, ⑩ API 응답 캐시 헤더, ⑪ 해당 응답에서의 제한된 비밀 반사 음성검증, ⑬ Worker 집계 메트릭, ⑭ 기술적 롤백 후보 **식별**의 각 범위. ③ 전체 구성 preflight/비밀 회전, ⑤의 지속적인 의존성 readiness, ⑨의 전체 Saju 계약, ⑩의 모든 실제 개인 데이터 응답, ⑪의 모든 본문/로그, ⑫ 로그 실측·redaction, ⑬ 종단간 지표·경보, ⑭ 복귀 drill, Phase 7 장애 주입, Phase 10–12 용량 실측, Phase 8 **DR/Hosted Auth-Storage 전체 복구**는 별도 증거가 필요하다. 전체 \`Production Operations ACCEPTANCE\`는 **미완료**, \`dr_ready=false\`, \`serviceResumptionAllowed=false\` 유지.
+
+재검증/승격 규칙: 배포 버전이 바뀌면 해당 새 버전의 워크플로 결과 없이 기존 실측을 자동 승격하지 않는다. Auth/DB/Saju 건강이 영구히 보장되는 것이 아니며, 결과는 각 실행 시각의 관찰이다. 아래 최초 2026-10-30 기준 스냅샷의 과거 RED/미확인은 지우지 않고 이 최신 추가 기록으로 시간 범위를 명확히 한다.
+
 ## 1. 트랙의 구현 목적과 최종 엔드포인트(종료 상태)
 
 **목적:** 명하의 실제 운영 경로가 어떤 소스·설정·의존성으로 서비스되는지 추적하고, 배포·비밀 관리·관측·장애 격리·캐시 보호·성능/용량·백업/복구를 **검증 가능한 증거**로 관리하여 문제가 생겼을 때 안전하게 중단·복원할 수 있도록 하는 것. 기능·사주 해석 결과의 품질 개선 트랙이나 다른 서비스의 임의 기능 구현 트랙이 아님.
@@ -136,6 +151,8 @@ Cloudflare Provider observability 설정은 `enabled=true`, `logs.enabled=true`,
 | Saju/DB/복구 책임 경계 | [`POSTGRES_DR_READINESS_STATUS_V1.md`](POSTGRES_DR_READINESS_STATUS_V1.md), [`HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md`](HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md) |
 | Phase 9–12 근거 | [캐시](API_CACHE_ISOLATION_PHASE9_20261030.md), [지연](API_PERFORMANCE_BASELINE_PHASE10_20261030.md), [부하](API_CONTROLLED_CAPACITY_PHASE11_20261030.md), [확장](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md) |
 | Phase 13 구체적 운영 evidence | [`MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md`](MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md) 및 [PR #2770 실측 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2770) |
+
+**최신 실측 증거:** 이 보고서 상단의 2026-10-30 16:52 KST 추가 검증이 아래 초기 §3.2/§5 스냅샷보다 최신입니다.
 
 **보고서 자체의 한계:** 이 파일을 병합하는 것은 **현황과 종료 조건의 권위 있는 스냅샷 기록**이지 Phase 1–13 수용의 완료 또는 새로운 Production 배포에 대한 자동 보증이 아님. 병합 후 main SHA나 Worker 버전이 바뀌면 재확인해야 함.
 
