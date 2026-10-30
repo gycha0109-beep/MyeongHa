@@ -130,7 +130,7 @@ async function serve() {
         return;
       }
 
-      if (['/api/me', '/api/life-record', '/api/readings', '/api/memories'].includes(pathname) && req.method === 'GET') {
+      if (['/api/me', '/api/life-record', '/api/readings'].includes(pathname) && req.method === 'GET') {
         requests.push({ path: pathname, authorization });
         if (authorization !== `Bearer ${member.accessToken}`) {
           sendJson(res, 401, authError());
@@ -179,8 +179,7 @@ async function serve() {
           sendJson(res, 200, envelope({ readings: [reading], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
           return;
         }
-        sendJson(res, 200, envelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
-        return;
+        throw new Error(`Unexpected Records endpoint: ${pathname}`);
       }
 
       if (pathname.startsWith('/api/')) {
@@ -352,8 +351,8 @@ try {
   assert(session?.user?.id === member.id, 'Records browser stored the wrong Member identity');
   assert(session?.accessToken === member.accessToken, 'Records browser stored the wrong Member access token');
 
-  const recordsRequests = requests.filter((request) => ['/api/me', '/api/life-record', '/api/readings', '/api/memories'].includes(request.path));
-  assert(recordsRequests.length === 4, `Expected four Records API requests, received ${recordsRequests.length}`);
+  const recordsRequests = requests.filter((request) => ['/api/me', '/api/life-record', '/api/readings'].includes(request.path));
+  assert(recordsRequests.length === 3, `Expected three Records API requests, received ${recordsRequests.length}`);
   assert(recordsRequests[0].path === '/api/me', 'Records did not validate canonical /api/me before reading ledgers');
   for (const request of recordsRequests) {
     assert(request.authorization === `Bearer ${member.accessToken}`, `${request.path} did not use the active Member bearer`);
