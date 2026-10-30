@@ -2,8 +2,9 @@
 begin;
 -- G0-D1/D2/D3 core: exact original Memory -> committed Assistant -> current
 -- original Grant/Record lineage on the SAME DB read transaction.
--- STAGED ONLY. Not in plan.mjs, auto migration or Production installation.
--- This authorizes neither old User text nor Relationship/Reader derived data.
+-- Staged only in the S0 isolated SQL plan. No auto Production migration.
+-- Historical User originals require S0/15; Relationship events require
+-- S0/14 source verification; Reader and quoted derived data remain HOLD.
 -- Unknown lineage FAILS CLOSED, rather than silently becoming NO_PERSONAL.
 
 -- Use the existing S0 runtime owner, original G1 pin and G2 validated
@@ -137,8 +138,8 @@ $original_lineage$;
 
 -- Read a whole model-context window, never a subset after dropping an
 -- unproven row. Lock/authorize EVERY candidate BEFORE reading ANY body_text.
--- The current canonical User message is a separate live-input authority;
--- historic User/system content has no origin proof yet and must remain HOLD.
+-- The current canonical User message remains separate live-input authority.
+-- Historical User source requires exact committed Member Turn proof in S0/15.
 create function public.qry_seyeon_g0_current_source_recent_messages_v1(
   p_subject_id uuid, p_thread_id uuid,
   p_current_user_message_id uuid, p_limit integer
@@ -203,6 +204,10 @@ begin
           constraint='seyeon_g0_current_user_source_invalid',
           message='Current model context source is unavailable';
       end if;
+    elsif v_row.sender_type='user' and v_row.character_id is null then
+      perform seyeon_private.assert_current_original_member_user_message_v1(
+        p_subject_id,p_thread_id,v_row.id
+      );
     elsif v_row.sender_type='character'
           and v_row.character_id='seyeon' then
       perform seyeon_private.assert_current_original_assistant_lineage_v1(
@@ -242,8 +247,7 @@ begin
   where m.subject_id=p_subject_id and m.thread_id=p_thread_id
     and m.redacted_at is null and m.body_text is not null
     and (
-      (m.id=p_current_user_message_id and m.sender_type='user'
-       and c.character_id is null)
+      (m.sender_type='user' and c.character_id is null)
       or (m.id<>p_current_user_message_id and m.sender_type='character'
           and c.character_id='seyeon')
     )
