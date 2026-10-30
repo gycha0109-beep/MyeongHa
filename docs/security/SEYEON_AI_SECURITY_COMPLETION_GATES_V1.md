@@ -155,3 +155,15 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - `postgres-seyeon-planner-non-durable-decision-v1.ts` 및 `commitSeyeonPlannerMemoryDecisionS0V1`는 기존 Character-only 수락·Grant Owner 경로와 함께 네 가지 UX 선택을 하나의 DB 트랜잭션 결정 분기로 연결한다. 복수 캐릭터와 Life Fact 수락은 여전히 명시적으로 HOLD한다.
 - 합성 PostgreSQL 17 테스트에서 두 선택의 **제안 내용 삭제, 새 Memory 0건, Grant 0건, Replay 차단**을 검증하도록 추가했다. 일반 API EXECUTE는 기본 DENY, Producer/Decision/RPC는 운영 Migration 및 공용 Router에 마운트하지 않았다.
 - `session_only`의 현 대화 Context 반영과 정책적 보존기간/TTL, 과거 G3 권한 검증, 실제 Renderer/UI 공개와 실제 Post-turn Worker 자동 실행은 미완료이다. 테스트 GREEN만으로 구현 전체 또는 운영 승인 완료라고 간주하지 않는다.
+
+
+## Worklog — Security / Character Memory UC-06·UC-07
+
+> 작성 규칙 (2026-10-30부터 적용): 각 실제 작업 단위가 끝날 때마다 **작업 내용·변경 파일·커밋·확인한 CI 결과·미완료/차단**을 이 문서에 누적한다. CI의 대상 SHA와 실행 완료 여부를 구분하고, 아직 실운영에 연결되지 않은 코드를 '완료'로 표시하지 않는다. 최신 기록을 아래쪽에 추가한다.
+
+### 2026-10-30 · W01 · Post-turn 자동 제안 연결 착수
+
+- **확인:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)의 최신 작업 HEAD `87b73ea44a7731ff3d476d33b2d3caa1c5d09ea8`. 사용자는 이전 GREEN을 알렸으나 확인된 가장 최근 PR-run은 `93ee6595`에서 CI RED 이후의 실행이며, 현재 HEAD의 전체 GREEN을 확인하지 못했다. `main` 변경으로 PR이 `dirty` 상태임을 확인.
+- **작업 목표:** 실제 `seyeon-post-turn-analysis-worker-v1.ts`의 committed User/Character claim과 S0 Planner Producer 사이에 서버 소유 결속을 추가. 사용자 클릭·원문 전체 저장·무승인 영구 기록을 새로 만들지 않음.
+- **보안 전제:** 기존 Production Post-turn은 DB Owner가 검증한 OFF 정리만 허용하고, 개인 텍스트·Provider 요청은 기본 HOLD. G0~G6, 운영 개인정보·유료 호출은 변경하지 않음.
+- **미완료:** Worker 결속·테스트·충돌 해소·새 HEAD CI 및 승인 결과.
