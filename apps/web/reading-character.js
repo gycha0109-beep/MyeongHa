@@ -238,6 +238,8 @@ function clearPersistedReadingPresentation() {
   document.querySelector('[data-official-report-pillars]')?.replaceChildren();
   document.querySelector('[data-official-report-elements]')?.replaceChildren();
   document.querySelector('[data-official-report-gods]')?.replaceChildren();
+  document.querySelector('[data-official-report-elements-group]')?.setAttribute('hidden', '');
+  document.querySelector('[data-official-report-gods-group]')?.setAttribute('hidden', '');
   const facts = document.querySelector('[data-official-report-facts]');
   if (facts) facts.hidden = true;
   const first = document.querySelector('[data-official-report-first]');
@@ -542,6 +544,10 @@ function renderStoredReportEvidence(summary) {
   });
   const hasElements = Array.isArray(summary.fiveElements) && summary.fiveElements.length > 0;
   const hasGods = Array.isArray(summary.tenGods) && summary.tenGods.length > 0;
+  const elementGroup = document.querySelector('[data-official-report-elements-group]');
+  const godGroup = document.querySelector('[data-official-report-gods-group]');
+  if (elementGroup) elementGroup.hidden = !hasElements;
+  if (godGroup) godGroup.hidden = !hasGods;
   if (validPillars.length === 0 && !hasElements && !hasGods) return;
 
   const output = document.querySelector('[data-official-report-pillars]');

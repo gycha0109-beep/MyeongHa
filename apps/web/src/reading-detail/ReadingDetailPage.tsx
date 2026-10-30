@@ -44,10 +44,14 @@ export function ReadingDetailPage() {
         <section className="official-report-facts" data-official-report-facts hidden aria-label="저장된 명식 근거">
           <h2>저장된 명식 근거</h2>
           <div className="official-report-pillars" data-official-report-pillars />
-          <h3>오행 근거</h3>
-          <div className="official-report-evidence" data-official-report-elements data-official-reading />
-          <h3>십성 근거</h3>
-          <div className="official-report-evidence" data-official-report-gods data-official-reading />
+          <div data-official-report-elements-group hidden>
+            <h3>오행 근거</h3>
+            <div className="official-report-evidence" data-official-report-elements data-official-reading />
+          </div>
+          <div data-official-report-gods-group hidden>
+            <h3>십성 근거</h3>
+            <div className="official-report-evidence" data-official-report-gods data-official-reading />
+          </div>
         </section>
         <nav className="official-report-toc" aria-label="보고서 목차" data-official-report-toc />
         <div className="official-report-sections" data-official-report-sections />

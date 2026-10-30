@@ -121,6 +121,15 @@ describe('Records long-form official report boundary', () => {
     expect(css).toContain('.official-report-section:focus-visible');
   });
 
+  it('shows only available official elemental and ten-god evidence groups', () => {
+    expect(jsx).toContain('data-official-report-elements-group hidden');
+    expect(jsx).toContain('data-official-report-gods-group hidden');
+    expect(runtime).toContain('if (elementGroup) elementGroup.hidden = !hasElements;');
+    expect(runtime).toContain('if (godGroup) godGroup.hidden = !hasGods;');
+    expect(runtime).toContain("document.querySelector('[data-official-report-elements-group]')?.setAttribute('hidden', '')");
+    expect(runtime).toContain("document.querySelector('[data-official-report-gods-group]')?.setAttribute('hidden', '')");
+  });
+
   it('preserves every official scope limitation and hides missing structural evidence', () => {
     expect(runtime).toContain("notices.filter((text) => typeof text === 'string' && text.trim()).join('\\n\\n')");
     expect(runtime).not.toContain("notices.find((text)");
