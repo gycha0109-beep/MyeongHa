@@ -30,7 +30,7 @@ const PERSONAL_SQL = [
 
 const HISTORY_SQL = [
   'select history_records_jsonb as "historyRecordsJsonb"',
-  'from public.qry_production_relationship_history_runtime_v1($1::uuid,$2::text,$3::bigint)',
+  'from public.qry_seyeon_g0_current_source_relationship_history_v1($1::uuid,$2::text,$3::bigint)',
 ].join('\n');
 
 const RECENT_SQL = [
