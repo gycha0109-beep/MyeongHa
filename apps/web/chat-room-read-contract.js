@@ -67,29 +67,39 @@ export function parseChatThreadRouteV1(search) {
     : Object.freeze({ state: 'ready', threadId });
 }
 
-function serverOriginalMemoryOffer(message, threadId, roomCharacterId) {
-  if (!Object.prototype.hasOwnProperty.call(message, 'memoryProposalOffer')) return undefined;
-  const offer = message.memoryProposalOffer;
-  if (offer === null || typeof offer !== 'object' || Array.isArray(offer) ||
-      Object.keys(offer).length !== 6 ||
-      !['sourceAuthority', 'characterId', 'redacted', 'threadId', 'turnId', 'messageId']
-        .every((key) => Object.prototype.hasOwnProperty.call(offer, key)) ||
-      offer.sourceAuthority !== 'server_original_message' ||
-      offer.characterId !== 'seyeon' || offer.redacted !== false ||
-      roomCharacterId !== 'seyeon' || message.senderType !== 'user' ||
+function serverPlannerMemoryProposal(message, roomCharacterId) {
+  // A pending fact must be emitted by the server's Dialogue Planner, not
+  // inferred from a user Message or constructed from a browser selection.
+  if (!Object.prototype.hasOwnProperty.call(message, 'memoryProposal')) {
+    if (Object.prototype.hasOwnProperty.call(message, 'memoryProposalOffer')) {
+      fail('manual original-message Memory offer is unsupported');
+    }
+    return undefined;
+  }
+  const proposal = message.memoryProposal;
+  if (proposal === null || typeof proposal !== 'object' || Array.isArray(proposal) ||
+      Object.keys(proposal).length !== 6 ||
+      !['sourceAuthority','characterId','proposalId','proposalKind','proposalState','summary']
+        .every(key => Object.prototype.hasOwnProperty.call(proposal,key)) ||
+      proposal.sourceAuthority !== 'server_dialogue_planner' ||
+      proposal.characterId !== 'seyeon' || roomCharacterId !== 'seyeon' ||
+      message.senderType !== 'character' || message.characterId !== 'seyeon' ||
       message.redacted !== false ||
-      typeof message.bodyText !== 'string' || !message.bodyText.trim() ||
-      offer.threadId !== threadId || offer.messageId !== message.messageId ||
-      !UUID_V1.test(offer.turnId)) {
-    fail('original Memory offer lacks exact server-origin message authority');
+      proposal.proposalState !== 'pending' ||
+      !['memory','life_fact'].includes(proposal.proposalKind) ||
+      typeof proposal.proposalId !== 'string' || !UUID_V1.test(proposal.proposalId) ||
+      typeof proposal.summary !== 'string' ||
+      proposal.summary.trim() !== proposal.summary ||
+      proposal.summary.length < 1 || proposal.summary.length > 4000) {
+    fail('Memory proposal lacks exact server Dialogue Planner authority');
   }
   return Object.freeze({
-    sourceAuthority: 'server_original_message',
+    sourceAuthority: 'server_dialogue_planner',
     characterId: 'seyeon',
-    redacted: false,
-    threadId,
-    turnId: offer.turnId,
-    messageId: message.messageId,
+    proposalId: proposal.proposalId,
+    proposalKind: proposal.proposalKind,
+    proposalState: 'pending',
+    summary: proposal.summary,
   });
 }
 
@@ -124,7 +134,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds, threadId, roo
     fail('visible message contains redactedAt');
   }
 
-  const memoryProposalOffer = serverOriginalMemoryOffer(message, threadId, roomCharacterId);
+  const memoryProposal = serverPlannerMemoryProposal(message, roomCharacterId);
   seenMessageIds.add(messageId);
   return Object.freeze({
     messageId,
@@ -135,7 +145,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds, threadId, roo
     createdAt,
     redacted: message.redacted,
     redactedAt,
-    ...(memoryProposalOffer === undefined ? {} : { memoryProposalOffer }),
+    ...(memoryProposal === undefined ? {} : { memoryProposal }),
   });
 }
 
