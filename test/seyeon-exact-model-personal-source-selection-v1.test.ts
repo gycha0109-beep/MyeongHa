@@ -107,12 +107,44 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
     }]);
     expect(result.selectedModelSourceCensusDigest).toBe(hash({
       originalPersonalSources: result.selectedSources,
+      currentUserSource: null,
+      unpinnedRecentSources: [],
       unpinnedDerivedSources: result.selectedUnpinnedDerivedSources,
     }));
     expect(Object.isFrozen(result.selectedUnpinnedDerivedSources)).toBe(true);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.selectedSources)).toBe(true);
     expect(result.selectedSources.some(x=> x.recordId === ID2)).toBe(false);
+  });
+
+  it('censuses only actual capped recent model messages with exact current User provenance', () => {
+    const current = { messageId: ID1, role: 'user' as const, text: 'current question' };
+    const past = { messageId: ID2, role: 'assistant' as const, text: 'prior answer' };
+    const old = { messageId: GRANT1, role: 'user' as const, text: 'older history' };
+    const selected = selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories: [], sourceCandidates: [],
+      recentMessages: [old, past, current], maxRecentMessages: 2,
+      currentUserMessageId: ID1,
+    });
+    expect(selected.selectedCurrentUserSource).toEqual({
+      messageId: ID1, role: 'user', selectedModelMessageDigest: hash(current),
+      persistedBeforeModel: false,
+    });
+    expect(selected.selectedUnpinnedRecentSources).toEqual([{
+      messageId: ID2, role: 'assistant', selectedModelMessageDigest: hash(past),
+      persistedBeforeModel: false,
+    }]);
+    expect(selected.selectedModelSourceCensusDigest).toBe(hash({
+      originalPersonalSources: [],
+      currentUserSource: selected.selectedCurrentUserSource,
+      unpinnedRecentSources: selected.selectedUnpinnedRecentSources,
+      unpinnedDerivedSources: [],
+    }));
+    expect(() => selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories: [], sourceCandidates: [],
+      recentMessages: [old, past, current], maxRecentMessages: 1,
+      currentUserMessageId: ID2,
+    })).toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
   });
 
   it('selects relationship-only and preserves explicit zero personal even when candidates exist', () => {
