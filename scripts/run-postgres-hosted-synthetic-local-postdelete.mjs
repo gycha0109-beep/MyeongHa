@@ -15,7 +15,7 @@ async function json(response, step) {
   catch { hold(step + ' returned malformed JSON'); }
 }
 
-export async function verifyLocalSyntheticPostDeletion(env, request = fetch) {
+export async function verifyLocalSyntheticPostDeletion(env, request = fetch, dbFactory = null) {
   const c = validateLocalFixtureConfig(env);
   if (typeof request !== 'function') hold('request transport unavailable');
   const member = await request(BASE + '/auth/v1/token?grant_type=password', {
@@ -74,13 +74,17 @@ export async function verifyLocalSyntheticPostDeletion(env, request = fetch) {
     method: 'GET', redirect: 'manual', headers: memberHeaders,
   });
 
-  const { default: pg } = await import('pg');
-  const db = new pg.Client({
-    host: '127.0.0.1', port: 54322, database: 'postgres',
-    user: 'postgres', password: c.dbPassword, ssl: false,
-    connectionTimeoutMillis: 5000,
-  });
-  await db.connect();
+  if (!dbFactory) dbFactory = async (password) => {
+    const { default: pg } = await import('pg');
+    const client = new pg.Client({
+      host: '127.0.0.1', port: 54322, database: 'postgres',
+      user: 'postgres', password, ssl: false,
+      connectionTimeoutMillis: 5000,
+    });
+    await client.connect();
+    return client;
+  };
+  const db = await dbFactory(c.dbPassword);
   try {
     const dbIdentity = await db.query(
       "select current_database() as database_name, current_user as role, to_regclass('dr_synthetic_local.revoked_subjects') is not null as revoked_table"
