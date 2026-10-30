@@ -48,6 +48,7 @@ function scenario(postStorageStatus = 403) {
     }
     if (url.endsWith('/auth/v1/admin/users/' + uuid)) {
       expect(sourceRead).toBe(true);
+      expect(marker).toBe(true);
       expect(options.method).toBe('DELETE');
       expect(options.headers.apikey).toBe(env.MH_DR_LOCAL_SERVICE_ROLE_KEY);
       deleted = true;
@@ -68,7 +69,7 @@ function scenario(postStorageStatus = 403) {
       throw new Error('unexpected DB query');
     }, end: async () => {} };
   };
-  return { request, calls, dbFactory };
+  return { request, calls, dbFactory, wasDeleted: () => deleted };
 }
 
 describe('Docker-local synthetic post-deletion access verification', () => {
@@ -81,23 +82,23 @@ describe('Docker-local synthetic post-deletion access verification', () => {
       newLoginDenied: 'PASS',
       refreshAfterDeletionDenied: 'PASS',
       staleAccessTokenStorageDenied: 'PASS',
-      staleTokenBeforeRevocationDenied: 'FAIL',
+      revocationAppliedBeforeDeletion: true,
+      revocationBeforeDeletionStorageDenied: 'PASS',
       localRevocationMarkerApplied: true,
       drReady: false, gate: 'BLOCKED', serviceResumptionAllowed: false,
       independentPrivacyContinuityProven: false,
     });
     expect(calls.map(x => x.method)).toEqual([
-      'POST','GET','GET','DELETE','POST','POST','GET','GET',
+      'POST','GET','GET','GET','DELETE','POST','POST','GET',
     ]);
     expect(JSON.stringify(report)).not.toContain(uuid);
     expect(JSON.stringify(report)).not.toContain('synthetic-access');
   });
   it('flags stale JWT Storage disclosure as FAIL, never a pass', async () => {
     const scene = scenario(200);
-    const report = await verifyLocalSyntheticPostDeletion(env, scene.request, scene.dbFactory);
-    expect(report.staleAccessTokenStorageDenied).toBe('FAIL');
-    expect(report.gate).toBe('BLOCKED');
-    expect(report.drReady).toBe(false);
+    await expect(verifyLocalSyntheticPostDeletion(env, scene.request, scene.dbFactory))
+      .rejects.toThrow('revocation marker must deny stale JWT before account deletion');
+    expect(scene.wasDeleted()).toBe(false);
   });
   it('refuses even the synthetic delete before verified identity and object baseline', async () => {
     let deleted = false;
