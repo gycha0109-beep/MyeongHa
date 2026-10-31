@@ -49,6 +49,7 @@ describe('G4 private first-Memory credit reservation before provider',()=>{
     const d=database();
     const result=await admitSeyeonG4FirstMemoryCreditsV1(request(d.pool));
     expect(result).toEqual({kind:'reserved',canonicalSubjectId:subject,
+      threadId:thread,clientTurnId:turn,
       reservationId:reservation,requiredCredits:10});
     expect(d.sql[0]).toBe('BEGIN');
     expect(d.sql[1]).toBe('SET LOCAL ROLE myeongha_api_executor');

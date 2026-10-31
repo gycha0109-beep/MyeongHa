@@ -29,7 +29,7 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
   threadId:string;
   clientTurnId:string;
 }>):Promise<Readonly<
-  | {kind:'reserved';canonicalSubjectId:string;reservationId:string;requiredCredits:10}
+  | {kind:'reserved';canonicalSubjectId:string;threadId:string;clientTurnId:string;reservationId:string;requiredCredits:10}
   | {kind:'owner_admin_exempt';canonicalSubjectId:string;requiredCredits:0}
 >> {
   if(input.verifiedEvidence?.kind!=='member'){
@@ -78,6 +78,7 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
         throw new SeyeonG4FirstMemoryCreditHoldV1();
       return Object.freeze({
         kind:'reserved' as const,canonicalSubjectId:resolvedSubject.subjectId,
+        threadId:input.threadId.toLowerCase(),clientTurnId:input.clientTurnId.toLowerCase(),
         reservationId:result.reservationId,requiredCredits:result.requiredCredits,
       });
     },
