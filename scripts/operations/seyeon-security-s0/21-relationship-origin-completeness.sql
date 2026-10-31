@@ -24,6 +24,9 @@ declare
   v_event record;
   v_origin record;
   v_message_count bigint;
+  v_all_ref_count bigint;
+  v_distinct_message_count bigint;
+  v_distinct_ordinal_count bigint;
   v_resolved_source_count bigint:=0;
   v_history record;
 begin
@@ -67,14 +70,31 @@ begin
         message='Current relationship lineage is unavailable';
     end if;
 
-    select count(*) into v_message_count
+    -- Include the ENTIRE DB provenance set. A sourceRef of an unknown
+    -- kind cannot hide behind one valid source_message. Repeated source
+    -- message IDs or ordinals are ambiguous, not independently justified.
+    select count(*),
+      count(*) filter (
+        where p.ref_kind='source_message' and p.source_message_id is not null
+      ),
+      count(distinct p.source_message_id) filter (
+        where p.ref_kind='source_message'
+      ),
+      count(distinct p.ordinal) filter (
+        where p.ref_kind='source_message'
+      )
+    into v_all_ref_count,v_message_count,
+      v_distinct_message_count,v_distinct_ordinal_count
     from public.relationship_event_provenance_refs p
     where p.event_id=v_event.id and p.subject_id=p_subject_id
-      and p.character_id='seyeon' and p.ref_kind='source_message';
+      and p.character_id='seyeon';
 
     -- Every origin is checked. Zero, ambiguous/unknown or over-limit source
     -- sets are NOT reduced to a 'no-personal' or partially filtered event.
-    if v_message_count<1 or v_message_count>32 then
+    if v_message_count<1 or v_message_count>32
+       or v_all_ref_count<>v_message_count
+       or v_distinct_message_count<>v_message_count
+       or v_distinct_ordinal_count<>v_message_count then
       raise exception using errcode='42501',
         constraint='seyeon_g0_relationship_origin_unverifiable',
         message='Current relationship lineage is unavailable';
