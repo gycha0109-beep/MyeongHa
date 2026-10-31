@@ -19,6 +19,7 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '16-planner-memory-pending-expiry.sql',
   '17-planner-memory-display-candidate.sql',
   '18-planner-pre-model-source-authority.sql',
+  '19-first-original-assistant-replay.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {
