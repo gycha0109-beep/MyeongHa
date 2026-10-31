@@ -71,6 +71,8 @@ describe('UC-06 post-turn Worker -> Planner memory port',()=>{
       captured.push(values === undefined ? {sql} : {sql,values});
       if(sql.includes('begin_member_subject_context_v1'))
         return {rows:[{subjectId:SUBJECT,subjectKind:'member'}]};
+      if(sql.includes('qry_seyeon_planner_pre_model_source_v1'))
+        return {rows:[{sourceReady:true}]};
       if(sql.includes('cmd_create_pending_seyeon_planner_memory_v1'))
         return {rows:[{proposalId:values?.[1],proposalState:'pending',replayed:false}]};
       return {rows:[]};
@@ -90,6 +92,8 @@ describe('UC-06 post-turn Worker -> Planner memory port',()=>{
         TURN,committedTurn.assistantMessageId,committedTurn.userMessageId,
         '사용자는 나비라는 고양이를 키운다','나비라는 고양이를 키워']);
     expect(captured.map(x=>x.sql)).toContain('COMMIT');
-    expect(pool.connect).toHaveBeenCalledTimes(1);
+    expect(pool.connect).toHaveBeenCalledTimes(2);
+    expect(captured.filter(x=>x.sql.includes('qry_seyeon_planner_pre_model_source_v1')))
+      .toHaveLength(2);
   });
 });
