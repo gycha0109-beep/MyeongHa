@@ -216,6 +216,7 @@ bash test/db/account_deletion_start_rls_catalog_guard.sh
 bash test/db/public_trigger_function_security_catalog_guard.sh
 bash test/db/account_deletion_finalization_preflight.sh
 bash test/db/account_deletion_db_finalizer.sh
+run_isolated_case myeongha_commerce_private_claim_finalizer_pg17_proof bash test/db/commerce_private_claim_finalizer_full_pg17.sh
 bash test/db/account_deletion_worker_completion.sh
 bash test/db/account_deletion_worker_execution_identity.sh
 bash test/db/account_deletion_finalizer_catalog_guard.sh
