@@ -20,7 +20,7 @@ import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/
 import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
 import { verifySeyeonPlannerPreModelSourceV1 } from '../apps/api/src/postgres-seyeon-planner-pre-model-source-v1.js';
 import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
-import { sendSeyeonPendingPlannerProposalNodeS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-reveal-s0-v1.js';
+import { handleSeyeonPendingPlannerNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-http-s0-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -507,20 +507,23 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
     }));
 
-    const send=async(evidence:typeof f.evidence,threadId=f.thread,assistantId=f.assistant)=>{
+    const send=async(evidence:typeof f.evidence,threadId=f.thread,
+      assistantId=f.assistant,authorized=true)=>{
       let resolveOutcome!:(outcome:string)=>void;
       const complete=new Promise<string>(resolve=>{resolveOutcome=resolve;});
-      const server=createServer((_incoming,response)=>{
-        const controller=new AbortController();
-        void sendSeyeonPendingPlannerProposalNodeS0V1({
-          pool:subjectPool,verifiedEvidence:evidence,
-          serverThreadId:threadId,serverAssistantMessageId:assistantId,
-          response,requestSignal:controller.signal,requestId:'s0-proposal-211',
+      const server=createServer((incoming,response)=>{
+        void handleSeyeonPendingPlannerNodeHttpS0V1({
+          incoming,response,pool:subjectPool,requestId:'s0-proposal-211',
+          identityEvidenceVerifier:{verifyRequestIdentity:async(request)=>
+            request.headers.get('authorization')==='Bearer synthetic-member'
+              ? evidence : null},
         }).then(resolveOutcome,()=>resolveOutcome('error'));
       });
       await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
       try{
-        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
+        const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${threadId}/planner-proposals/${assistantId}`;
+        const response=await fetch(url,{headers:authorized
+          ?{Authorization:'Bearer synthetic-member'}:{}});
         const raw=await response.text();
         const outcome=await complete;
         return {status:response.status,cache:response.headers.get('Cache-Control'),
@@ -543,6 +546,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       meta:{apiContractVersion:'v0.9',requestId:'s0-proposal-211'},
     });
     expect(visible.raw).not.toContain('Synthetic first hello');
+
+    const unauthenticated=await send(f.evidence,f.thread,f.assistant,false);
+    expect(unauthenticated.status).toBe(401);
+    expect(unauthenticated.outcome).toBe('preflight_denied');
+    expect(unauthenticated.raw).not.toContain('사용자는 인사를 했다');
 
     const other=await prepare(212);
     await other.commit();
