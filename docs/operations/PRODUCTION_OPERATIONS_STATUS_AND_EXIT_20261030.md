@@ -160,6 +160,15 @@
 - **한계:** 실제 운영용 subject 함수 본문과 schema migration을 실행한 검증이 아닌 **동일 함수 이름/호출 계약을 가진 합성 정책과 데이터**로 RLS 엔진·권한·트랜잭션 컨텍스트를 검증. 로컬 합성 클러스터는 `ssl:false`이므로 `verify-full` TLS/인증서·운영 PG17·실제 Supabase RLS 정책, Hosted Auth/DR, 운영 capacity/Phase 13 ACCEPTANCE는 **미확인**. `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
 - **다음 작업:** 운영 실제 DB에 비접근 방식으로 인증서 검증/TLS 연결을 동일 격리 PostgreSQL에서 검증하고, 단계적 복구 또는 Phase 10~12의 실제 DB/사용자 부하에 대한 별도 승인된 근거를 확보. Worklog 기록은 기존 보고서에 누적하고 별도 문서를 만들지 않음.
 
+### 2026-11-01 01:18 KST — Phase 7 격리 PostgreSQL 실TLS 인증서·호스트명·평문 차단 검증
+
+- **로드맵 위치:** Phase 7 장애 격리 및 DB 연결 보안 후속. [Production Operations 아키텍처](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 Production DB TLS 검증 조건을 운영 환경에 영향 없이, 별도 로컬 PostgreSQL 엔진에서 실제 연결로 검증. **운영 DB·Supabase·Cloudflare 설정/트래픽/계정 접근 없음**.
+- **실제 구현:** [`scripts/operations/verify-isolated-postgres-tls-peer-phase7.mjs`](../../scripts/operations/verify-isolated-postgres-tls-peer-phase7.mjs). `PG_BIN_DIR` 및 `OPENSSL_BIN`을 명시적으로 요구하고 `initdb`로 매 실행 임시 PostgreSQL 18 데이터 디렉터리와 랜덤 `127.0.0.1` 포트를 생성. OpenSSL로 **당일 유효한 테스트용 자체 서명 서버 인증서와 별도 미신뢰 인증서**를 임시 생성하고, IP/DNS SAN을 가진 신뢰 인증서만 사용하는 `pg.Pool`의 `ssl: { ca, rejectUnauthorized: true }` 연결 후 실제 `pg_stat_ssl.ssl=true` SQL 결과를 검증. `pg_hba.conf`는 합성 비슈퍼유저 로그인에 **TLS 접속 허용, 평문 접속 거부** 규칙을 선행 적용. 최종 `finally`에서 격리 DB를 종료하고 개인키/인증서/임시 데이터를 모두 삭제하며 저장소에 인증서·비밀을 포함하지 않음.
+- **실측 결과:** Windows Node 24.14.0 + 로컬 PostgreSQL 18 + Git OpenSSL 환경, 스크립트 `result=PASS`, exit code 0. (1) 신뢰한 테스트 인증서·올바른 호스트/IP SAN → 암호화 SQL 접속 **PASS**; (2) **미신뢰 인증서** → `DEPTH_ZERO_SELF_SIGNED_CERT` 거부; (3) **호스트명 불일치** → `ERR_TLS_CERT_ALTNAME_INVALID` 거부; (4) **TLS 없는 연결** → PostgreSQL `28000` 거부. 연결 로그인은 임시 비슈퍼유저. 관련 기존 TLS/subject pool 회귀 **4파일 48/48 PASS**, `tsc -p tsconfig.json --noEmit` PASS, `node --check` PASS.
+- **실행 문제·보정:** 최초 실행은 Windows `pg_ctl -o` 옵션에 단일 따옴표가 **경로 문자의 일부**로 해석되어 임시 인증서를 찾지 못한 설정 오류. 따옴표를 제거해 재실행, 실제 TLS 연결 실증 PASS. **운영 서버 설정은 수정하지 않았음.**
+- **수용 경계:** 이 테스트는 **임시 자체 서명 인증서 및 합성 DB 역할**을 가진 PostgreSQL 18의 `pg` 클라이언트 TLS 인증서·호스트명 검증 실증이지, 실제 Production PostgreSQL 17/Supabase CA 핀·권한 역할·RLS·MyeongHa `buildProductionNodePostgresPoolConfigV1` 전체 설정 경로 또는 Cloudflare 배포 인증 완료를 뜻하지 않음. 운영 승인 플래그 `dr_ready=false`, `serviceResumptionAllowed=false`, Phase 8/13 미수용 유지.
+- **추적/다음:** 브랜치 `ops/phase7-isolated-postgres-tls-peer-20261101`로 실행 스크립트와 본 Worklog를 함께 PR 제출. 필요 시 격리 PostgreSQL 17 및 실제 production-config 변환 경로의 인증서 검증을 별도로 확인. [Worklog PR #2817](https://github.com/gycha0109-beep/MyeongHa/pull/2817)의 통합 CI는 당시 진행 중이므로 성공/병합 추정 금지.
+
 ## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
 
 **이 절은 아래 §3.2와 §5의 구버전/미수용 항목 중 같은 엔드포인트·같은 조건을 대상으로 한 과거 상태보다 최신 증거**이다. 현재 운영 준비 전체가 완료되었다는 뜻이 아니라 **배포된 정확한 버전에 연결한 검증 부분집합**의 최신 관측이다.
