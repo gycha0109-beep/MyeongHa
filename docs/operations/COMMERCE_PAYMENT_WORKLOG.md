@@ -72,3 +72,12 @@
 - **설명:** `docs/operations/COMMERCE_READER_REVOKE_LOCK_CAS_BRIDGE_V1.md`.
 - **PR 및 최종 로컬 검증:** [PR #2804](https://github.com/gycha0109-beep/MyeongHa/pull/2804), 구현 커밋 `fd9cbe6c`. 관련 Vitest 14개 파일 **306건 PASS**, 타입 검사·빌드 PASS, 격리 PostgreSQL SQL 잠금 스모크 PASS. **GitHub 필수 CI 및 병합은 별도 대기**, 운영/라이브 회수 불활성.
 - **남은 것:** 기존 Provider/Reader 신뢰 가능한 최신 순서·권한 회수 조건을 연결하고 P4 운영 적용 전에 실제 PG17 동시성/분리 수준 테스트. 사용자 재승인은 요구하지 않으며 P5/LIVE 결제는 보류합니다.
+
+### 2026-10-31 — 개인 환불 접수 기록의 계정 삭제 후보 구현 (독립 브랜치)
+
+- **브랜치:** `feat/commerce-payment/private-claim-finalizer-candidate-20261031` — 앞선 PR #2804의 통합 CI와 독립 진행.
+- **구현:** 마지막 계정 삭제 함수(1520)와 동일한 선행검사/기존 데이터 처리 로직에 **정확한 Subject 개인 Claim 삭제, 삭제 후 잔여 확인, 이미 삭제된 Subject 재실행 시 잔여 Claim 거부** 세 지점을 추가한 비배포 SQL 후보 작성.
+- **증거:** 기존 1520 본문과 세 삽입 지점을 제외한 완전 동일성 테스트 8건 PASS. 격리 PGlite/PostgreSQL 18.6 WASM에서 일반 DELETE 차단, 지정 Subject DELETE, 다른 Subject Claim 보존, 구매 Intent 2건 보존 SQL PASS. 아직 **전체 계정 삭제 함수 실행/PG17 전체 마이그레이션/복원 검증은 수행하지 않았습니다.**
+- **안전:** 기존 결정된 P0-PR-01 기본 DELETE와 Commerce P5Y 보존 분리. `claimDispositionGraphIntegrated=false`, 새 Claim 및 finalizer SQL은 `docs/operations/candidates/` 외부 비배포 후보 유지. 운영 환불·권한 회수·실제 고객 접수 모두 OFF.
+- **다음:** 실제 PostgreSQL 17 전체 삭제 그래프와 FK/Reader 권한/계정 복원 동작을 검증한 뒤에만 forward-only 마이그레이션으로 옮길 수 있습니다.
+- **통합 PR:** [PR #2805](https://github.com/gycha0109-beep/MyeongHa/pull/2805). #2804 병합 커밋 `d9e25eee` 기준 최신 `main`으로 갱신한 뒤 기존 Worklog를 보존하여 제출했습니다. 관련 테스트 **34개**, 타입 검사·빌드, 격리 SQL PASS. 공식 CI·병합 상태는 별도 확인합니다.
