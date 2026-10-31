@@ -161,3 +161,11 @@ Watchtower-Track: security
 - **보안 경계:** 기존 양수 1 Memory 제한·과거 메시지/관계 0건 및 기존 positive G2/G3 HOLD를 해제하지 않았다. 현재 Production DB에 신규 결합 RPC/ACL을 설치·허가하지 않았고 S0 소스가 API EXECUTE를 부여하지 않으므로 새 호출 경로가 실제 Production 모델 사용을 열지 않는다. 독립 단위 테스트에서 사용하는 기존 주입 Port의 동작도 변경하지 않는다.
 - **검증/미완료:** 선행 HEAD `e6b1de1a`의 [CI #41184237655](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41184237655)에서 security TypeScript 작업 검사는 PASS, PostgreSQL 전체 검사는 당시 진행 중. 이번 연결 HEAD의 검증 결과는 별도로 확인하며 실행·통합·병합·실DB 실증 전 G1 완료 아님.
 - **다음:** 신규 소스의 TypeScript/CI 및 격리 PostgreSQL 동작 확인, G2 Commit에서 최근 메시지 Pin과 현재 원본 Grant를 같은 증명으로 검증, G3 재공개까지 연결. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W10 — G2 동일 Commit에서 G1 현재 User 원본 재검증 (PR #2789)
+
+- **목적/구현:** `02-atomic-commit.sql`의 기존 실제 `validated → committed` 트리거에 G1 최근 메시지 불변 증명서가 존재하는 경우 동일 PostgreSQL Commit 트랜잭션에서 Member/Thread/Attempt·User 메시지 ID와 본문 원본 digest·content_hash를 다시 대조하도록 연결했다. 사용자 메시지 삭제/변경 또는 타 Subject/Thread 원본 변경이면 DB Commit 자체를 거부한다.
+- **하위 호환:** 예전 S0 설치 단위에는 신규 Attempt 칼럼이 없을 수 있어 `to_jsonb(old)` 기반으로 선택적으로 검증한다. 기존 zero-proof 승인 범위와 legacy positive source 체크를 바꾸지 않고, 신규 결합 Pin 존재 시 추가 원본 검증을 실시한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`, 이 Worklog. 별도 운영 DDL·ACL/Provider 활성화는 실행하지 않았다.
+- **현재 한계/다음:** G2의 원본 Memory 현재 Grant 재검증과 신규 User 출처 검증은 소스 경로로 연결했지만, Reader/관계·과거 메시지 전체 출처와 G3 최초/Replay 공개 재검증, 실제 PostgreSQL 경합 테스트, Production 적용은 미완료. 최종 HEAD의 검사는 결과 확인 전 PASS로 계산하지 않는다. 운영 `HOLD_FORWARD_STOPPED` 유지.

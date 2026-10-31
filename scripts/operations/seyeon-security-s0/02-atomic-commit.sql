@@ -22,6 +22,9 @@ declare
   v_positive jsonb;
   v_memory record;
   v_current_digest text;
+  v_recent jsonb;
+  v_recent_message jsonb;
+  v_current_user record;
 begin
   if old.seyeon_personal_source_pin_jsonb is not null and
      (old.seyeon_personal_source_pin_jsonb is distinct from
@@ -72,6 +75,52 @@ begin
         raise exception using errcode='23514',
           constraint='seyeon_positive_g2_missing_original_pin',
           message='Positive Commit requires exact original immutable Pin';
+      end if;
+
+      -- If the new G1 recent-message certificate exists, recheck the
+      -- exact original User text under this same actual Commit TX.
+      -- Legacy staged positive attempts without the new certificate
+      -- remain held by their existing distinct source policy.
+      v_recent:=to_jsonb(old)->'seyeon_recent_source_pin_jsonb';
+      if v_recent is not null then
+        v_recent_message:=v_recent->'sources'->0;
+        if v_recent->>'schemaVersion' is distinct from
+             'seyeon-g1-recent-model-source-pin-v1'
+           or v_recent->>'subjectId' is distinct from old.subject_id::text
+           or v_recent->>'turnId' is distinct from old.turn_id::text
+           or v_recent->>'attemptId' is distinct from old.id::text
+           or v_recent->>'threadId' is distinct from v_positive->>'threadId'
+           or jsonb_typeof(v_recent->'sources') is distinct from 'array'
+           or jsonb_array_length(v_recent->'sources')<>1
+           or v_recent_message->>'role' is distinct from 'user'
+           or (v_recent_message->>'dbContentHash') is null
+           or (v_recent_message->>'dbBodySha256')
+               !~ '^sha256:v1:[a-f0-9]{64}$'
+        then
+          raise exception using errcode='23514',
+            constraint='seyeon_positive_g2_recent_source_pin_invalid',
+            message='G2 current User source certificate is invalid';
+        end if;
+        select msg.id,msg.body_text,msg.content_hash
+          into v_current_user
+        from public.conversation_messages msg
+        where msg.id=(v_recent_message->>'messageId')::uuid
+          and msg.subject_id=old.subject_id
+          and msg.thread_id=(v_recent->>'threadId')::uuid
+          and msg.turn_id=old.turn_id
+          and msg.sender_type='user'
+          and msg.redacted_at is null and msg.body_text is not null
+        for share of msg;
+        if not found or
+           v_current_user.content_hash is distinct from
+             v_recent_message->>'dbContentHash'
+           or 'sha256:v1:'||
+             encode(sha256(convert_to(v_current_user.body_text,'UTF8')),'hex')
+               is distinct from v_recent_message->>'dbBodySha256' then
+          raise exception using errcode='23514',
+            constraint='seyeon_positive_g2_recent_source_changed',
+            message='Original User message changed since model Pin';
+        end if;
       end if;
 
       perform 1
