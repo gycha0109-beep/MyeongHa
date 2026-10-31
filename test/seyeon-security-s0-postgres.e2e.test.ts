@@ -21,6 +21,7 @@ import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/post
 import { verifySeyeonPlannerPreModelSourceV1 } from '../apps/api/src/postgres-seyeon-planner-pre-model-source-v1.js';
 import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
 import { handleSeyeonPendingPlannerNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-http-s0-v1.js';
+import { handleSeyeonPlannerDecisionNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-node-http-s0-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -579,6 +580,75 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(afterDiscard.status).toBe(503);
     expect(afterDiscard.outcome).toBe('proposal_withheld');
     expect(afterDiscard.raw).not.toContain('사용자는 인사를 했다');
+  });
+
+  it('UC-06/07 real Node GET -> explicit POST discard -> replay denied on the same Member',async()=>{
+    const f=await prepare(213);
+    await f.commit();
+    const proposalId=uuid(27,213);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+    const identityEvidenceVerifier={
+      verifyRequestIdentity:async(request:Request)=>
+        request.headers.get('authorization')==='Bearer synthetic-member'
+          ?f.evidence:null,
+    };
+    const server=createServer((incoming,response)=>{
+      const input={incoming,response,pool:subjectPool,identityEvidenceVerifier,
+        requestId:'planner-node-flow-213'};
+      if(incoming.method==='POST'){
+        void handleSeyeonPlannerDecisionNodeHttpS0V1(input);
+      }else{
+        void handleSeyeonPendingPlannerNodeHttpS0V1(input);
+      }
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const origin=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const getUrl=origin+'/api/chat/'+f.thread+'/planner-proposals/'+f.assistant;
+    const postUrl=origin+'/api/memory/proposals/'+proposalId+'/decision';
+    try{
+      const visible=await fetch(getUrl,{headers:{Authorization:'Bearer synthetic-member'}});
+      expect(visible.status).toBe(200);
+      const offered=await visible.json();
+      expect(offered.data.memoryProposal).toMatchObject({
+        proposalId,sourceAuthority:'server_dialogue_planner',proposalState:'pending',
+        summary:'사용자는 인사를 했다',
+      });
+      const denied=await fetch(postUrl,{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'discard'}})});
+      expect(denied.status).toBe(401);
+      const confirmed=await fetch(postUrl,{method:'POST',
+        headers:{Authorization:'Bearer synthetic-member','Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'discard'}})});
+      expect(confirmed.status).toBe(200);
+      expect(confirmed.headers.get('Cache-Control')).toBe('no-store');
+      expect((await confirmed.json()).data).toEqual({
+        proposalId,decision:'discard',status:'resolved',persisted:false,grantCount:0,
+      });
+      const again=await fetch(getUrl,{headers:{Authorization:'Bearer synthetic-member'}});
+      expect(again.status).toBe(503);
+      const withheld=await again.text();
+      expect(withheld).not.toContain('사용자는 인사를 했다');
+      expect(withheld).not.toContain('Synthetic first hello');
+      const replay=await fetch(postUrl,{method:'POST',
+        headers:{Authorization:'Bearer synthetic-member','Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'discard'}})});
+      expect(replay.status).toBe(503);
+      const {rows:[db]}=await pool.query(`select status,
+        proposed_value_jsonb as payload,
+        (select count(*)::int from public.memory_items m
+          where m.source_turn_id=memory_proposals.source_turn_id
+          and m.subject_id=memory_proposals.subject_id) as memories
+        from public.memory_proposals where id=$1`,[proposalId]);
+      expect(db).toEqual({status:'rejected',payload:{},memories:0});
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
   });
 
   it('UC-07 session-only and discard resolve pending without long-term Memory or Grants',async()=>{
