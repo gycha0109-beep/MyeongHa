@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2835 중복 통합 CI RED 원인 및 정식 재제출
+
+- **정확한 실패:** [통합 #41232685886](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232685886)에서는 `admission` FAILURE, `full` SKIPPED. `Integration requires the dedicated CI submission label event`가 원인이다. 일반 `ops` 라벨 이벤트는 정식 제출 이벤트가 아니므로 보안상 거부된 것이고, 애플리케이션·DB·복원 테스트의 실패가 아니다.
+- **같은 원본의 독립 통과 증거:** [통합 #41232685514](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232685514)는 동일 PR HEAD `8f910c72d6ec54968aeeda0997688c83125eefe3`의 `ci-integration-ready` 제출 이벤트를 받아 `admission`, 전체 `full`, `CI Integration Verify` **SUCCESS**. 다만 중복 실패 체크가 PR 차단 상태로 남았으므로 성공 실행만을 병합 완료로 간주하지 않는다.
+- **조치:** Worklog의 현재 실패 진단을 커밋해 HEAD를 갱신한 뒤 필요한 기본 CI가 통과하면 `ci-integration-ready` 라벨 **하나만 제거/재적용**하여 새 HEAD를 전용 이벤트로 다시 제출한다. `ops` 라벨은 건드리지 않아 다른 일반 라벨 이벤트를 발생시키지 않는다. 자동 병합은 유지한다. 새 통합 CI의 실제 PASS 및 병합 완료는 별도 확인 전 미판정.
+- **운영 보호:** 이 작업은 CI 제출 절차 및 문서 근거만 수정한다. Production DB·Cloudflare 배포·Supabase migration/Role/ACL/비밀 변경 없음. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+
 ### 2026-11-01 KST — Phase 8 실제 DB ACL·백업 신선도 확인 및 현재 Production 보호 백업 재실행
 
 - **범위:** Supabase Production `cnsfpcdiyofqvhpcegfc`의 승인된 `scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql` 및 `seyeon-r2-acl-grants-canonical-readonly.sql`을 **SELECT만** 실행했다. PostgreSQL 17, 대상 RPC **19/19 존재**, 누락 **0**, `anon`/`authenticated` 직접 실행 가능 **0/19**. 함수 정의/Owner 등 원문·개인정보·비밀을 출력하지 않았으며 집계 fingerprint만 확인했다.
