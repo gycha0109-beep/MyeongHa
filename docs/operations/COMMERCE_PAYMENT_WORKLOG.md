@@ -60,3 +60,15 @@
 - **현재 남은 의존성:** 신뢰 가능한 Provider 순서 또는 동등한 최신 상태 조정 계약, Reader R2/T2 원자적 범위 잠금, 법적 청약철회/제공 증거, 실제 PostgreSQL 17 전체 migrations 검증. 후보 SQL은 `supabase/migrations/` 밖에 유지하며 운영 환불·권한 회수 모두 미활성화.
 - **추가 검증:** 관련 Vitest **13개 파일·283건 PASS**, 타입 검사 PASS, 빌드 PASS. 격리 SQL 2종 모두 PASS: `COMMERCE_EXACT_CANCELLED_AMOUNT_SQL_SMOKE_PASS`, `COMMERCE_EXACT_READER_CANCEL_AMOUNT_SQL_SMOKE_PASS`. 기존 실제 Commerce 마이그레이션/트리거가 포함된 PostgreSQL 17 증거는 여전히 미완료입니다.
 - **PR·CI:** [PR #2801](https://github.com/gycha0109-beep/MyeongHa/pull/2801), 구현 커밋 `4b01970d`. GitHub 필수 통합 CI와 병합은 **검증 결과 확인 전까지 대기**이며 로컬 검증 성공과 별개로 관리합니다.
+
+### 2026-10-31 — 정확한 Reader Grant 잠금·버전 검사 연결
+
+- **기준:** [PR #2801](https://github.com/gycha0109-beep/MyeongHa/pull/2801) 필수 통합 CI 성공 후 병합 확인, `main` 기준 `71315540` (결제 #2801 병합 커밋 `30ddaf31` 포함).
+- **브랜치:** `feat/commerce-payment/revoke-lock-cas-bridge-20261031`.
+- **실제 구현:** 기존 PortOne 취소 Provider Event를 먼저 잠그고, 기존 Receipt에서 확정된 Subject/Purchase Intent에 정확히 결속된 **하나의 Reader 구매 Grant**를 잠급니다. 동일 트랜잭션 안에서 Grant revision·마지막 ordering key를 비교하고 기존 취소 금액·같은 이벤트의 회수 이력을 재검사합니다.
+- **격리:** 익명/로그인/API/service/worker 계정은 거부합니다. 이벤트나 Grant가 없거나 충돌·변경된 경우 다른 Reader 구매권을 대신 사용하지 않습니다. 기존 Entitlement Effect는 호출하지 않으며 **항상 ROLLBACK**, 실제 권한 변경 0.
+- **현재 제한:** 이 잠금은 Reader 최종 R2/T2 공유 범위 잠금이 아닙니다. Provider NEWER/STALE 비교자·법적 환불 결론·배송/제공 증거·T2 Lock Order 없이 실제 revoke를 허용하지 않습니다.
+- **최초 검증:** Vitest 신규 23건 PASS; 격리 PGlite 0.5.13/PostgreSQL 18.6 WASM의 실제 Provider Event/Grant `FOR UPDATE`, Revision 변경 후 재검사, Reader B Grant 보존 SQL PASS (`COMMERCE_READER_REVOKE_LOCK_CAS_SQL_SMOKE_PASS`). PostgreSQL 17 전체 migration/trigger·동시 TCP 세션 검증은 **아님**.
+- **설명:** `docs/operations/COMMERCE_READER_REVOKE_LOCK_CAS_BRIDGE_V1.md`.
+- **PR 및 최종 로컬 검증:** [PR #2804](https://github.com/gycha0109-beep/MyeongHa/pull/2804), 구현 커밋 `fd9cbe6c`. 관련 Vitest 14개 파일 **306건 PASS**, 타입 검사·빌드 PASS, 격리 PostgreSQL SQL 잠금 스모크 PASS. **GitHub 필수 CI 및 병합은 별도 대기**, 운영/라이브 회수 불활성.
+- **남은 것:** 기존 Provider/Reader 신뢰 가능한 최신 순서·권한 회수 조건을 연결하고 P4 운영 적용 전에 실제 PG17 동시성/분리 수준 테스트. 사용자 재승인은 요구하지 않으며 P5/LIVE 결제는 보류합니다.
