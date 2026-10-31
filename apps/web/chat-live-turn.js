@@ -9,16 +9,17 @@ export function presentChatLiveTurnV1(stream, input) {
   }
 
   const document = stream.ownerDocument;
+  const labels = input.labels ?? {};
   const user = document.createElement('article');
   user.className = 'conversation-message conversation-live-message';
   user.dataset.sender = 'user';
   user.dataset.pending = 'true';
-  user.setAttribute('aria-label', '전송 중인 메시지');
+  user.setAttribute('aria-label', labels.sendingAria ?? '전송 중인 메시지');
 
   const userAvatar = document.createElement('span');
   userAvatar.className = 'conversation-message-avatar';
   userAvatar.setAttribute('aria-hidden', 'true');
-  userAvatar.textContent = '나';
+  userAvatar.textContent = labels.userLabel ?? '나';
   const userBody = document.createElement('div');
   userBody.className = 'conversation-message-body';
   const userContent = document.createElement('p');
@@ -31,21 +32,21 @@ export function presentChatLiveTurnV1(stream, input) {
   typing.dataset.sender = 'character';
   typing.dataset.pending = 'true';
   typing.setAttribute('role', 'status');
-  typing.setAttribute('aria-label', '세연의 답장을 기다리는 중');
+  typing.setAttribute('aria-label', labels.waitingAria ?? '세연의 답장을 기다리는 중');
 
   const avatar = document.createElement('span');
   avatar.className = 'conversation-message-avatar';
   avatar.dataset.character = 'seyeon';
   avatar.setAttribute('aria-hidden', 'true');
-  avatar.textContent = '세';
+  avatar.textContent = labels.characterAvatar ?? '세';
 
   const reply = document.createElement('div');
   reply.className = 'conversation-message-body';
   const name = document.createElement('strong');
-  name.textContent = '세연';
+  name.textContent = labels.characterLabel ?? '세연';
   const bubble = document.createElement('p');
   bubble.className = 'conversation-live-typing';
-  bubble.textContent = '답장하는 중';
+  bubble.textContent = labels.typingText ?? '답장하는 중';
   const dots = document.createElement('span');
   dots.className = 'conversation-live-dots';
   dots.setAttribute('aria-hidden', 'true');
@@ -70,6 +71,34 @@ export function presentChatLiveTurnV1(stream, input) {
   };
 }
 
+
+/**
+ * Repaint only ephemeral labels; never rewrite the user's pending message.
+ * This also handles a locale switch while a request is in flight.
+ */
+export function repaintPendingChatLiveTurnV1(stream, labels) {
+  if (!stream || !labels) return;
+  const pendingUser = stream.querySelector('.conversation-live-message[data-sender="user"][data-pending="true"]');
+  if (pendingUser) {
+    pendingUser.setAttribute('aria-label', labels.sendingAria);
+    const avatar = pendingUser.querySelector('.conversation-message-avatar');
+    if (avatar) avatar.textContent = labels.userLabel;
+  }
+  const pendingCharacter = stream.querySelector('.conversation-live-message[data-sender="character"][data-pending="true"]');
+  if (pendingCharacter) {
+    pendingCharacter.setAttribute('aria-label', labels.waitingAria);
+    const avatar = pendingCharacter.querySelector('.conversation-message-avatar');
+    const name = pendingCharacter.querySelector('.conversation-message-body > strong');
+    const typing = pendingCharacter.querySelector('.conversation-live-typing');
+    if (avatar) avatar.textContent = labels.characterAvatar;
+    if (name) name.textContent = labels.characterLabel;
+    if (typing) {
+      const dots = typing.querySelector('.conversation-live-dots');
+      typing.textContent = labels.typingText;
+      if (dots) typing.append(dots);
+    }
+  }
+}
 
 /**
  * Append receipt-ACKed turns to the visible *current-document* conversation.
@@ -121,7 +150,7 @@ export function presentAcknowledgedChatTurnV1(stream, input) {
   };
 
   const user = article('user', input.userLabel ?? '나', input.userLabel ?? '나', userText);
-  const seyeon = article('character', '세', input.characterLabel ?? '세연', assistantText);
+  const seyeon = article('character', input.characterAvatar ?? '세', input.characterLabel ?? '세연', assistantText);
   stream.append(user, seyeon);
   stream.scrollTop = stream.scrollHeight;
   return true;

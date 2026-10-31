@@ -22,6 +22,12 @@ for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(so
 for (const [source, row] of JA_TW_TO_EN_CN_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 for (const [source, row] of EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 registerStaticCopy('라이트 모드로 전환', { 'ja-JP': 'ライトモードに切り替え', 'zh-TW': '切換至淺色模式', 'en-US': 'Switch to light mode', 'zh-CN': '切换至浅色模式' });
+registerStaticCopy('전송 중인 메시지', { 'ja-JP': '送信中のメッセージ', 'zh-TW': '傳送中的訊息', 'en-US': 'Sending message', 'zh-CN': '正在发送的消息' });
+registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨンの返信を待っています', 'zh-TW': '正在等待 Seyeon 回覆', 'en-US': 'Waiting for Seyeon to reply', 'zh-CN': '正在等待 Seyeon 回复' });
+registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });
+registerStaticCopy('이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.', { 'ja-JP': 'プライバシー保護のため、以前の会話履歴は表示できません。', 'zh-TW': '基於隱私保護，無法顯示先前的對話紀錄。', 'en-US': 'Previous chat history is hidden to protect privacy.', 'zh-CN': '为保护隐私，无法显示此前的聊天记录。' });
+registerStaticCopy('이전 대화 기록은 개인정보 보호를 위해 표시하지 않습니다. 새 AI 답변은 아직 준비 중입니다.', { 'ja-JP': 'プライバシー保護のため、以前の会話履歴は表示しません。新しい AI の返答はまだ準備中です。', 'zh-TW': '為保護隱私，先前的對話紀錄不會顯示。新的 AI 回覆尚在準備中。', 'en-US': 'Previous chat history is hidden for privacy. New AI replies are not yet available.', 'zh-CN': '为保护隐私，之前的聊天记录不会显示。新的 AI 回复尚未就绪。' });
+registerStaticCopy('현재 세연의 AI 메시지 전송은 운영 준비 중입니다. 크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며, 입력한 내용은 보존했습니다.', { 'ja-JP': '現在、セヨンの AI メッセージ送信は準備中です。クレジットの予約・精算処理が未接続のため送信できませんが、入力した内容は保持されています。', 'zh-TW': 'Seyeon 的 AI 訊息傳送功能尚在準備中。由於點數預留與結算尚未接通，無法傳送，但輸入內容已保留。', 'en-US': 'Seyeon AI messaging is not yet available. Credit reservation and settlement are not connected, so the message was not sent. Your draft is saved.', 'zh-CN': 'Seyeon 的 AI 消息发送功能尚未就绪。由于点数预留和结算尚未接通，消息无法发送，但输入内容已保留。' });
 for (const [source, row] of MY_STATIC_UI_COPY_V1) {
   registerStaticCopy(source, Object.fromEntries(LOCALE_ORDER.map((locale, index) => [locale, row[index]])));
 }

@@ -134,6 +134,81 @@ try{
       failures.push({ page: 'chat-hub.html', scenario: 'localized-fixed-character-discovery', locale, discovery });
     }
   }
+
+  // Live sending/typing bubbles are excluded from the static-text scanner.
+  // Exercise the exact in-flight state that previously leaked Korean labels,
+  // including locale switches before a server ACK.
+  for (const [locale, nextLocale] of [
+    ['ja-JP', 'en-US'], ['zh-TW', 'zh-CN'],
+    ['en-US', 'ja-JP'], ['zh-CN', 'zh-TW'],
+  ]) {
+    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
+    await change(locale);
+    const begun = await evaluate(`(async () => {
+      const [{ presentChatLiveTurnV1 }, { getUiLocale, translateStaticUi }, { resolveCharacterDisplayNameV1 }] = await Promise.all([
+        import('/chat-live-turn.js'), import('/ui-i18n.js'), import('/character-display-locale.js'),
+      ]);
+      const locale = getUiLocale();
+      const name = resolveCharacterDisplayNameV1('seyeon', locale);
+      const copy = {
+        sendingAria: translateStaticUi('전송 중인 메시지', locale),
+        waitingAria: translateStaticUi('세연의 답장을 기다리는 중', locale),
+        userLabel: translateStaticUi('나', locale),
+        characterLabel: name,
+        characterAvatar: name.slice(0, 1),
+        typingText: translateStaticUi('답장하는 중', locale),
+      };
+      const stream = document.querySelector('[data-chat-stream]');
+      window.__chatLocaleProbeClear?.();
+      window.__chatLocaleProbeClear = presentChatLiveTurnV1(stream, {
+        message: 'what are you doing now?', labels: copy,
+      });
+      const user = stream.querySelector('.conversation-live-message[data-sender="user"]');
+      const typing = stream.querySelector('.conversation-live-message[data-sender="character"]');
+      return {
+        lang: locale,
+        userText: user?.querySelector('p')?.textContent ?? '',
+        userAria: user?.getAttribute('aria-label') ?? '',
+        name: typing?.querySelector('.conversation-message-body > strong')?.textContent ?? '',
+        typingText: typing?.querySelector('.conversation-live-typing')?.childNodes[0]?.textContent ?? '',
+        typingAria: typing?.getAttribute('aria-label') ?? '',
+        dots: typing?.querySelectorAll('.conversation-live-dots span')?.length ?? 0,
+        expected: copy,
+      };
+    })()`);
+    if (begun.lang !== locale || begun.userText !== 'what are you doing now?' ||
+        begun.userAria !== begun.expected.sendingAria ||
+        begun.name !== begun.expected.characterLabel ||
+        begun.typingText !== begun.expected.typingText ||
+        begun.typingAria !== begun.expected.waitingAria ||
+        begun.dots !== 3 || /[가-힣]/u.test(begun.name + begun.typingText + begun.typingAria)) {
+      failures.push({ page: 'chat.html', scenario: 'live-pending-bubble', locale, begun });
+    }
+    await change(nextLocale);
+    const switched = await evaluate(`(() => {
+      const user = document.querySelector('.conversation-live-message[data-sender="user"]');
+      const typing = document.querySelector('.conversation-live-message[data-sender="character"]');
+      return {
+        lang: document.documentElement.lang,
+        userText: user?.querySelector('p')?.textContent ?? '',
+        userAvatar: user?.querySelector('.conversation-message-avatar')?.textContent ?? '',
+        userAria: user?.getAttribute('aria-label') ?? '',
+        name: typing?.querySelector('.conversation-message-body > strong')?.textContent ?? '',
+        avatar: typing?.querySelector('.conversation-message-avatar')?.textContent ?? '',
+        typingText: typing?.querySelector('.conversation-live-typing')?.childNodes[0]?.textContent ?? '',
+        typingAria: typing?.getAttribute('aria-label') ?? '',
+        dots: typing?.querySelectorAll('.conversation-live-dots span')?.length ?? 0,
+      };
+    })()`);
+    const expectedName = nextLocale === 'ja-JP' ? 'セヨン' : 'Seyeon';
+    if (switched.lang !== nextLocale || switched.userText !== 'what are you doing now?' ||
+        switched.name !== expectedName || switched.avatar !== expectedName.slice(0, 1) ||
+        switched.dots !== 3 || !switched.typingText ||
+        /[가-힣]/u.test(switched.name + switched.typingText + switched.typingAria + switched.userAria)) {
+      failures.push({ page: 'chat.html', scenario: 'live-pending-locale-switch', locale: nextLocale, switched });
+    }
+    await evaluate('window.__chatLocaleProbeClear?.()');
+  }
   await change('zh-TW');
   await navigate('reading.html','#saju-birth-form');
   const chineseFields=await evaluate('(()=>({lang:document.documentElement.lang,male:document.querySelector("#saju-birth-sex option[value=male]")?.textContent}))()');
