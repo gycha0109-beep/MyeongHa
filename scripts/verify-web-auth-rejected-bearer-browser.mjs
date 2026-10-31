@@ -133,8 +133,15 @@ async function serve() {
 
       if (pathname === '/api/readings' && req.method === 'GET') {
         requests.push({ scenario, path: pathname, authorization });
-        if (!kind) {
+        // The Records page reads /api/readings before /api/life-record.
+        // Exercise all three auth cases at the first real Records read.
+        if (!kind || (scenario === 'records-life-401' && kind === 'member') ||
+            (scenario === 'records-guest-401' && kind === 'guest')) {
           sendJson(res, 401, errorEnvelope());
+          return;
+        }
+        if (scenario === 'records-life-403' && kind === 'member') {
+          sendJson(res, 403, errorEnvelope('FORBIDDEN'));
           return;
         }
         sendJson(res, 200, envelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));

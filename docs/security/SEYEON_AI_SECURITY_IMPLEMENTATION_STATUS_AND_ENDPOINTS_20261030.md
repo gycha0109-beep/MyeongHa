@@ -232,3 +232,10 @@ Watchtower-Track: security
 - **원인 및 변경:** 동일 Worker의 다른 보안 브랜치 프리뷰 빌드가 새 토큰 `Workers Builds - 2026-10-31 16:30`으로 성공한 것을 확인했다. #2786 전용 빌드 트리거 `4ac94015-8944-4b39-847a-679856c679e4`의 `build_token_uuid`만 새 토큰 `75190e92-211a-45fc-86e5-21d08753da41`로 갱신했다. Branch filter·빌드·Preview 명령·운영 배포 설정은 변경하지 않았다.
 - **재시도:** Cloudflare API에서 동일 HEAD로 빌드 `294a573a-d5e8-467e-a95e-1b68e7cd96c9`를 수동 생성했으며 최초 상태 `queued`를 확인했다. 최종 성공·GitHub PR check 갱신은 아직 확정하지 않는다.
 - **남은 범위/운영:** #2786 GitHub PostgreSQL/Security/Browser 검증과 새로운 Cloudflare 빌드 결과, main 병합 확인 필요. 운영 `HOLD_FORWARD_STOPPED` 유지; Production DB/ACL/Provider/public Reveal 활성화 없음.
+
+### 2026-10-31 / W19 — #2786 브라우저 검사 2/2 401·403 응답 경로 정합성 수정
+
+- **RED 증거:** [GitHub Actions #41204675103, job #124547233944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41204675103/job/124547233944)에서 확인 단계 `Verify multiple signup confirmation Guest handoffs`가 실패. 앞선 7개 handoff 시나리오는 PASS. 실패한 `records-life-401` 상황에서 브라우저의 실제 첫 Records 요청은 `/api/readings`였고, 테스트 서버는 이를 200으로 응답했다. 이후 `/api/life-record`가 호출되지 않아 원본 Member 인증 거부가 발생하지 않았으며 Member 세션이 남아 테스트가 실패했다.
+- **구현:** `scripts/verify-web-auth-rejected-bearer-browser.mjs` 테스트 서버의 `/api/readings` 응답을 실제 첫 요청 순서와 일치시켰다. `records-life-401` Member 및 `records-guest-401` Guest에는 401, `records-life-403` Member에는 403을 반환한다. 기존 `/api/life-record`의 해당 사례 응답은 유지해 경로 순서 변화도 수용한다. 브라우저의 원래 401 무효화·403 유지에 대한 검증 기준을 완화하지 않았다.
+- **변경 파일:** `scripts/verify-web-auth-rejected-bearer-browser.mjs`, 동일 Worklog. `node --check` 및 `git diff --check` 확인; 브라우저/CI PASS 여부는 새로운 HEAD 검사가 끝난 뒤 판정한다.
+- **진행 및 운영:** #2786의 다른 CI와 Cloudflare Workers 빌드는 별도 판정; 이번 수정을 이유로 다른 트랙 검사를 취소하거나 운영 Production DB/ACL/Provider/HTTP 공개를 활성화하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
