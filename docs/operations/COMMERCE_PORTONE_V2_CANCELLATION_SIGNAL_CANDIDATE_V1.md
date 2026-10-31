@@ -115,3 +115,15 @@ modules from `dist/`. A complete-visibility operations identity and the
 authorized server-side secret are required, but no live credentials were used
 in these tests. Do not add a public route, scheduler or auto-revoke to this
 candidate without the previously defined LIVE and refund execution gates.
+
+## 2026-10-31: exact cancellation amount shape, still read-only
+
+The offline PortOne V2 cancellation readback classifier now exposes three **observed shape facts** in addition to the existing fail-closed classification:
+
+- `observedCancelledTotalMinor`: the aggregate `payment.amount.cancelled` **across all successful cancellation entries**, not an individual webhook's refund amount.
+- `observedMatchingSucceededCancellationMinor`: the `totalAmount` of the **one matching cancellation ID only when that entry is SUCCEEDED**; `null` for REQUESTED/FAILED/missing matching ID or an inconsistent response.
+- `observedMatchingCancellationStatus`: `SUCCEEDED`, `REQUESTED`, `FAILED` or `null` from the exact matched cancellation ID.
+
+An aggregate 8,900 KRW cancellation can contain a 3,000 KRW cancellation and a separate 5,900 KRW cancellation. The webhook identifying the 3,000 KRW cancellation must **not** inherit the aggregate 8,900 KRW amount. Pending/failed events never have a succeeded matching amount; invalid readbacks return `null` on all amount/status fields.
+
+These are **only offline parsed PG response shapes**. Their source authenticity is not established by the offline classifier. The existing fixed-origin authenticated PortOne GET adapter remains the separate trust boundary. No consumer refund amount, grant revocation, PG POST, settlement finality or public route becomes authorized. The persisted cancellation Provider Event candidate stays nondeployable until comparable ordering, exact cancellation evidence retention and T2/Reader rights are proven.

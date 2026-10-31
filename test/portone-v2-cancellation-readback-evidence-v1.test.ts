@@ -32,6 +32,9 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
       shapeConsistent:true,originalPaymentMatched:true,
       matchedCancellationIdObserved:true,fullCancelShapeObserved:true,
       partialCancelShapeObserved:false,
+      observedCancelledTotalMinor:8900,
+      observedMatchingSucceededCancellationMinor:8900,
+      observedMatchingCancellationStatus:'SUCCEEDED',
       sourceAuthenticityProven:false,originalReceiptProven:false,
       refundExecutionAuthorized:false,entitlementRevocationAuthorized:false,
     });
@@ -46,6 +49,9 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
     });
     expect(r).toMatchObject({kind:'partial_cancel_shape_observed',
       fullCancelShapeObserved:false,partialCancelShapeObserved:true,
+      observedCancelledTotalMinor:3000,
+      observedMatchingSucceededCancellationMinor:3000,
+      observedMatchingCancellationStatus:'SUCCEEDED',
       entitlementRevocationAuthorized:false});
   });
   it('accumulates multiple successful partial cancellations into a full cancellation',()=>{
@@ -54,6 +60,10 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
       {id:'cancel-2',status:'SUCCEEDED',totalAmount:5900},
     ]});
     expect(r.kind).toBe('full_cancel_shape_observed');
+    // One cancellation of 3000 is not a 8900 refund even when all events sum to 8900.
+    expect(r.observedCancelledTotalMinor).toBe(8900);
+    expect(r.observedMatchingSucceededCancellationMinor).toBe(3000);
+    expect(r.observedMatchingCancellationStatus).toBe('SUCCEEDED');
   });
   it('a REQUESTED cancellation never proves finality',()=>{
     const r=inspect({
@@ -61,6 +71,9 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
       cancellations:[{...CANCEL,status:'REQUESTED'}],
     });
     expect(r.kind).toBe('cancellation_pending');
+    expect(r.observedCancelledTotalMinor).toBe(0);
+    expect(r.observedMatchingSucceededCancellationMinor).toBeNull();
+    expect(r.observedMatchingCancellationStatus).toBe('REQUESTED');
     expect(r.entitlementRevocationAuthorized).toBe(false);
   });
   it('a FAILED cancellation is not silently labelled completed',()=>{
@@ -69,6 +82,9 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
       cancellations:[{...CANCEL,status:'FAILED'}],
     });
     expect(r.kind).toBe('not_cancelled');
+    expect(r.observedCancelledTotalMinor).toBe(0);
+    expect(r.observedMatchingSucceededCancellationMinor).toBeNull();
+    expect(r.observedMatchingCancellationStatus).toBe('FAILED');
     expect(r.fullCancelShapeObserved).toBe(false);
   });
   it('does not identify the signalled cancellationId as succeeded when only a different cancellation succeeded',()=>{
@@ -81,6 +97,9 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
       ],
     });
     expect(r.kind).toBe('cancellation_pending');
+    expect(r.observedCancelledTotalMinor).toBe(3000);
+    expect(r.observedMatchingSucceededCancellationMinor).toBeNull();
+    expect(r.observedMatchingCancellationStatus).toBe('REQUESTED');
   });
   it.each([
     [{id:'attacker-payment'}],
@@ -106,6 +125,9 @@ describe('PortOne V2 original-receipt-bound cancellation readback SHAPE',()=>{
     const r=inspect(changes);
     expect(r.kind).toBe('inconsistent_or_unrecognized');
     expect(r.shapeConsistent).toBe(false);
+    expect(r.observedCancelledTotalMinor).toBeNull();
+    expect(r.observedMatchingSucceededCancellationMinor).toBeNull();
+    expect(r.observedMatchingCancellationStatus).toBeNull();
     expect(r.entitlementRevocationAuthorized).toBe(false);
   });
   it.each([

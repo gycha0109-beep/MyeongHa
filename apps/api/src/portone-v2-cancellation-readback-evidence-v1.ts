@@ -32,6 +32,10 @@ export interface PortOneV2CancellationReadbackReviewV1 {
   readonly matchedCancellationIdObserved: boolean;
   readonly fullCancelShapeObserved: boolean;
   readonly partialCancelShapeObserved: boolean;
+  // Parsed response-shape amounts only, NOT authenticated payment evidence.
+  readonly observedCancelledTotalMinor: number | null;
+  readonly observedMatchingSucceededCancellationMinor: number | null;
+  readonly observedMatchingCancellationStatus: 'SUCCEEDED'|'REQUESTED'|'FAILED'|null;
   readonly sourceAuthenticityProven: false;
   readonly originalReceiptProven: false;
   readonly refundExecutionAuthorized: false;
@@ -53,6 +57,9 @@ function minor(v: unknown): v is number {
 function result(
   kind:ReadbackClassificationV1,
   matchedCancellationIdObserved=false,
+  observedCancelledTotalMinor:number|null=null,
+  observedMatchingSucceededCancellationMinor:number|null=null,
+  observedMatchingCancellationStatus:'SUCCEEDED'|'REQUESTED'|'FAILED'|null=null,
 ):PortOneV2CancellationReadbackReviewV1 {
   return Object.freeze({
     kind,shapeConsistent:kind!=='inconsistent_or_unrecognized',
@@ -60,6 +67,8 @@ function result(
     matchedCancellationIdObserved,
     fullCancelShapeObserved:kind==='full_cancel_shape_observed',
     partialCancelShapeObserved:kind==='partial_cancel_shape_observed',
+    observedCancelledTotalMinor,observedMatchingSucceededCancellationMinor,
+    observedMatchingCancellationStatus,
     sourceAuthenticityProven:false,originalReceiptProven:false,
     refundExecutionAuthorized:false,entitlementRevocationAuthorized:false,
   });
@@ -106,6 +115,7 @@ export function inspectPortOneV2CancellationReadbackEvidenceV1(input:Readonly<{
   const seen=new Set<string>();
   let matchingCancellationId=false;
   let matchedCancellationStatus:'SUCCEEDED'|'REQUESTED'|'FAILED'|undefined;
+  let matchedSucceededAmount:number|null=null;
   for(const cancellationValue of payment.cancellations) {
     const c=record(cancellationValue);
     if(c===null||!id(c.id)||seen.has(c.id)||!minor(c.totalAmount)||
@@ -116,6 +126,7 @@ export function inspectPortOneV2CancellationReadbackEvidenceV1(input:Readonly<{
     if(c.id===input.cancellationId){
       matchingCancellationId=true;
       matchedCancellationStatus=c.status as 'SUCCEEDED'|'REQUESTED'|'FAILED';
+      matchedSucceededAmount=c.status==='SUCCEEDED'?c.totalAmount as number:null;
     }
     if(c.status==='REQUESTED')requested=true;
     if(c.status==='SUCCEEDED') {
@@ -132,19 +143,22 @@ export function inspectPortOneV2CancellationReadbackEvidenceV1(input:Readonly<{
   // announce settlement for its cancellation ID unless that exact ID SUCCEEDED.
   if(input.cancellationId!==undefined&&matchedCancellationStatus!=='SUCCEEDED') {
     if(matchedCancellationStatus==='REQUESTED')
-      return result('cancellation_pending',true);
-    return result('not_cancelled',true);
+      return result('cancellation_pending',true,amount.cancelled as number,null,'REQUESTED');
+    return result('not_cancelled',true,amount.cancelled as number,null,'FAILED');
   }
 
   if(payment.status==='CANCELLED') {
     if(amount.cancelled!==amount.paid||succeededTotal===0||requested)
       return INCONSISTENT;
-    return result('full_cancel_shape_observed',matchingCancellationId);
+    return result('full_cancel_shape_observed',matchingCancellationId,
+      amount.cancelled as number,matchedSucceededAmount,matchedCancellationStatus??null);
   }
   if(payment.status==='PARTIAL_CANCELLED') {
     if(amount.cancelled===0||amount.cancelled>=amount.paid)return INCONSISTENT;
-    return result('partial_cancel_shape_observed',matchingCancellationId);
+    return result('partial_cancel_shape_observed',matchingCancellationId,
+      amount.cancelled as number,matchedSucceededAmount,matchedCancellationStatus??null);
   }
   if(amount.cancelled!==0)return INCONSISTENT;
-  return result(requested?'cancellation_pending':'not_cancelled',matchingCancellationId);
+  return result(requested?'cancellation_pending':'not_cancelled',matchingCancellationId,
+    amount.cancelled as number,matchedSucceededAmount,matchedCancellationStatus??null);
 }
