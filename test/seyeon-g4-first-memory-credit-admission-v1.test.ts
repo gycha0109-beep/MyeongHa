@@ -34,10 +34,28 @@ function database(owner:unknown={isOwnerAdmin:false,chatCreditExempt:false,
       release(){released++;},
     };},
   };
-  return {pool,sql,binds,get released(){return released;}};
+  const privateSql:string[]=[];
+  const privateBinds:(readonly unknown[]|undefined)[]=[];
+  let privateReleased=0;
+  const privateCreditPool:PostgresSubjectPoolV1={
+    async connect(){return {
+      async query<Row>(text:string,args?:readonly unknown[]){
+        privateSql.push(text);privateBinds.push(args);
+        if(text.includes('internal_cmd_chat_credit_reserve_v1'))
+          return {rows:[{outcome,reservationId:reservation,committedTurnId:turn,
+            availableCredits:'40',totalCredits:'50'}] as unknown as readonly Row[]};
+        return {rows:[] as readonly Row[]};
+      },
+      release(){privateReleased++;},
+    };},
+  };
+  return {pool,privateCreditPool,sql,binds,privateSql,privateBinds,
+    get released(){return released;},get privateReleased(){return privateReleased;}};
 }
-const request=(pool:PostgresSubjectPoolV1)=>({pool,verifiedEvidence:evidence,
-  threadId:thread,clientTurnId:turn});
+const request=(d:ReturnType<typeof database>)=>({
+  pool:d.pool,privateCreditPool:d.privateCreditPool,verifiedEvidence:evidence,
+  threadId:thread,clientTurnId:turn,
+});
 
 describe('G4 private first-Memory credit reservation before provider',()=>{
   it('remains unmounted until verified delivery ACK also settles the reservation',()=>{
@@ -47,45 +65,63 @@ describe('G4 private first-Memory credit reservation before provider',()=>{
   });
   it('reserves ten credits for the DB-resolved Member, never an input Subject',async()=>{
     const d=database();
-    const result=await admitSeyeonG4FirstMemoryCreditsV1(request(d.pool));
+    const result=await admitSeyeonG4FirstMemoryCreditsV1(request(d));
     expect(result).toEqual({kind:'reserved',canonicalSubjectId:subject,
       threadId:thread,clientTurnId:turn,
       reservationId:reservation,requiredCredits:10});
     expect(d.sql[0]).toBe('BEGIN');
     expect(d.sql[1]).toBe('SET LOCAL ROLE myeongha_api_executor');
-    const credit=d.sql.findIndex(q=>q.includes('internal_cmd_chat_credit_reserve_v1'));
-    expect(credit).toBeGreaterThan(d.sql.findIndex(q=>q.includes('qry_myeongha_owner_admin_access_v1')));
-    expect(d.binds[credit]).toEqual([subject,thread,turn]);
+    expect(d.sql.some(q=>q.includes('internal_cmd_chat_credit_reserve_v1'))).toBe(false);
     expect(d.sql.at(-1)).toBe('COMMIT');
+    expect(d.privateSql[0]).toBe('BEGIN');
+    expect(d.privateSql[1]).toBe('SET LOCAL ROLE myeongha_commerce_internal_executor');
+    expect(d.privateSql[2]).toContain("set_config('myeongha.subject_id'");
+    expect(d.privateBinds[2]).toEqual([subject]);
+    const credit=d.privateSql.findIndex(q=>q.includes('internal_cmd_chat_credit_reserve_v1'));
+    expect(credit).toBeGreaterThan(2);
+    expect(d.privateBinds[credit]).toEqual([subject,thread,turn]);
+    expect(d.privateSql.at(-1)).toBe('COMMIT');
     expect(d.released).toBe(1);
+    expect(d.privateReleased).toBe(1);
   });
   it('exempts only a DB-verified Owner Admin without allocating credits',async()=>{
     const d=database({isOwnerAdmin:true,chatCreditExempt:true,sandboxCheckoutAllowed:true});
-    await expect(admitSeyeonG4FirstMemoryCreditsV1(request(d.pool))).resolves.toEqual({
+    await expect(admitSeyeonG4FirstMemoryCreditsV1(request(d))).resolves.toEqual({
       kind:'owner_admin_exempt',canonicalSubjectId:subject,requiredCredits:0,
     });
-    expect(d.sql.some(q=>q.includes('internal_cmd_chat_credit_reserve_v1'))).toBe(false);
+    expect(d.privateSql).toHaveLength(0);
+    expect(d.privateReleased).toBe(0);
   });
   it.each(['insufficient','conflict','committed_replay','already_reserved'])(
     'rolls back %s instead of issuing new model admission',async outcome=>{
       const d=database(undefined,outcome);
-      await expect(admitSeyeonG4FirstMemoryCreditsV1(request(d.pool)))
+      await expect(admitSeyeonG4FirstMemoryCreditsV1(request(d)))
         .rejects.toBeInstanceOf(SeyeonG4FirstMemoryCreditHoldV1);
-      expect(d.sql.at(-1)).toBe('ROLLBACK');
-      expect(d.sql).not.toContain('COMMIT');
-      expect(d.released).toBe(1);
+      expect(d.sql.at(-1)).toBe('COMMIT');
+      expect(d.privateSql.at(-1)).toBe('ROLLBACK');
+      expect(d.privateSql).not.toContain('COMMIT');
+      expect(d.privateReleased).toBe(1);
     });
+  it('rejects a shared ordinary/private pool before any DB transaction',async()=>{
+    const d=database();
+    await expect(admitSeyeonG4FirstMemoryCreditsV1({
+      ...request(d),privateCreditPool:d.pool,
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryCreditHoldV1);
+    expect(d.sql).toHaveLength(0);
+    expect(d.privateSql).toHaveLength(0);
+  });
   it('denies guest and spoofed Owner flags before credit spending',async()=>{
     const d=database();
     await expect(admitSeyeonG4FirstMemoryCreditsV1({
-      ...request(d.pool),verifiedEvidence:{kind:'guest',verifiedGuestTokenHash:'guest'} as never,
+      ...request(d),verifiedEvidence:{kind:'guest',verifiedGuestTokenHash:'guest'} as never,
     })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryCreditHoldV1);
     expect(d.sql).toHaveLength(0);
+    expect(d.privateSql).toHaveLength(0);
     const forged=database({isOwnerAdmin:false,chatCreditExempt:true,
       sandboxCheckoutAllowed:false});
-    await expect(admitSeyeonG4FirstMemoryCreditsV1(request(forged.pool)))
+    await expect(admitSeyeonG4FirstMemoryCreditsV1(request(forged)))
       .rejects.toBeInstanceOf(SeyeonG4FirstMemoryCreditHoldV1);
     expect(forged.sql.at(-1)).toBe('ROLLBACK');
-    expect(forged.sql.some(q=>q.includes('internal_cmd_chat_credit_reserve_v1'))).toBe(false);
+    expect(forged.privateSql).toHaveLength(0);
   });
 });

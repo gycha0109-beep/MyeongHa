@@ -5,6 +5,7 @@ import {executePostgresSubjectTransactionV1,type PostgresSubjectPoolV1} from './
 import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
 import {createPostgresChatCreditCandidatePortsV1} from './postgres-chat-credit-candidate-v1.js';
 import {reserveChatReplyCreditsV1} from './commerce-chat-credit-gate-v1.js';
+import {executePostgresCommerceInternalTransactionV1} from './postgres-commerce-internal-execution.js';
 
 export const SEYEON_G4_FIRST_MEMORY_CREDIT_ADMISSION_V1=Object.freeze({
   productionMounted:false, requiredCredits:10,
@@ -25,6 +26,8 @@ type OwnerRow=Readonly<{
 
 export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
   pool:PostgresSubjectPoolV1;
+  /** Private, server-owned Commerce role connection; NEVER a public DB session. */
+  privateCreditPool:PostgresSubjectPoolV1;
   verifiedEvidence:VerifiedSubjectIdentityEvidenceV1;
   threadId:string;
   clientTurnId:string;
@@ -32,10 +35,13 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
   | {kind:'reserved';canonicalSubjectId:string;threadId:string;clientTurnId:string;reservationId:string;requiredCredits:10}
   | {kind:'owner_admin_exempt';canonicalSubjectId:string;requiredCredits:0}
 >> {
-  if(input.verifiedEvidence?.kind!=='member'){
+  if(input.verifiedEvidence?.kind!=='member'||
+      !input.privateCreditPool||input.privateCreditPool===input.pool){
     throw new SeyeonG4FirstMemoryCreditHoldV1();
   }
-  return executePostgresSubjectTransactionV1({
+  // Authenticate the original Member under the ordinary RLS-bound role.
+  // This transaction NEVER gets private credit ledger EXECUTE authority.
+  const preflight=await executePostgresSubjectTransactionV1({
     pool:input.pool,verifiedEvidence:input.verifiedEvidence,
     execute:async({client,resolvedSubject})=>{
       if(resolvedSubject.subjectKind!=='member')
@@ -52,18 +58,32 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
           ((row.chatCreditExempt||row.sandboxCheckoutAllowed)&&!row.isOwnerAdmin)){
         throw new SeyeonG4FirstMemoryCreditHoldV1();
       }
-      if(row.chatCreditExempt){
-        return Object.freeze({
-          kind:'owner_admin_exempt' as const,
-          canonicalSubjectId:resolvedSubject.subjectId,requiredCredits:0 as const,
-        });
-      }
+      return Object.freeze({
+        canonicalSubjectId:resolvedSubject.subjectId,
+        ownerAdminExempt:row.chatCreditExempt,
+      });
+    },
+  });
+  if(preflight.ownerAdminExempt){
+    return Object.freeze({kind:'owner_admin_exempt' as const,
+      canonicalSubjectId:preflight.canonicalSubjectId,requiredCredits:0 as const});
+  }
+  // Only a server-trusted, separately scoped Commerce transaction may call
+  // the private reserve owner. The canonical identity is resolved above from
+  // verified Member evidence, never supplied by request JSON or model output.
+  return executePostgresCommerceInternalTransactionV1({
+    pool:input.privateCreditPool,
+    execute:async({client})=>{
+      await client.query(
+        "select pg_catalog.set_config('myeongha.subject_id',$1::text,true)",
+        [preflight.canonicalSubjectId],
+      );
       const ports=createPostgresChatCreditCandidatePortsV1({
-        client,canonicalSubjectId:resolvedSubject.subjectId,
+        client,canonicalSubjectId:preflight.canonicalSubjectId,
       });
       let freshReservation=false;
       const result=await reserveChatReplyCreditsV1({
-        verifiedSubjectId:resolvedSubject.subjectId,
+        verifiedSubjectId:preflight.canonicalSubjectId,
         threadId:input.threadId,clientTurnId:input.clientTurnId,
         port:{reserveForReply:async request=>{
           const outcome=await ports.reservation.reserveForReply(request);
@@ -77,7 +97,7 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
       if(result.kind!=='reservation'||!freshReservation)
         throw new SeyeonG4FirstMemoryCreditHoldV1();
       return Object.freeze({
-        kind:'reserved' as const,canonicalSubjectId:resolvedSubject.subjectId,
+        kind:'reserved' as const,canonicalSubjectId:preflight.canonicalSubjectId,
         threadId:input.threadId.toLowerCase(),clientTurnId:input.clientTurnId.toLowerCase(),
         reservationId:result.reservationId,requiredCredits:result.requiredCredits,
       });

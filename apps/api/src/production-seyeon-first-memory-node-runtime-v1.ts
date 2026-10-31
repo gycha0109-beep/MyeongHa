@@ -28,6 +28,8 @@ import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-v
 export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
+  /** G4 private Commerce pool is independent of the ordinary Member DB role. */
+  readonly privateCreditPool?: PostgresSubjectPoolV1;
   readonly governedCostPool?: SeyeonGovernedPostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Reviewed server policy only, never headers, JSON, env flags or model text. */
@@ -66,8 +68,12 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
       if (!SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
         throw Error('First Memory G4 credits and delivery settlement are not mounted.');
       }
+      if (input.privateCreditPool === undefined) {
+        throw Error('First Memory G4 private credit authority is not configured.');
+      }
       await admitSeyeonG4FirstMemoryCreditsV1({
-        pool:lease.pool,verifiedEvidence:turn.verifiedEvidence,
+        pool:lease.pool,privateCreditPool:input.privateCreditPool,
+        verifiedEvidence:turn.verifiedEvidence,
         threadId:turn.threadId,clientTurnId:turn.clientTurnId,
       });
       // Readiness has already succeeded before this closure can access
