@@ -125,6 +125,15 @@
 - **남은 것과 다음 작업:** 위 링크에서 attempt 2의 최종 `full` 및 `CI Integration Verify`를 확인하고 통과 시 자동 병합 처리. 새 소스가 배포되더라도 실제 운영/DR 승격에는 별도 최신 버전 증거가 필요함.
 - **관련 추적:** [PR #2796 CI 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2796/checks), [통합 재실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051), [PR #2796 진행 상황 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2796#issuecomment-6541334063).
 
+### 2026-10-31 23:46 KST — Phase 11 격리 PostgreSQL 실제 부하·연결 풀 포화 실측
+
+- **로드맵:** Production Operations 아키텍처 Phase 11의 `controlled non-production tests` 및 `DB saturation ceilings` 검증을 실제 임시 PostgreSQL에서 실행. Phase 12의 확장 트리거를 미리 수치화하지 않으며, 운영 시스템/실사용자 데이터에는 접근하지 않음.
+- **구현:** [`scripts/operations/measure-isolated-postgres-capacity-phase11.mjs`](../../scripts/operations/measure-isolated-postgres-capacity-phase11.mjs). `PG_BIN_DIR`로 지정한 로컬 PostgreSQL 18의 `initdb`/`pg_ctl`을 이용해 임시 데이터 디렉터리 및 임의 127.0.0.1 포트에 **별도 SQL 인스턴스** 생성. 단일 `pg.Pool`에 `max=2`, SQL `SELECT pg_sleep($1::double precision)` 합성 지연 **80ms**, 연결 획득 대기 **140ms**를 적용하고 동시 요청 1/2/4/8 단계에서 총 96건 측정. DB 첫 연결 과정은 별도 **1500ms 초기 warmup**으로 분리하여 초기 기동 시간을 포화 계측으로 오인하지 않음. 측정 및 예외 시 `finally`에서 DB 서버 정지·임시 파일 삭제, 다른 PostgreSQL 서비스 미변경.
+- **측정값(2026-10-31 KST, 단일 로컬 실행):** 동시 1개 **20/20 성공**, 성공 p95 **95.079ms**, **10.688 성공 req/s**. 동시 2개 **20/20 성공**, p95 **97.511ms**, **20.381 req/s**. 동시 4개 **24/24 성공**, p95 **189.273ms**, **21.324 req/s**. 동시 8개 **16/32 성공·16/32 연결 획득 타임아웃(실패율 50%)**, 성공분만의 p95 **220.291ms**, **21.326 성공 req/s**. 서버 드라이버가 관측한 연결 수는 전 구간 최대 2, 높은 동시 요청 뒤 정상 `SELECT 1` 회복 PASS. 스크립트 최종 `result=PASS`, exit code 0.
+- **실행 보정:** 최초 실행에서 임시 PostgreSQL의 두 번째 연결이 시작 과정에서 85ms 제한에 걸려 warmup이 실패한 사실을 확인. **기동 시 연결 준비**와 **측정 대상 연결 대기 한계**를 분리한 뒤 재실행해 PASS. 이는 실서비스 설정 변경이나 실제 DB의 장애·부하가 아님.
+- **해석 한계:** 로컬 PostgreSQL **18** + `ssl:false`로 고정된 합성 `pg_sleep` 벤치마크이며 운영 PostgreSQL 버전, `verify-full` TLS/RLS, 실제 명하 SQL·인덱스·사용자 혼합 트래픽, Saju CPU/메모리, 인프라 규모·비용을 대표하지 않음. 표시한 p95는 **성공한 요청만** 기준이므로 실패율과 함께 해석해야 함. `productionCapacityProven=false`, `realMyeonghaQueriesMeasured=false`, `scalingThresholdApproved=false`; **Phase 11 전체 수용/Phase 12 확장 트리거/Phase 13 Production Operations ACCEPTANCE/DR 수용 모두 미완료**.
+- **추적/다음:** 본 재현 스크립트와 Worklog를 같은 PR로 제출. 독립 진행 중인 [기록 조회 API 장애 PR #2806](https://github.com/gycha0109-beep/MyeongHa/pull/2806)은 필수 CI 통과 후 전용 통합 검증을 제출했고 **실행 중**임(작성 시점). 두 PR의 CI·병합 결과는 별도 증거 확인 전 PASS 또는 완료 추정 금지. 이후 실제 격리 DB의 MyeongHa 쿼리·권한/성능 증거 확보로 Phase 11~12 진행.
+
 ---
 
 ## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
