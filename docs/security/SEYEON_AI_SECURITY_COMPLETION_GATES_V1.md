@@ -308,3 +308,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **실 HTTP 검증:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에서 진짜 Node 요청으로 pending GET → 인증 없는 POST 401 → 인증된 'discard' POST 200 → 재조회 503 → 결정 재요청 503 및 DB payload 삭제/Memory 생성 0건을 테스트한다. 기존 PostgreSQL 이중 트랜잭션 동시성 시험도 유지한다.
 - **상태:** 이 구현은 원본 Member에 의한 pending **Memory Proposal**의 선택과 재표시 제한에 국한한다. Chat Assistant 원문/과거 대화/모델의 개인기록/Grant G3 공개, G0 재승인 정책, G1·G2 양수 pin/commit 및 G5/G6 승인 충족이 아니다. 최신 HEAD 검증이 끝나기 전에는 GREEN 판정하지 않는다. PR #2761 Draft/병합 금지, 운영 개인정보·유료 Provider HOLD 유지.
 
+
+
+### 2026-11-01 · W17 · G3 원래 Grant 기반 첫 세연 답변 재조회 (S0 격리)
+
+- **실제 구현:** '19-first-original-assistant-replay.sql'은 최초 Node 송출로 DB에 delivered가 확인된 **한 개의 첫 번째 세연 Assistant 원문**만 재조회한다. 단일 Thread의 사용자/세연 메시지 정확히 두 건, 파생 Relationship 0건, 기존 Attempt의 immutable positiveProof와 저장된 원래 Grant ID, 원본 Record의 현 상태·digest·원래 Grant 철회 여부를 기존 G0 DB-owner 함수로 재확인한다. 새 Grant나 과거 HTTP 캐시는 권한 증거로 쓰지 않는다.
+- **HTTP 연결:** 'seyeon-first-original-assistant-replay-node-s0-v1.ts'는 실 Node GET 요청의 Member 인증·DB canonical Subject를 검증하고 매 요청 새 DB 트랜잭션에서 SQL을 호출한다. 실제 응답은 기존 'sendSeyeonNodeOriginalGrantResponseV1'을 재사용하여 **직접 Node socket finish까지 원래 Grant/Record 잠금을 유지**하고 'no-store'로 비스트리밍 전달한다. DB 이름은 격리 S0/CI PG17만 허용한다.
+- **실 DB 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 첫 G2 Commit과 첫 Node 전송 완료 후 HTTP 연속 재조회, 타 Member/미인증/원본 User Message ID 차단, 원래 Grant 철회 이후 본문 0건을 추가했다. 격리 fixture에서만 실행 역할에 함수 권한을 임시 부여한다. 기본 설치 권한은 여전히 DENY.
+- **한계:** 실제 Production History GET과 일반 committed_replay는 이 경로로 대체되지 않는다. Vercel Fetch/Cloudflare 프록시 및 최종 클라이언트 수신·Reader/Relationship/혼합 출처를 증명하지 못했다. G0-D1~D5/G1/G2/G3 전체/운영 G4~G6는 계속 HOLD. source registry/운영 ACL/서비스 Route/유료 Provider 활성화 없음, PR #2761 Draft·병합 금지.
+- **검증 판정:** 새 커밋 HEAD CI/PG17 확인 전에는 PASS로 기록하지 않는다.
+
