@@ -270,3 +270,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **승인 후 재조회 검증:** 기존 실제 PostgreSQL 17 격리 UC-07 테스트에서 사용자 승인으로 Proposal이 `accepted`가 되면 같은 원본 Thread/Assistant의 G3 **내부 후보 재조회가 null**이어야 함을 명시. 커밋 `44de7b24`. 기존 `discard` 후 차단·만료 후 차단 테스트와 함께 승인된 제안의 중복 UI 제안을 금지. 이는 실 HTTP Reveal이나 철회 선형화 완료 증명이 아님.
 - **브랜치/승인:** 기존 `feat/security/s0-private-memory-review-client-20261030` / PR #2761 Draft 유지, 자동 병합 OFF. `main` 병합·Cloudflare 토큰·운영 DB 마이그레이션·개인정보 Route·유료 Provider 연결 없음. G0/G1/G2/G3/G4/G5/G6 관련 미승인 공개는 계속 `HOLD_FORWARD_STOPPED`.
 - **남은 작업:** 이 커밋들의 정확한 HEAD CI/Web/Governance/PG17/외부 Cloudflare 검사 확인. G3 원래 Grant·취소·재승인·과거 파생 Context를 하나의 서버/DB/HTTP 공개 선형화 경계로 결속하는 실제 구현 및 정책 검증은 여전히 미완료.
+
+
+### 2026-10-31 · W13 · 기억 거부 CI 수정 및 실제 두 세션의 승인 경쟁 검증
+
+- **CI 증거:** 직전 HEAD `54d843cb`의 [CI 41185557039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185557039)에서 Governance/Web PASS, PostgreSQL17 PASS, Work Track · security RED. 792개 중 739 PASS/51 SKIP/2 FAIL: `seyeon-planner-memory-proposal-producer-v1.test.ts`의 한국어 ‘기록하지 말아줘’ 미인식과 `web-chat-room-read-contract.test.ts`의 공백 메시지 예외 문구 불일치. 기존 PR 전체 PASS 아님.
+- **실제 수정:** `seyeon-planner-memory-proposal-extractor-v1.ts`가 ‘기록하지 말아줘’의 `말아` 거부 표현을 모델 호출 전 인식하도록 보완(`fddbb190`). `web-chat-room-read-contract.test.ts`는 null 메시지 본문과 빈/공백 본문을 각각 실제 안전 차단 경계에서 거부함을 확인하도록 정정(`7a962dd5`). 운영 권한·개인정보 공개 범위는 확대하지 않음.
+- **실제 PostgreSQL 17 동시성 검증 추가:** `test/seyeon-security-s0-postgres.e2e.test.ts`에서 동일 Member/Assistant의 Owner 발급 pending 제안에 대해 독립된 두 트랜잭션이 `discard`와 `character_only` 결정을 경쟁하도록 구성. 먼저 확보한 제안 잠금 때문에 후속 승인 요청이 대기하고, `discard` 완료 후 승인 요청이 실패하며 제안 내용 제거, Memory/Grant 0건, 내부 제안 재표시 0건을 검증. 커밋 `47c8f5a7`. 아직 새 HEAD CI 결과로 통과 판정하지 않음.
+- **운영 불변:** PR #2761 동일 Draft 브랜치, 자동 병합 OFF. public G3 Reveal/Replay, 실사용자 private 모델 읽기, 유료 Provider, 운영 DB Migration·Role 변경 없음. 실제 G3 동의·철회 시점의 HTTP 바이트 공개 선형화, G0 정책 계약 승인 및 G5/G6 운영 검증은 여전히 `HOLD_FORWARD_STOPPED`.
+- **다음:** W13 포함 새 정확한 HEAD에서 CI/PG17 검증 결과 확인. 별도 승인 없이 내부 후보를 HTTP에 노출하지 않으며, 이후 G3 원본 Grant/현재 권한·Replay를 실제 트랜잭션/HTTP 경계에 연결하는 작업이 필요.
