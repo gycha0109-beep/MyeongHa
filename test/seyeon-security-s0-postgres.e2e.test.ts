@@ -427,9 +427,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
 
   it('serializes two independent Member decisions: discard prevents concurrent durable consent',async()=>{
-    const f=await prepare(207);
+    const f=await prepare(209);
     await f.commit();
-    const proposalId=uuid(27,207);
+    const proposalId=uuid(27,209);
     await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
       canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
       assistantMessageId:f.assistant,userMessageId:f.user,
