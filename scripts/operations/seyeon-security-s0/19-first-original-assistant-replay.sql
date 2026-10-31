@@ -4,6 +4,9 @@
 -- authorization. This RPC neither creates nor substitutes a Grant.
 begin;
 
+grant myeongha_seyeon_chat_runtime_owner to current_user;
+grant create on schema seyeon_private to myeongha_seyeon_chat_runtime_owner;
+
 create function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
   p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid
 ) returns table(assistant_text text)
@@ -83,6 +86,11 @@ begin
   return query select v_text;
 end
 $replay$;
+
+alter function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+  owner to myeongha_seyeon_chat_runtime_owner;
+revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
+revoke myeongha_seyeon_chat_runtime_owner from current_user;
 
 revoke all on function
   seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
