@@ -126,3 +126,21 @@
 - **테스트:** 신규 test/commerce-stored-portone-cancellation-hmac-recheck-v1.test.mjs 23건 PASS, 기존 HMAC GET 관련 12건 PASS. 확장 회귀와 PR·CI 결과 별도 기록.
 - **남은 작업:** 제공·법적 승인·Provider 순서 판정·Reader T2 잠금 결합 전에는 실제 환불·Grant 회수 호출을 연결하지 않습니다.
 - **통합 PR:** [PR #2816](https://github.com/gycha0109-beep/MyeongHa/pull/2816), 최초 구현 커밋 5c0979b9, 후속 DB 계보 연결 커밋 e54edff9. 관련 Vitest 9개 파일 **195건 PASS**, 타입 검사·빌드 PASS. 선행 #2811 병합 후 최신 main 기준으로 Worklog 충돌 없이 갱신하고 필수 CI·자동 병합을 설정합니다.
+
+### 2026-11-01 — 저장된 PortOne 취소 HMAC 및 Reader 구매권 실제 PostgreSQL 17 계보 검사
+
+- **선행 작업:** PR #2816 내부 비배포 HMAC 재확인 구현을 기반으로 독립 브랜치 `feat/commerce-payment/hmac-lineage-real-pg17-20261101`에서 추가했습니다.
+- **실제 구현:** 기존 저장 Provider Event → 원본 Receipt → Purchase Intent → 결제 Attempt → B2 Reader Grant를 결합하는 **원본 SQL 자체**를 격리 PG17에서 실행하는 테스트를 추가했습니다. 다른 B3 Reader의 별도 Grant와 존재하지 않는 이벤트는 일치하지 않아야 합니다.
+- **안전:** 전체 공식 Reader fixture 이후 B2/B3 합성 Attempt·취소 이벤트만 트랜잭션에서 만들고 항상 ROLLBACK. PG15 일반 DB 트랙·운영 마이그레이션·공개 endpoint·Provider refund POST·자동 Entitlement Effect는 변경하지 않습니다.
+- **로컬 증거:** SQL 생성·Bash 구문·관련 Vitest 40건/타입 검사·빌드 PASS. **실제 PG17 데이터베이스 성공은 GitHub CI 검증 전까지 미확인**입니다.
+- **남은 작업:** 선행 #2816 병합 시 최신 `main`으로 갱신하고 이 PG17 실행 항목의 CI 결과 확인, 이후 별도의 Provider ordering/법적 근거/Reader T2 조건을 충족하기 전 권한 회수 OFF 유지.
+- **상세:** `docs/operations/COMMERCE_P4_STORED_PORTONE_HMAC_REAL_PG17_LINEAGE_PROOF_V1.md`.
+- **통합 PR:** [PR #2819](https://github.com/gycha0109-beep/MyeongHa/pull/2819), 구현 커밋 `69606421`. 선행 #2816 미병합 시에는 Draft 스택 PR로 유지하며, #2816 병합 후 최신 `main`으로 변경해 공식 PostgreSQL 17 통합 CI·자동 병합을 활성화합니다.
+- **진행 상태 갱신(2026-11-01):** #2816 필수 통합 CI 성공 및 `main` 병합 `6285fe66` 확인. 후속 [PR #2819](https://github.com/gycha0109-beep/MyeongHa/pull/2819)는 `main` 기준 재정렬·Draft 해제·`ci-integration-ready` 지정·자동 병합 설정까지 완료했습니다. 실제 PostgreSQL 17 전체 SQL 증거는 #2819 CI 결과 확인 전까지 미확정입니다.
+
+### 2026-11-01 — PR #2819 PostgreSQL 17 RED 원인 수정 및 재시도
+
+- **실패 원인:** [CI #41217837268](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41217837268)에서 공식 B2/B3 구매 Intent가 `verified`가 된 후 합성 Payment Attempt를 신규 등록해 `new payment attempts require a non-terminal Purchase Intent` 제약에 걸렸습니다. [Integration #41217873363](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41217873363)는 이 CI 실패 때문에 필수 선행 검사에서 중단됐습니다.
+- **수정:** 공식 Reader fixture 원본을 변경하지 않고, 실행 시 생성하는 테스트 사본에만 B2/B3 Intent가 `created` 상태일 때 Payment Attempt를 먼저 삽입하도록 수정했습니다. 기존 verified Receipt·Reader 구매권 증명 절차는 그대로 유지합니다.
+- **검증:** 합성 Attempt 삽입 → Intent verified → Receipt 생성 순서 검사 추가, 관련 Vitest **41개 PASS**, 타입 검사·빌드·Bash·SQL 생성기 검사 PASS. 운영 마이그레이션·결제/환불/자동 Grant 회수 기능 변경 없음.
+- **남은 것:** 새 PR 커밋의 실제 PostgreSQL 17 실행 및 필수 Integration 결과. 완료 전까지 전체 DB 검사 통과를 추정하지 않습니다.
