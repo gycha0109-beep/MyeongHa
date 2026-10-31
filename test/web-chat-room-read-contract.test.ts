@@ -162,8 +162,9 @@ describe('browser Chat room read contract', () => {
     for (const bodyText of [null,'','   ']) {
       expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
         room.messages[0],{...room.messages[1],bodyText},
-      ]},{expectedThreadId:THREAD_ID})).toThrow(
-        'Memory proposal lacks exact server Dialogue Planner authority');
+      ]},{expectedThreadId:THREAD_ID})).toThrow(bodyText === null
+        ? 'Memory proposal lacks exact server Dialogue Planner authority'
+        : 'message bodyText is invalid');
     }
     expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
       {...room.messages[0],memoryProposal:proposal},room.messages[1],
