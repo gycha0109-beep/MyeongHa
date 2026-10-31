@@ -242,3 +242,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **변경 파일:** `scripts/operations/seyeon-security-s0/{17-planner-memory-display-candidate.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.ts`, `test/{seyeon-planner-memory-display-candidate-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
 - **구현 커밋:** `748662c8`, `0046d4d6`, `9ad5daaf`, `10b39b9d`, `ee65fa1b`, `d0d6cab4`, `42a4e334`, `af5d1b2b`.
 - **진행 상태:** 해당 새 코드의 최신 HEAD CI/PG17 **결과 확인 전**. 후속은 권한 취소/재승인 및 과거 대화 G3 원자 검증 뒤만 실제 Reveal/UI에 결속할 수 있다. 본 작업으로 실사용자 개인정보 공개, 유료 모델 실행, 자동 병합을 활성화하지 않았다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W10 · G3 내부 후보 검증 오류 수정 및 사용자 기억 거부 우선 적용
+
+- **확인:** 작업 시작 시 PR #2761 HEAD `8ff44dc86276972928cc2d8eece40b8ff669a94a`의 GitHub Actions 중 Governance/Web PASS, PostgreSQL 17 PASS, Work Track · security RED. [CI 41179023985](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41179023985) 로그: `test/seyeon-planner-memory-display-candidate-v1.test.ts`의 기대 객체 필드 `canonicalMemberSubjectId`와 실제 내부 조회 결과의 `subjectId`가 불일치한 합성 assertion 1건. 실제 제품 권한 오류로 단정하지 않음.
+- **수정:** 테스트 기대 값을 DB Owner 후보 응답 계약의 `subjectId`로 정정. 커밋 `f7ef8ec5`.
+- **제품 안전 범위:** 세연의 Dialogue Planner에서 사용자 발화에 명시적인 한국어/영어 **기억·기록·저장 금지 요청**이 있을 경우 구조화 모델을 호출하기 **전에** `decision:'none'`으로 종료하는 우선 거부 규칙 추가. 이는 원본 사용자 승인 없이 Memory를 저장하지 않으며, 기존 저장된 기록의 삭제·취소 처리라고 주장하지 않는다. 코드 `seyeon-planner-memory-proposal-extractor-v1.ts`, 테스트 `seyeon-planner-memory-proposal-producer-v1.test.ts`.
+- **커밋:** `122b2948` (모델 호출 전 거부), `162dc610` (한국어·영어 거부 및 일반 발화 회귀 테스트).
+- **Cloudflare/병합:** 사용자가 Cloudflare 설정을 별도 트랙에서 해결했다고 알려줌. 본 트랙은 Cloudflare 배포 명령·토큰에 손대지 않음. PR은 병합 방지를 위해 **Draft, auto-merge=null** 유지; 현재 브랜치에만 커밋.
+- **검증 상태/다음:** 해당 변경이 포함된 신규 HEAD GitHub Actions/외부 Cloudflare Check Run 검증 결과는 아직 확인 전. S0 SQL·실사용자 텍스트 공개는 계속 HOLD. UC-07/G3의 승인·철회 기반 응답 공개는 별도 실제 권한 증명이 필요하다.
