@@ -70,7 +70,6 @@ function recordsFetch(calls: Array<{ endpoint: string; authorization: string | n
         },
       });
     }
-    if (endpoint === '/api/life-record') return successEnvelope({ facts: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
     if (endpoint === '/api/readings') return successEnvelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } });
     return Response.json({ ok: false }, { status: 404 });
   });
@@ -90,7 +89,6 @@ function snapshotFor(label: string, endpoint: string) {
       },
     };
   }
-  if (endpoint === '/api/life-record') return { facts: [{ factType: `${label}-fact` }], pagination: { pageSize: 50, hasMore: false, nextCursor: null } };
   if (endpoint === '/api/readings') {
     const readingIdentity = label === 'member-a'
       ? '44444444-4444-4444-8444-444444444401'
@@ -140,22 +138,14 @@ describe('Records active bearer binding', () => {
 
     await expect(client.readRecords()).resolves.toMatchObject({
       profile: { subjectKind: 'member' },
-      lifeFacts: { facts: [] },
       readings: { readings: [] },
     });
 
     expect(resolveBearer).toHaveBeenCalledTimes(2);
-    expect(calls).toHaveLength(3);
-    expect(calls.map((call) => call.endpoint)).toEqual([
-      '/api/me',
-      '/api/life-record',
-      '/api/readings',
-    ]);
+    expect(calls).toHaveLength(2);
+    expect(calls.map((call) => call.endpoint)).toEqual(['/api/me', '/api/readings']);
     expect(calls[0]).toEqual({ endpoint: '/api/me', authorization: `Bearer ${memberSession.accessToken}` });
-    expect(calls.slice(1).map((call) => call.authorization)).toEqual([
-      `Bearer ${memberSession.accessToken}`,
-      `Bearer ${memberSession.accessToken}`,
-    ]);
+    expect(calls[1].authorization).toBe(`Bearer ${memberSession.accessToken}`);
   });
 
   it('binds an opaque Guest bearer instead of issuing unauthenticated Records requests', async () => {
@@ -167,7 +157,7 @@ describe('Records active bearer binding', () => {
 
     await client.readRecords();
 
-    expect(calls).toHaveLength(3);
+    expect(calls).toHaveLength(2);
     expect(calls.every((call) => call.authorization === 'Bearer opaque-guest-session')).toBe(true);
   });
 
@@ -190,13 +180,12 @@ describe('Records active bearer binding', () => {
 
     await expect(client.readRecords()).resolves.toMatchObject({
       profile: { profile: { displayName: 'member-b' } },
-      lifeFacts: { facts: [{ factType: 'member-b-fact' }] },
       readings: { readings: [{ readingId: '44444444-4444-4444-8444-444444444402' }] },
     });
 
-    expect(calls).toHaveLength(6);
-    expect(calls.slice(0, 3).every((call) => call.authorization === `Bearer ${memberA.token}`)).toBe(true);
-    expect(calls.slice(3).every((call) => call.authorization === `Bearer ${memberB.token}`)).toBe(true);
+    expect(calls).toHaveLength(4);
+    expect(calls.slice(0, 2).every((call) => call.authorization === `Bearer ${memberA.token}`)).toBe(true);
+    expect(calls.slice(2).every((call) => call.authorization === `Bearer ${memberB.token}`)).toBe(true);
   });
 
   it('fails closed instead of returning either stale snapshot when authority changes twice', async () => {
@@ -220,7 +209,7 @@ describe('Records active bearer binding', () => {
     });
 
     await expect(client.readRecords()).rejects.toMatchObject({ code: 'WEB_RECORDS_SESSION_CHANGED' });
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(4);
   });
 
   it('fails closed without making an API request when no active bearer can be resolved', async () => {
