@@ -292,6 +292,14 @@ Watchtower-Track: security
 - **구현:** positive 1-Memory 분기에서 `positivePersonalSourcePort`와 `combinedSourcePinPort`를 모두 필수로 하며, **동일 트랜잭션의 Memory+현재 User 결합 Pin** 하나만 호출하도록 legacy fallback을 삭제했다. 두 출처의 결합 DB Pin을 사용할 수 없는 경우 기존 `SeyeonProductionChatExecutionErrorV1`로 Provider 진입 전에 차단한다. 현재 운영 Projector 기본 비활성, 0-Personal 흐름, 일반 Replay/History HOLD는 유지한다.
 - **회귀 기준:** `test/seyeon-attempt-zero-personal-proof-v1.test.ts`와 `test/seyeon-exact-model-personal-source-selection-v1.test.ts`의 기존 Provider 이전 보안 순서 검증을 결합 Pin 필수·legacy 경로 부재 기준으로 갱신했다. `git diff --check` PASS. 로컬 worktree에는 vitest/typescript 설치본이 없어 CI에서 실행·타입 통과 확인해야 한다.
 - **변경 범위:** `apps/api/src/seyeon-production-chat-execution-v1.ts`, 두 기존 테스트, 본 Worklog. 운영 DB/ACL/Provider/Reader/HTTP Route 설정은 변경하지 않는다. `HOLD_FORWARD_STOPPED` 유지. 전체 G0~G6 종료 판정 아님.
+### 2026-11-01 / W28 — G2 원자 확정 시 현재 User DB 출처 Pin 필수화 (source-only)
+
+- **선행 통합:** PR #2822 `403fc1a1`은 Security/Governance/Web/Cloudflare 필수 CI GREEN 후 부모 #2786 브랜치에 squash 병합(`a443d34983eac7c71eceeaf163a16c980b327647`). #2786는 main 자동 병합 설정 중이나 아직 BLOCKED.
+- **발견:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`의 실제 `validated -> committed` 전환 Trigger는 positive Memory Pin만 있고 `seyeon_recent_source_pin_jsonb`가 NULL인 경우 원본 User 재검증을 건너뛸 수 있었다. 상위 실행 경로의 G1 결합 Pin 필수 정책만으로는 독립 SQL/레거시 호출의 G2 보호가 완전하지 않았다.
+- **구현:** positive Memory Commit 분기에 현재 User 원본 G1 Pin을 의무화했다. 없으면 `seyeon_positive_g2_recent_source_pin_required`로 해당 Commit 트랜잭션을 실패시키고, 기존 SQL trigger의 동일 DB 트랜잭션 안에서 User 본문·원본 해시/Grant/Memory 정합성 검사와 assistant/outbox 원자성을 유지한다. 0건 비개인정보 Commit·다른 앱 운영 함수·공개 범위 변경 없음.
+- **PostgreSQL 검증:** 기존 S0 disposable PostgreSQL 17 통합 테스트의 positive 정상 fixture는 최근 User 원본을 G1으로 먼저 고정하도록 갱신했다. 신규 부정 케이스는 구형 Memory-only Pin을 강제로 생성해 G2 Commit 거부 및 validated Attempt 상태 유지와 assistant 메시지 생성 0건을 검증한다. CI 통과 전 결과 PASS 아님.
+- **변경:** `02-atomic-commit.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 누적 보안 Worklog. `git diff --check`와 `plan.mjs`의 `installerMayActivateProduction=false` 확인. Production DB/ACL/Provider/HTTP/Reader 활성화 없음. `HOLD_FORWARD_STOPPED` 유지.
+
 ### 2026-11-01 / W29 — G3 내부 Node 송신 함수의 Replay 직접 호출 차단 (source-only)
 
 - **독립 작업:** G2 최근 User Pin 필수화 #2823의 PostgreSQL 17 CI가 실행 중이어서 별도의 G3 전송 경계를 구현했다. 부모는 CI GREEN으로 확인된 #2786 통합 HEAD `a443d34983eac7c71eceeaf163a16c980b327647`이며 운영 병합·활성화는 별도다.
