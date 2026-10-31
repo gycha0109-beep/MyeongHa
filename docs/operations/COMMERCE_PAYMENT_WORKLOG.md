@@ -144,3 +144,11 @@
 - **수정:** 공식 Reader fixture 원본을 변경하지 않고, 실행 시 생성하는 테스트 사본에만 B2/B3 Intent가 `created` 상태일 때 Payment Attempt를 먼저 삽입하도록 수정했습니다. 기존 verified Receipt·Reader 구매권 증명 절차는 그대로 유지합니다.
 - **검증:** 합성 Attempt 삽입 → Intent verified → Receipt 생성 순서 검사 추가, 관련 Vitest **41개 PASS**, 타입 검사·빌드·Bash·SQL 생성기 검사 PASS. 운영 마이그레이션·결제/환불/자동 Grant 회수 기능 변경 없음.
 - **남은 것:** 새 PR 커밋의 실제 PostgreSQL 17 실행 및 필수 Integration 결과. 완료 전까지 전체 DB 검사 통과를 추정하지 않습니다.
+
+### 2026-11-01 — PortOne 인증 GET 이후 Reader 구매권 스냅샷 재검사
+
+- **기준:** PR #2819([완료](https://github.com/gycha0109-beep/MyeongHa/pull/2819))의 PostgreSQL 17·통합 CI 그린 및 `main` 병합 `9bfe2409` 확인.
+- **구현:** 최초 DB 취소 Event/Receipt/Attempt/Reader Grant 확인과 인증된 PortOne 개별 취소 GET 후, 동일한 완전 가시성 읽기 전용 SQL로 다시 스냅샷을 읽어 일치하지 않는 취소 상태·금액·Grant revision/status/order·Receipt·결제 시도를 모두 HOLD 처리합니다. 두 조회는 모두 ROLLBACK이며 실제 Entitlement Effect 호출은 없습니다.
+- **검증:** 변경된 Reader Grant 및 Provider Event, 최초/두 번째 DB 오류, 누락·중복, 권한 상실·롤백, 원본 결제 계보에 대한 신규 회귀 검사. 기존 실제 PostgreSQL 17 스모크에 조회 필드 추가(결과는 공식 CI 확인 전 미확정).
+- **안전:** `postGetDbSnapshotStable`는 관찰값일 뿐 Provider `NEWER/STALE`, T2 원자적 잠금, 법적 환불 또는 실제 Grant 회수 승인으로 승격하지 않습니다. 운영 refund/LIVE/자동 revoke OFF 유지.
+- **브랜치:** `feat/commerce-payment/postget-reader-cas-revalidation-20261101`. 상세: `docs/operations/COMMERCE_P4_POST_GET_READER_CAS_REVALIDATION_V1.md`.

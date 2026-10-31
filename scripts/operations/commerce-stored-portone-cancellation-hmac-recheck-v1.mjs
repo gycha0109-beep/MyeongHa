@@ -11,6 +11,7 @@ select
  event.id::text as "providerEventId",
  event.event_type as "eventType",
  event.status as "eventStatus",
+ event.provider_ordering_key as "eventProviderOrderingKey",
  event.payload_fingerprint as "eventSignedHmac",
  event.verified_payload_jsonb->>'schemaVersion' as "sourceSchema",
  event.verified_payload_jsonb->>'signedPayloadHmac' as "sourceSignedHmac",
@@ -27,8 +28,12 @@ select
  receipt.external_transaction_id as "originalTransactionId",
  receipt.verified_amount_minor::text as "receiptPaidMinor",
  receipt.verified_currency as "receiptCurrency",
+ receipt.verification_status as "receiptVerificationStatus",
  attempt.provider_request_id as "providerPaymentId",
- g.id::text as "exactReaderGrantId"
+ g.id::text as "exactReaderGrantId",
+ g.status as "grantStatus",
+ g.revision::text as "grantRevision",
+ g.last_provider_ordering_key as "grantLastProviderOrderingKey"
 from public.commerce_provider_events event
 join public.commerce_receipts receipt
  on receipt.id=event.resolved_receipt_id
@@ -90,6 +95,8 @@ const ID=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const MAC=/^hmac-sha256:k1:[0-9a-f]{64}$/u;
 const MONEY=/^[1-9][0-9]*$/u;
 const CURRENCY=/^[A-Z]{3}$/u;
+const REVISION=/^(0|[1-9][0-9]*)$/u;
+const ORDER=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const MAX=BigInt(Number.MAX_SAFE_INTEGER);
 const no=(kind,more={})=>Object.freeze({
  schemaVersion:COMMERCE_STORED_PORTONE_CANCEL_HMAC_RECHECK_V1.schemaVersion,
@@ -97,7 +104,7 @@ const no=(kind,more={})=>Object.freeze({
  latestExactSuccessObserved:false,matchedCancellationAmountUnchanged:false,
  refundExecutionAuthorized:false,grantRevocationAuthorized:false,
  readerT2LockHeld:false,providerOrderingProven:false,
- entitlementEffectInvoked:false,writesPerformed:false,
+ postGetDbSnapshotStable:false,entitlementEffectInvoked:false,writesPerformed:false,
  ...more,
 });
 function validRow(row,providerEventId,entitlementGrantId){
@@ -121,13 +128,50 @@ function validRow(row,providerEventId,entitlementGrantId){
     row.originalTransactionId.trim()!==row.originalTransactionId||
     row.sourceOrderingProven!=='false'||
     row.sourceRefundAuthorized!=='false'||
-    row.sourceRevokeAuthorized!=='false')return false;
+    row.sourceRevokeAuthorized!=='false'||
+    !['verified','revoked'].includes(row.receiptVerificationStatus)||
+    !['active','revoked','expired'].includes(row.grantStatus)||
+    typeof row.grantRevision!=='string'||!REVISION.test(row.grantRevision)||
+    (row.grantLastProviderOrderingKey!==null&&
+      (typeof row.grantLastProviderOrderingKey!=='string'||
+       !ORDER.test(row.grantLastProviderOrderingKey)||
+       row.grantLastProviderOrderingKey.trim()!==row.grantLastProviderOrderingKey))||
+    (row.eventProviderOrderingKey!==null&&
+      (typeof row.eventProviderOrderingKey!=='string'||
+       !ORDER.test(row.eventProviderOrderingKey)||
+       row.eventProviderOrderingKey.trim()!==row.eventProviderOrderingKey))
+   )return false;
  const paid=BigInt(row.receiptPaidMinor);
  const exact=BigInt(row.sourceExactAmountMinor);
  const cumulative=BigInt(row.sourceInitialCumulativeMinor);
  return paid<=MAX&&exact<=cumulative&&cumulative<=paid&&
   (row.eventType!=='Transaction.Cancelled'||cumulative===paid)&&
   (row.eventType!=='Transaction.PartialCancelled'||exact<paid);
+}
+
+/**
+ * Read a consistent canonical source under independently verified operations
+ * visibility. Reused before and after the external GET, never across the GET.
+ */
+async function readExactStoredSnapshot(dbClient,providerEventId,entitlementGrantId){
+ let begun=false;
+ try{
+  await dbClient.query('begin isolation level repeatable read read only');
+  begun=true;
+  await dbClient.query("set local statement_timeout='10000ms'");
+  const auth=await dbClient.query(`select
+   current_setting('transaction_read_only')='on' as "readOnly",
+   (rolsuper or rolbypassrls) as "completeVisibility"
+   from pg_catalog.pg_roles where rolname=current_user`);
+  if(auth.rows.length!==1||auth.rows[0].readOnly!==true||
+     auth.rows[0].completeVisibility!==true)
+   throw Error('STORED_PORTONE_CANCEL_RECHECK_AUTHORITY_REQUIRED');
+  const result=await dbClient.query(COMMERCE_STORED_PORTONE_CANCEL_HMAC_SOURCE_SQL_V1,
+   [providerEventId,entitlementGrantId]);
+  return result.rows;
+ }finally{
+  if(begun)await dbClient.query('rollback');
+ }
 }
 
 /**
@@ -143,29 +187,12 @@ export async function recheckStoredPortOneCancellationByHmacPrivateV1({
  if(typeof providerEventId!=='string'||!UUID.test(providerEventId)||
     typeof entitlementGrantId!=='string'||!UUID.test(entitlementGrantId))
   throw Error('INVALID_STORED_PORTONE_CANCEL_RECHECK_INPUT');
- let begun=false;
- let row;
- try{
-  await dbClient.query('begin isolation level repeatable read read only');
-  begun=true;
-  await dbClient.query("set local statement_timeout='10000ms'");
-  const auth=await dbClient.query(`select
-   current_setting('transaction_read_only')='on' as "readOnly",
-   (rolsuper or rolbypassrls) as "completeVisibility"
-   from pg_catalog.pg_roles where rolname=current_user`);
-  if(auth.rows.length!==1||auth.rows[0].readOnly!==true||
-     auth.rows[0].completeVisibility!==true)
-   throw Error('STORED_PORTONE_CANCEL_RECHECK_AUTHORITY_REQUIRED');
-  const result=await dbClient.query(COMMERCE_STORED_PORTONE_CANCEL_HMAC_SOURCE_SQL_V1,
-    [providerEventId,entitlementGrantId]);
-  if(result.rows.length===0)return no('exact_stored_event_reader_grant_not_found');
-  if(result.rows.length!==1)throw Error('AMBIGUOUS_STORED_PORTONE_CANCEL_SOURCE');
-  row=result.rows[0];
-  if(!validRow(row,providerEventId,entitlementGrantId))
-   return no('stored_source_v2_provenance_inconsistent');
- }finally{
-  if(begun)await dbClient.query('rollback');
- }
+ const rows=await readExactStoredSnapshot(dbClient,providerEventId,entitlementGrantId);
+ if(rows.length===0)return no('exact_stored_event_reader_grant_not_found');
+ if(rows.length!==1)throw Error('AMBIGUOUS_STORED_PORTONE_CANCEL_SOURCE');
+ const row=rows[0];
+ if(!validRow(row,providerEventId,entitlementGrantId))
+  return no('stored_source_v2_provenance_inconsistent');
  const linked={originalReceiptBound:true,exactGrantBound:true};
  let inspect=providerInspector;
  if(!inspect){
@@ -209,8 +236,19 @@ export async function recheckStoredPortOneCancellationByHmacPrivateV1({
  if(row.eventType==='Transaction.PartialCancelled'&&
     !['partial_cancel_shape_observed','full_cancel_shape_observed'].includes(current.kind))
   return no('partial_cancellation_no_longer_observed',linked);
+
+ // An external GET does not freeze the local Reader Grant. Re-open a second
+ // independent read-only snapshot after GET and reject ANY changed source,
+ // Receipt, payment handoff or Grant revision/order/status before reporting
+ // matching evidence. This is NOT an atomic T2 lock, comparator or revoke.
+ const after=await readExactStoredSnapshot(dbClient,providerEventId,entitlementGrantId);
+ if(after.length!==1||
+    !validRow(after[0],providerEventId,entitlementGrantId)||
+    Object.keys(row).length!==Object.keys(after[0]).length||
+    Object.keys(row).some(key=>after[0][key]!==row[key]))
+  return no('stored_source_or_grant_changed_during_provider_get',linked);
  return no('same_exact_cancellation_success_reobserved',{
   ...linked,latestExactSuccessObserved:true,
-  matchedCancellationAmountUnchanged:true,
+  matchedCancellationAmountUnchanged:true,postGetDbSnapshotStable:true,
  });
 }
