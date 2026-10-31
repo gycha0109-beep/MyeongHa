@@ -1,6 +1,7 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
 import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
+import { readCurrentSajuBirthProfileV1, matchCurrentSajuBirthProfileV1 } from './saju-current-birth-authority.js';
 
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
@@ -24,14 +25,6 @@ function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing Saju hub element: ${id}`);
   return element;
-}
-
-function readSessionValue(key) {
-  try {
-    return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
 }
 
 function writeSessionValue(key, value) {
@@ -119,32 +112,11 @@ async function createBirthProfile(token, request) {
   return data;
 }
 
-async function readBirthProfile(token, birthProfileId) {
-  if (!birthProfileId) return null;
-  const response = await fetch(`${BIRTH_PROFILE_ENDPOINT}/${encodeURIComponent(birthProfileId)}`, {
-    method: 'GET',
-    headers: bearerHeaders(token),
-    credentials: 'same-origin',
-    cache: 'no-store',
-  });
-  const payload = await readJson(response);
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    throw requestError('birth-read', response.status, readPublicErrorCode(payload), `Birth Profile read failed with status ${response.status}.`);
-  }
-  try {
-    return unwrapSuccess(payload);
-  } catch {
-    return null;
-  }
-}
-
 // The calculation endpoint independently authorizes the current subject/revision.
 // Failure to fetch optional birth-summary labels must not discard real calculated pillars.
-async function readDisplayBirthProfile(token, birthProfileId) {
-  if (!birthProfileId) return null;
+async function readDisplayBirthProfile(token) {
   try {
-    return await readBirthProfile(token, birthProfileId);
+    return await readCurrentSajuBirthProfileV1(token);
   } catch (error) {
     if (error?.status === 401 || error?.status === 403) throw error;
     return null;
@@ -396,7 +368,7 @@ function renderBirthDetails(profile, locale = getUiLocale()) {
     ? byLocale('음력', '旧暦', '農曆')
     : input?.calendarType === 'solar' ? byLocale('양력', '新暦', '國曆') : missing;
   const time = input?.timeKnown === false ? byLocale('시간 모름', '時刻不明', '時間不詳') :
-    typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(input.birthTime)
+    typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/u.test(input.birthTime)
       ? (() => {
           const [hour, minute] = input.birthTime.slice(0,5).split(':').map(Number);
           return byLocale(`${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${String(minute).padStart(2, '0')}분`,
@@ -508,12 +480,10 @@ async function loadExistingSaju() {
   }
 
   const { token } = activeBearer;
-  const birthProfileId = readSessionValue(BIRTH_PROFILE_ID_KEY);
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
   try {
-    let profile = await readDisplayBirthProfile(token, birthProfileId);
-    if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
+    const profile = await readDisplayBirthProfile(token);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
       clearBirthSession();
@@ -522,11 +492,11 @@ async function loadExistingSaju() {
     }
 
     const calculation = await calculateSaju(token);
-    if (!profile) {
-      const storedId = readSessionValue(BIRTH_PROFILE_ID_KEY);
-      profile = await readDisplayBirthProfile(token, storedId);
+    const matchingProfile = matchCurrentSajuBirthProfileV1(profile, calculation);
+    renderCalculation(calculation, matchingProfile);
+    if (!matchingProfile) {
+      setState('ready', '현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');
     }
-    renderCalculation(calculation, profile);
 
   } catch (error) {
     if (error?.status === 401) {
@@ -535,11 +505,8 @@ async function loadExistingSaju() {
       return;
     }
     if (error?.operation === 'saju-calculation' && (error?.status === 404 || error?.code === 'NOT_FOUND')) {
-      if (birthProfileId) {
-        setState('error', '등록된 출생정보가 있지만 현재 자기 명식 계산 대상과 연결되지 않았습니다. 잠시 후 다시 확인해 주세요.');
-      } else {
-        setState('empty');
-      }
+      if (profile) setState('error', '등록된 출생정보가 있지만 현재 자기 명식 계산 대상과 연결되지 않았습니다. 잠시 후 다시 확인해 주세요.');
+      else setState('empty');
       return;
     }
     if (error?.operation === 'saju-calculation') {
@@ -564,11 +531,15 @@ async function submitBirthProfile(event) {
     const request = buildBirthRequest();
     activeBearer = await ensureActiveBearer();
     const token = activeBearer.token;
-    const receipt = await createBirthProfile(token, request);
+    await createBirthProfile(token, request);
     profileCreated = true;
     const calculation = await calculateSaju(token);
-    const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
-    renderCalculation(calculation, profile);
+    const profile = await readDisplayBirthProfile(token);
+    const matchingProfile = matchCurrentSajuBirthProfileV1(profile, calculation);
+    renderCalculation(calculation, matchingProfile);
+    if (!matchingProfile) {
+      setState('ready', '현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');
+    }
 
     const continuedPreview = resumePreviewHrefV1(window.location.search);
     if (continuedPreview) window.location.assign(continuedPreview);
