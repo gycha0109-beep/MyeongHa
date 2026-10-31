@@ -426,6 +426,72 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(ownerEvidence.n).toBe(0);
   });
 
+  it('serializes two independent Member decisions: discard prevents concurrent durable consent',async()=>{
+    const f=await prepare(207);
+    await f.commit();
+    const proposalId=uuid(27,207);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+
+    let sourceLocked!:()=>void,release!:()=>void;
+    const locked=new Promise<void>(resolve=>{sourceLocked=resolve;});
+    const proceed=new Promise<void>(resolve=>{release=resolve;});
+    const resolveChoice=(choice:'discard'|'character_only')=>f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      });
+      if(choice==='discard'){sourceLocked();await proceed;}
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,choice,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+      });
+      return commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    const first=resolveChoice('discard');
+    await locked;
+    const second=resolveChoice('character_only')
+      .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+
+    let waited=false;
+    for(let i=0;i<100;i++){
+      const {rows:[waiting]}=await pool.query(`select exists(
+        select 1 from pg_stat_activity
+        where datname=current_database() and wait_event_type='Lock'
+          and pid<>pg_backend_pid()) as waiting`);
+      if(waiting.waiting===true){waited=true;break;}
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    try{expect(waited).toBe(true);}
+    finally{release();}
+    expect(await first).toMatchObject({
+      proposalId,decision:'discard',status:'resolved',
+      persisted:false,grantCount:0,payloadPurged:true,
+    });
+    const losing=await second;
+    expect(losing.ok).toBe(false);
+    if(!losing.ok)expect(losing.error).toMatchObject({
+      code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE',
+    });
+    const {rows:[state]}=await pool.query(`select p.status,p.proposed_value_jsonb as payload,
+      (select count(*)::int from public.memory_items m where m.subject_id=p.subject_id
+        and m.source_turn_id=p.source_turn_id) as memories,
+      (select count(*)::int from public.record_access_grants g
+        join public.memory_items m on m.id=g.memory_item_id
+        where m.subject_id=p.subject_id and m.source_turn_id=p.source_turn_id) as grants
+      from public.memory_proposals p where p.id=$1`,[proposalId]);
+    expect(state).toEqual({status:'rejected',payload:{},memories:0,grants:0});
+    expect(await f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.assistant,
+      approvedInternalS0Inspection:()=>true,
+    }))).toBeNull();
+  });
+
   it('UC-07 session-only and discard resolve pending without long-term Memory or Grants',async()=>{
     for(const [n,choice,status] of [
       [203,'session_only','expired'],
