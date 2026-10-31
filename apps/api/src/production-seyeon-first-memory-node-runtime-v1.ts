@@ -22,6 +22,8 @@ import {
   resolveProductionSeyeonRoleProviderConfigsV1,
 } from './production-seyeon-turn-send-runtime-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from './seyeon-first-positive-memory-node-http-ingress-v1.js';
+import { SEYEON_SECURITY_S0_PRODUCTION_V1 } from './seyeon-security-s0-production-policy-v1.js';
+import { admitSeyeonG4FirstMemoryCreditsV1 } from './seyeon-g4-first-memory-credit-admission-v1.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
 
 export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
@@ -63,6 +65,16 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
           input.governorApproval === undefined) {
         throw Error('First Memory runtime requires reviewed source and cost authority.');
       }
+      // No paid Memory inference may start on provider credentials alone.
+      // Until delivery ACK can settle/release the same atomic reservation,
+      // the server-owned G4 production gate is deliberately closed.
+      if (!SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
+        throw Error('First Memory G4 credits and delivery settlement are not mounted.');
+      }
+      await admitSeyeonG4FirstMemoryCreditsV1({
+        pool:lease.pool,verifiedEvidence:turn.verifiedEvidence,
+        threadId:turn.threadId,clientTurnId:turn.clientTurnId,
+      });
       // Readiness has already succeeded before this closure can access
       // provider credentials or create any metered model implementation.
       const base = {...await resolveProductionSeyeonProviderConfigAtRequestV1(input.env),

@@ -84,6 +84,9 @@ declare
   v_message text;
   v_memory_digest text;
   v_receipt_proof text;
+  v_recent jsonb;
+  v_recent_source jsonb;
+  v_recent_user record;
 begin
   if p_subject_id is null or p_thread_id is null
      or p_turn_id is null or p_attempt_id is null
@@ -126,8 +129,9 @@ begin
   -- The validated G1 Pin is irrevocably attached to this original committed
   -- Attempt. A replay receipt or an LLM-generated source reference has no
   -- Reveal authority. Lock both rows through the Node socket handoff.
-  select a.seyeon_personal_source_pin_jsonb->'positiveProof'
-  into v_pin
+  select a.seyeon_personal_source_pin_jsonb->'positiveProof',
+    nullif(to_jsonb(a)->'seyeon_recent_source_pin_jsonb','null'::jsonb)
+  into v_pin,v_recent
   from public.chat_turns t
   join public.chat_turn_attempts a
     on a.turn_id=t.id and a.subject_id=t.subject_id
@@ -168,6 +172,50 @@ begin
      or v_pin->>'recordKind' is distinct from 'memory'
   then
     return;
+  end if;
+
+  -- Every positive first Reveal now requires the original model User
+  -- certificate, matching the G1 combined Pin and G2 Commit rules.
+  -- A legacy Memory-only committed attempt cannot disclose old private
+  -- assistant text, even when its original Memory Grant remains active.
+  if v_recent is null then return; end if;
+  if v_recent is not null then
+    v_recent_source:=v_recent->'sources'->0;
+    if jsonb_typeof(v_recent) is distinct from 'object'
+      or v_recent->>'schemaVersion' is distinct from
+        'seyeon-g1-recent-model-source-pin-v1'
+      or v_recent->>'subjectId' is distinct from p_subject_id::text
+      or v_recent->>'threadId' is distinct from p_thread_id::text
+      or v_recent->>'turnId' is distinct from p_turn_id::text
+      or v_recent->>'attemptId' is distinct from p_attempt_id::text
+      or (v_recent->>'selectedModelSourceCensusDigest' ~ '^sha256:v1:[a-f0-9]{64}$') is distinct from true
+      or jsonb_typeof(v_recent->'sources') is distinct from 'array'
+      or jsonb_array_length(v_recent->'sources')<>1
+      or v_recent_source->>'messageId'
+          is distinct from p_expected_user_message_id::text
+      or v_recent_source->>'role' is distinct from 'user'
+      or (v_recent_source->>'selectedModelMessageDigest' ~ '^sha256:v1:[a-f0-9]{64}$') is distinct from true
+      or v_recent_source->>'dbContentHash' is null
+      or (v_recent_source->>'dbBodySha256' ~ '^sha256:v1:[a-f0-9]{64}$') is distinct from true
+    then return; end if;
+
+    select m.body_text,m.content_hash into v_recent_user
+    from public.conversation_messages m
+    where m.id=p_expected_user_message_id
+      and m.subject_id=p_subject_id
+      and m.thread_id=p_thread_id
+      and m.turn_id=p_turn_id
+      and m.sender_type='user'
+      and m.redacted_at is null
+      and m.body_text is not null
+    for share of m;
+    if not found
+      or v_recent_user.content_hash is distinct from
+         v_recent_source->>'dbContentHash'
+      or 'sha256:v1:' || encode(
+           sha256(convert_to(v_recent_user.body_text,'UTF8')),'hex')
+         is distinct from v_recent_source->>'dbBodySha256'
+    then return; end if;
   end if;
 
   -- No SRC-25 registered model-inference permission => absolutely no Reveal.

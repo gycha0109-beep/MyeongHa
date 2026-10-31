@@ -20,4 +20,13 @@ drop table if exists public.chat_credit_lots_v1 cascade;
 SQL
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/chat_credit_private_ledger_v1.sql >/dev/null
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/chat_credit_private_ledger_v1_test.sql >/dev/null
-echo 'PASS commerce chat credit private ledger candidate: signup/replay/reserve/settle/release/shortage/ACL'
+# G4 private delivery ACK V2 and refund proof are rehearsed only in this
+# throwaway clone; the official staged migration remains excluded from Production.
+if [[ "${CI:-}" != "true" || "${PGHOST:-}" != "localhost" ||
+      "${PGDATABASE:-}" != "myeongha_commerce_credit_candidate_test" ]]; then
+  echo 'HOLD: G4 requires named isolated PostgreSQL CI database' >&2
+  exit 2
+fi
+psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027125500_chat_credit_delivered_ack_private_v1.sql >/dev/null
+psql -v ON_ERROR_STOP=1 -f test/db/candidates/chat_credit_g4_original_delivery_reconciliation_v1_test.sql >/dev/null
+echo 'PASS commerce chat credit private ledger + G4 original ACK/failed refund/duplicate reservation/ACL (disposable)'

@@ -92,19 +92,21 @@ function committedResult(override: Partial<{
   sourceThread: string;
   commitAttemptId: string;
   receiptTurnId: string;
+  disposition: 'executed' | 'committed_replay';
+  replayed: boolean;
 }> = {}): RunProductionSeyeonChatResultV1 {
   return {
     subjectId,
     threadBinding: { threadId: override.sourceThread ?? threadId },
     execution: {
-      disposition: 'executed',
+      disposition: override.disposition ?? 'executed',
       receivedTurn: { turnId },
       committedTurn: {
         turnId: override.receiptTurnId ?? turnId,
         attemptId: override.commitAttemptId ?? attemptId,
         assistantMessageId: messageId,
         sequenceNo: 2,
-        replayed: false,
+        replayed: override.replayed ?? false,
       },
       // Never read the model output: only the locked original SQL can reveal.
       get runtimeResult() { throw new Error('UNTRUSTED_MODEL_RESPONSE_WAS_READ'); },
@@ -214,6 +216,21 @@ describe('first zero-source Node turn execution-to-DB-to-socket bridge', () => {
       },
       meta: {apiContractVersion: 'v0.9',requestId: 'request-2312-synthetic'},
     });
+  });
+
+  it.each([
+    { name: 'replay disposition', override: { disposition: 'committed_replay' as const } },
+    { name: 'replayed original receipt', override: { replayed: true } },
+  ])('rejects $name before accessing the protected original body', async ({ override }) => {
+    const db = testDb({ rows: [{ assistantText: 'PRIVATE_FROM_DB' }] });
+    const response = new ResponseDouble();
+    await expect(executeAndDeliverSeyeonFirstZeroNodeTurnV1(request({
+      db, response, run: async () => committedResult(override),
+    }))).rejects.toMatchObject({ code: 'REPLAY_HOLD' });
+    expect(db.connects).toBe(1); // DB readiness only, never the original text query.
+    expect(db.events).not.toContain('locked-original-read');
+    expect(response.body).toBe('');
+    expect(response.destroyed).toBe(true);
   });
 
   it('rejects inconsistent committed receipt without an original DB read', async () => {

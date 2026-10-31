@@ -46,6 +46,7 @@ import {
 import type { SeyeonAttemptZeroPersonalProofV1 } from './seyeon-attempt-zero-personal-proof-v1.js';
 import {assertSeyeonPositiveG1FinalModelContextSealV1} from './seyeon-positive-g1-final-model-context-seal-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
+import type { SeyeonG1CombinedModelPinRequestV1 } from './seyeon-g1-positive-combined-source-port-v1.js';
 import type {
   SeyeonExactModelPersonalSourceSelectionV1,
 } from './seyeon-exact-model-personal-source-selection-v1.js';
@@ -276,6 +277,9 @@ extends BaseProductionSliceInputV1 {
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   /** Only the existing verified Subject runner may supply this Owner port. */
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
+  readonly combinedSourcePinPort?: Readonly<{
+    pinBeforeModel(input: SeyeonG1CombinedModelPinRequestV1): Promise<Readonly<Record<string, unknown>>>;
+  }>;
   readonly requiredPersonalRecordCount?: 0 | 1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
   readonly relationshipSyncOutboxPort?:
@@ -715,6 +719,13 @@ export async function runSeyeonProductionChatExecutionV1(
           ...(contextInput.maxRetrievedMemories === undefined ? {} : {
             maxRetrievedMemories: contextInput.maxRetrievedMemories,
           }),
+          // Exact recentConversation (including current DB User Turn) follows
+          // the SAME tail selection and cap as the final model assembler.
+          recentMessages: contextInput.recentMessages,
+          ...(contextInput.maxRecentMessages === undefined ? {} : {
+            maxRecentMessages: contextInput.maxRecentMessages,
+          }),
+          currentUserMessageId: receivedTurn.userMessageId,
           sourceCandidates: productionContext.personalRecordProjectionCandidates ?? [],
         });
 
@@ -752,7 +763,11 @@ export async function runSeyeonProductionChatExecutionV1(
           // the DB RPC; current registry is empty and this fails before model.
           const source = exactModelPersonalSources.selectedSources[0];
           const candidate = productionContext.personalRecordProjectionCandidates?.[0];
+          // The one-Memory positive route MUST pin that Memory together
+          // with its actual current User message. No legacy Memory-only
+          // fallback: that would omit the model-visible User lineage.
           if (!input.positivePersonalSourcePort ||
+              !input.combinedSourcePinPort ||
               exactModelPersonalSources.selectedPersonalRecordCount !== 1 ||
               exactModelPersonalSources.selectedMemoryCount !== 1 ||
               exactModelPersonalSources.selectedSources.length !== 1 ||
@@ -788,23 +803,31 @@ export async function runSeyeonProductionChatExecutionV1(
           // compares its raw PG-JSONB digest with the same DB-read snapshot,
           // persists its own immutable proof and moves context_ready in one TX.
           // If it is unavailable, no Interpreter/Renderer/Reviewer is called.
-          personalRecordProof =
-            await input.positivePersonalSourcePort.pinBeforeModel({
-              subjectId,
-              threadId,
-              turnId: receivedTurn.turnId,
-              attemptId: attempt.attemptId,
-              originalMemoryId: source.recordId,
-              originalGrantId: source.grantId,
-              recordType: source.recordType,
-              schemaVersion: source.schemaVersion,
-              projectorVersion: source.projectorVersion,
-              selectedSources: exactModelPersonalSources.selectedSources,
-              selectedSourcesDigest: positiveModelCorrelation.selectedSourcesDigest,
-              projectedMemoryDigest: source.projectedMemoryDigest,
-              finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
-              expectedOriginalPgDigest: source.rawRecordPgDigest,
-            });
+          const positivePinRequest = Object.freeze({
+            subjectId,
+            threadId,
+            turnId: receivedTurn.turnId,
+            attemptId: attempt.attemptId,
+            originalMemoryId: source.recordId,
+            originalGrantId: source.grantId,
+            recordType: source.recordType,
+            schemaVersion: source.schemaVersion,
+            projectorVersion: source.projectorVersion,
+            selectedSources: exactModelPersonalSources.selectedSources,
+            selectedSourcesDigest: positiveModelCorrelation.selectedSourcesDigest,
+            projectedMemoryDigest: source.projectedMemoryDigest,
+            finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
+            expectedOriginalPgDigest: source.rawRecordPgDigest,
+          });
+          personalRecordProof = await input.combinedSourcePinPort.pinBeforeModel({
+            ...positivePinRequest,
+            currentUserMessageId: receivedTurn.userMessageId,
+            recentMessages: contextInput.recentMessages,
+            ...(contextInput.maxRecentMessages === undefined ? {} : {
+              maxRecentMessages: contextInput.maxRecentMessages,
+            }),
+            selection: exactModelPersonalSources,
+          });
         }
 
         const governance = await resolveTurnGovernance({
