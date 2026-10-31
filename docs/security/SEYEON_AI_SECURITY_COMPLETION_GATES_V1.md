@@ -345,3 +345,11 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **영속·실행:** `seyeon-production-chat-execution-v1.ts`의 기존 PostgreSQL Owner `pinBeforeModel`이 위 결속 digest를 **모델 호출 전에** 기존 불변 `chat_turn_attempts.seyeon_personal_source_pin_jsonb.positiveProof.finalModelContextDigest`에 기록한다. Interpreter 진입 직전의 최종 조립 Context와 원래 서버 출처·전체 입력·결속 digest를 다시 대조하며 다르면 Provider로 진행하지 않는다. 새 테이블, 운영 공개 RPC, 신규 DB 실행 권한을 추가하지 않는다.
 - **검증:** `test/seyeon-positive-g1-final-model-context-seal-v1.test.ts`에 예전 단순 Context 해시 재사용, 출처 census 교체, 위조된 현재 사용자 메시지, 미검증 Relationship 유입 차단 및 비어 있지 않은 1-Memory 정상 결속을 추가한다. 정확한 최신 HEAD CI/PG17 결과 확인 전 GREEN 미확정.
 - **한계:** G1 전체 모델 요청/Preflight/렌더러·시맨틱 리뷰 파생 모든 필드에 대한 별도 독립 서명은 아직 아니다. 현재 **단일 원본 Memory·원래 Grant·원본 User 1건·파생 0건**에만 적용하며 다중 Memory/Life Fact, 관계 이력·Reader/Saju·과거 History source propagation, 정책 승인, 일반 G3 Replay, G4~G6는 HOLD. 무키 SHA는 독립 권한 증거가 아니며 DB Owner의 원래 Grant 잠금과 불변 Attempt Pin이 별도로 필요하다. Source-only PR #2761 Draft, 운영 공개·유료 Provider·병합 OFF.
+
+### 2026-11-01 · W22 · 관계 파생 출처 전체 참조 검증 및 2원본 Memory 모델 선택 사전 검증 (격리)
+
+- **기존 증거:** 직전 HEAD `e886a9a4`의 CI [41238972144](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41238972144), Governance/Web/Mobile 모두 PASS. 그 이전 W21의 타입 보정까지 포함. 본 W22 변경은 새로운 CI로 별도 검증한다.
+- **G0 관계 출처:** S0 전용 `21-relationship-origin-completeness.sql`에서 Relationship Event의 **전체** DB provenance 참조를 집계하여, 허용된 `source_message`가 아닌 참조나 NULL 메시지, 같은 Message/ordinal의 중복이 하나라도 있으면 원본 조회 전에 전체 HOLD한다. 이전의 성공 참조만 통과하는 부분 결속을 금지한다. 해당 SQL을 설치하는 운영 Migration/ACL에는 변경 없음.
+- **R21 모델 선행 검사:** `seyeon-r21-offline-derived-source-closure-v1.ts`에 이미 존재하는 실제 모델 메모리 선택·검증 함수를 결속한다. 격리 후보 ContextReady로 진행하기 전 원본 Memory 2건/정확한 원래 Grant 2건/Projection digest 대응/선택된 수 2건을 요구한다. Relationship·과거 대화·Reader·Worker·외부 도구·Preflight 유입이 하나라도 발견되면 HOLD. `test/seyeon-r21-offline-derived-source-closure-v1.test.ts`와 기존 G0 참조 회귀 검증을 추가했다.
+- **경계:** 2원본 R21은 **오프라인·격리 DB 후보**로만 존재하며, 정식 운영 G1/G2의 다중 출처 불변 Pin, Model Provider, 일반 G3 공개·재조회/철회 경쟁, Reader/Saju 교차 출처, 비용·운영 승인까지 해결하지 않는다. 실제 유료 Provider/공개 Route/운영 Role/DB 마이그레이션/병합 없음. G0 미승인, G1 다중 출처 미완료, G2~G6 HOLD; `HOLD_FORWARD_STOPPED` 유지.
+- **검증:** 새 HEAD CI 및 PostgreSQL 17 결과 확인 전 GREEN 미확정.
