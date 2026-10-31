@@ -379,6 +379,13 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       from public.memory_proposals p join public.memory_items m
         on m.id=p.accepted_memory_item_id where p.id=$1`,[id]);
     expect(record).toEqual({status:'accepted',body:{summary:'사용자가 인사를 했다'},grants:1});
+    // A completed decision cannot recreate a pending browser offer on replay.
+    // Re-approval or later withdrawal must never resurrect the old proposal.
+    expect(await f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.assistant,
+      approvedInternalS0Inspection:()=>true,
+    }))).toBeNull();
     await expect(f.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
       client,canonicalMemberSubjectId:f.subject,proposalId:id,
     }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
