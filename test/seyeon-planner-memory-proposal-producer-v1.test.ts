@@ -167,6 +167,9 @@ describe('server-owned post-turn Planner stage',()=>{
       if(sql.includes('begin_member_subject_context_v1')){
         return {rows:[{subjectId:SUBJECT,subjectKind:'member'}]};
       }
+      if(sql.includes('qry_seyeon_planner_pre_model_source_v1')) {
+        return {rows:[{sourceReady:true}]};
+      }
       if(sql.includes('cmd_create_pending_seyeon_planner_memory_v1')) {
         return {rows:[{proposalId:values?.[1],proposalState:'pending',replayed:false}]};
       }
@@ -192,8 +195,71 @@ describe('server-owned post-turn Planner stage',()=>{
     expect(queries).toContain('COMMIT');
     expect(queries).not.toContain('ROLLBACK');
     expect(provider.generate).toHaveBeenCalledTimes(1);
-    expect(pool.connect).toHaveBeenCalledTimes(1);
+    expect(pool.connect).toHaveBeenCalledTimes(2);
+    expect(release).toHaveBeenCalledTimes(2);
+    expect(queries.filter(sql=>sql.includes('qry_seyeon_planner_pre_model_source_v1')))
+      .toHaveLength(2);
+    expect(queries.indexOf('COMMIT')).toBeLessThan(
+      queries.findIndex(sql=>sql.includes('cmd_create_pending_seyeon_planner_memory_v1')),
+    );
+  });
+
+  it('prevents a paid Planner call if the DB cannot verify current original source',async()=>{
+    const provider={providerKey:'synthetic',modelKey:'synthetic',generate:vi.fn()};
+    const queries:string[]=[];
+    const query=vi.fn(async(sql:string)=>{
+      queries.push(sql);
+      if(sql.includes('begin_member_subject_context_v1'))
+        return {rows:[{subjectId:SUBJECT,subjectKind:'member'}]};
+      if(sql.includes('qry_seyeon_planner_pre_model_source_v1'))return {rows:[]};
+      return {rows:[]};
+    });
+    const release=vi.fn();
+    const pool={connect:vi.fn(async()=>({query,release}))};
+    await expect(runSeyeonPostTurnPlannerMemoryV1({
+      pool:pool as never,
+      verifiedEvidence:{kind:'member',verifiedAuthUserId:SUBJECT},
+      committedTurn:{turnId:TURN,...source},
+      governedProvider:provider,
+      approvedModelAndDbStage:()=>true,
+    })).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    expect(provider.generate).not.toHaveBeenCalled();
+    expect(queries).toContain('ROLLBACK');
+    expect(queries).not.toContain('COMMIT');
     expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a changed original after Planner generation and before pending write',async()=>{
+    let authorityChecks=0;
+    const queries:string[]=[];
+    const query=vi.fn(async(sql:string,values?:readonly unknown[])=>{
+      queries.push(sql);
+      if(sql.includes('begin_member_subject_context_v1'))
+        return {rows:[{subjectId:SUBJECT,subjectKind:'member'}]};
+      if(sql.includes('qry_seyeon_planner_pre_model_source_v1')) {
+        authorityChecks++;
+        return {rows:authorityChecks===1?[{sourceReady:true}]:[]};
+      }
+      if(sql.includes('cmd_create_pending_seyeon_planner_memory_v1'))
+        throw Error('MUST NOT persist after source changes');
+      return {rows:[]};
+    });
+    const pool={connect:vi.fn(async()=>({query,release:vi.fn()}))};
+    const provider={providerKey:'synthetic',modelKey:'synthetic',
+      generate:vi.fn(async()=>({
+        decision:'propose',claimAuthority:'user_asserted',...candidate,
+      }))};
+    await expect(runSeyeonPostTurnPlannerMemoryV1({
+      pool:pool as never,
+      verifiedEvidence:{kind:'member',verifiedAuthUserId:SUBJECT},
+      committedTurn:{turnId:TURN,...source},
+      governedProvider:provider,approvedModelAndDbStage:()=>true,
+    })).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    expect(provider.generate).toHaveBeenCalledTimes(1);
+    expect(authorityChecks).toBe(2);
+    expect(queries.some(sql=>sql.includes('cmd_create_pending_seyeon_planner_memory_v1'))).toBe(false);
+    expect(queries.filter(sql=>sql==='COMMIT')).toHaveLength(1);
+    expect(queries).toContain('ROLLBACK');
   });
 
   it('guest evidence cannot trigger a paid Planner call',async()=>{
