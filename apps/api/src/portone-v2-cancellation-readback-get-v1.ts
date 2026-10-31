@@ -60,6 +60,52 @@ async function readBoundedJson(
 }
 
 /**
+ * One shared fixed-origin, bounded, authenticated GET transport for the
+ * individual-cancellation and complete-set read-only inspectors.
+ * The returned payload stays in the private call stack, never an API response.
+ */
+export async function getPortOneV2PaymentReadbackPrivateV1(input:Readonly<{
+  providerPaymentId:string;
+  apiSecret:string;
+  fetchImpl?:FetchV1|undefined;
+}>):Promise<unknown>{
+  if(!validIdentity(input.providerPaymentId)||
+     typeof input.apiSecret!=='string'||
+     input.apiSecret.length<16||input.apiSecret.length>4096||
+     input.apiSecret.trim()!==input.apiSecret||
+     /[\r\n\u0000-\u001f\u007f]/u.test(input.apiSecret))
+    throw new Error('Invalid internal PortOne V2 cancellation lookup configuration.');
+  const controller=new AbortController();
+  let timeout:ReturnType<typeof setTimeout>|undefined;
+  let didTimeout=false;
+  const signal=controller.signal;
+  const deadline=new Promise<never>((_,reject)=>{
+    timeout=setTimeout(()=>{
+      didTimeout=true;
+      controller.abort();
+      reject(providerError());
+    },PORTONE_V2_CANCELLATION_READBACK_GET_V1.timeoutMilliseconds);
+  });
+  try{
+    const operation=(async()=>{
+      const response=await (input.fetchImpl??fetch)(
+        `${PORTONE_V2_CANCELLATION_READBACK_GET_V1.endpoint}/payments/${encodeURIComponent(input.providerPaymentId)}`,
+        {method:'GET',redirect:'manual',signal,
+          headers:{accept:'application/json',authorization:`PortOne ${input.apiSecret}`}},
+      );
+      if(response.status!==200)throw providerError();
+      return readBoundedJson(response,PORTONE_V2_CANCELLATION_READBACK_GET_V1.maxResponseBytes);
+    })();
+    return await Promise.race([operation,deadline]);
+  }catch{
+    throw providerError();
+  }finally{
+    if(timeout!==undefined)clearTimeout(timeout);
+    if(didTimeout)controller.abort();
+  }
+}
+
+/**
  * Internal operations-only GET. Unmounted: no public route, no stored secret,
  * and no POST /cancel. The original receipt input must come from a trusted
  * complete-visibility Commerce evidence lookup, never webhook data.
@@ -98,28 +144,12 @@ export async function inspectPortOneV2CancellationViaGetCandidateV1(input:Readon
      input.apiSecret.trim()!==input.apiSecret||
      /[\r\n\u0000-\u001f\u007f]/u.test(input.apiSecret))
     throw new Error('Invalid internal PortOne V2 cancellation lookup configuration.');
-  const controller=new AbortController();
-  let timeout:ReturnType<typeof setTimeout>|undefined;
-  let didTimeout=false;
-  const signal=controller.signal;
-  const deadline=new Promise<never>((_,reject)=>{
-    timeout=setTimeout(()=>{
-      didTimeout=true;
-      controller.abort();
-      reject(providerError());
-    },PORTONE_V2_CANCELLATION_READBACK_GET_V1.timeoutMilliseconds);
-  });
   try{
-    const operation=(async()=>{
-      const response=await (input.fetchImpl??fetch)(
-        `${PORTONE_V2_CANCELLATION_READBACK_GET_V1.endpoint}/payments/${encodeURIComponent(input.providerPaymentId)}`,
-        {method:'GET',redirect:'manual',signal,
-          headers:{accept:'application/json',authorization:`PortOne ${input.apiSecret}`}},
-      );
-      if(response.status!==200)throw providerError();
-      return readBoundedJson(response,PORTONE_V2_CANCELLATION_READBACK_GET_V1.maxResponseBytes);
-    })();
-    const raw=await Promise.race([operation,deadline]);
+    const raw=await getPortOneV2PaymentReadbackPrivateV1({
+      providerPaymentId:input.providerPaymentId,
+      apiSecret:input.apiSecret,
+      fetchImpl:input.fetchImpl,
+    });
     // The source ledger holds only a keyed HMAC, not a raw cancellationId.
     // Match each bounded current GET item in memory; never return/store raw ID.
     let matchedId=input.cancellationId;
@@ -158,8 +188,5 @@ export async function inspectPortOneV2CancellationViaGetCandidateV1(input:Readon
     return Object.freeze({...classified,providerReadbackFromAuthenticatedGet:true as const});
   }catch{
     throw providerError();
-  }finally{
-    if(timeout!==undefined)clearTimeout(timeout);
-    if(didTimeout)controller.abort();
   }
 }

@@ -20,6 +20,10 @@ describe('P4 canonical cancellation-item-set SQL on real isolated PostgreSQL17 s
  it('executes the exact production-candidate read-only SQL without maintaining test duplicate',()=>{
   expect(generator).toContain('COMMERCE_PORTONE_CANCEL_SET_AUDIT_SQL_V1');
   expect(generated).toContain(SOURCE_SQL);
+  expect(SOURCE_SQL).toContain('attempt.provider_request_id as "providerPaymentId"');
+  expect(SOURCE_SQL).toContain('attempt.provider_transaction_id=receipt.external_transaction_id');
+  expect(generated).toContain('b2."providerPaymentId" is distinct from');
+  expect(partialGenerated).toContain('b."providerPaymentId" is distinct from');
   expect(generated).toContain('execute query_text into strict b2 using receipt_b2');
   expect(generated).toContain('execute query_text into unexpected using receipt_b3');
   expect(generated).toContain('COMMERCE_PORTONE_CANCELLATION_SET_PG17_PASS');

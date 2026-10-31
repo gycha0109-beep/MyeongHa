@@ -45,6 +45,7 @@ begin
   if b."receiptId" is distinct from '00000000-0000-4000-8000-000000000016'
      or b."receiptPaidMinor" is distinct from '8900'
      or b."receiptCurrency" is distinct from 'KRW'
+     or b."providerPaymentId" is distinct from 'pmt-B'
      or b."sourceSchema" is distinct from 'commerce-portone-cancellation-source-v2'
      or b."cancellationStatus" is distinct from 'SUCCEEDED'
      or b."orderingProven" is distinct from 'false'

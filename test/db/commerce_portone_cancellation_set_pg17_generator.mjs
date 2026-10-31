@@ -57,6 +57,7 @@ begin
    or b2."sourceSchema" is distinct from 'commerce-portone-cancellation-source-v2'
    or b2."cancellationStatus" is distinct from 'SUCCEEDED'
    or b2."receiptCurrency" is distinct from 'KRW'
+   or b2."providerPaymentId" is distinct from 'synthetic-hmac-b2-payment'
    or b2."eventType" is distinct from 'Transaction.Cancelled'
    or b2."sourceEventType" is distinct from 'Transaction.Cancelled'
    or b2."eventStatus" is distinct from 'verified'
