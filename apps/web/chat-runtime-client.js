@@ -14,6 +14,7 @@ import { MyeongHaApiClientErrorV1 } from '../../packages/api-client/src/index.ts
 import { sendSeyeonBrowserTurnWithReceiptV1 } from './chat-turn-receipt-client.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
 import { mountSeyeonPrivateMemoryReviewV1 } from './seyeon-private-memory-review-view.js';
+import { subscribeSeyeonMemoryVisibilityInvalidationV1 } from './seyeon-memory-visibility-invalidation.js';
 
 const params = new URLSearchParams(window.location.search);
 const threadRoute = parseChatThreadRouteV1(params);
@@ -45,6 +46,9 @@ let authoritativeCharacterId = null;
 let historyWithheld = false;
 let composeStatusSource = null;
 let roomLoadingSource = null;
+// Increment whenever server-confirmed source withdrawal invalidates this
+// document. Async fetch/receipt responses from earlier epochs cannot repaint.
+let sourceVisibilityEpoch = 0;
 
 function uiText(source) {
   return translateStaticUi(source, getUiLocale());
@@ -424,6 +428,7 @@ async function readChatPage(activeBearer, afterSequenceNo) {
 }
 
 async function loadRoomState() {
+  const startedAtVisibilityEpoch = sourceVisibilityEpoch;
   if (!threadId || invalidThreadRoute) {
     setComposeStatus('유효한 대화를 다시 선택해 주세요.');
     return false;
@@ -478,6 +483,9 @@ async function loadRoomState() {
     // Current session must still match the credentials used for the entire
     // owner-scoped read. No private body or Memory offer survives a change.
     const latestBearer = await getActiveBearer();
+    if (sourceVisibilityEpoch !== startedAtVisibilityEpoch) {
+      throw new Error('Memory source invalidated during room read.');
+    }
     if (latestBearer?.kind !== activeBearer.kind ||
         latestBearer?.token !== activeBearer.token) {
       throw new Error('Character Room Member session changed during read.');
@@ -512,6 +520,7 @@ function ensureRoomReady() {
   if (roomBootPromise) return roomBootPromise;
 
   roomBootPromise = (async () => {
+    const initialVisibilityEpoch = sourceVisibilityEpoch;
     if (invalidThreadRoute) {
       setComposeStatus('대화 주소가 올바르지 않습니다. 연결자를 다시 선택해 주세요.');
       return false;
@@ -530,7 +539,7 @@ function ensureRoomReady() {
       }
 
       const loaded = await loadRoomState();
-      if (!loaded) return false;
+      if (!loaded || sourceVisibilityEpoch !== initialVisibilityEpoch) return false;
       roomReady = true;
       if (retryButton) retryButton.hidden = true;
       setComposeStatus(historyWithheld
@@ -570,6 +579,7 @@ async function sendTurn(message) {
   if (sendingTurn) return;
 
   sendingTurn = true;
+  const sendVisibilityEpoch = sourceVisibilityEpoch;
   setComposerBusy(true);
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
@@ -630,6 +640,7 @@ async function sendTurn(message) {
     // positive receipt confirmation or as a reason to resend this turn.
     const currentBearer = await getActiveBearer();
     if (currentBearer?.kind !== 'member' ||
+        sourceVisibilityEpoch !== sendVisibilityEpoch ||
         currentBearer.token !== activeBearer.token ||
         authoritativeCharacterId !== 'seyeon' ||
         threadId !== submittedThreadId) {
@@ -698,6 +709,16 @@ function submitTurn(event) {
 
   void sendTurn(message.trim());
 }
+
+// Withdrawal ACK is a presentation-invalidation signal ONLY. It carries no
+// identity or private text, does not authorize replay and cannot revoke DB
+// consent. Suppress stale in-flight chat loads and AI responses in this tab.
+subscribeSeyeonMemoryVisibilityInvalidationV1(() => {
+  if (authoritativeCharacterId !== null && authoritativeCharacterId !== 'seyeon') return;
+  sourceVisibilityEpoch += 1;
+  clearOwnerScopedRoomStateForAuthorityChange();
+  setComposeStatus('기억 접근 철회 요청이 확인되어 이전 세연 답변을 숨겼습니다. 이후 접근 권한은 서버에서 다시 확인합니다.');
+});
 
 document.addEventListener('myeongha:chat-submit', submitTurn);
 retryButton?.addEventListener('click', () => {
