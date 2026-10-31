@@ -364,3 +364,10 @@ Watchtower-Track: security
 - **실행 연결:** 첫 Memory Node 실행 후보는 새 `privateCreditPool`을 명시적으로 받아야 하며 미구성 시 Provider credentials 조회 전 HOLD. `creditBilling.productionMounted=false`가 우선하여 실제 DB 예약/모델 호출은 여전히 절대 실행되지 않음. 기존 일반 `pool`을 비공개 Pool로 몰래 재사용하지 않는다.
 - **검증:** 기존 G4 예약 테스트를 일반/비공개 두 개의 독립 Pool 모형으로 변경해 역할·Subject 및 예약 호출 위치, Owner exempt의 비공개 연결 0회, 부족/중복 요청 private ROLLBACK, 두 Pool 동일 객체 거부를 확인한다. `git diff --check` 확인; 신규 PR CI GREEN 이전에 PASS 판정 없음.
 - **미완료:** 기존 G4 Reconciliation 후보도 일반 역할에서 private ACK/환불 RPC를 직접 호출하므로 동일한 역할 분리 이행이 다음 구현 과제다. 전용 Commerce 역할에 private G4 최소 EXECUTE가 실제 부여된 적 없으며, 별도 범위 제한/격리 PostgreSQL 증명·승인 후에만 운영 DB 권한 변경 가능. 공개 HTTP ACK와 전달 재조정/미확정 복구도 미완료. 운영 `HOLD_FORWARD_STOPPED`, G4/G5/G6 정식 완료 아님.
+### 2026-11-01 / W38 — G4 원본 전달 정산·환불도 Member/Commerce DB 역할 분리 (source-only)
+
+- **연속 구현:** W37(#2843)의 첫 Memory 신규 예약에 이어 `reconcileSeyeonG4FirstMemoryCreditsV1`에서 같은 비공개 정산 권한 문제를 제거한다. 기존에는 일반 RLS `myeongha_api_executor` 트랜잭션에서 private ACK V2 및 크레딧 예약 표·환불 RPC에 직접 접근하므로, 실제 권한이 정상적으로 잠겨 있으면 실행 실패해야 하는 후보 구조였다.
+- **구현:** 인증된 Member에 대한 별도 `executePostgresSubjectTransactionV1`로 canonical Subject를 재확인하고, 그 식별자가 최초 reservation과 일치할 때만 별도 `privateCreditPool`에서 `executePostgresCommerceInternalTransactionV1`을 개시한다. Commerce 역할을 트랜잭션 한정으로 진입하고 canonical Subject를 바인딩한 후에만 기존 원본 delivery ACK V2 또는 확정 미전달 환불 SQL을 호출한다. 해당 비공개 TX에서 Owner → 정확한 예약 → 원본 Turn 잠금 순서는 W36과 동일하게 유지한다.
+- **차단:** 일반/비공개 Pool 객체가 동일하거나 Guest/Member 불일치·예약/응답 출처 불일치면 정산·환불 전 HOLD. 기존 중복 정산 방어, 네트워크 오류 시 환불 금지, 실제 사용자 전달 영수증 요구는 변경하지 않는다.
+- **검증:** 기존 `test/seyeon-g4-first-memory-credit-reconciliation-v1.test.ts`에서 두 개의 독립 Pool 실행, 일반 API 역할 후 내부 Commerce 역할 전환, private TX 내 Subject 바인딩 후 ACK 실행 순서, 동일 Pool 사용 거부, original DB 거부 시 rollback 및 환불 0회를 검사하도록 수정했다. `git diff --check` 확인. 신규 HEAD CI GREEN 이전에 PASS 판정하지 않음.
+- **남은 것:** 실제 비공개 Commerce 역할의 G4 reserve/ack/finalize 최소 EXECUTE 권한은 운영에 부여하지 않았고 별도 격리 실증·배포 승격이 필요하다. 검증된 서버 영수증 수신·정산/환불 재시도 복구, Gate G5/G6도 미완료. 기존 `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지.
