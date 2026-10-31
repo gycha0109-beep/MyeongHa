@@ -21,6 +21,7 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '18-planner-pre-model-source-authority.sql',
   '19-first-original-assistant-replay.sql',
   '20-first-original-dialogue-pair.sql',
+  '21-relationship-origin-completeness.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {
