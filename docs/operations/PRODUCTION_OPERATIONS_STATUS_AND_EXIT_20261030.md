@@ -19,6 +19,21 @@
 - **명시적 수용 한계:** 이것은 **로컬·단순 Health 라우트의 마이크로 계측**일 뿐 Production web TTFB, API 사용자 경로 p95, DB/Auth/Saju 종단 지연, 실제 Cold start, 연결 풀·DB 포화 용량이나 Cloudflare Worker의 고객 트래픽 처리 한계를 입증하지 않음. `productionCapacityProven=false`, `realDbDependencyMeasured=false` 유지. Phase 10–12 전체 수용, Phase 13 Production Operations ACCEPTANCE, Phase 8 DR 준비 상태를 승격하지 않음.
 - **추적·후속:** 브랜치 `ops/phase10-11-loopback-worker-health-worklog-20261031`에서 동일 문서와 재현 가능한 테스트를 PR로 제출. 이후 운영 경계의 정당한 합성 데이터·격리 DB를 연결한 별도 실측 필요.
 
+### 2026-10-31 18:36 KST — Phase 7 격리 PostgreSQL 18 실제 SQL 지연·연결 고갈 실증
+
+- **구현:** [`scripts/operations/verify-postgres-isolated-chaos-phase7.mjs`](../../scripts/operations/verify-postgres-isolated-chaos-phase7.mjs) 추가. 로컬 `PG_BIN_DIR` 아래의 `initdb`/`pg_ctl`로 **매번 임시 데이터 디렉터리와 임의 127.0.0.1 포트에 별도 PostgreSQL 인스턴스**를 생성하고, 실제 Node `pg.Pool`로 SQL/연결 테스트. 인스턴스는 `finally`에서 종료하고 임시 디렉터리를 삭제. 기존 로컬 PostgreSQL 서비스 및 Hosted/Production DB 설정·데이터에 접근하지 않음.
+- **실제 SQL/포화 실행:** Windows Node 24·로컬 PostgreSQL 18에서 스크립트 exit 0 / 출력 `result=PASS`. 독립 DB의 `SELECT pg_sleep(0.6)`은 `statement_timeout=180ms`에 의해 PostgreSQL 오류 코드 **`57014`**로 중단됨(최종 재현 SQL 취소 **199ms**, 초기 성공 관측 **193ms**). 이어서 동일 풀 `SELECT 1` 성공으로 타임아웃 이후 연결 재사용 정상 확인. `max=1`로 첫 연결을 점유한 동안 대기 중인 두 번째 `pool.connect()`가 `connectionTimeoutMillis=250ms`에 따라 **261ms**에서 종료되며 최대 풀 연결이 1을 넘지 않음을 확인. 격리 서버를 정지한 뒤 새로운 `SELECT 1`의 연결 거부 `ECONNREFUSED` 약 **1ms** 관측.
+- **환경 차이·수정:** 첫 시도는 로컬 환경의 SSL 기본설정으로 인해 분리된 인스턴스가 SSL 연결을 거부함. 스크립트 내부의 **임시 격리 DB용 설정에만** `ssl:false`를 명시한 뒤 실행 성공. 운영 DB의 필수 `verify-full` TLS 설정은 변경하지 않음. 테스트용 비밀·사용자 데이터 출력 없음. 실행 결과는 **단일 로컬 시점의 관측**이며 p95/SLO 지표로 사용하지 않음.
+- **수용 경계/다음:** 기존 synthetic TCP 테스트와 달리 **실제 PostgreSQL SQL statement timeout과 풀 대기 고갈**까지 증명했으나, Production의 PG17/strict TLS/권한 역할, 실제 MyeongHa DB 라우트 503 경계, Hosted DB 용량·장애 및 복구, 모니터링은 여전히 미검증. Phase 7/13 전체 완료, `dr_ready`, `serviceResumptionAllowed` 승격 금지. 향후 필요 시 동등하게 격리된 PostgreSQL 17에서 같은 검증을 재현하고, 승인된 실제 API 경계로 확대.
+
+### 2026-10-31 18:30 KST — Phase 7 PostgreSQL 로컬 TCP 장애·연결 수 상한 검증
+
+- **구현 목적:** [Production Operations 아키텍처 §34](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 DB unavailable, DB slow, DB connection exhaustion 중 *연결·핸드셰이크 경계*를 통제된 비Production 환경에서 실제 소켓으로 검증. 실사용자·실서비스·운영 PostgreSQL 또는 Supabase에 접근하지 않음.
+- **실제 변경:** [`test/postgres-subject-pool-loopback-chaos-phase7.test.ts`](../../test/postgres-subject-pool-loopback-chaos-phase7.test.ts) 추가. Node의 실제 `127.0.0.1` TCP 서버와 `pg.Pool`을 사용해 (1) 닫힌 포트의 `ECONNREFUSED`, (2) 연결은 받되 PostgreSQL 핸드셰이크를 진행하지 않는 서버, (3) `maxConnectionsPerRuntime=1`인 상태에서 4개 동시 연결 요청을 시험. 기존 일반 `buildNodePostgresPoolConfigV1`의 `connectionTimeoutMs=125`, `statementTimeoutMs=500`, `maxConnectionsPerRuntime=1` 설정과 실제 pg 드라이버 동작을 함께 확인. 매 실패 후 Cloudflare Worker의 독립 `GET /api/health`가 200인지 검증.
+- **실행 증거:** Windows Node 24 + Vitest 4.1.11. 신규 **3/3 PASS**, 관련 PostgreSQL pool 기존 회귀 포함 **5파일 30/30 PASS**, `tsc -p tsconfig.json --noEmit` PASS. 열린 TCP 서버의 연결 수 최대치는 설정된 1을 넘지 않음. 로컬 TCP 요청 시간은 각 시험의 2초 이내 제한 조건을 만족. 합성 사용자·합성 PostgreSQL URL만 사용하며 실제 credential/SQL 데이터 없음.
+- **범위 및 한계:** 이것은 **실제 TCP transport/연결 대기·풀 연결 상한 검증**이지, 운영의 strict TLS `verify-full` 경로나 실제 PostgreSQL SQL 실행, `pg_sleep` 등 SQL 지연 시 `statement_timeout` 실행, DB 실제 capacity/성능·500 응답 경로의 종단 간 실증을 대체하지 않는다. 테스트 서버는 PostgreSQL 프로토콜을 구현하지 않으며, 500ms `statementTimeoutMs`는 구성 연결만 검증했지 SQL에서 발동시킨 증거가 아님. §34 전체 Phase 7, Production Operations Phase 13, Hosted Auth/Storage DR은 **미수용**. `dr_ready=false` 및 `serviceResumptionAllowed=false` 유지.
+- **추적/다음:** 브랜치 `ops/phase7-postgres-tcp-chaos-worklog-20261031`, 검증 파일과 본 Worklog를 함께 PR로 제출. 다음 순서는 실제 격리 PostgreSQL 인스턴스에서 SQL 지연·연결 점유 제한 및 적절한 오류 매핑을 측정하고, 안전한 성능/용량 기준으로 승격하는 것. Cloudflare Preview 인증 오류는 별도 추적.
+
 
 
 ### 2026-10-31 — 기록 화면 Guest 401 브라우저 검증 경로 수정

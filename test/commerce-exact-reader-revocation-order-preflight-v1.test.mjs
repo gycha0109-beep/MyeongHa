@@ -20,6 +20,13 @@ const ROW=Object.freeze({
  receiptId:RECEIPT,receiptSubjectId:SUBJECT,
  receiptTransactionId:'transaction-original',
  receiptPaidMinor:'8900',receiptCurrency:'KRW',
+ cancelEvidenceSchema:'commerce-portone-cancellation-source-v2',
+ cancelEvidenceStatus:'SUCCEEDED',
+ cancelEvidenceIdHmac:'hmac-sha256:k1:'+('c'.repeat(64)),
+ exactSucceededCancellationAmountMinor:'8900',
+ observedCumulativeCancelledAmountMinor:'8900',
+ cancelEvidenceOriginalPaidAmountMinor:'8900',
+ cancelEvidenceCurrency:'KRW',
  grantId:GRANT,grantSubjectId:SUBJECT,grantSourceReceiptId:RECEIPT,
  grantStatus:'active',grantRevision:'3',grantLastProviderOrderingKey:null,
  officialReadingId:READING,readerCharacterId:'seyeon',
@@ -201,5 +208,53 @@ describe('P4 exact Reader revocation lineage and provider event ordering inspect
   const client=db({error:Error('db visibility failure')});
   await expect(inspect(client,INPUT)).rejects.toThrow();
   expect(client.queries.at(-1)[0]).toBe('rollback');
+ });
+});
+
+describe('P4 exact cancellation item amount vs cumulative refund observation',()=>{
+ it('never mistakes a single 3000 cancellation for an 8900 whole-Reader revoke',async()=>{
+  const r=await inspect(db({rows:[{...ROW,
+   exactSucceededCancellationAmountMinor:'3000',
+   observedCumulativeCancelledAmountMinor:'8900',
+  }]}),INPUT);
+  expect(r.kind).toBe('cumulative_payment_cancel_does_not_prove_single_item_full');
+  expect(r.sourceOrderClassification).toBe('INCOMPARABLE');
+  expect(r.grantRevocationAuthorized).toBe(false);
+  expect(r.otherActiveReaderPurchaseGrants).toBe('1');
+ });
+ it('rejects a stored GET aggregate exceeding paid Receipt',async()=>{
+  const r=await inspect(db({rows:[{...ROW,
+   exactSucceededCancellationAmountMinor:'3000',
+   observedCumulativeCancelledAmountMinor:'9000',
+  }]}),INPUT);
+  expect(r.kind).toBe('exact_cancellation_amount_evidence_inconsistent');
+  expect(r.entitlementEffectInvoked).toBe(false);
+ });
+ it('no matching successful cancellation ID fingerprint is not review evidence',async()=>{
+  const r=await inspect(db({rows:[{...ROW,
+   cancelEvidenceIdHmac:null,
+  }]}),INPUT);
+  expect(r.kind).toBe('exact_cancellation_amount_evidence_missing');
+ });
+ it('a REQUESTED cancellation is not a SUCCEEDED one',async()=>{
+  const r=await inspect(db({rows:[{...ROW,
+   cancelEvidenceStatus:'REQUESTED',
+  }]}),INPUT);
+  expect(r.kind).toBe('exact_cancellation_amount_evidence_missing');
+ });
+ it('a prior source-v1 payload cannot impersonate v2 exact amount facts',async()=>{
+  const r=await inspect(db({rows:[{...ROW,
+   cancelEvidenceSchema:'commerce-portone-cancellation-source-v1',
+  }]}),INPUT);
+  expect(r.kind).toBe('exact_cancellation_amount_evidence_missing');
+ });
+ it('an exact full item still cannot bypass unknown provider order',async()=>{
+  const r=await inspect(db({rows:[{...ROW,
+   exactSucceededCancellationAmountMinor:'8900',
+   observedCumulativeCancelledAmountMinor:'8900',
+  }]}),INPUT);
+  expect(r.kind).toBe('provider_order_provenance_missing');
+  expect(r.readerT2LockHeld).toBe(false);
+  expect(r.grantRevocationAuthorized).toBe(false);
  });
 });

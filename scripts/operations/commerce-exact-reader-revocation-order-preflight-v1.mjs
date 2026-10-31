@@ -17,6 +17,16 @@ select
   receipt.external_transaction_id as "receiptTransactionId",
   receipt.verified_amount_minor::text as "receiptPaidMinor",
   receipt.verified_currency as "receiptCurrency",
+  event.verified_payload_jsonb->>'schemaVersion' as "cancelEvidenceSchema",
+  event.verified_payload_jsonb->>'matchingCancellationStatus' as "cancelEvidenceStatus",
+  event.verified_payload_jsonb->>'cancellationIdHmac' as "cancelEvidenceIdHmac",
+  event.verified_payload_jsonb->>'exactSucceededCancellationAmountMinor'
+    as "exactSucceededCancellationAmountMinor",
+  event.verified_payload_jsonb->>'observedCumulativeCancelledAmountMinor'
+    as "observedCumulativeCancelledAmountMinor",
+  event.verified_payload_jsonb->>'originalReceiptPaidAmountMinor'
+    as "cancelEvidenceOriginalPaidAmountMinor",
+  event.verified_payload_jsonb->>'currency' as "cancelEvidenceCurrency",
   g.id::text as "grantId",
   g.subject_id::text as "grantSubjectId",
   g.source_receipt_id::text as "grantSourceReceiptId",
@@ -201,6 +211,26 @@ export async function inspectExactReaderRevocationOrderPreflightV1(
    return hold('provider_cancellation_pending',linked);
   if(r.providerEventType==='Transaction.PartialCancelled')
    return hold('partial_cancellation_scope_review_required',linked);
+  // A cumulative CANCELLED payment can contain multiple separate partial
+  // cancellation items. Only the exact item amount (NOT the aggregate) may
+  // enter an eventual Reader revoke review. Nothing authorizes a revoke here.
+  if(r.cancelEvidenceSchema!=='commerce-portone-cancellation-source-v2'||
+     r.cancelEvidenceStatus!=='SUCCEEDED'||
+     typeof r.cancelEvidenceIdHmac!=='string'||
+     !/^hmac-sha256:k1:[0-9a-f]{64}$/u.test(r.cancelEvidenceIdHmac)||
+     !count(r.exactSucceededCancellationAmountMinor)||
+     !count(r.observedCumulativeCancelledAmountMinor)||
+     r.cancelEvidenceOriginalPaidAmountMinor!==r.receiptPaidMinor||
+     r.cancelEvidenceCurrency!==r.receiptCurrency)
+   return hold('exact_cancellation_amount_evidence_missing',linked);
+  const paid=BigInt(r.receiptPaidMinor);
+  const individual=BigInt(r.exactSucceededCancellationAmountMinor);
+  const cumulative=BigInt(r.observedCumulativeCancelledAmountMinor);
+  if(individual===0n||individual>cumulative||cumulative>paid||
+     (r.providerEventType==='Transaction.Cancelled'&&cumulative!==paid))
+   return hold('exact_cancellation_amount_evidence_inconsistent',linked);
+  if(individual!==paid)
+   return hold('cumulative_payment_cancel_does_not_prove_single_item_full',linked);
   if(r.eventProviderOrderingKey===null)
    return hold('provider_order_provenance_missing',linked);
   // The mere presence/equality of lexical keys does not compare provider time.

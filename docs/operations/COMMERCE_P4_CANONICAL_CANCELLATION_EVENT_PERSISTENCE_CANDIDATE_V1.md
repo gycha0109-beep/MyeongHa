@@ -39,3 +39,13 @@ Before production activation: independently prove the event payload and stable r
 2. Extend the verified adapter with trustable exact cancelled amount and cancellation item finality (without assuming refund legal outcome), and define provider-comparable order provenance under the existing Entitlement Effect comparator contract.
 3. Apply an authorized exact Reader Grant revoke within existing T2/lock/revision rules **only after** money/legal/delivery facts are established. No cross-Reader or Chat revocation.
 4. Independently finish the `digital_reading_withdrawal_claims_private_v1` Subject graph, FK deletion order and restored-state privacy reconciliation before deploying the consumer claim table.
+
+## 2026-10-31 exact cancellation item amount and delayed replay hardening (source-v2)
+
+The staged SQL now requires the signed webhook's **specific cancellationId** (stored as a server HMAC, never a raw customer/PSP payload), a separately authenticated `GET /payments/{paymentId}` with the **same cancellationId in SUCCEEDED state**, its positive `totalAmount`, and the cumulative `payment.amount.cancelled`. The individual SUCCEEDED amount must not exceed the cumulative amount or the original verified Production Reading Receipt. `Transaction.PartialCancelled` must identify an item strictly smaller than the original paid amount.
+
+A partial cancellation notification can be delivered after the provider payment has reached CANCELLED through *another* cancellation. It is accepted only if the exact signed cancellation item is still SUCCEEDED and its individual amount is unchanged. The original HMAC, Provider Event ID, Subject, Receipt and exact succeeded amount remain immutable; a larger aggregate observed later does not modify or replace the first recorded aggregate. Replaying a decreased aggregate or a changed original item rejects.
+
+The exact-Reader private preflight now reads this source-v2 amount provenance and explicitly classifies `cumulative_payment_cancel_does_not_prove_single_item_full` when a payment's **cumulative full** cancellation actually consists of multiple partial items. Even an exact whole-item amount cannot authorize a revoke without trustworthy provider order, statutory determination, delivery evidence and Reader R2/T2 atomic locking. All operations remain **internal candidates, not mounted**, with no refund execution, public route or Entitlement Effect. Current v2 SQL replaces the **non-deployable candidate only**, not any existing deployed database function.
+
+PortOne API schema for GET/payment cancellation values: https://developers.portone.io/api/rest-v2/payment . All amounts are minor currency units and are not a consumer refund determination.
