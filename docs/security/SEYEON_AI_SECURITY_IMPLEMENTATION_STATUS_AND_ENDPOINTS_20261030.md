@@ -247,3 +247,10 @@ Watchtower-Track: security
 - **구현:** 최신 origin/main (`d9e25eee`) 합류 과정의 단일 충돌 `scripts/verify-web-auth-rejected-bearer-browser.mjs`를 직접 해결했다. main의 `/api/readings` Guest 거부 경로·추적 정보·미사용 mock API 제거를 유지하고, 첫 실요청인 `/api/readings`에 Member 401 및 Member 403 검사만 추가했다. 원래 무효화(401)/세션 유지(403) 검증 내용은 변경하지 않았다.
 - **변경:** 최신 main과의 Git 통합 커밋 및 이 Worklog. 기존 보안 G1/G2/G3 소스는 그대로 보존하고 운영 범위는 넓히지 않았다.
 - **검증/미완료:** 병합 파일 `node --check` 및 `git diff --check` 시행; 새 HEAD GitHub Browser/DB/Security와 Cloudflare 검사 결과는 실행 후 확인 전까지 PASS 아님. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-10-31 / W21 — #2786 PostgreSQL 17 역사 참여자 테스트의 중복 식별자 보정
+
+- **실패 증거:** [CI #41205332272, postgres17 job #124549180802](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41205332272/job/124549180802). 기존 G1/G2/G3 실제 PostgreSQL 테스트 `test/seyeon-security-s0-postgres.e2e.test.ts`의 13건은 모두 PASS. 다음 `test/seyeon-security-s0-history-presence.e2e.test.ts`의 3건 중 1건이 `conversation_thread_characters_pkey` 중복(`a8150000-0000-4000-8000-000000000013`)으로 중단됐다.
+- **수정:** 동일 임시 PostgreSQL 17 DB에서 앞선 G1 최초 공개 사례가 이미 사용한 `uuid(15,13)`과 역사 참여자 테스트의 Yeoul 조인 ID가 충돌했다. 역사 참여자 테스트에만 전용 미사용 `uuid(15,913)`을 부여했다. 참여자 이탈·교체, 타 Member 접근 차단, 실제 메시지 열람 HOLD 검증 로직은 그대로 유지한다.
+- **변경 파일:** `test/seyeon-security-s0-history-presence.e2e.test.ts`, 본 Worklog. `git diff --check` 확인. 신규 HEAD의 CI 완료 전까지 해당 검사 PASS 판정 없음.
+- **재실행 및 운영:** 해당 PR에 푸시해 자동 CI로 재검증하며, 무관한 다른 CI 진행 상태는 보안 구현 중단 사유로 삼지 않는다. 운영 DB/Provider/ACL/HTTP 공개 변경 없음. `HOLD_FORWARD_STOPPED` 유지.

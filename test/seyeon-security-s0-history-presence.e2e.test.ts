@@ -69,7 +69,7 @@ describe.skipIf(!enabled)('G3 S0 history-presence authority in real PostgreSQL 1
     const active=await pool.query(`insert into public.conversation_thread_characters(
       id,thread_id,character_id,content_bundle_id,role,joined_at)
       values($1,$2,'yeoul',$3,'primary',clock_timestamp())
-      returning id`,[uuid(15,13),uuid(14,1),uuid(12,1)]);
+      returning id`,[uuid(15,913),uuid(14,1),uuid(12,1)]);
     expect(active.rowCount).toBe(1);
 
     const visibleBinding=await executePostgresSubjectTransactionV1({
