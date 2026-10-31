@@ -40,3 +40,9 @@ This is the next stage after the private read-only preflight (checkout, Receipt 
 - TypeScript typecheck, focused synthetic candidate tests including replay, conflicts, cross-owner, missing authority, commit ambiguity.
 - PostgreSQL 17 isolated disposable DB migration/fixture `test/db/digital_reading_withdrawal_claim_private_v1_smoke.sql`: owner FK, uniqueness, immutable operations, RLS/ACL and server receipt timestamp. No production DB mutation.
 - No claim that this candidate is production-mounted, that real payment/refund executed, or that release authority has passed.
+
+## 2026-10-31: P0-PR-01 exact-Subject DELETE exception candidate
+
+The non-deployable private claim table now permits `DELETE` **only** when the caller is the owner of the existing `internal_finalize_account_deletion_db_v1(uuid,uuid,text)` function **and** the transaction-local `myeongha.account_deletion_finalizer_subject_id` equals the claim row's Subject. Other DELETE and all UPDATE attempts remain rejected by the append-only trigger. This is consistent with the approved default DELETE disposition and does not change any P5Y Commerce retained evidence table.
+
+This change **does not complete the Subject dependency graph** or register a new deployable migration. The existing approved account deletion finalizer must still explicitly delete this table in FK-safe order; the policy graph, replay/restore reconciliation and isolated PostgreSQL finalizer checks must be updated before the table can be deployed. `claimDispositionGraphIntegrated=false` and no public customer intake remain unchanged.
