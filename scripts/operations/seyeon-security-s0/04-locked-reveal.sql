@@ -187,18 +187,15 @@ begin
       or v_recent->>'threadId' is distinct from p_thread_id::text
       or v_recent->>'turnId' is distinct from p_turn_id::text
       or v_recent->>'attemptId' is distinct from p_attempt_id::text
-      or v_recent->>'selectedModelSourceCensusDigest'
-          !~ '^sha256:v1:[a-f0-9]{64}$'
+      or (v_recent->>'selectedModelSourceCensusDigest' ~ '^sha256:v1:[a-f0-9]{64}$') is distinct from true
       or jsonb_typeof(v_recent->'sources') is distinct from 'array'
       or jsonb_array_length(v_recent->'sources')<>1
       or v_recent_source->>'messageId'
           is distinct from p_expected_user_message_id::text
       or v_recent_source->>'role' is distinct from 'user'
-      or v_recent_source->>'selectedModelMessageDigest'
-          !~ '^sha256:v1:[a-f0-9]{64}$'
+      or (v_recent_source->>'selectedModelMessageDigest' ~ '^sha256:v1:[a-f0-9]{64}$') is distinct from true
       or v_recent_source->>'dbContentHash' is null
-      or v_recent_source->>'dbBodySha256'
-          !~ '^sha256:v1:[a-f0-9]{64}$'
+      or (v_recent_source->>'dbBodySha256' ~ '^sha256:v1:[a-f0-9]{64}$') is distinct from true
     then return; end if;
 
     select m.body_text,m.content_hash into v_recent_user
