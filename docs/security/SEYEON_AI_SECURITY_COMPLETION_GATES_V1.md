@@ -336,5 +336,5 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 ### 2026-11-01 · W20 · G0 과거 대화·관계 파생 원본 누락 시 전체 HOLD
 
 - **과거 대화:** `13-g0-current-original-lineage-context.sql`의 최근 메시지 후보를 선택할 때 삭제 처리된 행·본문 NULL·공백 행을 먼저 제외하던 필터를 제거했다. 요청된 시퀀스 범위 전체를 검사해 한 행이라도 원본 본문·해시·상태가 불완전하면 `seyeon_g0_context_window_source_missing`으로 전체 HOLD한다. 과거 정상 메시지만 이어 붙여 부분 응답하거나 더 오래된 행으로 빈자리를 채우지 않는다.
-- **관계 파생:** `14-g0-relationship-event-original-lineage.sql`은 DB에 기록된 원본 Message 참조 수와 실제 결속·검증에 성공한 Message 수를 매 Event마다 일치시킨다. 삭제·누락·권한으로 숨겨진 원본 참조가 내부 JOIN에서 사라져도 파생 관계 이력 일부를 허용하지 않는다.
+- **관계 파생:** 기존 `14-g0-relationship-event-original-lineage.sql`은 `main`과 동일하게 유지하며, 격리 설치 후 `21-relationship-origin-completeness.sql`이 기존 함수의 권한·소유자를 유지한 채 원본 Message 참조 수와 실제 결속·검증에 성공한 Message 수를 매 Event마다 일치시킨다. 삭제·누락·권한으로 숨겨진 원본 참조가 내부 JOIN에서 사라져도 파생 관계 이력 일부를 허용하지 않는다.
 - **검증·경계:** 원본 전체 검사 조건의 소스 회귀 검증을 `test/seyeon-g0-complete-source-census-v1.test.ts`에 추가. 신규 CI 결과 확인 전 GREEN 미확정. 기존 G1 전체 모델 사용 집합 Pin·G3 다중 History 실공개·Reader 교차 출처·G4 비용·G5/G6 운영 종료는 HOLD. 소스 구현만 수행, PR #2761 Draft·운영 ACL/Provider/배포 변경 없음.
