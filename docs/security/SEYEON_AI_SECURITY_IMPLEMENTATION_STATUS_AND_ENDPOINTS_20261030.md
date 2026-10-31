@@ -152,3 +152,12 @@ Watchtower-Track: security
 - **승인 Scope:** 기존 S0 그대로 **양수 원본 Memory 1건·현재 User 메시지 1건**만 지원한다. 과거 User/Assistant, Relationship, Reader, 다중 Records는 이 결합 함수에서 허용하지 않는다. 모델 호출·G2/G3·사용자 비용 경로의 Production activation도 없다.
 - **실제 파일:** `scripts/operations/seyeon-security-s0/17-g1-positive-combined-model-source-pin.sql`, `scripts/operations/seyeon-security-s0/plan.mjs`, Worklog 문서. S0 격리 설치 소스로만 등록하고 API/일반 역할에 직접 EXECUTE를 부여하지 않았다.
 - **미완료/다음:** G1 결합 SQL을 서버의 검증된 원본 선택/모델 전 호출 경로에 연결하고, 실제 PostgreSQL 격리 실증 및 G2 동일 결합 출처 재확인까지 완료해야 한다. 별도 설치·운영 승인과 G5/G6 증거는 아직 없다. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W09 — G1 단일 트랜잭션 Pin의 실제 서버 모델 이전 경로 연결 (PR #2789)
+
+- **목적/구현:** 실제 `runSeyeonProductionChatExecutionV1`의 양수 Memory 1건 분기에서 모델 Provider 호출 이전에 DB Owner 결합 G1 Pin을 수행하도록 호출 경로를 추가했다. `seyeon-production-transactional-ports-v1.ts`가 기존 검증된 Subject Runner와 원본 권한 DB 트랜잭션을 이용해 `pinSeyeonG1CombinedModelSourcesV1`를 호출한다. 현재 User 메시지·선택 목록·모델 컨텍스트 digest는 서버에서만 조립한다.
+- **변경 파일:** `apps/api/src/seyeon-g1-positive-combined-source-port-v1.ts`, `apps/api/src/seyeon-production-chat-execution-v1.ts`, `apps/api/src/seyeon-production-transactional-ports-v1.ts`, `apps/api/src/production-seyeon-chat-runtime-v1.ts`, 이 Worklog.
+- **보안 경계:** 기존 양수 1 Memory 제한·과거 메시지/관계 0건 및 기존 positive G2/G3 HOLD를 해제하지 않았다. 현재 Production DB에 신규 결합 RPC/ACL을 설치·허가하지 않았고 S0 소스가 API EXECUTE를 부여하지 않으므로 새 호출 경로가 실제 Production 모델 사용을 열지 않는다. 독립 단위 테스트에서 사용하는 기존 주입 Port의 동작도 변경하지 않는다.
+- **검증/미완료:** 선행 HEAD `e6b1de1a`의 [CI #41184237655](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41184237655)에서 security TypeScript 작업 검사는 PASS, PostgreSQL 전체 검사는 당시 진행 중. 이번 연결 HEAD의 검증 결과는 별도로 확인하며 실행·통합·병합·실DB 실증 전 G1 완료 아님.
+- **다음:** 신규 소스의 TypeScript/CI 및 격리 PostgreSQL 동작 확인, G2 Commit에서 최근 메시지 Pin과 현재 원본 Grant를 같은 증명으로 검증, G3 재공개까지 연결. 운영 `HOLD_FORWARD_STOPPED` 유지.

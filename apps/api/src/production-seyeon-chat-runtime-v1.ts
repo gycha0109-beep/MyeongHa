@@ -517,6 +517,7 @@ export function createProductionSeyeonChatRuntimeV1(
           semanticReviewerProvider: meteredReviewer,
           persistencePort: meteredChatPersistence,
           positivePersonalSourcePort: ports.positivePersonalSource,
+          combinedSourcePinPort: ports.combinedSourcePin,
           ...(input.requiredPersonalRecordCount===undefined?{}:{requiredPersonalRecordCount:input.requiredPersonalRecordCount}),
           ...(input.approvedPersonalRecordModelUse === undefined ? {} : {
             serverOwnedPersonalRecordProjectors: Object.freeze([
