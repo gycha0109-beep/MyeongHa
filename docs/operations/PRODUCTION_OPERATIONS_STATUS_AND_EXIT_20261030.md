@@ -10,6 +10,25 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2835 중복 통합 CI RED 원인 및 정식 재제출
+
+- **정확한 실패:** [통합 #41232685886](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232685886)에서는 `admission` FAILURE, `full` SKIPPED. `Integration requires the dedicated CI submission label event`가 원인이다. 일반 `ops` 라벨 이벤트는 정식 제출 이벤트가 아니므로 보안상 거부된 것이고, 애플리케이션·DB·복원 테스트의 실패가 아니다.
+- **같은 원본의 독립 통과 증거:** [통합 #41232685514](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232685514)는 동일 PR HEAD `8f910c72d6ec54968aeeda0997688c83125eefe3`의 `ci-integration-ready` 제출 이벤트를 받아 `admission`, 전체 `full`, `CI Integration Verify` **SUCCESS**. 다만 중복 실패 체크가 PR 차단 상태로 남았으므로 성공 실행만을 병합 완료로 간주하지 않는다.
+- **조치:** Worklog의 현재 실패 진단을 커밋해 HEAD를 갱신한 뒤 필요한 기본 CI가 통과하면 `ci-integration-ready` 라벨 **하나만 제거/재적용**하여 새 HEAD를 전용 이벤트로 다시 제출한다. `ops` 라벨은 건드리지 않아 다른 일반 라벨 이벤트를 발생시키지 않는다. 자동 병합은 유지한다. 새 통합 CI의 실제 PASS 및 병합 완료는 별도 확인 전 미판정.
+- **운영 보호:** 이 작업은 CI 제출 절차 및 문서 근거만 수정한다. Production DB·Cloudflare 배포·Supabase migration/Role/ACL/비밀 변경 없음. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+
+### 2026-11-01 KST — Phase 8 실제 DB ACL·백업 신선도 확인 및 현재 Production 보호 백업 재실행
+
+- **범위:** Supabase Production `cnsfpcdiyofqvhpcegfc`의 승인된 `scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql` 및 `seyeon-r2-acl-grants-canonical-readonly.sql`을 **SELECT만** 실행했다. PostgreSQL 17, 대상 RPC **19/19 존재**, 누락 **0**, `anon`/`authenticated` 직접 실행 가능 **0/19**. 함수 정의/Owner 등 원문·개인정보·비밀을 출력하지 않았으며 집계 fingerprint만 확인했다.
+- **ACL 변화 주의:** 현 19개 RPC의 명시적 허가 관계 **38건**. 2026-10-29 기존 근거의 **37건**보다 1건 많으므로 정확한 변경 시점·승인 경로·기능별 기대 권한이 확정되기 전에는 **ACL 전체 동등성 PASS를 선언하지 않는다**. 브라우저 실행 권한이 새로 열린 증거는 없다. `GRANT`/`REVOKE` 미실행.
+- **역사적 변경 위험 구분:** 원격 전용 `20261008090417`는 이번 읽기 전용 재확인에서 **104,021 UTF-8 byte**, SHA-256 `4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894`로 기존 기록과 일치. 기존 [2026-10-16 R2-G 위험 수용 결정](SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md)의 `CLOSED_RISK_ACCEPTED` 유지: 역사적 실행자·요청 ID·COMMIT 원본 추적을 개발 차단 조건으로 재개하지 않는다. 현재 운영 ACL/DDL/스키마 동등성과 DR 검증은 별개.
+- **실제 백업 신선도:** 기존 기록에 적힌 2026-10-29 한 차례 외에도 자동 암호화 백업 [#40967959395](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40967959395) 및 [#41136999464](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41136999464) 모두 SUCCESS. 가장 최근 확인된 백업 #41136999464의 frontier는 `20261030021027`, 산출물 `13017123378` (암호화/보존기한 2026-11-29). 독립 조회한 현 Production 최신 migration `20261031182926`보다 과거 스냅샷이므로 **최신 스키마 커버/실제 복원 성공을 추정하지 않는다**.
+- **보호 백업 성공 + 격리 복원 제출:** `main` `a71851de0f29db81e5891ed9ecf470450a59b5a9`에서 기존 `Production PostgreSQL Logical Backup`을 수동 실행, [백업 #41231798713](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41231798713) **SUCCESS**, 암호화 Artifact `13054460230` (2026-11-30T19:00:05Z 만료), 기록된 frontier `20261031185454`. 이후 Production `supabase_migrations`를 독립 SELECT하여 **227개 적용 이력, 최신 frontier `20261031185454` 일치** 확인. 해당 최신 원격-only 항목 이름은 `seyeon_owner_legacy_room_archive_preserving_history_20261101`이며 변경 SQL 본문·행은 출력하지 않았다. 기존 보호 [격리 PostgreSQL17 복원 #41232195180](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232195180)을 backup_run_id `41231798713`, incident 기준 `2026-10-31T19:00:15Z`, ops 귀속으로 제출. **복원 성공은 아래 실증으로 확인했으나 Hosted 동등성은 미입증.** 운영 DB SQL/스키마/마이그레이션·비밀 설정을 변경하지 않았다.
+- **최신 백업 격리 복원 PASS:** [Protected isolated PostgreSQL17 restore #41232195180](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232195180) **SUCCESS**, 근거 artifact `13053338927` (SHA-256 `5d971573d819695baa206f62b2db3c92d9d82037e7d75d9329bcb54a8588cf8a`, 만료 2026-11-30T19:02:11Z). 복원 보고서가 `backup_workflow_run_id=41231798713`, `backup_migration_frontier=20261031185454`를 확인했다. 초기 6개 migration version/name snapshot, 11개 함수·6개 RLS, 인증 요청 제한 테이블/소유권/ACL/합성 admission PASS. 합성 개인정보 replay/finalization은 PASS지만 **실제 지속 수집 개인정보 이벤트 replay는 이번 실행에서 수행하지 않았다**. 검증 산출물 `recovered-serving-admission.json`은 `gate=BLOCKED`, `serviceResumptionAllowed=false`, `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`를 명시한다.
+- **차단 유지:** Hosted Auth/Storage 원본 복구, 지속적인 독립 개인정보 삭제·철회 연속성, 전체 서비스 RPO 24시간/RTO 6시간은 아직 미입증. `dr_ready=false`, `provider_managed_data_full_restore=false`, `future_safe_privacy_reconciliation=false`, `serviceResumptionAllowed=false` 유지. #1887 OPEN.
+
+
 ### 2026-11-01 KST — Phase 8 실제 Supabase Production migration 이력 읽기 전용 대조
 
 - **검증 경계:** 명하 Production Supabase `MyengHa` project ref `cnsfpcdiyofqvhpcegfc`의 `list_migrations` 읽기 전용 조회를 현장 수행. 비교 저장소는 GitHub `main` `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd`의 `supabase/migrations/*.sql`; 파일을 변경하지 않았다. 버전 문자열의 **정확 일치 여부만** 비교했으며 실제 적용 SQL/DDL/ACL/checksum 동등성 검증이 아니다.
