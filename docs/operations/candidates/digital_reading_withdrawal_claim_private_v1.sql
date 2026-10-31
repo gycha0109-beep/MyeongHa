@@ -47,6 +47,23 @@ security invoker
 set search_path = pg_catalog, public
 as $$
 begin
+  -- Exception only for the existing approved P0-PR-01 DB-finalization
+  -- transaction and its exact Subject. Ordinary DELETE stays forbidden.
+  if tg_op = 'DELETE' and
+    current_user = (
+      select pg_catalog.pg_get_userbyid(proc.proowner)
+      from pg_catalog.pg_proc proc
+      where proc.oid = pg_catalog.to_regprocedure(
+        'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+      )
+    ) and coalesce(
+      nullif(pg_catalog.current_setting(
+        'myeongha.account_deletion_finalizer_subject_id', true
+      ), '')::uuid = old.subject_id, false
+    ) then
+    return old;
+  end if;
+
   if tg_op <> 'INSERT' then
     raise exception using errcode='23514',
       constraint='digital_reading_withdrawal_claim_private_immutable',
