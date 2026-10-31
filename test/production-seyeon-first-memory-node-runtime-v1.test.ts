@@ -2,7 +2,7 @@
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { describe, expect, it } from 'vitest';
-import { createProductionSeyeonFirstMemoryNodeRuntimeV1 } from '../apps/api/src/production-seyeon-first-memory-node-runtime-v1.js';
+import { createProductionSeyeonFirstMemoryNodeRuntimeV1, createProductionSeyeonFirstMemoryExecutionV1 } from '../apps/api/src/production-seyeon-first-memory-node-runtime-v1.js';
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 import { PRODUCTION_USER_DATA_RUNTIME_ENV_V1, MYEONGHA_PRODUCTION_SUPABASE_ORIGIN, PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1 } from '../apps/api/src/production-user-data-runtime-config.js';
 
@@ -47,6 +47,19 @@ describe('first Memory production composition stays closed before credential res
       expect(response?.status ?? 503).not.toBe(200);
       expect(credentialReads).toBe(0);
       expect(readinessReads).toBe(1);
+      const approved = createProductionSeyeonFirstMemoryExecutionV1({
+        env,pool,memberFetchImpl:async()=>Response.json({id:auth}),
+        approvedPersonalRecordModelUse:()=>true,
+        governorApproval:{} as never,
+      });
+      try {
+        await expect(approved.runtime.run({
+          verifiedEvidence:{kind:'member',verifiedAuthUserId:auth},
+          threadId:'33333333-3333-4333-8333-333333333333',
+          clientTurnId:'44444444-4444-4444-8444-444444444444',text:'hello',
+        })).rejects.toThrow('G4 credits and delivery settlement are not mounted');
+        expect(credentialReads).toBe(0);
+      } finally {await approved.close();}
     } finally {
       server.closeAllConnections();
       await new Promise<void>(resolve => server.close(() => resolve()));
