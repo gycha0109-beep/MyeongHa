@@ -36,20 +36,20 @@ export async function pinSeyeonG1RecentSourcesCandidateV1(
   input:Readonly<SeyeonG1RecentPinInputV1>,
 ):Promise<Readonly<Record<string,unknown>>> {
   if(![input.subjectId,input.threadId,input.turnId,input.attemptId,
-    input.currentUserMessageId].every(id=>typeof id==='string'&&UUID.test(id)))hold();
+    input.currentUserMessageId].every(id=>typeof id==='string'&&UUID.test(id)))throw Error('G1 recent source certificate unavailable');
   const s=input.selection;
   if(!s||s.persistedBeforeModel!==false||s.permitsAtomicCommit!==false
     ||s.permitsHttpReveal!==false||!SHA.test(s.selectedModelSourceCensusDigest)
     ||!Array.isArray(s.selectedSources)||!Array.isArray(s.selectedUnpinnedRecentSources)
     ||!Array.isArray(s.selectedUnpinnedDerivedSources)
-    ||s.selectedUnpinnedDerivedSources.length!==0)hold();
+    ||s.selectedUnpinnedDerivedSources.length!==0)throw Error('G1 recent source certificate unavailable');
   const current=s.selectedCurrentUserSource;
   if(!current||current.messageId!==input.currentUserMessageId
-    ||current.role!=='user'||current.persistedBeforeModel!==false)hold();
+    ||current.role!=='user'||current.persistedBeforeModel!==false)throw Error('G1 recent source certificate unavailable');
   if(hash({
     originalPersonalSources:s.selectedSources,currentUserSource:current,
     unpinnedRecentSources:s.selectedUnpinnedRecentSources,unpinnedDerivedSources:[],
-  })!==s.selectedModelSourceCensusDigest)hold();
+  })!==s.selectedModelSourceCensusDigest)throw Error('G1 recent source certificate unavailable');
   let messages:readonly SeyeonRecentMessageV2[];
   try {
     messages=selectSeyeonRuntimeRecentMessagesV2({
@@ -58,15 +58,15 @@ export async function pinSeyeonG1RecentSourcesCandidateV1(
     });
   }catch{return hold();}
   if(messages.length<1||messages.length>24
-    ||messages[messages.length-1]?.messageId!==current.messageId)hold();
+    ||messages[messages.length-1]?.messageId!==current.messageId)throw Error('G1 recent source certificate unavailable');
   const sources=[...s.selectedUnpinnedRecentSources,current];
-  if(sources.length!==messages.length)hold();
+  if(sources.length!==messages.length)throw Error('G1 recent source certificate unavailable');
   const seen=new Set<string>();
   const manifest=messages.map((m,i)=>{
     const src=sources[i];
     if(!src||!UUID.test(src.messageId)||src.messageId!==m.messageId
       ||src.role!==m.role||src.persistedBeforeModel!==false
-      ||src.selectedModelMessageDigest!==hash(m)||seen.has(src.messageId))hold();
+      ||src.selectedModelMessageDigest!==hash(m)||seen.has(src.messageId))throw Error('G1 recent source certificate unavailable');
     seen.add(src.messageId);
     return {messageId:src.messageId,role:src.role,
       text:m.text,selectedModelMessageDigest:src.selectedModelMessageDigest};
@@ -81,13 +81,13 @@ $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::jsonb,$7::text
   ]);
   const row=rows.rows[0];
   if(rows.rows.length!==1||!row||!row.certificate
-    ||typeof row.certificate!=='object'||Array.isArray(row.certificate))hold();
+    ||typeof row.certificate!=='object'||Array.isArray(row.certificate))throw Error('G1 recent source certificate unavailable');
   const receipt=row.certificate as Record<string,unknown>;
   if(receipt.schemaVersion!=='seyeon-g1-recent-model-source-pin-v1'
     ||receipt.subjectId!==input.subjectId||receipt.threadId!==input.threadId
     ||receipt.turnId!==input.turnId||receipt.attemptId!==input.attemptId
     ||receipt.selectedModelSourceCensusDigest!==s.selectedModelSourceCensusDigest
-    ||!Array.isArray(receipt.sources)||receipt.sources.length!==manifest.length)hold();
+    ||!Array.isArray(receipt.sources)||receipt.sources.length!==manifest.length)throw Error('G1 recent source certificate unavailable');
   for(let i=0;i<manifest.length;i++){
     const model=manifest[i];
     const original=receipt.sources[i];
@@ -97,7 +97,7 @@ $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::jsonb,$7::text
       ||(original as Record<string,unknown>).selectedModelMessageDigest
         !==model.selectedModelMessageDigest
       ||(original as Record<string,unknown>).dbBodySha256!==
-        'sha256:v1:'+createHash('sha256').update(model.text).digest('hex'))hold();
+        'sha256:v1:'+createHash('sha256').update(model.text).digest('hex'))throw Error('G1 recent source certificate unavailable');
   }
   return Object.freeze(receipt);
 }
