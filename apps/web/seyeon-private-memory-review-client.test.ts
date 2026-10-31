@@ -163,7 +163,7 @@ describe('UC-07 browser review surface',()=>{
       const root=new FakeElement();
       const panel=mountSeyeonPrivateMemoryReviewV1({
         container:root,plannerProposal:candidate,client,
-      } as never) as FakeElement|null;
+      } as never) as unknown as FakeElement|null;
       expect(panel).not.toBeNull();
       const summary=panel!.children.find(node=>
         node.className==='s0-memory-proposal-summary');
