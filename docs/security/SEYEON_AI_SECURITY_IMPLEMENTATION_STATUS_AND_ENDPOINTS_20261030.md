@@ -315,3 +315,10 @@ Watchtower-Track: security
 - **수정:** 동일 G3 PostgreSQL owner 함수가 기결 Commit·Attempt를 잠근 이후 `seyeon_recent_source_pin_jsonb`가 NULL이면 보호된 Assistant 본문/Grant를 조회하기 전에 아무 행도 반환하지 않고 HOLD한다. Pin이 존재하면 원래와 동일한 `messageId`/Subject/Thread/Turn/Attempt 및 현재 DB 원문 해시 검증을 적용한다. 실제 운영 Migration·API ACL·Provider 호출·공개 Route·스트리밍을 활성화하지 않는다.
 - **검증 범위:** 기존 S0 PostgreSQL 17 실제 결합 User Pin + 첫 Reveal 통합 테스트를 보존하고 `git diff --check`, `plan.mjs installerMayActivateProduction=false` 확인. 레거시 과거 Commit fixture를 신규 운영 데이터로 변조하지 않으며, 신선한 HEAD CI 결과 전까지 전체 PASS라고 주장하지 않는다.
 - **남은 것:** G0 전체 출처/Streaming 권한 계약, G1 다중 기록/파생 출처, G2/G3 실제 운영 배포 승격, G4 일반 크레딧 결제 종단, G5/G6 최종 검증·승인. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-01 / W31 — #2786 db-authority-core R24 재전송 테스트 정책 정합화
+
+- **실패 근거:** [GitHub Actions #41223846354 / db-authority-core #124603850941](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41223846354/job/124603850941). disposable PostgreSQL R5 테스트 16건 중 15건 통과, `R24 real G2 committed receipt to Node G3` 1건이 `UND_ERR_SOCKET`으로 RED. 레거시 R24 테스트가 valid Grant의 `committed_replay` 원문 재전송 HTTP 200을 기대했으나, 통합된 G3 Node 송신 경계 W29는 replay=true에 소켓을 즉시 닫도록 강화되어 충돌했다.
+- **조치:** `test/seyeon-r5-current-reveal-disposable.test.ts`의 R24 통합 검증을 **처음 응답 200** 및 **replay는 처음/Grant 취소·다른 Grant 재발급 이후 모두 연결 종료·HTTP 본문 없음·보호된 DB connect 0회**로 정합화. Replay 예외의 구체적인 차단 메시지와 파기된 Node socket을 확인한다. 오래된 200 replay 승인이나 503 응답을 가정하지 않는다. 다른 실제 DB R5 revoke/regrant 및 첫 응답 원자 확정 테스트 유지.
+- **변경 파일/검증:** R24 통합 테스트와 이 단일 보안 Worklog만 변경. `git diff --check` 확인. 실제 db-authority-core 재실행 CI 확인 전에는 PASS라고 표시하지 않는다.
+- **운영:** Production DB/ACL/Provider/공개 응답/기존 G3 전송 방어 코드 변경 없음. `HOLD_FORWARD_STOPPED` 유지, 전체 G0~G6 종료 판정 아님.
