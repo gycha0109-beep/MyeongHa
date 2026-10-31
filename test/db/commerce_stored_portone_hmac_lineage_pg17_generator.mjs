@@ -1,3 +1,4 @@
+import {readFileSync} from 'node:fs';
 import {
  COMMERCE_STORED_PORTONE_CANCEL_HMAC_SOURCE_SQL_V1 as sourceSql,
 } from '../../scripts/operations/commerce-stored-portone-cancellation-hmac-recheck-v1.mjs';
@@ -8,44 +9,58 @@ if(!sourceSql.includes('join public.standard_reading_reader_access_grants access
    !sourceSql.includes('event.id=$1::uuid')) {
  throw Error('STORED_PORTONE_HMAC_SQL_CONTRACT_NOT_CURRENT');
 }
+// Only synthesize the payment handoff while the official B2/B3 Intents
+// are still CREATED. Reuse the original official fixture unchanged; its
+// subsequent verified Receipts and distinct Reader Grants remain authoritative.
+const fixtureAttemptSql = String.raw`
+-- P4 PG17 HMAC evidence: insert each independent handoff BEFORE verification.
+insert into public.commerce_payment_attempts(
+ id,purchase_intent_id,subject_id,product_offer_id,attempt_no,provider,
+ environment,idempotency_key,provider_request_id,provider_transaction_id,
+ status,failure_code,created_at,updated_at
+)
+select x.attempt_id::uuid,pi.id,pi.subject_id,pi.product_offer_id,
+ 1,'portone_v2','production',x.idempotency_key,
+ x.payment_id,x.transaction_id,'response_received',null,
+ clock_timestamp(),clock_timestamp()
+from public.purchase_intents pi
+join (values
+ ('12192300-0000-0000-0000-000000000002',
+  '12196100-0000-4000-8000-000000000002',
+  'synthetic-hmac-b2-attempt','synthetic-hmac-b2-payment',
+  'tx-official-reader-b2'),
+ ('12192300-0000-0000-0000-000000000003',
+  '12196100-0000-4000-8000-000000000003',
+  'synthetic-hmac-b3-attempt','synthetic-hmac-b3-payment',
+  'tx-official-reader-b3')
+) as x(intent_id,attempt_id,idempotency_key,payment_id,transaction_id)
+ on pi.id=x.intent_id::uuid
+where pi.status='created';
+`;
+
+if(process.argv.includes('--fixture')){
+ const original=readFileSync(
+  'test/db/official_standard_reading_reader_interpretation.sql','utf8'
+ ).replace(/\r\n/gu,'\n');
+ const anchor=`update public.purchase_intents
+set status = 'verified', updated_at = clock_timestamp()
+where id in (
+  '12192300-0000-0000-0000-000000000002',
+  '12192300-0000-0000-0000-000000000003'
+);`;
+ if(original.split(anchor).length!==2)
+  throw Error('OFFICIAL_B2_B3_PRE_VERIFICATION_BOUNDARY_CHANGED');
+ process.stdout.write(original.replace(anchor,fixtureAttemptSql+'\n'+anchor));
+ process.exit(0);
+}
+
 const proof = [
  String.raw`\set ON_ERROR_STOP on
 -- ONLY isolated PG17 database with official_standard_reading_reader_interpretation fixture.
 begin;
 set local statement_timeout = '20s';
 
--- The independent B2 purchase is a verified Receipt-backed Reader Grant.
--- Attach a synthetic, provenance-only payment attempt to B2's actual Intent.
-insert into public.commerce_payment_attempts(
- id,purchase_intent_id,subject_id,product_offer_id,attempt_no,provider,
- environment,idempotency_key,provider_request_id,provider_transaction_id,
- status,failure_code,created_at,updated_at
-)
-select '12196100-0000-4000-8000-000000000002'::uuid,
- pi.id,pi.subject_id,pi.product_offer_id,1,'portone_v2',
- 'production','synthetic-hmac-b2-attempt','synthetic-hmac-b2-payment',
- cr.external_transaction_id,'response_received',null,
- clock_timestamp(),clock_timestamp()
-from public.purchase_intents pi
-join public.commerce_receipts cr on cr.purchase_intent_id=pi.id
-where pi.id='12192300-0000-0000-0000-000000000002'::uuid
-  and cr.provider='portone_v2' and cr.environment='production';
-
--- A second independent B3 payment attempt proves no cross-purchase grant match.
-insert into public.commerce_payment_attempts(
- id,purchase_intent_id,subject_id,product_offer_id,attempt_no,provider,
- environment,idempotency_key,provider_request_id,provider_transaction_id,
- status,failure_code,created_at,updated_at
-)
-select '12196100-0000-4000-8000-000000000003'::uuid,
- pi.id,pi.subject_id,pi.product_offer_id,1,'portone_v2',
- 'production','synthetic-hmac-b3-attempt','synthetic-hmac-b3-payment',
- cr.external_transaction_id,'response_received',null,
- clock_timestamp(),clock_timestamp()
-from public.purchase_intents pi
-join public.commerce_receipts cr on cr.purchase_intent_id=pi.id
-where pi.id='12192300-0000-0000-0000-000000000003'::uuid
-  and cr.provider='portone_v2' and cr.environment='production';
+-- Original B2/B3 attempts are installed before Purchase Intent verification.
 
 -- Independent source-v2 event is from B2 only. No PG refund or Entitlement writer.
 insert into public.commerce_provider_events(
