@@ -58,6 +58,8 @@ declare
   v_count integer;
   v_current_count integer:=0;
   v_message record;
+  v_canonical_selected text;
+  v_exact_selected_digest text;
   v_certificate jsonb:='[]'::jsonb;
   v_previous_sequence bigint:= -1;
   v_pin jsonb;
@@ -124,6 +126,20 @@ begin
       or v_message.content_hash is null then
       raise exception using errcode='42501',
         message='G1 recent source ordering or DB origin invalid';
+    end if;
+    -- The actual model-selected digest must describe THIS DB-original
+    -- {messageId,role,text}, not merely have a plausible SHA-256 shape.
+    -- Match the sorted-key canonicalJson() encoding used by the server.
+    v_canonical_selected:='{"messageId":'||to_jsonb(v_message.id::text)::text||
+      ',"role":'||to_jsonb(v_item->>'role')::text||
+      ',"text":'||to_jsonb(v_message.body_text)::text||'}';
+    v_exact_selected_digest:='sha256:v1:'||
+      encode(sha256(convert_to(v_canonical_selected,'UTF8')),'hex');
+    if v_item->>'selectedModelMessageDigest' is distinct from
+       v_exact_selected_digest then
+      raise exception using errcode='42501',
+        constraint='seyeon_g1_recent_model_digest_mismatch',
+        message='G1 selected model message digest differs from DB original';
     end if;
     v_previous_sequence:=v_message.sequence_no;
 
