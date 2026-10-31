@@ -26,7 +26,7 @@ describe('UC-06 S0 internal Planner display candidate is NOT G3 Reveal',()=>{
   });
 
   it('pins candidate to exact server Member/thread/assistant and rejects browser-shaped output',async()=>{
-    const query=vi.fn(async()=>({rows:[record]}));
+    const query=vi.fn(async(_sql:string,_values?:readonly unknown[])=>({rows:[record]}));
     const found=await inspectSeyeonPlannerDisplayCandidateS0V1({
       client:{query} as never,...args,
       approvedInternalS0Inspection:()=>true,
@@ -41,7 +41,7 @@ describe('UC-06 S0 internal Planner display candidate is NOT G3 Reveal',()=>{
     expect((found as unknown as Record<string,unknown>).memoryProposal).toBeUndefined();
     expect(query.mock.calls[0]?.[0])
       .toContain('qry_pending_seyeon_planner_display_candidate_v1');
-    expect(query.mock.calls[0]?.[1]).toEqual(undefined);
+    expect(query.mock.calls[0]?.[1]).toEqual([SUBJECT,THREAD,ASSISTANT]);
   });
 
   it('treats no pending Owner-created proposal as absent without leaking history',async()=>{
