@@ -1,3 +1,4 @@
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import {
   inspectPortOneV2CancellationReadbackEvidenceV1,
   type PortOneV2CancellationReadbackReviewV1,
@@ -59,25 +60,16 @@ async function readBoundedJson(
 }
 
 /**
- * Internal operations-only GET. Unmounted: no public route, no stored secret,
- * and no POST /cancel. The original receipt input must come from a trusted
- * complete-visibility Commerce evidence lookup, never webhook data.
+ * One shared fixed-origin, bounded, authenticated GET transport for the
+ * individual-cancellation and complete-set read-only inspectors.
+ * The returned payload stays in the private call stack, never an API response.
  */
-export async function inspectPortOneV2CancellationViaGetCandidateV1(input:Readonly<{
+export async function getPortOneV2PaymentReadbackPrivateV1(input:Readonly<{
   providerPaymentId:string;
-  originalTransactionId:string;
-  originalVerifiedPaidAmountMinor:number;
-  originalCurrency:string;
-  environment:'production'|'sandbox';
-  cancellationId?:string|undefined;
   apiSecret:string;
   fetchImpl?:FetchV1|undefined;
-}>):Promise<PortOneV2CancellationReadbackReviewV1&Readonly<{
-  providerReadbackFromAuthenticatedGet:true;
-}>>{
+}>):Promise<unknown>{
   if(!validIdentity(input.providerPaymentId)||
-     !validIdentity(input.originalTransactionId)||
-     (input.cancellationId!==undefined&&!validIdentity(input.cancellationId))||
      typeof input.apiSecret!=='string'||
      input.apiSecret.length<16||input.apiSecret.length>4096||
      input.apiSecret.trim()!==input.apiSecret||
@@ -104,21 +96,97 @@ export async function inspectPortOneV2CancellationViaGetCandidateV1(input:Readon
       if(response.status!==200)throw providerError();
       return readBoundedJson(response,PORTONE_V2_CANCELLATION_READBACK_GET_V1.maxResponseBytes);
     })();
-    const raw=await Promise.race([operation,deadline]);
+    return await Promise.race([operation,deadline]);
+  }catch{
+    throw providerError();
+  }finally{
+    if(timeout!==undefined)clearTimeout(timeout);
+    if(didTimeout)controller.abort();
+  }
+}
+
+/**
+ * Internal operations-only GET. Unmounted: no public route, no stored secret,
+ * and no POST /cancel. The original receipt input must come from a trusted
+ * complete-visibility Commerce evidence lookup, never webhook data.
+ */
+export async function inspectPortOneV2CancellationViaGetCandidateV1(input:Readonly<{
+  providerPaymentId:string;
+  originalTransactionId:string;
+  originalVerifiedPaidAmountMinor:number;
+  originalCurrency:string;
+  environment:'production'|'sandbox';
+  cancellationId?:string|undefined;
+  cancellationIdHmac?:string|undefined;
+  sourceHmacSecret?:string|undefined;
+  apiSecret:string;
+  fetchImpl?:FetchV1|undefined;
+}>):Promise<PortOneV2CancellationReadbackReviewV1&Readonly<{
+  providerReadbackFromAuthenticatedGet:true;
+}>>{
+  const recheckByHmac=input.cancellationIdHmac!==undefined||
+    input.sourceHmacSecret!==undefined;
+  if(!validIdentity(input.providerPaymentId)||
+     !validIdentity(input.originalTransactionId)||
+     (recheckByHmac&&(
+       input.cancellationId!==undefined||
+       typeof input.cancellationIdHmac!=='string'||
+       !/^hmac-sha256:k1:[0-9a-f]{64}$/u.test(input.cancellationIdHmac)||
+       typeof input.sourceHmacSecret!=='string'||
+       Buffer.byteLength(input.sourceHmacSecret,'utf8')<32||
+       Buffer.byteLength(input.sourceHmacSecret,'utf8')>4096||
+       input.sourceHmacSecret.trim()!==input.sourceHmacSecret||
+       /[\r\n\u0000-\u001f\u007f]/u.test(input.sourceHmacSecret)
+     ))||
+     (input.cancellationId!==undefined&&!validIdentity(input.cancellationId))||
+     typeof input.apiSecret!=='string'||
+     input.apiSecret.length<16||input.apiSecret.length>4096||
+     input.apiSecret.trim()!==input.apiSecret||
+     /[\r\n\u0000-\u001f\u007f]/u.test(input.apiSecret))
+    throw new Error('Invalid internal PortOne V2 cancellation lookup configuration.');
+  try{
+    const raw=await getPortOneV2PaymentReadbackPrivateV1({
+      providerPaymentId:input.providerPaymentId,
+      apiSecret:input.apiSecret,
+      fetchImpl:input.fetchImpl,
+    });
+    // The source ledger holds only a keyed HMAC, not a raw cancellationId.
+    // Match each bounded current GET item in memory; never return/store raw ID.
+    let matchedId=input.cancellationId;
+    if(recheckByHmac){
+      const payload=raw as Record<string,unknown>|null;
+      const items=payload!==null&&typeof payload==='object'&&
+        !Array.isArray(payload)?payload.cancellations:null;
+      if(!Array.isArray(items)||items.length>64)throw providerError();
+      const target=Buffer.from(input.cancellationIdHmac!.slice('hmac-sha256:k1:'.length),'hex');
+      let count=0;
+      for(const item of items){
+        if(item===null||typeof item!=='object'||Array.isArray(item))
+          throw providerError();
+        const rawId=(item as Record<string,unknown>).id;
+        if(!validIdentity(rawId))throw providerError();
+        const candidate=createHmac('sha256',input.sourceHmacSecret!)
+          .update(JSON.stringify([
+            'portone-cancellation-item-v1',input.providerPaymentId,rawId,
+          ]),'utf8').digest();
+        if(timingSafeEqual(candidate,target)){
+          matchedId=rawId;
+          count++;
+        }
+      }
+      if(count!==1)throw providerError();
+    }
     const classified=inspectPortOneV2CancellationReadbackEvidenceV1({
       paymentId:input.providerPaymentId,
       originalTransactionId:input.originalTransactionId,
       originalVerifiedPaidAmountMinor:input.originalVerifiedPaidAmountMinor,
       originalCurrency:input.originalCurrency,
       environment:input.environment,
-      ...(input.cancellationId===undefined?{}:{cancellationId:input.cancellationId}),
+      ...(matchedId===undefined?{}:{cancellationId:matchedId}),
       paymentReadback:raw,
     });
     return Object.freeze({...classified,providerReadbackFromAuthenticatedGet:true as const});
   }catch{
     throw providerError();
-  }finally{
-    if(timeout!==undefined)clearTimeout(timeout);
-    if(didTimeout)controller.abort();
   }
 }

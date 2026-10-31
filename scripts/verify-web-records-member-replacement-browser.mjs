@@ -175,7 +175,7 @@ try {
   await navigate(tabA, origin, '/hall.html', '.product-profile');
   await signIn(tabA, memberA);
   await navigate(tabA, origin, '/records.html', '#records-content');
-  await waitFor(tabA, `document.querySelector('#records-content')?.hidden === false && document.querySelector('#records-display-name')?.textContent?.trim() === ${JSON.stringify(memberA.name)}`, 'Member A Records did not render');
+  await waitFor(tabA, `document.querySelector('#records-content')?.hidden === false && document.querySelector('.records-reading-card--persisted a')?.getAttribute('href')?.includes(${JSON.stringify(memberA.readingId)}) === true`, 'Member A Records did not render');
 
   const loadsBeforeRace = recordsLoads;
   holdA = true;
@@ -191,16 +191,15 @@ try {
   await navigate(tabB, origin, '/hall.html', '.product-profile');
   await signIn(tabB, memberB);
   await waitFor(tabB, `JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken === ${JSON.stringify(memberB.token)}`, 'Member B did not become canonical');
-  await waitFor(tabA, `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('#records-display-name')?.textContent?.trim() === ${JSON.stringify(memberB.name)} && document.querySelector('.records-reading-card--persisted a')?.getAttribute('href')?.includes(${JSON.stringify(memberB.readingId)}) === true`, 'Records did not refetch under Member B');
+  await waitFor(tabA, `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('.records-reading-card--persisted a')?.getAttribute('href')?.includes(${JSON.stringify(memberB.readingId)}) === true`, 'Records did not refetch under Member B');
   assert(recordsLoads >= loadsBeforeRace + 2, `storage-driven Records reload did not occur; loads=${recordsLoads}`);
 
   holdA = false;
   releaseA?.();
   releaseA = null;
   await sleep(500);
-  const finalState = await tabA.evaluate(`(() => ({ member: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null'), name: document.querySelector('#records-display-name')?.textContent?.trim() ?? null, links: [...document.querySelectorAll('.records-reading-card--persisted a')].map((link) => link.getAttribute('href') ?? '') }))()`);
+  const finalState = await tabA.evaluate(`(() => ({ member: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null'), links: [...document.querySelectorAll('.records-reading-card--persisted a')].map((link) => link.getAttribute('href') ?? '') }))()`);
   assert(finalState.member?.accessToken === memberB.token, 'canonical Member regressed');
-  assert(finalState.name === memberB.name, 'stale Member A profile rendered after replacement');
   assert(finalState.links.length === 1, 'Member B Reading archive count is incorrect');
   assert(finalState.links[0].includes(memberB.readingId), 'Member B Reading is missing');
   assert(!finalState.links.some((href) => href.includes(memberA.readingId)), 'Member A private Reading rendered under Member B');

@@ -76,10 +76,11 @@ const hold=(kind,more={})=>Object.freeze({
  * comparator, legal/delivery evidence and Reader R2/T2 lock are not admitted.
  */
 export async function inspectLockedReaderRevokeCasPreflightV1(client,{
- providerEventId,entitlementGrantId,
+ providerEventId,entitlementGrantId,expectedReceiptId,
  expectedGrantRevision,expectedLastProviderOrderingKey,
 }){
  if(!inputValid(providerEventId)||!inputValid(entitlementGrantId)||
+    (expectedReceiptId!==undefined&&!inputValid(expectedReceiptId))||
     !revisionValid(expectedGrantRevision)||!keyValid(expectedLastProviderOrderingKey))
   throw Error('INVALID_READER_REVOKE_CAS_PREFLIGHT_INPUT');
  let began=false;
@@ -110,6 +111,8 @@ export async function inspectLockedReaderRevokeCasPreflightV1(client,{
      !inputValid(e.purchaseIntentId))
    throw Error('INVALID_REVOKE_SOURCE_EVENT_EVIDENCE');
   const sourceLocked={sourceEventLocked:true};
+  if(expectedReceiptId!==undefined&&e.receiptId!==expectedReceiptId)
+   return hold('exact_cancellation_receipt_scope_changed',sourceLocked);
 
   // The original paid receipt/Subject/Purchase Intent come from the locked
   // Provider Event's exact DB lineage, never from an external input.

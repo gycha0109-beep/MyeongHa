@@ -38,6 +38,10 @@ export interface SeyeonGlmRendererConfigV1 {
     purpose: 'dialogue_render';
     providerKey: typeof SEYEON_GLM_RENDERER_PROVIDER_KEY_V1;
     modelKey: typeof SEYEON_GLM_RENDERER_MODEL_V1;
+  }>, exact: Readonly<{
+    request: SeyeonStructuredProviderRequestV2;
+    serializedRequestBody: string;
+    requestBodyBytes: number;
   }>) => Promise<void>;
   readonly afterOutcome?: (event: SeyeonAiCostEventV1) => Promise<void>;
 }
@@ -101,7 +105,11 @@ export function createSeyeonGlmRendererV1(
         modelKey: SEYEON_GLM_RENDERER_MODEL_V1,
       });
       // The cost ledger start must commit before paid inference.
-      await config.beforeDispatch?.(base);
+      await config.beforeDispatch?.(base, Object.freeze({
+        request,
+        serializedRequestBody: body,
+        requestBodyBytes: bytes,
+      }));
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30_000);
       let outcome: SeyeonAiCallOutcomeV1 = 'network_failure';

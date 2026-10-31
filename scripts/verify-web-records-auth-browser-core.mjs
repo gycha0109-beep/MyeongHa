@@ -282,7 +282,7 @@ async function waitFor(client, expression, message, timeout = 10_000) {
     diagnostics = await client.evaluate(`(() => ({
       pathname: location.pathname,
       status: document.querySelector('#records-status')?.textContent?.trim() ?? null,
-      displayName: document.querySelector('#records-display-name')?.textContent?.trim() ?? null,
+      persistedCount: document.querySelectorAll('.records-reading-card--persisted').length,
       routeState: document.body.dataset.readingRouteState ?? null,
       recordMode: document.body.dataset.readingRecordMode ?? null,
       memberSession: localStorage.getItem('myeongha.memberSession.v1'),
@@ -343,7 +343,7 @@ try {
 
   await waitFor(
     client,
-    `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('#records-display-name')?.textContent?.trim() === '기록 회원'`,
+    `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('.records-reading-card--persisted a') !== null`,
     'Member login did not reach an authorized Records state',
   );
 

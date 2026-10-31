@@ -22,13 +22,15 @@ describe('Records v2 product surface', () => {
       readFile(web('records-page.js'), 'utf8'),
     ]);
     const markup = `${html}\n${component}`;
-    for (const id of ['records-status', 'records-content', 'records-display-name', 'records-subject-kind', 'saju-records-list']) {
+    for (const id of ['records-status', 'records-content', 'saju-records-list']) {
       expect(markup).toContain(`id="${id}"`);
     }
     expect(js).toContain('createRecordsRuntimeClient().readRecords()');
     expect(js).not.toContain('renderCurrentBirthProfile');
     expect(js).not.toContain('renderMemories');
     expect(markup).not.toContain('life-records-list');
+    expect(markup).not.toContain('records-profile-strip');
+    expect(js).not.toContain('renderProfile(');
     expect(markup).not.toContain('role="tablist"');
     expect(js).not.toContain('function setupTabs()');
   });

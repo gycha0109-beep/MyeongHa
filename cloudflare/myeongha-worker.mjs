@@ -7,6 +7,7 @@ import {SEYEON_SECURITY_S0_PRODUCTION_V1,
   SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1} from '../apps/api/src/seyeon-security-s0-production-policy-v1.js';
 import apiRuntime, {cloudflareEmergencyHoldEnabledV1} from '../workers/cloudflare-static-preview.mjs';
 import { isSeyeonCloudflareProtectedIngressAliasV1 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
+import {createSeyeonGlmContextCapacityGovernorV1} from '../apps/api/src/seyeon-glm-governor-approval-v1.js';
 import { cloudflareAuthRoute, handleCloudflareAuthRequest, rateLimitCloudflareRequestV1 } from './member-auth-worker.mjs';
 import {approvedCloudflareAuthOriginV1} from '../workers/cloudflare-auth-db-api.mjs';
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
@@ -78,7 +79,15 @@ export default {
           ?createCloudflareSeyeonIssuedReplyReceiptRuntimeV1({env})
           :firstReplyRoute
             ?createCloudflareSeyeonFirstMemoryRuntimeV1({
-              env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+              env,
+              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved
+                ? {zeroSourceFirstReplyApproved:true} : {}),
+              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.glmRendererApproved &&
+                  typeof env?.OPENROUTER_API_KEY==='string' &&
+                  env.OPENROUTER_API_KEY.trim().length>0
+                ? {glmRendererGovernor:createSeyeonGlmContextCapacityGovernorV1()}
+                : {}),
+              approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
               governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
             })
             :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
