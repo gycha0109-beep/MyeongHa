@@ -13,6 +13,8 @@ import { extractSeyeonPlannerMemoryCandidateV1 }
   from './seyeon-planner-memory-proposal-extractor-v1.js';
 import { createPendingSeyeonPlannerMemoryProposalV1 }
   from './postgres-seyeon-planner-memory-proposal-producer-v1.js';
+import { verifySeyeonPlannerPreModelSourceV1 }
+  from './postgres-seyeon-planner-pre-model-source-v1.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -89,8 +91,26 @@ export async function runSeyeonPostTurnPlannerMemoryV1(input: Readonly<{
   } catch { admitted = false; }
   if (!admitted) throw new SeyeonPostTurnPlannerMemoryHoldV1();
 
-  // No DB locks are held during model execution. Original committed rows
-  // and exact user quote are checked again by the DB owner before INSERT.
+  // No metered Provider may run until the DB owner has verified the exact
+  // canonical Member, committed Turn and both original message texts.
+  // Do not retain database locks across an external model request.
+  await executePostgresSubjectTransactionV1({
+    pool: input.pool,
+    verifiedEvidence: input.verifiedEvidence,
+    execute: async ({ resolvedSubject, client }) => {
+      if (resolvedSubject.subjectKind !== 'member') {
+        throw new SeyeonPostTurnPlannerMemoryHoldV1();
+      }
+      await verifySeyeonPlannerPreModelSourceV1(client, {
+        canonicalMemberSubjectId: resolvedSubject.subjectId,
+        ...input.committedTurn,
+      });
+    },
+  });
+
+  // The first check is deliberately not a durable grant or model proof.
+  // Repeat it inside the pending-proposal INSERT transaction after Provider
+  // execution so any intervening source edit/redaction fails closed.
   const extraction = await extractSeyeonPlannerMemoryCandidateV1({
     userMessageId: input.committedTurn.userMessageId,
     userText: input.committedTurn.userText,
@@ -113,6 +133,10 @@ export async function runSeyeonPostTurnPlannerMemoryV1(input: Readonly<{
         resolvedSubject.subjectId,
         input.committedTurn.turnId,
       );
+      await verifySeyeonPlannerPreModelSourceV1(client, {
+        canonicalMemberSubjectId: resolvedSubject.subjectId,
+        ...input.committedTurn,
+      });
       const created = await createPendingSeyeonPlannerMemoryProposalV1(client, {
         canonicalMemberSubjectId: resolvedSubject.subjectId,
         proposalId,
