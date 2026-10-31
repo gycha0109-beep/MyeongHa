@@ -12,6 +12,14 @@
 
 이 보고서는 최신 구현 상태뿐 아니라 **각 실행 세션의 실제 변경·실행 증거·남은 차단 항목을 누적**한다. 후속 운영 작업은 기존 기록을 덮어쓰거나 임의 완료율을 붙이지 않고, 날짜별로 **무엇을 바꾸었는지 / 어떤 실행이 PASS·FAIL인지 / 실제로 검증하지 않은 범위 / 관련 PR·CI / 다음 종료 작업**을 남긴다. PR의 GREEN은 해당 운영 항목의 Production 수용을 자동으로 의미하지 않는다.
 
+### 2026-10-31 15:20 KST — Phase 7 CI RED 실제 타입 오류 수정 및 재검증
+
+- **대상:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783), 이전 HEAD `8069e90dc05647f57f1c873ddc9749bc4822f24f`.
+- **실패 사실:** [CI #41027086821](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027086821)에서 기존 테스트 29개는 별개로, TypeScript의 `TS7016`(JavaScript Worker 모듈 타입 선언 부재), `TS2560/TS2559/TS7006`(HTTP 서버 listener의 타입을 options로 오인하고 매개변수가 암시적 any로 처리됨)으로 `npx tsc -p tsconfig.json --noEmit` FAIL. 이전 [통합 #41027106803](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027106803)은 제출 이벤트 위반, 후속 [#41027119135](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027119135)은 실제 `CI Verify` 실패로 선행 검증 거부. 서로 구별해야 함.
+- **수정:** [`test/saju-production-calculation-loopback-chaos-phase7.test.ts`](../../test/saju-production-calculation-loopback-chaos-phase7.test.ts)의 `listen(handler)`를 Node `RequestListener`로 명시하여 실제 HTTP 함수 콜백을 정확하게 타입화. 이미 실행·검증된 JavaScript 기반 Cloudflare Worker import 한 줄에는 해당 단일 모듈의 타입 선언 부재만 국소적으로 설명·억제. 런타임 동작, 운영 비밀, Production 엔드포인트, 장애 시험 시나리오는 변경하지 않음.
+- **재검증:** 수정 커밋 `4217945b219b5e124b7cdceec435060357f5a85c`. **이 Worklog 작성 시점의 신규 CI/tsc 결과는 미확인**이므로 PASS 주장 금지. PR의 후속 GitHub CI 타입 검사·통합 검사 링크와 결과가 확인되어야 종료됨.
+- **남은 것:** CI에서 실제 타입·기능 테스트 재확인, 병합 조건 충족. Phase 7의 Hosted DB/Auth/Cloud Run 장애 주입과 Phase 8 DR 등 별도 미수용은 유지. **다음 작업:** 동일 PR의 CI 확인 후 자동 병합; 실패하면 같은 변경 범위 안에서 보수 수정.
+
 ### 2026-10-30 17:29 KST — Phase 7, Saju 종속 장애의 실제 루프백 HTTP 주입
 
 - **구현 목적:** `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §34 Saju kill/slow/wrong credential 장애 격리 조건을, 단순 mocked fetch가 아닌 **실제 TCP/HTTP 송수신**에서 재현한다. 사용자 데이터·Production 서버는 사용하지 않는다.
