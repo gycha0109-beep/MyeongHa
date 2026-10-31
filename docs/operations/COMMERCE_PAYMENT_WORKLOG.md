@@ -186,3 +186,4 @@
 - **로컬 검증:** 신규 모듈 및 기존 조회·잠금·CAS 경계 집중 Vitest 59건 PASS. 전체 관련 회귀·타입 검사·빌드 결과는 최종 검증 후 기록하며, 공식 CI와 병합은 확인 전까지 미확정입니다.
 - **문서:** `docs/operations/COMMERCE_P4_CURRENT_CANCEL_SET_READER_LOCKED_CAS_REVIEW_V1.md`.
 - **최종 로컬 검증:** 결제·Reader 관련 Vitest **17개 파일/323건 PASS**, TypeScript 타입 검사·빌드 PASS, 빌드된 PortOne V2 전체 취소 조회 모듈 로드 PASS, 기존 PostgreSQL 17 취소 집합 SQL 생성기 PASS. 공식 통합 CI 및 병합은 별도 결과 전까지 미확정입니다.
+- **통합 PR:** [PR #2841](https://github.com/gycha0109-beep/MyeongHa/pull/2841), 최초 구현 커밋 03cee16. 관련 Vitest 323건 PASS, 타입 검사·빌드/모듈 로드 PASS. 필수 통합 CI와 병합은 완료 근거 전까지 대기 상태입니다.
