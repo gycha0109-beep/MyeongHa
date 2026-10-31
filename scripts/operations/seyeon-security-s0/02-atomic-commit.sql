@@ -77,11 +77,14 @@ begin
           message='Positive Commit requires exact original immutable Pin';
       end if;
 
-      -- If the new G1 recent-message certificate exists, recheck the
-      -- exact original User text under this same actual Commit TX.
-      -- Legacy staged positive attempts without the new certificate
-      -- remain held by their existing distinct source policy.
+      -- Every positive G2 Commit must carry the exact G1 current-User
+      -- source certificate. Legacy Memory-only pins are NOT sufficient.
       v_recent:=nullif(to_jsonb(old)->'seyeon_recent_source_pin_jsonb','null'::jsonb);
+      if v_recent is null then
+        raise exception using errcode='23514',
+          constraint='seyeon_positive_g2_recent_source_pin_required',
+          message='Positive Commit requires an original User source certificate';
+      end if;
       if v_recent is not null then
         v_recent_message:=v_recent->'sources'->0;
         if v_recent->>'schemaVersion' is distinct from
