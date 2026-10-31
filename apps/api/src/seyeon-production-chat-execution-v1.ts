@@ -278,7 +278,7 @@ extends BaseProductionSliceInputV1 {
   readonly combinedSourcePinPort?: Readonly<{
     pinBeforeModel(input: SeyeonG1CombinedModelPinRequestV1): Promise<Readonly<Record<string, unknown>>>;
   }>;
-  readonly requiredPersonalRecordCount?: 1;
+  readonly requiredPersonalRecordCount?: 0 | 1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;

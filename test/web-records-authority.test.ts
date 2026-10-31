@@ -57,7 +57,8 @@ describe('web records authority boundary', () => {
     expect(page).not.toContain('innerHTML');
     expect(page).not.toContain('insertAdjacentHTML');
     expect(page).not.toContain('renderLifeFacts');
-    expect(page).toContain("nameNode.dataset.recordsSource = ''");
+    expect(html).not.toContain('records-profile-strip');
+    expect(page).not.toContain('records-display-name');
     expect(i18n).toContain('[data-records-source]');
   });
 

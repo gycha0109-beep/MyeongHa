@@ -55,7 +55,7 @@ describe('Records Production browser boundary', () => {
     expect(browser).toContain("requireCredential('MYEONGHA_PRODUCTION_MEMBER_EMAIL')");
     expect(browser).toContain("requireCredential('MYEONGHA_PRODUCTION_MEMBER_PASSWORD', { trim: false })");
     expect(browser).toContain("location.pathname === '/records.html'");
-    expect(browser).toContain("state.subjectKind === '회원 기록'");
+    expect(browser).toContain('state.profileStripRemoved');
     expect(browser).toContain('state.persistedCount === 0');
     expect(browser).toContain('state.sampleCount === 0');
     expect(browser).toContain('state.emptyCount === 1');

@@ -1,8 +1,16 @@
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-10-29  
+> Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-11-01
 > Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
+
+## 2026-11-01 — newer Production encrypted backup + isolated PG17 restore PASS, Hosted DR still BLOCKED
+
+- **Current inspected source window:** existing Production Supabase project `cnsfpcdiyofqvhpcegfc`; `supabase_migrations.schema_migrations` SELECT-only independently confirmed latest numeric version **`20261031185454`** and 227 rows. The remote-only latest name is `seyeon_owner_legacy_room_archive_preserving_history_20261101`. This was a point-in-time observation and does not make remote/Repo SQL/DDL/ACL identical.
+- **Encrypted actual Production backup:** [workflow #41231798713](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41231798713) **SUCCESS** on `main` `a71851de0f29db81e5891ed9ecf470450a59b5a9`. Governed GitHub artifact **`13054460230`**, created archive name `myeongha-postgres-20261031T185653Z`, expiration `2026-11-30T19:00:05Z`. Its logged `migration_frontier=20261031185454` equaled the separate live SQL observation. Backup does not include all provider-managed Auth/Storage content or the entire remote migration ledger.
+- **Protected isolated restore of that exact backup:** [workflow #41232195180](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232195180) **SUCCESS** on disposable Supabase-compatible PostgreSQL 17, source checkout `c16538d9ba55fb6066b6b037926cfec2d96bdc40`. Restore evidence artifact **`13053338927`**, digest `sha256:5d971573d819695baa206f62b2db3c92d9d82037e7d75d9329bcb54a8588cf8a`, expires `2026-11-30T19:02:11Z`. Exact source run ID `41231798713`, restored frontier `20261031185454`, incident reference `2026-10-31T19:00:15Z`. Six 1400–1450 migration name/version entries, 11 public RPC/6 RLS objects, auth-rate-limit schema/owner/ACL and synthetic admission tests passed.
+- **What did NOT pass:** the restore replayed **synthetic** privacy mechanisms only; no actual incident-era continuous independent Production deletion/revocation ledger was supplied. The sanitized admission report explicitly says `providerManagedDataFullRestore=false`, `futureSafePrivacyReconciliation=false`, `serviceResumptionAllowed=false`, `drReady=false`, `gate=BLOCKED`; no Hosted Auth sessions/tokens or Storage object/policy restoration was exercised. Restore duration is not whole-service RTO. Approved `PT24H` RPO and `PT6H` RTO remain unproven for complete service recovery.
+- **Technical ACL follow-up:** current Production PG17 read-only catalog inspection found 19/19 tracked Se-yeon functions with zero `anon`/`authenticated` EXECUTE; direct grant edges **38** vs 2026-10-29 baseline **37**. Exact authorization of the one-edge delta requires classification before claiming full ACL equivalence. Historical 2026-10-08 actor request-ID/COMMIT forensics remain `CLOSED_RISK_ACCEPTED` per the existing owner decision; do not reopen as a coding blocker. No Production DDL/DML/migration repair or secret configuration change was made in this checkpoint.
 
 ## 2026-10-29 — latest backup restored on isolated PostgreSQL 17; Hosted service remains BLOCKED
 

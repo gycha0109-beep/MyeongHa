@@ -11,6 +11,7 @@ import {
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
 import type {SeyeonGovernedPostgresSubjectPoolV1} from './seyeon-governed-postgres-pool-v1.js';
+import type {SeyeonAiGovernorAdmissionV1} from './postgres-seyeon-ai-cost-ledger-v1.js';
 import { parseSeyeonGovernedDbConfigV1 } from './seyeon-governed-postgres-pool-v1.js';
 import {
   createSeyeonProductionChatGovernorsV1,
@@ -35,6 +36,10 @@ export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
   /** Reviewed server policy only, never headers, JSON, env flags or model text. */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
   readonly governorApproval?: SeyeonProductionChatGovernorApprovalV1;
+  /** Server-approved certified GLM reservation policy. Never derived from client/env flag. */
+  readonly glmRendererGovernor?: SeyeonAiGovernorAdmissionV1;
+  /** Explicit server-approved first-turn zero-source path. */
+  readonly zeroSourceFirstReplyApproved?: true;
 }
 
 /**
@@ -91,11 +96,20 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
         ordinaryDatabasePrincipal: config.databasePrincipal,
         rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
       }):undefined;
+      const glmKey = input.glmRendererGovernor === undefined ? null : input.env.OPENROUTER_API_KEY;
+      if (input.glmRendererGovernor !== undefined &&
+          (typeof glmKey !== 'string' || glmKey.trim().length < 20)) {
+        throw Error('Approved GLM renderer requires a server OpenRouter API key.');
+      }
       const runtime = createProductionSeyeonChatRuntimeV1({
         databaseConfig: config, pool: lease.pool,
-        requiredPersonalRecordCount:1,
+        requiredPersonalRecordCount:input.zeroSourceFirstReplyApproved===true?0:1,
         providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
         governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
+        ...(input.glmRendererGovernor === undefined ? {} : {
+          glmRendererGovernor: input.glmRendererGovernor,
+          glmRendererConfig: {apiKey: glmKey as string},
+        }),
         ...(governedDbConfig===undefined?{}:{governedDbConfig}),
         ...(input.governedCostPool===undefined?{}:{governedCostPool:input.governedCostPool}),
         approvedPersonalRecordModelUse: input.approvedPersonalRecordModelUse,

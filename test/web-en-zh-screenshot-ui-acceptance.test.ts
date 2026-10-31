@@ -80,7 +80,7 @@ describe('Web EN/CN screenshot UI acceptance', () => {
   });
   it('wires client-rendered cards, modal, photos and account state into localized UI', () => {
     expect(read('chat-hub.js')).toContain('uiLabel(person.title)');
-    expect(read('chat-hub.js')).toContain('uiLabel(person.line)');
+    expect(read('chat-hub.js')).toContain('resolveCharacterChatIntroV1(person.key, getUiLocale())');
     expect(read('reader-picker-dialog.js')).toContain('paintFixedUi();');
     expect(read('reader-picker-dialog.js')).toContain('translateStaticUi(targetSource, locale)');
     expect(read('face-reading-shell.js')).toContain("renderReaderHeading(readerHeading, '{reader}과 함께 관상을 봅니다.'");
@@ -96,7 +96,8 @@ describe('Web EN/CN screenshot UI acceptance', () => {
       expect(translateStaticUi('내가 작성한 상담 메시지, 임의 내용 123', locale)).toBe('내가 작성한 상담 메시지, 임의 내용 123');
       expect(translateStaticUi('공식 사주 결과의 임의 본문 456', locale)).toBe('공식 사주 결과의 임의 본문 456');
     }
-    expect(read('records-page.js')).toContain("nameNode.dataset.recordsSource = ''");
+    expect(read('src/records/RecordsPage.tsx')).not.toContain('records-display-name');
+    expect(read('records-page.js')).not.toContain('renderProfile(');
     expect(read('ui-i18n.js')).toContain('[data-chat-body-source]');
     expect(read('ui-i18n.js')).toContain('[data-official-reading]');
   });

@@ -35,6 +35,7 @@ import {
   createSeyeonGlmRendererV1,
   type SeyeonGlmRendererConfigV1,
 } from './openrouter-seyeon-glm-renderer-v1.js';
+import { createGovernedSeyeonGlmRendererV1 } from './governed-openrouter-seyeon-glm-renderer-v1.js';
 import { startSeyeonAiCallV1, settleSeyeonAiCallV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import type {
   PostgresSubjectPoolV1,
@@ -167,6 +168,8 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly roleProviderConfigs?: SeyeonProductionRoleProviderConfigsV1;
   /** Se-yeon's spoken reply uses GLM on the existing turn. */
   readonly glmRendererConfig?: SeyeonGlmRendererConfigV1;
+  /** Certified OpenRouter-specific bound, distinct from native OpenAI count. */
+  readonly glmRendererGovernor?: SeyeonAiGovernorAdmissionV1;
   /** Default OFF: no Production Governor activation in D3A. */
   readonly governorMode?: SeyeonProductionGovernorModeV1;
   /** Explicit server-only opt-in: each native role must receive a certified cap. */
@@ -188,7 +191,7 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
    * DB registry, G1/G2 and current-rights Reveal remain independent guards.
    */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
-  readonly requiredPersonalRecordCount?: 1;
+  readonly requiredPersonalRecordCount?: 0 | 1;
 }
 
 function text(value: string, path: string, max: number): string {
@@ -309,8 +312,12 @@ export function createProductionSeyeonChatRuntimeV1(
       input.governorMode !== 'ENFORCE') {
     throw new Error('Positive Memory requires the enforced server cost Governor.');
   }
-  if (input.glmRendererConfig !== undefined && input.governorMode === 'ENFORCE') {
-    throw new Error('GLM renderer requires an OpenRouter-specific governed cost policy.');
+  if (input.governorMode === 'ENFORCE' &&
+      (input.glmRendererConfig === undefined) !== (input.glmRendererGovernor === undefined)) {
+    throw new Error('GLM ENFORCE requires both credentials and a certified Governor.');
+  }
+  if (input.glmRendererGovernor !== undefined && input.governorMode !== 'ENFORCE') {
+    throw new Error('GLM Governor cannot run outside ENFORCE.');
   }
   if (input.costGovernorForRole !== undefined &&
       input.provider !== undefined) {
@@ -426,6 +433,15 @@ export function createProductionSeyeonChatRuntimeV1(
         },
       });
       const meterRole = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+        if (role === 'renderer' && input.glmRendererConfig !== undefined &&
+            input.governorMode === 'ENFORCE') {
+          return createGovernedSeyeonGlmRendererV1({
+            config: input.glmRendererConfig,
+            governor: input.glmRendererGovernor!,
+            runner: costRunner,
+            getBinding: () => activeCostBinding,
+          });
+        }
         if (role === 'renderer' && input.glmRendererConfig !== undefined) {
           let reservedBinding: SeyeonAiCostLedgerBindingV1 | null = null;
           return createSeyeonGlmRendererV1({

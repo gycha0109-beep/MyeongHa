@@ -43,20 +43,6 @@ function requireArray(payload, key) {
   return payload[key];
 }
 
-function renderProfile(payload) {
-  const name = payload?.profile?.displayName;
-  const nameNode = byId('records-display-name');
-  if (typeof name === 'string' && name.trim().length > 0) {
-    nameNode.dataset.recordsSource = '';
-    nameNode.textContent = name;
-  } else {
-    delete nameNode.dataset.recordsSource;
-    nameNode.textContent = uiText('호칭 미설정');
-  }
-  const kind = payload?.subjectKind === 'member' ? '회원 기록' : payload?.subjectKind === 'guest' ? '게스트 기록' : '현재 기록';
-  byId('records-subject-kind').textContent = uiText(kind);
-}
-
 function markRecordsEntry() {
   const params = new URLSearchParams(window.location.search);
   if (params.get('from') === 'reading') document.body.dataset.recordsEntry = 'reading-handoff';
@@ -100,7 +86,6 @@ function clearRecordsForSessionChange() {
   displayedRecordsOwner = null;
   byId('records-content').hidden = true;
   for (const id of [
-    'records-display-name', 'records-subject-kind',
     'saju-records-list', 'saju-records-count',
   ]) {
     byId(id).replaceChildren();
@@ -277,7 +262,6 @@ function setFailure(error) {
 }
 
 function renderLoadedRecords(records) {
-  renderProfile(records.profile);
   renderSajuReadings(records.readings);
 }
 

@@ -84,7 +84,11 @@
       "seyeon-c08-first-turn-local-pg17",
       "seyeon-first-zero-locked-reveal-disposable-pg17",
       "seyeon-c08y-disposable-shared-ledger-pg17",
-      "seyeon-security-s0-real-path-pg17"
+      "seyeon-security-s0-real-path-pg17",
+      "commerce-private-claim-full-finalizer-pg17",
+      "commerce-stored-portone-hmac-lineage-pg17",
+      "commerce-portone-cancellation-set-audit-pg17",
+      "commerce-portone-cancellation-partial-set-pg17"
     ]
   }
 }
