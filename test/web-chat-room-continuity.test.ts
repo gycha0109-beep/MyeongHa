@@ -117,6 +117,6 @@ describe('Web Character Room continuous open and resume', () => {
     expect(page).not.toContain('className="character-room-menu"');
     expect(transport).not.toContain('renderHistory(');
     expect(presentation).not.toContain("const historyDrawer =");
-    expect(presentation).toContain('setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, getUiLocale()))');
+    expect(presentation).toContain('setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, chatEntryLocale))');
   });
 });

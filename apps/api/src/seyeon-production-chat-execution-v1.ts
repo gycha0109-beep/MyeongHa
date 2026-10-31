@@ -17,6 +17,7 @@ import {
   type RunSeyeonProductionContextVerticalSliceInputV1,
   type RunSeyeonProductionContextVerticalSliceResultV1,
 } from './seyeon-production-context-vertical-slice-v1.js';
+import type { RequestUiLocaleV1 } from './request-ui-locale-v1.js';
 import {
   runSeyeonCharacterTurnV2,
   type RunSeyeonCharacterTurnV2Input,
@@ -261,6 +262,7 @@ type BaseProductionSliceInputV1 = Omit<
 export interface RunSeyeonProductionChatExecutionInputV1
 extends BaseProductionSliceInputV1 {
   readonly threadId: string;
+  readonly replyLocale?: RequestUiLocaleV1;
   readonly receivePlan: ChatReceivePlan;
   readonly baseContext: SeyeonProductionBoundCharacterContextInputV1;
   readonly governance?: RunSeyeonCharacterTurnV2Input['governance'];
@@ -840,6 +842,7 @@ export async function runSeyeonProductionChatExecutionV1(
           assertGovernedPreflightSourceClosure: assertSeyeonPreflightZeroPrivateSourceClosureV1,
           userMessageRef: receivedTurn.userMessageId,
           userText: receivedTurn.userText,
+          replyLocale: input.replyLocale ?? 'ko-KR',
           contextInput,
           governance,
           interpreterProvider: input.interpreterProvider,

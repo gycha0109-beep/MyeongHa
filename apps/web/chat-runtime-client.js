@@ -109,6 +109,7 @@ function readPendingTurn(targetThreadId) {
     return Object.freeze({
       clientTurnId: parsed.clientTurnId,
       text: parsed.text,
+      locale: ['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN'].includes(parsed.locale) ? parsed.locale : getUiLocale(),
     });
   } catch {
     sessionStorage.removeItem(pendingTurnKey(targetThreadId));
@@ -123,6 +124,7 @@ function getOrCreatePendingTurn(message) {
   const pendingTurn = Object.freeze({
     clientTurnId: crypto.randomUUID(),
     text: message,
+    locale: getUiLocale(),
   });
   sessionStorage.setItem(pendingTurnKey(threadId), JSON.stringify(pendingTurn));
   return pendingTurn;
@@ -563,8 +565,8 @@ async function sendTurn(message) {
         bearer: activeBearer.token,
         threadId: submittedThreadId,
         turn: { clientTurnId: pendingTurn.clientTurnId, text: pendingTurn.text },
-        language: getUiLocale(),
-        localeHeaders: getUiLocaleRequestHeadersV1(),
+        language: pendingTurn.locale,
+        localeHeaders: { 'X-MyeongHa-UI-Locale': pendingTurn.locale },
       });
     } catch (error) {
       if (error instanceof MyeongHaApiClientErrorV1) {
