@@ -126,3 +126,12 @@
 - **테스트:** 신규 test/commerce-stored-portone-cancellation-hmac-recheck-v1.test.mjs 23건 PASS, 기존 HMAC GET 관련 12건 PASS. 확장 회귀와 PR·CI 결과 별도 기록.
 - **남은 작업:** 제공·법적 승인·Provider 순서 판정·Reader T2 잠금 결합 전에는 실제 환불·Grant 회수 호출을 연결하지 않습니다.
 - **통합 PR:** [PR #2816](https://github.com/gycha0109-beep/MyeongHa/pull/2816), 최초 구현 커밋 5c0979b9, 후속 DB 계보 연결 커밋 e54edff9. 관련 Vitest 9개 파일 **195건 PASS**, 타입 검사·빌드 PASS. 선행 #2811 병합 후 최신 main 기준으로 Worklog 충돌 없이 갱신하고 필수 CI·자동 병합을 설정합니다.
+
+### 2026-11-01 — 저장된 PortOne 취소 HMAC 및 Reader 구매권 실제 PostgreSQL 17 계보 검사
+
+- **선행 작업:** PR #2816 내부 비배포 HMAC 재확인 구현을 기반으로 독립 브랜치 `feat/commerce-payment/hmac-lineage-real-pg17-20261101`에서 추가했습니다.
+- **실제 구현:** 기존 저장 Provider Event → 원본 Receipt → Purchase Intent → 결제 Attempt → B2 Reader Grant를 결합하는 **원본 SQL 자체**를 격리 PG17에서 실행하는 테스트를 추가했습니다. 다른 B3 Reader의 별도 Grant와 존재하지 않는 이벤트는 일치하지 않아야 합니다.
+- **안전:** 전체 공식 Reader fixture 이후 B2/B3 합성 Attempt·취소 이벤트만 트랜잭션에서 만들고 항상 ROLLBACK. PG15 일반 DB 트랙·운영 마이그레이션·공개 endpoint·Provider refund POST·자동 Entitlement Effect는 변경하지 않습니다.
+- **로컬 증거:** SQL 생성·Bash 구문·관련 Vitest 40건/타입 검사·빌드 PASS. **실제 PG17 데이터베이스 성공은 GitHub CI 검증 전까지 미확인**입니다.
+- **남은 작업:** 선행 #2816 병합 시 최신 `main`으로 갱신하고 이 PG17 실행 항목의 CI 결과 확인, 이후 별도의 Provider ordering/법적 근거/Reader T2 조건을 충족하기 전 권한 회수 OFF 유지.
+- **상세:** `docs/operations/COMMERCE_P4_STORED_PORTONE_HMAC_REAL_PG17_LINEAGE_PROOF_V1.md`.
