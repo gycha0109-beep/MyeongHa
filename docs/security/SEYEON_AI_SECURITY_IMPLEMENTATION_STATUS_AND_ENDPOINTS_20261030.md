@@ -278,3 +278,10 @@ Watchtower-Track: security
 - **보정:** Node 전달 경계에서 사전 검증을 통과한 처음 응답의 `replayed:false`를 명시적으로 생성하고, 성공 응답 단위 테스트도 고정 `false`를 기대한다. 사전 `REPLAY_HOLD` 거부 조건이나 새 격리 테스트 두 건을 완화·삭제하지 않았다.
 - **변경 파일:** `apps/api/src/seyeon-first-zero-node-turn-delivery-v1.ts`, `test/seyeon-first-zero-node-turn-delivery-v1.test.ts`, 누적 Worklog. `git diff --check` 통과; 수정 HEAD CI 결과는 추후 확인 전 PASS 아님.
 - **운영:** G3 Replay 공개는 계속 금지이며 Production DB/ACL/Provider/Streaming/HTTP 경로 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W26 — G1 모델 선택 User 메시지 Digest DB 원문 재계산 (source-only)
+
+- **발견:** `seyeon_private.pin_model_recent_sources_v1`은 모델이 선택한 `selectedModelMessageDigest`가 `sha256:v1:` 형태인지만 검사했고, 해당 값이 DB에서 잠근 정확한 User/Assistant 원문과 일치하는지는 검증하지 않았다. API 측 상관관계 검사가 있더라도 PostgreSQL Owner가 해당 원문 Digest를 독립 검증해야 하므로 G1 불변 증명 수준에 공백이 있었다.
+- **구현:** 기존 `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`의 잠긴 원본 `messageId`, 모델 role, DB `body_text`를 서버 `canonicalJson({messageId,role,text})`와 동일한 정렬 키 순서/UTF-8 JSON 문자열로 재조립하고 SHA-256을 직접 계산한다. 전달된 해시와 불일치하면 `seyeon_g1_recent_model_digest_mismatch`로 원자 트랜잭션에서 거부하며, Attempt Pin 저장과 뒤따르는 모델/Commit은 진행하지 않는다. 원문은 추가로 반환하거나 로그에 남기지 않는다.
+- **격리 검증:** 기존 PostgreSQL 17 S0 실제 original Pin/Commit/Reveal 테스트에 64자리 형식은 정상이나 내용이 위조된 digest를 전달하는 부정 사례를 추가했다. 실패 시 Attempt의 G1 최근 Pin·positive Pin 및 생성된 Character 메시지가 없음을 확인한다. 정상 원문 해시를 통과시키는 기존 first Reveal/Replay 검사도 유지한다.
+- **변경 범위:** 격리 SQL `16-g1-model-recent-source-pin.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 이 단일 Worklog. 운영 DB/ACL/Provider/공개 API·Reader·History/Replay 활성화 없음. `installerMayActivateProduction=false`, `git diff --check` 확인. CI에서 PostgreSQL 실제 해시 일치·거부를 검증하기 전까지 PASS 판정하지 않는다.
+- **선행·남은 것:** #2814는 GREEN 후 #2786 브랜치에 병합됐다. #2786 main 자동 병합은 아직 BLOCKED이며 공식 G0~G6 종료 게이트는 통과한 상태가 아니다. 모델 전체 출처 Census의 DB 강제 서명, 다중 Memory/Life Fact/파생 이력, 운영 G2/G3/G4·G5/G6는 계속 미완료. `HOLD_FORWARD_STOPPED` 유지.

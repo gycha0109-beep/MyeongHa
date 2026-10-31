@@ -89,7 +89,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
   afterAll(async () => { await ordinaryPool?.end();await pool?.end(); });
 
-  async function prepare(n: number, virtual?: { summary: string }, withRecentPin = false) {
+  async function prepare(n: number, virtual?: { summary: string }, withRecentPin: boolean | 'invalid' = false) {
     const auth = uuid(10, n), subject = uuid(11, n), thread = uuid(14, n);
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
@@ -151,7 +151,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         select seyeon_private.pin_model_recent_sources_v1(
           $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::jsonb,$7::text
         )`, [subject,thread,turn,attempt,user,JSON.stringify([{
-          ...recentMessage,selectedModelMessageDigest:hash(recentMessage),
+          ...recentMessage,selectedModelMessageDigest:withRecentPin === 'invalid'
+            ? 'sha256:v1:' + '0'.repeat(64) : hash(recentMessage),
         }]),hash({
           originalPersonalSources:[source],
           currentUserSource:{...recentMessage,selectedModelMessageDigest:hash(recentMessage)},
@@ -248,6 +249,21 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await new Promise<void>(resolve => server.close(() => resolve()));
     }
   }
+
+  it('rejects a forged model-message digest before saving any G1 certificate or invoking a model', async () => {
+    await expect(prepare(14, undefined, 'invalid')).rejects.toMatchObject({
+      constraint: 'seyeon_g1_recent_model_digest_mismatch',
+    });
+    const {rows:[pin]}=await pool.query(`select
+      seyeon_recent_source_pin_jsonb as recent,
+      seyeon_personal_source_pin_jsonb as personal,
+      state from public.chat_turn_attempts where id=$1`,[uuid(17,14)]);
+    expect(pin).toMatchObject({recent:null,personal:null,state:'running'});
+    const {rows:[count]}=await pool.query(`select count(*)::int as n
+      from public.conversation_messages
+      where turn_id=$1 and sender_type='character'`,[uuid(16,14)]);
+    expect(count.n).toBe(0);
+  });
 
   it('checks the exact pinned User DB original before first Reveal without permitting a replay', async () => {
     const f = await prepare(13, undefined, true);
