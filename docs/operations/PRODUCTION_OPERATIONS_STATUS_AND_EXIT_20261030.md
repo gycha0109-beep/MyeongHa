@@ -36,6 +36,17 @@
 - **환경 차이·수정:** 첫 시도는 로컬 환경의 SSL 기본설정으로 인해 분리된 인스턴스가 SSL 연결을 거부함. 스크립트 내부의 **임시 격리 DB용 설정에만** `ssl:false`를 명시한 뒤 실행 성공. 운영 DB의 필수 `verify-full` TLS 설정은 변경하지 않음. 테스트용 비밀·사용자 데이터 출력 없음. 실행 결과는 **단일 로컬 시점의 관측**이며 p95/SLO 지표로 사용하지 않음.
 - **수용 경계/다음:** 기존 synthetic TCP 테스트와 달리 **실제 PostgreSQL SQL statement timeout과 풀 대기 고갈**까지 증명했으나, Production의 PG17/strict TLS/권한 역할, 실제 MyeongHa DB 라우트 503 경계, Hosted DB 용량·장애 및 복구, 모니터링은 여전히 미검증. Phase 7/13 전체 완료, `dr_ready`, `serviceResumptionAllowed` 승격 금지. 향후 필요 시 동등하게 격리된 PostgreSQL 17에서 같은 검증을 재현하고, 승인된 실제 API 경계로 확대.
 
+### 2026-10-31 22:20 KST — Phase 7 DB 연결 장애 시 Records API HTTP 응답 실증
+
+- **작업 목적:** 아키텍처 §34의 DB unavailable/slow 시 실제 사용자용 HTTP 경계가 안전한 오류를 반환하고, 별도 core health가 계속 가능한지 확인. 운영 DB/실사용자 데이터/실서비스에 요청이나 장애 주입을 하지 않음.
+- **실제 구현:** [`test/cloudflare-records-db-fault-real-transport-phase7.test.mjs`](../../test/cloudflare-records-db-fault-real-transport-phase7.test.mjs) 추가. Cloudflare의 **실제 Records 요청 어댑터와 실제 소스 Records HTTP 런타임**을 통해 `GET /api/life-record`, `GET /api/readings`, `GET /api/memories` 3개 경로를 실행. 실제 Node `pg.Pool`은 임의 127.0.0.1 TCP 포트에 연결해 (1) TCP 연결 거부, (2) TCP 수락 후 PostgreSQL handshake 정지 두 조건을 재현. 각 요청은 연결 시도 1회, 정해진 연결 deadline 150ms 및 풀 종료 1회가 적용되는지 검증.
+- **통제된 가정:** 운영 인증·TLS/호스트 승인 과정에 실제 계정/인증서를 투입하지 않도록 테스트 환경에서는 **출처·DB 승인 preflight 및 요청 identity verifier만 합성 결과로 주입**. 실제 route handler, Records HTTP runtime, `pg.Pool` TCP 오류, 503 반환/헤더 처리 코드는 프로덕션 소스 그대로 사용. 따라서 실제 Hosted Auth, Cloudflare TLS/RLS 운영 승인, SQL 실행까지 증명하지 않음.
+- **실행 증거:** Node 24 / Vitest 4.1.11, 신규 실제 TCP 장애 **6/6 PASS**. 관련 Records API·HTTP/메서드 회귀 포함 **4파일 29/29 PASS** 및 `tsc -p tsconfig.json --noEmit` PASS. 두 조건 모두 각 API에서 HTTP **503** / `AUTH_UPSTREAM_UNAVAILABLE` / `Cache-Control: no-store`, 임의 연결 재시도 없음, pool close 1회, redirect/CORS/cookie/합성 DB 비밀·Bearer 비반사, **독립 `GET /api/health` 200** 확인. 테스트 실제 실행의 실패 처리 시간은 각 2초 이내. 서버와 소켓은 테스트 종료 때 닫음.
+- **미완료/경계:** 실제 DB schema SQL 지연, Worker strict TLS `verify-full` 및 Supabase Auth 호출, Production PostgreSQL 17, Hosted DB/사용자 데이터, API p95 및 장애 알림/DR 등은 `NOT_OBSERVED`. Phase 7 전체·Phase 13 운영 수용·DR readiness 승격 금지 (`dr_ready=false`, `serviceResumptionAllowed=false`).
+- **추적·다음:** [PR #2806](https://github.com/gycha0109-beep/MyeongHa/pull/2806), 브랜치 `ops/phase7-records-db-api-failure-worklog-20261031`, 최초 구현 커밋 `861656da808ded7131367304dceac01a1e43ea6e`. PR의 작업 분류는 저장소가 요구하는 단독 라인 `Watchtower-Track: ops` 형식으로 보정했으며, 새 커밋의 CI·통합 검사 결과는 **미확정**으로 남김. 이후 §34의 구성·계약에 맞는 안전한 격리 DB 환경에서 TLS/RLS/권한 및 장애 경계 검증, Phase 10~12 운영 실측으로 연결.
+
+
+
 ### 2026-10-31 18:30 KST — Phase 7 PostgreSQL 로컬 TCP 장애·연결 수 상한 검증
 
 - **구현 목적:** [Production Operations 아키텍처 §34](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 DB unavailable, DB slow, DB connection exhaustion 중 *연결·핸드셰이크 경계*를 통제된 비Production 환경에서 실제 소켓으로 검증. 실사용자·실서비스·운영 PostgreSQL 또는 Supabase에 접근하지 않음.
