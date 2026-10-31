@@ -211,3 +211,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **병합 커밋:** `c2e5a62609fe91432bfd1404faca1d564d77f3cf` (두 부모: 기존 작업 HEAD `bb557c39`, 최신 `main` `7057d272`). PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)은 병합 가능, 자동 병합 설정 유지.
 - **검증:** 병합 직후 최신 HEAD CI는 아직 실행 목록에서 확인되지 않았으며, 이 단계에서 GREEN으로 기록하지 않는다. 재실행 결과는 [PR Checks](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks) 기준으로 확인.
 - **잔여:** 최종 HEAD TypeScript·보안 트랙·PostgreSQL 17 CI, 실제 G3 기억 제안 UI 전달, 운영 G0/G4 승인 및 원문 접근 보안. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W07 · Cloudflare Workers Builds 별도 RED 원인 확인
+
+- **전체 검사 판정 정정:** HEAD `a4b2666291a73fda1527ba1a16dab9384d80691e`에서 GitHub Actions 3개(Governance, Web, CI) 모두 PASS, PostgreSQL17도 PASS. 그러나 GitHub의 **외부 Check Run** `Workers Builds: myeongha` [124466218250](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks?check_run_id=124466218250)은 FAILED. 따라서 PR 전체 GREEN이라고 판정하지 않는다.
+- **Cloudflare 실로그:** build `7eab4f9d-1d22-4a09-86c1-9ec0c599abad`의 `npm run build:web` 및 Vite 빌드는 성공. 배포 단계 `npx wrangler preview` (Wrangler `4.156.0`)에서 Cloudflare API `Authentication error [10000]` 및 `Invalid access token [9109]`으로 실패. 외부 플랫폼 서비스 장애나 프로젝트 코드 오류의 증거가 아니라 **해당 Preview 배포 빌드 토큰의 유효성·권한 문제**임.
+- **설정 확인:** Cloudflare Workers Builds의 현재 소스 브랜치 트리거는 `feat/security/s0-private-memory-review-client-20261030`, 빌드는 `npm run build:web`, Preview 배포는 `npx wrangler preview`, 빌드 토큰 명칭은 `myeongha build token`. 토큰 등록 메타데이터는 존재하지만 실행 시 사용된 인증은 실패. 실사용 권한이나 현재 활성 상태는 메타데이터만으로 보증되지 않음.
+- **조치:** 원인·증거 기록만 수행. 운영 Worker 배포 명령 변경, Preview 검증 비활성화, API 토큰 재발급·노출, 개인정보·운영 ACL 변경 **없음**. GitHub 내부 CI 통과를 Cloudflare 외부 검사 통과와 혼동하지 않도록 검증 범위를 분리.
+- **남은 작업:** Cloudflare Workers Builds 설정에서 유효한 권한의 API 토큰을 새로 발급·선택(사용자 계정 작업 필요), Preview 재실행 후 해당 외부 Check Run PASS 확인. 원본 개인정보·유료모델 접근은 `HOLD_FORWARD_STOPPED` 유지.
