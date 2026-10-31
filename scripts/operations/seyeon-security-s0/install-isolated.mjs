@@ -67,6 +67,8 @@ try {
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.cmd_expire_pending_planner_memory_batch_v1(timestamptz,integer)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_pending_seyeon_planner_display_candidate_v1(uuid,uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.lock_memory_subject_v1(uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
       'public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)', 'EXECUTE')
