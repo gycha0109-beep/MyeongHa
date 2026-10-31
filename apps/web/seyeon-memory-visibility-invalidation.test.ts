@@ -10,6 +10,11 @@ import { createRecordsMemoryGrantRevokeClient } from './records-memory-grant-rev
 const MEMORY_ID = '22222222-2222-4222-8222-222222222222';
 const makeAck = (status: 'pending'|'committed') => ({
   ok:true,
+  meta: {
+    apiContractVersion: 'v0.9',
+    requestId: 'seyeon-memory-visibility-revoke-test',
+    serverTime: '2026-11-01T00:00:00Z',
+  },
   data:status==='pending'
     ?{status,memoryItemId:MEMORY_ID,characterId:'seyeon',newUseBlocked:true}
     :{status,memoryItemId:MEMORY_ID,characterId:'seyeon',
