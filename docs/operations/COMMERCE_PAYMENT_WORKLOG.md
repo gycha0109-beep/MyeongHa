@@ -109,3 +109,20 @@
 - **실패 원인:** [PR #2811 초기 일반 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41212139498)의 `db-authority-core`는 PostgreSQL **15.19**에서 실행되었지만 새 후보는 PostgreSQL **17 전용**으로 제한돼 있었습니다. `DENY: ... got 150019`에서 실패. 이전 코드의 실제 PG17 실행 실패가 아니라 테스트 연결 대상 오류입니다.
 - **조치:** PostgreSQL 15 `run_authority_core.sh`에 추가했던 검사를 제거하고, `scripts/ci/db-suites.json`의 `postgres17` 그룹 및 `test/db/run_ci_case.sh`의 전용 실행 항목에 등록했습니다. CI PostgreSQL 17·격리 DB 검사와 기존 마이그레이션 적용을 유지합니다.
 - **검증:** 기존 일반 DB finalizer 기본 실행 절차는 변경하지 않고, 새 테스트는 PG17 전용 그룹에서만 실행하도록 계약 검사·Bash 구문 검사를 수정했습니다. **수정한 실제 PG17 통합 CI 결과는 아직 미확인**입니다.
+
+### 2026-10-31 — PortOne 취소 ID HMAC 기반 최신 GET 재확인
+
+- **기준 브랜치:** `feat/commerce-payment/portone-cancel-hmac-recheck-20261031`. 개인정보 삭제 전체 PG17 증거는 별도 PR #2811에서 필수 CI 진행 중이며 자동 병합 조건에 따릅니다.
+- **실제 구현:** 최소화된 기존 취소 Provider Event의 `cancellationIdHmac`로 인증된 PortOne GET에 있는 정확한 취소 ID를 일시적으로 재식별하고, 기존 개별 SUCCEEDED 금액/누적 금액 분류기에 연결하는 read-only 서버 후보. 원본 취소 ID나 API/HMAC secret을 보관하거나 결과에 반환하지 않습니다.
+- **검증:** 관련 Vitest 8개 파일 **172건 PASS**, 타입 검사·빌드 PASS. 지문 불일치/다른 Payment ID/부분 취소 누적/REQUESTED·FAILED/중복 취소 ID를 안전하게 처리함을 검증했습니다.
+- **배포 경계:** 환불 POST/권한 회수/LIVE 결제/공개 웹훅 미활성. HMAC 일치는 최신 상태 확인 수단일 뿐 Provider 순서나 법적 환불·Reader R2/T2 권한 회수 승인이 아닙니다.
+- **상세:** `docs/operations/COMMERCE_P4_PORTONE_CANCELLATION_HMAC_RECHECK_V1.md`.
+
+### 2026-11-01 — 저장된 PortOne 취소 이벤트의 최신 HMAC 재조회와 Reader 권한 계보 연결
+
+- **기준:** HMAC GET 재조회 구현 커밋 5c0979b9, 브랜치 feat/commerce-payment/portone-cancel-hmac-recheck-20261031. #2811 개인정보 최종 삭제 통합 검증은 별도 CI 진행 중.
+- **실제 구현:** 기존 영속화된 최소화 source-v2 취소 Provider Event를 완전 가시성 읽기 전용 DB에서 확인하고, 원본 결제 Receipt/금액/통화 및 정확한 Reader Grant/Purchase Intent 계보를 확인한 뒤 트랜잭션을 종료합니다. 이후 인증된 PortOne GET에서 같은 cancellationIdHmac의 개별 취소 성공 상태와 금액을 재확인합니다.
+- **음성·예외 처리:** 원본 이벤트 서명·최초 GET의 HMAC 지문·비활성 Authority 검사, 불명확한 중복 매핑·다른 Grant·금액 변화·취소 상태 REQUESTED/FAILED·누적 취소액 후퇴·Provider GET 실패·원본 결제 불일치를 모두 HOLD 처리합니다. readerT2LockHeld=false, providerOrderingProven=false, grantRevocationAuthorized=false, writesPerformed=false 유지.
+- **테스트:** 신규 test/commerce-stored-portone-cancellation-hmac-recheck-v1.test.mjs 23건 PASS, 기존 HMAC GET 관련 12건 PASS. 확장 회귀와 PR·CI 결과 별도 기록.
+- **남은 작업:** 제공·법적 승인·Provider 순서 판정·Reader T2 잠금 결합 전에는 실제 환불·Grant 회수 호출을 연결하지 않습니다.
+- **통합 PR:** [PR #2816](https://github.com/gycha0109-beep/MyeongHa/pull/2816), 최초 구현 커밋 5c0979b9, 후속 DB 계보 연결 커밋 e54edff9. 관련 Vitest 9개 파일 **195건 PASS**, 타입 검사·빌드 PASS. 선행 #2811 병합 후 최신 main 기준으로 Worklog 충돌 없이 갱신하고 필수 CI·자동 병합을 설정합니다.
