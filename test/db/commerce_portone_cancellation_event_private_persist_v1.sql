@@ -98,7 +98,8 @@ begin
  from public.internal_persist_portone_cancellation_event_v1(
   'pmt-A','webhook-A','Transaction.Cancelled','tx-A',
   'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-  'hmac-sha256:k1:'||repeat('b',64)
+  'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
  );
  if v_id is null or v_replay is distinct from false then
   raise exception 'first cancellation did not persist exactly once';
@@ -108,7 +109,8 @@ begin
  from public.internal_persist_portone_cancellation_event_v1(
   'pmt-A','webhook-A','Transaction.Cancelled','tx-A',
   'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-  'hmac-sha256:k1:'||repeat('b',64)
+  'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
  );
  if v_id_again is distinct from v_id or v_replay is distinct from true then
   raise exception 'exact cancellation replay generated a duplicate event';
@@ -123,6 +125,10 @@ begin
  from public.commerce_provider_events where id=v_id;
  if v_count<>1 or v_status<>'verified' or v_original<>'tx-A'
     or v_fingerprint is distinct from 'hmac-sha256:k1:'||repeat('a',64)
+    or (v_readback ->> 'schemaVersion') is distinct from 'commerce-portone-cancellation-source-v2'
+    or (v_readback ->> 'exactSucceededCancellationAmountMinor') is distinct from '8900'
+    or (v_readback ->> 'observedCumulativeCancelledAmountMinor') is distinct from '8900'
+    or (v_readback ->> 'cancellationIdHmac') is distinct from 'hmac-sha256:k1:'||repeat('d',64)
     or (v_readback ->> 'orderingProven') is distinct from 'false'
     or (v_readback ->> 'refundExecutionAuthorized') is distinct from 'false'
     or (v_readback ->> 'entitlementRevocationAuthorized') is distinct from 'false'
@@ -140,7 +146,8 @@ begin
   perform public.internal_persist_portone_cancellation_event_v1(
    'pmt-A','webhook-A','Transaction.Cancelled','tx-A',
    'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('c',64),
-   'hmac-sha256:k1:'||repeat('b',64)
+   'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
   );
   raise exception 'same event ID conflicting signed payload should be rejected';
  exception when unique_violation then null;
@@ -151,7 +158,8 @@ begin
   perform public.internal_persist_portone_cancellation_event_v1(
    'pmt-B','webhook-A','Transaction.Cancelled','tx-B',
    'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-   'hmac-sha256:k1:'||repeat('b',64)
+   'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
   );
   raise exception 'second Reader transaction reused the first cancellation event';
  exception when unique_violation then null;
@@ -162,7 +170,8 @@ begin
   perform public.internal_persist_portone_cancellation_event_v1(
    'pmt-A','pending-A','Transaction.CancelPending','tx-A',
    'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-   'hmac-sha256:k1:'||repeat('b',64)
+   'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
   );
   raise exception 'pending event should not establish a verified cancellation';
  exception when check_violation then null;
@@ -172,7 +181,8 @@ begin
   perform public.internal_persist_portone_cancellation_event_v1(
    'pmt-A','mismatch-A','Transaction.PartialCancelled','tx-A',
    'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-   'hmac-sha256:k1:'||repeat('b',64)
+   'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
   );
   raise exception 'partial vs full mismatch should not persist';
  exception when check_violation then null;
@@ -183,7 +193,8 @@ begin
   perform public.internal_persist_portone_cancellation_event_v1(
    'pmt-chat','webhook-chat','Transaction.Cancelled','tx-chat',
    'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-   'hmac-sha256:k1:'||repeat('b',64)
+   'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
   );
   raise exception 'non-Reading product was accepted';
  exception when raise_exception then
@@ -197,7 +208,8 @@ begin
   perform public.internal_persist_portone_cancellation_event_v1(
    'pmt-A','webhook-wrong','Transaction.Cancelled','tx-B',
    'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('a',64),
-   'hmac-sha256:k1:'||repeat('b',64)
+   'hmac-sha256:k1:'||repeat('b',64),
+  'hmac-sha256:k1:'||repeat('d',64),8900,8900
   );
   raise exception 'wrong transaction was accepted';
  exception when raise_exception then
@@ -206,7 +218,58 @@ begin
   end if;
  end;
 
- if (select count(*) from public.commerce_provider_events)<>1 then
+ -- Reader B: event-specific 3000 partial cancellation and an immutable
+ -- replay after another independent 5900 cancellation completed the payment.
+ select provider_event_id,replayed into v_id_again,v_replay
+ from public.internal_persist_portone_cancellation_event_v1(
+  'pmt-B','webhook-B','Transaction.PartialCancelled','tx-B',
+  'partial_cancel_shape_observed','hmac-sha256:k1:'||repeat('e',64),
+  'hmac-sha256:k1:'||repeat('f',64),
+  'hmac-sha256:k1:'||repeat('c',64),3000,3000
+ );
+ if v_id_again is null or v_replay is distinct from false then
+  raise exception 'first partial event not recorded';
+ end if;
+ select provider_event_id,replayed into v_id,v_replay
+ from public.internal_persist_portone_cancellation_event_v1(
+  'pmt-B','webhook-B','Transaction.PartialCancelled','tx-B',
+  'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('e',64),
+  'hmac-sha256:k1:'||repeat('f',64),
+  'hmac-sha256:k1:'||repeat('c',64),3000,8900
+ );
+ if v_id is distinct from v_id_again or v_replay is distinct from true then
+  raise exception 'late partial webhook did not replay same canonical event';
+ end if;
+ select verified_payload_jsonb into v_readback
+ from public.commerce_provider_events where id=v_id_again;
+ if v_readback->>'exactSucceededCancellationAmountMinor' is distinct from '3000'
+    or v_readback->>'observedCumulativeCancelledAmountMinor' is distinct from '3000'
+    or (select resolved_receipt_id from public.commerce_provider_events where id=v_id_again)
+        is distinct from '00000000-0000-4000-8000-000000000016'::uuid then
+  raise exception 'late replay mutated original partial cancellation amount or Reader B';
+ end if;
+ begin
+  perform public.internal_persist_portone_cancellation_event_v1(
+   'pmt-B','webhook-B','Transaction.PartialCancelled','tx-B',
+   'full_cancel_shape_observed','hmac-sha256:k1:'||repeat('e',64),
+   'hmac-sha256:k1:'||repeat('f',64),
+   'hmac-sha256:k1:'||repeat('c',64),5900,8900
+  );
+  raise exception 'same webhook with changed exact item amount should fail';
+ exception when unique_violation then null;
+ end;
+ begin
+  perform public.internal_persist_portone_cancellation_event_v1(
+   'pmt-B','webhook-B','Transaction.PartialCancelled','tx-B',
+   'partial_cancel_shape_observed','hmac-sha256:k1:'||repeat('e',64),
+   'hmac-sha256:k1:'||repeat('f',64),
+   'hmac-sha256:k1:'||repeat('c',64),3000,2000
+  );
+  raise exception 'regressed aggregate should fail';
+ exception when check_violation then null;
+ end;
+
+ if (select count(*) from public.commerce_provider_events)<>2 then
   raise exception 'negative cases inserted unexpected event rows';
  end if;
  if (select count(*) from public.commerce_receipts)<>3 then

@@ -14,14 +14,12 @@ export const COMMERCE_PORTONE_CANCELLATION_EVENT_PRIVATE_PERSIST_V1=Object.freez
 export const COMMERCE_PORTONE_CANCELLATION_EVENT_PERSIST_SQL_V1=`
 select provider_event_id::text as "providerEventId", replayed
 from public.internal_persist_portone_cancellation_event_v1(
- $1::text,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text
+ $1::text,$2::text,$3::text,$4::text,$5::text,$6::text,$7::text,
+ $8::text,$9::bigint,$10::bigint
 )
 `.trim();
 
-const KIND=Object.freeze({
- 'Transaction.Cancelled':'full_cancel_shape_observed',
- 'Transaction.PartialCancelled':'partial_cancel_shape_observed',
-});
+const SUPPORTED=new Set(['Transaction.Cancelled','Transaction.PartialCancelled']);
 const DENIED=kind=>Object.freeze({
  schemaVersion:COMMERCE_PORTONE_CANCELLATION_EVENT_PRIVATE_PERSIST_V1.schemaVersion,
  kind,canonicalEventStored:false,refunded:false,grantRevoked:false,
@@ -73,8 +71,11 @@ export async function persistVerifiedPortOneCancellationEventPrivateV1({
  }catch{return DENIED('authentication_rejected');}
  if(!signed||signed.kind!=='cancellation_lookup_candidate')
   return DENIED('not_cancellation_event');
- const requiredKind=KIND[signed.eventType];
- if(!requiredKind)return DENIED('pending_or_unsupported_cancellation_event');
+ if(!SUPPORTED.has(signed.eventType))
+  return DENIED('pending_or_unsupported_cancellation_event');
+ if(typeof signed.providerCancellationId!=='string'||
+    signed.providerCancellationId.length===0)
+  return DENIED('exact_cancellation_id_required');
 
  let original;
  try{
@@ -95,16 +96,26 @@ export async function persistVerifiedPortOneCancellationEventPrivateV1({
    apiSecret,fetchImpl,
   });
  }catch{return DENIED('provider_readback_unavailable');}
- // Not merely a signed webhook: a final shape must be independently observed.
- // The GET adapter returns no raw payment payload and no settlement permission.
+ // The authenticated GET must show this EXACT signed cancellation ID as
+ // SUCCEEDED, not just a later aggregate payment cancellation.
+ const exactAmount=classified?.observedMatchingSucceededCancellationMinor;
+ const totalCancelled=classified?.observedCancelledTotalMinor;
+ const originalPaid=original.originalVerifiedPaidAmountMinor;
+ const acceptableShape=signed.eventType==='Transaction.Cancelled'
+  ?classified?.kind==='full_cancel_shape_observed'
+  :['partial_cancel_shape_observed','full_cancel_shape_observed'].includes(classified?.kind);
  if(!classified||classified.providerReadbackFromAuthenticatedGet!==true||
-    classified.kind!==requiredKind||classified.shapeConsistent!==true||
+    !acceptableShape||classified.shapeConsistent!==true||
     classified.originalPaymentMatched!==true||
+    classified.matchedCancellationIdObserved!==true||
+    classified.observedMatchingCancellationStatus!=='SUCCEEDED'||
+    !Number.isSafeInteger(exactAmount)||exactAmount<=0||
+    !Number.isSafeInteger(totalCancelled)||totalCancelled<exactAmount||
+    totalCancelled>originalPaid||
+    (signed.eventType==='Transaction.PartialCancelled'&&exactAmount>=originalPaid)||
     classified.refundExecutionAuthorized!==false||
-    classified.entitlementRevocationAuthorized!==false||
-    (signed.providerCancellationId!==null&&
-     classified.matchedCancellationIdObserved!==true))
-  return DENIED('unverified_cancellation_semantics');
+    classified.entitlementRevocationAuthorized!==false)
+  return DENIED('unverified_exact_cancellation_amount');
 
  const signedMac=mac(sourceHmacSecret,[
   'portone-cancel-signed-v1',signed.providerWebhookId,
@@ -114,8 +125,11 @@ export async function persistVerifiedPortOneCancellationEventPrivateV1({
   'portone-cancel-get-v1',original.providerPaymentId,
   original.originalTransactionId,original.originalVerifiedPaidAmountMinor,
   original.originalCurrency,signed.eventType,
-  signed.providerCancellationId,classified.kind,
-  classified.matchedCancellationIdObserved,
+  signed.providerCancellationId,exactAmount,'SUCCEEDED',
+ ]);
+ const cancelIdMac=mac(sourceHmacSecret,[
+  'portone-cancellation-item-v1',signed.providerPaymentId,
+  signed.providerCancellationId,
  ]);
  let tx=false,committing=false;
  try{
@@ -137,7 +151,8 @@ export async function persistVerifiedPortOneCancellationEventPrivateV1({
   const result=await dbClient.query(
    COMMERCE_PORTONE_CANCELLATION_EVENT_PERSIST_SQL_V1,
    [signed.providerPaymentId,signed.providerWebhookId,signed.eventType,
-    original.originalTransactionId,classified.kind,signedMac,readbackMac],
+    original.originalTransactionId,classified.kind,signedMac,readbackMac,
+    cancelIdMac,exactAmount,totalCancelled],
   );
   if(result.rows.length!==1||
      !UUID.test(result.rows[0].providerEventId)||
