@@ -196,12 +196,13 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
     const provider = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     expect(exact).toBeGreaterThan(-1);
     expect(interlock).toBeGreaterThan(exact);
-    const positivePin = runtime.indexOf('personalRecordProof = input.combinedSourcePinPort');
+    const positivePin = runtime.indexOf('personalRecordProof = await input.combinedSourcePinPort.pinBeforeModel({');
     const combinedPin = runtime.indexOf('await input.combinedSourcePinPort.pinBeforeModel({');
-    const legacyPin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel(positivePinRequest)');
+    const missingCombinedHold = runtime.indexOf('!input.combinedSourcePinPort ||');
     expect(positivePin).toBeGreaterThan(interlock);
     expect(combinedPin).toBeGreaterThan(positivePin);
-    expect(legacyPin).toBeGreaterThan(combinedPin);
+    expect(missingCombinedHold).toBeGreaterThan(-1);
+    expect(runtime).not.toContain('await input.positivePersonalSourcePort.pinBeforeModel(positivePinRequest)');
     expect(positivePin).toBeLessThan(governance);
     expect(governance).toBeGreaterThan(exact);
     expect(provider).toBeGreaterThan(governance);

@@ -761,7 +761,11 @@ export async function runSeyeonProductionChatExecutionV1(
           // the DB RPC; current registry is empty and this fails before model.
           const source = exactModelPersonalSources.selectedSources[0];
           const candidate = productionContext.personalRecordProjectionCandidates?.[0];
+          // The one-Memory positive route MUST pin that Memory together
+          // with its actual current User message. No legacy Memory-only
+          // fallback: that would omit the model-visible User lineage.
           if (!input.positivePersonalSourcePort ||
+              !input.combinedSourcePinPort ||
               exactModelPersonalSources.selectedPersonalRecordCount !== 1 ||
               exactModelPersonalSources.selectedMemoryCount !== 1 ||
               exactModelPersonalSources.selectedSources.length !== 1 ||
@@ -813,17 +817,15 @@ export async function runSeyeonProductionChatExecutionV1(
             finalModelContextDigest: positiveModelCorrelation.finalModelContextDigest,
             expectedOriginalPgDigest: source.rawRecordPgDigest,
           });
-          personalRecordProof = input.combinedSourcePinPort
-            ? await input.combinedSourcePinPort.pinBeforeModel({
-                ...positivePinRequest,
-                currentUserMessageId: receivedTurn.userMessageId,
-                recentMessages: contextInput.recentMessages,
-                ...(contextInput.maxRecentMessages === undefined ? {} : {
-                  maxRecentMessages: contextInput.maxRecentMessages,
-                }),
-                selection: exactModelPersonalSources,
-              })
-            : await input.positivePersonalSourcePort.pinBeforeModel(positivePinRequest);
+          personalRecordProof = await input.combinedSourcePinPort.pinBeforeModel({
+            ...positivePinRequest,
+            currentUserMessageId: receivedTurn.userMessageId,
+            recentMessages: contextInput.recentMessages,
+            ...(contextInput.maxRecentMessages === undefined ? {} : {
+              maxRecentMessages: contextInput.maxRecentMessages,
+            }),
+            selection: exactModelPersonalSources,
+          });
         }
 
         const governance = await resolveTurnGovernance({

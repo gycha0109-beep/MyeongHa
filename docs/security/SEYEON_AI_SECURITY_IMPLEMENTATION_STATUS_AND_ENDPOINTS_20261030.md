@@ -285,3 +285,10 @@ Watchtower-Track: security
 - **격리 검증:** 기존 PostgreSQL 17 S0 실제 original Pin/Commit/Reveal 테스트에 64자리 형식은 정상이나 내용이 위조된 digest를 전달하는 부정 사례를 추가했다. 실패 시 Attempt의 G1 최근 Pin·positive Pin 및 생성된 Character 메시지가 없음을 확인한다. 정상 원문 해시를 통과시키는 기존 first Reveal/Replay 검사도 유지한다.
 - **변경 범위:** 격리 SQL `16-g1-model-recent-source-pin.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 이 단일 Worklog. 운영 DB/ACL/Provider/공개 API·Reader·History/Replay 활성화 없음. `installerMayActivateProduction=false`, `git diff --check` 확인. CI에서 PostgreSQL 실제 해시 일치·거부를 검증하기 전까지 PASS 판정하지 않는다.
 - **선행·남은 것:** #2814는 GREEN 후 #2786 브랜치에 병합됐다. #2786 main 자동 병합은 아직 BLOCKED이며 공식 G0~G6 종료 게이트는 통과한 상태가 아니다. 모델 전체 출처 Census의 DB 강제 서명, 다중 Memory/Life Fact/파생 이력, 운영 G2/G3/G4·G5/G6는 계속 미완료. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W27 — G1 실제 Chat 실행의 Memory-only Pin 우회 제거 (Provider 사전 차단)
+
+- **선행:** [#2820](https://github.com/gycha0109-beep/MyeongHa/pull/2820)의 PostgreSQL 17, 보안·Governance·Web·Cloudflare CI GREEN을 확인한 뒤 기존 #2786 부모 브랜치에 squash 병합했다(merge SHA `6ac6a3fad457e703e134036ec81828b354e67401`). 부모의 main 병합은 여전히 BLOCKED, auto-merge는 설정된 상태다.
+- **발견:** `runSeyeonProductionChatExecutionV1`의 1-Memory positive 실행은 combinedSourcePinPort가 없으면 구형 `positivePersonalSourcePort.pinBeforeModel`을 호출할 수 있었다. 그러면 Memory 원본 Pin만 남고 실제 모델 입력의 현재 User 원본을 DB Attempt에 함께 고정하지 않은 채 Provider 쪽으로 진행할 가능성이 있었다.
+- **구현:** positive 1-Memory 분기에서 `positivePersonalSourcePort`와 `combinedSourcePinPort`를 모두 필수로 하며, **동일 트랜잭션의 Memory+현재 User 결합 Pin** 하나만 호출하도록 legacy fallback을 삭제했다. 두 출처의 결합 DB Pin을 사용할 수 없는 경우 기존 `SeyeonProductionChatExecutionErrorV1`로 Provider 진입 전에 차단한다. 현재 운영 Projector 기본 비활성, 0-Personal 흐름, 일반 Replay/History HOLD는 유지한다.
+- **회귀 기준:** `test/seyeon-attempt-zero-personal-proof-v1.test.ts`와 `test/seyeon-exact-model-personal-source-selection-v1.test.ts`의 기존 Provider 이전 보안 순서 검증을 결합 Pin 필수·legacy 경로 부재 기준으로 갱신했다. `git diff --check` PASS. 로컬 worktree에는 vitest/typescript 설치본이 없어 CI에서 실행·타입 통과 확인해야 한다.
+- **변경 범위:** `apps/api/src/seyeon-production-chat-execution-v1.ts`, 두 기존 테스트, 본 Worklog. 운영 DB/ACL/Provider/Reader/HTTP Route 설정은 변경하지 않는다. `HOLD_FORWARD_STOPPED` 유지. 전체 G0~G6 종료 판정 아님.
