@@ -1,4 +1,4 @@
-import {describe,it} from 'node:test';
+import {describe,it} from 'vitest';
 import assert from 'node:assert/strict';
 import {
  COMMERCE_CANCELLATION_EXACT_EVENT_READINESS_SQL_V1 as SQL,
