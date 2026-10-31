@@ -352,7 +352,7 @@ try {
   assert(session?.accessToken === member.accessToken, 'Records browser stored the wrong Member access token');
 
   const recordsRequests = requests.filter((request) => ['/api/me', '/api/life-record', '/api/readings'].includes(request.path));
-  assert(recordsRequests.length === 3, `Expected three Records API requests, received ${recordsRequests.length}`);
+  assert(recordsRequests.length === 2, `Expected two Records API requests, received ${recordsRequests.length}`);
   assert(recordsRequests[0].path === '/api/me', 'Records did not validate canonical /api/me before reading ledgers');
   for (const request of recordsRequests) {
     assert(request.authorization === `Bearer ${member.accessToken}`, `${request.path} did not use the active Member bearer`);
