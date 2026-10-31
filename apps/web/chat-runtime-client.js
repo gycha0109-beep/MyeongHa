@@ -639,8 +639,10 @@ async function sendTurn(message) {
     // A protected history GET may legitimately return 503. Never use it as
     // positive receipt confirmation or as a reason to resend this turn.
     const currentBearer = await getActiveBearer();
+    if (sourceVisibilityEpoch !== sendVisibilityEpoch) {
+      throw new Error('SOURCE_INVALIDATED');
+    }
     if (currentBearer?.kind !== 'member' ||
-        sourceVisibilityEpoch !== sendVisibilityEpoch ||
         currentBearer.token !== activeBearer.token ||
         authoritativeCharacterId !== 'seyeon' ||
         threadId !== submittedThreadId) {
@@ -660,6 +662,7 @@ async function sendTurn(message) {
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {
       AUTH_REQUIRED: '로그인 상태가 만료되었습니다. 다시 로그인해 주세요.',
+      SOURCE_INVALIDATED: '기억 접근 권한이 변경되어 이전 세연 답변을 표시하지 않습니다. 이후 접근 여부는 서버에서 다시 확인합니다.',
       MEMBER_REQUIRED: '현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.',
       CONTENT_INCOMPATIBLE: '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.',
       CAPABILITY_UNAVAILABLE: '세연 실대화 운영 연결을 지금 사용할 수 없습니다.',
