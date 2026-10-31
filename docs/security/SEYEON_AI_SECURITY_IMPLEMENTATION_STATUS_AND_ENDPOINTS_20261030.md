@@ -292,3 +292,10 @@ Watchtower-Track: security
 - **구현:** positive 1-Memory 분기에서 `positivePersonalSourcePort`와 `combinedSourcePinPort`를 모두 필수로 하며, **동일 트랜잭션의 Memory+현재 User 결합 Pin** 하나만 호출하도록 legacy fallback을 삭제했다. 두 출처의 결합 DB Pin을 사용할 수 없는 경우 기존 `SeyeonProductionChatExecutionErrorV1`로 Provider 진입 전에 차단한다. 현재 운영 Projector 기본 비활성, 0-Personal 흐름, 일반 Replay/History HOLD는 유지한다.
 - **회귀 기준:** `test/seyeon-attempt-zero-personal-proof-v1.test.ts`와 `test/seyeon-exact-model-personal-source-selection-v1.test.ts`의 기존 Provider 이전 보안 순서 검증을 결합 Pin 필수·legacy 경로 부재 기준으로 갱신했다. `git diff --check` PASS. 로컬 worktree에는 vitest/typescript 설치본이 없어 CI에서 실행·타입 통과 확인해야 한다.
 - **변경 범위:** `apps/api/src/seyeon-production-chat-execution-v1.ts`, 두 기존 테스트, 본 Worklog. 운영 DB/ACL/Provider/Reader/HTTP Route 설정은 변경하지 않는다. `HOLD_FORWARD_STOPPED` 유지. 전체 G0~G6 종료 판정 아님.
+### 2026-11-01 / W29 — G3 내부 Node 송신 함수의 Replay 직접 호출 차단 (source-only)
+
+- **독립 작업:** G2 최근 User Pin 필수화 #2823의 PostgreSQL 17 CI가 실행 중이어서 별도의 G3 전송 경계를 구현했다. 부모는 CI GREEN으로 확인된 #2786 통합 HEAD `a443d34983eac7c71eceeaf163a16c980b327647`이며 운영 병합·활성화는 별도다.
+- **발견:** 상위 `deliverSeyeonCommittedFirstZeroNodeTurnV1`은 이미 `committed_replay`와 `commit.replayed=true`를 차단하지만, 재사용 가능한 하위 `sendSeyeonNodeOriginalGrantResponseV1`은 전달 받은 `chatResponseMetadata.replayed=true`를 단순 출력 메타데이터로 취급했다. 직접 호출 시 DB 원문 조회 경로가 실행될 가능성이 있어 소켓 경계 자체에도 Replay 인가 차단이 필요했다.
+- **구현:** Node 응답 송신 전 메타데이터가 유효하더라도 `replayed=true`이면 `SeyeonNodeOriginalGrantSendBoundaryErrorV1`을 발생시키고 소켓을 파기한다. DB 원본 읽기 callback/Provider 호출/본문 송신은 실행되지 않는다. 0건·정상 최초 응답·권한 없음 503 동작 및 비스트리밍 유지. 기존 HTTP/Reader·Provider/ACL/DB 설정 변경 없음.
+- **검증:** 실 Node 송신 경계 단위 테스트에 `replayed=true` 시 소켓 파기와 DB 읽기 0회를 검증하는 케이스를 추가하고, 기존 권한 없음 503 검사는 처음 요청인 `replayed=false`에 대한 거부로 유지했다. `git diff --check` 확인. 새 CI GREEN 전까지 결과 PASS는 미확정.
+- **범위:** G3 source-only 후보, 실 Production Route 공개하지 않음; 전체 개인기록/과거 Replay 승인하지 않음. `HOLD_FORWARD_STOPPED` 유지.
