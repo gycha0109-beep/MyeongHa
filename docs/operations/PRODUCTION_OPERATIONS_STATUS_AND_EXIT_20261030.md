@@ -136,6 +136,15 @@
 
 ---
 
+### 2026-11-01 — Phase 7 격리 PostgreSQL 실제 권한·RLS·트랜잭션 컨텍스트 검증
+
+- **목표:** 운영 로드맵 Phase 7 §34의 DB 장애·격리 후속으로, P0-AUTH-01의 **기존 `executePostgresSubjectTransactionV1` 실제 트랜잭션 경로가 PostgreSQL 엔진의 RLS/권한 및 커넥션 재사용과 함께 동작하는지** 분리된 환경에서 확인. Production DB, Supabase, Cloudflare 서비스, 사용자 레코드에 접근하지 않음.
+- **실제 구현:** [`test/postgres-subject-rls-isolated-phase7.test.ts`](../../test/postgres-subject-rls-isolated-phase7.test.ts) 추가. `PG_BIN_DIR`가 설정된 Windows 로컬에서 `initdb`/ `pg_ctl`로 **임시 PostgreSQL 18** 인스턴스를 임의 127.0.0.1 포트에서 생성하고 종료·삭제. 기존 프로덕션 소스 `executePostgresSubjectTransactionV1`을 그대로 사용해 `BEGIN`→`SET LOCAL ROLE myeongha_api_executor`→`begin_member_subject_context_v1`→`assert_myeongha_subject_context_v1`→SQL→`COMMIT/ROLLBACK` 흐름을 실제 SQL로 실행. 합성 member A/B, 임시 synthetic ledger 테이블·RLS 정책, 합성 resolver 함수만 테스트용으로 생성.
+- **권한·격리 증거:** 비슈퍼유저 `NOBYPASSRLS` 로그인/역할, `NOINHERIT`와 명시적 `SET ROLE` 권한을 사용. login의 ledger 직접 조회 **42501** 차단, Member A는 A 1건만 조회, Member B는 B 1건만 조회. 동일 최대 1개 연결 풀에서 A→B→알 수 없는 Member 거부→A 재조회 후에도 사용자 간 데이터 혼입 **0건**, 트랜잭션 종료 후 `current_user` 원래 login 및 transaction-local subject 값 제거 확인. 무권한 별도 login의 `SET ROLE` 및 ledger `INSERT` **42501** 확인.
+- **검증:** 로컬 Node 24, PostgreSQL 18, Vitest의 실제 `PG_BIN_DIR` 실증 **1/1 PASS** 및 TypeScript `tsc --noEmit` PASS. 외부 PostgreSQL이 설치되지 않은 CI 환경에서는 명시적으로 해당 실DB 실증을 **skip**하므로, 원격 CI PASS만으로 PostgreSQL 통합 실증을 주장하지 않음. 실행 명령: `PG_BIN_DIR=<installed PostgreSQL bin> npx vitest run test/postgres-subject-rls-isolated-phase7.test.ts`.
+- **한계:** 실제 운영용 subject 함수 본문과 schema migration을 실행한 검증이 아닌 **동일 함수 이름/호출 계약을 가진 합성 정책과 데이터**로 RLS 엔진·권한·트랜잭션 컨텍스트를 검증. 로컬 합성 클러스터는 `ssl:false`이므로 `verify-full` TLS/인증서·운영 PG17·실제 Supabase RLS 정책, Hosted Auth/DR, 운영 capacity/Phase 13 ACCEPTANCE는 **미확인**. `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+- **다음 작업:** 운영 실제 DB에 비접근 방식으로 인증서 검증/TLS 연결을 동일 격리 PostgreSQL에서 검증하고, 단계적 복구 또는 Phase 10~12의 실제 DB/사용자 부하에 대한 별도 승인된 근거를 확보. Worklog 기록은 기존 보고서에 누적하고 별도 문서를 만들지 않음.
+
 ## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
 
 **이 절은 아래 §3.2와 §5의 구버전/미수용 항목 중 같은 엔드포인트·같은 조건을 대상으로 한 과거 상태보다 최신 증거**이다. 현재 운영 준비 전체가 완료되었다는 뜻이 아니라 **배포된 정확한 버전에 연결한 검증 부분집합**의 최신 관측이다.
