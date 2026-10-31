@@ -12,6 +12,7 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '08-historical-thread-presence.sql', '09-owned-original-memory-grant.sql',
   '13-g0-current-original-lineage-context.sql',
   '14-g0-relationship-event-original-lineage.sql',
+  '15-g0-original-member-user-message.sql',
   '10-planner-memory-decision-source.sql',
   '11-planner-memory-proposal-producer.sql',
   '12-planner-memory-non-durable-decision.sql',

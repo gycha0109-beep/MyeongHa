@@ -84,3 +84,28 @@ Watchtower-Track: security
 - **사용자 결정:** 적용 범위와 최종 운영 활성화는 사용자에게 있다. 이미 정해진 거부 우선 설계 안의 소스 구현·CI·PR 병합은 추가 결정을 기다리지 않는다.
 
 > **최종 보고 결론:** `#2768 SOURCE_IMPLEMENTED / 기존 HEAD CI_GREEN / OPERATIONS_HOLD / SECURITY_TRACK_OPEN`. 이 파일 자체가 운영 권한을 부여하거나 G0~G6 PASS 증거를 생성하지 않는다.
+
+
+## 7. Worklog — 작업 단위 누적 기록
+
+> 기록 규칙: 이후 Security 트랙 개발 PR마다 **작업일·목적·변경한 실제 경로·정확한 PR/HEAD·CI/Integration·남은 범위·운영 상태**를 이 섹션에 누적한다. 문서 작성 시점의 검사는 확정된 결과만 적으며, 이후 검사 결과를 성공으로 추정하지 않는다. 과거 항목은 후속 작업에서 덮어쓰지 않는다.
+
+### 2026-10-30 / W01 — 원본 Memory → 과거 Assistant 현재 권한 (PR #2768)
+
+- **목적/구현:** `13-g0-current-original-lineage-context.sql`의 `assert_current_original_assistant_lineage_v1`과 `qry_seyeon_g0_current_source_recent_messages_v1`을 Production PostgreSQL context read adapter에 연결. 원본 Grant/Record의 동일 ID·현재 권한·digest를 확인하고 이력이 미확인되면 전체 HOLD.
+- **증거:** [PR #2768](https://github.com/gycha0109-beep/MyeongHa/pull/2768) HEAD `cc50687ca6cd3d3d726262040561c4a129ff1011`, [CI #41018439519](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41018439519) PASS, [Integration #41018652610](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41018652610) PASS, 병합 `80268c01913d33bf6a68f1d230a7f4766aeca4e3`.
+- **남은 것:** 과거 User·Relationship·Reader와 다중 파생의 원본 권한. 운영 SQL 적용/공개 승인 없음.
+
+### 2026-10-30 / W02 — 관계 이벤트 → 원본 Assistant 출처 (PR #2773)
+
+- **목적/구현:** `14-g0-relationship-event-original-lineage.sql` 추가. 관계 이벤트의 DB 원본 Message FK를 통해 committed Se-yeon Assistant 및 최초 Memory/Grant 현재 권한을 확인한 뒤 기존 관계 이력을 반환. `postgres-seyeon-production-context-read-v1.ts` 실제 Relationship 읽기 RPC 교체.
+- **증거:** [PR #2773](https://github.com/gycha0109-beep/MyeongHa/pull/2773) HEAD `99c691e0e2df2212bd0726ad45ee63fd30073ab1`, [CI #41020615655](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41020615655) PASS, [Integration #41022018630](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41022018630) PASS, 병합 `1800d2ed927b35bd84b75d0c76114e8f32493f77`.
+- **남은 것:** 단일 Assistant 이외의 원본 유형, 다중 메시지, Reader 교차 출처. SQL은 S0 격리 설치 전용이고 운영에 자동 반영되지 않음.
+
+### 2026-10-30 / W03 — 과거 User 원본·다중 관계 출처 및 충돌 정리 (PR #2779 → #2781)
+
+- **목적/구현:** `15-g0-original-member-user-message.sql` 신규: 동일 Member Subject/Thread의 DB 원본 User 메시지 및 확정 Turn 식별. `13`의 과거 User 조회, `14`의 전체 source_message FK 순회에 연결. Assistant는 여전히 정확한 기존 원본 Grant 검증 필요; World/server/미확인 출처는 HOLD.
+- **충돌 정리:** [#2779](https://github.com/gycha0109-beep/MyeongHa/pull/2779)은 선행 #2773 squash 병합 후 `main` 재타깃에서 Git `dirty` 발생. 동일 구현을 이미 병합된 `main`에 다시 적용해 [#2781](https://github.com/gycha0109-beep/MyeongHa/pull/2781)로 대체. #2779는 **미병합 종료**.
+- **증거:** 대체 PR #2781 문서 편집 전 HEAD `e8c1d8486529f77e325314b69277d6b8d5677c01`의 Web/Governance PASS; [CI #41025182088](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41025182088)는 이 기록 작성 시 DB 작업 미종결. 문서 커밋에 따른 최종 HEAD 검사/Integration·병합은 별도 확정한다.
+- **중요한 한계:** DB 원본 User 입력이라는 증거는 복사·인용된 다른 개인정보의 Grant를 대체하지 않는다. G1 양수 모델 사용은 `seyeon-production-chat-execution-v1.ts`에서 **원본 Memory 1건·past history/Relationship 0건**으로 계속 제한. Reader/공식 Reading 아티팩트는 별도 Character/상품/구매 권한 경로이고, 세연의 현재 context 조립에 직접 Reader 데이터 유입은 확인되지 않았으므로 임의 긍정 교차 공개를 만들지 않음.
+- **남은 것/다음:** #2781 최종 HEAD CI/Integration/병합, 실제 모델에 사용되는 **전체 원본·파생 출처의 G1 선행 영속 Pin**, G2/G3 현권한 재검증, Reader 교차 인용 계약, G4 일반 크레딧 종단, G5/G6. **운영 `HOLD_FORWARD_STOPPED` 유지**, 운영 DDL/ACL/Provider·traffic 변경 없음.
