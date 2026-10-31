@@ -131,22 +131,13 @@ async function serve() {
       }
 
       if (pathname === '/api/readings' && req.method === 'GET') {
-        requests.push({ scenario, path: pathname, authorization });
-        if (!kind) {
+        const rejectedGuest = scenario === 'records-guest-401' && kind === 'guest';
+        requests.push({ scenario, path: pathname, authorization, rejectedGuest });
+        if (!kind || rejectedGuest) {
           sendJson(res, 401, errorEnvelope());
           return;
         }
         sendJson(res, 200, envelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
-        return;
-      }
-
-      if (pathname === '/api/memories' && req.method === 'GET') {
-        requests.push({ scenario, path: pathname, authorization });
-        if (!kind || (scenario === 'records-guest-401' && kind === 'guest')) {
-          sendJson(res, 401, errorEnvelope());
-          return;
-        }
-        sendJson(res, 200, envelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
         return;
       }
 
@@ -370,6 +361,11 @@ try {
     client,
     `document.querySelector('#records-status')?.textContent?.includes('현재 세션이 필요') === true && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === null`,
     'Records ledger authoritative 401 did not invalidate the rejected Guest',
+  );
+  assert(
+    requests.some((request) => request.scenario === 'records-guest-401'
+      && request.path === '/api/readings' && request.rejectedGuest === true),
+    'Records Guest 401 scenario did not reach the active /api/readings ledger',
   );
 
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });

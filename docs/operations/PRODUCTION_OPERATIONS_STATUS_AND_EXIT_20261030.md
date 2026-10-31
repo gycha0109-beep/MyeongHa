@@ -10,6 +10,17 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 — 기록 화면 Guest 401 브라우저 검증 경로 수정
+
+- **목적:** [브라우저 검증 #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)의 최초 실행 및 1회 실패 작업 재실행 모두에서 나타난 `Records ledger authoritative 401 did not invalidate the rejected Guest` 오류를 실제 호출·응답 경계 기준으로 재현하고 해결한다.
+- **원인 확인:** `apps/web/records-runtime-client.js`의 현 기록 조회 엔드포인트는 `/api/me`, `/api/life-record`, `/api/readings`임. 그러나 [`scripts/verify-web-auth-rejected-bearer-browser.mjs`](../../scripts/verify-web-auth-rejected-bearer-browser.mjs)의 `records-guest-401` 시나리오는 **기록 화면이 호출하지 않는 `/api/memories`** 에서만 401을 반환했음. 당시 실패 로그에도 실제 `/api/readings` 요청만 남고 `/api/memories` 요청은 없음. 따라서 401이 기록 화면에 도달하지 않은 채 정상 로드되어, 테스트가 Guest bearer 잔존을 실제 세션 무효화 버그로 잘못 판정했음.
+- **수정:** 테스트의 Guest 401 주입 지점을 실제 `GET /api/readings`로 이동하고 미사용 `/api/memories` fixture 제거. `records-guest-401` 시나리오에서 **실제로 `/api/readings`에 해당 401을 주입했다는 별도 단언**을 추가하여 향후 페이지 API 이동 시 거짓 검증이 발생하지 않게 함. 제품 코드와 Auth/DB/Cloudflare 환경·비밀·데이터는 변경하지 않음.
+- **로컬 실증:** Node 24, `npm run build:web` **PASS**, Windows Edge headless를 Chrome DevTools Protocol로 구동한 `node scripts/verify-web-auth-rejected-bearer-browser.mjs` **PASS** (`MyeongHa_WEB_AUTH_REJECTED_BEARER_BROWSER_PASS`, exit 0). 생성된 JSON 검증 산출물에서 `records-guest-401` 실제 요청은 `/api/me`, `/api/life-record`, **`/api/readings` (rejectedGuest=true)**이고 `/api/memories` 호출 없음. 401 후 Guest bearer가 비워지는 검증과 기존 Member 401/403 구분 테스트 모두 통과함. 산출물은 로컬에만 두고 저장소에 올리지 않음.
+- **한계:** 로컬 합성 응답·브라우저 테스트 통과이며 Production 서버 장애·실제 사용자 세션/DR 수용 증거가 아님. **PR/원격 CI 성공 및 병합은 별도 확인 후 기록**하고 Phase 7 DB 장애/Phase 8 DR/Phase 13 운영 수용의 차단 상태는 유지함.
+- **추적:** 작업 브랜치 `fix/ops/records-guest-401-browser-proof-20261031`; 원래 관련 PR [#2790](https://github.com/gycha0109-beep/MyeongHa/pull/2790), 재시도 Worklog PR [#2792](https://github.com/gycha0109-beep/MyeongHa/pull/2792). **다음:** GitHub Web Auth Browser Regression에서 재확인, 실제 정상 검증일 때 병합. 원격 실패 시 해당 테스트에서 드러난 새로운 원인을 수정.
+
+
+
 ### 2026-10-31 17:11 KST — PR #2790 RED 진단 및 실패 작업 재실행
 
 - **요청·대상:** [Auth 로컬 장애 격리 PR #2790](https://github.com/gycha0109-beep/MyeongHa/pull/2790) (head `a012c48cf25cc3b28655cb32bb46bce785ff396c`). PR은 2026-10-31T07:05:39Z에 **실제 병합 완료**. 해당 head의 [기본 CI #41178543652](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543652), [정식 Integration #41178551294](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178551294), Governance [#41178543651](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543651)는 SUCCESS. [이전 Integration #41178544791](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178544791)의 제출 이벤트 admission 실패를 코드 오류로 혼동하지 않음.
