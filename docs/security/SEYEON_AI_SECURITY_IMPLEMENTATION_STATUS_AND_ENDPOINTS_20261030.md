@@ -254,3 +254,9 @@ Watchtower-Track: security
 - **수정:** 동일 임시 PostgreSQL 17 DB에서 앞선 G1 최초 공개 사례가 이미 사용한 `uuid(15,13)`과 역사 참여자 테스트의 Yeoul 조인 ID가 충돌했다. 역사 참여자 테스트에만 전용 미사용 `uuid(15,913)`을 부여했다. 참여자 이탈·교체, 타 Member 접근 차단, 실제 메시지 열람 HOLD 검증 로직은 그대로 유지한다.
 - **변경 파일:** `test/seyeon-security-s0-history-presence.e2e.test.ts`, 본 Worklog. `git diff --check` 확인. 신규 HEAD의 CI 완료 전까지 해당 검사 PASS 판정 없음.
 - **재실행 및 운영:** 해당 PR에 푸시해 자동 CI로 재검증하며, 무관한 다른 CI 진행 상태는 보안 구현 중단 사유로 삼지 않는다. 운영 DB/Provider/ACL/HTTP 공개 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-10-31 / W22 — G3 과거 세연 참여 이력의 DB 트랜잭션 잠금 (소스 후속 PR)
+
+- **목적/구현:** 기존 `qry_seyeon_thread_ever_involved_v1`은 읽기 시점의 이전/현재 참여자 정보를 검증했지만, 그 검사와 해당 HTTP 트랜잭션의 후속 기록 조회 사이에서 새로운 참여자가 연결되는 경쟁을 동기화하지 않았다. SQL definer 함수의 Thread Owner/Subject 확인에 `FOR UPDATE` 잠금을 적용하고 함수의 속성을 VOLATILE로 변경하여 같은 Thread에 새로운 Character 참여자를 FK로 연결하려는 세션의 KEY SHARE와 충돌하도록 했다. 잠금은 동일 읽기 트랜잭션 종료까지 유지된다.
+- **테스트:** 기존 disposable PostgreSQL 17 `test/seyeon-security-s0-history-presence.e2e.test.ts`에 **독립 DB 연결 두 개**로 검사 트랜잭션이 Thread를 잠그는 동안 경쟁 연결의 `FOR KEY SHARE`가 lock_timeout으로 거부되고, 원래 트랜잭션 종료 후 획득 가능함을 확인하는 사례를 추가했다. 과거 세연 참여 시 기존 HTTP History HOLD 및 타 사용자 404 검증은 그대로 유지한다.
+- **수정 파일:** `scripts/operations/seyeon-security-s0/08-historical-thread-presence.sql`, `test/seyeon-security-s0-history-presence.e2e.test.ts`, 동일 Worklog. S0 격리 설치 소스만 수정하며 Production migration/DB/Provider/ACL/Reader 및 본문 공개 범위를 변경하지 않는다.
+- **CI/한계:** `git diff --check` 확인. 새 HEAD CI와 PostgreSQL 경합 검사는 실행 후 결과 확인 전까지 PASS가 아니다. 이 잠금은 Character join FK 경쟁을 보호하는 G3 부분 구현일 뿐, 모든 Message/Grant 동시 변경 및 Replay 최초 공개를 승인하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
