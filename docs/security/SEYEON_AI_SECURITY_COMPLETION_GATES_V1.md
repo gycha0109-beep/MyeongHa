@@ -289,3 +289,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **변경:** scripts/operations/seyeon-security-s0/18-planner-pre-model-source-authority.sql 및 격리 설치 목록·ACL, 앱 소스 pre-model 검증 어댑터·post-turn 실행, 기존 단위/PG17 시험.
 - **남은 HOLD:** UC-06 원문 검증에 한정된 구현이며 G0/G1 양수 Pin/G2 Atomic Commit/G3 실제 공개·Replay/G4 비용 승인/G5·G6 운영 검증을 충족하지 않는다. 생산자 모델/DB 기본 DENY, 운영 Route·Migration·paid Provider·개인정보 Reveal OFF, PR #2761 Draft·병합 금지 유지.
 
+
+
+### 2026-10-31 · W15 · UC-06 보류 제안 직접 HTTP 공개와 재조회 현재 권한 결속 (S0 격리)
+
+- **구현:** 'seyeon-planner-pending-proposal-node-http-s0-v1.ts'는 실제 Node GET 요청의 Member Identity를 인증하고 DB에서 해당 회원의 canonical Subject를 구한 뒤, 지정 Thread/Assistant의 pending Planner Memory만 읽는 격리 HTTP 입구를 구성했다. 원본 사용자 메시지나 Assistant 과거 본문을 응답하지 않는다.
+- **공개 선형화:** 'seyeon-planner-pending-proposal-node-reveal-s0-v1.ts'는 기존 DB Owner의 정확한 보류 제안 조회를 독립 트랜잭션에서 호출하고, 제안 행 및 현재 대화 원본에 대한 잠금을 Node Socket 'finish'까지 유지한다. 승인/폐기/만료 후 재요청은 같은 DB를 새로 읽어 503으로 거부하며 이전에 보였던 제안을 캐시로 복원하지 않는다. 교차 회원·잘못된 메시지·인증 부재도 서버 출처/요약을 노출하지 않는다.
+- **범위 제한:** 오직 격리 PostgreSQL17 테스트 DB 이름, 직접 소유한 Node socket, 원본 pending 제안 요약만 대상이다. 일반 API EXECUTE 권한·운영 공개 Route·Vercel/Workers Fetch Proxy·모델·Memory/Grant 권한은 변경하지 않았다. 운영 G0/G3 최종 승인 또는 과거 Chat Replay의 공개 허가가 아니다.
+- **실 DB HTTP 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 합성 회원 인증을 사용하는 실제 Node HTTP GET, pending 제안 전달, 타 회원·비인증·타 Assistant 차단, 'discard' 후 재조회 503을 추가했다. 최신 HEAD CI 최종 결과는 별도 확인해야 하므로 이 기록에서는 PASS로 단정하지 않는다.
+- **남은 작업:** G0 원본 Grant/Record·파생 데이터의 현재 권한 정책, 실제 서비스 HTTP/Replay 경계 및 최종 수신 선형화, UC-07 운영 Route, G5/G6 실제 운영 전 검증. 'HOLD_FORWARD_STOPPED', PR #2761 Draft/병합 금지 유지.
+
