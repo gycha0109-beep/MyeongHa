@@ -15,25 +15,24 @@ describe('Records v2 product surface', () => {
     expect(html).toContain('class="mobile-bottom-nav"');
   });
 
-  it('preserves existing read runtime mount points and adds keyboard-capable tabs', async () => {
+  it('preserves report-only read runtime mount points without redundant tabs', async () => {
     const [html, component, js] = await Promise.all([
       readFile(web('records.html'), 'utf8'),
       readFile(web('src/records/RecordsPage.tsx'), 'utf8'),
       readFile(web('records-page.js'), 'utf8'),
     ]);
     const markup = `${html}\n${component}`;
-    for (const id of ['records-status', 'records-content', 'records-display-name', 'records-subject-kind', 'life-records-list', 'saju-records-list']) {
+    for (const id of ['records-status', 'records-content', 'saju-records-list']) {
       expect(markup).toContain(`id="${id}"`);
     }
     expect(js).toContain('createRecordsRuntimeClient().readRecords()');
     expect(js).not.toContain('renderCurrentBirthProfile');
     expect(js).not.toContain('renderMemories');
-    expect(js).toContain('function setupTabs()');
-    expect(js).toContain("event.key === 'ArrowLeft' || event.key === 'ArrowRight'");
-    expect(js).toContain("if (event.key === 'Home') targetIndex = 0;");
-    expect(js).toContain("else if (event.key === 'End') targetIndex = tabs.length - 1;");
-    expect(js).toContain('next.focus();');
-    expect(js).toContain('activate(next);');
+    expect(markup).not.toContain('life-records-list');
+    expect(markup).not.toContain('records-profile-strip');
+    expect(js).not.toContain('renderProfile(');
+    expect(markup).not.toContain('role="tablist"');
+    expect(js).not.toContain('function setupTabs()');
   });
 
   it('keeps all five global destinations coherent', async () => {
@@ -82,10 +81,9 @@ describe('mobile web width integration', () => {
     expect(html).not.toContain('href="chat.html">대화</a>');
   });
 
-  it('turns dense Records rows into a phone-safe stacked ledger', async () => {
+  it('turns Records report cards into a phone-safe single column', async () => {
     const css = await readFile(web('records-v2.css'), 'utf8');
-    expect(css).toContain('.ledger-head{display:none}');
-    expect(css).toContain('.ledger-row{grid-template-columns:minmax(0,1fr) auto');
-    expect(css).toContain('.records-tabs{width:100%;overflow-x:auto');
+    expect(css).toContain('.records-reading-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))');
+    expect(css).toContain('.records-reading-grid{grid-template-columns:1fr}');
   });
 });

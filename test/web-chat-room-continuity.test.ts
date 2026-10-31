@@ -32,8 +32,6 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('if (chatIntro) {');
     expect(runtime).toContain('chatStream.replaceChildren(chatIntro)');
     expect(runtime).toContain('chatStream.replaceChildren(...nodes)');
-    // A revoked source must also prevent a late successful room load from
-    // marking the UI ready; a simple !loaded check no longer covers this.
     expect(runtime).toContain('if (!loaded || sourceVisibilityEpoch !== initialVisibilityEpoch) return false;');
     expect(runtime).toContain('const initialVisibilityEpoch = sourceVisibilityEpoch;');
     expect(runtime).toContain('sourceVisibilityEpoch !== startedAtVisibilityEpoch');
@@ -88,14 +86,17 @@ describe('Web Character Room continuous open and resume', () => {
     const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'), runtime.indexOf('function submitTurn(event)'));
     expect(send).not.toContain('await loadRoomState()');
     expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
-    expect(send).toContain('renderAcknowledgedSeyeonFirstReply(acknowledgedReply)');
+    expect(send).toContain('renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn)');
     expect(send).toContain('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)');
     expect(send).toContain('threadId !== submittedThreadId');
     expect(runtime).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
     expect(runtime).toContain("error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE'");
     expect(runtime).toContain("error.code === 'CREDIT_AUTHORITY_UNAVAILABLE'");
-    expect(runtime).toContain("throw new Error('AI_TURN_NOT_YET_AVAILABLE')");
-    expect(runtime).toContain('크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며');
+    expect(runtime).toContain("throw new Error('SECURE_CHAT_TEMPORARILY_UNAVAILABLE')");
+    expect(runtime).toContain("throw new Error('CREDIT_AUTHORITY_UNAVAILABLE')");
+    expect(runtime).toContain("SECURE_CHAT_TEMPORARILY_UNAVAILABLE:");
+    expect(runtime).toContain("CREDIT_AUTHORITY_UNAVAILABLE:");
+    expect(runtime).not.toContain("AI_TURN_NOT_YET_AVAILABLE:");
   });
 
   it('smoke-checks the visible error and retry state without requiring the removed history drawer', async () => {
@@ -118,6 +119,6 @@ describe('Web Character Room continuous open and resume', () => {
     expect(page).not.toContain('className="character-room-menu"');
     expect(transport).not.toContain('renderHistory(');
     expect(presentation).not.toContain("const historyDrawer =");
-    expect(presentation).toContain('setDialogueLines(next.intro)');
+    expect(presentation).toContain('setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, getUiLocale()))');
   });
 });

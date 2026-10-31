@@ -10,7 +10,6 @@ import {
 
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
-  lifeFacts: '/api/life-record',
   readings: '/api/readings',
 });
 const AUTHORITY_READ_ATTEMPTS = 2;
@@ -256,8 +255,6 @@ export function createRecordsRuntimeClient(options = {}) {
 
   return Object.freeze({
     readProfile: () => readEndpoint(endpoints.profile),
-    readLifeFacts: () => readStable((bearer) =>
-      readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts')),
     readReadings: () => readStable(async (bearer) =>
       projectReadingHistory(
         await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
@@ -265,21 +262,16 @@ export function createRecordsRuntimeClient(options = {}) {
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeResult, readingResult] = await Promise.allSettled([
-          readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
+        const readingResult = await Promise.allSettled([
           readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
         ]);
-        // Authentication or subject denial in *any* ledger invalidates the entire snapshot.
-        // Non-auth transport errors are isolated: an unavailable ledger is not an empty ledger.
-        for (const result of [lifeResult, readingResult]) {
-          if (result.status === 'rejected' && result.reason instanceof RecordsRuntimeError
-            && result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED') throw result.reason;
-        }
+        const result = readingResult[0];
+        if (result.status === 'rejected' && result.reason instanceof RecordsRuntimeError
+          && result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED') throw result.reason;
         const unavailable = Object.freeze({ status: 'unavailable' });
-        const lifeFacts = lifeResult.status === 'fulfilled' ? lifeResult.value : unavailable;
-        const readings = readingResult.status === 'fulfilled'
-          ? projectReadingHistory(readingResult.value) : unavailable;
-        return Object.freeze({ profile, lifeFacts, readings });
+        const readings = result.status === 'fulfilled'
+          ? projectReadingHistory(result.value) : unavailable;
+        return Object.freeze({ profile, readings });
       });
     },
   });

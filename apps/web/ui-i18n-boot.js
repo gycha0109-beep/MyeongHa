@@ -2,7 +2,7 @@
 (() => {
   let locale = 'ko-KR';
   try { locale = window.localStorage.getItem('myeongha.ui.locale.v1') || 'ko-KR'; } catch { /* private mode */ }
-  if (locale !== 'ja-JP' && locale !== 'zh-TW') return;
+  if (!['ja-JP', 'zh-TW', 'en-US', 'zh-CN'].includes(locale)) return;
   document.documentElement.lang = locale;
   document.documentElement.dataset.uiPending = 'true';
   const fallback = setTimeout(() => document.documentElement.removeAttribute('data-ui-pending'), 4500);

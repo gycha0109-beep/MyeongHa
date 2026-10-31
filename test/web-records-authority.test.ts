@@ -30,7 +30,8 @@ describe('web records authority boundary', () => {
 
   it('uses only canonical server-resolved current-subject reads', () => {
     expect(client).toContain("profile: '/api/me'");
-    expect(client).toContain("lifeFacts: '/api/life-record'");
+    expect(client).toContain("readings: '/api/readings'");
+    expect(client).not.toContain("lifeFacts: '/api/life-record'");
     expect(client).not.toContain('/v1/');
     expect(client).not.toContain('subjectId=');
     expect(client).not.toContain('authUserId');
@@ -55,18 +56,18 @@ describe('web records authority boundary', () => {
     expect(page).toContain('textContent');
     expect(page).not.toContain('innerHTML');
     expect(page).not.toContain('insertAdjacentHTML');
-    expect(page).toContain("element.dataset.recordsSource = ''");
-    expect(page).toContain("nameNode.dataset.recordsSource = ''");
+    expect(page).not.toContain('renderLifeFacts');
+    expect(html).not.toContain('records-profile-strip');
+    expect(page).not.toContain('records-display-name');
     expect(i18n).toContain('[data-records-source]');
   });
 
-  it('opens the Saju records tab for an explicit Reading completion handoff', () => {
-    expect(page).toContain("const requestedTab = params.get('tab');");
-    expect(page).toContain("const fromReading = params.get('from') === 'reading';");
-    expect(page).toContain("const targetTabId = fromReading || requestedTab === 'saju'");
-    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink'");
-    expect(page).toContain('const initialTab = tabs.find((tab) => tab.id === targetTabId);');
-    expect(page).toContain('if (initialTab) activate(initialTab);');
+  it('marks Reading completion handoffs without restoring record tabs', () => {
+    expect(page).toContain("params.get('tab') === 'saju'");
+    expect(page).toContain("params.get('from') === 'reading'");
+    expect(page).toContain("document.body.dataset.recordsEntry = 'reading-handoff'");
+    expect(page).not.toContain('setupTabs');
+    expect(html).not.toContain('role="tablist"');
   });
 
   it('links persisted Reading history by stored identifiers without inventing Reader authority', () => {

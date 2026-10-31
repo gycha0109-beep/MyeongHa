@@ -282,7 +282,7 @@ async function waitFor(client, expression, message, timeout = 10_000) {
     diagnostics = await client.evaluate(`(() => ({
       pathname: location.pathname,
       status: document.querySelector('#records-status')?.textContent?.trim() ?? null,
-      displayName: document.querySelector('#records-display-name')?.textContent?.trim() ?? null,
+      persistedCount: document.querySelectorAll('.records-reading-card--persisted').length,
       routeState: document.body.dataset.readingRouteState ?? null,
       recordMode: document.body.dataset.readingRecordMode ?? null,
       memberSession: localStorage.getItem('myeongha.memberSession.v1'),
@@ -343,7 +343,7 @@ try {
 
   await waitFor(
     client,
-    `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('#records-display-name')?.textContent?.trim() === '기록 회원'`,
+    `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('.records-reading-card--persisted a') !== null`,
     'Member login did not reach an authorized Records state',
   );
 
@@ -352,7 +352,7 @@ try {
   assert(session?.accessToken === member.accessToken, 'Records browser stored the wrong Member access token');
 
   const recordsRequests = requests.filter((request) => ['/api/me', '/api/life-record', '/api/readings'].includes(request.path));
-  assert(recordsRequests.length === 3, `Expected three Records API requests, received ${recordsRequests.length}`);
+  assert(recordsRequests.length === 2, `Expected two Records API requests, received ${recordsRequests.length}`);
   assert(recordsRequests[0].path === '/api/me', 'Records did not validate canonical /api/me before reading ledgers');
   for (const request of recordsRequests) {
     assert(request.authorization === `Bearer ${member.accessToken}`, `${request.path} did not use the active Member bearer`);

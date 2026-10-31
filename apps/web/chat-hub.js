@@ -1,4 +1,5 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { resolveCharacterChatIntroV1 } from './character-chat-intro-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 
@@ -179,7 +180,7 @@ function createPersonCard(person, { pending = false } = {}) {
 
   const line = document.createElement('p');
   line.className = 'chat-person-line';
-  line.textContent = uiLabel(pending ? '이 연결자는 현재 등록을 준비 중입니다.' : person.line);
+  line.textContent = pending ? uiLabel('이 연결자는 현재 등록을 준비 중입니다.') : resolveCharacterChatIntroV1(person.key, getUiLocale()).join(' ');
 
   const tags = document.createElement('div');
   tags.className = 'chat-person-tags';
@@ -211,7 +212,7 @@ function createPersonCard(person, { pending = false } = {}) {
 }
 
 function normalizedSearchText(person) {
-  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags, uiLabel(person.title), uiLabel(person.line), ...person.tags.map(uiLabel)].join(' ').toLowerCase();
+  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags, uiLabel(person.title), resolveCharacterChatIntroV1(person.key, getUiLocale()).join(' '), ...person.tags.map(uiLabel)].join(' ').toLowerCase();
 }
 
 function filteredPeople() {

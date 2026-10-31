@@ -169,4 +169,33 @@ export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
   ["저장된 기억을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.", {'ja-JP':"現在、保存済みの記憶を確認できません。ほかの記録は引き続き表示できます。", 'zh-TW':"目前無法查看已儲存的記憶，其他紀錄仍可使用。", 'en-US':"Saved memories are unavailable now. You can still view your other records.", 'zh-CN':"目前无法查看已保存的记忆，其他记录仍可使用。"}],
   ["계정 또는 세션이 변경되었습니다. 현재 계정의 기록을 보려면 새로고침해 주세요.", {'ja-JP':"アカウントまたはセッションが変更されました。現在のアカウントの記録を見るには再読み込みしてください。", 'zh-TW':"帳號或工作階段已變更。請重新整理以查看目前帳號的紀錄。", 'en-US':"Your account or session has changed. Reload to view records for the current account.", 'zh-CN':"账号或会话已变更。请刷新页面以查看当前账号的记录。"}],
   ["조회할 수 없음", {'ja-JP':"確認できません", 'zh-TW':"無法查詢", 'en-US':"Unable to load", 'zh-CN':"无法查询"}],
+  // Unified Records archive translations across all four UI languages.
+  ["MY RECORDS", {
+    'ja-JP': "私の記録", 'zh-TW': "我的紀錄",
+    'en-US': "MY RECORDS", 'zh-CN': "我的记录",
+  }],
+  ["아직 저장된 사주 풀이가 없습니다.", {
+    'ja-JP': "保存済みの四柱推命の鑑定はまだありません。", 'zh-TW': "尚未儲存八字解讀。",
+    'en-US': "No saved Saju readings yet.", 'zh-CN': "还没有已保存的八字解读。",
+  }],
+  ["완료된 사주 풀이가 저장되면 이곳에서 풀이 이력을 확인할 수 있습니다.", {
+    'ja-JP': "完了した鑑定が保存されると、ここで履歴を確認できます。", 'zh-TW': "完成的八字解讀儲存後，即可在這裡查看紀錄。",
+    'en-US': "Once a completed Saju reading is saved, you can find it here.", 'zh-CN': "完成的八字解读保存后，即可在这里查看记录。",
+  }],
+  ["다른 사주 주제 둘러보기", {
+    'ja-JP': "ほかの四柱推命テーマを見る", 'zh-TW': "瀏覽其他八字主題",
+    'en-US': "Explore other Saju topics", 'zh-CN': "浏览其他八字主题",
+  }],
+  ["저장된 풀이 열기 →", {
+    'ja-JP': "保存済みの鑑定を開く →", 'zh-TW': "開啟已儲存的解讀 →",
+    'en-US': "Open saved reading →", 'zh-CN': "打开已保存的解读 →",
+  }],
+  ["사주 페이지에서 보기 →", {
+    'ja-JP': "四柱推命ページで見る →", 'zh-TW': "前往八字頁面查看 →",
+    'en-US': "View on Saju page →", 'zh-CN': "前往八字页面查看 →",
+  }],
+  ["완료", {
+    'ja-JP': "完了", 'zh-TW': "已完成",
+    'en-US': "Completed", 'zh-CN': "已完成",
+  }],
 ]);

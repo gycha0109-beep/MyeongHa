@@ -11,28 +11,22 @@ describe('Records official-report-first entry', () => {
   const jsx = readWeb('src/records/RecordsPage.tsx');
   const page = readWeb('records-page.js');
 
-  it('opens the authoritative Reading History by default alongside the Life Fact ledger', () => {
-    expect(jsx).toContain('aria-selected="true" aria-controls="saju-records"');
-    expect(jsx).toContain('id="saju-records" className="records-tab-panel records-report-home" role="tabpanel" aria-labelledby="saju-records-tab">');
-    for (const domain of ['life']) {
-      expect(jsx).toContain(`aria-controls="${domain}-records"`);
-      expect(jsx).toContain(`id="${domain}-records"`);
-    }
-    expect(page).toContain("requestedTab === 'saju'");
-    expect(page).toContain("life: 'life-records-tab'");
+  it('shows only the authoritative Reading History archive', () => {
+    expect(jsx).toContain('id="saju-records" className="records-report-home"');
+    expect(jsx).not.toContain('life-records');
+    expect(jsx).not.toContain('role="tablist"');
     expect(jsx).not.toContain('records-tab-divider');
     expect(jsx).not.toContain('records-report-intro');
     expect(jsx).not.toContain('birth-records-tab');
     expect(jsx).not.toContain('memory-records-tab');
     expect(page).not.toContain('birth-records-tab');
     expect(page).not.toContain('memory-records-tab');
-    expect(page).toContain("document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink'");
   });
 
   it('counts only authenticated Reading History and does not treat fixture cards as purchased reports', () => {
     expect(page).toContain("byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());");
     expect(page).toContain("const readings = requireArray(readingPayload, 'readings');");
-    expect(page).toContain("if (allowsDevelopmentSajuSamples())");
+    expect(page).not.toContain("allowsDevelopmentSajuSamples");
     expect(page).toContain("explore.href = 'reading.html'");
     expect(page).not.toContain('records-report-purchase-count');
     expect(page).not.toContain('records-report-price');
@@ -42,8 +36,7 @@ describe('Records official-report-first entry', () => {
     expect(page).toContain("if (readingPayload?.status === 'unavailable')");
     expect(page).toContain("byId('saju-records-count').textContent = uiText('조회할 수 없음');");
     expect(page).toContain('조회가 실패한 상태이며, 기록이 없다는 뜻은 아닙니다.');
-    expect(page).toContain("if (payload?.status === 'unavailable')");
-    expect(page).toContain("lifeFactsPayload?.status === 'unavailable'");
+    expect(page).not.toContain('lifeFactsPayload');
   });
 
   it('formats verified saved-record count for every supported locale', () => {
