@@ -261,3 +261,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **커밋:** `7c30b58f`(브라우저 DOM 즉시 소거), `33949908`(모의 DOM 회귀 테스트).
 - **보안/남은 것:** DOM에서의 전시 소거는 이미 사용자/서버에 저장된 과거 Chat 원문을 삭제하거나 G3 공개 권한을 획득한다는 뜻이 아니다. UC-07 서버의 영구 저장·동의 취소, 현재 G3 rights 기반 Reveal, 실제 Production 원문 조회 및 모델 승인 모두 별도 HOLD.
 - **운영/통합:** 사용자가 별도 Cloudflare 해결을 보고했으나 이 트랙은 인증 토큰/배포 설정 변경 없이 PR #2761 Draft·자동 병합 OFF를 계속 유지. CI 결과는 최신 커밋 기준 별도 확인 필요.
+
+### 2026-10-31 · W12 · 이관 후 기억 거부 패턴 복구 및 G3 내부 재표시 차단 보강
+
+- **CI 실패 원인:** PR #2761 HEAD `32f043cf`의 [Work Track · security](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41183832567)에서 한국어·영어 명시적 기억 거부 테스트 1건 RED. `seyeon-planner-memory-proposal-extractor-v1.ts` 정규식 리터럴의 `\\s` / `\\b`가 과잉 이스케이프되어 공백/단어 경계를 제대로 판별하지 못한 오류를 확인. 기존 Governance/Web/PG17 통과를 전체 GREEN으로 오인하지 않음.
+- **수정:** 기억 저장 거부 표현을 Provider 호출 전에 인식하도록 실제 정규식 문법을 바로잡음. 커밋 `0aecabf9`. 모델 자동 저장·Grant 생성 권한은 없음.
+- **대화 제안 결속:** `apps/web/chat-room-read-contract.js`는 서버가 붙인 미승인 제안이라도 원본 세연 Character 답변 `bodyText`가 null·빈 문자열·공백이면 응답 전체를 거부. 캐릭터 답변 없는 제안이 역사적 Message에 결속된 것처럼 표시되지 않게 보강. 커밋 `99b7c08f`, 회귀 테스트 `a4827af0`.
+- **승인 후 재조회 검증:** 기존 실제 PostgreSQL 17 격리 UC-07 테스트에서 사용자 승인으로 Proposal이 `accepted`가 되면 같은 원본 Thread/Assistant의 G3 **내부 후보 재조회가 null**이어야 함을 명시. 커밋 `44de7b24`. 기존 `discard` 후 차단·만료 후 차단 테스트와 함께 승인된 제안의 중복 UI 제안을 금지. 이는 실 HTTP Reveal이나 철회 선형화 완료 증명이 아님.
+- **브랜치/승인:** 기존 `feat/security/s0-private-memory-review-client-20261030` / PR #2761 Draft 유지, 자동 병합 OFF. `main` 병합·Cloudflare 토큰·운영 DB 마이그레이션·개인정보 Route·유료 Provider 연결 없음. G0/G1/G2/G3/G4/G5/G6 관련 미승인 공개는 계속 `HOLD_FORWARD_STOPPED`.
+- **남은 작업:** 이 커밋들의 정확한 HEAD CI/Web/Governance/PG17/외부 Cloudflare 검사 확인. G3 원래 Grant·취소·재승인·과거 파생 Context를 하나의 서버/DB/HTTP 공개 선형화 경계로 결속하는 실제 구현 및 정책 검증은 여전히 미완료.
