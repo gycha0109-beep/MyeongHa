@@ -69,7 +69,7 @@ describe('Se-yeon current-grant browser presentation invalidation', () => {
   });
 
   it('does not notify on missing Member, rejected receipt, or transport failure', async () => {
-    const dispatchEvent=vi.fn();
+    const dispatchEvent=vi.fn((_event:Event)=>true);
     vi.stubGlobal('window',{dispatchEvent});
     vi.stubGlobal('BroadcastChannel',undefined);
     const invalid=createRecordsMemoryGrantRevokeClient({
@@ -90,7 +90,7 @@ describe('Se-yeon current-grant browser presentation invalidation', () => {
   });
 
   it('committed revoke also invalidates local presentation', async () => {
-    const dispatchEvent=vi.fn();
+    const dispatchEvent=vi.fn((_event:Event)=>true);
     vi.stubGlobal('window',{dispatchEvent});
     vi.stubGlobal('BroadcastChannel',undefined);
     const client=createRecordsMemoryGrantRevokeClient({
