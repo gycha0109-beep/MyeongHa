@@ -10,6 +10,16 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 18:30 KST — Phase 7 PostgreSQL 로컬 TCP 장애·연결 수 상한 검증
+
+- **구현 목적:** [Production Operations 아키텍처 §34](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 DB unavailable, DB slow, DB connection exhaustion 중 *연결·핸드셰이크 경계*를 통제된 비Production 환경에서 실제 소켓으로 검증. 실사용자·실서비스·운영 PostgreSQL 또는 Supabase에 접근하지 않음.
+- **실제 변경:** [`test/postgres-subject-pool-loopback-chaos-phase7.test.ts`](../../test/postgres-subject-pool-loopback-chaos-phase7.test.ts) 추가. Node의 실제 `127.0.0.1` TCP 서버와 `pg.Pool`을 사용해 (1) 닫힌 포트의 `ECONNREFUSED`, (2) 연결은 받되 PostgreSQL 핸드셰이크를 진행하지 않는 서버, (3) `maxConnectionsPerRuntime=1`인 상태에서 4개 동시 연결 요청을 시험. 기존 일반 `buildNodePostgresPoolConfigV1`의 `connectionTimeoutMs=125`, `statementTimeoutMs=500`, `maxConnectionsPerRuntime=1` 설정과 실제 pg 드라이버 동작을 함께 확인. 매 실패 후 Cloudflare Worker의 독립 `GET /api/health`가 200인지 검증.
+- **실행 증거:** Windows Node 24 + Vitest 4.1.11. 신규 **3/3 PASS**, 관련 PostgreSQL pool 기존 회귀 포함 **5파일 30/30 PASS**, `tsc -p tsconfig.json --noEmit` PASS. 열린 TCP 서버의 연결 수 최대치는 설정된 1을 넘지 않음. 로컬 TCP 요청 시간은 각 시험의 2초 이내 제한 조건을 만족. 합성 사용자·합성 PostgreSQL URL만 사용하며 실제 credential/SQL 데이터 없음.
+- **범위 및 한계:** 이것은 **실제 TCP transport/연결 대기·풀 연결 상한 검증**이지, 운영의 strict TLS `verify-full` 경로나 실제 PostgreSQL SQL 실행, `pg_sleep` 등 SQL 지연 시 `statement_timeout` 실행, DB 실제 capacity/성능·500 응답 경로의 종단 간 실증을 대체하지 않는다. 테스트 서버는 PostgreSQL 프로토콜을 구현하지 않으며, 500ms `statementTimeoutMs`는 구성 연결만 검증했지 SQL에서 발동시킨 증거가 아님. §34 전체 Phase 7, Production Operations Phase 13, Hosted Auth/Storage DR은 **미수용**. `dr_ready=false` 및 `serviceResumptionAllowed=false` 유지.
+- **추적/다음:** 브랜치 `ops/phase7-postgres-tcp-chaos-worklog-20261031`, 검증 파일과 본 Worklog를 함께 PR로 제출. 다음 순서는 실제 격리 PostgreSQL 인스턴스에서 SQL 지연·연결 점유 제한 및 적절한 오류 매핑을 측정하고, 안전한 성능/용량 기준으로 승격하는 것. Cloudflare Preview 인증 오류는 별도 추적.
+
+
+
 ### 2026-10-31 — 기록 화면 Guest 401 브라우저 검증 경로 수정
 
 - **목적:** [브라우저 검증 #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)의 최초 실행 및 1회 실패 작업 재실행 모두에서 나타난 `Records ledger authoritative 401 did not invalidate the rejected Guest` 오류를 실제 호출·응답 경계 기준으로 재현하고 해결한다.
