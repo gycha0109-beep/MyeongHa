@@ -34,7 +34,8 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
     expect(worker).toContain('SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved');
     expect(runtime).toContain('requiredPersonalRecordCount:input.zeroSourceFirstReplyApproved===true?0:1');
     expect(fetcher).toContain('if(zeroSource)');
-    expect(fetcher).toContain(SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1);
+    expect(fetcher).toContain('zeroSource ? SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1');
+    expect(SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1).toBe('public.cmd_issue_seyeon_zero_source_first_reply_v1');
     expect(fetcher).toContain('assertSeyeonG0OriginalLineageReadyV1');
     expect(fetcher).toContain('deliveryReceipt:{attemptId:e.committedTurn.attemptId,challenge}');
   });
