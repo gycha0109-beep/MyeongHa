@@ -120,11 +120,11 @@ Watchtower-Track: security
 - **다음 구현:** 정확한 최종 모델 사용 집합의 **원본·파생 lineage를 DB Owner가 모델 이전 Attempt에 불변 저장하고**, G2 원자 Commit/HTTP 공개 시 **현재 원래 Grant ID**로 재검증하는 핵심 연결. 기존 전체 검증 완료 시점까지 positive 범위 확대 금지.
 
 
-### 2026-10-31 / W05 — G1 모델 최근 메시지 DB 원본·불변 Pin 소스 (PR 준비)
+### 2026-10-31 / W05 — G1 모델 최근 메시지 DB 원본·불변 Pin 소스 (PR #2789)
 
 - **목적/구현:** #2786 모델 선택 집합의 후속 G1 source-only 경로. PostgreSQL `seyeon_private.pin_model_recent_sources_v1`이 현재 User 및 과거 User/Assistant의 실제 DB message/committed lineage를 동일 Member/Thread에서 재검증하고, 정확한 메시지 순서·원본 content hash·본문 SHA-256·서버 선정 digest를 기존 Attempt의 신규 전용 칼럼에 보관한다. 저장된 값을 수정하지 못하도록 immutable trigger를 추가한다.
 - **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, `scripts/operations/seyeon-security-s0/plan.mjs`, `apps/api/src/seyeon-g1-model-recent-source-db-pin-v1.ts`, 이 Worklog 문서. 기존 positiveProof 또는 G2/G3 contract는 변경하지 않음.
-- **검사/전제:** 본 PR은 기존 #2786을 기반으로 한 신규 소스 후속 단위이며 DB Owner 전용 함수에 public/API 실행 GRANT가 없다. 모델 송출 경로 연결·동시 보관 계약·실DB 무결성/CI/Integration은 검증 및 추가 구현이 필요하다. SQL 설치 목록 추가는 S0 격리 설치 계획 전용이며 운영 Migration이 아니다.
+- **검사/전제:** [PR #2789](https://github.com/gycha0109-beep/MyeongHa/pull/2789) 최초 구현 HEAD `4a942f389a42b58396c213113d258cb898f6a6c5` 기준, #2786을 기반으로 한 신규 소스 후속 단위이며 DB Owner 전용 함수에 public/API 실행 GRANT가 없다. 모델 송출 경로 연결·동시 보관 계약·실DB 무결성/CI/Integration은 검증 및 추가 구현이 필요하다. SQL 설치 목록 추가는 S0 격리 설치 계획 전용이며 운영 Migration이 아니다.
 - **기존 PR #2786 상태:** HEAD `37a6114` 기준 CI/Governance/Web PASS, 별도 Web Auth Browser Regression 실패 (Records Guest 401 처리). [브라우저 검사 재실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41028133827) 요청, 독립 판정 전 완료 추정 금지.
 - **남은 것/다음:** #2786 필수 CI/Integration 병합, G1 실제 모델 전 호출 경로에 전용 원본 Pin 결합 및 G2/G3 출처 계약 확대, Reader/인용 출처, 일반 credit 및 G5/G6 운영 실증. 기존 Memory 1건·과거/관계 0건 production positive 제한 해제 금지.
 - **운영 상태:** `HOLD_FORWARD_STOPPED`. 운영 DB·ACL·Provider·HTTP 공개·credit 변경 없음.
