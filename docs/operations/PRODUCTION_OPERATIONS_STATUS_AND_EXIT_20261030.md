@@ -17,7 +17,7 @@
 - **통제된 가정:** 운영 인증·TLS/호스트 승인 과정에 실제 계정/인증서를 투입하지 않도록 테스트 환경에서는 **출처·DB 승인 preflight 및 요청 identity verifier만 합성 결과로 주입**. 실제 route handler, Records HTTP runtime, `pg.Pool` TCP 오류, 503 반환/헤더 처리 코드는 프로덕션 소스 그대로 사용. 따라서 실제 Hosted Auth, Cloudflare TLS/RLS 운영 승인, SQL 실행까지 증명하지 않음.
 - **실행 증거:** Node 24 / Vitest 4.1.11, 신규 실제 TCP 장애 **6/6 PASS**. 관련 Records API·HTTP/메서드 회귀 포함 **4파일 29/29 PASS** 및 `tsc -p tsconfig.json --noEmit` PASS. 두 조건 모두 각 API에서 HTTP **503** / `AUTH_UPSTREAM_UNAVAILABLE` / `Cache-Control: no-store`, 임의 연결 재시도 없음, pool close 1회, redirect/CORS/cookie/합성 DB 비밀·Bearer 비반사, **독립 `GET /api/health` 200** 확인. 테스트 실제 실행의 실패 처리 시간은 각 2초 이내. 서버와 소켓은 테스트 종료 때 닫음.
 - **미완료/경계:** 실제 DB schema SQL 지연, Worker strict TLS `verify-full` 및 Supabase Auth 호출, Production PostgreSQL 17, Hosted DB/사용자 데이터, API p95 및 장애 알림/DR 등은 `NOT_OBSERVED`. Phase 7 전체·Phase 13 운영 수용·DR readiness 승격 금지 (`dr_ready=false`, `serviceResumptionAllowed=false`).
-- **추적·다음:** 브랜치 `ops/phase7-records-db-api-failure-worklog-20261031`. 이번 변경의 GitHub PR·CI 결과는 별도 확인해 반영. 이후 §34의 구성·계약에 맞는 안전한 격리 DB 환경에서 TLS/RLS/권한 및 장애 경계 검증, Phase 10~12 운영 실측으로 연결.
+- **추적·다음:** [PR #2806](https://github.com/gycha0109-beep/MyeongHa/pull/2806), 브랜치 `ops/phase7-records-db-api-failure-worklog-20261031`, 최초 구현 커밋 `861656da808ded7131367304dceac01a1e43ea6e`. PR의 작업 분류는 저장소가 요구하는 단독 라인 `Watchtower-Track: ops` 형식으로 보정했으며, 새 커밋의 CI·통합 검사 결과는 **미확정**으로 남김. 이후 §34의 구성·계약에 맞는 안전한 격리 DB 환경에서 TLS/RLS/권한 및 장애 경계 검증, Phase 10~12 운영 실측으로 연결.
 
 
 
