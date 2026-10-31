@@ -143,8 +143,7 @@ export async function deliverSeyeonCommittedFirstZeroNodeTurnV1(input: Readonly<
     turnId: commit.turnId,
     assistantMessageId: commit.assistantMessageId,
     sequenceNo: commit.sequenceNo,
-    replayed:
-      result.execution.disposition === 'committed_replay' || commit.replayed,
+    replayed: false,
     requestId: input.requestId,
     serverTime: input.serverTime,
   };

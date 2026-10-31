@@ -162,7 +162,7 @@ describe('first zero-source Node turn execution-to-DB-to-socket bridge', () => {
         assistantMessageId: messageId,
         assistantText: 'DB에서만 나온 세연 응답',
         sequenceNo: 2,
-        replayed: override.replayed ?? false,
+        replayed: false,
       },
       meta: {
         apiContractVersion: 'v0.9',
