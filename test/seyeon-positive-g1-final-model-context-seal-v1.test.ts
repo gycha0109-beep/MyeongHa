@@ -101,7 +101,7 @@ describe('S3/G1 original Memory final Interpreter packet seal (offline)',()=>{
       ...base,selectedModelSourceCensusDigest:'sha256:v1:'+'f'.repeat(64),
     })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
     const alternate=buildSeyeonPositiveG1PreModelSourceCensusSealV1({
-      pinnedContextInput:{...contextInput,focuses:['changed']},
+      pinnedContextInput:{...contextInput,focuses:['care']},
       selected,currentUserMessageRef,currentUserText,
     });
     expect(alternate.finalModelContextDigest).not.toBe(censusSeal.finalModelContextDigest);
