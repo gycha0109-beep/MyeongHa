@@ -172,6 +172,40 @@ describe.skipIf(!enabled)('G3 S0 history-presence authority in real PostgreSQL 1
     }
   });
 
+  it('holds existing participant rows against concurrent UPDATE while an owned history check is live',async()=>{
+    const holder=await pool.connect();
+    const competing=await pool.connect();
+    try{
+      await holder.query('BEGIN');
+      await holder.query('SET LOCAL ROLE myeongha_api_executor');
+      await holder.query('select subject_id from public.begin_member_subject_context_v1($1::uuid)',[uuid(10,1)]);
+      const current=await holder.query<{everInvolved:boolean}>(CHECK,[uuid(11,1),uuid(14,1)]);
+      expect(current.rows).toEqual([{everInvolved:true}]);
+
+      await competing.query('BEGIN');
+      await competing.query("SET LOCAL lock_timeout='250ms'");
+      await expect(competing.query(
+        'update public.conversation_thread_characters set left_at=left_at '+
+        'where thread_id=$1::uuid and character_id=$2::text',
+        [uuid(14,1),'seyeon'],
+      )).rejects.toMatchObject({code:'55P03'});
+      await competing.query('ROLLBACK');
+
+      await holder.query('COMMIT');
+      const unlocked=await competing.query(
+        'select id from public.conversation_thread_characters '+
+        'where thread_id=$1::uuid and character_id=$2::text for no key update',
+        [uuid(14,1),'seyeon'],
+      );
+      expect(unlocked.rows).toHaveLength(1);
+    }finally{
+      await competing.query('ROLLBACK').catch(()=>{});
+      await holder.query('ROLLBACK').catch(()=>{});
+      competing.release();
+      holder.release();
+    }
+  });
+
   it('rejects another Member Thread even when the caller knows both UUIDs',async()=>{
     const attacker=uuid(10,1);
     await expect(executePostgresSubjectTransactionV1({

@@ -48,6 +48,14 @@ begin
       message='Owned Thread unavailable';
   end if;
 
+  -- The Thread lock prevents new participant INSERTs through its FK.
+  -- Lock every existing participant row too: a concurrent UPDATE can
+  -- replace character_id or left_at without taking another FK KEY SHARE
+  -- on the Thread. Keep both locks through the owner's HTTP read TX.
+  perform 1 from public.conversation_thread_characters ctc
+    where ctc.thread_id=p_thread_id
+    for share;
+
   return query
     select exists(
       select 1
