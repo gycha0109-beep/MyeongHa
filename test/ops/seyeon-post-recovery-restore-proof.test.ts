@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { buildRestoreEvidenceEnvelope } from '../../scripts/build-postgres-restore-evidence-envelope.mjs';
 
 const exporter = readFileSync('scripts/operations/export-production-postgres-backup.sh', 'utf8');
+const catalogSql = readFileSync('scripts/operations/production-migration-catalog-fingerprint-readonly.sql', 'utf8');
 const restore = readFileSync('scripts/run-postgres-isolated-restore-drill.sh', 'utf8');
 const sql = readFileSync('scripts/operations/seyeon-relationship-isolated-restore-proof.sql', 'utf8');
 const creatorDefaultAcl = readFileSync('scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql', 'utf8');
@@ -20,6 +21,10 @@ function fixture(scoped = true) {
     encrypted_sha256: 'c'.repeat(64),
     archive_name: 'myeongha-postgres-20261012T034704Z.tar.gz.enc',
     migration_frontier: 20261008090417,
+    ...(scoped ? {
+      migration_catalog_version_count: 228,
+      migration_catalog_sha256: 'd'.repeat(64),
+    } : {}),
     ephemeral_data_exclusions: ['public.member_auth_rate_limit_buckets'],
     ...(scoped ? { seyeon_early_relationship_migration_history_sha256: proofHash } : {}),
   };
@@ -31,6 +36,9 @@ function fixture(scoped = true) {
     privacy_reconciliation: 'not_exercised_by_this_workflow',
     dr_ready: false,
     backup_migration_frontier: 20261008090417,
+    backup_migration_catalog_version_count: scoped ? 228 : null,
+    backup_migration_catalog_sha256: scoped ? 'd'.repeat(64) : null,
+    backup_migration_catalog_fingerprint_verified: scoped,
     backup_ephemeral_data_exclusions: ['public.member_auth_rate_limit_buckets'],
     restore_started_at_utc: '2026-10-12T03:55:17Z',
     restore_completed_at_utc: '2026-10-12T03:55:20Z',
@@ -70,6 +78,13 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     expect(exporter).toContain('seyeon_early_relationship_migration_history: $seyeon_early_history');
     expect(exporter).toContain('seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256');
     expect(exporter).not.toContain('statements,');
+    expect(exporter).toContain('capture_migration_catalog_fingerprint');
+    expect(exporter).toContain('HOLD_MIGRATION_CATALOG: production history changed during governed dump.');
+    expect(catalogSql).toContain('supabase_migrations.schema_migrations');
+    expect(catalogSql).toContain('pg_catalog.sha256');
+    expect(catalogSql).not.toMatch(/\b(?:insert|update|delete|alter|drop|create|truncate)\b\s+\w+/iu);
+    expect(restore).toContain('HOLD_MIGRATION_CATALOG: source/public fingerprint mismatch.');
+    expect(restore).toContain('backup_migration_catalog_fingerprint_verified: $backup_migration_catalog_fingerprint_verified');
   });
 
   it('checks actual restored pg_proc, privilege, RLS, and exact snapshot in rollback-only temp scope', () => {
@@ -133,6 +148,10 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     expect(envelope.seyeon_early_history_restore_proof).toBe('restored_scoped_version_name_snapshot_6_pass');
     expect(envelope.seyeon_early_functions_restore_proof).toBe('restored_public_function_catalog_11_and_rls_6_pass');
     expect(envelope.source_seyeon_early_history_sha256).toBe(proofHash);
+    expect(envelope.source_migration_catalog_version_count).toBe(228);
+    expect(envelope.source_migration_catalog_sha256).toBe('d'.repeat(64));
+    expect(envelope.source_migration_catalog_fingerprint_only).toBe(true);
+    expect(envelope.full_migration_ledger_restoration_proven).toBe(false);
     expect(envelope.supabase_managed_migration_ledger_fully_restored).toBe(false);
     expect(envelope.dr_ready).toBe(false);
   });
@@ -153,11 +172,26 @@ describe('Se-yeon post-recovery governed backup to real PG17 catalog proof', () 
     const corruptDigest = fixture();
     corruptDigest.backupManifest.seyeon_early_relationship_migration_history_sha256 = 'x';
     expect(() => buildRestoreEvidenceEnvelope(corruptDigest)).toThrow(/must be SHA-256/);
+
+    const missingCatalogDigest = fixture();
+    delete missingCatalogDigest.backupManifest.migration_catalog_sha256;
+    expect(() => buildRestoreEvidenceEnvelope(missingCatalogDigest)).toThrow(/fingerprint fields must be paired/);
+
+    const forgedCatalogHash = fixture();
+    forgedCatalogHash.backupManifest.migration_catalog_sha256 = 'e'.repeat(64);
+    expect(() => buildRestoreEvidenceEnvelope(forgedCatalogHash)).toThrow(/backup_migration_catalog_sha256/);
+
+    const forgedCatalogProof = fixture();
+    forgedCatalogProof.restoreEvidence.backup_migration_catalog_fingerprint_verified = false;
+    expect(() => buildRestoreEvidenceEnvelope(forgedCatalogProof)).toThrow(/backup_migration_catalog_fingerprint_verified/);
   });
 
   it('accepts historical archives as unproven, never silently upgrades legacy evidence to PASS', () => {
     const envelope = buildRestoreEvidenceEnvelope(fixture(false));
     expect(envelope.source_seyeon_early_history_sha256).toBe(null);
+    expect(envelope.source_migration_catalog_version_count).toBe(null);
+    expect(envelope.source_migration_catalog_sha256).toBe(null);
+    expect(envelope.source_migration_catalog_fingerprint_only).toBe(false);
     expect(envelope.seyeon_early_history_restore_proof).toBe('not_captured_in_source_backup');
     expect(envelope.seyeon_early_functions_restore_proof).toBe('not_evidenced');
     expect(envelope.dr_ready).toBe(false);

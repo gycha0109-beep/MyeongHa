@@ -104,6 +104,19 @@ jq -e '
 seyeon_early_history_canonical="$(jq -c . <<<"$seyeon_early_history_before")"
 seyeon_early_history_sha256="$(printf '%s' "$seyeon_early_history_canonical" | sha256sum | awk '{print $1}')"
 
+capture_migration_catalog_fingerprint() {
+  PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=30000' \
+    psql -X -qAt --set ON_ERROR_STOP=1 \
+    --file scripts/operations/production-migration-catalog-fingerprint-readonly.sql
+}
+migration_catalog_before="$(capture_migration_catalog_fingerprint)"
+migration_catalog_canonical="$(jq -ec --argjson frontier "$migration_frontier" '
+  select(.version_count > 0 and .migration_frontier == $frontier
+    and (.catalog_sha256 | test("^[0-9a-f]{64}$")))
+' <<<"$migration_catalog_before")"
+migration_catalog_version_count="$(jq -er '.version_count' <<<"$migration_catalog_canonical")"
+migration_catalog_sha256="$(jq -er '.catalog_sha256' <<<"$migration_catalog_canonical")"
+
 bash scripts/operations/run-production-postgres-strict-dump.sh roles "$backup_dir/roles.sql"
 bash scripts/operations/run-production-postgres-strict-dump.sh schema "$backup_dir/schema.sql"
 bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir/data.sql"
@@ -115,6 +128,11 @@ test -s "$backup_dir/data.sql"
 seyeon_early_history_after="$(capture_seyeon_early_history)"
 if [[ "$(jq -c . <<<"$seyeon_early_history_after")" != "$seyeon_early_history_canonical" ]]; then
   echo 'HOLD_SEYEON_BACKUP: relationship history changed during governed dump.' >&2
+  exit 1
+fi
+migration_catalog_after="$(capture_migration_catalog_fingerprint)"
+if [[ "$(jq -c . <<<"$migration_catalog_after")" != "$migration_catalog_canonical" ]]; then
+  echo 'HOLD_MIGRATION_CATALOG: production history changed during governed dump.' >&2
   exit 1
 fi
 
@@ -138,6 +156,8 @@ jq -n \
   --arg started_at "$started_at" \
   --arg completed_at "$completed_at" \
   --arg seyeon_early_history_sha256 "$seyeon_early_history_sha256" \
+  --arg migration_catalog_sha256 "$migration_catalog_sha256" \
+  --argjson migration_catalog_version_count "$migration_catalog_version_count" \
   --argjson seyeon_early_history "$seyeon_early_history_canonical" \
   --argjson migration_frontier "$migration_frontier" \
   '{
@@ -148,6 +168,8 @@ jq -n \
     started_at_utc: $started_at,
     completed_at_utc: $completed_at,
     migration_frontier: $migration_frontier,
+    migration_catalog_version_count: $migration_catalog_version_count,
+    migration_catalog_sha256: $migration_catalog_sha256,
     seyeon_early_relationship_migration_history: $seyeon_early_history,
     seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256,
     ephemeral_data_exclusions: [
@@ -179,6 +201,8 @@ jq -n \
   --arg encrypted_sha256 "$encrypted_sha256" \
   --arg archive_name "$(basename "$encrypted_archive")" \
   --arg seyeon_early_history_sha256 "$seyeon_early_history_sha256" \
+  --arg migration_catalog_sha256 "$migration_catalog_sha256" \
+  --argjson migration_catalog_version_count "$migration_catalog_version_count" \
   --argjson migration_frontier "$migration_frontier" \
   '{
     schema_version: $schema_version,
@@ -188,6 +212,8 @@ jq -n \
     encrypted_sha256: $encrypted_sha256,
     archive_name: $archive_name,
     migration_frontier: $migration_frontier,
+    migration_catalog_version_count: $migration_catalog_version_count,
+    migration_catalog_sha256: $migration_catalog_sha256,
     seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256,
     ephemeral_data_exclusions: [
       "public.member_auth_rate_limit_buckets"
