@@ -10,6 +10,16 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 8 실제 DB ACL·백업 신선도 확인 및 현재 Production 보호 백업 재실행
+
+- **범위:** Supabase Production `cnsfpcdiyofqvhpcegfc`의 승인된 `scripts/operations/seyeon-r2-rpc-set-fingerprint-readonly.sql` 및 `seyeon-r2-acl-grants-canonical-readonly.sql`을 **SELECT만** 실행했다. PostgreSQL 17, 대상 RPC **19/19 존재**, 누락 **0**, `anon`/`authenticated` 직접 실행 가능 **0/19**. 함수 정의/Owner 등 원문·개인정보·비밀을 출력하지 않았으며 집계 fingerprint만 확인했다.
+- **ACL 변화 주의:** 현 19개 RPC의 명시적 허가 관계 **38건**. 2026-10-29 기존 근거의 **37건**보다 1건 많으므로 정확한 변경 시점·승인 경로·기능별 기대 권한이 확정되기 전에는 **ACL 전체 동등성 PASS를 선언하지 않는다**. 브라우저 실행 권한이 새로 열린 증거는 없다. `GRANT`/`REVOKE` 미실행.
+- **역사적 변경 위험 구분:** 원격 전용 `20261008090417`는 이번 읽기 전용 재확인에서 **104,021 UTF-8 byte**, SHA-256 `4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894`로 기존 기록과 일치. 기존 [2026-10-16 R2-G 위험 수용 결정](SEYEON_R2_G_OWNER_RISK_ACCEPTANCE_20261016.md)의 `CLOSED_RISK_ACCEPTED` 유지: 역사적 실행자·요청 ID·COMMIT 원본 추적을 개발 차단 조건으로 재개하지 않는다. 현재 운영 ACL/DDL/스키마 동등성과 DR 검증은 별개.
+- **실제 백업 신선도:** 기존 기록에 적힌 2026-10-29 한 차례 외에도 자동 암호화 백업 [#40967959395](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40967959395) 및 [#41136999464](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41136999464) 모두 SUCCESS. 가장 최근 확인된 백업 #41136999464의 frontier는 `20261030021027`, 산출물 `13017123378` (암호화/보존기한 2026-11-29). 독립 조회한 현 Production 최신 migration `20261031182926`보다 과거 스냅샷이므로 **최신 스키마 커버/실제 복원 성공을 추정하지 않는다**.
+- **기존 정상 보호 경로 사용:** 현재 main `a71851de0f29db81e5891ed9ecf470450a59b5a9`에서 기존 `Production PostgreSQL Logical Backup` workflow_dispatch를 실행, [백업 #41231798713](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41231798713). 작업은 현재 백업 진행 상태이며 성공·frontier·격리 복원 결과는 실행 근거 확인 전에는 미판정이다. 운영 DB SQL/스키마/마이그레이션·비밀 설정을 변경하지 않았다.
+- **차단 유지:** Hosted Auth/Storage 원본 복구, 지속적인 독립 개인정보 삭제·철회 연속성, 전체 서비스 RPO 24시간/RTO 6시간은 아직 미입증. `dr_ready=false`, `provider_managed_data_full_restore=false`, `future_safe_privacy_reconciliation=false`, `serviceResumptionAllowed=false` 유지. #1887 OPEN.
+
+
 ### 2026-11-01 KST — Phase 8 실제 Supabase Production migration 이력 읽기 전용 대조
 
 - **검증 경계:** 명하 Production Supabase `MyengHa` project ref `cnsfpcdiyofqvhpcegfc`의 `list_migrations` 읽기 전용 조회를 현장 수행. 비교 저장소는 GitHub `main` `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd`의 `supabase/migrations/*.sql`; 파일을 변경하지 않았다. 버전 문자열의 **정확 일치 여부만** 비교했으며 실제 적용 SQL/DDL/ACL/checksum 동등성 검증이 아니다.
