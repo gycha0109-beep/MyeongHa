@@ -18,8 +18,8 @@ const admission={kind:'reserved' as const,canonicalSubjectId:subject,
   threadId:thread,clientTurnId:turn,reservationId:reservation,requiredCredits:10 as const};
 const evidence={kind:'member' as const,verifiedAuthUserId:auth};
 
-function db({acked='settled',failedProof=true,finalized='released',resolved=subject}:
-  {acked?:string;failedProof?:boolean;finalized?:string;resolved?:string}={}){
+function db({acked='settled',failedProof=true,finalized='released',resolved=subject,matchingReservation=true}:
+  {acked?:string;failedProof?:boolean;finalized?:string;resolved?:string;matchingReservation?:boolean}={}){
   const calls:{sql:string;params:readonly unknown[]|undefined}[]=[];
   let releases=0;
   const pool:PostgresSubjectPoolV1={
@@ -29,6 +29,10 @@ function db({acked='settled',failedProof=true,finalized='released',resolved=subj
         if(sql.includes('begin_member_subject_context_v1')){
           return {rows:[{subjectId:resolved,subjectKind:'member'}] as unknown as readonly Row[]};
         }
+        if(sql.includes('from public.subjects where id='))
+          return {rows:[{subjectId:resolved}] as unknown as readonly Row[]};
+        if(sql.includes('from public.chat_credit_turn_reservations_v1 where id='))
+          return {rows:(matchingReservation?[{reservationId:reservation}]:[]) as unknown as readonly Row[]};
         if(sql.includes('internal_cmd_chat_credit_ack_delivered_proven_v2'))
           return {rows:[{state:acked}] as unknown as readonly Row[]};
         if(sql.includes("ct.state in ('failed_retryable','failed_final','abandoned')"))
@@ -71,6 +75,13 @@ describe('G4 private first Memory original-delivery reconciliation',()=>{
     expect(await reconcileSeyeonG4FirstMemoryCreditsV1({
       pool:t.pool,verifiedEvidence:evidence,admission,proof:failed,
     })).toEqual({kind:'released',creditsCharged:0});
+    const subjectLock=t.calls.findIndex(x=>x.sql.includes('from public.subjects where id='));
+    const reservationLock=t.calls.findIndex(x=>x.sql.includes('from public.chat_credit_turn_reservations_v1 where id='));
+    const failureProof=t.calls.findIndex(x=>x.sql.includes("ct.state in ('failed_retryable'"));
+    expect(subjectLock).toBeGreaterThan(-1);
+    expect(reservationLock).toBeGreaterThan(subjectLock);
+    expect(failureProof).toBeGreaterThan(reservationLock);
+    expect(t.calls[reservationLock]?.params).toEqual([reservation,subject,thread,turn]);
     expect(t.calls.find(x=>x.sql.includes("ct.state in ('failed_retryable'"))?.params)
       .toEqual([subject,reservation]);
     expect(t.calls.find(x=>x.sql.includes('internal_cmd_chat_credit_finalize_v1'))?.params)
@@ -84,6 +95,15 @@ describe('G4 private first Memory original-delivery reconciliation',()=>{
     })).rejects.toThrow('not settled');
     expect(t.calls.at(-1)?.sql).toBe('ROLLBACK');
     expect(t.releases).toBe(1);
+  });
+  it('never checks Turn or refunds if the original reservation is no longer held',async()=>{
+    const t=db({matchingReservation:false});
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,verifiedEvidence:evidence,admission,proof:failed,
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryReconciliationHoldV1);
+    expect(t.calls.at(-1)?.sql).toBe('ROLLBACK');
+    expect(t.calls.some(x=>x.sql.includes("ct.state in ('failed_retryable'"))).toBe(false);
+    expect(t.calls.some(x=>x.sql.includes('internal_cmd_chat_credit_finalize_v1'))).toBe(false);
   });
   it('never releases on a network failure without final DB non-delivery proof',async()=>{
     const t=db({failedProof:false});

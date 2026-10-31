@@ -85,8 +85,25 @@ export async function reconcileSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
           throw new SeyeonG4FirstMemoryReconciliationHoldV1();
         return Object.freeze({kind:'settled' as const,creditsCharged:10 as const});
       }
-      // Never release after an ordinary network error: the DB must prove
-      // the original Turn terminally failed WITHOUT commit or delivery.
+      // Keep the SAME owner -> reservation -> Turn lock order as the
+      // private ACK/settlement SQL. Reading Turn first and THEN taking
+      // finalization locks may deadlock against a concurrent delivery ACK.
+      const ownerLock=await client.query<{subjectId:unknown}>(
+        'select id::text as "subjectId" from public.subjects where id=$1::uuid and kind=\'member\' and status=\'active\' for update',
+        [resolvedSubject.subjectId],
+      );
+      if(ownerLock.rows.length!==1 ||
+          ownerLock.rows[0]?.subjectId!==resolvedSubject.subjectId)
+        throw new SeyeonG4FirstMemoryReconciliationHoldV1();
+      const reservationLock=await client.query<{reservationId:unknown}>(
+        'select id::text as "reservationId" from public.chat_credit_turn_reservations_v1 where id=$1::uuid and subject_id=$2::uuid and thread_id=$3::uuid and client_turn_id=$4::uuid and required_credits=10 and state=\'reserved\' for update',
+        [a.reservationId,resolvedSubject.subjectId,a.threadId,a.clientTurnId],
+      );
+      if(reservationLock.rows.length!==1 ||
+          reservationLock.rows[0]?.reservationId!==a.reservationId)
+        throw new SeyeonG4FirstMemoryReconciliationHoldV1();
+      // A transport error is never grounds for a refund: after the exact
+      // reservation locks, DB must prove terminal failure with no delivery.
       const released=await releaseFailedChatCreditsCandidateV1({
         client,canonicalSubjectId:resolvedSubject.subjectId,
         reservationId:a.reservationId,
