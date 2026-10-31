@@ -54,7 +54,7 @@ describe('P4 staged private Claim DELETE integration in full PostgreSQL account 
  });
  it('requires the actual finalizer replay to reject resurrected Claim instead of returning idempotent success',()=>{
   expect(scenario).toContain('after-finalization)');
-  expect(scenario).toContain('account_deletion_finalizer_claim_replay_residue');
+  expect(scenario).toContain('Private withdrawal claim remains after account DB finalization');
   expect(scenario).toContain('internal_finalize_account_deletion_db_v1(');
   expect(scenario).toContain('rollback;');
   expect(scenario).toContain('replay proof leaked synthetic residual data');

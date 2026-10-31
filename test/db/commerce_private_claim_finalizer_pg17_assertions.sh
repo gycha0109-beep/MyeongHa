@@ -95,7 +95,7 @@ SQL
   rc=$?
   set -e
   if [[ "$rc" == 0 ]] ||
-      ! grep -q 'account_deletion_finalizer_claim_replay_residue' "$log"; then
+      ! grep -q 'Private withdrawal claim remains after account DB finalization' "$log"; then
     cat "$log" >&2
     rm -f "$log"
     fail 'deleted Subject with resurrected Claim was not rejected by finalizer replay'
