@@ -202,3 +202,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **수정:** 포트 인수에 기존 `SeyeonPostTurnPlannerMemoryPortV1['propose']`의 정확한 인수 타입을 지정. 테스트 기록에는 `values`가 존재할 때만 필드를 넣어 `exactOptionalPropertyTypes`를 준수. 변경 범위는 두 TypeScript 파일뿐, 보안 권한/SQL/운영 DB 미변경.
 - **커밋:** `906ff336187b45fbbe4f9a09d9a4ffc5de05d9ce`(포트), `e576b03de78df5d987c9b9c08a29636c9418fd75`(테스트).
 - **미완료/다음:** 수정된 Worklog 포함 최종 HEAD의 CI·PostgreSQL 17 결과는 별도 확인해야 한다. 실제 유료 Provider 및 운영 Memory 공개는 G0/G3/G4/G6 권한·예산 증빙 전까지 `HOLD_FORWARD_STOPPED`.
+
+
+### 2026-10-31 · W06 · 최신 main G0 출처 변경 보존 병합
+
+- **충돌 원인:** 이번 TypeScript 수정 뒤 `main`에 별도 보안 트랙의 S0 G0 사용자 원문 출처 보호 `15-g0-original-member-user-message.sql` 등이 추가되어 PR #2761의 `scripts/operations/seyeon-security-s0/plan.mjs`와 충돌.
+- **해결:** 최신 `main`의 G0 `13`·`14`·`15` 출처 SQL 및 기존 다른 트랙 코드를 모두 보존하고, 이 트랙의 Planner `10`·`11`·`12` SQL도 그대로 유지한 병합 트리를 생성. 타 트랙의 별도 보안 문서 및 원본 SQL을 덮어쓰지 않음.
+- **병합 커밋:** `c2e5a62609fe91432bfd1404faca1d564d77f3cf` (두 부모: 기존 작업 HEAD `bb557c39`, 최신 `main` `7057d272`). PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)은 병합 가능, 자동 병합 설정 유지.
+- **검증:** 병합 직후 최신 HEAD CI는 아직 실행 목록에서 확인되지 않았으며, 이 단계에서 GREEN으로 기록하지 않는다. 재실행 결과는 [PR Checks](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks) 기준으로 확인.
+- **잔여:** 최종 HEAD TypeScript·보안 트랙·PostgreSQL 17 CI, 실제 G3 기억 제안 UI 전달, 운영 G0/G4 승인 및 원문 접근 보안. `HOLD_FORWARD_STOPPED` 유지.
