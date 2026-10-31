@@ -115,6 +115,25 @@ done < "$work_dir/plaintext-sha256.txt"
 internal_backup_migration_frontier="$(jq -r '.migration_frontier // empty' "$work_dir/manifest.json")"
 [[ "$internal_backup_migration_frontier" == "$backup_migration_frontier" ]]
 [[ "$(jq -c '.ephemeral_data_exclusions // []' "$work_dir/manifest.json")" == "$backup_ephemeral_data_exclusions_json" ]]
+public_catalog_count="$(jq -r '.migration_catalog_version_count // empty' "$manifest")"
+private_catalog_count="$(jq -r '.migration_catalog_version_count // empty' "$work_dir/manifest.json")"
+public_catalog_sha="$(jq -r '.migration_catalog_sha256 // empty' "$manifest")"
+private_catalog_sha="$(jq -r '.migration_catalog_sha256 // empty' "$work_dir/manifest.json")"
+catalog_fingerprint_verified='false'
+catalog_count_json='null'
+if [[ -n "$public_catalog_count" || -n "$private_catalog_count" || -n "$public_catalog_sha" || -n "$private_catalog_sha" ]]; then
+  [[ "$public_catalog_count" =~ ^[1-9][0-9]*$ && "$public_catalog_count" == "$private_catalog_count" ]] || {
+    echo 'HOLD_MIGRATION_CATALOG: source/public version count mismatch.' >&2
+    exit 1
+  }
+  [[ "$public_catalog_sha" =~ ^[0-9a-f]{64}$ && "$public_catalog_sha" == "$private_catalog_sha" ]] || {
+    echo 'HOLD_MIGRATION_CATALOG: source/public fingerprint mismatch.' >&2
+    exit 1
+  }
+  [[ -n "$backup_migration_frontier" ]]
+  catalog_fingerprint_verified='true'
+  catalog_count_json="$public_catalog_count"
+fi
 
 # The portable dump deliberately excludes provider-managed supabase_migrations.
 # A new-format backup captures only six immutable, non-sensitive version/name
@@ -502,6 +521,9 @@ jq -n \
   --argjson provider_rows_with_projected_columns_in_loopback "$provider_rows_with_projected_columns_in_loopback" \
   --argjson provider_rows_replayed_in_loopback "$provider_rows_replayed_in_loopback" \
   --argjson provider_managed_data_full_restore "$provider_managed_data_full_restore" \
+  --argjson backup_migration_catalog_version_count "$catalog_count_json" \
+  --arg backup_migration_catalog_sha256 "$public_catalog_sha" \
+  --argjson backup_migration_catalog_fingerprint_verified "$catalog_fingerprint_verified" \
   --argjson backup_migration_frontier "$backup_migration_frontier_json" \
   --argjson backup_ephemeral_data_exclusions "$backup_ephemeral_data_exclusions_json" \
   --arg seyeon_early_history_restore_proof "$seyeon_history_proof" \
@@ -543,6 +565,9 @@ jq -n \
     provider_source_counts_include_payloads: false,
     provider_managed_data_full_restore: $provider_managed_data_full_restore,
     backup_migration_frontier: $backup_migration_frontier,
+    backup_migration_catalog_version_count: $backup_migration_catalog_version_count,
+    backup_migration_catalog_sha256: (if $backup_migration_catalog_sha256 == "" then null else $backup_migration_catalog_sha256 end),
+    backup_migration_catalog_fingerprint_verified: $backup_migration_catalog_fingerprint_verified,
     seyeon_early_history_restore_proof: $seyeon_early_history_restore_proof,
     seyeon_early_functions_restore_proof: $seyeon_early_functions_restore_proof,
     supabase_managed_migration_ledger_fully_restored: false,

@@ -1,5 +1,13 @@
 # MyeongHa PostgreSQL Backup / Restore Runbook v1
 
+## 2026-11-01 — source migration-catalog fingerprint in governed backup (implementation, pending first backed-up artifact)
+
+The existing encrypted Production backup captures the maximum numeric migration version and a six-entry early Relationship history snapshot, but excludes the actual `supabase_migrations.schema_migrations` ledger. The updated backup exporter now performs **two read-only** catalog fingerprints, before and after the SQL dump, and fails without uploading the archive if the numeric-version catalog changes during the operation. The fingerprint includes the ordered version, name, and SHA-256 of each statement, aggregated into one SHA-256 value **without exporting SQL text, operator identifiers, credentials or user records**.
+
+Both the encrypted internal manifest and the sanitized public manifest now carry `migration_catalog_version_count` and `migration_catalog_sha256`. On isolated restore, the public and decrypted manifests must agree exactly; a missing/partial or mismatched new fingerprint blocks restoration. The sanitized restoration evidence records source count, digest and `backup_migration_catalog_fingerprint_verified=true`; older archives remain acceptable only as **unproven historical source-catalog snapshots**. Neither case restores the full Provider-managed migration ledger.
+
+A direct Production `SELECT` using the proposed query returned **228** numeric migration versions, maximum `20261031192427`, with a 64-character digest at the time of inspection. This validates only read-only query execution, not the future scheduled workflow or an independent restore. The first governed backup and isolated restore using this updated code must be observed after the change is merged. Source fingerprint equality does **not** prove restored SQL/DDL/ACL equivalence, Hosted Auth/Storage, deleted-user non-resurrection, full RPO/RTO or service continuation. `dr_ready=false` and `serviceResumptionAllowed=false` stay unchanged.
+
 ## 2026-10-29 current DR follow-up — latest migration-matched isolated restore SUCCESS
 
 - Governed encrypted [backup #40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605), source migration `20261029012948`, artifact `12871016812` (expires `2026-11-28T03:29:12Z`), restored successfully by [isolated PostgreSQL 17 drill #40817391430](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40817391430). Restore artifact `12872589146` (SHA-256 `38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb`, expires `2026-11-28T04:23:26Z`).

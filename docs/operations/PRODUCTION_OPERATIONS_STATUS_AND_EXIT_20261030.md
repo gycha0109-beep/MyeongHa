@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 8 운영 백업 전체 migration 카탈로그 지문 고정 구현
+
+- **실제 구현:** 기존 암호화 Production PostgreSQL 백업에 숫자 버전의 전체 migration `version/name/각 SQL statement SHA-256`을 순서대로 집계한 **단일 SHA-256 지문과 항목 수**를 추가했다. 별도 읽기 전용 SQL `scripts/operations/production-migration-catalog-fingerprint-readonly.sql`을 사용해 **백업 전후 동일한 원격 기록인지 비교**하고, 버전·개수·지문이 달라지면 백업 업로드 전 실패 처리한다. 운영 migration 본문/민감 행을 산출물 또는 로그로 출력하지 않는다.
+- **복원 연계:** 복원기는 암호화 파일 내부/외부 공개 manifest의 개수·지문을 교차 확인해 불일치와 부분 누락을 거부하고, 복원 증거에는 **원본 카탈로그 지문 검증만** 기록하도록 연결했다. 이전 백업은 지문이 없는 구형 기록으로 계속 수용하되 해당 근거가 없는 것으로 표시한다. `supabase_managed_migration_ledger_fully_restored=false`는 그대로 유지한다.
+- **검증 범위:** Production Supabase PG17에서 **SELECT-only**로 실제 새 SQL을 실행해 관측 시점 **228개**, 최신 버전 `20261031192427`, 64자리 SHA-256 응답 확인. 쉘 문법 2건 PASS, 복원 증거 생성 정상·위조 지문·누락·구형 호환 직접 검사 **4/4 PASS**, Node 문법 PASS. 아직 **새 버전으로 실제 운영 백업/격리 복원 완료 증거는 없다**; 원본 DB를 쓰거나 migration repair하지 않았다.
+- **잔여 차단:** 이번 변경은 원본 관리형 migration 기록의 **지문 캡처**이지 해당 기록 자체를 격리 DB에 복원하거나 실제 SQL/DDL/ACL 동등성을 증명한 것이 아니다. Hosted Auth/Storage 복구·개인정보 연속성·전체 RPO/RTO는 미검증이고, `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지. 머지 후 다음 정기 백업에서 새 지문 근거 확인 → 해당 백업의 격리 복원 증거 확인이 다음 단계다.
+
+
 ### 2026-11-01 KST — PR #2835 중복 통합 CI RED 원인 및 정식 재제출
 
 - **정확한 실패:** [통합 #41232685886](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41232685886)에서는 `admission` FAILURE, `full` SKIPPED. `Integration requires the dedicated CI submission label event`가 원인이다. 일반 `ops` 라벨 이벤트는 정식 제출 이벤트가 아니므로 보안상 거부된 것이고, 애플리케이션·DB·복원 테스트의 실패가 아니다.
