@@ -20,6 +20,7 @@ import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/
 import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
 import { verifySeyeonPlannerPreModelSourceV1 } from '../apps/api/src/postgres-seyeon-planner-pre-model-source-v1.js';
 import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
+import { sendSeyeonPendingPlannerProposalNodeS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-reveal-s0-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -493,6 +494,84 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       threadId:f.thread,assistantMessageId:f.assistant,
       approvedInternalS0Inspection:()=>true,
     }))).toBeNull();
+  });
+
+
+  it('UC-06 G3 S0 sends only current pending proposal via a locked real Node HTTP response',async()=>{
+    const f=await prepare(211);
+    await f.commit();
+    const proposalId=uuid(27,211);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+
+    const send=async(evidence:typeof f.evidence,threadId=f.thread,assistantId=f.assistant)=>{
+      let resolveOutcome!:(outcome:string)=>void;
+      const complete=new Promise<string>(resolve=>{resolveOutcome=resolve;});
+      const server=createServer((_incoming,response)=>{
+        const controller=new AbortController();
+        response.on('close',()=>controller.abort());
+        void sendSeyeonPendingPlannerProposalNodeS0V1({
+          pool:subjectPool,verifiedEvidence:evidence,
+          serverThreadId:threadId,serverAssistantMessageId:assistantId,
+          response,requestSignal:controller.signal,requestId:'s0-proposal-211',
+        }).then(resolveOutcome,()=>resolveOutcome('error'));
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/`);
+        const raw=await response.text();
+        const outcome=await complete;
+        return {status:response.status,cache:response.headers.get('Cache-Control'),
+          payload:JSON.parse(raw) as Record<string,unknown>,outcome,raw};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+
+    const visible=await send(f.evidence);
+    expect(visible.status).toBe(200);
+    expect(visible.cache).toContain('no-store');
+    expect(visible.outcome).toBe('proposal_sent');
+    expect(visible.payload).toEqual({ok:true,
+      data:{threadId:f.thread,assistantMessageId:f.assistant,
+        memoryProposal:{sourceAuthority:'server_dialogue_planner',
+          characterId:'seyeon',proposalId,proposalKind:'memory',
+          proposalState:'pending',summary:'사용자는 인사를 했다'}},
+      meta:{apiContractVersion:'v0.9',requestId:'s0-proposal-211'},
+    });
+    expect(visible.raw).not.toContain('Synthetic first hello');
+
+    const other=await prepare(212);
+    await other.commit();
+    const wrongMember=await send(other.evidence);
+    expect(wrongMember.status).toBe(503);
+    expect(wrongMember.outcome).toBe('proposal_withheld');
+    expect(wrongMember.raw).not.toContain('사용자는 인사를 했다');
+
+    const wrongMessage=await send(f.evidence,f.thread,f.user);
+    expect(wrongMessage.status).toBe(503);
+    expect(wrongMessage.raw).not.toContain('사용자는 인사를 했다');
+
+    await f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      });
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,choice:'discard',
+      });
+      return commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    const afterDiscard=await send(f.evidence);
+    expect(afterDiscard.status).toBe(503);
+    expect(afterDiscard.outcome).toBe('proposal_withheld');
+    expect(afterDiscard.raw).not.toContain('사용자는 인사를 했다');
   });
 
   it('UC-07 session-only and discard resolve pending without long-term Memory or Grants',async()=>{
