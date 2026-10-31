@@ -68,7 +68,7 @@ describe('UC-06 post-turn Worker -> Planner memory port',()=>{
     }))};
     const captured:{sql:string;values?:readonly unknown[]}[]=[];
     const query=vi.fn(async(sql:string,values?:readonly unknown[])=>{
-      captured.push({sql,values});
+      captured.push(values === undefined ? {sql} : {sql,values});
       if(sql.includes('begin_member_subject_context_v1'))
         return {rows:[{subjectId:SUBJECT,subjectKind:'member'}]};
       if(sql.includes('cmd_create_pending_seyeon_planner_memory_v1'))
