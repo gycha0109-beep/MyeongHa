@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2815 통합 CI 정책 거부 원인 확인 및 라벨 이벤트 재제출
+
+- **대상:** [PR #2815](https://github.com/gycha0109-beep/MyeongHa/pull/2815), source HEAD `a6c9b409b280a75a82f5b7d6218243895a42879a`, Phase 7 격리 PostgreSQL 역할/RLS 트랜잭션 경계 실증.
+- **RED 직접 원인:** [통합 CI #41215285132](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41215285132)의 admission 단계가 `Integration requires the dedicated CI submission label event`로 FAILURE. 전체 `full` job은 skipped여서 코드 테스트가 실패한 것이 아니며, 최초 일반 PR 이벤트의 필수 제출 형식이 잘못됐음.
+- **다른 검사 결과:** 같은 HEAD의 [기본 CI #41215279578](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41215279578), [Governance #41215279620](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41215279620), [Web PR Domain Gates #41215279572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41215279572), Cloudflare Workers Builds, `Work Track · ops` 모두 SUCCESS.
+- **실제 재제출:** 필수 검사가 전부 성공한 후 PR #2815에 **`ci-integration-ready` 전용 라벨**을 적용해 [통합 CI #41216562286](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41216562286)을 동일 HEAD에서 새로 제출. 재제출 접수와 실행 상태는 확인했지만 **최종 결과/병합 여부는 미확정**이며 PASS 추정 금지. 단순 `rerun failed jobs`는 원래 이벤트를 바꾸지 못하므로 사용하지 않음.
+- **변경 경계:** 제품 코드, 합성 RLS 테스트, PostgreSQL/Cloudflare 운영 설정, 비밀정보·사용자 데이터를 변경하지 않음. 기존 Worklog만 별도 문서 PR로 기록해 원본 PR의 통합 실행을 방해하지 않음. Phase 8 DR·Phase 13 전체 운영 수용 미완료; `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+
 ### 2026-11-01 KST — PR #2810 통합 CI 제출 이벤트 RED 확인 및 재제출
 
 - **대상:** [Phase 11 격리 PostgreSQL 용량 계측 PR #2810](https://github.com/gycha0109-beep/MyeongHa/pull/2810), 원본 HEAD `d4d647ba7daad901f7f6571bbfea59bb0230c653`. 해당 HEAD의 GitHub [CI #41211802736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211802736), [Governance #41211802687](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211802687), [웹 검사 #41211802683](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211802683), Cloudflare Workers Builds와 작업 트랙 분류는 모두 **SUCCESS**.
