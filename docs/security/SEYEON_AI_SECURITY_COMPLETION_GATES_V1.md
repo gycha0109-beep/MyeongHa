@@ -193,3 +193,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **커밋:** `bed9b1fe`(main 통합), `6e6ca7a1`(합성 Worker 흐름 테스트).
 - **CI:** 작업 HEAD `6e6ca7a140eea2b5bc58ebad49b06328cd6a7e4d`에서 CI/Web/Governance가 실행 대기·진행 중으로 확인됨. 성공 판정하지 않음. [PR 검사](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks).
 - **잔여:** 실제 Production Post-turn은 Owner 출처 Gate가 OFF-only로 개인 원문을 읽지 않는다. 현 상태의 포트 결속은 운영 활성화가 아니며, G0/G4 원천 승인·budget·G3 UI 후속 권한 계약·G5/G6 승인 후에만 개인 기록을 사용할 수 있다.
+
+
+### 2026-10-31 · W05 · CI RED TypeScript 오류 수정 및 재시도
+
+- **실패 증거:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks)의 HEAD `5433f2a662cd0047c4e046d014198e9f7fb06a9d` 검사. `Governance` / `Web PR Domain Gates` **GREEN**; `CI` [41027186530](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027186530) **RED**. `Work Track · security` (job `123968237399`)에서 TypeScript `TS7031`, `TS2379` 확인.
+- **원인:** `seyeon-post-turn-planner-memory-port-v1.ts`의 `propose({committedTurn})` 인수에 명시적 타입이 없어 암시적 any 발생. `test/seyeon-post-turn-planner-memory-port-v1.test.ts`의 선택 필드 `values`가 `undefined`일 때도 객체에 포함되어 엄격한 optional property 규칙 위반. PostgreSQL 17 종속 검사 역시 동일한 컴파일 오류에 의해 테스트를 시작하지 못해 RED로 전파됨. 해당 검사에는 추가로 `saju-abuse-admission-attack-e2e` / `saju-official-records-http-e2e` 실패가 기록됐지만, 로그상 이들의 공통 선행 원인은 컴파일 실패이며 별도 DB 기능 결함으로 단정하지 않는다.
+- **수정:** 포트 인수에 기존 `SeyeonPostTurnPlannerMemoryPortV1['propose']`의 정확한 인수 타입을 지정. 테스트 기록에는 `values`가 존재할 때만 필드를 넣어 `exactOptionalPropertyTypes`를 준수. 변경 범위는 두 TypeScript 파일뿐, 보안 권한/SQL/운영 DB 미변경.
+- **커밋:** `906ff336187b45fbbe4f9a09d9a4ffc5de05d9ce`(포트), `e576b03de78df5d987c9b9c08a29636c9418fd75`(테스트).
+- **미완료/다음:** 수정된 Worklog 포함 최종 HEAD의 CI·PostgreSQL 17 결과는 별도 확인해야 한다. 실제 유료 Provider 및 운영 Memory 공개는 G0/G3/G4/G6 권한·예산 증빙 전까지 `HOLD_FORWARD_STOPPED`.
