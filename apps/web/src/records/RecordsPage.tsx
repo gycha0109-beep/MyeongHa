@@ -12,7 +12,6 @@ export function RecordsPage() {
           <div className="records-kicker">MY RECORDS</div>
           <h1 className="records-title">기록</h1>
         </div>
-        <p className="records-lead">완료되어 저장된 사주 풀이를 다시 확인합니다.</p>
       </header>
 
       <div id="records-status" className="records-status" role="status">기록을 불러오는 중입니다…</div>
