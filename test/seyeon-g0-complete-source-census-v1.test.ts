@@ -25,6 +25,12 @@ describe('G0 source completeness before any historical text release', () => {
     expect(source).toContain('v_resolved_source_count:=0;');
     expect(source).toContain('v_resolved_source_count:=v_resolved_source_count+1;');
     expect(source).toContain('if v_resolved_source_count<>v_message_count then');
+    expect(source).toContain("where p.ref_kind='source_message' and p.source_message_id is not null");
+    expect(source).toContain("count(distinct p.source_message_id)");
+    expect(source).toContain("count(distinct p.ordinal)");
+    expect(source).toContain('v_all_ref_count<>v_message_count');
+    expect(source).toContain('v_distinct_message_count<>v_message_count');
+    expect(source).toContain('v_distinct_ordinal_count<>v_message_count');
     expect(source).toContain("constraint='seyeon_g0_relationship_origin_census_mismatch'");
     expect(source).toContain('perform seyeon_private.assert_current_original_member_user_message_v1(');
     expect(source).toContain('perform seyeon_private.assert_current_original_assistant_lineage_v1(');
