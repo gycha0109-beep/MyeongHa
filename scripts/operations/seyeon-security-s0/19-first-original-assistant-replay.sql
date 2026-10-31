@@ -77,9 +77,15 @@ begin
 
   -- DB-owned original Grant ID/record digest and current withdrawal status:
   -- the same exact committed Attempt's positiveProof, never a fresh regrant.
-  perform seyeon_private.assert_current_original_assistant_lineage_v1(
-    p_subject_id,p_thread_id,p_assistant_message_id
-  );
+  begin
+    perform seyeon_private.assert_current_original_assistant_lineage_v1(
+      p_subject_id,p_thread_id,p_assistant_message_id
+    );
+  exception when sqlstate '42501' then
+    -- A revoked, superseded, regranted or unsupported original source
+    -- returns no replay bytes. Other DB faults abort the whole send.
+    return;
+  end;
 
   -- The original Grant/Memory SHARE locks remain held through Node finish
   -- by the caller's still-live canonical Member transaction.
