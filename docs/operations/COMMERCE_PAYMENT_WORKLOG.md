@@ -152,3 +152,4 @@
 - **검증:** 변경된 Reader Grant 및 Provider Event, 최초/두 번째 DB 오류, 누락·중복, 권한 상실·롤백, 원본 결제 계보에 대한 신규 회귀 검사. 기존 실제 PostgreSQL 17 스모크에 조회 필드 추가(결과는 공식 CI 확인 전 미확정).
 - **안전:** `postGetDbSnapshotStable`는 관찰값일 뿐 Provider `NEWER/STALE`, T2 원자적 잠금, 법적 환불 또는 실제 Grant 회수 승인으로 승격하지 않습니다. 운영 refund/LIVE/자동 revoke OFF 유지.
 - **브랜치:** `feat/commerce-payment/postget-reader-cas-revalidation-20261101`. 상세: `docs/operations/COMMERCE_P4_POST_GET_READER_CAS_REVALIDATION_V1.md`.
+- **통합 PR:** [PR #2825](https://github.com/gycha0109-beep/MyeongHa/pull/2825). 구현 커밋 `dfa7920c`, 관련 Vitest 12개 파일 232건 PASS, 타입 검사·빌드·SQL 생성 PASS. 필수 PostgreSQL 17 및 통합 CI 완료 전까지 실제 DB 검증 결과는 미확정입니다.
