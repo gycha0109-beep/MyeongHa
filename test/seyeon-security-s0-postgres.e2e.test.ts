@@ -18,6 +18,7 @@ import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
 import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/postgres-seyeon-planner-memory-decision-source-v1.js';
 import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
+import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -88,6 +89,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         to myeongha_api_executor;
       grant execute on function seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1(uuid,uuid,text)
         to myeongha_api_executor;
+       grant execute on function seyeon_private.qry_pending_seyeon_planner_display_candidate_v1(uuid,uuid,uuid)
+         to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
         seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
@@ -535,6 +538,48 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
         clock_timestamp()-interval '1 day',101)`))
       .rejects.toMatchObject({constraint:'seyeon_planner_expiry_policy_required'});
+  });
+
+  it('S0 pending Planner display candidate is owner-bound, never a public G3 Reveal',async()=>{
+    const f=await prepare(208);
+    await f.commit();
+    const proposalId=uuid(27,208);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+
+    const inspect=()=>f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.assistant,
+      approvedInternalS0Inspection:()=>true,
+    }));
+    expect(await inspect()).toEqual({
+      sourceAuthority:'db_owner_planner_inspection_only',
+      disclosureAuthorized:false,subjectId:f.subject,threadId:f.thread,
+      assistantMessageId:f.assistant,proposalId,proposalKind:'memory',
+      summary:'사용자는 인사를 했다',
+    });
+    expect(await f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.user,
+      approvedInternalS0Inspection:()=>true,
+    }))).toBeNull();
+    await f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      });
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+        choice:'discard',
+      });
+      await commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    expect(await inspect()).toBeNull();
   });
 
   it('rejects a revoked original Grant at atomic Commit even after a fresh replacement Grant', async () => {
