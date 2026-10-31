@@ -81,7 +81,7 @@ begin
       -- exact original User text under this same actual Commit TX.
       -- Legacy staged positive attempts without the new certificate
       -- remain held by their existing distinct source policy.
-      v_recent:=to_jsonb(old)->'seyeon_recent_source_pin_jsonb';
+      v_recent:=nullif(to_jsonb(old)->'seyeon_recent_source_pin_jsonb','null'::jsonb);
       if v_recent is not null then
         v_recent_message:=v_recent->'sources'->0;
         if v_recent->>'schemaVersion' is distinct from

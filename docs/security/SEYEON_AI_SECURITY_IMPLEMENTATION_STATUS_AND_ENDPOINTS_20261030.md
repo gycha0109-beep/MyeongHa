@@ -184,3 +184,12 @@ Watchtower-Track: security
 - **목적/구현:** 선행 #2786의 Guest 401 테스트 경로 수정 커밋 `089d243d`를 #2789 후속 브랜치에 병합했다. 동일 보고서가 양쪽 브랜치에서 편집되어 발생한 Git 충돌은 #2789 쪽 W01~W11 전체 누적 원문을 유지하는 방식으로 해결했다. 브라우저 테스트 소스는 선행 브랜치의 수정본을 그대로 유지한다.
 - **증거/상태:** #2786 및 #2789 각 HEAD의 새 CI·전체 Integration 결과는 확인 전 PASS로 간주하지 않는다. 두 PR은 여전히 코드 소스 단계이며 병합·배포를 운영 승인으로 보지 않는다.
 - **미완료:** G1/G2 실제 PostgreSQL 격리 실행 증거, G3 최초/재공개·전출처 검증, G4 크레딧·G5/G6 운영 종료. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W13 — #2789 RED 보정: G2 JSON null과 G1 검증 테스트 정합성
+
+- **원인/증거:** [#2789 CI #41185261913](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185261913)에서 security 단위 검사 2건은 구형 문자열 `await input.positivePersonalSourcePort.pinBeforeModel({`의 존재를 요구하여 새 결합 호출 경로를 인식하지 못했다. PostgreSQL S0 e2e 9건은 기존 Attempt에 신규 출처 칼럼 값이 없는 경우 `to_jsonb(old)->'seyeon_recent_source_pin_jsonb'`가 SQL NULL이 아닌 JSON `null`로 해석되어 G2의 추가 출처 검증이 잘못 실행된 것이 직접 원인이다.
+- **수정:** `02-atomic-commit.sql`에서 JSON `null`을 SQL NULL로 정규화하여 기존 S0 양수 Grant/원본 검사와 공개 경로를 유지하고, 신규 모델 출처 증명이 실제 존재하는 경우에만 추가 User 출처 검증을 적용한다. 두 단위 검사는 새 결합 Pin 및 기존 주입 Pin 분기 모두 모델/거버넌스 호출 이전에 있는지 확인하도록 갱신했다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`, `test/seyeon-attempt-zero-personal-proof-v1.test.ts`, `test/seyeon-exact-model-personal-source-selection-v1.test.ts`, 본 Worklog.
+- **재검증 범위:** 수정 전 오류는 S0 실DB e2e 9건 및 security 테스트 2건. 로컬 의존 패키지 중 Vitest 실행 파일이 없어 로컬 직접 재검증은 수행되지 못했다. 후속 커밋의 CI 및 PostgreSQL 격리 검사 결과가 성공할 때만 PASS로 보고한다. #2786의 브라우저/보안 기본 검사는 PASS 확인되었으나 PR 병합 상태는 여전히 별도 확인 필요.
+- **운영:** `HOLD_FORWARD_STOPPED`; Production DB/ACL/Provider/Reveal 경로 활성화 없음.
