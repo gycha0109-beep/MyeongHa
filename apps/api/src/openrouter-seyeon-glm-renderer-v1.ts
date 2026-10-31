@@ -15,6 +15,8 @@ export const SEYEON_GLM_RENDERER_MODEL_V1 = 'z-ai/glm-5.3-flash' as const;
 export const SEYEON_GLM_RENDERER_PROVIDER_KEY_V1 = 'openrouter-chat' as const;
 export const SEYEON_GLM_RENDERER_ENDPOINT_V1 =
   'https://openrouter.ai/api/v1/chat/completions' as const;
+/** Real conversation packets include pinned context; the shadow cap was only 24 KiB. */
+export const SEYEON_GLM_RENDERER_MAX_REQUEST_BYTES_V1 = 131_072 as const;
 
 export interface SeyeonGlmRendererConfigV1 {
   readonly apiKey: string;
@@ -76,7 +78,7 @@ export function createSeyeonGlmRendererV1(
         },
       });
       const bytes = new TextEncoder().encode(body).byteLength;
-      if (bytes < 1 || bytes > 24_576) {
+      if (bytes < 1 || bytes > SEYEON_GLM_RENDERER_MAX_REQUEST_BYTES_V1) {
         throw new Error('Se-yeon GLM renderer request exceeds the bounded size.');
       }
       const callId = crypto.randomUUID();
@@ -124,7 +126,7 @@ export function createSeyeonGlmRendererV1(
         });
         const payload: unknown = JSON.parse(raw);
         if (!record(payload) ||
-            (payload.model !== undefined && payload.model !== SEYEON_GLM_RENDERER_MODEL_V1) ||
+            payload.model !== SEYEON_GLM_RENDERER_MODEL_V1 ||
             !Array.isArray(payload.choices) || payload.choices.length !== 1 ||
             !record(payload.choices[0])) {
           outcome = 'invalid_response';
@@ -148,6 +150,19 @@ export function createSeyeonGlmRendererV1(
           const completionDetails = record(u.completion_tokens_details) ? u.completion_tokens_details : {};
           cachedInputTokens = number(details.cached_tokens ?? 0);
           reasoningTokens = number(completionDetails.reasoning_tokens ?? 0);
+        }
+        // A delivered reply without metered usage is not admitted as a valid GLM result.
+        if (inputTokens === null || inputTokens < 1 || outputTokens === null ||
+            outputTokens < 1 || outputTokens > 1536 || cachedInputTokens === null ||
+            cachedInputTokens > inputTokens || reasoningTokens === null ||
+            reasoningTokens > outputTokens) {
+          // Malformed upstream counters must not also break the durable failure receipt.
+          inputTokens = null;
+          outputTokens = null;
+          cachedInputTokens = null;
+          reasoningTokens = null;
+          outcome = 'invalid_response';
+          throw new Error('Se-yeon GLM renderer response lacks valid usage.');
         }
         const result: unknown = JSON.parse(choice.message.content);
         if (!record(result)) {

@@ -92,6 +92,49 @@ describe('active Se-yeon GLM renderer transport', () => {
     }
   });
 
+  it('accepts a bounded, context-rich Se-yeon turn larger than the synthetic evaluation cap', async () => {
+    const fetchImpl = vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const body = String(init?.body);
+      expect(new TextEncoder().encode(body).byteLength).toBeGreaterThan(24_576);
+      expect(JSON.parse(body).messages[1].content).toContain('이전 대화');
+      return mockResponse({
+        model: SEYEON_GLM_RENDERER_MODEL_V1,
+        choices: [{finish_reason:'stop',message:{role:'assistant',content:'{"utterance":"기억하고 있어요."}'}}],
+        usage:{prompt_tokens:10500,completion_tokens:60},
+      });
+    });
+    const provider = createSeyeonGlmRendererV1({apiKey:key,fetchImpl});
+    expect(await provider.generate({
+      ...req, input:{...req.input, recentConversation:'이전 대화'.repeat(4_000)},
+    })).toEqual({utterance:'기억하고 있어요.'});
+    expect(fetchImpl).toHaveBeenCalledOnce();
+  });
+
+  it('never admits substituted models, missing usage or impossible token counts', async () => {
+    const invalid = [
+      {model:'other-provider/other-model',usage:{prompt_tokens:200,completion_tokens:35}},
+      {usage:{prompt_tokens:200,completion_tokens:35}},
+      {model:SEYEON_GLM_RENDERER_MODEL_V1},
+      {model:SEYEON_GLM_RENDERER_MODEL_V1,usage:{prompt_tokens:200,completion_tokens:0}},
+      {model:SEYEON_GLM_RENDERER_MODEL_V1,usage:{prompt_tokens:200,completion_tokens:1600}},
+      {model:SEYEON_GLM_RENDERER_MODEL_V1,usage:{prompt_tokens:200,completion_tokens:35,
+        prompt_tokens_details:{cached_tokens:201}}},
+    ];
+    for (const fields of invalid) {
+      const afterOutcome = vi.fn(async () => {});
+      const provider = createSeyeonGlmRendererV1({
+        apiKey:key,afterOutcome,
+        fetchImpl:async () => mockResponse({
+          choices:[{finish_reason:'stop',message:{role:'assistant',content:'{"utterance":"안녕"}'}}],
+          ...fields,
+        }),
+      });
+      await expect(provider.generate(req)).rejects.toThrow();
+      expect((afterOutcome.mock.calls as unknown[][])[0]?.[0])
+        .toMatchObject({outcome:'invalid_response'});
+    }
+  });
+
   it('does not retry or silently fall back to OpenAI after a provider failure', async () => {
     const fetchImpl = vi.fn(async () => new Response('unavailable',{status:503}));
     const afterOutcome = vi.fn(async () => {});
