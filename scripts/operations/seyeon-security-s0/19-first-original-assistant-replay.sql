@@ -11,7 +11,7 @@ create function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
   p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid
 ) returns table(assistant_text text)
 language plpgsql security definer
-set search_path=pg_catalog,public set row_security=off
+set search_path=pg_catalog,public
 as $replay$
 declare
   v_text text;
