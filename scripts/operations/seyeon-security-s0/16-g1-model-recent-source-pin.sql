@@ -32,6 +32,16 @@ for each row execute function seyeon_private.reject_recent_source_pin_mutation_v
 grant update (redacted_at) on public.conversation_messages
   to myeongha_seyeon_chat_runtime_owner;
 
+-- SELECT FOR SHARE must also pass an UPDATE USING policy. The NOLOGIN
+-- G1 owner may lock ONLY the current Subject's original messages, while
+-- WITH CHECK (false) rejects every attempted change, including no-ops.
+-- This does not give API or public roles additional row access.
+create policy seyeon_g1_recent_original_lock_only_v1
+on public.conversation_messages
+for update to myeongha_seyeon_chat_runtime_owner
+using (subject_id=public.current_myeongha_subject_id())
+with check (false);
+
 grant myeongha_seyeon_chat_runtime_owner to current_user;
 grant create on schema seyeon_private to myeongha_seyeon_chat_runtime_owner;
 

@@ -217,3 +217,11 @@ Watchtower-Track: security
 - **원인/조치:** PostgreSQL 17의 행잠금 `FOR SHARE`는 SELECT뿐 아니라 대상 테이블 중 최소 한 컬럼의 UPDATE 권한을 요구한다. 기존 `myeongha_seyeon_chat_runtime_owner`(NOLOGIN)에는 대화 메시지 SELECT/INSERT만 허용돼 있었다. S0 격리 설치 SQL `16-g1-model-recent-source-pin.sql`에서 **오직 NOLOGIN Owner에 `conversation_messages.redacted_at` 단일 컬럼 UPDATE 권한**을 추가하여 행잠금이 가능하도록 했다. 이 Owner의 실제 행 UPDATE는 기존 subject-scope RLS에 UPDATE 정책이 없어 계속 거부된다. API/anon/authenticated/service_role에 새 권한이나 공개 실행 경로는 부여하지 않는다.
 - **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 본 Worklog. 추가로 [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) HEAD의 필수 CI 재검증 결과를 확인해야 하며, 이 수정의 PASS를 선인정하지 않는다.
 - **외부 별도 실패:** Cloudflare Workers 빌드 실패는 기존 Invalid access token 문제로 분리, 운영 인증 토큰을 수정하거나 공개 빌드를 강제하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W17 — G1 행잠금 RED 재보정: PostgreSQL UPDATE RLS 선택 조건
+
+- **검사 근거:** [#2786 통합 CI #41190357843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41190357843)에서 S0 실제 DB 테스트 13개 중 12개 PASS, 신규 G1→G3 최초 공개 시나리오만 `seyeon_private.pin_model_recent_sources_v1`의 `G1 recent source ordering or DB origin invalid`로 실패. 이전 W16 후 `permission denied`는 해결됐으나 `SELECT ... FOR SHARE`의 원본 행 선택이 실패했다.
+- **원인/조치:** PostgreSQL 17 `SELECT FOR SHARE`는 SELECT 권한 외에 **UPDATE 행 보안 정책의 USING**도 통과해야 한다. `myeongha_seyeon_chat_runtime_owner`는 기존 subject-scoped SELECT RLS만 있고 UPDATE 정책이 없어 해당 원본 행이 숨겨졌다. 격리 SQL `16-g1-model-recent-source-pin.sql`에 **해당 NOLOGIN 소유자만** 현재 Subject의 행을 잠글 수 있는 UPDATE 정책을 추가했고 `WITH CHECK(false)`로 실제 UPDATE(동일 값 쓰기 포함)를 모두 거부한다. W16의 컬럼 한정 권한과 결합해서 행잠금만 가능하며 API/일반 역할 권한 및 public 실행 범위는 확대하지 않는다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 본 Worklog.
+- **후속 검증/운영:** 이번 수정 HEAD의 S0 격리 PostgreSQL·security·browser CI 재실행 결과는 성공 확인 전 PASS로 추정하지 않는다. Cloudflare Workers 빌드는 이전 인증 토큰 실패와 별개로 다룬다. 운영 DB/ACL/Provider/HTTP 공개 변경 없음; `HOLD_FORWARD_STOPPED` 유지.
