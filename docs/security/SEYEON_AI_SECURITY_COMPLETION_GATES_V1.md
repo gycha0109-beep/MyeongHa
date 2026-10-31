@@ -325,3 +325,10 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **대화 UI 결속:** 'chat-runtime-client.js'는 알림 수신 시 기존 세연 답변과 제안 DOM을 즉시 제거하고 권한 재확인 상태로 전환한다. 철회 전에 시작된 비동기 History 조회와 ACK 완료 후 도착하는 Turn 응답은 탭별 표시 상태 버전이 바뀌었으면 새로 렌더하지 않는다. 다른 Character 방의 권한을 확장하지 않으며 인증용 Bearer·DB Grant/철회 state는 변경하지 않는다.
 - **검증:** 'seyeon-memory-visibility-invalidation.test.ts'에서 pending/committed ACK, 잘못된 응답·비회원 차단, 로컬/다른 탭 무내용 알림을 테스트한다. 새 HEAD CI 결과 확인 전 GREEN으로 보고하지 않는다.
 - **경계:** 이미 외부로 송출된 HTTP 바이트를 회수하지 않는다. 다른 기기/탭에서 이루어진 철회가 열린 탭에 반드시 전달됨을 보장하는 실시간 서버 구독은 미구현이다. 알림은 화면 재표시 억제일 뿐, G0 원본 권한·G3 History 승인·실제 DB 철회 완료의 증거가 아니다. 서버 G1/G2/G3 원본 권한·Worker/Reader 파생 출처와 운영 크레딧/G4~G6는 HOLD. Source-only 동일 Draft PR #2761, 운영 공개·Provider·DB ACL·병합 없음.
+
+### 2026-11-01 · W19 · 첫 대화의 User·Assistant 원본 출처 공동 재조회 (S0 격리)
+
+- **구현:** 새 `20-first-original-dialogue-pair.sql`에서 기존 `19`의 **동일 첫 Assistant·원래 Grant/Memory·핀·현재 철회 상태** 검증이 완료된 경우에만, 같은 확정 Turn에 속하는 **DB 원본 Member User 메시지**의 동일 Subject/Thread·작성자 형태·해시·요청 스냅샷을 검증해 정확히 User 1건+Assistant 1건을 공동 반환한다. 어느 하나라도 확인할 수 없으면 원문 전체를 반환하지 않는다.
+- **직접 Node:** `seyeon-first-original-dialogue-pair-node-s0-v1.ts`에 동일 Member 인증과 대상 격리 DB를 요구하는 GET `/api/chat/:threadId/original-pair/:assistantMessageId`를 구현했다. 현재 Grant/Record와 메시지 SHARE 잠금을 **Node 소켓 finish까지** 보유한다. Fetch/Workers 프록시 경로, Production, 범용 History로는 마운트하지 않는다.
+- **설치/검증:** S0 격리 설치 계획에 20번 SQL 포함, 일반 API 역할의 기본 EXECUTE DENY를 설치 중 확인한다. 기존 PostgreSQL17 통합 테스트에서 유효한 첫 User·Assistant 한 쌍, 타 Subject, 비인증, 철회, 새 Grant 재승인 후 과거 답변 재생 불가를 실 HTTP로 검증하도록 연결했다. 현재 HEAD CI 결과 확인 전 GREEN 미확정.
+- **남은 범위:** 이 기능은 첫 대화 1쌍만 다룬다. 여러 Turn, 과거 인용된 파생 개인정보, Reader/관계 출처, 전체 G1 모델 Pin, 일반 G3 History/Replay, 운영 HTTP/수신 증명, G4~G6는 여전히 HOLD. 원본 사용자 메시지라는 사실만으로 복사·인용된 다른 개인정보의 권한이 자동 승인되지 않는다. PR #2761 Draft / 운영 공개·유료 Provider·병합 없음.
