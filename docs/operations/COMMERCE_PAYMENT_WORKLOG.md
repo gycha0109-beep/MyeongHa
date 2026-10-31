@@ -153,3 +153,15 @@
 - **안전:** `postGetDbSnapshotStable`는 관찰값일 뿐 Provider `NEWER/STALE`, T2 원자적 잠금, 법적 환불 또는 실제 Grant 회수 승인으로 승격하지 않습니다. 운영 refund/LIVE/자동 revoke OFF 유지.
 - **브랜치:** `feat/commerce-payment/postget-reader-cas-revalidation-20261101`. 상세: `docs/operations/COMMERCE_P4_POST_GET_READER_CAS_REVALIDATION_V1.md`.
 - **통합 PR:** [PR #2825](https://github.com/gycha0109-beep/MyeongHa/pull/2825). 구현 커밋 `dfa7920c`, 관련 Vitest 12개 파일 232건 PASS, 타입 검사·빌드·SQL 생성 PASS. 필수 PostgreSQL 17 및 통합 CI 완료 전까지 실제 DB 검증 결과는 미확정입니다.
+
+### 2026-11-01 — PortOne 개별 부분 취소 이벤트 집합의 영수증 단위 감사
+
+- **기준:** #2825가 필수 CI 통과 후 `main`에 병합된 상태에서 분기, 최초 기준 `069c4650`.
+- **실제 구현:** 기존 `commerce_provider_events`만 읽는 내부 취소 집합 감사 모듈을 추가했습니다. 검증된 Reading Receipt당 최대 256개 취소 Provider Event에서 서로 다른 취소 ID HMAC·서명 HMAC·최초 GET 증거·`SUCCEEDED` 금액을 대조합니다. 개별 취소 합계가 원금보다 크거나, 최초 관측된 누적액 집합과 일치하지 않거나, 동일 취소 ID가 서로 다른 이벤트에서 중복되면 보류합니다.
+- **안전 경계:** 읽기 전용 완전 가시성 권한·트랜잭션 ROLLBACK 강제. 별도 원장·운영 migration·환불 POST·Grant 회수·공개 라우트 없음. 숫자 합계가 일치해도 Provider `NEWER/STALE`, 법적 청약철회, 제공/전달, Reader R2/T2 권한 회수 근거를 주장하지 않습니다.
+- **격리 DB 검증:** 기존 전체 Reader B2/B3 PostgreSQL 17 테스트 스키마를 재사용하는 감사 SQL 검사와, 기존 **비배포 후보 저장 함수**를 격리 PG17에서 실행해 3,000원+5,900원 두 취소 및 동일 HMAC 중복을 확인하는 별도 검사를 CI에 추가했습니다. 후자는 로컬 PGlite/PostgreSQL 18.6 WASM에서 실제 SQL PASS. **공식 PostgreSQL 17의 두 검사 결과는 CI 완료 전까지 미확인**입니다.
+- **로컬 단위 검증:** 취소 집합 32건, PostgreSQL 17 테스트 계약 6건 PASS. 관련 결제·Reader 전체 회귀 검사·타입·빌드 결과는 최종 단계에서 추가 기록합니다.
+- **문서:** `docs/operations/COMMERCE_P4_CANCELLATION_SET_LEDGER_AUDIT_V1.md`.
+- **다음:** 저장된 HMAC 집합과 독립적인 최신 Provider GET 성공 취소 목록의 동등성 검증, 이후 순서/법적/Reader T2 권한 조건 완료 전까지 실제 환불·회수 비활성.
+- **최종 로컬 회귀:** 관련 Vitest 14개 파일 **270건 PASS**, TypeScript 타입 검사·빌드 PASS, PostgreSQL 17 전용 SQL 생성기 2종 및 Bash 검사 PASS. 별도 PGlite PostgreSQL 18.6에서 2건 부분 취소 실제 SQL PASS. PostgreSQL 17 공식 CI는 아직 대기 상태입니다.
+- **통합 PR:** [PR #2831](https://github.com/gycha0109-beep/MyeongHa/pull/2831), 최초 구현 커밋 636f1d15. 관련 Vitest 270건, 타입 검사·빌드 및 격리 PG18 SQL 통과. 공식 PostgreSQL 17/필수 통합 CI 결과와 병합은 별도 확인 전까지 대기 상태입니다.
