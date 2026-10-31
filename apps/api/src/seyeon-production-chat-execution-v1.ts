@@ -43,7 +43,10 @@ import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
 import type { SeyeonAttemptZeroPersonalProofV1 } from './seyeon-attempt-zero-personal-proof-v1.js';
-import {assertSeyeonPositiveG1FinalModelContextSealV1} from './seyeon-positive-g1-final-model-context-seal-v1.js';
+import {
+  assertSeyeonPositiveG1FinalModelContextSealV1,
+  buildSeyeonPositiveG1PreModelSourceCensusSealV1,
+} from './seyeon-positive-g1-final-model-context-seal-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type {
   SeyeonExactModelPersonalSourceSelectionV1,
@@ -720,6 +723,8 @@ export async function runSeyeonProductionChatExecutionV1(
           SeyeonAttemptZeroPersonalProofV1 | Readonly<Record<string, unknown>>;
         let positiveModelCorrelation: Readonly<{
           selectedSourcesDigest: string;
+          pinnedContextInputDigest: string;
+          selectedModelSourceCensusDigest: string;
           finalModelContextDigest: string;
         }> | null = null;
 
@@ -778,9 +783,17 @@ export async function runSeyeonProductionChatExecutionV1(
             );
           }
 
+          // Source selection and the COMPLETE bounded pre-model Context
+          // are sealed together before the Postgres owner persists the Pin.
+          // Derived and untracked history remain forbidden in S0.
           positiveModelCorrelation = Object.freeze({
             selectedSourcesDigest: exactModelPersonalSources.selectedSourcesDigest,
-            finalModelContextDigest: sha256(contextInput),
+            ...buildSeyeonPositiveG1PreModelSourceCensusSealV1({
+              pinnedContextInput:contextInput,
+              selected:exactModelPersonalSources,
+              currentUserMessageRef:receivedTurn.userMessageId,
+              currentUserText:receivedTurn.userText,
+            }),
           });
           // The PostgreSQL owner re-reads/locks the ORIGINAL Record+Grant,
           // compares its raw PG-JSONB digest with the same DB-read snapshot,
@@ -825,7 +838,9 @@ export async function runSeyeonProductionChatExecutionV1(
               // Unpinned Preflight/derived sources HOLD before Provider.
               assertSeyeonPositiveG1FinalModelContextSealV1({
                 pinnedContextInput:contextInput,
-                pinnedContextInputDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
+                pinnedContextInputDigest:positiveModelCorrelation?.pinnedContextInputDigest ?? '',
+                pinnedFinalModelContextDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
+                selectedModelSourceCensusDigest:positiveModelCorrelation?.selectedModelSourceCensusDigest ?? '',
                 selectedSourcesDigest:positiveModelCorrelation?.selectedSourcesDigest ?? '',
                 currentUserMessageRef:receivedTurn.userMessageId,
                 currentUserText:receivedTurn.userText,
