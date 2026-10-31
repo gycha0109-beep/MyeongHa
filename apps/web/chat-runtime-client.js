@@ -1,4 +1,4 @@
-import { presentChatLiveTurnV1, presentAcknowledgedChatTurnV1 } from './chat-live-turn.js';
+import { presentChatLiveTurnV1, presentAcknowledgedChatTurnV1, repaintPendingChatLiveTurnV1 } from './chat-live-turn.js';
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
@@ -48,6 +48,18 @@ let roomLoadingSource = null;
 
 function uiText(source) {
   return translateStaticUi(source, getUiLocale());
+}
+
+function liveTurnLabels() {
+  const characterLabel = resolveCharacterDisplayNameV1('seyeon', getUiLocale()) ?? uiText('세연');
+  return {
+    sendingAria: uiText('전송 중인 메시지'),
+    waitingAria: uiText('세연의 답장을 기다리는 중'),
+    userLabel: uiText('나'),
+    characterLabel,
+    characterAvatar: characterLabel.slice(0, 1),
+    typingText: uiText('답장하는 중'),
+  };
 }
 
 function setComposeStatus(message) {
@@ -212,7 +224,8 @@ function createStreamMessage(message, authoritativeCharacterId) {
   avatar.className = 'conversation-message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
   avatar.dataset.character = message.senderType === 'character' ? 'runtime-character' : 'user';
-  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : '대';
+  const senderName = senderLabel(message, authoritativeCharacterId);
+  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : senderName.slice(0, 1);
 
   const body = document.createElement('div');
   body.className = 'conversation-message-body';
@@ -266,6 +279,7 @@ document.addEventListener('myeongha:localechange', () => {
   if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
   if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
   if (!chatStream) return;
+  repaintPendingChatLiveTurnV1(chatStream, liveTurnLabels());
   for (const article of chatStream.querySelectorAll('.conversation-message')) {
     const placeholder = article.querySelector('[data-chat-ui-placeholder]');
     if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
@@ -281,6 +295,10 @@ document.addEventListener('myeongha:localechange', () => {
     if (senderType === 'user') {
       const avatar = article.querySelector('.conversation-message-avatar');
       if (avatar) avatar.textContent = translateStaticUi('나', getUiLocale());
+    } else if (senderType === 'character' && characterId) {
+      const avatar = article.querySelector('.conversation-message-avatar');
+      const localizedName = resolveCharacterDisplayNameV1(characterId, getUiLocale());
+      if (avatar && localizedName) avatar.textContent = localizedName.slice(0, 1);
     }
   }
 });
@@ -300,6 +318,7 @@ function renderAcknowledgedSeyeonTurn(result, pendingTurn) {
     assistantText: result.assistantText,
     userLabel: uiText('나'),
     characterLabel: resolveCharacterDisplayNameV1('seyeon', getUiLocale()) ?? uiText('세연'),
+    characterAvatar: liveTurnLabels().characterAvatar,
   });
   if (presented) historyWithheld = true;
   return presented;
@@ -530,7 +549,7 @@ async function sendTurn(message) {
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
   const submittedThreadId = threadId;
-  const removePendingBubbles = presentChatLiveTurnV1(chatStream, { message: pendingTurn.text });
+  const removePendingBubbles = presentChatLiveTurnV1(chatStream, { message: pendingTurn.text, labels: liveTurnLabels() });
 
   try {
     const activeBearer = await getActiveBearer();

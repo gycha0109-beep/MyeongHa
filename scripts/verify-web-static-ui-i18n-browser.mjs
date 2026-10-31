@@ -134,6 +134,81 @@ try{
       failures.push({ page: 'chat-hub.html', scenario: 'localized-fixed-character-discovery', locale, discovery });
     }
   }
+
+  // Live sending/typing bubbles are excluded from the static-text scanner.
+  // Exercise the exact in-flight state that previously leaked Korean labels,
+  // including locale switches before a server ACK.
+  for (const [locale, nextLocale] of [
+    ['ja-JP', 'en-US'], ['zh-TW', 'zh-CN'],
+    ['en-US', 'ja-JP'], ['zh-CN', 'zh-TW'],
+  ]) {
+    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
+    await change(locale);
+    const begun = await evaluate(`(async () => {
+      const [{ presentChatLiveTurnV1 }, { getUiLocale, translateStaticUi }, { resolveCharacterDisplayNameV1 }] = await Promise.all([
+        import('/chat-live-turn.js'), import('/ui-i18n.js'), import('/character-display-locale.js'),
+      ]);
+      const locale = getUiLocale();
+      const name = resolveCharacterDisplayNameV1('seyeon', locale);
+      const copy = {
+        sendingAria: translateStaticUi('전송 중인 메시지', locale),
+        waitingAria: translateStaticUi('세연의 답장을 기다리는 중', locale),
+        userLabel: translateStaticUi('나', locale),
+        characterLabel: name,
+        characterAvatar: name.slice(0, 1),
+        typingText: translateStaticUi('답장하는 중', locale),
+      };
+      const stream = document.querySelector('[data-chat-stream]');
+      window.__chatLocaleProbeClear?.();
+      window.__chatLocaleProbeClear = presentChatLiveTurnV1(stream, {
+        message: 'what are you doing now?', labels: copy,
+      });
+      const user = stream.querySelector('.conversation-live-message[data-sender="user"]');
+      const typing = stream.querySelector('.conversation-live-message[data-sender="character"]');
+      return {
+        lang: locale,
+        userText: user?.querySelector('p')?.textContent ?? '',
+        userAria: user?.getAttribute('aria-label') ?? '',
+        name: typing?.querySelector('.conversation-message-body > strong')?.textContent ?? '',
+        typingText: typing?.querySelector('.conversation-live-typing')?.childNodes[0]?.textContent ?? '',
+        typingAria: typing?.getAttribute('aria-label') ?? '',
+        dots: typing?.querySelectorAll('.conversation-live-dots span')?.length ?? 0,
+        expected: copy,
+      };
+    })()`);
+    if (begun.lang !== locale || begun.userText !== 'what are you doing now?' ||
+        begun.userAria !== begun.expected.sendingAria ||
+        begun.name !== begun.expected.characterLabel ||
+        begun.typingText !== begun.expected.typingText ||
+        begun.typingAria !== begun.expected.waitingAria ||
+        begun.dots !== 3 || /[가-힣]/u.test(begun.name + begun.typingText + begun.typingAria)) {
+      failures.push({ page: 'chat.html', scenario: 'live-pending-bubble', locale, begun });
+    }
+    await change(nextLocale);
+    const switched = await evaluate(`(() => {
+      const user = document.querySelector('.conversation-live-message[data-sender="user"]');
+      const typing = document.querySelector('.conversation-live-message[data-sender="character"]');
+      return {
+        lang: document.documentElement.lang,
+        userText: user?.querySelector('p')?.textContent ?? '',
+        userAvatar: user?.querySelector('.conversation-message-avatar')?.textContent ?? '',
+        userAria: user?.getAttribute('aria-label') ?? '',
+        name: typing?.querySelector('.conversation-message-body > strong')?.textContent ?? '',
+        avatar: typing?.querySelector('.conversation-message-avatar')?.textContent ?? '',
+        typingText: typing?.querySelector('.conversation-live-typing')?.childNodes[0]?.textContent ?? '',
+        typingAria: typing?.getAttribute('aria-label') ?? '',
+        dots: typing?.querySelectorAll('.conversation-live-dots span')?.length ?? 0,
+      };
+    })()`);
+    const expectedName = nextLocale === 'ja-JP' ? 'セヨン' : 'Seyeon';
+    if (switched.lang !== nextLocale || switched.userText !== 'what are you doing now?' ||
+        switched.name !== expectedName || switched.avatar !== expectedName.slice(0, 1) ||
+        switched.dots !== 3 || !switched.typingText ||
+        /[가-힣]/u.test(switched.name + switched.typingText + switched.typingAria + switched.userAria)) {
+      failures.push({ page: 'chat.html', scenario: 'live-pending-locale-switch', locale: nextLocale, switched });
+    }
+    await evaluate('window.__chatLocaleProbeClear?.()');
+  }
   await change('zh-TW');
   await navigate('reading.html','#saju-birth-form');
   const chineseFields=await evaluate('(()=>({lang:document.documentElement.lang,male:document.querySelector("#saju-birth-sex option[value=male]")?.textContent}))()');
@@ -175,6 +250,62 @@ try{
     if(source.lang!==locale||source.user!=='사주'||source.reading!=='사주'){
       failures.push({page:'chat.html',lang:locale,source});
     }
+  }
+
+
+  // A real Chat error is a runtime status, not initial static page copy.
+  // Exercise the same live DOM mutation and locale-switch path that previously
+  // left the safe-response failure in Korean on an English chat screen.
+  for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN']) {
+    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
+    await change(locale);
+    const statusProbe = await evaluate(`(async () => {
+      const { translateStaticUi } = await import('/ui-i18n.js');
+      const sources = ["세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.","대화방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.","현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.","로그인 상태가 만료되었습니다. 다시 로그인해 주세요.","세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.","대화 서버 응답을 확인할 수 없습니다.","메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.","크레딧 안내를 확인해 주세요. 입력한 내용은 그대로 남아 있습니다.","이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.","전송 결과를 다시 확인하지 못했습니다. 같은 문장으로 다시 보내면 중복 생성 없이 확인을 이어갑니다.","현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다."];
+      const status = document.createElement('p');
+      status.className = 'character-compose-status';
+      status.dataset.chatErrorLocaleProbe = '';
+      status.dataset.composeStatus = '';
+      document.querySelector('[data-compose-status]')?.after(status);
+      const failures = [];
+      const locale = document.documentElement.lang;
+      for (const source of sources) {
+        status.textContent = source;
+        await new Promise(done => setTimeout(done, 45));
+        const expected = translateStaticUi(source, locale);
+        if (expected === source || /[가-힣]/u.test(expected) ||
+            status.textContent !== expected) failures.push({ source, actual: status.textContent, expected });
+      }
+      // Unrecognized backend Korean errors must show a cautious localized
+      // fallback, while staying outside user messages or official readings.
+      status.textContent = '서버가 제공한 미등록 대화 오류 테스트 문구입니다.';
+      await new Promise(done => setTimeout(done, 45));
+      const genericFallback = translateStaticUi('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', locale);
+      if (status.textContent !== genericFallback) {
+        failures.push({ source: 'unknown-runtime-error', actual: status.textContent, expected: genericFallback });
+      }
+      status.textContent = sources[0];
+      await new Promise(done => setTimeout(done, 45));
+      return { lang: locale, failures };
+    })()`);
+    if (statusProbe.lang !== locale || statusProbe.failures.length) {
+      failures.push({ page: 'chat.html', scenario: 'dynamic-error-notice', locale, statusProbe });
+    }
+    const changedLocale = locale === 'en-US' ? 'zh-CN' : 'en-US';
+    await change(changedLocale);
+    const retranslated = await evaluate(`(async () => {
+      const { translateStaticUi } = await import('/ui-i18n.js');
+      const source = "세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.";
+      const status = document.querySelector('[data-chat-error-locale-probe]');
+      return { lang: document.documentElement.lang, actual: status?.textContent ?? '',
+        expected: translateStaticUi(source, document.documentElement.lang) };
+    })()`);
+    if (retranslated.lang !== changedLocale || retranslated.actual !== retranslated.expected ||
+        /[가-힣]/u.test(retranslated.actual)) {
+      failures.push({ page: 'chat.html', scenario: 'error-notice-live-language-switch',
+        locale: changedLocale, retranslated });
+    }
+    await evaluate('document.querySelector("[data-chat-error-locale-probe]")?.remove()');
   }
 
   // React-owned My dashboard: changing the global locale must re-render all

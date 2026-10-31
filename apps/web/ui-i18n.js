@@ -22,6 +22,16 @@ for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(so
 for (const [source, row] of JA_TW_TO_EN_CN_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 for (const [source, row] of EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 registerStaticCopy('라이트 모드로 전환', { 'ja-JP': 'ライトモードに切り替え', 'zh-TW': '切換至淺色模式', 'en-US': 'Switch to light mode', 'zh-CN': '切换至浅色模式' });
+registerStaticCopy('세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': 'セヨンの安全な応答処理を完了できませんでした。入力した内容は保持されています。しばらくしてからもう一度お試しください。', 'zh-TW': '未能完成 Seyeon 的安全回覆處理。您輸入的內容已保留，請稍後再試。', 'en-US': "Seyeon could not complete the response safely. Your message has been preserved. Please try again shortly.", 'zh-CN': '未能完成 Seyeon 的安全回复处理。您输入的内容已保留，请稍后重试。' });
+registerStaticCopy('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': '会話の状態を確認できませんでした。しばらくしてからもう一度お試しください。', 'zh-TW': '無法確認對話狀態，請稍後再試。', 'en-US': 'The chat status could not be verified. Please try again shortly.', 'zh-CN': '无法确认对话状态，请稍后重试。' });
+registerStaticCopy("이전 대화에 미완료 메시지가 남아 새 메시지가 차단됐습니다. 기존 메시지의 전송 상태를 확인해 주세요.", { 'ja-JP': "前の会話に未完了のメッセージがあるため、新しいメッセージを送信できません。先に送信したメッセージの状態をご確認ください。", 'zh-TW': "上一段對話仍有未完成的訊息，因此無法傳送新訊息。請確認先前訊息的傳送狀態。", 'en-US': "An unfinished message in the previous conversation is blocking new messages. Please check the delivery status of that message.", 'zh-CN': "上一段对话仍有未完成的消息，因此无法发送新消息。请确认此前消息的发送状态。" });
+registerStaticCopy("관리자 또는 크레딧 사용 권한을 확인하지 못했습니다. 입력한 내용은 보존했습니다. 다시 로그인한 뒤 시도해 주세요.", { 'ja-JP': "管理者権限またはクレジット利用権限を確認できませんでした。入力内容は保持されています。再度ログインしてからお試しください。", 'zh-TW': "無法確認管理員或點數使用權限。輸入內容已保留，請重新登入後再試。", 'en-US': "Could not verify administrator or credit-use permissions. Your message has been preserved. Please sign in again and retry.", 'zh-CN': "无法确认管理员或点数使用权限。输入内容已保留，请重新登录后重试。" });
+registerStaticCopy('전송 중인 메시지', { 'ja-JP': '送信中のメッセージ', 'zh-TW': '傳送中的訊息', 'en-US': 'Sending message', 'zh-CN': '正在发送的消息' });
+registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨンの返信を待っています', 'zh-TW': '正在等待 Seyeon 回覆', 'en-US': 'Waiting for Seyeon to reply', 'zh-CN': '正在等待 Seyeon 回复' });
+registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });
+registerStaticCopy('이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.', { 'ja-JP': 'プライバシー保護のため、以前の会話履歴は表示できません。', 'zh-TW': '基於隱私保護，無法顯示先前的對話紀錄。', 'en-US': 'Previous chat history is hidden to protect privacy.', 'zh-CN': '为保护隐私，无法显示此前的聊天记录。' });
+registerStaticCopy('이전 대화 기록은 개인정보 보호를 위해 표시하지 않습니다. 새 AI 답변은 아직 준비 중입니다.', { 'ja-JP': 'プライバシー保護のため、以前の会話履歴は表示しません。新しい AI の返答はまだ準備中です。', 'zh-TW': '為保護隱私，先前的對話紀錄不會顯示。新的 AI 回覆尚在準備中。', 'en-US': 'Previous chat history is hidden for privacy. New AI replies are not yet available.', 'zh-CN': '为保护隐私，之前的聊天记录不会显示。新的 AI 回复尚未就绪。' });
+registerStaticCopy('현재 세연의 AI 메시지 전송은 운영 준비 중입니다. 크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며, 입력한 내용은 보존했습니다.', { 'ja-JP': '現在、セヨンの AI メッセージ送信は準備中です。クレジットの予約・精算処理が未接続のため送信できませんが、入力した内容は保持されています。', 'zh-TW': 'Seyeon 的 AI 訊息傳送功能尚在準備中。由於點數預留與結算尚未接通，無法傳送，但輸入內容已保留。', 'en-US': 'Seyeon AI messaging is not yet available. Credit reservation and settlement are not connected, so the message was not sent. Your draft is saved.', 'zh-CN': 'Seyeon 的 AI 消息发送功能尚未就绪。由于点数预留和结算尚未接通，消息无法发送，但输入内容已保留。' });
 for (const [source, row] of MY_STATIC_UI_COPY_V1) {
   registerStaticCopy(source, Object.fromEntries(LOCALE_ORDER.map((locale, index) => [locale, row[index]])));
 }
@@ -50,6 +60,8 @@ export function formatStaticUi(source, params, locale = getUiLocale()) {
 
 const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
+const unmappedChatStatusSource = new WeakMap();
+const CHAT_STATUS_SAFE_FALLBACK = '대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 const trackedAttributes = new WeakMap();
 const ATTRIBUTES = ['aria-label', 'title', 'placeholder'];
 
@@ -69,6 +81,33 @@ function repaintText(textNode, locale) {
   if (!parent || parent.matches('textarea') || isBlocked(parent)) return;
   const current = textNode.nodeValue ?? '';
   const trimmed = current.trim();
+  // Status banners are authored system copy, not private transcripts. Unknown
+  // server/runtime Korean errors must not leak untranslated into other locales.
+  // Never touch chat message bodies or arbitrary user-authored text.
+  const isSystemStatus = !!parent.closest('[data-compose-status], [data-room-loading]');
+  const previousUnmapped = unmappedChatStatusSource.get(textNode);
+  if (previousUnmapped !== undefined) {
+    const accepted = [
+      previousUnmapped,
+      CHAT_STATUS_SAFE_FALLBACK,
+      ...LOCALE_ORDER.map(language => translateStaticUi(CHAT_STATUS_SAFE_FALLBACK, language)),
+    ];
+    if (accepted.includes(trimmed)) {
+      const replacement = locale === 'ko-KR'
+        ? previousUnmapped : translateStaticUi(CHAT_STATUS_SAFE_FALLBACK, locale);
+      if (trimmed !== replacement) textNode.nodeValue = current.replace(trimmed, replacement);
+      return;
+    }
+    unmappedChatStatusSource.delete(textNode);
+  }
+  if (isSystemStatus && trimmed && /[가-힣]/u.test(trimmed) &&
+      !AUTHORITATIVE_STATIC_UI_COPY.has(trimmed)) {
+    unmappedChatStatusSource.set(textNode, trimmed);
+    if (locale !== 'ko-KR') {
+      textNode.nodeValue = current.replace(trimmed, translateStaticUi(CHAT_STATUS_SAFE_FALLBACK, locale));
+    }
+    return;
+  }
   let korean = trackedText.get(textNode);
   if (AUTHORITATIVE_STATIC_UI_COPY.has(trimmed)) {
     korean = trimmed;

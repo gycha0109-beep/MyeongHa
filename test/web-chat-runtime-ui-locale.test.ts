@@ -26,7 +26,7 @@ describe('Chat Runtime authored UI locale boundary', () => {
     ];
     for (const source of authored) {
       expect(runtime).toContain(source);
-      for (const locale of ['ja-JP', 'zh-TW'] as const) {
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
         expect(translateStaticUi(source, locale)).not.toBe(source);
         expect(translateStaticUi(source, locale)).not.toMatch(/[가-힣]/u);
       }
@@ -35,7 +35,7 @@ describe('Chat Runtime authored UI locale boundary', () => {
   });
 
   it('localizes the shared theme toggle accessibility label reported by Web PR gate', () => {
-    for (const locale of ['ja-JP', 'zh-TW'] as const) {
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
       expect(translateStaticUi('밤 화면으로 전환', locale)).not.toMatch(/[가-힣]/u);
       expect(translateStaticUi('낮 화면으로 전환', locale)).not.toMatch(/[가-힣]/u);
     }
