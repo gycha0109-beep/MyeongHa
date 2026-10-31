@@ -279,3 +279,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **실제 PostgreSQL 17 동시성 검증 추가:** `test/seyeon-security-s0-postgres.e2e.test.ts`에서 동일 Member/Assistant의 Owner 발급 pending 제안에 대해 독립된 두 트랜잭션이 `discard`와 `character_only` 결정을 경쟁하도록 구성. 먼저 확보한 제안 잠금 때문에 후속 승인 요청이 대기하고, `discard` 완료 후 승인 요청이 실패하며 제안 내용 제거, Memory/Grant 0건, 내부 제안 재표시 0건을 검증. 커밋 `47c8f5a7`. 아직 새 HEAD CI 결과로 통과 판정하지 않음.
 - **운영 불변:** PR #2761 동일 Draft 브랜치, 자동 병합 OFF. public G3 Reveal/Replay, 실사용자 private 모델 읽기, 유료 Provider, 운영 DB Migration·Role 변경 없음. 실제 G3 동의·철회 시점의 HTTP 바이트 공개 선형화, G0 정책 계약 승인 및 G5/G6 운영 검증은 여전히 `HOLD_FORWARD_STOPPED`.
 - **다음:** W13 포함 새 정확한 HEAD에서 CI/PG17 검증 결과 확인. 별도 승인 없이 내부 후보를 HTTP에 노출하지 않으며, 이후 G3 원본 Grant/현재 권한·Replay를 실제 트랜잭션/HTTP 경계에 연결하는 작업이 필요.
+
+
+### 2026-10-31 · W14 · UC-06 원문 Pre-Model DB 검증 연결 (S0 격리)
+
+- **구현:** '18-planner-pre-model-source-authority.sql'은 이미 커밋된 세연 단독 대화의 Member Subject·Turn·User Message·Assistant Message와 양쪽 원문 전체 일치를 DB Owner가 확인한 뒤 불리언만 반환한다. 변경·철회된 원문과 임의 메시지 ID는 자격 없음. 일반 API 역할·브라우저 EXECUTE DENY, 격리 설치 전용.
+- **실행 연결:** 'runSeyeonPostTurnPlannerMemoryV1'이 유료 추출 Provider **호출 전** DB 원문을 검증하고, 제안 저장 **동일 DB 트랜잭션 안**에서 같은 원문을 재검증한다. 모델 처리 중 바뀐 메시지가 pending Memory로 기록되는 것을 차단한다. Producer의 자체 Owner 검증도 유지한다.
+- **검증:** 포트·원문 추출 테스트에 과금 Provider 0회·원문 변경 후 pending 생성 0회·DB 롤백을 추가했다. PostgreSQL17 합성 시험에 정상 원문·사용자 원문 변조·답변 변조·잘못된 Assistant 결속을 추가했다. **최신 HEAD CI 이전에는 PASS로 판정하지 않는다.**
+- **변경:** scripts/operations/seyeon-security-s0/18-planner-pre-model-source-authority.sql 및 격리 설치 목록·ACL, 앱 소스 pre-model 검증 어댑터·post-turn 실행, 기존 단위/PG17 시험.
+- **남은 HOLD:** UC-06 원문 검증에 한정된 구현이며 G0/G1 양수 Pin/G2 Atomic Commit/G3 실제 공개·Replay/G4 비용 승인/G5·G6 운영 검증을 충족하지 않는다. 생산자 모델/DB 기본 DENY, 운영 Route·Migration·paid Provider·개인정보 Reveal OFF, PR #2761 Draft·병합 금지 유지.
+
