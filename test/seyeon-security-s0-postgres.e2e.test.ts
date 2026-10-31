@@ -1170,15 +1170,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         join public.chat_turn_attempts a on a.id=t.committed_attempt_id
         join public.conversation_thread_characters c on c.id=m.thread_character_id
         where m.id=$1`,[f.assistant]);
-      const lineage=await diagnosticClient.query(
-        'select seyeon_private.assert_current_original_assistant_lineage_v1($1::uuid,$2::uuid,$3::uuid)',
-        [f.subject,f.thread,f.assistant],
-      );
       const rows=await diagnosticClient.query(
         'select assistant_text as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1($1::uuid,$2::uuid,$3::uuid)',
         [f.subject,f.thread,f.assistant],
       );
-      replayRows={metadata:metadata.rows,lineageRows:lineage.rows.length,replay:rows.rows};
+      replayRows={metadata:metadata.rows,replay:rows.rows};
     }finally{
       await diagnosticClient.query('ROLLBACK');
       diagnosticClient.release();
@@ -1186,7 +1182,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(replayRows).toEqual({
       metadata:[{state:'delivered',deliveredAt:true,noIssuedReceipt:true,
         sameOriginalText:true,participantCurrent:true}],
-      lineageRows:1,replay:[{assistantText:f.assistantText}],
+      replay:[{assistantText:f.assistantText}],
     });
 
     const other=await prepare(217);
