@@ -89,7 +89,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
   afterAll(async () => { await ordinaryPool?.end();await pool?.end(); });
 
-  async function prepare(n: number, virtual?: { summary: string }, withRecentPin: boolean | 'invalid' = false) {
+  async function prepare(n: number, virtual?: { summary: string }, withRecentPin: boolean | 'invalid' = true) {
     const auth = uuid(10, n), subject = uuid(11, n), thread = uuid(14, n);
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
@@ -249,6 +249,23 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await new Promise<void>(resolve => server.close(() => resolve()));
     }
   }
+
+  it('denies G2 Commit for a legacy Memory-only Pin with no current User certificate', async () => {
+    const f=await prepare(15,undefined,false);
+    await expect(f.commit()).rejects.toMatchObject({
+      constraint:'seyeon_positive_g2_recent_source_pin_required',
+    });
+    const {rows:[attempt]}=await pool.query(`select state,
+      seyeon_personal_source_pin_jsonb as personal,
+      seyeon_recent_source_pin_jsonb as recent
+      from public.chat_turn_attempts where id=$1`,[f.attempt]);
+    expect(attempt.state).toBe('validated');
+    expect(attempt.personal.positiveProof).toBeDefined();
+    expect(attempt.recent).toBeNull();
+    const {rows:[count]}=await pool.query(`select count(*)::int as n
+      from public.conversation_messages where turn_id=$1 and sender_type='character'`,[f.turn]);
+    expect(count.n).toBe(0);
+  });
 
   it('rejects a forged model-message digest before saving any G1 certificate or invoking a model', async () => {
     await expect(prepare(14, undefined, 'invalid')).rejects.toMatchObject({
