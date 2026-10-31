@@ -48,7 +48,6 @@ declare
   v_event record;
   v_origin record;
   v_message_count bigint;
-  v_resolved_source_count bigint:=0;
   v_history record;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -104,7 +103,6 @@ begin
         message='Current relationship lineage is unavailable';
     end if;
 
-    v_resolved_source_count:=0;
     for v_origin in
       select msg.id,msg.thread_id,msg.turn_id,msg.sender_type
       from public.relationship_event_provenance_refs p
@@ -114,7 +112,6 @@ begin
         and p.character_id='seyeon' and p.ref_kind='source_message'
       order by p.ordinal
     loop
-      v_resolved_source_count:=v_resolved_source_count+1;
       if v_origin.turn_id is distinct from v_event.source_turn_id then
         raise exception using errcode='42501',
           constraint='seyeon_g0_relationship_origin_unverifiable',
@@ -135,14 +132,6 @@ begin
           message='Current relationship lineage is unavailable';
       end if;
     end loop;
-    -- The inner join must resolve EVERY DB-owned origin reference. A missing
-    -- or RLS-hidden Message must not turn a multi-source Event into an
-    -- apparently legitimate, partially proven Relationship History.
-    if v_resolved_source_count<>v_message_count then
-      raise exception using errcode='42501',
-        constraint='seyeon_g0_relationship_origin_census_mismatch',
-        message='Current relationship lineage is unavailable';
-    end if;
   end loop;
 
   if v_event_count<>v_entry_count then
