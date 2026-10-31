@@ -108,7 +108,9 @@ if (scene) {
   scene.setAttribute('aria-label', translateStaticUi(character.sceneLabel, getUiLocale()));
 }
 
+const chatEntryLocale = getUiLocale();
 const dialogueLine = document.querySelector('[data-dialogue-line]');
+dialogueLine?.setAttribute('data-chat-intro-language-locked', '');
 function setDialogueLines(lines) {
   if (!dialogueLine) return;
   dialogueLine.replaceChildren();
@@ -118,7 +120,7 @@ function setDialogueLines(lines) {
   });
 }
 
-setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, getUiLocale()) : character.intro.map(line => translateStaticUi(line, getUiLocale())));
+setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, chatEntryLocale) : character.intro.map(line => translateStaticUi(line, chatEntryLocale)));
 
 export function applyCanonicalCharacterPresentationV1(characterId) {
   const identity = resolveCanonicalCharacterPresentationV1(characterId);
@@ -140,7 +142,7 @@ export function applyCanonicalCharacterPresentationV1(characterId) {
     node.dataset.character = identity.presentationKey;
     node.textContent = resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale()).slice(0, 1);
   });
-  setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, getUiLocale()));
+  setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, chatEntryLocale));
   if (scene) scene.setAttribute('aria-label', translateStaticUi(next.sceneLabel, getUiLocale()));
   return true;
 }
@@ -205,7 +207,7 @@ document.addEventListener('myeongha:localechange', () => {
   document.title = `${label} · ${translateStaticUi('대화 · 명하', getUiLocale())}`;
   document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach(node => { node.textContent = label; });
   document.querySelectorAll('[data-character-avatar]').forEach(node => { node.textContent = label.slice(0, 1); });
-  if (characterKey) setDialogueLines(resolveCharacterChatIntroV1(characterKey, getUiLocale()));
-  else setDialogueLines(character.intro.map(line => translateStaticUi(line, getUiLocale())));
+  // The greeting is fixed at room entry, even when UI navigation changes locale.
+
   if (scene) scene.setAttribute('aria-label', translateStaticUi(character.sceneLabel, getUiLocale()));
 });
