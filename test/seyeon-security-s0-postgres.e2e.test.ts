@@ -1198,6 +1198,15 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const withdrawn=await send(f.evidence);
     expect(withdrawn.status).toBe(503);
     expect(withdrawn.body).not.toContain(f.assistantText);
+
+    // Reconsent issues a distinct Grant; it must never revive this Attempt.
+    await pool.query(`insert into public.record_access_grants(
+      id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
+      values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`,
+      [uuid(29,216),f.subject,f.memory]);
+    const newlyGranted=await send(f.evidence);
+    expect(newlyGranted.status).toBe(503);
+    expect(newlyGranted.body).not.toContain(f.assistantText);
   });
 
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
