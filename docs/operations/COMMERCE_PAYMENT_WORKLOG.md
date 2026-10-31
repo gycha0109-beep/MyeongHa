@@ -198,3 +198,4 @@
 - **문서:** `docs/operations/COMMERCE_P4_EXACT_READER_WITHDRAWAL_NOTICE_DELIVERY_HOLD_V1.md`.
 - **다음:** 실제 고객 전달 증거 승인 및 Reader R2/T2 공개·잠금, Provider의 신뢰 가능한 처리 순서·법적 최종판단 계약을 분리해 구현해야 합니다. P0-PR-01·LEGAL-004 재승인 요청 없음.
 - **최종 로컬 회귀:** 결제·Reader·청약철회 관련 Vitest **22개 파일/435건 PASS**, 타입 검사·빌드 PASS, 신규 PostgreSQL 17 SQL 생성기·Bash 라우팅·테스트 계약 PASS. 실제 PostgreSQL 17 신규 검사 및 필수 통합 CI 성공은 결과 확인 전까지 미확정입니다.
+- **통합 PR:** [PR #2844](https://github.com/gycha0109-beep/MyeongHa/pull/2844), 구현 커밋 2c97e396. 관련 Vitest 435건·타입 검사·빌드 PASS. 실제 PG17/필수 통합 CI 결과 및 병합은 완료 근거 전까지 미확정입니다.
