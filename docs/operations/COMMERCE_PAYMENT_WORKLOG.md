@@ -125,3 +125,4 @@
 - **음성·예외 처리:** 원본 이벤트 서명·최초 GET의 HMAC 지문·비활성 Authority 검사, 불명확한 중복 매핑·다른 Grant·금액 변화·취소 상태 REQUESTED/FAILED·누적 취소액 후퇴·Provider GET 실패·원본 결제 불일치를 모두 HOLD 처리합니다. readerT2LockHeld=false, providerOrderingProven=false, grantRevocationAuthorized=false, writesPerformed=false 유지.
 - **테스트:** 신규 test/commerce-stored-portone-cancellation-hmac-recheck-v1.test.mjs 23건 PASS, 기존 HMAC GET 관련 12건 PASS. 확장 회귀와 PR·CI 결과 별도 기록.
 - **남은 작업:** 제공·법적 승인·Provider 순서 판정·Reader T2 잠금 결합 전에는 실제 환불·Grant 회수 호출을 연결하지 않습니다.
+- **통합 PR:** [PR #2816](https://github.com/gycha0109-beep/MyeongHa/pull/2816), 최초 구현 커밋 5c0979b9, 후속 DB 계보 연결 커밋 e54edff9. 관련 Vitest 9개 파일 **195건 PASS**, 타입 검사·빌드 PASS. 선행 #2811 병합 후 최신 main 기준으로 Worklog 충돌 없이 갱신하고 필수 CI·자동 병합을 설정합니다.
