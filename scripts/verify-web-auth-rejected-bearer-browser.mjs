@@ -118,7 +118,8 @@ async function serve() {
           sendJson(res, 401, errorEnvelope());
           return;
         }
-        if (scenario === 'records-life-401' && kind === 'member') {
+        if ((scenario === 'records-life-401' && kind === 'member') ||
+            (scenario === 'records-guest-401' && kind === 'guest')) {
           sendJson(res, 401, errorEnvelope());
           return;
         }

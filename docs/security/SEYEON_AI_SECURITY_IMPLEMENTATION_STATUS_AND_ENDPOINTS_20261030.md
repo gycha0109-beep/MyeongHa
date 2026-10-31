@@ -118,3 +118,11 @@ Watchtower-Track: security
 - **PR/CI:** 최초 [#2784](https://github.com/gycha0109-beep/MyeongHa/pull/2784)는 #2781 squash 병합 후 W01~W03 문서 충돌로 미병합 종료. **동일 구현 + W04를 최신 main에 재적용한 [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786)**에서 최종 HEAD 검증 진행. 최초 HEAD `0e7a125758da01a629a06dc9b8c450df08fbb5f6`의 [CI #41027327633](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027327633)은 R19 기존 fixture 새 필드 누락으로 FAILED. R19 기능·권한은 완화하지 않고 `694b125`/`5f65ccf`에서 수정했으며, [새 PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2784/checks) 및 후속 Integration은 **결과 확인 전 PASS 아님**. 문서 커밋에 따른 최신 HEAD는 별도 확인 필요.
 - **완료로 계산하지 않는 것:** 이 목록은 **서버 계산 출처 census이며 DB Owner 서명·불변 Attempt Pin이 아니다**(`persistedBeforeModel:false`). 본 S0 긍정 모델은 기존대로 Memory 1건·이전 메시지/Relationship 0건만 허용. 복사·재인용 간접 출처, Reader 교차 원본, 전체 G1 Pin·G2/G3·일반 credit 및 G5/G6 모두 미완료. 운영 DDL·ACL·Provider·Cloudflare 변경 없음; `HOLD_FORWARD_STOPPED` 유지.
 - **다음 구현:** 정확한 최종 모델 사용 집합의 **원본·파생 lineage를 DB Owner가 모델 이전 Attempt에 불변 저장하고**, G2 원자 Commit/HTTP 공개 시 **현재 원래 Grant ID**로 재검증하는 핵심 연결. 기존 전체 검증 완료 시점까지 positive 범위 확대 금지.
+
+
+### 2026-10-31 / W11 — #2786 CI Guest 401 브라우저 시나리오 정합성 수정
+
+- **문제:** 선행 [PR #2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) 브라우저 검사 [#41028133827](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41028133827)가 2회 실패. `records-guest-401` 시나리오는 `/api/memories`에만 401을 주도록 설정됐지만, 실제 Records 화면은 해당 상황에서 `/api/me`, `/api/life-record`, `/api/readings`를 호출하므로 Guest 무효화가 발생하지 않았다.
+- **구현:** `scripts/verify-web-auth-rejected-bearer-browser.mjs`의 해당 시나리오에서 Records가 실제 요청하는 `/api/life-record`에 권위 있는 401 응답을 반환하도록 최소 수정. 화면의 인증·실패 처리 로직이나 서버 정책은 변경하지 않았다.
+- **검증/남은 것:** 신규 #2786 HEAD의 브라우저 CI/Integration을 확인하기 전 성공 판정하지 않음. #2789의 후속 G1 소스/Worklog W05~W10은 별도 누적 브랜치에 있으며, 이 수정은 #2786 후속 브랜치로 통합해 W11을 단일 기록에 보존해야 한다.
+- **운영:** `HOLD_FORWARD_STOPPED`, 운영 Provider·DB·ACL·HTTP 공개 변경 없음.
