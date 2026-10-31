@@ -81,3 +81,14 @@
 - **안전:** 기존 결정된 P0-PR-01 기본 DELETE와 Commerce P5Y 보존 분리. `claimDispositionGraphIntegrated=false`, 새 Claim 및 finalizer SQL은 `docs/operations/candidates/` 외부 비배포 후보 유지. 운영 환불·권한 회수·실제 고객 접수 모두 OFF.
 - **다음:** 실제 PostgreSQL 17 전체 삭제 그래프와 FK/Reader 권한/계정 복원 동작을 검증한 뒤에만 forward-only 마이그레이션으로 옮길 수 있습니다.
 - **통합 PR:** [PR #2805](https://github.com/gycha0109-beep/MyeongHa/pull/2805). #2804 병합 커밋 `d9e25eee` 기준 최신 `main`으로 갱신한 뒤 기존 Worklog를 보존하여 제출했습니다. 관련 테스트 **34개**, 타입 검사·빌드, 격리 SQL PASS. 공식 CI·병합 상태는 별도 확인합니다.
+
+### 2026-10-31 — PortOne V2 개별 취소와 기존 Entitlement Effect의 합성 DB 연결
+
+- **기준:** PR #2804 공식 CI 통과 후 병합 확인, `main` 커밋 `d9e25eee`. 개인정보 삭제 후보는 독립 PR #2805에서 통합 검증 진행 중.
+- **브랜치:** `feat/commerce-payment/portone-reader-effect-synthetic-proof-20261031`.
+- **실제 구현:** 별도 `myeongha_*` 격리 DB에서 공식 Reader B2/B3 구매 Fixture와 PortOne V2 `source-v2` 개별 SUCCEEDED 취소 증거를 사용하여, 취소 이벤트 → 원본 Receipt → 대상 B2 Grant 잠금/버전 비교 후 기존 `internal_apply_entitlement_effect_v1`을 실제 호출하는 검증 경로 작성. B2 회수 1건·동일 이벤트 멱등 재전송·다른 B3 구매권 보존/잘못된 Grant 거부 검사, 최종 `ROLLBACK`으로 작업 자체는 비영속.
+- **CI 연결:** `test/db/run_authority_core.sh`에서 마이그레이션이 적용된 별도 PostgreSQL 17 테스트 DB를 복제하여 검증하도록 포함. 이전 단순 Provider 중립 회수 테스트와 달리 PortOne V2 취소 개별 금액 계보를 직접 사용합니다.
+- **로컬 확인:** Vitest 계약 검증 6건 PASS, Bash 구문 검사 PASS. **전체 PostgreSQL 17 SQL 실행 및 원자적 변경 결과는 공식 CI 완료 전까지 미확인**입니다.
+- **안전/구현 경계:** 웹훅·사용자 접수·환불 POST·운영 Grant 회수 경로는 모두 비활성. 이 합성 DB 시나리오는 Provider의 신뢰 가능한 순서·법적 환불 판정·제공 증거·Reader R2/T2 최종 제공 잠금을 증명하지 않으며 실제 운영 회수 권한이 아닙니다.
+- **문서:** `docs/operations/COMMERCE_P4_PORTONE_READER_ENTITLEMENT_SYNTHETIC_PROOF_V1.md`.
+- **PR / 최종 로컬 증거:** [PR #2807](https://github.com/gycha0109-beep/MyeongHa/pull/2807), 구현 커밋 `1e4421aa`. 관련 Vitest 15개 파일 **312건 PASS**; #2805 병합 최신 기준 핵심 42건 PASS, 타입 검사·빌드·Bash 구문 PASS. **PostgreSQL 17 실제 SQL 결과는 통합 CI가 완료되기 전까지 미확인**입니다.
