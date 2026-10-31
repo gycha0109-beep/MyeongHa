@@ -22,6 +22,7 @@ import { verifySeyeonPlannerPreModelSourceV1 } from '../apps/api/src/postgres-se
 import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
 import { handleSeyeonPendingPlannerNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-http-s0-v1.js';
 import { handleSeyeonPlannerDecisionNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-node-http-s0-v1.js';
+import { handleSeyeonFirstOriginalAssistantReplayNodeS0V1 } from '../apps/api/src/seyeon-first-original-assistant-replay-node-s0-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -1137,6 +1138,64 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       memberDenied:true,serviceRoleDenied:true,
       noGrantUpdates:true,noMemoryUpdates:true,
     });
+  });
+
+  it('G3 S0 replays the first delivered original Assistant over a real Node HTTP socket only while its original Grant is current',async()=>{
+    const f=await prepare(216,{summary:'synthetic original memory for replay'});
+    await f.commit();
+    let firstText:string|null=null;
+    await f.locked()({signal:new AbortController().signal,deliver:async text=>{
+      firstText=text;
+    }});
+    expect(firstText).toBe(f.assistantText);
+
+    const other=await prepare(217);
+    await other.commit();
+    const send=async(evidence:typeof f.evidence,assistantId=f.assistant,
+      authorization=true)=>{
+      const server=createServer((incoming,response)=>{
+        void handleSeyeonFirstOriginalAssistantReplayNodeS0V1({
+          incoming,response,pool:subjectPool,requestId:'original-replay-216',
+          identityEvidenceVerifier:{verifyRequestIdentity:async(request)=>
+            authorization && request.headers.get('authorization')==='Bearer synthetic-member'
+              ?evidence:null},
+        });
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-replay/${assistantId}`,{
+          headers:authorization?{Authorization:'Bearer synthetic-member'}:{},
+        });
+        return {status:response.status,cache:response.headers.get('Cache-Control'),
+          body:await response.text()};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+
+    const first=await send(f.evidence);
+    expect(first.status).toBe(200);
+    expect(first.cache).toContain('no-store');
+    expect(first.body).toContain(f.assistantText);
+    const second=await send(f.evidence);
+    expect(second.status).toBe(200);
+    expect(second.body).toContain(f.assistantText);
+
+    const unverified=await send(f.evidence,f.assistant,false);
+    expect(unverified.status).toBe(401);
+    expect(unverified.body).not.toContain(f.assistantText);
+    const foreign=await send(other.evidence);
+    expect(foreign.status).toBe(503);
+    expect(foreign.body).not.toContain(f.assistantText);
+    const wrongOriginal=await send(f.evidence,f.user);
+    expect(wrongOriginal.status).toBe(503);
+    expect(wrongOriginal.body).not.toContain(f.assistantText);
+
+    await f.revoke();
+    const withdrawn=await send(f.evidence);
+    expect(withdrawn.status).toBe(503);
+    expect(withdrawn.body).not.toContain(f.assistantText);
   });
 
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
