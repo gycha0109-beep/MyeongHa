@@ -134,8 +134,12 @@ describe('Se-yeon server-owned zero-record attempt provenance', () => {
     expect(validate).toBeGreaterThan(model);
     expect(persist).toBeGreaterThan(validate);
     expect(commit).toBeGreaterThan(persist);
-    const positivePin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
+    const positivePin = runtime.indexOf('personalRecordProof = input.combinedSourcePinPort');
+    const combinedPin = runtime.indexOf('await input.combinedSourcePinPort.pinBeforeModel({');
+    const legacyPin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel(positivePinRequest)');
     expect(positivePin).toBeGreaterThan(minted);
+    expect(combinedPin).toBeGreaterThan(positivePin);
+    expect(legacyPin).toBeGreaterThan(combinedPin);
     expect(positivePin).toBeLessThan(model);
 
     const sql = await readFile(
