@@ -5,6 +5,7 @@ import {
 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
 import {
   extractSeyeonPlannerMemoryCandidateV1,
+  isExplicitSeyeonPlannerMemoryOptOutV1,
 } from '../apps/api/src/seyeon-planner-memory-proposal-extractor-v1.js';
 import {
   deriveSeyeonPlannerProposalIdV1,
@@ -65,6 +66,31 @@ describe('UC-06 server Dialogue Planner Memory candidate',()=>{
       await expect(extractSeyeonPlannerMemoryCandidateV1({...source,provider}))
         .rejects.toMatchObject({code:'SEYEON_PLANNER_MEMORY_EXTRACTION_HOLD'});
     }
+  });
+
+  it('obeys explicit Korean/English no-memory directions before any paid Provider call',async()=>{
+    const provider={providerKey:'synthetic',modelKey:'synthetic',
+      generate:vi.fn(async()=>({
+        decision:'propose',claimAuthority:'user_asserted',...candidate,
+      }))};
+    for (const userText of [
+      '나비라는 고양이를 키워. 이거 기억하지 마',
+      '나는 나비라는 고양이를 키워. 기록하지 말아줘',
+      '이건 저장하지 마세요',
+      'Please do not remember this.',
+      "I have a cat, but don't save it.",
+      'Forget this please.',
+    ]) {
+      expect(isExplicitSeyeonPlannerMemoryOptOutV1(userText)).toBe(true);
+      expect(await extractSeyeonPlannerMemoryCandidateV1({
+        ...source,userText,provider,
+      })).toEqual({decision:'none'});
+    }
+    expect(provider.generate).not.toHaveBeenCalled();
+    for (const userText of [
+      '나비라는 고양이를 키워',
+      '지난번에 뭘 기억하지 못했지?',
+    ]) expect(isExplicitSeyeonPlannerMemoryOptOutV1(userText)).toBe(false);
   });
 
   it('DB Producer receives only server-owned IDs, one grounded summary and evidence quote',async()=>{
