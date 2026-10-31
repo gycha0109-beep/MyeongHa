@@ -10,6 +10,33 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 8 실제 Supabase Production migration 이력 읽기 전용 대조
+
+- **검증 경계:** 명하 Production Supabase `MyengHa` project ref `cnsfpcdiyofqvhpcegfc`의 `list_migrations` 읽기 전용 조회를 현장 수행. 비교 저장소는 GitHub `main` `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd`의 `supabase/migrations/*.sql`; 파일을 변경하지 않았다. 버전 문자열의 **정확 일치 여부만** 비교했으며 실제 적용 SQL/DDL/ACL/checksum 동등성 검증이 아니다.
+- **실측:** 원격 적용 이력 **226개**, 저장소 SQL 파일 **217개**, 버전 일치 **200개**, 원격에만 존재하는 버전 **26개**, 저장소에만 존재하는 버전 **17개**. 원격 최신 `20261031182926` (`s0_g0_relationship_original_lineage_scoped_owner_grant_20261101`); 저장소의 파일명 기준 최신 버전 `20261029185500`. 여러 다른 개발 트랙의 최신 변경이 포함될 수 있으므로 무단 정리·재배열 금지.
+- **미해결 핵심:** 원격 전용 `20261008090417` (`seyeon_runtime_1460_1510_acl_before_owner_recovery`) 여전. 동일 논리 이름 `owner_kcp_sandbox_remove_daily_limit_v1`도 원격 `20261029012948`과 저장소 `20261029012000`으로 **버전 불일치**. 최신 Admin/보안 원격 버전은 저장소 파일에 없으며, 저장소의 최신 공식 사주 발급 migration 파일은 원격 적용 목록에서 확인되지 않았다.
+- **판정 및 행동:** #1887 **OPEN**, `dr_ready=false`, `serviceResumptionAllowed=false` 유지. **Migration repair/revert/apply, Production DDL, DB 사용자·권한·데이터 변경 없음.** 각 불일치 버전의 원본·적용 SQL·DDL/checksum·승인/배포 귀속을 확인한 뒤에만 안전한 forward-only 정합화를 검토하고, 그 이후 최신 백업/격리 복원을 재실행한다. 단순 이름 유사성으로 동등성 확정 또는 DR 출시 승인 금지.
+
+
+### 2026-11-01 KST — Phase 13 최신 Cloudflare 실제 배포 100% 및 익명·Member/DB/Saju E2E 수용 증거 갱신
+
+- **실제 Provider 버전(독립 조회):** Cloudflare Workers `myeongha` 배포 API GET의 최신 배포 `4b583e11-0aa4-458b-b490-fa0f603df6af`, 2026-10-31T18:17:04Z, 활성 버전 `7e18da4b-4374-449d-8fd0-133bc6541244` 100% 확인. E2E 이후 동일 버전 100%를 재조회했다. 이는 GitHub `main` SHA 또는 전체 의존성/배포 아티팩트 동등성의 증거가 아니다.
+- **현재 main 소스 근거:** 검증 두 건 모두 GitHub `main` checkout SHA `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd`. 해당 source에서 운영 엔드포인트 검사를 실행했다는 뜻이며 Worker 바이너리가 같은 Git SHA로 빌드됐다는 독립 증빙은 아직 별도이다.
+- **익명 live smoke PASS:** [Cloudflare Primary Worker E2E #41230000760](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41230000760) **SUCCESS**, 2026-10-31T18:33:55Z 종료. `operations` 모드 결과에 Worker 헤더 관측 버전 `7e18da4b-4374-449d-8fd0-133bc6541244` 일치, 화면 200, health 200, readiness(config-only) 200, 비인증 Member/Saju/preview 401, 교차 Origin 로그인 403, 미지 경로 404, 잘못된 health method 405 확인. `liveDependencyConnectivityProven=false`는 이 익명 검사의 정상 범위다.
+- **로그인·DB·사주 실서비스 E2E PASS:** [Cloudflare Primary Worker Authenticated E2E #41230003340](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41230003340) **SUCCESS**, 정확한 동일 Worker 버전 요청 헤더 검증 후 전용 Member 로그인 200, DB 주체 귀속 200, 현재 Birth revision 조회 200, 계산-only Saju 연동 200. 기존 governed 계정/시크릿 사용, 새 사용자 등록·업무 프로필 수정·결제·해석·Provider Chat 없음(로그인 세션 발급은 발생). Chat 경로는 기존 503 HOLD를 유지하며 양성 Chat 기능 수용이 아니다.
+- **판정 범위:** 현재 확인된 정확한 Worker 버전에서 익명 경계와 양성 Auth/DB/Saju 기본 경로를 각각 실증했다. 다만 readiness는 설정 점검이며 DB/Saju 장애 회복, 로그 실제 샘플/redaction, 의존성별 p95, rollback, Hosted Auth/Storage 통합 복원, RPO/RTO는 여전히 **NOT_ACCEPTED**. #1887, `dr_ready=false`, `serviceResumptionAllowed=false` 유지. 배포 버전이 바뀌면 이 두 실증을 새 버전의 수용으로 자동 복제하지 않는다.
+
+
+### 2026-11-01 KST — PR #2821 병합 확인, PR #2829 전용 라벨 통합 재제출 및 운영 TLS 권한 구분
+
+- **선행 병합:** [PR #2821](https://github.com/gycha0109-beep/MyeongHa/pull/2821) source `54279060c4906b4958e021801aa7119946f1c775`는 [동일 HEAD 통합 CI #41220458822](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41220458822) **SUCCESS** 후 2026-11-01 01:48 KST 병합 확인. PostgreSQL 18 격리 인증서 신뢰/호스트명/평문 차단 증거는 합성 환경에 한정된다.
+- **후속 구현:** [PR #2829](https://github.com/gycha0109-beep/MyeongHa/pull/2829), source HEAD `3ff20f6a175a2c7a10cee8d7561172c2424ff4e9`. 기존 실소스 `buildProductionPostgresStrictTlsTargetV1`을 격리 PostgreSQL 18과 합성 CA/동적 fingerprint로 시험. 로컬 신규 **1/1 PASS**, TLS 관련 회귀 **38/38 PASS**, TypeScript PASS. CI 환경에 PostgreSQL 실행 경로가 없으면 실제 DB 검증 테스트는 skip하므로 CI green을 실DB 실증으로 대체하지 않는다.
+- **최초 CI 정책 거부:** 동일 HEAD 기본 CI [#41224238048](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41224238048), Governance [#41224238067](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41224238067), Web PR [#41224238046](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41224238046) **SUCCESS**. [통합 #41224242474](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41224242474)은 `Integration requires the dedicated CI submission label event`로 admission FAILURE, `full` SKIPPED; 코드 실패로 오분류하지 않는다.
+- **실제 재제출 및 완료:** 선행 검사가 성공한 원본 PR에 `ci-integration-ready` 라벨 적용. [신규 통합 #41227956293](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41227956293) 동 HEAD **SUCCESS**. [PR #2829](https://github.com/gycha0109-beep/MyeongHa/pull/2829)는 2026-11-01 03:15 KST 자동 병합, merge SHA `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd` 확인. 최초 통합 RED는 제출 이벤트 오류이며 소스 검증 실패가 아니다.
+- **기존 Production TLS authority와 구분:** `config/operations/production-postgres-tls-peer-verification-v1.json`에는 2026-09-28의 운영 인증서 pin, verify-full canary 및 일반 풀 활성화 검증 이력([#36475232900](https://github.com/gycha0109-beep/MyeongHa/actions/runs/36475232900), [#36497482499](https://github.com/gycha0109-beep/MyeongHa/actions/runs/36497482499))이 이미 있다. **운영 TLS 설정을 이번 작업에서 처음 구현한 것으로 기록하지 않는다.** 이는 과거 범위의 근거이며 현재 Cloudflare Worker·운영 DB·PG17/실제 RLS의 최신 종합 수용으로 자동 승격하지 않는다. #2829는 Production의 고정 CA/pin·실제 접속 비밀을 사용하지 않았다.
+- **변경 및 다음 경계:** 이 기록은 기존 운영 Worklog에만 추가한다. Production DB/Cloudflare/Supabase/비밀·개인정보는 변경하지 않는다. #2829 통합·병합 확인 후 최신 배포와 연결된 읽기 전용 운영 DB 역할/TLS 증거 및 DR #1887 불일치 해소가 남는다. `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+
+
 ### 2026-11-01 KST — PR #2815 통합 CI 정책 거부 원인 확인 및 라벨 이벤트 재제출
 
 - **대상:** [PR #2815](https://github.com/gycha0109-beep/MyeongHa/pull/2815), source HEAD `a6c9b409b280a75a82f5b7d6218243895a42879a`, Phase 7 격리 PostgreSQL 역할/RLS 트랜잭션 경계 실증.
