@@ -164,3 +164,4 @@
 - **문서:** `docs/operations/COMMERCE_P4_CANCELLATION_SET_LEDGER_AUDIT_V1.md`.
 - **다음:** 저장된 HMAC 집합과 독립적인 최신 Provider GET 성공 취소 목록의 동등성 검증, 이후 순서/법적/Reader T2 권한 조건 완료 전까지 실제 환불·회수 비활성.
 - **최종 로컬 회귀:** 관련 Vitest 14개 파일 **270건 PASS**, TypeScript 타입 검사·빌드 PASS, PostgreSQL 17 전용 SQL 생성기 2종 및 Bash 검사 PASS. 별도 PGlite PostgreSQL 18.6에서 2건 부분 취소 실제 SQL PASS. PostgreSQL 17 공식 CI는 아직 대기 상태입니다.
+- **통합 PR:** [PR #2831](https://github.com/gycha0109-beep/MyeongHa/pull/2831), 최초 구현 커밋 636f1d15. 관련 Vitest 270건, 타입 검사·빌드 및 격리 PG18 SQL 통과. 공식 PostgreSQL 17/필수 통합 CI 결과와 병합은 별도 확인 전까지 대기 상태입니다.
