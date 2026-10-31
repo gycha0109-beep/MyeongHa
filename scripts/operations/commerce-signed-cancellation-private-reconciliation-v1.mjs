@@ -4,6 +4,9 @@
 import {
   resolveCancellationOriginalReceiptPrivateV1,
 } from './commerce-cancellation-payment-receipt-link-v1.mjs';
+import {
+  inspectExactCancellationProviderEventReadinessV1,
+} from './commerce-cancellation-exact-event-readiness-v1.mjs';
 
 const DISABLED=Object.freeze({
   schemaVersion:'commerce-signed-cancellation-private-reconciliation-v1',
@@ -27,7 +30,7 @@ export const COMMERCE_SIGNED_CANCELLATION_PRIVATE_RECONCILIATION_V1=DISABLED;
  */
 export async function reconcileSignedCancellationPrivateV1({
   dbClient,request,webhookConfig,apiSecret,
-  fetchImpl,authenticator,readbackInspector,
+  fetchImpl,authenticator,readbackInspector,providerEventReadinessInspector,
 }){
   let authenticate=authenticator;
   let inspect=readbackInspector;
@@ -81,7 +84,33 @@ export async function reconcileSignedCancellationPrivateV1({
   });
   const kind=mapping[classified.kind];
   if(!kind)return base('inconsistent_provider_readback');
+  // The signed webhook and the authenticated PSP GET are not a substitute for
+  // a durable, ordered, exactly-reconciled canonical Commerce Provider Event.
+  // Run the existing-event audit only after both sources and the original
+  // production Receipt have matched; never create events or apply effects here.
+  let eventReadiness;
+  try {
+    const audit=providerEventReadinessInspector??
+      inspectExactCancellationProviderEventReadinessV1;
+    eventReadiness=await audit(dbClient,{
+      providerWebhookId:signed.providerWebhookId,
+      originalTransactionId:original.originalTransactionId,
+      expectedEventType:signed.eventType,
+    });
+    if(!eventReadiness||eventReadiness.writesPerformed!==false||
+       eventReadiness.grantRevocationAuthorized!==false||
+       eventReadiness.providerRefundAuthorized!==false||
+       typeof eventReadiness.kind!=='string'||
+       typeof eventReadiness.sourceEventReady!=='boolean'||
+       typeof eventReadiness.exactPurchaseGrantRevoked!=='boolean')
+      return base('canonical_provider_event_audit_inconsistent');
+  } catch {
+    return base('canonical_provider_event_audit_unavailable');
+  }
   return Object.freeze({...base(kind),
+    canonicalProviderEventStatus:eventReadiness.kind,
+    canonicalProviderEventReady:eventReadiness.sourceEventReady,
+    exactEventGrantRevocationObserved:eventReadiness.exactPurchaseGrantRevoked,
     exactProductionReceiptLinked:true,
     providerGetObserved:true,
     originalPaymentMatched:true,

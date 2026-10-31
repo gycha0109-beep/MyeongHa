@@ -7,7 +7,7 @@ import {
 } from '../scripts/operations/commerce-cancellation-exact-event-readiness-v1.mjs';
 
 const EVENT='portone-event-1',TX='verified-transaction-1';
-const INPUT={providerWebhookId:EVENT,originalTransactionId:TX};
+const INPUT={providerWebhookId:EVENT,originalTransactionId:TX,expectedEventType:'Transaction.Cancelled'};
 const ROW={
  providerEventId:'00000000-0000-4000-8000-000000000001',
  eventType:'Transaction.Cancelled',eventStatus:'verified',
@@ -25,7 +25,7 @@ function db(rows=[ROW],authority={readOnly:true,completeVisibility:true}){
   calls.push([sql,params]);
   if(sql.includes('pg_catalog.pg_roles'))return {rows:[authority]};
   if(sql===SQL){
-   assert.deepEqual(params,[EVENT]);
+   assert.deepEqual(params,[EVENT,rows[0]?.eventType??'Transaction.Cancelled']);
    return {rows};
   }
   assert.ok(!/\b(insert|update|delete|commit)\b/i.test(sql),'No mutation SQL');
@@ -63,12 +63,12 @@ describe('exact verified cancellation event / Reader purchase Grant audit',()=>{
   assert.equal(r.kind,'event_receipt_identity_inconsistent');
  });
  it('does not treat partial refund tag as full cancellation authority',async()=>{
-  const r=await inspect(db([{...ROW,eventType:'Transaction.PartialCancelled'}]),INPUT);
+  const r=await inspect(db([{...ROW,eventType:'Transaction.PartialCancelled'}]),{...INPUT,expectedEventType:'Transaction.PartialCancelled'});
   assert.equal(r.kind,'verified_event_review_candidate');
   assert.equal(r.grantRevocationAuthorized,false);
  });
  it('does not treat pending event as final even with verified event status',async()=>{
-  const r=await inspect(db([{...ROW,eventType:'Transaction.CancelPending'}]),INPUT);
+  const r=await inspect(db([{...ROW,eventType:'Transaction.CancelPending'}]),{...INPUT,expectedEventType:'Transaction.CancelPending'});
   assert.equal(r.grantRevocationAuthorized,false);
  });
  it('missing event cannot be used to revoke',async()=>{

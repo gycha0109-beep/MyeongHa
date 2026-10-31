@@ -10,6 +10,8 @@ import {
 } from '../scripts/operations/commerce-signed-cancellation-private-reconciliation-v1.mjs';
 import {COMMERCE_CANCELLATION_PAYMENT_RECEIPT_LINK_SQL_V1 as LOOKUP}
  from '../scripts/operations/commerce-cancellation-payment-receipt-link-v1.mjs';
+import {COMMERCE_CANCELLATION_EXACT_EVENT_READINESS_SQL_V1 as EVENT_AUDIT}
+ from '../scripts/operations/commerce-cancellation-exact-event-readiness-v1.mjs';
 
 const NOW=new Date('2026-10-30T05:00:00.000Z');
 const TS=String(Math.floor(NOW.getTime()/1000));
@@ -45,13 +47,17 @@ function signedRequest(type='Transaction.Cancelled',data={
   'webhook-timestamp':TS,'webhook-signature':'v1,'+sig,
  }};
 }
-function fakeDb({rows=[ROW],authority={readOnly:true,completeVisibility:true},error}={}){
+function fakeDb({rows=[ROW],eventRows=[],authority={readOnly:true,completeVisibility:true},error}={}){
  return {query:vi.fn(async (sql,args)=>{
   if(sql.includes('pg_catalog.pg_roles'))return {rows:[authority]};
   if(sql===LOOKUP){
    if(error)throw error;
    expect(args).toEqual([PAYMENT_ID,TX]);
    return {rows};
+  }
+  if(sql===EVENT_AUDIT){
+   expect(args).toEqual(['msg_1','Transaction.Cancelled']);
+   return {rows:eventRows};
   }
   if(sql.toLowerCase().includes('insert')||
      sql.toLowerCase().includes('update')||
@@ -93,6 +99,9 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
    kind:'full_cancel_review_candidate',
    exactProductionReceiptLinked:true,providerGetObserved:true,
    fullCancelShapeObserved:true,partialCancelShapeObserved:false,
+   canonicalProviderEventStatus:'canonical_event_missing',
+   canonicalProviderEventReady:false,
+   exactEventGrantRevocationObserved:false,
    fullRefundExecutionAuthorized:false,grantRevocationAuthorized:false,
    entitlementEffectEligible:false,writesPerformed:false,
   });
@@ -196,5 +205,71 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
   }))});
   expect(r.kind).toBe('inconsistent_provider_readback');
   expect(http).not.toHaveBeenCalled();
+ });
+});
+
+describe('signed PortOne cancellation and persisted event readiness bridge',()=>{
+ const eventRow=Object.freeze({
+  providerEventId:'00000000-0000-4000-8000-000000000011',
+  eventType:'Transaction.Cancelled',eventStatus:'verified',
+  resolutionSourceType:'receipt',providerOrderingKey:'ordering-1',
+  eventTransactionId:TX,eventOriginalTransactionId:null,
+  receiptId:ROW.verifiedReceiptId,receiptStatus:'verified',
+  receiptTransactionId:TX,receiptAmountMinor:'8900',receiptCurrency:'KRW',
+  receiptSubjectId:ROW.subjectId,
+  purchaseGrantCount:'1',exactEventRevocationCount:'0',
+ });
+ it('exposes only safe canonical event readiness after signed webhook + PSP GET',async()=>{
+  const db=fakeDb({eventRows:[eventRow]});
+  const result=await executor(db,fakeFetch());
+  expect(result).toMatchObject({
+   kind:'full_cancel_review_candidate',
+   canonicalProviderEventStatus:'verified_event_review_candidate',
+   canonicalProviderEventReady:true,
+   exactEventGrantRevocationObserved:false,
+   entitlementEffectEligible:false,
+   grantRevocationAuthorized:false,writesPerformed:false,
+  });
+  expect(db.query.mock.calls.some(([sql])=>sql===EVENT_AUDIT)).toBe(true);
+  expect(JSON.stringify(result)).not.toContain(TX);
+  expect(JSON.stringify(result)).not.toContain('msg_1');
+  expect(JSON.stringify(result)).not.toContain(ROW.subjectId);
+ });
+ it('detects already-recorded same-provider-event revocation without repeating it',async()=>{
+  const result=await executor(fakeDb({
+   eventRows:[{...eventRow,exactEventRevocationCount:'1'}],
+  }),fakeFetch());
+  expect(result).toMatchObject({
+   canonicalProviderEventStatus:'exact_event_revocation_observed',
+   canonicalProviderEventReady:true,
+   exactEventGrantRevocationObserved:true,
+   grantRevocationAuthorized:false,writesPerformed:false,
+  });
+ });
+ it('does not audit canonical event if PortOne GET is untrusted',async()=>{
+  const db=fakeDb({eventRows:[eventRow]});
+  const result=await executor(db,fakeFetch({...PAID,transactionId:'wrong'}));
+  expect(result.kind).toBe('inconsistent_provider_readback');
+  expect(db.query.mock.calls.some(([sql])=>sql===EVENT_AUDIT)).toBe(false);
+ });
+ it('fails closed when exact event audit cannot access canonical records',async()=>{
+  const db=fakeDb({eventRows:[eventRow]});
+  const result=await executor(db,fakeFetch(),{
+   providerEventReadinessInspector:async()=>{throw Error('database unavailable')},
+  });
+  expect(result.kind).toBe('canonical_provider_event_audit_unavailable');
+  expect(result.grantRevocationAuthorized).toBe(false);
+ });
+ it('ignores a forged audit result that claims authority to revoke',async()=>{
+  const db=fakeDb();
+  const result=await executor(db,fakeFetch(),{
+   providerEventReadinessInspector:async()=>({
+    kind:'verified_event_review_candidate',sourceEventReady:true,
+    exactPurchaseGrantRevoked:false,grantRevocationAuthorized:true,
+    providerRefundAuthorized:false,writesPerformed:false,
+   }),
+  });
+  expect(result.kind).toBe('canonical_provider_event_audit_inconsistent');
+  expect(result.grantRevocationAuthorized).toBe(false);
  });
 });

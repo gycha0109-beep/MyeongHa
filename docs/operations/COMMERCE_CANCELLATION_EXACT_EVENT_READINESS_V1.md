@@ -29,3 +29,11 @@ A privileged operations-only PostgreSQL identity opens a bounded **repeatable-re
 ## Verification and next implementation
 
 `node --test test/commerce-cancellation-exact-event-readiness-v1.test.mjs` exercises exact source lineage, replay observation, partial/pending tags, missing/unverified/ambiguous event, provider ordering and RLS-complete role enforcement. Future work must construct and verify an **authorized cancellation provider event persistence contract**, deduplicate by provider event ID, tie its ordering to the Receipt and Reader/T2 lifecycle, and only then invoke the existing Entitlement Effect application with a legal outcome. No new lifecycle events are created here.
+
+## 2026-10-31: stitched operations-only readback
+
+The existing `reconcileSignedCancellationPrivateV1` flow now invokes this exact stored-event audit **after** the signed PortOne notification, original verified Production Reading Receipt, and authenticated provider GET have all passed. It forwards the signed event ID, the original verified transaction ID, and the **signed event type** as exact matching keys.
+
+The internal response distinguishes `canonical_event_missing`, `canonical_event_unverified`, `provider_ordering_unresolved`, `verified_event_review_candidate`, and `exact_event_revocation_observed`. Missing privileges/invalid audits fail closed. None authorizes a refund, provider cancellation POST or Entitlement Effect. No new public HTTP endpoint is mounted, and no database write or migration is introduced.
+
+**Remaining:** an audited cancellation event persistence/idempotency command and legally authorized exact-grant effect execution, plus separate integration of the proposed new private withdrawal-claim table into the approved P0-PR-01 deletion graph.

@@ -43,6 +43,7 @@ join public.commerce_receipts receipt
 where event.provider='portone_v2'
  and event.environment='production'
  and event.external_event_id=$1::text
+ and event.event_type=$2::text
  and receipt.provider='portone_v2'
  and receipt.environment='production'
  and receipt.verification_status in ('verified','revoked')
@@ -72,7 +73,8 @@ export const COMMERCE_CANCELLATION_EXACT_EVENT_READINESS_V1=Object.freeze({
  */
 export async function inspectExactCancellationProviderEventReadinessV1(client,input){
  if(!input||!validId(input.providerWebhookId)||
-    !validId(input.originalTransactionId))throw Error('INVALID_CANCELLATION_EVENT_AUDIT_INPUT');
+    !validId(input.originalTransactionId)||
+    !TYPES.has(input.expectedEventType))throw Error('INVALID_CANCELLATION_EVENT_AUDIT_INPUT');
  let tx=false;
  try{
   await client.query('begin isolation level repeatable read read only');tx=true;
@@ -85,12 +87,12 @@ export async function inspectExactCancellationProviderEventReadinessV1(client,in
      authority.rows[0].readOnly!==true||
      authority.rows[0].completeVisibility!==true)
     throw Error('CANCELLATION_EVENT_AUDIT_AUTHORITY_REQUIRED');
-  const answer=await client.query(COMMERCE_CANCELLATION_EXACT_EVENT_READINESS_SQL_V1,[input.providerWebhookId]);
+  const answer=await client.query(COMMERCE_CANCELLATION_EXACT_EVENT_READINESS_SQL_V1,[input.providerWebhookId,input.expectedEventType]);
   if(answer.rows.length===0)return no('canonical_event_missing');
   if(answer.rows.length!==1)throw Error('CANCELLATION_EVENT_AUDIT_AMBIGUOUS');
   const r=answer.rows[0];
   if(!validId(r.providerEventId)||!validId(r.receiptId)||
-     !TYPES.has(r.eventType)||
+     !TYPES.has(r.eventType)||r.eventType!==input.expectedEventType||
      !validId(r.receiptTransactionId)||
      r.receiptTransactionId!==input.originalTransactionId||
      !(r.eventTransactionId===input.originalTransactionId||
