@@ -239,3 +239,11 @@ Watchtower-Track: security
 - **구현:** `scripts/verify-web-auth-rejected-bearer-browser.mjs` 테스트 서버의 `/api/readings` 응답을 실제 첫 요청 순서와 일치시켰다. `records-life-401` Member 및 `records-guest-401` Guest에는 401, `records-life-403` Member에는 403을 반환한다. 기존 `/api/life-record`의 해당 사례 응답은 유지해 경로 순서 변화도 수용한다. 브라우저의 원래 401 무효화·403 유지에 대한 검증 기준을 완화하지 않았다.
 - **변경 파일:** `scripts/verify-web-auth-rejected-bearer-browser.mjs`, 동일 Worklog. `node --check` 및 `git diff --check` 확인; 브라우저/CI PASS 여부는 새로운 HEAD 검사가 끝난 뒤 판정한다.
 - **진행 및 운영:** #2786의 다른 CI와 Cloudflare Workers 빌드는 별도 판정; 이번 수정을 이유로 다른 트랙 검사를 취소하거나 운영 Production DB/ACL/Provider/HTTP 공개를 활성화하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W20 — #2786 최신 main 합류·브라우저 검사 충돌 해결
+
+- **목적:** W19 브라우저 검사 수정 HEAD `030cea09cc8ff6593fcc99d63c1e44d1d094c195`가 최신 main의 다른 Records Guest 인증 시험 수정(#2796)과 동일 파일에서 충돌해 PR 상태가 DIRTY로 바뀐 것을 해소한다.
+- **구현:** 최신 origin/main (`d9e25eee`) 합류 과정의 단일 충돌 `scripts/verify-web-auth-rejected-bearer-browser.mjs`를 직접 해결했다. main의 `/api/readings` Guest 거부 경로·추적 정보·미사용 mock API 제거를 유지하고, 첫 실요청인 `/api/readings`에 Member 401 및 Member 403 검사만 추가했다. 원래 무효화(401)/세션 유지(403) 검증 내용은 변경하지 않았다.
+- **변경:** 최신 main과의 Git 통합 커밋 및 이 Worklog. 기존 보안 G1/G2/G3 소스는 그대로 보존하고 운영 범위는 넓히지 않았다.
+- **검증/미완료:** 병합 파일 `node --check` 및 `git diff --check` 시행; 새 HEAD GitHub Browser/DB/Security와 Cloudflare 검사 결과는 실행 후 확인 전까지 PASS 아님. `HOLD_FORWARD_STOPPED` 유지.

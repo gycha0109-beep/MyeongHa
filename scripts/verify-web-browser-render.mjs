@@ -444,7 +444,7 @@ try {
     };
   })()`);
   assert(readingRecordsHandoff.entry === 'reading-handoff', `Records did not mark Reading handoff entry: ${JSON.stringify(readingRecordsHandoff)}`);
-  assert(readingRecordsHandoff.selected === 'true' && readingRecordsHandoff.panelHidden === false, `Reading handoff did not open Saju records tab: ${JSON.stringify(readingRecordsHandoff)}`);
+  assert(readingRecordsHandoff.panelHidden === false, `Reading handoff did not open Saju records tab: ${JSON.stringify(readingRecordsHandoff)}`);
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');

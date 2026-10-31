@@ -36,6 +36,8 @@ import type {
 
 export const SEYEON_PRODUCTION_PROVIDER_ROUTING_V1 = Object.freeze({
   directDefaultModel: 'gpt-5.6-terra',
+  responseModel: 'z-ai/glm-5.3-flash',
+  responseProvider: 'openrouter-chat',
 } as const);
 
 function optionalEnv(
@@ -188,6 +190,9 @@ export function createProductionSeyeonTurnSendRuntimeV1(
               ...(enforce === null
                 ? (roleProviderConfigs === undefined ? {} : { roleProviderConfigs })
                 : { roleProviderConfigs: enforce.roleProviderConfigs }),
+              ...(input.providerConfig === undefined ? {
+                glmRendererConfig: { apiKey: optionalEnv(input.env, 'OPENROUTER_API_KEY') ?? '' },
+              } : {}),
               clientCompatibilityProfile:
                 input.clientCompatibilityProfile ??
                 SEYEON_PRODUCTION_WEB_COMPATIBILITY_PROFILE_V1,

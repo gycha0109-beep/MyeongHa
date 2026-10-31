@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 describe('Seyeon Web turn-send wiring', () => {
-  it('connects the approved Member send route and displays only the receipt-ACKed first reply', async () => {
+  it('connects the approved Member send route and displays the ACKed turn in the current live conversation', async () => {
     const source = await readFile(
       new URL('../apps/web/chat-runtime-client.js', import.meta.url),
       'utf8',
@@ -15,7 +15,7 @@ describe('Seyeon Web turn-send wiring', () => {
     expect(source).toContain('clientTurnId: crypto.randomUUID()');
     const send = source.slice(source.indexOf('async function sendTurn(message)'), source.indexOf('function submitTurn(event)'));
     expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
-    expect(send).toContain('renderAcknowledgedSeyeonFirstReply(acknowledgedReply)');
+    expect(send).toContain('renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn)');
     expect(send).not.toContain('await loadRoomState()');
     expect(send).toContain('currentBearer.token !== activeBearer.token');
     expect(source).toContain("authoritativeCharacterId !== 'seyeon'");

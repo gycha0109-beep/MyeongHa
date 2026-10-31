@@ -7,10 +7,6 @@ import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
 import { ensureActiveBearer, readMemberSession, readGuestBearer, PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { captureReadingResponseOwnerV1, isReadingResponseOwnerCurrentV1 } from './reading-response-owner-guard.js';
 
-const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';
-const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';
-const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '::1', '[::1]']));
-
 function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing records page element: ${id}`);
@@ -40,94 +36,11 @@ function uiElement(tag, className, source) {
   return textElement(tag, className, uiText(source));
 }
 
-function sourceElement(tag, className, value) {
-  const element = textElement(tag, className, value);
-  element.dataset.recordsSource = '';
-  return element;
-}
-
-function formatStoredValue(value) {
-  if (value === null) return '—';
-  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value);
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return uiText('[표시할 수 없는 기록]');
-  }
-}
-
 function requireArray(payload, key) {
   if (!Array.isArray(payload?.[key])) {
     throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', `Records payload is missing ${key}.`);
   }
   return payload[key];
-}
-
-function isPlainObject(value) {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function isSampleSajuReadingFact(fact) {
-  return fact?.factType === SAMPLE_SAJU_FACT_TYPE
-    && fact?.schemaVersion === SAMPLE_SAJU_SCHEMA_VERSION
-    && isPlainObject(fact?.valueJsonb)
-    && fact.valueJsonb.sample === true;
-}
-
-function allowsDevelopmentSajuSamples() {
-  return DEVELOPMENT_SAMPLE_HOSTS.has(window.location.hostname.toLowerCase());
-}
-
-function asNonEmptyString(value) {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null;
-}
-
-function asStringArray(value) {
-  if (!Array.isArray(value)) return [];
-  return value.map(asNonEmptyString).filter(Boolean);
-}
-
-function setupTabs() {
-  const tabs = Array.from(document.querySelectorAll('.records-tab[role="tab"]'));
-  const panels = Array.from(document.querySelectorAll('.records-tab-panel[role="tabpanel"]'));
-
-  function activate(tab) {
-    const targetId = tab.getAttribute('aria-controls');
-    for (const candidate of tabs) {
-      candidate.setAttribute('aria-selected', candidate === tab ? 'true' : 'false');
-      candidate.tabIndex = candidate === tab ? 0 : -1;
-    }
-    for (const panel of panels) panel.hidden = panel.id !== targetId;
-  }
-
-  tabs.forEach((tab, index) => {
-    tab.addEventListener('click', () => activate(tab));
-    tab.addEventListener('keydown', (event) => {
-      let targetIndex;
-      if (event.key === 'Home') targetIndex = 0;
-      else if (event.key === 'End') targetIndex = tabs.length - 1;
-      else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
-        const delta = event.key === 'ArrowRight' ? 1 : -1;
-        targetIndex = (index + delta + tabs.length) % tabs.length;
-      } else return;
-      event.preventDefault();
-      const next = tabs[targetIndex];
-      next.focus();
-      activate(next);
-    });
-  });
-
-  const params = new URLSearchParams(window.location.search);
-  const requestedTab = params.get('tab');
-  const fromReading = params.get('from') === 'reading';
-  const targetTabId = fromReading || requestedTab === 'saju'
-    ? 'saju-records-tab'
-    : ({ life: 'life-records-tab' }[requestedTab] ?? 'saju-records-tab');
-  const initialTab = tabs.find((tab) => tab.id === targetTabId);
-  if (initialTab) activate(initialTab);
-  if (fromReading || requestedTab === 'saju') {
-    document.body.dataset.recordsEntry = fromReading ? 'reading-handoff' : 'saju-deeplink';
-  }
 }
 
 function renderProfile(payload) {
@@ -144,30 +57,10 @@ function renderProfile(payload) {
   byId('records-subject-kind').textContent = uiText(kind);
 }
 
-function renderLifeFacts(payload) {
-  const target = byId('life-records-list');
-  clear(target);
-  if (payload?.status === 'unavailable') {
-    target.append(uiElement('p', 'muted records-empty', '현세록을 지금 확인할 수 없습니다. 다른 기록은 계속 확인할 수 있습니다.'));
-    return;
-  }
-  const facts = requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact));
-  if (facts.length === 0) {
-    target.append(uiElement('p', 'muted records-empty', '아직 남아 있는 현세록이 없습니다.'));
-    return;
-  }
-  for (const fact of facts) {
-    const row = document.createElement('div');
-    row.className = 'ledger-row';
-    row.append(textElement('div', '', formatTimestamp(fact.confirmedAt)));
-    const detail = document.createElement('div');
-    detail.append(sourceElement('strong', '', String(fact.factType ?? uiText('기록 항목'))));
-    detail.append(document.createElement('br'));
-    detail.append(sourceElement('span', 'fine', formatStoredValue(fact.valueJsonb)));
-    row.append(detail);
-    row.append(textElement('div', '', uiText(fact.revokedAt ? '철회됨' : '기록됨')));
-    target.append(row);
-  }
+function markRecordsEntry() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('from') === 'reading') document.body.dataset.recordsEntry = 'reading-handoff';
+  else if (params.get('tab') === 'saju') document.body.dataset.recordsEntry = 'saju-deeplink';
 }
 
 function readingPresentation(sajuDomain) {
@@ -207,7 +100,7 @@ function clearRecordsForSessionChange() {
   displayedRecordsOwner = null;
   byId('records-content').hidden = true;
   for (const id of [
-    'records-display-name', 'records-subject-kind', 'life-records-list',
+    'records-display-name', 'records-subject-kind',
     'saju-records-list', 'saju-records-count',
   ]) {
     byId(id).replaceChildren();
@@ -340,63 +233,7 @@ function renderSajuReadingEmpty(target) {
   target.append(empty);
 }
 
-function renderSajuReadingSamples(target, lifeFactsPayload) {
-  const sampleFacts = requireArray(lifeFactsPayload, 'facts').filter(isSampleSajuReadingFact);
-
-  if (sampleFacts.length === 0) {
-    renderSajuReadingEmpty(target);
-    return;
-  }
-
-  for (const fact of sampleFacts) {
-    const value = fact.valueJsonb;
-    const title = asNonEmptyString(value.title) ?? uiText('사주 풀이');
-    const period = asNonEmptyString(value.period);
-    const summary = asNonEmptyString(value.summary) ?? uiText('샘플 풀이 요약이 없습니다.');
-    const keywords = asStringArray(value.keywords);
-    const highlights = asStringArray(value.highlights);
-
-    const card = document.createElement('article');
-    card.className = 'records-reading-card records-reading-card--sample';
-
-    const top = document.createElement('div');
-    top.className = 'records-reading-top';
-    const identity = document.createElement('div');
-    identity.className = 'records-reading-identity';
-    identity.append(textElement('span', 'records-reading-icon', '職'));
-    const heading = document.createElement('div');
-    const eyebrow = document.createElement('div');
-    eyebrow.className = 'records-reading-eyebrow';
-    eyebrow.append(textElement('span', 'records-reading-badge', uiText('개발 샘플')));
-    if (period) eyebrow.append(sourceElement('span', 'records-reading-period', period));
-    heading.append(eyebrow, sourceElement('h3', 'records-reading-title', title));
-    identity.append(heading);
-    top.append(identity);
-    top.append(textElement('span', 'records-reading-date', formatTimestamp(fact.confirmedAt)));
-    card.append(top);
-
-    card.append(sourceElement('p', 'records-reading-summary', summary));
-
-    if (keywords.length > 0) {
-      const chips = document.createElement('div');
-      chips.className = 'records-reading-keywords';
-      for (const keyword of keywords) chips.append(sourceElement('span', 'records-reading-chip', keyword));
-      card.append(chips);
-    }
-
-    if (highlights.length > 0) {
-      const list = document.createElement('ul');
-      list.className = 'records-reading-highlights';
-      for (const highlight of highlights) list.append(sourceElement('li', '', highlight));
-      card.append(list);
-    }
-
-    appendReadingFooter(card, uiText('실제 Reading이 없을 때만 보이는 UI fixture'));
-    target.append(card);
-  }
-}
-
-function renderSajuReadings(readingPayload, lifeFactsPayload) {
+function renderSajuReadings(readingPayload) {
   const target = byId('saju-records-list');
   clear(target);
   if (readingPayload?.status === 'unavailable') {
@@ -414,11 +251,6 @@ function renderSajuReadings(readingPayload, lifeFactsPayload) {
   byId('saju-records-count').textContent = recordsReportCountV1(readings.length, getUiLocale());
   if (readings.length > 0) {
     for (const reading of readings) renderPersistedReading(target, reading);
-    return;
-  }
-  if (allowsDevelopmentSajuSamples()) {
-    if (lifeFactsPayload?.status === 'unavailable') renderSajuReadingEmpty(target);
-    else renderSajuReadingSamples(target, lifeFactsPayload);
     return;
   }
   renderSajuReadingEmpty(target);
@@ -446,12 +278,11 @@ function setFailure(error) {
 
 function renderLoadedRecords(records) {
   renderProfile(records.profile);
-  renderLifeFacts(records.lifeFacts);
-  renderSajuReadings(records.readings, records.lifeFacts);
+  renderSajuReadings(records.readings);
 }
 
 async function boot() {
-  setupTabs();
+  markRecordsEntry();
   const status = byId('records-status');
   status.hidden = false;
   status.textContent = uiText(recordsStatusSource);

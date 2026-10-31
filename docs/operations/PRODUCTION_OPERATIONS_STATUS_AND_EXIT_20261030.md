@@ -8,6 +8,95 @@
 >
 > 최종 판정: **코드·배포·익명 운영 점검 일부 확인 / 전체 Production Operations ACCEPTANCE = 미완료**. `dr_ready=false`, `serviceResumptionAllowed=false` 상태를 변경하지 않음.
 
+## Worklog — 운영 트랙 작업 이력
+
+### 2026-10-31 18:36 KST — Phase 7 격리 PostgreSQL 18 실제 SQL 지연·연결 고갈 실증
+
+- **구현:** [`scripts/operations/verify-postgres-isolated-chaos-phase7.mjs`](../../scripts/operations/verify-postgres-isolated-chaos-phase7.mjs) 추가. 로컬 `PG_BIN_DIR` 아래의 `initdb`/`pg_ctl`로 **매번 임시 데이터 디렉터리와 임의 127.0.0.1 포트에 별도 PostgreSQL 인스턴스**를 생성하고, 실제 Node `pg.Pool`로 SQL/연결 테스트. 인스턴스는 `finally`에서 종료하고 임시 디렉터리를 삭제. 기존 로컬 PostgreSQL 서비스 및 Hosted/Production DB 설정·데이터에 접근하지 않음.
+- **실제 SQL/포화 실행:** Windows Node 24·로컬 PostgreSQL 18에서 스크립트 exit 0 / 출력 `result=PASS`. 독립 DB의 `SELECT pg_sleep(0.6)`은 `statement_timeout=180ms`에 의해 PostgreSQL 오류 코드 **`57014`**로 중단됨(최종 재현 SQL 취소 **199ms**, 초기 성공 관측 **193ms**). 이어서 동일 풀 `SELECT 1` 성공으로 타임아웃 이후 연결 재사용 정상 확인. `max=1`로 첫 연결을 점유한 동안 대기 중인 두 번째 `pool.connect()`가 `connectionTimeoutMillis=250ms`에 따라 **261ms**에서 종료되며 최대 풀 연결이 1을 넘지 않음을 확인. 격리 서버를 정지한 뒤 새로운 `SELECT 1`의 연결 거부 `ECONNREFUSED` 약 **1ms** 관측.
+- **환경 차이·수정:** 첫 시도는 로컬 환경의 SSL 기본설정으로 인해 분리된 인스턴스가 SSL 연결을 거부함. 스크립트 내부의 **임시 격리 DB용 설정에만** `ssl:false`를 명시한 뒤 실행 성공. 운영 DB의 필수 `verify-full` TLS 설정은 변경하지 않음. 테스트용 비밀·사용자 데이터 출력 없음. 실행 결과는 **단일 로컬 시점의 관측**이며 p95/SLO 지표로 사용하지 않음.
+- **수용 경계/다음:** 기존 synthetic TCP 테스트와 달리 **실제 PostgreSQL SQL statement timeout과 풀 대기 고갈**까지 증명했으나, Production의 PG17/strict TLS/권한 역할, 실제 MyeongHa DB 라우트 503 경계, Hosted DB 용량·장애 및 복구, 모니터링은 여전히 미검증. Phase 7/13 전체 완료, `dr_ready`, `serviceResumptionAllowed` 승격 금지. 향후 필요 시 동등하게 격리된 PostgreSQL 17에서 같은 검증을 재현하고, 승인된 실제 API 경계로 확대.
+
+### 2026-10-31 18:30 KST — Phase 7 PostgreSQL 로컬 TCP 장애·연결 수 상한 검증
+
+- **구현 목적:** [Production Operations 아키텍처 §34](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 DB unavailable, DB slow, DB connection exhaustion 중 *연결·핸드셰이크 경계*를 통제된 비Production 환경에서 실제 소켓으로 검증. 실사용자·실서비스·운영 PostgreSQL 또는 Supabase에 접근하지 않음.
+- **실제 변경:** [`test/postgres-subject-pool-loopback-chaos-phase7.test.ts`](../../test/postgres-subject-pool-loopback-chaos-phase7.test.ts) 추가. Node의 실제 `127.0.0.1` TCP 서버와 `pg.Pool`을 사용해 (1) 닫힌 포트의 `ECONNREFUSED`, (2) 연결은 받되 PostgreSQL 핸드셰이크를 진행하지 않는 서버, (3) `maxConnectionsPerRuntime=1`인 상태에서 4개 동시 연결 요청을 시험. 기존 일반 `buildNodePostgresPoolConfigV1`의 `connectionTimeoutMs=125`, `statementTimeoutMs=500`, `maxConnectionsPerRuntime=1` 설정과 실제 pg 드라이버 동작을 함께 확인. 매 실패 후 Cloudflare Worker의 독립 `GET /api/health`가 200인지 검증.
+- **실행 증거:** Windows Node 24 + Vitest 4.1.11. 신규 **3/3 PASS**, 관련 PostgreSQL pool 기존 회귀 포함 **5파일 30/30 PASS**, `tsc -p tsconfig.json --noEmit` PASS. 열린 TCP 서버의 연결 수 최대치는 설정된 1을 넘지 않음. 로컬 TCP 요청 시간은 각 시험의 2초 이내 제한 조건을 만족. 합성 사용자·합성 PostgreSQL URL만 사용하며 실제 credential/SQL 데이터 없음.
+- **범위 및 한계:** 이것은 **실제 TCP transport/연결 대기·풀 연결 상한 검증**이지, 운영의 strict TLS `verify-full` 경로나 실제 PostgreSQL SQL 실행, `pg_sleep` 등 SQL 지연 시 `statement_timeout` 실행, DB 실제 capacity/성능·500 응답 경로의 종단 간 실증을 대체하지 않는다. 테스트 서버는 PostgreSQL 프로토콜을 구현하지 않으며, 500ms `statementTimeoutMs`는 구성 연결만 검증했지 SQL에서 발동시킨 증거가 아님. §34 전체 Phase 7, Production Operations Phase 13, Hosted Auth/Storage DR은 **미수용**. `dr_ready=false` 및 `serviceResumptionAllowed=false` 유지.
+- **추적/다음:** 브랜치 `ops/phase7-postgres-tcp-chaos-worklog-20261031`, 검증 파일과 본 Worklog를 함께 PR로 제출. 다음 순서는 실제 격리 PostgreSQL 인스턴스에서 SQL 지연·연결 점유 제한 및 적절한 오류 매핑을 측정하고, 안전한 성능/용량 기준으로 승격하는 것. Cloudflare Preview 인증 오류는 별도 추적.
+
+
+
+### 2026-10-31 — 기록 화면 Guest 401 브라우저 검증 경로 수정
+
+- **목적:** [브라우저 검증 #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)의 최초 실행 및 1회 실패 작업 재실행 모두에서 나타난 `Records ledger authoritative 401 did not invalidate the rejected Guest` 오류를 실제 호출·응답 경계 기준으로 재현하고 해결한다.
+- **원인 확인:** `apps/web/records-runtime-client.js`의 현 기록 조회 엔드포인트는 `/api/me`, `/api/life-record`, `/api/readings`임. 그러나 [`scripts/verify-web-auth-rejected-bearer-browser.mjs`](../../scripts/verify-web-auth-rejected-bearer-browser.mjs)의 `records-guest-401` 시나리오는 **기록 화면이 호출하지 않는 `/api/memories`** 에서만 401을 반환했음. 당시 실패 로그에도 실제 `/api/readings` 요청만 남고 `/api/memories` 요청은 없음. 따라서 401이 기록 화면에 도달하지 않은 채 정상 로드되어, 테스트가 Guest bearer 잔존을 실제 세션 무효화 버그로 잘못 판정했음.
+- **수정:** 테스트의 Guest 401 주입 지점을 실제 `GET /api/readings`로 이동하고 미사용 `/api/memories` fixture 제거. `records-guest-401` 시나리오에서 **실제로 `/api/readings`에 해당 401을 주입했다는 별도 단언**을 추가하여 향후 페이지 API 이동 시 거짓 검증이 발생하지 않게 함. 제품 코드와 Auth/DB/Cloudflare 환경·비밀·데이터는 변경하지 않음.
+- **로컬 실증:** Node 24, `npm run build:web` **PASS**, Windows Edge headless를 Chrome DevTools Protocol로 구동한 `node scripts/verify-web-auth-rejected-bearer-browser.mjs` **PASS** (`MyeongHa_WEB_AUTH_REJECTED_BEARER_BROWSER_PASS`, exit 0). 생성된 JSON 검증 산출물에서 `records-guest-401` 실제 요청은 `/api/me`, `/api/life-record`, **`/api/readings` (rejectedGuest=true)**이고 `/api/memories` 호출 없음. 401 후 Guest bearer가 비워지는 검증과 기존 Member 401/403 구분 테스트 모두 통과함. 산출물은 로컬에만 두고 저장소에 올리지 않음.
+- **한계:** 로컬 합성 응답·브라우저 테스트 통과이며 Production 서버 장애·실제 사용자 세션/DR 수용 증거가 아님. **PR/원격 CI 성공 및 병합은 별도 확인 후 기록**하고 Phase 7 DB 장애/Phase 8 DR/Phase 13 운영 수용의 차단 상태는 유지함.
+- **추적:** 작업 브랜치 `fix/ops/records-guest-401-browser-proof-20261031`; 원래 관련 PR [#2790](https://github.com/gycha0109-beep/MyeongHa/pull/2790), 재시도 Worklog PR [#2792](https://github.com/gycha0109-beep/MyeongHa/pull/2792). **다음:** GitHub Web Auth Browser Regression에서 재확인, 실제 정상 검증일 때 병합. 원격 실패 시 해당 테스트에서 드러난 새로운 원인을 수정.
+
+
+
+### 2026-10-31 17:11 KST — PR #2790 RED 진단 및 실패 작업 재실행
+
+- **요청·대상:** [Auth 로컬 장애 격리 PR #2790](https://github.com/gycha0109-beep/MyeongHa/pull/2790) (head `a012c48cf25cc3b28655cb32bb46bce785ff396c`). PR은 2026-10-31T07:05:39Z에 **실제 병합 완료**. 해당 head의 [기본 CI #41178543652](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543652), [정식 Integration #41178551294](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178551294), Governance [#41178543651](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543651)는 SUCCESS. [이전 Integration #41178544791](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178544791)의 제출 이벤트 admission 실패를 코드 오류로 혼동하지 않음.
+- **실제 RED:** [Web Auth Browser Regression #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)에서 첫 번째 검사 묶음 PASS, 두 번째 묶음 FAIL. [실패 작업 #124471023109](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614/job/124471023109)은 `scripts/verify-web-auth-rejected-bearer-browser.mjs`의 'Records ledger authoritative 401 did not invalidate the rejected Guest' 오류. 당시 기록 화면 `/records.html`에서 인증 거부 Guest의 `active` bearer가 잔존하는 것으로 관측됨. 테스트 산출물과 원인 확정 전이므로 '일시적 플레키' 또는 본 운영 트랙의 Auth 서버 수정이 원인이라고 단정하지 않음.
+- **재시도 확정 결과:** GitHub Actions의 **실패 작업만 다시 실행** 기능으로 동일 [실행 #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)의 `run_attempt=2`를 실행함. 1번 shard **SUCCESS**, 2번 shard [job #124485970914](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614/job/124485970914) **FAILURE**, 최종 집계 [job #124486205660](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614/job/124486205660) **FAILURE**. 이전과 동일하게 `/records.html`의 401 응답 후 Guest bearer `active` 값이 남았고 `recordsStatus`가 비어 있었음. **일시적 플레키나 정상 결과로 승격 금지**; UI 인증·페이지 부트스트랩의 실제 원인 분석 및 소스 수정이 남음. 추가 무제한 재시도 금지.
+- **별도 외부 RED:** PR #2790의 Cloudflare Workers Builds `eed91ae9-8a7e-4a80-9cc1-4504d4610710`는 Provider 기준 outcome FAIL, 대상은 PR 분기 `ops/phase7-auth-loopback-fault-worklog-20261031`, 배포명령 `node scripts/cloudflare-main-web-cd.mjs`. Cloudflare 제공 build logs는 본 조회에서 빈 배열이므로 구체적인 실패 원인을 **미확인**으로 유지. 앞선 [Cloudflare Preview 토큰 실패 Worklog](#2026-10-31--cloudflare-preview-red-실제-원인1회-재시도-pr-2783-후속)와 동일 원인이라고 단정하지 않음. Production 배포 실패로 승격하지 않음.
+- **변경 및 운영 범위:** 이번 진단/재시도에서 Auth 애플리케이션 코드·Production 데이터·Cloudflare 운영 구성을 변경하지 않음. 본 문서에 사실 및 증거만 추가. **후속 작업:** 브라우저 재실행 결과가 실패라면 401 후 Guest bearer 무효화 경로를 별도 인증 UI 트랙 관점에서 실제 수정·재검증. Phase 7 DB 및 DR 미수용은 그대로 유지.
+
+
+
+### 2026-10-31 15:55 KST — Phase 7 Supabase Auth 실제 로컬 HTTP 장애 검증
+
+- **목적:** 아키텍처 §34의 Auth 불능 시 보호 요청 차단 및 독립 Health 유지 조건을 실제 로컬 TCP/HTTP에서 검증. Production Supabase 계정·DB·로그인 정보는 사용하지 않음.
+- **구현:** [`apps/api/src/supabase-auth-loopback-fault-phase7.test.ts`](../../apps/api/src/supabase-auth-loopback-fault-phase7.test.ts) 추가. 고정된 Production Supabase 호스트로 향하는 테스트 호출만 테스트 안에서 로컬 `127.0.0.1` 서버로 치환하여 503 응답, 잘못된 자격증명 401, 요청 제한 429, TCP 연결 거부를 각각 주입. 실서비스·실사용자에 대한 실패 주입 없음.
+- **검증 결과:** 신규 Vitest **4/4 PASS**, `npx tsc -p tsconfig.json --noEmit` **PASS**. 각 실패는 계약에 따른 `AUTH_UPSTREAM_UNAVAILABLE`/ `INVALID_CREDENTIALS`/ `RATE_LIMITED` 오류로 매핑, API `no-store`, 테스트 비밀번호·API 키·상류 오류 본문 비반사, 자동 재시도 없음, 독립 Cloudflare Worker `GET /api/health` 200 유지 확인.
+- **구현 경계:** 기존 Auth 제품 코드 자체는 변경하지 않음. Auth 느린 응답 5초 실제 종단 간 지연, PostgreSQL 연결 고갈·지연, Cloudflare Production 장애, DR Hosted Auth/Storage 복구, 실제 운영 알림/용량은 **미검증**. 따라서 Phase 7 전체/Phase 8/Phase 13 운영 수용 완료를 주장하지 않음.
+- **추적:** 작업 브랜치 `ops/phase7-auth-loopback-fault-worklog-20261031`; 로컬 테스트와 타입 검사 PASS. 후속 CI·PR 검증은 PR 체크 페이지에서 구분. **다음 작업:** DB 장애 및 요청/연결 지연 실증을 독립 격리 환경에서 수행.
+
+
+
+이 보고서는 최신 구현 상태뿐 아니라 **각 실행 세션의 실제 변경·실행 증거·남은 차단 항목을 누적**한다. 후속 운영 작업은 기존 기록을 덮어쓰거나 임의 완료율을 붙이지 않고, 날짜별로 **무엇을 바꾸었는지 / 어떤 실행이 PASS·FAIL인지 / 실제로 검증하지 않은 범위 / 관련 PR·CI / 다음 종료 작업**을 남긴다. PR의 GREEN은 해당 운영 항목의 Production 수용을 자동으로 의미하지 않는다.
+
+### 2026-10-31 — Cloudflare Preview RED 실제 원인·1회 재시도 (PR #2783 후속)
+
+- **대상 및 판정 범위:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783) HEAD `ea7815bfeaf97a0afd946bf2acbb5a72ffb3a155`, 외부 체크 [Workers Builds: myeongha #124464858847](https://github.com/gycha0109-beep/MyeongHa/pull/2783/checks?check_run_id=124464858847). Cloudflare **Preview** 빌드이며 `main` Production 배포/실서비스 가용성 판정과 구분.
+- **원래 RED 원인:** Cloudflare Workers Build `deff648c-4733-4a1c-b223-3e7dcf1b551f` (2026-10-31T06:23:58Z 종료, FAIL). `npm run build:web` 성공, `npx wrangler preview`에서 Cloudflare API의 프리뷰 엔드포인트가 **Rate limited [10429]**를 반환. TypeScript 오류·웹 빌드 실패가 아니었음.
+- **정확한 커밋 1회 수동 재시도:** 기존 Preview trigger `de1b9384-b760-44bd-9529-49fcf995ae7d`의 Workers Builds API에 원본 HEAD `ea7815bf...`를 한 번 제출. 신규 Build `ecd56543-e04f-4cf6-97d3-6d06a1216245` (2026-10-31T06:33:32Z 종료, **FAIL**): 웹 빌드는 다시 SUCCESS, Preview 배포 요청에서 **Authentication error [10000]** 및 `/accounts` 응답 **Invalid access token [9109]**. 이전 10429만으로 완전히 설명되는 사건이 아니며, Build에 연결된 **Preview용 인증 토큰 유효성/권한**이 수용 차단으로 드러남.
+- **설정 경계 추가 확인(읽기 전용):** Cloudflare Workers Builds 설정의 `auto_build_enabled=true`, `previews_enabled=false`, Git 배포 브랜치 `ops/phase7-loopback-saju-chaos-worklog-20261030`, 배포 명령 `npx wrangler preview` 및 **빌드 토큰 등록 1개**를 확인. 해당 토큰은 현재 구성에서 단독 사용되므로 정상 Production용 대체 토큰이 있다고 가정할 수 없음. 이 임시 브랜치 기반 Build 설정은 `main` 실제 Production 배포 수용 근거와 별개이며, 임의로 수정하거나 `previews_enabled`를 전체 배포 준비 완료로 해석하면 안 됨.
+- **재시도 제한:** 현재 토큰으로 다시 빌드를 반복하면 해결되지 않으므로 추가 재시도하지 않음. 원인 없는 소스 수정, Production 권한의 무분별한 Preview 재사용, 비밀 출력, Token/Cloudflare 설정 변경도 수행하지 않음. 해당 Cloudflare Workers Builds 토큰을 유효하고 필요한 권한 범위로 복구한 뒤, 임시 브랜치 프리뷰 빌드를 계속 유지할지/정리할지 Production 배포 경계와 구분해 결정해야 함. **동일 source SHA의 Preview 배포 성공**은 아직 미확인. 토큰 값은 보고서·CI·PR 댓글에 남기지 않음.
+- **동일 PR 코드 검증/병합:** 수정 HEAD의 [GitHub CI #41176340904](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41176340904), [통합 CI #41176368371](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41176368371), Governance [#41176340854](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41176340854) **모두 SUCCESS**. PR은 2026-10-31T06:31:36Z에 자동 병합, `main` merge SHA `1704ad012debed1c3c0612c4a59c3b48cf189cc2`. 따라서 실패한 **브랜치 Preview 체크**가 이 PR의 실제 병합을 차단하지는 않았음.
+- **현재 미증명:** Preview 배포 성공, 새 `main` SHA의 Cloudflare Production 배포 성공, 이후 최신 Worker 버전의 실서비스 E2E는 이 작업으로 **증명하지 않음**. Phase 8 DR 차단과 운영 수용 미완료도 유지.
+- **다음 작업/블로커:** Preview Build 토큰 유효성 복구 및 동일 SHA 재검증이 외부 설정 블로커. 신규 코드 변경 없음. 본 Worklog는 **외부 서비스 체크 실패 원인과 재시도 결과**를 기록하는 작업으로, 운영 배포 완료를 선언하지 않음.
+
+### 2026-10-31 15:20 KST — Phase 7 CI RED 실제 타입 오류 수정 및 재검증
+
+- **대상:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783), 이전 HEAD `8069e90dc05647f57f1c873ddc9749bc4822f24f`.
+- **실패 사실:** [CI #41027086821](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027086821)에서 기존 테스트 29개는 별개로, TypeScript의 `TS7016`(JavaScript Worker 모듈 타입 선언 부재), `TS2560/TS2559/TS7006`(HTTP 서버 listener의 타입을 options로 오인하고 매개변수가 암시적 any로 처리됨)으로 `npx tsc -p tsconfig.json --noEmit` FAIL. 이전 [통합 #41027106803](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027106803)은 제출 이벤트 위반, 후속 [#41027119135](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027119135)은 실제 `CI Verify` 실패로 선행 검증 거부. 서로 구별해야 함.
+- **수정:** [`test/saju-production-calculation-loopback-chaos-phase7.test.ts`](../../test/saju-production-calculation-loopback-chaos-phase7.test.ts)의 `listen(handler)`를 Node `RequestListener`로 명시하여 실제 HTTP 함수 콜백을 정확하게 타입화. 이미 실행·검증된 JavaScript 기반 Cloudflare Worker import 한 줄에는 해당 단일 모듈의 타입 선언 부재만 국소적으로 설명·억제. 런타임 동작, 운영 비밀, Production 엔드포인트, 장애 시험 시나리오는 변경하지 않음.
+- **재검증:** 수정 커밋 `4217945b219b5e124b7cdceec435060357f5a85c`. **이 Worklog 작성 시점의 신규 CI/tsc 결과는 미확인**이므로 PASS 주장 금지. PR의 후속 GitHub CI 타입 검사·통합 검사 링크와 결과가 확인되어야 종료됨.
+- **남은 것:** CI에서 실제 타입·기능 테스트 재확인, 병합 조건 충족. Phase 7의 Hosted DB/Auth/Cloud Run 장애 주입과 Phase 8 DR 등 별도 미수용은 유지. **다음 작업:** 동일 PR의 CI 확인 후 자동 병합; 실패하면 같은 변경 범위 안에서 보수 수정.
+
+### 2026-10-30 17:29 KST — Phase 7, Saju 종속 장애의 실제 루프백 HTTP 주입
+
+- **구현 목적:** `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §34 Saju kill/slow/wrong credential 장애 격리 조건을, 단순 mocked fetch가 아닌 **실제 TCP/HTTP 송수신**에서 재현한다. 사용자 데이터·Production 서버는 사용하지 않는다.
+- **실제 변경:** [`test/saju-production-calculation-loopback-chaos-phase7.test.ts`](../../test/saju-production-calculation-loopback-chaos-phase7.test.ts) 추가. `127.0.0.1`의 단독 Node HTTP 서버가 (1) 연결이 끊긴 Saju origin, (2) 헤더 400ms 지연, (3) 헤더 후 응답 본문 400ms 지연, (4) 틀린 합성 Bearer를 주입한다. 실제 `fetch`를 쓰는 Saju 계산 어댑터의 deadline `80ms`, `TIMEOUT`/`NETWORK_FAILURE`/`HTTP_4XX`, 오류 비밀 비반사·공개 오류 축약, 단일 요청(재시도 금지)과 **각 경우 Cloudflare Worker의 독립 `GET /api/health` 200**을 확인한다. 생년월일 등은 고정된 합성 fixture이다.
+- **실제 실행 결과:** Windows 격리 Git worktree, Node 24, Vitest 4.1.11. 기존 Saju HTTP/response cleanup/deadline/kill-switch 테스트 **5개 파일·25개 테스트 PASS** (`TEST_EXIT=0`), 신규 실제 루프백 TCP 장애 **1개 파일·4개 테스트 PASS** (`TEST_EXIT=0`). 실행 표적은 Production이 아니라 로컬 합성 HTTP 서버이다. 400ms 지연보다 짧은 80ms caller timeout 후 반환되고, core health는 계속 200이었다. 테스트 실행은 실시간 Production 서비스 장애를 발생시키지 않았다.
+- **검증 범위/미완료:** **Saju production adapter 구현의 실제 로컬 네트워크 실패 경계**만 확인했다. Cloud Run 실제 인스턴스 kill, Hosted PostgreSQL 불능/slow/exhaustion, 전체 사용자 라우트의 Saju 장애 응답, Auth/비밀 회전, Production p95 및 장애 알림/복구는 **NOT_OBSERVED**. Phase 7 전체 완료·DR readiness·서비스 재개 승격은 불가.
+- **추적:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783), 최초 테스트/구현 커밋 `7cb9300ce5bf8d2b6e94a031f4009743107cad51`, 브랜치 `ops/phase7-loopback-saju-chaos-worklog-20261030`. [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2783/checks)는 원격 검증 증거이며, 아직 실행/완료 전에는 성공으로 간주하지 않는다. **다음 작업:** 안전한 격리 환경의 DB/Auth/Saju dependency 실제 실패·지연 검증과 Phase 10–12 측정. 필요한 통제 조건이 없으면 PASS가 아니라 BLOCKED로 분류한다.
+
+### 2026-10-31 — PR #2796 통합 CI 실행 순서 RED 보정·실패 작업 재실행
+
+- **실제 코드 및 독립 검증:** [PR #2796](https://github.com/gycha0109-beep/MyeongHa/pull/2796) head `4baa4d07972298e61139b65122feaf55667bdaf8`의 [Web Auth Browser Regression #41185845104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845104), [CI #41185845072](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845072), [Governance #41185845015](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845015), [Web PR #41185845029](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845029), Cloudflare Workers Builds는 각각 **SUCCESS**. 따라서 Guest 401 브라우저 검증기 변경 자체가 이 RED의 원인은 아님.
+- **실패 원인 구분:** [통합 #41185847945](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185847945)는 별도 제출 라벨 이벤트가 아닌 요청이라 정책상 `Integration requires the dedicated CI submission label event`로 거부. 이후 라벨로 제출된 [통합 #41185858051](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051)의 **첫 실행**은 필수 `Web PR Verify` 체크가 진행 중이라 `Required check is pending: Web PR Verify`로 admission FAIL. 이는 필수 검사 완료 전 통합 검증이 시작된 순서 문제.
+- **실제 조치:** 같은 head에서 `Web PR Verify` 등 필수 체크가 모두 성공한 사실을 확인한 뒤, [통합 #41185858051](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051)의 **실패 작업만 재실행** (attempt 2). 두 번째 진입 검사 `admission` **SUCCESS** 확인. 본 Worklog 작성 당시 전체 검사 `full` 실행 중으로, **전체 통합 CI/병합 완료는 아직 미확정**. 동일 소스의 추가 불필요한 수정이나 Cloudflare 설정·실서비스 변경은 수행하지 않음.
+- **남은 것과 다음 작업:** 위 링크에서 attempt 2의 최종 `full` 및 `CI Integration Verify`를 확인하고 통과 시 자동 병합 처리. 새 소스가 배포되더라도 실제 운영/DR 승격에는 별도 최신 버전 증거가 필요함.
+- **관련 추적:** [PR #2796 CI 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2796/checks), [통합 재실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051), [PR #2796 진행 상황 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2796#issuecomment-6541334063).
+
+---
+
 ## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
 
 **이 절은 아래 §3.2와 §5의 구버전/미수용 항목 중 같은 엔드포인트·같은 조건을 대상으로 한 과거 상태보다 최신 증거**이다. 현재 운영 준비 전체가 완료되었다는 뜻이 아니라 **배포된 정확한 버전에 연결한 검증 부분집합**의 최신 관측이다.

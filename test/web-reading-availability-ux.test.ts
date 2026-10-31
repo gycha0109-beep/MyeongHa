@@ -89,8 +89,8 @@ describe('Web Saju Product discovery: honest route availability', () => {
 
   it('keeps development sample readings loopback-only', async () => {
     const records = await load('records-page.js');
-    expect(records).toContain("DEVELOPMENT_SAMPLE_HOSTS.has(window.location.hostname.toLowerCase())");
-    expect(records).toContain("if (allowsDevelopmentSajuSamples())");
+    expect(records).not.toContain('DEVELOPMENT_SAMPLE_HOSTS');
+    expect(records).not.toContain('allowsDevelopmentSajuSamples');
     expect(records).not.toContain("DEVELOPMENT_SAMPLE_HOSTS.add('myeongha.vercel.app')");
   });
 });
