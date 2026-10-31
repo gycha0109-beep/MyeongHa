@@ -1,6 +1,8 @@
 import { PLANNED_STATIC_UI_COPY_V1 } from './ui-i18n-planned-copy-v1.js';
 import { MY_STATIC_UI_COPY_V1 } from './ui-my-copy.js';
 import { RECORDS_HUB_STATIC_UI_COPY_V1 } from './ui-records-hub-copy.js';
+import { JA_TW_TO_EN_CN_STATIC_UI_COPY_V1 } from './ui-i18n-ja-tw-en-cn-copy-v1.js';
+import { EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1 } from './ui-i18n-en-cn-ja-tw-active-copy-v1.js';
 
 // Fixed, authored web UI copy only. Chat messages, birth data, and official readings are intentionally excluded.
 // Korean is the source locale; this dictionary is not a translation service.
@@ -17,6 +19,9 @@ function registerStaticCopy(source, localized) {
 }
 // All four non-Korean languages use one lookup with identical precedence.
 for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
+for (const [source, row] of JA_TW_TO_EN_CN_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
+for (const [source, row] of EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
+registerStaticCopy('라이트 모드로 전환', { 'ja-JP': 'ライトモードに切り替え', 'zh-TW': '切換至淺色模式', 'en-US': 'Switch to light mode', 'zh-CN': '切换至浅色模式' });
 for (const [source, row] of MY_STATIC_UI_COPY_V1) {
   registerStaticCopy(source, Object.fromEntries(LOCALE_ORDER.map((locale, index) => [locale, row[index]])));
 }

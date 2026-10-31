@@ -106,6 +106,35 @@ try{
     const result=await evaluate('('+audit+')()');
     if(result.locale!=='zh-TW'||result.stored!=='zh-TW'||result.total||result.attrTotal)failures.push({page:file,lang:'zh-TW',...result});
   }
+
+  // The same full-page Korean-leak scan must run for the English and Simplified
+  // Chinese surfaces, not just Japanese and Traditional Chinese.
+  for (const locale of ['en-US', 'zh-CN']) {
+    await change(locale);
+    for (const [file, selector] of pages) {
+      await navigate(file, selector);
+      const localized = await evaluate('(' + audit + ')()');
+      if (localized.locale !== locale || localized.stored !== locale || localized.total || localized.attrTotal) {
+        failures.push({ page: file, lang: locale, ...localized });
+      }
+    }
+  }
+  // A product-authored greeting is UI copy, not an AI reply. It must switch
+  // languages on the existing chat page without altering any stored messages.
+  for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN']) {
+    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
+    await change(locale);
+    const greeting = await evaluate('(() => ({ text: document.querySelector("[data-dialogue-line]")?.textContent ?? "", lang: document.documentElement.lang }))()');
+    if (greeting.lang !== locale || !greeting.text.trim() || /[가-힣]/u.test(greeting.text)) {
+      failures.push({ page: 'chat.html', scenario: 'localized-fixed-character-greeting', locale, greeting });
+    }
+    await navigate('chat-hub.html', '.chat-hub-shell');
+    const discovery = await evaluate('(() => ({ text: document.querySelector(".chat-person-card[data-character=seyeon] .chat-person-line")?.textContent ?? "", lang: document.documentElement.lang }))()');
+    if (discovery.lang !== locale || !discovery.text.trim() || /[가-힣]/u.test(discovery.text)) {
+      failures.push({ page: 'chat-hub.html', scenario: 'localized-fixed-character-discovery', locale, discovery });
+    }
+  }
+  await change('zh-TW');
   await navigate('reading.html','#saju-birth-form');
   const chineseFields=await evaluate('(()=>({lang:document.documentElement.lang,male:document.querySelector("#saju-birth-sex option[value=male]")?.textContent}))()');
   if(chineseFields.lang!=='zh-TW'||chineseFields.male!=='男性')failures.push({page:'reading.html',chineseFields});

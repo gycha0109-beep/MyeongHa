@@ -80,7 +80,7 @@ describe('Web EN/CN screenshot UI acceptance', () => {
   });
   it('wires client-rendered cards, modal, photos and account state into localized UI', () => {
     expect(read('chat-hub.js')).toContain('uiLabel(person.title)');
-    expect(read('chat-hub.js')).toContain('uiLabel(person.line)');
+    expect(read('chat-hub.js')).toContain('resolveCharacterChatIntroV1(person.key, getUiLocale())');
     expect(read('reader-picker-dialog.js')).toContain('paintFixedUi();');
     expect(read('reader-picker-dialog.js')).toContain('translateStaticUi(targetSource, locale)');
     expect(read('face-reading-shell.js')).toContain("renderReaderHeading(readerHeading, '{reader}과 함께 관상을 봅니다.'");
