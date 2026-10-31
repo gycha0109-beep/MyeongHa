@@ -18,6 +18,13 @@ describe('P4 stored PortOne source-v2 -> exact Reader/Receipt full PostgreSQL17 
   expect(generated).toContain('execute q into strict data_row using event_id,b2_grant');
   expect(generated).toContain('execute q into wrong_row using event_id,b3_grant');
   expect(generated).toContain('get diagnostics matched_rows = row_count');
+  for(const key of [
+   'grantRevision','grantStatus','grantLastProviderOrderingKey',
+   'receiptVerificationStatus','eventProviderOrderingKey',
+  ]){
+   expect(liveQuery).toContain('as "'+key+'"');
+   expect(generated).toContain('data_row."'+key+'"');
+  }
  });
  it('is exclusively in a real PostgreSQL17 disposable CI case',()=>{
   expect(matrix.postgres17.postgres).toBe(17);

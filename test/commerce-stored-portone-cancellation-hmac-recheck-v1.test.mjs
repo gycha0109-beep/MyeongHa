@@ -20,7 +20,10 @@ const H=(parts)=>'hmac-sha256:k1:'+
  createHmac('sha256',SECRET).update(JSON.stringify(parts),'utf8').digest('hex');
 const row=Object.freeze({
  providerEventId:EVENT,eventType:'Transaction.PartialCancelled',
- eventStatus:'verified',eventSignedHmac:H(['signed-original']),
+ eventStatus:'verified',eventProviderOrderingKey:null,
+ receiptVerificationStatus:'verified',
+ grantStatus:'active',grantRevision:'3',grantLastProviderOrderingKey:null,
+ eventSignedHmac:H(['signed-original']),
  sourceSchema:'commerce-portone-cancellation-source-v2',
  sourceSignedHmac:H(['signed-original']),sourceReadbackHmac:H(['readback-original']),
  cancellationIdHmac:H(['portone-cancellation-item-v1',PAYMENT_ID,CANCEL_A]),
@@ -32,16 +35,23 @@ const row=Object.freeze({
  originalTransactionId:TX,receiptPaidMinor:'8900',receiptCurrency:'KRW',
  providerPaymentId:PAYMENT_ID,exactReaderGrantId:GRANT,
 });
-function mockDb({rows=[row],authority={readOnly:true,completeVisibility:true},error}={}){
- const calls=[];let inTx=false;
+function mockDb({
+ rows=[row],rowsAfterGet=null,
+ authority={readOnly:true,completeVisibility:true},
+ authorityAfterGet=null,error,errorAfterGet,
+}={}){
+ const calls=[];let inTx=false,sourceReads=0;
  return {calls,query:vi.fn(async(sql,args)=>{
   calls.push({sql,args});
   if(sql.startsWith('begin ')){inTx=true;return {rows:[]};}
   if(sql==='rollback'){inTx=false;return {rows:[]};}
-  if(sql.includes('pg_catalog.pg_roles'))return {rows:[authority]};
+  if(sql.includes('pg_catalog.pg_roles'))
+   return {rows:[sourceReads===0?authority:(authorityAfterGet||authority)]};
   if(sql===SOURCE_SQL){
-   if(error)throw error;
-   return {rows};
+   sourceReads++;
+   if(sourceReads===1&&error)throw error;
+   if(sourceReads===2&&errorAfterGet)throw errorAfterGet;
+   return {rows:sourceReads===2&&rowsAfterGet!==null?rowsAfterGet:rows};
   }
   if(sql.startsWith('set local statement_timeout'))return {rows:[]};
   throw Error('Unexpected DB command: '+sql);
@@ -104,12 +114,17 @@ describe('P4 stored canonical PortOne source-v2 -> authenticated HMAC re-GET',()
    kind:'same_exact_cancellation_success_reobserved',
    originalReceiptBound:true,exactGrantBound:true,
    latestExactSuccessObserved:true,matchedCancellationAmountUnchanged:true,
+   postGetDbSnapshotStable:true,
    refundExecutionAuthorized:false,grantRevocationAuthorized:false,
    readerT2LockHeld:false,providerOrderingProven:false,
    entitlementEffectInvoked:false,writesPerformed:false,
   });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
   expect(db.calls.map(c=>c.sql)).toEqual([
+   'begin isolation level repeatable read read only',
+   "set local statement_timeout='10000ms'",
+   expect.stringContaining('pg_catalog.pg_roles'),
+   SOURCE_SQL,'rollback',
    'begin isolation level repeatable read read only',
    "set local statement_timeout='10000ms'",
    expect.stringContaining('pg_catalog.pg_roles'),
@@ -188,5 +203,75 @@ describe('P4 stored canonical PortOne source-v2 -> authenticated HMAC re-GET',()
   await expect(call(db,{providerEventId:'invalid',fetchImpl})).rejects.toThrow('INVALID_STORED_PORTONE_CANCEL_RECHECK_INPUT');
   expect(db.query).not.toHaveBeenCalled();
   expect(fetchImpl).not.toHaveBeenCalled();
+ });
+});
+
+describe('P4 second DB snapshot after authenticated cancellation GET',()=>{
+ it.each([
+  ['Grant revision advanced',{grantRevision:'4'}],
+  ['Grant revoked',{grantStatus:'revoked'}],
+  ['Grant ordering key changed',{grantLastProviderOrderingKey:'untrusted-new-key'}],
+  ['provider event order changed',{eventProviderOrderingKey:'provider-opaque'}],
+  ['event processing status changed',{eventStatus:'processed'}],
+  ['source signed evidence changed',{eventSignedHmac:H(['another-signature']),sourceSignedHmac:H(['another-signature'])}],
+  ['original Receipt verification changed',{receiptVerificationStatus:'revoked'}],
+  ['payment attempt id changed',{providerPaymentId:'another-payment-id'}],
+  ['same event source amount changed',{sourceExactAmountMinor:'3100'}],
+ ])('HOLD on intervening %s without a Grant mutation',async(_label,changes)=>{
+  const db=mockDb({rowsAfterGet:[{...row,...changes}]}),fetchImpl=f();
+  const result=await call(db,{fetchImpl});
+  expect(result).toMatchObject({
+   kind:'stored_source_or_grant_changed_during_provider_get',
+   originalReceiptBound:true,exactGrantBound:true,
+   postGetDbSnapshotStable:false,latestExactSuccessObserved:false,
+   refundExecutionAuthorized:false,grantRevocationAuthorized:false,
+   entitlementEffectInvoked:false,writesPerformed:false,
+  });
+  expect(fetchImpl).toHaveBeenCalledTimes(1);
+  expect(db.calls.filter(c=>c.sql===SOURCE_SQL)).toHaveLength(2);
+  expect(db.calls.filter(c=>c.sql==='rollback')).toHaveLength(2);
+  expect(db.inTransaction).toBe(false);
+  expect(JSON.stringify(result)).not.toContain(PAYMENT_ID);
+  expect(JSON.stringify(result)).not.toContain(SECRET);
+ });
+ it.each([
+  ['missing source',[]],
+  ['ambiguous source',[row,row]],
+ ])('HOLD on %s in second DB read',async(_label,rowsAfterGet)=>{
+  const db=mockDb({rowsAfterGet});
+  const result=await call(db);
+  expect(result.kind).toBe('stored_source_or_grant_changed_during_provider_get');
+  expect(result.grantRevocationAuthorized).toBe(false);
+  expect(db.inTransaction).toBe(false);
+ });
+ it('fails closed and releases the transaction if DB visibility changes after GET',async()=>{
+  const db=mockDb({authorityAfterGet:{readOnly:true,completeVisibility:false}});
+  await expect(call(db)).rejects.toThrow('STORED_PORTONE_CANCEL_RECHECK_AUTHORITY_REQUIRED');
+  expect(db.calls.filter(c=>c.sql===SOURCE_SQL)).toHaveLength(1);
+  expect(db.calls.filter(c=>c.sql==='rollback')).toHaveLength(2);
+  expect(db.inTransaction).toBe(false);
+ });
+ it('fails closed and rolls back if the second DB query errors after GET',async()=>{
+  const db=mockDb({errorAfterGet:new Error('second snapshot unavailable')});
+  await expect(call(db)).rejects.toThrow('second snapshot unavailable');
+  expect(db.calls.filter(c=>c.sql==='rollback')).toHaveLength(2);
+  expect(db.inTransaction).toBe(false);
+ });
+ it('does not perform a second DB read when provider cancellation GET is invalid',async()=>{
+  const db=mockDb();
+  const result=await call(db,{fetchImpl:f(payment({missing:true}))});
+  expect(result.latestExactSuccessObserved).toBe(false);
+  expect(db.calls.filter(c=>c.sql===SOURCE_SQL)).toHaveLength(1);
+  expect(db.calls.filter(c=>c.sql==='rollback')).toHaveLength(1);
+ });
+ it('never promotes current GET or stable DB snapshots into trusted NEWER ordering or T2 authority',async()=>{
+  const db=mockDb();
+  const result=await call(db);
+  expect(result).toMatchObject({
+   kind:'same_exact_cancellation_success_reobserved',
+   postGetDbSnapshotStable:true,
+   providerOrderingProven:false,readerT2LockHeld:false,
+   grantRevocationAuthorized:false,writesPerformed:false,
+  });
  });
 });
