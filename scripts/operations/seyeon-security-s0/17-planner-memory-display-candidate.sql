@@ -50,7 +50,7 @@ begin
       and p.accepted_life_fact_id is null
     limit 2
   )
-  select min(c.id),count(*)::integer
+  select min(c.id::text)::uuid,count(*)::integer
     into v_proposal_id,v_candidate_count from candidates c;
 
   if v_candidate_count is distinct from 1 then return; end if;
