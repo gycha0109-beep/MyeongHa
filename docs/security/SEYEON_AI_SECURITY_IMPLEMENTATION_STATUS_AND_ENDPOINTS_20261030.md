@@ -307,3 +307,11 @@ Watchtower-Track: security
 - **구현:** Node 응답 송신 전 메타데이터가 유효하더라도 `replayed=true`이면 `SeyeonNodeOriginalGrantSendBoundaryErrorV1`을 발생시키고 소켓을 파기한다. DB 원본 읽기 callback/Provider 호출/본문 송신은 실행되지 않는다. 0건·정상 최초 응답·권한 없음 503 동작 및 비스트리밍 유지. 기존 HTTP/Reader·Provider/ACL/DB 설정 변경 없음.
 - **검증:** 실 Node 송신 경계 단위 테스트에 `replayed=true` 시 소켓 파기와 DB 읽기 0회를 검증하는 케이스를 추가하고, 기존 권한 없음 503 검사는 처음 요청인 `replayed=false`에 대한 거부로 유지했다. `git diff --check` 확인. 새 CI GREEN 전까지 결과 PASS는 미확정.
 - **범위:** G3 source-only 후보, 실 Production Route 공개하지 않음; 전체 개인기록/과거 Replay 승인하지 않음. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-01 / W30 — G3 최초 공개에 원본 User G1 Pin 필수화 (source-only)
+
+- **선행:** #2823(PostgreSQL 17/보안/Governance GREEN)을 부모 #2786에 squash 병합(`8f9d36ff92d113bc437740d72893989c712b1a3d`). #2824는 W28/W29 동일 Worklog의 충돌을 해소하고 병합 커밋 `f92ea00f`를 별도 PR HEAD로 재검증 중이다.
+- **발견:** 실제 G3 최초 공개 SQL(`04-locked-reveal.sql`)의 original User G1 최근 출처 증명은 검증 로직이 있어도 Pin이 없는 옛 Memory-only Attempt를 그대로 통과시키는 선택적 분기였다. G1 모델 전 결합 Pin 및 G2 Commit 필수 정책과 달라 오래된 응답을 최초 공개하는 별도 통로가 남아 있었다.
+- **수정:** 동일 G3 PostgreSQL owner 함수가 기결 Commit·Attempt를 잠근 이후 `seyeon_recent_source_pin_jsonb`가 NULL이면 보호된 Assistant 본문/Grant를 조회하기 전에 아무 행도 반환하지 않고 HOLD한다. Pin이 존재하면 원래와 동일한 `messageId`/Subject/Thread/Turn/Attempt 및 현재 DB 원문 해시 검증을 적용한다. 실제 운영 Migration·API ACL·Provider 호출·공개 Route·스트리밍을 활성화하지 않는다.
+- **검증 범위:** 기존 S0 PostgreSQL 17 실제 결합 User Pin + 첫 Reveal 통합 테스트를 보존하고 `git diff --check`, `plan.mjs installerMayActivateProduction=false` 확인. 레거시 과거 Commit fixture를 신규 운영 데이터로 변조하지 않으며, 신선한 HEAD CI 결과 전까지 전체 PASS라고 주장하지 않는다.
+- **남은 것:** G0 전체 출처/Streaming 권한 계약, G1 다중 기록/파생 출처, G2/G3 실제 운영 배포 승격, G4 일반 크레딧 결제 종단, G5/G6 최종 검증·승인. `HOLD_FORWARD_STOPPED` 유지.

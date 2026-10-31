@@ -174,10 +174,11 @@ begin
     return;
   end if;
 
-  -- If G1 persisted the selected model User certificate, G3 must recheck
-  -- its exact original DB text inside the very same first-Reveal TX.
-  -- Existing S0 attempts without this newer certificate retain their
-  -- separately approved, original-memory-only S0 scope (not a new grant).
+  -- Every positive first Reveal now requires the original model User
+  -- certificate, matching the G1 combined Pin and G2 Commit rules.
+  -- A legacy Memory-only committed attempt cannot disclose old private
+  -- assistant text, even when its original Memory Grant remains active.
+  if v_recent is null then return; end if;
   if v_recent is not null then
     v_recent_source:=v_recent->'sources'->0;
     if jsonb_typeof(v_recent) is distinct from 'object'
