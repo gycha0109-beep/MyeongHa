@@ -176,3 +176,14 @@
 - **남은 과제:** Provider 비교 가능 처리 순서 또는 안전한 동등 상태 조정, 실제 Legal/Reader 전달 증거, Reader R2/T2 원자적 잠금과 기존 Entitlement Effect 결속. LIVE/자동 환불/권한 회수는 비활성 유지.
 - **최종 로컬 검증:** 관련 결제·Reader Vitest **16개 파일 / 303건 PASS**, TypeScript 타입 검사·빌드 PASS, PostgreSQL 17 독립 검증 SQL 생성기 2종 PASS. 실제 PostgreSQL 17 전체 실행 및 통합 CI는 PR 성공 전까지 미확정입니다.
 - **통합 PR:** [PR #2837](https://github.com/gycha0109-beep/MyeongHa/pull/2837), 핵심 커밋 addc9e0. 관련 Vitest 303건 PASS, 타입 검사·빌드 PASS, PG17 생성기 2종 PASS. 공식 PostgreSQL 17·통합 CI 및 병합 여부는 확인 전까지 미확정입니다.
+
+### 2026-11-01 — PortOne 전체 취소 집합과 정확한 Reader Grant 잠금·CAS 검증 연결
+
+- **선행:** [PR #2837](https://github.com/gycha0109-beep/MyeongHa/pull/2837) 필수 CI 성공 및 `main` 병합 `d0cce502` 확인. 전체 취소 HMAC 지문·금액·원본 영수증 대조는 기존 구현을 재사용합니다.
+- **구현:** 동일한 정확한 취소 Provider Event가 첫·두 번째 읽기 전용 DB 집합에 모두 들어 있고 인증된 전체 PortOne GET과 항목별 금액까지 일치한 경우에만, 기존 SERIALIZABLE Event→Reader Grant FOR UPDATE 잠금·revision CAS 사전검사를 실행하도록 연결했습니다. 잠긴 이벤트의 원본 Receipt가 사전 검증한 Receipt와 다르면 해당 Reader 구매권 잠금 이전에 보류합니다.
+- **검사 경계:** 다른 Event/Receipt, 다른 Reader 구매권, GET 중 이벤트 변동, Grant 버전·마지막 처리 키 변화, 동일 이벤트 중복 회수, 부분 취소·누적 취소를 구분합니다. 기존 DB SQL·권한 변경 함수·마이그레이션은 변경하지 않습니다. 두 READ ONLY 트랜잭션·하나의 SERIALIZABLE 잠금 트랜잭션은 전부 ROLLBACK합니다.
+- **안전:** Provider NEWER/STALE 순서, 법정 환불·디지털 Reader 제공/전달, R2/T2 공유 범위 잠금의 승인되지 않은 조건을 true로 올리지 않습니다. 과거 동일 이벤트의 실제 revoked Effect가 입증될 때만 기존 SAME 재실행을 관찰합니다. 환불 POST/실제 Entitlement Effect/사용자 API/LIVE OFF 유지.
+- **로컬 검증:** 신규 모듈 및 기존 조회·잠금·CAS 경계 집중 Vitest 59건 PASS. 전체 관련 회귀·타입 검사·빌드 결과는 최종 검증 후 기록하며, 공식 CI와 병합은 확인 전까지 미확정입니다.
+- **문서:** `docs/operations/COMMERCE_P4_CURRENT_CANCEL_SET_READER_LOCKED_CAS_REVIEW_V1.md`.
+- **최종 로컬 검증:** 결제·Reader 관련 Vitest **17개 파일/323건 PASS**, TypeScript 타입 검사·빌드 PASS, 빌드된 PortOne V2 전체 취소 조회 모듈 로드 PASS, 기존 PostgreSQL 17 취소 집합 SQL 생성기 PASS. 공식 통합 CI 및 병합은 별도 결과 전까지 미확정입니다.
+- **통합 PR:** [PR #2841](https://github.com/gycha0109-beep/MyeongHa/pull/2841), 최초 구현 커밋 03cee16. 관련 Vitest 323건 PASS, 타입 검사·빌드/모듈 로드 PASS. 필수 통합 CI와 병합은 완료 근거 전까지 대기 상태입니다.
