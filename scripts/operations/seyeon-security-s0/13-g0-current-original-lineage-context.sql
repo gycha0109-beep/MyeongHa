@@ -179,19 +179,31 @@ begin
   -- Select only metadata here. The source text is not touched until all
   -- selected messages and original grant rows have passed owner checks.
   for v_row in
-    select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no,m.content_hash
+    select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no,
+           m.content_hash,m.redacted_at,m.has_body
     from (
+      -- Census every message in the requested sequence window, including
+      -- redacted / blank / missing-body rows. Filtering them out here would
+      -- silently return a different, apparently fully-authorized history.
       select src.id,src.turn_id,src.sender_type,src.thread_character_id,
-             src.thread_id,src.sequence_no,src.content_hash
+             src.thread_id,src.sequence_no,src.content_hash,src.redacted_at,
+             nullif(btrim(src.body_text),'') is not null as has_body
       from public.conversation_messages src
       where src.subject_id=p_subject_id and src.thread_id=p_thread_id
-        and src.redacted_at is null and src.body_text is not null
       order by src.sequence_no desc limit p_limit
     ) m
     left join public.conversation_thread_characters c
       on c.id=m.thread_character_id and c.thread_id=m.thread_id
     order by m.sequence_no asc
   loop
+    -- A removed, redacted or empty candidate is an unknown source, not
+    -- permission to backfill the window with an older message. HOLD all.
+    if v_row.redacted_at is not null or v_row.has_body is distinct from true
+       or nullif(btrim(v_row.content_hash),'') is null then
+      raise exception using errcode='42501',
+        constraint='seyeon_g0_context_window_source_missing',
+        message='Current model context source is unavailable';
+    end if;
     v_total:=v_total+1;
     v_ids:=array_append(v_ids,v_row.id);
     v_hashes:=array_append(v_hashes,v_row.content_hash);
