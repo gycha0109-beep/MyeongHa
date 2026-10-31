@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2810 통합 CI 제출 이벤트 RED 확인 및 재제출
+
+- **대상:** [Phase 11 격리 PostgreSQL 용량 계측 PR #2810](https://github.com/gycha0109-beep/MyeongHa/pull/2810), 원본 HEAD `d4d647ba7daad901f7f6571bbfea59bb0230c653`. 해당 HEAD의 GitHub [CI #41211802736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211802736), [Governance #41211802687](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211802687), [웹 검사 #41211802683](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211802683), Cloudflare Workers Builds와 작업 트랙 분류는 모두 **SUCCESS**.
+- **RED 원인:** [통합 CI #41211807512](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41211807512)의 `admission` job #124568895568이 `Integration requires the dedicated CI submission label event`로 **FAILURE**. `full` job은 **skipped**로 실제 통합 테스트는 돌지 않음. SQL 측정 도구의 코드 실패가 아니라 **`ci-integration-ready` 전용 라벨 이벤트 미제출**에 따른 정책상 거부이며, 동일 실행의 실패 작업만 재시도해도 입력 이벤트가 바뀌지 않음.
+- **실제 보정 및 재제출:** 모든 필수 체크가 완료되었음을 확인하고 **PR #2810에 `ci-integration-ready` 라벨을 적용**해 동일 HEAD의 새로운 [통합 CI #41213071138](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41213071138)를 제출. 최종 결과는 **본 기록 시점 pending**이므로 성공·병합을 추정하지 않음. 원래 PR의 소스 코드, 측정 결과, Production 서비스/DB, Cloudflare 설정 및 비밀은 변경하지 않음.
+- **분리된 기록 PR:** 통합 검증이 진행되는 원본 PR #2810의 HEAD를 불필요하게 변경하지 않도록 이번 관측·재제출 기록만 본 기존 Worklog에 별도 커밋으로 누적. Phase 11은 **격리 DB 합성 측정**까지 완료했으나, 실제 운영 SQL/TLS/RLS, Phase 12 확장 기준, Phase 13 운영 수용, Phase 8 DR 수용은 여전히 **미완료**. `dr_ready=false` 및 `serviceResumptionAllowed=false` 유지.
+
 ### 2026-10-31 21:31 KST — PR #2803 통합 CI RED 보정 및 최신 main 병합 충돌 해결
 
 - **실제 RED:** [통합 CI #41190779314](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41190779314) (최초 attempt 1)의 admission 실패는 `Integration requires the dedicated CI submission label event`. 이번 RED의 직접 원인은 **전용 `ci-integration-ready` 라벨 제출 이벤트가 아닌 PR 이벤트로 시작된 통합 CI**이며, 해당 커밋 `6a9fd49e`의 일반 CI·Web PR·Governance·Cloudflare Workers Builds는 모두 SUCCESS. 실패 작업을 단순 재실행해도 이벤트 유형이 바뀌지 않으므로 재실행만으로 해결할 수 없음.
