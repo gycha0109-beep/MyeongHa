@@ -43,6 +43,26 @@ function requireArray(payload, key) {
   return payload[key];
 }
 
+function renderProfile(payload) {
+  const name = payload?.profile?.displayName;
+  const nameNode = byId('records-display-name');
+  if (typeof name === 'string' && name.trim().length > 0) {
+    nameNode.dataset.recordsSource = '';
+    nameNode.textContent = name;
+  } else {
+    delete nameNode.dataset.recordsSource;
+    nameNode.textContent = uiText('호칭 미설정');
+  }
+  const kind = payload?.subjectKind === 'member' ? '회원 기록' : payload?.subjectKind === 'guest' ? '게스트 기록' : '현재 기록';
+  byId('records-subject-kind').textContent = uiText(kind);
+}
+
+function markRecordsEntry() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('from') === 'reading') document.body.dataset.recordsEntry = 'reading-handoff';
+  else if (params.get('tab') === 'saju') document.body.dataset.recordsEntry = 'saju-deeplink';
+}
+
 function readingPresentation(sajuDomain) {
   return readingDomainPresentationV1(sajuDomain);
 }
@@ -262,6 +282,7 @@ function renderLoadedRecords(records) {
 }
 
 async function boot() {
+  markRecordsEntry();
   const status = byId('records-status');
   status.hidden = false;
   status.textContent = uiText(recordsStatusSource);

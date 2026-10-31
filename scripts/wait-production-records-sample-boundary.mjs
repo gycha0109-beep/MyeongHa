@@ -5,9 +5,14 @@ const REQUIRED_PAGE_MARKERS = Object.freeze([
   '/assets/records-',
 ]);
 const REQUIRED_MARKERS = Object.freeze([
-  "const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '::1', '[::1]']));",
-  'if (allowsDevelopmentSajuSamples())',
+  'function renderSajuReadings(readingPayload)',
+  'function markRecordsEntry()',
   'renderSajuReadingEmpty(target);',
+]);
+const FORBIDDEN_MARKERS = Object.freeze([
+  'renderSajuReadingSamples',
+  'allowsDevelopmentSajuSamples',
+  'function renderLifeFacts(',
 ]);
 const MAX_ATTEMPTS = 60;
 const RETRY_DELAY_MS = 2_000;
@@ -30,7 +35,7 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     ]);
     if (pageResponse.ok && scriptResponse.ok) {
       const [page, source] = await Promise.all([pageResponse.text(), scriptResponse.text()]);
-      if (REQUIRED_PAGE_MARKERS.every((marker) => page.includes(marker)) && REQUIRED_MARKERS.every((marker) => source.includes(marker))) {
+      if (REQUIRED_PAGE_MARKERS.every((marker) => page.includes(marker)) && REQUIRED_MARKERS.every((marker) => source.includes(marker)) && FORBIDDEN_MARKERS.every((marker) => !source.includes(marker))) {
         console.log(`MyeongHa production Records sample-boundary deployment observed after ${attempt} attempt(s).`);
         process.exit(0);
       }

@@ -17,7 +17,7 @@ describe('Records Saju history surface', () => {
   it('keeps Saju reading records separate from Life Facts and other record domains', () => {
     expect(html).toContain('id="saju-records"');
     expect(html).toContain('id="saju-records-list"');
-    expect(html).toContain('>사주 보고서<');
+    expect(html).toContain('<h3>보관된 사주 기록</h3>');
     expect(html).not.toContain('records-report-intro');
     expect(html).not.toContain('records-tab-divider');
     expect(html).not.toContain('role="tablist"');
@@ -38,7 +38,7 @@ describe('Records Saju history surface', () => {
     expect(client).not.toContain("lifeFacts: '/api/life-record'");
     expect(client).toContain("result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED'");
     expect(client).toContain("const unavailable = Object.freeze({ status: 'unavailable' });");
-    expect(client).toContain('projectReadingHistory(readingResult.value)');
+    expect(client).toContain('projectReadingHistory(result.value)');
     expect(client).toContain('return Object.freeze({ profile, readings });');
   });
 
@@ -50,7 +50,7 @@ describe('Records Saju history surface', () => {
     expect(page).toContain("records-reading-card records-reading-card--persisted");
     expect(page).toContain('readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale())');
     expect(page).toContain('readerBadgeSources.set(badge, reading.readerCharacterIds)');
-    expect(page).toContain("if (allowsDevelopmentSajuSamples())");
+    expect(page).not.toContain('allowsDevelopmentSajuSamples');
     expect(page).not.toContain('renderSajuReadingSamples');
     expect(page).toContain('renderSajuReadingEmpty(target);');
   });
