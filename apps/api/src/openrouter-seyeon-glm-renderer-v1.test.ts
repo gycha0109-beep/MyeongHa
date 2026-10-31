@@ -56,6 +56,8 @@ describe('active Se-yeon GLM renderer transport', () => {
       purpose: 'dialogue_render', providerKey: 'openrouter-chat',
       modelKey: 'z-ai/glm-5.3-flash', outcome: 'response_received',
       inputTokens: 220, outputTokens: 35,
+      priceVersion: 'openrouter-glm53flash-list-20261031',
+      costStatus: 'estimated', estimatedCostMicroUsd: 51,
     });
   });
 
@@ -141,6 +143,9 @@ describe('active Se-yeon GLM renderer transport', () => {
     const provider = createSeyeonGlmRendererV1({apiKey:key,fetchImpl,afterOutcome});
     await expect(provider.generate(req)).rejects.toThrow();
     expect(fetchImpl).toHaveBeenCalledOnce();
-    expect((afterOutcome.mock.calls as unknown[][])[0]?.[0]).toMatchObject({outcome:'http_failure',httpStatus:503});
+    expect((afterOutcome.mock.calls as unknown[][])[0]?.[0]).toMatchObject({
+      outcome:'http_failure',httpStatus:503,
+      costStatus:'usage_unknown',estimatedCostMicroUsd:null,
+    });
   });
 });

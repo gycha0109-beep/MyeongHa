@@ -5,6 +5,7 @@ import {
   createSeyeonAiCostEventV1,
   type SeyeonAiCostEventV1,
   type SeyeonAiCallOutcomeV1,
+  type SeyeonAiPriceV1,
 } from './seyeon-ai-usage-cost-v1.js';
 import type {
   SeyeonStructuredProviderPortV2,
@@ -17,6 +18,17 @@ export const SEYEON_GLM_RENDERER_ENDPOINT_V1 =
   'https://openrouter.ai/api/v1/chat/completions' as const;
 /** Real conversation packets include pinned context; the shadow cap was only 24 KiB. */
 export const SEYEON_GLM_RENDERER_MAX_REQUEST_BYTES_V1 = 131_072 as const;
+
+/** Conservative non-promotion list-price estimate; not an invoice or ENFORCE budget approval. */
+export const SEYEON_GLM_RENDERER_COST_ESTIMATE_PRICE_V1: SeyeonAiPriceV1 = Object.freeze({
+  priceVersion: 'openrouter-glm53flash-list-20261031',
+  providerKey: SEYEON_GLM_RENDERER_PROVIDER_KEY_V1,
+  modelKey: SEYEON_GLM_RENDERER_MODEL_V1,
+  // OpenRouter's regular (non-discounted) published rates, USD/M tokens.
+  inputMicroUsdPerMillion: 150_000,
+  cachedInputMicroUsdPerMillion: 150_000,
+  outputMicroUsdPerMillion: 500_000,
+});
 
 export interface SeyeonGlmRendererConfigV1 {
   readonly apiKey: string;
@@ -181,6 +193,7 @@ export function createSeyeonGlmRendererV1(
           ...base, outcome, httpStatus: status,
           elapsedMs: Math.max(0, Math.round(performance.now() - started)),
           usage: {inputTokens, outputTokens, cachedInputTokens, reasoningTokens},
+          price: SEYEON_GLM_RENDERER_COST_ESTIMATE_PRICE_V1,
         });
         await config.afterOutcome?.(event);
       }
