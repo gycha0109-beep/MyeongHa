@@ -175,3 +175,4 @@
 - **상세:** `docs/operations/COMMERCE_P4_CANCELLATION_SET_AUTHENTICATED_GET_RECONCILIATION_V1.md`.
 - **남은 과제:** Provider 비교 가능 처리 순서 또는 안전한 동등 상태 조정, 실제 Legal/Reader 전달 증거, Reader R2/T2 원자적 잠금과 기존 Entitlement Effect 결속. LIVE/자동 환불/권한 회수는 비활성 유지.
 - **최종 로컬 검증:** 관련 결제·Reader Vitest **16개 파일 / 303건 PASS**, TypeScript 타입 검사·빌드 PASS, PostgreSQL 17 독립 검증 SQL 생성기 2종 PASS. 실제 PostgreSQL 17 전체 실행 및 통합 CI는 PR 성공 전까지 미확정입니다.
+- **통합 PR:** [PR #2837](https://github.com/gycha0109-beep/MyeongHa/pull/2837), 핵심 커밋 addc9e0. 관련 Vitest 303건 PASS, 타입 검사·빌드 PASS, PG17 생성기 2종 PASS. 공식 PostgreSQL 17·통합 CI 및 병합 여부는 확인 전까지 미확정입니다.
