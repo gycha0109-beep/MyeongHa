@@ -10,6 +10,16 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 17:11 KST — PR #2790 RED 진단 및 실패 작업 재실행
+
+- **요청·대상:** [Auth 로컬 장애 격리 PR #2790](https://github.com/gycha0109-beep/MyeongHa/pull/2790) (head `a012c48cf25cc3b28655cb32bb46bce785ff396c`). PR은 2026-10-31T07:05:39Z에 **실제 병합 완료**. 해당 head의 [기본 CI #41178543652](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543652), [정식 Integration #41178551294](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178551294), Governance [#41178543651](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543651)는 SUCCESS. [이전 Integration #41178544791](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178544791)의 제출 이벤트 admission 실패를 코드 오류로 혼동하지 않음.
+- **실제 RED:** [Web Auth Browser Regression #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)에서 첫 번째 검사 묶음 PASS, 두 번째 묶음 FAIL. [실패 작업 #124471023109](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614/job/124471023109)은 `scripts/verify-web-auth-rejected-bearer-browser.mjs`의 'Records ledger authoritative 401 did not invalidate the rejected Guest' 오류. 당시 기록 화면 `/records.html`에서 인증 거부 Guest의 `active` bearer가 잔존하는 것으로 관측됨. 테스트 산출물과 원인 확정 전이므로 '일시적 플레키' 또는 본 운영 트랙의 Auth 서버 수정이 원인이라고 단정하지 않음.
+- **재시도:** GitHub Actions의 **실패 작업만 다시 실행** 기능으로 동일 [실행 #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)의 `run_attempt=2` 제출 성공. 1번 shard는 SUCCESS 확인. 2번 shard는 본 Worklog 기재 시점 **in_progress**이며 성공을 추정하지 않음. 실제 PASS/FAIL 판정은 링크의 **최종 attempt=2 결과**만을 기준으로 추적.
+- **별도 외부 RED:** PR #2790의 Cloudflare Workers Builds `eed91ae9-8a7e-4a80-9cc1-4504d4610710`는 Provider 기준 outcome FAIL, 대상은 PR 분기 `ops/phase7-auth-loopback-fault-worklog-20261031`, 배포명령 `node scripts/cloudflare-main-web-cd.mjs`. Cloudflare 제공 build logs는 본 조회에서 빈 배열이므로 구체적인 실패 원인을 **미확인**으로 유지. 앞선 [Cloudflare Preview 토큰 실패 Worklog](#2026-10-31--cloudflare-preview-red-실제-원인1회-재시도-pr-2783-후속)와 동일 원인이라고 단정하지 않음. Production 배포 실패로 승격하지 않음.
+- **변경 및 운영 범위:** 이번 진단/재시도에서 Auth 애플리케이션 코드·Production 데이터·Cloudflare 운영 구성을 변경하지 않음. 본 문서에 사실 및 증거만 추가. **후속 작업:** 브라우저 재실행 결과가 실패라면 401 후 Guest bearer 무효화 경로를 별도 인증 UI 트랙 관점에서 실제 수정·재검증. Phase 7 DB 및 DR 미수용은 그대로 유지.
+
+
+
 ### 2026-10-31 15:55 KST — Phase 7 Supabase Auth 실제 로컬 HTTP 장애 검증
 
 - **목적:** 아키텍처 §34의 Auth 불능 시 보호 요청 차단 및 독립 Health 유지 조건을 실제 로컬 TCP/HTTP에서 검증. Production Supabase 계정·DB·로그인 정보는 사용하지 않음.
