@@ -65,7 +65,7 @@ describe('G4 private first-Memory credit reservation before provider',()=>{
     });
     expect(d.sql.some(q=>q.includes('internal_cmd_chat_credit_reserve_v1'))).toBe(false);
   });
-  it.each(['insufficient','conflict','committed_replay'])(
+  it.each(['insufficient','conflict','committed_replay','already_reserved'])(
     'rolls back %s instead of issuing new model admission',async outcome=>{
       const d=database(undefined,outcome);
       await expect(admitSeyeonG4FirstMemoryCreditsV1(request(d.pool)))

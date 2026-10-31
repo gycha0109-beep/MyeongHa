@@ -61,13 +61,20 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
       const ports=createPostgresChatCreditCandidatePortsV1({
         client,canonicalSubjectId:resolvedSubject.subjectId,
       });
+      let freshReservation=false;
       const result=await reserveChatReplyCreditsV1({
         verifiedSubjectId:resolvedSubject.subjectId,
         threadId:input.threadId,clientTurnId:input.clientTurnId,
-        port:ports.reservation,
+        port:{reserveForReply:async request=>{
+          const outcome=await ports.reservation.reserveForReply(request);
+          freshReservation=outcome.kind==='reserved';
+          return outcome;
+        }},
       });
-      // Insufficient/conflict/committed replay are NEVER a new model admission.
-      if(result.kind!=='reservation')
+      // Existing reservation means an earlier model call may still be running.
+      // Do not dispatch a second paid inference merely because its credit
+      // reservation is idempotent; only a FRESH reserve admits a model call.
+      if(result.kind!=='reservation'||!freshReservation)
         throw new SeyeonG4FirstMemoryCreditHoldV1();
       return Object.freeze({
         kind:'reserved' as const,canonicalSubjectId:resolvedSubject.subjectId,

@@ -330,3 +330,8 @@ Watchtower-Track: security
 - **실행 연결:** `production-seyeon-first-memory-node-runtime-v1.ts`에서 사용자가 승인한 Memory/Governor 자격만으로 모델 설정을 읽을 수 없도록 `creditBilling.productionMounted`를 추가로 검사하고, 해당 권한이 승인·장착되기 전에는 Provider credential 읽기 전에 HOLD한다. 향후 실제 정산 종단이 연결된 경우에만 현재 User/Thread/ClientTurn 기준 예약 함수가 모델 호출 전 수행될 후보 결합이다. `creditBilling.productionMounted=false` 고정 유지, **실제 예약/결제 실행·공개 모델 호출은 활성화하지 않음**.
 - **테스트:** `test/seyeon-g4-first-memory-credit-admission-v1.test.ts`로 canonical Member/원자 예약/Owner exemption/부족·충돌·기확정·Guest·위조 권한 거부/트랜잭션 종료를 검증. 기존 첫 Memory 노드 실행 검증에는 승인 콜백이 true여도 크레딧 정산이 장착되지 않으면 Provider 키 읽기 없이 HOLD하는 사례를 추가. `git diff --check` 확인. 로컬 워크트리는 vitest/tsc 실행파일이 없어 새 PR CI 결과를 기다려야 한다.
 - **미완료:** 원본 응답 전달 ACK와 예약 정산/실패 해제의 실제 종단·운영 DB 역할/권한·일반 결제 크레딧 배포는 여전히 별도 필요. 본 구현은 G4 종료 판정·Provider/결제 운영 활성화가 아니다. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W33 — G4 같은 예약의 중복 Provider 입장 차단 (#2833 보강)
+
+- **발견/보정:** 결제 트랙의 `reserveChatReplyCreditsV1`은 DB 원자 반환 `reserved`와 `already_reserved`를 공통 `reservation`으로 정규화한다. 이를 새 Provider 입장 권한으로 무조건 수용하면 동일 ClientTurn 재시도로 중복 유료 AI 호출이 가능하다.
+- **구현:** G4 첫 Memory 예약 후보가 기존 서버 검증·원자 예약 함수를 그대로 이용하면서 DB 원본 결과가 **새로운 `reserved`** 인 경우에만 첫 모델 입장을 인정한다. `already_reserved`는 기존 예약/기확정 Turn의 조회·전달 경로에서 별도 처리되어야 하며, 신규 Provider 호출은 `SEYEON_G4_CREDIT_ADMISSION_HOLD`로 거부하고 해당 후보 트랜잭션을 ROLLBACK한다.
+- **검증:** G4 후보 단위 검증에 재예약 경합의 `already_reserved`를 거부 사례로 추가. 새 커밋 CI GREEN 전에는 테스트 통과를 추정하지 않는다. 결제/AI 실제 Production 권한은 변경하지 않았으며 `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지.
