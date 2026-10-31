@@ -231,3 +231,14 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **변경 파일:** `scripts/operations/seyeon-security-s0/{16-planner-memory-pending-expiry.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-pending-expiry-v1.ts`, `test/{seyeon-planner-memory-expiry-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
 - **구현 커밋:** `895d079f`, `28213e49`, `cd6bdd33`, `160d8fdb`, `8c6e7321`, `14acb8d4`.
 - **검증 상태:** 변경 커밋 기준 신규 CI **결과 확인 전**. Cloudflare Workers Build의 인증 실패는 별도 트랙 소관이며 이 작업이 해결하거나 무시하지 않는다. 보존기간/실제 자동 만료 스케줄·원본 채팅 수명·G3 공개 권한은 미완료. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W09 · G3 대화 제안 표시의 DB 소유 원본 결속 후보 (공개 금지)
+
+- **범위:** 실제 대화의 세연 Character 메시지에만 pending 제안을 연결하는 후속 G3 작업 중 **내부 원본 결속 검사**를 격리 S0에 구현. Cloudflare 문제를 건드리지 않고 PR #2761 **동일 브랜치**에서 계속 진행. 운영 HTTP Reveal/Replay는 여전히 HOLD.
+- **DB:** `17-planner-memory-display-candidate.sql`은 Owner 출처 테이블에서 생성 사실이 입증되고, 현재 Member Subject·Thread·Assistant Message가 정확히 일치하며, UC-07 승인 출처 함수를 재검증한 **미승인 Memory Proposal 최대 한 건**의 내부 Summary만 반환한다. 사용자 메시지 선택/수동 Proposal, 다른 대화방·캐릭터의 제안, 이미 수락·폐기·만료된 제안은 불허한다. 해당 함수는 일반 API 역할에서 **EXECUTE DENY**, 운영 Migration 및 공용 Router 미마운트.
+- **서버:** `postgres-seyeon-planner-memory-display-candidate-v1.ts`에서 내부 승인 callback이 없으면 SQL 조회 자체를 거부한다. 응답 `sourceAuthority='db_owner_planner_inspection_only'`, `disclosureAuthorized=false`는 의도적으로 **웹의 `memoryProposal` 공개 스키마와 호환되지 않는다**. 이를 채팅/AI/웹에 곧바로 전달하거나 G3 승인 근거로 사용할 수 없다.
+- **검증 추가:** `test/seyeon-planner-memory-display-candidate-v1.test.ts`에 미승인 차단, 정확한 사용자/대화/메시지 결속, 위조·중복 응답 차단을 추가. `test/seyeon-security-s0-postgres.e2e.test.ts`에는 실제 Owner 출처로 생성된 대화 제안을 내부 조회한 뒤 다른 User Message 조회는 0건, discard 이후 재조회는 0건인지 확인하는 합성 테스트를 추가.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/{17-planner-memory-display-candidate.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.ts`, `test/{seyeon-planner-memory-display-candidate-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
+- **구현 커밋:** `748662c8`, `0046d4d6`, `9ad5daaf`, `10b39b9d`, `ee65fa1b`, `d0d6cab4`, `42a4e334`, `af5d1b2b`.
+- **진행 상태:** 해당 새 코드의 최신 HEAD CI/PG17 **결과 확인 전**. 후속은 권한 취소/재승인 및 과거 대화 G3 원자 검증 뒤만 실제 Reveal/UI에 결속할 수 있다. 본 작업으로 실사용자 개인정보 공개, 유료 모델 실행, 자동 병합을 활성화하지 않았다. `HOLD_FORWARD_STOPPED` 유지.
