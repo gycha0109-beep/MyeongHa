@@ -252,6 +252,62 @@ try{
     }
   }
 
+
+  // A real Chat error is a runtime status, not initial static page copy.
+  // Exercise the same live DOM mutation and locale-switch path that previously
+  // left the safe-response failure in Korean on an English chat screen.
+  for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN']) {
+    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
+    await change(locale);
+    const statusProbe = await evaluate(`(async () => {
+      const { translateStaticUi } = await import('/ui-i18n.js');
+      const sources = ["세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.","대화방을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.","현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.","로그인 상태가 만료되었습니다. 다시 로그인해 주세요.","세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.","대화 서버 응답을 확인할 수 없습니다.","메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.","크레딧 안내를 확인해 주세요. 입력한 내용은 그대로 남아 있습니다.","이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.","전송 결과를 다시 확인하지 못했습니다. 같은 문장으로 다시 보내면 중복 생성 없이 확인을 이어갑니다.","현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다."];
+      const status = document.createElement('p');
+      status.className = 'character-compose-status';
+      status.dataset.chatErrorLocaleProbe = '';
+      status.dataset.composeStatus = '';
+      document.querySelector('[data-compose-status]')?.after(status);
+      const failures = [];
+      const locale = document.documentElement.lang;
+      for (const source of sources) {
+        status.textContent = source;
+        await new Promise(done => setTimeout(done, 45));
+        const expected = translateStaticUi(source, locale);
+        if (expected === source || /[가-힣]/u.test(expected) ||
+            status.textContent !== expected) failures.push({ source, actual: status.textContent, expected });
+      }
+      // Unrecognized backend Korean errors must show a cautious localized
+      // fallback, while staying outside user messages or official readings.
+      status.textContent = '서버가 제공한 미등록 대화 오류 테스트 문구입니다.';
+      await new Promise(done => setTimeout(done, 45));
+      const genericFallback = translateStaticUi('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', locale);
+      if (status.textContent !== genericFallback) {
+        failures.push({ source: 'unknown-runtime-error', actual: status.textContent, expected: genericFallback });
+      }
+      status.textContent = sources[0];
+      await new Promise(done => setTimeout(done, 45));
+      return { lang: locale, failures };
+    })()`);
+    if (statusProbe.lang !== locale || statusProbe.failures.length) {
+      failures.push({ page: 'chat.html', scenario: 'dynamic-error-notice', locale, statusProbe });
+    }
+    const changedLocale = locale === 'en-US' ? 'zh-CN' : 'en-US';
+    await change(changedLocale);
+    const retranslated = await evaluate(`(async () => {
+      const { translateStaticUi } = await import('/ui-i18n.js');
+      const source = "세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.";
+      const status = document.querySelector('[data-chat-error-locale-probe]');
+      return { lang: document.documentElement.lang, actual: status?.textContent ?? '',
+        expected: translateStaticUi(source, document.documentElement.lang) };
+    })()`);
+    if (retranslated.lang !== changedLocale || retranslated.actual !== retranslated.expected ||
+        /[가-힣]/u.test(retranslated.actual)) {
+      failures.push({ page: 'chat.html', scenario: 'error-notice-live-language-switch',
+        locale: changedLocale, retranslated });
+    }
+    await evaluate('document.querySelector("[data-chat-error-locale-probe]")?.remove()');
+  }
+
   // React-owned My dashboard: changing the global locale must re-render all
   // card labels and asynchronous account state without reloading the page.
   await send('Emulation.setDeviceMetricsOverride',{width:1440,height:1000,deviceScaleFactor:1,mobile:false});

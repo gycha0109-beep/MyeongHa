@@ -22,6 +22,8 @@ for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(so
 for (const [source, row] of JA_TW_TO_EN_CN_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 for (const [source, row] of EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 registerStaticCopy('라이트 모드로 전환', { 'ja-JP': 'ライトモードに切り替え', 'zh-TW': '切換至淺色模式', 'en-US': 'Switch to light mode', 'zh-CN': '切换至浅色模式' });
+registerStaticCopy('세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': 'セヨンの安全な応答処理を完了できませんでした。入力した内容は保持されています。しばらくしてからもう一度お試しください。', 'zh-TW': '未能完成 Seyeon 的安全回覆處理。您輸入的內容已保留，請稍後再試。', 'en-US': "Seyeon could not complete the response safely. Your message has been preserved. Please try again shortly.", 'zh-CN': '未能完成 Seyeon 的安全回复处理。您输入的内容已保留，请稍后重试。' });
+registerStaticCopy('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': '会話の状態を確認できませんでした。しばらくしてからもう一度お試しください。', 'zh-TW': '無法確認對話狀態，請稍後再試。', 'en-US': 'The chat status could not be verified. Please try again shortly.', 'zh-CN': '无法确认对话状态，请稍后重试。' });
 registerStaticCopy('전송 중인 메시지', { 'ja-JP': '送信中のメッセージ', 'zh-TW': '傳送中的訊息', 'en-US': 'Sending message', 'zh-CN': '正在发送的消息' });
 registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨンの返信を待っています', 'zh-TW': '正在等待 Seyeon 回覆', 'en-US': 'Waiting for Seyeon to reply', 'zh-CN': '正在等待 Seyeon 回复' });
 registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });
@@ -56,6 +58,8 @@ export function formatStaticUi(source, params, locale = getUiLocale()) {
 
 const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
+const unmappedChatStatusSource = new WeakMap();
+const CHAT_STATUS_SAFE_FALLBACK = '대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 const trackedAttributes = new WeakMap();
 const ATTRIBUTES = ['aria-label', 'title', 'placeholder'];
 
@@ -75,6 +79,33 @@ function repaintText(textNode, locale) {
   if (!parent || parent.matches('textarea') || isBlocked(parent)) return;
   const current = textNode.nodeValue ?? '';
   const trimmed = current.trim();
+  // Status banners are authored system copy, not private transcripts. Unknown
+  // server/runtime Korean errors must not leak untranslated into other locales.
+  // Never touch chat message bodies or arbitrary user-authored text.
+  const isSystemStatus = !!parent.closest('[data-compose-status], [data-room-loading]');
+  const previousUnmapped = unmappedChatStatusSource.get(textNode);
+  if (previousUnmapped !== undefined) {
+    const accepted = [
+      previousUnmapped,
+      CHAT_STATUS_SAFE_FALLBACK,
+      ...LOCALE_ORDER.map(language => translateStaticUi(CHAT_STATUS_SAFE_FALLBACK, language)),
+    ];
+    if (accepted.includes(trimmed)) {
+      const replacement = locale === 'ko-KR'
+        ? previousUnmapped : translateStaticUi(CHAT_STATUS_SAFE_FALLBACK, locale);
+      if (trimmed !== replacement) textNode.nodeValue = current.replace(trimmed, replacement);
+      return;
+    }
+    unmappedChatStatusSource.delete(textNode);
+  }
+  if (isSystemStatus && trimmed && /[가-힣]/u.test(trimmed) &&
+      !AUTHORITATIVE_STATIC_UI_COPY.has(trimmed)) {
+    unmappedChatStatusSource.set(textNode, trimmed);
+    if (locale !== 'ko-KR') {
+      textNode.nodeValue = current.replace(trimmed, translateStaticUi(CHAT_STATUS_SAFE_FALLBACK, locale));
+    }
+    return;
+  }
   let korean = trackedText.get(textNode);
   if (AUTHORITATIVE_STATIC_UI_COPY.has(trimmed)) {
     korean = trimmed;

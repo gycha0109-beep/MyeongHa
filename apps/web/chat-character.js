@@ -191,7 +191,7 @@ composer?.addEventListener('submit', (event) => {
 
   const handled = !composer.dispatchEvent(submitEvent);
   if (!handled && composeStatus) {
-    composeStatus.textContent = '현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다.';
+    composeStatus.textContent = translateStaticUi('현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다.', getUiLocale());
   }
 });
 
