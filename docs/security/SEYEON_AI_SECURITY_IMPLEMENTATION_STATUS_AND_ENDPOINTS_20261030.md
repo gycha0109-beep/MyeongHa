@@ -144,3 +144,11 @@ Watchtower-Track: security
 - **목적/구현:** [CI #41183956482](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41183956482)의 `Work Track · security`에서 신규 최근 메시지 Pin 어댑터의 nullable/unknown 정적 타입 흐름이 실패했다. 식별·메시지·DB 영수증 실패 분기를 명시적 예외 종료로 변경하여 타입 검증이 실패 구간 뒤의 객체를 잘못 nullable로 유지하지 않도록 수정했다. 기존 원본 검증·DB 본문 정확 대조·HOLD 조건은 완화하지 않았다.
 - **변경 파일:** `apps/api/src/seyeon-g1-model-recent-source-db-pin-v1.ts`, 이 Worklog. 해당 컴파일 수정의 최종 HEAD CI 결과는 후속 실행으로 확인할 때까지 PASS가 아니다.
 - **다음/미완료:** #2789 신규 HEAD CI 확인과 G1 Pin 실제 모델 호출 경로 연결, 기존 #2786의 별도 Guest 전환 브라우저 실패 정리. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W08 — G1 현재 User·원본 Memory 단일 트랜잭션 결합 Pin 소스 (PR #2789)
+
+- **목적/구현:** 새 `17-g1-positive-combined-model-source-pin.sql`에서 한 번의 DB owner 호출 안에 (1) 모델에 선택된 현재 User DB 원본·실제 본문·source census 불변 Pin, (2) 기존 정확한 Memory Record/Grant 원본·type/schema·payload digest 양수 Pin과 Chat `context_ready` 전이를 결합했다. 두 단계 중 하나라도 실패하면 같은 PostgreSQL 트랜잭션 전체가 롤백된다.
+- **승인 Scope:** 기존 S0 그대로 **양수 원본 Memory 1건·현재 User 메시지 1건**만 지원한다. 과거 User/Assistant, Relationship, Reader, 다중 Records는 이 결합 함수에서 허용하지 않는다. 모델 호출·G2/G3·사용자 비용 경로의 Production activation도 없다.
+- **실제 파일:** `scripts/operations/seyeon-security-s0/17-g1-positive-combined-model-source-pin.sql`, `scripts/operations/seyeon-security-s0/plan.mjs`, Worklog 문서. S0 격리 설치 소스로만 등록하고 API/일반 역할에 직접 EXECUTE를 부여하지 않았다.
+- **미완료/다음:** G1 결합 SQL을 서버의 검증된 원본 선택/모델 전 호출 경로에 연결하고, 실제 PostgreSQL 격리 실증 및 G2 동일 결합 출처 재확인까지 완료해야 한다. 별도 설치·운영 승인과 G5/G6 증거는 아직 없다. 운영 `HOLD_FORWARD_STOPPED` 유지.

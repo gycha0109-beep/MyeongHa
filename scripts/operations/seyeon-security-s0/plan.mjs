@@ -14,6 +14,7 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '14-g0-relationship-event-original-lineage.sql',
   '15-g0-original-member-user-message.sql',
   '16-g1-model-recent-source-pin.sql',
+  '17-g1-positive-combined-model-source-pin.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {
