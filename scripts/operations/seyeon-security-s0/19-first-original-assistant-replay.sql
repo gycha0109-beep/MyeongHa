@@ -23,6 +23,11 @@ set search_path=pg_catalog,public set row_security=off
 as $replay$
 declare
   v_text text;
+  v_pin jsonb;
+  v_turn uuid;
+  v_attempt uuid;
+  v_original record;
+  v_pg_digest text;
 begin
   if p_subject_id is null or p_thread_id is null
      or p_assistant_message_id is null then return; end if;
@@ -38,7 +43,10 @@ begin
   for update of th;
   if not found then return; end if;
 
-  select m.body_text into v_text
+  -- Inspect only DB-original metadata first. Private assistant bytes are
+  -- read after the exact original Memory and Grant have been locked.
+  select a.seyeon_personal_source_pin_jsonb->'positiveProof',t.id,a.id
+  into v_pin,v_turn,v_attempt
   from public.conversation_messages m
   join public.chat_turns t
     on t.id=m.turn_id and t.thread_id=m.thread_id
@@ -51,8 +59,11 @@ begin
   where m.id=p_assistant_message_id and m.subject_id=p_subject_id
     and m.thread_id=p_thread_id
     and m.sender_type='character' and m.redacted_at is null
-    and m.body_text is not null and length(btrim(m.body_text))>0
-    and m.body_text=a.generated_body_text
+    and a.seyeon_personal_source_pinned_at is not null
+    and a.seyeon_personal_source_pin_jsonb=
+        jsonb_build_object('positiveProof',a.seyeon_personal_source_pin_jsonb->'positiveProof')
+    and a.validation_result_jsonb->'personalRecordProvenance'
+        =a.seyeon_personal_source_pin_jsonb->'positiveProof'
     and t.state='delivered' and t.delivered_at is not null
     and t.committed_at is not null and t.committed_attempt_id=a.id
     and a.state='committed' and a.committed_message_id=m.id
@@ -83,20 +94,130 @@ begin
         where r.subject_id=p_subject_id and r.character_id='seyeon')
   then return; end if;
 
-  -- DB-owned original Grant ID/record digest and current withdrawal status:
-  -- the same exact committed Attempt's positiveProof, never a fresh regrant.
-  begin
-    perform seyeon_private.assert_current_original_assistant_lineage_v1(
-      p_subject_id,p_thread_id,p_assistant_message_id
-    );
-  exception when sqlstate '42501' then
-    -- A revoked, superseded, regranted or unsupported original source
-    -- returns no replay bytes. Other DB faults abort the whole send.
-    return;
-  end;
+  -- The existing G0 helper is restricted to the metadata runtime owner
+  -- and cannot read the protected Grant/Memory tables. For this isolated
+  -- replay, repeat its exact original-Proof checks INSIDE the already
+  -- restricted postgres-owned S0 function. Do not widen table privileges.
+  if jsonb_typeof(v_pin) is distinct from 'object'
+     or v_pin->>'schemaVersion' is distinct from
+       'seyeon-positive-original-memory-source-pin-v1'
+     or v_pin->>'subjectId' is distinct from p_subject_id::text
+     or v_pin->>'threadId' is distinct from p_thread_id::text
+     or v_pin->>'turnId' is distinct from v_turn::text
+     or v_pin->>'attemptId' is distinct from v_attempt::text
+     or v_pin->>'characterId' is distinct from 'seyeon'
+     or v_pin->>'recordKind' is distinct from 'memory'
+     or v_pin->>'recordId' is null
+     or v_pin->>'originalGrantId' is null
+     or v_pin->>'originalGrantedAt' is null
+     or v_pin->>'originalPgJsonbDigest'
+        !~ '^sha256:pg-jsonb:v1:[a-f0-9]{64}
+end
+$replay$;
 
-  -- The original Grant/Memory SHARE locks remain held through Node finish
-  -- by the caller's still-live canonical Member transaction.
+-- Keep the creator, postgres, as the SECURITY DEFINER owner. The
+-- metadata-only runtime owner is deliberately not granted this read.
+revoke all on function
+  seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+from public,anon,authenticated,service_role,myeongha_api_executor;
+-- Test-only API EXECUTE is issued separately by the disposable fixture.
+-- No general runtime, browser, or public API role gains this RPC.
+commit;
+
+     or v_pin->>'selectedSourcesDigest'
+        !~ '^sha256:v1:[a-f0-9]{64}
+end
+$replay$;
+
+-- Keep the creator, postgres, as the SECURITY DEFINER owner. The
+-- metadata-only runtime owner is deliberately not granted this read.
+revoke all on function
+  seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+from public,anon,authenticated,service_role,myeongha_api_executor;
+-- Test-only API EXECUTE is issued separately by the disposable fixture.
+-- No general runtime, browser, or public API role gains this RPC.
+commit;
+
+     or v_pin->>'projectedMemoryDigest'
+        !~ '^sha256:v1:[a-f0-9]{64}
+end
+$replay$;
+
+-- Keep the creator, postgres, as the SECURITY DEFINER owner. The
+-- metadata-only runtime owner is deliberately not granted this read.
+revoke all on function
+  seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+from public,anon,authenticated,service_role,myeongha_api_executor;
+-- Test-only API EXECUTE is issued separately by the disposable fixture.
+-- No general runtime, browser, or public API role gains this RPC.
+commit;
+
+     or v_pin->>'finalModelContextDigest'
+        !~ '^sha256:v1:[a-f0-9]{64}
+end
+$replay$;
+
+-- Keep the creator, postgres, as the SECURITY DEFINER owner. The
+-- metadata-only runtime owner is deliberately not granted this read.
+revoke all on function
+  seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+from public,anon,authenticated,service_role,myeongha_api_executor;
+-- Test-only API EXECUTE is issued separately by the disposable fixture.
+-- No general runtime, browser, or public API role gains this RPC.
+commit;
+
+  then return; end if;
+
+  -- No registry approval means this historical first delivery is unavailable.
+  -- The registry lock is the existing first-Reveal restricted owner guard.
+  if not seyeon_private.lock_positive_source_registry_v1(
+    v_pin->>'recordType',
+    v_pin->>'recordSchemaVersion',
+    v_pin->>'projectorVersion'
+  ) then return; end if;
+
+  -- Never substitute a later Grant for the original Grant on the Attempt.
+  -- Lock both current Grant and Memory while sending the Node response.
+  select g.granted_at,m.content_jsonb into v_original
+  from public.record_access_grants g
+  join public.memory_items m
+    on m.id=g.memory_item_id and m.subject_id=g.subject_id
+  where g.id=(v_pin->>'originalGrantId')::uuid
+    and g.subject_id=p_subject_id
+    and g.memory_item_id=(v_pin->>'recordId')::uuid
+    and g.life_fact_id is null
+    and g.grantee_character_id='seyeon'
+    and g.grant_reason='user_choice'
+    and g.revoked_at is null
+    and g.seyeon_revoke_requested_at is null
+    and m.revoked_at is null and m.source_kind='user_approved'
+    and m.memory_type=v_pin->>'recordType'
+    and m.schema_version=v_pin->>'recordSchemaVersion'
+  for share of g,m;
+  if not found then return; end if;
+  v_pg_digest:='sha256:pg-jsonb:v1:'||
+    encode(sha256(convert_to(v_original.content_jsonb::text,'UTF8')),'hex');
+  if v_original.granted_at::text is distinct from
+       (v_pin->>'originalGrantedAt')::timestamptz::text
+     or v_pg_digest is distinct from v_pin->>'originalPgJsonbDigest'
+  then return; end if;
+
+  -- Only now fetch the assistant body; recheck the actual DB-original
+  -- generated text and retain Message/Attempt SHARE locks until Node finish.
+  select m.body_text into v_text
+  from public.conversation_messages m
+  join public.chat_turn_attempts a
+    on a.id=v_attempt and a.subject_id=m.subject_id and a.turn_id=m.turn_id
+  where m.id=p_assistant_message_id
+    and m.subject_id=p_subject_id and m.thread_id=p_thread_id
+    and m.redacted_at is null and m.sender_type='character'
+    and m.body_text is not null and length(btrim(m.body_text))>0
+    and m.body_text=a.generated_body_text
+    and a.committed_message_id=m.id and a.state='committed'
+  for share of m,a;
+  if not found then return; end if;
+
+  -- One authorized first-delivery historical body, never a full History.
   return query select v_text;
 end
 $replay$;
