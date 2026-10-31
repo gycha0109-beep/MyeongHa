@@ -70,6 +70,14 @@
 - **검증 범위/미완료:** **Saju production adapter 구현의 실제 로컬 네트워크 실패 경계**만 확인했다. Cloud Run 실제 인스턴스 kill, Hosted PostgreSQL 불능/slow/exhaustion, 전체 사용자 라우트의 Saju 장애 응답, Auth/비밀 회전, Production p95 및 장애 알림/복구는 **NOT_OBSERVED**. Phase 7 전체 완료·DR readiness·서비스 재개 승격은 불가.
 - **추적:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783), 최초 테스트/구현 커밋 `7cb9300ce5bf8d2b6e94a031f4009743107cad51`, 브랜치 `ops/phase7-loopback-saju-chaos-worklog-20261030`. [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2783/checks)는 원격 검증 증거이며, 아직 실행/완료 전에는 성공으로 간주하지 않는다. **다음 작업:** 안전한 격리 환경의 DB/Auth/Saju dependency 실제 실패·지연 검증과 Phase 10–12 측정. 필요한 통제 조건이 없으면 PASS가 아니라 BLOCKED로 분류한다.
 
+### 2026-10-31 — PR #2796 통합 CI 실행 순서 RED 보정·실패 작업 재실행
+
+- **실제 코드 및 독립 검증:** [PR #2796](https://github.com/gycha0109-beep/MyeongHa/pull/2796) head `4baa4d07972298e61139b65122feaf55667bdaf8`의 [Web Auth Browser Regression #41185845104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845104), [CI #41185845072](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845072), [Governance #41185845015](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845015), [Web PR #41185845029](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185845029), Cloudflare Workers Builds는 각각 **SUCCESS**. 따라서 Guest 401 브라우저 검증기 변경 자체가 이 RED의 원인은 아님.
+- **실패 원인 구분:** [통합 #41185847945](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185847945)는 별도 제출 라벨 이벤트가 아닌 요청이라 정책상 `Integration requires the dedicated CI submission label event`로 거부. 이후 라벨로 제출된 [통합 #41185858051](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051)의 **첫 실행**은 필수 `Web PR Verify` 체크가 진행 중이라 `Required check is pending: Web PR Verify`로 admission FAIL. 이는 필수 검사 완료 전 통합 검증이 시작된 순서 문제.
+- **실제 조치:** 같은 head에서 `Web PR Verify` 등 필수 체크가 모두 성공한 사실을 확인한 뒤, [통합 #41185858051](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051)의 **실패 작업만 재실행** (attempt 2). 두 번째 진입 검사 `admission` **SUCCESS** 확인. 본 Worklog 작성 당시 전체 검사 `full` 실행 중으로, **전체 통합 CI/병합 완료는 아직 미확정**. 동일 소스의 추가 불필요한 수정이나 Cloudflare 설정·실서비스 변경은 수행하지 않음.
+- **남은 것과 다음 작업:** 위 링크에서 attempt 2의 최종 `full` 및 `CI Integration Verify`를 확인하고 통과 시 자동 병합 처리. 새 소스가 배포되더라도 실제 운영/DR 승격에는 별도 최신 버전 증거가 필요함.
+- **관련 추적:** [PR #2796 CI 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2796/checks), [통합 재실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185858051), [PR #2796 진행 상황 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2796#issuecomment-6541334063).
+
 ---
 
 ## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
