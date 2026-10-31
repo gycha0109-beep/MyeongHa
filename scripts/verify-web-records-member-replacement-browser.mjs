@@ -7,10 +7,10 @@ import { spawn } from 'node:child_process';
 
 const root = resolve(process.cwd(), process.env.MYEONGHA_WEB_OUTPUT_DIR ?? 'public');
 const chromeBin = process.env.CHROME_BIN ?? process.env.CHROME_PATH ?? 'chrome';
-const memberA = Object.freeze({ id: '11111111-1111-4111-8111-111111111111', email: 'records-a@example.com', token: 'records-a.payload.signature', refresh: 'records-a-refresh', name: '기록 회원 A', fact: 'member-a-private-fact' });
-const memberB = Object.freeze({ id: '22222222-2222-4222-8222-222222222222', email: 'records-b@example.com', token: 'records-b.payload.signature', refresh: 'records-b-refresh', name: '기록 회원 B', fact: 'member-b-private-fact' });
+const memberA = Object.freeze({ id: '11111111-1111-4111-8111-111111111111', email: 'records-a@example.com', token: 'records-a.payload.signature', refresh: 'records-a-refresh', name: '기록 회원 A', readingId: '44444444-4444-4444-8444-444444444401', sessionId: '55555555-5555-4555-8555-555555555501', readerId: 'seyeon' });
+const memberB = Object.freeze({ id: '22222222-2222-4222-8222-222222222222', email: 'records-b@example.com', token: 'records-b.payload.signature', refresh: 'records-b-refresh', name: '기록 회원 B', readingId: '44444444-4444-4444-8444-444444444402', sessionId: '55555555-5555-4555-8555-555555555502', readerId: 'baekheon' });
 const members = [memberA, memberB];
-const recordsPaths = new Set(['/api/me', '/api/life-record', '/api/readings']);
+const recordsPaths = new Set(['/api/me', '/api/readings']);
 const mime = new Map([['.html', 'text/html; charset=utf-8'], ['.css', 'text/css; charset=utf-8'], ['.js', 'text/javascript; charset=utf-8'], ['.svg', 'image/svg+xml'], ['.png', 'image/png'], ['.webp', 'image/webp']]);
 const requests = [];
 const assert = (value, message) => { if (!value) throw new Error(message); };
@@ -38,8 +38,19 @@ function memberForAuth(value) {
 function recordsPayload(member, path) {
   if (path === '/api/me') return { subjectKind: 'member', subjectStatus: 'active', profile: { displayName: member.name, locale: 'ko-KR', timezone: 'Asia/Seoul', onboardingState: 'completed', updatedAt: '2026-09-10T00:00:00.000Z' } };
   const pagination = { pageSize: 50, hasMore: false, nextCursor: null };
-  if (path === '/api/life-record') return { facts: [{ factType: member.fact, schemaVersion: 'test.v1', valueJsonb: { owner: member.email }, confirmedAt: '2026-09-10T00:00:00.000Z', revokedAt: null }], pagination };
-  if (path === '/api/readings') return { readings: [], pagination };
+  if (path === '/api/readings') return {
+    readings: [{
+      readingId: member.readingId,
+      readingSessionId: member.sessionId,
+      sajuDomain: 'career',
+      readingContractVersion: 'reading-v1',
+      productResponseState: 'delivered',
+      readerCharacterIds: [member.readerId],
+      createdAt: '2026-09-10T00:00:00.000Z',
+      completedAt: '2026-09-10T00:01:00.000Z',
+    }],
+    pagination,
+  };
   throw new Error(`Unexpected Records endpoint: ${path}`);
 }
 
@@ -173,33 +184,34 @@ try {
   const requestStart = requests.length;
   await tabA.send('Page.reload', { ignoreCache: true });
   const gateDeadline = Date.now() + 10_000;
-  while (blockedA < 2 && Date.now() < gateDeadline) await sleep(50);
-  assert(blockedA >= 2, 'Member A Records requests did not reach the response gate');
+  while (blockedA < 1 && Date.now() < gateDeadline) await sleep(50);
+  assert(blockedA >= 1, 'Member A Reading request did not reach the response gate');
 
   tabB = await connect(port);
   await navigate(tabB, origin, '/hall.html', '.product-profile');
   await signIn(tabB, memberB);
   await waitFor(tabB, `JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null')?.accessToken === ${JSON.stringify(memberB.token)}`, 'Member B did not become canonical');
-  await waitFor(tabA, `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('#records-display-name')?.textContent?.trim() === ${JSON.stringify(memberB.name)} && document.querySelector('#life-records-list')?.textContent?.includes(${JSON.stringify(memberB.fact)}) === true`, 'Records did not refetch under Member B');
+  await waitFor(tabA, `location.pathname === '/records.html' && document.querySelector('#records-content')?.hidden === false && document.querySelector('#records-display-name')?.textContent?.trim() === ${JSON.stringify(memberB.name)} && document.querySelector('.records-reading-card--persisted a')?.getAttribute('href')?.includes(${JSON.stringify(memberB.readingId)}) === true`, 'Records did not refetch under Member B');
   assert(recordsLoads >= loadsBeforeRace + 2, `storage-driven Records reload did not occur; loads=${recordsLoads}`);
 
   holdA = false;
   releaseA?.();
   releaseA = null;
   await sleep(500);
-  const finalState = await tabA.evaluate(`(() => ({ member: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null'), name: document.querySelector('#records-display-name')?.textContent?.trim() ?? null, facts: document.querySelector('#life-records-list')?.textContent?.trim() ?? '' }))()`);
+  const finalState = await tabA.evaluate(`(() => ({ member: JSON.parse(localStorage.getItem('myeongha.memberSession.v1') ?? 'null'), name: document.querySelector('#records-display-name')?.textContent?.trim() ?? null, links: [...document.querySelectorAll('.records-reading-card--persisted a')].map((link) => link.getAttribute('href') ?? '') }))()`);
   assert(finalState.member?.accessToken === memberB.token, 'canonical Member regressed');
   assert(finalState.name === memberB.name, 'stale Member A profile rendered after replacement');
-  assert(finalState.facts.includes(memberB.fact), 'Member B fact is missing');
-  assert(!finalState.facts.includes(memberA.fact), 'Member A private fact rendered under Member B');
+  assert(finalState.links.length === 1, 'Member B Reading archive count is incorrect');
+  assert(finalState.links[0].includes(memberB.readingId), 'Member B Reading is missing');
+  assert(!finalState.links.some((href) => href.includes(memberA.readingId)), 'Member A private Reading rendered under Member B');
 
   const raceReads = requests.slice(requestStart).filter((request) => recordsPaths.has(request.path));
   const staleReads = raceReads.filter((request) => request.member === memberA.email).length;
   const replacementReads = raceReads.filter((request) => request.member === memberB.email).length;
-  assert(staleReads >= 3 && replacementReads >= 3, `expected both authority generations; reads=${JSON.stringify(raceReads)}`);
+  assert(staleReads >= 2 && replacementReads >= 2, `expected both authority generations; reads=${JSON.stringify(raceReads)}`);
 
   await mkdir(resolve(process.cwd(), 'artifacts'), { recursive: true });
-  await writeFile(resolve(process.cwd(), 'artifacts/web-records-auth-browser-smoke-member-replacement.json'), `${JSON.stringify({ recordsLoads, blockedA, staleReads, replacementReads, finalMember: finalState.member?.accessToken ?? null, staleFactAbsent: !finalState.facts.includes(memberA.fact) }, null, 2)}\n`);
+  await writeFile(resolve(process.cwd(), 'artifacts/web-records-auth-browser-smoke-member-replacement.json'), `${JSON.stringify({ recordsLoads, blockedA, staleReads, replacementReads, finalMember: finalState.member?.accessToken ?? null, staleReadingAbsent: !finalState.links.some((href) => href.includes(memberA.readingId)) }, null, 2)}\n`);
   functionalPass = true;
   console.log('MyeongHa_WEB_RECORDS_MEMBER_REPLACEMENT_BROWSER_PASS stale_member_hidden=true replacement_refetched=true final_member_b=true');
 } catch (error) {
