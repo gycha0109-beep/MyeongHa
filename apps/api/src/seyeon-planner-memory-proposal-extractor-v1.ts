@@ -13,6 +13,23 @@ import type { ServerSeyeonPlannerFactCandidateV1 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const CONTROL = /[\u0000-\u001f\u007f]/u;
 
+// User refusal takes precedence over model output. This conservative
+// language guard only suppresses proposals; it never grants consent or
+// deletes an existing Memory. An ambiguous instruction is safer as 'none'.
+const EXPLICIT_NO_MEMORY = [
+  /(?:기억|저장|기록)(?:하|해두)?지\\s*마/iu,
+  /(?:기억|저장|기록)\\s*(?:하지|해두지)\\s*마/iu,
+  /(?:기억|저장|기록)(?:해두)?\\s*두지\\s*마/iu,
+  /(?:do\\s+not|don't|dont)\\s+(?:remember|save|store|record)\\b/iu,
+  /(?:forget\\s+(?:this|that|what\\s+i\\s+said))\\b/iu,
+];
+
+export function isExplicitSeyeonPlannerMemoryOptOutV1(userText:string):boolean {
+  return typeof userText==='string' &&
+    EXPLICIT_NO_MEMORY.some(expression=>expression.test(userText));
+}
+
+
 export const SEYEON_PLANNER_MEMORY_EXTRACTION_V1 = Object.freeze({
   purpose: 'memory_proposal_extraction',
   defaultModelAdmission: 'DENY',
@@ -68,6 +85,11 @@ export async function extractSeyeonPlannerMemoryCandidateV1(input: Readonly<{
       input.userText.length > 20000 || input.assistantText.length > 20000 ||
       !input.provider || typeof input.provider.generate !== 'function') {
     throw new SeyeonPlannerMemoryExtractionHoldV1();
+  }
+  // Do not spend a paid model call or stage any pending personal fact after
+  // an explicit "do not remember" instruction in the committed User turn.
+  if (isExplicitSeyeonPlannerMemoryOptOutV1(input.userText)) {
+    return Object.freeze({ decision: 'none' as const });
   }
   const request: SeyeonStructuredProviderRequestV2 = Object.freeze({
     contractVersion: SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
