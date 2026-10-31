@@ -15,6 +15,8 @@ describe('P4 exact Reader withdrawal evidence PG17 independent fixture contract'
  it('uses exact operational SQL source instead of copying an alternate query',()=>{
   expect(generator).toContain('COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1');
   expect(generated).toContain(sourceSql);
+  expect(sourceSql).toContain('join public.entitlement_grants egrant');
+  expect(sourceSql).not.toMatch(/\\bjoin\\s+public\\.entitlement_grants\\s+grant\\b/iu);
   expect(generated).toContain('execute q into strict one using');
   expect(generated).toContain('COMMERCE_EXACT_READER_LEGAL_EVIDENCE_HOLD_PG17_PASS');
  });

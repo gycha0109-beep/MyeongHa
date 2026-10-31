@@ -18,10 +18,10 @@ select
  receipt.id::text as "receiptId",
  receipt.subject_id::text as "subjectId",
  receipt.purchase_intent_id::text as "purchaseIntentId",
- grant.id::text as "grantId",
- grant.revision::text as "grantRevision",
- grant.last_provider_ordering_key as "lastProviderOrderingKey",
- grant.status as "grantStatus",
+ egrant.id::text as "grantId",
+ egrant.revision::text as "grantRevision",
+ egrant.last_provider_ordering_key as "lastProviderOrderingKey",
+ egrant.status as "grantStatus",
  access.official_reading_id::text as "officialReadingId",
  access.reader_character_id as "readerCharacterId",
  notice.unit_id::text as "unitId"
@@ -41,12 +41,12 @@ join public.purchase_intents intent
  and intent.status='verified'
  and intent.expected_amount_minor=receipt.verified_amount_minor
  and intent.expected_currency=receipt.verified_currency
-join public.entitlement_grants grant
- on grant.id=$2::uuid and grant.subject_id=receipt.subject_id
- and grant.source_receipt_id=receipt.id and grant.grant_source_type='purchase'
+join public.entitlement_grants egrant
+ on egrant.id=$2::uuid and egrant.subject_id=receipt.subject_id
+ and egrant.source_receipt_id=receipt.id and egrant.grant_source_type='purchase'
 join public.standard_reading_reader_access_grants access
- on access.entitlement_grant_id=grant.id
- and access.subject_id=grant.subject_id
+ on access.entitlement_grant_id=egrant.id
+ and access.subject_id=egrant.subject_id
  and access.purchase_intent_id=intent.id
 join public.purchase_intent_reader_selections selection
  on selection.purchase_intent_id=intent.id

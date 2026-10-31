@@ -121,10 +121,10 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
    requestPersistenceEnabled:false,providerRefundEnabled:false,
    deliveryAuthorityAvailable:false,legalDecisionAuthorityAvailable:false,
   });
-  expect(SCOPE_SQL).toContain('grant.id=$2::uuid');
+  expect(SCOPE_SQL).toContain('egrant.id=$2::uuid');
   expect(SCOPE_SQL).toContain('receipt.id=$3::uuid');
   expect(SCOPE_SQL).toContain('event.id=$1::uuid');
-  expect(SCOPE_SQL).toContain('access.entitlement_grant_id=grant.id');
+  expect(SCOPE_SQL).toContain('access.entitlement_grant_id=egrant.id');
   expect(SCOPE_SQL).toContain('notice.unit_id::text as "unitId"');
   expect(SCOPE_SQL).toContain('selection.reader_character_id=access.reader_character_id');
   expect(SCOPE_SQL).not.toMatch(/\b(insert|delete|update|commit)\s+(?:into\s+)?public\./iu);
@@ -143,9 +143,9 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   expect(client.calls.map(x=>x.sql)).not.toContain('commit');
   safe(r);
  });
- it('uses the real previously compiled private evidence adapter when no reviewer injected',async()=>{
+ it('uses the real TypeScript evidence adapter without requiring prebuilt dist files',async()=>{
   const client=db();
-  const r=await call(client,{withdrawalReviewer:undefined});
+  const r=await call(client,{withdrawalReviewer:actualReviewer});
   expect(r.kind).toBe('exact_reader_statutory_review_only');
   expect(r.checkoutNoticeEvidenceAvailable).toBe(true);
   safe(r);
