@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 13 최신 Cloudflare 실제 배포 100% 및 익명·Member/DB/Saju E2E 수용 증거 갱신
+
+- **실제 Provider 버전(독립 조회):** Cloudflare Workers `myeongha` 배포 API GET의 최신 배포 `4b583e11-0aa4-458b-b490-fa0f603df6af`, 2026-10-31T18:17:04Z, 활성 버전 `7e18da4b-4374-449d-8fd0-133bc6541244` 100% 확인. E2E 이후 동일 버전 100%를 재조회했다. 이는 GitHub `main` SHA 또는 전체 의존성/배포 아티팩트 동등성의 증거가 아니다.
+- **현재 main 소스 근거:** 검증 두 건 모두 GitHub `main` checkout SHA `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd`. 해당 source에서 운영 엔드포인트 검사를 실행했다는 뜻이며 Worker 바이너리가 같은 Git SHA로 빌드됐다는 독립 증빙은 아직 별도이다.
+- **익명 live smoke PASS:** [Cloudflare Primary Worker E2E #41230000760](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41230000760) **SUCCESS**, 2026-10-31T18:33:55Z 종료. `operations` 모드 결과에 Worker 헤더 관측 버전 `7e18da4b-4374-449d-8fd0-133bc6541244` 일치, 화면 200, health 200, readiness(config-only) 200, 비인증 Member/Saju/preview 401, 교차 Origin 로그인 403, 미지 경로 404, 잘못된 health method 405 확인. `liveDependencyConnectivityProven=false`는 이 익명 검사의 정상 범위다.
+- **로그인·DB·사주 실서비스 E2E PASS:** [Cloudflare Primary Worker Authenticated E2E #41230003340](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41230003340) **SUCCESS**, 정확한 동일 Worker 버전 요청 헤더 검증 후 전용 Member 로그인 200, DB 주체 귀속 200, 현재 Birth revision 조회 200, 계산-only Saju 연동 200. 기존 governed 계정/시크릿 사용, 새 사용자 등록·업무 프로필 수정·결제·해석·Provider Chat 없음(로그인 세션 발급은 발생). Chat 경로는 기존 503 HOLD를 유지하며 양성 Chat 기능 수용이 아니다.
+- **판정 범위:** 현재 확인된 정확한 Worker 버전에서 익명 경계와 양성 Auth/DB/Saju 기본 경로를 각각 실증했다. 다만 readiness는 설정 점검이며 DB/Saju 장애 회복, 로그 실제 샘플/redaction, 의존성별 p95, rollback, Hosted Auth/Storage 통합 복원, RPO/RTO는 여전히 **NOT_ACCEPTED**. #1887, `dr_ready=false`, `serviceResumptionAllowed=false` 유지. 배포 버전이 바뀌면 이 두 실증을 새 버전의 수용으로 자동 복제하지 않는다.
+
+
 ### 2026-11-01 KST — PR #2821 병합 확인, PR #2829 전용 라벨 통합 재제출 및 운영 TLS 권한 구분
 
 - **선행 병합:** [PR #2821](https://github.com/gycha0109-beep/MyeongHa/pull/2821) source `54279060c4906b4958e021801aa7119946f1c775`는 [동일 HEAD 통합 CI #41220458822](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41220458822) **SUCCESS** 후 2026-11-01 01:48 KST 병합 확인. PostgreSQL 18 격리 인증서 신뢰/호스트명/평문 차단 증거는 합성 환경에 한정된다.
