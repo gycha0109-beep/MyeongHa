@@ -136,3 +136,4 @@
 - **남은 작업:** 선행 #2816 병합 시 최신 `main`으로 갱신하고 이 PG17 실행 항목의 CI 결과 확인, 이후 별도의 Provider ordering/법적 근거/Reader T2 조건을 충족하기 전 권한 회수 OFF 유지.
 - **상세:** `docs/operations/COMMERCE_P4_STORED_PORTONE_HMAC_REAL_PG17_LINEAGE_PROOF_V1.md`.
 - **통합 PR:** [PR #2819](https://github.com/gycha0109-beep/MyeongHa/pull/2819), 구현 커밋 `69606421`. 선행 #2816 미병합 시에는 Draft 스택 PR로 유지하며, #2816 병합 후 최신 `main`으로 변경해 공식 PostgreSQL 17 통합 CI·자동 병합을 활성화합니다.
+- **진행 상태 갱신(2026-11-01):** #2816 필수 통합 CI 성공 및 `main` 병합 `6285fe66` 확인. 후속 [PR #2819](https://github.com/gycha0109-beep/MyeongHa/pull/2819)는 `main` 기준 재정렬·Draft 해제·`ci-integration-ready` 지정·자동 병합 설정까지 완료했습니다. 실제 PostgreSQL 17 전체 SQL 증거는 #2819 CI 결과 확인 전까지 미확정입니다.
