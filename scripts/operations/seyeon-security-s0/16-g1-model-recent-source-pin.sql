@@ -25,6 +25,13 @@ create trigger seyeon_g1_recent_source_pin_immutable_v1
 before update on public.chat_turn_attempts
 for each row execute function seyeon_private.reject_recent_source_pin_mutation_v1();
 
+-- PostgreSQL 17 requires column UPDATE privilege for SELECT ... FOR SHARE.
+-- This NOLOGIN owner needs a row lock, NOT a data mutation path.
+-- Conversation messages have subject-scoped SELECT RLS and NO matching
+-- UPDATE policy for this owner; API/anonymous roles receive no new GRANT.
+grant update (redacted_at) on public.conversation_messages
+  to myeongha_seyeon_chat_runtime_owner;
+
 grant myeongha_seyeon_chat_runtime_owner to current_user;
 grant create on schema seyeon_private to myeongha_seyeon_chat_runtime_owner;
 

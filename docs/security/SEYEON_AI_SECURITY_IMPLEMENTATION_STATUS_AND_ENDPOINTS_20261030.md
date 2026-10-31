@@ -209,3 +209,11 @@ Watchtower-Track: security
 - **수정:** G3 최초 공개 DB 함수가 신규 `selectedModelSourceCensusDigest` / `selectedModelMessageDigest` / `dbBodySha256`의 정규식 검증 중 **NULL도 명확히 거부**하도록 변경했다. 값이 누락된 경우에도 PostgreSQL 3값 논리 때문에 검사 분기가 미실행되지 않게 `IS DISTINCT FROM TRUE`를 적용했다. 정상적인 구형 S0는 별도 경로로 유지한다.
 - **PR/CI:** G3 후속 [#2800](https://github.com/gycha0109-beep/MyeongHa/pull/2800), 첫 HEAD `26117357`. 최초 PR 본문에 보안 트랙 식별 문자열의 실제 줄바꿈이 적용되지 않아 `Work Track · unattributed`가 실행됐다. PR 본문을 `Watchtower-Track: security` 독립 줄로 수정했으며, 본 W15 커밋에 따른 CI 재실행에서 보안 분류·PostgreSQL 검증을 확인해야 한다.
 - **검증/미완료:** #2800 최초 HEAD PostgreSQL 검사 진행 중이므로 아직 PASS로 주장하지 않는다. 새로운 코드·설치 계획은 여전히 S0 disposable source only, 운영 DB/ACL/Provider/HTTP 공개·History·Replay HOLD 해제 없음. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W16 — #2786 통합 CI RED: G1 출처 행잠금 권한 보정 및 재검증
+
+- **RED 증거:** [통합 CI #41189513938](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41189513938)의 PostgreSQL 17 job 1건 실패. 신규 `test/seyeon-security-s0-postgres.e2e.test.ts`의 실제 G1 원본 메시지 Pin→G3 최초 공개 시나리오에서 `seyeon_private.pin_model_recent_sources_v1`의 `SELECT ... FOR SHARE OF m`가 `permission denied for table conversation_messages`로 실패. 기존 12개 S0 사례 통과, 다른 security/browser/Governance/Web job PASS.
+- **원인/조치:** PostgreSQL 17의 행잠금 `FOR SHARE`는 SELECT뿐 아니라 대상 테이블 중 최소 한 컬럼의 UPDATE 권한을 요구한다. 기존 `myeongha_seyeon_chat_runtime_owner`(NOLOGIN)에는 대화 메시지 SELECT/INSERT만 허용돼 있었다. S0 격리 설치 SQL `16-g1-model-recent-source-pin.sql`에서 **오직 NOLOGIN Owner에 `conversation_messages.redacted_at` 단일 컬럼 UPDATE 권한**을 추가하여 행잠금이 가능하도록 했다. 이 Owner의 실제 행 UPDATE는 기존 subject-scope RLS에 UPDATE 정책이 없어 계속 거부된다. API/anon/authenticated/service_role에 새 권한이나 공개 실행 경로는 부여하지 않는다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 본 Worklog. 추가로 [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) HEAD의 필수 CI 재검증 결과를 확인해야 하며, 이 수정의 PASS를 선인정하지 않는다.
+- **외부 별도 실패:** Cloudflare Workers 빌드 실패는 기존 Invalid access token 문제로 분리, 운영 인증 토큰을 수정하거나 공개 빌드를 강제하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
