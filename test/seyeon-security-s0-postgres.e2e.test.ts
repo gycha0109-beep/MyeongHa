@@ -18,6 +18,7 @@ import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
 import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/postgres-seyeon-planner-memory-decision-source-v1.js';
 import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
+import { verifySeyeonPlannerPreModelSourceV1 } from '../apps/api/src/postgres-seyeon-planner-pre-model-source-v1.js';
 import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -91,6 +92,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         to myeongha_api_executor;
        grant execute on function seyeon_private.qry_pending_seyeon_planner_display_candidate_v1(uuid,uuid,uuid)
          to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_planner_pre_model_source_v1(uuid,uuid,uuid,uuid,text,text)
+        to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
         seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
@@ -925,6 +928,32 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       memberDenied:true,serviceRoleDenied:true,
       noGrantUpdates:true,noMemoryUpdates:true,
     });
+  });
+
+  it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
+    const f=await prepare(210);
+    await f.commit();
+    const source={canonicalMemberSubjectId:f.subject,turnId:f.turn,
+      userMessageId:f.user,userText:f.userText,
+      assistantMessageId:f.assistant,assistantText:f.assistantText};
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,source,
+    ))).resolves.toBeUndefined();
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,{...source,userText:'Synthetic forged user text'},
+    ))).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,{...source,assistantText:'Synthetic forged assistant text'},
+    ))).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,{...source,assistantMessageId:f.user},
+    ))).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    const {rows:[count]}=await pool.query(`select
+      (select count(*)::int from public.memory_proposals
+       where source_turn_id=$1) as proposals,
+      (select count(*)::int from public.record_access_grants
+       where subject_id=$2) as grants`,[f.turn,f.subject]);
+    expect(count).toEqual({proposals:0,grants:1});
   });
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {
