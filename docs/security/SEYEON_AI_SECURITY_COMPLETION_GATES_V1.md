@@ -318,3 +318,10 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **한계:** 실제 Production History GET과 일반 committed_replay는 이 경로로 대체되지 않는다. Vercel Fetch/Cloudflare 프록시 및 최종 클라이언트 수신·Reader/Relationship/혼합 출처를 증명하지 못했다. G0-D1~D5/G1/G2/G3 전체/운영 G4~G6는 계속 HOLD. source registry/운영 ACL/서비스 Route/유료 Provider 활성화 없음, PR #2761 Draft·병합 금지.
 - **검증 판정:** 새 커밋 HEAD CI/PG17 확인 전에는 PASS로 기록하지 않는다.
 
+
+### 2026-11-01 · W18 · 권한 철회 ACK 이후 열린 웹 대화의 잔류 개인정보 재표시 차단
+
+- **구현:** 'records-memory-grant-revoke.js'에서 서버의 정확한 Member 확인과 'withdrawal_pending/newUseBlocked' 또는 'committed' 철회 응답이 인정된 경우에만 'seyeon-memory-visibility-invalidation.js'를 호출한다. 메시지·Memory ID·회원 토큰·원본 텍스트가 없는 알림을 현재 탭과 같은 출처의 다른 탭에 발송한다. 네트워크 실패, 비회원, 불일치·위조 응답은 알림 발급 조건이 아니다.
+- **대화 UI 결속:** 'chat-runtime-client.js'는 알림 수신 시 기존 세연 답변과 제안 DOM을 즉시 제거하고 권한 재확인 상태로 전환한다. 철회 전에 시작된 비동기 History 조회와 ACK 완료 후 도착하는 Turn 응답은 탭별 표시 상태 버전이 바뀌었으면 새로 렌더하지 않는다. 다른 Character 방의 권한을 확장하지 않으며 인증용 Bearer·DB Grant/철회 state는 변경하지 않는다.
+- **검증:** 'seyeon-memory-visibility-invalidation.test.ts'에서 pending/committed ACK, 잘못된 응답·비회원 차단, 로컬/다른 탭 무내용 알림을 테스트한다. 새 HEAD CI 결과 확인 전 GREEN으로 보고하지 않는다.
+- **경계:** 이미 외부로 송출된 HTTP 바이트를 회수하지 않는다. 다른 기기/탭에서 이루어진 철회가 열린 탭에 반드시 전달됨을 보장하는 실시간 서버 구독은 미구현이다. 알림은 화면 재표시 억제일 뿐, G0 원본 권한·G3 History 승인·실제 DB 철회 완료의 증거가 아니다. 서버 G1/G2/G3 원본 권한·Worker/Reader 파생 출처와 운영 크레딧/G4~G6는 HOLD. Source-only 동일 Draft PR #2761, 운영 공개·Provider·DB ACL·병합 없음.
