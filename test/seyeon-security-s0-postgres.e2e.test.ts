@@ -458,6 +458,85 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('SRC-05 bounded pending Planner expiry erases only overdue DB-owned proposals',async()=>{
+    const overdue=await prepare(205);
+    await overdue.commit();
+    const overdueId=uuid(27,205);
+    const current=await prepare(206);
+    await current.commit();
+    const currentId=uuid(27,206);
+    const rejected=await prepare(207);
+    await rejected.commit();
+    const rejectedId=uuid(27,207);
+
+    for(const [f,proposalId] of [
+      [overdue,overdueId],[current,currentId],[rejected,rejectedId],
+    ] as const){
+      await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+        canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+        assistantMessageId:f.assistant,userMessageId:f.user,
+        candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+      }));
+    }
+    const rejectedReceipt=await rejected.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:rejected.subject,proposalId:rejectedId,
+      });
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:rejected.subject,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+        choice:'discard',
+      });
+      return commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:rejected.subject,plan,
+      });
+    });
+    expect(rejectedReceipt.payloadPurged).toBe(true);
+
+    await pool.query(`update public.memory_proposals
+      set created_at=clock_timestamp()-interval '3 days'
+      where id in ($1,$2)`,[overdueId,rejectedId]);
+    const cutoff=new Date(Date.now()-24*60*60*1000).toISOString();
+    const {rows:[acl]}=await pool.query(`select has_function_privilege(
+      'myeongha_api_executor',
+      'seyeon_private.cmd_expire_pending_planner_memory_batch_v1(timestamptz,integer)',
+      'EXECUTE') as allowed`);
+    expect(acl.allowed).toBe(false);
+
+    const {rows:expired}=await pool.query(`select proposal_id::text as id,
+      subject_id::text as subject, payload_purged as purged
+      from seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        $1::timestamptz,$2::integer)`,[cutoff,1]);
+    expect(expired).toEqual([{
+      id:overdueId,subject:overdue.subject,purged:true,
+    }]);
+    const {rows:records}=await pool.query(`select id::text as id,status,
+      proposed_value_jsonb as payload from public.memory_proposals
+      where id=any($1::uuid[]) order by id`,
+      [[overdueId,currentId,rejectedId]]);
+    const status=new Map(records.map(x=>[x.id,{status:x.status,payload:x.payload}]));
+    expect(status.get(overdueId)).toEqual({status:'expired',payload:{}});
+    expect(status.get(currentId)).toEqual({
+      status:'pending',payload:{summary:'사용자는 인사를 했다'},
+    });
+    expect(status.get(rejectedId)).toEqual({status:'rejected',payload:{}});
+    const {rows:replayed}=await pool.query(`select proposal_id from
+      seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        $1::timestamptz,$2::integer)`,[cutoff,1]);
+    expect(replayed).toHaveLength(0);
+    await expect(overdue.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+      client,canonicalMemberSubjectId:overdue.subject,proposalId:overdueId,
+    }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    await expect(pool.query(`select * from
+      seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        clock_timestamp()+interval '1 day',1)`))
+      .rejects.toMatchObject({constraint:'seyeon_planner_expiry_policy_required'});
+    await expect(pool.query(`select * from
+      seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        clock_timestamp()-interval '1 day',101)`))
+      .rejects.toMatchObject({constraint:'seyeon_planner_expiry_policy_required'});
+  });
+
   it('rejects a revoked original Grant at atomic Commit even after a fresh replacement Grant', async () => {
     const f = await prepare(2);
     await f.revoke();
