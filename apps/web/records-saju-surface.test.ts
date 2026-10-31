@@ -15,28 +15,18 @@ describe('Records Saju history surface', () => {
   const css = readWeb('records-v2.css');
 
   it('keeps Saju reading records separate from Life Facts and other record domains', () => {
-    expect(html).toContain('aria-controls="saju-records"');
+    expect(html).toContain('id="saju-records"');
     expect(html).toContain('id="saju-records-list"');
     expect(html).toContain('>사주 보고서<');
     expect(html).not.toContain('records-report-intro');
     expect(html).not.toContain('records-tab-divider');
-    expect(html).toContain('aria-selected="true" aria-controls="saju-records"');
-    expect(html).toContain('aria-labelledby="life-records-tab" hidden');
+    expect(html).not.toContain('role="tablist"');
+    expect(html).not.toContain('life-records-tab');
     expect(html).toContain('>보관된 사주 기록<');
-    expect(html).toContain('>현세록<');
+    expect(html).not.toContain('>현세록<');
     expect(html).not.toContain('aria-controls="birth-records"');
     expect(html).not.toContain('aria-controls="memory-records"');
     expect(html).not.toContain('명식록 추가');
-  });
-
-  it('supports keyboard Home and End for the report-first tablist without breaking arrow navigation', () => {
-    expect(page).toContain("if (event.key === 'Home') targetIndex = 0;");
-    expect(page).toContain("else if (event.key === 'End') targetIndex = tabs.length - 1;");
-    expect(page).toContain("event.key === 'ArrowLeft' || event.key === 'ArrowRight'");
-    expect(page).toContain("targetIndex = (index + delta + tabs.length) % tabs.length;");
-    expect(page).toContain('const next = tabs[targetIndex];');
-    expect(page).toContain('next.focus();');
-    expect(page).toContain('activate(next);');
   });
 
   it('loads persisted Reading History with the same Records bearer', () => {
@@ -45,11 +35,11 @@ describe('Records Saju history surface', () => {
     expect(client).toContain('readReadings: () => readStable(async (bearer) =>');
     expect(client).toContain("await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings')");
     expect(client).toContain('if (seenCursors.has(nextCursor))');
-    expect(client).toContain('const [lifeResult, readingResult] = await Promise.allSettled([');
+    expect(client).not.toContain("lifeFacts: '/api/life-record'");
     expect(client).toContain("result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED'");
     expect(client).toContain("const unavailable = Object.freeze({ status: 'unavailable' });");
     expect(client).toContain('projectReadingHistory(readingResult.value)');
-    expect(client).toContain('return Object.freeze({ profile, lifeFacts, readings });');
+    expect(client).toContain('return Object.freeze({ profile, readings });');
   });
 
   it('renders persisted Reading history before any development-only sample fallback', () => {
@@ -61,7 +51,7 @@ describe('Records Saju history surface', () => {
     expect(page).toContain('readerProvenanceLocaleLabelV1(reading.readerCharacterIds, getUiLocale())');
     expect(page).toContain('readerBadgeSources.set(badge, reading.readerCharacterIds)');
     expect(page).toContain("if (allowsDevelopmentSajuSamples())");
-    expect(page).toContain('renderSajuReadingSamples(target, lifeFactsPayload)');
+    expect(page).not.toContain('renderSajuReadingSamples');
     expect(page).toContain('renderSajuReadingEmpty(target);');
   });
 
@@ -124,25 +114,8 @@ describe('Records Saju history surface', () => {
     expect(recordsUiLocale).toContain('완료된 Official Reading만 다시 열 수 있습니다.');
   });
 
-  it('recognizes only the explicit sample fixture contract and removes it from the Life Fact ledger', () => {
-    expect(page).toContain("const SAMPLE_SAJU_FACT_TYPE = 'sample_saju_reading_result';");
-    expect(page).toContain("const SAMPLE_SAJU_SCHEMA_VERSION = 'sample.v1';");
-    expect(page).toContain('fact.valueJsonb.sample === true');
-    expect(page).toContain("requireArray(payload, 'facts').filter((fact) => !isSampleSajuReadingFact(fact))");
-    expect(page).toContain("requireArray(lifeFactsPayload, 'facts').filter(isSampleSajuReadingFact)");
-  });
-
-  it('allows sample cards only on explicit loopback development hosts', () => {
-    expect(page).toContain("new Set(['localhost', '127.0.0.1', '::1', '[::1]'])");
-    expect(page).toContain('DEVELOPMENT_SAMPLE_HOSTS.has(window.location.hostname.toLowerCase())');
-    expect(page).not.toContain('myeongha.vercel.app');
-    expect(page).not.toContain('.vercel.app');
-  });
-
   it('keeps the fallback honest and never invents snapshot semantics or a score', () => {
-    expect(page).toContain("records-reading-card records-reading-card--sample");
-    expect(page).toContain("records-reading-badge', uiText('개발 샘플')");
-    expect(page).toContain('실제 Reading이 없을 때만 보이는 UI fixture');
+    expect(page).not.toContain('records-reading-card--sample');
     expect(page).toContain("empty.className = 'records-reading-empty'");
     expect(page).toContain('아직 저장된 사주 풀이가 없습니다.');
     expect(page).toContain("link.href = options.href ?? 'reading.html';");
@@ -152,7 +125,6 @@ describe('Records Saju history surface', () => {
     expect(page).not.toContain('value.score');
     expect(page).not.toContain('점수');
     expect(css).toContain('.records-reading-card');
-    expect(css).toContain('.records-reading-chip');
-    expect(css).toContain('.records-reading-highlights');
+
   });
 });
