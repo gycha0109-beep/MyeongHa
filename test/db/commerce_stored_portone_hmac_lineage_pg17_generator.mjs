@@ -127,6 +127,11 @@ begin
     or data_row."sourcePaidMinor" is distinct from '1'
     or data_row."receiptPaidMinor" is distinct from '1'
     or data_row."receiptCurrency" is distinct from 'KRW'
+    or data_row."receiptVerificationStatus" is distinct from 'verified'
+    or data_row."grantStatus" not in ('active','revoked','expired')
+    or data_row."grantRevision" !~ '^[0-9]+$'
+    or data_row."grantLastProviderOrderingKey" is not null
+    or data_row."eventProviderOrderingKey" is not null
     or data_row."providerPaymentId" is distinct from 'synthetic-hmac-b2-payment'
     or data_row."originalTransactionId" is distinct from 'tx-official-reader-b2'
     or data_row."sourceOrderingProven" is distinct from 'false'
