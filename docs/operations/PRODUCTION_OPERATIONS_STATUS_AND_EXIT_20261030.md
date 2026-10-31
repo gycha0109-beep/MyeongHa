@@ -10,6 +10,16 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 15:55 KST — Phase 7 Supabase Auth 실제 로컬 HTTP 장애 검증
+
+- **목적:** 아키텍처 §34의 Auth 불능 시 보호 요청 차단 및 독립 Health 유지 조건을 실제 로컬 TCP/HTTP에서 검증. Production Supabase 계정·DB·로그인 정보는 사용하지 않음.
+- **구현:** [`apps/api/src/supabase-auth-loopback-fault-phase7.test.ts`](../../apps/api/src/supabase-auth-loopback-fault-phase7.test.ts) 추가. 고정된 Production Supabase 호스트로 향하는 테스트 호출만 테스트 안에서 로컬 `127.0.0.1` 서버로 치환하여 503 응답, 잘못된 자격증명 401, 요청 제한 429, TCP 연결 거부를 각각 주입. 실서비스·실사용자에 대한 실패 주입 없음.
+- **검증 결과:** 신규 Vitest **4/4 PASS**, `npx tsc -p tsconfig.json --noEmit` **PASS**. 각 실패는 계약에 따른 `AUTH_UPSTREAM_UNAVAILABLE`/ `INVALID_CREDENTIALS`/ `RATE_LIMITED` 오류로 매핑, API `no-store`, 테스트 비밀번호·API 키·상류 오류 본문 비반사, 자동 재시도 없음, 독립 Cloudflare Worker `GET /api/health` 200 유지 확인.
+- **구현 경계:** 기존 Auth 제품 코드 자체는 변경하지 않음. Auth 느린 응답 5초 실제 종단 간 지연, PostgreSQL 연결 고갈·지연, Cloudflare Production 장애, DR Hosted Auth/Storage 복구, 실제 운영 알림/용량은 **미검증**. 따라서 Phase 7 전체/Phase 8/Phase 13 운영 수용 완료를 주장하지 않음.
+- **추적:** 작업 브랜치 `ops/phase7-auth-loopback-fault-worklog-20261031`; 로컬 테스트와 타입 검사 PASS. 후속 CI·PR 검증은 PR 체크 페이지에서 구분. **다음 작업:** DB 장애 및 요청/연결 지연 실증을 독립 격리 환경에서 수행.
+
+
+
 이 보고서는 최신 구현 상태뿐 아니라 **각 실행 세션의 실제 변경·실행 증거·남은 차단 항목을 누적**한다. 후속 운영 작업은 기존 기록을 덮어쓰거나 임의 완료율을 붙이지 않고, 날짜별로 **무엇을 바꾸었는지 / 어떤 실행이 PASS·FAIL인지 / 실제로 검증하지 않은 범위 / 관련 PR·CI / 다음 종료 작업**을 남긴다. PR의 GREEN은 해당 운영 항목의 Production 수용을 자동으로 의미하지 않는다.
 
 ### 2026-10-31 — Cloudflare Preview RED 실제 원인·1회 재시도 (PR #2783 후속)
