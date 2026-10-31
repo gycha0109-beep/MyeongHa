@@ -266,3 +266,9 @@ Watchtower-Track: security
 - **격리 검사:** `test/seyeon-security-s0-history-presence.e2e.test.ts`에 실제 PostgreSQL 17 연결 2개로 같은 Thread의 기존 Se-yeon 참여자 `UPDATE`가 원본 권한 읽기 종료 전에는 lock timeout으로 거부되고 종료 후에는 행 잠금을 얻는 시나리오를 추가했다. 기존 W22 신규 참여자 FK 잠금/원본 이력/타 Member 차단 검사는 보존한다.
 - **변경 파일:** `scripts/operations/seyeon-security-s0/08-historical-thread-presence.sql`, `test/seyeon-security-s0-history-presence.e2e.test.ts`, 동일 Worklog. 운영 DB·ACL·Provider·Reader·HTTP 공개 설정을 변경하지 않고 S0 격리 검증 소스만 수정한다.
 - **검증 및 남은 과제:** PostgreSQL 17 잠금 의미는 현재 공식 문서의 `FOR SHARE` 대 `FOR NO KEY UPDATE` 충돌 관계와 일치한다. `git diff --check` 확인 후 후속 CI에서 실제 성공 확인 필요. 이 잠금은 기존 참여자 변경/신규 참여자 동시성을 제한하는 G3 부분 구현으로, 권한 취소·과거 Replay·출처 원본 전체에 대한 종료 증거는 아니다. 운영 `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W24 — G3 Node 첫 응답 경로에서 Committed Replay 사전 차단
+
+- **목적/구현:** 실제 운영 HTTP의 `committed_replay` 재공개 HOLD는 이미 존재하지만, 격리된 Node 직접 소켓 전송 `deliverSeyeonCommittedFirstZeroNodeTurnV1`이 `replayed=true` 메타데이터만 표시하고 DB에 원본 답변을 다시 읽게 요청할 수 있었다. 새 G3 source-only 방어는 `execution.disposition=committed_replay` 또는 `committedTurn.replayed=true` 중 **하나라도 참이면** DB의 잠금 원문 조회 전에 소켓을 닫고 명시적 `REPLAY_HOLD` 오류를 반환한다. 이는 승인된 첫 응답 동작만 유지하며 새로운 Replay 승인은 생성하지 않는다.
+- **변경 파일:** `apps/api/src/seyeon-first-zero-node-turn-delivery-v1.ts`, `test/seyeon-first-zero-node-turn-delivery-v1.test.ts`, 동일 Worklog. 기존 Node 서버 응답 metadata와 Vercel Fetch / HTTP의 HOLD 정책은 그대로 유지한다.
+- **검증:** 기존 Node 전송 격리 단위 테스트에 (1) Replay 실행 disposition, (2) 실제 Commit 영수증 replay 플래그 두 사례를 추가했다. 두 경우 준비 DB 조회 이후 보호된 원본 답변을 읽는 SQL을 호출하지 않고 Response body를 비우며 소켓을 종료하는지 검증한다. 정적 diff 검사 확인; 새 HEAD CI로 테스트·타입·통합 결과를 확인하기 전 PASS라고 주장하지 않는다.
+- **선행/남은 작업:** 선행 #2809·#2812는 #2786 브랜치에 통합됐고 그 통합 HEAD의 필수 검사 GREEN 확인. #2786은 auto-merge 설정에도 `main` 병합 BLOCKED로 남아 있다. 아직 Reader 과거 본문·일반 Replay 권한·Proxy/Streaming·다중 원본·G4/G5/G6 승인/운영 종료는 HOLD. `HOLD_FORWARD_STOPPED` 유지.

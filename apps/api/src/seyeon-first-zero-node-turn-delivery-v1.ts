@@ -47,7 +47,7 @@ select exists(
 `.trim();
 
 export class SeyeonFirstZeroNodeTurnDeliveryErrorV1 extends Error {
-  constructor(readonly code: 'INVALID_SCOPE' | 'DB_NOT_READY' | 'INVALID_COMMIT') {
+  constructor(readonly code: 'INVALID_SCOPE' | 'DB_NOT_READY' | 'INVALID_COMMIT' | 'REPLAY_HOLD') {
     super('Seyeon first zero-source Node turn delivery is unavailable.');
     this.name = 'SeyeonFirstZeroNodeTurnDeliveryErrorV1';
   }
@@ -121,6 +121,12 @@ export async function deliverSeyeonCommittedFirstZeroNodeTurnV1(input: Readonly<
 }>): Promise<SeyeonNodeOriginalGrantSendOutcomeV1> {
   const { result } = input;
   const commit = result?.execution?.committedTurn;
+  // An already committed/replayed answer is not a new first Reveal.
+  // Never ask the DB to re-read original private text for a replay locator.
+  if (result?.execution?.disposition === 'committed_replay' || commit?.replayed === true) {
+    input.response.destroy();
+    throw new SeyeonFirstZeroNodeTurnDeliveryErrorV1('REPLAY_HOLD');
+  }
   if (!member(input.verifiedEvidence) ||
       !UUID.test(input.expectedThreadId) ||
       result.threadBinding.threadId !== input.expectedThreadId ||
