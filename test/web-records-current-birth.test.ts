@@ -39,7 +39,7 @@ describe('Web Records report-only page-scoped reads', () => {
     });
     const result = await runtime.readRecords();
     expect(result.readings).toEqual({ status: 'unavailable' });
-    expect(result.profile.profile.displayName).toBe('회원');
+    expect(result.profile).toMatchObject({ profile: { displayName: '회원' } });
     expect(result).not.toHaveProperty('lifeFacts');
   });
 
