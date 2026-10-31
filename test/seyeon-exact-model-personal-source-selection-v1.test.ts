@@ -66,6 +66,9 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
   it('holds the first-Memory scope before model dispatch when its original source is absent',()=>{
     const empty={retrievedMemories:[],sourceCandidates:[]};
     expect(selectSeyeonExactModelPersonalSourcesV1(empty).selectedPersonalRecordCount).toBe(0);
+    expect(selectSeyeonExactModelPersonalSourcesV1({...empty,requiredPersonalRecordCount:0}).selectedPersonalRecordCount).toBe(0);
+    expect(()=>selectSeyeonExactModelPersonalSourcesV1({retrievedMemories:[m1],sourceCandidates:[c1],requiredPersonalRecordCount:0}))
+      .toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
     expect(()=>selectSeyeonExactModelPersonalSourcesV1({...empty,requiredPersonalRecordCount:1}))
       .toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
     expect(selectSeyeonExactModelPersonalSourcesV1({retrievedMemories:[m1],sourceCandidates:[c1],

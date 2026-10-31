@@ -80,6 +80,8 @@ export default {
           :firstReplyRoute
             ?createCloudflareSeyeonFirstMemoryRuntimeV1({
               env,
+              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved
+                ? {zeroSourceFirstReplyApproved:true} : {}),
               ...(SEYEON_SECURITY_S0_PRODUCTION_V1.glmRendererApproved &&
                   typeof env?.OPENROUTER_API_KEY==='string' &&
                   env.OPENROUTER_API_KEY.trim().length>0
