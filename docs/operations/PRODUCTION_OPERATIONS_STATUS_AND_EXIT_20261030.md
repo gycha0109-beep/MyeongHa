@@ -10,6 +10,17 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 18:56 KST — Phase 10–11 격리 Worker Health 지연·동시 요청 계측
+
+- **목표:** [Production Operations 아키텍처 §28–29](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 기초 지연·제한된 동시 요청 측정을 기존 **루프백 전용 유틸**로 실제 수행. 실서비스 사용자의 요청이나 Production Worker/DB/Auth/Saju에 부하를 주지 않음.
+- **구현:** [`test/local-worker-health-capacity-phase10-11.test.ts`](../../test/local-worker-health-capacity-phase10-11.test.ts) 추가. 실제 소스의 `myeongha-worker.mjs` `GET /api/health`를 임의 `127.0.0.1` 포트의 Node HTTP 서버를 통해 호출. 기존 `collectLoopbackApiBaseline`(warmup 5 + 표본 50), `measureControlledLoopbackCapacity`(100건씩 동시 4개·8개)를 재사용하며 총 255개의 **로컬 진단 요청**으로 측정. 성공 응답 200, 실패 0, 설정된 동시 상한 이내인지 검증. 측정 서버는 테스트 종료 때 모든 연결을 닫고 종료함.
+- **실제 관측:** Windows Node 24 / Vitest 4.1.11의 **최종 재실행 PASS**, `tsc --noEmit` PASS. 마지막 실행에서 baseline p50 **0.569ms**, p95 **1.566ms**, p99 **2.677ms** (50개). 동시 4개·100건 모두 PASS, peak=4, 관측 **1,974.778req/s**, 성공 지연 p95 **2.685ms**. 동시 8개·100건 모두 PASS, peak=8, 관측 **1,883.399req/s**, 성공 지연 p95 **6.088ms**. 초기 계측도 전 건 성공했으나, 수치는 매 실행·PC 상태에 따라 달라지는 단일 실험값이며 서비스 SLO로 승인된 값이 아님.
+- **재현 환경 보정:** Worker 원본은 `.js`로 표시되는 TypeScript 소스를 테스트 번들러가 해석하므로 순수 Node 직접 실행은 모듈 경로 오류였음. 해당 임시 CLI를 채택하지 않고 기존 Vitest 환경에서 실행되는 테스트로 구현. 외부 워크트리의 `node_modules` Junction은 동일 패키지 타입의 중복 선언 오류를 유발해 제거하고, **독립 `npm ci`** 후 타입 검사 및 측정을 모두 통과시킴.
+- **명시적 수용 한계:** 이것은 **로컬·단순 Health 라우트의 마이크로 계측**일 뿐 Production web TTFB, API 사용자 경로 p95, DB/Auth/Saju 종단 지연, 실제 Cold start, 연결 풀·DB 포화 용량이나 Cloudflare Worker의 고객 트래픽 처리 한계를 입증하지 않음. `productionCapacityProven=false`, `realDbDependencyMeasured=false` 유지. Phase 10–12 전체 수용, Phase 13 Production Operations ACCEPTANCE, Phase 8 DR 준비 상태를 승격하지 않음.
+- **추적·후속:** 브랜치 `ops/phase10-11-loopback-worker-health-worklog-20261031`에서 동일 문서와 재현 가능한 테스트를 PR로 제출. 이후 운영 경계의 정당한 합성 데이터·격리 DB를 연결한 별도 실측 필요.
+
+
+
 ### 2026-10-31 — 기록 화면 Guest 401 브라우저 검증 경로 수정
 
 - **목적:** [브라우저 검증 #41178543614](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178543614)의 최초 실행 및 1회 실패 작업 재실행 모두에서 나타난 `Records ledger authoritative 401 did not invalidate the rejected Guest` 오류를 실제 호출·응답 경계 기준으로 재현하고 해결한다.
