@@ -97,6 +97,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
          to myeongha_api_executor;
       grant execute on function seyeon_private.qry_seyeon_planner_pre_model_source_v1(uuid,uuid,uuid,uuid,text,text)
         to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+        to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
         seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
