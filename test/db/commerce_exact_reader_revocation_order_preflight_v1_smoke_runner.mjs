@@ -43,12 +43,21 @@ const script=[
  'begin;',
  'alter table public.commerce_receipts add column verified_amount_minor bigint, add column verified_currency text;',
  'alter table public.entitlement_grants add column last_provider_ordering_key text;',
+ 'alter table public.commerce_provider_events add column verified_payload_jsonb jsonb;',
  `update public.commerce_receipts set verified_amount_minor=8900,
     verified_currency='KRW' where external_transaction_id in ('tx-a','tx-b');`,
  `update public.commerce_provider_events set
     event_type='Transaction.Cancelled',
     external_original_transaction_id='tx-a',
     provider_ordering_key=null
+    where id='${EVENT_A}'::uuid;`,
+ `update public.commerce_provider_events set verified_payload_jsonb=jsonb_build_object(
+    'schemaVersion','commerce-portone-cancellation-source-v2',
+    'matchingCancellationStatus','SUCCEEDED',
+    'cancellationIdHmac','hmac-sha256:k1:'||repeat('c',64),
+    'exactSucceededCancellationAmountMinor',8900,
+    'observedCumulativeCancelledAmountMinor',8900,
+    'originalReceiptPaidAmountMinor',8900,'currency','KRW')
     where id='${EVENT_A}'::uuid;`,
  checkExact(),
  `update public.commerce_provider_events set event_type='Transaction.PartialCancelled'

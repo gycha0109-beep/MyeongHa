@@ -58,6 +58,13 @@ function readback({kind='full',status=200}={}){
    currency:'KRW',channel:{type:'LIVE'},amount:{paid:8900,cancelled:3000},
    cancellations:[{id:CANCEL_ID,status:'SUCCEEDED',totalAmount:3000}],
   };
+ }else if(kind==='laterFull'){
+  payment={
+   id:PAYMENT_ID,transactionId:TX,status:'CANCELLED',version:'V2',
+   currency:'KRW',channel:{type:'LIVE'},amount:{paid:8900,cancelled:8900},
+   cancellations:[{id:CANCEL_ID,status:'SUCCEEDED',totalAmount:3000},
+    {id:'later-cancel',status:'SUCCEEDED',totalAmount:5900}],
+  };
  }else if(kind==='pending'){
   payment={
    id:PAYMENT_ID,transactionId:TX,status:'PAID',version:'V2',
@@ -139,7 +146,9 @@ describe('P4 PortOne cancellation canonical Provider Event private persistence c
   expect(sql).toContain('p_signed_event_hmac');
   expect(sql).toContain('p_readback_shape_hmac');
   expect(sql).toContain("v_event.provider_ordering_key is not null");
-  expect(sql).toContain("p_event_type,p_readback_kind");
+  expect(sql).toContain("p_event_type='Transaction.PartialCancelled'");
+  expect(sql).toContain('exactSucceededCancellationAmountMinor');
+  expect(sql).toContain('cancellationIdHmac');
   expect(sql).toContain('revoke all on function');
   expect(sql).not.toMatch(/update public\.entitlement_grants|insert into public\.entitlement_events|http_post/u);
  });
@@ -156,11 +165,12 @@ describe('P4 PortOne cancellation canonical Provider Event private persistence c
   expect(dbMutations(c)[0].args.slice(0,5)).toEqual([
    PAYMENT_ID,'webhook-id-123','Transaction.Cancelled',TX,'full_cancel_shape_observed',
   ]);
-  for(const arg of dbMutations(c)[0].args.slice(5)){
+  for(const arg of dbMutations(c)[0].args.slice(5,8)){
    expect(arg).toMatch(/^hmac-sha256:k1:[0-9a-f]{64}$/u);
    expect(arg).not.toContain('seyeon');
    expect(arg).not.toContain('rawBody');
   }
+  expect(dbMutations(c)[0].args.slice(8)).toEqual([8900,8900]);
   expect(c.queries.at(-1).sql).toBe('commit');
   expect(JSON.stringify(r)).not.toContain(PAYMENT_ID);
   expect(JSON.stringify(r)).not.toContain(TX);
@@ -223,17 +233,17 @@ describe('P4 PortOne cancellation canonical Provider Event private persistence c
  it('mismatched signed event type and provider final state cannot be persisted',async()=>{
   const c=db();
   const r=await execute(c,{request:signed('Transaction.PartialCancelled')});
-  expect(r.kind).toBe('unverified_cancellation_semantics');
+  expect(r.kind).toBe('unverified_exact_cancellation_amount');
   expect(dbMutations(c)).toHaveLength(0);
  });
  it('pending provider cancellation does not become finality from a signed final tag',async()=>{
   const c=db(),r=await execute(c,{fetchImpl:readback({kind:'pending'})});
-  expect(r.kind).toBe('unverified_cancellation_semantics');
+  expect(r.kind).toBe('unverified_exact_cancellation_amount');
   expect(dbMutations(c)).toHaveLength(0);
  });
  it('other provider cancellation ID cannot be substituted',async()=>{
   const c=db(),r=await execute(c,{fetchImpl:readback({kind:'otherCancellation'})});
-  expect(r.kind).toBe('unverified_cancellation_semantics');
+  expect(r.kind).toBe('unverified_exact_cancellation_amount');
   expect(dbMutations(c)).toHaveLength(0);
  });
  it('tampered signed provider transaction cannot use a different paid receipt',async()=>{
@@ -294,5 +304,59 @@ describe('P4 PortOne cancellation canonical Provider Event private persistence c
   expect(r.kind).toBe('source_fingerprint_authority_unavailable');
   expect(c.query).not.toHaveBeenCalled();
   expect(http).not.toHaveBeenCalled();
+ });
+});
+
+describe('canonical cancellation exact-amount source invariants',()=>{
+ it('requires a signed exact cancellation ID before Receipt lookup or PG GET',async()=>{
+  const c=db(),http=readback();
+  const r=await execute(c,{
+   request:signed('Transaction.Cancelled',{paymentId:PAYMENT_ID,transactionId:TX}),
+   fetchImpl:http,
+  });
+  expect(r.kind).toBe('exact_cancellation_id_required');
+  expect(c.query).not.toHaveBeenCalled();
+  expect(http).not.toHaveBeenCalled();
+ });
+ it('partial webhook replay after a later successful cancellation preserves exact amount/HMAC',async()=>{
+  const first=db(),later=db({persistRows:[{providerEventId:UUID,replayed:true}]});
+  const request=signed('Transaction.PartialCancelled');
+  const a=await execute(first,{request,fetchImpl:readback({kind:'partial'})});
+  const b=await execute(later,{request,fetchImpl:readback({kind:'laterFull'})});
+  expect(a.kind).toBe('canonical_event_recorded');
+  expect(b.kind).toBe('canonical_event_replayed');
+  const oldArgs=dbMutations(first)[0].args, newArgs=dbMutations(later)[0].args;
+  expect(oldArgs.slice(5,9)).toEqual(newArgs.slice(5,9));
+  expect(oldArgs.slice(8)).toEqual([3000,3000]);
+  expect(newArgs.slice(8)).toEqual([3000,8900]);
+  expect(a.refunded).toBe(false);
+  expect(b.grantRevoked).toBe(false);
+ });
+ it('full payment cancellation does not mislabel one individual 3000 refund as 8900',async()=>{
+  const c=db();
+  const r=await execute(c,{fetchImpl:readback({kind:'laterFull'})});
+  expect(r.kind).toBe('canonical_event_recorded');
+  expect(dbMutations(c)[0].args.slice(8)).toEqual([3000,8900]);
+  expect(r.refundExecutionAuthorized).toBe(false);
+ });
+ it('a forged provider adapter without a verified exact success amount cannot persist',async()=>{
+  const c=db();
+  const r=await execute(c,{
+   providerInspector:async input=>({
+    ...await inspect(input),
+    observedMatchingSucceededCancellationMinor:null,
+   }),
+  });
+  expect(r.kind).toBe('unverified_exact_cancellation_amount');
+  expect(dbMutations(c)).toHaveLength(0);
+ });
+ it('a signed partial event cannot treat a single full-payment cancellation as partial',async()=>{
+  const c=db();
+  const r=await execute(c,{
+   request:signed('Transaction.PartialCancelled'),
+   fetchImpl:readback({kind:'full'}),
+  });
+  expect(r.kind).toBe('unverified_exact_cancellation_amount');
+  expect(dbMutations(c)).toHaveLength(0);
  });
 });
