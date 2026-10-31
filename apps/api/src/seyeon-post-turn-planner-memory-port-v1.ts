@@ -32,7 +32,7 @@ export function createSeyeonPostTurnPlannerMemoryPortV1(input: Readonly<{
   approvedModelAndDbStage?: () => boolean | Promise<boolean>;
 }>): SeyeonPostTurnPlannerMemoryPortV1 {
   return Object.freeze({
-    propose: async ({committedTurn}) => {
+    propose: async ({ committedTurn }: Parameters<SeyeonPostTurnPlannerMemoryPortV1['propose']>[0]) => {
       // The underlying runner independently derives canonical Member Subject
       // inside its DB transaction and re-verifies exact original source rows.
       return runSeyeonPostTurnPlannerMemoryV1({
