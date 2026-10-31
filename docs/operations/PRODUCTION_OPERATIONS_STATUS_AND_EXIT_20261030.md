@@ -10,6 +10,16 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 21:31 KST — PR #2803 통합 CI RED 보정 및 최신 main 병합 충돌 해결
+
+- **실제 RED:** [통합 CI #41190779314](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41190779314) (최초 attempt 1)의 admission 실패는 `Integration requires the dedicated CI submission label event`. 이번 RED의 직접 원인은 **전용 `ci-integration-ready` 라벨 제출 이벤트가 아닌 PR 이벤트로 시작된 통합 CI**이며, 해당 커밋 `6a9fd49e`의 일반 CI·Web PR·Governance·Cloudflare Workers Builds는 모두 SUCCESS. 실패 작업을 단순 재실행해도 이벤트 유형이 바뀌지 않으므로 재실행만으로 해결할 수 없음.
+- **추가 진행 차단:** PR #2803은 최신 `main` 반영 전 `mergeable_state=dirty`로 확인. 동일 보고서의 상단 Worklog에 PR #2799의 **Phase 7 DB 실측 기록**과 PR #2803의 **Phase 10–11 Health 계측 기록**이 각각 추가되어 문서 병합 충돌이 발생했음. 이는 제품 코드 충돌이 아님.
+- **보정:** 기존 PR #2803 브랜치에 최신 `origin/main`을 병합하고 **두 Worklog 기록을 모두 보존**해 문서 충돌 해결. 다른 트랙의 최신 코드·문서도 본문을 변경하지 않고 그대로 병합. 충돌 마커 0건 및 `git diff --check` 확인.
+- **실제 로컬 재검증:** 최신 `main` 병합 후 `tsc -p tsconfig.json --noEmit` **PASS** 및 `npx vitest run test/local-worker-health-capacity-phase10-11.test.ts` **PASS**. 로컬 Worker Health 50개 기준 표본 p95 **1.113ms**, 동시 4개/8개 각각 100건 모두 200(실패 0), p95 각각 **3.283ms / 6.141ms**. 단일 개발 PC 계측으로 Production 용량·SLO 증거가 아님.
+- **재시도·종료 조건:** 보정한 새 HEAD의 일반 CI, Governance, Web PR 등 **필수 체크가 실제 SUCCESS인 것을 확인한 뒤** `ci-integration-ready` 전용 라벨 이벤트를 발생시켜 통합 검증 재제출. **신규 원격 CI·통합 결과 및 자동 병합은 완료 확인 전 성공으로 기록하지 않음.** Production DB/서비스/Cloudflare 설정 변경 없음. DR 및 운영 전체 수용 차단 유지.
+
+
+
 ### 2026-10-31 18:56 KST — Phase 10–11 격리 Worker Health 지연·동시 요청 계측
 
 - **목표:** [Production Operations 아키텍처 §28–29](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md)의 기초 지연·제한된 동시 요청 측정을 기존 **루프백 전용 유틸**로 실제 수행. 실서비스 사용자의 요청이나 Production Worker/DB/Auth/Saju에 부하를 주지 않음.
