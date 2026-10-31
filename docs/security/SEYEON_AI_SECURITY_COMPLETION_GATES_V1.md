@@ -299,3 +299,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **실 DB HTTP 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 합성 회원 인증을 사용하는 실제 Node HTTP GET, pending 제안 전달, 타 회원·비인증·타 Assistant 차단, 'discard' 후 재조회 503을 추가했다. 최신 HEAD CI 최종 결과는 별도 확인해야 하므로 이 기록에서는 PASS로 단정하지 않는다.
 - **남은 작업:** G0 원본 Grant/Record·파생 데이터의 현재 권한 정책, 실제 서비스 HTTP/Replay 경계 및 최종 수신 선형화, UC-07 운영 Route, G5/G6 실제 운영 전 검증. 'HOLD_FORWARD_STOPPED', PR #2761 Draft/병합 금지 유지.
 
+
+
+### 2026-11-01 · W16 · UC-06/07 실제 Node HTTP 조회→결정→재조회 격리 통합
+
+- **구현:** 'seyeon-planner-memory-decision-node-http-s0-v1.ts'는 앞서 구현된 GET pending 제안 S0 경로와 별도로, 검증된 Node IncomingMessage/ServerResponse에서 Member의 POST 네 가지 명시적 선택을 기존 UC-07 서버 결정 핸들러와 기존 Owner DB 결정 함수에 직접 연결한다. 원문, Summary, 임의 Grant/공유 대상은 HTTP에서 받지 않으며, 정상 DB 승인 결과도 제안 내용 없이 반환한다.
+- **실제 DB 경계:** 수락/폐기하는 **바로 그 회원 DB 트랜잭션 안**에서 이름이 맞는 격리 PostgreSQL DB만 통과한다. 운영 DB·Vercel Fetch·Workers Proxy는 공개 미마운트 및 S0 DB 이름 차단이다. 기본 Production Decision admission/Role ACL은 그대로 DENY이고 사용자/환경변수로 우회하지 못한다.
+- **실 HTTP 검증:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에서 진짜 Node 요청으로 pending GET → 인증 없는 POST 401 → 인증된 'discard' POST 200 → 재조회 503 → 결정 재요청 503 및 DB payload 삭제/Memory 생성 0건을 테스트한다. 기존 PostgreSQL 이중 트랜잭션 동시성 시험도 유지한다.
+- **상태:** 이 구현은 원본 Member에 의한 pending **Memory Proposal**의 선택과 재표시 제한에 국한한다. Chat Assistant 원문/과거 대화/모델의 개인기록/Grant G3 공개, G0 재승인 정책, G1·G2 양수 pin/commit 및 G5/G6 승인 충족이 아니다. 최신 HEAD 검증이 끝나기 전에는 GREEN 판정하지 않는다. PR #2761 Draft/병합 금지, 운영 개인정보·유료 Provider HOLD 유지.
+
