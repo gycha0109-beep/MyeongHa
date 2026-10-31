@@ -21,7 +21,7 @@ describe('G0 source completeness before any historical text release', () => {
   });
 
   it('rejects a derived relationship event if any original message reference fails to resolve', () => {
-    const source = sql('14-g0-relationship-event-original-lineage.sql');
+    const source = sql('21-relationship-origin-completeness.sql');
     expect(source).toContain('v_resolved_source_count:=0;');
     expect(source).toContain('v_resolved_source_count:=v_resolved_source_count+1;');
     expect(source).toContain('if v_resolved_source_count<>v_message_count then');
