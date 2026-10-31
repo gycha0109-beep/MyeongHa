@@ -10,6 +10,17 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 22:20 KST — Phase 7 DB 연결 장애 시 Records API HTTP 응답 실증
+
+- **작업 목적:** 아키텍처 §34의 DB unavailable/slow 시 실제 사용자용 HTTP 경계가 안전한 오류를 반환하고, 별도 core health가 계속 가능한지 확인. 운영 DB/실사용자 데이터/실서비스에 요청이나 장애 주입을 하지 않음.
+- **실제 구현:** [`test/cloudflare-records-db-fault-real-transport-phase7.test.mjs`](../../test/cloudflare-records-db-fault-real-transport-phase7.test.mjs) 추가. Cloudflare의 **실제 Records 요청 어댑터와 실제 소스 Records HTTP 런타임**을 통해 `GET /api/life-record`, `GET /api/readings`, `GET /api/memories` 3개 경로를 실행. 실제 Node `pg.Pool`은 임의 127.0.0.1 TCP 포트에 연결해 (1) TCP 연결 거부, (2) TCP 수락 후 PostgreSQL handshake 정지 두 조건을 재현. 각 요청은 연결 시도 1회, 정해진 연결 deadline 150ms 및 풀 종료 1회가 적용되는지 검증.
+- **통제된 가정:** 운영 인증·TLS/호스트 승인 과정에 실제 계정/인증서를 투입하지 않도록 테스트 환경에서는 **출처·DB 승인 preflight 및 요청 identity verifier만 합성 결과로 주입**. 실제 route handler, Records HTTP runtime, `pg.Pool` TCP 오류, 503 반환/헤더 처리 코드는 프로덕션 소스 그대로 사용. 따라서 실제 Hosted Auth, Cloudflare TLS/RLS 운영 승인, SQL 실행까지 증명하지 않음.
+- **실행 증거:** Node 24 / Vitest 4.1.11, 신규 실제 TCP 장애 **6/6 PASS**. 관련 Records API·HTTP/메서드 회귀 포함 **4파일 29/29 PASS** 및 `tsc -p tsconfig.json --noEmit` PASS. 두 조건 모두 각 API에서 HTTP **503** / `AUTH_UPSTREAM_UNAVAILABLE` / `Cache-Control: no-store`, 임의 연결 재시도 없음, pool close 1회, redirect/CORS/cookie/합성 DB 비밀·Bearer 비반사, **독립 `GET /api/health` 200** 확인. 테스트 실제 실행의 실패 처리 시간은 각 2초 이내. 서버와 소켓은 테스트 종료 때 닫음.
+- **미완료/경계:** 실제 DB schema SQL 지연, Worker strict TLS `verify-full` 및 Supabase Auth 호출, Production PostgreSQL 17, Hosted DB/사용자 데이터, API p95 및 장애 알림/DR 등은 `NOT_OBSERVED`. Phase 7 전체·Phase 13 운영 수용·DR readiness 승격 금지 (`dr_ready=false`, `serviceResumptionAllowed=false`).
+- **추적·다음:** 브랜치 `ops/phase7-records-db-api-failure-worklog-20261031`. 이번 변경의 GitHub PR·CI 결과는 별도 확인해 반영. 이후 §34의 구성·계약에 맞는 안전한 격리 DB 환경에서 TLS/RLS/권한 및 장애 경계 검증, Phase 10~12 운영 실측으로 연결.
+
+
+
 ### 2026-10-31 18:36 KST — Phase 7 격리 PostgreSQL 18 실제 SQL 지연·연결 고갈 실증
 
 - **구현:** [`scripts/operations/verify-postgres-isolated-chaos-phase7.mjs`](../../scripts/operations/verify-postgres-isolated-chaos-phase7.mjs) 추가. 로컬 `PG_BIN_DIR` 아래의 `initdb`/`pg_ctl`로 **매번 임시 데이터 디렉터리와 임의 127.0.0.1 포트에 별도 PostgreSQL 인스턴스**를 생성하고, 실제 Node `pg.Pool`로 SQL/연결 테스트. 인스턴스는 `finally`에서 종료하고 임시 디렉터리를 삭제. 기존 로컬 PostgreSQL 서비스 및 Hosted/Production DB 설정·데이터에 접근하지 않음.
