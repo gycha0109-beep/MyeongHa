@@ -225,3 +225,10 @@ Watchtower-Track: security
 - **원인/조치:** PostgreSQL 17 `SELECT FOR SHARE`는 SELECT 권한 외에 **UPDATE 행 보안 정책의 USING**도 통과해야 한다. `myeongha_seyeon_chat_runtime_owner`는 기존 subject-scoped SELECT RLS만 있고 UPDATE 정책이 없어 해당 원본 행이 숨겨졌다. 격리 SQL `16-g1-model-recent-source-pin.sql`에 **해당 NOLOGIN 소유자만** 현재 Subject의 행을 잠글 수 있는 UPDATE 정책을 추가했고 `WITH CHECK(false)`로 실제 UPDATE(동일 값 쓰기 포함)를 모두 거부한다. W16의 컬럼 한정 권한과 결합해서 행잠금만 가능하며 API/일반 역할 권한 및 public 실행 범위는 확대하지 않는다.
 - **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 본 Worklog.
 - **후속 검증/운영:** 이번 수정 HEAD의 S0 격리 PostgreSQL·security·browser CI 재실행 결과는 성공 확인 전 PASS로 추정하지 않는다. Cloudflare Workers 빌드는 이전 인증 토큰 실패와 별개로 다룬다. 운영 DB/ACL/Provider/HTTP 공개 변경 없음; `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-10-31 / W18 — #2786 Cloudflare Workers Builds 인증 RED 보정과 단독 재시도
+
+- **증거:** [Cloudflare 빌드 3d3a382b-1e34-40ff-b521-860d165ad1b2](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/3d3a382b-1e34-40ff-b521-860d165ad1b2)는 대상 HEAD `4864e397a1303b812bbdb0755f581c45fda539e9`에서 `npm run build:web` 성공 후 `npx wrangler preview`의 API 인증 오류 `10000`, `Invalid access token 9109`로 RED 확정.
+- **원인 및 변경:** 동일 Worker의 다른 보안 브랜치 프리뷰 빌드가 새 토큰 `Workers Builds - 2026-10-31 16:30`으로 성공한 것을 확인했다. #2786 전용 빌드 트리거 `4ac94015-8944-4b39-847a-679856c679e4`의 `build_token_uuid`만 새 토큰 `75190e92-211a-45fc-86e5-21d08753da41`로 갱신했다. Branch filter·빌드·Preview 명령·운영 배포 설정은 변경하지 않았다.
+- **재시도:** Cloudflare API에서 동일 HEAD로 빌드 `294a573a-d5e8-467e-a95e-1b68e7cd96c9`를 수동 생성했으며 최초 상태 `queued`를 확인했다. 최종 성공·GitHub PR check 갱신은 아직 확정하지 않는다.
+- **남은 범위/운영:** #2786 GitHub PostgreSQL/Security/Browser 검증과 새로운 Cloudflare 빌드 결과, main 병합 확인 필요. 운영 `HOLD_FORWARD_STOPPED` 유지; Production DB/ACL/Provider/public Reveal 활성화 없음.
