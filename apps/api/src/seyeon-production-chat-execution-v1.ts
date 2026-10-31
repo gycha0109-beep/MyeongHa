@@ -274,7 +274,7 @@ extends BaseProductionSliceInputV1 {
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   /** Only the existing verified Subject runner may supply this Owner port. */
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
-  readonly requiredPersonalRecordCount?: 1;
+  readonly requiredPersonalRecordCount?: 0 | 1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;

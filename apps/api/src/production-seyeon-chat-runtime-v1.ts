@@ -191,7 +191,7 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
    * DB registry, G1/G2 and current-rights Reveal remain independent guards.
    */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
-  readonly requiredPersonalRecordCount?: 1;
+  readonly requiredPersonalRecordCount?: 0 | 1;
 }
 
 function text(value: string, path: string, max: number): string {

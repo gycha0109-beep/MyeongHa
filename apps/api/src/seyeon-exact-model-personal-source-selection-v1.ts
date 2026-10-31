@@ -110,7 +110,8 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
   readonly retrievedMemories: readonly SeyeonRetrievedMemoryV2[];
   readonly maxRetrievedMemories?: number;
   /** Server-owned first-Memory constraint; never a client/model capability. */
-  readonly requiredPersonalRecordCount?: 1;
+  /** Exact server policy: 0 for first zero-source, 1 for Positive S0. */
+  readonly requiredPersonalRecordCount?: 0 | 1;
   readonly sourceCandidates: readonly SeyeonPersonalRecordProjectionCandidateV1[];
 }): SeyeonExactModelPersonalSourceSelectionV1 {
   if (!Array.isArray(input.retrievedMemories) ||
@@ -200,7 +201,7 @@ export function selectSeyeonExactModelPersonalSourcesV1(input: {
   }
 
   if(input.requiredPersonalRecordCount!==undefined&&
-     (input.requiredPersonalRecordCount!==1||selectedSources.length!==1)){
+     (selectedSources.length!==input.requiredPersonalRecordCount)){
     throw new SeyeonExactModelPersonalSourceSelectionHoldV1();
   }
 

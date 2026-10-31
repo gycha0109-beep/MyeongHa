@@ -22,7 +22,9 @@ export function createProductionSeyeonFirstMemoryFetchRuntimeV1(
       if(command!==null)return command;
       return handleSeyeonFirstPositiveMemoryFetchV1({request,requestId,serverTime,
         pool:execution.pool,identityEvidenceVerifier:execution.identityEvidenceVerifier,
-        runtime:execution.runtime});
+        runtime:execution.runtime,
+        ...(input.zeroSourceFirstReplyApproved===true ? {zeroSourceFirstReplyApproved:true as const}:{}),
+      });
     },
     close(){return execution.close();},
   });

@@ -34,6 +34,8 @@ export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
   readonly governorApproval?: SeyeonProductionChatGovernorApprovalV1;
   /** Server-approved certified GLM reservation policy. Never derived from client/env flag. */
   readonly glmRendererGovernor?: SeyeonAiGovernorAdmissionV1;
+  /** Explicit server-approved first-turn zero-source path. */
+  readonly zeroSourceFirstReplyApproved?: true;
 }
 
 /**
@@ -83,7 +85,7 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
       }
       const runtime = createProductionSeyeonChatRuntimeV1({
         databaseConfig: config, pool: lease.pool,
-        requiredPersonalRecordCount:1,
+        requiredPersonalRecordCount:input.zeroSourceFirstReplyApproved===true?0:1,
         providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
         governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
         ...(input.glmRendererGovernor === undefined ? {} : {

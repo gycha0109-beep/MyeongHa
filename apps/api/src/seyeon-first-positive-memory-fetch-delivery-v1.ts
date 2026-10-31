@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import { preflightSeyeonChatTurnSendRequestV1 } from './chat-turn-send-http.js';
 import { createSeyeonCloudflareStaticPreflightDenialV1 } from './seyeon-cloudflare-offline-reveal-fence-v1.js';
+import {assertSeyeonZeroSourceHttpReceiptReadyV1, SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from './seyeon-zero-source-http-receipt-ready-v1.js';
 import { executePostgresSubjectTransactionV1, type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { ProductionSeyeonChatRuntimeV1 } from './production-seyeon-chat-runtime-v1.js';
 
@@ -76,6 +77,8 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   pool: PostgresSubjectPoolV1;
   runtime: Pick<ProductionSeyeonChatRuntimeV1,'run'>;
+  /** Server policy only; never selected by a browser parameter. */
+  zeroSourceFirstReplyApproved?: true;
 }>): Promise<Response> {
   const held=()=>holdSeyeonReceiptHttpV1(input.requestId);
   try {
@@ -83,10 +86,16 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     if(preflight.kind==='denied')return preflight.response;
     if(input.request.headers.get(SEYEON_POSITIVE_DELIVERY_RECEIPT_HEADER_V1)!=='v1' ||
        input.request.signal.aborted)return held();
+    const zeroSource=input.zeroSourceFirstReplyApproved===true;
     // Receipt HTTP requires G1/G2 and its own issuer, never EXECUTE on the
     // old Node sender. Production leaves that unreceipted RPC revoked.
     await executePostgresSubjectTransactionV1({pool:input.pool,
       verifiedEvidence:preflight.verifiedEvidence,execute:async({client})=>{
+        if(zeroSource){
+          await assertSeyeonZeroSourceHttpReceiptReadyV1(client);
+          await assertSeyeonG0OriginalLineageReadyV1(client);
+          return;
+        }
         const r=await client.query<{ready:boolean}>(`select count(*)=5 as ready
           from pg_catalog.pg_proc p where p.oid in(to_regprocedure($1),to_regprocedure($2),to_regprocedure($3),
             to_regprocedure($4),to_regprocedure($5))
@@ -127,7 +136,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         if(resolvedSubject.subjectKind!=='member'||resolvedSubject.subjectId!==result.subjectId||
            input.request.signal.aborted)throw Error('Original Subject unavailable');
         const r=await client.query<{assistantText:unknown}>(`select assistant_text as "assistantText"
-          from public.cmd_issue_seyeon_positive_first_reply_v1(
+          from ${zeroSource ? SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1 : 'public.cmd_issue_seyeon_positive_first_reply_v1'}(
             $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text,$9::bytea)`,[
           resolvedSubject.subjectId,preflight.threadId,e.committedTurn.turnId,e.committedTurn.attemptId,
           e.receivedTurn.userMessageId,e.committedTurn.assistantMessageId,
