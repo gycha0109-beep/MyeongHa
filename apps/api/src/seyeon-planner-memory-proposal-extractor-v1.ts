@@ -17,7 +17,7 @@ const CONTROL = /[\u0000-\u001f\u007f]/u;
 // language guard only suppresses proposals; it never grants consent or
 // deletes an existing Memory. An ambiguous instruction is safer as 'none'.
 const EXPLICIT_NO_MEMORY = [
-  /(?:기억|저장|기록)(?:하|해두)?지\s*마/iu,
+  /(?:기억|저장|기록)(?:하|해두)?지\s*(?:마|말아)/iu,
   /(?:기억|저장|기록)\s*(?:하지|해두지)\s*마/iu,
   /(?:기억|저장|기록)(?:해두)?\s*두지\s*마/iu,
   /(?:do\s+not|don't|dont)\s+(?:remember|save|store|record)\b/iu,
