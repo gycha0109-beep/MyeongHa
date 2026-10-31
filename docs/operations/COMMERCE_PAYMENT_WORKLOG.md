@@ -109,3 +109,11 @@
 - **실패 원인:** [PR #2811 초기 일반 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41212139498)의 `db-authority-core`는 PostgreSQL **15.19**에서 실행되었지만 새 후보는 PostgreSQL **17 전용**으로 제한돼 있었습니다. `DENY: ... got 150019`에서 실패. 이전 코드의 실제 PG17 실행 실패가 아니라 테스트 연결 대상 오류입니다.
 - **조치:** PostgreSQL 15 `run_authority_core.sh`에 추가했던 검사를 제거하고, `scripts/ci/db-suites.json`의 `postgres17` 그룹 및 `test/db/run_ci_case.sh`의 전용 실행 항목에 등록했습니다. CI PostgreSQL 17·격리 DB 검사와 기존 마이그레이션 적용을 유지합니다.
 - **검증:** 기존 일반 DB finalizer 기본 실행 절차는 변경하지 않고, 새 테스트는 PG17 전용 그룹에서만 실행하도록 계약 검사·Bash 구문 검사를 수정했습니다. **수정한 실제 PG17 통합 CI 결과는 아직 미확인**입니다.
+
+### 2026-10-31 — PortOne 취소 ID HMAC 기반 최신 GET 재확인
+
+- **기준 브랜치:** `feat/commerce-payment/portone-cancel-hmac-recheck-20261031`. 개인정보 삭제 전체 PG17 증거는 별도 PR #2811에서 필수 CI 진행 중이며 자동 병합 조건에 따릅니다.
+- **실제 구현:** 최소화된 기존 취소 Provider Event의 `cancellationIdHmac`로 인증된 PortOne GET에 있는 정확한 취소 ID를 일시적으로 재식별하고, 기존 개별 SUCCEEDED 금액/누적 금액 분류기에 연결하는 read-only 서버 후보. 원본 취소 ID나 API/HMAC secret을 보관하거나 결과에 반환하지 않습니다.
+- **검증:** 관련 Vitest 8개 파일 **172건 PASS**, 타입 검사·빌드 PASS. 지문 불일치/다른 Payment ID/부분 취소 누적/REQUESTED·FAILED/중복 취소 ID를 안전하게 처리함을 검증했습니다.
+- **배포 경계:** 환불 POST/권한 회수/LIVE 결제/공개 웹훅 미활성. HMAC 일치는 최신 상태 확인 수단일 뿐 Provider 순서나 법적 환불·Reader R2/T2 권한 회수 승인이 아닙니다.
+- **상세:** `docs/operations/COMMERCE_P4_PORTONE_CANCELLATION_HMAC_RECHECK_V1.md`.
