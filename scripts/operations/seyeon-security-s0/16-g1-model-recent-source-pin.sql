@@ -82,7 +82,8 @@ begin
 
   for v_item in select value from jsonb_array_elements(p_selected) loop
     if jsonb_typeof(v_item) is distinct from 'object'
-      or (select count(*) from jsonb_object_keys(v_item))<>3
+      or (select count(*) from jsonb_object_keys(v_item))<>4
+      or jsonb_typeof(v_item->'text') is distinct from 'string'
       or v_item->>'messageId' is null
       or v_item->>'role' not in ('user','assistant')
       or (v_item->>'selectedModelMessageDigest')
@@ -101,7 +102,8 @@ begin
       and m.subject_id=p_subject_id and m.thread_id=p_thread_id
       and m.redacted_at is null and m.body_text is not null
     for share of m;
-    if not found or v_message.sequence_no<=v_previous_sequence
+    if not found or v_message.body_text is distinct from v_item->>'text'
+      or v_message.sequence_no<=v_previous_sequence
       or v_message.content_hash is null then
       raise exception using errcode='42501',
         message='G1 recent source ordering or DB origin invalid';

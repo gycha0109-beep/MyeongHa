@@ -128,3 +128,12 @@ Watchtower-Track: security
 - **기존 PR #2786 상태:** HEAD `37a6114` 기준 CI/Governance/Web PASS, 별도 Web Auth Browser Regression 실패 (Records Guest 401 처리). [브라우저 검사 재실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41028133827) 요청, 독립 판정 전 완료 추정 금지.
 - **남은 것/다음:** #2786 필수 CI/Integration 병합, G1 실제 모델 전 호출 경로에 전용 원본 Pin 결합 및 G2/G3 출처 계약 확대, Reader/인용 출처, 일반 credit 및 G5/G6 운영 실증. 기존 Memory 1건·과거/관계 0건 production positive 제한 해제 금지.
 - **운영 상태:** `HOLD_FORWARD_STOPPED`. 운영 DB·ACL·Provider·HTTP 공개·credit 변경 없음.
+
+
+### 2026-10-31 / W06 — G1 출처 증명에 모델 실제 본문·DB 원본 동일성 결속 (PR #2789 후속)
+
+- **목적/구현:** 최초 G1 recent-source DB Pin 소스의 검증을 강화. 서버는 기존 모델 Context와 동일한 최근 메시지 선택 규칙을 재실행하여 원래 선택된 각 messageId·role·본문과 digest를 대조한다. DB 소스 함수는 Caller가 전달한 모델 본문과 DB의 실제 비삭제 원문을 같은 권한 트랜잭션에서 정확히 비교한 뒤에만 원본 메시지 증명서를 Attempt에 불변 저장한다. DB 반환 증명서의 각 메시지 ID/role/본문 digest도 서버에서 검사한다. 본문 문자열은 Pin 증명서에 보관하지 않는다.
+- **변경 파일:** `apps/api/src/seyeon-g1-model-recent-source-db-pin-v1.ts`, `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 이 Worklog. 기존 1건 Memory 양수 권한 및 G2/G3/운영 ACL은 확대하지 않았다.
+- **검사 실패 및 수정:** [PR #2789 기본 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178482988)에서 신규 어댑터의 TypeScript nullable 타입 오류가 확인되어 후속 코드에서 수정했다. 동일 CI의 PostgreSQL suite에 포함된 `saju-abuse-admission-attack-e2e`, `saju-official-records-http-e2e` 실패는 신규 Pin 직접 실패로 확인되지 않았으므로 이 작업의 PASS로 추정하지 않는다. 후속 HEAD CI 결과는 실행 후 별도 확정한다.
+- **계속 미완료:** 이 함수는 S0 소스/어댑터이며 실제 모델 호출 Runner에 아직 연결되지 않았다. DB 설치·원본 Pin과 기존 personal positiveProof의 원자적 결합·G2 Commit·G3 공개 시점 검증·실DB 실증도 완료가 아니다. [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) 선행 브라우저 테스트 실패는 별도 유지.
+- **다음:** 검증된 후속 CI를 확인하고 모델 호출 전 서버 실행 경로에 하나의 DB-Owner 승인된 Pin으로 실제 연결. 운영 `HOLD_FORWARD_STOPPED` 유지.
