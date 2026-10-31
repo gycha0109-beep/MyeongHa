@@ -4,14 +4,22 @@
 -- authorization. This RPC neither creates nor substitutes a Grant.
 begin;
 
-grant myeongha_seyeon_chat_runtime_owner to current_user;
-grant create on schema seyeon_private to myeongha_seyeon_chat_runtime_owner;
+-- The new replay function must not impersonate the metadata-only runtime
+-- owner when reading protected message bodies. Match the restricted S0 first
+-- reveal's existing PostgreSQL owner authority; never grant direct API read.
+do $s0_replay_owner$
+begin
+  if current_user <> 'postgres' then
+    raise exception 'Isolated original Assistant replay requires the reviewed PostgreSQL owner';
+  end if;
+end
+$s0_replay_owner$;
 
 create function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
   p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid
 ) returns table(assistant_text text)
 language plpgsql security definer
-set search_path=pg_catalog,public
+set search_path=pg_catalog,public set row_security=off
 as $replay$
 declare
   v_text text;
@@ -93,16 +101,11 @@ begin
 end
 $replay$;
 
-alter function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
-  owner to myeongha_seyeon_chat_runtime_owner;
-revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
-revoke myeongha_seyeon_chat_runtime_owner from current_user;
-
+-- Keep the creator, postgres, as the SECURITY DEFINER owner. The
+-- metadata-only runtime owner is deliberately not granted this read.
 revoke all on function
   seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
 from public,anon,authenticated,service_role,myeongha_api_executor;
-grant execute on function
-  seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
-to myeongha_seyeon_chat_runtime_owner;
-
+-- Test-only API EXECUTE is issued separately by the disposable fixture.
+-- No general runtime, browser, or public API role gains this RPC.
 commit;
