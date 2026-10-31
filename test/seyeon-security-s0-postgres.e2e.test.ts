@@ -1154,8 +1154,14 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     // Before testing the socket, prove the DB-authoritative replay row is
     // eligible. A failing expectation here identifies a SQL authority gap
     // rather than misdiagnosing the 503 as a transport error.
-    const replayRows=await f.run(async({client})=>{
-      const metadata=await client.query(`select t.state,t.delivered_at is not null as "deliveredAt",
+    const diagnosticClient=await pool.connect();
+    let replayRows;
+    try{
+      await diagnosticClient.query('BEGIN');
+      await diagnosticClient.query(
+        "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+      );
+      const metadata=await diagnosticClient.query(`select t.state,t.delivered_at is not null as "deliveredAt",
         a.seyeon_positive_delivery_issued_at is null as "noIssuedReceipt",
         m.body_text=a.generated_body_text as "sameOriginalText",
         c.left_at is null as "participantCurrent"
@@ -1164,16 +1170,19 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         join public.chat_turn_attempts a on a.id=t.committed_attempt_id
         join public.conversation_thread_characters c on c.id=m.thread_character_id
         where m.id=$1`,[f.assistant]);
-      const lineage=await client.query(
+      const lineage=await diagnosticClient.query(
         'select seyeon_private.assert_current_original_assistant_lineage_v1($1::uuid,$2::uuid,$3::uuid)',
         [f.subject,f.thread,f.assistant],
       );
-      const rows=await client.query(
+      const rows=await diagnosticClient.query(
         'select assistant_text as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1($1::uuid,$2::uuid,$3::uuid)',
         [f.subject,f.thread,f.assistant],
       );
-      return {metadata:metadata.rows,lineageRows:lineage.rows.length,replay:rows.rows};
-    });
+      replayRows={metadata:metadata.rows,lineageRows:lineage.rows.length,replay:rows.rows};
+    }finally{
+      await diagnosticClient.query('ROLLBACK');
+      diagnosticClient.release();
+    }
     expect(replayRows).toEqual({
       metadata:[{state:'delivered',deliveredAt:true,noIssuedReceipt:true,
         sameOriginalText:true,participantCurrent:true}],
