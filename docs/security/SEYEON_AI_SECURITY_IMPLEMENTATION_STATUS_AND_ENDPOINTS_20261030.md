@@ -299,6 +299,15 @@ Watchtower-Track: security
 - **구현:** positive Memory Commit 분기에 현재 User 원본 G1 Pin을 의무화했다. 없으면 `seyeon_positive_g2_recent_source_pin_required`로 해당 Commit 트랜잭션을 실패시키고, 기존 SQL trigger의 동일 DB 트랜잭션 안에서 User 본문·원본 해시/Grant/Memory 정합성 검사와 assistant/outbox 원자성을 유지한다. 0건 비개인정보 Commit·다른 앱 운영 함수·공개 범위 변경 없음.
 - **PostgreSQL 검증:** 기존 S0 disposable PostgreSQL 17 통합 테스트의 positive 정상 fixture는 최근 User 원본을 G1으로 먼저 고정하도록 갱신했다. 신규 부정 케이스는 구형 Memory-only Pin을 강제로 생성해 G2 Commit 거부 및 validated Attempt 상태 유지와 assistant 메시지 생성 0건을 검증한다. CI 통과 전 결과 PASS 아님.
 - **변경:** `02-atomic-commit.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 누적 보안 Worklog. `git diff --check`와 `plan.mjs`의 `installerMayActivateProduction=false` 확인. Production DB/ACL/Provider/HTTP/Reader 활성화 없음. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-01 / W29 — G3 내부 Node 송신 함수의 Replay 직접 호출 차단 (source-only)
+
+- **독립 작업:** G2 최근 User Pin 필수화 #2823의 PostgreSQL 17 CI가 실행 중이어서 별도의 G3 전송 경계를 구현했다. 부모는 CI GREEN으로 확인된 #2786 통합 HEAD `a443d34983eac7c71eceeaf163a16c980b327647`이며 운영 병합·활성화는 별도다.
+- **발견:** 상위 `deliverSeyeonCommittedFirstZeroNodeTurnV1`은 이미 `committed_replay`와 `commit.replayed=true`를 차단하지만, 재사용 가능한 하위 `sendSeyeonNodeOriginalGrantResponseV1`은 전달 받은 `chatResponseMetadata.replayed=true`를 단순 출력 메타데이터로 취급했다. 직접 호출 시 DB 원문 조회 경로가 실행될 가능성이 있어 소켓 경계 자체에도 Replay 인가 차단이 필요했다.
+- **구현:** Node 응답 송신 전 메타데이터가 유효하더라도 `replayed=true`이면 `SeyeonNodeOriginalGrantSendBoundaryErrorV1`을 발생시키고 소켓을 파기한다. DB 원본 읽기 callback/Provider 호출/본문 송신은 실행되지 않는다. 0건·정상 최초 응답·권한 없음 503 동작 및 비스트리밍 유지. 기존 HTTP/Reader·Provider/ACL/DB 설정 변경 없음.
+- **검증:** 실 Node 송신 경계 단위 테스트에 `replayed=true` 시 소켓 파기와 DB 읽기 0회를 검증하는 케이스를 추가하고, 기존 권한 없음 503 검사는 처음 요청인 `replayed=false`에 대한 거부로 유지했다. `git diff --check` 확인. 새 CI GREEN 전까지 결과 PASS는 미확정.
+- **범위:** G3 source-only 후보, 실 Production Route 공개하지 않음; 전체 개인기록/과거 Replay 승인하지 않음. `HOLD_FORWARD_STOPPED` 유지.
+
 ### 2026-11-01 / W30 — G3 최초 공개에 원본 User G1 Pin 필수화 (source-only)
 
 - **선행:** #2823(PostgreSQL 17/보안/Governance GREEN)을 부모 #2786에 squash 병합(`8f9d36ff92d113bc437740d72893989c712b1a3d`). #2824는 W28/W29 동일 Worklog의 충돌을 해소하고 병합 커밋 `f92ea00f`를 별도 PR HEAD로 재검증 중이다.
