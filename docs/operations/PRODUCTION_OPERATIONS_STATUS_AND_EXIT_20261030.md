@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 8 실제 Supabase Production migration 이력 읽기 전용 대조
+
+- **검증 경계:** 명하 Production Supabase `MyengHa` project ref `cnsfpcdiyofqvhpcegfc`의 `list_migrations` 읽기 전용 조회를 현장 수행. 비교 저장소는 GitHub `main` `cbef94d1d8c6fcbb9d9c6d2e798a6431fe0af0fd`의 `supabase/migrations/*.sql`; 파일을 변경하지 않았다. 버전 문자열의 **정확 일치 여부만** 비교했으며 실제 적용 SQL/DDL/ACL/checksum 동등성 검증이 아니다.
+- **실측:** 원격 적용 이력 **226개**, 저장소 SQL 파일 **217개**, 버전 일치 **200개**, 원격에만 존재하는 버전 **26개**, 저장소에만 존재하는 버전 **17개**. 원격 최신 `20261031182926` (`s0_g0_relationship_original_lineage_scoped_owner_grant_20261101`); 저장소의 파일명 기준 최신 버전 `20261029185500`. 여러 다른 개발 트랙의 최신 변경이 포함될 수 있으므로 무단 정리·재배열 금지.
+- **미해결 핵심:** 원격 전용 `20261008090417` (`seyeon_runtime_1460_1510_acl_before_owner_recovery`) 여전. 동일 논리 이름 `owner_kcp_sandbox_remove_daily_limit_v1`도 원격 `20261029012948`과 저장소 `20261029012000`으로 **버전 불일치**. 최신 Admin/보안 원격 버전은 저장소 파일에 없으며, 저장소의 최신 공식 사주 발급 migration 파일은 원격 적용 목록에서 확인되지 않았다.
+- **판정 및 행동:** #1887 **OPEN**, `dr_ready=false`, `serviceResumptionAllowed=false` 유지. **Migration repair/revert/apply, Production DDL, DB 사용자·권한·데이터 변경 없음.** 각 불일치 버전의 원본·적용 SQL·DDL/checksum·승인/배포 귀속을 확인한 뒤에만 안전한 forward-only 정합화를 검토하고, 그 이후 최신 백업/격리 복원을 재실행한다. 단순 이름 유사성으로 동등성 확정 또는 DR 출시 승인 금지.
+
+
 ### 2026-11-01 KST — Phase 13 최신 Cloudflare 실제 배포 100% 및 익명·Member/DB/Saju E2E 수용 증거 갱신
 
 - **실제 Provider 버전(독립 조회):** Cloudflare Workers `myeongha` 배포 API GET의 최신 배포 `4b583e11-0aa4-458b-b490-fa0f603df6af`, 2026-10-31T18:17:04Z, 활성 버전 `7e18da4b-4374-449d-8fd0-133bc6541244` 100% 확인. E2E 이후 동일 버전 100%를 재조회했다. 이는 GitHub `main` SHA 또는 전체 의존성/배포 아티팩트 동등성의 증거가 아니다.
