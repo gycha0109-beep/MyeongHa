@@ -23,6 +23,7 @@ import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgr
 import { handleSeyeonPendingPlannerNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-http-s0-v1.js';
 import { handleSeyeonPlannerDecisionNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-node-http-s0-v1.js';
 import { handleSeyeonFirstOriginalAssistantReplayNodeS0V1 } from '../apps/api/src/seyeon-first-original-assistant-replay-node-s0-v1.js';
+import { handleSeyeonFirstOriginalDialoguePairNodeS0V1 } from '../apps/api/src/seyeon-first-original-dialogue-pair-node-s0-v1.js';
 import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
 import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
@@ -98,6 +99,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       grant execute on function seyeon_private.qry_seyeon_planner_pre_model_source_v1(uuid,uuid,uuid,uuid,text,text)
         to myeongha_api_executor;
       grant execute on function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(uuid,uuid,uuid)
         to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
@@ -1218,6 +1221,39 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(second.status).toBe(200);
     expect(second.body).toContain(f.assistantText);
 
+    // A distinct, still-unmounted direct Node path combines the exact
+    // Member-authored first User with this same original-Grant-locked reply.
+    const sendPair=async(evidence:typeof f.evidence,authorized=true)=>{
+      const server=createServer((incoming,response)=>{
+        void handleSeyeonFirstOriginalDialoguePairNodeS0V1({
+          incoming,response,pool:subjectPool,requestId:'original-pair-216',
+          identityEvidenceVerifier:{verifyRequestIdentity:async(request)=>
+            authorized && request.headers.get('authorization')==='Bearer synthetic-member'
+              ?evidence:null},
+        });
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-pair/${f.assistant}`,{
+          headers:authorized?{Authorization:'Bearer synthetic-member'}:{},
+        });
+        return {status:response.status,body:await response.text()};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+    const firstPair=await sendPair(f.evidence);
+    expect(firstPair.status).toBe(200);
+    expect(JSON.parse(firstPair.body).data).toMatchObject({
+      threadId:f.thread,userMessageId:f.user,userText:f.userText,
+      assistantMessageId:f.assistant,assistantText:f.assistantText,
+    });
+    expect((await sendPair(other.evidence)).status).toBe(503);
+    const unverifiedPair=await sendPair(f.evidence,false);
+    expect(unverifiedPair.status).toBe(401);
+    expect(unverifiedPair.body).not.toContain(f.userText);
+
     const unverified=await send(f.evidence,f.assistant,false);
     expect(unverified.status).toBe(401);
     expect(unverified.body).not.toContain(f.assistantText);
@@ -1232,6 +1268,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const withdrawn=await send(f.evidence);
     expect(withdrawn.status).toBe(503);
     expect(withdrawn.body).not.toContain(f.assistantText);
+    const withdrawnPair=await sendPair(f.evidence);
+    expect(withdrawnPair.status).toBe(503);
+    expect(withdrawnPair.body).not.toContain(f.userText);
+    expect(withdrawnPair.body).not.toContain(f.assistantText);
 
     // Reconsent issues a distinct Grant; it must never revive this Attempt.
     await pool.query(`insert into public.record_access_grants(
@@ -1241,6 +1281,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const newlyGranted=await send(f.evidence);
     expect(newlyGranted.status).toBe(503);
     expect(newlyGranted.body).not.toContain(f.assistantText);
+    const regrantedPair=await sendPair(f.evidence);
+    expect(regrantedPair.status).toBe(503);
+    expect(regrantedPair.body).not.toContain(f.userText);
   });
 
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
