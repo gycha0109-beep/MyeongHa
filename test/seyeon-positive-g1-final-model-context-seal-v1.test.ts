@@ -13,6 +13,7 @@ import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/se
 import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
 import {
   assertSeyeonPositiveG1FinalModelContextSealV1,
+  buildSeyeonPositiveG1PreModelSourceCensusSealV1,
   SeyeonPositiveG1FinalModelContextHoldV1,
 } from '../apps/api/src/seyeon-positive-g1-final-model-context-seal-v1.js';
 
@@ -47,9 +48,18 @@ const original=assembleSeyeonRuntimeContextV2({
 const selected=selectSeyeonExactModelPersonalSourcesV1({
   retrievedMemories:contextInput.retrievedMemories,sourceCandidates:[candidate],
 });
+const censusSeal=buildSeyeonPositiveG1PreModelSourceCensusSealV1({
+  pinnedContextInput:contextInput,
+  selected,
+  currentUserMessageRef,currentUserText,
+});
 const base={
   pinnedContextInput:contextInput,
-  pinnedContextInputDigest:hash(contextInput),
+  ...{
+    pinnedContextInputDigest:censusSeal.pinnedContextInputDigest,
+    pinnedFinalModelContextDigest:censusSeal.finalModelContextDigest,
+    selectedModelSourceCensusDigest:censusSeal.selectedModelSourceCensusDigest,
+  },
   selectedSourcesDigest:selected.selectedSourcesDigest,
   sourceCandidates:[candidate],
   currentUserMessageRef,currentUserText,
@@ -76,6 +86,46 @@ describe('S3/G1 original Memory final Interpreter packet seal (offline)',()=>{
     const alt={...candidate,grantId:RID};
     expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
       ...base,sourceCandidates:[alt],
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+  });
+
+  it('seals the exact selected model-source census to the persisted G1 digest',()=>{
+    expect(censusSeal.pinnedContextInputDigest).toBe(hash(contextInput));
+    expect(censusSeal.selectedModelSourceCensusDigest)
+      .toBe(selected.selectedModelSourceCensusDigest);
+    expect(censusSeal.finalModelContextDigest).not.toBe(hash(contextInput));
+    expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+      ...base,pinnedFinalModelContextDigest:hash(contextInput),
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+    expect(()=>assertSeyeonPositiveG1FinalModelContextSealV1({
+      ...base,selectedModelSourceCensusDigest:'sha256:v1:'+'f'.repeat(64),
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+    const alternate=buildSeyeonPositiveG1PreModelSourceCensusSealV1({
+      pinnedContextInput:{...contextInput,focuses:['care']},
+      selected,currentUserMessageRef,currentUserText,
+    });
+    expect(alternate.finalModelContextDigest).not.toBe(censusSeal.finalModelContextDigest);
+  });
+
+  it('denies derived sources and a forged current Member message before persisting',()=>{
+    const forged={...contextInput,recentMessages:[{
+      ...contextInput.recentMessages[0]!,messageId:RID,
+    }]};
+    expect(()=>buildSeyeonPositiveG1PreModelSourceCensusSealV1({
+      pinnedContextInput:forged,selected,currentUserMessageRef,currentUserText,
+    })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
+    const event:SeyeonRetrievedMemoryV2={
+      kind:'relationship_event',memoryId:'relationship:synthetic',
+      sourceRef:'relationship:synthetic',claimKind:'fact',summary:'derived',
+      relevance:0.9,salience:0.8,
+    };
+    const derived=selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories:[memory,event],sourceCandidates:[candidate],
+    });
+    expect(derived.selectedUnpinnedDerivedSources).toHaveLength(1);
+    expect(()=>buildSeyeonPositiveG1PreModelSourceCensusSealV1({
+      pinnedContextInput:{...contextInput,retrievedMemories:[memory,event]},
+      selected:derived,currentUserMessageRef,currentUserText,
     })).toThrow(SeyeonPositiveG1FinalModelContextHoldV1);
   });
 

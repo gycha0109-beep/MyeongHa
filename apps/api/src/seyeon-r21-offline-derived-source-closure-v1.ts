@@ -8,6 +8,7 @@ import {
 } from './seyeon-production-context-v1.js';
 import type {SeyeonRetrievedMemoryV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import {canonicalJson} from '../../../packages/domain/src/index.js';
+import {selectSeyeonExactModelPersonalSourcesV1} from './seyeon-exact-model-personal-source-selection-v1.js';
 
 export const SEYEON_R21_OFFLINE_DERIVED_SOURCE_CLOSURE_V1 =
   'seyeon-r21-offline-derived-source-closure-v1' as const;
@@ -120,6 +121,24 @@ export function assertSeyeonR21OfflineDerivedSourceClosureV1(input:{
         ||a.schemaVersion!==c.schemaVersion){
         throw new SeyeonR21DerivedSourceClosureHoldV1();
       }
+    }
+    // R21's isolated two-source ContextReady proof must bind exactly the
+    // TWO model-selected original memory projections, not merely a snapshot
+    // whose admissions happen to have the same count. Reuse the real runtime
+    // sorter/cap and source digest matcher; unknown derived/history stays HOLD.
+    const selected=selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories:input.retrievedMemories,
+      sourceCandidates:input.sourceCandidates,
+    });
+    if(selected.selectedMemoryCount!==2
+      ||selected.selectedPersonalRecordCount!==2
+      ||selected.selectedSources.length!==2
+      ||selected.selectedUnpinnedDerivedSources.length!==0
+      ||selected.selectedSources.some(source=>source.recordKind!=='memory')
+      ||s.personalRecordAdmissions.length!==2
+      ||new Set(selected.selectedSources.map(source=>source.recordId)).size!==2
+      ||new Set(selected.selectedSources.map(source=>source.grantId)).size!==2){
+      throw new SeyeonR21DerivedSourceClosureHoldV1();
     }
   } catch {
     throw new SeyeonR21DerivedSourceClosureHoldV1();

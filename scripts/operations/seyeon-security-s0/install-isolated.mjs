@@ -54,6 +54,26 @@ try {
     and not has_table_privilege('myeongha_api_executor','public.memory_items','UPDATE')
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','UPDATE')
     and not has_table_privilege('myeongha_api_executor','public.record_access_grants','INSERT')
+    and not has_table_privilege('myeongha_api_executor',
+      'seyeon_private.planner_memory_proposal_sources_v1','INSERT')
+    and not has_table_privilege('myeongha_api_executor',
+      'seyeon_private.planner_memory_proposal_sources_v1','SELECT')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_seyeon_pending_planner_memory_decision_v1(uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.cmd_create_pending_seyeon_planner_memory_v1(uuid,uuid,uuid,uuid,uuid,text,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1(uuid,uuid,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.cmd_expire_pending_planner_memory_batch_v1(timestamptz,integer)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_pending_seyeon_planner_display_candidate_v1(uuid,uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_seyeon_planner_pre_model_source_v1(uuid,uuid,uuid,uuid,text,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(uuid,uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.lock_memory_subject_v1(uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',

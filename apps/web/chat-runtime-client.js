@@ -14,6 +14,8 @@ import { PRODUCT_AUTH_STORAGE_V1 } from './product-auth.js';
 import { MyeongHaApiClientErrorV1 } from '../../packages/api-client/src/index.ts';
 import { sendSeyeonBrowserTurnWithReceiptV1 } from './chat-turn-receipt-client.js';
 import { shouldReloadChatForMemberSessionStorageChange } from './product-auth-surface.js';
+import { mountSeyeonPrivateMemoryReviewV1 } from './seyeon-private-memory-review-view.js';
+import { subscribeSeyeonMemoryVisibilityInvalidationV1 } from './seyeon-memory-visibility-invalidation.js';
 
 const params = new URLSearchParams(window.location.search);
 const threadRoute = parseChatThreadRouteV1(params);
@@ -45,6 +47,8 @@ let authoritativeCharacterId = null;
 let historyWithheld = false;
 let composeStatusSource = null;
 let roomLoadingSource = null;
+// A confirmed memory withdrawal invalidates async presentation across tabs.
+let sourceVisibilityEpoch = 0;
 
 function uiText(source) {
   return translateStaticUi(source, getUiLocale());
@@ -258,7 +262,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
   return article;
 }
 
-function renderConversation(messages, authoritativeCharacterId) {
+function renderConversation(messages, authoritativeCharacterId, historyProtected, memberReadAllowed) {
   if (!chatStream) return;
   const nodes = messages.map((message) => createStreamMessage(message, authoritativeCharacterId)).filter(Boolean);
   if (nodes.length === 0) {
@@ -271,6 +275,18 @@ function renderConversation(messages, authoritativeCharacterId) {
     return;
   }
   chatStream.replaceChildren(...nodes);
+  // Only a verified server Dialogue Planner pending proposal may be reviewed.
+  // Never turn a user Message into a manual Memory creation entrypoint.
+  // Protected History has no original messages or eligible proposals.
+  if (!historyProtected && memberReadAllowed && authoritativeCharacterId === 'seyeon') {
+    for (let i = 0; i < messages.length; i += 1) {
+      const proposal = messages[i]?.memoryProposal;
+      const body = nodes[i]?.querySelector('.conversation-message-body');
+      if (proposal && body instanceof HTMLElement) {
+        mountSeyeonPrivateMemoryReviewV1({ container: body, plannerProposal: proposal });
+      }
+    }
+  }
   chatStream.scrollTop = chatStream.scrollHeight;
 }
 
@@ -327,7 +343,7 @@ function renderAcknowledgedSeyeonTurn(result, pendingTurn) {
 }
 function renderRoomState(state) {
   historyWithheld = state.historyWithheld === true;
-  renderConversation(state.messages, state.characterId);
+  renderConversation(state.messages, state.characterId, historyWithheld, state.memberReadAllowed === true);
 
   // Exact-nine product authority maps canonical Character id to the same
   // English browser presentation key. The thread read remains identity authority.
@@ -409,6 +425,7 @@ async function readChatPage(activeBearer, afterSequenceNo) {
 }
 
 async function loadRoomState() {
+  const startedAtVisibilityEpoch = sourceVisibilityEpoch;
   if (!threadId || invalidThreadRoute) {
     setComposeStatus('유효한 대화를 다시 선택해 주세요.');
     return false;
@@ -460,11 +477,22 @@ async function loadRoomState() {
     if (characterId === null) {
       throw new Error('Character Room read omitted character authority.');
     }
+    // Current session must still match the credentials used for the entire
+    // owner-scoped read. No private body or Memory offer survives a change.
+    const latestBearer = await getActiveBearer();
+    if (sourceVisibilityEpoch !== startedAtVisibilityEpoch) {
+      throw new Error('Memory source invalidated during room read.');
+    }
+    if (latestBearer?.kind !== activeBearer.kind ||
+        latestBearer?.token !== activeBearer.token) {
+      throw new Error('Character Room Member session changed during read.');
+    }
     authoritativeCharacterId = characterId;
     renderRoomState(Object.freeze({
       characterId,
       messages: Object.freeze(messages),
       historyWithheld:protectedHistory,
+      memberReadAllowed:activeBearer.kind === 'member',
     }));
     return true;
   } catch (error) {
@@ -489,6 +517,7 @@ function ensureRoomReady() {
   if (roomBootPromise) return roomBootPromise;
 
   roomBootPromise = (async () => {
+    const initialVisibilityEpoch = sourceVisibilityEpoch;
     if (invalidThreadRoute) {
       setComposeStatus('대화 주소가 올바르지 않습니다. 연결자를 다시 선택해 주세요.');
       return false;
@@ -507,7 +536,7 @@ function ensureRoomReady() {
       }
 
       const loaded = await loadRoomState();
-      if (!loaded) return false;
+      if (!loaded || sourceVisibilityEpoch !== initialVisibilityEpoch) return false;
       roomReady = true;
       if (retryButton) retryButton.hidden = true;
       setComposeStatus(historyWithheld
@@ -547,6 +576,7 @@ async function sendTurn(message) {
   if (sendingTurn) return;
 
   sendingTurn = true;
+  const sendVisibilityEpoch = sourceVisibilityEpoch;
   setComposerBusy(true);
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
@@ -609,6 +639,9 @@ async function sendTurn(message) {
     // A protected history GET may legitimately return 503. Never use it as
     // positive receipt confirmation or as a reason to resend this turn.
     const currentBearer = await getActiveBearer();
+    if (sourceVisibilityEpoch !== sendVisibilityEpoch) {
+      throw new Error('SOURCE_INVALIDATED');
+    }
     if (currentBearer?.kind !== 'member' ||
         currentBearer.token !== activeBearer.token ||
         authoritativeCharacterId !== 'seyeon' ||
@@ -629,6 +662,7 @@ async function sendTurn(message) {
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {
       AUTH_REQUIRED: '로그인 상태가 만료되었습니다. 다시 로그인해 주세요.',
+      SOURCE_INVALIDATED: '기억 접근 권한이 변경되어 이전 세연 답변을 표시하지 않습니다. 이후 접근 여부는 서버에서 다시 확인합니다.',
       MEMBER_REQUIRED: '현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.',
       CONTENT_INCOMPATIBLE: '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.',
       CAPABILITY_UNAVAILABLE: '세연 실대화 운영 연결을 지금 사용할 수 없습니다.',
@@ -680,6 +714,16 @@ function submitTurn(event) {
 
   void sendTurn(message.trim());
 }
+
+// Withdrawal ACK is a presentation-invalidation signal ONLY. It carries no
+// identity or private text, does not authorize replay and cannot revoke DB
+// consent. Suppress stale in-flight chat loads and AI responses in this tab.
+subscribeSeyeonMemoryVisibilityInvalidationV1(() => {
+  if (authoritativeCharacterId !== null && authoritativeCharacterId !== 'seyeon') return;
+  sourceVisibilityEpoch += 1;
+  clearOwnerScopedRoomStateForAuthorityChange();
+  setComposeStatus('기억 접근 철회 요청이 확인되어 이전 세연 답변을 숨겼습니다. 이후 접근 권한은 서버에서 다시 확인합니다.');
+});
 
 document.addEventListener('myeongha:chat-submit', submitTurn);
 retryButton?.addEventListener('click', () => {

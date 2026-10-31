@@ -42,6 +42,20 @@ describe('Mobile / Web UI localization parity', () => {
     }
   });
 
+  it('keeps added Seyeon withdrawal notices consistent between web and mobile', () => {
+    const notices = [
+      '기억 접근 권한이 변경되어 이전 세연 답변을 표시하지 않습니다. 이후 접근 여부는 서버에서 다시 확인합니다.',
+      '기억 접근 철회 요청이 확인되어 이전 세연 답변을 숨겼습니다. 이후 접근 권한은 서버에서 다시 확인합니다.',
+    ];
+    for (const notice of notices) {
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+        const translated = translateStaticUi(notice, locale);
+        expect(translated, `web ${locale}`).not.toMatch(/[가-힣]/u);
+        expect(translateMobileUiCopy(notice, locale)).toBe(translated);
+      }
+    }
+  });
+
   it('keeps unknown or private text, submitted facts, and model output unchanged', () => {
     for (const value of [
       '사용자의 고유한 대화 내용',

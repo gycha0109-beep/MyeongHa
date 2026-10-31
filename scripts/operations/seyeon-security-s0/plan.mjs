@@ -13,6 +13,15 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '13-g0-current-original-lineage-context.sql',
   '14-g0-relationship-event-original-lineage.sql',
   '15-g0-original-member-user-message.sql',
+  '10-planner-memory-decision-source.sql',
+  '11-planner-memory-proposal-producer.sql',
+  '12-planner-memory-non-durable-decision.sql',
+  '16-planner-memory-pending-expiry.sql',
+  '17-planner-memory-display-candidate.sql',
+  '18-planner-pre-model-source-authority.sql',
+  '19-first-original-assistant-replay.sql',
+  '20-first-original-dialogue-pair.sql',
+  '21-relationship-origin-completeness.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {

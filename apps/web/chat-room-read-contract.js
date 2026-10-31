@@ -67,7 +67,44 @@ export function parseChatThreadRouteV1(search) {
     : Object.freeze({ state: 'ready', threadId });
 }
 
-function parseMessage(message, previousSequenceNo, seenMessageIds) {
+function serverPlannerMemoryProposal(message, roomCharacterId) {
+  // A pending fact must be emitted by the server's Dialogue Planner, not
+  // inferred from a user Message or constructed from a browser selection.
+  if (!Object.prototype.hasOwnProperty.call(message, 'memoryProposal')) {
+    if (Object.prototype.hasOwnProperty.call(message, 'memoryProposalOffer')) {
+      fail('manual original-message Memory offer is unsupported');
+    }
+    return undefined;
+  }
+  const proposal = message.memoryProposal;
+  if (proposal === null || typeof proposal !== 'object' || Array.isArray(proposal) ||
+      Object.keys(proposal).length !== 6 ||
+      !['sourceAuthority','characterId','proposalId','proposalKind','proposalState','summary']
+        .every(key => Object.prototype.hasOwnProperty.call(proposal,key)) ||
+      proposal.sourceAuthority !== 'server_dialogue_planner' ||
+      proposal.characterId !== 'seyeon' || roomCharacterId !== 'seyeon' ||
+      message.senderType !== 'character' || message.characterId !== 'seyeon' ||
+      typeof message.bodyText !== 'string' || !message.bodyText.trim() ||
+      message.redacted !== false ||
+      proposal.proposalState !== 'pending' ||
+      !['memory','life_fact'].includes(proposal.proposalKind) ||
+      typeof proposal.proposalId !== 'string' || !UUID_V1.test(proposal.proposalId) ||
+      typeof proposal.summary !== 'string' ||
+      proposal.summary.trim() !== proposal.summary ||
+      proposal.summary.length < 1 || proposal.summary.length > 4000) {
+    fail('Memory proposal lacks exact server Dialogue Planner authority');
+  }
+  return Object.freeze({
+    sourceAuthority: 'server_dialogue_planner',
+    characterId: 'seyeon',
+    proposalId: proposal.proposalId,
+    proposalKind: proposal.proposalKind,
+    proposalState: 'pending',
+    summary: proposal.summary,
+  });
+}
+
+function parseMessage(message, previousSequenceNo, seenMessageIds, threadId, roomCharacterId) {
   if (!message || typeof message !== 'object' || Array.isArray(message)) {
     fail('message is invalid');
   }
@@ -98,6 +135,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
     fail('visible message contains redactedAt');
   }
 
+  const memoryProposal = serverPlannerMemoryProposal(message, roomCharacterId);
   seenMessageIds.add(messageId);
   return Object.freeze({
     messageId,
@@ -108,6 +146,7 @@ function parseMessage(message, previousSequenceNo, seenMessageIds) {
     createdAt,
     redacted: message.redacted,
     redactedAt,
+    ...(memoryProposal === undefined ? {} : { memoryProposal }),
   });
 }
 
@@ -179,7 +218,7 @@ export function parseChatRoomReadPayloadV1(payload, options) {
   let previousSequenceNo = afterSequenceNo;
   const seenMessageIds = new Set();
   const messages = payload.messages.map((message) => {
-    const parsed = parseMessage(message, previousSequenceNo, seenMessageIds);
+    const parsed = parseMessage(message, previousSequenceNo, seenMessageIds, threadId, characterId);
     previousSequenceNo = parsed.sequenceNo;
     return parsed;
   });

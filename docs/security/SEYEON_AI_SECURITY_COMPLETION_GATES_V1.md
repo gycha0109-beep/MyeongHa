@@ -109,3 +109,247 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 
 각 Gate: `{gate, scope, owner, PR, exact_head_sha, merge_sha, CI_run_url, postgres_run_url, negative_tests, permissions_audit, open_holds, approval, final_state}`.
 증거가 없으면 `HOLD`, 운영에서 검증할 수 없으면 별도 리스크 승인 없이는 PASS 금지.
+
+## 2026-10-30 — UC-06/UC-07 Planner 주도 Memory 제안 복구 (운영 비활성)
+
+**설계 정본**: `Usecase_re_reviewed_v2` UC-06/UC-07 및 `MyeongHa_Character_System_Architecture_C1`의 Planner / Gate / Renderer 분리. 캐릭터가 필요한 현재 Life Fact를 질문하고, 답변에서 기억할 사실을 인식하면 Dialogue Planner/Character Runtime이 **pending Memory/Life Fact Proposal**을 만든다. 사용자는 다음 네 가지 중 하나를 명시적으로 결정한다.
+
+1. `session_only` — 이 대화에서만; 장기 저장 및 Grant 없음.
+2. `character_only:seyeon` — 세연만 기억; 해당 Memory/Life Fact + 명시적 Character Grant.
+3. `current_characters` — 승인 시점의 현재 캐릭터들에게 각각 명시적 Grant (대상은 서버에서 결정).
+4. `discard` — 기록하지 않음; 장기 저장 및 Grant 없음.
+
+이것은 사용자가 과거 User Message를 선택해 원문 전체를 `summary`로 기록하는 기능이 아니다. 원문 Message는 서버가 권한 확인을 마친 **출처 증빙**에만 사용할 수 있다. 원문을 직접 Memory로 만드는 수동 Producer PR #2759는 설계 위반으로 **병합 없이 종료**한다.
+
+- `chat-room-read-contract.js`는 서버가 세연 **캐릭터 답변**에 결속시킨 `memoryProposal`의 정확한 6필드 `sourceAuthority:'server_dialogue_planner'`, `characterId:'seyeon'`, `proposalId`, `proposalKind`, `proposalState:'pending'`, `summary`만 통과시킨다. User Message에 달린 제안, 이전 `memoryProposalOffer`, 위조 ID·스키마·상태·Character는 거부한다.
+- `seyeon-private-memory-review-view.js`는 **메시지 저장 버튼이 없고**, 서버의 기억 제안 내용과 네 가지 선택지를 보여준다. 내용은 DOM `textContent`만 사용하고 브라우저가 사실을 추출/수정하지 않는다.
+- `seyeon-private-memory-review-client.js`는 원본 사용자 메시지로 Proposal을 생성하는 POST가 없다. 서버가 발행한 Proposal ID에 대해서만 `POST /api/memory/proposals/:id/decision`으로 사용자의 명시적 `choice.mode`를 전달한다. 임의 `summary`, 원문, Grant ID, 공유 대상 목록을 전송하지 않는다. 동일 Proposal의 불명확한 결과는 자동 재요청하지 않는다.
+- `session_only`/`discard`는 영속 기록·Grant 0을, `character_only`/`current_characters`는 명시적 결정과 서버의 일치하는 결과를 요구한다. Member/세션 변경/응답 불일치 시 HOLD.
+- **운영 구현 미완료**: 서버 Planner Proposal 생성, 응답 결속, DB Atomic Scope Decision API는 아직 연결되지 않았고 `/decision`은 미마운트다. 기존 `chat-read-http.ts`의 세연 History metadata-only HOLD는 그대로이므로 위 UI는 운영에 표시되지 않는다. 유료 AI/원문 Reveal/Projector/운영 DB·ACL을 켜지 않았다.
+
+**종료 조건**: Planner의 서버 생성 사실 제안과 원문 출처 증명, UC-07 네 선택의 실제 DB/Session 처리, 동의·철회/Revocation·Replay·두 세션 경쟁 검증, 운영 G0~G6 승인 증거가 충족되어야 한다. 현재 UI staging/CI가 PASS여도 S0 운영 PASS나 전체 AI 보안 완료를 의미하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+### UC-07 서버 결정 경로 구현 (S0 격리 / 운영 미마운트)
+
+- `seyeon-planner-memory-decision-v1.ts`는 기존 `packages/domain/src/memory-resolution.ts`를 재사용하여 UX 네 선택을 `session_only`, `accept_long_term + character_only`, `accept_long_term + current_characters`, `reject`로 매핑한다. 공유 대상은 브라우저가 제출하지 않고 DB가 읽은 현 캐릭터 집합만 사용한다.
+- `seyeon-planner-memory-decision-http-v1.ts`는 **회원 인증, 본인 Subject DB 트랜잭션, 정확한 1개 선택, 내부 pending 제안 읽기/잠금, 단일 트랜잭션 결정, 결과 검증**을 구현한다. 클라이언트 Summary·원문·Grant ID·대상 캐릭터 목록 입력은 금지한다. 승인 callback이나 검증 가능한 DB 구현이 없으면 503이다.
+- `10-planner-memory-decision-source.sql` / `postgres-seyeon-planner-memory-decision-source-v1.ts`는 S0 단독 세연 대화의 **확정된 세연 Character Message**에 연결된 `proposal_dedupe_key='seyeon-dialogue-planner:v1'` pending Proposal만 원본 테이블에서 잠금 검증한다. 원본·제안 Summary를 반환하지 않으며, 사용자의 수동 UserMessage Proposal을 Planner 제안으로 인정하지 않는다. 기본 API 역할은 신규 RPC를 실행할 수 없다. 격리 PG17 합성 테스트에서만 제한된 권한을 임시 허용한다.
+- `seyeon-planner-memory-decision-commit-v1.ts`는 **S0 Memory 한 건, 세연 Grant 한 건**에 한하여 기존 비공개 수락 Owner RPC와 명시 Grant Owner RPC를 같은 DB 트랜잭션에서 차례로 실행한다. `current_characters`도 DB 현재 집합이 세연 단독일 때만 이 경로로 처리한다.
+- **아직 구현/승인되지 않은 부분을 지원한다고 간주하지 않는다.** `session_only`/`discard`의 비영구 처리는 S0 격리 DB Owner 명령으로 구현했으나 운영 및 전체 개인정보 보존 계약(SRC-05)은 미완료이다. `current_characters`의 실제 다중 캐릭터 Grant, Life Fact persistence, 실제 대화 Post-turn Worker의 Planner 추출 실행 연결, 최종 캐릭터 메시지와 pending 제안의 G3 공개 권한 연결은 여전히 HOLD다.
+- `production-seyeon-planner-memory-decision-runtime-v1.ts`는 실제 Production identity verifier/DB pool/소유 DB adapter를 조립하지만 **public router 미마운트, admission 기본 DENY, 승인 없는 운영 실행 불가** 상태다.
+- 새 S0 격리 SQL은 `supabase/migrations`에 추가하지 않았고 실제 운영 DB·ACL·registry·모델/Worker는 변경하지 않았다. G0~G6 및 SRC-25 승인 전 `HOLD_FORWARD_STOPPED`를 유지한다.
+
+### UC-06 서버 Planner 후보 생성 → pending Proposal (S0 격리 구현 / 운영 HOLD)
+
+- `seyeon-planner-memory-proposal-extractor-v1.ts`: 기존 `SeyeonStructuredProviderPortV2`의 별도 `memory_proposal_extraction` 목적을 선언한다. 모델은 대화에 적합한 **한 가지 사용자 진술 후보** 또는 `none`만 제안하며, 짧은 3인칭 사실 `summary`와 실제 사용자 발언에서 연속으로 인용한 `userEvidenceQuote`를 반환해야 한다. 근거가 일치하지 않거나 원문 전체를 기억으로 복사하려 하면 거부한다. 모델 출력은 사실/승인 권위가 아니다.
+- `seyeon-post-turn-planner-memory-proposal-v1.ts`: 독립 서버 Post-turn 호출 함수. 모델+DB 명령을 수행하려면 **신뢰된 서버 내부 승인 callback**이 필요하며 기본 DENY. 승인 시에도 Member 검증/DB 트랜잭션 및 출처 재검증을 거쳐 **pending Proposal만** 만든다. 매 Subject/Turn에 대해 재시도해도 고정되는 서버 Proposal UUID를 사용한다. Post-turn Worker와 Production 조립부에 **호출 포트는 결속**됐으나 기존 OFF-only 원본 출처 계약 및 기본 모델·DB DENY 때문에 운영에서 실행되지 않는다.
+- `11-planner-memory-proposal-producer.sql` 및 `postgres-seyeon-planner-memory-proposal-producer-v1.ts`: S0 DB Owner의 `cmd_create_pending_seyeon_planner_memory_v1`가 확정된 세연의 Character 답변, 정확히 같은 Turn의 User Message, 원문에 실제 포함된 짧은 증거 인용을 재검증해 `memory_proposals(status=pending)`만 생성한다. `memory_items`·`life_facts`·`record_access_grants` 자동 생성 **0건**. 한 Turn당 하나, 리플레이에 다른 사실/ID를 끼워넣으면 거부한다.
+- `seyeon_private.planner_memory_proposal_sources_v1` DB Owner 전용 출처 테이블에서 **진짜 소유 함수가 생성한 제안**과 User/Assistant 메시지 및 Turn을 바인딩한다. `10-planner-memory-decision-source.sql`이 이 출처를 확인해야만 UC-07 승인 검토가 가능하다. `proposal_dedupe_key` 문구를 수동 INSERT한 것만으로는 위조할 수 없다. 일반 API·Member·Guest·service role에는 테이블/생성 RPC 직접 접근을 열지 않는다.
+- PostgreSQL 17 격리 합성 테스트는 이제 원래의 직접 `memory_proposals` INSERT 대신 DB Owner Producer를 호출하여 **제안 → 승인 전 Memory 0건 → 본인 승인 후 Memory/Grant 각 1건**, 동일 제안 재시도/근거 없는 사용자 메시지/출처 없는 가짜 Planner 행 거부를 검증한다.
+- **운영 미완료**: Post-turn Worker 호출 포트는 구현됐지만 **기존 OFF-only DB 출처 Gate가 개인정보 Claim 자체를 차단**하므로 실제 유료/실사용자 자동 후보 생성·공개는 여전히 실행 불가. 기존 AI Governor의 별도 purpose 예산 승인, 개인정보 보존기간/제안 폐기, G3 현재 접근권한에 의한 제안 렌더링, G0~G6 검증/승인이 필요하다. 현재 `HOLD_FORWARD_STOPPED`; 새 SQL은 운영 Migration에 포함되지 않으며 DB ACL/공용 Router/유료 호출을 활성화하지 않는다.
+
+### UC-07 비영구 선택 2가지 S0 DB Owner 결정 (운영 HOLD)
+
+- `12-planner-memory-non-durable-decision.sql`의 `seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1`는 DB Owner가 확인한 **진짜 pending Planner 제안**에 대해서만 `session_only` / `discard` 결정이 가능하다. 동일 Subject/Turn의 원본 캐릭터·사용자 메시지와 Owner 발급 출처가 일치해야 한다.
+- `session_only`는 장기 Memory/Grant 없이 제안 상태를 `expired`로 확정하고 `proposed_value_jsonb={}`로 지운다. 원래 대화 자체는 기존 채팅 Session/History 계약을 따른다. `discard`는 `rejected`로 확정하고 같은 방식으로 후보 내용을 지운다.
+- `postgres-seyeon-planner-non-durable-decision-v1.ts` 및 `commitSeyeonPlannerMemoryDecisionS0V1`는 기존 Character-only 수락·Grant Owner 경로와 함께 네 가지 UX 선택을 하나의 DB 트랜잭션 결정 분기로 연결한다. 복수 캐릭터와 Life Fact 수락은 여전히 명시적으로 HOLD한다.
+- 합성 PostgreSQL 17 테스트에서 두 선택의 **제안 내용 삭제, 새 Memory 0건, Grant 0건, Replay 차단**을 검증하도록 추가했다. 일반 API EXECUTE는 기본 DENY, Producer/Decision/RPC는 운영 Migration 및 공용 Router에 마운트하지 않았다.
+- `session_only`의 현 대화 Context 반영과 정책적 보존기간/TTL, 과거 G3 권한 검증, 실제 Renderer/UI 공개와 실제 Post-turn Worker 자동 실행은 미완료이다. 테스트 GREEN만으로 구현 전체 또는 운영 승인 완료라고 간주하지 않는다.
+
+
+## Worklog — Security / Character Memory UC-06·UC-07
+
+> 작성 규칙 (2026-10-30부터 적용): 각 실제 작업 단위가 끝날 때마다 **작업 내용·변경 파일·커밋·확인한 CI 결과·미완료/차단**을 이 문서에 누적한다. CI의 대상 SHA와 실행 완료 여부를 구분하고, 아직 실운영에 연결되지 않은 코드를 '완료'로 표시하지 않는다. 최신 기록을 아래쪽에 추가한다.
+
+### 2026-10-30 · W01 · Post-turn 자동 제안 연결 착수
+
+- **확인:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)의 최신 작업 HEAD `87b73ea44a7731ff3d476d33b2d3caa1c5d09ea8`. 사용자는 이전 GREEN을 알렸으나 확인된 가장 최근 PR-run은 `93ee6595`에서 CI RED 이후의 실행이며, 현재 HEAD의 전체 GREEN을 확인하지 못했다. `main` 변경으로 PR이 `dirty` 상태임을 확인.
+- **작업 목표:** 실제 `seyeon-post-turn-analysis-worker-v1.ts`의 committed User/Character claim과 S0 Planner Producer 사이에 서버 소유 결속을 추가. 사용자 클릭·원문 전체 저장·무승인 영구 기록을 새로 만들지 않음.
+- **보안 전제:** 기존 Production Post-turn은 DB Owner가 검증한 OFF 정리만 허용하고, 개인 텍스트·Provider 요청은 기본 HOLD. G0~G6, 운영 개인정보·유료 호출은 변경하지 않음.
+- **미완료:** Worker 결속·테스트·충돌 해소·새 HEAD CI 및 승인 결과.
+
+
+### 2026-10-30 · W02 · Post-turn Worker 제안 포트 결속
+
+- **구현:** `seyeon-post-turn-analysis-worker-v1.ts`에 `SeyeonPostTurnPlannerMemoryPortV1`을 추가. **DB claim과 snapshot 원문 결속 검증 후**, OFF·checkpoint 재처리가 아닌 새로운 클레임에만 `propose()`를 호출한다. 응답은 `none` 또는 정확한 pending UUID/재생 여부만 허용하고 다른 반환은 HOLD한다.
+- **서버 조립:** `seyeon-post-turn-planner-memory-port-v1.ts`가 기존 `runSeyeonPostTurnPlannerMemoryV1`을 신뢰된 Subject 증빙/DB pool/provider에 연결. `production-seyeon-post-turn-worker-runtime-v1.ts`에서 포트를 구성해 Worker에 전달한다.
+- **커밋:** `b1ae10fb` (worker), `05c6f3fc` (adapter), `a0b6b147` (runtime).
+- **보안·활성화:** 실제 Production Worker는 기존 `enforceCurrentSourceAuthority=true`가 **OFF-only cleanup**만 허용하여 private claim 이전에 반환/차단한다. Planner 모델/DB 승인 callback도 부여하지 않아 호출 경로는 운영에서 계속 **DENY**다. 이를 실서비스 자동 제안 활성화로 주장하지 않는다.
+- **검증/다음:** 경로·권한 회귀 테스트와 새 HEAD CI 필요. G0/G4 승인·Model 원문 접근 근거·새 purpose 예산 및 G3 응답 결속 HOLD.
+
+
+### 2026-10-30 · W03 · Post-turn 결속 검증 및 차단 회귀 테스트
+
+- **구현/검증 코드:** `test/seyeon-post-turn-source-authority-hold.test.ts`에서 기존 Production `OFF` 정리/원문 차단 시 Planner 호출 0회·private claim 0회를 검증. `test/seyeon-post-turn-planner-memory-port-v1.test.ts`에서 snapshot/claim/체크포인트/모델 추출 순서, Owner 생산 경로, Member 검증, G0/G4 미승인 시 Provider·DB 호출 0회를 검증.
+- **커밋:** `757c3b07`, 테스트 구조 수정 `55065664`, `81798f05`.
+- **현재 상태:** 신규 HEAD에서 완결된 CI 결과 **아직 미확인**. 기존 Production OFF-only 정책, 기본 DENY, 운영 ACL 미변경.
+- **후속:** 최신 `main`이 S0 `14-g0-relationship-event-original-lineage.sql`을 추가하여 `plan.mjs`가 충돌한 상황. 타 트랙 작업을 보존하는 병합과 정확한 SHA 기반 CI 재검증이 필요.
+
+
+### 2026-10-30 · W04 · 합성 Claim 실행 검증 / 최신 main 병합
+
+- **구현:** `test/seyeon-post-turn-planner-memory-worker-v1.test.ts`에서 검증된 Claim의 정확한 User/Assistant 원문만 후보 포트에 전달, `OFF`·완료 체크포인트에서는 호출 0회, Assistant snapshot 불일치 및 가짜 제안 응답은 관계 분석 및 체크포인트 이전 HOLD를 확인하는 합성 테스트를 추가.
+- **main 병합:** `bed9b1fe`은 최신 `main`의 보안 G0 관계 이벤트 출처 `14-g0-relationship-event-original-lineage.sql`과 기타 기존 트랙 변경을 보존하면서 `plan.mjs`에 10·11·12 Planner SQL을 함께 기록하는 병합 커밋이다. 병합 시 새 `main`의 사주·레코드 트랙 코드를 덮어쓰지 않았으며, PR은 병합 가능으로 복구.
+- **커밋:** `bed9b1fe`(main 통합), `6e6ca7a1`(합성 Worker 흐름 테스트).
+- **CI:** 작업 HEAD `6e6ca7a140eea2b5bc58ebad49b06328cd6a7e4d`에서 CI/Web/Governance가 실행 대기·진행 중으로 확인됨. 성공 판정하지 않음. [PR 검사](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks).
+- **잔여:** 실제 Production Post-turn은 Owner 출처 Gate가 OFF-only로 개인 원문을 읽지 않는다. 현 상태의 포트 결속은 운영 활성화가 아니며, G0/G4 원천 승인·budget·G3 UI 후속 권한 계약·G5/G6 승인 후에만 개인 기록을 사용할 수 있다.
+
+
+### 2026-10-31 · W05 · CI RED TypeScript 오류 수정 및 재시도
+
+- **실패 증거:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks)의 HEAD `5433f2a662cd0047c4e046d014198e9f7fb06a9d` 검사. `Governance` / `Web PR Domain Gates` **GREEN**; `CI` [41027186530](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027186530) **RED**. `Work Track · security` (job `123968237399`)에서 TypeScript `TS7031`, `TS2379` 확인.
+- **원인:** `seyeon-post-turn-planner-memory-port-v1.ts`의 `propose({committedTurn})` 인수에 명시적 타입이 없어 암시적 any 발생. `test/seyeon-post-turn-planner-memory-port-v1.test.ts`의 선택 필드 `values`가 `undefined`일 때도 객체에 포함되어 엄격한 optional property 규칙 위반. PostgreSQL 17 종속 검사 역시 동일한 컴파일 오류에 의해 테스트를 시작하지 못해 RED로 전파됨. 해당 검사에는 추가로 `saju-abuse-admission-attack-e2e` / `saju-official-records-http-e2e` 실패가 기록됐지만, 로그상 이들의 공통 선행 원인은 컴파일 실패이며 별도 DB 기능 결함으로 단정하지 않는다.
+- **수정:** 포트 인수에 기존 `SeyeonPostTurnPlannerMemoryPortV1['propose']`의 정확한 인수 타입을 지정. 테스트 기록에는 `values`가 존재할 때만 필드를 넣어 `exactOptionalPropertyTypes`를 준수. 변경 범위는 두 TypeScript 파일뿐, 보안 권한/SQL/운영 DB 미변경.
+- **커밋:** `906ff336187b45fbbe4f9a09d9a4ffc5de05d9ce`(포트), `e576b03de78df5d987c9b9c08a29636c9418fd75`(테스트).
+- **미완료/다음:** 수정된 Worklog 포함 최종 HEAD의 CI·PostgreSQL 17 결과는 별도 확인해야 한다. 실제 유료 Provider 및 운영 Memory 공개는 G0/G3/G4/G6 권한·예산 증빙 전까지 `HOLD_FORWARD_STOPPED`.
+
+
+### 2026-10-31 · W06 · 최신 main G0 출처 변경 보존 병합
+
+- **충돌 원인:** 이번 TypeScript 수정 뒤 `main`에 별도 보안 트랙의 S0 G0 사용자 원문 출처 보호 `15-g0-original-member-user-message.sql` 등이 추가되어 PR #2761의 `scripts/operations/seyeon-security-s0/plan.mjs`와 충돌.
+- **해결:** 최신 `main`의 G0 `13`·`14`·`15` 출처 SQL 및 기존 다른 트랙 코드를 모두 보존하고, 이 트랙의 Planner `10`·`11`·`12` SQL도 그대로 유지한 병합 트리를 생성. 타 트랙의 별도 보안 문서 및 원본 SQL을 덮어쓰지 않음.
+- **병합 커밋:** `c2e5a62609fe91432bfd1404faca1d564d77f3cf` (두 부모: 기존 작업 HEAD `bb557c39`, 최신 `main` `7057d272`). PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)은 병합 가능, 자동 병합 설정 유지.
+- **검증:** 병합 직후 최신 HEAD CI는 아직 실행 목록에서 확인되지 않았으며, 이 단계에서 GREEN으로 기록하지 않는다. 재실행 결과는 [PR Checks](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks) 기준으로 확인.
+- **잔여:** 최종 HEAD TypeScript·보안 트랙·PostgreSQL 17 CI, 실제 G3 기억 제안 UI 전달, 운영 G0/G4 승인 및 원문 접근 보안. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W07 · Cloudflare Workers Builds 별도 RED 원인 확인
+
+- **전체 검사 판정 정정:** HEAD `a4b2666291a73fda1527ba1a16dab9384d80691e`에서 GitHub Actions 3개(Governance, Web, CI) 모두 PASS, PostgreSQL17도 PASS. 그러나 GitHub의 **외부 Check Run** `Workers Builds: myeongha` [124466218250](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks?check_run_id=124466218250)은 FAILED. 따라서 PR 전체 GREEN이라고 판정하지 않는다.
+- **Cloudflare 실로그:** build `7eab4f9d-1d22-4a09-86c1-9ec0c599abad`의 `npm run build:web` 및 Vite 빌드는 성공. 배포 단계 `npx wrangler preview` (Wrangler `4.156.0`)에서 Cloudflare API `Authentication error [10000]` 및 `Invalid access token [9109]`으로 실패. 외부 플랫폼 서비스 장애나 프로젝트 코드 오류의 증거가 아니라 **해당 Preview 배포 빌드 토큰의 유효성·권한 문제**임.
+- **설정 확인:** Cloudflare Workers Builds의 현재 소스 브랜치 트리거는 `feat/security/s0-private-memory-review-client-20261030`, 빌드는 `npm run build:web`, Preview 배포는 `npx wrangler preview`, 빌드 토큰 명칭은 `myeongha build token`. 토큰 등록 메타데이터는 존재하지만 실행 시 사용된 인증은 실패. 실사용 권한이나 현재 활성 상태는 메타데이터만으로 보증되지 않음.
+- **조치:** 원인·증거 기록만 수행. 운영 Worker 배포 명령 변경, Preview 검증 비활성화, API 토큰 재발급·노출, 개인정보·운영 ACL 변경 **없음**. GitHub 내부 CI 통과를 Cloudflare 외부 검사 통과와 혼동하지 않도록 검증 범위를 분리.
+- **남은 작업:** Cloudflare Workers Builds 설정에서 유효한 권한의 API 토큰을 새로 발급·선택(사용자 계정 작업 필요), Preview 재실행 후 해당 외부 Check Run PASS 확인. 원본 개인정보·유료모델 접근은 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W08 · 미승인 제안 만료·개인정보 소거 S0 구현 (브랜치 지속 / 병합 금지)
+
+- **작업 범위:** 별도 Cloudflare 인증 토큰/Preview 오류 해결 트랙에 의존하지 않고, 현재 PR #2761 **동일 브랜치**에서 UC-06/SRC-05의 미승인 pending 제안 잔류 문제를 줄이는 격리 DB 소유 처리 경로를 구현. `main` 병합·운영 배포·Cloudflare 설정 변경 없음.
+- **SQL:** `16-planner-memory-pending-expiry.sql`의 `seyeon_private.cmd_expire_pending_planner_memory_batch_v1`은 **DB 소유 생성 출처**가 있는 `pending` 세연 Memory 제안만 처리한다. 승인 정책이 제공한 과거 시각보다 오래된 후보를 최대 100건씩 잠금(`SKIP LOCKED`) 처리하고, 동일 DB 명령으로 `status=expired`와 `proposed_value_jsonb={}`를 확정한다. 원래 승인된 `Memory`, `Grant`, 사용자 원문 메시지는 수정하지 않는다. 경쟁하는 사용자 동의는 기존 Proposal 행 잠금으로 직렬화된다.
+- **서버 경계:** `postgres-seyeon-planner-memory-pending-expiry-v1.ts`는 보존기간을 하드코딩하지 않고, **서버 내부 승인 + 명시적인 UTC cutoff + 1~100건 한도**가 모두 만족되어야 SQL을 호출한다. 모델/HTTP/환경 변수로 임의 권한을 만들지 않으며 일반 API `EXECUTE` 기본 DENY, 운영 경로·스케줄 미연결.
+- **테스트:** `test/seyeon-planner-memory-expiry-v1.test.ts`에서 기본 차단·미래 시각·초과 건수·위조 응답 거부를 확인하는 단위 테스트 추가. `test/seyeon-security-s0-postgres.e2e.test.ts`에서 오래된 DB 소유 제안만 만료, 최근 pending/기존 rejected 보존, 같은 행 재처리 0건, 만료 후 UC-07 승인 불가, 일반 API ACL DENY, 범위 초과 거부를 확인하는 PostgreSQL 17 합성 통합 테스트 추가.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/{16-planner-memory-pending-expiry.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-pending-expiry-v1.ts`, `test/{seyeon-planner-memory-expiry-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
+- **구현 커밋:** `895d079f`, `28213e49`, `cd6bdd33`, `160d8fdb`, `8c6e7321`, `14acb8d4`.
+- **검증 상태:** 변경 커밋 기준 신규 CI **결과 확인 전**. Cloudflare Workers Build의 인증 실패는 별도 트랙 소관이며 이 작업이 해결하거나 무시하지 않는다. 보존기간/실제 자동 만료 스케줄·원본 채팅 수명·G3 공개 권한은 미완료. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W09 · G3 대화 제안 표시의 DB 소유 원본 결속 후보 (공개 금지)
+
+- **범위:** 실제 대화의 세연 Character 메시지에만 pending 제안을 연결하는 후속 G3 작업 중 **내부 원본 결속 검사**를 격리 S0에 구현. Cloudflare 문제를 건드리지 않고 PR #2761 **동일 브랜치**에서 계속 진행. 운영 HTTP Reveal/Replay는 여전히 HOLD.
+- **DB:** `17-planner-memory-display-candidate.sql`은 Owner 출처 테이블에서 생성 사실이 입증되고, 현재 Member Subject·Thread·Assistant Message가 정확히 일치하며, UC-07 승인 출처 함수를 재검증한 **미승인 Memory Proposal 최대 한 건**의 내부 Summary만 반환한다. 사용자 메시지 선택/수동 Proposal, 다른 대화방·캐릭터의 제안, 이미 수락·폐기·만료된 제안은 불허한다. 해당 함수는 일반 API 역할에서 **EXECUTE DENY**, 운영 Migration 및 공용 Router 미마운트.
+- **서버:** `postgres-seyeon-planner-memory-display-candidate-v1.ts`에서 내부 승인 callback이 없으면 SQL 조회 자체를 거부한다. 응답 `sourceAuthority='db_owner_planner_inspection_only'`, `disclosureAuthorized=false`는 의도적으로 **웹의 `memoryProposal` 공개 스키마와 호환되지 않는다**. 이를 채팅/AI/웹에 곧바로 전달하거나 G3 승인 근거로 사용할 수 없다.
+- **검증 추가:** `test/seyeon-planner-memory-display-candidate-v1.test.ts`에 미승인 차단, 정확한 사용자/대화/메시지 결속, 위조·중복 응답 차단을 추가. `test/seyeon-security-s0-postgres.e2e.test.ts`에는 실제 Owner 출처로 생성된 대화 제안을 내부 조회한 뒤 다른 User Message 조회는 0건, discard 이후 재조회는 0건인지 확인하는 합성 테스트를 추가.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/{17-planner-memory-display-candidate.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.ts`, `test/{seyeon-planner-memory-display-candidate-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
+- **구현 커밋:** `748662c8`, `0046d4d6`, `9ad5daaf`, `10b39b9d`, `ee65fa1b`, `d0d6cab4`, `42a4e334`, `af5d1b2b`.
+- **진행 상태:** 해당 새 코드의 최신 HEAD CI/PG17 **결과 확인 전**. 후속은 권한 취소/재승인 및 과거 대화 G3 원자 검증 뒤만 실제 Reveal/UI에 결속할 수 있다. 본 작업으로 실사용자 개인정보 공개, 유료 모델 실행, 자동 병합을 활성화하지 않았다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W10 · G3 내부 후보 검증 오류 수정 및 사용자 기억 거부 우선 적용
+
+- **확인:** 작업 시작 시 PR #2761 HEAD `8ff44dc86276972928cc2d8eece40b8ff669a94a`의 GitHub Actions 중 Governance/Web PASS, PostgreSQL 17 PASS, Work Track · security RED. [CI 41179023985](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41179023985) 로그: `test/seyeon-planner-memory-display-candidate-v1.test.ts`의 기대 객체 필드 `canonicalMemberSubjectId`와 실제 내부 조회 결과의 `subjectId`가 불일치한 합성 assertion 1건. 실제 제품 권한 오류로 단정하지 않음.
+- **수정:** 테스트 기대 값을 DB Owner 후보 응답 계약의 `subjectId`로 정정. 커밋 `f7ef8ec5`.
+- **제품 안전 범위:** 세연의 Dialogue Planner에서 사용자 발화에 명시적인 한국어/영어 **기억·기록·저장 금지 요청**이 있을 경우 구조화 모델을 호출하기 **전에** `decision:'none'`으로 종료하는 우선 거부 규칙 추가. 이는 원본 사용자 승인 없이 Memory를 저장하지 않으며, 기존 저장된 기록의 삭제·취소 처리라고 주장하지 않는다. 코드 `seyeon-planner-memory-proposal-extractor-v1.ts`, 테스트 `seyeon-planner-memory-proposal-producer-v1.test.ts`.
+- **커밋:** `122b2948` (모델 호출 전 거부), `162dc610` (한국어·영어 거부 및 일반 발화 회귀 테스트).
+- **Cloudflare/병합:** 사용자가 Cloudflare 설정을 별도 트랙에서 해결했다고 알려줌. 본 트랙은 Cloudflare 배포 명령·토큰에 손대지 않음. PR은 병합 방지를 위해 **Draft, auto-merge=null** 유지; 현재 브랜치에만 커밋.
+- **검증 상태/다음:** 해당 변경이 포함된 신규 HEAD GitHub Actions/외부 Cloudflare Check Run 검증 결과는 아직 확인 전. S0 SQL·실사용자 텍스트 공개는 계속 HOLD. UC-07/G3의 승인·철회 기반 응답 공개는 별도 실제 권한 증명이 필요하다.
+
+
+### 2026-10-31 · W11 · UC-07 선택 이후 브라우저 제안 원문 삭제
+
+- **기능:** `apps/web/seyeon-private-memory-review-view.js`에서 사용자가 명시적으로 네 선택 중 하나를 확정하면 네트워크 전송 전에 **제안 요약 문자열을 비우고 선택 버튼 전체를 즉시 라이브 DOM에서 제거**하도록 변경. 서버가 승인 확정을 반환하든 오류/응답 불명으로 끝나든, 브라우저가 과거 제안 본문을 계속 보여주거나 결과 불명 상황에서 재클릭할 수 없게 한다. 사용자가 확인 창에서 취소한 경우만 기존 선택 UI를 유지한다.
+- **테스트:** `apps/web/seyeon-private-memory-review-client.test.ts`에서 모의 DOM으로 `discard` 확정 직후 서버 응답 전 summary 공백·상태 영역만 남음·선택 버튼 비활성·정확한 결정 1회 전송을 검증. 기존 서버 결정/동의 권한을 변경하지 않는다.
+- **커밋:** `7c30b58f`(브라우저 DOM 즉시 소거), `33949908`(모의 DOM 회귀 테스트).
+- **보안/남은 것:** DOM에서의 전시 소거는 이미 사용자/서버에 저장된 과거 Chat 원문을 삭제하거나 G3 공개 권한을 획득한다는 뜻이 아니다. UC-07 서버의 영구 저장·동의 취소, 현재 G3 rights 기반 Reveal, 실제 Production 원문 조회 및 모델 승인 모두 별도 HOLD.
+- **운영/통합:** 사용자가 별도 Cloudflare 해결을 보고했으나 이 트랙은 인증 토큰/배포 설정 변경 없이 PR #2761 Draft·자동 병합 OFF를 계속 유지. CI 결과는 최신 커밋 기준 별도 확인 필요.
+
+### 2026-10-31 · W12 · 이관 후 기억 거부 패턴 복구 및 G3 내부 재표시 차단 보강
+
+- **CI 실패 원인:** PR #2761 HEAD `32f043cf`의 [Work Track · security](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41183832567)에서 한국어·영어 명시적 기억 거부 테스트 1건 RED. `seyeon-planner-memory-proposal-extractor-v1.ts` 정규식 리터럴의 `\\s` / `\\b`가 과잉 이스케이프되어 공백/단어 경계를 제대로 판별하지 못한 오류를 확인. 기존 Governance/Web/PG17 통과를 전체 GREEN으로 오인하지 않음.
+- **수정:** 기억 저장 거부 표현을 Provider 호출 전에 인식하도록 실제 정규식 문법을 바로잡음. 커밋 `0aecabf9`. 모델 자동 저장·Grant 생성 권한은 없음.
+- **대화 제안 결속:** `apps/web/chat-room-read-contract.js`는 서버가 붙인 미승인 제안이라도 원본 세연 Character 답변 `bodyText`가 null·빈 문자열·공백이면 응답 전체를 거부. 캐릭터 답변 없는 제안이 역사적 Message에 결속된 것처럼 표시되지 않게 보강. 커밋 `99b7c08f`, 회귀 테스트 `a4827af0`.
+- **승인 후 재조회 검증:** 기존 실제 PostgreSQL 17 격리 UC-07 테스트에서 사용자 승인으로 Proposal이 `accepted`가 되면 같은 원본 Thread/Assistant의 G3 **내부 후보 재조회가 null**이어야 함을 명시. 커밋 `44de7b24`. 기존 `discard` 후 차단·만료 후 차단 테스트와 함께 승인된 제안의 중복 UI 제안을 금지. 이는 실 HTTP Reveal이나 철회 선형화 완료 증명이 아님.
+- **브랜치/승인:** 기존 `feat/security/s0-private-memory-review-client-20261030` / PR #2761 Draft 유지, 자동 병합 OFF. `main` 병합·Cloudflare 토큰·운영 DB 마이그레이션·개인정보 Route·유료 Provider 연결 없음. G0/G1/G2/G3/G4/G5/G6 관련 미승인 공개는 계속 `HOLD_FORWARD_STOPPED`.
+- **남은 작업:** 이 커밋들의 정확한 HEAD CI/Web/Governance/PG17/외부 Cloudflare 검사 확인. G3 원래 Grant·취소·재승인·과거 파생 Context를 하나의 서버/DB/HTTP 공개 선형화 경계로 결속하는 실제 구현 및 정책 검증은 여전히 미완료.
+
+
+### 2026-10-31 · W13 · 기억 거부 CI 수정 및 실제 두 세션의 승인 경쟁 검증
+
+- **CI 증거:** 직전 HEAD `54d843cb`의 [CI 41185557039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185557039)에서 Governance/Web PASS, PostgreSQL17 PASS, Work Track · security RED. 792개 중 739 PASS/51 SKIP/2 FAIL: `seyeon-planner-memory-proposal-producer-v1.test.ts`의 한국어 ‘기록하지 말아줘’ 미인식과 `web-chat-room-read-contract.test.ts`의 공백 메시지 예외 문구 불일치. 기존 PR 전체 PASS 아님.
+- **실제 수정:** `seyeon-planner-memory-proposal-extractor-v1.ts`가 ‘기록하지 말아줘’의 `말아` 거부 표현을 모델 호출 전 인식하도록 보완(`fddbb190`). `web-chat-room-read-contract.test.ts`는 null 메시지 본문과 빈/공백 본문을 각각 실제 안전 차단 경계에서 거부함을 확인하도록 정정(`7a962dd5`). 운영 권한·개인정보 공개 범위는 확대하지 않음.
+- **실제 PostgreSQL 17 동시성 검증 추가:** `test/seyeon-security-s0-postgres.e2e.test.ts`에서 동일 Member/Assistant의 Owner 발급 pending 제안에 대해 독립된 두 트랜잭션이 `discard`와 `character_only` 결정을 경쟁하도록 구성. 먼저 확보한 제안 잠금 때문에 후속 승인 요청이 대기하고, `discard` 완료 후 승인 요청이 실패하며 제안 내용 제거, Memory/Grant 0건, 내부 제안 재표시 0건을 검증. 커밋 `47c8f5a7`. 아직 새 HEAD CI 결과로 통과 판정하지 않음.
+- **운영 불변:** PR #2761 동일 Draft 브랜치, 자동 병합 OFF. public G3 Reveal/Replay, 실사용자 private 모델 읽기, 유료 Provider, 운영 DB Migration·Role 변경 없음. 실제 G3 동의·철회 시점의 HTTP 바이트 공개 선형화, G0 정책 계약 승인 및 G5/G6 운영 검증은 여전히 `HOLD_FORWARD_STOPPED`.
+- **다음:** W13 포함 새 정확한 HEAD에서 CI/PG17 검증 결과 확인. 별도 승인 없이 내부 후보를 HTTP에 노출하지 않으며, 이후 G3 원본 Grant/현재 권한·Replay를 실제 트랜잭션/HTTP 경계에 연결하는 작업이 필요.
+
+
+### 2026-10-31 · W14 · UC-06 원문 Pre-Model DB 검증 연결 (S0 격리)
+
+- **구현:** '18-planner-pre-model-source-authority.sql'은 이미 커밋된 세연 단독 대화의 Member Subject·Turn·User Message·Assistant Message와 양쪽 원문 전체 일치를 DB Owner가 확인한 뒤 불리언만 반환한다. 변경·철회된 원문과 임의 메시지 ID는 자격 없음. 일반 API 역할·브라우저 EXECUTE DENY, 격리 설치 전용.
+- **실행 연결:** 'runSeyeonPostTurnPlannerMemoryV1'이 유료 추출 Provider **호출 전** DB 원문을 검증하고, 제안 저장 **동일 DB 트랜잭션 안**에서 같은 원문을 재검증한다. 모델 처리 중 바뀐 메시지가 pending Memory로 기록되는 것을 차단한다. Producer의 자체 Owner 검증도 유지한다.
+- **검증:** 포트·원문 추출 테스트에 과금 Provider 0회·원문 변경 후 pending 생성 0회·DB 롤백을 추가했다. PostgreSQL17 합성 시험에 정상 원문·사용자 원문 변조·답변 변조·잘못된 Assistant 결속을 추가했다. **최신 HEAD CI 이전에는 PASS로 판정하지 않는다.**
+- **변경:** scripts/operations/seyeon-security-s0/18-planner-pre-model-source-authority.sql 및 격리 설치 목록·ACL, 앱 소스 pre-model 검증 어댑터·post-turn 실행, 기존 단위/PG17 시험.
+- **남은 HOLD:** UC-06 원문 검증에 한정된 구현이며 G0/G1 양수 Pin/G2 Atomic Commit/G3 실제 공개·Replay/G4 비용 승인/G5·G6 운영 검증을 충족하지 않는다. 생산자 모델/DB 기본 DENY, 운영 Route·Migration·paid Provider·개인정보 Reveal OFF, PR #2761 Draft·병합 금지 유지.
+
+
+
+### 2026-10-31 · W15 · UC-06 보류 제안 직접 HTTP 공개와 재조회 현재 권한 결속 (S0 격리)
+
+- **구현:** 'seyeon-planner-pending-proposal-node-http-s0-v1.ts'는 실제 Node GET 요청의 Member Identity를 인증하고 DB에서 해당 회원의 canonical Subject를 구한 뒤, 지정 Thread/Assistant의 pending Planner Memory만 읽는 격리 HTTP 입구를 구성했다. 원본 사용자 메시지나 Assistant 과거 본문을 응답하지 않는다.
+- **공개 선형화:** 'seyeon-planner-pending-proposal-node-reveal-s0-v1.ts'는 기존 DB Owner의 정확한 보류 제안 조회를 독립 트랜잭션에서 호출하고, 제안 행 및 현재 대화 원본에 대한 잠금을 Node Socket 'finish'까지 유지한다. 승인/폐기/만료 후 재요청은 같은 DB를 새로 읽어 503으로 거부하며 이전에 보였던 제안을 캐시로 복원하지 않는다. 교차 회원·잘못된 메시지·인증 부재도 서버 출처/요약을 노출하지 않는다.
+- **범위 제한:** 오직 격리 PostgreSQL17 테스트 DB 이름, 직접 소유한 Node socket, 원본 pending 제안 요약만 대상이다. 일반 API EXECUTE 권한·운영 공개 Route·Vercel/Workers Fetch Proxy·모델·Memory/Grant 권한은 변경하지 않았다. 운영 G0/G3 최종 승인 또는 과거 Chat Replay의 공개 허가가 아니다.
+- **실 DB HTTP 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 합성 회원 인증을 사용하는 실제 Node HTTP GET, pending 제안 전달, 타 회원·비인증·타 Assistant 차단, 'discard' 후 재조회 503을 추가했다. 최신 HEAD CI 최종 결과는 별도 확인해야 하므로 이 기록에서는 PASS로 단정하지 않는다.
+- **남은 작업:** G0 원본 Grant/Record·파생 데이터의 현재 권한 정책, 실제 서비스 HTTP/Replay 경계 및 최종 수신 선형화, UC-07 운영 Route, G5/G6 실제 운영 전 검증. 'HOLD_FORWARD_STOPPED', PR #2761 Draft/병합 금지 유지.
+
+
+
+### 2026-11-01 · W16 · UC-06/07 실제 Node HTTP 조회→결정→재조회 격리 통합
+
+- **구현:** 'seyeon-planner-memory-decision-node-http-s0-v1.ts'는 앞서 구현된 GET pending 제안 S0 경로와 별도로, 검증된 Node IncomingMessage/ServerResponse에서 Member의 POST 네 가지 명시적 선택을 기존 UC-07 서버 결정 핸들러와 기존 Owner DB 결정 함수에 직접 연결한다. 원문, Summary, 임의 Grant/공유 대상은 HTTP에서 받지 않으며, 정상 DB 승인 결과도 제안 내용 없이 반환한다.
+- **실제 DB 경계:** 수락/폐기하는 **바로 그 회원 DB 트랜잭션 안**에서 이름이 맞는 격리 PostgreSQL DB만 통과한다. 운영 DB·Vercel Fetch·Workers Proxy는 공개 미마운트 및 S0 DB 이름 차단이다. 기본 Production Decision admission/Role ACL은 그대로 DENY이고 사용자/환경변수로 우회하지 못한다.
+- **실 HTTP 검증:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에서 진짜 Node 요청으로 pending GET → 인증 없는 POST 401 → 인증된 'discard' POST 200 → 재조회 503 → 결정 재요청 503 및 DB payload 삭제/Memory 생성 0건을 테스트한다. 기존 PostgreSQL 이중 트랜잭션 동시성 시험도 유지한다.
+- **상태:** 이 구현은 원본 Member에 의한 pending **Memory Proposal**의 선택과 재표시 제한에 국한한다. Chat Assistant 원문/과거 대화/모델의 개인기록/Grant G3 공개, G0 재승인 정책, G1·G2 양수 pin/commit 및 G5/G6 승인 충족이 아니다. 최신 HEAD 검증이 끝나기 전에는 GREEN 판정하지 않는다. PR #2761 Draft/병합 금지, 운영 개인정보·유료 Provider HOLD 유지.
+
+
+
+### 2026-11-01 · W17 · G3 원래 Grant 기반 첫 세연 답변 재조회 (S0 격리)
+
+- **실제 구현:** '19-first-original-assistant-replay.sql'은 최초 Node 송출로 DB에 delivered가 확인된 **한 개의 첫 번째 세연 Assistant 원문**만 재조회한다. 단일 Thread의 사용자/세연 메시지 정확히 두 건, 파생 Relationship 0건, 기존 Attempt의 immutable positiveProof와 저장된 원래 Grant ID, 원본 Record의 현 상태·digest·원래 Grant 철회 여부를 기존 G0 DB-owner 함수로 재확인한다. 새 Grant나 과거 HTTP 캐시는 권한 증거로 쓰지 않는다.
+- **HTTP 연결:** 'seyeon-first-original-assistant-replay-node-s0-v1.ts'는 실 Node GET 요청의 Member 인증·DB canonical Subject를 검증하고 매 요청 새 DB 트랜잭션에서 SQL을 호출한다. 실제 응답은 기존 'sendSeyeonNodeOriginalGrantResponseV1'을 재사용하여 **직접 Node socket finish까지 원래 Grant/Record 잠금을 유지**하고 'no-store'로 비스트리밍 전달한다. DB 이름은 격리 S0/CI PG17만 허용한다.
+- **실 DB 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 첫 G2 Commit과 첫 Node 전송 완료 후 HTTP 연속 재조회, 타 Member/미인증/원본 User Message ID 차단, 원래 Grant 철회 이후 본문 0건을 추가했다. 격리 fixture에서만 실행 역할에 함수 권한을 임시 부여한다. 기본 설치 권한은 여전히 DENY.
+- **한계:** 실제 Production History GET과 일반 committed_replay는 이 경로로 대체되지 않는다. Vercel Fetch/Cloudflare 프록시 및 최종 클라이언트 수신·Reader/Relationship/혼합 출처를 증명하지 못했다. G0-D1~D5/G1/G2/G3 전체/운영 G4~G6는 계속 HOLD. source registry/운영 ACL/서비스 Route/유료 Provider 활성화 없음, PR #2761 Draft·병합 금지.
+- **검증 판정:** 새 커밋 HEAD CI/PG17 확인 전에는 PASS로 기록하지 않는다.
+
+
+### 2026-11-01 · W18 · 권한 철회 ACK 이후 열린 웹 대화의 잔류 개인정보 재표시 차단
+
+- **구현:** 'records-memory-grant-revoke.js'에서 서버의 정확한 Member 확인과 'withdrawal_pending/newUseBlocked' 또는 'committed' 철회 응답이 인정된 경우에만 'seyeon-memory-visibility-invalidation.js'를 호출한다. 메시지·Memory ID·회원 토큰·원본 텍스트가 없는 알림을 현재 탭과 같은 출처의 다른 탭에 발송한다. 네트워크 실패, 비회원, 불일치·위조 응답은 알림 발급 조건이 아니다.
+- **대화 UI 결속:** 'chat-runtime-client.js'는 알림 수신 시 기존 세연 답변과 제안 DOM을 즉시 제거하고 권한 재확인 상태로 전환한다. 철회 전에 시작된 비동기 History 조회와 ACK 완료 후 도착하는 Turn 응답은 탭별 표시 상태 버전이 바뀌었으면 새로 렌더하지 않는다. 다른 Character 방의 권한을 확장하지 않으며 인증용 Bearer·DB Grant/철회 state는 변경하지 않는다.
+- **검증:** 'seyeon-memory-visibility-invalidation.test.ts'에서 pending/committed ACK, 잘못된 응답·비회원 차단, 로컬/다른 탭 무내용 알림을 테스트한다. 새 HEAD CI 결과 확인 전 GREEN으로 보고하지 않는다.
+- **경계:** 이미 외부로 송출된 HTTP 바이트를 회수하지 않는다. 다른 기기/탭에서 이루어진 철회가 열린 탭에 반드시 전달됨을 보장하는 실시간 서버 구독은 미구현이다. 알림은 화면 재표시 억제일 뿐, G0 원본 권한·G3 History 승인·실제 DB 철회 완료의 증거가 아니다. 서버 G1/G2/G3 원본 권한·Worker/Reader 파생 출처와 운영 크레딧/G4~G6는 HOLD. Source-only 동일 Draft PR #2761, 운영 공개·Provider·DB ACL·병합 없음.
+
+### 2026-11-01 · W19 · 첫 대화의 User·Assistant 원본 출처 공동 재조회 (S0 격리)
+
+- **구현:** 새 `20-first-original-dialogue-pair.sql`에서 기존 `19`의 **동일 첫 Assistant·원래 Grant/Memory·핀·현재 철회 상태** 검증이 완료된 경우에만, 같은 확정 Turn에 속하는 **DB 원본 Member User 메시지**의 동일 Subject/Thread·작성자 형태·해시·요청 스냅샷을 검증해 정확히 User 1건+Assistant 1건을 공동 반환한다. 어느 하나라도 확인할 수 없으면 원문 전체를 반환하지 않는다.
+- **직접 Node:** `seyeon-first-original-dialogue-pair-node-s0-v1.ts`에 동일 Member 인증과 대상 격리 DB를 요구하는 GET `/api/chat/:threadId/original-pair/:assistantMessageId`를 구현했다. 현재 Grant/Record와 메시지 SHARE 잠금을 **Node 소켓 finish까지** 보유한다. Fetch/Workers 프록시 경로, Production, 범용 History로는 마운트하지 않는다.
+- **설치/검증:** S0 격리 설치 계획에 20번 SQL 포함, 일반 API 역할의 기본 EXECUTE DENY를 설치 중 확인한다. 기존 PostgreSQL17 통합 테스트에서 유효한 첫 User·Assistant 한 쌍, 타 Subject, 비인증, 철회, 새 Grant 재승인 후 과거 답변 재생 불가를 실 HTTP로 검증하도록 연결했다. 현재 HEAD CI 결과 확인 전 GREEN 미확정.
+- **남은 범위:** 이 기능은 첫 대화 1쌍만 다룬다. 여러 Turn, 과거 인용된 파생 개인정보, Reader/관계 출처, 전체 G1 모델 Pin, 일반 G3 History/Replay, 운영 HTTP/수신 증명, G4~G6는 여전히 HOLD. 원본 사용자 메시지라는 사실만으로 복사·인용된 다른 개인정보의 권한이 자동 승인되지 않는다. PR #2761 Draft / 운영 공개·유료 Provider·병합 없음.
+
+### 2026-11-01 · W20 · G0 과거 대화·관계 파생 원본 누락 시 전체 HOLD
+
+- **과거 대화:** `13-g0-current-original-lineage-context.sql`의 최근 메시지 후보를 선택할 때 삭제 처리된 행·본문 NULL·공백 행을 먼저 제외하던 필터를 제거했다. 요청된 시퀀스 범위 전체를 검사해 한 행이라도 원본 본문·해시·상태가 불완전하면 `seyeon_g0_context_window_source_missing`으로 전체 HOLD한다. 과거 정상 메시지만 이어 붙여 부분 응답하거나 더 오래된 행으로 빈자리를 채우지 않는다.
+- **관계 파생:** 기존 `14-g0-relationship-event-original-lineage.sql`은 `main`과 동일하게 유지하며, 격리 설치 후 `21-relationship-origin-completeness.sql`이 기존 함수의 권한·소유자를 유지한 채 원본 Message 참조 수와 실제 결속·검증에 성공한 Message 수를 매 Event마다 일치시킨다. 삭제·누락·권한으로 숨겨진 원본 참조가 내부 JOIN에서 사라져도 파생 관계 이력 일부를 허용하지 않는다.
+- **검증·경계:** 원본 전체 검사 조건의 소스 회귀 검증을 `test/seyeon-g0-complete-source-census-v1.test.ts`에 추가. 신규 CI 결과 확인 전 GREEN 미확정. 기존 G1 전체 모델 사용 집합 Pin·G3 다중 History 실공개·Reader 교차 출처·G4 비용·G5/G6 운영 종료는 HOLD. 소스 구현만 수행, PR #2761 Draft·운영 ACL/Provider/배포 변경 없음.
+
+### 2026-11-01 · W21 · 첫 Memory 모델 입력의 전체 선택 출처 결속·선행 G1 증거 강화
+
+- **구현:** `seyeon-positive-g1-final-model-context-seal-v1.ts`에 버전 지정된 `buildSeyeonPositiveG1PreModelSourceCensusSealV1`을 추가했다. 모델에 실제 남은 `selectedSources`의 digest와 `selectedModelSourceCensusDigest`, 정확히 1건인 현재 Member User 메시지, 1건의 원래 Memory와 원래 Grant, **전체 pre-Preflight Context의 digest**를 하나의 `finalModelContextDigest`에 결속한다. 누락·위조·불일치·미검증 Relationship-derived 출처는 HOLD.
+- **영속·실행:** `seyeon-production-chat-execution-v1.ts`의 기존 PostgreSQL Owner `pinBeforeModel`이 위 결속 digest를 **모델 호출 전에** 기존 불변 `chat_turn_attempts.seyeon_personal_source_pin_jsonb.positiveProof.finalModelContextDigest`에 기록한다. Interpreter 진입 직전의 최종 조립 Context와 원래 서버 출처·전체 입력·결속 digest를 다시 대조하며 다르면 Provider로 진행하지 않는다. 새 테이블, 운영 공개 RPC, 신규 DB 실행 권한을 추가하지 않는다.
+- **검증:** `test/seyeon-positive-g1-final-model-context-seal-v1.test.ts`에 예전 단순 Context 해시 재사용, 출처 census 교체, 위조된 현재 사용자 메시지, 미검증 Relationship 유입 차단 및 비어 있지 않은 1-Memory 정상 결속을 추가한다. 정확한 최신 HEAD CI/PG17 결과 확인 전 GREEN 미확정.
+- **한계:** G1 전체 모델 요청/Preflight/렌더러·시맨틱 리뷰 파생 모든 필드에 대한 별도 독립 서명은 아직 아니다. 현재 **단일 원본 Memory·원래 Grant·원본 User 1건·파생 0건**에만 적용하며 다중 Memory/Life Fact, 관계 이력·Reader/Saju·과거 History source propagation, 정책 승인, 일반 G3 Replay, G4~G6는 HOLD. 무키 SHA는 독립 권한 증거가 아니며 DB Owner의 원래 Grant 잠금과 불변 Attempt Pin이 별도로 필요하다. Source-only PR #2761 Draft, 운영 공개·유료 Provider·병합 OFF.
+
+### 2026-11-01 · W22 · 관계 파생 출처 전체 참조 검증 및 2원본 Memory 모델 선택 사전 검증 (격리)
+
+- **기존 증거:** 직전 HEAD `e886a9a4`의 CI [41238972144](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41238972144), Governance/Web/Mobile 모두 PASS. 그 이전 W21의 타입 보정까지 포함. 본 W22 변경은 새로운 CI로 별도 검증한다.
+- **G0 관계 출처:** S0 전용 `21-relationship-origin-completeness.sql`에서 Relationship Event의 **전체** DB provenance 참조를 집계하여, 허용된 `source_message`가 아닌 참조나 NULL 메시지, 같은 Message/ordinal의 중복이 하나라도 있으면 원본 조회 전에 전체 HOLD한다. 이전의 성공 참조만 통과하는 부분 결속을 금지한다. 해당 SQL을 설치하는 운영 Migration/ACL에는 변경 없음.
+- **R21 모델 선행 검사:** `seyeon-r21-offline-derived-source-closure-v1.ts`에 이미 존재하는 실제 모델 메모리 선택·검증 함수를 결속한다. 격리 후보 ContextReady로 진행하기 전 원본 Memory 2건/정확한 원래 Grant 2건/Projection digest 대응/선택된 수 2건을 요구한다. Relationship·과거 대화·Reader·Worker·외부 도구·Preflight 유입이 하나라도 발견되면 HOLD. `test/seyeon-r21-offline-derived-source-closure-v1.test.ts`와 기존 G0 참조 회귀 검증을 추가했다.
+- **경계:** 2원본 R21은 **오프라인·격리 DB 후보**로만 존재하며, 정식 운영 G1/G2의 다중 출처 불변 Pin, Model Provider, 일반 G3 공개·재조회/철회 경쟁, Reader/Saju 교차 출처, 비용·운영 승인까지 해결하지 않는다. 실제 유료 Provider/공개 Route/운영 Role/DB 마이그레이션/병합 없음. G0 미승인, G1 다중 출처 미완료, G2~G6 HOLD; `HOLD_FORWARD_STOPPED` 유지.
+- **검증:** 새 HEAD CI 및 PostgreSQL 17 결과 확인 전 GREEN 미확정.

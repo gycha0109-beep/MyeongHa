@@ -130,7 +130,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(transport).not.toContain('payload.presentationKey');
     expect(transport).toContain("import('./api-envelope.js')");
     expect(transport).toContain('unwrapApiSuccessEnvelope(envelope)');
-    expect(transport).toContain('renderConversation(state.messages, state.characterId)');
+    expect(transport).toContain('renderConversation(state.messages, state.characterId, historyWithheld, state.memberReadAllowed === true)');
     expect(transport).toContain("article.className = 'conversation-message'");
     expect(transport).not.toContain("new URL('/api/chat/thread', window.location.origin)");
     expect(transport).not.toContain("url.searchParams.set('character', characterKey)");
@@ -147,7 +147,7 @@ describe('MyeongHa immersive long-form Character Room', () => {
 
     expect(transport).toContain('applyCanonicalCharacterPresentationV1(state.characterId)');
     expect(transport).toContain('resolveCanonicalCharacterPresentationV1(message.characterId)');
-    expect(transport).toContain('renderConversation(state.messages, state.characterId)');
+    expect(transport).toContain('renderConversation(state.messages, state.characterId, historyWithheld, state.memberReadAllowed === true)');
     expect(transport).not.toContain('presentationKey: state.characterId');
     expect(presentation).toContain("root.dataset.characterAuthority = 'canonical_character_id'");
     expect(presentation).toContain("presentationCharacterKey ?? (hasThreadRoute ? null : 'baekheon')");
