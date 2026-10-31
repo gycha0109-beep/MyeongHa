@@ -109,3 +109,250 @@ Watchtower-Track: security
 - **증거:** 대체 PR #2781 문서 편집 전 HEAD `e8c1d8486529f77e325314b69277d6b8d5677c01`의 Web/Governance PASS; [CI #41025182088](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41025182088)는 이 기록 작성 시 DB 작업 미종결. 문서 커밋에 따른 최종 HEAD 검사/Integration·병합은 별도 확정한다.
 - **중요한 한계:** DB 원본 User 입력이라는 증거는 복사·인용된 다른 개인정보의 Grant를 대체하지 않는다. G1 양수 모델 사용은 `seyeon-production-chat-execution-v1.ts`에서 **원본 Memory 1건·past history/Relationship 0건**으로 계속 제한. Reader/공식 Reading 아티팩트는 별도 Character/상품/구매 권한 경로이고, 세연의 현재 context 조립에 직접 Reader 데이터 유입은 확인되지 않았으므로 임의 긍정 교차 공개를 만들지 않음.
 - **남은 것/다음:** #2781 최종 HEAD CI/Integration/병합, 실제 모델에 사용되는 **전체 원본·파생 출처의 G1 선행 영속 Pin**, G2/G3 현권한 재검증, Reader 교차 인용 계약, G4 일반 크레딧 종단, G5/G6. **운영 `HOLD_FORWARD_STOPPED` 유지**, 운영 DDL/ACL/Provider·traffic 변경 없음.
+
+
+### 2026-10-30 / W04 — 최종 모델 최근 메시지 출처 집합 G1 결속 (PR #2784)
+
+- **목적/핵심 본체:** 기존 G1 선택기에 빠져 있던 *모델에 실제 남는* 현재 DB User 및 과거 User·Assistant 메시지 집합을 조립기와 동일한 tail-cap/정규화 규칙으로 선별. `selectedCurrentUserSource`, `selectedUnpinnedRecentSources`, 선택 메시지 digest를 `selectedModelSourceCensusDigest`의 일부로 결속. 단순 원본 이력 전체나 AI가 만든 sourceRef를 모델 사용 증거로 간주하지 않음.
+- **실제 코드:** `packages/domain/src/seyeon-runtime-context-v2.ts`의 공용 `selectSeyeonRuntimeRecentMessagesV2`, `apps/api/src/seyeon-exact-model-personal-source-selection-v1.ts`의 G1 모델 출처 목록, `apps/api/src/seyeon-production-chat-execution-v1.ts`의 DB receive 원본 User ID 전달. 기존 R19 격리 positive Pin 후보에서 새로운 미영속 최근 출처가 전부 0개인지 검증하도록 계약·기존 테스트를 갱신.
+- **PR/CI:** 최초 [#2784](https://github.com/gycha0109-beep/MyeongHa/pull/2784)는 #2781 squash 병합 후 W01~W03 문서 충돌로 미병합 종료. **동일 구현 + W04를 최신 main에 재적용한 [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786)**에서 최종 HEAD 검증 진행. 최초 HEAD `0e7a125758da01a629a06dc9b8c450df08fbb5f6`의 [CI #41027327633](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027327633)은 R19 기존 fixture 새 필드 누락으로 FAILED. R19 기능·권한은 완화하지 않고 `694b125`/`5f65ccf`에서 수정했으며, [새 PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/2784/checks) 및 후속 Integration은 **결과 확인 전 PASS 아님**. 문서 커밋에 따른 최신 HEAD는 별도 확인 필요.
+- **완료로 계산하지 않는 것:** 이 목록은 **서버 계산 출처 census이며 DB Owner 서명·불변 Attempt Pin이 아니다**(`persistedBeforeModel:false`). 본 S0 긍정 모델은 기존대로 Memory 1건·이전 메시지/Relationship 0건만 허용. 복사·재인용 간접 출처, Reader 교차 원본, 전체 G1 Pin·G2/G3·일반 credit 및 G5/G6 모두 미완료. 운영 DDL·ACL·Provider·Cloudflare 변경 없음; `HOLD_FORWARD_STOPPED` 유지.
+- **다음 구현:** 정확한 최종 모델 사용 집합의 **원본·파생 lineage를 DB Owner가 모델 이전 Attempt에 불변 저장하고**, G2 원자 Commit/HTTP 공개 시 **현재 원래 Grant ID**로 재검증하는 핵심 연결. 기존 전체 검증 완료 시점까지 positive 범위 확대 금지.
+
+
+### 2026-10-31 / W05 — G1 모델 최근 메시지 DB 원본·불변 Pin 소스 (PR #2789)
+
+- **목적/구현:** #2786 모델 선택 집합의 후속 G1 source-only 경로. PostgreSQL `seyeon_private.pin_model_recent_sources_v1`이 현재 User 및 과거 User/Assistant의 실제 DB message/committed lineage를 동일 Member/Thread에서 재검증하고, 정확한 메시지 순서·원본 content hash·본문 SHA-256·서버 선정 digest를 기존 Attempt의 신규 전용 칼럼에 보관한다. 저장된 값을 수정하지 못하도록 immutable trigger를 추가한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, `scripts/operations/seyeon-security-s0/plan.mjs`, `apps/api/src/seyeon-g1-model-recent-source-db-pin-v1.ts`, 이 Worklog 문서. 기존 positiveProof 또는 G2/G3 contract는 변경하지 않음.
+- **검사/전제:** [PR #2789](https://github.com/gycha0109-beep/MyeongHa/pull/2789) 최초 구현 HEAD `4a942f389a42b58396c213113d258cb898f6a6c5` 기준, #2786을 기반으로 한 신규 소스 후속 단위이며 DB Owner 전용 함수에 public/API 실행 GRANT가 없다. 모델 송출 경로 연결·동시 보관 계약·실DB 무결성/CI/Integration은 검증 및 추가 구현이 필요하다. SQL 설치 목록 추가는 S0 격리 설치 계획 전용이며 운영 Migration이 아니다.
+- **기존 PR #2786 상태:** HEAD `37a6114` 기준 CI/Governance/Web PASS, 별도 Web Auth Browser Regression 실패 (Records Guest 401 처리). [브라우저 검사 재실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41028133827) 요청, 독립 판정 전 완료 추정 금지.
+- **남은 것/다음:** #2786 필수 CI/Integration 병합, G1 실제 모델 전 호출 경로에 전용 원본 Pin 결합 및 G2/G3 출처 계약 확대, Reader/인용 출처, 일반 credit 및 G5/G6 운영 실증. 기존 Memory 1건·과거/관계 0건 production positive 제한 해제 금지.
+- **운영 상태:** `HOLD_FORWARD_STOPPED`. 운영 DB·ACL·Provider·HTTP 공개·credit 변경 없음.
+
+
+### 2026-10-31 / W06 — G1 출처 증명에 모델 실제 본문·DB 원본 동일성 결속 (PR #2789 후속)
+
+- **목적/구현:** 최초 G1 recent-source DB Pin 소스의 검증을 강화. 서버는 기존 모델 Context와 동일한 최근 메시지 선택 규칙을 재실행하여 원래 선택된 각 messageId·role·본문과 digest를 대조한다. DB 소스 함수는 Caller가 전달한 모델 본문과 DB의 실제 비삭제 원문을 같은 권한 트랜잭션에서 정확히 비교한 뒤에만 원본 메시지 증명서를 Attempt에 불변 저장한다. DB 반환 증명서의 각 메시지 ID/role/본문 digest도 서버에서 검사한다. 본문 문자열은 Pin 증명서에 보관하지 않는다.
+- **변경 파일:** `apps/api/src/seyeon-g1-model-recent-source-db-pin-v1.ts`, `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 이 Worklog. 기존 1건 Memory 양수 권한 및 G2/G3/운영 ACL은 확대하지 않았다.
+- **검사 실패 및 수정:** [PR #2789 기본 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41178482988)에서 신규 어댑터의 TypeScript nullable 타입 오류가 확인되어 후속 코드에서 수정했다. 동일 CI의 PostgreSQL suite에 포함된 `saju-abuse-admission-attack-e2e`, `saju-official-records-http-e2e` 실패는 신규 Pin 직접 실패로 확인되지 않았으므로 이 작업의 PASS로 추정하지 않는다. 후속 HEAD CI 결과는 실행 후 별도 확정한다.
+- **계속 미완료:** 이 함수는 S0 소스/어댑터이며 실제 모델 호출 Runner에 아직 연결되지 않았다. DB 설치·원본 Pin과 기존 personal positiveProof의 원자적 결합·G2 Commit·G3 공개 시점 검증·실DB 실증도 완료가 아니다. [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) 선행 브라우저 테스트 실패는 별도 유지.
+- **다음:** 검증된 후속 CI를 확인하고 모델 호출 전 서버 실행 경로에 하나의 DB-Owner 승인된 Pin으로 실제 연결. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W07 — G1 Pin 신규 TypeScript 컴파일 실패 수정 (PR #2789)
+
+- **목적/구현:** [CI #41183956482](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41183956482)의 `Work Track · security`에서 신규 최근 메시지 Pin 어댑터의 nullable/unknown 정적 타입 흐름이 실패했다. 식별·메시지·DB 영수증 실패 분기를 명시적 예외 종료로 변경하여 타입 검증이 실패 구간 뒤의 객체를 잘못 nullable로 유지하지 않도록 수정했다. 기존 원본 검증·DB 본문 정확 대조·HOLD 조건은 완화하지 않았다.
+- **변경 파일:** `apps/api/src/seyeon-g1-model-recent-source-db-pin-v1.ts`, 이 Worklog. 해당 컴파일 수정의 최종 HEAD CI 결과는 후속 실행으로 확인할 때까지 PASS가 아니다.
+- **다음/미완료:** #2789 신규 HEAD CI 확인과 G1 Pin 실제 모델 호출 경로 연결, 기존 #2786의 별도 Guest 전환 브라우저 실패 정리. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W08 — G1 현재 User·원본 Memory 단일 트랜잭션 결합 Pin 소스 (PR #2789)
+
+- **목적/구현:** 새 `17-g1-positive-combined-model-source-pin.sql`에서 한 번의 DB owner 호출 안에 (1) 모델에 선택된 현재 User DB 원본·실제 본문·source census 불변 Pin, (2) 기존 정확한 Memory Record/Grant 원본·type/schema·payload digest 양수 Pin과 Chat `context_ready` 전이를 결합했다. 두 단계 중 하나라도 실패하면 같은 PostgreSQL 트랜잭션 전체가 롤백된다.
+- **승인 Scope:** 기존 S0 그대로 **양수 원본 Memory 1건·현재 User 메시지 1건**만 지원한다. 과거 User/Assistant, Relationship, Reader, 다중 Records는 이 결합 함수에서 허용하지 않는다. 모델 호출·G2/G3·사용자 비용 경로의 Production activation도 없다.
+- **실제 파일:** `scripts/operations/seyeon-security-s0/17-g1-positive-combined-model-source-pin.sql`, `scripts/operations/seyeon-security-s0/plan.mjs`, Worklog 문서. S0 격리 설치 소스로만 등록하고 API/일반 역할에 직접 EXECUTE를 부여하지 않았다.
+- **미완료/다음:** G1 결합 SQL을 서버의 검증된 원본 선택/모델 전 호출 경로에 연결하고, 실제 PostgreSQL 격리 실증 및 G2 동일 결합 출처 재확인까지 완료해야 한다. 별도 설치·운영 승인과 G5/G6 증거는 아직 없다. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W09 — G1 단일 트랜잭션 Pin의 실제 서버 모델 이전 경로 연결 (PR #2789)
+
+- **목적/구현:** 실제 `runSeyeonProductionChatExecutionV1`의 양수 Memory 1건 분기에서 모델 Provider 호출 이전에 DB Owner 결합 G1 Pin을 수행하도록 호출 경로를 추가했다. `seyeon-production-transactional-ports-v1.ts`가 기존 검증된 Subject Runner와 원본 권한 DB 트랜잭션을 이용해 `pinSeyeonG1CombinedModelSourcesV1`를 호출한다. 현재 User 메시지·선택 목록·모델 컨텍스트 digest는 서버에서만 조립한다.
+- **변경 파일:** `apps/api/src/seyeon-g1-positive-combined-source-port-v1.ts`, `apps/api/src/seyeon-production-chat-execution-v1.ts`, `apps/api/src/seyeon-production-transactional-ports-v1.ts`, `apps/api/src/production-seyeon-chat-runtime-v1.ts`, 이 Worklog.
+- **보안 경계:** 기존 양수 1 Memory 제한·과거 메시지/관계 0건 및 기존 positive G2/G3 HOLD를 해제하지 않았다. 현재 Production DB에 신규 결합 RPC/ACL을 설치·허가하지 않았고 S0 소스가 API EXECUTE를 부여하지 않으므로 새 호출 경로가 실제 Production 모델 사용을 열지 않는다. 독립 단위 테스트에서 사용하는 기존 주입 Port의 동작도 변경하지 않는다.
+- **검증/미완료:** 선행 HEAD `e6b1de1a`의 [CI #41184237655](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41184237655)에서 security TypeScript 작업 검사는 PASS, PostgreSQL 전체 검사는 당시 진행 중. 이번 연결 HEAD의 검증 결과는 별도로 확인하며 실행·통합·병합·실DB 실증 전 G1 완료 아님.
+- **다음:** 신규 소스의 TypeScript/CI 및 격리 PostgreSQL 동작 확인, G2 Commit에서 최근 메시지 Pin과 현재 원본 Grant를 같은 증명으로 검증, G3 재공개까지 연결. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W10 — G2 동일 Commit에서 G1 현재 User 원본 재검증 (PR #2789)
+
+- **목적/구현:** `02-atomic-commit.sql`의 기존 실제 `validated → committed` 트리거에 G1 최근 메시지 불변 증명서가 존재하는 경우 동일 PostgreSQL Commit 트랜잭션에서 Member/Thread/Attempt·User 메시지 ID와 본문 원본 digest·content_hash를 다시 대조하도록 연결했다. 사용자 메시지 삭제/변경 또는 타 Subject/Thread 원본 변경이면 DB Commit 자체를 거부한다.
+- **하위 호환:** 예전 S0 설치 단위에는 신규 Attempt 칼럼이 없을 수 있어 `to_jsonb(old)` 기반으로 선택적으로 검증한다. 기존 zero-proof 승인 범위와 legacy positive source 체크를 바꾸지 않고, 신규 결합 Pin 존재 시 추가 원본 검증을 실시한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`, 이 Worklog. 별도 운영 DDL·ACL/Provider 활성화는 실행하지 않았다.
+- **현재 한계/다음:** G2의 원본 Memory 현재 Grant 재검증과 신규 User 출처 검증은 소스 경로로 연결했지만, Reader/관계·과거 메시지 전체 출처와 G3 최초/Replay 공개 재검증, 실제 PostgreSQL 경합 테스트, Production 적용은 미완료. 최종 HEAD의 검사는 결과 확인 전 PASS로 계산하지 않는다. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W11 — #2786 CI Guest 401 브라우저 시나리오 정합성 수정
+
+- **문제:** 선행 [PR #2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) 브라우저 검사 [#41028133827](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41028133827)가 2회 실패. `records-guest-401` 시나리오는 `/api/memories`에만 401을 주도록 설정됐지만, 실제 Records 화면은 해당 상황에서 `/api/me`, `/api/life-record`, `/api/readings`를 호출하므로 Guest 무효화가 발생하지 않았다.
+- **구현:** `scripts/verify-web-auth-rejected-bearer-browser.mjs`의 해당 시나리오에서 Records가 실제 요청하는 `/api/life-record`에 권위 있는 401 응답을 반환하도록 최소 수정. 화면의 인증·실패 처리 로직이나 서버 정책은 변경하지 않았다.
+- **검증/남은 것:** 신규 #2786 HEAD의 브라우저 CI/Integration을 확인하기 전 성공 판정하지 않음. #2789의 후속 G1 소스/Worklog W05~W10은 별도 누적 브랜치에 있으며, 이 수정은 #2786 후속 브랜치로 통합해 W11을 단일 기록에 보존해야 한다.
+- **운영:** `HOLD_FORWARD_STOPPED`, 운영 Provider·DB·ACL·HTTP 공개 변경 없음.
+
+
+### 2026-10-31 / W12 — #2786 선행 변경과 #2789 누적 보안 구현 합류
+
+- **목적/구현:** 선행 #2786의 Guest 401 테스트 경로 수정 커밋 `089d243d`를 #2789 후속 브랜치에 병합했다. 동일 보고서가 양쪽 브랜치에서 편집되어 발생한 Git 충돌은 #2789 쪽 W01~W11 전체 누적 원문을 유지하는 방식으로 해결했다. 브라우저 테스트 소스는 선행 브랜치의 수정본을 그대로 유지한다.
+- **증거/상태:** #2786 및 #2789 각 HEAD의 새 CI·전체 Integration 결과는 확인 전 PASS로 간주하지 않는다. 두 PR은 여전히 코드 소스 단계이며 병합·배포를 운영 승인으로 보지 않는다.
+- **미완료:** G1/G2 실제 PostgreSQL 격리 실행 증거, G3 최초/재공개·전출처 검증, G4 크레딧·G5/G6 운영 종료. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W13 — #2789 RED 보정: G2 JSON null과 G1 검증 테스트 정합성
+
+- **원인/증거:** [#2789 CI #41185261913](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185261913)에서 security 단위 검사 2건은 구형 문자열 `await input.positivePersonalSourcePort.pinBeforeModel({`의 존재를 요구하여 새 결합 호출 경로를 인식하지 못했다. PostgreSQL S0 e2e 9건은 기존 Attempt에 신규 출처 칼럼 값이 없는 경우 `to_jsonb(old)->'seyeon_recent_source_pin_jsonb'`가 SQL NULL이 아닌 JSON `null`로 해석되어 G2의 추가 출처 검증이 잘못 실행된 것이 직접 원인이다.
+- **수정:** `02-atomic-commit.sql`에서 JSON `null`을 SQL NULL로 정규화하여 기존 S0 양수 Grant/원본 검사와 공개 경로를 유지하고, 신규 모델 출처 증명이 실제 존재하는 경우에만 추가 User 출처 검증을 적용한다. 두 단위 검사는 새 결합 Pin 및 기존 주입 Pin 분기 모두 모델/거버넌스 호출 이전에 있는지 확인하도록 갱신했다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`, `test/seyeon-attempt-zero-personal-proof-v1.test.ts`, `test/seyeon-exact-model-personal-source-selection-v1.test.ts`, 본 Worklog.
+- **재검증 범위:** 수정 전 오류는 S0 실DB e2e 9건 및 security 테스트 2건. 로컬 의존 패키지 중 Vitest 실행 파일이 없어 로컬 직접 재검증은 수행되지 못했다. 후속 커밋의 CI 및 PostgreSQL 격리 검사 결과가 성공할 때만 PASS로 보고한다. #2786의 브라우저/보안 기본 검사는 PASS 확인되었으나 PR 병합 상태는 여전히 별도 확인 필요.
+- **운영:** `HOLD_FORWARD_STOPPED`; Production DB/ACL/Provider/Reveal 경로 활성화 없음.
+
+
+### 2026-10-31 / W14 — G3 최초 공개의 현재 User 원본·G1 최근 출처 재검증 (후속 PR)
+
+- **목적/구현:** G1 최근 출처 증명이 실제 Attempt에 있는 경우, 기존 `seyeon_private.lock_positive_first_memory_reply_v1`이 최초 답변의 비공개 텍스트를 읽거나 발행하기 **전에 동일 PostgreSQL 잠금 트랜잭션에서** 원본 User 메시지의 exact Member·Thread·Turn·Attempt·ID, 내용 해시 및 UTF-8 본문 SHA-256을 재조회해 검증하도록 수정했다. 인증 원본 메시지가 삭제/교체/변경되었거나 출처 증명이 부정확하면 기존처럼 빈 응답(공개 거부)으로 종료한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/04-locked-reveal.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 본 Worklog.
+- **호환 및 범위:** 선행 S0의 Memory 1건·현재 User 메시지 1건 원본 Grant/G2/G3 제한은 그대로 유지한다. 기존 S0에서 선택적 최근 출처 증명이 없는 Attempt는 종전 Memory 원본 검증을 유지하고, 새로운 출처 증명이 존재하면 추가 검사를 실시한다. 테스트용 `seyeon_private` 호출 허용은 이름이 제한된 일회성 격리 테스트 DB 안에서만 부여되며 **설치 기본값과 운영 권한은 불변**이다. Replay·History·Worker·Reader의 신규 공개 경로는 열지 않았다.
+- **격리 검증:** 실제 PostgreSQL S0 fixture에 모델 User 1건의 DB 출처 증명을 사전 저장해 최초 공개 후 재공개가 차단되는 사례를 추가했다. 소스 검사와 CI/격리 PostgreSQL의 후속 결과는 성공 확인 전 완료로 주장하지 않는다.
+- **선행 및 남은 것:** #2789는 초록 검사 후 #2786 브랜치에 병합됐다. #2786은 새 HEAD에서 GitHub security/PostgreSQL/browser 검사는 통과했으나 Cloudflare Workers 빌드는 인증 실패로 차단돼 있고 main 병합이 아직 미완료다. G0 전체 출처 G1/G2/G3, Replay/History, G4 크레딧, G5/G6 운영 실증은 계속 미완료다. **운영 `HOLD_FORWARD_STOPPED` 유지.**
+
+
+### 2026-10-31 / W15 — G3 증명서 누락 필드 거부 강화 및 #2800 CI 라우팅 보정
+
+- **수정:** G3 최초 공개 DB 함수가 신규 `selectedModelSourceCensusDigest` / `selectedModelMessageDigest` / `dbBodySha256`의 정규식 검증 중 **NULL도 명확히 거부**하도록 변경했다. 값이 누락된 경우에도 PostgreSQL 3값 논리 때문에 검사 분기가 미실행되지 않게 `IS DISTINCT FROM TRUE`를 적용했다. 정상적인 구형 S0는 별도 경로로 유지한다.
+- **PR/CI:** G3 후속 [#2800](https://github.com/gycha0109-beep/MyeongHa/pull/2800), 첫 HEAD `26117357`. 최초 PR 본문에 보안 트랙 식별 문자열의 실제 줄바꿈이 적용되지 않아 `Work Track · unattributed`가 실행됐다. PR 본문을 `Watchtower-Track: security` 독립 줄로 수정했으며, 본 W15 커밋에 따른 CI 재실행에서 보안 분류·PostgreSQL 검증을 확인해야 한다.
+- **검증/미완료:** #2800 최초 HEAD PostgreSQL 검사 진행 중이므로 아직 PASS로 주장하지 않는다. 새로운 코드·설치 계획은 여전히 S0 disposable source only, 운영 DB/ACL/Provider/HTTP 공개·History·Replay HOLD 해제 없음. 운영 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W16 — #2786 통합 CI RED: G1 출처 행잠금 권한 보정 및 재검증
+
+- **RED 증거:** [통합 CI #41189513938](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41189513938)의 PostgreSQL 17 job 1건 실패. 신규 `test/seyeon-security-s0-postgres.e2e.test.ts`의 실제 G1 원본 메시지 Pin→G3 최초 공개 시나리오에서 `seyeon_private.pin_model_recent_sources_v1`의 `SELECT ... FOR SHARE OF m`가 `permission denied for table conversation_messages`로 실패. 기존 12개 S0 사례 통과, 다른 security/browser/Governance/Web job PASS.
+- **원인/조치:** PostgreSQL 17의 행잠금 `FOR SHARE`는 SELECT뿐 아니라 대상 테이블 중 최소 한 컬럼의 UPDATE 권한을 요구한다. 기존 `myeongha_seyeon_chat_runtime_owner`(NOLOGIN)에는 대화 메시지 SELECT/INSERT만 허용돼 있었다. S0 격리 설치 SQL `16-g1-model-recent-source-pin.sql`에서 **오직 NOLOGIN Owner에 `conversation_messages.redacted_at` 단일 컬럼 UPDATE 권한**을 추가하여 행잠금이 가능하도록 했다. 이 Owner의 실제 행 UPDATE는 기존 subject-scope RLS에 UPDATE 정책이 없어 계속 거부된다. API/anon/authenticated/service_role에 새 권한이나 공개 실행 경로는 부여하지 않는다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 본 Worklog. 추가로 [#2786](https://github.com/gycha0109-beep/MyeongHa/pull/2786) HEAD의 필수 CI 재검증 결과를 확인해야 하며, 이 수정의 PASS를 선인정하지 않는다.
+- **외부 별도 실패:** Cloudflare Workers 빌드 실패는 기존 Invalid access token 문제로 분리, 운영 인증 토큰을 수정하거나 공개 빌드를 강제하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W17 — G1 행잠금 RED 재보정: PostgreSQL UPDATE RLS 선택 조건
+
+- **검사 근거:** [#2786 통합 CI #41190357843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41190357843)에서 S0 실제 DB 테스트 13개 중 12개 PASS, 신규 G1→G3 최초 공개 시나리오만 `seyeon_private.pin_model_recent_sources_v1`의 `G1 recent source ordering or DB origin invalid`로 실패. 이전 W16 후 `permission denied`는 해결됐으나 `SELECT ... FOR SHARE`의 원본 행 선택이 실패했다.
+- **원인/조치:** PostgreSQL 17 `SELECT FOR SHARE`는 SELECT 권한 외에 **UPDATE 행 보안 정책의 USING**도 통과해야 한다. `myeongha_seyeon_chat_runtime_owner`는 기존 subject-scoped SELECT RLS만 있고 UPDATE 정책이 없어 해당 원본 행이 숨겨졌다. 격리 SQL `16-g1-model-recent-source-pin.sql`에 **해당 NOLOGIN 소유자만** 현재 Subject의 행을 잠글 수 있는 UPDATE 정책을 추가했고 `WITH CHECK(false)`로 실제 UPDATE(동일 값 쓰기 포함)를 모두 거부한다. W16의 컬럼 한정 권한과 결합해서 행잠금만 가능하며 API/일반 역할 권한 및 public 실행 범위는 확대하지 않는다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`, 본 Worklog.
+- **후속 검증/운영:** 이번 수정 HEAD의 S0 격리 PostgreSQL·security·browser CI 재실행 결과는 성공 확인 전 PASS로 추정하지 않는다. Cloudflare Workers 빌드는 이전 인증 토큰 실패와 별개로 다룬다. 운영 DB/ACL/Provider/HTTP 공개 변경 없음; `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-10-31 / W18 — #2786 Cloudflare Workers Builds 인증 RED 보정과 단독 재시도
+
+- **증거:** [Cloudflare 빌드 3d3a382b-1e34-40ff-b521-860d165ad1b2](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/3d3a382b-1e34-40ff-b521-860d165ad1b2)는 대상 HEAD `4864e397a1303b812bbdb0755f581c45fda539e9`에서 `npm run build:web` 성공 후 `npx wrangler preview`의 API 인증 오류 `10000`, `Invalid access token 9109`로 RED 확정.
+- **원인 및 변경:** 동일 Worker의 다른 보안 브랜치 프리뷰 빌드가 새 토큰 `Workers Builds - 2026-10-31 16:30`으로 성공한 것을 확인했다. #2786 전용 빌드 트리거 `4ac94015-8944-4b39-847a-679856c679e4`의 `build_token_uuid`만 새 토큰 `75190e92-211a-45fc-86e5-21d08753da41`로 갱신했다. Branch filter·빌드·Preview 명령·운영 배포 설정은 변경하지 않았다.
+- **재시도:** Cloudflare API에서 동일 HEAD로 빌드 `294a573a-d5e8-467e-a95e-1b68e7cd96c9`를 수동 생성했으며 최초 상태 `queued`를 확인했다. 최종 성공·GitHub PR check 갱신은 아직 확정하지 않는다.
+- **남은 범위/운영:** #2786 GitHub PostgreSQL/Security/Browser 검증과 새로운 Cloudflare 빌드 결과, main 병합 확인 필요. 운영 `HOLD_FORWARD_STOPPED` 유지; Production DB/ACL/Provider/public Reveal 활성화 없음.
+
+### 2026-10-31 / W19 — #2786 브라우저 검사 2/2 401·403 응답 경로 정합성 수정
+
+- **RED 증거:** [GitHub Actions #41204675103, job #124547233944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41204675103/job/124547233944)에서 확인 단계 `Verify multiple signup confirmation Guest handoffs`가 실패. 앞선 7개 handoff 시나리오는 PASS. 실패한 `records-life-401` 상황에서 브라우저의 실제 첫 Records 요청은 `/api/readings`였고, 테스트 서버는 이를 200으로 응답했다. 이후 `/api/life-record`가 호출되지 않아 원본 Member 인증 거부가 발생하지 않았으며 Member 세션이 남아 테스트가 실패했다.
+- **구현:** `scripts/verify-web-auth-rejected-bearer-browser.mjs` 테스트 서버의 `/api/readings` 응답을 실제 첫 요청 순서와 일치시켰다. `records-life-401` Member 및 `records-guest-401` Guest에는 401, `records-life-403` Member에는 403을 반환한다. 기존 `/api/life-record`의 해당 사례 응답은 유지해 경로 순서 변화도 수용한다. 브라우저의 원래 401 무효화·403 유지에 대한 검증 기준을 완화하지 않았다.
+- **변경 파일:** `scripts/verify-web-auth-rejected-bearer-browser.mjs`, 동일 Worklog. `node --check` 및 `git diff --check` 확인; 브라우저/CI PASS 여부는 새로운 HEAD 검사가 끝난 뒤 판정한다.
+- **진행 및 운영:** #2786의 다른 CI와 Cloudflare Workers 빌드는 별도 판정; 이번 수정을 이유로 다른 트랙 검사를 취소하거나 운영 Production DB/ACL/Provider/HTTP 공개를 활성화하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 / W20 — #2786 최신 main 합류·브라우저 검사 충돌 해결
+
+- **목적:** W19 브라우저 검사 수정 HEAD `030cea09cc8ff6593fcc99d63c1e44d1d094c195`가 최신 main의 다른 Records Guest 인증 시험 수정(#2796)과 동일 파일에서 충돌해 PR 상태가 DIRTY로 바뀐 것을 해소한다.
+- **구현:** 최신 origin/main (`d9e25eee`) 합류 과정의 단일 충돌 `scripts/verify-web-auth-rejected-bearer-browser.mjs`를 직접 해결했다. main의 `/api/readings` Guest 거부 경로·추적 정보·미사용 mock API 제거를 유지하고, 첫 실요청인 `/api/readings`에 Member 401 및 Member 403 검사만 추가했다. 원래 무효화(401)/세션 유지(403) 검증 내용은 변경하지 않았다.
+- **변경:** 최신 main과의 Git 통합 커밋 및 이 Worklog. 기존 보안 G1/G2/G3 소스는 그대로 보존하고 운영 범위는 넓히지 않았다.
+- **검증/미완료:** 병합 파일 `node --check` 및 `git diff --check` 시행; 새 HEAD GitHub Browser/DB/Security와 Cloudflare 검사 결과는 실행 후 확인 전까지 PASS 아님. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-10-31 / W21 — #2786 PostgreSQL 17 역사 참여자 테스트의 중복 식별자 보정
+
+- **실패 증거:** [CI #41205332272, postgres17 job #124549180802](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41205332272/job/124549180802). 기존 G1/G2/G3 실제 PostgreSQL 테스트 `test/seyeon-security-s0-postgres.e2e.test.ts`의 13건은 모두 PASS. 다음 `test/seyeon-security-s0-history-presence.e2e.test.ts`의 3건 중 1건이 `conversation_thread_characters_pkey` 중복(`a8150000-0000-4000-8000-000000000013`)으로 중단됐다.
+- **수정:** 동일 임시 PostgreSQL 17 DB에서 앞선 G1 최초 공개 사례가 이미 사용한 `uuid(15,13)`과 역사 참여자 테스트의 Yeoul 조인 ID가 충돌했다. 역사 참여자 테스트에만 전용 미사용 `uuid(15,913)`을 부여했다. 참여자 이탈·교체, 타 Member 접근 차단, 실제 메시지 열람 HOLD 검증 로직은 그대로 유지한다.
+- **변경 파일:** `test/seyeon-security-s0-history-presence.e2e.test.ts`, 본 Worklog. `git diff --check` 확인. 신규 HEAD의 CI 완료 전까지 해당 검사 PASS 판정 없음.
+- **재실행 및 운영:** 해당 PR에 푸시해 자동 CI로 재검증하며, 무관한 다른 CI 진행 상태는 보안 구현 중단 사유로 삼지 않는다. 운영 DB/Provider/ACL/HTTP 공개 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-10-31 / W22 — G3 과거 세연 참여 이력의 DB 트랜잭션 잠금 (소스 후속 PR)
+
+- **목적/구현:** 기존 `qry_seyeon_thread_ever_involved_v1`은 읽기 시점의 이전/현재 참여자 정보를 검증했지만, 그 검사와 해당 HTTP 트랜잭션의 후속 기록 조회 사이에서 새로운 참여자가 연결되는 경쟁을 동기화하지 않았다. SQL definer 함수의 Thread Owner/Subject 확인에 `FOR UPDATE` 잠금을 적용하고 함수의 속성을 VOLATILE로 변경하여 같은 Thread에 새로운 Character 참여자를 FK로 연결하려는 세션의 KEY SHARE와 충돌하도록 했다. 잠금은 동일 읽기 트랜잭션 종료까지 유지된다.
+- **테스트:** 기존 disposable PostgreSQL 17 `test/seyeon-security-s0-history-presence.e2e.test.ts`에 **독립 DB 연결 두 개**로 검사 트랜잭션이 Thread를 잠그는 동안 경쟁 연결의 `FOR KEY SHARE`가 lock_timeout으로 거부되고, 원래 트랜잭션 종료 후 획득 가능함을 확인하는 사례를 추가했다. 과거 세연 참여 시 기존 HTTP History HOLD 및 타 사용자 404 검증은 그대로 유지한다.
+- **수정 파일:** `scripts/operations/seyeon-security-s0/08-historical-thread-presence.sql`, `test/seyeon-security-s0-history-presence.e2e.test.ts`, 동일 Worklog. S0 격리 설치 소스만 수정하며 Production migration/DB/Provider/ACL/Reader 및 본문 공개 범위를 변경하지 않는다.
+- **CI/한계:** `git diff --check` 확인. 새 HEAD CI와 PostgreSQL 경합 검사는 실행 후 결과 확인 전까지 PASS가 아니다. 이 잠금은 Character join FK 경쟁을 보호하는 G3 부분 구현일 뿐, 모든 Message/Grant 동시 변경 및 Replay 최초 공개를 승인하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W23 — G3 과거 참여자 수정 경합 잠금 추가 (PR 후속)
+
+- **목적 및 구현:** #2809(W22)의 소유 Thread `FOR UPDATE`가 새로운 Character 참여자 `INSERT`와 충돌하는 반면, 기존 `conversation_thread_characters`의 `character_id` 또는 `left_at`를 바꾸는 `UPDATE`는 Thread FK 잠금을 다시 얻지 않을 수 있다. 동일 S0 역사 참여자 권한 함수(`08-historical-thread-presence.sql`)에서 **해당 Thread의 기존 참여자 전체를 `FOR SHARE`로 잠근 후** `ever_involved`를 계산하도록 추가했다. 참여자의 현재·과거 Character 변경은 다음 DB 읽기 트랜잭션까지 대기하며, History 본문 공개 허가로 사용하지 않는다.
+- **격리 검사:** `test/seyeon-security-s0-history-presence.e2e.test.ts`에 실제 PostgreSQL 17 연결 2개로 같은 Thread의 기존 Se-yeon 참여자 `UPDATE`가 원본 권한 읽기 종료 전에는 lock timeout으로 거부되고 종료 후에는 행 잠금을 얻는 시나리오를 추가했다. 기존 W22 신규 참여자 FK 잠금/원본 이력/타 Member 차단 검사는 보존한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/08-historical-thread-presence.sql`, `test/seyeon-security-s0-history-presence.e2e.test.ts`, 동일 Worklog. 운영 DB·ACL·Provider·Reader·HTTP 공개 설정을 변경하지 않고 S0 격리 검증 소스만 수정한다.
+- **검증 및 남은 과제:** PostgreSQL 17 잠금 의미는 현재 공식 문서의 `FOR SHARE` 대 `FOR NO KEY UPDATE` 충돌 관계와 일치한다. `git diff --check` 확인 후 후속 CI에서 실제 성공 확인 필요. 이 잠금은 기존 참여자 변경/신규 참여자 동시성을 제한하는 G3 부분 구현으로, 권한 취소·과거 Replay·출처 원본 전체에 대한 종료 증거는 아니다. 운영 `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W24 — G3 Node 첫 응답 경로에서 Committed Replay 사전 차단
+
+- **목적/구현:** 실제 운영 HTTP의 `committed_replay` 재공개 HOLD는 이미 존재하지만, 격리된 Node 직접 소켓 전송 `deliverSeyeonCommittedFirstZeroNodeTurnV1`이 `replayed=true` 메타데이터만 표시하고 DB에 원본 답변을 다시 읽게 요청할 수 있었다. 새 G3 source-only 방어는 `execution.disposition=committed_replay` 또는 `committedTurn.replayed=true` 중 **하나라도 참이면** DB의 잠금 원문 조회 전에 소켓을 닫고 명시적 `REPLAY_HOLD` 오류를 반환한다. 이는 승인된 첫 응답 동작만 유지하며 새로운 Replay 승인은 생성하지 않는다.
+- **변경 파일:** `apps/api/src/seyeon-first-zero-node-turn-delivery-v1.ts`, `test/seyeon-first-zero-node-turn-delivery-v1.test.ts`, 동일 Worklog. 기존 Node 서버 응답 metadata와 Vercel Fetch / HTTP의 HOLD 정책은 그대로 유지한다.
+- **검증:** 기존 Node 전송 격리 단위 테스트에 (1) Replay 실행 disposition, (2) 실제 Commit 영수증 replay 플래그 두 사례를 추가했다. 두 경우 준비 DB 조회 이후 보호된 원본 답변을 읽는 SQL을 호출하지 않고 Response body를 비우며 소켓을 종료하는지 검증한다. 정적 diff 검사 확인; 새 HEAD CI로 테스트·타입·통합 결과를 확인하기 전 PASS라고 주장하지 않는다.
+- **선행/남은 작업:** 선행 #2809·#2812는 #2786 브랜치에 통합됐고 그 통합 HEAD의 필수 검사 GREEN 확인. #2786은 auto-merge 설정에도 `main` 병합 BLOCKED로 남아 있다. 아직 Reader 과거 본문·일반 Replay 권한·Proxy/Streaming·다중 원본·G4/G5/G6 승인/운영 종료는 HOLD. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W25 — #2814 RED 보정: Replay 사전 차단 이후 타입·테스트 정합성
+
+- **실패/근거:** [#2814 CI #41214905363](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41214905363) 보안 작업이 TypeScript 컴파일 오류 2건으로 RED: Replay 여부를 먼저 차단하여 실행 결과가 `executed`로 좁혀졌음에도 그 아래 metadata에서 `committed_replay`를 다시 비교해 TS2367 발생. 단위 테스트 성공 응답 기대값에서 fixture 인수 외부의 `override` 변수를 참조해 TS2304 발생.
+- **보정:** Node 전달 경계에서 사전 검증을 통과한 처음 응답의 `replayed:false`를 명시적으로 생성하고, 성공 응답 단위 테스트도 고정 `false`를 기대한다. 사전 `REPLAY_HOLD` 거부 조건이나 새 격리 테스트 두 건을 완화·삭제하지 않았다.
+- **변경 파일:** `apps/api/src/seyeon-first-zero-node-turn-delivery-v1.ts`, `test/seyeon-first-zero-node-turn-delivery-v1.test.ts`, 누적 Worklog. `git diff --check` 통과; 수정 HEAD CI 결과는 추후 확인 전 PASS 아님.
+- **운영:** G3 Replay 공개는 계속 금지이며 Production DB/ACL/Provider/Streaming/HTTP 경로 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W26 — G1 모델 선택 User 메시지 Digest DB 원문 재계산 (source-only)
+
+- **발견:** `seyeon_private.pin_model_recent_sources_v1`은 모델이 선택한 `selectedModelMessageDigest`가 `sha256:v1:` 형태인지만 검사했고, 해당 값이 DB에서 잠근 정확한 User/Assistant 원문과 일치하는지는 검증하지 않았다. API 측 상관관계 검사가 있더라도 PostgreSQL Owner가 해당 원문 Digest를 독립 검증해야 하므로 G1 불변 증명 수준에 공백이 있었다.
+- **구현:** 기존 `scripts/operations/seyeon-security-s0/16-g1-model-recent-source-pin.sql`의 잠긴 원본 `messageId`, 모델 role, DB `body_text`를 서버 `canonicalJson({messageId,role,text})`와 동일한 정렬 키 순서/UTF-8 JSON 문자열로 재조립하고 SHA-256을 직접 계산한다. 전달된 해시와 불일치하면 `seyeon_g1_recent_model_digest_mismatch`로 원자 트랜잭션에서 거부하며, Attempt Pin 저장과 뒤따르는 모델/Commit은 진행하지 않는다. 원문은 추가로 반환하거나 로그에 남기지 않는다.
+- **격리 검증:** 기존 PostgreSQL 17 S0 실제 original Pin/Commit/Reveal 테스트에 64자리 형식은 정상이나 내용이 위조된 digest를 전달하는 부정 사례를 추가했다. 실패 시 Attempt의 G1 최근 Pin·positive Pin 및 생성된 Character 메시지가 없음을 확인한다. 정상 원문 해시를 통과시키는 기존 first Reveal/Replay 검사도 유지한다.
+- **변경 범위:** 격리 SQL `16-g1-model-recent-source-pin.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 이 단일 Worklog. 운영 DB/ACL/Provider/공개 API·Reader·History/Replay 활성화 없음. `installerMayActivateProduction=false`, `git diff --check` 확인. CI에서 PostgreSQL 실제 해시 일치·거부를 검증하기 전까지 PASS 판정하지 않는다.
+- **선행·남은 것:** #2814는 GREEN 후 #2786 브랜치에 병합됐다. #2786 main 자동 병합은 아직 BLOCKED이며 공식 G0~G6 종료 게이트는 통과한 상태가 아니다. 모델 전체 출처 Census의 DB 강제 서명, 다중 Memory/Life Fact/파생 이력, 운영 G2/G3/G4·G5/G6는 계속 미완료. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W27 — G1 실제 Chat 실행의 Memory-only Pin 우회 제거 (Provider 사전 차단)
+
+- **선행:** [#2820](https://github.com/gycha0109-beep/MyeongHa/pull/2820)의 PostgreSQL 17, 보안·Governance·Web·Cloudflare CI GREEN을 확인한 뒤 기존 #2786 부모 브랜치에 squash 병합했다(merge SHA `6ac6a3fad457e703e134036ec81828b354e67401`). 부모의 main 병합은 여전히 BLOCKED, auto-merge는 설정된 상태다.
+- **발견:** `runSeyeonProductionChatExecutionV1`의 1-Memory positive 실행은 combinedSourcePinPort가 없으면 구형 `positivePersonalSourcePort.pinBeforeModel`을 호출할 수 있었다. 그러면 Memory 원본 Pin만 남고 실제 모델 입력의 현재 User 원본을 DB Attempt에 함께 고정하지 않은 채 Provider 쪽으로 진행할 가능성이 있었다.
+- **구현:** positive 1-Memory 분기에서 `positivePersonalSourcePort`와 `combinedSourcePinPort`를 모두 필수로 하며, **동일 트랜잭션의 Memory+현재 User 결합 Pin** 하나만 호출하도록 legacy fallback을 삭제했다. 두 출처의 결합 DB Pin을 사용할 수 없는 경우 기존 `SeyeonProductionChatExecutionErrorV1`로 Provider 진입 전에 차단한다. 현재 운영 Projector 기본 비활성, 0-Personal 흐름, 일반 Replay/History HOLD는 유지한다.
+- **회귀 기준:** `test/seyeon-attempt-zero-personal-proof-v1.test.ts`와 `test/seyeon-exact-model-personal-source-selection-v1.test.ts`의 기존 Provider 이전 보안 순서 검증을 결합 Pin 필수·legacy 경로 부재 기준으로 갱신했다. `git diff --check` PASS. 로컬 worktree에는 vitest/typescript 설치본이 없어 CI에서 실행·타입 통과 확인해야 한다.
+- **변경 범위:** `apps/api/src/seyeon-production-chat-execution-v1.ts`, 두 기존 테스트, 본 Worklog. 운영 DB/ACL/Provider/Reader/HTTP Route 설정은 변경하지 않는다. `HOLD_FORWARD_STOPPED` 유지. 전체 G0~G6 종료 판정 아님.
+### 2026-11-01 / W28 — G2 원자 확정 시 현재 User DB 출처 Pin 필수화 (source-only)
+
+- **선행 통합:** PR #2822 `403fc1a1`은 Security/Governance/Web/Cloudflare 필수 CI GREEN 후 부모 #2786 브랜치에 squash 병합(`a443d34983eac7c71eceeaf163a16c980b327647`). #2786는 main 자동 병합 설정 중이나 아직 BLOCKED.
+- **발견:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`의 실제 `validated -> committed` 전환 Trigger는 positive Memory Pin만 있고 `seyeon_recent_source_pin_jsonb`가 NULL인 경우 원본 User 재검증을 건너뛸 수 있었다. 상위 실행 경로의 G1 결합 Pin 필수 정책만으로는 독립 SQL/레거시 호출의 G2 보호가 완전하지 않았다.
+- **구현:** positive Memory Commit 분기에 현재 User 원본 G1 Pin을 의무화했다. 없으면 `seyeon_positive_g2_recent_source_pin_required`로 해당 Commit 트랜잭션을 실패시키고, 기존 SQL trigger의 동일 DB 트랜잭션 안에서 User 본문·원본 해시/Grant/Memory 정합성 검사와 assistant/outbox 원자성을 유지한다. 0건 비개인정보 Commit·다른 앱 운영 함수·공개 범위 변경 없음.
+- **PostgreSQL 검증:** 기존 S0 disposable PostgreSQL 17 통합 테스트의 positive 정상 fixture는 최근 User 원본을 G1으로 먼저 고정하도록 갱신했다. 신규 부정 케이스는 구형 Memory-only Pin을 강제로 생성해 G2 Commit 거부 및 validated Attempt 상태 유지와 assistant 메시지 생성 0건을 검증한다. CI 통과 전 결과 PASS 아님.
+- **변경:** `02-atomic-commit.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 누적 보안 Worklog. `git diff --check`와 `plan.mjs`의 `installerMayActivateProduction=false` 확인. Production DB/ACL/Provider/HTTP/Reader 활성화 없음. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-01 / W29 — G3 내부 Node 송신 함수의 Replay 직접 호출 차단 (source-only)
+
+- **독립 작업:** G2 최근 User Pin 필수화 #2823의 PostgreSQL 17 CI가 실행 중이어서 별도의 G3 전송 경계를 구현했다. 부모는 CI GREEN으로 확인된 #2786 통합 HEAD `a443d34983eac7c71eceeaf163a16c980b327647`이며 운영 병합·활성화는 별도다.
+- **발견:** 상위 `deliverSeyeonCommittedFirstZeroNodeTurnV1`은 이미 `committed_replay`와 `commit.replayed=true`를 차단하지만, 재사용 가능한 하위 `sendSeyeonNodeOriginalGrantResponseV1`은 전달 받은 `chatResponseMetadata.replayed=true`를 단순 출력 메타데이터로 취급했다. 직접 호출 시 DB 원문 조회 경로가 실행될 가능성이 있어 소켓 경계 자체에도 Replay 인가 차단이 필요했다.
+- **구현:** Node 응답 송신 전 메타데이터가 유효하더라도 `replayed=true`이면 `SeyeonNodeOriginalGrantSendBoundaryErrorV1`을 발생시키고 소켓을 파기한다. DB 원본 읽기 callback/Provider 호출/본문 송신은 실행되지 않는다. 0건·정상 최초 응답·권한 없음 503 동작 및 비스트리밍 유지. 기존 HTTP/Reader·Provider/ACL/DB 설정 변경 없음.
+- **검증:** 실 Node 송신 경계 단위 테스트에 `replayed=true` 시 소켓 파기와 DB 읽기 0회를 검증하는 케이스를 추가하고, 기존 권한 없음 503 검사는 처음 요청인 `replayed=false`에 대한 거부로 유지했다. `git diff --check` 확인. 새 CI GREEN 전까지 결과 PASS는 미확정.
+- **범위:** G3 source-only 후보, 실 Production Route 공개하지 않음; 전체 개인기록/과거 Replay 승인하지 않음. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-01 / W30 — G3 최초 공개에 원본 User G1 Pin 필수화 (source-only)
+
+- **선행:** #2823(PostgreSQL 17/보안/Governance GREEN)을 부모 #2786에 squash 병합(`8f9d36ff92d113bc437740d72893989c712b1a3d`). #2824는 W28/W29 동일 Worklog의 충돌을 해소하고 병합 커밋 `f92ea00f`를 별도 PR HEAD로 재검증 중이다.
+- **발견:** 실제 G3 최초 공개 SQL(`04-locked-reveal.sql`)의 original User G1 최근 출처 증명은 검증 로직이 있어도 Pin이 없는 옛 Memory-only Attempt를 그대로 통과시키는 선택적 분기였다. G1 모델 전 결합 Pin 및 G2 Commit 필수 정책과 달라 오래된 응답을 최초 공개하는 별도 통로가 남아 있었다.
+- **수정:** 동일 G3 PostgreSQL owner 함수가 기결 Commit·Attempt를 잠근 이후 `seyeon_recent_source_pin_jsonb`가 NULL이면 보호된 Assistant 본문/Grant를 조회하기 전에 아무 행도 반환하지 않고 HOLD한다. Pin이 존재하면 원래와 동일한 `messageId`/Subject/Thread/Turn/Attempt 및 현재 DB 원문 해시 검증을 적용한다. 실제 운영 Migration·API ACL·Provider 호출·공개 Route·스트리밍을 활성화하지 않는다.
+- **검증 범위:** 기존 S0 PostgreSQL 17 실제 결합 User Pin + 첫 Reveal 통합 테스트를 보존하고 `git diff --check`, `plan.mjs installerMayActivateProduction=false` 확인. 레거시 과거 Commit fixture를 신규 운영 데이터로 변조하지 않으며, 신선한 HEAD CI 결과 전까지 전체 PASS라고 주장하지 않는다.
+- **남은 것:** G0 전체 출처/Streaming 권한 계약, G1 다중 기록/파생 출처, G2/G3 실제 운영 배포 승격, G4 일반 크레딧 결제 종단, G5/G6 최종 검증·승인. `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-01 / W31 — #2786 db-authority-core R24 재전송 테스트 정책 정합화
+
+- **실패 근거:** [GitHub Actions #41223846354 / db-authority-core #124603850941](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41223846354/job/124603850941). disposable PostgreSQL R5 테스트 16건 중 15건 통과, `R24 real G2 committed receipt to Node G3` 1건이 `UND_ERR_SOCKET`으로 RED. 레거시 R24 테스트가 valid Grant의 `committed_replay` 원문 재전송 HTTP 200을 기대했으나, 통합된 G3 Node 송신 경계 W29는 replay=true에 소켓을 즉시 닫도록 강화되어 충돌했다.
+- **조치:** `test/seyeon-r5-current-reveal-disposable.test.ts`의 R24 통합 검증을 **처음 응답 200** 및 **replay는 처음/Grant 취소·다른 Grant 재발급 이후 모두 연결 종료·HTTP 본문 없음·보호된 DB connect 0회**로 정합화. Replay 예외의 구체적인 차단 메시지와 파기된 Node socket을 확인한다. 오래된 200 replay 승인이나 503 응답을 가정하지 않는다. 다른 실제 DB R5 revoke/regrant 및 첫 응답 원자 확정 테스트 유지.
+- **변경 파일/검증:** R24 통합 테스트와 이 단일 보안 Worklog만 변경. `git diff --check` 확인. 실제 db-authority-core 재실행 CI 확인 전에는 PASS라고 표시하지 않는다.
+- **운영:** Production DB/ACL/Provider/공개 응답/기존 G3 전송 방어 코드 변경 없음. `HOLD_FORWARD_STOPPED` 유지, 전체 G0~G6 종료 판정 아님.
+### 2026-11-01 / W32 — G4 첫 Memory 회원 크레딧 예약 권한 결합 및 Provider 사전 HOLD (source-only)
+
+- **선행 상태:** PR #2786 HEAD `70b5e768`에서 db-authority-core 포함 필수 보안/PostgreSQL17/Browser/Governance/Web/Cloudflare CI 전부 GREEN 확인. 자동 병합은 설정되었지만 `main` 병합은 GitHub에서 BLOCKED.
+- **실제 G4 공백:** `commerce-chat-credit-gate-v1` / `postgres-chat-credit-candidate-v1` / `commerce-chat-credit-delivery-ack-candidate-v1`의 10크레딧 원자 예약·전달 ACK 정산 후보가 있지만, 세연의 첫 Memory 모델 입구는 그 예약을 필수로 요구하지 않았다. 서버 Governor의 모델 비용 원장만으로 고객 채팅 크레딧 권한을 대신할 수 없다.
+- **구현:** `seyeon-g4-first-memory-credit-admission-v1.ts` 후보를 추가. 기존 검증된 Member 증거를 하나의 PostgreSQL Subject 트랜잭션에서 canonical Subject로 변환하고, 같은 트랜잭션의 DB Owner Admin 권한 함수와 기존 private 10-credit reserve 포트를 순서대로 호출한다. DB 확인된 Owner Admin의 chatCreditExempt만 예약을 생략한다. 부족·충돌·기확정 Replay·권한 불일치·Guest·위조 exemption은 모델 입장 권한으로 변환하지 않고 ROLLBACK한다. 별도 HTTP 공개나 API EXECUTE는 없다.
+- **실행 연결:** `production-seyeon-first-memory-node-runtime-v1.ts`에서 사용자가 승인한 Memory/Governor 자격만으로 모델 설정을 읽을 수 없도록 `creditBilling.productionMounted`를 추가로 검사하고, 해당 권한이 승인·장착되기 전에는 Provider credential 읽기 전에 HOLD한다. 향후 실제 정산 종단이 연결된 경우에만 현재 User/Thread/ClientTurn 기준 예약 함수가 모델 호출 전 수행될 후보 결합이다. `creditBilling.productionMounted=false` 고정 유지, **실제 예약/결제 실행·공개 모델 호출은 활성화하지 않음**.
+- **테스트:** `test/seyeon-g4-first-memory-credit-admission-v1.test.ts`로 canonical Member/원자 예약/Owner exemption/부족·충돌·기확정·Guest·위조 권한 거부/트랜잭션 종료를 검증. 기존 첫 Memory 노드 실행 검증에는 승인 콜백이 true여도 크레딧 정산이 장착되지 않으면 Provider 키 읽기 없이 HOLD하는 사례를 추가. `git diff --check` 확인. 로컬 워크트리는 vitest/tsc 실행파일이 없어 새 PR CI 결과를 기다려야 한다.
+- **미완료:** 원본 응답 전달 ACK와 예약 정산/실패 해제의 실제 종단·운영 DB 역할/권한·일반 결제 크레딧 배포는 여전히 별도 필요. 본 구현은 G4 종료 판정·Provider/결제 운영 활성화가 아니다. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W33 — G4 같은 예약의 중복 Provider 입장 차단 (#2833 보강)
+
+- **발견/보정:** 결제 트랙의 `reserveChatReplyCreditsV1`은 DB 원자 반환 `reserved`와 `already_reserved`를 공통 `reservation`으로 정규화한다. 이를 새 Provider 입장 권한으로 무조건 수용하면 동일 ClientTurn 재시도로 중복 유료 AI 호출이 가능하다.
+- **구현:** G4 첫 Memory 예약 후보가 기존 서버 검증·원자 예약 함수를 그대로 이용하면서 DB 원본 결과가 **새로운 `reserved`** 인 경우에만 첫 모델 입장을 인정한다. `already_reserved`는 기존 예약/기확정 Turn의 조회·전달 경로에서 별도 처리되어야 하며, 신규 Provider 호출은 `SEYEON_G4_CREDIT_ADMISSION_HOLD`로 거부하고 해당 후보 트랜잭션을 ROLLBACK한다.
+- **검증:** G4 후보 단위 검증에 재예약 경합의 `already_reserved`를 거부 사례로 추가. 새 커밋 CI GREEN 전에는 테스트 통과를 추정하지 않는다. 결제/AI 실제 Production 권한은 변경하지 않았으며 `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W34 — G4 첫 Memory 예약에 원본 Turn 연계 및 전달/미전달 정산 후보 연결
+
+- **선행:** #2786 HEAD `af6c220f1a323d5a48ac8d7702d3dd5700ac011b` 필수 CI(db-authority-core·PostgreSQL 17·Work Track·Governance·Web·Auth Browser·Cloudflare 등) GREEN 확인. #2786는 main 병합 BLOCKED, auto-merge 설정 유지. 운영 `HOLD_FORWARD_STOPPED`.
+- **발견:** #2833의 신규 10-credit Admission은 canonical Member/Thread/ClientTurn에 대해 DB 원자 예약 후 `reservationId`를 반환하지만, 최초 AI 전달 후 고객 크레딧 정산·확정 미전달 환불을 같은 원본 예약에 묶은 세연 전용 내부 연결부가 없었다. 기존 결제 트랙은 독립된 `internal_cmd_chat_credit_ack_delivered_proven_v2`와 `releaseFailedChatCreditsCandidateV1`의 DB 검증 계약을 제공하며 HTTP ACK는 아직 미장착.
+- **구현:** `seyeon-g4-first-memory-credit-admission-v1.ts`의 성공 신규 예약에 canonical Subject/Thread/ClientTurn 세 식별자를 명시적으로 포함한다. 신규 `seyeon-g4-first-memory-credit-reconciliation-v1.ts`는 서버가 보유하는 해당 예약과 별도로 검증된 Member identity를 새 PostgreSQL Subject 트랜잭션에서 교차 검증한 뒤 (1) **confirmed_delivered**는 정확한 committed Turn+Assistant 및 S0 positive delivery receipt를 DB가 증명한 경우에만 기존 private 10-credit ACK/settlement 함수를 호출하거나 (2) **definitive_undelivered**는 원본 ChatTurn에 commit/delivery가 전혀 없고 DB의 terminal failed state 증명이 있는 경우에만 기존 private reservation release 함수를 호출한다. 소켓 `finish`, LLM 완료, 클라이언트 boolean, 일반 네트워크 오류만으로는 정산/환불하지 않는다. 커밋/출처가 맞지 않으면 ROLLBACK한다.
+- **테스트/검증:** 기존 G4 예약 테스트 성공 결과에 Thread/ClientTurn 일치 검사를 추가하고, 새 격리 트랜잭션 테스트에 실제 함수 호출 인자, DB 거부 시 rollback, 미전달 증명 없이는 refund 없음, Member·Subject·예약·assistant 변조 거부를 추가했다. `git diff --check` 검사. 로컬 worktree에 node_modules가 없어 실제 Vitest/PG 검사는 신규 HEAD CI로 확인하며 GREEN 전까지 통과 선언하지 않는다.
+- **출시 차단/남은 것:** 소스 후보와 기존 내부 결제 함수 조립에만 해당한다. 정산 API EXECUTE·HTTP route·실제 결제 크레딧 사용자 지갑·Node→고객 수신 ACK·독립 PostgreSQL 증명까지 G4 운영 승격은 미완료. 후보 `productionMounted:false`, 세연 `creditBilling.productionMounted:false`, Producer/Worker/공개 API·DB migration 변경 없음. `HOLD_FORWARD_STOPPED` 지속.
+### 2026-11-01 / W35 — G4 원본 전달 ACK·환불 DB 권한 실증 (격리 PostgreSQL)
+
+- **선행:** PR #2834의 GitGuardian·Work Track·Governance·Web·Cloudflare/CI 필수 검사 GREEN 확인 후 부모 #2786에 squash 병합(`5d34e2029a095798cce71efd2525521d14df7458`). 단, #2834 개별 PR에서 `db-authority-core`는 SKIPPED였으므로 실제 PostgreSQL PASS는 주장하지 않았다. 부모 #2786의 `main` 자동 병합은 여전히 BLOCKED.
+- **구현:** 기존 `test/db/run_authority_core.sh`의 격리 Commerce Credit Candidate 하위 실행기 `test/db/candidates/chat_credit_private_ledger_v1.sh`에서, 기존 후보 DDL·회귀 확인 후 **이름이 고정된 `myeongha_commerce_credit_candidate_test` / CI=true / PGHOST=localhost** 조건에 한해 기존 미배포 private ACK V2 SQL(`20261027125500_chat_credit_delivered_ack_private_v1.sql`)을 격리 DB에만 설치하고 새 SQL 증명 테스트를 실행하도록 확장했다. Production Migration 파일·운영 DB·실제 크레딧 RPC EXECUTE는 변경하지 않는다.
+- **신규 PG 테스트:** `test/db/candidates/chat_credit_g4_original_delivery_reconciliation_v1_test.sql`은 임시 Member/Thread/Turn/크레딧 예약을 하나의 ROLLBACK 트랜잭션으로 생성하고 (1) 새 예약 1건만 허용, 동일 ClientTurn의 `already_reserved` 반환과 10크레딧 중복 차감 방지, (2) 미확정/미전달 답변이나 허위 reservationId로 private ACK V2 정산 시도 시 실패 및 예약 유지, (3) 미확정 진행 중인 Turn은 환불 근거가 될 수 없고, **최종 failed_final + 결제 없는 Turn**만 환불 적격, (4) 동일 예약 두 번 해제 시 잔액 정확히 복원, 해제 후 늦은 ACK 정산 거부, (5) API executor/authenticated/service_role의 private ACK V2 EXECUTE 없음 검증을 수행한다.
+- **검증:** `git diff --check` 및 CI 라우팅에서 `test/db/` 변경은 `db-authority-core` 실행 대상으로 확인. 사용자 PC에서는 Docker Linux Engine이 비활성 상태이므로 로컬 실증을 수행하거나 운영 DB를 건드리지 않았다. 새 HEAD의 실제 PostgreSQL CI 성공 전까지 PASS 판정하지 않는다.
+- **남은 것:** G4 정식 전달 ACK 수신자/내부 권한 배포, 실제 긍정 전송→정산 성공 실 DB 경로, 불확정 장애에서 예약 장기 보류/복구, 전반적인 DB·HTTP·Provider 서비스 연결 및 G5/G6 완료 게이트. G0~G6 완료 판정 아님, `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W36 — G4 미전달 환불 동시성 잠금 순서 정합화 (source-only)
+
+- **선행:** PR #2838 `db-authority-core`를 포함한 필수 CI GREEN 확인 후 #2786에 squash 통합(`f09517b756e60df19cf3da9967b84eee08a253b3`). 해당 HEAD의 전체 통합 CI는 재실행 중이며 `CI Integration Verify` 요구사항이 충족되기 전에는 `main` 자동 병합이 차단된다.
+- **발견:** `reconcileSeyeonG4FirstMemoryCreditsV1`의 최종 실패 환불 경로는 기존 `releaseFailedChatCreditsCandidateV1`의 Turn `FOR SHARE`를 먼저 수행한 후 DB finalize에서 Subject/Reservation을 `FOR UPDATE`한다. 반면 private Delivery ACK V2의 잠금 순서는 Subject → Reservation → Turn이므로 동시 ACK/환불 경합 시 잠금 순서 역전 위험이 있었다.
+- **수정:** 내부 G4 Candidate의 환불 경로는 정산할 exact canonical Member `subjects`를 `FOR UPDATE`하고, 원본 `reservationId` + 동일 Subject/Thread/ClientTurn + 정확히 10크레딧 및 현재 `reserved` 상태를 `FOR UPDATE`로 잠근 **후에만** terminal failed/no-delivery Turn 증명을 수행한다. 예약이 없거나 소유자/상태가 달라지면 즉시 HOLD 및 트랜잭션 롤백하고 환불 SQL을 호출하지 않는다. 성공 ACK 쪽 DB 기존 잠금 순서는 변경하지 않는다.
+- **검증:** `test/seyeon-g4-first-memory-credit-reconciliation-v1.test.ts`에서 Subject → Reservation → Turn 증명 → Finalize 순서를 검사하고, 기존 예약이 없을 때 본문 확인/환불 0회와 rollback을 검증한다. `git diff --check` 확인, 새 PR CI 실행 전 GREEN 판정 아님.
+- **권한/출시:** 실행 SQL은 여전히 private 후보로, `myeongha_api_executor`에 Ledger 테이블/정산 RPC 접근 권한이 허용되지 않아 별도 승인된 Server Owner DB 포트 구축 전 운영 연결 불가. SQL Migration, ACL grant, HTTP, Provider, 실제 결제는 변경하지 않는다. `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. G4/G5/G6 완료 아님.

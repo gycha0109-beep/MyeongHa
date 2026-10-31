@@ -204,6 +204,13 @@ export async function sendSeyeonNodeOriginalGrantResponseV1(
     deadlineMs = deadlineValue(input.deadlineMs);
     if (input.chatResponseMetadata !== undefined) {
       assertSeyeonNodeChatResponseMetadataV1(input.chatResponseMetadata);
+      // The low-level socket boundary must not trust an upstream replay
+      // admission. Replayed receipts never authorize a first private send.
+      if (input.chatResponseMetadata.replayed) {
+        throw new SeyeonNodeOriginalGrantSendBoundaryErrorV1(
+          'Replayed Seyeon turns cannot use the original first-send socket.',
+        );
+      }
     }
     if (input.response.headersSent || input.response.writableEnded ||
         input.response.destroyed) {

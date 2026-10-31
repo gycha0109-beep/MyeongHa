@@ -45,6 +45,9 @@ function requireSelection(
       !SHA.test(selection.selectedModelSourceCensusDigest) ||
       !Array.isArray(selection.selectedUnpinnedDerivedSources) ||
       selection.selectedUnpinnedDerivedSources.length !== 0 ||
+      selection.selectedCurrentUserSource !== null ||
+      !Array.isArray(selection.selectedUnpinnedRecentSources) ||
+      selection.selectedUnpinnedRecentSources.length !== 0 ||
       !Number.isSafeInteger(selection.selectedPersonalRecordCount) ||
       selection.selectedPersonalRecordCount < 1 ||
       selection.selectedPersonalRecordCount > 2 ||
@@ -60,6 +63,8 @@ function requireSelection(
       selection.selectedModelSourceCensusDigest !== 'sha256:v1:' +
         createHash('sha256').update(canonicalJson({
           originalPersonalSources: selection.selectedSources,
+          currentUserSource: null,
+          unpinnedRecentSources: [],
           unpinnedDerivedSources: [],
         })).digest('hex')) {
     throw new SeyeonR19OfflinePositivePinHoldV1();

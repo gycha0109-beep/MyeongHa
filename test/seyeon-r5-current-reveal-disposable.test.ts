@@ -634,7 +634,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
   });
 
 
-  it('R24 real G2 committed receipt to Node G3: first, fresh replay, revoked/regranted replay 503, stale payload zero', async () => {
+  it('R24 real G2 committed receipt to Node G3: first only; replay closes socket without DB read even after regrant', async () => {
     const id=await committed(83); // Existing R3 actual v2 with 2 Outboxes.
     const g2Receipt:SeyeonR23OfflineG2CommitReceiptV1={
       status:'disposable_atomic_v2_committed',
@@ -645,10 +645,17 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     };
     const result=async(purpose:'first'|'committed_replay',expected:'assistant_sent'|'reveal_held')=>{
       let observed:{status:number;cache:string|null;wire:string}|null=null;
+      let replayDbConnections=0;
       await withR9Loopback(async(req,response)=>{
         await r9ReadBody(req);
-        const outcome=await sendSeyeonR24OfflineG3V1({
-          receipt:g2Receipt,pool:offlineOriginalGrantPgPool,
+        const attempt=sendSeyeonR24OfflineG3V1({
+          receipt:g2Receipt,
+          pool:purpose==='committed_replay'?{
+            async connect(){
+              replayDbConnections++;
+              throw Error('Replay must never open a protected DB read');
+            },
+          }:offlineOriginalGrantPgPool,
           verifiedEvidence:{kind:'member',verifiedAuthUserId:offlineMemberId},
           threadId:id.thread,response,
           requestSignal:new AbortController().signal,
@@ -660,17 +667,29 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
             serverTime:'2026-10-19T00:00:00.000Z',
           },
         });
-        expect(outcome).toBe(expected);
+        if(purpose==='committed_replay'){
+          await expect(attempt).rejects.toThrow(/Replayed Seyeon turns/u);
+          expect(response.destroyed).toBe(true);
+        }else{
+          expect(await attempt).toBe(expected);
+        }
       },async origin=>{
-        const received=await fetch(origin+'/r24-offline-g2-to-g3',{
+        const request=fetch(origin+'/r24-offline-g2-to-g3',{
           method:'POST',body:'synthetic-only',
         });
+        if(purpose==='committed_replay'){
+          await expect(request).rejects.toThrow();
+          return;
+        }
+        const received=await request;
         observed={
           status:received.status,
           cache:received.headers.get('cache-control'),
           wire:await received.text(),
         };
       });
+      expect(replayDbConnections).toBe(0);
+      if(purpose==='committed_replay')return {status:0,cache:null,wire:''};
       if(observed===null)throw Error('R24 missing Node loopback delivery');
       return observed as {status:number;cache:string|null;wire:string};
     };
@@ -679,11 +698,8 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
     expect(first.cache).toBe('no-store');
     expect(first.wire).toContain(body);
     expect(first.wire).toContain('"replayed":false');
-    const replay=await result('committed_replay','assistant_sent');
-    expect(replay.status).toBe(200);
-    expect(replay.cache).toBe('no-store');
-    expect(replay.wire).toContain(body);
-    expect(replay.wire).toContain('"replayed":true');
+    const replay=await result('committed_replay','reveal_held');
+    expect(replay).toEqual({status:0,cache:null,wire:''});
     await transaction(async c=>{
       await c.query('update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',[id.grant]);
       await c.query(
@@ -692,10 +708,7 @@ describe.skipIf(!enabled)('R5 disposable actual-v2 current-rights first/replay/h
       );
     });
     const denied=await result('committed_replay','reveal_held');
-    expect(denied.status).toBe(503);
-    expect(denied.cache).toBe('no-store');
-    expect(denied.wire).not.toContain(body);
-    expect(denied.wire).toContain('SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE');
+    expect(denied).toEqual({status:0,cache:null,wire:''});
     await expect(history(id)).rejects.toMatchObject({
       constraint:'seyeon_offline_r5_page_held',
     });
