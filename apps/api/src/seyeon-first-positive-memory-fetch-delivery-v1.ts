@@ -15,6 +15,41 @@ const PIN_RPC='public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid
 const COMMIT_RPC='public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)';
 const ACK_RPC='seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)';
 const REQUEST_REVOKE_RPC='seyeon_private.cmd_request_seyeon_memory_revoke_v1(uuid,uuid)';
+const G0_RECENT_RPC='public.qry_seyeon_g0_current_source_recent_messages_v1(uuid,uuid,uuid,integer)';
+const G0_HISTORY_RPC='public.qry_seyeon_g0_current_source_relationship_history_v1(uuid,text,bigint)';
+const G0_USER_RPC='seyeon_private.assert_current_original_member_user_message_v1(uuid,uuid,uuid)';
+const G0_ASSISTANT_RPC='seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)';
+
+/**
+ * Run after subject authentication but BEFORE a new logical turn is inserted.
+ * A missing original-lineage guard must not create failed_retryable turns that
+ * obstruct subsequent sends. This is a readiness check, not a bypass.
+ */
+export async function assertSeyeonG0OriginalLineageReadyV1(client: Readonly<{
+  query(sql: string, values?: unknown[]): Promise<{rows: readonly unknown[]}> | {rows: readonly unknown[]};
+}>): Promise<void> {
+  const result=await client.query(`select count(*)=4 as ready
+    from pg_catalog.pg_proc p
+    where p.oid in(to_regprocedure($1),to_regprocedure($2),
+                   to_regprocedure($3),to_regprocedure($4))
+      and p.prosecdef
+      and pg_catalog.pg_get_userbyid(p.proowner)='myeongha_seyeon_chat_runtime_owner'
+      and (
+        (p.oid in(to_regprocedure($1),to_regprocedure($2))
+         and has_function_privilege(current_user,p.oid,'EXECUTE'))
+        or
+        (p.oid in(to_regprocedure($3),to_regprocedure($4))
+         and not has_function_privilege(current_user,p.oid,'EXECUTE'))
+      )
+      and not has_function_privilege('anon',p.oid,'EXECUTE')
+      and not has_function_privilege('authenticated',p.oid,'EXECUTE')
+      and not has_function_privilege('service_role',p.oid,'EXECUTE')`,
+    [G0_RECENT_RPC,G0_HISTORY_RPC,G0_USER_RPC,G0_ASSISTANT_RPC]);
+  if(result.rows.length!==1 || (result.rows[0] as {ready?:unknown}|undefined)?.ready!==true) {
+    console.error('MYEONGHA_SEYEON_G0_READINESS_HOLD');
+    throw new Error('Original-lineage context authority is not installed or approved.');
+  }
+}
 
 /** Only the exact DB-owned in-flight error is safe to disclose as a static 409.
  * Every other failed security, source, model, or receipt step remains 503.
@@ -65,6 +100,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
           and not has_function_privilege('authenticated',p.oid,'EXECUTE')
           and not has_function_privilege('service_role',p.oid,'EXECUTE')`,[ISSUE_RPC,ACK_RPC,REQUEST_REVOKE_RPC,PIN_RPC,COMMIT_RPC]);
         if(r.rows.length!==1||r.rows[0]?.ready!==true)throw Error('Receipt authority unavailable');
+        await assertSeyeonG0OriginalLineageReadyV1(client);
       }});
     if(input.request.signal.aborted)return held();
     const result=await input.runtime.run({verifiedEvidence:preflight.verifiedEvidence,
