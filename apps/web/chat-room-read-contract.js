@@ -84,6 +84,7 @@ function serverPlannerMemoryProposal(message, roomCharacterId) {
       proposal.sourceAuthority !== 'server_dialogue_planner' ||
       proposal.characterId !== 'seyeon' || roomCharacterId !== 'seyeon' ||
       message.senderType !== 'character' || message.characterId !== 'seyeon' ||
+      typeof message.bodyText !== 'string' || !message.bodyText.trim() ||
       message.redacted !== false ||
       proposal.proposalState !== 'pending' ||
       !['memory','life_fact'].includes(proposal.proposalKind) ||
