@@ -651,6 +651,59 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('UC-07 real Node Member POST creates exactly one accepted Memory and original Se-yeon Grant',async()=>{
+    const f=await prepare(215);
+    await f.commit();
+    const proposalId=uuid(27,215);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+    const identityEvidenceVerifier={
+      verifyRequestIdentity:async()=>f.evidence,
+    };
+    const server=createServer((incoming,response)=>{
+      const args={incoming,response,pool:subjectPool,identityEvidenceVerifier,
+        requestId:'node-member-accept-215'};
+      if(incoming.method==='POST'){
+        void handleSeyeonPlannerDecisionNodeHttpS0V1(args);
+      }else{
+        void handleSeyeonPendingPlannerNodeHttpS0V1(args);
+      }
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const origin=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    try{
+      const response=await fetch(
+        origin+'/api/memory/proposals/'+proposalId+'/decision',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'character_only',characterId:'seyeon'}}),
+      });
+      expect(response.status).toBe(200);
+      expect((await response.json()).data).toEqual({
+        proposalId,decision:'character_only',status:'resolved',
+        persisted:true,grantCount:1,
+      });
+      const {rows:[state]}=await pool.query(`select p.status,
+        (select count(*)::int from public.memory_items m
+          where m.id=p.accepted_memory_item_id) as memories,
+        (select count(*)::int from public.record_access_grants g
+          where g.memory_item_id=p.accepted_memory_item_id
+            and g.grantee_character_id='seyeon') as grants
+        from public.memory_proposals p where p.id=$1`,[proposalId]);
+      expect(state).toEqual({status:'accepted',memories:1,grants:1});
+      const replay=await fetch(origin+'/api/chat/'+f.thread+
+        '/planner-proposals/'+f.assistant);
+      expect(replay.status).toBe(503);
+      const body=await replay.text();
+      expect(body).not.toContain('사용자는 인사를 했다');
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
   it('UC-07 session-only and discard resolve pending without long-term Memory or Grants',async()=>{
     for(const [n,choice,status] of [
       [203,'session_only','expired'],
