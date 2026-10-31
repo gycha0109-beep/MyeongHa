@@ -260,3 +260,9 @@ Watchtower-Track: security
 - **테스트:** 기존 disposable PostgreSQL 17 `test/seyeon-security-s0-history-presence.e2e.test.ts`에 **독립 DB 연결 두 개**로 검사 트랜잭션이 Thread를 잠그는 동안 경쟁 연결의 `FOR KEY SHARE`가 lock_timeout으로 거부되고, 원래 트랜잭션 종료 후 획득 가능함을 확인하는 사례를 추가했다. 과거 세연 참여 시 기존 HTTP History HOLD 및 타 사용자 404 검증은 그대로 유지한다.
 - **수정 파일:** `scripts/operations/seyeon-security-s0/08-historical-thread-presence.sql`, `test/seyeon-security-s0-history-presence.e2e.test.ts`, 동일 Worklog. S0 격리 설치 소스만 수정하며 Production migration/DB/Provider/ACL/Reader 및 본문 공개 범위를 변경하지 않는다.
 - **CI/한계:** `git diff --check` 확인. 새 HEAD CI와 PostgreSQL 경합 검사는 실행 후 결과 확인 전까지 PASS가 아니다. 이 잠금은 Character join FK 경쟁을 보호하는 G3 부분 구현일 뿐, 모든 Message/Grant 동시 변경 및 Replay 최초 공개를 승인하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W23 — G3 과거 참여자 수정 경합 잠금 추가 (PR 후속)
+
+- **목적 및 구현:** #2809(W22)의 소유 Thread `FOR UPDATE`가 새로운 Character 참여자 `INSERT`와 충돌하는 반면, 기존 `conversation_thread_characters`의 `character_id` 또는 `left_at`를 바꾸는 `UPDATE`는 Thread FK 잠금을 다시 얻지 않을 수 있다. 동일 S0 역사 참여자 권한 함수(`08-historical-thread-presence.sql`)에서 **해당 Thread의 기존 참여자 전체를 `FOR SHARE`로 잠근 후** `ever_involved`를 계산하도록 추가했다. 참여자의 현재·과거 Character 변경은 다음 DB 읽기 트랜잭션까지 대기하며, History 본문 공개 허가로 사용하지 않는다.
+- **격리 검사:** `test/seyeon-security-s0-history-presence.e2e.test.ts`에 실제 PostgreSQL 17 연결 2개로 같은 Thread의 기존 Se-yeon 참여자 `UPDATE`가 원본 권한 읽기 종료 전에는 lock timeout으로 거부되고 종료 후에는 행 잠금을 얻는 시나리오를 추가했다. 기존 W22 신규 참여자 FK 잠금/원본 이력/타 Member 차단 검사는 보존한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/08-historical-thread-presence.sql`, `test/seyeon-security-s0-history-presence.e2e.test.ts`, 동일 Worklog. 운영 DB·ACL·Provider·Reader·HTTP 공개 설정을 변경하지 않고 S0 격리 검증 소스만 수정한다.
+- **검증 및 남은 과제:** PostgreSQL 17 잠금 의미는 현재 공식 문서의 `FOR SHARE` 대 `FOR NO KEY UPDATE` 충돌 관계와 일치한다. `git diff --check` 확인 후 후속 CI에서 실제 성공 확인 필요. 이 잠금은 기존 참여자 변경/신규 참여자 동시성을 제한하는 G3 부분 구현으로, 권한 취소·과거 Replay·출처 원본 전체에 대한 종료 증거는 아니다. 운영 `HOLD_FORWARD_STOPPED` 유지.
