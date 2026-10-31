@@ -45,14 +45,14 @@ describe('active Se-yeon GLM renderer transport', () => {
     expect(await provider.generate(req)).toEqual({utterance: '어, 왔어?'});
     expect(provider.modelKey).toBe('z-ai/glm-5.3-flash');
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(SEYEON_GLM_RENDERER_ENDPOINT_V1);
-    expect(calls[0].body.model).toBe(SEYEON_GLM_RENDERER_MODEL_V1);
-    expect(calls[0].body.response_format.type).toBe('json_schema');
-    expect(calls[0].body.messages[1].content).toContain('안녕, 세연!');
-    expect(calls[0].key).toBe('Bearer ' + key);
+    expect(calls[0]!.url).toBe(SEYEON_GLM_RENDERER_ENDPOINT_V1);
+    expect(calls[0]!.body.model).toBe(SEYEON_GLM_RENDERER_MODEL_V1);
+    expect(calls[0]!.body.response_format.type).toBe('json_schema');
+    expect(calls[0]!.body.messages[1].content).toContain('안녕, 세연!');
+    expect(calls[0]!.key).toBe('Bearer ' + key);
     expect(beforeDispatch).toHaveBeenCalledOnce();
     expect(afterOutcome).toHaveBeenCalledOnce();
-    expect(afterOutcome.mock.calls[0]?.[0]).toMatchObject({
+    expect((afterOutcome.mock.calls as unknown[][])[0]?.[0]).toMatchObject({
       purpose: 'dialogue_render', providerKey: 'openrouter-chat',
       modelKey: 'z-ai/glm-5.3-flash', outcome: 'response_received',
       inputTokens: 220, outputTokens: 35,
