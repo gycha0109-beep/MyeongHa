@@ -159,6 +159,12 @@ describe('browser Chat room read contract', () => {
         room.messages[0],{...room.messages[1],memoryProposal:forged},
       ]},{expectedThreadId:THREAD_ID})).toThrow('Memory proposal lacks exact server Dialogue Planner authority');
     }
+    for (const bodyText of [null,'','   ']) {
+      expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
+        room.messages[0],{...room.messages[1],bodyText},
+      ]},{expectedThreadId:THREAD_ID})).toThrow(
+        'Memory proposal lacks exact server Dialogue Planner authority');
+    }
     expect(()=>parseChatRoomReadPayloadV1({...room,messages:[
       {...room.messages[0],memoryProposal:proposal},room.messages[1],
     ]},{expectedThreadId:THREAD_ID})).toThrow('Memory proposal lacks exact server Dialogue Planner authority');
