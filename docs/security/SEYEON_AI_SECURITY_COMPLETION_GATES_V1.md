@@ -220,3 +220,14 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **설정 확인:** Cloudflare Workers Builds의 현재 소스 브랜치 트리거는 `feat/security/s0-private-memory-review-client-20261030`, 빌드는 `npm run build:web`, Preview 배포는 `npx wrangler preview`, 빌드 토큰 명칭은 `myeongha build token`. 토큰 등록 메타데이터는 존재하지만 실행 시 사용된 인증은 실패. 실사용 권한이나 현재 활성 상태는 메타데이터만으로 보증되지 않음.
 - **조치:** 원인·증거 기록만 수행. 운영 Worker 배포 명령 변경, Preview 검증 비활성화, API 토큰 재발급·노출, 개인정보·운영 ACL 변경 **없음**. GitHub 내부 CI 통과를 Cloudflare 외부 검사 통과와 혼동하지 않도록 검증 범위를 분리.
 - **남은 작업:** Cloudflare Workers Builds 설정에서 유효한 권한의 API 토큰을 새로 발급·선택(사용자 계정 작업 필요), Preview 재실행 후 해당 외부 Check Run PASS 확인. 원본 개인정보·유료모델 접근은 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W08 · 미승인 제안 만료·개인정보 소거 S0 구현 (브랜치 지속 / 병합 금지)
+
+- **작업 범위:** 별도 Cloudflare 인증 토큰/Preview 오류 해결 트랙에 의존하지 않고, 현재 PR #2761 **동일 브랜치**에서 UC-06/SRC-05의 미승인 pending 제안 잔류 문제를 줄이는 격리 DB 소유 처리 경로를 구현. `main` 병합·운영 배포·Cloudflare 설정 변경 없음.
+- **SQL:** `16-planner-memory-pending-expiry.sql`의 `seyeon_private.cmd_expire_pending_planner_memory_batch_v1`은 **DB 소유 생성 출처**가 있는 `pending` 세연 Memory 제안만 처리한다. 승인 정책이 제공한 과거 시각보다 오래된 후보를 최대 100건씩 잠금(`SKIP LOCKED`) 처리하고, 동일 DB 명령으로 `status=expired`와 `proposed_value_jsonb={}`를 확정한다. 원래 승인된 `Memory`, `Grant`, 사용자 원문 메시지는 수정하지 않는다. 경쟁하는 사용자 동의는 기존 Proposal 행 잠금으로 직렬화된다.
+- **서버 경계:** `postgres-seyeon-planner-memory-pending-expiry-v1.ts`는 보존기간을 하드코딩하지 않고, **서버 내부 승인 + 명시적인 UTC cutoff + 1~100건 한도**가 모두 만족되어야 SQL을 호출한다. 모델/HTTP/환경 변수로 임의 권한을 만들지 않으며 일반 API `EXECUTE` 기본 DENY, 운영 경로·스케줄 미연결.
+- **테스트:** `test/seyeon-planner-memory-expiry-v1.test.ts`에서 기본 차단·미래 시각·초과 건수·위조 응답 거부를 확인하는 단위 테스트 추가. `test/seyeon-security-s0-postgres.e2e.test.ts`에서 오래된 DB 소유 제안만 만료, 최근 pending/기존 rejected 보존, 같은 행 재처리 0건, 만료 후 UC-07 승인 불가, 일반 API ACL DENY, 범위 초과 거부를 확인하는 PostgreSQL 17 합성 통합 테스트 추가.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/{16-planner-memory-pending-expiry.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-pending-expiry-v1.ts`, `test/{seyeon-planner-memory-expiry-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
+- **구현 커밋:** `895d079f`, `28213e49`, `cd6bdd33`, `160d8fdb`, `8c6e7321`, `14acb8d4`.
+- **검증 상태:** 변경 커밋 기준 신규 CI **결과 확인 전**. Cloudflare Workers Build의 인증 실패는 별도 트랙 소관이며 이 작업이 해결하거나 무시하지 않는다. 보존기간/실제 자동 만료 스케줄·원본 채팅 수명·G3 공개 권한은 미완료. `HOLD_FORWARD_STOPPED` 유지.
