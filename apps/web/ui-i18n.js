@@ -16,12 +16,12 @@ function registerStaticCopy(source, localized) {
   AUTHORITATIVE_STATIC_UI_COPY.set(source, { ...current, ...localized });
 }
 // All four non-Korean languages use one lookup with identical precedence.
+for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 for (const [source, row] of MY_STATIC_UI_COPY_V1) {
   registerStaticCopy(source, Object.fromEntries(LOCALE_ORDER.map((locale, index) => [locale, row[index]])));
 }
 for (const [source, row] of COPY) registerStaticCopy(source, { 'ja-JP': row[0], 'zh-TW': row[1] });
 for (const [source, row] of PLANNED_STATIC_UI_COPY_V1) registerStaticCopy(source, { 'en-US': row[0], 'zh-CN': row[1] });
-for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 
 export function normalizeUiLocale(value) {
   return SUPPORTED_UI_LOCALES.includes(value) ? value : 'ko-KR';
