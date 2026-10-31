@@ -35,3 +35,35 @@ describe('Commerce P0-PR-01 DECIDED + new claim table deployment gate',()=>{
   expect(code).not.toContain('retentionPolicyApproved');
  });
 });
+
+describe('private claim DELETE is reserved for approved DB finalizer only',()=>{
+ it('permits only the trusted finalizer owner on the exact deletion Subject',()=>{
+  const sql=readFileSync(file(
+   'docs/operations/candidates/digital_reading_withdrawal_claim_private_v1.sql'
+  ),'utf8');
+  expect(sql).toContain("if tg_op = 'DELETE' and");
+  expect(sql).toContain('current_user = (');
+  expect(sql).toContain(
+   'public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)'
+  );
+  expect(sql).toContain('myeongha.account_deletion_finalizer_subject_id');
+  expect(sql).toMatch(/old\.subject_id[\s\S]*?then\s+return old;/u);
+  expect(sql).toContain("if tg_op <> 'INSERT' then");
+  expect(sql).toContain('enable row level security');
+  const finalizer=readFileSync(file(
+   'supabase/migrations/1520_account_deletion_finalizer_relationship_runtime_sync.sql'
+  ),'utf8');
+  expect(finalizer).toContain(
+   "'myeongha.account_deletion_finalizer_subject_id'"
+  );
+ });
+ it('still blocks deployment until the full privacy graph and FK order are integrated',()=>{
+  const privateIntake=readFileSync(file(
+   'apps/api/src/commerce-digital-reading-withdrawal-private-intake-v1.ts'
+  ),'utf8');
+  expect(privateIntake).toContain('claimDispositionGraphIntegrated: false');
+  expect(existsSync(file(
+   'supabase/migrations/20261030150000_digital_reading_withdrawal_claim_private_v1.sql'
+  ))).toBe(false);
+ });
+});
