@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-10-31 18:36 KST — Phase 7 격리 PostgreSQL 18 실제 SQL 지연·연결 고갈 실증
+
+- **구현:** [`scripts/operations/verify-postgres-isolated-chaos-phase7.mjs`](../../scripts/operations/verify-postgres-isolated-chaos-phase7.mjs) 추가. 로컬 `PG_BIN_DIR` 아래의 `initdb`/`pg_ctl`로 **매번 임시 데이터 디렉터리와 임의 127.0.0.1 포트에 별도 PostgreSQL 인스턴스**를 생성하고, 실제 Node `pg.Pool`로 SQL/연결 테스트. 인스턴스는 `finally`에서 종료하고 임시 디렉터리를 삭제. 기존 로컬 PostgreSQL 서비스 및 Hosted/Production DB 설정·데이터에 접근하지 않음.
+- **실제 SQL/포화 실행:** Windows Node 24·로컬 PostgreSQL 18에서 스크립트 exit 0 / 출력 `result=PASS`. 독립 DB의 `SELECT pg_sleep(0.6)`은 `statement_timeout=180ms`에 의해 PostgreSQL 오류 코드 **`57014`**로 중단됨(최종 재현 SQL 취소 **199ms**, 초기 성공 관측 **193ms**). 이어서 동일 풀 `SELECT 1` 성공으로 타임아웃 이후 연결 재사용 정상 확인. `max=1`로 첫 연결을 점유한 동안 대기 중인 두 번째 `pool.connect()`가 `connectionTimeoutMillis=250ms`에 따라 **261ms**에서 종료되며 최대 풀 연결이 1을 넘지 않음을 확인. 격리 서버를 정지한 뒤 새로운 `SELECT 1`의 연결 거부 `ECONNREFUSED` 약 **1ms** 관측.
+- **환경 차이·수정:** 첫 시도는 로컬 환경의 SSL 기본설정으로 인해 분리된 인스턴스가 SSL 연결을 거부함. 스크립트 내부의 **임시 격리 DB용 설정에만** `ssl:false`를 명시한 뒤 실행 성공. 운영 DB의 필수 `verify-full` TLS 설정은 변경하지 않음. 테스트용 비밀·사용자 데이터 출력 없음. 실행 결과는 **단일 로컬 시점의 관측**이며 p95/SLO 지표로 사용하지 않음.
+- **수용 경계/다음:** 기존 synthetic TCP 테스트와 달리 **실제 PostgreSQL SQL statement timeout과 풀 대기 고갈**까지 증명했으나, Production의 PG17/strict TLS/권한 역할, 실제 MyeongHa DB 라우트 503 경계, Hosted DB 용량·장애 및 복구, 모니터링은 여전히 미검증. Phase 7/13 전체 완료, `dr_ready`, `serviceResumptionAllowed` 승격 금지. 향후 필요 시 동등하게 격리된 PostgreSQL 17에서 같은 검증을 재현하고, 승인된 실제 API 경계로 확대.
+
 ### 2026-10-31 22:20 KST — Phase 7 DB 연결 장애 시 Records API HTTP 응답 실증
 
 - **작업 목적:** 아키텍처 §34의 DB unavailable/slow 시 실제 사용자용 HTTP 경계가 안전한 오류를 반환하고, 별도 core health가 계속 가능한지 확인. 운영 DB/실사용자 데이터/실서비스에 요청이나 장애 주입을 하지 않음.
@@ -20,13 +27,6 @@
 - **추적·다음:** [PR #2806](https://github.com/gycha0109-beep/MyeongHa/pull/2806), 브랜치 `ops/phase7-records-db-api-failure-worklog-20261031`, 최초 구현 커밋 `861656da808ded7131367304dceac01a1e43ea6e`. PR의 작업 분류는 저장소가 요구하는 단독 라인 `Watchtower-Track: ops` 형식으로 보정했으며, 새 커밋의 CI·통합 검사 결과는 **미확정**으로 남김. 이후 §34의 구성·계약에 맞는 안전한 격리 DB 환경에서 TLS/RLS/권한 및 장애 경계 검증, Phase 10~12 운영 실측으로 연결.
 
 
-
-### 2026-10-31 18:36 KST — Phase 7 격리 PostgreSQL 18 실제 SQL 지연·연결 고갈 실증
-
-- **구현:** [`scripts/operations/verify-postgres-isolated-chaos-phase7.mjs`](../../scripts/operations/verify-postgres-isolated-chaos-phase7.mjs) 추가. 로컬 `PG_BIN_DIR` 아래의 `initdb`/`pg_ctl`로 **매번 임시 데이터 디렉터리와 임의 127.0.0.1 포트에 별도 PostgreSQL 인스턴스**를 생성하고, 실제 Node `pg.Pool`로 SQL/연결 테스트. 인스턴스는 `finally`에서 종료하고 임시 디렉터리를 삭제. 기존 로컬 PostgreSQL 서비스 및 Hosted/Production DB 설정·데이터에 접근하지 않음.
-- **실제 SQL/포화 실행:** Windows Node 24·로컬 PostgreSQL 18에서 스크립트 exit 0 / 출력 `result=PASS`. 독립 DB의 `SELECT pg_sleep(0.6)`은 `statement_timeout=180ms`에 의해 PostgreSQL 오류 코드 **`57014`**로 중단됨(최종 재현 SQL 취소 **199ms**, 초기 성공 관측 **193ms**). 이어서 동일 풀 `SELECT 1` 성공으로 타임아웃 이후 연결 재사용 정상 확인. `max=1`로 첫 연결을 점유한 동안 대기 중인 두 번째 `pool.connect()`가 `connectionTimeoutMillis=250ms`에 따라 **261ms**에서 종료되며 최대 풀 연결이 1을 넘지 않음을 확인. 격리 서버를 정지한 뒤 새로운 `SELECT 1`의 연결 거부 `ECONNREFUSED` 약 **1ms** 관측.
-- **환경 차이·수정:** 첫 시도는 로컬 환경의 SSL 기본설정으로 인해 분리된 인스턴스가 SSL 연결을 거부함. 스크립트 내부의 **임시 격리 DB용 설정에만** `ssl:false`를 명시한 뒤 실행 성공. 운영 DB의 필수 `verify-full` TLS 설정은 변경하지 않음. 테스트용 비밀·사용자 데이터 출력 없음. 실행 결과는 **단일 로컬 시점의 관측**이며 p95/SLO 지표로 사용하지 않음.
-- **수용 경계/다음:** 기존 synthetic TCP 테스트와 달리 **실제 PostgreSQL SQL statement timeout과 풀 대기 고갈**까지 증명했으나, Production의 PG17/strict TLS/권한 역할, 실제 MyeongHa DB 라우트 503 경계, Hosted DB 용량·장애 및 복구, 모니터링은 여전히 미검증. Phase 7/13 전체 완료, `dr_ready`, `serviceResumptionAllowed` 승격 금지. 향후 필요 시 동등하게 격리된 PostgreSQL 17에서 같은 검증을 재현하고, 승인된 실제 API 경계로 확대.
 
 ### 2026-10-31 18:30 KST — Phase 7 PostgreSQL 로컬 TCP 장애·연결 수 상한 검증
 
