@@ -187,3 +187,14 @@
 - **문서:** `docs/operations/COMMERCE_P4_CURRENT_CANCEL_SET_READER_LOCKED_CAS_REVIEW_V1.md`.
 - **최종 로컬 검증:** 결제·Reader 관련 Vitest **17개 파일/323건 PASS**, TypeScript 타입 검사·빌드 PASS, 빌드된 PortOne V2 전체 취소 조회 모듈 로드 PASS, 기존 PostgreSQL 17 취소 집합 SQL 생성기 PASS. 공식 통합 CI 및 병합은 별도 결과 전까지 미확정입니다.
 - **통합 PR:** [PR #2841](https://github.com/gycha0109-beep/MyeongHa/pull/2841), 최초 구현 커밋 03cee16. 관련 Vitest 323건 PASS, 타입 검사·빌드/모듈 로드 PASS. 필수 통합 CI와 병합은 완료 근거 전까지 대기 상태입니다.
+
+### 2026-11-01 — 정확한 Reader 구매 단위의 고지·실제 전달 증거 구분 및 법적 HOLD 연결
+
+- **선행:** [PR #2841](https://github.com/gycha0109-beep/MyeongHa/pull/2841) 필수 CI 그린 후 `main` 병합 `fddd6a61` 확인. 전체 취소 집합·Reader Grant 잠금 및 revision CAS는 기존 내부 검사 재사용.
+- **실제 구현:** 기존 인증 PortOne 전체 취소 GET과 정확한 구매권 잠금·버전 검사에 이어, 읽기 전용으로 해당 Provider Event/원본 Receipt/Subject/Reader Grant의 동일 구매 Intent를 확인하고 정확한 서버 결제 시점 고지 `unit_id`를 읽습니다. 기존 검증된 production 결제·고지 확인 증거 어댑터와 디지털 Reading 청약철회 검토기를 재사용해 법적 검토용 자료의 상태를 분류합니다.
+- **안전·보호:** 다른 Reader/Receipt/Subject/버전·미승인 고지/미검증 Purchase Intent는 차단. 기존 공식 증거 소스에 실제 고객 전달 기록이 없어 `durableConsumerDeliveryProven=false`를 유지하며, 조작된 전달 완료 분류조차 보류합니다. 고객 접수·환불 POST·LIVE·자동 Reader 권한 회수·영속화 기록·새 운영 마이그레이션은 없습니다. DB는 완전 가시성 읽기 전용 및 ROLLBACK만 사용합니다.
+- **격리 PostgreSQL 17:** 기존 B2/B3 서로 다른 공식 Reading 구매와 합성 PortOne 취소 Event fixture에서 동일 운영 SELECT를 실행해 B2만 정확히 조회하고 B3/잘못된 Receipt/Event가 반환되지 않는지 검증하는 CI 항목을 추가했습니다. 고지 증거가 없는 기존 fixture에서 `unitId=null`을 확인하며 콘텐츠 전달을 추정하지 않습니다. 공식 PG17 CI 성공 전까지는 미확정.
+- **로컬 검증:** 신규 법적/고지/권한 오류 25건 및 PG17 계약 4건 PASS; 관련 전체 회귀·빌드 결과는 최종 검증 후 추가합니다.
+- **문서:** `docs/operations/COMMERCE_P4_EXACT_READER_WITHDRAWAL_NOTICE_DELIVERY_HOLD_V1.md`.
+- **다음:** 실제 고객 전달 증거 승인 및 Reader R2/T2 공개·잠금, Provider의 신뢰 가능한 처리 순서·법적 최종판단 계약을 분리해 구현해야 합니다. P0-PR-01·LEGAL-004 재승인 요청 없음.
+- **최종 로컬 회귀:** 결제·Reader·청약철회 관련 Vitest **22개 파일/435건 PASS**, 타입 검사·빌드 PASS, 신규 PostgreSQL 17 SQL 생성기·Bash 라우팅·테스트 계약 PASS. 실제 PostgreSQL 17 신규 검사 및 필수 통합 CI 성공은 결과 확인 전까지 미확정입니다.
