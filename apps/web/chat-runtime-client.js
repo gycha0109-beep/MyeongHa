@@ -563,9 +563,11 @@ async function sendTurn(message) {
           }));
           throw new Error('CREDIT_SHORTAGE');
         }
-        if (error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
-            error.code === 'CREDIT_AUTHORITY_UNAVAILABLE') {
-          throw new Error('AI_TURN_NOT_YET_AVAILABLE');
+        if (error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE') {
+          throw new Error('SECURE_CHAT_TEMPORARILY_UNAVAILABLE');
+        }
+        if (error.code === 'CREDIT_AUTHORITY_UNAVAILABLE') {
+          throw new Error('CREDIT_AUTHORITY_UNAVAILABLE');
         }
         if (error.status === 403) throw new Error('MEMBER_REQUIRED');
         if (['CONTENT_INCOMPATIBLE', 'CAPABILITY_UNAVAILABLE', 'TURN_IN_FLIGHT',
@@ -609,10 +611,11 @@ async function sendTurn(message) {
       MEMBER_REQUIRED: '현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.',
       CONTENT_INCOMPATIBLE: '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.',
       CAPABILITY_UNAVAILABLE: '세연 실대화 운영 연결을 지금 사용할 수 없습니다.',
-      TURN_IN_FLIGHT: '이전 메시지를 처리 중입니다. 잠시 후 다시 보내 주세요.',
+      TURN_IN_FLIGHT: '이전 대화에 미완료 메시지가 남아 새 메시지가 차단됐습니다. 기존 메시지의 전송 상태를 확인해 주세요.',
       IDEMPOTENCY_CONFLICT: '같은 전송 식별자가 다른 내용과 충돌했습니다.',
       AI_TEMPORARILY_UNAVAILABLE: '세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.',
-      AI_TURN_NOT_YET_AVAILABLE: '현재 세연의 AI 메시지 전송은 운영 준비 중입니다. 크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며, 입력한 내용은 보존했습니다.',
+      SECURE_CHAT_TEMPORARILY_UNAVAILABLE: '\uc138\uc5f0\uc758 \uc548\uc804\ud55c \uc751\ub2f5 \ucc98\ub9ac\uac00 \uc644\ub8cc\ub418\uc9c0 \uc54a\uc558\uc2b5\ub2c8\ub2e4. \uc785\ub825\ud55c \ub0b4\uc6a9\uc740 \ubcf4\uc874\ud588\uc2b5\ub2c8\ub2e4. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.',
+      CREDIT_AUTHORITY_UNAVAILABLE: '\uad00\ub9ac\uc790 \ub610\ub294 \ud06c\ub808\ub527 \uc0ac\uc6a9 \uad8c\ud55c\uc744 \ud655\uc778\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \uc785\ub825\ud55c \ub0b4\uc6a9\uc740 \ubcf4\uc874\ud588\uc2b5\ub2c8\ub2e4. \ub2e4\uc2dc \ub85c\uadf8\uc778\ud55c \ub4a4 \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.',
       INVALID_RESPONSE: '대화 서버 응답을 확인할 수 없습니다.',
       TURN_SEND_FAILED: '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
       CREDIT_SHORTAGE: '크레딧 안내를 확인해 주세요. 입력한 내용은 그대로 남아 있습니다.',
