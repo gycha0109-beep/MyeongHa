@@ -5,7 +5,8 @@ const read=path=>readFileSync(path,'utf8');
 const runner=read('test/db/commerce_private_claim_finalizer_full_pg17.sh');
 const scenario=read('test/db/commerce_private_claim_finalizer_pg17_assertions.sh');
 const existing=read('test/db/account_deletion_db_finalizer.sh');
-const suite=read('test/db/run_authority_core.sh');
+const suite=read('test/db/run_ci_case.sh');
+const matrix=JSON.parse(read('scripts/ci/db-suites.json'));
 const candidate=read('docs/operations/candidates/account_deletion_finalizer_with_private_withdrawal_claim_v1.sql');
 const claim=read('docs/operations/candidates/digital_reading_withdrawal_claim_private_v1.sql');
 
@@ -16,11 +17,17 @@ describe('P4 staged private Claim DELETE integration in full PostgreSQL account 
   expect(runner).toContain('digital_reading_withdrawal_claim_private_v1.sql');
   expect(runner).toContain('account_deletion_finalizer_with_private_withdrawal_claim_v1.sql');
   expect(runner).toContain('COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF=1');
+  expect(runner).toContain("show server_version_num");
   expect(runner).not.toContain('supabase db push');
  });
  it('runs the actual existing end-to-end DB finalizer rather than a copied simulation',()=>{
   expect(runner).toContain('bash test/db/account_deletion_db_finalizer.sh');
-  expect(suite).toContain('run_isolated_case myeongha_commerce_private_claim_finalizer_pg17_proof bash test/db/commerce_private_claim_finalizer_full_pg17.sh');
+  expect(matrix.postgres17.postgres).toBe(17);
+  expect(matrix.postgres17.cases).toContain('commerce-private-claim-full-finalizer-pg17');
+  expect(suite).toContain('commerce-private-claim-full-finalizer-pg17)');
+  expect(suite).toContain('HOLD_COMMERCE_PRIVATE_CLAIM_FINALIZER_NOT_ISOLATED_PG17');
+  expect(suite).toContain('bash test/db/commerce_private_claim_finalizer_full_pg17.sh');
+  expect(read('test/db/run_authority_core.sh')).not.toContain('commerce_private_claim_finalizer_full_pg17.sh');
   expect(existing).toContain('internal_finalize_account_deletion_db_v1(');
   expect(existing).toContain('create table public._finalizer_blocker');
   expect(existing).toContain('COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF');

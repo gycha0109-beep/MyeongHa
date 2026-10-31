@@ -9,7 +9,7 @@
 - `test/db/commerce_private_claim_finalizer_full_pg17.sh`: 반드시 PostgreSQL 17 및 격리 `myeongha_*` 테스트 DB인지 검증한 뒤, 기존의 개인 Claim 테이블·최종 삭제 함수 후보 SQL만 설치합니다. 실제 `supabase/migrations/` 또는 운영 DB를 수정하지 않습니다.
 - `test/db/account_deletion_db_finalizer.sh`: 특정 환경 변수일 때만 새 Claim 증거의 seed/롤백/삭제 완료 검증을 끼워 넣습니다. 기본 기존 테스트 실행 동작은 변경하지 않습니다.
 - `test/db/commerce_private_claim_finalizer_pg17_assertions.sh`: 본인 계정과 다른 계정에 각각 구매 Intent와 개인 Claim을 합성 생성합니다. 일반 DELETE 차단, 외래키 오류로 삭제 실패 시 정확한 원본 Claim 롤백, 정상 계정 삭제 시 해당 Claim 0건·타인 Claim 1건·보존되는 두 Purchase Intent 2건, 이미 삭제된 계정에 개인 Claim이 복원된 경우 최종 삭제 재실행 거부와 해당 검증 트랜잭션 롤백을 확인합니다.
-- `test/db/run_authority_core.sh`: 기존 전체 마이그레이션 기반의 독립 DB 복제 절차에 새 전체 삭제 통합 검사를 추가했습니다.
+- `scripts/ci/db-suites.json`과 `test/db/run_ci_case.sh`: PostgreSQL **17 전용** 독립 CI 데이터베이스 검사 항목에 추가했습니다. PostgreSQL 15의 일반 `db-authority-core`에서는 실행하지 않습니다.
 - `test/commerce-private-claim-real-pg17-finalizer-v1.test.mjs`: 공개 권한/운영 마이그레이션 변경 금지와 테스트 연결을 검증합니다.
 
 ## 안전 경계
