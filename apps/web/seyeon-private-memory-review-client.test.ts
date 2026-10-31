@@ -132,6 +132,59 @@ describe('UC-07 browser review surface',()=>{
       }
     }finally{vi.unstubAllGlobals();}
   });
+  it('erases unapproved summary and choice controls immediately after confirmed discard',async()=>{
+    class FakeElement {
+      className='';
+      textContent='';
+      isConnected=true;
+      type='';
+      disabled=false;
+      dataset:Record<string,string>={};
+      children:FakeElement[]=[];
+      onClick:(()=>Promise<void>)|null=null;
+      setAttribute(_name:string,_value:string){}
+      addEventListener(name:string,handler:()=>Promise<void>) {
+        if(name==='click')this.onClick=handler;
+      }
+      append(...nodes:FakeElement[]) {this.children.push(...nodes);}
+      replaceChildren(...nodes:FakeElement[]) {this.children=[...nodes];}
+      click() {return this.onClick?.();}
+    }
+    vi.stubGlobal('HTMLElement',FakeElement);
+    vi.stubGlobal('document',{createElement:()=>new FakeElement()});
+    vi.stubGlobal('window',{confirm:()=>true});
+    try{
+      let finish:((receipt:{proposalId:string;decision:string;status:string})=>void)|undefined;
+      const client={
+        decidePlannerProposal:vi.fn(()=>new Promise<{
+          proposalId:string;decision:string;status:string;
+        }>(resolve=>{finish=resolve;})),
+      };
+      const root=new FakeElement();
+      const panel=mountSeyeonPrivateMemoryReviewV1({
+        container:root,plannerProposal:candidate,client,
+      } as never) as FakeElement|null;
+      expect(panel).not.toBeNull();
+      const summary=panel!.children.find(node=>
+        node.className==='s0-memory-proposal-summary');
+      const discard=panel!.children.find(node=>node.dataset.choice==='discard');
+      expect(summary?.textContent).toBe(candidate.summary);
+      expect(discard).toBeDefined();
+      const submitted=discard!.click();
+      expect(summary?.textContent).toBe('');
+      expect(panel!.children).toHaveLength(1);
+      expect(panel!.children[0]?.className).toBe('s0-memory-proposal-status');
+      expect(discard!.disabled).toBe(true);
+      expect(client.decidePlannerProposal).toHaveBeenCalledWith(candidate,'discard',true);
+      finish!({proposalId:PROPOSAL,decision:'discard',status:'resolved'});
+      await submitted;
+      expect(panel!.children).toHaveLength(1);
+      expect(summary?.textContent).toBe('');
+    }finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('Chat mounts only from server-owned Planner proposal with protected-history hold',()=>{
     const chat=readFileSync(new URL('./chat-runtime-client.js',import.meta.url),'utf8');
     const read=readFileSync(new URL('./chat-room-read-contract.js',import.meta.url),'utf8');
