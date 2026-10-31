@@ -16,7 +16,8 @@
 
 ## 안전과 검증 범위
 
-- `apps/api/src/portone-v2-cancellation-readback-get-v1.ts`와 `test/portone-v2-cancellation-readback-get-hmac-v1.test.ts`만 프로그램 변경 대상입니다. 운영 엔드포인트, DB 마이그레이션, PG 환불 POST, Reader Grant Effect는 추가하지 않습니다.
+- PortOne GET의 지문 매칭 외에도 `scripts/operations/commerce-stored-portone-cancellation-hmac-recheck-v1.mjs`를 추가하여 **저장된 개별 취소 Provider Event → 검증된 원본 Receipt/Purchase Intent → 정확한 Reader Grant**의 일대일 DB 계보를 완전 가시성·읽기 전용 트랜잭션에서 확인한 후, DB 트랜잭션을 종료하고 인증된 최신 PortOne GET으로 재대조합니다. 원본 항목 금액 변화·누적액 감소·원본 결제/통화 불일치·취소 실패·다른 Reader 권한·중복 DB 결과는 거부합니다. `test/commerce-stored-portone-cancellation-hmac-recheck-v1.test.mjs`의 별도 23개 검증을 추가했습니다.
+- 운영 엔드포인트, DB 마이그레이션, PG 환불 POST, Reader Grant Effect는 추가하지 않습니다.
 - 관련 Vitest 8개 파일 **172건 PASS**, TypeScript 검사·빌드 PASS. 합성 GET 응답 기반으로 동작을 검증했으며 실제 PortOne 계정 또는 운영 결제를 호출하지 않았습니다.
 - 이 단계에서 **Provider 순서 NEWER/STALE 판단, 법정 환불 판정, 실제 정산 완료, Reader R2/T2 최종 제공 잠금·실제 권한 회수 권한은 여전히 미검증·비활성**입니다. 단순히 HMAC과 최신 응답이 일치해도 회수 허가는 되지 않습니다.
 - 공식 PortOne V2 Payment API 참고: https://developers.portone.io/api/rest-v2/payment
