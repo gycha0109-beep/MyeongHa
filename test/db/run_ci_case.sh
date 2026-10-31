@@ -688,6 +688,16 @@ SQL
     }
     bash test/db/saju_single_project_operator_permit_pg17.sh
     ;;
+  commerce-private-claim-full-finalizer-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMERCE_PRIVATE_CLAIM_FINALIZER_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_private_claim_finalizer_full_pg17.sh
+    ;;
   *)
     echo "Unknown DB CI case: $case_name" >&2
     exit 2

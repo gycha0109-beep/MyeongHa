@@ -92,3 +92,20 @@
 - **안전/구현 경계:** 웹훅·사용자 접수·환불 POST·운영 Grant 회수 경로는 모두 비활성. 이 합성 DB 시나리오는 Provider의 신뢰 가능한 순서·법적 환불 판정·제공 증거·Reader R2/T2 최종 제공 잠금을 증명하지 않으며 실제 운영 회수 권한이 아닙니다.
 - **문서:** `docs/operations/COMMERCE_P4_PORTONE_READER_ENTITLEMENT_SYNTHETIC_PROOF_V1.md`.
 - **PR / 최종 로컬 증거:** [PR #2807](https://github.com/gycha0109-beep/MyeongHa/pull/2807), 구현 커밋 `1e4421aa`. 관련 Vitest 15개 파일 **312건 PASS**; #2805 병합 최신 기준 핵심 42건 PASS, 타입 검사·빌드·Bash 구문 PASS. **PostgreSQL 17 실제 SQL 결과는 통합 CI가 완료되기 전까지 미확인**입니다.
+
+### 2026-10-31 — 개인 환불 접수 기록의 전체 PostgreSQL 17 계정 삭제 경로 연결
+
+- **기준:** [PR #2807](https://github.com/gycha0109-beep/MyeongHa/pull/2807) 및 그 하위 실제 PostgreSQL 17 `db-authority-core`·`postgres17` 통합 검증 모두 성공 후 `main` 병합 `df0194a1`.
+- **브랜치:** `feat/commerce-payment/claim-finalizer-real-pg17-20261031`.
+- **실제 구현:** 기존 account deletion DB finalizer 전체 실행 테스트에만 활성화되는 Claim 증거 체크를 추가하고, 동일하게 마이그레이션이 적용된 독립 PostgreSQL 17 DB에서 보류 중인 개인 Claim/최종 삭제 SQL 후보를 설치하도록 연결했습니다. 정상/실패·롤백·중복 재실행·삭제 후 복원 잔여 기록·다른 계정/Commerce 보존 구매 증거를 검사합니다.
+- **안전:** 격리 `myeongha_*`·PostgreSQL 17 버전 검사 필수. 기존 일반 계정 삭제 테스트·운영 SQL의 기본 동작은 변경하지 않으며 두 후보 SQL 모두 `docs/operations/candidates`에 잔류합니다. 실제 개인 Claim을 DB에 배포하거나 소비자 청약철회/Provider 환불/권한 회수를 활성화하지 않습니다.
+- **로컬 검증:** Vitest 구조·개인정보 경계 검사 21건 PASS, Bash 스크립트 문법 PASS. **전체 PostgreSQL 17 원자적 삭제 시나리오는 GitHub 통합 CI에서 실행되기 전까지 결과 미확인**.
+- **다음:** 통합 CI의 실제 PostgreSQL 17 실행 성공 및 개인정보 복원 재조정 후에만 forward-only 마이그레이션 편입과 private intake 활성화를 검토합니다.
+- **상세:** `docs/operations/COMMERCE_P4_PRIVATE_CLAIM_FULL_PG17_FINALIZER_PROOF_V1.md`.
+- **PR:** [PR #2811](https://github.com/gycha0109-beep/MyeongHa/pull/2811), 최초 구현 커밋 `651b5560`. 실제 PostgreSQL 17 전체 finalizer 실행·최신 CI·병합은 검증이 끝나기 전까지 성공으로 표시하지 않습니다. 로컬 관련 42건/타입 검사·빌드/Bash 문법 PASS.
+
+### 2026-10-31 — PR #2811 통합 CI 환경 오류 수정
+
+- **실패 원인:** [PR #2811 초기 일반 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41212139498)의 `db-authority-core`는 PostgreSQL **15.19**에서 실행되었지만 새 후보는 PostgreSQL **17 전용**으로 제한돼 있었습니다. `DENY: ... got 150019`에서 실패. 이전 코드의 실제 PG17 실행 실패가 아니라 테스트 연결 대상 오류입니다.
+- **조치:** PostgreSQL 15 `run_authority_core.sh`에 추가했던 검사를 제거하고, `scripts/ci/db-suites.json`의 `postgres17` 그룹 및 `test/db/run_ci_case.sh`의 전용 실행 항목에 등록했습니다. CI PostgreSQL 17·격리 DB 검사와 기존 마이그레이션 적용을 유지합니다.
+- **검증:** 기존 일반 DB finalizer 기본 실행 절차는 변경하지 않고, 새 테스트는 PG17 전용 그룹에서만 실행하도록 계약 검사·Bash 구문 검사를 수정했습니다. **수정한 실제 PG17 통합 CI 결과는 아직 미확인**입니다.
