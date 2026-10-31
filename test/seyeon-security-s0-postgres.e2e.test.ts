@@ -512,7 +512,6 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       const complete=new Promise<string>(resolve=>{resolveOutcome=resolve;});
       const server=createServer((_incoming,response)=>{
         const controller=new AbortController();
-        response.on('close',()=>controller.abort());
         void sendSeyeonPendingPlannerProposalNodeS0V1({
           pool:subjectPool,verifiedEvidence:evidence,
           serverThreadId:threadId,serverAssistantMessageId:assistantId,
