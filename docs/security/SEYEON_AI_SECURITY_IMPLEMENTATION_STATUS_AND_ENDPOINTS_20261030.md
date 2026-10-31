@@ -193,3 +193,12 @@ Watchtower-Track: security
 - **변경 파일:** `scripts/operations/seyeon-security-s0/02-atomic-commit.sql`, `test/seyeon-attempt-zero-personal-proof-v1.test.ts`, `test/seyeon-exact-model-personal-source-selection-v1.test.ts`, 본 Worklog.
 - **재검증 범위:** 수정 전 오류는 S0 실DB e2e 9건 및 security 테스트 2건. 로컬 의존 패키지 중 Vitest 실행 파일이 없어 로컬 직접 재검증은 수행되지 못했다. 후속 커밋의 CI 및 PostgreSQL 격리 검사 결과가 성공할 때만 PASS로 보고한다. #2786의 브라우저/보안 기본 검사는 PASS 확인되었으나 PR 병합 상태는 여전히 별도 확인 필요.
 - **운영:** `HOLD_FORWARD_STOPPED`; Production DB/ACL/Provider/Reveal 경로 활성화 없음.
+
+
+### 2026-10-31 / W14 — G3 최초 공개의 현재 User 원본·G1 최근 출처 재검증 (후속 PR)
+
+- **목적/구현:** G1 최근 출처 증명이 실제 Attempt에 있는 경우, 기존 `seyeon_private.lock_positive_first_memory_reply_v1`이 최초 답변의 비공개 텍스트를 읽거나 발행하기 **전에 동일 PostgreSQL 잠금 트랜잭션에서** 원본 User 메시지의 exact Member·Thread·Turn·Attempt·ID, 내용 해시 및 UTF-8 본문 SHA-256을 재조회해 검증하도록 수정했다. 인증 원본 메시지가 삭제/교체/변경되었거나 출처 증명이 부정확하면 기존처럼 빈 응답(공개 거부)으로 종료한다.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/04-locked-reveal.sql`, `test/seyeon-security-s0-postgres.e2e.test.ts`, 본 Worklog.
+- **호환 및 범위:** 선행 S0의 Memory 1건·현재 User 메시지 1건 원본 Grant/G2/G3 제한은 그대로 유지한다. 기존 S0에서 선택적 최근 출처 증명이 없는 Attempt는 종전 Memory 원본 검증을 유지하고, 새로운 출처 증명이 존재하면 추가 검사를 실시한다. 테스트용 `seyeon_private` 호출 허용은 이름이 제한된 일회성 격리 테스트 DB 안에서만 부여되며 **설치 기본값과 운영 권한은 불변**이다. Replay·History·Worker·Reader의 신규 공개 경로는 열지 않았다.
+- **격리 검증:** 실제 PostgreSQL S0 fixture에 모델 User 1건의 DB 출처 증명을 사전 저장해 최초 공개 후 재공개가 차단되는 사례를 추가했다. 소스 검사와 CI/격리 PostgreSQL의 후속 결과는 성공 확인 전 완료로 주장하지 않는다.
+- **선행 및 남은 것:** #2789는 초록 검사 후 #2786 브랜치에 병합됐다. #2786은 새 HEAD에서 GitHub security/PostgreSQL/browser 검사는 통과했으나 Cloudflare Workers 빌드는 인증 실패로 차단돼 있고 main 병합이 아직 미완료다. G0 전체 출처 G1/G2/G3, Replay/History, G4 크레딧, G5/G6 운영 실증은 계속 미완료다. **운영 `HOLD_FORWARD_STOPPED` 유지.**

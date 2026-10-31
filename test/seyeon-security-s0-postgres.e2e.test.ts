@@ -68,6 +68,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       values('memory','conversation_recall','v1','seyeon-conversation-recall-projector-v1',true,true);
       grant execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text) to myeongha_api_executor;
+      -- The following narrow Grant exists ONLY inside this disposable S0
+      -- fixture; the installed source remains API-closed by default.
+      grant usage on schema seyeon_private to myeongha_api_executor;
+      grant execute on function seyeon_private.pin_model_recent_sources_v1(
+        uuid,uuid,uuid,uuid,uuid,jsonb,text) to myeongha_api_executor;
       grant execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text) to myeongha_api_executor;
       grant execute on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
@@ -84,7 +89,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
   afterAll(async () => { await ordinaryPool?.end();await pool?.end(); });
 
-  async function prepare(n: number, virtual?: { summary: string }) {
+  async function prepare(n: number, virtual?: { summary: string }, withRecentPin = false) {
     const auth = uuid(10, n), subject = uuid(11, n), thread = uuid(14, n);
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
@@ -140,6 +145,19 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       expect(source.grantId).toBe(grant);
     }
     const selectionDigest = hash([source]), contextDigest = hash(modelContext ?? { synthetic: turn });
+    if (withRecentPin) {
+      const recentMessage = { messageId: user, role: 'user' as const, text: userText };
+      await run(({ client }) => client.query(`
+        select seyeon_private.pin_model_recent_sources_v1(
+          $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::jsonb,$7::text
+        )`, [subject,thread,turn,attempt,user,JSON.stringify([{
+          ...recentMessage,selectedModelMessageDigest:hash(recentMessage),
+        }]),hash({
+          originalPersonalSources:[source],
+          currentUserSource:{...recentMessage,selectedModelMessageDigest:hash(recentMessage)},
+          unpinnedRecentSources:[],unpinnedDerivedSources:[],
+        })]));
+    }
     await run(({ client }) => createSeyeonPositiveS0OwnerDbPortsV1(client).pinBeforeModel({
       subjectId: subject, threadId: thread, turnId: turn, attemptId: attempt,
       originalMemoryId: memory, originalGrantId: grant, recordType: source.recordType,
@@ -230,6 +248,20 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await new Promise<void>(resolve => server.close(() => resolve()));
     }
   }
+
+  it('checks the exact pinned User DB original before first Reveal without permitting a replay', async () => {
+    const f = await prepare(13, undefined, true);
+    const originalPin = await pool.query(`select seyeon_recent_source_pin_jsonb as pin
+      from public.chat_turn_attempts where id=$1`, [f.attempt]);
+    expect(originalPin.rows[0].pin.sources).toHaveLength(1);
+    expect(originalPin.rows[0].pin.sources[0].messageId).toBe(f.user);
+    const reply = await requestVirtualFirstReply(f);
+    expect(reply.status).toBe(200);
+    expect(reply.body).toContain(f.assistantText);
+    await f.locked()({ signal: new AbortController().signal,
+      deliver: async text => { expect(text).toBeNull(); },
+    });
+  });
 
   it('persists exact G1, commits actual v2 plus two Outboxes, consumes first Reveal once, and keeps private acceptance at zero grants', async () => {
     const f = await prepare(1);
