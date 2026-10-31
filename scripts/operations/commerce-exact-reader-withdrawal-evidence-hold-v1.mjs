@@ -24,7 +24,7 @@ select
  egrant.status as "grantStatus",
  access.official_reading_id::text as "officialReadingId",
  access.reader_character_id as "readerCharacterId",
- notice.unit_id::text as "unitId"
+ access.reader_content_bundle_id::text as "readerContentBundleId"
 from public.commerce_provider_events event
 join public.commerce_receipts receipt
  on receipt.id=event.resolved_receipt_id
@@ -52,11 +52,6 @@ join public.purchase_intent_reader_selections selection
  on selection.purchase_intent_id=intent.id
  and selection.reader_character_id=access.reader_character_id
  and selection.reader_content_bundle_id=access.reader_content_bundle_id
-left join public.digital_reading_checkout_notice_presentations_v1 notice
- on notice.purchase_intent_id=intent.id
- and notice.subject_id=intent.subject_id
- and notice.reader_character_id=selection.reader_character_id
- and notice.reader_content_bundle_id=selection.reader_content_bundle_id
 where event.id=$1::uuid
  and receipt.id=$3::uuid
  and event.provider='portone_v2'
@@ -64,6 +59,32 @@ where event.id=$1::uuid
  and event.status in ('verified','processed')
  and event.resolution_source_type='receipt'
  and event.event_type in ('Transaction.Cancelled','Transaction.PartialCancelled')
+limit 2
+`.trim();
+
+/**
+ * Checkout notice tables are held staged SQL and intentionally absent from
+ * historical PG17 fixtures. Probe their existence BEFORE any SQL referencing
+ * the staged relation; an absent table must HOLD, never fabricate a unit.
+ */
+export const COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1=`
+select pg_catalog.to_regclass(
+ 'public.digital_reading_checkout_notice_presentations_v1'
+) is not null as "noticeInstalled"
+`.trim();
+
+export const COMMERCE_EXACT_READER_STAGED_NOTICE_UNIT_SQL_V1=`
+select
+ presentation.unit_id::text as "unitId",
+ presentation.purchase_intent_id::text as "purchaseIntentId",
+ presentation.subject_id::text as "subjectId",
+ presentation.reader_character_id as "readerCharacterId",
+ presentation.reader_content_bundle_id::text as "readerContentBundleId"
+from public.digital_reading_checkout_notice_presentations_v1 presentation
+where presentation.purchase_intent_id=$1::uuid
+ and presentation.subject_id=$2::uuid
+ and presentation.reader_character_id=$3::text
+ and presentation.reader_content_bundle_id=$4::uuid
 limit 2
 `.trim();
 
@@ -125,15 +146,40 @@ async function inspectExactPaidUnit(dbClient,{
      !['active','revoked','expired'].includes(r.grantStatus))
    return no('exact_reader_purchase_or_cas_changed_after_lock');
 
-  const exact={exactReaderLockedCasPreviouslyObserved:true,exactPurchasedUnitBound:true};
-  if(typeof r.unitId!=='string'||!UUID.test(r.unitId))
-   return no('exact_unit_checkout_presentation_missing',exact);
+  const paidScope={exactReaderLockedCasPreviouslyObserved:true};
+  if(typeof r.readerContentBundleId!=='string'||
+     !UUID.test(r.readerContentBundleId))
+   return no('exact_reader_purchase_or_cas_changed_after_lock');
+
+  // The approved notice migration is explicitly staged and skipped by the
+  // existing historical PostgreSQL 17 suite. Its absence is an expected HOLD.
+  const relation=await dbClient.query(
+   COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1,
+  );
+  if(relation.rows.length!==1||
+     relation.rows[0].noticeInstalled!==true)
+   return no('exact_unit_checkout_presentation_schema_not_installed',paidScope);
+  const notices=await dbClient.query(
+   COMMERCE_EXACT_READER_STAGED_NOTICE_UNIT_SQL_V1,
+   [r.purchaseIntentId,r.subjectId,r.readerCharacterId,
+    r.readerContentBundleId],
+  );
+  if(notices.rows.length!==1)
+   return no('exact_unit_checkout_presentation_missing',paidScope);
+  const unit=notices.rows[0];
+  if(unit.purchaseIntentId!==r.purchaseIntentId||
+     unit.subjectId!==r.subjectId||
+     unit.readerCharacterId!==r.readerCharacterId||
+     unit.readerContentBundleId!==r.readerContentBundleId||
+     typeof unit.unitId!=='string'||!UUID.test(unit.unitId))
+   return no('exact_unit_checkout_presentation_scope_mismatch',paidScope);
+  const exact={...paidScope,exactPurchasedUnitBound:true};
 
   // The existing private legal triage is fed exclusively from trusted DB
   // lineage; a caller cannot choose a different Subject, Intent or unit.
   const result=await reviewer(dbClient,{
    subjectId:r.subjectId,purchaseIntentId:r.purchaseIntentId,
-   unitId:r.unitId,reason:withdrawalReason,
+   unitId:unit.unitId,reason:withdrawalReason,
   });
   if(!result||!['not_admitted','manual_review_candidate'].includes(result.kind)||
      result.requestRecorded!==false||

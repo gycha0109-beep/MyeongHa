@@ -205,3 +205,9 @@
 - **Work Track 실패:** CI가 타입 검사를 마친 후 전체 Vitest를 먼저 실행하고 빌드는 이후에 수행합니다. 새 테스트 1건이 아직 생성되지 않은 dist/ 내부 모듈을 불러와 7,671건 통과/1건 실패가 발생했습니다. 기존 소스 기반 검토 어댑터를 테스트에서 직접 연결하도록 수정했으며 **dist/ 폴더를 격리해 실제 사전 빌드 없는 상황에서 신규 테스트 29건 PASS**를 확인했습니다.
 - **PostgreSQL 17 실패:** 새 읽기 전용 구입 단위 SQL이 PostgreSQL 예약어 grant를 테이블 별칭으로 사용해 파서 오류가 발생했습니다. 별칭을 egrant로 변경하고 PG17 계약 테스트에서 같은 오류 재발을 검출하도록 보강했습니다.
 - **안전 경계:** 보안·법적 검토 로직/데이터 정책·실제 DB 마이그레이션·환불/Entitlement 실행 기능은 변경하지 않았습니다. PR #2844 필수 CI에서 변경된 실제 PG17 SQL 실행이 확인되기 전까지 PG17 PASS를 추정하지 않습니다.
+### 2026-11-01 — PR #2844 두 번째 CI 실패: 배포 보류된 고지 테이블 참조 제거
+
+- **재실행 결과:** 수정 커밋 `5e768849`에서 Work Track·Web·Governance·db-authority-core·commerce-payment/runtime/content/entitlement DB 검사는 PASS. PostgreSQL 17 전용 격리 검사만 FAIL. CI Integration은 일반 CI Verify가 실패했으므로 승인 검증에서 중단됨(독립 원인 아님).
+- **정확한 원인:** `test/db/staged_commerce_migration_policy.sh`가 `20261027054525_digital_reading_checkout_notice_evidence_v1.sql`을 기존 히스토리 PG17 스키마에서 **의도적으로 제외**하지만, 새 Reader 구매 단위 SQL은 그 migration의 `digital_reading_checkout_notice_presentations_v1` 테이블을 정적 LEFT JOIN하여 `relation does not exist`로 실패.
+- **구현 수정:** verified Receipt / Reader Grant / Reading 선택을 조회하는 항상 사용 가능한 SQL과, 고지 테이블 설치 여부만 조회하는 `to_regclass` 검사 및 설치된 경우에만 정확한 Intent·Subject·Reader·Bundle의 고지 `unit_id`를 조회하는 SQL을 분리. 테이블이 없으면 `exact_unit_checkout_presentation_schema_not_installed`로 **안전 보류**, 실제 구매·고지·전달 증거 및 법적/환불 승인 모두 false. 기존 stage migration 제외 정책, 생산 DB 스키마, 고객 API는 변경 없음.
+- **검증:** 사전 빌드 없이 신규 법적 고지 검사 28건 + PG17 계약 검사 4건 PASS. 공식 PG17 SQL 생성기는 실제 운영 Reader 구매 계보와 고지 테이블이 **설치되지 않은 상태**를 확인하도록 수정. PG17 실제 실행 결과는 새 PR CI가 완료되기 전까지 미확정.

@@ -1,6 +1,7 @@
 import {execFileSync} from 'node:child_process';
 import {
  COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1 as scopeSql,
+ COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1 as noticeProbeSql,
 } from '../../scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs';
 
 const underlying=execFileSync(process.execPath,[
@@ -15,12 +16,16 @@ declare
  q text:=$scope$`,
  scopeSql,
  String.raw`$scope$;
+ notice_q text:=$notice$`,
+ noticeProbeSql,
+ String.raw`$notice$;
  b2 uuid;
  b3 uuid;
  b2_receipt uuid;
  subject_id uuid;
  one record;
  other record;
+ notice_state record;
  matched bigint;
 begin
  select g.id,cr.id,cr.subject_id
@@ -45,8 +50,15 @@ begin
       '12192300-0000-0000-0000-000000000002'
     or one."providerEventId" is distinct from
       '12196200-0000-4000-8000-000000000002'
-    or one."unitId" is not null then
+    or one."readerContentBundleId" is null then
   raise exception 'OFFICIAL_READER_EXACT_PURCHASE_SCOPE_OR_UNIT_MISMATCH';
+ end if;
+
+ -- This historical fixture deliberately skips the staged checkout-notice
+ -- migration. The actual operations query must HOLD on absent notice data.
+ execute notice_q into strict notice_state;
+ if notice_state."noticeInstalled" is distinct from false then
+  raise exception 'OFFICIAL_READER_STAGED_NOTICE_UNEXPECTEDLY_INSTALLED';
  end if;
 
  -- Correct B2 cancellation must not resolve B3's independently bought
@@ -77,7 +89,7 @@ begin
  ) then
   raise exception 'OFFICIAL_READER_LEGAL_HOLD_MUTATED_GRANT';
  end if;
- raise notice 'PASS exact B2 Event/Receipt/Reader Grant, B3 denied, no checkout delivery proof inferred';
+ raise notice 'PASS exact B2 Event/Receipt/Reader Grant, B3 denied, staged notice absent and HOLD';
 end;
 $exact_reader_legal$;
 

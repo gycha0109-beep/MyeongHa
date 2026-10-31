@@ -1,6 +1,8 @@
 import {describe,it,expect,vi} from 'vitest';
 import {
  COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1 as SCOPE_SQL,
+ COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1 as NOTICE_PROBE_SQL,
+ COMMERCE_EXACT_READER_STAGED_NOTICE_UNIT_SQL_V1 as NOTICE_UNIT_SQL,
  COMMERCE_EXACT_READER_WITHDRAWAL_EVIDENCE_HOLD_V1 as CONFIG,
  inspectExactReaderWithdrawalEvidenceHoldV1 as inspect,
 } from '../scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs';
@@ -17,11 +19,17 @@ const INTENT='00000000-0000-4000-8000-000000000005';
 const UNIT='00000000-0000-4000-8000-000000000008';
 const OFFICIAL='00000000-0000-4000-8000-000000000007';
 const BUNDLE='standard-reader-bundle-v1';
+const BUNDLE_ID='00000000-0000-4000-8000-000000000055';
 const SCOPE={
  providerEventId:EVENT,receiptId:RECEIPT,subjectId:SUBJECT,
  purchaseIntentId:INTENT,grantId:GRANT,grantRevision:'3',
  lastProviderOrderingKey:null,grantStatus:'active',
- officialReadingId:OFFICIAL,readerCharacterId:'seyeon',unitId:UNIT,
+ officialReadingId:OFFICIAL,readerCharacterId:'seyeon',
+ readerContentBundleId:BUNDLE_ID,
+};
+const UNIT_ROW={
+ unitId:UNIT,purchaseIntentId:INTENT,subjectId:SUBJECT,
+ readerCharacterId:'seyeon',readerContentBundleId:BUNDLE_ID,
 };
 const PURCHASE={
  subjectId:SUBJECT,purchaseIntentId:INTENT,unitId:UNIT,
@@ -47,7 +55,9 @@ const VERIFIED={
  readerT2LockHeld:false,legalRefundAuthority:false,
  providerOrderingProven:false,
 };
-function db({scope=[SCOPE],purchase=[PURCHASE],notice=[NOTICE],role={
+function db({
+ scope=[SCOPE],purchase=[PURCHASE],notice=[NOTICE],
+ noticeInstalled=true,unitRows=[UNIT_ROW],role={
  readOnly:true,completeVisibility:true,currentUser:'postgres',
 },errorSql=null}={}){
  const calls=[];
@@ -61,6 +71,12 @@ function db({scope=[SCOPE],purchase=[PURCHASE],notice=[NOTICE],role={
   if(sql===SCOPE_SQL){
    expect(params).toEqual([EVENT,GRANT,RECEIPT]);
    return {rows:scope};
+  }
+  if(sql===NOTICE_PROBE_SQL)
+   return {rows:[{noticeInstalled}]};
+  if(sql===NOTICE_UNIT_SQL){
+   expect(params).toEqual([INTENT,SUBJECT,'seyeon',BUNDLE_ID]);
+   return {rows:unitRows};
   }
   if(sql.includes('presentation.unit_id::text as "unitId"')){
    expect(params).toEqual([INTENT,SUBJECT,UNIT]);
@@ -125,7 +141,9 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   expect(SCOPE_SQL).toContain('receipt.id=$3::uuid');
   expect(SCOPE_SQL).toContain('event.id=$1::uuid');
   expect(SCOPE_SQL).toContain('access.entitlement_grant_id=egrant.id');
-  expect(SCOPE_SQL).toContain('notice.unit_id::text as "unitId"');
+  expect(SCOPE_SQL).not.toContain('digital_reading_checkout_notice_presentations_v1');
+  expect(NOTICE_UNIT_SQL).toContain('presentation.unit_id::text as "unitId"');
+  expect(NOTICE_PROBE_SQL).toContain('to_regclass(');
   expect(SCOPE_SQL).toContain('selection.reader_character_id=access.reader_character_id');
   expect(SCOPE_SQL).not.toMatch(/\b(insert|delete|update|commit)\s+(?:into\s+)?public\./iu);
  });
@@ -161,10 +179,10 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   safe(r);
  });
  it('missing presentation is not considered proof of exact purchased unit',async()=>{
-  const c=db({scope:[{...SCOPE,unitId:null}]}),reviewer=vi.fn();
+  const c=db({unitRows:[]}),reviewer=vi.fn();
   const r=await call(c,{withdrawalReviewer:reviewer});
   expect(r.kind).toBe('exact_unit_checkout_presentation_missing');
-  expect(r.exactPurchasedUnitBound).toBe(true);
+  expect(r.exactPurchasedUnitBound).toBe(false);
   expect(r.checkoutNoticeEvidenceAvailable).toBe(false);
   expect(reviewer).not.toHaveBeenCalled();
   safe(r);
@@ -279,5 +297,56 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
    await expect(call(c,overrides)).rejects.toThrow('INVALID');
    expect(c.query).not.toHaveBeenCalled();
   }
+ });
+});
+
+describe('P4 historical PG17 fixture intentionally lacks staged notice tables',()=>{
+ it('HOLDs exact paid Reader when staged checkout schema is absent; never accesses missing relation',async()=>{
+  const client=db({noticeInstalled:false});
+  const reviewer=vi.fn();
+  const result=await call(client,{withdrawalReviewer:reviewer});
+  expect(result).toMatchObject({
+   kind:'exact_unit_checkout_presentation_schema_not_installed',
+   exactReaderLockedCasPreviouslyObserved:true,
+   exactPurchasedUnitBound:false,checkoutNoticeEvidenceAvailable:false,
+   durableConsumerDeliveryProven:false,
+   grantRevocationAuthorized:false,writesPerformed:false,
+  });
+  expect(client.calls.some(x=>x.sql===SCOPE_SQL)).toBe(true);
+  expect(client.calls.some(x=>x.sql===NOTICE_PROBE_SQL)).toBe(true);
+  expect(client.calls.some(x=>x.sql===NOTICE_UNIT_SQL)).toBe(false);
+  expect(client.calls.filter(x=>x.sql==='rollback')).toHaveLength(1);
+  expect(reviewer).not.toHaveBeenCalled();
+  safe(result);
+ });
+ it('cannot treat missing, duplicate or cross-Reader staged presentations as purchased-unit evidence',async()=>{
+  for(const units of [
+   [],
+   [UNIT_ROW,UNIT_ROW],
+   [{...UNIT_ROW,subjectId:'00000000-0000-4000-8000-000000000099'}],
+   [{...UNIT_ROW,readerCharacterId:'other'}],
+   [{...UNIT_ROW,readerContentBundleId:'00000000-0000-4000-8000-000000000099'}],
+   [{...UNIT_ROW,unitId:'not-a-uuid'}],
+  ]){
+   const client=db({unitRows:units}),reviewer=vi.fn();
+   const result=await call(client,{withdrawalReviewer:reviewer});
+   expect(result.exactPurchasedUnitBound).toBe(false);
+   expect(result.checkoutNoticeEvidenceAvailable).toBe(false);
+   expect(result.grantRevocationAuthorized).toBe(false);
+   expect(reviewer).not.toHaveBeenCalled();
+   expect(client.calls.filter(x=>x.sql==='rollback')).toHaveLength(1);
+   safe(result);
+  }
+ });
+ it('validates immutable Reader bundle identity before checking whether staging exists',async()=>{
+  const client=db({
+   scope:[{...SCOPE,readerContentBundleId:'not-uuid'}],
+   noticeInstalled:false,
+  });
+  const result=await call(client);
+  expect(result.kind).toBe('exact_reader_purchase_or_cas_changed_after_lock');
+  expect(client.calls.some(x=>x.sql===NOTICE_PROBE_SQL)).toBe(false);
+  expect(client.calls.some(x=>x.sql===NOTICE_UNIT_SQL)).toBe(false);
+  safe(result);
  });
 });

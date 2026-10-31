@@ -3,6 +3,7 @@ import {execFileSync} from 'node:child_process';
 import {describe,it,expect} from 'vitest';
 import {
  COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1 as sourceSql,
+ COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1 as noticeProbeSql,
 } from '../scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs';
 const matrix=JSON.parse(readFileSync('scripts/ci/db-suites.json','utf8'));
 const runner=readFileSync('test/db/run_ci_case.sh','utf8');
@@ -15,6 +16,11 @@ describe('P4 exact Reader withdrawal evidence PG17 independent fixture contract'
  it('uses exact operational SQL source instead of copying an alternate query',()=>{
   expect(generator).toContain('COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1');
   expect(generated).toContain(sourceSql);
+  expect(generated).toContain(noticeProbeSql);
+  expect(sourceSql).not.toContain(
+   'digital_reading_checkout_notice_presentations_v1');
+  expect(generated).toContain('execute notice_q into strict notice_state');
+  expect(generated).toContain('OFFICIAL_READER_STAGED_NOTICE_UNEXPECTEDLY_INSTALLED');
   expect(sourceSql).toContain('join public.entitlement_grants egrant');
   expect(sourceSql).not.toMatch(/\\bjoin\\s+public\\.entitlement_grants\\s+grant\\b/iu);
   expect(generated).toContain('execute q into strict one using');
@@ -26,7 +32,7 @@ describe('P4 exact Reader withdrawal evidence PG17 independent fixture contract'
   expect(generated).toContain('OFFICIAL_READER_CROSS_PURCHASE_GRANT_ACCEPTED');
   expect(generated).toContain('OFFICIAL_READER_WRONG_RECEIPT_ACCEPTED');
   expect(generated).toContain('OFFICIAL_READER_WRONG_PROVIDER_EVENT_ACCEPTED');
-  expect(generated).toContain('one."unitId" is not null');
+  expect(generated).toContain('one."readerContentBundleId" is null');
   expect(generated).toContain('OFFICIAL_READER_LEGAL_HOLD_MUTATED_GRANT');
  });
  it('is only in PostgreSQL 17 isolated CI case database',()=>{

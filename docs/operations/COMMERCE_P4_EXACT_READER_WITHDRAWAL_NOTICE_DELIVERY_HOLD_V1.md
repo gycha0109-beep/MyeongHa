@@ -21,7 +21,7 @@
 ## 테스트 / 실제 DB 계약
 
 - `test/commerce-exact-reader-withdrawal-evidence-hold-v1.test.mjs`: 구매·영수증·Reader 버전·구입 단위 변경, 고지 없음, 다른 Subject, 법적 사유 별 수동 triage, 없는 delivery 권한, 잘못된 역할·DB 실패, 효과 미실행을 검증합니다. 실제 타입스크립트 기존 evidence adapter와 compiled module 호출도 수행합니다.
-- `test/db/commerce_exact_reader_withdrawal_hold_pg17_generator.mjs` 및 `commerce_exact_reader_withdrawal_hold_pg17.sh`: 기존 공식 Reading B2/B3 독립 구매·합성 취소 이벤트 fixture를 재사용합니다. **동일한 운영 후보 SELECT SQL**을 실제 PostgreSQL 17에 적용해 B2는 정확히 조회되지만 B3 권한·가짜 영수증·가짜 이벤트는 조회되지 않아야 합니다. 공식 fixture에는 승인된 고지/전달 증거가 없으므로 `unitId=null`로 HOLD임을 확인합니다. 합성 데이터는 트랜잭션 `ROLLBACK`합니다.
+- `test/db/commerce_exact_reader_withdrawal_hold_pg17_generator.mjs` 및 `commerce_exact_reader_withdrawal_hold_pg17.sh`: 기존 공식 Reading B2/B3 독립 구매·합성 취소 이벤트 fixture를 재사용합니다. **동일한 운영 후보 SELECT SQL**을 실제 PostgreSQL 17에 적용해 B2는 정확히 조회되지만 B3 권한·가짜 영수증·가짜 이벤트는 조회되지 않아야 합니다. 공식 fixture에는 승인된 고지/전달 증거가 없으므로 `noticeInstalled=false`로 HOLD임을 확인합니다. 합성 데이터는 트랜잭션 `ROLLBACK`합니다.
 - 격리 PostgreSQL 17 테스트 항목은 `postgres17` 전용 CI에만 추가합니다. 공식 CI가 끝나기 전까지는 **실제 PG17 PASS라고 기록하지 않습니다**.
 
 ## 여전히 남은 운영 선행 조건
@@ -31,3 +31,12 @@
 3. 위 독립 권한들이 하나의 트랜잭션에서 기존 Entitlement Effect writer와 안전하게 결합될 때만 운영 실행 단계로 진입할 수 있습니다.
 
 따라서 `legalDecisionAuthorized=false`, `providerRefundAuthorized=false`, `grantRevocationAuthorized=false`, `readerT2LockHeld=false`, `writesPerformed=false`는 유지됩니다.
+
+## 2026-11-01 CI correction — staged checkout notice is not part of the historical PG17 schema
+
+- The pinned historical DB migration guard deliberately excludes `20261027054525_digital_reading_checkout_notice_evidence_v1.sql`. This policy has **not** been changed, and the staged checkout notice tables must not be inferred to exist in production or legacy test databases.
+- The always-available exact purchased Reader query now references only the already-proven Provider Event, Receipt, verified Intent, Reader Grant and Reader selection. It does **not** join any staged checkout notice table.
+- While still in a full-visibility READ ONLY transaction, the operations inspector checks table presence with `to_regclass`. If the staged table is absent, it returns `exact_unit_checkout_presentation_schema_not_installed` and ROLLBACKs. If the table exists, a second exact Intent/Subject/Reader/Bundle SELECT resolves the server-owned unit before the existing private legal notice reviewer is invoked.
+- `exactPurchasedUnitBound`, `checkoutNoticeEvidenceAvailable`, `durableConsumerDeliveryProven`, legal decision, refund and Reader Grant revocation cannot become true merely because the catalog or verified purchased Reader grant exists.
+- The actual PG17 SQL fixture now proves the exact B2 purchase and B3 exclusion AND asserts the staged notice relation is absent via the exact production source probe. Separate unit tests cover an installed notice table, missing or ambiguous units, mismatched Subject/Reader/bundle and missing-schema HOLD.
+- This resolves the PG17 red from [CI #41239247413](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41239247413); the final PG17 result must still come from the next official CI run.
