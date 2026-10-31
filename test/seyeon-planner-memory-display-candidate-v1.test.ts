@@ -34,7 +34,8 @@ describe('UC-06 S0 internal Planner display candidate is NOT G3 Reveal',()=>{
     expect(found).toEqual({
       sourceAuthority:'db_owner_planner_inspection_only',
       disclosureAuthorized:false,
-      ...args,proposalId:PROPOSAL,proposalKind:'memory',
+      subjectId:SUBJECT,threadId:THREAD,assistantMessageId:ASSISTANT,
+      proposalId:PROPOSAL,proposalKind:'memory',
       summary:record.summary,
     });
     expect(Object.isFrozen(found)).toBe(true);
