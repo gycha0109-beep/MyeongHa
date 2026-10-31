@@ -12,6 +12,16 @@
 
 이 보고서는 최신 구현 상태뿐 아니라 **각 실행 세션의 실제 변경·실행 증거·남은 차단 항목을 누적**한다. 후속 운영 작업은 기존 기록을 덮어쓰거나 임의 완료율을 붙이지 않고, 날짜별로 **무엇을 바꾸었는지 / 어떤 실행이 PASS·FAIL인지 / 실제로 검증하지 않은 범위 / 관련 PR·CI / 다음 종료 작업**을 남긴다. PR의 GREEN은 해당 운영 항목의 Production 수용을 자동으로 의미하지 않는다.
 
+### 2026-10-31 — Cloudflare Preview RED 실제 원인·1회 재시도 (PR #2783 후속)
+
+- **대상 및 판정 범위:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783) HEAD `ea7815bfeaf97a0afd946bf2acbb5a72ffb3a155`, 외부 체크 [Workers Builds: myeongha #124464858847](https://github.com/gycha0109-beep/MyeongHa/pull/2783/checks?check_run_id=124464858847). Cloudflare **Preview** 빌드이며 `main` Production 배포/실서비스 가용성 판정과 구분.
+- **원래 RED 원인:** Cloudflare Workers Build `deff648c-4733-4a1c-b223-3e7dcf1b551f` (2026-10-31T06:23:58Z 종료, FAIL). `npm run build:web` 성공, `npx wrangler preview`에서 Cloudflare API의 프리뷰 엔드포인트가 **Rate limited [10429]**를 반환. TypeScript 오류·웹 빌드 실패가 아니었음.
+- **정확한 커밋 1회 수동 재시도:** 기존 Preview trigger `de1b9384-b760-44bd-9529-49fcf995ae7d`의 Workers Builds API에 원본 HEAD `ea7815bf...`를 한 번 제출. 신규 Build `ecd56543-e04f-4cf6-97d3-6d06a1216245` (2026-10-31T06:33:32Z 종료, **FAIL**): 웹 빌드는 다시 SUCCESS, Preview 배포 요청에서 **Authentication error [10000]** 및 `/accounts` 응답 **Invalid access token [9109]**. 이전 10429만으로 완전히 설명되는 사건이 아니며, Build에 연결된 **Preview용 인증 토큰 유효성/권한**이 수용 차단으로 드러남.
+- **재시도 제한:** 유효하지 않은 토큰으로 다시 빌드를 반복하면 해결되지 않으므로 추가 재시도하지 않음. 원인 없는 소스 수정, Production 토큰의 Preview 재사용, 비밀 출력, Token/Cloudflare 설정 변경도 수행하지 않음. Worker Preview Build 설정의 API token을 실제 유효한 최소 권한 토큰으로 교체·재설정하고, 그 뒤 **동일 source SHA의 Preview 배포 성공**을 별도로 확인해야 외부 RED가 해소됨. 필요 토큰 값은 보고서·CI·PR 댓글에 남기지 않음.
+- **동일 PR 코드 검증/병합:** 수정 HEAD의 [GitHub CI #41176340904](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41176340904), [통합 CI #41176368371](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41176368371), Governance [#41176340854](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41176340854) **모두 SUCCESS**. PR은 2026-10-31T06:31:36Z에 자동 병합, `main` merge SHA `1704ad012debed1c3c0612c4a59c3b48cf189cc2`. 따라서 실패한 **브랜치 Preview 체크**가 이 PR의 실제 병합을 차단하지는 않았음.
+- **현재 미증명:** Preview 배포 성공, 새 `main` SHA의 Cloudflare Production 배포 성공, 이후 최신 Worker 버전의 실서비스 E2E는 이 작업으로 **증명하지 않음**. Phase 8 DR 차단과 운영 수용 미완료도 유지.
+- **다음 작업/블로커:** Preview Build 토큰 유효성 복구 및 동일 SHA 재검증이 외부 설정 블로커. 신규 코드 변경 없음. 본 Worklog는 **외부 서비스 체크 실패 원인과 재시도 결과**를 기록하는 작업으로, 운영 배포 완료를 선언하지 않음.
+
 ### 2026-10-31 15:20 KST — Phase 7 CI RED 실제 타입 오류 수정 및 재검증
 
 - **대상:** [PR #2783](https://github.com/gycha0109-beep/MyeongHa/pull/2783), 이전 HEAD `8069e90dc05647f57f1c873ddc9749bc4822f24f`.
