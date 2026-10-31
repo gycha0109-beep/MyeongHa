@@ -84,7 +84,7 @@ describe('Web Character Room continuous open and resume', () => {
     const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'), runtime.indexOf('function submitTurn(event)'));
     expect(send).not.toContain('await loadRoomState()');
     expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
-    expect(send).toContain('renderAcknowledgedSeyeonFirstReply(acknowledgedReply)');
+    expect(send).toContain('renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn)');
     expect(send).toContain('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)');
     expect(send).toContain('threadId !== submittedThreadId');
     expect(runtime).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');

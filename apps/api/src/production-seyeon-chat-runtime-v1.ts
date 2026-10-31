@@ -31,6 +31,11 @@ import {
   OpenAiSeyeonStructuredProviderErrorV1,
   type OpenAiSeyeonStructuredProviderConfigV1,
 } from './openai-seyeon-structured-provider-v1.js';
+import {
+  createSeyeonGlmRendererV1,
+  type SeyeonGlmRendererConfigV1,
+} from './openrouter-seyeon-glm-renderer-v1.js';
+import { startSeyeonAiCallV1, settleSeyeonAiCallV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import type {
   PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
@@ -160,6 +165,8 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
   readonly roleProviderConfigs?: SeyeonProductionRoleProviderConfigsV1;
+  /** Se-yeon's spoken reply uses GLM on the existing turn. */
+  readonly glmRendererConfig?: SeyeonGlmRendererConfigV1;
   /** Default OFF: no Production Governor activation in D3A. */
   readonly governorMode?: SeyeonProductionGovernorModeV1;
   /** Explicit server-only opt-in: each native role must receive a certified cap. */
@@ -302,6 +309,9 @@ export function createProductionSeyeonChatRuntimeV1(
       input.governorMode !== 'ENFORCE') {
     throw new Error('Positive Memory requires the enforced server cost Governor.');
   }
+  if (input.glmRendererConfig !== undefined && input.governorMode === 'ENFORCE') {
+    throw new Error('GLM renderer requires an OpenRouter-specific governed cost policy.');
+  }
   if (input.costGovernorForRole !== undefined &&
       input.provider !== undefined) {
     throw new Error('Governed chat requires native, fully metered Provider config.');
@@ -416,6 +426,24 @@ export function createProductionSeyeonChatRuntimeV1(
         },
       });
       const meterRole = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+        if (role === 'renderer' && input.glmRendererConfig !== undefined) {
+          let reservedBinding: SeyeonAiCostLedgerBindingV1 | null = null;
+          return createSeyeonGlmRendererV1({
+            ...input.glmRendererConfig,
+            async beforeDispatch(call) {
+              const binding = activeCostBinding;
+              if (binding === null) throw new Error('GLM renderer requires an active chat attempt.');
+              await costRunner.run(binding.subjectId, client =>
+                startSeyeonAiCallV1(client, binding, call));
+              reservedBinding = binding;
+            },
+            async afterOutcome(event) {
+              if (reservedBinding === null) return;
+              await costRunner.run(reservedBinding.subjectId, client =>
+                settleSeyeonAiCallV1(client, reservedBinding!, event));
+            },
+          });
+        }
         const roleConfig = input.roleProviderConfigs?.[role];
         const config = roleConfig ??
           (input.provider === undefined ? input.providerConfig : undefined);
