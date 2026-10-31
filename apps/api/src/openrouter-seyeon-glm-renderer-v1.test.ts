@@ -98,6 +98,6 @@ describe('active Se-yeon GLM renderer transport', () => {
     const provider = createSeyeonGlmRendererV1({apiKey:key,fetchImpl,afterOutcome});
     await expect(provider.generate(req)).rejects.toThrow();
     expect(fetchImpl).toHaveBeenCalledOnce();
-    expect(afterOutcome.mock.calls[0]?.[0]).toMatchObject({outcome:'http_failure',httpStatus:503});
+    expect((afterOutcome.mock.calls as unknown[][])[0]?.[0]).toMatchObject({outcome:'http_failure',httpStatus:503});
   });
 });
