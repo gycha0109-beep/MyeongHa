@@ -1,4 +1,4 @@
-import { createServer } from 'node:http';
+import { createServer, type RequestListener } from 'node:http';
 import { once } from 'node:events';
 import { describe, expect, it } from 'vitest';
 import {
@@ -6,6 +6,7 @@ import {
   SajuProductionCalculationHttpAdapterErrorV1,
   toSajuProductionCalculationApiErrorV1,
 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
+// @ts-expect-error Runtime Worker is a JavaScript module without TypeScript declarations.
 import worker from '../cloudflare/myeongha-worker.mjs';
 
 const BIRTH = {
@@ -19,7 +20,7 @@ const BIRTH = {
 } as const;
 const SENSITIVE = 'synthetic-secret-must-never-escape';
 
-async function listen(handler: Parameters<typeof createServer>[0]) {
+async function listen(handler: RequestListener) {
   const server = createServer(handler);
   server.listen(0, '127.0.0.1');
   await once(server, 'listening');
