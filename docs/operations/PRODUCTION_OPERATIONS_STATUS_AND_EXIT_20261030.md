@@ -169,6 +169,15 @@
 - **수용 경계:** 이 테스트는 **임시 자체 서명 인증서 및 합성 DB 역할**을 가진 PostgreSQL 18의 `pg` 클라이언트 TLS 인증서·호스트명 검증 실증이지, 실제 Production PostgreSQL 17/Supabase CA 핀·권한 역할·RLS·MyeongHa `buildProductionNodePostgresPoolConfigV1` 전체 설정 경로 또는 Cloudflare 배포 인증 완료를 뜻하지 않음. 운영 승인 플래그 `dr_ready=false`, `serviceResumptionAllowed=false`, Phase 8/13 미수용 유지.
 - **추적/다음:** 브랜치 `ops/phase7-isolated-postgres-tls-peer-20261101`로 실행 스크립트와 본 Worklog를 함께 PR 제출. 필요 시 격리 PostgreSQL 17 및 실제 production-config 변환 경로의 인증서 검증을 별도로 확인. [Worklog PR #2817](https://github.com/gycha0109-beep/MyeongHa/pull/2817)의 통합 CI는 당시 진행 중이므로 성공/병합 추정 금지.
 
+### 2026-11-01 02:21 KST — Phase 7 엄격한 운영용 TLS 구성 함수의 격리 PostgreSQL 연결 검증
+
+- **로드맵 목표:** 이전 [PR #2821](https://github.com/gycha0109-beep/MyeongHa/pull/2821)의 실제 TLS 소켓 검증을 확대하여, 기존 **명하 소스 함수 `buildProductionPostgresStrictTlsTargetV1`**가 생성한 연결 설정을 실제 PostgreSQL에 적용하고, 서명/CA 지문 및 SSL URL 검증으로 안전한 접속을 강제하는지 확인. Production DB/Supabase·Cloudflare 연결이나 설정·사용자 기록 변경 없음.
+- **구현:** [`test/production-postgres-strict-tls-isolated-phase7.test.ts`](../../test/production-postgres-strict-tls-isolated-phase7.test.ts). `PG_BIN_DIR`과 `OPENSSL_BIN`을 제공했을 때만 실행되는 격리 실증. 임시 PostgreSQL 18/127.0.0.1, 일회성 자체 서명 CA·서버 인증서, 합성 비슈퍼유저와 일회성 DB URL을 생성. `X509Certificate.fingerprint256`를 일회성 테스트용 authority의 fingerprint로 전달하여 **기존 검증 함수**로 `sslmode=verify-full`을 검사한 뒤, 함수가 반환한 `connectionString`과 `ssl: {ca, rejectUnauthorized:true}`를 실제 `pg.Pool`에 그대로 적용. `pg_stat_ssl`의 `ssl=true`와 합성 로그인 계정을 실제 SQL로 확인. 모든 DB 파일·개인키/인증서는 `finally`에서 정리.
+- **로컬 실행 증거:** Windows Node 24.14.0 / PostgreSQL 18 / Git OpenSSL / Vitest 4.1.11에서 **실DB TLS 연결 테스트 1/1 PASS**. (1) 합성 CA 지문이 일치한 실제 TLS SQL PASS, (2) 다른 CA를 허용된 지문으로 속이려는 시도는 연결 전에 `ROOT_CERTIFICATE_FINGERPRINT_MISMATCH`로 차단, (3) `sslmode=require`와 추가 `sslrootcert` URL 옵션은 각각 `TLS_MODE_NOT_VERIFY_FULL`, `AMBIGUOUS_SSL_CONFIGURATION`으로 차단, (4) 미신뢰 CA를 별도 테스트용 지문으로 허가해 구성해도 실제 드라이버는 `DEPTH_ZERO_SELF_SIGNED_CERT`로 접속 거부. 관련 기존 TLS/subject pool 회귀 **3파일·38/38 PASS**, `tsc -p tsconfig.json --noEmit` PASS.
+- **실행 중 보정:** 첫 TLS 연결에서 명하용 `pg` 드라이버가 확인한 서버 이름은 `localhost`였는데 테스트 인증서 SAN에 IP만 존재해 **`ERR_TLS_CERT_ALTNAME_INVALID`로 정상 거부**됨. 테스트 인증서에 `DNS:localhost,IP:127.0.0.1` SAN을 모두 포함시켜 재실행 PASS. **실제 프로그램의 호스트명 검증을 끄거나 변경하지 않았음.**
+- **제한 및 승인 경계:** 임시 테스트 지문을 권한 객체로 전달해 **일반 strict TLS 대상 생성 함수**의 실제 작동을 검증한 것으로, **상수 `PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1`를 사용하는 운영 전용 `buildProductionNodePostgresPoolConfigV1`의 실제 운영 인증서 검증**, Supabase 원격 CA/로그인·RLS·PG17 및 Cloudflare 배포 연결은 여전히 미검증. CI에 `PG_BIN_DIR`/ `OPENSSL_BIN`이 없으면 실제 PostgreSQL 실증은 skip되므로 원격 GREEN만으로 실DB 성공을 주장하지 않음. Phase 8 DR/Phase 13 Production Operations ACCEPTANCE 미완료, `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+- **후속:** 스크립트·문서 같은 PR 제출, CI 통과 후 운영 DB 접속을 요구하지 않는 나머지 미완료 증거를 로드맵 순으로 확보. 운영 데이터·비밀·인증서의 외부 문의나 변경은 진행하지 않음.
+
 ## 2026-10-30 16:52 KST 추가 검증 — 최신 Cloudflare 배포의 실제 양성·음성 E2E PASS
 
 **이 절은 아래 §3.2와 §5의 구버전/미수용 항목 중 같은 엔드포인트·같은 조건을 대상으로 한 과거 상태보다 최신 증거**이다. 현재 운영 준비 전체가 완료되었다는 뜻이 아니라 **배포된 정확한 버전에 연결한 검증 부분집합**의 최신 관측이다.
