@@ -103,6 +103,9 @@ export async function handleSeyeonFirstOriginalDialoguePairNodeS0V1(
       refuse(response,404,'NOT_FOUND');
       return 'preflight_denied';
     }
+    // Stable identifiers remain narrowed inside the asynchronous DB callback.
+    const threadId=match[1];
+    const assistantMessageId=match[2];
     const headers=new Headers();
     for(const [key,value] of Object.entries(incoming.headers)){
       if(Array.isArray(value)){for(const item of value)headers.append(key,item);}
@@ -138,7 +141,7 @@ export async function handleSeyeonFirstOriginalDialoguePairNodeS0V1(
         await client.query("SET LOCAL lock_timeout = '2000ms'");
         await client.query("SET LOCAL statement_timeout = '5000ms'");
         const result=await client.query<Pair>(QUERY,[
-          resolvedSubject.subjectId,match[1],match[2],
+          resolvedSubject.subjectId,threadId,assistantMessageId,
         ]);
         if(controller.signal.aborted||result.rows.length>1){
           throw Error('Original pair source unavailable');
@@ -146,14 +149,14 @@ export async function handleSeyeonFirstOriginalDialoguePairNodeS0V1(
         const row=result.rows[0];
         const valid=row!==undefined &&
           typeof row.userMessageId==='string' && row.userMessageId.length===36 &&
-          typeof row.assistantMessageId==='string' && row.assistantMessageId.toLowerCase()===match[2].toLowerCase() &&
+          typeof row.assistantMessageId==='string' && row.assistantMessageId.toLowerCase()===assistantMessageId.toLowerCase() &&
           typeof row.userText==='string' && row.userText.trim()!=='' &&
           typeof row.assistantText==='string' && row.assistantText.trim()!=='' &&
           Buffer.byteLength(row.userText,'utf8')<=8_000 &&
           Buffer.byteLength(row.assistantText,'utf8')<=65_536;
         const payload=Buffer.from(JSON.stringify(valid ? {
           ok:true,
-          data:{threadId:match[1],userMessageId:row.userMessageId,
+          data:{threadId,userMessageId:row.userMessageId,
             userText:row.userText,assistantMessageId:row.assistantMessageId,
             assistantText:row.assistantText},
           meta:{apiContractVersion:'v0.9',requestId,
