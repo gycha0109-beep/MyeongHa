@@ -214,3 +214,35 @@ describe('P4 exact Reader revoke Provider Event -> Grant atomic CAS lock bridge'
   expect(c.query).not.toHaveBeenCalled();
  });
 });
+
+describe('P4 locked source-event Receipt identity pinned to authenticated cancel set',()=>{
+ it('accepts exact original Receipt only as an observation, no mutation',async()=>{
+  const c=client();
+  const r=await inspect(c,{...INPUT,expectedReceiptId:RECEIPT});
+  expect(r.kind).toBe('trusted_provider_order_missing');
+  expect(r.grantRevocationAuthorized).toBe(false);
+  expect(locked(c).map(x=>x.sql)).toEqual([EVENT_SQL,GRANT_SQL]);
+  expect(c.calls.at(-1).sql).toBe('rollback');
+ });
+ it('a mismatched Receipt cannot reach the exact Grant lock or source evidence query',async()=>{
+  const c=client();
+  const r=await inspect(c,{
+   ...INPUT,expectedReceiptId:'00000000-0000-4000-8000-000000000099',
+  });
+  expect(r).toMatchObject({
+   kind:'exact_cancellation_receipt_scope_changed',
+   sourceEventLocked:true,exactReaderGrantLocked:false,
+   grantRevocationAuthorized:false,readerT2LockHeld:false,
+   entitlementEffectInvoked:false,writesPerformed:false,
+  });
+  expect(locked(c).map(x=>x.sql)).toEqual([EVENT_SQL]);
+  expect(c.calls.some(x=>x.sql===EVIDENCE_SQL)).toBe(false);
+  expect(c.calls.at(-1).sql).toBe('rollback');
+ });
+ it('invalid expected Receipt is rejected before acquiring any lock',async()=>{
+  const c=client();
+  await expect(inspect(c,{...INPUT,expectedReceiptId:'not-uuid'}))
+   .rejects.toThrow('INVALID');
+  expect(c.query).not.toHaveBeenCalled();
+ });
+});
