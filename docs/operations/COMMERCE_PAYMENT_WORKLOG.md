@@ -165,3 +165,13 @@
 - **다음:** 저장된 HMAC 집합과 독립적인 최신 Provider GET 성공 취소 목록의 동등성 검증, 이후 순서/법적/Reader T2 권한 조건 완료 전까지 실제 환불·회수 비활성.
 - **최종 로컬 회귀:** 관련 Vitest 14개 파일 **270건 PASS**, TypeScript 타입 검사·빌드 PASS, PostgreSQL 17 전용 SQL 생성기 2종 및 Bash 검사 PASS. 별도 PGlite PostgreSQL 18.6에서 2건 부분 취소 실제 SQL PASS. PostgreSQL 17 공식 CI는 아직 대기 상태입니다.
 - **통합 PR:** [PR #2831](https://github.com/gycha0109-beep/MyeongHa/pull/2831), 최초 구현 커밋 636f1d15. 관련 Vitest 270건, 타입 검사·빌드 및 격리 PG18 SQL 통과. 공식 PostgreSQL 17/필수 통합 CI 결과와 병합은 별도 확인 전까지 대기 상태입니다.
+
+### 2026-11-01 — 인증된 PortOne 전체 취소 목록과 기존 Receipt 원장 HMAC 집합 대조
+
+- **선행 병합:** [PR #2831](https://github.com/gycha0109-beep/MyeongHa/pull/2831) 병합 확인(`6674709a`). 기존 복수 취소 원장 자체의 중복·건별 합계 감사 기능을 기반으로 다음 작업을 분리했습니다.
+- **실제 구현:** 내부 fixed-origin 인증 PortOne V2 GET을 단일 취소/전체 취소 공통 전송으로 정리했습니다. 기존 원본 Receipt/검증된 결제 Attempt에서 조회한 Payment ID를 사용하며, 최대 64개 GET 취소 항목을 서버 메모리에서 HMAC으로 변환한 뒤 **저장된 모든 성공 취소 건의 지문·금액·전체 합계와 정확히 대조**합니다.
+- **안전:** 빠진/추가된 취소 항목, 금액 변경, 원 거래·통화 오류, 미완료/실패 취소, 다른 결제 시도, GET 전후 DB 원장 변경을 HOLD 처리합니다. 두 DB 조회는 완전 가시성·읽기 전용·개별 ROLLBACK이며 Provider NEWER/STALE, 법적 환불, Reader R2/T2 권한을 새로 승인하지 않습니다. 공개 API·운영 마이그레이션·환불 POST·Grant Effect 없음.
+- **실 DB 계약:** #2831에서 이미 가동된 별도 PostgreSQL 17 두 검사에서 새 정확한 Payment Attempt ID도 확인하도록 강화했습니다. PostgreSQL 17의 변경된 전체 스키마 성공은 이번 PR 필수 CI 전까지 **미확정**입니다.
+- **상세:** `docs/operations/COMMERCE_P4_CANCELLATION_SET_AUTHENTICATED_GET_RECONCILIATION_V1.md`.
+- **남은 과제:** Provider 비교 가능 처리 순서 또는 안전한 동등 상태 조정, 실제 Legal/Reader 전달 증거, Reader R2/T2 원자적 잠금과 기존 Entitlement Effect 결속. LIVE/자동 환불/권한 회수는 비활성 유지.
+- **최종 로컬 검증:** 관련 결제·Reader Vitest **16개 파일 / 303건 PASS**, TypeScript 타입 검사·빌드 PASS, PostgreSQL 17 독립 검증 SQL 생성기 2종 PASS. 실제 PostgreSQL 17 전체 실행 및 통합 CI는 PR 성공 전까지 미확정입니다.
