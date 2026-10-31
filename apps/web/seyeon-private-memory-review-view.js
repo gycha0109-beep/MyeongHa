@@ -48,6 +48,11 @@ export function mountSeyeonPrivateMemoryReviewV1(options) {
       if (!window.confirm(t(`"${label}" 선택을 확정하시겠습니까?`))) return;
       inFlight = true;
       buttons.forEach(button => { button.disabled = true; });
+      // After explicit selection, immediately remove the unapproved personal
+      // summary and all choice controls from the live DOM. An uncertain
+      // server ACK must never leave the old proposal actionable or visible.
+      summary.textContent = '';
+      panel.replaceChildren(status);
       status.textContent = t('선택 결과를 확인 중입니다…');
       try {
         const receipt = await client.decidePlannerProposal(plannerProposal, choice, true);
