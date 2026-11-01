@@ -3,9 +3,29 @@ import {describe,expect,it,vi} from 'vitest';
 import {assertSeyeonZeroSourceHttpReceiptReadyV1,SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from '../apps/api/src/seyeon-zero-source-http-receipt-ready-v1.js';
 import {SEYEON_SECURITY_S0_PRODUCTION_V1} from '../apps/api/src/seyeon-security-s0-production-policy-v1.js';
 
+import {isSeyeonFirstReceiptEligibleReceiveV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
+
 const read=(name:string)=>readFileSync(new URL('../'+name,import.meta.url),'utf8');
 
 describe('Cloudflare zero-personal-source first reply is server-owned and fail-closed',()=>{
+  it('admits only new user turns or failed-retryable same-turn attempts; never committed replay',()=>{
+    expect(isSeyeonFirstReceiptEligibleReceiveV1({turnState:'received',replayed:false})).toBe(true);
+    expect(isSeyeonFirstReceiptEligibleReceiveV1({turnState:'failed_retryable',replayed:true})).toBe(true);
+    for(const c of [
+      {turnState:'received',replayed:true},
+      {turnState:'failed_retryable',replayed:false},
+      {turnState:'committed',replayed:true},
+      {turnState:'delivered',replayed:true},
+      {turnState:'failed_final',replayed:true},
+      {turnState:'abandoned',replayed:true},
+    ])expect(isSeyeonFirstReceiptEligibleReceiveV1(c)).toBe(false);
+    const live=read('apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.ts');
+    expect(live).toContain('!eligibleReceive');
+    expect(live).toContain('e.receivedTurn.committedTurn!==null||e.attempt.replayed');
+    expect(live).toContain('e.committedTurn.replayed');
+    expect(live).toContain('SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1');
+  });
+
   it('admits no uninstalled or unowned DB issuer before paid dispatch',async()=>{
     const query=vi.fn(async(sql:string,args:unknown[])=>{
       expect(sql).toContain('count(*)=3');

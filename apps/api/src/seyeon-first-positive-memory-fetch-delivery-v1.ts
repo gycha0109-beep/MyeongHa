@@ -64,6 +64,14 @@ export function classifySeyeonFirstPositiveMemoryFailureV1(error: unknown, reque
   return holdSeyeonReceiptHttpV1(requestId);
 }
 
+/** A new attempt may recover the same original failed User turn, never replay a delivered Assistant. */
+export function isSeyeonFirstReceiptEligibleReceiveV1(received: Readonly<{
+  turnState: string; replayed: boolean;
+}>): boolean {
+  return (received.turnState==='received' && received.replayed===false) ||
+    (received.turnState==='failed_retryable' && received.replayed===true);
+}
+
 export function holdSeyeonReceiptHttpV1(requestId: string): Response {
   return Response.json({ok:false,error:{code:'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
     messageKey:'chat.secure_reveal_unavailable',retryable:false},
@@ -81,6 +89,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   zeroSourceFirstReplyApproved?: true;
 }>): Promise<Response> {
   const held=()=>holdSeyeonReceiptHttpV1(input.requestId);
+  let stage: 'preflight'|'receipt_readiness'|'model_execution'|'receipt_issuer'='preflight';
   try {
     const preflight=await preflightSeyeonChatTurnSendRequestV1(input);
     if(preflight.kind==='denied')return preflight.response;
@@ -89,6 +98,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     const zeroSource=input.zeroSourceFirstReplyApproved===true;
     // Receipt HTTP requires G1/G2 and its own issuer, never EXECUTE on the
     // old Node sender. Production leaves that unreceipted RPC revoked.
+    stage='receipt_readiness';
     await executePostgresSubjectTransactionV1({pool:input.pool,
       verifiedEvidence:preflight.verifiedEvidence,execute:async({client})=>{
         if(zeroSource){
@@ -112,11 +122,17 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         await assertSeyeonG0OriginalLineageReadyV1(client);
       }});
     if(input.request.signal.aborted)return held();
+    stage='model_execution';
     const result=await input.runtime.run({verifiedEvidence:preflight.verifiedEvidence,
       threadId:preflight.threadId,clientTurnId:preflight.clientTurnId,text:preflight.text});
     const e=result.execution;
+    // A fresh response may be generated for the SAME durable clientTurnId
+    // after its previous attempt failed before Commit. That receive is an
+    // idempotent replay of the User row, NOT a replay of any Assistant text.
+    // An already committed/delivered reply remains non-revealable here.
+    const eligibleReceive=isSeyeonFirstReceiptEligibleReceiveV1(e.receivedTurn);
     if(e.disposition!=='executed'||e.receivedTurn.userText!==preflight.text||
-       e.receivedTurn.replayed||e.receivedTurn.turnState!=='received'||
+       !eligibleReceive||
        e.receivedTurn.committedTurn!==null||e.attempt.replayed||
        e.receivedTurn.turnId!==e.committedTurn.turnId||
        e.attempt.attemptId!==e.committedTurn.attemptId||e.committedTurn.replayed||
@@ -131,6 +147,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
        input.request.signal.aborted)return held();
     const challenge=randomBytes(32).toString('hex');
     const receiptHash=createHash('sha256').update(challenge,'utf8').digest();
+    stage='receipt_issuer';
     const body=await executePostgresSubjectTransactionV1({pool:input.pool,
       verifiedEvidence:preflight.verifiedEvidence,execute:async({client,resolvedSubject})=>{
         if(resolvedSubject.subjectKind!=='member'||resolvedSubject.subjectId!==result.subjectId||
@@ -157,7 +174,12 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     if(input.request.signal.aborted)return held();
     return new Response(body,{headers:{'Content-Type':'application/json; charset=utf-8',
       'Cache-Control':'no-store, no-transform','Content-Encoding':'identity'}});
-  }catch(error){return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);}
+  }catch(error){
+    // Security-safe operational diagnosis: never log source text, IDs,
+    // provider payload, credentials, raw error messages, or model responses.
+    console.error('MYEONGHA_SEYEON_FIRST_REPLY_STAGE_HOLD',stage);
+    return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);
+  }
 }
 
 /** Capability-only receipt. Returns no identity, source, grant or reply text. */

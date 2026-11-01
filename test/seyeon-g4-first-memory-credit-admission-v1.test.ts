@@ -92,6 +92,31 @@ describe('G4 private first-Memory credit reservation before provider',()=>{
     expect(d.privateSql).toHaveLength(0);
     expect(d.privateReleased).toBe(0);
   });
+  it('admits a canonical DB-verified Owner Admin with no paid-credit pool',async()=>{
+    const d=database({isOwnerAdmin:true,chatCreditExempt:true,sandboxCheckoutAllowed:false});
+    const {privateCreditPool:unused,...withoutPrivatePool}=request(d);
+    expect(unused).toBe(d.privateCreditPool);
+    await expect(admitSeyeonG4FirstMemoryCreditsV1(withoutPrivatePool)).resolves.toEqual({
+      kind:'owner_admin_exempt',canonicalSubjectId:subject,requiredCredits:0,
+    });
+    expect(d.sql.some(sql=>sql.includes('qry_myeongha_owner_admin_access_v1'))).toBe(true);
+    expect(d.sql.at(-1)).toBe('COMMIT');
+    expect(d.privateSql).toHaveLength(0);
+  });
+  it('fails closed for any ordinary or forged Owner without a paid-credit pool',async()=>{
+    for(const owner of [
+      {isOwnerAdmin:false,chatCreditExempt:false,sandboxCheckoutAllowed:false},
+      {isOwnerAdmin:false,chatCreditExempt:true,sandboxCheckoutAllowed:false},
+      {isOwnerAdmin:true,chatCreditExempt:false,sandboxCheckoutAllowed:false},
+    ]){
+      const d=database(owner);
+      const {privateCreditPool:unused,...withoutPrivatePool}=request(d);
+      expect(unused).toBe(d.privateCreditPool);
+      await expect(admitSeyeonG4FirstMemoryCreditsV1(withoutPrivatePool))
+        .rejects.toBeInstanceOf(SeyeonG4FirstMemoryCreditHoldV1);
+      expect(d.privateSql).toHaveLength(0);
+    }
+  });
   it.each(['insufficient','conflict','committed_replay','already_reserved'])(
     'rolls back %s instead of issuing new model admission',async outcome=>{
       const d=database(undefined,outcome);

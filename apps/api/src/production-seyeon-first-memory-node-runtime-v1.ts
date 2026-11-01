@@ -67,20 +67,35 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
           input.governorApproval === undefined) {
         throw Error('First Memory runtime requires reviewed source and cost authority.');
       }
-      // No paid Memory inference may start on provider credentials alone.
-      // Until delivery ACK can settle/release the same atomic reservation,
-      // the server-owned G4 production gate is deliberately closed.
-      if (!SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
-        throw Error('First Memory G4 credits and delivery settlement are not mounted.');
+      // A DB-verified Owner Admin is exempt from customer chat credits.
+      // The first-zero-source Owner-only service can be tested while the
+      // general paid receipt/settlement rail remains deliberately sealed.
+      // No caller flag, environment variable or claimed account role grants
+      // exemption: the existing RLS-bound Subject RPC decides it again.
+      if (input.zeroSourceFirstReplyApproved === true &&
+          !SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
+        const admission = await admitSeyeonG4FirstMemoryCreditsV1({
+          pool:lease.pool,verifiedEvidence:turn.verifiedEvidence,
+          threadId:turn.threadId,clientTurnId:turn.clientTurnId,
+        });
+        if (admission.kind !== 'owner_admin_exempt') {
+          throw Error('Owner-only first zero-source turn requires DB-verified credit exemption.');
+        }
+      } else {
+        // Non-exempt Members never reach a paid Provider without the approved
+        // Commerce reservation and receipt-settlement rail.
+        if (!SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
+          throw Error('First Memory G4 credits and delivery settlement are not mounted.');
+        }
+        if (input.privateCreditPool === undefined) {
+          throw Error('First Memory G4 private credit authority is not configured.');
+        }
+        await admitSeyeonG4FirstMemoryCreditsV1({
+          pool:lease.pool,privateCreditPool:input.privateCreditPool,
+          verifiedEvidence:turn.verifiedEvidence,
+          threadId:turn.threadId,clientTurnId:turn.clientTurnId,
+        });
       }
-      if (input.privateCreditPool === undefined) {
-        throw Error('First Memory G4 private credit authority is not configured.');
-      }
-      await admitSeyeonG4FirstMemoryCreditsV1({
-        pool:lease.pool,privateCreditPool:input.privateCreditPool,
-        verifiedEvidence:turn.verifiedEvidence,
-        threadId:turn.threadId,clientTurnId:turn.clientTurnId,
-      });
       // Readiness has already succeeded before this closure can access
       // provider credentials or create any metered model implementation.
       const base = {...await resolveProductionSeyeonProviderConfigAtRequestV1(input.env),

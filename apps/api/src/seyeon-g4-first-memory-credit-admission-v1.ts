@@ -27,7 +27,8 @@ type OwnerRow=Readonly<{
 export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
   pool:PostgresSubjectPoolV1;
   /** Private, server-owned Commerce role connection; NEVER a public DB session. */
-  privateCreditPool:PostgresSubjectPoolV1;
+  /** Optional only for the DB-verified Owner Admin exemption. Paid Members still require a separate Commerce pool. */
+  privateCreditPool?:PostgresSubjectPoolV1;
   verifiedEvidence:VerifiedSubjectIdentityEvidenceV1;
   threadId:string;
   clientTurnId:string;
@@ -36,7 +37,7 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
   | {kind:'owner_admin_exempt';canonicalSubjectId:string;requiredCredits:0}
 >> {
   if(input.verifiedEvidence?.kind!=='member'||
-      !input.privateCreditPool||input.privateCreditPool===input.pool){
+      input.privateCreditPool===input.pool){
     throw new SeyeonG4FirstMemoryCreditHoldV1();
   }
   // Authenticate the original Member under the ordinary RLS-bound role.
@@ -68,6 +69,9 @@ export async function admitSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
     return Object.freeze({kind:'owner_admin_exempt' as const,
       canonicalSubjectId:preflight.canonicalSubjectId,requiredCredits:0 as const});
   }
+  // A non-exempt Member must never reach a model without the distinct,
+  // server-owned Commerce pool; absence is not a zero-cost reservation.
+  if (!input.privateCreditPool) throw new SeyeonG4FirstMemoryCreditHoldV1();
   // Only a server-trusted, separately scoped Commerce transaction may call
   // the private reserve owner. The canonical identity is resolved above from
   // verified Member evidence, never supplied by request JSON or model output.
