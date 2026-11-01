@@ -102,7 +102,13 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       .replaceAll('first-zero-test-v1', 'first-zero-test-v1-' + n)
       .replaceAll('first-zero-test-release', 'first-zero-test-release-' + n)
       .replaceAll('first-zero-disposable-v1', uuid(30, n))
-      .replaceAll("repeat('a',64)", "repeat('" + n.toString(16) + "',64)")
+      // After fixture 15, hex numbering has two characters: repeating the
+      // entire numeral 64 times would violate the exact 64-hex hash contract.
+      // Preserve existing fixtures 1–15 unchanged; derive unique valid hashes
+      // for the new G5 receipts without colliding with older seeded bundles.
+      .replaceAll("repeat('a',64)", n <= 15
+        ? "repeat('" + n.toString(16) + "',64)"
+        : "'" + createHash('sha256').update('s0-g5-content-'+n).digest('hex') + "'")
       .replaceAll('Synthetic first hello', userText);
     await pool.query(adapt(baseline.slice(0, seedEnd)));
     await pool.query(`insert into public.memory_items(
@@ -748,7 +754,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
 
   it('G5 real original Fetch/256-bit proof/HTTP ACK settles 10 credits exactly once',async()=>{
     await installDisposableG5Credit();
-    const f=await prepare(13,{summary:'Synthetic approved original Memory for credit ACK'});
+    // Existing S0 tests already own fixture 13; isolate the Commerce E2E.
+    const f=await prepare(17,{summary:'Synthetic approved original Memory for credit ACK'});
     await reserveFirstPositive(f);
     const response=await fetchReply(f);
     expect(response.status).toBe(200);
@@ -773,7 +780,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
 
   it('G5 durable receipt survives Commerce DB outage; retry settles same 10',async()=>{
-    const f=await prepare(14,{summary:'Synthetic approved original Memory for recovery'});
+    // Existing S0 tests already own fixture 14; never overwrite originals.
+    const f=await prepare(18,{summary:'Synthetic approved original Memory for recovery'});
     await reserveFirstPositive(f);
     const response=await fetchReply(f);
     expect(response.status).toBe(200);
