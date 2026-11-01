@@ -136,6 +136,12 @@ A dedicated authorized isolated Hosted project (or an approved full-stack local 
 This document **closes the inventory/classification subtask only**. Provider-service equivalence, incident-time independent privacy continuity and S8 final E2E remain **HOLD**.
 
 
+## 2026-11-01 CI execution adapter — disposable local Supabase Auth/Storage
+
+The existing Phase-4 synthetic local fixture and real HTTP acceptance harness now has a **manual, main-only** GitHub Linux execution path: `.github/workflows/postgres-hosted-synthetic-local-acceptance.yml`, invoking `scripts/operations/run-postgres-hosted-synthetic-local-ci.sh`. It creates a **brand-new temporary CLI-only project** outside the repository, starts only the required Docker-backed Supabase local components with pinned stable CLI 2.122.0, exercises fixed `127.0.0.1` Auth/Storage endpoints with deterministic synthetic object bytes and synthetic identities, and disposes of the stack. It does not link to Production, read Production credentials, copy backup records, or create a Hosted project.
+
+The workflow produces an **identifier-free** local evidence artifact; the old in-memory unit tests remain separate. The real GitHub Linux run is **NOT YET PROVEN** until that workflow is dispatched after the PR merges and a successful run is observed. Even after such a PASS, `hostedProviderRecoveryProven=false`, `independentPrivacyContinuityProven=false`, `wholeServiceRpoRtoProven=false`, `drReady=false`, `serviceResumptionAllowed=false` and `gate=BLOCKED` remain unchanged. No local CI result may be promoted to a Hosted service-recovery decision.
+
 ## 5. Local synthetic-only Auth/Storage functional acceptance harness (implementation, no Hosted claim)
 
 The Phase-4 **local synthetic-only** alternative now has an executable

@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 8 기존 로컬 Auth/Storage 합성 수용 검증을 일회용 Linux CI에 연결
+
+- **선행 종료 확인:** [PR #2847](https://github.com/gycha0109-beep/MyeongHa/pull/2847)은 [CI Integration #41241185170](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41241185170) SUCCESS 후 2026-11-01 06:13:41 KST 병합, main `ad4f5d5661454bdcad404ba7d5a59bcacd9ce3b8`. 새 migration 카탈로그 지문 백업 [#41240435451](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240435451)과 격리 PG17 복원 [#41240770891](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240770891) PASS 증거는 병합된 문서에 귀속한다.
+- **이번 구현:** 기존 [Hosted Auth/Storage gap matrix](HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md)의 **Phase-4 합성 로컬 서비스 검증 절차**를 GitHub 일회용 Ubuntu runner에 연결했다. `.github/workflows/postgres-hosted-synthetic-local-acceptance.yml`은 **수동 main/저장소 한정**, Production environment/secret 없이 read-only GitHub 권한으로만 실행한다. `scripts/operations/run-postgres-hosted-synthetic-local-ci.sh`는 임시 신규 로컬 Supabase CLI **2.122.0** 설치·기동·정지, 고정 localhost Auth/Storage, 기존 fixture·실제 HTTP/DB 수용 실행 및 개인정보 식별자 없는 결과만 보관한다. 기존 Production migration/운영 프로젝트와 분리된 임시 `supabase/config.toml`을 사용하고 운영 프로젝트 연결을 거부한다.
+- **수용 범위:** 실제 로컬 Synthetic 계정 로그인/오류/삭제 계정 차단, private Storage 실제 객체 해시 검증/비인가 차단, refresh-token/로그아웃 후 차단. **실제 Linux CI 실행 PASS는 첫 workflow_dispatch 결과 전까지 미판정**; 기존 Vitest mock PASS와 혼동하지 않는다. 결과 증거는 `hostedProviderRecoveryProven=false`, `independentPrivacyContinuityProven=false`, `wholeServiceRpoRtoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`, `gate=BLOCKED`를 유지한다.
+- **현재 개인정보 원장 관측:** [자동 수집 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554) SUCCESS 및 비식별 공개 manifest 조회: **백업 #41243930121** 기준 이벤트 **0개**, 지난 수집과 **24043초(약 6시간 40분)** 간격, 정상 일정 3600초보다 **20443초 초과**. overlap이 남은 이벤트 유실은 발견하지 않았으나 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`다. 일정 실행 성공 또는 eventCount=0을 독립적인 연속 개인정보 삭제/철회 증거로 승격하지 않는다.
+- **격리 환경 현황:** Supabase 조직에서 운영 프로젝트 외 별도 명하 Hosted DR 대상이 없고 분기(branch) **0개**. 사용자 집 PC Docker CLI는 있으나 daemon 비실행. 이번 구현은 무료 GitHub runner의 일회용 로컬 합성 스택을 사용하며 Hosted 전체 복구를 대체하지 않는다. Production SQL/DDL/Auth/Storage/비밀/결제를 변경하지 않았다. #1887 OPEN, `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+
+
 ### 2026-11-01 KST — Phase 8 신형 migration 카탈로그 지문 백업 실증 및 최신 Worker 서비스 검사
 
 - **선행 완료:** [PR #2845](https://github.com/gycha0109-beep/MyeongHa/pull/2845)는 [전체 통합 #41238368751](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41238368751) SUCCESS 후 2026-11-01 05:31:46 KST 병합(merge `3790702aa3ab3966e478dad15a178842a10e32e4`). 소스 원본 SHA와 병합 SHA를 구분한다.
