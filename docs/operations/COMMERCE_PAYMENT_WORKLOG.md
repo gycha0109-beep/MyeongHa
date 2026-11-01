@@ -223,3 +223,4 @@
 - **검증:** 신규 Reader 내부 Source 검증 17건, 기존 법적 검토 확장 8건 및 PostgreSQL 17 계약 포함 집중 57건 PASS. 전체 관련 회귀/타입/빌드 결과는 최종 검증 후 기록합니다. 새 실제 PG17 실행은 공식 CI 완료 전까지 미확정.
 - **문서:** `docs/operations/COMMERCE_P4_READER_PRIVATE_SOURCE_NOT_CONSUMER_DELIVERY_V1.md`.
 - **최종 로컬 회귀:** 관련 Vitest **23개 파일/463건 PASS**, TypeScript 타입 검사·빌드 PASS, 실제 PG17 fixture 기반 SQL 생성기 및 Bash 문법 PASS. 로컬 Docker 엔진은 실행 중이지 않아 신규 실제 PostgreSQL 17 DB 통합 검사는 미실행이며, PR의 공식 postgres17 CI 성공으로만 증명합니다.
+- **통합 PR:** [PR #2853](https://github.com/gycha0109-beep/MyeongHa/pull/2853), 구현 커밋 c06e05d5. 관련 Vitest 463건·타입 검사·빌드 PASS. 공식 PostgreSQL 17 전체 스키마/필수 통합 CI와 병합은 결과 확인 전까지 미확정입니다.
