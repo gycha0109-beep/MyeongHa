@@ -241,3 +241,10 @@
 - **배포 경계:** 신규 SQL은 **비배포 후보 폴더**에 있고 기존 운영 migration/checkout notice stage 제외 정책, P0-PR-01·LEGAL-004, 환불/Entitlement/LIVE는 변경하지 않습니다. 이 후보는 S5 보호 본문 identity를 승인된 원본 테이블에 대조하지 못하며 아직 Reader 최종 R2/T2 공개·S7 전송 경로에 연결되지 않았습니다. 특히 *서버 준비 기록*과 *기기 ACK*는 수신/제공에 관한 단서일 뿐 `DELIVERED_PROVABLE`의 긍정 authority가 아닙니다.
 - **다음 작업:** 실제 Reader R2/T2·S5/S7 원본에 응답 준비/ACK 기록을 결속하고, 신설 테이블의 계정 삭제·보존 기간 규칙을 승인된 정책에 맞춰 연결한 다음 격리 PostgreSQL 17 실제 SQL 실행 검증과 forward-only migration을 수행합니다. 이후 독립 전달 증거를 법적 수동 검토 소스에 연결합니다. 새로운 무근거 전달 완료 판정은 금지합니다.
 - **작업 브랜치:** `feat/commerce/reader-delivery-receipt-capture-20261101`. 신규 구현, 테스트, 워크로그는 동일 PR에 포함합니다. 자동 환불·Reader 권한 회수·LIVE 결제는 계속 OFF.
+
+### 2026-11-01 — Reader 전달 기록 후보의 실제 PostgreSQL 17 실행 검사 연결
+
+- **실제 작업:** 이미 실행되는 `commerce-exact-reader-withdrawal-hold-pg17` 격리 DB 검사에 비배포 후보 SQL 설치와 실제 INSERT/ACK 함수 호출을 추가했습니다. 기존 B2/B3 구매 fixture를 재사용하며 새로운 workflow나 CI case를 만들지 않았습니다.
+- **실행 증명 대상:** 정확한 B2 구매권 준비 1건, 동일 요청 재시도 후 원본 시각 불변, 별도 구매 B3로 재사용 시 거부, 잘못된 ACK HMAC 거부, 정상 ACK 1건과 재시도 멱등, 마지막 ROLLBACK. 실험 도중 환불·권한 회수 함수는 실행하지 않습니다.
+- **검증 상태:** 테스트 경로와 격리 DB 가드를 실제 코드에 연결했습니다. **공식 PostgreSQL 17 CI가 아직 성공하기 전이므로 SQL 실행 성공은 미확정**입니다. 결과가 나오면 해당 PR/커밋의 CI를 기준으로 판단합니다.
+- **PR:** [#2855](https://github.com/gycha0109-beep/MyeongHa/pull/2855), 자동 병합 설정. 현재 단계는 *서버 응답 준비/기기 ACK의 영속 기록 후보 + 실 DB 검증 경로*이며 최종 사용자 전달 사실 또는 운영 권한은 아닙니다.
