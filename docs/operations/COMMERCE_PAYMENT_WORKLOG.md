@@ -264,3 +264,15 @@
 - **충돌 처리:** DB Owner 아카이브 전체 241개 파일을 그대로 병합하면 현재 웹·Saju·보안·운영 파일 16개 충돌 및 의도치 않은 권한 확장이 발생하므로 전체 병합은 취소했다. 특히 환불 전체 취소 어댑터는 현행 PortOne 타입과 불일치해 이식 대상에서 제외하고 기존 최신 검증 흐름과 통합할 예정이다.
 - **검증 상태:** 이번 통합 브랜치의 타입/회귀/실제 DB·CI 결과는 아직 미확정. 새 작업을 모두 모은 뒤 최종 검사한다. 중간 CI 완료를 근거 없이 추정하지 않는다.
 - **다음:** 선행 SQL Writer를 현행 공식 Receipt/Reader 버전에 맞춰 통합하고, 실물 지급/취소/전달 경로를 같은 구매권·원자 잠금으로 묶는다. P0-PR-01 개인정보 삭제 그래프와 전달/청약철회 보존 규칙을 적용한 뒤 최종 통합 CI를 실행한다.
+
+### 2026-11-01 — 결제 P3/P4 ↔ 공식 Reader S2~S7 통합 구현 묶음 (통합 작업 브랜치)
+
+- **방식:** 기존 완료 작업은 재작성하지 않고 DB Owner #2301 닫힌 Draft 아카이브에서 실제 구현한 기능을 현행 Commerce 통합 브랜치에 포팅했습니다. 과거 대형 PR 전체 병합에서 발생한 16개 충돌 파일은 자동 덮어쓰지 않았습니다.
+- **DB 실제 기능:** 1740~2300 범위 공식 Reader 관련 forward-only migration 57개를 이식했습니다. 주요 구현은 결제 단위 공동 잠금, verified Receipt 기반 Grant 발급·Reader 결속, 취소 성공 이벤트 기반 특정 Grant 회수, 보호 답변 원자적 저장·현 권한 재조회, 전달 준비/기기 ACK, 환불 검토용 전달 이력 및 개인정보 삭제·복구·키 폐기 처리입니다. 과거 성공 근거만으로 현행 DB 적용 성공을 주장하지 않습니다.
+- **P3 호출 연결:** 기존 Commerce **사용자 검증 결제 완료 / 인증 Provider 완료** 뒤, 서버 전용 명시적 내부 설정이 있는 경우에만 DB 검증된 Receipt로 `fulfillVerifiedReaderReceiptV1`를 호출하도록 연결. DB 내부에서는 같은 구매 권한 범위를 재검증하고 멱등 발급·공식 Reading의 추가 Reader 재사용 조건을 적용합니다. 기본값 OFF, 기존 P1 Owner Sandbox와 공개 구매 플로우는 건드리지 않았습니다.
+- **P4 실제 취소·권한 회수:** 독립적인 PortOne V2 인증 GET을 통한 `CANCELLED`·정확한 `SUCCEEDED` 취소 건 검사와 해당 Reader Grant만 회수하는 기존 DB Writer·서버 어댑터 및 Webhook 실행 경로를 통합했습니다. Cloudflare가 거부하는 구형 `redirect:error`는 포팅하지 않고 현재의 `redirect:manual`+3xx 거부 구현을 그대로 유지했습니다. **서비스가 PortOne에 환불을 요청하는 POST API는 아직 연결되지 않았으며**, 다른 Reader 구매권/채팅 회수 금지는 기존 원자 범위를 유지합니다.
+- **Reader 유료 콘텐츠:** 기존 DB Owner의 서버 보호 답변 저장/조회, 웹·모바일 전달 처리, 서버 ACK·계정 삭제 오프프라이머리 복원/키 폐기 모듈을 통합했습니다. `api/me.ts`에는 기존 일반 API를 보존하고 Reader/ACK/Records 요청 분기만 연결했으며 **paidReadReleaseEnabled=false/productReleaseEnabled=false**로 공개는 닫혀 있습니다.
+- **Reader 원본 접근 검증:** 기존 Reader admission에 정확한 현시점 verified Purchase/Grant/Reader/Bundle 검증을 출처 로드 전·정책 확인 후·발급 직전에 추가했습니다. 기존의 Reader 메타데이터 전체 비교 및 hash 재검사는 제거하지 않았습니다. 독립 S1 범위 잠금/최종 T2 없이 공개 권한을 추정하지 않습니다.
+- **개인정보:** 보호 답변·기기 ACK를 운영 데이터베이스에서 삭제하는 것만으로는 오프프라이머리 암호키 삭제가 완료되지 않으므로, 계정 삭제 Worker의 키 파기 장벽·재개 검사 및 미완료 시 최종 삭제 확인 차단 경로도 통합했습니다.
+- **아직 미완료:** 현재 main 이력·Saju Production 근거·판매 가능한 Offer/Charge Terms·실제 결제사 취소 POST·운영 개인정보 삭제/복구 정합성·유료 Reader 공개 조건·LIVE 준비는 별도 미충족입니다. DB migration과 신규 파일은 **로컬 브랜치에만** 있고 실제 Production Supabase 적용이나 LIVE 운영 활성화가 이뤄진 것이 아닙니다.
+- **검증:** 이 구현 묶음의 타입·회귀·실제 DB 검증 결과는 **아직 미확정**입니다. 작업 중간마다 CI를 재실행하지 않으며 통합 후 로컬 필수 확인과 공식 단일 CI를 수행합니다.

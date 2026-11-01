@@ -1,3 +1,8 @@
+import { fulfillVerifiedReaderReceiptV1 } from './commerce-verified-reader-fulfillment.js';
+import {
+  continuationFromVerifiedReaderBindV1,
+  type CommerceReaderReceiptContinuationV1,
+} from './commerce-reader-product-continuity-v1.js';
 import {
   loadCommercePaymentVerificationContextV1,
 } from './commerce-payment-verification-context-read.js';
@@ -28,6 +33,12 @@ export interface SubjectOwnedCommercePaymentCompletionV1 {
   readonly receiptId: string;
   readonly providerEventId: string;
   readonly replayed: boolean;
+  readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
+  /**
+   * Safe product navigation ONLY, not live entitlement or an interpretation.
+   * Absent for ordinary Commerce purchases / disabled private S2.
+   */
+  readonly readerContinuation?: CommerceReaderReceiptContinuationV1;
 }
 
 /**
@@ -43,6 +54,8 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly paymentAttemptId: unknown;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
+  /** Explicit internal S2 only; public subject completion remains inactive. */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }): Promise<SubjectOwnedCommercePaymentCompletionV1> {
   const verificationContext = await executePostgresSubjectTransactionV1({
     pool: input.pool,
@@ -74,10 +87,23 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
       }),
   });
 
+  const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
+    ? await fulfillVerifiedReaderReceiptV1({
+        pool: input.pool,
+        receiptId: persisted.receiptId,
+      })
+    : undefined;
+
   return Object.freeze({
     paymentAttemptId,
     receiptId: persisted.receiptId,
     providerEventId: persisted.providerEventId,
     replayed: persisted.replayed,
+    ...(input.privateReaderReceiptFulfillmentEnabled === true
+      ? { readerFulfillment: readerFulfillment?.kind ?? 'not_reader' as const }
+      : {}),
+    ...(readerFulfillment === undefined || readerFulfillment === null
+      ? {}
+      : { readerContinuation: continuationFromVerifiedReaderBindV1(readerFulfillment) }),
   });
 }

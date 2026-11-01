@@ -1,4 +1,5 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { tryDispatchHeldOfficialReaderV1 } from '../apps/api/src/official-reader-held-vercel-dispatch-v1.js';
 import { handleContactInquiryRequestV1 } from '../apps/api/src/contact-inquiry-http.js';
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
@@ -916,6 +917,8 @@ export default {
       request,
       routeId: 'api.me.dispatch',
       execute: async ({ requestId, serverTime }) => {
+        const heldReader = tryDispatchHeldOfficialReaderV1({ request, requestId, serverTime });
+        if (heldReader !== null) return heldReader;
         const target = resolveDispatchTarget(request);
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);
