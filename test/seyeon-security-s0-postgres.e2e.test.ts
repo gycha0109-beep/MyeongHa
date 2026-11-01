@@ -18,6 +18,10 @@ import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
+import { handleSeyeonPositiveReceiptAndCreditCandidateV1 }
+  from '../apps/api/src/seyeon-g4-positive-receipt-credit-bridge-candidate-v1.js';
+import { executePostgresCommerceInternalTransactionV1 }
+  from '../apps/api/src/postgres-commerce-internal-execution.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
 import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
@@ -98,7 +102,13 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       .replaceAll('first-zero-test-v1', 'first-zero-test-v1-' + n)
       .replaceAll('first-zero-test-release', 'first-zero-test-release-' + n)
       .replaceAll('first-zero-disposable-v1', uuid(30, n))
-      .replaceAll("repeat('a',64)", "repeat('" + n.toString(16) + "',64)")
+      // After fixture 15, hex numbering has two characters: repeating the
+      // entire numeral 64 times would violate the exact 64-hex hash contract.
+      // Preserve existing fixtures 1–15 unchanged; derive unique valid hashes
+      // for the new G5 receipts without colliding with older seeded bundles.
+      .replaceAll("repeat('a',64)", n <= 15
+        ? "repeat('" + n.toString(16) + "',64)"
+        : "'" + createHash('sha256').update('s0-g5-content-'+n).digest('hex') + "'")
       .replaceAll('Synthetic first hello', userText);
     await pool.query(adapt(baseline.slice(0, seedEnd)));
     await pool.query(`insert into public.memory_items(
@@ -657,6 +667,143 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       noGrantUpdates:true,noMemoryUpdates:true,
     });
   });
+
+  // Real S0 original receipt + private G4 credit on ONE disposable PostgreSQL.
+  // It intentionally uses the existing prepare/fetchReply S0 test fixtures.
+  let g5CreditSchemaInstalled=false;
+  const privateG5Pool=():PostgresSubjectPoolV1=>Object.freeze({connect:()=>pool.connect()});
+  async function installDisposableG5Credit(){
+    if(g5CreditSchemaInstalled)return;
+    const db=process.env.PGDATABASE??'';
+    if(process.env.CI!=='true'||process.env.GITHUB_ACTIONS!=='true'||
+       process.env.DB_SUITE!=='postgres17'||process.env.PGHOST!=='localhost'||
+       !/^myeongha_ci_case_[0-9]+$/u.test(db)){
+      throw Error('HOLD: G5 integration only in isolated Actions PG17 clone');
+    }
+    // Recreate the candidate ledger only on the disposable cloned schema.
+    await pool.query(`drop trigger if exists tr_chat_credit_member_signup_v1 on public.subjects;
+      drop trigger if exists tr_chat_credit_subject_erasure_v1 on public.subjects;
+      drop function if exists commerce_credit_private.internal_tr_chat_credit_member_signup_v1();
+      drop function if exists commerce_credit_private.internal_tr_chat_credit_subject_erasure_v1();
+      drop function if exists public.internal_cmd_chat_credit_finalize_v1(uuid,uuid,boolean,uuid);
+      drop function if exists public.internal_cmd_chat_credit_reserve_v1(uuid,uuid,uuid);
+      drop function if exists public.internal_cmd_chat_signup_credit_v1(uuid);
+      drop function if exists public.internal_qry_chat_credit_balance_v1(uuid);
+      drop table if exists public.chat_credit_turn_allocations_v1 cascade;
+      drop table if exists public.chat_credit_turn_reservations_v1 cascade;
+      drop table if exists public.chat_credit_lots_v1 cascade;`);
+    for(const path of [
+      '../test/db/candidates/chat_credit_private_ledger_v1.sql',
+      '../supabase/migrations/20261027125500_chat_credit_delivered_ack_private_v1.sql',
+      '../test/db/candidates/seyeon_g4_private_credit_role_only_v1.sql',
+      '../test/db/candidates/seyeon_g4_receipt_credit_settle_private_v1.sql',
+    ]){
+      await pool.query(readFileSync(new URL(path,import.meta.url),'utf8'));
+    }
+    const {rows:[acl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',
+        'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as api_denied,
+      not has_function_privilege('authenticated',
+        'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as public_denied,
+      has_function_privilege('myeongha_commerce_internal_executor',
+        'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as commerce_only`);
+    expect(acl).toEqual({api_denied:true,public_denied:true,commerce_only:true});
+    g5CreditSchemaInstalled=true;
+  }
+  async function reserveFirstPositive(f:Awaited<ReturnType<typeof prepare>>){
+    await pool.query('select public.internal_cmd_chat_signup_credit_v1($1::uuid)',[f.subject]);
+    return executePostgresCommerceInternalTransactionV1({
+      pool:privateG5Pool(),
+      execute:async({client})=>{
+        await client.query('select pg_catalog.set_config($1,$2,true)',
+          ['myeongha.subject_id',f.subject]);
+        const r=await client.query<{outcome:string;reservation_id:string}>(
+          'select outcome,reservation_id from public.internal_cmd_chat_credit_reserve_v1($1,$2,$3)',
+          [f.subject,f.thread,uuid(30,f.n)]);
+        expect(r.rows[0]?.outcome).toBe('reserved');
+        expect(r.rows[0]?.reservation_id).toBeTruthy();
+        return r.rows[0]!.reservation_id;
+      },
+    });
+  }
+  async function creditState(f:Awaited<ReturnType<typeof prepare>>){
+    const {rows:[r]}=await pool.query<{state:string;available:string;credits:string}>(`select r.state,
+      (select available_credits from public.internal_qry_chat_credit_balance_v1($1))::text as available,
+      (select coalesce(sum(a.credits),0) from public.chat_credit_turn_allocations_v1 a
+       where a.reservation_id=r.id)::text as credits
+      from public.chat_credit_turn_reservations_v1 r
+      where r.subject_id=$1 and r.client_turn_id=$2`,[f.subject,uuid(30,f.n)]);
+    return {state:r?.state,available:r?.available,credits:r?.credits};
+  }
+  const creditReceipt=(f:Awaited<ReturnType<typeof prepare>>,attempt:string,proof:string,
+    privateCreditPool:PostgresSubjectPoolV1=privateG5Pool())=>
+    handleSeyeonPositiveReceiptAndCreditCandidateV1({
+      request:new Request('https://receipt.test/api/chat/delivery-receipts/'+attempt,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({proof}),
+      }),
+      requestId:'g5-real-http-credit',receiptPool:subjectPool,privateCreditPool,
+    });
+
+  // Only the Actions PG17 named throwaway clone can host the Commerce candidate.
+  // Do not register skipped tests in the separate restored-backup rehearsal,
+  // whose evidence requires zero pending tests.
+  if(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'&&
+     process.env.DB_SUITE==='postgres17'&&process.env.PGHOST==='localhost'&&
+     /^myeongha_ci_case_[0-9]+$/u.test(process.env.PGDATABASE??'')){
+
+  it('G5 real original Fetch/256-bit proof/HTTP ACK settles 10 credits exactly once',async()=>{
+    await installDisposableG5Credit();
+    // Existing S0 tests already own fixture 13; isolate the Commerce E2E.
+    const f=await prepare(17,{summary:'Synthetic approved original Memory for credit ACK'});
+    await reserveFirstPositive(f);
+    const response=await fetchReply(f);
+    expect(response.status).toBe(200);
+    const payload=await response.json();
+    const receipt=payload.data.deliveryReceipt as {attemptId:string;challenge:string};
+    const proof=receiptProof(payload.data.assistantText as string,receipt.challenge);
+    expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+    const {rows:[pre]}=await pool.query(
+      'select seyeon_positive_delivery_received_at from public.chat_turn_attempts where id=$1',
+      [f.attempt]);
+    expect(pre.seyeon_positive_delivery_received_at).toBeNull();
+    expect((await creditReceipt(f,f.attempt,'0'.repeat(64))).status).toBe(503);
+    expect((await creditReceipt(f,uuid(17,999),proof)).status).toBe(503);
+    expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+    expect((await creditReceipt(f,receipt.attemptId,proof)).status).toBe(200);
+    expect((await creditReceipt(f,receipt.attemptId,proof)).status).toBe(200);
+    expect(await creditState(f)).toEqual({state:'settled',available:'40',credits:'10'});
+    const {rows:[confirmed]}=await pool.query(
+      'select seyeon_positive_delivery_received_at from public.chat_turn_attempts where id=$1',
+      [f.attempt]);
+    expect(confirmed.seyeon_positive_delivery_received_at).not.toBeNull();
+  });
+
+  it('G5 durable receipt survives Commerce DB outage; retry settles same 10',async()=>{
+    // Existing S0 tests already own fixture 14; never overwrite originals.
+    const f=await prepare(18,{summary:'Synthetic approved original Memory for recovery'});
+    await reserveFirstPositive(f);
+    const response=await fetchReply(f);
+    expect(response.status).toBe(200);
+    const payload=await response.json();
+    const receipt=payload.data.deliveryReceipt as {attemptId:string;challenge:string};
+    const proof=receiptProof(payload.data.assistantText as string,receipt.challenge);
+    const unavailablePrivatePool=Object.freeze({
+      connect:async()=>{throw Error('synthetic isolated private Commerce outage');},
+    }) as PostgresSubjectPoolV1;
+    const failed=await creditReceipt(f,receipt.attemptId,proof,unavailablePrivatePool);
+    expect(failed.status).toBe(503);
+    expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+    const {rows:[committed]}=await pool.query(
+      'select seyeon_positive_delivery_received_at from public.chat_turn_attempts where id=$1',
+      [f.attempt]);
+    expect(committed.seyeon_positive_delivery_received_at).not.toBeNull();
+    expect((await creditReceipt(f,receipt.attemptId,proof)).status).toBe(200);
+    expect((await creditReceipt(f,receipt.attemptId,proof)).status).toBe(200);
+    expect(await creditState(f)).toEqual({state:'settled',available:'40',credits:'10'});
+  });
+
+  } // End Actions-only credit integration; restored-backup S0 still runs unchanged.
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {
     const { rows: [before] } = await pool.query('select count(*)::int as n from public.memory_items');
