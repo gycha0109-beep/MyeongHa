@@ -1144,4 +1144,121 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(fetches).toBe(0);
   });
 
+  it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
+    if(!pool)throw Error('R32 disposable budget test only');
+    const a=await createTurn(761);
+    const originals=[
+      {recordId:'d5000000-0000-4000-8000-000000000003',
+       grantId:'d6000000-0000-4000-8000-000000000003'},
+      {recordId:'d5000000-0000-4000-8000-000000000004',
+       grantId:'d6000000-0000-4000-8000-000000000004'},
+    ];
+    const source=await modelSources(originals);
+    const pinInput={
+      pool:scopedPool,
+      verifiedEvidence:{kind:'member' as const,
+        verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001'},
+      threadId:a.thread,turnId:a.turn,attemptId:a.attempt,
+      ...source,twoOriginalContextReady:true as const,
+    };
+    await persistSeyeonR20OfflineDigestBoundPinV1(pinInput);
+    const purpose='integrity_classification' as const;
+    const request:SeyeonStructuredProviderRequestV2={
+      contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+      purpose,
+      instructions:'Isolated R32 budget rollback input; never contains private data.',
+      input:{
+        fixture:true,purpose,
+        selectedSourcesDigest:source.selection.selectedSourcesDigest,
+        priorNativeWireDigest:null,
+      },
+      responseSchema:{
+        type:'object',additionalProperties:false,
+        properties:{ok:{type:'boolean'}},required:['ok'],
+      },
+    };
+    const purposes=['integrity_classification','disclosure_classification',
+      'turn_interpretation','dialogue_render','semantic_review'] as const;
+    const governor:SeyeonAiGovernorAdmissionV1={
+      policy:{
+        policyVersion:'offline-r32-test-v1',
+        providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+        priceQuote:{
+          priceVersion:'offline-r32-price-v1',
+          providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+          inputMicroUsdPerMillion:1000000,
+          cachedInputMicroUsdPerMillion:250000,
+          outputMicroUsdPerMillion:4000000,
+        },
+        allowedPurposes:[...purposes],contextWindowTokens:4096,
+        maximumInputTokens:1000,maximumOutputTokens:256,
+        maximumSerializedRequestBytes:65536,
+      },
+      certifiedInputTokenUpperBound:()=>500,
+    };
+    let fetches=0;
+    const reservations:SeyeonR32OfflineStageReceiptV1[]=[];
+    const sender=()=>createOpenAiSeyeonStructuredProviderV1({
+      apiKey:'never-send-r32-budget',model:'seyeon-r35-offline',
+      maxOutputTokens:256,
+      fetchImpl:async()=>{fetches++;throw Error('NETWORK_NEVER_ALLOWED');},
+      meteredBeforeDispatch:async(call,requestBody)=>{
+        reservations.push(await reserveSeyeonR32OfflineFiveStageV1({
+          pinInput,request,call,requestBody,governor,
+        }));
+        throw new SeyeonR32OfflineFiveStageHoldV1();
+      },
+    });
+    const initial=await pool.query<{occupied:string}>(
+      "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    expect(initial.rows).toHaveLength(1);
+    await pool.query(
+      "update public.seyeon_ai_governor_daily_budgets_v1 set global_limit_micro_usd=occupied_micro_usd where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    try{
+      await expect(sender().generate(request)).rejects.toMatchObject({
+        code:'PRE_DISPATCH_REJECTED',
+      });
+      expect(fetches).toBe(0);
+      expect(reservations).toHaveLength(0);
+      const rolledBack=await pool.query<{stage_count:string;cost_count:string}>(
+        "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
+        " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as cost_count",
+        [a.attempt],
+      );
+      expect(rolledBack.rows).toMatchObject([{
+        stage_count:'0',cost_count:'0',
+      }]);
+      const now=await pool.query<{occupied:string}>(
+        "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+      );
+      expect(now.rows[0]?.occupied).toBe(initial.rows[0]?.occupied);
+    }finally{
+      await pool.query(
+        "update public.seyeon_ai_governor_daily_budgets_v1 set global_limit_micro_usd=50000 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+      );
+    }
+    await expect(sender().generate(request)).rejects.toMatchObject({
+      code:'PRE_DISPATCH_REJECTED',
+    });
+    expect(reservations).toHaveLength(1);
+    expect(reservations[0]).toMatchObject({
+      stageIndex:0,purpose:'integrity_classification',
+      reservedMicroUsd:'1524',permitsProvider:false,
+    });
+    expect(fetches).toBe(0);
+    // Repeated stage cannot reserve twice, even with a NEW native Call ID.
+    await expect(sender().generate(request)).rejects.toMatchObject({
+      code:'PRE_DISPATCH_REJECTED',
+    });
+    const final=await pool.query<{stage_count:string;cost_count:string}>(
+      "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
+      " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as cost_count",
+      [a.attempt],
+    );
+    expect(final.rows).toMatchObject([{stage_count:'1',cost_count:'1'}]);
+    expect(fetches).toBe(0);
+  });
+
 });
