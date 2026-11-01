@@ -870,6 +870,89 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     })).toEqual({status:'empty',found:0,settled:0,failed:0});
   });
 
+  it('G5 account deletion started after real S0 ACK blocks preview, apply and direct private settlement',async()=>{
+    const f=await prepare(21,{summary:'Account deletion race after valid S0 delivery'});
+    await reserveFirstPositive(f);
+    const response=await fetchReply(f);
+    expect(response.status).toBe(200);
+    const data=(await response.json()).data;
+    const receipt=data.deliveryReceipt as {attemptId:string;challenge:string};
+    const proof=receiptProof(data.assistantText as string,receipt.challenge);
+
+    // Persist the real original ACK, then simulate a Commerce outage before settlement.
+    const unavailable=Object.freeze({
+      connect:async()=>{throw Error('isolated Commerce outage before account deletion');},
+    }) as PostgresSubjectPoolV1;
+    expect((await creditReceipt(f,receipt.attemptId,proof,unavailable)).status).toBe(503);
+    const {rows:[originalAck]}=await pool.query(
+      'select seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',
+      [f.attempt],
+    );
+    expect(originalAck.received).not.toBeNull();
+    expect(await creditState(f)).toEqual({
+      state:'reserved',available:'40',credits:'10',
+    });
+
+    // A preview is not an authorization that survives a Member deletion request.
+    const testAsOf=new Date(Date.now()+10*60_000);
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),mode:'preview',maxBatch:1,testAsOf,
+    })).toEqual({status:'preview',found:1,settled:0,failed:0});
+
+    // Use the actual account-deletion start DB authority, not a fabricated status.
+    const {rows:[deletion]}=await pool.query(
+      'select * from public.cmd_start_account_deletion_v1($1::uuid,$2::uuid,$3::text,$4::uuid)',
+      [f.subject,uuid(26,21),'g5-account-deletion-original-21',uuid(27,21)],
+    );
+    expect(deletion).toMatchObject({deletion_job_status:'running',replayed:false});
+    const {rows:[member]}=await pool.query(
+      'select status from public.subjects where id=$1',[f.subject],
+    );
+    expect(member.status).toBe('deletion_pending');
+
+    // Both recovery modes re-query the current DB original and exclude this Member.
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),mode:'preview',maxBatch:1,testAsOf,
+    })).toEqual({status:'preview',found:0,settled:0,failed:0});
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),mode:'apply',maxBatch:1,testAsOf,
+    })).toEqual({status:'empty',found:0,settled:0,failed:0});
+
+    // Even a previously previewed Attempt, submitted directly using the
+    // internal Commerce role, must re-check deletion_pending under row lock.
+    await expect(executePostgresCommerceInternalTransactionV1({
+      pool:privateG5Pool(),
+      execute:({client})=>client.query(
+        'select public.internal_cmd_seyeon_g4_receipt_credit_settle_v1($1::uuid)',
+        [f.attempt],
+      ),
+    })).rejects.toThrow('active original Member');
+
+    // Account-deletion-pending Members cannot use the ordinary credit balance
+    // query either. Inspect the disposable Owner ledger directly, without
+    // restoring Member status or bypassing the original receipt guard.
+    await expect(pool.query(
+      'select * from public.internal_qry_chat_credit_balance_v1($1::uuid)',
+      [f.subject],
+    )).rejects.toThrow('not an active Subject');
+    const {rows:[retainedLedger]}=await pool.query(
+      `select r.state,
+         (select coalesce(sum(a.credits),0) from public.chat_credit_turn_allocations_v1 a
+          where a.reservation_id=r.id)::text as credits,
+         (select coalesce(sum(l.credits_remaining),0) from public.chat_credit_lots_v1 l
+          where l.subject_id=r.subject_id)::text as remaining
+       from public.chat_credit_turn_reservations_v1 r
+       where r.subject_id=$1 and r.client_turn_id=$2`,
+      [f.subject,uuid(30,f.n)],
+    );
+    expect(retainedLedger).toEqual({state:'reserved',credits:'10',remaining:'40'});
+    const {rows:[stillOriginal]}=await pool.query(
+      'select seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',
+      [f.attempt],
+    );
+    expect(stillOriginal.received).toEqual(originalAck.received);
+  });
+
   } // End Actions-only credit integration; restored-backup S0 still runs unchanged.
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {
