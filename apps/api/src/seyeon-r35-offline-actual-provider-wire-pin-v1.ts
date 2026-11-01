@@ -68,6 +68,8 @@ export function assertSeyeonR35OfflineActualWireV1(input:{
     OpenAiSeyeonStructuredProviderConfigV1['meteredBeforeDispatch']
   >>[0];
   readonly requestBody:string;
+  /** R26 only: cap must be included in the ACTUAL native Provider bytes. */
+  readonly enforcedOutputTokens?:number;
 }):string{
   const {pinned,pinInput,call,requestBody}=input;
   try {
@@ -87,12 +89,17 @@ export function assertSeyeonR35OfflineActualWireV1(input:{
       ||call.requestBodyBytes!==Buffer.byteLength(requestBody,'utf8')) {
       throw new SeyeonR35OfflineWireHoldV1();
     }
+    if(input.enforcedOutputTokens!==undefined &&
+      (!Number.isSafeInteger(input.enforcedOutputTokens)
+       ||input.enforcedOutputTokens<1||input.enforcedOutputTokens>32_768))
+      throw new SeyeonR35OfflineWireHoldV1();
     const expected=buildSeyeonTurnInterpreterRequestV2(pinInput.finalModelContext);
     // The exact field insertion/order is also significant: the same bytes
     // are subsequently passed verbatim to fetch by this Provider adapter.
     const expectedBytes=JSON.stringify({
       model:OFFLINE_MODEL,
       store:false,
+      ...(input.enforcedOutputTokens===undefined?{}:{max_output_tokens:input.enforcedOutputTokens}),
       instructions:expected.instructions+'\n\n'+SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1,
       input:[{
         role:'user',
@@ -129,12 +136,14 @@ export async function attestSeyeonR35OfflineWireAfterDbPinV1(input:{
     OpenAiSeyeonStructuredProviderConfigV1['meteredBeforeDispatch']
   >>[0];
   readonly requestBody:string;
+  readonly enforcedOutputTokens?:number;
 }):Promise<SeyeonR35OfflineWireReceiptV1>{
   try {
     const pinned=await persistSeyeonR20OfflineDigestBoundPinV1(input.pinInput);
     const matched=assertSeyeonR35OfflineActualWireV1({
       pinned,pinInput:input.pinInput,call:input.call,
       requestBody:input.requestBody,
+      ...(input.enforcedOutputTokens===undefined?{}:{enforcedOutputTokens:input.enforcedOutputTokens}),
     });
     return Object.freeze({
       status:'disposable_db_pin_and_pre_dispatch_wire_attested' as const,
