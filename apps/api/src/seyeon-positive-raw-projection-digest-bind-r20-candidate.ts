@@ -87,10 +87,16 @@ export async function persistSeyeonR20OfflineDigestBoundPinV1(
 
     // R21: deny unpinned History/Relationship/Reader/Worker/Preflight
     // before R20 creates any positive Parent/Edge in PostgreSQL.
+    // The caller's proposed source count is rechecked against the real
+    // selector and immutable DB originals below; never widen to other counts.
+    const expectedCount=input.selection?.selectedPersonalRecordCount;
+    if(expectedCount!==1&&expectedCount!==2)
+      throw new SeyeonR20OfflineDigestHoldV1();
     assertSeyeonR21OfflineDerivedSourceClosureV1({
       envelope:input.sourceEnvelope,
       retrievedMemories:input.retrievedMemories,
       sourceCandidates:input.sourceCandidates,
+      expectedOriginalMemoryCount:expectedCount,
     });
 
     // R34: an R20 selection can be internally correct while a separate final
