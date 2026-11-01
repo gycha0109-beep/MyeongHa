@@ -34,6 +34,8 @@ describe('Phase 8 disposable Supabase Auth/Storage acceptance', () => {
     expect(runner).toContain('dr-synthetic-private');
     expect(runner).toContain('prepare-postgres-hosted-synthetic-local-fixtures.mjs');
     expect(runner).toContain('run-postgres-hosted-synthetic-local-acceptance.mjs');
+    expect(runner).toContain('"verificationStatus": "BLOCKED_INCOMPLETE"');
+    expect(runner).toContain('"outputContainsIdentifiers": false');
     for (const expected of [
       '.positiveLogin == "PASS"',
       '.wrongPasswordDenied == "PASS"',

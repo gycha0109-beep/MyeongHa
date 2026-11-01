@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 6·8 운영 관제·복구 합성 검증 묶음 구현 (통합 CI 마지막 1회 원칙)
+
+- **작업 방식:** PR #2851의 수정된 커밋 `9b910a510e1a2ab2c53edd35e312a5887086b054`에서 기본 CI의 PostgreSQL17·db-authority-core·Workers·Governance 등을 **SUCCESS** 확인했으나 [이전 전체 통합 #41290070944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290070944)의 실패는 유지한다. 중간 작업마다 전용 통합 라벨을 재발행하지 않고, 기존 `ci-integration-ready` 라벨은 구현을 묶는 동안 제거했다. 마지막 변경사항을 푸시한 뒤 해당 HEAD에서 기본 CI 통과를 확인하고 전용 통합 라벨을 **한 번만** 적용한다. 필수 단위 확인은 로컬로 진행한다.
+- **작업 A — 수집 지연 표시 통합:** `f1c915b6`의 원장 수집 간격(2× 기존 3600초 주기 이상) GitHub Actions 경고 기능을 이 트랙 브랜치에 병합했다. 이전 [자동 원장 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554)의 수집 간격 24043초·초과 20443초는 해당 경고 대상이다. 원장 자체의 안전한 암호화 업로드·이전 snapshot 겹침 검증을 훼손하지 않는다.
+- **작업 B — 수집 작업 누락의 독립 조회:** 기존 원장과 **다른 GitHub Actions workflow** `.github/workflows/production-privacy-ledger-freshness-watch.yml` 및 읽기 전용 `scripts/operations/check-privacy-ledger-completion-freshness.mjs` 구현. 매시 23분과 수동 main 실행에서 GitHub 제공 기본 read-only 토큰만 사용해 정확한 원장 workflow의 최신 성공 실행·암호화 artifact 유무·최종 실행 완료 후 경과 시간을 확인한다. 7200초(기존 3600초 정규 간격의 2배) 이상 경과, 원장 없음, artifact 누락/만료, GitHub API 미응답은 **실패 상태로 명시**한다. 실제 파일·비밀번호·이벤트·사용자 식별자는 가져오지 않는다. 8개 로컬 단위 테스트, GitHub Actions 책임·신뢰 경계 정적 검사 PASS. GitHub API에서 실제 원장 #41287556554와 artifact `13076075848`의 연결 형태를 읽기 전용으로 확인했다.
+- **작업 C — 격리 합성 복구 증거 보강:** 앞서 구현한 임시 Ubuntu·Supabase Auth/Storage 합성 실검증은 운영 호스팅·신규 유료 DB를 사용하지 않는다. 로컬 합성 검사가 비정상 종료되면 비식별 `BLOCKED_INCOMPLETE` 증거를 남기되 성공 증거로 오인하지 않도록 수정했다. Supabase CLI `2.122.0` 배포 패키지 존재와 현재 명령 형식을 확인했으며, **실제 CI의 합성 Auth/Storage 통과는 workflow_dispatch 실행 전 미판정**이다.
+- **운영 경계:** GitHub Actions 두 workflow가 서로 다른 일정이어도 모두 GitHub에 의존한다. 경고는 가시성/실패 판정이고 알림 전달·독립 CDC·삭제/철회 연속성·원본 Hosted Auth/Storage 복원·전체 서비스 PT24H RPO/PT6H RTO 실증이 아니다. `continuousCaptureProven=false`, `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false` 및 #1887 OPEN 유지. Production DB·DDL·ACL·비밀·사용자 데이터·유료 서비스 변경 없음.
+
+
 ### 2026-11-01 KST — Phase 8 개인정보 복구 원장 수집 지연을 GitHub 운영 경고로 노출
 
 - **운영 실측:** [자동 개인정보 원장 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554)의 **비식별 공개 manifest**에서 다음 값을 확인: 이전~최신 수집 간격 **24043초**, 예정된 주기 **3600초**, 초과 **20443초**, 수집한 지원 이벤트 **0건**, `snapshotOverlapStatus=OVERLAPPING_CAPTURED_EVENTS_PRESERVED`, `sourceContinuityProven=false`. 수집 성공과 0건은 독립 연속 수집·복구 가능성을 증명하지 않는다.

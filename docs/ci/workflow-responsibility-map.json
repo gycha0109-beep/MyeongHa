@@ -242,6 +242,12 @@
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"
     },
+    "production-privacy-ledger-freshness-watch.yml": {
+      "responsibility": "postgres-privacy-recovery-freshness-watch",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
     "production-privacy-canary-orphan-cleanup-one-shot.yml": {
       "responsibility": "privacy-recovery-operations",
       "prMode": "none",

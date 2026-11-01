@@ -24,6 +24,27 @@ stack_dir="$RUNNER_TEMP/myeongha-dr-local-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}
 mkdir -m 700 "$stack_dir"
 
 cleanup() {
+  local exit_code=$?
+  if (( exit_code != 0 )); then
+    # Failure leaves a bounded, identifier-free artifact instead of empty proof.
+    # A partial/failed local test must never be mistaken for Hosted DR success.
+    cat > "$RUNNER_TEMP/myeongha-dr-synthetic-evidence.json" <<'JSON'
+{
+  "schema": "myeongha-hosted-recovery-synthetic-local-v1",
+  "target": "local-loopback-synthetic-only",
+  "verificationStatus": "BLOCKED_INCOMPLETE",
+  "hostedProviderRecoveryProven": false,
+  "independentPrivacyContinuityProven": false,
+  "wholeServiceRpoRtoProven": false,
+  "providerManagedDataFullRestore": false,
+  "futureSafePrivacyReconciliation": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "gate": "BLOCKED",
+  "outputContainsIdentifiers": false
+}
+JSON
+  fi
   if [[ -d "$stack_dir/supabase" ]]; then
     ( cd "$stack_dir" && npx --yes supabase@2.122.0 stop --no-backup >/dev/null 2>&1 ) || true
   fi
