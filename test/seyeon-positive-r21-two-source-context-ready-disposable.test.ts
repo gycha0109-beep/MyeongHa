@@ -383,6 +383,61 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'select count(*)::text as count from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid',
       [a.attempt],
     )).toMatchObject({rows:[{count:'0'}]});
+    // Real G2 cannot treat five stage-wire receipts as a Cost Governor
+    // reservation. Verify the deliberate R30-only Attempt cannot commit.
+    const suffix=a.turn.slice(-12);
+    await tx(async c=>{
+      const generated=await c.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_generated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::jsonb,$11::text,$12::text,$13::jsonb) as ok',
+        [subject,a.turn,a.attempt,a.participant,
+         'd8100000-0000-4000-8000-'+suffix,
+         'offline','offline-model','offline-stage-r30','synthetic stage only',
+         JSON.stringify({text:'synthetic stage only'}),
+         'chat-character-message-v1','sha256:v1:'+'b'.repeat(64),'[]'],
+      );
+      expect(generated.rows[0]?.ok).toBe(false);
+      const edges=await c.query<{
+        recordId:string;grantId:string;pgPayloadDigest:string;
+      }>(
+        'select memory_id::text as "recordId",original_grant_id::text as "grantId",pg_payload_digest as "pgPayloadDigest" from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
+        [a.attempt],
+      );
+      expect(edges.rows).toHaveLength(2);
+      const validated=await c.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_validated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::text,$8::text,$9::jsonb,$10::jsonb) as ok',
+        [subject,a.turn,a.attempt,
+         'd8200000-0000-4000-8000-'+suffix,
+         'offline','offline-model','offline-r30-guard',
+         'sha256:v1:'+'b'.repeat(64),
+         JSON.stringify({passed:true,personalRecordProvenance:{
+           schemaVersion:'offline-positive-two-original-source-proof-r25',
+           selectedSourcesDigest:source.selection.selectedSourcesDigest,
+           sources:edges.rows.map(e=>({
+             recordId:e.recordId,originalGrantId:e.grantId,
+             pgPayloadDigest:e.pgPayloadDigest,
+           })),
+         }}),'[]'],
+      );
+      expect(validated.rows[0]?.ok).toBe(false);
+    },true);
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
+      [subject,a.thread,a.turn,a.attempt,
+       'd8300000-0000-4000-8000-'+suffix,
+       'd8400000-0000-4000-8000-'+suffix,
+       'd8500000-0000-4000-8000-'+suffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:a.turn,
+         assistantMessageId:'d8300000-0000-4000-8000-'+suffix,
+         userMessageId:a.user,
+       }),
+       'sha256:v1:synthetic-stage-only-r30',
+       source.selection.selectedSourcesDigest],
+    ),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_governed_cost_missing_wire_seal',
+    });
+    expect(fetches).toBe(0);
   });
   it('R26: real G1 two-original digest and native wire -> atomic governed reservation; fetch stays blocked',async()=>{
     if(!pool)throw Error('disposable PostgreSQL required');
