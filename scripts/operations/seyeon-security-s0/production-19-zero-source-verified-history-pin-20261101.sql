@@ -59,8 +59,6 @@ declare
  f text;
  h text;
  old_condition text := 'v_selection -> ''selectedUnpinnedRecentSources'' is distinct from ''[]''::jsonb';
- old_census text := '''}){
-[]';
  -- No interpolated SQL comes from a client or from a Conversation row.
  guard text := $guard$jsonb_typeof(v_selection -> 'selectedUnpinnedRecentSources') is distinct from 'array' or
      jsonb_array_length(v_selection -> 'selectedUnpinnedRecentSources') > 23$guard$;
