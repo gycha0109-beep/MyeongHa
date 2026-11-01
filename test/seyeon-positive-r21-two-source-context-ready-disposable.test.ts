@@ -504,6 +504,75 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         "update public.seyeon_ai_governor_daily_budgets_v1 set global_limit_micro_usd=50000 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
       );
     }
+    // Bypassing the server's wire seal via the legacy Cost Start RPC is
+    // insufficient even if the DB accepts a bounded synthetic reservation.
+    const unsealed=await createTurn(758);
+    await candidate(unsealed,[first,second]);
+    const unsealedCall='d9000000-0000-4000-8000-000000000758';
+    await tx(async client=>{
+      const start=await client.query<{call_id:string}>(
+        'select * from public.cmd_governed_start_seyeon_ai_call_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::text,$11::bigint,$12::bigint,$13::bigint)',
+        [subject,unsealed.turn,unsealed.attempt,'chat',unsealedCall,
+         'turn_interpretation','openai-responses','seyeon-r35-offline',
+         'offline-r26-test-v1','offline-r26-rate-v1',500,256,2048],
+      );
+      expect(start.rows).toMatchObject([{call_id:unsealedCall}]);
+      const tail=unsealed.turn.slice(-12);
+      const generated=await client.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_generated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::jsonb,$11::text,$12::text,$13::jsonb) as ok',
+        [subject,unsealed.turn,unsealed.attempt,unsealed.participant,
+         'd8100000-0000-4000-8000-'+tail,'offline','offline-model',
+         'offline-renderer-r28','synthetic unsealed',
+         JSON.stringify({text:'synthetic unsealed'}),
+         'chat-character-message-v1','sha256:v1:'+'b'.repeat(64),'[]'],
+      );
+      expect(generated.rows[0]?.ok).toBe(false);
+      const edge=await client.query<{
+        recordId:string;grantId:string;digest:string;
+      }>(
+        'select memory_id::text as "recordId",original_grant_id::text as "grantId",pg_payload_digest as digest from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
+        [unsealed.attempt],
+      );
+      expect(edge.rows).toHaveLength(2);
+      const proof={
+        schemaVersion:'offline-positive-two-original-source-proof-r25',
+        selectedSourcesDigest:unsealed.selection,
+        sources:edge.rows.map(e=>({
+          recordId:e.recordId,originalGrantId:e.grantId,pgPayloadDigest:e.digest,
+        })),
+      };
+      const validated=await client.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_validated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::text,$8::text,$9::jsonb,$10::jsonb) as ok',
+        [subject,unsealed.turn,unsealed.attempt,
+         'd8200000-0000-4000-8000-'+tail,'offline','offline-model',
+         'offline-output-guard-r28','sha256:v1:'+'b'.repeat(64),
+         JSON.stringify({passed:true,personalRecordProvenance:proof}),'[]'],
+      );
+      expect(validated.rows[0]?.ok).toBe(false);
+    },true);
+    const suffix=unsealed.turn.slice(-12);
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
+      [subject,unsealed.thread,unsealed.turn,unsealed.attempt,
+       'd8300000-0000-4000-8000-'+suffix,
+       'd8400000-0000-4000-8000-'+suffix,
+       'd8500000-0000-4000-8000-'+suffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:unsealed.turn,
+         assistantMessageId:'d8300000-0000-4000-8000-'+suffix,
+         userMessageId:unsealed.user,
+       }),
+       'sha256:v1:synthetic-unsealed-r28',unsealed.selection],
+    ),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_governed_cost_missing_wire_seal',
+    });
+    const noCommit=await pool.query<{count:string}>(
+      "select count(*)::text as count from public.conversation_messages where turn_id=$1::uuid and sender_type='character'",
+      [unsealed.turn],
+    );
+    expect(noCommit.rows[0]?.count).toBe('0');
+
     // A stale G1/Wire receipt is not enough once the SECOND original Grant
     // was revoked between attestation and the new G4 DB reservation.
     await pool.query(
