@@ -137,12 +137,14 @@ begin
       or v_context->'relationshipSemantics' is distinct from 'null'::jsonb
       or v_context->'recentConversation' is distinct from '[]'::jsonb
       or jsonb_typeof(v_context->'integrity') is distinct from 'object'
-      or v_context#>'{integrity,decisions}' is distinct from '[]'::jsonb
-      or v_context#>'{integrity,governedPreflightApplied}'
-          is distinct from 'false'::jsonb
-      or jsonb_typeof(v_context->'disclosure') is distinct from 'object'
-      or v_context#>'{disclosure,decision}' is distinct from 'null'::jsonb
-      or v_context#>'{disclosure,retrievedSources}' is distinct from '[]'::jsonb
+      or v_context->'integrity' is distinct from
+          '{"decisions":[],"governedPreflightApplied":false,"unverifiedClaimsMayEnterAsFacts":false,"claimsMayCreateRelationshipEvents":false,"claimsMayMutateRelationshipState":false}'::jsonb
+      or v_context->'disclosure' is distinct from
+          '{"decision":null,"retrievedSources":[]}'::jsonb
+      or v_context->'retrievalPolicy' is distinct from
+          '{"callbackRequiresSourceRef":true,"factAndInterpretationRemainDistinct":true,"anotherCharacterPrivateHistoryForbidden":true,"privateCharacterContentRequiresDisclosureDecision":true,"userClaimRequiresIntegrityDecision":true,"assistantOutputNeverAuthority":true,"legacyUndefinedAndHypothesisFieldsNeverTruthAuthority":true}'::jsonb
+      or v_context->'behaviorPolicy' is distinct from
+          '{"interactionDepth":"public_first_contact","initiativeMode":"character_leads","careMode":"light_unless_explicit_need","questionMode":"movement_first","maxQuestionsPerUtterance":1,"requireCharacterOwnedMove":true,"permissionHandoffAsDefaultForbidden":true,"therapyFramingAsDefaultForbidden":true,"lowIntensityUserStatePolicy":"acknowledge_then_character_move","lowIntensityExpressionPolicy":"runtime_clamp_baseline_or_playful","recentMoveNoveltyPolicy":"avoid_repeating_unprompted_assistant_mechanic","recentMoveNoveltyUnit":"concrete_mechanic_or_activity","initiativePatternMayRepeat":true,"conversationPacePolicy":"state_owned_pacing_stance_without_new_prompt","directCurrentDesirePolicy":"state_turn_local_seyeon_want_without_forced_invite","turnLocalPresentDesireNeverDurableAuthority":true,"preferredActionKeys":["approach","activate","tease","invite","admit_boundary","accept_care"]}'::jsonb
       or v_context#>>'{character,characterId}' is distinct from 'seyeon'
       or jsonb_typeof(v_context->'retrievedMemories') is distinct from 'array'
       or (select count(*) from jsonb_object_keys(
