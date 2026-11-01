@@ -127,6 +127,27 @@ begin
     raise exception 'reader delivery transport purchase or replay mismatch' using errcode='23514';
   end if;
 
+  -- A duplicate deliveryAttemptId is not allowed to replay a previously
+  -- prepared receipt after the purchased Grant has been revoked.
+  if not exists (
+    select 1 from public.standard_reading_reader_access_grants a
+    join public.purchase_intents pi on pi.id=a.purchase_intent_id
+      and pi.subject_id=a.subject_id and pi.status='verified'
+    join public.entitlement_grants g on g.id=a.entitlement_grant_id
+      and g.subject_id=a.subject_id and g.status='active'
+      and g.grant_source_type='purchase'
+      and g.valid_from <= clock_timestamp()
+      and (g.valid_until is null or g.valid_until > clock_timestamp())
+    where a.purchase_intent_id=v_preparation.purchase_intent_id
+      and a.subject_id=v_preparation.subject_id
+      and a.entitlement_grant_id=v_preparation.entitlement_grant_id
+      and a.official_reading_id=v_preparation.official_reading_id
+      and a.reader_character_id=v_preparation.reader_character_id
+      and a.reader_content_bundle_id=v_preparation.reader_content_bundle_id
+  ) then
+    raise exception 'reader delivery entitlement no longer active' using errcode='23514';
+  end if;
+
   -- Preparation is an internal server event, not successful HTTP send.
   delivery_attempt_id := v_preparation.delivery_attempt_id;
   response_prepared_at := v_preparation.response_prepared_at;
