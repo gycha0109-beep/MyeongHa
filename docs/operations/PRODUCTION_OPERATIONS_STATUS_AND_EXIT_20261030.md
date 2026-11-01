@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 8 개인정보 복구 원장 수집 지연을 GitHub 운영 경고로 노출
+
+- **운영 실측:** [자동 개인정보 원장 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554)의 **비식별 공개 manifest**에서 다음 값을 확인: 이전~최신 수집 간격 **24043초**, 예정된 주기 **3600초**, 초과 **20443초**, 수집한 지원 이벤트 **0건**, `snapshotOverlapStatus=OVERLAPPING_CAPTURED_EVENTS_PRESERVED`, `sourceContinuityProven=false`. 수집 성공과 0건은 독립 연속 수집·복구 가능성을 증명하지 않는다.
+- **이번 구현:** 기존 `scripts/operations/export-production-postgres-privacy-recovery-ledger.sh`가 이미 계산하는 `captureIntervalSeconds`와 `nominalScheduledIntervalSeconds`를 비교해, 두 정규 주기(2×3600초) 이상 간격이 벌어지면 기존 GitHub Actions 실행에 **비식별 warning annotation**을 추가한다. 경고에는 측정 간격·주기·초과 시간만 포함되고 사용자/이벤트/비밀/SQL 원문은 담지 않는다. 캡처 지연을 이유로 유효한 암호화 원장 파일의 생성을 중단하지 않으며 기존 overlap 오류 차단은 보존한다.
+- **검증:** 기존 원장 overlap 비교 검증 PASS, 보호된 복구 원장 workflow 계약 PASS, 변경된 shell 문법 검사와 코드 diff 검사 수행. **새 경고가 실제 Production scheduled workflow에서 출력됐는지는 후속 실행 증거 확인 전까지 미판정**; 외부 알림 전송이나 24시간 승인 RPO 충족 증거를 주장하지 않는다.
+- **남은 경계:** 운영 GitHub 일정 실행의 지연 자체를 해소하거나 독립 CDC/불변 삭제 기록을 확보한 것이 아니다. `continuousCaptureProven=false`, `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `dr_ready=false`, `serviceResumptionAllowed=false` 유지. Hosted Auth/Storage 및 실제 전체 재해 복구는 #1887 OPEN.
+
+
 ### 2026-11-01 KST — Phase 8 신형 migration 카탈로그 지문 백업 실증 및 최신 Worker 서비스 검사
 
 - **선행 완료:** [PR #2845](https://github.com/gycha0109-beep/MyeongHa/pull/2845)는 [전체 통합 #41238368751](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41238368751) SUCCESS 후 2026-11-01 05:31:46 KST 병합(merge `3790702aa3ab3966e478dad15a178842a10e32e4`). 소스 원본 SHA와 병합 SHA를 구분한다.

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import { buildPrivacyRecoveryLedgerManifest } from './build-postgres-privacy-recovery-ledger-manifest.mjs';
 import { validatePrivacyLedgerSnapshotOverlap } from './validate-postgres-privacy-ledger-snapshot-overlap.mjs';
@@ -147,4 +148,9 @@ const empty = validatePrivacyLedgerSnapshotOverlap(emptyPrev, emptyNext);
 assert.equal(empty.overlapEventCount, 0);
 assert.equal(empty.sourceContinuityProven, false);
 
-console.log('PostgreSQL privacy ledger snapshot overlap PASS: captured events cannot disappear silently; all future-safe/DR claims remain false.');
+const exporter = readFileSync('scripts/operations/export-production-postgres-privacy-recovery-ledger.sh', 'utf8');
+assert.ok(exporter.includes('observed_interval >= 2 * nominal_interval'));
+assert.ok(exporter.includes('::warning title=Privacy ledger capture cadence gap::'));
+assert.ok(exporter.includes('Source continuity remains unproven; this is not an RPO'));
+assert.ok(exporter.includes('manifest_sha256="$(sha256sum "$manifest"'));
+console.log('PostgreSQL privacy ledger snapshot overlap PASS: captured events cannot disappear silently; delayed schedule warning stays diagnostic and all future-safe/DR claims remain false.');
