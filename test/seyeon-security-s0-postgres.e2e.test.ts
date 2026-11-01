@@ -20,6 +20,8 @@ import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import { handleSeyeonPositiveReceiptAndCreditCandidateV1 }
   from '../apps/api/src/seyeon-g4-positive-receipt-credit-bridge-candidate-v1.js';
+import { recoverSeyeonG5ReceivedCreditsCandidateV1 }
+  from '../apps/api/src/seyeon-g5-received-credit-recovery-candidate-v1.js';
 import { executePostgresCommerceInternalTransactionV1 }
   from '../apps/api/src/postgres-commerce-internal-execution.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
@@ -697,6 +699,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       '../supabase/migrations/20261027125500_chat_credit_delivered_ack_private_v1.sql',
       '../test/db/candidates/seyeon_g4_private_credit_role_only_v1.sql',
       '../test/db/candidates/seyeon_g4_receipt_credit_settle_private_v1.sql',
+      '../test/db/candidates/seyeon_g5_received_credit_recovery_catalog_v1.sql',
     ]){
       await pool.query(readFileSync(new URL(path,import.meta.url),'utf8'));
     }
@@ -706,8 +709,18 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       not has_function_privilege('authenticated',
         'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as public_denied,
       has_function_privilege('myeongha_commerce_internal_executor',
-        'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as commerce_only`);
-    expect(acl).toEqual({api_denied:true,public_denied:true,commerce_only:true});
+        'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as commerce_only,
+      not has_function_privilege('myeongha_api_executor',
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_api_denied,
+      has_function_privilege('myeongha_commerce_internal_executor',
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_commerce_only,
+      not has_function_privilege('authenticated',
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_member_denied,
+      not has_function_privilege('service_role',
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_service_denied`);
+    expect(acl).toEqual({api_denied:true,public_denied:true,commerce_only:true,
+      catalog_api_denied:true,catalog_commerce_only:true,
+      catalog_member_denied:true,catalog_service_denied:true});
     g5CreditSchemaInstalled=true;
   }
   async function reserveFirstPositive(f:Awaited<ReturnType<typeof prepare>>){
@@ -801,6 +814,55 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect((await creditReceipt(f,receipt.attemptId,proof)).status).toBe(200);
     expect((await creditReceipt(f,receipt.attemptId,proof)).status).toBe(200);
     expect(await creditState(f)).toEqual({state:'settled',available:'40',credits:'10'});
+  });
+
+  it('G5 recovers only aged DB-confirmed received replies; skips unreceived and double charge',async()=>{
+    const received=await prepare(19,{summary:'Isolated recovery receipt original'});
+    await reserveFirstPositive(received);
+    const response=await fetchReply(received);
+    expect(response.status).toBe(200);
+    const data=(await response.json()).data;
+    const receipt=data.deliveryReceipt as {attemptId:string;challenge:string};
+    const proof=receiptProof(data.assistantText as string,receipt.challenge);
+
+    const unavailable=Object.freeze({
+      connect:async()=>{throw Error('disposable Commerce outage before settlement');},
+    }) as PostgresSubjectPoolV1;
+    expect((await creditReceipt(received,receipt.attemptId,proof,unavailable)).status).toBe(503);
+    expect(await creditState(received)).toEqual({
+      state:'reserved',available:'40',credits:'10',
+    });
+
+    const unreceived=await prepare(20,{summary:'Unreceived original must never be charged'});
+    await reserveFirstPositive(unreceived);
+    const pendingReply=await fetchReply(unreceived);
+    expect(pendingReply.status).toBe(200);
+    // Deliberately never submit its browser-issued challenge.
+
+    // The bounded recovery catalog intentionally ignores fresh receipt ACKs.
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),maxBatch:1,
+    })).toEqual({status:'empty',found:0,settled:0,failed:0});
+
+    // Simulate five-minute clock ageing ONLY on this isolated Owner fixture;
+    // never manufacture an ACK or mutate Production receipt timestamps.
+    await pool.query(
+      "update public.chat_turn_attempts set seyeon_positive_delivery_received_at="+
+        "clock_timestamp()-interval '10 minutes' where id=$1",
+      [received.attempt],
+    );
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),maxBatch:1,
+    })).toEqual({status:'completed',found:1,settled:1,failed:0});
+    expect(await creditState(received)).toEqual({
+      state:'settled',available:'40',credits:'10',
+    });
+    expect(await creditState(unreceived)).toEqual({
+      state:'reserved',available:'40',credits:'10',
+    });
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),maxBatch:1,
+    })).toEqual({status:'empty',found:0,settled:0,failed:0});
   });
 
   } // End Actions-only credit integration; restored-backup S0 still runs unchanged.
