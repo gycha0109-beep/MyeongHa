@@ -282,7 +282,7 @@ try {
   assert(!hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home three-card public Saju row missing or retired product visible');
   assert(!hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home must not render redundant placeholder conversation card');
   const directEntry = await client.evaluate(`(() => {
-    const hrefFor = (key) => document.querySelector(`.mhx-character-art[data-character="${key}"]`)?.closest('.mhx-character')?.querySelector('.mhx-character-footer a')?.getAttribute('href');
+    const hrefFor = (key) => document.querySelector('.mhx-character-art[data-character="' + key + '"]')?.closest('.mhx-character')?.querySelector('.mhx-character-footer a')?.getAttribute('href');
     return {
       seyeon: hrefFor('seyeon'), baekheon: hrefFor('baekheon'), yeoul: hrefFor('yeoul'),
       staleRecent: !!document.querySelector('.mhx-recent-card'),
