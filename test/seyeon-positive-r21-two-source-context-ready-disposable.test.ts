@@ -414,5 +414,24 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         "update public.seyeon_ai_governor_daily_budgets_v1 set global_limit_micro_usd=50000 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
       );
     }
+    // A stale G1/Wire receipt is not enough once the SECOND original Grant
+    // was revoked between attestation and the new G4 DB reservation.
+    await pool.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [second.grantId],
+    );
+    const staleId='d9000000-0000-4000-8000-000000000026';
+    await expect(reserveSeyeonR26OfflineGovernedWireV1({
+      ...beforeDispatch,call:{...beforeDispatch.call,callId:staleId},
+    })).rejects.toBeInstanceOf(SeyeonR26OfflineG4HoldV1);
+    const leaked=await pool.query<{count:string}>(
+      'select count(*)::text as count from public.seyeon_ai_call_cost_events where call_id=$1::uuid',
+      [staleId],
+    );
+    expect(leaked.rows[0]?.count).toBe('0');
+    const remaining=await pool.query<{occupied:string}>(
+      "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    expect(remaining.rows[0]?.occupied).toBe('1524');
   });
 });
