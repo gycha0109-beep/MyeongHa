@@ -212,17 +212,8 @@ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
           ||!Array.isArray(proof.sources)
           ||proof.sources.length!==selected.selectedPersonalRecordCount)
           throw new SeyeonR20OfflineDigestHoldV1();
-        if(input.twoOriginalContextReady===true){
-          const state=await client.query<{turnState:unknown,attemptState:unknown}>(`
-select t.state as "turnState",a.state as "attemptState"
-from public.chat_turns t
-join public.chat_turn_attempts a on a.turn_id=t.id and a.subject_id=t.subject_id
-where t.id=$1::uuid and t.subject_id=$2::uuid
-  and t.thread_id=$3::uuid and a.id=$4::uuid
-`.trim(),[input.turnId,resolvedSubject.subjectId,input.threadId,input.attemptId]);
-          if(state.rows.length!==1||state.rows[0]?.turnState!=='context_ready')
-            throw new SeyeonR20OfflineDigestHoldV1();
-        }
+        // R21 Owner response already proves the real ContextReady transition;
+        // avoid granting the ordinary API role direct turn/attempt table reads.
         for(let i=0;i<proof.sources.length;i++){
           const row=proof.sources[i] as OriginalRow;
           const src=selected.selectedSources[i]!;
