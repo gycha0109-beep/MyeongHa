@@ -654,6 +654,37 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     });
     expect(fetchCount).toBe(0);
 
+    // A deletion of cost/Provider evidence must NEVER erase the governed
+    // Attempt marker, which would silently reopen legacy positive G2.
+    await pool.query(
+      'delete from public.seyeon_ai_call_cost_events where call_id=$1::uuid',
+      [receipt.callId],
+    );
+    const surviving=await pool.query<{markers:string;ledger:string;queue:string}>(
+      'select (select count(*)::text from seyeon_positive_candidate.governed_wire_reservations_r28 where call_id=$1::uuid) as markers,'+
+      ' (select count(*)::text from public.seyeon_ai_call_cost_events where call_id=$1::uuid) as ledger,'+
+      ' (select count(*)::text from public.seyeon_ai_provider_receipt_queue_v1 where call_id=$1::uuid) as queue',
+      [receipt.callId],
+    );
+    expect(surviving.rows).toMatchObject([{markers:'1',ledger:'0',queue:'0'}]);
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
+      [subject,id.thread,id.turn,id.attempt,
+       'd8300000-0000-4000-8000-'+idSuffix,
+       'd8400000-0000-4000-8000-'+idSuffix,
+       'd8500000-0000-4000-8000-'+idSuffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:id.turn,
+         assistantMessageId:'d8300000-0000-4000-8000-'+idSuffix,
+         userMessageId:id.user,
+       }),
+       'sha256:v1:synthetic-ledger-deleted-r29',
+       source.selection.selectedSourcesDigest],
+    ),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_governed_cost_unsettled',
+    });
+
     // A stale G1/Wire receipt is not enough once the SECOND original Grant
     // was revoked between attestation and the new G4 DB reservation.
     await pool.query(
