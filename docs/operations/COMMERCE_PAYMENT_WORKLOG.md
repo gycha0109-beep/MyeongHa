@@ -311,3 +311,34 @@
 - **로컬 검증:** 신규 소유자 입력 테스트 14건 + 실제 PortOne 환불/복구 테스트 15건 = **29/29 PASS**, `tsc -p tsconfig.build.json --noEmit` **PASS**. 실제 신규 PostgreSQL 17 migration 실행·오프프라이머리 복구·공식 전체 CI는 사용자 요청에 따라 최종 통합 단계까지 보류합니다.
 - **명시적 미완료:** 실제 구매자의 일반 청약철회 접수 UI·접수증, 별도 승인 증빙의 운영 프로비저닝, P0-CM-03 saleable SKU 및 Saju Production, 실제 Provider 취소 E2E, PostgreSQL 17 DB 적용, LIVE 결제는 여전히 비활성/검증 전입니다. 이 작업은 고객 환불을 실제 수행하지 않았으며 공개 서비스로 활성화하지 않았습니다.
 - **이번 묶음 최종 로컬 확인:** 결제 완료·Reader 접근·취소·환불 결정/실행 코드의 집중 Vitest **10개 파일 121/121 PASS**, 서버 빌드 타입 검사 **PASS**, 변경 파일 공백 오류 확인 **PASS**. 이는 **격리 PostgreSQL 17 새 SQL 실행 증명/전체 CI/실제 결제사 트랜잭션 결과가 아닙니다**.
+
+### 2026-11-01 — 고객 청약철회 접수 자료의 실제 DB 이행·개인정보 삭제 그래프 연결
+
+- **한 것:** 기존 비배포 `digital_reading_withdrawal_claim_private_v1.sql`을 기반으로, 최신 S4 계정 삭제 함수(2010)의 **보호 답변 삭제·외부 암호키 파기 확인**을 그대로 보존한 신규 순방향 `2320_commerce_digital_reading_claim_account_delete_v1.sql`을 작성했습니다. 접수 기록 테이블에 입력·변조 방지·본인 Subject/Purchase Intent 참조 검증을 적용하고, 계정 삭제 시 해당 고객 접수 기록을 먼저 삭제하며 삭제 완료 재실행에서 데이터 재등장을 차단합니다. 금융 P5Y 테이블은 삭제하지 않습니다.
+- **한 것:** 회원의 구매 단위가 서버 검증 Production Receipt, Reader 선택, 실제 결제 전 구매정보 표시와 일치하는 경우에만 정해진 코드로 청약철회 요청을 DB에 기록하는 별도 DB 함수를 추가했습니다. 중복 요청은 최초 입력과 지문을 비교해 반환하며, 수정을 요구하는 동일 키 재전송은 실패합니다. 고객이 보낸 주관적 배송/읽음 플래그를 승인 판단으로 쓰지 않습니다.
+- **남은 것:** 새 SQL의 실제 PostgreSQL 17 격리 이행과 계정 삭제 회귀 검사는 아직 미실행입니다. 이 기능은 일반 접수 중 증빙·구매 단위가 없는 건을 대체하지 않으며, 구형 구매·미인증 고객은 기존 문의 경로가 별도로 필요합니다. 운영 DB·공개 판매·LIVE는 변경하지 않았습니다.
+
+### 2026-11-01 — 회원 청약철회 접수·접수번호 조회 API 구현
+
+- **한 것:** `commerce-digital-reading-withdrawal-claim-http-v1.ts`에서 회원 신원 확인 후 동일 Subject 트랜잭션으로 접수/조회할 수 있는 POST/GET 경로를 구현했습니다. 서버 전용 HMAC 멱등 키·고정 요청 해시, 요청 본문 최대 2048바이트, 동일 출처 POST, 엄격한 필드·UUID 검증, no-store, 타인 구매/접수 존재 여부 비노출 및 DB COMMIT 뒤에만 접수 번호를 반환하는 경계를 적용했습니다.
+- **한 것:** 기존 단일 `api/me.ts`에 `__myeongha_withdrawal_claim=1` 분기를 연결했습니다. `MYEONGHA_WITHDRAWAL_CLAIM_ENABLED` 기본 OFF, 별도 HMAC Secret 필요, 사용자 응답에 환불 승인·결제사 환불 완료 여부는 항상 FALSE입니다. 소비자 접수와 운영자 수동 법적 결정·실제 Provider 취소는 독립적으로 보존합니다.
+- **로컬 검사:** 새 접수 HTTP 단위 테스트 11/11 PASS, `tsc -p tsconfig.build.json --noEmit` PASS. 계정 삭제 FK 및 실제 Postgres migration은 최종 통합 전 별도 검증이 필요합니다.
+- **다음:** 접수 계약과 개인정보 삭제 실제 DB 이행을 격리 PostgreSQL 17에서 검증한 후, 접수 내역→운영자 결정→결제사 취소 인계의 안전한 연결을 완성하고 전체 CI를 한 번에 수행합니다.
+
+### 2026-11-01 — 주문 증빙 없이도 접수 가능한 일반 청약철회 요청
+
+- **한 것:** 기존 exact Purchase Intent/Unit 두 ID가 있는 경우만 저장하던 새 SQL Writer를 확장하여 **두 ID가 모두 없는 일반 고객 청약철회/환불 문의도** 로그인된 회원 Subject에 접수할 수 있도록 했습니다. 원본 Receipt/Reader를 찾았다고 추정하지 않고 NULL로 남기며, ID가 하나만 있거나 잘못된 경우는 거절합니다. 정해진 사유·HMAC 멱등 기록·본인 확인·일반 서비스 DELETE 정책은 그대로 유지합니다.
+- **한 것:** 접수 API가 `{idempotencyKey,reason}` 또는 정확한 4개 필드 입력을 지원하도록 변경했습니다. 일반 접수는 실제 구매 확인이나 환불 지급을 뜻하지 않으며 추후 운영자 검토 대상입니다. 새로운 청약철회 조건·제외 사유를 자동으로 판단하지 않습니다.
+- **로컬 검증:** 기존·일반 접수 사례를 포함해 신규 API 검증 **13/13 PASS**, 서버 빌드 타입 검사 **PASS**. 전체 PostgreSQL 실행은 아직 확인되지 않았습니다.
+
+### 2026-11-01 — 마이페이지 청약철회 접수 화면 구현
+
+- **한 것:** `apps/web/src/commerce/WithdrawalRequestPanel.tsx`에 사유 선택, 선택적 구매정보 입력, 재시도 시 동일 멱등 키, 회원 세션, 접수번호·접수시각 표시, 환불 미승인 안내, 문의 경로를 구현했습니다. `apps/web/src/my/MyPage.tsx`의 구매 내역 패널에 연결했습니다.
+- **배포 경계:** 웹 화면은 `VITE_MYEONGHA_WITHDRAWAL_CLAIM_VISIBLE=1`에서만 표시되고 API는 독립적으로 `MYEONGHA_WITHDRAWAL_CLAIM_ENABLED=1`과 서버 HMAC Secret·승인된 신규 DB 계약을 모두 요구합니다. 현재 기본 OFF이고 실제 고객에게 미검증 접수 완료를 주장하지 않습니다.
+- **로컬 검증:** 서버 TypeScript 및 웹앱 TypeScript 검사 **PASS**. 현재 신규 접수 API 테스트 **13/13 PASS**. UI 실제 브라우저·Provider·PG17 E2E는 아직 미검증입니다.
+
+### 2026-11-01 — 계정 삭제/청약철회 접수 동시 실행 잠금 및 누적 검사
+
+- **동시성 수정:** 새 접수 DB 함수가 현재 회원 행을 `FOR SHARE`로 잠가, 계정 삭제 finalizer의 회원 행 `FOR UPDATE`와 직렬화되게 했습니다. 계정 삭제 직후 신규 개인정보 접수 기록이 되살아나는 창을 닫았으며 finalizer는 기존 S4 보호 답변 외부 키 파기 장벽을 유지합니다. 실제 PG17 동시 실행 검증은 최종 통합 단계 전까지 미실행입니다.
+- **로컬 검사:** 서버 및 웹 TypeScript 컴파일 검사 **PASS**, 결제·Reader·환불·청약철회 관련 11개 테스트 파일 **134/134 PASS**, 변경 공백 검사 **PASS**. 이는 전체 워크스페이스 CI와 PostgreSQL 실행 증명이 아닙니다.
+- **상태:** 결제 판매·Reader 콘텐츠 공개·환불 자동승인·실제 PortOne 환불과 고객 접수 UI는 운영에서 활성화하지 않았습니다. 작업 브랜치 내에서만 코드를 연결했으며 마지막 통합 CI 방식은 유지합니다.
