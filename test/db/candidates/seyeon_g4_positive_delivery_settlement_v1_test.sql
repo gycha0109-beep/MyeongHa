@@ -179,13 +179,31 @@ begin
     if sqlerrm not like 'Credit ACK lacks matching original DB-delivered assistant proof%'
       then raise; end if;
   end;
-  if public.internal_cmd_chat_credit_ack_delivered_proven_v2(
-       s,thread,client_turn,rid,committed_turn,assistant)<>'settled' then
-    raise exception 'Original positive delivery did not settle';
+  -- No browser-selected reservation, subject or message can trigger this
+  -- private post-receipt RPC; it binds all identifiers from the real DB.
+  begin
+    perform public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(
+      'cb180000-0000-4000-8000-000000000002'::uuid);
+    raise exception 'Unknown receipt Attempt unexpectedly settled';
+  exception when others then
+    if sqlerrm not like 'G4 receipt settlement requires original acknowledged positive delivery%'
+      then raise; end if;
+  end;
+  if public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(
+       'cb180000-0000-4000-8000-000000000001'::uuid)<>'settled' then
+    raise exception 'Persisted positive receipt did not settle ten credits';
   end if;
-  if public.internal_cmd_chat_credit_ack_delivered_proven_v2(
-       s,thread,client_turn,rid,committed_turn,assistant)<>'settled' then
-    raise exception 'Same original positive ACK was not idempotent';
+  if public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(
+       'cb180000-0000-4000-8000-000000000001'::uuid)<>'settled' then
+    raise exception 'Repeated original receipt was not idempotent';
+  end if;
+  if has_function_privilege('myeongha_api_executor',
+    'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE')
+    or has_function_privilege('authenticated',
+    'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE')
+    or has_function_privilege('service_role',
+    'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') then
+    raise exception 'Receipt-driven credit settlement leaked to public';
   end if;
   select outcome into state
     from public.internal_cmd_chat_credit_reserve_v1(s,thread,client_turn);
@@ -214,8 +232,8 @@ declare
   state text;
   allocations integer;
 begin
-  select id,state into rid,state from public.chat_credit_turn_reservations_v1
-    where subject_id=s and client_turn_id='cb160000-0000-4000-8000-000000000001';
+  select r.id,r.state into rid,state from public.chat_credit_turn_reservations_v1 r
+    where r.subject_id=s and r.client_turn_id='cb160000-0000-4000-8000-000000000001';
   if rid is null or state<>'settled' then
     raise exception 'Persisted positive reservation not settled';
   end if;
