@@ -53,7 +53,7 @@ describe('Home approved illustration assets — Golden Master', () => {
     expect(homeSource).not.toContain('오늘은 움직이기보다');
     expect(homeSource).not.toContain('퇴사를 고민했던 이야기');
     expect(homeSource).not.toContain('세연');
-    expect(homeSource).not.toContain('chat.html?character=');
+    expect(homeSource).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
     expect(homeSource).toContain('사주 관심 주제');
     expect(homeSource).toContain('당신의 이야기를');
   });

@@ -22,7 +22,6 @@ describe('web Home authority boundary', () => {
     expect(homeSource).not.toContain('마지막 변화 · 8월 24일');
     expect(homeSource).not.toContain('오늘은 좀 괜찮았어요?');
     expect(homeSource).not.toContain('지난 이야기가 조금 신경 쓰였어요');
-    expect(homeSource).not.toContain('chat.html?character=seyeon');
   });
 
   it('binds only the canonical current-subject profile route', () => {
@@ -50,7 +49,7 @@ describe('web Home authority boundary', () => {
 
   it('does not derive a Life Thread from unresolved Life Fact type/value schemas', () => {
     expect(lifeRecordRead).toContain('does not define positive Life Fact type/value schemas while SRC-25 remains');
-    expect(homeSource).toContain('최근 대화 기록은 아직 홈에 연결되지 않았습니다.');
+    expect(homeSource).not.toContain('최근 대화 기록은 아직 홈에 연결되지 않았습니다.');
     expect(client).not.toContain('/api/life-record');
   });
 
@@ -60,7 +59,8 @@ describe('web Home authority boundary', () => {
     expect(page).toContain("findReaderPresentation(key)");
     expect(page).toContain('reader.portrait');
     expect(page).toContain('href="chat-hub.html"');
-    expect(homeSource).not.toContain('chat.html?character=');
+    expect(page).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
+    expect(page).not.toContain('threadId=');
   });
 
   it('keeps the static My fallback while delegating live header auth state to the shared renderer', () => {

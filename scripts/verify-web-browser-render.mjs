@@ -255,7 +255,7 @@ try {
       elements: [
         inspect('.product-header', 100, 40), inspect('.mhx-hero', 900, 300),
         inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 600, 140),
-        inspect('.mhx-content-grid', 900, 70), inspect('.mhx-recent-card', 900, 60),
+        inspect('.mhx-content-grid', 900, 70),
       ],
     };
   })()`);
@@ -280,7 +280,7 @@ try {
   assert(hallState.monthHref === 'reading.html', `Home monthly feature must link to the Saju hub, got ${hallState.monthHref}`);
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
   assert(!hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home three-card public Saju row missing or retired product visible');
-  assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home recent-story fail-closed state missing');
+  assert(!hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home must not render redundant placeholder conversation card');
   await artifact(client, '-home');
 
   await navigate(client, origin, '/reading.html', '#saju-empty');

@@ -98,7 +98,7 @@ export function HomePage() {
               </div>
               <div className="mhx-character-footer">
                 <p>{reader.tone}</p>
-                <a href="chat-hub.html">대화 살펴보기 <span aria-hidden="true">→</span></a>
+                <a href={reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'}>대화 살펴보기 <span aria-hidden="true">→</span></a>
               </div>
             </article>
           ))}
@@ -126,20 +126,6 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mhx-section mhx-recent" aria-labelledby="mhx-recent-title">
-        <div className="mhx-section-head">
-          <h2 id="mhx-recent-title" className="mhx-section-title">최근 이야기</h2>
-          <a href="chat-hub.html">전체보기 <span aria-hidden="true">›</span></a>
-        </div>
-        <div className="mhx-recent-card">
-          <span className="mhx-recent-seal" aria-hidden="true">明</span>
-          <div>
-            <strong>당신의 이야기를 기다리고 있어요</strong>
-            <p>최근 대화 기록은 아직 홈에 연결되지 않았습니다. 실제 대화와 기록은 대화 화면에서 확인해 주세요.</p>
-          </div>
-          <a className="mhx-primary-link mhx-recent-link" href="chat-hub.html">대화 보러 가기 <span aria-hidden="true">→</span></a>
-        </div>
-      </section>
       <FortuneCookie />
     </div>
   );
