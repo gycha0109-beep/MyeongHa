@@ -281,6 +281,24 @@ try {
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
   assert(!hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home three-card public Saju row missing or retired product visible');
   assert(!hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home must not render redundant placeholder conversation card');
+  const directEntry = await client.evaluate(`(() => {
+    const hrefFor = (key) => document.querySelector(`.mhx-character-art[data-character="${key}"]`)?.closest('.mhx-character')?.querySelector('.mhx-character-footer a')?.getAttribute('href');
+    return {
+      seyeon: hrefFor('seyeon'), baekheon: hrefFor('baekheon'), yeoul: hrefFor('yeoul'),
+      staleRecent: !!document.querySelector('.mhx-recent-card'),
+      floatingFortune: !!document.querySelector('.fortune-cookie'),
+    };
+  })()`);
+  assert(directEntry.seyeon === 'chat.html?character=seyeon' && directEntry.baekheon === 'chat-hub.html' && directEntry.yeoul === 'chat-hub.html', `Home character direct entry mismatch: ${JSON.stringify(directEntry)}`);
+  assert(!directEntry.staleRecent && !directEntry.floatingFortune, `Retired Home UI still visible: ${JSON.stringify(directEntry)}`);
+  await client.evaluate(`document.querySelector('.mhx-content-grid button.mhx-content-card')?.click()`);
+  await waitForVisible(client, '.fortune-cookie-reveal');
+  const fortune = await client.evaluate(`(() => ({
+    text: document.querySelector('#fortune-cookie-reveal-message')?.textContent?.trim() ?? '',
+    intermediate: !!document.querySelector('.fortune-cookie-panel'),
+  }))()`);
+  assert(fortune.text && !fortune.intermediate, `Home fortune did not open directly: ${JSON.stringify(fortune)}`);
+  await client.evaluate(`document.querySelector('.fortune-cookie-reveal-close')?.click()`);
   await artifact(client, '-home');
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
