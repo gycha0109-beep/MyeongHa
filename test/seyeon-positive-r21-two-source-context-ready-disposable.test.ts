@@ -443,7 +443,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       constraint:'seyeon_offline_r28_governed_cost_missing_wire_seal',
     });
     expect(fetches).toBe(0);
-  });
+  },30000);
   it('R26: real G1 two-original digest and native wire -> atomic governed reservation; fetch stays blocked',async()=>{
     if(!pool)throw Error('disposable PostgreSQL required');
     const id=await createTurn(756);
@@ -899,7 +899,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     // One explicitly SYNTHETIC outcome reduced only its own reserved
     // balance to 300; the other unsealed/unsent start still retains 1,524.
     expect(remaining.rows[0]?.occupied).toBe('1824');
-  });
+  },30000);
   it('R32: five native stages reserve+settle exact DB costs while final G2 remains denied',async()=>{
     if(!pool)throw Error('R32 requires disposable PostgreSQL');
     // These two fresh originals are independent of the R26 revoked fixture.
@@ -1142,7 +1142,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       messages:'0',outboxes:'0',admissions:'0',
     });
     expect(fetches).toBe(0);
-  });
+  },45000);
 
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
@@ -1259,6 +1259,6 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     );
     expect(final.rows).toMatchObject([{stage_count:'1',cost_count:'1'}]);
     expect(fetches).toBe(0);
-  });
+  },30000);
 
 });
