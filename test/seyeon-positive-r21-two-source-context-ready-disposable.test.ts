@@ -660,6 +660,24 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
       [second.grantId],
     );
+    // The genuine DB settlement ledger does not extend a revoked Memory.
+    // G2 must re-lock both ORIGINAL Grants, even after receipt ACK.
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
+      [subject,id.thread,id.turn,id.attempt,
+       'd8300000-0000-4000-8000-'+idSuffix,
+       'd8400000-0000-4000-8000-'+idSuffix,
+       'd8500000-0000-4000-8000-'+idSuffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:id.turn,assistantMessageId:'d8300000-0000-4000-8000-'+idSuffix,
+         userMessageId:id.user,
+       }),
+       'sha256:v1:synthetic-revoked-after-settle-r29',
+       source.selection.selectedSourcesDigest],
+    ),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r25_original_grant_revoked',
+    });
     const staleId='d9000000-0000-4000-8000-000000000026';
     await expect(reserveSeyeonR26OfflineGovernedWireV1({
       ...beforeDispatch,call:{...beforeDispatch.call,callId:staleId},
