@@ -29,4 +29,7 @@ if [[ "${CI:-}" != "true" || "${PGHOST:-}" != "localhost" ||
 fi
 psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027125500_chat_credit_delivered_ack_private_v1.sql >/dev/null
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/chat_credit_g4_original_delivery_reconciliation_v1_test.sql >/dev/null
-echo 'PASS commerce chat credit private ledger + G4 original ACK/failed refund/duplicate reservation/ACL (disposable)'
+# Only this disposable clone may exercise the narrowly scoped private RPC role.
+psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_role_only_v1.sql >/dev/null
+psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_role_only_v1_test.sql >/dev/null
+echo 'PASS commerce private ledger + G4 original ACK/refund and isolated private-role reservation/ACK ACL'
