@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — Phase 7·11 실제 격리 PostgreSQL 18 재현 CI 구현 (운영 DB 미접근)
+
+- **이전 작업 완료 확인:** [PR #2860](https://github.com/gycha0109-beep/MyeongHa/pull/2860) HEAD `cf9906114426f997b92c8ec3c3d2a4475c4d6fe8`는 기본·전체 [통합 검사](https://github.com/gycha0109-beep/MyeongHa/pull/2860/checks) 모두 SUCCESS 후 2026-11-01T14:09:10Z 병합(main `93ccc2ef5f73ba47aa1c771b5033735f082ab2bf`). 격리 Auth/Storage 7/7 PASS 및 원장 freshness RED→GREEN은 이미 Worklog에 증거 보존됨. Hosted 복구·privacy 지속성은 여전히 HOLD.
+- **남은 실증 공백:** Phase 7 `test/postgres-subject-rls-isolated-phase7.test.ts`는 Windows의 실제 PostgreSQL18에서 1/1 검증됐지만 GitHub 일반 CI에 `PG_BIN_DIR`가 없으면 `describe.skip`으로 실제 DB 검증이 생략될 수 있었다. Phase 11 `scripts/operations/measure-isolated-postgres-capacity-phase11.mjs`는 기존 로컬 PostgreSQL18의 96건 합성 압력 측정 자료가 있었지만, 재현 가능한 GitHub Linux 실제 DB 실행/비식별 아티팩트는 없었다.
+- **이번 구현:** main 수동만 허용하는 `.github/workflows/postgres-isolated-rls-capacity-acceptance.yml` 및 `scripts/operations/run-isolated-postgres-phase7-phase11-ci.sh` 추가. 현재 제공되는 GitHub Ubuntu 26.04 + 내장 PostgreSQL18에서만 실행하고, 정확한 repo/ref/event·loopback PostgreSQL18 바이너리·Prod DB/Supabase 자격증명 부재를 확인한다. Phase7은 실제 RLS·역할·트랜잭션 검사 1/1 **명시적 출력 필수**(skip 불가), Phase11은 실제 임시 PostgreSQL18 96건 측정·max2 풀 제한·고동시성 획득 타임아웃·회복 조건을 검사한다. 성공 또는 실패에 관계없이 **비식별 결과 JSON**으로 PASS 또는 `BLOCKED_INCOMPLETE` 기록. 결과 보존 14일. 기존 기능/운영 코드·DB·마이그레이션·SQL 변경 없음.
+- **검증 및 다음 실행:** 수동 워크플로 책임 매핑·Vitest 정적 계약·Bash/YAML 문법 및 기존 운영 정책 검사를 제출 전 실행한다. **실제 새 Linux PostgreSQL18 실행은 PR 병합 후 수동 트리거 전 미판정**이며 사용자 PC의 과거 1/1 PASS를 이 워크플로의 PASS로 오인하지 않는다. 실제 측정 수치는 Linux 실행 결과에 근거해 다음 Worklog에 추가한다.
+- **범위 경계:** Phase 7 실제 합성 DB RLS 기능과 Phase 11 합성 풀 고갈은 Production DB 정책, verify-full TLS, MyeongHa 실쿼리, DB 용량 임계값, Saju CPU/메모리, Hosted Auth/Storage 완전 복원, 개인정보 삭제/철회 이벤트 연속성, PT24H RPO/PT6H RTO 또는 최종 운영 ACCEPTANCE의 근거가 아니다. `productionCapacityProven=false`, `scalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`; #1887 OPEN 유지.
+
+
 ### 2026-11-01 KST — PR #2851 통합 완료·격리 Auth/Storage 실제 PASS·원장 감시 RED→GREEN 실증
 
 - **통합 완료:** [PR #2851](https://github.com/gycha0109-beep/MyeongHa/pull/2851) 수정 HEAD `485574b05a7cfb8adf1977d671b6f6a30f2c0d47`에서 [기본 CI #41308117557](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41308117557) SUCCESS 후, 최종 [전체 통합 CI #41311230427](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41311230427) **11개 검사 모두 SUCCESS**. 2026-11-01T13:33:21Z(22:33:21 KST) 병합, main merge SHA `822c20e8713103618d360a292015c94e45246269`. 이전 실패 #41306348789 및 #41290070944는 과거 실패로 남기며 최신 성공으로 덮어쓰지 않는다.
