@@ -347,7 +347,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       });
       await expect(client.generate(request)).rejects.toThrow();
     };
-    await expect(sendStage('semantic_review')).rejects.toThrow();
+    await sendStage('semantic_review');
     expect(fetches).toBe(0);
     expect(receipts).toHaveLength(0);
     for(const stage of stages)await sendStage(stage);
@@ -757,7 +757,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
        'sha256:v1:synthetic-r29-post-turn-hash',
        source.selection.selectedSourcesDigest],
     ),true)).rejects.toMatchObject({
-      constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+      constraint:'seyeon_offline_r30_native_stage_lineage_incomplete',
     });
     const stillNoOutputs=await pool.query<{messages:string;admissions:string}>(
       "select (select count(*)::text from public.conversation_messages where turn_id=$1::uuid and sender_type='character') as messages,"+
