@@ -99,7 +99,9 @@ function inputs(rawOverride?:string,projectionOverride?:string){
   });
   return {retrievedMemories,sourceCandidates,selection,sourceEnvelope,finalModelContext};
 }
-function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
+function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>&{
+  twoOriginalContextReady?:true;
+}){
   return persistSeyeonR20OfflineDigestBoundPinV1({
     pool,verifiedEvidence:evidence,threadId:THREAD,turnId:TURN,
     attemptId:ATTEMPT,...other,
