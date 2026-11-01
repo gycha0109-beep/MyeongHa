@@ -115,8 +115,15 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     const result=await input.runtime.run({verifiedEvidence:preflight.verifiedEvidence,
       threadId:preflight.threadId,clientTurnId:preflight.clientTurnId,text:preflight.text});
     const e=result.execution;
+    // A fresh response may be generated for the SAME durable clientTurnId
+    // after its previous attempt failed before Commit. That receive is an
+    // idempotent replay of the User row, NOT a replay of any Assistant text.
+    // An already committed/delivered reply remains non-revealable here.
+    const eligibleReceive =
+      (e.receivedTurn.turnState==='received' && e.receivedTurn.replayed===false) ||
+      (e.receivedTurn.turnState==='failed_retryable' && e.receivedTurn.replayed===true);
     if(e.disposition!=='executed'||e.receivedTurn.userText!==preflight.text||
-       e.receivedTurn.replayed||e.receivedTurn.turnState!=='received'||
+       !eligibleReceive||
        e.receivedTurn.committedTurn!==null||e.attempt.replayed||
        e.receivedTurn.turnId!==e.committedTurn.turnId||
        e.attempt.attemptId!==e.committedTurn.attemptId||e.committedTurn.replayed||
