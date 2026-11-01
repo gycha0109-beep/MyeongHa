@@ -17,7 +17,6 @@ describe('Home Golden Master showcase structure', () => {
       '요즘, 무엇이 가장',
       '궁금하세요?',
       '사주 관심 주제',
-      '전체 사주',
       '직업 · 커리어',
       '재물',
       '연애 · 관계',
@@ -29,6 +28,7 @@ describe('Home Golden Master showcase structure', () => {
       expect(homeSource).toContain(label);
     }
 
+    expect(homeSource).not.toContain('전체 사주');
     expect(homeSource).toContain('사주 프리뷰 보기');
     expect(homeSource).toContain('resolveReadingAvailabilityV1(topic.href).label');
     expect(homeSource).toContain('인물 둘러보기');

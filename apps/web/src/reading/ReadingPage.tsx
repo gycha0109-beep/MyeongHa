@@ -2,7 +2,7 @@ import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
-// All twelve Saju topics share one product layer. Route availability is
+// The eleven public Saju topics share one product layer. Route availability is
 // independent from Product identity and never grants sale or Reader access.
 const sajuProductTopics = [
   { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },

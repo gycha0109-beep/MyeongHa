@@ -7,7 +7,6 @@ import {
 import { resolveReadingDetailRoute } from '../apps/web/reading-detail-route.js';
 
 const expectedWebHrefs = [
-  'reading-detail.html?topic=temperament&scope=original',
   'reading-detail.html?topic=career',
   'reading-detail.html?topic=money',
   'reading-detail.html?topic=love',
@@ -38,7 +37,7 @@ describe('mobile Saju topic parity with the web hub', () => {
     expect(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.webHref).sort()).toEqual(
       [...expectedWebHrefs].sort(),
     );
-    expect(new Set(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.key)).size).toBe(12);
+    expect(new Set(MOBILE_SAJU_TOPICS_V1.map((topic) => topic.key)).size).toBe(11);
   });
 
   it('keeps mobile labels aligned with the web route authority', () => {
@@ -52,7 +51,7 @@ describe('mobile Saju topic parity with the web hub', () => {
     }
   });
 
-  it('executes only the exact five currently approved Preview readings', () => {
+  it('exposes only the four publicly listed approved Preview readings', () => {
     const executable = MOBILE_SAJU_TOPICS_V1
       .filter((topic) => topic.availability.kind === 'preview')
       .map((topic) =>
@@ -62,7 +61,6 @@ describe('mobile Saju topic parity with the web hub', () => {
       );
 
     expect(executable).toEqual([
-      ['temperament', '전체 사주'],
       ['career', '직업운'],
       ['money', '재물운'],
       ['love', '연애운'],

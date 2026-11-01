@@ -254,7 +254,7 @@ try {
       overflow: document.documentElement.scrollWidth - innerWidth,
       elements: [
         inspect('.product-header', 100, 40), inspect('.mhx-hero', 900, 300),
-        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 600, 220),
+        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 600, 140),
         inspect('.mhx-content-grid', 900, 70), inspect('.mhx-recent-card', 900, 60),
       ],
     };
@@ -268,18 +268,18 @@ try {
     assert(el.exists && el.visible, `Home Golden Master element unavailable: ${el.selector}`);
   }
   assert(Math.abs(hallState.shellWidth - hallState.contentWidth) <= 2, `Home hero container must match the scrollable viewport: shell=${hallState.shellWidth}, content=${hallState.contentWidth}`);
-  assert(hallState.productCount === 4, `Home Golden Master must expose exactly four product cards, got ${hallState.productCount}`);
-  assert(hallState.productTopBands.length === 4 && hallState.productTopBands[0] === hallState.productTopBands[1] && hallState.productTopBands[2] === hallState.productTopBands[3] && hallState.productTopBands[2] > hallState.productTopBands[0], `Home product cards must form two rows of two: ${JSON.stringify(hallState.productTopBands)}`);
+  assert(hallState.productCount === 3, `Home Golden Master must expose exactly three public product cards, got ${hallState.productCount}`);
+  assert(hallState.productTopBands.length === 3 && hallState.productTopBands.every((top) => top === hallState.productTopBands[0]), `Home product cards must form one row of three: ${JSON.stringify(hallState.productTopBands)}`);
   assert(hallState.oldSidebars === 0, `Home Golden Master reintroduced sidebar layout: ${hallState.oldSidebars}`);
   assert(hallState.overflow <= 2, `Home Golden Master horizontal overflow: ${hallState.overflow}px`);
   assert(hallState.bodyText.includes('요즘, 무엇이 가장') && hallState.bodyText.includes('궁금하세요?'), 'Home topic-first headline missing');
   assert(hallState.bodyText.includes('당신의 이야기를') && hallState.bodyText.includes('들어줄 사람이 있어요'), 'Home character discovery missing');
-  assert(hallState.heroHref === 'reading-detail.html?topic=temperament&scope=original', `Home preview entry must route to approved preview: ${hallState.heroHref}`);
+  assert(hallState.heroHref === 'reading.html', `Home preview entry must route to the Saju hub: ${hallState.heroHref}`);
   assert(!hallState.bodyText.includes('연화') && !hallState.bodyText.includes('대화 시작 완료'), 'Home must not invent Character or relationship state');
-  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('월간 해석은 준비 중입니다.') && hallState.bodyText.includes('전체 사주 프리뷰'), 'Home must distinguish monthly unavailable from admitted Preview');
-  assert(hallState.monthHref === 'reading-detail.html?topic=temperament&scope=original', `Home feature must link to admitted General Natal Preview, got ${hallState.monthHref}`);
+  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('월간 해석은 준비 중입니다.') && hallState.bodyText.includes('내 명식과 다른 주제를 먼저 살펴보세요.'), 'Home must distinguish monthly unavailable from current public readings');
+  assert(hallState.monthHref === 'reading.html', `Home monthly feature must link to the Saju hub, got ${hallState.monthHref}`);
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
-  assert(hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
+  assert(!hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home three-card public Saju row missing or retired product visible');
   assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home recent-story fail-closed state missing');
   await artifact(client, '-home');
 
@@ -318,7 +318,7 @@ try {
   await sleep(180);
   const pickerOpen = await client.evaluate(`(() => {
     const anchor = [...document.querySelectorAll('a[href^="reading-detail.html"]')]
-      .find((item) => item.getAttribute('href')?.includes('topic=temperament'));
+      .find((item) => item.getAttribute('href')?.includes('topic=career'));
     if (!(anchor instanceof HTMLAnchorElement)) return { triggerFound: false };
     anchor.click();
     const dialog = document.querySelector('[data-reading-reader-picker]');
@@ -365,7 +365,7 @@ try {
       readerName: document.querySelector('[data-reader-name]')?.textContent?.trim() ?? '',
     };
   })()`);
-  assert(selectedReaderRoute.topic === 'temperament' && selectedReaderRoute.scope === 'original', `Reader picker lost Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.topic === 'career' && selectedReaderRoute.scope === null, `Reader picker lost the selected public Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.reader === 'seyeon', `Reader picker did not bind Seyeon into the URL: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.readerDataset === 'seyeon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.presentationDataset === 'reading-scene-v1' && selectedReaderRoute.readerName === '세연', `Reader Reading Scene v1 did not activate: ${JSON.stringify(selectedReaderRoute)}`);
