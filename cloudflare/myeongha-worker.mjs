@@ -63,6 +63,7 @@ export default {
         routeId:receiptRoute?'api.chat.delivery-receipt':revokeRoute?'api.memories.seyeon.revoke':'rewrite.chat.turns',
         execute:async()=>{
       let runtime;
+      let phase='runtime_init';
       try{
         const rejected=await rateLimitCloudflareRequestV1(request,env,
           receiptRoute?'seyeon-receipt':revokeRoute?'seyeon-withdrawal':'seyeon-turn');
@@ -97,10 +98,12 @@ export default {
         // delivery-receipt settlement are actually mounted. The sole DB-bound
         // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
         // Even a server-side account lookup failure must not admit a model.
+        phase='owner_credit_verify';
         if(firstReplyRoute && !(await runtime.verifyOwnerCreditExemption(request))){
           return Response.json({ok:false,error:{code:'CREDIT_AUTHORITY_UNAVAILABLE',retryable:false}},
             {status:503,headers:HEALTH_HEADERS});
         }
+        phase='handle_request';
         const response=await runtime.handleRequest(request);
         const headers=new Headers(response.headers);
         for(const [key,value] of Object.entries(HEALTH_HEADERS))headers.set(key,value);
@@ -109,7 +112,11 @@ export default {
           headers.set('Content-Encoding','identity');
         }
         return new Response(response.body,{status:response.status,headers});
-      }catch{
+      }catch(error){
+        const failure=error!==null&&typeof error==='object'?error:null;
+        const sqlState=typeof failure?.code==='string'&&/^[A-Z0-9]{5}$/u.test(failure.code)?failure.code:null;
+        const sqlConstraint=typeof failure?.constraint==='string'&&/^[a-z0-9_]{1,96}$/u.test(failure.constraint)?failure.constraint:null;
+        console.error('MYEONGHA_SEYEON_WORKER_PHASE_DIAGNOSTIC '+JSON.stringify({phase,sqlState,sqlConstraint}));
         return Response.json({ok:false,error:{code:'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',retryable:false}},
           {status:503,headers:HEALTH_HEADERS});
       }finally{try{await runtime?.close();}catch{ /* never replace a committed response with private diagnostics */ }}

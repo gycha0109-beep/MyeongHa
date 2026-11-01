@@ -81,12 +81,14 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   zeroSourceFirstReplyApproved?: true;
 }>): Promise<Response> {
   const held=()=>holdSeyeonReceiptHttpV1(input.requestId);
+  let phase:'preflight'|'receipt_readiness'|'chat_execution'|'receipt_issue'='preflight';
   try {
     const preflight=await preflightSeyeonChatTurnSendRequestV1(input);
     if(preflight.kind==='denied')return preflight.response;
     if(input.request.headers.get(SEYEON_POSITIVE_DELIVERY_RECEIPT_HEADER_V1)!=='v1' ||
        input.request.signal.aborted)return held();
     const zeroSource=input.zeroSourceFirstReplyApproved===true;
+    phase='receipt_readiness';
     // Receipt HTTP requires G1/G2 and its own issuer, never EXECUTE on the
     // old Node sender. Production leaves that unreceipted RPC revoked.
     await executePostgresSubjectTransactionV1({pool:input.pool,
@@ -112,6 +114,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         await assertSeyeonG0OriginalLineageReadyV1(client);
       }});
     if(input.request.signal.aborted)return held();
+    phase='chat_execution';
     const result=await input.runtime.run({verifiedEvidence:preflight.verifiedEvidence,
       threadId:preflight.threadId,clientTurnId:preflight.clientTurnId,text:preflight.text});
     const e=result.execution;
@@ -131,6 +134,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
        input.request.signal.aborted)return held();
     const challenge=randomBytes(32).toString('hex');
     const receiptHash=createHash('sha256').update(challenge,'utf8').digest();
+    phase='receipt_issue';
     const body=await executePostgresSubjectTransactionV1({pool:input.pool,
       verifiedEvidence:preflight.verifiedEvidence,execute:async({client,resolvedSubject})=>{
         if(resolvedSubject.subjectKind!=='member'||resolvedSubject.subjectId!==result.subjectId||
@@ -157,7 +161,13 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     if(input.request.signal.aborted)return held();
     return new Response(body,{headers:{'Content-Type':'application/json; charset=utf-8',
       'Cache-Control':'no-store, no-transform','Content-Encoding':'identity'}});
-  }catch(error){return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);}
+  }catch(error){
+    const failure=error!==null&&typeof error==='object'?error as {code?:unknown;constraint?:unknown}:null;
+    const sqlState=typeof failure?.code==='string'&&/^[A-Z0-9]{5}$/u.test(failure.code)?failure.code:null;
+    const sqlConstraint=typeof failure?.constraint==='string'&&/^[a-z0-9_]{1,96}$/u.test(failure.constraint)?failure.constraint:null;
+    console.error('MYEONGHA_SEYEON_FIRST_REPLY_PHASE_DIAGNOSTIC '+JSON.stringify({phase,sqlState,sqlConstraint}));
+    return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);
+  }
 }
 
 /** Capability-only receipt. Returns no identity, source, grant or reply text. */
