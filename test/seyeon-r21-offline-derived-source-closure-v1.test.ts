@@ -69,6 +69,32 @@ describe('S0 R21 two original model-source preflight admission (never Provider p
       .toThrow(SeyeonR21DerivedSourceClosureHoldV1);
   });
 
+  it('preserves the isolated single-memory R20/R23 contract without admitting a second source',()=>{
+    const singleMemories=memories.slice(0,1);
+    const singleCandidates=candidates.slice(0,1);
+    const singleEnvelope:SeyeonR21OfflineDerivedSourceEnvelopeV1={
+      ...envelope,
+      sourceSnapshot:{
+        ...envelope.sourceSnapshot,
+        retrievedMemories:singleMemories,
+        personalRecordProjectionCandidates:singleCandidates,
+        personalRecordAdmissions:envelope.sourceSnapshot.personalRecordAdmissions.slice(0,1),
+      },
+    };
+    expect(()=>check({
+      envelope:singleEnvelope,retrievedMemories:singleMemories,
+      sourceCandidates:singleCandidates,expectedOriginalMemoryCount:1,
+    })).not.toThrow();
+    expect(()=>check({
+      envelope:singleEnvelope,retrievedMemories:singleMemories,
+      sourceCandidates:singleCandidates,expectedOriginalMemoryCount:2,
+    })).toThrow(SeyeonR21DerivedSourceClosureHoldV1);
+    expect(()=>check({
+      envelope,retrievedMemories:memories,
+      sourceCandidates:candidates,expectedOriginalMemoryCount:1,
+    })).toThrow(SeyeonR21DerivedSourceClosureHoldV1);
+  });
+
   it('holds if either source projection, ID or Grant is changed',()=>{
     for(const forged of [
       [candidates[0]!],
