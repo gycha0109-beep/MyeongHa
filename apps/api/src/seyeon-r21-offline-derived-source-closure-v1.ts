@@ -138,8 +138,8 @@ export function assertSeyeonR21OfflineDerivedSourceClosureV1(input:{
       ||selected.selectedUnpinnedDerivedSources.length!==0
       ||selected.selectedSources.some(source=>source.recordKind!=='memory')
       ||s.personalRecordAdmissions.length!==input.expectedOriginalMemoryCount
-      ||new Set(selected.selectedSources.map(source=>source.recordId)).size!==2
-      ||new Set(selected.selectedSources.map(source=>source.grantId)).size!==2){
+      ||new Set(selected.selectedSources.map(source=>source.recordId)).size!==input.expectedOriginalMemoryCount
+      ||new Set(selected.selectedSources.map(source=>source.grantId)).size!==input.expectedOriginalMemoryCount){
       throw new SeyeonR21DerivedSourceClosureHoldV1();
     }
   } catch {
