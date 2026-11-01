@@ -35,6 +35,12 @@ declare
   v_bytes bigint;
   v_body jsonb;
   v_stage_input jsonb;
+  v_context jsonb;
+  v_memory jsonb;
+  v_edge seyeon_positive_candidate.source_edges_r1%rowtype;
+  v_ordinal integer;
+  v_memory_ids jsonb;
+  v_source_refs jsonb;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
@@ -91,6 +97,115 @@ begin
     then
       raise exception using errcode='23514',
         constraint='seyeon_r34_synthetic_stage_contract_mismatch';
+    end if;
+  end if;
+  -- R35: never treat a manipulated Interpreter packet as an allowed
+  -- derived context merely because its caller provided a SHA or an earlier
+  -- immutable two-original SourceSet. R20 Node verified the canonical
+  -- zero-derived Context, but the restricted DB RPC is independently callable.
+  -- This fence admits ONLY the two named synthetic Memory projections.
+  if p_purpose='turn_interpretation' then
+    begin
+      v_stage_input:=(v_body#>>'{input,0,content,0,text}')::jsonb;
+    exception when others then
+      raise exception using errcode='23514',
+        constraint='seyeon_r35_unpinned_derived_interpreter_context';
+    end;
+    v_context:=v_stage_input->'context';
+    if jsonb_typeof(v_stage_input) is distinct from 'object'
+      or (select count(*) from jsonb_object_keys(v_stage_input))<>3
+      or not (v_stage_input ?& array[
+        'context','allowedInterpretationVocabulary','allowedReferenceVocabulary'
+      ])
+      or jsonb_typeof(v_context) is distinct from 'object'
+      or jsonb_typeof(v_stage_input->'allowedInterpretationVocabulary')
+          is distinct from 'object'
+      or jsonb_typeof(v_stage_input->'allowedReferenceVocabulary')
+          is distinct from 'object'
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_r35_unpinned_derived_interpreter_context';
+    end if;
+    if (select count(*) from jsonb_object_keys(v_context))<>13
+      or not (v_context ?& array[
+        'schemaVersion','character','authorityBoundaries','integrity',
+        'relationship','relationshipSemantics','bibleSlices',
+        'recentConversation','retrievedMemories','disclosure',
+        'retrievalPolicy','actionPolicy','behaviorPolicy'
+      ])
+      or v_context->'relationship' is distinct from 'null'::jsonb
+      or v_context->'relationshipSemantics' is distinct from 'null'::jsonb
+      or v_context->'recentConversation' is distinct from '[]'::jsonb
+      or jsonb_typeof(v_context->'integrity') is distinct from 'object'
+      or v_context#>'{integrity,decisions}' is distinct from '[]'::jsonb
+      or v_context#>'{integrity,governedPreflightApplied}'
+          is distinct from 'false'::jsonb
+      or jsonb_typeof(v_context->'disclosure') is distinct from 'object'
+      or v_context#>'{disclosure,decision}' is distinct from 'null'::jsonb
+      or v_context#>'{disclosure,retrievedSources}' is distinct from '[]'::jsonb
+      or v_context#>>'{character,characterId}' is distinct from 'seyeon'
+      or jsonb_typeof(v_context->'retrievedMemories') is distinct from 'array'
+      or (select count(*) from jsonb_object_keys(
+          v_stage_input->'allowedReferenceVocabulary'
+      ))<>3
+      or not (v_stage_input->'allowedReferenceVocabulary' ?& array[
+        'noticeEvidenceRefs','memoryIds','historySourceRefs'
+      ])
+      or v_stage_input#>'{allowedReferenceVocabulary,historySourceRefs}'
+          is distinct from '[]'::jsonb
+      or v_stage_input#>'{allowedInterpretationVocabulary,revealLevels}'
+          is distinct from '["public"]'::jsonb
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_r35_unpinned_derived_interpreter_context';
+    end if;
+    if jsonb_array_length(v_context->'retrievedMemories')<>2 then
+      raise exception using errcode='23514',
+        constraint='seyeon_r35_unpinned_derived_interpreter_context';
+    end if;
+    v_memory_ids:='[]'::jsonb;
+    v_source_refs:='[]'::jsonb;
+    v_ordinal:=0;
+    for v_edge in
+      select * from seyeon_positive_candidate.source_edges_r1
+      where attempt_id=p_attempt order by ordinal for share
+    loop
+      v_memory:=v_context->'retrievedMemories'->v_ordinal;
+      if v_ordinal>=2 or v_edge.ordinal<>v_ordinal
+        or jsonb_typeof(v_memory) is distinct from 'object'
+        or (select count(*) from jsonb_object_keys(v_memory))<>7
+        or not (v_memory ?& array[
+          'memoryId','kind','claimKind','summary','sourceRef',
+          'relevance','salience'
+        ])
+        or v_memory->>'kind' is distinct from 'memory'
+        or v_memory->>'memoryId' is distinct from
+          'memory:'||v_edge.memory_id::text
+        or v_memory->>'sourceRef' is distinct from
+          'memory:'||v_edge.memory_id::text||
+          ':grant:'||v_edge.original_grant_id::text
+        or v_memory->>'claimKind' is distinct from 'fact'
+        or v_memory->>'summary' is distinct from
+          'synthetic model projection '||v_ordinal::text
+        or v_memory->>'relevance' is distinct from
+          case v_ordinal when 0 then '0.9' else '0.8' end
+        or v_memory->>'salience' is distinct from '0.8'
+      then
+        raise exception using errcode='23514',
+          constraint='seyeon_r35_unpinned_derived_interpreter_context';
+      end if;
+      v_memory_ids:=v_memory_ids||jsonb_build_array(v_memory->>'memoryId');
+      v_source_refs:=v_source_refs||jsonb_build_array(v_memory->>'sourceRef');
+      v_ordinal:=v_ordinal+1;
+    end loop;
+    if v_ordinal<>2
+      or v_stage_input#>'{allowedReferenceVocabulary,memoryIds}'
+          is distinct from v_memory_ids
+      or v_stage_input#>'{allowedReferenceVocabulary,noticeEvidenceRefs}'
+          is distinct from v_source_refs
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_r35_unpinned_derived_interpreter_context';
     end if;
   end if;
   -- R30 owns the source-to-native-wire proof, exact stage order and
