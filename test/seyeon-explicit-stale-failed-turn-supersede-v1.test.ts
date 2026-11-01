@@ -6,6 +6,7 @@ const db=source('scripts/operations/seyeon-security-s0/production-21-explicit-st
 const handler=source('apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.ts');
 const browser=source('apps/web/chat-runtime-client.js');
 const transport=source('apps/web/chat-turn-receipt-client.js');
+const g0=source('scripts/operations/seyeon-security-s0/production-22-ignore-abandoned-g0-history-20261102.sql');
 
 describe('Se-yeon stale failed User turn differs from current draft',()=>{
   it('requires verified Subject and thread, fails closed for ambiguous or active Turns',()=>{
@@ -43,6 +44,18 @@ describe('Se-yeon stale failed User turn differs from current draft',()=>{
     expect(handler).toContain("kind:'turn_in_flight',requestId:input.requestId");
     expect(handler).toContain("e.receivedTurn.committedTurn!==null||e.attempt.replayed");
     expect(handler).toContain('SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1');
+  });
+  it('excludes abandoned messages from BOTH exact G0 reader and the 12-key DB source Pin',()=>{
+    expect(g0).toContain('qry_seyeon_g0_current_source_recent_messages_v1');
+    expect(g0).toContain('cmd_mark_seyeon_chat_context_ready_pinned_v1');
+    expect(g0).toContain('src.id=p_current_user_message_id');
+    expect(g0).toContain('m.id::text=v_current_id');
+    expect(g0).toContain("admitted_turn.state in ('committed','delivered')");
+    expect(g0).toContain('admitted_turn.committed_attempt_id is not null');
+    expect(g0).toContain('admitted_turn.committed_at is not null');
+    expect(g0).toContain("position('v_selection_keys <> 12' in b)");
+    expect(g0).toContain('revoke create on schema public from myeongha_seyeon_chat_runtime_owner');
+    expect(g0).toMatch(/commit;\\s*$/u);
   });
   it('the user confirms explicitly; header cannot be sent on unrelated routes',()=>{
     expect(browser).toContain('window.confirm(');
