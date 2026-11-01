@@ -215,7 +215,8 @@ begin
   f:=replace(f,'  v_census_digest:=''sha256:v1:''||encode(',history||
      '  v_census_digest:=''sha256:v1:''||encode(');
   -- Existing first-response canonical digest remains identical when history=[].
-  f:=replace(f,'''unpinnedRecentSources":[]}'','''unpinnedRecentSources":''||v_history_payload||''}''');
+  f:=replace(f,$census_old$"unpinnedRecentSources":[]}'$census_old$,
+    $census_new$"unpinnedRecentSources":'||v_history_payload||'}'$census_new$);
   if position('v_history_payload' in f)=0 or position('v_history_payload||' in f)=0
     then raise exception 'Historical source census digest substitution failed'; end if;
   execute f;
