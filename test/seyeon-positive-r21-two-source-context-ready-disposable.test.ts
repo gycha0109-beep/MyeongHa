@@ -1500,4 +1500,108 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(final.rows[0]).toEqual(rows.rows[0]);
   },30000);
 
+
+  it('R34: direct DB governed stage rejects injected instructions, schema, nested private payload and wrong predecessor',async()=>{
+    if(!pool)throw Error('R34 disposable DB only');
+    // Use fresh original IDs; old Grant replacements never authorize this Attempt.
+    const {id,source}=await r33Prepare(764,920);
+    const native=await r33NativeWire(
+      'integrity_classification',source.selection.selectedSourcesDigest,null,
+    );
+    const original=JSON.parse(native.body) as {
+      instructions:string;
+      input:{role:string;content:{type:string;text:string}[]}[];
+      text:{format:{
+        type:string;name:string;strict:boolean;schema:Record<string,unknown>;
+      }};
+    };
+    const expectedSelection=source.selection.selectedSourcesDigest;
+    const mutated=[
+      JSON.stringify({...original,
+        instructions:original.instructions+' UNAPPROVED_PRIVATE_SOURCE_INSTRUCTIONS'}),
+      JSON.stringify({...original,text:{format:{
+        ...original.text.format,
+        schema:{...original.text.format.schema,
+          properties:{ok:{type:'boolean'},privateOutput:{type:'string'}},
+          required:['ok','privateOutput'],
+        },
+      }}}),
+      JSON.stringify({...original,input:[{
+        role:'user',content:[{
+          type:'input_text',
+          text:JSON.stringify({
+            fixture:true,purpose:'integrity_classification',
+            selectedSourcesDigest:expectedSelection,
+            priorNativeWireDigest:null,
+            unapprovedDerivedPrivateText:'DO_NOT_ADMIT',
+          }),
+        }],
+      }]}),
+      JSON.stringify({...original,input:[{
+        role:'user',content:[{
+          type:'input_text',
+          text:JSON.stringify({
+            fixture:true,purpose:'integrity_classification',
+            selectedSourcesDigest:expectedSelection,
+            priorNativeWireDigest:null,untrusted:'', // fifth key, even empty
+          }),
+        }],
+      }]}),
+    ];
+    const dbStart=(purpose:string,callId:string,wire:string,nativeDigest:string)=>
+      tx(c=>c.query(
+        'select seyeon_positive_candidate.claim_governed_stage_r32($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::bigint) as receipt',
+        [subject,id.thread,id.turn,id.attempt,purpose,callId,
+         expectedSelection,hash(source.finalModelContext),
+         nativeDigest,wire,'offline-r32-test-v1','offline-r32-price-v1',500],
+      ),true);
+    const budgetBefore=await pool.query<{occupied:string}>(
+      "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    expect(budgetBefore.rows).toHaveLength(1);
+    for(const wire of mutated){
+      await expect(dbStart('integrity_classification',
+        native.callId,wire,native.requestDigest)).rejects.toMatchObject({
+        code:'23514',constraint:'seyeon_r34_synthetic_stage_contract_mismatch',
+      });
+    }
+    const untouched=await pool.query<{stages:string;costs:string;budget:string}>(
+      "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stages,"+
+      " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as costs,"+
+      " (select occupied_micro_usd::text from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date) as budget",
+      [id.attempt],
+    );
+    expect(untouched.rows[0]).toMatchObject({
+      stages:'0',costs:'0',budget:budgetBefore.rows[0]!.occupied,
+    });
+    // The exact native body (and same Call ID) can enter the existing
+    // DB cost governor. This is a reservation only, never a sent request.
+    const accepted=await dbStart('integrity_classification',
+      native.callId,native.body,native.requestDigest);
+    expect(accepted.rows[0]?.receipt).toMatchObject({
+      stageIndex:0,purpose:'integrity_classification',
+      reservedMicroUsd:'1524',
+      permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    });
+    const wrongPrevious=await r33NativeWire(
+      'disclosure_classification',expectedSelection,
+      'sha256:wire-utf8:v1:'+'0'.repeat(64),
+    );
+    await expect(dbStart('disclosure_classification',
+      wrongPrevious.callId,wrongPrevious.body,wrongPrevious.requestDigest
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r34_synthetic_stage_contract_mismatch',
+    });
+    const final=await pool.query<{stages:string;costs:string;budget:string}>(
+      "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stages,"+
+      " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as costs,"+
+      " (select occupied_micro_usd::text from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date) as budget",
+      [id.attempt],
+    );
+    expect(final.rows[0]).toMatchObject({
+      stages:'1',costs:'1',
+      budget:String(BigInt(budgetBefore.rows[0]!.occupied)+1524n),
+    });
+  },30000);
+
 });
