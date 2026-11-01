@@ -54,7 +54,8 @@ const envelope:SeyeonR21OfflineDerivedSourceEnvelopeV1={
 };
 const check=(change:Partial<Parameters<typeof assertSeyeonR21OfflineDerivedSourceClosureV1>[0]>={})=>
   assertSeyeonR21OfflineDerivedSourceClosureV1({
-    envelope,retrievedMemories:memories,sourceCandidates:candidates,...change,
+    envelope,retrievedMemories:memories,sourceCandidates:candidates,
+    expectedOriginalMemoryCount:2,...change,
   });
 const withMemories=(next:readonly SeyeonRetrievedMemoryV2[])=>({
   ...envelope,
