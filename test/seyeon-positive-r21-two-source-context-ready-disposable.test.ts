@@ -987,7 +987,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     // balance to 300; the other unsealed/unsent start still retains 1,524.
     expect(remaining.rows[0]?.occupied).toBe('1824');
   },30000);
-  it('R32: five native stages reserve+settle exact DB costs while final G2 remains denied',async()=>{
+  it('R32/R35: DB rejects ten unpinned Interpreter source mutations, then settles five synthetic stages with G2 HOLD',async()=>{
     if(!pool)throw Error('R32 requires disposable PostgreSQL');
     // These two fresh originals are independent of the R26 revoked fixture.
     const originals=[
