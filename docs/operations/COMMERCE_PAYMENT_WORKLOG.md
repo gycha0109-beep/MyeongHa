@@ -287,3 +287,17 @@
 - **PR 관리:** 기존 단편 후보 PR [#2855](https://github.com/gycha0109-beep/MyeongHa/pull/2855)는 새 Reader S7 단일화로 대체돼 **closed/unmerged** 처리했습니다. 원본 PR의 중간 CI 성공은 현재 통합 브랜치의 통합 통과가 아닙니다.
 - **남은 필수 구현/인수:** Saleable Offer/Charge Terms와 승인된 Saju 공급, 고객 실제 수령 증거 판정, 법정 청약철회 최종 처리·PortOne 환불 요청 POST, 개인정보 최종 복구 인수, 현재 DB migration 이력 정합성, 유료 Reader 공개 및 LIVE. 수동·운영 승인 없이 LIVE와 자동 환불을 켜지 않습니다.
 - **다음:** 실제 결제사 취소 요청·Claim 영속화·법적 검토를 현재 저장된 원본 Receipt/Reader lock과 하나의 경로로 연결하고, 신규 DB migration을 격리 PostgreSQL 17에서 검증한 뒤 최종 통합 CI를 한 번에 실행합니다.
+
+### 2026-11-01 — P4 실제 PortOne 전액 환불 요청과 영속 중복 방지 구현
+
+- **실제 구현:** `2310_official_reader_private_refund_dispatch_v1.sql`에 원본 Receipt에 1:1로 결속된 소유자 승인 법적 판정, 단일 전송 예약, 결제사 취소 ID/요청 상태, 취소 확인 기록을 분리해서 영속화하는 함수와 테이블을 추가했습니다. 공개 API·service_role·일반 API executor에 직접 접근/승인 권한을 부여하지 않았으며 자동 법적 승인 경로도 생성하지 않았습니다.
+- **실제 결제사 호출:** `commerce-portone-reader-refund-request-v1.ts`에서 공식 PortOne V2 전액취소 POST와 고정 멱등 키, 원결제 금액 기반 취소가능잔액 확인, 강제 타임아웃/리다이렉트 거부, 응답 범위 제한을 구현했습니다. POST·통신 불확실성 이후에는 영속 상태를 유지하고 재시도 POST를 금지합니다.
+- **실제 권한 회수 연결:** 취소 응답 `REQUESTED` 또는 `SUCCEEDED` 자체로 환불 완료/권한 회수를 선언하지 않고, 인증된 결제사 GET이 해당 결제/취소/금액의 전체 성공을 검증해야 기존 단일 Receipt·Grant 회수 Writer를 실행한 뒤 환불 요청 상태를 confirmed로 갱신합니다. 비결제사 취소/다른 Reader·부분 환불은 회수 불가입니다.
+- **보류:** 소유자의 개별 환불 결정 원본 DB 레코드 입력 도구/계정 삭제·법정 금융보존 정책 결속, 취소 요청 이후 타임아웃 재조정, 실데이터 DB 설치/통합 CI는 아직 미완료입니다. 이번 단계의 로컬 커밋은 Production DB에 적용한 것이 아니며 자동 환불과 LIVE는 OFF입니다.
+
+### 2026-11-01 — 통신 실패 후 결제사 GET 복구·환불 결과 구분
+
+- **실제 구현:** `commerce-portone-reader-refund-recovery-v1.ts`에 결제사 인증 GET으로 원본 paymentId/transactionId·KRW 원금·CANCELLED·성공 취소 1건만 허용하는 복구 함수를 추가했습니다. 최초 취소 POST가 타임아웃 등으로 불확실해도 새 POST를 발송하지 않고, 재실행 시 조회한 성공 취소 ID를 기존 승인 건에 기록한 후 정규 취소 검증/Receipt·Grant 회수 경로를 재사용합니다. 실패·다중 취소·원금 불일치는 보류합니다.
+- **실제 구현:** 결제사 인증키·설정값을 DB 전송 예약 전에 검증하도록 수정하여 잘못된 설정 때문에 예약만 소진되지 않도록 했습니다. 이미 회수할 구매권이 없는 취소와 실제 회수 성공, 완료 재호출의 결과를 구분합니다.
+- **로컬 필수 검사:** `tsc -p tsconfig.build.json --noEmit` **PASS**. 새 환불 요청·상태 복구 단위 테스트 `test/commerce-portone-reader-refund-request-v1.test.ts` **15/15 PASS**. 실제 PortOne 계정 네트워크 취소 또는 새 SQL 실제 DB 적용/통합 CI는 실행하지 않았습니다.
+- **남은 구현/검증:** 정확한 법적 결정 이력 저장 입력·검증 경로, 신규 환불 테이블의 승인된 계정 삭제·금융증빙 보존 정책 연계, 격리 PostgreSQL 17 신규 SQL 실제 실행, 샌드박스 전액 취소 E2E 및 기존 판매 가능한 Reader SKU·사주 공급 선행 조건. 외부 계정에 환불 POST는 실행하지 않았으며 LIVE/HOLD 경계를 유지합니다.
