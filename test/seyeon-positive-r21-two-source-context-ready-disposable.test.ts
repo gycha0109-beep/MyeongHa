@@ -1482,6 +1482,22 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     ),true)).rejects.toMatchObject({
       code:'23514',constraint:'seyeon_r30_original_grant_revoked',
     });
+    // An unrelated newly issued Grant to the SAME Memory does not revive
+    // the exact revoked original Grant already pinned by this Attempt.
+    const replacementGrant='d6000000-0000-4000-8000-000000000009';
+    await pool.query(
+      "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+      [replacementGrant,subject,originals[1]!.recordId],
+    );
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.claim_governed_stage_r32($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::bigint) as receipt',
+      [subject,id.thread,id.turn,id.attempt,'disclosure_classification',
+       next.callId,source.selection.selectedSourcesDigest,
+       hash(source.finalModelContext),next.requestDigest,next.body,
+       'offline-r32-test-v1','offline-r32-price-v1',500],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r30_original_grant_revoked',
+    });
     const final=await pool.query<{stages:string;calls:string;budget:string}>(
       "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stages,"+
       " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as calls,"+
