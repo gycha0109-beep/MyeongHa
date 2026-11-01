@@ -504,11 +504,54 @@ begin
       raise exception using errcode='23514',
         constraint='seyeon_offline_r37_stage_result_lineage_incomplete';
     end if;
-    -- R37 is NOT evidence that a Provider generated or a validator accepted
-    -- an inference result. Matching five synthetic local-result records and
-    -- settled synthetic costs STILL cannot authorize a real G2 Commit.
-    -- G0 full private provenance, all actual outputs, actual Preflight and
-    -- Character/semantic Output Guard attestation remain absent.
+    -- R38: four independent NEGATIVE-only fixture probes must refer to
+    -- the already sealed Interpreter / Renderer / Semantic Reviewer calls.
+    -- These observations are NOT Provider responses or passing output guards.
+    -- The fixture's local "rejected" field is never trusted as approval.
+    if (select count(*)
+        from seyeon_positive_candidate.guard_negative_probes_r38 p
+        where p.attempt_id=p_attempt)<>4
+      or exists (
+        select 1
+        from (values
+          ('interpretation_unknown_reference',2,'turn_interpretation',
+            'guardSeyeonTurnInterpretationV2'),
+          ('renderer_unapproved_private_source',3,'dialogue_render',
+            'admitSeyeonRendererDraftV2'),
+          ('semantic_review_hash_mismatch',4,'semantic_review',
+            'guardSeyeonRendererOutputV2'),
+          ('semantic_review_rejected',4,'semantic_review',
+            'guardSeyeonRendererOutputV2')
+        ) expected(case_key,stage_index,purpose,guard_name)
+        left join seyeon_positive_candidate.guard_negative_probes_r38 p
+          on p.attempt_id=p_attempt
+         and p.case_key=expected.case_key
+        left join seyeon_positive_candidate.native_stage_lineage_r30 s
+          on s.attempt_id=p_attempt
+         and s.stage_index=expected.stage_index
+        where p.attempt_id is null
+          or p.stage_index is distinct from expected.stage_index
+          or p.purpose is distinct from expected.purpose
+          or p.guard_name is distinct from expected.guard_name
+          or p.call_id is distinct from s.call_id
+          or p.native_wire_digest is distinct from s.native_wire_digest
+          or p.candidate_digest !~ '^sha256:v1:[0-9a-f]{64}$'
+          or p.verdict is distinct from 'rejected'
+          or p.origin_kind is distinct from
+             'local_invalid_fixture_not_provider_output'
+          or p.provider_dispatched is distinct from false
+          or p.output_guard_verified is distinct from false
+      )
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r38_negative_guard_probe_missing';
+    end if;
+    -- R37/R38 never assert verified AI outputs: they are local synthetic
+    -- NO-PROVIDER observations and invalid-fixture guard rejections.
+    -- Even when all four negative probes, five local result markers and
+    -- five synthetic receipt ACKs exist, the real positive reply remains
+    -- unapproved. Actual Provider output provenance + independent guarded
+    -- render/review and G0 consent remain absent.
     raise exception using errcode='23514',
       constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
