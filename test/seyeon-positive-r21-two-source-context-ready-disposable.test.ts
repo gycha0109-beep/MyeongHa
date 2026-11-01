@@ -351,6 +351,96 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       lifecycle_state:'started',governor_ceiling_micro_usd:'1524',
       governor_input_bound_tokens:'500',governor_output_cap_tokens:'256',
     }]);
+    // R28's immutable DB record must correspond to the SAME governed cost
+    // row and both original edges. No full model/private bytes are stored.
+    const seals=await pool.query<{
+      source_count:number;selected_sources_digest:string;
+      final_model_context_digest:string;native_wire_digest:string;
+      input_ceiling_tokens:string;output_ceiling_tokens:string;
+      reserved_micro_usd:string;purpose:string;
+    }>(
+      'select source_count,selected_sources_digest,final_model_context_digest,native_wire_digest,input_ceiling_tokens::text,output_ceiling_tokens::text,reserved_micro_usd::text,purpose from seyeon_positive_candidate.governed_wire_reservations_r28 where call_id=$1::uuid',
+      [receipt.callId],
+    );
+    expect(seals.rows).toMatchObject([{
+      source_count:2,selected_sources_digest:source.selection.selectedSourcesDigest,
+      final_model_context_digest:hash(source.finalModelContext),
+      native_wire_digest:receipt.wireBodyDigest,
+      input_ceiling_tokens:'500',output_ceiling_tokens:'256',
+      reserved_micro_usd:'1524',purpose:'turn_interpretation',
+    }]);
+    const acl=await tx(c=>c.query<{canRead:boolean;canWrite:boolean}>(
+      'select has_table_privilege(current_user,$1::text,\'SELECT\') as "canRead",has_table_privilege(current_user,$1::text,\'INSERT\') as "canWrite"',
+      ['seyeon_positive_candidate.governed_wire_reservations_r28'],
+    ),true);
+    expect(acl.rows).toMatchObject([{canRead:false,canWrite:false}]);
+    await expect(pool.query(
+      'update seyeon_positive_candidate.governed_wire_reservations_r28 set reserved_micro_usd=1 where call_id=$1::uuid',
+      [receipt.callId],
+    )).rejects.toMatchObject({code:'23514'});
+
+    // Even with a valid G1 SourceSet and a committed G4 reservation, the
+    // actual G2 Owner cannot treat a NEVER-SENT request as successful usage.
+    const syntheticBody='r28 denied before Provider result';
+    const idSuffix=id.turn.slice(-12);
+    await tx(async client=>{
+      const generated=await client.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_generated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::jsonb,$11::text,$12::text,$13::jsonb) as ok',
+        [subject,id.turn,id.attempt,id.participant,'d8100000-0000-4000-8000-'+idSuffix,
+         'offline','offline-model','offline-renderer-r28',syntheticBody,
+         JSON.stringify({text:syntheticBody}),'chat-character-message-v1',
+         'sha256:v1:'+'b'.repeat(64),'[]'],
+      );
+      expect(generated.rows[0]?.ok).toBe(false);
+      const proofRows=await client.query<{
+        memory_id:string;original_grant_id:string;pg_payload_digest:string;
+      }>(
+        'select memory_id::text,original_grant_id::text,pg_payload_digest from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
+        [id.attempt],
+      );
+      expect(proofRows.rows).toHaveLength(2);
+      const verifiedProof={
+        schemaVersion:'offline-positive-two-original-source-proof-r25',
+        selectedSourcesDigest:source.selection.selectedSourcesDigest,
+        sources:proofRows.rows.map(r=>({
+          recordId:r.memory_id,originalGrantId:r.original_grant_id,
+          pgPayloadDigest:r.pg_payload_digest,
+        })),
+      };
+      const validated=await client.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_validated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::text,$8::text,$9::jsonb,$10::jsonb) as ok',
+        [subject,id.turn,id.attempt,'d8200000-0000-4000-8000-'+idSuffix,
+         'offline','offline-model','offline-output-guard-r28',
+         'sha256:v1:'+'b'.repeat(64),
+         JSON.stringify({passed:true,personalRecordProvenance:verifiedProof}),'[]'],
+      );
+      expect(validated.rows[0]?.ok).toBe(false);
+    },true);
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text) as receipt',
+      [subject,id.thread,id.turn,id.attempt,
+       'd8300000-0000-4000-8000-'+idSuffix,
+       'd8400000-0000-4000-8000-'+idSuffix,
+       'd8500000-0000-4000-8000-'+idSuffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:id.turn,assistantMessageId:'d8300000-0000-4000-8000-'+idSuffix,
+         userMessageId:id.user,
+       }),
+       'sha256:v1:synthetic-post-turn-r28',
+       source.selection.selectedSourcesDigest],
+    ),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_governed_cost_unsettled',
+    });
+    const withheld=await pool.query<{messages:string;outboxes:string;admissions:string}>(
+      "select (select count(*)::text from public.conversation_messages where turn_id=$1::uuid and sender_type='character') as messages,"+
+      " (select count(*)::text from public.outbox_events where aggregate_type='chat_turn' and aggregate_id=$1::text and event_type in ('CHAT_TURN_COMMITTED','SEYEON_POST_TURN_ANALYSIS_REQUESTED')) as outboxes,"+
+      " (select count(*)::text from seyeon_positive_candidate.actual_v2_commit_admissions_r3 where attempt_id=$2::uuid) as admissions",
+      [id.turn,id.attempt],
+    );
+    expect(withheld.rows[0]).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+    });
     // Same Call ID must not claim a second reservation/Provider dispatch.
     await expect(reserveSeyeonR26OfflineGovernedWireV1(beforeDispatch))
       .rejects.toBeInstanceOf(SeyeonR26OfflineG4HoldV1);
