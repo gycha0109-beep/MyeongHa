@@ -254,3 +254,13 @@
 - **저장소 확인:** 기존 DB Owner PR [#2299](https://github.com/gycha0109-beep/MyeongHa/pull/2299)(원본 구매권·Reader 결속)와 [#2301](https://github.com/gycha0109-beep/MyeongHa/pull/2301)(취소/권한 회수)은 모두 **closed / unmerged Draft**입니다. 과거 격리 CI 성공을 `main`에 합쳐진 운영 Writer로 취급하지 않습니다.
 - **구현 경계:** 이번 PR #2855의 후보 기록 함수를 S5 보호 본문·S7 기기 전송/ACK의 최종 승인된 Writer라고 주장하지 않습니다. 해당 실제 소유 경로가 `main`에서 확인된 뒤 같은 구매권·공개 트랜잭션에 결속해야 합니다.
 - **다음:** #2855의 PostgreSQL 17 결과 확인 후, 기존 S5/S7 구현을 중복 설계하지 않고 현재 `main`의 실제 사용 가능 코드를 기준으로 호출 경로·개인정보 삭제 정책을 우선 연결합니다.
+
+### 2026-11-01 — P3 실제 영수증→Reader 구매권 지급 코드 통합 작업
+
+- **방식 변경:** 작업 단위 PR/CI 대기를 중단하고, 독립 통합 작업 브랜치 `feat/commerce/operational-integration-20261101`에서 구현을 모은 다음 최종 통합 검증한다. #2855의 전달 기록 후보를 출발점으로 사용한다.
+- **선행 확인:** #2855 체크된 SHA `68deccc8`의 CI/Web/Governance 성공을 확인했으나, 아직 PR은 open이므로 병합됐다고 주장하지 않는다. 기존 DB Owner #2299/#2301은 closed/unmerged였으며 코드가 main의 현재 권한으로 활성화된 상태가 아니다.
+- **실제 구현:** 기존 DB Owner 아카이브에서 `apps/api/src/commerce-verified-reader-fulfillment.ts`, `apps/api/src/commerce-verified-reader-receipt-bind.ts`와 `tests/commerce-verified-reader-fulfillment-idempotency.test.ts`를 현재 브랜치로 이식했다. 기존 서버 검증 Receipt를 바탕으로 내부 DB에 정확한 Purchase Intent/Reader 권한을 원자적으로 결속하는 코드이며, 기존 승인된 구매역할(initial/additional), 중복 확인, 공식 Reading 재사용과 잘못된 권한 발급 거부를 보존한다.
+- **배포 금지 사유:** 이식한 함수가 호출하는 내부 DB 함수는 #2299/#2301의 미병합 SQL에 의존한다. 따라서 현재 운영에서는 직접 호출하거나 공개 API에 연결하지 않는다. 런타임/고객 결제/환불/LIVE 활성화는 아직 수행하지 않았다.
+- **충돌 처리:** DB Owner 아카이브 전체 241개 파일을 그대로 병합하면 현재 웹·Saju·보안·운영 파일 16개 충돌 및 의도치 않은 권한 확장이 발생하므로 전체 병합은 취소했다. 특히 환불 전체 취소 어댑터는 현행 PortOne 타입과 불일치해 이식 대상에서 제외하고 기존 최신 검증 흐름과 통합할 예정이다.
+- **검증 상태:** 이번 통합 브랜치의 타입/회귀/실제 DB·CI 결과는 아직 미확정. 새 작업을 모두 모은 뒤 최종 검사한다. 중간 CI 완료를 근거 없이 추정하지 않는다.
+- **다음:** 선행 SQL Writer를 현행 공식 Receipt/Reader 버전에 맞춰 통합하고, 실물 지급/취소/전달 경로를 같은 구매권·원자 잠금으로 묶는다. P0-PR-01 개인정보 삭제 그래프와 전달/청약철회 보존 규칙을 적용한 뒤 최종 통합 CI를 실행한다.
