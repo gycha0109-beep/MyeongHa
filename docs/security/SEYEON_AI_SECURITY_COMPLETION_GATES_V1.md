@@ -353,3 +353,11 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **R21 모델 선행 검사:** `seyeon-r21-offline-derived-source-closure-v1.ts`에 이미 존재하는 실제 모델 메모리 선택·검증 함수를 결속한다. 격리 후보 ContextReady로 진행하기 전 원본 Memory 2건/정확한 원래 Grant 2건/Projection digest 대응/선택된 수 2건을 요구한다. Relationship·과거 대화·Reader·Worker·외부 도구·Preflight 유입이 하나라도 발견되면 HOLD. `test/seyeon-r21-offline-derived-source-closure-v1.test.ts`와 기존 G0 참조 회귀 검증을 추가했다.
 - **경계:** 2원본 R21은 **오프라인·격리 DB 후보**로만 존재하며, 정식 운영 G1/G2의 다중 출처 불변 Pin, Model Provider, 일반 G3 공개·재조회/철회 경쟁, Reader/Saju 교차 출처, 비용·운영 승인까지 해결하지 않는다. 실제 유료 Provider/공개 Route/운영 Role/DB 마이그레이션/병합 없음. G0 미승인, G1 다중 출처 미완료, G2~G6 HOLD; `HOLD_FORWARD_STOPPED` 유지.
 - **검증:** 새 HEAD CI 및 PostgreSQL 17 결과 확인 전 GREEN 미확정.
+
+
+### 2026-11-01 · W23 · 1원본/2원본 사전 출처 검증 회귀 복구 (격리 / HOLD)
+
+- **확인된 CI:** W22 HEAD `172c59d9`의 [CI #41240656186](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240656186)는 **RED**. Work Track security와 PostgreSQL17은 성공했지만 공통 `db-authority-core`에서 기존 R23 단일 원본 커밋 테스트 11건 중 1건이 `R23_OFFLINE_G2_ATOMIC_COMMIT_HOLD`로 실패. 전체 GREEN으로 기록하지 않는다.
+- **원인 및 수정:** R21 2-Memory 고정 검사 재사용이 기존 R20/R23 1-Memory를 잘못 차단했다. R21 원본 검증에서 격리 시나리오의 정확한 허용 원본 수를 서버가 명시하도록 변경하고 R20은 기존 1/2 범위를 선택·DB 재대조하며 R23은 기존 정확한 1건만 요구한다. 1건과 2건의 수량 교차 거부 회귀 테스트를 추가했다.
+- **기존 2원본 DB 근거:** `test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql`의 R21 PostgreSQL 격리 함수는 합성 원본 Grant 2건과 SourceSet의 2개 edge를 같은 DB 트랜잭션에서 잠그고 실제 `context_ready`를 기록한다. 그러나 이 증거는 정식 운영 최종 모델 Context와 독립 권한 승인을 결합한 G1/G2 완료를 뜻하지 않는다.
+- **현재 경계:** 수정 HEAD는 새 CI 판정 전 **미검증**. PR #2761은 Draft·미병합 유지. G0 승인, 다중 출처의 실제 운영 모델 입력/DB 선행 Pin, Life Fact·파생 권한, G2 커밋 경쟁, G3 History/Reveal, Governor 비용·운영 G4~G6 모두 HOLD. 유료 Provider/공개 Route/운영 Migration/ACL 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
