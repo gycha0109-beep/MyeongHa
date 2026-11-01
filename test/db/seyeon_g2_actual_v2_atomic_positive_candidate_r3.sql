@@ -160,6 +160,9 @@ declare
   v_sources jsonb := '[]'::jsonb;
   v_expected_count integer;
   v_source_count integer := 0;
+  v_wire record;
+  v_cost record;
+  v_provider_receipt record;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if p_subject is null or p_thread is null or p_turn is null
@@ -317,6 +320,50 @@ begin
       is distinct from v_expected then
     raise exception using errcode='23514',
       constraint='seyeon_offline_r3_unbound_validation';
+  end if;
+
+  -- R28: a successful governed budget RESERVATION is NOT a dispatched
+  -- Provider call and never G2 authority. The source/wire/cost seal is
+  -- immutable and cannot be ignored when it exists on this Attempt.
+  -- R28 is an isolated bridge; it deliberately stops before approving
+  -- the other chat Provider stages (preflight/renderer/reviewer).
+  select * into v_wire
+  from seyeon_positive_candidate.governed_wire_reservations_r28 w
+  where w.attempt_id=p_attempt and w.subject_id=p_subject
+    and w.thread_id=p_thread and w.turn_id=p_turn
+  for share;
+  if found then
+    select * into v_cost from public.seyeon_ai_call_cost_events e
+    where e.call_id=v_wire.call_id and e.subject_id=p_subject
+      and e.turn_id=p_turn and e.attempt_id=p_attempt and e.phase='chat'
+    for share;
+    select * into v_provider_receipt
+    from public.seyeon_ai_provider_receipt_queue_v1 q
+    where q.call_id=v_wire.call_id and q.subject_id=p_subject
+      and q.turn_id=p_turn and q.attempt_id=p_attempt and q.phase='chat'
+    for share;
+    if v_wire.source_count is distinct from v_expected_count
+      or v_wire.selected_sources_digest is distinct from p_selection_digest
+      or v_cost.call_id is null
+      or v_cost.lifecycle_state is distinct from 'settled'
+      or v_cost.cost_status is distinct from 'estimated'
+      or v_cost.outcome is distinct from 'response_received'
+      or v_cost.governor_ceiling_micro_usd is distinct from v_wire.reserved_micro_usd
+      or v_cost.governor_input_bound_tokens is distinct from v_wire.input_ceiling_tokens
+      or v_cost.governor_output_cap_tokens is distinct from v_wire.output_ceiling_tokens
+      or v_cost.governor_effective_micro_usd>v_wire.reserved_micro_usd
+      or v_provider_receipt.call_id is null
+      or v_provider_receipt.acked_at is null
+      or v_provider_receipt.provider_event is distinct from v_cost.event_jsonb
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r28_governed_cost_unsettled';
+    end if;
+    -- Even a valid one-stage settled receipt does not prove preflight,
+    -- model-output provenance, renderer, reviewer, or last-hop approval.
+    -- No synthetic receipt may promote this offline Candidate to G2.
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
 
   insert into seyeon_positive_candidate.actual_v2_commit_admissions_r3(
