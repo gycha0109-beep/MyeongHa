@@ -58,6 +58,8 @@ export function assertSeyeonR21OfflineDerivedSourceClosureV1(input:{
   readonly envelope:SeyeonR21OfflineDerivedSourceEnvelopeV1;
   readonly retrievedMemories:readonly SeyeonRetrievedMemoryV2[];
   readonly sourceCandidates:readonly SeyeonPersonalRecordProjectionCandidateV1[];
+  /** Fixed server-owned isolated scenario: legacy one-source R23 or two-source R21. */
+  readonly expectedOriginalMemoryCount:1|2;
 }):void{
   const e=input.envelope;
   const k=['version','sourceSnapshot','preflightState',
@@ -130,12 +132,12 @@ export function assertSeyeonR21OfflineDerivedSourceClosureV1(input:{
       retrievedMemories:input.retrievedMemories,
       sourceCandidates:input.sourceCandidates,
     });
-    if(selected.selectedMemoryCount!==2
-      ||selected.selectedPersonalRecordCount!==2
-      ||selected.selectedSources.length!==2
+    if(selected.selectedMemoryCount!==input.expectedOriginalMemoryCount
+      ||selected.selectedPersonalRecordCount!==input.expectedOriginalMemoryCount
+      ||selected.selectedSources.length!==input.expectedOriginalMemoryCount
       ||selected.selectedUnpinnedDerivedSources.length!==0
       ||selected.selectedSources.some(source=>source.recordKind!=='memory')
-      ||s.personalRecordAdmissions.length!==2
+      ||s.personalRecordAdmissions.length!==input.expectedOriginalMemoryCount
       ||new Set(selected.selectedSources.map(source=>source.recordId)).size!==2
       ||new Set(selected.selectedSources.map(source=>source.grantId)).size!==2){
       throw new SeyeonR21DerivedSourceClosureHoldV1();
