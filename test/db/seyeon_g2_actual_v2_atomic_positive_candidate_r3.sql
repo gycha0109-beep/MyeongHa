@@ -361,12 +361,326 @@ begin
       or v_cost.lifecycle_state is distinct from 'settled'
       or v_cost.cost_status is distinct from 'estimated'
       or v_cost.outcome is distinct from 'response_received'
+      or v_cost.governor_receipt_pinned_at is null
+      or v_cost.governor_bucket_utc_date is distinct from v_wire.reserved_bucket_utc_date
       or v_cost.governor_ceiling_micro_usd is distinct from v_wire.reserved_micro_usd
       or v_cost.governor_input_bound_tokens is distinct from v_wire.input_ceiling_tokens
       or v_cost.governor_output_cap_tokens is distinct from v_wire.output_ceiling_tokens
+      or v_cost.estimated_cost_micro_usd is null
+      or v_cost.governor_effective_micro_usd is null
       or v_cost.governor_effective_micro_usd>v_wire.reserved_micro_usd
+      or v_cost.estimated_cost_micro_usd>v_wire.reserved_micro_usd
+      or v_cost.price_version is distinct from v_cost.governor_price_version
+      or v_cost.event_jsonb->>'callId' is distinct from v_wire.call_id::text
+      or v_cost.event_jsonb->>'outcome' is distinct from 'response_received'
+      or v_cost.event_jsonb->>'costStatus' is distinct from 'estimated'
+      or v_cost.event_jsonb->>'httpStatus' is distinct from '200'
+      or v_cost.event_jsonb->>'invoiceReconciled' is distinct from 'false'
+      or v_cost.event_jsonb->>'estimatedCostMicroUsd'
+           is distinct from v_cost.estimated_cost_micro_usd::text
+      or v_cost.event_jsonb->>'inputTokens' is null
+      or v_cost.event_jsonb->>'outputTokens' is null
+      or v_cost.event_jsonb->>'cachedInputTokens' is null
+      or v_cost.event_jsonb->>'reasoningTokens' is null
+      or coalesce(v_cost.event_jsonb->>'inputTokens' ~ '^[0-9]{1,16}
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r28_governed_cost_unsettled';
+    end if;
+    -- Even a valid one-stage settled receipt does not prove preflight,
+    -- model-output provenance, renderer, reviewer, or last-hop approval.
+    -- No synthetic receipt may promote this offline Candidate to G2.
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
+  end if;
+
+  insert into seyeon_positive_candidate.actual_v2_commit_admissions_r3(
+    attempt_id,subject_id,thread_id,turn_id,source_selection_digest,
+    record_id,original_grant_id,pg_payload_digest,source_count,source_proof_jsonb
+  ) values(p_attempt,p_subject,p_thread,p_turn,v_set.selected_sources_digest,
+           v_pin.original_memory_id,v_pin.original_grant_id,v_pin.original_raw_digest,
+           v_expected_count,v_expected);
+
+  select * into strict v_commit
+  from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+    p_subject,p_thread,p_turn,p_attempt,p_message,p_chat_outbox,
+    p_post_outbox,p_snapshot,p_snapshot_hash
+  );
+  if v_commit.turn_id is distinct from p_turn
+     or v_commit.attempt_id is distinct from p_attempt
+     or v_commit.assistant_message_id is distinct from p_message
+     or v_commit.post_turn_outbox_event_id is distinct from p_post_outbox
+     or v_commit.replayed is distinct from false then
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r3_real_v2_result_mismatch';
+  end if;
+  return jsonb_build_object(
+    'turnId',v_commit.turn_id::text,
+    'attemptId',v_commit.attempt_id::text,
+    'assistantMessageId',v_commit.assistant_message_id::text,
+    'postTurnOutboxEventId',v_commit.post_turn_outbox_event_id::text,
+    'replayed',false
+  );
+end $g2$;
+
+-- Restrict BOTH old wrapper routes for this disposable candidate;
+-- the G2 owner wrapper above alone can invoke the unchanged real v2.
+revoke execute on function public.cmd_commit_seyeon_chat_turn_runtime_v2(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text
+) from myeongha_api_executor;
+revoke all on seyeon_positive_candidate.actual_v2_commit_admissions_r3
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) from public,anon,authenticated,service_role;
+grant execute on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) to myeongha_api_executor;
+
+do $acl$
+begin
+  if has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)','EXECUTE')
+    or has_table_privilege('myeongha_api_executor',
+      'seyeon_positive_candidate.actual_v2_commit_admissions_r3','INSERT')
+    or has_function_privilege('public',
+      'seyeon_positive_candidate.commit_actual_v2_r3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text)','EXECUTE')
+  then
+    raise exception 'offline actual v2 candidate accidentally leaked direct Commit capability';
+  end if;
+end $acl$;
+commit;
+\echo 'PASS: disposable G2 actual v2 atomic original Grant admission + zero-only-preserving 1640 candidate installed; Production untouched'
+,false)=false
+      or coalesce(v_cost.event_jsonb->>'outputTokens' ~ '^[0-9]{1,16}
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r28_governed_cost_unsettled';
+    end if;
+    -- Even a valid one-stage settled receipt does not prove preflight,
+    -- model-output provenance, renderer, reviewer, or last-hop approval.
+    -- No synthetic receipt may promote this offline Candidate to G2.
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
+  end if;
+
+  insert into seyeon_positive_candidate.actual_v2_commit_admissions_r3(
+    attempt_id,subject_id,thread_id,turn_id,source_selection_digest,
+    record_id,original_grant_id,pg_payload_digest,source_count,source_proof_jsonb
+  ) values(p_attempt,p_subject,p_thread,p_turn,v_set.selected_sources_digest,
+           v_pin.original_memory_id,v_pin.original_grant_id,v_pin.original_raw_digest,
+           v_expected_count,v_expected);
+
+  select * into strict v_commit
+  from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+    p_subject,p_thread,p_turn,p_attempt,p_message,p_chat_outbox,
+    p_post_outbox,p_snapshot,p_snapshot_hash
+  );
+  if v_commit.turn_id is distinct from p_turn
+     or v_commit.attempt_id is distinct from p_attempt
+     or v_commit.assistant_message_id is distinct from p_message
+     or v_commit.post_turn_outbox_event_id is distinct from p_post_outbox
+     or v_commit.replayed is distinct from false then
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r3_real_v2_result_mismatch';
+  end if;
+  return jsonb_build_object(
+    'turnId',v_commit.turn_id::text,
+    'attemptId',v_commit.attempt_id::text,
+    'assistantMessageId',v_commit.assistant_message_id::text,
+    'postTurnOutboxEventId',v_commit.post_turn_outbox_event_id::text,
+    'replayed',false
+  );
+end $g2$;
+
+-- Restrict BOTH old wrapper routes for this disposable candidate;
+-- the G2 owner wrapper above alone can invoke the unchanged real v2.
+revoke execute on function public.cmd_commit_seyeon_chat_turn_runtime_v2(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text
+) from myeongha_api_executor;
+revoke all on seyeon_positive_candidate.actual_v2_commit_admissions_r3
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) from public,anon,authenticated,service_role;
+grant execute on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) to myeongha_api_executor;
+
+do $acl$
+begin
+  if has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)','EXECUTE')
+    or has_table_privilege('myeongha_api_executor',
+      'seyeon_positive_candidate.actual_v2_commit_admissions_r3','INSERT')
+    or has_function_privilege('public',
+      'seyeon_positive_candidate.commit_actual_v2_r3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text)','EXECUTE')
+  then
+    raise exception 'offline actual v2 candidate accidentally leaked direct Commit capability';
+  end if;
+end $acl$;
+commit;
+\echo 'PASS: disposable G2 actual v2 atomic original Grant admission + zero-only-preserving 1640 candidate installed; Production untouched'
+,false)=false
+      or coalesce(v_cost.event_jsonb->>'cachedInputTokens' ~ '^[0-9]{1,16}
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r28_governed_cost_unsettled';
+    end if;
+    -- Even a valid one-stage settled receipt does not prove preflight,
+    -- model-output provenance, renderer, reviewer, or last-hop approval.
+    -- No synthetic receipt may promote this offline Candidate to G2.
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
+  end if;
+
+  insert into seyeon_positive_candidate.actual_v2_commit_admissions_r3(
+    attempt_id,subject_id,thread_id,turn_id,source_selection_digest,
+    record_id,original_grant_id,pg_payload_digest,source_count,source_proof_jsonb
+  ) values(p_attempt,p_subject,p_thread,p_turn,v_set.selected_sources_digest,
+           v_pin.original_memory_id,v_pin.original_grant_id,v_pin.original_raw_digest,
+           v_expected_count,v_expected);
+
+  select * into strict v_commit
+  from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+    p_subject,p_thread,p_turn,p_attempt,p_message,p_chat_outbox,
+    p_post_outbox,p_snapshot,p_snapshot_hash
+  );
+  if v_commit.turn_id is distinct from p_turn
+     or v_commit.attempt_id is distinct from p_attempt
+     or v_commit.assistant_message_id is distinct from p_message
+     or v_commit.post_turn_outbox_event_id is distinct from p_post_outbox
+     or v_commit.replayed is distinct from false then
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r3_real_v2_result_mismatch';
+  end if;
+  return jsonb_build_object(
+    'turnId',v_commit.turn_id::text,
+    'attemptId',v_commit.attempt_id::text,
+    'assistantMessageId',v_commit.assistant_message_id::text,
+    'postTurnOutboxEventId',v_commit.post_turn_outbox_event_id::text,
+    'replayed',false
+  );
+end $g2$;
+
+-- Restrict BOTH old wrapper routes for this disposable candidate;
+-- the G2 owner wrapper above alone can invoke the unchanged real v2.
+revoke execute on function public.cmd_commit_seyeon_chat_turn_runtime_v2(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text
+) from myeongha_api_executor;
+revoke all on seyeon_positive_candidate.actual_v2_commit_admissions_r3
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) from public,anon,authenticated,service_role;
+grant execute on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) to myeongha_api_executor;
+
+do $acl$
+begin
+  if has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)','EXECUTE')
+    or has_table_privilege('myeongha_api_executor',
+      'seyeon_positive_candidate.actual_v2_commit_admissions_r3','INSERT')
+    or has_function_privilege('public',
+      'seyeon_positive_candidate.commit_actual_v2_r3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text)','EXECUTE')
+  then
+    raise exception 'offline actual v2 candidate accidentally leaked direct Commit capability';
+  end if;
+end $acl$;
+commit;
+\echo 'PASS: disposable G2 actual v2 atomic original Grant admission + zero-only-preserving 1640 candidate installed; Production untouched'
+,false)=false
+      or coalesce(v_cost.event_jsonb->>'reasoningTokens' ~ '^[0-9]{1,16}
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r28_governed_cost_unsettled';
+    end if;
+    -- Even a valid one-stage settled receipt does not prove preflight,
+    -- model-output provenance, renderer, reviewer, or last-hop approval.
+    -- No synthetic receipt may promote this offline Candidate to G2.
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
+  end if;
+
+  insert into seyeon_positive_candidate.actual_v2_commit_admissions_r3(
+    attempt_id,subject_id,thread_id,turn_id,source_selection_digest,
+    record_id,original_grant_id,pg_payload_digest,source_count,source_proof_jsonb
+  ) values(p_attempt,p_subject,p_thread,p_turn,v_set.selected_sources_digest,
+           v_pin.original_memory_id,v_pin.original_grant_id,v_pin.original_raw_digest,
+           v_expected_count,v_expected);
+
+  select * into strict v_commit
+  from public.cmd_commit_seyeon_chat_turn_runtime_v2(
+    p_subject,p_thread,p_turn,p_attempt,p_message,p_chat_outbox,
+    p_post_outbox,p_snapshot,p_snapshot_hash
+  );
+  if v_commit.turn_id is distinct from p_turn
+     or v_commit.attempt_id is distinct from p_attempt
+     or v_commit.assistant_message_id is distinct from p_message
+     or v_commit.post_turn_outbox_event_id is distinct from p_post_outbox
+     or v_commit.replayed is distinct from false then
+    raise exception using errcode='23514',
+      constraint='seyeon_offline_r3_real_v2_result_mismatch';
+  end if;
+  return jsonb_build_object(
+    'turnId',v_commit.turn_id::text,
+    'attemptId',v_commit.attempt_id::text,
+    'assistantMessageId',v_commit.assistant_message_id::text,
+    'postTurnOutboxEventId',v_commit.post_turn_outbox_event_id::text,
+    'replayed',false
+  );
+end $g2$;
+
+-- Restrict BOTH old wrapper routes for this disposable candidate;
+-- the G2 owner wrapper above alone can invoke the unchanged real v2.
+revoke execute on function public.cmd_commit_seyeon_chat_turn_runtime_v2(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text
+) from myeongha_api_executor;
+revoke all on seyeon_positive_candidate.actual_v2_commit_admissions_r3
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) from public,anon,authenticated,service_role;
+grant execute on function seyeon_positive_candidate.commit_actual_v2_r3(
+  uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text
+) to myeongha_api_executor;
+
+do $acl$
+begin
+  if has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v1(uuid,uuid,uuid,uuid,uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.cmd_commit_seyeon_chat_turn_runtime_v2(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)','EXECUTE')
+    or has_table_privilege('myeongha_api_executor',
+      'seyeon_positive_candidate.actual_v2_commit_admissions_r3','INSERT')
+    or has_function_privilege('public',
+      'seyeon_positive_candidate.commit_actual_v2_r3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text)','EXECUTE')
+  then
+    raise exception 'offline actual v2 candidate accidentally leaked direct Commit capability';
+  end if;
+end $acl$;
+commit;
+\echo 'PASS: disposable G2 actual v2 atomic original Grant admission + zero-only-preserving 1640 candidate installed; Production untouched'
+,false)=false
+      or (v_cost.event_jsonb->>'inputTokens')::numeric>v_wire.input_ceiling_tokens
+      or (v_cost.event_jsonb->>'outputTokens')::numeric>v_wire.output_ceiling_tokens
+      or (v_cost.event_jsonb->>'cachedInputTokens')::numeric>
+           (v_cost.event_jsonb->>'inputTokens')::numeric
+      or (v_cost.event_jsonb->>'reasoningTokens')::numeric>
+           (v_cost.event_jsonb->>'outputTokens')::numeric
       or v_provider_receipt.call_id is null
       or v_provider_receipt.acked_at is null
+      or v_provider_receipt.claim_token is not null
+      or v_provider_receipt.claimed_until is not null
+      or v_provider_receipt.price_version is distinct from v_cost.governor_price_version
       or v_provider_receipt.provider_event is distinct from v_cost.event_jsonb
     then
       raise exception using errcode='23514',
