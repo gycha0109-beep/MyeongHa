@@ -39,7 +39,7 @@ npx --yes supabase@2.122.0 init >"$stack_dir/cli-init.log" 2>&1 || fail 'Local C
 
 # Auth, Storage, PostgREST, API gateway and PostgreSQL are required.
 # Omit unused memory-heavy local services; never ignore stack health checks.
-if ! npx --yes supabase@2.122.0 start -x studio,inbucket,realtime,analytics,vector,imgproxy >"$stack_dir/cli-start.log" 2>&1; then
+if ! npx --yes supabase@2.122.0 start -x imgproxy,realtime,edge-runtime,vector,studio,postgres-meta,mailpit,logflare >"$stack_dir/cli-start.log" 2>&1; then
   fail 'Local-only Supabase Auth/Storage stack failed to start. No Hosted resources were used.'
 fi
 
