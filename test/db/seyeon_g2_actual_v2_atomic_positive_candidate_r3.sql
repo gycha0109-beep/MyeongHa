@@ -474,9 +474,41 @@ begin
       raise exception using errcode='23514',
         constraint='seyeon_offline_r30_all_stage_cost_settlement_unproven';
     end if;
-    -- Matching five metadata-stage and settled Cost rows STILL cannot
-    -- authorize actual inference output or user disclosure. G0 full private
-    -- provenance, full Preflight and Output Guard attestation remain missing.
+    -- R37: all FIVE stage outcomes must have an exact immutable local
+    -- observation tied to the same native Call, purpose, stage and wire.
+    -- These are explicitly synthetic NO-PROVIDER/NO-OUTPUT-GUARD markers.
+    -- Even when all five exist they MUST NOT authorize real Commit/Reveal.
+    if (select count(*)
+        from seyeon_positive_candidate.synthetic_stage_results_r37 r
+        where r.attempt_id=p_attempt)<>5
+      or exists(
+        select 1
+        from seyeon_positive_candidate.native_stage_lineage_r30 s
+        left join seyeon_positive_candidate.synthetic_stage_results_r37 r
+          on r.attempt_id=s.attempt_id
+         and r.stage_index=s.stage_index
+        where s.attempt_id=p_attempt and (
+          r.attempt_id is null
+          or r.call_id is distinct from s.call_id
+          or r.purpose is distinct from s.purpose
+          or r.native_wire_digest is distinct from s.native_wire_digest
+          or r.synthetic_payload_digest
+               !~ '^sha256:pg-jsonb:v1:[a-f0-9]{64}$'
+          or r.origin_kind is distinct from 'local_synthetic_no_provider'
+          or r.provider_dispatched is distinct from false
+          or r.provider_output_verified is distinct from false
+          or r.output_guard_verified is distinct from false
+        )
+      )
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r37_stage_result_lineage_incomplete';
+    end if;
+    -- R37 is NOT evidence that a Provider generated or a validator accepted
+    -- an inference result. Matching five synthetic local-result records and
+    -- settled synthetic costs STILL cannot authorize a real G2 Commit.
+    -- G0 full private provenance, all actual outputs, actual Preflight and
+    -- Character/semantic Output Guard attestation remain absent.
     raise exception using errcode='23514',
       constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
