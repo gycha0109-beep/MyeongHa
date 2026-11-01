@@ -28,3 +28,12 @@ Watchtower-Track: security
 
 - `test/seyeon-zero-source-census-production-contract-v1.test.ts`: 실제 서버 선택 결과(10개 항목), zeroProof(14개 항목), 빈 출처 SHA-256, 역할 복원 및 운영 SQL 보안 계약 검증.
 - 실 사용자 개인 대화 본문을 fixture/로그에 사용하지 않으며, 추가 유료 호출을 자동 실행하지 않는다.
+
+## 2026-11-01 후속 보정 — 최신 12개 선택 항목
+
+- CI #41241214634 / `Work Track · security`에서 `uses the currently generated exact ten-key selection shape` 1건 실패. 런타임은 `selectedCurrentUserSource`, `selectedUnpinnedRecentSources`를 추가한 **12개** 선택 항목을 생성하며, 기존 운영 DB는 10개만 수용한다.
+- 신규 독립 적용 스크립트: `scripts/operations/seyeon-security-s0/production-18-zero-source-current-user-pin-20261101.sql`. 먼저 설치된 10개 계약, 함수 소유자·실행 권한·역할 상태를 확인한 후 12개 계약으로 한정 교체한다.
+- 기존 기억 0건/파생 출처 0건의 제한 유지. 새 `selectedUnpinnedRecentSources`는 정확히 빈 배열이어야 하고, `selectedCurrentUserSource`는 같은 Subject·Thread·Turn의 미삭제 사용자 메시지 하나를 가리켜야 한다. PostgreSQL에서 원문 정규화 SHA-256과 전체 모델 출처 집계 SHA-256을 독립 재계산하고 두 값 모두 서버 선택 증명과 일치해야 한다.
+- 기존 1640 migration과 이미 적용된 production-17 스크립트는 수정하지 않는다. 임시 스키마 CREATE/역할 전환은 단일 트랜잭션에서 복원되고 운영 메시지·비용 원장은 변경하지 않는다.
+- **상태:** 코드 브랜치 반영. 실제 Production SQL 적용, 보안 CI 통과, GLM 첫 답장, HTTP ACK 및 정산 결과는 별도 증거가 나올 때까지 미확정.
+- **범위 제한:** 기존 과거 메시지가 포함된 연속 대화는 아직 허용하지 않는다. 이후에는 과거 User/Assistant 메시지도 원본 DB·접근권한과 정확하게 대조하는 별도 승격이 필요하다.
