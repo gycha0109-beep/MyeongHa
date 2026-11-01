@@ -116,6 +116,7 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       envelope:input.sourceEnvelope,
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
+      expectedOriginalMemoryCount:1,
     });
     // G1→G2: close the otherwise unobserved final assembled packet gap.
     // The same zero-derived/preflight-not-run envelope must describe the
