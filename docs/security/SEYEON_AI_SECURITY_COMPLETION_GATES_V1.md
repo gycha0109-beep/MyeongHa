@@ -442,3 +442,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 
 - 모든 W26–W31 보안 구현 및 격리 테스트를 단일 누적 커밋으로 Draft PR #2761에 fast-forward 반영했다. 최초 Git ref 동기화 시점에는 해당 SHA에서의 GitHub Actions CI 실행 기록이 확인되지 않았다.
 - 이 문서 변경은 **실제 승인·검증 결과가 아니라** 최종 PR 동기화 이벤트를 통해 CI를 시작하기 위한 비기능적 기록이다. 테스트 성공·실제 Provider 호출·운영 공개·PR 병합을 추정하지 않으며, 실행 결과가 확인되기 전까지 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W33 · G4 두 독립 PostgreSQL 세션: 원본 권한 철회 ↔ 실제 예산 예약 선형화 (격리 / HOLD)
+
+- **실제 G4 경쟁 검증 추가:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에 R33 합성 격리 두 시나리오를 구현. 각 시나리오는 **별도 원본 Memory/정확한 Original Grant 두 건** 및 실제 DB ContextReady를 새 Attempt에 Pin한 뒤, 실제 `createOpenAiSeyeonStructuredProviderV1`의 네이티브 wire를 받은 직후 Provider fetch를 무조건 차단한다. DB에서 `claim_governed_stage_r32`(원본 DB lock → R30 wire 영수증 → 실제 Governor Cost Start)를 서로 독립된 PostgreSQL 접속 두 개로 실행하고, 제3 DB 접속에서 `pg_stat_activity.wait_event_type='Lock'`을 확인해 **실제 잠금 충돌**을 검증한다. 자바스크립트 시간 지연만으로 경쟁을 가정하지 않는다.
+- **철회 먼저:** 철회 Transaction이 Subject를 먼저 `FOR UPDATE`로 잠그고 두 번째 원래 Grant를 폐기하는 동안 비용 예약 Transaction이 차단됨을 확인한다. 철회 COMMIT 뒤에는 `seyeon_r30_original_grant_revoked`로 입장 자체가 실패해야 하며 **Stage marker 0, Cost Ledger 0, 기존 일별 예산 점유 불변**이다. 사전에 확정한 R21 G1 출처/ContextReady는 취소된 Grant에 대한 영구적 호출권으로 해석하지 않는다.
+- **예약 먼저:** 반대로 R32 입장 측이 Subject→Thread→Turn→Attempt→원본 Grant/Memory lock을 확보해 **Stage 0 + 1,524 microUSD 보수적 예약을 동일 DB Transaction에서 확정하기 전까지** 철회 Transaction이 실제 Subject 잠금에서 기다리도록 구성한다. 예약 COMMIT 뒤 철회가 원래 두 번째 Grant를 폐기한다. 기존 미송신 예약 1건은 마음대로 환불하지 않고 유지한다. **다음 Stage는 새로운 Call ID라도** 동일한 폐기 원본 Grant 때문에 실패하며 Stage 1 추가 기록 0, Cost Ledger 추가 0, 예산 추가 점유 0이다.
+- **재승인 우회 금지:** 두 번째 Memory에 새로운 별개 Grant를 재발급한 뒤에도 기존 Attempt의 불변 `original_grant_id`는 바뀌지 않으므로 다음 모델 Stage는 동일한 철회 오류로 중단되어야 한다. 신규 Grant가 옛 Attempt의 G1 Pin을 복원할 수 없다.
+- **운영 경계:** R33은 **격리 테스트만 추가**하며 새 Production migration, Provider dispatch, 비용 정책 시딩, HTTP Reveal/History, 사용자 개인정보 이관 및 G2 공개권한은 전혀 변경하지 않는다. R31 최종 격리 G2 실행권한 회수 후 운영은 계속 `HOLD_FORWARD_STOPPED`이다. 구버전 PR의 CI 그린 사용자 보고는 참고하되 **이번 R33 신규 HEAD의 실제 CI 및 두 독립 PostgreSQL 세션 PASS는 아직 미확정**으로 남긴다.
