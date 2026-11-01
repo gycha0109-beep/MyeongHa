@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 
 const workflow = readFileSync('.github/workflows/postgres-isolated-rls-capacity-acceptance.yml', 'utf8');
 const runner = readFileSync('scripts/operations/run-isolated-postgres-phase7-phase11-ci.sh', 'utf8');
+const rlsFixture = readFileSync('test/postgres-subject-rls-isolated-phase7.test.ts', 'utf8');
+const capacityProbe = readFileSync('scripts/operations/measure-isolated-postgres-capacity-phase11.mjs', 'utf8');
 
 describe('isolated PG18 actual authority and capacity workflow', () => {
   it('is manual, exact main, read-only, and without Production credentials', () => {
@@ -35,6 +37,14 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(runner).toContain('.totalRequested == 96');
     expect(runner).toContain('.observations[3].acquireTimeouts > 0');
     expect(runner).toContain('postSaturationRecovery == true');
+  });
+
+  it('uses a private Unix socket directory per synthetic PostgreSQL instance on Linux', () => {
+    expect(rlsFixture).toContain("process.platform === 'win32' ? '' : ' -c unix_socket_directories='+dir");
+    expect(capacityProbe).toContain("process.platform === 'win32' ? '' : ' -c unix_socket_directories=' + dataDir");
+    expect(rlsFixture).toContain("'127.0.0.1'");
+    expect(capacityProbe).toContain("'127.0.0.1'");
+    expect(runner).toContain("PG_BIN_DIR:-");
   });
 
   it('always blocks Production and service-resumption claims even on evidence PASS', () => {
