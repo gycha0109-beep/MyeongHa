@@ -13,7 +13,8 @@ type Options={general?:boolean;privileged?:boolean;readOnly?:boolean;
   missing?:boolean;many?:boolean;conflict?:boolean};
 function fixture(options:Options={}){
   const statements:{sql:string;args:readonly unknown[]|undefined}[]=[];
-  const pool:PostgresSubjectPoolV1={
+  // Vitest generic SQL mock is runtime-valid; its generic return cannot be inferred by TS.
+  const pool={
     connect:vi.fn(async()=>({
       query:vi.fn(async<T=Record<string,unknown>>(sql:string,args?:readonly unknown[])=>{
         statements.push({sql,args});
@@ -42,7 +43,7 @@ function fixture(options:Options={}){
       release:vi.fn(),
     })),
   };
-  return {pool,statements};
+  return {pool:pool as unknown as PostgresSubjectPoolV1,statements};
 }
 describe('operations-only Reader withdrawal review / exact refund handoff',()=>{
   it('is never a public, automated legal or money event',()=>{

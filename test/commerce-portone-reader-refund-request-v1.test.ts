@@ -32,7 +32,8 @@ function fixture(){
   let recordCount=0;
   let confirmCount=0;
   const statements: string[]=[];
-  const pool:PostgresSubjectPoolV1={
+  // Vitest generic SQL mock is runtime-valid; its generic return cannot be inferred by TS.
+  const pool={
     connect:vi.fn(async()=>({
       query:vi.fn(async(sql:string, args?:unknown[])=>{
         statements.push(sql);
@@ -67,7 +68,7 @@ function fixture(){
       }),
       release:vi.fn(),
     })),
-  };
+  } as unknown as PostgresSubjectPoolV1;
   const fetchImpl=vi.fn<ReaderPrivateRefundFetchV1>(async()=>{
     return {
       status:200,headers:{get:(key)=>key==='content-type'?'application/json':null},
@@ -76,10 +77,10 @@ function fixture(){
   });
   const verifier={verifyFullCancellation:vi.fn(async()=>proof)};
   const run=()=>executePrivatelyAuthorizedReaderFullRefundV1({
-    pool,authorizationId:auth,apiSecret:'private-service-api-secret-12345',
+    pool:pool as unknown as PostgresSubjectPoolV1,authorizationId:auth,apiSecret:'private-service-api-secret-12345',
     fetchImpl,verifier,
   });
-  return {pool,fetchImpl,verifier,run,statements,
+  return {pool:pool as unknown as PostgresSubjectPoolV1,fetchImpl,verifier,run,statements,
     get state(){return state},
     get recordCount(){return recordCount},
     get confirmCount(){return confirmCount},
@@ -192,7 +193,7 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
     });
     expect(result.kind).toBe('confirmed_revoked');
     expect(lookupFetchImpl).toHaveBeenCalledTimes(1);
-    const [url,init]=lookupFetchImpl.mock.calls[0]!;
+    const [url,init]=lookupFetchImpl.mock.calls[0] as unknown as [string, {method:string;redirect:string}];
     expect(url).toBe('https://api.portone.io/payments/read-payment-001');
     expect(init).toMatchObject({method:'GET',redirect:'manual'});
     expect(f.fetchImpl).toHaveBeenCalledTimes(1);

@@ -374,3 +374,11 @@
 - **로컬 검사 결과:** 기존 Reader·구매권·환불·고객 접수·운영자 인계 대상 **13개 테스트 파일 154/154 PASS**, 서버 빌드 TypeScript PASS, 웹앱 TypeScript PASS, 수정 PG17 검사용 Bash 스크립트 문법 PASS, 변경 공백 검사 PASS. 실제 PostgreSQL 17 실행·공식 전체 CI는 **아직 미실행**입니다.
 - **환경 제한:** 집 PC의 PostgreSQL 18을 사용해 운영 DB와 완전히 격리된 임시 클러스터를 생성했으나, 클라이언트 접속 시 PostgreSQL 18 서버 프로세스가 `0xC0000142`로 비정상 종료되어 실제 SQL 검증을 수행하지 못했습니다. Docker Linux 엔진도 연결되지 않았습니다. PostgreSQL 18 오류를 SQL 성공/실패로 추정하지 않으며, PostgreSQL 17 자체는 아직 검증되지 않았습니다.
 - **남은 작업:** 마지막 CI에서 신규 마이그레이션의 실제 PG17 적용·계정 삭제·고객 청약철회·Provider event/Receipt·운영권한 회수·Reader 접근 회귀를 확인해야 합니다. P2 판매 가능 Offer/Charge Terms 및 사주 Production 공급, S5/S7 실제 전달, 정책/결제사 LIVE 준비는 이 로컬 코드 연결 결과만으로 충족되었다고 판정하지 않습니다. 현재 운영 DB 변경, 실제 환불, 라이브 결제 활성화는 하지 않았습니다.
+
+### 2026-11-02 — PR #2869 통합 CI 실패 1차 원인 분석 및 수정
+
+- **실제 실패 판독:** [PR #2869](https://github.com/gycha0109-beep/MyeongHa/pull/2869)의 Governance 및 CI 검증이 FAILED. Web/Mobile PR 검증은 PASS. Governance는 신규 1790/1800 Entitlement Outbox Writer가 계정 삭제 전송자 등록 목록에 빠진 것이 직접 원인. CI의 shared TypeScript check는 새 단위 테스트 4개에서 Vitest generic SQL mock과 실제 Postgres 인터페이스 타입 충돌. DB authority-core는 신규 Reader/S4/고객 Claim의 Subject 직접 FK 6개가 고정 30개 FK 목록 외에 존재하기 때문. Content/Postgres17은 이전 synthetic official Reader fixture가 신규 Reader 선잠금 요구에 미적합. Runtime/Commerce/Entitlement 다수 구형 DB test도 충돌해 전부 PASS로 추정할 수 없음.
+- **수정 완료 — Governance:** `scripts/verify-account-deletion-finalization-preflight.mjs`가 기존 Entitlement Subject-bound Outbox 가드를 변경하지 않고 1790/1800 Writer를 정확한 추가 출처로 검증하도록 업데이트. 로컬 Governance preflight PASS.
+- **수정 완료 — shared TypeScript:** 4개 신규 환불/접수 테스트의 비일반화된 SQL 모의 구현만 테스트 범위에서 타입 어댑팅하고, 환불 재조회 mock 호출 인자 타입 확인을 정정. Production TypeScript 코드는 변경하지 않음. 집 PC의 다른 작업 폴더 공유 node_modules로 인해 나타나는 모바일 사설 타입 경로 충돌은 별개의 로컬 환경 문제로 구분.
+- **수정 완료 — Subject FK 목록:** P0-PR-01 원본 30개 삭제 그래프를 수정하지 않고, Reader S3/S4/S7 및 고객 청약철회 등 새 단독 개인정보 테이블의 정확한 Subject FK 6개를 `subject_owned_data_graph_catalog_guard.sh`에 명시적으로 등록. 새 6개 중 하나라도 빠지거나 승인되지 않은 7번째 FK가 생기면 실패하도록 보존. **기존 S4 개인정보 제거·외부 암호키 경계 실제 DB 검증은 계속 필수**이며 목록 등록 자체는 삭제의 충분조건이 아님.
+- **중단·남은 문제:** 신규 Reader 선잠금 계약과 과거 synthetic DB fixture의 호환성 및 PostgreSQL 15/17 여러 DB suite 실패는 아직 해결되지 않음. 기존 강화된 잠금 규칙을 CI에 맞추려고 해제하지 않음. 모든 로컬 코드 수정은 PR 후속 커밋으로 제출 후 그 SHA의 CI 결과를 반드시 새로 확인해야 하며, 구 CI 재실행 성공으로 추정하지 않는다. LIVE와 실제 환불은 OFF.

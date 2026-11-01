@@ -28,7 +28,8 @@ function fixture(options:{
 }={}){
   const queries:{sql:string;args:unknown[]|undefined}[]=[];
   const release=vi.fn();
-  const pool:PostgresSubjectPoolV1={
+  // Vitest generic SQL mock is runtime-valid; its generic return cannot be inferred by TS.
+  const pool={
     connect:vi.fn(async()=>({
       query:vi.fn(async<Row=Record<string,unknown>>(sql:string,args?:unknown[])=>{
         queries.push({sql,args});
@@ -58,7 +59,7 @@ function fixture(options:{
       release,
     })),
   };
-  return {pool,queries,release};
+  return {pool:pool as unknown as PostgresSubjectPoolV1,queries,release};
 }
 describe('operator-adjudicated private Reader refund intake',()=>{
   it('does not mount public refund or create an automatic legal decision',()=>{

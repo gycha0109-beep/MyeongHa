@@ -34,6 +34,9 @@ const expectedProducerFiles = [
   '1080_entitlement_effect_apply_v1.sql',
   '1470_seyeon_relationship_sync_outbox_v1.sql',
   '1500_seyeon_post_turn_analysis_runtime_v1.sql',
+  // New verified-Receipt Reader guards replace the same entitlement writer.
+  '1790_official_reader_legacy_provider_effect_scope_guard_v1.sql',
+  '1800_official_reader_receipt_grant_prelocked_scope_guard_v1.sql',
 ];
 
 if (JSON.stringify(producerFiles) !== JSON.stringify(expectedProducerFiles)) {
@@ -80,6 +83,18 @@ for (const [path, aggregateType] of [
     fail(path + ' must bind top-level payload_jsonb.subjectId to canonical Subject');
   }
 }
+for (const name of [
+  '1790_official_reader_legacy_provider_effect_scope_guard_v1.sql',
+  '1800_official_reader_receipt_grant_prelocked_scope_guard_v1.sql',
+]) {
+  const text = await readFile('supabase/migrations/' + name, 'utf8');
+  const inserts = (text.match(/insert\s+into\s+public\.outbox_events\b/gi) || []).length;
+  if (inserts !== 1 || !text.includes("'entitlement'") ||
+      !text.includes("'subjectId', v_grant.subject_id::text")) {
+    fail(name + ' not accounted for in canonical Subject outbox preflight');
+  }
+}
+
 if (!migration.includes("oe.payload_jsonb ->> 'subjectId' = p_subject_id::text")) {
   fail('preflight lost canonical payload_jsonb.subjectId fallback for governed outbox producers');
 }

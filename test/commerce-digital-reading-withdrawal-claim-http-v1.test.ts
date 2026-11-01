@@ -20,7 +20,8 @@ type FixtureOptions={subject?:string; deny?:boolean; replayed?:boolean; missing?
   status?:'received'|'refund_decision_recorded'|'refund_processing'|'refund_confirmed';};
 function fixture(options:FixtureOptions={}){
   const queries:{sql:string;values:readonly unknown[]|undefined}[]=[];
-  const pool:PostgresSubjectPoolV1={connect:vi.fn(async()=>({
+  // Vitest generic SQL mock is runtime-valid; its generic return cannot be inferred by TS.
+  const pool={connect:vi.fn(async()=>({
     query:vi.fn(async<Row=Record<string,unknown>>(sql:string,values?:readonly unknown[])=>{
       queries.push({sql,values});
       if(sql==='BEGIN'||sql==='COMMIT'||sql==='ROLLBACK'
@@ -61,8 +62,8 @@ function fixture(options:FixtureOptions={}){
     });
   }
   const run=(req=request(),enabled=true)=>handle({request:req,
-    identityEvidenceVerifier:verifier,pool,enabled,idempotencySecret:secret});
-  return {pool,verifier,queries,request,run};
+    identityEvidenceVerifier:verifier,pool:pool as unknown as PostgresSubjectPoolV1,enabled,idempotencySecret:secret});
+  return {pool:pool as unknown as PostgresSubjectPoolV1,verifier,queries,request,run};
 }
 describe('buyer exact paid Reader withdrawal intake',()=>{
   it('never auto-enables an intake, refund, payment or legal approval',()=>{
