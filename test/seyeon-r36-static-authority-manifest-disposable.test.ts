@@ -98,6 +98,18 @@ describe.skipIf(!enabled)('R36 approved-code-only Interpreter static Owner manif
       await writer.query('ROLLBACK').catch(()=>undefined);
       writer.release();
     }
+    const deleter=await pool.connect();
+    try{
+      await deleter.query('BEGIN');
+      await expect(deleter.query(
+        'delete from '+tableName,
+      )).rejects.toMatchObject({
+        code:'23514',constraint:'offline_source_set_immutable',
+      });
+    }finally{
+      await deleter.query('ROLLBACK').catch(()=>undefined);
+      deleter.release();
+    }
     const reader=await pool.connect();
     try{
       await reader.query('BEGIN');
