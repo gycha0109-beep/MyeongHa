@@ -6,6 +6,7 @@ import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-ex
 import {createSeyeonAttemptZeroPersonalProofV1} from '../apps/api/src/seyeon-attempt-zero-personal-proof-v1.js';
 
 const repair=readFileSync(new URL('../scripts/operations/seyeon-security-s0/production-17-zero-source-selection-census-pin-20261101.sql',import.meta.url),'utf8');
+const currentSourceRepair=readFileSync(new URL('../scripts/operations/seyeon-security-s0/production-18-zero-source-current-user-pin-20261101.sql',import.meta.url),'utf8');
 const original=readFileSync(new URL('../supabase/migrations/1640_seyeon_zero_personal_source_pre_model_pin_v1.sql',import.meta.url),'utf8');
 const digest=(value:unknown)=>'sha256:v1:'+createHash('sha256').update(canonicalJson(value)).digest('hex');
 const ids={
@@ -16,25 +17,58 @@ const ids={
 };
 
 describe('production zero-source G1 selection census compatibility',()=>{
-  it('uses the currently generated exact ten-key selection shape',()=>{
+  it('uses the currently generated exact twelve-key selection shape',()=>{
     const selection=selectSeyeonExactModelPersonalSourcesV1({
       retrievedMemories:[],sourceCandidates:[],requiredPersonalRecordCount:0,
     });
     expect(Object.keys(selection).sort()).toEqual([
       'permitsAtomicCommit','permitsHttpReveal','persistedBeforeModel',
-      'selectedMemoryCount','selectedModelSourceCensusDigest',
+      'selectedMemoryCount','selectedCurrentUserSource','selectedUnpinnedRecentSources',
+      'selectedModelSourceCensusDigest',
       'selectedPersonalRecordCount','selectedSources','selectedSourcesDigest',
       'selectedUnpinnedDerivedSources','version',
     ].sort());
     expect(selection.selectedSources).toEqual([]);
+    expect(selection.selectedCurrentUserSource).toBeNull();
+    expect(selection.selectedUnpinnedRecentSources).toEqual([]);
     expect(selection.selectedUnpinnedDerivedSources).toEqual([]);
     expect(selection.selectedMemoryCount).toBe(0);
     expect(selection.selectedSourcesDigest).toBe(digest([]));
     expect(selection.selectedModelSourceCensusDigest).toBe(digest({
-      originalPersonalSources:[],unpinnedDerivedSources:[],
+      originalPersonalSources:[],currentUserSource:null,
+      unpinnedRecentSources:[],unpinnedDerivedSources:[],
     }));
     expect(repair).toContain(digest([]));
     expect(repair).toContain(digest({originalPersonalSources:[],unpinnedDerivedSources:[]}));
+  });
+
+  it('matches one DB-original current User source before creating the 12-key Pin',()=>{
+    const messageId='11111111-1111-4111-8111-111111111111';
+    const current={messageId,role:'user' as const,text:'first turn'};
+    const selection=selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories:[],sourceCandidates:[],recentMessages:[current],
+      currentUserMessageId:messageId,requiredPersonalRecordCount:0,
+    });
+    expect(selection.selectedCurrentUserSource).toEqual({
+      messageId,role:'user',persistedBeforeModel:false,
+      selectedModelMessageDigest:digest(current),
+    });
+    expect(selection.selectedUnpinnedRecentSources).toEqual([]);
+    expect(selection.selectedModelSourceCensusDigest).toBe(digest({
+      originalPersonalSources:[],
+      currentUserSource:selection.selectedCurrentUserSource,
+      unpinnedRecentSources:[],unpinnedDerivedSources:[],
+    }));
+    expect(currentSourceRepair).toContain('v_selection_keys <> 12');
+    expect(currentSourceRepair).toContain("v_selection -> 'selectedUnpinnedRecentSources' is distinct from '[]'::jsonb");
+    expect(currentSourceRepair).toContain('m.thread_id=v_thread_id and m.turn_id=p_turn_id');
+    expect(currentSourceRepair).toContain("m.subject_id=p_subject_id and m.sender_type='user'");
+    expect(currentSourceRepair).toContain('m.redacted_at is null');
+    expect(currentSourceRepair).toContain("pg_catalog.sha256(pg_catalog.convert_to(");
+    expect(currentSourceRepair).toContain("v_selection #>> '{selectedCurrentUserSource,selectedModelMessageDigest}'");
+    expect(currentSourceRepair).toContain('v_census_digest');
+    expect(currentSourceRepair).toContain('revoke create on schema public from myeongha_seyeon_chat_runtime_owner;');
+    expect(currentSourceRepair).toMatch(/commit;\s*$/u);
   });
 
   it('keeps original 14-key zero proof unchanged',()=>{
