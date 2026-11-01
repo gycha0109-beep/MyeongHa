@@ -133,16 +133,19 @@ export function WithdrawalRequestPanel(){
         <form onSubmit={event=>void submit(event)}>
           <label htmlFor="withdrawal-reason">접수 사유</label>
           <select id="withdrawal-reason" value={reason}
-            onChange={event=>setReason(event.target.value as typeof reason)}>
+            onChange={event=>{setReason(event.target.value as typeof reason);setNonce(null);setFailure(null);}}
+            disabled={pending}>
             {REASONS.map(([value,label])=><option key={value} value={value}>{label}</option>)}
           </select>
           <label htmlFor="withdrawal-purchase-id">구매 ID (선택)</label>
           <input id="withdrawal-purchase-id" autoComplete="off" value={purchase}
-            maxLength={36} onChange={e=>setPurchase(e.target.value)}
+            maxLength={36} disabled={pending}
+            onChange={e=>{setPurchase(e.target.value);setNonce(null);setFailure(null);}}
             placeholder="확인 가능한 경우 입력" />
           <label htmlFor="withdrawal-unit-id">구매 단위 ID (선택)</label>
           <input id="withdrawal-unit-id" autoComplete="off" value={unit}
-            maxLength={36} onChange={e=>setUnit(e.target.value)}
+            maxLength={36} disabled={pending}
+            onChange={e=>{setUnit(e.target.value);setNonce(null);setFailure(null);}}
             placeholder="구매 ID 입력 시 함께 입력" />
           <button type="submit" disabled={pending}>
             {pending?'접수 중…':'청약철회 요청 접수'}
