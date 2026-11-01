@@ -27,7 +27,7 @@ import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analy
 export const SEYEON_R23_OFFLINE_G2_COMMIT_V1=Object.freeze({
   database:'myeongha_seyeon_positive_pin_candidate_test',
   function:'seyeon_positive_candidate.commit_actual_v2_r3',
-  sourceCount:1,
+  sourceCounts:[1,2],
   permitsProvider:false,
   permitsHttpReveal:false,
   productionMounted:false,
@@ -49,9 +49,16 @@ export interface SeyeonR23G1PinnedReceiptV1{
   readonly selectedSourcesDigest:string;
   /** Offline pre-model checked Context digest; not DB-signed G1 authority. */
   readonly finalModelContextDigest:string;
-  readonly recordId:string;
-  readonly originalGrantId:string;
-  readonly pgPayloadDigest:string;
+  /** Legacy scalar receipt for one original only. */
+  readonly recordId?:string;
+  readonly originalGrantId?:string;
+  readonly pgPayloadDigest?:string;
+  /** For two originals, both current DB JSONB digests, ordered by ordinal. */
+  readonly sources?:readonly {
+    readonly recordId:string;
+    readonly originalGrantId:string;
+    readonly pgPayloadDigest:string;
+  }[];
   readonly contextReady:true;
 }
 export interface CommitSeyeonR23OfflineAtomicInputV1{
@@ -116,7 +123,7 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       envelope:input.sourceEnvelope,
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
-      expectedOriginalMemoryCount:1,
+      expectedOriginalMemoryCount:input.preModelSelection?.selectedPersonalRecordCount===2?2:1,
     });
     // G1→G2: close the otherwise unobserved final assembled packet gap.
     // The same zero-derived/preflight-not-run envelope must describe the
@@ -142,18 +149,20 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       retrievedMemories:input.finalRetrievedMemories,
       sourceCandidates:input.sourceCandidates,
     });
-    const original=selection.selectedSources[0];
-    if(selection.selectedMemoryCount!==1
-      ||selection.selectedPersonalRecordCount!==1
+    const count=selection.selectedSources.length;
+    if((count!==1&&count!==2)
+      ||selection.selectedMemoryCount!==count
+      ||selection.selectedPersonalRecordCount!==count
       ||selection.persistedBeforeModel!==false
       ||selection.permitsAtomicCommit!==false
       ||selection.permitsHttpReveal!==false
-      ||!original||original.recordKind!=='memory'
-      ||original.recordType!=='shared_detail'
-      ||original.schemaVersion!=='memory-v1'
-      ||!UUID.test(original.recordId)||!UUID.test(original.grantId)
-      ||!SHA.test(original.rawRecordDigest)
-      ||!SHA.test(original.projectedMemoryDigest)
+      ||selection.selectedSources.some(original=>
+        original.recordKind!=='memory'
+        ||original.recordType!=='shared_detail'
+        ||original.schemaVersion!=='memory-v1'
+        ||!UUID.test(original.recordId)||!UUID.test(original.grantId)
+        ||!SHA.test(original.rawRecordDigest)
+        ||!SHA.test(original.projectedMemoryDigest))
       ||canonicalJson(selection)!==canonicalJson(input.preModelSelection)){
       throw new SeyeonR23OfflineG2CommitHoldV1();
     }
@@ -162,9 +171,19 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
       ||r.turnId!==input.turnId||r.attemptId!==input.attemptId
       ||r.selectedSourcesDigest!==selection.selectedSourcesDigest
       ||r.finalModelContextDigest!==finalModelContextDigest
-      ||r.recordId!==original.recordId
-      ||r.originalGrantId!==original.grantId
-      ||!PG_SHA.test(r.pgPayloadDigest)){
+      ||(count===1&&(
+        r.recordId!==selection.selectedSources[0]?.recordId
+        ||r.originalGrantId!==selection.selectedSources[0]?.grantId
+        ||!r.pgPayloadDigest||!PG_SHA.test(r.pgPayloadDigest)
+        ||r.sources!==undefined))
+      ||(count===2&&(
+        r.recordId!==undefined||r.originalGrantId!==undefined
+        ||r.pgPayloadDigest!==undefined
+        ||!Array.isArray(r.sources)||r.sources.length!==2
+        ||r.sources.some((source,i)=>
+          source.recordId!==selection.selectedSources[i]?.recordId
+          ||source.originalGrantId!==selection.selectedSources[i]?.grantId
+          ||!PG_SHA.test(source.pgPayloadDigest))))){
       throw new SeyeonR23OfflineG2CommitHoldV1();
     }
     // The existing official worker schema also rejects a self-consistently
@@ -209,27 +228,31 @@ export async function commitSeyeonR23OfflineAtomicV2V1(
           throw new SeyeonR23OfflineG2CommitHoldV1();
         const checked=proof as Record<string,unknown>;
         if(checked.selectedSourcesDigest!==selection.selectedSourcesDigest
-          ||checked.sourceCount!==1||!Array.isArray(checked.sources)
-          ||checked.sources.length!==1)
+          ||checked.sourceCount!==count||!Array.isArray(checked.sources)
+          ||checked.sources.length!==count)
           throw new SeyeonR23OfflineG2CommitHoldV1();
-        const pinned=checked.sources[0];
-        if(!pinned||typeof pinned!=='object'||Array.isArray(pinned))
-          throw new SeyeonR23OfflineG2CommitHoldV1();
-        const row=pinned as Record<string,unknown>;
-        if(row.ordinal!==0||row.recordKind!=='memory'
-          ||row.recordId!==original.recordId||row.grantId!==original.grantId
-          ||row.recordType!==original.recordType
-          ||row.schemaVersion!==original.schemaVersion
-          ||row.pgPayloadDigest!==r.pgPayloadDigest)
-          throw new SeyeonR23OfflineG2CommitHoldV1();
-        const originalRawDigest='sha256:v1:'+
-          createHash('sha256').update(canonicalJson({
-            kind:row.recordKind,recordId:row.recordId,grantId:row.grantId,
-            recordType:row.recordType,schemaVersion:row.schemaVersion,
-            payload:row.payload,
-          })).digest('hex');
-        if(originalRawDigest!==original.rawRecordDigest)
-          throw new SeyeonR23OfflineG2CommitHoldV1();
+        for(let i=0;i<count;i++){
+          const pinned=checked.sources[i];
+          const original=selection.selectedSources[i]!;
+          if(!pinned||typeof pinned!=='object'||Array.isArray(pinned))
+            throw new SeyeonR23OfflineG2CommitHoldV1();
+          const row=pinned as Record<string,unknown>;
+          const expectedPgDigest=count===1?r.pgPayloadDigest:r.sources?.[i]?.pgPayloadDigest;
+          if(row.ordinal!==i||row.recordKind!=='memory'
+            ||row.recordId!==original.recordId||row.grantId!==original.grantId
+            ||row.recordType!==original.recordType
+            ||row.schemaVersion!==original.schemaVersion
+            ||row.pgPayloadDigest!==expectedPgDigest)
+            throw new SeyeonR23OfflineG2CommitHoldV1();
+          const originalRawDigest='sha256:v1:'+
+            createHash('sha256').update(canonicalJson({
+              kind:row.recordKind,recordId:row.recordId,grantId:row.grantId,
+              recordType:row.recordType,schemaVersion:row.schemaVersion,
+              payload:row.payload,
+            })).digest('hex');
+          if(originalRawDigest!==original.rawRecordDigest)
+            throw new SeyeonR23OfflineG2CommitHoldV1();
+        }
         const result=await client.query<{receipt:unknown}>(`
 select seyeon_positive_candidate.commit_actual_v2_r3(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,
