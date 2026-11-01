@@ -1541,9 +1541,9 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         role:'user',content:[{
           type:'input_text',
           text:JSON.stringify({
-            fixture:true,purpose:'integrity_classification',
+            fixture:false,purpose:'integrity_classification',
             selectedSourcesDigest:expectedSelection,
-            priorNativeWireDigest:null,untrusted:'', // fifth key, even empty
+            priorNativeWireDigest:null, // false cannot masquerade as a synthetic fixture
           }),
         }],
       }]}),
