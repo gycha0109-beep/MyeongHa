@@ -265,6 +265,10 @@ begin
       and m.memory_type='shared_detail' and m.schema_version='memory-v1'
     for share of g,m;
     if not found then
+      if v_expected_count=1 then
+        raise exception using errcode='23514',
+          constraint='seyeon_offline_r3_original_grant_revoked';
+      end if;
       raise exception using errcode='23514',
         constraint='seyeon_offline_r25_original_grant_revoked';
     end if;
