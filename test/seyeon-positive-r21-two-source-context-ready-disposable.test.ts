@@ -2,6 +2,14 @@
 // R21: real PostgreSQL, exact named disposable clone, synthetic sources only.
 import {afterAll, describe, expect, it} from 'vitest';
 import {Pool, type PoolClient} from 'pg';
+import {createHash} from 'node:crypto';
+import {canonicalJson} from '../packages/domain/src/index.js';
+import {assembleSeyeonRuntimeContextV2, type SeyeonRetrievedMemoryV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
+import {selectSeyeonExactModelPersonalSourcesV1} from '../apps/api/src/seyeon-exact-model-personal-source-selection-v1.js';
+import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/seyeon-production-context-v1.js';
+import type {SeyeonR21OfflineDerivedSourceEnvelopeV1} from '../apps/api/src/seyeon-r21-offline-derived-source-closure-v1.js';
+import type {PostgresSubjectPoolV1} from '../apps/api/src/postgres-subject-execution.js';
+import {persistSeyeonR20OfflineDigestBoundPinV1, SeyeonR20OfflineDigestHoldV1} from '../apps/api/src/seyeon-positive-raw-projection-digest-bind-r20-candidate.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -104,6 +112,77 @@ async function state(a:Fixture){
     return q.rows[0];
   });
 }
+const hash=(x:unknown)=>'sha256:v1:'+createHash('sha256')
+  .update(canonicalJson(x)).digest('hex');
+const scopedPool:PostgresSubjectPoolV1={
+  async connect(){
+    if(!pool)throw Error('R21 disposable PostgreSQL only');
+    const c=await pool.connect();
+    return {
+      async query<Row>(sql:string,params?:readonly unknown[]){
+        const result=await c.query(sql,params===undefined?[]:[...params]);
+        return {rows:result.rows as Row[]};
+      },
+      release(error?:unknown){c.release(error instanceof Error?error:undefined);},
+    };
+  },
+};
+async function modelSources(){
+  if(!pool)throw Error('R21 disposable PostgreSQL only');
+  const raw=await pool.query<{id:string;content_jsonb:unknown}>(
+    'select id::text as id,content_jsonb from public.memory_items where id=any($1::uuid[])',
+    [[first.recordId,second.recordId]],
+  );
+  if(raw.rows.length!==2)throw Error('Two synthetic originals required');
+  const payload=new Map(raw.rows.map(r=>[r.id,r.content_jsonb]));
+  const origins=[first,second] as const;
+  const memories:readonly SeyeonRetrievedMemoryV2[]=origins.map((o,i)=>({
+    kind:'memory',memoryId:'memory:'+o.recordId,
+    sourceRef:'memory:'+o.recordId+':grant:'+o.grantId,
+    claimKind:'fact',summary:'synthetic model projection '+i,
+    relevance:0.9-i*0.1,salience:0.8,
+  }));
+  const candidates:readonly SeyeonPersonalRecordProjectionCandidateV1[]=
+    origins.map((o,i)=>({
+      recordKind:'memory',recordId:o.recordId,grantId:o.grantId,
+      recordType:'shared_detail',schemaVersion:'memory-v1',
+      projectedMemoryId:memories[i]!.memoryId,
+      rawRecordDigest:hash({
+        kind:'memory',recordId:o.recordId,grantId:o.grantId,
+        recordType:'shared_detail',schemaVersion:'memory-v1',
+        payload:payload.get(o.recordId),
+      }),
+      projectedMemoryDigest:hash(memories[i]),
+      permitsAtomicCommit:false,permitsHttpReveal:false,
+    }));
+  const selection=selectSeyeonExactModelPersonalSourcesV1({
+    retrievedMemories:memories,sourceCandidates:candidates,
+  });
+  const envelope:SeyeonR21OfflineDerivedSourceEnvelopeV1={
+    version:'seyeon-r21-offline-derived-source-closure-v1',
+    sourceSnapshot:{
+      version:'seyeon-production-context-v1',
+      retrievedMemories:memories,
+      personalRecordProjectionCandidates:candidates,
+      personalRecordAdmissions:candidates.map(c=>({
+        recordId:c.recordId,recordKind:c.recordKind,recordType:c.recordType,
+        schemaVersion:c.schemaVersion,reason:'ADMITTED' as const,
+      })),
+      recentMessages:[],relationshipHistoryRecords:[],
+      activeRelationshipEventCount:0,historyThroughRevision:0,
+      relationshipRevisionUsedForTurn:null,
+    },
+    preflightState:'not_run',disclosureRetrievedPrivateSources:[],
+    readerDerivedSources:[],workerDerivedSources:[],externalToolPrivateSources:[],
+  };
+  const finalModelContext=assembleSeyeonRuntimeContextV2({
+    relationship:null,relationshipSemantics:null,recentMessages:[],
+    retrievedMemories:memories,integrityDecisions:[],
+    governedPreflightApplied:false,disclosure:{decision:null,retrievedSources:[]},
+  });
+  return {retrievedMemories:memories,sourceCandidates:candidates,
+    sourceEnvelope:envelope,selection,finalModelContext};
+}
 describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core ContextReady',()=>{
   afterAll(async()=>{await pool?.end();});
   it('atomically pins two locked originals, marks context ready, denies Provider/Commit/Reveal',async()=>{
@@ -118,6 +197,50 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
     });
     await expect(candidate(a,[first,second])).rejects.toThrow();
+  });
+  it('R20 model-selected two originals -> R21 real ContextReady in one DB transaction',async()=>{
+    const id=await createTurn(754);
+    const source=await modelSources();
+    const receipt=await persistSeyeonR20OfflineDigestBoundPinV1({
+      pool:scopedPool,
+      verifiedEvidence:{kind:'member',verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001'},
+      threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
+      ...source,twoOriginalContextReady:true,
+    });
+    expect(receipt).toMatchObject({
+      selectedPersonalRecordCount:2,contextReady:true,
+      selectedSourcesDigest:source.selection.selectedSourcesDigest,
+      finalModelContextDigest:hash(source.finalModelContext),
+      permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    });
+    expect(await state(id)).toMatchObject({
+      turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
+    });
+    const wrong=await createTurn(755);
+    // Validly recomputed outer manifest cannot authorize an altered original.
+    const changedCandidates=source.sourceCandidates.map((c,i)=>i===1?{
+      ...c,rawRecordDigest:'sha256:v1:'+'0'.repeat(64),
+    }:c);
+    const changedSelection=selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories:source.retrievedMemories,sourceCandidates:changedCandidates,
+    });
+    const altered={
+      ...source,sourceCandidates:changedCandidates,selection:changedSelection,
+      sourceEnvelope:{
+        ...source.sourceEnvelope,
+        sourceSnapshot:{...source.sourceEnvelope.sourceSnapshot,
+          personalRecordProjectionCandidates:changedCandidates},
+      },
+    };
+    await expect(persistSeyeonR20OfflineDigestBoundPinV1({
+      pool:scopedPool,
+      verifiedEvidence:{kind:'member',verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001'},
+      threadId:wrong.thread,turnId:wrong.turn,attemptId:wrong.attempt,
+      ...altered,twoOriginalContextReady:true,
+    })).rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+    expect(await state(wrong)).toMatchObject({
+      turnState:'planned',parents:'0',edges:'0',firstPins:'0',
+    });
   });
   it('rejects a replaced second Grant and rolls back all parent/edge/context writes',async()=>{
     const a=await createTurn(752);
