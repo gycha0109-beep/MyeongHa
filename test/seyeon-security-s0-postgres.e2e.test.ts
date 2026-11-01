@@ -711,13 +711,13 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       has_function_privilege('myeongha_commerce_internal_executor',
         'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as commerce_only,
       not has_function_privilege('myeongha_api_executor',
-        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_api_denied,
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)','EXECUTE') as catalog_api_denied,
       has_function_privilege('myeongha_commerce_internal_executor',
-        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_commerce_only,
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)','EXECUTE') as catalog_commerce_only,
       not has_function_privilege('authenticated',
-        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_member_denied,
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)','EXECUTE') as catalog_member_denied,
       not has_function_privilege('service_role',
-        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)','EXECUTE') as catalog_service_denied`);
+        'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)','EXECUTE') as catalog_service_denied`);
     expect(acl).toEqual({api_denied:true,public_denied:true,commerce_only:true,
       catalog_api_denied:true,catalog_commerce_only:true,
       catalog_member_denied:true,catalog_service_denied:true});
@@ -844,15 +844,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       privateCreditPool:privateG5Pool(),maxBatch:1,
     })).toEqual({status:'empty',found:0,settled:0,failed:0});
 
-    // Simulate five-minute clock ageing ONLY on this isolated Owner fixture;
-    // never manufacture an ACK or mutate Production receipt timestamps.
-    await pool.query(
-      "update public.chat_turn_attempts set seyeon_positive_delivery_received_at="+
-        "clock_timestamp()-interval '10 minutes' where id=$1",
-      [received.attempt],
-    );
+    // Do not rewrite immutable delivery evidence to age it. Only the named
+    // disposable PG17 clone accepts a bounded, read-only virtual query clock.
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
       privateCreditPool:privateG5Pool(),maxBatch:1,
+      testAsOf:new Date(Date.now()+10*60_000),
     })).toEqual({status:'completed',found:1,settled:1,failed:0});
     expect(await creditState(received)).toEqual({
       state:'settled',available:'40',credits:'10',

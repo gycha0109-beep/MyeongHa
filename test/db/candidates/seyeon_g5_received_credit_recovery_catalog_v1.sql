@@ -5,16 +5,28 @@
 begin;
 
 create function public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(
-  p_limit integer
+  p_limit integer,
+  p_test_as_of timestamptz default null
 )
 returns table(attempt_id uuid)
 language plpgsql volatile security definer
 set search_path=pg_catalog,public
 set row_security=off
 as $catalog$
+declare v_now timestamptz:=pg_catalog.clock_timestamp();
 begin
   if p_limit is null or p_limit<1 or p_limit>25 then
     raise exception 'G5 recovery lookup limit must be between 1 and 25';
+  end if;
+  -- A virtual clock is permitted ONLY in the exact disposable Actions case
+  -- database. Production cannot shift time or rewrite protected receipts.
+  if p_test_as_of is not null then
+    if pg_catalog.current_database() !~ '^myeongha_ci_case_[0-9]+$'
+       or p_test_as_of < v_now
+       or p_test_as_of > v_now + interval '15 minutes' then
+      raise exception 'G5 recovery test clock requires isolated bounded CI database';
+    end if;
+    v_now:=p_test_as_of;
   end if;
 
   return query
@@ -41,14 +53,14 @@ begin
         and a.seyeon_positive_delivery_receipt_hash is not null
         and a.seyeon_positive_delivery_received_at is not null
         and a.seyeon_positive_delivery_received_at
-             <= pg_catalog.clock_timestamp()-interval '5 minutes'
+             <= v_now-interval '5 minutes'
       order by a.seyeon_positive_delivery_received_at,a.id
       limit p_limit;
 end
 $catalog$;
 
-revoke all on function public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)
+revoke all on function public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)
   from public,anon,authenticated,service_role,myeongha_api_executor;
-grant execute on function public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer)
+grant execute on function public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)
   to myeongha_commerce_internal_executor;
 commit;

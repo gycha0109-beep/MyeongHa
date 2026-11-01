@@ -40,7 +40,7 @@ describe('G5 received-only bounded Commerce recovery candidate',()=>{
     expect(state.transaction).toHaveBeenCalledWith(expect.objectContaining({pool}));
     expect(state.query).toHaveBeenCalledWith(
       expect.stringContaining('internal_qry_seyeon_g5_unsettled_received_attempts_v1'),
-      [1],
+      [1,null],
     );
     expect(state.query).toHaveBeenCalledWith(
       'select public.internal_cmd_seyeon_g4_receipt_credit_settle_v1($1::uuid) as "state"',

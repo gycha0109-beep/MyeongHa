@@ -33,19 +33,31 @@ export type SeyeonG5RecoverySummaryV1=Readonly<{
 export async function recoverSeyeonG5ReceivedCreditsCandidateV1(input:Readonly<{
   privateCreditPool:PostgresSubjectPoolV1;
   maxBatch?:number;
+  // Only disposable PG17 CI may advance the read-only recovery clock.
+  testAsOf?:Date;
 }>):Promise<SeyeonG5RecoverySummaryV1>{
   if(!input.privateCreditPool)throw Error('Private Commerce pool required');
   const maxBatch=input.maxBatch??25;
   if(!Number.isInteger(maxBatch)||maxBatch<1||maxBatch>25){
     throw Error('G5 recovery batch must be within 1..25');
   }
+  if(input.testAsOf!==undefined){
+    const db=process.env.PGDATABASE??'';
+    if(!(input.testAsOf instanceof Date)||
+      !Number.isFinite(input.testAsOf.getTime())||
+      process.env.CI!=='true'||process.env.GITHUB_ACTIONS!=='true'||
+      process.env.DB_SUITE!=='postgres17'||process.env.PGHOST!=='localhost'||
+      !/^myeongha_ci_case_[0-9]+$/u.test(db)){
+      throw Error('G5 recovery virtual clock is CI disposable PG17 only');
+    }
+  }
   const ids=await executePostgresCommerceInternalTransactionV1({
     pool:input.privateCreditPool,
     execute:async({client})=>{
       const found=await client.query<{attemptId:unknown}>(
         'select attempt_id as "attemptId" from '+
-          'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1($1::integer)',
-        [maxBatch],
+          'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1($1::integer,$2::timestamptz)',
+        [maxBatch,input.testAsOf?.toISOString()??null],
       );
       if(found.rows.length>maxBatch)throw Error('G5 recovery catalog exceeded bounded batch');
       const seen=new Set<string>();
