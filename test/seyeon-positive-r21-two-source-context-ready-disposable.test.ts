@@ -1765,6 +1765,29 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       stages:'1',calls:'1',
       budget:String(BigInt(start.rows[0]!.occupied)+1524n),
     });
+    // A reservation was valid BEFORE revocation, but that cannot permit
+    // even a synthetic local outcome AFTER the exact Grant was revoked.
+    const synthetic={
+      schemaVersion:'seyeon-r37-synthetic-stage-result-v1',
+      attemptId:id.attempt,stageIndex:0,
+      purpose:'integrity_classification',callId,
+      nativeWireDigest:'sha256:wire-utf8:v1:'+
+        createHash('sha256').update(body,'utf8').digest('hex'),
+      providerDispatched:false,outputGuardVerified:false,
+      result:{kind:'no_provider_output',verified:false},
+    };
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.record_synthetic_stage_result_r37($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::jsonb) as receipt',
+      [subject,id.thread,id.turn,id.attempt,
+       'integrity_classification',callId,JSON.stringify(synthetic)],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r37_original_grant_revoked',
+    });
+    const noOutput=await pool.query<{n:string}>(
+      'select count(*)::text as n from seyeon_positive_candidate.synthetic_stage_results_r37 where attempt_id=$1::uuid',
+      [id.attempt],
+    );
+    expect(noOutput.rows).toEqual([{n:'0'}]);
     const next=await r33NativeWire('disclosure_classification',
       source.selection.selectedSourcesDigest,
       'sha256:wire-utf8:v1:'+createHash('sha256').update(body,'utf8').digest('hex'),
