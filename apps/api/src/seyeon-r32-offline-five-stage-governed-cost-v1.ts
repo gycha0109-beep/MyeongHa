@@ -37,6 +37,13 @@ const DB='myeongha_seyeon_positive_pin_candidate_test';
 const MODEL='seyeon-r35-offline';
 const PROVIDER='openai-responses';
 const OUTPUT_CAP=256;
+export const SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1=
+  'R32 synthetic offline-only stage; no external derived/private inputs.' as const;
+export const SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1=Object.freeze({
+  type:'object' as const,additionalProperties:false as const,
+  properties:Object.freeze({ok:Object.freeze({type:'boolean' as const})}),
+  required:Object.freeze(['ok'] as const),
+});
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 const DIGEST=/^sha256:v1:[a-f0-9]{64}$/u;
 const WIRE=/^sha256:wire-utf8:v1:[a-f0-9]{64}$/u;
@@ -154,7 +161,14 @@ export async function reserveSeyeonR32OfflineFiveStageV1(
       if(!x||typeof x!=='object'||Array.isArray(x))
         throw new SeyeonR32OfflineFiveStageHoldV1();
       const v=x as Record<string,unknown>;
-      if(Object.keys(v).length!==4
+      if(request.instructions!==SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1
+        ||canonicalJson(request.responseSchema)!==
+          canonicalJson(SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1)
+        ||Object.keys(v).length!==4
+        ||!Object.hasOwn(v,'fixture')
+        ||!Object.hasOwn(v,'purpose')
+        ||!Object.hasOwn(v,'selectedSourcesDigest')
+        ||!Object.hasOwn(v,'priorNativeWireDigest')
         ||v.fixture!==true||v.purpose!==request.purpose
         ||v.selectedSourcesDigest!==s.selectedSourcesDigest
         ||(v.priorNativeWireDigest!==null
