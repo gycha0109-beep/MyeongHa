@@ -5,10 +5,13 @@
 create table public.commerce_reader_full_refund_dispatches_v1 (
   id uuid primary key,
   receipt_id uuid not null unique references public.commerce_receipts(id),
-  legal_decision_ref text not null,
+  legal_decision_ref text not null unique,
   legal_actor_ref text not null,
   legal_approved_at timestamptz not null,
   reason text not null,
+  -- Existing P0-PR-01 Commerce financial-evidence retention class P5Y.
+  -- This table contains no raw claim/body/Subject or operator PII.
+  retained_until timestamptz not null default (pg_catalog.clock_timestamp()+interval '5 years'),
   status text not null default 'approved',
   provider_cancellation_id text,
   provider_request_status text,
@@ -17,13 +20,16 @@ create table public.commerce_reader_full_refund_dispatches_v1 (
   confirmed_at timestamptz,
   created_at timestamptz not null default pg_catalog.clock_timestamp(),
   constraint reader_refund_decision_ref_chk check
-    (length(legal_decision_ref) between 1 and 256
-     and legal_decision_ref=btrim(legal_decision_ref)),
+    (legal_decision_ref ~ '^sha256:v1:[a-f0-9]{64}$'),
   constraint reader_refund_actor_chk check
-    (length(legal_actor_ref) between 1 and 256
-     and legal_actor_ref=btrim(legal_actor_ref)),
+    (legal_actor_ref ~ '^operator:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
   constraint reader_refund_reason_chk check
-    (length(reason) between 1 and 256 and reason=btrim(reason)),
+    (reason in ('customer_withdrawal','non_delivery','contract_mismatch',
+      'duplicate_charge','statutory_obligation','other_approved')),
+  constraint reader_refund_approval_time_chk check
+    (legal_approved_at <= created_at),
+  constraint reader_refund_retention_chk check
+    (retained_until >= legal_approved_at + interval '5 years'),
   constraint reader_refund_status_chk check
     (status in ('approved','dispatching','submitted','confirmed')),
   constraint reader_refund_cancellation_id_chk check
@@ -162,13 +168,22 @@ begin
     or v.provider_cancellation_id is distinct from p_cancellation_id
     or not exists(
       select 1 from public.commerce_receipts cr
+      join public.commerce_provider_events pe
+        on pe.resolved_receipt_id=cr.id
+       and pe.resolved_subject_id=cr.subject_id
+       and pe.provider='portone_v2'
+       and pe.event_type='Transaction.Cancelled'
+       and pe.external_event_id=('myeongha:portone-v2:full-cancel:v1:'||p_cancellation_id)
+       and pe.status in ('verified','processed')
       where cr.id=v.receipt_id and cr.verification_status='revoked'
       and cr.environment='production' and cr.provider='portone_v2'
     ) then
     raise exception 'Refund receipt still unconfirmed by verified cancellation' using errcode='23514';
   end if;
   update public.commerce_reader_full_refund_dispatches_v1
-    set status='confirmed',confirmed_at=coalesce(confirmed_at,pg_catalog.clock_timestamp())
+    set status='confirmed',confirmed_at=coalesce(confirmed_at,pg_catalog.clock_timestamp()),
+        retained_until=greatest(retained_until,
+          pg_catalog.clock_timestamp()+interval '5 years')
   where id=p_id;
   return true;
 end;
@@ -197,3 +212,113 @@ grant execute on function public.internal_record_reader_full_refund_response_v1(
   to myeongha_commerce_internal_executor;
 grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1(uuid,text)
   to myeongha_commerce_internal_executor;
+
+
+-- P0-PR-01 P5Y: keep financial disposition evidence after ordinary account
+-- deletion, without customer Subject/PII columns. No direct customer FK.
+-- Legal owner decision fields cannot be modified after insertion. Completion
+-- can only advance and confirmation extends the retention floor.
+create function public.tr_guard_reader_full_refund_dispatch_v1()
+returns trigger language plpgsql security invoker
+set search_path=pg_catalog,public as $reader_refund_immutability$
+begin
+  if tg_op='DELETE' then
+    if old.status <> 'confirmed'
+       or old.retained_until > pg_catalog.clock_timestamp() then
+      raise exception 'Reader refund legal evidence remains within P5Y'
+        using errcode='23514';
+    end if;
+    return old;
+  end if;
+  if tg_op='INSERT' then
+    if new.status <> 'approved'
+       or new.reserved_at is not null
+       or new.submitted_at is not null
+       or new.confirmed_at is not null
+       or new.provider_cancellation_id is not null
+       or new.provider_request_status is not null then
+      raise exception 'New Reader refund disposition must be an unsubmitted legal decision'
+        using errcode='23514';
+    end if;
+    return new;
+  end if;
+  if row(new.id,new.receipt_id,new.legal_decision_ref,new.legal_actor_ref,
+    new.legal_approved_at,new.reason,new.created_at)
+    is distinct from
+    row(old.id,old.receipt_id,old.legal_decision_ref,old.legal_actor_ref,
+      old.legal_approved_at,old.reason,old.created_at)
+      or new.retained_until < old.retained_until then
+    raise exception 'Reader legal refund evidence is immutable'
+      using errcode='23514';
+  end if;
+  if not (
+      (old.status='approved' and new.status='dispatching')
+      or (old.status='dispatching' and new.status='submitted')
+      or (old.status='submitted' and new.status='confirmed')
+      or (old.status='confirmed' and new.status='confirmed')
+    ) then
+    raise exception 'Reader refund dispatch state regression forbidden'
+      using errcode='23514';
+  end if;
+  if old.provider_cancellation_id is not null and
+    new.provider_cancellation_id is distinct from old.provider_cancellation_id
+    then
+      raise exception 'Reader refund cancellation identity cannot change'
+        using errcode='23514';
+  end if;
+  if new.status='confirmed' then
+    -- A single precise committed confirmation timestamp, not a second
+    -- independent clock_timestamp() call, anchors the five-year minimum.
+    new.retained_until:=greatest(new.retained_until,
+      new.confirmed_at+interval '5 years');
+  end if;
+  return new;
+end;
+$reader_refund_immutability$;
+
+create trigger tr_guard_reader_full_refund_dispatch_v1
+before insert or update or delete on public.commerce_reader_full_refund_dispatches_v1
+for each row execute function public.tr_guard_reader_full_refund_dispatch_v1();
+revoke all on function public.tr_guard_reader_full_refund_dispatch_v1() from public;
+create index commerce_reader_refund_retention_v1_idx
+on public.commerce_reader_full_refund_dispatches_v1(retained_until,id)
+where status='confirmed';
+
+comment on table public.commerce_reader_full_refund_dispatches_v1 is
+'P0-PR-01 Commerce P5Y minimal financial legal disposition, no customer body or raw claim. Owner-only initial approval; provider submission alone never grants refund completion.';
+
+
+-- Privileged owner-only P5Y retention cleanup. Unresolved dispatches are
+-- never purged just because five years have elapsed. All other Commerce P5Y
+-- tables remain governed by their existing independent retention jobs.
+create function public.internal_purge_completed_reader_refund_dispositions_v1(
+  p_limit integer
+) returns integer
+language plpgsql volatile security invoker
+set search_path=pg_catalog,public
+as $reader_refund_retention$
+declare v_count integer;
+begin
+  if p_limit is null or p_limit < 1 or p_limit > 1000 then
+    raise exception 'Reader refund retention cleanup limit invalid'
+      using errcode='23514';
+  end if;
+  with candidates as (
+    select d.id from public.commerce_reader_full_refund_dispatches_v1 d
+    where d.status='confirmed'
+      and d.retained_until<=pg_catalog.clock_timestamp()
+    order by d.retained_until,d.id
+    limit p_limit
+    for update skip locked
+  ), deleted as (
+    delete from public.commerce_reader_full_refund_dispatches_v1 d
+    using candidates c where d.id=c.id
+    returning d.id
+  )
+  select pg_catalog.count(*)::integer into v_count from deleted;
+  return v_count;
+end;
+$reader_refund_retention$;
+revoke all on function public.internal_purge_completed_reader_refund_dispositions_v1(integer)
+  from public;
+-- No EXECUTE granted to Commerce, API, workers, service_role or Web clients.
