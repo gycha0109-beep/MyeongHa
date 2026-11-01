@@ -368,5 +368,51 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       governor:{policy,certifiedInputTokenUpperBound:()=>null},
     })).rejects.toBeInstanceOf(SeyeonR26OfflineG4HoldV1);
     expect(fetchCount).toBe(0);
+    // Actual DB budget exhaustion AFTER an authentic two-original Pin prevents
+    // the next native Provider call; no fake zero-cost or retry authorization.
+    const deniedTurn=await createTurn(757);
+    const deniedPin={
+      ...pinInput,threadId:deniedTurn.thread,turnId:deniedTurn.turn,
+      attemptId:deniedTurn.attempt,
+    };
+    await pool.query(
+      "update public.seyeon_ai_governor_daily_budgets_v1 set global_limit_micro_usd=1524 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    try{
+      const deniedProvider=createOpenAiSeyeonStructuredProviderV1({
+        model:'seyeon-r35-offline',apiKey:'offline-r26-never-send',
+        maxOutputTokens:256,
+        fetchImpl:async()=>{fetchCount++;throw Error('FORBIDDEN_NETWORK');},
+        meteredBeforeDispatch:async(call,requestBody)=>{
+          const attested=await attestSeyeonR35OfflineWireAfterDbPinV1({
+            pinInput:deniedPin,call,requestBody,enforcedOutputTokens:256,
+          });
+          await reserveSeyeonR26OfflineGovernedWireV1({
+            pinInput:deniedPin,wireAttestation:attested,call,requestBody,governor,
+          });
+          throw new SeyeonR26OfflineG4HoldV1();
+        },
+      });
+      await expect(deniedProvider.generate(buildSeyeonTurnInterpreterRequestV2(
+        source.finalModelContext,
+      ))).rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
+      expect(fetchCount).toBe(0);
+      expect(await state(deniedTurn)).toMatchObject({
+        turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
+      });
+      const deniedLedger=await pool.query<{count:string}>(
+        'select count(*)::text as count from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid',
+        [deniedTurn.attempt],
+      );
+      expect(deniedLedger.rows[0]?.count).toBe('0');
+      const total=await pool.query<{occupied:string}>(
+        "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+      );
+      expect(total.rows[0]?.occupied).toBe('1524');
+    }finally{
+      await pool.query(
+        "update public.seyeon_ai_governor_daily_budgets_v1 set global_limit_micro_usd=50000 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+      );
+    }
   });
 });
