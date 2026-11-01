@@ -8,6 +8,9 @@ if [[ ! "$db" =~ ^myeongha_ci_case_[0-9]+$ || ! "$pg_version" =~ ^17[0-9]{4}$ ]]
 fi
 node test/db/commerce_stored_portone_hmac_lineage_pg17_generator.mjs --fixture |
  psql -X -v ON_ERROR_STOP=1 -f - >/dev/null
-node test/db/commerce_exact_reader_withdrawal_hold_pg17_generator.mjs |
+# Install the candidate ONLY inside the independently guarded disposable CI DB.
+# This does not apply the candidate to the ordinary migration stream.
+psql -X -v ON_ERROR_STOP=1 -f docs/operations/candidates/commerce_reader_delivery_transport_capture_v1.sql >/dev/null
+node test/db/commerce_reader_delivery_transport_pg17_generator.mjs |
  psql -X -v ON_ERROR_STOP=1 -f -
-echo 'PASS: exact PortOne Event/Receipt/paid Reader unit can be inspected; unrelated purchase rejected; no delivery fact or Grant mutation'
+echo 'PASS: exact paid Reader scope, internal source HOLD and isolated delivery transport preparation/ACK; no legal delivery or Grant mutation'
