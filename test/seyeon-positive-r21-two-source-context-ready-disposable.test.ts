@@ -1300,10 +1300,36 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
                 code:'23514',constraint:'seyeon_r37_synthetic_result_authority_forged',
               });
             }
+            // Stage 1 cannot reserve an additional budget before Stage 0
+            // has a local observation, even with a valid real native wire.
+            const early=await r33NativeWire(
+              'disclosure_classification',
+              source.selection.selectedSourcesDigest,reserved.nativeWireDigest,
+            );
+            await expect(tx(c=>c.query(
+              'select seyeon_positive_candidate.claim_governed_stage_r32($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::bigint) as receipt',
+              [subject,a.thread,a.turn,a.attempt,'disclosure_classification',
+               early.callId,source.selection.selectedSourcesDigest,
+               hash(source.finalModelContext),early.requestDigest,early.body,
+               policy.policyVersion,policy.priceQuote.priceVersion,500],
+            ),true)).rejects.toMatchObject({
+              code:'23514',constraint:'seyeon_r37_previous_local_stage_outcome_missing',
+            });
+            const denied=await pool!.query<{stage_count:string;cost_count:string}>(
+              "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
+              " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as cost_count",
+              [a.attempt],
+            );
+            expect(denied.rows).toMatchObject([{stage_count:'1',cost_count:'1'}]);
           }
           observed.push(await recordSeyeonR37SyntheticStageObservationV1({
             pinInput,reservation:reserved,
           }));
+          if(reserved.stageIndex===0){
+            await expect(recordSeyeonR37SyntheticStageObservationV1({
+              pinInput,reservation:reserved,
+            })).rejects.toBeInstanceOf(SeyeonR37OfflineSyntheticResultHoldV1);
+          }
           throw new SeyeonR32OfflineFiveStageHoldV1();
         },
       });
@@ -1323,6 +1349,22 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(used.map(r=>r.interpreterContextSealed)).toEqual([
       false,false,true,false,false,
     ]);
+    const results=await pool.query<{
+      stage_index:number;call_id:string;origin_kind:string;
+      provider_dispatched:boolean;provider_output_verified:boolean;
+      output_guard_verified:boolean;synthetic_payload_digest:string;
+    }>(
+      'select stage_index,call_id::text,origin_kind,provider_dispatched,provider_output_verified,output_guard_verified,synthetic_payload_digest from seyeon_positive_candidate.synthetic_stage_results_r37 where attempt_id=$1::uuid order by stage_index',
+      [a.attempt],
+    );
+    expect(results.rows).toHaveLength(5);
+    expect(results.rows.map(r=>r.call_id)).toEqual(used.map(r=>r.callId));
+    expect(results.rows.every(r=>r.origin_kind==='local_synthetic_no_provider'
+      &&r.provider_dispatched===false&&r.provider_output_verified===false
+      &&r.output_guard_verified===false
+      &&/^sha256:pg-jsonb:v1:[0-9a-f]{64}$/u.test(
+        r.synthetic_payload_digest,
+      ))).toBe(true);
     const ledger=await pool.query<{
       purpose:string;call_id:string;governor_ceiling_micro_usd:string;
       lifecycle_state:string;
@@ -1475,7 +1517,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       messages:'0',outboxes:'0',admissions:'0',
     });
     expect(fetches).toBe(0);
-  },45000);
+  },60000);
 
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
