@@ -5,7 +5,6 @@ import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 // All twelve Saju topics share one product layer. Route availability is
 // independent from Product identity and never grants sale or Reader access.
 const sajuProductTopics = [
-  { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
   { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
   { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
   { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
@@ -21,6 +20,10 @@ const sajuProductTopics = [
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
+  // Preserve historic detail URLs in the route layer, but do not surface the
+  // retired general-natal product through the present Home/Saju catalogs.
+  const resumedVisibleTopic = resumedPreview && sajuProductTopics.some((topic) => topic.href === resumedPreview)
+    ? resumedPreview : null;
   const [chartTab, setChartTab] = useState<'pillars' | 'elements'>('pillars');
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
   useEffect(() => {
@@ -167,7 +170,7 @@ export function ReadingPage() {
 
         <section className="saju-design-products" aria-labelledby="saju-design-products-title">
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
-          <p>12개 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
+          <p>관심 있는 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
             {sajuProductTopics.map((topic) => {
               const availability = resolveReadingAvailabilityV1(topic.href);
@@ -198,7 +201,7 @@ export function ReadingPage() {
           </div>
         </section>
 
-        <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
+        <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedVisibleTopic ?? '#saju-design-products-title'}>{resumedVisibleTopic ? '선택한 해석 이어보기 →' : '주제별 해석 살펴보기 →'}</a></div>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>

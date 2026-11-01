@@ -453,3 +453,26 @@ html[data-theme="dark"] .saju-design-pillars .saju-pillar-hanja.is-element-match
   .saju-design-pillars .saju-pillar,
   .saju-pillar-hanja { transition: none; }
 }
+
+/* Eleven independently gated products: distribute the three-card last row evenly. */
+.saju-design-product-grid { grid-template-columns: repeat(12, minmax(0,1fr)); }
+.saju-design-product-card { grid-column: span 3; }
+.saju-design-product-card:nth-last-child(3):nth-child(4n+1),
+.saju-design-product-card:nth-last-child(3):nth-child(4n+1) ~ .saju-design-product-card {
+  grid-column: span 4;
+}
+@media (max-width: 850px) {
+  .saju-design-product-card { grid-column: span 6; }
+  .saju-design-product-card:nth-last-child(3):nth-child(4n+1),
+  .saju-design-product-card:nth-last-child(3):nth-child(4n+1) ~ .saju-design-product-card {
+    grid-column: span 6;
+  }
+  .saju-design-product-card:last-child:nth-child(odd) { grid-column: 1 / -1; }
+}
+@media (max-width: 350px) {
+  .saju-design-product-card,
+  .saju-design-product-card:nth-last-child(3):nth-child(4n+1),
+  .saju-design-product-card:nth-last-child(3):nth-child(4n+1) ~ .saju-design-product-card {
+    grid-column: 1 / -1;
+  }
+}
