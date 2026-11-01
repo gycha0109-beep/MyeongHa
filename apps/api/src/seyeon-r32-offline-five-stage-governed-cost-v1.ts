@@ -11,6 +11,7 @@ import {
 } from './seyeon-exact-model-personal-source-selection-v1.js';
 import {
   buildSeyeonTurnInterpreterRequestV2,
+  SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
   type SeyeonStructuredProviderRequestV2,
 } from './seyeon-character-runtime-v2.js';
 import {
@@ -106,6 +107,7 @@ export async function reserveSeyeonR32OfflineFiveStageV1(
     if(!s||s.selectedPersonalRecordCount!==2||s.selectedMemoryCount!==2
       ||s.selectedSources.length!==2||!DIGEST.test(s.selectedSourcesDigest)
       ||!UUID.test(call.callId)||!UUID.test(pinInput.attemptId)
+      ||request.contractVersion!==SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2
       ||!purposes.includes(request.purpose as StagePurpose)
       ||call.purpose!==request.purpose
       ||call.providerKey!==PROVIDER||call.modelKey!==MODEL
@@ -143,6 +145,24 @@ export async function reserveSeyeonR32OfflineFiveStageV1(
       canonicalJson(request)!==canonicalJson(
         buildSeyeonTurnInterpreterRequestV2(reconstructed),
       ))throw new SeyeonR32OfflineFiveStageHoldV1();
+    // Four non-interpreter inputs MUST be the small synthetic metadata
+    // envelope. Never accept actual unpinned Preflight/Reader/Renderer text
+    // as a convenient offline "Stage" merely because its wire is valid.
+    let syntheticPrevious:string|null=null;
+    if(request.purpose!=='turn_interpretation'){
+      const x=request.input;
+      if(!x||typeof x!=='object'||Array.isArray(x))
+        throw new SeyeonR32OfflineFiveStageHoldV1();
+      const v=x as Record<string,unknown>;
+      if(Object.keys(v).length!==4
+        ||v.fixture!==true||v.purpose!==request.purpose
+        ||v.selectedSourcesDigest!==s.selectedSourcesDigest
+        ||(v.priorNativeWireDigest!==null
+          &&(typeof v.priorNativeWireDigest!=='string'
+            ||!WIRE.test(v.priorNativeWireDigest))))
+        throw new SeyeonR32OfflineFiveStageHoldV1();
+      syntheticPrevious=v.priorNativeWireDigest as string|null;
+    }
     const expectedBody=JSON.stringify({
       model:MODEL,store:false,max_output_tokens:OUTPUT_CAP,
       instructions:request.instructions+'\n\n'+SEYEON_PROVIDER_UNTRUSTED_DATA_BOUNDARY_V1,
@@ -213,6 +233,8 @@ select seyeon_positive_candidate.claim_governed_stage_r32(
             (typeof v.previousWireDigest!=='string'
               ||!WIRE.test(v.previousWireDigest)))
           ||v.interpreterContextSealed!==(request.purpose==='turn_interpretation')
+          ||(request.purpose!=='turn_interpretation'
+            &&v.previousWireDigest!==syntheticPrevious)
           ||v.permitsProvider!==false||v.permitsAtomicCommit!==false
           ||v.permitsHttpReveal!==false)
           throw new SeyeonR32OfflineFiveStageHoldV1();
