@@ -37,6 +37,13 @@ import {
   SeyeonR37OfflineSyntheticResultHoldV1,
   type SeyeonR37OfflineSyntheticResultV1,
 } from '../apps/api/src/seyeon-r37-offline-synthetic-stage-result-v1.js';
+import {
+  exerciseSeyeonR38NegativeRealGuardsV1,
+} from '../apps/api/src/seyeon-r38-offline-guard-rejection-probes-v1.js';
+import {
+  recordSeyeonR38OfflineNegativeGuardProbeV1,
+  SeyeonR38OfflineNegativeEvidenceHoldV1,
+} from '../apps/api/src/seyeon-r38-offline-guard-negative-db-v1.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -1054,6 +1061,13 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     );
     const used:SeyeonR32OfflineStageReceiptV1[]=[];
     const observed:SeyeonR37OfflineSyntheticResultV1[]=[];
+    // Actual authored guards execute on INVALID non-private local fixtures.
+    // A negative probe is never a Provider response or passing validation.
+    const probes=exerciseSeyeonR38NegativeRealGuardsV1(
+      source.finalModelContext,
+    );
+    expect(probes).toHaveLength(4);
+    const rejectedCases:string[]=[];
     let fetches=0;
     for(const purpose of purposes){
       const request:SeyeonStructuredProviderRequestV2=
@@ -1330,6 +1344,42 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
               pinInput,reservation:reserved,
             })).rejects.toBeInstanceOf(SeyeonR37OfflineSyntheticResultHoldV1);
           }
+          const localGuardCases=probes.filter(
+            probe=>probe.stagePurpose===reserved.purpose,
+          );
+          for(const probe of localGuardCases){
+            if(probe.caseKey==='interpretation_unknown_reference'){
+              // A restricted Executor cannot label a successful review as
+              // one of the four negative guard cases or bind another Stage.
+              await expect(tx(c=>c.query(
+                'select seyeon_positive_candidate.record_guard_negative_probe_r38($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::integer,$7::text,$8::uuid,$9::text,$10::text,$11::text) as receipt',
+                [subject,a.thread,a.turn,a.attempt,'semantic_review_passed',
+                 reserved.stageIndex,reserved.purpose,reserved.callId,
+                 reserved.nativeWireDigest,probe.actualGuardName,
+                 probe.candidateDigest],
+              ),true)).rejects.toMatchObject({
+                code:'23514',
+                constraint:'seyeon_r38_negative_probe_scope_forged',
+              });
+            }
+            const result=await recordSeyeonR38OfflineNegativeGuardProbeV1({
+              pinInput,reservation:reserved,probe,
+            });
+            expect(result).toMatchObject({
+              caseKey:probe.caseKey,
+              verdict:'rejected',providerDispatched:false,
+              outputGuardVerified:false,
+              permitsAtomicCommit:false,permitsHttpReveal:false,
+            });
+            rejectedCases.push(result.caseKey);
+            if(probe.caseKey==='interpretation_unknown_reference'){
+              await expect(recordSeyeonR38OfflineNegativeGuardProbeV1({
+                pinInput,reservation:reserved,probe,
+              })).rejects.toBeInstanceOf(
+                SeyeonR38OfflineNegativeEvidenceHoldV1,
+              );
+            }
+          }
           throw new SeyeonR32OfflineFiveStageHoldV1();
         },
       });
@@ -1340,6 +1390,12 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     }
     expect(used.map(r=>r.stageIndex)).toEqual([0,1,2,3,4]);
     expect(observed.map(r=>r.stageIndex)).toEqual([0,1,2,3,4]);
+    expect(rejectedCases).toEqual([
+      'interpretation_unknown_reference',
+      'renderer_unapproved_private_source',
+      'semantic_review_hash_mismatch',
+      'semantic_review_rejected',
+    ]);
     expect(observed.every(r=>r.providerDispatched===false
       &&r.providerOutputVerified===false
       &&r.outputGuardVerified===false
@@ -1377,6 +1433,28 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     ),true)).rejects.toMatchObject({code:'42501'});
     await expect(tx(c=>c.query(
       'delete from seyeon_positive_candidate.synthetic_stage_results_r37 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    const guardRows=await pool.query<{
+      case_key:string;verdict:string;origin_kind:string;
+      provider_dispatched:boolean;output_guard_verified:boolean;
+    }>(
+      'select case_key,verdict,origin_kind,provider_dispatched,output_guard_verified from seyeon_positive_candidate.guard_negative_probes_r38 where attempt_id=$1::uuid order by case_key',
+      [a.attempt],
+    );
+    expect(guardRows.rows).toHaveLength(4);
+    expect(guardRows.rows.every(r=>r.verdict==='rejected'
+      &&r.origin_kind==='local_invalid_fixture_not_provider_output'
+      &&r.provider_dispatched===false
+      &&r.output_guard_verified===false)).toBe(true);
+    await expect(pool.query(
+      "update seyeon_positive_candidate.guard_negative_probes_r38 set verdict='passed' where attempt_id=$1::uuid",
+      [a.attempt],
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'offline_source_set_immutable',
+    });
+    await expect(tx(c=>c.query(
+      'select * from seyeon_positive_candidate.guard_negative_probes_r38 where attempt_id=$1::uuid',
       [a.attempt],
     ),true)).rejects.toMatchObject({code:'42501'});
     const ledger=await pool.query<{
@@ -1509,6 +1587,15 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
     });
+    // Negative-only real guard probes cannot replace actual Provider output.
+    // A deleted probe is a missing evidence chain, not a positive PASS.
+    await pool.query(
+      "delete from seyeon_positive_candidate.guard_negative_probes_r38 where attempt_id=$1::uuid and case_key='semantic_review_rejected'",
+      [a.attempt],
+    );
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r38_negative_guard_probe_missing',
+    });
     // Deleting an observation under the scratch DB owner simulates lost
     // local evidence. API executors cannot DELETE this table; a privacy
     // cascade remains legal. G2 MUST notice the missing Stage-4 outcome.
@@ -1531,7 +1618,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       messages:'0',outboxes:'0',admissions:'0',
     });
     expect(fetches).toBe(0);
-  },60000);
+  },90000);
 
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
