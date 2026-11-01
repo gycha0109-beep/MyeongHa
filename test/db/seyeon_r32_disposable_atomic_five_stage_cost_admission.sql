@@ -37,7 +37,8 @@ begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
     or p_policy is null or p_rate is null or p_input_bound is null
-    or p_input_bound<1 or p_context_digest !~ '^sha256:v1:[a-f0-9]{64}$'
+    or p_input_bound<1 or p_context_digest is null
+    or p_context_digest !~ '^sha256:v1:[a-f0-9]{64}$'
     or p_wire is null or octet_length(p_wire) not between 1 and 65536
   then
     raise exception using errcode='23514',
