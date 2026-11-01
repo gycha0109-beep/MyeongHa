@@ -26,6 +26,14 @@ registerStaticCopy('세연의 안전한 응답 처리가 완료되지 않았습�
 registerStaticCopy('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': '会話の状態を確認できませんでした。しばらくしてからもう一度お試しください。', 'zh-TW': '無法確認對話狀態，請稍後再試。', 'en-US': 'The chat status could not be verified. Please try again shortly.', 'zh-CN': '无法确认对话状态，请稍后重试。' });
 registerStaticCopy("이전 대화에 미완료 메시지가 남아 새 메시지가 차단됐습니다. 기존 메시지의 전송 상태를 확인해 주세요.", { 'ja-JP': "前の会話に未完了のメッセージがあるため、新しいメッセージを送信できません。先に送信したメッセージの状態をご確認ください。", 'zh-TW': "上一段對話仍有未完成的訊息，因此無法傳送新訊息。請確認先前訊息的傳送狀態。", 'en-US': "An unfinished message in the previous conversation is blocking new messages. Please check the delivery status of that message.", 'zh-CN': "上一段对话仍有未完成的消息，因此无法发送新消息。请确认此前消息的发送状态。" });
 registerStaticCopy("관리자 또는 크레딧 사용 권한을 확인하지 못했습니다. 입력한 내용은 보존했습니다. 다시 로그인한 뒤 시도해 주세요.", { 'ja-JP': "管理者権限またはクレジット利用権限を確認できませんでした。入力内容は保持されています。再度ログインしてからお試しください。", 'zh-TW': "無法確認管理員或點數使用權限。輸入內容已保留，請重新登入後再試。", 'en-US': "Could not verify administrator or credit-use permissions. Your message has been preserved. Please sign in again and retry.", 'zh-CN': "无法确认管理员或点数使用权限。输入内容已保留，请重新登录后重试。" });
+registerStaticCopy("계산 확인 중", { 'ja-JP': "計算を確認中", 'zh-TW': "正在確認計算", 'en-US': "Checking calculation", 'zh-CN': "正在确认计算" });
+registerStaticCopy("사주 계산 결과", { 'ja-JP': "四柱の計算結果", 'zh-TW': "八字計算結果", 'en-US': "Saju calculation results", 'zh-CN': "八字计算结果" });
+registerStaticCopy("서버가 계산한 천간·지지 8글자의 오행 개수입니다. 강약 점수가 아닙니다.", { 'ja-JP': "サーバーで計算された八字の五行の文字数です。強弱の評価ではありません。", 'zh-TW': "這是伺服器計算的八字五行字數，並非強弱評分。", 'en-US': "Counts of the five elements in the eight calculated characters. These are not strength scores.", 'zh-CN': "这是服务器计算的八字五行字数，并非强弱评分。" });
+registerStaticCopy("사주 네 기둥", { 'ja-JP': "四柱八字の四柱", 'zh-TW': "八字四柱", 'en-US': "Four Saju pillars", 'zh-CN': "八字四柱" });
+registerStaticCopy("오행 선택", { 'ja-JP': "五行を選択", 'zh-TW': "選擇五行", 'en-US': "Choose an element", 'zh-CN': "选择五行" });
+registerStaticCopy("오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.", { 'ja-JP': "五行を選ぶと、対応する天干・地支が強調されます。", 'zh-TW': "選擇五行，可在四柱八字中標示對應的天干與地支。", 'en-US': "Choose an element to highlight its corresponding stems and branches.", 'zh-CN': "选择五行，可在四柱八字中标示对应的天干与地支。" });
+registerStaticCopy("명식에서 보기", { 'ja-JP': "四柱で見る", 'zh-TW': "在四柱中查看", 'en-US': "View in Four Pillars", 'zh-CN': "在四柱中查看" });
+registerStaticCopy("계산된 사실 정보를 확인합니다.", { 'ja-JP': "計算済みの情報を確認します。", 'zh-TW': "查看已計算的資料。", 'en-US': "Review the calculated facts.", 'zh-CN': "查看已计算的数据。" });
 registerStaticCopy('전송 중인 메시지', { 'ja-JP': '送信中のメッセージ', 'zh-TW': '傳送中的訊息', 'en-US': 'Sending message', 'zh-CN': '正在发送的消息' });
 registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨンの返信を待っています', 'zh-TW': '正在等待 Seyeon 回覆', 'en-US': 'Waiting for Seyeon to reply', 'zh-CN': '正在等待 Seyeon 回复' });
 registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });

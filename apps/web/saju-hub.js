@@ -2,6 +2,7 @@ import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidate
 import { getUiLocale } from './ui-i18n.js';
 import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
 import { readCurrentSajuBirthProfileV1, matchCurrentSajuBirthProfileV1 } from './saju-current-birth-authority.js';
+import { mountSajuRadarV1, sajuRadarElementLabelV1, SAJU_RADAR_ELEMENT_COLORS_V1 } from './saju-five-elements-radar.js';
 
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
@@ -286,7 +287,22 @@ function renderPillars(snapshot) {
     const value = document.createElement('div');
     value.className = 'saju-pillar-value';
     const strong = document.createElement('strong');
-    strong.textContent = display.characters;
+    const resolved = resolvedPillar(state);
+    if (resolved) {
+      for (const partKey of ['stem', 'branch']) {
+        const part = resolved[partKey];
+        const character = document.createElement('span');
+        character.className = 'saju-pillar-hanja';
+        character.dataset.sajuPartElement = ELEMENTS.includes(part?.element) ? part.element : '';
+        character.dataset.sajuPartKind = partKey;
+        character.style.setProperty('--saju-element-color',
+          SAJU_RADAR_ELEMENT_COLORS_V1[part?.element] ?? '#c9a98a');
+        character.textContent = part?.hanja || part?.value || '—';
+        strong.append(character);
+      }
+    } else {
+      strong.textContent = display.characters;
+    }
     strong.dataset.sajuSourceCharacters = display.characters;
     const text = document.createElement('span');
     text.textContent = display.text;
@@ -318,25 +334,75 @@ function countElements(snapshot) {
   return counts;
 }
 
-function renderElements(snapshot) {
-  const root = byId('saju-element-bars');
-  root.replaceChildren();
-  const counts = countElements(snapshot);
-  const max = Math.max(1, ...Object.values(counts));
+let selectedSajuElement = null;
+let lastRenderedSajuSnapshot = null;
 
-  for (const element of ELEMENTS) {
-    const item = document.createElement('span');
-    item.className = 'saju-element';
-    const label = document.createElement('b');
-    label.textContent = sajuElementLabelV1(element, getUiLocale());
-    label.dataset.sajuElementKey = element;
-    const bar = document.createElement('i');
-    bar.style.setProperty('--element-fill', `${Math.round((counts[element] / max) * 100)}%`);
-    const value = document.createElement('small');
-    value.textContent = String(counts[element]);
-    item.append(label, bar, value);
-    root.append(item);
+function selectedElementExplanation(element, locale = getUiLocale()) {
+  const name = sajuRadarElementLabelV1(element, locale);
+  if (locale === 'en-US') return `Highlighting stems and branches belonging to ${name} in the Four Pillars tab.`;
+  if (locale === 'ja-JP') return `${name}に対応する天干・地支を四柱八字で強調します。`;
+  if (locale === 'zh-TW') return `已在四柱八字中標示屬於${name}的天干與地支。`;
+  if (locale === 'zh-CN') return `已在四柱八字中标示属于${name}的天干与地支。`;
+  return `${name}에 해당하는 천간·지지를 사주팔자에서 강조합니다.`;
+}
+
+function defaultElementExplanation(locale = getUiLocale()) {
+  if (locale === 'en-US') return 'Choose an element to highlight the matching stems and branches.';
+  if (locale === 'ja-JP') return '五行を選ぶと、対応する天干・地支が強調されます。';
+  if (locale === 'zh-TW') return '選擇五行，可在四柱八字中標示對應的天干與地支。';
+  if (locale === 'zh-CN') return '选择五行，可在四柱八字中标示对应的天干与地支。';
+  return '오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.';
+}
+
+function syncSajuElementSelection() {
+  const selected = selectedSajuElement;
+  const pillars = document.getElementById('saju-pillar-grid');
+  if (!pillars) return;
+  pillars.dataset.sajuSelectedElement = selected ?? '';
+  for (const part of pillars.querySelectorAll('[data-saju-part-element]')) {
+    part.classList.toggle('is-element-match',
+      Boolean(selected) && part.dataset.sajuPartElement === selected);
   }
+  for (const card of pillars.querySelectorAll('[data-saju-pillar-key]')) {
+    card.classList.toggle('is-element-linked', Boolean(card.querySelector('.is-element-match')));
+  }
+  for (const control of document.querySelectorAll('[data-saju-element-select]')) {
+    const chosen = control.dataset.sajuElementSelect === selected;
+    control.classList.toggle('is-selected', chosen);
+    control.setAttribute('aria-pressed', String(chosen));
+  }
+  const note = document.getElementById('saju-pillar-selection-note');
+  if (note) {
+    note.hidden = !selected;
+    note.textContent = selected ? selectedElementExplanation(selected) : '';
+  }
+  const feedback = document.getElementById('saju-element-feedback');
+  if (feedback) feedback.textContent = selected
+    ? selectedElementExplanation(selected) : defaultElementExplanation();
+}
+
+function chooseSajuElement(element) {
+  selectedSajuElement = selectedSajuElement === element ? null : element;
+  syncSajuElementSelection();
+  document.dispatchEvent(new CustomEvent('myeongha:saju-element-selected', {
+    detail: { element: selectedSajuElement },
+  }));
+}
+
+function renderElements(snapshot) {
+  const choicesRoot = byId('saju-element-bars');
+  const chartRoot = byId('saju-element-radar');
+  const counts = countElements(snapshot);
+  mountSajuRadarV1({
+    document,
+    chartRoot,
+    choicesRoot,
+    counts,
+    locale: getUiLocale(),
+    selectedElement: selectedSajuElement,
+    onSelect: chooseSajuElement,
+  });
+  syncSajuElementSelection();
 }
 
 function formatBirthSummary(profile, locale = 'ko-KR') {
@@ -401,9 +467,7 @@ function retranslateCalculatedSaju() {
     const meta = card.querySelector('.saju-pillar-meta');
     if (meta) meta.textContent = meta.dataset['saju' + suffix] ?? meta.textContent;
   }
-  for (const label of hub.querySelectorAll('[data-saju-element-key]')) {
-    label.textContent = sajuElementLabelV1(label.dataset.sajuElementKey,locale);
-  }
+  if (lastRenderedSajuSnapshot) renderElements(lastRenderedSajuSnapshot);
   const dayMaster = byId('saju-day-master');
   dayMaster.textContent = locale === 'ko-KR' ? dayMaster.dataset.sajuKo : dayMaster.dataset.sajuIntl;
   const meta = byId('saju-day-master-meta');
@@ -429,8 +493,13 @@ function renderCalculation(calculation, profile) {
   lastRenderedBirthProfile = profile;
   const snapshot = calculation?.snapshot;
   if (!snapshot || typeof snapshot !== 'object') throw new Error('Saju snapshot is unavailable.');
+  selectedSajuElement = null;
+  lastRenderedSajuSnapshot = snapshot;
   renderPillars(snapshot);
   renderElements(snapshot);
+  document.dispatchEvent(new CustomEvent('myeongha:saju-element-selected', {
+    detail: { element: null },
+  }));
 
   const day = resolvedPillar(snapshot.pillars?.day);
   const dayStem = day?.stem;
