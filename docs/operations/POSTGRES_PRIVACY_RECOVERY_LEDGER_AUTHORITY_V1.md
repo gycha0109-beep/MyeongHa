@@ -114,6 +114,14 @@ change. `future_safe_privacy_reconciliation=false` and `dr_ready=false`
 remain mandatory pending independently verified continuous source authority,
 Hosted provider equivalence, and full recovery acceptance.
 
+## 2026-11-01 — first live freshness monitor FAIL → source refresh → monitor PASS
+
+After [PR #2851](https://github.com/gycha0109-beep/MyeongHa/pull/2851) merged, the first independent [freshness monitor #41312147367](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41312147367) **correctly failed**: latest confirmed source run **#41287556554**, GitHub completion time `2026-11-01T09:08:36Z`, age `16133` seconds, exact encrypted artifact present, threshold `7200` seconds, status `CAPTURE_COMPLETION_STALE`.
+
+A **single manually dispatched existing protected source ledger** [#41312262633](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41312262633) succeeded, with encrypted artifact **#13086116443** (SHA-256 `4711e3ebc7bf3b3d4f84cd4890cf299aebe607e5aa517dcd5605b0a1febde117`, expires 2026-12-01T13:39:11Z). Public sanitized manifest reports `capturedAt=2026-11-01T13:39:08Z`, supported `eventCount=0`, `backupRunId=41243930121`, `futureSafePrivacyReconciliation=false`, `drReady=false`. The encrypted event payload was **not** decrypted or inspected.
+
+The subsequent independent [freshness monitor #41312435995](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41312435995) **PASS**: source run `41312262633`, `elapsedSinceRunCompletionSeconds=117`, `encryptedArtifactObserved=true`, `status=RECENT_CAPTURE_COMPLETION_OBSERVED`. This is the first real observed monitor red-to-green recovery. It proves recent completion and artifact metadata presence **only**; scheduled-run delays, possible missing privacy events, independently continuous event evidence, email delivery, approved RPO and whole-service recovery are **NOT PROVEN**. `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false` remain invariant.
+
 ## 2026-11-01 — independent GitHub snapshot-completion freshness watch
 
 In addition to the existing warning emitted **inside** a successful scheduled privacy-ledger capture, Phase 6 now has `.github/workflows/production-privacy-ledger-freshness-watch.yml`. This separate **manual/main-only or hourly scheduled** GitHub Actions job uses only the repository-scoped GitHub token with `actions: read` and `contents: read` to query the exact `production-postgres-privacy-recovery-ledger.yml` workflow's latest successful main run and the encrypted artifact it actually uploaded. It never reads the archive or event contents, links to Supabase, accesses Production secrets, or changes the original capture schedule.
