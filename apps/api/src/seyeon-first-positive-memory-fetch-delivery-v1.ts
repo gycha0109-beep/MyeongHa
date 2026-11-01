@@ -20,6 +20,7 @@ const G0_RECENT_RPC='public.qry_seyeon_g0_current_source_recent_messages_v1(uuid
 const G0_HISTORY_RPC='public.qry_seyeon_g0_current_source_relationship_history_v1(uuid,text,bigint)';
 const G0_USER_RPC='seyeon_private.assert_current_original_member_user_message_v1(uuid,uuid,uuid)';
 const G0_ASSISTANT_RPC='seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)';
+const RECOVER_FAILED_USER_RPC='public.qry_seyeon_recover_exact_failed_user_turn_v1(uuid,uuid,text)';
 
 /**
  * Run after subject authentication but BEFORE a new logical turn is inserted.
@@ -89,7 +90,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   zeroSourceFirstReplyApproved?: true;
 }>): Promise<Response> {
   const held=()=>holdSeyeonReceiptHttpV1(input.requestId);
-  let stage: 'preflight'|'receipt_readiness'|'model_execution'|'receipt_issuer'='preflight';
+  let stage: 'preflight'|'receipt_readiness'|'failed_turn_reconciliation'|'model_execution'|'receipt_issuer'='preflight';
   try {
     const preflight=await preflightSeyeonChatTurnSendRequestV1(input);
     if(preflight.kind==='denied')return preflight.response;
@@ -122,9 +123,46 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         await assertSeyeonG0OriginalLineageReadyV1(client);
       }});
     if(input.request.signal.aborted)return held();
+
+    // A browser may have lost its sessionStorage clientTurnId. Recover only
+    // the exact prior failed, uncommitted User text under the SAME verified
+    // canonical Subject and Se-yeon thread. Never rewrite a different message,
+    // fabricate a client Turn ID or reveal previous transcript material.
+    let executionClientTurnId=preflight.clientTurnId;
+    if(zeroSource){
+      stage='failed_turn_reconciliation';
+      const recovered=await executePostgresSubjectTransactionV1({
+        pool:input.pool,verifiedEvidence:preflight.verifiedEvidence,
+        execute:async({client,resolvedSubject})=>{
+          if(resolvedSubject.subjectKind!=='member')throw Error('Member required for recovery');
+          const readiness=await client.query<{ready:boolean}>(`select count(*)=1 as ready
+            from pg_catalog.pg_proc p
+            where p.oid=to_regprocedure($1) and p.prosecdef
+              and pg_catalog.pg_get_userbyid(p.proowner)='myeongha_seyeon_chat_runtime_owner'
+              and has_function_privilege(current_user,p.oid,'EXECUTE')
+              and not has_function_privilege('anon',p.oid,'EXECUTE')
+              and not has_function_privilege('authenticated',p.oid,'EXECUTE')
+              and not has_function_privilege('service_role',p.oid,'EXECUTE')`,
+            [RECOVER_FAILED_USER_RPC]);
+          if(readiness.rows.length!==1||readiness.rows[0]?.ready!==true)
+            throw Error('Exact previous-User recovery authority not installed');
+          const r=await client.query<{clientTurnId:unknown}>(`select
+            public.qry_seyeon_recover_exact_failed_user_turn_v1(
+              $1::uuid,$2::uuid,$3::text) as "clientTurnId"`,
+            [resolvedSubject.subjectId,preflight.threadId,preflight.text]);
+          if(r.rows.length!==1)throw Error('Ambiguous original User recovery');
+          const id=r.rows[0]?.clientTurnId;
+          if(id===null)return null;
+          if(typeof id!=='string'||!UUID.test(id))throw Error('Invalid DB-owned client turn');
+          return id;
+        },
+      });
+      if(recovered!==null)executionClientTurnId=recovered;
+    }
+    if(input.request.signal.aborted)return held();
     stage='model_execution';
     const result=await input.runtime.run({verifiedEvidence:preflight.verifiedEvidence,
-      threadId:preflight.threadId,clientTurnId:preflight.clientTurnId,text:preflight.text});
+      threadId:preflight.threadId,clientTurnId:executionClientTurnId,text:preflight.text});
     const e=result.execution;
     // A fresh response may be generated for the SAME durable clientTurnId
     // after its previous attempt failed before Commit. That receive is an
@@ -157,7 +195,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
             $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text,$9::bytea)`,[
           resolvedSubject.subjectId,preflight.threadId,e.committedTurn.turnId,e.committedTurn.attemptId,
           e.receivedTurn.userMessageId,e.committedTurn.assistantMessageId,
-          e.committedTurn.postTurnOutboxEventId,preflight.clientTurnId,receiptHash]);
+          e.committedTurn.postTurnOutboxEventId,executionClientTurnId,receiptHash]);
         const text=r.rows.length===1?r.rows[0]?.assistantText:null;
         if(typeof text!=='string'||text.trim()===''||Buffer.byteLength(text,'utf8')>65_536||
            input.request.signal.aborted)throw Error('Original response unavailable');
