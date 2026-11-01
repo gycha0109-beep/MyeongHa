@@ -35,10 +35,13 @@ describe('Web Golden Master', () => {
     ]);
 
     const topicCatalog = page.match(/const readingTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
-    expect(topicCatalog.match(/motif:/gu)).toHaveLength(4);
-    expectInOrder(topicCatalog, ['전체 사주', '직업 · 커리어', '재물', '연애 · 관계']);
+    expect(topicCatalog.match(/motif:/gu)).toHaveLength(3);
+    expectInOrder(topicCatalog, ['직업 · 커리어', '재물', '연애 · 관계']);
+    expect(topicCatalog).not.toContain('전체 사주');
+    expect(page).toContain('<span className="mhx-hero-heading-line">요즘, 무엇이 가장</span>');
+    expect(page).toContain('<em className="mhx-hero-heading-line">궁금하세요?</em>');
+    expect(page).toContain('href="reading.html"');
     for (const href of [
-      'reading-detail.html?topic=temperament&scope=original',
       'reading-detail.html?topic=career',
       'reading-detail.html?topic=money',
       'reading-detail.html?topic=love',
@@ -52,8 +55,11 @@ describe('Web Golden Master', () => {
     expect(page).not.toContain('퇴사를 고민했던 이야기');
     expect(page).not.toContain('3일 전');
     expect(page).not.toContain('인연 120');
-    expect(css).toMatch(/\.mhx-topics\s*\{[\s\S]*?grid-template-columns:\s*repeat\(4,/u);
+    expect(css).toMatch(/\.mhx-topics\s*\{[\s\S]*?grid-template-columns:\s*repeat\(3,/u);
     expect(css).toContain('@media (max-width: 580px)');
+    expect(css).toContain('url("home-moonlight-concept-dark.avif") right center');
+    expect(css).not.toContain('url("home-moonlight-concept-light.avif")');
+    expect(css).toContain('mhx-hero-heading-line');
     expect(home).not.toContain('home-sidebar');
     expect(home).not.toContain('gm-sidebar');
   });
@@ -79,7 +85,7 @@ describe('Web Golden Master', () => {
       '보고서 구성 미리보기',
     ]);
     expectInOrder(page.slice(page.indexOf('const sajuProductTopics')), [
-      '전체 사주 해석', '직업 · 커리어', '재물', '연애 · 관계',
+      '직업 · 커리어', '재물', '연애 · 관계',
       '사업', '가족', '삶의 단계', '올해', '이번 달', '배우자', '궁합', '지금 고민으로 보기',
     ]);
 
@@ -96,6 +102,11 @@ describe('Web Golden Master', () => {
       'saju-birth-calendar-display',
     ] as const;
     for (const id of runtimeIds) expect(saju).toContain(`id="${id}"`);
+    expect(page).not.toContain('전체 사주');
+    const catalog = page.match(/const sajuProductTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
+    expect(catalog.match(/symbol:/gu)).toHaveLength(11);
+    expect(page).toContain("resumedVisibleTopic ?? '#saju-design-products-title'");
+    expect(design).toContain('.saju-design-product-card:nth-last-child(3):nth-child(4n+1)');
     expect(saju).not.toContain('gm-sidebar');
     expect(design).toContain('.saju-design-product-grid');
     expect(design).toContain('@media (max-width:690px)');

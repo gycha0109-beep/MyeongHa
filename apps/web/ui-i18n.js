@@ -34,6 +34,10 @@ registerStaticCopy("오행 선택", { 'ja-JP': "五行を選択", 'zh-TW': "選�
 registerStaticCopy("오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.", { 'ja-JP': "五行を選ぶと、対応する天干・地支が強調されます。", 'zh-TW': "選擇五行，可在四柱八字中標示對應的天干與地支。", 'en-US': "Choose an element to highlight its corresponding stems and branches.", 'zh-CN': "选择五行，可在四柱八字中标示对应的天干与地支。" });
 registerStaticCopy("명식에서 보기", { 'ja-JP': "四柱で見る", 'zh-TW': "在四柱中查看", 'en-US': "View in Four Pillars", 'zh-CN': "在四柱中查看" });
 registerStaticCopy("계산된 사실 정보를 확인합니다.", { 'ja-JP': "計算済みの情報を確認します。", 'zh-TW': "查看已計算的資料。", 'en-US': "Review the calculated facts.", 'zh-CN': "查看已计算的数据。" });
+registerStaticCopy("관심 있는 사주 해석 주제를 같은 상품 영역에서 확인합니다.", { 'ja-JP': "関心のある四柱推命のテーマを同じ商品一覧でご覧いただけます。", 'zh-TW': "您可在同一商品列表查看感興趣的八字解讀主題。", 'en-US': "Explore the Saju reading topics that interest you in one place.", 'zh-CN': "您可在同一商品列表查看感兴趣的八字解读主题。" });
+registerStaticCopy("월간 해석은 준비 중입니다. 내 명식과 다른 주제를 먼저 살펴보세요.", { 'ja-JP': "月間鑑定は準備中です。まずはご自身の命式やほかのテーマをご覧ください。", 'zh-TW': "月度解讀仍在準備中。您可以先查看自己的命盤及其他主題。", 'en-US': "Monthly readings are not available yet. Explore your birth chart and other topics first.", 'zh-CN': "月度解读仍在准备中。您可以先查看自己的命盘及其他主题。" });
+registerStaticCopy("선택한 해석 이어보기 →", { 'ja-JP': "選択した鑑定の続きを見る →", 'zh-TW': "繼續查看已選解讀 →", 'en-US': "Continue selected reading →", 'zh-CN': "继续查看已选解读 →" });
+registerStaticCopy("주제별 해석 살펴보기 →", { 'ja-JP': "テーマ別の鑑定を見る →", 'zh-TW': "瀏覽各主題解讀 →", 'en-US': "Explore reading topics →", 'zh-CN': "浏览各主题解读 →" });
 registerStaticCopy('전송 중인 메시지', { 'ja-JP': '送信中のメッセージ', 'zh-TW': '傳送中的訊息', 'en-US': 'Sending message', 'zh-CN': '正在发送的消息' });
 registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨンの返信を待っています', 'zh-TW': '正在等待 Seyeon 回覆', 'en-US': 'Waiting for Seyeon to reply', 'zh-CN': '正在等待 Seyeon 回复' });
 registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });

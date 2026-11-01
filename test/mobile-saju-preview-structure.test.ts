@@ -21,7 +21,7 @@ describe('mobile M3-B Saju Preview Reading structure', () => {
     expect(view).not.toContain('JSON.stringify');
   });
 
-  it('keeps exactly five executable Preview topics while exposing the full web topic surface', async () => {
+  it('preserves five API Preview text contracts while exposing eleven public Saju topics', async () => {
     const client = await readRepoFile('packages/api-client/src/saju-preview.ts');
     const view = await readRepoFile(
       'apps/mobile/src/features/saju/SajuPreviewReadingView.tsx',
@@ -38,7 +38,6 @@ describe('mobile M3-B Saju Preview Reading structure', () => {
     expect(view).toContain('다른 주제의 풀이로 자동 대체하지 않습니다');
 
     for (const label of [
-      '전체 사주',
       '직업 · 커리어',
       '재물',
       '연애 · 관계',
@@ -53,6 +52,8 @@ describe('mobile M3-B Saju Preview Reading structure', () => {
     ]) {
       expect(catalog).toContain(`label: '${label}'`);
     }
+    expect(catalog).not.toContain("label: '전체 사주'");
+    expect(catalog).not.toContain("key: 'temperament',");
   });
 
   it('preserves neutral Preview authority copy', async () => {

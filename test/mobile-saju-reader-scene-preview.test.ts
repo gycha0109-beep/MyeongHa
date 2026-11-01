@@ -6,8 +6,13 @@ const source = (path: string) => readFile(new URL('../' + path, import.meta.url)
 
 describe('native Reader Saju preview scene admission and presentation', () => {
   it('allows only approved Seyeon preview topics', () => {
-    expect(resolveMobileSajuSceneAdmissionV1('seyeon', 'temperament')?.readingText).toBe('전체 사주');
+    // The legacy General Natal engine route remains supported, but this retired
+    // product has no public mobile catalog entry and cannot open a Reader scene.
+    expect(resolveMobileSajuSceneAdmissionV1('seyeon', 'temperament')).toBeNull();
     expect(resolveMobileSajuSceneAdmissionV1('seyeon', 'career')?.readingText).toBe('직업운');
+    expect(resolveMobileSajuSceneAdmissionV1('seyeon', 'money')?.readingText).toBe('재물운');
+    expect(resolveMobileSajuSceneAdmissionV1('seyeon', 'love')?.readingText).toBe('연애운');
+    expect(resolveMobileSajuSceneAdmissionV1('seyeon', 'business')?.readingText).toBe('사업운');
     for (const topic of ['year', 'month', 'family', 'compatibility', 'question-specific', 'unknown']) {
       expect(resolveMobileSajuSceneAdmissionV1('seyeon', topic)).toBeNull();
     }

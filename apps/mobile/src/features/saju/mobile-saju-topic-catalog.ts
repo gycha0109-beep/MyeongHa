@@ -63,18 +63,6 @@ export const MOBILE_SAJU_TOPIC_SECTIONS_V1: readonly MobileSajuTopicSectionV1[] 
     support: '나를 더 깊이 이해하는 시간',
     topics: Object.freeze([
       Object.freeze({
-        key: 'temperament',
-        label: '전체 사주',
-        description: '나라는 사람을 더 깊이',
-        icon: '✦',
-        webHref: 'reading-detail.html?topic=temperament&scope=original',
-        availability: Object.freeze({
-          kind: 'preview',
-          readingText: '전체 사주',
-          statusLabel: '바로 보기',
-        }),
-      }),
-      Object.freeze({
         key: 'career',
         label: '직업 · 커리어',
         description: '지금의 길, 더 나은 길로',
