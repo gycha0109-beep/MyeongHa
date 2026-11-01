@@ -1365,6 +1365,20 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       &&/^sha256:pg-jsonb:v1:[0-9a-f]{64}$/u.test(
         r.synthetic_payload_digest,
       ))).toBe(true);
+    await expect(pool.query(
+      "update seyeon_positive_candidate.synthetic_stage_results_r37 set provider_output_verified=true where attempt_id=$1::uuid and stage_index=0",
+      [a.attempt],
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'offline_source_set_immutable',
+    });
+    await expect(tx(c=>c.query(
+      'select * from seyeon_positive_candidate.synthetic_stage_results_r37 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(tx(c=>c.query(
+      'delete from seyeon_positive_candidate.synthetic_stage_results_r37 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
     const ledger=await pool.query<{
       purpose:string;call_id:string;governor_ceiling_micro_usd:string;
       lifecycle_state:string;
