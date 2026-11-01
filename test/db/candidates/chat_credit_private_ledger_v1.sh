@@ -32,4 +32,8 @@ psql -v ON_ERROR_STOP=1 -f test/db/candidates/chat_credit_g4_original_delivery_r
 # Only this disposable clone may exercise the narrowly scoped private RPC role.
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_role_only_v1.sql >/dev/null
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_role_only_v1_test.sql >/dev/null
-echo 'PASS commerce private ledger + G4 original ACK/refund and isolated private-role reservation/ACK ACL'
+# The private refund candidate owns its own original DB failure proof;
+# no wallet table or generic finalize access is granted to runtime roles.
+psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_refund_proven_v1.sql >/dev/null
+psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_refund_proven_v1_test.sql >/dev/null
+echo 'PASS commerce credit ledger + G4 ACK/private refund and least-privilege role (disposable)'
