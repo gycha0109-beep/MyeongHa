@@ -56,4 +56,9 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r25_disposable_first_once_g3.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
-echo 'PASS offline R2/R5/R25 real G2 + first-once G3 delivery/rollback races; Production G0/G2/G3 HOLD'
+# After legacy compatibility/G3 tests, revoke positive G2 executor permissions
+# in the same scratch DB. No new owner positive Commit is granted.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r31-g2-forward-stop-disposable.test.ts --maxWorkers=1
+echo 'PASS offline G1/G4 native five-stage owner ancestry, G2/G3 tests, final G2 ACL forward stop; Production G0/G2/G3 HOLD'
