@@ -1163,6 +1163,105 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
                 constraint:'seyeon_r35_unpinned_derived_interpreter_context',
               });
             }
+            // R36 independent DB-authored source: a forged (but otherwise
+            // structurally correct) Character/Schema/instruction cannot
+            // borrow original Memory/Grant authority to charge the model.
+            const rawNative=native as unknown as Record<string,unknown>;
+            const rawText=rawNative.text as {
+              format:{
+                type:string;name:string;strict:boolean;
+                schema:Record<string,unknown>;
+              };
+            };
+            const staticVariants:readonly Record<string,unknown>[]=[
+              {...rawNative,instructions:String(rawNative.instructions)+' HIDDEN_UNAPPROVED_INSTRUCTION'},
+              {...rawNative,text:{format:{
+                ...rawText.format,
+                schema:{...rawText.format.schema,
+                  properties:{unauthorizedPrivateOutput:{type:'string'}},
+                },
+              }}},
+              {...rawNative,input:[{
+                role:'user',content:[{
+                  type:'input_text',text:JSON.stringify({
+                    ...originalInput,context:{...baseline,
+                      character:{
+                        ...(baseline.character as Record<string,unknown>),
+                        sourceBibleBlobSha:'forged-character-git-blob',
+                      },
+                    },
+                  }),
+                }],
+              }]},
+              {...rawNative,input:[{
+                role:'user',content:[{
+                  type:'input_text',text:JSON.stringify({
+                    ...originalInput,context:{...baseline,
+                      bibleSlices:[...(baseline.bibleSlices as unknown[]),
+                        {id:'forged-private-slice',sourceSections:[],
+                         runtimePurpose:'unauthorized',invariants:[]}],
+                    },
+                  }),
+                }],
+              }]},
+              {...rawNative,input:[{
+                role:'user',content:[{
+                  type:'input_text',text:JSON.stringify({
+                    ...originalInput,context:{...baseline,
+                      authorityBoundaries:{
+                        ...(baseline.authorityBoundaries as Record<string,unknown>),
+                        assistantOutputNeverAuthority:false,
+                      },
+                    },
+                  }),
+                }],
+              }]},
+              {...rawNative,input:[{
+                role:'user',content:[{
+                  type:'input_text',text:JSON.stringify({
+                    ...originalInput,context:{...baseline,
+                      actionPolicy:{
+                        ...(baseline.actionPolicy as Record<string,unknown>),
+                        unauthorizedPrivateAction:'allowed',
+                      },
+                    },
+                  }),
+                }],
+              }]},
+              {...rawNative,input:[{
+                role:'user',content:[{
+                  type:'input_text',text:JSON.stringify({
+                    ...originalInput,
+                    allowedInterpretationVocabulary:{
+                      ...(originalInput.allowedInterpretationVocabulary as Record<string,unknown>),
+                      unauthorizedPrivateLevel:['secret'],
+                    },
+                  }),
+                }],
+              }]},
+              {...rawNative,input:[{
+                role:'user',content:[{
+                  type:'input_text',text:JSON.stringify({
+                    ...originalInput,context:{...baseline,
+                      schemaVersion:'unapproved-runtime-version',
+                    },
+                  }),
+                }],
+              }]},
+            ];
+            for(const forged of staticVariants){
+              await expect(tx(c=>c.query(
+                'select seyeon_positive_candidate.claim_governed_stage_r32($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::bigint) as receipt',
+                [subject,a.thread,a.turn,a.attempt,purpose,call.callId,
+                 source.selection.selectedSourcesDigest,
+                 hash(source.finalModelContext),hash(request),
+                 JSON.stringify(forged),policy.policyVersion,
+                 policy.priceQuote.priceVersion,500],
+              ),true)).rejects.toMatchObject({
+                code:'23514',
+                constraint:'seyeon_r36_static_authority_manifest_mismatch',
+              });
+            }
             const reservedAfter=await pool!.query<{stage_count:string;cost_count:string}>(
               "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
               " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as cost_count",
