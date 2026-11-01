@@ -29,7 +29,7 @@ declare
  b2 uuid;
  b3 uuid;
  b2_receipt uuid;
- subject_id uuid;
+ v_subject_id uuid;
  one record;
  b3_access record;
  source_row record;
@@ -38,7 +38,7 @@ declare
  matched bigint;
 begin
  select g.id,cr.id,cr.subject_id
- into strict b2,b2_receipt,subject_id
+ into strict b2,b2_receipt,v_subject_id
  from public.entitlement_grants g
  join public.commerce_receipts cr on cr.id=g.source_receipt_id
  where cr.purchase_intent_id='12192300-0000-0000-0000-000000000002'::uuid
@@ -54,7 +54,7 @@ begin
  '12196200-0000-4000-8000-000000000002'::uuid,b2,b2_receipt;
  if one."receiptId" is distinct from b2_receipt::text
     or one."grantId" is distinct from b2::text
-    or one."subjectId" is distinct from subject_id::text
+    or one."subjectId" is distinct from v_subject_id::text
     or one."purchaseIntentId" is distinct from
       '12192300-0000-0000-0000-000000000002'
     or one."providerEventId" is distinct from
@@ -66,11 +66,11 @@ begin
  -- A private official Source commit is not evidence of consumer delivery.
  -- Pin BOTH the B2 purchase and a second independent paid B3 bundle.
  execute source_q into strict source_row using
- one."officialReadingId"::uuid,subject_id,
+ one."officialReadingId"::uuid,v_subject_id,
  one."readerCharacterId",b2,one."purchaseIntentId"::uuid,
  one."readerContentBundleId"::uuid;
  if source_row."officialReadingId" is distinct from one."officialReadingId"
-    or source_row."subjectId" is distinct from subject_id::text
+    or source_row."subjectId" is distinct from v_subject_id::text
     or source_row."readerCharacterId" is distinct from one."readerCharacterId"
     or source_row."readerContentBundleId" is distinct from one."readerContentBundleId"
     or source_row."executionStatus" is distinct from 'succeeded'
@@ -89,13 +89,13 @@ begin
         a.purchase_intent_id::text as "purchaseIntentId"
  into strict b3_access
  from public.standard_reading_reader_access_grants a
- where a.entitlement_grant_id=b3 and a.subject_id=subject_id;
+ where a.entitlement_grant_id=b3 and a.subject_id=v_subject_id;
  if b3_access."readerContentBundleId" is not distinct from
     one."readerContentBundleId" then
   raise exception 'EXACT_READER_B2_B3_INDEPENDENT_BUNDLE_REQUIRED';
  end if;
  execute source_q into strict source_row using
- b3_access."officialReadingId"::uuid,subject_id,
+ b3_access."officialReadingId"::uuid,v_subject_id,
  b3_access."readerCharacterId",b3,b3_access."purchaseIntentId"::uuid,
  b3_access."readerContentBundleId"::uuid;
  if source_row."officialReadingId" is distinct from b3_access."officialReadingId"
@@ -105,7 +105,7 @@ begin
  end if;
 
  execute source_q into other using
- one."officialReadingId"::uuid,subject_id,
+ one."officialReadingId"::uuid,v_subject_id,
  one."readerCharacterId",b3,one."purchaseIntentId"::uuid,
  one."readerContentBundleId"::uuid;
  get diagnostics matched=row_count;

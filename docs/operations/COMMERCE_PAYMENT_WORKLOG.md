@@ -224,3 +224,9 @@
 - **문서:** `docs/operations/COMMERCE_P4_READER_PRIVATE_SOURCE_NOT_CONSUMER_DELIVERY_V1.md`.
 - **최종 로컬 회귀:** 관련 Vitest **23개 파일/463건 PASS**, TypeScript 타입 검사·빌드 PASS, 실제 PG17 fixture 기반 SQL 생성기 및 Bash 문법 PASS. 로컬 Docker 엔진은 실행 중이지 않아 신규 실제 PostgreSQL 17 DB 통합 검사는 미실행이며, PR의 공식 postgres17 CI 성공으로만 증명합니다.
 - **통합 PR:** [PR #2853](https://github.com/gycha0109-beep/MyeongHa/pull/2853), 구현 커밋 c06e05d5. 관련 Vitest 463건·타입 검사·빌드 PASS. 공식 PostgreSQL 17 전체 스키마/필수 통합 CI와 병합은 결과 확인 전까지 미확정입니다.
+
+### 2026-11-01 — PR #2853 통합 PostgreSQL 17 실패 수정
+
+- **공식 CI 사실:** [통합 CI #41290232104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290232104)에서 admission, 일반 Work Track, runtime/content/commerce-payment/commerce-entitlement, DB authority-core는 PASS. 실제 실패는 `full / DB dependency · postgres17`의 `commerce-exact-reader-withdrawal-hold-pg17` 1건이며, 뒤따르는 CI Verify/Integration Verify 실패는 그 결과에 종속.
+- **원인 및 수정:** 새 PostgreSQL 17 격리 SQL 블록에서 `subject_id`를 PL/pgSQL 지역 변수명과 DB 컬럼명에 동시에 사용해 `column reference "subject_id" is ambiguous`가 발생했습니다. 지역 변수를 `v_subject_id`로 변경하고 B2/B3 조회·비교에서 같은 이름을 사용하도록 보정했습니다. 운영 Read-only Source SQL, 실제 구매 권한, 환불·권한 회수 코드에는 변경이 없습니다.
+- **회귀 보호:** PG17 SQL 생성기의 지역 변수 선언·원본 Receipt 대응·B3 구매권 조건에 혼동 가능한 열-열 자기 비교가 남지 않았는지 직접 검사하는 테스트를 추가했습니다. 실제 PG17 SQL 실행 성공은 **새 CI에서 확인하기 전까지 미확정**입니다.

@@ -37,6 +37,14 @@ describe('P4 exact Reader withdrawal evidence PG17 independent fixture contract'
   expect(generated).toContain('execute q into strict one using');
   expect(generated).toContain('COMMERCE_EXACT_READER_LEGAL_EVIDENCE_HOLD_PG17_PASS');
  });
+ it('disambiguates the B3 Subject variable from the SQL table column',()=>{
+  expect(generator).toContain('v_subject_id uuid;');
+  expect(generator).toContain('into strict b2,b2_receipt,v_subject_id');
+  expect(generated).toContain(
+   'where a.entitlement_grant_id=b3 and a.subject_id=v_subject_id;');
+  expect(generated).not.toMatch(/\ba\.subject_id\s*=\s*subject_id\b/iu);
+  expect(generator).not.toMatch(/^\s*subject_id\s+uuid\s*;/mu);
+ });
  it('proves B2 verified paid Reader lineage, denies B3 and wrong Receipt/Event',()=>{
   expect(generator).toContain('commerce_stored_portone_hmac_lineage_pg17_generator.mjs');
   expect(wrapper).toContain('commerce_stored_portone_hmac_lineage_pg17_generator.mjs --fixture');
