@@ -647,8 +647,22 @@ as $reader_claim_status$
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   return query
-    select c.id,c.received_at,c.state
+    select c.id,c.received_at,
+      case
+        when d.status='confirmed' then 'refund_confirmed'
+        when d.status in ('dispatching','submitted') then 'refund_processing'
+        when d.status='approved' then 'refund_decision_recorded'
+        else 'received'
+      end::text
     from public.digital_reading_withdrawal_claims_private_v1 c
+    left join public.commerce_reader_full_refund_dispatches_v1 d
+      on d.source_claim_fingerprint=
+        'sha256:v1:'||pg_catalog.encode(
+          pg_catalog.sha256(pg_catalog.convert_to(c.id::text,'UTF8')),'hex')
+      and exists(
+        select 1 from public.commerce_receipts cr
+        where cr.id=d.receipt_id and cr.subject_id=c.subject_id
+      )
     where c.subject_id=p_subject_id and c.id=p_claim_id
       and c.contract_version='digital-reading-withdrawal-claim-v1'
     limit 1;

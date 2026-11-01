@@ -7,6 +7,8 @@ create table public.commerce_reader_full_refund_dispatches_v1 (
   receipt_id uuid not null unique references public.commerce_receipts(id),
   legal_decision_ref text not null unique,
   legal_actor_ref text not null,
+  -- Non-reversible provenance only. Raw customer claim remains P0-PR-01 DELETE.
+  source_claim_fingerprint text unique,
   legal_approved_at timestamptz not null,
   reason text not null,
   -- Existing P0-PR-01 Commerce financial-evidence retention class P5Y.
@@ -23,6 +25,9 @@ create table public.commerce_reader_full_refund_dispatches_v1 (
     (legal_decision_ref ~ '^sha256:v1:[a-f0-9]{64}$'),
   constraint reader_refund_actor_chk check
     (legal_actor_ref ~ '^operator:[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'),
+  constraint reader_refund_claim_source_chk check
+    (source_claim_fingerprint is null or
+     source_claim_fingerprint ~ '^sha256:v1:[a-f0-9]{64}$'),
   constraint reader_refund_reason_chk check
     (reason in ('customer_withdrawal','non_delivery','contract_mismatch',
       'duplicate_charge','statutory_obligation','other_approved')),
@@ -51,6 +56,8 @@ create table public.commerce_reader_full_refund_dispatches_v1 (
       and confirmed_at is not null and provider_cancellation_id is not null)
   )
 );
+
+alter table public.commerce_reader_full_refund_dispatches_v1 enable row level security;
 
 -- No grants on the table to API, worker, service_role or Commerce executor.
 -- A privileged operations owner must record the actual legal disposition.
@@ -243,10 +250,10 @@ begin
     return new;
   end if;
   if row(new.id,new.receipt_id,new.legal_decision_ref,new.legal_actor_ref,
-    new.legal_approved_at,new.reason,new.created_at)
+    new.source_claim_fingerprint,new.legal_approved_at,new.reason,new.created_at)
     is distinct from
     row(old.id,old.receipt_id,old.legal_decision_ref,old.legal_actor_ref,
-      old.legal_approved_at,old.reason,old.created_at)
+      old.source_claim_fingerprint,old.legal_approved_at,old.reason,old.created_at)
       or new.retained_until < old.retained_until then
     raise exception 'Reader legal refund evidence is immutable'
       using errcode='23514';

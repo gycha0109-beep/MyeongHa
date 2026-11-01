@@ -27,6 +27,7 @@ export function WithdrawalRequestPanel(){
   const [failure,setFailure]=useState<string|null>(null);
   const [receipt,setReceipt]=useState<Submitted|null>(null);
   const [nonce,setNonce]=useState<string|null>(null);
+  const [latestStatus,setLatestStatus]=useState<string|null>(null);
 
   async function submit(event:React.FormEvent<HTMLFormElement>){
     event.preventDefault();
@@ -80,6 +81,38 @@ export function WithdrawalRequestPanel(){
       setPending(false);
     }
   }
+  async function checkStatus(){
+    if(!receipt||pending)return;
+    setPending(true);
+    setFailure(null);
+    try{
+      const bearer=await getActiveBearer();
+      if(!bearer||bearer.kind!=='member')throw Error('회원 로그인이 필요합니다.');
+      const params=new URLSearchParams({__myeongha_withdrawal_claim:'1',claimId:receipt.claimId});
+      const response=await fetch('/api/me?'+params.toString(),{
+        method:'GET',credentials:'same-origin',cache:'no-store',
+        headers:{authorization:'Bearer '+bearer.token,accept:'application/json'},
+      });
+      const payload:unknown=await response.json();
+      if(!response.ok||!payload||typeof payload!=='object'
+        ||!('ok'in payload)||payload.ok!==true
+        ||!('data'in payload)||!payload.data||typeof payload.data!=='object')
+        throw Error('접수 상태를 확인할 수 없습니다.');
+      const data=payload.data as Record<string,unknown>;
+      if(data.claimId!==receipt.claimId||typeof data.status!=='string'
+        ||!['received','refund_decision_recorded','refund_processing','refund_confirmed'].includes(data.status))
+        throw Error('접수 상태 확인 결과가 올바르지 않습니다.');
+      setLatestStatus(data.status);
+    }catch(e){
+      setFailure(e instanceof Error?e.message:'접수 상태를 확인할 수 없습니다.');
+    }finally{setPending(false);}
+  }
+  const statusCopy:Record<string,string>={
+    received:'접수 완료 · 검토 대기',
+    refund_decision_recorded:'환불 결정 기록됨 · 결제사 처리 전',
+    refund_processing:'결제사 환불 처리 확인 중',
+    refund_confirmed:'결제사 환불 확인 완료',
+  };
   return (
     <section className="my-withdrawal-request" aria-label="청약철회 및 환불 요청">
       <h4>청약철회 및 환불 요청</h4>
@@ -91,6 +124,10 @@ export function WithdrawalRequestPanel(){
           <p>접수번호: <code>{receipt.claimId}</code></p>
           <p>접수시각: {new Date(receipt.receivedAt).toLocaleString('ko-KR')}</p>
           <p>접수 기록은 보존 정책에 따라 처리되며 실제 환불은 검토 후 진행됩니다.</p>
+          <p>{statusCopy[latestStatus??'received']}</p>
+          <button type="button" disabled={pending} onClick={()=>void checkStatus()}>
+            {pending?'상태 확인 중…':'처리 상태 새로고침'}
+          </button>
         </div>
       ):(
         <form onSubmit={event=>void submit(event)}>

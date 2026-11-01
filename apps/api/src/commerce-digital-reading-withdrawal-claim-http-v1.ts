@@ -77,10 +77,12 @@ type ClaimRow={claimId:unknown;receivedAt:unknown;replayed?:unknown;state?:unkno
 function resultRow(row:ClaimRow,forStatus:boolean){
   if(typeof row.claimId!=='string'||!UUID.test(row.claimId)
     ||typeof row.receivedAt!=='string'||!Number.isFinite(Date.parse(row.receivedAt))
-    ||(forStatus?row.state!=='received':typeof row.replayed!=='boolean'))
+    ||(forStatus?!['received','refund_decision_recorded','refund_processing','refund_confirmed'].includes(String(row.state))
+      :typeof row.replayed!=='boolean'))
     throw Error('CLAIM_ROW_INVALID');
   return {claimId:row.claimId,receivedAt:row.receivedAt,
-    replayed:forStatus?null:row.replayed};
+    replayed:forStatus?null:row.replayed,
+    state:forStatus?row.state:'received'};
 }
 export async function handleDigitalReadingWithdrawalClaimHttpV1(input:Readonly<{
   request:Request;
@@ -164,7 +166,7 @@ export async function handleDigitalReadingWithdrawalClaimHttpV1(input:Readonly<{
     },{status:201,headers:NO_STORE});
     return Response.json({
       ok:true,data:{claimId:data.claimId,
-        receivedAt:data.receivedAt,status:'received'},
+        receivedAt:data.receivedAt,status:data.state},
     },{status:200,headers:NO_STORE});
   }catch{
     return error('CLAIM_UNAVAILABLE',503);

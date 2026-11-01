@@ -16,7 +16,8 @@ const secret='a-private-hmac-secret-with-40-characters-and-more';
 const endpoint='https://example.com/api/me?__myeongha_withdrawal_claim=1';
 const body={purchaseIntentId:purchase,unitId:reading,
   idempotencyKey:nonce,reason:'change_of_mind'};
-type FixtureOptions={subject?:string; deny?:boolean; replayed?:boolean; missing?:boolean; conflict?:boolean;};
+type FixtureOptions={subject?:string; deny?:boolean; replayed?:boolean; missing?:boolean; conflict?:boolean;
+  status?:'received'|'refund_decision_recorded'|'refund_processing'|'refund_confirmed';};
 function fixture(options:FixtureOptions={}){
   const queries:{sql:string;values:readonly unknown[]|undefined}[]=[];
   const pool:PostgresSubjectPoolV1={connect:vi.fn(async()=>({
@@ -37,7 +38,7 @@ function fixture(options:FixtureOptions={}){
       if(sql.includes('qry_received_digital_reading_withdrawal_claim_v1'))
         return {rows:options.missing?[] as Row[]:[{
           claimId:claim,receivedAt:'2026-11-01T13:00:00.000Z',
-          state:'received',
+          state:options.status??'received',
         } as Row]};
       throw Error('UNEXPECTED_SQL');
     }),
@@ -150,6 +151,13 @@ describe('buyer exact paid Reader withdrawal intake',()=>{
       status:'received',
     });
   });
+  it.each(['refund_decision_recorded','refund_processing','refund_confirmed'] as const)(
+    'shows exact owned customer claim lifecycle state %s without exposing raw refund evidence',async status=>{
+      const f=fixture({status});
+      const r=await f.run(f.request({method:'GET',url:endpoint+'&claimId='+claim}));
+      expect(r.status).toBe(200);
+      expect((await r.json()).data.status).toBe(status);
+    });
   it('does not disclose existence of another Subject claim',async()=>{
     const f=fixture({missing:true});
     const r=await f.run(f.request({
@@ -176,6 +184,10 @@ describe('buyer exact paid Reader withdrawal intake',()=>{
     expect(sql).toContain('public.assert_myeongha_subject_context_v1(p_subject_id)');
     expect(sql).toContain('Serialize with the account finalizer');
     expect(sql).toContain('for share;');
+    expect(sql).toContain('d.source_claim_fingerprint=');
+    expect(sql).toContain('refund_decision_recorded');
+    expect(sql).toContain('refund_processing');
+    expect(sql).toContain('refund_confirmed');
     expect(sql).toContain('digital_reading_withdrawal_claim_scope_shape_check');
     expect(sql).toContain('to myeongha_api_executor;');
     expect(sql).not.toContain('grant all on table public.digital_reading_withdrawal_claims_private_v1');
