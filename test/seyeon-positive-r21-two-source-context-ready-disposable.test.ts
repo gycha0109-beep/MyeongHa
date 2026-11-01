@@ -24,6 +24,11 @@ import {
 } from '../apps/api/src/seyeon-r26-offline-governed-wire-reservation-v1.js';
 import type {SeyeonAiGovernorAdmissionV1} from '../apps/api/src/postgres-seyeon-ai-cost-ledger-v1.js';
 import {createSeyeonAiCostEventV1} from '../apps/api/src/seyeon-ai-usage-cost-v1.js';
+import {
+  reserveSeyeonR32OfflineFiveStageV1,
+  SeyeonR32OfflineFiveStageHoldV1,
+  type SeyeonR32OfflineStageReceiptV1,
+} from '../apps/api/src/seyeon-r32-offline-five-stage-governed-cost-v1.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -141,15 +146,15 @@ const scopedPool:PostgresSubjectPoolV1={
     };
   },
 };
-async function modelSources(){
+async function modelSources(origins:readonly {recordId:string;grantId:string}[]=[first,second]){
   if(!pool)throw Error('R21 disposable PostgreSQL only');
+  if(origins.length!==2)throw Error('R21 two originals required');
   const raw=await pool.query<{id:string;content_jsonb:unknown}>(
     'select id::text as id,content_jsonb from public.memory_items where id=any($1::uuid[])',
-    [[first.recordId,second.recordId]],
+    [origins.map(s=>s.recordId)],
   );
   if(raw.rows.length!==2)throw Error('Two synthetic originals required');
   const payload=new Map(raw.rows.map(r=>[r.id,r.content_jsonb]));
-  const origins=[first,second] as const;
   const memories:readonly SeyeonRetrievedMemoryV2[]=origins.map((o,i)=>({
     kind:'memory',memoryId:'memory:'+o.recordId,
     sourceRef:'memory:'+o.recordId+':grant:'+o.grantId,
@@ -895,4 +900,248 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     // balance to 300; the other unsealed/unsent start still retains 1,524.
     expect(remaining.rows[0]?.occupied).toBe('1824');
   });
+  it('R32: five native stages reserve+settle exact DB costs while final G2 remains denied',async()=>{
+    if(!pool)throw Error('R32 requires disposable PostgreSQL');
+    // These two fresh originals are independent of the R26 revoked fixture.
+    const originals=[
+      {recordId:'d5000000-0000-4000-8000-000000000003',
+       grantId:'d6000000-0000-4000-8000-000000000003'},
+      {recordId:'d5000000-0000-4000-8000-000000000004',
+       grantId:'d6000000-0000-4000-8000-000000000004'},
+    ];
+    await tx(async client=>{
+      for(let i=0;i<originals.length;i++){
+        const o=originals[i]!;
+        await client.query(
+          "insert into public.memory_items(id,subject_id,memory_type,schema_version,content_jsonb,source_kind,created_by_character_id,revoked_at,created_at) values($1,$2,'shared_detail','memory-v1',$3::jsonb,'user_approved','seyeon',null,clock_timestamp())",
+          [o.recordId,subject,JSON.stringify({synthetic:true,r32:i})],
+        );
+        await client.query(
+          "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+          [o.grantId,subject,o.recordId],
+        );
+      }
+    });
+    const a=await createTurn(760);
+    const source=await modelSources(originals);
+    const pinInput={
+      pool:scopedPool,
+      verifiedEvidence:{kind:'member' as const,
+        verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001'},
+      threadId:a.thread,turnId:a.turn,attemptId:a.attempt,
+      ...source,twoOriginalContextReady:true as const,
+    };
+    await persistSeyeonR20OfflineDigestBoundPinV1(pinInput);
+    const purposes=['integrity_classification','disclosure_classification',
+      'turn_interpretation','dialogue_render','semantic_review'] as const;
+    const policy:SeyeonAiGovernorAdmissionV1['policy']={
+      policyVersion:'offline-r32-test-v1',providerKey:'openai-responses',
+      modelKey:'seyeon-r35-offline',
+      priceQuote:{
+        priceVersion:'offline-r32-price-v1',providerKey:'openai-responses',
+        modelKey:'seyeon-r35-offline',inputMicroUsdPerMillion:1000000,
+        cachedInputMicroUsdPerMillion:250000,outputMicroUsdPerMillion:4000000,
+      },
+      allowedPurposes:[...purposes],contextWindowTokens:4096,
+      maximumInputTokens:1000,maximumOutputTokens:256,
+      maximumSerializedRequestBytes:65536,
+    };
+    const governor:SeyeonAiGovernorAdmissionV1={
+      policy,
+      certifiedInputTokenUpperBound:(_request,bytes,body)=>{
+        if(bytes!==Buffer.byteLength(body,'utf8'))
+          throw Error('R32 fake certification saw different wire bytes');
+        return 500; // isolated synthetic bound, not an official tokenizer
+      },
+    };
+    await pool.query(
+      "insert into public.seyeon_ai_governor_model_policies_v1(provider_key,model_key,policy_version,price_version,allowed_purposes,context_window_tokens,maximum_input_tokens,maximum_output_tokens,maximum_serialized_request_bytes,input_micro_usd_per_million,cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active) values ($1,$2,$3,$4,$5::text[],4096,1000,256,65536,1000000,250000,4000000,true)",
+      [policy.providerKey,policy.modelKey,policy.policyVersion,
+       policy.priceQuote.priceVersion,[...purposes]],
+    );
+    const used:SeyeonR32OfflineStageReceiptV1[]=[];
+    let fetches=0;
+    for(const purpose of purposes){
+      const request:SeyeonStructuredProviderRequestV2=
+        purpose==='turn_interpretation'
+          ?buildSeyeonTurnInterpreterRequestV2(source.finalModelContext)
+          :{
+            contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+            purpose,
+            instructions:'R32 synthetic offline-only stage; no external derived/private inputs.',
+            input:{
+              fixture:true,purpose,
+              selectedSourcesDigest:source.selection.selectedSourcesDigest,
+              priorNativeWireDigest:used.length===0?null:used[used.length-1]?.nativeWireDigest,
+            },
+            responseSchema:{
+              type:'object',additionalProperties:false,
+              properties:{ok:{type:'boolean'}},required:['ok'],
+            },
+          };
+      const client=createOpenAiSeyeonStructuredProviderV1({
+        apiKey:'no-network-r32-synthetic-only',model:'seyeon-r35-offline',
+        maxOutputTokens:256,
+        fetchImpl:async()=>{fetches++;throw Error('R32_NETWORK_FORBIDDEN');},
+        meteredBeforeDispatch:async(call,requestBody)=>{
+          used.push(await reserveSeyeonR32OfflineFiveStageV1({
+            pinInput,request,call,requestBody,governor,
+          }));
+          throw new SeyeonR32OfflineFiveStageHoldV1();
+        },
+      });
+      await expect(client.generate(request)).rejects.toMatchObject({
+        code:'PRE_DISPATCH_REJECTED',
+      });
+      expect(fetches).toBe(0);
+    }
+    expect(used.map(r=>r.stageIndex)).toEqual([0,1,2,3,4]);
+    expect(used.every(r=>r.reservedMicroUsd==='1524')).toBe(true);
+    expect(used.map(r=>r.interpreterContextSealed)).toEqual([
+      false,false,true,false,false,
+    ]);
+    const ledger=await pool.query<{
+      purpose:string;call_id:string;governor_ceiling_micro_usd:string;
+      lifecycle_state:string;
+    }>(
+      'select purpose,call_id::text,governor_ceiling_micro_usd::text,lifecycle_state from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid order by purpose',
+      [a.attempt],
+    );
+    expect(ledger.rows).toHaveLength(5);
+    expect(ledger.rows.every(row=>row.lifecycle_state==='started'
+      &&row.governor_ceiling_micro_usd==='1524')).toBe(true);
+    const stageRows=await pool.query<{call_id:string;purpose:string}>(
+      'select call_id::text,purpose from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid order by stage_index',
+      [a.attempt],
+    );
+    expect(stageRows.rows.map(row=>row.call_id)).toEqual(used.map(x=>x.callId));
+    const interpreterSeal=await pool.query<{native_wire_digest:string}>(
+      'select native_wire_digest from seyeon_positive_candidate.governed_wire_reservations_r28 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    expect(interpreterSeal.rows).toMatchObject([{
+      native_wire_digest:used[2]!.nativeWireDigest,
+    }]);
+    // Stage 0,1,2,3,4 were NOT sent: unknown costs reserve full ceilings.
+    // G2 cannot commit from original pin or reservation alone.
+    const suffix=a.turn.slice(-12);
+    await tx(async client=>{
+      const generated=await client.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_generated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::jsonb,$11::text,$12::text,$13::jsonb) as ok',
+        [subject,a.turn,a.attempt,a.participant,
+         'd8100000-0000-4000-8000-'+suffix,'offline','offline-model',
+         'offline-r32-render','synthetic five-stage reply',
+         JSON.stringify({text:'synthetic five-stage reply'}),
+         'chat-character-message-v1','sha256:v1:'+'b'.repeat(64),'[]'],
+      );
+      expect(generated.rows[0]?.ok).toBe(false);
+      const originalsFromDb=await client.query<{
+        recordId:string;originalGrantId:string;pgPayloadDigest:string;
+      }>(
+        'select memory_id::text as "recordId",original_grant_id::text as "originalGrantId",pg_payload_digest as "pgPayloadDigest" from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
+        [a.attempt],
+      );
+      expect(originalsFromDb.rows).toHaveLength(2);
+      const proof={
+        schemaVersion:'offline-positive-two-original-source-proof-r25',
+        selectedSourcesDigest:source.selection.selectedSourcesDigest,
+        sources:originalsFromDb.rows,
+      };
+      const validated=await client.query<{ok:boolean}>(
+        'select public.cmd_persist_seyeon_chat_validated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::text,$7::text,$8::text,$9::jsonb,$10::jsonb) as ok',
+        [subject,a.turn,a.attempt,
+         'd8200000-0000-4000-8000-'+suffix,'offline','offline-model',
+         'offline-r32-output','sha256:v1:'+'b'.repeat(64),
+         JSON.stringify({passed:true,personalRecordProvenance:proof}),'[]'],
+      );
+      expect(validated.rows[0]?.ok).toBe(false);
+    },true);
+    const tryCommit=()=>tx(client=>client.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
+      [subject,a.thread,a.turn,a.attempt,
+       'd8300000-0000-4000-8000-'+suffix,
+       'd8400000-0000-4000-8000-'+suffix,
+       'd8500000-0000-4000-8000-'+suffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:a.turn,
+         assistantMessageId:'d8300000-0000-4000-8000-'+suffix,
+         userMessageId:a.user,
+       }),
+       'sha256:v1:r32-synthetic-never-dispatched',
+       source.selection.selectedSourcesDigest],
+    ),true);
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_governed_cost_unsettled',
+    });
+    // Explicit SYNTHETIC Provider receipts only, with no actual network.
+    // Verify the existing worker claim, settlement and ACK for all five.
+    for(const v of used){
+      const event=createSeyeonAiCostEventV1({
+        callId:v.callId,purpose:v.purpose,providerKey:'openai-responses',
+        modelKey:'seyeon-r35-offline',outcome:'response_received',
+        httpStatus:200,elapsedMs:7,
+        usage:{
+          inputTokens:100,outputTokens:50,
+          cachedInputTokens:0,reasoningTokens:0,
+        },
+        price:policy.priceQuote,
+      });
+      expect(event.estimatedCostMicroUsd).toBe(300);
+      await tx(async client=>{
+        await client.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+        const stored=await client.query<{call_id:string;replayed:boolean}>(
+          'select * from public.cmd_store_seyeon_provider_receipt_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb)',
+          [subject,a.turn,a.attempt,'chat',JSON.stringify(event)],
+        );
+        expect(stored.rows).toMatchObject([{call_id:v.callId,replayed:false}]);
+      });
+      const claim=await tx(client=>client.query<{
+        call_id:string;claim_token:string;
+      }>(
+        'select call_id::text,claim_token::text from public.cmd_claim_seyeon_provider_receipt_v1()',
+      ));
+      expect(claim.rows[0]?.call_id).toBe(v.callId);
+      const token=claim.rows[0]?.claim_token;
+      if(!token)throw Error('R32 receipt worker lease missing');
+      await tx(async client=>{
+        await client.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+        const settled=await client.query<{
+          call_id:string;occupied_micro_usd:string;over_ceiling:boolean;
+        }>(
+          'select call_id::text,occupied_micro_usd::text,over_ceiling from public.cmd_governed_settle_seyeon_ai_call_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb)',
+          [subject,a.turn,a.attempt,'chat',JSON.stringify(event)],
+        );
+        expect(settled.rows).toMatchObject([{
+          call_id:v.callId,occupied_micro_usd:'300',over_ceiling:false,
+        }]);
+      });
+      const ack=await tx(client=>client.query<{acknowledged:boolean}>(
+        'select public.cmd_ack_seyeon_provider_receipt_v1($1::uuid,$2::uuid) as acknowledged',
+        [v.callId,token],
+      ));
+      expect(ack.rows).toMatchObject([{acknowledged:true}]);
+    }
+    const allSettled=await pool.query<{count:string}>(
+      "select count(*)::text as count from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid and lifecycle_state='settled' and cost_status='estimated'",
+      [a.attempt],
+    );
+    expect(allSettled.rows[0]?.count).toBe('5');
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+    });
+    const neverCommitted=await pool.query<{
+      messages:string;outboxes:string;admissions:string;
+    }>(
+      "select (select count(*)::text from public.conversation_messages where turn_id=$1::uuid and sender_type='character') as messages,"+
+      " (select count(*)::text from public.outbox_events where aggregate_id=$1::text and event_type in ('CHAT_TURN_COMMITTED','SEYEON_POST_TURN_ANALYSIS_REQUESTED')) as outboxes,"+
+      " (select count(*)::text from seyeon_positive_candidate.actual_v2_commit_admissions_r3 where attempt_id=$2::uuid) as admissions",
+      [a.turn,a.attempt],
+    );
+    expect(neverCommitted.rows[0]).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+    });
+    expect(fetches).toBe(0);
+  });
+
 });
