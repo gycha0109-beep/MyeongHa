@@ -64,6 +64,14 @@ export function classifySeyeonFirstPositiveMemoryFailureV1(error: unknown, reque
   return holdSeyeonReceiptHttpV1(requestId);
 }
 
+/** A new attempt may recover the same original failed User turn, never replay a delivered Assistant. */
+export function isSeyeonFirstReceiptEligibleReceiveV1(received: Readonly<{
+  turnState: string; replayed: boolean;
+}>): boolean {
+  return (received.turnState==='received' && received.replayed===false) ||
+    (received.turnState==='failed_retryable' && received.replayed===true);
+}
+
 export function holdSeyeonReceiptHttpV1(requestId: string): Response {
   return Response.json({ok:false,error:{code:'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
     messageKey:'chat.secure_reveal_unavailable',retryable:false},
@@ -119,9 +127,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     // after its previous attempt failed before Commit. That receive is an
     // idempotent replay of the User row, NOT a replay of any Assistant text.
     // An already committed/delivered reply remains non-revealable here.
-    const eligibleReceive =
-      (e.receivedTurn.turnState==='received' && e.receivedTurn.replayed===false) ||
-      (e.receivedTurn.turnState==='failed_retryable' && e.receivedTurn.replayed===true);
+    const eligibleReceive=isSeyeonFirstReceiptEligibleReceiveV1(e.receivedTurn);
     if(e.disposition!=='executed'||e.receivedTurn.userText!==preflight.text||
        !eligibleReceive||
        e.receivedTurn.committedTurn!==null||e.attempt.replayed||
