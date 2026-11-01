@@ -380,3 +380,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **테스트 추가:** `test/seyeon-g2-atomic-original-grant-race-disposable.test.ts`에 2원본 실제 ContextReady → 생성·검증 → 실제 v2 Commit → Outbox 2개·중복 커밋 차단, 두 번째 Grant digest 위조·철회·재승인 ID 교체, 독립 트랜잭션에서 철회 우선/커밋 우선 양방향 경쟁, 2원본 직접 HTTP DB Owner 답변/커밋 후 철회 재조회 차단을 추가했다. G2 SQL 소스 작성 중 발견한 중복 문자열 치환은 원본 SQL에서 재구성해 제거하고 함수 단일 정의를 확인했다.
 - **검증 상태:** 이 변경은 실제 테스트 실행 결과가 아닌 **구현/검증 시나리오 추가**이다. 통합 CI는 작업 중 반복 실행하지 않는 사용자 요청에 따라 **아직 실행·확정하지 않았다**. 코드 및 격리 SQL의 실행 성공을 추정하지 않는다.
 - **남은 출시 HOLD:** G0 원본 동의 정책 승인, Production G1 실제 최종 모델/Preflight/Reader·Saju·History/Relationship 파생 출처 완결성, G2 실제 Provider·Governor 단계 사용 승인, G3 실제 Production HTTP/프록시/수신 및 포괄 History, G4 비용 정산, G5/G6 전체 실행·운영 검증, 실제 병합/배포는 미완료. PR #2761은 Draft / 병합 금지 / 유료 Provider·공개 Route·운영 Migration 미활성, `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W26 · 두 원본 최종 모델 Wire와 실제 Governor 비용 예약 결속 (격리 / 무호출)
+
+- **G4 실제 구현:** `seyeon-r26-offline-governed-wire-reservation-v1.ts`를 추가했다. 기존 R35에서 모델에 전송될 **실제 네이티브 직렬화 요청 바이트**를 검증한 후, 명시적 `max_output_tokens`가 기존 서버 승인 정책의 정확한 상한과 일치하지 않거나 인증된 입력 토큰 상한이 없으면 DB 연결 전에 차단한다. 원래 Memory 1/2건과 SourceSet/최종 Context digest를 다시 확인하고 R20 DB Owner의 현재 Grant·원본 JSONB readback을 같은 Subject 트랜잭션에서 재검사한 다음, 기존 원자 `cmd_governed_start_seyeon_ai_call_v1`을 `startGovernedSeyeonAiCallV1`로 호출한다. 응답된 Call ID·최대 예약 비용·UTC 버킷을 검증하고 COMMIT이 확정된 경우에만 **오프라인 비용 예약 완료** 영수증을 돌려준다.
+- **실제 공급자 바이트 검증:** `seyeon-r35-offline-actual-provider-wire-pin-v1.ts`는 기존 무상한 R35 경로를 유지하면서 R26 전용 명시적 출력 상한을 정확한 요청 바이트 중 `max_output_tokens` 필드로 대조할 수 있게 확장했다. 토큰 상한/가격은 브라우저·모델 응답에서 받아 승인하지 않는다. 실제 오프라인 인증 토큰 상한 테스트는 합성 포트이며 운영용 tokenizer 검증 증거가 아니다.
+- **실 PostgreSQL 테스트:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에 실제 2원본 모델 Context → R21 불변 DB ContextReady → 실제 네이티브 Interpreter Provider 바이트 → R35 digest → R26 DB Governor 예약 → 서버상 `fetch` 0건을 추가했다. 합성 서버정책/일일 예산과 예약 비용 1,524 마이크로달러를 확인하고 같은 Call ID 재예약, 상한 위조, 토큰 상한 누락은 거부한다. 예약 실패/성공 어느 쪽도 Provider 전송·G2 Commit·G3 Reveal 권한은 주지 않는다.
+- **필수 시험 순서 정정:** 기존 격리 PG 설치 스크립트는 R25 G2 테스트가 R21 함수를 사용하기 전에 R21을 설치하도록, G2 테스트가 R5 현재-권한 조회를 호출하기 전에 R5를 설치하도록 순서를 수정했다. 이전에는 해당 두 호출의 런타임 함수가 아직 없었다.
+- **보안/운영 경계:** 이 G4 비용 예약은 **실제 AI 호출 승인/실행/정산이 아니다**. 예약만 남아도 사용 여부가 불명확하면 무과금으로 처리하지 않으며, 사용자의 운영비·새 모델 사용·공개 Route·원문 제공은 미승인이다. 코드와 시험 모두 명명된 폐기 가능 PostgreSQL만 허용한다. Operator 비용 정책·예산을 격리 fixture에서만 세팅하며 운영 데이터·Role·migration은 수정하지 않는다. PR #2761 Draft·병합 금지·`HOLD_FORWARD_STOPPED` 유지.
+- **CI:** 사용자가 요청한 연속 구현 후 통합검증 방식에 따라 중간 Actions 성공 확인·재실행을 하지 않았다. 이 W26의 TS 컴파일·PG17·DB 권한·비용 경로는 아직 **미실행/미확정**으로 기록한다.
