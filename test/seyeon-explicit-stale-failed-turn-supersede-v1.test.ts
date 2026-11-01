@@ -55,7 +55,7 @@ describe('Se-yeon stale failed User turn differs from current draft',()=>{
     expect(g0).toContain('admitted_turn.committed_at is not null');
     expect(g0).toContain("position('v_selection_keys <> 12' in b)");
     expect(g0).toContain('revoke create on schema public from myeongha_seyeon_chat_runtime_owner');
-    expect(g0).toMatch(/commit;\\s*$/u);
+    expect(g0).toMatch(/commit;\s*$/u);
   });
   it('the user confirms explicitly; header cannot be sent on unrelated routes',()=>{
     expect(browser).toContain('window.confirm(');
