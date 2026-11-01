@@ -133,12 +133,11 @@ export function ReadingPage() {
             <div className="saju-design-chart-tabs" role="tablist" aria-label="사주 계산 결과" onKeyDown={(event) => {
               if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
               event.preventDefault();
-              const order = ['pillars', 'elements'] as const;
-              const index = chartTab === 'pillars' ? 0 : 1;
-              const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1
-                : event.key === 'ArrowRight' ? (index + 1) % 2 : (index + 1) % 2;
-              setChartTab(order[next]);
-              const selector = next === 0 ? '#saju-pillars-tab' : '#saju-elements-tab';
+              const nextTab = event.key === 'Home' ? 'pillars'
+                : event.key === 'End' ? 'elements'
+                  : chartTab === 'pillars' ? 'elements' : 'pillars';
+              setChartTab(nextTab);
+              const selector = nextTab === 'pillars' ? '#saju-pillars-tab' : '#saju-elements-tab';
               event.currentTarget.querySelector<HTMLButtonElement>(selector)?.focus();
             }}>
               <button id="saju-pillars-tab" type="button" role="tab" aria-controls="saju-pillars-panel" aria-selected={chartTab === 'pillars'} tabIndex={chartTab === 'pillars' ? 0 : -1} className={chartTab === 'pillars' ? 'is-selected' : ''} onClick={() => setChartTab('pillars')}>사주팔자</button>
