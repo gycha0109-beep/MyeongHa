@@ -31,6 +31,12 @@ import {
   SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1,
   type SeyeonR32OfflineStageReceiptV1,
 } from '../apps/api/src/seyeon-r32-offline-five-stage-governed-cost-v1.js';
+import {
+  buildSeyeonR37SyntheticStageObservationV1,
+  recordSeyeonR37SyntheticStageObservationV1,
+  SeyeonR37OfflineSyntheticResultHoldV1,
+  type SeyeonR37OfflineSyntheticResultV1,
+} from '../apps/api/src/seyeon-r37-offline-synthetic-stage-result-v1.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -1047,6 +1053,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
        policy.priceQuote.priceVersion,[...purposes]],
     );
     const used:SeyeonR32OfflineStageReceiptV1[]=[];
+    const observed:SeyeonR37OfflineSyntheticResultV1[]=[];
     let fetches=0;
     for(const purpose of purposes){
       const request:SeyeonStructuredProviderRequestV2=
@@ -1269,8 +1276,33 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
             );
             expect(reservedAfter.rows).toEqual(reservedBefore.rows);
           }
-          used.push(await reserveSeyeonR32OfflineFiveStageV1({
+          const reserved=await reserveSeyeonR32OfflineFiveStageV1({
             pinInput,request,call,requestBody,governor,
+          });
+          used.push(reserved);
+          // This can only record the fact that NO real Provider output was
+          // observed; the R37 owner must refuse fake verified outcomes.
+          if(reserved.stageIndex===0){
+            const legit=buildSeyeonR37SyntheticStageObservationV1(reserved);
+            const fakes=[
+              {...legit,providerDispatched:true},
+              {...legit,outputGuardVerified:true},
+              {...legit,result:{kind:'provider_output',verified:true}},
+              {...legit,callId:'d9990000-0000-4000-8000-000000000999'},
+              {...legit,nativeWireDigest:'sha256:wire-utf8:v1:'+'a'.repeat(64)},
+            ];
+            for(const fake of fakes){
+              await expect(tx(c=>c.query(
+                'select seyeon_positive_candidate.record_synthetic_stage_result_r37($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::jsonb) as receipt',
+                [subject,a.thread,a.turn,a.attempt,
+                 reserved.purpose,reserved.callId,JSON.stringify(fake)],
+              ),true)).rejects.toMatchObject({
+                code:'23514',constraint:'seyeon_r37_synthetic_result_authority_forged',
+              });
+            }
+          }
+          observed.push(await recordSeyeonR37SyntheticStageObservationV1({
+            pinInput,reservation:reserved,
           }));
           throw new SeyeonR32OfflineFiveStageHoldV1();
         },
@@ -1281,6 +1313,12 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       expect(fetches).toBe(0);
     }
     expect(used.map(r=>r.stageIndex)).toEqual([0,1,2,3,4]);
+    expect(observed.map(r=>r.stageIndex)).toEqual([0,1,2,3,4]);
+    expect(observed.every(r=>r.providerDispatched===false
+      &&r.providerOutputVerified===false
+      &&r.outputGuardVerified===false
+      &&r.permitsAtomicCommit===false
+      &&r.permitsHttpReveal===false)).toBe(true);
     expect(used.every(r=>r.reservedMicroUsd==='1524')).toBe(true);
     expect(used.map(r=>r.interpreterContextSealed)).toEqual([
       false,false,true,false,false,
@@ -1414,6 +1452,16 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(allSettled.rows[0]?.count).toBe('5');
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+    });
+    // Deleting an observation under the scratch DB owner simulates lost
+    // local evidence. API executors cannot DELETE this table; a privacy
+    // cascade remains legal. G2 MUST notice the missing Stage-4 outcome.
+    await pool.query(
+      'delete from seyeon_positive_candidate.synthetic_stage_results_r37 where attempt_id=$1::uuid and stage_index=4',
+      [a.attempt],
+    );
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r37_stage_result_lineage_incomplete',
     });
     const neverCommitted=await pool.query<{
       messages:string;outboxes:string;admissions:string;
