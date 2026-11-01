@@ -10,12 +10,14 @@ export const SEYEON_G5_RECEIVED_CREDIT_RECOVERY_CANDIDATE_V1=Object.freeze({
   onlyAlreadyAcknowledgedOriginalReplies:true,
   minimumReceiptAgeMinutes:5,
   maximumBatch:25,
+  requiresExplicitApply:true,
+  previewHasNoSettlement:true,
 } as const);
 
 const ATTEMPT_UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 export type SeyeonG5RecoverySummaryV1=Readonly<{
-  status:'empty'|'completed'|'partial';
+  status:'preview'|'empty'|'completed'|'partial';
   found:number;
   settled:number;
   failed:number;
@@ -32,11 +34,16 @@ export type SeyeonG5RecoverySummaryV1=Readonly<{
  */
 export async function recoverSeyeonG5ReceivedCreditsCandidateV1(input:Readonly<{
   privateCreditPool:PostgresSubjectPoolV1;
+  // A private operational call must deliberately choose preview or apply.
+  mode:'preview'|'apply';
   maxBatch?:number;
   // Only disposable PG17 CI may advance the read-only recovery clock.
   testAsOf?:Date;
 }>):Promise<SeyeonG5RecoverySummaryV1>{
   if(!input.privateCreditPool)throw Error('Private Commerce pool required');
+  if(input.mode!=='preview'&&input.mode!=='apply'){
+    throw Error('G5 recovery requires explicit preview or apply mode');
+  }
   const maxBatch=input.maxBatch??25;
   if(!Number.isInteger(maxBatch)||maxBatch<1||maxBatch>25){
     throw Error('G5 recovery batch must be within 1..25');
@@ -71,6 +78,11 @@ export async function recoverSeyeonG5ReceivedCreditsCandidateV1(input:Readonly<{
       return Array.from(seen);
     },
   });
+  if(input.mode==='preview'){
+    // The bounded catalog is the same as apply, but no settlement can run.
+    // Found is limited to maxBatch; never claim a global backlog count.
+    return Object.freeze({status:'preview',found:ids.length,settled:0,failed:0});
+  }
   let settled=0,failed=0;
   for(const attemptId of ids){
     try{

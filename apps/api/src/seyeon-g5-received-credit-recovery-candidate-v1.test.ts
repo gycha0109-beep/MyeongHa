@@ -34,7 +34,7 @@ describe('G5 received-only bounded Commerce recovery candidate',()=>{
   });
   it('selects and settles using only the private Commerce transaction',async()=>{
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:pool as never,maxBatch:1,
+      privateCreditPool:pool as never,mode:'apply',maxBatch:1,
     })).toEqual({status:'completed',found:1,settled:1,failed:0});
     expect(state.transaction).toHaveBeenCalledTimes(2);
     expect(state.transaction).toHaveBeenCalledWith(expect.objectContaining({pool}));
@@ -47,21 +47,39 @@ describe('G5 received-only bounded Commerce recovery candidate',()=>{
       [a],
     );
   });
+  it('previews received-only recovery counts without settling or exposing original identities',async()=>{
+    const before=await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:pool as never,mode:'preview',maxBatch:1,
+    });
+    expect(before).toEqual({status:'preview',found:1,settled:0,failed:0});
+    expect(Object.keys(before).sort()).toEqual(['failed','found','settled','status']);
+    expect(state.transaction).toHaveBeenCalledTimes(1);
+    expect(state.query).toHaveBeenCalledTimes(1);
+    expect(state.query.mock.calls[0]?.[0]).toContain('internal_qry_seyeon_g5_');
+  });
+  it('rejects omitted or unknown run mode before touching Commerce DB',async()=>{
+    for(const mode of [undefined,null,'auto','execute','dry-run']){
+      await expect(recoverSeyeonG5ReceivedCreditsCandidateV1({
+        privateCreditPool:pool as never,mode:mode as never,
+      })).rejects.toThrow('explicit preview or apply');
+    }
+    expect(state.transaction).not.toHaveBeenCalled();
+  });
   it('returns empty and performs zero settlement for no original received candidates',async()=>{
     query([]);
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:pool as never,
+      privateCreditPool:pool as never,mode:'apply',
     })).toEqual({status:'empty',found:0,settled:0,failed:0});
     expect(state.transaction).toHaveBeenCalledTimes(1);
   });
   it('rejects missing credentials and unbounded requests before opening DB',async()=>{
     for(const maxBatch of [0,-1,26,2.5,NaN,Infinity]){
       await expect(recoverSeyeonG5ReceivedCreditsCandidateV1({
-        privateCreditPool:pool as never,maxBatch,
+        privateCreditPool:pool as never,mode:'apply',maxBatch,
       })).rejects.toThrow();
     }
     await expect(recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:undefined as never,
+      privateCreditPool:undefined as never,mode:'apply',
     })).rejects.toThrow();
     expect(state.transaction).not.toHaveBeenCalled();
   });
@@ -71,7 +89,7 @@ describe('G5 received-only bounded Commerce recovery candidate',()=>{
       [{attemptId:a},{attemptId:b}]]){
       query(rows);
       await expect(recoverSeyeonG5ReceivedCreditsCandidateV1({
-        privateCreditPool:pool as never,maxBatch:1,
+        privateCreditPool:pool as never,mode:'apply',maxBatch:1,
       })).rejects.toThrow();
     }
     expect(state.query.mock.calls.every(c=>
@@ -87,7 +105,7 @@ describe('G5 received-only bounded Commerce recovery candidate',()=>{
       return {rows:[{state:'settled'}]};
     });
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:pool as never,maxBatch:2,
+      privateCreditPool:pool as never,mode:'apply',maxBatch:2,
     })).toEqual({status:'partial',found:2,settled:1,failed:1});
     expect(state.transaction).toHaveBeenCalledTimes(3);
   });
