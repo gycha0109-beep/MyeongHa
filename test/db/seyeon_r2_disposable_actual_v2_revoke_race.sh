@@ -35,6 +35,9 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql
 # Only the G1 context-ready portion of R4 is installed; NO G3 Reveal/HTTP.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2.sql
+# R21 must be INSTALLED before R25 G2/R5 tests reference its two-original function.
+# Original single-memory and zero-memory paths are still unchanged.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-g2-atomic-original-grant-race-disposable.test.ts --maxWorkers=1
 # R5 current-rights first/replay/history Owner-style checks ONLY in scratch clone.
@@ -46,10 +49,8 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights
 # R25 extends the ACTUAL R5 current-rights Owner with exclusive one-shot Turn
 # consumption in the SAME disposable PG transaction held until Node finish.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r25_disposable_first_once_g3.sql
+# Verify G1 two-original atomic pin against the synthetic isolated DB.
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
-# R21: TWO exact original Grants and REAL ContextReady in the SAME scratch PG transaction.
-# Only a disposable G1 candidate: no Provider, actual G2 or G3 Reveal authority.
-psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
-SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
 echo 'PASS offline R2/R5/R25 real G2 + first-once G3 delivery/rollback races; Production G0/G2/G3 HOLD'
