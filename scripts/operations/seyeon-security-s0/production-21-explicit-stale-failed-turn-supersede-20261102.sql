@@ -57,7 +57,7 @@ begin
    for update;
   if not found then return false; end if;
 
-  select count(*),min(t.id)
+  select count(*),min(t.id::text)::uuid
     into v_count,v_failed_id
     from public.chat_turns t
    where t.thread_id=p_thread_id and t.subject_id=p_subject_id
