@@ -51,6 +51,9 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 # R37: create immutable synthetic-NO-PROVIDER result observations BEFORE
 # R32's stage admission so Stage N can require the Stage N-1 observation.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r37_disposable_synthetic_stage_result_lineage.sql
+# R38 captures only rejected invalid-fixture checks from the REAL authored
+# interpretation/renderer/semantic guard functions. No Provider or PASS.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r38_disposable_guard_negative_lineage.sql
 # One DB transaction now binds each actual native stage, trusted code-owned
 # Interpreter authority manifest, prior local result, and Governor budget.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql
@@ -73,4 +76,4 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r31-g2-forward-stop-disposable.test.ts --maxWorkers=1
-echo 'PASS offline G1/G4 original ancestry + Character R36 authority + R37 synthetic outcome audit, five-stage G2/G3 tests and final G2 ACL stop; Production G0/G2/G3 HOLD'
+echo 'PASS offline original ancestry + R36 Character authority + R37 local results + R38 rejected-guard fixtures, G2/G3 tests and final G2 ACL stop; Production G0/G2/G3 HOLD'
