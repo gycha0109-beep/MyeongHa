@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-02 KST — 격리 PostgreSQL18 Linux 시작 실패 원인 범위 축소 및 소켓 경로 격리 수정
+
+- **현황 확인:** [PR #2867](https://github.com/gycha0109-beep/MyeongHa/pull/2867)은 전체 통합 검사 성공 후 main `ed9d4bdcfbcf196c8f7bdf71cff6803a9e401c22`에 병합 완료. 그러나 그 후의 실제 Ubuntu26.04 PostgreSQL18 수동 실검증 [#41321211252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41321211252) **FAILURE**: 정확한 PostgreSQL18 바이너리·npm 설치는 통과했으나 실제 RLS Vitest 실행의 `pg_ctl start`가 약 2초 내 실패; SQL 권한 정책·사용자 격리 검사 자체는 실행되지 않았고 Phase11 96건 부하는 미실행. 비식별 실패 증거 artifact `13089721169`가 보존됐음. `postgres` 내부 로그는 기존 러너에서 공개되지 않았으므로 실패 원인을 Unix 소켓 경로 권한으로 **추정**하되, 실증 전 단정하지 않는다.
+- **기존 설계 공백 수정:** GitHub Ubuntu 패키지의 기본 `unix_socket_directories`가 일반 CI 사용자에게 쓰기 불가능할 수 있으므로, Phase7 실제 RLS 테스트 `test/postgres-subject-rls-isolated-phase7.test.ts`와 Phase11 실제 DB 풀 측정 `scripts/operations/measure-isolated-postgres-capacity-phase11.mjs` 모두 Linux에서 **각자의 임시 데이터 디렉터리를 PostgreSQL 소켓 경로로 명시**한다. Windows의 소켓 설정은 기존대로 유지한다. PostgreSQL 18 공식 문서상 해당 경로는 서버 시작 시 설정하는 항목이며 파일 생성 권한이 필요하다. 계속 127.0.0.1에만 바인딩하고 임시 클러스터를 종료/삭제한다.
+- **재발 진단:** 실제 `pg_ctl` 시작 실패 시 각 임시 PostgreSQL 로그에서 PostgreSQL ERROR/FATAL/소켓·권한 문제 관련 제한된 마지막 5줄만 추려 로그에 남기고, 임시 경로는 `[isolated-cluster]`로 대체한다. 기존 전체 Vitest 오류 출력/테스트 성공 강제·실패시 `BLOCKED_INCOMPLETE` 증거 작성은 유지한다. 사용자 데이터/Production credentials 사용 없음.
+- **검증 경계:** 커밋 전 Windows PostgreSQL 18.6, Node 24.14.0, Vitest 4.1.11에서 기존 Phase7 실제 RLS 통과 및 Phase11 실제 합성 풀 부하 검증, 신규 정적 계약 검사를 확인한다. **새 Linux 실증은 수정 PR 병합 후 수동 워크플로 재실행 전까지 미판정**한다. 새 Linux PASS 증거 없이 최종 운영 수용을 승격하지 않는다.
+- **미해결:** Hosted Auth·Storage 운영 전체 복원, 독립된 개인정보 삭제·철회 원장 연속성, 실운영 DB 용량·Saju 자원 상한 및 전체 PT24H RPO/PT6H RTO는 여전히 **NOT PROVEN**. `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지. 무료/격리 검증 범위 이외 인프라·운영 DB·SQL·비밀·설정은 변경하지 않는다.
+
+
 ### 2026-11-01 KST — PR #2863 Linux PostgreSQL18 실제 RLS 검사 RED 원인 진단 로그 보강
 
 - **성공 검증 및 배포:** [PR #2863](https://github.com/gycha0109-beep/MyeongHa/pull/2863) 정확한 HEAD `4f78596638448a222ad0e64af36e20ef14dc5712`가 [통합 CI #41315852591](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41315852591) 전체 필수 검증 SUCCESS 후 main `fc6c148735b58346c569747e8d51cc24a86bbc86`으로 2026-11-01T14:37:30Z 병합. 이는 새 수동 격리 PostgreSQL18 검사가 성공했다는 의미가 아니다.

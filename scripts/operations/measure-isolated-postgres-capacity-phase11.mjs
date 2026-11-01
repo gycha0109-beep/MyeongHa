@@ -1,6 +1,6 @@
 import { execFile as execFileCallback } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -116,11 +116,22 @@ try {
     '--encoding=UTF8', '--no-sync', '--no-instructions',
   ]);
   const port = await isolatedPort();
-  await pgTool('pg_ctl', [
-    '-D', dataDir, '-l', logFile, '-o',
-    '-h 127.0.0.1 -p ' + port + ' -c max_connections=12 -c listen_addresses=127.0.0.1',
-    '-w', '-t', '20', 'start',
-  ]);
+  try {
+    await pgTool('pg_ctl', [
+      '-D', dataDir, '-l', logFile, '-o',
+      '-h 127.0.0.1 -p ' + port + ' -c max_connections=12 -c listen_addresses=127.0.0.1' +
+        (process.platform === 'win32' ? '' : ' -c unix_socket_directories=' + dataDir),
+      '-w', '-t', '20', 'start',
+    ]);
+  } catch (error) {
+    const diagnostics = (await readFile(logFile, 'utf8').catch(() => ''))
+      .split(/\r?\n/u)
+      .filter(line => /FATAL|ERROR|permission denied|could not bind|could not create/iu.test(line))
+      .slice(-5)
+      .map(line => line.replace(/\/tmp\/myeongha-phase11-capacity-[^\s/]+/gu, '[isolated-cluster]'));
+    if (diagnostics.length > 0) console.error('ISOLATED_PG18_CAPACITY_STARTUP_CAUSE', diagnostics.join(' | '));
+    throw error;
+  }
   serverStarted = true;
   pool = new Pool({
     host: '127.0.0.1', port, database: 'postgres', user: owner,
