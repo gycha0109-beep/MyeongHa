@@ -228,6 +228,23 @@ insert into public.commerce_receipts(
   clock_timestamp(), clock_timestamp(), 'production', 'test-verifier-v1', 1, 'KRW'
 );
 
+-- The historical fixture now supports the modern Reader scope lock when
+-- that reviewed forward migration is present. In older schema snapshots the
+-- initial synthetic entitlement writer remains intentionally unchanged.
+select pg_catalog.set_config('myeongha.subject_id',
+  '11390000-0000-0000-0000-000000000001',false);
+begin;
+do $official_reader_receipt_prelock$
+begin
+  if to_regprocedure('public.internal_acquire_official_reader_scope_lock_v1(uuid,uuid,text)') is not null then
+    perform pg_catalog.set_config('myeongha.reader_pending_reading_id',
+      '12103100-0000-0000-0000-000000000001',true);
+    perform public.internal_acquire_official_reader_scope_lock_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001','test-standard-reader');
+  end if;
+end;
+$official_reader_receipt_prelock$;
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12102000-0000-0000-0000-000000000001',
   array['test-reader-unit'],
@@ -237,6 +254,17 @@ select * from public.internal_apply_verified_receipt_capability_effects_v1(
   array[null]::text[]
 );
 
+do $official_reader_additional_prelock$
+begin
+  if to_regprocedure('public.internal_acquire_official_reader_scope_lock_v1(uuid,uuid,text)') is not null then
+    perform pg_catalog.set_config('myeongha.reader_pending_reading_id',
+      '12103100-0000-0000-0000-000000000001',true);
+    perform public.internal_acquire_official_reader_scope_lock_v1(
+      '11390000-0000-0000-0000-000000000001',
+      '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
+  end if;
+end;
+$official_reader_additional_prelock$;
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12102000-0000-0000-0000-000000000002',
   array['test-reader-unit'],
@@ -245,6 +273,7 @@ select * from public.internal_apply_verified_receipt_capability_effects_v1(
   array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_catalog.set_config(
   'myeongha.subject_id',

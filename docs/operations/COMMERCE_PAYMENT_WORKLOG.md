@@ -391,3 +391,10 @@
 - **수정 — 테스트 자료:** 미존재했던 S4 임시 SQL 테스트 경로 대신 실제 1990 S4 forward migration의 보호 답변 선삭제 순서, 기존 실행 DB rollback 테스트를 검사하도록 변경했습니다. 임시 청약철회 후보 SQL을 중복 설치하라는 과거 테스트 기대값은 실제 2310/2320 이행 검증 및 권한 보호 검사로 치환했습니다. 관련 집중 테스트 38/38 통과.
 - **배포 차단:** `.github/workflows/supabase-production.yml`에서 Reader 전용 1740~2320 마이그레이션과 **비관련 SQL을 섞은 변경을 거부**하고 Reader 전용 미승인 이행을 일반 운영 DB 작업에서 제외합니다. `scripts/operations/run-supabase-production-migrations.sh`도 신규 Reader 이행 SQL이 존재하면 일반 include-all 동작 전에 차단합니다. 실제 운영 DB는 변경하지 않았습니다.
 - **검증 상태:** Git Bash의 CI shell 문법 및 신규 Reader 예외 지문 확인 경로는 로컬 통과. Windows 전용 임시 디렉터리 권한(EPERM)으로 Production hold 테스트의 로컬 실행이 완료되지 않았으므로 GitHub Linux CI에서 검증해야 합니다. 실물 PG17 신규 Reader·환불 DB 통합 결과는 아직 미확정입니다. 전체 CI가 성공하기 전에는 완료로 판정하지 않습니다.
+
+### 2026-11-02 — PR #2869 후속 CI (41324772237) 실패 분리·수정
+
+- **CI 재실행 확인:** 새 마이그레이션 분리 뒤 41324772237의 `commerce-payment`, `commerce-entitlement`, `content`, `runtime` DB suite **PASS**. Reader 통합 PG17은 실행 중이며 성공으로 추정하지 않음. CI의 일반 테스트에서는 **승인된 단일 Production repair** 2개가 신규 일반 배포 차단문에 막혀 실패했습니다.
+- **수정 — 승인된 좁은 복구 보존:** `run-supabase-production-migrations.sh`의 미승인 Reader 일반 배포 HOLD를, 기존 명시 승인된 Se-yeon ACL repair·Guest Promotion repair의 정확한 마이그레이션만 실행하고 종료한 뒤 위치하도록 이동했습니다. 일반 `supabase db push --include-all`에 도달하기 전에는 여전히 HOLD로 실패합니다. 기존 실제 복구 테스트 **18/18 PASS**, Bash 문법 검사 PASS.
+- **수정 — Reader 구형 synthetic 실험:** `official_standard_reading_reader_interpretation.sql`에 신규 1740 잠금 계약이 존재하는 DB에서만 정확한 Subject×Reading×Reader 범위 잠금을 **같은 트랜잭션 내에서** 먼저 획득하는 경로를 추가했습니다. 실서비스 잠금 완화 없이 기존 초기 Receipt synthetic Grant 실험이 1800 검증과 함께 수행되도록 변경했고, 신규 migration이 없는 구형 SQL에서는 이전 경로가 유지됩니다. 실제 PostgreSQL 17 실행 결과를 반드시 CI로 확인해야 합니다.
+- **상태:** 2차 CI가 완료되기 전에 원인 확인된 테스트 차단·Reader synthetic 호환성 문제를 수정 중. 최종 통합 SQL 실행 성공 여부는 미확정이며 LIVE·운영 DB 실행은 없습니다.

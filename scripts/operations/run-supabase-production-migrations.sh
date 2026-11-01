@@ -1,14 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# The staged Reader/paid-answer migrations have not been authorized for
-# the ordinary Production rollout. Never let a generic include-all db push
-# apply them or the existing historical migration backlog.
-if [[ -f supabase/migrations/1740_official_reader_scope_lock_private_v1.sql ]]; then
-  echo 'HOLD_OFFICIAL_READER_1740_2290: staged Reader through 2320 requires separately governed rollout' >&2
-  exit 1
-fi
-
 : "${SUPABASE_PROJECT_ID:?SUPABASE_PROJECT_ID is required}"
 : "${SUPABASE_DB_PASSWORD:?SUPABASE_DB_PASSWORD is required}"
 
@@ -159,6 +151,14 @@ if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" == 'true' ]]; then
 fi
 if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" != 'false' ]]; then
   echo 'Invalid promotion repair deployment scope.' >&2
+  exit 1
+fi
+
+# The staged Reader/paid-answer migrations have not been authorized for
+# the ordinary Production rollout. Never let a generic include-all db push
+# apply them or the existing historical migration backlog.
+if [[ -f supabase/migrations/1740_official_reader_scope_lock_private_v1.sql ]]; then
+  echo 'HOLD_OFFICIAL_READER_1740_2290: staged Reader through 2320 requires separately governed rollout' >&2
   exit 1
 fi
 
