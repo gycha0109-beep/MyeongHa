@@ -1,5 +1,6 @@
 -- Watchtower-Track: security
 -- R37 records LOCAL SYNTHETIC STAGE OUTCOMES, never model responses.
+-- Deletion on privacy/Attempt cascade is allowed; direct API DELETE is not.
 -- These metadata are NOT evidence that any Provider ran, responded or passed
 -- Character/semantic output guards. They can NEVER authorize G2 or Reveal.
 \set ON_ERROR_STOP on
@@ -15,8 +16,8 @@ begin
 end $pre$;
 
 create table seyeon_positive_candidate.synthetic_stage_results_r37(
-  attempt_id uuid not null references public.chat_turn_attempts(id),
-  stage_index integer not null check (stage_index between 0 and 4),
+  attempt_id uuid not null references public.chat_turn_attempts(id) on delete cascade,
+  stage_index smallint not null check (stage_index between 0 and 4),
   purpose text not null check (purpose in (
     'integrity_classification','disclosure_classification',
     'turn_interpretation','dialogue_render','semantic_review'
@@ -40,10 +41,10 @@ create table seyeon_positive_candidate.synthetic_stage_results_r37(
   foreign key (attempt_id,stage_index)
     references seyeon_positive_candidate.native_stage_lineage_r30(
       attempt_id,stage_index
-    )
+    ) on delete cascade
 );
 create trigger immutable_synthetic_stage_results_r37
-before update or delete on seyeon_positive_candidate.synthetic_stage_results_r37
+before update on seyeon_positive_candidate.synthetic_stage_results_r37
 for each row execute function seyeon_positive_candidate.reject_r1_source_rewrite();
 
 create function seyeon_positive_candidate.record_synthetic_stage_result_r37(
