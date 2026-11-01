@@ -953,6 +953,148 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(stillOriginal.received).toEqual(originalAck.received);
   });
 
+  // Two real isolated PostgreSQL connections are required; mocked races do not
+  // prove the Subject lock serializes account deletion and private settlement.
+  async function g5StrandedRaceOriginal(n:number){
+    const f=await prepare(n,{summary:'G5 deletion versus settlement PG race '+n});
+    await reserveFirstPositive(f);
+    const issued=await fetchReply(f);
+    expect(issued.status).toBe(200);
+    const data=(await issued.json()).data;
+    const receipt=data.deliveryReceipt as {attemptId:string;challenge:string};
+    const proof=receiptProof(data.assistantText as string,receipt.challenge);
+    const unavailable=Object.freeze({
+      connect:async()=>{throw Error('isolated G5 race Commerce failure');},
+    }) as PostgresSubjectPoolV1;
+    expect((await creditReceipt(f,receipt.attemptId,proof,unavailable)).status).toBe(503);
+    expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+    const {rows:[ack]}=await pool.query(
+      'select seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',
+      [f.attempt]);
+    expect(ack.received).not.toBeNull();
+    return {f,received:ack.received};
+  }
+
+  async function waitForG5RowLock(pid:number){
+    for(let i=0;i<100;i++){
+      const {rows:[status]}=await pool.query(
+        'select wait_event_type as waiting from pg_stat_activity where pid=$1 and datname=current_database()',
+        [pid]);
+      if(status?.waiting==='Lock')return;
+      await new Promise(resolve=>setTimeout(resolve,18));
+    }
+    throw Error('G5 race must exhibit actual PostgreSQL row-lock wait');
+  }
+
+  async function g5OwnerLedger(f:Awaited<ReturnType<typeof prepare>>){
+    const {rows:[r]}=await pool.query(`select r.state,
+      (select coalesce(sum(a.credits),0) from public.chat_credit_turn_allocations_v1 a
+       where a.reservation_id=r.id)::text as credits,
+      (select coalesce(sum(l.credits_remaining),0) from public.chat_credit_lots_v1 l
+       where l.subject_id=r.subject_id)::text as remaining,
+      (select count(*)::int from public.chat_credit_turn_reservations_v1 x
+       where x.subject_id=r.subject_id and x.client_turn_id=r.client_turn_id) as reservations
+      from public.chat_credit_turn_reservations_v1 r
+      where r.subject_id=$1 and r.client_turn_id=$2`,
+      [f.subject,uuid(30,f.n)]);
+    return r;
+  }
+  const deleteG5Account=(f:Awaited<ReturnType<typeof prepare>>,client:{
+    query:(sql:string,values?:unknown[])=>Promise<unknown>,
+  })=>client.query(
+    'select * from public.cmd_start_account_deletion_v1($1::uuid,$2::uuid,$3::text,$4::uuid)',
+    [f.subject,uuid(26,f.n),'g5-concurrent-account-deletion-'+f.n,uuid(27,f.n)],
+  );
+
+  it('G5 two-session race: settlement commits first, deletion waits then excludes future recovery',async()=>{
+    const {f,received}=await g5StrandedRaceOriginal(22);
+    const settlement=await pool.connect();
+    const deletion=await pool.connect();
+    let settledOpen=false,deleteOpen=false;
+    let pendingDeletion:Promise<{ok:boolean;error?:unknown}>|undefined;
+    try{
+      await settlement.query('BEGIN');settledOpen=true;
+      await settlement.query('SET LOCAL ROLE myeongha_commerce_internal_executor');
+      const {rows:[result]}=await settlement.query(
+        'select public.internal_cmd_seyeon_g4_receipt_credit_settle_v1($1::uuid) as state',
+        [f.attempt]);
+      expect(result.state).toBe('settled');
+      // Settlement holds the canonical Subject lock until COMMIT.
+      await deletion.query('BEGIN');deleteOpen=true;
+      const {rows:[p]}=await deletion.query('select pg_backend_pid() as pid');
+      pendingDeletion=deleteG5Account(f,deletion)
+        .then(()=>({ok:true}),error=>({ok:false,error}));
+      await waitForG5RowLock(p.pid);
+      await settlement.query('COMMIT');settledOpen=false;
+      expect((await pendingDeletion).ok).toBe(true);
+      await deletion.query('COMMIT');deleteOpen=false;
+    }finally{
+      if(settledOpen)await settlement.query('ROLLBACK');
+      if(pendingDeletion)await pendingDeletion;
+      if(deleteOpen)await deletion.query('ROLLBACK');
+      settlement.release();deletion.release();
+    }
+    expect(await g5OwnerLedger(f)).toEqual({
+      state:'settled',credits:'10',remaining:'40',reservations:1,
+    });
+    const {rows:[member]}=await pool.query(
+      'select status from public.subjects where id=$1',[f.subject]);
+    expect(member.status).toBe('deletion_pending');
+    const {rows:[ack]}=await pool.query(
+      'select seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',
+      [f.attempt]);
+    expect(ack.received).toEqual(received);
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),mode:'apply',maxBatch:1,
+      testAsOf:new Date(Date.now()+10*60_000),
+    })).toEqual({status:'empty',found:0,settled:0,failed:0});
+  });
+
+  it('G5 two-session race: deletion commits first, private settlement waits then rejects',async()=>{
+    const {f,received}=await g5StrandedRaceOriginal(23);
+    const settlement=await pool.connect();
+    const deletion=await pool.connect();
+    let settledOpen=false,deleteOpen=false;
+    let pendingSettlement:Promise<{ok:boolean;error?:unknown}>|undefined;
+    try{
+      await deletion.query('BEGIN');deleteOpen=true;
+      await deleteG5Account(f,deletion);
+      // Deletion's canonical Subject status update is uncommitted, but the
+      // Subject row lock must block even the privileged Commerce settlement.
+      await settlement.query('BEGIN');settledOpen=true;
+      await settlement.query('SET LOCAL ROLE myeongha_commerce_internal_executor');
+      const {rows:[p]}=await settlement.query('select pg_backend_pid() as pid');
+      pendingSettlement=settlement.query(
+        'select public.internal_cmd_seyeon_g4_receipt_credit_settle_v1($1::uuid) as state',
+        [f.attempt],
+      ).then(()=>({ok:true}),error=>({ok:false,error}));
+      await waitForG5RowLock(p.pid);
+      await deletion.query('COMMIT');deleteOpen=false;
+      const settled=await pendingSettlement;
+      expect(settled.ok).toBe(false);
+      expect(String((settled.error as Error)?.message)).toContain('active original Member');
+    }finally{
+      if(deleteOpen)await deletion.query('ROLLBACK');
+      if(pendingSettlement)await pendingSettlement;
+      if(settledOpen)await settlement.query('ROLLBACK');
+      settlement.release();deletion.release();
+    }
+    expect(await g5OwnerLedger(f)).toEqual({
+      state:'reserved',credits:'10',remaining:'40',reservations:1,
+    });
+    const {rows:[member]}=await pool.query(
+      'select status from public.subjects where id=$1',[f.subject]);
+    expect(member.status).toBe('deletion_pending');
+    const {rows:[ack]}=await pool.query(
+      'select seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',
+      [f.attempt]);
+    expect(ack.received).toEqual(received);
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),mode:'preview',maxBatch:1,
+      testAsOf:new Date(Date.now()+10*60_000),
+    })).toEqual({status:'preview',found:0,settled:0,failed:0});
+  });
+
   } // End Actions-only credit integration; restored-backup S0 still runs unchanged.
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {
