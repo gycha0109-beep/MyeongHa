@@ -198,7 +198,10 @@ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
             })!==source.rawRecordDigest)
             throw new SeyeonR26OfflineG4HoldV1();
         }
-        return startGovernedSeyeonAiCallV1(client,{
+        // The governed Start and the DB-owned original/wire correlation
+        // seal must COMMIT together. An unsigned Node receipt can never
+        // substitute for the immutable exact-cost DB record.
+        const reserved=await startGovernedSeyeonAiCallV1(client,{
           subjectId:resolvedSubject.subjectId,turnId:pinInput.turnId,
           attemptId:pinInput.attemptId,phase:'chat',
         },{
@@ -206,6 +209,32 @@ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
           providerKey:call.providerKey,modelKey:call.modelKey,
           requestBodyBytes:exactBytes,quote,
         });
+        const sealed=await client.query<{receipt:unknown}>(`
+select seyeon_positive_candidate.seal_governed_wire_cost_r28(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,
+  $6::text,$7::text,$8::text,$9::bigint,$10::bigint,$11::bigint,$12::date
+) as receipt
+`.trim(),[
+          resolvedSubject.subjectId,pinInput.threadId,pinInput.turnId,
+          pinInput.attemptId,reserved.callId,selection.selectedSourcesDigest,
+          digest(pinInput.finalModelContext),matched,quote.inputCeilingTokens,
+          quote.outputCeilingTokens,quote.ceilingMicroUsd,reserved.bucketUtcDate,
+        ]);
+        const proof=sealed.rows.length===1?sealed.rows[0]?.receipt:null;
+        if(!proof||typeof proof!=='object'||Array.isArray(proof))
+          throw new SeyeonR26OfflineG4HoldV1();
+        const receipt=proof as Record<string,unknown>;
+        if(Object.keys(receipt).length!==10
+          ||receipt.callId!==reserved.callId||receipt.sourceCount!==count
+          ||receipt.selectedSourcesDigest!==selection.selectedSourcesDigest
+          ||receipt.finalModelContextDigest!==digest(pinInput.finalModelContext)
+          ||receipt.nativeWireDigest!==matched
+          ||receipt.reservedMicroUsd!==reserved.ceilingMicroUsd.toString()
+          ||receipt.bucketUtcDate!==reserved.bucketUtcDate
+          ||receipt.sealed!==true||receipt.permitsProvider!==false
+          ||receipt.permitsAtomicCommit!==false)
+          throw new SeyeonR26OfflineG4HoldV1();
+        return reserved;
       },
     });
     // Reservation committed. Intentional HARD STOP: a real Provider result
