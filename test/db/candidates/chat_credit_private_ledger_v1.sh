@@ -41,4 +41,7 @@ psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_receipt_credit_settle_pr
 # A synthetic persisted positive receipt tests exact original commit/assistant
 # settlement under the private role; real browser-issued S0 receipt remains HOLD.
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_positive_delivery_settlement_v1_test.sql >/dev/null
-echo 'PASS commerce credit ledger + G4 private ACK/refund and synthetic positive settlement (disposable)'
+# G5: two independent real PG sessions, lock contention, crash rollback and
+# retry exactly once on original positive receipt; disposable clone ONLY.
+node test/db/candidates/seyeon_g5_private_credit_race_v1.mjs
+echo 'PASS commerce credit ledger + G4 proof + G5 two-session positive settle race (disposable)'

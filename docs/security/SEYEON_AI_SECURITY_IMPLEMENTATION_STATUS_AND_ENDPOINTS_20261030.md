@@ -411,3 +411,10 @@ Watchtower-Track: security
 - **원인:** 두 개의 잘못된 private pool 상황을 검사하면서 *동일한 Fetch Request 객체*를 두 번 전달해 본문 스트림이 첫 호출에서 소진됐다. 두 번째 호출은 누락/공유 pool 검사 전에 정상적으로 `INVALID_REQUEST` 400을 반환했다. 이는 운영 SQL 권한/크레딧 오류가 아니라 테스트의 단일 사용 Body 생명주기 실수다.
 - **수정:** 두 경우 각각 `input(request())`로 새로운 HTTP 요청을 생성하고, 누락된 전용 풀/일반 풀과 동일한 전용 풀 모두에서 실제 정산 쿼리 없이 503 Fail Closed를 검증하도록 수정. 결제/보안 구현 코드는 유지. 실제 고객 경로 활성화나 운영권한 변경 없음.
 - **진행 원칙:** 이 수정 커밋 이후 동일 PR의 새 HEAD 보안·DB·전체 통합 CI 결과만 판정한다. 이전 실패 체크나 이전 HEAD의 Integration 결과를 새 HEAD PASS로 오인하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+### 2026-11-01 / W45 — G5 원본 Positive 수신 증거 기반 크레딧 2세션 경합·실패 복구 검증 후보
+
+- **선행 확인:** #2854 최신 HEAD `64e73341a1ee0a8c90d9433bbc7600dd8a3bfc91`에서 `Work Track security`/실제 `db-authority-core`/전체 `CI Integration` 전부 GREEN(일반 CI 41307829962, Integration 41307884618); 자동 병합 완료, main 커밋 `5172e5f61ff2958041cf395a74b9f47800e76309`.
+- **기존 실제 S0 자산:** `test/seyeon-security-s0-postgres.e2e.test.ts`는 S0 첫 Memory의 DB 원본 권한, 공개 전 취소 경쟁, 수신 영수증 발급·수신 및 서로 다른 PostgreSQL 세션을 이미 실증한다. 그대로 유지하고 중복 스캐폴딩을 만들지 않는다. 다만 기존 테스트는 S0와 G4 장부를 같은 요청으로 연계하지 않으므로 두 경로를 합친 운영 G5 PASS로 추정하지 않는다.
+- **구현:** `test/db/candidates/seyeon_g5_private_credit_race_v1.mjs`를 추가하여 실제 PostgreSQL의 서로 다른 물리 연결 두 개로 **동일 원본 Attempt·Reservation에 대한 동시 수신 증거 기반 10크레딧 정산**을 수행한다. 첫 세션의 COMMIT 전 다른 세션이 실제 `pg_stat_activity.wait_event_type=Lock`에서 대기함을 확인하고, 직후 첫 세션 확정 → 두 번째 멱등 완료, Reservation 한 건·정산된 할당 10·남은 크레딧 40을 검사한다. 별도의 원본 Attempt는 첫 정산 결과를 COMMIT 전에 ROLLBACK(접속 중단 시나리오)하고 최초 예약 상태를 확인한 뒤 별도 연결에서 재시도해 정확히 한 번 정산한다.
+- **격리:** 기존 `myeongha_commerce_credit_candidate_test` 복제 PostgreSQL/`CI=true`/`PGHOST=localhost` 조건에서만 실행되도록 하고, 기존 G4 SQL fixture의 원본 회원·Thread·Turn·Attempt·Assistant·합성 positive receipt를 사용하는 독립 테스트다. S0 영수증 자체의 실제 사용자 수신과 G4 정산을 합친 end-to-end 증명이 아니며 운영 결제/Provider/DB 권한은 변경하지 않는다. `node --check`/`git diff --check`는 통과했으나 실제 2세션 CI 실행 결과는 새 PR에서 확인하기 전까지 **미확인**.
+- **남은 Gate:** G5 실제 브라우저 S0 HTTP 수신 → 유효 Challenge ACK → private G4 장부 정산 **같은 현장 결속**, 장애/취소/삭제 경합, Source/Owner 승인 및 G6 실제 운영 역할·관측/복구/승인은 별도. `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false` 유지.
