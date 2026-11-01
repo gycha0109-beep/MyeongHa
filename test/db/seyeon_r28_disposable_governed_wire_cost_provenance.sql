@@ -14,13 +14,15 @@ begin
 end $precondition$;
 
 -- No memory body, wire body, prompt or provider output is persisted here.
+-- Privacy deletion cascades from original Subject/Turn/Attempt/cost ledger;
+-- ordinary API cannot DELETE; UPDATE is always rejected by the trigger.
 -- An immutable hash is CORRELATION only; not a grant or a wire signature.
 create table seyeon_positive_candidate.governed_wire_reservations_r28 (
-  call_id uuid primary key references public.seyeon_ai_call_cost_events(call_id),
-  subject_id uuid not null references public.subjects(id),
-  thread_id uuid not null references public.conversation_threads(id),
-  turn_id uuid not null references public.chat_turns(id),
-  attempt_id uuid not null references public.chat_turn_attempts(id),
+  call_id uuid primary key references public.seyeon_ai_call_cost_events(call_id) on delete cascade,
+  subject_id uuid not null references public.subjects(id) on delete cascade,
+  thread_id uuid not null references public.conversation_threads(id) on delete cascade,
+  turn_id uuid not null references public.chat_turns(id) on delete cascade,
+  attempt_id uuid not null references public.chat_turn_attempts(id) on delete cascade,
   purpose text not null check (purpose='turn_interpretation'),
   source_count smallint not null check (source_count between 1 and 2),
   selected_sources_digest text not null
@@ -37,7 +39,7 @@ create table seyeon_positive_candidate.governed_wire_reservations_r28 (
   unique(attempt_id,purpose)
 );
 create trigger immutable_governed_wire_reservation_r28
-before update or delete on seyeon_positive_candidate.governed_wire_reservations_r28
+before update on seyeon_positive_candidate.governed_wire_reservations_r28
 for each row execute function seyeon_positive_candidate.reject_r1_source_rewrite();
 
 create function seyeon_positive_candidate.seal_governed_wire_cost_r28(
