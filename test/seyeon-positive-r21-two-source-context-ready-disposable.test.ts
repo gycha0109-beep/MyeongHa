@@ -27,6 +27,8 @@ import {createSeyeonAiCostEventV1} from '../apps/api/src/seyeon-ai-usage-cost-v1
 import {
   reserveSeyeonR32OfflineFiveStageV1,
   SeyeonR32OfflineFiveStageHoldV1,
+  SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1,
+  SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1,
   type SeyeonR32OfflineStageReceiptV1,
 } from '../apps/api/src/seyeon-r32-offline-five-stage-governed-cost-v1.js';
 
@@ -255,15 +257,12 @@ async function r33NativeWire(stage:'integrity_classification'|'disclosure_classi
   const request:SeyeonStructuredProviderRequestV2={
     contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
     purpose:stage,
-    instructions:'R33 synthetic, offline exact wire. No memory body and no actual provider.',
+    instructions:SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1,
     input:{
       fixture:true,purpose:stage,
       selectedSourcesDigest:selectionDigest,priorNativeWireDigest:previousWireDigest,
     },
-    responseSchema:{
-      type:'object',additionalProperties:false,
-      properties:{ok:{type:'boolean'}},required:['ok'],
-    },
+    responseSchema:SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1,
   };
   let callId='';let body='';let fetchCount=0;
   const adapter=createOpenAiSeyeonStructuredProviderV1({
@@ -1056,16 +1055,13 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
           :{
             contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
             purpose,
-            instructions:'R32 synthetic offline-only stage; no external derived/private inputs.',
+            instructions:SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1,
             input:{
               fixture:true,purpose,
               selectedSourcesDigest:source.selection.selectedSourcesDigest,
               priorNativeWireDigest:used.length===0?null:used[used.length-1]?.nativeWireDigest,
             },
-            responseSchema:{
-              type:'object',additionalProperties:false,
-              properties:{ok:{type:'boolean'}},required:['ok'],
-            },
+            responseSchema:SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1,
           };
       const client=createOpenAiSeyeonStructuredProviderV1({
         apiKey:'no-network-r32-synthetic-only',model:'seyeon-r35-offline',
@@ -1254,16 +1250,13 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     const request:SeyeonStructuredProviderRequestV2={
       contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
       purpose,
-      instructions:'Isolated R32 budget rollback input; never contains private data.',
+      instructions:SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1,
       input:{
         fixture:true,purpose,
         selectedSourcesDigest:source.selection.selectedSourcesDigest,
         priorNativeWireDigest:null,
       },
-      responseSchema:{
-        type:'object',additionalProperties:false,
-        properties:{ok:{type:'boolean'}},required:['ok'],
-      },
+      responseSchema:SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1,
     };
     const purposes=['integrity_classification','disclosure_classification',
       'turn_interpretation','dialogue_render','semantic_review'] as const;
