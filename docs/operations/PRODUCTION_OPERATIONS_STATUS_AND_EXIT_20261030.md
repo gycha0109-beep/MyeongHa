@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2851 전체 통합 CI RED, 독립 PostgreSQL 초기화 경쟁 수정
+
+- **실패 원본:** [통합 CI #41290070944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290070944), PR #2851 HEAD `a89f2d4d5db11634bc7cbf3a4f9da6dfcdab6986`. 전용 admission과 대부분의 DB·콘텐츠·결제 검사는 SUCCESS였으나 `full / DB dependency · postgres17` 실패로 `full / CI Verify`, `CI Integration Verify` FAILURE. 특정 실패 케이스는 `seyeon-r2-helper-service-role-least-privilege`.
+- **원인 확인:** 해당 케이스는 먼저 권한 차단 `PASS_SEYEON_HELPER_SERVICE_ROLE_REVOKE_ISOLATED_PG17`를 출력한 뒤 별도 disposable PG17 컨테이너의 비특권 소유자 검증으로 넘어간다. PostgreSQL 17 Docker 초기화 시 **임시 시작 → 종료 → 최종 재시작** 사이에 `pg_isready`가 조기 PASS했으며 후속 `psql`이 `FATAL: the database system is shutting down`으로 종료됐다. 이는 보안 GRANT/REVOKE 판정 실패가 아니라 실제 컨테이너 준비 조건이 잘못된 재현성 문제다.
+- **수정:** `test/db/seyeon_r2_helper_owner_restricted_pg17.sh` 준비 조건에 공식 PostgreSQL 엔트리포인트의 `PostgreSQL init process complete; ready for start up.` 최종 초기화 마커를 추가하고, 이 마커 **및 최종 PG17 `pg_isready` 모두 충족**해야 소유자 검증으로 진행하도록 바꿨다. 45초까지의 준비 대기는 실행 허용 시간이지 성능 목표가 아니다. 기존 권한 검사 SQL, 역할, 운영 DB, 검증 기대 결과는 변경하지 않았다.
+- **검증 구분:** 로컬 shell syntax와 소스 계약 검사를 수행해 변경의 정확성을 확인했다. 이 Windows 호스트의 Docker daemon이 비가동이므로 **동일 Linux 컨테이너 재현 PASS는 새 CI 결과 전까지 미판정**이다. 고장 난 종전 통합 실행을 GREEN으로 바꾸거나 실제 Hosted 복구가 증명됐다고 주장하지 않는다. `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+
+
 ### 2026-11-01 KST — Phase 8 기존 로컬 Auth/Storage 합성 수용 검증을 일회용 Linux CI에 연결
 
 - **선행 종료 확인:** [PR #2847](https://github.com/gycha0109-beep/MyeongHa/pull/2847)은 [CI Integration #41241185170](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41241185170) SUCCESS 후 2026-11-01 06:13:41 KST 병합, main `ad4f5d5661454bdcad404ba7d5a59bcacd9ce3b8`. 새 migration 카탈로그 지문 백업 [#41240435451](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240435451)과 격리 PG17 복원 [#41240770891](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240770891) PASS 증거는 병합된 문서에 귀속한다.
