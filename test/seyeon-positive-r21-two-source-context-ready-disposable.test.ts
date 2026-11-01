@@ -19,6 +19,7 @@ import {
   type SeyeonR26OfflineG4ReceiptV1,
 } from '../apps/api/src/seyeon-r26-offline-governed-wire-reservation-v1.js';
 import type {SeyeonAiGovernorAdmissionV1} from '../apps/api/src/postgres-seyeon-ai-cost-ledger-v1.js';
+import {createSeyeonAiCostEventV1} from '../apps/api/src/seyeon-ai-usage-cost-v1.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -573,6 +574,86 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     );
     expect(noCommit.rows[0]?.count).toBe('0');
 
+    // The old real DB Worker is exercised with a SYNTHETIC, never-sent
+    // Provider usage event. This only proves the ledger accounting chain;
+    // a simulated settlement is NEVER authority for a real model reply.
+    const syntheticOutcome=createSeyeonAiCostEventV1({
+      callId:receipt.callId,purpose:'turn_interpretation',
+      providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+      outcome:'response_received',httpStatus:200,elapsedMs:8,
+      usage:{
+        inputTokens:100,outputTokens:50,cachedInputTokens:0,reasoningTokens:0,
+      },
+      price:policy.priceQuote,
+    });
+    expect(syntheticOutcome).toMatchObject({
+      costStatus:'estimated',estimatedCostMicroUsd:300,
+      invoiceReconciled:false,
+    });
+    await tx(async client=>{
+      await client.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+      const stored=await client.query<{call_id:string;replayed:boolean}>(
+        'select * from public.cmd_store_seyeon_provider_receipt_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb)',
+        [subject,id.turn,id.attempt,'chat',JSON.stringify(syntheticOutcome)],
+      );
+      expect(stored.rows).toMatchObject([{call_id:receipt.callId,replayed:false}]);
+    });
+    const claimed=await tx(c=>c.query<{call_id:string;claim_token:string}>(
+      'select call_id::text,claim_token::text from public.cmd_claim_seyeon_provider_receipt_v1()',
+    ));
+    expect(claimed.rows).toHaveLength(1);
+    expect(claimed.rows[0]?.call_id).toBe(receipt.callId);
+    const token=claimed.rows[0]?.claim_token;
+    if(!token)throw Error('synthetic settlement worker lease missing');
+    await tx(async c=>{
+      await c.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+      const settled=await c.query<{
+        call_id:string;replayed:boolean;occupied_micro_usd:string;
+        over_ceiling:boolean;
+      }>(
+        'select call_id::text,replayed,occupied_micro_usd::text,over_ceiling from public.cmd_governed_settle_seyeon_ai_call_v1($1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb)',
+        [subject,id.turn,id.attempt,'chat',JSON.stringify(syntheticOutcome)],
+      );
+      expect(settled.rows).toMatchObject([{
+        call_id:receipt.callId,replayed:false,occupied_micro_usd:'300',
+        over_ceiling:false,
+      }]);
+    });
+    const acked=await tx(c=>c.query<{acknowledged:boolean}>(
+      'select public.cmd_ack_seyeon_provider_receipt_v1($1::uuid,$2::uuid) as acknowledged',
+      [receipt.callId,token],
+    ));
+    expect(acked.rows[0]?.acknowledged).toBe(true);
+    // G2 still MUST refuse a purported successful single interpreter call.
+    // It cannot establish the complete approved, provenance-preserving
+    // Preflight + Interpreter + Renderer + Reviewer lineage.
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
+      [subject,id.thread,id.turn,id.attempt,
+       'd8300000-0000-4000-8000-'+idSuffix,
+       'd8400000-0000-4000-8000-'+idSuffix,
+       'd8500000-0000-4000-8000-'+idSuffix,
+       JSON.stringify({
+         schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+         turnId:id.turn,
+         assistantMessageId:'d8300000-0000-4000-8000-'+idSuffix,
+         userMessageId:id.user,
+       }),
+       'sha256:v1:synthetic-r29-post-turn-hash',
+       source.selection.selectedSourcesDigest],
+    ),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+    });
+    const stillNoOutputs=await pool.query<{messages:string;admissions:string}>(
+      "select (select count(*)::text from public.conversation_messages where turn_id=$1::uuid and sender_type='character') as messages,"+
+      " (select count(*)::text from seyeon_positive_candidate.actual_v2_commit_admissions_r3 where attempt_id=$2::uuid) as admissions",
+      [id.turn,id.attempt],
+    );
+    expect(stillNoOutputs.rows[0]).toMatchObject({
+      messages:'0',admissions:'0',
+    });
+    expect(fetchCount).toBe(0);
+
     // A stale G1/Wire receipt is not enough once the SECOND original Grant
     // was revoked between attestation and the new G4 DB reservation.
     await pool.query(
@@ -591,8 +672,8 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     const remaining=await pool.query<{occupied:string}>(
       "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
     );
-    // The deliberately UNSENT direct-start attempt remains conservatively
-    // reserved: 1,524 + 1,524; a failed G2 never refunds unknown usage.
-    expect(remaining.rows[0]?.occupied).toBe('3048');
+    // One explicitly SYNTHETIC outcome reduced only its own reserved
+    // balance to 300; the other unsealed/unsent start still retains 1,524.
+    expect(remaining.rows[0]?.occupied).toBe('1824');
   });
 });
