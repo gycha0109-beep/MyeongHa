@@ -224,8 +224,13 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(room).not.toContain('대화로 돌아가기');
     expect(home).toContain('href="chat-hub.html">대화</a>');
     expect(home).toContain('href="chat-hub.html">인물 둘러보기');
-    expect(home).toContain('href="chat-hub.html">대화 보러 가기');
-    expect(home).not.toContain('href="chat.html?character=');
+    // The redundant Home recent-chat placeholder was intentionally removed.
+    // Global discovery still uses the hub, while Seyeon's portrait card opens
+    // her presentation room directly without claiming thread ownership.
+    expect(home).not.toContain('대화 보러 가기');
+    expect(home).not.toContain('mhx-recent-card');
+    expect(home).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
+    expect(home).not.toContain('threadId=');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
     expect(records).toContain('href="chat-hub.html">대화</a>');
   });
