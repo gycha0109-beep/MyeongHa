@@ -21,6 +21,8 @@ const G0_HISTORY_RPC='public.qry_seyeon_g0_current_source_relationship_history_v
 const G0_USER_RPC='seyeon_private.assert_current_original_member_user_message_v1(uuid,uuid,uuid)';
 const G0_ASSISTANT_RPC='seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)';
 const RECOVER_FAILED_USER_RPC='public.qry_seyeon_recover_exact_failed_user_turn_v1(uuid,uuid,text)';
+const SUPERSEDE_FAILED_USER_RPC='public.cmd_seyeon_supersede_stale_failed_turn_v1(uuid,uuid,text)';
+const EXPLICIT_SUPERSEDE_HEADER='X-MyeongHa-Seyeon-Explicit-Supersede';
 
 /**
  * Run after subject authentication but BEFORE a new logical turn is inserted.
@@ -97,6 +99,9 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     if(input.request.headers.get(SEYEON_POSITIVE_DELIVERY_RECEIPT_HEADER_V1)!=='v1' ||
        input.request.signal.aborted)return held();
     const zeroSource=input.zeroSourceFirstReplyApproved===true;
+    const supersedeHeader=input.request.headers.get(EXPLICIT_SUPERSEDE_HEADER);
+    if(supersedeHeader!==null &&
+       (supersedeHeader!=='v1'||!zeroSource))return held();
     // Receipt HTTP requires G1/G2 and its own issuer, never EXECUTE on the
     // old Node sender. Production leaves that unreceipted RPC revoked.
     stage='receipt_readiness';
@@ -158,6 +163,37 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         },
       });
       if(recovered!==null)executionClientTurnId=recovered;
+      // A new message cannot inherit the old User text or identity.
+      // Only a separate, explicit browser confirmation authorizes replacing
+      // an unrelated terminal-failed Turn with a new User message.
+      if(recovered===null && supersedeHeader==='v1'){
+        stage='failed_turn_reconciliation';
+        const superseded=await executePostgresSubjectTransactionV1({
+          pool:input.pool,verifiedEvidence:preflight.verifiedEvidence,
+          execute:async({client,resolvedSubject})=>{
+            if(resolvedSubject.subjectKind!=='member')throw Error('Member required');
+            const check=await client.query<{ready:boolean}>(`select count(*)=1 as ready
+              from pg_catalog.pg_proc p where p.oid=to_regprocedure($1)
+                and p.prosecdef
+                and pg_catalog.pg_get_userbyid(p.proowner)='myeongha_seyeon_chat_runtime_owner'
+                and has_function_privilege(current_user,p.oid,'EXECUTE')
+                and not has_function_privilege('anon',p.oid,'EXECUTE')
+                and not has_function_privilege('authenticated',p.oid,'EXECUTE')
+                and not has_function_privilege('service_role',p.oid,'EXECUTE')`,
+              [SUPERSEDE_FAILED_USER_RPC]);
+            if(check.rows.length!==1||check.rows[0]?.ready!==true)
+              throw Error('Explicit failed-turn supersede authority unavailable');
+            const r=await client.query<{superseded:boolean}>(`select
+              public.cmd_seyeon_supersede_stale_failed_turn_v1(
+                $1::uuid,$2::uuid,$3::text) as "superseded"`,
+              [resolvedSubject.subjectId,preflight.threadId,preflight.text]);
+            return r.rows.length===1 && r.rows[0]?.superseded===true;
+          },
+        });
+        if(!superseded)return createSeyeonCloudflareStaticPreflightDenialV1({
+          kind:'turn_in_flight',requestId:input.requestId,
+        });
+      }
     }
     if(input.request.signal.aborted)return held();
     stage='model_execution';
