@@ -40,6 +40,8 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2
 # R21 must be INSTALLED before R25 G2/R5 tests reference its two-original function.
 # Original single-memory and zero-memory paths are still unchanged.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
+# R30 is a no-dispatch five-stage source/wire ancestry receipt only.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r30_disposable_five_stage_native_wire_lineage.sql
 # R5 is required by the same two-original G2 test's post-commit Grant readback.
 # Install it before G2 tests; ordinary single-original cases keep their guards.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
