@@ -10,7 +10,11 @@ import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/se
 import type {SeyeonR21OfflineDerivedSourceEnvelopeV1} from '../apps/api/src/seyeon-r21-offline-derived-source-closure-v1.js';
 import type {PostgresSubjectPoolV1} from '../apps/api/src/postgres-subject-execution.js';
 import {persistSeyeonR20OfflineDigestBoundPinV1, SeyeonR20OfflineDigestHoldV1} from '../apps/api/src/seyeon-positive-raw-projection-digest-bind-r20-candidate.js';
-import {buildSeyeonTurnInterpreterRequestV2} from '../apps/api/src/seyeon-character-runtime-v2.js';
+import {
+  buildSeyeonTurnInterpreterRequestV2,
+  SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+  type SeyeonStructuredProviderRequestV2,
+} from '../apps/api/src/seyeon-character-runtime-v2.js';
 import {createOpenAiSeyeonStructuredProviderV1} from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import {attestSeyeonR35OfflineWireAfterDbPinV1} from '../apps/api/src/seyeon-r35-offline-actual-provider-wire-pin-v1.js';
 import {
@@ -268,6 +272,117 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(await state(a)).toMatchObject({
       turnState:'planned',parents:'0',edges:'0',firstPins:'0',
     });
+  });
+  it('R30: two DB-owned originals seal five ordered ACTUAL native stage bodies with zero fetch',async()=>{
+    if(!pool)throw Error('disposable PostgreSQL required');
+    const a=await createTurn(759);
+    const source=await modelSources();
+    await persistSeyeonR20OfflineDigestBoundPinV1({
+      pool:scopedPool,
+      verifiedEvidence:{kind:'member',verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001'},
+      threadId:a.thread,turnId:a.turn,attemptId:a.attempt,
+      ...source,twoOriginalContextReady:true,
+    });
+    const stages=['integrity_classification','disclosure_classification',
+      'turn_interpretation','dialogue_render','semantic_review'] as const;
+    type Stage=typeof stages[number];
+    const requests=new Map<Stage,SeyeonStructuredProviderRequestV2>();
+    for(const stage of stages){
+      requests.set(stage,stage==='turn_interpretation'
+        ?buildSeyeonTurnInterpreterRequestV2(source.finalModelContext)
+        :{
+          contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+          purpose:stage,
+          instructions:'Synthetic test-only prompt: no additional private sources and no real model dispatch.',
+          input:{synthetic:true,sourceSelectionDigest:source.selection.selectedSourcesDigest,
+            modelContextDigest:hash(source.finalModelContext),stage},
+          responseSchema:{
+            type:'object',additionalProperties:false,
+            properties:{ok:{type:'boolean'}},required:['ok'],
+          },
+        });
+    }
+    let fetches=0;
+    const receipts:{
+      stage:string;index:number;callId:string;wireDigest:string;
+      previous:string|null;body:string;
+    }[]=[];
+    const sendStage=async(stage:Stage)=>{
+      const request=requests.get(stage);
+      if(!request)throw Error('stage request fixture missing');
+      const client=createOpenAiSeyeonStructuredProviderV1({
+        model:'seyeon-r35-offline',apiKey:'offline-r30-no-real-provider',
+        maxOutputTokens:256,
+        fetchImpl:async()=>{fetches++;throw Error('FORBIDDEN_PROVIDER_FETCH');},
+        meteredBeforeDispatch:async(meta,body)=>{
+          const claimed=await tx(c=>c.query<{receipt:{
+            attemptId:string;stageIndex:number;purpose:string;
+            callId:string;sourceCount:number;nativeWireDigest:string;
+            selectedSourcesDigest:string;previousWireDigest:string|null;
+            permitsProvider:boolean;permitsAtomicCommit:boolean;
+            permitsHttpReveal:boolean;
+          }}>(
+            'select seyeon_positive_candidate.claim_two_original_stage_wire_r30($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text) as receipt',
+            [subject,a.thread,a.turn,a.attempt,stage,meta.callId,
+             source.selection.selectedSourcesDigest,hash(request),body],
+          ),true);
+          const receipt=claimed.rows[0]?.receipt;
+          if(!receipt)throw Error('R30 DB owner did not seal actual provider body');
+          expect(receipt).toMatchObject({
+            attemptId:a.attempt,purpose:stage,callId:meta.callId,
+            sourceCount:2,
+            selectedSourcesDigest:source.selection.selectedSourcesDigest,
+            nativeWireDigest:'sha256:wire-utf8:v1:'+
+              createHash('sha256').update(body,'utf8').digest('hex'),
+            permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+          });
+          receipts.push({
+            stage,index:receipt.stageIndex,callId:receipt.callId,
+            wireDigest:receipt.nativeWireDigest,
+            previous:receipt.previousWireDigest,body,
+          });
+          // Mandatory offline fence: DB stage admission cannot dispatch.
+          throw Error('R30 synthetic DB receipt is not Provider authorization');
+        },
+      });
+      await expect(client.generate(request)).rejects.toThrow();
+    };
+    await expect(sendStage('semantic_review')).rejects.toThrow();
+    expect(fetches).toBe(0);
+    expect(receipts).toHaveLength(0);
+    for(const stage of stages)await sendStage(stage);
+    expect(receipts.map(x=>x.index)).toEqual([0,1,2,3,4]);
+    expect(receipts.map(x=>x.stage)).toEqual([...stages]);
+    expect(receipts[0]?.previous).toBeNull();
+    for(let i=1;i<5;i++)
+      expect(receipts[i]?.previous).toBe(receipts[i-1]?.wireDigest);
+    expect(fetches).toBe(0);
+    const rows=await pool.query<{
+      stage_index:number;purpose:string;native_wire_digest:string;
+      previous_wire_digest:string|null;
+    }>(
+      'select stage_index,purpose,native_wire_digest,previous_wire_digest from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid order by stage_index',
+      [a.attempt],
+    );
+    expect(rows.rows).toHaveLength(5);
+    expect(rows.rows.map(x=>x.native_wire_digest)).toEqual(
+      receipts.map(x=>x.wireDigest),
+    );
+    expect(await state(a)).toMatchObject({
+      turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
+    });
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.claim_two_original_stage_wire_r30($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text)',
+      [subject,a.thread,a.turn,a.attempt,'semantic_review',
+       receipts[4]!.callId,source.selection.selectedSourcesDigest,
+       hash(requests.get('semantic_review')),receipts[4]!.body],
+    ),true)).rejects.toMatchObject({constraint:'seyeon_r30_duplicate_stage'});
+    // All five synthetic pre-dispatch receipts still do NOT authorize
+    // a cost-ungoverned reply/commit. G2 needs exact R28 cost+settlement.
+    expect(await pool.query<{count:string}>(
+      'select count(*)::text as count from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid',
+      [a.attempt],
+    )).toMatchObject({rows:[{count:'0'}]});
   });
   it('R26: real G1 two-original digest and native wire -> atomic governed reservation; fetch stays blocked',async()=>{
     if(!pool)throw Error('disposable PostgreSQL required');
