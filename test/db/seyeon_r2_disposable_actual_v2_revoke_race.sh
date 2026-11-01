@@ -42,7 +42,14 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
 # R30 is a no-dispatch five-stage source/wire ancestry receipt only.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r30_disposable_five_stage_native_wire_lineage.sql
-# One DB transaction must bind each native stage and the actual Governor budget.
+# R36: install DB-owned static Character/Interpreter manifest first;
+# real runtime builders produce the immutable PUBLIC authored snapshot.
+# Must finish before R32 can admit any Interpreter or charge a budget.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r36_disposable_interpreter_static_authority_manifest.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r36-static-authority-manifest-disposable.test.ts --maxWorkers=1
+# One DB transaction now binds each actual native stage, trusted code-owned
+# Interpreter authority manifest, and the real Governor budget.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql
 # R5 is required by the same two-original G2 test's post-commit Grant readback.
 # Install it before G2 tests; ordinary single-original cases keep their guards.
