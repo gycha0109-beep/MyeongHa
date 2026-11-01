@@ -202,6 +202,94 @@ async function modelSources(origins:readonly {recordId:string;grantId:string}[]=
   return {retrievedMemories:memories,sourceCandidates:candidates,
     sourceEnvelope:envelope,selection,finalModelContext};
 }
+
+/** R33 actual two-session PG lock race: inspect the other backend, not JS timing. */
+async function r33WaitForDbLock(label:string):Promise<void>{
+  if(!pool)throw Error('R33 disposable PG required');
+  for(let tries=0;tries<100;tries++){
+    const r=await pool.query<{n:string}>(
+      "select count(*)::text as n from pg_catalog.pg_stat_activity where application_name=$1 and wait_event_type='Lock'",
+      [label],
+    );
+    if(r.rows[0]?.n==='1')return;
+    await new Promise<void>(resolve=>setTimeout(resolve,25));
+  }
+  throw Error('R33 expected an independently blocked PostgreSQL session: '+label);
+}
+async function r33Prepare(n:number,firstOrdinal:number){
+  if(!pool)throw Error('R33 disposable PG required');
+  const originals=[firstOrdinal,firstOrdinal+1].map(x=>{
+    const suffix=String(x).padStart(12,'0');
+    return {
+      recordId:'d5000000-0000-4000-8000-'+suffix,
+      grantId:'d6000000-0000-4000-8000-'+suffix,
+    };
+  });
+  await tx(async c=>{
+    for(let i=0;i<originals.length;i++){
+      const o=originals[i]!;
+      await c.query(
+        "insert into public.memory_items(id,subject_id,memory_type,schema_version,content_jsonb,source_kind,created_by_character_id,revoked_at,created_at) values($1,$2,'shared_detail','memory-v1',$3::jsonb,'user_approved','seyeon',null,clock_timestamp())",
+        [o.recordId,subject,JSON.stringify({synthetic:true,r33:n,ordinal:i})],
+      );
+      await c.query(
+        "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+        [o.grantId,subject,o.recordId],
+      );
+    }
+  });
+  const id=await createTurn(n);
+  const source=await modelSources(originals);
+  await persistSeyeonR20OfflineDigestBoundPinV1({
+    pool:scopedPool,
+    verifiedEvidence:{
+      kind:'member',verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001',
+    },
+    threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
+    ...source,twoOriginalContextReady:true,
+  });
+  return {id,source,originals};
+}
+async function r33NativeWire(stage:'integrity_classification'|'disclosure_classification',
+  selectionDigest:string,previousWireDigest:string|null){
+  const request:SeyeonStructuredProviderRequestV2={
+    contractVersion:SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
+    purpose:stage,
+    instructions:'R33 synthetic, offline exact wire. No memory body and no actual provider.',
+    input:{
+      fixture:true,purpose:stage,
+      selectedSourcesDigest:selectionDigest,priorNativeWireDigest:previousWireDigest,
+    },
+    responseSchema:{
+      type:'object',additionalProperties:false,
+      properties:{ok:{type:'boolean'}},required:['ok'],
+    },
+  };
+  let callId='';let body='';let fetchCount=0;
+  const adapter=createOpenAiSeyeonStructuredProviderV1({
+    apiKey:'offline-r33-not-a-real-secret',model:'seyeon-r35-offline',
+    maxOutputTokens:256,
+    meteredBeforeDispatch:async(call,wire)=>{
+      callId=call.callId;body=wire;
+      throw Error('R33_NO_NETWORK_AUTHORIZATION');
+    },
+    fetchImpl:async()=>{fetchCount++;throw Error('R33_FORBIDDEN_NETWORK');},
+  });
+  await expect(adapter.generate(request)).rejects.toMatchObject({
+    code:'PRE_DISPATCH_REJECTED',
+  });
+  expect(fetchCount).toBe(0);
+  if(!callId||!body)throw Error('R33 native adapter never generated wire');
+  return {callId,body,requestDigest:hash(request)};
+}
+const R33_STAGE_START_SQL=`
+select seyeon_positive_candidate.claim_governed_stage_r32(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,'integrity_classification',
+  $5::uuid,$6::text,$7::text,$8::text,$9::text,
+  'offline-r32-test-v1','offline-r32-price-v1',500::bigint
+) as receipt
+`.trim();
+
 describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core ContextReady',()=>{
   afterAll(async()=>{await pool?.end();});
   it('atomically pins two locked originals, marks context ready, denies Provider/Commit/Reveal',async()=>{
@@ -1259,6 +1347,148 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     );
     expect(final.rows).toMatchObject([{stage_count:'1',cost_count:'1'}]);
     expect(fetches).toBe(0);
+  },30000);
+
+
+  it('R33 revoke-first: independent DB Subject lock blocks Cost Start, then denies original and reserves zero',async()=>{
+    if(!pool)throw Error('R33 scratch CI PG only');
+    const {id,source,originals}=await r33Prepare(762,5);
+    const {callId,body,requestDigest}=await r33NativeWire(
+      'integrity_classification',source.selection.selectedSourcesDigest,null,
+    );
+    const args=[
+      subject,id.thread,id.turn,id.attempt,callId,
+      source.selection.selectedSourcesDigest,hash(source.finalModelContext),
+      requestDigest,body,
+    ];
+    const start=await pool.query<{occupied:string}>(
+      "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    expect(start.rows).toHaveLength(1);
+    const revoker=await pool.connect();
+    const claimant=await pool.connect();
+    try{
+      await revoker.query('BEGIN');
+      await revoker.query('select id from public.subjects where id=$1::uuid for update',[subject]);
+      await revoker.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [originals[1]!.grantId],
+      );
+      await claimant.query("SET application_name='seyeon_r33_revoke_first_cost_waiter'");
+      await claimant.query('BEGIN');
+      await claimant.query('SET LOCAL ROLE myeongha_api_executor');
+      await claimant.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+      const admission=claimant.query(R33_STAGE_START_SQL,args).then(
+        result=>({kind:'success' as const,result}),
+        error=>({kind:'error' as const,error}),
+      );
+      await r33WaitForDbLock('seyeon_r33_revoke_first_cost_waiter');
+      await revoker.query('COMMIT');
+      const outcome=await admission;
+      expect(outcome.kind).toBe('error');
+      if(outcome.kind==='error')
+        expect(outcome.error).toMatchObject({
+          code:'23514',constraint:'seyeon_r30_original_grant_revoked',
+        });
+      await claimant.query('ROLLBACK');
+    }finally{
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await claimant.query('ROLLBACK').catch(()=>undefined);
+      await claimant.query("RESET application_name").catch(()=>undefined);
+      revoker.release();claimant.release();
+    }
+    const rows=await pool.query<{stages:string;calls:string;budget:string}>(
+      "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stages,"+
+      " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as calls,"+
+      " (select occupied_micro_usd::text from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date) as budget",
+      [id.attempt],
+    );
+    expect(rows.rows[0]).toMatchObject({
+      stages:'0',calls:'0',budget:start.rows[0]!.occupied,
+    });
+    expect(await state(id)).toMatchObject({
+      turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
+    });
+  },30000);
+
+  it('R33 reserve-first: revoke waits for actual budget+stage COMMIT; later stage cannot use stale Grant',async()=>{
+    if(!pool)throw Error('R33 scratch CI PG only');
+    const {id,source,originals}=await r33Prepare(763,7);
+    const {callId,body,requestDigest}=await r33NativeWire(
+      'integrity_classification',source.selection.selectedSourcesDigest,null,
+    );
+    const start=await pool.query<{occupied:string}>(
+      "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    expect(start.rows).toHaveLength(1);
+    const claimant=await pool.connect();
+    const revoker=await pool.connect();
+    try{
+      await claimant.query('BEGIN');
+      await claimant.query('SET LOCAL ROLE myeongha_api_executor');
+      await claimant.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
+      const admitted=await claimant.query<{receipt:{
+        callId:string;stageIndex:number;reservedMicroUsd:string;
+        permitsProvider:boolean;
+      }}>(R33_STAGE_START_SQL,[
+        subject,id.thread,id.turn,id.attempt,callId,
+        source.selection.selectedSourcesDigest,hash(source.finalModelContext),
+        requestDigest,body,
+      ]);
+      expect(admitted.rows[0]?.receipt).toMatchObject({
+        callId,stageIndex:0,reservedMicroUsd:'1524',permitsProvider:false,
+      });
+      await revoker.query("SET application_name='seyeon_r33_reserve_first_revoke_waiter'");
+      await revoker.query('BEGIN');
+      const revocation=(async()=>{
+        await revoker.query('select id from public.subjects where id=$1::uuid for update',[subject]);
+        await revoker.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [originals[1]!.grantId],
+        );
+        await revoker.query('COMMIT');
+      })();
+      await r33WaitForDbLock('seyeon_r33_reserve_first_revoke_waiter');
+      await claimant.query('COMMIT');
+      await revocation;
+    }finally{
+      await claimant.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query("RESET application_name").catch(()=>undefined);
+      claimant.release();revoker.release();
+    }
+    const rows=await pool.query<{stages:string;calls:string;budget:string}>(
+      "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stages,"+
+      " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as calls,"+
+      " (select occupied_micro_usd::text from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date) as budget",
+      [id.attempt],
+    );
+    expect(rows.rows[0]).toMatchObject({
+      stages:'1',calls:'1',
+      budget:String(BigInt(start.rows[0]!.occupied)+1524n),
+    });
+    const next=await r33NativeWire('disclosure_classification',
+      source.selection.selectedSourcesDigest,
+      'sha256:wire-utf8:v1:'+createHash('sha256').update(body,'utf8').digest('hex'),
+    );
+    // Same Owner, independently new Call ID. NO new paid reservation after
+    // the second ORIGINAL Grant was revoked, even though stage 0 once passed.
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.claim_governed_stage_r32($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::bigint) as receipt',
+      [subject,id.thread,id.turn,id.attempt,'disclosure_classification',
+       next.callId,source.selection.selectedSourcesDigest,
+       hash(source.finalModelContext),next.requestDigest,next.body,
+       'offline-r32-test-v1','offline-r32-price-v1',500],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r30_original_grant_revoked',
+    });
+    const final=await pool.query<{stages:string;calls:string;budget:string}>(
+      "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stages,"+
+      " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as calls,"+
+      " (select occupied_micro_usd::text from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date) as budget",
+      [id.attempt],
+    );
+    expect(final.rows[0]).toEqual(rows.rows[0]);
   },30000);
 
 });
