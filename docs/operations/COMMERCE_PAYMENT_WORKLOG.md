@@ -230,3 +230,14 @@
 - **공식 CI 사실:** [통합 CI #41290232104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290232104)에서 admission, 일반 Work Track, runtime/content/commerce-payment/commerce-entitlement, DB authority-core는 PASS. 실제 실패는 `full / DB dependency · postgres17`의 `commerce-exact-reader-withdrawal-hold-pg17` 1건이며, 뒤따르는 CI Verify/Integration Verify 실패는 그 결과에 종속.
 - **원인 및 수정:** 새 PostgreSQL 17 격리 SQL 블록에서 `subject_id`를 PL/pgSQL 지역 변수명과 DB 컬럼명에 동시에 사용해 `column reference "subject_id" is ambiguous`가 발생했습니다. 지역 변수를 `v_subject_id`로 변경하고 B2/B3 조회·비교에서 같은 이름을 사용하도록 보정했습니다. 운영 Read-only Source SQL, 실제 구매 권한, 환불·권한 회수 코드에는 변경이 없습니다.
 - **회귀 보호:** PG17 SQL 생성기의 지역 변수 선언·원본 Receipt 대응·B3 구매권 조건에 혼동 가능한 열-열 자기 비교가 남지 않았는지 직접 검사하는 테스트를 추가했습니다. 실제 PG17 SQL 실행 성공은 **새 CI에서 확인하기 전까지 미확정**입니다.
+
+### 2026-11-01 — 정확한 유료 Reader 응답 준비·고객 기기 ACK 영속 기록 구현 후보
+
+- **기준:** #2853의 공식 PostgreSQL 17 통합 CI #41292352193 SUCCESS 및 `main` 병합 `f5305809` 확인. 내부 공식 Reading 저장·Reader Interpretation 결속은 소비자 전달 사실이 아니라는 기존 경계를 유지합니다.
+- **실제 작업 1 — 저장:** `docs/operations/candidates/commerce_reader_delivery_transport_capture_v1.sql`에 정확한 유료 Reader 구매 단위의 응답 준비 기록과 기기 ACK 기록을 **서로 다른 두 테이블**로 추가했습니다. 검증된 Purchase Intent·해당 구매의 개별 Grant·공식 Reading·Reader·구매 Bundle이 일치하고 공식 Reading이 내부 커밋된 경우에만 응답 준비를 기록하는 내부 DB 함수, 기기 ACK 수신 시 같은 구매·Challenge HMAC·활성 Grant를 검증하는 함수, 동일 요청 재시도 멱등 처리를 포함합니다.
+- **실제 작업 2 — 서버 연동 후보:** `scripts/operations/commerce-reader-delivery-transport-capture-v1.mjs`에 서버에서 위 두 DB 함수를 호출하는 경계를 구현했습니다. 유효하지 않은 사용자/구매 ID·Challenge HMAC·DB 응답을 거부하고 출력에는 원본 고객·구매·Reading ID·비밀키를 넣지 않습니다. 결과는 `response_prepared_not_consumer_delivery` 또는 `client_acknowledged_not_human_read`이며 **실제 콘텐츠 전달·인간 열람·법적 환불 제한을 입증하지 않습니다**.
+- **실제 작업 3 — 경계 보호:** 재시도 시 동일 응답 준비 기록을 대조하고, 별도 구매/Reader/Bundle/본문 ID로 재사용하거나 Grant가 회수된 뒤 동일 준비 요청을 재실행하는 경우도 차단합니다. 역할에 대한 직접 테이블·함수 접근은 기본 차단하며 Production/public API 권한은 부여하지 않습니다.
+- **검증:** `test/commerce-reader-delivery-transport-capture-v1.test.mjs`에 호출 인자·불변 구매 범위·ACK 분리·실패 시 차단·비밀 출력 억제·SQL 보호 조건 검사 추가. 공식 CI/실제 PostgreSQL 17 실행 결과는 **확인 전까지 미확정**입니다.
+- **배포 경계:** 신규 SQL은 **비배포 후보 폴더**에 있고 기존 운영 migration/checkout notice stage 제외 정책, P0-PR-01·LEGAL-004, 환불/Entitlement/LIVE는 변경하지 않습니다. 이 후보는 S5 보호 본문 identity를 승인된 원본 테이블에 대조하지 못하며 아직 Reader 최종 R2/T2 공개·S7 전송 경로에 연결되지 않았습니다. 특히 *서버 준비 기록*과 *기기 ACK*는 수신/제공에 관한 단서일 뿐 `DELIVERED_PROVABLE`의 긍정 authority가 아닙니다.
+- **다음 작업:** 실제 Reader R2/T2·S5/S7 원본에 응답 준비/ACK 기록을 결속하고, 신설 테이블의 계정 삭제·보존 기간 규칙을 승인된 정책에 맞춰 연결한 다음 격리 PostgreSQL 17 실제 SQL 실행 검증과 forward-only migration을 수행합니다. 이후 독립 전달 증거를 법적 수동 검토 소스에 연결합니다. 새로운 무근거 전달 완료 판정은 금지합니다.
+- **작업 브랜치:** `feat/commerce/reader-delivery-receipt-capture-20261101`. 신규 구현, 테스트, 워크로그는 동일 PR에 포함합니다. 자동 환불·Reader 권한 회수·LIVE 결제는 계속 OFF.
