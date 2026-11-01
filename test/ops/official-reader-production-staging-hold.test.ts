@@ -4,8 +4,11 @@ import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, wr
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
-const workflow = readFileSync(resolve('.github/workflows/supabase-production.yml'), 'utf8');
-const runner = resolve('scripts/operations/run-supabase-production-migrations.sh');
+const workflow = readFileSync(resolve('.github/workflows/supabase-production.yml'), 'utf8').replace(/\r\n/g, '\n');
+const nativeRunner = resolve('scripts/operations/run-supabase-production-migrations.sh');
+const runner = process.platform === 'win32'
+  ? '/' + nativeRunner[0]!.toLowerCase() + nativeRunner.slice(2).replace(/\\/g, '/')
+  : nativeRunner;
 const prefix = '      - name: Determine governed Production DB relevance';
 const dispatchStart = workflow.indexOf('        run: |\n', workflow.indexOf(prefix));
 const dispatchEnd = workflow.indexOf('\n  deploy:', dispatchStart);

@@ -58,13 +58,13 @@ describe('S2 Reader writer lock hierarchy / S4 approved deletion boundary', () =
     before(src, 'internal_account_deletion_finalization_preflight_v1(', 'delete from public.standard_reading_reader_access_grants where subject_id = p_subject_id;');
     before(src, 'delete from public.standard_reading_reader_access_grants where subject_id = p_subject_id;', 'delete from public.conversation_messages where subject_id = p_subject_id;');
     expect(src).not.toContain('official_reader_s4_fixture');
-    const candidate = readFileSync('test/db/official_reader_s4_finalizer_forward_contract.sql','utf8');
-    before(
-      sliceAfter(candidate, 'create function official_reader_s4_fixture.rehearse_account_delete_child_first_v1('),
-      'delete from official_reader_s4_fixture.protected_bodies b',
-      'delete from public.standard_reading_reader_access_grants'
-    );
-    expect(candidate).toContain('rollback;');
-    expect(candidate).toContain('revoke all on function official_reader_s4_fixture.rehearse_account_delete_child_first_v1');
+    // Verify the committed S4 forward-only migration, not a removed scratch fixture.
+    const protectedFinalizer = migration('1990_official_reader_s4_account_deletion_protected_child_purge_v1.sql');
+    before(protectedFinalizer,
+      'delete from public.official_reader_paid_answer_bodies b',
+      'delete from public.standard_reading_reader_access_grants');
+    expect(protectedFinalizer).toContain('revoke all on function public.internal_finalize_account_deletion_db_v1');
+    const realDbTest = readFileSync('test/db/account_deletion_db_finalizer.sh','utf8');
+    expect(realDbTest).toContain('rollback');
   });
 });

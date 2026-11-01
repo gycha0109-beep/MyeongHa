@@ -60,13 +60,22 @@ reader_subject_children=(
   official_reader_paid_delivery_attempts_v1
   official_reader_s3_source_authority_receipts_v1
 )
+reader_subject_present=0
 for table in "${reader_subject_children[@]}"; do
-  if ! printf '%s\n' "$actual" | grep -Fxq "${table}|subject_id"; then
-    echo "Missing independently governed Reader subject child: ${table}" >&2
-    exit 1
+  if printf '%s\n' "$actual" | grep -Fxq "${table}|subject_id"; then
+    reader_subject_present=$((reader_subject_present + 1))
   fi
-  actual="$(printf '%s\n' "$actual" | grep -Fxv "${table}|subject_id")"
 done
+if [[ "$reader_subject_present" != 0 &&
+      "$reader_subject_present" != "${#reader_subject_children[@]}" ]]; then
+  echo 'Incomplete independent Reader deletion graph coverage' >&2
+  exit 1
+fi
+if [[ "$reader_subject_present" != 0 ]]; then
+  for table in "${reader_subject_children[@]}"; do
+    actual="$(printf '%s\n' "$actual" | grep -Fxv "${table}|subject_id")"
+  done
+fi
 actual="$(printf '%s\n' "$actual" | sed '/^chat_credit_lots_v1|subject_id$/d')"
 if [[ "$actual" != "$expected" ]]; then
   echo "Subject-owned data graph inventory drifted." >&2

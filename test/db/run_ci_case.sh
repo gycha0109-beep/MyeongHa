@@ -19,8 +19,14 @@ apply_standard_migrations() {
 
 apply_pg17_migrations_without_birth_authority() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+  local reader_scope='historical'
+  case "$case_name" in
+    commerce-private-claim-full-finalizer-pg17|commerce-stored-portone-hmac-lineage-pg17|\
+    commerce-portone-cancellation-set-audit-pg17|commerce-exact-reader-withdrawal-hold-pg17)
+      reader_scope='reader-integrated' ;;
+  esac
   for migration in supabase/migrations/*.sql; do
-    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
+    if skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"; then continue; fi
     if [[ "${migration}" == *'/0860_birth_profile_create_runtime_authority.sql' ]]; then
       echo "Skipping ${migration}; managed-principal parity is verified by the dedicated birth-profile case"
       continue
