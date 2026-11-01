@@ -9,6 +9,8 @@ begin
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
     or current_setting('server_version_num')::integer<150000
     or to_regprocedure('seyeon_positive_candidate.claim_two_original_stage_wire_r30(uuid,uuid,uuid,uuid,text,uuid,text,text,text)') is null
+    or to_regclass('seyeon_positive_candidate.interpreter_static_authority_manifest_r36') is null
+    or (select count(*) from seyeon_positive_candidate.interpreter_static_authority_manifest_r36)<>1
     or to_regprocedure('seyeon_positive_candidate.seal_governed_wire_cost_r28(uuid,uuid,uuid,uuid,uuid,text,text,text,bigint,bigint,bigint,date)') is null
     or to_regprocedure('public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)') is null
   then raise exception 'R32 only installs after isolated R28, R30 and DB Cost Governor';
@@ -41,6 +43,8 @@ declare
   v_ordinal integer;
   v_memory_ids jsonb;
   v_source_refs jsonb;
+  v_manifest seyeon_positive_candidate.interpreter_static_authority_manifest_r36%rowtype;
+  v_manifest_digest text;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
@@ -208,6 +212,50 @@ begin
     then
       raise exception using errcode='23514',
         constraint='seyeon_r35_unpinned_derived_interpreter_context';
+    end if;
+
+    -- R36: trusted manifest is generated from the ACTUAL approved authored
+    -- Character builder BEFORE R32 installation. It is immutable, owned by
+    -- the disposable DB installer, and inaccessible to the API executor.
+    -- A client may not substitute instructions, response Schema, Bible,
+    -- Character identity, authority registries, or permitted action vocab.
+    select * into v_manifest
+    from seyeon_positive_candidate.interpreter_static_authority_manifest_r36
+    where manifest_id='seyeon-two-original-offline-interpreter-static-r36'
+    for share;
+    if not found then
+      raise exception using errcode='23514',
+        constraint='seyeon_r36_static_authority_manifest_mismatch';
+    end if;
+    v_manifest_digest:='sha256:pg-jsonb:v1:'||
+      encode(sha256(convert_to(jsonb_build_object(
+        'interpreterInstructions',v_manifest.interpreter_instructions,
+        'responseSchema',v_manifest.response_schema,
+        'contextSchemaVersion',v_manifest.context_schema_version,
+        'character',v_manifest.character,
+        'authorityBoundaries',v_manifest.authority_boundaries,
+        'bibleSlices',v_manifest.bible_slices,
+        'actionPolicy',v_manifest.action_policy,
+        'allowedInterpretationVocabulary',
+          v_manifest.allowed_interpretation_vocabulary
+      )::text,'UTF8')),'hex');
+    if v_manifest.reference_manifest_digest is distinct from v_manifest_digest
+      or v_body->>'instructions'
+          is distinct from v_manifest.interpreter_instructions
+      or v_body#>'{text,format,schema}'
+          is distinct from v_manifest.response_schema
+      or v_context->>'schemaVersion'
+          is distinct from v_manifest.context_schema_version
+      or v_context->'character' is distinct from v_manifest.character
+      or v_context->'authorityBoundaries'
+          is distinct from v_manifest.authority_boundaries
+      or v_context->'bibleSlices' is distinct from v_manifest.bible_slices
+      or v_context->'actionPolicy' is distinct from v_manifest.action_policy
+      or v_stage_input->'allowedInterpretationVocabulary'
+          is distinct from v_manifest.allowed_interpretation_vocabulary
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_r36_static_authority_manifest_mismatch';
     end if;
   end if;
   -- R30 owns the source-to-native-wire proof, exact stage order and
