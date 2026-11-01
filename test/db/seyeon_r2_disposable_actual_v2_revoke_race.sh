@@ -70,4 +70,4 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r31-g2-forward-stop-disposable.test.ts --maxWorkers=1
-echo 'PASS offline G1/G4 native five-stage owner ancestry, G2/G3 tests, final G2 ACL forward stop; Production G0/G2/G3 HOLD'
+echo 'PASS offline G1/G4 original ancestry + immutable Character/Interpreter R36 authority, five-stage G2/G3 tests and final G2 ACL stop; Production G0/G2/G3 HOLD'
