@@ -361,3 +361,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **원인 및 수정:** R21 2-Memory 고정 검사 재사용이 기존 R20/R23 1-Memory를 잘못 차단했다. R21 원본 검증에서 격리 시나리오의 정확한 허용 원본 수를 서버가 명시하도록 변경하고 R20은 기존 1/2 범위를 선택·DB 재대조하며 R23은 기존 정확한 1건만 요구한다. 1건과 2건의 수량 교차 거부 회귀 테스트를 추가했다.
 - **기존 2원본 DB 근거:** `test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql`의 R21 PostgreSQL 격리 함수는 합성 원본 Grant 2건과 SourceSet의 2개 edge를 같은 DB 트랜잭션에서 잠그고 실제 `context_ready`를 기록한다. 그러나 이 증거는 정식 운영 최종 모델 Context와 독립 권한 승인을 결합한 G1/G2 완료를 뜻하지 않는다.
 - **현재 경계:** 수정 HEAD는 새 CI 판정 전 **미검증**. PR #2761은 Draft·미병합 유지. G0 승인, 다중 출처의 실제 운영 모델 입력/DB 선행 Pin, Life Fact·파생 권한, G2 커밋 경쟁, G3 History/Reveal, Governor 비용·운영 G4~G6 모두 HOLD. 유료 Provider/공개 Route/운영 Migration/ACL 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W24 · 두 원본의 모델 최종 선택 → 격리 DB 원자 ContextReady 연결
+
+- **회귀 정정:** R21의 1/2원본 분기에서 Record·Grant 고유 개수를 여전히 `2`로 고정하던 잔여 검사를 시나리오별 정확한 원본 개수에 결속했다. 기존 1원본 R20/R23과 격리 2원본 R21 모두 해당 조건을 통과해야 하며, 어느 쪽도 원본 수를 암묵적으로 확대하지 않는다.
+- **구현:** 기존 `persistSeyeonR20OfflineDigestBoundPinV1`의 기본 경로를 변경하지 않고, 명시적 격리 `twoOriginalContextReady:true`에서만 최종 모델 Context 전체 조립 동등성·정확한 선택 2건·원본 Record/Grant/투영 digest를 검증한다. 이후 **동일 Subject 트랜잭션**에서 이미 존재하는 R21 DB Owner `pin_two_and_context_ready_r21`을 호출해 두 개의 불변 Source Edge·첫 원본 scalar cross-check·실제 `context_ready`를 원자 기록한다. 같은 트랜잭션 안에서 DB Owner의 원본 payload inspection으로 두 원본의 digest를 다시 대조하며, DB 응답 형식·Grant·payload·모델 Context 불일치 시 전체 ROLLBACK한다. R21 Owner 응답을 확인하며 일반 API 역할에 새로운 테이블 SELECT 권한을 부여하지 않는다.
+- **실제 검증 시나리오 추가:** 기존 R20 테스트에 R21 선택 2건의 전용 경로·DB 응답 검증·원본/Grant 교체·COMMIT 실패 차단을 추가했다. 기존 R21 PostgreSQL 격리 테스트에는 실제 모델 Projection 두 건을 구성한 후 정식 DB Owner R21 함수와 동일 트랜잭션 원본 대조·ContextReady 저장·두 번째 원본 payload digest 위조 전체 롤백 시험을 추가했다.
+- **제한 및 HOLD:** 이 경로는 `myeongha_seyeon_positive_pin_candidate_test` 전용. 최종 모델 Context digest는 응용 서버에서 검증·응답하지만 DB의 별도 불변 최종 패킷 서명/Pin으로 승격되지 않는다. 임의 Preflight/History/Relationship/Reader/Worker/Saju·Life Fact 출처는 여전히 차단한다. PostgreSQL 원본 2건의 격리 `context_ready`는 실제 Provider 호출 권한, G2 두 원본의 원자 Commit, G3 Reveal/Replay, G4 비용 승인, G5/G6 운영 승인과 동등하지 않다.
+- **CI 판정:** 새 HEAD 정확한 전체 Actions 실행 결과 확인 전 성공 판정 금지. PR #2761은 Draft·미병합, 운영 migrations/ACL/공개 라우트/유료 호출 변경 없음, `HOLD_FORWARD_STOPPED` 유지.
