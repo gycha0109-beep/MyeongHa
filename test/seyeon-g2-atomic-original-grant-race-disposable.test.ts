@@ -518,6 +518,11 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       messages:'1',outboxes:'2',admissions:'1',
       attempt_state:'committed',turn_state:'committed',
     });
+    const reveal=await transaction(c=>c.query<{assistant_text:string|null}>(
+      'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as assistant_text',
+      [subject,id.thread,id.turn,id.attempt,id.assistantMessage],
+    ),true);
+    expect(reveal.rows[0]?.assistant_text).toBe(body);
     await expect(commitSeyeonR23OfflineAtomicV2V1(input))
       .rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
     expect(await saved(id)).toMatchObject({
@@ -685,6 +690,11 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       [second.grant],
     ));
     expect(grant.rows[0]?.revoked_at).not.toBeNull();
+    const replay=await transaction(c=>c.query<{assistant_text:string|null}>(
+      'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as assistant_text',
+      [subject,id.thread,id.turn,id.attempt,id.assistantMessage],
+    ),true);
+    expect(replay.rows[0]?.assistant_text).toBeNull();
   });
 
   it('R25 re-granting second Memory cannot retroactively authorize pinned second original',async()=>{
