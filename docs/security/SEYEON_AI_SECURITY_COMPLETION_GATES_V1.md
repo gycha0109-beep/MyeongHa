@@ -436,3 +436,9 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **5개 실제 DB Start+영수증 정산 테스트 설계:** 기존 R21 격리 PG 테스트에 앞선 철회 fixture와 독립된 새 원본 둘을 생성하여 G1 ContextReady를 확정하고, 다섯 네이티브 Stage에서 각각 `R30 + Cost Governor Start`가 원자적으로 확정되고 Interpreter가 R28 seal과 일치하는지 검사한다. 실제 공급자 `fetch=0`을 강제한 상태에서 다섯 원금 전부 보수적으로 예약되며, **테스트에서 생성한 가짜 공급자 사용량** (입력100·출력50; 300 microUSD)은 기존 Provider receipt queue → Worker claim → 실제 DB governed settlement → ACK 경로로만 정산한다. 실제 유료 비용/토큰 검증 결과라고 해석해서는 안 된다. 다섯 개 비용 정산을 모두 완료한 **후에도** G2는 `seyeon_offline_r28_complete_provider_lineage_not_approved`로 최종 거부하며 assistant/outbox/positive admission 모두 0건이어야 한다.
 - **예산/중복 원자 회귀 시나리오:** 새로운 격리 Attempt에 예산을 직전 점유액으로 제한한 상태에서 R32 Stage 입장을 시도하고, 실패 시 **Stage marker 0 / Cost ledger 0 / 기존 예산 점유 불변**을 검사한다. 한도를 복구한 뒤 정상 첫 Stage 1건만 예약되고, 같은 Stage 재호출의 새로운 Call ID는 중복으로 차단되며 Provider는 0회 전송한다.
 - **설치·검증 상태:** 격리 runner에 R30 이후 R32 설치, 그 다음에 R21/R26/R30/R32 테스트, 최종 R31 G2 접근권한 회수 순서를 반영. 정적 계약 검사에서 원자 함수 정의, 정확한 원본 Grant, 다섯 Stage 비용·최종 G2 HOLD, SQL 함수 중복 없음, 파일 호출 연결을 확인했다. **실 PostgreSQL/TypeScript·CI는 아직 실행 전이라 PASS를 주장하지 않는다.** 운영 Migration/role activation/유료 호출/PR 병합 없음. G0 정책 동의 전 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### W31 · 검증 요청 경계
+
+- 모든 W26–W31 보안 구현 및 격리 테스트를 단일 누적 커밋으로 Draft PR #2761에 fast-forward 반영했다. 최초 Git ref 동기화 시점에는 해당 SHA에서의 GitHub Actions CI 실행 기록이 확인되지 않았다.
+- 이 문서 변경은 **실제 승인·검증 결과가 아니라** 최종 PR 동기화 이벤트를 통해 CI를 시작하기 위한 비기능적 기록이다. 테스트 성공·실제 Provider 호출·운영 공개·PR 병합을 추정하지 않으며, 실행 결과가 확인되기 전까지 `HOLD_FORWARD_STOPPED` 유지.
