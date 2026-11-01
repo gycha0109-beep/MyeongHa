@@ -7,8 +7,8 @@ import type {VerifiedSubjectIdentityEvidenceV1}
   from './subject-identity-resolver.js';
 import {acknowledgeDeliveredChatCreditCandidateV1}
   from './commerce-chat-credit-delivery-ack-candidate-v1.js';
-import {releaseFailedChatCreditsCandidateV1}
-  from './commerce-chat-credit-ledger-candidate-v1.js';
+import {executePostgresCommerceInternalTransactionV1}
+  from './postgres-commerce-internal-execution.js';
 
 export const SEYEON_G4_FIRST_MEMORY_RECONCILIATION_V1=Object.freeze({
   productionMounted:false,
@@ -51,12 +51,16 @@ type SeyeonG4FinalProofV1=
  */
 export async function reconcileSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
   pool:PostgresSubjectPoolV1;
+  /** Dedicated internal Commerce role; never use the ordinary Member pool. */
+  privateCreditPool:PostgresSubjectPoolV1;
   verifiedEvidence:VerifiedSubjectIdentityEvidenceV1;
   admission:SeyeonG4ReservedReplyV1;
   proof:SeyeonG4FinalProofV1;
 }>):Promise<Readonly<{kind:'settled'|'released';creditsCharged:10|0}>> {
   const a=input.admission;
-  if(input.verifiedEvidence?.kind!=='member'||a?.kind!=='reserved'||
+  if(input.verifiedEvidence?.kind!=='member'||
+      !input.privateCreditPool||input.privateCreditPool===input.pool||
+      a?.kind!=='reserved'||
       a.requiredCredits!==10||
       ![a.canonicalSubjectId,a.threadId,a.clientTurnId,a.reservationId].every(valid)||
       (input.proof?.kind!=='confirmed_delivered'&&
@@ -65,16 +69,27 @@ export async function reconcileSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
         (!valid(input.proof.committedTurnId)||!valid(input.proof.assistantMessageId)))){
     throw new SeyeonG4FirstMemoryReconciliationHoldV1();
   }
-  return executePostgresSubjectTransactionV1({
+  // Resolve the verified Member under ordinary RLS but NEVER grant its
+  // connection access to private settlement or wallet tables.
+  const canonicalSubjectId=await executePostgresSubjectTransactionV1({
     pool:input.pool,verifiedEvidence:input.verifiedEvidence,
-    execute:async({client,resolvedSubject})=>{
+    execute:async({resolvedSubject})=>{
       if(resolvedSubject.subjectKind!=='member'||
-          resolvedSubject.subjectId.toLowerCase()!==a.canonicalSubjectId.toLowerCase()){
+          resolvedSubject.subjectId.toLowerCase()!==a.canonicalSubjectId.toLowerCase())
         throw new SeyeonG4FirstMemoryReconciliationHoldV1();
-      }
+      return resolvedSubject.subjectId;
+    },
+  });
+  return executePostgresCommerceInternalTransactionV1({
+    pool:input.privateCreditPool,
+    execute:async({client})=>{
+      await client.query(
+        "select pg_catalog.set_config('myeongha.subject_id',$1::text,true)",
+        [canonicalSubjectId],
+      );
       if(input.proof.kind==='confirmed_delivered'){
         const settled=await acknowledgeDeliveredChatCreditCandidateV1({
-          client,canonicalSubjectId:resolvedSubject.subjectId,
+          client,canonicalSubjectId,
           canonicalSubjectKind:'member',
           threadId:a.threadId,clientTurnId:a.clientTurnId,
           creditReservationId:a.reservationId,
@@ -85,30 +100,15 @@ export async function reconcileSeyeonG4FirstMemoryCreditsV1(input:Readonly<{
           throw new SeyeonG4FirstMemoryReconciliationHoldV1();
         return Object.freeze({kind:'settled' as const,creditsCharged:10 as const});
       }
-      // Keep the SAME owner -> reservation -> Turn lock order as the
-      // private ACK/settlement SQL. Reading Turn first and THEN taking
-      // finalization locks may deadlock against a concurrent delivery ACK.
-      const ownerLock=await client.query<{subjectId:unknown}>(
-        'select id::text as "subjectId" from public.subjects where id=$1::uuid and kind=\'member\' and status=\'active\' for update',
-        [resolvedSubject.subjectId],
+      // A private SECURITY DEFINER RPC proves original terminal failure and
+      // owns the full Subject -> Reservation -> Turn -> finalize lock sequence.
+      // This Commerce role never needs wallet-table SELECT or generic finalize.
+      // Network disconnect and retryable failure cannot authorize a refund.
+      const refund=await client.query<{state:unknown}>(
+        'select public.internal_cmd_seyeon_g4_credit_refund_proven_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid) as "state"',
+        [canonicalSubjectId,a.threadId,a.clientTurnId,a.reservationId],
       );
-      if(ownerLock.rows.length!==1 ||
-          ownerLock.rows[0]?.subjectId!==resolvedSubject.subjectId)
-        throw new SeyeonG4FirstMemoryReconciliationHoldV1();
-      const reservationLock=await client.query<{reservationId:unknown}>(
-        'select id::text as "reservationId" from public.chat_credit_turn_reservations_v1 where id=$1::uuid and subject_id=$2::uuid and thread_id=$3::uuid and client_turn_id=$4::uuid and required_credits=10 and state=\'reserved\' for update',
-        [a.reservationId,resolvedSubject.subjectId,a.threadId,a.clientTurnId],
-      );
-      if(reservationLock.rows.length!==1 ||
-          reservationLock.rows[0]?.reservationId!==a.reservationId)
-        throw new SeyeonG4FirstMemoryReconciliationHoldV1();
-      // A transport error is never grounds for a refund: after the exact
-      // reservation locks, DB must prove terminal failure with no delivery.
-      const released=await releaseFailedChatCreditsCandidateV1({
-        client,canonicalSubjectId:resolvedSubject.subjectId,
-        reservationId:a.reservationId,
-      });
-      if(released!=='released')
+      if(refund.rows.length!==1||refund.rows[0]?.state!=='released')
         throw new SeyeonG4FirstMemoryReconciliationHoldV1();
       return Object.freeze({kind:'released' as const,creditsCharged:0 as const});
     },
