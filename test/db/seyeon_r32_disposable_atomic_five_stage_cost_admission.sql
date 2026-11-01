@@ -11,6 +11,8 @@ begin
     or to_regprocedure('seyeon_positive_candidate.claim_two_original_stage_wire_r30(uuid,uuid,uuid,uuid,text,uuid,text,text,text)') is null
     or to_regclass('seyeon_positive_candidate.interpreter_static_authority_manifest_r36') is null
     or (select count(*) from seyeon_positive_candidate.interpreter_static_authority_manifest_r36)<>1
+    or to_regclass('seyeon_positive_candidate.synthetic_stage_results_r37') is null
+    or to_regprocedure('seyeon_positive_candidate.record_synthetic_stage_result_r37(uuid,uuid,uuid,uuid,text,uuid,jsonb)') is null
     or to_regprocedure('seyeon_positive_candidate.seal_governed_wire_cost_r28(uuid,uuid,uuid,uuid,uuid,text,text,text,bigint,bigint,bigint,date)') is null
     or to_regprocedure('public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)') is null
   then raise exception 'R32 only installs after isolated R28, R30 and DB Cost Governor';
@@ -283,6 +285,28 @@ begin
        is distinct from v_stage->>'previousWireDigest' then
     raise exception using errcode='23514',
       constraint='seyeon_r34_synthetic_stage_contract_mismatch';
+  end if;
+  -- Even in this OFFLINE rehearsal, Stage N cannot reserve another
+  -- Governor budget before Stage N-1 has one immutable local observation.
+  -- That observation carries providerDispatched=false, not a real output.
+  if (v_stage->>'stageIndex')::integer>0
+    and not exists(
+      select 1
+      from seyeon_positive_candidate.native_stage_lineage_r30 prior
+      join seyeon_positive_candidate.synthetic_stage_results_r37 result
+        on result.attempt_id=prior.attempt_id
+       and result.stage_index=prior.stage_index
+       and result.call_id=prior.call_id
+       and result.native_wire_digest=prior.native_wire_digest
+      where prior.attempt_id=p_attempt
+        and prior.stage_index=(v_stage->>'stageIndex')::integer-1
+        and result.origin_kind='local_synthetic_no_provider'
+        and result.provider_dispatched=false
+        and result.provider_output_verified=false
+        and result.output_guard_verified=false
+    ) then
+    raise exception using errcode='23514',
+      constraint='seyeon_r37_previous_local_stage_outcome_missing';
   end if;
   v_wire_digest:=v_stage->>'nativeWireDigest';
   v_bytes:=octet_length(p_wire);
