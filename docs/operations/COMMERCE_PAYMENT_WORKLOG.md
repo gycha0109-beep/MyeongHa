@@ -211,3 +211,22 @@
 - **정확한 원인:** `test/db/staged_commerce_migration_policy.sh`가 `20261027054525_digital_reading_checkout_notice_evidence_v1.sql`을 기존 히스토리 PG17 스키마에서 **의도적으로 제외**하지만, 새 Reader 구매 단위 SQL은 그 migration의 `digital_reading_checkout_notice_presentations_v1` 테이블을 정적 LEFT JOIN하여 `relation does not exist`로 실패.
 - **구현 수정:** verified Receipt / Reader Grant / Reading 선택을 조회하는 항상 사용 가능한 SQL과, 고지 테이블 설치 여부만 조회하는 `to_regclass` 검사 및 설치된 경우에만 정확한 Intent·Subject·Reader·Bundle의 고지 `unit_id`를 조회하는 SQL을 분리. 테이블이 없으면 `exact_unit_checkout_presentation_schema_not_installed`로 **안전 보류**, 실제 구매·고지·전달 증거 및 법적/환불 승인 모두 false. 기존 stage migration 제외 정책, 생산 DB 스키마, 고객 API는 변경 없음.
 - **검증:** 사전 빌드 없이 신규 법적 고지 검사 28건 + PG17 계약 검사 4건 PASS. 공식 PG17 SQL 생성기는 실제 운영 Reader 구매 계보와 고지 테이블이 **설치되지 않은 상태**를 확인하도록 수정. PG17 실제 실행 결과는 새 PR CI가 완료되기 전까지 미확정.
+
+### 2026-11-01 — 유료 Reader 내부 해석 저장 증거와 실제 소비자 전달 증거 분리
+
+- **선행 병합:** [PR #2844](https://github.com/gycha0109-beep/MyeongHa/pull/2844) 필수 CI 성공 후 `main` 병합 `1adc43e9` 확인. 단계적 도입 상태인 checkout notice 테이블이 없는 PostgreSQL 17에서도 안전하게 HOLD하는 계약을 유지합니다.
+- **실제 구현:** 기존 Reading/Reader Interpretation 내부 원본을 검증된 정확한 구매 Intent·Reader Grant·Reader Bundle에 결속해 추가로 읽기 전용 조회합니다. 내부 Reading 응답 상태가 `delivered`더라도 `official_source_committed_not_consumer_delivery`로만 분류하고, 고객 전달 증거·법적 판단·환불/Grant 회수를 허용하지 않습니다.
+- **분리 구매 보호:** 공식 SQL 테스트의 B2와 B3처럼 동일한 Reader의 서로 다른 콘텐츠 Bundle 구매가 존재합니다. 최초 Reader interpretation의 초기 Bundle만으로 대체하지 않고, B2/B3 각각의 독립 Purchase Intent·Entitlement Grant·Bundle을 일치시켜 잘못된 구매권·다른 Subject가 원본을 대여하지 못하도록 합니다.
+- **실제 PG17 계약:** 기존 `commerce-exact-reader-withdrawal-hold-pg17` 전용 격리 CI의 **동일 실행용 SQL**에서 B2/B3 양쪽의 정확한 결속, B3가 B2 구매로 가장한 교차 구매, 교차 Subject 거부를 검증하도록 확장했습니다. 운영 migration·Provider 취소·Entitlement Effect·고객 API 변경 없음.
+- **부재/실패 처리:** 내부 Source가 없거나 생성 중이어도 소비자 요청을 자동 거절하지 않고 수동 검토를 유지합니다. 확정된 Source 기록이 모순되면 고지·Legal 조회 전 HOLD. 모든 조회는 기존 완전 가시성 READ ONLY/ROLLBACK 안에서 수행하고, 개인정보·해석 원문·지문을 반환하지 않습니다.
+- **안전 경계:** 고객 실제 전달 기록의 서버 소스는 **여전히 미구현/미승인**입니다. `durableConsumerDeliveryProven=false`, Provider NEWER/STALE·법적 최종 판단·Reader R2/T2 Effect 연계 미완료, LIVE/자동 환불·회수 비활성 유지.
+- **검증:** 신규 Reader 내부 Source 검증 17건, 기존 법적 검토 확장 8건 및 PostgreSQL 17 계약 포함 집중 57건 PASS. 전체 관련 회귀/타입/빌드 결과는 최종 검증 후 기록합니다. 새 실제 PG17 실행은 공식 CI 완료 전까지 미확정.
+- **문서:** `docs/operations/COMMERCE_P4_READER_PRIVATE_SOURCE_NOT_CONSUMER_DELIVERY_V1.md`.
+- **최종 로컬 회귀:** 관련 Vitest **23개 파일/463건 PASS**, TypeScript 타입 검사·빌드 PASS, 실제 PG17 fixture 기반 SQL 생성기 및 Bash 문법 PASS. 로컬 Docker 엔진은 실행 중이지 않아 신규 실제 PostgreSQL 17 DB 통합 검사는 미실행이며, PR의 공식 postgres17 CI 성공으로만 증명합니다.
+- **통합 PR:** [PR #2853](https://github.com/gycha0109-beep/MyeongHa/pull/2853), 구현 커밋 c06e05d5. 관련 Vitest 463건·타입 검사·빌드 PASS. 공식 PostgreSQL 17 전체 스키마/필수 통합 CI와 병합은 결과 확인 전까지 미확정입니다.
+
+### 2026-11-01 — PR #2853 통합 PostgreSQL 17 실패 수정
+
+- **공식 CI 사실:** [통합 CI #41290232104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290232104)에서 admission, 일반 Work Track, runtime/content/commerce-payment/commerce-entitlement, DB authority-core는 PASS. 실제 실패는 `full / DB dependency · postgres17`의 `commerce-exact-reader-withdrawal-hold-pg17` 1건이며, 뒤따르는 CI Verify/Integration Verify 실패는 그 결과에 종속.
+- **원인 및 수정:** 새 PostgreSQL 17 격리 SQL 블록에서 `subject_id`를 PL/pgSQL 지역 변수명과 DB 컬럼명에 동시에 사용해 `column reference "subject_id" is ambiguous`가 발생했습니다. 지역 변수를 `v_subject_id`로 변경하고 B2/B3 조회·비교에서 같은 이름을 사용하도록 보정했습니다. 운영 Read-only Source SQL, 실제 구매 권한, 환불·권한 회수 코드에는 변경이 없습니다.
+- **회귀 보호:** PG17 SQL 생성기의 지역 변수 선언·원본 Receipt 대응·B3 구매권 조건에 혼동 가능한 열-열 자기 비교가 남지 않았는지 직접 검사하는 테스트를 추가했습니다. 실제 PG17 SQL 실행 성공은 **새 CI에서 확인하기 전까지 미확정**입니다.
