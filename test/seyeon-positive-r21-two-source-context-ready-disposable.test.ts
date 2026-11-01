@@ -1117,6 +1117,23 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
               {...originalInput,allowedReferenceVocabulary:{
                 ...refs,historySourceRefs:['relationship-event:forged'],
               }},
+              {...originalInput,context:{...baseline,
+                relationshipSemantics:{historyRevision:999},
+              }},
+              {...originalInput,context:{...baseline,
+                retrievedMemories:[
+                  ...memories,
+                  {kind:'relationship_event',memoryId:'relationship-event:fake',
+                   sourceRef:'relationship-event:fake',summary:'fabricated',
+                   relevance:1,salience:1,claimKind:'fact'},
+                ],
+              }},
+              {...originalInput,context:{...baseline,
+                behaviorPolicy:{
+                  ...(baseline.behaviorPolicy as Record<string,unknown>),
+                  injectedPriorAssistantMemory:'private-derived-data',
+                },
+              }},
             ];
             const reservedBefore=await pool!.query<{stage_count:string;cost_count:string}>(
               "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
