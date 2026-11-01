@@ -10,6 +10,47 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2851 최신 기본 CI RED: 신규 감시 테스트 등록 방식 수정
+
+- **실패 증거:** [기본 CI #41306348789](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41306348789) HEAD `c8bcf770ee1646e575ff1e84c2afd48280942790`에서 `db-authority-core`, `DB dependency · postgres17`, Governance, Web, Workers 등은 PASS. `Work Track · ops`의 Vitest 전체 검사에서 299개 파일 PASS, 1,711개 개별 검사 PASS, **새 `test/ops/production-privacy-ledger-completion-freshness.test.mjs`만** `No test suite found in file`로 FAIL하여 `CI Verify`가 연쇄 FAIL. 총 9개 새 테스트는 앞선 `node --test`에서 PASS했으나 `node:test` 함수를 사용해 저장소 표준 Vitest 러너에 등록되지 않았던 문제다.
+- **수정:** 해당 파일의 테스트 함수를 `vitest`에서 명시적으로 가져오도록 변경. 업무 로직, 운영 DB 및 증거 검증의 9개 테스트 내용, `drReady=false`·`serviceResumptionAllowed=false` 등의 차단 조건은 변경하지 않았다.
+- **검증:** 로컬 Vitest 재현 및 수정 HEAD의 기본 CI 결과를 별도 확인한다. **실패한 #41306348789를 성공으로 소급하지 않으며**, 검증된 수정 HEAD에서만 마지막 전용 통합 CI를 재제출한다. GitHub 기본 CI 자동 트리거와 전용 수동 통합 검증을 구분한다.
+
+
+### 2026-11-01 KST — Phase 6·8 운영 관제·복구 합성 검증 묶음 구현 (통합 CI 마지막 1회 원칙)
+
+- **작업 방식:** PR #2851의 수정된 커밋 `9b910a510e1a2ab2c53edd35e312a5887086b054`에서 기본 CI의 PostgreSQL17·db-authority-core·Workers·Governance 등을 **SUCCESS** 확인했으나 [이전 전체 통합 #41290070944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290070944)의 실패는 유지한다. 중간 작업마다 전용 통합 라벨을 재발행하지 않고, 기존 `ci-integration-ready` 라벨은 구현을 묶는 동안 제거했다. 마지막 변경사항을 푸시한 뒤 해당 HEAD에서 기본 CI 통과를 확인하고 전용 통합 라벨을 **한 번만** 적용한다. 필수 단위 확인은 로컬로 진행한다.
+- **작업 A — 수집 지연 표시 통합:** `f1c915b6`의 원장 수집 간격(2× 기존 3600초 주기 이상) GitHub Actions 경고 기능을 이 트랙 브랜치에 병합했다. 이전 [자동 원장 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554)의 수집 간격 24043초·초과 20443초는 해당 경고 대상이다. 원장 자체의 안전한 암호화 업로드·이전 snapshot 겹침 검증을 훼손하지 않는다.
+- **작업 B — 수집 작업 누락의 독립 조회:** 기존 원장과 **다른 GitHub Actions workflow** `.github/workflows/production-privacy-ledger-freshness-watch.yml` 및 읽기 전용 `scripts/operations/check-privacy-ledger-completion-freshness.mjs` 구현. 매시 23분과 수동 main 실행에서 GitHub 제공 기본 read-only 토큰만 사용해 정확한 원장 workflow의 최신 성공 실행·암호화 artifact 유무·최종 실행 완료 후 경과 시간을 확인한다. 7200초(기존 3600초 정규 간격의 2배) 이상 경과, 원장 없음, artifact 누락/만료, GitHub API 미응답은 **실패 상태로 명시**한다. 실제 파일·비밀번호·이벤트·사용자 식별자는 가져오지 않는다. 8개 로컬 단위 테스트, GitHub Actions 책임·신뢰 경계 정적 검사 PASS. GitHub API에서 실제 원장 #41287556554와 artifact `13076075848`의 연결 형태를 읽기 전용으로 확인했다.
+- **작업 C — 격리 합성 복구 증거 보강:** 앞서 구현한 임시 Ubuntu·Supabase Auth/Storage 합성 실검증은 운영 호스팅·신규 유료 DB를 사용하지 않는다. 로컬 합성 검사가 비정상 종료되면 비식별 `BLOCKED_INCOMPLETE` 증거를 남기되 성공 증거로 오인하지 않도록 수정했다. Supabase CLI `2.122.0` 배포 패키지 존재와 현재 명령 형식을 확인했으며, **실제 CI의 합성 Auth/Storage 통과는 workflow_dispatch 실행 전 미판정**이다.
+- **운영 경계:** GitHub Actions 두 workflow가 서로 다른 일정이어도 모두 GitHub에 의존한다. 경고는 가시성/실패 판정이고 알림 전달·독립 CDC·삭제/철회 연속성·원본 Hosted Auth/Storage 복원·전체 서비스 PT24H RPO/PT6H RTO 실증이 아니다. `continuousCaptureProven=false`, `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false` 및 #1887 OPEN 유지. Production DB·DDL·ACL·비밀·사용자 데이터·유료 서비스 변경 없음.
+
+
+### 2026-11-01 KST — Phase 8 개인정보 복구 원장 수집 지연을 GitHub 운영 경고로 노출
+
+- **운영 실측:** [자동 개인정보 원장 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554)의 **비식별 공개 manifest**에서 다음 값을 확인: 이전~최신 수집 간격 **24043초**, 예정된 주기 **3600초**, 초과 **20443초**, 수집한 지원 이벤트 **0건**, `snapshotOverlapStatus=OVERLAPPING_CAPTURED_EVENTS_PRESERVED`, `sourceContinuityProven=false`. 수집 성공과 0건은 독립 연속 수집·복구 가능성을 증명하지 않는다.
+- **이번 구현:** 기존 `scripts/operations/export-production-postgres-privacy-recovery-ledger.sh`가 이미 계산하는 `captureIntervalSeconds`와 `nominalScheduledIntervalSeconds`를 비교해, 두 정규 주기(2×3600초) 이상 간격이 벌어지면 기존 GitHub Actions 실행에 **비식별 warning annotation**을 추가한다. 경고에는 측정 간격·주기·초과 시간만 포함되고 사용자/이벤트/비밀/SQL 원문은 담지 않는다. 캡처 지연을 이유로 유효한 암호화 원장 파일의 생성을 중단하지 않으며 기존 overlap 오류 차단은 보존한다.
+- **검증:** 기존 원장 overlap 비교 검증 PASS, 보호된 복구 원장 workflow 계약 PASS, 변경된 shell 문법 검사와 코드 diff 검사 수행. **새 경고가 실제 Production scheduled workflow에서 출력됐는지는 후속 실행 증거 확인 전까지 미판정**; 외부 알림 전송이나 24시간 승인 RPO 충족 증거를 주장하지 않는다.
+- **남은 경계:** 운영 GitHub 일정 실행의 지연 자체를 해소하거나 독립 CDC/불변 삭제 기록을 확보한 것이 아니다. `continuousCaptureProven=false`, `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `dr_ready=false`, `serviceResumptionAllowed=false` 유지. Hosted Auth/Storage 및 실제 전체 재해 복구는 #1887 OPEN.
+
+### 2026-11-01 KST — PR #2851 전체 통합 CI RED, 독립 PostgreSQL 초기화 경쟁 수정
+
+- **실패 원본:** [통합 CI #41290070944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290070944), PR #2851 HEAD `a89f2d4d5db11634bc7cbf3a4f9da6dfcdab6986`. 전용 admission과 대부분의 DB·콘텐츠·결제 검사는 SUCCESS였으나 `full / DB dependency · postgres17` 실패로 `full / CI Verify`, `CI Integration Verify` FAILURE. 특정 실패 케이스는 `seyeon-r2-helper-service-role-least-privilege`.
+- **원인 확인:** 해당 케이스는 먼저 권한 차단 `PASS_SEYEON_HELPER_SERVICE_ROLE_REVOKE_ISOLATED_PG17`를 출력한 뒤 별도 disposable PG17 컨테이너의 비특권 소유자 검증으로 넘어간다. PostgreSQL 17 Docker 초기화 시 **임시 시작 → 종료 → 최종 재시작** 사이에 `pg_isready`가 조기 PASS했으며 후속 `psql`이 `FATAL: the database system is shutting down`으로 종료됐다. 이는 보안 GRANT/REVOKE 판정 실패가 아니라 실제 컨테이너 준비 조건이 잘못된 재현성 문제다.
+- **수정:** `test/db/seyeon_r2_helper_owner_restricted_pg17.sh` 준비 조건에 공식 PostgreSQL 엔트리포인트의 `PostgreSQL init process complete; ready for start up.` 최종 초기화 마커를 추가하고, 이 마커 **및 최종 PG17 `pg_isready` 모두 충족**해야 소유자 검증으로 진행하도록 바꿨다. 45초까지의 준비 대기는 실행 허용 시간이지 성능 목표가 아니다. 기존 권한 검사 SQL, 역할, 운영 DB, 검증 기대 결과는 변경하지 않았다.
+- **검증 구분:** 로컬 shell syntax와 소스 계약 검사를 수행해 변경의 정확성을 확인했다. 이 Windows 호스트의 Docker daemon이 비가동이므로 **동일 Linux 컨테이너 재현 PASS는 새 CI 결과 전까지 미판정**이다. 고장 난 종전 통합 실행을 GREEN으로 바꾸거나 실제 Hosted 복구가 증명됐다고 주장하지 않는다. `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+
+
+### 2026-11-01 KST — Phase 8 기존 로컬 Auth/Storage 합성 수용 검증을 일회용 Linux CI에 연결
+
+- **선행 종료 확인:** [PR #2847](https://github.com/gycha0109-beep/MyeongHa/pull/2847)은 [CI Integration #41241185170](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41241185170) SUCCESS 후 2026-11-01 06:13:41 KST 병합, main `ad4f5d5661454bdcad404ba7d5a59bcacd9ce3b8`. 새 migration 카탈로그 지문 백업 [#41240435451](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240435451)과 격리 PG17 복원 [#41240770891](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240770891) PASS 증거는 병합된 문서에 귀속한다.
+- **이번 구현:** 기존 [Hosted Auth/Storage gap matrix](HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md)의 **Phase-4 합성 로컬 서비스 검증 절차**를 GitHub 일회용 Ubuntu runner에 연결했다. `.github/workflows/postgres-hosted-synthetic-local-acceptance.yml`은 **수동 main/저장소 한정**, Production environment/secret 없이 read-only GitHub 권한으로만 실행한다. `scripts/operations/run-postgres-hosted-synthetic-local-ci.sh`는 임시 신규 로컬 Supabase CLI **2.122.0** 설치·기동·정지, 고정 localhost Auth/Storage, 기존 fixture·실제 HTTP/DB 수용 실행 및 개인정보 식별자 없는 결과만 보관한다. 기존 Production migration/운영 프로젝트와 분리된 임시 `supabase/config.toml`을 사용하고 운영 프로젝트 연결을 거부한다.
+- **수용 범위:** 실제 로컬 Synthetic 계정 로그인/오류/삭제 계정 차단, private Storage 실제 객체 해시 검증/비인가 차단, refresh-token/로그아웃 후 차단. **실제 Linux CI 실행 PASS는 첫 workflow_dispatch 결과 전까지 미판정**; 기존 Vitest mock PASS와 혼동하지 않는다. 결과 증거는 `hostedProviderRecoveryProven=false`, `independentPrivacyContinuityProven=false`, `wholeServiceRpoRtoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`, `gate=BLOCKED`를 유지한다.
+- **현재 개인정보 원장 관측:** [자동 수집 #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554) SUCCESS 및 비식별 공개 manifest 조회: **백업 #41243930121** 기준 이벤트 **0개**, 지난 수집과 **24043초(약 6시간 40분)** 간격, 정상 일정 3600초보다 **20443초 초과**. overlap이 남은 이벤트 유실은 발견하지 않았으나 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`다. 일정 실행 성공 또는 eventCount=0을 독립적인 연속 개인정보 삭제/철회 증거로 승격하지 않는다.
+- **첫 PR 검증 수정:** [PR #2851](https://github.com/gycha0109-beep/MyeongHa/pull/2851) 초기 Governance [#41289518168](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41289518168) RED는 신규 workflow가 기존 `docs/ci/workflow-responsibility-map.json`에 미등록돼 발생했다. 해당 워크플로를 수동 `ops` 운영 검증으로 등록한 뒤 로컬 CI 책임 검증·GitHub Actions 신뢰 경계 검사 모두 PASS. 프로그램/데이터 회귀 실패가 아니다. 수정된 HEAD의 CI PASS 및 병합은 아직 별도 확인해야 한다.
+- **격리 환경 현황:** Supabase 조직에서 운영 프로젝트 외 별도 명하 Hosted DR 대상이 없고 분기(branch) **0개**. 사용자 집 PC Docker CLI는 있으나 daemon 비실행. 이번 구현은 무료 GitHub runner의 일회용 로컬 합성 스택을 사용하며 Hosted 전체 복구를 대체하지 않는다. Production SQL/DDL/Auth/Storage/비밀/결제를 변경하지 않았다. #1887 OPEN, `dr_ready=false`, `serviceResumptionAllowed=false` 유지.
+
+
 ### 2026-11-01 KST — Phase 8 신형 migration 카탈로그 지문 백업 실증 및 최신 Worker 서비스 검사
 
 - **선행 완료:** [PR #2845](https://github.com/gycha0109-beep/MyeongHa/pull/2845)는 [전체 통합 #41238368751](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41238368751) SUCCESS 후 2026-11-01 05:31:46 KST 병합(merge `3790702aa3ab3966e478dad15a178842a10e32e4`). 소스 원본 SHA와 병합 SHA를 구분한다.

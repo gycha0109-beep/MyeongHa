@@ -128,6 +128,12 @@
       "mainMode": "regression",
       "workTrackAttribution": "none"
     },
+    "postgres-hosted-synthetic-local-acceptance.yml": {
+      "responsibility": "postgres-hosted-synthetic-local-recovery",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "postgres-isolated-restore-drill.yml": {
       "responsibility": "postgres-disaster-recovery",
       "prMode": "none",
@@ -232,6 +238,12 @@
     },
     "production-postgres-privacy-recovery-ledger.yml": {
       "responsibility": "postgres-privacy-recovery",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
+    },
+    "production-privacy-ledger-freshness-watch.yml": {
+      "responsibility": "postgres-privacy-recovery-freshness-watch",
       "prMode": "none",
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"

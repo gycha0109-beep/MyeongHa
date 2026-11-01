@@ -35,8 +35,13 @@ docker run --detach --rm --network none --name "$container" \
 unset password
 trap 'docker rm --force "$container" >/dev/null 2>&1 || true' EXIT
 ready=false
-for _ in $(seq 1 30); do
-  if docker exec "$container" pg_isready -q -U myeongha_acl_ci_bootstrap -d postgres; then
+# The official postgres image starts a temporary initdb server, shuts it
+# down, then starts the final PostgreSQL server. pg_isready can succeed on
+# the temporary socket and race with the intended shutdown.
+# Only admit the permanent instance after the init-complete boundary.
+for _ in $(seq 1 45); do
+  if docker logs "$container" 2>&1 | grep -F 'PostgreSQL init process complete; ready for start up.' >/dev/null \
+    && docker exec "$container" pg_isready -q -U myeongha_acl_ci_bootstrap -d postgres; then
     ready=true; break
   fi
   sleep 1
