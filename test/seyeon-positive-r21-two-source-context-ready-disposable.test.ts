@@ -307,8 +307,8 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       ...source,twoOriginalContextReady:true as const,
     };
     let fetchCount=0;
-    let observed:SeyeonR26OfflineG4ReceiptV1|null=null;
-    let beforeDispatch:Parameters<typeof reserveSeyeonR26OfflineGovernedWireV1>[0]|null=null;
+    const observed:SeyeonR26OfflineG4ReceiptV1[]=[];
+    const captured:Parameters<typeof reserveSeyeonR26OfflineGovernedWireV1>[0][]=[];
     const provider=createOpenAiSeyeonStructuredProviderV1({
       model:'seyeon-r35-offline',apiKey:'never-network-disposable-r26',
       maxOutputTokens:256,
@@ -317,8 +317,9 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         const wireAttestation=await attestSeyeonR35OfflineWireAfterDbPinV1({
           pinInput,call,requestBody,enforcedOutputTokens:256,
         });
-        beforeDispatch={pinInput,wireAttestation,call,requestBody,governor};
-        observed=await reserveSeyeonR26OfflineGovernedWireV1(beforeDispatch);
+        const proof={pinInput,wireAttestation,call,requestBody,governor};
+        captured.push(proof);
+        observed.push(await reserveSeyeonR26OfflineGovernedWireV1(proof));
         throw new SeyeonR26OfflineG4HoldV1(); // deliberate no-network fence
       },
     });
@@ -326,7 +327,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       source.finalModelContext,
     ))).rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
     expect(fetchCount).toBe(0);
-    expect(observed).toMatchObject({
+    expect(observed[0]).toMatchObject({
       status:'disposable_governed_reservation_committed_without_dispatch',
       selectedSourcesDigest:source.selection.selectedSourcesDigest,
       inputCeilingTokens:500,outputCeilingTokens:256,
@@ -336,13 +337,15 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(await state(id)).toMatchObject({
       turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
     });
-    if(!observed||!beforeDispatch)throw Error('G4 offline receipt absent');
+    const receipt=observed[0];
+    const beforeDispatch=captured[0];
+    if(!receipt||!beforeDispatch)throw Error('G4 offline receipt absent');
     const row=await pool.query<{
       lifecycle_state:string;governor_ceiling_micro_usd:string;
       governor_input_bound_tokens:string;governor_output_cap_tokens:string;
     }>(
       'select lifecycle_state,governor_ceiling_micro_usd::text,governor_input_bound_tokens::text,governor_output_cap_tokens::text from public.seyeon_ai_call_cost_events where call_id=$1::uuid',
-      [observed.callId],
+      [receipt.callId],
     );
     expect(row.rows).toMatchObject([{
       lifecycle_state:'started',governor_ceiling_micro_usd:'1524',
