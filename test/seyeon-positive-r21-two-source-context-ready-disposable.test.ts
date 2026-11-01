@@ -10,6 +10,15 @@ import type {SeyeonPersonalRecordProjectionCandidateV1} from '../apps/api/src/se
 import type {SeyeonR21OfflineDerivedSourceEnvelopeV1} from '../apps/api/src/seyeon-r21-offline-derived-source-closure-v1.js';
 import type {PostgresSubjectPoolV1} from '../apps/api/src/postgres-subject-execution.js';
 import {persistSeyeonR20OfflineDigestBoundPinV1, SeyeonR20OfflineDigestHoldV1} from '../apps/api/src/seyeon-positive-raw-projection-digest-bind-r20-candidate.js';
+import {buildSeyeonTurnInterpreterRequestV2} from '../apps/api/src/seyeon-character-runtime-v2.js';
+import {createOpenAiSeyeonStructuredProviderV1} from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
+import {attestSeyeonR35OfflineWireAfterDbPinV1} from '../apps/api/src/seyeon-r35-offline-actual-provider-wire-pin-v1.js';
+import {
+  reserveSeyeonR26OfflineGovernedWireV1,
+  SeyeonR26OfflineG4HoldV1,
+  type SeyeonR26OfflineG4ReceiptV1,
+} from '../apps/api/src/seyeon-r26-offline-governed-wire-reservation-v1.js';
+import type {SeyeonAiGovernorAdmissionV1} from '../apps/api/src/postgres-seyeon-ai-cost-ledger-v1.js';
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
@@ -258,5 +267,103 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(await state(a)).toMatchObject({
       turnState:'planned',parents:'0',edges:'0',firstPins:'0',
     });
+  });
+  it('R26: real G1 two-original digest and native wire -> atomic governed reservation; fetch stays blocked',async()=>{
+    if(!pool)throw Error('disposable PostgreSQL required');
+    const id=await createTurn(756);
+    const source=await modelSources();
+    const policy:SeyeonAiGovernorAdmissionV1['policy']={
+      policyVersion:'offline-r26-test-v1',
+      providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+      priceQuote:{
+        priceVersion:'offline-r26-rate-v1',
+        providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+        inputMicroUsdPerMillion:1_000_000,
+        cachedInputMicroUsdPerMillion:250_000,
+        outputMicroUsdPerMillion:4_000_000,
+      },
+      allowedPurposes:['turn_interpretation'],
+      contextWindowTokens:4096,maximumInputTokens:1000,
+      maximumOutputTokens:256,maximumSerializedRequestBytes:65_536,
+    };
+    await pool.query(
+      "insert into public.seyeon_ai_governor_model_policies_v1(provider_key,model_key,policy_version,price_version,allowed_purposes,context_window_tokens,maximum_input_tokens,maximum_output_tokens,maximum_serialized_request_bytes,input_micro_usd_per_million,cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active) values ($1,$2,$3,$4,array['turn_interpretation']::text[],4096,1000,256,65536,1000000,250000,4000000,true)",
+      ['openai-responses','seyeon-r35-offline','offline-r26-test-v1','offline-r26-rate-v1'],
+    );
+    await pool.query(
+      "insert into public.seyeon_ai_governor_daily_budgets_v1(bucket_utc_date,global_limit_micro_usd,subject_limit_micro_usd) values ((clock_timestamp() at time zone 'UTC')::date,50000,20000)",
+    );
+    const governor:SeyeonAiGovernorAdmissionV1={
+      policy,
+      certifiedInputTokenUpperBound:(_request,bytes,body)=>{
+        if(bytes!==Buffer.byteLength(body,'utf8'))throw Error('invalid exact bytes');
+        return 500; // synthetic offline certified-count fixture, not production proof
+      },
+    };
+    const pinInput={
+      pool:scopedPool,
+      verifiedEvidence:{kind:'member' as const,verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001'},
+      threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
+      ...source,twoOriginalContextReady:true as const,
+    };
+    let fetchCount=0;
+    let observed:SeyeonR26OfflineG4ReceiptV1|null=null;
+    let beforeDispatch:Parameters<typeof reserveSeyeonR26OfflineGovernedWireV1>[0]|null=null;
+    const provider=createOpenAiSeyeonStructuredProviderV1({
+      model:'seyeon-r35-offline',apiKey:'never-network-disposable-r26',
+      maxOutputTokens:256,
+      fetchImpl:async()=>{fetchCount++;throw Error('PROVIDER_SEND_FORBIDDEN');},
+      meteredBeforeDispatch:async(call,requestBody)=>{
+        const wireAttestation=await attestSeyeonR35OfflineWireAfterDbPinV1({
+          pinInput,call,requestBody,enforcedOutputTokens:256,
+        });
+        beforeDispatch={pinInput,wireAttestation,call,requestBody,governor};
+        observed=await reserveSeyeonR26OfflineGovernedWireV1(beforeDispatch);
+        throw new SeyeonR26OfflineG4HoldV1(); // deliberate no-network fence
+      },
+    });
+    await expect(provider.generate(buildSeyeonTurnInterpreterRequestV2(
+      source.finalModelContext,
+    ))).rejects.toMatchObject({code:'PRE_DISPATCH_REJECTED'});
+    expect(fetchCount).toBe(0);
+    expect(observed).toMatchObject({
+      status:'disposable_governed_reservation_committed_without_dispatch',
+      selectedSourcesDigest:source.selection.selectedSourcesDigest,
+      inputCeilingTokens:500,outputCeilingTokens:256,
+      reservedMicroUsd:'1524',
+      permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    });
+    expect(await state(id)).toMatchObject({
+      turnState:'context_ready',parents:'1',edges:'2',firstPins:'1',
+    });
+    if(!observed||!beforeDispatch)throw Error('G4 offline receipt absent');
+    const row=await pool.query<{
+      lifecycle_state:string;governor_ceiling_micro_usd:string;
+      governor_input_bound_tokens:string;governor_output_cap_tokens:string;
+    }>(
+      'select lifecycle_state,governor_ceiling_micro_usd::text,governor_input_bound_tokens::text,governor_output_cap_tokens::text from public.seyeon_ai_call_cost_events where call_id=$1::uuid',
+      [observed.callId],
+    );
+    expect(row.rows).toMatchObject([{
+      lifecycle_state:'started',governor_ceiling_micro_usd:'1524',
+      governor_input_bound_tokens:'500',governor_output_cap_tokens:'256',
+    }]);
+    // Same Call ID must not claim a second reservation/Provider dispatch.
+    await expect(reserveSeyeonR26OfflineGovernedWireV1(beforeDispatch))
+      .rejects.toBeInstanceOf(SeyeonR26OfflineG4HoldV1);
+    const budget=await pool.query<{occupied_micro_usd:string}>(
+      "select occupied_micro_usd::text from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
+    );
+    expect(budget.rows[0]?.occupied_micro_usd).toBe('1524');
+    // Forged cap or missing independent certification cannot reach Governor.
+    await expect(reserveSeyeonR26OfflineGovernedWireV1({
+      ...beforeDispatch,
+      governor:{...governor,policy:{...policy,maximumOutputTokens:257}},
+    })).rejects.toBeInstanceOf(SeyeonR26OfflineG4HoldV1);
+    await expect(reserveSeyeonR26OfflineGovernedWireV1({
+      ...beforeDispatch,
+      governor:{policy,certifiedInputTokenUpperBound:()=>null},
+    })).rejects.toBeInstanceOf(SeyeonR26OfflineG4HoldV1);
+    expect(fetchCount).toBe(0);
   });
 });
