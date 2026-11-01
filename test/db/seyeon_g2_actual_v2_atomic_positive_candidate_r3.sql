@@ -163,6 +163,9 @@ declare
   v_wire record;
   v_cost record;
   v_provider_receipt record;
+  v_stage record;
+  v_stage_index integer:=0;
+  v_previous_stage_wire text;
   v_has_wire boolean:=false;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
@@ -335,6 +338,9 @@ begin
   for share;
   v_has_wire:=found;
   if v_has_wire or exists(
+    select 1 from seyeon_positive_candidate.native_stage_lineage_r30 n
+    where n.attempt_id=p_attempt
+  ) or exists(
     select 1 from public.seyeon_ai_call_cost_events e
     where e.subject_id=p_subject and e.turn_id=p_turn
       and e.attempt_id=p_attempt and e.phase='chat'
@@ -402,9 +408,75 @@ begin
       raise exception using errcode='23514',
         constraint='seyeon_offline_r28_governed_cost_unsettled';
     end if;
-    -- Even a valid one-stage settled receipt does not prove preflight,
-    -- model-output provenance, renderer, reviewer, or last-hop approval.
-    -- No synthetic receipt may promote this offline Candidate to G2.
+    -- R30 five-stage ordered native-wire lineage. A single interpreter
+    -- cost receipt cannot substitute for the other four distinct call IDs.
+    -- Each stage is still metadata-only and NEVER provider authorization.
+    v_stage_index:=0;
+    v_previous_stage_wire:=null;
+    for v_stage in
+      select * from seyeon_positive_candidate.native_stage_lineage_r30
+      where attempt_id=p_attempt order by stage_index for share
+    loop
+      if v_stage.stage_index is distinct from v_stage_index
+        or v_stage.source_count is distinct from 2
+        or v_stage.selected_sources_digest is distinct from p_selection_digest
+        or v_stage.output_ceiling_tokens is distinct from 256
+        or v_stage.previous_wire_digest is distinct from v_previous_stage_wire
+        or v_stage.purpose is distinct from
+          (array['integrity_classification','disclosure_classification',
+                 'turn_interpretation','dialogue_render','semantic_review'])[v_stage_index+1]
+        or (v_stage_index=2 and (
+          v_stage.call_id is distinct from v_wire.call_id
+          or v_stage.native_wire_digest is distinct from v_wire.native_wire_digest
+        ))
+      then
+        raise exception using errcode='23514',
+          constraint='seyeon_offline_r30_native_stage_lineage_invalid';
+      end if;
+      v_previous_stage_wire:=v_stage.native_wire_digest;
+      v_stage_index:=v_stage_index+1;
+    end loop;
+    if v_stage_index<>5 then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r30_native_stage_lineage_incomplete';
+    end if;
+    if exists (
+      select 1 from seyeon_positive_candidate.native_stage_lineage_r30 s
+      left join public.seyeon_ai_call_cost_events c
+        on c.call_id=s.call_id and c.subject_id=p_subject
+        and c.turn_id=p_turn and c.attempt_id=p_attempt and c.phase='chat'
+        and c.purpose=s.purpose
+      left join public.seyeon_ai_provider_receipt_queue_v1 q
+        on q.call_id=s.call_id and q.subject_id=p_subject
+        and q.turn_id=p_turn and q.attempt_id=p_attempt and q.phase='chat'
+      where s.attempt_id=p_attempt and (
+        c.call_id is null or c.lifecycle_state is distinct from 'settled'
+        or c.governor_receipt_pinned_at is null
+        or c.cost_status is distinct from 'estimated'
+        or c.outcome is distinct from 'response_received'
+        or c.estimated_cost_micro_usd is null
+        or c.governor_effective_micro_usd is null
+        or c.governor_ceiling_micro_usd is null
+        or c.governor_effective_micro_usd>c.governor_ceiling_micro_usd
+        or c.governor_output_cap_tokens is distinct from s.output_ceiling_tokens
+        or c.event_jsonb->>'callId' is distinct from s.call_id::text
+        or c.event_jsonb->>'inputTokens' is null
+        or c.event_jsonb->>'outputTokens' is null
+        or coalesce(c.event_jsonb->>'inputTokens' ~ '^[0-9]{1,16}$',false)=false
+        or coalesce(c.event_jsonb->>'outputTokens' ~ '^[0-9]{1,16}$',false)=false
+        or (c.event_jsonb->>'inputTokens')::numeric>c.governor_input_bound_tokens
+        or (c.event_jsonb->>'outputTokens')::numeric>c.governor_output_cap_tokens
+        or q.call_id is null or q.acked_at is null
+        or q.claim_token is not null
+        or q.provider_event is distinct from c.event_jsonb
+      )
+    ) then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r30_all_stage_cost_settlement_unproven';
+    end if;
+    -- Matching five metadata-stage and settled Cost rows STILL cannot
+    -- authorize actual inference output or user disclosure. G0 full private
+    -- provenance, full Preflight and Output Guard attestation remain missing.
     raise exception using errcode='23514',
       constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
