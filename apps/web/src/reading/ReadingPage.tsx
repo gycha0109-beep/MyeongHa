@@ -21,7 +21,15 @@ const sajuProductTopics = [
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
-  const [chartTab, setChartTab] = useState<'pillars' | 'elements' | 'structure'>('pillars');
+  const [chartTab, setChartTab] = useState<'pillars' | 'elements'>('pillars');
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  useEffect(() => {
+    const onElementSelected = (event: Event) => {
+      setSelectedElement((event as CustomEvent<{ element: string | null }>).detail.element);
+    };
+    document.addEventListener('myeongha:saju-element-selected', onElementSelected);
+    return () => document.removeEventListener('myeongha:saju-element-selected', onElementSelected);
+  }, []);
   useEffect(() => {
     void import('../../saju-hub.js');
   }, []);
@@ -119,21 +127,36 @@ export function ReadingPage() {
           <section className="saju-design-card saju-design-chart-card" aria-labelledby="saju-design-chart-title">
             <header className="saju-design-card-heading">
               <h3 id="saju-design-chart-title">나의 사주 명식</h3>
+              <span id="saju-completeness-title" className="saju-calculation-badge" aria-live="polite">계산 확인 중</span>
+              <span id="saju-completeness-copy" className="saju-design-sr-title">계산된 사실 정보를 확인합니다.</span>
             </header>
-            <div className="saju-design-chart-tabs" role="tablist" aria-label="사주 계산 결과">
-              <button type="button" role="tab" aria-selected={chartTab === 'pillars'} className={chartTab === 'pillars' ? 'is-selected' : ''} onClick={() => setChartTab('pillars')}>사주팔자</button>
-              <button type="button" role="tab" aria-selected={chartTab === 'elements'} className={chartTab === 'elements' ? 'is-selected' : ''} onClick={() => setChartTab('elements')}>오행 분포</button>
-              <button type="button" role="tab" aria-selected={chartTab === 'structure'} className={chartTab === 'structure' ? 'is-selected' : ''} onClick={() => setChartTab('structure')}>계산 상태</button>
+            <div className="saju-design-chart-tabs" role="tablist" aria-label="사주 계산 결과" onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+              event.preventDefault();
+              const order = ['pillars', 'elements'] as const;
+              const index = chartTab === 'pillars' ? 0 : 1;
+              const next = event.key === 'Home' ? 0 : event.key === 'End' ? 1
+                : event.key === 'ArrowRight' ? (index + 1) % 2 : (index + 1) % 2;
+              setChartTab(order[next]);
+              const selector = next === 0 ? '#saju-pillars-tab' : '#saju-elements-tab';
+              event.currentTarget.querySelector<HTMLButtonElement>(selector)?.focus();
+            }}>
+              <button id="saju-pillars-tab" type="button" role="tab" aria-controls="saju-pillars-panel" aria-selected={chartTab === 'pillars'} tabIndex={chartTab === 'pillars' ? 0 : -1} className={chartTab === 'pillars' ? 'is-selected' : ''} onClick={() => setChartTab('pillars')}>사주팔자</button>
+              <button id="saju-elements-tab" type="button" role="tab" aria-controls="saju-elements-panel" aria-selected={chartTab === 'elements'} tabIndex={chartTab === 'elements' ? 0 : -1} className={chartTab === 'elements' ? 'is-selected' : ''} onClick={() => setChartTab('elements')}>오행 분포</button>
             </div>
-            <div className="saju-design-chart-content" role="tabpanel">
-              <div id="saju-pillar-grid" className="saju-pillar-grid saju-design-pillars" hidden={chartTab !== 'pillars'} aria-label="사주 네 기둥" />
-              <div className="saju-design-elements-panel" hidden={chartTab !== 'elements'}>
-                <p>서버가 계산한 천간·지지의 오행을 집계한 값입니다.</p>
-                <div id="saju-element-bars" className="saju-element-bars" />
+            <div className="saju-design-chart-content">
+              <div id="saju-pillars-panel" role="tabpanel" aria-labelledby="saju-pillars-tab" tabIndex={0} hidden={chartTab !== 'pillars'}>
+                <div id="saju-pillar-grid" className="saju-pillar-grid saju-design-pillars" aria-label="사주 네 기둥" />
+                <p id="saju-pillar-selection-note" className="saju-pillar-selection-note" hidden aria-live="polite" />
               </div>
-              <div className="saju-design-structure-panel" hidden={chartTab !== 'structure'}>
-                <strong id="saju-completeness-title">—</strong>
-                <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
+              <div id="saju-elements-panel" className="saju-design-elements-panel" role="tabpanel" aria-labelledby="saju-elements-tab" tabIndex={0} hidden={chartTab !== 'elements'}>
+                <p className="saju-elements-description">서버가 계산한 천간·지지 8글자의 오행 개수입니다. 강약 점수가 아닙니다.</p>
+                <div id="saju-element-radar" className="saju-element-radar" />
+                <div id="saju-element-bars" className="saju-element-choices" role="group" aria-label="오행 선택" />
+                <div className="saju-element-actions">
+                  <p id="saju-element-feedback" className="saju-element-feedback" aria-live="polite">오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.</p>
+                  <button id="saju-view-selected-pillars" className="saju-element-show-button" type="button" disabled={!selectedElement} onClick={() => setChartTab('pillars')}>명식에서 보기</button>
+                </div>
               </div>
             </div>
             <div className="saju-design-chart-foot">

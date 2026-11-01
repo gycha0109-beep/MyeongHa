@@ -20,9 +20,12 @@ const profile = {
   },
 };
 const fact = (value, hanja, element, yinYang) => ({ value, hanja, element, yinYang });
-const resolvedPillar = {
-  status: 'resolved',
-  value: { stem: fact('을', '乙', '목', '음'), branch: fact('해', '亥', '수', '음') },
+const resolved = (stem, branch) => ({ status: 'resolved', value: { stem, branch } });
+const resolvedPillars = {
+  year: resolved(fact('을', '乙', '목', '음'), fact('해', '亥', '수', '음')),
+  month: resolved(fact('기', '己', '토', '음'), fact('축', '丑', '토', '음')),
+  day: resolved(fact('을', '乙', '목', '음'), fact('사', '巳', '화', '음')),
+  hour: resolved(fact('신', '辛', '금', '음'), fact('사', '巳', '화', '음')),
 };
 let mismatch = false;
 const requests = [];
@@ -52,8 +55,7 @@ const server = createServer(async (req, res) => {
         res.end(envelope({ calculation: {
           birthRevisionRef: mismatch ? 'older-different-revision' : revision,
           snapshot: {
-            pillars: { year: resolvedPillar, month: resolvedPillar,
-              day: resolvedPillar, hour: resolvedPillar },
+            pillars: resolvedPillars,
             completeness: { birthTimeKnown: true, fullyResolved: true },
           },
         } }));
@@ -154,6 +156,42 @@ try {
   assert(ok.sex === '남성', 'Current saved gender not displayed: ' + JSON.stringify(ok));
   assert(ok.calendar.includes('양력'), 'Current saved calendar not displayed: ' + JSON.stringify(ok));
   assert(ok.summary.includes('1996.01.09'), 'Summary not bound to current saved birth date: ' + JSON.stringify(ok));
+  const initialTabs = await evaluate("({count:document.querySelectorAll('.saju-design-chart-tabs [role=tab]').length, active:document.querySelector('[role=tab][aria-selected=true]')?.id, statusPanel:!!document.querySelector('.saju-design-structure-panel'), badge:document.getElementById('saju-completeness-title')?.textContent})");
+  assert(initialTabs.count === 2 && initialTabs.active === 'saju-pillars-tab' &&
+    !initialTabs.statusPanel && initialTabs.badge,
+    'Did not preserve the separate two-tab chart: ' + JSON.stringify(initialTabs));
+  await evaluate("document.getElementById('saju-elements-tab').click()");
+  await sleep(90);
+  const radar = await evaluate("({visible:!document.getElementById('saju-elements-panel').hidden, svg:!!document.querySelector('#saju-element-radar svg'), counts:[...document.querySelectorAll('#saju-element-bars button')].map(b=>Number(b.lastElementChild?.textContent)), axes:document.querySelectorAll('.saju-radar-axis-choice[role=button]').length, statusTab:!!document.getElementById('saju-structure-tab')})");
+  assert(radar.visible && radar.svg && radar.axes === 5 &&
+    JSON.stringify(radar.counts) === JSON.stringify([2,2,2,1,1]) && !radar.statusTab,
+    'Radar data or tabs did not load: ' + JSON.stringify(radar));
+  await evaluate("document.querySelector('#saju-element-radar [data-saju-element-select]')?.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', bubbles:true}))");
+  await sleep(70);
+  const selected = await evaluate("({aria:document.querySelector('.saju-radar-axis-choice')?.getAttribute('aria-pressed'),buttonEnabled:!document.getElementById('saju-view-selected-pillars').disabled,note:document.getElementById('saju-element-feedback')?.textContent})");
+  assert(selected.aria === 'true' && selected.buttonEnabled && selected.note,
+    'Radar keyboard selection did not work: ' + JSON.stringify(selected));
+  await evaluate("document.getElementById('saju-view-selected-pillars').click()");
+  await sleep(60);
+  const wood = await evaluate("({visible:!document.getElementById('saju-pillars-panel').hidden, matching:[...document.querySelectorAll('.saju-pillar-hanja.is-element-match')].map(e=>e.dataset.sajuPartKind+':'+e.dataset.sajuPartElement), pillars:[...document.querySelectorAll('.saju-pillar.is-element-linked')].map(e=>e.dataset.sajuPillarKey)})");
+  assert(wood.visible && JSON.stringify(wood.matching) === JSON.stringify(['stem:목','stem:목']) &&
+    JSON.stringify(wood.pillars) === JSON.stringify(['year','day']),
+    'Wood selection highlighted wrong characters: ' + JSON.stringify(wood));
+  await evaluate("document.getElementById('saju-elements-tab').click()");
+  await evaluate("document.querySelectorAll('#saju-element-bars button')[1].click()");
+  await sleep(55);
+  await evaluate("document.getElementById('saju-view-selected-pillars').click()");
+  await sleep(55);
+  const fire = await evaluate("({matching:[...document.querySelectorAll('.saju-pillar-hanja.is-element-match')].map(e=>e.dataset.sajuPartKind+':'+e.dataset.sajuPartElement),pillars:[...document.querySelectorAll('.saju-pillar.is-element-linked')].map(e=>e.dataset.sajuPillarKey)})");
+  assert(JSON.stringify(fire.matching) === JSON.stringify(['branch:화','branch:화']) &&
+    JSON.stringify(fire.pillars) === JSON.stringify(['day','hour']),
+    'Fire selection highlighted wrong characters: ' + JSON.stringify(fire));
+  await evaluate("document.getElementById('saju-elements-tab').click()");
+  await evaluate("document.querySelectorAll('#saju-element-bars button')[1].click()");
+  await sleep(55);
+  const cleared = await evaluate("({active:document.querySelectorAll('.saju-pillar-hanja.is-element-match').length,disabled:document.getElementById('saju-view-selected-pillars').disabled})");
+  assert(cleared.active === 0 && cleared.disabled,
+    'Deselecting an element did not clear emphasis: ' + JSON.stringify(cleared));
   await fetch(origin + '/__test/mismatch');
   const mismatched = await navigateSaju();
   assert(mismatched.ready, 'Calculation must stay visible under source mismatch');
