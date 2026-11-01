@@ -119,15 +119,22 @@ try{
       }
     }
   }
-  // A product-authored greeting is UI copy, not an AI reply. It must switch
-  // languages on the existing chat page without altering any stored messages.
+  // The authored greeting takes its language once, when entering a room.
+  // Later UI changes affect chrome and future turns, not the initial greeting.
   for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN']) {
-    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
     await change(locale);
+    await navigate('chat.html?character=seyeon', '.conversation-chat-panel');
     const greeting = await evaluate('(() => ({ text: document.querySelector("[data-dialogue-line]")?.textContent ?? "", lang: document.documentElement.lang }))()');
     if (greeting.lang !== locale || !greeting.text.trim() || /[가-힣]/u.test(greeting.text)) {
       failures.push({ page: 'chat.html', scenario: 'localized-fixed-character-greeting', locale, greeting });
     }
+    const alternate = locale === 'en-US' ? 'ko-KR' : 'en-US';
+    await change(alternate);
+    const unchanged = await evaluate('document.querySelector("[data-dialogue-line]")?.textContent ?? ""');
+    if (unchanged !== greeting.text) {
+      failures.push({ page: 'chat.html', scenario: 'room-entry-language-must-stay-locked', locale, alternate });
+    }
+    await change(locale);
     await navigate('chat-hub.html', '.chat-hub-shell');
     const discovery = await evaluate('(() => ({ text: document.querySelector(".chat-person-card[data-character=seyeon] .chat-person-line")?.textContent ?? "", lang: document.documentElement.lang }))()');
     if (discovery.lang !== locale || !discovery.text.trim() || /[가-힣]/u.test(discovery.text)) {

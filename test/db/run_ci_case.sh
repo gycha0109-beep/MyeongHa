@@ -727,6 +727,16 @@ SQL
     }
     bash test/db/commerce_portone_cancellation_partial_set_pg17.sh
     ;;
+  commerce-exact-reader-withdrawal-hold-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_EXACT_READER_WITHDRAWAL_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_exact_reader_withdrawal_hold_pg17.sh
+    ;;
   *)
     echo "Unknown DB CI case: $case_name" >&2
     exit 2

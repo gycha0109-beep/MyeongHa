@@ -106,6 +106,50 @@ export function buildRestoreEvidenceEnvelope(input) {
     }
   }
 
+  const catalogCount = backupManifest.migration_catalog_version_count;
+  const catalogDigest = backupManifest.migration_catalog_sha256;
+  if ((catalogCount === undefined) !== (catalogDigest === undefined)) {
+    fail('backupManifest migration catalog fingerprint fields must be paired');
+  }
+  if (catalogCount !== undefined) {
+    if (!Number.isSafeInteger(catalogCount) || catalogCount < 1 ||
+        typeof catalogDigest !== 'string' || !SHA256_RE.test(catalogDigest)) {
+      fail('backupManifest migration catalog fingerprint is invalid');
+    }
+    requireExact(
+      restoreEvidence.backup_migration_catalog_version_count,
+      catalogCount,
+      'restoreEvidence.backup_migration_catalog_version_count',
+    );
+    requireExact(
+      restoreEvidence.backup_migration_catalog_sha256,
+      catalogDigest,
+      'restoreEvidence.backup_migration_catalog_sha256',
+    );
+    requireExact(
+      restoreEvidence.backup_migration_catalog_fingerprint_verified,
+      true,
+      'restoreEvidence.backup_migration_catalog_fingerprint_verified',
+    );
+    requireExact(
+      restoreEvidence.supabase_managed_migration_ledger_fully_restored,
+      false,
+      'restoreEvidence.supabase_managed_migration_ledger_fully_restored',
+    );
+  } else {
+    for (const key of [
+      'backup_migration_catalog_version_count',
+      'backup_migration_catalog_sha256',
+    ]) {
+      if (restoreEvidence[key] != null) {
+        fail('legacy restore cannot claim migration catalog source fingerprint');
+      }
+    }
+    if (restoreEvidence.backup_migration_catalog_fingerprint_verified === true) {
+      fail('legacy restore cannot claim verified source fingerprint');
+    }
+  }
+
   // The provider migration ledger itself is excluded by the portable backup.
   // When a new governed backup carries the bounded six-version snapshot, the
   // isolated runner must prove its exact temp-table replay and the restored
@@ -232,6 +276,10 @@ export function buildRestoreEvidenceEnvelope(input) {
     source_archive_name: archiveName,
     source_encrypted_sha256: encryptedSha256,
     source_seyeon_early_history_sha256: seyeonHistoryDigest ?? null,
+    source_migration_catalog_version_count: catalogCount ?? null,
+    source_migration_catalog_sha256: catalogDigest ?? null,
+    source_migration_catalog_fingerprint_only: catalogCount !== undefined,
+    full_migration_ledger_restoration_proven: false,
   });
 }
 

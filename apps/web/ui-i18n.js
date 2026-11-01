@@ -51,14 +51,14 @@ export function getUiLocale() {
 }
 export function getUiLocaleRequestHeadersV1() {
   const locale = getUiLocale();
-  return { [UI_LOCALE_REQUEST_HEADER_V1]: locale === 'en-US' || locale === 'zh-CN' ? 'ko-KR' : locale };
+  return { [UI_LOCALE_REQUEST_HEADER_V1]: locale };
 }
 export function formatStaticUi(source, params, locale = getUiLocale()) {
   const template = translateStaticUi(source, locale);
   return template.replace(/\{([a-zA-Z]+)\}/gu, (_, name) => String(params[name] ?? ''));
 }
 
-const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
+const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-chat-intro-language-locked], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
 const unmappedChatStatusSource = new WeakMap();
 const CHAT_STATUS_SAFE_FALLBACK = '대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';

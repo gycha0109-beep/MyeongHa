@@ -88,7 +88,8 @@
       "commerce-private-claim-full-finalizer-pg17",
       "commerce-stored-portone-hmac-lineage-pg17",
       "commerce-portone-cancellation-set-audit-pg17",
-      "commerce-portone-cancellation-partial-set-pg17"
+      "commerce-portone-cancellation-partial-set-pg17",
+      "commerce-exact-reader-withdrawal-hold-pg17"
     ]
   }
 }

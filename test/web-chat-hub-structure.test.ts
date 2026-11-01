@@ -238,7 +238,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(runtime).not.toContain("root.dataset.chatEntry = 'reading-handoff'");
     expect(runtime).not.toContain('readingHandoff');
     expect(runtime).not.toContain('읽기에서 이어왔군요.');
-    expect(runtime).toContain('setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, getUiLocale()) : character.intro.map(line => translateStaticUi(line, getUiLocale())))');
+    expect(runtime).toContain('setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, chatEntryLocale) : character.intro.map(line => translateStaticUi(line, chatEntryLocale)))');
   });
 
   it('keeps thread-only Chat navigation identity-neutral until server presentation authority exists', async () => {

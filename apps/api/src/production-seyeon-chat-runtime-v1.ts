@@ -36,6 +36,7 @@ import {
   type SeyeonGlmRendererConfigV1,
 } from './openrouter-seyeon-glm-renderer-v1.js';
 import { createGovernedSeyeonGlmRendererV1 } from './governed-openrouter-seyeon-glm-renderer-v1.js';
+import type { RequestUiLocaleV1 } from './request-ui-locale-v1.js';
 import { startSeyeonAiCallV1, settleSeyeonAiCallV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import type {
   PostgresSubjectPoolV1,
@@ -139,6 +140,8 @@ export interface RunProductionSeyeonChatInputV1 {
   readonly threadId: string;
   readonly clientTurnId: string;
   readonly text: string;
+  /** Snapshotted language of this submitted AI turn; independent of later UI changes. */
+  readonly replyLocale?: RequestUiLocaleV1;
 }
 
 export interface RunProductionSeyeonChatResultV1 {
@@ -538,6 +541,7 @@ export function createProductionSeyeonChatRuntimeV1(
         'chat_execution',
         () => runSeyeonProductionChatExecutionV1({
           mode: 'WRITE_DARK',
+          replyLocale: runInput.replyLocale ?? 'ko-KR',
           resolvedSubjectId: resolvedSubject.subjectId,
           threadId,
           receivePlan,
