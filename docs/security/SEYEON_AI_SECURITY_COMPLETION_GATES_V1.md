@@ -370,3 +370,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **실제 검증 시나리오 추가:** 기존 R20 테스트에 R21 선택 2건의 전용 경로·DB 응답 검증·원본/Grant 교체·COMMIT 실패 차단을 추가했다. 기존 R21 PostgreSQL 격리 테스트에는 실제 모델 Projection 두 건을 구성한 후 정식 DB Owner R21 함수와 동일 트랜잭션 원본 대조·ContextReady 저장·두 번째 원본 payload digest 위조 전체 롤백 시험을 추가했다.
 - **제한 및 HOLD:** 이 경로는 `myeongha_seyeon_positive_pin_candidate_test` 전용. 최종 모델 Context digest는 응용 서버에서 검증·응답하지만 DB의 별도 불변 최종 패킷 서명/Pin으로 승격되지 않는다. 임의 Preflight/History/Relationship/Reader/Worker/Saju·Life Fact 출처는 여전히 차단한다. PostgreSQL 원본 2건의 격리 `context_ready`는 실제 Provider 호출 권한, G2 두 원본의 원자 Commit, G3 Reveal/Replay, G4 비용 승인, G5/G6 운영 승인과 동등하지 않다.
 - **CI 판정:** 새 HEAD 정확한 전체 Actions 실행 결과 확인 전 성공 판정 금지. PR #2761은 Draft·미병합, 운영 migrations/ACL/공개 라우트/유료 호출 변경 없음, `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W25 · 두 원본 Memory의 원자 커밋·현재 Grant 기반 재조회 (격리 / HOLD)
+
+- **G2 실제 구현:** 격리 `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`의 DB Owner는 SourceSet 크기 1/2를 검증하고 선택된 **모든** 원본 Edge의 현재 원래 Grant·Memory·유형·JSONB digest를 잠근다. 둘 중 하나라도 철회/변조·교체·누락이면 아무것도 커밋하지 않는다. 검증된 원본 전체를 별도 불변 admission의 `source_count`와 `source_proof_jsonb`에 결속하고, 실제 `cmd_commit_seyeon_chat_turn_runtime_v2`로 세연 Assistant와 Chat/Post-turn Outbox 두 개를 **한 트랜잭션**에서 확정한다. 기존 1원본 validation proof 형식과 Zero Source Commit 경계는 유지한다.
+- **G1 → G2 앱 결속:** `seyeon-g2-atomic-exact-final-source-commit-r23-candidate.ts`가 1/2개의 최종 모델 선택 원본을 동일하게 재계산한다. 두 원본에서는 선택된 원래 Record/Grant와 서로 다른 PostgreSQL raw digest 2개를 모두 DB Owner R20 inspector로 재검사한다. G1 후보 receipt·SHA는 권한 증거로 신뢰하지 않으며, Context 전체가 바뀌면 DB 접근 전에 HOLD한다. 여전히 격리 DB만 허용하고 Provider 사용 권한은 발급하지 않는다.
+- **G3 두 원본 격리 읽기:** `test/db/seyeon_r5_disposable_reveal_current_rights.sql`의 기존 HTTP 첫 응답·재조회·History Owner 경계도 원본이 2건이면 **둘 다** 원래 Grant 현재 유효, 불변 admission, validated source provenance가 일치해야만 Assistant text를 반환한다. 한쪽이라도 철회되면 원문은 null, History는 전체 HOLD한다. 해당 SQL은 운영 공개 라우트가 아니며, Node 전송 이후 프록시·수신 증명도 아니다.
+- **테스트 추가:** `test/seyeon-g2-atomic-original-grant-race-disposable.test.ts`에 2원본 실제 ContextReady → 생성·검증 → 실제 v2 Commit → Outbox 2개·중복 커밋 차단, 두 번째 Grant digest 위조·철회·재승인 ID 교체, 독립 트랜잭션에서 철회 우선/커밋 우선 양방향 경쟁, 2원본 직접 HTTP DB Owner 답변/커밋 후 철회 재조회 차단을 추가했다. G2 SQL 소스 작성 중 발견한 중복 문자열 치환은 원본 SQL에서 재구성해 제거하고 함수 단일 정의를 확인했다.
+- **검증 상태:** 이 변경은 실제 테스트 실행 결과가 아닌 **구현/검증 시나리오 추가**이다. 통합 CI는 작업 중 반복 실행하지 않는 사용자 요청에 따라 **아직 실행·확정하지 않았다**. 코드 및 격리 SQL의 실행 성공을 추정하지 않는다.
+- **남은 출시 HOLD:** G0 원본 동의 정책 승인, Production G1 실제 최종 모델/Preflight/Reader·Saju·History/Relationship 파생 출처 완결성, G2 실제 Provider·Governor 단계 사용 승인, G3 실제 Production HTTP/프록시/수신 및 포괄 History, G4 비용 정산, G5/G6 전체 실행·운영 검증, 실제 병합/배포는 미완료. PR #2761은 Draft / 병합 금지 / 유료 Provider·공개 Route·운영 Migration 미활성, `HOLD_FORWARD_STOPPED` 유지.
