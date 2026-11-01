@@ -31,6 +31,8 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r4-owner-wire-receipt-disposable.test.ts --maxWorkers=1
 # Verify real zero-only baseline before changing *only* this disposable clone.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_production_compatibility_catalog_guard_v1.sql
+# Seal G4 origin/real governed reservation BEFORE installing G2's gated Owner.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r28_disposable_governed_wire_cost_provenance.sql
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover_candidate_v1.sql
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql
 # Only the G1 context-ready portion of R4 is installed; NO G3 Reveal/HTTP.
