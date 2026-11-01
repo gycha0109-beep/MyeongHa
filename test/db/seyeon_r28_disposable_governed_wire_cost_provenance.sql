@@ -14,11 +14,15 @@ begin
 end $precondition$;
 
 -- No memory body, wire body, prompt or provider output is persisted here.
--- Privacy deletion cascades from original Subject/Turn/Attempt/cost ledger;
--- ordinary API cannot DELETE; UPDATE is always rejected by the trigger.
+-- Privacy deletion cascades from Subject/Thread/Turn/Attempt. The cost
+-- ledger can be erased independently, but this Attempt-scoped governed marker
+-- stays until its Attempt is removed, preventing ungoverned G2 fallback.
+-- Ordinary API cannot DELETE; UPDATE is always rejected by the trigger.
 -- An immutable hash is CORRELATION only; not a grant or a wire signature.
 create table seyeon_positive_candidate.governed_wire_reservations_r28 (
-  call_id uuid primary key references public.seyeon_ai_call_cost_events(call_id) on delete cascade,
+  -- No FK to the cost row: a ledger privacy deletion must NOT erase the
+  -- Attempt's governed marker and reopen the legacy positive G2 path.
+  call_id uuid primary key,
   subject_id uuid not null references public.subjects(id) on delete cascade,
   thread_id uuid not null references public.conversation_threads(id) on delete cascade,
   turn_id uuid not null references public.chat_turns(id) on delete cascade,
