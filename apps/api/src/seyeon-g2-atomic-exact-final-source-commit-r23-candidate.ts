@@ -27,7 +27,8 @@ import {validateSeyeonPostTurnAnalysisSnapshotV1} from './seyeon-post-turn-analy
 export const SEYEON_R23_OFFLINE_G2_COMMIT_V1=Object.freeze({
   database:'myeongha_seyeon_positive_pin_candidate_test',
   function:'seyeon_positive_candidate.commit_actual_v2_r3',
-  sourceCounts:[1,2],
+  sourceCount:1, // legacy single-source metadata remains stable
+  supportedSourceCounts:[1,2],
   permitsProvider:false,
   permitsHttpReveal:false,
   productionMounted:false,
