@@ -591,6 +591,8 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     const remaining=await pool.query<{occupied:string}>(
       "select occupied_micro_usd::text as occupied from public.seyeon_ai_governor_daily_budgets_v1 where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date",
     );
-    expect(remaining.rows[0]?.occupied).toBe('1524');
+    // The deliberately UNSENT direct-start attempt remains conservatively
+    // reserved: 1,524 + 1,524; a failed G2 never refunds unknown usage.
+    expect(remaining.rows[0]?.occupied).toBe('3048');
   });
 });
