@@ -220,10 +220,10 @@ select seyeon_positive_candidate.seal_governed_wire_cost_r28(
           digest(pinInput.finalModelContext),matched,quote.inputCeilingTokens,
           quote.outputCeilingTokens,quote.ceilingMicroUsd,reserved.bucketUtcDate,
         ]);
-        const proof=sealed.rows.length===1?sealed.rows[0]?.receipt:null;
-        if(!proof||typeof proof!=='object'||Array.isArray(proof))
+        const sealProof=sealed.rows.length===1?sealed.rows[0]?.receipt:null;
+        if(!sealProof||typeof sealProof!=='object'||Array.isArray(sealProof))
           throw new SeyeonR26OfflineG4HoldV1();
-        const receipt=proof as Record<string,unknown>;
+        const receipt=sealProof as Record<string,unknown>;
         if(Object.keys(receipt).length!==10
           ||receipt.callId!==reserved.callId||receipt.sourceCount!==count
           ||receipt.selectedSourcesDigest!==selection.selectedSourcesDigest
