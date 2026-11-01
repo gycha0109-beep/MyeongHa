@@ -319,6 +319,18 @@ export function guardSeyeonTurnInterpretationV2(input: {
     expressionState =
       rawExpressionState === 'playful' ? 'playful' : 'baseline';
   }
+  // Model-selected behavior must remain inside the server-authorized
+  // action/expression envelope, not merely a known vocabulary value.
+  if (!input.context.actionPolicy.allowedActionKeys.includes(chosenAction)) {
+    throw new SeyeonTurnInterpretationErrorV2(
+      'Se-yeon chosenAction is not admitted for the current context.',
+    );
+  }
+  if (!input.context.actionPolicy.allowedExpressionStates.includes(expressionState)) {
+    throw new SeyeonTurnInterpretationErrorV2(
+      'Se-yeon expressionState is not admitted for the current context.',
+    );
+  }
   const revealLevel = parseEnum(
     input.rawOutput.reveal.level,
     SEYEON_REVEAL_LEVELS_V2,
