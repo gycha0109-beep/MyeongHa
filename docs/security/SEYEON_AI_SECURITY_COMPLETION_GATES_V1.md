@@ -390,3 +390,10 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **필수 시험 순서 정정:** 기존 격리 PG 설치 스크립트는 R25 G2 테스트가 R21 함수를 사용하기 전에 R21을 설치하도록, G2 테스트가 R5 현재-권한 조회를 호출하기 전에 R5를 설치하도록 순서를 수정했다. 이전에는 해당 두 호출의 런타임 함수가 아직 없었다.
 - **보안/운영 경계:** 이 G4 비용 예약은 **실제 AI 호출 승인/실행/정산이 아니다**. 예약만 남아도 사용 여부가 불명확하면 무과금으로 처리하지 않으며, 사용자의 운영비·새 모델 사용·공개 Route·원문 제공은 미승인이다. 코드와 시험 모두 명명된 폐기 가능 PostgreSQL만 허용한다. Operator 비용 정책·예산을 격리 fixture에서만 세팅하며 운영 데이터·Role·migration은 수정하지 않는다. PR #2761 Draft·병합 금지·`HOLD_FORWARD_STOPPED` 유지.
 - **CI:** 사용자가 요청한 연속 구현 후 통합검증 방식에 따라 중간 Actions 성공 확인·재실행을 하지 않았다. 이 W26의 TS 컴파일·PG17·DB 권한·비용 경로는 아직 **미실행/미확정**으로 기록한다.
+
+
+### 2026-11-01 · W27 · G4 DB 예산 초과·두 번째 Grant 철회 경쟁 및 CI 묶음 브랜치
+
+- **구현 검증 시나리오:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에서 실제 두 원본에 대한 합성 Governor 예약이 성공해 1,524 microUSD를 사용한 뒤, 같은 Call ID의 재예약·요청 출력 cap 위조·토큰 인증 누락 차단뿐 아니라 **다음 Turn의 비용 상한 초과**를 원자 DB Governor가 거절하여 새 Cost Ledger 0건/Provider 요청 0회임을 확인하도록 했다. 이어서 원본 2건 중 **두 번째 원래 Grant를 G1/Wire attestation 뒤 철회**한 후 새 Call ID로 예약을 시도하면 DB Owner 원본 readback에서 차단하고 예약 장부/예산 카운터가 늘지 않도록 시험을 추가했다. 합성 test fixture로만 구성하며 실행 PASS를 추정하지 않는다.
+- **CI 비용 절감 절차:** 이 저장소의 `.github/workflows/ci.yml`은 열린 PR 브랜치의 synchronize에 자동 반응한다. 앞선 PR #2761 커밋은 GitHub에서 자동 CI가 시작될 수 있어 **'중간 CI를 돌리지 않았다'는 수동 실행에 한정**된다. 사용자 요청인 연속 구현→마지막 통합 CI를 실제로 지키기 위해 `feat/security/g4-g5-offline-batch-20261101`을 해당 PR HEAD `ae52958c`에서 별도 생성했다. 추가 작업은 이 비PR 브랜치에 누적하고, 범위가 끝난 다음 필요한 검증을 거쳐 기존 Draft PR에 fast-forward로 통합한다. 본 단계에서는 PR branch 이동·본번 병합·배포 없음.
+- **현재 결론:** G4는 실제 서버 상한/출처/네이티브 Wire→격리 DB Governor 비용 예약 경로까지 연결됐지만 진짜 유료 Provider 발송·실제 사용량 영수증·정산·운영 승인과 동일하지 않다. G0 원본 동의, G1 전 범위 파생 출처, G2 운영 적용, G3 Production HTTP/History·실제 수신, G4 본번 정책, G5 최종 CI 및 G6 운영 승인은 모두 HOLD. `HOLD_FORWARD_STOPPED` 유지. **본 배치의 CI는 아직 정확한 HEAD로 검증·확정하지 않았다.**
