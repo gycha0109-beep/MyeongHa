@@ -276,3 +276,14 @@
 - **개인정보:** 보호 답변·기기 ACK를 운영 데이터베이스에서 삭제하는 것만으로는 오프프라이머리 암호키 삭제가 완료되지 않으므로, 계정 삭제 Worker의 키 파기 장벽·재개 검사 및 미완료 시 최종 삭제 확인 차단 경로도 통합했습니다.
 - **아직 미완료:** 현재 main 이력·Saju Production 근거·판매 가능한 Offer/Charge Terms·실제 결제사 취소 POST·운영 개인정보 삭제/복구 정합성·유료 Reader 공개 조건·LIVE 준비는 별도 미충족입니다. DB migration과 신규 파일은 **로컬 브랜치에만** 있고 실제 Production Supabase 적용이나 LIVE 운영 활성화가 이뤄진 것이 아닙니다.
 - **검증:** 이 구현 묶음의 타입·회귀·실제 DB 검증 결과는 **아직 미확정**입니다. 작업 중간마다 CI를 재실행하지 않으며 통합 후 로컬 필수 확인과 공식 단일 CI를 수행합니다.
+
+### 2026-11-01 — 중복 전달 테이블 제거, 기존 Reader 보호 검사 유지, 통합 구현 로컬 확인
+
+- **전달 증거 단일화:** 초기 #2855의 독립 응답 준비/기기 ACK 후보 SQL·호출 모듈·테스트 파일 4개를 제거했습니다. 대신 이미 구현된 기존 공식 Reader S7 2140 DB 전달 시도·ACK 계약과 보호 본문·계정 삭제 연계를 유일한 Writer로 채택했습니다. 관련 PostgreSQL 17 과거 HOLD 검사는 main 원본으로 복원했습니다. 기존 Worklog 과거 기록은 사실 이력으로 유지하며 현 항목으로 폐기 경계를 명시합니다.
+- **Reader Record 호환:** 현재 메인 Records의 공식 Reading/출생 Revision 보유 증거를 삭제하지 않고, 결제 Reader 조회 연속성 모듈이 재사용할 수 있도록 기존 Postgres authority port export만 추가했습니다. 과거 DB Owner 버전의 느슨한 Records 조회 코드를 덮어쓰지 않았습니다.
+- **Reader 출처 접근:** 정확한 현재 구매 Intent/Grant/Reader/Bundle의 독립 검증을 3회 수행하는 동안 현재 Reader 메타데이터 및 공식 응답 지문 전체 재검사도 보존했습니다. T1/T2는 각 트랜잭션에서 현 구매 사실을 재조회하며, 실패 시 생성 결과를 반환하지 않습니다.
+- **회귀 수정:** 이전 단위 테스트가 원본 구매권의 실제 SQL 확인을 모의하지 않았던 점을 고쳐, 승인/회수/출처 변경을 검증하는 기존 fixture에 정확한 현재 구매권 포트를 공급했습니다. 구현 코드를 느슨하게 고치지 않았습니다.
+- **검증 결과(로컬):** 서버 `tsc -p tsconfig.build.json --noEmit` PASS, 결제·Reader 주요 8개 Vitest 파일 **92/92 PASS**. 전체 workspace typecheck는 기존 타 작업폴더의 `node_modules` 디렉터리를 임시 연결해 모바일 private class 타입 경로 충돌이 발생하므로 결과를 전체 PASS로 주장하지 않습니다. 신규 전체 PostgreSQL 17 SQL 실행/통합 CI는 아직 미검증입니다.
+- **PR 관리:** 기존 단편 후보 PR [#2855](https://github.com/gycha0109-beep/MyeongHa/pull/2855)는 새 Reader S7 단일화로 대체돼 **closed/unmerged** 처리했습니다. 원본 PR의 중간 CI 성공은 현재 통합 브랜치의 통합 통과가 아닙니다.
+- **남은 필수 구현/인수:** Saleable Offer/Charge Terms와 승인된 Saju 공급, 고객 실제 수령 증거 판정, 법정 청약철회 최종 처리·PortOne 환불 요청 POST, 개인정보 최종 복구 인수, 현재 DB migration 이력 정합성, 유료 Reader 공개 및 LIVE. 수동·운영 승인 없이 LIVE와 자동 환불을 켜지 않습니다.
+- **다음:** 실제 결제사 취소 요청·Claim 영속화·법적 검토를 현재 저장된 원본 Receipt/Reader lock과 하나의 경로로 연결하고, 신규 DB migration을 격리 PostgreSQL 17에서 검증한 뒤 최종 통합 CI를 한 번에 실행합니다.

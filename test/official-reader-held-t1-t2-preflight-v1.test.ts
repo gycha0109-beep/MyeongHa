@@ -64,6 +64,8 @@ function fixture(options: {
             rows = [{ effectiveAt: transaction === 2 && options.badT2Clock
               ? 'not-a-db-clock' : DB_TIMES[transaction - 1] }];
             events.push('clock:' + transaction);
+          } else if (sql.includes('internal_assert_official_reader_current_verified_purchase_bundle_v1')) {
+            rows = [{ guardExecuted: null }];
           } else if (sql.includes('assert_myeongha_subject_context_v1')) {
             rows = [{}];
           } else if (sql !== 'SET LOCAL ROLE myeongha_api_executor') {
@@ -84,7 +86,7 @@ function fixture(options: {
   } as unknown as ContentReleaseRuntimeEntry;
 
   let t1Admission: Awaited<ReturnType<typeof prepareOfficialReadingReaderAdmissionV1>> | undefined;
-  const prepareAdmission = vi.fn(async (scope: { resolvedSubject: { subjectId: string } }, effectiveAt: string) => {
+  const prepareAdmission = vi.fn(async (scope: { resolvedSubject: { subjectId: string } }, effectiveAt: string, currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: (input: { subjectId: string; readingId: string; readerCharacterId: string; readerContentBundleId: string }) => Promise<void> }) => {
     const phase = effectiveAt === DB_TIMES[0] ? 1 : 2;
     events.push('admit:' + phase);
     if (phase === 2 && options.reuseT1 && t1Admission !== undefined) return t1Admission;
@@ -144,6 +146,7 @@ function fixture(options: {
         responseHash: hash,
         completedAt: '2026-10-10T08:00:00Z',
       }] },
+      currentVerifiedPurchaseAuthorityPort,
       productReaderEligibilityAuthorityPort: { readApprovedRule: async () => ({
         status: 'approved' as const,
         rule: {
