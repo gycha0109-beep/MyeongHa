@@ -19,8 +19,9 @@ import {
 import {
   guardSeyeonRiskBearingActionCausalityV1,
 } from '../../../packages/domain/src/seyeon-risk-action-causality-v1.js';
-import type {
-  SeyeonRuntimeContextV2,
+import {
+  assembleSeyeonRuntimeContextV2,
+  type SeyeonRuntimeContextV2,
 } from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 
 export const SEYEON_R38_NEGATIVE_CASES_V1=Object.freeze([
@@ -102,9 +103,26 @@ export function exerciseSeyeonR38NegativeRealGuardsV1(
     ||context.disclosure.decision!==null
     ||context.disclosure.retrievedSources.length!==0
     ||context.retrievedMemories.length!==2
-    ||context.retrievedMemories.some(x=>x.kind!=='memory'||
-      !x.memoryId.startsWith('memory:')||
+    ||context.retrievedMemories.some((x,i)=>
+      x.kind!=='memory'||x.claimKind!=='fact'||
+      x.summary!=='synthetic model projection '+i||
+      x.relevance!==(i===0?0.9:0.8)||x.salience!==0.8||
+      Object.keys(x).length!==7||
+      !/^memory:[a-f0-9-]{36}$/u.test(x.memoryId)||
+      !/^memory:[a-f0-9-]{36}:grant:[a-f0-9-]{36}$/u.test(x.sourceRef)||
       !x.sourceRef.startsWith(x.memoryId+':grant:')))
+    throw new SeyeonR38OfflineGuardProbeHoldV1();
+  // Actual authored policy, Bible, identity and disclosure defaults must
+  // match the server runtime. No arbitrary Context or real private content
+  // may be presented as a harmless synthetic negative fixture.
+  const baseline=assembleSeyeonRuntimeContextV2({
+    relationship:null,relationshipSemantics:null,
+    recentMessages:[],
+    integrityDecisions:[],governedPreflightApplied:false,
+    retrievedMemories:context.retrievedMemories,
+    disclosure:{decision:null,retrievedSources:[]},
+  });
+  if(canonicalJson(context)!==canonicalJson(baseline))
     throw new SeyeonR38OfflineGuardProbeHoldV1();
 
   const interpretationRaw={
