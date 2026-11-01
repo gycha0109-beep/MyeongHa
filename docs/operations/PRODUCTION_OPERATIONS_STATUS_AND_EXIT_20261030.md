@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2851 최신 기본 CI RED: 신규 감시 테스트 등록 방식 수정
+
+- **실패 증거:** [기본 CI #41306348789](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41306348789) HEAD `c8bcf770ee1646e575ff1e84c2afd48280942790`에서 `db-authority-core`, `DB dependency · postgres17`, Governance, Web, Workers 등은 PASS. `Work Track · ops`의 Vitest 전체 검사에서 299개 파일 PASS, 1,711개 개별 검사 PASS, **새 `test/ops/production-privacy-ledger-completion-freshness.test.mjs`만** `No test suite found in file`로 FAIL하여 `CI Verify`가 연쇄 FAIL. 총 9개 새 테스트는 앞선 `node --test`에서 PASS했으나 `node:test` 함수를 사용해 저장소 표준 Vitest 러너에 등록되지 않았던 문제다.
+- **수정:** 해당 파일의 테스트 함수를 `vitest`에서 명시적으로 가져오도록 변경. 업무 로직, 운영 DB 및 증거 검증의 9개 테스트 내용, `drReady=false`·`serviceResumptionAllowed=false` 등의 차단 조건은 변경하지 않았다.
+- **검증:** 로컬 Vitest 재현 및 수정 HEAD의 기본 CI 결과를 별도 확인한다. **실패한 #41306348789를 성공으로 소급하지 않으며**, 검증된 수정 HEAD에서만 마지막 전용 통합 CI를 재제출한다. GitHub 기본 CI 자동 트리거와 전용 수동 통합 검증을 구분한다.
+
+
 ### 2026-11-01 KST — Phase 6·8 운영 관제·복구 합성 검증 묶음 구현 (통합 CI 마지막 1회 원칙)
 
 - **작업 방식:** PR #2851의 수정된 커밋 `9b910a510e1a2ab2c53edd35e312a5887086b054`에서 기본 CI의 PostgreSQL17·db-authority-core·Workers·Governance 등을 **SUCCESS** 확인했으나 [이전 전체 통합 #41290070944](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41290070944)의 실패는 유지한다. 중간 작업마다 전용 통합 라벨을 재발행하지 않고, 기존 `ci-integration-ready` 라벨은 구현을 묶는 동안 제거했다. 마지막 변경사항을 푸시한 뒤 해당 HEAD에서 기본 CI 통과를 확인하고 전용 통합 라벨을 **한 번만** 적용한다. 필수 단위 확인은 로컬로 진행한다.
