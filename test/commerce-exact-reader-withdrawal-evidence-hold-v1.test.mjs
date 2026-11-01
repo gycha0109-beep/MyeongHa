@@ -6,6 +6,8 @@ import {
  COMMERCE_EXACT_READER_WITHDRAWAL_EVIDENCE_HOLD_V1 as CONFIG,
  inspectExactReaderWithdrawalEvidenceHoldV1 as inspect,
 } from '../scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs';
+import {COMMERCE_EXACT_READER_SOURCE_SNAPSHOT_SQL_V1 as PRIVATE_SOURCE_SQL}
+ from '../scripts/operations/commerce-exact-reader-source-not-delivery-v1.mjs';
 import {prepareDigitalReadingWithdrawalReviewV1} from
  '../apps/api/src/commerce-digital-reading-withdrawal-review-preflight-v1.js';
 import {createPostgresDigitalReadingWithdrawalEvidencePrivateV1} from
@@ -26,6 +28,13 @@ const SCOPE={
  lastProviderOrderingKey:null,grantStatus:'active',
  officialReadingId:OFFICIAL,readerCharacterId:'seyeon',
  readerContentBundleId:BUNDLE_ID,
+};
+const PRIVATE_READER_SOURCE_ROW={
+ officialReadingId:OFFICIAL,subjectId:SUBJECT,readerCharacterId:'seyeon',
+ readerContentBundleId:BUNDLE_ID,executionStatus:'succeeded',
+ committedExecutionAttemptId:'00000000-0000-4000-8000-000000000066',
+ hasCompletedAt:true,responseHash:'sha256:v1:'+'a'.repeat(64),
+ internalResponseState:'delivered',
 };
 const UNIT_ROW={
  unitId:UNIT,purchaseIntentId:INTENT,subjectId:SUBJECT,
@@ -57,7 +66,8 @@ const VERIFIED={
 };
 function db({
  scope=[SCOPE],purchase=[PURCHASE],notice=[NOTICE],
- noticeInstalled=true,unitRows=[UNIT_ROW],role={
+ noticeInstalled=true,unitRows=[UNIT_ROW],
+ sourceRows=[PRIVATE_READER_SOURCE_ROW],role={
  readOnly:true,completeVisibility:true,currentUser:'postgres',
 },errorSql=null}={}){
  const calls=[];
@@ -71,6 +81,10 @@ function db({
   if(sql===SCOPE_SQL){
    expect(params).toEqual([EVENT,GRANT,RECEIPT]);
    return {rows:scope};
+  }
+  if(sql===PRIVATE_SOURCE_SQL){
+   expect(params).toEqual([OFFICIAL,SUBJECT,'seyeon',GRANT,INTENT,BUNDLE_ID]);
+   return {rows:sourceRows};
   }
   if(sql===NOTICE_PROBE_SQL)
    return {rows:[{noticeInstalled}]};
@@ -154,6 +168,9 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
    exactReaderLockedCasPreviouslyObserved:true,
    exactPurchasedUnitBound:true,
    checkoutNoticeEvidenceAvailable:true,
+   privateReaderInterpretationIdentityObserved:true,
+   officialSourceCommittedButNotDelivered:true,
+   durableConsumerDeliveryProven:false,
    reviewClassification:'evidence_review_required',
   });
   expect(client.calls.filter(x=>x.sql==='rollback')).toHaveLength(1);
@@ -348,5 +365,78 @@ describe('P4 historical PG17 fixture intentionally lacks staged notice tables',(
   expect(client.calls.some(x=>x.sql===NOTICE_PROBE_SQL)).toBe(false);
   expect(client.calls.some(x=>x.sql===NOTICE_UNIT_SQL)).toBe(false);
   safe(result);
+ });
+});
+
+describe('P4 private source commit cannot become consumer delivery or withdrawal denial',()=>{
+ it('a committed official Reading with internal delivered state still holds all legal/effect approvals',async()=>{
+  const c=db();
+  const r=await call(c);
+  expect(r).toMatchObject({
+   kind:'exact_reader_statutory_review_only',
+   privateReaderInterpretationIdentityObserved:true,
+   officialSourceCommittedButNotDelivered:true,
+   durableConsumerDeliveryProven:false,
+   legalDecisionAuthorized:false,
+   providerRefundAuthorized:false,grantRevocationAuthorized:false,
+  });
+  expect(c.calls.some(x=>x.sql===PRIVATE_SOURCE_SQL)).toBe(true);
+  expect(c.calls.filter(x=>x.sql==='rollback')).toHaveLength(1);
+  safe(r);
+ });
+ it('a missing private Reading source does NOT prohibit consumer withdrawal review',async()=>{
+  const c=db({sourceRows:[]});
+  const r=await call(c);
+  expect(r).toMatchObject({
+   kind:'exact_reader_statutory_review_only',
+   privateReaderInterpretationIdentityObserved:false,
+   officialSourceCommittedButNotDelivered:false,
+   checkoutNoticeEvidenceAvailable:true,
+   durableConsumerDeliveryProven:false,
+  });
+  safe(r);
+ });
+ it('an unfinished source is still not delivered, and the legal review remains available',async()=>{
+  const c=db({sourceRows:[{
+   ...PRIVATE_READER_SOURCE_ROW,executionStatus:'running',
+   committedExecutionAttemptId:null,hasCompletedAt:false,
+   responseHash:null,internalResponseState:null,
+  }]});
+  const r=await call(c);
+  expect(r).toMatchObject({
+   kind:'exact_reader_statutory_review_only',
+   privateReaderInterpretationIdentityObserved:true,
+   officialSourceCommittedButNotDelivered:false,
+   legalDecisionAuthorized:false,grantRevocationAuthorized:false,
+  });
+  safe(r);
+ });
+ it.each([
+  ['other Subject',{subjectId:'00000000-0000-4000-8000-000000000099'}],
+  ['other Reader',{readerCharacterId:'other-reader'}],
+  ['other Reader bundle',{readerContentBundleId:'00000000-0000-4000-8000-000000000099'}],
+  ['unbound completed attempt',{committedExecutionAttemptId:null}],
+ ])('inconsistent %s source prevents staged notice and legal reviewers',async(_why,change)=>{
+  const c=db({sourceRows:[{...PRIVATE_READER_SOURCE_ROW,...change}]});
+  const reviewer=vi.fn();
+  const r=await call(c,{withdrawalReviewer:reviewer});
+  expect(r.kind).toBe('private_reader_source_scope_inconsistent');
+  expect(r.durableConsumerDeliveryProven).toBe(false);
+  expect(c.calls.some(x=>x.sql===NOTICE_PROBE_SQL)).toBe(false);
+  expect(c.calls.some(x=>x.sql===NOTICE_UNIT_SQL)).toBe(false);
+  expect(reviewer).not.toHaveBeenCalled();
+  expect(c.calls.at(-1).sql).toBe('rollback');
+  safe(r);
+ });
+ it('staged notice remains HOLD even when private official source is committed',async()=>{
+  const c=db({noticeInstalled:false});
+  const r=await call(c);
+  expect(r).toMatchObject({
+   kind:'exact_unit_checkout_presentation_schema_not_installed',
+   officialSourceCommittedButNotDelivered:true,
+   checkoutNoticeEvidenceAvailable:false,
+   durableConsumerDeliveryProven:false,
+  });
+  safe(r);
  });
 });

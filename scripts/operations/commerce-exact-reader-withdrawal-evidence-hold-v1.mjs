@@ -3,6 +3,8 @@
 // customer claim, refund, approved delivery source or Entitlement Effect.
 import {inspectCurrentCancelSetExactReaderLockedCasReviewV1} from
  './commerce-current-cancel-set-reader-locked-cas-review-v1.mjs';
+import {inspectExactReaderPrivateSourceNotDeliveryV1} from
+ './commerce-exact-reader-source-not-delivery-v1.mjs';
 
 export const COMMERCE_EXACT_READER_WITHDRAWAL_EVIDENCE_HOLD_V1=Object.freeze({
  schemaVersion:'commerce-exact-reader-withdrawal-evidence-hold-v1',
@@ -98,6 +100,8 @@ const REASONS=new Set([
 const no=(kind,extra={})=>Object.freeze({
  schemaVersion:COMMERCE_EXACT_READER_WITHDRAWAL_EVIDENCE_HOLD_V1.schemaVersion,
  kind,exactReaderLockedCasPreviouslyObserved:false,
+ privateReaderInterpretationIdentityObserved:false,
+ officialSourceCommittedButNotDelivered:false,
  exactPurchasedUnitBound:false,checkoutNoticeEvidenceAvailable:false,
  durableConsumerDeliveryProven:false,legalDecisionAuthorized:false,
  providerOrderingProven:false,readerT2LockHeld:false,
@@ -146,10 +150,28 @@ async function inspectExactPaidUnit(dbClient,{
      !['active','revoked','expired'].includes(r.grantStatus))
    return no('exact_reader_purchase_or_cas_changed_after_lock');
 
-  const paidScope={exactReaderLockedCasPreviouslyObserved:true};
   if(typeof r.readerContentBundleId!=='string'||
      !UUID.test(r.readerContentBundleId))
    return no('exact_reader_purchase_or_cas_changed_after_lock');
+
+  // Official source commit and Reader interpretation identity are never
+  // consumer delivery. Observe their exact scope in the SAME read-only
+  // snapshot without reusing them as a legal refund restriction.
+  const source=await inspectExactReaderPrivateSourceNotDeliveryV1(dbClient,{
+   officialReadingId:r.officialReadingId,subjectId:r.subjectId,
+   readerCharacterId:r.readerCharacterId,
+   entitlementGrantId,purchaseIntentId:r.purchaseIntentId,
+   readerContentBundleId:r.readerContentBundleId,
+  });
+  if(source.kind==='inconsistent_private_source')
+   return no('private_reader_source_scope_inconsistent');
+  const paidScope={
+   exactReaderLockedCasPreviouslyObserved:true,
+   privateReaderInterpretationIdentityObserved:
+    source.privateReaderInterpretationIdentityObserved,
+   officialSourceCommittedButNotDelivered:
+    source.officialSourceCommittedButNotDelivered,
+  };
 
   // The approved notice migration is explicitly staged and skipped by the
   // existing historical PostgreSQL 17 suite. Its absence is an expected HOLD.

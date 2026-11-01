@@ -1,6 +1,8 @@
 import {readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {describe,it,expect} from 'vitest';
+import {COMMERCE_EXACT_READER_SOURCE_SNAPSHOT_SQL_V1 as privateSourceSql}
+ from '../scripts/operations/commerce-exact-reader-source-not-delivery-v1.mjs';
 import {
  COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1 as sourceSql,
  COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1 as noticeProbeSql,
@@ -16,6 +18,15 @@ describe('P4 exact Reader withdrawal evidence PG17 independent fixture contract'
  it('uses exact operational SQL source instead of copying an alternate query',()=>{
   expect(generator).toContain('COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1');
   expect(generated).toContain(sourceSql);
+  expect(generated).toContain(privateSourceSql);
+  expect(generated).toContain('execute source_q into strict source_row using');
+  expect(generated).toContain('EXACT_READER_PRIVATE_SOURCE_B2_NOT_BOUND_TO_PAID_UNIT');
+  expect(generated).toContain('EXACT_READER_PRIVATE_SOURCE_B3_BUNDLE_MISMATCH');
+  expect(generated).toContain('EXACT_READER_PRIVATE_SOURCE_CROSS_PURCHASE_ACCEPTED');
+  expect(generated).toContain('EXACT_READER_PRIVATE_SOURCE_CROSS_SUBJECT_ACCEPTED');
+  expect(privateSourceSql).toContain('paid.entitlement_grant_id=$4::uuid');
+  expect(privateSourceSql).toContain('paid.purchase_intent_id=$5::uuid');
+  expect(privateSourceSql).toContain('paid.reader_content_bundle_id=$6::uuid');
   expect(generated).toContain(noticeProbeSql);
   expect(sourceSql).not.toContain(
    'digital_reading_checkout_notice_presentations_v1');

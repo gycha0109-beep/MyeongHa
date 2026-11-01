@@ -4,6 +4,10 @@ import {
  COMMERCE_EXACT_READER_NOTICE_RELATION_PROBE_SQL_V1 as noticeProbeSql,
 } from '../../scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs';
 
+import {
+ COMMERCE_EXACT_READER_SOURCE_SNAPSHOT_SQL_V1 as privateSourceSql,
+} from '../../scripts/operations/commerce-exact-reader-source-not-delivery-v1.mjs';
+
 const underlying=execFileSync(process.execPath,[
  'test/db/commerce_stored_portone_hmac_lineage_pg17_generator.mjs',
 ],{encoding:'utf8'});
@@ -19,11 +23,16 @@ declare
  notice_q text:=$notice$`,
  noticeProbeSql,
  String.raw`$notice$;
+ source_q text:=$private_source$`,
+ privateSourceSql,
+ String.raw`$private_source$;
  b2 uuid;
  b3 uuid;
  b2_receipt uuid;
  subject_id uuid;
  one record;
+ b3_access record;
+ source_row record;
  other record;
  notice_state record;
  matched bigint;
@@ -52,6 +61,65 @@ begin
       '12196200-0000-4000-8000-000000000002'
     or one."readerContentBundleId" is null then
   raise exception 'OFFICIAL_READER_EXACT_PURCHASE_SCOPE_OR_UNIT_MISMATCH';
+ end if;
+
+ -- A private official Source commit is not evidence of consumer delivery.
+ -- Pin BOTH the B2 purchase and a second independent paid B3 bundle.
+ execute source_q into strict source_row using
+ one."officialReadingId"::uuid,subject_id,
+ one."readerCharacterId",b2,one."purchaseIntentId"::uuid,
+ one."readerContentBundleId"::uuid;
+ if source_row."officialReadingId" is distinct from one."officialReadingId"
+    or source_row."subjectId" is distinct from subject_id::text
+    or source_row."readerCharacterId" is distinct from one."readerCharacterId"
+    or source_row."readerContentBundleId" is distinct from one."readerContentBundleId"
+    or source_row."executionStatus" is distinct from 'succeeded'
+    or source_row."committedExecutionAttemptId" is null
+    or source_row."hasCompletedAt" is distinct from true
+    or source_row."responseHash" is null
+    or source_row."internalResponseState" not in
+       ('delivered','delivered_with_fallback') then
+  raise exception 'EXACT_READER_PRIVATE_SOURCE_B2_NOT_BOUND_TO_PAID_UNIT';
+ end if;
+
+ -- The SAME logical Reader has a second independently paid bundle B3.
+ select a.official_reading_id::text as "officialReadingId",
+        a.reader_character_id as "readerCharacterId",
+        a.reader_content_bundle_id::text as "readerContentBundleId",
+        a.purchase_intent_id::text as "purchaseIntentId"
+ into strict b3_access
+ from public.standard_reading_reader_access_grants a
+ where a.entitlement_grant_id=b3 and a.subject_id=subject_id;
+ if b3_access."readerContentBundleId" is not distinct from
+    one."readerContentBundleId" then
+  raise exception 'EXACT_READER_B2_B3_INDEPENDENT_BUNDLE_REQUIRED';
+ end if;
+ execute source_q into strict source_row using
+ b3_access."officialReadingId"::uuid,subject_id,
+ b3_access."readerCharacterId",b3,b3_access."purchaseIntentId"::uuid,
+ b3_access."readerContentBundleId"::uuid;
+ if source_row."officialReadingId" is distinct from b3_access."officialReadingId"
+    or source_row."readerCharacterId" is distinct from b3_access."readerCharacterId"
+    or source_row."readerContentBundleId" is distinct from b3_access."readerContentBundleId" then
+  raise exception 'EXACT_READER_PRIVATE_SOURCE_B3_BUNDLE_MISMATCH';
+ end if;
+
+ execute source_q into other using
+ one."officialReadingId"::uuid,subject_id,
+ one."readerCharacterId",b3,one."purchaseIntentId"::uuid,
+ one."readerContentBundleId"::uuid;
+ get diagnostics matched=row_count;
+ if matched<>0 then
+  raise exception 'EXACT_READER_PRIVATE_SOURCE_CROSS_PURCHASE_ACCEPTED';
+ end if;
+ execute source_q into other using
+ one."officialReadingId"::uuid,
+ '00000000-0000-4000-8000-000000000099'::uuid,
+ one."readerCharacterId",b2,one."purchaseIntentId"::uuid,
+ one."readerContentBundleId"::uuid;
+ get diagnostics matched=row_count;
+ if matched<>0 then
+  raise exception 'EXACT_READER_PRIVATE_SOURCE_CROSS_SUBJECT_ACCEPTED';
  end if;
 
  -- This historical fixture deliberately skips the staged checkout-notice
@@ -89,7 +157,7 @@ begin
  ) then
   raise exception 'OFFICIAL_READER_LEGAL_HOLD_MUTATED_GRANT';
  end if;
- raise notice 'PASS exact B2 Event/Receipt/Reader Grant, B3 denied, staged notice absent and HOLD';
+ raise notice 'PASS B2 and B3 private official Source distinct paid bundles, not consumer delivery; staged notice absent and HOLD';
 end;
 $exact_reader_legal$;
 
