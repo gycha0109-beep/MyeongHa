@@ -38,14 +38,13 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2
 # R21 must be INSTALLED before R25 G2/R5 tests reference its two-original function.
 # Original single-memory and zero-memory paths are still unchanged.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
+# R5 is required by the same two-original G2 test's post-commit Grant readback.
+# Install it before G2 tests; ordinary single-original cases keep their guards.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-g2-atomic-original-grant-race-disposable.test.ts --maxWorkers=1
-# R5 current-rights first/replay/history Owner-style checks ONLY in scratch clone.
-# R7 uses the same real PG test suite to force a revoke AFTER authorized DB
-# read COMMIT but BEFORE the asynchronous Production HTTP Member verifier
-# resolves; this confirms current 503/no-store HOLD and demonstrates why DB
-# read COMMIT alone cannot authorize delayed wire bytes.
-psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
+# R7 reads already-installed R5 Owner under the same disposable DB;
+# a later revoke must block any delayed HTTP disclosure.
 # R25 extends the ACTUAL R5 current-rights Owner with exclusive one-shot Turn
 # consumption in the SAME disposable PG transaction held until Node finish.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r25_disposable_first_once_g3.sql
