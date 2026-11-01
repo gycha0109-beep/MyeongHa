@@ -405,3 +405,9 @@ Watchtower-Track: security
 - **전용 DB:** 격리된 PG에만 `internal_cmd_seyeon_g4_receipt_credit_settle_v1(Attempt)` SECDEF를 생성한다. 기존 S0 original Attempt에서 `positiveProof`, DB 수신 완료 마커, 완료된 Member/Thread/Turn/Assistant와 10-credit Reservation을 재조회·검증해 좁은 ACK V2로 정산한다. DB 잠금 순서는 Subject -> Reservation -> Turn/Attempt이며 권한은 `myeongha_commerce_internal_executor`에게만 있다. 일반 API/브라우저/service_role에게는 EXECUTE를 주지 않는다.
 - **검증:** #2854 격리 PostgreSQL 후보 테스트를 확장해 정확한 original Attempt 정산·멱등·잘못된 Attempt 거부·기존 충전액 50→40 확인 및 권한 범위를 검사한다. 신규 브리지 단위 테스트에서 S0 영수증 실패 시 0회 정산, 민간/전용 Pool 불일치, 정산 오류 후 재시도, 성공일 때만 HTTP 200을 확인한다.
 - **구분:** 이 구현은 *후보 소스와 합성 receipt를 이용한 격리 DB 테스트*다. S0 실제 서명/도착 흐름과 연계된 전체 HTTP+DB 2-session 경쟁·장애/재시도 검증, 운영 DB 역할·실제 credential·배포/관측/환불 재처리, G0–G3 Owner 승인 및 G5/G6 완료를 의미하지 않는다. Production router/Provider/결제는 변경하지 않았고 `HOLD_FORWARD_STOPPED`를 유지한다.
+### 2026-11-01 / W44 — #2854 Work Track security CI RED: 재사용 HTTP Request 테스트 수정
+
+- **실패 증거:** #2854 HEAD `7c7e310157b01bbf71de2be3575be5c12b8c8536`의 [Work Track security run 41307326596, job 124850337793](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41307326596/job/124850337793) RED. 실패한 테스트는 `commerce-chat-credit-delivery-ack-http-candidate-v1.test.ts`의 `fails closed on absent or shared private executor pool` 1건으로, 기대 503 대비 실제 400. 기존 테스트 9건/새 브리지 5건은 PASS. 같은 run의 실제 `db-authority-core`는 GREEN.
+- **원인:** 두 개의 잘못된 private pool 상황을 검사하면서 *동일한 Fetch Request 객체*를 두 번 전달해 본문 스트림이 첫 호출에서 소진됐다. 두 번째 호출은 누락/공유 pool 검사 전에 정상적으로 `INVALID_REQUEST` 400을 반환했다. 이는 운영 SQL 권한/크레딧 오류가 아니라 테스트의 단일 사용 Body 생명주기 실수다.
+- **수정:** 두 경우 각각 `input(request())`로 새로운 HTTP 요청을 생성하고, 누락된 전용 풀/일반 풀과 동일한 전용 풀 모두에서 실제 정산 쿼리 없이 503 Fail Closed를 검증하도록 수정. 결제/보안 구현 코드는 유지. 실제 고객 경로 활성화나 운영권한 변경 없음.
+- **진행 원칙:** 이 수정 커밋 이후 동일 PR의 새 HEAD 보안·DB·전체 통합 CI 결과만 판정한다. 이전 실패 체크나 이전 HEAD의 Integration 결과를 새 HEAD PASS로 오인하지 않는다. `HOLD_FORWARD_STOPPED` 유지.

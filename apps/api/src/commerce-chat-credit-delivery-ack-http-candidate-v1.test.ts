@@ -88,11 +88,10 @@ describe('unmounted credit ACK HTTP candidate',()=>{
    expect(state.transaction).not.toHaveBeenCalled();
  });
  it('fails closed on absent or shared private executor pool',async()=>{
-   const ordinary=input(request());
-   for(const attempted of [
-     {...ordinary,privateCreditPool:undefined as never},
-     {...ordinary,privateCreditPool:ordinary.pool},
-   ]){
+   for(const privateCreditPool of [undefined as never,ordinaryPool as never]){
+     // Fetch Request bodies are one-shot: each independent denial needs a
+     // fresh Request, otherwise parseBody correctly returns 400 first.
+     const attempted={...input(request()),privateCreditPool};
      const res=await handleChatCreditDeliveryAckCandidateV1(attempted);
      expect(res.status).toBe(503);
    }
