@@ -1068,6 +1068,91 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         maxOutputTokens:256,
         fetchImpl:async()=>{fetches++;throw Error('R32_NETWORK_FORBIDDEN');},
         meteredBeforeDispatch:async(call,requestBody)=>{
+          if(purpose==='turn_interpretation'){
+            // R35 independent DB protection: the Node wrapper has validated
+            // the real Context, but direct SQL must reject every derived
+            // source mutation BEFORE the Interpreter is cost-reserved.
+            const native=JSON.parse(requestBody) as {
+              input:{role:string;content:{type:string;text:string}[]}[];
+            };
+            const originalInput=JSON.parse(
+              native.input[0]!.content[0]!.text,
+            ) as Record<string,unknown>;
+            const baseline=originalInput.context as Record<string,unknown>;
+            const memories=baseline.retrievedMemories as
+              readonly Record<string,unknown>[];
+            const refs=originalInput.allowedReferenceVocabulary as
+              Record<string,unknown>;
+            const disclosure=baseline.disclosure as Record<string,unknown>;
+            const integrity=baseline.integrity as Record<string,unknown>;
+            const variants:readonly Record<string,unknown>[]=[
+              {...originalInput,context:{...baseline,
+                recentConversation:[{
+                  messageId:'d7100000-0000-4000-8000-000000000001',
+                  role:'assistant',text:'unverified prior assistant answer',
+                }],
+              }},
+              {...originalInput,context:{...baseline,
+                relationship:{relationshipStage:'forged_history'},
+              }},
+              {...originalInput,context:{...baseline,
+                integrity:{...integrity,governedPreflightApplied:true},
+              }},
+              {...originalInput,context:{...baseline,
+                disclosure:{...disclosure,
+                  retrievedSources:[{sourceRef:'unverified-derived-private'}]},
+              }},
+              {...originalInput,context:{...baseline,
+                retrievedMemories:[
+                  memories[0],
+                  {...memories[1],sourceRef:'memory:forged:grant:replacement'},
+                ],
+              }},
+              {...originalInput,context:{...baseline,
+                retrievedMemories:[
+                  {...memories[0],summary:'unverified old relationship text'},
+                  memories[1],
+                ],
+              }},
+              {...originalInput,allowedReferenceVocabulary:{
+                ...refs,historySourceRefs:['relationship-event:forged'],
+              }},
+            ];
+            const reservedBefore=await pool!.query<{stage_count:string;cost_count:string}>(
+              "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
+              " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as cost_count",
+              [a.attempt],
+            );
+            expect(reservedBefore.rows).toMatchObject([{
+              stage_count:'2',cost_count:'2',
+            }]);
+            for(const mutatedInput of variants){
+              const mutatedWire=JSON.stringify({
+                ...native,input:[{
+                  role:'user',content:[{
+                    type:'input_text',text:JSON.stringify(mutatedInput),
+                  }],
+                }],
+              });
+              await expect(tx(c=>c.query(
+                'select seyeon_positive_candidate.claim_governed_stage_r32($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::text,$13::bigint) as receipt',
+                [subject,a.thread,a.turn,a.attempt,purpose,call.callId,
+                 source.selection.selectedSourcesDigest,
+                 hash(source.finalModelContext),hash(request),
+                 mutatedWire,policy.policyVersion,
+                 policy.priceQuote.priceVersion,500],
+              ),true)).rejects.toMatchObject({
+                code:'23514',
+                constraint:'seyeon_r35_unpinned_derived_interpreter_context',
+              });
+            }
+            const reservedAfter=await pool!.query<{stage_count:string;cost_count:string}>(
+              "select (select count(*)::text from seyeon_positive_candidate.native_stage_lineage_r30 where attempt_id=$1::uuid) as stage_count,"+
+              " (select count(*)::text from public.seyeon_ai_call_cost_events where attempt_id=$1::uuid) as cost_count",
+              [a.attempt],
+            );
+            expect(reservedAfter.rows).toEqual(reservedBefore.rows);
+          }
           used.push(await reserveSeyeonR32OfflineFiveStageV1({
             pinInput,request,call,requestBody,governor,
           }));
