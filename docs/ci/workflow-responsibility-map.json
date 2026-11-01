@@ -128,6 +128,12 @@
       "mainMode": "regression",
       "workTrackAttribution": "none"
     },
+    "postgres-isolated-rls-capacity-acceptance.yml": {
+      "responsibility": "postgres-isolated-rls-capacity-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "postgres-hosted-synthetic-local-acceptance.yml": {
       "responsibility": "postgres-hosted-synthetic-local-recovery",
       "prMode": "none",

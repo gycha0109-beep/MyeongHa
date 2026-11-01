@@ -1,5 +1,16 @@
 # Phase 11 — Controlled non-production loopback capacity probe
 
+## 2026-11-01 — actual isolated PostgreSQL 18 CI execution (manual, synthetic-only)
+
+The existing `scripts/operations/measure-isolated-postgres-capacity-phase11.mjs` has previously run against the user's standalone PostgreSQL 18 installation with a real temporary database and measured connection pool contention. The existing Phase 7 subject/RLS test `test/postgres-subject-rls-isolated-phase7.test.ts` has also run locally, but **without `PG_BIN_DIR` it is skipped by ordinary GitHub CI**. This is not an admissible Linux DB proof.
+
+A separate main-only manual workflow, `.github/workflows/postgres-isolated-rls-capacity-acceptance.yml`, now executes both on an ephemeral GitHub-hosted **Ubuntu 26.04** runner whose PostgreSQL **18** binaries are installed under `/usr/lib/postgresql/18/bin`. The runtime `scripts/operations/run-isolated-postgres-phase7-phase11-ci.sh` refuses any other repository/ref/event, production database credentials, missing or incorrect PostgreSQL binaries, missing actual RLS PASS output, or capacity evidence that violates the existing bounded measurement contract. Each script creates its own disposable loopback database and cleans it up. No external project, hosted database, real user records, Production SQL migration or paid testing resource is created.
+
+The resulting 14-day sanitized artifact contains the actual stage-by-stage synthetic pool metrics (concurrency 1/2/4/8, 96 total requests, pool max 2), post-pressure recovery flag and exact Phase 7 RLS acceptance; on failure it emits `BLOCKED_INCOMPLETE`, never fabricated PASS. The full real Linux run has **NOT YET OCCURRED** until the main-only workflow is merged and manually dispatched.
+
+**Non-claims:** The synthetic `pg_sleep` contention test does not measure MyeongHa's real queries, Production DB pool budget, TLS verify-full/RLS policy parity, Saju CPU/memory ceiling, approved Production scaling threshold or service-wide RPO/RTO. This workflow adds *reproducible real disposable DB evidence*, not production load or an automatic scaling decision. `productionCapacityProven=false`, `scalingThresholdApproved=false`, `drReady=false` and `serviceResumptionAllowed=false` are mandatory in its evidence.
+
+
 Authority: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §29 and §38 Phase 11.
 
 `scripts/measure-controlled-loopback-capacity.mjs` executes a **user-invoked** bounded concurrent GET workload against a locally running public diagnostic endpoint only. It collects actual request-completion latencies, measured aggregate throughput, successful/non-200/transport-failure counts and observed peak concurrency. It reports no fabricated production capacity, CPU/memory ceilings or SLO. Requests cannot target a network address beyond `127.0.0.1` or a private/authenticated route.
