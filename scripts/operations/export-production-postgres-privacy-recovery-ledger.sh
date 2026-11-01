@@ -314,6 +314,26 @@ else
     }' > "$overlap_report"
 fi
 
+# A nominal hourly cron is not an RPO and cannot prove continuous capture.
+# Flag gaps spanning at least two nominal windows, without suppressing the
+# valid bounded encrypted snapshot or leaking source event identifiers.
+nominal_interval="$(jq -er '.nominalScheduledIntervalSeconds' "$overlap_report")"
+observed_interval="$(jq -r '.captureIntervalSeconds // empty' "$overlap_report")"
+beyond_nominal="$(jq -r '.captureIntervalBeyondNominalSeconds // empty' "$overlap_report")"
+[[ "$nominal_interval" =~ ^[1-9][0-9]*$ ]] || {
+  echo '::error title=Privacy ledger cadence evidence invalid::Nominal interval missing.' >&2
+  exit 1
+}
+if [[ -n "$observed_interval" || -n "$beyond_nominal" ]]; then
+  [[ "$observed_interval" =~ ^[1-9][0-9]*$ && "$beyond_nominal" =~ ^[0-9]+$ ]] || {
+    echo '::error title=Privacy ledger cadence evidence invalid::Elapsed interval malformed.' >&2
+    exit 1
+  }
+  if (( observed_interval >= 2 * nominal_interval )); then
+    echo "::warning title=Privacy ledger capture cadence gap::Observed interval ${observed_interval}s exceeds two nominal ${nominal_interval}s windows (excess ${beyond_nominal}s). Source continuity remains unproven; this is not an RPO or a service-resumption gate."
+  fi
+fi
+
 manifest_sha256="$(sha256sum "$manifest" | awk '{print $1}')"
 printf '%s  %s\n' "$manifest_sha256" "$(basename "$manifest")" > "$work_dir/plaintext-sha256.txt"
 
