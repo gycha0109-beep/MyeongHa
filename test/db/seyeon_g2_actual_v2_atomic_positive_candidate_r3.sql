@@ -163,6 +163,7 @@ declare
   v_wire record;
   v_cost record;
   v_provider_receipt record;
+  v_has_wire boolean:=false;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if p_subject is null or p_thread is null or p_turn is null
@@ -332,7 +333,19 @@ begin
   where w.attempt_id=p_attempt and w.subject_id=p_subject
     and w.thread_id=p_thread and w.turn_id=p_turn
   for share;
-  if found then
+  v_has_wire:=found;
+  if v_has_wire or exists(
+    select 1 from public.seyeon_ai_call_cost_events e
+    where e.subject_id=p_subject and e.turn_id=p_turn
+      and e.attempt_id=p_attempt and e.phase='chat'
+      and e.governor_bucket_utc_date is not null
+  ) then
+    if not v_has_wire then
+      -- Direct governed Start without the immutable source/wire seal
+      -- must never be treated as ordinary legacy G2.
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r28_governed_cost_missing_wire_seal';
+    end if;
     select * into v_cost from public.seyeon_ai_call_cost_events e
     where e.call_id=v_wire.call_id and e.subject_id=p_subject
       and e.turn_id=p_turn and e.attempt_id=p_attempt and e.phase='chat'
