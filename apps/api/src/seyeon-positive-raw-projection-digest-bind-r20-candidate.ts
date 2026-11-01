@@ -220,8 +220,7 @@ join public.chat_turn_attempts a on a.turn_id=t.id and a.subject_id=t.subject_id
 where t.id=$1::uuid and t.subject_id=$2::uuid
   and t.thread_id=$3::uuid and a.id=$4::uuid
 `.trim(),[input.turnId,resolvedSubject.subjectId,input.threadId,input.attemptId]);
-          if(state.rows.length!==1||state.rows[0]?.turnState!=='context_ready'
-            ||state.rows[0]?.attemptState!=='context_ready')
+          if(state.rows.length!==1||state.rows[0]?.turnState!=='context_ready')
             throw new SeyeonR20OfflineDigestHoldV1();
         }
         for(let i=0;i<proof.sources.length;i++){
