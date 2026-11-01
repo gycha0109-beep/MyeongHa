@@ -31,7 +31,7 @@ describe('Web Golden Master', () => {
     expect(home).toContain('href="home-moonlight.css"');
     expect(home).toContain('id="mhx-hero-title"');
     expectInOrder(page.slice(page.indexOf('return (')), [
-      'mhx-hero', 'mhx-topics', 'mhx-characters', 'mhx-content-grid', 'mhx-recent',
+      'mhx-hero', 'mhx-topics', 'mhx-characters', 'mhx-content-grid',
     ]);
 
     const topicCatalog = page.match(/const readingTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
@@ -50,8 +50,10 @@ describe('Web Golden Master', () => {
     expect(home).toContain('href="chat-hub.html"');
     expect(page).toContain("findReaderPresentation(key)");
     expect(page).toContain('reader.portrait');
-    expect(page).toContain('최근 대화 기록은 아직 홈에 연결되지 않았습니다.');
-    expect(page).not.toContain('chat.html?character=');
+    expect(page).not.toContain('mhx-recent');
+    expect(page).not.toContain('최근 대화 기록은 아직 홈에 연결되지 않았습니다.');
+    expect(page).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
+    expect(page).not.toContain('threadId=');
     expect(page).not.toContain('퇴사를 고민했던 이야기');
     expect(page).not.toContain('3일 전');
     expect(page).not.toContain('인연 120');
