@@ -114,6 +114,14 @@ change. `future_safe_privacy_reconciliation=false` and `dr_ready=false`
 remain mandatory pending independently verified continuous source authority,
 Hosted provider equivalence, and full recovery acceptance.
 
+## 2026-11-01 — bounded GitHub annotation for sustained snapshot cadence gaps
+
+The existing periodic privacy-ledger exporter now emits a GitHub Actions **warning annotation** if the elapsed time between two successfully captured snapshots is at least twice the workflow's **already documented nominal period (3600 seconds)**. The message contains only the measured interval, the nominal period and the excess seconds. It does not include event rows, subject identifiers, tokens, or raw SQL. The warning is diagnostic; it neither fails the bounded encrypted off-DB snapshot nor suppresses the prior-event overlap check.
+
+Read-only public manifest of [scheduled ledger #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554) (snapshot through 2026-11-01T08:08:31Z) recorded **24043 seconds** between captures and **20443 seconds** beyond nominal cadence, with **0** supported events. `snapshotOverlapStatus=OVERLAPPING_CAPTURED_EVENTS_PRESERVED` while `sourceContinuityProven=false`. This prior observation would trigger the new annotation, but **the new warning code has not yet been exercised by a completed Production scheduled workflow**. Actual GitHub email/notification delivery is not proven by an annotation, and a completed scheduled capture does not imply continuous independently durable privacy-event history.
+
+`futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false` stay unchanged. No provider mutation, unapproved alert threshold, or Hosted DR promotion is authorized.
+
 ## 2026-10-28 — measured scheduled-capture gaps (no continuity promotion)
 
 The successful [Production read-only ledger run 40697151010](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40697151010)
