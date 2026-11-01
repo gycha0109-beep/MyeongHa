@@ -36,4 +36,7 @@ psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_role_only
 # no wallet table or generic finalize access is granted to runtime roles.
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_refund_proven_v1.sql >/dev/null
 psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_private_credit_refund_proven_v1_test.sql >/dev/null
-echo 'PASS commerce credit ledger + G4 ACK/private refund and least-privilege role (disposable)'
+# A synthetic persisted positive receipt tests exact original commit/assistant
+# settlement under the private role; real browser-issued S0 receipt remains HOLD.
+psql -v ON_ERROR_STOP=1 -f test/db/candidates/seyeon_g4_positive_delivery_settlement_v1_test.sql >/dev/null
+echo 'PASS commerce credit ledger + G4 private ACK/refund and synthetic positive settlement (disposable)'
