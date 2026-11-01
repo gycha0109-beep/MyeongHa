@@ -42,6 +42,8 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
 # R30 is a no-dispatch five-stage source/wire ancestry receipt only.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r30_disposable_five_stage_native_wire_lineage.sql
+# One DB transaction must bind each native stage and the actual Governor budget.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql
 # R5 is required by the same two-original G2 test's post-commit Grant readback.
 # Install it before G2 tests; ordinary single-original cases keep their guards.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
