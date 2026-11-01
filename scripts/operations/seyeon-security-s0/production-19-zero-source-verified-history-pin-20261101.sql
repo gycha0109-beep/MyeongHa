@@ -217,7 +217,7 @@ begin
   -- Existing first-response canonical digest remains identical when history=[].
   f:=replace(f,$census_old$"unpinnedRecentSources":[]}'$census_old$,
     $census_new$"unpinnedRecentSources":'||v_history_payload||'}'$census_new$);
-  if position('v_history_payload' in f)=0 or position('v_history_payload||' in f)=0
+  if position($expected_census$"unpinnedRecentSources":'||v_history_payload||'}'$expected_census$ in f)=0
     then raise exception 'Historical source census digest substitution failed'; end if;
   execute f;
 
@@ -248,7 +248,7 @@ begin
      or h.owner is distinct from 'myeongha_seyeon_chat_runtime_owner'
      or f.prosecdef is distinct from true or h.prosecdef is distinct from true
      or position('v_selection_keys <> 12' in f.def)=0
-     or position('v_history_payload' in f.def)=0
+     or position($expected_census$"unpinnedRecentSources":'||v_history_payload||'}'$expected_census$ in f.def)=0
      or position('The earlier production assistant may have been produced' in h.def)=0
      or not has_function_privilege('myeongha_api_executor',f.oid,'EXECUTE')
      or has_function_privilege('anon',f.oid,'EXECUTE')
