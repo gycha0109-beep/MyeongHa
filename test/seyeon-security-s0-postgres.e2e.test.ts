@@ -841,14 +841,23 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
 
     // The bounded recovery catalog intentionally ignores fresh receipt ACKs.
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:privateG5Pool(),maxBatch:1,
+      privateCreditPool:privateG5Pool(),mode:'apply',maxBatch:1,
     })).toEqual({status:'empty',found:0,settled:0,failed:0});
 
-    // Do not rewrite immutable delivery evidence to age it. Only the named
-    // disposable PG17 clone accepts a bounded, read-only virtual query clock.
+    // Never rewrite immutable receipt evidence; preview then apply with
+    // the same read-only clock on the exact disposable PostgreSQL clone.
+    const testAsOf=new Date(Date.now()+10*60_000);
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:privateG5Pool(),maxBatch:1,
-      testAsOf:new Date(Date.now()+10*60_000),
+      privateCreditPool:privateG5Pool(),mode:'preview',maxBatch:1,testAsOf,
+    })).toEqual({status:'preview',found:1,settled:0,failed:0});
+    expect(await creditState(received)).toEqual({
+      state:'reserved',available:'40',credits:'10',
+    });
+    expect(await creditState(unreceived)).toEqual({
+      state:'reserved',available:'40',credits:'10',
+    });
+    expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+      privateCreditPool:privateG5Pool(),mode:'apply',maxBatch:1,testAsOf,
     })).toEqual({status:'completed',found:1,settled:1,failed:0});
     expect(await creditState(received)).toEqual({
       state:'settled',available:'40',credits:'10',
@@ -857,7 +866,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       state:'reserved',available:'40',credits:'10',
     });
     expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
-      privateCreditPool:privateG5Pool(),maxBatch:1,
+      privateCreditPool:privateG5Pool(),mode:'apply',maxBatch:1,
     })).toEqual({status:'empty',found:0,settled:0,failed:0});
   });
 
