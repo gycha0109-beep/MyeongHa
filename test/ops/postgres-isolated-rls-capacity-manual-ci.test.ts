@@ -26,6 +26,10 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(runner).toContain('pg_config');
     expect(runner).toContain('postgres-subject-rls-isolated-phase7.test.ts');
     expect(runner).toContain('MYEONGHA_ISOLATED_POSTGRES_RLS_PHASE7_PASS');
+    expect(runner).toContain('Isolated PostgreSQL 18 RLS diagnostic (sanitized)');
+    expect(runner).toContain('tail -n 85');
+    expect(runner).toContain('[SYNTHETIC_UUID]');
+    expect(runner).toContain('[DATABASE_URL_REDACTED]');
     expect(runner).toContain("grep -F '1 passed'");
     expect(runner).toContain('measure-isolated-postgres-capacity-phase11.mjs');
     expect(runner).toContain('.totalRequested == 96');

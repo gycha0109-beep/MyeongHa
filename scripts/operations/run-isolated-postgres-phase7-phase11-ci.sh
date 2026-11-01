@@ -51,6 +51,15 @@ trap cleanup EXIT
 cd "$MH_OPS_REPO_ROOT"
 export PG_BIN_DIR
 if ! ./node_modules/.bin/vitest run test/postgres-subject-rls-isolated-phase7.test.ts --reporter=verbose >"$scratch/rls.log" 2>&1; then
+  # The isolated fixture uses fixed synthetic UUIDs and receives no Production credentials.
+  # Emit bounded, redacted failure diagnostics: hidden scratch logs caused the first
+  # Linux run to be impossible to distinguish from a test/runner infrastructure error.
+  echo '::group::Isolated PostgreSQL 18 RLS diagnostic (sanitized)' >&2
+  tail -n 85 "$scratch/rls.log" | sed -E \
+    -e 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/[SYNTHETIC_UUID]/g' \
+    -e 's#postgres(ql)?://[^[:space:]]+#[DATABASE_URL_REDACTED]#g' \
+    -e 's/([Pp]assword|[Tt]oken|[Ss]ecret|[Kk]ey)=([^[:space:]]+)/\1=[REDACTED]/g' >&2
+  echo '::endgroup::' >&2
   fail 'Real PostgreSQL subject execution/RLS integration test failed.'
 fi
 grep -F 'MYEONGHA_ISOLATED_POSTGRES_RLS_PHASE7_PASS' "$scratch/rls.log" >/dev/null \

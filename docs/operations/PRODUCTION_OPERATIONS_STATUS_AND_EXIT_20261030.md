@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-01 KST — PR #2863 Linux PostgreSQL18 실제 RLS 검사 RED 원인 진단 로그 보강
+
+- **성공 검증 및 배포:** [PR #2863](https://github.com/gycha0109-beep/MyeongHa/pull/2863) 정확한 HEAD `4f78596638448a222ad0e64af36e20ef14dc5712`가 [통합 CI #41315852591](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41315852591) 전체 필수 검증 SUCCESS 후 main `fc6c148735b58346c569747e8d51cc24a86bbc86`으로 2026-11-01T14:37:30Z 병합. 이는 새 수동 격리 PostgreSQL18 검사가 성공했다는 의미가 아니다.
+- **첫 실제 Linux 실행 결과:** Ubuntu 26.04 수동 [격리 PostgreSQL18 실제 검증 #41317389955](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41317389955) **FAILURE**, job `isolated-postgres-proof`의 실제 RLS Vitest 실행 단계가 실패해 뒤의 96요청 풀 부하 측정은 **미실행**. `PG_BIN_DIR=/usr/lib/postgresql/18/bin` 존재와 PostgreSQL18 버전 초기 검사는 통과했고 npm 의존성 설치 PASS. 첫 러너는 `rls.log`를 임시 작업 폴더에만 기록한 후 실패 시 삭제하여 상세 오류 내용을 노출하지 못했다. 비식별 `BLOCKED_INCOMPLETE` artifact `13088185883`가 업로드됐다. 실패 근거를 진짜 RLS 테스트 PASS로 절대 전환하지 않는다.
+- **별도 동일 코드 로컬 검사:** 사용자의 로컬 PostgreSQL18 및 Node24/Vitest4에서 실제 RLS 테스트 `1/1 PASS`, `MYEONGHA_ISOLATED_POSTGRES_RLS_PHASE7_PASS` 출력 확인. 별도 실제 PostgreSQL18의 96개 합성 풀 요청 `result=PASS`: 1/2/4/8 동시성별 성공 `20/20,20/20,24/24,16/32`, 마지막 단계 풀 획득 타임아웃 `16/32`, max2 연결 제한 및 부하 후 복구 PASS. 이는 **Windows 로컬 환경의 재현**일 뿐 실패한 Linux CI를 대체하지 않는다.
+- **이번 진단 변경:** 기존 `run-isolated-postgres-phase7-phase11-ci.sh`의 실제 Vitest 실패시 임시 로그를 바로 삭제하기 전에 **끝부분 85줄만 GitHub Actions 그룹으로 출력**, 고정 합성 UUID·잠재적 DB URL·환경변수 비밀번호/토큰/시크릿 문자열을 가린다. Production 환경변수/호스티드 프로젝트를 허용하지 않는 초기 가드, 실제 테스트 성공 마커 강제, 실패시 `BLOCKED_INCOMPLETE`, `productionCapacityProven=false`, `drReady=false` 유지. 오류를 모르는 상태에서 무작정 테스트 SQL·권한을 완화하지 않는다.
+- **남은 검증:** 진단 변경의 정적 검사 및 새 실제 Linux 실행이 필요하며, 첫 RED 원인은 상세 오류를 수집해 확정할 때까지 **미확정**. 새로운 PostgreSQL 수동 실행이 PASS될 때만 Linux 실제 RLS/용량 근거를 승격한다. Hosted Provider 복원, 독립 개인정보 삭제/철회 소스 연속성, PT24H RPO/PT6H RTO 및 전체 운영 수용은 계속 `BLOCKED`, #1887 OPEN.
+
+
 ### 2026-11-01 KST — Phase 7·11 실제 격리 PostgreSQL 18 재현 CI 구현 (운영 DB 미접근)
 
 - **이전 작업 완료 확인:** [PR #2860](https://github.com/gycha0109-beep/MyeongHa/pull/2860) HEAD `cf9906114426f997b92c8ec3c3d2a4475c4d6fe8`는 기본·전체 [통합 검사](https://github.com/gycha0109-beep/MyeongHa/pull/2860/checks) 모두 SUCCESS 후 2026-11-01T14:09:10Z 병합(main `93ccc2ef5f73ba47aa1c771b5033735f082ab2bf`). 격리 Auth/Storage 7/7 PASS 및 원장 freshness RED→GREEN은 이미 Worklog에 증거 보존됨. Hosted 복구·privacy 지속성은 여전히 HOLD.
