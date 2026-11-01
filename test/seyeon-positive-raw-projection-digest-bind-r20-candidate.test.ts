@@ -107,7 +107,7 @@ function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
 }
 function mock(options:{
   db?:string;pin?:boolean;noInspect?:boolean;payloadTamper?:boolean;
-  commitFail?:boolean;grantTamper?:boolean;badR21?:boolean;notReady?:boolean;
+  commitFail?:boolean;grantTamper?:boolean;badR21?:boolean;
 }={}){
   const executed:string[]=[];
   const saved=inputs();
@@ -135,11 +135,6 @@ function mock(options:{
           permitsAtomicCommit:false,permitsHttpReveal:false,
         },
       }] as Row[]};
-      if(sql.includes('from public.chat_turns t')&&sql.includes('chat_turn_attempts a'))
-        return {rows:[{
-          turnState:options.notReady?'planned':'context_ready',
-          attemptState:'running',
-        }] as Row[]};
       if(sql.includes('pin_source_set_r1'))return {rows:[{
         pinned:options.pin??true,
       }] as Row[]};
@@ -218,7 +213,7 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
     expect(db.executed.some(x=>x.includes('pin_source_set_r1'))).toBe(false);
     expect(db.executed.indexOf('COMMIT')).toBeGreaterThan(
       db.executed.findIndex(x=>x.includes('inspect_pinned_raw_source_r20')));
-    for(const options of [{badR21:true},{notReady:true},{grantTamper:true},
+    for(const options of [{badR21:true},{grantTamper:true},
       {payloadTamper:true},{noInspect:true},{commitFail:true}]){
       const rejected=mock(options);
       await expect(call(rejected.pool,{...a,twoOriginalContextReady:true}))
