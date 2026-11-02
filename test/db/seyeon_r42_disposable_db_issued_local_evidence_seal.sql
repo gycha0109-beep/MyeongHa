@@ -379,6 +379,67 @@ begin
     v_count:=v_count+1;
   end loop;
   if v_count<>2 then return false; end if;
+  -- Verifying a MAC must also revalidate the CURRENT three output
+  -- fingerprints and Cost ACKs. A once-authentic seal cannot outlive a
+  -- deleted mock output, superseded pinned Stage or lost settlement.
+  select * into v_manifest
+  from seyeon_positive_candidate.local_guard_fixture_manifest_r41
+  where manifest_id='seyeon-r41-code-derived-public-guard-v1'
+  for share;
+  if not found or v_manifest.guarded_envelope_digest is distinct from
+      v_witness.guarded_envelope_digest
+    or v_witness.origin_kind is distinct from
+      'code_authored_local_fixture_no_provider'
+    or v_witness.provider_dispatched is distinct from false
+    or v_witness.provider_output_verified is distinct from false
+    or v_witness.output_guard_verified is distinct from false
+  then return false; end if;
+  for v_i in 2..4 loop
+    v_call:=case v_i when 2 then v_witness.interpretation_call_id
+      when 3 then v_witness.renderer_call_id
+      else v_witness.semantic_review_call_id end;
+    v_expected_digest:=case v_i
+      when 2 then v_manifest.interpretation_output_digest
+      when 3 then v_manifest.renderer_output_digest
+      else v_manifest.semantic_review_output_digest end;
+    select * into v_stage from
+      seyeon_positive_candidate.native_stage_lineage_r30 s
+      where s.attempt_id=p_attempt and s.stage_index=v_i for share;
+    if not found or v_stage.call_id is distinct from v_call
+      or v_stage.selected_sources_digest is distinct from
+         v_witness.selected_sources_digest
+    then return false; end if;
+    select * into v_output from
+      seyeon_positive_candidate.unverified_transport_lineage_r40 r
+      where r.attempt_id=p_attempt and r.stage_index=v_i for share;
+    if not found or v_output.call_id is distinct from v_stage.call_id
+      or v_output.native_wire_digest is distinct from
+         v_stage.native_wire_digest
+      or v_output.purpose is distinct from v_stage.purpose
+      or v_output.structured_output_digest is distinct from
+         v_expected_digest
+      or v_output.origin_kind is distinct from
+         'local_stub_transport_unverified'
+      or v_output.provider_output_verified is distinct from false
+      or v_output.output_guard_verified is distinct from false
+    then return false; end if;
+    select * into v_cost from public.seyeon_ai_call_cost_events c
+      where c.call_id=v_call and c.subject_id=p_subject
+        and c.turn_id=v_turn and c.attempt_id=p_attempt
+        and c.phase='chat' and c.purpose=v_stage.purpose for share;
+    select * into v_queue from public.seyeon_ai_provider_receipt_queue_v1 q
+      where q.call_id=v_call and q.subject_id=p_subject
+        and q.turn_id=v_turn and q.attempt_id=p_attempt
+        and q.phase='chat' for share;
+    if v_cost.call_id is null
+      or v_cost.lifecycle_state is distinct from 'settled'
+      or v_cost.outcome is distinct from 'response_received'
+      or v_cost.cost_status is distinct from 'estimated'
+      or v_cost.governor_receipt_pinned_at is null
+      or v_queue.call_id is null or v_queue.acked_at is null
+      or v_queue.provider_event is distinct from v_cost.event_jsonb
+    then return false; end if;
+  end loop;
   v_mac:=encode(public.hmac(convert_to(
     seyeon_positive_candidate.local_guard_seal_payload_r42(
       v_seal.attempt_id,v_seal.selected_sources_digest,
