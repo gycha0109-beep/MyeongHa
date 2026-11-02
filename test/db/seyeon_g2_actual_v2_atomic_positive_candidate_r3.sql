@@ -623,9 +623,23 @@ begin
     then raise exception using errcode='23514',
       constraint='seyeon_offline_r41_local_guard_fixture_lineage_missing';
     end if;
-    -- R37/R38/R40/R41 only demonstrate internal local fixtures and
-    -- original-bound accounting; they do not authenticate an AI output or
-    -- validate an actual user reply. Hard-stop remains unconditional.
+    -- R42: even a complete DB-authorized local Guard witness is not
+    -- a genuine model output. Still insist that its nonce-bound MAC is
+    -- authentic to the named disposable DB, within its expiry, and
+    -- tied to this exact original Member subject and R41 attempt.
+    -- No client-supplied "passed" Boolean, MAC or replay token is read.
+    if not coalesce(
+      seyeon_positive_candidate.verify_local_guard_seal_r42(
+        p_subject,p_attempt
+      ),false
+    ) then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r42_db_issued_local_seal_missing';
+    end if;
+    -- R37/R38/R40/R41/R42 only prove synthetic, DB-internal accounting:
+    -- actual Provider provenance, real Character Guard PASS, user consent
+    -- and the authorizing private Preflight remain absent.
+    -- The real assistant answer and Outbox ALWAYS remain blocked.
     raise exception using errcode='23514',
       constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
