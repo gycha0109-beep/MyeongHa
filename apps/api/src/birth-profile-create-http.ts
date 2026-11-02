@@ -36,6 +36,9 @@ export interface HandleBirthProfileCreateRequestInputV1 {
   readonly pool: PostgresSubjectPoolV1;
   readonly idPort: BirthProfileCreateIdPortV1;
   readonly fingerprintPort: BirthInputFingerprintPortV1;
+  /** Optional server-only, consent-gated observation after the authority transaction commits.
+   * Never observes request birth values, and must not affect the create response. */
+  readonly onBirthProfileCommitted?: (input: { readonly request: Request; readonly revisionId: string }) => Promise<void>;
 }
 
 function requireNonEmptyString(name: string, value: unknown): string {
@@ -206,6 +209,12 @@ export async function handleBirthProfileCreateRequestV1(
         }),
     });
 
+    // This is an optional post-commit hook. A telemetry failure must not
+    // turn an already committed Birth Profile into an apparent write failure.
+    if (input.onBirthProfileCommitted !== undefined) {
+      try { await input.onBirthProfileCommitted({ request: input.request, revisionId: data.revisionId }); }
+      catch { /* Analytics is optional and its rejection must remain isolated. */ }
+    }
     return successResponse(data, requestId, serverTime);
   } catch (error) {
     if (!(error instanceof ApiCommandError)) throw error;

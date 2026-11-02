@@ -217,6 +217,44 @@ describe('production Birth Profile create HTTP foundation', () => {
     expect(JSON.stringify(body)).not.toContain('input_hash');
   });
 
+  it('reports only the committed revision to an optional consent-gated observer, after COMMIT', async () => {
+    const observed: Array<{ revisionId: string; request: Request; committed: boolean }> = [];
+    const { input, pool } = makeInput({
+      onBirthProfileCommitted: async ({ request, revisionId }) => {
+        observed.push({
+          revisionId, request,
+          committed: pool.connection.calls.some(call => call.text === 'COMMIT'),
+        });
+      },
+    });
+    const response = await handleBirthProfileCreateRequestV1(input);
+    expect(response.status).toBe(201);
+    expect(observed).toEqual([{ revisionId: REVISION_ID, request: input.request, committed: true }]);
+    expect(Object.keys(observed[0]!)).toEqual(['revisionId','request','committed']);
+  });
+
+  it('does not turn a successful DB write into an error if optional analytics rejects', async () => {
+    const { input, pool } = makeInput({
+      onBirthProfileCommitted: async () => { throw new Error('No analytics consent'); },
+    });
+    const response = await handleBirthProfileCreateRequestV1(input);
+    expect(response.status).toBe(201);
+    expect(pool.connection.calls.some(call => call.text === 'COMMIT')).toBe(true);
+    expect(pool.connection.calls.some(call => call.text === 'ROLLBACK')).toBe(false);
+  });
+
+  it('never calls analytics after a rejected identity or failed write', async () => {
+    let observations = 0;
+    const callback = async () => { observations++; };
+    const denied = makeInput({ onBirthProfileCommitted: callback });
+    denied.verifier.evidence = null;
+    expect((await handleBirthProfileCreateRequestV1(denied.input)).status).toBe(401);
+    const failed = makeInput({ onBirthProfileCommitted: callback });
+    failed.pool.connection.failCreateWithConstraint = 'cmd_birth_profile_create_active_self_exists';
+    expect((await handleBirthProfileCreateRequestV1(failed.input)).status).toBe(400);
+    expect(observations).toBe(0);
+  });
+
   it('returns 401 without opening PostgreSQL when request identity is absent', async () => {
     const { input, verifier, pool } = makeInput();
     verifier.evidence = null;
