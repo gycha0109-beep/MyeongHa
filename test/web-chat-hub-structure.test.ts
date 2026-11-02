@@ -279,10 +279,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
   });
 
-  it('keeps My as the fifth active destination instead of falling back to Records', async () => {
+  it('keeps My reachable through the header profile and mobile navigation, without duplicate desktop tab', async () => {
     const html = await readFile(hubHtmlPath, 'utf8');
 
-    expect(html).toContain('class="product-nav-link" href="my.html">마이</a>');
+    expect(html).not.toContain('class="product-nav-link" href="my.html">마이</a>');
     expect(html).toContain('class="product-profile" href="my.html" aria-label="내 프로필"');
     expect(html).toContain('<span>마이</span>');
     expect(html).toContain('class="mobile-nav-link" href="my.html"');
