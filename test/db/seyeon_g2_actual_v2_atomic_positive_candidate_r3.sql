@@ -585,7 +585,7 @@ begin
     if (select count(*)
         from seyeon_positive_candidate.local_guard_fixture_lineage_r41 p
         where p.attempt_id=p_attempt)<>1
-      or exists (
+      or not exists (
         select 1
         from seyeon_positive_candidate.local_guard_fixture_lineage_r41 p
         join seyeon_positive_candidate.local_guard_fixture_manifest_r41 m
@@ -603,21 +603,21 @@ begin
         join seyeon_positive_candidate.unverified_transport_lineage_r40 us
           on us.attempt_id=p.attempt_id and us.stage_index=4
         where p.attempt_id=p_attempt and (
-          p.selected_sources_digest is distinct from p_selection_digest
-          or p.interpretation_call_id is distinct from i.call_id
-          or p.renderer_call_id is distinct from r.call_id
-          or p.semantic_review_call_id is distinct from s.call_id
-          or p.guarded_envelope_digest is distinct from m.guarded_envelope_digest
-          or ui.structured_output_digest is distinct from
+          p.selected_sources_digest is not distinct from p_selection_digest
+          and p.interpretation_call_id is not distinct from i.call_id
+          and p.renderer_call_id is not distinct from r.call_id
+          and p.semantic_review_call_id is not distinct from s.call_id
+          and p.guarded_envelope_digest is not distinct from m.guarded_envelope_digest
+          and ui.structured_output_digest is distinct from
              m.interpretation_output_digest
-          or ur.structured_output_digest is distinct from
+          and ur.structured_output_digest is distinct from
              m.renderer_output_digest
-          or us.structured_output_digest is distinct from
+          and us.structured_output_digest is distinct from
              m.semantic_review_output_digest
-          or p.origin_kind is distinct from 'code_authored_local_fixture_no_provider'
-          or p.provider_dispatched is distinct from false
-          or p.provider_output_verified is distinct from false
-          or p.output_guard_verified is distinct from false
+          and p.origin_kind is not distinct from 'code_authored_local_fixture_no_provider'
+          and p.provider_dispatched is not distinct from false
+          and p.provider_output_verified is not distinct from false
+          and p.output_guard_verified is not distinct from false
         )
       )
     then raise exception using errcode='23514',
