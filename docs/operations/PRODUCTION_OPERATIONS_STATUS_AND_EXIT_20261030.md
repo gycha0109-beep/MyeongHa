@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-02 KST — Phase 11 실제 사주 계산 엔진 격리 CPU·메모리·지연 관측
+
+- **로드맵 기준:** `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` Phase11의 사주 포화·용량 측정 미완료 항목을 대상으로 한다. 기존 [PR #2878](https://github.com/gycha0109-beep/MyeongHa/pull/2878)은 실제 명하 HTTP 호출부에서 **가상 429/503 거절**을 검증한 것일 뿐 Saju 엔진 실측이 아니다; 이 사실을 분리한다.
+- **실제 엔진 사용 구현:** `scripts/operations/measure-isolated-saju-engine-capacity-phase11.mjs` 수동 전용 계측기를 추가. 분리된 **깨끗한 최신 Saju 소스 SHA `9807ce89c08afc61b587560d515a475efd819032`**(Node 24, 명시적으로 `npm ci --ignore-scripts` 후 `npm run build`)에서 빌드한 **진짜 production calculation host**를 별도 Node 자식 프로세스로 기동하여 `127.0.0.1` 임시 포트로만 접근. 서버/클라이언트는 합성 날짜·자격증명만 사용하며 Production 또는 Saju 운영 환경변수와 연결하지 않음.
+- **실제 실행·원본 근거:** Node 24.20.0, Windows 로컬에서 동시성 1·2·4·8의 20/20/24/32 요청 **96/96 성공**, 요청 후 별도 회복 요청 PASS. [비식별 JSON](./SAJU_REAL_ENGINE_PHASE11_OBSERVATION_20261102.json) 파일 SHA-256 `2d3d8d4c4cf389898d0b5eb2bcdc8a2f5ded205da7bae0be316c811a28207019`; 저장 수치: p95 응답지연 **17.003/14.55/4.87/9.207ms**, 측정 자식 서버 CPU 사용 **0/47/16/63ms**(단시간 OS 정밀도 한계), 관측 최고 RSS **81.480/83.449/84.707/86.156MiB**. 결괏값 `status=OBSERVED`, 프로세스 종료 및 사용자 정보 미포함 확인.
+- **실험 한계:** 짧은 합성 요청/현재 로컬 PC 기준 **실제 Saju 계산을 수행한 관찰값**이지만 CPU/메모리의 한계치나 안전 처리량 **포화점을 입증한 것은 아님**. 실제 운영 컨테이너 크기, 배포 규모, DB/Auth/Saju 복합 요청이나 PT24H RPO/PT6H RTO 수용을 대신하지 않는다. `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`. Hosted provider 복구·독립 개인정보 기록 연속성 #1887 OPEN 유지.
+- **다음 구현:** 실제 사주 엔진을 위한 **자원 제한된 격리 실행 조건**에서 포화 관측 및 합법적 측정 범위 설정. 운영 앱/DB, 민감 정보, 결제, 실운영 Saju 서버 설정, 유료 프로젝트/인프라는 변경하지 않음.
+
 ### 2026-11-02 KST — Phase 11 사주 계산 동시 요청 거절·오류 격리 실 HTTP 테스트
 
 - **기존 완료 확인:** Phase7/11 실제 Linux PostgreSQL18 검증 [#41327504617](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41327504617) SUCCESS, 비식별 실측 근거 기록 [PR #2876](https://github.com/gycha0109-beep/MyeongHa/pull/2876)은 `main` 병합 `ad3509a97eef73d4a87d2de5fda55350269f2cdd` 확인. 이전 DB 검증은 반복 실행하지 않음.
