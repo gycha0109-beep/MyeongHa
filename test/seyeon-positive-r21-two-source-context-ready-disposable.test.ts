@@ -1747,6 +1747,39 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     // owner compares the same three R40 digests to the one code-derived,
     // postgres-only immutable manifest under current original Grant locks.
     const callIds=used.slice(2).map(v=>v.callId);
+    // R40 intentionally accepts an UNVERIFIED syntactically valid SHA.
+    // R41 must independently reject it against the code-derived manifest.
+    await pool.query(
+      'delete from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid and stage_index=4',
+      [a.attempt],
+    );
+    const wrongReviewHash={
+      ...r40SyntheticStubTransport(
+        used[4]!,guardedFixture.semanticReviewText,
+      ),
+      structuredOutputDigest:'sha256:wire-utf8:v1:'+'c'.repeat(64),
+    };
+    await recordSeyeonR40UnverifiedMockTransportV1({
+      pinInput,reservation:used[4]!,transport:wrongReviewHash,
+    });
+    await expect(recordSeyeonR41LocalFixtureWitnessV1({
+      pinInput,reservations:used.slice(2),
+    })).rejects.toBeInstanceOf(SeyeonR41OfflineFixtureDatabaseHoldV1);
+    const failedManifestCount=await pool.query<{n:string}>(
+      'select count(*)::text as n from seyeon_positive_candidate.local_guard_fixture_lineage_r41 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    expect(failedManifestCount.rows).toEqual([{n:'0'}]);
+    await pool.query(
+      'delete from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid and stage_index=4',
+      [a.attempt],
+    );
+    await recordSeyeonR40UnverifiedMockTransportV1({
+      pinInput,reservation:used[4]!,
+      transport:r40SyntheticStubTransport(
+        used[4]!,guardedFixture.semanticReviewText,
+      ),
+    });
     const claimWitness=(envelope:string,calls=callIds)=>tx(c=>c.query(
       'select seyeon_positive_candidate.record_local_guard_fixture_r41($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::uuid,$8::uuid,$9::text) as receipt',
       [subject,a.thread,a.turn,a.attempt,
