@@ -25,7 +25,8 @@ const settings=(value:string=dedicated)=>({
 const loginRow=()=>({
   sessionUser:G5.login,currentUser:G5.login,
   canLogin:true,canInherit:false,isSuper:false,canBypassRls:false,
-  canCreateDb:false,canCreateRole:false,membershipCount:1,directCommerceMembershipCount:1,
+  canCreateDb:false,canCreateRole:false,credentialUnexpired:true,
+  membershipCount:1,directCommerceMembershipCount:1,
   commerceMember:true,apiMember:false,directSettle:false,
   directCatalog:false,directLedgerUpdate:false,
 });
@@ -88,7 +89,8 @@ describe('G5 private Commerce physical credential preflight (unmounted)',()=>{
     for(const [field,value] of [
       ['sessionUser','member'],['currentUser','postgres'],['canLogin',false],
       ['canInherit',true],['isSuper',true],['canBypassRls',true],
-      ['canCreateDb',true],['canCreateRole',true],['membershipCount',2],
+      ['canCreateDb',true],['canCreateRole',true],['credentialUnexpired',false],
+      ['credentialUnexpired',null],['membershipCount',2],
       ['directCommerceMembershipCount',0],
       ['commerceMember',false],['apiMember',true],['directSettle',true],
       ['directCatalog',true],['directLedgerUpdate',true],

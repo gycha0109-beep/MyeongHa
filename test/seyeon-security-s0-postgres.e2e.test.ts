@@ -951,6 +951,22 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         privateCreditPool:privatePool,mode:'preview',maxBatch:1,testAsOf:asOf,
       })).toEqual({status:'preview',found:1,settled:0,failed:0});
       expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+      // PostgreSQL password expiry prevents NEW authentication, but it does
+      // not terminate already-authenticated pooled sessions. The G5 checkout
+      // must inspect the current role validity on EACH existing session.
+      await pool.query(`alter role ${login} valid until '2000-01-01 00:00:00+00'`);
+      try{
+        const {rows:[alive]}=await raw.query('select session_user as login');
+        expect(alive.login).toBe(login);
+        await expect(privatePool.connect()).rejects.toBeInstanceOf(
+          SeyeonG5PrivateCommerceBoundaryErrorV1);
+        await expect(recoverSeyeonG5ReceivedCreditsCandidateV1({
+          privateCreditPool:privatePool,mode:'preview',maxBatch:1,testAsOf:asOf,
+        })).rejects.toThrow();
+        expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+      }finally{
+        await pool.query(`alter role ${login} valid until '2099-01-01 00:00:00+00'`);
+      }
       // Privilege escalation must stop before returning a connection to
       // the transaction executor, even though the LOGIN has NOINHERIT.
       await pool.query(`grant myeongha_api_executor to ${login}`);
