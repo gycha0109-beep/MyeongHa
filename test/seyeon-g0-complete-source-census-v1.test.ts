@@ -20,6 +20,32 @@ describe('G0 source completeness before any historical text release', () => {
     expect(window).toContain('if v_returned<>v_total then');
   });
 
+  it('a historical Assistant cannot outlive its DB-original User prompt', () => {
+    const g0 = sql('13-g0-current-original-lineage-context.sql');
+    const original = g0.split(
+      'create function seyeon_private.assert_current_original_assistant_lineage_v1(',
+    )[1]?.split('-- Read a whole model-context window')[0] ?? '';
+    expect(original).toContain("v_pin->>'currentUserMessageId'");
+    expect(original).toContain("v_pin->>'currentUserTextDigest'");
+    expect(original).toContain("constraint='seyeon_g0_assistant_original_user_missing'");
+    expect(original).toContain("constraint='seyeon_g0_assistant_original_user_changed'");
+    expect(original).toContain('v_user_count<>1');
+    expect(original).toContain('for share of um;');
+    expect(original).toContain("sha256:wire-utf8:v1:");
+    const g2 = sql('02-atomic-commit.sql');
+    expect(g2).toContain("v_positive ->> 'currentUserMessageId'");
+    expect(g2).toContain("v_positive ->> 'currentUserTextDigest'");
+    expect(g2).toContain('for share of msg;');
+    const replay = sql('19-first-original-assistant-replay.sql');
+    expect(replay).toContain(
+      'perform seyeon_private.assert_current_original_assistant_lineage_v1(',
+    );
+    const relation = sql('21-relationship-origin-completeness.sql');
+    expect(relation).toContain(
+      'perform seyeon_private.assert_current_original_assistant_lineage_v1(',
+    );
+  });
+
   it('rejects a derived relationship event if any original message reference fails to resolve', () => {
     const source = sql('21-relationship-origin-completeness.sql');
     expect(source).toContain('v_resolved_source_count:=0;');

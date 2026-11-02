@@ -25,6 +25,8 @@ declare
   v_grant uuid;
   v_record uuid;
   v_original record;
+  v_original_user record;
+  v_user_count bigint;
   v_turn text;
   v_attempt text;
 begin
@@ -73,6 +75,13 @@ begin
      or v_pin->>'attemptId' is distinct from v_attempt
      or v_pin->>'characterId' is distinct from 'seyeon'
      or v_pin->>'recordKind' is distinct from 'memory'
+     -- A historical Assistant without its ORIGINAL Member prompt is
+     -- not trusted derived context, even if its Memory Grant is current.
+     or v_pin->>'currentUserMessageId' is null
+     or v_pin->>'currentUserMessageId'
+          !~ '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
+     or v_pin->>'currentUserTextDigest'
+          !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
      or v_pin->>'recordId' is null
      or v_pin->>'originalGrantId' is null
      or v_pin->>'originalPgJsonbDigest'
@@ -84,6 +93,39 @@ begin
     raise exception using errcode='42501',
       constraint='seyeon_g0_original_lineage_unverifiable',
       message='Current source lineage is not available';
+  end if;
+
+  -- W46: G1's DB-original current User identity is part of the
+  -- Assistant's historical lineage. A revoked, redacted, replaced or
+  -- modified original prompt invalidates ALL derived reuse. The Message
+  -- SHARE lock holds this decision until the calling read TX finishes.
+  select count(*) into v_user_count
+  from public.conversation_messages um
+  where um.subject_id=p_subject_id and um.thread_id=p_thread_id
+    and um.turn_id=v_turn::uuid and um.sender_type='user';
+  if v_user_count<>1 then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_assistant_original_user_missing',
+      message='Historical Assistant original User source is unavailable';
+  end if;
+  select um.id,um.body_text into v_original_user
+  from public.conversation_messages um
+  where um.id=(v_pin->>'currentUserMessageId')::uuid
+    and um.subject_id=p_subject_id and um.thread_id=p_thread_id
+    and um.turn_id=v_turn::uuid and um.sender_type='user'
+    and um.thread_character_id is null
+    and um.character_content_bundle_id is null
+    and um.redacted_at is null and um.body_text is not null
+    and length(btrim(um.body_text))>0
+    and nullif(btrim(um.content_hash),'') is not null
+  for share of um;
+  if not found
+     or 'sha256:wire-utf8:v1:'||
+        encode(sha256(convert_to(v_original_user.body_text,'UTF8')),'hex')
+        is distinct from v_pin->>'currentUserTextDigest' then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_assistant_original_user_changed',
+      message='Historical Assistant original User source is unavailable';
   end if;
 
   -- Require the exact original Grant ID; a newer grant for the same Record

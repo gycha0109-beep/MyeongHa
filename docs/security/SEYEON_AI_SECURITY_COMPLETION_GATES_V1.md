@@ -582,3 +582,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **실제 서버 결속:** 기존 `pinBeforeModel` 호출은 서버에서 DB Receive 결과로 얻은 current User ID/텍스트 지문을 보낸다. DB가 반환한 고정 User ID·본문 지문이 다르거나 추가/누락 필드가 있으면 최초 모델 호출 전 거부한다. 정확한 원본 Memory/Grant·Final Context 검증은 그대로 유지한다.
 - **경계:** 격리 Source-only, 자동 운영 Migration 없음. 이 검증은 원문 User 대화에 **인용되거나 복사된 다른 비공개 자료의 파생 출처**까지 승인하는 것이 아니다. 일반 History, Reader, Life Fact와 Preflight private 자료는 여전히 HOLD; 실제 모델 제공자·결제·G2/Reveal 허가 없음. 비활성 Production Projector·Route와 `HOLD_FORWARD_STOPPED` 유지.
 - **검증:** 기존 G1 exact owner receipt test에 본문·메시지 ID 변조와 원문 DB 수 검증 SQL 계약을 추가. HEAD TypeScript/Vitest/실 PostgreSQL/CI는 별도 실행 근거 없이는 PASS 선언하지 않는다.
+
+
+### 2026-11-02 · W46 · 이전 AI 답변의 원본 사용자 질문까지 G0/G2/G3 현재 권한 검증에 결속 (격리 / HOLD)
+
+- **실제 보안 결손:** W45는 사용자 원문 Message ID·UTF-8 SHA를 모델 이전 불변 G1 Pin에 포함했으나, 실제 G0 과거 Assistant 출처 판단은 기존 Memory/Grant만 재검증했고 G2는 현재 Turn의 User ID만 대조했다. 원래 User 원문이 삭제·수정·redact된 뒤에도 과거 Assistant가 모델 입력/재공개 권한 증빙으로 인정되는 위험이 있었다.
+- **G0 파생 출처 재검증:** 기존 `assert_current_original_assistant_lineage_v1`에서 보존한 **원래 DB User Message ID와 본문 SHA**가 현재 같은 Subject/Thread/원래 Turn의 유일한 User 메시지와 일치하는지 SHARE 잠금 아래 검사한다. 원문 삭제/변경·redact·다른 Turn 또는 권한 정보 유실이면 전체 HOLD. 기존 G0 recent Context와 Relationship의 Assistant lineage 검사는 이 함수를 직접 호출하므로 동일 조건을 재사용한다.
+- **G2 실제 원자 저장:** `cmd_commit_seyeon_positive_chat_turn_v1`의 같은 DB Commit 트랜잭션에서 현재 원본 User의 본문을 잠그고 G1의 `currentUserMessageId/currentUserTextDigest`와 재대조한다. 단순 서버 SELECT-before-COMMIT 대신 기존 atomic Commit 함수에 포함하며, 원본 Memory/Grant 잠금·Outbox 원자성은 그대로 유지한다.
+- **G3 S0 첫 재열람:** 기존 첫 Assistant replay 함수도 동일한 G0 원본 Assistant verifier를 재사용한다. 원래 User가 더는 유효하지 않으면 과거 답변의 공개로 이어지지 않는다. 추론 결과의 '권한 승인' 텍스트나 새 Grant가 원래 User 출처를 대체하지 못한다.
+- **범위·남은 위험:** 소스 전용 SQL·정적 연결 테스트; 이 단계는 새 역사 Context의 모델 입력을 활성화하지 않는다. 인용·복사된 비공개 User 텍스트, Reader knowledge, Life Fact·다중 Grant의 전체 파생 출처 계약·실 PG 세션 실행/G0 승인/G6는 HOLD. `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1=[]`, 운영 DDL/ACL·유료 AI·HTTP Reveal·PR 병합 무변경, `HOLD_FORWARD_STOPPED` 유지. 신규 SHA의 실제 TypeScript/Vitest/PostgreSQL/CI는 별도 실행 근거 전 PASS 금지.

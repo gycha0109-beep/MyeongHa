@@ -155,6 +155,7 @@ declare
   v_validated_provenance jsonb;
   v_commit record;
   v_original_user_message_id text;
+  v_original_user_body_text text;
   v_original_user_count bigint;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -190,11 +191,16 @@ begin
   -- This owner intentionally has SELECT but no UPDATE privilege on
   -- conversation_messages; do not expand ACL just to read the original ID.
   -- Existing DB receiver/Commit functions own that Message's lifecycle.
-  select msg.id::text into v_original_user_message_id
+  select msg.id::text,msg.body_text
+    into v_original_user_message_id,v_original_user_body_text
   from public.conversation_messages msg
   where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
     and msg.turn_id=p_turn_id and msg.sender_type='user'
-    and msg.redacted_at is null;
+    and msg.thread_character_id is null
+    and msg.character_content_bundle_id is null
+    and msg.redacted_at is null and msg.body_text is not null
+    and length(btrim(msg.body_text))>0
+  for share of msg;
   if not found then
     raise exception using errcode='23514',
       constraint='seyeon_positive_g2_original_user_message_mismatch',
@@ -246,6 +252,13 @@ begin
      or v_positive ->> 'attemptId' is distinct from p_attempt_id::text
      or v_positive ->> 'characterId' is distinct from 'seyeon'
      or v_positive ->> 'recordKind' is distinct from 'memory'
+     -- G1 W45 original User identity must remain EXACT at G2.
+     -- The prior Turn and User row locks remain held across v2 Commit.
+     or v_positive ->> 'currentUserMessageId'
+       is distinct from v_original_user_message_id
+     or v_positive ->> 'currentUserTextDigest'
+       is distinct from 'sha256:wire-utf8:v1:'||
+         encode(sha256(convert_to(v_original_user_body_text,'UTF8')),'hex')
      or v_positive ->> 'selectedSourcesDigest'
        is distinct from p_selected_sources_digest
      or v_positive ->> 'finalModelContextDigest'
