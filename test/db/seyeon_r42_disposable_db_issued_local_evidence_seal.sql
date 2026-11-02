@@ -288,6 +288,8 @@ declare
   v_i smallint;
   v_call uuid;
   v_expected_digest text;
+  v_thread uuid;
+  v_turn uuid;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
@@ -301,21 +303,23 @@ begin
   perform 1 from public.subjects x where x.id=p_subject
     and x.status='active' and x.merged_into_subject_id is null for share;
   if not found then return false; end if;
-  perform 1 from public.conversation_threads x where x.subject_id=p_subject
-    and x.id=(select a.thread_id from public.chat_turn_attempts a
-      join public.chat_turns t on t.id=a.turn_id
-      where a.id=p_attempt and a.subject_id=p_subject)
+  select t.thread_id,t.id into v_thread,v_turn
+  from public.chat_turn_attempts a
+  join public.chat_turns t on t.id=a.turn_id
+  where a.id=p_attempt and a.subject_id=p_subject
+    and t.subject_id=p_subject;
+  if not found then return false; end if;
+  perform 1 from public.conversation_threads x
+  where x.id=v_thread and x.subject_id=p_subject
     and x.status='active' for share;
-  -- Avoid a redundant guessed thread identifier in verifier logic: check
-  -- the exact Attempt -> Turn -> Thread relation independently below.
-  perform 1 from public.chat_turns t
-    join public.conversation_threads th on th.id=t.thread_id
-    join public.chat_turn_attempts a on a.turn_id=t.id
-    where a.id=p_attempt and a.subject_id=p_subject
-      and t.subject_id=p_subject and t.state='context_ready'
-      and th.subject_id=p_subject and th.status='active'
-      and a.state='running'
-    for share of t,th,a;
+  if not found then return false; end if;
+  perform 1 from public.chat_turns x
+  where x.id=v_turn and x.thread_id=v_thread and x.subject_id=p_subject
+    and x.state='context_ready' for share;
+  if not found then return false; end if;
+  perform 1 from public.chat_turn_attempts x
+  where x.id=p_attempt and x.turn_id=v_turn and x.subject_id=p_subject
+    and x.state='running' for share;
   if not found then return false; end if;
   select * into v_seal from
     seyeon_positive_candidate.local_guard_seals_r42
