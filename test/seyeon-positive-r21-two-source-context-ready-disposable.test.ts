@@ -1561,6 +1561,22 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_governed_cost_unsettled',
     });
+    // R40: a fake output digest MUST NOT bypass unsettled Governor Cost.
+    // The exact same originally pinned Call, native request and two Grants
+    // are deliberately tested before synthetic queue settlement.
+    const stub0=r40SyntheticStubTransport(used[0]!);
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.record_unverified_transport_r40($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid,$7::text,$8::jsonb) as receipt',
+      [subject,a.thread,a.turn,a.attempt,0,used[0]!.callId,
+       used[0]!.nativeWireDigest,JSON.stringify(stub0)],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r40_governed_cost_not_settled',
+    });
+    const beforeStub=await pool.query<{n:string}>(
+      'select count(*)::text as n from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    expect(beforeStub.rows).toEqual([{n:'0'}]);
     // Explicit SYNTHETIC Provider receipts only, with no actual network.
     // Verify the existing worker claim, settlement and ACK for all five.
     for(const v of used){
