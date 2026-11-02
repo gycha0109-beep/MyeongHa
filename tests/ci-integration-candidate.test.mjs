@@ -35,13 +35,19 @@ describe('pinned integration admission and required evidence', () => {
     const other = current(); other.base.ref = 'release';
     expect(() => validateCandidate(candidate, other)).toThrow('default branch');
   });
-  it('permits loose freshness but still requires an Actions-bound integration requirement', () => {
+  it('permits loose freshness but requires Actions-bound integration and GitGuardian app checks', () => {
     expect(() => assertStagedPolicy([])).toThrow('Staged CI requires');
-    const rules = (app, strict = false) => [{ type: 'required_status_checks', parameters: {
-      strict_required_status_checks_policy: strict,
-      required_status_checks: [{ context: 'CI Integration Verify', integration_id: app }],
-    } }];
-    expect(() => assertStagedPolicy(rules(7))).toThrow();
+    const rules = (app, strict = false, guardianApp = 46505) => [{
+      type: 'required_status_checks', parameters: {
+        strict_required_status_checks_policy: strict,
+        required_status_checks: [
+          { context: 'CI Integration Verify', integration_id: app },
+          { context: 'GitGuardian Security Checks', integration_id: guardianApp },
+        ],
+      },
+    }];
+    expect(() => assertStagedPolicy(rules(7))).toThrow('CI Integration Verify');
+    expect(() => assertStagedPolicy(rules(15368, false, 7))).toThrow('GitGuardian Security Checks');
     expect(() => assertStagedPolicy(rules(15368))).not.toThrow();
     expect(() => assertStagedPolicy(rules(15368, true))).not.toThrow();
   });

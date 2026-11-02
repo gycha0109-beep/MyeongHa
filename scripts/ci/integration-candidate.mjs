@@ -35,6 +35,10 @@ export function assertStagedPolicy(rules) {
   if (!checks.some(check => check.context === integrationContext && check.integration_id === 15368)) {
     throw new Error('Staged CI requires CI Integration Verify from GitHub Actions in the default-branch ruleset');
   }
+  if (!checks.some(check =>
+    check.context === 'GitGuardian Security Checks' && check.integration_id === 46505)) {
+    throw new Error('Staged CI requires GitGuardian Security Checks from the GitGuardian app in the default-branch ruleset');
+  }
 }
 
 export function assertParallelTrackLoosePolicy(rules) {
