@@ -765,6 +765,55 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
      process.env.DB_SUITE==='postgres17'&&process.env.PGHOST==='localhost'&&
      /^myeongha_ci_case_[0-9]+$/u.test(process.env.PGDATABASE??'')){
 
+  it('G5 separate DB role sessions deny ordinary API and allow only private Commerce catalog/settlement RPCs',async()=>{
+    await installDisposableG5Credit();
+    const publicApi=await pool.connect();
+    const privateCommerce=await pool.connect();
+    try{
+      await publicApi.query('BEGIN');
+      await publicApi.query('SET LOCAL ROLE myeongha_api_executor');
+      await privateCommerce.query('BEGIN');
+      await privateCommerce.query('SET LOCAL ROLE myeongha_commerce_internal_executor');
+      const {rows:[apiRole]}=await publicApi.query(
+        'select current_user as role, session_user as login');
+      const {rows:[commerceRole]}=await privateCommerce.query(
+        'select current_user as role, session_user as login');
+      expect(apiRole.role).toBe('myeongha_api_executor');
+      expect(commerceRole.role).toBe('myeongha_commerce_internal_executor');
+      const rpc='public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)';
+      const settle='public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)';
+      const {rows:[apiAcl]}=await publicApi.query(
+        `select has_function_privilege(current_user,$1,'EXECUTE') as catalog,
+                has_function_privilege(current_user,$2,'EXECUTE') as settle,
+                has_table_privilege(current_user,'public.chat_credit_turn_reservations_v1','UPDATE') as ledger_update`,
+        [rpc,settle]);
+      expect(apiAcl).toEqual({catalog:false,settle:false,ledger_update:false});
+      const {rows:[commerceAcl]}=await privateCommerce.query(
+        `select has_function_privilege(current_user,$1,'EXECUTE') as catalog,
+                has_function_privilege(current_user,$2,'EXECUTE') as settle,
+                has_table_privilege(current_user,'public.chat_credit_turn_reservations_v1','UPDATE') as ledger_update`,
+        [rpc,settle]);
+      expect(commerceAcl).toEqual({catalog:true,settle:true,ledger_update:false});
+      // Executable behavior, not just ACL metadata: API role cannot call the
+      // recovery catalog, and its failure never contaminates Commerce session.
+      await expect(publicApi.query(
+        'select attempt_id from public.internal_qry_seyeon_g5_unsettled_received_attempts_v1($1::integer,$2::timestamptz)',
+        [1,null],
+      )).rejects.toMatchObject({code:'42501'});
+      const {rows:privateResults}=await privateCommerce.query(
+        'select attempt_id from public.internal_qry_seyeon_g5_unsettled_received_attempts_v1($1::integer,$2::timestamptz)',
+        [1,null],
+      );
+      expect(privateResults).toEqual([]);
+      // Separate sessions are not proof of Production secret provisioning.
+      expect(apiRole.login).toBe(commerceRole.login);
+    }finally{
+      await publicApi.query('ROLLBACK');
+      await privateCommerce.query('ROLLBACK');
+      publicApi.release();privateCommerce.release();
+    }
+  });
+
   it('G5 real original Fetch/256-bit proof/HTTP ACK settles 10 credits exactly once',async()=>{
     await installDisposableG5Credit();
     // Existing S0 tests already own fixture 13; isolate the Commerce E2E.
