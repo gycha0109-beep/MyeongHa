@@ -87,6 +87,7 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
       {...base,meteredAfterStructuredOutput:undefined},
       {...base,priceQuote:undefined},
       {...base,maxOutputTokens:undefined},
+      {...base,origin:'https://untrusted-provider.example.invalid'},
     ];
     for(const config of cases){
       expect(()=>createOpenAiSeyeonStructuredProviderV1(config))
@@ -217,6 +218,20 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     });
     expect(events).toHaveLength(1);
     expect(events[0]?.outcome).toBe('invalid_response');
+  });
+  it('withholds syntactically valid but non-object output in strict mode',async()=>{
+    const fetchImpl=vi.fn(async()=>fakeResponse({text:'["not-a-schema-object"]'}));
+    const events:SeyeonAiCostEventV1[]=[];
+    const afterOutput=vi.fn(async()=>undefined);
+    const provider=createOpenAiSeyeonStructuredProviderV1(strictConfig({
+      fetchImpl,after:async event=>{events.push(event);},afterOutput,
+    }));
+    await expect(provider.generate(request)).rejects.toMatchObject({
+      code:'INVALID_STRUCTURED_OUTPUT',
+    });
+    expect(events).toHaveLength(1);
+    expect(events[0]?.outcome).toBe('invalid_response');
+    expect(afterOutput).not.toHaveBeenCalled();
   });
   it('cannot turn malformed output JSON into a successful persistent receipt',async()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse({text:'{invalid-json'}));
