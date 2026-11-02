@@ -1,11 +1,13 @@
 // Watchtower-Track: security
 // No external HTTP. This uses only a local synthetic Fetch Response, not a
 // Provider-signed receipt or an authorized Se-yeon Character reply.
+import {createHash} from 'node:crypto';
 import {describe,expect,it,vi} from 'vitest';
 import {
   createOpenAiSeyeonStructuredProviderV1,
   OpenAiSeyeonStructuredProviderErrorV1,
   type OpenAiSeyeonStructuredProviderConfigV1,
+  type SeyeonUnverifiedTransportOutputReceiptV1,
 } from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import {
   SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
@@ -62,6 +64,7 @@ function fakeResponse(options:{
 function strictConfig(input:{
   fetchImpl:NonNullable<OpenAiSeyeonStructuredProviderConfigV1['fetchImpl']>;
   after:(event:SeyeonAiCostEventV1)=>Promise<void>;
+  afterOutput?:(receipt:SeyeonUnverifiedTransportOutputReceiptV1)=>Promise<void>;
   before?:NonNullable<OpenAiSeyeonStructuredProviderConfigV1['meteredBeforeDispatch']>;
 }):OpenAiSeyeonStructuredProviderConfigV1{
   return {
@@ -70,6 +73,7 @@ function strictConfig(input:{
     requireDurableOutcomeReceipt:true,
     meteredBeforeDispatch:input.before??(async()=>undefined),
     meteredAfterOutcome:input.after,
+    meteredAfterStructuredOutput:input.afterOutput??(async()=>undefined),
     fetchImpl:input.fetchImpl,
   };
 }
@@ -80,6 +84,7 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     const cases:OpenAiSeyeonStructuredProviderConfigV1[]=[
       {...base,meteredBeforeDispatch:undefined},
       {...base,meteredAfterOutcome:undefined},
+      {...base,meteredAfterStructuredOutput:undefined},
       {...base,priceQuote:undefined},
       {...base,maxOutputTokens:undefined},
     ];
@@ -103,6 +108,8 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     let admissionBody='';
     let receiptStarted=false;
     const events:SeyeonAiCostEventV1[]=[];
+    const outputReceipts:SeyeonUnverifiedTransportOutputReceiptV1[]=[];
+    const order:string[]=[];
     const provider=createOpenAiSeyeonStructuredProviderV1(strictConfig({
       fetchImpl,
       before:async(call,body)=>{
@@ -114,7 +121,13 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
       after:async event=>{
         events.push(event);
         receiptStarted=true;
+        order.push('cost-start');
         await new Promise<void>(resolve=>{release=resolve;});
+        order.push('cost-durable');
+      },
+      afterOutput:async proof=>{
+        order.push('output-durable');
+        outputReceipts.push(proof);
       },
     }));
     let released=false;
@@ -134,6 +147,24 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     release();
     expect(await inFlight).toEqual({ok:true});
     expect(released).toBe(true);
+    expect(order).toEqual(['cost-start','cost-durable','output-durable']);
+    expect(outputReceipts).toHaveLength(1);
+    const proof=outputReceipts[0]!;
+    const body=await fakeResponse().text();
+    const sha=(text:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(text,'utf8').digest('hex');
+    expect(proof).toMatchObject({
+      schemaVersion:'seyeon-unverified-transport-output-receipt-r39',
+      originKind:'unverified_transport_bytes_only',
+      purpose:'semantic_review',
+      providerKey:'openai-responses',modelKey:'seyeon-r39-offline',
+      responseId:'resp_r39_synthetic_not_provider',
+      responseBodyDigest:sha(body),
+      structuredOutputDigest:sha('{"ok":true}'),
+      callId:events[0]!.callId,
+      providerOutputVerified:false,outputGuardVerified:false,
+      permitsAtomicCommit:false,permitsHttpReveal:false,
+    });
   });
   it('withholds the entire response if actual cost outcome persistence fails',async()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse());
@@ -146,6 +177,22 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(after).toHaveBeenCalledTimes(1);
+  });
+  it('withholds output if the exact native transport/output digest receipt is not durable',async()=>{
+    const fetchImpl=vi.fn(async()=>fakeResponse());
+    const afterCost=vi.fn(async()=>undefined);
+    const afterOutput=vi.fn(async()=>{
+      throw Error('R39_SYNTHETIC_DIGEST_STORE_UNAVAILABLE');
+    });
+    const provider=createOpenAiSeyeonStructuredProviderV1(strictConfig({
+      fetchImpl,after:afterCost,afterOutput,
+    }));
+    await expect(provider.generate(request)).rejects.toMatchObject({
+      code:'STRUCTURED_OUTPUT_RECEIPT_NOT_DURABLE',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(afterCost).toHaveBeenCalledTimes(1);
+    expect(afterOutput).toHaveBeenCalledTimes(1);
   });
   it('withholds the output when the synthetic transport omits priced token usage',async()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse({usage:false}));
