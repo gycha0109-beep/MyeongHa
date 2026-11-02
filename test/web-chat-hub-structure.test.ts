@@ -79,6 +79,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
       readFile(hubV2CssPath, 'utf8'),
     ]);
     expect(page).toContain('data-relationship-section hidden');
+    expect(page).toContain('새로운 연결자를 준비하고 있습니다');
+    expect(page).toContain('명하의 이야기를 함께할 새로운 연결자들이 계속 찾아올 예정입니다.');
+    expect(page).not.toContain('data-pending-people-grid');
+    expect(page).not.toContain('연결자 등록 및 대화 기능 준비 중');
+    expect(page).not.toContain('세 연결자는 소개만 먼저 공개됩니다.');
     expect(page).toContain('data-people-grid');
     expect(page).toContain('data-meet-shortcut hidden');
     expect(page).toContain('data-incoming-section hidden');
@@ -178,6 +183,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(hubCss).toContain('.chat-person-art-image');
     expect(hubCss).not.toContain('--portrait-scale');
     expect(hubCss).not.toContain('transform: scale(var(--portrait-scale');
+    expect(js).not.toContain('data-pending-people-grid');
+    expect(js).not.toContain("createPersonCard(person, { pending: true })");
+    expect(js).toContain("key !== 'seorin' && key !== 'mira' && key !== 'doyun'");
     expect(js).not.toContain('portrait.position');
     expect(js).not.toContain('portrait.scale');
     expect(js).not.toContain('portrait.origin');

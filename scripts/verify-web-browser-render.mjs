@@ -585,6 +585,22 @@ try {
   const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-route-state', { artifactSuffix: '-dark-reading-detail' });
   const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-people .chat-person-card', { artifactSuffix: '-dark-chat-hub' });
   const darkChatRoom = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { artifactSuffix: '-dark-chat-room' });
+  await navigate(client, origin, '/chat.html?character=seyeon', '.conversation-chat-panel');
+  let darkSeyeonAvatar = null;
+  for (let retry = 0; retry < 30; retry++) {
+    darkSeyeonAvatar = await client.evaluate(`(() => {
+      const avatar = document.querySelector('.conversation-message-avatar[data-character="seyeon"]');
+      if (!avatar) return null;
+      const style = getComputedStyle(avatar);
+      return { theme: document.documentElement.dataset.theme, image: style.backgroundImage,
+        size: style.backgroundSize, position: style.backgroundPosition, repeat: style.backgroundRepeat };
+    })()`);
+    if (darkSeyeonAvatar) break;
+    await sleep(100);
+  }
+  assert(darkSeyeonAvatar?.theme === 'dark' && darkSeyeonAvatar.image.includes('seyeon-portrait-v2.webp')
+    && darkSeyeonAvatar.size === 'cover' && darkSeyeonAvatar.repeat === 'no-repeat',
+    `Dark Seyeon chat avatar must keep the approved portrait and cover crop: ${JSON.stringify(darkSeyeonAvatar)}`);
   const darkRecords = await verifyDarkPage(client, origin, '/records.html', '.records-main');
   const darkMy = await verifyDarkPage(client, origin, '/my.html', '.my-main');
 
