@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-02 KST — Phase 11 사주 계산 동시 요청 거절·오류 격리 실 HTTP 테스트
+
+- **기존 완료 확인:** Phase7/11 실제 Linux PostgreSQL18 검증 [#41327504617](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41327504617) SUCCESS, 비식별 실측 근거 기록 [PR #2876](https://github.com/gycha0109-beep/MyeongHa/pull/2876)은 `main` 병합 `ad3509a97eef73d4a87d2de5fda55350269f2cdd` 확인. 이전 DB 검증은 반복 실행하지 않음.
+- **이번 구현:** `test/saju-calculation-controlled-overload-phase11.test.ts` 신규 추가. 사주 계산 **실제 HTTP 어댑터**를 임시 `127.0.0.1` HTTP 서버와 연결하여 8개 동시 클라이언트·합성 요청 32건을 실행. 서버 허용 동시 처리 2개 이상은 429 거절, 수용 건은 503 임시 실패를 응답시키며 32건이 실제로 한 번씩만 요청되었는지, 과도한 재시도 없이 거절/일시 오류를 `SAJU_TEMPORARILY_UNAVAILABLE`로 분류하는지, 가상 토큰과 upstream private body를 밖으로 반출하지 않는지 검사.
+- **로컬 결과:** Node24·Vitest4 실제 loopback TCP **1/1 PASS**; 검사는 실제 사주 계산 서버가 아닌 별도 로컬 합성 HTTP 서비스로 실행됐으므로 실제 사주 엔진의 CPU/메모리 한계나 Production 용량을 입증하지 않는다. 코어 계산 함수·인증/결제/운영 DB·마이그레이션·실운영 엔드포인트 변경 없음.
+- **남은 검증:** 사주 실제 계산 엔진을 사용한 승인된 격리 부하·리소스 계측 및 별도 운영 용량 기준, Hosted Auth/Storage 전체 복원과 독립 개인정보 원장 연속성·전체 RPO/RTO는 미완료. `sajuResourceCeilingProven=false`, `productionCapacityProven=false`, `scalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`; #1887 OPEN.
+
+
 ### 2026-11-02 KST — Phase 7·11 실제 Linux 격리 PostgreSQL 18 검증 PASS 및 비식별 증거 실사
 
 - **병합 확인:** [PR #2873](https://github.com/gycha0109-beep/MyeongHa/pull/2873), 소켓 경로 수정 HEAD `c589a1f92c1b5c370e3774c0655fa922f5b0d019`은 [전체 통합 CI #41324933923](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41324933923) 모든 필수 검사 SUCCESS 후 `2026-11-01T16:18:09Z`에 main `03ac28c4ffa77ddb01d05e92f2c1906ab052968f`으로 병합. 첫 Linux 실패 [#41317389955](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41317389955)와 재시도 실패 [#41321211252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41321211252)는 과거 실패로 유지하며 새 성공으로 덮어쓰지 않는다.
