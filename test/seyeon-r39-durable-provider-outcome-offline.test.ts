@@ -147,6 +147,18 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(after).toHaveBeenCalledTimes(1);
   });
+  it('withholds the output when the synthetic transport omits priced token usage',async()=>{
+    const fetchImpl=vi.fn(async()=>fakeResponse({usage:false}));
+    const after=vi.fn(async()=>undefined);
+    const provider=createOpenAiSeyeonStructuredProviderV1(strictConfig({
+      fetchImpl,after,
+    }));
+    await expect(provider.generate(request)).rejects.toMatchObject({
+      code:'OUTCOME_RECEIPT_NOT_DURABLE',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(after).not.toHaveBeenCalled();
+  });
   it('cannot turn an incomplete response into a successful persistent receipt',async()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse({status:'incomplete'}));
     const events:SeyeonAiCostEventV1[]=[];
