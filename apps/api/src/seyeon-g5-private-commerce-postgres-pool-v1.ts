@@ -91,6 +91,8 @@ select
   r.rolbypassrls as "canBypassRls",
   r.rolcreatedb as "canCreateDb",
   r.rolcreaterole as "canCreateRole",
+  (r.rolvaliduntil is null or r.rolvaliduntil > pg_catalog.statement_timestamp())
+    as "credentialUnexpired",
   (select count(*)::integer from pg_catalog.pg_auth_members m
     where m.member=r.oid) as "membershipCount",
   pg_catalog.pg_has_role(current_user,$1,'MEMBER') as "commerceMember",
@@ -115,7 +117,7 @@ export function verifySeyeonG5PrivateCommerceLoginPreflightV1(
     return fail('INVALID_LOGIN','G5 separate Commerce session login mismatch.');
   if(r.canLogin!==true||r.canInherit!==false||r.isSuper!==false||
      r.canBypassRls!==false||r.canCreateDb!==false||r.canCreateRole!==false||
-     r.membershipCount!==1||r.directCommerceMembershipCount!==1)
+     r.credentialUnexpired!==true||r.membershipCount!==1||r.directCommerceMembershipCount!==1)
     return fail('UNSAFE_LOGIN','G5 login flags or role membership exceed minimum authority.');
   if(r.commerceMember!==true)
     return fail('MISSING_AUTHORITY','G5 login cannot assume the private Commerce role.');
