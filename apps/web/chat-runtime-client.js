@@ -574,11 +574,9 @@ async function sendTurn(message) {
         // Do NOT overwrite/rewrite its original text or silently cancel it.
         // An explicit choice archives that failed Turn (without deleting it)
         // and sends the current draft as a new, independently identified Turn.
-        const confirmed = window.confirm(
-          '이 대화방에 이전에 실패한 다른 메시지가 남아 있습니다. ' +
-          '기존 기록은 보존하면서 미완료 전송을 종료하고, ' +
-          '지금 입력한 문장을 새 메시지로 보내시겠습니까?'
-        );
+        const confirmed = window.confirm(uiText(
+          '이 대화방에 이전에 실패한 다른 메시지가 남아 있습니다. 기존 기록은 보존하면서 미완료 전송을 종료하고, 지금 입력한 문장을 새 메시지로 보내시겠습니까?'
+        ));
         if (!confirmed) throw new Error('TURN_IN_FLIGHT');
         try {
           acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1({
