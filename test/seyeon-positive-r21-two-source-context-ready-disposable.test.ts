@@ -1886,6 +1886,43 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'select * from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
       [a.attempt],
     ),true)).rejects.toMatchObject({code:'42501'});
+    // R43 role cutover: the old API-side function and direct SQL paths
+    // are denied even though this Attempt has a valid local R41 witness.
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.issue_local_guard_seal_r42($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+      [subject,a.thread,a.turn,a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid)',
+      [subject,a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(issueSeyeonR42OfflineDbLocalSealV1({
+      pinInput,localWitness:restoredWitness,
+    })).rejects.toBeInstanceOf(SeyeonR42OfflineDbSealHoldV1);
+    await expect(issueSeyeonR43SeparatedLocalGuardSealV1({
+      pinInput,localWitness:restoredWitness,
+      validatorPool:pinInput.pool,
+    })).rejects.toBeInstanceOf(SeyeonR43EvaluatorAuthorityHoldV1);
+    const roleAcl=await pool.query<{
+      member:boolean;api_issue:boolean;api_verify:boolean;
+      evaluator_issue:boolean;evaluator_verify:boolean;
+    }>(`
+select
+  pg_has_role('myeongha_api_executor',
+    'myeongha_seyeon_guard_evaluator_r43','MEMBER') as member,
+  has_function_privilege('myeongha_api_executor',
+    'seyeon_positive_candidate.issue_local_guard_seal_r42(uuid,uuid,uuid,uuid)','EXECUTE') as api_issue,
+  has_function_privilege('myeongha_api_executor',
+    'seyeon_positive_candidate.verify_local_guard_seal_r42(uuid,uuid)','EXECUTE') as api_verify,
+  has_function_privilege('myeongha_seyeon_guard_evaluator_r43',
+    'seyeon_positive_candidate.issue_local_guard_seal_r42(uuid,uuid,uuid,uuid)','EXECUTE') as evaluator_issue,
+  has_function_privilege('myeongha_seyeon_guard_evaluator_r43',
+    'seyeon_positive_candidate.verify_local_guard_seal_r42(uuid,uuid)','EXECUTE') as evaluator_verify
+`);
+    expect(roleAcl.rows).toEqual([{
+      member:false,api_issue:false,api_verify:false,
+      evaluator_issue:true,evaluator_verify:true,
+    }]);
     const sealed=await issueSeyeonR43SeparatedLocalGuardSealV1({
       pinInput,localWitness:restoredWitness,
       validatorPool:validatorPool!,
@@ -1902,10 +1939,10 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(sealed.sealFingerprint).toMatch(
       /^sha256:pg-jsonb:v1:[0-9a-f]{64}$/u,
     );
-    const validatedSeal=await tx(c=>c.query<{valid:boolean}>(
+    const validatedSeal=await validatorTx(c=>c.query<{valid:boolean}>(
       'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
       [subject,a.attempt],
-    ),true);
+    ));
     expect(validatedSeal.rows).toEqual([{valid:true}]);
     await expect(issueSeyeonR43SeparatedLocalGuardSealV1({
       pinInput,localWitness:restoredWitness,
@@ -1945,10 +1982,10 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         guardedFixture.guardedEnvelopeDigest,'0'.repeat(64),
       ],
     );
-    const rejectedFakeSeal=await tx(c=>c.query<{valid:boolean}>(
+    const rejectedFakeSeal=await validatorTx(c=>c.query<{valid:boolean}>(
       'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
       [subject,a.attempt],
-    ),true);
+    ));
     expect(rejectedFakeSeal.rows).toEqual([{valid:false}]);
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r42_db_issued_local_seal_missing',
@@ -1975,10 +2012,10 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         guardedFixture.guardedEnvelopeDigest,'0'.repeat(64),
       ],
     );
-    const expired=await tx(c=>c.query<{valid:boolean}>(
+    const expired=await validatorTx(c=>c.query<{valid:boolean}>(
       'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
       [subject,a.attempt],
-    ),true);
+    ));
     expect(expired.rows).toEqual([{valid:false}]);
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r42_db_issued_local_seal_missing',
@@ -2024,10 +2061,10 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
       [originals[0]!.grantId],
     );
-    const invalidAfterRevoke=await tx(c=>c.query<{valid:boolean}>(
+    const invalidAfterRevoke=await validatorTx(c=>c.query<{valid:boolean}>(
       'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
       [subject,a.attempt],
-    ),true);
+    ));
     expect(invalidAfterRevoke.rows).toEqual([{valid:false}]);
     const neverCommitted=await pool.query<{
       messages:string;outboxes:string;admissions:string;
