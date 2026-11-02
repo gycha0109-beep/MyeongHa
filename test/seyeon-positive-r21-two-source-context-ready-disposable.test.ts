@@ -1963,6 +1963,17 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r37_stage_result_lineage_incomplete',
     });
+    // R42 HMAC is also invalidated directly after its original Grant is
+    // revoked, despite an otherwise correct earlier sealed manifest.
+    await pool.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [originals[0]!.grantId],
+    );
+    const invalidAfterRevoke=await tx(c=>c.query<{valid:boolean}>(
+      'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
+      [subject,a.attempt],
+    ),true);
+    expect(invalidAfterRevoke.rows).toEqual([{valid:false}]);
     const neverCommitted=await pool.query<{
       messages:string;outboxes:string;admissions:string;
     }>(
