@@ -45,6 +45,7 @@ export interface PrepareCharacterStandardChatGroundingInputV2 {
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   readonly productReaderEligibilityAuthorityPort: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?: import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
 }
 
@@ -155,6 +156,7 @@ export async function prepareCharacterStandardChatGroundingV2(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
   };
 
   let initial: PreparedOfficialReadingReaderAdmissionV1;

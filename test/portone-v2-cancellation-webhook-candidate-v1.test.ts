@@ -70,7 +70,7 @@ describe('PortOne V2 private signed cancellation webhook candidate',()=>{
     expect(Object.isFrozen(result)).toBe(true);
   });
   it('allows missing optional transactionId but never infers cancellation amount',()=>{
-    const r=admit(body('Transaction.Cancelled',{paymentId:'purchase-lookup-1'}));
+    const r=admit(body('Transaction.PartialCancelled',{paymentId:'purchase-lookup-1'}));
     expect(r).toMatchObject({
       kind:'cancellation_lookup_candidate',
       providerTransactionId:null,providerCancellationId:null,fullRefundProven:false,

@@ -1,4 +1,5 @@
 import type { SajuDomain } from '../../../packages/contracts/src/index.js';
+import type { OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type { ContentReleaseRuntimeEntry } from '../../../packages/world-content/src/index.js';
 import {
   getChatThreadRuntimeBinding,
@@ -60,6 +61,7 @@ export interface PrepareOfficialReadingReaderAdmissionInputV1 {
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   /** Product/Commerce-owned approved policy resolver; not a test fallback in production. */
   readonly productReaderEligibilityAuthorityPort: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }
 
 export interface PreparedOfficialReadingReaderAdmissionV1 {
@@ -168,6 +170,20 @@ export async function prepareOfficialReadingReaderAdmissionV1(
     authorityPort: input.threadBindingAuthorityPort,
   });
   const readerCharacterId = assertPinned(thread, input.contentEntry);
+  const purchaseAuthority = input.currentVerifiedPurchaseAuthorityPort;
+  if (!purchaseAuthority || !input.resolvedSubjectId ||
+      typeof input.readingId !== 'string') return deny('ACCESS_DENIED');
+  const exactPurchase = Object.freeze({
+    subjectId: input.resolvedSubjectId,
+    readingId: input.readingId,
+    readerCharacterId,
+    readerContentBundleId: thread.activeContentBundleId,
+  });
+  try {
+    await purchaseAuthority.assertCurrentVerifiedPurchase(exactPurchase);
+  } catch {
+    return deny('ACCESS_DENIED');
+  }
 
   let access;
   try {
@@ -196,6 +212,13 @@ export async function prepareOfficialReadingReaderAdmissionV1(
   });
   if (eligibility.status !== 'eligible') {
     return deny('POLICY_HOLD');
+  }
+
+  // Provider cancellation may race Product eligibility; recheck before source read.
+  try {
+    await purchaseAuthority.assertCurrentVerifiedPurchase(exactPurchase);
+  } catch {
+    return deny('ACCESS_DENIED');
   }
 
   let source: CharacterStandardReadingKnowledgeSourceV1;
@@ -262,6 +285,13 @@ export async function prepareOfficialReadingReaderAdmissionV1(
     return deny('ACCESS_DENIED');
   }
   if (!sameReaderAccess(access, currentAccess)) return deny('ACCESS_DENIED');
+  // Provider cancellation may race Product eligibility; recheck before source read.
+  try {
+    await purchaseAuthority.assertCurrentVerifiedPurchase(exactPurchase);
+  } catch {
+    return deny('ACCESS_DENIED');
+  }
+
 
   const scope = Object.freeze({
     subjectId: access.subjectId,

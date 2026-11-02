@@ -314,7 +314,8 @@ describe('canonical cancellation exact-amount source invariants',()=>{
    request:signed('Transaction.Cancelled',{paymentId:PAYMENT_ID,transactionId:TX}),
    fetchImpl:http,
   });
-  expect(r.kind).toBe('exact_cancellation_id_required');
+  // The signed authenticator rejects malformed full-cancel data before receipt lookup.
+  expect(r.kind).toBe('authentication_rejected');
   expect(c.query).not.toHaveBeenCalled();
   expect(http).not.toHaveBeenCalled();
  });

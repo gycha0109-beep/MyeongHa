@@ -154,6 +154,14 @@ if [[ "${SUPABASE_PROMOTION_REPAIR_ONLY:-false}" != 'false' ]]; then
   exit 1
 fi
 
+# The staged Reader/paid-answer migrations have not been authorized for
+# the ordinary Production rollout. Never let a generic include-all db push
+# apply them or the existing historical migration backlog.
+if [[ -f supabase/migrations/1740_official_reader_scope_lock_private_v1.sql ]]; then
+  echo 'HOLD_OFFICIAL_READER_1740_2290: staged Reader through 2320 requires separately governed rollout' >&2
+  exit 1
+fi
+
 # A historical recovery has already installed 1460-1510 while 1400-1450
 # relationship Event/Correction/Snapshot functions are absent in Production.
 # Fail CLOSED before legacy migration repair OR db push; ordinary --include-all

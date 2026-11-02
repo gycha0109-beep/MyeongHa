@@ -111,8 +111,12 @@ export function authenticatePortOneV2CancellationWebhookCandidateV1(input: {
   const authentication = authenticatePortOneV2WebhookPaymentCompletionV1({
     request, config: input.config,
   });
-  if (authentication.kind !== 'ignored' ||
-      !TYPES.has(authentication.eventType)) return IGNORED;
+  // Full cancellation is returned by the shared signed parser as
+  // payment_cancellation; partial/pending notifications remain ignored.
+  const signedEventType = authentication.kind === 'payment_cancellation'
+    ? 'Transaction.Cancelled'
+    : authentication.kind === 'ignored' ? authentication.eventType : null;
+  if (signedEventType === null || !TYPES.has(signedEventType)) return IGNORED;
 
   let payload: Record<string, unknown>;
   try {
@@ -123,7 +127,7 @@ export function authenticatePortOneV2CancellationWebhookCandidateV1(input: {
   } catch {
     return fail();
   }
-  if (payload.type !== authentication.eventType) return fail();
+  if (payload.type !== signedEventType) return fail();
   const data = record(payload.data);
   const paymentId = id(data.paymentId);
   const transactionId = data.transactionId === undefined ||
@@ -133,7 +137,7 @@ export function authenticatePortOneV2CancellationWebhookCandidateV1(input: {
 
   return Object.freeze({
     kind: 'cancellation_lookup_candidate',
-    eventType: authentication.eventType as CancellationTagV1,
+    eventType: signedEventType as CancellationTagV1,
     providerWebhookId: authentication.providerWebhookId,
     providerPaymentId: paymentId,
     providerTransactionId: transactionId,

@@ -390,6 +390,7 @@ function authorities(
     accessAuthorityPort,
     artifactAuthorityPort,
     productReaderEligibilityAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: vi.fn(async () => {}) },
     relationshipAuthorityPort,
     memoryItemsAuthorityPort,
     memoryGrantsAuthorityPort,
@@ -1303,6 +1304,7 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
       accessAuthorityPort: authority.accessAuthorityPort,
       artifactAuthorityPort: authority.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: authority.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: authority.currentVerifiedPurchaseAuthorityPort,
       groundingProjectionPort: { projectGrounding: vi.fn(async () => bundle) },
     });
     const readLatestValidatedAnchor = vi.fn(async () => null as
@@ -1593,6 +1595,7 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
       accessAuthorityPort: f.authority.accessAuthorityPort,
       artifactAuthorityPort: f.authority.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: f.authority.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: f.authority.currentVerifiedPurchaseAuthorityPort,
       groundingProjectionPort: { projectGrounding: f.projectGrounding },
     };
   }
@@ -1749,6 +1752,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       accessAuthorityPort: authority.accessAuthorityPort,
       artifactAuthorityPort: authority.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: authority.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: authority.currentVerifiedPurchaseAuthorityPort,
       groundingProjectionPort: { projectGrounding: vi.fn(async () => bundle) },
     });
     const ids = grounded.grounding.units.map(unit => unit.unitId);
@@ -2074,6 +2078,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       accessAuthorityPort: f.authority.accessAuthorityPort,
       artifactAuthorityPort: f.authority.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: f.authority.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: f.authority.currentVerifiedPurchaseAuthorityPort,
     };
     return { f, outputHold, args };
   }
@@ -2499,6 +2504,7 @@ describe('A3-kappa first Official Reading question source entry (public OFF)', (
       accessAuthorityPort: authority.accessAuthorityPort,
       artifactAuthorityPort: authority.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: authority.productReaderEligibilityAuthorityPort,
+      currentVerifiedPurchaseAuthorityPort: authority.currentVerifiedPurchaseAuthorityPort,
       groundingProjectionPort: { projectGrounding: vi.fn(async () => bundle) },
     });
     const readLatestValidatedAnchor = vi.fn(async () => null as

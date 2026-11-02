@@ -156,6 +156,12 @@ class TransactionOfficialReadingRecordPortV1 implements OfficialReadingRecordRea
   }
 }
 
+/** Reuses the current Records authority, including its Birth revision check. */
+export function createPostgresOfficialReadingRecordAuthorityPortV1(
+  client: PostgresTransactionQueryV1,
+): OfficialReadingRecordReadAuthorityPortV1 {
+  return new TransactionOfficialReadingRecordPortV1(client);
+}
 function requestedReadingId(request: Request): string | null {
   const url = new URL(request.url);
   if (url.pathname !== READINGS_ROUTE) return null;

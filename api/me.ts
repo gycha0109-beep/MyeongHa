@@ -1,4 +1,6 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { tryDispatchHeldOfficialReaderV1 } from '../apps/api/src/official-reader-held-vercel-dispatch-v1.js';
+import { handleDigitalReadingWithdrawalClaimHttpV1 } from '../apps/api/src/commerce-digital-reading-withdrawal-claim-http-v1.js';
 import { handleContactInquiryRequestV1 } from '../apps/api/src/contact-inquiry-http.js';
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
@@ -916,6 +918,28 @@ export default {
       request,
       routeId: 'api.me.dispatch',
       execute: async ({ requestId, serverTime }) => {
+        // Exact buyer claim intake is independently closed until the
+        // operations release explicitly enables the installed DB command.
+        const withdrawalUrl = new URL(request.url);
+        if (withdrawalUrl.searchParams.has('__myeongha_withdrawal_claim')) {
+          if (process.env.MYEONGHA_WITHDRAWAL_CLAIM_ENABLED !== '1') {
+            return Response.json({ok:false,error:{code:'SERVICE_UNAVAILABLE'}}, {
+              status:503,headers:{'Cache-Control':'no-store'},
+            });
+          }
+          return handleDigitalReadingWithdrawalClaimHttpV1({
+            request,
+            enabled:true,
+            ...(process.env.MYEONGHA_WITHDRAWAL_CLAIM_HMAC_SECRET === undefined
+              ? {} : {idempotencySecret:process.env.MYEONGHA_WITHDRAWAL_CLAIM_HMAC_SECRET}),
+            pool:getSharedPostgresPool(),
+            identityEvidenceVerifier:createProductionRequestIdentityVerifierV1({
+              config:parseProductionUserDataRuntimeConfigV1(process.env),
+            }),
+          });
+        }
+        const heldReader = tryDispatchHeldOfficialReaderV1({ request, requestId, serverTime });
+        if (heldReader !== null) return heldReader;
         const target = resolveDispatchTarget(request);
         if (target === null) {
           cancelUnusedRequestBodyBestEffort(request);

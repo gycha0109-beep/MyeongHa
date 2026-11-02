@@ -221,6 +221,20 @@ jobs:
             fi
           fi
 
+          # Staged paid Reader migrations may be reviewed in a PR but may
+          # never accidentally enter ordinary Production migration deployment.
+          # Mixed Reader plus unrelated migration changes are rejected.
+          reader_stage_re='^supabase/migrations/(17[4-9]0|1[89][0-9]0|2[0-2][0-9]0|23[0-2]0)_'
+          migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"
+          if [[ -n "$migration_changes" ]] && grep -Eq "$reader_stage_re" <<<"$migration_changes"; then
+            if printf '%s\n' "$migration_changes" | grep -Ev "$reader_stage_re" | grep -q .; then
+              echo 'HOLD_READER_MIXED_PRODUCTION_DEPLOY' >&2
+              exit 1
+            fi
+            requires_deploy=false
+            reason='staged Reader migrations are isolated from ordinary Production deployment'
+          fi
+
           promotion_repair_only=false
           if [[ "$EVENT_NAME" == 'push' && "$requires_deploy" == 'true' ]]; then
             migration_changes="$(printf '%s\n' "${changed_files:-}" | grep '^supabase/migrations/' || true)"

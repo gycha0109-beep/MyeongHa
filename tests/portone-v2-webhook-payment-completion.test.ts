@@ -220,7 +220,7 @@ describe('PortOne V2 webhook payment completion authentication', () => {
   });
 
   it('authenticates then ignores known non-paid and unknown future event types', () => {
-    for (const type of ['Transaction.Cancelled', 'Future.NewEvent']) {
+    for (const type of ['Transaction.Failed', 'Future.NewEvent']) {
       const rawBody = body(type);
       expect(authenticatePortOneV2WebhookPaymentCompletionV1({ request: request({ rawBody }), config: config() })).toEqual({
         kind: 'ignored', providerWebhookId: 'msg_1', eventType: type,

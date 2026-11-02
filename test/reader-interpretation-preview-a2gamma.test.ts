@@ -78,6 +78,7 @@ function fixture(input: { policy?: 'withheld' | 'throw'; access?: 'valid' | 'mis
     accessAuthorityPort: { readAccessibleReadings },
     artifactAuthorityPort: { readArtifactSource },
     productReaderEligibilityAuthorityPort: { readApprovedRule },
+    currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: vi.fn(async () => {}) },
     relationshipAuthorityPort: {} as never,
     memoryItemsAuthorityPort: {} as never,
     memoryGrantsAuthorityPort: {} as never,

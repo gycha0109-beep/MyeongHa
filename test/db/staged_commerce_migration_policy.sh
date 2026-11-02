@@ -4,6 +4,29 @@
 # This policy requires exact Git blob fingerprints before excluding any staged file.
 skip_staged_portone_migration_from_historical_fixture() {
   local migration="$1" expected
+  local inclusion="${2:-historical}" name="${migration##*/}" version actual
+  # The old PG15 catalog snapshot must not silently absorb the 59 staged
+  # official-Reader/payment migrations. Separate PG17 integrated cases load
+  # them verbatim; never change the historical approved schema fingerprint.
+  if [[ "$name" =~ ^([0-9]{4})_ ]]; then
+    version="${BASH_REMATCH[1]}"
+    if (( 10#$version >= 1740 && 10#$version <= 2320 )); then
+      [[ "$inclusion" == 'reader-integrated' ]] && return 1
+      expected="$(awk -v n="$name" '$1==n {print $2}' \
+        test/db/official_reader_staged_migration_hashes_v1.txt)"
+      if [[ ! "$expected" =~ ^[a-f0-9]{40}$ ]]; then
+        echo 'HOLD_UNREVIEWED_READER_MIGRATION_IN_HISTORICAL_FIXTURE' >&2
+        exit 1
+      fi
+      actual="$(git hash-object "$migration")" || exit 1
+      if [[ "$actual" != "$expected" ]]; then
+        echo 'HOLD_READER_HISTORICAL_STAGING_FINGERPRINT_DRIFT' >&2
+        exit 1
+      fi
+      echo "Skipping isolated Reader staged migration from historical catalog: $name"
+      return 0
+    fi
+  fi
   case "${migration##*/}" in
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;

@@ -1,0 +1,39 @@
+{
+  "contractVersion": "myeongha-production-reader-privacy-purge-worker-v1",
+  "watchtowerTrack": "db-authority-core",
+  "purpose": "Retire protected Reader paid-answer bodies and unique DEKs after last verified entitlement is lost",
+  "deploymentState": "registered-disabled",
+  "productionPaidReadEnabled": false,
+  "workerPrincipal": "myeongha_worker_runtime",
+  "executionRole": "myeongha_system_executor",
+  "databaseTlsPeerMode": "verify-full",
+  "sameDatabaseConfigModule": "apps/api/src/production-account-deletion-worker-db-config.ts",
+  "sameRuntimeModule": "apps/api/src/production-account-deletion-worker-runtime.ts",
+  "sharedOffPrimaryPrivacyConfigModule": "apps/api/src/official-reader-offprimary-worker-config-v1.ts",
+  "sharedOffPrimaryEnvironment": [
+    "MYEONGHA_READER_PRIVACY_LEDGER_ROOT",
+    "MYEONGHA_READER_PRIVACY_KEY_ROOT",
+    "MYEONGHA_READER_PRIVACY_LEDGER_SEAL_KEY_B64",
+    "MYEONGHA_READER_PRIVACY_KEY_SEAL_KEY_B64"
+  ],
+  "launch": {
+    "command": "node scripts/operations/run-official-reader-privacy-purge-worker.mjs",
+    "packageScript": "worker:reader-privacy-purge:managed",
+    "confirmation": "RUN_PRIVATE_READER_REVOCATION_PURGE",
+    "batchLimit": 20,
+    "pollIntervalSeconds": 300,
+    "maximumRetryBackoffSeconds": 3600,
+    "leaseMinutes": 15,
+    "singleProcessSequentialBatches": true,
+    "ownerActivationEnvironment": "MYEONGHA_READER_PRIVACY_PURGE_ACTIVATION",
+    "ownerActivationValue": "PRIVATE_OWNER_MOUNT_READY"
+  },
+  "gates": {
+    "noDeploymentWithoutMigrationRecovery": true,
+    "noAutoGitHubWorkflow": true,
+    "noThirdPartyContact": true,
+    "noTemporaryStorageFallback": true,
+    "noPaidReadActivation": true,
+    "noEmissionOfSubjectOrKeyIdentifiers": true
+  }
+}
