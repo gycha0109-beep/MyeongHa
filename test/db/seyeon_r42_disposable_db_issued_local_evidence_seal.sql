@@ -280,6 +280,14 @@ declare
   v_current record;
   v_original_digest text;
   v_count integer:=0;
+  v_manifest seyeon_positive_candidate.local_guard_fixture_manifest_r41%rowtype;
+  v_stage seyeon_positive_candidate.native_stage_lineage_r30%rowtype;
+  v_output seyeon_positive_candidate.unverified_transport_lineage_r40%rowtype;
+  v_cost public.seyeon_ai_call_cost_events%rowtype;
+  v_queue public.seyeon_ai_provider_receipt_queue_v1%rowtype;
+  v_i smallint;
+  v_call uuid;
+  v_expected_digest text;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
@@ -288,6 +296,27 @@ begin
       where a.id=p_attempt and a.subject_id=p_subject
     )
   then return false; end if;
+  -- A stale seal must not remain accepted after a Turn/Attempt or Subject
+  -- becomes inactive. Consistent row locks also serialize revoke races.
+  perform 1 from public.subjects x where x.id=p_subject
+    and x.status='active' and x.merged_into_subject_id is null for share;
+  if not found then return false; end if;
+  perform 1 from public.conversation_threads x where x.subject_id=p_subject
+    and x.id=(select a.thread_id from public.chat_turn_attempts a
+      join public.chat_turns t on t.id=a.turn_id
+      where a.id=p_attempt and a.subject_id=p_subject)
+    and x.status='active' for share;
+  -- Avoid a redundant guessed thread identifier in verifier logic: check
+  -- the exact Attempt -> Turn -> Thread relation independently below.
+  perform 1 from public.chat_turns t
+    join public.conversation_threads th on th.id=t.thread_id
+    join public.chat_turn_attempts a on a.turn_id=t.id
+    where a.id=p_attempt and a.subject_id=p_subject
+      and t.subject_id=p_subject and t.state='context_ready'
+      and th.subject_id=p_subject and th.status='active'
+      and a.state='running'
+    for share of t,th,a;
+  if not found then return false; end if;
   select * into v_seal from
     seyeon_positive_candidate.local_guard_seals_r42
     where attempt_id=p_attempt;
