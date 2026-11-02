@@ -109,6 +109,7 @@ describe('P2 Reader Product Offer and versioned charge terms operational inspect
       SQL,
       'rollback',
     ]);
+    expect(SQL).toContain('case when ct.id is null then null else ct.retired_at is null end');
     expect(SQL).not.toMatch(/external_product_id|\bupdate\b|\binsert\b|\bdelete\b/iu);
   });
 });

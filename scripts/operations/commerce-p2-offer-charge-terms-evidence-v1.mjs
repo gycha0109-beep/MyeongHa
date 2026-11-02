@@ -6,7 +6,7 @@ select o.id::text as "offerId",o.platform as "platform",
  (o.retired_at is null) as "offerCurrent",
  ct.id::text as "termsId",ct.terms_version as "termsVersion",
  ct.amount_minor::text as "amountMinor",ct.currency as "currency",
- (ct.retired_at is null) as "termsCurrent"
+ (case when ct.id is null then null else ct.retired_at is null end) as "termsCurrent"
 from public.products p
 join public.product_offers o on o.product_id=p.id
 left join public.product_offer_charge_terms ct on ct.product_offer_id=o.id

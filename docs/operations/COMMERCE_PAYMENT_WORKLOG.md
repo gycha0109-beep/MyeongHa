@@ -444,3 +444,5 @@
 - **안전 경계:** 가격이 8,900원으로 일치하더라도 Charge Terms 승인은 불가능. `saleActivationAuthorized`, `executableChargeAuthorized`, `productionFulfillmentAuthorized`는 항상 `false`. 이 점검 도구만으로 P2를 완료 또는 P5를 활성화할 수 없음.
 - **로컬 검증:** 신규 상세 증빙 + 기존 P2 HOLD 회귀 테스트 총 **24/24 PASS**, Node 구문 검사 PASS, git diff 공백 검사 PASS. 실제 운영 DB는 조회하지 않음.
 - **다음:** PR 일반/필수 통합 CI, 병합 후 상품별 운영 승인·Production Saju 공급·실제 고객 제공의 미충족 선행 조건 확인. LIVE는 HOLD.
+
+- **추가 SQL 정합성 수정:** Offer가 존재하지만 Charge Terms가 없는 LEFT JOIN 결과에서는 `ct.retired_at is null`이 TRUE로 평가될 수 있으므로, `ct.id is null`이면 `termsCurrent`를 SQL NULL로 반환하도록 변경. 실제 DB null row와 검증 스키마가 일치하도록 테스트를 보강했으며 P2 테스트 24/24 재통과. 기존 판매 HOLD 유지.
