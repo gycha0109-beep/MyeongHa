@@ -57,7 +57,7 @@ describe('S0 G0->G1 exact historical model-input window (offline HOLD)',()=>{
     const exec=readFileSync(new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts',import.meta.url),'utf8');
     const reread=exec.indexOf('const dbVerifiedWindow=await input.contextReadPort.readRecentMessages({');
     const assertion=exec.indexOf('buildSeyeonG1HistoricalModelWindowCensusV1({');
-    const hold=exec.indexOf("'Se-yeon historical model sources need an immutable G1 DB Pin before Provider.'");
+    const hold=exec.indexOf('throw new SeyeonHistoricalCandidatePersistedHoldV1();',assertion);
     const actualPin=exec.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
     expect(reread).toBeGreaterThan(0);
     expect(reread).toBeLessThan(assertion);

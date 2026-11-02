@@ -327,6 +327,15 @@ export class SeyeonProductionChatExecutionErrorV1 extends Error {
   }
 }
 
+/** A committed historical candidate is intentionally held, not a failed model attempt. */
+export class SeyeonHistoricalCandidatePersistedHoldV1 extends SeyeonProductionChatExecutionErrorV1 {
+  readonly code = 'SEYEON_HISTORICAL_CANDIDATE_HOLD' as const;
+  constructor() {
+    super('Se-yeon historical model sources need an immutable G1 DB Pin before Provider.');
+    this.name = 'SeyeonHistoricalCandidatePersistedHoldV1';
+  }
+}
+
 /** A committed answer is not current permission to reveal its old bytes. */
 export class SeyeonCommittedReplayRevealHoldV1 extends SeyeonProductionChatExecutionErrorV1 {
   readonly code = 'SEYEON_REPLAY_REVEAL_HOLD' as const;
@@ -811,6 +820,9 @@ export async function runSeyeonProductionChatExecutionV1(
                 }),
                 historicalSources:census.historicalSources,
               });
+              // The isolated owner transaction has already committed its candidate.
+              // Do not mark this context_ready attempt as a retryable model failure.
+              throw new SeyeonHistoricalCandidatePersistedHoldV1();
             }
             throw new SeyeonProductionChatExecutionErrorV1(
               'Se-yeon historical model sources need an immutable G1 DB Pin before Provider.',
@@ -1065,7 +1077,8 @@ export async function runSeyeonProductionChatExecutionV1(
 
 
   } catch (error) {
-    if (commitState.value === null) {
+    if (commitState.value === null &&
+        !(error instanceof SeyeonHistoricalCandidatePersistedHoldV1)) {
       await input.persistencePort.failAttempt({
         subjectId,
         turnId: receivedTurn.turnId,

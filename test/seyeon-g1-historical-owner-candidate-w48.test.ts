@@ -127,10 +127,23 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(g2).toContain("old.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
     expect(g2).toContain("a.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
   });
+  it('preserves a committed candidate HOLD without retryable failure cleanup',()=>{
+    const server=readFileSync(new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts',import.meta.url),'utf8');
+    const persist=server.indexOf('await input.historicalSourceCandidateDbPort.pinBeforeModel({');
+    const hold=server.indexOf('throw new SeyeonHistoricalCandidatePersistedHoldV1();',persist);
+    const provider=server.indexOf('const runtime = await runSeyeonCharacterTurnV2({',persist);
+    const failure=server.indexOf('await input.persistencePort.failAttempt({',provider);
+    expect(persist).toBeGreaterThan(0);
+    expect(hold).toBeGreaterThan(persist);
+    expect(provider).toBeGreaterThan(hold);
+    expect(failure).toBeGreaterThan(provider);
+    expect(server.slice(failure-160,failure)).toContain('!(error instanceof SeyeonHistoricalCandidatePersistedHoldV1)');
+    expect(server).toContain("readonly code = 'SEYEON_HISTORICAL_CANDIDATE_HOLD'");
+  });
   it('production execution always stops before model after isolated DB candidate Pin',()=>{
     const server=readFileSync(new URL('../apps/api/src/seyeon-production-chat-execution-v1.ts',import.meta.url),'utf8');
     const pin=server.indexOf('await input.historicalSourceCandidateDbPort.pinBeforeModel({');
-    const denied=server.indexOf("'Se-yeon historical model sources need an immutable G1 DB Pin before Provider.'");
+    const denied=server.indexOf('throw new SeyeonHistoricalCandidatePersistedHoldV1();',pin);
     const run=server.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     expect(pin).toBeGreaterThan(0);
     expect(denied).toBeGreaterThan(pin);

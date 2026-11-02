@@ -616,3 +616,11 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **승인 경계:** 저장 형태는 `historicalCandidateProof` (`seyeon-g1-historical-source-candidate-v1`)이지 기존 `positiveProof`가 아니다. `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`이고 **저장 성공 시에도 반드시 AI Interpreter 호출 전에 중단**한다. 기존 G2 Atomic Commit과 G3 Reveal은 이 타입을 허가하지 않는다. 이는 원본 출처를 저장하는 후보까지의 구현이며 **정식 양수 History G1/G2/G3 허가가 아니다**.
 - **검증:** `test/seyeon-g1-historical-owner-candidate-w48.test.ts`에 정확한 DB 후보/역할·source 변경/권한 플래그 변조/모델 중단 계약을 추가. 단위 테스트는 소스에 작성했으나 최종 HEAD 실제 실행·PostgreSQL 독립 2세션 및 운영 CI 확인 이전에는 PASS 판정 금지.
 - **미완료:** Reader·Relationship·인용/복사된 파생 출처 전체, 양수 History 정상 답변 생성/동일 TX Commit/최초 공개·Replay, G0 최종 승인, 실제 DB·HTTP Race 증명과 G6. 운영 DDL·유료 Provider·공개 API·PR 병합 없음; `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-02 · W48 후속 · 격리 History 후보 저장 후 실패 처리 충돌 분리 (HOLD)
+
+- 최신 이관 HEAD `e87de2c47c7f5724a67828470d84355e179fc83b`에서 W48 후보 Pin 성공 뒤 의도적 예외가 일반 `failAttempt`를 호출하는 경로를 확인했다. 후보는 모델·Commit·Reveal 허가가 아닌데도 일반 실패 상태 전환이 불변 `context_ready` 증빙과 충돌할 수 있으므로, 성공적으로 저장한 후보만 별도의 `SeyeonHistoricalCandidatePersistedHoldV1`으로 구분하고 일반 실패 처리를 호출하지 않도록 수정했다. DB 저장 실패 또는 후보 준비 실패는 기존 일반 실패 경로를 유지한다.
+- 새 보안 권한·SQL·Source Registry·운영 Role·공개 Route·외부 Provider 호출을 추가하지 않았다. W48 후보는 세 권한 플래그가 모두 false이며, 성공 경로는 Interpreter 호출 전에 계속 HOLD한다. 다른 이력 출처는 자동 승인하지 않는다.
+- W48 및 과거 모델 입력 Census의 표적 Vitest 32개 통과. 전체 TypeScript 검사는 별도 기존 모바일 API-client 타입 중복 및 테스트 계약 오류로 실패; 해당 오류를 이번 수정의 PASS로 대체하지 않는다. 로컬 PostgreSQL 17 실행 서버가 응답하지 않아 격리 DB 설치, 실제 커밋 이후 후보 재조회, Owner 함수 권한 및 두 세션 경합은 미검증이다.
+- 다음 작업: 폐기형 PostgreSQL 17에서 W48 원본 후보 저장→실제 커밋→예외 후 재조회와 실패/철회 0건을 검증하고, 저장 증거가 확인되면 기존 G0/G1 양수 History 정식 출처 계약을 진행한다. 운영 상태는 `HOLD_FORWARD_STOPPED`이며 Draft PR의 운영 병합·배포는 금지한다.
