@@ -34,6 +34,10 @@ function pool():PostgresSubjectPoolV1{
         expect(String(params?.[0])).toMatch(/^myeongha-guest-bearer-hmac-sha256-v1:[0-9a-f]{64}$/u);
         return{rows:[{subjectId:SUBJECT,subjectKind:'guest'}] as Row[]};
       }
+      if(text.includes('qry_official_reading_birth_revision_status_v1')){
+        expect(params).toEqual([SUBJECT,READING]);
+        return{rows:[{issuedRevisionNo:2,currentRevisionNo:2,revisionState:'current'}] as Row[]};
+      }
       if(text.includes('qry_official_reading_record_runtime_v1')){
         expect(params).toEqual([SUBJECT,READING]);
         return{rows:[record] as Row[]};
