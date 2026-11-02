@@ -31,8 +31,10 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(runtime).toContain("messageInput.value = ''");
     const runtimeNormalized = runtime.replace(/\r\n/gu, '\n');
     expect(runtimeNormalized.indexOf("messageInput.value = ''")).toBeLessThan(
-      runtimeNormalized.indexOf('} catch (error) {\n    const code = error instanceof Error ? error.message'),
+      runtimeNormalized.indexOf('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1'),
     );
+    expect(runtimeNormalized).toContain('!receiptAcknowledged && threadId === submittedThreadId');
+    expect(runtimeNormalized).toContain('messageInput.value = pendingTurn.text');
     expect(dialog).not.toContain('requestPayment(');
     expect(dialog).not.toContain('purchase-intent');
   });
