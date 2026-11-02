@@ -823,17 +823,20 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const apiPassword=randomBytes(30).toString('hex');
     const commercePassword=randomBytes(30).toString('hex');
     // Cluster roles are disposed at the end: never create a Production login.
-    const createLogin=async(name:string,password:string,executor:string)=>{
+    const createLogin=async(name:string,password:string)=>{
       await pool.query(
         'select pg_catalog.format(\'CREATE ROLE %I LOGIN PASSWORD %L\',$1::text,$2::text)',
         [name,password],
       ).then(async r=>pool.query(r.rows[0].format));
-      await pool.query(`grant ${executor} to ${name}`);
     };
     let api:Pool|undefined,commerce:Pool|undefined;
     try{
-      await createLogin(apiLogin,apiPassword,'myeongha_api_executor');
-      await createLogin(commerceLogin,commercePassword,'myeongha_commerce_internal_executor');
+      await createLogin(apiLogin,apiPassword);
+      await createLogin(commerceLogin,commercePassword);
+      // Role membership is a separate operation from credential generation.
+      // These static values are permission roles, never passwords or secrets.
+      await pool.query(`grant myeongha_api_executor to ${apiLogin}`);
+      await pool.query(`grant myeongha_commerce_internal_executor to ${commerceLogin}`);
       const connection=Object.freeze({
         host:process.env.PGHOST,port:Number(process.env.PGPORT??5432),
         database:process.env.PGDATABASE,ssl:false,max:1,statement_timeout:5000,
