@@ -51,10 +51,17 @@ import {
   recordSeyeonR40UnverifiedMockTransportV1,
   SeyeonR40OfflineUnverifiedTransportHoldV1,
 } from '../apps/api/src/seyeon-r40-offline-unverified-transport-db-v1.js';
+import {buildSeyeonR41LocalGuardFixtureV1}
+  from '../apps/api/src/seyeon-r41-offline-actual-guard-fixture-v1.js';
+import {
+  recordSeyeonR41LocalFixtureWitnessV1,
+  SeyeonR41OfflineFixtureDatabaseHoldV1,
+} from '../apps/api/src/seyeon-r41-offline-guard-fixture-db-v1.js';
 
 /** Strictly fake transport: NOT a Provider response or Guard PASS. */
 function r40SyntheticStubTransport(
   receipt:SeyeonR32OfflineStageReceiptV1,
+  structuredText='{"ok":true}',
 ):SeyeonUnverifiedTransportOutputReceiptV1{
   const sha=(x:string)=>'sha256:wire-utf8:v1:'+
     createHash('sha256').update(x,'utf8').digest('hex');
@@ -69,7 +76,7 @@ function r40SyntheticStubTransport(
       synthetic:true,stage:receipt.stageIndex,
       receipt:'unverified_mock_only',callId:receipt.callId,
     })),
-    structuredOutputDigest:sha('{"ok":true}'),
+    structuredOutputDigest:sha(structuredText),
     providerOutputVerified:false,outputGuardVerified:false,
     permitsAtomicCommit:false,permitsHttpReveal:false,
   });
@@ -1637,8 +1644,19 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     // provider responses. Even a fully settled Cost + valid native wire is
     // insufficient to prove any Model/Output Guard authorization.
     const mockRecorded=[];
+    const guardedFixture=buildSeyeonR41LocalGuardFixtureV1(
+      source.finalModelContext,
+    );
+    const authoredOutputTexts=[
+      '{"ok":true}','{"ok":true}',
+      guardedFixture.interpretationText,
+      guardedFixture.rendererText,
+      guardedFixture.semanticReviewText,
+    ];
     for(const v of used){
-      const transport=r40SyntheticStubTransport(v);
+      const transport=r40SyntheticStubTransport(
+        v,authoredOutputTexts[v.stageIndex]!,
+      );
       if(v.stageIndex===0){
         const forged={...transport,providerOutputVerified:true};
         await expect(tx(c=>c.query(
