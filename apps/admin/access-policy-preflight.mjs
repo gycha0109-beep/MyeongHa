@@ -35,8 +35,10 @@ export async function verifyAdminAccessPolicyV1(input){
  }
  const apps=await read(base,'applications');
  const selected=apps.filter(a=>a?.name===APP_NAME&&a?.domain===HOST&&a?.type==='self_hosted');
- if(selected.length!==1||selected[0].aud!==audience||!ID.test(selected[0].id??''))
-   throw Error('Dedicated Admin Access application identity mismatch');
+ if(selected.length===0)throw Error('Dedicated Admin Access application not visible to deployment token');
+ if(selected.length!==1)throw Error('Dedicated Admin Access application identity ambiguous');
+ if(selected[0].aud!==audience)throw Error('Dedicated Admin Access audience mismatch');
+ if(!ID.test(selected[0].id??''))throw Error('Dedicated Admin Access application ID invalid');
  const app=selected[0];
  const policies=await read(base+'/'+app.id+'/policies','policies');
  // Report a safe reason when a provisioned Owner identity differs; no email is logged.
