@@ -24,6 +24,11 @@ import { recoverSeyeonG5ReceivedCreditsCandidateV1 }
   from '../apps/api/src/seyeon-g5-received-credit-recovery-candidate-v1.js';
 import { executePostgresCommerceInternalTransactionV1 }
   from '../apps/api/src/postgres-commerce-internal-execution.js';
+import {
+  SEYEON_G5_PRIVATE_COMMERCE_DB_V1,
+  SeyeonG5PrivateCommercePostgresPoolV1,
+  SeyeonG5PrivateCommerceBoundaryErrorV1,
+} from '../apps/api/src/seyeon-g5-private-commerce-postgres-pool-v1.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
 import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
@@ -888,6 +893,88 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await commerce?.end();
       // Unconditionally remove only the names derived from the isolated CI DB.
       await pool.query(`drop role if exists ${apiLogin},${commerceLogin}`);
+    }
+  });
+
+  it('G5 actual PG17 separate NOINHERIT LOGIN: checked private pool settles original receipt; excess API membership blocks checkout',async()=>{
+    await installDisposableG5Credit();
+    const db=process.env.PGDATABASE??'';
+    if(process.env.CI!=='true'||process.env.GITHUB_ACTIONS!=='true'||
+       process.env.DB_SUITE!=='postgres17'||process.env.PGHOST!=='localhost'||
+       !/^myeongha_ci_case_[0-9]+$/u.test(db)){
+      throw Error('G5 physical login must be tested only in disposable Actions PG17');
+    }
+    const {f,received}=await g5StrandedRaceOriginal(24);
+    const login=SEYEON_G5_PRIVATE_COMMERCE_DB_V1.login;
+    const {rows:existing}=await pool.query(
+      'select 1 from pg_catalog.pg_roles where rolname=$1',[login]);
+    expect(existing).toHaveLength(0);
+    const password=randomBytes(30).toString('hex');
+    const {rows:[roleDDL]}=await pool.query(
+      "select pg_catalog.format('CREATE ROLE %I LOGIN NOINHERIT PASSWORD %L',$1::text,$2::text) as ddl",
+      [login,password]);
+    let created=false;
+    let native:Pool|undefined;
+    let privatePool:SeyeonG5PrivateCommercePostgresPoolV1|undefined;
+    try{
+      await pool.query(roleDDL.ddl);created=true;
+      await pool.query(`grant myeongha_commerce_internal_executor to ${login}`);
+      native=new Pool({
+        host:process.env.PGHOST,port:Number(process.env.PGPORT??5432),
+        user:login,password,database:db,ssl:false,max:2,statement_timeout:5000,
+      });
+      const raw=native;
+      privatePool=new SeyeonG5PrivateCommercePostgresPoolV1({
+        async connect(){
+          const c=await raw.connect();
+          return {
+            async query(sql,values){
+              const r=values===undefined?await c.query(sql):await c.query(sql,[...values]);
+              return {rows:r.rows as readonly Record<string,unknown>[]};
+            },
+            release(error){c.release(error);},
+          };
+        },
+        async end(){await raw.end();},
+      });
+      // Before any SET LOCAL ROLE, a physical LOGIN cannot execute private
+      // G4/G5 RPCs. The preflight uses this same unprivileged session.
+      const {rows:[identity]}=await raw.query(
+        'select session_user as login,current_user as role');
+      expect(identity).toEqual({login,role:login});
+      await expect(raw.query(
+        'select attempt_id from public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(1,null)',
+      )).rejects.toMatchObject({code:'42501'});
+      const safe=await privatePool.connect();safe.release();
+      const asOf=new Date(Date.now()+10*60_000);
+      expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+        privateCreditPool:privatePool,mode:'preview',maxBatch:1,testAsOf:asOf,
+      })).toEqual({status:'preview',found:1,settled:0,failed:0});
+      expect(await creditState(f)).toEqual({state:'reserved',available:'40',credits:'10'});
+      // Privilege escalation must stop before returning a connection to
+      // the transaction executor, even though the LOGIN has NOINHERIT.
+      await pool.query(`grant myeongha_api_executor to ${login}`);
+      try{
+        await expect(privatePool.connect()).rejects.toBeInstanceOf(
+          SeyeonG5PrivateCommerceBoundaryErrorV1);
+      }finally{
+        await pool.query(`revoke myeongha_api_executor from ${login}`);
+      }
+      expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+        privateCreditPool:privatePool,mode:'apply',maxBatch:1,testAsOf:asOf,
+      })).toEqual({status:'completed',found:1,settled:1,failed:0});
+      expect(await creditState(f)).toEqual({state:'settled',available:'40',credits:'10'});
+      const {rows:[ack]}=await pool.query(
+        'select seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',
+        [f.attempt]);
+      expect(ack.received).toEqual(received);
+      expect(await recoverSeyeonG5ReceivedCreditsCandidateV1({
+        privateCreditPool:privatePool,mode:'preview',maxBatch:1,testAsOf:asOf,
+      })).toEqual({status:'preview',found:0,settled:0,failed:0});
+    }finally{
+      if(privatePool)await privatePool.close();
+      else await native?.end();
+      if(created)await pool.query(`drop role if exists ${login}`);
     }
   });
 
