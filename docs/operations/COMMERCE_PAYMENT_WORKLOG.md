@@ -410,3 +410,11 @@
 - **실패 확인:** PR #2869 커밋 05e8bd2a의 핵심 CI·Governance·Web·Mobile는 PASS, 별도 `Reader Grounding Cross-Service E2E` 실행 41397268134는 1/3 FAIL. 원인은 `test/saju-character-grounding-cross-service.e2e.test.ts`의 공식 Reading source hash가 `sha256:cross-service-official-artifact`로 하드코딩되어, v2 출처가 요구하는 canonical `sha256:v1:<실제 응답 digest>`와 불일치한 점.
 - **수정:** E2E가 실제 `deliveredResponse()`를 `hashSajuHeldSourceProofRequestV1`으로 해시하여 metadata/access/source에 동일한 정확한 immutable digest를 사용하도록 교체. 공식 Reader 권한·출처 일치 검증을 완화하지 않음.
 - **로컬 확인:** TypeScript 서버 빌드 타입 검사 PASS, E2E 테스트 파일 import PASS (로컬 실제 Saju 호스트 미가동으로 3개 테스트 정상 SKIP), git diff --check PASS. 실제 타 서비스 HTTP round-trip과 인증/회수 부정 검증은 해당 PR의 Linux cross-service CI 결과를 확인해야 함. 운영 DB/실제 환불/LIVE 변경 없음.
+
+### 2026-11-02 — P4 운영자 검토 건 → 정확한 영수증 → 수동 환불 실행 연결
+
+- **기반 확인:** PR #2869이 최종 [CI Integration #41402864351](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41402864351) SUCCESS 이후 `main`에 squash 병합(`2b7af680`)됐습니다. 이 신규 작업은 최신 `main`에서 따로 분기하며 기존 통합 완료분은 반복 구현하지 않습니다.
+- **구현:** `commerce-reader-reviewed-refund-execution-v1.ts`에 기존 관리자 전용 고객 접수 검토(READ ONLY)와 기존 운영자 법적 승인 기록·PortOne 환불 명령을 직접 연결했습니다. 관리자가 명시한 원본 접수번호와 영수증이 동일한 검증 대상인지 확인하고, 신청 누락·영수증 불일치·후보 초과·중복 후보·이미 `revoked`된 영수증을 환불 실행 전에 보류합니다. 선택 후보가 하나여도 자동 선택하지 않습니다.
+- **기존 안전장치 재사용:** 고객 접수만으로 자동 승인·환불하지 않으며 공개 API/스케줄러에 경로를 등록하지 않습니다. 고권한 법적 승인 연결과 결제사 실행 연결의 풀을 분리하고, DB의 별도 직렬화 승인 함수가 동일 Subject·Purchase Intent·Unit·Receipt 출처를 재검증한 뒤에만 영속적인 법적 결정을 기록하도록 기존 코드를 그대로 사용합니다. 해당 결정의 COMMIT이 불확실할 때 결제사 POST를 하지 않는 규칙은 유지합니다.
+- **검증:** 연계 신규 테스트 11건 및 기존 운영 승인·환불 관련 46건, 총 5개 파일 **57/57 PASS**. 서버 TypeScript build 타입검사 PASS, 변경 공백 검사 PASS. 격리 PostgreSQL 17 및 실제 PortOne 호출은 이번 별도 운영 연결에서 실행하지 않았습니다. 공개 환불/LIVE/운영 DB 활성화는 하지 않았습니다.
+- **다음:** 새 브랜치 PR 통합 검증. 이후 판매 가능한 Offer/Charge Terms, Production Saju 공급, S5/S7 고객 제공 권한 및 운영 DB 적용은 각 미충족 선행 조건이 충족되기 전까지 HOLD로 유지합니다.
