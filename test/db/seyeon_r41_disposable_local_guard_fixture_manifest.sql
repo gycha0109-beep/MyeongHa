@@ -250,3 +250,39 @@ begin
     'permitsHttpReveal',false
   );
 end $record$;
+
+revoke all on seyeon_positive_candidate.local_guard_fixture_manifest_r41
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on seyeon_positive_candidate.local_guard_fixture_lineage_r41
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on function
+  seyeon_positive_candidate.install_local_guard_fixture_manifest_r41(
+    text,text,text,text,text
+  ) from public,anon,authenticated,service_role,myeongha_api_executor;
+revoke all on function
+  seyeon_positive_candidate.record_local_guard_fixture_r41(
+    uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text
+  ) from public,anon,authenticated,service_role;
+grant execute on function
+  seyeon_positive_candidate.record_local_guard_fixture_r41(
+    uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text
+  ) to myeongha_api_executor;
+do $acl$
+begin
+  if has_table_privilege('myeongha_api_executor',
+       'seyeon_positive_candidate.local_guard_fixture_manifest_r41','SELECT')
+    or has_table_privilege('myeongha_api_executor',
+       'seyeon_positive_candidate.local_guard_fixture_lineage_r41','INSERT')
+    or has_table_privilege('myeongha_api_executor',
+       'seyeon_positive_candidate.local_guard_fixture_lineage_r41','SELECT')
+    or has_function_privilege('myeongha_api_executor',
+       'seyeon_positive_candidate.install_local_guard_fixture_manifest_r41(text,text,text,text,text)','EXECUTE')
+    or has_function_privilege('public',
+       'seyeon_positive_candidate.record_local_guard_fixture_r41(uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text)','EXECUTE')
+    or not has_function_privilege('myeongha_api_executor',
+       'seyeon_positive_candidate.record_local_guard_fixture_r41(uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text)','EXECUTE')
+  then raise exception 'R41 installer/read/Executor ACL violation';
+  end if;
+end $acl$;
+commit;
+\echo 'PASS R41 fixed public authored-guard mock fixture manifest; real output still HOLD'
