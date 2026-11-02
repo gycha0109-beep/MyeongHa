@@ -551,6 +551,14 @@ async function sendTurn(message) {
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
   const submittedThreadId = threadId;
+  // Clear the composer as soon as the send starts. The durable pending Turn
+  // retains the exact text for an idempotent retry if the send is not ACKed.
+  if (messageInput instanceof HTMLTextAreaElement &&
+      messageInput.value.trim() === pendingTurn.text) {
+    messageInput.value = '';
+    messageInput.style.height = 'auto';
+  }
+  let receiptAcknowledged = false;
   const removePendingBubbles = presentChatLiveTurnV1(chatStream, { message: pendingTurn.text, labels: liveTurnLabels() });
 
   try {
@@ -575,7 +583,7 @@ async function sendTurn(message) {
         // An explicit choice archives that failed Turn (without deleting it)
         // and sends the current draft as a new, independently identified Turn.
         const confirmed = window.confirm(uiText(
-          '이 대화방에 이전에 실패한 다른 메시지가 남아 있습니다. 기존 기록은 보존하면서 미완료 전송을 종료하고, 지금 입력한 문장을 새 메시지로 보내시겠습니까?'
+          '이전에 보내지 못한 메시지가 있어요. 이전 기록은 남기고 새 메시지를 보낼까요?'
         ));
         if (!confirmed) throw new Error('TURN_IN_FLIGHT');
         try {
@@ -627,6 +635,9 @@ async function sendTurn(message) {
       throw new Error('INVALID_RESPONSE');
     }
 
+    // ACK already succeeded. A subsequent UI/history failure must never
+    // restore an already-delivered message into the send composer.
+    receiptAcknowledged = true;
     // The receipt ACK is already complete. Retire the idempotency draft
     // before a refresh or session change can make a successful turn retryable.
     clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
@@ -650,6 +661,15 @@ async function sendTurn(message) {
       ? '세연의 답변이 도착했습니다.'
       : '현재 대화 기록 연결을 사용할 수 없습니다.');
   } catch (error) {
+    // Restore the exact text only for a failed/unacknowledged submission.
+    // Never overwrite a newer draft, a different thread, or an ACKed turn.
+    if (!receiptAcknowledged && threadId === submittedThreadId &&
+        messageInput instanceof HTMLTextAreaElement &&
+        !messageInput.value.trim()) {
+      messageInput.value = pendingTurn.text;
+      messageInput.style.height = 'auto';
+      messageInput.style.height = `${Math.min(messageInput.scrollHeight, 120)}px`;
+    }
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {
       AUTH_REQUIRED: '로그인 상태가 만료되었습니다. 다시 로그인해 주세요.',
