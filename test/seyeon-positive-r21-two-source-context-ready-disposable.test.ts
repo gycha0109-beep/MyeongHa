@@ -1933,6 +1933,36 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
       [a.attempt],
     );
+    // A syntactically correct MAC row that has already expired can never
+    // revive its old nonce; expiry is enforced by the DB verifier.
+    await pool.query(
+      `insert into seyeon_positive_candidate.local_guard_seals_r42(
+        attempt_id,selected_sources_digest,interpretation_call_id,
+        renderer_call_id,semantic_review_call_id,guarded_envelope_digest,
+        issued_at,expires_at,nonce,hmac_sha256
+      ) values(
+        $1::uuid,$2::text,$3::uuid,$4::uuid,$5::uuid,$6::text,
+        clock_timestamp()-interval '2 hours',
+        clock_timestamp()-interval '1 hour',
+        gen_random_uuid(),$7::text
+      )`,[
+        a.attempt,source.selection.selectedSourcesDigest,
+        used[2]!.callId,used[3]!.callId,used[4]!.callId,
+        guardedFixture.guardedEnvelopeDigest,'0'.repeat(64),
+      ],
+    );
+    const expired=await tx(c=>c.query<{valid:boolean}>(
+      'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
+      [subject,a.attempt],
+    ),true);
+    expect(expired.rows).toEqual([{valid:false}]);
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r42_db_issued_local_seal_missing',
+    });
+    await pool.query(
+      'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
     await issueSeyeonR42OfflineDbLocalSealV1({
       pinInput,localWitness:restoredWitness,
     });
