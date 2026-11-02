@@ -15,7 +15,10 @@ import {
   SEYEON_STRUCTURED_PROVIDER_CONTRACT_VERSION_V2,
   type SeyeonStructuredProviderRequestV2,
 } from '../apps/api/src/seyeon-character-runtime-v2.js';
-import {createOpenAiSeyeonStructuredProviderV1} from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
+import {
+  createOpenAiSeyeonStructuredProviderV1,
+  type SeyeonUnverifiedTransportOutputReceiptV1,
+} from '../apps/api/src/openai-seyeon-structured-provider-v1.js';
 import {attestSeyeonR35OfflineWireAfterDbPinV1} from '../apps/api/src/seyeon-r35-offline-actual-provider-wire-pin-v1.js';
 import {
   reserveSeyeonR26OfflineGovernedWireV1,
@@ -44,6 +47,33 @@ import {
   recordSeyeonR38OfflineNegativeGuardProbeV1,
   SeyeonR38OfflineNegativeEvidenceHoldV1,
 } from '../apps/api/src/seyeon-r38-offline-guard-negative-db-v1.js';
+import {
+  recordSeyeonR40UnverifiedMockTransportV1,
+  SeyeonR40OfflineUnverifiedTransportHoldV1,
+} from '../apps/api/src/seyeon-r40-offline-unverified-transport-db-v1.js';
+
+/** Strictly fake transport: NOT a Provider response or Guard PASS. */
+function r40SyntheticStubTransport(
+  receipt:SeyeonR32OfflineStageReceiptV1,
+):SeyeonUnverifiedTransportOutputReceiptV1{
+  const sha=(x:string)=>'sha256:wire-utf8:v1:'+
+    createHash('sha256').update(x,'utf8').digest('hex');
+  return Object.freeze({
+    schemaVersion:'seyeon-unverified-transport-output-receipt-r39',
+    originKind:'unverified_transport_bytes_only',
+    callId:receipt.callId,purpose:receipt.purpose,
+    providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+    responseId:'resp_r40_synthetic_stage_'+receipt.stageIndex+
+      '_'+receipt.callId.replace(/-/gu,''),
+    responseBodyDigest:sha(JSON.stringify({
+      synthetic:true,stage:receipt.stageIndex,
+      receipt:'unverified_mock_only',callId:receipt.callId,
+    })),
+    structuredOutputDigest:sha('{"ok":true}'),
+    providerOutputVerified:false,outputGuardVerified:false,
+    permitsAtomicCommit:false,permitsHttpReveal:false,
+  });
+}
 
 const enabled=process.env.CI==='true' &&
   process.env.SEYEON_POSITIVE_GRANT_REAL_PG==='1' &&
