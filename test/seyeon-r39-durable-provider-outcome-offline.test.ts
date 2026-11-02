@@ -36,11 +36,12 @@ const price:NonNullable<OpenAiSeyeonStructuredProviderConfigV1['priceQuote']>={
 };
 function fakeResponse(options:{
   status?:string;text?:string;usage?:boolean;
+  id?:string;model?:string;
 }={}):Response{
   const obj={
-    id:'resp_r39_synthetic_not_provider',
+    id:options.id??'resp_r39_synthetic_not_provider',
     object:'response',
-    model:'seyeon-r39-offline',
+    model:options.model??'seyeon-r39-offline',
     status:options.status??'completed',
     output:[{
       type:'message',role:'assistant',
@@ -107,6 +108,7 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     });
     let release:()=>void=()=>{throw Error('Callback was not installed');};
     let admissionBody='';
+    let admittedCallId='';
     let receiptStarted=false;
     const events:SeyeonAiCostEventV1[]=[];
     const outputReceipts:SeyeonUnverifiedTransportOutputReceiptV1[]=[];
@@ -118,6 +120,7 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
           new TextEncoder().encode(body).byteLength,
         );
         admissionBody=body;
+        admittedCallId=call.callId;
       },
       after:async event=>{
         events.push(event);
@@ -150,6 +153,7 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     expect(released).toBe(true);
     expect(order).toEqual(['cost-start','cost-durable','output-durable']);
     expect(outputReceipts).toHaveLength(1);
+    expect(events[0]?.callId).toBe(admittedCallId);
     const proof=outputReceipts[0]!;
     const body=await fakeResponse().text();
     const sha=(text:string)=>'sha256:wire-utf8:v1:'+
@@ -218,6 +222,25 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     });
     expect(events).toHaveLength(1);
     expect(events[0]?.outcome).toBe('invalid_response');
+  });
+  it('rejects response identity or model mismatch before any successful receipt',async()=>{
+    for(const options of [
+      {id:'untrusted-response-id'},
+      {model:'another-model'},
+    ]){
+      const fetchImpl=vi.fn(async()=>fakeResponse(options));
+      const events:SeyeonAiCostEventV1[]=[];
+      const afterOutput=vi.fn(async()=>undefined);
+      const provider=createOpenAiSeyeonStructuredProviderV1(strictConfig({
+        fetchImpl,after:async event=>{events.push(event);},afterOutput,
+      }));
+      await expect(provider.generate(request)).rejects.toMatchObject({
+        code:'INVALID_RESPONSE',
+      });
+      expect(events).toHaveLength(1);
+      expect(events[0]?.outcome).toBe('invalid_response');
+      expect(afterOutput).not.toHaveBeenCalled();
+    }
   });
   it('withholds syntactically valid but non-object output in strict mode',async()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse({text:'["not-a-schema-object"]'}));
