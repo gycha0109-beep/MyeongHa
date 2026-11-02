@@ -546,12 +546,40 @@ begin
       raise exception using errcode='23514',
         constraint='seyeon_offline_r38_negative_guard_probe_missing';
     end if;
-    -- R37/R38 never assert verified AI outputs: they are local synthetic
-    -- NO-PROVIDER observations and invalid-fixture guard rejections.
-    -- Even when all four negative probes, five local result markers and
-    -- five synthetic receipt ACKs exist, the real positive reply remains
-    -- unapproved. Actual Provider output provenance + independent guarded
-    -- render/review and G0 consent remain absent.
+    -- R40: even the extra digest-only transport receipts are NOT actual
+    -- model provenance or output validation. Still, fail closed if one is
+    -- absent, mismatched to the R30/R37 Call/Wire, or falsely marks PASS.
+    if (select count(*)
+        from seyeon_positive_candidate.unverified_transport_lineage_r40 r
+        where r.attempt_id=p_attempt)<>5
+      or exists (
+        select 1
+        from seyeon_positive_candidate.native_stage_lineage_r30 s
+        left join seyeon_positive_candidate.unverified_transport_lineage_r40 r
+          on r.attempt_id=s.attempt_id
+         and r.stage_index=s.stage_index
+        where s.attempt_id=p_attempt and (
+          r.attempt_id is null
+          or r.purpose is distinct from s.purpose
+          or r.call_id is distinct from s.call_id
+          or r.native_wire_digest is distinct from s.native_wire_digest
+          or r.response_id !~ '^resp_r40_synthetic_[a-z0-9_-]{3,100}$'
+          or r.response_body_digest
+               !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
+          or r.structured_output_digest
+               !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
+          or r.origin_kind is distinct from 'local_stub_transport_unverified'
+          or r.provider_output_verified is distinct from false
+          or r.output_guard_verified is distinct from false
+        )
+      )
+    then
+      raise exception using errcode='23514',
+        constraint='seyeon_offline_r40_unverified_transport_lineage_missing';
+    end if;
+    -- R37/R38/R40 are synthetic local assertions, NOT actual Provider
+    -- output or Character Guard PASS. Five valid Cost ACKs plus every
+    -- synthetic digest and negative probe still cannot authorize G2.
     raise exception using errcode='23514',
       constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
