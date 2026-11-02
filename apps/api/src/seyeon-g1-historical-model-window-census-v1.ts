@@ -43,6 +43,7 @@ export function buildSeyeonG1HistoricalModelWindowCensusV1(input:Readonly<{
   historicalSourceCount:number;
   selectedHistoricalModelSourceDigest:string;
   selectedCompleteModelWindowDigest:string;
+  historicalSources:readonly Readonly<{messageId:string;role:'user'|'assistant';textDigest:string}>[];
   persistedBeforeModel:false;
   authorizesModel:false;
   permitsHttpReveal:false;
@@ -81,7 +82,8 @@ export function buildSeyeonG1HistoricalModelWindowCensusV1(input:Readonly<{
         if(row.messageId===input.currentUserMessageId)
           throw new SeyeonG1HistoricalModelWindowHoldV1();
         historicalSources.push(Object.freeze({
-          messageId:row.messageId,role,textDigest:hash(row.text),
+          messageId:row.messageId,role,textDigest:'sha256:wire-utf8:v1:'+
+            createHash('sha256').update(row.text,'utf8').digest('hex'),
         }));
       }
       ids.add(row.messageId);
@@ -93,6 +95,7 @@ export function buildSeyeonG1HistoricalModelWindowCensusV1(input:Readonly<{
     return Object.freeze({
       version:SEYEON_G1_HISTORICAL_MODEL_WINDOW_CENSUS_V1,
       historicalSourceCount:historicalSources.length,
+      historicalSources:Object.freeze(historicalSources),
       selectedHistoricalModelSourceDigest:hash(historicalSources),
       selectedCompleteModelWindowDigest:hash(exact),
       persistedBeforeModel:false as const,
