@@ -600,3 +600,9 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **원본→재사용 결속:** Node Owner DB 포트는 위 두 필드가 정확히 일치해야만 G1 수령 증빙을 승인한다. 원래 AI 답변을 재사용하는 G0 verifier 및 G2 원자 Commit도 같은 불변 Source Count/Digest를 검사한다. W46의 원본 User ID·본문 지문 검증은 그대로 유지한다.
 - **안전한 범위:** 이는 **과거 대화 0건을 확증하는 실제 G1 Owner Pin**이며, 과거 자료가 1건 이상일 때의 **양수 원본 출처 Pin은 아직 구현되지 않았다**. Verified History/Relationship/Reader의 nonzero 모델 사용은 계속 HOLD. 신규 인가·배포·모델 호출·HTTP 공개·운영 DB 변경·PR 병합 없음; G0~G6는 미통과.
 - **검증:** G1 Owner receipt의 새 필드 누락/추가/위조, DB 전체 Thread 메시지 검사, G0/G2 연계의 계약 테스트를 확장했다. 실제 PostgreSQL 2세션/HEAD TypeScript·Vitest 전체 실행/운영 활성화는 별도 증거 필요.
+
+
+#### W47 후속 · 양수 과거 대화 원본 전수 대조 후보 (모델 호출 차단 유지)
+- 이미 존재하는 G0 DB 원본/파생 관계 재검증 Reader를 **실제 Production Chat Planner**의 양수 Memory 경로에서 다시 호출해, 모델에 선택된 **모든** 최근 User/Assistant 메시지의 ID·순서·역할·원문 SHA를 정밀 대조한다. 하나라도 누락·변조·순서/Character·현재 User 정체성 불일치면 Abort.
+- `buildSeyeonG1HistoricalModelWindowCensusV1`은 유효한 양수 History 전체 목록 digest를 생성하지만 **`persistedBeforeModel:false`, `authorizesModel:false`, `permitsHttpReveal:false`**를 반환한다. DB Owner의 양수 History G1 Pin이 아직 없으므로 검사 통과해도 **무조건 모델 호출 전 HOLD**한다.
+- G1의 실제 불변 Positive Pin은 W47에서 확인한 **과거 History 0건**에만 허용. History 1건 이상/Relationship/Reader 혼합은 최종 원본별 DB G1 Pin·G2/G3 재검증/운영 승인 전 불허. 이 후속 구현은 정책/모델 호출/운영 DB/HTTP/PR 병합 권한을 변경하지 않는다.

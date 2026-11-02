@@ -47,6 +47,7 @@ import {
   assertSeyeonPositiveG1FinalModelContextSealV1,
   buildSeyeonPositiveG1PreModelSourceCensusSealV1,
 } from './seyeon-positive-g1-final-model-context-seal-v1.js';
+import {buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type {
   SeyeonExactModelPersonalSourceSelectionV1,
@@ -749,6 +750,28 @@ export async function runSeyeonProductionChatExecutionV1(
             exactModelSourceSelection: exactModelPersonalSources,
           });
         } else {
+          // W47: Re-read the exact original history window through G0's
+          // DB-owned lineage authorizer, not a caller-supplied sourceRef.
+          // The manifest is source-only and NOT yet an immutable G1 Pin.
+          // Nonzero past conversation stays HOLD even after it matches.
+          if(productionContext.recentMessages.length>0){
+            const maxRecentMessages=contextInput.maxRecentMessages??12;
+            const dbVerifiedWindow=await input.contextReadPort.readRecentMessages({
+              subjectId,threadId,limit:maxRecentMessages,
+              currentUserMessageRef:receivedTurn.userMessageId,
+            });
+            buildSeyeonG1HistoricalModelWindowCensusV1({
+              currentUserMessageId:receivedTurn.userMessageId,
+              currentUserText:receivedTurn.userText,
+              maxRecentMessages,
+              dbVerifiedWindow,
+              exactModelRecentMessages:contextInput.recentMessages.slice(-maxRecentMessages),
+            });
+            throw new SeyeonProductionChatExecutionErrorV1(
+              'Se-yeon historical model sources need an immutable G1 DB Pin before Provider.',
+            );
+          }
+
           // Narrow initial G1/G2 implementation: exactly one user-approved
           // Memory and NO untracked derived past or extra source candidate.
           // SRC-25 approved type/projector registration is still required by
