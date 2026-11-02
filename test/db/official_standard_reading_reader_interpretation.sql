@@ -995,6 +995,19 @@ cross join (values
 ) as x(receipt_id, intent_id, transaction_id, fingerprint)
 where cr.id = '12102000-0000-0000-0000-000000000002';
 
+-- Modern independent B2/B3 paid Reader effects share one S1 lock.
+begin;
+select pg_catalog.set_config('myeongha.subject_id',
+ '11390000-0000-0000-0000-000000000001',true);
+do $reader_b2_prelock$
+begin
+ if to_regprocedure('public.internal_acquire_official_reader_scope_lock_v1(uuid,uuid,text)') is not null then
+  perform public.internal_acquire_official_reader_scope_lock_v1(
+   '11390000-0000-0000-0000-000000000001',
+   '12103100-0000-0000-0000-000000000001','test-unlockable-reader');
+ end if;
+end;
+$reader_b2_prelock$;
 select * from public.internal_apply_verified_receipt_capability_effects_v1(
   '12192000-0000-0000-0000-000000000002',
   array['test-reader-unit'], array[transaction_timestamp()],
@@ -1083,6 +1096,7 @@ select * from public.internal_apply_verified_receipt_capability_effects_v1(
   array[transaction_timestamp()], array[null]::timestamptz[],
   array[null]::text[]
 );
+commit;
 
 select pg_temp.assert_v2_true(
   'DB-C2 other-bundle B3 binds same official Reading but distinct bundle provenance',

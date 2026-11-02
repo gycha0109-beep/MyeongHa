@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import {
   continuationFromVerifiedReaderBindV1,
   resolveCommerceReaderRecordContinuityV1,
@@ -40,6 +41,14 @@ const BIND: FulfilledVerifiedReaderReceiptV1 = Object.freeze({
   purchaseRole: 'initial_reading',
 });
 
+const RECORD_SNAPSHOT = {
+      responseVersion: 'myeonghwa-product-reading-response-v2',
+      state: 'delivered',
+      reading: { readingId: READING, sections: [] },
+    };
+// This fixture exercises historical archive continuity, not modern issuer canonicalization.
+const RECORD_HASH = 'sha256:synthetic-legacy-source';
+
 const RECORD: OfficialReadingRecordReadAuthorityPortV1 = {
   readRecord: async () => ({
     readingId: READING,
@@ -47,12 +56,8 @@ const RECORD: OfficialReadingRecordReadAuthorityPortV1 = {
     sajuDomain: 'career',
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     productResponseState: 'delivered',
-    responseSnapshotJsonb: {
-      responseVersion: 'myeonghwa-product-reading-response-v2',
-      state: 'delivered',
-      reading: { readingId: READING, sections: [] },
-    },
-    responseHash: 'sha256:v1:' + 'a'.repeat(64),
+    responseSnapshotJsonb: RECORD_SNAPSHOT,
+    responseHash: RECORD_HASH,
     // Historical Reader provenance is deliberately not a live Grant.
     readerCharacterIds: ['seyeon'],
     completedAt: NOW,
@@ -75,7 +80,7 @@ const ACCESS = Object.freeze({
   domainCapabilityVersion: 'domain-capability-v1',
   readingContractVersion: 'myeonghwa-product-reading-response-v2',
   sajuEngineVersion: 'saju-v2',
-  responseHash: 'sha256:v1:' + 'a'.repeat(64),
+  responseHash: RECORD_HASH,
 });
 
 type ReaderAuthorities = Pick<

@@ -242,6 +242,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?: import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly admitServerReader?: (serverReaderCharacterId: string) => void;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);
@@ -275,6 +276,7 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     ...(input.productReaderEligibilityAuthorityPort
       ? { productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort }
       : {}),
+    ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
     ...(input.admitServerReader ? { admitServerReader: input.admitServerReader } : {}),
   });
 

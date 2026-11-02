@@ -398,3 +398,10 @@
 - **수정 — 승인된 좁은 복구 보존:** `run-supabase-production-migrations.sh`의 미승인 Reader 일반 배포 HOLD를, 기존 명시 승인된 Se-yeon ACL repair·Guest Promotion repair의 정확한 마이그레이션만 실행하고 종료한 뒤 위치하도록 이동했습니다. 일반 `supabase db push --include-all`에 도달하기 전에는 여전히 HOLD로 실패합니다. 기존 실제 복구 테스트 **18/18 PASS**, Bash 문법 검사 PASS.
 - **수정 — Reader 구형 synthetic 실험:** `official_standard_reading_reader_interpretation.sql`에 신규 1740 잠금 계약이 존재하는 DB에서만 정확한 Subject×Reading×Reader 범위 잠금을 **같은 트랜잭션 내에서** 먼저 획득하는 경로를 추가했습니다. 실서비스 잠금 완화 없이 기존 초기 Receipt synthetic Grant 실험이 1800 검증과 함께 수행되도록 변경했고, 신규 migration이 없는 구형 SQL에서는 이전 경로가 유지됩니다. 실제 PostgreSQL 17 실행 결과를 반드시 CI로 확인해야 합니다.
 - **상태:** 2차 CI가 완료되기 전에 원인 확인된 테스트 차단·Reader synthetic 호환성 문제를 수정 중. 최종 통합 SQL 실행 성공 여부는 미확정이며 LIVE·운영 DB 실행은 없습니다.
+
+### 2026-11-02 — CI #41325221985 후속 수정
+- 실제 실패: Work Track 내 7개 테스트 파일 269건, 추가로 PostgreSQL 17의 Commerce 3개 독립 케이스 실패 확인.
+- 구현: Reader/Chat/Preview/HTTP의 정확한 현재 구매권 확인 포트를 기존 A2 접근 게이트에 전달. 실서비스 권한 검증을 우회하거나 기본 허가하지 않음.
+- 테스트 자료: 사주·Reader·취소 웹훅·이전 형식의 기록 해시를 현재 명시된 테스트 계약에 맞게 수정. 기존의 부정 테스트는 유지.
+- PostgreSQL 17: 독립적인 B2/B3 유료 Reader 결제 데이터 테스트에 기존 Subject×Reading×Reader 잠금 획득을 추가하여 1790 안전 장벽을 유지. 실제 PG17 재검증 필요.
+- 로컬 검증: 관련 7개 테스트 파일 321/321 PASS, API TypeScript 검사 PASS. 학원 PC에서는 실제 PG17 테스트 미실행. 운영 DB·실제 환불·LIVE 미변경.
