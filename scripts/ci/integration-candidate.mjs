@@ -80,7 +80,9 @@ export function currentCandidate(repo, pr) {
   const current = api(`repos/${repo}/pulls/${pr}`);
   const metadata = api(`repos/${repo}`);
   current.defaultBranch = metadata.default_branch;
-  current.defaultSha = api(`repos/${repo}/commits/${encodeURIComponent(metadata.default_branch)}`).sha;
+  // Fetch only the branch ref: the full commit API returns all changed files
+  // and can exceed execFileSync's 1 MiB output limit after a large merge.
+  current.defaultSha = api(`repos/${repo}/git/ref/heads/${encodeURIComponent(metadata.default_branch)}`).object.sha;
   return current;
 }
 

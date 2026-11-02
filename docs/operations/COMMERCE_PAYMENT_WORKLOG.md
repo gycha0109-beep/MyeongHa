@@ -410,3 +410,9 @@
 - **실패 확인:** PR #2869 커밋 05e8bd2a의 핵심 CI·Governance·Web·Mobile는 PASS, 별도 `Reader Grounding Cross-Service E2E` 실행 41397268134는 1/3 FAIL. 원인은 `test/saju-character-grounding-cross-service.e2e.test.ts`의 공식 Reading source hash가 `sha256:cross-service-official-artifact`로 하드코딩되어, v2 출처가 요구하는 canonical `sha256:v1:<실제 응답 digest>`와 불일치한 점.
 - **수정:** E2E가 실제 `deliveredResponse()`를 `hashSajuHeldSourceProofRequestV1`으로 해시하여 metadata/access/source에 동일한 정확한 immutable digest를 사용하도록 교체. 공식 Reader 권한·출처 일치 검증을 완화하지 않음.
 - **로컬 확인:** TypeScript 서버 빌드 타입 검사 PASS, E2E 테스트 파일 import PASS (로컬 실제 Saju 호스트 미가동으로 3개 테스트 정상 SKIP), git diff --check PASS. 실제 타 서비스 HTTP round-trip과 인증/회수 부정 검증은 해당 PR의 Linux cross-service CI 결과를 확인해야 함. 운영 DB/실제 환불/LIVE 변경 없음.
+
+### 2026-11-02 — P4 운영자 환불 연결 PR #2889 최종 통합 검사 및 요청기 용량 오류 수정
+- **원 PR:** #2889 커밋 `859610ca`에서 CI, Governance, Web PR Domain Gates 모두 PASS. 필수 `CI Integration Verify` 부재로 병합 보류. 원래 통합 요청 스크립트가 대형 main 병합 커밋 전체(파일 192건)를 JSON으로 받다가 `spawnSync gh ENOBUFS` 발생.
+- **실행:** PR #2889 HEAD를 수정하지 않고 로컬 요청기의 GitHub `commits/main` 전체 응답을 `git/ref/heads/main` SHA만 조회하도록 수정한 뒤 기존 `request-integration.mjs` 실행 성공. 정확한 SHA·기존 보호 규칙 확인 뒤 [통합 검사 #41406605093](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41406605093) 요청됨. 해당 검사의 성공 여부는 별도 확인 필요.
+- **영구 수정:** 독립 브랜치에서 `scripts/ci/integration-candidate.mjs`의 기본 브랜치 SHA 조회를 최소 크기의 Git ref API로 교체하고, 이후 다시 전체 commit 조회가 섞이지 않도록 테스트 추가. 기존 required check, GitGuardian, pinned HEAD, integration label 제출 정책은 미변경.
+- **로컬 검증:** CI 요청기 관련 테스트 23/23 PASS, Node 구문 검사 PASS, 변경 공백 검사 PASS. 운영 DB·환불·LIVE는 변경하지 않음.
