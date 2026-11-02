@@ -462,6 +462,16 @@ export function createOpenAiSeyeonStructuredProviderV1(
             ...(config.priceQuote === undefined ? {} : { priceQuote: config.priceQuote }),
             ...(config.observeMetric === undefined ? {} : { observeMetric: config.observeMetric }),
           });
+          // R39: incomplete/unpriced usage is NEVER an allowed "success"
+          // settlement in strict mode. Client-side text cannot fill missing
+          // provider token usage or silently make a paid call free.
+          if(config.requireDurableOutcomeReceipt===true
+            &&outcome==='response_received'
+            &&(event.costStatus!=='estimated'
+              ||event.estimatedCostMicroUsd===null
+              ||event.inputTokens===null
+              ||event.outputTokens===null))
+            throw new Error('R39_STRICT_PROVIDER_USAGE_UNPROVEN');
           await config.meteredAfterOutcome?.(event);
         } catch {
           // Existing mode still preserves legacy best-effort metrics, but
