@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-02 KST — Phase 11 실제 사주 엔진 CPU·메모리 강제 제한 격리 실행 경로 구현
+
+- **현황:** Phase 11 동시 요청 거절 검증 [PR #2878](https://github.com/gycha0109-beep/MyeongHa/pull/2878) 통합 CI [#41396970797](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41396970797) 성공 후 병합. 실제 사주 엔진 리소스 관측 [PR #2881](https://github.com/gycha0109-beep/MyeongHa/pull/2881) 최초 통합 CI 성공 후 `main` 변경에 따른 문서 충돌을 병합했고 새 SHA에 대한 통합 CI [#41402426159](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41402426159)를 정확한 PR HEAD로 재제출. 이 PR의 재검증 완료나 병합은 아직 확인되지 않음.
+- **구현:** 새 수동 전용 `.github/workflows/saju-isolated-cgroup-capacity-acceptance.yml`, `scripts/operations/run-isolated-saju-cgroup-phase11-ci.sh`, `scripts/operations/collect-isolated-saju-cgroup-phase11.mjs`, 정적·부정 검증 추가. public Saju 정확한 SHA `9807ce89c08afc61b587560d515a475efd819032` 빌드만 허용. disposable GitHub Linux 컨테이너에 명시적인 **0.5 CPU / 256MiB RAM 및 스왑 금지**를 적용해 실제 production calculation host에 합성 96건을 요청하고 커널 cgroup 실제 강제한도·CPU throttle·메모리 peak/OOM 정보를 확인할 수 있도록 구성.
+- **안전 경계:** GitHub `main` 수동 실행만 허용. Docker `--network none`으로 외부 인터넷/운영 서버 연결 차단, 호스트 포트 미노출, 소스 read-only, 임시 메모리 파일만 쓰기 허용, 운영 DB·Saju Bearer·Supabase 비밀 env 거부. 실패 시 반드시 `BLOCKED_INCOMPLETE`. cgroup 환경이 호환되지 않거나 Docker 없으면 성공으로 처리하지 않음.
+- **검증 한계:** Windows 장비의 Docker 데몬 및 Linux WSL 배포판이 없어 **실제 리소스 제한 컨테이너는 아직 실행되지 않았음**. 새 정적·수치·부정계약 검증은 로컬 PASS; GitHub Linux 수동 실증 후에만 강제 제한 증거를 인정한다. 단일 제한값에서 측정 성공해도 `sajuSaturationCeilingProven=false`, `productionCapacityProven=false`, `drReady=false`, `serviceResumptionAllowed=false`; Hosted 전체 복구·독립 개인정보 원장 연속성 #1887 OPEN.
+
 ### 2026-11-02 KST — Phase 11 실제 사주 계산 엔진 격리 CPU·메모리·지연 관측
 
 - **로드맵 기준:** `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` Phase11의 사주 포화·용량 측정 미완료 항목을 대상으로 한다. 기존 [PR #2878](https://github.com/gycha0109-beep/MyeongHa/pull/2878)은 실제 명하 HTTP 호출부에서 **가상 429/503 거절**을 검증한 것일 뿐 Saju 엔진 실측이 아니다; 이 사실을 분리한다.
