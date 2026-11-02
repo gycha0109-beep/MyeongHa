@@ -51,6 +51,13 @@ export interface CreateProductionPaymentAttemptServerVerificationRuntimeInputV1 
   }) => Promise<void>;
   /** Opt-in: provider-verified production Reading receipt and active consent only. */
   readonly verifiedPurchaseAnalytics?: Pick<ReturnType<typeof createAdminAnalyticsVerifiedPurchaseAdapterV1>, 'record'>;
+  /**
+   * Explicit SERVER-owned S2 fulfillment after the provider-verified Receipt
+   * has committed. This is not an environment/browser switch, does not mount
+   * the route, and never authorizes S5 content generation or S7 disclosure.
+   * Defaults to OFF until DB Owner's private Writer is accepted.
+   */
+  readonly privateReaderReceiptFulfillmentEnabled?: boolean;
 }
 
 /**
@@ -103,6 +110,8 @@ export function createProductionPaymentAttemptServerVerificationRuntimeV1(
         verificationAdapter,
         ...(observer === undefined ? {} :
           { onVerifiedReceiptCommitted: observer }),
+        privateReaderReceiptFulfillmentEnabled:
+          input.privateReaderReceiptFulfillmentEnabled === true,
       });
     },
     close() {

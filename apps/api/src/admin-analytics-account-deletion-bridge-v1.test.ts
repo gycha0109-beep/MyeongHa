@@ -21,6 +21,11 @@ function harness(options:{failErase?:boolean;withAnalytics?:boolean}={}){
       outboxEventId:OUTBOX,outboxStatus:phase==='completed'?'processed' as const:'processing' as const};}},
     dbFinalizerPort:{async finalizeDatabase(){calls.push('finalize');phase='auth_deletion_required';return{finalized:true,replayed:false,authMappingPresent:true};}},
     completionPort:{async completeDeletion(){calls.push('complete');phase='completed';return{completed:true,replayed:false,completedAt:'2026-10-28T10:00:00Z'};}},
+    readerPrivacyStatePort:{
+      async readProtectedManifest(){return{entries:[]};},
+      async hasPendingKeyErasure(){return false;},
+      async markKeysErased(){return false;},
+    },
   };
   const authDeletionPort:SupabaseAuthAdminUserDeletionPortV1={
     async deleteUser(){calls.push('auth');phase='completion_ack_required';return{outcome:'deleted'};},

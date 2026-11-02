@@ -173,6 +173,16 @@ function fixtures(options: {
       CharacterStandardReadingArtifactAuthorityPortV1,
     productReaderEligibilityAuthorityPort: { readApprovedRule } satisfies
       ProductReaderEligibilityAuthorityPortV1,
+    currentVerifiedPurchaseAuthorityPort: {
+      assertCurrentVerifiedPurchase: vi.fn(async (scope: {
+        subjectId: string; readingId: string; readerCharacterId: string; readerContentBundleId: string;
+      }) => {
+        if (scope.subjectId !== SUBJECT || scope.readingId !== READING ||
+            scope.readerCharacterId !== reader || scope.readerContentBundleId !== (options.pinnedBundle ?? BUNDLE)) {
+          throw new Error('exact purchase authority mismatch');
+        }
+      }),
+    },
   };
   return { input, events, readRuntimeBinding, readAccessibleReadings,
     readApprovedRule, readArtifactSource };

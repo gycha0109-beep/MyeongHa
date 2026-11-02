@@ -11,11 +11,12 @@ const candidate=read('docs/operations/candidates/account_deletion_finalizer_with
 const claim=read('docs/operations/candidates/digital_reading_withdrawal_claim_private_v1.sql');
 
 describe('P4 staged private Claim DELETE integration in full PostgreSQL account finalizer',()=>{
- it('installs both candidates only inside disposable isolated full-migration PostgreSQL DB',()=>{
+ it('tests approved migrations only inside disposable isolated full-migration PostgreSQL DB',()=>{
   expect(runner).toContain('^myeongha_[a-z0-9_]+$');
   expect(runner).toContain('"$db" == *production*');
-  expect(runner).toContain('digital_reading_withdrawal_claim_private_v1.sql');
-  expect(runner).toContain('account_deletion_finalizer_with_private_withdrawal_claim_v1.sql');
+  expect(runner).toContain('Both approved Commerce migrations (2310 and 2320)');
+  expect(runner).toContain('digital_reading_withdrawal_claims_private_v1');
+  expect(runner).toContain('NEW_COMMERCE_CLAIM_REFUND_ACL_OR_SCHEMA_MISMATCH');
   expect(runner).toContain('COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF=1');
   expect(runner).toContain("show server_version_num");
   expect(runner).not.toContain('supabase db push');
@@ -54,7 +55,7 @@ describe('P4 staged private Claim DELETE integration in full PostgreSQL account 
  });
  it('requires the actual finalizer replay to reject resurrected Claim instead of returning idempotent success',()=>{
   expect(scenario).toContain('after-finalization)');
-  expect(scenario).toContain('Private withdrawal claim remains after account DB finalization');
+  expect(scenario).toContain('Withdrawal claim resurrected after account deletion');
   expect(scenario).toContain('internal_finalize_account_deletion_db_v1(');
   expect(scenario).toContain('rollback;');
   expect(scenario).toContain('replay proof leaked synthetic residual data');

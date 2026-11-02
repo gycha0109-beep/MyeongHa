@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import type { CharacterRuntimeContextV1 } from '../packages/domain/src/index.js';
 import {
   runReaderInterpretationPreviewV1,
@@ -22,8 +23,10 @@ const READER_ID = 'baekheon';
 const BUNDLE_ID = 'bundle-baekheon-cross-service-v1';
 const RESPONSE_VERSION = 'myeonghwa-product-reading-response-v2';
 const ENGINE_VERSION = 'saju-cross-service-engine-v1';
-const OFFICIAL_ARTIFACT_HASH = 'sha256:cross-service-official-artifact';
 const TIMING_TEXT = '긴 시간축에서 반복되는 흐름을 확인해야 합니다.';
+// The stored v2 artifact must be content-addressed to its exact delivered snapshot.
+// A decorative fixture hash is rejected by the same strict authority used in production.
+const OFFICIAL_ARTIFACT_HASH = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(deliveredResponse());
 
 function requiredEnv(name: string): string {
   const value = process.env[name];
