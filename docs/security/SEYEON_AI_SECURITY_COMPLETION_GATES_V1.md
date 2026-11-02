@@ -606,3 +606,13 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - 이미 존재하는 G0 DB 원본/파생 관계 재검증 Reader를 **실제 Production Chat Planner**의 양수 Memory 경로에서 다시 호출해, 모델에 선택된 **모든** 최근 User/Assistant 메시지의 ID·순서·역할·원문 SHA를 정밀 대조한다. 하나라도 누락·변조·순서/Character·현재 User 정체성 불일치면 Abort.
 - `buildSeyeonG1HistoricalModelWindowCensusV1`은 유효한 양수 History 전체 목록 digest를 생성하지만 **`persistedBeforeModel:false`, `authorizesModel:false`, `permitsHttpReveal:false`**를 반환한다. DB Owner의 양수 History G1 Pin이 아직 없으므로 검사 통과해도 **무조건 모델 호출 전 HOLD**한다.
 - G1의 실제 불변 Positive Pin은 W47에서 확인한 **과거 History 0건**에만 허용. History 1건 이상/Relationship/Reader 혼합은 최종 원본별 DB G1 Pin·G2/G3 재검증/운영 승인 전 불허. 이 후속 구현은 정책/모델 호출/운영 DB/HTTP/PR 병합 권한을 변경하지 않는다.
+
+
+### 2026-11-02 · W48 · 전체 과거 대화 출처를 격리 DB 불변 후보에 결속 (모델/Commit/Reveal HOLD)
+
+- **구현:** 기존 양수 한 건 Memory의 G1 Pin과 분리된 `22-g1-original-historical-candidate-pin.sql`을 S0 설치 계획의 G0 원본 출처 함수 뒤에 추가. 동일 DB 트랜잭션에서 원본 Member/현재 User/과거 User·Assistant 전체 모델 창/원본 Memory·Grant의 현재 유효성을 검증하고, 원래 `chat_turn_attempts.seyeon_personal_source_pin_jsonb`에 불변 후보 기록을 남긴다. 새 개인 데이터 테이블은 만들지 않는다.
+- **원본 권한:** G0 DB 함수 `qry_seyeon_g0_current_source_recent_messages_v1`가 과거 Assistant에 연결된 기존 원본 Grant, 원래 User 질문과 현재 철회 상태를 재검증하며, 입력 배열의 메시지 ID·역할·UTF-8 SHA-256 지문을 DB가 **전수 재생성**하여 비교한다. 중복/누락/다른 Character/순서 변경·현재 User 변조·원본 Memory/Grant 변경 시 후보 생성 전체 HOLD. DB 원문은 후보 영수증에 복제하지 않는다.
+- **실제 Node 경로:** `historicalSourceCandidateDbPort`는 검증된 Subject 경로에서 별도 격리 포트를 공급받았을 때만 사용한다. 양수 History 창의 전체 Source/Context digest를 결속해 DB 영수증의 목록·원본 IDs·불허 표식을 정밀 검사한다. 보통의 운영 경로에는 새 포트가 공급되지 않으며 기본 개인기록 Projector도 비활성이다.
+- **승인 경계:** 저장 형태는 `historicalCandidateProof` (`seyeon-g1-historical-source-candidate-v1`)이지 기존 `positiveProof`가 아니다. `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`이고 **저장 성공 시에도 반드시 AI Interpreter 호출 전에 중단**한다. 기존 G2 Atomic Commit과 G3 Reveal은 이 타입을 허가하지 않는다. 이는 원본 출처를 저장하는 후보까지의 구현이며 **정식 양수 History G1/G2/G3 허가가 아니다**.
+- **검증:** `test/seyeon-g1-historical-owner-candidate-w48.test.ts`에 정확한 DB 후보/역할·source 변경/권한 플래그 변조/모델 중단 계약을 추가. 단위 테스트는 소스에 작성했으나 최종 HEAD 실제 실행·PostgreSQL 독립 2세션 및 운영 CI 확인 이전에는 PASS 판정 금지.
+- **미완료:** Reader·Relationship·인용/복사된 파생 출처 전체, 양수 History 정상 답변 생성/동일 TX Commit/최초 공개·Replay, G0 최종 승인, 실제 DB·HTTP Race 증명과 G6. 운영 DDL·유료 Provider·공개 API·PR 병합 없음; `HOLD_FORWARD_STOPPED` 유지.
