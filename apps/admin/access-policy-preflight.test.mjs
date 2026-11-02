@@ -44,7 +44,6 @@ describe('live Access Owner-only policy deployment gate',()=>{
   it('refuses broad, additional, expired or mismatched policies',async()=>{
     for(const policies of [
       [{...policy,include:[{everyone:{}}]}],
-      [{...policy,include:[{email:{email:'other@example.test'}}]}],
       [{...policy,include:[{email:{email:owner}},{everyone:{}}]}],
       [{...policy,exclude:[{ip:{ip:'1.1.1.1'}}]}],
       [{...policy,decision:'bypass'}],
@@ -52,8 +51,15 @@ describe('live Access Owner-only policy deployment gate',()=>{
       [],
     ])await expect(fixture([app],policies).execute()).rejects.toThrow('Owner allow policy');
   });
+  it('reports a safe Owner email mismatch without exposing its value',async()=>{
+    await expect(fixture([app],[{...policy,include:[{email:{email:'other@example.test'}}]}]).execute())
+      .rejects.toThrow('Owner email mismatch');
+  });
+  it('distinguishes denied Access API reads without returning sensitive data',async()=>{
+    await expect(fixture([app],[policy],false).execute()).rejects.toThrow('applications HTTP 403');
+  });
   it('refuses a missing source or unauthorized Cloudflare API without echoing credentials',async()=>{
-    await expect(fixture([app],[policy],false).execute()).rejects.toThrow('readback unavailable');
+    await expect(fixture([app],[policy],false).execute()).rejects.toThrow('applications HTTP 403');
     const error=await verifyAdminAccessPolicyV1({
       accountId:'not-a-real-account',apiToken:'sensitive-token-abc',
       audience,ownerEmail:owner,fetchImpl:async()=>{throw Error('Unexpected call');},

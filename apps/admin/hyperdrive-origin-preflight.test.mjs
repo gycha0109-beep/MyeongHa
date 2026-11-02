@@ -5,7 +5,7 @@ const read='a'.repeat(32),audit='b'.repeat(32);
 const base={id:read,name:'myeongha-admin-reader-test',
  caching:{disabled:true},
  mtls:{sslmode:'verify-full',ca_certificate_id:'d25c14bc-d654-46b8-89cf-5c4baf931771'},
- origin:{host:'aws-0-ap-southeast-1.pooler.supabase.com',port:5432,scheme:'postgresql',
+ origin:{host:'aws-0-ap-southeast-1.pooler.supabase.com',port:6543,scheme:'postgresql',
   user:'myeongha_admin_reader.cnsfpcdiyofqvhpcegfc',database:'postgres'},
 };
 const auditConfig={...base,id:audit,name:'myeongha-admin-audit-test',
@@ -39,6 +39,7 @@ describe('dedicated Admin Hyperdrive origin preflight',()=>{
    {...base,caching:{disabled:false}},
    {...base,id:audit},
    {...base,origin:{...base.origin,database:'other'}},
+   {...base,origin:{...base.origin,port:5432}},
   ])expect(()=>check(changed)).toThrow();
  });
  it('fails closed if live origin metadata is missing or unavailable',async()=>{

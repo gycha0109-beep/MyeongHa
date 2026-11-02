@@ -24,7 +24,8 @@ export function inspectAdminHyperdriveOriginV1(config,role,id){
   throw Error('Dedicated Admin origin host mismatch');
  const user=origin.host===POOLER?role+'.'+PROJECT:role;
  if(origin.user!==user||origin.database!=='postgres'||
-    origin.port!==5432||!['postgres','postgresql'].includes(origin.scheme))
+    origin.port!==(origin.host===POOLER?6543:5432)||
+    !['postgres','postgresql'].includes(origin.scheme))
   throw Error('Dedicated Admin origin principal mismatch');
  return Object.freeze({role,verified:true});
 }
