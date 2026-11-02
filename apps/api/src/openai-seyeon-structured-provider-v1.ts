@@ -408,6 +408,13 @@ export function createOpenAiSeyeonStructuredProviderV1(
   const requestTimeoutMs = timeoutMs(config.timeoutMs);
   const requestOutputCeiling = maxOutputTokens(config.maxOutputTokens);
   const fetchImpl = config.fetchImpl ?? fetch;
+  // Strict provenance requires the actual configured OpenAI API origin,
+  // never an arbitrary user-supplied HTTPS endpoint. A locally injected
+  // fixture Fetch remains only a test and is not a Provider signature.
+  if(config.requireDurableOutcomeReceipt===true
+     &&config.origin!==undefined
+     &&config.origin!==OPENAI_RESPONSES_DEFAULT_ORIGIN_V1)
+    failConfiguration('Strict governed output requires the fixed OpenAI API origin.');
   if (config.requireDurableOutcomeReceipt===true &&
     (config.meteredBeforeDispatch===undefined
      ||config.meteredAfterOutcome===undefined
@@ -631,6 +638,12 @@ export function createOpenAiSeyeonStructuredProviderV1(
               );
             outputText=extractStructuredText(raw);
             structured=JSON.parse(outputText) as unknown;
+            if(!isRecord(structured))
+              throw new OpenAiSeyeonStructuredProviderErrorV1(
+                'INVALID_STRUCTURED_OUTPUT',
+                'Strict structured output must be a root JSON object.',
+                response.status,
+              );
           }catch(error){
             await meter('invalid_response',response.status,raw);
             if(error instanceof OpenAiSeyeonStructuredProviderErrorV1)
