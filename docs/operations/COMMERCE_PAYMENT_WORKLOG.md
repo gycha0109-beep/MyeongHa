@@ -429,3 +429,9 @@
 - **확인:** CI #41406605093 실패는 `admission`의 `spawnSync gh ENOBUFS`이며 전체 환불 회귀 검증은 시작되지 않았음. 해당 커밋의 `commits/main` JSON 조회가 1MB 이상이어서 실패. 새 커밋 `8421d74d`에서 `git/ref/heads/main` 조회로 변경하고 회귀 검증 34/34 PASS.
 - **main 최신화:** 원격 main이 #2888 병합 `a19cb76b`까지 진행했으며 동일 ref 조회 수정이 먼저 반영되어, PR 브랜치의 충돌은 해당 코드 바로 위 주석 문장 차이만 발생. main의 동일 안전 로직을 유지하고 충돌을 해결. 별도 보안 트랙 파일들은 main 그대로 병합되며 환불 경로를 임의 변경하지 않음.
 - **안전 경계:** 동결된 과거 통합 요청은 실패로 유지. 새로운 PR HEAD의 CI 성공과 다시 요청할 최종 `CI Integration Verify` 성공 없이는 병합하지 않음. LIVE/운영 DB/실제 환불 변경 없음.
+
+### 2026-11-02 — PR #2889 최종 CI 성공 후 main 충돌 해소
+- **확인:** 최종 [통합 CI #41410102536](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41410102536)의 admission/full/DB PG17/CI Verify/CI Integration Verify 모두 SUCCESS. 원 HEAD `2b5e3960`에서 재확인.
+- **병합 차단:** 그 후 다른 트랙의 #2890/#2892 등의 병합으로 origin/main이 `d7d07f65`까지 이동하여 #2889는 GitHub mergeable_state `dirty`. `tests/ci-integration-candidate.test.mjs`의 CI 조회 검증 테스트 한 파일이 충돌했음.
+- **수정:** 기존 브랜치의 중복 간이 검증 대신 신규 main의 더 엄격한 `defaultBranchRefSha()` 브랜치·SHA 검증 테스트를 그대로 유지함. 기타 main의 보안·채팅 변경을 제외/변형하지 않고 통합. 로컬 관련 테스트 **82/82 PASS**, API TypeScript PASS, staged diff check PASS.
+- **다음 게이트:** 충돌해결 커밋 원격 제출 후 새 HEAD에서 CI 성공과 새 필수 고정 HEAD Integration CI를 확인하기 전에는 합병 완료로 추정하지 않음. LIVE 및 운영 DB 변경 없음.

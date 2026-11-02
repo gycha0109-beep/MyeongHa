@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, assertParallelTrackLoosePolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
+import { describe, expect, it } from 'vitest';
+import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, assertParallelTrackLoosePolicy, validateCandidate, defaultBranchRefSha } from '../scripts/ci/integration-candidate.mjs';
 
 const candidate = { pr: '42', head: 'a'.repeat(40), base: 'b'.repeat(40) };
 const current = () => ({
@@ -13,12 +13,30 @@ const check = (id = 1, name = 'CI Verify', conclusion = 'success', app = 15368) 
   id, name, conclusion, status: 'completed', app: { id: app },
 });
 
-describe('pinned integration admission and required evidence', () => {
-  it('reads only the default-branch Git ref rather than an oversized commit payload', () => {
-    const source = readFileSync('scripts/ci/integration-candidate.mjs', 'utf8');
-    expect(source).toContain('git/ref/heads/${encodeURIComponent(metadata.default_branch)}');
-    expect(source).not.toContain('api(`repos/${repo}/commits/${encodeURIComponent(metadata.default_branch)}`)');
+describe('size-bounded default-branch commit authority', () => {
+  const sha='a'.repeat(40);
+  it('reads the exact default branch commit reference', () => {
+    expect(defaultBranchRefSha({
+      ref:'refs/heads/main',object:{type:'commit',sha},
+    },'main')).toBe(sha);
   });
+  it('rejects different branches, non-commit refs and malformed SHAs', () => {
+    for(const bad of [
+      {ref:'refs/heads/release',object:{type:'commit',sha}},
+      {ref:'refs/heads/main',object:{type:'tag',sha}},
+      {ref:'refs/heads/main',object:{type:'commit',sha:'z'.repeat(40)}},
+      {ref:'refs/heads/main',object:{type:'commit',sha:'a'.repeat(39)}},
+      null,
+    ]) expect(() => defaultBranchRefSha(bad,'main')).toThrow('authoritative');
+  });
+  it('does not retrieve full commit patches for branch-head freshness checks', () => {
+    const readFile=readFileSync(new URL('../scripts/ci/integration-candidate.mjs',import.meta.url),'utf8');
+    expect(readFile).toContain('git/ref/heads/');
+    expect(readFile).not.toMatch(/api\(`repos\/\$\{repo\}\/commits\/\$\{encodeURIComponent\(metadata\.default_branch\)\}/u);
+  });
+});
+
+describe('pinned integration admission and required evidence', () => {
   it('accepts the exact open PR against the current default branch', () => {
     expect(() => validateCandidate(candidate, current())).not.toThrow();
   });
