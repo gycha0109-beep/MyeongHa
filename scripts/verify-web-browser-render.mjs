@@ -320,6 +320,11 @@ try {
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
       empty: visible('#saju-empty'), form: visible('#saju-birth-form'), button: visible('#saju-create-button'),
       hubHidden: document.querySelector('#saju-hub')?.hidden, hubRendered: rendered('#saju-hub'),
+      backdrop: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+      panelBackdrop: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage,
+      panelBorder: getComputedStyle(document.querySelector('#saju-empty')).borderTopWidth,
+      mainWidth: document.querySelector('.gm-saju-main').getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
       overflow: document.documentElement.scrollWidth - innerWidth,
     };
   })()`);
@@ -330,6 +335,7 @@ try {
   assert(sajuState.empty && sajuState.form && sajuState.button, 'Saju onboarding is not fully visible');
   assert(sajuState.hubHidden === true && sajuState.hubRendered === false, 'Saju populated state must fail closed without a Birth Profile');
   assert(sajuState.bodyText.includes('아직 등록된 사주가 없습니다.') && sajuState.bodyText.includes('내 사주 만들기'), 'Saju onboarding copy missing');
+  assert(sajuState.backdrop.includes('saju-empty-light.avif') && sajuState.panelBackdrop === 'none' && sajuState.panelBorder === '0px' && Math.abs(sajuState.mainWidth - sajuState.viewportWidth) <= 2, `Light Saju artwork must cover the full page body, not the inner registration panel: ${JSON.stringify(sajuState)}`);
   assert(sajuState.overflow <= 2, `Saju horizontal overflow: ${sajuState.overflow}px`);
   await artifact(client, '-saju');
 
@@ -475,10 +481,16 @@ try {
       const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
     };
-    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav'), overflow: document.documentElement.scrollWidth - innerWidth };
+    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav'),
+      backdrop: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+      panelBackdrop: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage,
+      mainWidth: document.querySelector('.gm-saju-main').getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
+      overflow: document.documentElement.scrollWidth - innerWidth };
   })()`);
   assert(mobileSaju.width === 390 && mobileSaju.empty && mobileSaju.form && mobileSaju.bottomNav, 'Mobile Saju onboarding is not fully visible');
   assert(mobileSaju.overflow <= 2, `Mobile Saju horizontal overflow: ${mobileSaju.overflow}px`);
+  assert(mobileSaju.backdrop.includes('saju-empty-light.avif') && mobileSaju.panelBackdrop === 'none' && Math.abs(mobileSaju.mainWidth - mobileSaju.viewportWidth) <= 2, `Mobile Saju artwork must fill the content viewport: ${JSON.stringify(mobileSaju)}`);
   await artifact(client, '-saju-mobile');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -567,6 +579,9 @@ try {
   assert(toggleState.dark.theme === 'dark' && toggleState.dark.stored === 'dark' && toggleState.dark.pressed === 'true', 'Theme toggle did not switch back to dark');
 
   const darkSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju' });
+  const darkSajuBackdrop = await client.evaluate(`(() => ({ main: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+    panel: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage }))()`);
+  assert(darkSajuBackdrop.main.includes('saju-empty-dark.avif') && darkSajuBackdrop.panel === 'none', `Dark Saju artwork must be full-bleed: ${JSON.stringify(darkSajuBackdrop)}`);
   const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-route-state', { artifactSuffix: '-dark-reading-detail' });
   const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-people .chat-person-card', { artifactSuffix: '-dark-chat-hub' });
   const darkChatRoom = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { artifactSuffix: '-dark-chat-room' });
@@ -576,6 +591,9 @@ try {
   await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const darkMobileHome = await verifyDarkPage(client, origin, '/hall.html', '.mhx-hero', { artifactSuffix: '-dark-home-mobile' });
   const darkMobileSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju-mobile' });
+  const darkMobileSajuBackdrop = await client.evaluate(`(() => ({ main: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+    panel: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage }))()`);
+  assert(darkMobileSajuBackdrop.main.includes('saju-empty-dark.avif') && darkMobileSajuBackdrop.panel === 'none', `Dark mobile Saju artwork must be full-bleed: ${JSON.stringify(darkMobileSajuBackdrop)}`);
   const darkMobileChat = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { toggle: false, artifactSuffix: '-dark-chat-room-mobile' });
   const mobileChatState = await client.evaluate(`(() => ({
     theme: document.documentElement.dataset.theme,

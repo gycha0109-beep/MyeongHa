@@ -223,16 +223,37 @@ html[data-theme="dark"] body.saju-hub-page .saju-form-error {
   color: #ffdbd4;
 }
 
-/* Empty saju birth form: theme-specific celestial artwork, with the form kept readable. */
-body.saju-hub-page .saju-empty {
-  background: #faf6ef url("./assets/saju/saju-empty-light.avif?v=20261026-threadless") center / cover no-repeat;
+/* Extend the existing Saju entry artwork to the whole canvas below the header.
+   Only the empty registration state gets this full-bleed backdrop. */
+body.saju-hub-page .gm-saju-main:has(#saju-empty:not([hidden])) {
+  min-height: calc(100vh - 92px);
+  min-height: calc(100svh - 92px);
+  padding: 0;
+  background: #faf6ef url("./assets/saju/saju-empty-light.avif?v=20261026-threadless") center 55% / cover no-repeat;
+}
+body.saju-hub-page .gm-saju-main:has(#saju-empty:not([hidden])) .saju-empty {
+  min-height: max(650px, calc(100svh - 92px));
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 body.saju-hub-page .saju-empty::before,
 body.saju-hub-page .saju-empty::after {
   content: none;
 }
-html[data-theme="dark"] body.saju-hub-page .saju-empty {
-  background: #171c23 url("./assets/saju/saju-empty-dark.avif?v=20261026-threadless") center / cover no-repeat;
+html[data-theme="dark"] body.saju-hub-page .gm-saju-main:has(#saju-empty:not([hidden])) {
+  background: #171c23 url("./assets/saju/saju-empty-dark.avif?v=20261026-threadless") center 55% / cover no-repeat;
+}
+@media (max-width: 767px) {
+  body.saju-hub-page .gm-saju-main:has(#saju-empty:not([hidden])) {
+    min-height: calc(100svh - 72px);
+    background-position: center bottom;
+  }
+  body.saju-hub-page .gm-saju-main:has(#saju-empty:not([hidden])) .saju-empty {
+    min-height: max(640px, calc(100svh - 72px));
+  }
 }
 
 /* Two independent tabs: refined Four Pillars and interactive five-element radar. */

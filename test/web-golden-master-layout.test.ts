@@ -109,6 +109,11 @@ describe('Web Golden Master', () => {
     expect(catalog.match(/symbol:/gu)).toHaveLength(11);
     expect(page).toContain("resumedVisibleTopic ?? '#saju-design-products-title'");
     expect(design).toContain('.saju-design-product-card:nth-last-child(3):nth-child(4n+1)');
+    expect(design).toContain('.gm-saju-main:has(#saju-empty:not([hidden]))');
+    expect(design).toContain('saju-empty-light.avif?v=20261026-threadless');
+    expect(design).toContain('saju-empty-dark.avif?v=20261026-threadless');
+    expect(design).toContain('background: transparent;');
+    expect(design).toContain('min-height: max(650px, calc(100svh - 92px))');
     expect(saju).not.toContain('gm-sidebar');
     expect(design).toContain('.saju-design-product-grid');
     expect(design).toContain('@media (max-width:690px)');
