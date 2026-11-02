@@ -1913,7 +1913,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         issued_at,expires_at,nonce,hmac_sha256
       ) values(
         $1::uuid,$2::text,$3::uuid,$4::uuid,$5::uuid,$6::text,
-        clock_timestamp(),clock_timestamp()+interval '1 hour',
+        statement_timestamp(),statement_timestamp()+interval '1 hour',
         gen_random_uuid(),$7::text
       )`,[
         a.attempt,source.selection.selectedSourcesDigest,
@@ -1942,8 +1942,8 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         issued_at,expires_at,nonce,hmac_sha256
       ) values(
         $1::uuid,$2::text,$3::uuid,$4::uuid,$5::uuid,$6::text,
-        clock_timestamp()-interval '2 hours',
-        clock_timestamp()-interval '1 hour',
+        statement_timestamp()-interval '2 hours',
+        statement_timestamp()-interval '1 hour',
         gen_random_uuid(),$7::text
       )`,[
         a.attempt,source.selection.selectedSourcesDigest,
