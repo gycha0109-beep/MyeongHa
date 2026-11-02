@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { describe, it } from 'node:test';
+import { describe, it } from 'vitest';
 import { assertIsolatedSajuCgroupEvidence } from '../../scripts/operations/collect-isolated-saju-cgroup-phase11.mjs';
 
 const workflow = readFileSync('.github/workflows/saju-isolated-cgroup-capacity-acceptance.yml', 'utf8');
