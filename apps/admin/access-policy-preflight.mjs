@@ -18,22 +18,32 @@ export async function verifyAdminAccessPolicyV1(input){
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(ownerEmail))
    throw Error('Dedicated Admin Access verification configuration unavailable');
  const base='https://api.cloudflare.com/client/v4/accounts/'+accountId+'/access/apps';
- async function read(path){
-  const res=await fetchImpl(path,{method:'GET',redirect:'error',
+ async function read(path,stage){
+  let res;
+  try{res=await fetchImpl(path,{method:'GET',redirect:'error',
    headers:{Authorization:'Bearer '+apiToken,Accept:'application/json'},
-   signal:AbortSignal.timeout(8000)});
-  if(!res.ok)throw Error('Dedicated Admin Access readback unavailable');
-  const value=await res.json();
+   signal:AbortSignal.timeout(8000)});}catch{
+   throw Error('Dedicated Admin Access '+stage+' request unavailable');
+  }
+  // Include only the endpoint category and HTTP status, never remote bodies or credentials.
+  if(!res.ok)throw Error('Dedicated Admin Access '+stage+' HTTP '+res.status);
+  let value;
+  try{value=await res.json();}catch{throw Error('Invalid Admin Access '+stage+' response');}
   if(value?.success!==true||!Array.isArray(value.result))
-   throw Error('Invalid Admin Access readback');
+   throw Error('Invalid Admin Access '+stage+' response');
   return value.result;
  }
- const apps=await read(base);
+ const apps=await read(base,'applications');
  const selected=apps.filter(a=>a?.name===APP_NAME&&a?.domain===HOST&&a?.type==='self_hosted');
  if(selected.length!==1||selected[0].aud!==audience||!ID.test(selected[0].id??''))
    throw Error('Dedicated Admin Access application identity mismatch');
  const app=selected[0];
- const policies=await read(base+'/'+app.id+'/policies');
+ const policies=await read(base+'/'+app.id+'/policies','policies');
+ // Report a safe reason when a provisioned Owner identity differs; no email is logged.
+ if(policies.length===1&&policies[0]?.include?.length===1&&
+    policies[0].include[0]?.email?.email&&
+    policies[0].include[0].email.email!==ownerEmail)
+   throw Error('Dedicated Admin Access Owner email mismatch');
  if(policies.length!==1||!ID.test(policies[0]?.id??'')||
     policies[0].decision!=='allow'||policies[0].name!=='Owner email only'||
     !Array.isArray(policies[0].include)||policies[0].include.length!==1||
@@ -58,8 +68,11 @@ if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.u
    ownerEmail:process.env.MYEONGHA_ADMIN_OWNER_EMAIL,
   });
   console.log(JSON.stringify(result));
- }catch{
-  console.error('Dedicated Admin Access Owner-policy readback failed');
+ }catch(error){
+  const message=String(error?.message??'');
+  // Only locally defined, non-sensitive error categories can reach CI logs.
+  console.error(/^Dedicated Admin Access|^Invalid Admin Access/u.test(message)
+   ?message:'Dedicated Admin Access Owner-policy readback failed');
   process.exitCode=2;
  }
 }
