@@ -58,6 +58,12 @@ psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r38_disposable_guard_negative_linea
 # Its Owner re-verifies two current original Grants, native stage and
 # settled Cost event + ACK before any synthetic digest is recorded.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r40_disposable_unverified_transport_lineage.sql
+# R41 bootstrap: run the ACTUAL authored domain guards against the fixed
+# public, original-only fixture and freeze the three output digests.
+# This may never authorize real Provider output or HTTP Reveal.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r41_disposable_local_guard_fixture_manifest.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r41-local-guard-fixture-manifest-disposable.test.ts --maxWorkers=1
 # One DB transaction now binds each actual native stage, trusted code-owned
 # Interpreter authority manifest, prior local result, and Governor budget.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql
@@ -80,4 +86,4 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r31-g2-forward-stop-disposable.test.ts --maxWorkers=1
-echo 'PASS offline original ancestry + R36 Character authority + R37 local results + R38 rejected guards + R40 mocked transport digests, G2/G3 and final G2 ACL stop; Production G0/G2/G3 HOLD'
+echo 'PASS offline original ancestry + R36 Character authority + R37/R38 local results + R40 mock transport + R41 authored guard fixture, G2/G3 HOLD; Production G0/G2/G3 HOLD'
