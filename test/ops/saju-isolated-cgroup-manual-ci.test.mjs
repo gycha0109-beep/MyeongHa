@@ -34,6 +34,7 @@ const kernel = {
   cpuMax: '50000 100000\n',
   cpuStat: 'usage_usec 190000\nnr_periods 30\nnr_throttled 10\nthrottled_usec 100000\n',
   memoryMax: '268435456\n',
+  memorySwapMax: '0\n',
   memoryPeak: '165000000\n',
   memoryEvents: 'low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\n',
 };
@@ -65,6 +66,7 @@ describe('Phase 11 actual isolated Saju cgroup manual proof', () => {
     assert.equal(report.resourceConstraintEnforced, true);
     assert.equal(report.cpuQuotaCores, 0.5);
     assert.equal(report.memoryLimitBytes, 268435456);
+    assert.equal(report.memorySwapLimitBytes, 0);
     assert.equal(report.observedCgroupPeakMemoryBytes, 165000000);
     assert.equal(report.successfulCalculations, 96);
     assert.equal(report.cpuThrottledPeriods, 10);
@@ -76,6 +78,7 @@ describe('Phase 11 actual isolated Saju cgroup manual proof', () => {
   it('fails closed on missing resource limits, OOM, partial measurements or readiness claims', () => {
     assert.throws(() => assertIsolatedSajuCgroupEvidence(sample, { ...kernel, cpuMax: 'max 100000\n' }));
     assert.throws(() => assertIsolatedSajuCgroupEvidence(sample, { ...kernel, memoryMax: 'max\n' }));
+    assert.throws(() => assertIsolatedSajuCgroupEvidence(sample, { ...kernel, memorySwapMax: '1048576\n' }));
     assert.throws(() => assertIsolatedSajuCgroupEvidence(sample, { ...kernel, memoryEvents: kernel.memoryEvents.replace('oom_kill 0', 'oom_kill 1') }));
     assert.throws(() => assertIsolatedSajuCgroupEvidence({ ...sample, attempted: 95 }, kernel));
     assert.throws(() => assertIsolatedSajuCgroupEvidence({ ...sample, productionCapacityProven: true }, kernel));

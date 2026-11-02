@@ -97,6 +97,7 @@ jq -e --arg sha "$expected" \
    .cpuQuotaMicroseconds == 50000 and
    .cpuPeriodMicroseconds == 100000 and
    .memoryLimitBytes == 268435456 and
+   .memorySwapLimitBytes == 0 and
    .observedCgroupPeakMemoryBytes > 0 and
    .observedMemoryOomKillEvents == 0 and
    .sajuSaturationCeilingProven == false and

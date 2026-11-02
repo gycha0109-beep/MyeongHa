@@ -46,10 +46,12 @@ export function assertIsolatedSajuCgroupEvidence(measurement, cgroup) {
   requireCondition(quota === EXPECTED_CPU_QUOTA && period === EXPECTED_CPU_PERIOD,
     'CPU hard cap was not enforced');
   const memoryLimitBytes = Number(cgroup.memoryMax.trim());
+  const swapLimitBytes = Number(cgroup.memorySwapMax.trim());
   const memoryPeakBytes = Number(cgroup.memoryPeak.trim());
   requireCondition(memoryLimitBytes === EXPECTED_MEMORY_BYTES &&
     Number.isSafeInteger(memoryPeakBytes) && memoryPeakBytes > 0,
   'Memory hard cap was not enforced');
+  requireCondition(swapLimitBytes === 0, 'Container swap must be disabled by kernel cgroup');
   requireCondition(memoryPeakBytes <= memoryLimitBytes,
     'Memory peak exceeded hard memory limit');
 
@@ -87,6 +89,7 @@ export function assertIsolatedSajuCgroupEvidence(measurement, cgroup) {
     cpuThrottledPeriods,
     cpuThrottledMicroseconds,
     memoryLimitBytes,
+    memorySwapLimitBytes: swapLimitBytes,
     observedCgroupPeakMemoryBytes: memoryPeakBytes,
     observedMemoryOomKillEvents: memoryOomKillEvents,
     observations: measurement.observations,
@@ -109,6 +112,7 @@ if (process.argv[1] && pathToFileURL(resolve(process.argv[1])).href === import.m
       cpuMax: await readFile('/sys/fs/cgroup/cpu.max', 'utf8'),
       cpuStat: await readFile('/sys/fs/cgroup/cpu.stat', 'utf8'),
       memoryMax: await readFile('/sys/fs/cgroup/memory.max', 'utf8'),
+      memorySwapMax: await readFile('/sys/fs/cgroup/memory.swap.max', 'utf8'),
       memoryPeak: await readFile('/sys/fs/cgroup/memory.peak', 'utf8'),
       memoryEvents: await readFile('/sys/fs/cgroup/memory.events', 'utf8'),
     };
