@@ -276,6 +276,10 @@ declare
   v_witness seyeon_positive_candidate.local_guard_fixture_lineage_r41%rowtype;
   v_key bytea;
   v_mac text;
+  v_edge seyeon_positive_candidate.source_edges_r1%rowtype;
+  v_current record;
+  v_original_digest text;
+  v_count integer:=0;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
@@ -310,6 +314,38 @@ begin
     or v_seal.provider_output_verified is distinct from false
     or v_seal.output_guard_verified is distinct from false
   then return false; end if;
+  -- The signature alone can outlive an Original Grant. Its only valid
+  -- use is while BOTH exact originally pinned Memory/Grant pairs remain
+  -- current. Re-grant with a new ID cannot resurrect the sealed fixture.
+  for v_edge in
+    select * from seyeon_positive_candidate.source_edges_r1
+    where attempt_id=p_attempt order by ordinal for share
+  loop
+    if v_count>=2 or v_edge.ordinal<>v_count
+      or v_edge.record_kind<>'memory'
+      or v_edge.record_type<>'shared_detail'
+      or v_edge.schema_version<>'memory-v1'
+    then return false; end if;
+    select g.granted_at,m.content_jsonb into v_current
+    from public.record_access_grants g
+    join public.memory_items m on m.id=g.memory_item_id
+      and m.subject_id=g.subject_id
+    where g.id=v_edge.original_grant_id and g.subject_id=p_subject
+      and g.memory_item_id=v_edge.memory_id
+      and g.grantee_character_id='seyeon'
+      and g.revoked_at is null and m.revoked_at is null
+      and m.source_kind='user_approved' and m.memory_type='shared_detail'
+      and m.schema_version='memory-v1'
+    for share of g,m;
+    if not found then return false; end if;
+    v_original_digest:='sha256:pg-jsonb:v1:'||
+      encode(sha256(convert_to(v_current.content_jsonb::text,'UTF8')),'hex');
+    if v_current.granted_at is distinct from v_edge.original_granted_at
+      or v_original_digest is distinct from v_edge.pg_payload_digest
+    then return false; end if;
+    v_count:=v_count+1;
+  end loop;
+  if v_count<>2 then return false; end if;
   v_mac:=encode(public.hmac(convert_to(
     seyeon_positive_candidate.local_guard_seal_payload_r42(
       v_seal.attempt_id,v_seal.selected_sources_digest,
