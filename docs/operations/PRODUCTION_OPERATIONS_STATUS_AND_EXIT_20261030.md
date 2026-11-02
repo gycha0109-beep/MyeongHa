@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-02 KST — Phase 7·11 실제 Linux 격리 PostgreSQL 18 검증 PASS 및 비식별 증거 실사
+
+- **병합 확인:** [PR #2873](https://github.com/gycha0109-beep/MyeongHa/pull/2873), 소켓 경로 수정 HEAD `c589a1f92c1b5c370e3774c0655fa922f5b0d019`은 [전체 통합 CI #41324933923](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41324933923) 모든 필수 검사 SUCCESS 후 `2026-11-01T16:18:09Z`에 main `03ac28c4ffa77ddb01d05e92f2c1906ab052968f`으로 병합. 첫 Linux 실패 [#41317389955](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41317389955)와 재시도 실패 [#41321211252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41321211252)는 과거 실패로 유지하며 새 성공으로 덮어쓰지 않는다.
+- **실제 Linux 실행:** 이후 별도의 최신 main SHA `b7d71697119c1a0d33a95979d5f4333202da1b5d`에서 Ubuntu 26.04 및 PostgreSQL18 **수동 격리 실검증 [#41327504617](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41327504617) SUCCESS**. PostgreSQL 18 임시 loopback 클러스터를 분리 생성·종료했으며, 로컬 권한/RLS 테스트 **1/1 PASS**와 합성 DB 풀 압력·사후 정상 회복 **PASS**를 실제 GitHub job log에서 확인.
+- **비식별 결과 증명:** GitHub Actions 결과 artifact `13092295390`, `isolated-pg18-phase7-phase11-41327504617`, SHA-256 `6ad1330742bc564b3c9f5045b6bdbdf8dfd7dfd2b3b89dd41dccd8b66933278b` (artifact ZIP 다이제스트, `2026-11-15T16:40:41Z` 만료)를 독립적으로 다운로드해 JSON 계약 검증 **PASS**. `schema=myeongha-ops-isolated-pg18-phase7-phase11-v1`, `status=PASS`, `realIsolatedRlsProven=true`, `isolatedRlsCaseCount=1`, `isolatedPoolSaturationProven=true`, `outputContainsIdentifiers=false` 확인.
+- **실제 합성 부하 수치:** 최대 풀 2개, 합성 지연 80ms, 연결 획득 제한 140ms, 총 96건. 동시성 1에서 **20/20 성공**(p95 **82.009ms**), 2에서 **20/20**(p95 **81.945ms**), 4에서 **24/24**(p95 **163.545ms**), 8에서 **16/32 성공·16/32 의도된 획득 타임아웃**(성공분 p95 **209.284ms**). 총 **80건 성공·16건 제한**, `observedPeakConnections<=2`, `postSaturationRecovery=true`. 해당 측정은 `SELECT pg_sleep`의 합성 SQL이며 실제 명하 요청량/용량 평가로 전환할 수 없다.
+- **수용 경계 유지:** `productionRlsProven=false`, `productionCapacityProven=false`, `realMyeonghaQueriesMeasured=false`, `sajuResourceCeilingProven=false`, `scalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`. 실제 Hosted Auth·Storage 전체 복구, 독립 개인정보 원장 연속성, 운영 DB TLS/실쿼리 및 승인된 PT24H RPO/PT6H RTO, 최종 운영 ACCEPTANCE는 미완료. #1887 OPEN; Production DB·사용자 데이터·운영 환경·유료 리소스 변경 없음.
+
+
 ### 2026-11-02 KST — 격리 PostgreSQL18 Linux 시작 실패 원인 범위 축소 및 소켓 경로 격리 수정
 
 - **현황 확인:** [PR #2867](https://github.com/gycha0109-beep/MyeongHa/pull/2867)은 전체 통합 검사 성공 후 main `ed9d4bdcfbcf196c8f7bdf71cff6803a9e401c22`에 병합 완료. 그러나 그 후의 실제 Ubuntu26.04 PostgreSQL18 수동 실검증 [#41321211252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41321211252) **FAILURE**: 정확한 PostgreSQL18 바이너리·npm 설치는 통과했으나 실제 RLS Vitest 실행의 `pg_ctl start`가 약 2초 내 실패; SQL 권한 정책·사용자 격리 검사 자체는 실행되지 않았고 Phase11 96건 부하는 미실행. 비식별 실패 증거 artifact `13089721169`가 보존됐음. `postgres` 내부 로그는 기존 러너에서 공개되지 않았으므로 실패 원인을 Unix 소켓 경로 권한으로 **추정**하되, 실증 전 단정하지 않는다.
