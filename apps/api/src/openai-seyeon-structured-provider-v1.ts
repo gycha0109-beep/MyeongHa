@@ -283,66 +283,89 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function extractStructuredText(raw: unknown): string {
+// W44 AI-output boundary: transport content is still untrusted. In particular,
+// tool calls and other output items MUST NOT disappear while extracting one
+// plausible-looking assistant JSON object. Reasoning items carry no user text.
+// This is structural admission, never a provider signature or Output Guard PASS.
+function extractStructuredText(raw: unknown, strict = false): string {
   if (!isRecord(raw)) {
     throw new OpenAiSeyeonStructuredProviderErrorV1(
-      'INVALID_RESPONSE',
-      'OpenAI Responses payload must be an object.',
-      200,
+      'INVALID_RESPONSE', 'OpenAI Responses payload must be an object.', 200,
     );
   }
   if (raw.status !== 'completed') {
     throw new OpenAiSeyeonStructuredProviderErrorV1(
-      'INVALID_RESPONSE',
-      'OpenAI Responses request did not complete successfully.',
-      200,
+      'INVALID_RESPONSE', 'OpenAI Responses request did not complete successfully.', 200,
     );
   }
   if (!Array.isArray(raw.output)) {
     throw new OpenAiSeyeonStructuredProviderErrorV1(
-      'INVALID_RESPONSE',
-      'OpenAI Responses payload is missing output items.',
-      200,
+      'INVALID_RESPONSE', 'OpenAI Responses payload is missing output items.', 200,
     );
   }
-
+  let messages = 0;
   const texts: string[] = [];
   for (const item of raw.output) {
-    if (!isRecord(item) || item.type !== 'message') continue;
+    if (!isRecord(item)) {
+      throw new OpenAiSeyeonStructuredProviderErrorV1(
+        'INVALID_RESPONSE', 'OpenAI output item is invalid.', 200,
+      );
+    }
+    if (item.type === 'reasoning') {
+      if (item.status !== undefined && item.status !== 'completed') {
+        throw new OpenAiSeyeonStructuredProviderErrorV1(
+          'INVALID_RESPONSE', 'OpenAI reasoning item did not complete.', 200,
+        );
+      }
+      continue;
+    }
+    // No tools were requested. A response carrying an unexpected tool or
+    // auxiliary output item is not an authorized structured-only reply.
+    if (item.type !== 'message') {
+      throw new OpenAiSeyeonStructuredProviderErrorV1(
+        'INVALID_RESPONSE', 'OpenAI returned an unauthorized output item.', 200,
+      );
+    }
+    messages += 1;
+    if (messages !== 1 ||
+        (item.role !== undefined && item.role !== 'assistant') ||
+        (strict && item.role !== 'assistant') ||
+        (item.status !== undefined && item.status !== 'completed') ||
+        (item.phase !== undefined && item.phase !== null &&
+          item.phase !== 'final_answer')) {
+      throw new OpenAiSeyeonStructuredProviderErrorV1(
+        'INVALID_RESPONSE', 'OpenAI structured assistant output identity is invalid.', 200,
+      );
+    }
     if (!Array.isArray(item.content)) {
       throw new OpenAiSeyeonStructuredProviderErrorV1(
-        'INVALID_RESPONSE',
-        'OpenAI message output content is invalid.',
-        200,
+        'INVALID_RESPONSE', 'OpenAI message output content is invalid.', 200,
       );
     }
     for (const part of item.content) {
-      if (!isRecord(part)) continue;
-      if (part.type === 'refusal') {
+      if (!isRecord(part)) {
         throw new OpenAiSeyeonStructuredProviderErrorV1(
-          'MODEL_REFUSAL',
-          'OpenAI model refused the structured request.',
-          200,
+          'INVALID_RESPONSE', 'OpenAI message content item is invalid.', 200,
         );
       }
-      if (part.type === 'output_text') {
-        if (typeof part.text !== 'string' || part.text.trim().length === 0) {
-          throw new OpenAiSeyeonStructuredProviderErrorV1(
-            'INVALID_RESPONSE',
-            'OpenAI structured output text is invalid.',
-            200,
-          );
-        }
-        texts.push(part.text);
+      if (part.type === 'refusal') {
+        throw new OpenAiSeyeonStructuredProviderErrorV1(
+          'MODEL_REFUSAL', 'OpenAI model refused the structured request.', 200,
+        );
       }
+      if (part.type !== 'output_text' ||
+          typeof part.text !== 'string' || part.text.trim().length === 0) {
+        throw new OpenAiSeyeonStructuredProviderErrorV1(
+          'INVALID_RESPONSE', 'OpenAI structured output text is invalid.', 200,
+        );
+      }
+      texts.push(part.text);
     }
   }
-
-  if (texts.length !== 1) {
+  if (messages !== 1 || texts.length !== 1) {
     throw new OpenAiSeyeonStructuredProviderErrorV1(
       'INVALID_RESPONSE',
-      'OpenAI structured request must produce exactly one output_text part.',
-      200,
+      'OpenAI structured request must produce exactly one assistant output_text.', 200,
     );
   }
   return texts[0]!;
@@ -630,13 +653,14 @@ export function createOpenAiSeyeonStructuredProviderV1(
               ||typeof raw.id!=='string'
               ||!/^resp_[A-Za-z0-9_-]{3,120}$/u.test(raw.id)
               ||raw.model!==model
+              ||raw.object!=='response'
               ||rawResponseBodyText===null)
               throw new OpenAiSeyeonStructuredProviderErrorV1(
                 'INVALID_RESPONSE',
                 'Structured transport response identity is invalid.',
                 response.status,
               );
-            outputText=extractStructuredText(raw);
+            outputText=extractStructuredText(raw,true);
             structured=JSON.parse(outputText) as unknown;
             if(!isRecord(structured))
               throw new OpenAiSeyeonStructuredProviderErrorV1(
