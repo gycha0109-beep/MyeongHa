@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, assertParallelTrackLoosePolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
 
 const candidate = { pr: '42', head: 'a'.repeat(40), base: 'b'.repeat(40) };
@@ -13,6 +14,11 @@ const check = (id = 1, name = 'CI Verify', conclusion = 'success', app = 15368) 
 });
 
 describe('pinned integration admission and required evidence', () => {
+  it('reads only the default-branch Git ref rather than an oversized commit payload', () => {
+    const source = readFileSync('scripts/ci/integration-candidate.mjs', 'utf8');
+    expect(source).toContain('git/ref/heads/${encodeURIComponent(metadata.default_branch)}');
+    expect(source).not.toContain('api(`repos/${repo}/commits/${encodeURIComponent(metadata.default_branch)}`)');
+  });
   it('accepts the exact open PR against the current default branch', () => {
     expect(() => validateCandidate(candidate, current())).not.toThrow();
   });

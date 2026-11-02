@@ -418,3 +418,9 @@
 - **기존 안전장치 재사용:** 고객 접수만으로 자동 승인·환불하지 않으며 공개 API/스케줄러에 경로를 등록하지 않습니다. 고권한 법적 승인 연결과 결제사 실행 연결의 풀을 분리하고, DB의 별도 직렬화 승인 함수가 동일 Subject·Purchase Intent·Unit·Receipt 출처를 재검증한 뒤에만 영속적인 법적 결정을 기록하도록 기존 코드를 그대로 사용합니다. 해당 결정의 COMMIT이 불확실할 때 결제사 POST를 하지 않는 규칙은 유지합니다.
 - **검증:** 연계 신규 테스트 11건 및 기존 운영 승인·환불 관련 46건, 총 5개 파일 **57/57 PASS**. 서버 TypeScript build 타입검사 PASS, 변경 공백 검사 PASS. 격리 PostgreSQL 17 및 실제 PortOne 호출은 이번 별도 운영 연결에서 실행하지 않았습니다. 공개 환불/LIVE/운영 DB 활성화는 하지 않았습니다.
 - **다음:** 새 브랜치 PR 통합 검증. 이후 판매 가능한 Offer/Charge Terms, Production Saju 공급, S5/S7 고객 제공 권한 및 운영 DB 적용은 각 미충족 선행 조건이 충족되기 전까지 HOLD로 유지합니다.
+
+### 2026-11-02 — PR #2889 최종 통합 CI #41406605093 실패 수정 및 재실행
+- **실패 원인 확정:** `admission` 단계에서 PR HEAD `859610ca`의 `scripts/ci/integration-candidate.mjs`가 `repos/.../commits/main`의 거대한 JSON 응답을 동기 호출하여 `spawnSync gh ENOBUFS` 발생. `full` 검증은 실행되지 않고 `CI Integration Verify`가 실패한 것. 결제·환불 실행 코드 자체의 실패 증거는 없음.
+- **수정:** 이미 독립 CI 복구 PR #2891에 구현한 동일한 기본 브랜치 SHA 조회 변경을 **대기 중인 #2889 브랜치 자체에도 반영**. `git/ref/heads/main`의 최소 크기 SHA만 읽어 기존 커밋 정보 용량 문제를 제거. 동일 필수 검사 및 GitGuardian/동결 HEAD 검증은 유지.
+- **검증:** 통합 CI 사전검사·운영자 환불 브리지 관련 로컬 테스트 **34/34 PASS**, Node 구문 및 git diff --check PASS. 수정된 PR HEAD의 일반 CI와 최종 CI가 실제 통과하기 전까지 병합 완료로 판정 금지.
+- **재시도:** 새 PR HEAD를 Push하여 일반 필수 검사 재실행 뒤 동일 HEAD로 고정된 통합 검사를 1회 요청. 기존 실패한 #41406605093는 성공으로 변경되지 않음. 운영 DB/실제 고객 환불/LIVE는 변경하지 않음.
