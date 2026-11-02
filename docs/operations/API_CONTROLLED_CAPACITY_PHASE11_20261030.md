@@ -6,7 +6,23 @@ The existing `scripts/operations/measure-isolated-postgres-capacity-phase11.mjs`
 
 A separate main-only manual workflow, `.github/workflows/postgres-isolated-rls-capacity-acceptance.yml`, now executes both on an ephemeral GitHub-hosted **Ubuntu 26.04** runner whose PostgreSQL **18** binaries are installed under `/usr/lib/postgresql/18/bin`. The runtime `scripts/operations/run-isolated-postgres-phase7-phase11-ci.sh` refuses any other repository/ref/event, production database credentials, missing or incorrect PostgreSQL binaries, missing actual RLS PASS output, or capacity evidence that violates the existing bounded measurement contract. Each script creates its own disposable loopback database and cleans it up. No external project, hosted database, real user records, Production SQL migration or paid testing resource is created.
 
-The resulting 14-day sanitized artifact contains the actual stage-by-stage synthetic pool metrics (concurrency 1/2/4/8, 96 total requests, pool max 2), post-pressure recovery flag and exact Phase 7 RLS acceptance; on failure it emits `BLOCKED_INCOMPLETE`, never fabricated PASS. The full real Linux run has **NOT YET OCCURRED** until the main-only workflow is merged and manually dispatched.
+The resulting 14-day sanitized artifact contains the actual stage-by-stage synthetic pool metrics (concurrency 1/2/4/8, 96 total requests, pool max 2), post-pressure recovery flag and exact Phase 7 RLS acceptance; on failure it emits `BLOCKED_INCOMPLETE`, never fabricated PASS. **The first actual successful Linux run occurred on 2026-11-01T16:40Z (2026-11-02 KST), documented in the evidence addendum below.**
+
+### 2026-11-02 — First successful GitHub Linux real isolated PostgreSQL 18 acceptance
+
+After [PR #2873](https://github.com/gycha0109-beep/MyeongHa/pull/2873) fixed the per-cluster Linux Unix socket directory and passed [full Integration #41324933923](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41324933923), its merge `03ac28c4ffa77ddb01d05e92f2c1906ab052968f` was deployed into main. A separately dispatched [actual manual Ubuntu26.04 PG18 run #41327504617](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41327504617) executed at exact later main SHA `b7d71697119c1a0d33a95979d5f4333202da1b5d` and **SUCCESS**. The job log shows true isolated RLS subject/role transaction **1/1 PASS** and real synthetic DB pool pressure/recovery **PASS**, not a skipped test.
+
+Its independently downloaded identifier-free [evidence artifact #13092295390](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41327504617/artifacts/13092295390) (ZIP digest `sha256:6ad1330742bc564b3c9f5045b6bdbdf8dfd7dfd2b3b89dd41dccd8b66933278b`, expires 2026-11-15T16:40:41Z) confirms `status=PASS`, `realIsolatedRlsProven=true`, `isolatedPoolSaturationProven=true`, `isolatedRlsCaseCount=1`, `outputContainsIdentifiers=false`, `postSaturationRecovery=true`. The synthetic 80ms SQL-delay, 140ms acquisition-timeout, max-two-connection controlled measurements were:
+
+| Concurrent clients | Synthetic requests | Completed | Controlled acquisition timeouts | Successful p95 |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 20 | 20 | 0 | 82.009ms |
+| 2 | 20 | 20 | 0 | 81.945ms |
+| 4 | 24 | 24 | 0 | 163.545ms |
+| 8 | 32 | 16 | 16 | 209.284ms |
+
+Total **96 attempted; 80 completed; 16 expected controlled acquisition timeouts**, with no pool overrun and subsequent successful connection/SQL recovery. These are **isolated synthetic** limits, not MyeongHa Production capacity limits. Both previous Linux failures [#41317389955](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41317389955) and [#41321211252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41321211252) remain recorded. The evidence explicitly retains `productionRlsProven=false`, `productionCapacityProven=false`, `realMyeonghaQueriesMeasured=false`, `sajuResourceCeilingProven=false`, `scalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`.
+
 
 **Non-claims:** The synthetic `pg_sleep` contention test does not measure MyeongHa's real queries, Production DB pool budget, TLS verify-full/RLS policy parity, Saju CPU/memory ceiling, approved Production scaling threshold or service-wide RPO/RTO. This workflow adds *reproducible real disposable DB evidence*, not production load or an automatic scaling decision. `productionCapacityProven=false`, `scalingThresholdApproved=false`, `drReady=false` and `serviceResumptionAllowed=false` are mandatory in its evidence.
 
