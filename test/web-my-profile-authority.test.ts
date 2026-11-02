@@ -16,18 +16,19 @@ const readingDetail = readFileSync(join(webRoot, 'reading-detail.html'), 'utf8')
 const profileAuthority = readFileSync(join(root, 'apps', 'api', 'src', 'subject-profile.ts'), 'utf8');
 
 describe('web My profile authority boundary', () => {
-  it('ships a real My destination in the five-part product IA', () => {
+  it('ships a real My destination via profile and mobile links in the shared product header', () => {
     expect(myHtml).toContain('<title>마이 · 명하</title>');
     expect(myHtml).toContain('href="product.css"');
     expect(myHtml).toContain('href="my.css"');
     expect(myHtml).toContain('src="/src/my/main.tsx"');
-    expect(myHtml).toContain('href="my.html" aria-current="page">마이</a>');
-    expect(hall).toContain('class="product-nav-link" href="my.html">마이</a>');
-    expect(hall).toContain('class="mobile-nav-link" href="my.html"');
-    expect(reading).toContain('class="product-nav-link" href="my.html">마이</a>');
-    expect(reading).toContain('class="mobile-nav-link" href="my.html"');
-    expect(readingDetail).toContain('class="product-nav-link" href="my.html">마이</a>');
-    expect(readingDetail).toContain('class="mobile-nav-link" href="my.html"');
+    expect(myHtml).toContain('class="product-profile" href="my.html" aria-label="마이 페이지" aria-current="page"');
+    expect(myHtml).toContain('class="mobile-nav-link" href="my.html" aria-current="page"');
+    for (const html of [myHtml, hall, reading, readingDetail]) {
+      expect(html).not.toContain('class="product-nav-link" href="my.html"');
+      expect(html).toContain('class="product-profile"');
+      expect(html).toContain('href="my.html"');
+      expect(html).toContain('class="mobile-nav-link" href="my.html"');
+    }
   });
 
   it('reads only the verified current profile surface through GET /api/me', () => {

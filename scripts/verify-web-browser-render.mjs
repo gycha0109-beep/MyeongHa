@@ -570,13 +570,18 @@ try {
   const toggleState = await client.evaluate(`(() => {
     const button = document.querySelector('.product-theme-toggle');
     button.click();
-    const light = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'), pressed: button.getAttribute('aria-pressed') };
+    const light = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'),
+      pressed: button.getAttribute('aria-pressed'), headerImage: getComputedStyle(document.querySelector('.product-header')).backgroundImage };
     button.click();
-    const dark = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'), pressed: button.getAttribute('aria-pressed') };
+    const dark = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'),
+      pressed: button.getAttribute('aria-pressed'), headerImage: getComputedStyle(document.querySelector('.product-header')).backgroundImage };
     return { light, dark };
   })()`);
   assert(toggleState.light.theme === 'light' && toggleState.light.stored === 'light' && toggleState.light.pressed === 'false', 'Theme toggle did not switch to light');
   assert(toggleState.dark.theme === 'dark' && toggleState.dark.stored === 'dark' && toggleState.dark.pressed === 'true', 'Theme toggle did not switch back to dark');
+  assert(toggleState.light.headerImage.includes('myeongha-header-light-texture-v2.webp') &&
+    toggleState.dark.headerImage.includes('myeongha-header-dark-texture-v2.webp'),
+    `Shared header must switch approved light and dark paper texture assets: ${JSON.stringify(toggleState)}`);
 
   const darkSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju' });
   const darkSajuBackdrop = await client.evaluate(`(() => ({ main: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
