@@ -51,6 +51,14 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
   readonly observeMetric?: (event: SeyeonAiCostEventV1) => void;
   /** Server-private, awaited durable outcome persistence. No browser-owned inputs. */
   readonly meteredAfterOutcome?: (event: SeyeonAiCostEventV1) => Promise<void>;
+  /**
+   * R39 opt-in: STRICT fail-closed for offline governance rehearsals.
+   * No output is returned until the current Call ID's metered outcome is
+   * durably acknowledged. Existing Production behavior is unchanged unless
+   * explicitly enabled. This does NOT attest to Provider authenticity,
+   * validated output, or authorize G2/Reveal.
+   */
+  readonly requireDurableOutcomeReceipt?: true;
   /** Server-owned admission hook; must finish before network dispatch. */
   readonly beforeDispatch?: (call: Readonly<{
     callId: string;
@@ -76,6 +84,7 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
 export type OpenAiSeyeonStructuredProviderFailureCodeV1 =
   | 'INVALID_CONFIGURATION'
   | 'PRE_DISPATCH_REJECTED'
+  | 'OUTCOME_RECEIPT_NOT_DURABLE'
   | 'TIMEOUT'
   | 'NETWORK_FAILURE'
   | 'HTTP_FAILURE'
@@ -367,6 +376,15 @@ export function createOpenAiSeyeonStructuredProviderV1(
   const requestTimeoutMs = timeoutMs(config.timeoutMs);
   const requestOutputCeiling = maxOutputTokens(config.maxOutputTokens);
   const fetchImpl = config.fetchImpl ?? fetch;
+  if (config.requireDurableOutcomeReceipt===true &&
+    (config.meteredBeforeDispatch===undefined
+     ||config.meteredAfterOutcome===undefined
+     ||config.priceQuote===undefined
+     ||requestOutputCeiling===undefined)){
+    failConfiguration(
+      'Strict governed output requires pre-dispatch Cost admission, a priced capped request and durable outcome persistence.',
+    );
+  }
   if (config.priceQuote !== undefined) {
     estimateSeyeonAiCallCostV1({
       providerKey: OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
@@ -446,8 +464,16 @@ export function createOpenAiSeyeonStructuredProviderV1(
           });
           await config.meteredAfterOutcome?.(event);
         } catch {
-          // Malformed provider usage must not change an otherwise valid answer.
+          // Existing mode still preserves legacy best-effort metrics, but
+          // R39 STRICT mode must never return an answer or claim settlement
+          // if the server-owned cost/event receipt failed to persist.
           console.error('MYEONGHA_SEYEON_PROVIDER_METRIC_OR_PERSIST_FAILED');
+          if(config.requireDurableOutcomeReceipt===true){
+            throw new OpenAiSeyeonStructuredProviderErrorV1(
+              'OUTCOME_RECEIPT_NOT_DURABLE',
+              'Governed structured output was withheld because its outcome receipt was not durable.',
+            );
+          }
         }
       };
       const controller = new AbortController();
@@ -542,6 +568,27 @@ export function createOpenAiSeyeonStructuredProviderV1(
           );
         }
 
+        if(config.requireDurableOutcomeReceipt===true){
+          // STRICT: never persist a "response_received" success receipt
+          // before validating the actual bounded native JSON output shape.
+          let structured:unknown;
+          try{
+            const text=extractStructuredText(raw);
+            structured=JSON.parse(text) as unknown;
+          }catch(error){
+            await meter('invalid_response',response.status,raw);
+            if(error instanceof OpenAiSeyeonStructuredProviderErrorV1)
+              throw error;
+            throw new OpenAiSeyeonStructuredProviderErrorV1(
+              'INVALID_STRUCTURED_OUTPUT',
+              'OpenAI structured output text is not valid JSON.',
+              response.status,
+            );
+          }
+          await meter('response_received',response.status,raw);
+          return structured;
+        }
+        // Backwards compatible legacy mode (existing Production routing).
         await meter('response_received', response.status, raw);
         const text = extractStructuredText(raw);
         try {
