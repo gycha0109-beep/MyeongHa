@@ -59,6 +59,14 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
    * validated output, or authorize G2/Reveal.
    */
   readonly requireDurableOutcomeReceipt?: true;
+  /**
+   * R39 second strict gate: bind the exact bounded HTTP response bytes and
+   * structured output text to the same Call ID. Only digests leave the adapter.
+   * This is NOT a Provider signature, Output Guard PASS or G2 permission.
+   */
+  readonly meteredAfterStructuredOutput?: (
+    receipt: SeyeonUnverifiedTransportOutputReceiptV1,
+  ) => Promise<void>;
   /** Server-owned admission hook; must finish before network dispatch. */
   readonly beforeDispatch?: (call: Readonly<{
     callId: string;
@@ -81,10 +89,34 @@ export interface OpenAiSeyeonStructuredProviderConfigV1 {
   ) => void | Promise<void>;
 }
 
+export interface SeyeonUnverifiedTransportOutputReceiptV1 {
+  readonly schemaVersion:'seyeon-unverified-transport-output-receipt-r39';
+  readonly originKind:'unverified_transport_bytes_only';
+  readonly callId:string;
+  readonly purpose:SeyeonStructuredProviderRequestV2['purpose'];
+  readonly providerKey:typeof OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1;
+  readonly modelKey:string;
+  readonly responseId:string;
+  readonly responseBodyDigest:string;
+  readonly structuredOutputDigest:string;
+  readonly providerOutputVerified:false;
+  readonly outputGuardVerified:false;
+  readonly permitsAtomicCommit:false;
+  readonly permitsHttpReveal:false;
+}
+async function sha256TransportUtf8V1(text:string):Promise<string>{
+  const encoded=new TextEncoder().encode(text);
+  const hash=await crypto.subtle.digest('SHA-256',encoded);
+  return 'sha256:wire-utf8:v1:'+
+    Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,'0'))
+      .join('');
+}
+
 export type OpenAiSeyeonStructuredProviderFailureCodeV1 =
   | 'INVALID_CONFIGURATION'
   | 'PRE_DISPATCH_REJECTED'
   | 'OUTCOME_RECEIPT_NOT_DURABLE'
+  | 'STRUCTURED_OUTPUT_RECEIPT_NOT_DURABLE'
   | 'TIMEOUT'
   | 'NETWORK_FAILURE'
   | 'HTTP_FAILURE'
@@ -379,6 +411,7 @@ export function createOpenAiSeyeonStructuredProviderV1(
   if (config.requireDurableOutcomeReceipt===true &&
     (config.meteredBeforeDispatch===undefined
      ||config.meteredAfterOutcome===undefined
+     ||config.meteredAfterStructuredOutput===undefined
      ||config.priceQuote===undefined
      ||requestOutputCeiling===undefined)){
     failConfiguration(
@@ -555,11 +588,13 @@ export function createOpenAiSeyeonStructuredProviderV1(
         }
 
         let raw: unknown;
+        let rawResponseBodyText:string|null=null;
         try {
           const boundedText = await readBoundedUpstreamJsonTextV1(response, {
             maximumBodyBytes: OPENAI_SEYEON_STRUCTURED_PROVIDER_MAX_RESPONSE_BYTES_V1,
             signal: controller.signal,
           });
+          rawResponseBodyText=boundedText;
           raw = JSON.parse(boundedText) as unknown;
         } catch {
           if (timedOut || controller.signal.aborted) {
@@ -582,9 +617,20 @@ export function createOpenAiSeyeonStructuredProviderV1(
           // STRICT: never persist a "response_received" success receipt
           // before validating the actual bounded native JSON output shape.
           let structured:unknown;
+          let outputText='';
           try{
-            const text=extractStructuredText(raw);
-            structured=JSON.parse(text) as unknown;
+            if(!isRecord(raw)
+              ||typeof raw.id!=='string'
+              ||!/^resp_[A-Za-z0-9_-]{3,120}$/u.test(raw.id)
+              ||raw.model!==model
+              ||rawResponseBodyText===null)
+              throw new OpenAiSeyeonStructuredProviderErrorV1(
+                'INVALID_RESPONSE',
+                'Structured transport response identity is invalid.',
+                response.status,
+              );
+            outputText=extractStructuredText(raw);
+            structured=JSON.parse(outputText) as unknown;
           }catch(error){
             await meter('invalid_response',response.status,raw);
             if(error instanceof OpenAiSeyeonStructuredProviderErrorV1)
@@ -596,6 +642,34 @@ export function createOpenAiSeyeonStructuredProviderV1(
             );
           }
           await meter('response_received',response.status,raw);
+          // A durable priced cost event is necessary but not sufficient:
+          // the exact transport/parsed-output digests must also be accepted
+          // for the SAME Call ID before exposing this value to the runtime.
+          try{
+            const transport=raw as Record<string,unknown>;
+            const evidence:SeyeonUnverifiedTransportOutputReceiptV1=
+              Object.freeze({
+                schemaVersion:'seyeon-unverified-transport-output-receipt-r39',
+                originKind:'unverified_transport_bytes_only',
+                callId,purpose:request.purpose,
+                providerKey:OPENAI_SEYEON_STRUCTURED_PROVIDER_KEY_V1,
+                modelKey:model,responseId:transport.id as string,
+                responseBodyDigest:await sha256TransportUtf8V1(
+                  rawResponseBodyText as string,
+                ),
+                structuredOutputDigest:await sha256TransportUtf8V1(outputText),
+                providerOutputVerified:false,
+                outputGuardVerified:false,
+                permitsAtomicCommit:false,
+                permitsHttpReveal:false,
+              });
+            await config.meteredAfterStructuredOutput?.(evidence);
+          }catch{
+            throw new OpenAiSeyeonStructuredProviderErrorV1(
+              'STRUCTURED_OUTPUT_RECEIPT_NOT_DURABLE',
+              'Governed structured output was withheld because its transport digest receipt was not durable.',
+            );
+          }
           return structured;
         }
         // Backwards compatible legacy mode (existing Production routing).
