@@ -405,3 +405,8 @@
 - 테스트 자료: 사주·Reader·취소 웹훅·이전 형식의 기록 해시를 현재 명시된 테스트 계약에 맞게 수정. 기존의 부정 테스트는 유지.
 - PostgreSQL 17: 독립적인 B2/B3 유료 Reader 결제 데이터 테스트에 기존 Subject×Reading×Reader 잠금 획득을 추가하여 1790 안전 장벽을 유지. 실제 PG17 재검증 필요.
 - 로컬 검증: 관련 7개 테스트 파일 321/321 PASS, API TypeScript 검사 PASS. 학원 PC에서는 실제 PG17 테스트 미실행. 운영 DB·실제 환불·LIVE 미변경.
+
+### 2026-11-02 — Reader Grounding Cross-Service E2E 실패 수정
+- **실패 확인:** PR #2869 커밋 05e8bd2a의 핵심 CI·Governance·Web·Mobile는 PASS, 별도 `Reader Grounding Cross-Service E2E` 실행 41397268134는 1/3 FAIL. 원인은 `test/saju-character-grounding-cross-service.e2e.test.ts`의 공식 Reading source hash가 `sha256:cross-service-official-artifact`로 하드코딩되어, v2 출처가 요구하는 canonical `sha256:v1:<실제 응답 digest>`와 불일치한 점.
+- **수정:** E2E가 실제 `deliveredResponse()`를 `hashSajuHeldSourceProofRequestV1`으로 해시하여 metadata/access/source에 동일한 정확한 immutable digest를 사용하도록 교체. 공식 Reader 권한·출처 일치 검증을 완화하지 않음.
+- **로컬 확인:** TypeScript 서버 빌드 타입 검사 PASS, E2E 테스트 파일 import PASS (로컬 실제 Saju 호스트 미가동으로 3개 테스트 정상 SKIP), git diff --check PASS. 실제 타 서비스 HTTP round-trip과 인증/회수 부정 검증은 해당 PR의 Linux cross-service CI 결과를 확인해야 함. 운영 DB/실제 환불/LIVE 변경 없음.
