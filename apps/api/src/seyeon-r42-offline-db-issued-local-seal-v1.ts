@@ -92,9 +92,9 @@ select seyeon_positive_candidate.issue_local_guard_seal_r42(
           throw new SeyeonR42OfflineDbSealHoldV1();
         const verified=await client.query<{valid:boolean}>(`
 select seyeon_positive_candidate.verify_local_guard_seal_r42(
-  $1::uuid
+  $1::uuid,$2::uuid
 ) as valid
-`.trim(),[pinInput.attemptId]);
+`.trim(),[resolvedSubject.subjectId,pinInput.attemptId]);
         if(verified.rows.length!==1||verified.rows[0]?.valid!==true)
           throw new SeyeonR42OfflineDbSealHoldV1();
         return Object.freeze(
