@@ -2272,6 +2272,17 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     ),true)).rejects.toMatchObject({
       code:'23514',constraint:'seyeon_r41_original_grant_revoked',
     });
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.issue_local_guard_seal_r42($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+      [subject,id.thread,id.turn,id.attempt],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r42_original_grant_revoked',
+    });
+    const neverSealed=await pool.query<{n:string}>(
+      'select count(*)::text as n from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
+      [id.attempt],
+    );
+    expect(neverSealed.rows).toEqual([{n:'0'}]);
     const next=await r33NativeWire('disclosure_classification',
       source.selection.selectedSourcesDigest,
       'sha256:wire-utf8:v1:'+createHash('sha256').update(body,'utf8').digest('hex'),
