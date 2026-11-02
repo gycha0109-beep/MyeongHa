@@ -789,9 +789,9 @@ export async function runSeyeonProductionChatExecutionV1(
               && original.rawRecordPgDigest!==undefined
               && original.projectorVersion!==undefined
               && candidate?.recordId===original.recordId
-              && candidate.grantId===original.grantId
-              && candidate.rawRecordPgDigest===original.rawRecordPgDigest
-              && candidate.projectorVersion===original.projectorVersion) {
+              && candidate?.grantId===original.grantId
+              && candidate?.rawRecordPgDigest===original.rawRecordPgDigest
+              && candidate?.projectorVersion===original.projectorVersion) {
               // DB Owner compares ALL actual G0 origins in its own TX and
               // persists historicalCandidateProof (never positiveProof).
               // Even a successful DB receipt NEVER reaches the Interpreter.
