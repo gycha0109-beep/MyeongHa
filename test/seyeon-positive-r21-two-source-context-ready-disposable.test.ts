@@ -2021,6 +2021,33 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       [id.attempt],
     );
     expect(noOutput.rows).toEqual([{n:'0'}]);
+    // R40 must also refuse a delayed output fingerprint after exact Grant
+    // revocation, before any cost/response identity can be promoted.
+    const revokedTransport={
+      schemaVersion:'seyeon-unverified-transport-output-receipt-r39',
+      originKind:'unverified_transport_bytes_only',
+      callId,purpose:'integrity_classification',
+      providerKey:'openai-responses',modelKey:'seyeon-r35-offline',
+      responseId:'resp_r40_synthetic_revoked_000',
+      responseBodyDigest:'sha256:wire-utf8:v1:'+'1'.repeat(64),
+      structuredOutputDigest:'sha256:wire-utf8:v1:'+'2'.repeat(64),
+      providerOutputVerified:false,outputGuardVerified:false,
+      permitsAtomicCommit:false,permitsHttpReveal:false,
+    };
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.record_unverified_transport_r40($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid,$7::text,$8::jsonb) as receipt',
+      [subject,id.thread,id.turn,id.attempt,0,callId,
+       'sha256:wire-utf8:v1:'+
+        createHash('sha256').update(body,'utf8').digest('hex'),
+       JSON.stringify(revokedTransport)],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r40_original_grant_revoked',
+    });
+    const r40NeverRecorded=await pool.query<{n:string}>(
+      'select count(*)::text as n from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid',
+      [id.attempt],
+    );
+    expect(r40NeverRecorded.rows).toEqual([{n:'0'}]);
     const next=await r33NativeWire('disclosure_classification',
       source.selection.selectedSourcesDigest,
       'sha256:wire-utf8:v1:'+createHash('sha256').update(body,'utf8').digest('hex'),
