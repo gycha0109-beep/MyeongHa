@@ -67,6 +67,11 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 # R42: install scratch-only DB-owned HMAC issuer/verifier. No key is
 # committed, returned or made available to the API executor.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r42_disposable_db_issued_local_evidence_seal.sql
+# R43: the ordinary Member API Executor must not mint or verify DB MACs.
+# Only a scratch dedicated NOLOGIN evaluator role may execute R42 Owners.
+# The isolated Postgres test login is privileged; this does NOT prove
+# separate production credentials or any genuine Provider output approval.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r43_disposable_validator_role_split.sql
 # One DB transaction now binds each actual native stage, trusted code-owned
 # Interpreter authority manifest, prior local result, and Governor budget.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql
@@ -89,4 +94,4 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r31-g2-forward-stop-disposable.test.ts --maxWorkers=1
-echo 'PASS offline original ancestry + R36 Character + R37/R38 local results + R40 mock transport + R41 authored guard fixture + R42 DB HMAC, G2/G3 HOLD; Production G0/G2/G3 HOLD'
+echo 'PASS offline original ancestry + R36 Character + R37/R38 local results + R40 mocked transport + R41 Guard fixture + R42 DB HMAC + R43 validator-only issuer role; G2/G3/Production HOLD'
