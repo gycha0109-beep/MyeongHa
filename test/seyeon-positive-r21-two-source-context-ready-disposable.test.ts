@@ -2036,6 +2036,13 @@ select
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r40_unverified_transport_lineage_missing',
     });
+    const missingOutputAlsoRevokesSeal=await validatorTx(
+      c=>c.query<{valid:boolean}>(
+        'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
+        [subject,a.attempt],
+      ),
+    );
+    expect(missingOutputAlsoRevokesSeal.rows).toEqual([{valid:false}]);
     // Negative-only real guard probes cannot replace actual Provider output.
     // A deleted probe is a missing evidence chain, not a positive PASS.
     await pool.query(
