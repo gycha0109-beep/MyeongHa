@@ -33,13 +33,12 @@ describe('live Access Owner-only policy deployment gate',()=>{
     expect(f.requests[1].url).toMatch(/\/access\/apps\/[0-9a-f-]+\/policies$/u);
     expect(f.requests.every(x=>x.method==='GET'&&x.redirect==='error'&&x.auth)).toBe(true);
   });
-  it('rejects a different audience or wrong/multiple app identities',async()=>{
-    for(const apps of [
-      [{...app,aud:'f'.repeat(64)}],
-      [{...app,domain:'myeongha.gycha0109.workers.dev'}],
-      [app,app],
-      [],
-    ])await expect(fixture(apps).execute()).rejects.toThrow('identity mismatch');
+  it('classifies missing, ambiguous and mismatched applications without returning private values',async()=>{
+    for(const apps of [[],[{...app,domain:'myeongha.gycha0109.workers.dev'}]])
+      await expect(fixture(apps).execute()).rejects.toThrow('application not visible');
+    await expect(fixture([app,app]).execute()).rejects.toThrow('application identity ambiguous');
+    await expect(fixture([{...app,aud:'f'.repeat(64)}]).execute()).rejects.toThrow('audience mismatch');
+    await expect(fixture([{...app,id:'bad-id'}]).execute()).rejects.toThrow('application ID invalid');
   });
   it('refuses broad, additional, expired or mismatched policies',async()=>{
     for(const policies of [
