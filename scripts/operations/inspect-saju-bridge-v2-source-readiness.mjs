@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const SAJU_BRIDGE_V2_SOURCE_PATHS = Object.freeze([
-  'vercel.json',
+  'workers/cloudflare-api-router.mjs',
   'api/me.ts',
   'api/me/saju/calculation.ts',
   'apps/api/src/saju-bridge-existing-authorities-v2.ts',
@@ -27,7 +27,7 @@ export const SAJU_BRIDGE_V2_SOURCE_PATHS = Object.freeze([
 
 export const SAJU_BRIDGE_V2_OPERATIONAL_GAPS = Object.freeze([
   'CURRENT_SAJU_CLOUD_RUN_SERVING_REVISION_NOT_VERIFIED',
-  'CURRENT_VERCEL_ORIGIN_AND_BEARER_BINDING_NOT_VERIFIED',
+  'CURRENT_CLOUDFLARE_ORIGIN_AND_BEARER_BINDING_NOT_VERIFIED',
   'CURRENT_PRODUCTION_SUBJECT_BIRTH_DB_FUNCTIONS_NOT_VERIFIED',
   'CURRENT_AUTHENTICATED_PRODUCT_PREVIEW_E2E_NOT_VERIFIED',
 ]);
@@ -52,23 +52,10 @@ export function inspectSajuBridgeV2SourceReadiness(input) {
       if (!source.includes(fragment)) failures.push(path + ':' + key);
     }
   };
-  const previewPath = '/api/me/saju/preview-reading';
-  const calculationPath = '/api/me/saju/calculation';
-  let rewrites;
-  try {
-    const vercel = JSON.parse(files['vercel.json']);
-    rewrites = vercel.rewrites;
-    if (!Array.isArray(rewrites)) throw new Error('rewrites is not an array');
-  } catch {
-    failures.push('vercel.json:REWRITES_INVALID');
-  }
-  if (rewrites !== undefined) {
-    const preview = rewrites.filter(x => x?.source === previewPath);
-    if (preview.length !== 1 ||
-        preview[0].destination !== '/api/me?__myeongha_saju_preview_reading=1') {
-      failures.push('vercel.json:PREVIEW_REWRITE_DRIFT');
-    }
-  }
+  requireFragments('workers/cloudflare-api-router.mjs', {
+    PREVIEW_REWRITE: 'destination: "/api/me?__myeongha_saju_preview_reading=1"',
+    CALCULATION_ROUTE: 'id: "api.me.saju.calculation", path: "/api/me/saju/calculation"',
+  });
   requireFragments('api/me.ts', {
     PREVIEW_QUERY_MARKER: "SAJU_PREVIEW_READING_PARAM = '__myeongha_saju_preview_reading'",
     PREVIEW_SOURCE_PATH: "SAJU_PREVIEW_READING_ROUTE = '/api/me/saju/preview-reading'",

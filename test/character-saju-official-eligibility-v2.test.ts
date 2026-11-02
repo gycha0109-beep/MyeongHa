@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { SAJU_DOMAINS, type SajuDomain } from '../packages/contracts/src/index.js';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import { OFFICIAL_READER_RUNTIME_IDS_V1 } from '../apps/api/src/reader-production-rollout-policy-v1.js';
 import {
   issueCharacterSajuOfficialStandardEligibilityV2,
@@ -29,6 +30,21 @@ function standardPolicy(domain: SajuDomain = 'general'): ProductReaderRuleLookup
 }
 
 function fixture(reader = 'seyeon', domain: SajuDomain = 'general') {
+  const responseSnapshot = {
+    responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+    responseVersion: 'myeonghwa-product-reading-response-v2',
+    state: 'delivered',
+    messageCode: 'READING_DELIVERED',
+    requiredAction: 'none',
+    reading: {
+      readingId: READING,
+      sections: [{ sectionType: 'overview', state: 'complete', title: '공식 전체',
+        blocks: [{ type: 'paragraph', text: '근거에 기반해 설명합니다.' }] }],
+      disclosures: [],
+      calculationSummary: {},
+    },
+  };
+  const responseHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(responseSnapshot);
   const readApprovedRule = vi.fn(async (): Promise<ProductReaderRuleLookupV1> => standardPolicy(domain));
   const productAuthorityPort = { readApprovedRule };
   const access = {
@@ -42,7 +58,7 @@ function fixture(reader = 'seyeon', domain: SajuDomain = 'general') {
     domainCapabilityVersion: `${domain}-v1`,
     readingContractVersion: 'myeonghwa-product-reading-response-v2',
     sajuEngineVersion: 'saju-engine-v1',
-    responseHash: 'sha256:v1:fixture-response-hash',
+    responseHash,
   };
   const input = {
     resolvedSubjectId: SUBJECT,
@@ -63,19 +79,8 @@ function fixture(reader = 'seyeon', domain: SajuDomain = 'general') {
       readingId: READING, productId: PRODUCT, readerCharacterId: reader,
       readingContractVersion: 'myeonghwa-product-reading-response-v2',
       productResponseState: 'delivered',
-      responseSnapshotJsonb: {
-        responseVersion: 'myeonghwa-product-reading-response-v2',
-        state: 'delivered',
-        reading: {
-          readingId: READING,
-          sections: [{ sectionType: 'overview', title: '전체', blocks: [
-            { type: 'paragraph', text: '공식 근거를 기반으로 설명합니다.' },
-          ] }],
-          disclosures: [],
-          calculationSummary: {},
-        },
-      },
-      responseHash: 'sha256:v1:fixture-response-hash',
+      responseSnapshotJsonb: responseSnapshot,
+      responseHash,
       completedAt: '2026-10-09T07:30:00.000Z',
     }]) },
     productReaderEligibilityAuthorityPort: productAuthorityPort,

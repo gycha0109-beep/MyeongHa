@@ -86,6 +86,37 @@ function ownedMemoryId(request: Request): string | null {
 }
 
 /**
+ * Cloudflare may expose a ReadableStream for an HTTP POST with zero body
+ * bytes. Only actual nonempty content is forbidden; never trust a header
+ * or read a user-supplied payload into memory to decide authorization.
+ */
+async function hasBodyBytesOrReadFailure(request: Request): Promise<boolean> {
+  if (request.body === null) return false;
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try { reader = request.body.getReader(); }
+  catch { return true; }
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('Empty-body read deadline')), 1000);
+  });
+  try {
+    for (;;) {
+      if (request.signal.aborted) return true;
+      const chunk = await Promise.race([reader.read(), deadline]);
+      if (chunk.done) return false;
+      if (chunk.value.byteLength > 0) return true;
+    }
+  } catch {
+    return true;
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+    try { void reader.cancel().catch(() => undefined); } catch {}
+    try { reader.releaseLock(); } catch {}
+  }
+}
+
+/**
  * POST /api/memories/:memoryItemId/grants/seyeon/revoke
  *
  * No JSON body: caller cannot forge Subject/Character/Grant/Attempt. Auth
@@ -119,8 +150,9 @@ export async function handleSeyeonMemoryGrantRevokeRequestV1(
     });
   }
 
-  // Empty-body-only: no browser-specified subject, character or Grant override.
-  if (input.request.body !== null) {
+  // Reject bytes, not a Worker-synthesized zero-byte POST stream.
+  // No browser-specified Subject, Character or Grant may reach the authority.
+  if (await hasBodyBytesOrReadFailure(input.request)) {
     return problem({
       status: 400,
       code: 'INVALID_REQUEST',

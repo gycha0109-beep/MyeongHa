@@ -25,6 +25,11 @@ from public.qry_seyeon_post_turn_analysis_job_v1(
 )
 `.trim();
 
+const PRECLAIM_SQL = `
+select admissibility
+from public.qry_seyeon_post_turn_preclaim_admissibility_v1($1::uuid,$2::uuid)
+`.trim();
+
 const CLAIM_SQL = `
 select
   outbox_event_id::text as "outboxEventId",
@@ -111,6 +116,21 @@ implements SeyeonPostTurnAnalysisOutboxPortV1 {
       status:text('status',row.status),
       leaseExpiresAt:nullableInstant('lease expiry',row.leaseExpiresAt),
     })));
+  }
+
+  async preflightClaim(input: {
+    subjectId: string;
+    outboxEventId: string;
+  }): Promise<'off_cleanup' | 'hold'> {
+    const result=await this.client.query<{admissibility:unknown}>(PRECLAIM_SQL,[
+      input.subjectId,input.outboxEventId,
+    ]);
+    if (result.rows.length!==1 ||
+        (result.rows[0]?.admissibility!=='off_cleanup' &&
+         result.rows[0]?.admissibility!=='hold')) {
+      throw new Error('Se-yeon post-turn preclaim DB admission is invalid.');
+    }
+    return result.rows[0].admissibility;
   }
 
   async claim(

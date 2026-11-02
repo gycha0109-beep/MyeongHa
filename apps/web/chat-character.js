@@ -1,4 +1,5 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { resolveCharacterChatIntroV1 } from './character-chat-intro-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
 import { parseChatThreadRouteV1 } from './chat-room-read-contract.js';
@@ -86,7 +87,7 @@ if (characterKey) {
     ? 'thread_identity_pending'
     : 'thread_identity_invalid';
 }
-document.title = `${characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name} · 대화 · 명하`;
+document.title = `${characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name} · ${translateStaticUi('대화 · 명하', getUiLocale())}`;
 
 document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
   node.textContent = characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name;
@@ -104,10 +105,12 @@ document.querySelectorAll('[data-character-avatar]').forEach((node) => {
 
 const scene = document.querySelector('[data-character-scene]');
 if (scene) {
-  scene.setAttribute('aria-label', character.sceneLabel);
+  scene.setAttribute('aria-label', translateStaticUi(character.sceneLabel, getUiLocale()));
 }
 
+const chatEntryLocale = getUiLocale();
 const dialogueLine = document.querySelector('[data-dialogue-line]');
+dialogueLine?.setAttribute('data-chat-intro-language-locked', '');
 function setDialogueLines(lines) {
   if (!dialogueLine) return;
   dialogueLine.replaceChildren();
@@ -117,7 +120,7 @@ function setDialogueLines(lines) {
   });
 }
 
-setDialogueLines(character.intro);
+setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, chatEntryLocale) : character.intro.map(line => translateStaticUi(line, chatEntryLocale)));
 
 export function applyCanonicalCharacterPresentationV1(characterId) {
   const identity = resolveCanonicalCharacterPresentationV1(characterId);
@@ -127,7 +130,7 @@ export function applyCanonicalCharacterPresentationV1(characterId) {
 
   root.dataset.character = identity.presentationKey;
   root.dataset.characterAuthority = 'canonical_character_id';
-  document.title = `${resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale())} · 대화 · 명하`;
+  document.title = `${resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale())} · ${translateStaticUi('대화 · 명하', getUiLocale())}`;
 
   document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach((node) => {
     node.textContent = resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale());
@@ -139,8 +142,8 @@ export function applyCanonicalCharacterPresentationV1(characterId) {
     node.dataset.character = identity.presentationKey;
     node.textContent = resolveCharacterDisplayNameV1(identity.presentationKey, getUiLocale()).slice(0, 1);
   });
-  setDialogueLines(next.intro);
-  if (scene) scene.setAttribute('aria-label', next.sceneLabel);
+  setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, chatEntryLocale));
+  if (scene) scene.setAttribute('aria-label', translateStaticUi(next.sceneLabel, getUiLocale()));
   return true;
 }
 
@@ -190,7 +193,7 @@ composer?.addEventListener('submit', (event) => {
 
   const handled = !composer.dispatchEvent(submitEvent);
   if (!handled && composeStatus) {
-    composeStatus.textContent = '현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다.';
+    composeStatus.textContent = translateStaticUi('현재 이 대화는 서버 연결이 준비되지 않았습니다. 입력한 내용은 보내지지 않았습니다.', getUiLocale());
   }
 });
 
@@ -201,7 +204,10 @@ document.addEventListener('myeongha:localechange', () => {
     return;
   }
   const label = characterKey ? resolveCharacterDisplayNameV1(characterKey, getUiLocale()) : character.name;
-  document.title = `${label} · 대화 · 명하`;
+  document.title = `${label} · ${translateStaticUi('대화 · 명하', getUiLocale())}`;
   document.querySelectorAll('[data-character-name], [data-dialogue-name]').forEach(node => { node.textContent = label; });
   document.querySelectorAll('[data-character-avatar]').forEach(node => { node.textContent = label.slice(0, 1); });
+  // The greeting is fixed at room entry, even when UI navigation changes locale.
+
+  if (scene) scene.setAttribute('aria-label', translateStaticUi(character.sceneLabel, getUiLocale()));
 });

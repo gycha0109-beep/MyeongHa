@@ -12,7 +12,6 @@ const MOBILE_SOCIAL_REDIRECT_SCHEME = 'myeongha:' as const;
 const MOBILE_SOCIAL_REDIRECT_HOST = 'auth' as const;
 const MOBILE_SOCIAL_REDIRECT_PATH = '/callback' as const;
 const WEB_SOCIAL_REDIRECT_ORIGINS = new Set([
-  'https://myeongha.vercel.app',
   'https://myeongha.gycha0109.workers.dev',
   'https://myeongha-web.gycha0109.workers.dev',
 ]);

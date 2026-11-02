@@ -345,7 +345,7 @@ describe('Supabase auth HTTP proxy', () => {
       const url = new URL(String(input));
       expect(url.pathname).toBe('/auth/v1/signup');
       expect(url.searchParams.get('redirect_to')).toBe(
-        'https://myeongha.vercel.app/auth.html?confirmed=1&next=reading-detail.html%3Ftopic%3Dlove',
+        'https://myeongha.gycha0109.workers.dev/auth.html?confirmed=1&next=reading-detail.html%3Ftopic%3Dlove',
       );
       return Response.json({
         id: '22222222-2222-4222-8222-222222222222',
@@ -378,7 +378,7 @@ describe('Supabase auth HTTP proxy', () => {
     const upstream = vi.fn(async (input: string | URL | Request) => {
       const url = new URL(String(input));
       expect(url.searchParams.get('redirect_to')).toBe(
-        'https://myeongha.vercel.app/auth.html?confirmed=1&next=hall.html',
+        'https://myeongha.gycha0109.workers.dev/auth.html?confirmed=1&next=hall.html',
       );
       return Response.json({
         id: '22222222-2222-4222-8222-222222222222',

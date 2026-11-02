@@ -8,6 +8,7 @@ export interface ReadingSceneFlagsV1 {
 export interface ReadingSceneProgressV1 {
   progress: string;
   structureTitle: string;
+  supportingTitle: string;
   nextLabel: string;
   authorityNote: string;
   recordsLinkLabel: string;

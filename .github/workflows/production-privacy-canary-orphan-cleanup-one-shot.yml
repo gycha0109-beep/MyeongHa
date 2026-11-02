@@ -1,0 +1,124 @@
+name: Production Privacy Canary Orphan Prestart Cleanup One-Shot
+run-name: "[WT:ops] Cleanup failed synthetic privacy canary 40322743599"
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Type CLEANUP_FAILED_PRIVACY_CANARY_40322743599
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: production-privacy-recovery-canary
+  cancel-in-progress: false
+
+jobs:
+  orphan-prestart-cleanup:
+    name: exact failed-run synthetic fixture cleanup
+    environment: production
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      MYEONGHA_PRIVACY_CANARY_CONFIRM: RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY
+      MYEONGHA_PRIVACY_CANARY_ORPHAN_RUN_ID: '40322743599'
+      MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET: ${{ secrets.MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET }}
+      MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM: ${{ secrets.SUPABASE_PRODUCTION_SERVER_ROOT_CERT_PEM }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PRODUCTION_SESSION_POOLER_HOST: ${{ secrets.SUPABASE_PRODUCTION_SESSION_POOLER_HOST }}
+    steps:
+      - name: Checkout exact reviewed main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact one-shot source, run identity and reviewed diff
+        shell: bash
+        env:
+          CLEANUP_CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -Eeuo pipefail
+          # Report the failed gate by name without exposing private data or secrets.
+          guard='event_and_confirmation'
+          trap 'code=$?; echo "::error title=Privacy cleanup guard blocked::${guard} failed (exit ${code})" >&2' ERR
+          [[ "$GITHUB_REPOSITORY" == 'gycha0109-beep/MyeongHa' ]]
+          [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' ]]
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$CLEANUP_CONFIRMATION" == 'CLEANUP_FAILED_PRIVACY_CANARY_40322743599' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ -z "$(git status --porcelain)" ]]
+          guard='approved_history_and_four_file_diff'
+          # Review authority is the immutable #2641 squash commit, not the moving main tip.
+          reviewed='518f9fef12761d84792054f0d30abf4175fea22f'
+          git cat-file -e "$reviewed^{commit}"
+          git merge-base --is-ancestor "$reviewed" HEAD
+          [[ "$(git show -s --format=%s "$reviewed")" == 'ops(privacy): recover failed synthetic canary 40322743599' ]]
+          actual="$(git diff-tree --no-commit-id --name-only -r "$reviewed")"
+          expected="$(printf '%s\n' \
+            '.github/workflows/production-privacy-canary-orphan-cleanup-one-shot.yml' \
+            'docs/ci/workflow-responsibility-map.json' \
+            'scripts/run-production-privacy-recovery-canary.mjs' \
+            'scripts/verify-production-privacy-canary-orphan-cleanup-workflow.mjs')"
+          [[ "$actual" == "$expected" ]]
+          guard='immutable_approved_content_hashes'
+          # Immutable approved Git blobs, including the historical workflow.
+          [[ "$(git rev-parse "$reviewed:.github/workflows/production-privacy-canary-orphan-cleanup-one-shot.yml")" == 'a51fd51fc5495e922f20ec8d7aedc190414e8c30' ]]
+          [[ "$(git rev-parse "$reviewed:docs/ci/workflow-responsibility-map.json")" == '6564c16ea1b4261f12ffbd5e9c26722938c6004c' ]]
+          [[ "$(git rev-parse "$reviewed:scripts/run-production-privacy-recovery-canary.mjs")" == '7034c096b5bdac6d939153c27c38b6e04d0aae41' ]]
+          [[ "$(git rev-parse "$reviewed:scripts/verify-production-privacy-canary-orphan-cleanup-workflow.mjs")" == 'a1039eb071ad3e188f30ce63713f391ca48bdf30' ]]
+          guard='destructive_runtime_unchanged'
+          # Only the destructive cleanup runtime must remain identical to the approved source.
+          # Mapping and static verifier may evolve independently after the reviewed commit.
+          git diff --quiet "$reviewed" HEAD -- scripts/run-production-privacy-recovery-canary.mjs
+          guard='original_failed_run_identity'
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/40322743599")"
+          jq -e '.path == ".github/workflows/production-privacy-recovery-canary.yml"
+            and .head_branch == "main"
+            and .head_sha == "0bc93474318f1af29b1fd0adab53c31ecea0d406"
+            and .event == "workflow_dispatch"
+            and .status == "completed"
+            and .conclusion == "failure"' <<< "$run" >/dev/null
+          guard='required_production_credentials'
+          [[ -n "${MYEONGHA_SUPABASE_AUTH_ADMIN_SECRET:-}" ]]
+          [[ -n "${MYEONGHA_WORKER_DATABASE_SSL_ROOT_CERT_PEM:-}" ]]
+          [[ -n "${SUPABASE_DB_PASSWORD:-}" ]]
+          guard='approved_production_pooler_hostname'
+          [[ "$SUPABASE_PRODUCTION_SESSION_POOLER_HOST" =~ ^[a-z0-9-]+([.][a-z0-9-]+)*[.]pooler[.]supabase[.]com$ ]]
+          trap - ERR
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Install and build guarded runtime
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+
+      - name: Bind ephemeral non-artifact canary state
+        shell: bash
+        run: echo "MYEONGHA_PRIVACY_CANARY_STATE_PATH=$RUNNER_TEMP/orphan-prestart-private-state.json" >> "$GITHUB_ENV"
+
+      - name: Recover only original synthetic failed-run state
+        run: node scripts/run-production-privacy-recovery-canary.mjs recover-orphan-prestart
+
+      - name: Remove only pristine synthetic records and hosted Auth test user
+        run: node scripts/run-production-privacy-recovery-canary.mjs cleanup-prestart
+
+      - name: Verify synthetic fixture absent in DB and hosted Auth
+        run: node scripts/run-production-privacy-recovery-canary.mjs verify-orphan-prestart-cleanup
+
+      - name: Record identifier-free result
+        run: |
+          echo 'PASS: run 40322743599 pre-deletion synthetic orphan cleanup verified' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Production privacy authoritative recovery/DR status remains HOLD' >> "$GITHUB_STEP_SUMMARY"

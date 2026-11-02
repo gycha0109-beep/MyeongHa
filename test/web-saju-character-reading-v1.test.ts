@@ -135,10 +135,11 @@ describe('MyeongHa character-led Saju Reading v1', () => {
   });
 
   it('reopens persisted Official Reading from Records without entering Reader Scene', async () => {
-    const [runtime, handoff] = await Promise.all([
+    const [runtimeText, handoff] = await Promise.all([
       readFile(readingRuntimePath, 'utf8'),
       readFile(readingHandoffPath, 'utf8'),
     ]);
+    const runtime = runtimeText.replace(/\r\n/gu, '\n');
 
     expect(runtime).toContain("from './official-reading-record-contract.js'");
     expect(runtime).toContain("const OFFICIAL_READING_RECORD_ENDPOINT = '/api/readings';");
@@ -146,7 +147,7 @@ describe('MyeongHa character-led Saju Reading v1', () => {
     expect(runtime).toContain('record.readingId !== persistedReadingHandoff.readingId');
     expect(runtime).toContain('record.readingSessionId !== persistedReadingHandoff.readingSessionId');
     expect(runtime).toContain('record.sajuDomain !== persistedReadingHandoff.sajuDomain');
-    expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record' })");
+    expect(runtime).toContain("activatePreviewReading({ ...readingView, source: 'record', record })");
     expect(runtime).toContain("root.dataset.readingRouteState = isStoredRecord ? 'persisted_record' : 'preview'");
     expect(runtime).toContain('function clearPersistedReadingPresentation()');
     expect(runtime).toContain("delete root.dataset.reader;");

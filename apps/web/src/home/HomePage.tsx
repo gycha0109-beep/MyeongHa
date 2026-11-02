@@ -1,15 +1,11 @@
+import { useEffect, useState } from 'react';
 import { findReaderPresentation } from '../../reader-presentation-catalog.js';
+import { resolveCharacterDisplayNameV1 } from '../../character-display-locale.js';
+import { getUiLocale } from '../../ui-i18n.js';
 import { resolveReadingAvailabilityV1 } from '../reading/reading-availability.js';
 import { FortuneCookie } from './FortuneCookie.js';
 
 const readingTopics = [
-  {
-    title: '전체 사주',
-    description: '나라는 사람을 더 깊이 이해하고 싶을 때',
-    glyph: '✦',
-    href: 'reading-detail.html?topic=temperament&scope=original',
-    motif: 'all',
-  },
   {
     title: '직업 · 커리어',
     description: '일과 선택의 길이 궁금할 때',
@@ -40,6 +36,15 @@ const featuredReaders = ['seyeon', 'baekheon', 'yeoul']
   .filter((reader): reader is NonNullable<typeof reader> => reader !== null);
 
 export function HomePage() {
+  const [locale, setLocale] = useState(() => getUiLocale());
+
+  useEffect(() => {
+    const syncLocale = () => setLocale(getUiLocale());
+    document.addEventListener('myeongha:localechange', syncLocale);
+    syncLocale();
+    return () => document.removeEventListener('myeongha:localechange', syncLocale);
+  }, []);
+
   return (
     <div className="mhx-home">
       <section className="mhx-hero" aria-labelledby="mhx-hero-title">
@@ -47,7 +52,8 @@ export function HomePage() {
         <div className="mhx-hero-inner">
           <p className="mhx-eyebrow">흐르는 시간을, 더 나은 이야기로</p>
           <h1 id="mhx-hero-title" className="mhx-hero-heading">
-            요즘, 무엇이 가장 <em>궁금하세요?</em>
+            <span className="mhx-hero-heading-line">요즘, 무엇이 가장</span>
+            <em className="mhx-hero-heading-line">궁금하세요?</em>
           </h1>
           <p className="mhx-hero-subtitle">궁금한 주제를 선택하면, 명하가 당신의 이야기를 시작합니다.</p>
           <div className="mhx-topics" aria-label="사주 관심 주제">
@@ -64,7 +70,7 @@ export function HomePage() {
             ))}
           </div>
           <div className="mhx-hero-actions">
-            <a className="mhx-primary-link" href="reading-detail.html?topic=temperament&scope=original">
+            <a className="mhx-primary-link" href="reading.html">
               사주 프리뷰 보기 <span aria-hidden="true">→</span>
             </a>
             <p>간단한 정보로 지금, 당신의 사주를 미리 만나보세요.<small>정식 읽기 제공 여부는 상세 화면에서 확인할 수 있습니다.</small></p>
@@ -83,16 +89,16 @@ export function HomePage() {
         <div className="mhx-character-list">
           {featuredReaders.map((reader) => (
             <article className="mhx-character" key={reader.key}>
-              <div className="mhx-character-art">
-                <img src={reader.portrait} alt={reader.name} loading="lazy" decoding="async" />
+              <div className="mhx-character-art" data-character={reader.key}>
+                <img src={reader.portrait} alt={resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name} data-ui-react-owned loading="lazy" decoding="async" />
                 <div className="mhx-character-caption">
-                  <h3>{reader.name}</h3>
+                  <h3 data-ui-react-owned>{resolveCharacterDisplayNameV1(reader.key, locale) ?? reader.name}</h3>
                   <span>{reader.title}</span>
                 </div>
               </div>
               <div className="mhx-character-footer">
                 <p>{reader.tone}</p>
-                <a href="chat-hub.html">대화 살펴보기 <span aria-hidden="true">→</span></a>
+                <a href={reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'}>대화 살펴보기 <span aria-hidden="true">→</span></a>
               </div>
             </article>
           ))}
@@ -107,9 +113,9 @@ export function HomePage() {
             <span className="mhx-content-copy"><strong>오늘의 포춘쿠키</strong><small>가벼운 한마디를 뽑아보세요. 공식 사주 운세와는 별개입니다.</small></span>
             <span className="mhx-content-arrow" aria-hidden="true">›</span>
           </button>
-          <a className="mhx-content-card" href="reading-detail.html?topic=temperament&scope=original">
+          <a className="mhx-content-card" href="reading.html">
             <span className="mhx-content-icon" data-tone="month" aria-hidden="true">▦</span>
-            <span className="mhx-content-copy"><strong>이번 달 사주 읽기</strong><small>월간 해석은 준비 중입니다. 전체 사주 프리뷰를 먼저 확인해 보세요.</small></span>
+            <span className="mhx-content-copy"><strong>이번 달 사주 읽기</strong><small>월간 해석은 준비 중입니다. 내 명식과 다른 주제를 먼저 살펴보세요.</small></span>
             <span className="mhx-content-arrow" aria-hidden="true">›</span>
           </a>
           <a className="mhx-content-card" href="birth.html">
@@ -120,20 +126,6 @@ export function HomePage() {
         </div>
       </section>
 
-      <section className="mhx-section mhx-recent" aria-labelledby="mhx-recent-title">
-        <div className="mhx-section-head">
-          <h2 id="mhx-recent-title" className="mhx-section-title">최근 이야기</h2>
-          <a href="chat-hub.html">전체보기 <span aria-hidden="true">›</span></a>
-        </div>
-        <div className="mhx-recent-card">
-          <span className="mhx-recent-seal" aria-hidden="true">明</span>
-          <div>
-            <strong>당신의 이야기를 기다리고 있어요</strong>
-            <p>최근 대화 기록은 아직 홈에 연결되지 않았습니다. 실제 대화와 기록은 대화 화면에서 확인해 주세요.</p>
-          </div>
-          <a className="mhx-primary-link mhx-recent-link" href="chat-hub.html">대화 보러 가기 <span aria-hidden="true">→</span></a>
-        </div>
-      </section>
       <FortuneCookie />
     </div>
   );

@@ -228,7 +228,7 @@ describe('PortOne V2 webhook runtime composition', () => {
     expect(url).toBe('https://api.portone.io/payments/payment-1');
     expect(init).toMatchObject({
       method: 'GET',
-      redirect: 'error',
+      redirect: 'manual',
       headers: {
         accept: 'application/json',
         authorization: `PortOne ${API_SECRET}`,

@@ -16,7 +16,7 @@ export const CHAT_CREDIT_DELIVERY_ACK_CANDIDATE_V1 = Object.freeze({
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const SQL = `
-select public.internal_cmd_chat_credit_ack_delivered_v1(
+select public.internal_cmd_chat_credit_ack_delivered_proven_v2(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid
 ) as "state"
 `.trim();

@@ -9,7 +9,7 @@ import {
 describe('shared social auth API client', () => {
   it('parses a governed social auth start response', async () => {
     const client = new MyeongHaApiClientV1({
-      origin: 'https://myeongha.vercel.app',
+      origin: 'https://myeongha.gycha0109.workers.dev',
       fetchImpl: async () => Response.json({
         ok: true,
         data: {

@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+﻿import { describe, expect, it } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import {
   getOfficialReadingRecord,
   OfficialReadingRecordReadAuthorityPortErrorV1,
@@ -10,21 +11,29 @@ const READING_ID = '44444444-4444-4444-8444-444444444444';
 const SESSION_ID = '55555555-5555-4555-8555-555555555555';
 const SUBJECT_ID = '66666666-6666-4666-8666-666666666666';
 
+const SNAPSHOT = Object.freeze({
+  responseVersion: 'myeonghwa-product-reading-response-v2',
+  responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+  state: 'delivered',
+  messageCode: 'READING_DELIVERED',
+  requiredAction: 'none',
+  reading: Object.freeze({
+    readingId: READING_ID,
+    sections: Object.freeze([
+      { sectionType: 'overview', state: 'complete', title: '공식 결과',
+        blocks: [{ type: 'paragraph', text: '원문 해석' }] },
+    ]),
+    disclosures: Object.freeze([{ type: 'scope_limitation', text: '검증된 범위 안에서 해석합니다.' }]),
+  }),
+});
 const ROW: OfficialReadingRecordAuthorityRowV1 = Object.freeze({
   readingId: READING_ID,
   readingSessionId: SESSION_ID,
   sajuDomain: 'career',
   readingContractVersion: 'myeonghwa-product-reading-response-v2',
   productResponseState: 'delivered',
-  responseSnapshotJsonb: Object.freeze({
-    responseVersion: 'myeonghwa-product-reading-response-v2',
-    state: 'delivered',
-    reading: Object.freeze({
-      readingId: READING_ID,
-      sections: Object.freeze([]),
-    }),
-  }),
-  responseHash: 'sha256:stored-reading',
+  responseSnapshotJsonb: SNAPSHOT,
+  responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(SNAPSHOT),
   readerCharacterIds: Object.freeze(['seyeon']),
   completedAt: '2026-09-23T00:01:00.000Z',
 });
@@ -49,11 +58,42 @@ describe('Official Reading Records read contract', () => {
       productResponseState: 'delivered',
       readerCharacterIds: ['seyeon'],
       completedAt: '2026-09-23T00:01:00.000Z',
+      birthRevision: { issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' },
       reading: ROW.responseSnapshotJsonb,
     });
     expect(result).not.toHaveProperty('responseHash');
     expect(result).not.toHaveProperty('threadId');
     expect(result).not.toHaveProperty('readerContext');
+  });
+
+  it('compares stored self Birth revision without reconstructing or rewriting the official result', async () => {
+    for (const birthRevision of [
+      { issuedRevisionNo: 2, currentRevisionNo: 2, state: 'current' as const },
+      { issuedRevisionNo: 2, currentRevisionNo: 3, state: 'changed' as const },
+      { issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' as const },
+    ]) {
+      const result = await getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        authorityPort: port({ ...ROW, birthRevision }),
+      });
+      expect(result.birthRevision).toEqual(birthRevision);
+      expect(result.reading).toStrictEqual(ROW.responseSnapshotJsonb);
+      expect(result).not.toHaveProperty('sourceBirthRevisionId');
+      expect(result).not.toHaveProperty('currentBirthRevisionId');
+    }
+    for (const birthRevision of [
+      { issuedRevisionNo: 1, currentRevisionNo: 2, state: 'current' as const },
+      { issuedRevisionNo: null, currentRevisionNo: 2, state: 'changed' as const },
+      { issuedRevisionNo: 1, currentRevisionNo: 1, state: 'changed' as const },
+      { issuedRevisionNo: -1, currentRevisionNo: 2, state: 'unknown' as const },
+    ]) {
+      await expect(getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        authorityPort: port({ ...ROW, birthRevision }),
+      })).rejects.toThrow('Birth revision provenance is inconsistent');
+    }
   });
 
   it('binds a server-pinned Reader hash to the Records DB row without returning the hash', async () => {
@@ -68,6 +108,96 @@ describe('Official Reading Records read contract', () => {
     expect(admitted).not.toHaveProperty('responseHash');
     await expect(read('sha256:wrong-reader-row')).rejects.toThrow('stored hash differs');
     await expect(read('')).rejects.toThrow('stored hash differs');
+  });
+
+  it('preserves legacy owner-gated records while rejecting malformed canonical digest claims', async () => {
+    const legacyHash = 'sha256:stored-reading';
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID,
+      readingId: READING_ID,
+      expectedResponseHash: legacyHash,
+      authorityPort: port({ ...ROW, responseHash: legacyHash }),
+    })).resolves.toMatchObject({ readingId: READING_ID });
+    for (const malformedHash of [
+      'sha256:v1:fake',
+      'sha256:v1:' + 'G'.repeat(64),
+    ]) {
+      await expect(getOfficialReadingRecord({
+        resolvedSubjectId: SUBJECT_ID,
+        readingId: READING_ID,
+        expectedResponseHash: malformedHash,
+        authorityPort: port({ ...ROW, responseHash: malformedHash }),
+      })).rejects.toThrow('source response hash mismatch');
+    }
+  });
+
+  it('rereads an issuer-hashed official report only when the stored body still matches the immutable digest', async () => {
+    const immutable = {
+      responseVersion: 'myeonghwa-product-reading-response-v2',
+      responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+      state: 'delivered',
+      messageCode: 'READING_DELIVERED',
+      requiredAction: 'none',
+      reading: {
+        readingId: READING_ID,
+        sections: [
+          { sectionType: 'overview', state: 'complete', title: '怨듭떇 寃곌낵',
+            blocks: [{ type: 'paragraph', text: '?몄쬆???쒕쾭 ?먮낯?낅땲??' }] },
+        ],
+        disclosures: [{ type: 'scope_limitation', text: '??紐낆떇??異쒖깮?쒓컖? ?뺤젙?섏뼱 ?덉뒿?덈떎.' }],
+      },
+    };
+    const issued = {
+      ...ROW,
+      responseSnapshotJsonb: immutable,
+      responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(immutable),
+    };
+    const admitted = await getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID, authorityPort: port(issued),
+    });
+    expect(admitted.reading).toEqual(immutable);
+
+    const modified = {
+      ...immutable,
+      reading: {
+        ...(immutable.reading as Record<string, unknown>),
+        sections: [
+          { sectionType: 'overview', state: 'complete', title: '怨듭떇 寃곌낵',
+            blocks: [{ type: 'paragraph', text: '?먮낯??蹂寃쏀븳 ?댁슜?낅땲??' }] },
+        ],
+      },
+    };
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
+      authorityPort: port({ ...issued, responseSnapshotJsonb: modified }),
+    })).rejects.toThrow('source response hash mismatch');
+    // Even a rehashed malformed canonical envelope cannot be disclosed as a
+    // successful official report. This guards the server's final read boundary.
+    const noInterpretation = {
+      ...immutable,
+      reading: { ...immutable.reading, sections: [] },
+    };
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
+      authorityPort: port({
+        ...issued,
+        responseSnapshotJsonb: noInterpretation,
+        responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(noInterpretation),
+      }),
+    })).rejects.toThrow('failed product admission');
+
+    const mismatchedEnvelope = {
+      ...immutable,
+      messageCode: 'READING_EVIDENCE_INSUFFICIENT',
+    };
+    await expect(getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID,
+      authorityPort: port({
+        ...issued,
+        responseSnapshotJsonb: mismatchedEnvelope,
+        responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(mismatchedEnvelope),
+      }),
+    })).rejects.toThrow('failed product admission');
   });
 
   it('fails closed when the owner-scoped record does not exist', async () => {
@@ -113,16 +243,19 @@ describe('Official Reading Records read contract', () => {
   });
 
   it('admits only archive-openable Product response states', async () => {
+    const fallbackSnapshot = {
+      ...SNAPSHOT,
+      state: 'delivered_with_fallback',
+      messageCode: 'READING_DELIVERED_WITH_GROUNDED_FALLBACK',
+    };
     await expect(getOfficialReadingRecord({
       resolvedSubjectId: SUBJECT_ID,
       readingId: READING_ID,
       authorityPort: port({
         ...ROW,
         productResponseState: 'delivered_with_fallback',
-        responseSnapshotJsonb: {
-          ...(ROW.responseSnapshotJsonb as Record<string, unknown>),
-          state: 'delivered_with_fallback',
-        },
+        responseSnapshotJsonb: fallbackSnapshot,
+        responseHash: 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(fallbackSnapshot),
       }),
     })).resolves.toMatchObject({
       readingId: READING_ID,

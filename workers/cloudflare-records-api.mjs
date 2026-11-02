@@ -15,13 +15,16 @@ import {
   createProductionMemoryItemsReadRuntimeV1,
 } from '../apps/api/src/production-records-read-runtime.ts';
 import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/production-user-data-runtime-config.ts';
+import { createProductionRequestIdentityVerifierV1 } from '../apps/api/src/production-request-identity-verifier.ts';
+import { handleSeyeonMemberMemoryGrantStatusRequestV1 } from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.ts';
 import {
   buildProductionNodePostgresPoolConfigV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import { CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1 } from '../apps/api/src/cloudflare-direct-postgres-candidate.ts';
 
 const SECURITY_HEADERS=CLOUDFLARE_APPROVED_RESPONSE_HEADERS_V1;
-const RECORD_IDS=new Set(['rewrite.life-record','rewrite.readings','rewrite.memories']);
+const RECORD_IDS=new Set(['rewrite.life-record','rewrite.readings','rewrite.memories',
+  'rewrite.seyeon.memory.grant.status']);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
 function denied() {
@@ -37,6 +40,9 @@ function unavailable() {
 export function allowedCloudflareRecordsReadQueryV1(route,url) {
   if (!RECORD_IDS.has(route?.id)) return false;
   if (url.hash!=='') return false;
+  // The current-grant query accepts only the exact original Memory URL.
+  // It never accepts an owner/Grant selector or a Vercel rewrite marker.
+  if (route.id==='rewrite.seyeon.memory.grant.status') return url.search==='';
   if (url.search==='') return true;
   const keys=[...url.searchParams.keys()];
   if (new Set(keys).size!==keys.length || keys.some(key=>
@@ -92,15 +98,24 @@ export async function tryHandleCloudflareApprovedRecordsV1(request,bindings,rout
   }catch{return unavailable();}
   let pool,runtime,result;
   try{
+    const grantStatus=route.id==='rewrite.seyeon.memory.grant.status';
+    const verifier=grantStatus
+      ?createProductionRequestIdentityVerifierV1({config})
+      :null;
     pool=createCloudflareSubjectPoolV1(config,bindings, CLOUDFLARE_DIRECT_POSTGRES_CANDIDATE_LIMITS_V1);
-    runtime=route.id==='rewrite.life-record'
-      ?createProductionLifeRecordReadRuntimeV1({env:bindings,pool})
-      :readings
-        ?createProductionReadingHistoryReadRuntimeV1({env:bindings,pool})
-        :createProductionMemoryItemsReadRuntimeV1({env:bindings,pool});
-    result=await runtime.handleRequest({
-      request,requestId:crypto.randomUUID(),serverTime:new Date().toISOString(),
-    });
+    const requestInput={request,requestId:crypto.randomUUID(),serverTime:new Date().toISOString()};
+    if(grantStatus){
+      result=await handleSeyeonMemberMemoryGrantStatusRequestV1({
+        ...requestInput,identityEvidenceVerifier:verifier,pool,
+      });
+    }else{
+      runtime=route.id==='rewrite.life-record'
+        ?createProductionLifeRecordReadRuntimeV1({env:bindings,pool})
+        :readings
+          ?createProductionReadingHistoryReadRuntimeV1({env:bindings,pool})
+          :createProductionMemoryItemsReadRuntimeV1({env:bindings,pool});
+      result=await runtime.handleRequest(requestInput);
+    }
   }catch{result=unavailable();}
   let closed=true;
   try{await runtime?.close();}catch{closed=false;}

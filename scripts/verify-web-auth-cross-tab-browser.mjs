@@ -495,10 +495,10 @@ try {
   assert(rotatedBearer.active?.kind === 'member' && rotatedBearer.active?.token === rotatedMemberAccessToken, 'Tab B active bearer resolver did not expose the rotated Member token');
   assert(rotatedBearer.ensured?.kind === 'member' && rotatedBearer.ensured?.token === rotatedMemberAccessToken, 'Tab B ensure bearer did not expose the rotated Member token');
 
-  await navigate(tabA, origin, '/my.html', '#my-account-email');
+  await navigate(tabA, origin, '/my.html', '.my-account-card');
   await waitFor(
     tabA,
-    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(testIdentity.email)} && Boolean(document.querySelector('.my-logout-action'))`,
+    `document.querySelector('.my-account-meta')?.textContent?.includes(${JSON.stringify(testIdentity.email)}) && Boolean(document.querySelector('.my-logout-action'))`,
     'Tab A My page did not expose the Member logout action',
   );
   const signOutScheduled = await tabA.evaluate(`(() => {

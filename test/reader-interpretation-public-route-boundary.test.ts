@@ -3,16 +3,13 @@ import { describe, expect, it } from 'vitest';
 
 import meEndpoint from '../api/me.js';
 
-const vercelConfigPath = new URL('../vercel.json', import.meta.url);
+const cloudflareRouterPath = new URL('../workers/cloudflare-api-router.mjs', import.meta.url);
 const READER_ROUTE = '/api/me/readings/reader-interpretation/preview';
 
 describe('Reader Interpretation public route activation boundary', () => {
   it('keeps the public Reader Interpretation rewrite absent until activation is explicitly approved', async () => {
-    const config = JSON.parse(await readFile(vercelConfigPath, 'utf8')) as {
-      rewrites?: Array<{ source?: string; destination?: string }>;
-    };
-
-    expect(config.rewrites?.some((rule) => rule.source === READER_ROUTE)).toBe(false);
+    const router = await readFile(cloudflareRouterPath, 'utf8');
+    expect(router).not.toContain('source: "' + READER_ROUTE + '"');
   });
 
   it('fails the unactivated Reader Interpretation pathname closed at the production dispatcher', async () => {

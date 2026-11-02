@@ -1,7 +1,6 @@
 import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import { parseReadingHistoryPayloadV1, ReadingHistoryContractErrorV1 } from './reading-history-contract.js';
 import { unwrapApiSuccessEnvelope, WebApiEnvelopeError } from './api-envelope.js';
-import { assertBirthProfile } from './my-runtime-client.js';
 import {
   PRODUCT_AUTH_STORAGE_V1,
   ensureActiveBearer,
@@ -11,10 +10,7 @@ import {
 
 const DEFAULT_ENDPOINTS = Object.freeze({
   profile: '/api/me',
-  birthProfile: '/api/me/birth-profile',
-  lifeFacts: '/api/life-record',
   readings: '/api/readings',
-  memories: '/api/memories',
 });
 const AUTHORITY_READ_ATTEMPTS = 2;
 
@@ -129,19 +125,6 @@ async function readJson(fetchImpl, endpoint, bearer) {
     throw error;
   }
 }
-async function readOptionalCurrentBirthProfile(fetchImpl, endpoint, bearer) {
-  try {
-    const payload = await readJson(fetchImpl, endpoint, bearer);
-    // Share the validated current-self Birth contract with My.
-    return Object.freeze({ status: 'ready', payload: assertBirthProfile(payload) });
-  } catch (error) {
-    // Revoked credentials cannot be downgraded into an optional-data error.
-    if (error instanceof RecordsRuntimeError && error.code === 'WEB_RECORDS_SESSION_REQUIRED') throw error;
-    // Other failures do not hide Life Facts, Official Readings or Memories.
-    return Object.freeze({ status: 'unavailable' });
-  }
-}
-
 function projectReadingHistory(payload) {
   try {
     return parseReadingHistoryPayloadV1(payload);
@@ -251,26 +234,6 @@ async function readPagedCollection(fetchImpl, endpoint, bearer, field) {
   }
 }
 
-const MEMORY_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
-
-function requireSeyeonGrantStatus(payload, memoryItemId) {
-  if (
-    payload.memoryItemId !== memoryItemId
-    || payload.characterId !== 'seyeon'
-    || typeof payload.currentlyGranted !== 'boolean'
-    || !(payload.grantedAt === null || (typeof payload.grantedAt === 'string' && Number.isFinite(Date.parse(payload.grantedAt))))
-    || (payload.currentlyGranted && payload.grantedAt === null)
-    || (!payload.currentlyGranted && payload.grantedAt !== null)
-  ) {
-    throw new RecordsRuntimeError('WEB_RECORDS_MALFORMED_RESPONSE', 'Current Se-yeon grant status is invalid.');
-  }
-  return Object.freeze({
-    memoryItemId,
-    currentlyGranted: payload.currentlyGranted,
-    grantedAt: payload.grantedAt,
-  });
-}
-
 export function createRecordsRuntimeClient(options = {}) {
   const fetchImpl = requireFetch(options.fetchImpl ?? globalThis.fetch);
   const resolveBearer = options.resolveBearer ?? ensureActiveBearer;
@@ -292,37 +255,23 @@ export function createRecordsRuntimeClient(options = {}) {
 
   return Object.freeze({
     readProfile: () => readEndpoint(endpoints.profile),
-    readLifeFacts: () => readStable((bearer) =>
-      readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts')),
     readReadings: () => readStable(async (bearer) =>
       projectReadingHistory(
         await readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
       )),
-    readMemories: () => readStable((bearer) =>
-      readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories')),
-    readSeyeonMemoryGrantStatus(memoryItemId) {
-      if (typeof memoryItemId !== 'string' || !MEMORY_UUID_V1.test(memoryItemId)) {
-        throw new RecordsRuntimeError('WEB_RECORDS_INVALID_MEMORY_ID', 'A valid memory identity is required.');
-      }
-      const endpoint = `${endpoints.memories}/${encodeURIComponent(memoryItemId)}/grants/seyeon`;
-      return readStable(async (bearer) => {
-        if (bearer.kind !== 'member') {
-          throw new RecordsRuntimeError('WEB_RECORDS_MEMBER_REQUIRED', 'Member identity is required for Se-yeon grant status.');
-        }
-        return requireSeyeonGrantStatus(await readJson(fetchImpl, endpoint, bearer), memoryItemId);
-      });
-    },
     readRecords() {
       return readStable(async (bearer) => {
         const profile = await readJson(fetchImpl, endpoints.profile, bearer);
-        const [lifeFacts, readingsPayload, memories, birth] = await Promise.all([
-          readPagedCollection(fetchImpl, endpoints.lifeFacts, bearer, 'facts'),
+        const readingResult = await Promise.allSettled([
           readPagedCollection(fetchImpl, endpoints.readings, bearer, 'readings'),
-          readPagedCollection(fetchImpl, endpoints.memories, bearer, 'memories'),
-          readOptionalCurrentBirthProfile(fetchImpl, endpoints.birthProfile, bearer),
         ]);
-        const readings = projectReadingHistory(readingsPayload);
-        return Object.freeze({ profile, lifeFacts, readings, memories, birth });
+        const result = readingResult[0];
+        if (result.status === 'rejected' && result.reason instanceof RecordsRuntimeError
+          && result.reason.code === 'WEB_RECORDS_SESSION_REQUIRED') throw result.reason;
+        const unavailable = Object.freeze({ status: 'unavailable' });
+        const readings = result.status === 'fulfilled'
+          ? projectReadingHistory(result.value) : unavailable;
+        return Object.freeze({ profile, readings });
       });
     },
   });

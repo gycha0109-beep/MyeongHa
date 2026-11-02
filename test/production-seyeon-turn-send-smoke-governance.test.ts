@@ -6,7 +6,7 @@ describe('Production Seyeon turn smoke contract', () => {
     const workflow = await readFile(
       new URL('../.github/workflows/production-seyeon-turn-send-smoke.yml', import.meta.url),
       'utf8',
-    );
+    ).then(source => source.replace(/\r\n/gu, '\n'));
     expect(workflow).toContain('workflow_dispatch:');
     expect(workflow).toContain('VERIFY_SEYEON_PRODUCTION_TURN');
     expect(workflow).toContain("branches:\n      - main");
@@ -24,7 +24,7 @@ describe('Production Seyeon turn smoke contract', () => {
       new URL('../scripts/verify-production-seyeon-turn-send.mjs', import.meta.url),
       'utf8',
     );
-    expect(source).toContain("const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app'");
+    expect(source).toContain("const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev'");
     expect(source).toContain("body: JSON.stringify({ characterId: 'seyeon' })");
     expect(source).toContain('/turns');
     expect(source).toContain('const clientTurnId = randomUUID()');

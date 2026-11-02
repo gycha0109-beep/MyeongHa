@@ -60,6 +60,12 @@ const requiredWorkflowFragments = [
   'bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir/data.sql"',
   "PGOPTIONS='-c default_transaction_read_only=on'",
   'capture_seyeon_early_history',
+  'production-migration-catalog-fingerprint-readonly.sql',
+  'migration_catalog_before="$(capture_migration_catalog_fingerprint)"',
+  'migration_catalog_after="$(capture_migration_catalog_fingerprint)"',
+  'HOLD_MIGRATION_CATALOG: production history changed during governed dump.',
+  'migration_catalog_version_count: $migration_catalog_version_count',
+  'migration_catalog_sha256: $migration_catalog_sha256',
   'seyeon_early_history_before="$(capture_seyeon_early_history)"',
   'seyeon_early_history_after="$(capture_seyeon_early_history)"',
   'HOLD_SEYEON_BACKUP: scoped 1400..1450 migration history incomplete.',
@@ -158,13 +164,23 @@ if (!(encryptIndex < plaintextDeleteIndex && runnerStepIndex < uploadIndex)) {
 
 if (workflow.includes('push:')) {
   for (const fragment of [
-    "'.github/ops/postgres-backup-frontier-1310.once'",
-    'Gate one-shot frontier-1310 backup marker',
-    'POSTGRES-BACKUP-FRONTIER-1310-V1',
+    "'.github/ops/postgres-backup-migration-20261029012948-20261029.once'",
+    'Gate one-shot deployed migration 20261029012948 backup marker',
+    'POSTGRES-BACKUP-MIGRATION-20261029012948-20261029-V1',
+    'ops(dr): one-shot backup migration 20261029012948',
+    "github.event_name == 'push'",
+    'now - point <= 86400',
+    "OBSERVED_MIGRATION_FRONTIER",
+    "[[ \"$OBSERVED_MIGRATION_FRONTIER\" == '20261029012948' ]]",
   ]) {
     if (!workflow.includes(fragment)) {
       throw new Error(`One-shot backup bridge missing exact authority fragment: ${fragment}`);
     }
+  }
+  const backupPaths = workflow.split('  workflow_dispatch:')[0]
+    .split('\n').filter((line) => line.trim().startsWith("- '.github/ops/"));
+  if (backupPaths.length !== 1) {
+    throw new Error('Only the exact one-shot migration backup marker may trigger Production backup on push.');
   }
 }
 
@@ -175,7 +191,12 @@ const requiredRestoreSourceResolverFragments = [
   '(.event == "schedule" or .event == "workflow_dispatch" or .event == "push")',
   '.repository.full_name == env.GITHUB_REPOSITORY',
   "if [[ \"$run_event\" == 'push' ]]",
-  '.github/ops/postgres-backup-frontier-1310.once?ref=$source_sha',
+  '$marker_path?ref=$source_sha',
+  'postgres-backup-frontier-1310.once',
+  'POSTGRES-BACKUP-FRONTIER-1310-V1',
+  'postgres-backup-migration-20261029012948-20261029.once',
+  String.raw`marker_token="$(tr -d '\r\n' < "$marker_path")"`,
+  'Gate one-shot deployed migration 20261029012948 backup marker',
   '.github/workflows/production-postgres-backup.yml?ref=$source_sha',
   'POSTGRES-BACKUP-FRONTIER-1310-V1',
   'Gate one-shot frontier-1310 backup marker',
@@ -190,7 +211,7 @@ if (restoreSourceResolver.includes('.name == "Production PostgreSQL Logical Back
 }
 
 const requiredRunbookFragments = [
-  'CURRENT-FRONTIER BACKUP+RESTORE PROVEN',
+  'OBSERVED-MIGRATION-VERSION-MATCHED PG17 RESTORE PROVEN',
   'Current Supabase organization plan: `free`',
   'PITR',
   'NOT AVAILABLE UNDER THE CURRENT FREE-PLAN OPERATING BASELINE',

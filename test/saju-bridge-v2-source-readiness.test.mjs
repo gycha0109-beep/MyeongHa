@@ -22,7 +22,7 @@ describe('Saju bridge V2 non-mutating source and release evidence separation', (
       productionNetworkCalls: 0,
       secretsRead: false,
     });
-    expect(report.operationalGaps).toContain('CURRENT_VERCEL_ORIGIN_AND_BEARER_BINDING_NOT_VERIFIED');
+    expect(report.operationalGaps).toContain('CURRENT_CLOUDFLARE_ORIGIN_AND_BEARER_BINDING_NOT_VERIFIED');
     const serialized = JSON.stringify(report);
     expect(serialized).not.toContain('MYEONGHA_DATABASE_URL=');
     expect(serialized).not.toContain('MYEONGHA_SAJU_SERVICE_BEARER=');
@@ -31,12 +31,12 @@ describe('Saju bridge V2 non-mutating source and release evidence separation', (
 
   it.each([
     [
-      'vercel.json',
+      'workers/cloudflare-api-router.mjs',
       (source) => source.replace(
         '/api/me?__myeongha_saju_preview_reading=1',
         '/api/me?__myeongha_saju_preview_reading=0',
       ),
-      'PREVIEW_REWRITE_DRIFT',
+      'PREVIEW_REWRITE',
     ],
     [
       'api/me.ts',
@@ -109,9 +109,9 @@ describe('Saju bridge V2 non-mutating source and release evidence separation', (
     );
     const broken = inspectSajuBridgeV2SourceReadiness({
       ...sources,
-      'vercel.json': '{',
+      'workers/cloudflare-api-router.mjs': '{',
     });
-    expect(broken.failedChecks).toContain('vercel.json:REWRITES_INVALID');
+    expect(broken.failedChecks).toContain('workers/cloudflare-api-router.mjs:PREVIEW_REWRITE');
     expect(broken.operationalGaps).toHaveLength(4);
     expect(broken.stagingAdmission).toBe('HOLD');
   });

@@ -55,7 +55,7 @@ export async function runCloudflarePrimaryE2E(options = {}) {
   assert(origin === CLOUDFLARE_PRIMARY_E2E_ORIGIN,
     'E2E target is pinned to the governed Cloudflare primary Worker');
   const mode = options.mode ?? 'anonymous';
-  assert(mode === 'anonymous' || mode === 'authenticated', 'Unknown E2E mode');
+  assert(['anonymous', 'authenticated', 'operations'].includes(mode), 'Unknown E2E mode');
   const expectedVersion = options.expectedVersion ?? process.env.CLOUDFLARE_EXPECTED_WORKER_VERSION;
   if (mode === 'authenticated') {
     assert(typeof expectedVersion === 'string' &&
@@ -64,6 +64,7 @@ export async function runCloudflarePrimaryE2E(options = {}) {
   }
   const fetchImpl = options.fetchImpl ?? fetch;
   const checks = [];
+  let observedOperationsWorkerVersion = null;
 
   async function call(label, path, init = {}) {
     // Every request stays on the exact owned origin; redirects never follow.
@@ -88,6 +89,15 @@ export async function runCloudflarePrimaryE2E(options = {}) {
     if (mode === 'authenticated' && pinnedPaths.includes(path)) {
       assert(response.headers.get('x-myeongha-worker-version') === expectedVersion,
         label + ' returned a different deployed Worker version; no credential replay');
+    }
+    if (mode === 'operations' && pinnedPaths.includes(path)) {
+      const version = response.headers.get('x-myeongha-worker-version');
+      assert(typeof version === 'string' &&
+        /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/iu.test(version),
+      label + ' is missing its exact Worker version');
+      if (observedOperationsWorkerVersion === null) observedOperationsWorkerVersion = version;
+      assert(version === observedOperationsWorkerVersion,
+        label + ' changed Worker version during the operations smoke');
     }
     return response;
   }
@@ -179,8 +189,17 @@ export async function runCloudflarePrimaryE2E(options = {}) {
   noSecretEgress(unknown, 'unknown API');
   mark('api.unknown_fence', 404);
 
+  if (mode === 'operations') {
+    assert(ready.status === 200 && meAnonymous.status === 401 &&
+      sajuAnonymous.status === 401 && previewAnonymous.status === 401,
+      'Cloudflare operations NOT_ACCEPTED: config readiness=' + ready.status +
+      ' member denial=' + meAnonymous.status + ' saju denial=' + sajuAnonymous.status +
+      ' preview denial=' + previewAnonymous.status);
+    mark('api.operations_config_and_auth_denial', 200);
+  }
+
   // Only deliberately invalid identities are used; no chat/AI call is authorized.
-  for (const [name, path, method] of [
+  if (mode !== 'operations') for (const [name, path, method] of [
     ['chat.open_hold', '/api/chat', 'GET'],
     ['chat.turn_hold', '/api/chat/00000000-0000-4000-8000-000000000000/turns', 'POST'],
     ['chat.encoded_hold', '/%61pi/chat', 'GET'],
@@ -286,6 +305,12 @@ export async function runCloudflarePrimaryE2E(options = {}) {
     target: 'myeongha',
     mode,
     result: 'PASS',
+    ...(mode === 'operations' ? {
+      observedWorkerVersion: observedOperationsWorkerVersion,
+      readinessScope: 'configuration-only',
+      liveDependencyConnectivityProven: false,
+      productionAcceptanceProven: false,
+    } : {}),
     checks: Object.freeze(checks),
     // Never serialize sensitive responses, identities, tokens or private data.
   });

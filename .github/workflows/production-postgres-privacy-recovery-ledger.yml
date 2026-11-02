@@ -189,6 +189,63 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client jq
 
+      - name: Resolve prior governed privacy ledger artifact
+        id: previous
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          runs_json="$RUNNER_TEMP/previous-privacy-ledger-runs.json"
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/workflows/production-postgres-privacy-recovery-ledger.yml/runs?branch=main&status=success&per_page=50" \
+            -o "$runs_json"
+          previous_run_id="$(jq -r '
+            [.workflow_runs[]
+              | select(
+                  .path == ".github/workflows/production-postgres-privacy-recovery-ledger.yml"
+                  and .head_branch == "main"
+                  and .conclusion == "success"
+                  and (.event == "schedule" or .event == "workflow_dispatch")
+                )
+            ] | sort_by(.created_at) | last | .id // empty
+          ' "$runs_json")"
+          if [[ -z "$previous_run_id" ]]; then
+            echo 'No prior completed privacy ledger: new evidence stays NO_PREDECESSOR_UNVERIFIED.'
+            exit 0
+          fi
+          [[ "$previous_run_id" =~ ^[1-9][0-9]*$ ]]
+          artifacts_json="$RUNNER_TEMP/previous-privacy-ledger-artifacts.json"
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$previous_run_id/artifacts?per_page=100" \
+            -o "$artifacts_json"
+          previous_artifacts="$(jq -c '[
+            .artifacts[]
+            | select(.expired == false and
+                (.name | test("^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$")))
+          ]' "$artifacts_json")"
+          if [[ "$(jq 'length' <<<"$previous_artifacts")" != 1 ]]; then
+            echo '::error title=Privacy ledger predecessor missing::Prior successful ledger artifact is missing, ambiguous or expired; source continuity is unverified.'
+            exit 1
+          fi
+          echo "artifact_id=$(jq -er '.[0].id' <<<"$previous_artifacts")" >> "$GITHUB_OUTPUT"
+          echo "run_id=$previous_run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download previous encrypted privacy ledger
+        if: steps.previous.outputs.artifact_id != ''
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.previous.outputs.run_id }}
+          artifact-ids: ${{ steps.previous.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/previous-ledger-artifact
+
       - name: Export replay-supported privacy events read-only
         id: export
         shell: bash
@@ -197,6 +254,7 @@ jobs:
           BACKUP_COMPLETED_AT_UTC: ${{ steps.cutoff.outputs.backup_completed_at_utc }}
           BACKUP_SOURCE_SHA: ${{ steps.source.outputs.backup_source_sha }}
           BACKUP_ARTIFACT_NAME: ${{ steps.source.outputs.backup_artifact_name }}
+          PREVIOUS_LEDGER_ARTIFACT_DIR: ${{ steps.previous.outputs.artifact_id != '' && format('{0}/previous-ledger-artifact', runner.temp) || '' }}
         run: bash scripts/operations/export-production-postgres-privacy-recovery-ledger.sh
       - name: Upload encrypted privacy recovery ledger
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7

@@ -141,9 +141,7 @@ describe('My and Records authoritative bearer rejection', () => {
     seedMember();
     const fetchImpl = vi.fn(async (endpoint: string) => {
       if (endpoint === '/api/me') return profileEnvelope('member');
-      if (endpoint === '/api/life-record') return Response.json({ ok: false }, { status: 401 });
-      if (endpoint === '/api/readings') return successEnvelope({ readings: [] });
-      if (endpoint === '/api/memories') return successEnvelope({ memories: [] });
+      if (endpoint === '/api/readings') return Response.json({ ok: false }, { status: 401 });
       return Response.json({ ok: false }, { status: 404 });
     });
     const client = createRecordsRuntimeClient({
@@ -162,9 +160,7 @@ describe('My and Records authoritative bearer rejection', () => {
     seedGuest();
     const fetchImpl = vi.fn(async (endpoint: string) => {
       if (endpoint === '/api/me') return profileEnvelope('guest');
-      if (endpoint === '/api/life-record') return successEnvelope({ facts: [] });
-      if (endpoint === '/api/readings') return successEnvelope({ readings: [] });
-      if (endpoint === '/api/memories') return Response.json({ ok: false }, { status: 401 });
+      if (endpoint === '/api/readings') return Response.json({ ok: false }, { status: 401 });
       return Response.json({ ok: false }, { status: 404 });
     });
     const client = createRecordsRuntimeClient({
@@ -182,9 +178,7 @@ describe('My and Records authoritative bearer rejection', () => {
     seedMember();
     const fetchImpl = vi.fn(async (endpoint: string) => {
       if (endpoint === '/api/me') return profileEnvelope('member');
-      if (endpoint === '/api/life-record') return Response.json({ ok: false }, { status: 403 });
-      if (endpoint === '/api/readings') return successEnvelope({ readings: [] });
-      if (endpoint === '/api/memories') return successEnvelope({ memories: [] });
+      if (endpoint === '/api/readings') return Response.json({ ok: false }, { status: 403 });
       return Response.json({ ok: false }, { status: 404 });
     });
     const client = createRecordsRuntimeClient({

@@ -8,6 +8,12 @@
 
 ---
 
+## 상태 권위 보정 (2026-10-28)
+
+**ACTIVE:** `P0-CM-01` Web one-off launch rail. **SUPERSEDED(상태 기록만):** 아래 §1/§5/§8에서 `P0-CM-02 OPEN-P0`라고 쓴 것은 2026-09-05의 HISTORICAL 스냅샷입니다. [현재 P0 결정 원장](P0_DECISION_REGISTER.md)은 `P0-CM-02 DECIDED` **PortOne V2**로 확정합니다. 이 문서가 이미 완료된 PSP 결정을 다시 열지 않습니다.
+
+`P0-CM-03`은 사주 페이지 전체 공개 방향과 `standard.love_relationship` KRW 8,900 상품/정가 결정이 있어도 **Offer/Charge Terms 및 판매·권한 활성화에 대해서는 OPEN-P0/HOLD**입니다. [Commerce 결제 아키텍처](COMMERCE_PAYMENT_TRACK_ARCHITECTURE_V1.md)와 최신 원장의 결정·구현 근거가 우선하며, 기존 결제 검증·Entitlement fail-closed 경계는 그대로 유지합니다. [설계 충돌 원장](architecture/ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md) AR-07/10을 참조합니다.
+
 ## 1. Decision
 
 ```text

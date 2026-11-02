@@ -8,7 +8,13 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '../seyeon-private-memory-grant-revoke-r17-candidate.sql',
   '00-original-source-locks.sql', '01-source-pin.sql', '02-atomic-commit.sql',
   '03-private-memory-accept.sql', '04-locked-reveal.sql', '05-http-delivery-receipt.sql',
-  '06-attempt-receipt-progression.sql',
+  '06-attempt-receipt-progression.sql', '07-member-withdrawal-status.sql',
+  '08-historical-thread-presence.sql', '09-owned-original-memory-grant.sql',
+  '13-g0-current-original-lineage-context.sql',
+  '14-g0-relationship-event-original-lineage.sql',
+  '15-g0-original-member-user-message.sql',
+  '16-g1-model-recent-source-pin.sql',
+  '17-g1-positive-combined-model-source-pin.sql',
 ]);
 
 export async function buildSeyeonSecurityS0InstallationPlan() {

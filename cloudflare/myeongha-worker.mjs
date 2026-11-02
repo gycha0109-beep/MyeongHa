@@ -2,10 +2,12 @@
 // separately governed subject-scoped Auth/DB/Saju API adapters.
 // No API Worker-to-Worker hop and no implicit Vercel proxy.
 import sealedRuntime from './preview-worker.mjs';
+import {isOwnerPortOneSdkRequestV1,serveOwnerPortOneSdkV1} from './owner-portone-sdk-proxy.mjs';
 import {SEYEON_SECURITY_S0_PRODUCTION_V1,
   SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1} from '../apps/api/src/seyeon-security-s0-production-policy-v1.js';
 import apiRuntime, {cloudflareEmergencyHoldEnabledV1} from '../workers/cloudflare-static-preview.mjs';
 import { isSeyeonCloudflareProtectedIngressAliasV1 } from '../apps/api/src/seyeon-cloudflare-ops-router-handoff-offline-v1.js';
+import {createSeyeonGlmContextCapacityGovernorV1} from '../apps/api/src/seyeon-glm-governor-approval-v1.js';
 import { cloudflareAuthRoute, handleCloudflareAuthRequest, rateLimitCloudflareRequestV1 } from './member-auth-worker.mjs';
 import {approvedCloudflareAuthOriginV1} from '../workers/cloudflare-auth-db-api.mjs';
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
@@ -56,7 +58,6 @@ export default {
     const firstReplyRoute=/^\/api\/chat\/[a-f0-9-]+\/turns$/u.test(url.pathname);
     if(approvedCloudflareAuthOriginV1(request,env)!==null && request.method==='POST' && url.search==='' && SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled &&
        (receiptRoute||revokeRoute||(firstReplyRoute&&SEYEON_SECURITY_S0_PRODUCTION_V1.modelUseEnabled&&
-       SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling?.productionMounted===true&&
        !cloudflareEmergencyHoldEnabledV1(env)))){
       // Import inside the request: DB pools/credentials never become isolate
       // global state. Every alias/history/replay still reaches the sealed router.
@@ -68,12 +69,40 @@ export default {
         const rejected=await rateLimitCloudflareRequestV1(request,env,
           receiptRoute?'seyeon-receipt':revokeRoute?'seyeon-withdrawal':'seyeon-turn');
         if(rejected)return rejected;
-        const {createCloudflareSeyeonFirstMemoryRuntimeV1}=await import(
-          '../workers/cloudflare-seyeon-first-memory-runtime.mjs');
-        runtime=createCloudflareSeyeonFirstMemoryRuntimeV1({
-          env,approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
-          governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
-        });
+        const {
+          createCloudflareSeyeonFirstMemoryRuntimeV1,
+          createCloudflareSeyeonReceiptWithdrawalRuntimeV1,
+          createCloudflareSeyeonIssuedReplyReceiptRuntimeV1,
+        }=await import('../workers/cloudflare-seyeon-first-memory-runtime.mjs');
+        // Proof-only receipt must remain available without Member Auth,
+        // whereas withdrawal still verifies the current Member and Subject.
+        // Both stay independent from the metered model/governed DB.
+        runtime=receiptRoute
+          ?createCloudflareSeyeonIssuedReplyReceiptRuntimeV1({env})
+          :firstReplyRoute
+            ?createCloudflareSeyeonFirstMemoryRuntimeV1({
+              env,
+              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved
+                ? {zeroSourceFirstReplyApproved:true} : {}),
+              ...(SEYEON_SECURITY_S0_PRODUCTION_V1.glmRendererApproved &&
+                  typeof env?.OPENROUTER_API_KEY==='string' &&
+                  env.OPENROUTER_API_KEY.trim().length>0
+                ? {glmRendererGovernor:createSeyeonGlmContextCapacityGovernorV1()}
+                : {}),
+              approvedPersonalRecordModelUse:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+              governorApproval:SEYEON_SECURITY_S0_GOVERNOR_APPROVAL_V1,
+            })
+            :createCloudflareSeyeonReceiptWithdrawalRuntimeV1({
+              env,approvedWithdrawalWriteAdmission:()=>SEYEON_SECURITY_S0_PRODUCTION_V1.receiptAndWithdrawalEnabled,
+            });
+        // The general paid rail remains sealed until atomic reservation and
+        // delivery-receipt settlement are actually mounted. The sole DB-bound
+        // Owner Admin may test the existing governed, G1/G2/G3-protected AI.
+        // Even a server-side account lookup failure must not admit a model.
+        if(firstReplyRoute && !(await runtime.verifyOwnerCreditExemption(request))){
+          return Response.json({ok:false,error:{code:'CREDIT_AUTHORITY_UNAVAILABLE',retryable:false}},
+            {status:503,headers:HEALTH_HEADERS});
+        }
         const response=await runtime.handleRequest(request);
         const headers=new Headers(response.headers);
         for(const [key,value] of Object.entries(HEALTH_HEADERS))headers.set(key,value);
@@ -114,13 +143,39 @@ export default {
       // Preserve native Member Auth/Rate Limiter priority and single event
       // coverage before governed Ops API fallthrough.
       const route = matchCloudflareApiRoute(url.pathname);
-      const response = cloudflareAuthRoute(request) !== null && route !== null
+      const response = cloudflareAuthRoute(request, env) !== null && route !== null
         ? await executeSecurityObservedRequestV1({
             request, routeId: route.id,
             execute: () => handleCloudflareAuthRequest(request, env),
           })
         : await apiRuntime.fetch(request, env, ctx);
       return withWorkerVersion(response,env);
+    }
+    // Only this exact read-only path may relay the fixed official PortOne
+    // SDK. No arbitrary URLs, request credentials or checkout data cross it.
+    if (isOwnerPortOneSdkRequestV1(request,url)) {
+      return withWorkerVersion(await serveOwnerPortOneSdkV1(),env);
+    }
+    // This owner-only *test console* static HTML can load the official KCP
+    // SDK without relaxing the production SPA's strict CSP. All sensitive
+    // operations independently require DB-verified Owner Admin and sandbox.
+    if (url.pathname === '/owner-portone-sandbox.html' &&
+        (request.method === 'GET' || request.method === 'HEAD')) {
+      const response = await sealedRuntime.fetch(request, env, ctx);
+      if (response.status !== 200) return withWorkerVersion(response, env);
+      const headers = new Headers(response.headers);
+      headers.set('Content-Security-Policy',
+        "default-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; "+
+        "script-src 'self' https://cdn.portone.io; style-src 'self'; "+
+        "connect-src 'self' https://checkout-service.prod.iamport.co https://*.portone.io https://*.kcp.co.kr; "+
+        "img-src 'self' data: https:; font-src 'self'; "+
+        "frame-src https:; form-action 'self' https:");
+      headers.set('Cache-Control','no-store');
+      headers.set('Referrer-Policy','no-referrer');
+      headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
+      return withWorkerVersion(new Response(response.body,{
+        status:response.status,statusText:response.statusText,headers,
+      }),env);
     }
     if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) {
       const index = new URL(url);

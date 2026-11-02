@@ -61,6 +61,10 @@ insert into public.commerce_account_links(id,subject_id,provider,external_accoun
 values ('$commerce_link_id','$subject_id','test-provider','sha256:retain','active',clock_timestamp(),null,clock_timestamp());
 SQL
 
+if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
+  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh seed "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
+fi
+
 if "${psql_base[@]}" -c "delete from public.birth_profile_revisions where id='$revision_id';" >/dev/null 2>&1; then fail "birth revision delete escaped immutable guard"; fi
 if "${psql_base[@]}" -c "delete from public.reading_execution_attempts where id='$execution_id';" >/dev/null 2>&1; then fail "reading execution delete escaped immutable guard"; fi
 pass "ordinary immutable DELETEs remain rejected"
@@ -115,6 +119,9 @@ set -e
 [[ "$blocker_rc" -ne 0 ]] || fail "late FK blocker did not abort"
 rollback_state="$("${psql_base[@]}" -Atc "select s.status||'|'||(select count(*) from public.readings where subject_id='$subject_id')||'|'||coalesce(dj.finalization_policy_version,'NULL') from public.subjects s join public.data_deletion_jobs dj on dj.id='$job_id' where s.id='$subject_id';")"
 [[ "$rollback_state" == "deletion_pending|1|NULL" ]] || fail "rollback mismatch: $rollback_state"
+if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
+  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-rollback "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
+fi
 pass "mid-finalization failure rolled back atomically"
 "${psql_base[@]}" -c "drop table public._finalizer_blocker;"
 
@@ -144,6 +151,9 @@ auth_exists="$("${psql_base[@]}" -Atc "select count(*) from auth.users where id=
 
 replay="$("${psql_base[@]}" -Atc "select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int) from public.internal_finalize_account_deletion_db_v1('$subject_id','$job_id','$lock_owner');")"
 [[ "$replay" == "1|1|1" ]] || fail "idempotent replay mismatch: $replay"
+if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
+  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-finalization "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
+fi
 
 public_exec="$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)','EXECUTE') then '1' else '0' end;")"
 api_exec="$("${psql_base[@]}" -Atc "select case when has_function_privilege('myeongha_api_executor','public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)','EXECUTE') then '1' else '0' end;")"

@@ -1,4 +1,5 @@
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
+import { resolveCharacterChatIntroV1 } from './character-chat-intro-locale.js';
 import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 import { parseChatThreadIdV1 } from './chat-room-read-contract.js';
 
@@ -76,10 +77,6 @@ const launchPeople = Object.freeze(
   people.filter(({ key }) => key !== 'seorin' && key !== 'mira' && key !== 'doyun'),
 );
 
-const pendingPeople = Object.freeze(
-  ['doyun', 'seorin', 'mira'].map(key => people.find(person => person.key === key)).filter(Boolean),
-);
-
 const portraitArt = Object.freeze({
   seyeon: Object.freeze({ src: 'assets/characters/seyeon-portrait-v2.webp' }),
   baekheon: Object.freeze({ src: 'assets/characters/baekheon-portrait-v2.webp' }),
@@ -93,7 +90,6 @@ const portraitArt = Object.freeze({
 });
 
 const peopleGrid = document.querySelector('[data-people-grid]');
-const pendingPeopleGrid = document.querySelector('[data-pending-people-grid]');
 const peopleSearch = document.querySelector('[data-people-search]');
 const peopleMore = document.querySelector('[data-people-more]');
 const searchEmpty = document.querySelector('[data-search-empty]');
@@ -134,9 +130,9 @@ function roomHref(characterKey, threadId) {
   url.searchParams.set('character', safeKey);
   return `${url.pathname.split('/').pop()}${url.search}`;
 }
-function createPersonCard(person, { pending = false } = {}) {
+function createPersonCard(person) {
   const article = document.createElement('article');
-  article.className = pending ? 'chat-person-card is-pending' : 'chat-person-card';
+  article.className = 'chat-person-card';
   article.dataset.character = person.key;
 
   const art = document.createElement('div');
@@ -179,7 +175,7 @@ function createPersonCard(person, { pending = false } = {}) {
 
   const line = document.createElement('p');
   line.className = 'chat-person-line';
-  line.textContent = uiLabel(pending ? '이 연결자는 현재 등록을 준비 중입니다.' : person.line);
+  line.textContent = resolveCharacterChatIntroV1(person.key, getUiLocale()).join(' ');
 
   const tags = document.createElement('div');
   tags.className = 'chat-person-tags';
@@ -190,28 +186,25 @@ function createPersonCard(person, { pending = false } = {}) {
     tags.append(tagNode);
   });
 
-  const action = document.createElement(pending ? 'span' : 'a');
-  action.className = pending ? 'chat-person-action chat-person-pending-label' : 'chat-person-action';
-  if (!pending) {
-    action.href = roomHref(person.key);
-    action.dataset.chatPreviewCharacter = person.key;
-  }
+  const action = document.createElement('a');
+  action.className = 'chat-person-action';
+  action.href = roomHref(person.key);
+  action.dataset.chatPreviewCharacter = person.key;
 
   const actionLabel = document.createElement('span');
-  actionLabel.textContent = uiLabel(pending ? '등록 중 · 대화 준비 중' : '이야기하기');
+  actionLabel.textContent = uiLabel('이야기하기');
   const actionArrow = document.createElement('span');
   actionArrow.setAttribute('aria-hidden', 'true');
-  actionArrow.textContent = pending ? '◇' : '→';
+  actionArrow.textContent = '→';
   action.append(actionLabel, actionArrow);
 
-  if (pending) copy.append(titleRow, line, action);
-  else copy.append(titleRow, line, tags, action);
+  copy.append(titleRow, line, tags, action);
   article.append(art, copy);
   return article;
 }
 
 function normalizedSearchText(person) {
-  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags, uiLabel(person.title), uiLabel(person.line), ...person.tags.map(uiLabel)].join(' ').toLowerCase();
+  return [person.name, resolveCharacterDisplayNameV1(person.key, getUiLocale()), person.title, person.line, ...person.tags, uiLabel(person.title), resolveCharacterChatIntroV1(person.key, getUiLocale()).join(' '), ...person.tags.map(uiLabel)].join(' ').toLowerCase();
 }
 
 function filteredPeople() {
@@ -233,10 +226,6 @@ function renderPeople() {
     const label = peopleMore.querySelector('span');
     if (label) label.textContent = uiLabel('다른 사람 더 보기');
   }
-}
-
-if (pendingPeopleGrid) {
-  pendingPeopleGrid.replaceChildren(...pendingPeople.map(person => createPersonCard(person, { pending: true })));
 }
 
 peopleSearch?.addEventListener('input', () => {
@@ -436,5 +425,4 @@ setHubPresentationState('unavailable');
 // UI-only redraw: canonical character keys and server thread identity stay fixed.
 document.addEventListener('myeongha:localechange', () => {
   renderPeople();
-  if (pendingPeopleGrid) pendingPeopleGrid.replaceChildren(...pendingPeople.map(person => createPersonCard(person, { pending: true })));
 });

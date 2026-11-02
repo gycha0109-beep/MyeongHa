@@ -64,13 +64,12 @@ describe('Reader staged rollout: one Preview presentation candidate, shared nine
       read('apps/web/reader-rollout-policy.js'),
       read('apps/web/reader-runtime-client.js'),
       read('apps/api/src/production-reader-interpretation-activation.ts'),
-      read('vercel.json'),
+      read('workers/cloudflare-api-router.mjs'),
     ]);
     expect(picker).not.toContain("publicInterpretationEnabled: true");
     expect(policy).toContain('READER_PUBLIC_INTERPRETATION_ENABLED_V1 = false');
     expect(runtime).toContain('const enabled = options.enabled === true');
     expect(server).toContain("publicRouteEnabled: false as const");
-    const rewrites = JSON.parse(config) as { rewrites?: { source: string }[] };
-    expect(rewrites.rewrites?.some(x=>x.source==='/api/me/readings/reader-interpretation/preview')).toBe(false);
+    expect(config).not.toContain('source: "/api/me/readings/reader-interpretation/preview"');
   });
 });

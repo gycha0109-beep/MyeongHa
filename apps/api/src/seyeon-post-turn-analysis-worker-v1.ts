@@ -112,6 +112,22 @@ export interface SeyeonPostTurnAnalysisClaimV1 {
 }
 
 export interface SeyeonPostTurnAnalysisOutboxPortV1 {
+  /** DB-owned, read-only admission BEFORE a job lease or its private texts. */
+  preflightClaim?(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+  }>): Awaitable<'off_cleanup' | 'hold'>;
+  /** Owner-owned single DB transaction: no old message body crosses to Node. */
+  completeOffWithoutText?(input: Readonly<{
+    subjectId: string;
+    outboxEventId: string;
+    lockOwner: string;
+    leaseExpiresAt: string;
+  }>): Awaitable<Readonly<{
+    outboxEventId: string;
+    processedAt: string;
+    reclaimed: boolean;
+  }>>;
   findByTurn(input: Readonly<{
     subjectId: string;
     turnId: string;
@@ -178,6 +194,8 @@ export interface ProcessSeyeonPostTurnAnalysisInputV1 {
   readonly extractorProvider: SeyeonStructuredProviderPortV2;
   readonly relationshipSyncOutboxPort?:
     SeyeonProductionRelationshipSyncOutboxPortV1;
+  /** Mandatory on every Production caller; offline/synthetic fixture seam only. */
+  readonly enforceCurrentSourceAuthority?: true;
 }
 
 export type ProcessSeyeonPostTurnAnalysisResultV1 =
@@ -211,6 +229,29 @@ export class SeyeonPostTurnAnalysisErrorV1 extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SeyeonPostTurnAnalysisErrorV1';
+  }
+}
+
+/** No current original-Grant/derived-source evidence is bound to a worker job. */
+export class SeyeonPostTurnSourceAuthorityHoldV1 extends Error {
+  readonly code = 'SEYEON_POST_TURN_SOURCE_AUTHORITY_HOLD' as const;
+  constructor() {
+    super('Se-yeon post-turn private source authority is unavailable.');
+    this.name = 'SeyeonPostTurnSourceAuthorityHoldV1';
+  }
+}
+
+/** Production fails closed before Provider, checkpoint replay or relationship writes.
+ * OFF jobs may finish without extracting or publishing any source content.
+ * This is not a Grant verifier; removing the HOLD needs an owner-backed
+ * current-source and derived-lineage authorization contract.
+ */
+export function assertSeyeonPostTurnSourceAuthorityV1(
+  mode: SeyeonProductionRelationshipModeV1,
+  checkpoint: unknown | null,
+): void {
+  if (mode !== 'OFF' || checkpoint !== null) {
+    throw new SeyeonPostTurnSourceAuthorityHoldV1();
   }
 }
 
@@ -659,6 +700,54 @@ async function finishFromCheckpoint(input: {
 export async function processSeyeonPostTurnAnalysisV1(
   input: ProcessSeyeonPostTurnAnalysisInputV1,
 ): Promise<ProcessSeyeonPostTurnAnalysisResultV1> {
+  if (input.enforceCurrentSourceAuthority === true) {
+    // No Outbox lease, private assistant text, Provider, or checkpoint until
+    // an existing Subject-scoped DB Owner confirms the only safe OFF path.
+    // Missing/uninstalled authority or any SQL error cannot be inferred
+    // from a snapshot supplied by the job.
+    let admission: 'off_cleanup' | 'hold' = 'hold';
+    try {
+      admission = await input.outboxPort.preflightClaim?.({
+        subjectId: input.subjectId,
+        outboxEventId: input.outboxEventId,
+      }) ?? 'hold';
+    } catch {
+      admission = 'hold';
+    }
+    if (admission !== 'off_cleanup' ||
+        input.outboxPort.completeOffWithoutText === undefined) {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+
+    // OFF has no extraction or relationship write. Recheck admissibility and
+    // claim+complete under ONE DB Owner row lock without selecting userText,
+    // assistantText, snapshots or private event material into the Worker.
+    let done: Awaited<ReturnType<NonNullable<
+      SeyeonPostTurnAnalysisOutboxPortV1['completeOffWithoutText']
+    >>>;
+    try {
+      done = await input.outboxPort.completeOffWithoutText({
+        subjectId: input.subjectId,
+        outboxEventId: input.outboxEventId,
+        lockOwner: input.lockOwner,
+        leaseExpiresAt: input.leaseExpiresAt,
+      });
+    } catch {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+    if (done.outboxEventId !== input.outboxEventId ||
+        !Number.isFinite(Date.parse(done.processedAt)) ||
+        typeof done.reclaimed !== 'boolean') {
+      throw new SeyeonPostTurnSourceAuthorityHoldV1();
+    }
+    return Object.freeze({
+      version: SEYEON_POST_TURN_ANALYSIS_WORKER_VERSION_V1,
+      decision: 'disabled' as const,
+      outboxEventId: done.outboxEventId,
+      reclaimed: done.reclaimed,
+      processedAt: done.processedAt,
+    });
+  }
   const claimed = one(
     await input.outboxPort.claim({
       subjectId: input.subjectId,

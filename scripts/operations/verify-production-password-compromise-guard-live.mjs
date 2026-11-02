@@ -1,4 +1,4 @@
-const PRODUCTION_SIGNUP_ENDPOINT = 'https://myeongha.vercel.app/api/auth/sign-up';
+const PRODUCTION_SIGNUP_ENDPOINT = 'https://myeongha.gycha0109.workers.dev/api/auth/sign-up';
 const EXPECTED_STATUS = 422;
 const EXPECTED_ERROR_CODE = 'COMPROMISED_PASSWORD';
 const MAX_RESPONSE_BYTES = 64 * 1024;

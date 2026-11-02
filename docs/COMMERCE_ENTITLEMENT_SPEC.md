@@ -1,5 +1,13 @@
 # 명하 Commerce / Entitlement Implementation Specification v0.13
 
+> **2026-10-30 current-state supersession:** P0-PR-01 is DECIDED since
+> 2026-09-19 (service DELETE / Commerce P5Y / encrypted backup P30D).
+> This dated 2026-09-16 specification retains historical OPEN labels.
+> The approved refund principles are also settled; remaining gates are
+> implementation or LIVE conditions, not reapproval requests. Refer to
+> [current Payment gates](operations/COMMERCE_PAYMENT_CURRENT_DECISION_AND_IMPLEMENTATION_GATES_20261030.md)
+> and the Decision Register before interpreting the historical blockers.
+>
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-16**  
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  

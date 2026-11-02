@@ -90,6 +90,27 @@ describe('R11 Node-owned bounded original Grant disclosure transport candidate',
     expect(reads).toBe(0);
   });
 
+  it('rejects a replay receipt at the socket boundary before any private DB read', async () => {
+    let destroyed=false;
+    let reads=0;
+    const response={
+      headersSent:false,writableEnded:false,destroyed:false,
+      destroy(){destroyed=true;},
+    } as unknown as ServerResponse;
+    await expect(sendSeyeonNodeOriginalGrantResponseV1({
+      response,requestSignal:new AbortController().signal,
+      chatResponseMetadata:{
+        turnId:'44444444-4444-4444-8444-444444444444',
+        assistantMessageId:'66666666-6666-4666-8666-666666666666',
+        sequenceNo:2,replayed:true,requestId:'g3-replay-denied',
+        serverTime:'2026-10-18T13:00:00.000Z',
+      },
+      withLockedOriginalGrant:async()=>{reads++;},
+    })).rejects.toThrow(/Replayed Seyeon turns/u);
+    expect(destroyed).toBe(true);
+    expect(reads).toBe(0);
+  });
+
   it('destroys an already-started response without a second protected send', async () => {
     let destroyed = false;
     let reads = 0;
@@ -258,7 +279,7 @@ describe('R11 Node-owned bounded original Grant disclosure transport candidate',
           turnId: '44444444-4444-4444-8444-444444444444',
           assistantMessageId: '66666666-6666-4666-8666-666666666666',
           sequenceNo: 2,
-          replayed: true,
+          replayed: false,
           requestId: 'request-held',
           serverTime: '2026-10-18T13:00:00.000Z',
         },

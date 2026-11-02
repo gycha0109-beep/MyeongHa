@@ -14,9 +14,9 @@ type Row = Readonly<Record<string, unknown>>;
 export const POSTGRES_SEYEON_PRODUCTION_PERSONAL_RECORD_CONTEXT_BINDING_V1 =
   'public.qry_seyeon_production_personal_record_context_v1' as const;
 export const POSTGRES_PRODUCTION_RELATIONSHIP_HISTORY_RUNTIME_BINDING_V1 =
-  'public.qry_production_relationship_history_runtime_v1' as const;
+  'public.qry_seyeon_g0_current_source_relationship_history_v1' as const;
 export const POSTGRES_SEYEON_PRODUCTION_RECENT_MESSAGES_BINDING_V1 =
-  'public.qry_reader_context_recent_messages_v1' as const;
+  'public.qry_seyeon_g0_current_source_recent_messages_v1' as const;
 
 const PERSONAL_SQL = [
   'select',
@@ -30,14 +30,14 @@ const PERSONAL_SQL = [
 
 const HISTORY_SQL = [
   'select history_records_jsonb as "historyRecordsJsonb"',
-  'from public.qry_production_relationship_history_runtime_v1($1::uuid,$2::text,$3::bigint)',
+  'from public.qry_seyeon_g0_current_source_relationship_history_v1($1::uuid,$2::text,$3::bigint)',
 ].join('\n');
 
 const RECENT_SQL = [
   'select message_id::text as "messageId", sequence_no::text as "sequenceNo",',
   ' sender_type as "senderType", character_id as "characterId",',
   ' body_text as "text", created_at::text as "createdAt"',
-  'from public.qry_reader_context_recent_messages_v1($1::uuid,$2::uuid,$3::integer)',
+  'from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$4::uuid,$3::integer)',
 ].join('\n');
 
 function constraintOf(error: unknown): string | null {
@@ -192,12 +192,14 @@ implements SeyeonProductionContextReadAuthorityPortV1 {
     readonly subjectId: string;
     readonly threadId: string;
     readonly limit: number;
+    readonly currentUserMessageRef?: string;
   }): Promise<readonly SeyeonProductionRecentMessageAuthorityRowV1[]> {
     try {
       const result = await this.client.query<Row>(RECENT_SQL, [
         input.subjectId,
         input.threadId,
         input.limit,
+        input.currentUserMessageRef ?? null,
       ]);
       return Object.freeze(result.rows.map((row) => Object.freeze({
         messageId: str('recent message id', row.messageId),

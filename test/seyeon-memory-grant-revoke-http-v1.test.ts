@@ -52,6 +52,55 @@ describe('R16 Se-yeon original Memory Grant revoke HTTP candidate — NOT mounte
     })).status).toBe(403);
   });
 
+  it('accepts zero-byte Worker POST streams, then still requires verified Member and DB admission', async () => {
+    const empty = requestFor({ body: '' });
+    expect(empty.body).not.toBeNull();
+    expect((await call(empty, null)).status).toBe(401);
+
+    let revokes = 0;
+    const approved = await call(requestFor({ body: '' }), MEMBER, {
+      approvedDbWriteAdmission: () => true,
+      revoke: async () => {
+        revokes += 1;
+        return { status: 'pending' as const, memoryItemId: MEMORY_ID,
+          characterId: 'seyeon' as const, newUseBlocked: true as const };
+      },
+    });
+    expect(approved.status).toBe(202);
+    expect((await approved.json()).data).toMatchObject({
+      status: 'pending', newUseBlocked: true,
+    });
+    expect(revokes).toBe(1);
+  });
+
+  it('rejects nonempty or locked streams before Member authentication and DB use', async () => {
+    let verifications = 0;
+    let revokes = 0;
+    const overrides = {
+      identityEvidenceVerifier: {
+        verifyRequestIdentity: async () => {
+          verifications += 1;
+          return MEMBER;
+        },
+      },
+      approvedDbWriteAdmission: () => true,
+      revoke: async () => {
+        revokes += 1;
+        throw Error('Body must be rejected before revocation');
+      },
+    };
+    expect((await call(requestFor({ body: '{}' }), MEMBER, overrides)).status).toBe(400);
+    const request = requestFor({ body: '' });
+    const lock = request.body!.getReader();
+    try {
+      expect((await call(request, MEMBER, overrides)).status).toBe(400);
+    } finally {
+      lock.releaseLock();
+    }
+    expect(verifications).toBe(0);
+    expect(revokes).toBe(0);
+  });
+
   it('defaults to 503/no-store: missing, false and failing DB-write admission never invoke revoker', async () => {
     let calls = 0;
     const revoke = async () => {

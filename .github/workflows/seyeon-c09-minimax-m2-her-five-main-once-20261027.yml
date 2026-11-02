@@ -1,0 +1,63 @@
+name: '[WT:character-memory] C09 approved MiniMax M2-her five-case one-shot'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/seyeon-c09-minimax-m2-her-five-main-once-20261027.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c09-minimax-m2-her-five-owner-approved-20261027-once
+  cancel-in-progress: false
+
+jobs:
+  minimax-five:
+    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1 && contains(github.event.head_commit.message, 'C09_MINIMAX_M2_HER_FIVE_ONCE_20261027') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact owner-approved research-only runner
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: '0ccde655de4fec2fbf2be347b08aec93adab4f61'
+          persist-credentials: false
+
+      - name: Prepare Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Validate offline exact five cases, zero paid calls
+        run: |
+          set -euo pipefail
+          node --check scripts/seyeon-c09-openrouter-minimax-m2-her-5x1-20261027.mjs
+          node scripts/seyeon-c09-openrouter-minimax-m2-her-5x1-20261027.mjs --dry-run
+          echo 'Zero paid calls during syntax and fixed-question preflight.'
+
+      - name: Run five owner-approved MiniMax generations maximum with USD 0.03 hard quote cap
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo '::error::OpenRouter production environment key unavailable. No paid model calls.'
+            exit 2
+          fi
+          node scripts/seyeon-c09-openrouter-minimax-m2-her-5x1-20261027.mjs --execute --approved-minimax-her-five-20261027
+
+      - name: Retain public synthetic answer text, token usage and latency
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: c09-minimax-m2-her-five-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/seyeon-c09-minimax-m2-her-five-20261027-v1.json
+            artifacts/seyeon-c09-minimax-m2-her-five-20261027-v1.md
+          if-no-files-found: warn
+          retention-days: 21

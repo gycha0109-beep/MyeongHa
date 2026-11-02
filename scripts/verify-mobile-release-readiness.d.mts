@@ -1,4 +1,4 @@
-export const MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1: 'https://myeongha.vercel.app';
+export const MOBILE_RELEASE_PRODUCTION_API_ORIGIN_V1: 'https://myeongha.gycha0109.workers.dev';
 
 export interface MobileReleaseEnvironmentV1 {
   readonly EXPO_PUBLIC_MYEONGHA_API_ORIGIN?: string | undefined;

@@ -72,3 +72,39 @@ html[data-theme="dark"] .character-room-retry {
   color: #f1e6d7;
   border-color: rgba(193,158,109,.45);
 }
+
+/* Live chat feedback: temporary bubbles are replaced with server-read history. */
+.conversation-live-message[data-pending="true"] {
+  animation: chat-live-appear .18s ease-out both;
+}
+.conversation-live-message[data-pending="true"][data-sender="user"] .conversation-message-body p {
+  opacity: .78;
+}
+.conversation-live-typing {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--mh-ink-muted, #756c64);
+}
+.conversation-live-dots {
+  display: inline-flex;
+  gap: 1px;
+  letter-spacing: 1px;
+}
+.conversation-live-dots span {
+  animation: chat-live-dot 1.15s ease-in-out infinite;
+}
+.conversation-live-dots span:nth-child(2) { animation-delay: .15s; }
+.conversation-live-dots span:nth-child(3) { animation-delay: .30s; }
+@keyframes chat-live-appear {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes chat-live-dot {
+  0%, 65%, 100% { opacity: .35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .conversation-live-message[data-pending="true"],
+  .conversation-live-dots span { animation: none; }
+}

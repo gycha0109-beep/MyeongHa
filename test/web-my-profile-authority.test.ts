@@ -73,7 +73,11 @@ describe('web My profile authority boundary', () => {
   });
 
   it('does not fabricate plan, entitlement, or notification values', () => {
-    expect(page).toContain('이용권·결제 내역 및 알림 설정은 실제 서버 조회·동의 기능이 연결될 때만 메뉴에 표시합니다.');
+    expect(page).toContain('구매 내역 조회가 연결되지 않았습니다.');
+    expect(page).toContain('이용권 조회가 연결되지 않았습니다.');
+    expect(page).toContain('구매 내역');
+    expect(page).toContain('내 이용권');
+    expect(page).not.toContain('잔여 이용권 0');
     expect(page).not.toContain('my-setting-row is-pending');
     expect(page).not.toContain('프리미엄');
     expect(page).not.toContain('구독 중');

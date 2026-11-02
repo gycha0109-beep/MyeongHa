@@ -6,7 +6,7 @@ const paths = {
   auth: 'apps/api/src/supabase-auth-http.ts',
   productAuth: 'apps/web/product-auth.js',
   authPage: 'apps/web/auth-page.js',
-  vercel: 'vercel.json',
+  cloudflare: 'cloudflare/myeongha-worker.mjs',
   authority: 'docs/operations/PASSWORD_COMPROMISE_GUARD_V1.md',
   productionCanaryWorkflow: '.github/workflows/production-password-compromise-guard-evidence.yml',
   productionCanary: 'scripts/operations/verify-production-password-compromise-guard-live.mjs',
@@ -70,7 +70,7 @@ for (const fragment of [
   "case 'PASSWORD_SECURITY_UNAVAILABLE':",
 ]) requireFragment('authPage', fragment);
 
-requireFragment('vercel', '"value": "default-src \'self\'; base-uri \'self\'; object-src \'none\'; frame-ancestors \'none\'; form-action \'self\'; img-src \'self\' data:; font-src \'self\'; style-src \'self\'; script-src \'self\'; connect-src \'self\'"');
+requireFragment('cloudflare', "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; img-src 'self' data:; font-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'");
 
 for (const fragment of [
   'workflow_dispatch:',
@@ -82,7 +82,7 @@ for (const fragment of [
 ]) requireFragment('productionCanaryWorkflow', fragment);
 
 for (const fragment of [
-  "const PRODUCTION_SIGNUP_ENDPOINT = 'https://myeongha.vercel.app/api/auth/sign-up'",
+  "const PRODUCTION_SIGNUP_ENDPOINT = 'https://myeongha.gycha0109.workers.dev/api/auth/sign-up'",
   "const EXPECTED_STATUS = 422",
   "const EXPECTED_ERROR_CODE = 'COMPROMISED_PASSWORD'",
   "const compromisedPassword = ['123', '456'].join('')",

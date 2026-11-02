@@ -5,9 +5,13 @@ case_name="${1:?db CI case name is required}"
 
 bash test/db/verify_no_schema_cardinality_hardcoding.sh
 
+# The same pinned staged-migration guard is shared by all historical fixtures.
+source test/db/staged_commerce_migration_policy.sh
+
 apply_standard_migrations() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do
+    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
     echo "Applying ${migration}"
     psql -v ON_ERROR_STOP=1 -f "${migration}" >/dev/null
   done
@@ -16,6 +20,7 @@ apply_standard_migrations() {
 apply_pg17_migrations_without_birth_authority() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do
+    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
     if [[ "${migration}" == *'/0860_birth_profile_create_runtime_authority.sql' ]]; then
       echo "Skipping ${migration}; managed-principal parity is verified by the dedicated birth-profile case"
       continue
@@ -42,7 +47,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
         20261007150457_guest_promotion_auth_fk_validation.sql|20261008043000_seyeon_manifest_acl_restore.sql)
           timestamped_count=$(( timestamped_count + 1 ))
           ;;
-        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql)
+        20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql|20261024134543_saju_abuse_admission_runtime_authority.sql|20261024134610_saju_abuse_admission_production_policy_v1.sql|20261024135504_saju_abuse_admission_cleanup_worker_authority.sql|20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql|20261026025332_seyeon_chat_helper_service_role_least_privilege.sql|20261026100200_portone_chat_credit_catalog_staged_v1.sql|20261026110300_owner_admin_credit_testing_v1.sql|20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql|20261027125500_chat_credit_delivered_ack_private_v1.sql|20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql|20261027185000_owner_kcp_sandbox_private_prepare_v1.sql|20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql|20261027054525_digital_reading_checkout_notice_evidence_v1.sql|20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql|20261029094500_records_official_birth_revision_status_v1.sql|20261029111500_saju_official_issuance_preflight_v1.sql|20261029112500_saju_official_stored_lineage_v1.sql|20261029145500_saju_official_attempt_reconciliation_status_v1.sql|20261029164000_saju_official_stored_engine_lineage_v2.sql|20261029175000_saju_official_stored_purchase_lineage_v3.sql|20261029185500_official_reader_verified_purchase_access_v1.sql)
           # Post-frontier security migration is known but must NEVER be replayed
           # into the historical 1510 R2 catalog/restore authority fixture.
           # Reject a same-named modified migration instead of silently skipping.
@@ -50,12 +55,38 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
           # need not include git. Compute the exact canonical Git blob SHA-1
           # with coreutils if git is missing. Windows CRLF checkout is allowed
           # ONLY when LF normalization produces the unchanged pinned SQL blob.
-          local reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+          local reviewed_blob_sha1 hold_reason='HOLD_R2_POST_FRONTIER_SQL_FINGERPRINT_DRIFT'
+          case "$basename" in
+            20261018190000_seyeon_locked_first_zero_source_reveal_v1.sql)
+              reviewed_blob_sha1='3fbe7322cb3f11484a3e0a42bdc0598879b3d1d8'
+              hold_reason='HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT'
+              ;;
+            20261026025332_seyeon_chat_helper_service_role_least_privilege.sql)
+              reviewed_blob_sha1='c051a1dde2b3a260cdde5efafdcf1583c79d608d'
+              hold_reason='HOLD_R2_CHAT_HELPER_ACL_SQL_FINGERPRINT_DRIFT'
+              ;;
+          esac
           case "$basename" in
             20261024134543_saju_abuse_admission_runtime_authority.sql) reviewed_blob_sha1='4be88ed0003bc4db226cc2324a506183094f35ff' ;;
             20261024134610_saju_abuse_admission_production_policy_v1.sql) reviewed_blob_sha1='c9a6354ec0d1fb2c932aca1e1916e65a5c623705' ;;
             20261024135504_saju_abuse_admission_cleanup_worker_authority.sql) reviewed_blob_sha1='cd31fb16e0985c732208cf69d41d1bd88f7ef31e' ;;
             20261024141330_saju_abuse_admission_policy_approval_clock_v2.sql) reviewed_blob_sha1='9b3abf4f8296c8385b55f29e224381bdf14e8a4e' ;;
+            20261026100200_portone_chat_credit_catalog_staged_v1.sql) reviewed_blob_sha1='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
+            20261026110300_owner_admin_credit_testing_v1.sql) reviewed_blob_sha1='186ffa2085e5922ec8319d4e5dd345a41597f3cd' ;;
+            20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql) reviewed_blob_sha1='5e5270466e700f98b2d41cac338298735dc1ad99' ;;
+            20261027125500_chat_credit_delivered_ack_private_v1.sql) reviewed_blob_sha1='5e5db487aa8a155cfded83b8d58c363e20f1a7b0' ;;
+             20261027163500_commerce_owner_sandbox_credit_checkout_v1.sql) reviewed_blob_sha1='b5a47d794c8ffb0e62fecfb25d81c0b6c9312f70' ;;
+             20261027185000_owner_kcp_sandbox_private_prepare_v1.sql) reviewed_blob_sha1='3f2d10daa1b7a22b647d50bd4498408c58e1639b' ;;
+             20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql) reviewed_blob_sha1='59a2d005cace08cb46da9cf57351131620218d0b' ;;
+            20261027054525_digital_reading_checkout_notice_evidence_v1.sql) reviewed_blob_sha1='550e2ff3dd86d16d30334220c223650387b71ca7' ;;
+            20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql) reviewed_blob_sha1='3903c37f80f860f899fb1086b4bab878e73eab1d' ;;
+            20261029094500_records_official_birth_revision_status_v1.sql) reviewed_blob_sha1='aaed00ca0b067071d80245fca2ccac641885638e' ;;
+            20261029111500_saju_official_issuance_preflight_v1.sql) reviewed_blob_sha1='3c1f426343b03a5c746b551420851ccc38e8f244' ;;
+            20261029112500_saju_official_stored_lineage_v1.sql) reviewed_blob_sha1='7a48bfb0cbb1fdbe72d514823730d9415ddd81ac' ;;
+            20261029145500_saju_official_attempt_reconciliation_status_v1.sql) reviewed_blob_sha1='0704f457992b2b729236ecb17c78900e0f8ca84e' ;;
+            20261029164000_saju_official_stored_engine_lineage_v2.sql) reviewed_blob_sha1='fc387a60822de352239f7bfed6eb804582e07dd0' ;;
+            20261029175000_saju_official_stored_purchase_lineage_v3.sql) reviewed_blob_sha1='92ad0bce1472dda77fd11cbe208507a7d5cd48fe' ;;
+            20261029185500_official_reader_verified_purchase_access_v1.sql) reviewed_blob_sha1='d523293ce6af2104f045f7245f727ae26c8c1bf8' ;;
           esac
           local local_blob_sha1 local_bytes normalized_bytes
           if command -v git >/dev/null 2>&1; then
@@ -75,7 +106,7 @@ apply_pg17_migrations_through_seyeon_production_frontier() {
             )"
           fi
           [[ "$local_blob_sha1" == "$reviewed_blob_sha1" ]] || {
-            echo "HOLD_R2_ZERO_REVEAL_SQL_FINGERPRINT_DRIFT" >&2; return 1;
+            echo "$hold_reason" >&2; return 1;
           }
           continue
           ;;
@@ -130,6 +161,17 @@ case "$case_name" in
         if (result.status !== 0) process.exit(result.status ?? 1);
       }
     '
+    ;;
+  saju-official-records-http-e2e)
+    verify_pg17
+    [[ "${CI:-}" == true && "${GITHUB_ACTIONS:-}" == true &&
+       "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+       "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_SAJU_OFFICIAL_REREAD_E2E_DISPOSABLE_DB_REQUIRED >&2
+      exit 1
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/saju_official_records_http_e2e_pg17.sh
     ;;
   seyeon-security-s0-real-path-pg17)
     verify_pg17
@@ -220,6 +262,13 @@ case "$case_name" in
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_payment_source_authority.sql
     psql -1 -v ON_ERROR_STOP=1 -f test/db/commerce_trigger_security_hardening.sql
     bash test/db/entitlement_projection_recompute_concurrency.sh
+    ;;
+  commerce-paid-credit-policy-v1)
+    apply_standard_migrations
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026100200_portone_chat_credit_catalog_staged_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261026110300_owner_admin_credit_testing_v1.sql
+    psql -v ON_ERROR_STOP=1 -f supabase/migrations/20261027101000_chat_credit_paid_validity_and_verified_mint_v1.sql
+    psql -v ON_ERROR_STOP=1 -f test/db/portone_paid_credit_policy_v1.sql
     ;;
   commerce-payment-adversarial-e2e)
     apply_standard_migrations
@@ -602,6 +651,11 @@ SQL
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_r2_h_1720_forward.sh
     ;;
+  seyeon-r2-helper-service-role-least-privilege)
+    verify_pg17
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/seyeon_r2_helper_service_role_least_privilege.sh
+    ;;
   seyeon-r2-rpc-catalog)
     verify_pg17
     apply_pg17_migrations_without_birth_authority
@@ -633,6 +687,55 @@ SQL
       echo HOLD_SAJU_SINGLE_PROJECT_NOT_DISPOSABLE_PG17 >&2; exit 1;
     }
     bash test/db/saju_single_project_operator_permit_pg17.sh
+    ;;
+  commerce-private-claim-full-finalizer-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMERCE_PRIVATE_CLAIM_FINALIZER_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_private_claim_finalizer_full_pg17.sh
+    ;;
+  commerce-stored-portone-hmac-lineage-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMERCE_HMAC_LINEAGE_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_stored_portone_hmac_lineage_pg17.sh
+    ;;
+  commerce-portone-cancellation-set-audit-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMERCE_CANCELLATION_SET_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_portone_cancellation_set_pg17.sh
+    ;;
+  commerce-portone-cancellation-partial-set-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMERCE_PARTIAL_SET_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    bash test/db/commerce_portone_cancellation_partial_set_pg17.sh
+    ;;
+  commerce-exact-reader-withdrawal-hold-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_EXACT_READER_WITHDRAWAL_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_exact_reader_withdrawal_hold_pg17.sh
     ;;
   *)
     echo "Unknown DB CI case: $case_name" >&2

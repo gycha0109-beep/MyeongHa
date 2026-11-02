@@ -42,6 +42,36 @@ describe('Web Character Room continuous open and resume', () => {
     expect(css).toContain('.character-room-loading[hidden]');
   });
 
+  it('drops stale transcript DOM when G3 history authority denies or a full reread fails', async () => {
+    const runtime = await web('chat-runtime-client.js');
+    const read = runtime.slice(
+      runtime.indexOf('async function readChatPage('),
+      runtime.indexOf('async function loadRoomState()'),
+    );
+    const reload = runtime.slice(
+      runtime.indexOf('async function loadRoomState()'),
+      runtime.indexOf('// Resolve or reuse an owner-scoped thread'),
+    );
+    const scrub = runtime.slice(
+      runtime.indexOf('function clearOwnerScopedRoomStateForAuthorityChange()'),
+      runtime.indexOf('function invalidateRejectedBearer('),
+    );
+    expect(read).toContain('if (response.status === 503)');
+    expect(read).toContain("code === 'SEYEON_HISTORY_REVEAL_HOLD'");
+    expect(read).toContain("throw new Error('SEYEON_HISTORY_REVEAL_HOLD')");
+    expect(scrub).toContain('chatStream?.replaceChildren()');
+    expect(scrub).toContain('authoritativeCharacterId = null');
+    expect(scrub).toContain('roomReady = false');
+    expect(scrub).toContain('if (chatIntro) chatIntro.hidden = true');
+    expect(scrub).toContain('if (contextPill) contextPill.hidden = true');
+    expect(reload).toContain('clearOwnerScopedRoomStateForAuthorityChange()');
+    expect(reload).toContain("error.message === 'SEYEON_HISTORY_REVEAL_HOLD'");
+    expect(reload.indexOf('clearOwnerScopedRoomStateForAuthorityChange()'))
+      .toBeLessThan(reload.lastIndexOf('return false;'));
+    expect(scrub).not.toContain('sessionStorage.setItem(');
+    expect(scrub).not.toContain('sessionStorage.removeItem(');
+  });
+
   it('sends the first composed message exactly once through the existing guarded Member turn route', async () => {
     const runtime = await web('chat-runtime-client.js');
     expect(runtime).toContain('if (queuedSubmission) return');
@@ -51,13 +81,20 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('getOrCreatePendingTurn(message)');
     expect(runtime).toContain('clientTurnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("authoritativeCharacterId !== 'seyeon'");
-    expect(runtime).toContain('const rereadSucceeded = await loadRoomState()');
-    expect(runtime).toContain('clearPendingTurn(pendingTurn.clientTurnId)');
+    const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'), runtime.indexOf('function submitTurn(event)'));
+    expect(send).not.toContain('await loadRoomState()');
+    expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
+    expect(send).toContain('renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn)');
+    expect(send).toContain('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)');
+    expect(send).toContain('threadId !== submittedThreadId');
     expect(runtime).toContain('메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.');
     expect(runtime).toContain("error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE'");
     expect(runtime).toContain("error.code === 'CREDIT_AUTHORITY_UNAVAILABLE'");
-    expect(runtime).toContain("throw new Error('AI_TURN_NOT_YET_AVAILABLE')");
-    expect(runtime).toContain('크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며');
+    expect(runtime).toContain("throw new Error('SECURE_CHAT_TEMPORARILY_UNAVAILABLE')");
+    expect(runtime).toContain("throw new Error('CREDIT_AUTHORITY_UNAVAILABLE')");
+    expect(runtime).toContain("SECURE_CHAT_TEMPORARILY_UNAVAILABLE:");
+    expect(runtime).toContain("CREDIT_AUTHORITY_UNAVAILABLE:");
+    expect(runtime).not.toContain("AI_TURN_NOT_YET_AVAILABLE:");
   });
 
   it('smoke-checks the visible error and retry state without requiring the removed history drawer', async () => {
@@ -80,6 +117,6 @@ describe('Web Character Room continuous open and resume', () => {
     expect(page).not.toContain('className="character-room-menu"');
     expect(transport).not.toContain('renderHistory(');
     expect(presentation).not.toContain("const historyDrawer =");
-    expect(presentation).toContain('setDialogueLines(next.intro)');
+    expect(presentation).toContain('setDialogueLines(resolveCharacterChatIntroV1(identity.presentationKey, chatEntryLocale))');
   });
 });

@@ -439,6 +439,7 @@ export async function sendSeyeonChatTurnV1(
   bearer: string,
   threadIdInput: unknown,
   requestInput: unknown,
+  options: Readonly<{ requireDeliveryReceipt?: boolean }> = {},
 ): Promise<SeyeonChatTurnSendResultV1> {
   const threadId = parseChatThreadIdV1(threadIdInput);
   const request = parseTurnSendInputV1(requestInput);
@@ -450,6 +451,12 @@ export async function sendSeyeonChatTurnV1(
     ...(globalThis.crypto?.subtle===undefined?{}:{deliveryReceipt:'v1' as const}),
   });
   const result = parseSeyeonTurnSendResultV1(data);
+  // The production S0 browser never treats a bare 200 as a delivered reply.
+  // Retain the opt-in default for callers outside the original-memory S0 scope.
+  if (options.requireDeliveryReceipt === true &&
+      (!isRecord(data) || data.deliveryReceipt === undefined)) {
+    return invalid('S0 first reply requires a confirmed delivery receipt.');
+  }
   // Only a completely parsed original response may provide this capability.
   // Never persist/log the proof, replay the model request, or copy it to UI.
   if (isRecord(data) && data.deliveryReceipt !== undefined) {

@@ -8,6 +8,14 @@
 
 ---
 
+## 2026-10-28 권위 범위 보정 — 과거 화면 상태 설계는 유지
+
+이 문서의 `Landing → Hall → Character Intro/Chat → Birth → First Reading`은 **화면/상태 설계의 초기 공통 지도**이지 모든 신규 방문자에게 현재 강제할 단일 출시 절차가 아닙니다. 최초 세연 안내·무료 경험·최종 세연 대화는 [Reader Knowledge v1.1](MyeongHa_UX_Reading_Reader_Knowledge_Spec_v1.1.md)의 별도 UX 제품 설계 범위이며, 실제 무료 베타 활성화는 개별 구현·배포 증거와 구분합니다.
+
+과거 첨부 원본 `Usecase_re_reviewed_v2(1).md` §4의 출시 최소 5명은 [9명 출시 사용자 결정](source-authority-decisions/CHARACTER_LAUNCH_MVP_AUTHORITY_V1.md)으로 **SUPERSEDED**되었습니다. 다만 일반 캐릭터 9명 출시는 [세연 1명 Reader 프리뷰](WEB_READER_STAGED_ROLLOUT_SEYEON_FIRST_V1.md)나 유료 Reader 개방 인원과 같지 않습니다. 현행 `apps/web/reader-rollout-policy.js`는 프리뷰 세연만 허용하고 공개 유료 Reader를 기본 차단합니다. 결제 완료 화면·Reading 장면·채팅 화면 존재만으로 서버 Reader 권한/유료 상품 활성화가 발생하지 않습니다.
+
+추가 근거와 상태 분류: [설계 충돌 원장](architecture/ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md). 기존 전송·개인정보·clarification fail-closed 조건은 유지합니다.
+
 ## 1. 목적
 
 Use Case를 실제 Web/Mobile 화면/상태로 옮길 때 로그인 벽, 개인정보 폼, AI retry, clarification, 삭제 의미가 UI마다 달라지는 것을 막는다.

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
 import {
   prepareCharacterStandardChatGroundingV2,
@@ -245,6 +246,25 @@ function authorities(
   participants: readonly string[] = ['baekheon'],
   readerContentBundleId = BUNDLE_ID,
 ) {
+  const responseSnapshot = {
+        responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
+        responseVersion: 'myeonghwa-product-reading-response-v2',
+        state: 'delivered',
+        messageCode: 'READING_DELIVERED',
+        requiredAction: 'none',
+        reading: {
+          readingId: READING_ID,
+          calculationSummary: {},
+          sections: [{
+            sectionType: 'career',
+            state: 'complete',
+            title: '직업 · 일',
+            blocks: [{ type: 'paragraph', text: '서버가 다시 읽은 공식 직업 Reading입니다.' }],
+          }],
+          disclosures: [],
+        },
+      };
+  const responseHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(responseSnapshot);
   const threadBindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1 = {
     readRuntimeBinding: vi.fn(async () => [{
       threadId: THREAD_ID,
@@ -272,7 +292,7 @@ function authorities(
       domainCapabilityVersion: 'career-v1',
       readingContractVersion: 'myeonghwa-product-reading-response-v2',
       sajuEngineVersion: 'saju-engine-v1',
-      responseHash: 'sha256:v1:official-reading-response',
+      responseHash,
     }]),
   };
   const artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1 = {
@@ -282,21 +302,8 @@ function authorities(
       readerCharacterId: 'baekheon',
       readingContractVersion: 'myeonghwa-product-reading-response-v2',
       productResponseState: 'delivered',
-      responseSnapshotJsonb: {
-        responseVersion: 'myeonghwa-product-reading-response-v2',
-        state: 'delivered',
-        reading: {
-          readingId: READING_ID,
-          calculationSummary: {},
-          sections: [{
-            sectionType: 'career',
-            title: '직업 · 일',
-            blocks: [{ type: 'paragraph', text: '서버가 다시 읽은 공식 직업 Reading입니다.' }],
-          }],
-          disclosures: [],
-        },
-      },
-      responseHash: 'sha256:v1:official-reading-response',
+      responseSnapshotJsonb: responseSnapshot,
+      responseHash,
       completedAt: '2026-09-21T00:00:00.000Z',
     }]),
   };
@@ -981,7 +988,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
 
     // A2 verifies the exact Reader Grant and Product rule before the
     // downstream relationship/memory authority is resolved.
-    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(1);
+    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(2);
     expect(authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
@@ -1046,7 +1053,7 @@ describe('Official Reading Reader Chat turn preflight', () => {
 
     // A2 verifies the exact Reader Grant and Product rule before the
     // downstream relationship/memory authority is resolved.
-    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(1);
+    expect(authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(2);
     expect(authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(1);
   });
 
@@ -1444,7 +1451,7 @@ describe('A3-epsilon server-only Official Standard Reader Chat V2 preflight (pub
       '서버가 다시 읽은 공식 직업 Reading입니다.',
     ]);
     expect(result.runtime.memories.map((memory) => memory.granteeCharacterId)).toEqual(['baekheon']);
-    expect(args.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(2);
+    expect(args.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(4);
     expect(args.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(2);
     expect(args.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(5);
   });
@@ -1605,7 +1612,7 @@ describe('A3-zeta / PR 2-A server-only Chat Grounding V2 admission (public OFF)'
     expect(() => assertServerPreparedStandardChatGroundingV2({ ...result }))
       .toThrow(/grounding is unavailable/u);
     expect(f.projectGrounding).toHaveBeenCalledTimes(1);
-    expect(f.authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(4);
+    expect(f.authority.accessAuthorityPort.readAccessibleReadings).toHaveBeenCalledTimes(8);
     expect(f.authority.artifactAuthorityPort.readArtifactSource).toHaveBeenCalledTimes(4);
     expect(f.authority.productReaderEligibilityAuthorityPort.readApprovedRule).toHaveBeenCalledTimes(11);
   });

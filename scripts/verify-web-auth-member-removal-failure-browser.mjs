@@ -321,12 +321,12 @@ try {
   })()`);
   assert(signedIn === memberAccessToken, 'Production sign-in did not establish the expected Member generation');
 
-  await navigate(client, origin, '/my.html', '#my-account-email');
+  await navigate(client, origin, '/my.html', '.my-account-card');
   await waitFor(
     client,
     `document.readyState === 'complete'
       && location.pathname === '/my.html'
-      && document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(identity.email)}
+      && document.querySelector('.my-account-meta')?.textContent?.includes(${JSON.stringify(identity.email)})
       && Boolean(document.querySelector('.my-logout-action'))`,
     'My page did not fully initialize with a Member logout button',
   );

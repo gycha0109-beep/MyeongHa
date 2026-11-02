@@ -20,6 +20,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "none"
     },
+    "character-c1-three-five-approved-main-once-20261028.yml": {
+      "responsibility": "character-memory-owner-approved-public-three-character-five-turn-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "ci-db-track.yml": {
       "responsibility": "db-suite-verification",
       "prMode": "routed-via-ci",
@@ -116,23 +122,23 @@
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
     },
-    "mobile-push-production-activate.yml": {
-      "responsibility": "mobile-push-production-activation",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "dispatch-input-or-commit-metadata"
-    },
-    "mobile-social-auth-production-inspect.yml": {
-      "responsibility": "mobile-social-auth-production-read-only-inspection",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "dispatch-input-or-commit-metadata"
-    },
     "postgres-dr-readiness.yml": {
       "responsibility": "postgres-disaster-recovery",
       "prMode": "none",
       "mainMode": "regression",
       "workTrackAttribution": "none"
+    },
+    "postgres-isolated-rls-capacity-acceptance.yml": {
+      "responsibility": "postgres-isolated-rls-capacity-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
+    "postgres-hosted-synthetic-local-acceptance.yml": {
+      "responsibility": "postgres-hosted-synthetic-local-recovery",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
     },
     "postgres-isolated-restore-drill.yml": {
       "responsibility": "postgres-disaster-recovery",
@@ -194,36 +200,6 @@
       "mainMode": "manual",
       "workTrackAttribution": "none"
     },
-    "production-guest-bootstrap-abuse-policy-evidence.yml": {
-      "responsibility": "production-abuse-policy-evidence",
-      "prMode": "none",
-      "mainMode": "scheduled-manual",
-      "workTrackAttribution": "dispatch-input-or-schedule"
-    },
-    "production-guest-bootstrap-abuse-policy.yml": {
-      "responsibility": "production-abuse-policy-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
-    "production-guest-bootstrap-ttl-binding.yml": {
-      "responsibility": "production-guest-auth-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "none"
-    },
-    "production-member-auth-abuse-policy.yml": {
-      "responsibility": "production-member-auth-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
-    "production-member-auth-rate-limit-canary.yml": {
-      "responsibility": "production-member-auth-evidence",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-member-chat-open-reuse-smoke.yml": {
       "responsibility": "production-chat-smoke",
       "prMode": "none",
@@ -272,14 +248,14 @@
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"
     },
-    "production-postgres-tls-peer-canary.yml": {
-      "responsibility": "postgres-transport-security",
+    "production-privacy-ledger-freshness-watch.yml": {
+      "responsibility": "postgres-privacy-recovery-freshness-watch",
       "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
     },
-    "production-postgres-tls-peer-preflight.yml": {
-      "responsibility": "postgres-transport-security",
+    "production-privacy-canary-orphan-cleanup-one-shot.yml": {
+      "responsibility": "privacy-recovery-operations",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
@@ -296,40 +272,22 @@
       "mainMode": "triggered-operations",
       "workTrackAttribution": "none"
     },
-    "production-saju-admission-canary.yml": {
-      "responsibility": "production-saju-smoke",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-saju-current-subject-smoke.yml": {
       "responsibility": "production-saju-smoke",
       "prMode": "none",
       "mainMode": "triggered-operations",
       "workTrackAttribution": "commit-metadata"
     },
-    "production-saju-redeploy-recovery.yml": {
-      "responsibility": "production-saju-recovery",
-      "prMode": "none",
-      "mainMode": "triggered-operations",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "production-saju-service-origin-binding.yml": {
-      "responsibility": "production-saju-operations",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "none"
-    },
-    "production-security-alerting-activate.yml": {
-      "responsibility": "production-security-alerting",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "dispatch-input"
-    },
     "production-seyeon-db-authority-audit.yml": {
       "responsibility": "production-character-db-authority-audit",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "production-seyeon-helper-acl-one-shot.yml": {
+      "responsibility": "production-seyeon-helper-acl-single-grant-revoke",
+      "prMode": "none",
+      "mainMode": "manual",
       "workTrackAttribution": "commit-metadata"
     },
     "production-seyeon-turn-send-smoke.yml": {
@@ -442,6 +400,24 @@
     },
     "seyeon-c09-gpt6-luna-five-main-once-20261026.yml": {
       "responsibility": "character-memory-owner-approved-single-model-gpt6-luna-five-public-dialogues-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c09-luna-agency-five-main-once-20261026.yml": {
+      "responsibility": "character-memory-owner-approved-improved-gpt6-luna-public-five-dialogues-one-shot",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c09-minimax-remaining-four-main-once-20261027.yml": {
+      "responsibility": "character-memory-owner-approved-original-minimax-q2-q5_q7_q10-continuation-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "seyeon-c09-minimax-m2-her-five-main-once-20261027.yml": {
+      "responsibility": "character-memory-owner-approved-minimax-m2-her-five-synthetic-dialogues-one-shot",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"

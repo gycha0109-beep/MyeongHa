@@ -1,0 +1,153 @@
+// Watchtower-Track: security
+import {describe,expect,it} from 'vitest';
+import {reconcileSeyeonG4FirstMemoryCreditsV1,
+  SeyeonG4FirstMemoryReconciliationHoldV1,
+  SEYEON_G4_FIRST_MEMORY_RECONCILIATION_V1}
+  from '../apps/api/src/seyeon-g4-first-memory-credit-reconciliation-v1.js';
+import type {PostgresSubjectPoolV1}
+  from '../apps/api/src/postgres-subject-execution.js';
+
+const auth='11111111-1111-4111-8111-111111111111';
+const subject='22222222-2222-4222-8222-222222222222';
+const thread='33333333-3333-4333-8333-333333333333';
+const turn='44444444-4444-4444-8444-444444444444';
+const reservation='55555555-5555-4555-8555-555555555555';
+const committed='66666666-6666-4666-8666-666666666666';
+const assistant='77777777-7777-4777-8777-777777777777';
+const admission={kind:'reserved' as const,canonicalSubjectId:subject,
+  threadId:thread,clientTurnId:turn,reservationId:reservation,requiredCredits:10 as const};
+const evidence={kind:'member' as const,verifiedAuthUserId:auth};
+
+function db({acked='settled',failedProof=true,finalized='released',resolved=subject,matchingReservation=true}:
+  {acked?:string;failedProof?:boolean;finalized?:string;resolved?:string;matchingReservation?:boolean}={}){
+  const calls:{sql:string;params:readonly unknown[]|undefined}[]=[];
+  let releases=0;
+  const pool:PostgresSubjectPoolV1={
+    async connect(){return {
+      async query<Row>(sql:string,params?:readonly unknown[]){
+        calls.push({sql,params});
+        if(sql.includes('begin_member_subject_context_v1')){
+          return {rows:[{subjectId:resolved,subjectKind:'member'}] as unknown as readonly Row[]};
+        }
+
+        if(sql.includes('internal_cmd_chat_credit_ack_delivered_proven_v2'))
+          return {rows:[{state:acked}] as unknown as readonly Row[]};
+        if(sql.includes('internal_cmd_seyeon_g4_credit_refund_proven_v1')){
+          if(!matchingReservation)
+            throw Error('G4 refund requires exact still-reserved credit');
+          if(!failedProof)
+            throw Error('G4 refund requires terminal uncommitted undelivered Turn');
+          return {rows:[{state:finalized}] as unknown as readonly Row[]};
+        }
+        return {rows:[] as readonly Row[]};
+      },
+      release(){releases++;},
+    };},
+  };
+  const privateCreditPool:PostgresSubjectPoolV1={connect:()=>pool.connect()};
+  return {pool,privateCreditPool,calls,get releases(){return releases;}};
+}
+const confirmed={kind:'confirmed_delivered' as const,
+  committedTurnId:committed,assistantMessageId:assistant};
+const failed={kind:'definitive_undelivered' as const};
+
+describe('G4 private first Memory original-delivery reconciliation',()=>{
+  it('remains unmounted and cannot equate socket finish with confirmed user receipt',()=>{
+    expect(SEYEON_G4_FIRST_MEMORY_RECONCILIATION_V1).toEqual({
+      productionMounted:false,chargeRequiresOriginalDeliveredDbProof:true,
+      releaseRequiresFinalUndeliveredDbProof:true,socketFinishIsNotDeliveryReceipt:true,
+    });
+  });
+  it('settles ten credits only with exact DB-owned positive delivery proof',async()=>{
+    const t=db();
+    const result=await reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,privateCreditPool:t.privateCreditPool,verifiedEvidence:evidence,admission,proof:confirmed,
+    });
+    expect(result).toEqual({kind:'settled',creditsCharged:10});
+    const ack=t.calls.find(x=>x.sql.includes('internal_cmd_chat_credit_ack_delivered_proven_v2'));
+    expect(ack?.params).toEqual([subject,thread,turn,reservation,committed,assistant]);
+    expect(t.calls[0]?.sql).toBe('BEGIN');
+    const ordinaryRole=t.calls.findIndex(x=>x.sql==='SET LOCAL ROLE myeongha_api_executor');
+    const privateRole=t.calls.findIndex(x=>x.sql==='SET LOCAL ROLE myeongha_commerce_internal_executor');
+    const privateBinding=t.calls.findIndex(x=>x.sql.includes("set_config('myeongha.subject_id'"));
+    const ackIndex=t.calls.findIndex(x=>x.sql.includes('internal_cmd_chat_credit_ack_delivered_proven_v2'));
+    expect(ordinaryRole).toBeGreaterThan(-1);
+    expect(privateRole).toBeGreaterThan(ordinaryRole);
+    expect(privateBinding).toBeGreaterThan(privateRole);
+    expect(t.calls[privateBinding]?.params).toEqual([subject]);
+    expect(ackIndex).toBeGreaterThan(privateBinding);
+    expect(t.calls.at(-1)?.sql).toBe('COMMIT');
+    expect(t.releases).toBe(2);
+    expect(t.calls.some(x=>x.sql.includes('internal_cmd_chat_credit_finalize_v1'))).toBe(false);
+  });
+  it('releases only after a DB-proven terminal failure and never charges',async()=>{
+    const t=db();
+    expect(await reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,privateCreditPool:t.privateCreditPool,verifiedEvidence:evidence,admission,proof:failed,
+    })).toEqual({kind:'released',creditsCharged:0});
+    const ownerRole=t.calls.findIndex(x=>x.sql==='SET LOCAL ROLE myeongha_commerce_internal_executor');
+    const refundIndex=t.calls.findIndex(x=>x.sql.includes('internal_cmd_seyeon_g4_credit_refund_proven_v1'));
+    expect(refundIndex).toBeGreaterThan(ownerRole);
+    expect(t.calls[refundIndex]?.params).toEqual([subject,thread,turn,reservation]);
+    expect(t.calls.some(x=>x.sql.includes('internal_cmd_chat_credit_finalize_v1'))).toBe(false);
+    expect(t.calls.some(x=>x.sql.includes('from public.chat_credit_turn_reservations_v1'))).toBe(false);
+    expect(t.calls.at(-1)?.sql).toBe('COMMIT');
+  });
+  it('holds and rolls back when delivery DB authority rejects a reported ACK',async()=>{
+    const t=db({acked:'rejected'});
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,privateCreditPool:t.privateCreditPool,verifiedEvidence:evidence,admission,proof:confirmed,
+    })).rejects.toThrow('not settled');
+    expect(t.calls.at(-1)?.sql).toBe('ROLLBACK');
+    expect(t.releases).toBe(2);
+  });
+  it('never checks Turn or refunds if the original reservation is no longer held',async()=>{
+    const t=db({matchingReservation:false});
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,privateCreditPool:t.privateCreditPool,verifiedEvidence:evidence,admission,proof:failed,
+    })).rejects.toThrow('G4 refund requires exact still-reserved credit');
+    expect(t.calls.at(-1)?.sql).toBe('ROLLBACK');
+    expect(t.calls.some(x=>x.sql.includes('internal_cmd_chat_credit_finalize_v1'))).toBe(false);
+  });
+  it('never releases on a network failure without final DB non-delivery proof',async()=>{
+    const t=db({failedProof:false});
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,privateCreditPool:t.privateCreditPool,verifiedEvidence:evidence,admission,proof:failed,
+    })).rejects.toThrow('terminal uncommitted undelivered Turn');
+    expect(t.calls.at(-1)?.sql).toBe('ROLLBACK');
+    expect(t.calls.some(x=>x.sql.includes('internal_cmd_chat_credit_finalize_v1'))).toBe(false);
+  });
+  it('rejects shared ordinary/private pool before reading any original data',async()=>{
+    const t=db();
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:t.pool,privateCreditPool:t.pool,verifiedEvidence:evidence,admission,proof:confirmed,
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryReconciliationHoldV1);
+    expect(t.calls).toHaveLength(0);
+  });
+  it('denies forged subject, Guest, wrong reservation or forged receipt IDs before settlement',async()=>{
+    const guest=db();
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:guest.pool,privateCreditPool:guest.privateCreditPool,verifiedEvidence:{kind:'guest'} as never,
+      admission,proof:confirmed,
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryReconciliationHoldV1);
+    expect(guest.calls).toHaveLength(0);
+
+    const wrong=db({resolved:'88888888-8888-4888-8888-888888888888'});
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:wrong.pool,privateCreditPool:wrong.privateCreditPool,verifiedEvidence:evidence,admission,proof:confirmed,
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryReconciliationHoldV1);
+    expect(wrong.calls.at(-1)?.sql).toBe('ROLLBACK');
+
+    const invalid=db();
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:invalid.pool,privateCreditPool:invalid.privateCreditPool,verifiedEvidence:evidence,
+      admission:{...admission,reservationId:'invalid'},
+      proof:confirmed,
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryReconciliationHoldV1);
+    await expect(reconcileSeyeonG4FirstMemoryCreditsV1({
+      pool:invalid.pool,privateCreditPool:invalid.privateCreditPool,verifiedEvidence:evidence,admission,
+      proof:{...confirmed,assistantMessageId:'invalid'},
+    })).rejects.toBeInstanceOf(SeyeonG4FirstMemoryReconciliationHoldV1);
+    expect(invalid.calls).toHaveLength(0);
+  });
+});

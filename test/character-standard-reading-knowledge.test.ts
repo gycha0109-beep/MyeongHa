@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   ApiCommandError,
   resolveCharacterStandardReadingKnowledgeV1,
@@ -160,6 +161,81 @@ describe('Character Standard Reading Reader Knowledge source', () => {
     await expect(resolveWith(authorityPorts)).rejects.toThrow(
       /metadata and artifact authorities disagree/u,
     );
+  });
+
+  it('admits a canonical v2 Reader artifact only while its immutable stored hash matches', async () => {
+    const snapshot = {
+      responseVersion: 'myeonghwa-product-reading-response-v2',
+      responseId: 'source-response-v2',
+      state: 'delivered',
+      reading: {
+        readingId: accessRow().readingId,
+        sections: [{ sectionType: 'general', title: '원문',
+          blocks: [{ type: 'paragraph', text: '발행 당시 저장된 사주 원문' }] }],
+        disclosures: [],
+        calculationSummary: { ambiguity: [] },
+      },
+    };
+    const originalHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot);
+    const access = {
+      ...accessRow(),
+      readingContractVersion: 'myeonghwa-product-reading-response-v2',
+      responseHash: originalHash,
+    };
+    const artifact = {
+      ...artifactRow(),
+      readingContractVersion: access.readingContractVersion,
+      productResponseState: 'delivered',
+      responseSnapshotJsonb: snapshot,
+      responseHash: originalHash,
+    };
+    const accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1 = {
+      readAccessibleReadings: vi.fn(async () => [access]),
+    };
+    const artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1 = {
+      readArtifactSource: vi.fn(async () => [artifact]),
+    };
+    const args = {
+      resolvedSubjectId: access.subjectId,
+      readerCharacterId: access.readerCharacterId,
+      readingId: access.readingId,
+      effectiveAt: EFFECTIVE_AT,
+      accessAuthorityPort,
+      artifactAuthorityPort,
+    };
+    const good = await resolveCharacterStandardReadingKnowledgeV1(args);
+    expect(good.responseHash).toBe(originalHash);
+    expect(good.responseSnapshotJsonb).toEqual(snapshot);
+
+    const tamperedSource: CharacterStandardReadingArtifactAuthorityPortV1 = {
+      readArtifactSource: vi.fn(async () => [{
+        ...artifact,
+        responseSnapshotJsonb: {
+          ...snapshot,
+          reading: {
+            ...snapshot.reading,
+            sections: [{ sectionType: 'general', title: '원문',
+              blocks: [{ type: 'paragraph', text: '위조된 사주 풀이' }] }],
+          },
+        },
+      }]),
+    };
+    await expect(resolveCharacterStandardReadingKnowledgeV1({
+      ...args, artifactAuthorityPort: tamperedSource,
+    })).rejects.toThrow(/source response hash mismatch/u);
+
+    // A malformed but identical digest in both DB access and artifact rows
+    // must not disable the canonical v2 content-addressed validation.
+    const malformedHash = 'sha256:v1:not-a-64-hex-digest';
+    await expect(resolveCharacterStandardReadingKnowledgeV1({
+      ...args,
+      accessAuthorityPort: {
+        readAccessibleReadings: async () => [{ ...access, responseHash: malformedHash }],
+      },
+      artifactAuthorityPort: {
+        readArtifactSource: async () => [{ ...artifact, responseHash: malformedHash }],
+      },
+    })).rejects.toThrow(/source response hash mismatch/u);
   });
 
   it('fails closed when metadata and raw source hashes disagree', async () => {

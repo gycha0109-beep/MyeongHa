@@ -10,8 +10,10 @@ import type {
 } from './production-seyeon-chat-runtime-v1.js';
 import {
   SeyeonProductionChatExecutionErrorV1,
+  SeyeonCommittedReplayRevealHoldV1,
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
+import { resolveRequestUiLocaleV1 } from './request-ui-locale-v1.js';
 import {
   createSeyeonVercelEmptyPreflightDenialV1,
   createSeyeonVercelStaticPreflightDenialV1,
@@ -83,17 +85,18 @@ function methodNotAllowed(): Response {
 
 function projectResult(result: RunProductionSeyeonChatResultV1) {
   const execution = result.execution;
-  const assistantText = execution.disposition === 'committed_replay'
-    ? execution.assistantText
-    : execution.runtimeResult.envelope.utterance;
+  // No success serialization may ever include committed replay material,
+  // even if an alternate runtime returns a replay result instead of throwing.
+  if (execution.disposition === 'committed_replay') {
+    throw new SeyeonCommittedReplayRevealHoldV1();
+  }
+  const assistantText = execution.runtimeResult.envelope.utterance;
   return Object.freeze({
     turnId: execution.committedTurn.turnId,
     assistantMessageId: execution.committedTurn.assistantMessageId,
     assistantText,
     sequenceNo: execution.committedTurn.sequenceNo,
-    replayed:
-      execution.disposition === 'committed_replay' ||
-      execution.committedTurn.replayed,
+    replayed: execution.committedTurn.replayed,
   });
 }
 
@@ -104,6 +107,15 @@ function postgresConstraint(error: unknown): string | null {
 }
 
 function mapExecutionError(error: unknown, requestId: string): Response | null {
+  if (error instanceof SeyeonCommittedReplayRevealHoldV1) {
+    return jsonError({
+      status: 503,
+      code: error.code,
+      messageKey: 'chat.secure_reveal_unavailable',
+      retryable: false,
+      requestId,
+    });
+  }
   if (error instanceof SeyeonFirstHttpRevealHoldV1) {
     return jsonError({
       status: 503,
@@ -305,6 +317,7 @@ export async function handleSeyeonChatTurnSendRequestV1(
       threadId: preflight.threadId,
       clientTurnId: preflight.clientTurnId,
       text: preflight.text,
+      replyLocale: resolveRequestUiLocaleV1(input.request).locale,
     });
     return success(projectResult(result), input.requestId, input.serverTime);
   } catch (error) {

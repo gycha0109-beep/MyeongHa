@@ -41,9 +41,12 @@ function selection():SeyeonExactModelPersonalSourceSelectionV1 {
     selectedPersonalRecordCount:2,
     selectedSources,
     selectedSourcesDigest:digest(selectedSources),
+    selectedCurrentUserSource:null,
+    selectedUnpinnedRecentSources:[],
     selectedUnpinnedDerivedSources:[],
     selectedModelSourceCensusDigest:digest({
-      originalPersonalSources:selectedSources,unpinnedDerivedSources:[],
+      originalPersonalSources:selectedSources,currentUserSource:null,
+      unpinnedRecentSources:[],unpinnedDerivedSources:[],
     }),
     persistedBeforeModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
   };

@@ -66,6 +66,9 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
   it('holds the first-Memory scope before model dispatch when its original source is absent',()=>{
     const empty={retrievedMemories:[],sourceCandidates:[]};
     expect(selectSeyeonExactModelPersonalSourcesV1(empty).selectedPersonalRecordCount).toBe(0);
+    expect(selectSeyeonExactModelPersonalSourcesV1({...empty,requiredPersonalRecordCount:0}).selectedPersonalRecordCount).toBe(0);
+    expect(()=>selectSeyeonExactModelPersonalSourcesV1({retrievedMemories:[m1],sourceCandidates:[c1],requiredPersonalRecordCount:0}))
+      .toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
     expect(()=>selectSeyeonExactModelPersonalSourcesV1({...empty,requiredPersonalRecordCount:1}))
       .toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
     expect(selectSeyeonExactModelPersonalSourcesV1({retrievedMemories:[m1],sourceCandidates:[c1],
@@ -107,12 +110,44 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
     }]);
     expect(result.selectedModelSourceCensusDigest).toBe(hash({
       originalPersonalSources: result.selectedSources,
+      currentUserSource: null,
+      unpinnedRecentSources: [],
       unpinnedDerivedSources: result.selectedUnpinnedDerivedSources,
     }));
     expect(Object.isFrozen(result.selectedUnpinnedDerivedSources)).toBe(true);
     expect(Object.isFrozen(result)).toBe(true);
     expect(Object.isFrozen(result.selectedSources)).toBe(true);
     expect(result.selectedSources.some(x=> x.recordId === ID2)).toBe(false);
+  });
+
+  it('censuses only actual capped recent model messages with exact current User provenance', () => {
+    const current = { messageId: ID1, role: 'user' as const, text: 'current question' };
+    const past = { messageId: ID2, role: 'assistant' as const, text: 'prior answer' };
+    const old = { messageId: GRANT1, role: 'user' as const, text: 'older history' };
+    const selected = selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories: [], sourceCandidates: [],
+      recentMessages: [old, past, current], maxRecentMessages: 2,
+      currentUserMessageId: ID1,
+    });
+    expect(selected.selectedCurrentUserSource).toEqual({
+      messageId: ID1, role: 'user', selectedModelMessageDigest: hash(current),
+      persistedBeforeModel: false,
+    });
+    expect(selected.selectedUnpinnedRecentSources).toEqual([{
+      messageId: ID2, role: 'assistant', selectedModelMessageDigest: hash(past),
+      persistedBeforeModel: false,
+    }]);
+    expect(selected.selectedModelSourceCensusDigest).toBe(hash({
+      originalPersonalSources: [],
+      currentUserSource: selected.selectedCurrentUserSource,
+      unpinnedRecentSources: selected.selectedUnpinnedRecentSources,
+      unpinnedDerivedSources: [],
+    }));
+    expect(() => selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories: [], sourceCandidates: [],
+      recentMessages: [old, past, current], maxRecentMessages: 1,
+      currentUserMessageId: ID2,
+    })).toThrow(SeyeonExactModelPersonalSourceSelectionHoldV1);
   });
 
   it('selects relationship-only and preserves explicit zero personal even when candidates exist', () => {
@@ -164,8 +199,13 @@ describe('G1-B exact personal record runtime source selection, no DB authorizati
     const provider = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');
     expect(exact).toBeGreaterThan(-1);
     expect(interlock).toBeGreaterThan(exact);
-    const positivePin = runtime.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
+    const positivePin = runtime.indexOf('personalRecordProof = await input.combinedSourcePinPort.pinBeforeModel({');
+    const combinedPin = runtime.indexOf('await input.combinedSourcePinPort.pinBeforeModel({');
+    const missingCombinedHold = runtime.indexOf('!input.combinedSourcePinPort ||');
     expect(positivePin).toBeGreaterThan(interlock);
+    expect(combinedPin).toBeGreaterThan(positivePin);
+    expect(missingCombinedHold).toBeGreaterThan(-1);
+    expect(runtime).not.toContain('await input.positivePersonalSourcePort.pinBeforeModel(positivePinRequest)');
     expect(positivePin).toBeLessThan(governance);
     expect(governance).toBeGreaterThan(exact);
     expect(provider).toBeGreaterThan(governance);

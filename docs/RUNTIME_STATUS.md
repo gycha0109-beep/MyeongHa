@@ -36,7 +36,7 @@
 
 `npm run check` validates repository-local typechecking, tests, builds, static web output, deployment-configuration contracts, the production user-data binding workflow contract, and the Guest bootstrap TTL binding workflow contract. It does **not** by itself prove remote Vercel environment state or successful remote request execution.
 
-`npm run verify:production:api` performs a networked remote check against the canonical production health endpoint by default. It is intentionally excluded from `npm run check` so repository CI does not depend on production availability. `MYEONGHA_PRODUCTION_ORIGIN` may override the origin for an explicit remote target.
+`npm run verify:production:api` performs a networked remote health check against `https://myeongha.gycha0109.workers.dev` by default (Ops source migration 2026-10-26). It is intentionally excluded from `npm run check` so repository CI does not depend on production availability. `MYEONGHA_PRODUCTION_ORIGIN` may override the origin explicitly, including `https://myeongha.vercel.app` for a Vercel standby/rollback health check. Earlier deployment notes in this document describe the former Vercel production architecture and must not be mistaken for current Cloudflare acceptance evidence.
 
 Remote production evidence currently includes:
 

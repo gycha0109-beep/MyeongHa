@@ -16,6 +16,7 @@ export const SEYEON_MEMBER_MEMORY_GRANT_STATUS_HTTP_V1 = Object.freeze({
   method: 'GET',
   publicRoute: '/api/memories/:memoryItemId/grants/seyeon',
   dbAuthority: 'public.qry_memory_active_grants_v1',
+  lifecycleAuthority: 'public.qry_seyeon_memory_grant_lifecycle_v1',
   databaseWrites: false,
 } as const);
 
@@ -92,31 +93,64 @@ export async function handleSeyeonMemberMemoryGrantStatusRequestV1(
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence: evidence,
-      execute: ({ resolvedSubject, client }) => {
+      execute: async ({ resolvedSubject, client }) => {
         if (resolvedSubject.subjectKind !== 'member') {
           throw new ApiCommandError('NOT_FOUND', 'Member grant status unavailable.');
         }
-        return getMemoryGrants({
+        // Source RLS deliberately hides pending withdrawal rows. The ordinary
+        // owner-scoped grant projection remains the current-use authority.
+        const grants = await getMemoryGrants({
           resolvedSubjectId: resolvedSubject.subjectId,
           memoryItemId,
           authorityPort: createPostgresReaderContextMemoryGrantsAuthorityPortV1(client),
         });
+        const seyeon = grants.grants.filter(grant => grant.characterId === 'seyeon');
+        if (seyeon.length > 1) throw new Error('Ambiguous current grant');
+        const active = seyeon[0];
+        const available = await client.query<{ installed: boolean }>(
+          `select to_regprocedure(
+            'public.qry_seyeon_memory_grant_lifecycle_v1(uuid,uuid)'
+          ) is not null as "installed"`,
+        );
+        if (available.rows.length !== 1 ||
+            typeof available.rows[0]?.installed !== 'boolean') {
+          throw new Error('Lifecycle authority installation unknown');
+        }
+        if (!available.rows[0].installed) {
+          // Before the read-only SQL is installed, "no active grant" could
+          // mean pending withdrawal OR fully revoked. Never infer completion.
+          return {
+            grantState: active === undefined ? 'unknown' : 'active',
+            grantedAt: active?.grantedAt ?? null,
+          } as const;
+        }
+        const lifecycle = await client.query<{ grantState: string; grantedAt: string | null }>(
+          `select grant_state as "grantState",
+                  granted_at::text as "grantedAt"
+             from public.qry_seyeon_memory_grant_lifecycle_v1($1::uuid,$2::uuid)`,
+          [resolvedSubject.subjectId, memoryItemId],
+        );
+        if (lifecycle.rows.length !== 1) throw new Error('Lifecycle result missing');
+        const row = lifecycle.rows[0]!;
+        if (row.grantState !== 'active' &&
+            row.grantState !== 'withdrawal_pending' &&
+            row.grantState !== 'not_granted') throw new Error('Invalid lifecycle state');
+        if ((row.grantState === 'active') !== (active !== undefined) ||
+            (row.grantState === 'active' && row.grantedAt !== active?.grantedAt) ||
+            (row.grantState !== 'active' && row.grantedAt !== null)) {
+          throw new Error('Grant authority and lifecycle disagree');
+        }
+        return { grantState: row.grantState, grantedAt: row.grantedAt } as const;
       },
     });
-    const seyeon = data.grants.filter(grant => grant.characterId === 'seyeon');
-    // One original Memory cannot produce two unambiguous *current* grants
-    // for the same Character. Do not report a misleading positive state.
-    if (seyeon.length > 1) {
-      return errorResponse(503, 'GRANT_STATUS_UNAVAILABLE', input.requestId);
-    }
-    const grant = seyeon[0];
     return Response.json({
       ok: true,
       data: {
         memoryItemId,
         characterId: 'seyeon',
-        currentlyGranted: grant !== undefined,
-        grantedAt: grant?.grantedAt ?? null,
+        currentlyGranted: data.grantState === 'active',
+        grantedAt: data.grantedAt,
+        grantState: data.grantState,
       },
       meta: {
         apiContractVersion: 'v0.9',

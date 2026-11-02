@@ -235,7 +235,7 @@ async function authSnapshot(client) {
       memberUserId: member?.user?.id ?? null,
       activeBearer: sessionStorage.getItem('myeongha.guestBearer.v1'),
       pendingGuest: sessionStorage.getItem('myeongha.pendingGuestBearer.v1'),
-      myStatus: document.querySelector('#my-status')?.textContent?.trim() ?? null,
+      myStatus: document.querySelector('.my-account-meta')?.textContent?.trim() ?? null,
       myActions: document.querySelector('.my-logout-action, .my-connect-action')?.textContent?.trim() ?? null,
     };
   })()`);
@@ -351,10 +351,10 @@ try {
     'Tab B did not converge to Member before canonical rejection',
   );
 
-  await navigate(tabA, origin, '/my.html', '#my-account-email');
+  await navigate(tabA, origin, '/my.html', '.my-account-card');
   await waitFor(
     tabA,
-    `document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(identity.email)} && Boolean(document.querySelector('.my-logout-action'))`,
+    `document.querySelector('.my-account-meta')?.textContent?.includes(${JSON.stringify(identity.email)}) && Boolean(document.querySelector('.my-logout-action'))`,
     'Canonical Member profile did not render before rejection',
   );
 
@@ -366,11 +366,11 @@ try {
   assert(beforeRejectionB.activeBearer === memberAccessToken, 'Tab B pre-rejection Member bearer was not active');
 
   rejectCurrentSubject = true;
-  await navigate(tabA, origin, '/my.html?canonical-rejection=1', '#my-status');
+  await navigate(tabA, origin, '/my.html?canonical-rejection=1', '.my-account-card');
   await waitFor(
     tabA,
     `!localStorage.getItem('myeongha.memberSession.v1')
-      && document.querySelector('#my-status')?.textContent?.includes('현재 세션이 필요합니다.')
+      && document.querySelector('.my-account-meta')?.textContent?.includes('현재 세션이 필요합니다.')
       && document.querySelector('.my-connect-action')?.textContent?.includes('로그인하기')
       && sessionStorage.getItem('myeongha.guestBearer.v1') === ${JSON.stringify(tabAGuestBearer)}
       && sessionStorage.getItem('myeongha.pendingGuestBearer.v1') === null`,

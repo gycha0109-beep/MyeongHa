@@ -1,5 +1,7 @@
 import { SAJU_DOMAINS } from '../../../packages/contracts/src/index.js';
+import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
 import { ApiCommandError } from './api-error.js';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
 export const OFFICIAL_READING_RECORD_READ_AUTHORITY_BINDING_V1 =
   'public.qry_official_reading_record_runtime_v1' as const;
@@ -21,6 +23,14 @@ export interface OfficialReadingRecordAuthorityRowV1 {
   readonly responseHash: string;
   readonly readerCharacterIds: readonly string[];
   readonly completedAt: string;
+  /** Owner/Grant-gated self Birth metadata from the same DB transaction. */
+  readonly birthRevision?: OfficialReadingBirthRevisionStatusV1;
+}
+
+export interface OfficialReadingBirthRevisionStatusV1 {
+  readonly issuedRevisionNo: number | null;
+  readonly currentRevisionNo: number | null;
+  readonly state: 'current' | 'changed' | 'unknown';
 }
 
 export class OfficialReadingRecordReadAuthorityPortErrorV1 extends Error {
@@ -47,6 +57,7 @@ export interface OfficialReadingRecordV1 {
   readonly productResponseState: string;
   readonly readerCharacterIds: readonly string[];
   readonly completedAt: string;
+  readonly birthRevision: OfficialReadingBirthRevisionStatusV1;
   readonly reading: Readonly<Record<string, unknown>>;
 }
 
@@ -108,6 +119,29 @@ function requireReaderCharacterIds(value: unknown): readonly string[] {
     throw new Error('Official Reading record authority returned non-deterministic Reader provenance.');
   }
   return Object.freeze(ids);
+}
+
+function requireBirthRevisionStatus(
+  value: OfficialReadingBirthRevisionStatusV1 | undefined,
+): OfficialReadingBirthRevisionStatusV1 {
+  if (value === undefined) {
+    return Object.freeze({ issuedRevisionNo: null, currentRevisionNo: null, state: 'unknown' });
+  }
+  const validNo = (n: number | null): boolean =>
+    n === null || (Number.isSafeInteger(n) && n > 0);
+  if (!validNo(value.issuedRevisionNo) || !validNo(value.currentRevisionNo)
+    || !['current', 'changed', 'unknown'].includes(value.state)
+    || (value.state !== 'unknown'
+      && (value.issuedRevisionNo === null || value.currentRevisionNo === null))
+    || (value.state === 'current' && value.issuedRevisionNo !== value.currentRevisionNo)
+    || (value.state === 'changed' && value.issuedRevisionNo === value.currentRevisionNo)) {
+    throw new Error('Official Reading Birth revision provenance is inconsistent.');
+  }
+  return Object.freeze({
+    issuedRevisionNo: value.issuedRevisionNo,
+    currentRevisionNo: value.currentRevisionNo,
+    state: value.state,
+  });
 }
 
 function requireReadingSnapshot(
@@ -206,6 +240,29 @@ export async function getOfficialReadingRecord(input: {
       readingContractVersion,
       productResponseState,
     });
+    // Modern issuer-addressed v2 snapshots must match their canonical digest.
+    // Historical records with noncanonical source hashes predate this issuer
+    // format and retain the existing owner/current-Grant archive policy.
+    // A malformed hash CLAIMING the canonical scheme cannot bypass validation.
+    if (readingContractVersion === 'myeonghwa-product-reading-response-v2'
+      && storedResponseHash.startsWith('sha256:v1:')) {
+      if (!/^sha256:v1:[a-f0-9]{64}$/u.test(storedResponseHash)
+        || 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(reading)
+          !== storedResponseHash) {
+        throw new Error('Official Reading archive source response hash mismatch.');
+      }
+      let display;
+      try {
+        display = projectProductReadingResponseV2(reading);
+      } catch {
+        throw new Error('Official Reading archive canonical response failed product admission.');
+      }
+      if (display.kind !== 'delivered'
+        || display.responseState !== productResponseState
+        || display.readingId !== readingId) {
+        throw new Error('Official Reading archive canonical response failed product admission.');
+      }
+    }
 
     return Object.freeze({
       readingId,
@@ -215,6 +272,7 @@ export async function getOfficialReadingRecord(input: {
       productResponseState,
       readerCharacterIds: requireReaderCharacterIds(row.readerCharacterIds),
       completedAt: requireTimestamp(row.completedAt),
+      birthRevision: requireBirthRevisionStatus(row.birthRevision),
       reading,
     });
   } catch (error) {

@@ -1,4 +1,5 @@
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.js';
+import { handleContactInquiryRequestV1 } from '../apps/api/src/contact-inquiry-http.js';
 import { canonicalizeRequestUiLocaleHeadersV1 } from '../apps/api/src/request-ui-locale-v1.js';
 import { createNodePostgresSubjectPoolV1 } from '../apps/api/src/node-postgres-subject-pool.js';
 import { createProductionChatReadRuntimeV1 } from '../apps/api/src/production-chat-read-runtime.js';
@@ -24,6 +25,8 @@ import { parseProductionUserDataRuntimeConfigV1 } from '../apps/api/src/producti
 export const config = Object.freeze({ maxDuration: 60 });
 
 const PROFILE_ROUTE = '/api/me' as const;
+const CONTACT_INQUIRY_ROUTE = '/api/contact' as const;
+const CONTACT_INQUIRY_PARAM = '__myeongha_contact_inquiry' as const;
 const CREDIT_WALLET_ROUTE = '/api/me/credits' as const;
 const CREDIT_WALLET_PARAM = '__myeongha_chat_credit_wallet' as const;
 const LIFE_RECORD_ROUTE = '/api/life-record' as const;
@@ -220,6 +223,7 @@ function getSajuPreviewReadingRuntime(): ReturnType<typeof createProductionCurre
 
 type DispatchTarget =
   | { readonly kind: 'profile'; readonly route: typeof PROFILE_ROUTE }
+  | { readonly kind: 'contact-inquiry'; readonly route: typeof CONTACT_INQUIRY_ROUTE }
   | { readonly kind: 'credit-wallet'; readonly route: typeof CREDIT_WALLET_ROUTE }
   | { readonly kind: 'saju-preview-reading'; readonly route: typeof SAJU_PREVIEW_READING_ROUTE }
   | {
@@ -379,6 +383,7 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
   const keys = [...new Set(url.searchParams.keys())];
   const knownKeys = new Set<string>([
     RECORDS_ROUTE_PARAM,
+    CONTACT_INQUIRY_PARAM,
     CREDIT_WALLET_PARAM,
     SEYEON_GRANT_STATUS_PARAM,
     SEYEON_GRANT_REVOKE_PARAM,
@@ -401,6 +406,15 @@ function resolveDispatchTarget(request: Request): DispatchTarget | null {
 
   const shareValue = getSingleNonEmptyParam(url.searchParams, VERCEL_SHARE_PARAM);
   if (shareValue === null) return null;
+
+  const contactInquiryValue = getSingleNonEmptyParam(url.searchParams, CONTACT_INQUIRY_PARAM);
+  if (contactInquiryValue === null) return null;
+  if (contactInquiryValue !== undefined || url.pathname === CONTACT_INQUIRY_ROUTE) {
+    if (contactInquiryValue !== '1' ||
+        (url.pathname !== PROFILE_ROUTE && url.pathname !== CONTACT_INQUIRY_ROUTE) ||
+        keys.some(key => key !== CONTACT_INQUIRY_PARAM && key !== VERCEL_SHARE_PARAM)) return null;
+    return { kind: 'contact-inquiry', route: CONTACT_INQUIRY_ROUTE };
+  }
 
   // Credits are routed through the existing Member /api/me Function to stay
   // under the hard 12-Function Vercel plan limit. No Subject IDs or unrelated
@@ -793,6 +807,8 @@ export function toCanonicalMeRequestForTestV1(
   const target = targetInput ?? resolveDispatchTarget(request);
   if (target === null) throw new Error('Cannot canonicalize an unresolved /api/me dispatch target.');
 
+  if (target.kind === 'contact-inquiry') return request;
+
   const url = new URL(`https://myeongha.internal${target.route}`);
   if (target.kind === 'chat-read') {
     if (target.afterSequenceNo !== undefined) {
@@ -839,6 +855,33 @@ function runtimeForTarget(target: DispatchTarget) {
   switch (target.kind) {
     case 'profile':
       return getProfileRuntime();
+    case 'contact-inquiry':
+      return {
+        handleRequest: ({ request, requestId, serverTime }: {
+          request: Request;
+          requestId: string;
+          serverTime: string;
+        }) => handleContactInquiryRequestV1({
+          request,
+          env: {
+            RESEND_API_KEY: process.env.RESEND_API_KEY,
+            CONTACT_FROM_EMAIL: process.env.CONTACT_FROM_EMAIL,
+            CONTACT_TO_EMAIL: process.env.CONTACT_TO_EMAIL,
+          },
+          verifySession: async (authorization) => {
+            const probe = new Request('https://myeongha.internal/api/me', {
+              method: 'GET',
+              headers: { Authorization: authorization, Accept: 'application/json' },
+            });
+            const verification = await getProfileRuntime().handleRequest({
+              request: probe,
+              requestId,
+              serverTime,
+            });
+            return verification.status === 200;
+          },
+        }),
+      };
     case 'credit-wallet':
       return getCreditWalletRuntime();
     case 'saju-preview-reading':

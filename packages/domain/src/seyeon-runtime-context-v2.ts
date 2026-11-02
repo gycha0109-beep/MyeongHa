@@ -638,26 +638,34 @@ export function selectSeyeonRuntimeRetrievedMemoriesV2(input: Readonly<{
   );
 }
 
+/** Shared final-model recent-message selection for G1 source census and runtime. */
+export function selectSeyeonRuntimeRecentMessagesV2(input: Readonly<{
+  readonly recentMessages: readonly SeyeonRecentMessageV2[];
+  readonly maxRecentMessages?: number;
+}>): readonly SeyeonRecentMessageV2[] {
+  const maxRecentMessages = assertPositiveBoundedInteger(
+    input.maxRecentMessages, 12, 24, 'maxRecentMessages',
+  );
+  return Object.freeze(input.recentMessages
+    .slice(-maxRecentMessages)
+    .map(validateRecentMessage));
+}
+
 export function assembleSeyeonRuntimeContextV2(
   input: AssembleSeyeonRuntimeContextV2Input,
 ): SeyeonRuntimeContextV2 {
-  const maxRecentMessages = assertPositiveBoundedInteger(
-    input.maxRecentMessages,
-    12,
-    24,
-    'maxRecentMessages',
-  );
   const relationship = validateRelationship(input.relationship);
   const relationshipSemantics = validateRelationshipSemanticsOverlay(
     input.relationshipSemantics,
     relationship,
   );
 
-  const recentConversation = Object.freeze(
-    input.recentMessages
-      .slice(-maxRecentMessages)
-      .map(validateRecentMessage),
-  );
+  const recentConversation = selectSeyeonRuntimeRecentMessagesV2({
+    recentMessages: input.recentMessages,
+    ...(input.maxRecentMessages === undefined ? {} : {
+      maxRecentMessages: input.maxRecentMessages,
+    }),
+  });
 
   const retrievedMemories = selectSeyeonRuntimeRetrievedMemoriesV2({
     retrievedMemories: input.retrievedMemories,

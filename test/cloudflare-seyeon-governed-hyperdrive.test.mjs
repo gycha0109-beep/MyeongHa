@@ -8,7 +8,7 @@ vi.mock('pg',()=>({Pool:class{
   if(sql==='select current_user::text as "currentUser"')return{rows:[{currentUser:'myeongha_seyeon_governed_executor'}]};
   return{rows:[]};},release:error=>this.releases.push(error)};}
 }}));
-import{createCloudflareSeyeonSubjectPoolV1,createCloudflareSeyeonGovernedPoolV1}from'../workers/cloudflare-hyperdrive-subject-pool.mjs';
+import{createCloudflareSeyeonSubjectPoolV1,createCloudflareSeyeonGovernedPoolV1,createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1}from'../workers/cloudflare-hyperdrive-subject-pool.mjs';
 const bindings=()=>({MYEONGHA_CLOUDFLARE_POSTGRES_TRANSPORT:'approved-supabase-hyperdrive-v1',
  MYEONGHA_CLOUDFLARE_HYPERDRIVE_ORIGIN_POLICY:'supabase-verify-full-rls-v1',
  MYEONGHA_CLOUDFLARE_HYPERDRIVE_PRINCIPAL:'myeongha_cf_hyperdrive_login',
@@ -19,6 +19,21 @@ describe('separate Cloudflare subject and governed cost bindings',()=>{
  it('rejects missing, reused or unapproved bindings without acquiring a SQL connection',()=>{
   const b=bindings();for(const bad of [{...b,SEYEON_GOVERNED_HYPERDRIVE:undefined},{...b,SEYEON_GOVERNED_HYPERDRIVE:b.SEYEON_SUBJECT_HYPERDRIVE},{...b,SEYEON_SUBJECT_HYPERDRIVE:undefined}])expect(()=>createCloudflareSeyeonGovernedPoolV1(bad)).toThrow();
   expect(state.pools).toHaveLength(0);
+ });
+ it('keeps S0 withdrawal and issued-response receipt runnable without any governed cost binding',async()=>{
+  const b=bindings();
+  const privacy=createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1({
+    ...b,SEYEON_GOVERNED_HYPERDRIVE:undefined,
+  });
+  expect(state.pools).toHaveLength(1);
+  expect(state.pools[0].config.connectionString).toBe(b.SEYEON_SUBJECT_HYPERDRIVE.connectionString);
+  expect(state.pools[0].config.max).toBe(1);
+  await privacy.close();
+  expect(state.pools[0].ended).toBe(true);
+  expect(()=>createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1({
+    ...b,SEYEON_GOVERNED_HYPERDRIVE:b.SEYEON_SUBJECT_HYPERDRIVE,
+  })).toThrow();
+  expect(state.pools).toHaveLength(1);
  });
  it('uses distinct request-owned max-one pools and proves the governed role before exposing a connection',async()=>{
   const b=bindings();const ordinary=createCloudflareSeyeonSubjectPoolV1(b);

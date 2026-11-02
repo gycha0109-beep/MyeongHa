@@ -1,3 +1,4 @@
+import { presentChatLiveTurnV1, presentAcknowledgedChatTurnV1, repaintPendingChatLiveTurnV1 } from './chat-live-turn.js';
 import { resolveCharacterDisplayNameV1 } from './character-display-locale.js';
 import { getUiLocale, getUiLocaleRequestHeadersV1, translateStaticUi } from './ui-i18n.js';
 import { resolveCanonicalCharacterPresentationV1 } from './character-presentation-identity.js';
@@ -49,6 +50,18 @@ function uiText(source) {
   return translateStaticUi(source, getUiLocale());
 }
 
+function liveTurnLabels() {
+  const characterLabel = resolveCharacterDisplayNameV1('seyeon', getUiLocale()) ?? uiText('세연');
+  return {
+    sendingAria: uiText('전송 중인 메시지'),
+    waitingAria: uiText('세연의 답장을 기다리는 중'),
+    userLabel: uiText('나'),
+    characterLabel,
+    characterAvatar: characterLabel.slice(0, 1),
+    typingText: uiText('답장하는 중'),
+  };
+}
+
 function setComposeStatus(message) {
   composeStatusSource = message;
   if (composeStatus) composeStatus.textContent = uiText(message);
@@ -96,6 +109,7 @@ function readPendingTurn(targetThreadId) {
     return Object.freeze({
       clientTurnId: parsed.clientTurnId,
       text: parsed.text,
+      locale: ['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN'].includes(parsed.locale) ? parsed.locale : getUiLocale(),
     });
   } catch {
     sessionStorage.removeItem(pendingTurnKey(targetThreadId));
@@ -110,15 +124,16 @@ function getOrCreatePendingTurn(message) {
   const pendingTurn = Object.freeze({
     clientTurnId: crypto.randomUUID(),
     text: message,
+    locale: getUiLocale(),
   });
   sessionStorage.setItem(pendingTurnKey(threadId), JSON.stringify(pendingTurn));
   return pendingTurn;
 }
 
-function clearPendingTurn(clientTurnId) {
-  const existing = readPendingTurn(threadId);
+function clearPendingTurn(clientTurnId, targetThreadId = threadId) {
+  const existing = readPendingTurn(targetThreadId);
   if (existing?.clientTurnId !== clientTurnId) return;
-  sessionStorage.removeItem(pendingTurnKey(threadId));
+  sessionStorage.removeItem(pendingTurnKey(targetThreadId));
 }
 
 function restorePendingDraft() {
@@ -211,7 +226,8 @@ function createStreamMessage(message, authoritativeCharacterId) {
   avatar.className = 'conversation-message-avatar';
   avatar.setAttribute('aria-hidden', 'true');
   avatar.dataset.character = message.senderType === 'character' ? 'runtime-character' : 'user';
-  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : '대';
+  const senderName = senderLabel(message, authoritativeCharacterId);
+  avatar.textContent = message.senderType === 'user' ? translateStaticUi('나', getUiLocale()) : senderName.slice(0, 1);
 
   const body = document.createElement('div');
   body.className = 'conversation-message-body';
@@ -265,6 +281,7 @@ document.addEventListener('myeongha:localechange', () => {
   if (composeStatusSource !== null && composeStatus) composeStatus.textContent = uiText(composeStatusSource);
   if (roomLoadingSource !== null && roomLoading) roomLoading.textContent = uiText(roomLoadingSource);
   if (!chatStream) return;
+  repaintPendingChatLiveTurnV1(chatStream, liveTurnLabels());
   for (const article of chatStream.querySelectorAll('.conversation-message')) {
     const placeholder = article.querySelector('[data-chat-ui-placeholder]');
     if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
@@ -280,10 +297,34 @@ document.addEventListener('myeongha:localechange', () => {
     if (senderType === 'user') {
       const avatar = article.querySelector('.conversation-message-avatar');
       if (avatar) avatar.textContent = translateStaticUi('나', getUiLocale());
+    } else if (senderType === 'character' && characterId) {
+      const avatar = article.querySelector('.conversation-message-avatar');
+      const localizedName = resolveCharacterDisplayNameV1(characterId, getUiLocale());
+      if (avatar && localizedName) avatar.textContent = localizedName.slice(0, 1);
     }
   }
 });
 
+// The S0 receipt is verified and ACKed before this call. History/Replay are
+// deliberately unavailable: display only the just-received response in this
+// document, never cache it or infer an authorized transcript from it.
+function renderAcknowledgedSeyeonTurn(result, pendingTurn) {
+  if (!result || typeof result.assistantText !== 'string' ||
+      result.assistantText.trim().length === 0 || !pendingTurn) return false;
+  if (chatIntro) chatIntro.hidden = true;
+  // Show every receipt-confirmed turn in the active page only, including a
+  // recovered replay whose original delivery response was lost.
+  const presented = presentAcknowledgedChatTurnV1(chatStream, {
+    turnId: pendingTurn.clientTurnId,
+    userText: pendingTurn.text,
+    assistantText: result.assistantText,
+    userLabel: uiText('나'),
+    characterLabel: resolveCharacterDisplayNameV1('seyeon', getUiLocale()) ?? uiText('세연'),
+    characterAvatar: liveTurnLabels().characterAvatar,
+  });
+  if (presented) historyWithheld = true;
+  return presented;
+}
 function renderRoomState(state) {
   historyWithheld = state.historyWithheld === true;
   renderConversation(state.messages, state.characterId);
@@ -300,8 +341,11 @@ function renderRoomState(state) {
 }
 
 function clearOwnerScopedRoomStateForAuthorityChange() {
+  // Old DOM Message nodes are not durable history Reveal authority.
   chatStream?.replaceChildren();
+  if (chatIntro) chatIntro.hidden = true;
   roomReady = false;
+  authoritativeCharacterId = null;
   historyWithheld = false;
   if (contextPill) contextPill.hidden = true;
   if (contextTitle) contextTitle.textContent = '';
@@ -335,6 +379,22 @@ async function readChatPage(activeBearer, afterSequenceNo) {
   if (response.status === 401) {
     invalidateRejectedBearer(activeBearer);
     throw new Error('Character Room read requires a current session.');
+  }
+  if (response.status === 503) {
+    // A former Se-yeon participant can be absent from the requested page.
+    // Never treat a rejected historical replay as a transient empty page.
+    // Consume only the public error code; do not project private body fields.
+    let code = null;
+    try {
+      const denial = await response.json();
+      code = denial?.error?.code ?? null;
+    } catch {
+      // Malformed denial is still a failed authoritative re-read.
+    }
+    if (code === 'SEYEON_HISTORY_REVEAL_HOLD') {
+      throw new Error('SEYEON_HISTORY_REVEAL_HOLD');
+    }
+    throw new Error(`Character Room read failed with ${response.status}.`);
   }
   if (!response.ok) {
     throw new Error(`Character Room read failed with ${response.status}.`);
@@ -407,8 +467,16 @@ async function loadRoomState() {
       historyWithheld:protectedHistory,
     }));
     return true;
-  } catch {
-    setComposeStatus('현재 대화 기록 연결을 사용할 수 없습니다.');
+  } catch (error) {
+    // A failed authoritative history re-read cannot leave a previously
+    // rendered DOM transcript/Relationship-derived presentation accessible.
+    // This also applies to malformed denial envelopes and changed owners.
+    clearOwnerScopedRoomStateForAuthorityChange();
+    setComposeStatus(
+      error instanceof Error && error.message === 'SEYEON_HISTORY_REVEAL_HOLD'
+        ? '이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.'
+        : '현재 대화 기록 연결을 사용할 수 없습니다.',
+    );
     return false;
   }
 }
@@ -482,29 +550,56 @@ async function sendTurn(message) {
   setComposerBusy(true);
   setComposeStatus('세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
+  const submittedThreadId = threadId;
+  const removePendingBubbles = presentChatLiveTurnV1(chatStream, { message: pendingTurn.text, labels: liveTurnLabels() });
 
   try {
     const activeBearer = await getActiveBearer();
     if (!activeBearer || activeBearer.kind !== 'member') {
       throw new Error('MEMBER_REQUIRED');
     }
+    let acknowledgedReply;
     try {
-      await sendSeyeonBrowserTurnWithReceiptV1({
+      acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1({
         origin: window.location.origin,
         bearer: activeBearer.token,
-        threadId,
+        threadId: submittedThreadId,
         turn: { clientTurnId: pendingTurn.clientTurnId, text: pendingTurn.text },
-        language: getUiLocale(),
-        localeHeaders: getUiLocaleRequestHeadersV1(),
+        language: pendingTurn.locale,
+        localeHeaders: { 'X-MyeongHa-UI-Locale': pendingTurn.locale },
       });
     } catch (error) {
-      if (error instanceof MyeongHaApiClientErrorV1) {
+      if (error instanceof MyeongHaApiClientErrorV1 && error.code === 'TURN_IN_FLIGHT') {
+        // A different earlier User message may be stored as failed_retryable.
+        // Do NOT overwrite/rewrite its original text or silently cancel it.
+        // An explicit choice archives that failed Turn (without deleting it)
+        // and sends the current draft as a new, independently identified Turn.
+        const confirmed = window.confirm(uiText(
+          '이 대화방에 이전에 실패한 다른 메시지가 남아 있습니다. 기존 기록은 보존하면서 미완료 전송을 종료하고, 지금 입력한 문장을 새 메시지로 보내시겠습니까?'
+        ));
+        if (!confirmed) throw new Error('TURN_IN_FLIGHT');
+        try {
+          acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1({
+            origin: window.location.origin,
+            bearer: activeBearer.token,
+            threadId: submittedThreadId,
+            turn: { clientTurnId: pendingTurn.clientTurnId, text: pendingTurn.text },
+            language: pendingTurn.locale,
+            localeHeaders: { 'X-MyeongHa-UI-Locale': pendingTurn.locale },
+            supersedeFailed: true,
+          });
+        } catch (retryError) {
+          if (retryError instanceof MyeongHaApiClientErrorV1 &&
+              retryError.code === 'TURN_IN_FLIGHT') throw new Error('TURN_IN_FLIGHT');
+          throw new Error('TURN_SEND_FAILED');
+        }
+      } else if (error instanceof MyeongHaApiClientErrorV1) {
         if (error.status === 401 || error.code === 'AUTH_REQUIRED') {
           invalidateRejectedBearer(activeBearer);
           throw new Error('AUTH_REQUIRED');
         }
         if (error.code === 'IDEMPOTENCY_CONFLICT') {
-          clearPendingTurn(pendingTurn.clientTurnId);
+          clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
           throw new Error('IDEMPOTENCY_CONFLICT');
         }
         if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'CREDIT_INSUFFICIENT') {
@@ -513,9 +608,11 @@ async function sendTurn(message) {
           }));
           throw new Error('CREDIT_SHORTAGE');
         }
-        if (error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE' ||
-            error.code === 'CREDIT_AUTHORITY_UNAVAILABLE') {
-          throw new Error('AI_TURN_NOT_YET_AVAILABLE');
+        if (error.code === 'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE') {
+          throw new Error('SECURE_CHAT_TEMPORARILY_UNAVAILABLE');
+        }
+        if (error.code === 'CREDIT_AUTHORITY_UNAVAILABLE') {
+          throw new Error('CREDIT_AUTHORITY_UNAVAILABLE');
         }
         if (error.status === 403) throw new Error('MEMBER_REQUIRED');
         if (['CONTENT_INCOMPATIBLE', 'CAPABILITY_UNAVAILABLE', 'TURN_IN_FLIGHT',
@@ -530,15 +627,28 @@ async function sendTurn(message) {
       throw new Error('INVALID_RESPONSE');
     }
 
-    const rereadSucceeded = await loadRoomState();
-    if (!rereadSucceeded) throw new Error('AUTHORITATIVE_REREAD_FAILED');
+    // The receipt ACK is already complete. Retire the idempotency draft
+    // before a refresh or session change can make a successful turn retryable.
+    clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
+    // A protected history GET may legitimately return 503. Never use it as
+    // positive receipt confirmation or as a reason to resend this turn.
+    const currentBearer = await getActiveBearer();
+    if (currentBearer?.kind !== 'member' ||
+        currentBearer.token !== activeBearer.token ||
+        authoritativeCharacterId !== 'seyeon' ||
+        threadId !== submittedThreadId) {
+      // Never render a private reply into a different Member or thread.
+      throw new Error('AUTH_REQUIRED');
+    }
 
-    clearPendingTurn(pendingTurn.clientTurnId);
     if (messageInput instanceof HTMLTextAreaElement) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
     }
-    setComposeStatus('세연의 답변이 도착했습니다.');
+    const presented = renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn);
+    setComposeStatus(presented
+      ? '세연의 답변이 도착했습니다.'
+      : '현재 대화 기록 연결을 사용할 수 없습니다.');
   } catch (error) {
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {
@@ -546,10 +656,11 @@ async function sendTurn(message) {
       MEMBER_REQUIRED: '현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.',
       CONTENT_INCOMPATIBLE: '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.',
       CAPABILITY_UNAVAILABLE: '세연 실대화 운영 연결을 지금 사용할 수 없습니다.',
-      TURN_IN_FLIGHT: '이전 메시지를 처리 중입니다. 잠시 후 다시 보내 주세요.',
+      TURN_IN_FLIGHT: '이전 대화에 미완료 메시지가 남아 새 메시지가 차단됐습니다. 기존 메시지의 전송 상태를 확인해 주세요.',
       IDEMPOTENCY_CONFLICT: '같은 전송 식별자가 다른 내용과 충돌했습니다.',
       AI_TEMPORARILY_UNAVAILABLE: '세연의 답변 생성이 잠시 지연되고 있습니다. 다시 시도해 주세요.',
-      AI_TURN_NOT_YET_AVAILABLE: '현재 세연의 AI 메시지 전송은 운영 준비 중입니다. 크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며, 입력한 내용은 보존했습니다.',
+      SECURE_CHAT_TEMPORARILY_UNAVAILABLE: '\uc138\uc5f0\uc758 \uc548\uc804\ud55c \uc751\ub2f5 \ucc98\ub9ac\uac00 \uc644\ub8cc\ub418\uc9c0 \uc54a\uc558\uc2b5\ub2c8\ub2e4. \uc785\ub825\ud55c \ub0b4\uc6a9\uc740 \ubcf4\uc874\ud588\uc2b5\ub2c8\ub2e4. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.',
+      CREDIT_AUTHORITY_UNAVAILABLE: '\uad00\ub9ac\uc790 \ub610\ub294 \ud06c\ub808\ub527 \uc0ac\uc6a9 \uad8c\ud55c\uc744 \ud655\uc778\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \uc785\ub825\ud55c \ub0b4\uc6a9\uc740 \ubcf4\uc874\ud588\uc2b5\ub2c8\ub2e4. \ub2e4\uc2dc \ub85c\uadf8\uc778\ud55c \ub4a4 \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694.',
       INVALID_RESPONSE: '대화 서버 응답을 확인할 수 없습니다.',
       TURN_SEND_FAILED: '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
       CREDIT_SHORTAGE: '크레딧 안내를 확인해 주세요. 입력한 내용은 그대로 남아 있습니다.',
@@ -560,6 +671,7 @@ async function sendTurn(message) {
       '메시지를 보내지 못했습니다. 입력한 내용은 그대로 남아 있습니다.',
     );
   } finally {
+    removePendingBubbles();
     sendingTurn = false;
     setComposerBusy(false);
   }

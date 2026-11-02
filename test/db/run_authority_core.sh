@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source test/db/staged_commerce_migration_policy.sh
+
 apply_migrations() {
   local db="$1"
   PGDATABASE="$db" psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
   for migration in supabase/migrations/*.sql; do
+    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
     echo "Applying ${migration} to ${db}"
     PGDATABASE="$db" psql -v ON_ERROR_STOP=1 -f "$migration" >/dev/null
   done
@@ -250,6 +253,7 @@ run_isolated_case myeongha_reader_first_thread_app_test bash test/db/official_re
 run_isolated_case myeongha_reader_grant_lock_race_preflight_test bash test/db/official_reader_grant_row_lock_race_preflight.sh
 run_isolated_case myeongha_reader_new_grant_insert_phantom_preflight_test bash test/db/official_reader_new_grant_insert_phantom_preflight.sh
 run_isolated_case myeongha_reader_provider_effect_revoke_race_preflight_test bash test/db/official_reader_provider_effect_revoke_race_preflight.sh
+run_isolated_case myeongha_portone_v2_exact_reader_effect_synthetic_test bash test/db/commerce_portone_v2_exact_reader_effect_synthetic_v1.sh
 run_isolated_case myeongha_reader_birth_scope_lock_candidate_preflight_test bash test/db/official_reader_birth_scope_lock_candidate_preflight.sh
 authority_profile_stage 'remaining-authority-and-catalog'
 bash test/db/entitlements_current_query.sh

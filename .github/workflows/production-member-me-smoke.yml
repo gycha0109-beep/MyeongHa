@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type VERIFY_MEMBER_ME to run the read-only production Member /api/me smoke.'
+        description: 'VERIFY_MEMBER_ME or VERIFY_SEYEON_G3_HISTORY_HOLD (existing owned Se-yeon history Thread, read-only).'
         required: true
         type: string
 
@@ -25,12 +25,16 @@ jobs:
       MYEONGHA_PRODUCTION_MEMBER_EMAIL: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EMAIL }}
       MYEONGHA_PRODUCTION_MEMBER_PASSWORD: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_PASSWORD }}
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: ${{ secrets.MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID }}
+      MYEONGHA_PRODUCTION_G3_HISTORY_THREAD_ID: ${{ secrets.MYEONGHA_PRODUCTION_G3_HISTORY_THREAD_ID }}
     steps:
       - name: Verify explicit dispatch and governed fresh-session credentials
         shell: bash
         run: |
           set -euo pipefail
-          [[ "$DISPATCH_CONFIRM" == 'VERIFY_MEMBER_ME' ]]
+          [[ "$DISPATCH_CONFIRM" == 'VERIFY_MEMBER_ME' || "$DISPATCH_CONFIRM" == 'VERIFY_SEYEON_G3_HISTORY_HOLD' ]]
+          if [[ "$DISPATCH_CONFIRM" == 'VERIFY_SEYEON_G3_HISTORY_HOLD' ]]; then
+            [[ "${MYEONGHA_PRODUCTION_G3_HISTORY_THREAD_ID:-}" =~ ^[0-9a-fA-F-]{36}$ ]]
+          fi
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EMAIL:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_PASSWORD:-}"
           test -n "${MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID:-}"
@@ -45,4 +49,9 @@ jobs:
           package-manager-cache: false
 
       - name: Verify production Member current-subject boundary
+        if: ${{ env.DISPATCH_CONFIRM == 'VERIFY_MEMBER_ME' }}
         run: node scripts/verify-production-member-me.mjs
+
+      - name: Verify authenticated Se-yeon historical Chat GET holds before replay
+        if: ${{ env.DISPATCH_CONFIRM == 'VERIFY_SEYEON_G3_HISTORY_HOLD' }}
+        run: node scripts/verify-production-seyeon-g3-history-http.mjs

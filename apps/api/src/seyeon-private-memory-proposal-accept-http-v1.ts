@@ -62,19 +62,28 @@ function unavailable(requestId: string): Response {
 async function readExactPrivateBody(request: Request): Promise<boolean> {
   if (!/^application\/json(?:\s*;|$)/iu.test(request.headers.get('content-type') ?? '')) return false;
   if (request.body === null) return false;
-  const reader = request.body.getReader();
+  // An already consumed or locked stream is invalid input, not an uncaught
+  // Worker error. No identity verifier or DB admission may run on this path.
+  let reader: ReadableStreamDefaultReader<Uint8Array>;
+  try {
+    reader = request.body.getReader();
+  } catch {
+    return false;
+  }
   const bytes: Uint8Array[] = [];
   let total = 0;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(() => reject(Error('Private proposal body read deadline')), 1500);
+  });
   try {
     while (true) {
-      const next = await reader.read();
+      if (request.signal.aborted) return false;
+      const next = await Promise.race([reader.read(), deadline]);
       if (next.done) break;
       if (!next.value) return false;
       total += next.value.byteLength;
-      if (total > MAX_BODY_BYTES) {
-        await reader.cancel();
-        return false;
-      }
+      if (total > MAX_BODY_BYTES) return false;
       bytes.push(next.value);
     }
     const joined = new Uint8Array(total);
@@ -94,7 +103,10 @@ async function readExactPrivateBody(request: Request): Promise<boolean> {
   } catch {
     return false;
   } finally {
-    reader.releaseLock();
+    if (timeout !== undefined) clearTimeout(timeout);
+    // A failed cancellation/release must not turn safe rejection into 500.
+    try { void reader.cancel().catch(() => undefined); } catch { /* best effort */ }
+    try { reader.releaseLock(); } catch { /* best effort */ }
   }
 }
 

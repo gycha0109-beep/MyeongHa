@@ -763,7 +763,7 @@ Roll-forward is preferred when data/schema state makes code rollback unsafe.
 
 ## 24. Backup / Restore
 
-Current evidence:
+Original architecture-design snapshot (2026-09-04; **superseded as operational state**, not a current readiness verdict):
 
 ```text
 Supabase project healthy
@@ -773,6 +773,10 @@ PITR = UNKNOWN
 restore procedure = UNVERIFIED
 restore drill = NOT EVIDENCED
 ```
+
+**Operational readback, 2026-10-28:** repository-controlled encrypted PostgreSQL backups and a PostgreSQL 17 isolated restoration with authoritative captured-window privacy reconciliation have been executed. [Restore #40655447574](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40655447574) succeeded from backup #40468157715, privacy ledger #40468500587 and read-only completion proof #40633679630. The original deletion parent #40468086758 remains FAILURE. Application roles/ACL, Auth ID links, replay idempotency, privacy non-resurrection and Commerce P5Y retention passed for that captured window only. Evidence artifact #12801666793 contains three sanitized JSON records.
+
+Read-only Production migration history at this date reaches `20261028011357`, later than backup `20261027043527`; the selected restored image is **not** verified as current-live-schema coverage. Hosted Auth login/session/token reconstruction and Storage file-byte restoration were **not** demonstrated (3 provider-managed COPY blocks projected, 27 skipped). Independent deletion/revocation coverage beyond ledger capture was not demonstrated. `provider_managed_data_full_restore=false`, `future_safe_privacy_reconciliation=false`, `dr_ready=false`. Do not allow recovered traffic on the basis of an isolated database-only PASS. Exact migration reconciliation remains tracked in [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887).
 
 Requirements:
 

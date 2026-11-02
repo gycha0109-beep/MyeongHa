@@ -34,6 +34,10 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/saju_official_records_http_e2e_pg17\.sh$/u,
+  /^scripts\/verify-saju-official-records-http-postgres-e2e\.mjs$/u,
+  /^test\/db\/seyeon_r2_helper_service_role_least_privilege\.sh$/u,
+  /^test\/db\/seyeon_r2_helper_owner_restricted_pg17\.sh$/u,
   /^supabase\/proposals\/20261024065948_saju_abuse_admission_runtime_authority\.sql$/u,
   /^scripts\/(?:verify-saju-abuse-admission-postgres|lib\/saju-admission-attack-e2e)\.mjs$/u,
   /^scripts\/verify-saju-abuse-production-policy-postgres\.mjs$/u,
@@ -41,6 +45,7 @@ const postgres17Patterns = [
   /^apps\/api\/src\/(?:postgres-saju-abuse-admission|saju-abuse-admission-http|current-subject-saju-(?:calculation|preview-reading)-http|production-current-subject-saju-(?:calculation|preview-reading)-runtime)\.ts$/u,
   /^scripts\/operations\/seyeon-security-s0\//u,
   /^test\/seyeon-security-s0-postgres\.e2e\.test\.ts$/u,
+  /^test\/seyeon-security-s0-history-presence\.e2e\.test\.ts$/u,
   /^test\/db\/seyeon_security_s0_real_path_pg17\.sh$/u,
   // R5/R9 exact-original-Grant tests require the named disposable PG17
   // authority-core harness. A source-only test edit must not silently skip

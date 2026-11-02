@@ -1,0 +1,62 @@
+name: '[WT:character-memory] C09 MiniMax M2-her approved remaining four once'
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/seyeon-c09-minimax-remaining-four-main-once-20261027.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: c09-minimax-m2-her-remaining-four-20261027-once
+  cancel-in-progress: false
+
+jobs:
+  remaining-four:
+    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && github.event_name == 'push' && github.run_attempt == 1 && contains(github.event.head_commit.message, 'C09_MINIMAX_M2_HER_REMAINING_FOUR_ONCE_20261027') }}
+    runs-on: ubuntu-24.04
+    environment: production
+    timeout-minutes: 25
+    steps:
+      - name: Checkout immutable owner-approved research code without modifying production
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: '824c97500f6c0ccdd8a5fc1cdf3e4e6722fbdfb2'
+          persist-credentials: false
+
+      - name: Prepare Node.js 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+
+      - name: Validate four original public questions offline without paid calls
+        run: |
+          set -euo pipefail
+          node --check scripts/seyeon-c09-minimax-m2-her-remaining-four-paid-once-20261027.mjs
+          node scripts/seyeon-c09-minimax-m2-her-remaining-four-paid-once-20261027.mjs --dry-run
+          echo 'Original Q1 deliberately omitted; 0 model requests in dry-run.'
+
+      - name: Invoke already-approved remaining four MiniMax questions at most once each
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          set -euo pipefail
+          set +x
+          if [ -z "$OPENROUTER_API_KEY" ]; then
+            echo '::error::OpenRouter key missing, no paid model requests.'
+            exit 2
+          fi
+          node scripts/seyeon-c09-minimax-m2-her-remaining-four-paid-once-20261027.mjs --execute --approved-minimax-remaining-four-20261027
+
+      - name: Preserve public-only outputs and per-question results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: c09-minimax-remaining-four-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            artifacts/seyeon-c09-minimax-m2-her-remaining-four-20261027-v1.json
+          if-no-files-found: warn
+          retention-days: 21

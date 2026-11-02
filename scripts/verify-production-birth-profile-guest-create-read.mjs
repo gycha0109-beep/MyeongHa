@@ -1,4 +1,4 @@
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const BOOTSTRAP_URL = `${PRODUCTION_ORIGIN}/api/session/bootstrap`;
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const BIRTH_PROFILES_URL = `${PRODUCTION_ORIGIN}/api/birth-profiles`;

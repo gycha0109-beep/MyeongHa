@@ -40,7 +40,7 @@ const requiredWorkflowFragments = [
   'RUNTIME_SMOKE_STATE_PATH: ${{ runner.temp }}/myeongha-data-api-containment-runtime-smoke.json',
   'run: node scripts/verify-production-data-api-containment-guest-runtime.mjs',
   'run: bash scripts/run-production-data-api-containment.sh',
-  'https://myeongha.vercel.app/api/health',
+  'https://myeongha.gycha0109.workers.dev/api/health',
   'Verify governed Guest canonical-subject path after transition',
   'CONTAINMENT_RUNTIME_SMOKE_MODE: verify',
   'Remove runtime smoke credential material',
@@ -136,7 +136,7 @@ for (const fragment of requiredRunnerFragments) {
 }
 
 const requiredRuntimeSmokeFragments = [
-  "const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';",
+  "const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';",
   'const BOOTSTRAP_URL = `${PRODUCTION_ORIGIN}/api/session/bootstrap`;',
   'const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;',
   "mode !== 'bootstrap' && mode !== 'verify'",

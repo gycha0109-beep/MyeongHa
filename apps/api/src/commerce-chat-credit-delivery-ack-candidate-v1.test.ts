@@ -27,7 +27,7 @@ describe('Chat credit delivered acknowledgement candidate',()=>{
     expect(await acknowledgeDeliveredChatCreditCandidateV1({...args,client:t.client}))
       .toEqual({kind:'settled',creditsCharged:10});
     expect(t.calls[0]?.args).toEqual([s,thread,turn,reservation,committed,message]);
-    expect(t.calls[0]?.sql).toContain('internal_cmd_chat_credit_ack_delivered_v1');
+    expect(t.calls[0]?.sql).toContain('internal_cmd_chat_credit_ack_delivered_proven_v2');
   });
   it('never admits a Guest acknowledgement',async()=>{
     const t=db('settled');

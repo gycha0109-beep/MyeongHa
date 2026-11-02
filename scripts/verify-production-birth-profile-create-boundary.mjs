@@ -1,4 +1,4 @@
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const BIRTH_PROFILE_URL = `${PRODUCTION_ORIGIN}/api/birth-profiles`;
 const DYNAMIC_PROFILE_ID = 'b6300000-0000-0000-0000-000000000001';
 const REQUEST_TIMEOUT_MS = 15_000;

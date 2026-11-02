@@ -12,22 +12,24 @@ describe('Records Production browser boundary', () => {
   const workflow = read('.github/workflows/production-records-current-subject-smoke.yml');
 
   it('never authorizes development Reading fixtures on deploy hosts', () => {
-    expect(page).toContain("new Set(['localhost', '127.0.0.1', '::1', '[::1]'])");
-    expect(page).toContain('DEVELOPMENT_SAMPLE_HOSTS.has(window.location.hostname.toLowerCase())');
-    expect(page).toContain('if (allowsDevelopmentSajuSamples())');
+    expect(page).not.toContain('allowsDevelopmentSajuSamples');
+    expect(page).not.toContain('renderSajuReadingSamples');
+    expect(page).not.toContain('sample_saju_reading_result');
     expect(page).toContain('renderSajuReadingEmpty(target);');
     expect(page).not.toContain('myeongha.vercel.app');
     expect(page).not.toContain('.vercel.app');
   });
 
   it('waits for the changed Records boundary before running the Production browser smoke', () => {
-    expect(waiter).toContain("const PRODUCTION_RECORDS_PAGE = 'https://myeongha.vercel.app/records.html';");
-    expect(waiter).toContain("const PRODUCTION_RECORDS_SCRIPT = 'https://myeongha.vercel.app/records-page.js';");
+    expect(waiter).toContain("const PRODUCTION_RECORDS_PAGE = 'https://myeongha.gycha0109.workers.dev/records.html';");
+    expect(waiter).toContain("const PRODUCTION_RECORDS_SCRIPT = 'https://myeongha.gycha0109.workers.dev/records-page.js';");
     expect(waiter).toContain("'id=\"records-react-root\"'");
     expect(waiter).toContain("'/assets/records-'");
-    expect(waiter).toContain("const DEVELOPMENT_SAMPLE_HOSTS = Object.freeze(new Set(['localhost', '127.0.0.1', '::1', '[::1]']));");
-    expect(waiter).toContain("'if (allowsDevelopmentSajuSamples())'");
+    expect(waiter).toContain("'function renderSajuReadings(readingPayload)'");
+    expect(waiter).toContain("'function markRecordsEntry()'");
     expect(waiter).toContain("'renderSajuReadingEmpty(target);'");
+    expect(waiter).toContain("'renderSajuReadingSamples'");
+    expect(waiter).toContain("FORBIDDEN_MARKERS.every((marker) => !source.includes(marker))");
     expect(waiter).toContain("headers: { 'Cache-Control': 'no-cache' }");
     expect(waiter).toContain('MAX_ATTEMPTS = 60');
     expect(waiter).not.toContain('MYEONGHA_PRODUCTION_MEMBER_PASSWORD');
@@ -47,13 +49,13 @@ describe('Records Production browser boundary', () => {
   });
 
   it('pins canonical Production login, Reading request, and empty-state visibility without credential logging', () => {
-    expect(browser).toContain("const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';");
+    expect(browser).toContain("const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';");
     expect(browser).toContain("const AUTH_URL = `${PRODUCTION_ORIGIN}/auth.html?next=records.html`;");
     expect(browser).toContain("const READINGS_URL = `${PRODUCTION_ORIGIN}/api/readings`;");
     expect(browser).toContain("requireCredential('MYEONGHA_PRODUCTION_MEMBER_EMAIL')");
     expect(browser).toContain("requireCredential('MYEONGHA_PRODUCTION_MEMBER_PASSWORD', { trim: false })");
     expect(browser).toContain("location.pathname === '/records.html'");
-    expect(browser).toContain("state.subjectKind === '회원 기록'");
+    expect(browser).toContain('state.profileStripRemoved');
     expect(browser).toContain('state.persistedCount === 0');
     expect(browser).toContain('state.sampleCount === 0');
     expect(browser).toContain('state.emptyCount === 1');

@@ -8,9 +8,17 @@
 > Reader: **구매 시 선택한 Character; 공식 Reading identity와 분리**  
 > Supersedes as current Product direction: `saju.general_natal.deep.v1` / KRW 9,900 historical inactive candidate
 
+## 2026-10-28 current product scope clarification
+
+**The twelve Saju topics are peer products in one Standard Reading layer.** This document defines the historical, already-specified relationship Product contract only; it is **not** authority to prioritize, launch, or architect relationship ahead of the other eleven Saju products. The earlier "first Standard Reading Product" wording and CURRENT_FIRST_STANDARD_PRODUCT marker below record the historical sequencing decision, not today's product hierarchy. The separate Saju eight-menu research roadmap is not a catalog reduction.
+
+KRW 8,900 is a **decided list-price decision, not a pending approval request**. Keep the scope of existing price records exact; do not automatically invent executable Offer/Charge Terms or other unconfirmed SKU prices. An inactive Product, Production issuer HOLD, and paid Grant HOLD remain operational gates, not reasons to dilute an engine-supported user's interpretation.
+
+Official interpretation and Reader presentation must explain what the engine actually derived in direct, detailed language, without repeating generic "insufficient evidence / cannot conclude" disclaimers. Any limitation that changes the conclusion is presented concretely at the relevant location. Do not invent conclusions outside the engine.
+
 ## 1. Decision
 
-The first Standard Reading Product is:
+This document specifies the historical relationship Standard Reading Product:
 
 ```text
 Product = standard.love_relationship

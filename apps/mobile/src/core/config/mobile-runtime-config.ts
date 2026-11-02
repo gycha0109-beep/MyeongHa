@@ -1,4 +1,4 @@
-export const MOBILE_PRODUCTION_API_ORIGIN_V1 = 'https://myeongha.vercel.app' as const;
+export const MOBILE_PRODUCTION_API_ORIGIN_V1 = 'https://myeongha.gycha0109.workers.dev' as const;
 
 export const MOBILE_EAS_PROJECT_ID_V1 =
   '5c20243c-60a8-44f3-9d8c-ca06ccc8bebe' as const;

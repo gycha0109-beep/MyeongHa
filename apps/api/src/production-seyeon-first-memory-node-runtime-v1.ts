@@ -11,6 +11,7 @@ import {
   type ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
 import type {SeyeonGovernedPostgresSubjectPoolV1} from './seyeon-governed-postgres-pool-v1.js';
+import type {SeyeonAiGovernorAdmissionV1} from './postgres-seyeon-ai-cost-ledger-v1.js';
 import { parseSeyeonGovernedDbConfigV1 } from './seyeon-governed-postgres-pool-v1.js';
 import {
   createSeyeonProductionChatGovernorsV1,
@@ -21,16 +22,24 @@ import {
   resolveProductionSeyeonRoleProviderConfigsV1,
 } from './production-seyeon-turn-send-runtime-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from './seyeon-first-positive-memory-node-http-ingress-v1.js';
+import { SEYEON_SECURITY_S0_PRODUCTION_V1 } from './seyeon-security-s0-production-policy-v1.js';
+import { admitSeyeonG4FirstMemoryCreditsV1 } from './seyeon-g4-first-memory-credit-admission-v1.js';
 import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
 
 export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
   readonly env: ProductionUserDataRuntimeEnvV1;
   readonly pool?: PostgresSubjectPoolV1;
+  /** G4 private Commerce pool is independent of the ordinary Member DB role. */
+  readonly privateCreditPool?: PostgresSubjectPoolV1;
   readonly governedCostPool?: SeyeonGovernedPostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Reviewed server policy only, never headers, JSON, env flags or model text. */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
   readonly governorApproval?: SeyeonProductionChatGovernorApprovalV1;
+  /** Server-approved certified GLM reservation policy. Never derived from client/env flag. */
+  readonly glmRendererGovernor?: SeyeonAiGovernorAdmissionV1;
+  /** Explicit server-approved first-turn zero-source path. */
+  readonly zeroSourceFirstReplyApproved?: true;
 }
 
 /**
@@ -58,6 +67,35 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
           input.governorApproval === undefined) {
         throw Error('First Memory runtime requires reviewed source and cost authority.');
       }
+      // A DB-verified Owner Admin is exempt from customer chat credits.
+      // The first-zero-source Owner-only service can be tested while the
+      // general paid receipt/settlement rail remains deliberately sealed.
+      // No caller flag, environment variable or claimed account role grants
+      // exemption: the existing RLS-bound Subject RPC decides it again.
+      if (input.zeroSourceFirstReplyApproved === true &&
+          !SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
+        const admission = await admitSeyeonG4FirstMemoryCreditsV1({
+          pool:lease.pool,verifiedEvidence:turn.verifiedEvidence,
+          threadId:turn.threadId,clientTurnId:turn.clientTurnId,
+        });
+        if (admission.kind !== 'owner_admin_exempt') {
+          throw Error('Owner-only first zero-source turn requires DB-verified credit exemption.');
+        }
+      } else {
+        // Non-exempt Members never reach a paid Provider without the approved
+        // Commerce reservation and receipt-settlement rail.
+        if (!SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted) {
+          throw Error('First Memory G4 credits and delivery settlement are not mounted.');
+        }
+        if (input.privateCreditPool === undefined) {
+          throw Error('First Memory G4 private credit authority is not configured.');
+        }
+        await admitSeyeonG4FirstMemoryCreditsV1({
+          pool:lease.pool,privateCreditPool:input.privateCreditPool,
+          verifiedEvidence:turn.verifiedEvidence,
+          threadId:turn.threadId,clientTurnId:turn.clientTurnId,
+        });
+      }
       // Readiness has already succeeded before this closure can access
       // provider credentials or create any metered model implementation.
       const base = {...await resolveProductionSeyeonProviderConfigAtRequestV1(input.env),
@@ -73,11 +111,20 @@ export function createProductionSeyeonFirstMemoryExecutionV1(
         ordinaryDatabasePrincipal: config.databasePrincipal,
         rootCertificatePem: config.databaseSslRootCertificatePem ?? '',
       }):undefined;
+      const glmKey = input.glmRendererGovernor === undefined ? null : input.env.OPENROUTER_API_KEY;
+      if (input.glmRendererGovernor !== undefined &&
+          (typeof glmKey !== 'string' || glmKey.trim().length < 20)) {
+        throw Error('Approved GLM renderer requires a server OpenRouter API key.');
+      }
       const runtime = createProductionSeyeonChatRuntimeV1({
         databaseConfig: config, pool: lease.pool,
-        requiredPersonalRecordCount:1,
+        requiredPersonalRecordCount:input.zeroSourceFirstReplyApproved===true?0:1,
         providerConfig: base, roleProviderConfigs: governors.roleProviderConfigs,
         governorMode: 'ENFORCE', costGovernorForRole: governors.costGovernorForRole,
+        ...(input.glmRendererGovernor === undefined ? {} : {
+          glmRendererGovernor: input.glmRendererGovernor,
+          glmRendererConfig: {apiKey: glmKey as string},
+        }),
         ...(governedDbConfig===undefined?{}:{governedDbConfig}),
         ...(input.governedCostPool===undefined?{}:{governedCostPool:input.governedCostPool}),
         approvedPersonalRecordModelUse: input.approvedPersonalRecordModelUse,

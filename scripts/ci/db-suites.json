@@ -39,7 +39,8 @@
       "commerce-payment-verification-context",
       "commerce-provider-payment-verification-context",
       "commerce-verified-payment-evidence-persistence",
-      "commerce-payment-adversarial-e2e"
+      "commerce-payment-adversarial-e2e",
+      "commerce-paid-credit-policy-v1"
     ]
   },
   "commerce-entitlement": {
@@ -59,11 +60,13 @@
     "postgres": 17,
     "cases": [
       "saju-abuse-admission-attack-e2e",
+      "saju-official-records-http-e2e",
       "guest-promotion-auth-fk",
       "birth-profile-create-runtime-authority",
       "content-release-lifecycle",
       "member-character-thread-open",
       "seyeon-r2-rpc-catalog",
+      "seyeon-r2-helper-service-role-least-privilege",
       "seyeon-r2-cross-env-catalog",
       "seyeon-r2-pending-migrations",
       "seyeon-r2-h-1670-forward",
@@ -81,7 +84,12 @@
       "seyeon-c08-first-turn-local-pg17",
       "seyeon-first-zero-locked-reveal-disposable-pg17",
       "seyeon-c08y-disposable-shared-ledger-pg17",
-      "seyeon-security-s0-real-path-pg17"
+      "seyeon-security-s0-real-path-pg17",
+      "commerce-private-claim-full-finalizer-pg17",
+      "commerce-stored-portone-hmac-lineage-pg17",
+      "commerce-portone-cancellation-set-audit-pg17",
+      "commerce-portone-cancellation-partial-set-pg17",
+      "commerce-exact-reader-withdrawal-hold-pg17"
     ]
   }
 }

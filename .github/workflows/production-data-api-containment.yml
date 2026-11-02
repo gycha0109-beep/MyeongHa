@@ -96,7 +96,7 @@ jobs:
             --connect-timeout 5 \
             --max-time 15 \
             -H 'Accept: application/json' \
-            'https://myeongha.vercel.app/api/health')"
+            'https://myeongha.gycha0109.workers.dev/api/health')"
 
           [[ "$http_status" == '200' ]]
           jq -e 'type == "object" and .status == "ok" and length == 1' "$response_file" >/dev/null

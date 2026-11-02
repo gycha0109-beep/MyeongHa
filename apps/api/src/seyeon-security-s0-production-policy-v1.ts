@@ -8,6 +8,10 @@ export const SEYEON_SECURITY_S0_PRODUCTION_V1=Object.freeze({
   contractVersion:'seyeon-positive-http-receipt-barrier-v1',
   receiptAndWithdrawalEnabled:true,
   modelUseEnabled:true,
+  zeroSourceFirstReplyApproved:true,
+  // Trusted server code permits the GLM spoken-reply cutover only when a
+  // server-side OpenRouter secret is installed. No browser or env flag enables it.
+  glmRendererApproved:true,
   // Existing credit entitlement is the only customer admission policy.
   // Paid turns cannot reach the provider until the actual production path
   // atomically reserves credits and settles only on a verified receipt.

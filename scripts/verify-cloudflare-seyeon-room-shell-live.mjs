@@ -88,5 +88,46 @@ check(paged.status===503&&paged.body.ok===false,
 const anon=await call('/api/chat/'+threadId+'?afterSequenceNo=0');
 check(anon.status!==200&&anon.body.ok===false,
   'ANONYMOUS_ROOM_OPEN');
+
+// The S0 read-only lifecycle authority is installed independently from the
+// model source and from Receipt. Discover only one owned current Memory through
+// the existing Member Records API; never log its identity or content.
+const memories=await call('/api/memories?pageSize=1',token);
+check(memories.status===200&&memories.body.ok===true,'MEMBER_MEMORIES_READ_FAILED');
+const ownerMemories=jsonRecord(memories.body.data).memories;
+check(Array.isArray(ownerMemories)&&ownerMemories.length===1,
+  'NO_OWNED_CURRENT_MEMORY_FOR_GRANT_CHECK');
+const ownedMemory=jsonRecord(ownerMemories[0]);
+// A current Memory is not necessarily the one approved for S0 model input.
+// Do not call an unrelated personal record a Se-yeon source verification.
+check(ownedMemory.memoryType==='conversation_recall'&&
+  ownedMemory.schemaVersion==='v1','S0_ORIGINAL_SOURCE_TYPE_MISMATCH');
+check(typeof ownedMemory.memoryItemId==='string'&&UUID.test(ownedMemory.memoryItemId),
+  'OWNER_MEMORY_ID_INVALID');
+const grantPath='/api/memories/'+ownedMemory.memoryItemId+'/grants/seyeon';
+const grant=await call(grantPath,token);
+check(grant.status===200&&grant.body.ok===true,'OWNER_GRANT_STATUS_NOT_AVAILABLE');
+const state=jsonRecord(grant.body.data);
+check(Object.keys(state).sort().join(',')===
+  ['memoryItemId','characterId','currentlyGranted','grantedAt','grantState'].sort().join(','),
+  'GRANT_STATUS_UNAPPROVED_FIELDS');
+check(state.memoryItemId===ownedMemory.memoryItemId&&state.characterId==='seyeon',
+  'OWNER_GRANT_STATUS_MISMATCH');
+check(['active','withdrawal_pending','not_granted'].includes(state.grantState),
+  'OWNER_GRANT_LIFECYCLE_UNVERIFIED');
+check(state.currentlyGranted===(state.grantState==='active'),
+  'OWNER_GRANT_CURRENT_USE_MISMATCH');
+check(state.grantState==='active'
+  ? typeof state.grantedAt==='string'&&Number.isFinite(Date.parse(state.grantedAt))
+  : state.grantedAt===null,
+  'OWNER_GRANT_TIMESTAMP_MISMATCH');
+check(!JSON.stringify(grant.body).includes(token),'OWNER_GRANT_REFLECTED_TOKEN');
+const anonymousGrant=await call(grantPath);
+check(anonymousGrant.status===401&&anonymousGrant.body.ok===false&&
+  anonymousGrant.body.error?.code==='AUTH_REQUIRED',
+  'ANONYMOUS_GRANT_STATUS_NOT_DENIED');
+
 console.log('SEYEON_OWNER_ROOM_SHELL_E2E_PASS; historyWithheld='+
-  String(room.historyWithheld)+'; historyPageHeld=true; anonymousDenied=true; modelNotCalled=true');
+  String(room.historyWithheld)+
+  '; historyPageHeld=true; anonymousDenied=true; modelNotCalled=true'+
+  '; ownerGrantLifecycleVerified=true; anonymousGrantDenied=true; sourceContentLogged=false');

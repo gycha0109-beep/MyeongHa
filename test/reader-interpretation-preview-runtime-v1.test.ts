@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
   SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
@@ -23,9 +24,9 @@ import type {
 const SUBJECT_ID = 'subject-reader-runtime-1';
 const READING_ID = 'official-reading-1';
 const SOURCE_HASH = 'a'.repeat(64);
-const OFFICIAL_ARTIFACT_HASH = 'sha256:test-official-reading-artifact';
 const ENGINE_VERSION = 'saju-preview-engine-v1';
 const RESPONSE_VERSION = 'myeonghwa-product-reading-response-v2';
+const OFFICIAL_ARTIFACT_HASH = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(officialResponseSnapshot());
 
 function unitId(hex: string): string {
   return `grounding_unit_${hex.repeat(24)}`;
@@ -261,13 +262,17 @@ function officialResponseSnapshot(
   readingContractVersion = RESPONSE_VERSION,
 ): Record<string, unknown> {
   return {
+    responseId: 'reading_response_aaaaaaaaaaaaaaaaaaaaaaaa',
     responseVersion: readingContractVersion,
     state: productResponseState,
+    messageCode: 'READING_DELIVERED',
+    requiredAction: 'none',
     reading: {
       readingId: READING_ID,
       sections: [
         {
           sectionType: 'overview',
+          state: 'complete',
           title: '전체',
           blocks: [{ type: 'paragraph', text: '공식 Reading 원문입니다.' }],
         },
@@ -525,12 +530,12 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     const result = await run(readers.baekheon, {
       ports: authorityPorts({
         activeReaders: ['baekheon'],
-        responseHash: 'sha256:opaque-db-artifact-hash-contract',
+        responseHash: OFFICIAL_ARTIFACT_HASH,
       }),
     });
 
     expect(result.officialArtifactResponseHash).toBe(
-      'sha256:opaque-db-artifact-hash-contract',
+      OFFICIAL_ARTIFACT_HASH,
     );
     expect(result.sourceResponseHash).toBe(SOURCE_HASH);
     expect(result.officialArtifactResponseHash).not.toBe(result.sourceResponseHash);
@@ -545,7 +550,7 @@ describe('Reader Interpretation Preview Runtime v1', () => {
           productResponseState: 'partial_evidence',
         }),
       }),
-    ).rejects.toMatchObject({ code: 'SOURCE_MISMATCH' });
+    ).rejects.toMatchObject({ code: 'AUTHORITY_CONFLICT' });
   });
 
   it('rejects grounding built for a different Product Reading response contract version', async () => {

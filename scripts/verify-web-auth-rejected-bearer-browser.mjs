@@ -131,22 +131,20 @@ async function serve() {
       }
 
       if (pathname === '/api/readings' && req.method === 'GET') {
-        requests.push({ scenario, path: pathname, authorization });
-        if (!kind) {
+        const rejectedGuest = scenario === 'records-guest-401' && kind === 'guest';
+        requests.push({ scenario, path: pathname, authorization, rejectedGuest });
+        // The Records page reads /api/readings before /api/life-record.
+        // Keep the main-branch Guest rejection and test Member 401/403
+        // against the first actual Records read, not an unreached endpoint.
+        if (!kind || rejectedGuest || (scenario === 'records-life-401' && kind === 'member')) {
           sendJson(res, 401, errorEnvelope());
+          return;
+        }
+        if (scenario === 'records-life-403' && kind === 'member') {
+          sendJson(res, 403, errorEnvelope('FORBIDDEN'));
           return;
         }
         sendJson(res, 200, envelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
-        return;
-      }
-
-      if (pathname === '/api/memories' && req.method === 'GET') {
-        requests.push({ scenario, path: pathname, authorization });
-        if (!kind || (scenario === 'records-guest-401' && kind === 'guest')) {
-          sendJson(res, 401, errorEnvelope());
-          return;
-        }
-        sendJson(res, 200, envelope({ memories: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));
         return;
       }
 
@@ -251,8 +249,8 @@ async function waitFor(client, expression, message) {
   }
   const diagnostics = await client.evaluate(`(() => ({
     pathname: location.pathname,
-    myStatus: document.querySelector('#my-status')?.textContent?.trim() ?? null,
-    myBirthStatus: document.querySelector('#my-birth-status')?.textContent?.trim() ?? null,
+    myStatus: document.querySelector('.my-account-meta')?.textContent?.trim() ?? null,
+    myBirthStatus: document.querySelector('.my-detail-panel')?.textContent?.trim() ?? null,
     recordsStatus: document.querySelector('#records-status')?.textContent?.trim() ?? null,
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
@@ -317,28 +315,31 @@ try {
 
   scenario = 'my-birth-401';
   await seedMember(client);
-  await navigate(client, origin, '/my.html?case=birth401', '#my-status');
+  await navigate(client, origin, '/my.html?case=birth401', '.my-account-card');
   await waitFor(
     client,
-    `document.querySelector('#my-status')?.textContent?.includes('더 이상 유효하지 않아') === true && document.querySelector('#my-content')?.hidden === true && document.querySelector('#my-display-name')?.textContent === '' && localStorage.getItem(${JSON.stringify(memberKey)}) === null`,
+    `document.querySelector('.my-account-meta')?.textContent?.includes('더 이상 유효하지 않아') === true && !document.querySelector('.my-logout-action') && !document.querySelector('.my-account-meta')?.textContent?.includes('browser-member@example.com') && localStorage.getItem(${JSON.stringify(memberKey)}) === null`,
     'My Birth authoritative 401 did not invalidate the rejected Member and fail-close owner state',
   );
 
   scenario = 'my-birth-403';
   await seedMember(client);
-  await navigate(client, origin, '/my.html?case=birth403', '#my-status');
+  await navigate(client, origin, '/my.html?case=birth403', '.my-account-card');
+  await waitFor(client, `Boolean(document.querySelector('.my-logout-action'))`,
+    'My Member account did not resolve before birth 403 detail inspection');
+  await client.evaluate(`document.querySelector('.my-settings-grid .my-choice-card')?.click()`);
   await waitFor(
     client,
-    `document.querySelector('#my-birth-status')?.textContent?.includes('현재 세션 권한으로') === true && document.querySelector('#my-content')?.hidden === false && localStorage.getItem(${JSON.stringify(memberKey)}) !== null && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === ${JSON.stringify(memberToken)}`,
+    `document.querySelector('.my-detail-panel')?.textContent?.includes('현재 세션 권한으로') === true && Boolean(document.querySelector('.my-logout-action')) && localStorage.getItem(${JSON.stringify(memberKey)}) !== null && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === ${JSON.stringify(memberToken)}`,
     'My Birth 403 did not preserve the authorized Member profile and credential',
   );
 
   scenario = 'my-guest-profile-401';
   await seedGuest(client);
-  await navigate(client, origin, '/my.html?case=guest401', '#my-status');
+  await navigate(client, origin, '/my.html?case=guest401', '.my-account-card');
   await waitFor(
     client,
-    `document.querySelector('#my-status')?.textContent?.includes('현재 세션이 필요') === true && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === null`,
+    `document.querySelector('.my-account-meta')?.textContent?.includes('현재 세션이 필요') === true && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === null`,
     'My profile authoritative 401 did not invalidate the rejected Guest',
   );
 
@@ -367,6 +368,11 @@ try {
     client,
     `document.querySelector('#records-status')?.textContent?.includes('현재 세션이 필요') === true && sessionStorage.getItem(${JSON.stringify(activeBearerKey)}) === null`,
     'Records ledger authoritative 401 did not invalidate the rejected Guest',
+  );
+  assert(
+    requests.some((request) => request.scenario === 'records-guest-401'
+      && request.path === '/api/readings' && request.rejectedGuest === true),
+    'Records Guest 401 scenario did not reach the active /api/readings ledger',
   );
 
   await mkdir(join(process.cwd(), 'artifacts'), { recursive: true });

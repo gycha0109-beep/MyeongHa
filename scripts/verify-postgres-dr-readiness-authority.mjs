@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { readdir, readFile } from 'node:fs/promises';
+import { validateDrCurrentEvidence } from './validate-postgres-dr-current-evidence.mjs';
 
 const paths = {
   operations: 'docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md',
@@ -34,36 +35,14 @@ if (migrationNumbers.length === 0) {
   throw new Error('No numbered SQL migrations found under supabase/migrations');
 }
 const repositoryMigrationFrontier = Math.max(...migrationNumbers);
-const productionMigrationMatch = files.readinessStatus.match(
-  /^production_schema_latest_deployed_migration:\s*(\d+)\s*$/m,
+// The September 1310 snapshot is deliberately historical and must never be
+// used as current Production authority. A dated October observation is a
+// bounded snapshot, not a live Supabase query or a serving promotion.
+const currentEvidence = validateDrCurrentEvidence(
+  files.readinessStatus,
+  repositoryMigrationFrontier,
+  process.env.GITHUB_EVENT_NAME ?? 'local',
 );
-if (!productionMigrationMatch) {
-  throw new Error(
-    `${paths.readinessStatus} is missing production_schema_latest_deployed_migration authority`,
-  );
-}
-const productionMigrationFrontier = Number(productionMigrationMatch[1]);
-if (!Number.isSafeInteger(productionMigrationFrontier)) {
-  throw new Error('Production migration frontier is not a safe integer');
-}
-if (repositoryMigrationFrontier < productionMigrationFrontier) {
-  throw new Error(
-    `Repository migration frontier ${repositoryMigrationFrontier} is behind deployed production migration ${productionMigrationFrontier}.`,
-  );
-}
-if (repositoryMigrationFrontier > productionMigrationFrontier) {
-  const eventName = process.env.GITHUB_EVENT_NAME ?? 'local';
-  if (eventName !== 'pull_request') {
-    throw new Error(
-      `PostgreSQL DR evidence covers deployed migration ${productionMigrationFrontier}, but repository migration frontier is ${repositoryMigrationFrontier}. ` +
-      'After merge/deployment, capture and restore a new governed production backup before claiming current-production-schema recovery.',
-    );
-  }
-  console.log(
-    `PostgreSQL DR pre-deploy guard: PR candidate migration frontier ${repositoryMigrationFrontier} is ahead of deployed production ${productionMigrationFrontier}; ` +
-    'existing backup/restore evidence remains authoritative only for the deployed production frontier and does not cover the candidate schema.',
-  );
-}
 
 function requireFragment(key, fragment) {
   if (!files[key].includes(fragment)) {
@@ -119,7 +98,9 @@ requireFragment('restoreHarness', 'dr_ready: false');
 requireFragment('restoreEnvelope', 'backupManifest.migration_frontier');
 requireFragment('restoreEnvelope', "public.member_auth_rate_limit_buckets");
 requireFragment('restoreEnvelope', "member_auth_rate_limit_synthetic_admission: 'pass'");
-requireFragment('restoreRunbook', 'Production state: CURRENT-FRONTIER BACKUP+RESTORE PROVEN / DR NOT READY');
+requireFragment('restoreRunbook', 'Production state: OBSERVED-MIGRATION-VERSION-MATCHED PG17 RESTORE PROVEN / HOSTED AND DR NOT READY');
+requireFragment('restoreRunbook', '#40799522511');
+requireFragment('restoreRunbook', '#40817391430');
 requireFragment('restoreRunbook', 'backup schema freshness             = CURRENT — backup frontier 1310 / deployed frontier 1310');
 requireFragment('restoreRunbook', 'current-schema restore              = EVIDENCED — run 36295215761 / frontier 1310');
 requireFragment('restoreRunbook', 'bounded privacy source authority    = RUNTIME-PROVEN — run 35653303484 / AUTHORITATIVE_CAPTURED_WINDOW_V1');
@@ -158,6 +139,20 @@ for (const staleFragment of [
 }
 
 const requiredStatusFragments = [
+  'verified_isolated_restore_run_id: 40817391430',
+  'verified_isolated_restore_result: SUCCESS',
+  'verified_isolated_restore_backup_run_id: 40812111605',
+  'verified_isolated_restore_backup_migration: 20261029012948',
+  'verified_isolated_restore_artifact_id: 12872589146',
+  'verified_isolated_restore_artifact_sha256: 38dc5b4024cdb45d7e69ef5793bd89010b67089602217bdb4413082a390b79fb',
+  'verified_provider_rows_skipped_in_loopback: 112',
+  'verified_provider_rows_projected_in_loopback: 53',
+  'verified_provider_rows_replayed_in_loopback: 54',
+  'verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger',
+  'verified_isolated_restore_synthetic_privacy: PASS',
+  'verified_isolated_restore_serving_gate: BLOCKED',
+  'verified_restore_matches_observed_migration_version: true',
+  'verified_full_schema_catalog_equivalence: false',
   'latest_governed_backup_run_id: 36294430134',
   'latest_governed_backup_source_sha: 1d67dda2c17d35b7bf089d733981bd2425a0a0c5',
   'latest_governed_backup_artifact_id: 10923756192',
@@ -231,11 +226,15 @@ for (const staleRuntimeFragment of [
   }
 }
 
-const candidateFrontierNote =
-  repositoryMigrationFrontier > productionMigrationFrontier
-    ? ` Repository candidate migration ${repositoryMigrationFrontier} is pending deployment and is not covered by that recovery evidence.`
-    : '';
-
 console.log(
-  `PostgreSQL DR readiness authority guard PASS: production is deployed through migration ${productionMigrationFrontier}; Production non-zero bounded-window reconciliation and full authoritative RPO/RTO comparisons are proven, while provider-managed full-restore equivalence and future-safe recovery remain open so dr_ready=false.${candidateFrontierNote}`,
+  `PostgreSQL DR authority guard PASS (serving BLOCKED): latest isolated restore ${currentEvidence.restoreRunId} ` +
+  `passed from backup ${currentEvidence.backupRunId} at migration ${currentEvidence.restoredBackupMigration}; ` +
+  `this matches the observed Production migration VERSION ${currentEvidence.observedLiveMigrationVersion}, ` +
+  `not full schema/ACL or Hosted Auth/Storage equivalence. Current restore exercised synthetic privacy only; ` +
+  `the older real captured-window replay remains a separate historical proof. ` +
+  `Repository frontier ${currentEvidence.repositoryMigrationFrontier}; independent future privacy ` +
+  `continuity and serving S8 HOLD; dr_ready=false.` +
+  (currentEvidence.repositoryCandidateBeyondObservation
+    ? ' PR-only candidate migration advance is unverified by current-production recovery evidence.'
+    : ''),
 );

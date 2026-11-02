@@ -97,7 +97,6 @@ describe('Reading hub/detail fail-closed regression', () => {
 
   it('keeps every current hub product route explicit', () => {
     for (const href of [
-      'reading-detail.html?topic=temperament&scope=original',
       'reading-detail.html?topic=career',
       'reading-detail.html?topic=money',
       'reading-detail.html?topic=love',
@@ -112,6 +111,8 @@ describe('Reading hub/detail fail-closed regression', () => {
     ]) {
       expect(hub).toContain(href);
     }
+    expect(hub).not.toContain('전체 사주');
+    expect(hub).not.toContain('reading-detail.html?topic=temperament&scope=original');
   });
 
   it('keeps the result stage hidden until an admitted Preview Reading is delivered', () => {

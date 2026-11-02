@@ -72,6 +72,77 @@ assert.throws(
   /not an authoritative post-backup source/u,
 );
 
+// Reject any attempt to stretch a captured-window claim beyond the actual
+// database extraction cutoff, even if the incident itself fits the forged field.
+for (const [patch, pattern] of [
+  [
+    { authoritativeCoverageThrough: '2026-09-18T11:23:19.000Z' },
+    /authoritative coverage must exactly equal capturedAt/u,
+  ],
+  [
+    { capturedAt: '2026-09-18T10:23:18.000Z' },
+    /authoritative coverage must exactly equal capturedAt/u,
+  ],
+  [
+    { capturedAt: 'not-a-date' },
+    /capturedAt must be ISO-8601/u,
+  ],
+  [
+    { futureSafePrivacyReconciliation: true },
+    /source summary attempts to promote/u,
+  ],
+  [
+    { drReady: true },
+    /source summary attempts to promote/u,
+  ],
+  [
+    { authoritativePrivacyReconciliation: true },
+    /source summary attempts to promote/u,
+  ],
+  [
+    { replayPlannerAccepted: false },
+    /source summary lacks accepted replay planner/u,
+  ],
+  [
+    { backupRunId: 0 },
+    /backupRunId must be a positive integer/u,
+  ],
+  [
+    { sourceDigest: 'sha256:not-a-digest' },
+    /source digest is not a canonical SHA-256 digest/u,
+  ],
+  [
+    { eventCount: 2 },
+    /event type counts do not match eventCount/u,
+  ],
+  [
+    { eventTypeCounts: { ACCOUNT_DELETION_STARTED: -1 } },
+    /event type counts do not match eventCount/u,
+  ],
+]) {
+  assert.throws(
+    () => validatePrivacyRecoveryLedgerCoverage(
+      { ...summary, ...patch },
+      '2026-09-18T10:23:19.000Z',
+    ),
+    pattern,
+  );
+}
+
+// A zero-event captured window is valid when the source and its counts agree.
+const zeroEvent = {
+  ...summary,
+  eventCount: 0,
+  eventTypeCounts: { ACCOUNT_DELETION_STARTED: 0 },
+};
+assert.equal(
+  validatePrivacyRecoveryLedgerCoverage(
+    zeroEvent,
+    '2026-09-18T10:23:19.000Z',
+  ).coverageStatus,
+  'covered',
+);
+
 const reportText = JSON.stringify(covered);
 for (const forbidden of ['subjectId', 'authUserId', 'deletionJobId', 'outboxEventId']) {
   assert.equal(reportText.includes(forbidden), false);

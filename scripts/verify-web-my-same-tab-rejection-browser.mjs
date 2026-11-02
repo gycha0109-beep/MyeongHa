@@ -200,31 +200,27 @@ try {
 
   await waitFor(
     client,
-    `document.querySelector('#my-content')?.hidden === false && document.querySelector('#my-display-name')?.textContent?.trim() === ${JSON.stringify(rejectedDisplayName)} && document.querySelector('#my-account-email')?.textContent?.trim() === ${JSON.stringify(rejectedEmail)}`,
+    `document.querySelector('.my-account-meta')?.textContent.includes(${JSON.stringify(rejectedEmail)})`,
     'rejected Member profile did not render before the delayed Birth rejection',
   );
 
   await waitFor(
     client,
-    `localStorage.getItem('myeongha.memberSession.v1') === null && document.querySelector('#my-content')?.hidden === true`,
+    `localStorage.getItem('myeongha.memberSession.v1') === null && document.querySelector('.my-account-meta')?.textContent.includes('더 이상 유효하지 않아')`,
     'rejected Member did not invalidate and fail-close My in the same tab',
   );
 
   const finalState = await client.evaluate(`(() => ({
     member: localStorage.getItem('myeongha.memberSession.v1'),
     guest: sessionStorage.getItem('myeongha.guestBearer.v1'),
-    contentHidden: document.querySelector('#my-content')?.hidden,
-    birthHidden: document.querySelector('#my-birth-content')?.hidden,
-    displayName: document.querySelector('#my-display-name')?.textContent ?? null,
-    email: document.querySelector('#my-account-email')?.textContent ?? null,
-    note: document.querySelector('#my-account-note')?.textContent ?? null,
+    accountText: document.querySelector('.my-account-meta')?.textContent ?? '',
+    birthDetails: document.querySelector('.my-settings-section .my-account-facts')?.textContent ?? '',
     bodyText: document.body.textContent ?? '',
-    status: document.querySelector('#my-status')?.textContent ?? '',
+    status: document.querySelector('.my-account-meta')?.textContent ?? '',
   }))()`);
   assert(finalState.member === null, 'rejected Member credential remained canonical');
   assert(finalState.guest === guestBearer, 'unrejected Guest credential was removed');
-  assert(finalState.contentHidden === true && finalState.birthHidden === true, 'My owner state did not fail-close');
-  assert(finalState.displayName === '' && finalState.email === '' && finalState.note === '', 'stale Member profile values remained in the DOM');
+  assert(!finalState.accountText.includes(rejectedEmail) && finalState.birthDetails === '', 'My owner state did not fail-close');
   assert(!finalState.bodyText.includes(rejectedDisplayName) && !finalState.bodyText.includes(rejectedEmail), 'rejected Member private profile remained in document text');
   assert(finalState.status.includes('더 이상 유효하지 않아'), 'My rejected-session fail-closed status was not rendered');
 

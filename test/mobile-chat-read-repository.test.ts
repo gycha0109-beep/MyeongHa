@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MyeongHaApiClientErrorV1 } from '../packages/api-client/src/http.js';
 
 import {
   MobileChatReadRepositoryErrorV1,
@@ -70,6 +71,141 @@ describe('mobile Chat read repository', () => {
     expect(final.hasMore).toBe(false);
   });
 
+  it('discards earlier transcript and Relationship metadata if later pagination returns G3 HOLD', async () => {
+    const calls: number[] = [];
+    const privateCanary = 'FORMER_SEYEON_DERIVED_PRIVATE_CONTENT';
+    const service: MobileChatReadServiceV1 = {
+      async readThreadPage(_threadId, options = {}) {
+        const after = options.afterSequenceNo ?? 0;
+        calls.push(after);
+        if (after !== 0) {
+          throw new MyeongHaApiClientErrorV1(
+            'http', 'SEYEON_HISTORY_REVEAL_HOLD',
+            'Authoritative history rights unavailable.', 503, false,
+          );
+        }
+        return {
+          ...threadPage(0, [{ ...msg(1), bodyText: privateCanary }, msg(2)], true),
+          relationship: {
+            stateId: 'state-private',
+            characterId: 'baekheon',
+            closeness: 12,
+            trust: 13,
+            friction: 0,
+            relationshipStage: 'private-stage',
+            policyVersion: 'v1',
+            revision: 1,
+            lastInteractionAt: null,
+            updatedAt: '2026-10-29T00:00:00.000Z',
+          },
+        };
+      },
+    };
+    const repository = createMobileChatReadRepositoryV1({ threadId, service, pageSize: 2 });
+    const first = await repository.loadInitial();
+    expect(first.messages[0]?.bodyText).toBe(privateCanary);
+    expect(first.relationship?.stateId).toBe('state-private');
+    await expect(repository.loadMore()).rejects.toMatchObject({
+      code: 'SEYEON_HISTORY_REVEAL_HOLD',
+    });
+    const held = repository.getSnapshot();
+    expect(held).toMatchObject({
+      status: 'error',
+      errorCode: 'SEYEON_HISTORY_REVEAL_HOLD',
+      threadId,
+      characterId: null,
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+      contentReleaseId: null,
+      contentBundleId: null,
+      contentRevision: null,
+      messages: [],
+    });
+    expect(JSON.stringify(held)).not.toContain(privateCanary);
+    expect(JSON.stringify(held)).not.toContain('state-private');
+    const after = await repository.loadMore();
+    expect(after).toBe(held);
+    expect(calls).toEqual([0, 2]);
+  });
+
+  it.each([
+    ['AUTH_REQUIRED', 401],
+    ['FORBIDDEN', 403],
+    ['NOT_FOUND', 404],
+  ] as const)('discards cached owner data on subsequent %s (%i) denial', async (code, status) => {
+    const privateCanary = 'PREVIOUS_OWNER_PRIVATE_CHAT';
+    let calls = 0;
+    const service: MobileChatReadServiceV1 = {
+      async readThreadPage(_threadId, options = {}) {
+        calls++;
+        if ((options.afterSequenceNo ?? 0) !== 0) {
+          throw new MyeongHaApiClientErrorV1(
+            'http', code, 'Current authorization denied.', status, false,
+          );
+        }
+        return {
+          ...threadPage(0, [{ ...msg(1), bodyText: privateCanary }, msg(2)], true),
+          relationship: {
+            stateId: 'prior-owner-relationship',
+            characterId: 'baekheon',
+            closeness: 1,
+            trust: 1,
+            friction: 0,
+            relationshipStage: 'private',
+            policyVersion: 'v1',
+            revision: 1,
+            lastInteractionAt: null,
+            updatedAt: '2026-10-30T00:00:00.000Z',
+          },
+        };
+      },
+    };
+    const repository = createMobileChatReadRepositoryV1({ threadId, service, pageSize: 2 });
+    await repository.loadInitial();
+    await expect(repository.loadMore()).rejects.toMatchObject({ code });
+    expect(repository.getSnapshot()).toMatchObject({
+      status: 'error',
+      errorCode: code,
+      messages: [],
+      characterId: null,
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+      contentReleaseId: null,
+      contentBundleId: null,
+      contentRevision: null,
+    });
+    expect(JSON.stringify(repository.getSnapshot())).not.toContain(privateCanary);
+    expect(JSON.stringify(repository.getSnapshot())).not.toContain('prior-owner-relationship');
+    await repository.loadMore();
+    expect(calls).toBe(2);
+  });
+
+  it('keeps previously verified pages for ordinary transient continuation errors', async () => {
+    const service: MobileChatReadServiceV1 = {
+      async readThreadPage(_threadId, options = {}) {
+        const after = options.afterSequenceNo ?? 0;
+        if (after !== 0) {
+          throw new MyeongHaApiClientErrorV1(
+            'network', 'API_NETWORK_ERROR', 'Temporary transport loss.',
+          );
+        }
+        return threadPage(0, [msg(1), msg(2)], true);
+      },
+    };
+    const repository = createMobileChatReadRepositoryV1({ threadId, service, pageSize: 2 });
+    await repository.loadInitial();
+    await expect(repository.loadMore()).rejects.toMatchObject({
+      code: 'API_NETWORK_ERROR',
+    });
+    const transient = repository.getSnapshot();
+    expect(transient.status).toBe('error');
+    expect(transient.errorCode).toBe('API_NETWORK_ERROR');
+    expect(transient.messages.map(message => message.sequenceNo)).toEqual([1, 2]);
+    expect(transient.hasMore).toBe(true);
+  });
+
   it('fails closed if a later page repeats a message identity', async () => {
     const service: MobileChatReadServiceV1 = {
       async readThreadPage(_threadId, options = {}) {
@@ -91,6 +227,11 @@ describe('mobile Chat read repository', () => {
     expect(repository.getSnapshot()).toMatchObject({
       status: 'error',
       errorCode: 'CHAT_PAGINATION_PROTOCOL_ERROR',
+      characterId: null,
+      messages: [],
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
     });
   });
 
@@ -108,6 +249,16 @@ describe('mobile Chat read repository', () => {
     await repository.loadInitial();
     await expect(repository.loadMore()).rejects.toMatchObject({
       code: 'CHAT_THREAD_BINDING_CHANGED',
+    });
+    expect(repository.getSnapshot()).toMatchObject({
+      status: 'error',
+      errorCode: 'CHAT_THREAD_BINDING_CHANGED',
+      characterId: null,
+      messages: [],
+      relationship: null,
+      hasMore: false,
+      nextAfterSequenceNo: null,
+      contentReleaseId: null,
     });
   });
 

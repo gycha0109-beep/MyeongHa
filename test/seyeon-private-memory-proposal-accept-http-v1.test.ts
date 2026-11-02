@@ -51,6 +51,61 @@ describe('private proposal acceptance remains OFF at the HTTP boundary', () => {
     }
   });
 
+  it('rejects a locked proposal body without touching auth or the database', async () => {
+    const request = makeRequest({ grantChoice: { mode: 'private' } });
+    const lock = request.body!.getReader();
+    const verifier = { verifyRequestIdentity: vi.fn(async () => member) };
+    try {
+      const response = await handleSeyeonPrivateMemoryProposalAcceptRequestV1({
+        request, ...metadata, identityEvidenceVerifier: verifier, pool,
+      });
+      expect(response.status).toBe(400);
+      expect(response.headers.get('Cache-Control')).toBe('no-store');
+      expect((await response.json()).error.code).toBe('INVALID_REQUEST');
+      expect(verifier.verifyRequestIdentity).not.toHaveBeenCalled();
+      expect(pool.connect).not.toHaveBeenCalled();
+    } finally { lock.releaseLock(); }
+  });
+
+  it('keeps malformed body rejection even when stream cleanup throws', async () => {
+    const request = makeRequest({ grantChoice: { mode: 'public' } });
+    const original = request.body!.getReader.bind(request.body);
+    Object.defineProperty(request.body!, 'getReader', {
+      value: () => {
+        const reader = original();
+        Object.defineProperty(reader, 'releaseLock', {
+          value: () => { throw Error('test cleanup failure'); },
+        });
+        return reader;
+      },
+    });
+    const response = await handleSeyeonPrivateMemoryProposalAcceptRequestV1({
+      request, ...metadata, identityEvidenceVerifier, pool,
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_REQUEST');
+    expect(pool.connect).not.toHaveBeenCalled();
+  });
+
+  it('rejects a never-ending proposal body without invoking admission', async () => {
+    const request = new Request(ROUTE, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: new ReadableStream<Uint8Array>({
+        start(controller) { controller.enqueue(new TextEncoder().encode('{"grantChoice":')); },
+        cancel() {},
+      }),
+      duplex: 'half',
+    } as RequestInit);
+    const verifier = { verifyRequestIdentity: vi.fn(async () => member) };
+    const response = await handleSeyeonPrivateMemoryProposalAcceptRequestV1({
+      request, ...metadata, identityEvidenceVerifier: verifier, pool,
+    });
+    expect(response.status).toBe(400);
+    expect((await response.json()).error.code).toBe('INVALID_REQUEST');
+    expect(verifier.verifyRequestIdentity).not.toHaveBeenCalled();
+    expect(pool.connect).not.toHaveBeenCalled();
+  }, 4000);
+
   it('requires a Member and denies Guests before the DB admission', async () => {
     for (const identity of [null, { kind: 'guest' as const, verifiedGuestTokenHash: 'token' }]) {
       const response = await handleSeyeonPrivateMemoryProposalAcceptRequestV1({

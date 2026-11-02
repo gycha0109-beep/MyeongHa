@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { fileURLToPath } from 'node:url';
 
 import { MOBILE_PRODUCTION_API_ORIGIN_V1 } from '../apps/mobile/src/core/config/mobile-runtime-config.js';
 import {
@@ -11,7 +12,7 @@ import {
 describe('mobile release readiness preflight', () => {
   it('accepts the approved production platform identifiers in the current repository', async () => {
     const report = await readMobileReleaseReadinessV1(
-      new URL('..', import.meta.url).pathname,
+      fileURLToPath(new URL('..', import.meta.url)),
       {},
     );
 
@@ -56,7 +57,7 @@ describe('mobile release readiness preflight', () => {
     expect(resolveMobileReleaseApiOriginV1(undefined)).toBe(
       MOBILE_PRODUCTION_API_ORIGIN_V1,
     );
-    expect(resolveMobileReleaseApiOriginV1('https://myeongha.vercel.app/')).toBe(
+    expect(resolveMobileReleaseApiOriginV1(MOBILE_PRODUCTION_API_ORIGIN_V1 + '/')).toBe(
       MOBILE_PRODUCTION_API_ORIGIN_V1,
     );
   });
@@ -65,8 +66,10 @@ describe('mobile release readiness preflight', () => {
     for (const configured of [
       'https://staging.example.com',
       'http://127.0.0.1:3000',
+      'https://myeongha.vercel.app',
       'https://myeongha.vercel.app/path',
       'https://myeongha.vercel.app?preview=1',
+      'https://myeongha.gycha0109.workers.dev/path',
     ]) {
       expect(() => resolveMobileReleaseApiOriginV1(configured)).toThrow();
     }
@@ -97,7 +100,7 @@ describe('mobile release readiness preflight', () => {
     expect(report.ready).toBe(false);
     expect(report.blockers).toEqual([]);
     expect(report.violations).toEqual([
-      'EXPO_PUBLIC_MYEONGHA_API_ORIGIN must resolve to canonical Production origin https://myeongha.vercel.app for release.',
+      'EXPO_PUBLIC_MYEONGHA_API_ORIGIN must resolve to canonical Production origin https://myeongha.gycha0109.workers.dev for release.',
     ]);
   });
 

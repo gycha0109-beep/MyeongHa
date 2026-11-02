@@ -1,6 +1,6 @@
 import { acquireProductionMemberSmokeSession } from './production-member-smoke-session.mjs';
 
-const PRODUCTION_ORIGIN = 'https://myeongha.vercel.app';
+const PRODUCTION_ORIGIN = 'https://myeongha.gycha0109.workers.dev';
 const CHAT_OPEN_URL = `${PRODUCTION_ORIGIN}/api/chat`;
 const MEMBER_ME_URL = `${PRODUCTION_ORIGIN}/api/me`;
 const REQUEST_TIMEOUT_MS = 20_000;
