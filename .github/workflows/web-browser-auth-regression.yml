@@ -44,7 +44,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  scope:
+    name: auth-browser-scope
+    runs-on: ubuntu-latest
+    outputs:
+      run_browser: ${{ steps.resolve.outputs.run_browser }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        if: github.event_name == 'pull_request'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Check Admin-only package metadata impact
+        id: resolve
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            echo "run_browser=true" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/ci/web-auth-browser-change-scope.mjs "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          fi
+
   auth-browser-shard-1:
+    needs: scope
+    if: ${{ needs.scope.outputs.run_browser == 'true' }}
     name: auth-browser-regression (1/2)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -132,6 +164,8 @@ jobs:
           if-no-files-found: ignore
 
   auth-browser-shard-2:
+    needs: scope
+    if: ${{ needs.scope.outputs.run_browser == 'true' }}
     name: auth-browser-regression (2/2)
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -219,6 +253,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     needs:
+      - scope
       - auth-browser-shard-1
       - auth-browser-shard-2
     if: ${{ always() && !cancelled() }}
@@ -227,8 +262,15 @@ jobs:
         env:
           SHARD_1_RESULT: ${{ needs.auth-browser-shard-1.result }}
           SHARD_2_RESULT: ${{ needs.auth-browser-shard-2.result }}
+          RUN_BROWSER: ${{ needs.scope.outputs.run_browser }}
         shell: bash
         run: |
           set -euo pipefail
-          test "$SHARD_1_RESULT" = "success"
-          test "$SHARD_2_RESULT" = "success"
+          if [[ "$RUN_BROWSER" == "false" ]]; then
+            test "$SHARD_1_RESULT" = "skipped"
+            test "$SHARD_2_RESULT" = "skipped"
+          else
+            test "$RUN_BROWSER" = "true"
+            test "$SHARD_1_RESULT" = "success"
+            test "$SHARD_2_RESULT" = "success"
+          fi

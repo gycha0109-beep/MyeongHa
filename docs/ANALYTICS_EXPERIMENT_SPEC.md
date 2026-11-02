@@ -145,7 +145,7 @@ Personalization benchmark의 `InterpretationSignature`, consumed fingerprints �
 
 ## 10. Consent / Retention
 
-Analytics consent/opt-out와 retention의 법적/제품 정책은 `OPEN-P0: P0-PR-01` 및 적용되는 consent policy를 따른다. 본 spec은 보존 기간을 임의 확정하지 않는다.
+일반 제품 분석 이벤트의 보존 기간은 2026-10-27 단일 Owner가 **180일**로 확정했다. 발생 시각 기준이며 동의 만료·철회·사용자 삭제가 더 빠르면 먼저 적용한다. [Admin 운영 정책](operations/ADMIN_OPERATING_POLICY_20261027_V1.md)을 따른다. 기존 Commerce `P5Y`·백업 `P30D`·일반 로그 정본은 변경하지 않으며 실제 개인정보 수집 활성화는 별도 실행 승인과 동의·삭제 결속 검증이 필요하다.
 
 ## 11. Schema Evolution
 
