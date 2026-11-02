@@ -1631,7 +1631,107 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     );
     expect(allSettled.rows[0]?.count).toBe('5');
     await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r40_unverified_transport_lineage_missing',
+    });
+    // R40: these receipts are SHA-only local mock transports, not actual
+    // provider responses. Even a fully settled Cost + valid native wire is
+    // insufficient to prove any Model/Output Guard authorization.
+    const mockRecorded=[];
+    for(const v of used){
+      const transport=r40SyntheticStubTransport(v);
+      if(v.stageIndex===0){
+        const forged={...transport,providerOutputVerified:true};
+        await expect(tx(c=>c.query(
+          'select seyeon_positive_candidate.record_unverified_transport_r40($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid,$7::text,$8::jsonb) as receipt',
+          [subject,a.thread,a.turn,a.attempt,v.stageIndex,v.callId,
+           v.nativeWireDigest,JSON.stringify(forged)],
+        ),true)).rejects.toMatchObject({
+          code:'23514',constraint:'seyeon_r40_transport_authority_forged',
+        });
+        await expect(tx(c=>c.query(
+          'select seyeon_positive_candidate.record_unverified_transport_r40($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid,$7::text,$8::jsonb) as receipt',
+          [subject,a.thread,a.turn,a.attempt,v.stageIndex,v.callId,
+           'sha256:wire-utf8:v1:'+'0'.repeat(64),
+           JSON.stringify(transport)],
+        ),true)).rejects.toMatchObject({
+          code:'23514',constraint:'seyeon_r40_stage_wire_unbound',
+        });
+        await expect(recordSeyeonR40UnverifiedMockTransportV1({
+          pinInput,reservation:v,
+          transport:{...transport,responseId:'resp_real_unverified_source'},
+        })).rejects.toBeInstanceOf(
+          SeyeonR40OfflineUnverifiedTransportHoldV1,
+        );
+      }
+      const recorded=await recordSeyeonR40UnverifiedMockTransportV1({
+        pinInput,reservation:v,transport,
+      });
+      expect(recorded).toMatchObject({
+        attemptId:a.attempt,callId:v.callId,
+        stageIndex:v.stageIndex,purpose:v.purpose,
+        nativeWireDigest:v.nativeWireDigest,
+        responseId:transport.responseId,
+        responseBodyDigest:transport.responseBodyDigest,
+        structuredOutputDigest:transport.structuredOutputDigest,
+        providerOutputVerified:false,outputGuardVerified:false,
+        permitsAtomicCommit:false,permitsHttpReveal:false,
+      });
+      mockRecorded.push(recorded);
+      if(v.stageIndex===0){
+        await expect(recordSeyeonR40UnverifiedMockTransportV1({
+          pinInput,reservation:v,transport,
+        })).rejects.toBeInstanceOf(
+          SeyeonR40OfflineUnverifiedTransportHoldV1,
+        );
+      }
+    }
+    expect(mockRecorded).toHaveLength(5);
+    const r40Rows=await pool.query<{
+      stage_index:number;call_id:string;origin_kind:string;
+      provider_output_verified:boolean;output_guard_verified:boolean;
+      response_body_digest:string;structured_output_digest:string;
+    }>(
+      'select stage_index,call_id::text,origin_kind,provider_output_verified,output_guard_verified,response_body_digest,structured_output_digest from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid order by stage_index',
+      [a.attempt],
+    );
+    expect(r40Rows.rows).toHaveLength(5);
+    expect(r40Rows.rows.map(row=>row.call_id)).toEqual(
+      used.map(v=>v.callId),
+    );
+    expect(r40Rows.rows.every(row=>
+      row.origin_kind==='local_stub_transport_unverified'
+      &&row.provider_output_verified===false
+      &&row.output_guard_verified===false
+      &&/^sha256:wire-utf8:v1:[0-9a-f]{64}$/u.test(
+        row.response_body_digest,
+      )&&/^sha256:wire-utf8:v1:[0-9a-f]{64}$/u.test(
+        row.structured_output_digest,
+      )
+    )).toBe(true);
+    await expect(pool.query(
+      "update seyeon_positive_candidate.unverified_transport_lineage_r40 set provider_output_verified=true where attempt_id=$1::uuid",
+      [a.attempt],
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'offline_source_set_immutable',
+    });
+    await expect(tx(c=>c.query(
+      'select * from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(tx(c=>c.query(
+      'delete from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+    });
+    // One missing MOCK transport digest is independently diagnosed.
+    await pool.query(
+      'delete from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid and stage_index=4',
+      [a.attempt],
+    );
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r40_unverified_transport_lineage_missing',
     });
     // Negative-only real guard probes cannot replace actual Provider output.
     // A deleted probe is a missing evidence chain, not a positive PASS.
@@ -1664,7 +1764,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       messages:'0',outboxes:'0',admissions:'0',
     });
     expect(fetches).toBe(0);
-  },90000);
+  },120000);
 
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
