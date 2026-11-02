@@ -608,11 +608,11 @@ begin
           and p.renderer_call_id is not distinct from r.call_id
           and p.semantic_review_call_id is not distinct from s.call_id
           and p.guarded_envelope_digest is not distinct from m.guarded_envelope_digest
-          and ui.structured_output_digest is distinct from
+          and ui.structured_output_digest is not distinct from
              m.interpretation_output_digest
-          and ur.structured_output_digest is distinct from
+          and ur.structured_output_digest is not distinct from
              m.renderer_output_digest
-          and us.structured_output_digest is distinct from
+          and us.structured_output_digest is not distinct from
              m.semantic_review_output_digest
           and p.origin_kind is not distinct from 'code_authored_local_fixture_no_provider'
           and p.provider_dispatched is not distinct from false
