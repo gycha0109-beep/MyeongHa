@@ -82,6 +82,11 @@ begin
           !~ '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
      or v_pin->>'currentUserTextDigest'
           !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
+     -- This G0 verifier only admits the G1 source contract with zero
+     -- historical messages. Future nonzero contracts require new lineage.
+     or v_pin->>'historicalSourceCount' is distinct from '0'
+     or v_pin->>'historicalSourceCensusDigest' is distinct from
+        'sha256:v1:'||encode(sha256(convert_to('[]','UTF8')),'hex')
      or v_pin->>'recordId' is null
      or v_pin->>'originalGrantId' is null
      or v_pin->>'originalPgJsonbDigest'

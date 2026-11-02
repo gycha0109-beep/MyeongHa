@@ -65,6 +65,7 @@ declare
   v_memory record;
   v_user_message record;
   v_turn_message_count integer;
+  v_thread_message_count integer;
   v_user_text_digest text;
   v_pg_digest text;
   v_positive jsonb;
@@ -133,6 +134,19 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_positive_g1_user_message_count_invalid',
       message='Positive G1 requires one original current User message';
+  end if;
+
+  -- W47: the admitted one-Memory model input has ZERO past conversation.
+  -- Count every thread message, including redacted, empty, other-Character
+  -- and unrecognized rows. They may never disappear behind SELECT filters.
+  -- No G0-positive historical-context permission is granted by this Pin.
+  select count(*) into v_thread_message_count
+  from public.conversation_messages msg
+  where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id;
+  if v_thread_message_count<>1 then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g1_historical_source_unpinned',
+      message='Positive G1 cannot pin an unverified past message source';
   end if;
 
   select msg.id,msg.body_text into v_user_message
@@ -206,6 +220,9 @@ begin
     'characterId','seyeon',
     'currentUserMessageId',v_user_message.id::text,
     'currentUserTextDigest',v_user_text_digest,
+    'historicalSourceCount',0,
+    'historicalSourceCensusDigest',
+      'sha256:v1:'||encode(sha256(convert_to('[]','UTF8')),'hex'),
     'recordKind','memory',
     'recordId',p_record_id::text,
     'originalGrantId',p_original_grant_id::text,

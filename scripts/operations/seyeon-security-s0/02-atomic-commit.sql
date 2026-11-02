@@ -259,6 +259,9 @@ begin
      or v_positive ->> 'currentUserTextDigest'
        is distinct from 'sha256:wire-utf8:v1:'||
          encode(sha256(convert_to(v_original_user_body_text,'UTF8')),'hex')
+     or v_positive ->> 'historicalSourceCount' is distinct from '0'
+     or v_positive ->> 'historicalSourceCensusDigest' is distinct from
+         'sha256:v1:'||encode(sha256(convert_to('[]','UTF8')),'hex')
      or v_positive ->> 'selectedSourcesDigest'
        is distinct from p_selected_sources_digest
      or v_positive ->> 'finalModelContextDigest'

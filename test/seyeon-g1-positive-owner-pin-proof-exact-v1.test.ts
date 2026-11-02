@@ -56,6 +56,8 @@ function actualDbProof():Record<string,unknown>{
     characterId:'seyeon',
     currentUserMessageId:input.currentUserMessageId,
     currentUserTextDigest:input.currentUserTextDigest,
+    historicalSourceCount:0,
+    historicalSourceCensusDigest:selectedDigest([]),
     recordKind:'memory',
     recordId:input.originalMemoryId,
     originalGrantId:input.originalGrantId,
@@ -103,6 +105,8 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
     ['replaced original Grant',{originalGrantId:UUID(7)}],
     ['another User message',{currentUserMessageId:UUID(8)}],
     ['different current User text',{currentUserTextDigest:'sha256:wire-utf8:v1:'+'a'.repeat(64)}],
+    ['forged historical count',{historicalSourceCount:1}],
+    ['untrusted historical source set',{historicalSourceCensusDigest:DIGEST('e')}],
   ] as const)('rejects %s in the DB G1 proof rather than accepting model authorization',async(_name,patch)=>{
     const {port,sql}=fakeOwner({...actualDbProof(),...patch});
     await expect(port.pinBeforeModel(input)).rejects.toThrow(/Pin receipt mismatch/u);
@@ -170,6 +174,9 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
     expect(sql).toContain('for share of msg;');
     expect(sql).toContain("'currentUserMessageId',v_user_message.id::text");
     expect(sql).toContain("'currentUserTextDigest',v_user_text_digest");
+    expect(sql).toContain("constraint='seyeon_positive_g1_historical_source_unpinned'");
+    expect(sql).toContain("'historicalSourceCount',0");
+    expect(sql).toContain("'historicalSourceCensusDigest',");
   });
 
 });

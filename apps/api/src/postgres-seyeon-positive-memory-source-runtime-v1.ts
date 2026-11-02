@@ -17,6 +17,8 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const SHA=/^sha256:v1:[a-f0-9]{64}$/u;
 const PG_SHA=/^sha256:pg-jsonb:v1:[a-f0-9]{64}$/u;
 const WIRE_SHA=/^sha256:wire-utf8:v1:[a-f0-9]{64}$/u;
+const EMPTY_HISTORY_SHA='sha256:v1:'+
+  createHash('sha256').update('[]','utf8').digest('hex');
 
 export interface SeyeonPositiveS0SourcePinInputV1 {
   readonly subjectId:string;
@@ -153,6 +155,7 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
       const expectedKeys=[
         'schemaVersion','subjectId','threadId','turnId','attemptId',
         'characterId','currentUserMessageId','currentUserTextDigest',
+        'historicalSourceCount','historicalSourceCensusDigest',
         'recordKind','recordId','originalGrantId',
         'originalGrantedAt','recordType','recordSchemaVersion',
         'projectorVersion','selectedSourcesDigest','projectedMemoryDigest',
@@ -166,6 +169,8 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         ||proof.characterId!=='seyeon'||proof.recordKind!=='memory'
         ||proof.currentUserMessageId!==input.currentUserMessageId
         ||proof.currentUserTextDigest!==input.currentUserTextDigest
+        ||proof.historicalSourceCount!==0
+        ||proof.historicalSourceCensusDigest!==EMPTY_HISTORY_SHA
         ||proof.originalGrantId!==input.originalGrantId
         ||proof.recordId!==input.originalMemoryId
         ||proof.recordType!==input.recordType

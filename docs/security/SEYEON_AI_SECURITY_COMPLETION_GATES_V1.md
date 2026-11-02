@@ -591,3 +591,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **G2 실제 원자 저장:** `cmd_commit_seyeon_positive_chat_turn_v1`의 같은 DB Commit 트랜잭션에서 현재 원본 User의 본문을 잠그고 G1의 `currentUserMessageId/currentUserTextDigest`와 재대조한다. 단순 서버 SELECT-before-COMMIT 대신 기존 atomic Commit 함수에 포함하며, 원본 Memory/Grant 잠금·Outbox 원자성은 그대로 유지한다.
 - **G3 S0 첫 재열람:** 기존 첫 Assistant replay 함수도 동일한 G0 원본 Assistant verifier를 재사용한다. 원래 User가 더는 유효하지 않으면 과거 답변의 공개로 이어지지 않는다. 추론 결과의 '권한 승인' 텍스트나 새 Grant가 원래 User 출처를 대체하지 못한다.
 - **범위·남은 위험:** 소스 전용 SQL·정적 연결 테스트; 이 단계는 새 역사 Context의 모델 입력을 활성화하지 않는다. 인용·복사된 비공개 User 텍스트, Reader knowledge, Life Fact·다중 Grant의 전체 파생 출처 계약·실 PG 세션 실행/G0 승인/G6는 HOLD. `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1=[]`, 운영 DDL/ACL·유료 AI·HTTP Reveal·PR 병합 무변경, `HOLD_FORWARD_STOPPED` 유지. 신규 SHA의 실제 TypeScript/Vitest/PostgreSQL/CI는 별도 실행 근거 전 PASS 금지.
+
+
+### 2026-11-02 · W47 · 모델 이전 전체 과거 대화 출처의 DB 부재 증빙 (격리 / HOLD)
+
+- **기존 결손:** 실제 S0 G1 모델 입력은 현재 User 1건과 원본 Memory 1건만 허용하지만 G1 DB Owner는 과거 대화가 **DB의 같은 Thread에 전혀 없었는지** 직접 확인하지 않았다. 애플리케이션의 `recentMessages=[]` 선언이나 모델 입력 SHA만으로 DB 과거 자료의 완전한 출처를 증명할 수 없다.
+- **실제 개선:** G1 Owner가 해당 Thread의 **모든 메시지 수**를 검사한다(삭제 표시·다른 발화자·빈 메시지도 포함). 원래 Current User 1건 외 메시지가 하나라도 있으면, 최초 Interpreter 요청 전에 `seyeon_positive_g1_historical_source_unpinned`으로 거부한다. 단일 원본 Memory 경로의 DB 불변 Attempt Pin에 `historicalSourceCount=0`, `historicalSourceCensusDigest=SHA256([])`를 함께 기록한다.
+- **원본→재사용 결속:** Node Owner DB 포트는 위 두 필드가 정확히 일치해야만 G1 수령 증빙을 승인한다. 원래 AI 답변을 재사용하는 G0 verifier 및 G2 원자 Commit도 같은 불변 Source Count/Digest를 검사한다. W46의 원본 User ID·본문 지문 검증은 그대로 유지한다.
+- **안전한 범위:** 이는 **과거 대화 0건을 확증하는 실제 G1 Owner Pin**이며, 과거 자료가 1건 이상일 때의 **양수 원본 출처 Pin은 아직 구현되지 않았다**. Verified History/Relationship/Reader의 nonzero 모델 사용은 계속 HOLD. 신규 인가·배포·모델 호출·HTTP 공개·운영 DB 변경·PR 병합 없음; G0~G6는 미통과.
+- **검증:** G1 Owner receipt의 새 필드 누락/추가/위조, DB 전체 Thread 메시지 검사, G0/G2 연계의 계약 테스트를 확장했다. 실제 PostgreSQL 2세션/HEAD TypeScript·Vitest 전체 실행/운영 활성화는 별도 증거 필요.
