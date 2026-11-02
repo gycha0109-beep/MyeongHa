@@ -57,6 +57,10 @@ import {
   recordSeyeonR41LocalFixtureWitnessV1,
   SeyeonR41OfflineFixtureDatabaseHoldV1,
 } from '../apps/api/src/seyeon-r41-offline-guard-fixture-db-v1.js';
+import {
+  issueSeyeonR42OfflineDbLocalSealV1,
+  SeyeonR42OfflineDbSealHoldV1,
+} from '../apps/api/src/seyeon-r42-offline-db-issued-local-seal-v1.js';
 
 /** Strictly fake transport: NOT a Provider response or Guard PASS. */
 function r40SyntheticStubTransport(
@@ -1837,7 +1841,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       [a.attempt],
     ),true)).rejects.toMatchObject({code:'42501'});
     await expect(tryCommit()).rejects.toMatchObject({
-      constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+      constraint:'seyeon_offline_r42_db_issued_local_seal_missing',
     });
     // Even the removal of one local fixture witness is diagnosed without
     // treating an otherwise valid local Guard PASS as a genuine Provider.
@@ -1848,8 +1852,89 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r41_local_guard_fixture_lineage_missing',
     });
-    await recordSeyeonR41LocalFixtureWitnessV1({
+    const restoredWitness=await recordSeyeonR41LocalFixtureWitnessV1({
       pinInput,reservations:used.slice(2),
+    });
+    // R42: no Caller can read the HMAC secret, bypass an absent issuer,
+    // reuse a previous deleted witness, or self-upgrade local evidence.
+    await expect(tx(c=>c.query(
+      'select * from seyeon_positive_candidate.local_guard_seal_key_r42',
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(tx(c=>c.query(
+      'select * from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    const sealed=await issueSeyeonR42OfflineDbLocalSealV1({
+      pinInput,localWitness:restoredWitness,
+    });
+    expect(sealed).toMatchObject({
+      status:'isolated_db_issued_local_fixture_seal_no_provider',
+      attemptId:a.attempt,
+      selectedSourcesDigest:source.selection.selectedSourcesDigest,
+      guardedEnvelopeDigest:guardedFixture.guardedEnvelopeDigest,
+      providerOutputVerified:false,outputGuardVerified:false,
+      permitsProvider:false,permitsAtomicCommit:false,
+      permitsHttpReveal:false,
+    });
+    expect(sealed.sealFingerprint).toMatch(
+      /^sha256:pg-jsonb:v1:[0-9a-f]{64}$/u,
+    );
+    const validatedSeal=await tx(c=>c.query<{valid:boolean}>(
+      'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
+      [subject,a.attempt],
+    ),true);
+    expect(validatedSeal.rows).toEqual([{valid:true}]);
+    await expect(issueSeyeonR42OfflineDbLocalSealV1({
+      pinInput,localWitness:restoredWitness,
+    })).rejects.toBeInstanceOf(SeyeonR42OfflineDbSealHoldV1);
+    await expect(tx(c=>c.query(
+      'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(pool.query(
+      "update seyeon_positive_candidate.local_guard_seals_r42 set hmac_sha256=$2::text where attempt_id=$1::uuid",
+      [a.attempt,'0'.repeat(64)],
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'offline_source_set_immutable',
+    });
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+    });
+    // A compromised OR unprivileged request cannot substitute a guessed
+    // MAC even if the UUIDs and the R41 witness itself remain unchanged.
+    await pool.query(
+      'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    await pool.query(
+      `insert into seyeon_positive_candidate.local_guard_seals_r42(
+        attempt_id,selected_sources_digest,interpretation_call_id,
+        renderer_call_id,semantic_review_call_id,guarded_envelope_digest,
+        issued_at,expires_at,nonce,hmac_sha256
+      ) values(
+        $1::uuid,$2::text,$3::uuid,$4::uuid,$5::uuid,$6::text,
+        clock_timestamp(),clock_timestamp()+interval '1 hour',
+        gen_random_uuid(),$7::text
+      )`,[
+        a.attempt,source.selection.selectedSourcesDigest,
+        used[2]!.callId,used[3]!.callId,used[4]!.callId,
+        guardedFixture.guardedEnvelopeDigest,'0'.repeat(64),
+      ],
+    );
+    const rejectedFakeSeal=await tx(c=>c.query<{valid:boolean}>(
+      'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
+      [subject,a.attempt],
+    ),true);
+    expect(rejectedFakeSeal.rows).toEqual([{valid:false}]);
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r42_db_issued_local_seal_missing',
+    });
+    await pool.query(
+      'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    await issueSeyeonR42OfflineDbLocalSealV1({
+      pinInput,localWitness:restoredWitness,
     });
     // One missing MOCK transport digest is independently diagnosed.
     await pool.query(
@@ -1890,7 +1975,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       messages:'0',outboxes:'0',admissions:'0',
     });
     expect(fetches).toBe(0);
-  },150000);
+  },180000);
 
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
