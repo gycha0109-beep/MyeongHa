@@ -61,6 +61,10 @@ import {
   issueSeyeonR42OfflineDbLocalSealV1,
   SeyeonR42OfflineDbSealHoldV1,
 } from '../apps/api/src/seyeon-r42-offline-db-issued-local-seal-v1.js';
+import {
+  issueSeyeonR43SeparatedLocalGuardSealV1,
+  SeyeonR43EvaluatorAuthorityHoldV1,
+} from '../apps/api/src/seyeon-r43-offline-validator-session-v1.js';
 
 /** Strictly fake transport: NOT a Provider response or Guard PASS. */
 function r40SyntheticStubTransport(
@@ -92,6 +96,9 @@ const enabled=process.env.CI==='true' &&
   process.env.PGUSER==='postgres' &&
   process.env.PGDATABASE==='myeongha_seyeon_positive_pin_candidate_test';
 const pool=enabled?new Pool({max:3,connectionTimeoutMillis:5000}):null;
+// Different physical pool object from the ordinary Member API. Isolated PG
+// uses the same privileged test login; no Production separation is claimed.
+const validatorPool=enabled?new Pool({max:1,connectionTimeoutMillis:5000}):null;
 const subject='d2000000-0000-4000-8000-000000000001';
 const bundle='d3000000-0000-4000-8000-000000000001';
 const release='d3100000-0000-4000-8000-000000000001';
@@ -124,6 +131,21 @@ async function tx<T>(fn:(c:PoolClient)=>Promise<T>,executor=false):Promise<T>{
       await c.query('SET LOCAL ROLE myeongha_api_executor');
       await c.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
     }
+    const result=await fn(c);
+    await c.query('COMMIT');
+    return result;
+  }catch(e){
+    await c.query('ROLLBACK').catch(()=>undefined);
+    throw e;
+  }finally{c.release();}
+}
+async function validatorTx<T>(fn:(c:PoolClient)=>Promise<T>):Promise<T>{
+  if(!validatorPool)throw Error('R43 requires separate disposable evaluator pool');
+  const c=await validatorPool.connect();
+  try{
+    await c.query('BEGIN');
+    await c.query('SET LOCAL ROLE myeongha_seyeon_guard_evaluator_r43');
+    await c.query("select set_config('myeongha.subject_id',$1,true)",[subject]);
     const result=await fn(c);
     await c.query('COMMIT');
     return result;
@@ -344,7 +366,7 @@ select seyeon_positive_candidate.claim_governed_stage_r32(
 `.trim();
 
 describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core ContextReady',()=>{
-  afterAll(async()=>{await pool?.end();});
+  afterAll(async()=>{await pool?.end();await validatorPool?.end();});
   it('atomically pins two locked originals, marks context ready, denies Provider/Commit/Reveal',async()=>{
     const a=await createTurn(751);
     const result=await candidate(a,[first,second]);
@@ -1864,8 +1886,9 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'select * from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
       [a.attempt],
     ),true)).rejects.toMatchObject({code:'42501'});
-    const sealed=await issueSeyeonR42OfflineDbLocalSealV1({
+    const sealed=await issueSeyeonR43SeparatedLocalGuardSealV1({
       pinInput,localWitness:restoredWitness,
+      validatorPool:validatorPool!,
     });
     expect(sealed).toMatchObject({
       status:'isolated_db_issued_local_fixture_seal_no_provider',
@@ -1884,9 +1907,10 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       [subject,a.attempt],
     ),true);
     expect(validatedSeal.rows).toEqual([{valid:true}]);
-    await expect(issueSeyeonR42OfflineDbLocalSealV1({
+    await expect(issueSeyeonR43SeparatedLocalGuardSealV1({
       pinInput,localWitness:restoredWitness,
-    })).rejects.toBeInstanceOf(SeyeonR42OfflineDbSealHoldV1);
+      validatorPool:validatorPool!,
+    })).rejects.toBeInstanceOf(SeyeonR43EvaluatorAuthorityHoldV1);
     await expect(tx(c=>c.query(
       'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
       [a.attempt],
@@ -1963,8 +1987,9 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       'delete from seyeon_positive_candidate.local_guard_seals_r42 where attempt_id=$1::uuid',
       [a.attempt],
     );
-    await issueSeyeonR42OfflineDbLocalSealV1({
+    await issueSeyeonR43SeparatedLocalGuardSealV1({
       pinInput,localWitness:restoredWitness,
+      validatorPool:validatorPool!,
     });
     // One missing MOCK transport digest is independently diagnosed.
     await pool.query(
