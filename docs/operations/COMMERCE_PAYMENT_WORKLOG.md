@@ -410,3 +410,28 @@
 - **실패 확인:** PR #2869 커밋 05e8bd2a의 핵심 CI·Governance·Web·Mobile는 PASS, 별도 `Reader Grounding Cross-Service E2E` 실행 41397268134는 1/3 FAIL. 원인은 `test/saju-character-grounding-cross-service.e2e.test.ts`의 공식 Reading source hash가 `sha256:cross-service-official-artifact`로 하드코딩되어, v2 출처가 요구하는 canonical `sha256:v1:<실제 응답 digest>`와 불일치한 점.
 - **수정:** E2E가 실제 `deliveredResponse()`를 `hashSajuHeldSourceProofRequestV1`으로 해시하여 metadata/access/source에 동일한 정확한 immutable digest를 사용하도록 교체. 공식 Reader 권한·출처 일치 검증을 완화하지 않음.
 - **로컬 확인:** TypeScript 서버 빌드 타입 검사 PASS, E2E 테스트 파일 import PASS (로컬 실제 Saju 호스트 미가동으로 3개 테스트 정상 SKIP), git diff --check PASS. 실제 타 서비스 HTTP round-trip과 인증/회수 부정 검증은 해당 PR의 Linux cross-service CI 결과를 확인해야 함. 운영 DB/실제 환불/LIVE 변경 없음.
+
+### 2026-11-02 — P4 운영자 검토 건 → 정확한 영수증 → 수동 환불 실행 연결
+
+- **기반 확인:** PR #2869이 최종 [CI Integration #41402864351](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41402864351) SUCCESS 이후 `main`에 squash 병합(`2b7af680`)됐습니다. 이 신규 작업은 최신 `main`에서 따로 분기하며 기존 통합 완료분은 반복 구현하지 않습니다.
+- **구현:** `commerce-reader-reviewed-refund-execution-v1.ts`에 기존 관리자 전용 고객 접수 검토(READ ONLY)와 기존 운영자 법적 승인 기록·PortOne 환불 명령을 직접 연결했습니다. 관리자가 명시한 원본 접수번호와 영수증이 동일한 검증 대상인지 확인하고, 신청 누락·영수증 불일치·후보 초과·중복 후보·이미 `revoked`된 영수증을 환불 실행 전에 보류합니다. 선택 후보가 하나여도 자동 선택하지 않습니다.
+- **기존 안전장치 재사용:** 고객 접수만으로 자동 승인·환불하지 않으며 공개 API/스케줄러에 경로를 등록하지 않습니다. 고권한 법적 승인 연결과 결제사 실행 연결의 풀을 분리하고, DB의 별도 직렬화 승인 함수가 동일 Subject·Purchase Intent·Unit·Receipt 출처를 재검증한 뒤에만 영속적인 법적 결정을 기록하도록 기존 코드를 그대로 사용합니다. 해당 결정의 COMMIT이 불확실할 때 결제사 POST를 하지 않는 규칙은 유지합니다.
+- **검증:** 연계 신규 테스트 11건 및 기존 운영 승인·환불 관련 46건, 총 5개 파일 **57/57 PASS**. 서버 TypeScript build 타입검사 PASS, 변경 공백 검사 PASS. 격리 PostgreSQL 17 및 실제 PortOne 호출은 이번 별도 운영 연결에서 실행하지 않았습니다. 공개 환불/LIVE/운영 DB 활성화는 하지 않았습니다.
+- **다음:** 새 브랜치 PR 통합 검증. 이후 판매 가능한 Offer/Charge Terms, Production Saju 공급, S5/S7 고객 제공 권한 및 운영 DB 적용은 각 미충족 선행 조건이 충족되기 전까지 HOLD로 유지합니다.
+
+### 2026-11-02 — PR #2889 최종 통합 CI #41406605093 실패 수정 및 재실행
+- **실패 원인 확정:** `admission` 단계에서 PR HEAD `859610ca`의 `scripts/ci/integration-candidate.mjs`가 `repos/.../commits/main`의 거대한 JSON 응답을 동기 호출하여 `spawnSync gh ENOBUFS` 발생. `full` 검증은 실행되지 않고 `CI Integration Verify`가 실패한 것. 결제·환불 실행 코드 자체의 실패 증거는 없음.
+- **수정:** 이미 독립 CI 복구 PR #2891에 구현한 동일한 기본 브랜치 SHA 조회 변경을 **대기 중인 #2889 브랜치 자체에도 반영**. `git/ref/heads/main`의 최소 크기 SHA만 읽어 기존 커밋 정보 용량 문제를 제거. 동일 필수 검사 및 GitGuardian/동결 HEAD 검증은 유지.
+- **검증:** 통합 CI 사전검사·운영자 환불 브리지 관련 로컬 테스트 **34/34 PASS**, Node 구문 및 git diff --check PASS. 수정된 PR HEAD의 일반 CI와 최종 CI가 실제 통과하기 전까지 병합 완료로 판정 금지.
+- **재시도:** 새 PR HEAD를 Push하여 일반 필수 검사 재실행 뒤 동일 HEAD로 고정된 통합 검사를 1회 요청. 기존 실패한 #41406605093는 성공으로 변경되지 않음. 운영 DB/실제 고객 환불/LIVE는 변경하지 않음.
+
+### 2026-11-02 — PR #2889 CI admission 재시도 전 main 동기화 충돌 해결
+- **확인:** CI #41406605093 실패는 `admission`의 `spawnSync gh ENOBUFS`이며 전체 환불 회귀 검증은 시작되지 않았음. 해당 커밋의 `commits/main` JSON 조회가 1MB 이상이어서 실패. 새 커밋 `8421d74d`에서 `git/ref/heads/main` 조회로 변경하고 회귀 검증 34/34 PASS.
+- **main 최신화:** 원격 main이 #2888 병합 `a19cb76b`까지 진행했으며 동일 ref 조회 수정이 먼저 반영되어, PR 브랜치의 충돌은 해당 코드 바로 위 주석 문장 차이만 발생. main의 동일 안전 로직을 유지하고 충돌을 해결. 별도 보안 트랙 파일들은 main 그대로 병합되며 환불 경로를 임의 변경하지 않음.
+- **안전 경계:** 동결된 과거 통합 요청은 실패로 유지. 새로운 PR HEAD의 CI 성공과 다시 요청할 최종 `CI Integration Verify` 성공 없이는 병합하지 않음. LIVE/운영 DB/실제 환불 변경 없음.
+
+### 2026-11-02 — PR #2889 최종 CI 성공 후 main 충돌 해소
+- **확인:** 최종 [통합 CI #41410102536](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41410102536)의 admission/full/DB PG17/CI Verify/CI Integration Verify 모두 SUCCESS. 원 HEAD `2b5e3960`에서 재확인.
+- **병합 차단:** 그 후 다른 트랙의 #2890/#2892 등의 병합으로 origin/main이 `d7d07f65`까지 이동하여 #2889는 GitHub mergeable_state `dirty`. `tests/ci-integration-candidate.test.mjs`의 CI 조회 검증 테스트 한 파일이 충돌했음.
+- **수정:** 기존 브랜치의 중복 간이 검증 대신 신규 main의 더 엄격한 `defaultBranchRefSha()` 브랜치·SHA 검증 테스트를 그대로 유지함. 기타 main의 보안·채팅 변경을 제외/변형하지 않고 통합. 로컬 관련 테스트 **82/82 PASS**, API TypeScript PASS, staged diff check PASS.
+- **다음 게이트:** 충돌해결 커밋 원격 제출 후 새 HEAD에서 CI 성공과 새 필수 고정 HEAD Integration CI를 확인하기 전에는 합병 완료로 추정하지 않음. LIVE 및 운영 DB 변경 없음.
