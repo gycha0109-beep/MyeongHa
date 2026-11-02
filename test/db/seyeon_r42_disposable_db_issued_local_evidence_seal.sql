@@ -36,7 +36,8 @@ before update or delete on seyeon_positive_candidate.local_guard_seal_key_r42
 for each row execute function seyeon_positive_candidate.reject_r1_source_rewrite();
 
 create table seyeon_positive_candidate.local_guard_seals_r42(
-  attempt_id uuid primary key references public.chat_turn_attempts(id)
+  attempt_id uuid primary key
+    references seyeon_positive_candidate.local_guard_fixture_lineage_r41(attempt_id)
     on delete cascade,
   selected_sources_digest text not null
     check(selected_sources_digest ~ '^sha256:v1:[a-f0-9]{64}$'),
@@ -266,8 +267,8 @@ end $issue$;
 -- Called ONLY after existing G2 independently checks all 5 stage/cost/Grant
 -- chains. Never exposes the secret nor accepts a client-provided signature.
 create function seyeon_positive_candidate.verify_local_guard_seal_r42(
-  p_attempt uuid
-) returns boolean language plpgsql stable security definer
+  p_subject uuid,p_attempt uuid
+) returns boolean language plpgsql security definer
 set search_path=pg_catalog,public,seyeon_positive_candidate
 as $verify$
 declare
@@ -276,7 +277,12 @@ declare
   v_key bytea;
   v_mac text;
 begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
   if current_database()<>'myeongha_seyeon_positive_pin_candidate_test'
+    or not exists (
+      select 1 from public.chat_turn_attempts a
+      where a.id=p_attempt and a.subject_id=p_subject
+    )
   then return false; end if;
   select * into v_seal from
     seyeon_positive_candidate.local_guard_seals_r42
@@ -326,13 +332,13 @@ revoke all on function
     uuid,uuid,uuid,uuid
   ) from public,anon,authenticated,service_role;
 revoke all on function
-  seyeon_positive_candidate.verify_local_guard_seal_r42(uuid)
+  seyeon_positive_candidate.verify_local_guard_seal_r42(uuid,uuid)
   from public,anon,authenticated,service_role;
 grant execute on function
   seyeon_positive_candidate.issue_local_guard_seal_r42(uuid,uuid,uuid,uuid)
   to myeongha_api_executor;
 grant execute on function
-  seyeon_positive_candidate.verify_local_guard_seal_r42(uuid)
+  seyeon_positive_candidate.verify_local_guard_seal_r42(uuid,uuid)
   to myeongha_api_executor;
 do $acl$
 begin
@@ -345,7 +351,7 @@ begin
     or has_function_privilege('public',
        'seyeon_positive_candidate.issue_local_guard_seal_r42(uuid,uuid,uuid,uuid)','EXECUTE')
     or has_function_privilege('public',
-       'seyeon_positive_candidate.verify_local_guard_seal_r42(uuid)','EXECUTE')
+       'seyeon_positive_candidate.verify_local_guard_seal_r42(uuid,uuid)','EXECUTE')
     or not has_function_privilege('myeongha_api_executor',
        'seyeon_positive_candidate.issue_local_guard_seal_r42(uuid,uuid,uuid,uuid)','EXECUTE')
   then raise exception 'R42 untrusted secret or seal role exposure'; end if;
