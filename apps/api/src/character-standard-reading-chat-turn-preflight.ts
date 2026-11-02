@@ -49,6 +49,7 @@ export interface PrepareCharacterStandardReadingChatTurnPreflightInputV1 {
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   /** Mandatory A2 Product/Commerce policy authority: absence fails closed. */
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?: import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   readonly memoryItemsAuthorityPort: MemoryItemsReadAuthorityPortV1;
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
@@ -111,6 +112,7 @@ export async function prepareCharacterStandardReadingChatTurnPreflightV1(
     accessAuthorityPort: input.accessAuthorityPort,
     artifactAuthorityPort: input.artifactAuthorityPort,
     productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
     });
   } catch {
     throw new CharacterStandardReadingChatTurnPreflightErrorV1(

@@ -84,6 +84,7 @@ function fixture(reader = 'seyeon', domain: SajuDomain = 'general') {
       completedAt: '2026-10-09T07:30:00.000Z',
     }]) },
     productReaderEligibilityAuthorityPort: productAuthorityPort,
+    currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: vi.fn(async () => {}) },
   };
   return { input, productAuthorityPort, readApprovedRule };
 }

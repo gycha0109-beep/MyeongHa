@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { WithdrawalRequestPanel } from '../commerce/WithdrawalRequestPanel.js';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
@@ -158,6 +159,8 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
       ) : null}
       {panel === 'orders' ? (
         <>
+          {import.meta.env.VITE_MYEONGHA_WITHDRAWAL_CLAIM_VISIBLE === '1'
+            ? <WithdrawalRequestPanel /> : null}
           <h3><MyText source="구매 내역" /></h3>
           <p><MyText source="결제한 해석과 상품의 거래 내역을 확인하는 공간입니다." /></p>
           <p className="my-detail-hint"><MyText source="구매 내역 조회가 연결되지 않았습니다. 구매 내역이 없다는 뜻은 아닙니다." /></p>

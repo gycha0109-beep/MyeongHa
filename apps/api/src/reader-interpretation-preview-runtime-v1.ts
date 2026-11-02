@@ -145,6 +145,7 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
    * it cannot be substituted with a hard-coded standard Product or Reader role.
    */
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
+  readonly currentVerifiedPurchaseAuthorityPort?: import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   /**
    * Optional production-only release admission after authoritative Thread
    * and Official Reading have been re-resolved. This is NOT a grant.
@@ -599,6 +600,7 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
       accessAuthorityPort: input.accessAuthorityPort,
       artifactAuthorityPort: input.artifactAuthorityPort,
       productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
     });
   } catch (error) {
     if (error instanceof OfficialReadingReaderAdmissionErrorV1) {
