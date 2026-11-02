@@ -1741,7 +1741,82 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       [a.attempt],
     ),true)).rejects.toMatchObject({code:'42501'});
     await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r41_local_guard_fixture_lineage_missing',
+    });
+    // An arbitrary claimed Guard PASS cannot manufacture a witness. The
+    // owner compares the same three R40 digests to the one code-derived,
+    // postgres-only immutable manifest under current original Grant locks.
+    const callIds=used.slice(2).map(v=>v.callId);
+    const claimWitness=(envelope:string,calls=callIds)=>tx(c=>c.query(
+      'select seyeon_positive_candidate.record_local_guard_fixture_r41($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::uuid,$8::uuid,$9::text) as receipt',
+      [subject,a.thread,a.turn,a.attempt,
+       source.selection.selectedSourcesDigest,
+       calls[0],calls[1],calls[2],envelope],
+    ),true);
+    await expect(claimWitness('sha256:v1:'+'0'.repeat(64)))
+      .rejects.toMatchObject({
+        code:'23514',constraint:'seyeon_r41_code_manifest_mismatch',
+      });
+    await expect(claimWitness(guardedFixture.guardedEnvelopeDigest,
+      [used[1]!.callId,used[3]!.callId,used[4]!.callId],
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r41_stage_call_unbound',
+    });
+    const validGuardWitness=await recordSeyeonR41LocalFixtureWitnessV1({
+      pinInput,reservations:used.slice(2),
+    });
+    expect(validGuardWitness).toMatchObject({
+      attemptId:a.attempt,selectedSourcesDigest:source.selection.selectedSourcesDigest,
+      interpretationCallId:used[2]!.callId,
+      rendererCallId:used[3]!.callId,
+      semanticReviewCallId:used[4]!.callId,
+      guardedEnvelopeDigest:guardedFixture.guardedEnvelopeDigest,
+      providerDispatched:false,providerOutputVerified:false,
+      outputGuardVerified:false,permitsAtomicCommit:false,
+      permitsHttpReveal:false,
+    });
+    await expect(recordSeyeonR41LocalFixtureWitnessV1({
+      pinInput,reservations:used.slice(2),
+    })).rejects.toBeInstanceOf(SeyeonR41OfflineFixtureDatabaseHoldV1);
+    const guardRows41=await pool.query<{
+      interpretation_call_id:string;renderer_call_id:string;
+      semantic_review_call_id:string;origin_kind:string;
+      output_guard_verified:boolean;
+    }>(
+      'select interpretation_call_id::text,renderer_call_id::text,semantic_review_call_id::text,origin_kind,output_guard_verified from seyeon_positive_candidate.local_guard_fixture_lineage_r41 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    expect(guardRows41.rows).toEqual([{
+      interpretation_call_id:used[2]!.callId,
+      renderer_call_id:used[3]!.callId,
+      semantic_review_call_id:used[4]!.callId,
+      origin_kind:'code_authored_local_fixture_no_provider',
+      output_guard_verified:false,
+    }]);
+    await expect(pool.query(
+      "update seyeon_positive_candidate.local_guard_fixture_lineage_r41 set output_guard_verified=true where attempt_id=$1::uuid",
+      [a.attempt],
+    )).rejects.toMatchObject({
+      code:'23514',constraint:'offline_source_set_immutable',
+    });
+    await expect(tx(c=>c.query(
+      'select * from seyeon_positive_candidate.local_guard_fixture_lineage_r41 where attempt_id=$1::uuid',
+      [a.attempt],
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+    });
+    // Even the removal of one local fixture witness is diagnosed without
+    // treating an otherwise valid local Guard PASS as a genuine Provider.
+    await pool.query(
+      'delete from seyeon_positive_candidate.local_guard_fixture_lineage_r41 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    await expect(tryCommit()).rejects.toMatchObject({
+      constraint:'seyeon_offline_r41_local_guard_fixture_lineage_missing',
+    });
+    await recordSeyeonR41LocalFixtureWitnessV1({
+      pinInput,reservations:used.slice(2),
     });
     // One missing MOCK transport digest is independently diagnosed.
     await pool.query(
@@ -1782,7 +1857,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       messages:'0',outboxes:'0',admissions:'0',
     });
     expect(fetches).toBe(0);
-  },120000);
+  },150000);
 
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
