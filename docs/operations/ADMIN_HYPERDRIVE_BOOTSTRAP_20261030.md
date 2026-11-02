@@ -64,3 +64,16 @@ Enter the two role passwords and token when prompted (the token can alternativel
 Record the IDs in MYEONGHA_ADMIN_READ_HYPERDRIVE_ID and MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID through the authorized private deployment Secret channel. The existing stage-inactive workflow still requires the other dedicated URL/CA/Access/Owner Secrets and performs its own live gate checks.
 
 This is not evidence that the Owner authenticated, the Worker was deployed, or production read access was enabled. Public myeongha Worker, previous Hyperdrives and customer data remain unchanged.
+
+## 2026-11-02 production Admin stage preparation
+
+Both Admin Hyperdrive origins were created and read-back verified with disabled cache and TLS verify-full:
+
+- Reader: `6d081e4736e44213bb0b6e08af7e88cc`
+- Audit Writer: `8a3a715514b64e1e9e7cb0e53d08949e`
+
+The following names are now registered as environment-scoped GitHub Actions Secrets under the existing `Production` environment: `MYEONGHA_ADMIN_CLOUDFLARE_ACCOUNT_ID`, `MYEONGHA_ADMIN_ACCESS_AUD`, `MYEONGHA_ADMIN_READ_HYPERDRIVE_ID`, `MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID`, `MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM`, `MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN`. The non-deploying `stage_inactive_worker=no` CI completed successfully (run 41400478918).
+
+Remaining required GitHub Secrets must be supplied on a trusted PC without storing values in code, logs, or chat: Admin Worker deployment API token, exact Owner email, corresponding Supabase Owner `auth.users` UUID, Supabase publishable key, dedicated Reader password, dedicated Audit Writer password. Use `node apps/admin/configure-private-stage-secrets.mjs` in an interactive Windows terminal authenticated with `gh`; each missing value is copied into local clipboard and consumed on Enter. It constructs the two role-specific TLS connection URLs locally and only sends them through GitHub encrypted Secrets. Never use the Hyperdrive-only admin token as an assumed Worker deployment token: the deployment credential requires appropriate Workers deployment, Access-policy read and Hyperdrive read permissions.
+
+Do not enable `stage_inactive_worker=yes` until all required environment Secrets and Access owner policy are verified. This procedure never activates Admin operations or changes the customer-facing `myeongha` Worker.
