@@ -168,6 +168,56 @@ async function navigate(client, origin, pathname, selector) {
   await sleep(120);
 }
 
+async function inspectSharedHeader(client) {
+  return client.evaluate(`(() => {
+    const rect = selector => document.querySelector(selector)?.getBoundingClientRect();
+    const css = selector => {
+      const node = document.querySelector(selector);
+      return node ? getComputedStyle(node) : null;
+    };
+    const header = rect('.product-header');
+    return {
+      height: header?.height ?? 0,
+      innerHeight: rect('.product-header-inner')?.height ?? 0,
+      brandFont: css('.product-brand-name')?.fontSize ?? '',
+      navFont: css('.product-nav-link')?.fontSize ?? '',
+      navGap: css('.product-nav')?.gap ?? '',
+      navDisplay: css('.product-nav')?.display ?? '',
+      navHeight: rect('.product-nav')?.height ?? 0,
+      iconWidth: rect('.product-icon-button')?.width ?? 0,
+      themeWidth: rect('.product-theme-toggle')?.width ?? 0,
+      profileHeight: rect('.product-profile')?.height ?? 0,
+      localeWidth: rect('.ui-locale-select')?.width ?? 0,
+      texture: css('.product-header')?.backgroundImage ?? '',
+      cssLoaded: [...document.styleSheets].some(sheet => sheet.href?.endsWith('/shared-product-header.css')),
+    };
+  })()`);
+}
+
+async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight) {
+  let baseline = null;
+  for (const pathname of routes) {
+    await navigate(client, origin, pathname, '.product-header');
+    await waitForVisible(client, '.product-header .ui-locale-select');
+    const header = await inspectSharedHeader(client);
+    assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
+    assert(Math.abs(header.height - expectedHeight) <= 1 && Math.abs(header.innerHeight - (expectedHeight - 1)) <= 2,
+      `Unexpected header height on ${pathname}: ${JSON.stringify(header)}`);
+    if (expectedHeight === 92) {
+      assert(header.navDisplay === 'flex' && header.profileHeight > 0, `Desktop header is missing nav/profile on ${pathname}`);
+    } else {
+      assert(header.navDisplay === 'none' && header.profileHeight === 0, `Mobile header must hide desktop nav/profile on ${pathname}`);
+    }
+    if (!baseline) { baseline = header; continue; }
+    for (const key of ['height','innerHeight','brandFont','navFont','navGap','navDisplay','navHeight','iconWidth','themeWidth','profileHeight','localeWidth']) {
+      const ok = typeof header[key] === 'number'
+        ? Math.abs(header[key] - baseline[key]) <= 1
+        : header[key] === baseline[key];
+      assert(ok, `Shared header ${key} mismatch on ${pathname}: ${JSON.stringify({ home: baseline[key], current: header[key] })}`);
+    }
+  }
+}
+
 async function verifyDarkPage(client, origin, pathname, selector, { toggle = true, artifactSuffix = null } = {}) {
   await navigate(client, origin, pathname, selector);
   const cleanPath = pathname.split('?')[0];
@@ -300,6 +350,9 @@ try {
   assert(fortune.text && !fortune.intermediate, `Home fortune did not open directly: ${JSON.stringify(fortune)}`);
   await client.evaluate(`document.querySelector('.fortune-cookie-reveal-close')?.click()`);
   await artifact(client, '-home');
+
+  await verifySharedHeaderGeometry(client, origin,
+    ['/hall.html','/reading.html','/face-reading.html','/chat-hub.html','/chat.html','/records.html','/my.html','/reading-detail.html','/auth.html'], 92);
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
@@ -492,6 +545,9 @@ try {
   assert(mobileSaju.overflow <= 2, `Mobile Saju horizontal overflow: ${mobileSaju.overflow}px`);
   assert(mobileSaju.backdrop.includes('saju-empty-light.avif') && mobileSaju.panelBackdrop === 'none' && Math.abs(mobileSaju.mainWidth - mobileSaju.viewportWidth) <= 2, `Mobile Saju artwork must fill the content viewport: ${JSON.stringify(mobileSaju)}`);
   await artifact(client, '-saju-mobile');
+
+  await verifySharedHeaderGeometry(client, origin,
+    ['/hall.html','/reading.html','/chat-hub.html','/my.html'], 86);
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await navigate(client, origin, '/reading-detail.html?scope=year', '.reading-route-state');
