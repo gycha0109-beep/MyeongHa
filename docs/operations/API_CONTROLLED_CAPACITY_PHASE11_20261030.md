@@ -55,10 +55,38 @@ The **fixed 127.0.0.1** destination and allowlisted public health/readiness rout
 
 The JSON report separates successful, non-200, transport-failed and skipped requests; reports measured elapsed duration, achieved throughput, observed concurrency and successful latency p50/p95/p99. Response bodies and transport errors are never printed. A redirect, malformed response or oversized diagnostic body invalidates the report. These are *diagnostic envelope* measurements; no SLO, Production scaling threshold, DB connection ceiling, or Saju CPU/memory limit is inferred. Do not feed the new sustained schema into the Phase 12 short-probe scaling analyzer.
 
+### 2026-11-02 — Actual Saju calculation engine local resource observation (96 requests)
+
+The existing Phase11 dependency-overload scenario uses a deliberately synthetic HTTP upstream, not the actual calculation engine. Separately, `scripts/operations/measure-isolated-saju-engine-capacity-phase11.mjs` now runs the **real Saju production calculation host** compiled from a **clean Saju source checkout**, but exclusively as a disposable, isolated Node.js subprocess listening on `127.0.0.1` with an ephemeral port and a fixed synthetic-only bearer/input. Parent and child processes use only a minimal local execution environment. No hosted project, Saju deployment, external HTTP target, live user record, secret or production database is involved.
+
+Manual reproduction, using a *separate clean Saju worktree* rather than any active development checkout:
+
+```sh
+# In the isolated Saju source worktree:
+npm ci --ignore-scripts --no-audit --no-fund
+npm run build
+
+# In the MyeongHa source worktree:
+node scripts/operations/measure-isolated-saju-engine-capacity-phase11.mjs --saju-repo "<absolute-path-to-clean-built-Saju-checkout>"
+```
+
+The launcher verifies the Saju package name, clean Git worktree and exact 40-character source SHA. It refuses arbitrary URL targets. The actual Saju service executes the pinned synthetic birth fixture through its real `/api/calculations` HTTP endpoint. It measures **20/20/24/32 actual completed requests at 1/2/4/8 concurrency**, each under an 8-second request deadline, with response-format checks, CPU usage deltas and *sampled* RSS memory observations from the isolated child process, followed by a successful recovery request. The local measurement uses **96 total requests** and declares `status=OBSERVED`, never a production capacity acceptance.
+
+An inspectable sanitized measurement from **Node 24.20.0 on Windows, Saju SHA `9807ce89c08afc61b587560d515a475efd819032`**, is checked into [SAJU_REAL_ENGINE_PHASE11_OBSERVATION_20261102.json](./SAJU_REAL_ENGINE_PHASE11_OBSERVATION_20261102.json) (file SHA-256 `2d3d8d4c4cf389898d0b5eb2bcdc8a2f5ded205da7bae0be316c811a28207019`).
+
+| Concurrent callers | Actual real-engine responses | p95 success latency (ms) | Observed server CPU time (ms) | Sampled peak RSS (MiB) |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | 20/20 | 17.003 | 0 | 81.480 |
+| 2 | 20/20 | 14.550 | 47 | 83.449 |
+| 4 | 24/24 | 4.870 | 16 | 84.707 |
+| 8 | 32/32 | 9.207 | 63 | 86.156 |
+
+All **96/96 actual synthetic calculation responses** succeeded, and the subsequent recovery request succeeded. The per-stage CPU timing is an OS/Node observation and can be coarse at short durations; shorter/more concurrent p95 measurements are **not** proof that concurrency improves performance. The observed peak RSS is sampled and **not an upper bound**. No controlled saturation threshold was reached, so no service CPU ceiling, safe concurrency limit, worker sizing, auto-scale trigger, SLO or production-wide RPO/RTO is inferred. `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false` and `serviceResumptionAllowed=false`.
+
+**Outstanding:** Repeat and characterize real engine performance under an explicitly approved isolated, resource-constrained service target to find an actual saturation point; measure DB/Auth/Saju dependency timing with production-like geometry without touching live user traffic. Hosted full DR and privacy continuity remain independently blocked. No Production mutation, backup/restore gate or provider infrastructure is added.
+
 ### 2026-11-02 — Controlled Saju dependency overload boundary (local actual HTTP)
 
 The new `test/saju-calculation-controlled-overload-phase11.test.ts` exercises the **real production Saju calculation HTTP adapter** against an ephemeral `127.0.0.1` HTTP server (not a mocked fetch). It submits **32 synthetic requests with 8 concurrent workers** to a deliberately constrained **2-in-flight** local upstream, returning controlled `429` overload rejection or `503` temporary failure. The test requires exactly 32 upstream requests (no unbounded retry), at least one overload rejection and one unavailable response, a peak of at most two accepted in-flight upstream jobs, consistent `SAJU_TEMPORARILY_UNAVAILABLE` public error classification, and no leakage of the synthetic bearer or upstream private response body.
 
 This fills **only the Phase 11 caller-side concurrent dependency overload/error isolation evidence** using the implemented real HTTP adapter. The upstream is a synthetic local HTTP stub: it **does not run the actual Saju calculation engine**, perform real saju calculation, measure CPU/memory, establish provider limits, demonstrate service-wide concurrency budgets, or authorize Production scaling. Unlike the initial PostgreSQL18 proof, this case is a bounded Vitest local integration test; production `sajuResourceCeilingProven=false`, `productionCapacityProven=false` and `scalingThresholdApproved=false` remain unchanged. Initial local Node24/Vitest4 result: **1/1 PASS**; GitHub PR verification remains separate.
-
-**Outstanding:** Execute on an actual isolated service with synthetic data, measure dependency DB/Auth/Saju timings separately, then exercise supported DB/Saju saturation and dependency-latency scenarios. No Production mutation, backup/restore gate or provider infrastructure is added.
