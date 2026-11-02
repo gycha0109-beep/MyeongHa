@@ -183,6 +183,21 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
     expect(events).toHaveLength(1);
     expect(events[0]?.outcome).toBe('invalid_response');
   });
+  it('preserves existing non-strict legacy best-effort metric behavior',async()=>{
+    const fetchImpl=vi.fn(async()=>fakeResponse());
+    const after=vi.fn(async()=>{throw Error('R39_LEGACY_METRIC_FAILURE');});
+    const provider=createOpenAiSeyeonStructuredProviderV1({
+      apiKey:'r39-not-a-real-live-provider-secret',
+      model:'seyeon-r39-offline',
+      maxOutputTokens:256,
+      priceQuote:price,
+      fetchImpl,
+      meteredAfterOutcome:after,
+    });
+    expect(await provider.generate(request)).toEqual({ok:true});
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(after).toHaveBeenCalledTimes(1);
+  });
   it('denies network entirely if G4 before-dispatch admission fails',async()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse());
     const after=vi.fn(async()=>undefined);
