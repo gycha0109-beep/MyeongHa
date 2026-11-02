@@ -48,6 +48,7 @@ import {
   buildSeyeonPositiveG1PreModelSourceCensusSealV1,
 } from './seyeon-positive-g1-final-model-context-seal-v1.js';
 import {buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
+import type {SeyeonG1HistoricalCandidateDbPortV1} from './postgres-seyeon-g1-historical-candidate-port-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type {
   SeyeonExactModelPersonalSourceSelectionV1,
@@ -278,6 +279,8 @@ extends BaseProductionSliceInputV1 {
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   /** Only the existing verified Subject runner may supply this Owner port. */
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
+  /** Explicit S0 Owner port; historical evidence is never model authority. */
+  readonly historicalSourceCandidateDbPort?: SeyeonG1HistoricalCandidateDbPortV1;
   readonly requiredPersonalRecordCount?: 1;
   readonly executionIdPort: SeyeonProductionChatExecutionIdPortV1;
   readonly relationshipSyncOutboxPort?:
@@ -760,13 +763,55 @@ export async function runSeyeonProductionChatExecutionV1(
               subjectId,threadId,limit:maxRecentMessages,
               currentUserMessageRef:receivedTurn.userMessageId,
             });
-            buildSeyeonG1HistoricalModelWindowCensusV1({
+            const census=buildSeyeonG1HistoricalModelWindowCensusV1({
               currentUserMessageId:receivedTurn.userMessageId,
               currentUserText:receivedTurn.userText,
               maxRecentMessages,
               dbVerifiedWindow,
               exactModelRecentMessages:contextInput.recentMessages.slice(-maxRecentMessages),
             });
+            const original=exactModelPersonalSources.selectedSources[0];
+            const candidate=productionContext.personalRecordProjectionCandidates?.[0];
+            if(input.historicalSourceCandidateDbPort!==undefined
+              && exactModelPersonalSources.selectedPersonalRecordCount===1
+              && exactModelPersonalSources.selectedMemoryCount===1
+              && exactModelPersonalSources.selectedSources.length===1
+              && exactModelPersonalSources.selectedUnpinnedDerivedSources.length===0
+              && productionContext.retrievedMemories.length===1
+              && productionContext.personalRecordAdmissions.length===1
+              && productionContext.personalRecordAdmissions[0]?.reason==='ADMITTED'
+              && productionContext.personalRecordProjectionCandidates?.length===1
+              && productionContext.relationshipHistoryRecords.length===0
+              && productionContext.activeRelationshipEventCount===0
+              && productionContext.historyThroughRevision===0
+              && (productionContext.relationshipRevisionUsedForTurn??0)===0
+              && original?.recordKind==='memory'
+              && original.rawRecordPgDigest!==undefined
+              && original.projectorVersion!==undefined
+              && candidate?.recordId===original.recordId
+              && candidate.grantId===original.grantId
+              && candidate.rawRecordPgDigest===original.rawRecordPgDigest
+              && candidate.projectorVersion===original.projectorVersion) {
+              // DB Owner compares ALL actual G0 origins in its own TX and
+              // persists historicalCandidateProof (never positiveProof).
+              // Even a successful DB receipt NEVER reaches the Interpreter.
+              await input.historicalSourceCandidateDbPort.pinBeforeModel({
+                subjectId,threadId,turnId:receivedTurn.turnId,
+                attemptId:attempt.attemptId,
+                currentUserMessageId:receivedTurn.userMessageId,
+                currentUserTextDigest:'sha256:wire-utf8:v1:'+
+                  createHash('sha256').update(receivedTurn.userText,'utf8').digest('hex'),
+                selectedOriginalMemory:original,
+                selectedSourcesDigest:exactModelPersonalSources.selectedSourcesDigest,
+                preModelContextDigest:sha256({
+                  contextInput,
+                  selectedModelSourceCensusDigest:
+                    exactModelPersonalSources.selectedModelSourceCensusDigest,
+                  completeHistoryDigest:census.selectedCompleteModelWindowDigest,
+                }),
+                historicalSources:census.historicalSources,
+              });
+            }
             throw new SeyeonProductionChatExecutionErrorV1(
               'Se-yeon historical model sources need an immutable G1 DB Pin before Provider.',
             );
