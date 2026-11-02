@@ -577,9 +577,55 @@ begin
       raise exception using errcode='23514',
         constraint='seyeon_offline_r40_unverified_transport_lineage_missing';
     end if;
-    -- R37/R38/R40 are synthetic local assertions, NOT actual Provider
-    -- output or Character Guard PASS. Five valid Cost ACKs plus every
-    -- synthetic digest and negative probe still cannot authorize G2.
+    -- R41: one code-derived PUBLIC synthetic guard fixture must be
+    -- linked to the three correct sealed native-stage Call IDs and source
+    -- set, with all three unverified output SHA values matching the immutable
+    -- CI-installed real-domain-guard fixture manifest. No client PASS flag
+    -- or claim to real Provider origin is accepted.
+    if (select count(*)
+        from seyeon_positive_candidate.local_guard_fixture_lineage_r41 p
+        where p.attempt_id=p_attempt)<>1
+      or exists (
+        select 1
+        from seyeon_positive_candidate.local_guard_fixture_lineage_r41 p
+        join seyeon_positive_candidate.local_guard_fixture_manifest_r41 m
+          on m.manifest_id='seyeon-r41-code-derived-public-guard-v1'
+        join seyeon_positive_candidate.native_stage_lineage_r30 i
+          on i.attempt_id=p.attempt_id and i.stage_index=2
+        join seyeon_positive_candidate.native_stage_lineage_r30 r
+          on r.attempt_id=p.attempt_id and r.stage_index=3
+        join seyeon_positive_candidate.native_stage_lineage_r30 s
+          on s.attempt_id=p.attempt_id and s.stage_index=4
+        join seyeon_positive_candidate.unverified_transport_lineage_r40 ui
+          on ui.attempt_id=p.attempt_id and ui.stage_index=2
+        join seyeon_positive_candidate.unverified_transport_lineage_r40 ur
+          on ur.attempt_id=p.attempt_id and ur.stage_index=3
+        join seyeon_positive_candidate.unverified_transport_lineage_r40 us
+          on us.attempt_id=p.attempt_id and us.stage_index=4
+        where p.attempt_id=p_attempt and (
+          p.selected_sources_digest is distinct from p_selection_digest
+          or p.interpretation_call_id is distinct from i.call_id
+          or p.renderer_call_id is distinct from r.call_id
+          or p.semantic_review_call_id is distinct from s.call_id
+          or p.guarded_envelope_digest is distinct from m.guarded_envelope_digest
+          or ui.structured_output_digest is distinct from
+             m.interpretation_output_digest
+          or ur.structured_output_digest is distinct from
+             m.renderer_output_digest
+          or us.structured_output_digest is distinct from
+             m.semantic_review_output_digest
+          or p.origin_kind is distinct from 'code_authored_local_fixture_no_provider'
+          or p.provider_dispatched is distinct from false
+          or p.provider_output_verified is distinct from false
+          or p.output_guard_verified is distinct from false
+        )
+      )
+    then raise exception using errcode='23514',
+      constraint='seyeon_offline_r41_local_guard_fixture_lineage_missing';
+    end if;
+    -- R37/R38/R40/R41 only demonstrate internal local fixtures and
+    -- original-bound accounting; they do not authenticate an AI output or
+    -- validate an actual user reply. Hard-stop remains unconditional.
     raise exception using errcode='23514',
       constraint='seyeon_offline_r28_complete_provider_lineage_not_approved';
   end if;
