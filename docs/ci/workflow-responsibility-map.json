@@ -326,6 +326,12 @@
       "mainMode": "manual-only",
       "workTrackAttribution": "dispatch-input"
     },
+    "saju-isolated-cgroup-capacity-acceptance.yml": {
+      "responsibility": "saju-real-engine-kernel-cpu-memory-constrained-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "seyeon-c06-f01-v2-manual-eval.yml": {
       "responsibility": "production-character-model-evaluation",
       "prMode": "none",
