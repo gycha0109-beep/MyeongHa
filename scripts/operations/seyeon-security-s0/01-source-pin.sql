@@ -63,6 +63,9 @@ set search_path=pg_catalog, public
 as $g1$
 declare
   v_memory record;
+  v_user_message record;
+  v_turn_message_count integer;
+  v_user_text_digest text;
   v_pg_digest text;
   v_positive jsonb;
   v_replayed boolean;
@@ -117,6 +120,40 @@ begin
     p_subject_id,p_thread_id
   );
 
+  -- W45: before any AI inference, bind this positive Memory Pin to
+  -- the ONE exact DB-original User message on the planned Turn. A caller's
+  -- message ref, a sourceRef string or an LLM's quote is never authority.
+  -- Lock the Turn above first so concurrent Turn changes cannot bypass
+  -- this current-user origin census.
+  select count(*) into v_turn_message_count
+  from public.conversation_messages msg
+  where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
+    and msg.turn_id=p_turn_id;
+  if v_turn_message_count<>1 then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g1_user_message_count_invalid',
+      message='Positive G1 requires one original current User message';
+  end if;
+
+  select msg.id,msg.body_text into v_user_message
+  from public.conversation_messages msg
+  where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
+    and msg.turn_id=p_turn_id and msg.sender_type='user'
+    and msg.thread_character_id is null
+    and msg.character_content_bundle_id is null
+    and msg.redacted_at is null
+    and msg.body_text is not null
+    and length(btrim(msg.body_text))>0
+    and nullif(btrim(msg.content_hash),'') is not null
+  for share of msg;
+  if not found then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g1_user_original_invalid',
+      message='Positive G1 current User origin is unavailable';
+  end if;
+  v_user_text_digest:='sha256:wire-utf8:v1:'||
+    encode(sha256(convert_to(v_user_message.body_text,'UTF8')),'hex');
+
   perform 1 from public.chat_turn_attempts a
   where a.id=p_attempt_id and a.turn_id=p_turn_id
     and a.subject_id=p_subject_id and a.state='running'
@@ -167,6 +204,8 @@ begin
     'turnId',p_turn_id::text,
     'attemptId',p_attempt_id::text,
     'characterId','seyeon',
+    'currentUserMessageId',v_user_message.id::text,
+    'currentUserTextDigest',v_user_text_digest,
     'recordKind','memory',
     'recordId',p_record_id::text,
     'originalGrantId',p_original_grant_id::text,

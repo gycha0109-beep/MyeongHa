@@ -573,3 +573,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - **모델 출력 수용 기준:** 실제 Provider 어댑터의 공통 파서는 완료된 assistant 메시지 **한 건 + JSON text 한 건**만 허용하고, 추론용 `reasoning` 항목을 제외한 임의 tool/auxiliary output, 다중 메시지, user/other role, 진행 중 메시지, commentary, 알 수 없는 content 타입은 모두 거부한다. 엄격 비용·영속 증빙 모드는 `object=response`, 필수 assistant role, 기존 Response ID·요청 모델 결속까지 확인하고 **비정상 출력은 성공 비용·출력 지문 영수증 전에** 거부한다. Legacy mock 호환을 위해 role 누락의 기존 비엄격 fixture만 유지한다.
 - **증거와 범위:** 실제 `createOpenAiSeyeonStructuredProviderV1.generate()` 경로에 합성 HTTP 응답을 공급하는 오프라인 부정·정상 테스트를 추가한다. 실제 OpenAI 서버의 서명을 발급하거나 사용하지 않으며, Provider 진위·의미 안전·실사용자 Consent·G2 Commit/G3 HTTP Reveal 통과를 주장하지 않는다. 개인정보 Projector, 운영 DB, 공개 Route, 유료 AI, PR 병합은 변경하지 않는다.
 - **남은 작업:** 실제 서버가 생성·사용한 Input/Output/Guard 결과를 동일 Call ID 및 DB Owner 검증으로 연결하고, G0에서 승인한 출처·철회 정책 아래 실제 PostgreSQL 두 세션과 HTTP 공개 검증을 완료해야 한다. `HOLD_FORWARD_STOPPED` 유지; 신규 HEAD 실제 CI/TS/Vitest/PG 통과는 확인 전 미확정이다.
+
+
+### 2026-11-02 · W45 · G1 모델 호출 전 DB 원본 User↔Memory 출처 결속 강화 (격리 / HOLD)
+
+- **해결한 AI 입력 출처 문제:** 기존 G1 Positive Pin은 한 Memory와 정확한 Grant, 서버 생성 Final Context 해시를 DB에 고정했지만, 동일 Turn의 *현재 User 원문*이 실제 DB의 원본인지 DB가 독립적으로 증명하는 필드는 없었다. 문자열 SourceRef나 모델 요약을 이용한 원본 주장은 승인하지 않는다.
+- **실제 owner 경계:** S0 격리 SQL `01-source-pin.sql`은 Subject→planned Turn을 잠근 후 같은 Subject/Thread/Turn의 메시지 **정확히 1건**, User sender·비redacted·본문·해시·Character 필드 없음 조건을 확인한다. 그 DB 원본의 Message ID와 원문 UTF-8 SHA-256 지문을 기존 불변 G1 Attempt Pin에 함께 보존한다. 새 원문 복제 테이블이나 별도의 공개 API는 만들지 않는다.
+- **실제 서버 결속:** 기존 `pinBeforeModel` 호출은 서버에서 DB Receive 결과로 얻은 current User ID/텍스트 지문을 보낸다. DB가 반환한 고정 User ID·본문 지문이 다르거나 추가/누락 필드가 있으면 최초 모델 호출 전 거부한다. 정확한 원본 Memory/Grant·Final Context 검증은 그대로 유지한다.
+- **경계:** 격리 Source-only, 자동 운영 Migration 없음. 이 검증은 원문 User 대화에 **인용되거나 복사된 다른 비공개 자료의 파생 출처**까지 승인하는 것이 아니다. 일반 History, Reader, Life Fact와 Preflight private 자료는 여전히 HOLD; 실제 모델 제공자·결제·G2/Reveal 허가 없음. 비활성 Production Projector·Route와 `HOLD_FORWARD_STOPPED` 유지.
+- **검증:** 기존 G1 exact owner receipt test에 본문·메시지 ID 변조와 원문 DB 수 검증 SQL 계약을 추가. HEAD TypeScript/Vitest/실 PostgreSQL/CI는 별도 실행 근거 없이는 PASS 선언하지 않는다.

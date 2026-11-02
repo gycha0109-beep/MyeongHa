@@ -805,6 +805,9 @@ export async function runSeyeonProductionChatExecutionV1(
               threadId,
               turnId: receivedTurn.turnId,
               attemptId: attempt.attemptId,
+              currentUserMessageId:receivedTurn.userMessageId,
+              currentUserTextDigest:'sha256:wire-utf8:v1:'+
+                createHash('sha256').update(receivedTurn.userText,'utf8').digest('hex'),
               originalMemoryId: source.recordId,
               originalGrantId: source.grantId,
               recordType: source.recordType,
