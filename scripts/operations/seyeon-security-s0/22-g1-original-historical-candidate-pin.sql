@@ -63,7 +63,9 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_history_candidate_turn_invalid';
   end if;
-  perform public.assert_seyeon_chat_thread_runtime_v1(p_subject_id,p_thread_id);
+  perform 1 from public.assert_seyeon_chat_thread_runtime_v1(
+    p_subject_id,p_thread_id
+  );
   perform 1 from public.chat_turn_attempts a
     where a.id=p_attempt_id and a.subject_id=p_subject_id
       and a.turn_id=p_turn_id and a.state='running'
