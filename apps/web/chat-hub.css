@@ -961,23 +961,43 @@ html[data-theme="dark"] body.chat-hub-page .chat-person-tag {
 }
 
 
-/* Inactive/registration-only identities are visible at the very bottom, never clickable. */
+/* One passive notice for connectors that are not published yet. */
 .chat-pending-section {
   margin-top: 26px;
-  padding: clamp(18px, 2.5vw, 28px);
+  padding: clamp(20px, 2.8vw, 32px);
   border: 1px solid var(--chat-line);
   border-radius: 14px;
   background: color-mix(in srgb, var(--mh-paper-raised) 66%, transparent);
 }
-.chat-pending-heading { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 8px 22px; margin-bottom: 18px; }
-.chat-pending-heading h2 { margin: 6px 0 0; color: var(--mh-ink); font-family: var(--mh-serif); font-size: 23px; }
-.chat-pending-heading p { margin: 0; color: var(--mh-ink-muted); font-size: 12px; line-height: 1.65; }
-.chat-pending-section .chat-person-card.is-pending { min-height: 185px; opacity: .82; background: color-mix(in srgb, var(--mh-paper-muted) 55%, transparent); }
-.chat-pending-section .chat-person-card.is-pending:hover { transform: none; box-shadow: none; border-color: rgba(128, 92, 55, .2); }
-.chat-pending-section .chat-person-card.is-pending .chat-person-art-image { filter: grayscale(.85); opacity: .67; }
-.chat-pending-section .chat-person-card.is-pending .chat-person-copy { display: flex; flex-direction: column; }
-.chat-pending-section .chat-person-pending-label { display: inline-flex; margin-top: auto; gap: 9px; color: var(--mh-ink-muted); cursor: default; text-decoration: none; }
+.chat-pending-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.chat-pending-heading h2 {
+  margin: 7px 0 0;
+  color: var(--mh-ink);
+  font: 700 clamp(19px, 2vw, 24px)/1.45 var(--mh-serif);
+}
+.chat-pending-symbol {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--chat-line);
+  border-radius: 50%;
+  color: var(--mh-brass-strong);
+  font-size: 23px;
+}
+.chat-pending-copy {
+  margin: 12px 0 0;
+  color: var(--mh-ink-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
 @media (max-width: 767px) {
-  .chat-pending-section { margin-top: 17px; padding: 18px 14px; }
-  .chat-pending-section .chat-person-card.is-pending { min-height: 165px; }
+  .chat-pending-section { margin-top: 17px; padding: 20px 18px; }
+  .chat-pending-symbol { width: 36px; height: 36px; font-size: 20px; }
 }

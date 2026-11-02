@@ -50,6 +50,20 @@ for (const [source, row] of MY_STATIC_UI_COPY_V1) {
 }
 for (const [source, row] of COPY) registerStaticCopy(source, { 'ja-JP': row[0], 'zh-TW': row[1] });
 for (const [source, row] of PLANNED_STATIC_UI_COPY_V1) registerStaticCopy(source, { 'en-US': row[0], 'zh-CN': row[1] });
+for (const [source, localized] of Object.entries({
+  '새로운 연결자를 준비하고 있습니다': {
+    'ja-JP': '新しい案内人を準備しています',
+    'zh-TW': '我們正在準備新的引路人',
+    'en-US': 'More guides are on the way',
+    'zh-CN': '我们正在准备新的引路人',
+  },
+  '명하의 이야기를 함께할 새로운 연결자들이 계속 찾아올 예정입니다.': {
+    'ja-JP': '命河の物語を共にする新しい案内人たちが、これからも登場する予定です。',
+    'zh-TW': '陪伴您走進命河故事的新引路人，未來也會持續加入。',
+    'en-US': 'New guides will keep joining MyeongHa to share your stories.',
+    'zh-CN': '陪伴您走进命河故事的新引路人今后也会不断加入。',
+  },
+})) registerStaticCopy(source, localized);
 
 export function normalizeUiLocale(value) {
   return SUPPORTED_UI_LOCALES.includes(value) ? value : 'ko-KR';
