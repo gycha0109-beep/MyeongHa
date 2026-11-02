@@ -2174,6 +2174,19 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
       [id.attempt],
     );
     expect(r40NeverRecorded.rows).toEqual([{n:'0'}]);
+    // A code-derived synthetic Guard witness cannot be recorded after
+    // revocation either, even if someone forges later-stage Call UUIDs.
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.record_local_guard_fixture_r41($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,$6::uuid,$7::uuid,$8::uuid,$9::text)',
+      [subject,id.thread,id.turn,id.attempt,
+       source.selection.selectedSourcesDigest,
+       'd8000000-0000-4000-8000-000000000061',
+       'd8000000-0000-4000-8000-000000000062',
+       'd8000000-0000-4000-8000-000000000063',
+       'sha256:v1:'+'1'.repeat(64)],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r41_original_grant_revoked',
+    });
     const next=await r33NativeWire('disclosure_classification',
       source.selection.selectedSourcesDigest,
       'sha256:wire-utf8:v1:'+createHash('sha256').update(body,'utf8').digest('hex'),
