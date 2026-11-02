@@ -324,6 +324,7 @@ try {
       panelBackdrop: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage,
       panelBorder: getComputedStyle(document.querySelector('#saju-empty')).borderTopWidth,
       mainWidth: document.querySelector('.gm-saju-main').getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
       overflow: document.documentElement.scrollWidth - innerWidth,
     };
   })()`);
@@ -334,7 +335,7 @@ try {
   assert(sajuState.empty && sajuState.form && sajuState.button, 'Saju onboarding is not fully visible');
   assert(sajuState.hubHidden === true && sajuState.hubRendered === false, 'Saju populated state must fail closed without a Birth Profile');
   assert(sajuState.bodyText.includes('아직 등록된 사주가 없습니다.') && sajuState.bodyText.includes('내 사주 만들기'), 'Saju onboarding copy missing');
-  assert(sajuState.backdrop.includes('saju-empty-light.avif') && sajuState.panelBackdrop === 'none' && sajuState.panelBorder === '0px' && Math.abs(sajuState.mainWidth - 1440) <= 2, `Light Saju artwork must cover the full page body, not the inner registration panel: ${JSON.stringify(sajuState)}`);
+  assert(sajuState.backdrop.includes('saju-empty-light.avif') && sajuState.panelBackdrop === 'none' && sajuState.panelBorder === '0px' && Math.abs(sajuState.mainWidth - sajuState.viewportWidth) <= 2, `Light Saju artwork must cover the full page body, not the inner registration panel: ${JSON.stringify(sajuState)}`);
   assert(sajuState.overflow <= 2, `Saju horizontal overflow: ${sajuState.overflow}px`);
   await artifact(client, '-saju');
 
@@ -484,11 +485,12 @@ try {
       backdrop: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
       panelBackdrop: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage,
       mainWidth: document.querySelector('.gm-saju-main').getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
       overflow: document.documentElement.scrollWidth - innerWidth };
   })()`);
   assert(mobileSaju.width === 390 && mobileSaju.empty && mobileSaju.form && mobileSaju.bottomNav, 'Mobile Saju onboarding is not fully visible');
   assert(mobileSaju.overflow <= 2, `Mobile Saju horizontal overflow: ${mobileSaju.overflow}px`);
-  assert(mobileSaju.backdrop.includes('saju-empty-light.avif') && mobileSaju.panelBackdrop === 'none' && Math.abs(mobileSaju.mainWidth - 390) <= 2, `Mobile Saju artwork must fill the content viewport: ${JSON.stringify(mobileSaju)}`);
+  assert(mobileSaju.backdrop.includes('saju-empty-light.avif') && mobileSaju.panelBackdrop === 'none' && Math.abs(mobileSaju.mainWidth - mobileSaju.viewportWidth) <= 2, `Mobile Saju artwork must fill the content viewport: ${JSON.stringify(mobileSaju)}`);
   await artifact(client, '-saju-mobile');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
