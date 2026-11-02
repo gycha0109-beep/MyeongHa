@@ -326,6 +326,12 @@
       "mainMode": "manual-only",
       "workTrackAttribution": "dispatch-input"
     },
+    "saju-isolated-rate-ladder-phase11.yml": {
+      "responsibility": "saju-real-engine-constrained-rate-ladder-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "saju-isolated-cgroup-capacity-acceptance.yml": {
       "responsibility": "saju-real-engine-kernel-cpu-memory-constrained-evidence",
       "prMode": "none",
