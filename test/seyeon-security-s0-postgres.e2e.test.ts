@@ -1,7 +1,7 @@
 // Watchtower-Track: security
 // Actual production-table SQL and existing TS ports; synthetic identities only.
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { Pool } from 'pg';
@@ -811,6 +811,80 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await publicApi.query('ROLLBACK');
       await privateCommerce.query('ROLLBACK');
       publicApi.release();privateCommerce.release();
+    }
+  });
+
+  it('G5 distinct disposable DB LOGIN credentials isolate API and private Commerce authority',async()=>{
+    await installDisposableG5Credit();
+    const suffix=(process.env.PGDATABASE??'').replace('myeongha_ci_case_','');
+    if(!/^[0-9]+$/u.test(suffix))throw Error('G5 distinct LOGIN only in named disposable CI DB');
+    const apiLogin='g5_api_ci_'+suffix;
+    const commerceLogin='g5_private_ci_'+suffix;
+    const apiPassword=randomBytes(30).toString('hex');
+    const commercePassword=randomBytes(30).toString('hex');
+    // Cluster roles are disposed at the end: never create a Production login.
+    const createLogin=async(name:string,password:string,executor:string)=>{
+      await pool.query(
+        'select pg_catalog.format(\'CREATE ROLE %I LOGIN PASSWORD %L\',$1::text,$2::text)',
+        [name,password],
+      ).then(async r=>pool.query(r.rows[0].format));
+      await pool.query(`grant ${executor} to ${name}`);
+    };
+    let api:Pool|undefined,commerce:Pool|undefined;
+    try{
+      await createLogin(apiLogin,apiPassword,'myeongha_api_executor');
+      await createLogin(commerceLogin,commercePassword,'myeongha_commerce_internal_executor');
+      const connection=Object.freeze({
+        host:process.env.PGHOST,port:Number(process.env.PGPORT??5432),
+        database:process.env.PGDATABASE,ssl:false,max:1,statement_timeout:5000,
+      });
+      api=new Pool({...connection,user:apiLogin,password:apiPassword});
+      commerce=new Pool({...connection,user:commerceLogin,password:commercePassword});
+      // The physical LOGIN identity must differ even before SET ROLE.
+      const {rows:[apiIdentity]}=await api.query(
+        'select session_user as login,current_user as effective_role');
+      const {rows:[commerceIdentity]}=await commerce.query(
+        'select session_user as login,current_user as effective_role');
+      expect(apiIdentity).toEqual({login:apiLogin,effective_role:apiLogin});
+      expect(commerceIdentity).toEqual({login:commerceLogin,effective_role:commerceLogin});
+      const apiClient=await api.connect();
+      const commerceClient=await commerce.connect();
+      try{
+        await apiClient.query('BEGIN');
+        await apiClient.query('SET LOCAL ROLE myeongha_api_executor');
+        await commerceClient.query('BEGIN');
+        await commerceClient.query('SET LOCAL ROLE myeongha_commerce_internal_executor');
+        const {rows:[a]}=await apiClient.query(`select session_user as login,
+          current_user as effective_role,
+          has_function_privilege(current_user,
+            'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as can_settle,
+          has_function_privilege(current_user,
+            'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)','EXECUTE') as can_recover`);
+        const {rows:[c]}=await commerceClient.query(`select session_user as login,
+          current_user as effective_role,
+          has_function_privilege(current_user,
+            'public.internal_cmd_seyeon_g4_receipt_credit_settle_v1(uuid)','EXECUTE') as can_settle,
+          has_function_privilege(current_user,
+            'public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(integer,timestamptz)','EXECUTE') as can_recover`);
+        expect(a).toEqual({login:apiLogin,effective_role:'myeongha_api_executor',can_settle:false,can_recover:false});
+        expect(c).toEqual({login:commerceLogin,effective_role:'myeongha_commerce_internal_executor',can_settle:true,can_recover:true});
+        await expect(apiClient.query(
+          'select attempt_id from public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(1,null)',
+        )).rejects.toMatchObject({code:'42501'});
+        const {rows:found}=await commerceClient.query(
+          'select attempt_id from public.internal_qry_seyeon_g5_unsettled_received_attempts_v1(1,null)',
+        );
+        expect(found).toEqual([]);
+      }finally{
+        await apiClient.query('ROLLBACK');
+        await commerceClient.query('ROLLBACK');
+        apiClient.release();commerceClient.release();
+      }
+    }finally{
+      await api?.end();
+      await commerce?.end();
+      // Unconditionally remove only the names derived from the isolated CI DB.
+      await pool.query(`drop role if exists ${apiLogin},${commerceLogin}`);
     }
   });
 
