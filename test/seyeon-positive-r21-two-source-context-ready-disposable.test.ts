@@ -1923,6 +1923,23 @@ select
       member:false,api_issue:false,api_verify:false,
       evaluator_issue:true,evaluator_verify:true,
     }]);
+    // The issuer can sign through its DB Owner, but cannot directly read
+    // the secret, stored HMAC or raw code-derived witness table.
+    const verifierIdentity=await validatorTx(c=>c.query<{role:string}>(
+      'select current_user::text as role',
+    ));
+    expect(verifierIdentity.rows).toEqual([{
+      role:'myeongha_seyeon_guard_evaluator_r43',
+    }]);
+    for(const target of [
+      'seyeon_positive_candidate.local_guard_seal_key_r42',
+      'seyeon_positive_candidate.local_guard_seals_r42',
+      'seyeon_positive_candidate.local_guard_fixture_lineage_r41',
+    ]){
+      await expect(validatorTx(c=>c.query(
+        'select * from '+target,
+      ))).rejects.toMatchObject({code:'42501'});
+    }
     const sealed=await issueSeyeonR43SeparatedLocalGuardSealV1({
       pinInput,localWitness:restoredWitness,
       validatorPool:validatorPool!,
