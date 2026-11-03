@@ -12,6 +12,12 @@ describe('shared refined header', () => {
     expect(css).toContain('--mh-header-height-desktop: 92px;');
     expect(css).toContain('--mh-header-height-mobile: 86px;');
     expect(css).toContain('height: 100%;');
+    for (const key of ['--mh-header-bell', '--mh-header-moon', '--mh-header-sun', '--mh-header-user']) {
+      expect(css).toContain(key);
+    }
+    expect(css).toContain('.product-theme-toggle-mark::before');
+    expect(css).toContain('.ui-locale-picker::before { content: none !important');
+    expect(css).toContain('mask-size: contain;');
     for (const legacy of ['golden-master.css', 'golden-master-lock.css', 'home-moonlight.css']) {
       expect(await read(legacy)).not.toMatch(/body\.gm-page(?:\[data-page="home"\])? \.product-(?:header|brand|nav|utilities|profile|icon-button|theme-toggle)/);
     }
@@ -29,6 +35,7 @@ describe('shared refined header', () => {
     for (const page of ['hall','reading','face-reading','chat-hub','chat','records','my','reading-detail','auth']) {
       const html = await read(page + '.html');
       expect(html).not.toMatch(/class="product-nav-link" href="my\.html"/);
+      expect(html).not.toContain('<span aria-hidden="true">⌄</span>');
       expect(html).toContain('class="product-profile"');
       expect(html).toContain('class="product-nav"');
       expect(html).toContain('ui-i18n.css');

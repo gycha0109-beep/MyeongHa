@@ -23,13 +23,14 @@ describe('Guest Character Room sign-in gate and dark avatar crop', () => {
     expect(page).toContain("import('../../chat-runtime-client.js')");
   });
 
-  it('crops Seyeon dark portrait without changing the source image or other themes', async () => {
+  it('matches the light theme portrait scale in dark mode without changing the source image', async () => {
     const theme = await web('product-theme.css');
     const start = theme.indexOf('html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-avatar[data-character="seyeon"] {');
     expect(start).toBeGreaterThan(0);
     const rule = theme.slice(start, theme.indexOf('}', start));
     expect(rule).toContain('seyeon-portrait-v2.webp');
-    expect(rule).toContain('background-size: 142% auto;');
+    expect(rule).toContain('background-size: cover;');
+    expect(rule).not.toContain('142%');
     expect(rule).toContain('background-position: center 22%;');
     expect(rule).toContain('background-repeat: no-repeat;');
   });
