@@ -1999,9 +1999,21 @@ select
     )).rejects.toMatchObject({
       code:'23514',constraint:'offline_source_set_immutable',
     });
+    // R42 only verifies an offline seal while the Turn is context_ready.
+    // G2's legacy commit requires validated, so this transient state change
+    // must invalidate the seal and block before the later Provider gate.
+    // Preserve both DB guards: do not weaken the state check to make a
+    // synthetic, no-Provider fixture look like a production-ready commit.
     await expect(tryCommit()).rejects.toMatchObject({
-      constraint:'seyeon_offline_r28_complete_provider_lineage_not_approved',
+      code:'23514',constraint:'seyeon_offline_r42_db_issued_local_seal_missing',
     });
+    // The rejected attempt rolls back its transient validated state;
+    // the DB-issued seal remains authentic for the original ContextReady Turn.
+    const afterRejectedCommit=await validatorTx(c=>c.query<{valid:boolean}>(
+      'select seyeon_positive_candidate.verify_local_guard_seal_r42($1::uuid,$2::uuid) as valid',
+      [subject,a.attempt],
+    ));
+    expect(afterRejectedCommit.rows).toEqual([{valid:true}]);
     // A compromised OR unprivileged request cannot substitute a guessed
     // MAC even if the UUIDs and the R41 witness itself remain unchanged.
     await pool.query(
