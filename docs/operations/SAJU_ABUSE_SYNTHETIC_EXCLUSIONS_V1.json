@@ -85,6 +85,101 @@
       "requestId": "d884d5ce-5991-497e-a0a3-d46250531644",
       "reason": "governed Production Guest Saju Preview Reading smoke after bounded Reading rollout",
       "evidenceRef": "GitHub Actions run 37166344665 / PR #1580"
+    },
+    {
+      "requestId": "ebf79343-5845-4ba1-8fc6-2a2207d36f1a",
+      "reason": "governed Cloudflare primary Saju boundary canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559184461; primary Workers Logs 2026-11-03T01:21:26.320Z"
+    },
+    {
+      "requestId": "bc987b34-f668-4616-bed4-42d1ac2fa031",
+      "reason": "governed Cloudflare primary Saju boundary canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559184461; primary Workers Logs 2026-11-03T01:21:26.275Z"
+    },
+    {
+      "requestId": "20ad7ccd-b65a-49e7-9b30-721e4fbc4c48",
+      "reason": "governed Cloudflare primary Saju boundary canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559184461; primary Workers Logs 2026-11-03T01:21:26.210Z"
+    },
+    {
+      "requestId": "881ee822-d567-4cb5-95ef-d7cf4bae2efd",
+      "reason": "governed Cloudflare primary Saju normal canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559455325; primary Workers Logs 2026-11-03T01:23:56.168Z"
+    },
+    {
+      "requestId": "41effd1a-d470-4e40-a43e-6ec632ad2a3a",
+      "reason": "governed Cloudflare primary Saju normal canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559455325; primary Workers Logs 2026-11-03T01:23:56.076Z"
+    },
+    {
+      "requestId": "4a567718-15c3-4885-b9cc-c7c81540e2ff",
+      "reason": "governed Cloudflare primary Saju normal canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559455325; primary Workers Logs 2026-11-03T01:23:56.007Z"
+    },
+    {
+      "requestId": "0f386a3e-4fac-452c-a0c4-3a70e332ac0e",
+      "reason": "governed Cloudflare primary Saju failed_quota canary; SERVER_FAILURE 503",
+      "evidenceRef": "GitHub Actions run 41559656148; primary Workers Logs 2026-11-03T01:26:30.922Z"
+    },
+    {
+      "requestId": "74fd235b-998d-4979-8ddd-555b51a616aa",
+      "reason": "governed Cloudflare primary Saju failed_quota canary; SERVER_FAILURE 503",
+      "evidenceRef": "GitHub Actions run 41559656148; primary Workers Logs 2026-11-03T01:26:30.859Z"
+    },
+    {
+      "requestId": "afd2e1d5-5d76-4626-891f-ab9530c493d5",
+      "reason": "governed Cloudflare primary Saju failed_quota canary; RATE_LIMITED 429",
+      "evidenceRef": "GitHub Actions run 41559656148; primary Workers Logs 2026-11-03T01:26:10.898Z"
+    },
+    {
+      "requestId": "e3b9690c-0510-4478-b92b-4f0f5d27b947",
+      "reason": "governed Cloudflare primary Saju failed_quota canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559656148; primary Workers Logs 2026-11-03T01:25:45.420Z"
+    },
+    {
+      "requestId": "c69175b2-2529-4ab2-920c-c8c30f8e8a54",
+      "reason": "governed Cloudflare primary Saju failed_quota canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559656148; primary Workers Logs 2026-11-03T01:25:45.340Z"
+    },
+    {
+      "requestId": "a51dc034-a4c3-4c0b-9fb8-692dfe0130e9",
+      "reason": "governed Cloudflare primary Saju failed_quota canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41559656148; primary Workers Logs 2026-11-03T01:25:45.302Z"
+    },
+    {
+      "requestId": "adc0540e-6a24-4a50-8dad-dbf927532ea6",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; RATE_LIMITED 429",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:24:54.303Z"
+    },
+    {
+      "requestId": "e827339b-10ff-4dec-962c-f88aa8fec40e",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; RATE_LIMITED 429",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:24:34.127Z"
+    },
+    {
+      "requestId": "3ad98092-fe07-45f1-add1-8a2ae8fd8d86",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; RATE_LIMITED 429",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:23:41.953Z"
+    },
+    {
+      "requestId": "014b21b7-2282-473e-a10d-11f9d75f581d",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; RATE_LIMITED 429",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:23:23.089Z"
+    },
+    {
+      "requestId": "fd0a9049-7de9-4fcd-8ae5-2fa98d84a924",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:22:22.400Z"
+    },
+    {
+      "requestId": "be621e0e-0b2e-4626-9f30-a3b3bf255230",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:22:22.361Z"
+    },
+    {
+      "requestId": "539ba480-8dab-4e55-b9a2-73fd51e8681d",
+      "reason": "governed Cloudflare primary Saju passed_quota canary; ACCESS_DENIED 401",
+      "evidenceRef": "GitHub Actions run 41571776787; primary Workers Logs 2026-11-03T03:22:22.304Z"
     }
   ]
 }

@@ -133,3 +133,12 @@ node scripts/verify-saju-abuse-admission-postgres.mjs
 - **Umbrella #1529 remains OPEN** until remaining actual acceptance evidence is met; do not declare ROADMAP_COMPLETE. Earlier 2026-10-24/25 notes and Vercel alert states are historical. Primary production runtime is Cloudflare, Vercel auxiliary.
 
 Watchtower-Track: security
+
+## 2026-11-03 A09 provenance checkpoint after A06 completion
+
+- The last mandatory active implementation path is **#1527 / OWASP A09 organic-evidence assessment**; #1526 / A06 was CLOSED with exact deployed Worker quota canary [41571776787](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41571776787). The native Cloudflare primary monitor remains ACTIVE, worker 401/403/429 events reach provider logs and a synthetic provider notification was delivered.
+- A 14-window official provider read-only capture of Cloudflare primary security events (2026-10-27T04:20:00Z–2026-11-03T04:07:00Z) returned **202 events**. Nineteen had independently reconstructed governed synthetic attribution by bounded run windows, route/status and expected counts, and were registered in the canonical exclusion file; **183 non-excluded events** remain with 401=113, 403=14, 429=0, 503=56. The retained population is **not proven organic** and may include unattributed synthetic events. See [A09 capture report](../operations/SECURITY_BASELINE_CLOUDFLARE_20261103.json) and [runbook](../operations/PRODUCTION_SECURITY_ALERTING_RUNBOOK_V1.md).
+- The official monitor JSON now records actual ingestion as VERIFIED for 401/403/429 instead of the stale `PENDING_OPS_API_ROLLOUT`, but intentionally retains `organicBaselineEstablished=false`. No app-owned fixed threshold, provider mutation, artificial anomaly, or invented production traffic was introduced.
+- **Exit:** A06 PASS; A09 provider monitor/configuration and live log ingestion PASS, bounded synthetic-aware evidence PARTIAL, organic attribution/organic alert delivery remains HOLD. Umbrella #1529 remains OPEN; **do not declare ROADMAP_COMPLETE** on current evidence. Do not invent additional engineering work outside these exit conditions.
+
+Watchtower-Track: security
