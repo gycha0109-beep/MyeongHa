@@ -604,8 +604,8 @@ try {
     await sleep(100);
   }
   assert(darkSeyeonAvatar?.theme === 'dark' && darkSeyeonAvatar.image.includes('seyeon-portrait-v2.webp')
-    && darkSeyeonAvatar.size === 'cover' && darkSeyeonAvatar.repeat === 'no-repeat',
-    `Dark Seyeon chat avatar must keep the approved portrait and cover crop: ${JSON.stringify(darkSeyeonAvatar)}`);
+    && darkSeyeonAvatar.size === '142% auto' && darkSeyeonAvatar.repeat === 'no-repeat',
+    `Dark Seyeon chat avatar must keep the approved portrait with zoomed side-margin crop: ${JSON.stringify(darkSeyeonAvatar)}`);
   const darkRecords = await verifyDarkPage(client, origin, '/records.html', '.records-main');
   const darkMy = await verifyDarkPage(client, origin, '/my.html', '.my-main');
 
