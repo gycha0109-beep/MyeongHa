@@ -54,7 +54,7 @@ function portonePayment(overrides:Record<string,unknown>={}): Record<string,unkn
     amount:{total:4900},
     currency:'KRW',
     cancelledAt:'2026-10-18T11:00:00Z',
-    cancellations:[{id:CANCEL,status:'SUCCEEDED'}],
+    cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:4900}],
     ...overrides,
   };
 }
@@ -148,8 +148,20 @@ describe('PortOne authenticated full cancellation -> scoped Reader revoke',()=>{
     {status:'CANCEL_PENDING'},
     {id:'other-order'},
     {transactionId:'other-transaction'},
-    {cancellations:[{id:'different-cancellation',status:'SUCCEEDED'}]},
-    {cancellations:[{id:CANCEL,status:'REQUESTED'}]},
+    {cancellations:[{id:'different-cancellation',status:'SUCCEEDED',totalAmount:4900}]},
+    {cancellations:[{id:CANCEL,status:'REQUESTED',totalAmount:4900}]},
+    // CANCELLED alone is not proof that this one cancellation refunded
+    // the whole purchase. Multiple partial cancellations are not eligible.
+    {cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:1900}]},
+    {cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:'4900'}]},
+    {cancellations:[
+      {id:CANCEL,status:'SUCCEEDED',totalAmount:1900},
+      {id:'another-cancel',status:'SUCCEEDED',totalAmount:3000},
+    ]},
+    {cancellations:[
+      {id:CANCEL,status:'SUCCEEDED',totalAmount:4900},
+      {id:'another-pending',status:'REQUESTED',totalAmount:100},
+    ]},
     {channel:{type:'TEST'}},
   ])('rejects non-authoritative provider response %o, without any DB writes',async(bad)=>{
     const sql:string[]=[];

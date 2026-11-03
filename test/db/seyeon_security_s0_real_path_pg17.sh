@@ -14,3 +14,5 @@ SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-security-s0-postgres.e2e.test.ts --maxWorkers=1
 SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-security-s0-history-presence.e2e.test.ts --maxWorkers=1
+SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-unissued-zero-reply.pg.e2e.test.ts --maxWorkers=1

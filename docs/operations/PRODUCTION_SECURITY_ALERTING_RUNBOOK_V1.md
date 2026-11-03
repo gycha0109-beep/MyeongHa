@@ -191,3 +191,12 @@ Watchtower-Track: security
 - Final A09 gate remains **OPEN** until an independently attributable organic population and any required organically triggered anomaly evidence are supported by actual provider history. Do not label unknown records as organic, invent fixed thresholds, or deliberately flood Production to trigger an alert. Operations DR/readiness is a separate track.
 
 Watchtower-Track: security
+
+## 2026-11-03 — controlled A09 isolation drill and Cloudflare delivery proof
+
+- **Controlled simulation (not production)**: Docker `--network none`, binding only to `127.0.0.1`; 222 HTTP requests to synthetic Member/Guest auth and per-subject quota routes; real MyeongHa structured event emitter. Responses: 200=80, 401=95, 403=27, 429=20. Detector mirror using the repository's native monitor settings emitted one webhook alert on a spike; healthy baseline emitted none; cooldown suppressed duplicates. This is not Cloudflare's proprietary detection implementation.
+- **Cloudflare delivery test (real provider):** `POST /accounts/{account_id}/alerting/v3/policies/{policy_id}/test` accepted, provider history ID `bbd541ad-123e-4bb5-a3b6-99990be91488`, sent 2026-11-03T07:38:56.458597Z via the existing email policy. The connected recipient inbox received the notification at 07:39:04Z. Do not recategorize this as a naturally triggered signal; it is the provider's official synthetic test.
+- **Remaining distinction:** An actual native `zscore_spike` firing from Cloudflare Worker log query has NOT been independently observed. The earlier confirmed Production 401/403/429 log ingestion and A06 rate-limit canary are separate PASS evidence. Keep organic-baseline and native auto-trigger exit flags false. Do not attack Production to create an incident.
+- [Sanitized evidence](../security/A09_ISOLATED_ATTACK_NOTIFICATION_EVIDENCE_20261103.json) and [replay harness](../../scripts/verify-a09-isolated-attack-delivery.mjs). No credentials, external network calls, personal information or policy mutations from the Docker drill.
+
+Watchtower-Track: security
