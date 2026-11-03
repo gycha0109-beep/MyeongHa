@@ -114,7 +114,12 @@ export interface SeyeonDialogueEnvelopeV2 {
 }
 
 export class SeyeonRendererGuardErrorV2 extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    readonly code: 'OUTPUT_STRUCTURE_INVALID' | 'REVIEW_HASH_MISMATCH' |
+      'REVIEW_EVIDENCE_INVALID' | 'SEMANTIC_REVIEW_REJECTED' = 'OUTPUT_STRUCTURE_INVALID',
+    readonly failureCodes: readonly SeyeonSemanticFailureCodeV2[] = [],
+  ) {
     super(message);
     this.name = 'SeyeonRendererGuardErrorV2';
   }
@@ -298,6 +303,7 @@ export function guardSeyeonSemanticReviewV2(input: {
   if (reviewedUtteranceHash !== expectedHash) {
     throw new SeyeonRendererGuardErrorV2(
       'Semantic review is not bound to the current renderer utterance.',
+      'REVIEW_HASH_MISMATCH',
     );
   }
 
@@ -373,6 +379,7 @@ export function guardSeyeonSemanticReviewV2(input: {
     if (missingEvidence !== undefined) {
       throw new SeyeonRendererGuardErrorV2(
         `Semantic review failure lacks evidence: ${missingEvidence}`,
+        'REVIEW_EVIDENCE_INVALID',
       );
     }
   }
@@ -507,6 +514,8 @@ export function guardSeyeonRendererOutputV2(input: {
   if (semanticReview.failureCodes.length > 0) {
     throw new SeyeonRendererGuardErrorV2(
       `Se-yeon semantic review rejected renderer output: ${semanticReview.failureCodes.join(', ')}`,
+      'SEMANTIC_REVIEW_REJECTED',
+      semanticReview.failureCodes,
     );
   }
 
