@@ -65,14 +65,39 @@ try {
     } });
     assert.equal(birth.status, 201);
     stage = 'normal-and-quota';
+    // Keep the synthetic quota proof inside a bounded number of concurrent real
+    // calculations. Unbounded limit+1 bursts previously coincided with 503s.
+    // The production quota values remain provider-owned and unchanged.
+    async function collectResponses(path, token, count) {
+      const responses = new Array(count);
+      let nextIndex = 0;
+      let stopped = false;
+      const startedAt = Date.now();
+      // Await every already-started request before writing failure evidence.
+      // Never retry an uncertain write or send further requests after an unexpected failure.
+      await Promise.all(Array.from({ length: Math.min(count, 8) }, async () => {
+        while (!stopped && nextIndex < count) {
+          const index = nextIndex++;
+          try {
+            responses[index] = await send(path, {
+              method: 'POST', token,
+              ...(path.endsWith('preview-reading') ? { body: { readingText: '전체 사주' } } : {}),
+            });
+          } catch {
+            // Only record a safe status marker; never serialize a thrown error.
+            responses[index] = { status: 0, retry: null };
+          }
+          if (![200, 429].includes(responses[index].status)) stopped = true;
+        }
+      }));
+      return { responses: responses.filter(Boolean), elapsedMs: Date.now() - startedAt };
+    }
     for (const identity of [{ kind: 'member', token: accessToken }, { kind: 'guest', token: guestToken }]) {
       for (const path of ['/api/me/saju/calculation', '/api/me/saju/preview-reading']) {
         const limit = path.endsWith('calculation') ? approvedLimits.calculation : approvedLimits.previewReading;
         assert.ok(Number.isSafeInteger(limit) && limit >= 1 && limit <= 60);
-        const responses = await Promise.all(Array.from({ length: phase === 'quota' ? limit + 1 : 1 }, () => send(path, {
-          method: 'POST', token: identity.token,
-          ...(path.endsWith('preview-reading') ? { body: { readingText: '전체 사주' } } : {}),
-        })));
+        const expectedAttempts = phase === 'quota' ? limit + 1 : 1;
+        const { responses, elapsedMs } = await collectResponses(path, identity.token, expectedAttempts);
         if (phase === 'quota') {
           // Keep a privacy-safe status histogram even when a real Worker quota canary fails.
           // Never downgrade upstream 503s to successful admission or expose response bodies.
@@ -81,7 +106,13 @@ try {
             const status = String(response.status);
             statusCounts[status] = (statusCounts[status] ?? 0) + 1;
           }
-          results.push({ route: path, identityKind: identity.kind, attemptCount: responses.length, statusCounts });
+          results.push({ route: path, identityKind: identity.kind, requestedCount: expectedAttempts,
+            attemptCount: responses.length, elapsedMs, statusCounts });
+        }
+        if (phase === 'quota') {
+          // Never accept an apparent rate limit whose cohort exceeded the policy window.
+          assert.ok(elapsedMs <= approvedLimits.windowSeconds * 1000,
+            'Synthetic quota cohort outlasted its policy window');
         }
         assert.deepEqual(responses.map(r => r.status).sort(), phase === 'quota' ? [...Array(limit).fill(200), 429] : [200]);
         for (const response of responses) {
