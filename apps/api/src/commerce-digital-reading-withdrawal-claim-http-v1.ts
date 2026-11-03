@@ -103,9 +103,20 @@ export async function handleDigitalReadingWithdrawalClaimHttpV1(input:Readonly<{
   const method=input.request.method;
   if(method!=='POST'&&method!=='GET')
     return new Response(null,{status:405,headers:{...NO_STORE,Allow:'GET, POST'}});
-  if(method==='POST'&&(input.request.headers.get('origin')!==url.origin
-    ||url.searchParams.has('claimId')))
-    return error('ORIGIN_FORBIDDEN',403);
+  if(method==='POST'){
+    // Browser writes require the exact Origin. Native clients may omit it,
+    // but only with an explicit JWT-shaped Bearer and no ambient Cookie.
+    // The identity verifier below, not the token shape, authenticates Member.
+    const origin=input.request.headers.get('origin');
+    const bearer=input.request.headers.get('authorization');
+    const nativeBearerOnly=origin===null
+      && input.request.headers.get('cookie')===null
+      && typeof bearer==='string'
+      && /^Bearer [A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/u.test(bearer);
+    if(url.searchParams.has('claimId') ||
+       (origin!==url.origin && !nativeBearerOnly))
+      return error('ORIGIN_FORBIDDEN',403);
+  }
   if(typeof input.idempotencySecret!=='string'
     ||Buffer.byteLength(input.idempotencySecret,'utf8')<32)
     return error('SERVICE_UNAVAILABLE',503);
