@@ -28,7 +28,7 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
 
   it('admits no uninstalled or unowned DB issuer before paid dispatch',async()=>{
     const query=vi.fn(async(sql:string,args:unknown[])=>{
-      expect(sql).toContain('count(*)=3');
+      expect(sql).toContain('count(*)=4');
       expect(sql).toContain("'row_security=off'=any(p.proconfig)");
       expect(sql).toContain("pg_get_userbyid(p.proowner)='postgres'");
       expect(sql).toContain("not has_function_privilege('anon',p.oid,'EXECUTE')");
@@ -38,6 +38,7 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
         'public.cmd_issue_seyeon_zero_source_first_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)',
         'public.qry_seyeon_locked_first_zero_source_reveal_v1(uuid,uuid,uuid,uuid)',
         'seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)',
+        'public.cmd_recover_seyeon_unissued_zero_reply_v1(uuid,uuid,text,bytea)',
       ]);
       return {rows:[{ready:true}]};
     });

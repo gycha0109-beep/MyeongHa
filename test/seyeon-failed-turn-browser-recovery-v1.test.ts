@@ -3,7 +3,7 @@ import {describe,expect,it} from 'vitest';
 
 const code=readFileSync(new URL(
   '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.ts',
-  import.meta.url),'utf8');
+  import.meta.url),'utf8').replace(/\r\n/gu,'\n');
 const sql=readFileSync(new URL(
   '../scripts/operations/seyeon-security-s0/production-20-recover-exact-failed-user-turn-20261102.sql',
   import.meta.url),'utf8');
