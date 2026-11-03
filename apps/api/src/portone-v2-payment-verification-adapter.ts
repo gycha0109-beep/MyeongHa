@@ -987,7 +987,7 @@ export function createPortOneV2FullCancellationVerifierV1(
         const verifiedAmountMinor=requireAmountMinor(payment.amount);
         // A CANCELLED payment can result from several separate partial
         // cancellations. Such a set must never be promoted into one exact
-        // full-refund authority for a scoped Reader Grant.
+        // full-refund authority for one exact paid Reader purchase.
         if (!Array.isArray(payment.cancellations)
             || payment.cancellations.length!==1) {
           return fail('INVALID_PAYMENT',
