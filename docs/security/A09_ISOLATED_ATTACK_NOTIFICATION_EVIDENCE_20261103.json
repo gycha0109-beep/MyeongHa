@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "myeongha-a09-isolated-attack-and-provider-delivery-evidence-v1",
+  "observedDateKst": "2026-11-03",
+  "testType": "controlled-synthetic-exercise",
+  "isolation": {
+    "execution": "Docker node:24-bookworm-slim",
+    "network": "--network none",
+    "listener": "127.0.0.1 only",
+    "productionEndpointsContacted": false,
+    "productionDbTouched": false,
+    "productionMonitorConfigurationChanged": false
+  },
+  "localAttack": {
+    "testedAgainst": "real apps/api/src/security-observability.ts event emitter",
+    "requestCount": 222,
+    "httpStatusDistribution": {
+      "200": 80,
+      "401": 95,
+      "403": 27,
+      "429": 20
+    },
+    "totalCanonicalSecurityEvents": 190,
+    "baseline": {
+      "source": "simulated historical events, not real production baseline",
+      "duration": "4h",
+      "buckets": 48,
+      "noAlertBeforeAttack": true
+    },
+    "anomalyMirror": {
+      "providerConfigAlgorithm": "zscore_spike",
+      "sensitivitySigma": 3.5,
+      "shortWindow": "5m",
+      "longWindow": "4h",
+      "detectedEvents": 142,
+      "computedZScore": 141,
+      "detected": true,
+      "implementation": "local deterministic mirror; not Cloudflare's proprietary evaluation"
+    },
+    "delivery": {
+      "channel": "isolated local HTTP webhook receiver",
+      "accepted": 1,
+      "duplicateNotificationSuppressed": true
+    },
+    "result": "PASS"
+  },
+  "cloudflareOfficialTest": {
+    "policyId": "fab0d24cd73740f5b2dba97766f78a66",
+    "action": "POST official notification policy /test",
+    "apiAccepted": true,
+    "providerHistoryId": "bbd541ad-123e-4bb5-a3b6-99990be91488",
+    "providerSentAtUtc": "2026-11-03T07:38:56.458597Z",
+    "emailReceivedAtUtc": "2026-11-03T07:39:04Z",
+    "mailboxReceived": true,
+    "deliveryMechanism": "email",
+    "testOnly": true,
+    "result": "PASS"
+  },
+  "limitations": {
+    "simulatedAttackDidNotGenerateCloudflareMonitorSignal": true,
+    "nativeCloudflareAutomaticAnomalyFiringProven": false,
+    "organicAnomalyNotificationProven": false,
+    "productionSecurityAlertBaselineChanged": false,
+    "policyClosureAllowedByThisEvidenceAlone": false
+  }
+}

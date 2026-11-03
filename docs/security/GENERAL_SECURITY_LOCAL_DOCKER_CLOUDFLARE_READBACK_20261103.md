@@ -69,3 +69,12 @@ Watchtower-Track: security
 - Collection required no Production DB, Worker, alert configuration or synthetic traffic modification. Private exported request-level logs remained exclusively in the local verification directory, outside Git; the committed evidence contains only aggregated counts, SHA-256 and canonical test exclusion receipts.
 
 Watchtower-Track: security
+
+## 2026-11-03 — requested isolated simulated security event spike
+
+- Lab used Docker `--network none`, real structured security event emitter and actual local HTTP request flood of 222 mock-target calls (200=80, 401=95, 403=27, 429=20). The deterministic mirror of configured 3.5-sigma 5m/4h policy notified its isolated local receiver once; baseline/no-spike produced zero notifications and repeat cooldown suppressed duplicate dispatch.
+- Independent official Cloudflare alert policy `/test` succeeded; current primary email receiver genuinely received the notification. Provider alert history dispatched `bbd541ad-123e-4bb5-a3b6-99990be91488` at 07:38:56Z. This was synthetic **test** delivery, not organic auto-detection and was not caused by lab HTTP traffic.
+- Reproduce isolated replay with `docker run --rm --network none --memory 512m -v '<repo>:/workspace:ro' -w /workspace node:24-bookworm-slim node scripts/verify-a09-isolated-attack-delivery.mjs`. The machine-readable [evidence](A09_ISOLATED_ATTACK_NOTIFICATION_EVIDENCE_20261103.json) is sanitized. No Production change.
+- General security remains at A06 PASS / A09 native organic-trigger evidence not yet attained. Do not infer ROADMAP_COMPLETE solely from two separate synthetic exercises.
+
+Watchtower-Track: security

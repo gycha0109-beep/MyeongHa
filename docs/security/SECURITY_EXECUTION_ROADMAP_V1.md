@@ -142,3 +142,14 @@ Watchtower-Track: security
 - **Exit:** A06 PASS; A09 provider monitor/configuration and live log ingestion PASS, bounded synthetic-aware evidence PARTIAL, organic attribution/organic alert delivery remains HOLD. Umbrella #1529 remains OPEN; **do not declare ROADMAP_COMPLETE** on current evidence. Do not invent additional engineering work outside these exit conditions.
 
 Watchtower-Track: security
+
+## 2026-11-03 — isolated attack exercise and real Cloudflare notification test
+
+- User-authorized isolated simulation ran on `node:24-bookworm-slim` with **Docker `--network none`** and loopback-only HTTP endpoints; the simulator imported the **actual** `apps/api/src/security-observability.ts` event writer rather than inventing security log fields.
+- 222 local HTTP calls yielded 80 success / 95 authentication-denied / 27 permission-denied / 20 rate-limited responses. Canonical schema analysis saw 190 security events (including 48 synthetic historical baseline events).
+- Using the repository's *current provider policy configuration* (z-score sensitivity 3.5, 5-minute recent, 4-hour historical, 1-hour repeat), an explicitly labelled **local deterministic detector mirror** did not alert during the simulated quiet baseline, detected the 142-event spike, delivered exactly one event to the isolated webhook sink, and suppressed the repeated notification.
+- Separately, the **actual existing Cloudflare primary alert policy** official `/test` endpoint succeeded. Cloudflare notification history independently recorded email dispatch `bbd541ad-123e-4bb5-a3b6-99990be91488` on `2026-11-03T07:38:56.458597Z`; the configured Gmail inbox received the corresponding alert at `2026-11-03T07:39:04Z`. This validates the external provider delivery route, not actual automatic anomaly firing.
+- Scope boundary: the **local mirror and provider test are separate experiments**. The Docker traffic never reached Cloudflare, so these successes do **not** prove the Cloudflare-native anomaly engine automatically triggered on a real spike. No production Worker, database, threshold or destination was modified. Raw request data and credentials are excluded from committed evidence.
+- [Machine-readable exercise evidence](A09_ISOLATED_ATTACK_NOTIFICATION_EVIDENCE_20261103.json); reproduction script `scripts/verify-a09-isolated-attack-delivery.mjs`. This meets the user's requested **safe simulation** while maintaining accurate A09/umbrella closure authority. #1527 and #1529 remain OPEN until actual provider automated trigger/organic attribution is proved or the acceptance scope is explicitly revised.
+
+Watchtower-Track: security
