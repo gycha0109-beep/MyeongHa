@@ -245,10 +245,10 @@ async function verifyColdHeaderFirstPaint(client, origin) {
         assert(drift <= 1.5, 'Cold-load header ' + field + ' shifted ' + drift + 'px on ' + pathname
           + ': ' + JSON.stringify(samples.slice(0, 8)));
       }
-      const hydrated = await client.evaluate("(() => ({
+      const hydrated = await client.evaluate(`(() => ({
         themeBound: document.querySelector('.product-theme-toggle')?.dataset.themeBound,
         localeMounted: document.querySelector('[data-ui-locale-picker]')?.dataset.uiLocaleMounted,
-      }))()");
+      }))()`);
       assert(hydrated.themeBound === 'true' && hydrated.localeMounted === 'true',
         'Static header controls are not interactive on ' + pathname + ': ' + JSON.stringify(hydrated));
     }

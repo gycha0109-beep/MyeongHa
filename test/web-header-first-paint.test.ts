@@ -25,7 +25,7 @@ describe('first-paint header controls', () => {
     expect(locale).toContain("existing.querySelector('.ui-locale-select')");
     expect(locale).toContain("select.addEventListener('change'");
     expect(locale).toContain("wrap.dataset.uiLocaleMounted = 'true'");
-    expect(css).toContain('scrollbar-gutter: stable;');
+    expect(css).toContain('scrollbar-gutter: stable both-edges;');
     expect(css).not.toContain('grid-template-columns: 205px minmax(335px, 1fr) max-content !important;\n/* First-paint geometry');
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 334px !important;');
   });
