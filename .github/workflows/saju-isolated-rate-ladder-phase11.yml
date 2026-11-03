@@ -3,6 +3,15 @@ run-name: "[WT:ops] Phase 11 actual Saju CPU-constrained rate ladder"
 
 on:
   workflow_dispatch:
+    inputs:
+      experiment:
+        description: CPU-constrained workload configuration
+        type: choice
+        required: true
+        default: shared
+        options:
+          - shared
+          - split
 
 permissions:
   contents: read
@@ -42,14 +51,31 @@ jobs:
           npm run build
 
       - name: Measure rate ladder in memory and CPU constrained offline container
+        if: ${{ inputs.experiment != 'split' }}
         shell: bash
         run: bash scripts/operations/run-isolated-saju-rate-ladder-phase11-ci.sh
 
+      - name: Measure separately constrained actual Saju and load generator
+        if: ${{ inputs.experiment == 'split' }}
+        run: |
+          node scripts/operations/run-isolated-saju-split-rate-ladder-phase11.mjs \
+            --saju-repo "$GITHUB_WORKSPACE/_isolated_saju" \
+            --out "$RUNNER_TEMP/myeongha-isolated-saju-split-rate-ladder-phase11-proof.json"
+
       - name: Upload sanitized synthetic rate measurements
-        if: ${{ always() }}
+        if: ${{ always() && inputs.experiment != 'split' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: isolated-saju-rate-ladder-phase11-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-isolated-saju-rate-ladder-phase11-proof.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload sanitized separately constrained rate measurements
+        if: ${{ always() && inputs.experiment == 'split' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: isolated-saju-split-rate-ladder-phase11-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-isolated-saju-split-rate-ladder-phase11-proof.json
           if-no-files-found: ignore
           retention-days: 14

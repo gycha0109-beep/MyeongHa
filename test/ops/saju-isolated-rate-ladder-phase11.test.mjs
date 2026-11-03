@@ -125,4 +125,32 @@ describe('Phase 11 controlled real Saju rate-ladder evidence', () => {
     expect(runner).toContain('REQUEST_DEADLINE_MS = 2500');
     expect(runner).toContain('saturationKneeApproved: false');
   });
+
+  it('isolates split driver and Saju quotas without changing the original workflow default', () => {
+    const workflow = readFileSync('.github/workflows/saju-isolated-rate-ladder-phase11.yml', 'utf8');
+    const orchestrator = readFileSync('scripts/operations/run-isolated-saju-split-rate-ladder-phase11.mjs', 'utf8');
+    const service = readFileSync('scripts/operations/saju-split-service-phase11.mjs', 'utf8');
+    const driver = readFileSync('scripts/operations/measure-isolated-saju-split-rate-ladder-phase11.mjs', 'utf8');
+    expect(workflow).toContain('default: shared');
+    expect(workflow).toContain("inputs.experiment == 'split'");
+    expect(workflow).toContain('isolated-saju-split-rate-ladder-phase11-');
+    expect(orchestrator).toContain("'--network=none'");
+    expect(orchestrator).toContain("'--network=container:' + cid");
+    expect(orchestrator).toContain("'--cpus=0.50'");
+    expect(orchestrator).toContain("'--cpus=1.00'");
+    expect(orchestrator).toContain("'--cap-drop=ALL'");
+    expect(orchestrator).toContain("'--read-only'");
+    expect(orchestrator).toContain('BLOCKED_INCOMPLETE');
+    expect(orchestrator).toContain('SAJU_PRODUCTION_SERVICE_BEARER');
+    expect(orchestrator).toContain('saturationKneeApproved: false');
+    expect(service).toContain("service.listen(43007");
+    expect(service).toContain("metricServer.listen(43008");
+    expect(driver).toContain("http://127.0.0.1:43007/api/calculations");
+    expect(driver).toContain("http://127.0.0.1:43008/metrics");
+    expect(driver).toContain('separateResourceCgroups: true');
+    expect(driver).toContain('totalPlannedSlots');
+    expect(driver).toContain('driverCpuUsecDelta');
+    expect(driver).toContain('serviceCpuUsecDelta');
+    expect(driver).toContain('serviceResumptionAllowed: false');
+  });
 });
