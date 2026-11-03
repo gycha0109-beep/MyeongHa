@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 
 const read = (path: string) => readFile(new URL('../apps/web/' + path, import.meta.url), 'utf8');
-const routes = ['hall', 'reading', 'face-reading', 'chat-hub', 'chat', 'records', 'my', 'reading-detail', 'auth'];
+const routes = ['hall', 'reading', 'face-reading', 'chat-hub', 'chat', 'records', 'my', 'reading-detail', 'auth', 'contact'];
 
 describe('first-paint header controls', () => {
   it.each(routes)('%s pre-renders complete right-side controls before scripts load', async (page) => {
@@ -10,10 +10,13 @@ describe('first-paint header controls', () => {
     const header = html.slice(html.indexOf('<header class="product-header'), html.indexOf('</header>'));
     expect(header).toContain('class="product-theme-toggle"');
     expect(header).toContain('class="product-theme-toggle-mark"');
+    expect(header).toContain('class="product-report-link"');
+    expect(header).toContain('href="contact.html?report=content"');
     expect(header).toContain('data-ui-locale-picker');
     expect(header).toContain('class="ui-locale-select"');
     expect(header.match(/<option value=/g)).toHaveLength(5);
     expect(header.indexOf('class="product-theme-toggle"')).toBeLessThan(header.indexOf('class="product-profile"'));
+    expect(header.indexOf('class="product-report-link"')).toBeGreaterThan(header.indexOf('class="product-profile"'));
     expect(header.indexOf('class="ui-locale-picker"')).toBeGreaterThan(header.indexOf('class="product-profile"'));
   });
 
@@ -28,6 +31,6 @@ describe('first-paint header controls', () => {
     expect(css).toContain('html { overflow-y: scroll; }');
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
     expect(css).not.toContain('grid-template-columns: 205px minmax(335px, 1fr) max-content !important;\n/* First-paint geometry');
-    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 334px !important;');
+    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 382px !important;');
   });
 });

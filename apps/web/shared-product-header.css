@@ -261,17 +261,107 @@ html[data-theme="dark"] body.product-page .product-header .ui-locale-select {
   body.product-page .product-header .ui-locale-select { max-width: 78px; width: 78px; font-size: 10px; }
 }
 
-/* One 20px / 1.8px-stroke outline icon family across all nine headers. */
+/* Image assets extracted from the approved 10-icon ZIP.
+   5 columns: theme, language, notification, profile, report.
+   Row 1 light, row 2 dark. One 240x96 image means the same asset is
+   present from first paint on every route; CSS-only row change on theme. */
 body.product-page .product-header {
-  --mh-header-bell: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M18%208a6%206%200%200%200-12%200c0%207-3%207-3%209h18c0-2-3-2-3-9%22%2F%3E%3Cpath%20d%3D%22M10%2021h4%22%2F%3E%3C%2Fsvg%3E");
-  --mh-header-moon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20.985%2012.486A9%209%200%200%201%2011.514%203.015%209%209%200%201%200%2020.985%2012.486Z%22%2F%3E%3C%2Fsvg%3E");
-  --mh-header-sun: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M12%202v2m0%2016v2M4.93%204.93l1.41%201.41m11.32%2011.32%201.41%201.41M2%2012h2m16%200h2M4.93%2019.07l1.41-1.41M17.66%206.34l1.41-1.41%22%2F%3E%3C%2Fsvg%3E");
-  --mh-header-user: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%228%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M4%2021v-2a8%208%200%200%201%2016%200v2%22%2F%3E%3C%2Fsvg%3E");
+  --mh-glyph-sprite: url("assets/header/header-ui-glyphs-v1.png");
+  --mh-glyph-row: 0px;
 }
+html[data-theme="dark"] body.product-page .product-header { --mh-glyph-row: -28px; }
 body.product-page .product-header .product-icon-button,
 body.product-page .product-header .product-theme-toggle,
 body.product-page .product-header .product-profile,
+body.product-page .product-header .product-report-link,
 body.product-page .product-header .ui-locale-select {
+  transition: border-color .16s ease, background-color .16s ease;
+}
+body.product-page .product-header .product-theme-toggle:hover { transform: none !important; }
+body.product-page .product-header .product-theme-toggle-mark,
+body.product-page .product-header .product-profile-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 0 !important;
+  background: transparent !important;
+  border: none !important;
+}
+body.product-page .product-header .product-icon-button::before,
+body.product-page .product-header .product-theme-toggle-mark::before,
+body.product-page .product-header .product-profile-mark::before,
+body.product-page .product-header .ui-locale-picker::before,
+body.product-page .product-header .product-report-link::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 28px !important;
+  height: 28px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  transform: translate(-50%, -50%) !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  background-image: var(--mh-glyph-sprite) !important;
+  background-size: 140px 56px !important;
+  background-repeat: no-repeat !important;
+  -webkit-mask: none !important;
+  mask: none !important;
+  pointer-events: none;
+}
+/* x offsets fixed in 28px cells: 0 / -28 / -56 / -84 / -112 */
+body.product-page .product-header .product-theme-toggle-mark::before {
+  background-position: 0 var(--mh-glyph-row) !important;
+}
+body.product-page .product-header .ui-locale-picker::before {
+  top: 50% !important;
+  left: 17px !important;
+  z-index: 1;
+  background-position: -28px var(--mh-glyph-row) !important;
+}
+body.product-page .product-header .product-icon-button::before {
+  background-position: -56px var(--mh-glyph-row) !important;
+}
+body.product-page .product-header .product-profile-mark::before {
+  background-position: -84px var(--mh-glyph-row) !important;
+}
+body.product-page .product-header .product-report-link::before {
+  background-position: -112px var(--mh-glyph-row) !important;
+}
+body.product-page .product-header .product-icon-button::after,
+body.product-page .product-header .product-profile-mark::after {
+  content: none !important;
+  display: none !important;
+}
+body.product-page .product-header .product-report-link {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid rgba(161, 123, 88, .38);
+  border-radius: 50%;
+  color: #523e34;
+  background: rgba(255, 250, 243, .56);
+  text-decoration: none;
+}
+body.product-page .product-header .product-report-link:hover {
+  border-color: #a77a4c;
+  background-color: rgba(255, 250, 243, .85);
+}
+body.product-page .product-header .ui-locale-select {
+
   transition: border-color .16s ease, background-color .16s ease;
 }
 body.product-page .product-header .product-icon-button::before,
@@ -459,5 +549,74 @@ body.product-page .product-header .ui-locale-picker {
   body.product-page .product-header .ui-locale-picker {
     flex-basis: 82px;
     width: 82px;
+  }
+}
+
+/* Five pre-rendered controls, including the report link, reserve space before
+   any authentication/theme/locale script runs. */
+body.product-page .product-header .product-header-inner {
+  grid-template-columns: 205px minmax(335px, 1fr) 382px !important;
+}
+body.product-page .product-header .product-utilities { gap: 9px !important; }
+body.product-page .product-header .ui-locale-select {
+  padding-left: 35px;
+  padding-right: 16px;
+  font-size: 11px;
+}
+body.product-page .product-header .product-profile {
+  gap: 5px;
+}
+html[data-theme="dark"] body.product-page .product-header .product-report-link {
+  color: #f1e4d2;
+  border-color: rgba(217, 174, 117, .50);
+  background-color: rgba(11, 21, 31, .54);
+}
+html[data-theme="dark"] body.product-page .product-header .product-report-link:hover {
+  border-color: #d7aa72;
+  background-color: rgba(45, 58, 70, .88);
+}
+body.product-page .product-header .product-report-link:focus-visible {
+  outline: 2px solid #c49a5c;
+  outline-offset: 3px;
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  body.product-page .product-header .product-header-inner {
+    grid-template-columns: 146px minmax(200px, 1fr) 322px !important;
+  }
+  body.product-page .product-header .product-icon-button,
+  body.product-page .product-header .product-theme-toggle,
+  body.product-page .product-header .product-report-link {
+    width: 36px !important;
+    min-width: 36px;
+    min-height: 36px !important;
+    flex: 0 0 36px !important;
+  }
+  body.product-page .product-header .ui-locale-select {
+    padding-left: 30px;
+    padding-right: 13px;
+  }
+}
+@media (max-width: 767px) {
+  body.product-page .product-header .product-report-link {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    flex: 0 0 36px;
+  }
+  body.product-page .product-header .ui-locale-select {
+    padding-left: 30px;
+    padding-right: 13px;
+  }
+}
+@media (max-width: 420px) {
+  body.product-page .product-header .product-report-link {
+    width: 34px;
+    min-width: 34px;
+    min-height: 34px;
+    flex: 0 0 34px;
+  }
+  body.product-page .product-header .ui-locale-select {
+    padding-left: 29px;
+    padding-right: 10px;
   }
 }
