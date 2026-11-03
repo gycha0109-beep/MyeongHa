@@ -2,7 +2,8 @@ import pg from 'pg';
 import {randomUUID} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {createAdminOriginTargetV1,ADMIN_ORIGIN_PRINCIPAL_SQL_V1} from './origin-preflight.mjs';
+import {createAdminOriginTargetV1,ADMIN_ORIGIN_PRINCIPAL_SQL_V1,
+ assertAdminOriginClientTlsV1,assertAdminOriginIdentityV1} from './origin-preflight.mjs';
 
 const ROLE='myeongha_admin_audit_writer';
 const REQUIRED=['MYEONGHA_ADMIN_AUDIT_DATABASE_URL','MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM'];
@@ -33,10 +34,9 @@ export async function verifyAdminAuditWriteV1(env,options={}){
   });
   connection=await pool.connect();
   await connection.query('BEGIN');active=true;
+  assertAdminOriginClientTlsV1(target,connection);
   const principal=await connection.query(ADMIN_ORIGIN_PRINCIPAL_SQL_V1);
-  const identity=principal.rows[0];
-  if(principal.rows.length!==1||identity?.role!==ROLE||identity.restricted!==true||identity.tls!==true)
-   throw Error('Dedicated audit identity unavailable');
+  assertAdminOriginIdentityV1(target,principal,ROLE);
   const inserted=await connection.query(INSERT,[randomUUID(),'allowed']);
   if(inserted.rowCount!==1)throw Error('Audit append was not accepted');
   async function rejects(sql,values,expectedCode){

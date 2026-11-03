@@ -47,6 +47,57 @@ describe('read-only dedicated origin preflight',()=>{
   expect(JSON.stringify(report)).not.toContain(privateMessage);
   expect(JSON.stringify(report)).not.toContain('synthetic-secret-value');
  });
+ it('accepts pooler backend TLS=false only with verified, CA-pinned client TLS and least privilege',async()=>{
+  const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-secret-value']));
+  let currentRole;
+  const run=async authorized=>inspectAdminOriginRolesV1(env,{
+    diagnostics:true,
+    targetFactory(_env,role){
+      currentRole=role;
+      return {connectionString:'postgresql://test:secret@pooler.invalid/postgres',
+        backendTlsRequired:false,
+        ssl:{rejectUnauthorized:true,ca:'-----BEGIN CERTIFICATE----- synthetic peer pin'}};
+    },
+    poolFactory(){const role=currentRole;return{
+      async connect(){return{
+        connection:{stream:{encrypted:true,authorized}},
+        async query(sql){return{rows:sql.includes('AS restricted')?[{role,restricted:true,tls:false}]
+          :sql.startsWith('SELECT has_')?[{isolated:true}]:[]};},
+        release(){},
+      };},
+      async end(){},
+    };},
+  });
+  const ok=await run(true);
+  expect(ok.originRolesVerified).toBe(true);
+  expect(ok.roles.every(x=>x.verified)).toBe(true);
+  expect(ok.activationEnabled).toBe(false);
+  const denied=await run(false);
+  expect(denied.originRolesVerified).toBe(false);
+  expect(denied.diagnostics).toEqual([
+    {role:'myeongha_admin_reader',phase:'client_tls',category:'tls_peer_unverified'},
+    {role:'myeongha_admin_audit_writer',phase:'client_tls',category:'tls_peer_unverified'},
+  ]);
+  expect(JSON.stringify(denied)).not.toContain('synthetic-secret-value');
+ });
+ it('does not accept PostgreSQL backend TLS=false for a direct database connection',async()=>{
+  const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-secret-value']));
+  let currentRole;
+  const report=await inspectAdminOriginRolesV1(env,{
+   diagnostics:true,
+   targetFactory(_env,role){currentRole=role;return{connectionString:'postgresql://test:secret@db.invalid/postgres',
+    backendTlsRequired:true,ssl:{rejectUnauthorized:true}};},
+   poolFactory(){const role=currentRole;return{
+    async connect(){return{
+     async query(sql){return{rows:sql.includes('AS restricted')?[{role,restricted:true,tls:false}]
+      :sql.startsWith('SELECT has_')?[{isolated:true}]:[]};},
+     release(){},
+    };},async end(){},
+   };},
+  });
+  expect(report.originRolesVerified).toBe(false);
+  expect(report.diagnostics.every(d=>d.phase==='identity'&&d.category==='postgres_backend_tls_mismatch')).toBe(true);
+ });
  it('fails closed if an origin exposes broader privilege or an unencrypted connection',async()=>{
   const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-secret-value']));
   const report=await inspectAdminOriginRolesV1(env,{targetFactory(){return{connectionString:'test'};},poolFactory(){return{async connect(){return{async query(sql){return{rows:sql.includes('AS restricted')?[{role:'postgres',restricted:false,tls:false}]:[]};},release(){}};},async end(){}};}});
