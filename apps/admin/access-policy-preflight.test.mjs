@@ -65,6 +65,32 @@ describe('live Access Owner-only policy deployment gate',()=>{
   it('distinguishes denied Access API reads without returning sensitive data',async()=>{
     await expect(fixture(app,[policy],false).execute()).rejects.toThrow('application HTTP 403');
   });
+  it('diagnoses a 403 using the deployment credential without exposing its value',async()=>{
+    const secret='test-token-never-emit-123456';
+    const readId='a'.repeat(32);
+    const urls=[];
+    const fetchImpl=vi.fn(async(url)=>{
+      urls.push(url);
+      if(url.endsWith('/user/tokens/verify'))return {
+        ok:true,status:200,async json(){return{success:true,result:{status:'active',id:'private'}}}
+      };
+      if(url.endsWith('/tokens/verify'))return {ok:false,status:403};
+      if(url.includes('/hyperdrive/configs/'))return {ok:true,status:200};
+      return {ok:false,status:403};
+    });
+    const error=await verifyAdminAccessPolicyV1({
+      accountId,apiToken:secret,audience,ownerEmail:owner,
+      readHyperdriveId:readId,fetchImpl,
+    }).then(()=>null,e=>e);
+    expect(error?.message).toContain('application HTTP 403');
+    expect(error?.message).toContain('user_verify=active');
+    expect(error?.message).toContain('account_verify=http_403');
+    expect(error?.message).toContain('reader_hyperdrive=http_200');
+    expect(error?.message).not.toContain(secret);
+    expect(error?.message).not.toContain(owner);
+    expect(error?.message).not.toContain('private');
+    expect(urls).toHaveLength(4);
+  });
   it('refuses a missing source or unauthorized Cloudflare API without echoing credentials',async()=>{
     await expect(fixture(app,[policy],false).execute()).rejects.toThrow('application HTTP 403');
     const error=await verifyAdminAccessPolicyV1({
