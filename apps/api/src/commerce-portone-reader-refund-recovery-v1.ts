@@ -62,14 +62,18 @@ export async function recoverExactPortOneFullCancellationIdV1(input: Readonly<{
     const amount=payment.amount;
     if(!amount||typeof amount!=='object'||Array.isArray(amount)
       ||(amount as Record<string,unknown>).total!==input.originalAmountMinor)return null;
-    if(!Array.isArray(payment.cancellations))return null;
-    const succeeded=payment.cancellations.filter((c:unknown)=>{
-      if(!c||typeof c!=='object'||Array.isArray(c))return false;
-      return (c as Record<string,unknown>).status==='SUCCEEDED';
-    });
-    if(succeeded.length!==1)return null;
-    const cancellation=succeeded[0] as Record<string,unknown>;
-    if(typeof cancellation.id!=='string'||!providerId.test(cancellation.id))return null;
+    // Recovery may record an ID before the later independent verifier.
+    // A fully CANCELLED payment assembled from multiple partial cancels is
+    // not the single original full-refund operation being recovered.
+    if(!Array.isArray(payment.cancellations)
+      ||payment.cancellations.length!==1)return null;
+    const candidate:unknown=payment.cancellations[0];
+    if(!candidate||typeof candidate!=='object'||Array.isArray(candidate))return null;
+    const cancellation=candidate as Record<string,unknown>;
+    if(cancellation.status!=='SUCCEEDED'
+      ||cancellation.totalAmount!==input.originalAmountMinor
+      ||typeof cancellation.id!=='string'
+      ||!providerId.test(cancellation.id))return null;
     return cancellation.id;
   }catch{
     return null;
