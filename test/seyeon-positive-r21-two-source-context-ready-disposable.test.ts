@@ -1117,11 +1117,22 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
         return 500; // isolated synthetic bound, not an official tokenizer
       },
     };
-    await pool.query(
-      "insert into public.seyeon_ai_governor_model_policies_v1(provider_key,model_key,policy_version,price_version,allowed_purposes,context_window_tokens,maximum_input_tokens,maximum_output_tokens,maximum_serialized_request_bytes,input_micro_usd_per_million,cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active) values ($1,$2,$3,$4,$5::text[],4096,1000,256,65536,1000000,250000,4000000,true)",
-      [policy.providerKey,policy.modelKey,policy.policyVersion,
-       policy.priceQuote.priceVersion,[...purposes]],
-    );
+    // The preceding R26 case leaves its rate card active. PostgreSQL permits
+    // only one active policy per provider/model, and immutable rate cards may
+    // change only is_active. Rotate the disposable fixture atomically without
+    // mutating historical prices, settling costs or relaxing any DB guard.
+    await tx(async client=>{
+      const retired=await client.query(
+        "update public.seyeon_ai_governor_model_policies_v1 set is_active=false where provider_key=$1 and model_key=$2 and policy_version=$3 and is_active",
+        [policy.providerKey,policy.modelKey,'offline-r26-test-v1'],
+      );
+      expect(retired.rowCount).toBe(1);
+      await client.query(
+        "insert into public.seyeon_ai_governor_model_policies_v1(provider_key,model_key,policy_version,price_version,allowed_purposes,context_window_tokens,maximum_input_tokens,maximum_output_tokens,maximum_serialized_request_bytes,input_micro_usd_per_million,cached_input_micro_usd_per_million,output_micro_usd_per_million,is_active) values ($1,$2,$3,$4,$5::text[],4096,1000,256,65536,1000000,250000,4000000,true)",
+        [policy.providerKey,policy.modelKey,policy.policyVersion,
+         policy.priceQuote.priceVersion,[...purposes]],
+      );
+    });
     const used:SeyeonR32OfflineStageReceiptV1[]=[];
     const observed:SeyeonR37OfflineSyntheticResultV1[]=[];
     // Actual authored guards execute on INVALID non-private local fixtures.
