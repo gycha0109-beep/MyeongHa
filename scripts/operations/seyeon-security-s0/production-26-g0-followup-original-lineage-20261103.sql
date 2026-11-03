@@ -165,26 +165,27 @@ GRANT EXECUTE ON FUNCTION seyeon_private.assert_g0_zero_assistant_lineage_v1(uui
  TO myeongha_seyeon_chat_runtime_owner;
 
 DO $patch$
-DECLARE f text; g text; old_check text; new_check text;
+DECLARE f text; g text; source_start integer; source_end integer;
 BEGIN
   SELECT pg_get_functiondef(to_regprocedure(
     'seyeon_private.assert_current_original_member_user_message_v1(uuid,uuid,uuid)'))
   INTO f;
-  old_check:=$old$
-  if v_id is distinct from p_user_message_id then
-    raise exception using errcode='42501',
-      constraint='seyeon_g0_user_origin_unverifiable',
-      message='Current original Member source is unavailable';
-  end if;
-$old$;
-  IF f IS NULL OR position('for share of msg,t,thread;' IN f)=0
-     OR position(old_check IN f)=0 THEN
-    RAISE EXCEPTION 'G0 Member original function drifted';
-  END IF;
-  f:=replace(f,'for share of msg,t,thread;','for share of t,thread;');
-  f:=replace(f,old_check,old_check||
-    '  perform seyeon_private.lock_g0_original_message_v1('||
-    'p_subject_id,p_thread_id,p_user_message_id,''user'');'||chr(10));
+  source_start:=position('  select msg.id into v_id' IN f);
+  IF source_start=0 THEN RAISE EXCEPTION 'G0 Member original SELECT missing'; END IF;
+  source_end:=position('  end if;' IN substring(f from source_start));
+  IF f IS NULL OR source_end=0
+     OR position('for share of msg,t,thread;' IN f)=0
+     OR position('constraint=''seyeon_g0_user_origin_unverifiable''' IN f)=0
+  THEN RAISE EXCEPTION 'G0 Member original function drifted'; END IF;
+  -- The previous invoker-visible SELECT was filtered by runtime-owner RLS,
+  -- and its SHARE of msg required UPDATE privilege. Replace that entire
+  -- proof with a narrowly scoped, lock-only table-owner proof carrying
+  -- the SAME canonical Member/Turn/Thread predicates.
+  source_end:=source_start+source_end-2+length('  end if;');
+  f:=substring(f from 1 for source_start-1)||
+     '  perform seyeon_private.lock_g0_original_message_v1('||
+     'p_subject_id,p_thread_id,p_user_message_id,''user'');'||chr(10)||
+     substring(f from source_end+1);
   EXECUTE f;
 
   SELECT pg_get_functiondef(to_regprocedure(
