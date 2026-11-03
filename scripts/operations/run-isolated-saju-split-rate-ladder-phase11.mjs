@@ -1,3 +1,4 @@
+import { validateSajuSustainedReport } from './validate-isolated-saju-sustained-phase11.mjs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -68,11 +69,15 @@ function validate(result) {
 }
 async function main(argv) {
   const local = argv.includes('--local');
-  const parts = argv.filter(x => x !== '--local');
+  const sustained = argv.includes('--sustained');
+  const parts = argv.filter(x => x !== '--local' && x !== '--sustained');
   required(parts.length === 4 && parts[0] === '--saju-repo' && parts[2] === '--out',
-    'Required arguments: --saju-repo <path> --out <file> [--local]');
+    'Required arguments: --saju-repo <path> --out <file> [--local] [--sustained]');
   const saju = resolve(parts[1]), out = resolve(parts[3]);
-  writeFileSync(out, JSON.stringify(BLOCKED, null, 2) + '\n', 'utf8');
+  writeFileSync(out, JSON.stringify({
+    ...BLOCKED,
+    schema: sustained ? 'myeongha-ops-saju-split-cgroup-sustained-phase11-v1' : SCHEMA,
+  }, null, 2) + '\n', 'utf8');
   let server;
   try {
     if (process.env.GITHUB_ACTIONS === 'true') {
@@ -112,7 +117,9 @@ async function main(argv) {
     const readonly = (source, target) => ['--mount',
       'type=bind,source=' + source + ',target=' + target + ',readonly'];
     const serviceScript = resolve(scripts, 'saju-split-service-phase11.mjs');
-    const driverScript = resolve(scripts, 'measure-isolated-saju-split-rate-ladder-phase11.mjs');
+    const driverScript = resolve(scripts, sustained ?
+      'measure-isolated-saju-sustained-phase11.mjs' :
+      'measure-isolated-saju-split-rate-ladder-phase11.mjs');
     const cid = call('docker', [
       'run', '--rm', '-d', '--pull=never', '--name', id,
       '--network=none', '--cpus=0.50', '--memory=256m', '--memory-swap=256m',
@@ -137,9 +144,10 @@ async function main(argv) {
       '--cpus=1.00', '--memory=256m', '--memory-swap=256m',
       ...base, ...readonly(driverScript, '/usr/local/bin/mh-saju-driver.mjs'),
       image, 'node', '/usr/local/bin/mh-saju-driver.mjs',
-    ], 120000);
+    ], sustained ? 1_320_000 : 120000);
     required(stdout.split(/\r?\n/u).length === 1, 'Unexpected driver stdout');
-    const report = validate(JSON.parse(stdout));
+    const report = sustained ? validateSajuSustainedReport(JSON.parse(stdout)) :
+      validate(JSON.parse(stdout));
     const result = {
       ...report,
       nodeImageDigest: image,
@@ -150,7 +158,9 @@ async function main(argv) {
     required(call('docker', ['inspect', '-f', '{{.State.Running}}', cid]) === 'true',
       'Saju service not alive after exercise');
     writeFileSync(out, JSON.stringify(result, null, 2) + '\n', 'utf8');
-    console.log('ISOLATED_SAJU_SPLIT_CGROUP_OBSERVED: actual Saju and driver separately constrained; production approval remains blocked');
+    console.log(sustained ?
+      'ISOLATED_SAJU_SUSTAINED_OBSERVED: actual 5m/15m Linux split-cgroup envelopes; production approval blocked' :
+      'ISOLATED_SAJU_SPLIT_CGROUP_OBSERVED: actual Saju and driver separately constrained; production approval remains blocked');
   } finally {
     if (server) {
       try { call('docker', ['rm', '-f', server], 10000); } catch { /* best-effort isolated cleanup */ }

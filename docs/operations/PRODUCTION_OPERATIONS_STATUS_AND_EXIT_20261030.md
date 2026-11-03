@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-03 KST — Phase 11 actual Saju sustained 5m / 15m split-cgroup workflow implemented
+
+- **Implementation, not yet real Linux evidence:** The already accepted manual, `main`-only [Saju rate-ladder workflow](../../.github/workflows/saju-isolated-rate-ladder-phase11.yml) supports an explicit `sustained` profile in addition to unchanged `shared`/`split`. The actual pinned public Saju engine and independently constrained synthetic load generator run in offline Linux Docker; fixed **300 seconds at 1 request/s with max concurrency 1** and **900 seconds at 4 requests/s with max concurrency 4** (3,900 scheduled slots maximum), no catch-up bursts. A response deadline, latency and failures, schedule/in-flight skips, separate service/client CPU/peak-memory/OOM and final calculation recovery are measured and sanitized. Any setup/run/cgroup failure leaves `BLOCKED_INCOMPLETE`; tests are **not** a real sustained runtime observation.
+- **Next required evidence:** After code lands on exact `main`, manually run the existing workflow with `experiment=sustained` on GitHub Ubuntu, independently inspect six operational safeguards and both *actual elapsed* windows, compare actual attempted/success/skip totals and kernel constraints, preserve sanitized JSON and SHA-256 in operations docs. Do not infer Production baseline from the fixed synthetic profiles; real workload, API/Auth/DB latency and measured saturation remain open.
+- **Acceptance:** `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false` remain unchanged. Hosted restore/privacy [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) is still OPEN.
+
+
 ### 2026-11-03 KST — Verified GitHub Ubuntu Saju split-cgroup rate ladder (Phase 11)
 
 - **Real GitHub Linux execution:** [manual main-only split run #41565835572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41565835572) **SUCCESS** on exact MyeongHa `main` `137211996b27a5b7f34755e85c61334001bbf4bf`, built public pinned Saju source `9807ce89c08afc61b587560d515a475efd819032`. This is an actual Saju calculation workload in two isolated Linux resource cgroups sharing only a network-disabled loopback namespace; no Production DB, user record, billing, secret or real Saju endpoint was touched.
