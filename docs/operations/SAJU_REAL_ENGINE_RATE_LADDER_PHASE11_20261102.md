@@ -4,7 +4,7 @@
 
 ## Phase 11 — real Saju sustained 5-minute / 15-minute split-cgroup envelope (implementation)
 
-**Status: IMPLEMENTED, ACTUAL SUSTAINED LINUX EXECUTION NOT YET VERIFIED.** The existing approved operations architecture (§29) defines an initial **5-minute single-user** and **15-minute normal-concurrency** measurement. The existing `scripts/measure-sustained-loopback-capacity.mjs` probes synthetic public API diagnostics; it does **not** run the real Saju calculation host. This Phase 11 extension exercises the real pinned public Saju engine, without replacing the API baseline or claiming Production capacity.
+**Status: ACTUAL GITHUB LINUX 5M/15M SUSTAINED EXECUTION VERIFIED (2026-11-03); PRODUCTION ACCEPTANCE REMAINS BLOCKED.** The existing approved operations architecture (§29) defines an initial **5-minute single-user** and **15-minute normal-concurrency** measurement. The existing `scripts/measure-sustained-loopback-capacity.mjs` probes synthetic public API diagnostics; it does **not** run the real Saju calculation host. This Phase 11 extension exercises the real pinned public Saju engine, without replacing the API baseline or claiming Production capacity.
 
 The **existing** main-only, manually dispatched `saju-isolated-rate-ladder-phase11.yml` now accepts a third fixed `experiment=sustained` choice. `shared` and `split` remain supported and unchanged by default. After merger, select `sustained` once; the workflow builds the exact Saju SHA `9807ce89c08afc61b587560d515a475efd819032` and runs a separate 0.5-CPU/256MiB service container and 1-CPU/256MiB synthetic driver container sharing **only** the offline loopback network namespace. Both have swap zero, read-only root and code mounts, no host ports, non-root users, no extra capabilities or Production secrets. No user data, DB or real provider calls are involved.
 
@@ -17,6 +17,31 @@ The **existing** main-only, manually dispatched `saju-isolated-rate-ladder-phase
 The workload has a fixed synthetic Saju input, no rate catch-up bursts, 2.5-second request deadline, 300-ms inter-profile gap, and real calculation preflight/recovery. It counts every scheduled slot as actually attempted, missed due to scheduler lag, or skipped due to in-flight cap; successful, HTTP non-200, malformed and transport failures are recorded separately. Successful p50/p95/p99, actual successful throughput, elapsed stage windows and independent *service/driver* kernel CPU usage, throttling, peak memory and OOM measurements are retained in an identifier-free JSON artifact. Exact source/main SHA and Node image digest are reported. Failures retain `BLOCKED_INCOMPLETE` rather than produce fabricated evidence. Successful execution uses `OBSERVED_SUSTAINED_REAL_SAJU` (measurement success, **not** Production acceptance). Artifact retention is 14 days; independently check and preserve actual results after completion.
 
 **Non-claims:** These two scenarios use *fixed synthetic diagnostic rates*, not observed normal Production traffic. A sustained pass or error profile alone does not prove actual Production workload, DB/Auth/Saju end-to-end latency, service saturation ceiling, autoscaling threshold, SLO or full disaster recovery. Hosted migration/DR #1887 remains unresolved; `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false` and `serviceResumptionAllowed=false` remain mandatory.
+
+### Actual 2026-11-03 GitHub Linux 5m/15m sustained execution and independent evidence
+
+- **Execution:** [manual GitHub Ubuntu 26.04 run #41573816739](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41573816739) completed **SUCCESS** on exact MyeongHa `main` `bcb8abe3fe65e36cbf12516dbc52cbb921f3fc6f`; the pinned real Saju production calculation host source was `9807ce89c08afc61b587560d515a475efd819032` and the Linux Node runtime image digest was `node@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c`. The runner's dedicated sustained step and artifact upload both succeeded.
+- **Original sanitized artifact:** GitHub artifact ID `13203278079` (artifact name `isolated-saju-sustained-phase11-41573816739`, retention 14 days) downloaded and preserved as [original Linux sustained JSON](./SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json). SHA-256 of the **raw JSON bytes**, not its ZIP: `e5c7144dee28ef0afe97d4981a89ba7e8013994663fffae04d2996cdab4fd819`. The JSON's source SHA, main SHA, schema, six resource quotas, two real elapsed windows, request accounting, response stats, kernel counters, recovery and all false acceptance flags are independently checked by [the proof verifier](../../scripts/operations/verify-saju-sustained-linux-proof-phase11.mjs).
+- **Actual measurement, not an estimated workload:** Both profiles completed real Saju calculations using fixed synthetic input; all **3,900/3,900 scheduled** slots were attempted and successful. There were zero skipped-scheduling slots, zero in-flight-cap skips, zero HTTP/non-200 responses, zero transport failures and zero invalid responses.
+
+| Profile | Actual scheduling window | Planned / attempted / successful | Maximum observed in-flight | p50 / p95 / p99 successful latency | Achieved successful rate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 5m, 1 target request/s, cap 1 | 299,999.639ms | 300 / 300 / 300 | 1 | 2.143 / 2.769 / 4.182ms | 1/s |
+| 15m, 4 target requests/s, cap 4 | 899,999.868ms | 3,600 / 3,600 / 3,600 | **1** | 1.723 / 2.124 / 2.389ms | 4/s |
+| **Total** | **20m planned, actual stage windows validated** | **3,900 / 3,900 / 3,900** | — | — | — |
+
+- **Separate Linux cgroup resource enforcement:** Saju service **0.5 CPU**, driver **1 CPU**, each **256MiB RAM / zero swap**. Service cumulative kernel CPU `4,341,855µs`, throttle periods **0**, peak memory `48,455,680 bytes`; driver cumulative CPU `5,708,168µs`, throttle periods **0**, peak memory `50,700,288 bytes`. `oom_kill=0` for both; real calculation recovery after all sustained stages **PASS**.
+- **Critical concurrency limitation:** The second profile's **configured maximum in-flight is 4, but maximum *observed* was 1**. It demonstrates an actual 15-minute **arrival-rate** measurement at 4/s; it does *not* demonstrate four simultaneous running calculations. Neither this result nor the preceding 6-second ladder establishes a Saju saturation knee, simultaneous four-client guarantee, portable Production TPS, SLO, representative traffic, end-to-end DB/Auth/API latency, scaling trigger or Hosted DR. The service and driver remain on the same underlying host even with separate cgroups.
+- **Governance:** `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`, `outputContainsIdentifiers=false`. Hosted restoration/privacy blocker [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN. The sustained measurement scenario and its evidence are **complete**, but Phase 11 capacity/ceiling verification and Phase 12/13 approvals are **not**.
+
+**Offline verifier invocation:**
+
+```sh
+node scripts/operations/verify-saju-sustained-linux-proof-phase11.mjs \
+  docs/operations/SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json \
+  e5c7144dee28ef0afe97d4981a89ba7e8013994663fffae04d2996cdab4fd819 \
+  bcb8abe3fe65e36cbf12516dbc52cbb921f3fc6f
+```
 
 ## Separate resource-cgroup follow-up — implementation (Phase 11)
 
