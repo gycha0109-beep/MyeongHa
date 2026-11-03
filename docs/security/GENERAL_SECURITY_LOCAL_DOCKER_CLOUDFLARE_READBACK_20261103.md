@@ -59,3 +59,13 @@ Watchtower-Track: security
 - A09 / #1527 stays OPEN: native alert enabled, event coverage and synthetic test delivery are confirmed, but synthetic-separated organic baseline and organically triggered anomaly notification are not. Umbrella #1529 and Operations DR #1887 remain independently open. No provider or production DB mutations occurred during evidence capture.
 
 Watchtower-Track: security
+
+## 2026-11-03 A09 primary-log synthetic attribution update
+
+- On merged `main=991c44fe361aef7211ab6b201852599d43509080` (PR #2921), the security track independently queried Cloudflare Workers Observability in 14 bounded windows covering 2026-10-27T04:20:00Z–2026-11-03T04:07:00Z, returning 202 v1 security events.
+- Nineteen event request IDs matched governed canary run windows **and** exact route/status counts: runs 41559184461 (3), 41559455325 (3), 41559656148 (6), 41571776787 (7). The canonical test exclusion register was updated accordingly; event IDs are never included in the published aggregate report. This attribution relies on bounded timing+expected patterns, not an authenticated per-request run tag.
+- Sanitized [A09 capture report](../operations/SECURITY_BASELINE_CLOUDFLARE_20261103.json) from the existing baseline collector: 202 parsed, 19 synthetic excluded, 183 remaining; 401=113, 403=14, 429=0, 503=56. Remaining population must be described as **non-excluded / origin unknown**, not organic. Cloudflare provider limits and retention prevent proving a complete production population from this read.
+- Monitor authority actual primary ingestion field corrected to VERIFIED; `organicBaselineEstablished=false` and `organicAnomalyTriggerTested=false` are unchanged. Provider's one historical synthetic email test is not organic alert evidence. A09 #1527 and umbrella #1529 remain OPEN; A06 #1526 remains CLOSED.
+- Collection required no Production DB, Worker, alert configuration or synthetic traffic modification. Private exported request-level logs remained exclusively in the local verification directory, outside Git; the committed evidence contains only aggregated counts, SHA-256 and canonical test exclusion receipts.
+
+Watchtower-Track: security

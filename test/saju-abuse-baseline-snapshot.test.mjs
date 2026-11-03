@@ -226,16 +226,25 @@ describe('follow-up Saju abuse baseline snapshot after bounded Reading rollout',
     expect(serialized).not.toMatch(/[a-f0-9]{64}/u);
   });
 
-  it('pins all seventeen governed synthetic Saju request ids exactly once', () => {
+  it('preserves the original seventeen Saju synthetic IDs and adds exact Cloudflare canary receipts', () => {
     const exclusions = readJson(exclusionsPath);
     const ids = exclusions.requests.map((request) => request.requestId);
 
-    expect(ids).toHaveLength(17);
-    expect(new Set(ids).size).toBe(17);
+    expect(ids).toHaveLength(36);
+    expect(new Set(ids).size).toBe(36);
     expect(
       exclusions.requests.filter(
         (request) => request.evidenceRef === 'GitHub Actions run 37166344665 / PR #1580',
       ),
     ).toHaveLength(5);
+    for (const [run, count] of [
+      ['41559184461', 3], ['41559455325', 3],
+      ['41559656148', 6], ['41571776787', 7],
+    ]) {
+      const governed = exclusions.requests.filter((request) =>
+        request.evidenceRef?.startsWith(`GitHub Actions run ${run}; primary Workers Logs`));
+      expect(governed).toHaveLength(count);
+      expect(governed.every((request) => request.reason.startsWith('governed Cloudflare primary Saju '))).toBe(true);
+    }
   });
 });

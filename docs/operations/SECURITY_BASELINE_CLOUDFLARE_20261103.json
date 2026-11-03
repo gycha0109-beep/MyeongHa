@@ -1,0 +1,249 @@
+{
+  "schemaVersion": "myeongha-security-baseline-capture-report-v1",
+  "mode": "evidence_only",
+  "captures": [
+    {
+      "from": "2026-10-27T04:20:00.000Z",
+      "to": "2026-11-03T04:07:00.000Z",
+      "declaredRecordCount": 202,
+      "declaredRecordLimit": 500,
+      "capReached": false,
+      "retentionLimited": true,
+      "sourceSha256": "35fa4e525290eed7fd5ecc7fb0f60ae35310125f0ca5aae5e1382df6cfd65c34"
+    }
+  ],
+  "collectionQuality": {
+    "queryGaps": [],
+    "capReached": false,
+    "retentionLimited": true,
+    "providerBoundsIndependentlyVerified": false,
+    "completePopulationProven": false,
+    "note": "Declared query intervals do not prove log delivery, filter coverage, retention completeness, or zero demand."
+  },
+  "saju": {
+    "schemaVersion": "myeongha-saju-abuse-baseline-report-v1",
+    "mode": "evidence_only",
+    "observationWindow": {
+      "firstAuthenticatedAttemptAt": null,
+      "lastAuthenticatedAttemptAt": null,
+      "retentionNote": null
+    },
+    "inputQuality": {
+      "parsedEventCount": 0,
+      "exactDuplicateEventCount": 0,
+      "configuredSyntheticRequestCount": 36,
+      "syntheticExcludedRequestCount": 0,
+      "syntheticExcludedEventCount": 0,
+      "unmatchedAuthenticatedAdmissionCount": 0,
+      "orphanOutcomeCount": 0
+    },
+    "authenticatedAttempts": {
+      "total": 0,
+      "uniquePseudonymousClients": 0,
+      "subjectKindDistribution": {},
+      "perClientRequestCountHistogram": {},
+      "routeDistribution": {}
+    },
+    "correlatedOutcomes": {
+      "matched": 0,
+      "unmatchedAuthenticatedAdmissions": 0,
+      "coverageRatio": null,
+      "statusCodeDistribution": {},
+      "statusClassDistribution": {},
+      "matchedFailureOutcomeCount": 0,
+      "failureFollowedByLaterAttemptCount": 0,
+      "failureFollowedByLaterAttemptIntervalMs": {
+        "count": 0,
+        "minMs": null,
+        "medianMs": null,
+        "maxMs": null
+      }
+    },
+    "burstEvidence": {
+      "burstWindowSeconds": null,
+      "maxAuthenticatedAttemptsBySingleClient": null,
+      "perClientBurstMaxHistogram": null,
+      "note": "No burst window was supplied; no burst threshold was inferred."
+    },
+    "perRoute": {
+      "api.me.saju.calculation": {
+        "authenticatedAttempts": {
+          "total": 0,
+          "uniquePseudonymousClients": 0,
+          "subjectKindDistribution": {},
+          "perClientRequestCountHistogram": {}
+        },
+        "correlatedOutcomes": {
+          "matched": 0,
+          "unmatchedAuthenticatedAdmissions": 0,
+          "coverageRatio": null,
+          "statusCodeDistribution": {},
+          "statusClassDistribution": {},
+          "matchedFailureOutcomeCount": 0,
+          "failureFollowedByLaterAttemptCount": 0,
+          "failureFollowedByLaterAttemptIntervalMs": {
+            "count": 0,
+            "minMs": null,
+            "medianMs": null,
+            "maxMs": null
+          }
+        },
+        "burstEvidence": {
+          "burstWindowSeconds": null,
+          "maxAuthenticatedAttemptsBySingleClient": null,
+          "perClientBurstMaxHistogram": null,
+          "note": "No burst window was supplied; no burst threshold was inferred."
+        }
+      },
+      "api.me.saju.preview-reading": {
+        "authenticatedAttempts": {
+          "total": 0,
+          "uniquePseudonymousClients": 0,
+          "subjectKindDistribution": {},
+          "perClientRequestCountHistogram": {}
+        },
+        "correlatedOutcomes": {
+          "matched": 0,
+          "unmatchedAuthenticatedAdmissions": 0,
+          "coverageRatio": null,
+          "statusCodeDistribution": {},
+          "statusClassDistribution": {},
+          "matchedFailureOutcomeCount": 0,
+          "failureFollowedByLaterAttemptCount": 0,
+          "failureFollowedByLaterAttemptIntervalMs": {
+            "count": 0,
+            "minMs": null,
+            "medianMs": null,
+            "maxMs": null
+          }
+        },
+        "burstEvidence": {
+          "burstWindowSeconds": null,
+          "maxAuthenticatedAttemptsBySingleClient": null,
+          "perClientBurstMaxHistogram": null,
+          "note": "No burst window was supplied; no burst threshold was inferred."
+        }
+      }
+    },
+    "policyDecision": {
+      "produced": false,
+      "numericLimit": null,
+      "windowSeconds": null,
+      "enforcementAuthorized": false,
+      "note": "Baseline evidence does not automatically choose or authorize an admission policy."
+    }
+  },
+  "security": {
+    "schemaVersion": "myeongha-security-event-baseline-report-v1",
+    "mode": "evidence_only",
+    "inputQuality": {
+      "parsedEventCount": 202,
+      "exactDuplicateEventCount": 0,
+      "syntheticExcludedEventCount": 19,
+      "population": "non-excluded-events; unregistered synthetic traffic may remain"
+    },
+    "totalEvents": 183,
+    "statusDistribution": {
+      "401": 113,
+      "403": 14,
+      "503": 56
+    },
+    "routeDistribution": {
+      "api.auth.promote-guest": 1,
+      "api.auth.refresh": 9,
+      "api.auth.sign-in": 13,
+      "api.chat.delivery-receipt": 2,
+      "api.me": 15,
+      "api.me.saju.calculation": 13,
+      "api.memories.seyeon.revoke": 1,
+      "api.session.bootstrap": 15,
+      "rewrite.chat.open": 7,
+      "rewrite.chat.thread": 4,
+      "rewrite.chat.turns": 23,
+      "rewrite.commerce.owner-sandbox-prepare": 4,
+      "rewrite.commerce.owner-sandbox-verify": 9,
+      "rewrite.contact.inquiry": 6,
+      "rewrite.life-record": 15,
+      "rewrite.memories": 15,
+      "rewrite.readings": 15,
+      "rewrite.saju.preview": 13,
+      "rewrite.seyeon.memory.grant.status": 3
+    },
+    "methodDistribution": {
+      "GET": 67,
+      "POST": 116
+    },
+    "byEventCode": {
+      "ACCESS_DENIED": {
+        "totalEvents": 127,
+        "statusDistribution": {
+          "401": 113,
+          "403": 14
+        },
+        "routeDistribution": {
+          "api.auth.refresh": 9,
+          "api.auth.sign-in": 13,
+          "api.me": 15,
+          "api.me.saju.calculation": 13,
+          "api.memories.seyeon.revoke": 1,
+          "rewrite.chat.open": 7,
+          "rewrite.commerce.owner-sandbox-prepare": 1,
+          "rewrite.commerce.owner-sandbox-verify": 1,
+          "rewrite.contact.inquiry": 6,
+          "rewrite.life-record": 15,
+          "rewrite.memories": 15,
+          "rewrite.readings": 15,
+          "rewrite.saju.preview": 13,
+          "rewrite.seyeon.memory.grant.status": 3
+        },
+        "methodDistribution": {
+          "GET": 63,
+          "POST": 64
+        }
+      },
+      "RATE_LIMITED": {
+        "totalEvents": 0,
+        "statusDistribution": {},
+        "routeDistribution": {},
+        "methodDistribution": {}
+      },
+      "SERVER_FAILURE": {
+        "totalEvents": 56,
+        "statusDistribution": {
+          "503": 56
+        },
+        "routeDistribution": {
+          "api.auth.promote-guest": 1,
+          "api.chat.delivery-receipt": 2,
+          "api.session.bootstrap": 15,
+          "rewrite.chat.thread": 4,
+          "rewrite.chat.turns": 23,
+          "rewrite.commerce.owner-sandbox-prepare": 3,
+          "rewrite.commerce.owner-sandbox-verify": 8
+        },
+        "methodDistribution": {
+          "GET": 4,
+          "POST": 52
+        }
+      },
+      "UNEXPECTED_EXCEPTION": {
+        "totalEvents": 0,
+        "statusDistribution": {},
+        "routeDistribution": {},
+        "methodDistribution": {}
+      }
+    },
+    "policyDecision": {
+      "produced": false,
+      "fixedThreshold": null,
+      "providerMutationAuthorized": false
+    }
+  },
+  "decision": {
+    "numericAdmissionPolicy": "HOLD",
+    "securityAlertThreshold": "HOLD",
+    "enforcementAuthorized": false,
+    "providerMutationAuthorized": false,
+    "issueClosureAllowed": false
+  }
+}
