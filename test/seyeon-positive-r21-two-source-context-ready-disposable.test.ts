@@ -1573,10 +1573,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     // Stage 0,1,2,3,4 were NOT sent: unknown costs reserve full ceilings.
     // G2 cannot commit from original pin or reservation alone.
     const suffix=a.turn.slice(-12);
-    await tx(async client=>{
-      // Legacy generated/validated negative probes must not advance this
-      // offline ContextReady Attempt before its R40/R42 evidence checks.
-      await client.query('SAVEPOINT r32_legacy_negative_probe');
+    const prepareG2Probe=async(client:PoolClient)=>{
       const generated=await client.query<{ok:boolean}>(
         'select public.cmd_persist_seyeon_chat_generated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::jsonb,$11::text,$12::text,$13::jsonb) as ok',
         [subject,a.turn,a.attempt,a.participant,
@@ -1606,9 +1603,19 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
          JSON.stringify({passed:true,personalRecordProvenance:proof}),'[]'],
       );
       expect(validated.rows[0]?.ok).toBe(false);
+    };
+    // A negative legacy probe advances Turn state only inside its transaction;
+    // reverting it keeps the independent R40/R42 ContextReady path intact.
+    await tx(async client=>{
+      await client.query('SAVEPOINT r32_legacy_negative_probe');
+      await prepareG2Probe(client);
       await client.query('ROLLBACK TO SAVEPOINT r32_legacy_negative_probe');
     },true);
-    const tryCommit=()=>tx(client=>client.query(
+    // G2 checks need validated state, but never persist it onto the R40
+    // offline evidence chain. A rejected G2 commit rolls back both writes.
+    const tryCommit=()=>tx(async client=>{
+      await prepareG2Probe(client);
+      return client.query(
       'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
       [subject,a.thread,a.turn,a.attempt,
        'd8300000-0000-4000-8000-'+suffix,
@@ -1622,7 +1629,8 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
        }),
        'sha256:v1:r32-synthetic-never-dispatched',
        source.selection.selectedSourcesDigest],
-    ),true);
+      );
+    },true);
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_governed_cost_unsettled',
     });
