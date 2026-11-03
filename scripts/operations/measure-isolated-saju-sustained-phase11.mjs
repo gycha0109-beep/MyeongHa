@@ -7,6 +7,8 @@ export const SUSTAINED_PROFILES = Object.freeze([
   Object.freeze({ name: 'normal-concurrency-15m', durationSeconds: 900, targetRps: 4, concurrencyLimit: 4 }),
 ]);
 export const SUSTAINED_SCHEMA = 'myeongha-ops-saju-split-cgroup-sustained-phase11-v1';
+export const FOUR_CLIENT_WAVE_PROFILE = Object.freeze({ name: 'four-client-waves-15m', durationSeconds: 900, targetRps: 4, concurrencyLimit: 4 });
+export const FOUR_CLIENT_WAVE_SCHEMA = 'myeongha-ops-saju-split-cgroup-four-client-waves-phase11-v1';
 const CAP = 268435456;
 const BEARER = 'isolated-phase11-rate-ladder-synthetic-only';
 const BODY = JSON.stringify({
@@ -81,16 +83,16 @@ async function calculate() {
     return { kind: 'transport', durationMs: performance.now() - started };
   }
 }
-async function stage(profile) {
+async function stage(profile, grouped = false) {
   const { name, durationSeconds, targetRps, concurrencyLimit } = profile;
   const [beforeServer, beforeDriver] = await Promise.all([serviceCgroup(), ownCgroup()]);
   const plannedSlots = durationSeconds * targetRps;
-  const intervalMs = 1000 / targetRps;
+  const intervalMs = grouped ? 1000 : 1000 / targetRps;
   const start = performance.now(), deadline = start + durationSeconds * 1000;
   const pending = new Set(), started = [];
   let skippedSchedulingLag = 0, skippedInFlightCap = 0, maxInFlightObserved = 0;
   for (let slot = 0; slot < plannedSlots; slot++) {
-    const scheduled = start + slot * intervalMs;
+    const scheduled = start + (grouped ? Math.floor(slot / 4) : slot) * intervalMs;
     const now = performance.now();
     if (now < scheduled) await sleep(scheduled - now);
     const actual = performance.now();
@@ -120,6 +122,7 @@ async function stage(profile) {
   const count = kind => completed.filter(x => x.kind === kind).length;
   return {
     profile: name, durationSeconds, targetRps, concurrencyLimit,
+    ...(grouped ? { clientWaveSize: 4 } : {}),
     plannedSlots, attempted: completed.length, successfulCalculations: successes.length,
     non200: count('non200'), transportFailures: count('transport'),
     invalidResponses: count('invalid'), skippedSchedulingLag, skippedInFlightCap,
@@ -141,19 +144,22 @@ async function stage(profile) {
   };
 }
 async function main() {
+  const grouped = process.argv.length === 3 && process.argv[2] === '--four-client-waves';
+  const selectedProfiles = grouped ? [FOUR_CLIENT_WAVE_PROFILE] : SUSTAINED_PROFILES;
   const [beforeServer, beforeDriver] = await Promise.all([serviceCgroup(), ownCgroup()]);
   ensure((await calculate()).kind === 'success', 'Actual warm-up failed');
   const phases = [];
-  for (const profile of SUSTAINED_PROFILES) {
-    phases.push(await stage(profile));
-    if (profile !== SUSTAINED_PROFILES.at(-1)) await sleep(300);
+  for (const profile of selectedProfiles) {
+    phases.push(await stage(profile, grouped));
+    if (profile !== selectedProfiles.at(-1)) await sleep(300);
   }
   const recovered = (await calculate()).kind === 'success';
   ensure(recovered, 'Actual Saju failed post-sustained recovery');
   const [afterServer, afterDriver] = await Promise.all([serviceCgroup(), ownCgroup()]);
   const report = {
-    schema: SUSTAINED_SCHEMA,
-    status: 'OBSERVED_SUSTAINED_REAL_SAJU',
+    schema: grouped ? FOUR_CLIENT_WAVE_SCHEMA : SUSTAINED_SCHEMA,
+    status: grouped ? 'OBSERVED_FOUR_CLIENT_WAVES' : 'OBSERVED_SUSTAINED_REAL_SAJU',
+    ...(grouped ? { clientWaveSize: 4 } : {}),
     sourceSha: '9807ce89c08afc61b587560d515a475efd819032',
     actualSajuProductionHostUsed: true, syntheticInputOnly: true,
     networkScope: 'shared-offline-network-namespace-loopback-only',
@@ -183,13 +189,14 @@ async function main() {
     productionScalingThresholdApproved: false, drReady: false,
     serviceResumptionAllowed: false, outputContainsIdentifiers: false,
   };
-  ensure(report.totalPlannedSlots === 3900 && report.totalActualAttempts > 0 &&
+  ensure(report.totalPlannedSlots === (grouped ? 3600 : 3900) &&
+    (!grouped || phases[0].maxInFlightObserved === 4) && report.totalActualAttempts > 0 &&
     report.phases.every(x => x.attempted + x.skippedSchedulingLag +
       x.skippedInFlightCap === x.plannedSlots),
   'Sustained aggregate was incomplete');
   console.log(JSON.stringify(report));
 }
-if (process.argv.length !== 2) {
+if (process.argv.length !== 2 && !(process.argv.length === 3 && process.argv[2] === '--four-client-waves')) {
   console.error('ISOLATED_SAJU_SUSTAINED_ARGUMENTS_INVALID');
   process.exitCode = 1;
 } else {
