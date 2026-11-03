@@ -455,3 +455,11 @@
 - **실패 경계:** 완전 조회 가능한 DB 관리자 연결이 아니거나, 건수·상세 행이 불일치하거나, 25개 이상의 상세 행·중복 Charge Terms·모순된 Offer·잘못된 금액 등 입력을 발견하면 오류로 중단하고 ROLLBACK. 조용히 성공으로 취급하거나 상세 결과를 생략하지 않음. 정상 비활성 카탈로그는 `hold_observed`, 상품/가격 구성 변경은 `investigation_required`로 보고하며, **두 경우 모두 결제/판매/Production Reader 제공 승인값은 무조건 false**.
 - **검증:** 신규 단일 스냅샷 증빙 + 기존 두 P2 읽기 전용 검증 관련 Vitest **39/39 PASS**, Node 구문 확인, Git 변경 공백 검사 PASS. 실제 Production DB/PortOne 접근·SQL 쓰기·LIVE 플래그 변경 없음.
 - **다음:** PR 일반 CI·고정 HEAD 최종 통합 검증과 main 병합. 실제 개별 Product Offer/Charge Terms 실행 허가는 Saju Production 공급·Owner 판매 결정·PG 계약 등 미충족 조건이 확인되기 전까지 HOLD.
+
+### 2026-11-03 — P2 동일 시점 보류 검사 수동 실행기
+
+- **기준선:** P2 통합 검사 PR #2903은 최종 CI #41558536150 SUCCESS 후 main에 병합(b16b634e). 후속 브랜치는 검사 로직을 중복 구현하지 않고 별도 수동 진입점만 추가함.
+- **구현:** scripts/operations/run-commerce-p2-readonly-audit-v1.mjs. 운영자 명시 호출에서 호스트·포트·감사 로그인·TLS CA 지문·verify-full을 고정 검증, DB 세션 default_transaction_read_only=on을 강제하고 기존 단일 스냅샷 검사 실행.
+- **안전:** 누락된 인증·권한, DB 응답 오류, 가격/상품 이탈 모두 HOLD. 출력은 상태·제한 건수·차단 사유만 포함하고 접속 비밀번호·원본 SQL 예외는 제외. H​​OLD_OBSERVED도 판매 허가가 아니며 LIVE·실제 환불·DB 쓰기 없음.
+- **검증:** 신규 및 기존 P2 감사 테스트 4개 파일 46/46 PASS, Node 구문 검사 PASS. 실제 운영 DB 접속 미실행.
+- **다음:** 최신 main을 기준으로 독립 PR 및 CI 검증. P0-CM-03 판매 승인, Saju Production 공급, S5/S7 고객 전달 및 LIVE는 HOLD.
