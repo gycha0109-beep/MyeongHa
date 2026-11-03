@@ -100,6 +100,25 @@ async function strictTarget(env,role,key){
  // do not mistake the pooler-to-Postgres hop for client peer verification.
  return Object.freeze({...verifiedTarget,backendTlsRequired:!pooler});
 }
+// Shared by read-only origin and rolled-back audit preflights. The pooled
+// Node->Supavisor TLS peer is separately verified; pg_stat_ssl reports only
+// Supavisor->PostgreSQL, so it cannot substitute for that client-side evidence.
+export function assertAdminOriginClientTlsV1(target,connection){
+ if(target.backendTlsRequired!==false)return;
+ const stream=connection.connection?.stream;
+ if(target.ssl?.rejectUnauthorized!==true||
+    typeof target.ssl.ca!=='string'||
+    !target.ssl.ca.includes('-----BEGIN CERTIFICATE-----')||
+    stream?.encrypted!==true||stream?.authorized!==true)
+  throw Error('Origin client TLS peer unverified');
+}
+export function assertAdminOriginIdentityV1(target,principal,role){
+ const identity=principal.rows[0];
+ if(principal.rows.length!==1||identity?.role!==role)throw Error('Origin role mismatch');
+ if(identity.restricted!==true)throw Error('Origin restricted role mismatch');
+ if(typeof identity.tls!=='boolean'||(target.backendTlsRequired!==false&&identity.tls!==true))
+  throw Error('Origin PostgreSQL backend TLS mismatch');
+}
 export {strictTarget as createAdminOriginTargetV1, PRINCIPAL as ADMIN_ORIGIN_PRINCIPAL_SQL_V1};
 export async function inspectAdminOriginRolesV1(env,options={}){
  const missing=ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.filter(key=>typeof env[key]!=='string'||!env[key].trim());
@@ -113,23 +132,11 @@ export async function inspectAdminOriginRolesV1(env,options={}){
    phase='connect';
    pool=(options.poolFactory??(config=>new pg.Pool(config)))({connectionString:target.connectionString,ssl:target.ssl,max:1,connectionTimeoutMillis:3000,statement_timeout:3000});
    connection=await pool.connect();await connection.query('BEGIN READ ONLY');active=true;
-   // Pooler: require actual authenticated Node TLS, with the pinned CA/hostname
-   // checked by node-postgres. No insecure fallback or verify disable allowed.
-   if(target.backendTlsRequired===false){
-    phase='client_tls';
-    const stream=connection.connection?.stream;
-    if(target.ssl?.rejectUnauthorized!==true||
-       typeof target.ssl.ca!=='string'||
-       !target.ssl.ca.includes('-----BEGIN CERTIFICATE-----')||
-       stream?.encrypted!==true||stream?.authorized!==true)
-      throw Error('Origin client TLS peer unverified');
-   }
+   phase='client_tls';
+   assertAdminOriginClientTlsV1(target,connection);
    phase='identity';
-   const principal=await connection.query(PRINCIPAL);const identity=principal.rows[0];
-   if(principal.rows.length!==1||identity?.role!==role)throw Error('Origin role mismatch');
-   if(identity.restricted!==true)throw Error('Origin restricted role mismatch');
-   if(typeof identity.tls!=='boolean'||(target.backendTlsRequired!==false&&identity.tls!==true))
-    throw Error('Origin PostgreSQL backend TLS mismatch');
+   const principal=await connection.query(PRINCIPAL);
+   assertAdminOriginIdentityV1(target,principal,role);
    phase='privileges';
    const privileges=await connection.query(PRIVILEGES[role]);
    if(privileges.rows.length!==1||privileges.rows[0]?.isolated!==true)throw Error('Origin isolation unavailable');
