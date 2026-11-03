@@ -169,3 +169,14 @@ Repository governance is implemented by:
 `scripts/verify-production-security-alerting-governance.mjs`
 
 Provider activation evidence is complete for the governed 5xx anomaly rule recorded above. Any future rule replacement must again produce a stable `ar_...` rule ID, verify team-owner notifications, and independently inspect the provider rule after creation or discovery.
+
+## 2026-11-03 Cloudflare A09 operational readback and organic-evidence boundary
+
+- Cloudflare alerting history GET since 2026-10-20 returned one dispatch from primary monitor `fab0d24cd73740f5b2dba97766f78a66` (canonical history ID `fab0d24c-d737-40f5-b2db-a97766f78a66`), sent 2026-10-24T20:53:08.807195Z using the existing email destination. That was the historical **synthetic provider test**, not an organic anomaly alert. No new alert dispatches were returned.
+- Primary monitor still `enabled=true` and `type=custom_analytics`; provider-native 3.5-sigma increase-only sensitivity, recent 5m vs 4h baseline and 1h repeat remain provider-owned. Do not impose arbitrary fixed numeric thresholds or flood Production to force firing.
+- Official Workers Logs telemetry scoped to `$metadata.service=myeongha` and `MYEONGHA_SECURITY_EVENT`, 2026-10-27T03:32:22.586Z through 2026-11-03T03:32:22.586Z: 213/213 parsed events, `ACCESS_DENIED=147` (401=133, 403=14), `RATE_LIMITED=5` (429=5), `SERVER_FAILURE=61` (503=61). All five 429 were observed during known synthetic Saju quota runs (one earlier failed canary and four successful 2026-11-03 cohorts). This is a mixed provider-retained population, **not** a trustworthy organic-only demand baseline.
+- Production Member and Guest calculation/preview quota canary [41571776787](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41571776787) PASS on pinned deployed Worker; independent bounded Worker log query matched all four 429 denials. The older 503-containing canary remains historically FAIL.
+- Verified: 401/403/429 primary Worker log ingestion, active native monitor, provider test-delivery path, exact-version production quota behavior. Not verified: independently attributable organic traffic baseline and organically triggered notification. Keep #1527 and #1529 OPEN; avoid misleading zero-demand or anomaly-fired claims.
+- Complete source and four-cohort counts: [security evidence](../security/GENERAL_SECURITY_LOCAL_DOCKER_CLOUDFLARE_READBACK_20261103.md).
+
+Watchtower-Track: security
