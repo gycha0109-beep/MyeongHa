@@ -154,11 +154,12 @@ describe('MyeongHa immersive long-form Character Room', () => {
     expect(presentation).toContain("'thread_identity_pending'");
   });
 
-  it('preserves Seyeon portrait and zoom crop in dark mode after global avatar background resets', async () => {
+  it('keeps dark Seyeon portrait framing identical to light mode after background resets', async () => {
     const themeCss = await readFile(new URL('../apps/web/product-theme.css', import.meta.url), 'utf8');
     expect(themeCss).toContain('body.character-room-v2[data-character="seyeon"] .conversation-message-avatar[data-character="seyeon"]');
     expect(themeCss).toContain('background-image: url("assets/characters/seyeon-portrait-v2.webp")');
-    expect(themeCss).toContain('background-size: 142% auto;');
+    expect(themeCss).toContain('background-size: cover;');
+    expect(themeCss).not.toContain('background-size: 142% auto;');
     expect(themeCss).toContain('background-position: center 22%;');
   });
 
