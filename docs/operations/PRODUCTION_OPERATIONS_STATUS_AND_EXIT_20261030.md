@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-03 KST — Actual constrained Saju arrival-rate ladder (Linux)
+
+- **Verified execution:** [Ubuntu 26.04 manual #41556469998](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41556469998) **SUCCESS** at exact main `103ce134b9419baf6d28f756d252a249dcfc127c`. The pinned public Saju engine `9807ce89c08afc61b587560d515a475efd819032` ran in an offline 0.5 CPU / 256MiB Docker container. Original artifact `13194193281` was downloaded and checked; permanent [identifier-free JSON](./SAJU_REAL_ENGINE_RATE_LADDER_PHASE11_OBSERVATION_20261103.json) SHA-256 `dd1d4b7a2e47f782e401273b83702f83dedb378810335655b839da5cf703679a`. Full observations in [Phase 11 procedure](./SAJU_REAL_ENGINE_RATE_LADDER_PHASE11_20261102.md).
+- **Actual pressure:** Six 6-second arrival-rate steps at 10/25/50/100/200/400 requests/s; 4,710 planned, 4,394 attempted and successful, 316 skipped by scheduling lag (0,0,0,5,14,297), zero concurrency-cap skips, zero HTTP/transport/invalid responses. At 400/s: 2,103 of 2,400 planned started/succeeded, successful rate 350.642/s, p95 1.377ms and p99 5.145ms. This is a load-generator plus service shared CPU observation, not a Production saturation knee.
+- **Kernel and recovery:** Forced CPU 0.5 / memory 256MiB / swap 0. Throttling 34 overall periods / 2,362,210 microseconds (including non-stage windows); peak memory 84,426,752 bytes, OOM kills 0, real post-pressure recovery PASS. Shared client CPU and successful-response latency mean the data cannot isolate Saju provider-only throughput.
+- **Authority:** `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`. No Production data or settings used. Remaining Phase 11: isolate driver scheduling vs Saju resource saturation and gather production-like sustained evidence. Hosted DR/privacy [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN.
+
 ### 2026-11-02 KST — Actual Ubuntu 26.04 Saju engine constrained CPU and memory evidence
 
 - **Verified run:** The manual, main-only [Linux constrained Saju workflow #41433151383](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41433151383) completed **SUCCESS** on exact main `20cf1167298aa98fdaf9519a5bed0b1a4f3cbd25` (merged [PR #2886](https://github.com/gycha0109-beep/MyeongHa/pull/2886)). The real Saju production calculation host from public, fixed source `9807ce89c08afc61b587560d515a475efd819032` ran inside a Docker container with external networking disabled and synthetic requests only. The actual job log records `ISOLATED_SAJU_CGROUP_PHASE11_OBSERVED`.
