@@ -6,18 +6,28 @@ const webRoot = resolve(process.cwd(), 'apps/web');
 const readWeb = (name: string) => readFileSync(resolve(webRoot, name), 'utf8');
 
 describe('Home/Saju shared product header', () => {
+  const shared = readWeb('shared-product-header.css');
   const lock = readWeb('golden-master-lock.css');
+  const golden = readWeb('golden-master.css');
   const authUi = readWeb('product-auth-ui.js');
 
-  it('restores the shared desktop header geometry instead of the Golden Master mini header', () => {
-    expect(lock).toMatch(/@media \(min-width: 768px\)[\s\S]*body\.gm-page \.product-header-inner \{[\s\S]*width: min\(var\(--mh-max\), calc\(100% - 64px\)\);[\s\S]*margin: 0 auto;[\s\S]*min-height: 92px;/);
-    expect(lock).toMatch(/@media \(min-width: 1100px\)[\s\S]*grid-template-columns: 220px minmax\(420px, 1fr\) 220px;/);
-    expect(lock).toMatch(/body\.gm-page \.product-nav \{[\s\S]*height: 92px;/);
-    expect(lock).toMatch(/body\.gm-page \.product-brand-seal \{[\s\S]*display: grid;/);
+  it('uses the same authoritative header geometry on every product page, not a Golden Master mini header', () => {
+    expect(shared).toContain('--mh-header-height-desktop: 92px;');
+    expect(shared).toContain('--mh-header-height-mobile: 86px;');
+    expect(shared).toContain('height: var(--mh-header-height-desktop);');
+    expect(shared).toContain('width: min(var(--mh-max), calc(100% - 64px));');
+    expect(shared).toContain('grid-template-columns: 205px minmax(335px, 1fr) max-content !important;');
+    expect(shared).toContain('body.product-page .product-header .product-nav { height: 100%; }');
+    expect(shared).toContain('body.product-page .product-header .product-brand-seal');
+    expect(shared).toContain('display: grid !important;');
+    expect(lock).not.toMatch(/body\.gm-page \.product-(?:header|nav|brand|profile|theme-toggle)/);
+    expect(golden).not.toMatch(/body\.gm-page \.product-(?:header|nav|brand|profile|theme-toggle)/);
   });
 
-  it('keeps the shared profile/login control visible on desktop Golden Master pages', () => {
-    expect(lock).toMatch(/@media \(min-width: 768px\)[\s\S]*body\.gm-page \.product-profile \{[\s\S]*display: inline-flex;/);
+  it('keeps the desktop profile/login link visible under the common header rule', () => {
+    expect(shared).toContain('body.product-page .product-header .product-profile {');
+    expect(shared).toContain('display: inline-flex !important;');
+    expect(shared).toContain('body.product-page .product-header .product-profile { display: none !important; }');
     expect(authUi).toContain("profile.href = `auth.html?next=${encodeURIComponent(safeNextHref())}`;");
     expect(authUi).toContain("profile.setAttribute('aria-label', '로그인');");
     expect(authUi).toContain("label.textContent = '로그인';");
@@ -30,5 +40,7 @@ describe('Home/Saju shared product header', () => {
     expect(html).toContain('<span class="product-brand-sub">MyeongHa</span>');
     expect(html).toContain('class="product-profile"');
     expect(html).toContain('<script src="product-theme.js"></script>');
+    expect(html).toContain('href="shared-product-header.css"');
+    expect(html.indexOf('shared-product-header.css')).toBeGreaterThan(html.indexOf('ui-i18n.css'));
   });
 });
