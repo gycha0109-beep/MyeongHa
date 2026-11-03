@@ -14,7 +14,7 @@ const request = {
 
 describe('GLM renderer is compatible with Cloudflare Workers fetch',()=>{
   it('uses manual redirect mode and accepts an ordinary structured result',async()=>{
-    const outcomes=vi.fn(async()=>undefined);
+    const outcomes=vi.fn(async (_event:unknown)=>undefined);
     const send=vi.fn(async(_url:string,init:RequestInit)=>{
       expect(init.redirect).toBe('manual');
       return Response.json({
@@ -42,7 +42,7 @@ describe('GLM renderer is compatible with Cloudflare Workers fetch',()=>{
   });
 
   it('denies an upstream redirect rather than following it',async()=>{
-    const outcomes=vi.fn(async()=>undefined);
+    const outcomes=vi.fn(async (_event:unknown)=>undefined);
     const send=vi.fn(async(_url:string,init:RequestInit)=>{
       expect(init.redirect).toBe('manual');
       return new Response(null,{status:302,
