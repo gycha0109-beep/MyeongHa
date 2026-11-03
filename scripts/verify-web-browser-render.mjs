@@ -224,6 +224,40 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
   }
 }
 
+// Test uncached first-frame geometry, not just the fully loaded page.
+async function verifyColdHeaderFirstPaint(client, origin) {
+  await client.send('Network.enable');
+  const tracker = await client.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: "(() => {\n  const samples = [];\n  window.__mhHeaderFirstPaint = samples;\n  const start = performance.now();\n  function capture() {\n    const nav = document.querySelector('.product-nav');\n    const header = document.querySelector('.product-header');\n    if (nav && header && document.body && getComputedStyle(document.body).visibility !== 'hidden') {\n      const rect = nav.getBoundingClientRect();\n      const controls = document.querySelector('.product-utilities');\n      if (rect.width > 0) samples.push({\n        x: rect.x, width: rect.width, headerX: header.getBoundingClientRect().x,\n        theme: controls?.querySelectorAll('.product-theme-toggle').length ?? 0,\n        locale: controls?.querySelectorAll('[data-ui-locale-picker]').length ?? 0,\n      });\n    }\n    if (performance.now() - start < 2300) requestAnimationFrame(capture);\n  }\n  requestAnimationFrame(capture);\n})();",
+  });
+  await client.send('Network.setCacheDisabled', { cacheDisabled: true });
+  try {
+    for (const pathname of ['/hall.html', '/reading.html', '/chat-hub.html']) {
+      await navigate(client, origin, pathname, '.product-header');
+      await sleep(250);
+      const samples = await client.evaluate('window.__mhHeaderFirstPaint ?? []');
+      assert(samples.length > 1, 'No first-paint header samples for ' + pathname);
+      assert(samples.every((frame) => frame.theme === 1 && frame.locale === 1),
+        'Header controls appeared late on ' + pathname + ': ' + JSON.stringify(samples.slice(0, 8)));
+      for (const field of ['x', 'width', 'headerX']) {
+        const values = samples.map((frame) => frame[field]);
+        const drift = Math.max(...values) - Math.min(...values);
+        assert(drift <= 1.5, 'Cold-load header ' + field + ' shifted ' + drift + 'px on ' + pathname
+          + ': ' + JSON.stringify(samples.slice(0, 8)));
+      }
+      const hydrated = await client.evaluate("(() => ({
+        themeBound: document.querySelector('.product-theme-toggle')?.dataset.themeBound,
+        localeMounted: document.querySelector('[data-ui-locale-picker]')?.dataset.uiLocaleMounted,
+      }))()");
+      assert(hydrated.themeBound === 'true' && hydrated.localeMounted === 'true',
+        'Static header controls are not interactive on ' + pathname + ': ' + JSON.stringify(hydrated));
+    }
+  } finally {
+    await client.send('Network.setCacheDisabled', { cacheDisabled: false });
+    await client.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: tracker.identifier });
+  }
+}
+
 async function verifyDarkPage(client, origin, pathname, selector, { toggle = true, artifactSuffix = null } = {}) {
   await navigate(client, origin, pathname, selector);
   const cleanPath = pathname.split('?')[0];
@@ -359,6 +393,8 @@ try {
 
   await verifySharedHeaderGeometry(client, origin,
     ['/hall.html','/reading.html','/face-reading.html','/chat-hub.html','/chat.html','/records.html','/my.html','/reading-detail.html','/auth.html'], 92);
+
+  await verifyColdHeaderFirstPaint(client, origin);
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
