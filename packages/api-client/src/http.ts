@@ -35,6 +35,8 @@ export interface MyeongHaApiRequestV1 {
   readonly body?: unknown;
   /** Negotiate receipt support; this is never source-use authorization. */
   readonly deliveryReceipt?: 'v1';
+  /** Explicit bearer-only native requests must not attach ambient cookies. */
+  readonly credentials?: 'omit';
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -178,6 +180,7 @@ export class MyeongHaApiClientV1 {
         method: input.method,
         headers,
         cache: 'no-store',
+        ...(input.credentials === 'omit' ? { credentials: 'omit' as const } : {}),
         ...(input.body === undefined ? {} : { body: JSON.stringify(input.body) }),
       });
     } catch (error) {
