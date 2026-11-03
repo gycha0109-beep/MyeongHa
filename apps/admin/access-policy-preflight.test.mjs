@@ -66,7 +66,7 @@ describe('live Access Owner-only policy deployment gate',()=>{
     await expect(fixture(app,[policy],false).execute()).rejects.toThrow('application HTTP 403');
   });
   it('refuses a missing source or unauthorized Cloudflare API without echoing credentials',async()=>{
-    await expect(fixture([app],[policy],false).execute()).rejects.toThrow('applications HTTP 403');
+    await expect(fixture(app,[policy],false).execute()).rejects.toThrow('application HTTP 403');
     const error=await verifyAdminAccessPolicyV1({
       accountId:'not-a-real-account',apiToken:'sensitive-token-abc',
       audience,ownerEmail:owner,fetchImpl:async()=>{throw Error('Unexpected call');},
