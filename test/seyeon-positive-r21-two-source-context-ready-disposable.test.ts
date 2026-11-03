@@ -564,7 +564,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
          'chat-character-message-v1','sha256:v1:'+'b'.repeat(64),'[]'],
       );
       expect(generated.rows[0]?.ok).toBe(false);
-      const edges=await c.query<{
+      const edges=await pool!.query<{
         recordId:string;grantId:string;pgPayloadDigest:string;
       }>(
         'select memory_id::text as "recordId",original_grant_id::text as "grantId",pg_payload_digest as "pgPayloadDigest" from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
@@ -731,7 +731,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
          'sha256:v1:'+'b'.repeat(64),'[]'],
       );
       expect(generated.rows[0]?.ok).toBe(false);
-      const proofRows=await client.query<{
+      const proofRows=await pool!.query<{
         memory_id:string;original_grant_id:string;pg_payload_digest:string;
       }>(
         'select memory_id::text,original_grant_id::text,pg_payload_digest from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
@@ -866,7 +866,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
          'chat-character-message-v1','sha256:v1:'+'b'.repeat(64),'[]'],
       );
       expect(generated.rows[0]?.ok).toBe(false);
-      const edge=await client.query<{
+      const edge=await pool!.query<{
         recordId:string;grantId:string;digest:string;
       }>(
         'select memory_id::text as "recordId",original_grant_id::text as "grantId",pg_payload_digest as digest from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
@@ -1067,10 +1067,10 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     if(!pool)throw Error('R32 requires disposable PostgreSQL');
     // These two fresh originals are independent of the R26 revoked fixture.
     const originals=[
-      {recordId:'d5000000-0000-4000-8000-000000000003',
-       grantId:'d6000000-0000-4000-8000-000000000003'},
-      {recordId:'d5000000-0000-4000-8000-000000000004',
-       grantId:'d6000000-0000-4000-8000-000000000004'},
+      {recordId:'d5000000-0000-4000-8000-000000000901',
+       grantId:'d6000000-0000-4000-8000-000000000901'},
+      {recordId:'d5000000-0000-4000-8000-000000000902',
+       grantId:'d6000000-0000-4000-8000-000000000902'},
     ];
     await tx(async client=>{
       for(let i=0;i<originals.length;i++){
@@ -1555,7 +1555,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
          'chat-character-message-v1','sha256:v1:'+'b'.repeat(64),'[]'],
       );
       expect(generated.rows[0]?.ok).toBe(false);
-      const originalsFromDb=await client.query<{
+      const originalsFromDb=await pool!.query<{
         recordId:string;originalGrantId:string;pgPayloadDigest:string;
       }>(
         'select memory_id::text as "recordId",original_grant_id::text as "originalGrantId",pg_payload_digest as "pgPayloadDigest" from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',
@@ -2108,10 +2108,10 @@ select
     if(!pool)throw Error('R32 disposable budget test only');
     const a=await createTurn(761);
     const originals=[
-      {recordId:'d5000000-0000-4000-8000-000000000003',
-       grantId:'d6000000-0000-4000-8000-000000000003'},
-      {recordId:'d5000000-0000-4000-8000-000000000004',
-       grantId:'d6000000-0000-4000-8000-000000000004'},
+      {recordId:'d5000000-0000-4000-8000-000000000901',
+       grantId:'d6000000-0000-4000-8000-000000000901'},
+      {recordId:'d5000000-0000-4000-8000-000000000902',
+       grantId:'d6000000-0000-4000-8000-000000000902'},
     ];
     const source=await modelSources(originals);
     const pinInput={

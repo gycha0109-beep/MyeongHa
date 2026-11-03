@@ -62,10 +62,18 @@ export function buildSeyeonPositiveG1PreModelSourceCensusSealV1(input:Readonly<{
        selected.selectedMemoryCount!==1 ||
        selected.selectedPersonalRecordCount!==1 ||
        selected.selectedSources.length!==1 ||
+       selected.selectedCurrentUserSource?.messageId!==input.currentUserMessageRef ||
+       selected.selectedCurrentUserSource?.role!=='user' ||
+       selected.selectedCurrentUserSource?.selectedModelMessageDigest!==
+         digest(context.recentMessages[0]) ||
+       selected.selectedCurrentUserSource?.persistedBeforeModel!==false ||
+       selected.selectedUnpinnedRecentSources.length!==0 ||
        selected.selectedUnpinnedDerivedSources.length!==0 ||
        selected.selectedSourcesDigest!==digest(selected.selectedSources) ||
        selected.selectedModelSourceCensusDigest!==digest({
          originalPersonalSources:selected.selectedSources,
+         currentUserSource:selected.selectedCurrentUserSource,
+         unpinnedRecentSources:selected.selectedUnpinnedRecentSources,
          unpinnedDerivedSources:selected.selectedUnpinnedDerivedSources,
        })) {
       throw new SeyeonPositiveG1FinalModelContextHoldV1();
@@ -137,6 +145,8 @@ export function assertSeyeonPositiveG1FinalModelContextSealV1(input:Readonly<{
     }
     const actual=selectSeyeonExactModelPersonalSourcesV1({
       retrievedMemories:input.assembledContext.retrievedMemories,
+      recentMessages:input.pinnedContextInput.recentMessages,
+      currentUserMessageId:input.currentUserMessageRef,
       sourceCandidates:input.sourceCandidates,
     });
     const persisted=buildSeyeonPositiveG1PreModelSourceCensusSealV1({

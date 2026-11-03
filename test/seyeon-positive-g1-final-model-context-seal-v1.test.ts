@@ -47,6 +47,8 @@ const original=assembleSeyeonRuntimeContextV2({
 });
 const selected=selectSeyeonExactModelPersonalSourcesV1({
   retrievedMemories:contextInput.retrievedMemories,sourceCandidates:[candidate],
+  recentMessages:contextInput.recentMessages,
+  currentUserMessageId:currentUserMessageRef,
 });
 const censusSeal=buildSeyeonPositiveG1PreModelSourceCensusSealV1({
   pinnedContextInput:contextInput,
