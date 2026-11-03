@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateSustainedLinuxProof } from '../../scripts/operations/verify-saju-sustained-linux-proof-phase11.mjs';
+import { validateSustainedLinuxProof, verifySustainedLinuxProofFile } from '../../scripts/operations/verify-saju-sustained-linux-proof-phase11.mjs';
 
 const MAIN = 'a'.repeat(40);
 function report() {
@@ -46,6 +46,20 @@ function report() {
   };
 }
 describe('Independent sustained real-Saju Linux evidence accounting',()=>{
+  it('verifies the exact real 20-minute GitHub Linux original artifact with no production approval',()=>{
+    const path='docs/operations/SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json';
+    const hash='e5c7144dee28ef0afe97d4981a89ba7e8013994663fffae04d2996cdab4fd819';
+    const githubMain='bcb8abe3fe65e36cbf12516dbc52cbb921f3fc6f';
+    expect(verifySustainedLinuxProofFile(path,hash,githubMain)).toMatchObject({
+      planned:3900,attempted:3900,successful:3900,
+      skippedScheduling:0,skippedConcurrency:0,
+      non200:0,transportFailures:0,invalidResponses:0,
+      serviceCpuUsec:4341855,driverCpuUsec:5708168,
+      serviceThrottling:0,driverThrottling:0,recovery:true,productionReady:false,
+    });
+    expect(()=>verifySustainedLinuxProofFile(path,'0'.repeat(64),githubMain)).toThrow();
+    expect(()=>verifySustainedLinuxProofFile(path,hash,'0'.repeat(40))).toThrow();
+  });
   it('requires two real 5m/15m stages with separate cgroups and correct counts',()=>{
     expect(validateSustainedLinuxProof(report(),MAIN)).toMatchObject({
       planned:3900,attempted:3900,successful:3900,
