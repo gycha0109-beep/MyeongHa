@@ -7,6 +7,7 @@ import { createSeyeonCloudflareStaticPreflightDenialV1 } from './seyeon-cloudfla
 import {assertSeyeonZeroSourceHttpReceiptReadyV1, SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from './seyeon-zero-source-http-receipt-ready-v1.js';
 import { executePostgresSubjectTransactionV1, type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { ProductionSeyeonChatRuntimeV1 } from './production-seyeon-chat-runtime-v1.js';
+import { recoverSeyeonUnissuedZeroReplyV1 } from './seyeon-unissued-zero-reply-recovery-v1.js';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 export const SEYEON_POSITIVE_DELIVERY_RECEIPT_HEADER_V1='x-myeongha-delivery-receipt';
@@ -82,6 +83,16 @@ export function holdSeyeonReceiptHttpV1(requestId: string): Response {
   {status:503,headers:{'Cache-Control':'no-store'}});
 }
 
+/** Server-defined categories only; never log SQL, parameters or exception text. */
+export function seyeonFirstReplyFailureMetadataV1(error: unknown) {
+  const value=typeof error==='object'&&error!==null ? error as {code?:unknown;constraint?:unknown}:{};
+  const sqlState=['23514','23505','42501','55P03','40001','40P01','53300','57014','08001','08006']
+    .find(code=>code===value.code)??null;
+  const sqlConstraint=['seyeon_unissued_reply_invalid','seyeon_unissued_reply_not_recoverable',
+    'seyeon_unissued_reply_source_denied'].find(code=>code===value.constraint)??null;
+  return {sqlState,sqlConstraint};
+}
+
 /** No metered runtime is invoked unless all receipt and withdrawal RPCs exist. */
 export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   request: Request; requestId: string; serverTime: string;
@@ -92,7 +103,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   zeroSourceFirstReplyApproved?: true;
 }>): Promise<Response> {
   const held=()=>holdSeyeonReceiptHttpV1(input.requestId);
-  let stage: 'preflight'|'receipt_readiness'|'failed_turn_reconciliation'|'model_execution'|'receipt_issuer'='preflight';
+  let stage: 'preflight'|'receipt_readiness'|'unissued_recovery'|'failed_turn_reconciliation'|'model_execution'|'receipt_issuer'='preflight';
   try {
     const preflight=await preflightSeyeonChatTurnSendRequestV1(input);
     if(preflight.kind==='denied')return preflight.response;
@@ -128,6 +139,16 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         await assertSeyeonG0OriginalLineageReadyV1(client);
       }});
     if(input.request.signal.aborted)return held();
+
+    if(zeroSource){
+      stage='unissued_recovery';
+      const recovered=await recoverSeyeonUnissuedZeroReplyV1({pool:input.pool,
+        verifiedEvidence:preflight.verifiedEvidence,threadId:preflight.threadId,
+        text:preflight.text,signal:input.request.signal,requestId:input.requestId,serverTime:input.serverTime});
+      if(input.request.signal.aborted)return held();
+      if(recovered!==null)return new Response(recovered,{headers:{
+        'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store, no-transform','Content-Encoding':'identity'}});
+    }
 
     // A browser may have lost its sessionStorage clientTurnId. Recover only
     // the exact prior failed, uncommitted User text under the SAME verified
@@ -252,6 +273,9 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     // Security-safe operational diagnosis: never log source text, IDs,
     // provider payload, credentials, raw error messages, or model responses.
     console.error('MYEONGHA_SEYEON_FIRST_REPLY_STAGE_HOLD',stage);
+    console.error('MYEONGHA_SEYEON_FIRST_REPLY_DIAGNOSTIC '+JSON.stringify({
+      stage,...seyeonFirstReplyFailureMetadataV1(error),
+    }));
     return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);
   }
 }
