@@ -36,7 +36,7 @@ describe('shared refined header', () => {
   });
 
   it('uses five section links, with My represented by the real profile link', async () => {
-    for (const page of ['hall','reading','face-reading','chat-hub','chat','records','my','reading-detail','auth']) {
+    for (const page of ['hall','reading','face-reading','chat-hub','chat','records','my','reading-detail','auth','contact']) {
       const html = await read(page + '.html');
       expect(html).not.toMatch(/class="product-nav-link" href="my\.html"/);
       expect(html).not.toContain('<span aria-hidden="true">⌄</span>');
@@ -48,7 +48,8 @@ describe('shared refined header', () => {
       expect((html.match(/data-ui-locale-picker/g) ?? []).length).toBe(1);
       expect((html.match(/class="ui-locale-select"/g) ?? []).length).toBe(1);
       expect(html.indexOf('class="product-theme-toggle"')).toBeLessThan(html.indexOf('class="product-profile"'));
-      expect(html.indexOf('class="ui-locale-picker"')).toBeGreaterThan(html.indexOf('class="product-profile"'));
+      expect(html.indexOf('class="ui-locale-picker"')).toBeLessThan(html.indexOf('class="product-icon-button"') < 0 ? html.indexOf('class="product-profile"') : html.indexOf('class="product-profile"'));
+      expect(html.indexOf('class="product-report-link"')).toBeGreaterThan(html.indexOf('class="product-profile"'));
       expect(html).toContain('ui-i18n.css');
       expect(html).toContain('shared-product-header.css');
       expect(html.indexOf('shared-product-header.css')).toBeGreaterThan(html.indexOf('ui-i18n.css'));
@@ -56,5 +57,12 @@ describe('shared refined header', () => {
     expect(await read('my.html')).toContain('aria-current="page"');
     const png = await readFile(new URL('assets/header/header-ui-glyphs-v1.png', root));
     expect(png.toString('hex', 0, 8)).toBe('89504e470d0a1a0a');
+    expect(png.readUInt32BE(16)).toBe(240);
+    expect(png.readUInt32BE(20)).toBe(96);
+    const theme = await read('product-theme.js');
+    expect(theme).not.toContain("mark.textContent = dark ? '☀' : '☾'");
+    const contact = await read('contact.js');
+    expect(contact).toContain("searchParams.get('report') === 'content'");
+    expect(contact).toContain("category.value = 'other'");
   });
 });

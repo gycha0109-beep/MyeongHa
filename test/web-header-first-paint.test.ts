@@ -17,7 +17,7 @@ describe('first-paint header controls', () => {
     expect(header.match(/<option value=/g)).toHaveLength(5);
     expect(header.indexOf('class="product-theme-toggle"')).toBeLessThan(header.indexOf('class="product-profile"'));
     expect(header.indexOf('class="product-report-link"')).toBeGreaterThan(header.indexOf('class="product-profile"'));
-    expect(header.indexOf('class="ui-locale-picker"')).toBeGreaterThan(header.indexOf('class="product-profile"'));
+    expect(header.indexOf('class="ui-locale-picker"')).toBeLessThan(header.indexOf('class="product-profile"'));
   });
 
   it('hydrates the static controls and preserves legacy fallback and interaction', async () => {
@@ -32,5 +32,7 @@ describe('first-paint header controls', () => {
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
     expect(css).not.toContain('grid-template-columns: 205px minmax(335px, 1fr) max-content !important;\n/* First-paint geometry');
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 382px !important;');
+    expect(css).toContain('background-position: -112px var(--mh-glyph-row) !important;');
+    expect(theme).not.toContain("mark.textContent = dark ? '☀' : '☾'");
   });
 });
