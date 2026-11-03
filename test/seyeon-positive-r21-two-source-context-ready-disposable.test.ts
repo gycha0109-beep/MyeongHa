@@ -1553,10 +1553,30 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     expect(interpreterSeal.rows).toMatchObject([{
       native_wire_digest:used[2]!.nativeWireDigest,
     }]);
+    // R40's unsettled-cost guard must be exercised while this Turn is still
+    // context_ready. The later G2 generated/validated probes intentionally
+    // change the Turn state and must not hide the independent cost guard.
+    expect(await state(a)).toMatchObject({turnState:'context_ready'});
+    const stub0=r40SyntheticStubTransport(used[0]!);
+    await expect(tx(c=>c.query(
+      'select seyeon_positive_candidate.record_unverified_transport_r40($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid,$7::text,$8::jsonb) as receipt',
+      [subject,a.thread,a.turn,a.attempt,0,used[0]!.callId,
+       used[0]!.nativeWireDigest,JSON.stringify(stub0)],
+    ),true)).rejects.toMatchObject({
+      code:'23514',constraint:'seyeon_r40_governed_cost_not_settled',
+    });
+    const beforeStub=await pool.query<{n:string}>(
+      'select count(*)::text as n from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid',
+      [a.attempt],
+    );
+    expect(beforeStub.rows).toEqual([{n:'0'}]);
     // Stage 0,1,2,3,4 were NOT sent: unknown costs reserve full ceilings.
     // G2 cannot commit from original pin or reservation alone.
     const suffix=a.turn.slice(-12);
     await tx(async client=>{
+      // Legacy generated/validated negative probes must not advance this
+      // offline ContextReady Attempt before its R40/R42 evidence checks.
+      await client.query('SAVEPOINT r32_legacy_negative_probe');
       const generated=await client.query<{ok:boolean}>(
         'select public.cmd_persist_seyeon_chat_generated_runtime_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::text,$9::text,$10::jsonb,$11::text,$12::text,$13::jsonb) as ok',
         [subject,a.turn,a.attempt,a.participant,
@@ -1586,6 +1606,7 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
          JSON.stringify({passed:true,personalRecordProvenance:proof}),'[]'],
       );
       expect(validated.rows[0]?.ok).toBe(false);
+      await client.query('ROLLBACK TO SAVEPOINT r32_legacy_negative_probe');
     },true);
     const tryCommit=()=>tx(client=>client.query(
       'select seyeon_positive_candidate.commit_actual_v2_r3($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text,$10::text)',
@@ -1605,22 +1626,6 @@ describe.skipIf(!enabled)('R21 exact TWO original Grants before REAL core Contex
     await expect(tryCommit()).rejects.toMatchObject({
       constraint:'seyeon_offline_r28_governed_cost_unsettled',
     });
-    // R40: a fake output digest MUST NOT bypass unsettled Governor Cost.
-    // The exact same originally pinned Call, native request and two Grants
-    // are deliberately tested before synthetic queue settlement.
-    const stub0=r40SyntheticStubTransport(used[0]!);
-    await expect(tx(c=>c.query(
-      'select seyeon_positive_candidate.record_unverified_transport_r40($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::integer,$6::uuid,$7::text,$8::jsonb) as receipt',
-      [subject,a.thread,a.turn,a.attempt,0,used[0]!.callId,
-       used[0]!.nativeWireDigest,JSON.stringify(stub0)],
-    ),true)).rejects.toMatchObject({
-      code:'23514',constraint:'seyeon_r40_governed_cost_not_settled',
-    });
-    const beforeStub=await pool.query<{n:string}>(
-      'select count(*)::text as n from seyeon_positive_candidate.unverified_transport_lineage_r40 where attempt_id=$1::uuid',
-      [a.attempt],
-    );
-    expect(beforeStub.rows).toEqual([{n:'0'}]);
     // Explicit SYNTHETIC Provider receipts only, with no actual network.
     // Verify the existing worker claim, settlement and ACK for all five.
     for(const v of used){
@@ -2410,10 +2415,17 @@ select
     ),true)).rejects.toMatchObject({
       code:'23514',constraint:'seyeon_r41_original_grant_revoked',
     });
+    // Ordinary API must be blocked by the R43 role split even before the
+    // issuer evaluates a revoked Grant. The isolated evaluator independently
+    // proves the original-Grant rejection behind that ACL.
     await expect(tx(c=>c.query(
       'select seyeon_positive_candidate.issue_local_guard_seal_r42($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
       [subject,id.thread,id.turn,id.attempt],
-    ),true)).rejects.toMatchObject({
+    ),true)).rejects.toMatchObject({code:'42501'});
+    await expect(validatorTx(c=>c.query(
+      'select seyeon_positive_candidate.issue_local_guard_seal_r42($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+      [subject,id.thread,id.turn,id.attempt],
+    ))).rejects.toMatchObject({
       code:'23514',constraint:'seyeon_r42_original_grant_revoked',
     });
     const neverSealed=await pool.query<{n:string}>(
