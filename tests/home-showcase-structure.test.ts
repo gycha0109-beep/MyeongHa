@@ -17,18 +17,19 @@ describe('Home Golden Master showcase structure', () => {
       '요즘, 무엇이 가장',
       '궁금하세요?',
       '사주 관심 주제',
-      '전체 사주',
       '직업 · 커리어',
       '재물',
       '연애 · 관계',
       '당신의 이야기를',
       '지금, 확인해 보세요',
       '이번 달 사주 읽기',
-      '최근 이야기',
     ]) {
       expect(homeSource).toContain(label);
     }
 
+    expect(homeSource).not.toContain('전체 사주');
+    expect(homeSource).not.toContain('mhx-recent-card');
+    expect(homeSource).not.toContain('최근 이야기');
     expect(homeSource).toContain('사주 프리뷰 보기');
     expect(homeSource).toContain('resolveReadingAvailabilityV1(topic.href).label');
     expect(homeSource).toContain('인물 둘러보기');
@@ -53,6 +54,7 @@ describe('Home Golden Master showcase structure', () => {
     expect(homeSource).not.toContain('오늘은 움직이기보다');
     expect(homeSource).not.toContain('퇴사를 고민했던 이야기');
     expect(homeSource).not.toContain('세연');
-    expect(homeSource).not.toContain('chat.html?character=');
+    expect(homeSource).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
+    expect(homeSource).not.toContain('threadId=');
   });
 });

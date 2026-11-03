@@ -1,6 +1,6 @@
 import { execFile as execFileCb } from 'node:child_process';
 import { createServer } from 'node:net';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -107,9 +107,20 @@ isolated('Phase 7 isolated PostgreSQL real RLS / execution-role transaction boun
       await pgTool('initdb', ['-D',dir,'-U',ADMIN,'--auth-host=trust','--auth-local=trust',
         '--encoding=UTF8','--no-sync','--no-instructions']);
       const port = await availablePort();
-      await pgTool('pg_ctl', ['-D',dir,'-l',log,'-o',
-        '-h 127.0.0.1 -p '+port+' -c listen_addresses=127.0.0.1',
-        '-w','-t','20','start']);
+      try {
+        await pgTool('pg_ctl', ['-D',dir,'-l',log,'-o',
+          '-h 127.0.0.1 -p '+port+' -c listen_addresses=127.0.0.1' +
+          (process.platform === 'win32' ? '' : ' -c unix_socket_directories='+dir),
+          '-w','-t','20','start']);
+      } catch (error) {
+        const diagnostics = (await readFile(log, 'utf8').catch(() => ''))
+          .split(/\r?\n/u)
+          .filter(line => /FATAL|ERROR|permission denied|could not bind|could not create/iu.test(line))
+          .slice(-5)
+          .map(line => line.replace(/\/tmp\/myeongha-phase7-rls-[^\s/]+/gu, '[isolated-cluster]'));
+        if (diagnostics.length > 0) console.error('ISOLATED_PG18_STARTUP_CAUSE', diagnostics.join(' | '));
+        throw error;
+      }
       started = true;
       const base = { host:'127.0.0.1',port,database:'postgres',ssl:false,
         max:1,connectionTimeoutMillis:1500,allowExitOnIdle:true };

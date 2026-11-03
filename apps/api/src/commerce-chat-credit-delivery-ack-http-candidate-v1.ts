@@ -3,6 +3,7 @@
 // database EXECUTE grant is mounted by this module.
 import type {IdentityEvidenceVerificationPortV1} from './current-subject-profile-http.js';
 import {executePostgresSubjectTransactionV1,type PostgresSubjectPoolV1} from './postgres-subject-execution.js';
+import {executePostgresCommerceInternalTransactionV1} from './postgres-commerce-internal-execution.js';
 import {acknowledgeDeliveredChatCreditCandidateV1} from './commerce-chat-credit-delivery-ack-candidate-v1.js';
 
 export const CHAT_CREDIT_DELIVERY_ACK_HTTP_CANDIDATE_V1=Object.freeze({
@@ -80,6 +81,8 @@ export async function handleChatCreditDeliveryAckCandidateV1(input:Readonly<{
   serverTime:string;
   identityEvidenceVerifier:IdentityEvidenceVerificationPortV1;
   pool:PostgresSubjectPoolV1;
+  /** Dedicated server-owned Commerce credentials; cannot share Member pool. */
+  privateCreditPool:PostgresSubjectPoolV1;
 }>):Promise<Response>{
   const {request,requestId}=input;
   if(request.method!=='POST')return new Response(null,{status:405,headers:{Allow:'POST','Cache-Control':'no-store'}});
@@ -93,13 +96,29 @@ export async function handleChatCreditDeliveryAckCandidateV1(input:Readonly<{
   if(identity.kind!=='member')return failure(403,'FORBIDDEN',requestId);
   const body=await boundedBody(request);
   if(body===null)return failure(400,'INVALID_REQUEST',requestId);
+  // Never send the private ACK using a normal Member RLS transaction.
+  if(!input.privateCreditPool || input.privateCreditPool===input.pool){
+    return failure(503,'CREDIT_AUTHORITY_UNAVAILABLE',requestId);
+  }
   try{
-    const ack=await executePostgresSubjectTransactionV1({
+    const canonicalSubjectId=await executePostgresSubjectTransactionV1({
       pool:input.pool,verifiedEvidence:identity,
-      execute:async({client,resolvedSubject})=>{
+      execute:async({resolvedSubject})=>{
         if(resolvedSubject.subjectKind!=='member')throw Error('Member-only credit ACK');
+        return resolvedSubject.subjectId;
+      },
+    });
+    const ack=await executePostgresCommerceInternalTransactionV1({
+      pool:input.privateCreditPool,
+      execute:async({client})=>{
+        // Transaction-local binding; the SECDEF authority independently checks
+        // exact original DB-delivered Turn, assistant and S0 receipt marker.
+        await client.query(
+          "select pg_catalog.set_config('myeongha.subject_id',$1::text,true)",
+          [canonicalSubjectId],
+        );
         return acknowledgeDeliveredChatCreditCandidateV1({
-          client,canonicalSubjectId:resolvedSubject.subjectId,
+          client,canonicalSubjectId,
           canonicalSubjectKind:'member',...body,
           creditReservationId:body.reservationId,
           committedAssistantMessageId:body.assistantMessageId,

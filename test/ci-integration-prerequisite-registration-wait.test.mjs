@@ -1,8 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { waitForCiVerifyRegistration } from '../scripts/ci/integration-candidate.mjs';
+import { assertStagedPolicy, waitForCiVerifyRegistration } from '../scripts/ci/integration-candidate.mjs';
 
 describe('frozen-head CI Integration registration race guard', () => {
+  it('requires GitGuardian as a source-bound main merge check, never an untrusted copy', () => {
+    const checks=[
+      {context:'CI Integration Verify',integration_id:15368},
+      {context:'GitGuardian Security Checks',integration_id:46505},
+    ];
+    const rules=[{type:'required_status_checks',parameters:{required_status_checks:checks}}];
+    expect(()=>assertStagedPolicy(rules)).not.toThrow();
+    expect(()=>assertStagedPolicy([{
+      type:'required_status_checks',
+      parameters:{required_status_checks:checks.slice(0,1)},
+    }])).toThrow('Staged CI requires GitGuardian Security Checks');
+    expect(()=>assertStagedPolicy([{
+      type:'required_status_checks',
+      parameters:{required_status_checks:[
+        checks[0],{context:'GitGuardian Security Checks',integration_id:15368},
+      ]},
+    }])).toThrow('Staged CI requires GitGuardian Security Checks');
+  });
   it('allows normal CI more than 3 minutes to publish its required check', () => {
     const yaml = readFileSync('.github/workflows/ci-integration.yml', 'utf8');
     const admission = yaml.slice(yaml.indexOf('  admission:'), yaml.indexOf('  full:'));

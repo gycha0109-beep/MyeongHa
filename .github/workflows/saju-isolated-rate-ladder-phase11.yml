@@ -1,0 +1,55 @@
+name: Isolated Saju Engine Synthetic Rate Ladder
+run-name: "[WT:ops] Phase 11 actual Saju CPU-constrained rate ladder"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-operations-isolated-saju-rate-ladder
+  cancel-in-progress: false
+
+jobs:
+  isolated-saju-rate-ladder:
+    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-26.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact main MyeongHa source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Checkout public fixed Saju calculation engine
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: gycha0109-beep/Saju
+          ref: 9807ce89c08afc61b587560d515a475efd819032
+          path: _isolated_saju
+          persist-credentials: false
+
+      - name: Install pinned Node 24
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+
+      - name: Build actual Saju calculation engine from fixed public source
+        working-directory: _isolated_saju
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+
+      - name: Measure rate ladder in memory and CPU constrained offline container
+        shell: bash
+        run: bash scripts/operations/run-isolated-saju-rate-ladder-phase11-ci.sh
+
+      - name: Upload sanitized synthetic rate measurements
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: isolated-saju-rate-ladder-phase11-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-isolated-saju-rate-ladder-phase11-proof.json
+          if-no-files-found: ignore
+          retention-days: 14

@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, assertParallelTrackLoosePolicy, validateCandidate } from '../scripts/ci/integration-candidate.mjs';
+import { assertSubmissionEvent, assertPrerequisites, assertStagedPolicy, assertParallelTrackLoosePolicy, validateCandidate, defaultBranchRefSha } from '../scripts/ci/integration-candidate.mjs';
 
 const candidate = { pr: '42', head: 'a'.repeat(40), base: 'b'.repeat(40) };
 const current = () => ({
@@ -10,6 +11,29 @@ const current = () => ({
 });
 const check = (id = 1, name = 'CI Verify', conclusion = 'success', app = 15368) => ({
   id, name, conclusion, status: 'completed', app: { id: app },
+});
+
+describe('size-bounded default-branch commit authority', () => {
+  const sha='a'.repeat(40);
+  it('reads the exact default branch commit reference', () => {
+    expect(defaultBranchRefSha({
+      ref:'refs/heads/main',object:{type:'commit',sha},
+    },'main')).toBe(sha);
+  });
+  it('rejects different branches, non-commit refs and malformed SHAs', () => {
+    for(const bad of [
+      {ref:'refs/heads/release',object:{type:'commit',sha}},
+      {ref:'refs/heads/main',object:{type:'tag',sha}},
+      {ref:'refs/heads/main',object:{type:'commit',sha:'z'.repeat(40)}},
+      {ref:'refs/heads/main',object:{type:'commit',sha:'a'.repeat(39)}},
+      null,
+    ]) expect(() => defaultBranchRefSha(bad,'main')).toThrow('authoritative');
+  });
+  it('does not retrieve full commit patches for branch-head freshness checks', () => {
+    const readFile=readFileSync(new URL('../scripts/ci/integration-candidate.mjs',import.meta.url),'utf8');
+    expect(readFile).toContain('git/ref/heads/');
+    expect(readFile).not.toMatch(/api\(`repos\/\$\{repo\}\/commits\/\$\{encodeURIComponent\(metadata\.default_branch\)\}/u);
+  });
 });
 
 describe('pinned integration admission and required evidence', () => {
@@ -35,13 +59,19 @@ describe('pinned integration admission and required evidence', () => {
     const other = current(); other.base.ref = 'release';
     expect(() => validateCandidate(candidate, other)).toThrow('default branch');
   });
-  it('permits loose freshness but still requires an Actions-bound integration requirement', () => {
+  it('permits loose freshness but requires Actions-bound integration and GitGuardian app checks', () => {
     expect(() => assertStagedPolicy([])).toThrow('Staged CI requires');
-    const rules = (app, strict = false) => [{ type: 'required_status_checks', parameters: {
-      strict_required_status_checks_policy: strict,
-      required_status_checks: [{ context: 'CI Integration Verify', integration_id: app }],
-    } }];
-    expect(() => assertStagedPolicy(rules(7))).toThrow();
+    const rules = (app, strict = false, guardianApp = 46505) => [{
+      type: 'required_status_checks', parameters: {
+        strict_required_status_checks_policy: strict,
+        required_status_checks: [
+          { context: 'CI Integration Verify', integration_id: app },
+          { context: 'GitGuardian Security Checks', integration_id: guardianApp },
+        ],
+      },
+    }];
+    expect(() => assertStagedPolicy(rules(7))).toThrow('CI Integration Verify');
+    expect(() => assertStagedPolicy(rules(15368, false, 7))).toThrow('GitGuardian Security Checks');
     expect(() => assertStagedPolicy(rules(15368))).not.toThrow();
     expect(() => assertStagedPolicy(rules(15368, true))).not.toThrow();
   });

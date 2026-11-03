@@ -36,6 +36,7 @@ import {
   type SeyeonGlmRendererConfigV1,
 } from './openrouter-seyeon-glm-renderer-v1.js';
 import { createGovernedSeyeonGlmRendererV1 } from './governed-openrouter-seyeon-glm-renderer-v1.js';
+import type { RequestUiLocaleV1 } from './request-ui-locale-v1.js';
 import { startSeyeonAiCallV1, settleSeyeonAiCallV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import type {
   PostgresSubjectPoolV1,
@@ -139,6 +140,8 @@ export interface RunProductionSeyeonChatInputV1 {
   readonly threadId: string;
   readonly clientTurnId: string;
   readonly text: string;
+  /** Snapshotted language of this submitted AI turn; independent of later UI changes. */
+  readonly replyLocale?: RequestUiLocaleV1;
 }
 
 export interface RunProductionSeyeonChatResultV1 {
@@ -191,7 +194,7 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
    * DB registry, G1/G2 and current-rights Reveal remain independent guards.
    */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
-  readonly requiredPersonalRecordCount?: 1;
+  readonly requiredPersonalRecordCount?: 0 | 1;
 }
 
 function text(value: string, path: string, max: number): string {
@@ -538,6 +541,7 @@ export function createProductionSeyeonChatRuntimeV1(
         'chat_execution',
         () => runSeyeonProductionChatExecutionV1({
           mode: 'WRITE_DARK',
+          replyLocale: runInput.replyLocale ?? 'ko-KR',
           resolvedSubjectId: resolvedSubject.subjectId,
           threadId,
           receivePlan,
@@ -561,6 +565,7 @@ export function createProductionSeyeonChatRuntimeV1(
           semanticReviewerProvider: meteredReviewer,
           persistencePort: meteredChatPersistence,
           positivePersonalSourcePort: ports.positivePersonalSource,
+          combinedSourcePinPort: ports.combinedSourcePin,
           ...(input.requiredPersonalRecordCount===undefined?{}:{requiredPersonalRecordCount:input.requiredPersonalRecordCount}),
           ...(input.approvedPersonalRecordModelUse === undefined ? {} : {
             serverOwnedPersonalRecordProjectors: Object.freeze([

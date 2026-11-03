@@ -58,7 +58,7 @@ describe('S0 G0->G1 exact historical model-input window (offline HOLD)',()=>{
     const reread=exec.indexOf('const dbVerifiedWindow=await input.contextReadPort.readRecentMessages({');
     const assertion=exec.indexOf('buildSeyeonG1HistoricalModelWindowCensusV1({');
     const hold=exec.indexOf('throw new SeyeonHistoricalCandidatePersistedHoldV1();',assertion);
-    const actualPin=exec.indexOf('await input.positivePersonalSourcePort.pinBeforeModel({');
+    const actualPin=exec.indexOf('await input.combinedSourcePinPort.pinBeforeModel({');
     expect(reread).toBeGreaterThan(0);
     expect(reread).toBeLessThan(assertion);
     expect(assertion).toBeLessThan(hold);

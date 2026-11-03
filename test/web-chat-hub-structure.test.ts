@@ -79,6 +79,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
       readFile(hubV2CssPath, 'utf8'),
     ]);
     expect(page).toContain('data-relationship-section hidden');
+    expect(page).toContain('새로운 연결자를 준비하고 있습니다');
+    expect(page).toContain('명하의 이야기를 함께할 새로운 연결자들이 계속 찾아올 예정입니다.');
+    expect(page).not.toContain('data-pending-people-grid');
+    expect(page).not.toContain('연결자 등록 및 대화 기능 준비 중');
+    expect(page).not.toContain('세 연결자는 소개만 먼저 공개됩니다.');
     expect(page).toContain('data-people-grid');
     expect(page).toContain('data-meet-shortcut hidden');
     expect(page).toContain('data-incoming-section hidden');
@@ -178,6 +183,9 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(hubCss).toContain('.chat-person-art-image');
     expect(hubCss).not.toContain('--portrait-scale');
     expect(hubCss).not.toContain('transform: scale(var(--portrait-scale');
+    expect(js).not.toContain('data-pending-people-grid');
+    expect(js).not.toContain("createPersonCard(person, { pending: true })");
+    expect(js).toContain("key !== 'seorin' && key !== 'mira' && key !== 'doyun'");
     expect(js).not.toContain('portrait.position');
     expect(js).not.toContain('portrait.scale');
     expect(js).not.toContain('portrait.origin');
@@ -224,8 +232,13 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(room).not.toContain('대화로 돌아가기');
     expect(home).toContain('href="chat-hub.html">대화</a>');
     expect(home).toContain('href="chat-hub.html">인물 둘러보기');
-    expect(home).toContain('href="chat-hub.html">대화 보러 가기');
-    expect(home).not.toContain('href="chat.html?character=');
+    // The redundant Home recent-chat placeholder was intentionally removed.
+    // Global discovery still uses the hub, while Seyeon's portrait card opens
+    // her presentation room directly without claiming thread ownership.
+    expect(home).not.toContain('대화 보러 가기');
+    expect(home).not.toContain('mhx-recent-card');
+    expect(home).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
+    expect(home).not.toContain('threadId=');
     expect(reading).toContain('href="chat-hub.html">대화</a>');
     expect(records).toContain('href="chat-hub.html">대화</a>');
   });
@@ -238,7 +251,7 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(runtime).not.toContain("root.dataset.chatEntry = 'reading-handoff'");
     expect(runtime).not.toContain('readingHandoff');
     expect(runtime).not.toContain('읽기에서 이어왔군요.');
-    expect(runtime).toContain('setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, getUiLocale()) : character.intro.map(line => translateStaticUi(line, getUiLocale())))');
+    expect(runtime).toContain('setDialogueLines(characterKey ? resolveCharacterChatIntroV1(characterKey, chatEntryLocale) : character.intro.map(line => translateStaticUi(line, chatEntryLocale)))');
   });
 
   it('keeps thread-only Chat navigation identity-neutral until server presentation authority exists', async () => {
@@ -266,10 +279,10 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(runtime).not.toContain("(params.get('character') || 'baekheon')");
   });
 
-  it('keeps My as the fifth active destination instead of falling back to Records', async () => {
+  it('keeps My reachable through the header profile and mobile navigation, without duplicate desktop tab', async () => {
     const html = await readFile(hubHtmlPath, 'utf8');
 
-    expect(html).toContain('class="product-nav-link" href="my.html">마이</a>');
+    expect(html).not.toContain('class="product-nav-link" href="my.html">마이</a>');
     expect(html).toContain('class="product-profile" href="my.html" aria-label="내 프로필"');
     expect(html).toContain('<span>마이</span>');
     expect(html).toContain('class="mobile-nav-link" href="my.html"');

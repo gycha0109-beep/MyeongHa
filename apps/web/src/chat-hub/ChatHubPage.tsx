@@ -76,10 +76,13 @@ export function ChatHubPage() {
 
       <section className="chat-pending-section" aria-labelledby="chat-pending-title">
         <div className="chat-pending-heading">
-          <div><span className="chat-hub-section-kicker">COMING SOON</span><h2 id="chat-pending-title">연결자 등록 중</h2></div>
-          <p>세 연결자는 소개만 먼저 공개됩니다. 대화 기능은 준비 중입니다.</p>
+          <div>
+            <span className="chat-hub-section-kicker">COMING SOON</span>
+            <h2 id="chat-pending-title">새로운 연결자를 준비하고 있습니다</h2>
+          </div>
+          <span className="chat-pending-symbol" aria-hidden="true">✧</span>
         </div>
-        <div className="chat-people-grid" data-pending-people-grid />
+        <p className="chat-pending-copy">명하의 이야기를 함께할 새로운 연결자들이 계속 찾아올 예정입니다.</p>
       </section>
     </div>
   );

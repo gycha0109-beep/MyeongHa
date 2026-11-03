@@ -9,7 +9,7 @@ create function public.qry_seyeon_thread_ever_involved_v1(
   p_thread_id uuid
 )
 returns table(ever_involved boolean)
-language plpgsql stable security definer
+language plpgsql volatile security definer
 set search_path=pg_catalog,public
 set row_security=off
 as $guard$
@@ -32,16 +32,29 @@ begin
       constraint='seyeon_history_presence_subject_ineligible',
       message='Canonical Subject unavailable';
   end if;
+  -- Serialize the historical-participant verdict against new participant
+  -- references. FOR UPDATE conflicts with the FK's KEY SHARE lock when
+  -- another TX joins a Character to this Thread; the lock remains until
+  -- this caller's owning HTTP read transaction ends.
   perform 1 from public.conversation_threads t
     where t.id=p_thread_id
       and t.subject_id=p_subject_id
-      and t.status in ('active','archived');
+      and t.status in ('active','archived')
+    for update;
   if not found then
     raise exception using
       errcode='P0001',
       constraint='seyeon_history_presence_thread_unavailable',
       message='Owned Thread unavailable';
   end if;
+
+  -- The Thread lock prevents new participant INSERTs through its FK.
+  -- Lock every existing participant row too: a concurrent UPDATE can
+  -- replace character_id or left_at without taking another FK KEY SHARE
+  -- on the Thread. Keep both locks through the owner's HTTP read TX.
+  perform 1 from public.conversation_thread_characters ctc
+    where ctc.thread_id=p_thread_id
+    for share;
 
   return query
     select exists(

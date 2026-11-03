@@ -133,8 +133,15 @@ async function serve() {
       if (pathname === '/api/readings' && req.method === 'GET') {
         const rejectedGuest = scenario === 'records-guest-401' && kind === 'guest';
         requests.push({ scenario, path: pathname, authorization, rejectedGuest });
-        if (!kind || rejectedGuest) {
+        // The Records page reads /api/readings before /api/life-record.
+        // Keep the main-branch Guest rejection and test Member 401/403
+        // against the first actual Records read, not an unreached endpoint.
+        if (!kind || rejectedGuest || (scenario === 'records-life-401' && kind === 'member')) {
           sendJson(res, 401, errorEnvelope());
+          return;
+        }
+        if (scenario === 'records-life-403' && kind === 'member') {
+          sendJson(res, 403, errorEnvelope('FORBIDDEN'));
           return;
         }
         sendJson(res, 200, envelope({ readings: [], pagination: { pageSize: 50, hasMore: false, nextCursor: null } }));

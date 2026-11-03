@@ -114,6 +114,32 @@ change. `future_safe_privacy_reconciliation=false` and `dr_ready=false`
 remain mandatory pending independently verified continuous source authority,
 Hosted provider equivalence, and full recovery acceptance.
 
+## 2026-11-01 — first live freshness monitor FAIL → source refresh → monitor PASS
+
+After [PR #2851](https://github.com/gycha0109-beep/MyeongHa/pull/2851) merged, the first independent [freshness monitor #41312147367](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41312147367) **correctly failed**: latest confirmed source run **#41287556554**, GitHub completion time `2026-11-01T09:08:36Z`, age `16133` seconds, exact encrypted artifact present, threshold `7200` seconds, status `CAPTURE_COMPLETION_STALE`.
+
+A **single manually dispatched existing protected source ledger** [#41312262633](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41312262633) succeeded, with encrypted artifact **#13086116443** (SHA-256 `4711e3ebc7bf3b3d4f84cd4890cf299aebe607e5aa517dcd5605b0a1febde117`, expires 2026-12-01T13:39:11Z). Public sanitized manifest reports `capturedAt=2026-11-01T13:39:08Z`, supported `eventCount=0`, `backupRunId=41243930121`, `futureSafePrivacyReconciliation=false`, `drReady=false`. The encrypted event payload was **not** decrypted or inspected.
+
+The subsequent independent [freshness monitor #41312435995](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41312435995) **PASS**: source run `41312262633`, `elapsedSinceRunCompletionSeconds=117`, `encryptedArtifactObserved=true`, `status=RECENT_CAPTURE_COMPLETION_OBSERVED`. This is the first real observed monitor red-to-green recovery. It proves recent completion and artifact metadata presence **only**; scheduled-run delays, possible missing privacy events, independently continuous event evidence, email delivery, approved RPO and whole-service recovery are **NOT PROVEN**. `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false` remain invariant.
+
+## 2026-11-01 — independent GitHub snapshot-completion freshness watch
+
+In addition to the existing warning emitted **inside** a successful scheduled privacy-ledger capture, Phase 6 now has `.github/workflows/production-privacy-ledger-freshness-watch.yml`. This separate **manual/main-only or hourly scheduled** GitHub Actions job uses only the repository-scoped GitHub token with `actions: read` and `contents: read` to query the exact `production-postgres-privacy-recovery-ledger.yml` workflow's latest successful main run and the encrypted artifact it actually uploaded. It never reads the archive or event contents, links to Supabase, accesses Production secrets, or changes the original capture schedule.
+
+The watcher runs at minute `:23` independently of the source capture's `:47` schedule. It fails visibly (red Actions check and sanitized annotation) when it finds **no successful snapshot**, a completed snapshot older than **7200 seconds**, a missing/expired exact encrypted artifact, an invalid future timestamp, or an unavailable/malformed GitHub API response. The boundary is twice the **existing nominal hourly cadence** and remains a diagnostic operations signal, **not** an approved RPO or a continuous-capture proof. It records only the job's run ID, GitHub-reported completion time, elapsed seconds, artifact-presence boolean and fail-closed DR flags. GitHub `updated_at` is an indicator of completed workflow freshness; it is not the exact underlying `capturedAt` or confirmation that every event was durably captured.
+
+The watcher and source snapshot are both hosted by GitHub Actions: platform scheduling delays, disabled workflows or an unavailable GitHub service can prevent both. A red workflow check is visible in GitHub but **does not by itself prove email/push notification delivery** or provide a second independently durable data provider. `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `approvedRpoProven=false`, `drReady=false` and `serviceResumptionAllowed=false` are mandatory on every outcome.
+
+The read-only GitHub API contract was verified against actual metadata for [scheduled privacy capture #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554); its run and artifact association are present. All synthetic freshness cases (recent, stale, no capture, missing/expired artifact, wrong branch, invalid future time, denied scope, exact API binding) pass locally. **First actual scheduled/manual watcher execution on merged main is pending**, so live alert appearance is not yet proven.
+
+## 2026-11-01 — bounded GitHub annotation for sustained snapshot cadence gaps
+
+The existing periodic privacy-ledger exporter now emits a GitHub Actions **warning annotation** if the elapsed time between two successfully captured snapshots is at least twice the workflow's **already documented nominal period (3600 seconds)**. The message contains only the measured interval, the nominal period and the excess seconds. It does not include event rows, subject identifiers, tokens, or raw SQL. The warning is diagnostic; it neither fails the bounded encrypted off-DB snapshot nor suppresses the prior-event overlap check.
+
+Read-only public manifest of [scheduled ledger #41287556554](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41287556554) (snapshot through 2026-11-01T08:08:31Z) recorded **24043 seconds** between captures and **20443 seconds** beyond nominal cadence, with **0** supported events. `snapshotOverlapStatus=OVERLAPPING_CAPTURED_EVENTS_PRESERVED` while `sourceContinuityProven=false`. This prior observation would trigger the new annotation, but **the new warning code has not yet been exercised by a completed Production scheduled workflow**. Actual GitHub email/notification delivery is not proven by an annotation, and a completed scheduled capture does not imply continuous independently durable privacy-event history.
+
+`futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false` stay unchanged. No provider mutation, unapproved alert threshold, or Hosted DR promotion is authorized.
+
 ## 2026-10-28 — measured scheduled-capture gaps (no continuity promotion)
 
 The successful [Production read-only ledger run 40697151010](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40697151010)

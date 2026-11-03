@@ -214,3 +214,49 @@ describe('P4 stored canonical set vs authenticated current PortOne cancellation 
   });
  });
 });
+
+describe('P4 exact Provider Event member of full current cancellation set',()=>{
+ it('requires exact persisted candidate event to be in the verified set',async()=>{
+  const client=db(),fetchImpl=fetchFor();
+  const r=await run(client,{
+   expectedProviderEventId:'00000000-0000-4000-8000-000000000099',
+   fetchImpl,
+  });
+  expect(r.kind).toBe('exact_provider_event_not_in_verified_cancel_set');
+  expect(fetchImpl).not.toHaveBeenCalled();
+  expect(client.calls.filter(x=>x.sql==='rollback')).toHaveLength(1);
+  safe(r);
+ });
+ it('certifies specific source membership only when authenticated full GET and both DB snapshots agree',async()=>{
+  const r=await run(db(),{
+   expectedProviderEventId:SECOND.providerEventId,
+  });
+  expect(r).toMatchObject({
+   kind:'authenticated_current_cancel_set_matches_recorded',
+   exactProviderEventIncluded:true,
+   observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+   providerOrderingProven:false,
+  });
+  safe(r);
+ });
+ it('does not promote the wrong event when it appears only after provider GET',async()=>{
+  const client=db({rows:[FIRST],rowsAfter:RECORDS}),fetchImpl=fetchFor();
+  const r=await run(client,{
+   expectedProviderEventId:SECOND.providerEventId,
+   fetchImpl,
+  });
+  expect(r.kind).toBe('exact_provider_event_not_in_verified_cancel_set');
+  expect(fetchImpl).not.toHaveBeenCalled();
+ });
+ it('cannot certify event membership when it disappears after GET',async()=>{
+  const client=db({rowsAfter:[FIRST]});
+  const r=await run(client,{expectedProviderEventId:SECOND.providerEventId});
+  expect(r.kind).toBe('stored_cancel_set_changed_during_provider_get');
+  safe(r);
+ });
+ it('rejects invalid external event identity before beginning DB read',async()=>{
+  const client=db();
+  await expect(run(client,{expectedProviderEventId:'not-uuid'})).rejects.toThrow('INVALID');
+  expect(client.query).not.toHaveBeenCalled();
+ });
+});

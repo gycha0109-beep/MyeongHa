@@ -171,8 +171,10 @@ describe('C08-R public synthetic compact 3-call Shadow (NO external provider)',(
         name:row.stage,requestBodyBytes:row.bytes,maxCompletionTokens:1536,
       })),
     });
-    expect(worstCase.reservedMicroUsd).toBe(6675);
-    expect(worstCase.reserveUpperKrw).toBe(16.6875);
+    // The additional reply-locale field changes the real serialized wire quote.
+    // Preserve the exact offline budget snapshot; do not relax admission limits.
+    expect(worstCase.reservedMicroUsd).toBe(6679);
+    expect(worstCase.reserveUpperKrw).toBe(16.6975);
     expect(worstCase.targetMetUnderStressAssumptions).toBe(false);
     expect(worstCase.providerHardCapVerified).toBe(false);
     expect(worstCase.providerInvoiceReconciled).toBe(false);

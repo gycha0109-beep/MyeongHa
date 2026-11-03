@@ -3,6 +3,11 @@ import type {
   SupabaseAuthAdminUserDeletionPortV1,
 } from './supabase-auth-admin-user-deletion.js';
 
+import type {
+  OfficialReaderAccountPrivacyDeletionPortV1,
+  OfficialReaderProtectedDeletionManifestV1,
+} from './official-reader-private-account-deletion-lifecycle-v1.js';
+
 type Awaitable<T> = T | Promise<T>;
 
 export const ACCOUNT_DELETION_WORKER_ORCHESTRATION_BINDINGS_V1 = Object.freeze({
@@ -49,7 +54,28 @@ export interface AccountDeletionWorkerDbFinalizerPortV1 {
     readonly subjectId: string;
     readonly deletionJobId: string;
     readonly lockOwner: string;
+    /** Written only after an independent durable Privacy tombstone ACK. */
+    readonly privacyFenceId?: string;
   }): Awaitable<AccountDeletionWorkerDbFinalizerResultV1>;
+}
+
+export interface AccountDeletionReaderPrivacyStatePortV1 {
+  readProtectedManifest(input: {
+    readonly subjectId: string;
+    readonly deletionJobId: string;
+    readonly lockOwner: string;
+  }): Awaitable<OfficialReaderProtectedDeletionManifestV1>;
+  hasPendingKeyErasure(input: {
+    readonly subjectId: string;
+    readonly deletionJobId: string;
+    readonly lockOwner: string;
+  }): Awaitable<boolean>;
+  markKeysErased(input: {
+    readonly subjectId: string;
+    readonly deletionJobId: string;
+    readonly lockOwner: string;
+    readonly privacyFenceId: string;
+  }): Awaitable<boolean>;
 }
 
 export interface AccountDeletionWorkerCompletionResultV1 {
@@ -74,6 +100,8 @@ export interface RunClaimedAccountDeletionWorkerInputV1 {
   readonly dbFinalizerPort: AccountDeletionWorkerDbFinalizerPortV1;
   readonly authDeletionPort: SupabaseAuthAdminUserDeletionPortV1;
   readonly completionPort: AccountDeletionWorkerCompletionPortV1;
+  readonly readerPrivacyStatePort?: AccountDeletionReaderPrivacyStatePortV1;
+  readonly readerPrivacyDeletionPort?: OfficialReaderAccountPrivacyDeletionPortV1;
 }
 
 export interface RunClaimedAccountDeletionWorkerResultV1 {
@@ -93,7 +121,8 @@ export type AccountDeletionWorkerOrchestrationFailureCodeV1 =
   | 'INVALID_RESUME_STATE'
   | 'INVALID_FINALIZER_RESULT'
   | 'INVALID_COMPLETION_RESULT'
-  | 'PERSISTED_PHASE_DID_NOT_ADVANCE';
+  | 'PERSISTED_PHASE_DID_NOT_ADVANCE'
+  | 'READER_PRIVACY_DELETION_UNAVAILABLE';
 
 export class AccountDeletionWorkerOrchestrationErrorV1 extends Error {
   constructor(
@@ -306,9 +335,38 @@ export async function runClaimedAccountDeletionWorkerV1(
   }
 
   if (state.phase === 'db_finalization_required') {
+    // Take the exact encrypted-body ID/key manifest under the live claimed
+    // deletion lease. The durable outside-backup tombstone MUST precede any
+    // physical DB deletion; no vendor I/O runs inside a PostgreSQL TX.
+    let privacyFenceId: string | undefined;
+    if (input.readerPrivacyStatePort) {
+      const manifest = await input.readerPrivacyStatePort.readProtectedManifest(dbInput);
+      if (!manifest || !Array.isArray(manifest.entries)) {
+        return fail('READER_PRIVACY_DELETION_UNAVAILABLE',
+          'Reader protected deletion manifest is unavailable.');
+      }
+      if (manifest.entries.length > 0) {
+        if (!input.readerPrivacyDeletionPort) {
+          return fail('READER_PRIVACY_DELETION_UNAVAILABLE',
+            'Protected Reader deletion needs the outside-backup ledger and key authority.');
+        }
+        const fence = await input.readerPrivacyDeletionPort.fenceBeforeDatabaseDeletion({
+          subjectId, deletionJobId, manifest,
+        });
+        if (fence.subjectId !== subjectId || fence.deletionJobId !== deletionJobId
+            || typeof fence.fenceId !== 'string' || fence.fenceId.length === 0) {
+          return fail('READER_PRIVACY_DELETION_UNAVAILABLE',
+            'Protected Reader deletion returned the wrong external fence.');
+        }
+        privacyFenceId = fence.fenceId;
+      }
+    }
     dbFinalizerInvoked = true;
     const result = requireFinalizerResult(
-      await input.dbFinalizerPort.finalizeDatabase(dbInput),
+      await input.dbFinalizerPort.finalizeDatabase({
+        ...dbInput,
+        ...(privacyFenceId === undefined ? {} : { privacyFenceId }),
+      }),
     );
     dbFinalizerReplayed = result.replayed;
 
@@ -320,6 +378,37 @@ export async function runClaimedAccountDeletionWorkerV1(
       );
     }
     state = next;
+  }
+
+  // On a restarted Worker, the DB child rows are already gone. The
+  // independent ledger is the ONLY durable source of the original key
+  // manifest; finish key destruction before touching hosted Auth or marking
+  // the outbox complete. Re-running erase is safe and required on retries.
+  if (state.phase === 'auth_deletion_required'
+      || state.phase === 'completion_ack_required') {
+    if (input.readerPrivacyDeletionPort) {
+      if (!input.readerPrivacyStatePort) {
+        return fail('READER_PRIVACY_DELETION_UNAVAILABLE',
+          'Reader Privacy DB acknowledgment port is missing.');
+      }
+      const acknowledged = await input.readerPrivacyDeletionPort.finishAfterDatabaseDeletion({
+        subjectId, deletionJobId,
+      });
+      if (acknowledged !== null) {
+        const marked = await input.readerPrivacyStatePort.markKeysErased({
+          ...dbInput, privacyFenceId: acknowledged.fenceId,
+        });
+        if (marked !== true) {
+          return fail('READER_PRIVACY_DELETION_UNAVAILABLE',
+            'Reader protected key erasure DB acknowledgment failed.');
+        }
+      }
+    }
+    if (input.readerPrivacyStatePort
+        && await input.readerPrivacyStatePort.hasPendingKeyErasure(dbInput)) {
+      return fail('READER_PRIVACY_DELETION_UNAVAILABLE',
+        'Reader protected keys remain pending before account deletion can continue.');
+    }
   }
 
   if (state.phase === 'auth_deletion_required') {

@@ -18,6 +18,10 @@ import {
   type SeyeonPositiveS0OwnerDbPortsV1,
 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import {
+  pinSeyeonG1CombinedModelSourcesV1,
+  type SeyeonG1CombinedModelPinRequestV1,
+} from './seyeon-g1-positive-combined-source-port-v1.js';
+import {
   createPostgresSeyeonProductionContextReadAuthorityPortV1,
 } from './postgres-seyeon-production-context-read-v1.js';
 import {
@@ -57,6 +61,9 @@ export interface SeyeonProductionTransactionalPortsV1 {
   readonly chatPersistence: SeyeonProductionChatPersistencePortV1;
   /** G1/G2 DB Owner ports, not a model or HTTP Reveal capability. */
   readonly positivePersonalSource: SeyeonPositiveS0OwnerDbPortsV1;
+  readonly combinedSourcePin: Readonly<{
+    pinBeforeModel(request: SeyeonG1CombinedModelPinRequestV1): Promise<Readonly<Record<string, unknown>>>;
+  }>;
   readonly relationshipRead: SeyeonProductionRelationshipReadAuthorityPortV1;
   readonly contextRead: SeyeonProductionContextReadAuthorityPortV1;
   readonly postTurnAnalysis: SeyeonPostTurnAnalysisOutboxPortV1;
@@ -178,6 +185,14 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
       },
     });
 
+  const combinedSourcePin = Object.freeze({
+    pinBeforeModel(request: SeyeonG1CombinedModelPinRequestV1) {
+      requireSubject(subjectId, request.subjectId);
+      return runner.run(subjectId, (client) =>
+        pinSeyeonG1CombinedModelSourcesV1(client, request));
+    },
+  });
+
   const relationshipRead: SeyeonProductionRelationshipReadAuthorityPortV1 =
     Object.freeze({
       readCurrent(request: Parameters<SeyeonProductionRelationshipReadAuthorityPortV1['readCurrent']>[0]) {
@@ -295,6 +310,7 @@ export function createSeyeonProductionTransactionalPortsV1(input: {
     bundleManifest,
     chatPersistence,
     positivePersonalSource,
+    combinedSourcePin,
     relationshipRead,
     contextRead,
     postTurnAnalysis,

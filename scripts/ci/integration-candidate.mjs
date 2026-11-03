@@ -35,6 +35,10 @@ export function assertStagedPolicy(rules) {
   if (!checks.some(check => check.context === integrationContext && check.integration_id === 15368)) {
     throw new Error('Staged CI requires CI Integration Verify from GitHub Actions in the default-branch ruleset');
   }
+  if (!checks.some(check =>
+    check.context === 'GitGuardian Security Checks' && check.integration_id === 46505)) {
+    throw new Error('Staged CI requires GitGuardian Security Checks from the GitGuardian app in the default-branch ruleset');
+  }
 }
 
 export function assertParallelTrackLoosePolicy(rules) {
@@ -69,6 +73,16 @@ export function api(path) {
   return JSON.parse(execFileSync('gh', ['api', path], { encoding: 'utf8' }));
 }
 
+export function defaultBranchRefSha(reference, branch) {
+  if (typeof branch !== 'string' || !branch ||
+      reference?.ref !== `refs/heads/${branch}` ||
+      reference?.object?.type !== 'commit' ||
+      !/^[a-f0-9]{40}$/u.test(reference.object.sha)) {
+    throw new Error('Default branch reference is not an authoritative commit');
+  }
+  return reference.object.sha;
+}
+
 export function currentCandidate(repo, pr) {
   if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/u.test(repo) || !/^[1-9][0-9]*$/u.test(String(pr))) {
     throw new Error('Invalid repository/PR');
@@ -76,7 +90,10 @@ export function currentCandidate(repo, pr) {
   const current = api(`repos/${repo}/pulls/${pr}`);
   const metadata = api(`repos/${repo}`);
   current.defaultBranch = metadata.default_branch;
-  current.defaultSha = api(`repos/${repo}/commits/${encodeURIComponent(metadata.default_branch)}`).sha;
+  // The commits endpoint embeds every changed file/patch; large merges exceed
+  // execFileSync's output buffer. A branch Git ref returns only the HEAD object.
+  const ref = api(`repos/${repo}/git/ref/heads/${encodeURIComponent(metadata.default_branch)}`);
+  current.defaultSha = defaultBranchRefSha(ref, metadata.default_branch);
   return current;
 }
 

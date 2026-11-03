@@ -27,12 +27,11 @@ describe('MyeongHa product Home — Golden Master', () => {
     const topicHero = page.indexOf('className="mhx-hero"');
     const characters = page.indexOf('className="mhx-characters"');
     const content = page.indexOf('id="mhx-today-title"');
-    const recent = page.indexOf('id="mhx-recent-title"');
+    expect(page).not.toContain('id="mhx-recent-title"');
 
     expect(topicHero).toBeGreaterThan(-1);
     expect(characters).toBeGreaterThan(topicHero);
     expect(content).toBeGreaterThan(characters);
-    expect(recent).toBeGreaterThan(content);
     expect(homeSource).not.toContain('home-sidebar');
     expect(homeSource).not.toContain('gm-sidebar');
   });
@@ -87,7 +86,7 @@ describe('MyeongHa product Home — Golden Master', () => {
     expect(homeSource).toContain('href="chat-hub.html"');
     expect(homeSource).toContain('사주 관심 주제');
     expect(homeSource).toContain('mhx-characters');
-    expect(homeSource).not.toContain('href="chat.html?character=');
+    expect(page).toContain("reader.key === 'seyeon' ? 'chat.html?character=seyeon' : 'chat-hub.html'");
     expect(homeSource).not.toContain('세연');
   });
 });

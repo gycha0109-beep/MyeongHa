@@ -1,6 +1,8 @@
 import { ensureActiveBearer, getActiveBearer, invalidateGuestSession, invalidateMemberSession } from './product-auth.js';
 import { getUiLocale } from './ui-i18n.js';
 import { resumePreviewHrefV1 } from './reading-preview-continuation.js';
+import { readCurrentSajuBirthProfileV1, matchCurrentSajuBirthProfileV1 } from './saju-current-birth-authority.js';
+import { mountSajuRadarV1, sajuRadarElementLabelV1, SAJU_RADAR_ELEMENT_COLORS_V1 } from './saju-five-elements-radar.js';
 
 import {
   sajuPillarLabelV1, sajuElementLabelV1, sajuYinYangLabelV1,
@@ -24,14 +26,6 @@ function byId(id) {
   const element = document.getElementById(id);
   if (!element) throw new Error(`Missing Saju hub element: ${id}`);
   return element;
-}
-
-function readSessionValue(key) {
-  try {
-    return sessionStorage.getItem(key);
-  } catch {
-    return null;
-  }
 }
 
 function writeSessionValue(key, value) {
@@ -119,32 +113,11 @@ async function createBirthProfile(token, request) {
   return data;
 }
 
-async function readBirthProfile(token, birthProfileId) {
-  if (!birthProfileId) return null;
-  const response = await fetch(`${BIRTH_PROFILE_ENDPOINT}/${encodeURIComponent(birthProfileId)}`, {
-    method: 'GET',
-    headers: bearerHeaders(token),
-    credentials: 'same-origin',
-    cache: 'no-store',
-  });
-  const payload = await readJson(response);
-  if (response.status === 404) return null;
-  if (!response.ok) {
-    throw requestError('birth-read', response.status, readPublicErrorCode(payload), `Birth Profile read failed with status ${response.status}.`);
-  }
-  try {
-    return unwrapSuccess(payload);
-  } catch {
-    return null;
-  }
-}
-
 // The calculation endpoint independently authorizes the current subject/revision.
 // Failure to fetch optional birth-summary labels must not discard real calculated pillars.
-async function readDisplayBirthProfile(token, birthProfileId) {
-  if (!birthProfileId) return null;
+async function readDisplayBirthProfile(token) {
   try {
-    return await readBirthProfile(token, birthProfileId);
+    return await readCurrentSajuBirthProfileV1(token);
   } catch (error) {
     if (error?.status === 401 || error?.status === 403) throw error;
     return null;
@@ -314,7 +287,22 @@ function renderPillars(snapshot) {
     const value = document.createElement('div');
     value.className = 'saju-pillar-value';
     const strong = document.createElement('strong');
-    strong.textContent = display.characters;
+    const resolved = resolvedPillar(state);
+    if (resolved) {
+      for (const partKey of ['stem', 'branch']) {
+        const part = resolved[partKey];
+        const character = document.createElement('span');
+        character.className = 'saju-pillar-hanja';
+        character.dataset.sajuPartElement = ELEMENTS.includes(part?.element) ? part.element : '';
+        character.dataset.sajuPartKind = partKey;
+        character.style.setProperty('--saju-element-color',
+          SAJU_RADAR_ELEMENT_COLORS_V1[part?.element] ?? '#c9a98a');
+        character.textContent = part?.hanja || part?.value || '—';
+        strong.append(character);
+      }
+    } else {
+      strong.textContent = display.characters;
+    }
     strong.dataset.sajuSourceCharacters = display.characters;
     const text = document.createElement('span');
     text.textContent = display.text;
@@ -346,25 +334,75 @@ function countElements(snapshot) {
   return counts;
 }
 
-function renderElements(snapshot) {
-  const root = byId('saju-element-bars');
-  root.replaceChildren();
-  const counts = countElements(snapshot);
-  const max = Math.max(1, ...Object.values(counts));
+let selectedSajuElement = null;
+let lastRenderedSajuSnapshot = null;
 
-  for (const element of ELEMENTS) {
-    const item = document.createElement('span');
-    item.className = 'saju-element';
-    const label = document.createElement('b');
-    label.textContent = sajuElementLabelV1(element, getUiLocale());
-    label.dataset.sajuElementKey = element;
-    const bar = document.createElement('i');
-    bar.style.setProperty('--element-fill', `${Math.round((counts[element] / max) * 100)}%`);
-    const value = document.createElement('small');
-    value.textContent = String(counts[element]);
-    item.append(label, bar, value);
-    root.append(item);
+function selectedElementExplanation(element, locale = getUiLocale()) {
+  const name = sajuRadarElementLabelV1(element, locale);
+  if (locale === 'en-US') return `Highlighting stems and branches belonging to ${name} in the Four Pillars tab.`;
+  if (locale === 'ja-JP') return `${name}に対応する天干・地支を四柱八字で強調します。`;
+  if (locale === 'zh-TW') return `已在四柱八字中標示屬於${name}的天干與地支。`;
+  if (locale === 'zh-CN') return `已在四柱八字中标示属于${name}的天干与地支。`;
+  return `${name}에 해당하는 천간·지지를 사주팔자에서 강조합니다.`;
+}
+
+function defaultElementExplanation(locale = getUiLocale()) {
+  if (locale === 'en-US') return 'Choose an element to highlight the matching stems and branches.';
+  if (locale === 'ja-JP') return '五行を選ぶと、対応する天干・地支が強調されます。';
+  if (locale === 'zh-TW') return '選擇五行，可在四柱八字中標示對應的天干與地支。';
+  if (locale === 'zh-CN') return '选择五行，可在四柱八字中标示对应的天干与地支。';
+  return '오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.';
+}
+
+function syncSajuElementSelection() {
+  const selected = selectedSajuElement;
+  const pillars = document.getElementById('saju-pillar-grid');
+  if (!pillars) return;
+  pillars.dataset.sajuSelectedElement = selected ?? '';
+  for (const part of pillars.querySelectorAll('[data-saju-part-element]')) {
+    part.classList.toggle('is-element-match',
+      Boolean(selected) && part.dataset.sajuPartElement === selected);
   }
+  for (const card of pillars.querySelectorAll('[data-saju-pillar-key]')) {
+    card.classList.toggle('is-element-linked', Boolean(card.querySelector('.is-element-match')));
+  }
+  for (const control of document.querySelectorAll('[data-saju-element-select]')) {
+    const chosen = control.dataset.sajuElementSelect === selected;
+    control.classList.toggle('is-selected', chosen);
+    control.setAttribute('aria-pressed', String(chosen));
+  }
+  const note = document.getElementById('saju-pillar-selection-note');
+  if (note) {
+    note.hidden = !selected;
+    note.textContent = selected ? selectedElementExplanation(selected) : '';
+  }
+  const feedback = document.getElementById('saju-element-feedback');
+  if (feedback) feedback.textContent = selected
+    ? selectedElementExplanation(selected) : defaultElementExplanation();
+}
+
+function chooseSajuElement(element) {
+  selectedSajuElement = selectedSajuElement === element ? null : element;
+  syncSajuElementSelection();
+  document.dispatchEvent(new CustomEvent('myeongha:saju-element-selected', {
+    detail: { element: selectedSajuElement },
+  }));
+}
+
+function renderElements(snapshot) {
+  const choicesRoot = byId('saju-element-bars');
+  const chartRoot = byId('saju-element-radar');
+  const counts = countElements(snapshot);
+  mountSajuRadarV1({
+    document,
+    chartRoot,
+    choicesRoot,
+    counts,
+    locale: getUiLocale(),
+    selectedElement: selectedSajuElement,
+    onSelect: chooseSajuElement,
+  });
+  syncSajuElementSelection();
 }
 
 function formatBirthSummary(profile, locale = 'ko-KR') {
@@ -396,7 +434,7 @@ function renderBirthDetails(profile, locale = getUiLocale()) {
     ? byLocale('음력', '旧暦', '農曆')
     : input?.calendarType === 'solar' ? byLocale('양력', '新暦', '國曆') : missing;
   const time = input?.timeKnown === false ? byLocale('시간 모름', '時刻不明', '時間不詳') :
-    typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d$/u.test(input.birthTime)
+    typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/u.test(input.birthTime)
       ? (() => {
           const [hour, minute] = input.birthTime.slice(0,5).split(':').map(Number);
           return byLocale(`${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${String(minute).padStart(2, '0')}분`,
@@ -429,9 +467,7 @@ function retranslateCalculatedSaju() {
     const meta = card.querySelector('.saju-pillar-meta');
     if (meta) meta.textContent = meta.dataset['saju' + suffix] ?? meta.textContent;
   }
-  for (const label of hub.querySelectorAll('[data-saju-element-key]')) {
-    label.textContent = sajuElementLabelV1(label.dataset.sajuElementKey,locale);
-  }
+  if (lastRenderedSajuSnapshot) renderElements(lastRenderedSajuSnapshot);
   const dayMaster = byId('saju-day-master');
   dayMaster.textContent = locale === 'ko-KR' ? dayMaster.dataset.sajuKo : dayMaster.dataset.sajuIntl;
   const meta = byId('saju-day-master-meta');
@@ -457,8 +493,13 @@ function renderCalculation(calculation, profile) {
   lastRenderedBirthProfile = profile;
   const snapshot = calculation?.snapshot;
   if (!snapshot || typeof snapshot !== 'object') throw new Error('Saju snapshot is unavailable.');
+  selectedSajuElement = null;
+  lastRenderedSajuSnapshot = snapshot;
   renderPillars(snapshot);
   renderElements(snapshot);
+  document.dispatchEvent(new CustomEvent('myeongha:saju-element-selected', {
+    detail: { element: null },
+  }));
 
   const day = resolvedPillar(snapshot.pillars?.day);
   const dayStem = day?.stem;
@@ -508,12 +549,10 @@ async function loadExistingSaju() {
   }
 
   const { token } = activeBearer;
-  const birthProfileId = readSessionValue(BIRTH_PROFILE_ID_KEY);
   setState('loading', '현재 세션의 명식을 확인하는 중입니다…');
 
   try {
-    let profile = await readDisplayBirthProfile(token, birthProfileId);
-    if (birthProfileId && profile === null) removeSessionValue(BIRTH_PROFILE_ID_KEY);
+    const profile = await readDisplayBirthProfile(token);
 
     if (profile && !storedProfileHasSupportedBirthDate(profile)) {
       clearBirthSession();
@@ -522,11 +561,11 @@ async function loadExistingSaju() {
     }
 
     const calculation = await calculateSaju(token);
-    if (!profile) {
-      const storedId = readSessionValue(BIRTH_PROFILE_ID_KEY);
-      profile = await readDisplayBirthProfile(token, storedId);
+    const matchingProfile = matchCurrentSajuBirthProfileV1(profile, calculation);
+    renderCalculation(calculation, matchingProfile);
+    if (!matchingProfile) {
+      setState('ready', '현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');
     }
-    renderCalculation(calculation, profile);
 
   } catch (error) {
     if (error?.status === 401) {
@@ -535,11 +574,8 @@ async function loadExistingSaju() {
       return;
     }
     if (error?.operation === 'saju-calculation' && (error?.status === 404 || error?.code === 'NOT_FOUND')) {
-      if (birthProfileId) {
-        setState('error', '등록된 출생정보가 있지만 현재 자기 명식 계산 대상과 연결되지 않았습니다. 잠시 후 다시 확인해 주세요.');
-      } else {
-        setState('empty');
-      }
+      if (profile) setState('error', '등록된 출생정보가 있지만 현재 자기 명식 계산 대상과 연결되지 않았습니다. 잠시 후 다시 확인해 주세요.');
+      else setState('empty');
       return;
     }
     if (error?.operation === 'saju-calculation') {
@@ -564,11 +600,15 @@ async function submitBirthProfile(event) {
     const request = buildBirthRequest();
     activeBearer = await ensureActiveBearer();
     const token = activeBearer.token;
-    const receipt = await createBirthProfile(token, request);
+    await createBirthProfile(token, request);
     profileCreated = true;
     const calculation = await calculateSaju(token);
-    const profile = await readDisplayBirthProfile(token, receipt.birthProfileId);
-    renderCalculation(calculation, profile);
+    const profile = await readDisplayBirthProfile(token);
+    const matchingProfile = matchCurrentSajuBirthProfileV1(profile, calculation);
+    renderCalculation(calculation, matchingProfile);
+    if (!matchingProfile) {
+      setState('ready', '현재 출생 정보를 불러올 수 없습니다. 확인되지 않은 값을 대신 표시하지 않습니다.');
+    }
 
     const continuedPreview = resumePreviewHrefV1(window.location.search);
     if (continuedPreview) window.location.assign(continuedPreview);

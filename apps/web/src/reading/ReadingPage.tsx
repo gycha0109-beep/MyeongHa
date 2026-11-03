@@ -2,10 +2,9 @@ import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
-// All twelve Saju topics share one product layer. Route availability is
+// The eleven public Saju topics share one product layer. Route availability is
 // independent from Product identity and never grants sale or Reader access.
 const sajuProductTopics = [
-  { symbol: '▤', title: '전체 사주 해석', href: 'reading-detail.html?topic=temperament&scope=original', outline: ['타고난 기질과 성향', '강점과 약점', '삶의 주요 흐름', '인생의 중요한 시기', '통합 조언'] },
   { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
   { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
   { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
@@ -21,7 +20,19 @@ const sajuProductTopics = [
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
-  const [chartTab, setChartTab] = useState<'pillars' | 'elements' | 'structure'>('pillars');
+  // Preserve historic detail URLs in the route layer, but do not surface the
+  // retired general-natal product through the present Home/Saju catalogs.
+  const resumedVisibleTopic = resumedPreview && sajuProductTopics.some((topic) => topic.href === resumedPreview)
+    ? resumedPreview : null;
+  const [chartTab, setChartTab] = useState<'pillars' | 'elements'>('pillars');
+  const [selectedElement, setSelectedElement] = useState<string | null>(null);
+  useEffect(() => {
+    const onElementSelected = (event: Event) => {
+      setSelectedElement((event as CustomEvent<{ element: string | null }>).detail.element);
+    };
+    document.addEventListener('myeongha:saju-element-selected', onElementSelected);
+    return () => document.removeEventListener('myeongha:saju-element-selected', onElementSelected);
+  }, []);
   useEffect(() => {
     void import('../../saju-hub.js');
   }, []);
@@ -119,21 +130,35 @@ export function ReadingPage() {
           <section className="saju-design-card saju-design-chart-card" aria-labelledby="saju-design-chart-title">
             <header className="saju-design-card-heading">
               <h3 id="saju-design-chart-title">나의 사주 명식</h3>
+              <span id="saju-completeness-title" className="saju-calculation-badge" aria-live="polite">계산 확인 중</span>
+              <span id="saju-completeness-copy" className="saju-design-sr-title">계산된 사실 정보를 확인합니다.</span>
             </header>
-            <div className="saju-design-chart-tabs" role="tablist" aria-label="사주 계산 결과">
-              <button type="button" role="tab" aria-selected={chartTab === 'pillars'} className={chartTab === 'pillars' ? 'is-selected' : ''} onClick={() => setChartTab('pillars')}>사주팔자</button>
-              <button type="button" role="tab" aria-selected={chartTab === 'elements'} className={chartTab === 'elements' ? 'is-selected' : ''} onClick={() => setChartTab('elements')}>오행 분포</button>
-              <button type="button" role="tab" aria-selected={chartTab === 'structure'} className={chartTab === 'structure' ? 'is-selected' : ''} onClick={() => setChartTab('structure')}>계산 상태</button>
+            <div className="saju-design-chart-tabs" role="tablist" aria-label="사주 계산 결과" onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return;
+              event.preventDefault();
+              const nextTab = event.key === 'Home' ? 'pillars'
+                : event.key === 'End' ? 'elements'
+                  : chartTab === 'pillars' ? 'elements' : 'pillars';
+              setChartTab(nextTab);
+              const selector = nextTab === 'pillars' ? '#saju-pillars-tab' : '#saju-elements-tab';
+              event.currentTarget.querySelector<HTMLButtonElement>(selector)?.focus();
+            }}>
+              <button id="saju-pillars-tab" type="button" role="tab" aria-controls="saju-pillars-panel" aria-selected={chartTab === 'pillars'} tabIndex={chartTab === 'pillars' ? 0 : -1} className={chartTab === 'pillars' ? 'is-selected' : ''} onClick={() => setChartTab('pillars')}>사주팔자</button>
+              <button id="saju-elements-tab" type="button" role="tab" aria-controls="saju-elements-panel" aria-selected={chartTab === 'elements'} tabIndex={chartTab === 'elements' ? 0 : -1} className={chartTab === 'elements' ? 'is-selected' : ''} onClick={() => setChartTab('elements')}>오행 분포</button>
             </div>
-            <div className="saju-design-chart-content" role="tabpanel">
-              <div id="saju-pillar-grid" className="saju-pillar-grid saju-design-pillars" hidden={chartTab !== 'pillars'} aria-label="사주 네 기둥" />
-              <div className="saju-design-elements-panel" hidden={chartTab !== 'elements'}>
-                <p>서버가 계산한 천간·지지의 오행을 집계한 값입니다.</p>
-                <div id="saju-element-bars" className="saju-element-bars" />
+            <div className="saju-design-chart-content">
+              <div id="saju-pillars-panel" role="tabpanel" aria-labelledby="saju-pillars-tab" tabIndex={0} hidden={chartTab !== 'pillars'}>
+                <div id="saju-pillar-grid" className="saju-pillar-grid saju-design-pillars" aria-label="사주 네 기둥" />
+                <p id="saju-pillar-selection-note" className="saju-pillar-selection-note" hidden aria-live="polite" />
               </div>
-              <div className="saju-design-structure-panel" hidden={chartTab !== 'structure'}>
-                <strong id="saju-completeness-title">—</strong>
-                <p id="saju-completeness-copy">확정된 계산 사실만 표시합니다.</p>
+              <div id="saju-elements-panel" className="saju-design-elements-panel" role="tabpanel" aria-labelledby="saju-elements-tab" tabIndex={0} hidden={chartTab !== 'elements'}>
+                <p className="saju-elements-description">서버가 계산한 천간·지지 8글자의 오행 개수입니다. 강약 점수가 아닙니다.</p>
+                <div id="saju-element-radar" className="saju-element-radar" />
+                <div id="saju-element-bars" className="saju-element-choices" role="group" aria-label="오행 선택" />
+                <div className="saju-element-actions">
+                  <p id="saju-element-feedback" className="saju-element-feedback" aria-live="polite">오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.</p>
+                  <button id="saju-view-selected-pillars" className="saju-element-show-button" type="button" disabled={!selectedElement} onClick={() => setChartTab('pillars')}>명식에서 보기</button>
+                </div>
               </div>
             </div>
             <div className="saju-design-chart-foot">
@@ -145,7 +170,7 @@ export function ReadingPage() {
 
         <section className="saju-design-products" aria-labelledby="saju-design-products-title">
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
-          <p>12개 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
+          <p>관심 있는 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
           <div className="saju-design-product-grid">
             {sajuProductTopics.map((topic) => {
               const availability = resolveReadingAvailabilityV1(topic.href);
@@ -176,7 +201,7 @@ export function ReadingPage() {
           </div>
         </section>
 
-        <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedPreview ?? 'reading-detail.html?topic=temperament&scope=original'}>무료 사주 프리뷰 열기 →</a></div>
+        <div className="saju-design-preview-link"><span>지금 확인할 수 있는 무료 개인별 사주 프리뷰</span><a href={resumedVisibleTopic ?? '#saju-design-products-title'}>{resumedVisibleTopic ? '선택한 해석 이어보기 →' : '주제별 해석 살펴보기 →'}</a></div>
         <span id="saju-flow-year" hidden aria-hidden="true" />
       </section>
     </div>

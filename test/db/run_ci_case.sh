@@ -19,8 +19,14 @@ apply_standard_migrations() {
 
 apply_pg17_migrations_without_birth_authority() {
   psql -v ON_ERROR_STOP=1 -f test/db/bootstrap_supabase_auth_stub.sql
+  local reader_scope='historical'
+  case "$case_name" in
+    commerce-private-claim-full-finalizer-pg17|commerce-stored-portone-hmac-lineage-pg17|\
+    commerce-portone-cancellation-set-audit-pg17|commerce-exact-reader-withdrawal-hold-pg17)
+      reader_scope='reader-integrated' ;;
+  esac
   for migration in supabase/migrations/*.sql; do
-    if skip_staged_portone_migration_from_historical_fixture "$migration"; then continue; fi
+    if skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"; then continue; fi
     if [[ "${migration}" == *'/0860_birth_profile_create_runtime_authority.sql' ]]; then
       echo "Skipping ${migration}; managed-principal parity is verified by the dedicated birth-profile case"
       continue
@@ -726,6 +732,16 @@ SQL
       echo HOLD_COMMERCE_PARTIAL_SET_NOT_ISOLATED_PG17 >&2; exit 1;
     }
     bash test/db/commerce_portone_cancellation_partial_set_pg17.sh
+    ;;
+  commerce-exact-reader-withdrawal-hold-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_EXACT_READER_WITHDRAWAL_NOT_ISOLATED_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_exact_reader_withdrawal_hold_pg17.sh
     ;;
   *)
     echo "Unknown DB CI case: $case_name" >&2

@@ -208,15 +208,21 @@ export async function auditPortOneCancellationSetForReceiptV1(
  * legal refund, atomic Reader T2, customer ACK or permission to revoke.
  */
 export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
- dbClient,receiptId,sourceHmacSecret,apiSecret,fetchImpl,providerInspector,
+ dbClient,receiptId,expectedProviderEventId,sourceHmacSecret,apiSecret,
+ fetchImpl,providerInspector,
 }){
- if(typeof receiptId!=='string'||!UUID.test(receiptId))
+ if(typeof receiptId!=='string'||!UUID.test(receiptId)||
+    (expectedProviderEventId!==undefined&&
+     (typeof expectedProviderEventId!=='string'||!UUID.test(expectedProviderEventId))))
   throw Error('INVALID_CANCELLATION_SET_RECONCILIATION_RECEIPT');
  const first=await auditPortOneCancellationSetForReceiptV1(
   dbClient,{receiptId},PRIVATE_SET_AUDIT,
  );
  if(!first.privateRows)return no('stored_cancellation_set_not_ready');
  const before=first.privateRows;
+ if(expectedProviderEventId!==undefined&&
+    before.filter(r=>r.providerEventId===expectedProviderEventId).length!==1)
+  return no('exact_provider_event_not_in_verified_cancel_set');
  if(before.length>64)
   return no('provider_get_set_capacity_exceeded');
  const head=before[0];
@@ -281,7 +287,11 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
   dbClient,{receiptId},PRIVATE_SET_AUDIT,
  );
  if(!second.privateRows||second.privateRows.length!==before.length||
-    second.summary.kind!==first.summary.kind)
+    second.summary.kind!==first.summary.kind||
+    (expectedProviderEventId!==undefined&&
+     second.privateRows.filter(
+      r=>r.providerEventId===expectedProviderEventId,
+     ).length!==1))
   return no('stored_cancel_set_changed_during_provider_get');
  const byId=new Map(second.privateRows.map(r=>[r.providerEventId,r]));
  if(byId.size!==before.length||
@@ -296,6 +306,7 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
   recordedSetSelfConsistent:true,
   authenticatedProviderGetObserved:true,observedProviderSetMatched:true,
   postGetDbSnapshotStable:true,
+  exactProviderEventIncluded:expectedProviderEventId!==undefined,
   matchedCancellationItems:before.length,
   matchedCancellationAmountMinor:first.summary.recordedItemAmountMinor,
  });

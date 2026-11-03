@@ -245,20 +245,16 @@ try {
   assert(auth.lang==='ja-JP' && !/[가-힣]/u.test(auth.text),'Japanese auth UI contains untranslated Hangul: '+auth.text.match(/.{0,30}[가-힣].{0,40}/gu)?.slice(0,12).join(' | '));
   assert(auth.overflow<=2,'Japanese auth layout overflow');
 
-  // Verify the user-visible daily fortune, not just its button label. The
-  // random content is authored copy and must never fall back to Korean.
-  await navigate(client,origin,'/hall.html','.fortune-cookie-trigger');
+  // The Home card opens the localized fortune result immediately, with no launcher or intermediate panel.
+  await navigate(client,origin,'/hall.html','.mhx-content-grid button.mhx-content-card');
   await sleep(350);
-  const trigger=await inspect("(() => ({lang:document.documentElement.lang,text:document.querySelector('.fortune-cookie-trigger')?.textContent.trim(),pending:document.documentElement.dataset.uiPending??null,boot:!!document.querySelector('script[src=\"/ui-i18n-boot.js\"]')}))()");
-  assert(trigger.lang==='ja-JP' && trigger.text.includes('今日の運勢'),'Japanese fortune trigger not localized: '+JSON.stringify(trigger));
+  const trigger=await inspect("(() => ({lang:document.documentElement.lang,text:document.querySelector('.mhx-content-grid button.mhx-content-card')?.textContent.trim(),pending:document.documentElement.dataset.uiPending??null,boot:!!document.querySelector('script[src=\"/ui-i18n-boot.js\"]'),floating:!!document.querySelector('.fortune-cookie')}))()");
+  assert(trigger.lang==='ja-JP' && trigger.text && !trigger.floating,'Japanese Home fortune card unavailable or floating launcher visible: '+JSON.stringify(trigger));
   assert(trigger.pending===null && trigger.boot,'Early locale bootstrap was missing or never completed');
-  await inspect("(() => {document.querySelector('.fortune-cookie-trigger').click(); return true;})()");
-  await sleep(150);
-  await inspect("(() => {const button=document.querySelector('.fortune-cookie-draw'); if(!button)throw Error('fortune draw missing');button.click();return true;})()");
-  await sleep(200);
-  const daily=await inspect("(() => ({message:document.querySelector('#fortune-cookie-reveal-message')?.textContent.trim(),title:document.querySelector('#fortune-cookie-reveal-title')?.textContent.trim()}))()");
-  assert(daily.message && !/[가-힣]/u.test(daily.message+daily.title),'Daily fortune revealed Korean: '+JSON.stringify(daily));
-
+  await inspect("(() => {document.querySelector('.mhx-content-grid button.mhx-content-card').click();return true;})()");
+  await sleep(300);
+  const daily=await inspect("(() => ({message:document.querySelector('#fortune-cookie-reveal-message')?.textContent.trim(),title:document.querySelector('#fortune-cookie-reveal-title')?.textContent.trim(),intermediate:!!document.querySelector('.fortune-cookie-panel')}))()");
+  assert(daily.message && !daily.intermediate && !/[가-힣]/u.test(daily.message+daily.title),'Daily fortune must reveal immediately in Japanese: '+JSON.stringify(daily));
   // Offline/unavailable chat is still a fixed UI state. It is not a user
   // message and must show the chosen language even on a failed API request.
   await navigate(client,origin,'/chat.html?character=seyeon','[data-compose-status]');

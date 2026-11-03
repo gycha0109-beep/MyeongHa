@@ -24,8 +24,22 @@ for (const [source, row] of EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1) registerSta
 registerStaticCopy('라이트 모드로 전환', { 'ja-JP': 'ライトモードに切り替え', 'zh-TW': '切換至淺色模式', 'en-US': 'Switch to light mode', 'zh-CN': '切换至浅色模式' });
 registerStaticCopy('세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': 'セヨンの安全な応答処理を完了できませんでした。入力した内容は保持されています。しばらくしてからもう一度お試しください。', 'zh-TW': '未能完成 Seyeon 的安全回覆處理。您輸入的內容已保留，請稍後再試。', 'en-US': "Seyeon could not complete the response safely. Your message has been preserved. Please try again shortly.", 'zh-CN': '未能完成 Seyeon 的安全回复处理。您输入的内容已保留，请稍后重试。' });
 registerStaticCopy('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': '会話の状態を確認できませんでした。しばらくしてからもう一度お試しください。', 'zh-TW': '無法確認對話狀態，請稍後再試。', 'en-US': 'The chat status could not be verified. Please try again shortly.', 'zh-CN': '无法确认对话状态，请稍后重试。' });
+registerStaticCopy("이전에 보내지 못한 메시지가 있어요. 이전 기록은 남기고 새 메시지를 보낼까요?", { 'ja-JP': "前に送れなかったメッセージがあります。記録を残したまま、新しいメッセージを送りますか？", 'zh-TW': "有一則之前未能送出的訊息。要保留紀錄並傳送新訊息嗎？", 'en-US': "An earlier message failed. Keep its record and send your new message?", 'zh-CN': "有一条之前未能发送的消息。要保留记录并发送新消息吗？" });
+registerStaticCopy("이 대화방에 이전에 실패한 다른 메시지가 남아 있습니다. 기존 기록은 보존하면서 미완료 전송을 종료하고, 지금 입력한 문장을 새 메시지로 보내시겠습니까?", { 'ja-JP': "この会話には以前送信に失敗した別のメッセージが残っています。記録を保持したまま未完了の送信を終了し、現在の文章を新しいメッセージとして送信しますか？", 'zh-TW': "這段對話仍有另一則先前傳送失敗的訊息。要保留原始紀錄、結束未完成的傳送，並將目前輸入的內容作為新訊息送出嗎？", 'en-US': "A different earlier message in this conversation failed to send. Keep its record, close the unfinished send, and send your current text as a new message?", 'zh-CN': "此对话仍有另一条此前发送失败的消息。是否保留原始记录、结束未完成的发送，并将当前输入的内容作为新消息发送？" });
 registerStaticCopy("이전 대화에 미완료 메시지가 남아 새 메시지가 차단됐습니다. 기존 메시지의 전송 상태를 확인해 주세요.", { 'ja-JP': "前の会話に未完了のメッセージがあるため、新しいメッセージを送信できません。先に送信したメッセージの状態をご確認ください。", 'zh-TW': "上一段對話仍有未完成的訊息，因此無法傳送新訊息。請確認先前訊息的傳送狀態。", 'en-US': "An unfinished message in the previous conversation is blocking new messages. Please check the delivery status of that message.", 'zh-CN': "上一段对话仍有未完成的消息，因此无法发送新消息。请确认此前消息的发送状态。" });
 registerStaticCopy("관리자 또는 크레딧 사용 권한을 확인하지 못했습니다. 입력한 내용은 보존했습니다. 다시 로그인한 뒤 시도해 주세요.", { 'ja-JP': "管理者権限またはクレジット利用権限を確認できませんでした。入力内容は保持されています。再度ログインしてからお試しください。", 'zh-TW': "無法確認管理員或點數使用權限。輸入內容已保留，請重新登入後再試。", 'en-US': "Could not verify administrator or credit-use permissions. Your message has been preserved. Please sign in again and retry.", 'zh-CN': "无法确认管理员或点数使用权限。输入内容已保留，请重新登录后重试。" });
+registerStaticCopy("계산 확인 중", { 'ja-JP': "計算を確認中", 'zh-TW': "正在確認計算", 'en-US': "Checking calculation", 'zh-CN': "正在确认计算" });
+registerStaticCopy("사주 계산 결과", { 'ja-JP': "四柱の計算結果", 'zh-TW': "八字計算結果", 'en-US': "Saju calculation results", 'zh-CN': "八字计算结果" });
+registerStaticCopy("서버가 계산한 천간·지지 8글자의 오행 개수입니다. 강약 점수가 아닙니다.", { 'ja-JP': "サーバーで計算された八字の五行の文字数です。強弱の評価ではありません。", 'zh-TW': "這是伺服器計算的八字五行字數，並非強弱評分。", 'en-US': "Counts of the five elements in the eight calculated characters. These are not strength scores.", 'zh-CN': "这是服务器计算的八字五行字数，并非强弱评分。" });
+registerStaticCopy("사주 네 기둥", { 'ja-JP': "四柱八字の四柱", 'zh-TW': "八字四柱", 'en-US': "Four Saju pillars", 'zh-CN': "八字四柱" });
+registerStaticCopy("오행 선택", { 'ja-JP': "五行を選択", 'zh-TW': "選擇五行", 'en-US': "Choose an element", 'zh-CN': "选择五行" });
+registerStaticCopy("오행을 선택하면 관련 천간·지지를 명식에서 강조합니다.", { 'ja-JP': "五行を選ぶと、対応する天干・地支が強調されます。", 'zh-TW': "選擇五行，可在四柱八字中標示對應的天干與地支。", 'en-US': "Choose an element to highlight its corresponding stems and branches.", 'zh-CN': "选择五行，可在四柱八字中标示对应的天干与地支。" });
+registerStaticCopy("명식에서 보기", { 'ja-JP': "四柱で見る", 'zh-TW': "在四柱中查看", 'en-US': "View in Four Pillars", 'zh-CN': "在四柱中查看" });
+registerStaticCopy("계산된 사실 정보를 확인합니다.", { 'ja-JP': "計算済みの情報を確認します。", 'zh-TW': "查看已計算的資料。", 'en-US': "Review the calculated facts.", 'zh-CN': "查看已计算的数据。" });
+registerStaticCopy("관심 있는 사주 해석 주제를 같은 상품 영역에서 확인합니다.", { 'ja-JP': "関心のある四柱推命のテーマを同じ商品一覧でご覧いただけます。", 'zh-TW': "您可在同一商品列表查看感興趣的八字解讀主題。", 'en-US': "Explore the Saju reading topics that interest you in one place.", 'zh-CN': "您可在同一商品列表查看感兴趣的八字解读主题。" });
+registerStaticCopy("월간 해석은 준비 중입니다. 내 명식과 다른 주제를 먼저 살펴보세요.", { 'ja-JP': "月間鑑定は準備中です。まずはご自身の命式やほかのテーマをご覧ください。", 'zh-TW': "月度解讀仍在準備中。您可以先查看自己的命盤及其他主題。", 'en-US': "Monthly readings are not available yet. Explore your birth chart and other topics first.", 'zh-CN': "月度解读仍在准备中。您可以先查看自己的命盘及其他主题。" });
+registerStaticCopy("선택한 해석 이어보기 →", { 'ja-JP': "選択した鑑定の続きを見る →", 'zh-TW': "繼續查看已選解讀 →", 'en-US': "Continue selected reading →", 'zh-CN': "继续查看已选解读 →" });
+registerStaticCopy("주제별 해석 살펴보기 →", { 'ja-JP': "テーマ別の鑑定を見る →", 'zh-TW': "瀏覽各主題解讀 →", 'en-US': "Explore reading topics →", 'zh-CN': "浏览各主题解读 →" });
 registerStaticCopy('전송 중인 메시지', { 'ja-JP': '送信中のメッセージ', 'zh-TW': '傳送中的訊息', 'en-US': 'Sending message', 'zh-CN': '正在发送的消息' });
 registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨンの返信を待っています', 'zh-TW': '正在等待 Seyeon 回覆', 'en-US': 'Waiting for Seyeon to reply', 'zh-CN': '正在等待 Seyeon 回复' });
 registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });
@@ -37,6 +51,20 @@ for (const [source, row] of MY_STATIC_UI_COPY_V1) {
 }
 for (const [source, row] of COPY) registerStaticCopy(source, { 'ja-JP': row[0], 'zh-TW': row[1] });
 for (const [source, row] of PLANNED_STATIC_UI_COPY_V1) registerStaticCopy(source, { 'en-US': row[0], 'zh-CN': row[1] });
+for (const [source, localized] of Object.entries({
+  '새로운 연결자를 준비하고 있습니다': {
+    'ja-JP': '新しい案内人を準備しています',
+    'zh-TW': '我們正在準備新的引路人',
+    'en-US': 'More guides are on the way',
+    'zh-CN': '我们正在准备新的引路人',
+  },
+  '명하의 이야기를 함께할 새로운 연결자들이 계속 찾아올 예정입니다.': {
+    'ja-JP': '命河の物語を共にする新しい案内人たちが、これからも登場する予定です。',
+    'zh-TW': '陪伴您走進命河故事的新引路人，未來也會持續加入。',
+    'en-US': 'New guides will keep joining MyeongHa to share your stories.',
+    'zh-CN': '陪伴您走进命河故事的新引路人今后也会不断加入。',
+  },
+})) registerStaticCopy(source, localized);
 
 registerStaticCopy("기억 접근 권한이 변경되어 이전 세연 답변을 표시하지 않습니다. 이후 접근 여부는 서버에서 다시 확인합니다.", { 'ja-JP': "記憶へのアクセス権限が変更されたため、以前のセヨンの返信は表示しません。今後のアクセス権限はサーバーで再確認します。", 'zh-TW': "記憶存取權限已變更，因此不會顯示先前世妍的回覆。之後的存取權限將由伺服器重新確認。" });
 registerStaticCopy("기억 접근 철회 요청이 확인되어 이전 세연 답변을 숨겼습니다. 이후 접근 권한은 서버에서 다시 확인합니다.", { 'ja-JP': "記憶へのアクセス撤回要求が確認されたため、以前のセヨンの返信を非表示にしました。以後のアクセス権限はサーバーで再確認します。", 'zh-TW': "已確認撤回記憶存取權限的請求，因此已隱藏先前世妍的回覆。之後的存取權限將由伺服器重新確認。" });
@@ -54,14 +82,14 @@ export function getUiLocale() {
 }
 export function getUiLocaleRequestHeadersV1() {
   const locale = getUiLocale();
-  return { [UI_LOCALE_REQUEST_HEADER_V1]: locale === 'en-US' || locale === 'zh-CN' ? 'ko-KR' : locale };
+  return { [UI_LOCALE_REQUEST_HEADER_V1]: locale };
 }
 export function formatStaticUi(source, params, locale = getUiLocale()) {
   const template = translateStaticUi(source, locale);
   return template.replace(/\{([a-zA-Z]+)\}/gu, (_, name) => String(params[name] ?? ''));
 }
 
-const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
+const BLOCKED_TEXT = 'script, style, noscript, pre, code, svg, [contenteditable], [data-contact-i18n-root], [data-ui-react-owned], .conversation-message-stream .conversation-message:not([data-chat-intro]), [data-message-id], [data-chat-message], [data-reading-content], [data-official-reading], [data-records-source], [data-chat-body-source], [data-chat-intro-language-locked], [data-reading-step-title], [data-reading-step-body], [data-reading-structure-body], [data-reading-supporting-body], [data-reading-step-notice-text], [data-chart-pillar-year], [data-chart-pillar-month], [data-chart-pillar-day], [data-chart-pillar-hour], [data-chart-five-elements], [data-chart-ten-gods], [data-official-report-elements], [data-official-report-gods], [data-reader-comment], [data-context-title], [data-thread-bar-title]';
 const trackedText = new WeakMap();
 const unmappedChatStatusSource = new WeakMap();
 const CHAT_STATUS_SAFE_FALLBACK = '대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';

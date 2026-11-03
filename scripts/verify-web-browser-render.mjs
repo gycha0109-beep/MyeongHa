@@ -168,6 +168,62 @@ async function navigate(client, origin, pathname, selector) {
   await sleep(120);
 }
 
+async function inspectSharedHeader(client) {
+  return client.evaluate(`(() => {
+    const rect = selector => document.querySelector(selector)?.getBoundingClientRect();
+    const css = selector => {
+      const node = document.querySelector(selector);
+      return node ? getComputedStyle(node) : null;
+    };
+    const header = rect('.product-header');
+    return {
+      height: header?.height ?? 0,
+      innerHeight: rect('.product-header-inner')?.height ?? 0,
+      brandFont: css('.product-brand-name')?.fontSize ?? '',
+      navFont: css('.product-nav-link')?.fontSize ?? '',
+      navGap: css('.product-nav')?.gap ?? '',
+      navDisplay: css('.product-nav')?.display ?? '',
+      navHeight: rect('.product-nav')?.height ?? 0,
+      iconWidth: rect('.product-icon-button')?.width ?? 0,
+      themeWidth: rect('.product-theme-toggle')?.width ?? 0,
+      profileHeight: rect('.product-profile')?.height ?? 0,
+      localeWidth: rect('.ui-locale-select')?.width ?? 0,
+      texture: css('.product-header')?.backgroundImage ?? '',
+      cssLoaded: [...document.styleSheets].some(sheet => sheet.href?.endsWith('/shared-product-header.css')),
+    };
+  })()`);
+}
+
+async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight) {
+  let baseline = null;
+  for (const pathname of routes) {
+    await navigate(client, origin, pathname, '.product-header');
+    await waitForVisible(client, '.product-header .ui-locale-select');
+    const header = await inspectSharedHeader(client);
+    assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
+    assert(Math.abs(header.height - expectedHeight) <= 1 && Math.abs(header.innerHeight - (expectedHeight - 1)) <= 2,
+      `Unexpected header height on ${pathname}: ${JSON.stringify(header)}`);
+    if (expectedHeight === 92) {
+      assert(header.navDisplay === 'flex' && header.profileHeight > 0, `Desktop header is missing nav/profile on ${pathname}`);
+    } else {
+      assert(header.navDisplay === 'none' && header.profileHeight === 0, `Mobile header must hide desktop nav/profile on ${pathname}`);
+    }
+    // Authentication intentionally has no notifications button. Check the size
+    // of shared controls, but do not require a control absent by design.
+    if (pathname !== '/auth.html' && expectedHeight === 92) {
+      assert(header.iconWidth > 0, `Notification control unexpectedly missing on ${pathname}`);
+    }
+    if (!baseline) { baseline = header; continue; }
+    for (const key of ['height','innerHeight','brandFont','navFont','navGap','navDisplay','navHeight','iconWidth','themeWidth','profileHeight','localeWidth']) {
+      if (key === 'iconWidth' && (header.iconWidth === 0 || baseline.iconWidth === 0)) continue;
+      const ok = typeof header[key] === 'number'
+        ? Math.abs(header[key] - baseline[key]) <= 1
+        : header[key] === baseline[key];
+      assert(ok, `Shared header ${key} mismatch on ${pathname}: ${JSON.stringify({ home: baseline[key], current: header[key] })}`);
+    }
+  }
+}
+
 async function verifyDarkPage(client, origin, pathname, selector, { toggle = true, artifactSuffix = null } = {}) {
   await navigate(client, origin, pathname, selector);
   const cleanPath = pathname.split('?')[0];
@@ -254,8 +310,8 @@ try {
       overflow: document.documentElement.scrollWidth - innerWidth,
       elements: [
         inspect('.product-header', 100, 40), inspect('.mhx-hero', 900, 300),
-        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 600, 220),
-        inspect('.mhx-content-grid', 900, 70), inspect('.mhx-recent-card', 900, 60),
+        inspect('.mhx-characters', 900, 220), inspect('.mhx-topics', 600, 140),
+        inspect('.mhx-content-grid', 900, 70),
       ],
     };
   })()`);
@@ -268,20 +324,41 @@ try {
     assert(el.exists && el.visible, `Home Golden Master element unavailable: ${el.selector}`);
   }
   assert(Math.abs(hallState.shellWidth - hallState.contentWidth) <= 2, `Home hero container must match the scrollable viewport: shell=${hallState.shellWidth}, content=${hallState.contentWidth}`);
-  assert(hallState.productCount === 4, `Home Golden Master must expose exactly four product cards, got ${hallState.productCount}`);
-  assert(hallState.productTopBands.length === 4 && hallState.productTopBands[0] === hallState.productTopBands[1] && hallState.productTopBands[2] === hallState.productTopBands[3] && hallState.productTopBands[2] > hallState.productTopBands[0], `Home product cards must form two rows of two: ${JSON.stringify(hallState.productTopBands)}`);
+  assert(hallState.productCount === 3, `Home Golden Master must expose exactly three public product cards, got ${hallState.productCount}`);
+  assert(hallState.productTopBands.length === 3 && hallState.productTopBands.every((top) => top === hallState.productTopBands[0]), `Home product cards must form one row of three: ${JSON.stringify(hallState.productTopBands)}`);
   assert(hallState.oldSidebars === 0, `Home Golden Master reintroduced sidebar layout: ${hallState.oldSidebars}`);
   assert(hallState.overflow <= 2, `Home Golden Master horizontal overflow: ${hallState.overflow}px`);
   assert(hallState.bodyText.includes('요즘, 무엇이 가장') && hallState.bodyText.includes('궁금하세요?'), 'Home topic-first headline missing');
   assert(hallState.bodyText.includes('당신의 이야기를') && hallState.bodyText.includes('들어줄 사람이 있어요'), 'Home character discovery missing');
-  assert(hallState.heroHref === 'reading-detail.html?topic=temperament&scope=original', `Home preview entry must route to approved preview: ${hallState.heroHref}`);
+  assert(hallState.heroHref === 'reading.html', `Home preview entry must route to the Saju hub: ${hallState.heroHref}`);
   assert(!hallState.bodyText.includes('연화') && !hallState.bodyText.includes('대화 시작 완료'), 'Home must not invent Character or relationship state');
-  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('월간 해석은 준비 중입니다.') && hallState.bodyText.includes('전체 사주 프리뷰'), 'Home must distinguish monthly unavailable from admitted Preview');
-  assert(hallState.monthHref === 'reading-detail.html?topic=temperament&scope=original', `Home feature must link to admitted General Natal Preview, got ${hallState.monthHref}`);
+  assert(hallState.bodyText.includes('이번 달 사주 읽기') && hallState.bodyText.includes('월간 해석은 준비 중입니다.') && hallState.bodyText.includes('내 명식과 다른 주제를 먼저 살펴보세요.'), 'Home must distinguish monthly unavailable from current public readings');
+  assert(hallState.monthHref === 'reading.html', `Home monthly feature must link to the Saju hub, got ${hallState.monthHref}`);
   assert(!hallState.bodyText.includes('이달의 운세 전체보기') && !hallState.bodyText.includes('오늘의 흐름은 사주 화면에서 직접 펼쳐볼 수 있습니다.'), 'Home must not claim blocked monthly Reading availability');
-  assert(hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home four-card Saju row missing');
-  assert(hallState.bodyText.includes('최근 이야기') && hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home recent-story fail-closed state missing');
+  assert(!hallState.bodyText.includes('전체 사주') && hallState.bodyText.includes('직업 · 커리어') && hallState.bodyText.includes('재물') && hallState.bodyText.includes('연애 · 관계'), 'Home three-card public Saju row missing or retired product visible');
+  assert(!hallState.bodyText.includes('최근 대화 기록은 아직 홈에 연결되지 않았습니다.'), 'Home must not render redundant placeholder conversation card');
+  const directEntry = await client.evaluate(`(() => {
+    const hrefFor = (key) => document.querySelector('.mhx-character-art[data-character="' + key + '"]')?.closest('.mhx-character')?.querySelector('.mhx-character-footer a')?.getAttribute('href');
+    return {
+      seyeon: hrefFor('seyeon'), baekheon: hrefFor('baekheon'), yeoul: hrefFor('yeoul'),
+      staleRecent: !!document.querySelector('.mhx-recent-card'),
+      floatingFortune: !!document.querySelector('.fortune-cookie'),
+    };
+  })()`);
+  assert(directEntry.seyeon === 'chat.html?character=seyeon' && directEntry.baekheon === 'chat-hub.html' && directEntry.yeoul === 'chat-hub.html', `Home character direct entry mismatch: ${JSON.stringify(directEntry)}`);
+  assert(!directEntry.staleRecent && !directEntry.floatingFortune, `Retired Home UI still visible: ${JSON.stringify(directEntry)}`);
+  await client.evaluate(`document.querySelector('.mhx-content-grid button.mhx-content-card')?.click()`);
+  await waitForVisible(client, '.fortune-cookie-reveal');
+  const fortune = await client.evaluate(`(() => ({
+    text: document.querySelector('#fortune-cookie-reveal-message')?.textContent?.trim() ?? '',
+    intermediate: !!document.querySelector('.fortune-cookie-panel'),
+  }))()`);
+  assert(fortune.text && !fortune.intermediate, `Home fortune did not open directly: ${JSON.stringify(fortune)}`);
+  await client.evaluate(`document.querySelector('.fortune-cookie-reveal-close')?.click()`);
   await artifact(client, '-home');
+
+  await verifySharedHeaderGeometry(client, origin,
+    ['/hall.html','/reading.html','/face-reading.html','/chat-hub.html','/chat.html','/records.html','/my.html','/reading-detail.html','/auth.html'], 92);
 
   await navigate(client, origin, '/reading.html', '#saju-empty');
   await waitForVisible(client, '#saju-empty');
@@ -302,6 +379,11 @@ try {
       styles: [...document.styleSheets].map((sheet) => sheet.href ? new URL(sheet.href).pathname : 'inline'),
       empty: visible('#saju-empty'), form: visible('#saju-birth-form'), button: visible('#saju-create-button'),
       hubHidden: document.querySelector('#saju-hub')?.hidden, hubRendered: rendered('#saju-hub'),
+      backdrop: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+      panelBackdrop: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage,
+      panelBorder: getComputedStyle(document.querySelector('#saju-empty')).borderTopWidth,
+      mainWidth: document.querySelector('.gm-saju-main').getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
       overflow: document.documentElement.scrollWidth - innerWidth,
     };
   })()`);
@@ -312,13 +394,14 @@ try {
   assert(sajuState.empty && sajuState.form && sajuState.button, 'Saju onboarding is not fully visible');
   assert(sajuState.hubHidden === true && sajuState.hubRendered === false, 'Saju populated state must fail closed without a Birth Profile');
   assert(sajuState.bodyText.includes('아직 등록된 사주가 없습니다.') && sajuState.bodyText.includes('내 사주 만들기'), 'Saju onboarding copy missing');
+  assert(sajuState.backdrop.includes('saju-empty-light.avif') && sajuState.panelBackdrop === 'none' && sajuState.panelBorder === '0px' && Math.abs(sajuState.mainWidth - sajuState.viewportWidth) <= 2, `Light Saju artwork must cover the full page body, not the inner registration panel: ${JSON.stringify(sajuState)}`);
   assert(sajuState.overflow <= 2, `Saju horizontal overflow: ${sajuState.overflow}px`);
   await artifact(client, '-saju');
 
   await sleep(180);
   const pickerOpen = await client.evaluate(`(() => {
     const anchor = [...document.querySelectorAll('a[href^="reading-detail.html"]')]
-      .find((item) => item.getAttribute('href')?.includes('topic=temperament'));
+      .find((item) => item.getAttribute('href')?.includes('topic=career'));
     if (!(anchor instanceof HTMLAnchorElement)) return { triggerFound: false };
     anchor.click();
     const dialog = document.querySelector('[data-reading-reader-picker]');
@@ -365,7 +448,7 @@ try {
       readerName: document.querySelector('[data-reader-name]')?.textContent?.trim() ?? '',
     };
   })()`);
-  assert(selectedReaderRoute.topic === 'temperament' && selectedReaderRoute.scope === 'original', `Reader picker lost Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
+  assert(selectedReaderRoute.topic === 'career' && selectedReaderRoute.scope === null, `Reader picker lost the selected public Reading route identity: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.reader === 'seyeon', `Reader picker did not bind Seyeon into the URL: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.readerDataset === 'seyeon' && selectedReaderRoute.selectionDataset === 'explicit', `Reading runtime did not consume explicit Reader selection: ${JSON.stringify(selectedReaderRoute)}`);
   assert(selectedReaderRoute.presentationDataset === 'reading-scene-v1' && selectedReaderRoute.readerName === '세연', `Reader Reading Scene v1 did not activate: ${JSON.stringify(selectedReaderRoute)}`);
@@ -457,11 +540,20 @@ try {
       const r = el.getBoundingClientRect(); const s = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
     };
-    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav'), overflow: document.documentElement.scrollWidth - innerWidth };
+    return { width: innerWidth, empty: visible('#saju-empty'), form: visible('#saju-birth-form'), bottomNav: visible('.mobile-bottom-nav'),
+      backdrop: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+      panelBackdrop: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage,
+      mainWidth: document.querySelector('.gm-saju-main').getBoundingClientRect().width,
+      viewportWidth: document.documentElement.clientWidth,
+      overflow: document.documentElement.scrollWidth - innerWidth };
   })()`);
   assert(mobileSaju.width === 390 && mobileSaju.empty && mobileSaju.form && mobileSaju.bottomNav, 'Mobile Saju onboarding is not fully visible');
   assert(mobileSaju.overflow <= 2, `Mobile Saju horizontal overflow: ${mobileSaju.overflow}px`);
+  assert(mobileSaju.backdrop.includes('saju-empty-light.avif') && mobileSaju.panelBackdrop === 'none' && Math.abs(mobileSaju.mainWidth - mobileSaju.viewportWidth) <= 2, `Mobile Saju artwork must fill the content viewport: ${JSON.stringify(mobileSaju)}`);
   await artifact(client, '-saju-mobile');
+
+  await verifySharedHeaderGeometry(client, origin,
+    ['/hall.html','/reading.html','/chat-hub.html','/my.html'], 86);
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await navigate(client, origin, '/reading-detail.html?scope=year', '.reading-route-state');
@@ -540,24 +632,51 @@ try {
   const toggleState = await client.evaluate(`(() => {
     const button = document.querySelector('.product-theme-toggle');
     button.click();
-    const light = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'), pressed: button.getAttribute('aria-pressed') };
+    const light = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'),
+      pressed: button.getAttribute('aria-pressed'), headerImage: getComputedStyle(document.querySelector('.product-header')).backgroundImage };
     button.click();
-    const dark = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'), pressed: button.getAttribute('aria-pressed') };
+    const dark = { theme: document.documentElement.dataset.theme, stored: localStorage.getItem('myeongha.productTheme.v1'),
+      pressed: button.getAttribute('aria-pressed'), headerImage: getComputedStyle(document.querySelector('.product-header')).backgroundImage };
     return { light, dark };
   })()`);
   assert(toggleState.light.theme === 'light' && toggleState.light.stored === 'light' && toggleState.light.pressed === 'false', 'Theme toggle did not switch to light');
   assert(toggleState.dark.theme === 'dark' && toggleState.dark.stored === 'dark' && toggleState.dark.pressed === 'true', 'Theme toggle did not switch back to dark');
+  assert(toggleState.light.headerImage.includes('myeongha-header-light-texture-v2.webp') &&
+    toggleState.dark.headerImage.includes('myeongha-header-dark-texture-v2.webp'),
+    `Shared header must switch approved light and dark paper texture assets: ${JSON.stringify(toggleState)}`);
 
   const darkSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju' });
+  const darkSajuBackdrop = await client.evaluate(`(() => ({ main: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+    panel: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage }))()`);
+  assert(darkSajuBackdrop.main.includes('saju-empty-dark.avif') && darkSajuBackdrop.panel === 'none', `Dark Saju artwork must be full-bleed: ${JSON.stringify(darkSajuBackdrop)}`);
   const darkReading = await verifyDarkPage(client, origin, '/reading-detail.html?scope=year', '.reading-route-state', { artifactSuffix: '-dark-reading-detail' });
   const darkChatHub = await verifyDarkPage(client, origin, '/chat-hub.html', '.conversation-people .chat-person-card', { artifactSuffix: '-dark-chat-hub' });
   const darkChatRoom = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { artifactSuffix: '-dark-chat-room' });
+  await navigate(client, origin, '/chat.html?character=seyeon', '.conversation-chat-panel');
+  let darkSeyeonAvatar = null;
+  for (let retry = 0; retry < 30; retry++) {
+    darkSeyeonAvatar = await client.evaluate(`(() => {
+      const avatar = document.querySelector('.conversation-message-avatar[data-character="seyeon"]');
+      if (!avatar) return null;
+      const style = getComputedStyle(avatar);
+      return { theme: document.documentElement.dataset.theme, image: style.backgroundImage,
+        size: style.backgroundSize, position: style.backgroundPosition, repeat: style.backgroundRepeat };
+    })()`);
+    if (darkSeyeonAvatar) break;
+    await sleep(100);
+  }
+  assert(darkSeyeonAvatar?.theme === 'dark' && darkSeyeonAvatar.image.includes('seyeon-portrait-v2.webp')
+    && darkSeyeonAvatar.size === 'cover' && darkSeyeonAvatar.repeat === 'no-repeat',
+    `Dark Seyeon chat avatar must keep the approved portrait and cover crop: ${JSON.stringify(darkSeyeonAvatar)}`);
   const darkRecords = await verifyDarkPage(client, origin, '/records.html', '.records-main');
   const darkMy = await verifyDarkPage(client, origin, '/my.html', '.my-main');
 
   await client.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const darkMobileHome = await verifyDarkPage(client, origin, '/hall.html', '.mhx-hero', { artifactSuffix: '-dark-home-mobile' });
   const darkMobileSaju = await verifyDarkPage(client, origin, '/reading.html', '#saju-empty', { artifactSuffix: '-dark-saju-mobile' });
+  const darkMobileSajuBackdrop = await client.evaluate(`(() => ({ main: getComputedStyle(document.querySelector('.gm-saju-main')).backgroundImage,
+    panel: getComputedStyle(document.querySelector('#saju-empty')).backgroundImage }))()`);
+  assert(darkMobileSajuBackdrop.main.includes('saju-empty-dark.avif') && darkMobileSajuBackdrop.panel === 'none', `Dark mobile Saju artwork must be full-bleed: ${JSON.stringify(darkMobileSajuBackdrop)}`);
   const darkMobileChat = await verifyDarkPage(client, origin, '/chat.html', '.conversation-chat-panel', { toggle: false, artifactSuffix: '-dark-chat-room-mobile' });
   const mobileChatState = await client.evaluate(`(() => ({
     theme: document.documentElement.dataset.theme,

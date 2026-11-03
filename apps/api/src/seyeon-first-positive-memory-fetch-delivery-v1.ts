@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import { preflightSeyeonChatTurnSendRequestV1 } from './chat-turn-send-http.js';
 import { createSeyeonCloudflareStaticPreflightDenialV1 } from './seyeon-cloudflare-offline-reveal-fence-v1.js';
+import {assertSeyeonZeroSourceHttpReceiptReadyV1, SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from './seyeon-zero-source-http-receipt-ready-v1.js';
 import { executePostgresSubjectTransactionV1, type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { ProductionSeyeonChatRuntimeV1 } from './production-seyeon-chat-runtime-v1.js';
 
@@ -19,6 +20,9 @@ const G0_RECENT_RPC='public.qry_seyeon_g0_current_source_recent_messages_v1(uuid
 const G0_HISTORY_RPC='public.qry_seyeon_g0_current_source_relationship_history_v1(uuid,text,bigint)';
 const G0_USER_RPC='seyeon_private.assert_current_original_member_user_message_v1(uuid,uuid,uuid)';
 const G0_ASSISTANT_RPC='seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)';
+const RECOVER_FAILED_USER_RPC='public.qry_seyeon_recover_exact_failed_user_turn_v1(uuid,uuid,text)';
+const SUPERSEDE_FAILED_USER_RPC='public.cmd_seyeon_supersede_stale_failed_turn_v1(uuid,uuid,text)';
+const EXPLICIT_SUPERSEDE_HEADER='X-MyeongHa-Seyeon-Explicit-Supersede';
 
 /**
  * Run after subject authentication but BEFORE a new logical turn is inserted.
@@ -63,6 +67,14 @@ export function classifySeyeonFirstPositiveMemoryFailureV1(error: unknown, reque
   return holdSeyeonReceiptHttpV1(requestId);
 }
 
+/** A new attempt may recover the same original failed User turn, never replay a delivered Assistant. */
+export function isSeyeonFirstReceiptEligibleReceiveV1(received: Readonly<{
+  turnState: string; replayed: boolean;
+}>): boolean {
+  return (received.turnState==='received' && received.replayed===false) ||
+    (received.turnState==='failed_retryable' && received.replayed===true);
+}
+
 export function holdSeyeonReceiptHttpV1(requestId: string): Response {
   return Response.json({ok:false,error:{code:'SEYEON_FIRST_REVEAL_AUTHORITY_UNAVAILABLE',
     messageKey:'chat.secure_reveal_unavailable',retryable:false},
@@ -76,17 +88,30 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   pool: PostgresSubjectPoolV1;
   runtime: Pick<ProductionSeyeonChatRuntimeV1,'run'>;
+  /** Server policy only; never selected by a browser parameter. */
+  zeroSourceFirstReplyApproved?: true;
 }>): Promise<Response> {
   const held=()=>holdSeyeonReceiptHttpV1(input.requestId);
+  let stage: 'preflight'|'receipt_readiness'|'failed_turn_reconciliation'|'model_execution'|'receipt_issuer'='preflight';
   try {
     const preflight=await preflightSeyeonChatTurnSendRequestV1(input);
     if(preflight.kind==='denied')return preflight.response;
     if(input.request.headers.get(SEYEON_POSITIVE_DELIVERY_RECEIPT_HEADER_V1)!=='v1' ||
        input.request.signal.aborted)return held();
+    const zeroSource=input.zeroSourceFirstReplyApproved===true;
+    const supersedeHeader=input.request.headers.get(EXPLICIT_SUPERSEDE_HEADER);
+    if(supersedeHeader!==null &&
+       (supersedeHeader!=='v1'||!zeroSource))return held();
     // Receipt HTTP requires G1/G2 and its own issuer, never EXECUTE on the
     // old Node sender. Production leaves that unreceipted RPC revoked.
+    stage='receipt_readiness';
     await executePostgresSubjectTransactionV1({pool:input.pool,
       verifiedEvidence:preflight.verifiedEvidence,execute:async({client})=>{
+        if(zeroSource){
+          await assertSeyeonZeroSourceHttpReceiptReadyV1(client);
+          await assertSeyeonG0OriginalLineageReadyV1(client);
+          return;
+        }
         const r=await client.query<{ready:boolean}>(`select count(*)=5 as ready
           from pg_catalog.pg_proc p where p.oid in(to_regprocedure($1),to_regprocedure($2),to_regprocedure($3),
             to_regprocedure($4),to_regprocedure($5))
@@ -103,11 +128,85 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         await assertSeyeonG0OriginalLineageReadyV1(client);
       }});
     if(input.request.signal.aborted)return held();
+
+    // A browser may have lost its sessionStorage clientTurnId. Recover only
+    // the exact prior failed, uncommitted User text under the SAME verified
+    // canonical Subject and Se-yeon thread. Never rewrite a different message,
+    // fabricate a client Turn ID or reveal previous transcript material.
+    let executionClientTurnId=preflight.clientTurnId;
+    if(zeroSource){
+      stage='failed_turn_reconciliation';
+      const recovered=await executePostgresSubjectTransactionV1({
+        pool:input.pool,verifiedEvidence:preflight.verifiedEvidence,
+        execute:async({client,resolvedSubject})=>{
+          if(resolvedSubject.subjectKind!=='member')throw Error('Member required for recovery');
+          const readiness=await client.query<{ready:boolean}>(`select count(*)=1 as ready
+            from pg_catalog.pg_proc p
+            where p.oid=to_regprocedure($1) and p.prosecdef
+              and pg_catalog.pg_get_userbyid(p.proowner)='myeongha_seyeon_chat_runtime_owner'
+              and has_function_privilege(current_user,p.oid,'EXECUTE')
+              and not has_function_privilege('anon',p.oid,'EXECUTE')
+              and not has_function_privilege('authenticated',p.oid,'EXECUTE')
+              and not has_function_privilege('service_role',p.oid,'EXECUTE')`,
+            [RECOVER_FAILED_USER_RPC]);
+          if(readiness.rows.length!==1||readiness.rows[0]?.ready!==true)
+            throw Error('Exact previous-User recovery authority not installed');
+          const r=await client.query<{clientTurnId:unknown}>(`select
+            public.qry_seyeon_recover_exact_failed_user_turn_v1(
+              $1::uuid,$2::uuid,$3::text) as "clientTurnId"`,
+            [resolvedSubject.subjectId,preflight.threadId,preflight.text]);
+          if(r.rows.length!==1)throw Error('Ambiguous original User recovery');
+          const id=r.rows[0]?.clientTurnId;
+          if(id===null)return null;
+          if(typeof id!=='string'||!UUID.test(id))throw Error('Invalid DB-owned client turn');
+          return id;
+        },
+      });
+      if(recovered!==null)executionClientTurnId=recovered;
+      // A new message cannot inherit the old User text or identity.
+      // Only a separate, explicit browser confirmation authorizes replacing
+      // an unrelated terminal-failed Turn with a new User message.
+      if(recovered===null && supersedeHeader==='v1'){
+        stage='failed_turn_reconciliation';
+        const superseded=await executePostgresSubjectTransactionV1({
+          pool:input.pool,verifiedEvidence:preflight.verifiedEvidence,
+          execute:async({client,resolvedSubject})=>{
+            if(resolvedSubject.subjectKind!=='member')throw Error('Member required');
+            const check=await client.query<{ready:boolean}>(`select count(*)=1 as ready
+              from pg_catalog.pg_proc p where p.oid=to_regprocedure($1)
+                and p.prosecdef
+                and pg_catalog.pg_get_userbyid(p.proowner)='myeongha_seyeon_chat_runtime_owner'
+                and has_function_privilege(current_user,p.oid,'EXECUTE')
+                and not has_function_privilege('anon',p.oid,'EXECUTE')
+                and not has_function_privilege('authenticated',p.oid,'EXECUTE')
+                and not has_function_privilege('service_role',p.oid,'EXECUTE')`,
+              [SUPERSEDE_FAILED_USER_RPC]);
+            if(check.rows.length!==1||check.rows[0]?.ready!==true)
+              throw Error('Explicit failed-turn supersede authority unavailable');
+            const r=await client.query<{superseded:boolean}>(`select
+              public.cmd_seyeon_supersede_stale_failed_turn_v1(
+                $1::uuid,$2::uuid,$3::text) as "superseded"`,
+              [resolvedSubject.subjectId,preflight.threadId,preflight.text]);
+            return r.rows.length===1 && r.rows[0]?.superseded===true;
+          },
+        });
+        if(!superseded)return createSeyeonCloudflareStaticPreflightDenialV1({
+          kind:'turn_in_flight',requestId:input.requestId,
+        });
+      }
+    }
+    if(input.request.signal.aborted)return held();
+    stage='model_execution';
     const result=await input.runtime.run({verifiedEvidence:preflight.verifiedEvidence,
-      threadId:preflight.threadId,clientTurnId:preflight.clientTurnId,text:preflight.text});
+      threadId:preflight.threadId,clientTurnId:executionClientTurnId,text:preflight.text});
     const e=result.execution;
+    // A fresh response may be generated for the SAME durable clientTurnId
+    // after its previous attempt failed before Commit. That receive is an
+    // idempotent replay of the User row, NOT a replay of any Assistant text.
+    // An already committed/delivered reply remains non-revealable here.
+    const eligibleReceive=isSeyeonFirstReceiptEligibleReceiveV1(e.receivedTurn);
     if(e.disposition!=='executed'||e.receivedTurn.userText!==preflight.text||
-       e.receivedTurn.replayed||e.receivedTurn.turnState!=='received'||
+       !eligibleReceive||
        e.receivedTurn.committedTurn!==null||e.attempt.replayed||
        e.receivedTurn.turnId!==e.committedTurn.turnId||
        e.attempt.attemptId!==e.committedTurn.attemptId||e.committedTurn.replayed||
@@ -122,16 +221,17 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
        input.request.signal.aborted)return held();
     const challenge=randomBytes(32).toString('hex');
     const receiptHash=createHash('sha256').update(challenge,'utf8').digest();
+    stage='receipt_issuer';
     const body=await executePostgresSubjectTransactionV1({pool:input.pool,
       verifiedEvidence:preflight.verifiedEvidence,execute:async({client,resolvedSubject})=>{
         if(resolvedSubject.subjectKind!=='member'||resolvedSubject.subjectId!==result.subjectId||
            input.request.signal.aborted)throw Error('Original Subject unavailable');
         const r=await client.query<{assistantText:unknown}>(`select assistant_text as "assistantText"
-          from public.cmd_issue_seyeon_positive_first_reply_v1(
+          from ${zeroSource ? SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1 : 'public.cmd_issue_seyeon_positive_first_reply_v1'}(
             $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text,$9::bytea)`,[
           resolvedSubject.subjectId,preflight.threadId,e.committedTurn.turnId,e.committedTurn.attemptId,
           e.receivedTurn.userMessageId,e.committedTurn.assistantMessageId,
-          e.committedTurn.postTurnOutboxEventId,preflight.clientTurnId,receiptHash]);
+          e.committedTurn.postTurnOutboxEventId,executionClientTurnId,receiptHash]);
         const text=r.rows.length===1?r.rows[0]?.assistantText:null;
         if(typeof text!=='string'||text.trim()===''||Buffer.byteLength(text,'utf8')>65_536||
            input.request.signal.aborted)throw Error('Original response unavailable');
@@ -148,7 +248,12 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     if(input.request.signal.aborted)return held();
     return new Response(body,{headers:{'Content-Type':'application/json; charset=utf-8',
       'Cache-Control':'no-store, no-transform','Content-Encoding':'identity'}});
-  }catch(error){return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);}
+  }catch(error){
+    // Security-safe operational diagnosis: never log source text, IDs,
+    // provider payload, credentials, raw error messages, or model responses.
+    console.error('MYEONGHA_SEYEON_FIRST_REPLY_STAGE_HOLD',stage);
+    return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);
+  }
 }
 
 /** Capability-only receipt. Returns no identity, source, grant or reply text. */

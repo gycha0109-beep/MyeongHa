@@ -13,6 +13,7 @@ import {
   SeyeonCommittedReplayRevealHoldV1,
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
+import { resolveRequestUiLocaleV1 } from './request-ui-locale-v1.js';
 import {
   createSeyeonVercelEmptyPreflightDenialV1,
   createSeyeonVercelStaticPreflightDenialV1,
@@ -316,6 +317,7 @@ export async function handleSeyeonChatTurnSendRequestV1(
       threadId: preflight.threadId,
       clientTurnId: preflight.clientTurnId,
       text: preflight.text,
+      replyLocale: resolveRequestUiLocaleV1(input.request).locale,
     });
     return success(projectResult(result), input.requestId, input.serverTime);
   } catch (error) {
