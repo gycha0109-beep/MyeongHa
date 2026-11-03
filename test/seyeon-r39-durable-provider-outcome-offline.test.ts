@@ -82,14 +82,16 @@ describe('R39 STRICT durable outcome: exact native Responses adapter, synthetic 
   it('refuses any strict request without server-owned admission, pricing, cap or receipt writer',()=>{
     const fetchImpl=vi.fn(async()=>fakeResponse());
     const base=strictConfig({fetchImpl,after:async()=>undefined});
-    const cases:OpenAiSeyeonStructuredProviderConfigV1[]=[
+    // Deliberate invalid runtime inputs: exactOptionalPropertyTypes prohibits
+    // explicitly undefined fields on otherwise valid provider configuration.
+    const cases=[
       {...base,meteredBeforeDispatch:undefined},
       {...base,meteredAfterOutcome:undefined},
       {...base,meteredAfterStructuredOutput:undefined},
       {...base,priceQuote:undefined},
       {...base,maxOutputTokens:undefined},
       {...base,origin:'https://untrusted-provider.example.invalid'},
-    ];
+    ] as unknown as OpenAiSeyeonStructuredProviderConfigV1[];
     for(const config of cases){
       expect(()=>createOpenAiSeyeonStructuredProviderV1(config))
         .toThrow(OpenAiSeyeonStructuredProviderErrorV1);

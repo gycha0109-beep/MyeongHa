@@ -357,12 +357,16 @@ function r25Snapshot(id:ReturnType<typeof ids>){
 }
 function r25Proof(selectionDigest:string,id:ReturnType<typeof ids>,
   second:ReturnType<typeof ids>,digests:readonly string[]){
+  const [firstDigest,secondDigest]=digests;
+  if (typeof firstDigest!=='string'||typeof secondDigest!=='string') {
+    throw Error('R25 requires both DB-original PostgreSQL payload digests');
+  }
   return {
     schemaVersion:'offline-positive-two-original-source-proof-r25',
     selectedSourcesDigest:selectionDigest,
     sources:[
-      {recordId:id.memory,originalGrantId:id.grant,pgPayloadDigest:digests[0]},
-      {recordId:second.memory,originalGrantId:second.grant,pgPayloadDigest:digests[1]},
+      {recordId:id.memory,originalGrantId:id.grant,pgPayloadDigest:firstDigest},
+      {recordId:second.memory,originalGrantId:second.grant,pgPayloadDigest:secondDigest},
     ],
   };
 }

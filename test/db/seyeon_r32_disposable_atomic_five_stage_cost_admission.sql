@@ -359,7 +359,8 @@ begin
     'permitsProvider',false,'permitsAtomicCommit',false,
     'permitsHttpReveal',false
   );
-end $claim$;
+end;
+$claim$;
 
 revoke all on function seyeon_positive_candidate.claim_governed_stage_r32(
   uuid,uuid,uuid,uuid,text,uuid,text,text,text,text,text,text,bigint
