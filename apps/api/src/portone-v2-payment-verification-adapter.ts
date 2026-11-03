@@ -984,20 +984,31 @@ export function createPortOneV2FullCancellationVerifierV1(
           return fail('INVALID_PAYMENT',
             'PortOne V2 payment is not the exact authoritative full cancellation.');
         }
+        const verifiedAmountMinor=requireAmountMinor(payment.amount);
+        // A CANCELLED payment can result from several separate partial
+        // cancellations. Such a set must never be promoted into one exact
+        // full-refund authority for a scoped Reader Grant.
         if (!Array.isArray(payment.cancellations)
-            || payment.cancellations.length===0
-            || !payment.cancellations.some((candidate: unknown) => {
-              if (typeof candidate !== 'object' || candidate===null
-                  || Array.isArray(candidate)) return false;
-              const item = candidate as Record<string,unknown>;
-              return item.id===cancellationId && item.status==='SUCCEEDED';
-            })) {
+            || payment.cancellations.length!==1) {
           return fail('INVALID_PAYMENT',
-            'PortOne V2 exact successful cancellation is unavailable.');
+            'PortOne V2 exact single full cancellation is unavailable.');
+        }
+        const candidate:unknown=payment.cancellations[0];
+        if (typeof candidate!=='object' || candidate===null
+            || Array.isArray(candidate)) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 exact single full cancellation is invalid.');
+        }
+        const cancellation=candidate as Record<string,unknown>;
+        if (cancellation.id!==cancellationId
+            || cancellation.status!=='SUCCEEDED'
+            || !Number.isSafeInteger(cancellation.totalAmount)
+            || cancellation.totalAmount!==verifiedAmountMinor) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 exact single full cancellation amount is unavailable.');
         }
 
         const cancelledAt=requirePaidAt(payment.cancelledAt);
-        const verifiedAmountMinor=requireAmountMinor(payment.amount);
         const verifiedCurrency=requireCurrency(payment.currency);
         const canonical=JSON.stringify({
           schemaVersion:'myeongha.portone-v2.full-cancel-evidence.v1',
