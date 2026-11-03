@@ -1,5 +1,5 @@
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
-import { createMobileWithdrawalClaimServiceV1 } from './mobile-withdrawal-claim-service';
+import { createMobileWithdrawalClaimServiceV1 } from './mobile-withdrawal-claim-service.js';
 
 /** UI and API activation are separate. This is OFF in every default build. */
 export const MOBILE_WITHDRAWAL_CLAIM_UI_ENABLED_V1 =
