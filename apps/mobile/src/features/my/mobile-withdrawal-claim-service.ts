@@ -53,9 +53,9 @@ export function createMobileWithdrawalClaimServiceV1(input: Readonly<{
     });
   }
   return Object.freeze({
-    submit: (request) => memberRequest((bearer) =>
+    submit: (request: SubmitDigitalReadingWithdrawalRequestV1) => memberRequest((bearer) =>
       submitDigitalReadingWithdrawalClaimV1(input.client, bearer, request)),
-    readStatus: (claimId) => memberRequest((bearer) =>
+    readStatus: (claimId: string) => memberRequest((bearer) =>
       readDigitalReadingWithdrawalClaimStatusV1(input.client, bearer, claimId)),
   });
 }
