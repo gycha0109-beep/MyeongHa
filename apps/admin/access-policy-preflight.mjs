@@ -7,6 +7,8 @@ import {pathToFileURL} from 'node:url';
  */
 const HOST='myeongha-admin.gycha0109.workers.dev';
 const APP_NAME='MyeongHa Admin Owner Only';
+const EXPECTED_ACCOUNT_ID='410d3f82ed3ccc66609a2b698803859b';
+const APP_ID='3a376a53-ad4d-4a07-9fa0-cd55cb0cb62f';
 const ACCOUNT=/^[a-f0-9]{32}$/iu;
 const ID=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu;
 const AUD=/^[a-f0-9]{64}$/iu;
@@ -17,8 +19,10 @@ export async function verifyAdminAccessPolicyV1(input){
     !AUD.test(audience??'')||typeof ownerEmail!=='string'||
     !/^[^\s@]+@[^\s@]+\.[^\s@]+$/u.test(ownerEmail))
    throw Error('Dedicated Admin Access verification configuration unavailable');
+ if(accountId!==EXPECTED_ACCOUNT_ID)
+   throw Error('Dedicated Admin Access account mismatch');
  const base='https://api.cloudflare.com/client/v4/accounts/'+accountId+'/access/apps';
- async function read(path,stage){
+ async function read(path,stage,asArray=true){
   let res;
   try{res=await fetchImpl(path,{method:'GET',redirect:'error',
    headers:{Authorization:'Bearer '+apiToken,Accept:'application/json'},
@@ -29,17 +33,17 @@ export async function verifyAdminAccessPolicyV1(input){
   if(!res.ok)throw Error('Dedicated Admin Access '+stage+' HTTP '+res.status);
   let value;
   try{value=await res.json();}catch{throw Error('Invalid Admin Access '+stage+' response');}
-  if(value?.success!==true||!Array.isArray(value.result))
+  if(value?.success!==true||!(asArray?Array.isArray(value.result):
+    value.result!==null&&typeof value.result==='object'&&!Array.isArray(value.result)))
    throw Error('Invalid Admin Access '+stage+' response');
   return value.result;
  }
- const apps=await read(base,'applications');
- const selected=apps.filter(a=>a?.name===APP_NAME&&a?.domain===HOST&&a?.type==='self_hosted');
- if(selected.length===0)throw Error('Dedicated Admin Access application not visible to deployment token');
- if(selected.length!==1)throw Error('Dedicated Admin Access application identity ambiguous');
- if(selected[0].aud!==audience)throw Error('Dedicated Admin Access audience mismatch');
- if(!ID.test(selected[0].id??''))throw Error('Dedicated Admin Access application ID invalid');
- const app=selected[0];
+ // The Access app is provisioned with a known ID. Fetching that exact object avoids
+ // interpreting an unrelated/filtered list response as a token-permission failure.
+ const app=await read(base+'/'+APP_ID,'application',false);
+ if(app.id!==APP_ID||app.name!==APP_NAME||app.domain!==HOST||app.type!=='self_hosted')
+   throw Error('Dedicated Admin Access application identity mismatch');
+ if(app.aud!==audience)throw Error('Dedicated Admin Access audience mismatch');
  const policies=await read(base+'/'+app.id+'/policies','policies');
  // Report a safe reason when a provisioned Owner identity differs; no email is logged.
  if(policies.length===1&&policies[0]?.include?.length===1&&
