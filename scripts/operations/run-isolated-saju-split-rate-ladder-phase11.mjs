@@ -1,4 +1,4 @@
-import { validateSajuFourClientWavesReport } from './validate-isolated-saju-four-client-waves-phase11.mjs';
+import { validateFourClientWavesReport } from './validate-isolated-saju-four-client-waves-phase11.mjs';
 import { validateSajuSustainedReport } from './validate-isolated-saju-sustained-phase11.mjs';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -151,7 +151,7 @@ async function main(argv) {
       ...(fourClientWaves ? ['--four-client-waves'] : []),
     ], sustained ? 1_320_000 : fourClientWaves ? 1_020_000 : 120000);
     required(stdout.split(/\r?\n/u).length === 1, 'Unexpected driver stdout');
-    const report = fourClientWaves ? validateSajuFourClientWavesReport(JSON.parse(stdout)) :
+    const report = fourClientWaves ? validateFourClientWavesReport(JSON.parse(stdout)) :
       sustained ? validateSajuSustainedReport(JSON.parse(stdout)) :
         validate(JSON.parse(stdout));
     const result = {
