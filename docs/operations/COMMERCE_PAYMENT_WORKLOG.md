@@ -446,3 +446,12 @@
 - **다음:** PR 일반/필수 통합 CI, 병합 후 상품별 운영 승인·Production Saju 공급·실제 고객 제공의 미충족 선행 조건 확인. LIVE는 HOLD.
 
 - **추가 SQL 정합성 수정:** Offer가 존재하지만 Charge Terms가 없는 LEFT JOIN 결과에서는 `ct.retired_at is null`이 TRUE로 평가될 수 있으므로, `ct.id is null`이면 `termsCurrent`를 SQL NULL로 반환하도록 변경. 실제 DB null row와 검증 스키마가 일치하도록 테스트를 보강했으며 P2 테스트 24/24 재통과. 기존 판매 HOLD 유지.
+
+### 2026-11-03 — PR #2898 병합 후 P2 동일 시점 상품·가격 판매 보류 증빙
+
+- **기준선:** PR #2898은 `103ce134b9419baf6d28f756d252a249dcfc127c`로 main에 병합됨. 본 구현은 해당 최신 main에서 신규 브랜치 `feat/commerce/readiness-gate-20261103`로 분리.
+- **로드맵 대상:** P2 `standard.love_relationship` Product·Reader 구매 단위와 Offer/버전별 Charge Terms의 일관된 판매 전 확인. 현재 P0-CM-03 개별 상품 활성화는 미승인, KRW 8,900은 결정된 표시 가격일 뿐 실행 가격 권한이 아니며, Saju Production Reading 권한도 미확정.
+- **실제 구현:** `scripts/operations/commerce-p2-single-snapshot-readiness-hold-v1.mjs`에 기존 카탈로그·Offer/Terms 두 SQL을 단일 `REPEATABLE READ READ ONLY` 트랜잭션에서 조회하는 내부 점검 추가. 전체 Product/Capability/Reader spec 상태와 Offer 총 건수, 활성 Offer 건수, Charge Terms 건수를 한 DB 스냅샷으로 대조함.
+- **실패 경계:** 완전 조회 가능한 DB 관리자 연결이 아니거나, 건수·상세 행이 불일치하거나, 25개 이상의 상세 행·중복 Charge Terms·모순된 Offer·잘못된 금액 등 입력을 발견하면 오류로 중단하고 ROLLBACK. 조용히 성공으로 취급하거나 상세 결과를 생략하지 않음. 정상 비활성 카탈로그는 `hold_observed`, 상품/가격 구성 변경은 `investigation_required`로 보고하며, **두 경우 모두 결제/판매/Production Reader 제공 승인값은 무조건 false**.
+- **검증:** 신규 단일 스냅샷 증빙 + 기존 두 P2 읽기 전용 검증 관련 Vitest **39/39 PASS**, Node 구문 확인, Git 변경 공백 검사 PASS. 실제 Production DB/PortOne 접근·SQL 쓰기·LIVE 플래그 변경 없음.
+- **다음:** PR 일반 CI·고정 HEAD 최종 통합 검증과 main 병합. 실제 개별 Product Offer/Charge Terms 실행 허가는 Saju Production 공급·Owner 판매 결정·PG 계약 등 미충족 조건이 확인되기 전까지 HOLD.
