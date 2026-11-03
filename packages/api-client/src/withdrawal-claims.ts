@@ -84,6 +84,7 @@ export async function submitDigitalReadingWithdrawalClaimV1(
     method: 'POST',
     path: DIGITAL_READING_WITHDRAWAL_ENDPOINT_V1,
     bearer,
+    credentials: 'omit',
     body: {
       reason: request.reason,
       idempotencyKey: request.idempotencyKey,
@@ -118,6 +119,7 @@ export async function readDigitalReadingWithdrawalClaimStatusV1(
     method: 'GET',
     path: DIGITAL_READING_WITHDRAWAL_ENDPOINT_V1 + '&claimId=' + claimId.toLowerCase(),
     bearer,
+    credentials: 'omit',
   });
   if (!object(data) || data.claimId !== claimId.toLowerCase()
       || !time(data.receivedAt) || typeof data.status !== 'string'
