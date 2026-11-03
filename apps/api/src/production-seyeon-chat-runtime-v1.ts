@@ -37,6 +37,7 @@ import {
 } from './openrouter-seyeon-glm-renderer-v1.js';
 import { createGovernedSeyeonGlmRendererV1 } from './governed-openrouter-seyeon-glm-renderer-v1.js';
 import type { RequestUiLocaleV1 } from './request-ui-locale-v1.js';
+import { seyeonOutputGuardDiagnosticV1 } from './seyeon-output-guard-diagnostic-v1.js';
 import { startSeyeonAiCallV1, settleSeyeonAiCallV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
 import type {
   PostgresSubjectPoolV1,
@@ -290,6 +291,9 @@ async function runSeyeonTurnRuntimePhaseV1<T>(
         sqlState,
         sqlConstraint,
         runtimeStage,
+        ...seyeonOutputGuardDiagnosticV1(
+          error instanceof SeyeonCharacterRuntimeErrorV2 ? error.cause : error,
+        ),
         providerFailureCode: providerCause?.code ?? null,
         providerHttpStatus: providerCause?.httpStatus ?? null,
         providerDiagnostic: providerCause?.diagnostic ?? null,
