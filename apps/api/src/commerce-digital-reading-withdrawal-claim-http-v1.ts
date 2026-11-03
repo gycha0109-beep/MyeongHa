@@ -112,7 +112,7 @@ export async function handleDigitalReadingWithdrawalClaimHttpV1(input:Readonly<{
     const nativeBearerOnly=origin===null
       && input.request.headers.get('cookie')===null
       && typeof bearer==='string'
-      && /^Bearer [A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/u.test(bearer);
+    && /^Bearer [A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(bearer);
     if(url.searchParams.has('claimId') ||
        (origin!==url.origin && !nativeBearerOnly))
       return error('ORIGIN_FORBIDDEN',403);
