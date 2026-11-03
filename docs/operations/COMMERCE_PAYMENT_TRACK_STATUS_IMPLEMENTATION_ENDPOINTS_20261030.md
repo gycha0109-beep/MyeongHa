@@ -94,16 +94,21 @@
 - **새 접수 테이블 `digital_reading_withdrawal_claims_private_v1`은 승인된 개인정보 Subject 그래프에 미편입**: 승인된 9개 P5Y 증거 테이블에 없는 새로운 테이블. 따라서 `supabase/migrations/`가 아닌 `docs/operations/candidates/digital_reading_withdrawal_claim_private_v1.sql`에 보관. `accountDeletionPolicyDecided=true`이지만 `claimDispositionGraphIntegrated=false`. 기존 개인정보 삭제 finalizer·FK 정리·복원 검증에 편입하기 전 **자동 배포 불가**. 새로운 정책 결정을 요구하지 않는다.
 - **상품 가격과 판매 가능한 청구 권한은 별개**: `standard.love_relationship` **8,900원 목록가 결정** ≠ enabled Offer/ChargeTerms ≠ 구매 가능.
 
-## 6. 다음 구현 순서와 의존성 — 병합 이후 개발 경로
+## 6. 개발 전용 실행 로드맵 — 2026-11-03 사용자 지시 반영
 
-1. **기존 Commerce Provider Event 저장·중복 방지·순서 권한 재사용**: 이번 검증한 원본 거래번호, PortOne 취소 최종 상태와 정확한 결제 영수증을 **기존 이벤트 스키마**로 수렴한다. 신규 중복 원장을 만들지 않는다.
-2. **기존 Entitlement Effect와 Reader/T2 접근 잠금 결속**: 전액·부분·취소 대기를 구분하고 해당 Purchase Intent / Reader / Grant만 회수할 수 있는 안전한 적용 조건을 완성한다. 일반 채팅과 별도 구매권 불변.
-3. **실제 Reading 제공 사실 source 확보**: 결제 성공/고지 체크/T2 COMMIT/HTTP 송신 시도만으로 제공 완료를 판단하지 않는다. 사용자 안내·접수·확인 경로를 연결한다.
-4. **신규 환불 claim 후보의 개인정보 삭제 실행 그래프 편입**: 기존 P0-PR-01 DELETE/ANONYMIZE/P5Y/P30D에 맞는 정확한 테이블 처리·FK 순서와 복원 후 privacy replay 증명. 그 전까지 자동 SQL 적용 금지.
-5. **P3 유료 공급 + P5 LIVE 게이트 확인**: 승인된 Saju production relationship/natal/general 풀이 공급, Reader access eligibility, 실행 Offer/ChargeTerms, PG 상점/채널/정산·보안·상품고지·실제 환불 제공 준비 이후 독립 E2E와 배포.
+**이 절만 결제 트랙의 향후 실행 로드맵으로 사용한다.** 완료 판정은 코드·테스트·문서의 증거로 한다. 아래 항목은 이미 구현된 후보를 재구현하라는 뜻이 아니라, **실제 서비스 연결이 빠진 부분만** 최신 `main`에서 확인하여 이어서 구현하라는 뜻이다. 완료된 항목은 재작업하지 않는다.
 
-**사용자 재승인 요청 대상이 아닌 것:** P0-PR-01 및 이미 승인된 환불 정책 원칙.
-**여전히 실제로 필요한 것:** 미완성 구현과 운영 상점/상품/Reader/Saju 공급·LEGAL·PG 준비. “LIVE HOLD”를 “정책 재승인 HOLD”로 바꾸지 않는다.
+1. **취소 이벤트 처리 완성:** 기존 Commerce Provider Event의 원본 Receipt 결속, 중복 방지, 최신 취소 상태/순서 판정과 기존 취소 HMAC·PortOne GET 검사 결과를 안전하게 결합한다. 별도 중복 원장 생성 금지.
+2. **정확한 유료 권한 지급·회수 연결:** 검증된 결제만 해당 Reader/Reading 구매권으로 연결하고, 환불/취소 확정 시 기존 Entitlement Effect와 Reader/T2 잠금·버전 검사로 **해당 구매권만** 회수한다. 다른 Reader 구매권·일반 채팅 권한 보존. 미검증·대기·부분 취소는 안전 보류.
+3. **실제 결과물 제공·청약철회 접수 구현:** 고객에게 Reading이 실제 제공되었음을 증명할 수 있는 서버 측 전달 기록과 조회·확인 경로를 구현하고, 기존 고지/Receipt/Reader 검토기와 고객 접수·상태 조회를 연결한다. 결제 완료·DB 저장·HTTP 전송 시도만으로 제공 완료 처리 금지.
+4. **청약철회 기록의 개인정보 삭제 연동:** 신규 `digital_reading_withdrawal_claims_private_v1` 후보를 기존 계정 삭제·익명화·보존·복원 후 privacy replay 처리에 정확히 연결하고 FK/삭제 순서·격리 PostgreSQL 검증을 완료한다. 기존 `P0-PR-01`과 환불 원칙 재승인 요청 금지.
+5. **비운영 통합 검증 및 문서 종료:** 구매→서버 검증→정확한 권한→Reading 전달→청약철회/취소→정확한 회수→개인정보 삭제를 격리 환경에서 종단 간 검증한다. 실패·중복·경합·부분 취소·타 구매권 보존 포함. 실제로 통과한 증거와 공개/미공개 경로를 문서화한다.
+
+**실행 규칙:** 운영 판매, 실제 PG 환불 POST, 운영 DB SQL 적용, 공개 LIVE 라우트 활성화는 이 개발 로드맵의 자동 실행 대상이 아니다. 기존에 미승인인 기능을 테스트를 위해 운영에 켜지 않는다. 코드와 격리 테스트로 구현 가능한 부분은 별도 운영 승인 대기 없이 진행한다.
+
+**로드맵에서 제외한 비개발 조건(상태·출시 차단 사실로만 유지):** 상품 판매 여부/Offer 활성화 결정, 사주 Production 해석 콘텐츠 공급, 실제 PG 가맹점·정산·채널 준비, 운영 DB 배포 승인, 실제 판매 개시, 외부 법적·운영 판단. 이들은 구현 완료 판정에 포함하지 않으며, 개발 완료를 이유로 자동 충족되었다고 표시하지 않는다.
+
+**완료 판정:** 위 1~5의 개발·격리 검증·문서화가 모두 증거로 확인되면 **개발 로드맵 `ROADMAP_COMPLETE`**를 선언한다. 이는 운영 출시 완료를 뜻하지 않는다.
 
 ## 7. 통합/검증과 병합 범위
 
