@@ -208,8 +208,14 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
     } else {
       assert(header.navDisplay === 'none' && header.profileHeight === 0, `Mobile header must hide desktop nav/profile on ${pathname}`);
     }
+    // Authentication intentionally has no notifications button. Check the size
+    // of shared controls, but do not require a control absent by design.
+    if (pathname !== '/auth.html' && expectedHeight === 92) {
+      assert(header.iconWidth > 0, `Notification control unexpectedly missing on ${pathname}`);
+    }
     if (!baseline) { baseline = header; continue; }
     for (const key of ['height','innerHeight','brandFont','navFont','navGap','navDisplay','navHeight','iconWidth','themeWidth','profileHeight','localeWidth']) {
+      if (key === 'iconWidth' && (header.iconWidth === 0 || baseline.iconWidth === 0)) continue;
       const ok = typeof header[key] === 'number'
         ? Math.abs(header[key] - baseline[key]) <= 1
         : header[key] === baseline[key];

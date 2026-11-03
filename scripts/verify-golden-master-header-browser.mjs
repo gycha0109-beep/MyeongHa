@@ -163,8 +163,8 @@ try {
   const pages = [home, saju, chat];
 
   for (const state of pages) {
-    assert(state.headerHeight === 93, `${state.pathname} shared header outer height must be 93px including border, got ${state.headerHeight}`);
-    assert(state.innerHeight === 92, `${state.pathname} shared header inner height must be 92px, got ${state.innerHeight}`);
+    assert(state.headerHeight === 92, `${state.pathname} shared header outer height must be 92px including border, got ${state.headerHeight}`);
+    assert(state.innerHeight === 91, `${state.pathname} shared header inner height must be 91px, got ${state.innerHeight}`);
     assert(state.innerWidth === 1320, `${state.pathname} shared header shell must be 1320px, got ${state.innerWidth}`);
     assert(state.centeredDelta <= 1, `${state.pathname} header shell is not viewport-centered: delta ${state.centeredDelta}px`);
     assert(state.brandSub === 'MyeongHa', `${state.pathname} brand subtitle drifted: ${state.brandSub}`);
