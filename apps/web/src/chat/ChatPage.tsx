@@ -1,7 +1,40 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { readMemberSession, PRODUCT_AUTH_STORAGE_V1 } from '../../product-auth.js';
 import { CreditRechargeDialog } from '../commerce/CreditRechargeDialog.js';
 
+function loginRequiredForChat() {
+  try {
+    return !readMemberSession();
+  } catch {
+    return true;
+  }
+}
+
 export function ChatPage() {
+  const loginDialogRef = useRef<HTMLDialogElement>(null);
+  const [loginRequired, setLoginRequired] = useState(loginRequiredForChat);
+  const resumeChatHref = `chat.html${window.location.search}`;
+
+  useEffect(() => {
+    const syncLogin = () => setLoginRequired(loginRequiredForChat());
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === PRODUCT_AUTH_STORAGE_V1.memberSession) syncLogin();
+    };
+    window.addEventListener('myeongha:auth-changed', syncLogin);
+    window.addEventListener('storage', onStorage);
+    return () => {
+      window.removeEventListener('myeongha:auth-changed', syncLogin);
+      window.removeEventListener('storage', onStorage);
+    };
+  }, []);
+
+  useEffect(() => {
+    const dialog = loginDialogRef.current;
+    if (!dialog) return;
+    if (loginRequired && !dialog.open) dialog.showModal();
+    else if (!loginRequired && dialog.open) dialog.close();
+  }, [loginRequired]);
+
   useEffect(() => {
     async function connectRoom() {
       await import('../../chat-character.js');
@@ -80,6 +113,24 @@ export function ChatPage() {
           <button className="character-room-retry" data-room-retry type="button" hidden>대화 다시 연결하기 →</button>
         </section>
       </main>
+      <dialog
+        ref={loginDialogRef}
+        className="chat-login-dialog"
+        aria-labelledby="chat-login-title"
+        aria-describedby="chat-login-description"
+        data-chat-login-dialog
+        onCancel={(event) => event.preventDefault()}
+      >
+        <div className="chat-login-dialog-content">
+          <span className="chat-login-kicker">MYEONGHA · CONVERSATION</span>
+          <h2 id="chat-login-title">로그인이 필요합니다</h2>
+          <p id="chat-login-description">연결자와 대화를 나누려면 먼저 로그인해 주세요. 로그인 후 이 대화 화면으로 돌아옵니다.</p>
+          <div className="chat-login-actions">
+            <a className="chat-login-primary" href={`auth.html?next=${encodeURIComponent(resumeChatHref)}`}>로그인하고 대화하기</a>
+            <a className="chat-login-secondary" href="chat-hub.html">대화 목록으로 돌아가기</a>
+          </div>
+        </div>
+      </dialog>
       <CreditRechargeDialog />
     </>
   );

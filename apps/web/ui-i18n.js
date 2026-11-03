@@ -21,6 +21,10 @@ function registerStaticCopy(source, localized) {
 for (const [source, row] of RECORDS_HUB_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 for (const [source, row] of JA_TW_TO_EN_CN_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
 for (const [source, row] of EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1) registerStaticCopy(source, row);
+registerStaticCopy('로그인이 필요합니다', { 'ja-JP': 'ログインが必要です', 'zh-TW': '請先登入', 'en-US': 'Sign in required', 'zh-CN': '请先登录' });
+registerStaticCopy('연결자와 대화를 나누려면 먼저 로그인해 주세요. 로그인 후 이 대화 화면으로 돌아옵니다.', { 'ja-JP': '案内人と話すにはログインしてください。ログイン後、この会話画面に戻ります。', 'zh-TW': '請先登入以與引路人對話。登入後將返回此對話畫面。', 'en-US': 'Sign in to talk with your guide. You will return to this chat afterward.', 'zh-CN': '请先登录以与引路人对话。登录后将返回此对话页面。' });
+registerStaticCopy('로그인하고 대화하기', { 'ja-JP': 'ログインして会話する', 'zh-TW': '登入並開始對話', 'en-US': 'Sign in to chat', 'zh-CN': '登录并开始对话' });
+registerStaticCopy('대화 목록으로 돌아가기', { 'ja-JP': '会話一覧に戻る', 'zh-TW': '返回對話列表', 'en-US': 'Back to conversations', 'zh-CN': '返回对话列表' });
 registerStaticCopy('라이트 모드로 전환', { 'ja-JP': 'ライトモードに切り替え', 'zh-TW': '切換至淺色模式', 'en-US': 'Switch to light mode', 'zh-CN': '切换至浅色模式' });
 registerStaticCopy('세연의 안전한 응답 처리가 완료되지 않았습니다. 입력한 내용은 보존했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': 'セヨンの安全な応答処理を完了できませんでした。入力した内容は保持されています。しばらくしてからもう一度お試しください。', 'zh-TW': '未能完成 Seyeon 的安全回覆處理。您輸入的內容已保留，請稍後再試。', 'en-US': "Seyeon could not complete the response safely. Your message has been preserved. Please try again shortly.", 'zh-CN': '未能完成 Seyeon 的安全回复处理。您输入的内容已保留，请稍后重试。' });
 registerStaticCopy('대화 상태를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.', { 'ja-JP': '会話の状態を確認できませんでした。しばらくしてからもう一度お試しください。', 'zh-TW': '無法確認對話狀態，請稍後再試。', 'en-US': 'The chat status could not be verified. Please try again shortly.', 'zh-CN': '无法确认对话状态，请稍后重试。' });
