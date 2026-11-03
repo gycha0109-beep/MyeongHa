@@ -86,8 +86,7 @@ BEGIN
   END IF;
 END $lock$;
 REVOKE ALL ON FUNCTION seyeon_private.lock_g0_original_message_v1(uuid,uuid,uuid,text)
-  FROM PUBLIC,anon,authenticated,service_role,myeongha_api_executor,
-       myeongha_seyeon_subject_login;
+  FROM PUBLIC,anon,authenticated,service_role,myeongha_api_executor;
 GRANT EXECUTE ON FUNCTION seyeon_private.lock_g0_original_message_v1(uuid,uuid,uuid,text)
   TO myeongha_seyeon_chat_runtime_owner;
 
