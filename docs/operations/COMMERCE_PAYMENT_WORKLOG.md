@@ -435,3 +435,14 @@
 - **병합 차단:** 그 후 다른 트랙의 #2890/#2892 등의 병합으로 origin/main이 `d7d07f65`까지 이동하여 #2889는 GitHub mergeable_state `dirty`. `tests/ci-integration-candidate.test.mjs`의 CI 조회 검증 테스트 한 파일이 충돌했음.
 - **수정:** 기존 브랜치의 중복 간이 검증 대신 신규 main의 더 엄격한 `defaultBranchRefSha()` 브랜치·SHA 검증 테스트를 그대로 유지함. 기타 main의 보안·채팅 변경을 제외/변형하지 않고 통합. 로컬 관련 테스트 **82/82 PASS**, API TypeScript PASS, staged diff check PASS.
 - **다음 게이트:** 충돌해결 커밋 원격 제출 후 새 HEAD에서 CI 성공과 새 필수 고정 HEAD Integration CI를 확인하기 전에는 합병 완료로 추정하지 않음. LIVE 및 운영 DB 변경 없음.
+
+### 2026-11-02 — #2889 병합 완료 및 P2 Offer/Charge Terms 상세 읽기 전용 증빙
+
+- **완료 확인:** P4 운영자 환불 연결 PR #2889의 [고정 HEAD 통합 CI #41420335817](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41420335817)에서 모든 admission, full, PostgreSQL 17, CI Verify 및 CI Integration Verify **SUCCESS**. PR은 `aa953d034e73011443f3c2c07538bf5746484186`으로 `main`에 병합됨. 후속 구현은 새 브랜치 `feat/commerce/p2-readiness-evidence-20261102`에서 진행.
+- **P2 선행 조건:** P0-CM-03에서 `standard.love_relationship`의 KRW 8,900은 **표시 가격만 확정**. 개별 상품 판매 활성화 승인·사주 Production Reading 권한·실행 가능한 Offer 및 Charge Terms는 여전히 충족되지 않았으며 기존 P2 카탈로그 HOLD 검사도 유지함.
+- **구현:** `scripts/operations/commerce-p2-offer-charge-terms-evidence-v1.mjs`는 고권한(read-only/complete visibility) 단일 Repeatable Read 트랜잭션에서 해당 상품의 Offer와 버전별 Charge Terms를 최대 25행까지 조회하고, 현행 Offer/Terms, 8,900 KRW 가격과의 차이, 현행 Terms 중복 및 예상 밖 상품 구성 여부를 구분함. 외부 결제사 상품 식별자, 비밀·고객 정보는 결과에 포함하지 않음. 25행 초과, 잘못된 DB 결과, 권한 부족은 실패로 판정하고 ROLLBACK하며, 쓰기·결제사 호출·구매권 발급 기능은 없음.
+- **안전 경계:** 가격이 8,900원으로 일치하더라도 Charge Terms 승인은 불가능. `saleActivationAuthorized`, `executableChargeAuthorized`, `productionFulfillmentAuthorized`는 항상 `false`. 이 점검 도구만으로 P2를 완료 또는 P5를 활성화할 수 없음.
+- **로컬 검증:** 신규 상세 증빙 + 기존 P2 HOLD 회귀 테스트 총 **24/24 PASS**, Node 구문 검사 PASS, git diff 공백 검사 PASS. 실제 운영 DB는 조회하지 않음.
+- **다음:** PR 일반/필수 통합 CI, 병합 후 상품별 운영 승인·Production Saju 공급·실제 고객 제공의 미충족 선행 조건 확인. LIVE는 HOLD.
+
+- **추가 SQL 정합성 수정:** Offer가 존재하지만 Charge Terms가 없는 LEFT JOIN 결과에서는 `ct.retired_at is null`이 TRUE로 평가될 수 있으므로, `ct.id is null`이면 `termsCurrent`를 SQL NULL로 반환하도록 변경. 실제 DB null row와 검증 스키마가 일치하도록 테스트를 보강했으며 P2 테스트 24/24 재통과. 기존 판매 HOLD 유지.
