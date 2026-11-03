@@ -401,7 +401,9 @@ body.product-page .product-header .ui-locale-select:focus-visible {
 
 /* First-paint geometry: static controls and fixed menu cells cannot shift while
    theme, locale, fonts, or Member session initialization complete. */
-html { scrollbar-gutter: stable both-edges; }
+/* Keep the native scrollbar present on every desktop route from the first
+   paint, without adding a left gutter that offsets full-bleed content. */
+html { overflow-y: scroll; }
 body.product-page .product-header .product-header-inner {
   grid-template-columns: 205px minmax(335px, 1fr) 334px !important;
 }

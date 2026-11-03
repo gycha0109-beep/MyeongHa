@@ -12,7 +12,8 @@ describe('shared refined header', () => {
     expect(css).toContain('--mh-header-height-desktop: 92px;');
     expect(css).toContain('--mh-header-height-mobile: 86px;');
     expect(css).toContain('height: 100%;');
-    expect(css).toContain('scrollbar-gutter: stable;');
+    expect(css).toContain('html { overflow-y: scroll; }');
+    expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 334px !important;');
     expect(css).toContain('grid-template-columns: 150px minmax(220px, 1fr) 282px !important;');
     expect(css).toContain('flex: 0 0 112px;');
