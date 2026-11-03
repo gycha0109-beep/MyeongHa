@@ -1,2 +1,7 @@
 # Linux PostgreSQL CI case shell scripts must stay LF even under Windows core.autocrlf.
 test/db/*.sh text eol=lf
+
+# Preserve the original GitHub Linux Saju evidence bytes on Windows checkouts.
+docs/operations/SAJU_REAL_ENGINE_SPLIT_CGROUP_LINUX_OBSERVATION_20261103.json text eol=lf
+# Actual 5m/15m Saju Linux proof must keep original bytes across Windows checkouts.
+docs/operations/SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json text eol=lf

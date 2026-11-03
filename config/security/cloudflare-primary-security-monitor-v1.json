@@ -12,7 +12,10 @@
   "querySource": "sql_api",
   "dataset": "logs.workersLogs",
   "eventSchema": "myeongha-security-event-v1",
-  "eventCodes": ["ACCESS_DENIED", "RATE_LIMITED"],
+  "eventCodes": [
+    "ACCESS_DENIED",
+    "RATE_LIMITED"
+  ],
   "detection": {
     "algorithm": "zscore_spike",
     "sensitivityStandardDeviations": 3.5,
@@ -23,9 +26,13 @@
     "selectionAuthority": "Cloudflare UI native defaults; increase only",
     "repositoryFixedRequestThreshold": null
   },
-  "delivery": { "channel": "email", "recipientAuthority": "existing Cloudflare account owner", "recipientCount": 1 },
+  "delivery": {
+    "channel": "email",
+    "recipientAuthority": "existing Cloudflare account owner",
+    "recipientCount": 1
+  },
   "providerConfiguration": "ACTIVE_READBACK_VERIFIED",
-  "actualPrimaryLogIngestion": "PENDING_OPS_API_ROLLOUT",
+  "actualPrimaryLogIngestion": "VERIFIED_PRIMARY_401_403_429",
   "actualNotificationReceipt": "SYNTHETIC_PROVIDER_TEST_RECEIVED",
   "deliveryTest": {
     "method": "official Cloudflare monitor Test action; executed once",
@@ -38,5 +45,19 @@
   },
   "organicBaselineEstablished": false,
   "authorization": "User requested completion including alert activation; clarified Cloudflare as primary server.",
-  "observedDateKst": "2026-10-25"
+  "observedDateKst": "2026-11-03",
+  "actualPrimaryLogIngestionEvidence": {
+    "observedAtKst": "2026-11-03",
+    "boundedQuotaRun": "GitHub Actions 41571776787",
+    "logObservedWindowUtc": {
+      "from": "2026-11-03T03:22:00Z",
+      "to": "2026-11-03T03:28:00Z"
+    },
+    "accessDenied401": 3,
+    "rateLimited429": 4,
+    "serverFailure503": 0,
+    "privacySafeSchema": "myeongha-security-event-v1",
+    "independentProviderLogQuery": true,
+    "organicPopulationEstablished": false
+  }
 }

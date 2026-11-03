@@ -1,0 +1,62 @@
+/* Unauthenticated Character Room entry — actual modal, never a false empty chat. */
+.chat-login-dialog {
+  position: fixed;
+  width: min(440px, calc(100vw - 32px));
+  max-height: min(86dvh, 580px);
+  margin: auto;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid rgba(158, 114, 79, .35);
+  border-radius: 20px;
+  color: #3d3035;
+  background: #fff9f1;
+  box-shadow: 0 28px 75px rgba(30, 24, 30, .28);
+}
+.chat-login-dialog::backdrop {
+  background: rgba(18, 23, 30, .60);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+.chat-login-dialog-content { padding: clamp(26px, 6vw, 36px); }
+.chat-login-kicker { color: #987044; font: 700 10px/1.5 var(--mh-sans); letter-spacing: .16em; }
+.chat-login-dialog h2 {
+  margin: 13px 0 10px;
+  color: #3d2937;
+  font: 700 clamp(23px, 5vw, 29px)/1.35 var(--mh-serif);
+}
+.chat-login-dialog p { margin: 0; color: #75645f; font-size: 14px; line-height: 1.8; }
+.chat-login-actions { display: grid; gap: 10px; margin-top: 26px; }
+.chat-login-actions a {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.chat-login-primary { color: #fffaf6 !important; background: #70384e; }
+.chat-login-primary:hover { background: #88465f; }
+.chat-login-secondary { border-color: #dfcbbb !important; color: #614d4a !important; background: transparent; }
+.chat-login-secondary:hover { background: #f5e8dc; }
+.chat-login-actions a:focus-visible { outline: 3px solid #c49a5c; outline-offset: 3px; }
+html[data-theme="dark"] .chat-login-dialog {
+  color: #f2e6d7;
+  background: #192630;
+  border-color: rgba(214, 170, 105, .42);
+  box-shadow: 0 28px 75px rgba(0, 0, 0, .48);
+}
+html[data-theme="dark"] .chat-login-dialog h2 { color: #f4e7d8; }
+html[data-theme="dark"] .chat-login-dialog p { color: #c6b8ae; }
+html[data-theme="dark"] .chat-login-kicker { color: #d2a66c; }
+html[data-theme="dark"] .chat-login-primary { background: #a55e7c; }
+html[data-theme="dark"] .chat-login-primary:hover { background: #b96b8b; }
+html[data-theme="dark"] .chat-login-secondary { color: #e7d7c9 !important; border-color: #705d57 !important; }
+html[data-theme="dark"] .chat-login-secondary:hover { background: #26353e; }
+@media (max-width: 600px) {
+  .chat-login-dialog { width: calc(100vw - 24px); border-radius: 18px; }
+  .chat-login-dialog-content { padding: 25px 20px; }
+}

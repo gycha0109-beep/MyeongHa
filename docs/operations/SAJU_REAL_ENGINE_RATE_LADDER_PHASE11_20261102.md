@@ -2,6 +2,110 @@
 
 **Status: ACTUAL LINUX OBSERVATION COMPLETE (2026-11-03); PRODUCTION ACCEPTANCE REMAINS BLOCKED.** This is an additional bounded non-production workload in the existing Phase 11 saturation-characterization roadmap. It is not a scaling approval or a replacement for Phase 12 production-like evidence.
 
+## Phase 11 — real Saju sustained 5-minute / 15-minute split-cgroup envelope (implementation)
+
+**Status: ACTUAL GITHUB LINUX 5M/15M SUSTAINED EXECUTION VERIFIED (2026-11-03); PRODUCTION ACCEPTANCE REMAINS BLOCKED.** The existing approved operations architecture (§29) defines an initial **5-minute single-user** and **15-minute normal-concurrency** measurement. The existing `scripts/measure-sustained-loopback-capacity.mjs` probes synthetic public API diagnostics; it does **not** run the real Saju calculation host. This Phase 11 extension exercises the real pinned public Saju engine, without replacing the API baseline or claiming Production capacity.
+
+The **existing** main-only, manually dispatched `saju-isolated-rate-ladder-phase11.yml` now accepts a third fixed `experiment=sustained` choice. `shared` and `split` remain supported and unchanged by default. After merger, select `sustained` once; the workflow builds the exact Saju SHA `9807ce89c08afc61b587560d515a475efd819032` and runs a separate 0.5-CPU/256MiB service container and 1-CPU/256MiB synthetic driver container sharing **only** the offline loopback network namespace. Both have swap zero, read-only root and code mounts, no host ports, non-root users, no extra capabilities or Production secrets. No user data, DB or real provider calls are involved.
+
+| Bounded sustained profile | Exact duration | Target maximum request arrival rate | Maximum in-flight calculations | Scheduled slots |
+| --- | ---: | ---: | ---: | ---: |
+| Single user | 300 seconds (5 minutes) | 1 request/s | 1 | 300 |
+| Synthetic normal concurrency | 900 seconds (15 minutes) | 4 requests/s | 4 | 3,600 |
+| **Total** | **1,200 seconds** | — | — | **3,900** |
+
+The workload has a fixed synthetic Saju input, no rate catch-up bursts, 2.5-second request deadline, 300-ms inter-profile gap, and real calculation preflight/recovery. It counts every scheduled slot as actually attempted, missed due to scheduler lag, or skipped due to in-flight cap; successful, HTTP non-200, malformed and transport failures are recorded separately. Successful p50/p95/p99, actual successful throughput, elapsed stage windows and independent *service/driver* kernel CPU usage, throttling, peak memory and OOM measurements are retained in an identifier-free JSON artifact. Exact source/main SHA and Node image digest are reported. Failures retain `BLOCKED_INCOMPLETE` rather than produce fabricated evidence. Successful execution uses `OBSERVED_SUSTAINED_REAL_SAJU` (measurement success, **not** Production acceptance). Artifact retention is 14 days; independently check and preserve actual results after completion.
+
+**Non-claims:** These two scenarios use *fixed synthetic diagnostic rates*, not observed normal Production traffic. A sustained pass or error profile alone does not prove actual Production workload, DB/Auth/Saju end-to-end latency, service saturation ceiling, autoscaling threshold, SLO or full disaster recovery. Hosted migration/DR #1887 remains unresolved; `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false` and `serviceResumptionAllowed=false` remain mandatory.
+
+### Actual 2026-11-03 GitHub Linux 5m/15m sustained execution and independent evidence
+
+- **Execution:** [manual GitHub Ubuntu 26.04 run #41573816739](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41573816739) completed **SUCCESS** on exact MyeongHa `main` `bcb8abe3fe65e36cbf12516dbc52cbb921f3fc6f`; the pinned real Saju production calculation host source was `9807ce89c08afc61b587560d515a475efd819032` and the Linux Node runtime image digest was `node@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c`. The runner's dedicated sustained step and artifact upload both succeeded.
+- **Original sanitized artifact:** GitHub artifact ID `13203278079` (artifact name `isolated-saju-sustained-phase11-41573816739`, retention 14 days) downloaded and preserved as [original Linux sustained JSON](./SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json). SHA-256 of the **raw JSON bytes**, not its ZIP: `e5c7144dee28ef0afe97d4981a89ba7e8013994663fffae04d2996cdab4fd819`. The JSON's source SHA, main SHA, schema, six resource quotas, two real elapsed windows, request accounting, response stats, kernel counters, recovery and all false acceptance flags are independently checked by [the proof verifier](../../scripts/operations/verify-saju-sustained-linux-proof-phase11.mjs).
+- **Actual measurement, not an estimated workload:** Both profiles completed real Saju calculations using fixed synthetic input; all **3,900/3,900 scheduled** slots were attempted and successful. There were zero skipped-scheduling slots, zero in-flight-cap skips, zero HTTP/non-200 responses, zero transport failures and zero invalid responses.
+
+| Profile | Actual scheduling window | Planned / attempted / successful | Maximum observed in-flight | p50 / p95 / p99 successful latency | Achieved successful rate |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 5m, 1 target request/s, cap 1 | 299,999.639ms | 300 / 300 / 300 | 1 | 2.143 / 2.769 / 4.182ms | 1/s |
+| 15m, 4 target requests/s, cap 4 | 899,999.868ms | 3,600 / 3,600 / 3,600 | **1** | 1.723 / 2.124 / 2.389ms | 4/s |
+| **Total** | **20m planned, actual stage windows validated** | **3,900 / 3,900 / 3,900** | — | — | — |
+
+- **Separate Linux cgroup resource enforcement:** Saju service **0.5 CPU**, driver **1 CPU**, each **256MiB RAM / zero swap**. Service cumulative kernel CPU `4,341,855µs`, throttle periods **0**, peak memory `48,455,680 bytes`; driver cumulative CPU `5,708,168µs`, throttle periods **0**, peak memory `50,700,288 bytes`. `oom_kill=0` for both; real calculation recovery after all sustained stages **PASS**.
+- **Critical concurrency limitation:** The second profile's **configured maximum in-flight is 4, but maximum *observed* was 1**. It demonstrates an actual 15-minute **arrival-rate** measurement at 4/s; it does *not* demonstrate four simultaneous running calculations. Neither this result nor the preceding 6-second ladder establishes a Saju saturation knee, simultaneous four-client guarantee, portable Production TPS, SLO, representative traffic, end-to-end DB/Auth/API latency, scaling trigger or Hosted DR. The service and driver remain on the same underlying host even with separate cgroups.
+- **Governance:** `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`, `outputContainsIdentifiers=false`. Hosted restoration/privacy blocker [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN. The sustained measurement scenario and its evidence are **complete**, but Phase 11 capacity/ceiling verification and Phase 12/13 approvals are **not**.
+
+**Offline verifier invocation:**
+
+```sh
+node scripts/operations/verify-saju-sustained-linux-proof-phase11.mjs \
+  docs/operations/SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json \
+  e5c7144dee28ef0afe97d4981a89ba7e8013994663fffae04d2996cdab4fd819 \
+  bcb8abe3fe65e36cbf12516dbc52cbb921f3fc6f
+```
+
+## Separate resource-cgroup follow-up — implementation (Phase 11)
+
+The first actual Linux observation showed 316 scheduler-lag slots when **the synthetic driver and Saju shared one CPU cgroup**. This leaves the engine-only saturation question open. The existing manually dispatched workflow now supports two explicit `experiment` choices: `shared` (historical original, unchanged by default) and `split` (separate source-constrained service and load-generator cgroups). No new per-phase workflow is created.
+
+The `split` runner first verifies the *exact clean public Saju SHA* `9807ce89c08afc61b587560d515a475efd819032` on the host and pins the Node 24 Docker image by immutable digest. A disposable **service** container has `--network=none`, 0.5 CPU, 256MiB memory, swap 0, a read-only source mount and root filesystem, zero extra capabilities, no host port mapping and a non-root runtime. A separate **driver** container uses 1 CPU, 256MiB memory, swap 0 and `--network=container:<service>`, which shares the *offline* loopback network namespace but **not** the service's CPU or memory cgroup. There is no public/Production endpoint. Both sides use bounded synthetic input, no Production environment variables, no credentials and no user records.
+
+The driver performs the same 6-second 10/25/50/100/200/400 requests/s synthetic schedule, maximum 16 concurrent requests, 2.5-second request deadline, 300ms inter-stage gap, and counts all skipped slots. Per stage it reads **service-only** and **driver-only** cgroup CPU usage/throttling and peak memory separately. The lightweight service cgroup meter is reachable on another loopback-only port; only synthetic counters are returned. It also checks real warmup and recovery calculation, no OOM, forced resource limits, and explicit false Production/DR acceptance flags. Failures produce `BLOCKED_INCOMPLETE`, never fabricated evidence. A completed split run uses `OBSERVED_SPLIT_CGROUP_RATE_LADDER` and a distinct 14-day sanitized artifact.
+
+The service and driver remain on the *same Docker host*, potentially contending for underlying host CPU even with separate cgroups. Separate-accounting measurements remove the shared **quota** confound but do **not** prove a portable saturation ceiling or Production safe TPS. Neither the short shared-cgroup nor short split-cgroup report may be fed into the Phase 12 short-probe analyzer. Long-duration, actual request distribution, real API/DB/Auth topology, worker/process sizing and repeatability remain outside this single diagnostic.
+
+### 2026-11-03 — Actual GitHub Ubuntu 26.04 split-cgroup Linux proof
+
+**Execution:** [main-only manual split run #41565835572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41565835572) completed **SUCCESS** at exact MyeongHa main SHA `137211996b27a5b7f34755e85c61334001bbf4bf`. It compiled the actual Saju production calculation host from exact public SHA `9807ce89c08afc61b587560d515a475efd819032` (Node image `node@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c`) and ran the explicit `split` experiment. All workflow steps, including the isolated computation and evidence upload, succeeded.
+
+**Original evidence:** [permanent sanitized Linux JSON](./SAJU_REAL_ENGINE_SPLIT_CGROUP_LINUX_OBSERVATION_20261103.json), SHA-256 **`2063321492567f7bff495e14844040030da8fd9878c3a6672bfaac6c4ddb6ec3`** (JSON bytes, not the ZIP digest). Downloaded from actual run artifact `13199220968`, `isolated-saju-split-rate-ladder-phase11-41565835572` (GitHub artifact retention 14 days). Independently checked using [the exact-schema, digest, and fail-closed validator](../../scripts/operations/verify-saju-split-rate-ladder-proof-phase11.mjs):
+
+```sh
+node scripts/operations/verify-saju-split-rate-ladder-proof-phase11.mjs \
+  docs/operations/SAJU_REAL_ENGINE_SPLIT_CGROUP_LINUX_OBSERVATION_20261103.json \
+  2063321492567f7bff495e14844040030da8fd9878c3a6672bfaac6c4ddb6ec3 \
+  137211996b27a5b7f34755e85c61334001bbf4bf
+```
+
+| Target requests/s | Planned slots | Attempted / successful | Scheduling / cap skips | Successful p95 / p99 | Achieved success/s |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 10 | 60 | 60 / 60 | 0 / 0 | 3.102 / 3.553ms | 10.169 |
+| 25 | 150 | 150 / 150 | 0 / 0 | 2.309 / 2.506ms | 25.168 |
+| 50 | 300 | 300 / 300 | 0 / 0 | 2.242 / 5.074ms | 50.168 |
+| 100 | 600 | 600 / 600 | 0 / 0 | 1.277 / 1.566ms | 100.170 |
+| 200 | 1,200 | 1,200 / 1,200 | 0 / 0 | 1.035 / 1.671ms | 200.187 |
+| 400 | 2,400 | 2,400 / 2,400 | 0 / 0 | 0.711 / 1.280ms | 400.137 |
+| **Total** | **4,710** | **4,710 / 4,710** | **0 / 0** | — | — |
+
+**Separate kernel observations:** Actual Saju service was constrained to **0.5 CPU / 256MiB RAM / zero swap**, while the independent driver had **1 CPU / 256MiB RAM / zero swap**. Service cgroup: `2,394,137µs` CPU usage, **0** throttled periods, `55,746,560` bytes peak memory. Driver cgroup: `2,933,030µs` CPU usage, **0** throttled periods, `53,788,672` bytes peak memory. Both recorded `oom_kill=0`, no HTTP/transport/invalid-response errors, and an actual post-pressure calculation recovery **PASS**.
+
+**Interpretation and independent environment comparison:**
+
+| Environment | Distinct service/driver CPU cgroups | Success / planned | Missing scheduled slots at 400/s | Observed highest-step successful p95 |
+| --- | --- | --- | ---: | ---: |
+| GitHub Linux shared cgroup [#41556469998](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41556469998) | No | 4,394 / 4,710 | 297 | 1.377ms |
+| Local Docker Desktop split cgroups ([local JSON](./SAJU_REAL_ENGINE_SPLIT_CGROUP_LOCAL_OBSERVATION_20261103.json)) | Yes | 4,367 / 4,710 | 341 (120 scheduling, 221 concurrency cap) | 59.081ms |
+| **GitHub Linux split cgroups** [#41565835572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41565835572) | **Yes** | **4,710 / 4,710** | **0** | **0.711ms** |
+
+The host platforms and resource-accounting layout differ, so these numbers are **not** controlled same-host A/B measurements or portable performance baselines. In this GitHub split run, **no Saju saturation knee was reached up to the bounded target of 400/s**. The source-specific, short synthetic success does **not** prove a 400 TPS Production minimum, maximum Saju throughput, production-like API/DB/Auth response, any sustained 5m/15m baseline, resource scaling trigger, or approved SLO. The server and driver remain on the same physical host even when independently cgroup-constrained. The artifact explicitly retains all Production capacity/scaling and Hosted DR/service-resumption approvals `false`. Phase 11 service capacity and Phase 12 scaling evaluation remain blocked pending reproducible sustained production-like evidence.
+
+### 2026-11-03 — Actual local split-cgroup Linux Docker evidence
+
+The split-cgroup variant was executed once on **local Docker Desktop with a Linux Docker Engine** using pinned, clean public Saju SHA `9807ce89c08afc61b587560d515a475efd819032` and a content-addressed Node 24 image. This is a *local Linux container result*, not a GitHub Ubuntu run or a Production capacity measurement. The sanitized raw [JSON](./SAJU_REAL_ENGINE_SPLIT_CGROUP_LOCAL_OBSERVATION_20261103.json) has SHA-256 `7e7793f687427c79bb86ad6f6acb2eff8ba540aa9386611f5a3275b9a01e1ab4`, includes `localValidationOnly=true`, and retains all seven Production/DR acceptance flags as `false`.
+
+| Target arrival rate | Planned slots | Successful actual calculations | Scheduling lag skips | In-flight cap skips | Success p95 / p99 | Achieved successful rate |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 10/s | 60 | 60 | 0 | 0 | 5.126 / 9.087ms | 10.167/s |
+| 25/s | 150 | 150 | 0 | 0 | 3.124 / 6.148ms | 25.166/s |
+| 50/s | 300 | 300 | 0 | 0 | 2.687 / 4.587ms | 50.159/s |
+| 100/s | 600 | 600 | 0 | 0 | 3.775 / 5.501ms | 100.178/s |
+| 200/s | 1,200 | 1,198 | 2 | 0 | 2.22 / 3.678ms | 199.854/s |
+| 400/s | 2,400 | 2,059 | 120 | 221 | 59.081 / 75.266ms | 343.353/s |
+| **Total** | **4,710** | **4,367** | **122** | **221** | — | — |
+
+The run successfully performed all 4,367 attempted calculations, without non-200, transport or invalid-response failures. Resource accounting is now **separated**: Saju service 0.5 CPU / 256MiB / no swap, actual kernel CPU use `5,527,264µs`, 27 throttled periods, cgroup peak memory `59,404,288 bytes`; load-generator 1 CPU / 256MiB / no swap, kernel CPU use `6,910,115µs`, 2 throttled periods, peak memory `50,528,256 bytes`; both zero OOM kills and final calculation recovery PASS.
+
+At 400/s, scheduling lag and the driver's 16-in-flight cap both caused skipped slots. The observation supports further investigation into service response pressure **under the specified local constraints**. It is not sufficient to establish an engine-only maximum TPS, a reproducible saturation knee or Production worker/auto-scaling numbers; it cannot be compared 1:1 to the earlier GitHub runner shared-cgroup experiment because both the container layout and host environment differ. The main-only GitHub Linux `split` dispatch will be evaluated independently after merging this implementation.
+
 ## Execution contract
 
 After this change merges into MyeongHa `main`, the owner may manually dispatch `.github/workflows/saju-isolated-rate-ladder-phase11.yml`. It checks out the exact public Saju source `9807ce89c08afc61b587560d515a475efd819032`, builds the actual production calculation host, and runs the controlled pressure driver within **one disposable Linux Docker cgroup**.

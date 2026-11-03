@@ -205,10 +205,10 @@ try {
   const memberHeader = await client.evaluate(`(() => {
     const profile = document.querySelector('.product-profile');
     const spans = [...profile.querySelectorAll(':scope > span')];
-    return { label: spans[1]?.textContent?.trim(), chevron: spans.at(-1)?.textContent?.trim() };
+    return { label: spans[1]?.textContent?.trim(), count: spans.length, text: profile.textContent.trim() };
   })()`);
   assert(memberHeader.label === '마이', `Member header label is incorrect: ${memberHeader.label}`);
-  assert(memberHeader.chevron === '⌄', `Member header chevron was overwritten: ${memberHeader.chevron}`);
+  assert(memberHeader.count === 2 && !memberHeader.text.includes('⌄'), `Member header must not show a dropdown arrow: ${JSON.stringify(memberHeader)}`);
 
   await client.evaluate(`localStorage.removeItem('myeongha.memberSession.v1')`);
   await navigate(client, origin, '/hall.html', '.product-profile');
@@ -216,10 +216,10 @@ try {
   const guestHeader = await client.evaluate(`(() => {
     const profile = document.querySelector('.product-profile');
     const spans = [...profile.querySelectorAll(':scope > span')];
-    return { label: spans[1]?.textContent?.trim(), chevron: spans.at(-1)?.textContent?.trim() };
+    return { label: spans[1]?.textContent?.trim(), count: spans.length, text: profile.textContent.trim() };
   })()`);
   assert(guestHeader.label === '로그인', `Guest header label is incorrect: ${guestHeader.label}`);
-  assert(guestHeader.chevron === '⌄', `Guest header chevron was overwritten: ${guestHeader.chevron}`);
+  assert(guestHeader.count === 2 && !guestHeader.text.includes('⌄'), `Guest header must not show a dropdown arrow: ${JSON.stringify(guestHeader)}`);
 
   console.log('MyeongHa_WEB_AUTH_CONFIRMATION_BROWSER_PASS');
 } catch (error) {

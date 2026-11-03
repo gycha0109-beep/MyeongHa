@@ -464,13 +464,14 @@ html[data-theme="dark"] body.character-room-v2 .conversation-message-avatar {
   background: #17252d;
 }
 
-/* The dark avatar background shorthand resets cover to auto; restore the
-   approved Seyeon portrait and crop for the message avatar. */
+/* The dark avatar background shorthand resets image sizing; reapply the
+   exact same portrait framing as light mode, with no independent dark zoom. */
 html[data-theme="dark"] body.character-room-v2[data-character="seyeon"] .conversation-message-avatar[data-character="seyeon"] {
   background-image: url("assets/characters/seyeon-portrait-v2.webp");
   background-size: cover;
   background-position: center 22%;
   background-repeat: no-repeat;
+  background-color: #eadacc;
   color: transparent;
 }
 

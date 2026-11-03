@@ -38,9 +38,14 @@ it('keeps an unknown Member sign-in origin from receiving credentials', async ()
   await expect(acquireProductionMemberSmokeSession({ origin: 'https://attacker.invalid' })).rejects.toThrow('Unapproved');
 });
 
-it('exercises real harness Member/Guest normal and quota paths with redacted synthetic transport', () => {
+it.each(['normal', 'upstream-503', 'transport-failure', 'window-expired'])('exercises redacted Member/Guest quota paths (%s)', scenario => {
   const code = `
     const counts = new Map();
+    const originalNow = Date.now;
+    let clockOffsetMs = 0;
+    Date.now = () => originalNow() + clockOffsetMs;
+    let inFlight = 0;
+    let peakInFlight = 0;
     globalThis.fetch = async (url, init = {}) => {
       const parsed = new URL(url);
       if (parsed.origin !== 'https://myeongha.gycha0109.workers.dev') process.exit(42);
@@ -57,6 +62,14 @@ it('exercises real harness Member/Guest normal and quota paths with redacted syn
       const key = token + path;
       const count = (counts.get(key) ?? 0) + 1;
       counts.set(key,count);
+      inFlight++;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      if (peakInFlight > 8) process.exit(45);
+      await new Promise(resolve => setTimeout(resolve, 4));
+      inFlight--;
+      if (${JSON.stringify(scenario)} === 'upstream-503' && token === 'Bearer synthetic-member-bearer' && path.endsWith('calculation') && count === 4) return answer({ok:false},503);
+      if (${JSON.stringify(scenario)} === 'transport-failure' && token === 'Bearer synthetic-member-bearer' && path.endsWith('calculation') && count === 4) throw new Error('synthetic transport detail is private');
+      if (${JSON.stringify(scenario)} === 'window-expired' && token === 'Bearer synthetic-member-bearer' && path.endsWith('calculation') && count === 61) clockOffsetMs = 61000;
       if (count > (path.endsWith('calculation') ? 60 : 20)) return Response.json({ok:false,error:{code:'RATE_LIMITED'}},{status:429,headers:{...headers,'retry-after':'30'}});
       return answer({ok:true});
     };
@@ -71,14 +84,32 @@ it('exercises real harness Member/Guest normal and quota paths with redacted syn
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: 'synthetic-subject-identity',
     },
   });
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(scenario === 'normal' ? 0 : 1);
   const evidence = JSON.parse(result.stdout);
-  expect(evidence.status).toBe('PASS');
-  expect(evidence.memberAndGuestNormal).toBe(true);
-  expect(evidence.quotaDenial).toBe(true);
+  expect(evidence.status).toBe(scenario === 'normal' ? 'PASS' : 'FAIL');
   expect(evidence.productionActivationAuthorizedByResult).toBe(false);
-  expect(evidence.results.filter(r => r.status === 200)).toHaveLength(160);
-  expect(evidence.results.filter(r => r.status === 429)).toHaveLength(4);
+  if (scenario !== 'normal') {
+    expect(evidence.stage).toBe('normal-and-quota');
+    expect(evidence.quotaDenial).toBeUndefined();
+    const failureBatch = evidence.results.find(r => r.route === '/api/me/saju/calculation' && r.identityKind === 'member');
+    expect(failureBatch.requestedCount).toBe(61);
+    expect(failureBatch.attemptCount).toBeGreaterThanOrEqual(4);
+    if (scenario === 'window-expired') {
+      expect(failureBatch.attemptCount).toBe(61);
+      expect(failureBatch.statusCounts).toMatchObject({ '200': 60, '429': 1 });
+      expect(failureBatch.elapsedMs).toBeGreaterThanOrEqual(61000);
+    } else {
+      expect(failureBatch.attemptCount).toBeLessThan(61);
+      expect(failureBatch.statusCounts[scenario === 'upstream-503' ? '503' : '0']).toBe(1);
+      expect(failureBatch.elapsedMs).toBeGreaterThanOrEqual(0);
+    }
+    expect(result.stdout + result.stderr).not.toContain('synthetic transport detail is private');
+  } else {
+    expect(evidence.memberAndGuestNormal).toBe(true);
+    expect(evidence.quotaDenial).toBe(true);
+    expect(evidence.results.filter(r => r.status === 200)).toHaveLength(160);
+    expect(evidence.results.filter(r => r.status === 429)).toHaveLength(4);
+  }
   for (const privateValue of ['synthetic-password', 'synthetic-subject-identity', 'synthetic-member-bearer', 'synthetic-guest-bearer', '2000-01-01']) {
     expect(result.stdout + result.stderr).not.toContain(privateValue);
   }

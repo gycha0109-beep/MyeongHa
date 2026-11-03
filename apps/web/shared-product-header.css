@@ -260,3 +260,204 @@ html[data-theme="dark"] body.product-page .product-header .ui-locale-select {
   body.product-page .product-header .product-theme-toggle { width: 34px !important; min-width: 34px; min-height: 34px !important; flex-basis: 34px !important; }
   body.product-page .product-header .ui-locale-select { max-width: 78px; width: 78px; font-size: 10px; }
 }
+
+/* One 20px / 1.8px-stroke outline icon family across all nine headers. */
+body.product-page .product-header {
+  --mh-header-bell: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M18%208a6%206%200%200%200-12%200c0%207-3%207-3%209h18c0-2-3-2-3-9%22%2F%3E%3Cpath%20d%3D%22M10%2021h4%22%2F%3E%3C%2Fsvg%3E");
+  --mh-header-moon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20.985%2012.486A9%209%200%200%201%2011.514%203.015%209%209%200%201%200%2020.985%2012.486Z%22%2F%3E%3C%2Fsvg%3E");
+  --mh-header-sun: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M12%202v2m0%2016v2M4.93%204.93l1.41%201.41m11.32%2011.32%201.41%201.41M2%2012h2m16%200h2M4.93%2019.07l1.41-1.41M17.66%206.34l1.41-1.41%22%2F%3E%3C%2Fsvg%3E");
+  --mh-header-user: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%23000%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%228%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M4%2021v-2a8%208%200%200%201%2016%200v2%22%2F%3E%3C%2Fsvg%3E");
+}
+body.product-page .product-header .product-icon-button,
+body.product-page .product-header .product-theme-toggle,
+body.product-page .product-header .product-profile,
+body.product-page .product-header .ui-locale-select {
+  transition: border-color .16s ease, background-color .16s ease;
+}
+body.product-page .product-header .product-icon-button::before,
+body.product-page .product-header .product-profile-mark::before,
+body.product-page .product-header .product-theme-toggle-mark::before {
+  content: "";
+  display: block;
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 0;
+  background: currentColor;
+  box-shadow: none;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
+}
+body.product-page .product-header .product-icon-button::before {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  -webkit-mask-image: var(--mh-header-bell);
+  mask-image: var(--mh-header-bell);
+}
+body.product-page .product-header .product-icon-button::after { content: none !important; display: none !important; }
+body.product-page .product-header .product-profile-mark {
+  display: grid;
+  place-items: center;
+  position: relative;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  font-size: 0;
+  color: inherit;
+  background: transparent !important;
+  border: none !important;
+}
+body.product-page .product-header .product-profile-mark::before {
+  inset: 0;
+  left: 0;
+  top: 0;
+  -webkit-mask-image: var(--mh-header-user);
+  mask-image: var(--mh-header-user);
+}
+body.product-page .product-header .product-profile-mark::after { content: none !important; display: none !important; }
+body.product-page .product-header .product-theme-toggle-mark {
+  display: grid;
+  position: relative;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  font-size: 0 !important;
+  color: inherit;
+}
+body.product-page .product-header .product-theme-toggle-mark::before {
+  position: static;
+  -webkit-mask-image: var(--mh-header-moon);
+  mask-image: var(--mh-header-moon);
+}
+html[data-theme="dark"] body.product-page .product-header .product-theme-toggle-mark::before {
+  -webkit-mask-image: var(--mh-header-sun);
+  mask-image: var(--mh-header-sun);
+}
+/* No decorative target/globe glyph: locale is a plain readable select. */
+body.product-page .product-header .ui-locale-picker::before { content: none !important; display: none !important; }
+body.product-page .product-header .ui-locale-select {
+  width: 103px;
+  max-width: 103px;
+  padding-left: 14px;
+  padding-right: 24px;
+  font-size: 12px;
+  text-overflow: ellipsis;
+}
+body.product-page .product-header .product-profile {
+  gap: 9px;
+  padding-inline: 13px;
+}
+body.product-page .product-header .product-profile > span:last-child:not(.product-profile-mark) {
+  max-width: 80px;
+}
+html[data-theme="dark"] body.product-page .product-header .product-icon-button:hover,
+html[data-theme="dark"] body.product-page .product-header .product-theme-toggle:hover,
+html[data-theme="dark"] body.product-page .product-header .product-profile:hover,
+html[data-theme="dark"] body.product-page .product-header .ui-locale-select:hover {
+  border-color: #d7aa72 !important;
+  background-color: rgba(45, 58, 70, .88) !important;
+}
+body.product-page .product-header .product-icon-button:focus-visible,
+body.product-page .product-header .product-theme-toggle:focus-visible,
+body.product-page .product-header .product-profile:focus-visible,
+body.product-page .product-header .ui-locale-select:focus-visible {
+  outline: 2px solid #c49a5c;
+  outline-offset: 3px;
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  body.product-page .product-header .ui-locale-select {
+    width: 90px;
+    max-width: 90px;
+    padding-left: 10px;
+    padding-right: 20px;
+    font-size: 11px;
+  }
+}
+@media (max-width: 767px) {
+  body.product-page .product-header .ui-locale-select {
+    width: 90px;
+    max-width: 90px;
+    padding-left: 10px;
+    padding-right: 20px;
+    font-size: 11px;
+  }
+}
+@media (max-width: 420px) {
+  body.product-page .product-header .ui-locale-select {
+    width: 82px;
+    max-width: 82px;
+    padding-left: 9px;
+    padding-right: 18px;
+    font-size: 10px;
+  }
+}
+
+/* First-paint geometry: static controls and fixed menu cells cannot shift while
+   theme, locale, fonts, or Member session initialization complete. */
+/* Keep the native scrollbar present on every desktop route from the first
+   paint, without adding a left gutter that offsets full-bleed content. */
+html { overflow-y: scroll; }
+body.product-page .product-header .product-header-inner {
+  grid-template-columns: 205px minmax(335px, 1fr) 334px !important;
+}
+body.product-page .product-header .product-nav {
+  width: min(100%, 390px);
+  justify-content: space-between;
+  gap: 0 !important;
+}
+body.product-page .product-header .product-nav-link {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+body.product-page .product-header .product-profile {
+  flex: 0 0 112px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+}
+body.product-page .product-header .ui-locale-picker {
+  flex: 0 0 103px;
+  width: 103px;
+  margin-right: 0;
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  body.product-page .product-header .product-header-inner {
+    grid-template-columns: 150px minmax(220px, 1fr) 282px !important;
+  }
+  body.product-page .product-header .product-nav {
+    width: min(100%, 280px);
+  }
+  body.product-page .product-header .product-profile {
+    flex-basis: 94px;
+    width: 94px;
+    min-width: 94px;
+    max-width: 94px;
+  }
+  body.product-page .product-header .ui-locale-picker {
+    flex-basis: 90px;
+    width: 90px;
+  }
+}
+@media (max-width: 767px) {
+  body.product-page .product-header .product-header-inner {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+  }
+  body.product-page .product-header .ui-locale-picker {
+    flex-basis: 90px;
+    width: 90px;
+  }
+}
+@media (max-width: 420px) {
+  body.product-page .product-header .ui-locale-picker {
+    flex-basis: 82px;
+    width: 82px;
+  }
+}

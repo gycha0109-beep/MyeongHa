@@ -124,3 +124,21 @@ node scripts/verify-saju-abuse-admission-postgres.mjs
 ## 다음 단일 작업
 
 승인된 개발 구현과 공격 E2E는 VERIFIED입니다. PR 병합은 별도 후속 지시로 승인됐으며 필수 CI 통과 조건으로 진행합니다. 다음 운영 작업은 #1526 제한·정리 보존과 #1527 4xx alert/no-alert 정책을 확정해 SQL 승격·배포·활성화 패킷을 검토하는 것입니다. 병합을 운영 활성화·DEPLOYED로 간주하지 않습니다. #425는 외부 플랫폼 후속입니다.
+
+## 2026-11-03 latest general-security status (supersedes historical HOLD snapshots above)
+
+- **A06 / #1526: ACCEPTED on pinned deployed Production version.** The governed [Cloudflare quota canary 41571776787](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41571776787) PASSED on Worker `adf66a49-0a0b-426e-b001-cdd16e7f3617`: Member and Guest calculation 60 x HTTP 200 then HTTP 429, preview 20 x HTTP 200 then HTTP 429, all within one approved 60-second window. Independent Workers Logs confirmed four `RATE_LIMITED` 429 records. 60/20 limits were explicitly approved on 2026-10-24, not derived from invented organic traffic. PG17 attack E2E 84/84 PASS, full isolated Linux Docker test 8,545 PASS, CI Integration [41570777200](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41570777200) SUCCESS.
+- **A09 / #1527: PARTIAL / ORGANIC BASELINE HOLD.** Cloudflare native monitor activated/re-read, privacy-safe Worker event ingestion and real 401/403/429 coverage verified, and one provider synthetic test dispatch confirmed. The 7-day bounded provider population had 213 security events (147 ACCESS_DENIED, five known synthetic RATE_LIMITED, 61 SERVER_FAILURE); not a synthetic-separated organic baseline. No organic anomaly alert firing was independently evidenced. Do not close A09 or invent fixed thresholds. See [runbook](../operations/PRODUCTION_SECURITY_ALERTING_RUNBOOK_V1.md).
+- **A03 / #1536:** pinned restore drill evidence confirmed, issue CLOSED. **A02 / #425:** platform default ACL no-exposure verification resolved, issue CLOSED. Operations DR #1887 and fail-closed resume gates remain separately OPEN.
+- **Umbrella #1529 remains OPEN** until remaining actual acceptance evidence is met; do not declare ROADMAP_COMPLETE. Earlier 2026-10-24/25 notes and Vercel alert states are historical. Primary production runtime is Cloudflare, Vercel auxiliary.
+
+Watchtower-Track: security
+
+## 2026-11-03 A09 provenance checkpoint after A06 completion
+
+- The last mandatory active implementation path is **#1527 / OWASP A09 organic-evidence assessment**; #1526 / A06 was CLOSED with exact deployed Worker quota canary [41571776787](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41571776787). The native Cloudflare primary monitor remains ACTIVE, worker 401/403/429 events reach provider logs and a synthetic provider notification was delivered.
+- A 14-window official provider read-only capture of Cloudflare primary security events (2026-10-27T04:20:00Z–2026-11-03T04:07:00Z) returned **202 events**. Nineteen had independently reconstructed governed synthetic attribution by bounded run windows, route/status and expected counts, and were registered in the canonical exclusion file; **183 non-excluded events** remain with 401=113, 403=14, 429=0, 503=56. The retained population is **not proven organic** and may include unattributed synthetic events. See [A09 capture report](../operations/SECURITY_BASELINE_CLOUDFLARE_20261103.json) and [runbook](../operations/PRODUCTION_SECURITY_ALERTING_RUNBOOK_V1.md).
+- The official monitor JSON now records actual ingestion as VERIFIED for 401/403/429 instead of the stale `PENDING_OPS_API_ROLLOUT`, but intentionally retains `organicBaselineEstablished=false`. No app-owned fixed threshold, provider mutation, artificial anomaly, or invented production traffic was introduced.
+- **Exit:** A06 PASS; A09 provider monitor/configuration and live log ingestion PASS, bounded synthetic-aware evidence PARTIAL, organic attribution/organic alert delivery remains HOLD. Umbrella #1529 remains OPEN; **do not declare ROADMAP_COMPLETE** on current evidence. Do not invent additional engineering work outside these exit conditions.
+
+Watchtower-Track: security
