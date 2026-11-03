@@ -2143,12 +2143,28 @@ select
   it('R32: exhausted DB budget rolls back both the stage marker and governed cost',async()=>{
     if(!pool)throw Error('R32 disposable budget test only');
     const a=await createTurn(761);
+    // This scenario must not reuse the 901/902 originals revoked by the
+    // preceding R32/R35 security test; doing so fails at the original-Grant
+    // gate before the Governor's insufficient-budget branch is exercised.
     const originals=[
-      {recordId:'d5000000-0000-4000-8000-000000000901',
-       grantId:'d6000000-0000-4000-8000-000000000901'},
-      {recordId:'d5000000-0000-4000-8000-000000000902',
-       grantId:'d6000000-0000-4000-8000-000000000902'},
+      {recordId:'d5000000-0000-4000-8000-000000000903',
+       grantId:'d6000000-0000-4000-8000-000000000903'},
+      {recordId:'d5000000-0000-4000-8000-000000000904',
+       grantId:'d6000000-0000-4000-8000-000000000904'},
     ];
+    await tx(async client=>{
+      for(let i=0;i<originals.length;i++){
+        const o=originals[i]!;
+        await client.query(
+          "insert into public.memory_items(id,subject_id,memory_type,schema_version,content_jsonb,source_kind,created_by_character_id,revoked_at,created_at) values($1,$2,'shared_detail','memory-v1',$3::jsonb,'user_approved','seyeon',null,clock_timestamp())",
+          [o.recordId,subject,JSON.stringify({synthetic:true,r32Budget:i})],
+        );
+        await client.query(
+          "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+          [o.grantId,subject,o.recordId],
+        );
+      }
+    });
     const source=await modelSources(originals);
     const pinInput={
       pool:scopedPool,
