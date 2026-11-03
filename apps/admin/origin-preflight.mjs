@@ -29,6 +29,10 @@ function safeOriginFailureCategory(error){
  if(['ETIMEDOUT','ESOCKETTIMEDOUT'].includes(code))return 'timeout';
  if(['ENOTFOUND','EAI_AGAIN','ECONNREFUSED','ECONNRESET'].includes(code))return 'network_unavailable';
  if(code==='42501')return 'permission_denied';
+ if(error?.message==='Origin client TLS peer unverified')return 'tls_peer_unverified';
+ if(error?.message==='Origin role mismatch')return 'role_mismatch';
+ if(error?.message==='Origin restricted role mismatch')return 'role_restrictions_mismatch';
+ if(error?.message==='Origin PostgreSQL backend TLS mismatch')return 'postgres_backend_tls_mismatch';
  return 'unclassified';
 }
 const PRINCIPAL=`SELECT r.rolname AS role, r.rolcanlogin AND NOT r.rolinherit AND NOT r.rolsuper AND NOT r.rolbypassrls AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid) AS restricted, s.ssl AS tls FROM pg_catalog.pg_roles r LEFT JOIN pg_catalog.pg_stat_ssl s ON s.pid=pg_backend_pid() WHERE r.rolname=current_user`;
@@ -89,8 +93,12 @@ async function strictTarget(env,role,key){
  if((!pooler&&url.hostname!=='db.'+project+'.supabase.co')||url.pathname!=='/postgres'||
    decodeURIComponent(url.username)!==(pooler?role+'.'+project:role))throw Error('Dedicated project origin role mismatch');
  const tls=await import('../../dist/apps/api/src/production-postgres-tls-peer-verification.js');
- return tls.buildProductionPostgresStrictTlsTargetV1({databaseUrl:env[key],rootCertificatePem:env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM,
+ const verifiedTarget=tls.buildProductionPostgresStrictTlsTargetV1({databaseUrl:env[key],rootCertificatePem:env.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM,
   authority:{contractVersion:tls.PRODUCTION_POSTGRES_TLS_PEER_VERIFICATION_CONTRACT_VERSION_V1,projectRef:'cnsfpcdiyofqvhpcegfc',requiredTlsMode:tls.PRODUCTION_POSTGRES_TLS_REQUIRED_MODE_V1,rootCertificateFingerprint256:tls.PRODUCTION_POSTGRES_TLS_ROOT_FINGERPRINT256_V1}});
+ // pg_stat_ssl reports the PostgreSQL backend's peer, not the Node.js client's
+ // TLS connection to a Supavisor pooler. Keep strict verified client TLS;
+ // do not mistake the pooler-to-Postgres hop for client peer verification.
+ return Object.freeze({...verifiedTarget,backendTlsRequired:!pooler});
 }
 export {strictTarget as createAdminOriginTargetV1, PRINCIPAL as ADMIN_ORIGIN_PRINCIPAL_SQL_V1};
 export async function inspectAdminOriginRolesV1(env,options={}){
@@ -105,9 +113,23 @@ export async function inspectAdminOriginRolesV1(env,options={}){
    phase='connect';
    pool=(options.poolFactory??(config=>new pg.Pool(config)))({connectionString:target.connectionString,ssl:target.ssl,max:1,connectionTimeoutMillis:3000,statement_timeout:3000});
    connection=await pool.connect();await connection.query('BEGIN READ ONLY');active=true;
+   // Pooler: require actual authenticated Node TLS, with the pinned CA/hostname
+   // checked by node-postgres. No insecure fallback or verify disable allowed.
+   if(target.backendTlsRequired===false){
+    phase='client_tls';
+    const stream=connection.connection?.stream;
+    if(target.ssl?.rejectUnauthorized!==true||
+       typeof target.ssl.ca!=='string'||
+       !target.ssl.ca.includes('-----BEGIN CERTIFICATE-----')||
+       stream?.encrypted!==true||stream?.authorized!==true)
+      throw Error('Origin client TLS peer unverified');
+   }
    phase='identity';
    const principal=await connection.query(PRINCIPAL);const identity=principal.rows[0];
-   if(principal.rows.length!==1||identity?.role!==role||identity.restricted!==true||identity.tls!==true)throw Error('Origin identity unavailable');
+   if(principal.rows.length!==1||identity?.role!==role)throw Error('Origin role mismatch');
+   if(identity.restricted!==true)throw Error('Origin restricted role mismatch');
+   if(typeof identity.tls!=='boolean'||(target.backendTlsRequired!==false&&identity.tls!==true))
+    throw Error('Origin PostgreSQL backend TLS mismatch');
    phase='privileges';
    const privileges=await connection.query(PRIVILEGES[role]);
    if(privileges.rows.length!==1||privileges.rows[0]?.isolated!==true)throw Error('Origin isolation unavailable');
