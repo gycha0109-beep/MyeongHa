@@ -183,7 +183,7 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
       text:async()=>JSON.stringify({
         id:proof.paymentId,transactionId:proof.transactionId,
         status:'CANCELLED',currency:'KRW',amount:{total:8900},
-        cancellations:[{id:cancellation,status:'SUCCEEDED'}],
+        cancellations:[{id:cancellation,status:'SUCCEEDED',totalAmount:8900}],
       }),
     }));
     const result=await executePrivatelyAuthorizedReaderFullRefundV1({
@@ -211,8 +211,8 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
         id:proof.paymentId,transactionId:proof.transactionId,
         status:'CANCELLED',currency:'KRW',amount:{total:8900},
         cancellations:[
-          {id:cancellation,status:'SUCCEEDED'},
-          {id:'other-cancel',status:'SUCCEEDED'},
+          {id:cancellation,status:'SUCCEEDED',totalAmount:3900},
+          {id:'other-cancel',status:'SUCCEEDED',totalAmount:5000},
         ],
       }),
     }));
@@ -224,6 +224,47 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
     expect(f.fetchImpl).toHaveBeenCalledTimes(1);
     expect(f.recordCount).toBe(0);
     expect(f.confirmCount).toBe(0);
+  });
+  it.each([
+    {name:'partial amount reported as full',cancellations:[
+      {id:cancellation,status:'SUCCEEDED',totalAmount:3900},
+    ]},
+    {name:'missing cancellation amount',cancellations:[
+      {id:cancellation,status:'SUCCEEDED'},
+    ]},
+    {name:'one full cancel plus a pending second request',cancellations:[
+      {id:cancellation,status:'SUCCEEDED',totalAmount:8900},
+      {id:'second-pending',status:'REQUESTED',totalAmount:100},
+    ]},
+    {name:'two partial cancellations totaling the purchase',cancellations:[
+      {id:cancellation,status:'SUCCEEDED',totalAmount:3900},
+      {id:'second-partial',status:'SUCCEEDED',totalAmount:5000},
+    ]},
+  ])('does not persist a recovered cancellation ID for $name',async({cancellations})=>{
+    const f=fixture();
+    f.fetchImpl.mockRejectedValue(Error('POST response lost'));
+    expect((await f.run()).kind).toBe('reconciliation_required');
+    const lookupFetchImpl=vi.fn(async()=>({
+      status:200,
+      headers:{get:(key:string)=>key==='content-type'?'application/json':null},
+      text:async()=>JSON.stringify({
+        id:proof.paymentId,transactionId:proof.transactionId,
+        status:'CANCELLED',currency:'KRW',amount:{total:8900},
+        cancellations,
+      }),
+    }));
+    const result=await executePrivatelyAuthorizedReaderFullRefundV1({
+      pool:f.pool,authorizationId:auth,
+      apiSecret:'private-service-api-secret-12345',
+      lookupFetchImpl,fetchImpl:f.fetchImpl,verifier:f.verifier,
+    });
+    expect(result.kind).toBe('reconciliation_required');
+    expect(lookupFetchImpl).toHaveBeenCalledTimes(1);
+    expect(f.fetchImpl).toHaveBeenCalledTimes(1);
+    expect(f.recordCount).toBe(0);
+    expect(f.confirmCount).toBe(0);
+    expect(f.verifier.verifyFullCancellation).not.toHaveBeenCalled();
+    expect(applyVerifiedPortOneV2ReaderFullCancellationV1).not.toHaveBeenCalled();
   });
   it('does not call a revoked grant when provider cancelled before any grant issued',async()=>{
     const f=fixture();
