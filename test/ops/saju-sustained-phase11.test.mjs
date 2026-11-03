@@ -111,7 +111,7 @@ describe('Phase 11 real Saju sustained 5-minute / 15-minute envelope', () => {
     expect(runner).toContain("'--network=container:' + cid");
     expect(runner).toContain("'--cpus=0.50'");
     expect(runner).toContain("'--cpus=1.00'");
-    expect(runner).toContain('sustained ? 1_320_000 : 120000');
+    expect(runner).toContain('sustained ? 1_320_000 : fourClientWaves ? 1_020_000 : 120000');
     expect(runner).toContain('validateSajuSustainedReport');
     expect(driver).toContain('performance.now()');
     expect(driver).toContain('AbortSignal.timeout(2500)');
