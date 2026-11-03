@@ -463,3 +463,11 @@
 - **안전:** 누락된 인증·권한, DB 응답 오류, 가격/상품 이탈 모두 HOLD. 출력은 상태·제한 건수·차단 사유만 포함하고 접속 비밀번호·원본 SQL 예외는 제외. H​​OLD_OBSERVED도 판매 허가가 아니며 LIVE·실제 환불·DB 쓰기 없음.
 - **검증:** 신규 및 기존 P2 감사 테스트 4개 파일 46/46 PASS, Node 구문 검사 PASS. 실제 운영 DB 접속 미실행.
 - **다음:** 최신 main을 기준으로 독립 PR 및 CI 검증. P0-CM-03 판매 승인, Saju Production 공급, S5/S7 고객 전달 및 LIVE는 HOLD.
+
+### 2026-11-03 — 실제 운영 DB P2 상태 및 P3/P4 Reader 배포 준비 증빙
+
+- **실제 DB 읽기 전용 확인:** 명하 Supabase PostgreSQL 17에 고객/결제 개인정보를 조회하지 않는 SELECT 집계·to_regclass 조회만 수행. P2 standard.love_relationship Product 1(비활성 1), Spec 1, Capability 1, Offer 0, 활성 Offer 0, Charge Terms 0, 기존 retired 상품 1로 결정된 HOLD와 일치.
+- **P3/P4 실배포 경계:** official_reader_paid_answer_bodies, official_reader_paid_delivery_attempts_v1, commerce_reader_full_refund_dispatches_v1, digital_reading_withdrawal_claims_private_v1, official_reader_s3_source_authority_receipts_v1 다섯 테이블은 실제 운영 DB에서 모두 미존재. CI에서 Reader SQL이 검증됐다는 사실과 운영 배포 상태를 구분.
+- **구현:** 읽기 전용 내부 스키마 검사 `scripts/operations/commerce-reader-production-schema-hold-preflight-v1.mjs` 추가. P3/P4 필수 테이블 5개 존재 여부를 단일 Read Only 반복 읽기 트랜잭션에서 검사하고, 운영 상태와 구별해 누락/존재(추가 검증 필요) 결과를 반환. 어떠한 결과에서도 LIVE·환불·구매권·Reader 제공 허용하지 않음.
+- **검증:** 해당 검사 11/11 테스트 PASS, Node 구문 및 서버 타입 검사 PASS. 실제 운영 DB 스키마 적용·환불/구매·고객 처리 없음.
+- **미충족 조건:** P0-CM-03 상품 승인, Saju Production 권한, 운영 Reader 사전 승인 SQL, PG/LEGAL/고객 제공 준비 및 P5 LIVE 모두 보류. #2909 최종 CI는 별도 진행하며 동결 HEAD 변경하지 않음.
