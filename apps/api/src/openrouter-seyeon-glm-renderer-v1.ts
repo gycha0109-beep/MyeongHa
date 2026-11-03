@@ -121,7 +121,7 @@ export function createSeyeonGlmRendererV1(
       try {
         const response = await fetchImpl(SEYEON_GLM_RENDERER_ENDPOINT_V1, {
           method: 'POST',
-          redirect: 'error',
+          redirect: 'manual',
           headers: {
             Authorization: 'Bearer ' + key,
             'Content-Type': 'application/json',
