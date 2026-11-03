@@ -5,20 +5,6 @@ body.gm-page[data-page="home"] {
     linear-gradient(180deg, #faf5ef 0%, #f6eee8 48%, #f5eee8 100%);
 }
 body.gm-page[data-page="home"] .gm-home-main { padding: 0 0 42px; }
-body.gm-page[data-page="home"] .product-brand-seal {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 32px;
-  padding: 3px 4px;
-  border: 1px solid #a75c68;
-  border-radius: 4px;
-  color: #94445b;
-  font-family: var(--mh-serif);
-  font-size: 10px;
-  writing-mode: vertical-rl;
-}
-body.gm-page[data-page="home"] .product-profile { display: inline-flex; }
 .mhx-home {
   width: min(1312px, calc(100% - 64px));
   margin: 0 auto;
