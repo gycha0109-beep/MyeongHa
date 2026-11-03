@@ -3,11 +3,18 @@ import {describe,expect,it,vi} from 'vitest';
 import {assertSeyeonZeroSourceHttpReceiptReadyV1,SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from '../apps/api/src/seyeon-zero-source-http-receipt-ready-v1.js';
 import {SEYEON_SECURITY_S0_PRODUCTION_V1} from '../apps/api/src/seyeon-security-s0-production-policy-v1.js';
 
-import {isSeyeonFirstReceiptEligibleReceiveV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
+import {isSeyeonFirstReceiptEligibleReceiveV1,seyeonFirstReplyFailureMetadataV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 
 const read=(name:string)=>readFileSync(new URL('../'+name,import.meta.url),'utf8');
 
 describe('Cloudflare zero-personal-source first reply is server-owned and fail-closed',()=>{
+  it('reports fixed receipt DB categories without raw errors, statements or arbitrary identifiers',()=>{
+    const secret='private-user-text-or-key';
+    expect(seyeonFirstReplyFailureMetadataV1({code:'23514',constraint:'seyeon_unissued_reply_source_denied',
+      message:secret,detail:secret,query:secret})).toEqual({sqlState:'23514',sqlConstraint:'seyeon_unissued_reply_source_denied'});
+    expect(seyeonFirstReplyFailureMetadataV1({code:secret,constraint:secret,message:secret}))
+      .toEqual({sqlState:null,sqlConstraint:null});
+  });
   it('admits only new user turns or failed-retryable same-turn attempts; never committed replay',()=>{
     expect(isSeyeonFirstReceiptEligibleReceiveV1({turnState:'received',replayed:false})).toBe(true);
     expect(isSeyeonFirstReceiptEligibleReceiveV1({turnState:'failed_retryable',replayed:true})).toBe(true);

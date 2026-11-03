@@ -83,6 +83,16 @@ export function holdSeyeonReceiptHttpV1(requestId: string): Response {
   {status:503,headers:{'Cache-Control':'no-store'}});
 }
 
+/** Server-defined categories only; never log SQL, parameters or exception text. */
+export function seyeonFirstReplyFailureMetadataV1(error: unknown) {
+  const value=typeof error==='object'&&error!==null ? error as {code?:unknown;constraint?:unknown}:{};
+  const sqlState=['23514','23505','42501','55P03','40001','40P01','53300','57014','08001','08006']
+    .find(code=>code===value.code)??null;
+  const sqlConstraint=['seyeon_unissued_reply_invalid','seyeon_unissued_reply_not_recoverable',
+    'seyeon_unissued_reply_source_denied'].find(code=>code===value.constraint)??null;
+  return {sqlState,sqlConstraint};
+}
+
 /** No metered runtime is invoked unless all receipt and withdrawal RPCs exist. */
 export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
   request: Request; requestId: string; serverTime: string;
@@ -263,6 +273,9 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     // Security-safe operational diagnosis: never log source text, IDs,
     // provider payload, credentials, raw error messages, or model responses.
     console.error('MYEONGHA_SEYEON_FIRST_REPLY_STAGE_HOLD',stage);
+    console.error('MYEONGHA_SEYEON_FIRST_REPLY_DIAGNOSTIC '+JSON.stringify({
+      stage,...seyeonFirstReplyFailureMetadataV1(error),
+    }));
     return classifySeyeonFirstPositiveMemoryFailureV1(error,input.requestId);
   }
 }
