@@ -29,6 +29,24 @@ describe('read-only dedicated origin preflight',()=>{
   expect(JSON.stringify(report)).not.toContain('secret');expect(seen.filter(sql=>sql==='BEGIN READ ONLY')).toHaveLength(2);
   expect(seen.some(sql=>/^(?:INSERT|DELETE|UPDATE|ALTER|GRANT|CREATE)/u.test(sql))).toBe(false);
  });
+ it('exposes only bounded failure stages and categories, not raw connection errors',async()=>{
+  const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-secret-value']));
+  const privateMessage='password=should-never-appear';
+  const report=await inspectAdminOriginRolesV1(env,{
+   diagnostics:true,
+   targetFactory(_env,role){
+    if(role==='myeongha_admin_reader')throw Object.assign(new Error(privateMessage),{code:'28P01'});
+    throw new Error(privateMessage);
+   },
+  });
+  expect(report.originRolesVerified).toBe(false);
+  expect(report.diagnostics).toEqual([
+   {role:'myeongha_admin_reader',phase:'target',category:'authentication_rejected'},
+   {role:'myeongha_admin_audit_writer',phase:'target',category:'unclassified'},
+  ]);
+  expect(JSON.stringify(report)).not.toContain(privateMessage);
+  expect(JSON.stringify(report)).not.toContain('synthetic-secret-value');
+ });
  it('fails closed if an origin exposes broader privilege or an unencrypted connection',async()=>{
   const env=Object.fromEntries(ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.map(key=>[key,'synthetic-secret-value']));
   const report=await inspectAdminOriginRolesV1(env,{targetFactory(){return{connectionString:'test'};},poolFactory(){return{async connect(){return{async query(sql){return{rows:sql.includes('AS restricted')?[{role:'postgres',restricted:false,tls:false}]:[]};},release(){}};},async end(){}};}});
