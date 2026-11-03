@@ -73,6 +73,16 @@ try {
           method: 'POST', token: identity.token,
           ...(path.endsWith('preview-reading') ? { body: { readingText: '전체 사주' } } : {}),
         })));
+        if (phase === 'quota') {
+          // Keep a privacy-safe status histogram even when a real Worker quota canary fails.
+          // Never downgrade upstream 503s to successful admission or expose response bodies.
+          const statusCounts = {};
+          for (const response of responses) {
+            const status = String(response.status);
+            statusCounts[status] = (statusCounts[status] ?? 0) + 1;
+          }
+          results.push({ route: path, identityKind: identity.kind, attemptCount: responses.length, statusCounts });
+        }
         assert.deepEqual(responses.map(r => r.status).sort(), phase === 'quota' ? [...Array(limit).fill(200), 429] : [200]);
         for (const response of responses) {
           if (response.status === 429) {

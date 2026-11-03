@@ -38,7 +38,7 @@ it('keeps an unknown Member sign-in origin from receiving credentials', async ()
   await expect(acquireProductionMemberSmokeSession({ origin: 'https://attacker.invalid' })).rejects.toThrow('Unapproved');
 });
 
-it('exercises real harness Member/Guest normal and quota paths with redacted synthetic transport', () => {
+it.each([false, true])('exercises redacted Member/Guest quota paths (inject upstream 503 = %s)', injectUpstream503 => {
   const code = `
     const counts = new Map();
     globalThis.fetch = async (url, init = {}) => {
@@ -57,6 +57,7 @@ it('exercises real harness Member/Guest normal and quota paths with redacted syn
       const key = token + path;
       const count = (counts.get(key) ?? 0) + 1;
       counts.set(key,count);
+      if (${injectUpstream503} && token === 'Bearer synthetic-member-bearer' && path.endsWith('calculation') && count === 4) return answer({ok:false},503);
       if (count > (path.endsWith('calculation') ? 60 : 20)) return Response.json({ok:false,error:{code:'RATE_LIMITED'}},{status:429,headers:{...headers,'retry-after':'30'}});
       return answer({ok:true});
     };
@@ -71,14 +72,23 @@ it('exercises real harness Member/Guest normal and quota paths with redacted syn
       MYEONGHA_PRODUCTION_MEMBER_EXPECTED_SUBJECT_ID: 'synthetic-subject-identity',
     },
   });
-  expect(result.status).toBe(0);
+  expect(result.status).toBe(injectUpstream503 ? 1 : 0);
   const evidence = JSON.parse(result.stdout);
-  expect(evidence.status).toBe('PASS');
-  expect(evidence.memberAndGuestNormal).toBe(true);
-  expect(evidence.quotaDenial).toBe(true);
+  expect(evidence.status).toBe(injectUpstream503 ? 'FAIL' : 'PASS');
   expect(evidence.productionActivationAuthorizedByResult).toBe(false);
-  expect(evidence.results.filter(r => r.status === 200)).toHaveLength(160);
-  expect(evidence.results.filter(r => r.status === 429)).toHaveLength(4);
+  if (injectUpstream503) {
+    expect(evidence.stage).toBe('normal-and-quota');
+    expect(evidence.quotaDenial).toBeUndefined();
+    expect(evidence.results).toContainEqual({
+      route: '/api/me/saju/calculation', identityKind: 'member', attemptCount: 61,
+      statusCounts: { '200': 59, '429': 1, '503': 1 },
+    });
+  } else {
+    expect(evidence.memberAndGuestNormal).toBe(true);
+    expect(evidence.quotaDenial).toBe(true);
+    expect(evidence.results.filter(r => r.status === 200)).toHaveLength(160);
+    expect(evidence.results.filter(r => r.status === 429)).toHaveLength(4);
+  }
   for (const privateValue of ['synthetic-password', 'synthetic-subject-identity', 'synthetic-member-bearer', 'synthetic-guest-bearer', '2000-01-01']) {
     expect(result.stdout + result.stderr).not.toContain(privateValue);
   }
