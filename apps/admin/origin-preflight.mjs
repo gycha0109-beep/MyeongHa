@@ -18,6 +18,19 @@ const OPTIONAL=[
  ['myeongha_reading_ai_cost_writer_v1','MYEONGHA_ADMIN_READING_AI_COST_WRITER_DATABASE_URL'],
 ];
 export const ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1=Object.freeze([...CONFIG.map(([,key])=>key),'MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM']);
+// Diagnostics intentionally expose only fixed categories, never PostgreSQL error
+// messages, connection URLs, credential values, certificate bytes, or query text.
+function safeOriginFailureCategory(error){
+ const code=typeof error?.code==='string'?error.code:'';
+ if(error?.message==='Dedicated project origin role mismatch')return 'target_mismatch';
+ if(error?.name==='ProductionPostgresTlsPeerVerificationErrorV1')return 'tls_configuration';
+ if(code==='28P01'||code==='28000')return 'authentication_rejected';
+ if(['ERR_TLS_CERT_ALTNAME_INVALID','UNABLE_TO_VERIFY_LEAF_SIGNATURE','SELF_SIGNED_CERT_IN_CHAIN','CERT_HAS_EXPIRED'].includes(code))return 'tls_peer_rejected';
+ if(['ETIMEDOUT','ESOCKETTIMEDOUT'].includes(code))return 'timeout';
+ if(['ENOTFOUND','EAI_AGAIN','ECONNREFUSED','ECONNRESET'].includes(code))return 'network_unavailable';
+ if(code==='42501')return 'permission_denied';
+ return 'unclassified';
+}
 const PRINCIPAL=`SELECT r.rolname AS role, r.rolcanlogin AND NOT r.rolinherit AND NOT r.rolsuper AND NOT r.rolbypassrls AND NOT r.rolcreaterole AND NOT r.rolcreatedb AND NOT r.rolreplication AND NOT EXISTS(SELECT 1 FROM pg_catalog.pg_auth_members m WHERE m.member=r.oid) AS restricted, s.ssl AS tls FROM pg_catalog.pg_roles r LEFT JOIN pg_catalog.pg_stat_ssl s ON s.pid=pg_backend_pid() WHERE r.rolname=current_user`;
 // Confirm forbidden metadata cannot become readable through a broad table
 // GRANT, a column GRANT, or a schema default-privilege change.
@@ -83,28 +96,36 @@ export {strictTarget as createAdminOriginTargetV1, PRINCIPAL as ADMIN_ORIGIN_PRI
 export async function inspectAdminOriginRolesV1(env,options={}){
  const missing=ADMIN_ORIGIN_PREFLIGHT_REQUIRED_V1.filter(key=>typeof env[key]!=='string'||!env[key].trim());
  if(missing.length)return {originRolesVerified:false,activationEnabled:false,missing,roles:[]};
- const results=[];
+ const results=[],diagnostics=[];
  const roles=[...CONFIG,...OPTIONAL.filter(([,key])=>typeof env[key]==='string'&&env[key].trim())];
  for(const[role,key]of roles){
-  let pool,connection,active=false,discard;
+  let pool,connection,active=false,discard,phase='target';
   try{
    const target=await (options.targetFactory??strictTarget)(env,role,key);
+   phase='connect';
    pool=(options.poolFactory??(config=>new pg.Pool(config)))({connectionString:target.connectionString,ssl:target.ssl,max:1,connectionTimeoutMillis:3000,statement_timeout:3000});
    connection=await pool.connect();await connection.query('BEGIN READ ONLY');active=true;
+   phase='identity';
    const principal=await connection.query(PRINCIPAL);const identity=principal.rows[0];
    if(principal.rows.length!==1||identity?.role!==role||identity.restricted!==true||identity.tls!==true)throw Error('Origin identity unavailable');
+   phase='privileges';
    const privileges=await connection.query(PRIVILEGES[role]);
    if(privileges.rows.length!==1||privileges.rows[0]?.isolated!==true)throw Error('Origin isolation unavailable');
    await connection.query('COMMIT');active=false;results.push({role,verified:true});
-  }catch{results.push({role,verified:false});}
+  }catch(error){
+   results.push({role,verified:false});
+   if(options.diagnostics===true)diagnostics.push({role,phase,category:safeOriginFailureCategory(error)});
+  }
   finally{
    if(active)try{await connection.query('ROLLBACK');}catch(error){discard=error;}
    try{connection?.release(discard);await pool?.end();}catch{results[results.length-1].verified=false;}
   }
  }
- return {originRolesVerified:results.every(result=>result.verified),activationEnabled:false,missing,roles:results};
+ return {originRolesVerified:results.every(result=>result.verified),activationEnabled:false,missing,roles:results,
+  ...(options.diagnostics===true?{diagnostics}:{}),
+ };
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
- const result=await inspectAdminOriginRolesV1(process.env);console.log(JSON.stringify(result,null,2));
+ const result=await inspectAdminOriginRolesV1(process.env,{diagnostics:true});console.log(JSON.stringify(result,null,2));
  if(!result.originRolesVerified&&!process.argv.includes('--allow-blocked'))process.exitCode=2;
 }
