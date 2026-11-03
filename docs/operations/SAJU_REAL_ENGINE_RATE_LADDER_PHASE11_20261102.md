@@ -2,6 +2,22 @@
 
 **Status: ACTUAL LINUX OBSERVATION COMPLETE (2026-11-03); PRODUCTION ACCEPTANCE REMAINS BLOCKED.** This is an additional bounded non-production workload in the existing Phase 11 saturation-characterization roadmap. It is not a scaling approval or a replacement for Phase 12 production-like evidence.
 
+## Phase 11 — real Saju sustained 5-minute / 15-minute split-cgroup envelope (implementation)
+
+**Status: IMPLEMENTED, ACTUAL SUSTAINED LINUX EXECUTION NOT YET VERIFIED.** The existing approved operations architecture (§29) defines an initial **5-minute single-user** and **15-minute normal-concurrency** measurement. The existing `scripts/measure-sustained-loopback-capacity.mjs` probes synthetic public API diagnostics; it does **not** run the real Saju calculation host. This Phase 11 extension exercises the real pinned public Saju engine, without replacing the API baseline or claiming Production capacity.
+
+The **existing** main-only, manually dispatched `saju-isolated-rate-ladder-phase11.yml` now accepts a third fixed `experiment=sustained` choice. `shared` and `split` remain supported and unchanged by default. After merger, select `sustained` once; the workflow builds the exact Saju SHA `9807ce89c08afc61b587560d515a475efd819032` and runs a separate 0.5-CPU/256MiB service container and 1-CPU/256MiB synthetic driver container sharing **only** the offline loopback network namespace. Both have swap zero, read-only root and code mounts, no host ports, non-root users, no extra capabilities or Production secrets. No user data, DB or real provider calls are involved.
+
+| Bounded sustained profile | Exact duration | Target maximum request arrival rate | Maximum in-flight calculations | Scheduled slots |
+| --- | ---: | ---: | ---: | ---: |
+| Single user | 300 seconds (5 minutes) | 1 request/s | 1 | 300 |
+| Synthetic normal concurrency | 900 seconds (15 minutes) | 4 requests/s | 4 | 3,600 |
+| **Total** | **1,200 seconds** | — | — | **3,900** |
+
+The workload has a fixed synthetic Saju input, no rate catch-up bursts, 2.5-second request deadline, 300-ms inter-profile gap, and real calculation preflight/recovery. It counts every scheduled slot as actually attempted, missed due to scheduler lag, or skipped due to in-flight cap; successful, HTTP non-200, malformed and transport failures are recorded separately. Successful p50/p95/p99, actual successful throughput, elapsed stage windows and independent *service/driver* kernel CPU usage, throttling, peak memory and OOM measurements are retained in an identifier-free JSON artifact. Exact source/main SHA and Node image digest are reported. Failures retain `BLOCKED_INCOMPLETE` rather than produce fabricated evidence. Successful execution uses `OBSERVED_SUSTAINED_REAL_SAJU` (measurement success, **not** Production acceptance). Artifact retention is 14 days; independently check and preserve actual results after completion.
+
+**Non-claims:** These two scenarios use *fixed synthetic diagnostic rates*, not observed normal Production traffic. A sustained pass or error profile alone does not prove actual Production workload, DB/Auth/Saju end-to-end latency, service saturation ceiling, autoscaling threshold, SLO or full disaster recovery. Hosted migration/DR #1887 remains unresolved; `saturationKneeApproved=false`, `sajuSaturationCeilingProven=false`, `productionSajuCpuMemoryCeilingProven=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false` and `serviceResumptionAllowed=false` remain mandatory.
+
 ## Separate resource-cgroup follow-up — implementation (Phase 11)
 
 The first actual Linux observation showed 316 scheduler-lag slots when **the synthetic driver and Saju shared one CPU cgroup**. This leaves the engine-only saturation question open. The existing manually dispatched workflow now supports two explicit `experiment` choices: `shared` (historical original, unchanged by default) and `split` (separate source-constrained service and load-generator cgroups). No new per-phase workflow is created.
