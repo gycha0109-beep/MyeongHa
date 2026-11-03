@@ -48,7 +48,7 @@ describe('shared refined header', () => {
       expect((html.match(/data-ui-locale-picker/g) ?? []).length).toBe(1);
       expect((html.match(/class="ui-locale-select"/g) ?? []).length).toBe(1);
       expect(html.indexOf('class="product-theme-toggle"')).toBeLessThan(html.indexOf('class="product-profile"'));
-      expect(html.indexOf('class="ui-locale-picker"')).toBeLessThan(html.indexOf('class="product-icon-button"') < 0 ? html.indexOf('class="product-profile"') : html.indexOf('class="product-profile"'));
+      expect(html.indexOf('class="ui-locale-picker"')).toBeLessThan(html.indexOf('class="product-profile"'));
       expect(html.indexOf('class="product-report-link"')).toBeGreaterThan(html.indexOf('class="product-profile"'));
       expect(html).toContain('ui-i18n.css');
       expect(html).toContain('shared-product-header.css');
