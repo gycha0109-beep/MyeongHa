@@ -398,3 +398,64 @@ body.product-page .product-header .ui-locale-select:focus-visible {
     font-size: 10px;
   }
 }
+
+/* First-paint geometry: static controls and fixed menu cells cannot shift while
+   theme, locale, fonts, or Member session initialization complete. */
+html { scrollbar-gutter: stable; }
+body.product-page .product-header .product-header-inner {
+  grid-template-columns: 205px minmax(335px, 1fr) 334px !important;
+}
+body.product-page .product-header .product-nav {
+  width: min(100%, 390px);
+  justify-content: space-between;
+  gap: 0 !important;
+}
+body.product-page .product-header .product-nav-link {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+body.product-page .product-header .product-profile {
+  flex: 0 0 112px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
+}
+body.product-page .product-header .ui-locale-picker {
+  flex: 0 0 103px;
+  width: 103px;
+  margin-right: 0;
+}
+@media (min-width: 768px) and (max-width: 1099px) {
+  body.product-page .product-header .product-header-inner {
+    grid-template-columns: 150px minmax(220px, 1fr) 282px !important;
+  }
+  body.product-page .product-header .product-nav {
+    width: min(100%, 280px);
+  }
+  body.product-page .product-header .product-profile {
+    flex-basis: 94px;
+    width: 94px;
+    min-width: 94px;
+    max-width: 94px;
+  }
+  body.product-page .product-header .ui-locale-picker {
+    flex-basis: 90px;
+    width: 90px;
+  }
+}
+@media (max-width: 767px) {
+  body.product-page .product-header .product-header-inner {
+    grid-template-columns: minmax(0, 1fr) max-content !important;
+  }
+  body.product-page .product-header .ui-locale-picker {
+    flex-basis: 90px;
+    width: 90px;
+  }
+}
+@media (max-width: 420px) {
+  body.product-page .product-header .ui-locale-picker {
+    flex-basis: 82px;
+    width: 82px;
+  }
+}

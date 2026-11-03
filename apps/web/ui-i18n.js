@@ -239,16 +239,27 @@ function createLanguagePicker(locale, onChange) {
   return { wrap, select };
 }
 function mountStaticUiLocale() {
-  if (document.querySelector('[data-ui-locale-picker]')) return;
+  // Hydrate the HTML-rendered picker without inserting a new header control.
+  const existing = document.querySelector('[data-ui-locale-picker]');
+  if (existing?.dataset.uiLocaleMounted === 'true') return;
   let locale = storedLocale();
   const host = document.querySelector('.product-utilities')
     ?? document.querySelector('.landing-nav')
     ?? document.querySelector('.product-header-inner')
     ?? document.querySelector('header')
     ?? document.body;
-  const { wrap, select } = createLanguagePicker(locale, setLocale);
-  if (host === document.body) wrap.classList.add('ui-locale-picker--floating');
-  host.appendChild(wrap);
+  const created = !existing;
+  const { wrap, select } = existing
+    ? { wrap: existing, select: existing.querySelector('.ui-locale-select') }
+    : createLanguagePicker(locale, setLocale);
+  if (!select) throw new Error('Language selector markup is missing');
+  if (created) {
+    if (host === document.body) wrap.classList.add('ui-locale-picker--floating');
+    host.appendChild(wrap);
+  } else {
+    select.addEventListener('change', () => setLocale(select.value));
+  }
+  wrap.dataset.uiLocaleMounted = 'true';
   function setLocale(value) {
     locale = normalizeUiLocale(value);
     select.value = locale;

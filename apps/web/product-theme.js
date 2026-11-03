@@ -72,20 +72,27 @@
 
   const installToggle = () => {
     const utilities = document.querySelector('.product-utilities');
-    if (!utilities || utilities.querySelector('.product-theme-toggle')) return;
+    if (!utilities) return;
 
-    const button = document.createElement('button');
-    button.className = 'product-theme-toggle';
-    button.type = 'button';
-    button.innerHTML = '<span class="product-theme-toggle-mark" aria-hidden="true"></span>';
-    button.addEventListener('click', () => {
-      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      saveTheme(next);
-      applyTheme(next);
-    });
-
-    const profile = utilities.querySelector('.product-profile');
-    utilities.insertBefore(button, profile ?? utilities.firstChild);
+    // Product pages render the button in HTML, before any async script loads.
+    // Retain a creation fallback for older/non-product shells.
+    let button = utilities.querySelector('.product-theme-toggle');
+    if (!button) {
+      button = document.createElement('button');
+      button.className = 'product-theme-toggle';
+      button.type = 'button';
+      button.innerHTML = '<span class="product-theme-toggle-mark" aria-hidden="true"></span>';
+      const profile = utilities.querySelector('.product-profile');
+      utilities.insertBefore(button, profile ?? utilities.firstChild);
+    }
+    if (button.dataset.themeBound !== 'true') {
+      button.dataset.themeBound = 'true';
+      button.addEventListener('click', () => {
+        const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+        saveTheme(next);
+        applyTheme(next);
+      });
+    }
     syncToggle();
   };
 

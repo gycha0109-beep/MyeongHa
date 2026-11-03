@@ -12,6 +12,10 @@ describe('shared refined header', () => {
     expect(css).toContain('--mh-header-height-desktop: 92px;');
     expect(css).toContain('--mh-header-height-mobile: 86px;');
     expect(css).toContain('height: 100%;');
+    expect(css).toContain('scrollbar-gutter: stable;');
+    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 334px !important;');
+    expect(css).toContain('grid-template-columns: 150px minmax(220px, 1fr) 282px !important;');
+    expect(css).toContain('flex: 0 0 112px;');
     for (const key of ['--mh-header-bell', '--mh-header-moon', '--mh-header-sun', '--mh-header-user']) {
       expect(css).toContain(key);
     }
@@ -38,6 +42,11 @@ describe('shared refined header', () => {
       expect(html).not.toContain('<span aria-hidden="true">⌄</span>');
       expect(html).toContain('class="product-profile"');
       expect(html).toContain('class="product-nav"');
+      expect((html.match(/class="product-theme-toggle"/g) ?? []).length).toBe(1);
+      expect((html.match(/data-ui-locale-picker/g) ?? []).length).toBe(1);
+      expect((html.match(/class="ui-locale-select"/g) ?? []).length).toBe(1);
+      expect(html.indexOf('class="product-theme-toggle"')).toBeLessThan(html.indexOf('class="product-profile"'));
+      expect(html.indexOf('class="ui-locale-picker"')).toBeGreaterThan(html.indexOf('class="product-profile"'));
       expect(html).toContain('ui-i18n.css');
       expect(html).toContain('shared-product-header.css');
       expect(html.indexOf('shared-product-header.css')).toBeGreaterThan(html.indexOf('ui-i18n.css'));
