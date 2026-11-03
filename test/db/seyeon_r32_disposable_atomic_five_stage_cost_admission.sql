@@ -195,8 +195,8 @@ begin
         or v_memory->>'claimKind' is distinct from 'fact'
         or v_memory->>'summary' is distinct from
           'synthetic model projection '||v_ordinal::text
-        or v_memory->>'relevance' is distinct from
-          case v_ordinal when 0 then '0.9' else '0.8' end
+        or (v_ordinal=0 and v_memory->>'relevance' is distinct from '0.9')
+        or (v_ordinal=1 and v_memory->>'relevance' is distinct from '0.8')
         or v_memory->>'salience' is distinct from '0.8'
       then
         raise exception using errcode='23514',

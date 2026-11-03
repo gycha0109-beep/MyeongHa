@@ -30,12 +30,12 @@ describe('G0 source completeness before any historical text release', () => {
     expect(original).toContain("constraint='seyeon_g0_assistant_original_user_missing'");
     expect(original).toContain("constraint='seyeon_g0_assistant_original_user_changed'");
     expect(original).toContain('v_user_count<>1');
-    expect(original).toContain('for share of um;');
+    expect(original).toContain('perform seyeon_private.lock_memory_source_message_v1(');
     expect(original).toContain("sha256:wire-utf8:v1:");
     const g2 = sql('02-atomic-commit.sql');
     expect(g2).toContain("v_positive ->> 'currentUserMessageId'");
     expect(g2).toContain("v_positive ->> 'currentUserTextDigest'");
-    expect(g2).toContain('for share of msg;');
+    expect(g2).toContain('perform seyeon_private.lock_memory_source_message_v1(');
     const replay = sql('19-first-original-assistant-replay.sql');
     expect(replay).toContain(
       'perform seyeon_private.assert_current_original_assistant_lineage_v1(',

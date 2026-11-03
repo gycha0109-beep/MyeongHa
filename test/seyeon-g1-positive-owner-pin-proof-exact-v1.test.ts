@@ -171,7 +171,7 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
     expect(sql).toContain("constraint='seyeon_positive_g1_user_message_count_invalid'");
     expect(sql).toContain("constraint='seyeon_positive_g1_user_original_invalid'");
     expect(sql).toContain('msg.sender_type=\'user\'');
-    expect(sql).toContain('for share of msg;');
+    expect(sql).toContain('perform seyeon_private.lock_memory_source_message_v1(');
     expect(sql).toContain("'currentUserMessageId',v_user_message.id::text");
     expect(sql).toContain("'currentUserTextDigest',v_user_text_digest");
     expect(sql).toContain("constraint='seyeon_positive_g1_historical_source_unpinned'");
