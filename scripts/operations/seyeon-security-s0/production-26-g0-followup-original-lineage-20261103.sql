@@ -93,6 +93,7 @@ GRANT EXECUTE ON FUNCTION seyeon_private.lock_g0_original_message_v1(uuid,uuid,u
 -- Temporarily enable the established no-login function owner only for
 -- replacement of its private routines. Preserve Supabase-managed membership.
 GRANT CREATE ON SCHEMA seyeon_private TO myeongha_seyeon_chat_runtime_owner;
+GRANT CREATE ON SCHEMA public TO myeongha_seyeon_chat_runtime_owner;
 DO $member$
 BEGIN
   IF NOT (SELECT rolsuper FROM pg_roles WHERE rolname=current_user) THEN
@@ -217,6 +218,31 @@ BEGIN
 
   -- The DB committed Attempt, not a message-provided sourceRef$branch$);
   EXECUTE g;
+
+  -- The context window must not read an explicitly abandoned User Turn.
+  -- Exclude only preserved, uncommitted abandoned records; every other
+  -- historical source is still independently proven or fails closed.
+  SELECT pg_get_functiondef(to_regprocedure(
+    'public.qry_seyeon_g0_current_source_recent_messages_v1(uuid,uuid,uuid,integer)'))
+    INTO g;
+  IF g IS NULL OR position('and src.redacted_at is null and src.body_text is not null' IN g)=0
+     OR position('order by src.sequence_no desc limit p_limit' IN g)=0
+     OR position('seyeon_g0_historical_source_unverifiable' IN g)=0
+     OR position('and not exists (select 1 from public.chat_turns ignored' IN g)>0
+  THEN RAISE EXCEPTION 'G0 recent history source definition drifted'; END IF;
+  g:=replace(g,
+    'and src.redacted_at is null and src.body_text is not null',
+    $excluded$and src.redacted_at is null and src.body_text is not null
+        and not exists (
+          select 1 from public.chat_turns ignored
+          where ignored.id=src.turn_id and ignored.subject_id=src.subject_id
+            and ignored.thread_id=src.thread_id
+            and ignored.state='abandoned'
+            and ignored.committed_attempt_id is null
+            and ignored.committed_at is null
+            and src.sender_type='user'
+        )$excluded$);
+  EXECUTE g;
 END $patch$;
 RESET ROLE;
 
@@ -226,6 +252,7 @@ BEGIN
     EXECUTE 'REVOKE myeongha_seyeon_chat_runtime_owner FROM postgres GRANTED BY postgres';
   END IF;
 END $cleanup$;
+REVOKE CREATE ON SCHEMA public FROM myeongha_seyeon_chat_runtime_owner;
 REVOKE CREATE ON SCHEMA seyeon_private FROM myeongha_seyeon_chat_runtime_owner;
 
 DO $post$
@@ -250,6 +277,8 @@ BEGIN
                            'public.conversation_messages','UPDATE')
     OR has_schema_privilege('myeongha_seyeon_chat_runtime_owner',
                            'seyeon_private','CREATE')
+    OR has_schema_privilege('myeongha_seyeon_chat_runtime_owner',
+                           'public','CREATE')
   THEN RAISE EXCEPTION 'G0 continuation source authority postcondition failed'; END IF;
 END $post$;
 COMMIT;
