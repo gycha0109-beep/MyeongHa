@@ -12,6 +12,7 @@ import {
   type PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 import { createSeyeonPositiveS0OwnerDbPortsV1 } from '../apps/api/src/postgres-seyeon-positive-memory-source-runtime-v1.js';
+import { createSeyeonG1HistoricalCandidateOwnerPortV1 } from '../apps/api/src/postgres-seyeon-g1-historical-candidate-port-v1.js';
 import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
@@ -171,6 +172,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const selectionDigest = hash([source]), contextDigest = hash(modelContext ?? { synthetic: turn });
     await run(({ client }) => createSeyeonPositiveS0OwnerDbPortsV1(client).pinBeforeModel({
       subjectId: subject, threadId: thread, turnId: turn, attemptId: attempt,
+      currentUserMessageId:user,
+      currentUserTextDigest:'sha256:wire-utf8:v1:'+
+        createHash('sha256').update(userText,'utf8').digest('hex'),
       originalMemoryId: memory, originalGrantId: grant, recordType: source.recordType,
       schemaVersion: source.schemaVersion, projectorVersion: source.projectorVersion,
       selectedSources: [source], selectedSourcesDigest: selectionDigest,
@@ -1310,6 +1314,85 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       (select count(*)::int from public.record_access_grants
        where subject_id=$2) as grants`,[f.turn,f.subject]);
     expect(count).toEqual({proposals:0,grants:1});
+  });
+
+  it('W48 keeps a DB-original historical candidate durable without model/Commit/Reveal rights', async () => {
+    const f = await prepare(218, { summary: 'synthetic approved recall' });
+    await f.commit();
+    await f.locked()({ signal: new AbortController().signal, deliver: async value => {
+      expect(value).toBe(f.assistantText);
+    } });
+    const currentTurn=uuid(16,1218), currentAttempt=uuid(17,1218);
+    const currentUser=uuid(18,1218), currentText='Second original message for historical W48';
+    const receive=await pool.connect();
+    try {
+      await receive.query('BEGIN');
+      await receive.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receive.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1218),hash({second:'W48'}),
+        'chat-request-v1',JSON.stringify({text:currentText}),
+        uuid(13,218),uuid(12,218),currentTurn,currentUser,
+        currentText,null,hash({message:currentText}),
+      ]);
+      await receive.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,currentTurn,currentAttempt,'seyeon-production-chat-planner-v1']
+      );
+      await receive.query('COMMIT');
+    } catch(error) {
+      await receive.query('ROLLBACK'); throw error;
+    } finally { receive.release(); }
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(text:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(text,'utf8').digest('hex');
+    const history=[
+      {messageId:f.user,role:'user' as const,textDigest:wire(f.userText)},
+      {messageId:f.assistant,role:'assistant' as const,textDigest:wire(f.assistantText)},
+    ];
+    const client=await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const proof=await createSeyeonG1HistoricalCandidateOwnerPortV1(client)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:currentTurn,attemptId:currentAttempt,
+          currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'W48'}),
+          historicalSources:history,
+        });
+      expect(proof.historicalSourceCount).toBe(2);
+      expect(proof.authorizesModel).toBe(false);
+      expect(proof.permitsAtomicCommit).toBe(false);
+      expect(proof.permitsHttpReveal).toBe(false);
+      await client.query('COMMIT');
+    } catch(error) {
+      await client.query('ROLLBACK'); throw error;
+    } finally { client.release(); }
+    const {rows:[saved]}=await pool.query(`select
+      state,seyeon_personal_source_pin_jsonb as proof
+      from public.chat_turn_attempts where id=$1`,[currentAttempt]);
+    expect(saved.state).toBe('running');
+    expect(saved.proof.historicalCandidateProof.historicalSourceCount).toBe(2);
+    expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
+    const {rows:[acl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',
+      'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb)',
+      'EXECUTE') as denied`);
+    expect(acl.denied).toBe(true);
   });
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {

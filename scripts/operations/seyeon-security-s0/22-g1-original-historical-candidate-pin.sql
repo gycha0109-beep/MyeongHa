@@ -17,6 +17,7 @@ as $history_pin$
 declare
   v_user record;
   v_original record;
+  v_source_turn_id uuid;
   v_row record;
   v_n integer:=0;
   v_current_count integer;
@@ -85,6 +86,9 @@ begin
     raise exception using errcode='23514',
       constraint='seyeon_history_candidate_current_count';
   end if;
+  perform seyeon_private.lock_memory_source_message_v1(
+    p_subject_id,p_turn_id,p_current_user_id
+  );
   select m.id,m.body_text into v_user
   from public.conversation_messages m
   where m.id=p_current_user_id and m.subject_id=p_subject_id
@@ -92,8 +96,7 @@ begin
     and m.sender_type='user' and m.thread_character_id is null
     and m.character_content_bundle_id is null and m.redacted_at is null
     and m.body_text is not null and length(btrim(m.body_text))>0
-    and nullif(btrim(m.content_hash),'') is not null
-  for share of m;
+    and nullif(btrim(m.content_hash),'') is not null;
   if not found or p_current_user_digest is distinct from
       'sha256:wire-utf8:v1:'||
       encode(sha256(convert_to(v_user.body_text,'UTF8')),'hex') then
@@ -109,10 +112,21 @@ begin
     ) order by sequence_no
   loop
     v_n:=v_n+1;
+    select m.turn_id into v_source_turn_id
+    from public.conversation_messages m
+    where m.id=v_row.message_id and m.subject_id=p_subject_id
+      and m.thread_id=p_thread_id;
+    if not found then
+      raise exception using errcode='23514',
+        constraint='seyeon_history_candidate_source_missing';
+    end if;
+    perform seyeon_private.lock_memory_source_message_v1(
+      p_subject_id,v_source_turn_id,v_row.message_id
+    );
     perform 1 from public.conversation_messages m
       where m.id=v_row.message_id and m.subject_id=p_subject_id
-        and m.thread_id=p_thread_id and m.redacted_at is null
-        and m.body_text=v_row.body_text for share of m;
+        and m.thread_id=p_thread_id and m.turn_id=v_source_turn_id
+        and m.redacted_at is null and m.body_text=v_row.body_text;
     if not found then
       raise exception using errcode='23514',
         constraint='seyeon_history_candidate_source_changed';
@@ -157,10 +171,11 @@ begin
   where g.id=p_original_grant_id and g.subject_id=p_subject_id
     and g.memory_item_id=p_original_memory_id and g.life_fact_id is null
     and g.grantee_character_id='seyeon' and g.grant_reason='user_choice'
-    and g.revoked_at is null and g.seyeon_revoke_requested_at is null
+    -- The private lock above already verifies pending withdrawal under SHARE;
+    -- this SELECT-only owner cannot read the internal withdrawal timestamp.
+    and g.revoked_at is null
     and m.revoked_at is null and m.source_kind='user_approved'
-    and m.memory_type=p_record_type and m.schema_version=p_schema_version
-  for share of g,m;
+    and m.memory_type=p_record_type and m.schema_version=p_schema_version;
   if not found or p_original_pg_digest is distinct from
     'sha256:pg-jsonb:v1:'||
       encode(sha256(convert_to(v_original.content_jsonb::text,'UTF8')),'hex') then

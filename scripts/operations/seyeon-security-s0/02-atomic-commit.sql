@@ -191,6 +191,10 @@ begin
   -- This owner intentionally has SELECT but no UPDATE privilege on
   -- conversation_messages; do not expand ACL just to read the original ID.
   -- Existing DB receiver/Commit functions own that Message's lifecycle.
+  -- Use the privileged exact-row lock without granting message UPDATE.
+  perform seyeon_private.lock_memory_source_message_v1(
+    p_subject_id,p_turn_id,p_user_message_id
+  );
   select msg.id::text,msg.body_text
     into v_original_user_message_id,v_original_user_body_text
   from public.conversation_messages msg
@@ -199,8 +203,7 @@ begin
     and msg.thread_character_id is null
     and msg.character_content_bundle_id is null
     and msg.redacted_at is null and msg.body_text is not null
-    and length(btrim(msg.body_text))>0
-  for share of msg;
+    and length(btrim(msg.body_text))>0;
   if not found then
     raise exception using errcode='23514',
       constraint='seyeon_positive_g2_original_user_message_mismatch',

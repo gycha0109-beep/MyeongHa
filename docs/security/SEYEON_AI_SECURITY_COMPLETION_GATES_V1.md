@@ -624,3 +624,12 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 - 새 보안 권한·SQL·Source Registry·운영 Role·공개 Route·외부 Provider 호출을 추가하지 않았다. W48 후보는 세 권한 플래그가 모두 false이며, 성공 경로는 Interpreter 호출 전에 계속 HOLD한다. 다른 이력 출처는 자동 승인하지 않는다.
 - W48 및 과거 모델 입력 Census의 표적 Vitest 32개 통과. 전체 TypeScript 검사는 별도 기존 모바일 API-client 타입 중복 및 테스트 계약 오류로 실패; 해당 오류를 이번 수정의 PASS로 대체하지 않는다. 로컬 PostgreSQL 17 실행 서버가 응답하지 않아 격리 DB 설치, 실제 커밋 이후 후보 재조회, Owner 함수 권한 및 두 세션 경합은 미검증이다.
 - 다음 작업: 폐기형 PostgreSQL 17에서 W48 원본 후보 저장→실제 커밋→예외 후 재조회와 실패/철회 0건을 검증하고, 저장 증거가 확인되면 기존 G0/G1 양수 History 정식 출처 계약을 진행한다. 운영 상태는 `HOLD_FORWARD_STOPPED`이며 Draft PR의 운영 병합·배포는 금지한다.
+
+
+### 2026-11-03 · W48 Docker PostgreSQL 17.11 검증 완료 — 격리 범위 PASS / 운영 HOLD
+
+- GitHub PR #2761의 W48 후속을 **독립 로컬 Docker `postgres:17.11`**, 이름이 고정된 폐기형 `myeongha_seyeon_security_s0_test`에서 확인했다. Supabase Auth CI stub, 기존 DB migration 207개, 격리 S0 SQL 24개 설치 후 `test/seyeon-security-s0-postgres.e2e.test.ts` **23/23 통과**. 실제 유료 AI Provider·Production DB·개인정보·공개 Route 전송은 없었다.
+- 원본 Member User 메시지와 History를 검증할 때 일반 API/제한 Owner에 UPDATE 권한을 추가하지 않고 **기존 DB 전용 원본 행 잠금**을 사용하도록 G1/G0/G2 SQL을 정리했다. 이 변경으로 기존 Memory/Grant 정합성, Reader/파생 History 거부, 원본 내용 철회 경합을 포함하는 S0 테스트가 실제 PostgreSQL에서 동작한다.
+- W48 통합 사례는 과거 원본 User+Assistant, 현재 원본 User, 정확한 원래 Memory/Grant를 함께 검증한 뒤 `historicalCandidateProof`를 커밋·재조회한다. 저장된 Attempt는 `running`이며 `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`를 유지하고 일반 API에게 후보 발급 RPC 실행 권한이 없다. 이 기록은 G1 모델 입력 Positive authority가 아니다.
+- 기존 첫 답변 재열람 테스트에서 **원본 동의 철회가 SQL 권한 거부를 발생시켜 HTTP 연결을 끊던 문제**를 수정했다. 철회·원본 출처 부재의 지정된 `insufficient_privilege` 경계는 결과 0행으로 처리하여 기존 Node의 **고정 503 비개인정보 응답**을 허용한다. 실제 승인된 원본을 읽어 공개하는 결정을 새로 만들지 않는다. 다른 DB 오류·운영 권한 부족·단절은 자동 승격하지 않는다.
+- 검증 판정은 **W48 후보 보존 및 S0 Docker 통합 경로 완료**에 한정한다. G0 파생 출처 최종 승인, 실 Provider 인증·요금 영수증, 운영 G2/G3 양수 공개, DR/G6, Prod Migration/Role/Main 병합은 계속 `HOLD_FORWARD_STOPPED`. 별도 CI/전체 TypeScript는 현재 정확한 커밋 결과를 확인할 때까지 성공으로 단정하지 않는다.

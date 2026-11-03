@@ -117,9 +117,16 @@ begin
   -- sources still agree with the immutable G1 record: exact Grant/Record
   -- and the DB-original Member User message + unchanged body. Reuse the
   -- existing G0 verifier instead of accepting a historical SHA as authority.
-  perform seyeon_private.assert_current_original_assistant_lineage_v1(
-    p_subject_id,p_thread_id,p_assistant_message_id
-  );
+  begin
+    perform seyeon_private.assert_current_original_assistant_lineage_v1(
+      p_subject_id,p_thread_id,p_assistant_message_id
+    );
+  exception when insufficient_privilege then
+    -- A revoked original Grant is a normal current-rights denial.
+    -- Return zero rows, not a socket-destroying transport exception.
+    -- The Node layer emits only its fixed, non-personal 503 body.
+    return;
+  end;
 
   if not seyeon_private.lock_positive_source_registry_v1(
     v_pin->>'recordType',v_pin->>'recordSchemaVersion',

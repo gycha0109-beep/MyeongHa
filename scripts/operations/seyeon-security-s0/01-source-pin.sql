@@ -64,6 +64,7 @@ as $g1$
 declare
   v_memory record;
   v_user_message record;
+  v_locked_user_id uuid;
   v_turn_message_count integer;
   v_thread_message_count integer;
   v_user_text_digest text;
@@ -149,6 +150,19 @@ begin
       message='Positive G1 cannot pin an unverified past message source';
   end if;
 
+  -- The DB discovers the original id; no caller-controlled message id is trusted.
+  -- The private owner locks that row before the final content/digest read.
+  select msg.id into v_locked_user_id from public.conversation_messages msg
+  where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
+    and msg.turn_id=p_turn_id and msg.sender_type='user'
+    and msg.thread_character_id is null and msg.character_content_bundle_id is null;
+  if not found then
+    raise exception using errcode='23514',
+      constraint='seyeon_positive_g1_user_original_invalid';
+  end if;
+  perform seyeon_private.lock_memory_source_message_v1(
+    p_subject_id,p_turn_id,v_locked_user_id
+  );
   select msg.id,msg.body_text into v_user_message
   from public.conversation_messages msg
   where msg.subject_id=p_subject_id and msg.thread_id=p_thread_id
@@ -158,8 +172,7 @@ begin
     and msg.redacted_at is null
     and msg.body_text is not null
     and length(btrim(msg.body_text))>0
-    and nullif(btrim(msg.content_hash),'') is not null
-  for share of msg;
+    and nullif(btrim(msg.content_hash),'') is not null;
   if not found then
     raise exception using errcode='23514',
       constraint='seyeon_positive_g1_user_original_invalid',

@@ -18,7 +18,7 @@ create function seyeon_private.assert_current_original_assistant_lineage_v1(
   p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid
 ) returns void
 language plpgsql security definer
-set search_path=pg_catalog,public
+set search_path=pg_catalog,public set row_security=on
 as $original_lineage$
 declare
   v_pin jsonb;
@@ -113,6 +113,9 @@ begin
       constraint='seyeon_g0_assistant_original_user_missing',
       message='Historical Assistant original User source is unavailable';
   end if;
+  perform seyeon_private.lock_memory_source_message_v1(
+    p_subject_id,v_turn::uuid,(v_pin->>'currentUserMessageId')::uuid
+  );
   select um.id,um.body_text into v_original_user
   from public.conversation_messages um
   where um.id=(v_pin->>'currentUserMessageId')::uuid
@@ -122,8 +125,7 @@ begin
     and um.character_content_bundle_id is null
     and um.redacted_at is null and um.body_text is not null
     and length(btrim(um.body_text))>0
-    and nullif(btrim(um.content_hash),'') is not null
-  for share of um;
+    and nullif(btrim(um.content_hash),'') is not null;
   if not found
      or 'sha256:wire-utf8:v1:'||
         encode(sha256(convert_to(v_original_user.body_text,'UTF8')),'hex')
@@ -166,8 +168,7 @@ begin
     -- under a held SHARE lock; do not request extra grant-table columns.
     and m.revoked_at is null and m.source_kind='user_approved'
     and m.memory_type=v_pin->>'recordType'
-    and m.schema_version=v_pin->>'recordSchemaVersion'
-  for share of g,m;
+    and m.schema_version=v_pin->>'recordSchemaVersion';
 
   if not found or v_pin->>'originalGrantedAt' is null
      or v_original.granted_at::text is distinct from
@@ -195,7 +196,7 @@ create function public.qry_seyeon_g0_current_source_recent_messages_v1(
   character_id text, body_text text, created_at timestamptz
 )
 language plpgsql security definer
-set search_path=pg_catalog,public
+set search_path=pg_catalog,public set row_security=on
 as $context_window$
 declare
   v_row record;

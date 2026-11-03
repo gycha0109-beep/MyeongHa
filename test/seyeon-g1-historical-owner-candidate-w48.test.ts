@@ -121,7 +121,7 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(sql).toContain("'authorizesModel',false");
     expect(sql).toContain("'permitsAtomicCommit',false");
     expect(sql).toContain("'permitsHttpReveal',false");
-    expect(sql).toContain('for share of m');
+    expect(sql).toContain('lock_memory_source_message_v1(');
     expect(sql).toContain('m.body_text=v_row.body_text');
     const g2=readFileSync(new URL('../scripts/operations/seyeon-security-s0/02-atomic-commit.sql',import.meta.url),'utf8');
     expect(g2).toContain("old.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
