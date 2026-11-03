@@ -1471,6 +1471,107 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(acl.denied).toBe(true);
   });
 
+  it('G5 historical candidate cannot pin a revoked original Grant during an independent DB race', async () => {
+    const f=await prepare(220,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const currentTurn=uuid(16,1220),currentAttempt=uuid(17,1220);
+    const currentUser=uuid(18,1220),currentText='Fresh user turn after a sealed Assistant reply';
+    const setup=await pool.connect();
+    try {
+      await setup.query('BEGIN');
+      await setup.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await setup.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1220),hash({second:'G5-history-race'}),
+        'chat-request-v1',JSON.stringify({text:currentText}),
+        uuid(13,220),uuid(12,220),currentTurn,currentUser,
+        currentText,null,hash({message:currentText}),
+      ]);
+      await setup.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,currentTurn,currentAttempt,'seyeon-production-chat-planner-v1']
+      );
+      await setup.query('COMMIT');
+    }catch(error){
+      await setup.query('ROLLBACK');throw error;
+    }finally{setup.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(text:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(text,'utf8').digest('hex');
+    const revoker=await pool.connect();
+    const candidate=await pool.connect();
+    const marker='seyeon_g5_historical_candidate_revoke_waiter';
+    try{
+      await revoker.query('BEGIN');
+      await revoker.query(
+        'select id from public.record_access_grants where id=$1::uuid for update',
+        [f.grant],
+      );
+      await revoker.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [f.grant],
+      );
+      await candidate.query("select set_config('application_name',$1,false)",[marker]);
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:currentTurn,attemptId:currentAttempt,
+          currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-revoke-race'}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        }).then(receipt=>({ok:true as const,receipt}),
+          error=>({ok:false as const,error}));
+      let wasBlocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){wasBlocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(wasBlocked).toBe(true);
+      await revoker.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome.ok).toBe(false);
+      if(!outcome.ok)expect(outcome.error).toMatchObject({
+        code:'42501',constraint:'seyeon_source_lock_original_grant_required',
+      });
+    }finally{
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      revoker.release();candidate.release();
+    }
+    const {rows:[state]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin,
+      a.seyeon_personal_source_pinned_at as pinned_at
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[currentAttempt]);
+    expect(state).toMatchObject({turn_state:'planned',pin:null,pinned_at:null});
+  });
+
   // Real S0 original receipt + private G4 credit on ONE disposable PostgreSQL.
   // It intentionally uses the existing prepare/fetchReply S0 test fixtures.
   let g5CreditSchemaInstalled=false;
