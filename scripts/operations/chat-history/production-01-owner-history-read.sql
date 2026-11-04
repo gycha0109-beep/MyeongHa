@@ -36,9 +36,17 @@ BEGIN
   ) THEN RAISE EXCEPTION 'Chat history reader role privilege drift'; END IF;
 END $role$;
 
-CREATE SCHEMA chat_private AUTHORIZATION myeongha_chat_history_reader_v1;
+-- PostgreSQL 17 does not give a non-superuser CREATEROLE operator SET
+-- membership in a newly created role. Temporarily permit owner transfer
+-- inside this single transaction, then revoke SET before commit.
+GRANT myeongha_chat_history_reader_v1 TO postgres
+  WITH INHERIT FALSE, SET TRUE;
+
+CREATE SCHEMA chat_private;
 REVOKE ALL ON SCHEMA chat_private FROM PUBLIC,anon,authenticated,service_role;
 GRANT USAGE ON SCHEMA chat_private TO myeongha_api_executor;
+-- PostgreSQL 17 requires CREATE for the new owner at ALTER FUNCTION time.
+GRANT CREATE ON SCHEMA chat_private TO myeongha_chat_history_reader_v1;
 GRANT USAGE ON SCHEMA seyeon_private TO myeongha_chat_history_reader_v1;
 GRANT EXECUTE ON FUNCTION public.assert_myeongha_subject_context_v1(uuid)
   TO myeongha_chat_history_reader_v1;
@@ -192,8 +200,6 @@ BEGIN
   END LOOP;
 END $history$;
 
-ALTER FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
-  OWNER TO myeongha_chat_history_reader_v1;
 REVOKE ALL ON FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
   FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
@@ -219,21 +225,43 @@ REVOKE ALL ON FUNCTION public.qry_chat_thread_owner_visible_history_v1(uuid,uuid
 GRANT EXECUTE ON FUNCTION public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
   TO myeongha_api_executor;
 
+-- Finish all grants while the deployer owns the objects; transfer ownership
+-- last, and remove temporary SET rights before the transaction commits.
+ALTER FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
+  OWNER TO myeongha_chat_history_reader_v1;
+ALTER SCHEMA chat_private OWNER TO myeongha_chat_history_reader_v1;
+REVOKE SET OPTION FOR myeongha_chat_history_reader_v1 FROM postgres;
+
 DO $post$
 DECLARE f oid; private_f oid;
 BEGIN
   f:=to_regprocedure('public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)')::oid;
-  private_f:=to_regprocedure('chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)')::oid;
+  -- Read the catalog after ownership transfer: deployer intentionally has
+  -- no USAGE on the private schema, so to_regprocedure would be denied.
+  SELECT proc.oid INTO private_f
+  FROM pg_proc proc JOIN pg_namespace ns ON ns.oid=proc.pronamespace
+  WHERE ns.nspname='chat_private'
+    AND proc.proname='qry_chat_thread_owner_visible_history_v1'
+    AND proc.pronargs=4
+    AND proc.proargtypes[0]='uuid'::regtype
+    AND proc.proargtypes[1]='uuid'::regtype
+    AND proc.proargtypes[2]='bigint'::regtype
+    AND proc.proargtypes[3]='integer'::regtype;
   IF f IS NULL
     OR (SELECT proowner FROM pg_proc WHERE oid=f) <> to_regrole('postgres')::oid
     OR (SELECT prosecdef FROM pg_proc WHERE oid=f)
     OR private_f IS NULL
+    OR (SELECT nspowner FROM pg_namespace WHERE nspname='chat_private')
+       <> to_regrole('myeongha_chat_history_reader_v1')::oid
     OR (SELECT proowner FROM pg_proc WHERE oid=private_f)
        <> to_regrole('myeongha_chat_history_reader_v1')::oid
     OR NOT (SELECT prosecdef FROM pg_proc WHERE oid=private_f)
     OR NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid=private_f
         AND 'row_security=on'=ANY(proconfig)
         AND 'search_path=""'=ANY(proconfig))
+    OR EXISTS (SELECT 1 FROM pg_auth_members a
+      WHERE a.roleid='myeongha_chat_history_reader_v1'::regrole
+        AND a.member='postgres'::regrole AND a.set_option)
     OR has_schema_privilege('myeongha_api_executor','chat_private','CREATE')
     OR NOT has_function_privilege('myeongha_api_executor',private_f,'EXECUTE')
     OR EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname IN

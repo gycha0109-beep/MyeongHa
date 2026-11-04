@@ -77,6 +77,8 @@ INSERT INTO public.conversation_messages VALUES
  ('00000000-0000-4000-8000-000000000007','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','cccccccc-cccc-4ccc-8ccc-cccccccccccc',null,7,'user',null,'Redacted secret','v1',now(),now()),
  ('00000000-0000-4000-8000-000000000008','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','dddddddd-dddd-4ddd-8ddd-dddddddddddd',null,1,'character',null,'Another account secret','v1',now(),null);
 
+-- Disposable fixture: mimic the service login's ability to SET the API role.
+GRANT myeongha_api_executor TO postgres WITH INHERIT FALSE, SET TRUE;
 SET ROLE myeongha_api_executor;
 SELECT set_config('history.subject','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',false);
 DO $assert$
@@ -121,6 +123,9 @@ BEGIN
 END $assert$;
 RESET ROLE;
 -- The private read-only owner must still obey native RLS on foreign rows.
+-- Disposable-only RLS probe: grant SET temporarily after the migration
+-- has proved the deploying user cannot SET this isolated owner.
+GRANT myeongha_chat_history_reader_v1 TO postgres WITH INHERIT FALSE, SET TRUE;
 SET ROLE myeongha_chat_history_reader_v1;
 SELECT set_config('history.subject','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',false);
 DO $rls$
@@ -135,6 +140,7 @@ BEGIN
  ) THEN RAISE EXCEPTION 'Private reader bypassed foreign-subject RLS'; END IF;
 END $rls$;
 RESET ROLE;
+REVOKE SET OPTION FOR myeongha_chat_history_reader_v1 FROM postgres;
 DO $acl$
 BEGIN
  IF has_function_privilege('authenticated',
