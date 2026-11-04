@@ -207,7 +207,7 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     // The DB derives the Grant/body from the immutable Claim's Subject/Unit.
     const retainedReaderS7Timeline = await readRecordedReaderS7ClaimTimelineV1(
       connection,{
-        subjectId:claim.subjectId,
+        subjectId:claim.subjectId as string,
         purchaseIntentId:claim.purchaseIntentId,
         unitId:claim.unitId,
       },
