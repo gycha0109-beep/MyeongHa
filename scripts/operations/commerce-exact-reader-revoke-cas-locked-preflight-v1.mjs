@@ -49,7 +49,9 @@ where g.id=$1::uuid
 for update of g
 `.trim();
 
-const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+// PostgreSQL UUID columns also contain approved legacy fixture IDs with zero
+// version/variant nibbles; require canonical 128-bit syntax, not RFC v4.
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 const DEC=/^(0|[1-9][0-9]*)$/u;
 const ORDER=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const inputValid=(v)=>typeof v==='string'&&UUID.test(v);
