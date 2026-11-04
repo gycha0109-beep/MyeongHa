@@ -68,4 +68,48 @@ describe('mobile My view model', () => {
       revisionLabel: '현재 입력 · revision 2',
     });
   });
+
+  it('localizes My birth facts in all five UI languages without altering the original birth input', () => {
+    const input = {
+      calendarType: 'lunar' as const,
+      birthDate: '1995-08-17',
+      birthTime: '00:05',
+      timeKnown: true,
+      isLeapMonth: true,
+      sex: 'female' as const,
+    };
+    const birth = {
+      birthProfileId: 'birth-1',
+      profileKind: 'self' as const,
+      label: null,
+      archivedAt: null,
+      currentRevision: {
+        revisionId: 'revision-2',
+        revisionNo: 2,
+        input,
+      },
+      revisions: [{ revisionId: 'revision-2', revisionNo: 2, isCurrent: true }],
+    };
+    expect(createMobileMyBirthViewV1(birth, 'ko-KR')).toMatchObject({
+      birthDate: '1995.08.17', birthTime: '00:05', basis: '음력 · 윤달', sex: '여성',
+    });
+    expect(createMobileMyBirthViewV1(birth, 'ja-JP')).toMatchObject({
+      birthDate: '1995年8月17日', birthTime: '0:05', sex: '女性',
+      basis: '旧暦 · 閏月 · サーバー計算基準',
+    });
+    expect(createMobileMyBirthViewV1(birth, 'zh-TW')).toMatchObject({
+      birthDate: '1995年8月17日', birthTime: '0:05',
+      basis: '農曆 · 閏月 · 伺服器計算基準',
+    });
+    expect(createMobileMyBirthViewV1(birth, 'en-US')).toMatchObject({
+      birthDate: 'August 17, 1995', birthTime: '12:05 AM',
+      basis: 'Lunar · Leap month · Server-calculated', sex: 'Female',
+      revisionLabel: 'Current input · revision 2',
+    });
+    expect(createMobileMyBirthViewV1(birth, 'zh-CN')).toMatchObject({
+      birthDate: '1995年8月17日', birthTime: '00:05',
+      basis: '农历 · 闰月 · 服务器计算基准',
+    });
+    expect(birth.currentRevision.input).toEqual(input);
+  });
 });

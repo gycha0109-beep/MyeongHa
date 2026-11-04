@@ -3,6 +3,8 @@ import type {
   CurrentBirthProfileV1,
   CurrentSubjectProfileV1,
 } from '@myeongha/api-client';
+import type { MobileUiLocale } from '../../ui/mobile-ui-copy.js';
+import { projectMobileSajuBirthFactsV1 } from '../saju/mobile-saju-birth-display.js';
 
 export interface MobileMyProfileViewV1 {
   readonly displayName: string;
@@ -19,6 +21,14 @@ export interface MobileMyBirthViewV1 {
   readonly sex: string;
   readonly revisionLabel: string;
 }
+
+const REVISION_PREFIX: Readonly<Record<MobileUiLocale, string>> = Object.freeze({
+  'ko-KR': '현재 입력 · revision ',
+  'ja-JP': '現在の入力 · 改訂 ',
+  'zh-TW': '目前輸入 · 版本 ',
+  'en-US': 'Current input · revision ',
+  'zh-CN': '当前输入 · 版本 ',
+});
 
 function sexText(value: BirthInputV1['sex']): string {
   if (value === 'male') return '남성';
@@ -53,16 +63,19 @@ export function createMobileMyProfileViewV1(
 
 export function createMobileMyBirthViewV1(
   birth: CurrentBirthProfileV1,
+  locale: MobileUiLocale = 'ko-KR',
 ): MobileMyBirthViewV1 {
   const input = birth.currentRevision.input;
+  // Reuse the same source-owned birth presentation as Saju. Preserve the
+  // existing Korean My summary style without converting lunar dates.
+  const localized = projectMobileSajuBirthFactsV1(input, locale);
   return Object.freeze({
-    birthDate: input.birthDate.replaceAll('-', '.'),
-    birthTime:
-      input.timeKnown && input.birthTime !== null
-        ? input.birthTime.slice(0, 5)
-        : '시간 모름',
-    basis: calendarText(input),
-    sex: sexText(input.sex),
-    revisionLabel: `현재 입력 · revision ${birth.currentRevision.revisionNo}`,
+    birthDate: locale === 'ko-KR' ? input.birthDate.replaceAll('-', '.') : localized.date,
+    birthTime: locale === 'ko-KR'
+      ? (input.timeKnown && input.birthTime !== null ? input.birthTime.slice(0, 5) : '시간 모름')
+      : localized.time,
+    basis: locale === 'ko-KR' ? calendarText(input) : localized.basis,
+    sex: locale === 'ko-KR' ? sexText(input.sex) : localized.sex,
+    revisionLabel: `${REVISION_PREFIX[locale]}${birth.currentRevision.revisionNo}`,
   });
 }
