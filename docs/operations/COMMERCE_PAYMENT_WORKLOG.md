@@ -532,3 +532,9 @@
 - **검증:** 단일 전액·다건 부분 취소(3000+5900)·원본 계보 불일치·위조·중복·DB 장애에 대한 기존 청약철회 검토기 회귀 테스트 추가. 신규 PR CI 결과 전까지 PASS 미선언.
 - **한계:** 저장 원장은 Provider 최신 GET·시간 순서·최종 환불/법적 청약철회/소비자 실제 전달 입증이 아닙니다. 모든 결과의 Provider 환불 허용·Reader Grant 변경 허용은 false이고 기존 S7 ACK도 사람의 실제 소비 증명으로 승격하지 않습니다.
 - **운영 경계:** 기존 private read-only 기능에만 연결. 신규 SQL 마이그레이션/테이블/권한, 공개 API, 실제 PG 환불 POST, 운영 DB·LIVE·자동 권한 회수 변경 없음.
+
+### 2026-11-05 — #2986 TypeScript CI 레드 원인 수정
+
+- **실제 실패 근거:** CI 실행 [41901612252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41901612252)의 Commerce TypeScript 검사에서 `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts` 220~221행에 `TS2345/TS2322`가 발생했습니다.
+- **원인/수정:** 중복 Provider Event 2행을 포함한 `it.each` 데이터에서 행 배열이 테스트 함수의 여러 인자로 펼쳐져 타입에 맞지 않았습니다. 각 테스트 사례를 `{cancelRows:[...]}` 하나의 객체로 묶고 구조분해하여 전달합니다. 원본 취소·Grant·환불 비즈니스 로직은 무변경입니다.
+- **검증 상태:** 수정 커밋의 CI 성공 확인 전까지는 GREEN으로 보고하지 않습니다. 자동 병합/필수 통합 CI 요건은 그대로 유지합니다.
