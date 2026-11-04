@@ -1764,8 +1764,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await redactor.query("select set_config('application_name',$1,false)",[marker]);
       await redactor.query('BEGIN');
       const pending=redactor.query(
-        'update public.conversation_messages set redacted_at=clock_timestamp() where id=$1::uuid',
-        [f.user],
+        'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=$2::text where id=$1::uuid',
+        [f.user,'g5_synthetic_original_user_redaction'],
       ).then(result=>({ok:true as const,count:result.rowCount}),
         error=>({ok:false as const,error}));
       let blocked=false;

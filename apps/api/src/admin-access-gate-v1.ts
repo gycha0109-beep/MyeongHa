@@ -30,8 +30,18 @@ export function createAdminAccessGateV1(config: AdminAccessConfigurationV1, opti
   const binding = validateAdminAccessConfigurationV1(config);
   return async (request: Request): Promise<boolean> => {
     try {
-      const token = request.headers.get('cf-access-jwt-assertion');
-      if (token === null || token.length > 16_384) return false;
+      // Hostname-based Access browser sessions may arrive via CF_Authorization
+      // rather than the origin assertion header. Both paths MUST verify the
+      // SAME signed application JWT, audience, expiry and exact Owner claim.
+      const assertion = request.headers.get('cf-access-jwt-assertion');
+      const cookie = assertion === null ? request.headers.get('cookie') : null;
+      const cookieParts = cookie?.split(';') ?? [];
+      const authorizationCookies = cookieParts
+        .map(part => part.trim())
+        .filter(part => part.startsWith('CF_Authorization='));
+      if (assertion === null && authorizationCookies.length !== 1) return false;
+      const token = assertion ?? authorizationCookies[0]!.slice('CF_Authorization='.length);
+      if (!token || token.length > 16_384) return false;
       const parts = token.split('.');
       if (parts.length !== 3) return false;
       const header = decodePart(parts[0]!); const claims = decodePart(parts[1]!);
