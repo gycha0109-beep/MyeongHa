@@ -40,7 +40,7 @@ async function assertBlocking(observer,waiterPid,holderPid){
 async function snapshot(client){
  const r=await client.query(
   'select pi.id::text as purchase,cr.id::text as receipt,'+
-  'cr.external_transaction_id as transaction,g.id::text as grant,'+
+  'cr.external_transaction_id as "originalTransaction",g.id::text as grant,'+
   'g.revision::text as revision,g.status as status,'+
   'cr.verified_amount_minor::text as paid '+
   'from public.purchase_intents pi '+
@@ -70,7 +70,7 @@ try{
  const baseline=await snapshot(observer);
  const params=webhook=>[
   'synthetic-hmac-b2-payment',webhook,'Transaction.Cancelled',
-  baseline.b2.transaction,'full_cancel_shape_observed',
+  baseline.b2.originalTransaction,'full_cancel_shape_observed',
   webhook===FIRST_WEBHOOK?HMAC('a'):HMAC('d'),
   webhook===FIRST_WEBHOOK?HMAC('b'):HMAC('e'),
   HMAC('c'),1,1,
