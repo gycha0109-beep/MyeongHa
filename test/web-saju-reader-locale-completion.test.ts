@@ -12,7 +12,7 @@ describe('five-language Saju and Reader surface completion', () => {
     expect(SAJU_READER_SURFACE_COPY_V1.size).toBeGreaterThan(100);
     for (const [source] of SAJU_READER_SURFACE_COPY_V1) {
       expect(translateStaticUi(source, 'ko-KR')).toBe(source);
-      for (const locale of ['ja-JP','zh-TW','en-US','zh-CN']) {
+      for (const locale of ['ja-JP','zh-TW','en-US','zh-CN'] as const) {
         const translated = translateStaticUi(source, locale);
         expect(translated, `Missing ${locale} for ${source}`).not.toBe(source);
         expect(translated, `Korean leak: ${locale}/${source}`).not.toMatch(/[가-힣]/u);
