@@ -164,9 +164,10 @@ export async function inspectLockedReaderRevokeCasPreflightV1(client,{
   const ordered=discover.rows.map(scopeIdentity);
   if(new Set(ordered).size!==ordered.length)
    throw Error('DUPLICATE_READER_S1_SCOPE_EVIDENCE');
-  if(discover.rows.some((scope,i)=>
-    (i>0&&ordered[i-1]>=ordered[i])||
-    (expectedReceiptId!==undefined&&scope.receiptId!==expectedReceiptId)))
+  // SQL orders by the same database collation as the existing S2 dispatcher.
+  // JavaScript lexical ordering is not a safe substitute for DB text collation.
+  if(discover.rows.some(scope=>
+    expectedReceiptId!==undefined&&scope.receiptId!==expectedReceiptId))
    return hold('reader_s1_scope_or_receipt_changed');
   const originalScope=discover.rows[0];
   if(discover.rows.some(scope=>
