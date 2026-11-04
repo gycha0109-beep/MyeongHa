@@ -59,7 +59,10 @@ export function createDelegatePicker({
   grid.setAttribute('role', 'list');
 
   const localePainters = [];
+  // Public picker visibility only. Keep canonical reader identities and old links intact.
+  const hiddenPublicReaders = new Set(['doyun', 'mira', 'seorin']);
   for (const reader of READER_PRESENTATIONS) {
+    if (hiddenPublicReaders.has(reader.key)) continue;
     const optionState = resolveOption(reader);
     const button = document.createElement('button');
     button.className = 'reading-reader-option';

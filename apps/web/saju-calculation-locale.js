@@ -1,6 +1,6 @@
 // Presentation-only projections of server-resolved Saju facts.
 // The engine's pillars, uncertainty, element counts, and provenance are never changed.
-export const SAJU_DISPLAY_LOCALES_V1 = Object.freeze(['ko-KR', 'ja-JP', 'zh-TW']);
+export const SAJU_DISPLAY_LOCALES_V1 = Object.freeze(['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN']);
 const PILLARS = Object.freeze({
   year: Object.freeze(['년주', '年柱', '年柱']),
   month: Object.freeze(['월주', '月柱', '月柱']),
@@ -11,6 +11,33 @@ const ELEMENTS = Object.freeze({
   목: '木', 화: '火', 토: '土', 금: '金', 수: '水',
 });
 const YINYANG = Object.freeze({ 음: '陰', 양: '陽' });
+
+const PILLAR_EN_CN = Object.freeze({
+  year: ['Year pillar', '年柱'], month: ['Month pillar', '月柱'],
+  day: ['Day pillar', '日柱'], hour: ['Hour pillar', '时柱'],
+});
+const ELEMENTS_EN = Object.freeze({ 목: 'Wood', 화: 'Fire', 토: 'Earth', 금: 'Metal', 수: 'Water' });
+const YINYANG_EN = Object.freeze({ 음: 'Yin', 양: 'Yang' });
+const YINYANG_CN = Object.freeze({ 음: '阴', 양: '阳' });
+const STATUS_EN_CN = Object.freeze({
+  '복수 후보': ['Multiple candidates', '多个候选结果'],
+  '경계 시각 확인 필요': ['Boundary time requires verification', '需核实临界时间'],
+  '확인 불가': ['Cannot verify', '无法确认'],
+  '계산 정보 없음': ['Calculation unavailable', '无计算数据'],
+  '계산 완료': ['Calculated', '已计算'],
+  '확정': ['Confirmed', '已确认'],
+  '오행 미확인': ['Element unknown', '五行未确认'],
+  '음양 미확인': ['Yin/Yang unknown', '阴阳未确认'],
+  '일주가 확정될 때 표시됩니다.': ['Shown when the day pillar is confirmed.', '确认日柱后显示。'],
+  '네 기둥 계산 완료': ['All four pillars calculated', '四柱计算完成'],
+  '출생시간을 모르는 입력으로 계산되어 시주 등 일부 사실이 제한될 수 있습니다.': ['The birth time is unknown; some facts including the hour pillar may be unavailable.', '出生时间不详，时柱等部分信息可能无法确定。'],
+  '현재 Birth Profile revision에 결속된 계산 결과입니다.': ['Calculated from the current birth profile revision.', '根据当前出生资料版本计算的结果。'],
+  '시간 모름': ['Unknown time', '时间不详'],
+  '음력': ['Lunar', '农历'],
+  '양력': ['Solar', '公历'],
+  '현재 자기 Birth Profile과 연결된 계산 결과입니다.': ['Calculated from your current birth profile.', '根据您当前出生资料计算的结果。'],
+  '올해의 흐름': ['This year', '今年走势'],
+});
 const STATUS_COPY = Object.freeze({
   '복수 후보': ['複数候補', '多個候選'],
   '경계 시각 확인 필요': ['境界時刻の確認が必要', '需要確認臨界時間'],
@@ -45,21 +72,29 @@ export function sajuDisplayLocaleV1(locale) {
 export function localizeSajuCopyV1(korean, locale = 'ko-KR') {
   const language = sajuDisplayLocaleV1(locale);
   if (language === 'ko-KR') return korean;
-  const index = language === 'ja-JP' ? 0 : 1;
-  return STATUS_COPY[korean]?.[index] ?? korean;
+  if (language === 'en-US' || language === 'zh-CN') {
+    return STATUS_EN_CN[korean]?.[language === 'en-US' ? 0 : 1] ?? korean;
+  }
+  return STATUS_COPY[korean]?.[language === 'ja-JP' ? 0 : 1] ?? korean;
 }
 export function sajuPillarLabelV1(key, locale = 'ko-KR') {
   const row = Object.hasOwn(PILLARS, key) ? PILLARS[key] : null;
   if (!row) return null;
-  return row[sajuDisplayLocaleV1(locale) === 'ko-KR' ? 0 : locale === 'ja-JP' ? 1 : 2];
+  const language = sajuDisplayLocaleV1(locale);
+  if (language === 'en-US' || language === 'zh-CN') return PILLAR_EN_CN[key][language === 'en-US' ? 0 : 1];
+  return row[language === 'ko-KR' ? 0 : language === 'ja-JP' ? 1 : 2];
 }
 export function sajuElementLabelV1(element, locale = 'ko-KR') {
-  if (sajuDisplayLocaleV1(locale) === 'ko-KR') return element;
+  const language = sajuDisplayLocaleV1(locale);
+  if (language === 'ko-KR') return element;
+  if (language === 'en-US') return Object.hasOwn(ELEMENTS_EN, element) ? ELEMENTS_EN[element] : element;
   return Object.hasOwn(ELEMENTS, element) ? ELEMENTS[element] : element;
 }
 export function sajuYinYangLabelV1(value, locale = 'ko-KR') {
-  if (sajuDisplayLocaleV1(locale) === 'ko-KR') return value;
-  return Object.hasOwn(YINYANG, value) ? YINYANG[value] : value;
+  const language = sajuDisplayLocaleV1(locale);
+  if (language === 'ko-KR') return value;
+  const words = language === 'en-US' ? YINYANG_EN : language === 'zh-CN' ? YINYANG_CN : YINYANG;
+  return Object.hasOwn(words, value) ? words[value] : value;
 }
 export function projectSajuPillarDisplayV1(state, locale = 'ko-KR') {
   const resolved = state && typeof state === 'object' && state.status === 'resolved'
@@ -95,11 +130,15 @@ export function sajuCompletenessLabelV1(count, complete, locale = 'ko-KR') {
   if (complete) return localizeSajuCopyV1('네 기둥 계산 완료',language);
   if (language === 'ja-JP') return `四柱のうち${count}柱が確定`;
   if (language === 'zh-TW') return `已確認四柱中的${count}柱`;
+  if (language === 'en-US') return `${count}/4 pillars confirmed`;
+  if (language === 'zh-CN') return `已确认 ${count}/4 柱`;
   return `${count}/4 기둥 확정`;
 }
 export function sajuCurrentYearLabelV1(year, locale = 'ko-KR') {
   const language = sajuDisplayLocaleV1(locale);
   if (language === 'ja-JP') return `${year}年 · 今年の流れ`;
   if (language === 'zh-TW') return `${year}年 · 今年的運勢走向`;
+  if (language === 'en-US') return `${year} · This year`;
+  if (language === 'zh-CN') return `${year}年 · 今年走势`;
   return `${year}년 · 올해의 흐름`;
 }

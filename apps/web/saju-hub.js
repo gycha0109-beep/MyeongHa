@@ -309,6 +309,8 @@ function renderPillars(snapshot) {
     text.dataset.sajuKo = pillarDisplay(state, 'ko-KR').text;
     text.dataset.sajuJa = pillarDisplay(state, 'ja-JP').text;
     text.dataset.sajuZh = pillarDisplay(state, 'zh-TW').text;
+    text.dataset.sajuEn = pillarDisplay(state, 'en-US').text;
+    text.dataset.sajuCn = pillarDisplay(state, 'zh-CN').text;
     value.append(strong, text);
 
     const meta = document.createElement('span');
@@ -317,6 +319,8 @@ function renderPillars(snapshot) {
     meta.dataset.sajuKo = pillarDisplay(state, 'ko-KR').meta;
     meta.dataset.sajuJa = pillarDisplay(state, 'ja-JP').meta;
     meta.dataset.sajuZh = pillarDisplay(state, 'zh-TW').meta;
+    meta.dataset.sajuEn = pillarDisplay(state, 'en-US').meta;
+    meta.dataset.sajuCn = pillarDisplay(state, 'zh-CN').meta;
     card.append(cardLabel, value, meta);
     grid.append(card);
   }
@@ -419,30 +423,37 @@ let lastRenderedBirthProfile = null;
 // Present only server-owned Birth Profile facts; never invent birthplace or sex.
 function renderBirthDetails(profile, locale = getUiLocale()) {
   const input = profile?.currentRevision?.input;
-  const missing = locale === 'ja-JP' ? '確認できません' : locale === 'zh-TW' ? '無法確認' : '확인 불가';
-  const unavailable = locale === 'ja-JP' ? '入力項目なし' : locale === 'zh-TW' ? '未提供' : '제공되지 않음';
-  const byLocale = (ko, ja, zh) => locale === 'ja-JP' ? ja : locale === 'zh-TW' ? zh : ko;
+  const byLocale = (ko, ja, tw, en, cn) => ({
+    'ko-KR': ko, 'ja-JP': ja, 'zh-TW': tw, 'en-US': en, 'zh-CN': cn,
+  })[locale] ?? ko;
+  const missing = byLocale('확인 불가', '確認できません', '無法確認', 'Cannot verify', '无法确认');
+  const unavailable = byLocale('제공되지 않음', '入力項目なし', '未提供', 'Not provided', '未提供');
   const sourceDate = typeof input?.birthDate === 'string' && STORED_BIRTH_DATE_PATTERN.test(input.birthDate)
     ? input.birthDate : null;
   const dateParts = sourceDate?.split('-').map(Number);
   const date = dateParts
     ? byLocale(`${dateParts[0]}년 ${dateParts[1]}월 ${dateParts[2]}일`,
       `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`,
+      `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`,
+      new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })
+        .format(new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]))),
       `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`)
     : missing;
   const calendar = input?.calendarType === 'lunar'
-    ? byLocale('음력', '旧暦', '農曆')
-    : input?.calendarType === 'solar' ? byLocale('양력', '新暦', '國曆') : missing;
-  const time = input?.timeKnown === false ? byLocale('시간 모름', '時刻不明', '時間不詳') :
+    ? byLocale('음력', '旧暦', '農曆', 'Lunar', '农历')
+    : input?.calendarType === 'solar' ? byLocale('양력', '新暦', '國曆', 'Solar', '公历') : missing;
+  const time = input?.timeKnown === false ? byLocale('시간 모름', '時刻不明', '時間不詳', 'Unknown time', '时间不详') :
     typeof input?.birthTime === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/u.test(input.birthTime)
       ? (() => {
           const [hour, minute] = input.birthTime.slice(0,5).split(':').map(Number);
           return byLocale(`${hour < 12 ? '오전' : '오후'} ${hour % 12 || 12}시 ${String(minute).padStart(2, '0')}분`,
-            `${hour}:${String(minute).padStart(2, '0')}`, `${hour}:${String(minute).padStart(2, '0')}`);
+            `${hour}:${String(minute).padStart(2, '0')}`, `${hour}:${String(minute).padStart(2, '0')}`,
+            `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour < 12 ? 'AM' : 'PM'}`,
+            `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`);
         })() : missing;
-  const sex = input?.sex === 'female' ? byLocale('여성', '女性', '女性') :
-    input?.sex === 'male' ? byLocale('남성', '男性', '男性') :
-    input?.sex === 'unspecified' || input?.sex === null ? byLocale('미입력', '未指定', '未指定') : missing;
+  const sex = input?.sex === 'female' ? byLocale('여성', '女性', '女性', 'Female', '女性') :
+    input?.sex === 'male' ? byLocale('남성', '男性', '男性', 'Male', '男性') :
+    input?.sex === 'unspecified' || input?.sex === null ? byLocale('미입력', '未指定', '未指定', 'Not specified', '未指定') : missing;
   const place = typeof input?.birthPlace === 'string' && input.birthPlace.trim()
     ? input.birthPlace.trim() : unavailable;
   byId('saju-birth-date-display').textContent = date + (sourceDate ? ` (${calendar})` : '');
@@ -450,14 +461,14 @@ function renderBirthDetails(profile, locale = getUiLocale()) {
   byId('saju-birth-sex-display').textContent = sex;
   byId('saju-birth-place-display').textContent = place;
   byId('saju-birth-calendar-display').textContent =
-    input ? `${calendar} · ${byLocale('서버 계산 기준', 'サーバー計算基準', '伺服器計算基準')}` : missing;
+    input ? `${calendar} · ${byLocale('서버 계산 기준', 'サーバー計算基準', '伺服器計算基準', 'Server-calculated', '服务器计算基准')}` : missing;
 }
 
 function retranslateCalculatedSaju() {
   const hub = document.getElementById('saju-hub');
   if (!hub || hub.hidden) return;
   const locale = getUiLocale();
-  const suffix = locale === 'ja-JP' ? 'Ja' : locale === 'zh-TW' ? 'Zh' : 'Ko';
+  const suffix = { 'ko-KR': 'Ko', 'ja-JP': 'Ja', 'zh-TW': 'Zh', 'en-US': 'En', 'zh-CN': 'Cn' }[locale] ?? 'Ko';
   for (const card of hub.querySelectorAll('[data-saju-pillar-key]')) {
     const key = card.dataset.sajuPillarKey;
     const label = card.querySelector('.saju-pillar-label');
@@ -522,6 +533,8 @@ function renderCalculation(calculation, profile) {
   // The date and time remain identical; only calendar/unknown-time labels change.
   birthSummary.dataset.sajuJa = formatBirthSummary(profile, 'ja-JP');
   birthSummary.dataset.sajuZh = formatBirthSummary(profile, 'zh-TW');
+  birthSummary.dataset.sajuEn = formatBirthSummary(profile, 'en-US');
+  birthSummary.dataset.sajuCn = formatBirthSummary(profile, 'zh-CN');
   setState('ready');
   retranslateCalculatedSaju();
 }
