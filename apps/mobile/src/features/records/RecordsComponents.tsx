@@ -55,13 +55,13 @@ export function RecordsTabs({
 
 export function LifeFactCard({ item }: { item: LifeRecordFactV1 }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const revoked = item.revokedAt !== null;
   return (
     <View style={[styles.card, revoked && styles.cardMuted]}>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>現</Text>
-        <Text style={styles.date}>{formatRecordDateV1(item.confirmedAt)}</Text>
+        <Text style={styles.date}>{formatRecordDateV1(item.confirmedAt, locale)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.factType}</Text>
       <Text style={styles.caption}>{t('기록 형식')} {item.schemaVersion} · {t('출처')} {item.sourceKind}</Text>
@@ -81,12 +81,12 @@ export function ReadingHistoryCard({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const openable = readingIsArchiveOpenableV1(item.productResponseState);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const content = (
     <>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>命</Text>
-        <Text style={styles.date}>{formatRecordDateV1(item.completedAt)}</Text>
+        <Text style={styles.date}>{formatRecordDateV1(item.completedAt, locale)}</Text>
       </View>
       <Text style={styles.cardTitle}>{t(readingTitleV1(item.sajuDomain))}</Text>
       <Text style={styles.cardBody}>{t(readingReaderLabelV1(item.readerCharacterIds))}</Text>
@@ -114,12 +114,12 @@ export function ReadingHistoryCard({
 
 export function MemoryCard({ item }: { item: MemoryItemV1 }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   return (
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <Text style={styles.symbol}>記</Text>
-        <Text style={styles.date}>{formatRecordDateV1(item.createdAt)}</Text>
+        <Text style={styles.date}>{formatRecordDateV1(item.createdAt, locale)}</Text>
       </View>
       <Text style={styles.cardTitle}>{item.memoryType}</Text>
       <MobileUiText style={styles.cardBody}>저장된 기억</MobileUiText>
