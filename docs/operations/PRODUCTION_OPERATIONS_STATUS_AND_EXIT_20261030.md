@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Isolated PG18 product-path proof capture RED and deterministic repair
+
+- **Failed Linux main-only run:** [#41897344670](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41897344670) on main `0f3ed82e384fa593b16ee0f2826c3c9d0453902f` returned FAILURE. Its runner completed actual PostgreSQL18 RLS test 1/1 and existing synthetic SQL pool saturation/recovery successfully, and the new real-PG18 product-path Vitest exited successfully (the runner found `1 passed`). The subsequent shell extraction of the evidence marker from Vitest reporter stdout failed with `Actual product-path measurement marker missing`. **This is a missing proof artifact, not a valid product-path measurement PASS.** Original artifact `isolated-pg18-phase7-phase11-41897344670` (ID `13357136261`) correctly records `BLOCKED_INCOMPLETE`; do not promote its status.
+- **Targeted repair:** The isolated product-path test now writes its sanitized JSON proof directly to a new private, run-local file only after all assertions pass, using exclusive creation and restrictive file permissions. The existing main-only manual runner consumes and strictly validates that JSON directly, instead of depending on Vitest's presentation format. Existing fail-closed status on any missing/invalid evidence is retained. A regression test pins the file handoff. No new workflow or production access was introduced.
+- **Next:** complete linked PR CI and auto-merge; launch the **existing** manual PG18 workflow on the fixed main, inspect the original uploaded evidence and exact measurements, and preserve accepted isolated-only observations if actually PASS. Real Saju engine product-chain performance, Production RLS/capacity, scaling threshold, Hosted DR and [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remain unproven/open. `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`, `outputContainsIdentifiers=false`.
+
+
 ### 2026-11-05 KST — Phase 10/11 actual isolated PostgreSQL18 product path implementation, manual measurement pending
 
 - **Implementation:** Added `test/ops/product-saju-isolated-pg18-phase11.test.mjs` and extended the **existing** manual GitHub Ubuntu26.04 `postgres-isolated-rls-capacity-acceptance.yml` runner, without adding a CI workflow or touching Hosted resources. Uses the current production API handler, real temporary PostgreSQL18 with non-BYPASSRLS role, enforced owner RLS, subject transaction, actual SQL read and a two-connection pool, plus actual local HTTP transports for synthetic Supabase Member verification and Saju calculation response. See [exact experiment scope](PRODUCT_SAJU_ISOLATED_PG18_PHASE11_20261105.md).
