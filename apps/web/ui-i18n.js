@@ -55,6 +55,15 @@ for (const [source, row] of MY_STATIC_UI_COPY_V1) {
 }
 for (const [source, row] of COPY) registerStaticCopy(source, { 'ja-JP': row[0], 'zh-TW': row[1] });
 for (const [source, row] of PLANNED_STATIC_UI_COPY_V1) registerStaticCopy(source, { 'en-US': row[0], 'zh-CN': row[1] });
+// Shared header native hover titles. Keep the same authored Korean source for
+// DOM first paint, theme toggles, and locale changes across all five locales.
+for (const [source, translated] of Object.entries({
+  '다크 모드': { 'ja-JP': 'ダークモード', 'zh-TW': '深色模式', 'en-US': 'Dark mode', 'zh-CN': '深色模式' },
+  '라이트 모드': { 'ja-JP': 'ライトモード', 'zh-TW': '淺色模式', 'en-US': 'Light mode', 'zh-CN': '浅色模式' },
+  '알림': { 'ja-JP': '通知', 'zh-TW': '通知', 'en-US': 'Notifications', 'zh-CN': '通知' },
+  '언어 변경': { 'ja-JP': '言語を変更', 'zh-TW': '切換語言', 'en-US': 'Change language', 'zh-CN': '切换语言' },
+})) registerStaticCopy(source, translated);
+
 for (const [source, localized] of Object.entries({
   '새로운 연결자를 준비하고 있습니다': {
     'ja-JP': '新しい案内人を準備しています',
@@ -221,6 +230,7 @@ function createLanguagePicker(locale, onChange) {
   const select = document.createElement('select');
   select.className = 'ui-locale-select';
   select.setAttribute('aria-label', '언어 선택');
+  select.setAttribute('title', '언어 변경');
   const choices = [
     ['ko-KR', '한국어'],
     ['en-US', 'English'],

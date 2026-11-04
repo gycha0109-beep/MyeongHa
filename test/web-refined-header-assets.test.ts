@@ -14,11 +14,15 @@ describe('shared refined header', () => {
     expect(css).toContain('--mh-header-height-mobile: 86px;');
     expect(css).toContain('html { overflow-y: scroll; }');
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
-    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 250px !important;');
-    expect(css).toContain('grid-template-columns: 146px minmax(200px, 1fr) 219px !important;');
+    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 274px !important;');
+    expect(css).toContain('grid-template-columns: 146px minmax(200px, 1fr) 244px !important;');
     expect(css).toContain('header-ui-glyphs-v2.png');
     expect(css).toContain('background-size: 140px 56px !important;');
     expect(css).toContain('background-position: -28px var(--mh-glyph-row) !important;');
+    expect(css).toContain('transform: translate(calc(-50% + 3px), -50%) !important;');
+    expect(css).toContain('.product-icon-button[data-unread="true"]::after');
+    expect(css).toContain('padding: 0 27px 0 43px !important;');
+    expect(css).toContain('background-position: right 11px center !important;');
     expect(css).not.toContain('.product-report-link');
     for (const legacy of ['golden-master.css','golden-master-lock.css','home-moonlight.css']) {
       expect(await read(legacy)).not.toMatch(/body\.gm-page(?:\[data-page="home"\])? \.product-(?:header|brand|nav|utilities|profile|icon-button|theme-toggle)/);
@@ -43,6 +47,11 @@ describe('shared refined header', () => {
       expect(header).toContain('class="product-nav"');
       expect(header).not.toContain('product-report-link');
       expect(header).not.toContain('contact.html?report=content');
+      expect(header).toContain('title="다크 모드"');
+      expect(header).toContain('title="알림"');
+      expect(header).toContain('title="마이페이지"');
+      expect(header).toContain('title="언어 변경"');
+      expect(header).not.toContain('data-unread="true"');
       expect(header).not.toMatch(/<span(?: id="home-profile-name")?>마이<\/span>/);
       expect(header.match(/<option value=/g)).toHaveLength(5);
       expect(html.indexOf('shared-product-header.css')).toBeGreaterThan(html.indexOf('ui-i18n.css'));
