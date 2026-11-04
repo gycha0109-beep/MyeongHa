@@ -525,6 +525,14 @@
 - **남은 것:** 신뢰 가능한 Provider NEWER/STALE, 기존 Reader T2/Entitlement Writer 실제 결속, 고객 전달 입증 및 구매→취소→삭제 전체 격리 검증.
 - **안전:** 운영 DB·Live 상품·PortOne GET/POST·실제 환불/권한 회수·공개 라우트 미변경.
 
+### 2026-11-05 — 원본 취소 저장→정확한 Reader 구매권 회수 연결의 실제 PG17 격리 검증
+
+- **로드맵:** 6절 1·2·5번의 구매→원본 취소→정확한 Entitlement Effect 구간. 기존 합성 Event 직접 INSERT 검증과 달리 원본 Reader Receipt에 결속되는 **기존 비배포 취소 저장 함수**를 실제 호출하는 연결을 구현했습니다.
+- **구현:** 별도 PostgreSQL 17 독립 테스트 DB의 공식 B2/B3 Reader 구매 Fixture에서 원본 B2 금액 1의 SUCCEEDED 전액 취소를 함수로 저장하고 동일 웹훅 replay, 다른 웹훅의 동일 취소 ID 거부를 검사합니다. 해당 원본 Event 및 정확한 B2 Grant를 잠근 뒤 기존 `internal_apply_entitlement_effect_v1`를 오직 합성 시나리오에서 호출해 단일 B2 회수, 정확한 Effect 멱등 재실행, 다른 B3 권한·교차 회수 차단을 검사합니다.
+- **안전:** 실제 PG GET/POST, 운영 DB, 운영 schema migrations, LIVE, 사용자 대상 권한 회수 없음. 합성 Event/Effect 및 비배포 DDL은 같은 트랜잭션에서 **ROLLBACK**됩니다.
+- **검증:** `commerce-persisted-cancel-reader-effect-pg17` 독립 CI 사례 추가. PR의 실제 CI·통합 결과가 나오기 전까지 PASS 미판정.
+- **미완료:** Provider 신뢰 가능한 최신 사건 순서/최종성, 법적 판단, 실제 Reader R2/T2 권한 회수, 고객 전달/청약철회와 개인정보 삭제 연결, 전체 E2E. 이 합성 검증만으로 운영 회수를 허용하지 않습니다.
+
 ### 2026-11-05 — 고객 청약철회 원본 구매의 저장된 취소 Event 내부 검토 연결
 
 - **로드맵:** 6절 1·3·5번의 원본 결제/청약철회 접수/취소 증거 결속. 기존 `reviewRecordedReadingWithdrawalPrivateV1`의 단일 전체 가시성 READ ONLY 스냅샷에 원본 구매별 취소 원장 관측을 추가했습니다.
