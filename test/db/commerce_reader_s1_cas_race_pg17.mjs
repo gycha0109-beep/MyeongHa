@@ -62,8 +62,23 @@ try{
  assert.ok(aGrant);
  assert.ok(bGrant);
  assert.notEqual(aGrant.grant_id,bGrant.grant_id);
+
+ // The official B2/B3 fixture deliberately ENDS with both independent
+ // Grants revoked. Restore only B2 to active INSIDE the disposable test DB,
+ // matching the existing DB-C3 synthetic activation contract. B3 is untouched.
+ assert.equal(aGrant.status,'revoked');
+ const activation=await observer.query(
+  "update public.entitlement_grants set status='active',revision=revision+1,"+
+  'last_effective_at=pg_catalog.clock_timestamp(),'+
+  'updated_at=pg_catalog.clock_timestamp() '+
+  "where id=$1::uuid and status='revoked' and revision=$2::bigint "+
+  'returning revision::text as revision,status',
+  [aGrant.grant_id,aGrant.revision],
+ );
+ assert.equal(activation.rowCount,1,'isolated exact B2 activation must succeed');
+ aGrant.revision=activation.rows[0].revision;
+ aGrant.status=activation.rows[0].status;
  assert.equal(aGrant.status,'active');
- assert.equal(bGrant.status,'active');
 
  const result=await observer.query(scopeSql,[EVENT,aGrant.grant_id]);
  assert.ok(result.rows.length>0&&result.rows.length<=64,'exact B2 Reader S1 scopes required');
@@ -129,7 +144,7 @@ try{
  assert.equal(after.rows.find(x=>x.id===aGrant.grant_id)?.revision,
   String(BigInt(aGrant.revision)+1n));
  assert.equal(after.rows.find(x=>x.id===bGrant.grant_id)?.revision,bGrant.revision);
- assert.equal(after.rows.find(x=>x.id===bGrant.grant_id)?.status,'active');
+ assert.equal(after.rows.find(x=>x.id===bGrant.grant_id)?.status,bGrant.status);
  const effects=await observer.query(
   'select count(*)::text as total from public.entitlement_events '+
   'where source_provider_event_id=$1::uuid',
