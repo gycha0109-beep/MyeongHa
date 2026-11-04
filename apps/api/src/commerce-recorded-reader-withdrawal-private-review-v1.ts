@@ -209,7 +209,7 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
       connection,{
         subjectId:claim.subjectId as string,
         purchaseIntentId:claim.purchaseIntentId,
-        unitId:claim.unitId,
+        unitId:claim.unitId as string,
       },
     );
     return view(claim.claimId,receivedAt,
