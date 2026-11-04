@@ -383,13 +383,6 @@ body.product-page .product-header .product-theme-toggle-mark::before {
   -webkit-mask-size: contain;
   mask-size: contain;
 }
-body.product-page .product-header .product-icon-button::before {
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  -webkit-mask-image: var(--mh-header-bell);
-  mask-image: var(--mh-header-bell);
-}
 body.product-page .product-header .product-icon-button::after { content: none !important; display: none !important; }
 body.product-page .product-header .product-profile-mark {
   display: grid;
