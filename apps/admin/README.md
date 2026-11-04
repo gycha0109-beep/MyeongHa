@@ -2,6 +2,15 @@
 
 명하 운영자 전용 콘솔의 연속 구현 브랜치(A0~A7 일부)입니다. 코드 구현과 실제 운영 활성화는 분리합니다.
 
+## 실제 비허용 계정 차단 검증 (2026-11-04)
+
+Cloudflare Access에서 거부된 사용자는 해당 앱의 서명된 JWT를 발급받지 못하므로, 기존 `inactive-stage-owner-probe.mjs`의 두-JWT 입력을 실제 **Access 차단 로그인 증거**라고 간주할 수 없습니다. 이 로드맵 항목의 실증에는 `inactive-stage-denied-login-log.mjs`를 사용합니다.
+
+- 기존 Owner가 아닌 이메일로 관리자 Access 로그인을 **실제로 시도한 뒤**, 해당 시도의 30분 이내 시작·종료 시각을 정합니다. 새 사용자 계정 생성이나 allow/bypass 정책 변경은 필요하지 않습니다.
+- 신뢰할 수 있는 단기 실행 환경에서 `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `MYEONGHA_ADMIN_OWNER_EMAIL`, `MYEONGHA_ADMIN_STAGE_NONOWNER_EMAIL`, `MYEONGHA_ADMIN_STAGE_NONOWNER_ATTEMPT_SINCE`, `MYEONGHA_ADMIN_STAGE_NONOWNER_ATTEMPT_UNTIL`을 **일회성 프로세스 환경변수**로만 제공하고 `node apps/admin/inactive-stage-denied-login-log.mjs`를 실행합니다. 시각은 UTC ISO 8601입니다.
+- Cloudflare 인증 로그의 정확한 앱 ID·로그인 동작·이메일·시간·거부 결과를 함께 검증합니다. 허용 기록이 발견되거나 거부 기록이 없으면 실패합니다. 사용자 이메일·JWT·API 토큰·로그 본문은 결과에 출력하지 않습니다.
+- 현재는 실제 비허용 계정 로그인 시도가 확보되지 않았으므로 **실증 미완료**입니다. 합성 테스트와 Owner 인증 성공은 이 증거를 대신하지 않으며, Member 인증·실제 운영 조회와 운영 활성화도 별도로 남습니다.
+
 ## 최신 운영 확인 — 2026-10-30
 
 추가 설치: [공지·배너 비공개 DB 설치 기록](../../docs/operations/ADMIN_PRESENTATION_PRODUCTION_INSTALL_20261030.md). 기존 A7 테이블 3개·RPC 5개·전용 역할을 Production에 설치하고 롤백 검증했습니다. 공개 서비스 권한·로그인 비밀·Worker·게시 활성화는 추가하지 않았습니다. 아래의 “표현 정보 운영 미설치”는 이 기록 이전 상태입니다.
