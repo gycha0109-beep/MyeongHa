@@ -315,6 +315,29 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
+  it('keeps a revoked exact purchase\'s stored cancellation for private review without claiming delivery',async()=>{
+    // No CURRENT verified Receipt evidence, as happens after exact B2 revoke.
+    // The canonical Event may still be attached to the immutable Claim.
+    const f=fixture({purchasedRows:[],cancelRows:[FULL_CANCEL]});
+    const result=await run(f);
+    expect(result).toMatchObject({
+      kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
+      review:null,consumerDeliveryProven:false,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+      storedCancellationEvidence:{
+        kind:'one_exact_full_cancel_recorded_only',
+        recordedSuccessfulItems:1,
+        currentProviderGetObserved:false,providerOrderingProven:false,
+        refundFinalityProven:false,
+      },
+    });
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+    expect(f.query).toHaveBeenCalledWith(
+      expect.stringContaining('left join public.commerce_provider_events event'),
+      [PURCHASE,SUBJECT,UNIT],
+    );
+  });
+
   it('keeps another Subject\'s claim recorded but never borrows this Subject\'s receipt evidence',async()=>{
     const f=fixture({claimRows:[{...ROW,subjectId:UNIT}]});
     const result=await run(f);
