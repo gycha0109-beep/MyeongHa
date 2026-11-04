@@ -320,11 +320,16 @@ body.product-page .product-header .ui-locale-picker::before {
   pointer-events: none;
 }
 body.product-page .product-header .product-theme-toggle-mark::before { background-position: 0 var(--mh-glyph-row) !important; }
-/* The legacy sprite allocated room to an unread dot inside the bell cell.
-   Keep the bell optically centered; render any future server-backed badge separately. */
+/* Center the bell independently of the sprite's baked-in badge/cutout.
+   Separate light/dark SVGs have symmetric, uncropped bell outlines. */
 body.product-page .product-header .product-icon-button::before {
-  background-position: -56px var(--mh-glyph-row) !important;
-  transform: translate(calc(-50% + 3px), -50%) !important;
+  background-image: url("assets/header/header-bell-light.svg") !important;
+  background-position: center center !important;
+  background-size: 28px 28px !important;
+  transform: translate(-50%, -50%) !important;
+}
+html[data-theme="dark"] body.product-page .product-header .product-icon-button::before {
+  background-image: url("assets/header/header-bell-dark.svg") !important;
 }
 body.product-page .product-header .product-profile-mark::before { background-position: -84px var(--mh-glyph-row) !important; }
 body.product-page .product-header .ui-locale-picker::before {
@@ -341,8 +346,9 @@ body.product-page .product-header .product-icon-button[data-unread="true"]::afte
   content: "" !important;
   display: block !important;
   position: absolute;
-  top: 5px;
-  right: 5px;
+  top: 0;
+  right: 0;
+  z-index: 1;
   width: 9px;
   height: 9px;
   box-sizing: border-box;

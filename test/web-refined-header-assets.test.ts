@@ -19,8 +19,21 @@ describe('shared refined header', () => {
     expect(css).toContain('header-ui-glyphs-v2.png');
     expect(css).toContain('background-size: 140px 56px !important;');
     expect(css).toContain('background-position: -28px var(--mh-glyph-row) !important;');
-    expect(css).toContain('transform: translate(calc(-50% + 3px), -50%) !important;');
+    expect(css).not.toContain('translate(calc(-50% + 3px), -50%)');
+    expect(css).toContain('background-image: url("assets/header/header-bell-light.svg") !important;');
+    expect(css).toContain('background-image: url("assets/header/header-bell-dark.svg") !important;');
+    expect(css).toContain('background-position: center center !important;');
+    expect(css).toContain('transform: translate(-50%, -50%) !important;');
     expect(css).toContain('.product-icon-button[data-unread="true"]::after');
+    expect(css).toMatch(/\.product-icon-button\[data-unread="true"\]::after\s*\{[^}]*top: 0;[^}]*right: 0;/);
+    for (const [mode, stroke] of [['light', '#313844'], ['dark', '#f3f5f8']] as const) {
+      const bell = await read('assets/header/header-bell-' + mode + '.svg');
+      expect(bell).toContain('viewBox="0 0 28 28"');
+      expect(bell).toContain('stroke="' + stroke + '"');
+      expect(bell).toContain('M14 4.5');
+      expect(bell).not.toContain('circle');
+      expect(bell).not.toContain('clipPath');
+    }
     expect(css).toContain('padding: 0 27px 0 43px !important;');
     expect(css).toContain('background-position: right 11px center !important;');
     expect(css).not.toContain('.product-report-link');
