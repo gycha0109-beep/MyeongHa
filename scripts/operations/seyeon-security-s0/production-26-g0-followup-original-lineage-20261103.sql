@@ -229,23 +229,48 @@ BEGIN
   SELECT pg_get_functiondef(to_regprocedure(
     'public.qry_seyeon_g0_current_source_recent_messages_v1(uuid,uuid,uuid,integer)'))
     INTO g;
-  IF g IS NULL OR position('and src.redacted_at is null and src.body_text is not null' IN g)=0
+  IF g IS NULL
      OR position('order by src.sequence_no desc limit p_limit' IN g)=0
      OR position('seyeon_g0_historical_source_unverifiable' IN g)=0
      OR position('and not exists (select 1 from public.chat_turns ignored' IN g)>0
   THEN RAISE EXCEPTION 'G0 recent history source definition drifted'; END IF;
-  g:=replace(g,
-    'and src.redacted_at is null and src.body_text is not null',
-    $excluded$and src.redacted_at is null and src.body_text is not null
-        and not exists (
-          select 1 from public.chat_turns ignored
+  -- Production-22 applies an earlier filtered source window. The S0-13
+  -- installed original instead censuses redacted / missing-body metadata:
+  -- NEVER turn that complete census into a silently filtered history.
+  IF position('and src.redacted_at is null and src.body_text is not null' IN g)>0 THEN
+    g:=replace(g,
+      'and src.redacted_at is null and src.body_text is not null',
+      $excluded$and src.redacted_at is null and src.body_text is not null
+          and not exists (
+            select 1 from public.chat_turns ignored
+            where ignored.id=src.turn_id and ignored.subject_id=src.subject_id
+              and ignored.thread_id=src.thread_id
+              and ignored.state='abandoned'
+              and ignored.committed_attempt_id is null
+              and ignored.committed_at is null
+              and src.sender_type='user'
+          )$excluded$);
+  ELSIF position('nullif(btrim(src.body_text),' IN g)>0
+    AND position('as has_body' IN g)>0
+    AND position('v_row.has_body is distinct from true' IN g)>0
+    AND position('where src.subject_id=p_subject_id and src.thread_id=p_thread_id' IN g)>0
+  THEN
+    -- Preserve missing/redacted rows in the audited S0-13 census and
+    -- exclude ONLY terminal-abandoned, uncommitted original User rows.
+    g:=replace(g,
+      'where src.subject_id=p_subject_id and src.thread_id=p_thread_id',
+      $excluded$where src.subject_id=p_subject_id and src.thread_id=p_thread_id
+        and not exists (select 1 from public.chat_turns ignored
           where ignored.id=src.turn_id and ignored.subject_id=src.subject_id
             and ignored.thread_id=src.thread_id
             and ignored.state='abandoned'
             and ignored.committed_attempt_id is null
             and ignored.committed_at is null
-            and src.sender_type='user'
-        )$excluded$);
+            and src.sender_type='user')
+      $excluded$);
+  ELSE
+    RAISE EXCEPTION 'G0 recent history source definition drifted';
+  END IF;
   EXECUTE g;
 END $patch$;
 RESET ROLE;
