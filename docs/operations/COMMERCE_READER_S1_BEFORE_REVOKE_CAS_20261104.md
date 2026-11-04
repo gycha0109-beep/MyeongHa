@@ -10,6 +10,7 @@
 
 - 정식 Provider Event·원본 Receipt·구매 Grant·Reader 접근 기록의 **DB 연결에서만** 해당 구매의 Subject×Reading×Reader 잠금 범위를 조회합니다. 사용자/웹훅이 Reader나 Subject를 선택하지 못합니다.
 - 기존 1770 Writer와 같은 데이터베이스 정렬 순서로 각각 internal_acquire_official_reader_scope_lock_v1을 먼저 호출합니다. Reader 잠금 함수가 요구하는 READ COMMITTED를 사용하며, 제한 시간·잠금 대기 제한 후 종료 시 모든 잠금을 ROLLBACK합니다.
+- 공통 잠금 함수가 요구하는 `myeongha.subject_id`는 **기존 결제 원장으로 확인한 Subject**만 트랜잭션 범위에 설정합니다. 이미 다른 Subject가 설정된 연결은 즉시 거부하며, 사용자 입력을 회원 문맥으로 사용하지 않습니다.
 - 잠금 대기 후 독립 쿼리에서 범위를 다시 조회해 삽입·삭제·결속 변경을 감지합니다. 이후 원본 Provider Event→정확한 Reader Grant 행 순서로 잠그고 CAS(revision + 마지막 Provider key)를 검증합니다. 행 잠금 뒤에도 같은 범위를 다시 확인합니다.
 - 구매 Scope가 없거나, 64개를 초과하거나, 원본 Receipt/Reader 범위가 변경되거나, CAS가 달라지면 **보류**합니다. 여러 구매권이 존재해도 이벤트가 가리키는 원본 Receipt의 구매 Grant만 검사합니다.
 - 이번 사전검사는 S1 잠금 자체를 관측했더라도 Reader의 최종 T2 운영 잠금·Provider 최신 순서·법적 환불 결론·실제 Entitlement Effect 권한을 주장하지 않습니다. sourceOrderClassification은 신뢰 가능한 새로운 비교기가 없으면 INCOMPARABLE이며, 모든 writer 실행 허가는 false입니다.
