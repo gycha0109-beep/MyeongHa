@@ -13,6 +13,9 @@ describe('first-paint header controls', () => {
     expect(indices.every((value,index) => value >= 0 && (index===0 || value>indices[index-1]!))).toBe(true);
     expect(header).toContain('class="product-theme-toggle-mark"');
     expect(header).toContain('class="ui-locale-select"');
+    for (const tooltip of ['다크 모드', '알림', '마이페이지', '언어 변경']) {
+      expect(header).toContain('title="' + tooltip + '"');
+    }
     expect(header.match(/<option value=/g)).toHaveLength(5);
     expect(header).not.toContain('product-report-link');
     expect(header).not.toMatch(/<span(?: id="home-profile-name")?>마이<\/span>/);
@@ -27,7 +30,7 @@ describe('first-paint header controls', () => {
     expect(locale).toContain("wrap.dataset.uiLocaleMounted = 'true'");
     expect(css).toContain('html { overflow-y: scroll; }');
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
-    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 250px !important;');
+    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 274px !important;');
     expect(css).toContain('background-position: -28px var(--mh-glyph-row) !important;');
     expect(theme).not.toContain("mark.textContent = dark ? '☀' : '☾'");
   });
