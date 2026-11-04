@@ -1939,6 +1939,130 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('G5 original dialogue read holds active Subject against account deletion, then blocks future replay',async()=>{
+    const f=await prepare(233,{summary:'synthetic original dialogue before account deletion'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const reader=await pool.connect(),deletion=await pool.connect();
+    const marker='seyeon_g5_deletion_waits_on_original_dialogue';
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{userText:string,assistantText:string}>(`select
+        user_text as "userText",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{userText:f.userText,assistantText:f.assistantText}]);
+      await deletion.query("select set_config('application_name',$1,false)",[marker]);
+      await deletion.query('BEGIN');
+      const pending=deletion.query(`select * from public.cmd_start_account_deletion_v1(
+        $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+        f.subject,uuid(26,f.n),'g5-original-pair-after-read-'+f.n,uuid(27,f.n),
+      ]).then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows[0]).toMatchObject({
+        deletion_job_status:'running',replayed:false,
+      });
+      await deletion.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await deletion.query('ROLLBACK').catch(()=>undefined);
+      await deletion.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();deletion.release();
+    }
+    const {rows:[subject]}=await pool.query('select status from public.subjects where id=$1',[f.subject]);
+    expect(subject?.status).toBe('deletion_pending');
+    await expect(f.run(({client})=>client.query(`select user_text,assistant_text
+      from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]))).rejects.toThrow();
+    const {rows:[grant]}=await pool.query(`select revoked_at is null
+      and seyeon_revoke_requested_at is null as grant_active
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant?.grant_active).toBe(true);
+  });
+
+  it('G5 account deletion first blocks original dialogue read and HTTP disclosure with original Grant still active',async()=>{
+    const f=await prepare(234,{summary:'synthetic deletion pending before original dialogue'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const deletion=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g5_original_dialogue_waits_on_account_deletion';
+    try{
+      await deletion.query('BEGIN');
+      const {rows:[job]}=await deletion.query(`select * from public.cmd_start_account_deletion_v1(
+        $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+        f.subject,uuid(26,f.n),'g5-original-pair-deletion-first-'+f.n,uuid(27,f.n),
+      ]);
+      expect(job).toMatchObject({deletion_job_status:'running',replayed:false});
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await deletion.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(false);
+      if(!result.ok)expect(String(result.error)).toContain('active Member');
+    }finally{
+      await deletion.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      deletion.release();reader.release();
+    }
+    const {rows:[subject]}=await pool.query('select status from public.subjects where id=$1',[f.subject]);
+    expect(subject?.status).toBe('deletion_pending');
+    const {rows:[grant]}=await pool.query(`select revoked_at is null
+      and seyeon_revoke_requested_at is null as grant_active
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant?.grant_active).toBe(true);
+    const server=createServer((incoming,response)=>{
+      void handleSeyeonFirstOriginalDialoguePairNodeS0V1({
+        incoming,response,pool:subjectPool,requestId:'g5-original-pair-deleted-member-234',
+        identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+      });
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    try{
+      const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-pair/${f.assistant}`);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Cache-Control')).toContain('no-store');
+      const body=await response.text();
+      expect(body).not.toContain(f.userText);
+      expect(body).not.toContain(f.assistantText);
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
     const f=await prepare(210);
     await f.commit();
