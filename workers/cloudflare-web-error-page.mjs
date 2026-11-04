@@ -36,9 +36,14 @@ export function isPublicWebDocumentRequestV1(request) {
   try { url = new URL(request.url); } catch { return false; }
   // Even if this helper were accidentally called from an API branch, an
   // encoded/variant API root must never receive a document instead of JSON.
+  const isApiRootSegment = (segment) => {
+    if (segment.slice(0, 3).toLowerCase() !== 'api') return false;
+    const suffix = segment.slice(3, 4);
+    return suffix === '' || ['/', '\\', '.', ';', '%'].includes(suffix);
+  };
   let first = url.pathname.split('/')[1] ?? '';
   for (let i = 0; i < 4; i += 1) {
-    if (/^api(?:$|[/\\.;%])/iu.test(first)) return false;
+    if (isApiRootSegment(first)) return false;
     if (!first.includes('%')) break;
     try {
       const decoded = decodeURIComponent(first);
@@ -46,7 +51,7 @@ export function isPublicWebDocumentRequestV1(request) {
       first = decoded;
     } catch { return false; }
   }
-  if (/^api(?:$|[/\\.;%])/iu.test(first)) return false;
+  if (isApiRootSegment(first)) return false;
   const accept = request.headers.get('accept') ?? '';
   return request.headers.get('sec-fetch-mode') === 'navigate'
     || request.headers.get('sec-fetch-dest') === 'document'
