@@ -1,7 +1,7 @@
 import { MyeongHaApiClientErrorV1 } from '@myeongha/api-client';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
 import { resolveMobileApiOriginV1 } from '@/core/config/mobile-runtime-config';
-import { createMobileChatTurnIdV1 } from '@/features/chat/mobile-chat-turn-id';
+import { createMobilePaidReaderDeliveryRequestIdV1 } from '@/features/chat/mobile-paid-reader-delivery-id';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const TOKEN = /^[A-Za-z0-9_-]{43}$/u;
@@ -126,12 +126,14 @@ export async function readMobilePaidReaderChatMessageV1(input: Readonly<{
   signal: AbortSignal;
 }>): Promise<MobilePaidReaderReadOutcomeV1> {
   const endpoint = route(origin(), input.threadId, input.safeMessageId);
-  const deliveryRequestId = createMobileChatTurnIdV1();
+  const deliveryRequestId = createMobilePaidReaderDeliveryRequestIdV1();
   if (!UUID.test(deliveryRequestId)) throw new Error('Delivery identity unavailable.');
   return nativeMobileRuntimeV1.memberSession.withMemberBearer(async (bearer) => {
     const response = await retryNetworkOnce(() => fetch(endpoint, {
       method: 'GET',
       cache: 'no-store',
+      // Native Bearer-only delivery: do not attach device/browser cookies.
+      credentials: 'omit',
       headers: {
         Accept: 'application/json',
         Authorization: 'Bearer ' + bearer,
@@ -187,6 +189,8 @@ export async function acknowledgeMobilePaidReaderChatDeliveryV1(input: Readonly<
     const response = await retryNetworkOnce(() => fetch(endpoint, {
       method: 'POST',
       cache: 'no-store',
+      // Native Bearer-only delivery: do not attach device/browser cookies.
+      credentials: 'omit',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/json',
