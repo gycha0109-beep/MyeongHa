@@ -15,6 +15,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { formatMobileUiCopy } from '@/ui/mobile-ui-copy';
+import { SajuReportStructurePreview } from './SajuReportStructurePreview';
 
 type PreviewReadingTextV1 = Extract<
   MobileSajuTopicV1['availability'],
@@ -234,6 +235,8 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
           </View>
         </View>
       ))}
+
+      <SajuReportStructurePreview />
 
       {state.kind === 'blocked' ? (
         <View style={styles.stateCard}>
