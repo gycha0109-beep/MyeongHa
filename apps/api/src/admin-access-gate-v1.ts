@@ -68,9 +68,12 @@ export function createAdminAccessGateV1(config: AdminAccessConfigurationV1, opti
       // can reject valid Access users when the key endpoint is slow.
       stage = 'key_fetch';
       keyRequestSignal = AbortSignal.timeout(8000);
+      // Workers does not implement redirect:'error' (it throws before any fetch).
+      // manual prevents following an unexpected redirect to a different origin.
       const response = await (options.fetchImpl ?? fetch)(binding.issuer + '/cdn-cgi/access/certs', {
-        redirect: 'error', signal: keyRequestSignal, headers: { Accept: 'application/json' }, cache: 'no-store',
+        redirect: 'manual', signal: keyRequestSignal, headers: { Accept: 'application/json' }, cache: 'no-store',
       });
+      if (response.status >= 300 && response.status < 400) return deny('signing_keys_redirect_rejected');
       if (!response.ok) return deny('signing_keys_unavailable');
       stage = 'key_body';
       const bodyText = await readBoundedUpstreamJsonTextV1(response, { maximumBodyBytes: 65_536, signal: keyRequestSignal });

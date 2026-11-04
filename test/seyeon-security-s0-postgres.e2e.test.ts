@@ -1562,6 +1562,70 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('G3 original dialogue replay-first holds Member User source against concurrent redaction, then denies later reuse',async()=>{
+    const f=await prepare(228,{summary:'synthetic original User protected during G3 replay'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const reader=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g3_original_user_redaction_waits_on_replay';
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{userText:string,assistantText:string}>(`select
+        user_text as "userText",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{userText:f.userText,assistantText:f.assistantText}]);
+      // The first session keeps original source SHARE locks through the
+      // pending disclosure; the distinct redaction writer must actually wait.
+      await redactor.query("select set_config('application_name',$1,false)",[marker]);
+      await redactor.query('BEGIN');
+      const pending=redactor.query(`update public.conversation_messages
+        set redacted_at=clock_timestamp(),redaction_reason=$2::text
+        where id=$1::uuid`,[f.user,'g3_synthetic_original_user_redaction_after_replay'])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome.ok).toBe(true);
+      if(outcome.ok)expect(outcome.value.rowCount).toBe(1);
+      await redactor.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();redactor.release();
+    }
+    const after=await f.run(async({client})=>{
+      const pair=await client.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      const reply=await client.query(`select assistant_text
+        from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      return {pair:pair.rows,reply:reply.rows};
+    });
+    expect(after).toEqual({pair:[],reply:[]});
+    const {rows:[source]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      m.redacted_at is not null as user_redacted
+      from public.record_access_grants g,public.conversation_messages m
+      where g.id=$1 and m.id=$2`,[f.grant,f.user]);
+    expect(source).toEqual({grant_active:true,user_redacted:true});
+  });
+
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
     const f=await prepare(210);
     await f.commit();

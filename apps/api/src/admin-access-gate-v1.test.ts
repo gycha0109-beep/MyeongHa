@@ -52,6 +52,30 @@ describe('private hosted administrator boundary',()=>{
     expect(reasons).toEqual(['credential_missing_or_ambiguous','owner_claim_invalid']);
     expect(JSON.stringify(reasons)).not.toContain('other@example.test');
   });
+  it('uses Workers-supported manual redirects and rejects signing-key redirects',async()=>{
+    const request=new Request('https://admin.example.test/admin/',{
+      headers:{'cf-access-jwt-assertion':token()},
+    });
+    let calls=0;
+    const fetchImpl=(async(input:RequestInfo|URL,init?:RequestInit)=>{
+      calls++;
+      expect(String(input)).toBe(config.issuer+'/cdn-cgi/access/certs');
+      // Workers throws on redirect:error instead of issuing the request.
+      expect(init?.redirect).toBe('manual');
+      expect(init?.cache).toBe('no-store');
+      return Response.json({keys:[{...publicKey.export({format:'jwk'}),kid:'test-key',use:'sig'}]});
+    }) as typeof fetch;
+    const allowed=createAdminAccessGateV1(config,{fetchImpl,now:()=>1800000000000});
+    expect(await allowed(request)).toBe(true);
+    expect(calls).toBe(1);
+    const denialReasons:string[]=[];
+    const redirected=createAdminAccessGateV1(config,{
+      now:()=>1800000000000,onDenied:reason=>denialReasons.push(reason),
+      fetchImpl:(async()=>new Response(null,{status:302,headers:{location:'https://evil.example/keys'}})) as typeof fetch,
+    });
+    expect(await redirected(request)).toBe(false);
+    expect(denialReasons).toEqual(['signing_keys_redirect_rejected']);
+  });
   it('reports safe signing-key lookup failure stages without exposing credentials',async()=>{
     const reasons: string[]=[];
     const request=new Request('https://admin.example.test/admin/',{

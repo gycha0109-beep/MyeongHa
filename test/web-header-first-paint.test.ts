@@ -32,6 +32,11 @@ describe('first-paint header controls', () => {
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 274px !important;');
     expect(css).toContain('background-position: -28px var(--mh-glyph-row) !important;');
+    expect(css).toContain('background-image: url("assets/header/header-bell-light.svg") !important;');
+    expect(css).toContain('background-image: url("assets/header/header-bell-dark.svg") !important;');
+    expect(css).not.toContain('translate(calc(-50% + 3px), -50%)');
+    expect(css).toContain('top: calc(15% - 4px);');
+    expect(css).toContain('right: calc(15% - 4px);');
     expect(theme).not.toContain("mark.textContent = dark ? '☀' : '☾'");
   });
 });
