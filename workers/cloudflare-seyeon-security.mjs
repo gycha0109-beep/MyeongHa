@@ -186,16 +186,18 @@ export async function tryHandleCloudflareSeyeonSecurityV1(
     }
   }
   if ((verdict?.kind === 'unrelated_thread_requires_ops_reauthorization' ||
-       ((verdict?.kind === 'seyeon_empty_thread_requires_ops_reauthorization' ||
-         verdict?.kind === 'seyeon_existing_thread_shell_requires_ops_reauthorization') &&
-        ingress.kind === 'history')) &&
+       (ingress.kind === 'history' &&
+         verdict?.kind === 'seyeon_history_requires_ops_reauthorization')) &&
       verdict.threadId === ingress.threadId) {
-    // No positive response crosses this fence. The independent generic Chat
-    // reader must authenticate again, verify DB ownership and the present
-    // absence of every Se-yeon message before any empty shell is returned.
+    // Scope supplied no transcript or authorization to reveal anything.
+    // The independent generic reader MUST authenticate, verify the same
+    // owner, and execute the private current-rights history authority before
+    // even a historical body or redacted placeholder is returned.
+    // This exception is GET-only. Model turn POST and all replay aliases
+    // remain behind the existing first-Reveal security hold.
     return null;
   }
-  // Historical message content, mixed rooms, pagination and uncertain verdicts remain held.
+  // Unverified, malformed and protected send/replay decisions remain held.
   // Even a malicious injected success or forged 4xx cannot cross this fence.
   return enforceHeaders(fenceCloudflareSeyeonBeforeFetchReturnV1(
     verdict?.kind === 'seyeon_protected_held' || verdict?.kind === 'denied'
