@@ -25,12 +25,13 @@ describe('shared refined header', () => {
     expect(css).toContain('background-position: center center !important;');
     expect(css).toContain('transform: translate(-50%, -50%) !important;');
     expect(css).toContain('.product-icon-button[data-unread="true"]::after');
-    expect(css).toMatch(/\.product-icon-button\[data-unread="true"\]::after\s*\{[^}]*top: 0;[^}]*right: 0;/);
+    expect(css).toMatch(/\.product-icon-button\[data-unread="true"\]::after\s*\{[^}]*top: calc\(15% - 4px\);[^}]*right: calc\(15% - 4px\);/);
     for (const [mode, stroke] of [['light', '#313844'], ['dark', '#f3f5f8']] as const) {
       const bell = await read('assets/header/header-bell-' + mode + '.svg');
       expect(bell).toContain('viewBox="0 0 28 28"');
       expect(bell).toContain('stroke="' + stroke + '"');
       expect(bell).toContain('M14 4.5');
+      expect(bell).toContain('<g transform="translate(0 -1.5)">');
       expect(bell).not.toContain('circle');
       expect(bell).not.toContain('clipPath');
     }

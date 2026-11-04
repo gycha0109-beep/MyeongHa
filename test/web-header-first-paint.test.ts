@@ -35,6 +35,8 @@ describe('first-paint header controls', () => {
     expect(css).toContain('background-image: url("assets/header/header-bell-light.svg") !important;');
     expect(css).toContain('background-image: url("assets/header/header-bell-dark.svg") !important;');
     expect(css).not.toContain('translate(calc(-50% + 3px), -50%)');
+    expect(css).toContain('top: calc(15% - 4px);');
+    expect(css).toContain('right: calc(15% - 4px);');
     expect(theme).not.toContain("mark.textContent = dark ? '☀' : '☾'");
   });
 });

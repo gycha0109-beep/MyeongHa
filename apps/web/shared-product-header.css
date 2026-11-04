@@ -320,8 +320,8 @@ body.product-page .product-header .ui-locale-picker::before {
   pointer-events: none;
 }
 body.product-page .product-header .product-theme-toggle-mark::before { background-position: 0 var(--mh-glyph-row) !important; }
-/* Center the bell independently of the sprite's baked-in badge/cutout.
-   Separate light/dark SVGs have symmetric, uncropped bell outlines. */
+/* Center the complete bell independently of the old sprite cutout.
+   Both SVGs balance their ink vertically by 1.5px, with a symmetric x axis. */
 body.product-page .product-header .product-icon-button::before {
   background-image: url("assets/header/header-bell-light.svg") !important;
   background-position: center center !important;
@@ -346,8 +346,10 @@ body.product-page .product-header .product-icon-button[data-unread="true"]::afte
   content: "" !important;
   display: block !important;
   position: absolute;
-  top: 0;
-  right: 0;
+  /* Center the badge on the circle at 45°, not the square's top-right.
+     15% tracks the ring radius at 40/36/34px responsive button sizes. */
+  top: calc(15% - 4px);
+  right: calc(15% - 4px);
   z-index: 1;
   width: 9px;
   height: 9px;
