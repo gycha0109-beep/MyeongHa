@@ -1,0 +1,112 @@
+/* Standalone error surface. No generated illustration or external font. */
+:root {
+  color-scheme: light;
+  --error-paper: #fbf3e8;
+  --error-text: #392d28;
+  --error-muted: #74655d;
+  --error-border: #c7ad8e;
+  --error-accent: #915255;
+  --error-surface: rgba(255, 252, 248, .72);
+}
+* { box-sizing: border-box; }
+html { min-height: 100%; }
+body.mh-error-page {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--error-text);
+  font-family: "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  background:
+    radial-gradient(ellipse at 12% 68%, rgba(171, 142, 125, .14), transparent 36%),
+    radial-gradient(ellipse at 85% 75%, rgba(174, 146, 114, .12), transparent 34%),
+    var(--error-paper);
+}
+.mh-error-header {
+  height: 82px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  max-width: 1360px;
+  margin: 0 auto;
+  padding: 0 34px;
+  border-bottom: 1px solid var(--error-border);
+}
+.mh-error-brand { display: inline-flex; align-items: baseline; gap: 10px; text-decoration: none; color: var(--error-text); }
+.mh-error-brand-name { font-family: "Noto Serif KR", "Batang", serif; font-size: 29px; font-weight: 700; letter-spacing: .045em; }
+.mh-error-brand-en { font-family: Georgia, serif; font-size: 13px; }
+.mh-error-header-help { font-size: 13px; color: var(--error-muted); text-decoration: none; }
+.mh-error-header-help:hover, .mh-error-support:hover { text-decoration: underline; }
+.mh-error-main {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - 82px);
+  padding: clamp(42px, 8vh, 86px) 24px;
+}
+.mh-error-content { text-align: center; max-width: 740px; width: 100%; }
+.mh-error-kicker { color: var(--error-muted); font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+.mh-error-code {
+  margin: 8px 0 0;
+  color: #9a7953;
+  font: 400 clamp(94px, 14vw, 154px)/1.16 Georgia, "Times New Roman", serif;
+  letter-spacing: -.065em;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.mh-error-rule { height: 1px; width: 130px; margin: 19px auto 39px; background: var(--error-border); position: relative; }
+.mh-error-rule span { position: absolute; width: 7px; height: 7px; transform: translate(-50%, -50%) rotate(45deg); left: 50%; top: 50%; background: #ac8554; }
+.mh-error-content h1 {
+  margin: 0 0 17px;
+  font: 700 clamp(28px, 3.2vw, 42px)/1.4 "Noto Serif KR", "Batang", serif;
+  word-break: keep-all;
+}
+.mh-error-content p {
+  margin: 0 auto;
+  max-width: 540px;
+  color: var(--error-muted);
+  font-size: clamp(14px, 1.5vw, 16px);
+  line-height: 1.85;
+  word-break: keep-all;
+}
+.mh-error-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 42px; }
+.mh-error-actions a, .mh-error-actions button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 156px; min-height: 48px; padding: 12px 22px;
+  border-radius: 999px; font: 650 14px/1.4 "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  text-decoration: none; cursor: pointer; transition: background-color .15s ease, border-color .15s ease;
+}
+.mh-error-primary { background: var(--error-accent); border: 1px solid var(--error-accent); color: #fff8f1; }
+.mh-error-primary:hover { background: #793b40; }
+.mh-error-secondary, .mh-error-retry {
+  color: var(--error-text); border: 1px solid var(--error-border); background: var(--error-surface);
+}
+.mh-error-secondary:hover, .mh-error-retry:hover { border-color: var(--error-accent); }
+.mh-error-retry { display: none !important; }
+[data-error-status="500"] .mh-error-retry,
+[data-error-status="502"] .mh-error-retry,
+[data-error-status="503"] .mh-error-retry,
+[data-error-status="504"] .mh-error-retry { display: inline-flex !important; }
+.mh-error-support { display: inline-block; color: var(--error-accent); font-size: 13px; margin-top: 28px; text-underline-offset: 4px; }
+:focus-visible { outline: 3px solid #bf8e4f; outline-offset: 3px; }
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --error-paper: #0b1419;
+  --error-text: #efe7da;
+  --error-muted: #b9ab9b;
+  --error-border: #6d5b4c;
+  --error-accent: #985b60;
+  --error-surface: rgba(28, 40, 49, .84);
+}
+html[data-theme="dark"] body.mh-error-page {
+  background: radial-gradient(ellipse at 12% 68%, rgba(71, 91, 106, .18), transparent 36%),
+    radial-gradient(ellipse at 85% 75%, rgba(152, 126, 93, .11), transparent 34%), var(--error-paper);
+}
+html[data-theme="dark"] .mh-error-code { color: #c19b6a; }
+html[data-theme="dark"] .mh-error-primary:hover { background: #ae7274; }
+@media (max-width: 600px) {
+  .mh-error-header { height: 72px; padding: 0 20px; }
+  .mh-error-brand-name { font-size: 25px; }
+  .mh-error-main { min-height: calc(100vh - 72px); }
+  .mh-error-actions a, .mh-error-actions button { flex: 1 1 190px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mh-error-actions a, .mh-error-actions button { transition: none; }
+}
