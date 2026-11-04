@@ -93,7 +93,7 @@ echo 'PASS real ephemeral PostgreSQL 18 synthetic pool saturation and post-press
 
 # Reuse the existing manual PG18 runner to measure the real product DB path.
 # This fixture contains only local synthetic owners; Auth/Saju are loopback HTTP.
-if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.test.mjs --reporter=verbose >"$scratch/product-path.log" 2>&1; then
+if ! MH_OPS_ISOLATED_PRODUCT_PROOF_PATH="$scratch/product-path.json" ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.test.mjs --reporter=verbose >"$scratch/product-path.log" 2>&1; then
   echo '::group::Isolated PostgreSQL product-path diagnostics (sanitized)' >&2
   tail -n 75 "$scratch/product-path.log" | sed -E \
     -e 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/[SYNTHETIC_UUID]/g' \
@@ -104,9 +104,7 @@ if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.
 fi
 grep -F '1 passed' "$scratch/product-path.log" >/dev/null \
   || fail 'Exactly one PostgreSQL18 product-path test must pass.'
-sed -n 's/^MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS //p' "$scratch/product-path.log" \
-  >"$scratch/product-path.json"
-[[ -s "$scratch/product-path.json" ]] || fail 'Actual product-path measurement marker missing.'
+[[ -s "$scratch/product-path.json" ]] || fail 'Actual product-path private measurement file missing.'
 jq -e '
   .schema == "myeongha-isolated-pg18-product-path-phase10-phase11-v1"
   and .result == "PASS"
@@ -133,6 +131,7 @@ jq -e '
   and .outputContainsIdentifiers == false
 ' "$scratch/product-path.json" >/dev/null \
   || fail 'Real PostgreSQL18 product-path observations failed bounded safety contract.'
+echo 'MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS: verified private measurement file against exact bounded contract.'
 echo 'PASS isolated real PostgreSQL18 product path: Auth/Saju local HTTP, pool pressure, dependency failures.'
 
 jq -n --slurpfile metrics "$scratch/capacity.json" --slurpfile product "$scratch/product-path.json" '{
