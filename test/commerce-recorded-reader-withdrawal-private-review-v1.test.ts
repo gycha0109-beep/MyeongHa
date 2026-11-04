@@ -212,12 +212,12 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
   });
 
   it.each([
-    [{...FULL_CANCEL,eventReceiptId:UNIT}],
-    [{...FULL_CANCEL,eventSubjectId:UNIT}],
-    [{...FULL_CANCEL,orderingProven:'true'}],
-    [{...FULL_CANCEL,exactAmountMinor:'9000'}],
-    [FULL_CANCEL,FULL_CANCEL],
-  ])('holds inconsistent/cross-Reader/duplicated cancellation Event evidence',async cancelRows=>{
+    {cancelRows:[{...FULL_CANCEL,eventReceiptId:UNIT}]},
+    {cancelRows:[{...FULL_CANCEL,eventSubjectId:UNIT}]},
+    {cancelRows:[{...FULL_CANCEL,orderingProven:'true'}]},
+    {cancelRows:[{...FULL_CANCEL,exactAmountMinor:'9000'}]},
+    {cancelRows:[FULL_CANCEL,FULL_CANCEL]},
+  ])('holds inconsistent/cross-Reader/duplicated cancellation Event evidence',async ({cancelRows})=>{
     const f=fixture({cancelRows});
     const result=await run(f);
     expect(result?.storedCancellationEvidence).toMatchObject({
