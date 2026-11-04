@@ -40,8 +40,9 @@ export function projectMobileSajuBirthFactsV1(
   locale: MobileUiLocale,
 ): Readonly<Record<FieldV1, string>> {
   const birthDate = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(input.birthDate);
-  const parsed = birthDate?.slice(1).map(Number);
-  const [year, month, day] = parsed ?? [0, 0, 0];
+  const year = Number(birthDate?.[1] ?? 0);
+  const month = Number(birthDate?.[2] ?? 0);
+  const day = Number(birthDate?.[3] ?? 0);
   const validDate = year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
   const date = !validDate ? UNKNOWN[locale]
     : locale === 'ko-KR' ? `${year}년 ${month}월 ${day}일`
