@@ -1495,6 +1495,24 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb)',
       'EXECUTE') as denied`);
     expect(acl.denied).toBe(true);
+    // G2 must reject a saved historical audit candidate even from a direct
+    // legacy Attempt-state update, not just the positive Commit wrapper.
+    for(const state of ['validated','committed'] as const){
+      await expect(pool.query(`update public.chat_turn_attempts
+        set state=$2 where id=$1::uuid`,[currentAttempt,state]))
+        .rejects.toMatchObject({
+          code:'23514',constraint:'seyeon_g2_historical_candidate_not_authority',
+        });
+    }
+    const {rows:[afterDenied]}=await pool.query(`select
+      a.state as attempt_state,t.state as turn_state,
+      (select count(*)::int from public.conversation_messages m
+       where m.turn_id=t.id and m.sender_type='character') as assistant_count
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1::uuid`,[currentAttempt]);
+    expect(afterDenied).toEqual({
+      attempt_state:'running',turn_state:'context_ready',assistant_count:0,
+    });
   });
 
   it('G5 historical candidate cannot pin a revoked original Grant during an independent DB race', async () => {

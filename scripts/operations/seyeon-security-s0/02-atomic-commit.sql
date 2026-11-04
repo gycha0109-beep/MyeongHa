@@ -43,6 +43,17 @@ begin
       message='Se-yeon source Pin must precede model generation';
   end if;
 
+  -- A G1 historicalCandidateProof is an audit-only HOLD, never a
+  -- positive/zero original Pin. Reject direct state promotion too, including
+  -- callers that bypass the positive G2 wrapper or attempt a legacy update.
+  if new.planner_version='seyeon-production-chat-planner-v1'
+     and old.seyeon_personal_source_pin_jsonb ? 'historicalCandidateProof'
+     and new.state in ('validated','committed','delivered') then
+    raise exception using errcode='23514',
+      constraint='seyeon_g2_historical_candidate_not_authority',
+      message='Historical model source candidate cannot authorize Commit';
+  end if;
+
   if old.state='validated' and new.state='committed' and
      new.planner_version='seyeon-production-chat-planner-v1' then
     if old.seyeon_personal_source_pin_jsonb #> '{zeroProof,records}'

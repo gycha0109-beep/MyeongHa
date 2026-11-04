@@ -178,6 +178,8 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(sql).toContain('lock_memory_source_message_v1(');
     expect(sql).toContain('m.body_text=v_row.body_text');
     const g2=readFileSync(new URL('../scripts/operations/seyeon-security-s0/02-atomic-commit.sql',import.meta.url),'utf8');
+    expect(g2).toContain("old.seyeon_personal_source_pin_jsonb ? 'historicalCandidateProof'");
+    expect(g2).toContain('seyeon_g2_historical_candidate_not_authority');
     expect(g2).toContain("old.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
     expect(g2).toContain("a.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
   });
