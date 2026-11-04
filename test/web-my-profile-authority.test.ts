@@ -103,11 +103,11 @@ describe('web My profile authority boundary', () => {
     expect(productAuthUi).not.toContain('label.textContent');
 
     expect(reading).not.toContain('<span>지환</span>');
-    expect(reading).not.toMatch(/class="product-profile"[^>]*>[\s\S]*?<span>마이<\/span>/);
+    expect(reading.match(/<a class="product-profile"[^>]*>[\s\S]*?<\/a>/)?.[0]).not.toContain('<span>마이</span>');
     expect(reading).toContain('href="my.html" aria-label="내 프로필"');
 
     expect(readingDetail).not.toContain('<span>지환</span>');
-    expect(readingDetail).not.toMatch(/class="product-profile"[^>]*>[\s\S]*?<span>마이<\/span>/);
+    expect(readingDetail.match(/<a class="product-profile"[^>]*>[\s\S]*?<\/a>/)?.[0]).not.toContain('<span>마이</span>');
     expect(readingDetail).toContain('href="my.html" aria-label="내 프로필"');
     expect(readingDetail).toContain('src="/src/reading-detail/main.tsx"');
     expect(readingDetail).toContain('data-reader="seyeon"');
