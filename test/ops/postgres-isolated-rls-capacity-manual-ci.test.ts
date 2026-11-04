@@ -60,4 +60,22 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(runner).toContain('outputContainsIdentifiers: false');
     expect(workflow).toContain('if-no-files-found: ignore');
   });
+
+  it('includes bounded actual PostgreSQL18 product-path HTTP measurements in the existing manual job', () => {
+    const product = readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8');
+    expect(runner).toContain('product-saju-isolated-pg18-phase11.test.mjs');
+    expect(runner).toContain('MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS');
+    expect(runner).toContain('actual_ephemeral_postgres18_rls');
+    expect(runner).toContain('synthetic_response_not_real_engine');
+    expect(runner).toContain('isolatedProductPath: $product[0]');
+    expect(product).toContain('const isolated = BIN ? describe : describe.skip');
+    expect(product).toContain('postgresql');
+    expect(product).toContain('CREATE POLICY ops_phase11_owner');
+    expect(product).toContain('NOINHERIT');
+    expect(product).toContain('http://127.0.0.1:');
+    expect(product).toContain("productionCapacityProven: false");
+    expect(product).toContain("drReady: false");
+    expect(product).not.toContain('process.env.DATABASE_URL');
+    expect(product).not.toContain('process.env.SUPABASE_DB_PASSWORD');
+  });
 });
