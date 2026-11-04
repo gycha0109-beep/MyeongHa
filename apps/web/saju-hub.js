@@ -435,8 +435,7 @@ function renderBirthDetails(profile, locale = getUiLocale()) {
     ? byLocale(`${dateParts[0]}년 ${dateParts[1]}월 ${dateParts[2]}일`,
       `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`,
       `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`,
-      new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', year: 'numeric', month: 'long', day: 'numeric' })
-        .format(new Date(Date.UTC(dateParts[0], dateParts[1] - 1, dateParts[2]))),
+      `${['January','February','March','April','May','June','July','August','September','October','November','December'][dateParts[1] - 1] ?? dateParts[1]} ${dateParts[2]}, ${dateParts[0]}`,
       `${dateParts[0]}年${dateParts[1]}月${dateParts[2]}日`)
     : missing;
   const calendar = input?.calendarType === 'lunar'
