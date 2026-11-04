@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Phase 10/11 actual isolated PostgreSQL18 product path implementation, manual measurement pending
+
+- **Implementation:** Added `test/ops/product-saju-isolated-pg18-phase11.test.mjs` and extended the **existing** manual GitHub Ubuntu26.04 `postgres-isolated-rls-capacity-acceptance.yml` runner, without adding a CI workflow or touching Hosted resources. Uses the current production API handler, real temporary PostgreSQL18 with non-BYPASSRLS role, enforced owner RLS, subject transaction, actual SQL read and a two-connection pool, plus actual local HTTP transports for synthetic Supabase Member verification and Saju calculation response. See [exact experiment scope](PRODUCT_SAJU_ISOLATED_PG18_PHASE11_20261105.md).
+- **Measured outputs implemented, not yet accepted as observations:** 12 sequential and 32 concurrency-8 client request counts/p50/p95/p99, real PostgreSQL18 acquisition/query p95, admitted/failed requests under pool pressure, Saju HTTP timeout/no retry, injected Auth/DB errors, no-store/nonreflection and independent Health. The original PG18 manual artifact will add an `isolatedProductPath` proof object only after the real GitHub workflow actually succeeds and validates the sanitized measurements.
+- **Evidence boundary:** This is **code committed, actual real PG18 manual run PENDING**, not a claim of passed Linux measurements or full integrated real Saju engine. Saju HTTP returns a synthetic admissible calculation response; local Member verifier uses a synthetic identity. No Production DB, real user identity, provider mutation, paid request, or credential value used.
+- **Gates remain false:** `productionCapacityProven`, `productionScalingThresholdApproved`, `drReady`, `serviceResumptionAllowed`, `outputContainsIdentifiers`; Hosted Auth/Storage and migration-history blocker [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) still OPEN. **Next:** PR CI → current-main guarded manual PostgreSQL18 actual execution → original artifact independent checks → remaining real Saju/product topology constraints, Phase 12 only from observed ceilings.
+
+
 ### 2026-11-05 KST — Phase 10/11 integrated synthetic product request chain (implementation, CI unverified)
 
 - **Approved roadmap gap:** Phase 10/11 still lacks representative authenticated MyeongHa API → Auth → DB → Saju combined-path measurements. Previous actual PostgreSQL18 and actual Saju saturation experiments remain distinct and are not rerun or relabelled.
