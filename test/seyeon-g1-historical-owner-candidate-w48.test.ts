@@ -73,7 +73,18 @@ const fake=(receipt:unknown)=>{
       sql:string,params:readonly unknown[]=[],
     ):Promise<PostgresQueryResultV1<Row>>{
       calls.push({sql,params});
-      return {rows:[{receipt,expected_history_digest:proof().historicalSourceCensusDigest} as unknown as Row]};
+      return {rows:[{receipt,
+        expected_history_digest:proof().historicalSourceCensusDigest,
+        // Simulate the independent PostgreSQL recomputation: changed source
+        // JSONB cannot retain the original digest merely because its
+        // receipt-supplied digest string was left unchanged.
+        expected_assistant_digest:
+          receipt&&typeof receipt==='object'&&!Array.isArray(receipt)
+          &&canonicalJson((receipt as Record<string,unknown>).historicalAssistantOriginalSources)
+            ===canonicalJson(proof().historicalAssistantOriginalSources)
+          ?proof().historicalAssistantOriginalSourcesDigest
+          :'sha256:pg-jsonb:v1:'+'c'.repeat(64),
+      } as unknown as Row]};
     },
   };
   return {port:createSeyeonG1HistoricalCandidateOwnerPortV1(client),calls};
@@ -85,7 +96,9 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(response).toEqual(proof());
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain('cmd_pin_seyeon_historical_source_candidate_s0_v1');
+    expect(calls[0]?.sql).toContain('with pinned as materialized (');
     expect(calls[0]?.sql).toContain("sha256(convert_to($16::jsonb::text,'UTF8'))");
+    expect(calls[0]?.sql).toContain("(pinned.receipt->'historicalAssistantOriginalSources')::text");
     expect(calls[0]?.params).toHaveLength(16);
     expect(calls[0]?.params[15]).toEqual(JSON.stringify(historicalSources));
     expect(response.authorizesModel).toBe(false);
@@ -100,6 +113,14 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     ['changed original User',{currentUserTextDigest:wire('forged')}],
     ['source count mismatch',{historicalSourceCount:1}],
     ['source digest mismatch',{historicalSourceCensusDigest:'sha256:pg-jsonb:v1:'+'b'.repeat(64)}],
+    ['assistant lineage digest mismatch',{
+      historicalAssistantOriginalSourcesDigest:'sha256:pg-jsonb:v1:'+'c'.repeat(64),
+    }],
+    ['assistant lineage content substituted with stale DB digest',{
+      historicalAssistantOriginalSources:[{
+        ...historicalAssistantOriginal,originalUserTextDigest:wire('other original User'),
+      }],
+    }],
     ['missing historical source',{historicalSources:[historicalSources[0]]}],
     ['forged historical original Grant',{
       historicalAssistantOriginalSources:[{...historicalAssistantOriginal,originalGrantId:'forged'}],

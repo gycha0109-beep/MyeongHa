@@ -76,15 +76,26 @@ export function createSeyeonG1HistoricalCandidateOwnerPortV1(
           .update(canonicalJson([s])).digest('hex')!==input.selectedSourcesDigest
       ) throw Error('Se-yeon historical G1 candidate original source unverifiable');
 
-      const result=await client.query<{receipt:unknown;expected_history_digest:string}>(`
-select seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(
+      const result=await client.query<{
+        receipt:unknown;expected_history_digest:string;expected_assistant_digest:string;
+      }>(`
+with pinned as materialized (
+  select seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,
   $8::text,$9::text,$10::text,$11::text,$12::text,$13::text,
   $14::text,$15::text,$16::jsonb
-) as receipt,
+  ) as receipt
+)
+select pinned.receipt,
   'sha256:pg-jsonb:v1:'||encode(
     sha256(convert_to($16::jsonb::text,'UTF8')),'hex'
-  ) as expected_history_digest`.trim(),[
+  ) as expected_history_digest,
+  'sha256:pg-jsonb:v1:'||encode(
+    sha256(convert_to(
+      (pinned.receipt->'historicalAssistantOriginalSources')::text,'UTF8'
+    )),'hex'
+  ) as expected_assistant_digest
+from pinned`.trim(),[
         input.subjectId,input.threadId,input.turnId,input.attemptId,
         input.currentUserMessageId,s.recordId,s.grantId,
         s.recordType,s.schemaVersion,s.projectorVersion,
@@ -145,6 +156,9 @@ select seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(
         // from the exact manifest sent to the Owner. A syntactically valid
         // but mismatched DB receipt must never become a source certificate.
         ||p.historicalSourceCensusDigest!==result.rows[0].expected_history_digest
+        // Recompute the complete Assistant-origin lineage digest from the
+        // Owner's actual JSONB array, not the claimed receipt digest string.
+        ||p.historicalAssistantOriginalSourcesDigest!==result.rows[0].expected_assistant_digest
         ||p.authorizesModel!==false||p.permitsAtomicCommit!==false
         ||p.permitsHttpReveal!==false)
         throw Error('Se-yeon historical G1 original owner receipt mismatch');
