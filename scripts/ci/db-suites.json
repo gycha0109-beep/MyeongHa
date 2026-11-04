@@ -91,7 +91,8 @@
       "commerce-portone-cancellation-set-audit-pg17",
       "commerce-portone-cancellation-persist-full-pg17",
       "commerce-portone-cancellation-partial-set-pg17",
-      "commerce-exact-reader-withdrawal-hold-pg17"
+      "commerce-exact-reader-withdrawal-hold-pg17",
+      "commerce-reader-s1-cas-real-race-pg17"
     ]
   }
 }
