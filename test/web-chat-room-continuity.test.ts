@@ -81,8 +81,9 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('getOrCreatePendingTurn(message)');
     expect(runtime).toContain('clientTurnId: pendingTurn.clientTurnId');
     expect(runtime).toContain("authoritativeCharacterId !== 'seyeon'");
-    const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'), runtime.indexOf('function submitTurn(event)'));
-    expect(send).not.toContain('await loadRoomState()');
+    const send = runtime.slice(runtime.indexOf('async function sendTurn(message,'), runtime.indexOf('function submitTurn(event)'));
+    expect(send).toContain('if (retryFailed) {');
+    expect(send).toContain('const refreshed = await loadRoomState();');
     expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
     expect(send).toContain('renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn)');
     expect(send).toContain('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)');
