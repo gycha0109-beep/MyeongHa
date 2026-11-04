@@ -176,6 +176,25 @@ export async function inspectLockedReaderRevokeCasPreflightV1(client,{
     scope.purchaseIntentId!==originalScope.purchaseIntentId))
    throw Error('AMBIGUOUS_READER_S1_PURCHASE_LINEAGE');
 
+  // S1's private function independently requires a canonical transaction
+  // Subject. Only bind the DB-proven original Receipt owner, never an input
+  // Subject from a webhook or HTTP caller. An existing different context
+  // must be refused rather than silently impersonated.
+  const context=await client.query(
+   "select current_setting('myeongha.subject_id',true) as \"boundSubjectId\"");
+  if(context.rows.length!==1||
+     (context.rows[0].boundSubjectId!==null&&
+      context.rows[0].boundSubjectId!==''&&
+      context.rows[0].boundSubjectId!==originalScope.subjectId))
+   throw Error('READER_S1_TRUSTED_SUBJECT_CONTEXT_CONFLICT');
+  const bound=await client.query(
+   "select pg_catalog.set_config('myeongha.subject_id',$1::text,true) as \"boundSubjectId\"",
+   [originalScope.subjectId],
+  );
+  if(bound.rows.length!==1||
+     bound.rows[0].boundSubjectId!==originalScope.subjectId)
+   throw Error('READER_S1_TRUSTED_SUBJECT_BIND_FAILED');
+
   for(const scope of discover.rows){
    await client.query(COMMERCE_ACQUIRE_READER_S1_SCOPE_SQL_V1,[
     scope.subjectId,scope.officialReadingId,scope.readerCharacterId,
