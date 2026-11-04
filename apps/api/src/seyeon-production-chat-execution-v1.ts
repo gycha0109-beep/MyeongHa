@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import {
   canonicalJson,
 } from '../../../packages/domain/src/index.js';
+import {assembleSeyeonRuntimeContextV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import {
   assertServerPreparedChatReceivePlanV1,
   type ChatReceivePlan,
@@ -49,6 +50,7 @@ import {
   buildSeyeonPositiveG1PreModelSourceCensusSealV1,
 } from './seyeon-positive-g1-final-model-context-seal-v1.js';
 import {buildSeyeonG1HistoricalFinalContextCandidateSealV1,buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
+import {assertSeyeonG1HistoricalPostPreflightContextCandidateV1} from './seyeon-g1-historical-final-context-proof-v1.js';
 import type {SeyeonG1HistoricalCandidateDbPortV1} from './postgres-seyeon-g1-historical-candidate-port-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type { SeyeonG1CombinedModelPinRequestV1 } from './seyeon-g1-positive-combined-source-port-v1.js';
@@ -831,7 +833,8 @@ export async function runSeyeonProductionChatExecutionV1(
               // DB Owner compares ALL actual G0 origins in its own TX and
               // persists historicalCandidateProof (never positiveProof).
               // Even a successful DB receipt NEVER reaches the Interpreter.
-              await input.historicalSourceCandidateDbPort.pinBeforeModel({
+              const persistedHistoricalCandidateProof=
+                await input.historicalSourceCandidateDbPort.pinBeforeModel({
                 subjectId,threadId,turnId:receivedTurn.turnId,
                 attemptId:attempt.attemptId,
                 currentUserMessageId:receivedTurn.userMessageId,
@@ -844,8 +847,36 @@ export async function runSeyeonProductionChatExecutionV1(
                   historicalSeal.expectedFinalModelContextDigest,
                 historicalSources:census.historicalSources,
               });
-              // The isolated owner transaction has already committed its candidate.
-              // Do not mark this context_ready attempt as a retryable model failure.
+              // Compare the REAL DB-owner receipt with the deterministic
+              // full context candidate from the running chat path. Do not run
+              // governed Preflight here: it can invoke external providers and
+              // historical model rights are NOT yet approved.
+              try {
+                const assembledCandidateContext=assembleSeyeonRuntimeContextV2({
+                  ...contextInput,
+                  relationship:null,
+                  relationshipSemantics:null,
+                  integrityDecisions:[],
+                  governedPreflightApplied:true,
+                  disclosure:{decision:null,retrievedSources:[]},
+                });
+                assertSeyeonG1HistoricalPostPreflightContextCandidateV1({
+                  pinnedContextInput:contextInput,
+                  currentUserMessageId:receivedTurn.userMessageId,
+                  currentUserText:receivedTurn.userText,
+                  sourceCandidates:
+                    productionContext.personalRecordProjectionCandidates??[],
+                  census,
+                  persistedHistoricalCandidateProof,
+                  assembledContext:assembledCandidateContext,
+                });
+              } catch {
+                // The candidate has already been committed by DB Owner.
+                // Never call failAttempt on its immutable, context_ready row.
+                throw new SeyeonHistoricalCandidatePersistedHoldV1();
+              }
+              // G1 comparison alone never opens Provider, Commit or Reveal.
+              // Keep this a non-retryable HOLD even when all sources match.
               throw new SeyeonHistoricalCandidatePersistedHoldV1();
             }
             throw new SeyeonProductionChatExecutionErrorV1(

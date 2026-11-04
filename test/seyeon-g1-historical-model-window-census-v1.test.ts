@@ -64,6 +64,16 @@ describe('S0 G0->G1 exact historical model-input window (offline HOLD)',()=>{
     expect(reread).toBeLessThan(assertion);
     expect(assertion).toBeLessThan(hold);
     expect(hold).toBeLessThan(actualPin);
+    const receipt=exec.indexOf('const persistedHistoricalCandidateProof=');
+    const dbPin=exec.indexOf('await input.historicalSourceCandidateDbPort.pinBeforeModel({',receipt);
+    const exactContext=exec.indexOf('assertSeyeonG1HistoricalPostPreflightContextCandidateV1({',dbPin);
+    const safeHold=exec.indexOf('throw new SeyeonHistoricalCandidatePersistedHoldV1();',exactContext);
+    const provider=exec.indexOf('const runtime = await runSeyeonCharacterTurnV2({',safeHold);
+    expect(receipt).toBeGreaterThan(assertion);
+    expect(dbPin).toBeGreaterThan(receipt);
+    expect(exactContext).toBeGreaterThan(dbPin);
+    expect(safeHold).toBeGreaterThan(exactContext);
+    expect(provider).toBeGreaterThan(safeHold);
   });
 });
 
