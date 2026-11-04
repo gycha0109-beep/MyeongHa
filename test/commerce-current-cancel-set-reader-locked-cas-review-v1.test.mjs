@@ -12,6 +12,8 @@ import {
 import {
  COMMERCE_REVOKE_SOURCE_EVENT_LOCK_SQL_V1 as EVENT_SQL,
  COMMERCE_REVOKE_EXACT_READER_GRANT_LOCK_SQL_V1 as GRANT_SQL,
+ COMMERCE_REVOKE_READER_S1_SCOPES_SQL_V1 as S1_SCOPES_SQL,
+ COMMERCE_ACQUIRE_READER_S1_SCOPE_SQL_V1 as S1_LOCK_SQL,
 } from '../scripts/operations/commerce-exact-reader-revoke-cas-locked-preflight-v1.mjs';
 import {
  COMMERCE_EXACT_READER_REVOCATION_ORDER_SQL_V1 as ORDER_SQL,
@@ -22,6 +24,9 @@ const EVENT='00000000-0000-4000-8000-000000000091';
 const GRANT='00000000-0000-4000-8000-000000000002';
 const SUBJECT='00000000-0000-4000-8000-000000000004';
 const INTENT='00000000-0000-4000-8000-000000000005';
+const READING='00000000-0000-4000-8000-000000000007';
+const SCOPE={subjectId:SUBJECT,officialReadingId:READING,
+ readerCharacterId:'seyeon',receiptId:RECEIPT,purchaseIntentId:INTENT};
 const P='payment-exact-source',T='transaction-original',C='cancel-8900';
 const SECRET='private-source-hmac-secret-with-more-than-32-bytes';
 const API='private-portone-api-secret-with-more-than-16-bytes';
@@ -94,6 +99,12 @@ function db({setRows=[DB_ROW],setAfter=null,eventRows=[
    expect(args).toEqual([RECEIPT]);
    return {rows:setReads===2&&setAfter!==null?setAfter:setRows};
   }
+  if(sql===S1_SCOPES_SQL){
+   expect(args).toEqual([EVENT,GRANT]);return {rows:[SCOPE]};
+  }
+  if(sql===S1_LOCK_SQL){
+   expect(args).toEqual([SUBJECT,READING,'seyeon']);return {rows:[{}]};
+  }
   if(sql===EVENT_SQL){
    expect(args).toEqual([EVENT]);
    return {rows:eventRows};
@@ -147,6 +158,9 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
   expect(fetchImpl).toHaveBeenCalledTimes(1);
   expect(c.calls.filter(x=>x.sql===SET_SQL)).toHaveLength(2);
   expect(c.calls.filter(x=>x.sql==='rollback')).toHaveLength(3);
+  expect(c.calls.filter(x=>x.sql===S1_LOCK_SQL)).toHaveLength(1);
+  expect(c.calls.findIndex(x=>x.sql===S1_LOCK_SQL)).toBeLessThan(
+   c.calls.findIndex(x=>x.sql===EVENT_SQL));
   expect(c.calls.filter(x=>x.sql===EVENT_SQL)).toHaveLength(1);
   expect(c.calls.filter(x=>x.sql===GRANT_SQL)).toHaveLength(1);
   expect(c.calls.findIndex(x=>x.sql===GRANT_SQL))
