@@ -109,9 +109,8 @@ function id(value: unknown): value is string {
     value === value.toLowerCase();
 }
 function receivedInstant(value: unknown): value is string {
-  if (typeof value !== 'string' ||
-      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|\+00:00)$/u.test(value)) return false;
-  return Number.isFinite(Date.parse(value));
+  return typeof value === 'string' && value.length >= 20 && value.length <= 64 &&
+    Number.isFinite(Date.parse(value));
 }
 function view(
   claimId:string, receivedAt:string,
@@ -174,8 +173,9 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
         (claim.purchaseIntentId !== null &&
           (!id(claim.purchaseIntentId) || !id(claim.unitId)))) return failure();
 
+    const receivedAt = new Date(claim.receivedAt).toISOString();
     if (claim.purchaseIntentId === null) {
-      return view(claim.claimId,claim.receivedAt,
+      return view(claim.claimId,receivedAt,
         'general_unlinked_manual_review',null);
     }
 
@@ -192,11 +192,11 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     // A revoked/missing Receipt, missing original notice, DB failure or an
     // ambiguous unit must NEVER be converted into positive refund/denial proof.
     if (preflight.kind !== 'manual_review_candidate') {
-      return view(claim.claimId,claim.receivedAt,
+      return view(claim.claimId,receivedAt,
         'exact_unit_evidence_unavailable',null);
     }
 
-    return view(claim.claimId,claim.receivedAt,
+    return view(claim.claimId,receivedAt,
       'exact_unit_manual_review',preflight.review);
   } catch {
     return failure();
