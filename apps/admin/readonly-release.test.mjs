@@ -6,6 +6,7 @@ const expected={MYEONGHA_ADMIN_READ_HYPERDRIVE_ID:'a'.repeat(32),
 const disabled={
   name:'myeongha-admin',workers_dev:true,preview_urls:false,
   assets:{binding:'ASSETS',run_worker_first:true},ratelimits:[{name:'ADMIN_RATE_LIMITER'}],
+  services:[{binding:'MEMBER_AUTH_SERVICE',service:'myeongha'}],
   vars:{MYEONGHA_ADMIN_PRIVATE_ENABLED:'false',MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED:'false',
     MYEONGHA_ADMIN_RETENTION_ENABLED:'false',MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED:'false',
     MYEONGHA_ADMIN_HYPERDRIVE_POLICY:'dedicated-admin-verify-full-v1'},
@@ -15,6 +16,7 @@ const disabled={
 const bindings=()=>[
   ...Object.entries(disabled.vars).map(([name,text])=>({name,type:'plain_text',text})),
   ...disabled.hyperdrive.map(value=>({name:value.binding,type:'hyperdrive',id:value.id})),
+  {name:'MEMBER_AUTH_SERVICE',type:'service',service:'myeongha'},
   {name:'MYEONGHA_SUPABASE_API_KEY',type:'secret_text'},
   {name:'ASSETS',type:'assets'},{name:'ADMIN_RATE_LIMITER',type:'ratelimit'},
 ];
@@ -24,6 +26,7 @@ describe('dedicated read-only Admin release',()=>{
   const on=prepareAdminReadOnlyReleaseV1(disabled,'readonly');
   expect(on.vars).toEqual({...disabled.vars,MYEONGHA_ADMIN_PRIVATE_ENABLED:'true'});
   expect(on.hyperdrive).toEqual(disabled.hyperdrive);
+  expect(on.services).toEqual([{binding:'MEMBER_AUTH_SERVICE',service:'myeongha'}]);
   expect(on).not.toBe(disabled);
   expect(disabled.vars.MYEONGHA_ADMIN_PRIVATE_ENABLED).toBe('false');
   expect(prepareAdminReadOnlyReleaseV1(disabled,'disabled')).toEqual(disabled);
@@ -37,6 +40,8 @@ describe('dedicated read-only Admin release',()=>{
   expect(()=>prepareAdminReadOnlyReleaseV1({...disabled,ratelimits:[]},'readonly')).toThrow();
   expect(()=>prepareAdminReadOnlyReleaseV1({...disabled,workers_dev:false},'readonly')).toThrow();
   expect(()=>prepareAdminReadOnlyReleaseV1(disabled,'write')).toThrow();
+  expect(()=>prepareAdminReadOnlyReleaseV1({...disabled,services:[]},'readonly')).toThrow();
+  expect(()=>prepareAdminReadOnlyReleaseV1({...disabled,services:[{binding:'MEMBER_AUTH_SERVICE',service:'different'}]},'readonly')).toThrow();
   expect(()=>prepareAdminReadOnlyReleaseV1({...disabled,hyperdrive:[disabled.hyperdrive[0]]},'readonly')).toThrow();
  });
  it('verifies real release flag independently of the other three false flags',()=>{
@@ -47,6 +52,8 @@ describe('dedicated read-only Admin release',()=>{
   });
   expect(()=>inspectAdminReadOnlyReleaseV1(bindings(),expected,'readonly')).toThrow();
   expect(()=>inspectAdminReadOnlyReleaseV1(live,expected,'disabled')).toThrow();
+  expect(()=>inspectAdminReadOnlyReleaseV1(live.filter(b=>b.name!=='MEMBER_AUTH_SERVICE'),expected,'readonly')).toThrow();
+  expect(()=>inspectAdminReadOnlyReleaseV1(live.map(b=>b.name==='MEMBER_AUTH_SERVICE'?{...b,service:'different'}:b),expected,'readonly')).toThrow();
   for(const name of ['MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED','MYEONGHA_ADMIN_RETENTION_ENABLED','MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED']){
     expect(()=>inspectAdminReadOnlyReleaseV1(live.map(b=>b.name===name?{...b,text:'true'}:b),expected,'readonly')).toThrow();
   }

@@ -13,6 +13,9 @@ describe('isolated Admin deployment configuration',()=>{
   it('pins a single account-specific workers.dev hostname and requires the verified Access tenant',()=>{
     expect(config.workers_dev).toBe(true);
     expect(config.preview_urls).toBe(false);
+    expect(config.services).toEqual([{binding:'MEMBER_AUTH_SERVICE',service:'myeongha'}]);
+    expect(inspectAdminHostedDeploymentV1({}, {...config,services:[]}).invalid).toContain('isolated_private_worker_config');
+    expect(inspectAdminHostedDeploymentV1({}, {...config,services:[{binding:'MEMBER_AUTH_SERVICE',service:'different'}]}).invalid).toContain('isolated_private_worker_config');
     expect(ADMIN_WORKERS_DEV_ORIGIN_V1).toBe('https://myeongha-admin.gycha0109.workers.dev');
     expect(inspectAdminHostedDeploymentV1({MYEONGHA_ADMIN_ORIGIN:'https://myeongha-admin.other.workers.dev'},config).invalid).toContain('dedicated_workers_dev_origin_required');
     expect(inspectAdminHostedDeploymentV1({MYEONGHA_ADMIN_ORIGIN:ADMIN_WORKERS_DEV_ORIGIN_V1,MYEONGHA_ADMIN_ACCESS_ISSUER:'https://attacker.cloudflareaccess.com'},config).invalid).toContain('dedicated_admin_access_issuer_required');

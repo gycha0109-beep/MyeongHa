@@ -26,6 +26,10 @@ export function prepareAdminReadOnlyReleaseV1(config,mode) {
       REQUIRED.some(name=>config.hyperdrive.filter(b=>b.binding===name&&ID.test(b.id??'')).length!==1))
     throw Error('Admin Reader/Audit origins are not exclusively bound');
   assertNoWriteOrigins(config.hyperdrive);
+  if(!Array.isArray(config.services)||config.services.length!==1||
+      config.services[0]?.binding!=='MEMBER_AUTH_SERVICE'||
+      config.services[0]?.service!=='myeongha'||config.services[0]?.entrypoint!==undefined)
+    throw Error('Admin Member authentication service binding unavailable');
   if(FLAGS.some(name=>config.vars[name]!=='false'))
     throw Error('Admin release requires an initially disabled configuration');
   if(!Array.isArray(config.ratelimits)||!config.ratelimits.some(b=>b.name==='ADMIN_RATE_LIMITER'))
@@ -37,6 +41,9 @@ export function prepareAdminReadOnlyReleaseV1(config,mode) {
 export function inspectAdminReadOnlyReleaseV1(bindings,expected,mode) {
   if(!['readonly','disabled'].includes(mode)||!Array.isArray(bindings))throw Error('Unknown Admin release readback');
   assertNoWriteOrigins(bindings);
+  const service=bindings.filter(b=>b.name==='MEMBER_AUTH_SERVICE');
+  if(service.length!==1||service[0].type!=='service'||service[0].service!=='myeongha')
+    throw Error('Admin Member authentication service binding mismatch');
   const privateFlag=bindings.find(b=>b.name==='MYEONGHA_ADMIN_PRIVATE_ENABLED');
   if(privateFlag?.type!=='plain_text'||privateFlag.text!==(mode==='readonly'?'true':'false'))
     throw Error('Admin read-only activation mismatch');

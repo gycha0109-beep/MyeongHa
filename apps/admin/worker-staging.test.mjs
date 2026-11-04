@@ -1,6 +1,6 @@
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {afterEach,describe,it,expect,vi} from 'vitest';
-import worker from '../../cloudflare/admin-worker.mjs';
+import worker,{createAdminMemberAuthServiceFetchV1} from '../../cloudflare/admin-worker.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const env={MYEONGHA_ADMIN_PRIVATE_ENABLED:'false',
@@ -13,6 +13,21 @@ function jwt(extra={}){
  return data+'.'+sign('RSA-SHA256',Buffer.from(data),privateKey).toString('base64url');
 }
 afterEach(()=>vi.restoreAllMocks());
+describe('scoped same-account Member authentication transport',()=>{
+ it('permits only the original Member sign-in on the dedicated binding',async()=>{
+  const url='https://myeongha.gycha0109.workers.dev/api/auth/sign-in';
+  const called=[];
+  const env={MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN:'https://myeongha.gycha0109.workers.dev',
+    MEMBER_AUTH_SERVICE:{async fetch(input,init){called.push({input,method:init?.method});return Response.json({ok:false});}}};
+  const fetchImpl=createAdminMemberAuthServiceFetchV1(env);
+  expect((await fetchImpl(url,{method:'POST'})).status).toBe(200);
+  expect(called).toEqual([{input:url,method:'POST'}]);
+  expect(()=>fetchImpl(url.replace('sign-in','sign-out'),{method:'POST'})).toThrow();
+  expect(()=>fetchImpl(url,{method:'GET'})).toThrow();
+  expect(()=>createAdminMemberAuthServiceFetchV1({...env,MEMBER_AUTH_SERVICE:undefined})).toThrow();
+  expect(()=>createAdminMemberAuthServiceFetchV1({...env,MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN:'https://other.example'})).toThrow();
+ });
+});
 describe('inactive Worker verifies Access before its disabled boundary',()=>{
  it('denies anonymous and non-Owner requests without assets, bindings or SQL',async()=>{
   const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>{throw Error('unexpected network');});

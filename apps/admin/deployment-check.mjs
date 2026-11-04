@@ -17,7 +17,10 @@ export function inspectAdminHostedDeploymentV1(env,config) {
   const invalid=[];
   if(config.name!=='myeongha-admin'||config.workers_dev!==true||config.preview_urls!==false||
     config.assets?.binding!=='ASSETS'||config.assets?.directory!=='./dist'||config.assets?.run_worker_first!==true||
-    config.main!=='../../cloudflare/admin-worker.mjs'||config.routes!==undefined||config.route!==undefined) invalid.push('isolated_private_worker_config');
+    config.main!=='../../cloudflare/admin-worker.mjs'||config.routes!==undefined||config.route!==undefined||
+    !Array.isArray(config.services)||config.services.length!==1||
+    config.services[0]?.binding!=='MEMBER_AUTH_SERVICE'||config.services[0]?.service!=='myeongha'||
+    config.services[0]?.entrypoint!==undefined) invalid.push('isolated_private_worker_config');
   for(const key of ['MYEONGHA_ADMIN_ORIGIN','MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN','MYEONGHA_ADMIN_ACCESS_ISSUER']) {
     if(!env[key])continue;
     try {const url=new URL(env[key]);if(url.protocol!=='https:'||url.username||url.password||url.pathname!=='/'||url.search||url.hash)invalid.push(key);}catch{invalid.push(key);}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -249,8 +249,20 @@ export function AdminLogin({ onSession }: {
       await verifyAdminOwnerSessionV1(token);
       setPassword('');
       onSession(token);
-    } catch {
-      setError('관리자 세션을 시작할 수 없습니다. 인증 서버 연결 또는 권한을 확인해 주세요.');
+    } catch (error) {
+      if (error instanceof AdminAccessDeniedErrorV1) {
+        setError('회원 로그인 이후 관리자 Owner 권한 확인이 거부되었습니다.');
+      } else if (error instanceof AdminSignInFailureV1) {
+        const messages = {
+          'invalid-credentials': '명하 회원 계정의 이메일 또는 비밀번호를 확인해 주세요.',
+          'rate-limited': '회원 로그인 요청이 제한되었습니다. 잠시 후 다시 시도해 주세요.',
+          'upstream-unavailable': '명하 회원 인증 서버 연결을 완료하지 못했습니다.',
+          'invalid-session': '회원 로그인 응답에서 유효한 세션을 확인하지 못했습니다.',
+        } as const;
+        setError(messages[error.reason]);
+      } else {
+        setError('관리자 권한 확인 중 서버 연결이 실패했습니다.');
+      }
     } finally {
       setBusy(false);
     }

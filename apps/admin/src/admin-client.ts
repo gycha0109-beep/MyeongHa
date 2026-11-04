@@ -1,3 +1,12 @@
+export type AdminSignInFailureReasonV1 = 'invalid-credentials' | 'rate-limited' | 'upstream-unavailable' | 'invalid-session';
+
+export class AdminSignInFailureV1 extends Error {
+  constructor(readonly reason: AdminSignInFailureReasonV1) {
+    super('Admin Member sign-in failed: ' + reason);
+    this.name = 'AdminSignInFailureV1';
+  }
+}
+
 export class AdminAccessDeniedErrorV1 extends Error {
   constructor() {
     super('관리자 접근 권한이 거부되었습니다.');
@@ -60,14 +69,15 @@ export async function signInForAdminSessionV1(
     body: JSON.stringify({ email, password }),
   });
   if (!response.ok) {
-    throw new Error('인증 서버에서 로그인을 완료하지 못했습니다.');
+    throw new AdminSignInFailureV1(response.status === 401 ? 'invalid-credentials'
+      : response.status === 429 ? 'rate-limited' : 'upstream-unavailable');
   }
   const payload: unknown = await response.json();
   const data = isRecord(payload) && payload.ok === true ? payload.data : null;
   const session = isRecord(data) && data.status === 'authenticated' ? data.session : null;
   const accessToken = isRecord(session) ? session.accessToken : null;
   if (!jwtLike(accessToken)) {
-    throw new Error('관리자 인증에 사용할 회원 세션을 확인하지 못했습니다.');
+    throw new AdminSignInFailureV1('invalid-session');
   }
   return accessToken;
 }

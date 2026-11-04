@@ -60,6 +60,20 @@ export async function verifyAdminWorkerOwnerAccessV1(request,env,ctx) {
   return false;
 }
 
+/** Same-account workers.dev origins must use a scoped Service binding, not global fetch.
+ * Only the existing customer Member sign-in path may be reached. */
+export function createAdminMemberAuthServiceFetchV1(env) {
+  const origin='https://myeongha.gycha0109.workers.dev';
+  const service=env?.MEMBER_AUTH_SERVICE;
+  if(env?.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN!==origin||typeof service?.fetch!=='function')
+    throw Error('Dedicated Member authentication Service binding unavailable');
+  return (url,init) => {
+    if(url!==origin+'/api/auth/sign-in'||init?.method!=='POST')
+      throw Error('Admin Member service request is out of scope');
+    return service.fetch(url,init);
+  };
+}
+
 export default {
   async scheduled(_event,env,ctx){
     const {auditEnabled,analyticsEnabled}=validateAdminMaintenanceBindingsV1(env);
@@ -98,6 +112,7 @@ export default {
       // reject any aliased Reader/Audit/Command/Retention credential, even
       // when Wrangler assigned different binding names.
       validateAdminHttpBindingsV1(env);
+      const memberAuthFetch=createAdminMemberAuthServiceFetchV1(env);
       reader = new Pool({connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
       audit = new Pool({connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
       if(env.ADMIN_COMMAND_HYPERDRIVE?.connectionString){
@@ -108,7 +123,7 @@ export default {
       const handler = createAdminHostedHttpV1({origin:env.MYEONGHA_ADMIN_ORIGIN,memberAuthOrigin:env.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN,
         verifyAccess:async()=>true, // The signed, exact Owner gate already ran above.
         allowRequest:async()=>Boolean((await env.ADMIN_RATE_LIMITER.limit({key:env.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID})).success),
-        api:runtime.handleRequest,assets:request=>env.ASSETS.fetch(request)});
+        api:runtime.handleRequest,assets:request=>env.ASSETS.fetch(request),fetchImpl:memberAuthFetch});
       return await handler(request);
     } catch { return Response.json({error:'ADMIN_HOSTED_UNAVAILABLE'},{status:503,headers:{'Cache-Control':'no-store'}}); }
     finally { if(reader||audit||command) ctx.waitUntil(Promise.allSettled([reader?.end(),audit?.end(),command?.end()])); }
