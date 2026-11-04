@@ -631,6 +631,12 @@
       "prMode": "manual-only",
       "mainMode": "manual-only",
       "workTrackAttribution": "admin-console"
+    },
+    "admin-console-readonly-release.yml": {
+      "responsibility": "Owner-approved isolated Admin read-only release and disabled rollback using protected production environment",
+      "prMode": "manual-only",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "admin-console"
     }
   }
 }

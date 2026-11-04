@@ -24,6 +24,8 @@ export interface MobileSajuElementBalanceV1 {
 
 export interface MobileSajuViewModelV1 {
   readonly birthSummary: string;
+  /** Immutable presentation reference; never sent as a new or revised input. */
+  readonly birthInput: CurrentBirthProfileV1['currentRevision']['input'];
   readonly pillars: readonly MobileSajuPillarViewV1[];
   readonly dayMaster: Readonly<{
     status: 'resolved' | 'unresolved';
@@ -110,6 +112,7 @@ export function createMobileSajuViewModelV1(input: {
 
   return Object.freeze({
     birthSummary: formatBirthSummary(input.profile),
+    birthInput: input.profile.currentRevision.input,
     pillars: Object.freeze([
       pillarView('year', '년주', states.year),
       pillarView('month', '월주', states.month),
