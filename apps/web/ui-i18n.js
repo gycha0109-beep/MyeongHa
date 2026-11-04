@@ -61,7 +61,6 @@ for (const [source, translated] of Object.entries({
   '다크 모드': { 'ja-JP': 'ダークモード', 'zh-TW': '深色模式', 'en-US': 'Dark mode', 'zh-CN': '深色模式' },
   '라이트 모드': { 'ja-JP': 'ライトモード', 'zh-TW': '淺色模式', 'en-US': 'Light mode', 'zh-CN': '浅色模式' },
   '알림': { 'ja-JP': '通知', 'zh-TW': '通知', 'en-US': 'Notifications', 'zh-CN': '通知' },
-  '마이페이지': { 'ja-JP': 'マイページ', 'zh-TW': '個人中心', 'en-US': 'My page', 'zh-CN': '个人中心' },
   '언어 변경': { 'ja-JP': '言語を変更', 'zh-TW': '切換語言', 'en-US': 'Change language', 'zh-CN': '切换语言' },
 })) registerStaticCopy(source, translated);
 
