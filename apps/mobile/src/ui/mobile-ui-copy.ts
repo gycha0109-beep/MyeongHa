@@ -1,4 +1,5 @@
 import { MOBILE_UI_NATIVE_COPY } from './mobile-ui-native-copy.js';
+import { MOBILE_WEB_SAJU_SURFACE_COPY_V1 } from './mobile-web-saju-surface-copy-v1.js';
 import { lookupPlannedMobileStaticUiCopyV1 } from './mobile-planned-ui-copy-v1.js';
 
 /** Shared text values copied from apps/web/ui-i18n.js on this branch.
@@ -22,9 +23,17 @@ export function normalizeMobileUiLocale(value: unknown): MobileUiLocale {
 
 export function translateMobileUiCopy(source: string, locale: MobileUiLocale): string {
   if (locale === 'ko-KR') return source;
-  if (locale === 'en-US' || locale === 'zh-CN') return lookupPlannedMobileStaticUiCopyV1(source, locale) ?? source;
+  // Native-reviewed copy retains priority; Web's newer reviewed copy is a
+  // strict missing-key fallback for the four fixed presentation languages.
+  if (locale === 'en-US' || locale === 'zh-CN') {
+    return lookupPlannedMobileStaticUiCopyV1(source, locale)
+      ?? MOBILE_WEB_SAJU_SURFACE_COPY_V1.get(source)?.[locale]
+      ?? source;
+  }
   const row = COPY.get(source) ?? MOBILE_UI_NATIVE_COPY.get(source);
-  return row?.[locale === 'ja-JP' ? 0 : 1] ?? source;
+  return row?.[locale === 'ja-JP' ? 0 : 1]
+    ?? MOBILE_WEB_SAJU_SURFACE_COPY_V1.get(source)?.[locale]
+    ?? source;
 }
 
 export function formatMobileUiCopy(
