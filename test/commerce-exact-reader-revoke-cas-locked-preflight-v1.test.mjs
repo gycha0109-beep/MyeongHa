@@ -44,6 +44,7 @@ const INPUT={providerEventId:EVENT,entitlementGrantId:GRANT,
 function client({
  eventRows=[SOURCE],grantRows=[GRANT_ROW],evidenceRows=[ROW],
  scopeRows=[SCOPE],scopeAfterWait=null,scopeAfterGrant=null,
+ existingSubjectContext=null,
  authority={writable:true,completeVisibility:true,currentUser:'postgres'},
  failSql,
 }={}){
@@ -52,7 +53,7 @@ function client({
   calls.push({sql,args});
   if(sql.includes('pg_catalog.pg_roles'))return {rows:[authority]};
   if(sql.includes("current_setting('myeongha.subject_id',true)"))
-   return {rows:[{boundSubjectId:null}]};
+   return {rows:[{boundSubjectId:existingSubjectContext}]};
   if(sql.includes("set_config('myeongha.subject_id'")){
    expect(args).toEqual([SUBJECT]);
    return {rows:[{boundSubjectId:SUBJECT}]};
@@ -160,6 +161,12 @@ describe('P4 exact Reader revoke Provider Event -> Grant atomic CAS lock bridge'
  it('Reader purchase rebinding after locks is detected',async()=>{
   const c=client({evidenceRows:[{...ROW,grantSourceReceiptId:INTENT}]});
   await expect(inspect(c,INPUT)).rejects.toThrow('LINEAGE_CHANGED');
+  expect(c.calls.at(-1).sql).toBe('rollback');
+ });
+ it('refuses an already-bound different transaction Subject before S1 locks',async()=>{
+  const c=client({existingSubjectContext:RECEIPT});
+  await expect(inspect(c,INPUT)).rejects.toThrow('TRUSTED_SUBJECT_CONTEXT_CONFLICT');
+  expect(c.calls.some(x=>x.sql===S1_LOCK_SQL||x.sql===EVENT_SQL)).toBe(false);
   expect(c.calls.at(-1).sql).toBe('rollback');
  });
  it('will not take a Provider Event lock without an exact Reader S1 scope',async()=>{
