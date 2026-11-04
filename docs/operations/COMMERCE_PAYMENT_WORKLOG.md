@@ -501,3 +501,11 @@
 - **구현:** 웹은 기존 정확한 동일 출처를 요구하고, Origin 없는 모바일 요청은 **쿠키가 없고 JWT 형태의 명시적 Bearer가 있는 경우에만** 기존 회원 신원 검증으로 진행합니다. 유효한 토큰 형식 자체는 인증이 아니며, Guest/미인증은 여전히 거부합니다. 외부 Origin, Origin `null`, Origin 없는 쿠키 요청, 불완전한 토큰을 DB 접근 전에 차단합니다.
 - **검증:** 정상 모바일 POST, 외부 Origin·쿠키·미인증/비정상 Bearer 차단을 테스트에 추가했습니다. PR과 해당 HEAD CI 실제 성공 전까지 PASS를 선언하지 않습니다.
 - **배포 경계:** 기존 `MYEONGHA_WITHDRAWAL_CLAIM_ENABLED` 기본 비활성 유지. 운영 SQL 적용·고객 접수 활성화·PG 취소·환불 승인·Reader 권한 회수·LIVE 변경 없음. 웹 동일 출처 정책과 계정별 DB 권한 검사는 기존대로 유지됩니다.
+
+### 2026-11-05 — 서로 다른 취소 웹훅 ID의 원본 Receipt 잠금 실제 PG17 경합 검증
+
+- **로드맵:** 6절 1번(취소 이벤트 중복 방지의 병렬 도착 검증). 이미 구현된 원본 Receipt 잠금·취소 ID HMAC을 재사용하며 새로운 원장을 만들지 않음.
+- **구현:** 기존 전체 마이그레이션 PostgreSQL17 Reader B2/B3 공식 Fixture 검증 뒤 동일 일회용 DB에서 두 실제 트랜잭션이 하나의 cancellationId HMAC/서로 다른 서명 웹훅 ID로 저장을 경쟁하는 검증기 추가. 실제 DB 잠금 대기, 하나의 원본 Event만 기록, 동일 웹훅 재시도 replay, 다른 Reader 권한 보존 및 Effect 0건 검사.
+- **증거:** test/db/commerce_cancel_same_item_real_race_pg17.mjs, 기존 test/db/commerce_portone_cancellation_persist_full_pg17.sh 연결. 이 PR HEAD 통합 CI 완료 전 PG17 실행 성공은 미확정.
+- **남은 것:** 신뢰 가능한 Provider NEWER/STALE, 기존 Reader T2/Entitlement Writer 실제 결속, 고객 전달 입증 및 구매→취소→삭제 전체 격리 검증.
+- **안전:** 운영 DB·Live 상품·PortOne GET/POST·실제 환불/권한 회수·공개 라우트 미변경.
