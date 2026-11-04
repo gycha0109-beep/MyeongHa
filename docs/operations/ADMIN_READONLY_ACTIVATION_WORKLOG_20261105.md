@@ -25,3 +25,15 @@
 ## 작업 상태
 - GitHub PR/CI 및 실제 Worker 개통의 성공 여부는 확인된 링크와 결과를 확보한 뒤에만 기록한다.
 - 사용자 변경 명령·지속적 수집·정리 작업은 여전히 승인되지 않았다.
+
+## 2026-11-05 운영 읽기 전용 개통 결과 (이전 상태를 대체하는 최신 근거)
+
+- 승인된 PR [#2980](https://github.com/gycha0109-beep/MyeongHa/pull/2980)이 필수 검증 성공 후 `main`에 병합됨. 병합 커밋: `a34ee17d58a82b198358c2d40dae089157e5c5fd`.
+- 정확한 병합 커밋을 사용한 [관리자 읽기 전용 배포 #41900698768](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41900698768)이 완료·성공. 별도 관리자 Worker만 배포했고 기존 고객용 Worker는 배포 대상이 아님.
+- 배포 CI에서 Access Owner 정책, Reader/Audit 역할 분리, 실제 롤백형 감사 기록, 배포 후 설정, 익명 접근 차단 검사를 모두 통과함.
+- Cloudflare 운영 Worker 설정을 별도 읽기 전용 API로 재확인: `MYEONGHA_ADMIN_PRIVATE_ENABLED=true`; `MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED=false`, `MYEONGHA_ADMIN_RETENTION_ENABLED=false`, `MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED=false`.
+- Reader, Audit Writer, Member 인증 검증 키, 요청 제한 바인딩 존재. Command, Retention, Analytics Retention Hyperdrive 바인딩은 없음.
+- 인증되지 않은 요청의 `/admin/`와 `/api/admin/session`은 실제 Cloudflare Access 로그인으로 HTTP 302 이동함. 보호되지 않은 관리 페이지 또는 개인정보를 반환하지 않음.
+- 홈 PC에서 관리자 페이지를 열면 실제 Cloudflare Access Owner 로그인 화면에 도달함. 여기서 **아직 실제 Owner 로그인 및 명하 Member 인증/조회/감사 API 호출까지 완료되지는 않음**. 사용자의 브라우저 로그인 후 개별 근거가 필요하며 비밀번호·토큰·쿠키를 작업 로그나 채팅에 보관하지 않음.
+- 비Owner의 실제 로그인 거부 기록도 여전히 미확인. 해당 증거가 없는데 접근 정책의 개별 거부 검증을 완료 처리하지 않음.
+- 범위 외: 결제·환불·크레딧·계정 변경, 고객정보 변경, 보존기간 정리, 분석 자동 수집·정리 등은 비활성/미승인 상태 유지. `ROADMAP_COMPLETE` 미도달.
