@@ -10,7 +10,7 @@ async function source(path: string): Promise<string> {
 }
 
 describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
-  it('keeps six chat launch characters and shows three inactive entries at the bottom', async () => {
+  it('keeps only six public chat cards while preserving three dormant identities as metadata', async () => {
     expect(MOBILE_CHAT_LAUNCH_ROSTER_V1.map(x => x.characterId)).toEqual([
       'seyeon', 'yeoul', 'rahyeon', 'taegyeom', 'yunho', 'baekheon',
     ]);
@@ -18,8 +18,8 @@ describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
       'doyun', 'seorin', 'mira',
     ]);
     const hub = await source('apps/mobile/src/app/(tabs)/chat/index.tsx');
-    expect(hub).toContain('MOBILE_CHAT_PENDING_ROSTER_V1.map');
-    expect(hub).toContain('연결자 등록 중');
+    expect(hub).not.toContain('MOBILE_CHAT_PENDING_ROSTER_V1.map');
+    expect(hub).not.toContain('연결자 등록 중');
     expect(hub).toContain('disabled={disabled}');
     expect(hub).toContain('style={styles.cardMain}');
     expect(hub).toContain('style={styles.characterPortrait}');

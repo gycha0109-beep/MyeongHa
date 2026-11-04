@@ -35,7 +35,7 @@ Mobile now has:
 - owner-scoped Target Persons list in My plus source-authorized create-only registration for Target metadata + Target Birth revision 1;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
-- Member-only Chat open/reuse through `POST /api/chat`, with six publicly launched characters. The mobile Chat Hub still has a separate inactive three-Character COMING SOON list (a presentational mismatch with the newer Web selector); canonical nine identities and old-thread access remain server-owned;
+- Member-only Chat open/reuse through `POST /api/chat`, with exactly six publicly visible characters in the mobile Chat Hub (aligned with the newer Web selector). Doyun, Mira and Seorin are absent from public launch and pending cards, while canonical nine historical identities and old-thread access remain server-owned;
 - Member-only Seyeon Chat send, pending-turn idempotent replay and authoritative transcript reread. Other characters have no general Chat send authorization;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
 - source-authorized Expo Push Device Installation registration/refresh/rebind/revoke plumbing with SecureStore installation identity, user-initiated OS permission request, startup no-prompt sync, and account-switch fail-closed revoke;

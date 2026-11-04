@@ -41,15 +41,15 @@ describe('premium mobile Home and character roster', () => {
     expect(hub).toContain('이용 상태는 대화방에서 확인');
   });
 
-  it('preserves member gating, pending identities and server-only Chat Open', async () => {
+  it('preserves member gating and dormant identity metadata without public pending cards', async () => {
     const hub = await read('apps/mobile/src/app/(tabs)/chat/index.tsx');
     expect(hub).toContain("const canOpen = state.access === 'member'");
     expect(hub).toContain("const disabled = !canOpen");
     expect(hub).toContain('disabled={disabled}');
     expect(hub).toContain("state.access === 'guest'");
     expect(hub).toContain("router.push('/my')");
-    expect(hub).toContain('MOBILE_CHAT_PENDING_ROSTER_V1.map');
-    expect(hub).toContain('연결자 등록 중');
+    expect(hub).not.toContain('MOBILE_CHAT_PENDING_ROSTER_V1.map');
+    expect(hub).not.toContain('연결자 등록 중');
     expect(MOBILE_CHAT_PENDING_ROSTER_V1.map(x => x.characterId)).toEqual([
       'doyun', 'seorin', 'mira',
     ]);

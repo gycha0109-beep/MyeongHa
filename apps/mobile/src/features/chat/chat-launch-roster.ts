@@ -30,7 +30,7 @@ export const MOBILE_CHAT_LAUNCH_ROSTER_V1 = Object.freeze(
   ),
 );
 
-/** Inactive historical identities: display at the bottom, never send to Chat Open. */
+/** Historical dormant Character metadata only. Never render as public pending cards. */
 export const MOBILE_CHAT_PENDING_ROSTER_V1 = Object.freeze(
   ['doyun', 'seorin', 'mira'].flatMap(characterId => {
     const match = MOBILE_CHAT_KNOWN_CHARACTERS_V1.find(character => character.characterId === characterId);
