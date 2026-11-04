@@ -190,6 +190,9 @@ async function inspectSharedHeader(client) {
       localeWidth: rect('.ui-locale-select')?.width ?? 0,
       texture: css('.product-header')?.backgroundImage ?? '',
       cssLoaded: [...document.styleSheets].some(sheet => sheet.href?.endsWith('/shared-product-header.css')),
+      themeSprite: getComputedStyle(document.querySelector('.product-theme-toggle-mark'), '::before').backgroundImage,
+      reportSprite: getComputedStyle(document.querySelector('.product-report-link'), '::before').backgroundImage,
+      reportWidth: rect('.product-report-link')?.width ?? 0,
     };
   })()`);
 }
@@ -201,6 +204,9 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
     await waitForVisible(client, '.product-header .ui-locale-select');
     const header = await inspectSharedHeader(client);
     assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
+    assert(header.themeSprite.includes('header-ui-glyphs-v1.png') && header.reportSprite.includes('header-ui-glyphs-v1.png'),
+      `Shared header image assets missing on ${pathname}: ${JSON.stringify(header)}`);
+    assert(header.reportWidth > 0, `Report icon missing on ${pathname}`);
     assert(Math.abs(header.height - expectedHeight) <= 1 && Math.abs(header.innerHeight - (expectedHeight - 1)) <= 2,
       `Unexpected header height on ${pathname}: ${JSON.stringify(header)}`);
     if (expectedHeight === 92) {

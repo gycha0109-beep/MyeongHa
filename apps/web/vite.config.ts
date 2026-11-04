@@ -7,6 +7,7 @@ const webRoot = fileURLToPath(new URL('.', import.meta.url));
 const repositoryRoot = resolve(webRoot, '..', '..');
 const htmlEntries = [
   'index.html',
+  'error.html',
   'hall.html',
   'auth.html',
   'birth.html',

@@ -20,6 +20,9 @@ import {
   createMobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
+import { MobileWithdrawalClaimPanel } from '@/features/my/MobileWithdrawalClaimPanel';
+import { MOBILE_WITHDRAWAL_CLAIM_UI_ENABLED_V1 } from
+  '@/features/my/native-mobile-withdrawal-claim-service';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -206,6 +209,9 @@ export default function MyScreen() {
         <MyBirthCard birth={createMobileMyBirthViewV1(state.birth.birth)} />
       )}
 
+      {MOBILE_WITHDRAWAL_CLAIM_UI_ENABLED_V1 && currentAccount === 'member' ? (
+        <MobileWithdrawalClaimPanel />
+      ) : null}
       <MyFlowCards />
       <MyPendingSettings />
     </MobileScreen>

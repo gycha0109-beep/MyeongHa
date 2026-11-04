@@ -106,7 +106,9 @@ describe('Phase 11 four overlapping client-request wave evidence (NOT server CPU
     expect(workflow).not.toContain('pull_request:');
     expect(runner).toContain("'--network=none'");
     expect(runner).toContain("'--network=container:' + cid");
-    expect(runner).toContain('validateSajuFourClientWavesReport');
+    expect(runner).toContain("import { validateFourClientWavesReport } from './validate-isolated-saju-four-client-waves-phase11.mjs'");
+    expect(runner).toContain('validateFourClientWavesReport(JSON.parse(stdout))');
+    expect(runner).not.toContain('validateSajuFourClientWavesReport');
     expect(driver).toContain('Math.floor(slot / 4)');
     expect(driver).toContain('pending.add(task)');
     expect(driver).toContain('maxInFlightObserved === 4');
