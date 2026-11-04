@@ -1,6 +1,6 @@
 import {readFileSync} from 'node:fs';
 import {describe,expect,it,vi} from 'vitest';
-import {assertSeyeonZeroSourceHttpReceiptReadyV1,SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from '../apps/api/src/seyeon-zero-source-http-receipt-ready-v1.js';
+import {assertSeyeonZeroSourceHttpReceiptReadyV1,SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1,SEYEON_G0_RECEIPT_ISSUER_V1} from '../apps/api/src/seyeon-zero-source-http-receipt-ready-v1.js';
 import {SEYEON_SECURITY_S0_PRODUCTION_V1} from '../apps/api/src/seyeon-security-s0-production-policy-v1.js';
 
 import {isSeyeonFirstReceiptEligibleReceiveV1,seyeonFirstReplyFailureMetadataV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
@@ -30,12 +30,12 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
     expect(live).toContain('!eligibleReceive');
     expect(live).toContain('e.receivedTurn.committedTurn!==null||e.attempt.replayed');
     expect(live).toContain('e.committedTurn.replayed');
-    expect(live).toContain('SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1');
+    expect(live).toContain('SEYEON_G0_RECEIPT_ISSUER_V1');
   });
 
   it('admits no uninstalled or unowned DB issuer before paid dispatch',async()=>{
     const query=vi.fn(async(sql:string,args:unknown[])=>{
-      expect(sql).toContain('count(*)=4');
+      expect(sql).toContain('count(*)=7');
       expect(sql).toContain("'row_security=off'=any(p.proconfig)");
       expect(sql).toContain("pg_get_userbyid(p.proowner)='postgres'");
       expect(sql).toContain("not has_function_privilege('anon',p.oid,'EXECUTE')");
@@ -46,6 +46,9 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
         'public.qry_seyeon_locked_first_zero_source_reveal_v1(uuid,uuid,uuid,uuid)',
         'seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)',
         'public.cmd_recover_seyeon_unissued_zero_reply_v1(uuid,uuid,text,bytea)',
+        'public.cmd_issue_seyeon_zero_source_g0_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)',
+        'public.cmd_issue_seyeon_zero_source_followup_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)',
+        'public.cmd_recover_seyeon_unissued_g0_reply_v1(uuid,uuid,text,bytea)',
       ]);
       return {rows:[{ready:true}]};
     });
@@ -62,8 +65,9 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
     expect(worker).toContain('SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved');
     expect(runtime).toContain('requiredPersonalRecordCount:input.zeroSourceFirstReplyApproved===true?0:1');
     expect(fetcher).toContain('if(zeroSource)');
-    expect(fetcher).toContain('zeroSource ? SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1');
+    expect(fetcher).toContain('zeroSource ? SEYEON_G0_RECEIPT_ISSUER_V1');
     expect(SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1).toBe('public.cmd_issue_seyeon_zero_source_first_reply_v1');
+    expect(SEYEON_G0_RECEIPT_ISSUER_V1).toBe('public.cmd_issue_seyeon_zero_source_g0_reply_v1');
     expect(fetcher).toContain('assertSeyeonG0OriginalLineageReadyV1');
     expect(fetcher).toContain('deliveryReceipt:{attemptId:e.committedTurn.attemptId,challenge}');
   });
