@@ -230,3 +230,15 @@ export const MOBILE_SAJU_TOPIC_SECTIONS_V1: readonly MobileSajuTopicSectionV1[] 
 export const MOBILE_SAJU_TOPICS_V1 = Object.freeze(
   MOBILE_SAJU_TOPIC_SECTIONS_V1.flatMap((section) => [...section.topics]),
 );
+
+/**
+ * Home may focus only the Web's three featured, approved preview topics.
+ * This selects a visible Saju card. It never executes a reading or bypasses
+ * the existing Saju/Reader admission and server authorization.
+ */
+export type MobileHomeSajuFocusKeyV1 = 'career' | 'money' | 'love';
+
+export function resolveMobileHomeSajuFocusV1(value: unknown): MobileHomeSajuFocusKeyV1 | null {
+  if (value === 'career' || value === 'money' || value === 'love') return value;
+  return null;
+}
