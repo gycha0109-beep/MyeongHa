@@ -26,8 +26,14 @@ export function validateAdminAccessConfigurationV1(config: AdminAccessConfigurat
 export function createAdminAccessGateV1(config: AdminAccessConfigurationV1, options: {
   readonly fetchImpl?: typeof fetch;
   readonly now?: () => number;
+  /** Only fixed, nonsensitive reason codes. Never logs raw identity or credentials. */
+  readonly onDenied?: (reason: string) => void;
 } = {}) {
   const binding = validateAdminAccessConfigurationV1(config);
+  const deny = (reason: string): false => {
+    try { options.onDenied?.(reason); } catch { /* Diagnostics never affect the gate. */ }
+    return false;
+  };
   return async (request: Request): Promise<boolean> => {
     try {
       // Hostname-based Access browser sessions may arrive via CF_Authorization
@@ -39,35 +45,38 @@ export function createAdminAccessGateV1(config: AdminAccessConfigurationV1, opti
       const authorizationCookies = cookieParts
         .map(part => part.trim())
         .filter(part => part.startsWith('CF_Authorization='));
-      if (assertion === null && authorizationCookies.length !== 1) return false;
+      if (assertion === null && authorizationCookies.length !== 1) return deny('credential_missing_or_ambiguous');
       const token = assertion ?? authorizationCookies[0]!.slice('CF_Authorization='.length);
-      if (!token || token.length > 16_384) return false;
+      if (!token || token.length > 16_384) return deny('credential_invalid_size');
       const parts = token.split('.');
-      if (parts.length !== 3) return false;
+      if (parts.length !== 3) return deny('credential_invalid_format');
       const header = decodePart(parts[0]!); const claims = decodePart(parts[1]!);
       if (!object(header) || !object(claims) || header.alg !== 'RS256' ||
-          typeof header.kid !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/u.test(header.kid)) return false;
+          typeof header.kid !== 'string' || !/^[A-Za-z0-9_-]{1,256}$/u.test(header.kid)) return deny('header_invalid');
       const now = Math.floor((options.now ?? Date.now)() / 1000);
       const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-      if (claims.iss !== binding.issuer || !audiences.includes(binding.audience) ||
-          typeof claims.exp !== 'number' || !Number.isSafeInteger(claims.exp) || claims.exp <= now ||
+      if (claims.iss !== binding.issuer) return deny('issuer_mismatch');
+      if (!audiences.includes(binding.audience)) return deny('audience_mismatch');
+      if (typeof claims.exp !== 'number' || !Number.isSafeInteger(claims.exp) || claims.exp <= now ||
           (claims.nbf !== undefined && (typeof claims.nbf !== 'number' || claims.nbf > now)) ||
-          (claims.iat !== undefined && (typeof claims.iat !== 'number' || claims.iat > now + 30)) ||
-          typeof claims.email !== 'string' || claims.email.toLowerCase() !== binding.ownerEmail) return false;
+          (claims.iat !== undefined && (typeof claims.iat !== 'number' || claims.iat > now + 30))) return deny('token_time_invalid');
+      if (typeof claims.email !== 'string' || claims.email.toLowerCase() !== binding.ownerEmail)
+        return deny('owner_claim_invalid');
       const signal = AbortSignal.timeout(3000);
       const response = await (options.fetchImpl ?? fetch)(binding.issuer + '/cdn-cgi/access/certs', {
         redirect: 'error', signal, headers: { Accept: 'application/json' }, cache: 'no-store',
       });
-      if (!response.ok) return false;
+      if (!response.ok) return deny('signing_keys_unavailable');
       const jwks: unknown = JSON.parse(await readBoundedUpstreamJsonTextV1(response, { maximumBodyBytes: 65_536, signal }));
-      if (!object(jwks) || !Array.isArray(jwks.keys) || jwks.keys.length > 20) return false;
+      if (!object(jwks) || !Array.isArray(jwks.keys) || jwks.keys.length > 20) return deny('signing_keys_invalid');
       const keys = jwks.keys.filter((key: unknown) => object(key) && key.kid === header.kid && key.kty === 'RSA' &&
         (key.use === undefined || key.use === 'sig') && (key.alg === undefined || key.alg === 'RS256'));
-      if (keys.length !== 1 || !/^[A-Za-z0-9_-]+$/u.test(parts[2]!)) return false;
+      if (keys.length !== 1 || !/^[A-Za-z0-9_-]+$/u.test(parts[2]!)) return deny('signing_key_or_signature_invalid');
       const key = await crypto.subtle.importKey('jwk', keys[0] as JsonWebKey,
         { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
-      return await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, Buffer.from(parts[2]!, 'base64url'),
+      const signed=await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, Buffer.from(parts[2]!, 'base64url'),
         new TextEncoder().encode(parts[0] + '.' + parts[1]));
-    } catch { return false; }
+      return signed || deny('signature_invalid');
+    } catch { return deny('verification_exception'); }
   };
 }

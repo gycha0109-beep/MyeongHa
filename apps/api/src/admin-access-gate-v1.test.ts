@@ -42,6 +42,16 @@ describe('private hosted administrator boundary',()=>{
     expect(await gate(req('CF_Authorization='+token(),'bad.jwt.assertion'))).toBe(false);
     expect(await gate(req('CF_Authorization='+token(),'no-valid-token'))).toBe(false);
   });
+  it('emits only fixed denial reasons and never identity or token content',async()=>{
+    const reasons:string[]=[];
+    const gate=createAdminAccessGateV1(config,{fetchImpl:jwks,now:()=>1800000000000,
+      onDenied:reason=>reasons.push(reason)});
+    expect(await gate(new Request('https://admin.example.test/admin/'))).toBe(false);
+    expect(await gate(new Request('https://admin.example.test/admin/',{
+      headers:{cookie:'CF_Authorization='+token({...claims,email:'other@example.test'})}}))).toBe(false);
+    expect(reasons).toEqual(['credential_missing_or_ambiguous','owner_claim_invalid']);
+    expect(JSON.stringify(reasons)).not.toContain('other@example.test');
+  });
   it('never serves HTML or calls a database/API for an unverified Access identity',async()=>{
     let calls=0;
     const handler=createAdminHostedHttpV1({origin:'https://admin.example.test',memberAuthOrigin:'https://member.example.test',
