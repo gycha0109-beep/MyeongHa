@@ -135,6 +135,10 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(sql).toContain('lock_original_memory_grant_v1(');
     expect(sql).toContain("'historicalCandidateProof',v_proof");
     expect(sql).toContain("'historicalAssistantOriginalSources',v_assistant_originals");
+    expect(sql).toContain('assert_current_original_member_user_message_v1(');
+    expect(sql).toContain("m.turn_id=v_source_turn_id and m.sender_type='user'");
+    expect(sql).toContain('seyeon_history_candidate_assistant_user_origin_changed');
+    expect(sql).toContain('sha256(convert_to(v_assistant_user.body_text');
     expect(sql).toContain("a.validation_result_jsonb->'personalRecordProvenance'");
     expect(sql).toContain("'authorizesModel',false");
     expect(sql).toContain("'permitsAtomicCommit',false");

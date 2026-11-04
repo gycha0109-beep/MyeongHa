@@ -26,6 +26,7 @@ declare
   v_assistant_originals jsonb:='[]'::jsonb;
   v_assistant_pin jsonb;
   v_assistant_attempt uuid;
+  v_assistant_user record;
   v_proof jsonb;
   v_replayed boolean;
 begin
@@ -190,7 +191,8 @@ begin
           or v_assistant_pin->>'recordKind' is distinct from 'memory'
           or v_assistant_pin->>'recordId' is null
           or v_assistant_pin->>'originalGrantId' is null
-          or v_assistant_pin->>'currentUserMessageId' is null
+          or v_assistant_pin->>'currentUserMessageId'
+            !~* '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
           or v_assistant_pin->>'currentUserTextDigest'
             !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
           or v_assistant_pin->>'originalPgJsonbDigest'
@@ -199,6 +201,29 @@ begin
         then
           raise exception using errcode='23514',
             constraint='seyeon_history_candidate_assistant_original_missing';
+        end if;
+        -- A historical Assistant's claimed original User must still be the
+        -- committed Member-authored message from that SAME Turn. A digest
+        -- copied from a former positiveProof alone is not original authority.
+        perform seyeon_private.assert_current_original_member_user_message_v1(
+          p_subject_id,p_thread_id,
+          (v_assistant_pin->>'currentUserMessageId')::uuid
+        );
+        select m.id,m.body_text into v_assistant_user
+        from public.conversation_messages m
+        where m.id=(v_assistant_pin->>'currentUserMessageId')::uuid
+          and m.subject_id=p_subject_id and m.thread_id=p_thread_id
+          and m.turn_id=v_source_turn_id and m.sender_type='user'
+          and m.thread_character_id is null
+          and m.character_content_bundle_id is null
+          and m.redacted_at is null and m.body_text is not null
+          and nullif(btrim(m.content_hash),'') is not null;
+        if not found or v_assistant_pin->>'currentUserTextDigest'
+          is distinct from 'sha256:wire-utf8:v1:'||
+            encode(sha256(convert_to(v_assistant_user.body_text,'UTF8')),'hex')
+        then
+          raise exception using errcode='23514',
+            constraint='seyeon_history_candidate_assistant_user_origin_changed';
         end if;
         v_assistant_originals:=v_assistant_originals||jsonb_build_array(
           jsonb_build_object(
