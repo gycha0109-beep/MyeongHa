@@ -80,8 +80,8 @@ where e.id=$1::uuid and e.provider='portone_v2'
  and e.event_type in ('Transaction.Cancelled','Transaction.PartialCancelled')
  and a.official_reading_id is not null
  and a.reader_character_id is not null
-order by a.subject_id,a.official_reading_id,a.reader_character_id,
- e.resolved_receipt_id,receipt.purchase_intent_id
+order by "subjectId","officialReadingId","readerCharacterId",
+ "receiptId","purchaseIntentId"
 limit 65
 `.trim();
 
