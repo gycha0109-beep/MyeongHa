@@ -142,6 +142,11 @@ try{
   'B3 preserved; no Provider refund/Entitlement Effect\n',
  );
 }catch(error){
+ // A can be waiting on B's advisory lock; release it before awaiting A.
+ if(bInTransaction){
+  await b.query('rollback').catch(()=>{});
+  bInTransaction=false;
+ }
  if(inspectPromise)await inspectPromise.catch(()=>{});
  throw error;
 }finally{
