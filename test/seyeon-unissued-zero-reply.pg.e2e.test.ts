@@ -224,7 +224,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
         [id,attempt,stage,JSON.stringify(output),turn]);
       await log(generated,'renderer',{});
       await actor.query(
-        'select public.cmd_mark_chat_turn_generated_v1($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12::jsonb)',
+        'select public.cmd_mark_chat_turn_generated_v1($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)',
         [subject,turn,attempt,generated,'synthetic-v1',uuid(15,90),generatedText,
          'v1',JSON.stringify({text:generatedText}),'sha256:v1:'+'1'.repeat(64),JSON.stringify([])],
       );
