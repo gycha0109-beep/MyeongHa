@@ -71,7 +71,10 @@ const READER_REQUIRED=[
  "has_column_privilege(current_user,'public.commerce_receipts','id','SELECT')",
  "has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','SELECT')",
  "NOT has_table_privilege(current_user,'public.subjects','INSERT,UPDATE,DELETE,TRUNCATE')",
- "NOT has_table_privilege(current_user,'auth.users','SELECT')",
+ // auth is intentionally not USAGE-accessible to the Reader. Resolve this
+ // forbidden table by catalog OID, not by a schema-qualified name that can
+ // itself raise 42501 before the privilege check can return false.
+ "NOT has_table_privilege(current_user,(SELECT c.oid FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='auth' AND c.relname='users'),'SELECT')",
 ];
 const READER_PRIVILEGES_SQL='SELECT '+[
  ...READER_REQUIRED,
