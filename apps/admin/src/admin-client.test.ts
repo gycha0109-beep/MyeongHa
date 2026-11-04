@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1 } from './admin-client.js';
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
 describe('admin browser API client', () => {
   it('extracts only a bounded expiry for UI revocation, without granting access from claims', () => {
@@ -33,6 +33,14 @@ describe('admin browser API client', () => {
     }) as typeof fetch;
     expect(await signInForAdminSessionV1('owner@example.com', 'test-password', fake)).toBe(JWT);
     expect(path).toBe('/api/auth/sign-in');
+  });
+  it('distinguishes Member login errors without exposing remote response bodies',async()=>{
+    for(const [status,reason] of [[401,'invalid-credentials'],[429,'rate-limited'],[503,'upstream-unavailable']] as const){
+      const fake=(async()=>Response.json({error:'secret-must-not-surface'},{status})) as typeof fetch;
+      await expect(signInForAdminSessionV1('owner@example.test','not-a-password',fake)).rejects.toMatchObject({
+        name:'AdminSignInFailureV1',reason,
+      });
+    }
   });
   it('treats 403 as denied, never as a successful empty result', async () => {
     const fake = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;
