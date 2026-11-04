@@ -15,6 +15,7 @@ export interface SeyeonG1HistoricalCandidatePinInputV1 {
   readonly selectedOriginalMemory:SeyeonExactSelectedPersonalSourceV1;
   readonly selectedSourcesDigest:string;
   readonly preModelContextDigest:string;
+  readonly expectedFinalModelContextDigest:string;
   readonly historicalSources:readonly Readonly<{
     messageId:string;
     role:'user'|'assistant';
@@ -37,7 +38,8 @@ const keys=['schemaVersion','subjectId','threadId','turnId','attemptId',
   'recordKind','recordId','originalGrantId','originalGrantedAt',
   'recordType','recordSchemaVersion','projectorVersion',
   'originalPgJsonbDigest','selectedSourcesDigest','projectedMemoryDigest',
-  'preModelContextDigest','historicalSourceCount','historicalSources',
+  'preModelContextDigest','expectedFinalModelContextDigest',
+  'historicalSourceCount','historicalSources',
   'historicalSourceCensusDigest','historicalAssistantOriginalSources',
   'historicalAssistantOriginalSourcesDigest',
   'authorizesModel','permitsAtomicCommit','permitsHttpReveal'];
@@ -63,6 +65,7 @@ export function createSeyeonG1HistoricalCandidateOwnerPortV1(
         ||!HASH.test(s.projectedMemoryDigest)
         ||!HASH.test(input.selectedSourcesDigest)
         ||!HASH.test(input.preModelContextDigest)
+        ||!HASH.test(input.expectedFinalModelContextDigest)
         ||!WIRE.test(input.currentUserTextDigest)
         ||!Array.isArray(history)||history.length<1||history.length>23
         ||new Set(history.map(h=>h.messageId)).size!==history.length
@@ -83,12 +86,12 @@ with pinned as materialized (
   select seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,
   $8::text,$9::text,$10::text,$11::text,$12::text,$13::text,
-  $14::text,$15::text,$16::jsonb
+  $14::text,$15::text,$16::text,$17::jsonb
   ) as receipt
 )
 select pinned.receipt,
   'sha256:pg-jsonb:v1:'||encode(
-    sha256(convert_to($16::jsonb::text,'UTF8')),'hex'
+    sha256(convert_to($17::jsonb::text,'UTF8')),'hex'
   ) as expected_history_digest,
   'sha256:pg-jsonb:v1:'||encode(
     sha256(convert_to(
@@ -101,7 +104,8 @@ from pinned`.trim(),[
         s.recordType,s.schemaVersion,s.projectorVersion,
         input.currentUserTextDigest,s.rawRecordPgDigest,
         input.selectedSourcesDigest,s.projectedMemoryDigest,
-        input.preModelContextDigest,JSON.stringify(history),
+        input.preModelContextDigest,input.expectedFinalModelContextDigest,
+        JSON.stringify(history),
       ]);
       if(result.rows.length!==1||!result.rows[0] ||
         !result.rows[0].receipt||typeof result.rows[0].receipt!=='object'
@@ -112,7 +116,7 @@ from pinned`.trim(),[
       const assistantIds=history.filter(h=>h.role==='assistant').map(h=>h.messageId);
       if(Object.keys(p).length!==keys.length
         ||keys.some(key=>!Object.prototype.hasOwnProperty.call(p,key))
-        ||p.schemaVersion!=='seyeon-g1-historical-source-candidate-v3'
+        ||p.schemaVersion!=='seyeon-g1-historical-source-candidate-v4'
         ||p.subjectId!==input.subjectId||p.threadId!==input.threadId
         ||p.turnId!==input.turnId||p.attemptId!==input.attemptId
         ||p.characterId!=='seyeon'
@@ -128,6 +132,7 @@ from pinned`.trim(),[
         ||p.selectedSourcesDigest!==input.selectedSourcesDigest
         ||p.projectedMemoryDigest!==s.projectedMemoryDigest
         ||p.preModelContextDigest!==input.preModelContextDigest
+        ||p.expectedFinalModelContextDigest!==input.expectedFinalModelContextDigest
         ||p.historicalSourceCount!==history.length
         ||canonicalJson(p.historicalSources)!==canonicalJson(history)
         ||typeof p.historicalSourceCensusDigest!=='string'
