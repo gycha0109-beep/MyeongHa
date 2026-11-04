@@ -80,80 +80,55 @@ describe('S-CF2 owned-thread scope — OFFLINE, no router mounted', () => {
   });
 
   it.each([{ participants: ['seyeon'] }, { participants: ['baekheon', 'seyeon'] }])(
-    'keeps SeYeon messages sealed while permitting independently checked single-room metadata ($participants)',
+    'hands owner-checked GET history to an independent reader, while keeping POST held ($participants)',
     async ({ participants }) => {
       for (const [path, method, body] of [
         ['/api/chat/' + THREAD + '/turns', 'POST', { clientTurnId: TURN, text: PRIVATE }],
         ['/api/chat/' + THREAD + '?afterSequenceNo=0&pageSize=20', 'GET', undefined],
+        ['/api/chat/' + THREAD + '?afterSequenceNo=2&pageSize=20', 'GET', undefined],
       ] as const) {
-        const f = fixture(participants);
-        const result = await scopeSeyeonCloudflareOwnedChatRequestV1({
-          request: request(path, method, body),
-          requestId: ID, identityEvidenceVerifier: f.auth, pool: f.pool,
+        const f=fixture(participants);
+        const result=await scopeSeyeonCloudflareOwnedChatRequestV1({
+          request:request(path,method,body),requestId:ID,
+          identityEvidenceVerifier:f.auth,pool:f.pool,
         });
-        if(method === 'GET' && participants.length === 1) {
+        if(method==='GET'){
           expect(result).toEqual({
-            kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',
-            threadId:THREAD,
+            kind:'seyeon_history_requires_ops_reauthorization',threadId:THREAD,
           });
-        } else {
+          expect('response' in result).toBe(false);
+        }else{
           expect(result.kind).toBe('seyeon_protected_held');
-          if (result.kind === 'seyeon_protected_held') await assertHeld(result.response);
+          if(result.kind==='seyeon_protected_held') await assertHeld(result.response);
         }
-        expect(f.queries.some(x => x.sql.includes('qry_chat_thread_runtime_binding_v1'))).toBe(true);
-        expect(f.queries.some(x => x.sql.includes('qry_chat_thread_stream_v2')))
-          .toBe(method === 'GET' && participants.length === 1);
-        expect(f.queries.some(x => x.sql.includes('SET LOCAL ROLE myeongha_api_executor'))).toBe(true);
-        expect(f.queries.some(x =>
-          x.sql.includes('qry_chat_thread_runtime_binding_v1') &&
-          x.values?.[0] === SUBJECT && x.values?.[1] === THREAD,
-        )).toBe(true);
-        expect(f.queries.some(x => x.sql === 'COMMIT')).toBe(true);
+        expect(f.queries.some(x=>x.sql.includes('qry_chat_thread_runtime_binding_v1'))).toBe(true);
+        expect(f.queries.some(x=>x.sql.includes('qry_chat_thread_stream_v2'))).toBe(false);
+        expect(f.queries.some(x=>x.sql.includes('SET LOCAL ROLE myeongha_api_executor'))).toBe(true);
+        expect(f.queries.some(x=>x.sql.includes('qry_chat_thread_runtime_binding_v1') &&
+          x.values?.[0]===SUBJECT && x.values?.[1]===THREAD)).toBe(true);
+        expect(f.queries.some(x=>x.sql==='COMMIT')).toBe(true);
         expect(f.release).toHaveBeenCalledTimes(1);
       }
     },
   );
 
-  it('admits only a verified owner-scoped, first-page, single-Se-yeon empty shell for independent reauthorization', async () => {
-    const f = fixture(['seyeon'], false);
-    const result = await scopeSeyeonCloudflareOwnedChatRequestV1({
-      request: request('/api/chat/' + THREAD + '?afterSequenceNo=0&pageSize=50'),
-      requestId: ID, identityEvidenceVerifier: f.auth, pool: f.pool,
+  it.each([
+    {participants:['seyeon'],cursor:'?afterSequenceNo=0',stored:false},
+    {participants:['seyeon'],cursor:'?afterSequenceNo=0',stored:true},
+    {participants:['seyeon'],cursor:'?afterSequenceNo=1',stored:true},
+    {participants:['baekheon','seyeon'],cursor:'?afterSequenceNo=0',stored:true},
+    {participants:['baekheon','seyeon'],cursor:'?pageSize=50',stored:true},
+  ])('does not inspect previous content before handing owner-checked historical GET to current-rights SQL ($participants, $cursor)',async({participants,cursor,stored})=>{
+    const f=fixture(participants,stored);
+    const result=await scopeSeyeonCloudflareOwnedChatRequestV1({
+      request:request('/api/chat/'+THREAD+cursor),requestId:ID,
+      identityEvidenceVerifier:f.auth,pool:f.pool,
     });
     expect(result).toEqual({
-      kind: 'seyeon_empty_thread_requires_ops_reauthorization', threadId: THREAD,
+      kind:'seyeon_history_requires_ops_reauthorization',threadId:THREAD,
     });
-    expect('response' in result).toBe(false);
-    const query = f.queries.find(x => x.sql.includes('qry_chat_thread_stream_v2'));
-    expect(query?.sql).toContain('select exists (');
-    expect(query?.values).toEqual([SUBJECT, THREAD]);
-    expect(f.queries.some(x => x.sql === 'COMMIT')).toBe(true);
-    expect(f.release).toHaveBeenCalledTimes(1);
-  });
-
-  it.each([
-    {participants:['seyeon'],empty:false,cursor:'?afterSequenceNo=1'},
-    {participants:['baekheon','seyeon'],empty:false,cursor:'?afterSequenceNo=0'},
-    {participants:['seyeon'],empty:true,cursor:'?afterSequenceNo=0'},
-    {participants:['seyeon'],empty:'unknown',cursor:'?afterSequenceNo=0'},
-  ])('holds a non-first page, mixed thread, stored history or invalid existence proof', async ({participants,empty,cursor}) => {
-    const f = fixture(participants,empty);
-    const result = await scopeSeyeonCloudflareOwnedChatRequestV1({
-      request: request('/api/chat/' + THREAD + cursor),
-      requestId: ID, identityEvidenceVerifier: f.auth, pool: f.pool,
-    });
-    if (typeof empty !== 'boolean' && participants.length === 1) {
-      expect(result.kind).toBe('denied');
-    } else if (empty === true && participants.length === 1) {
-      expect(result).toEqual({
-        kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',threadId:THREAD,
-      });
-    } else {
-      expect(result.kind).toBe('seyeon_protected_held');
-    }
-    if (result.kind === 'denied' || result.kind === 'seyeon_protected_held') {
-      await assertHeld(result.response);
-    }
+    expect(f.queries.some(x=>x.sql.includes('qry_chat_thread_stream_v2'))).toBe(false);
+    expect(f.queries.some(x=>x.sql==='COMMIT')).toBe(true);
     expect(f.release).toHaveBeenCalledTimes(1);
   });
 

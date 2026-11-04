@@ -24,9 +24,9 @@ function setup(verdict){
   }));
   return {close,scope,createSubjectScope};
 }
-describe('S0 Worker ingress never equates an empty shell with History permission',()=>{
+describe('Owner-scoped GET history handoff never equates a scope verdict with permission to reveal',()=>{
   it('hands exact, owner-checked empty GET to the separately authorized reader',async()=>{
-    const d=setup({kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId:ID});
+    const d=setup({kind:'seyeon_history_requires_ops_reauthorization',threadId:ID});
     const response=await tryHandleCloudflareSeyeonSecurityV1(request(),{},{
       id:'rewrite.chat.thread',
     },d);
@@ -34,16 +34,19 @@ describe('S0 Worker ingress never equates an empty shell with History permission
     expect(d.scope).toHaveBeenCalledTimes(1);
     expect(d.close).toHaveBeenCalledTimes(1);
   });
-  it('passes an owned nonempty room only to independent metadata-shell authorization',async()=>{
-    const d=setup({kind:'seyeon_existing_thread_shell_requires_ops_reauthorization',threadId:ID});
-    const response=await tryHandleCloudflareSeyeonSecurityV1(request(),{},{
-      id:'rewrite.chat.thread',
-    },d);
-    expect(response).toBeNull();
-    expect(d.close).toHaveBeenCalledTimes(1);
+  it('passes an owned nonempty or paginated room only to a second current-rights reader',async()=>{
+    const d=setup({kind:'seyeon_history_requires_ops_reauthorization',threadId:ID});
+    for(const suffix of ['?afterSequenceNo=2&pageSize=50','?pageSize=10']){
+      const response=await tryHandleCloudflareSeyeonSecurityV1(request('GET',suffix),{},{
+        id:'rewrite.chat.thread',
+      },d);
+      expect(response).toBeNull();
+    }
+    expect(d.scope).toHaveBeenCalledTimes(2);
+    expect(d.close).toHaveBeenCalledTimes(2);
   });
   it('never admits a paid send even if a future scope returns the empty marker incorrectly',async()=>{
-    const d=setup({kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId:ID});
+    const d=setup({kind:'seyeon_history_requires_ops_reauthorization',threadId:ID});
     const response=await tryHandleCloudflareSeyeonSecurityV1(request('POST','/turns'),{},{
       id:'rewrite.chat.turns',
     },d);
@@ -53,7 +56,7 @@ describe('S0 Worker ingress never equates an empty shell with History permission
   });
   it.each([
     {kind:'seyeon_protected_held',threadId:ID},
-    {kind:'seyeon_empty_thread_requires_ops_reauthorization',threadId:'223e4567-e89b-42d3-a456-426614174000'},
+    {kind:'seyeon_history_requires_ops_reauthorization',threadId:'223e4567-e89b-42d3-a456-426614174000'},
     {kind:'denied'},
   ])('holds protected, mismatched and unknown authority responses',async(verdict)=>{
     const d=setup(verdict);
