@@ -41,12 +41,13 @@ const historicalAssistantOriginal={
   messageId:id(9),turnId:id(11),attemptId:id(12),
   originalUserMessageId:id(8),originalUserTextDigest:wire('original User'),
   recordId:original.recordId,originalGrantId:original.grantId,
+  originalGrantedAt:'2026-11-01T00:00:00Z',
   originalPgJsonbDigest:original.rawRecordPgDigest,
   recordType:original.recordType,recordSchemaVersion:original.schemaVersion,
   projectorVersion:original.projectorVersion,
 };
 const proof=()=>({
-  schemaVersion:'seyeon-g1-historical-source-candidate-v2',
+  schemaVersion:'seyeon-g1-historical-source-candidate-v3',
   subjectId:input.subjectId,threadId:input.threadId,turnId:input.turnId,
   attemptId:input.attemptId,characterId:'seyeon',
   currentUserMessageId:input.currentUserMessageId,
@@ -80,8 +81,8 @@ const fake=(receipt:unknown)=>{
         // receipt-supplied digest string was left unchanged.
         expected_assistant_digest:
           receipt&&typeof receipt==='object'&&!Array.isArray(receipt)
-          &&canonicalJson((receipt as Record<string,unknown>).historicalAssistantOriginalSources)
-            ===canonicalJson(proof().historicalAssistantOriginalSources)
+          &&JSON.stringify((receipt as Record<string,unknown>).historicalAssistantOriginalSources)
+            ===JSON.stringify(proof().historicalAssistantOriginalSources)
           ?proof().historicalAssistantOriginalSourcesDigest
           :'sha256:pg-jsonb:v1:'+'c'.repeat(64),
       } as unknown as Row]};
@@ -124,6 +125,16 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     ['missing historical source',{historicalSources:[historicalSources[0]]}],
     ['forged historical original Grant',{
       historicalAssistantOriginalSources:[{...historicalAssistantOriginal,originalGrantId:'forged'}],
+    }],
+    ['missing prior Grant issuance timestamp',{
+      historicalAssistantOriginalSources:[{
+        ...historicalAssistantOriginal,originalGrantedAt:undefined,
+      }],
+    }],
+    ['invalid prior Grant issuance timestamp',{
+      historicalAssistantOriginalSources:[{
+        ...historicalAssistantOriginal,originalGrantedAt:'not-a-date',
+      }],
     }],
     ['unlisted historical assistant origin',{historicalAssistantOriginalSources:[]}],
     ['different source type',{schemaVersion:'seyeon-positive-original-memory-source-pin-v1'}],

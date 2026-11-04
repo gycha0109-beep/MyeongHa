@@ -1464,12 +1464,20 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(saved.state).toBe('running');
     expect(saved.proof.historicalCandidateProof.historicalSourceCount).toBe(2);
     expect(saved.proof.historicalCandidateProof.schemaVersion)
-      .toBe('seyeon-g1-historical-source-candidate-v2');
+      .toBe('seyeon-g1-historical-source-candidate-v3');
+    const {rows:[priorGrant]}=await pool.query(`select
+      a.seyeon_personal_source_pin_jsonb->'positiveProof'->>'originalGrantedAt' as original_granted_at,
+      g.granted_at as database_granted_at
+      from public.chat_turn_attempts a,public.record_access_grants g
+      where a.id=$1 and g.id=$2`,[f.attempt,f.grant]);
+    expect(Date.parse(priorGrant.original_granted_at))
+      .toBe(new Date(priorGrant.database_granted_at).getTime());
     expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSources)
       .toEqual([{
         messageId:f.assistant,turnId:f.turn,attemptId:f.attempt,
         originalUserMessageId:f.user,originalUserTextDigest:wire(f.userText),
         recordId:f.memory,originalGrantId:f.grant,
+        originalGrantedAt:priorGrant.original_granted_at,
         originalPgJsonbDigest:original.digest,
         recordType:'conversation_recall',recordSchemaVersion:'v1',
         projectorVersion:'seyeon-conversation-recall-projector-v1',

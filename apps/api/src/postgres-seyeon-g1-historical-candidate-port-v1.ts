@@ -43,7 +43,7 @@ const keys=['schemaVersion','subjectId','threadId','turnId','attemptId',
   'authorizesModel','permitsAtomicCommit','permitsHttpReveal'];
 const assistantOriginalKeys=['messageId','turnId','attemptId',
   'originalUserMessageId','originalUserTextDigest','recordId',
-  'originalGrantId','originalPgJsonbDigest','recordType',
+  'originalGrantId','originalGrantedAt','originalPgJsonbDigest','recordType',
   'recordSchemaVersion','projectorVersion'].sort().join(',');
 
 export function createSeyeonG1HistoricalCandidateOwnerPortV1(
@@ -112,7 +112,7 @@ from pinned`.trim(),[
       const assistantIds=history.filter(h=>h.role==='assistant').map(h=>h.messageId);
       if(Object.keys(p).length!==keys.length
         ||keys.some(key=>!Object.prototype.hasOwnProperty.call(p,key))
-        ||p.schemaVersion!=='seyeon-g1-historical-source-candidate-v2'
+        ||p.schemaVersion!=='seyeon-g1-historical-source-candidate-v3'
         ||p.subjectId!==input.subjectId||p.threadId!==input.threadId
         ||p.turnId!==input.turnId||p.attemptId!==input.attemptId
         ||p.characterId!=='seyeon'
@@ -145,6 +145,8 @@ from pinned`.trim(),[
               entry.recordId,entry.originalGrantId].every(x=>
                 typeof x==='string'&&UUID.test(x))
             ||entry.originalUserMessageId===input.currentUserMessageId
+            ||typeof entry.originalGrantedAt!=='string'
+            ||!Number.isFinite(Date.parse(entry.originalGrantedAt))
             ||typeof entry.originalUserTextDigest!=='string'
             ||!WIRE.test(entry.originalUserTextDigest)
             ||typeof entry.originalPgJsonbDigest!=='string'

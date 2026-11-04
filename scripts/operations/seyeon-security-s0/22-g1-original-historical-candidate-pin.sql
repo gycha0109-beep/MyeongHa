@@ -191,6 +191,12 @@ begin
           or v_assistant_pin->>'recordKind' is distinct from 'memory'
           or v_assistant_pin->>'recordId' is null
           or v_assistant_pin->>'originalGrantId' is null
+          -- G0 has already locked this exact old Grant and compared its
+          -- real granted_at, but the historical G1 lineage must retain the
+          -- same issuance instant for downstream exact-authority proofs.
+          or v_assistant_pin->>'originalGrantedAt' is null
+          or v_assistant_pin->>'originalGrantedAt' !~
+            '^[0-9]{4}-[0-9]{2}-[0-9]{2}T'
           or v_assistant_pin->>'currentUserMessageId'
             !~* '^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$'
           or v_assistant_pin->>'currentUserTextDigest'
@@ -234,6 +240,7 @@ begin
             'originalUserTextDigest',v_assistant_pin->>'currentUserTextDigest',
             'recordId',v_assistant_pin->>'recordId',
             'originalGrantId',v_assistant_pin->>'originalGrantId',
+            'originalGrantedAt',v_assistant_pin->>'originalGrantedAt',
             'originalPgJsonbDigest',v_assistant_pin->>'originalPgJsonbDigest',
             'recordType',v_assistant_pin->>'recordType',
             'recordSchemaVersion',v_assistant_pin->>'recordSchemaVersion',
@@ -272,7 +279,7 @@ begin
 
   -- Deliberately NOT 'positiveProof'. Existing G2/G3 reject this shape.
   v_proof:=jsonb_build_object(
-    'schemaVersion','seyeon-g1-historical-source-candidate-v2',
+    'schemaVersion','seyeon-g1-historical-source-candidate-v3',
     'subjectId',p_subject_id::text,'threadId',p_thread_id::text,
     'turnId',p_turn_id::text,'attemptId',p_attempt_id::text,
     'characterId','seyeon','currentUserMessageId',v_user.id::text,
