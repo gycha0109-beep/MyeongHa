@@ -152,7 +152,10 @@ describe('Se-yeon Production personal-record pre-model safety interlock', () => 
       'utf8',
     );
     const gate = runtime.indexOf(
-      'assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(\n            productionContext,',
+      'assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(',
+    );
+    const historical = runtime.indexOf(
+      'assertSeyeonG0HistoricalMessagesRequireOwnerDbPinV1(',
     );
     const contextReady = runtime.indexOf('await input.persistencePort.markContextReady({');
     const model = runtime.indexOf('const runtime = await runSeyeonCharacterTurnV2({');

@@ -36,6 +36,9 @@ import {
   assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1,
 } from './seyeon-personal-record-precommit-hold-v1.js';
 import {
+  assertSeyeonG0HistoricalMessagesRequireOwnerDbPinV1,
+} from './seyeon-g0-verified-history-precommit-v1.js';
+import {
   assertSeyeonPreflightZeroPrivateSourceClosureV1,
   assertSeyeonZeroPrivateRetrievalBeforeReadV1,
   assertSeyeonZeroPrivateDescriptorBeforeReadV1,
@@ -737,11 +740,28 @@ export async function runSeyeonProductionChatExecutionV1(
         }> | null = null;
 
         if (exactModelPersonalSources.selectedPersonalRecordCount === 0) {
-          // Preserve every existing zero-source / unknown-derived HOLD,
-          // including candidate leftovers and unauthorized past messages.
-          assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
-            productionContext,
-          );
+          // An empty-history first reply retains the original strict HOLD.
+          // A real historical follow-up is NOT a zero-source first reply:
+          // verify that it contains only originally sourced User/Assistant
+          // messages, then require the existing owner DB function to lock
+          // each original and persist the immutable source census BEFORE
+          // any Preflight/Provider invocation. Unknown and relationship-
+          // derived sources remain held; no client-supplied claim is trusted.
+          if (productionContext.recentMessages.length === 0) {
+            assertSeyeonPersonalRecordsNotUsedBeforeUnprotectedCommitV1(
+              productionContext,
+            );
+          } else {
+            assertSeyeonG0HistoricalMessagesRequireOwnerDbPinV1({
+              productionContext,
+              selectedModelSources: exactModelPersonalSources,
+              modelRecentMessages: contextInput.recentMessages,
+              ...(contextInput.maxRecentMessages === undefined ? {} : {
+                maxRecentMessages: contextInput.maxRecentMessages,
+              }),
+              currentUserMessageId: receivedTurn.userMessageId,
+            });
+          }
           personalRecordProof = createSeyeonAttemptZeroPersonalProofV1({
             subjectId,
             threadId,
