@@ -193,6 +193,8 @@ async function inspectSharedHeader(client) {
       themeSprite: getComputedStyle(document.querySelector('.product-theme-toggle-mark'), '::before').backgroundImage,
       localeSprite: getComputedStyle(document.querySelector('.ui-locale-picker'), '::before').backgroundImage,
       notificationSprite: getComputedStyle(document.querySelector('.product-icon-button'), '::before').backgroundImage,
+      notificationTransform: getComputedStyle(document.querySelector('.product-icon-button'), '::before').transform,
+      unreadBadgeDisplay: getComputedStyle(document.querySelector('.product-icon-button'), '::after').display,
       hasReport: !!document.querySelector('.product-report-link'),
       controlOrder: [...(document.querySelector('.product-utilities')?.children ?? [])].map(node =>
         node.classList.contains('product-theme-toggle') ? 'theme' :
@@ -210,8 +212,11 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
     await waitForVisible(client, '.product-header .ui-locale-select');
     const header = await inspectSharedHeader(client);
     assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
-    assert([header.themeSprite, header.localeSprite, header.notificationSprite].every(sprite => sprite.includes('header-ui-glyphs-v2.png')),
+    assert([header.themeSprite, header.localeSprite].every(sprite => sprite.includes('header-ui-glyphs-v2.png'))
+      && /header-bell-(?:light|dark)\.svg/.test(header.notificationSprite),
       `Shared header image assets missing on ${pathname}: ${JSON.stringify(header)}`);
+    assert(header.notificationTransform === 'matrix(1, 0, 0, 1, -14, -14)' && header.unreadBadgeDisplay === 'none',
+      `Centered bell or default unread badge mismatch on ${pathname}: ${JSON.stringify(header)}`);
     assert(!header.hasReport && header.controlOrder === 'theme,notification,profile,locale',
       `Header control order mismatch on ${pathname}: ${JSON.stringify(header)}`);
     assert(Math.abs(header.height - expectedHeight) <= 1 && Math.abs(header.innerHeight - (expectedHeight - 1)) <= 2,
