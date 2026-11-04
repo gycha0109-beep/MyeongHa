@@ -45,6 +45,24 @@ function fixture() {
   };
 }
 describe('Independent original GitHub Linux four-client waves proof', () => {
+  it('independently verifies exact real GitHub Linux 15m original bytes and bounded measurements', () => {
+    const file='docs/operations/SAJU_REAL_ENGINE_FOUR_CLIENT_WAVES_LINUX_OBSERVATION_20261104.json';
+    const hash='ef267d4a158e338bd1c5d23652593c31ad018602de7671dbf2cf16932686817c';
+    const main='1c2f51f596419a6fe9a6f8d7145586c1cb339074';
+    expect(verifyFourClientWaveFile(file,hash,main)).toMatchObject({
+      sha256:hash,githubMainSha:main,
+      planned:3600,attempted:3600,success:3600,
+      clientWaveSize:4,observedMaxInFlight:4,
+      skippedScheduling:0,skippedConcurrency:0,
+      non200:0,transportFailures:0,invalidResponses:0,
+      successfulP95Ms:4.042,successfulP99Ms:5.277,
+      serviceCpuUsec:3593955,driverCpuUsec:3935323,
+      serviceThrottling:0,driverThrottling:0,
+      recovery:true,productionReady:false,
+    });
+    expect(()=>verifyFourClientWaveFile(file,'0'.repeat(64),main)).toThrow();
+    expect(()=>verifyFourClientWaveFile(file,hash,'0'.repeat(40))).toThrow();
+  });
   it('accepts valid 15m isolated four-outstanding-client measurement without Production approval', () => {
     expect(validateFourClientWaveLinuxProof(fixture(),MAIN)).toMatchObject({
       planned:3600,attempted:3600,success:3600,clientWaveSize:4,

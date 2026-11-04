@@ -5,3 +5,5 @@ test/db/*.sh text eol=lf
 docs/operations/SAJU_REAL_ENGINE_SPLIT_CGROUP_LINUX_OBSERVATION_20261103.json text eol=lf
 # Actual 5m/15m Saju Linux proof must keep original bytes across Windows checkouts.
 docs/operations/SAJU_REAL_ENGINE_SUSTAINED_LINUX_OBSERVATION_20261103.json text eol=lf
+# Preserve actual 15-minute four-client Linux original JSON bytes on Windows.
+docs/operations/SAJU_REAL_ENGINE_FOUR_CLIENT_WAVES_LINUX_OBSERVATION_20261104.json text eol=lf
