@@ -517,6 +517,14 @@
 - **남은 것:** 공식 Provider `NEWER/STALE` 비교 또는 동등 최신성 신뢰 근거, 실제 Reader T2·Entitlement Effect 결속, 소비자 전달 입증 및 전체 격리 E2E.
 - **운영 제외:** 운영 DB/PG 환불 POST·LIVE·공개 유료 API 무변경.
 
+### 2026-11-05 — 서로 다른 취소 웹훅 ID의 원본 Receipt 잠금 실제 PG17 경합 검증
+
+- **로드맵:** 6절 1번(취소 이벤트 중복 방지의 병렬 도착 검증). 이미 구현된 원본 Receipt 잠금·취소 ID HMAC을 재사용하며 새로운 원장을 만들지 않음.
+- **구현:** 기존 전체 마이그레이션 PostgreSQL17 Reader B2/B3 공식 Fixture 검증 뒤 동일 일회용 DB에서 두 실제 트랜잭션이 하나의 cancellationId HMAC/서로 다른 서명 웹훅 ID로 저장을 경쟁하는 검증기 추가. READ COMMITTED 실제 DB 잠금 대기 이후 23505/원본 취소 항목 중복 제약을 직접 확인합니다(일반 40001은 PASS 불가). 하나의 원본 Event만 기록, 동일 웹훅 재시도 replay, 다른 Reader 권한 보존 및 Effect 0건 검사.
+- **증거:** test/db/commerce_cancel_same_item_real_race_pg17.mjs, 기존 test/db/commerce_portone_cancellation_persist_full_pg17.sh 연결. 이 PR HEAD 통합 CI 완료 전 PG17 실행 성공은 미확정.
+- **남은 것:** 신뢰 가능한 Provider NEWER/STALE, 기존 Reader T2/Entitlement Writer 실제 결속, 고객 전달 입증 및 구매→취소→삭제 전체 격리 검증.
+- **안전:** 운영 DB·Live 상품·PortOne GET/POST·실제 환불/권한 회수·공개 라우트 미변경.
+
 ### 2026-11-05 — 원본 취소 저장→정확한 Reader 구매권 회수 연결의 실제 PG17 격리 검증
 
 - **로드맵:** 6절 1·2·5번의 구매→원본 취소→정확한 Entitlement Effect 구간. 기존 합성 Event 직접 INSERT 검증과 달리 원본 Reader Receipt에 결속되는 **기존 비배포 취소 저장 함수**를 실제 호출하는 연결을 구현했습니다.

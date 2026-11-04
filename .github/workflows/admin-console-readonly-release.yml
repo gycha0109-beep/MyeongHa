@@ -1,0 +1,99 @@
+name: Admin Console Read-Only Release
+on:
+  workflow_dispatch:
+    inputs:
+      release_mode:
+        description: 'Explicitly enable Owner-only reads or restore the disabled Admin Worker'
+        type: choice
+        options: ['readonly', 'disabled']
+        default: 'disabled'
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: myeongha-admin-deployment
+  cancel-in-progress: false
+jobs:
+  release:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.MYEONGHA_ADMIN_CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.MYEONGHA_ADMIN_CLOUDFLARE_ACCOUNT_ID }}
+      MYEONGHA_ADMIN_ORIGIN: https://myeongha-admin.gycha0109.workers.dev
+      MYEONGHA_ADMIN_ACCESS_ISSUER: https://noisy-star-3d9a.cloudflareaccess.com
+      MYEONGHA_ADMIN_ACCESS_AUD: ${{ secrets.MYEONGHA_ADMIN_ACCESS_AUD }}
+      MYEONGHA_ADMIN_OWNER_EMAIL: ${{ secrets.MYEONGHA_ADMIN_OWNER_EMAIL }}
+      MYEONGHA_ADMIN_OWNER_AUTH_USER_ID: ${{ secrets.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID }}
+      MYEONGHA_ADMIN_SUPABASE_ORIGIN: https://cnsfpcdiyofqvhpcegfc.supabase.co
+      MYEONGHA_SUPABASE_API_KEY: ${{ secrets.MYEONGHA_ADMIN_SUPABASE_PUBLISHABLE_KEY }}
+      MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN: ${{ secrets.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN }}
+      MYEONGHA_ADMIN_READ_HYPERDRIVE_ID: ${{ secrets.MYEONGHA_ADMIN_READ_HYPERDRIVE_ID }}
+      MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID: ${{ secrets.MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID }}
+      MYEONGHA_ADMIN_READ_DATABASE_URL: ${{ secrets.MYEONGHA_ADMIN_READ_DATABASE_URL }}
+      MYEONGHA_ADMIN_AUDIT_DATABASE_URL: ${{ secrets.MYEONGHA_ADMIN_AUDIT_DATABASE_URL }}
+      MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM: ${{ secrets.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile private PostgreSQL TLS verifier
+        run: npm run build
+      - name: Validate protected release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          for key in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID MYEONGHA_ADMIN_ACCESS_AUD MYEONGHA_ADMIN_OWNER_EMAIL MYEONGHA_ADMIN_OWNER_AUTH_USER_ID MYEONGHA_SUPABASE_API_KEY MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN MYEONGHA_ADMIN_READ_HYPERDRIVE_ID MYEONGHA_ADMIN_AUDIT_HYPERDRIVE_ID MYEONGHA_ADMIN_READ_DATABASE_URL MYEONGHA_ADMIN_AUDIT_DATABASE_URL MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM; do
+            [[ -n "${!key:-}" ]] || { echo "::error::Missing Admin release configuration: $key"; exit 1; }
+          done
+      - name: Verify live Owner Access policy and least-privilege database origins
+        run: |
+          node apps/admin/access-policy-preflight.mjs
+          node apps/admin/hyperdrive-origin-preflight.mjs
+          npm run verify:origins -w @myeongha/admin
+          node apps/admin/audit-write-preflight.mjs
+      - name: Prepare isolated Admin Worker deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run typecheck -w @myeongha/admin
+          npm run test -w @myeongha/admin
+          npm run build -w @myeongha/admin
+          node apps/admin/deployment-check.mjs --write-config "$RUNNER_TEMP/admin-release-disabled.json"
+          node apps/admin/readonly-release.mjs prepare "$RUNNER_TEMP/admin-release-disabled.json" "$RUNNER_TEMP/admin-release-selected.json" "${{ inputs.release_mode }}"
+      - name: Deploy selected Admin mode without mutation bindings
+        id: deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=wrangler@4.152.0 -- wrangler deploy --config "$RUNNER_TEMP/admin-release-selected.json"
+      - name: Restore Member identity verification secret to dedicated Admin Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$MYEONGHA_SUPABASE_API_KEY" | npm exec --yes --package=wrangler@4.152.0 -- wrangler secret put MYEONGHA_SUPABASE_API_KEY --name myeongha-admin
+      - name: Verify exact live Admin read-only or disabled mode
+        run: node apps/admin/readonly-release.mjs verify "${{ inputs.release_mode }}"
+      - name: Verify Owner-only Access and isolated DB connections remain unchanged
+        run: |
+          node apps/admin/access-policy-preflight.mjs
+          node apps/admin/hyperdrive-origin-preflight.mjs
+      - name: Verify anonymous visitors cannot see Admin assets or data
+        run: node apps/admin/inactive-stage-http-probe.mjs
+      - name: Restore fully disabled Admin Worker if read-only release fails
+        if: ${{ failure() && inputs.release_mode == 'readonly' && steps.deployment.outcome != 'skipped' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm exec --yes --package=wrangler@4.152.0 -- wrangler deploy --config "$RUNNER_TEMP/admin-release-disabled.json"
+          printf '%s' "$MYEONGHA_SUPABASE_API_KEY" | npm exec --yes --package=wrangler@4.152.0 -- wrangler secret put MYEONGHA_SUPABASE_API_KEY --name myeongha-admin
+          node apps/admin/readonly-release.mjs verify disabled
+      - name: Release scope
+        if: ${{ success() }}
+        run: echo 'Dedicated Owner-only Admin release verified; credits, commands, retention and analytics maintenance remain unavailable.'
