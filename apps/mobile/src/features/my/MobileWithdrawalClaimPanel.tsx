@@ -67,7 +67,7 @@ export function MobileWithdrawalClaimPanel(){
     }
     let requestNonce=nonce;
     if(!requestNonce){
-      // A random idempotency token is mandatory: never use Math.random.
+      // Require a cryptographically secure native UUID to deduplicate retries.
       const crypto=globalThis.crypto;
       if(typeof crypto?.randomUUID!=='function'){
         setError('보안용 접수 번호를 생성할 수 없습니다. 잠시 후 다시 시도해 주세요.');
