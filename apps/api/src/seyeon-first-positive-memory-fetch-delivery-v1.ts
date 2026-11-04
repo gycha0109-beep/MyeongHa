@@ -24,6 +24,7 @@ const G0_ASSISTANT_RPC='seyeon_private.assert_current_original_assistant_lineage
 const RECOVER_FAILED_USER_RPC='public.qry_seyeon_recover_exact_failed_user_turn_v1(uuid,uuid,text)';
 const SUPERSEDE_FAILED_USER_RPC='public.cmd_seyeon_supersede_stale_failed_turn_v1(uuid,uuid,text)';
 const EXPLICIT_SUPERSEDE_HEADER='X-MyeongHa-Seyeon-Explicit-Supersede';
+const EXPLICIT_RETRY_HEADER='X-MyeongHa-Seyeon-Explicit-Retry';
 
 /**
  * Run after subject authentication but BEFORE a new logical turn is inserted.
@@ -111,8 +112,9 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
        input.request.signal.aborted)return held();
     const zeroSource=input.zeroSourceFirstReplyApproved===true;
     const supersedeHeader=input.request.headers.get(EXPLICIT_SUPERSEDE_HEADER);
-    if(supersedeHeader!==null &&
-       (supersedeHeader!=='v1'||!zeroSource))return held();
+    const retryHeader=input.request.headers.get(EXPLICIT_RETRY_HEADER);
+    if((supersedeHeader!==null && (supersedeHeader!=='v1'||!zeroSource)) ||
+       (retryHeader!==null && (retryHeader!=='v1'||!zeroSource||supersedeHeader!==null)))return held();
     // Receipt HTTP requires G1/G2 and its own issuer, never EXECUTE on the
     // old Node sender. Production leaves that unreceipted RPC revoked.
     stage='receipt_readiness';
@@ -140,7 +142,9 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
       }});
     if(input.request.signal.aborted)return held();
 
-    if(zeroSource){
+    // Explicit failed-turn retry never recovers an already-issued Assistant;
+    // it may proceed only through the original failed User's exact ID.
+    if(zeroSource && retryHeader!=='v1'){
       stage='unissued_recovery';
       const recovered=await recoverSeyeonUnissuedZeroReplyV1({pool:input.pool,
         verifiedEvidence:preflight.verifiedEvidence,threadId:preflight.threadId,
@@ -184,6 +188,14 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         },
       });
       if(recovered!==null)executionClientTurnId=recovered;
+      // Explicit retries MUST find precisely one original failed, uncommitted
+      // User message. A delivery/abandon/race/ambiguous match is not permission
+      // to create a new logical turn or charge another reply.
+      if(retryHeader==='v1' && recovered===null){
+        return createSeyeonCloudflareStaticPreflightDenialV1({
+          kind:'idempotency_conflict',requestId:input.requestId,
+        });
+      }
       // A new message cannot inherit the old User text or identity.
       // Only a separate, explicit browser confirmation authorizes replacing
       // an unrelated terminal-failed Turn with a new User message.

@@ -5,7 +5,7 @@ import {translateStaticUi} from '../apps/web/ui-i18n.js';
 const source=readFileSync(new URL('../apps/web/chat-runtime-client.js',import.meta.url),'utf8');
 
 describe('Se-yeon chat composer send/restore and concise confirmation',()=>{
-  const start=source.indexOf('async function sendTurn(message)');
+  const start=source.indexOf('async function sendTurn(message,');
   const end=source.indexOf('function submitTurn(event)');
   const send=source.slice(start,end);
 

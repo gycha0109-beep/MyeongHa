@@ -41,6 +41,7 @@ let roomBootPromise = null;
 let roomReady = false;
 let queuedSubmission = false;
 let sendingTurn = false;
+let checkingFailedTurnRetry = false;
 let authoritativeCharacterId = null;
 let historyWithheld = false;
 let composeStatusSource = null;
@@ -77,6 +78,9 @@ function setComposerBusy(busy) {
   if (messageInput instanceof HTMLTextAreaElement) messageInput.readOnly = Boolean(busy);
   const sendButton = composer?.querySelector('button[type="submit"]');
   if (sendButton instanceof HTMLButtonElement) sendButton.disabled = Boolean(busy);
+  for (const retry of chatStream?.querySelectorAll('[data-chat-message-retry]') ?? []) {
+    if (retry instanceof HTMLButtonElement) retry.disabled = Boolean(busy) || checkingFailedTurnRetry;
+  }
 }
 
 function pendingDraftKey(targetThreadId) {
@@ -262,10 +266,30 @@ function createStreamMessage(message, authoritativeCharacterId) {
       ['failed_retryable','failed_final','abandoned'].includes(message.turnState)) {
     const note = document.createElement('small');
     note.className = 'chat-message-state';
+    const canRetry = message.turnState === 'failed_retryable' &&
+      authoritativeCharacterId === 'seyeon' &&
+      message.redacted !== true &&
+      typeof message.bodyText === 'string' && message.bodyText.trim().length > 0;
     note.dataset.chatUiPlaceholder = message.turnState === 'abandoned'
-      ? '전송을 종료한 메시지' : '답변 처리에 실패한 메시지 · 다시 전송할 수 있습니다.';
+      ? '전송을 종료한 메시지'
+      : message.turnState === 'failed_final'
+        ? '답변 처리가 종료된 메시지'
+        : canRetry ? '답변 처리에 실패한 메시지 · 다시 전송할 수 있습니다.'
+          : '답변 처리에 실패한 메시지';
     note.textContent = uiText(note.dataset.chatUiPlaceholder);
     body.append(note);
+    if (canRetry) {
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'chat-message-retry';
+      retry.dataset.chatMessageRetry = '';
+      retry.dataset.chatUiPlaceholder = '다시 전송';
+      retry.textContent = uiText('다시 전송');
+      retry.setAttribute('aria-label', uiText('이 메시지 다시 전송'));
+      retry.disabled = sendingTurn || checkingFailedTurnRetry;
+      retry.addEventListener('click', () => { void retryFailedMessage(message); });
+      body.append(retry);
+    }
   }
   article.append(avatar, body);
   return article;
@@ -296,8 +320,11 @@ document.addEventListener('myeongha:localechange', () => {
   if (!chatStream) return;
   repaintPendingChatLiveTurnV1(chatStream, liveTurnLabels());
   for (const article of chatStream.querySelectorAll('.conversation-message')) {
-    const placeholder = article.querySelector('[data-chat-ui-placeholder]');
-    if (placeholder) placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
+    for (const placeholder of article.querySelectorAll('[data-chat-ui-placeholder]')) {
+      placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
+    }
+    const retryButton = article.querySelector('[data-chat-message-retry]');
+    if (retryButton) retryButton.setAttribute('aria-label', uiText('이 메시지 다시 전송'));
     const senderType = article.dataset.sender;
     const characterId = article.dataset.messageCharacterId ?? null;
     const heading = article.querySelector('.conversation-message-heading strong');
@@ -547,7 +574,62 @@ function ensureRoomReady() {
   return roomBootPromise;
 }
 
-async function sendTurn(message) {
+// Retry is initiated ONLY from the server-read, owner-authorized failed User
+// message. A fresh read rejects stale, redacted, delivered or foreign-owner
+// messages before any metered send; the server repeats the same check when
+// the explicit retry reaches its original-turn recovery authority.
+async function retryFailedMessage(message) {
+  if (sendingTurn || checkingFailedTurnRetry || !roomReady || invalidThreadRoute ||
+      !threadId || authoritativeCharacterId !== 'seyeon' ||
+      message?.senderType !== 'user' || message?.turnState !== 'failed_retryable' ||
+      message.redacted === true || typeof message.bodyText !== 'string' ||
+      !message.bodyText.trim() || !Number.isSafeInteger(message.sequenceNo) ||
+      message.sequenceNo < 1) return;
+
+  const originalThreadId = threadId;
+  const pending = readPendingTurn(originalThreadId);
+  if (pending !== null && pending.text !== message.bodyText) {
+    setComposeStatus('다른 미완료 전송이 남아 있습니다. 먼저 전송 상태를 확인해 주세요.');
+    return;
+  }
+  checkingFailedTurnRetry = true;
+  setComposerBusy(true);
+  setComposeStatus('재전송 가능한 메시지인지 확인하고 있습니다…');
+  try {
+    const bearer = await getActiveBearer();
+    if (!bearer || bearer.kind !== 'member') throw new Error('AUTH_REQUIRED');
+    // No memory of another person's transcript is retained. Read the exact
+    // sequence position again from the protected, current-owner endpoint.
+    const page = await readChatPage(bearer, message.sequenceNo - 1);
+    if (threadId !== originalThreadId ||
+        page.characterId !== authoritativeCharacterId) throw new Error('AUTH_CHANGED');
+    const refreshed = page.messages.find(candidate =>
+      candidate.messageId === message.messageId &&
+      candidate.sequenceNo === message.sequenceNo);
+    if (!refreshed || refreshed.senderType !== 'user' ||
+        refreshed.turnState !== 'failed_retryable' ||
+        refreshed.redacted === true || refreshed.bodyText !== message.bodyText) {
+      await loadRoomState();
+      setComposeStatus('메시지 상태가 변경되었습니다. 대화를 다시 확인해 주세요.');
+      return;
+    }
+    const sameBearer = await getActiveBearer();
+    if (!sameBearer || sameBearer.kind !== 'member' ||
+        sameBearer.token !== bearer.token || !roomReady ||
+        threadId !== originalThreadId) throw new Error('AUTH_CHANGED');
+    checkingFailedTurnRetry = false;
+    await sendTurn(message.bodyText, { retryFailed: true });
+  } catch {
+    // A failed fresh owner read must remove stale authorized chat nodes.
+    clearOwnerScopedRoomStateForAuthorityChange();
+    setComposeStatus('재전송 상태를 확인하지 못했습니다. 대화를 다시 연결해 주세요.');
+  } finally {
+    checkingFailedTurnRetry = false;
+    if (!sendingTurn) setComposerBusy(false);
+  }
+}
+
+async function sendTurn(message, { retryFailed = false } = {}) {
   if (authoritativeCharacterId !== 'seyeon') {
     setComposeStatus('현재 운영 메시지 전송은 세연 대화에서만 사용할 수 있습니다.');
     return;
@@ -557,18 +639,21 @@ async function sendTurn(message) {
 
   sendingTurn = true;
   setComposerBusy(true);
-  setComposeStatus('세연이 답하고 있습니다…');
+  setComposeStatus(retryFailed ? '이전 메시지를 다시 전송하고 있습니다…' : '세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
   const submittedThreadId = threadId;
   // Clear the composer as soon as the send starts. The durable pending Turn
   // retains the exact text for an idempotent retry if the send is not ACKed.
-  if (messageInput instanceof HTMLTextAreaElement &&
+  if (!retryFailed && messageInput instanceof HTMLTextAreaElement &&
       messageInput.value.trim() === pendingTurn.text) {
     messageInput.value = '';
     messageInput.style.height = 'auto';
   }
   let receiptAcknowledged = false;
-  const removePendingBubbles = presentChatLiveTurnV1(chatStream, { message: pendingTurn.text, labels: liveTurnLabels() });
+  // The original failed User bubble is already in history. Never render a
+  // second (even temporary) User bubble for a retry of that same logical turn.
+  const removePendingBubbles = retryFailed ? () => {} :
+    presentChatLiveTurnV1(chatStream, { message: pendingTurn.text, labels: liveTurnLabels() });
 
   try {
     const activeBearer = await getActiveBearer();
@@ -582,11 +667,12 @@ async function sendTurn(message) {
         bearer: activeBearer.token,
         threadId: submittedThreadId,
         turn: { clientTurnId: pendingTurn.clientTurnId, text: pendingTurn.text },
+        retryFailed,
         language: pendingTurn.locale,
         localeHeaders: { 'X-MyeongHa-UI-Locale': pendingTurn.locale },
       });
     } catch (error) {
-      if (error instanceof MyeongHaApiClientErrorV1 && error.code === 'TURN_IN_FLIGHT') {
+      if (!retryFailed && error instanceof MyeongHaApiClientErrorV1 && error.code === 'TURN_IN_FLIGHT') {
         // A different earlier User message may be stored as failed_retryable.
         // Do NOT overwrite/rewrite its original text or silently cancel it.
         // An explicit choice archives that failed Turn (without deleting it)
@@ -617,6 +703,10 @@ async function sendTurn(message) {
         }
         if (error.code === 'IDEMPOTENCY_CONFLICT') {
           clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId);
+          if (retryFailed) {
+            await loadRoomState();
+            throw new Error('RETRY_STATE_CHANGED');
+          }
           throw new Error('IDEMPOTENCY_CONFLICT');
         }
         if (error.code === 'INSUFFICIENT_CREDITS' || error.code === 'CREDIT_INSUFFICIENT') {
@@ -661,18 +751,28 @@ async function sendTurn(message) {
       throw new Error('AUTH_REQUIRED');
     }
 
-    if (messageInput instanceof HTMLTextAreaElement) {
+    if (!retryFailed && messageInput instanceof HTMLTextAreaElement) {
       messageInput.value = '';
       messageInput.style.height = 'auto';
     }
-    const presented = renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn);
-    setComposeStatus(presented
-      ? '세연의 답변이 도착했습니다.'
-      : '현재 대화 기록 연결을 사용할 수 없습니다.');
+    if (retryFailed) {
+      // A retry reuses the historical logical User turn, so only a fresh
+      // owner-scoped history read can replace its prior failed-state badge.
+      const refreshed = await loadRoomState();
+      setComposeStatus(refreshed
+        ? '메시지를 다시 전송했습니다.'
+        : '현재 대화 기록 연결을 사용할 수 없습니다.');
+    } else {
+      const presented = renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn);
+      setComposeStatus(presented
+        ? '세연의 답변이 도착했습니다.'
+        : '현재 대화 기록 연결을 사용할 수 없습니다.');
+    }
   } catch (error) {
     // Restore the exact text only for a failed/unacknowledged submission.
     // Never overwrite a newer draft, a different thread, or an ACKed turn.
-    if (!receiptAcknowledged && threadId === submittedThreadId &&
+    if (!retryFailed && !receiptAcknowledged && threadId === submittedThreadId &&
+        (error instanceof Error ? error.message : '') !== 'RETRY_STATE_CHANGED' &&
         messageInput instanceof HTMLTextAreaElement &&
         !messageInput.value.trim()) {
       messageInput.value = pendingTurn.text;
@@ -682,6 +782,7 @@ async function sendTurn(message) {
     const code = error instanceof Error ? error.message : '';
     const messageByCode = {
       AUTH_REQUIRED: '로그인 상태가 만료되었습니다. 다시 로그인해 주세요.',
+      RETRY_STATE_CHANGED: '메시지 상태가 변경되었습니다. 대화를 다시 확인해 주세요.',
       MEMBER_REQUIRED: '현재 웹 실대화는 회원 계정에서만 사용할 수 있습니다.',
       CONTENT_INCOMPATIBLE: '현재 웹 버전과 세연 대화 콘텐츠가 맞지 않습니다.',
       CAPABILITY_UNAVAILABLE: '세연 실대화 운영 연결을 지금 사용할 수 없습니다.',
