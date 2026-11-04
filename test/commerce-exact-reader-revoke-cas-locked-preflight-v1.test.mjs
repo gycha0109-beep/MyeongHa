@@ -51,6 +51,12 @@ function client({
  const query=vi.fn(async(sql,args)=>{
   calls.push({sql,args});
   if(sql.includes('pg_catalog.pg_roles'))return {rows:[authority]};
+  if(sql.includes("current_setting('myeongha.subject_id',true)"))
+   return {rows:[{boundSubjectId:null}]};
+  if(sql.includes("set_config('myeongha.subject_id'")){
+   expect(args).toEqual([SUBJECT]);
+   return {rows:[{boundSubjectId:SUBJECT}]};
+  }
   if(sql===S1_SCOPES_SQL){
    expect(args).toEqual([EVENT,GRANT]);
    scopeReads++;
