@@ -53,6 +53,12 @@ registerStaticCopy('답변 처리에 실패한 메시지 · 다시 전송할 수
 registerStaticCopy('답변 처리에 실패한 메시지', { 'ja-JP': '返信処理に失敗したメッセージ', 'zh-TW': '回覆處理失敗的訊息', 'en-US': 'Reply failed', 'zh-CN': '回复处理失败的消息' });
 registerStaticCopy('답변 처리가 종료된 메시지', { 'ja-JP': '返信処理が終了したメッセージ', 'zh-TW': '回覆處理已結束的訊息', 'en-US': 'Reply processing ended', 'zh-CN': '回复处理已结束的消息' });
 registerStaticCopy('다시 전송', { 'ja-JP': '再送信', 'zh-TW': '重新傳送', 'en-US': 'Retry sending', 'zh-CN': '重新发送' });
+registerStaticCopy('답변이 확정되었지만 아직 전달되지 않았습니다.', { 'ja-JP': '返信は確定していますが、まだ受信されていません。', 'zh-TW': '回覆已確定，但尚未送達。', 'en-US': 'The reply is saved but has not been delivered yet.', 'zh-CN': '回复已确认，但尚未送达。' });
+registerStaticCopy('확정된 답변 받기', { 'ja-JP': '確定した返信を受け取る', 'zh-TW': '接收已確定的回覆', 'en-US': 'Receive saved reply', 'zh-CN': '接收已确认的回复' });
+registerStaticCopy('이 메시지의 확정된 답변 받기', { 'ja-JP': 'このメッセージの確定した返信を受け取る', 'zh-TW': '接收此訊息已確定的回覆', 'en-US': 'Receive the saved reply to this message', 'zh-CN': '接收此消息已确认的回复' });
+registerStaticCopy('확정된 답변의 현재 상태를 확인하고 있습니다…', { 'ja-JP': '確定した返信の現在の状態を確認しています…', 'zh-TW': '正在確認已確定回覆的狀態…', 'en-US': 'Checking the saved reply status…', 'zh-CN': '正在确认已保存回复的状态…' });
+registerStaticCopy('확정된 답변을 복구하고 있습니다…', { 'ja-JP': '確定した返信を安全に復元しています…', 'zh-TW': '正在安全地還原已確定的回覆…', 'en-US': 'Safely recovering the saved reply…', 'zh-CN': '正在安全地恢复已保存的回复…' });
+registerStaticCopy('확정된 답변을 받았습니다.', { 'ja-JP': '確定した返信を受け取りました。', 'zh-TW': '已收到確定的回覆。', 'en-US': 'Saved reply received.', 'zh-CN': '已收到已确认的回复。' });
 registerStaticCopy('이 메시지 다시 전송', { 'ja-JP': 'このメッセージを再送信', 'zh-TW': '重新傳送此訊息', 'en-US': 'Retry this message', 'zh-CN': '重新发送此消息' });
 registerStaticCopy('다른 미완료 전송이 남아 있습니다. 먼저 전송 상태를 확인해 주세요.', { 'ja-JP': '別の未完了の送信があります。先に送信状態を確認してください。', 'zh-TW': '尚有另一則未完成的傳送。請先確認傳送狀態。', 'en-US': 'Another send is unfinished. Check its status first.', 'zh-CN': '还有另一条未完成的发送。请先确认发送状态。' });
 registerStaticCopy('재전송 가능한 메시지인지 확인하고 있습니다…', { 'ja-JP': '再送信できるメッセージか確認しています…', 'zh-TW': '正在確認訊息是否可重新傳送…', 'en-US': 'Checking whether this message can be retried…', 'zh-CN': '正在确认此消息是否可以重发…' });
