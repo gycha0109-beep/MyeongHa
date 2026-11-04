@@ -161,6 +161,7 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
    postGetDbSnapshotStable:true,
    exactReaderGrantLockedAndCasChecked:true,
    readerS1LockAndScopeRecheckObserved:true,
+   singleExactFullCancellationObservedAtGet:true,
    sourceOrderClassification:'INCOMPARABLE',
   });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -176,6 +177,32 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
   expect(c.calls.findIndex(x=>x.sql===EVENT_SQL))
    .toBeGreaterThan(c.calls.map(x=>x.sql).lastIndexOf(SET_SQL));
   expect(c.calls.map(x=>x.sql)).not.toContain('commit');
+  expectedNoEffect(result);
+ });
+ it('holds 3000+5900 partial aggregate before any Reader lock or CAS',async()=>{
+  const c=db(),lockedCasInspector=vi.fn();
+  const result=await run(c,{
+   storedSetInspector:async()=>({
+    kind:'authenticated_current_cancel_set_matches_recorded',
+    recordedSetSelfConsistent:true,
+    authenticatedProviderGetObserved:true,
+    observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+    exactProviderEventIncluded:true,
+    singleExactFullCancellationObservedAtGet:false,
+    providerOrderingProven:false,currentProviderStateVerified:false,
+    grantRevocationAuthorized:false,providerRefundAuthorized:false,
+    writesPerformed:false,
+   }),
+   lockedCasInspector,
+  });
+  expect(result).toMatchObject({
+   kind:'current_cancel_set_is_not_one_exact_full_item',
+   authenticatedProviderSetMatched:true,
+   singleExactFullCancellationObservedAtGet:false,
+   exactReaderGrantLockedAndCasChecked:false,
+  });
+  expect(lockedCasInspector).not.toHaveBeenCalled();
+  expect(c.query).not.toHaveBeenCalled();
   expectedNoEffect(result);
  });
  it('rejects a candidate event missing from the recorded successful set BEFORE GET or locks',async()=>{
@@ -225,6 +252,7 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
    kind:'exact_reader_locked_cas_consistent_but_authority_held',
    exactReaderGrantLockedAndCasChecked:true,
    readerS1LockAndScopeRecheckObserved:true,
+   singleExactFullCancellationObservedAtGet:true,
    sourceOrderClassification:'INCOMPARABLE',
    grantRevocationAuthorized:false,
   });

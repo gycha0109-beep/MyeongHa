@@ -106,6 +106,7 @@ describe('P4 stored canonical set vs authenticated current PortOne cancellation 
    recordedSetSelfConsistent:true,authenticatedProviderGetObserved:true,
    observedProviderSetMatched:true,postGetDbSnapshotStable:true,
    matchedCancellationItems:2,matchedCancellationAmountMinor:'8900',
+   singleExactFullCancellationObservedAtGet:false,
   });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
   expect(client.calls.filter(x=>x.sql===SQL)).toHaveLength(2);
@@ -216,6 +217,28 @@ describe('P4 stored canonical set vs authenticated current PortOne cancellation 
 });
 
 describe('P4 exact Provider Event member of full current cancellation set',()=>{
+ it('observes a single original-amount cancellation only at authenticated GET time',async()=>{
+  const exact={...FIRST,eventType:'Transaction.Cancelled',
+   sourceEventType:'Transaction.Cancelled',exactAmountMinor:'8900',
+   firstObservedCumulativeMinor:'8900'};
+  const provider={...PAYMENT,cancellations:[{
+   id:A,status:'SUCCEEDED',totalAmount:8900,
+  }]};
+  const result=await run(db({rows:[exact]}),{
+   fetchImpl:fetchFor(provider),expectedProviderEventId:exact.providerEventId,
+  });
+  expect(result).toMatchObject({
+   kind:'authenticated_current_cancel_set_matches_recorded',
+   singleExactFullCancellationObservedAtGet:true,
+   exactProviderEventIncluded:true,
+   matchedCancellationItems:1,matchedCancellationAmountMinor:'8900',
+   providerOrderingProven:false,currentProviderStateVerified:false,
+   latestRefundFinalityProven:false,grantRevocationAuthorized:false,
+   writesPerformed:false,
+  });
+  safe(result);
+ });
+
  it('requires exact persisted candidate event to be in the verified set',async()=>{
   const client=db(),fetchImpl=fetchFor();
   const r=await run(client,{
