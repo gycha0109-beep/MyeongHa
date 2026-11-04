@@ -1,4 +1,4 @@
-export type SajuDisplayLocaleV1 = 'ko-KR' | 'ja-JP' | 'zh-TW';
+export type SajuDisplayLocaleV1 = 'ko-KR' | 'ja-JP' | 'zh-TW' | 'en-US' | 'zh-CN';
 export declare const SAJU_DISPLAY_LOCALES_V1: readonly SajuDisplayLocaleV1[];
 export declare function sajuDisplayLocaleV1(locale: unknown): SajuDisplayLocaleV1;
 export declare function localizeSajuCopyV1(korean: string, locale?: string): string;
