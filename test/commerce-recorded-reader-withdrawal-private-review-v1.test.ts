@@ -97,11 +97,18 @@ function fixture(options:Options={}) {
     }
     if(sql.includes('left join public.commerce_provider_events event')){
       if(options.queryFailure==='cancel')throw Error('source Event snapshot unavailable');
-      expect(args).toEqual([PURCHASE,SUBJECT,UNIT]);
+      // The read-only reviewer MUST use the immutable Claim's Subject,
+      // never a test fixture's default Subject or a sibling purchase.
+      const claimSubject=(options.claimRows?.[0] as
+        {subjectId?:unknown}|undefined)?.subjectId??SUBJECT;
+      expect(args).toEqual([PURCHASE,claimSubject,UNIT]);
       expect(sql).toContain('grant_row.source_receipt_id=receipt.id');
       expect(sql).toContain('access.purchase_intent_id=pi.id');
       expect(sql).toContain('notice.unit_id=$3::uuid');
       expect(sql).toContain("event.resolved_receipt_id=receipt.id");
+      // Real SQL would return zero rows for an unowned Receipt/Grant.
+      // Do not forge the default Subject's cancellation in that scenario.
+      if(claimSubject!==SUBJECT)return {rows:[] as T[]};
       return {rows:(options.cancelRows??[NO_CANCEL]) as T[]};
     }
     if(sql.includes('from public.purchase_intents pi')){
@@ -345,7 +352,15 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       kind:'exact_unit_evidence_unavailable',review:null,
       recordedCustomerClaim:true,providerRefundAuthorized:false,
     });
+    expect(result?.storedCancellationEvidence).toMatchObject({
+      kind:'stored_cancel_source_untrusted',
+      recordedSuccessfulItems:0,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+    });
     expect(status(result)).not.toContain(SUBJECT);
+    expect(f.statements.find(s=>
+      s.sql.includes('left join public.commerce_provider_events event'))?.args
+    ).toEqual([PURCHASE,UNIT,UNIT]);
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
