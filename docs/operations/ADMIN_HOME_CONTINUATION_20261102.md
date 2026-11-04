@@ -2,7 +2,18 @@
 
 This handoff contains **no secrets**. It is for continuing the existing Admin track from a second Windows PC without copying credentials from the school PC.
 
-## Verified completed work
+## Current verified status — 2026-11-04 (supersedes the dated handoff below)
+
+- PR #2940 merged after the required integration CI passed: https://github.com/gycha0109-beep/MyeongHa/pull/2940.
+- The Admin Console inactive staging workflow **passed both jobs** on `main` at commit `d80a15f2eb4b974f9840d5cbda186a5fb28d03d9`: https://github.com/gycha0109-beep/MyeongHa/actions/runs/41765513749.
+- The dedicated `myeongha-admin` Worker was deployed with `MYEONGHA_ADMIN_PRIVATE_ENABLED`, credit commands, retention and analytics retention **all false**. The deployed bindings and the Member-verification secret were read back successfully.
+- The staging CI verified the existing one-Owner Cloudflare Access policy; separate Reader/Audit Writer Hyperdrive identities; live PostgreSQL minimum privileges; audit INSERT and forbidden operations in a rolled-back transaction; and post-deployment Access/Hyperdrive policy readback.
+- Anonymous access to the deployed Admin page, API and static assets was rejected in the stage HTTP probe. **Real Owner and non-Owner Access login sessions were not exercised**, and Member authentication and production Admin reads were **not** activated or verified.
+- The existing customer-facing `myeongha` Worker was not the deployment target; do not conflate this isolated inactive stage with opening the Admin console for operational use.
+- **Next existing roadmap gate:** exercise the dedicated `apps/admin/inactive-stage-owner-probe.mjs` with short-lived real Owner and denied-user Access JWTs supplied only as ephemeral process environment values. Never commit, persist in GitHub Actions Secrets, or paste these sessions into reports or chat. The probe verifies only the inactive Access boundary, not Member auth or production reads. Actual Admin feature activation requires separate explicit approval and its own verification; leave credit commands, retention and analytics disabled.
+- Entries below describe the **2026-11-02 historical handoff**, including statements that the Worker was then undeployed. Those entries are retained as dated evidence, not the current deployment state.
+
+## Verified completed work (historical 2026-11-02)
 
 - Dedicated Supabase DB roles for Reader and Audit Writer were created previously.
 - Cloudflare dedicated Hyperdrives were created, read back and verified with TLS verify-full and caching disabled:
