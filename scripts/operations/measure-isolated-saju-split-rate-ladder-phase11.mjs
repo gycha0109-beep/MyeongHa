@@ -5,6 +5,11 @@ import { setTimeout as sleep } from 'node:timers/promises';
 const RATES = [10, 25, 50, 100, 200, 400];
 const SECONDS = 6;
 const MAX_IN_FLIGHT = 16;
+const SATURATION_RATES = [400, 800, 1200, 1600];
+const SATURATION_SECONDS = 15;
+const SATURATION_WAVES_PER_SECOND = 100;
+const SATURATION_MAX_IN_FLIGHT = 64;
+const SATURATION_ROUNDS = 2;
 const CAP = 268435456;
 const BEARER = 'isolated-phase11-rate-ladder-synthetic-only';
 const BODY = JSON.stringify({
@@ -84,22 +89,25 @@ async function calculation() {
     return { kind: 'transport', latency: performance.now() - started };
   }
 }
-async function measure(rate) {
+async function measure(rate, saturation = false, round = 0) {
   const [serviceBefore, driverBefore] = await Promise.all([serverMetrics(), clientMetrics()]);
-  const intervalMs = 1000 / rate;
-  const planned = rate * SECONDS;
+  const intervalMs = saturation ? 1000 / SATURATION_WAVES_PER_SECOND : 1000 / rate;
+  const waveSize = saturation ? rate / SATURATION_WAVES_PER_SECOND : 1;
+  const stageSeconds = saturation ? SATURATION_SECONDS : SECONDS;
+  const inFlightCap = saturation ? SATURATION_MAX_IN_FLIGHT : MAX_IN_FLIGHT;
+  const planned = rate * stageSeconds;
   const start = performance.now();
   let skippedSchedulingLag = 0, skippedInFlightCap = 0, peakInFlight = 0;
   const pending = new Set(), attempts = [];
   for (let slot = 0; slot < planned; slot++) {
-    const scheduled = start + slot * intervalMs;
+    const scheduled = start + Math.floor(slot / waveSize) * intervalMs;
     const now = performance.now();
     if (now < scheduled) await sleep(scheduled - now);
     if (performance.now() - scheduled >= intervalMs * 1.5) {
       skippedSchedulingLag++;
       continue;
     }
-    if (pending.size >= MAX_IN_FLIGHT) {
+    if (pending.size >= inFlightCap) {
       skippedInFlightCap++;
       continue;
     }
@@ -118,7 +126,8 @@ async function measure(rate) {
   const successes = completed.filter(result => result.kind === 'success');
   const count = kind => completed.filter(result => result.kind === kind).length;
   return {
-    targetRps: rate, intervalSeconds: SECONDS, plannedSlots: planned,
+    targetRps: rate, intervalSeconds: stageSeconds, plannedSlots: planned,
+    ...(saturation ? { round, wavesPerSecond: SATURATION_WAVES_PER_SECOND, waveSize } : {}),
     attempted: completed.length, successfulCalculations: successes.length,
     non200: count('non200'), transportFailures: count('transport'),
     invalidResponses: count('invalid'), skippedSchedulingLag, skippedInFlightCap,
@@ -140,19 +149,28 @@ async function measure(rate) {
   };
 }
 async function main() {
+  const saturation = process.argv.length === 3 && process.argv[2] === '--saturation';
+  requireValid(process.argv.length === 2 || saturation, 'Unsupported Saju driver mode');
   const [initialService, initialDriver] = await Promise.all([serverMetrics(), clientMetrics()]);
   requireValid((await calculation()).kind === 'success', 'Real calculation warmup failed');
   const rates = [];
-  for (const r of RATES) {
-    rates.push(await measure(r));
-    await sleep(300);
+  for (let round = 1; round <= (saturation ? SATURATION_ROUNDS : 1); round++) {
+    for (const r of saturation ? SATURATION_RATES : RATES) {
+      rates.push(await measure(r, saturation, round));
+      await sleep(300);
+    }
   }
   const recovery = (await calculation()).kind === 'success';
   requireValid(recovery, 'Real calculation recovery failed');
   const [finalService, finalDriver] = await Promise.all([serverMetrics(), clientMetrics()]);
   const report = {
-    schema: 'myeongha-ops-saju-split-cgroup-rate-ladder-phase11-v1',
-    status: 'OBSERVED_SPLIT_CGROUP_RATE_LADDER',
+    schema: saturation ? 'myeongha-ops-saju-split-cgroup-controlled-saturation-phase11-v1' :
+      'myeongha-ops-saju-split-cgroup-rate-ladder-phase11-v1',
+    status: saturation ? 'OBSERVED_BOUNDED_SPLIT_CGROUP_SATURATION' :
+      'OBSERVED_SPLIT_CGROUP_RATE_LADDER',
+    ...(saturation ? { boundedSyntheticProbeOnly: true,
+      wavesPerSecond: SATURATION_WAVES_PER_SECOND,
+      maxInFlightCap: SATURATION_MAX_IN_FLIGHT } : {}),
     sourceSha: '9807ce89c08afc61b587560d515a475efd819032',
     actualSajuProductionHostUsed: true, syntheticInputOnly: true,
     networkScope: 'shared-offline-network-namespace-loopback-only',
@@ -183,7 +201,7 @@ async function main() {
     productionScalingThresholdApproved: false, drReady: false,
     serviceResumptionAllowed: false, outputContainsIdentifiers: false,
   };
-  requireValid(report.totalPlannedSlots === 4710 &&
+  requireValid(report.totalPlannedSlots === (saturation ? 120000 : 4710) &&
     report.totalSuccessfulCalculations <= report.totalActualAttempts &&
     report.rates.every(r => r.attempted + r.skippedSchedulingLag + r.skippedInFlightCap === r.plannedSlots),
   'Aggregate slots invalid');
