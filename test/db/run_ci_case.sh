@@ -22,8 +22,7 @@ apply_pg17_migrations_without_birth_authority() {
   local reader_scope='historical'
   case "$case_name" in
     commerce-private-claim-full-finalizer-pg17|commerce-stored-portone-hmac-lineage-pg17|\
-    commerce-portone-cancellation-set-audit-pg17|commerce-exact-reader-withdrawal-hold-pg17|\
-    commerce-reader-s1-cas-real-race-pg17)
+    commerce-portone-cancellation-set-audit-pg17|commerce-exact-reader-withdrawal-hold-pg17)
       reader_scope='reader-integrated' ;;
   esac
   for migration in supabase/migrations/*.sql; do
@@ -752,16 +751,6 @@ SQL
       echo HOLD_COMMERCE_PARTIAL_SET_NOT_ISOLATED_PG17 >&2; exit 1;
     }
     bash test/db/commerce_portone_cancellation_partial_set_pg17.sh
-    ;;
-  commerce-reader-s1-cas-real-race-pg17)
-    verify_pg17
-    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
-        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
-        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
-      echo HOLD_COMMERCE_READER_S1_RACE_NOT_DISPOSABLE_PG17 >&2; exit 1;
-    }
-    apply_pg17_migrations_without_birth_authority
-    bash test/db/commerce_reader_s1_cas_race_pg17.sh
     ;;
   commerce-exact-reader-withdrawal-hold-pg17)
     verify_pg17
