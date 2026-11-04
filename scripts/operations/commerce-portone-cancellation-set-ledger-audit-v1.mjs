@@ -85,7 +85,7 @@ const no=(kind,extra={})=>Object.freeze({
  schemaVersion:COMMERCE_PORTONE_CANCEL_SET_AUDIT_V1.schemaVersion,
  kind,readOnly:true,recordedSetSelfConsistent:false,
  authenticatedProviderGetObserved:false,observedProviderSetMatched:false,
- postGetDbSnapshotStable:false,
+ postGetDbSnapshotStable:false,singleExactFullCancellationObservedAtGet:false,
  providerOrderingProven:false,currentProviderStateVerified:false,
  latestRefundFinalityProven:false,legalRefundAuthority:false,
  readerT2LockHeld:false,grantRevocationAuthorized:false,
@@ -302,11 +302,21 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
        Object.keys(row).some(key=>next[key]!==row[key]);
     }))
   return no('stored_cancel_set_changed_during_provider_get');
+ // Provider GET observation, not a durable event order or refund authority.
+ // A fully cancelled payment made up of partial cancellations is NOT one
+ // exact full cancellation item of the original Reader purchase.
+ const singleExactFull=before.length===1&&
+  first.summary.kind==='recorded_full_amount_set_consistent'&&
+  before[0].eventType==='Transaction.Cancelled'&&
+  before[0].exactAmountMinor===head.receiptPaidMinor&&
+  current.kind==='full_cancel_shape_observed'&&
+  current.successfulItems.length===1;
  return no('authenticated_current_cancel_set_matches_recorded',{
   recordedSetSelfConsistent:true,
   authenticatedProviderGetObserved:true,observedProviderSetMatched:true,
   postGetDbSnapshotStable:true,
   exactProviderEventIncluded:expectedProviderEventId!==undefined,
+  singleExactFullCancellationObservedAtGet:singleExactFull,
   matchedCancellationItems:before.length,
   matchedCancellationAmountMinor:first.summary.recordedItemAmountMinor,
  });
