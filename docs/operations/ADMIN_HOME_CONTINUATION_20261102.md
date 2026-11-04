@@ -2,6 +2,16 @@
 
 This handoff contains **no secrets**. It is for continuing the existing Admin track from a second Windows PC without copying credentials from the school PC.
 
+## 2026-11-04 follow-up: Cloudflare policy simulation and remaining gates
+
+- [Admin work-log PR #2963](https://github.com/gycha0109-beep/MyeongHa/pull/2963) merged after [11/11 integration jobs succeeded](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41790239741). No production Worker code or credentials changed.
+- Re-read the **live** `MyeongHa Admin Owner Only` Cloudflare Access application and single exact-email allow policy. Confirmed exact hostname, Access AUD and Owner binding match; no Everyone / Bypass or additional policy. The dedicated Worker remains deployed with all four activation flags `false`, Reader and Audit Hyperdrive bindings present. Anonymous requests to `/admin/`, `/admin/index.html`, and `/api/admin/session` each redirected to Access (HTTP 302) rather than returning privileged content.
+- Ran Cloudflare's **policy simulation against the exact configured Owner-only rule**. Simulation ID `281e584c0e442c56c104f3f70cdde8357d84280b2a50e57f4eed97d4620ea810` completed: **1 existing authenticated user evaluated, 1 allowed, 0 blocked, 0 errored**. This is **not** a non-Owner denial test because the test population contained no other authenticated user. It does not prove a second person's real login is denied.
+- A real **Owner** browser previously returned `ADMIN_PRIVATE_DISABLED` after signing/Owner validation, and remains the recorded acceptance evidence. Do not mistake the simulation or anonymous 302s for a second account's real session.
+- **Next blocked existing gate:** a genuine non-Owner login attempt/session must be observed without creating a fictitious user or storing JWTs/cookies. The existing dual-session `apps/admin/inactive-stage-owner-probe.mjs` cannot run truthfully with only the Owner's session.
+- **Independent gates before read-only operational launch:** real Member identity binding (email plus auth UUID in the same verified provider result) and actual Reader/Audit production request/permission behavior, distinct from the already-passed rollback-only DB role preflights. These require a separately controlled test/release path and cannot be claimed from an inactive `MYEONGHA_ADMIN_PRIVATE_ENABLED=false` Worker. An actual change to operational readiness/activation requires the user's **explicit approval**; no activation was made.
+- Credit commands, refunds/account actions, retention and analytics maintenance remain disabled. No new roadmap tasks were introduced.
+
 ## Current Admin evidence and work log — 2026-11-04 (latest)
 
 **Scope:** isolated `myeongha-admin` Worker and Owner-only Access gate; no customer-facing Worker, customer DML, credit command, or operational activation change in this verification.
