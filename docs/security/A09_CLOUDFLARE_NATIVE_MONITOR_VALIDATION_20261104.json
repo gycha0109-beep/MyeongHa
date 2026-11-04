@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "myeongha-a09-cloudflare-controlled-native-monitor-verification-v1",
+  "observedAtKst": "2026-11-04",
+  "provider": "Cloudflare",
+  "accountId": "410d3f82ed3ccc66609a2b698803859b",
+  "primary": {
+    "worker": "myeongha",
+    "policyId": "fab0d24cd73740f5b2dba97766f78a66",
+    "alertType": "custom_analytics",
+    "status": "ACTIVE_READBACK_VERIFIED",
+    "latestReadback": {
+      "algorithm": "zscore_spike",
+      "operator": "<",
+      "shortWindow": "5m",
+      "longWindow": "4h",
+      "sensitivitySigma": 3.5,
+      "executionInterval": "1m",
+      "repeatInterval": "1h",
+      "source": "sql_api",
+      "dataset": "logs.workersLogs",
+      "recipientCount": 1,
+      "modifiedAt": "2026-10-24T20:49:11.932523Z"
+    },
+    "operatorAndIntervalInvestigation": {
+      "action": "disabled shadow monitor create, provider readback, delete",
+      "operatorLessThanReaccepted": true,
+      "operatorGreaterThanRejected": true,
+      "operatorOmittedRejectedOnUpdate": true,
+      "providerDefaultExecutionInterval": "1m",
+      "productionPolicyChanged": false,
+      "interpretation": "The existing operator and one-minute interval are provider-accepted values; no documented evidence supports treating them as defective. Does not prove a zscore_spike notification."
+    },
+    "nativeAnomalyAutomaticallyFiredProven": false
+  },
+  "productionBaseline": {
+    "source": "docs/operations/SECURITY_BASELINE_CLOUDFLARE_20261103.json",
+    "capturedWindowUtc": {
+      "from": "2026-10-27T04:20:00.000Z",
+      "to": "2026-11-03T04:07:00.000Z"
+    },
+    "parsedEvents": 202,
+    "excludedKnownSynthetic": 19,
+    "remainingUnknownAttribution": 183,
+    "remainingStatusCounts": {
+      "401": 113,
+      "403": 14,
+      "429": 0,
+      "503": 56
+    },
+    "separatePrimaryWorkerRateLimitCanary": true,
+    "fullyOrganicPopulationProven": false,
+    "completePopulationProven": false,
+    "decision": "Use provider-owned anomaly detection rather than deriving a fixed numeric request threshold from mixed/limited retained data."
+  },
+  "controlledExercises": {
+    "isolatedReplay": {
+      "source": "docs/security/A09_ISOLATED_ATTACK_NOTIFICATION_EVIDENCE_20261103.json",
+      "requestCount": 222,
+      "canonicalEvents": 190,
+      "deterministicZscoreMirrorTriggered": true,
+      "cloudflareInternalZscoreTriggerProven": false
+    },
+    "nativeAnomalyIsolated": {
+      "worker": "myeongha-a09-native-lab-20261103",
+      "policyId": "ae91f96372fa447ebf2ae8fddedfe0cf",
+      "baselineCount": 44,
+      "spikeCount": 216,
+      "actualProviderSqlMatched": true,
+      "nativeAutomaticEmailReceived": false,
+      "causeDetermined": false,
+      "cleanedUp": true
+    },
+    "nativeThresholdIsolated": {
+      "worker": "myeongha-a09-live-control-20261104",
+      "policyId": "d6a12666dda149398edc708214889534",
+      "rule": "value > 10",
+      "source": "Cloudflare Workers Logs / Cloudflare SQL API",
+      "observedLast5m": 200,
+      "observedLast10m": 400,
+      "actualAlertValue": 400,
+      "alertStartedAtUtc": "2026-11-04T01:25:53.885647536Z",
+      "gmailReceivedAtUtc": "2026-11-04T01:29:22Z",
+      "gmailMessageId": "1a1a42cdca62229b",
+      "cloudflareAlertHistoryCountAfterTrigger": 1,
+      "exactPolicyLinkedFromEmail": true,
+      "providerTestEndpointCalled": false,
+      "nativeScheduledAlertProven": true,
+      "anomalyAlgorithmNotProvenByThresholdTest": true,
+      "evaluationIntervalAtFiring": "10m",
+      "oneMinuteIntervalCausalityProven": false,
+      "cleanedUp": true
+    }
+  },
+  "cleanup": {
+    "temporaryAnomalyWorkerDeleted": true,
+    "temporaryThresholdWorkerDeleted": true,
+    "temporaryThresholdPolicyDeleted": true,
+    "disabledVerificationPolicyDeleted": true,
+    "cloudflareGetAfterDelete404": true,
+    "primaryPolicyPreserved": true
+  },
+  "issueAcceptanceClarification": {
+    "userClarifiedRealAttackNotRequired": true,
+    "productionOrganicAttributionNotAsserted": true,
+    "productionNativeAnomalyFiringNotAsserted": true,
+    "providerActivationAndReadbackAcceptedAsConfigurationEvidence": true,
+    "controlledAutomaticThresholdDispatchAcceptedAsPipelineEvidence": true,
+    "fixedRequestThresholdOnProduction": null,
+    "requiresExactHeadCiAndPostMergeVerification": true,
+    "completionDetermination": "Assess #1527's written outcomes using bounded production baseline, documented limitations, active provider-native anomaly monitor and controlled delivery evidence; do not wait for real attacks or claim a native anomaly fired."
+  }
+}
