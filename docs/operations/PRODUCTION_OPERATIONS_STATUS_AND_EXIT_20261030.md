@@ -10,6 +10,15 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Phase 10/11 integrated synthetic product request chain (implementation, CI unverified)
+
+- **Approved roadmap gap:** Phase 10/11 still lacks representative authenticated MyeongHa API → Auth → DB → Saju combined-path measurements. Previous actual PostgreSQL18 and actual Saju saturation experiments remain distinct and are not rerun or relabelled.
+- **Implementation:** Added `test/ops/product-saju-synthetic-path-phase10-11.test.mjs` using the existing production current-subject Saju handler, actual loopback HTTP for the Member verifier/Saju adapter/API entrance, a fixed synthetic subject+Birth fixture and **synthetic bounded DB pool (max 2)**. Measures 12 sequential + 32 concurrency-8 request outcomes, aggregate successful p50/p95/p99, DB admission-pressure, HTTP Saju timeout/no retry, Auth/DB outage fail-closed, independent Health, `no-store` and forbidden token/internal-detail non-reflection. See [scope and execution contract](PRODUCT_SAJU_SYNTHETIC_CHAIN_PHASE10_11_20261105.md).
+- **Evidence state:** Code committed to an isolated `ops` branch; test/PR CI results **not yet confirmed at this worklog edit**. Do not call the new measurement actual GitHub Linux evidence until its linked CI completes. No production traffic, secrets, Hosted DB, Production mutation or billable provider is used.
+- **Explicit limitations:** `databaseTransport=synthetic_pool_not_real_postgres`, `sajuEngineTransport=synthetic_response_not_real_engine`; actual combined PostgreSQL query/connection time, pinned Saju CPU/memory, cross-service resource ceiling and Production TPS remain **not proven**. Real PostgreSQL18 RLS and real Saju CPU saturation evidence reported above is independent.
+- **Gates unchanged:** `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`, `outputContainsIdentifiers=false`; Hosted DR blocker [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN. **Next:** use this combined-path harness with disposable real PostgreSQL and pinned Saju where independently feasible, then connect measured ceilings to Phase 12 without introducing invented scale thresholds.
+
+
 ### 2026-11-04 KST — Actual two-round isolated real Saju saturation diagnostics preserved
 
 - **Actual Linux main run:** [saturation #41798949702](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41798949702) **SUCCESS**, MyeongHa exact main `11045d4b9662f1c8c50d92f58db6ea8916a643e0`, pinned public Saju `9807ce89c08afc61b587560d515a475efd819032`. Initial attempt [#41786718871](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41786718871) failed because round-number argument shadowed the rounding function, with only BLOCKED_INCOMPLETE artifact; correction PR #2960 merged with full integration PASS before the successful rerun.
