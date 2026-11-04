@@ -112,7 +112,7 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(status(result)).not.toContain(PURCHASE);
     expect(status(result)).not.toContain(UNIT);
     expect(status(result)).not.toContain('notice-v1');
-    expect(f.statements.join('')).not.toContain('INSERT');
+    expect(f.statements.map(s=>s.sql).join('\n')).not.toMatch(/\\b(?:INSERT|UPDATE|DELETE|GRANT)\\b/iu);
   });
 
   it('keeps a change-of-mind claim in manual evidence review when legal delivery is not proven',async()=>{
@@ -149,6 +149,17 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
+  it('keeps another Subject\'s claim recorded but never borrows this Subject\'s receipt evidence',async()=>{
+    const f=fixture({claimRows:[{...ROW,subjectId:UNIT}]});
+    const result=await run(f);
+    expect(result).toMatchObject({
+      kind:'exact_unit_evidence_unavailable',review:null,
+      recordedCustomerClaim:true,providerRefundAuthorized:false,
+    });
+    expect(status(result)).not.toContain(SUBJECT);
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+  });
+
   it('returns no case for a missing/deleted private Claim, without checking payments',async()=>{
     const f=fixture({claimRows:[]});
     expect(await run(f)).toBeNull();
@@ -156,7 +167,6 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
   });
 
   it.each([
-    {claimRows:[{...ROW,subjectId:UNIT}]},
     {claimRows:[{...ROW,claimId:UNIT}]},
     {claimRows:[{...ROW,purchaseIntentId:null}]},
     {claimRows:[{...ROW,unitId:null}]},
@@ -183,16 +193,27 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
-  it.each(['claim','purchase','notice','begin','rollback'] as const)(
-    'never converts %s DB failure into accepted or review-completed state',async queryFailure=>{
+  it.each(['purchase','notice'] as const)(
+    'preserves the recorded claim without forging %s evidence on private DB failure',async queryFailure=>{
+      const f=fixture({queryFailure});
+      await expect(run(f)).resolves.toMatchObject({
+        kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
+        review:null,providerRefundAuthorized:false,
+      });
+      expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+    },
+  );
+
+  it.each(['claim','begin','rollback'] as const)(
+    'never trusts an unsafe Claim transaction or failed %s operation',async queryFailure=>{
       const f=fixture({queryFailure});
       await expect(run(f)).rejects.toMatchObject({
         code:'RECORDED_READING_WITHDRAWAL_PRIVATE_REVIEW_UNAVAILABLE',
       });
       expect(f.statements.at(-1)?.sql).toBe(queryFailure==='begin'?
         'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY':'ROLLBACK');
-      if(queryFailure==='begin')expect(f.release.mock.calls[0]?.[0]).toBeInstanceOf(Error);
-      if(queryFailure==='rollback')expect(f.release.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+      if(queryFailure==='begin'||queryFailure==='rollback')
+        expect(f.release.mock.calls[0]?.[0]).toBeInstanceOf(Error);
     },
   );
 
