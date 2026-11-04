@@ -29,6 +29,13 @@ describe('inactive Worker verifies Access before its disabled boundary',()=>{
   }
   expect(io).toBe(0);expect(fetch).not.toHaveBeenCalled();
  });
+ it('logs only safe, fixed denial categories in the disabled stage',async()=>{
+  const diagnostic=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  await worker.fetch(new Request('https://myeongha-admin.gycha0109.workers.dev/admin/'),env,{});
+  expect(diagnostic).toHaveBeenCalledWith('ADMIN_ACCESS_DIAGNOSTIC_V1',{
+    source:'none',gateReason:'credential_missing_or_ambiguous',workerReason:'context_unavailable'});
+  expect(JSON.stringify(diagnostic.mock.calls)).not.toContain('owner@example.test');
+ });
  it('uses only Cloudflare-verified Owner context when the JWT header is unavailable',async()=>{
   const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>{throw Error('unexpected network');});
   let io=0;
