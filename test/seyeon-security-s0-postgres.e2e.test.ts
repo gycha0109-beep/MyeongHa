@@ -1366,6 +1366,62 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(regrantedPair.body).not.toContain(f.userText);
   });
 
+  it('G3 replay-first serializes independent Grant withdrawal, then denies a second disclosure',async()=>{
+    const f=await prepare(225,{summary:'synthetic G3 original Replay Grant'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const replay=await pool.connect(),revoker=await pool.connect();
+    const marker='seyeon_g3_replay_grant_withdrawal_waiter';
+    try{
+      await replay.query('BEGIN');
+      await replay.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await replay.query<{assistantText:string}>(`select assistant_text
+        as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{assistantText:f.assistantText}]);
+      // This distinct backend must not withdraw the original Grant while the
+      // first backend has authority locked for the pending replay response.
+      await revoker.query("select set_config('application_name',$1,false)",[marker]);
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=revoker.query(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await replay.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      await revoker.query('COMMIT');
+    }finally{
+      await replay.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      replay.release();revoker.release();
+    }
+    const after=await f.run(({client})=>client.query(`select assistant_text
+      as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]));
+    expect(after.rows).toEqual([]);
+    const {rows:[grant]}=await pool.query(`select
+      revoked_at is not null as revoked,
+      seyeon_revoke_requested_at is not null as requested
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant.revoked||grant.requested).toBe(true);
+  });
+
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
     const f=await prepare(210);
     await f.commit();
