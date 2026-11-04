@@ -175,7 +175,11 @@ BEGIN
   IF source_start=0 THEN RAISE EXCEPTION 'G0 Member original SELECT missing'; END IF;
   source_end:=position('  end if;' IN substring(f from source_start));
   IF f IS NULL OR source_end=0
-     OR position('for share of msg,t,thread;' IN f)=0
+     -- G0 v15 locks the message through the private source-lock routine,
+     -- then SHARE-locks only the canonical Turn and Thread. Requiring
+     -- SHARE OF msg here rejects the actual audited original function.
+     OR position('perform seyeon_private.lock_memory_source_message_v1(' IN f)=0
+     OR position('for share of t,thread;' IN f)=0
      OR position('constraint=''seyeon_g0_user_origin_unverifiable''' IN f)=0
   THEN RAISE EXCEPTION 'G0 Member original function drifted'; END IF;
   -- The previous invoker-visible SELECT was filtered by runtime-owner RLS,
