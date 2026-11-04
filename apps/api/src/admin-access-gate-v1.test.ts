@@ -23,6 +23,25 @@ describe('private hosted administrator boundary',()=>{
     const tampered=token().split('.');tampered[1]=Buffer.from(JSON.stringify({...claims,exp:1800000999})).toString('base64url');
     expect(await gate(request(tampered.join('.')))).toBe(false);
   });
+  it('accepts a signed Owner Access application cookie when the assertion header is absent',async()=>{
+    const gate=createAdminAccessGateV1(config,{fetchImpl:jwks,now:()=>1800000000000});
+    const req=(cookie:string,assertion?:string)=>new Request('https://admin.example.test/admin/',{
+      headers:{cookie,...(assertion?{'cf-access-jwt-assertion':assertion}:{})},
+    });
+    expect(await gate(req('CF_Authorization='+token()))).toBe(true);
+    expect(await gate(req('other=value; CF_Authorization='+token()))).toBe(true);
+    for(const value of [
+      'CF_Authorization='+token({...claims,email:'member@example.test'}),
+      'CF_Authorization='+token({...claims,aud:['wrong']}),
+      'CF_Authorization='+token({...claims,exp:1800000000}),
+      'CF_Authorization='+token().slice(0,-5)+'wrong',
+      'CF_Authorization=not-a-signed-jwt',
+      'CF_Authorization='+token()+'; CF_Authorization='+token(),
+      'other=value',
+    ])expect(await gate(req(value))).toBe(false);
+    expect(await gate(req('CF_Authorization='+token(),'bad.jwt.assertion'))).toBe(false);
+    expect(await gate(req('CF_Authorization='+token(),'no-valid-token'))).toBe(false);
+  });
   it('never serves HTML or calls a database/API for an unverified Access identity',async()=>{
     let calls=0;
     const handler=createAdminHostedHttpV1({origin:'https://admin.example.test',memberAuthOrigin:'https://member.example.test',
