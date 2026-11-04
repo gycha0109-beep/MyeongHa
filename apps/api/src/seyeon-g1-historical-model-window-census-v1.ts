@@ -3,7 +3,7 @@
 // This produces NO persisted G1 Pin, paid-model or HTTP Reveal permission.
 import {createHash} from 'node:crypto';
 import {canonicalJson} from '../../../packages/domain/src/index.js';
-import {assembleSeyeonRuntimeContextV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
+import {assembleSeyeonRuntimeContextV2,selectSeyeonRuntimeRecentMessagesV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {RunSeyeonCharacterTurnV2Input} from './seyeon-character-runtime-v2.js';
 import type {SeyeonRecentMessageV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonProductionRecentMessageAuthorityRowV1} from './seyeon-production-context-read-v1.js';
@@ -130,7 +130,10 @@ export function buildSeyeonG1HistoricalFinalContextCandidateSealV1(input:Readonl
 }>{
   try{
     const c=input.contextInput;
-    const selected=c?.recentMessages;
+    const selected=selectSeyeonRuntimeRecentMessagesV2({
+      recentMessages:c.recentMessages,
+      ...(c.maxRecentMessages===undefined?{}:{maxRecentMessages:c.maxRecentMessages}),
+    });
     const memory=c?.retrievedMemories;
     const past=input.census;
     if(!c||c.relationship!==null||!Array.isArray(selected)
