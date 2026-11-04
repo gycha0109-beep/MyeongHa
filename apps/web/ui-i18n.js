@@ -72,6 +72,13 @@ for (const [source, localized] of Object.entries({
 
 registerStaticCopy("기억 접근 권한이 변경되어 이전 세연 답변을 표시하지 않습니다. 이후 접근 여부는 서버에서 다시 확인합니다.", { 'ja-JP': "記憶へのアクセス権限が変更されたため、以前のセヨンの返信は表示しません。今後のアクセス権限はサーバーで再確認します。", 'zh-TW': "記憶存取權限已變更，因此不會顯示先前世妍的回覆。之後的存取權限將由伺服器重新確認。" });
 registerStaticCopy("기억 접근 철회 요청이 확인되어 이전 세연 답변을 숨겼습니다. 이후 접근 권한은 서버에서 다시 확인합니다.", { 'ja-JP': "記憶へのアクセス撤回要求が確認されたため、以前のセヨンの返信を非表示にしました。以後のアクセス権限はサーバーで再確認します。", 'zh-TW': "已確認撤回記憶存取權限的請求，因此已隱藏先前世妍的回覆。之後的存取權限將由伺服器重新確認。" });
+// The header report control is localized in every supported non-Korean UI locale.
+registerStaticCopy('콘텐츠 신고', {
+  'ja-JP': 'コンテンツを報告',
+  'zh-TW': '檢舉內容',
+  'en-US': 'Report content',
+  'zh-CN': '举报内容',
+});
 
 export function normalizeUiLocale(value) {
   return SUPPORTED_UI_LOCALES.includes(value) ? value : 'ko-KR';

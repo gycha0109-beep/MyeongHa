@@ -1463,6 +1463,19 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       from public.chat_turn_attempts where id=$1`,[currentAttempt]);
     expect(saved.state).toBe('running');
     expect(saved.proof.historicalCandidateProof.historicalSourceCount).toBe(2);
+    expect(saved.proof.historicalCandidateProof.schemaVersion)
+      .toBe('seyeon-g1-historical-source-candidate-v2');
+    expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSources)
+      .toEqual([{
+        messageId:f.assistant,turnId:f.turn,attemptId:f.attempt,
+        originalUserMessageId:f.user,originalUserTextDigest:wire(f.userText),
+        recordId:f.memory,originalGrantId:f.grant,
+        originalPgJsonbDigest:original.digest,
+        recordType:'conversation_recall',recordSchemaVersion:'v1',
+        projectorVersion:'seyeon-conversation-recall-projector-v1',
+      }]);
+    expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSourcesDigest)
+      .toMatch(/^sha256:pg-jsonb:v1:[a-f0-9]{64}$/u);
     expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
     const {rows:[acl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',

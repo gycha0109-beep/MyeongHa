@@ -23,6 +23,9 @@ declare
   v_current_count integer;
   v_required integer;
   v_history jsonb:='[]'::jsonb;
+  v_assistant_originals jsonb:='[]'::jsonb;
+  v_assistant_pin jsonb;
+  v_assistant_attempt uuid;
   v_proof jsonb;
   v_replayed boolean;
 begin
@@ -154,6 +157,65 @@ begin
         'textDigest','sha256:wire-utf8:v1:'||
           encode(sha256(convert_to(v_row.body_text,'UTF8')),'hex')
       ));
+      -- G1 evidence only: persist the DB-owned original Memory/Grant chain
+      -- for each *verified* historical Assistant. The G0 reader above
+      -- already locks/checks the exact old Grant, never a replacement.
+      -- Historical User rows have no inferred personal-record provenance.
+      if v_row.sender_type='character' then
+        select a.seyeon_personal_source_pin_jsonb->'positiveProof',a.id
+          into v_assistant_pin,v_assistant_attempt
+        from public.conversation_messages m
+        join public.chat_turns t
+          on t.id=m.turn_id and t.subject_id=m.subject_id
+          and t.thread_id=m.thread_id and t.committed_at is not null
+          and t.state in ('committed','delivered')
+        join public.chat_turn_attempts a
+          on a.id=t.committed_attempt_id and a.turn_id=t.id
+          and a.subject_id=t.subject_id and a.state='committed'
+          and a.committed_message_id=m.id
+        where m.id=v_row.message_id and m.subject_id=p_subject_id
+          and m.thread_id=p_thread_id and m.turn_id=v_source_turn_id
+          and m.sender_type='character' and m.redacted_at is null
+          and a.seyeon_personal_source_pinned_at is not null
+          and a.seyeon_personal_source_pin_jsonb=jsonb_build_object(
+            'positiveProof',a.seyeon_personal_source_pin_jsonb->'positiveProof')
+          and a.validation_result_jsonb->'personalRecordProvenance'
+            =a.seyeon_personal_source_pin_jsonb->'positiveProof';
+        if not found or jsonb_typeof(v_assistant_pin) is distinct from 'object'
+          or v_assistant_pin->>'subjectId' is distinct from p_subject_id::text
+          or v_assistant_pin->>'threadId' is distinct from p_thread_id::text
+          or v_assistant_pin->>'turnId' is distinct from v_source_turn_id::text
+          or v_assistant_pin->>'attemptId' is distinct from v_assistant_attempt::text
+          or v_assistant_pin->>'characterId' is distinct from 'seyeon'
+          or v_assistant_pin->>'recordKind' is distinct from 'memory'
+          or v_assistant_pin->>'recordId' is null
+          or v_assistant_pin->>'originalGrantId' is null
+          or v_assistant_pin->>'currentUserMessageId' is null
+          or v_assistant_pin->>'currentUserTextDigest'
+            !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
+          or v_assistant_pin->>'originalPgJsonbDigest'
+            !~ '^sha256:pg-jsonb:v1:[a-f0-9]{64}$'
+          or v_assistant_pin->>'historicalSourceCount' is distinct from '0'
+        then
+          raise exception using errcode='23514',
+            constraint='seyeon_history_candidate_assistant_original_missing';
+        end if;
+        v_assistant_originals:=v_assistant_originals||jsonb_build_array(
+          jsonb_build_object(
+            'messageId',v_row.message_id::text,
+            'turnId',v_source_turn_id::text,
+            'attemptId',v_assistant_attempt::text,
+            'originalUserMessageId',v_assistant_pin->>'currentUserMessageId',
+            'originalUserTextDigest',v_assistant_pin->>'currentUserTextDigest',
+            'recordId',v_assistant_pin->>'recordId',
+            'originalGrantId',v_assistant_pin->>'originalGrantId',
+            'originalPgJsonbDigest',v_assistant_pin->>'originalPgJsonbDigest',
+            'recordType',v_assistant_pin->>'recordType',
+            'recordSchemaVersion',v_assistant_pin->>'recordSchemaVersion',
+            'projectorVersion',v_assistant_pin->>'projectorVersion'
+          )
+        );
+      end if;
     end if;
   end loop;
   if v_n<>v_required or v_history is distinct from p_expected_historical then
@@ -185,7 +247,7 @@ begin
 
   -- Deliberately NOT 'positiveProof'. Existing G2/G3 reject this shape.
   v_proof:=jsonb_build_object(
-    'schemaVersion','seyeon-g1-historical-source-candidate-v1',
+    'schemaVersion','seyeon-g1-historical-source-candidate-v2',
     'subjectId',p_subject_id::text,'threadId',p_thread_id::text,
     'turnId',p_turn_id::text,'attemptId',p_attempt_id::text,
     'characterId','seyeon','currentUserMessageId',v_user.id::text,
@@ -203,6 +265,9 @@ begin
     'historicalSources',v_history,
     'historicalSourceCensusDigest','sha256:pg-jsonb:v1:'||
       encode(sha256(convert_to(v_history::text,'UTF8')),'hex'),
+    'historicalAssistantOriginalSources',v_assistant_originals,
+    'historicalAssistantOriginalSourcesDigest','sha256:pg-jsonb:v1:'||
+      encode(sha256(convert_to(v_assistant_originals::text,'UTF8')),'hex'),
     'authorizesModel',false,'permitsAtomicCommit',false,
     'permitsHttpReveal',false
   );

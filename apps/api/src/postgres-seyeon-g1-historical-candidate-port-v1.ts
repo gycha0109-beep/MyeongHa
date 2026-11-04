@@ -38,8 +38,13 @@ const keys=['schemaVersion','subjectId','threadId','turnId','attemptId',
   'recordType','recordSchemaVersion','projectorVersion',
   'originalPgJsonbDigest','selectedSourcesDigest','projectedMemoryDigest',
   'preModelContextDigest','historicalSourceCount','historicalSources',
-  'historicalSourceCensusDigest','authorizesModel','permitsAtomicCommit',
-  'permitsHttpReveal'];
+  'historicalSourceCensusDigest','historicalAssistantOriginalSources',
+  'historicalAssistantOriginalSourcesDigest',
+  'authorizesModel','permitsAtomicCommit','permitsHttpReveal'];
+const assistantOriginalKeys=['messageId','turnId','attemptId',
+  'originalUserMessageId','originalUserTextDigest','recordId',
+  'originalGrantId','originalPgJsonbDigest','recordType',
+  'recordSchemaVersion','projectorVersion'].sort().join(',');
 
 export function createSeyeonG1HistoricalCandidateOwnerPortV1(
   client:PostgresTransactionQueryV1,
@@ -89,9 +94,11 @@ select seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(
         ||Array.isArray(result.rows[0].receipt))
         throw Error('Se-yeon historical G1 owner receipt missing');
       const p=result.rows[0].receipt as Record<string,unknown>;
+      const originalSources=p.historicalAssistantOriginalSources;
+      const assistantIds=history.filter(h=>h.role==='assistant').map(h=>h.messageId);
       if(Object.keys(p).length!==keys.length
         ||keys.some(key=>!Object.prototype.hasOwnProperty.call(p,key))
-        ||p.schemaVersion!=='seyeon-g1-historical-source-candidate-v1'
+        ||p.schemaVersion!=='seyeon-g1-historical-source-candidate-v2'
         ||p.subjectId!==input.subjectId||p.threadId!==input.threadId
         ||p.turnId!==input.turnId||p.attemptId!==input.attemptId
         ||p.characterId!=='seyeon'
@@ -111,6 +118,26 @@ select seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(
         ||canonicalJson(p.historicalSources)!==canonicalJson(history)
         ||typeof p.historicalSourceCensusDigest!=='string'
         ||!PG.test(p.historicalSourceCensusDigest)
+        ||typeof p.historicalAssistantOriginalSourcesDigest!=='string'
+        ||!PG.test(p.historicalAssistantOriginalSourcesDigest)
+        ||!Array.isArray(originalSources)
+        ||originalSources.length!==assistantIds.length
+        ||originalSources.some((original,index)=>{
+          if(!original||typeof original!=='object'||Array.isArray(original))return true;
+          const entry=original as Record<string,unknown>;
+          return Object.keys(entry).sort().join(',')!==assistantOriginalKeys
+            ||entry.messageId!==assistantIds[index]
+            ||![entry.turnId,entry.attemptId,entry.originalUserMessageId,
+              entry.recordId,entry.originalGrantId].every(x=>
+                typeof x==='string'&&UUID.test(x))
+            ||entry.originalUserMessageId===input.currentUserMessageId
+            ||typeof entry.originalUserTextDigest!=='string'
+            ||!WIRE.test(entry.originalUserTextDigest)
+            ||typeof entry.originalPgJsonbDigest!=='string'
+            ||!PG.test(entry.originalPgJsonbDigest)
+            ||![entry.recordType,entry.recordSchemaVersion,
+              entry.projectorVersion].every(TEXT);
+        })
         ||p.authorizesModel!==false||p.permitsAtomicCommit!==false
         ||p.permitsHttpReveal!==false)
         throw Error('Se-yeon historical G1 original owner receipt mismatch');

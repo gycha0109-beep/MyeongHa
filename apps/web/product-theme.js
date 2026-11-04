@@ -52,8 +52,8 @@
     button.setAttribute('aria-pressed', dark ? 'true' : 'false');
     button.setAttribute('aria-label', dark ? '라이트 모드로 전환' : '다크 모드로 전환');
     button.setAttribute('title', dark ? '라이트 모드' : '다크 모드');
-    const mark = button.querySelector('.product-theme-toggle-mark');
-    if (mark) mark.textContent = dark ? '☀' : '☾';
+    // The theme icon is a fixed-position raster asset. Never insert invisible
+    // text glyphs that can affect layout or vary between font loads.
   };
 
   const applyTheme = (theme) => {

@@ -45,6 +45,35 @@ describe('dedicated Audit Writer real-operation staging preflight',()=>{
   expect(JSON.stringify(result)).not.toContain('synthetic-private');
   if(failure==='rollback'){expect(f.discarded).toBe(true);expect(result.transactionRolledBack).toBe(false);}
  });
+ it('allows pooled backend TLS=false only with authenticated, pinned client TLS for audit',async()=>{
+  const calls=[];let authorized=true;
+  const options={
+   targetFactory(){return{connectionString:'synthetic-private-url',
+    backendTlsRequired:false,ssl:{rejectUnauthorized:true,ca:'-----BEGIN CERTIFICATE----- synthetic'}};},
+   poolFactory(){return{async connect(){return{
+    connection:{stream:{encrypted:true,get authorized(){return authorized;}}},
+    async query(sql,values){
+     calls.push({sql,values});
+     if(sql.includes('AS restricted'))return{rows:[{role:'myeongha_admin_audit_writer',restricted:true,tls:false}]};
+     if(sql.startsWith('INSERT')){
+      if(values[1]==='invalid-probe-outcome')throw Object.assign(Error('invalid'),{code:'23514'});
+      return{rows:[],rowCount:1};
+     }
+     if(sql.startsWith('SELECT')||sql.startsWith('EXPLAIN'))throw Object.assign(Error('denied'),{code:'42501'});
+     return{rows:[]};
+    },
+    release(){},
+   };},async end(){}};},
+  };
+  const ok=await verifyAdminAuditWriteV1(env,options);
+  expect(ok.auditWriteVerified).toBe(true);
+  expect(ok.transactionRolledBack).toBe(true);
+  authorized=false;
+  const denied=await verifyAdminAuditWriteV1(env,options);
+  expect(denied.auditWriteVerified).toBe(false);
+  expect(denied.transactionRolledBack).toBe(true);
+  expect(calls.filter(x=>x.sql.startsWith('INSERT'))).toHaveLength(2);
+ });
  it('reports missing names without touching a database',async()=>{
   const f=fixture();const result=await verifyAdminAuditWriteV1({},f.options);
   expect(result.auditWriteVerified).toBe(false);expect(result.missing).toHaveLength(2);

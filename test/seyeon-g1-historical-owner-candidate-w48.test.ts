@@ -37,8 +37,16 @@ const input:SeyeonG1HistoricalCandidatePinInputV1={
   preModelContextDigest:sha({fixture:'full pre-model Context'}),
   historicalSources,
 };
+const historicalAssistantOriginal={
+  messageId:id(9),turnId:id(11),attemptId:id(12),
+  originalUserMessageId:id(8),originalUserTextDigest:wire('original User'),
+  recordId:original.recordId,originalGrantId:original.grantId,
+  originalPgJsonbDigest:original.rawRecordPgDigest,
+  recordType:original.recordType,recordSchemaVersion:original.schemaVersion,
+  projectorVersion:original.projectorVersion,
+};
 const proof=()=>({
-  schemaVersion:'seyeon-g1-historical-source-candidate-v1',
+  schemaVersion:'seyeon-g1-historical-source-candidate-v2',
   subjectId:input.subjectId,threadId:input.threadId,turnId:input.turnId,
   attemptId:input.attemptId,characterId:'seyeon',
   currentUserMessageId:input.currentUserMessageId,
@@ -54,6 +62,8 @@ const proof=()=>({
   preModelContextDigest:input.preModelContextDigest,
   historicalSourceCount:2,historicalSources,
   historicalSourceCensusDigest:'sha256:pg-jsonb:v1:'+'a'.repeat(64),
+  historicalAssistantOriginalSources:[historicalAssistantOriginal],
+  historicalAssistantOriginalSourcesDigest:'sha256:pg-jsonb:v1:'+'b'.repeat(64),
   authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
 });
 const fake=(receipt:unknown)=>{
@@ -89,6 +99,10 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     ['changed original User',{currentUserTextDigest:wire('forged')}],
     ['source count mismatch',{historicalSourceCount:1}],
     ['missing historical source',{historicalSources:[historicalSources[0]]}],
+    ['forged historical original Grant',{
+      historicalAssistantOriginalSources:[{...historicalAssistantOriginal,originalGrantId:'forged'}],
+    }],
+    ['unlisted historical assistant origin',{historicalAssistantOriginalSources:[]}],
     ['different source type',{schemaVersion:'seyeon-positive-original-memory-source-pin-v1'}],
     ['extra authority',{untrustedApproval:true}],
   ] as const)('rejects %s even when DB returns a receipt',async(_name,patch)=>{
@@ -118,6 +132,8 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(sql).toContain('v_history is distinct from p_expected_historical');
     expect(sql).toContain('lock_original_memory_grant_v1(');
     expect(sql).toContain("'historicalCandidateProof',v_proof");
+    expect(sql).toContain("'historicalAssistantOriginalSources',v_assistant_originals");
+    expect(sql).toContain("a.validation_result_jsonb->'personalRecordProvenance'");
     expect(sql).toContain("'authorizesModel',false");
     expect(sql).toContain("'permitsAtomicCommit',false");
     expect(sql).toContain("'permitsHttpReveal',false");

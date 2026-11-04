@@ -129,6 +129,52 @@ describe('buyer exact paid Reader withdrawal intake',()=>{
     expect(r.status).toBe(403);
     expect(f.queries).toHaveLength(0);
   });
+  function nativePost(headers:Record<string,string>={}):Request{
+    return new Request(endpoint,{
+      method:'POST',
+      headers:{'content-type':'application/json',...headers},
+      body:JSON.stringify(body),
+    });
+  }
+  it('admits native JWT-only member claim without Origin or Cookie',async()=>{
+    const f=fixture();
+    const request=nativePost({authorization:'Bearer test.member.jwt'});
+    expect(request.headers.has('origin')).toBe(false);
+    const response=await f.run(request);
+    expect(response.status).toBe(201);
+    expect(await response.json()).toMatchObject({
+      ok:true,data:{status:'received',refundApproved:false,providerRefundCompleted:false},
+    });
+    expect(f.verifier.verifyRequestIdentity).toHaveBeenCalledExactlyOnceWith(request);
+    expect(f.queries.some(q=>q.sql.includes('cmd_receive_digital_reading_withdrawal_claim_v1')))
+      .toBe(true);
+  });
+  it.each([
+    {caseName:'no Authorization',headers:{}},
+    {caseName:'non-JWT Bearer',headers:{authorization:'Bearer opaque'}},
+    {caseName:'ambient Cookie without Origin',headers:{
+      authorization:'Bearer test.member.jwt',cookie:'session=ambient',
+    }},
+    {caseName:'foreign Origin even with Bearer',headers:{
+      authorization:'Bearer test.member.jwt',origin:'https://evil.example',
+    }},
+    {caseName:'literal null Origin even with Bearer',headers:{
+      authorization:'Bearer test.member.jwt',origin:'null',
+    }},
+  ])('rejects native intake $caseName before identity and DB',async({headers})=>{
+    const f=fixture();
+    const response=await f.run(nativePost(headers));
+    expect(response.status).toBe(403);
+    expect(f.verifier.verifyRequestIdentity).not.toHaveBeenCalled();
+    expect(f.queries).toHaveLength(0);
+  });
+  it('does not treat JWT shape as authentication for native intake',async()=>{
+    const f=fixture();
+    vi.mocked(f.verifier.verifyRequestIdentity).mockResolvedValue(null);
+    const response=await f.run(nativePost({authorization:'Bearer test.member.jwt'}));
+    expect(response.status).toBe(401);
+    expect(f.queries).toHaveLength(0);
+  });
   it('blocks unauthenticated and Guest access',async()=>{
     const f=fixture();
     vi.mocked(f.verifier.verifyRequestIdentity).mockResolvedValue(null);

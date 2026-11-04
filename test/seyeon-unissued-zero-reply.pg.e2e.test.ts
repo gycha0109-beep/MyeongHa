@@ -123,6 +123,53 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     await expect(recover()).rejects.toMatchObject({constraint:'seyeon_unissued_reply_not_recoverable'});
   },30000);
 
+
+  it('permits a verified zero-source assistant as previous-turn context without broadening table grants',async()=>{
+    // The preceding test already delivered the first zero-source reply.
+    const subject=uuid(11,90),thread=uuid(14,90);
+    const oldTurn=uuid(16,90),nextTurn=uuid(46,90),nextUser=uuid(48,90);
+    await pool.query(
+      "insert into public.chat_turns(id,thread_id,subject_id,client_turn_id,request_hash,request_contract_version,request_snapshot_jsonb,resolved_content_release_id,resolved_content_bundle_id,state,revision,next_attempt_no,created_at,updated_at) "+
+      "select $2,thread_id,subject_id,$3,'sha256:v1:'||repeat('3',64),request_contract_version,'{}'::jsonb,resolved_content_release_id,resolved_content_bundle_id,'received',0,1,clock_timestamp(),clock_timestamp() from public.chat_turns where id=$1",
+      [oldTurn,nextTurn,uuid(47,90)]);
+    await pool.query(
+      "insert into public.conversation_messages(id,thread_id,subject_id,turn_id,sequence_no,sender_type,body_text,message_payload_jsonb,message_schema_version,content_hash,created_at) "+
+      "select $2,thread_id,subject_id,$3,4,'user','Synthetic continued hello','{}'::jsonb,'v1','sha256:v1:'||repeat('4',64),clock_timestamp() from public.chat_turns where id=$1",
+      [oldTurn,nextUser,nextTurn]);
+    const context=()=>executePostgresSubjectTransactionV1({
+      pool:subjectPool,
+      verifiedEvidence:{kind:'member' as const,verifiedAuthUserId:uuid(10,90)},
+      execute:({client,resolvedSubject})=>client.query<{messageId:string;senderType:string}>(
+        'select message_id::text as "messageId",sender_type as "senderType" from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,10)',
+        [resolvedSubject.subjectId,thread,nextUser]),
+    });
+    await expect(context()).rejects.toMatchObject({code:'42501'});
+    await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
+    const result=await context();
+    expect(result.rows.map(x=>x.senderType)).toEqual(['user','character','user']);
+    expect(result.rows.at(-1)?.messageId).toBe(nextUser);
+    const {rows:[acl]}=await pool.query(
+      "select has_table_privilege('myeongha_seyeon_chat_runtime_owner','public.conversation_messages','UPDATE') as can_update, "+
+      "has_function_privilege('anon','seyeon_private.lock_g0_original_message_v1(uuid,uuid,uuid,text)','EXECUTE') as anon_lock, "+
+      "has_function_privilege('myeongha_seyeon_chat_runtime_owner','seyeon_private.lock_g0_original_message_v1(uuid,uuid,uuid,text)','EXECUTE') as owner_lock");
+    expect(acl).toEqual({can_update:false,anon_lock:false,owner_lock:true});
+    const holder=await pool.connect(),writer=await pool.connect();
+    try {
+      await holder.query('BEGIN');
+      await holder.query('SET LOCAL ROLE myeongha_api_executor');
+      await holder.query('select subject_id from public.begin_member_subject_context_v1($1::uuid)',[uuid(10,90)]);
+      await holder.query('select message_id from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,10)',[subject,thread,nextUser]);
+      await writer.query('BEGIN');
+      await writer.query("SET LOCAL lock_timeout='250ms'");
+      await expect(writer.query('update public.conversation_messages set body_text=body_text where id=$1',[uuid(18,90)]))
+        .rejects.toMatchObject({code:'55P03'});
+    } finally {
+      await writer.query('ROLLBACK').catch(()=>undefined);
+      await holder.query('ROLLBACK').catch(()=>undefined);
+      writer.release();holder.release();
+    }
+  },30000);
+
   it('rejects active failed history and changed source text, and never issues a receipt for them',async()=>{
     const f=await prepare(91,'failed_retryable');
     const base={pool:subjectPool,verifiedEvidence:f.evidence,threadId:f.thread,signal:new AbortController().signal,
