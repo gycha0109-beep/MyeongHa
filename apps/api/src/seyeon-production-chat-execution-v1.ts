@@ -48,7 +48,7 @@ import {
   assertSeyeonPositiveG1FinalModelContextSealV1,
   buildSeyeonPositiveG1PreModelSourceCensusSealV1,
 } from './seyeon-positive-g1-final-model-context-seal-v1.js';
-import {buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
+import {buildSeyeonG1HistoricalFinalContextCandidateSealV1,buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
 import type {SeyeonG1HistoricalCandidateDbPortV1} from './postgres-seyeon-g1-historical-candidate-port-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type { SeyeonG1CombinedModelPinRequestV1 } from './seyeon-g1-positive-combined-source-port-v1.js';
@@ -815,6 +815,19 @@ export async function runSeyeonProductionChatExecutionV1(
               && candidate?.grantId===original.grantId
               && candidate?.rawRecordPgDigest===original.rawRecordPgDigest
               && candidate?.projectorVersion===original.projectorVersion) {
+              // Seal the deterministic full post-Preflight model CONTEXT
+              // candidate, not just its recent-message list. Actual Provider
+              // dispatch is still denied until real post-Preflight G1/G2/G3.
+              const historicalSeal=buildSeyeonG1HistoricalFinalContextCandidateSealV1({
+                contextInput,
+                currentUserMessageId:receivedTurn.userMessageId,
+                currentUserText:receivedTurn.userText,
+                census,
+                originalMemory:{recordId:original.recordId,grantId:original.grantId},
+                selectedSourcesDigest:exactModelPersonalSources.selectedSourcesDigest,
+                selectedModelSourceCensusDigest:
+                  exactModelPersonalSources.selectedModelSourceCensusDigest,
+              });
               // DB Owner compares ALL actual G0 origins in its own TX and
               // persists historicalCandidateProof (never positiveProof).
               // Even a successful DB receipt NEVER reaches the Interpreter.
@@ -826,12 +839,9 @@ export async function runSeyeonProductionChatExecutionV1(
                   createHash('sha256').update(receivedTurn.userText,'utf8').digest('hex'),
                 selectedOriginalMemory:original,
                 selectedSourcesDigest:exactModelPersonalSources.selectedSourcesDigest,
-                preModelContextDigest:sha256({
-                  contextInput,
-                  selectedModelSourceCensusDigest:
-                    exactModelPersonalSources.selectedModelSourceCensusDigest,
-                  completeHistoryDigest:census.selectedCompleteModelWindowDigest,
-                }),
+                preModelContextDigest:historicalSeal.preModelContextDigest,
+                expectedFinalModelContextDigest:
+                  historicalSeal.expectedFinalModelContextDigest,
                 historicalSources:census.historicalSources,
               });
               // The isolated owner transaction has already committed its candidate.
