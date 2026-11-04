@@ -86,7 +86,7 @@ try{
 
  const holderPid=Number((await a.query('select pg_backend_pid() as pid')).rows[0].pid);
  const waiterPid=Number((await b.query('select pg_backend_pid() as pid')).rows[0].pid);
- await a.query('begin isolation level serializable');
+ await a.query('begin isolation level read committed');
  aOpen=true;
  await a.query("set local statement_timeout='10000ms'");
  const first=await a.query(persistence,params(FIRST_WEBHOOK));
@@ -94,7 +94,7 @@ try{
  assert.equal(first.rows[0].replayed,false);
  assert.match(first.rows[0].providerEventId,/^[0-9a-f-]{36}$/u);
 
- await b.query('begin isolation level serializable');
+ await b.query('begin isolation level read committed');
  bOpen=true;
  await b.query("set local statement_timeout='10000ms'");
  await b.query("set local lock_timeout='7000ms'");
@@ -111,11 +111,9 @@ try{
  }catch(error){rejected=error;}
  bPending=null;
  assert.ok(rejected,'same cancellation item must not persist twice');
- assert.ok(['23505','40001'].includes(rejected.code),
-  'concurrent duplicate must conflict or serialize-abort');
- if(rejected.code==='23505'){
-  assert.equal(rejected.constraint,'cancellation_event_persist_same_item_webhook_conflict');
- }
+ assert.equal(rejected.code,'23505',
+  'concurrent duplicate must reach the original cancellation ID dedupe guard');
+ assert.equal(rejected.constraint,'cancellation_event_persist_same_item_webhook_conflict');
  await b.query('rollback');
  bOpen=false;
 
