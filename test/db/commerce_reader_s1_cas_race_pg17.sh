@@ -3,9 +3,9 @@ set -euo pipefail
 
 db="$(psql -X -v ON_ERROR_STOP=1 -Atqc 'select current_database()')"
 pg_version="$(psql -X -v ON_ERROR_STOP=1 -Atqc 'show server_version_num')"
-if [[ "\${GITHUB_ACTIONS:-}" != true ||
-      "\${DB_SUITE:-}" != postgres17 ||
-      "\${PGHOST:-}" != localhost || "\${PGPORT:-}" != 5432 ||
+if [[ "${GITHUB_ACTIONS:-}" != true ||
+      "${DB_SUITE:-}" != postgres17 ||
+      "${PGHOST:-}" != localhost || "${PGPORT:-}" != 5432 ||
       ! "$db" =~ ^myeongha_ci_case_[0-9]+$ ||
       ! "$pg_version" =~ ^17[0-9]{4}$ ]]; then
  echo 'DENY: shared Reader S1 lock race requires disposable PG17 CI database' >&2
