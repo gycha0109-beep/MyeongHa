@@ -2145,6 +2145,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
           selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
           preModelContextDigest:hash({historical:'W48'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"W48"}),
           historicalSources:history,
         });
       expect(proof.historicalSourceCount).toBe(2);
@@ -2160,8 +2161,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       from public.chat_turn_attempts where id=$1`,[currentAttempt]);
     expect(saved.state).toBe('running');
     expect(saved.proof.historicalCandidateProof.historicalSourceCount).toBe(2);
+    expect(saved.proof.historicalCandidateProof.expectedFinalModelContextDigest)
+      .toBe(hash({expectedFinalContext:'W48'}));
     expect(saved.proof.historicalCandidateProof.schemaVersion)
-      .toBe('seyeon-g1-historical-source-candidate-v3');
+      .toBe('seyeon-g1-historical-source-candidate-v4');
     const {rows:[priorGrant]}=await pool.query(`select
       a.seyeon_personal_source_pin_jsonb->'positiveProof'->>'originalGrantedAt' as original_granted_at,
       g.granted_at as database_granted_at
@@ -2189,7 +2192,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
     const {rows:[acl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',
-      'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb)',
+      'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,jsonb)',
       'EXECUTE') as denied`);
     expect(acl.denied).toBe(true);
     // Native Attempt progression rejects an illegal running -> validated/
@@ -2326,6 +2329,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
           selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
           preModelContextDigest:hash({historical:'G5-revoke-race'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-revoke-race"}),
           historicalSources:[
             {messageId:f.user,role:'user',textDigest:wire(f.userText)},
             {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
@@ -2414,6 +2418,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           currentUserMessageId:user,currentUserTextDigest:wire(text),
           selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
           preModelContextDigest:hash({historical:'G5-pin-first'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-pin-first"}),
           historicalSources:[
             {messageId:f.user,role:'user',textDigest:wire(f.userText)},
             {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
@@ -2526,6 +2531,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           currentUserMessageId:user,currentUserTextDigest:wire(text),
           selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
           preModelContextDigest:hash({historical:'G5-original-user-redaction'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-original-user-redaction"}),
           historicalSources:[
             {messageId:f.user,role:'user',textDigest:wire(f.userText)},
             {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
@@ -2645,6 +2651,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           currentUserMessageId:user,currentUserTextDigest:wire(text),
           selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
           preModelContextDigest:hash({historical:'G5-original-user-redaction-first'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-original-user-redaction-first"}),
           historicalSources:[
             {messageId:f.user,role:'user',textDigest:wire(f.userText)},
             {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
@@ -2829,6 +2836,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
         selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
         preModelContextDigest:hash({historical:'G5-delete-'+n}),
+        expectedFinalModelContextDigest:hash({expectedFinalContext:'G5-delete-'+n}),
         historicalSources:[
           {messageId:f.user,role:'user',textDigest:wire(f.userText)},
           {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
