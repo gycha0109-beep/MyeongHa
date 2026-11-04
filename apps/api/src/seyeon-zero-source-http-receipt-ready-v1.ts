@@ -1,25 +1,31 @@
 // Watchtower-Track: security
 // Exact server-only positive/nonpositive separation before paid inference.
 import type {PostgresTransactionQueryV1} from './postgres-subject-execution.js';
-import { SEYEON_UNISSUED_ZERO_REPLY_RPC_V1 } from './seyeon-unissued-zero-reply-recovery-v1.js';
+import { SEYEON_UNISSUED_ZERO_REPLY_RPC_V1, SEYEON_UNISSUED_G0_REPLY_RPC_V1 } from './seyeon-unissued-zero-reply-recovery-v1.js';
 const REQUIRED = Object.freeze([
   'public.cmd_issue_seyeon_zero_source_first_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)',
   'public.qry_seyeon_locked_first_zero_source_reveal_v1(uuid,uuid,uuid,uuid)',
   'seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text)',
   SEYEON_UNISSUED_ZERO_REPLY_RPC_V1,
+  'public.cmd_issue_seyeon_zero_source_g0_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)',
+  'public.cmd_issue_seyeon_zero_source_followup_reply_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea)',
+  SEYEON_UNISSUED_G0_REPLY_RPC_V1,
 ]);
 
 export const SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1 =
   'public.cmd_issue_seyeon_zero_source_first_reply_v1';
+export const SEYEON_G0_RECEIPT_ISSUER_V1 =
+  'public.cmd_issue_seyeon_zero_source_g0_reply_v1';
 
 export async function assertSeyeonZeroSourceHttpReceiptReadyV1(client: PostgresTransactionQueryV1): Promise<void> {
-  const r=await client.query<{ready:boolean}>(`select count(*)=4 as ready
+  const r=await client.query<{ready:boolean}>(`select count(*)=7 as ready
     from pg_catalog.pg_proc p
-    where p.oid in(to_regprocedure($1),to_regprocedure($2),to_regprocedure($3),to_regprocedure($4))
+    where p.oid in(to_regprocedure($1),to_regprocedure($2),to_regprocedure($3),to_regprocedure($4),to_regprocedure($5),to_regprocedure($6),to_regprocedure($7))
       and p.prosecdef
       and pg_catalog.pg_get_userbyid(p.proowner)='postgres'
       and 'row_security=off'=any(p.proconfig)
-      and has_function_privilege(current_user,p.oid,'EXECUTE')
+      and (p.oid=to_regprocedure($6) and not has_function_privilege(current_user,p.oid,'EXECUTE')
+           or p.oid<>to_regprocedure($6) and has_function_privilege(current_user,p.oid,'EXECUTE'))
       and not has_function_privilege('anon',p.oid,'EXECUTE')
       and not has_function_privilege('authenticated',p.oid,'EXECUTE')
       and not has_function_privilege('service_role',p.oid,'EXECUTE')`,REQUIRED);
