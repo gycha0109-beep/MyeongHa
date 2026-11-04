@@ -96,9 +96,9 @@ const DEC=/^(0|[1-9][0-9]*)$/u;
 const ORDER=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const inputValid=(v)=>typeof v==='string'&&UUID.test(v);
 const revisionValid=v=>typeof v==='string'&&DEC.test(v);
- v.trim()===v&&![...v].some(ch=>ch.codePointAt(0)<32||ch.codePointAt(0)===127);
+const keyValid=v=>v===null||(typeof v==='string'&&ORDER.test(v)&&v.trim()===v);
 const readerValid=v=>typeof v==='string'&&v.length>0&&v.length<=256&&
- v.trim()===v&&!/[\\u0000-\\u001f\\u007f]/u.test(v);
+ v.trim()===v&&![...v].some(ch=>ch.codePointAt(0)<32||ch.codePointAt(0)===127);
 function scopeIdentity(r){
  if(!inputValid(r.subjectId)||!inputValid(r.officialReadingId)||
     !inputValid(r.receiptId)||!inputValid(r.purchaseIntentId)||
