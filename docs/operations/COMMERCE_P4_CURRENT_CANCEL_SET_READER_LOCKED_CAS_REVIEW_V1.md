@@ -34,3 +34,10 @@
 - 상위 취소 집합 검토기의 긍정 판정은 기존 Reader 잠금 검토기의 정확한 계약 버전과 **공통 S1 범위 잠금·재확인, 원본 Provider Event 및 구매 Grant 잠금, revision 확인**을 모두 요구합니다. Event/Grant 행 잠금만 있거나 S1 관측이 누락되면 정상·SAME 재실행 분류를 보고하지 않습니다.
 - `readerS1LockAndScopeRecheckObserved`는 사전 검토 시점의 관측이며, 실제 운영 권한 획득이나 장기 유지 잠금이 아닙니다. 트랜잭션은 항상 ROLLBACK하고 환불·Entitlement Writer를 실행하지 않습니다.
 - S1 없이 긍정·SAME을 반환하는 위조 검토 결과와 알 수 없는 검토기 계약 버전은 회귀 테스트에서 거부합니다. Provider NEWER/STALE 의미 비교, 실제 T2·Effect, 법적 전달·환불 판단, 공개 라우트와 LIVE는 여전히 보류입니다.
+
+## 2026-11-05 — 인증 GET 단일 전액 취소 관측과 부분 취소 합계 분리
+
+- 원본 Receipt에 저장된 모든 취소 Provider Event와 인증된 PortOne GET 전체 취소 집합을 **두 개의 독립적인 읽기 전용 DB 스냅샷**으로 재검사하는 기존 흐름을 유지합니다.
+- 성공한 원본 취소 항목 **정확히 1건**, `Transaction.Cancelled`, 성공 취소 금액=원본 결제액, 인증 GET의 단일 성공 취소 및 `CANCELLED` 상태가 모두 일치할 때만 `singleExactFullCancellationObservedAtGet=true`를 반환합니다.
+- 3000+5900과 같이 여러 부분 취소가 누적되어 전액 취소 상태에 도달한 경우, 총액이 맞아도 단일 전액 취소로 승격하지 않고 **Reader 잠금·CAS 검토 진입 전** 안전 보류합니다.
+- 이 값은 *조회 시점의 관측*이며 Provider 사건 순서 `NEWER/STALE`, 환불 법적·정산 최종성, 실제 Reader T2 선형화나 권한 회수 권한을 나타내지 않습니다. 기존 모든 승인값 false·운영 DB·LIVE·실제 PG 환불 POST·공개 API 비활성을 유지합니다.
