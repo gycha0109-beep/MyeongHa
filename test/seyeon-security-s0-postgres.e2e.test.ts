@@ -2211,6 +2211,55 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(afterDenied).toEqual({
       attempt_state:'running',turn_state:'context_ready',assistant_count:0,
     });
+    // Fresh DB-owner current-rights audit is separate from (and never
+    // upgrades) the durable historicalCandidateProof.
+    const audit=()=>f.run(async({client})=>{
+      const {rows:[result]}=await client.query<{audit:Record<string,unknown>}>(
+        'select seyeon_private.qry_recheck_historical_candidate_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid) as audit',
+        [f.subject,f.thread,currentTurn,currentAttempt],
+      );
+      return result?.audit;
+    });
+    const auditSignature=
+      'seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)';
+    const {rows:[auditAcl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',$1,'EXECUTE') as closed`,[auditSignature]);
+    expect(auditAcl.closed).toBe(true); // Default installation remains API-closed.
+    // Dedicated synthetic fixture only: the owner never grants public use.
+    await pool.query(`grant execute on function
+      seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)
+      to myeongha_api_executor`);
+    try{
+      expect(await audit()).toEqual({
+        schemaVersion:'seyeon-historical-current-originals-audit-s0-v1',
+        historicalSourceCount:2,originalsCurrentForAudit:true,
+        authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+      });
+      await expect(f.run(({client})=>client.query(
+        'select seyeon_private.qry_recheck_historical_candidate_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+        [f.subject,f.thread,f.turn,currentAttempt],
+      ))).rejects.toMatchObject({constraint:'seyeon_history_recheck_candidate_invalid'});
+      await f.revoke();
+      await expect(audit()).rejects.toMatchObject({
+        constraint:'seyeon_source_lock_original_grant_required',
+      });
+      // A new Grant for the same Memory must never resurrect the old
+      // immutable historical Assistant/Attempt provenance.
+      await pool.query(`insert into public.record_access_grants(
+        id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
+        values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`,
+        [uuid(29,218),f.subject,f.memory]);
+      await expect(audit()).rejects.toMatchObject({
+        constraint:'seyeon_source_lock_original_grant_required',
+      });
+    }finally{
+      await pool.query(`revoke execute on function
+        seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)
+        from myeongha_api_executor`);
+    }
+    const {rows:[afterAuditAcl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',$1,'EXECUTE') as closed`,[auditSignature]);
+    expect(afterAuditAcl.closed).toBe(true);
   });
 
   it('G5 historical candidate cannot pin a revoked original Grant during an independent DB race', async () => {

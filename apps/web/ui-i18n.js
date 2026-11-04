@@ -3,6 +3,7 @@ import { MY_STATIC_UI_COPY_V1 } from './ui-my-copy.js';
 import { RECORDS_HUB_STATIC_UI_COPY_V1 } from './ui-records-hub-copy.js';
 import { JA_TW_TO_EN_CN_STATIC_UI_COPY_V1 } from './ui-i18n-ja-tw-en-cn-copy-v1.js';
 import { EN_CN_TO_JA_TW_ACTIVE_STATIC_UI_COPY_V1 } from './ui-i18n-en-cn-ja-tw-active-copy-v1.js';
+import { SAJU_READER_SURFACE_COPY_V1 } from './ui-i18n-saju-reader-surface-copy-v1.js';
 
 // Fixed, authored web UI copy only. Chat messages, birth data, and official readings are intentionally excluded.
 // Korean is the source locale; this dictionary is not a translation service.
@@ -100,6 +101,12 @@ registerStaticCopy('콘텐츠 신고', {
   'en-US': 'Report content',
   'zh-CN': '举报内容',
 });
+// Close only missing localized keys; never overwrite established product wording.
+for (const [source, translated] of SAJU_READER_SURFACE_COPY_V1) {
+  const current = AUTHORITATIVE_STATIC_UI_COPY.get(source) ?? {};
+  const missing = Object.fromEntries(Object.entries(translated).filter(([locale]) => !current[locale]));
+  if (Object.keys(missing).length) registerStaticCopy(source, missing);
+}
 
 export function normalizeUiLocale(value) {
   return SUPPORTED_UI_LOCALES.includes(value) ? value : 'ko-KR';
