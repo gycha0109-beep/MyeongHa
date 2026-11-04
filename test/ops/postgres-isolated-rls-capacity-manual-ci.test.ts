@@ -64,6 +64,10 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
   it('includes bounded actual PostgreSQL18 product-path HTTP measurements in the existing manual job', () => {
     const product = readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8');
     expect(runner).toContain('product-saju-isolated-pg18-phase11.test.mjs');
+    expect(runner).toContain('MH_OPS_ISOLATED_PRODUCT_PROOF_PATH="$scratch/product-path.json"');
+    expect(runner).toContain('[[ -s "$scratch/product-path.json" ]]');
+    expect(runner).not.toContain("sed -n 's/^MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS");
+    expect(product).toContain("writeFile(proofFile, JSON.stringify(proof), { flag: 'wx', mode: 0o600 })");
     expect(runner).toContain('MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS');
     expect(runner).toContain('actual_ephemeral_postgres18_rls');
     expect(runner).toContain('synthetic_response_not_real_engine');

@@ -1,5 +1,5 @@
 import { execFile as execFileCallback } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer as createTcpServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -362,7 +362,7 @@ isolated('Phase 10/11 actual isolated PostgreSQL 18 + Auth/Saju loopback product
       expect(state.dbActive).toBe(0);
       expect(state.sajuCalls).toBe(baseline.successful + contended.successful + 1);
 
-      console.log('MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS ' + JSON.stringify({
+      const proof = {
         schema: 'myeongha-isolated-pg18-product-path-phase10-phase11-v1',
         result: 'PASS', target: 'isolated PostgreSQL18 and loopback Auth/Saju HTTP product handler',
         baseline, contended,
@@ -379,7 +379,12 @@ isolated('Phase 10/11 actual isolated PostgreSQL 18 + Auth/Saju loopback product
         sajuEngineTransport: 'synthetic_response_not_real_engine',
         productionCapacityProven: false, productionScalingThresholdApproved: false,
         drReady: false, serviceResumptionAllowed: false, outputContainsIdentifiers: false,
-      }));
+      };
+      const proofFile = process.env.MH_OPS_ISOLATED_PRODUCT_PROOF_PATH;
+      if (proofFile) {
+        await writeFile(proofFile, JSON.stringify(proof), { flag: 'wx', mode: 0o600 });
+      }
+      console.log('MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS ' + JSON.stringify(proof));
     } finally {
       for (const server of servers.reverse()) await server.close().catch(() => undefined);
       await database?.close();
