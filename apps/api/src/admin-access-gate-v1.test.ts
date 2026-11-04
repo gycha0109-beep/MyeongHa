@@ -52,6 +52,24 @@ describe('private hosted administrator boundary',()=>{
     expect(reasons).toEqual(['credential_missing_or_ambiguous','owner_claim_invalid']);
     expect(JSON.stringify(reasons)).not.toContain('other@example.test');
   });
+  it('reports safe signing-key lookup failure stages without exposing credentials',async()=>{
+    const reasons: string[]=[];
+    const request=new Request('https://admin.example.test/admin/',{
+      headers:{'cf-access-jwt-assertion':token()},
+    });
+    const gate=(fetchImpl:typeof fetch)=>createAdminAccessGateV1(config,{
+      fetchImpl,now:()=>1800000000000,onDenied:reason=>reasons.push(reason),
+    });
+    expect(await gate((async()=>{throw Error('private exception detail');}) as typeof fetch)(request)).toBe(false);
+    expect(await gate((async()=>new Response('not JSON',{status:200})) as typeof fetch)(request)).toBe(false);
+    expect(await gate((async()=>Response.json({keys:[{
+      kty:'RSA',kid:'test-key',use:'sig',n:'broken',e:'AQAB',
+    }]})) as typeof fetch)(request)).toBe(false);
+    expect(reasons).toEqual([
+      'signing_keys_fetch_exception','signing_keys_json_exception','signing_keys_import_exception',
+    ]);
+    expect(JSON.stringify(reasons)).not.toContain('private exception detail');
+  });
   it('never serves HTML or calls a database/API for an unverified Access identity',async()=>{
     let calls=0;
     const handler=createAdminHostedHttpV1({origin:'https://admin.example.test',memberAuthOrigin:'https://member.example.test',
