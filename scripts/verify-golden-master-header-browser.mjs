@@ -137,6 +137,7 @@ async function inspectHeader(client, origin, pathname) {
       brandSub: brandSub?.textContent?.trim() ?? '',
       profileVisible: Boolean(profileRect && profileRect.width > 0 && profileRect.height > 0 && profileStyle?.display !== 'none' && profileStyle?.visibility !== 'hidden'),
       profileText: profile?.textContent?.replace(/\\s+/g, ' ').trim() ?? '',
+      profileLabel: profile?.getAttribute('aria-label') ?? '',
       profileHref: profile?.getAttribute('href') ?? '',
       profileAuthState: profile?.dataset.authState ?? null,
       overflow: document.documentElement.scrollWidth - viewportWidth,
@@ -170,7 +171,7 @@ try {
     assert(state.brandSub === 'MyeongHa', `${state.pathname} brand subtitle drifted: ${state.brandSub}`);
     assert(state.profileVisible, `${state.pathname} login/profile control is hidden`);
     assert(state.profileAuthState === 'guest', `${state.pathname} expected guest auth state, got ${state.profileAuthState}`);
-    assert(state.profileText.includes('로그인'), `${state.pathname} guest Login label missing: ${state.profileText}`);
+    assert(state.profileLabel === '로그인' && !state.profileText.includes('로그인'), `${state.pathname} icon-only guest Login label incorrect: ${JSON.stringify(state)}`);
     assert(state.profileHref.startsWith('auth.html?next='), `${state.pathname} guest Login does not route to auth.html: ${state.profileHref}`);
     assert(state.overflow <= 2, `${state.pathname} horizontal overflow: ${state.overflow}px`);
   }

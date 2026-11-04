@@ -39,7 +39,7 @@ describe('shared refined header', () => {
       const controls = ['product-theme-toggle','product-icon-button','product-profile','ui-locale-picker'];
       for (const item of controls) expect((header.match(new RegExp('class="' + item + '"','g')) ?? []).length).toBe(1);
       const positions = controls.map(item => header.indexOf('class="' + item + '"'));
-      expect(positions.every((value,index) => value >= 0 && (index === 0 || value > positions[index-1]))).toBe(true);
+      expect(positions.every((value,index) => value >= 0 && (index === 0 || value > positions[index-1]!))).toBe(true);
       expect(header).toContain('class="product-nav"');
       expect(header).not.toContain('product-report-link');
       expect(header).not.toContain('contact.html?report=content');
@@ -77,7 +77,7 @@ describe('shared refined header', () => {
     const colors = palette as Uint8Array;
     const alphas = opacity as Uint8Array;
     for (let index = 0; index < colors.length/3; index++) {
-      const r=colors[3*index],g=colors[3*index+1],b=colors[3*index+2];
+      const r=colors[3*index]!,g=colors[3*index+1]!,b=colors[3*index+2]!;
       if (r>g+15 && r>b+7) expect(alphas[index]).toBe(0);
     }
   });

@@ -205,10 +205,10 @@ try {
   const memberHeader = await client.evaluate(`(() => {
     const profile = document.querySelector('.product-profile');
     const spans = [...profile.querySelectorAll(':scope > span')];
-    return { label: spans[1]?.textContent?.trim(), count: spans.length, text: profile.textContent.trim() };
+    return { label: profile.getAttribute('aria-label'), count: spans.length, text: profile.textContent.trim() };
   })()`);
-  assert(memberHeader.label === '마이', `Member header label is incorrect: ${memberHeader.label}`);
-  assert(memberHeader.count === 2 && !memberHeader.text.includes('⌄'), `Member header must not show a dropdown arrow: ${JSON.stringify(memberHeader)}`);
+  assert(memberHeader.label === '마이 페이지', `Member header accessible label is incorrect: ${memberHeader.label}`);
+  assert(memberHeader.count === 1 && !memberHeader.text.includes('마이') && !memberHeader.text.includes('⌄'), `Member header must be icon-only: ${JSON.stringify(memberHeader)}`);
 
   await client.evaluate(`localStorage.removeItem('myeongha.memberSession.v1')`);
   await navigate(client, origin, '/hall.html', '.product-profile');
@@ -216,10 +216,10 @@ try {
   const guestHeader = await client.evaluate(`(() => {
     const profile = document.querySelector('.product-profile');
     const spans = [...profile.querySelectorAll(':scope > span')];
-    return { label: spans[1]?.textContent?.trim(), count: spans.length, text: profile.textContent.trim() };
+    return { label: profile.getAttribute('aria-label'), count: spans.length, text: profile.textContent.trim() };
   })()`);
-  assert(guestHeader.label === '로그인', `Guest header label is incorrect: ${guestHeader.label}`);
-  assert(guestHeader.count === 2 && !guestHeader.text.includes('⌄'), `Guest header must not show a dropdown arrow: ${JSON.stringify(guestHeader)}`);
+  assert(guestHeader.label === '로그인', `Guest header accessible label is incorrect: ${guestHeader.label}`);
+  assert(guestHeader.count === 1 && !guestHeader.text.includes('로그인') && !guestHeader.text.includes('⌄'), `Guest header must be icon-only: ${JSON.stringify(guestHeader)}`);
 
   console.log('MyeongHa_WEB_AUTH_CONFIRMATION_BROWSER_PASS');
 } catch (error) {

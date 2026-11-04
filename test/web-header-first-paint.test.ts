@@ -10,7 +10,7 @@ describe('first-paint header controls', () => {
     const header = html.slice(html.indexOf('<header class="product-header'),html.indexOf('</header>'));
     const controls = ['product-theme-toggle','product-icon-button','product-profile','ui-locale-picker'];
     const indices = controls.map(name => header.indexOf('class="' + name + '"'));
-    expect(indices.every((value,index) => value >= 0 && (index===0 || value>indices[index-1]))).toBe(true);
+    expect(indices.every((value,index) => value >= 0 && (index===0 || value>indices[index-1]!))).toBe(true);
     expect(header).toContain('class="product-theme-toggle-mark"');
     expect(header).toContain('class="ui-locale-select"');
     expect(header.match(/<option value=/g)).toHaveLength(5);
