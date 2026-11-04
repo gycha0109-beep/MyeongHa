@@ -32,7 +32,9 @@ describe('Web Character Room continuous open and resume', () => {
     expect(runtime).toContain('if (chatIntro) {');
     expect(runtime).toContain('chatStream.replaceChildren(chatIntro)');
     expect(runtime).toContain('chatStream.replaceChildren(...nodes)');
-    expect(runtime).toContain('if (!loaded) return false');
+    expect(runtime).toContain('if (!loaded || sourceVisibilityEpoch !== initialVisibilityEpoch) return false;');
+    expect(runtime).toContain('const initialVisibilityEpoch = sourceVisibilityEpoch;');
+    expect(runtime).toContain('sourceVisibilityEpoch !== startedAtVisibilityEpoch');
     expect(runtime).toContain('roomReady = true');
     expect(runtime).toContain('retryButton.hidden = false');
     expect(runtime).toContain('if (roomReady) return Promise.resolve(true)');

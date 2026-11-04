@@ -56,4 +56,37 @@ describe('Production post-turn source authority', () => {
     expect(result.decision).toBe('disabled');
     expect(claims).toBe(0);
   });
+
+  it('keeps Memory Planner entirely behind the Production source HOLD', async () => {
+    let plannerCalls=0;
+    let claimCalls=0;
+    for (const admission of ['hold','off_cleanup'] as const) {
+      const port={
+        preflightClaim:async()=>admission,
+        completeOffWithoutText:async()=>({
+          outboxEventId:'outbox',processedAt:'2026-10-30T00:00:00Z',
+          reclaimed:false,
+        }),
+        claim:async()=>{claimCalls++;throw Error('must not claim private messages');},
+      };
+      const input={
+        subjectId:'subject',outboxEventId:'outbox',
+        lockOwner:'worker',leaseExpiresAt:'2026-10-30T00:01:00Z',
+        outboxPort:port as never,extractorProvider:{} as never,
+        plannerMemoryPort:{
+          propose:async()=>{plannerCalls++;throw Error('must not propose');},
+        },
+        enforceCurrentSourceAuthority:true as const,
+      };
+      if(admission==='hold'){
+        await expect(processSeyeonPostTurnAnalysisV1(input))
+          .rejects.toBeInstanceOf(SeyeonPostTurnSourceAuthorityHoldV1);
+      }else{
+        await expect(processSeyeonPostTurnAnalysisV1(input))
+          .resolves.toMatchObject({decision:'disabled'});
+      }
+    }
+    expect(claimCalls).toBe(0);
+    expect(plannerCalls).toBe(0);
+  });
 });

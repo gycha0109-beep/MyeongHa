@@ -278,6 +278,99 @@ function r23Pool():PostgresSubjectPoolV1{
   };
 }
 
+
+/** R25 uses existing R21 Owner's two-source G1, without any production writes. */
+function r25FinalSource(n:number){
+  const first=r23FinalSource(ids(n));
+  const second=r23FinalSource(ids(n+1000));
+  const retrievedMemories=[...first.retrievedMemories,...second.retrievedMemories];
+  const sourceCandidates=[...first.sourceCandidates,...second.sourceCandidates];
+  const selection=selectSeyeonExactModelPersonalSourcesV1({
+    retrievedMemories,sourceCandidates,
+  });
+  const sourceEnvelope={
+    ...first.sourceEnvelope,
+    sourceSnapshot:{
+      ...first.sourceEnvelope.sourceSnapshot,
+      retrievedMemories,personalRecordProjectionCandidates:sourceCandidates,
+      personalRecordAdmissions:sourceCandidates.map(c=>({
+        recordId:c.recordId,recordKind:c.recordKind,
+        recordType:c.recordType,schemaVersion:c.schemaVersion,
+        reason:'ADMITTED' as const,
+      })),
+    },
+  };
+  const finalModelContext=assembleSeyeonRuntimeContextV2({
+    relationship:null,relationshipSemantics:null,recentMessages:[],
+    retrievedMemories,integrityDecisions:[],governedPreflightApplied:false,
+    disclosure:{decision:null,retrievedSources:[]},
+  });
+  return {retrievedMemories,sourceCandidates,selection,
+    sourceEnvelope,finalModelContext,finalModelContextDigest:r23Hash(finalModelContext)};
+}
+async function prepareR25(n:number,selectionDigest:string){
+  const id=await prepare(n,false,selectionDigest);
+  const second=ids(n+1000);
+  await transaction(async c=>{
+    await c.query(
+      "insert into public.memory_items(id,subject_id,memory_type,schema_version,content_jsonb,source_kind,created_by_character_id,revoked_at,created_at) values($1,$2,'shared_detail','memory-v1',$3::jsonb,'user_approved','seyeon',null,clock_timestamp())",
+      [second.memory,subject,JSON.stringify({fixture:n+1000,synthetic:true})],
+    );
+    await c.query(
+      "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+      [second.grant,subject,second.memory],
+    );
+  });
+  const pinned=await transaction(c=>c.query<{receipt:{contextReady:boolean;originalSourceCount:number}}>(
+    'select seyeon_positive_candidate.pin_two_and_context_ready_r21($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text) as receipt',
+    [subject,id.thread,id.turn,id.attempt,JSON.stringify([
+      {recordId:id.memory,grantId:id.grant},
+      {recordId:second.memory,grantId:second.grant},
+    ]),selectionDigest],
+  ),true);
+  expect(pinned.rows[0]?.receipt).toMatchObject({
+    contextReady:true,originalSourceCount:2,
+  });
+  const edge=await clientAction(c=>c.query<{
+    ordinal:number;pg_payload_digest:string;
+  }>('select ordinal,pg_payload_digest from seyeon_positive_candidate.source_edges_r1 where attempt_id=$1::uuid order by ordinal',[id.attempt]));
+  expect(edge.rows.map(row=>row.ordinal)).toEqual([0,1]);
+  return {id,second,pgDigests:edge.rows.map(r=>r.pg_payload_digest)};
+}
+function r25Snapshot(id:ReturnType<typeof ids>){
+  return {
+    schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+    mode:'OFF' as const,
+    turnId:id.turn,assistantMessageId:id.assistantMessage,
+    userMessageId:id.userMessage,
+    preparedAt:'2026-10-21T03:00:00.000Z',
+    productionAuthorityRef:'synthetic-r25-offline-only',
+    interpretation:{},envelope:{},eventAuthorityEvidence:{},
+    priorEvents:[],relationshipBefore:{},productionCausalBindings:[],
+    identity:{
+      experimentalEventId:id.attempt,
+      experimentalEventDedupeKey:'synthetic-r25-event',
+      productionEventId:id.chatOutbox,
+      relationshipSyncOutboxEventId:id.postOutbox,
+    },
+  };
+}
+function r25Proof(selectionDigest:string,id:ReturnType<typeof ids>,
+  second:ReturnType<typeof ids>,digests:readonly string[]){
+  const [firstDigest,secondDigest]=digests;
+  if (typeof firstDigest!=='string'||typeof secondDigest!=='string') {
+    throw Error('R25 requires both DB-original PostgreSQL payload digests');
+  }
+  return {
+    schemaVersion:'offline-positive-two-original-source-proof-r25',
+    selectedSourcesDigest:selectionDigest,
+    sources:[
+      {recordId:id.memory,originalGrantId:id.grant,pgPayloadDigest:firstDigest},
+      {recordId:second.memory,originalGrantId:second.grant,pgPayloadDigest:secondDigest},
+    ],
+  };
+}
+
 describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposable-only',()=>{
   afterAll(async()=>{await pool?.end();});
 
@@ -429,10 +522,201 @@ describe.skipIf(!enabled)('G2 original Grant actual-v2 two-session race, disposa
       messages:'1',outboxes:'2',admissions:'1',
       attempt_state:'committed',turn_state:'committed',
     });
+    const reveal=await transaction(c=>c.query<{assistant_text:string|null}>(
+      'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as assistant_text',
+      [subject,id.thread,id.turn,id.attempt,id.assistantMessage],
+    ),true);
+    expect(reveal.rows[0]?.assistant_text).toBe(body);
     await expect(commitSeyeonR23OfflineAtomicV2V1(input))
       .rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
     expect(await saved(id)).toMatchObject({
       messages:'1',outboxes:'2',admissions:'1',
+    });
+  });
+
+
+  it('R25: exact final TWO-memory model -> original Grant pair -> real v2/outboxes atomic G2',async()=>{
+    const n=61,final=r25FinalSource(n);
+    const {id,second,pgDigests}=await prepareR25(n,final.selection.selectedSourcesDigest);
+    const originalProof=r25Proof(final.selection.selectedSourcesDigest,id,second,pgDigests);
+    await stage(id,originalProof);
+    const snapshot=r25Snapshot(id);
+    const input={
+      pool:r23Pool(),
+      verifiedEvidence:{
+        kind:'member' as const,
+        verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001',
+      },
+      threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
+      assistantMessageId:id.assistantMessage,chatOutboxId:id.chatOutbox,
+      postTurnOutboxId:id.postOutbox,
+      postTurnSnapshot:snapshot,postTurnSnapshotHash:r23Hash(snapshot),
+      finalRetrievedMemories:final.retrievedMemories,
+      finalModelContext:final.finalModelContext,
+      sourceCandidates:final.sourceCandidates,sourceEnvelope:final.sourceEnvelope,
+      preModelSelection:final.selection,
+      g1Receipt:{
+        turnId:id.turn,attemptId:id.attempt,contextReady:true as const,
+        selectedSourcesDigest:final.selection.selectedSourcesDigest,
+        finalModelContextDigest:final.finalModelContextDigest,
+        sources:originalProof.sources,
+      },
+    };
+    // A format-valid but false second raw digest cannot authorize G2.
+    await expect(commitSeyeonR23OfflineAtomicV2V1({...input,g1Receipt:{
+      ...input.g1Receipt,sources:[input.g1Receipt.sources[0]!,{
+        ...input.g1Receipt.sources[1]!,
+        pgPayloadDigest:'sha256:pg-jsonb:v1:'+'0'.repeat(64),
+      }],
+    }})).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({messages:'0',outboxes:'0',admissions:'0'});
+    const receipt=await commitSeyeonR23OfflineAtomicV2V1(input);
+    expect(receipt).toMatchObject({
+      status:'disposable_atomic_v2_committed',replayed:false,
+      permitsProvider:false,permitsHttpReveal:false,
+    });
+    expect(await saved(id)).toMatchObject({
+      messages:'1',outboxes:'2',admissions:'1',
+      attempt_state:'committed',turn_state:'committed',
+    });
+    await expect(commitSeyeonR23OfflineAtomicV2V1(input))
+      .rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({messages:'1',outboxes:'2',admissions:'1'});
+  });
+
+  it('R25: revoking the SECOND original Grant before G2 prevents any assistant or outbox',async()=>{
+    const n=62,final=r25FinalSource(n);
+    const {id,second,pgDigests}=await prepareR25(n,final.selection.selectedSourcesDigest);
+    await stage(id,r25Proof(final.selection.selectedSourcesDigest,id,second,pgDigests));
+    await transaction(c=>c.query(
+      'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+      [second.grant],
+    ));
+    const snapshot=r25Snapshot(id);
+    await expect(commitSeyeonR23OfflineAtomicV2V1({
+      pool:r23Pool(),
+      verifiedEvidence:{
+        kind:'member',verifiedAuthUserId:'d1000000-0000-4000-8000-000000000001',
+      },
+      threadId:id.thread,turnId:id.turn,attemptId:id.attempt,
+      assistantMessageId:id.assistantMessage,chatOutboxId:id.chatOutbox,
+      postTurnOutboxId:id.postOutbox,
+      postTurnSnapshot:snapshot,postTurnSnapshotHash:r23Hash(snapshot),
+      finalRetrievedMemories:final.retrievedMemories,
+      finalModelContext:final.finalModelContext,
+      sourceCandidates:final.sourceCandidates,sourceEnvelope:final.sourceEnvelope,
+      preModelSelection:final.selection,
+      g1Receipt:{
+        turnId:id.turn,attemptId:id.attempt,contextReady:true,
+        selectedSourcesDigest:final.selection.selectedSourcesDigest,
+        finalModelContextDigest:final.finalModelContextDigest,
+        sources:r25Proof(final.selection.selectedSourcesDigest,id,second,pgDigests).sources,
+      },
+    })).rejects.toBeInstanceOf(SeyeonR23OfflineG2CommitHoldV1);
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',
+    });
+  });
+
+
+  it('R25 second-original revoke-first: independent G2 transaction waits then leaves no output',async()=>{
+    const n=63,final=r25FinalSource(n);
+    const {id,second,pgDigests}=await prepareR25(n,final.selection.selectedSourcesDigest);
+    await stage(id,r25Proof(final.selection.selectedSourcesDigest,id,second,pgDigests));
+    await clientAction(revoker=>clientAction(async committer=>{
+      await revoker.query('BEGIN');
+      await revoker.query(
+        'select id from public.subjects where id=$1::uuid for update',[subject],
+      );
+      await revoker.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [second.grant],
+      );
+      await committer.query("SET application_name='seyeon_r25_second_revoke_first'");
+      await committer.query('BEGIN');
+      await executor(committer);
+      const pending=actualCommit(committer,id).then(()=>false,(e:unknown)=>{
+        return (e as {constraint?:string}).constraint===
+          'seyeon_offline_r25_original_grant_revoked';
+      });
+      try{
+        await waitForLock('seyeon_r25_second_revoke_first');
+        await revoker.query('COMMIT');
+        expect(await pending).toBe(true);
+      }finally{
+        await committer.query('ROLLBACK').catch(()=>undefined);
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    }));
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
+      attempt_state:'validated',turn_state:'validated',
+    });
+  });
+
+  it('R25 second-original commit-first: revoke waits until actual v2 and both outboxes commit',async()=>{
+    const n=64,final=r25FinalSource(n);
+    const {id,second,pgDigests}=await prepareR25(n,final.selection.selectedSourcesDigest);
+    await stage(id,r25Proof(final.selection.selectedSourcesDigest,id,second,pgDigests));
+    await clientAction(committer=>clientAction(async revoker=>{
+      await committer.query('BEGIN');
+      await executor(committer);
+      const result=await actualCommit(committer,id);
+      expect(result.rows[0]?.receipt.replayed).toBe(false);
+      await revoker.query("SET application_name='seyeon_r25_second_revoke_waiter'");
+      await revoker.query('BEGIN');
+      const pending=(async()=>{
+        await revoker.query(
+          'select id from public.subjects where id=$1::uuid for update',[subject],
+        );
+        await revoker.query(
+          'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+          [second.grant],
+        );
+        await revoker.query('COMMIT');
+      })();
+      try{
+        await waitForLock('seyeon_r25_second_revoke_waiter');
+        await committer.query('COMMIT');
+        await pending;
+      }finally{
+        await committer.query('ROLLBACK').catch(()=>undefined);
+        await revoker.query('ROLLBACK').catch(()=>undefined);
+      }
+    }));
+    expect(await saved(id)).toMatchObject({
+      messages:'1',outboxes:'2',admissions:'1',
+      attempt_state:'committed',turn_state:'committed',
+    });
+    const grant=await clientAction(c=>c.query<{revoked_at:Date|null}>(
+      'select revoked_at from public.record_access_grants where id=$1::uuid',
+      [second.grant],
+    ));
+    expect(grant.rows[0]?.revoked_at).not.toBeNull();
+    const replay=await transaction(c=>c.query<{assistant_text:string|null}>(
+      'select seyeon_positive_candidate.reveal_http_r5($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid) as assistant_text',
+      [subject,id.thread,id.turn,id.attempt,id.assistantMessage],
+    ),true);
+    expect(replay.rows[0]?.assistant_text).toBeNull();
+  });
+
+  it('R25 re-granting second Memory cannot retroactively authorize pinned second original',async()=>{
+    const n=65,final=r25FinalSource(n);
+    const {id,second,pgDigests}=await prepareR25(n,final.selection.selectedSourcesDigest);
+    await stage(id,r25Proof(final.selection.selectedSourcesDigest,id,second,pgDigests));
+    await transaction(async c=>{
+      await c.query('update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',[second.grant]);
+      await c.query(
+        "insert into public.record_access_grants(id,subject_id,life_fact_id,memory_item_id,grantee_character_id,grant_reason,granted_at,revoked_at) values($1,$2,null,$3,'seyeon','user_choice',clock_timestamp(),null)",
+        ['d6000000-0000-4000-8000-000000009999',subject,second.memory],
+      );
+    });
+    await expect(transaction(c=>actualCommit(c,id),true)).rejects.toMatchObject({
+      constraint:'seyeon_offline_r25_original_grant_revoked',
+    });
+    expect(await saved(id)).toMatchObject({
+      messages:'0',outboxes:'0',admissions:'0',
     });
   });
 

@@ -16,12 +16,18 @@ export const SEYEON_POSITIVE_G2_ATOMIC_COMMIT_SQL_V1 =
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 const SHA=/^sha256:v1:[a-f0-9]{64}$/u;
 const PG_SHA=/^sha256:pg-jsonb:v1:[a-f0-9]{64}$/u;
+const WIRE_SHA=/^sha256:wire-utf8:v1:[a-f0-9]{64}$/u;
+const EMPTY_HISTORY_SHA='sha256:v1:'+
+  createHash('sha256').update('[]','utf8').digest('hex');
 
 export interface SeyeonPositiveS0SourcePinInputV1 {
   readonly subjectId:string;
   readonly threadId:string;
   readonly turnId:string;
   readonly attemptId:string;
+  /** Verified against the DB's exact current User message, never a client label. */
+  readonly currentUserMessageId:string;
+  readonly currentUserTextDigest:string;
   readonly originalMemoryId:string;
   readonly originalGrantId:string;
   readonly recordType:string;
@@ -90,7 +96,9 @@ export function createSeyeonPositiveS0OwnerDbPortsV1(
   return Object.freeze({
     async pinBeforeModel(input:SeyeonPositiveS0SourcePinInputV1):Promise<Readonly<Record<string,unknown>>>{
       if(![input.subjectId,input.threadId,input.turnId,input.attemptId,
+          input.currentUserMessageId,
           input.originalMemoryId,input.originalGrantId].every(exactId)
+        ||!WIRE_SHA.test(input.currentUserTextDigest)
         ||![input.recordType,input.schemaVersion,input.projectorVersion].every(strictText)
         ||![input.selectedSourcesDigest,input.projectedMemoryDigest,
             input.finalModelContextDigest].every(digest)
@@ -146,7 +154,9 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
       // to model authority even when the IDs and digest strings happen to fit.
       const expectedKeys=[
         'schemaVersion','subjectId','threadId','turnId','attemptId',
-        'characterId','recordKind','recordId','originalGrantId',
+        'characterId','currentUserMessageId','currentUserTextDigest',
+        'historicalSourceCount','historicalSourceCensusDigest',
+        'recordKind','recordId','originalGrantId',
         'originalGrantedAt','recordType','recordSchemaVersion',
         'projectorVersion','selectedSourcesDigest','projectedMemoryDigest',
         'originalPgJsonbDigest','finalModelContextDigest',
@@ -157,6 +167,10 @@ select public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         ||proof.subjectId!==input.subjectId||proof.threadId!==input.threadId
         ||proof.turnId!==input.turnId||proof.attemptId!==input.attemptId
         ||proof.characterId!=='seyeon'||proof.recordKind!=='memory'
+        ||proof.currentUserMessageId!==input.currentUserMessageId
+        ||proof.currentUserTextDigest!==input.currentUserTextDigest
+        ||proof.historicalSourceCount!==0
+        ||proof.historicalSourceCensusDigest!==EMPTY_HISTORY_SHA
         ||proof.originalGrantId!==input.originalGrantId
         ||proof.recordId!==input.originalMemoryId
         ||proof.recordType!==input.recordType

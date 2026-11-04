@@ -1,6 +1,7 @@
 import { getUiLocaleRequestHeadersV1 } from './ui-i18n.js';
 import { unwrapApiSuccessEnvelope } from './api-envelope.js';
 import { ensureActiveBearer, invalidateMemberSession } from './product-auth.js';
+import { publishSeyeonMemoryVisibilityInvalidationV1 } from './seyeon-memory-visibility-invalidation.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -103,6 +104,10 @@ export function createRecordsMemoryGrantRevokeClient(options = {}) {
       if (!sameSession(session, latest)) {
         throw new MemoryGrantRevokeError('MEMORY_REVOKE_SESSION_CHANGED', 'The active Member session changed.');
       }
+      // Only a server-confirmed pending/committed withdrawal invalidates
+      // already displayed Se-yeon content. It does not claim that previously
+      // delivered bytes were deleted or that server revocation is complete.
+      publishSeyeonMemoryVisibilityInvalidationV1();
       return ack;
     },
   });

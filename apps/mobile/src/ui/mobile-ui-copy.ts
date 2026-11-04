@@ -16,6 +16,14 @@ const COPY = new Map<string, readonly [string,string]>(
     [source,[japanese,traditionalChinese]]),
 );
 
+// New fixed status notices kept outside the approved shared 781-row baseline.
+const MEMORY_WITHDRAWAL_MOBILE_COPY_V1 = new Map<string, readonly [string,string]>(
+  ([["기억 접근 권한이 변경되어 이전 세연 답변을 표시하지 않습니다. 이후 접근 여부는 서버에서 다시 확인합니다.","記憶へのアクセス権限が変更されたため、以前のセヨンの返信は表示しません。今後のアクセス権限はサーバーで再確認します。","記憶存取權限已變更，因此不會顯示先前世妍的回覆。之後的存取權限將由伺服器重新確認。"],["기억 접근 철회 요청이 확인되어 이전 세연 답변을 숨겼습니다. 이후 접근 권한은 서버에서 다시 확인합니다.","記憶へのアクセス撤回要求が確認されたため、以前のセヨンの返信を非表示にしました。以後のアクセス権限はサーバーで再確認します。","已確認撤回記憶存取權限的請求，因此已隱藏先前世妍的回覆。之後的存取權限將由伺服器重新確認。"]] as Array<readonly [string,string,string]>).map(
+    ([source,japanese,traditionalChinese]): [string,readonly [string,string]] =>
+      [source,[japanese,traditionalChinese]],
+  ),
+);
+
 export function normalizeMobileUiLocale(value: unknown): MobileUiLocale {
   return SUPPORTED_MOBILE_UI_LOCALES.some(locale => locale === value) ? value as MobileUiLocale : 'ko-KR';
 }
@@ -23,7 +31,7 @@ export function normalizeMobileUiLocale(value: unknown): MobileUiLocale {
 export function translateMobileUiCopy(source: string, locale: MobileUiLocale): string {
   if (locale === 'ko-KR') return source;
   if (locale === 'en-US' || locale === 'zh-CN') return lookupPlannedMobileStaticUiCopyV1(source, locale) ?? source;
-  const row = COPY.get(source) ?? MOBILE_UI_NATIVE_COPY.get(source);
+  const row = COPY.get(source) ?? MEMORY_WITHDRAWAL_MOBILE_COPY_V1.get(source) ?? MOBILE_UI_NATIVE_COPY.get(source);
   return row?.[locale === 'ja-JP' ? 0 : 1] ?? source;
 }
 

@@ -16,4 +16,3 @@ echo 'PASS: exact source-v2 PortOne cancel event resolves one Receipt/Attempt/Re
 # The original full-migration fixture is already installed in this disposable
 # database. Reuse it for the real two-connection Reader S1/Grant CAS race.
 bash test/db/commerce_reader_s1_cas_race_pg17.sh
-

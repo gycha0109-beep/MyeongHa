@@ -31,25 +31,67 @@ SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r4-owner-wire-receipt-disposable.test.ts --maxWorkers=1
 # Verify real zero-only baseline before changing *only* this disposable clone.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_production_compatibility_catalog_guard_v1.sql
+# Seal G4 origin/real governed reservation BEFORE installing G2's gated Owner.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r28_disposable_governed_wire_cost_provenance.sql
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_legacy_direct_commit_acl_cutover_candidate_v1.sql
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql
 # Only the G1 context-ready portion of R4 is installed; NO G3 Reveal/HTTP.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_atomic_context_only_candidate_r2.sql
+# R21 must be INSTALLED before R25 G2/R5 tests reference its two-original function.
+# Original single-memory and zero-memory paths are still unchanged.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
+# R30 is a no-dispatch five-stage source/wire ancestry receipt only.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r30_disposable_five_stage_native_wire_lineage.sql
+# R36: install DB-owned static Character/Interpreter manifest first;
+# real runtime builders produce the immutable PUBLIC authored snapshot.
+# Must finish before R32 can admit any Interpreter or charge a budget.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r36_disposable_interpreter_static_authority_manifest.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r36-static-authority-manifest-disposable.test.ts --maxWorkers=1
+# R37: create immutable synthetic-NO-PROVIDER result observations BEFORE
+# R32's stage admission so Stage N can require the Stage N-1 observation.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r37_disposable_synthetic_stage_result_lineage.sql
+# R38 captures only rejected invalid-fixture checks from the REAL authored
+# interpretation/renderer/semantic guard functions. No Provider or PASS.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r38_disposable_guard_negative_lineage.sql
+# R40 only records mocked HTTP fingerprints with NO provider/Guard authority.
+# Its Owner re-verifies two current original Grants, native stage and
+# settled Cost event + ACK before any synthetic digest is recorded.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r40_disposable_unverified_transport_lineage.sql
+# R41 bootstrap: run the ACTUAL authored domain guards against the fixed
+# public, original-only fixture and freeze the three output digests.
+# This may never authorize real Provider output or HTTP Reveal.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r41_disposable_local_guard_fixture_manifest.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r41-local-guard-fixture-manifest-disposable.test.ts --maxWorkers=1
+# R42: install scratch-only DB-owned HMAC issuer/verifier. No key is
+# committed, returned or made available to the API executor.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r42_disposable_db_issued_local_evidence_seal.sql
+# R43: the ordinary Member API Executor must not mint or verify DB MACs.
+# Only a scratch dedicated NOLOGIN evaluator role may execute R42 Owners.
+# The isolated Postgres test login is privileged; this does NOT prove
+# separate production credentials or any genuine Provider output approval.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r43_disposable_validator_role_split.sql
+# One DB transaction now binds each actual native stage, trusted code-owned
+# Interpreter authority manifest, prior local result, and Governor budget.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql
+# R5 is required by the same two-original G2 test's post-commit Grant readback.
+# Install it before G2 tests; ordinary single-original cases keep their guards.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-g2-atomic-original-grant-race-disposable.test.ts --maxWorkers=1
-# R5 current-rights first/replay/history Owner-style checks ONLY in scratch clone.
-# R7 uses the same real PG test suite to force a revoke AFTER authorized DB
-# read COMMIT but BEFORE the asynchronous Production HTTP Member verifier
-# resolves; this confirms current 503/no-store HOLD and demonstrates why DB
-# read COMMIT alone cannot authorize delayed wire bytes.
-psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r5_disposable_reveal_current_rights.sql
+# R7 reads already-installed R5 Owner under the same disposable DB;
+# a later revoke must block any delayed HTTP disclosure.
 # R25 extends the ACTUAL R5 current-rights Owner with exclusive one-shot Turn
 # consumption in the SAME disposable PG transaction held until Node finish.
 psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r25_disposable_first_once_g3.sql
+# Verify G1 two-original atomic pin against the synthetic isolated DB.
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
 SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-r5-current-reveal-disposable.test.ts --maxWorkers=1
-# R21: TWO exact original Grants and REAL ContextReady in the SAME scratch PG transaction.
-# Only a disposable G1 candidate: no Provider, actual G2 or G3 Reveal authority.
-psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql
-SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts --maxWorkers=1
-echo 'PASS offline R2/R5/R25 real G2 + first-once G3 delivery/rollback races; Production G0/G2/G3 HOLD'
+# After legacy compatibility/G3 tests, revoke positive G2 executor permissions
+# in the same scratch DB. No new owner positive Commit is granted.
+psql -X -v ON_ERROR_STOP=1 -f test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql
+SEYEON_POSITIVE_GRANT_REAL_PG=1 ./node_modules/.bin/vitest run \
+  test/seyeon-r31-g2-forward-stop-disposable.test.ts --maxWorkers=1
+echo 'PASS offline original ancestry + R36 Character + R37/R38 local results + R40 mocked transport + R41 Guard fixture + R42 DB HMAC + R43 validator-only issuer role; G2/G3/Production HOLD'

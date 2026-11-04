@@ -99,7 +99,9 @@ function inputs(rawOverride?:string,projectionOverride?:string){
   });
   return {retrievedMemories,sourceCandidates,selection,sourceEnvelope,finalModelContext};
 }
-function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
+function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>&{
+  twoOriginalContextReady?:true;
+}){
   return persistSeyeonR20OfflineDigestBoundPinV1({
     pool,verifiedEvidence:evidence,threadId:THREAD,turnId:TURN,
     attemptId:ATTEMPT,...other,
@@ -107,7 +109,7 @@ function call(pool:PostgresSubjectPoolV1,other:ReturnType<typeof inputs>){
 }
 function mock(options:{
   db?:string;pin?:boolean;noInspect?:boolean;payloadTamper?:boolean;
-  commitFail?:boolean;grantTamper?:boolean;
+  commitFail?:boolean;grantTamper?:boolean;badR21?:boolean;
 }={}){
   const executed:string[]=[];
   const saved=inputs();
@@ -127,6 +129,13 @@ function mock(options:{
       }] as Row[]};
       if(sql.includes('current_database()'))return {rows:[{
         dbName:options.db??'myeongha_seyeon_positive_pin_candidate_test',
+      }] as Row[]};
+      if(sql.includes('pin_two_and_context_ready_r21'))return {rows:[{
+        receipt:options.badR21?{contextReady:true}:{
+          attemptId:ATTEMPT,selectedSourcesDigest:saved.selection.selectedSourcesDigest,
+          originalSourceCount:2,contextReady:true,permitsProvider:false,
+          permitsAtomicCommit:false,permitsHttpReveal:false,
+        },
       }] as Row[]};
       if(sql.includes('pin_source_set_r1'))return {rows:[{
         pinned:options.pin??true,
@@ -193,6 +202,34 @@ describe('R20 original JSONB ↔ final projection digest correspondence, no Prov
       permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
     });
   });
+  it('R21 two-source model Context and actual ContextReady are checked in one transaction',async()=>{
+    const a=inputs();
+    const db=mock();
+    const receipt=await call(db.pool,{...a,twoOriginalContextReady:true});
+    expect(receipt).toMatchObject({
+      selectedPersonalRecordCount:2,contextReady:true,
+      finalModelContextDigest:hash(a.finalModelContext),
+      permitsProvider:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    });
+    expect(db.executed.some(x=>x.includes('pin_two_and_context_ready_r21'))).toBe(true);
+    expect(db.executed.some(x=>x.includes('pin_source_set_r1'))).toBe(false);
+    expect(db.executed.indexOf('COMMIT')).toBeGreaterThan(
+      db.executed.findIndex(x=>x.includes('inspect_pinned_raw_source_r20')));
+    for(const options of [{badR21:true},{grantTamper:true},
+      {payloadTamper:true},{noInspect:true},{commitFail:true}]){
+      const rejected=mock(options);
+      await expect(call(rejected.pool,{...a,twoOriginalContextReady:true}))
+        .rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+      expect(rejected.executed).toContain('ROLLBACK');
+    }
+    const wrong=mock();
+    await expect(call(wrong.pool,{...a,
+      retrievedMemories:a.retrievedMemories.slice(0,1),
+      twoOriginalContextReady:true,
+    })).rejects.toBeInstanceOf(SeyeonR20OfflineDigestHoldV1);
+    expect(wrong.executed).toEqual([]);
+  });
+
   it('rejects forged raw, projected or selected digest and never permits Provider',async()=>{
     const db=mock();
     await expect(call(db.pool,inputs('sha256:v1:'+'0'.repeat(64))))

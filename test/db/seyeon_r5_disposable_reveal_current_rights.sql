@@ -40,6 +40,8 @@ declare
   v_current record;
   v_expected jsonb;
   v_digest text;
+  v_sources jsonb := '[]'::jsonb;
+  v_count integer := 0;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if p_subject is null or p_thread is null or p_turn is null then
@@ -87,57 +89,81 @@ begin
   select * into v_set from seyeon_positive_candidate.source_sets_r1 ss
   where ss.attempt_id=v_attempt_id and ss.subject_id=p_subject
     and ss.thread_id=p_thread and ss.turn_id=p_turn
-    and ss.source_count=1
+    and ss.source_count between 1 and 2
   for share;
   if v_admission.attempt_id is null or v_pin.attempt_id is null
     or v_set.attempt_id is null
+    or v_set.source_count is distinct from v_admission.source_count
     or v_set.selected_sources_digest is distinct from v_admission.source_selection_digest
     or v_pin.original_grant_id is distinct from v_admission.original_grant_id
     or v_pin.original_memory_id is distinct from v_admission.record_id
     or v_pin.original_raw_digest is distinct from v_admission.pg_payload_digest
   then return null; end if;
 
-  select * into v_edge from seyeon_positive_candidate.source_edges_r1 e
-  where e.attempt_id=v_attempt_id and e.ordinal=0 and e.record_kind='memory'
-    and e.memory_id=v_admission.record_id
-    and e.original_grant_id=v_admission.original_grant_id
-    and e.pg_payload_digest=v_admission.pg_payload_digest
-    and e.record_type=v_pin.original_record_type
-    and e.schema_version=v_pin.original_schema_version
-  for share;
-  if v_edge.attempt_id is null or
-    (select count(*) from seyeon_positive_candidate.source_edges_r1
-      where attempt_id=v_attempt_id)<>1 then return null; end if;
-
-  select m.memory_type,m.schema_version,m.content_jsonb,g.granted_at
-    into v_current
-  from public.record_access_grants g
-  join public.memory_items m
-    on m.id=g.memory_item_id and m.subject_id=g.subject_id
-  where g.id=v_admission.original_grant_id and g.subject_id=p_subject
-    and g.memory_item_id=v_admission.record_id
-    and g.grantee_character_id='seyeon' and g.revoked_at is null
-    and m.revoked_at is null and m.source_kind='user_approved'
-    and m.memory_type='shared_detail' and m.schema_version='memory-v1'
-  for share of g,m;
-  if not found then return null; end if;
-
-  v_digest:='sha256:pg-jsonb:v1:'||
-    encode(sha256(convert_to(v_current.content_jsonb::text,'UTF8')),'hex');
-  if v_current.memory_type is distinct from v_edge.record_type
-    or v_current.schema_version is distinct from v_edge.schema_version
-    or v_current.granted_at is distinct from v_edge.original_granted_at
-    or v_digest is distinct from v_edge.pg_payload_digest then
-    return null;
+  -- R25: all originals are current, not just the first legacy scalar.
+  -- Keep Subject SHARE plus every original Grant/Memory SHARE until the
+  -- HTTP socket's protected transaction finishes. Any revoked second
+  -- source or replaced Grant makes the entire response unavailable.
+  if (select count(*) from seyeon_positive_candidate.source_edges_r1
+      where attempt_id=v_attempt_id)<>v_set.source_count then return null; end if;
+  for v_edge in
+    select * from seyeon_positive_candidate.source_edges_r1
+      where attempt_id=v_attempt_id order by ordinal for share
+  loop
+    if v_edge.ordinal<>v_count or v_count>=v_set.source_count
+      or v_edge.record_kind<>'memory'
+      or v_edge.record_type<>'shared_detail'
+      or v_edge.schema_version<>'memory-v1' then return null; end if;
+    select m.memory_type,m.schema_version,m.content_jsonb,g.granted_at
+      into v_current
+    from public.record_access_grants g
+    join public.memory_items m
+      on m.id=g.memory_item_id and m.subject_id=g.subject_id
+    where g.id=v_edge.original_grant_id and g.subject_id=p_subject
+      and g.memory_item_id=v_edge.memory_id
+      and g.grantee_character_id='seyeon' and g.revoked_at is null
+      and m.revoked_at is null and m.source_kind='user_approved'
+      and m.memory_type='shared_detail' and m.schema_version='memory-v1'
+    for share of g,m;
+    if not found then return null; end if;
+    v_digest:='sha256:pg-jsonb:v1:'||
+      encode(sha256(convert_to(v_current.content_jsonb::text,'UTF8')),'hex');
+    if v_current.memory_type is distinct from v_edge.record_type
+      or v_current.schema_version is distinct from v_edge.schema_version
+      or v_current.granted_at is distinct from v_edge.original_granted_at
+      or v_digest is distinct from v_edge.pg_payload_digest then
+      return null;
+    end if;
+    if v_count=0 and
+      (v_edge.memory_id is distinct from v_pin.original_memory_id
+       or v_edge.original_grant_id is distinct from v_pin.original_grant_id
+       or v_edge.pg_payload_digest is distinct from v_pin.original_raw_digest)
+    then return null; end if;
+    v_sources:=v_sources||jsonb_build_array(jsonb_build_object(
+      'recordId',v_edge.memory_id::text,
+      'originalGrantId',v_edge.original_grant_id::text,
+      'pgPayloadDigest',v_edge.pg_payload_digest
+    ));
+    v_count:=v_count+1;
+  end loop;
+  if v_count<>v_set.source_count then return null; end if;
+  if v_set.source_count=1 then
+    v_expected:=jsonb_build_object(
+      'schemaVersion','offline-positive-original-source-proof-r3',
+      'recordId',v_admission.record_id::text,
+      'originalGrantId',v_admission.original_grant_id::text,
+      'selectedSourcesDigest',v_admission.source_selection_digest,
+      'pgPayloadDigest',v_admission.pg_payload_digest
+    );
+  else
+    v_expected:=jsonb_build_object(
+      'schemaVersion','offline-positive-two-original-source-proof-r25',
+      'selectedSourcesDigest',v_admission.source_selection_digest,
+      'sources',v_sources
+    );
   end if;
-  v_expected:=jsonb_build_object(
-    'schemaVersion','offline-positive-original-source-proof-r3',
-    'recordId',v_admission.record_id::text,
-    'originalGrantId',v_admission.original_grant_id::text,
-    'selectedSourcesDigest',v_admission.source_selection_digest,
-    'pgPayloadDigest',v_admission.pg_payload_digest
-  );
-  if v_validation->'personalRecordProvenance' is distinct from v_expected then
+  if v_expected is distinct from v_admission.source_proof_jsonb
+     or v_validation->'personalRecordProvenance' is distinct from v_expected then
     return null;
   end if;
 

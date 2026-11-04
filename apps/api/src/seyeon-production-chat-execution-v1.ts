@@ -47,7 +47,12 @@ import {
   createSeyeonAttemptZeroPersonalProofV1,
 } from './seyeon-attempt-zero-personal-proof-v1.js';
 import type { SeyeonAttemptZeroPersonalProofV1 } from './seyeon-attempt-zero-personal-proof-v1.js';
-import {assertSeyeonPositiveG1FinalModelContextSealV1} from './seyeon-positive-g1-final-model-context-seal-v1.js';
+import {
+  assertSeyeonPositiveG1FinalModelContextSealV1,
+  buildSeyeonPositiveG1PreModelSourceCensusSealV1,
+} from './seyeon-positive-g1-final-model-context-seal-v1.js';
+import {buildSeyeonG1HistoricalFinalContextCandidateSealV1,buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
+import type {SeyeonG1HistoricalCandidateDbPortV1} from './postgres-seyeon-g1-historical-candidate-port-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type { SeyeonG1CombinedModelPinRequestV1 } from './seyeon-g1-positive-combined-source-port-v1.js';
 import type {
@@ -280,6 +285,9 @@ extends BaseProductionSliceInputV1 {
   readonly persistencePort: SeyeonProductionChatPersistencePortV1;
   /** Only the existing verified Subject runner may supply this Owner port. */
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
+  /** Explicit S0 Owner port; historical evidence is never model authority. */
+  readonly historicalSourceCandidateDbPort?: SeyeonG1HistoricalCandidateDbPortV1;
+
   readonly combinedSourcePinPort?: Readonly<{
     pinBeforeModel(input: SeyeonG1CombinedModelPinRequestV1): Promise<Readonly<Record<string, unknown>>>;
   }>;
@@ -326,6 +334,15 @@ export class SeyeonProductionChatExecutionErrorV1 extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SeyeonProductionChatExecutionErrorV1';
+  }
+}
+
+/** A committed historical candidate is intentionally held, not a failed model attempt. */
+export class SeyeonHistoricalCandidatePersistedHoldV1 extends SeyeonProductionChatExecutionErrorV1 {
+  readonly code = 'SEYEON_HISTORICAL_CANDIDATE_HOLD' as const;
+  constructor() {
+    super('Se-yeon historical model sources need an immutable G1 DB Pin before Provider.');
+    this.name = 'SeyeonHistoricalCandidatePersistedHoldV1';
   }
 }
 
@@ -736,6 +753,8 @@ export async function runSeyeonProductionChatExecutionV1(
           SeyeonAttemptZeroPersonalProofV1 | Readonly<Record<string, unknown>>;
         let positiveModelCorrelation: Readonly<{
           selectedSourcesDigest: string;
+          pinnedContextInputDigest: string;
+          selectedModelSourceCensusDigest: string;
           finalModelContextDigest: string;
         }> | null = null;
 
@@ -777,6 +796,83 @@ export async function runSeyeonProductionChatExecutionV1(
             exactModelSourceSelection: exactModelPersonalSources,
           });
         } else {
+          // W47: Re-read the exact original history window through G0's
+          // DB-owned lineage authorizer, not a caller-supplied sourceRef.
+          // The manifest is source-only and NOT yet an immutable G1 Pin.
+          // Nonzero past conversation stays HOLD even after it matches.
+          if(productionContext.recentMessages.length>0){
+            const maxRecentMessages=contextInput.maxRecentMessages??12;
+            const dbVerifiedWindow=await input.contextReadPort.readRecentMessages({
+              subjectId,threadId,limit:maxRecentMessages,
+              currentUserMessageRef:receivedTurn.userMessageId,
+            });
+            const census=buildSeyeonG1HistoricalModelWindowCensusV1({
+              currentUserMessageId:receivedTurn.userMessageId,
+              currentUserText:receivedTurn.userText,
+              maxRecentMessages,
+              dbVerifiedWindow,
+              exactModelRecentMessages:contextInput.recentMessages.slice(-maxRecentMessages),
+            });
+            const original=exactModelPersonalSources.selectedSources[0];
+            const candidate=productionContext.personalRecordProjectionCandidates?.[0];
+            if(input.historicalSourceCandidateDbPort!==undefined
+              && exactModelPersonalSources.selectedPersonalRecordCount===1
+              && exactModelPersonalSources.selectedMemoryCount===1
+              && exactModelPersonalSources.selectedSources.length===1
+              && exactModelPersonalSources.selectedUnpinnedDerivedSources.length===0
+              && productionContext.retrievedMemories.length===1
+              && productionContext.personalRecordAdmissions.length===1
+              && productionContext.personalRecordAdmissions[0]?.reason==='ADMITTED'
+              && productionContext.personalRecordProjectionCandidates?.length===1
+              && productionContext.relationshipHistoryRecords.length===0
+              && productionContext.activeRelationshipEventCount===0
+              && productionContext.historyThroughRevision===0
+              && (productionContext.relationshipRevisionUsedForTurn??0)===0
+              && original?.recordKind==='memory'
+              && original.rawRecordPgDigest!==undefined
+              && original.projectorVersion!==undefined
+              && candidate?.recordId===original.recordId
+              && candidate?.grantId===original.grantId
+              && candidate?.rawRecordPgDigest===original.rawRecordPgDigest
+              && candidate?.projectorVersion===original.projectorVersion) {
+              // Seal the deterministic full post-Preflight model CONTEXT
+              // candidate, not just its recent-message list. Actual Provider
+              // dispatch is still denied until real post-Preflight G1/G2/G3.
+              const historicalSeal=buildSeyeonG1HistoricalFinalContextCandidateSealV1({
+                contextInput,
+                currentUserMessageId:receivedTurn.userMessageId,
+                currentUserText:receivedTurn.userText,
+                census,
+                originalMemory:{recordId:original.recordId,grantId:original.grantId},
+                selectedSourcesDigest:exactModelPersonalSources.selectedSourcesDigest,
+                selectedModelSourceCensusDigest:
+                  exactModelPersonalSources.selectedModelSourceCensusDigest,
+              });
+              // DB Owner compares ALL actual G0 origins in its own TX and
+              // persists historicalCandidateProof (never positiveProof).
+              // Even a successful DB receipt NEVER reaches the Interpreter.
+              await input.historicalSourceCandidateDbPort.pinBeforeModel({
+                subjectId,threadId,turnId:receivedTurn.turnId,
+                attemptId:attempt.attemptId,
+                currentUserMessageId:receivedTurn.userMessageId,
+                currentUserTextDigest:'sha256:wire-utf8:v1:'+
+                  createHash('sha256').update(receivedTurn.userText,'utf8').digest('hex'),
+                selectedOriginalMemory:original,
+                selectedSourcesDigest:exactModelPersonalSources.selectedSourcesDigest,
+                preModelContextDigest:historicalSeal.preModelContextDigest,
+                expectedFinalModelContextDigest:
+                  historicalSeal.expectedFinalModelContextDigest,
+                historicalSources:census.historicalSources,
+              });
+              // The isolated owner transaction has already committed its candidate.
+              // Do not mark this context_ready attempt as a retryable model failure.
+              throw new SeyeonHistoricalCandidatePersistedHoldV1();
+            }
+            throw new SeyeonProductionChatExecutionErrorV1(
+              'Se-yeon historical model sources need an immutable G1 DB Pin before Provider.',
+            );
+          }
+
           // Narrow initial G1/G2 implementation: exactly one user-approved
           // Memory and NO untracked derived past or extra source candidate.
           // SRC-25 approved type/projector registration is still required by
@@ -815,9 +911,17 @@ export async function runSeyeonProductionChatExecutionV1(
             );
           }
 
+          // Source selection and the COMPLETE bounded pre-model Context
+          // are sealed together before the Postgres owner persists the Pin.
+          // Derived and untracked history remain forbidden in S0.
           positiveModelCorrelation = Object.freeze({
             selectedSourcesDigest: exactModelPersonalSources.selectedSourcesDigest,
-            finalModelContextDigest: sha256(contextInput),
+            ...buildSeyeonPositiveG1PreModelSourceCensusSealV1({
+              pinnedContextInput:contextInput,
+              selected:exactModelPersonalSources,
+              currentUserMessageRef:receivedTurn.userMessageId,
+              currentUserText:receivedTurn.userText,
+            }),
           });
           // The PostgreSQL owner re-reads/locks the ORIGINAL Record+Grant,
           // compares its raw PG-JSONB digest with the same DB-read snapshot,
@@ -828,6 +932,8 @@ export async function runSeyeonProductionChatExecutionV1(
             threadId,
             turnId: receivedTurn.turnId,
             attemptId: attempt.attemptId,
+            currentUserTextDigest: 'sha256:wire-utf8:v1:' +
+              createHash('sha256').update(receivedTurn.userText,'utf8').digest('hex'),
             originalMemoryId: source.recordId,
             originalGrantId: source.grantId,
             recordType: source.recordType,
@@ -870,7 +976,9 @@ export async function runSeyeonProductionChatExecutionV1(
               // Unpinned Preflight/derived sources HOLD before Provider.
               assertSeyeonPositiveG1FinalModelContextSealV1({
                 pinnedContextInput:contextInput,
-                pinnedContextInputDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
+                pinnedContextInputDigest:positiveModelCorrelation?.pinnedContextInputDigest ?? '',
+                pinnedFinalModelContextDigest:positiveModelCorrelation?.finalModelContextDigest ?? '',
+                selectedModelSourceCensusDigest:positiveModelCorrelation?.selectedModelSourceCensusDigest ?? '',
                 selectedSourcesDigest:positiveModelCorrelation?.selectedSourcesDigest ?? '',
                 currentUserMessageRef:receivedTurn.userMessageId,
                 currentUserText:receivedTurn.userText,
@@ -1025,7 +1133,8 @@ export async function runSeyeonProductionChatExecutionV1(
 
 
   } catch (error) {
-    if (commitState.value === null) {
+    if (commitState.value === null &&
+        !(error instanceof SeyeonHistoricalCandidatePersistedHoldV1)) {
       await input.persistencePort.failAttempt({
         subjectId,
         turnId: receivedTurn.turnId,

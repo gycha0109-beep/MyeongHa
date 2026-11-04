@@ -109,3 +109,715 @@ AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/Myeong
 
 각 Gate: `{gate, scope, owner, PR, exact_head_sha, merge_sha, CI_run_url, postgres_run_url, negative_tests, permissions_audit, open_holds, approval, final_state}`.
 증거가 없으면 `HOLD`, 운영에서 검증할 수 없으면 별도 리스크 승인 없이는 PASS 금지.
+
+## 2026-10-30 — UC-06/UC-07 Planner 주도 Memory 제안 복구 (운영 비활성)
+
+**설계 정본**: `Usecase_re_reviewed_v2` UC-06/UC-07 및 `MyeongHa_Character_System_Architecture_C1`의 Planner / Gate / Renderer 분리. 캐릭터가 필요한 현재 Life Fact를 질문하고, 답변에서 기억할 사실을 인식하면 Dialogue Planner/Character Runtime이 **pending Memory/Life Fact Proposal**을 만든다. 사용자는 다음 네 가지 중 하나를 명시적으로 결정한다.
+
+1. `session_only` — 이 대화에서만; 장기 저장 및 Grant 없음.
+2. `character_only:seyeon` — 세연만 기억; 해당 Memory/Life Fact + 명시적 Character Grant.
+3. `current_characters` — 승인 시점의 현재 캐릭터들에게 각각 명시적 Grant (대상은 서버에서 결정).
+4. `discard` — 기록하지 않음; 장기 저장 및 Grant 없음.
+
+이것은 사용자가 과거 User Message를 선택해 원문 전체를 `summary`로 기록하는 기능이 아니다. 원문 Message는 서버가 권한 확인을 마친 **출처 증빙**에만 사용할 수 있다. 원문을 직접 Memory로 만드는 수동 Producer PR #2759는 설계 위반으로 **병합 없이 종료**한다.
+
+- `chat-room-read-contract.js`는 서버가 세연 **캐릭터 답변**에 결속시킨 `memoryProposal`의 정확한 6필드 `sourceAuthority:'server_dialogue_planner'`, `characterId:'seyeon'`, `proposalId`, `proposalKind`, `proposalState:'pending'`, `summary`만 통과시킨다. User Message에 달린 제안, 이전 `memoryProposalOffer`, 위조 ID·스키마·상태·Character는 거부한다.
+- `seyeon-private-memory-review-view.js`는 **메시지 저장 버튼이 없고**, 서버의 기억 제안 내용과 네 가지 선택지를 보여준다. 내용은 DOM `textContent`만 사용하고 브라우저가 사실을 추출/수정하지 않는다.
+- `seyeon-private-memory-review-client.js`는 원본 사용자 메시지로 Proposal을 생성하는 POST가 없다. 서버가 발행한 Proposal ID에 대해서만 `POST /api/memory/proposals/:id/decision`으로 사용자의 명시적 `choice.mode`를 전달한다. 임의 `summary`, 원문, Grant ID, 공유 대상 목록을 전송하지 않는다. 동일 Proposal의 불명확한 결과는 자동 재요청하지 않는다.
+- `session_only`/`discard`는 영속 기록·Grant 0을, `character_only`/`current_characters`는 명시적 결정과 서버의 일치하는 결과를 요구한다. Member/세션 변경/응답 불일치 시 HOLD.
+- **운영 구현 미완료**: 서버 Planner Proposal 생성, 응답 결속, DB Atomic Scope Decision API는 아직 연결되지 않았고 `/decision`은 미마운트다. 기존 `chat-read-http.ts`의 세연 History metadata-only HOLD는 그대로이므로 위 UI는 운영에 표시되지 않는다. 유료 AI/원문 Reveal/Projector/운영 DB·ACL을 켜지 않았다.
+
+**종료 조건**: Planner의 서버 생성 사실 제안과 원문 출처 증명, UC-07 네 선택의 실제 DB/Session 처리, 동의·철회/Revocation·Replay·두 세션 경쟁 검증, 운영 G0~G6 승인 증거가 충족되어야 한다. 현재 UI staging/CI가 PASS여도 S0 운영 PASS나 전체 AI 보안 완료를 의미하지 않는다. `HOLD_FORWARD_STOPPED` 유지.
+
+### UC-07 서버 결정 경로 구현 (S0 격리 / 운영 미마운트)
+
+- `seyeon-planner-memory-decision-v1.ts`는 기존 `packages/domain/src/memory-resolution.ts`를 재사용하여 UX 네 선택을 `session_only`, `accept_long_term + character_only`, `accept_long_term + current_characters`, `reject`로 매핑한다. 공유 대상은 브라우저가 제출하지 않고 DB가 읽은 현 캐릭터 집합만 사용한다.
+- `seyeon-planner-memory-decision-http-v1.ts`는 **회원 인증, 본인 Subject DB 트랜잭션, 정확한 1개 선택, 내부 pending 제안 읽기/잠금, 단일 트랜잭션 결정, 결과 검증**을 구현한다. 클라이언트 Summary·원문·Grant ID·대상 캐릭터 목록 입력은 금지한다. 승인 callback이나 검증 가능한 DB 구현이 없으면 503이다.
+- `10-planner-memory-decision-source.sql` / `postgres-seyeon-planner-memory-decision-source-v1.ts`는 S0 단독 세연 대화의 **확정된 세연 Character Message**에 연결된 `proposal_dedupe_key='seyeon-dialogue-planner:v1'` pending Proposal만 원본 테이블에서 잠금 검증한다. 원본·제안 Summary를 반환하지 않으며, 사용자의 수동 UserMessage Proposal을 Planner 제안으로 인정하지 않는다. 기본 API 역할은 신규 RPC를 실행할 수 없다. 격리 PG17 합성 테스트에서만 제한된 권한을 임시 허용한다.
+- `seyeon-planner-memory-decision-commit-v1.ts`는 **S0 Memory 한 건, 세연 Grant 한 건**에 한하여 기존 비공개 수락 Owner RPC와 명시 Grant Owner RPC를 같은 DB 트랜잭션에서 차례로 실행한다. `current_characters`도 DB 현재 집합이 세연 단독일 때만 이 경로로 처리한다.
+- **아직 구현/승인되지 않은 부분을 지원한다고 간주하지 않는다.** `session_only`/`discard`의 비영구 처리는 S0 격리 DB Owner 명령으로 구현했으나 운영 및 전체 개인정보 보존 계약(SRC-05)은 미완료이다. `current_characters`의 실제 다중 캐릭터 Grant, Life Fact persistence, 실제 대화 Post-turn Worker의 Planner 추출 실행 연결, 최종 캐릭터 메시지와 pending 제안의 G3 공개 권한 연결은 여전히 HOLD다.
+- `production-seyeon-planner-memory-decision-runtime-v1.ts`는 실제 Production identity verifier/DB pool/소유 DB adapter를 조립하지만 **public router 미마운트, admission 기본 DENY, 승인 없는 운영 실행 불가** 상태다.
+- 새 S0 격리 SQL은 `supabase/migrations`에 추가하지 않았고 실제 운영 DB·ACL·registry·모델/Worker는 변경하지 않았다. G0~G6 및 SRC-25 승인 전 `HOLD_FORWARD_STOPPED`를 유지한다.
+
+### UC-06 서버 Planner 후보 생성 → pending Proposal (S0 격리 구현 / 운영 HOLD)
+
+- `seyeon-planner-memory-proposal-extractor-v1.ts`: 기존 `SeyeonStructuredProviderPortV2`의 별도 `memory_proposal_extraction` 목적을 선언한다. 모델은 대화에 적합한 **한 가지 사용자 진술 후보** 또는 `none`만 제안하며, 짧은 3인칭 사실 `summary`와 실제 사용자 발언에서 연속으로 인용한 `userEvidenceQuote`를 반환해야 한다. 근거가 일치하지 않거나 원문 전체를 기억으로 복사하려 하면 거부한다. 모델 출력은 사실/승인 권위가 아니다.
+- `seyeon-post-turn-planner-memory-proposal-v1.ts`: 독립 서버 Post-turn 호출 함수. 모델+DB 명령을 수행하려면 **신뢰된 서버 내부 승인 callback**이 필요하며 기본 DENY. 승인 시에도 Member 검증/DB 트랜잭션 및 출처 재검증을 거쳐 **pending Proposal만** 만든다. 매 Subject/Turn에 대해 재시도해도 고정되는 서버 Proposal UUID를 사용한다. Post-turn Worker와 Production 조립부에 **호출 포트는 결속**됐으나 기존 OFF-only 원본 출처 계약 및 기본 모델·DB DENY 때문에 운영에서 실행되지 않는다.
+- `11-planner-memory-proposal-producer.sql` 및 `postgres-seyeon-planner-memory-proposal-producer-v1.ts`: S0 DB Owner의 `cmd_create_pending_seyeon_planner_memory_v1`가 확정된 세연의 Character 답변, 정확히 같은 Turn의 User Message, 원문에 실제 포함된 짧은 증거 인용을 재검증해 `memory_proposals(status=pending)`만 생성한다. `memory_items`·`life_facts`·`record_access_grants` 자동 생성 **0건**. 한 Turn당 하나, 리플레이에 다른 사실/ID를 끼워넣으면 거부한다.
+- `seyeon_private.planner_memory_proposal_sources_v1` DB Owner 전용 출처 테이블에서 **진짜 소유 함수가 생성한 제안**과 User/Assistant 메시지 및 Turn을 바인딩한다. `10-planner-memory-decision-source.sql`이 이 출처를 확인해야만 UC-07 승인 검토가 가능하다. `proposal_dedupe_key` 문구를 수동 INSERT한 것만으로는 위조할 수 없다. 일반 API·Member·Guest·service role에는 테이블/생성 RPC 직접 접근을 열지 않는다.
+- PostgreSQL 17 격리 합성 테스트는 이제 원래의 직접 `memory_proposals` INSERT 대신 DB Owner Producer를 호출하여 **제안 → 승인 전 Memory 0건 → 본인 승인 후 Memory/Grant 각 1건**, 동일 제안 재시도/근거 없는 사용자 메시지/출처 없는 가짜 Planner 행 거부를 검증한다.
+- **운영 미완료**: Post-turn Worker 호출 포트는 구현됐지만 **기존 OFF-only DB 출처 Gate가 개인정보 Claim 자체를 차단**하므로 실제 유료/실사용자 자동 후보 생성·공개는 여전히 실행 불가. 기존 AI Governor의 별도 purpose 예산 승인, 개인정보 보존기간/제안 폐기, G3 현재 접근권한에 의한 제안 렌더링, G0~G6 검증/승인이 필요하다. 현재 `HOLD_FORWARD_STOPPED`; 새 SQL은 운영 Migration에 포함되지 않으며 DB ACL/공용 Router/유료 호출을 활성화하지 않는다.
+
+### UC-07 비영구 선택 2가지 S0 DB Owner 결정 (운영 HOLD)
+
+- `12-planner-memory-non-durable-decision.sql`의 `seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1`는 DB Owner가 확인한 **진짜 pending Planner 제안**에 대해서만 `session_only` / `discard` 결정이 가능하다. 동일 Subject/Turn의 원본 캐릭터·사용자 메시지와 Owner 발급 출처가 일치해야 한다.
+- `session_only`는 장기 Memory/Grant 없이 제안 상태를 `expired`로 확정하고 `proposed_value_jsonb={}`로 지운다. 원래 대화 자체는 기존 채팅 Session/History 계약을 따른다. `discard`는 `rejected`로 확정하고 같은 방식으로 후보 내용을 지운다.
+- `postgres-seyeon-planner-non-durable-decision-v1.ts` 및 `commitSeyeonPlannerMemoryDecisionS0V1`는 기존 Character-only 수락·Grant Owner 경로와 함께 네 가지 UX 선택을 하나의 DB 트랜잭션 결정 분기로 연결한다. 복수 캐릭터와 Life Fact 수락은 여전히 명시적으로 HOLD한다.
+- 합성 PostgreSQL 17 테스트에서 두 선택의 **제안 내용 삭제, 새 Memory 0건, Grant 0건, Replay 차단**을 검증하도록 추가했다. 일반 API EXECUTE는 기본 DENY, Producer/Decision/RPC는 운영 Migration 및 공용 Router에 마운트하지 않았다.
+- `session_only`의 현 대화 Context 반영과 정책적 보존기간/TTL, 과거 G3 권한 검증, 실제 Renderer/UI 공개와 실제 Post-turn Worker 자동 실행은 미완료이다. 테스트 GREEN만으로 구현 전체 또는 운영 승인 완료라고 간주하지 않는다.
+
+
+## Worklog — Security / Character Memory UC-06·UC-07
+
+> 작성 규칙 (2026-10-30부터 적용): 각 실제 작업 단위가 끝날 때마다 **작업 내용·변경 파일·커밋·확인한 CI 결과·미완료/차단**을 이 문서에 누적한다. CI의 대상 SHA와 실행 완료 여부를 구분하고, 아직 실운영에 연결되지 않은 코드를 '완료'로 표시하지 않는다. 최신 기록을 아래쪽에 추가한다.
+
+### 2026-10-30 · W01 · Post-turn 자동 제안 연결 착수
+
+- **확인:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)의 최신 작업 HEAD `87b73ea44a7731ff3d476d33b2d3caa1c5d09ea8`. 사용자는 이전 GREEN을 알렸으나 확인된 가장 최근 PR-run은 `93ee6595`에서 CI RED 이후의 실행이며, 현재 HEAD의 전체 GREEN을 확인하지 못했다. `main` 변경으로 PR이 `dirty` 상태임을 확인.
+- **작업 목표:** 실제 `seyeon-post-turn-analysis-worker-v1.ts`의 committed User/Character claim과 S0 Planner Producer 사이에 서버 소유 결속을 추가. 사용자 클릭·원문 전체 저장·무승인 영구 기록을 새로 만들지 않음.
+- **보안 전제:** 기존 Production Post-turn은 DB Owner가 검증한 OFF 정리만 허용하고, 개인 텍스트·Provider 요청은 기본 HOLD. G0~G6, 운영 개인정보·유료 호출은 변경하지 않음.
+- **미완료:** Worker 결속·테스트·충돌 해소·새 HEAD CI 및 승인 결과.
+
+
+### 2026-10-30 · W02 · Post-turn Worker 제안 포트 결속
+
+- **구현:** `seyeon-post-turn-analysis-worker-v1.ts`에 `SeyeonPostTurnPlannerMemoryPortV1`을 추가. **DB claim과 snapshot 원문 결속 검증 후**, OFF·checkpoint 재처리가 아닌 새로운 클레임에만 `propose()`를 호출한다. 응답은 `none` 또는 정확한 pending UUID/재생 여부만 허용하고 다른 반환은 HOLD한다.
+- **서버 조립:** `seyeon-post-turn-planner-memory-port-v1.ts`가 기존 `runSeyeonPostTurnPlannerMemoryV1`을 신뢰된 Subject 증빙/DB pool/provider에 연결. `production-seyeon-post-turn-worker-runtime-v1.ts`에서 포트를 구성해 Worker에 전달한다.
+- **커밋:** `b1ae10fb` (worker), `05c6f3fc` (adapter), `a0b6b147` (runtime).
+- **보안·활성화:** 실제 Production Worker는 기존 `enforceCurrentSourceAuthority=true`가 **OFF-only cleanup**만 허용하여 private claim 이전에 반환/차단한다. Planner 모델/DB 승인 callback도 부여하지 않아 호출 경로는 운영에서 계속 **DENY**다. 이를 실서비스 자동 제안 활성화로 주장하지 않는다.
+- **검증/다음:** 경로·권한 회귀 테스트와 새 HEAD CI 필요. G0/G4 승인·Model 원문 접근 근거·새 purpose 예산 및 G3 응답 결속 HOLD.
+
+
+### 2026-10-30 · W03 · Post-turn 결속 검증 및 차단 회귀 테스트
+
+- **구현/검증 코드:** `test/seyeon-post-turn-source-authority-hold.test.ts`에서 기존 Production `OFF` 정리/원문 차단 시 Planner 호출 0회·private claim 0회를 검증. `test/seyeon-post-turn-planner-memory-port-v1.test.ts`에서 snapshot/claim/체크포인트/모델 추출 순서, Owner 생산 경로, Member 검증, G0/G4 미승인 시 Provider·DB 호출 0회를 검증.
+- **커밋:** `757c3b07`, 테스트 구조 수정 `55065664`, `81798f05`.
+- **현재 상태:** 신규 HEAD에서 완결된 CI 결과 **아직 미확인**. 기존 Production OFF-only 정책, 기본 DENY, 운영 ACL 미변경.
+- **후속:** 최신 `main`이 S0 `14-g0-relationship-event-original-lineage.sql`을 추가하여 `plan.mjs`가 충돌한 상황. 타 트랙 작업을 보존하는 병합과 정확한 SHA 기반 CI 재검증이 필요.
+
+
+### 2026-10-30 · W04 · 합성 Claim 실행 검증 / 최신 main 병합
+
+- **구현:** `test/seyeon-post-turn-planner-memory-worker-v1.test.ts`에서 검증된 Claim의 정확한 User/Assistant 원문만 후보 포트에 전달, `OFF`·완료 체크포인트에서는 호출 0회, Assistant snapshot 불일치 및 가짜 제안 응답은 관계 분석 및 체크포인트 이전 HOLD를 확인하는 합성 테스트를 추가.
+- **main 병합:** `bed9b1fe`은 최신 `main`의 보안 G0 관계 이벤트 출처 `14-g0-relationship-event-original-lineage.sql`과 기타 기존 트랙 변경을 보존하면서 `plan.mjs`에 10·11·12 Planner SQL을 함께 기록하는 병합 커밋이다. 병합 시 새 `main`의 사주·레코드 트랙 코드를 덮어쓰지 않았으며, PR은 병합 가능으로 복구.
+- **커밋:** `bed9b1fe`(main 통합), `6e6ca7a1`(합성 Worker 흐름 테스트).
+- **CI:** 작업 HEAD `6e6ca7a140eea2b5bc58ebad49b06328cd6a7e4d`에서 CI/Web/Governance가 실행 대기·진행 중으로 확인됨. 성공 판정하지 않음. [PR 검사](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks).
+- **잔여:** 실제 Production Post-turn은 Owner 출처 Gate가 OFF-only로 개인 원문을 읽지 않는다. 현 상태의 포트 결속은 운영 활성화가 아니며, G0/G4 원천 승인·budget·G3 UI 후속 권한 계약·G5/G6 승인 후에만 개인 기록을 사용할 수 있다.
+
+
+### 2026-10-31 · W05 · CI RED TypeScript 오류 수정 및 재시도
+
+- **실패 증거:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks)의 HEAD `5433f2a662cd0047c4e046d014198e9f7fb06a9d` 검사. `Governance` / `Web PR Domain Gates` **GREEN**; `CI` [41027186530](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41027186530) **RED**. `Work Track · security` (job `123968237399`)에서 TypeScript `TS7031`, `TS2379` 확인.
+- **원인:** `seyeon-post-turn-planner-memory-port-v1.ts`의 `propose({committedTurn})` 인수에 명시적 타입이 없어 암시적 any 발생. `test/seyeon-post-turn-planner-memory-port-v1.test.ts`의 선택 필드 `values`가 `undefined`일 때도 객체에 포함되어 엄격한 optional property 규칙 위반. PostgreSQL 17 종속 검사 역시 동일한 컴파일 오류에 의해 테스트를 시작하지 못해 RED로 전파됨. 해당 검사에는 추가로 `saju-abuse-admission-attack-e2e` / `saju-official-records-http-e2e` 실패가 기록됐지만, 로그상 이들의 공통 선행 원인은 컴파일 실패이며 별도 DB 기능 결함으로 단정하지 않는다.
+- **수정:** 포트 인수에 기존 `SeyeonPostTurnPlannerMemoryPortV1['propose']`의 정확한 인수 타입을 지정. 테스트 기록에는 `values`가 존재할 때만 필드를 넣어 `exactOptionalPropertyTypes`를 준수. 변경 범위는 두 TypeScript 파일뿐, 보안 권한/SQL/운영 DB 미변경.
+- **커밋:** `906ff336187b45fbbe4f9a09d9a4ffc5de05d9ce`(포트), `e576b03de78df5d987c9b9c08a29636c9418fd75`(테스트).
+- **미완료/다음:** 수정된 Worklog 포함 최종 HEAD의 CI·PostgreSQL 17 결과는 별도 확인해야 한다. 실제 유료 Provider 및 운영 Memory 공개는 G0/G3/G4/G6 권한·예산 증빙 전까지 `HOLD_FORWARD_STOPPED`.
+
+
+### 2026-10-31 · W06 · 최신 main G0 출처 변경 보존 병합
+
+- **충돌 원인:** 이번 TypeScript 수정 뒤 `main`에 별도 보안 트랙의 S0 G0 사용자 원문 출처 보호 `15-g0-original-member-user-message.sql` 등이 추가되어 PR #2761의 `scripts/operations/seyeon-security-s0/plan.mjs`와 충돌.
+- **해결:** 최신 `main`의 G0 `13`·`14`·`15` 출처 SQL 및 기존 다른 트랙 코드를 모두 보존하고, 이 트랙의 Planner `10`·`11`·`12` SQL도 그대로 유지한 병합 트리를 생성. 타 트랙의 별도 보안 문서 및 원본 SQL을 덮어쓰지 않음.
+- **병합 커밋:** `c2e5a62609fe91432bfd1404faca1d564d77f3cf` (두 부모: 기존 작업 HEAD `bb557c39`, 최신 `main` `7057d272`). PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)은 병합 가능, 자동 병합 설정 유지.
+- **검증:** 병합 직후 최신 HEAD CI는 아직 실행 목록에서 확인되지 않았으며, 이 단계에서 GREEN으로 기록하지 않는다. 재실행 결과는 [PR Checks](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks) 기준으로 확인.
+- **잔여:** 최종 HEAD TypeScript·보안 트랙·PostgreSQL 17 CI, 실제 G3 기억 제안 UI 전달, 운영 G0/G4 승인 및 원문 접근 보안. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W07 · Cloudflare Workers Builds 별도 RED 원인 확인
+
+- **전체 검사 판정 정정:** HEAD `a4b2666291a73fda1527ba1a16dab9384d80691e`에서 GitHub Actions 3개(Governance, Web, CI) 모두 PASS, PostgreSQL17도 PASS. 그러나 GitHub의 **외부 Check Run** `Workers Builds: myeongha` [124466218250](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks?check_run_id=124466218250)은 FAILED. 따라서 PR 전체 GREEN이라고 판정하지 않는다.
+- **Cloudflare 실로그:** build `7eab4f9d-1d22-4a09-86c1-9ec0c599abad`의 `npm run build:web` 및 Vite 빌드는 성공. 배포 단계 `npx wrangler preview` (Wrangler `4.156.0`)에서 Cloudflare API `Authentication error [10000]` 및 `Invalid access token [9109]`으로 실패. 외부 플랫폼 서비스 장애나 프로젝트 코드 오류의 증거가 아니라 **해당 Preview 배포 빌드 토큰의 유효성·권한 문제**임.
+- **설정 확인:** Cloudflare Workers Builds의 현재 소스 브랜치 트리거는 `feat/security/s0-private-memory-review-client-20261030`, 빌드는 `npm run build:web`, Preview 배포는 `npx wrangler preview`, 빌드 토큰 명칭은 `myeongha build token`. 토큰 등록 메타데이터는 존재하지만 실행 시 사용된 인증은 실패. 실사용 권한이나 현재 활성 상태는 메타데이터만으로 보증되지 않음.
+- **조치:** 원인·증거 기록만 수행. 운영 Worker 배포 명령 변경, Preview 검증 비활성화, API 토큰 재발급·노출, 개인정보·운영 ACL 변경 **없음**. GitHub 내부 CI 통과를 Cloudflare 외부 검사 통과와 혼동하지 않도록 검증 범위를 분리.
+- **남은 작업:** Cloudflare Workers Builds 설정에서 유효한 권한의 API 토큰을 새로 발급·선택(사용자 계정 작업 필요), Preview 재실행 후 해당 외부 Check Run PASS 확인. 원본 개인정보·유료모델 접근은 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W08 · 미승인 제안 만료·개인정보 소거 S0 구현 (브랜치 지속 / 병합 금지)
+
+- **작업 범위:** 별도 Cloudflare 인증 토큰/Preview 오류 해결 트랙에 의존하지 않고, 현재 PR #2761 **동일 브랜치**에서 UC-06/SRC-05의 미승인 pending 제안 잔류 문제를 줄이는 격리 DB 소유 처리 경로를 구현. `main` 병합·운영 배포·Cloudflare 설정 변경 없음.
+- **SQL:** `16-planner-memory-pending-expiry.sql`의 `seyeon_private.cmd_expire_pending_planner_memory_batch_v1`은 **DB 소유 생성 출처**가 있는 `pending` 세연 Memory 제안만 처리한다. 승인 정책이 제공한 과거 시각보다 오래된 후보를 최대 100건씩 잠금(`SKIP LOCKED`) 처리하고, 동일 DB 명령으로 `status=expired`와 `proposed_value_jsonb={}`를 확정한다. 원래 승인된 `Memory`, `Grant`, 사용자 원문 메시지는 수정하지 않는다. 경쟁하는 사용자 동의는 기존 Proposal 행 잠금으로 직렬화된다.
+- **서버 경계:** `postgres-seyeon-planner-memory-pending-expiry-v1.ts`는 보존기간을 하드코딩하지 않고, **서버 내부 승인 + 명시적인 UTC cutoff + 1~100건 한도**가 모두 만족되어야 SQL을 호출한다. 모델/HTTP/환경 변수로 임의 권한을 만들지 않으며 일반 API `EXECUTE` 기본 DENY, 운영 경로·스케줄 미연결.
+- **테스트:** `test/seyeon-planner-memory-expiry-v1.test.ts`에서 기본 차단·미래 시각·초과 건수·위조 응답 거부를 확인하는 단위 테스트 추가. `test/seyeon-security-s0-postgres.e2e.test.ts`에서 오래된 DB 소유 제안만 만료, 최근 pending/기존 rejected 보존, 같은 행 재처리 0건, 만료 후 UC-07 승인 불가, 일반 API ACL DENY, 범위 초과 거부를 확인하는 PostgreSQL 17 합성 통합 테스트 추가.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/{16-planner-memory-pending-expiry.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-pending-expiry-v1.ts`, `test/{seyeon-planner-memory-expiry-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
+- **구현 커밋:** `895d079f`, `28213e49`, `cd6bdd33`, `160d8fdb`, `8c6e7321`, `14acb8d4`.
+- **검증 상태:** 변경 커밋 기준 신규 CI **결과 확인 전**. Cloudflare Workers Build의 인증 실패는 별도 트랙 소관이며 이 작업이 해결하거나 무시하지 않는다. 보존기간/실제 자동 만료 스케줄·원본 채팅 수명·G3 공개 권한은 미완료. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W09 · G3 대화 제안 표시의 DB 소유 원본 결속 후보 (공개 금지)
+
+- **범위:** 실제 대화의 세연 Character 메시지에만 pending 제안을 연결하는 후속 G3 작업 중 **내부 원본 결속 검사**를 격리 S0에 구현. Cloudflare 문제를 건드리지 않고 PR #2761 **동일 브랜치**에서 계속 진행. 운영 HTTP Reveal/Replay는 여전히 HOLD.
+- **DB:** `17-planner-memory-display-candidate.sql`은 Owner 출처 테이블에서 생성 사실이 입증되고, 현재 Member Subject·Thread·Assistant Message가 정확히 일치하며, UC-07 승인 출처 함수를 재검증한 **미승인 Memory Proposal 최대 한 건**의 내부 Summary만 반환한다. 사용자 메시지 선택/수동 Proposal, 다른 대화방·캐릭터의 제안, 이미 수락·폐기·만료된 제안은 불허한다. 해당 함수는 일반 API 역할에서 **EXECUTE DENY**, 운영 Migration 및 공용 Router 미마운트.
+- **서버:** `postgres-seyeon-planner-memory-display-candidate-v1.ts`에서 내부 승인 callback이 없으면 SQL 조회 자체를 거부한다. 응답 `sourceAuthority='db_owner_planner_inspection_only'`, `disclosureAuthorized=false`는 의도적으로 **웹의 `memoryProposal` 공개 스키마와 호환되지 않는다**. 이를 채팅/AI/웹에 곧바로 전달하거나 G3 승인 근거로 사용할 수 없다.
+- **검증 추가:** `test/seyeon-planner-memory-display-candidate-v1.test.ts`에 미승인 차단, 정확한 사용자/대화/메시지 결속, 위조·중복 응답 차단을 추가. `test/seyeon-security-s0-postgres.e2e.test.ts`에는 실제 Owner 출처로 생성된 대화 제안을 내부 조회한 뒤 다른 User Message 조회는 0건, discard 이후 재조회는 0건인지 확인하는 합성 테스트를 추가.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/{17-planner-memory-display-candidate.sql,plan.mjs,install-isolated.mjs}`, `apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.ts`, `test/{seyeon-planner-memory-display-candidate-v1.test.ts,seyeon-security-s0-postgres.e2e.test.ts}`.
+- **구현 커밋:** `748662c8`, `0046d4d6`, `9ad5daaf`, `10b39b9d`, `ee65fa1b`, `d0d6cab4`, `42a4e334`, `af5d1b2b`.
+- **진행 상태:** 해당 새 코드의 최신 HEAD CI/PG17 **결과 확인 전**. 후속은 권한 취소/재승인 및 과거 대화 G3 원자 검증 뒤만 실제 Reveal/UI에 결속할 수 있다. 본 작업으로 실사용자 개인정보 공개, 유료 모델 실행, 자동 병합을 활성화하지 않았다. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-10-31 · W10 · G3 내부 후보 검증 오류 수정 및 사용자 기억 거부 우선 적용
+
+- **확인:** 작업 시작 시 PR #2761 HEAD `8ff44dc86276972928cc2d8eece40b8ff669a94a`의 GitHub Actions 중 Governance/Web PASS, PostgreSQL 17 PASS, Work Track · security RED. [CI 41179023985](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41179023985) 로그: `test/seyeon-planner-memory-display-candidate-v1.test.ts`의 기대 객체 필드 `canonicalMemberSubjectId`와 실제 내부 조회 결과의 `subjectId`가 불일치한 합성 assertion 1건. 실제 제품 권한 오류로 단정하지 않음.
+- **수정:** 테스트 기대 값을 DB Owner 후보 응답 계약의 `subjectId`로 정정. 커밋 `f7ef8ec5`.
+- **제품 안전 범위:** 세연의 Dialogue Planner에서 사용자 발화에 명시적인 한국어/영어 **기억·기록·저장 금지 요청**이 있을 경우 구조화 모델을 호출하기 **전에** `decision:'none'`으로 종료하는 우선 거부 규칙 추가. 이는 원본 사용자 승인 없이 Memory를 저장하지 않으며, 기존 저장된 기록의 삭제·취소 처리라고 주장하지 않는다. 코드 `seyeon-planner-memory-proposal-extractor-v1.ts`, 테스트 `seyeon-planner-memory-proposal-producer-v1.test.ts`.
+- **커밋:** `122b2948` (모델 호출 전 거부), `162dc610` (한국어·영어 거부 및 일반 발화 회귀 테스트).
+- **Cloudflare/병합:** 사용자가 Cloudflare 설정을 별도 트랙에서 해결했다고 알려줌. 본 트랙은 Cloudflare 배포 명령·토큰에 손대지 않음. PR은 병합 방지를 위해 **Draft, auto-merge=null** 유지; 현재 브랜치에만 커밋.
+- **검증 상태/다음:** 해당 변경이 포함된 신규 HEAD GitHub Actions/외부 Cloudflare Check Run 검증 결과는 아직 확인 전. S0 SQL·실사용자 텍스트 공개는 계속 HOLD. UC-07/G3의 승인·철회 기반 응답 공개는 별도 실제 권한 증명이 필요하다.
+
+
+### 2026-10-31 · W11 · UC-07 선택 이후 브라우저 제안 원문 삭제
+
+- **기능:** `apps/web/seyeon-private-memory-review-view.js`에서 사용자가 명시적으로 네 선택 중 하나를 확정하면 네트워크 전송 전에 **제안 요약 문자열을 비우고 선택 버튼 전체를 즉시 라이브 DOM에서 제거**하도록 변경. 서버가 승인 확정을 반환하든 오류/응답 불명으로 끝나든, 브라우저가 과거 제안 본문을 계속 보여주거나 결과 불명 상황에서 재클릭할 수 없게 한다. 사용자가 확인 창에서 취소한 경우만 기존 선택 UI를 유지한다.
+- **테스트:** `apps/web/seyeon-private-memory-review-client.test.ts`에서 모의 DOM으로 `discard` 확정 직후 서버 응답 전 summary 공백·상태 영역만 남음·선택 버튼 비활성·정확한 결정 1회 전송을 검증. 기존 서버 결정/동의 권한을 변경하지 않는다.
+- **커밋:** `7c30b58f`(브라우저 DOM 즉시 소거), `33949908`(모의 DOM 회귀 테스트).
+- **보안/남은 것:** DOM에서의 전시 소거는 이미 사용자/서버에 저장된 과거 Chat 원문을 삭제하거나 G3 공개 권한을 획득한다는 뜻이 아니다. UC-07 서버의 영구 저장·동의 취소, 현재 G3 rights 기반 Reveal, 실제 Production 원문 조회 및 모델 승인 모두 별도 HOLD.
+- **운영/통합:** 사용자가 별도 Cloudflare 해결을 보고했으나 이 트랙은 인증 토큰/배포 설정 변경 없이 PR #2761 Draft·자동 병합 OFF를 계속 유지. CI 결과는 최신 커밋 기준 별도 확인 필요.
+
+### 2026-10-31 · W12 · 이관 후 기억 거부 패턴 복구 및 G3 내부 재표시 차단 보강
+
+- **CI 실패 원인:** PR #2761 HEAD `32f043cf`의 [Work Track · security](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41183832567)에서 한국어·영어 명시적 기억 거부 테스트 1건 RED. `seyeon-planner-memory-proposal-extractor-v1.ts` 정규식 리터럴의 `\\s` / `\\b`가 과잉 이스케이프되어 공백/단어 경계를 제대로 판별하지 못한 오류를 확인. 기존 Governance/Web/PG17 통과를 전체 GREEN으로 오인하지 않음.
+- **수정:** 기억 저장 거부 표현을 Provider 호출 전에 인식하도록 실제 정규식 문법을 바로잡음. 커밋 `0aecabf9`. 모델 자동 저장·Grant 생성 권한은 없음.
+- **대화 제안 결속:** `apps/web/chat-room-read-contract.js`는 서버가 붙인 미승인 제안이라도 원본 세연 Character 답변 `bodyText`가 null·빈 문자열·공백이면 응답 전체를 거부. 캐릭터 답변 없는 제안이 역사적 Message에 결속된 것처럼 표시되지 않게 보강. 커밋 `99b7c08f`, 회귀 테스트 `a4827af0`.
+- **승인 후 재조회 검증:** 기존 실제 PostgreSQL 17 격리 UC-07 테스트에서 사용자 승인으로 Proposal이 `accepted`가 되면 같은 원본 Thread/Assistant의 G3 **내부 후보 재조회가 null**이어야 함을 명시. 커밋 `44de7b24`. 기존 `discard` 후 차단·만료 후 차단 테스트와 함께 승인된 제안의 중복 UI 제안을 금지. 이는 실 HTTP Reveal이나 철회 선형화 완료 증명이 아님.
+- **브랜치/승인:** 기존 `feat/security/s0-private-memory-review-client-20261030` / PR #2761 Draft 유지, 자동 병합 OFF. `main` 병합·Cloudflare 토큰·운영 DB 마이그레이션·개인정보 Route·유료 Provider 연결 없음. G0/G1/G2/G3/G4/G5/G6 관련 미승인 공개는 계속 `HOLD_FORWARD_STOPPED`.
+- **남은 작업:** 이 커밋들의 정확한 HEAD CI/Web/Governance/PG17/외부 Cloudflare 검사 확인. G3 원래 Grant·취소·재승인·과거 파생 Context를 하나의 서버/DB/HTTP 공개 선형화 경계로 결속하는 실제 구현 및 정책 검증은 여전히 미완료.
+
+
+### 2026-10-31 · W13 · 기억 거부 CI 수정 및 실제 두 세션의 승인 경쟁 검증
+
+- **CI 증거:** 직전 HEAD `54d843cb`의 [CI 41185557039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41185557039)에서 Governance/Web PASS, PostgreSQL17 PASS, Work Track · security RED. 792개 중 739 PASS/51 SKIP/2 FAIL: `seyeon-planner-memory-proposal-producer-v1.test.ts`의 한국어 ‘기록하지 말아줘’ 미인식과 `web-chat-room-read-contract.test.ts`의 공백 메시지 예외 문구 불일치. 기존 PR 전체 PASS 아님.
+- **실제 수정:** `seyeon-planner-memory-proposal-extractor-v1.ts`가 ‘기록하지 말아줘’의 `말아` 거부 표현을 모델 호출 전 인식하도록 보완(`fddbb190`). `web-chat-room-read-contract.test.ts`는 null 메시지 본문과 빈/공백 본문을 각각 실제 안전 차단 경계에서 거부함을 확인하도록 정정(`7a962dd5`). 운영 권한·개인정보 공개 범위는 확대하지 않음.
+- **실제 PostgreSQL 17 동시성 검증 추가:** `test/seyeon-security-s0-postgres.e2e.test.ts`에서 동일 Member/Assistant의 Owner 발급 pending 제안에 대해 독립된 두 트랜잭션이 `discard`와 `character_only` 결정을 경쟁하도록 구성. 먼저 확보한 제안 잠금 때문에 후속 승인 요청이 대기하고, `discard` 완료 후 승인 요청이 실패하며 제안 내용 제거, Memory/Grant 0건, 내부 제안 재표시 0건을 검증. 커밋 `47c8f5a7`. 아직 새 HEAD CI 결과로 통과 판정하지 않음.
+- **운영 불변:** PR #2761 동일 Draft 브랜치, 자동 병합 OFF. public G3 Reveal/Replay, 실사용자 private 모델 읽기, 유료 Provider, 운영 DB Migration·Role 변경 없음. 실제 G3 동의·철회 시점의 HTTP 바이트 공개 선형화, G0 정책 계약 승인 및 G5/G6 운영 검증은 여전히 `HOLD_FORWARD_STOPPED`.
+- **다음:** W13 포함 새 정확한 HEAD에서 CI/PG17 검증 결과 확인. 별도 승인 없이 내부 후보를 HTTP에 노출하지 않으며, 이후 G3 원본 Grant/현재 권한·Replay를 실제 트랜잭션/HTTP 경계에 연결하는 작업이 필요.
+
+
+### 2026-10-31 · W14 · UC-06 원문 Pre-Model DB 검증 연결 (S0 격리)
+
+- **구현:** '18-planner-pre-model-source-authority.sql'은 이미 커밋된 세연 단독 대화의 Member Subject·Turn·User Message·Assistant Message와 양쪽 원문 전체 일치를 DB Owner가 확인한 뒤 불리언만 반환한다. 변경·철회된 원문과 임의 메시지 ID는 자격 없음. 일반 API 역할·브라우저 EXECUTE DENY, 격리 설치 전용.
+- **실행 연결:** 'runSeyeonPostTurnPlannerMemoryV1'이 유료 추출 Provider **호출 전** DB 원문을 검증하고, 제안 저장 **동일 DB 트랜잭션 안**에서 같은 원문을 재검증한다. 모델 처리 중 바뀐 메시지가 pending Memory로 기록되는 것을 차단한다. Producer의 자체 Owner 검증도 유지한다.
+- **검증:** 포트·원문 추출 테스트에 과금 Provider 0회·원문 변경 후 pending 생성 0회·DB 롤백을 추가했다. PostgreSQL17 합성 시험에 정상 원문·사용자 원문 변조·답변 변조·잘못된 Assistant 결속을 추가했다. **최신 HEAD CI 이전에는 PASS로 판정하지 않는다.**
+- **변경:** scripts/operations/seyeon-security-s0/18-planner-pre-model-source-authority.sql 및 격리 설치 목록·ACL, 앱 소스 pre-model 검증 어댑터·post-turn 실행, 기존 단위/PG17 시험.
+- **남은 HOLD:** UC-06 원문 검증에 한정된 구현이며 G0/G1 양수 Pin/G2 Atomic Commit/G3 실제 공개·Replay/G4 비용 승인/G5·G6 운영 검증을 충족하지 않는다. 생산자 모델/DB 기본 DENY, 운영 Route·Migration·paid Provider·개인정보 Reveal OFF, PR #2761 Draft·병합 금지 유지.
+
+
+
+### 2026-10-31 · W15 · UC-06 보류 제안 직접 HTTP 공개와 재조회 현재 권한 결속 (S0 격리)
+
+- **구현:** 'seyeon-planner-pending-proposal-node-http-s0-v1.ts'는 실제 Node GET 요청의 Member Identity를 인증하고 DB에서 해당 회원의 canonical Subject를 구한 뒤, 지정 Thread/Assistant의 pending Planner Memory만 읽는 격리 HTTP 입구를 구성했다. 원본 사용자 메시지나 Assistant 과거 본문을 응답하지 않는다.
+- **공개 선형화:** 'seyeon-planner-pending-proposal-node-reveal-s0-v1.ts'는 기존 DB Owner의 정확한 보류 제안 조회를 독립 트랜잭션에서 호출하고, 제안 행 및 현재 대화 원본에 대한 잠금을 Node Socket 'finish'까지 유지한다. 승인/폐기/만료 후 재요청은 같은 DB를 새로 읽어 503으로 거부하며 이전에 보였던 제안을 캐시로 복원하지 않는다. 교차 회원·잘못된 메시지·인증 부재도 서버 출처/요약을 노출하지 않는다.
+- **범위 제한:** 오직 격리 PostgreSQL17 테스트 DB 이름, 직접 소유한 Node socket, 원본 pending 제안 요약만 대상이다. 일반 API EXECUTE 권한·운영 공개 Route·Vercel/Workers Fetch Proxy·모델·Memory/Grant 권한은 변경하지 않았다. 운영 G0/G3 최종 승인 또는 과거 Chat Replay의 공개 허가가 아니다.
+- **실 DB HTTP 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 합성 회원 인증을 사용하는 실제 Node HTTP GET, pending 제안 전달, 타 회원·비인증·타 Assistant 차단, 'discard' 후 재조회 503을 추가했다. 최신 HEAD CI 최종 결과는 별도 확인해야 하므로 이 기록에서는 PASS로 단정하지 않는다.
+- **남은 작업:** G0 원본 Grant/Record·파생 데이터의 현재 권한 정책, 실제 서비스 HTTP/Replay 경계 및 최종 수신 선형화, UC-07 운영 Route, G5/G6 실제 운영 전 검증. 'HOLD_FORWARD_STOPPED', PR #2761 Draft/병합 금지 유지.
+
+
+
+### 2026-11-01 · W16 · UC-06/07 실제 Node HTTP 조회→결정→재조회 격리 통합
+
+- **구현:** 'seyeon-planner-memory-decision-node-http-s0-v1.ts'는 앞서 구현된 GET pending 제안 S0 경로와 별도로, 검증된 Node IncomingMessage/ServerResponse에서 Member의 POST 네 가지 명시적 선택을 기존 UC-07 서버 결정 핸들러와 기존 Owner DB 결정 함수에 직접 연결한다. 원문, Summary, 임의 Grant/공유 대상은 HTTP에서 받지 않으며, 정상 DB 승인 결과도 제안 내용 없이 반환한다.
+- **실제 DB 경계:** 수락/폐기하는 **바로 그 회원 DB 트랜잭션 안**에서 이름이 맞는 격리 PostgreSQL DB만 통과한다. 운영 DB·Vercel Fetch·Workers Proxy는 공개 미마운트 및 S0 DB 이름 차단이다. 기본 Production Decision admission/Role ACL은 그대로 DENY이고 사용자/환경변수로 우회하지 못한다.
+- **실 HTTP 검증:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에서 진짜 Node 요청으로 pending GET → 인증 없는 POST 401 → 인증된 'discard' POST 200 → 재조회 503 → 결정 재요청 503 및 DB payload 삭제/Memory 생성 0건을 테스트한다. 기존 PostgreSQL 이중 트랜잭션 동시성 시험도 유지한다.
+- **상태:** 이 구현은 원본 Member에 의한 pending **Memory Proposal**의 선택과 재표시 제한에 국한한다. Chat Assistant 원문/과거 대화/모델의 개인기록/Grant G3 공개, G0 재승인 정책, G1·G2 양수 pin/commit 및 G5/G6 승인 충족이 아니다. 최신 HEAD 검증이 끝나기 전에는 GREEN 판정하지 않는다. PR #2761 Draft/병합 금지, 운영 개인정보·유료 Provider HOLD 유지.
+
+
+
+### 2026-11-01 · W17 · G3 원래 Grant 기반 첫 세연 답변 재조회 (S0 격리)
+
+- **실제 구현:** '19-first-original-assistant-replay.sql'은 최초 Node 송출로 DB에 delivered가 확인된 **한 개의 첫 번째 세연 Assistant 원문**만 재조회한다. 단일 Thread의 사용자/세연 메시지 정확히 두 건, 파생 Relationship 0건, 기존 Attempt의 immutable positiveProof와 저장된 원래 Grant ID, 원본 Record의 현 상태·digest·원래 Grant 철회 여부를 기존 G0 DB-owner 함수로 재확인한다. 새 Grant나 과거 HTTP 캐시는 권한 증거로 쓰지 않는다.
+- **HTTP 연결:** 'seyeon-first-original-assistant-replay-node-s0-v1.ts'는 실 Node GET 요청의 Member 인증·DB canonical Subject를 검증하고 매 요청 새 DB 트랜잭션에서 SQL을 호출한다. 실제 응답은 기존 'sendSeyeonNodeOriginalGrantResponseV1'을 재사용하여 **직접 Node socket finish까지 원래 Grant/Record 잠금을 유지**하고 'no-store'로 비스트리밍 전달한다. DB 이름은 격리 S0/CI PG17만 허용한다.
+- **실 DB 시험:** 'test/seyeon-security-s0-postgres.e2e.test.ts'에 첫 G2 Commit과 첫 Node 전송 완료 후 HTTP 연속 재조회, 타 Member/미인증/원본 User Message ID 차단, 원래 Grant 철회 이후 본문 0건을 추가했다. 격리 fixture에서만 실행 역할에 함수 권한을 임시 부여한다. 기본 설치 권한은 여전히 DENY.
+- **한계:** 실제 Production History GET과 일반 committed_replay는 이 경로로 대체되지 않는다. Vercel Fetch/Cloudflare 프록시 및 최종 클라이언트 수신·Reader/Relationship/혼합 출처를 증명하지 못했다. G0-D1~D5/G1/G2/G3 전체/운영 G4~G6는 계속 HOLD. source registry/운영 ACL/서비스 Route/유료 Provider 활성화 없음, PR #2761 Draft·병합 금지.
+- **검증 판정:** 새 커밋 HEAD CI/PG17 확인 전에는 PASS로 기록하지 않는다.
+
+
+### 2026-11-01 · W18 · 권한 철회 ACK 이후 열린 웹 대화의 잔류 개인정보 재표시 차단
+
+- **구현:** 'records-memory-grant-revoke.js'에서 서버의 정확한 Member 확인과 'withdrawal_pending/newUseBlocked' 또는 'committed' 철회 응답이 인정된 경우에만 'seyeon-memory-visibility-invalidation.js'를 호출한다. 메시지·Memory ID·회원 토큰·원본 텍스트가 없는 알림을 현재 탭과 같은 출처의 다른 탭에 발송한다. 네트워크 실패, 비회원, 불일치·위조 응답은 알림 발급 조건이 아니다.
+- **대화 UI 결속:** 'chat-runtime-client.js'는 알림 수신 시 기존 세연 답변과 제안 DOM을 즉시 제거하고 권한 재확인 상태로 전환한다. 철회 전에 시작된 비동기 History 조회와 ACK 완료 후 도착하는 Turn 응답은 탭별 표시 상태 버전이 바뀌었으면 새로 렌더하지 않는다. 다른 Character 방의 권한을 확장하지 않으며 인증용 Bearer·DB Grant/철회 state는 변경하지 않는다.
+- **검증:** 'seyeon-memory-visibility-invalidation.test.ts'에서 pending/committed ACK, 잘못된 응답·비회원 차단, 로컬/다른 탭 무내용 알림을 테스트한다. 새 HEAD CI 결과 확인 전 GREEN으로 보고하지 않는다.
+- **경계:** 이미 외부로 송출된 HTTP 바이트를 회수하지 않는다. 다른 기기/탭에서 이루어진 철회가 열린 탭에 반드시 전달됨을 보장하는 실시간 서버 구독은 미구현이다. 알림은 화면 재표시 억제일 뿐, G0 원본 권한·G3 History 승인·실제 DB 철회 완료의 증거가 아니다. 서버 G1/G2/G3 원본 권한·Worker/Reader 파생 출처와 운영 크레딧/G4~G6는 HOLD. Source-only 동일 Draft PR #2761, 운영 공개·Provider·DB ACL·병합 없음.
+
+### 2026-11-01 · W19 · 첫 대화의 User·Assistant 원본 출처 공동 재조회 (S0 격리)
+
+- **구현:** 새 `20-first-original-dialogue-pair.sql`에서 기존 `19`의 **동일 첫 Assistant·원래 Grant/Memory·핀·현재 철회 상태** 검증이 완료된 경우에만, 같은 확정 Turn에 속하는 **DB 원본 Member User 메시지**의 동일 Subject/Thread·작성자 형태·해시·요청 스냅샷을 검증해 정확히 User 1건+Assistant 1건을 공동 반환한다. 어느 하나라도 확인할 수 없으면 원문 전체를 반환하지 않는다.
+- **직접 Node:** `seyeon-first-original-dialogue-pair-node-s0-v1.ts`에 동일 Member 인증과 대상 격리 DB를 요구하는 GET `/api/chat/:threadId/original-pair/:assistantMessageId`를 구현했다. 현재 Grant/Record와 메시지 SHARE 잠금을 **Node 소켓 finish까지** 보유한다. Fetch/Workers 프록시 경로, Production, 범용 History로는 마운트하지 않는다.
+- **설치/검증:** S0 격리 설치 계획에 20번 SQL 포함, 일반 API 역할의 기본 EXECUTE DENY를 설치 중 확인한다. 기존 PostgreSQL17 통합 테스트에서 유효한 첫 User·Assistant 한 쌍, 타 Subject, 비인증, 철회, 새 Grant 재승인 후 과거 답변 재생 불가를 실 HTTP로 검증하도록 연결했다. 현재 HEAD CI 결과 확인 전 GREEN 미확정.
+- **남은 범위:** 이 기능은 첫 대화 1쌍만 다룬다. 여러 Turn, 과거 인용된 파생 개인정보, Reader/관계 출처, 전체 G1 모델 Pin, 일반 G3 History/Replay, 운영 HTTP/수신 증명, G4~G6는 여전히 HOLD. 원본 사용자 메시지라는 사실만으로 복사·인용된 다른 개인정보의 권한이 자동 승인되지 않는다. PR #2761 Draft / 운영 공개·유료 Provider·병합 없음.
+
+### 2026-11-01 · W20 · G0 과거 대화·관계 파생 원본 누락 시 전체 HOLD
+
+- **과거 대화:** `13-g0-current-original-lineage-context.sql`의 최근 메시지 후보를 선택할 때 삭제 처리된 행·본문 NULL·공백 행을 먼저 제외하던 필터를 제거했다. 요청된 시퀀스 범위 전체를 검사해 한 행이라도 원본 본문·해시·상태가 불완전하면 `seyeon_g0_context_window_source_missing`으로 전체 HOLD한다. 과거 정상 메시지만 이어 붙여 부분 응답하거나 더 오래된 행으로 빈자리를 채우지 않는다.
+- **관계 파생:** 기존 `14-g0-relationship-event-original-lineage.sql`은 `main`과 동일하게 유지하며, 격리 설치 후 `21-relationship-origin-completeness.sql`이 기존 함수의 권한·소유자를 유지한 채 원본 Message 참조 수와 실제 결속·검증에 성공한 Message 수를 매 Event마다 일치시킨다. 삭제·누락·권한으로 숨겨진 원본 참조가 내부 JOIN에서 사라져도 파생 관계 이력 일부를 허용하지 않는다.
+- **검증·경계:** 원본 전체 검사 조건의 소스 회귀 검증을 `test/seyeon-g0-complete-source-census-v1.test.ts`에 추가. 신규 CI 결과 확인 전 GREEN 미확정. 기존 G1 전체 모델 사용 집합 Pin·G3 다중 History 실공개·Reader 교차 출처·G4 비용·G5/G6 운영 종료는 HOLD. 소스 구현만 수행, PR #2761 Draft·운영 ACL/Provider/배포 변경 없음.
+
+### 2026-11-01 · W21 · 첫 Memory 모델 입력의 전체 선택 출처 결속·선행 G1 증거 강화
+
+- **구현:** `seyeon-positive-g1-final-model-context-seal-v1.ts`에 버전 지정된 `buildSeyeonPositiveG1PreModelSourceCensusSealV1`을 추가했다. 모델에 실제 남은 `selectedSources`의 digest와 `selectedModelSourceCensusDigest`, 정확히 1건인 현재 Member User 메시지, 1건의 원래 Memory와 원래 Grant, **전체 pre-Preflight Context의 digest**를 하나의 `finalModelContextDigest`에 결속한다. 누락·위조·불일치·미검증 Relationship-derived 출처는 HOLD.
+- **영속·실행:** `seyeon-production-chat-execution-v1.ts`의 기존 PostgreSQL Owner `pinBeforeModel`이 위 결속 digest를 **모델 호출 전에** 기존 불변 `chat_turn_attempts.seyeon_personal_source_pin_jsonb.positiveProof.finalModelContextDigest`에 기록한다. Interpreter 진입 직전의 최종 조립 Context와 원래 서버 출처·전체 입력·결속 digest를 다시 대조하며 다르면 Provider로 진행하지 않는다. 새 테이블, 운영 공개 RPC, 신규 DB 실행 권한을 추가하지 않는다.
+- **검증:** `test/seyeon-positive-g1-final-model-context-seal-v1.test.ts`에 예전 단순 Context 해시 재사용, 출처 census 교체, 위조된 현재 사용자 메시지, 미검증 Relationship 유입 차단 및 비어 있지 않은 1-Memory 정상 결속을 추가한다. 정확한 최신 HEAD CI/PG17 결과 확인 전 GREEN 미확정.
+- **한계:** G1 전체 모델 요청/Preflight/렌더러·시맨틱 리뷰 파생 모든 필드에 대한 별도 독립 서명은 아직 아니다. 현재 **단일 원본 Memory·원래 Grant·원본 User 1건·파생 0건**에만 적용하며 다중 Memory/Life Fact, 관계 이력·Reader/Saju·과거 History source propagation, 정책 승인, 일반 G3 Replay, G4~G6는 HOLD. 무키 SHA는 독립 권한 증거가 아니며 DB Owner의 원래 Grant 잠금과 불변 Attempt Pin이 별도로 필요하다. Source-only PR #2761 Draft, 운영 공개·유료 Provider·병합 OFF.
+
+### 2026-11-01 · W22 · 관계 파생 출처 전체 참조 검증 및 2원본 Memory 모델 선택 사전 검증 (격리)
+
+- **기존 증거:** 직전 HEAD `e886a9a4`의 CI [41238972144](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41238972144), Governance/Web/Mobile 모두 PASS. 그 이전 W21의 타입 보정까지 포함. 본 W22 변경은 새로운 CI로 별도 검증한다.
+- **G0 관계 출처:** S0 전용 `21-relationship-origin-completeness.sql`에서 Relationship Event의 **전체** DB provenance 참조를 집계하여, 허용된 `source_message`가 아닌 참조나 NULL 메시지, 같은 Message/ordinal의 중복이 하나라도 있으면 원본 조회 전에 전체 HOLD한다. 이전의 성공 참조만 통과하는 부분 결속을 금지한다. 해당 SQL을 설치하는 운영 Migration/ACL에는 변경 없음.
+- **R21 모델 선행 검사:** `seyeon-r21-offline-derived-source-closure-v1.ts`에 이미 존재하는 실제 모델 메모리 선택·검증 함수를 결속한다. 격리 후보 ContextReady로 진행하기 전 원본 Memory 2건/정확한 원래 Grant 2건/Projection digest 대응/선택된 수 2건을 요구한다. Relationship·과거 대화·Reader·Worker·외부 도구·Preflight 유입이 하나라도 발견되면 HOLD. `test/seyeon-r21-offline-derived-source-closure-v1.test.ts`와 기존 G0 참조 회귀 검증을 추가했다.
+- **경계:** 2원본 R21은 **오프라인·격리 DB 후보**로만 존재하며, 정식 운영 G1/G2의 다중 출처 불변 Pin, Model Provider, 일반 G3 공개·재조회/철회 경쟁, Reader/Saju 교차 출처, 비용·운영 승인까지 해결하지 않는다. 실제 유료 Provider/공개 Route/운영 Role/DB 마이그레이션/병합 없음. G0 미승인, G1 다중 출처 미완료, G2~G6 HOLD; `HOLD_FORWARD_STOPPED` 유지.
+- **검증:** 새 HEAD CI 및 PostgreSQL 17 결과 확인 전 GREEN 미확정.
+
+
+### 2026-11-01 · W23 · 1원본/2원본 사전 출처 검증 회귀 복구 (격리 / HOLD)
+
+- **확인된 CI:** W22 HEAD `172c59d9`의 [CI #41240656186](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240656186)는 **RED**. Work Track security와 PostgreSQL17은 성공했지만 공통 `db-authority-core`에서 기존 R23 단일 원본 커밋 테스트 11건 중 1건이 `R23_OFFLINE_G2_ATOMIC_COMMIT_HOLD`로 실패. 전체 GREEN으로 기록하지 않는다.
+- **원인 및 수정:** R21 2-Memory 고정 검사 재사용이 기존 R20/R23 1-Memory를 잘못 차단했다. R21 원본 검증에서 격리 시나리오의 정확한 허용 원본 수를 서버가 명시하도록 변경하고 R20은 기존 1/2 범위를 선택·DB 재대조하며 R23은 기존 정확한 1건만 요구한다. 1건과 2건의 수량 교차 거부 회귀 테스트를 추가했다.
+- **기존 2원본 DB 근거:** `test/db/seyeon_g1_r21_two_originals_context_ready_candidate_v1.sql`의 R21 PostgreSQL 격리 함수는 합성 원본 Grant 2건과 SourceSet의 2개 edge를 같은 DB 트랜잭션에서 잠그고 실제 `context_ready`를 기록한다. 그러나 이 증거는 정식 운영 최종 모델 Context와 독립 권한 승인을 결합한 G1/G2 완료를 뜻하지 않는다.
+- **현재 경계:** 수정 HEAD는 새 CI 판정 전 **미검증**. PR #2761은 Draft·미병합 유지. G0 승인, 다중 출처의 실제 운영 모델 입력/DB 선행 Pin, Life Fact·파생 권한, G2 커밋 경쟁, G3 History/Reveal, Governor 비용·운영 G4~G6 모두 HOLD. 유료 Provider/공개 Route/운영 Migration/ACL 변경 없음. `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W24 · 두 원본의 모델 최종 선택 → 격리 DB 원자 ContextReady 연결
+
+- **회귀 정정:** R21의 1/2원본 분기에서 Record·Grant 고유 개수를 여전히 `2`로 고정하던 잔여 검사를 시나리오별 정확한 원본 개수에 결속했다. 기존 1원본 R20/R23과 격리 2원본 R21 모두 해당 조건을 통과해야 하며, 어느 쪽도 원본 수를 암묵적으로 확대하지 않는다.
+- **구현:** 기존 `persistSeyeonR20OfflineDigestBoundPinV1`의 기본 경로를 변경하지 않고, 명시적 격리 `twoOriginalContextReady:true`에서만 최종 모델 Context 전체 조립 동등성·정확한 선택 2건·원본 Record/Grant/투영 digest를 검증한다. 이후 **동일 Subject 트랜잭션**에서 이미 존재하는 R21 DB Owner `pin_two_and_context_ready_r21`을 호출해 두 개의 불변 Source Edge·첫 원본 scalar cross-check·실제 `context_ready`를 원자 기록한다. 격리 R20 DB Owner 원본 검사에는 **정확한 두 불변 원본·첫 Pin 결속이 있는 R21 준비 완료 상태만** 허용하는 좁은 분기를 추가했다. 같은 트랜잭션 안에서 DB Owner의 원본 payload inspection으로 두 원본의 digest를 다시 대조하며, DB 응답 형식·Grant·payload·모델 Context 불일치 시 전체 ROLLBACK한다. R21 Owner 응답을 확인하며 일반 API 역할에 새로운 테이블 SELECT 권한을 부여하지 않는다.
+- **실제 검증 시나리오 추가:** 기존 R20 테스트에 R21 선택 2건의 전용 경로·DB 응답 검증·원본/Grant 교체·COMMIT 실패 차단을 추가했다. 기존 R21 PostgreSQL 격리 테스트에는 실제 모델 Projection 두 건을 구성한 후 정식 DB Owner R21 함수와 동일 트랜잭션 원본 대조·ContextReady 저장·두 번째 원본 payload digest 위조 전체 롤백 시험을 추가했다.
+- **제한 및 HOLD:** 이 경로는 `myeongha_seyeon_positive_pin_candidate_test` 전용. 최종 모델 Context digest는 응용 서버에서 검증·응답하지만 DB의 별도 불변 최종 패킷 서명/Pin으로 승격되지 않는다. 임의 Preflight/History/Relationship/Reader/Worker/Saju·Life Fact 출처는 여전히 차단한다. PostgreSQL 원본 2건의 격리 `context_ready`는 실제 Provider 호출 권한, G2 두 원본의 원자 Commit, G3 Reveal/Replay, G4 비용 승인, G5/G6 운영 승인과 동등하지 않다.
+- **CI 판정:** 새 HEAD 정확한 전체 Actions 실행 결과 확인 전 성공 판정 금지. PR #2761은 Draft·미병합, 운영 migrations/ACL/공개 라우트/유료 호출 변경 없음, `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W25 · 두 원본 Memory의 원자 커밋·현재 Grant 기반 재조회 (격리 / HOLD)
+
+- **G2 실제 구현:** 격리 `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`의 DB Owner는 SourceSet 크기 1/2를 검증하고 선택된 **모든** 원본 Edge의 현재 원래 Grant·Memory·유형·JSONB digest를 잠근다. 둘 중 하나라도 철회/변조·교체·누락이면 아무것도 커밋하지 않는다. 검증된 원본 전체를 별도 불변 admission의 `source_count`와 `source_proof_jsonb`에 결속하고, 실제 `cmd_commit_seyeon_chat_turn_runtime_v2`로 세연 Assistant와 Chat/Post-turn Outbox 두 개를 **한 트랜잭션**에서 확정한다. 기존 1원본 validation proof 형식과 Zero Source Commit 경계는 유지한다.
+- **G1 → G2 앱 결속:** `seyeon-g2-atomic-exact-final-source-commit-r23-candidate.ts`가 1/2개의 최종 모델 선택 원본을 동일하게 재계산한다. 두 원본에서는 선택된 원래 Record/Grant와 서로 다른 PostgreSQL raw digest 2개를 모두 DB Owner R20 inspector로 재검사한다. G1 후보 receipt·SHA는 권한 증거로 신뢰하지 않으며, Context 전체가 바뀌면 DB 접근 전에 HOLD한다. 여전히 격리 DB만 허용하고 Provider 사용 권한은 발급하지 않는다.
+- **G3 두 원본 격리 읽기:** `test/db/seyeon_r5_disposable_reveal_current_rights.sql`의 기존 HTTP 첫 응답·재조회·History Owner 경계도 원본이 2건이면 **둘 다** 원래 Grant 현재 유효, 불변 admission, validated source provenance가 일치해야만 Assistant text를 반환한다. 한쪽이라도 철회되면 원문은 null, History는 전체 HOLD한다. 해당 SQL은 운영 공개 라우트가 아니며, Node 전송 이후 프록시·수신 증명도 아니다.
+- **테스트 추가:** `test/seyeon-g2-atomic-original-grant-race-disposable.test.ts`에 2원본 실제 ContextReady → 생성·검증 → 실제 v2 Commit → Outbox 2개·중복 커밋 차단, 두 번째 Grant digest 위조·철회·재승인 ID 교체, 독립 트랜잭션에서 철회 우선/커밋 우선 양방향 경쟁, 2원본 직접 HTTP DB Owner 답변/커밋 후 철회 재조회 차단을 추가했다. G2 SQL 소스 작성 중 발견한 중복 문자열 치환은 원본 SQL에서 재구성해 제거하고 함수 단일 정의를 확인했다.
+- **검증 상태:** 이 변경은 실제 테스트 실행 결과가 아닌 **구현/검증 시나리오 추가**이다. 통합 CI는 작업 중 반복 실행하지 않는 사용자 요청에 따라 **아직 실행·확정하지 않았다**. 코드 및 격리 SQL의 실행 성공을 추정하지 않는다.
+- **남은 출시 HOLD:** G0 원본 동의 정책 승인, Production G1 실제 최종 모델/Preflight/Reader·Saju·History/Relationship 파생 출처 완결성, G2 실제 Provider·Governor 단계 사용 승인, G3 실제 Production HTTP/프록시/수신 및 포괄 History, G4 비용 정산, G5/G6 전체 실행·운영 검증, 실제 병합/배포는 미완료. PR #2761은 Draft / 병합 금지 / 유료 Provider·공개 Route·운영 Migration 미활성, `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W26 · 두 원본 최종 모델 Wire와 실제 Governor 비용 예약 결속 (격리 / 무호출)
+
+- **G4 실제 구현:** `seyeon-r26-offline-governed-wire-reservation-v1.ts`를 추가했다. 기존 R35에서 모델에 전송될 **실제 네이티브 직렬화 요청 바이트**를 검증한 후, 명시적 `max_output_tokens`가 기존 서버 승인 정책의 정확한 상한과 일치하지 않거나 인증된 입력 토큰 상한이 없으면 DB 연결 전에 차단한다. 원래 Memory 1/2건과 SourceSet/최종 Context digest를 다시 확인하고 R20 DB Owner의 현재 Grant·원본 JSONB readback을 같은 Subject 트랜잭션에서 재검사한 다음, 기존 원자 `cmd_governed_start_seyeon_ai_call_v1`을 `startGovernedSeyeonAiCallV1`로 호출한다. 응답된 Call ID·최대 예약 비용·UTC 버킷을 검증하고 COMMIT이 확정된 경우에만 **오프라인 비용 예약 완료** 영수증을 돌려준다.
+- **실제 공급자 바이트 검증:** `seyeon-r35-offline-actual-provider-wire-pin-v1.ts`는 기존 무상한 R35 경로를 유지하면서 R26 전용 명시적 출력 상한을 정확한 요청 바이트 중 `max_output_tokens` 필드로 대조할 수 있게 확장했다. 토큰 상한/가격은 브라우저·모델 응답에서 받아 승인하지 않는다. 실제 오프라인 인증 토큰 상한 테스트는 합성 포트이며 운영용 tokenizer 검증 증거가 아니다.
+- **실 PostgreSQL 테스트:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에 실제 2원본 모델 Context → R21 불변 DB ContextReady → 실제 네이티브 Interpreter Provider 바이트 → R35 digest → R26 DB Governor 예약 → 서버상 `fetch` 0건을 추가했다. 합성 서버정책/일일 예산과 예약 비용 1,524 마이크로달러를 확인하고 같은 Call ID 재예약, 상한 위조, 토큰 상한 누락은 거부한다. 예약 실패/성공 어느 쪽도 Provider 전송·G2 Commit·G3 Reveal 권한은 주지 않는다.
+- **필수 시험 순서 정정:** 기존 격리 PG 설치 스크립트는 R25 G2 테스트가 R21 함수를 사용하기 전에 R21을 설치하도록, G2 테스트가 R5 현재-권한 조회를 호출하기 전에 R5를 설치하도록 순서를 수정했다. 이전에는 해당 두 호출의 런타임 함수가 아직 없었다.
+- **보안/운영 경계:** 이 G4 비용 예약은 **실제 AI 호출 승인/실행/정산이 아니다**. 예약만 남아도 사용 여부가 불명확하면 무과금으로 처리하지 않으며, 사용자의 운영비·새 모델 사용·공개 Route·원문 제공은 미승인이다. 코드와 시험 모두 명명된 폐기 가능 PostgreSQL만 허용한다. Operator 비용 정책·예산을 격리 fixture에서만 세팅하며 운영 데이터·Role·migration은 수정하지 않는다. PR #2761 Draft·병합 금지·`HOLD_FORWARD_STOPPED` 유지.
+- **CI:** 사용자가 요청한 연속 구현 후 통합검증 방식에 따라 중간 Actions 성공 확인·재실행을 하지 않았다. 이 W26의 TS 컴파일·PG17·DB 권한·비용 경로는 아직 **미실행/미확정**으로 기록한다.
+
+
+### 2026-11-01 · W27 · G4 DB 예산 초과·두 번째 Grant 철회 경쟁 및 CI 묶음 브랜치
+
+- **구현 검증 시나리오:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에서 실제 두 원본에 대한 합성 Governor 예약이 성공해 1,524 microUSD를 사용한 뒤, 같은 Call ID의 재예약·요청 출력 cap 위조·토큰 인증 누락 차단뿐 아니라 **다음 Turn의 비용 상한 초과**를 원자 DB Governor가 거절하여 새 Cost Ledger 0건/Provider 요청 0회임을 확인하도록 했다. 이어서 원본 2건 중 **두 번째 원래 Grant를 G1/Wire attestation 뒤 철회**한 후 새 Call ID로 예약을 시도하면 DB Owner 원본 readback에서 차단하고 예약 장부/예산 카운터가 늘지 않도록 시험을 추가했다. 합성 test fixture로만 구성하며 실행 PASS를 추정하지 않는다.
+- **CI 비용 절감 절차:** 이 저장소의 `.github/workflows/ci.yml`은 열린 PR 브랜치의 synchronize에 자동 반응한다. 앞선 PR #2761 커밋은 GitHub에서 자동 CI가 시작될 수 있어 **'중간 CI를 돌리지 않았다'는 수동 실행에 한정**된다. 사용자 요청인 연속 구현→마지막 통합 CI를 실제로 지키기 위해 `feat/security/g4-g5-offline-batch-20261101`을 해당 PR HEAD `ae52958c`에서 별도 생성했다. 추가 작업은 이 비PR 브랜치에 누적하고, 범위가 끝난 다음 필요한 검증을 거쳐 기존 Draft PR에 fast-forward로 통합한다. 본 단계에서는 PR branch 이동·본번 병합·배포 없음.
+- **현재 결론:** G4는 실제 서버 상한/출처/네이티브 Wire→격리 DB Governor 비용 예약 경로까지 연결됐지만 진짜 유료 Provider 발송·실제 사용량 영수증·정산·운영 승인과 동일하지 않다. G0 원본 동의, G1 전 범위 파생 출처, G2 운영 적용, G3 Production HTTP/History·실제 수신, G4 본번 정책, G5 최종 CI 및 G6 운영 승인은 모두 HOLD. `HOLD_FORWARD_STOPPED` 유지. **본 배치의 CI는 아직 정확한 HEAD로 검증·확정하지 않았다.**
+
+
+### 2026-11-01 · W28 · 원본·Wire·비용 예약 원자 기록 및 G2 미정산 차단 (격리 / HOLD)
+
+- **출처·요청·비용이 하나의 DB 사실로 묶임:** `test/db/seyeon_r28_disposable_governed_wire_cost_provenance.sql`에 폐기 가능한 명명 PostgreSQL 전용 `governed_wire_reservations_r28` 불변 테이블과 SECURITY DEFINER `seal_governed_wire_cost_r28`을 추가. 원본 Subject·Thread·Turn·Attempt, 정확한 SourceSet 1~2건, 현재 원래 Grant/Memory/원문 JSONB digest, 실제 Cost Governor의 `started` 예약/상한/금액/UTC 버킷을 재검사한다. 개인정보·모델 메시지·실제 wire 원문은 기록하지 않고 모델 Context와 네이티브 UTF-8 wire의 digest만 기입한다. 같은 Attempt·목적의 중복 seal, 수정·삭제, 일반 API 역할의 직접 SELECT·INSERT는 차단. SHA는 **DB 서명·외부 공급자 호출 증명은 아님**.
+- **G4 원자 연결:** `seyeon-r26-offline-governed-wire-reservation-v1.ts`는 기존 Cost Governor `startGovernedSeyeonAiCallV1` 바로 다음에 **같은 PostgreSQL 트랜잭션 안에서** R28 Owner seal을 요청한다. DB 영수증 10개 필드가 서버 최종 Context/원본 집합/native wire/요금 상한과 일치하고 확정 COMMIT ACK를 받을 때만 오프라인 예약 영수증을 반환한다. R28 검증이 누락·위조·중복·권한 철회 등으로 실패하면 비용 예약도 원자적으로 롤백된다. 누락된 R28 설치는 비용만 남기는 성공이 아니라 실패 처리한다.
+- **G2 실효 차단:** `seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`의 **기존 실제 v2 경유** Owner가 해당 Attempt에 R28 seal 또는 다른 직접 governed Cost Start가 존재하는지 검증한다. Cost Start만 있고 seal이 없으면 차단한다. seal이 있어도 실제 Provider receipt queue가 정산·ACK되지 않았거나 사용량/금액이 본래 예약과 불일치하면 `seyeon_offline_r28_governed_cost_unsettled`로 차단한다. 독립적으로 해당 단일 interpreter 단계가 정상 정산됐더라도 Preflight·Renderer·Reviewer·모델 출력·최종 공개의 전 구간 증명이 없으므로 `seyeon_offline_r28_complete_provider_lineage_not_approved`로 **답변과 두 Outbox의 COMMIT을 계속 금지**한다. 이전 Cost Start 없는 단순 1/2 원본 **격리 R3 합성 시연**은 유지되므로 이것을 운영의 우회 없는 완결된 정책으로 해석하면 안 된다.
+- **합성 실 DB 테스트 추가:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`는 정당한 두 원본 G1/R35 wire → 실제 Governor 비용 예약 → DB 원본·wire·금액 불변 seal 조회, 기본 실행 역할 ACL, 변경 차단, 생성·검증 상태까지 진행했어도 **실제 G2가 Provider 미정산을 거부**하고 Assistant/Outbox/admission 0건임을 검사한다. 별도 Turn이 Legacy governed Cost Start만 사용해 seal을 건너뛰는 경우에도 G2 거부를 확인한다. 이미 발급된 미사용 예약은 **0원 정산·환불 추정 없이 보수적으로 예산 점유** 상태를 보존한다.
+- **설치 순서:** `test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh`에서 R28 Owner/불변 테이블을 격리 G2 Owner 설치 **전에만** 배치한다. Production migration, 공개 Router, Provider fetch 또는 유료 결제는 수정하지 않는다.
+- **미완료 / 주의:** G4 완료나 실사용 Provider 호출 증빙이 아니다. 현재 원본 0/1/2건/파생 출처를 포괄하는 운영 정책 승인, 모든 Chat Provider 4역할 5호출의 단계별 실제 서명·회계 정산, 원본 철회-v-Provider-commit 동시성, G2 최종 실제 응답/Reader/G3 수신, 운영 롤백·프라이버시 수명은 별도 작업이다. 추가 파일은 **격리 DB 전용**이며 배포/운영 권한 없음. `HOLD_FORWARD_STOPPED`, PR #2761 Draft 유지, 작업은 `feat/security/g4-g5-offline-batch-20261101`에 누적. **CI와 실제 PostgreSQL 검증은 마지막 통합 실행 전까지 미확정**.
+
+
+### 2026-11-01 · W29 · G4 영수증 실정산 검증·G2 단계 보류·비용 장부 삭제 우회 차단 (격리 / HOLD)
+
+- **실제 DB 정산 계약 재사용:** 기존 `cmd_store_seyeon_provider_receipt_v1` → `cmd_claim_seyeon_provider_receipt_v1` → `cmd_governed_settle_seyeon_ai_call_v1` → `cmd_ack_seyeon_provider_receipt_v1`의 영수증 저장·독점 수령·실제 비용 정산·최종 확인 경로를 격리 PG 합성 사례에 결속했다. 테스트 공급자 이벤트는 **실제 OpenAI 응답이 아닌 명시적 synthetic fixture**이며, Provider `fetch`는 **0회**이다. 승인 비용 1,524 microUSD에서 합성 입력 100개 + 출력 50개로 계산된 300 microUSD로 정산되는 시나리오 및 확인 완료를 검증하도록 작성했다. 이 합성 이벤트는 실제 공급자 송신/모델 결과/운영 비용 승인 증거가 절대 아니다.
+- **G2 보강:** `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`의 G4가 존재하는 분기는 단순 `settled` 상태 외에 **실제 같은 Call ID, original wire seal, UTC 예약일, 불변 가격 버전, 정산 금액, 정상 HTTP 200 수신, 입력·출력·캐시·추론 토큰의 정확한 상한, 원문과 정확히 일치하는 ACK된 Provider receipt**까지 DB row 수준에서 확인하도록 보강했다. 일치하지 않으면 Assistant/Chat/Post-turn 발송을 함께 막는다. 위 조건을 모두 만족해도 다른 통제 모델 단계의 출처·응답/비용·검증을 모두 증명할 수 없으므로 `seyeon_offline_r28_complete_provider_lineage_not_approved`로 **항상 HOLD**한다. 실사용 공개를 승인하는 새 예외 경로를 만들지 않았다.
+- **비용 장부 삭제 우회 취약점 수정:** 최초 R28에는 Cost Ledger를 부모로 둔 연쇄 삭제 FK가 존재해, 비용 장부 삭제만으로 원본/wire 검증 기록이 함께 사라지고 해당 Attempt가 예전 단순 G2 합성 경로로 떨어질 수 있었다. `governed_wire_reservations_r28`은 **Cost Ledger FK를 제거**하고 Subject/Thread/Turn/Attempt 수명에 종속된 표식을 유지하도록 수정했다. 장부나 Provider Queue를 개별 삭제해도 현재 Attempt가 남아 있으면 불변 **Governed Attempt 표식이 남아** G2가 반드시 미정산 HOLD를 반환한다. 원본 Subject/Turn/Attempt 삭제 시에는 연쇄 삭제하여 개인정보 보존 의무와 연동하며 일반 API 역할의 SELECT/INSERT/DELETE는 계속 불허한다.
+- **격리 회귀 시나리오:** 두 원본 G1 ContextReady → native wire → 비용 예약 → 합성 Provider receipt → worker claim/settle/ACK → **여전히 G2 커밋 거절**, 이어서 Cost Ledger/Queue 삭제 → Governed 표식 유지 → **여전히 G2 커밋 거절**, 마지막으로 두 번째 원래 Memory Grant 철회 → **G2 커밋 거절**을 추가했다. 예약만 된 다른 Attempt의 금액은 추정 환불 없이 계속 점유. 생성된 Assistant/Outbox/admission은 0건이어야 한다.
+- **한계 및 검증:** 각 보안 시나리오는 실행 명세로 추가되었으며 본 배치에서 실제 PostgreSQL/TypeScript·GitHub CI는 **아직 실행/확정하지 않았다**. 현재 G4 비용 단계의 합성 증빙은 실제 공급자 서명이 아니며, G0 동의/파생 출처·완전 모델 Stage chain, 운영 G1/G2/G3/G4 승격, G5 통합 CI, G6 운영 승인까지 모두 `HOLD_FORWARD_STOPPED`. PR #2761 Draft 유지, 비PR 구현 브랜치 `feat/security/g4-g5-offline-batch-20261101`에 누적, 유료 호출/운영 Migration/서비스 공개 없음.
+
+
+### 2026-11-01 · W30 · 두 원본 다섯 모델 단계 Wire 출처 연결 및 격리 G2 실행권한 최종 차단
+
+- **G2 SQL 필수 복구:** W29에서 토큰 정규식 `$'`가 포함된 문자열을 JavaScript의 일반 `replace(old,new)`에 넘겨, 정규식 뒤부터 `commit_actual_v2_r3` 함수 마지막 부분까지 여러 번 복제하는 **실제 SQL 중복/구문 파손**이 발생했음을 확인했다. 격리 후보의 정상 W28 커밋 `f96fdaaa`를 기초로 W29 정산 증빙 검증 조건을 **함수 기반 replacement**로 재적용했다. SQL 파일은 755→471줄로 복원되었고 CREATE FUNCTION·COMMIT·G2 Owner 함수 종료가 각 1회인 정적 검사까지 마쳤다. 테스트 전 발견·수정된 것이므로 해당 파손 버전의 SQL 실행 성공을 주장하지 않는다.
+- **G1/G4 다섯 단계 선행 증거:** `test/db/seyeon_r30_disposable_five_stage_native_wire_lineage.sql`을 추가했다. 격리 DB에서 기존 R21의 **원본 2개 / SourceSet 2개 Edge / 실제 ContextReady**를 정확히 재검증한 다음, `integrity_classification → disclosure_classification → turn_interpretation → dialogue_render → semantic_review`의 **5개 Stage 모델 전송 예정 데이터**를 순서대로 DB 원본 Grant/JSONB 재조회와 함께 불변 DB receipt로 저장한다. 각 단계의 서로 다른 Call ID, UTF-8 wire 해시, 이전 단계 wire 해시, 요청 byte 길이, 강제 출력 상한 256개를 기록한다. 다음 단계만 인정하고 순서 누락·중복·바꾼 원본/권한 철회·잘못된 네이티브 JSON body는 차단한다. 다른 Stage의 정확한 Production prompt/content provenance가 아니라 **실제 모델 어댑터가 생성한 wire *framing*의 합성 격리 실험**이다. Prompt 또는 개인 원문은 이 metadata 테이블에 저장하지 않는다.
+- **G2 다섯 단계 보완:** R28 원본-wire/비용 예약·단일 Interpreter 정산이 있더라도, R30의 **정확히 5개 Stage receipt와 연결된 선행 wire 해시·정확한 Interpreter Call ID/Wire**가 없으면 별도 `seyeon_offline_r30_native_stage_lineage_incomplete` 또는 mismatch로 중단하도록 수정했다. 다섯 개 모두 있어도 각각의 DB Cost Ledger `settled`/Governor receipt/개별 토큰 상한/Provider Queue ACK가 확인되지 않으면 중단한다. 심지어 모든 metadata/합성 비용 증빙을 만족해도 실제 단계 출력·G0 개인정보 정책·Preflight 파생 원문·안전 출력 결속이 없으므로 마지막 `seyeon_offline_r28_complete_provider_lineage_not_approved`가 **반드시 중단**한다. 어떤 격리 영수증도 유료 호출 또는 공개 승인을 의미하지 않는다.
+- **실제 Provider 어댑터 직렬화 시험 추가:** 기존 `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에 R30용 별도 합성 Turn을 생성하고 실제 앱의 `createOpenAiSeyeonStructuredProviderV1`에서 생산한 **다섯 목적의 실 네이티브 바이트**를 `meteredBeforeDispatch`에서 R30 DB Owner로 넘긴 뒤 **무조건 예외로 차단**하도록 했다. 다섯 단계 순서·DB 해시/앞 단계 결속·중복·건너뛰기·원본 2개·fetch 0회를 검사한다. Interpreter는 실제 `buildSeyeonTurnInterpreterRequestV2`를 재사용하고, 나머지 4개 모델 Stage는 **synthetic/no-original-outside-envelope request**이므로 전체 실 서비스 Prompt chain 검증으로 오인해서는 안 된다. 다섯 Stage 기록만 있고 Cost seal/정산이 없으면 실제 G2 Commit은 거부된다. R26 합성 Interpreter 비용 정산 시험은 5개 Stage 부재 차단으로 판정을 변경했다.
+- **최종 DB 권한 컷오버:** `test/db/seyeon_r31_disposable_g2_forward_stop_cutover.sql`을 추가하고 기존 G2/G3 호환성 테스트를 끝낸 **다음**에만 설치한다. 최종 격리 DB에서 `myeongha_api_executor` 및 기본 웹 역할의 구형 양수 G2 R3 실행 권한과 직접 v1/v2 저장 실행 권한을 회수하며, 별도 새 양수 저장권한은 부여하지 않는다. `test/seyeon-r31-g2-forward-stop-disposable.test.ts`는 서로 다른 실제 API 역할에서 기존 함수 실행이 `42501`로 거절되는지를 검증한다. 무검증/무비용 구형 G2 실험 경로를 **최종 격리 테스트 상태에서 닫아** 덧붙인 검사만으로 보안이 해결된 것으로 오판하지 않는다.
+- **CI/승인:** 변경된 파일과 설치 순서를 대상으로 정적 계약 점검을 수행하되, 사용자의 요청대로 **중간 GitHub Actions CI·실 PostgreSQL 구동·전체 TypeScript 컴파일은 아직 하지 않았다**. 이 모든 결과는 실행 전 미확정이며 G5 PASS가 아니다. 별도 비PR 작업 브랜치 `feat/security/g4-g5-offline-batch-20261101`, 기존 PR #2761 Draft·미병합 유지. 운영 migration/Role/paid Provider/실제 Member private 원문/UI 공개를 바꾸지 않았으며 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W31 · 다섯 단계 원본→Wire→비용 원자 예약 및 실제 DB 정산/최종 저장 HOLD (격리)
+
+- **R26 TypeScript 명백한 컴파일 오류 수정:** 동일 중첩 Subject 트랜잭션 콜백에서 `const proof`를 중복 선언해 R26이 타입 검사 이전에 컴파일될 수 없던 문제를 확인하고, 뒤쪽 DB seal proof를 `sealProof`로 분리했다. 외부 호출·운영 Provider 허가는 변경하지 않았다.
+- **실제 DB 비용 예약을 다섯 단계로 확장:** `test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql`에서 격리 R30 원본 Grant·현재 Memory/SourceSet·순서/현재 native wire 검증을 한 번의 Restricted Owner 함수로 실행한 뒤, **같은 PostgreSQL 트랜잭션 안에서 기존 `cmd_governed_start_seyeon_ai_call_v1`**의 서버 승인 모델 정책·정확한 요금·입력 상한·출력 256·전역/Subject 일별 예산·중복 Call ID 예약을 실행한다. Interpreter는 추가로 기존 R28의 immutable Context/wire/금액 영수증을 같은 트랜잭션에 봉인한다. 실패하면 Stage marker와 Governor reservation이 함께 롤백된다. 모든 Stage admission 결과는 `permitsProvider=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`이며 **실제 모델 송신은 없음**.
+- **Node 실제 native body·서버 정책 연결:** `apps/api/src/seyeon-r32-offline-five-stage-governed-cost-v1.ts`는 서버가 보유한 R21 개인 원본 두 건만의 Context와 모델 출처 선택을 재조립하고, 실제 Responses 어댑터 `meteredBeforeDispatch`의 정확한 직렬화 JSON (모델/강제 출력 cap/무신뢰 데이터 경계 문구/Schema)를 서버가 검증한다. 기존 서버 비용 정책의 원가 계산·인증된 입력 토큰 상한 계약을 호출한 다음, DB R32 Owner 응답의 Stage 순서·원본 선택·wire SHA·비용/날짜·Provider 거부 플래그를 확인한다. 실제 Interpreter 요청은 실 Character request builder와 정확히 같아야 하며, 나머지 4단계는 `fixture=true` 등 **4-key synthetic input**만 허용하여 Preflight/Reader/추가 민감 출처를 실제 인증했다고 위장하지 않는다.
+- **5개 실제 DB Start+영수증 정산 테스트 설계:** 기존 R21 격리 PG 테스트에 앞선 철회 fixture와 독립된 새 원본 둘을 생성하여 G1 ContextReady를 확정하고, 다섯 네이티브 Stage에서 각각 `R30 + Cost Governor Start`가 원자적으로 확정되고 Interpreter가 R28 seal과 일치하는지 검사한다. 실제 공급자 `fetch=0`을 강제한 상태에서 다섯 원금 전부 보수적으로 예약되며, **테스트에서 생성한 가짜 공급자 사용량** (입력100·출력50; 300 microUSD)은 기존 Provider receipt queue → Worker claim → 실제 DB governed settlement → ACK 경로로만 정산한다. 실제 유료 비용/토큰 검증 결과라고 해석해서는 안 된다. 다섯 개 비용 정산을 모두 완료한 **후에도** G2는 `seyeon_offline_r28_complete_provider_lineage_not_approved`로 최종 거부하며 assistant/outbox/positive admission 모두 0건이어야 한다.
+- **예산/중복 원자 회귀 시나리오:** 새로운 격리 Attempt에 예산을 직전 점유액으로 제한한 상태에서 R32 Stage 입장을 시도하고, 실패 시 **Stage marker 0 / Cost ledger 0 / 기존 예산 점유 불변**을 검사한다. 한도를 복구한 뒤 정상 첫 Stage 1건만 예약되고, 같은 Stage 재호출의 새로운 Call ID는 중복으로 차단되며 Provider는 0회 전송한다.
+- **설치·검증 상태:** 격리 runner에 R30 이후 R32 설치, 그 다음에 R21/R26/R30/R32 테스트, 최종 R31 G2 접근권한 회수 순서를 반영. 정적 계약 검사에서 원자 함수 정의, 정확한 원본 Grant, 다섯 Stage 비용·최종 G2 HOLD, SQL 함수 중복 없음, 파일 호출 연결을 확인했다. **실 PostgreSQL/TypeScript·CI는 아직 실행 전이라 PASS를 주장하지 않는다.** 운영 Migration/role activation/유료 호출/PR 병합 없음. G0 정책 동의 전 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### W31 · 검증 요청 경계
+
+- 모든 W26–W31 보안 구현 및 격리 테스트를 단일 누적 커밋으로 Draft PR #2761에 fast-forward 반영했다. 최초 Git ref 동기화 시점에는 해당 SHA에서의 GitHub Actions CI 실행 기록이 확인되지 않았다.
+- 이 문서 변경은 **실제 승인·검증 결과가 아니라** 최종 PR 동기화 이벤트를 통해 CI를 시작하기 위한 비기능적 기록이다. 테스트 성공·실제 Provider 호출·운영 공개·PR 병합을 추정하지 않으며, 실행 결과가 확인되기 전까지 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W33 · G4 두 독립 PostgreSQL 세션: 원본 권한 철회 ↔ 실제 예산 예약 선형화 (격리 / HOLD)
+
+- **실제 G4 경쟁 검증 추가:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에 R33 합성 격리 두 시나리오를 구현. 각 시나리오는 **별도 원본 Memory/정확한 Original Grant 두 건** 및 실제 DB ContextReady를 새 Attempt에 Pin한 뒤, 실제 `createOpenAiSeyeonStructuredProviderV1`의 네이티브 wire를 받은 직후 Provider fetch를 무조건 차단한다. DB에서 `claim_governed_stage_r32`(원본 DB lock → R30 wire 영수증 → 실제 Governor Cost Start)를 서로 독립된 PostgreSQL 접속 두 개로 실행하고, 제3 DB 접속에서 `pg_stat_activity.wait_event_type='Lock'`을 확인해 **실제 잠금 충돌**을 검증한다. 자바스크립트 시간 지연만으로 경쟁을 가정하지 않는다.
+- **철회 먼저:** 철회 Transaction이 Subject를 먼저 `FOR UPDATE`로 잠그고 두 번째 원래 Grant를 폐기하는 동안 비용 예약 Transaction이 차단됨을 확인한다. 철회 COMMIT 뒤에는 `seyeon_r30_original_grant_revoked`로 입장 자체가 실패해야 하며 **Stage marker 0, Cost Ledger 0, 기존 일별 예산 점유 불변**이다. 사전에 확정한 R21 G1 출처/ContextReady는 취소된 Grant에 대한 영구적 호출권으로 해석하지 않는다.
+- **예약 먼저:** 반대로 R32 입장 측이 Subject→Thread→Turn→Attempt→원본 Grant/Memory lock을 확보해 **Stage 0 + 1,524 microUSD 보수적 예약을 동일 DB Transaction에서 확정하기 전까지** 철회 Transaction이 실제 Subject 잠금에서 기다리도록 구성한다. 예약 COMMIT 뒤 철회가 원래 두 번째 Grant를 폐기한다. 기존 미송신 예약 1건은 마음대로 환불하지 않고 유지한다. **다음 Stage는 새로운 Call ID라도** 동일한 폐기 원본 Grant 때문에 실패하며 Stage 1 추가 기록 0, Cost Ledger 추가 0, 예산 추가 점유 0이다.
+- **재승인 우회 금지:** 두 번째 Memory에 새로운 별개 Grant를 재발급한 뒤에도 기존 Attempt의 불변 `original_grant_id`는 바뀌지 않으므로 다음 모델 Stage는 동일한 철회 오류로 중단되어야 한다. 신규 Grant가 옛 Attempt의 G1 Pin을 복원할 수 없다.
+- **운영 경계:** R33은 **격리 테스트만 추가**하며 새 Production migration, Provider dispatch, 비용 정책 시딩, HTTP Reveal/History, 사용자 개인정보 이관 및 G2 공개권한은 전혀 변경하지 않는다. R31 최종 격리 G2 실행권한 회수 후 운영은 계속 `HOLD_FORWARD_STOPPED`이다. 구버전 PR의 CI 그린 사용자 보고는 참고하되 **이번 R33 신규 HEAD의 실제 CI 및 두 독립 PostgreSQL 세션 PASS는 아직 미확정**으로 남긴다.
+
+
+### 2026-11-01 · W34 · 격리 G4 모델 단계의 지시문·응답 스키마·중첩 JSON 위조 차단 (원본 2건, Provider OFF)
+
+- **실제 보안 빈틈:** 기존 R32는 Interpreter 이외의 네 모델 단계에서 `request.input`의 4-key 합성 메타데이터만 Node가 확인했으나, **`request.instructions` 또는 `request.responseSchema`에 승인되지 않은 개인·파생 자료/출력 필드를 추가해도 비용 예약이 가능**했다. DB 소유 함수에는 직접 전달된 native wire의 합성 계약 검증이 없었으므로, 제한된 Executor가 Node 검증을 건너뛰는 경우도 막지 못했다. 외부 Provider 전송은 기존부터 OFF였지만, 내부 영수증에 불명 출처를 합법적 합성 Stage처럼 기록할 수 있는 정합성 결함이었다.
+- **Node 계약 고정:** `apps/api/src/seyeon-r32-offline-five-stage-governed-cost-v1.ts`에 서버 고정 `SEYEON_R32_SYNTHETIC_STAGE_INSTRUCTIONS_V1` 및 `SEYEON_R32_SYNTHETIC_STAGE_SCHEMA_V1`를 정의. 네 비Interpreter Stage의 지시문과 완전한 출력 형식을 정확히 비교하고 `request.input`의 **fixture=true, purpose, selectedSourcesDigest, priorNativeWireDigest 네 필드만** 허용한다. 동일 필드값이라도 누락·추가·잘못된 이전 Stage 해시는 HOLD. 실제 Interpreter는 기존 Character request builder와 정확히 동일한 Node 입력/지시문/스키마 검사 경계를 유지한다.
+- **DB Owner 자체 차단:** `test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql`의 `claim_governed_stage_r32`는 네 합성 Stage의 **진짜 Responses native wire**를 DB 안에서 JSONB로 파싱하여 전체 지시문(무신뢰 데이터 방어 문구 포함), 정확한 JSON Schema, 중첩 입력 JSON `fixture=true` 및 정확한 4개 필드를 별도 검증한다. 응답 스키마에 개인 출력 키를 추가하거나, 입력에서 다른 파생 원문을 섞거나, 합성 여부/Stage 출처를 속이면 `seyeon_r34_synthetic_stage_contract_mismatch`로 **원본 R30 Stage seal·Governor 비용 Start 모두 실행하기 전** 거부한다. 과거 Stage 해시가 DB가 실제 반환한 값과 다른 경우에는 같은 트랜잭션의 R30 단계 기록도 롤백하고 비용 예약 전 중단한다.
+- **직접 SQL 우회 시험:** 신규 R34 격리 PostgreSQL 테스트는 별도 원본 Memory 2개, 실제 R21 ContextReady를 준비한 다음 **Node 검증을 거치지 않고 제한된 Executor 역할로 DB 함수를 직접 호출**한다. 지시문에 새 내용 삽입, 출력 스키마 확장, 중첩 입력에 개인 파생 원문 추가, `fixture=false` 모두 거부되어 Stage/Cost 0건 및 예산 점유 불변이어야 한다. 동일 Call ID의 정상 native body는 제한된 1회 **합성 예약만** 통과해야 하며, 이후 잘못된 이전 Stage 해시는 거부되어 추가 Stage/Cost 0건이다. 각 실제 모델 어댑터 hook은 `fetch=0`을 강제한다.
+- **G0/G2/G3/G5 한계:** 이 규칙은 오직 **4개 합성 단계의 metadata-only wire**에만 적용한다. Interpreter가 포함하는 실제 전체 개인·파생 출처의 DB 독립 재구성과 정확한 모델 결과/Output Guard/HTTP Reveal 승인에 대한 G0-D1~D5는 여전히 미확정. G2는 완전 5단계 정산 뒤에도 항상 최종 HOLD이며, G3 재공개 허가는 없음. 운영 SQL/Role/HTTP 경로, 실제 유료 AI 호출 및 main 병합은 변경하지 않았다.
+- **검증:** 변경된 TS/SQL의 스키마·지시문 동일성과 단계 순서·비용 예약 이전 차단 조건을 정적으로 확인했다. **이번 신규 HEAD의 PostgreSQL/Vitest/TypeScript 및 CI 실행 결과는 아직 확인되지 않았으므로 성공으로 표시하지 않는다.** 사용자가 이전 HEAD의 그린을 알려주셨으나 신규 변경 검증과 구별한다. PR #2761 Draft 및 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-01 · W35 · G0-D3 파생 Context의 DB 독립 음성 판정: Interpreter 원본 둘만 허용 (격리 / Provider 0회)
+
+- **확인된 빈틈과 범위:** 이전 R21/R20의 Node 경계는 과거 Assistant/User 메시지, Relationship Event, Reader/Worker/외부 도구의 출처를 모델 전 사전 차단했고, R32 Node는 전체 합성 Context를 재조립했다. 그러나 **API 실행 역할이 R32 DB Owner를 직접 호출할 때 Interpreter native JSON의 개인/파생 내용은 DB가 독립적으로 검사하지 않았다**. R30은 모델 호출의 형태와 현재 Original Grant만 검사했고, R28의 Context Digest는 호출자가 제공했다. 이 상태에서는 미인가 과거 메시지나 관계 내용이 포함된 *오프라인 단계 영수증*을 예약할 수 있었다. 실제 Provider 접근과 G2 공개는 계속 차단된 상태였다.
+- **실제 DB 유래 확인 구현:** `test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql`의 제한된 `claim_governed_stage_r32`에서 Interpreter Stage의 **실제 모델 전송 예정 JSON 문자열을 DB 내에서 다시 파싱**한다. 정확한 `context` 13필드 및 Interpreter 허용 참조 세트를 요구하며, 최근 User/Assistant 메시지 0개, Relationship/RelationshipSemantics null, Integrity Preflight 미실행·검증 결정 0개, Disclosure 결정 null·비공개 자료 0개, 관계 이벤트 허용 참조 0개가 아니면 **`seyeon_r35_unpinned_derived_interpreter_context`로 거절**한다. 일반 빈집합을 개인 데이터 0건 증거로 바꾸지는 않는다.
+- **원본 Memory 두 건의 현재 출처 결속:** 실제 native `retrievedMemories`는 **정확히 2개**이고, 각 순서는 DB의 불변 R1 Original Source Edge와 일치해야 한다. 모델 Memory ID와 `sourceRef`에 DB가 읽은 정확한 Memory UUID·**원래 Grant UUID**가 들어가야 하며, 다른 관계 이벤트나 파생 Memory를 추가할 수 없다. 현재 합성 실험에서만 `summary='synthetic model projection 0/1'`, `claimKind='fact'`, 정해진 점수·정확한 7필드로 제한한다. 이는 실제 일반 유저의 Memory projection을 합법적으로 허용하는 구현이 아니며, **R30이 같은 트랜잭션에서 현재 Grant/원본 JSONB를 다시 잠금 검증**한 뒤 비용 예약으로 진행한다.
+- **고정 비개인 Context 차단:** 현재 공개 첫 대화의 `integrity`·`disclosure`·`retrievalPolicy`·`behaviorPolicy` 전체 객체가 서버가 정의한 무파생 baseline JSONB와 같아야 한다. 행동 정책이나 구조화된 Context에 승인되지 않은 출처 문장을 숨기면 거절한다. 이는 아직 Character-authored Bible 전체 내용/전체 Interpreter instructions 등을 DB가 독립적으로 인증하는 것을 뜻하지 않으며 **G0-D3 전체 파생 출처 증명·완전 Prompt 인증은 여전히 HOLD**이다.
+- **실제 경계에 직접 주입하는 10개 음성 사례:** 원본 두 건을 R21로 먼저 영속화하고, 5개 네이티브 Stage 중 Interpreter가 정상 예약되기 **직전**, 제한된 DB Executor 역할로 실제 `claim_governed_stage_r32`를 호출해 다음 조작을 시험한다: 과거 Assistant 메시지 추가, Relationship 상태 위조, Integrity Preflight 위조, Disclosure 비공개 자료 추가, 두 번째 원본 Grant 출처 변경, Memory 요약에 과거 관계 내용 삽입, 관계 이벤트 허용 참조 추가, 관계 의미 정보 삽입, `relationship_event` 메모리 추가, 행동 정책에 사적 문장 삽입. **10개 모두 Stage/Cost 기록 2건(선행 Stage 둘) 그대로, 해당 Interpreter 신규 예약 0, 실제 Provider fetch 0회**이어야 한다. 이어 원래 네이티브 Interpreter Stage와 나머지 두 Stage의 합성 DB 비용 예약/정산은 대조 경로로 유지하고, 모든 합성 영수증 정산 이후에도 **G2는 최종 거절**한다.
+- **변경 경계 및 증거:** 기존 격리 R32 함수/테스트를 확장했을 뿐 운영 SQL Migration·역할·G3 HTTP Reveal·실제 AI 키/유료 호출·PR 병합은 변경하지 않는다. 개인 파생 이력의 *긍정적 사용*을 위한 승인된 원본 연결 규칙, 과거 대화 소급 권한, Worker/Reader 출처 검증, 완전한 본문/Prompt 인증은 미구현이며 `HOLD_FORWARD_STOPPED`를 유지한다. 신규 W35 커밋의 TypeScript/Vitest/실 PostgreSQL·통합 CI는 **검증 완료 전까지 PASS 판정 금지**이다. 기존 이전 HEAD의 사용자 보고 그린과 신규 변경을 혼동하지 않는다.
+
+
+### 2026-11-02 · W36 · 승인된 Character/Interpreter 코드 출처를 DB에서 독립적으로 재확인 (격리 / Provider OFF)
+
+- **실제 빈틈:** W35는 네이티브 Interpreter 입력의 원본 두 Memory와 과거 대화/관계/비공개/Preflight 유래 0건을 DB에서 직접 확인하지만, DB Owner가 **Interpreter instructions, responseSchema, Character identity/source Bible, authored Bible slices, fact authority boundaries, action vocabulary**가 검토된 실제 소스 코드와 같은지는 검사하지 않았다. API 역할이 실제 원본 Grants를 소유하더라도 변조된 공개 Character 설정이나 모델 지시문을 합법적인 `G4` 비용 예약 단계로 위장할 수 있었다. 실제 Provider 호출/G2 공개는 기존 HOLD였다.
+- **코드 유래 기준값 생성:** `apps/api/src/seyeon-r36-offline-static-authority-manifest-v1.ts`에서 저장소의 **실제** `assembleSeyeonRuntimeContextV2`와 `buildSeyeonTurnInterpreterRequestV2`를 호출해 현재 승인 후보의 `public_first_contact`, 정확히 두 개의 **합성** 원본 Memory, Derived/Preflight/Disclosure 0건 Context를 구축한다. 서버가 실제 OpenAI 요청에 붙이는 무신뢰 입력 방어문구까지 포함한 instructions, 응답 JSON Schema, Context schemaVersion, Character 정보, authorityBoundaries, Bible slices, actionPolicy, Interpreter 선택 행동·표현·공개 vocabulary를 추출한다. **실제 사용자 Memory·개인원문·Provider key/응답은 이 기준값에 저장하지 않는다.**
+- **DB 불변 기준값:** 새 `test/db/seyeon_r36_disposable_interpreter_static_authority_manifest.sql`은 정확한 격리 PostgreSQL에서만 정적 manifest 테이블을 생성하며, **설치 전용 postgres 세션/역할**에서 출처 코드가 생성한 기준을 1회 INSERT한다. 테이블의 UPDATE/DELETE를 trigger로 거부하고 원본 manifest의 JSONB 정규화 SHA-256을 저장한다. `myeongha_api_executor`, `public`, `anon`, `authenticated`, `service_role`에는 테이블 접근 및 기준값 재설치 권한을 부여하지 않는다. 이 SHA-256은 **CI에서 생성된 코드 결속 fingerprint**이지 외부 승인 서명 또는 실제 배포 코드 서명이 아니다.
+- **실제 Interpreter 비용 전 재검증:** 기존 `test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql`의 제한된 `claim_governed_stage_r32`에서 W35 원본·파생 출처 음성 검사 후 DB가 **원래 설치된 정확한 Interpreter instructions, responseSchema, character/authority/bible/action/vocabulary**와 실제 모델 어댑터의 JSON 필드를 직접 비교한다. 변조되거나 manifest가 없으면 `seyeon_r36_static_authority_manifest_mismatch`로 거부하며 R30 Stage 기록·비용 Governor Start 이전에 완료된다. DB에 보존된 reference_manifest_digest도 실제 컬럼에서 독립 재계산해 비교한다.
+- **격리 설치 순서:** 기존 R21→R30 설치 후 R36 manifest DDL 및 **`test/seyeon-r36-static-authority-manifest-disposable.test.ts`가 실제 런타임 소스로 설치·READBACK·중복 설치 차단·갱신/삭제 불변성·API Executor 42501 접근 거부**를 확인해야만 R32 비용 Owner 설치로 이동한다. 설치된 manifest 정확히 1건 아니면 R32 DDL 설치도 중단한다.
+- **DB 직접 우회 회귀:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`의 실제 DB Inspector/동일 합성 two-original ContextReady/5단계 Cost 테스트에서 Interpreter 대기 중 **8개** 변조 사례(지시문 추가, 출력 스키마 변조, Character Bible Git SHA 위조, 임의 Bible Slice 추가, fact authority 변경, Action policy 임의 확장, Interpreter 허용 행동 참조 확장, Context schemaVersion 위조)를 **API 역할로 직접 DB RPC 호출**한다. 모두 R36 HOLD이며 Stage/Cost 2건에서 증가 0, 이후 올바른 native wire의 Interpreter 등 5단계 합성 비용 예약·정산은 여전히 가능해야 한다. **G2는 합성 정산 완료 후에도 최종 HOLD**를 유지한다.
+- **한계:** Code-derived manifest는 실제 저장소 소스와 CI 격리 DB의 일치성을 확인하는 장치이지 사용자가 G0 지시문·Character 출처를 정식 승인했다는 증거가 아니며, 변경된 소스 자체가 악의적이지 않다는 독립 증명도 아니다. Full Preflight/Reader/Worker private derived positive lineage, 실제 모델 출력/Reviewer 안전성, HTTP Reveal/Replay·유료 호출·운영 DR/G6는 미승인·미구현. **W36 현재 HEAD의 실 PostgreSQL/TypeScript/CI 실행은 확인 전이며 정적 계약 검사만 14개 항목 통과**. PR #2761 Draft, 운영 `HOLD_FORWARD_STOPPED`, 비용 Provider 네트워크 0회, Production SQL/Role 및 main 미변경.
+
+
+### 2026-11-02 · W37 · 다섯 모델 단계 결과 기록·비용 정산·G2 저장의 독립 결속 (격리 / no Provider / HOLD)
+
+- **실제 다음 경계:** W30–W36은 두 원본 Memory/Grant, 실제 Responses 네이티브 요청 wire, Character 고정 지시문 출처, 5개 단계 순서와 원자 Cost Governor Start·합성 사용량 정산을 DB에서 확인한다. 그러나 **각 단계별 로컬 결과 기록은 존재하지 않아** 단계 누락/결과 증빙 손실과 단순 비용 영수증만으로 완성도를 오판할 여지가 있었다. 실제 공급자는 애초에 0회 호출되므로, 여기서 **실제 AI 모델 출력이 존재한다고 주장해서는 안 된다.**
+- **R37 격리 원본·결과 기록:** `test/db/seyeon_r37_disposable_synthetic_stage_result_lineage.sql`에 Attempt+Stage마다 1건인 `synthetic_stage_results_r37`과 제한된 `record_synthetic_stage_result_r37` DB Owner 함수를 추가한다. DB는 이미 R30에 봉인된 같은 Attempt/Stage/Purpose/Call ID/native Wire SHA와 **같은 Cost Governor 예약**의 생존·출력 상한을 확인한 뒤, 정확한 9필드의 `local_synthetic_no_provider` 관측 메타데이터만 INSERT한다. 원문 프롬프트/캐릭터 출력/개인 Memory는 결과 테이블에 저장하지 않고 **합성 결과 JSONB의 PostgreSQL 정규화 SHA-256**만 저장한다. `providerDispatched=false`, `providerOutputVerified=false`, `outputGuardVerified=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`를 고정한다.
+- **취소 후 결과 생성도 차단:** 새 R37 기록 함수는 Subject→Thread→Turn→Attempt의 실제 상태 잠금 다음 **원래 두 Memory/Grant ID 및 현재 활성 상태, granted_at과 원문 JSONB PG SHA**를 직접 잠금 재확인한다. 예약이 먼저 확정됐어도 취소된 Grant를 후속 결과 생성 근거로 사용하지 못한다. 새로운 재승인 Grant도 불변 원래 Grant ID를 대체하지 못한다. 결과 등록은 원본을 묶은 비용 예약 실행 뒤에만 가능하다.
+- **단계 단위 비용 진입·결과 순서:** `test/db/seyeon_r32_disposable_atomic_five_stage_cost_admission.sql`의 기존 R32 Owner에 **이전 Stage R37 결과가 없으면 다음 Stage Governor 비용 예약을 롤백**하는 조건을 추가했다. 결과 없는 Stage 진행, 중복 결과, 불일치 Call ID/목적/네이티브 Wire, Provider 전송 또는 Guard PASS 위조를 허용하지 않는다. `apps/api/src/seyeon-r37-offline-synthetic-stage-result-v1.ts`는 실제 Verified Member 트랜잭션을 이용해 이 **NO-OUTPUT 합성 결과 표식만** 등록하며 Provider 클라이언트/실제 네트워크 호출·개인 원문을 갖지 않는다.
+- **G2 최종 저장 강제 검증:** `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`에 기존 **5단계 Cost Ledger 정산·Provider Queue ACK 확인 이후** 같은 5개 R30 Stage마다 R37 결과 기록이 정확하게 1건씩 있고 Stage 번호·목적·Call ID·wire SHA가 일치하는지 확인한다. 누락·불일치면 `seyeon_offline_r37_stage_result_lineage_incomplete`로 **원자 저장/Outbox 생성 0건**. 모두 존재하고 합성 비용 5건이 정산됐어도 **`seyeon_offline_r28_complete_provider_lineage_not_approved`로 반드시 HOLD**. 이는 실제 공급자 모델 응답·Guard 실행을 허가하거나 증명하는 기능이 아니다.
+- **실제 격리 음성 테스트:** 기존 두 원본·R36 Character manifest·5단계 R32 DB 통합 테스트에 5개 R37 합성 결과 등록/READBACK을 결속한다. Stage 0 결과 기록 전에 Stage 1 새 Call ID·네이티브 Wire로 비용 예약을 시도해 **Stage/Cost 추가 0**을 확인하고, ProviderDispatched=true, OutputGuardVerified=true, `result.verified=true`, 다른 Call ID/Wire digest 등 5개 위조를 거부한다. 같은 결과 반복 등록도 거부하며 API Executor의 직접 SELECT/DELETE 및 Owner 테이블 UPDATE는 차단한다. 합성 비용 전체 정산 뒤 **R37 결과 5건에서도 최종 G2 거부**, 이어 격리 DB 소유자가 Stage 4의 결과 기록 하나를 손실시킨 경우 G2가 독립 누락 조건으로 거절해야 한다.
+- **철회 경쟁 후속 검증:** R33의 **예약 먼저 → 원본 Grant 철회** 실 DB 두 세션 테스트에 R37 결과 등록을 추가로 시도하고, `seyeon_r37_original_grant_revoked` 및 Stage 결과 0건을 확인한다. 비용 예약은 기존처럼 임의 환불하지 않는다.
+- **실제 삭제 및 ACL:** R37 결과 행은 API에서 변경/조회/삭제 불가하고 UPDATE 자체를 거절한다. 그러나 원본 Account/Attempt 보존 정책에 맞춰 FK 삭제 연쇄를 허용한다. 개인정보 삭제 중단을 막기 위해 Owner 테이블의 DELETE 전면 방지 Trigger를 만들지 않았다. 반면 API 임의 DELETE는 계속 42501로 거부한다.
+- **격리 및 승인 경계:** R37 설치는 기존 R30·R36 다음, R32 설치 **이전**이며 기존 Draft PR #2761에만 누적 예정이다. 기존 Production migration/role/HTTP 공개/유료 Provider/main은 변경하지 않는다. 비용 정산의 테스트 영수증은 **합성**, R37 출력은 **실제 모델 출력이 없다는 기록**이다. 현실 G5의 실제 Provider 출력·승인된 Character Output Guard·G0-D1~D5·G3 공개/재생·운영 DR/G6는 계속 `HOLD_FORWARD_STOPPED`. **W37 실 PostgreSQL/Vitest/TypeScript/CI 실행은 아직 확인되지 않았으며 정적 계약 검사 17개 통과만 기록한다.**
+
+
+### 2026-11-02 · W38 · 실제 Character Guard의 합성 거부 4종과 G2 결속, **출력 승인 불가** (격리)
+
+- **G5 다음 작업 범위:** 기존 R37은 모델 5개 단계가 실제로 **Provider를 호출하지 않았다는 합성 결과 표식**을 동일 Native Wire·비용 예약과 결속했지만, 해석/렌더링/의미 검사 코드의 실제 거부 경로는 이 보안 격리 트랙의 DB 증빙으로 독립 검증하지 않았다. 실제 승인된 AI 출력도 없으므로 허위 `guardPass`를 만들거나 테스트 문구만으로 G2 실제 저장을 허용할 수 없다.
+- **실제 도메인 Guard 호출:** `apps/api/src/seyeon-r38-offline-guard-rejection-probes-v1.ts`에서 서버의 실제 `guardSeyeonTurnInterpretationV2`, `admitSeyeonRendererDraftV2`, `guardSeyeonRendererOutputV2`, `guardSeyeonRiskBearingActionCausalityV1`, `buildSeyeonRendererPacketV2`를 **합성 입력에서 직접 실행**한다. ① Interpreter의 존재하지 않는 개인 원본 참조, ② Renderer의 승인되지 않은 비공개 출처 참조, ③ Semantic Review가 현재 발화와 다른 해시를 반환한 경우, ④ Semantic Review에 증거가 있는 실패 코드가 붙은 경우를 정확한 기존 Guard에서 **각각 거부한 경우에만** 네 가지 음성 사례 기록을 만든다. 예기치 않게 검사를 통과하면 해당 테스트/호출은 예외로 중단한다. 모든 후보 입력은 원문이 아닌 `sha256:v1` 지문만 노출한다.
+- **사적 데이터 유입 경계:** R38 음성 실험은 실제 모델에 송신되지 않으며, 오직 R21 두 **합성** Memory의 정확한 `memoryId/sourceRef/Grant`, 고정 요약 `synthetic model projection 0/1`, 정확한 점수/필드 집합만 사용한다. Context 전체를 실제 `assembleSeyeonRuntimeContextV2`로 재조립하여 일치하는 경우에만 검사하므로 이전 채팅·관계 이벤트·임의 Reader/Preflight/사적 Character 설정이 합성 검증으로 위장하지 못한다.
+- **DB 음성 증빙만 영속화:** `test/db/seyeon_r38_disposable_guard_negative_lineage.sql`은 R37 결과가 확정된 Interpreter(2), Renderer(3), Semantic Reviewer(4) 단계에 정확히 연결되는 **4개 거부 사례**의 `guard_negative_probes_r38` 및 제한 Owner `record_guard_negative_probe_r38`를 제공한다. DB는 Subject/Thread/Turn/Attempt, R30 해당 Call ID와 Wire SHA, R37 해당 단계의 **Provider 미호출**, 정확히 두 원래 Memory의 현재 Grant·원문 해시를 같은 트랜잭션에서 잠금 검사한다. 사례 이름·단계·실제 Guard 함수 명칭은 폐쇄 목록이며 `verdict='rejected'`, `origin_kind='local_invalid_fixture_not_provider_output'`, `provider_dispatched=false`, `output_guard_verified=false`만 저장할 수 있다. 음성 후보 원문·AI 답변은 저장하지 않으며 갱신/직접 조회를 API 역할이 수행할 수 없다. 정책에 맞춰 Account/Attempt 삭제 연쇄를 허용한다.
+- **DB 영수증의 한계 명시:** 제한 Executor에게서 넘겨받은 후보 지문과 `rejected` 표시는 **모델·검증 시스템의 실제 실행 서명이나 출력 검증 통과 증거가 아니다.** R38은 합성 음성 결과를 올바른 단계에 연결하는 감사 자료일 뿐이며, 실제 Provider 응답의 출처·Guard PASS 증명으로 승격될 수 없다. 운영 G5는 여전히 미승인이다.
+- **G2 최종 차단:** `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`은 기존 Original Grant/Context/5개 네이티브 Stage/R37 5개 Result/합성 Cost Ledger 정산·Queue ACK 검사 후, R38의 4개 실패 사례가 각각 정확한 Stage·Call ID·Wire·Guard 명칭으로 보존되었는지 확인한다. 누락/위조면 `seyeon_offline_r38_negative_guard_probe_missing`. **전부 존재해도 `seyeon_offline_r28_complete_provider_lineage_not_approved`가 반드시 발생**하며 Assistant/Outbox/positive admission을 만들지 않는다. 이것은 사용자가 승인한 실제 Provider 출력이나 Renderer/Reviewer의 정상 결과를 아직 얻지 못했기 때문이다.
+- **실행 시나리오:** `test/seyeon-r38-real-guard-negative-fixtures.test.ts`는 **DB 없이 실제 Guard 함수 4개 음성 경로**를 실행한다. 기존 실제 격리 PostgreSQL 5단계 테스트는 R38 Owner에 4건을 각각 저장·재조회하고, 무단 PASS 사례·중복·테이블 UPDATE·Executor 직접 SELECT를 거부하며, 네 증빙 중 하나가 삭제되면 비용 영수증이 정산돼도 G2가 누락을 거부하는지 검사한다. R38을 R37 직후·R32 테스트 이전에 설치하도록 실행 스크립트를 연결한다.
+- **미완료/출시 경계:** 실제 유료 Provider에서 돌아온 검증 가능한 요청/응답, 인증된 출력 Guard·Semantic Reviewer 결과, 출처가 완결된 파생 Context를 갖춘 G2 Positive Commit, G3 HTTP Reveal/재생, G0 데이터 사용 동의, G5 통합 승인/G6 운영 전환은 **모두 미완료·HOLD**. 운영 DB Migration/Role·Production Provider/Reveal·main 병합은 변경하지 않는다. 정적 코드·SQL 계약 검사와 새 파일 자체는 실행 결과를 뜻하지 않으므로 **신규 W38 실제 PostgreSQL/TypeScript/Vitest/CI PASS는 별도 확인 전까지 미확정**. Draft PR #2761 및 `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-02 · W39 · 실제 Responses 어댑터의 비용/응답 해시 영속화 실패 차단 (선택적 엄격 모드 / 합성 Fetch / HOLD)
+
+- **확인된 결함:** 기존 `apps/api/src/openai-seyeon-structured-provider-v1.ts`는 `meteredAfterOutcome`이 거부되거나 실제 비용 기록 저장이 실패해도 콘솔에 실패를 기록하고 구조화 결과를 반환할 수 있었다. 따라서 이 기본 동작을 그대로 G4/G5 보안 경로에 연결하면 **유료 응답을 받은 뒤 Cost Ledger/Provider Queue 증빙이 없는데도 다음 Interpreter/Renderer/Reviewer로 진행**할 위험이 있다. 한편 잘못된 JSON/미완료 응답을 성공 사용량으로 기록하는 것도 피해야 한다.
+- **R39 엄격 모드의 원자적 전달 조건:** 서버 전용 `requireDurableOutcomeReceipt:true`를 **명시적으로 선택**한 경우에만 실행되는 차단 경계를 구현. 서버의 `meteredBeforeDispatch`, `meteredAfterOutcome`, `meteredAfterStructuredOutput`, 정확한 모델별 `priceQuote`, provider 출력 토큰 상한이 없거나 명시된 OpenAI 공식 Origin과 다르면 생성 시 거부한다. 기존 비엄격 운영 경로는 수정하지 않는다. 엄격 모드에서는 원본 Response의 완료 상태/ID/모델 일치, 정확한 출력 JSON 객체 및 실제 토큰 사용량·가격 계산이 먼저 검증되어야만 **동일 Call ID 비용 영수증**의 저장이 승인된다. 비용/사용량 모름·저장 실패 시 `OUTCOME_RECEIPT_NOT_DURABLE`로 출력을 전혀 반환하지 않는다. 실패 응답·불완전 JSON을 성공 영수증으로 올리지 않고 실패 사용량 이벤트로 처리한다.
+- **응답 원문은 저장하지 않고 정확한 바이트 지문만 결속:** 두 번째 후속 서버 전용 `meteredAfterStructuredOutput`에 `responseBodyDigest`와 `structuredOutputDigest`(각각 **정확한 수신 UTF-8 바이트 / 추출된 구조화 출력 text의 SHA-256**), Call ID, 목적/모델, 응답 ID를 전달한다. 비용 영수증 완료 **다음에** 출력 해시 영수증 저장이 성공해야만 구조화 결과를 반환하며, 저장 실패 시 `STRUCTURED_OUTPUT_RECEIPT_NOT_DURABLE`. 영수증에는 `originKind='unverified_transport_bytes_only'`, `providerOutputVerified=false`, `outputGuardVerified=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`가 강제된다. 이 둘은 유료 서비스가 서명한 공급자 증빙, DB Owner/사용자 승인, Character Output Guard PASS가 **아니며** 단순 비밀 없는 전송 바이트 지문이다.
+- **네트워크 없는 실제 어댑터 모의 응답:** `test/seyeon-r39-durable-provider-outcome-offline.test.ts`에서 현재 저장소의 OpenAI Responses Fetch 어댑터와 **로컬 `Response` 객체만** 사용한다. 요청 전 Cost 입장 거부 시 Fetch 0회, 성공 합성 응답에서 먼저 비용 기록 완료·그 뒤 출력 바이트 지문 영속화가 끝나기 전에는 반환 0회, 정확한 Request Call ID=비용 Call ID=응답 지문 Call ID, 응답 본문 및 구조화 출력 해시 일치성을 검사한다. 비용 저장 실패·출력 해시 저장 실패·가격/모델/사용량 누락·비공식 Origin·미완료 상태·잘못된 JSON·객체 아닌 JSON·응답 모델/ID 위조는 차단한다. 명시적으로 엄격 모드를 켜지 않은 기존 경로의 레거시 관측 실패 허용 동작은 보존되는지도 별도 시험한다. 테스트는 유료 Provider 네트워크를 수행하지 않는다.
+- **실제 승인되지 않은 영역:** R39의 새 영수증 Hook은 현재 격리 사양에서 **DB Owner 최종 증명 또는 실제 유료 Provider 호출에 연결하지 않았다**. 함수 반환 `Promise<void>`은 서버 Callback의 완료 사실일 뿐 실제 DB 영속화를 독립적으로 인증하는 서명은 아니다. 새 응답의 구조화 JSON 기본 검사 역시 캐릭터 맥락에 대한 실제 Semantic/Output Guard 승인과 동등하지 않다. W38 음성 증빙, R37 무Provider Stage 기록, G2 최종 `seyeon_offline_r28_complete_provider_lineage_not_approved` 차단은 그대로 유지한다. 실제 positive output authority/개인 데이터/HTTP Reveal/운영 Migration/role/Main merge 모두 G0/G5/G6 승인 전 `HOLD_FORWARD_STOPPED`.
+- **검증 상태:** 실제 저장소 `package.json` 기준 Node >=24, TypeScript 6.0.2, Vitest 4.1.11 계약과 코드를 확인했다. 서버 코드·엄격 요청·모의 응답·미승인 공개 차단에 대한 **정적 연결 검사 17개 항목 통과**. 신규 HEAD에 대한 실제 TypeScript·Vitest/실 PostgreSQL/전체 GitHub Actions는 **별도 실행·결과 확인 전 PASS 판정 금지**. PR #2761 Draft, 운영 Production Route·유료 AI 발송·본번 DB 변경·병합 없음.
+
+
+### 2026-11-02 · W40 · 합성 출력 바이트 지문을 원본 Grant·네이티브 Wire·정산 비용에 DB 독립 결속 (격리 / HOLD)
+
+- **실제 전 단계 결손:** W39는 기존 OpenAI Responses 어댑터의 선택적 엄격 모드에서 `meteredAfterOutcome` 비용 영수증과 `meteredAfterStructuredOutput` 두 개의 **원문 없는 SHA-256 지문**이 저장되기 전에 출력을 반환하지 않도록 했다. 하지만 이 Callback의 `Promise<void>`만으로는 **원본 Memory/Grant와 해당 Stage/Call ID/Cost Ledger가 정확히 같은 Attempt인지** DB Owner가 독립적으로 증명하지 못한다. W40은 이 마지막 결속의 **격리 후보 구현**이지 실제 유료 전송이나 정상 출력 PASS를 승인하는 작업이 아니다.
+- **실제 DB Owner 경계:** `test/db/seyeon_r40_disposable_unverified_transport_lineage.sql`에서 명명된 PostgreSQL 격리 DB에 한정하여, `unverified_transport_lineage_r40`과 `record_unverified_transport_r40`를 설치한다. (Attempt, Stage)당 1건인 불변 기록은 기존 R30 요청 Native Wire SHA, R37 해당 Stage 로컬 NO-PROVIDER 결과, **동일 Call ID** 및 모의 Responses 식별자, 실제 수신 본문/구조화 출력의 SHA-256 지문만 보존한다. **원문 프롬프트·Memory 본문·모델 응답 문자열은 저장하지 않는다.** API 직접 테이블 SELECT/INSERT/UPDATE/DELETE는 금지하고, 개인정보 삭제용 Attempt FK Cascade는 유지한다.
+- **현재 권한 및 비용 재검증:** DB는 Subject→Thread→Turn→Attempt의 활성 상태를 잠그고, R1에 봉인된 **원래 두 Memory/Grant**의 ID, 철회 여부, `granted_at`, 원본 JSONB digest를 재검증한다. 그 다음 R30 Stage Purpose/Call ID/native Wire와 R37 동일 Stage 봉인 및 **기존 Cost Governor의 `settled` 상태와 `response_received` 합성 이벤트/Provider Receipt Queue ACK**까지 일치하는 경우에만 R40 기록을 허용한다. 과거 예약이 있더라도 Grant 철회, 변경, 다른 Attempt·다른 Stage, 미정산/미ACK 비용은 모두 차단한다.
+- **공급자·출력 검증의 신뢰 수준 제한:** R39 어댑터가 제공하는 `SeyeonUnverifiedTransportOutputReceiptV1`의 정확한 13필드 `originKind='unverified_transport_bytes_only'`, `providerOutputVerified=false`, `outputGuardVerified=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`만 인정한다. **DB는 독립 원문/공급자 서명을 볼 수 없으므로 해시값의 실제 응답 유래 자체를 증명하지 않는다.** 아울러 현재 격리 DB는 `resp_r40_synthetic_...`로 시작하는 로컬 모의 Response ID만 허용한다. 실제 OpenAI 응답 ID나 개인 유래 정보를 이 테이블에 넣을 수 없고, R37의 `no_provider_output`과 모순되는 운영 증명으로 승격시키지 않는다.
+- **Node 호출 결속:** `apps/api/src/seyeon-r40-offline-unverified-transport-db-v1.ts`의 `recordSeyeonR40UnverifiedMockTransportV1`에서 R21 영속 원본 Pin과 기존 R32 예약 반환값, W39 출력 지문 타입을 연결한다. Verified Member Subject Transaction 및 고정 격리 DB만 사용한다. Callback 반환값의 Call ID/Stage/Wire/지문과 DB Owner 반환값을 다시 비교하고 어떤 거부든 **`R40_UNVERIFIED_TRANSPORT_NOT_OUTPUT_AUTHORITY`**로 fail closed 한다. Production Provider, HTTP Reply, real Guard PASS, 운영 DB Trigger/Migration에는 연결하지 않았다.
+- **G2 강제 누락 확인 후 영구 HOLD:** `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`의 기존 5개 Cost 정산·R30 요청·R37 합성 결과·R38 거부 Guard 증빙을 확인한 다음, R40 합성 출력 지문 **정확히 5개**가 동일 요청/Stage/Purpose/Call/Wire에 결속되어 있는지 다시 검사한다. 누락/변조는 `seyeon_offline_r40_unverified_transport_lineage_missing`로 중단. **모든 R40 지문이 있어도 반드시 `seyeon_offline_r28_complete_provider_lineage_not_approved`로 G2 저장·Outbox·HTTP Reveal을 차단**한다.
+- **격리 시험 확장:** 기존 R21 두 개 합성 원본·5단계 R32 진입·R37 5건·R38 거부 4건의 PG 테스트에서, 비용 정산 전 R40 등록은 `seyeon_r40_governed_cost_not_settled`로 0건이어야 한다. 합성 비용 5개가 정산되면 각 R40 stub fingerprint를 기록하고 정확한 5개 Readback, 위조 `providerOutputVerified=true`, 다른 Native Wire, 비합성 응답 ID, 중복 등록, API 직독/삭제·Owner UPDATE 등을 거부한다. 최종 G2는 합성 기록이 모두 있어도 HOLD, 지문 하나를 잃으면 R40 누락 전용 오류다. R33의 **예약 후 Grant 철회** 경쟁에서도 R40 등록 0건을 검사한다. 테스트는 실제 외부 AI/유료 호출 없이 합성 digest만 사용한다.
+- **현행 경계/남은 위험:** R39의 Callback 결과와 DB가 연결되는 후보 구현은 있으나 실제 Provider 경로에서 비용 영수증을 DB에 확정하는 Server Hook과 Output Guard PASS의 독립 승인/실제 모델 응답 인증, G0 파생 출처 권한 정책 및 G3 Reveal Streaming/Replay 운영 승인은 아직 없다. `HOLD_FORWARD_STOPPED`를 유지하고 운영 Migration·배포 Role·유료 Provider/실제 HTTP 공개/PR 병합은 변경하지 않는다. W40 신규 HEAD의 PostgreSQL/Vitest/TypeScript/GitHub Actions 실제 실행이 확인되기 전까지 PASS로 표시하지 않는다.
+
+
+### 2026-11-02 · W41 · 실제 세연 도메인 Guard의 고정 합성 통과 지문과 DB Original/Cost/Output 결속 (격리 / HOLD)
+
+- **G5 미완성 경계:** W40은 현재 Original Memory 2건·불변 Grant, R30 실제 Native Request SHA, 5단계 비용 정산과 ACK를 **합성** Response SHA에 연결한다. 그러나 `structuredOutputDigest`가 승인된 세연 Interpreter/Renderer/Semantic Review 함수에서 허용되는 **실제 결과 형식과 일치하는지**는 아직 별개였다. 그래서 비정상 원문을 SHA 포맷만 맞춰 제출해도 R40의 `unverified` 장부에 들어갈 수 있었다. G2 최종 차단은 계속 존재했다.
+- **코드 생성 고정 합성 통과 기준:** 신규 `apps/api/src/seyeon-r41-offline-actual-guard-fixture-v1.ts`는 실제 `guardSeyeonTurnInterpretationV2`, `guardSeyeonRiskBearingActionCausalityV1`, `buildSeyeonRendererPacketV2`, `admitSeyeonRendererDraftV2`, `guardSeyeonRendererOutputV2`를 **Provider 0회/공개 첫 대화/원본 두 개 합성 Memory/파생 이력 0건**에 대해 실행한다. 앞단 R38의 4개 **거부 사례**도 같은 정확한 서버 Context 기준으로 다시 검증한다. 공개 인삿말 하나의 정상 합성 Interpreter/Renderer/Reviewer 세 JSON을 실제 도메인 Guard가 허용한 경우에만 raw structured output UTF-8 SHA-256 3개, 발화 SHA, 최종 Guarded Envelope SHA를 생성한다. 실제 모델 결과, 개인 원문, 유료 공급자 HTTP 또는 Character/사용자 승인을 생성하지 않는다.
+- **한 번만 설치되는 코드 유래 기준값:** 신규 `test/db/seyeon_r41_disposable_local_guard_fixture_manifest.sql`의 `local_guard_fixture_manifest_r41`은 **명명된 격리 PostgreSQL + postgres 설치 세션에서만** 이 5개 지문을 1회 설치할 수 있다. 해당 테이블은 UPDATE/DELETE 불변이고 API 실행 역할은 읽기/재설치 불가. `test/seyeon-r41-local-guard-fixture-manifest-disposable.test.ts`가 실제 TypeScript 도메인 검사를 실행해 생성된 지문으로 설치·중복/위조·역할 ACL을 검증한다. 이 기준값은 **코드 유래 합성 fixture fingerprint**이며 독립된 실제 출력 서명·검증 실행 증명이 아니다. DB에 값을 넘긴 실행 주체가 실제 Guard 실행 사실을 암호학적으로 보증하는 것은 아니고, 격리 CI가 코드 유래 출력과 일치하는지를 비교한다.
+- **원본 권한·세 단계 출력·가격 영수증 묶음:** `record_local_guard_fixture_r41` DB Owner는 Subject→Thread→Turn→Attempt, R1 봉인된 **원래 두 Memory/Grant 현재 활성·발급 시각·PG 원문 SHA**를 잠근 뒤, Interpreter(2), Renderer(3), Semantic Review(4)의 R30 동일 Stage Call ID/Source SHA, R40 동일 Call ID/native Wire 및 **코드 생성 3개 Structured Output SHA**, 기존 G4 Cost Ledger `settled` 및 Provider Receipt Queue ACK를 전부 재확인한다. 하나라도 다르면 DB 트랜잭션 거부. 통과하면 Attempt당 1건의 `local_guard_fixture_lineage_r41`에 Call ID/원본 선택 SHA/가드된 합성 발화 Envelope SHA만 저장하며 **Provider/G2/Reveal/OutputGuard 성공 권한은 모두 false**. API 직접 테이블 읽기·수정·삭제 불가, Attempt 개인정보 삭제 Cascade는 보존한다.
+- **서버 연결:** `apps/api/src/seyeon-r41-offline-guard-fixture-db-v1.ts`는 현재 Verified Member·기존 R21 원본 Pin·R32 Stage 2~4 예약과 `finalModelContext`를 받아 **실제 Guard 함수를 다시 실행한 합성 값**을 고정 DB에 기록한다. R37/R38/R40과 동일한 격리 인증/Transaction만 사용한다. 별도의 실제 모델 응답 또는 임의 `passed:true`를 받지 않으며 DB 영수증의 Call ID/Original SHA/false 상태를 재비교한다.
+- **G2 최종 안전 거부:** 기존 `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`은 R37 5개 무Provider 표식, R38 네 부정 Guard 증빙, R40 다섯 합성 Response 지문 이후 **R41 1개와 실제 Stage 2/3/4 Call/모델 출력 SHA/불변 Manifest의 완전 일치**를 추가 확인한다. 없거나 불일치하면 `seyeon_offline_r41_local_guard_fixture_lineage_missing`; 일치하더라도 **무조건 `seyeon_offline_r28_complete_provider_lineage_not_approved`**. 실제 AI가 답했거나 실제 사용자의 캐릭터 출력이 승인됐다는 의미는 전혀 없다.
+- **DB 격리 회귀:** 기존 5단계 테스트의 R40 Stage 2~4 임의 `{"ok":true}` 해시를 **코드 실제 통과 합성 출력 JSON 지문**으로 교체한다. R41 증빙 누락, 임의 최종 Envelope SHA, 잘못된 Call ID, R40에는 들어갔지만 코드 유래 합성 출력과 다른 Semantic Review SHA, 증빙 중복·무단 UPDATE/SELECT, 증빙 삭제 후 G2 누락 검출 및 재설치를 시험한다. 예약 후 원본 Grant 철회 경쟁에서도 R41은 `seyeon_r41_original_grant_revoked`로 거부되어야 한다. 외부 API 호출은 계속 0회다.
+- **격리 설치 및 출시 경계:** G1 R21·G4 R30·R36·R37/R38·R40 설치 후 R41 DDL 및 실제 Guard 생성 Vitest 설치가 **R32 실제 5단계 격리 테스트보다 먼저** 실행되도록 `test/db/seyeon_r2_disposable_actual_v2_revoke_race.sh`에 연결한다. 기존 운영 Migration/role/유료 모델·main/실 HTTP 공개는 변경하지 않았다. 실제 AI Provider 응답 진위, 사용자 승인, 비공개 출처의 Positive Lineage, 실제 런타임 Guard PASS의 위조 불가능한 attestation, G3 공개/리플레이는 모두 **`HOLD_FORWARD_STOPPED`**이며 남은 G0/G5/G6 작업이다.
+- **검증 판정:** 본 W41은 코드·SQL·테스트·로드맵 문서의 구현으로만 기록한다. 정적 계약 연결 검사와 신규 HEAD 실제 TypeScript/Vitest/PG/CI 실행은 서로 다른 증거로 관리하며, **현재 신규 커밋의 실 DB/Vitest/GitHub Actions 성공 결과를 아직 확인하지 않았다.**
+
+
+### 2026-11-02 · W42 · 격리 DB 자체 HMAC 발급·재검증으로 합성 검사 기록 위조·재사용 방지 (G5 / HOLD)
+
+- **실제 미비점:** W41은 승인된 코드에서 실행된 Interpreter/Renderer/Semantic Review의 고정 공개 합성 결과 SHA를 DB의 현재 Original Grants·Native Stage/Call ID·R40 Local Output/Cost ACK와 비교한다. 그러나 API 역할이 제출한 임의의 `passed=true` 같은 표식을 출처로 삼지 않는 것과 별개로, **DB 자신이 발급한, 특정 Attempt·정확한 Call·발급 시각에 결속된 위조 방지 기록**은 없었다. 이 경계를 새로 만들어도 **실제 AI 공급자 응답의 독립 서명·진위 증명은 아니다.**
+- **진짜 DB 소유 HMAC 키·발급:** `test/db/seyeon_r42_disposable_db_issued_local_evidence_seal.sql`은 이름이 정확히 `myeongha_seyeon_positive_pin_candidate_test`인 폐기형 PostgreSQL에만 `pgcrypto` HMAC을 설치한다. 매번 32바이트 난수로 생성된 `local_guard_seal_key_r42` 비밀키는 DB Owner만 접근하고, `myeongha_api_executor`/공용 인증 역할에게 직접 SELECT/INSERT/UPDATE/DELETE를 허용하지 않는다. R42에 필요한 지문·Stage/Call·Original·비용 장부가 일치할 때에만 `issue_local_guard_seal_r42` DB Owner가 서명을 발급한다. 클라이언트가 서명이나 `검사 통과` Boolean, 모델 출력 원문을 제출하지 않는다.
+- **서명 입력과 수명:** canonical JSONB payload에 `schemaVersion`, `originKind=db_sealed_local_fixture_no_provider`, 정확한 Attempt ID, 원본 선택 SHA, R41 Interpreter/Renderer/Semantic Reviewer **3개 실제 격리 Call ID**, 이미 코드에서 결정된 Guarded Envelope SHA, 발급/만료 시각(UTC epoch microseconds), 1회 난수 nonce와 **모든 승인/공개 권한=false**를 포함한다. HMAC-SHA256 비밀키는 서버 DB 밖으로 출력되지 않는다. 서명은 고정 1시간 상한이며 Attempt당 1개만 발급한다. 반환 영수증에는 비밀키나 서명 원문이 아니라 **서명의 별도 SHA-256 지문과 상태 false**만 공개한다.
+- **기록 당시와 검증 시점의 원본 재확인:** DB 발급 경로는 활성 Subject→Thread→Turn→Attempt를 먼저 잠그고, R1 원래 두 Memory/Grant의 ID, 활성 상태, granted_at 및 JSONB SHA를 **현재 DB에서 다시 확인**한 뒤, R41 고정 지문·R30 정확한 Stage/Call/Wire·R40 같은 모델 출력 SHA·기존 G4 비용 `settled`와 ACK를 검증한다. `verify_local_guard_seal_r42(subject,attempt)`는 재생 가능한 클라이언트 입력 MAC을 받지 않고, 그 Member Subject 컨텍스트·한정 DB·만료·nonce/서명·R41 증빙 일치를 확인한다. 특히 **발급 후에도 기존 원본 Grant 2건의 활성·원문 상태를 다시 잠그고** 만료/철회·변조된 기록이면 false를 반환한다. 원본 Grant 재발급은 기존 원본 ID를 대체하지 못한다.
+- **직접 호출 권한과 삭제:** `apps/api/src/seyeon-r42-offline-db-issued-local-seal-v1.ts`는 기존 Verified Member Subject Transaction에서 W41 로컬 합성 Guard 증빙과 DB 자체 발급/검증을 **동일 트랜잭션**으로 완료하고 false 권한만 반환한다. HMAC 비밀키와 원본 MAC은 반환하지 않는다. 임의 클라이언트/익명 사용자는 발급 RPC 실행 권한이 없고, API Executor는 비밀키/실제 서명 행을 직접 조회하거나 임의 작성·삭제할 수 없다. R41 Witness 삭제 또는 계정/Attempt 삭제 시 서명 행은 **개인정보 삭제 Cascade**로 소멸한다. HMAC 키 행은 불변이며 격리 DB 수명에 종속된다.
+- **G2 저장 차단 강화:** `test/db/seyeon_g2_actual_v2_atomic_positive_candidate_r3.sql`에서 앞선 모든 R1/R21, R30–R41 Original/Native/Cost/Guard/Mock SHA 검증 후 **DB Owner의 `verify_local_guard_seal_r42(p_subject,p_attempt)=true`**만을 요구한다. 미발급/변조/만료/원본 권한 철회 시 `seyeon_offline_r42_db_issued_local_seal_missing`로 거부한다. 서명이 유효하고 모든 합성 원본·비용·로컬 Guard 검증을 충족하더라도 **마지막 `seyeon_offline_r28_complete_provider_lineage_not_approved`가 무조건 발생**, 실제 모델 출력을 저장/발송/공개하지 않는다. 이는 DB 소유 HMAC이 **실제 OpenAI 응답의 비위조 가능성을 증명하지 못하기 때문**이다.
+- **격리 통합 회귀:** 기존 R32/R41 5단계 실 PG 테스트에 R42 미발급 시 G2 거절, API의 비밀키·서명 행 읽기/삭제 42501, 발급 후 같은 Member·Call/Source SHA 확인, 중복 발급 거부, Owner가 삽입한 **형식만 맞는 가짜 HMAC** 검증 실패, 1시간 만료 후 false, 서명 행 위조 UPDATE 거부 및 정상 합성 기록 전체 이후 G2 영구 HOLD를 추가한다. 기존 R33 예약 먼저→원본 Grant 철회 시 발급 0건, W42 **발급 이후 원본 Grant 철회 시에도 재검증 false**를 명시한다. 테스트 실행 스크립트는 R41 코드 기준값 설치 직후 R42 DB HMAC 설치, 그 다음 R32/G2 테스트 순서를 고정한다.
+- **한계 및 미승인 항목:** W42 HMAC은 DB 자신이 발급한 **합성 fixture 검증 시점 기록**의 무결성을 보호한다. HMAC 비밀키 보유 DB Owner/운영 DB 권한 탈취까지 독립적으로 방어하는 하드웨어 원격 증명이나 실제 Provider 응답 서명은 아니다. 전체 파생 개인 출처/Preflight positive 허가, 실제 유료 OpenAI Request/Response 원본 신뢰 경로, 실제 Character Guard PASS 판정의 독립 실행 증명, HTTP Reveal/Replay 및 운영 G0/G5/G6 정식 승인은 여전히 없다. 실제 운영 데이터/Role/유료 Provider/병합은 변경하지 않으며 **`HOLD_FORWARD_STOPPED`** 유지. W42 신규 HEAD의 실 PostgreSQL/Vitest/TypeScript/전체 GitHub Actions 성공은 실행 증거가 확인되기 전까지 PASS로 주장하지 않는다.
+
+
+### 2026-11-02 · W43 · 일반 API와 출력 검사 전용 발급자 역할 분리, 오래된 서명 재검증 차단 (G5 격리 / HOLD)
+
+- **확인된 신뢰 경계:** W42는 DB가 자신만의 비밀키로 합성 Guard 지문의 HMAC을 발급·확인했지만, 일반 `myeongha_api_executor` 역할에 **서명 발급·검증 함수의 직접 실행 권한이 동시에 남아 있었다**. HMAC 키를 읽지 못하더라도 일반 요청 경로가 DB 서명 발급을 직접 시작한다면, 모델 검사 실행 주체와 증빙 발급 책임이 구분되지 않는다. 특히 **W42의 합성 HMAC은 실제 OpenAI 결과의 진위나 실제 Guard PASS 증명이 아니며**, 전 단계 실 PG/TypeScript CI의 실행 결과도 아직 확인되지 않았다.
+- **격리 역할 권한 분리:** `test/db/seyeon_r43_disposable_validator_role_split.sql`에서 명명된 Disposable PG에만 `myeongha_seyeon_guard_evaluator_r43 NOLOGIN NOINHERIT` 역할을 만든다. 일반 `myeongha_api_executor`, PUBLIC, anon, authenticated, service_role의 R42 발급 `issue_local_guard_seal_r42` 및 검증 `verify_local_guard_seal_r42` 직접 실행 권한을 **철회**하고, 오직 검증 전용 역할에 해당 두 RPC EXECUTE만 부여한다. 원본 HMAC 키/서명 행/검증 원본 R41 테이블은 검증 전용 역할에도 **직접 SELECT/INSERT가 허용되지 않는다**. 일반 API 역할은 이 새 역할의 MEMBER가 아니며, 모든 ACL을 SQL 자체에서 검증한다. G2의 기존 DB Owner 내부 검증은 유지된다.
+- **서버 처리 분리:** `apps/api/src/seyeon-r43-offline-validator-session-v1.ts`는 기존 일반 API Member 인증 트랜잭션에서 정확한 Subject만 해석하고, 이를 **별도의 검증 전용 Pool/트랜잭션**으로 전달한다. 검증 전용 트랜잭션은 별도 Role, Subject 바인딩, 현재 DB/Role 검사를 거친 뒤 R42 DB Owner 발급과 현재 DB 재검증을 한 트랜잭션 내 수행한다. 일반 API Pool을 서명 발급 Pool로 재사용하거나 `passed:true` 등 임의 출처 주장을 전달하면 즉시 거부한다. 기존 W42 일반 API 발급 래퍼는 컷오버 후 **권한 오류로 거부**되어야 한다.
+- **중요한 실제 분리 수준:** 본 통합 시험은 폐기형 PG의 `postgres` 슈퍼유저로 두 개의 물리 Pool을 만들어 `SET LOCAL ROLE`을 수행하므로 **두 개의 독립된 운영 자격증명을 확보했다는 의미는 아니다**. PostgreSQL의 일반 로그인은 역할 멤버십/SET 옵션이 없으면 다른 역할로 전환할 수 없지만, CI의 슈퍼유저는 전환 가능하다. 실제 서비스에서 완전한 분리가 필요하면 별도 최소권한 비슈퍼유저 Credential·배포 경계·서버 검증 실행 출처와 DB 발급자의 분리를 추가로 검증해야 하며, 이 작업은 G0/G5 승인 전 운영에 반영하지 않는다.
+- **검증 시점 재확인:** R42 DB Owner 검증 함수는 기존 Member Context, 현재 두 **원래 Memory/Grant**, HMAC nonce/만료 확인뿐 아니라 **현재 활성 Subject/Thread/Turn/Attempt**을 같은 잠금 순서로 검증한다. 이미 서명한 지문이라도 R41 code-authored Manifest/Stage 2–4의 정확한 Native Wire/출력 SHA, 현재 G4 비용 `settled` 및 Queue ACK를 재대조한다. 발급 후 원래 Grant가 철회되거나 R40 출력·정산 영수증이 없어지면 서명 자체가 남아도 검증 결과는 `false`; 재발급 Grant나 과거 서명으로 권한을 복원할 수 없다.
+- **테스트/배포 경계:** `test/seyeon-positive-r21-two-source-context-ready-disposable.test.ts`에서 일반 API의 직접 R42 발급/검증 42501, 기존 API 발급 래퍼의 거부, 별도 검증 역할 전용 발급/검증 성공, 동일 원본·Stage 출처/false 권한, 서명 위조/만료/중복 및 **서명 후 R40 결과 삭제/Grant 철회 시 재검증 false**를 다룬다. `test/seyeon-r43-validator-role-separation-offline.test.ts`에서는 PostgreSQL 연결 전 같은 Pool 재사용·위조 Guard PASS·다른 Attempt/출처를 차단한다. 기존 실행 스크립트는 R42 설치 뒤 **R43 권한 컷오버를 먼저 적용**한 다음 R32/G2 전체 격리 시나리오를 수행한다.
+- **영구 HOLD:** 역할 ACL과 DB HMAC의 유효성은 **실제 모델 응답의 서명/독립 인증, 사용자 private 출처 승인, 실제 Character Output Guard PASS, G2 긍정 Commit, G3 HTTP Reveal/Replay의 허가가 아니다.** 운영 DB Migration/Role·유료 AI·외부 문의·main 병합은 변경하지 않으며 `seyeon_offline_r28_complete_provider_lineage_not_approved`와 `HOLD_FORWARD_STOPPED`를 유지한다. W43 신규 HEAD의 실제 PostgreSQL/TypeScript/Vitest/Actions 전체 성공은 별도로 확인되기 전까지 미확정이다.
+
+
+### 2026-11-02 · W44 · 실제 AI Responses 출력 경계에서 혼입·역할 위조 차단 (운영 미승격 / HOLD)
+
+- **AI 고유 위험 수정:** 기존 OpenAI Responses 파서는 정확히 한 개의 `output_text`만 찾아도 다른 `output` 요소를 조용히 건너뛰었다. 그래서 구조화 JSON처럼 보이는 답변과 미승인 도구 호출이 한 응답에 혼재해도 어댑터가 무시한 쪽의 권한 주장·행동을 감지하지 못할 수 있었다. 실제 생성 텍스트의 신뢰 출처 경계를 직접 수정한다.
+- **모델 출력 수용 기준:** 실제 Provider 어댑터의 공통 파서는 완료된 assistant 메시지 **한 건 + JSON text 한 건**만 허용하고, 추론용 `reasoning` 항목을 제외한 임의 tool/auxiliary output, 다중 메시지, user/other role, 진행 중 메시지, commentary, 알 수 없는 content 타입은 모두 거부한다. 엄격 비용·영속 증빙 모드는 `object=response`, 필수 assistant role, 기존 Response ID·요청 모델 결속까지 확인하고 **비정상 출력은 성공 비용·출력 지문 영수증 전에** 거부한다. Legacy mock 호환을 위해 role 누락의 기존 비엄격 fixture만 유지한다.
+- **증거와 범위:** 실제 `createOpenAiSeyeonStructuredProviderV1.generate()` 경로에 합성 HTTP 응답을 공급하는 오프라인 부정·정상 테스트를 추가한다. 실제 OpenAI 서버의 서명을 발급하거나 사용하지 않으며, Provider 진위·의미 안전·실사용자 Consent·G2 Commit/G3 HTTP Reveal 통과를 주장하지 않는다. 개인정보 Projector, 운영 DB, 공개 Route, 유료 AI, PR 병합은 변경하지 않는다.
+- **남은 작업:** 실제 서버가 생성·사용한 Input/Output/Guard 결과를 동일 Call ID 및 DB Owner 검증으로 연결하고, G0에서 승인한 출처·철회 정책 아래 실제 PostgreSQL 두 세션과 HTTP 공개 검증을 완료해야 한다. `HOLD_FORWARD_STOPPED` 유지; 신규 HEAD 실제 CI/TS/Vitest/PG 통과는 확인 전 미확정이다.
+
+
+### 2026-11-02 · W45 · G1 모델 호출 전 DB 원본 User↔Memory 출처 결속 강화 (격리 / HOLD)
+
+- **해결한 AI 입력 출처 문제:** 기존 G1 Positive Pin은 한 Memory와 정확한 Grant, 서버 생성 Final Context 해시를 DB에 고정했지만, 동일 Turn의 *현재 User 원문*이 실제 DB의 원본인지 DB가 독립적으로 증명하는 필드는 없었다. 문자열 SourceRef나 모델 요약을 이용한 원본 주장은 승인하지 않는다.
+- **실제 owner 경계:** S0 격리 SQL `01-source-pin.sql`은 Subject→planned Turn을 잠근 후 같은 Subject/Thread/Turn의 메시지 **정확히 1건**, User sender·비redacted·본문·해시·Character 필드 없음 조건을 확인한다. 그 DB 원본의 Message ID와 원문 UTF-8 SHA-256 지문을 기존 불변 G1 Attempt Pin에 함께 보존한다. 새 원문 복제 테이블이나 별도의 공개 API는 만들지 않는다.
+- **실제 서버 결속:** 기존 `pinBeforeModel` 호출은 서버에서 DB Receive 결과로 얻은 current User ID/텍스트 지문을 보낸다. DB가 반환한 고정 User ID·본문 지문이 다르거나 추가/누락 필드가 있으면 최초 모델 호출 전 거부한다. 정확한 원본 Memory/Grant·Final Context 검증은 그대로 유지한다.
+- **경계:** 격리 Source-only, 자동 운영 Migration 없음. 이 검증은 원문 User 대화에 **인용되거나 복사된 다른 비공개 자료의 파생 출처**까지 승인하는 것이 아니다. 일반 History, Reader, Life Fact와 Preflight private 자료는 여전히 HOLD; 실제 모델 제공자·결제·G2/Reveal 허가 없음. 비활성 Production Projector·Route와 `HOLD_FORWARD_STOPPED` 유지.
+- **검증:** 기존 G1 exact owner receipt test에 본문·메시지 ID 변조와 원문 DB 수 검증 SQL 계약을 추가. HEAD TypeScript/Vitest/실 PostgreSQL/CI는 별도 실행 근거 없이는 PASS 선언하지 않는다.
+
+
+### 2026-11-02 · W46 · 이전 AI 답변의 원본 사용자 질문까지 G0/G2/G3 현재 권한 검증에 결속 (격리 / HOLD)
+
+- **실제 보안 결손:** W45는 사용자 원문 Message ID·UTF-8 SHA를 모델 이전 불변 G1 Pin에 포함했으나, 실제 G0 과거 Assistant 출처 판단은 기존 Memory/Grant만 재검증했고 G2는 현재 Turn의 User ID만 대조했다. 원래 User 원문이 삭제·수정·redact된 뒤에도 과거 Assistant가 모델 입력/재공개 권한 증빙으로 인정되는 위험이 있었다.
+- **G0 파생 출처 재검증:** 기존 `assert_current_original_assistant_lineage_v1`에서 보존한 **원래 DB User Message ID와 본문 SHA**가 현재 같은 Subject/Thread/원래 Turn의 유일한 User 메시지와 일치하는지 SHARE 잠금 아래 검사한다. 원문 삭제/변경·redact·다른 Turn 또는 권한 정보 유실이면 전체 HOLD. 기존 G0 recent Context와 Relationship의 Assistant lineage 검사는 이 함수를 직접 호출하므로 동일 조건을 재사용한다.
+- **G2 실제 원자 저장:** `cmd_commit_seyeon_positive_chat_turn_v1`의 같은 DB Commit 트랜잭션에서 현재 원본 User의 본문을 잠그고 G1의 `currentUserMessageId/currentUserTextDigest`와 재대조한다. 단순 서버 SELECT-before-COMMIT 대신 기존 atomic Commit 함수에 포함하며, 원본 Memory/Grant 잠금·Outbox 원자성은 그대로 유지한다.
+- **G3 S0 첫 재열람:** 기존 첫 Assistant replay 함수도 동일한 G0 원본 Assistant verifier를 재사용한다. 원래 User가 더는 유효하지 않으면 과거 답변의 공개로 이어지지 않는다. 추론 결과의 '권한 승인' 텍스트나 새 Grant가 원래 User 출처를 대체하지 못한다.
+- **범위·남은 위험:** 소스 전용 SQL·정적 연결 테스트; 이 단계는 새 역사 Context의 모델 입력을 활성화하지 않는다. 인용·복사된 비공개 User 텍스트, Reader knowledge, Life Fact·다중 Grant의 전체 파생 출처 계약·실 PG 세션 실행/G0 승인/G6는 HOLD. `SEYEON_PRODUCTION_PERSONAL_RECORD_PROJECTORS_V1=[]`, 운영 DDL/ACL·유료 AI·HTTP Reveal·PR 병합 무변경, `HOLD_FORWARD_STOPPED` 유지. 신규 SHA의 실제 TypeScript/Vitest/PostgreSQL/CI는 별도 실행 근거 전 PASS 금지.
+
+
+### 2026-11-02 · W47 · 모델 이전 전체 과거 대화 출처의 DB 부재 증빙 (격리 / HOLD)
+
+- **기존 결손:** 실제 S0 G1 모델 입력은 현재 User 1건과 원본 Memory 1건만 허용하지만 G1 DB Owner는 과거 대화가 **DB의 같은 Thread에 전혀 없었는지** 직접 확인하지 않았다. 애플리케이션의 `recentMessages=[]` 선언이나 모델 입력 SHA만으로 DB 과거 자료의 완전한 출처를 증명할 수 없다.
+- **실제 개선:** G1 Owner가 해당 Thread의 **모든 메시지 수**를 검사한다(삭제 표시·다른 발화자·빈 메시지도 포함). 원래 Current User 1건 외 메시지가 하나라도 있으면, 최초 Interpreter 요청 전에 `seyeon_positive_g1_historical_source_unpinned`으로 거부한다. 단일 원본 Memory 경로의 DB 불변 Attempt Pin에 `historicalSourceCount=0`, `historicalSourceCensusDigest=SHA256([])`를 함께 기록한다.
+- **원본→재사용 결속:** Node Owner DB 포트는 위 두 필드가 정확히 일치해야만 G1 수령 증빙을 승인한다. 원래 AI 답변을 재사용하는 G0 verifier 및 G2 원자 Commit도 같은 불변 Source Count/Digest를 검사한다. W46의 원본 User ID·본문 지문 검증은 그대로 유지한다.
+- **안전한 범위:** 이는 **과거 대화 0건을 확증하는 실제 G1 Owner Pin**이며, 과거 자료가 1건 이상일 때의 **양수 원본 출처 Pin은 아직 구현되지 않았다**. Verified History/Relationship/Reader의 nonzero 모델 사용은 계속 HOLD. 신규 인가·배포·모델 호출·HTTP 공개·운영 DB 변경·PR 병합 없음; G0~G6는 미통과.
+- **검증:** G1 Owner receipt의 새 필드 누락/추가/위조, DB 전체 Thread 메시지 검사, G0/G2 연계의 계약 테스트를 확장했다. 실제 PostgreSQL 2세션/HEAD TypeScript·Vitest 전체 실행/운영 활성화는 별도 증거 필요.
+
+
+#### W47 후속 · 양수 과거 대화 원본 전수 대조 후보 (모델 호출 차단 유지)
+- 이미 존재하는 G0 DB 원본/파생 관계 재검증 Reader를 **실제 Production Chat Planner**의 양수 Memory 경로에서 다시 호출해, 모델에 선택된 **모든** 최근 User/Assistant 메시지의 ID·순서·역할·원문 SHA를 정밀 대조한다. 하나라도 누락·변조·순서/Character·현재 User 정체성 불일치면 Abort.
+- `buildSeyeonG1HistoricalModelWindowCensusV1`은 유효한 양수 History 전체 목록 digest를 생성하지만 **`persistedBeforeModel:false`, `authorizesModel:false`, `permitsHttpReveal:false`**를 반환한다. DB Owner의 양수 History G1 Pin이 아직 없으므로 검사 통과해도 **무조건 모델 호출 전 HOLD**한다.
+- G1의 실제 불변 Positive Pin은 W47에서 확인한 **과거 History 0건**에만 허용. History 1건 이상/Relationship/Reader 혼합은 최종 원본별 DB G1 Pin·G2/G3 재검증/운영 승인 전 불허. 이 후속 구현은 정책/모델 호출/운영 DB/HTTP/PR 병합 권한을 변경하지 않는다.
+
+
+### 2026-11-02 · W48 · 전체 과거 대화 출처를 격리 DB 불변 후보에 결속 (모델/Commit/Reveal HOLD)
+
+- **구현:** 기존 양수 한 건 Memory의 G1 Pin과 분리된 `22-g1-original-historical-candidate-pin.sql`을 S0 설치 계획의 G0 원본 출처 함수 뒤에 추가. 동일 DB 트랜잭션에서 원본 Member/현재 User/과거 User·Assistant 전체 모델 창/원본 Memory·Grant의 현재 유효성을 검증하고, 원래 `chat_turn_attempts.seyeon_personal_source_pin_jsonb`에 불변 후보 기록을 남긴다. 새 개인 데이터 테이블은 만들지 않는다.
+- **원본 권한:** G0 DB 함수 `qry_seyeon_g0_current_source_recent_messages_v1`가 과거 Assistant에 연결된 기존 원본 Grant, 원래 User 질문과 현재 철회 상태를 재검증하며, 입력 배열의 메시지 ID·역할·UTF-8 SHA-256 지문을 DB가 **전수 재생성**하여 비교한다. 중복/누락/다른 Character/순서 변경·현재 User 변조·원본 Memory/Grant 변경 시 후보 생성 전체 HOLD. DB 원문은 후보 영수증에 복제하지 않는다.
+- **실제 Node 경로:** `historicalSourceCandidateDbPort`는 검증된 Subject 경로에서 별도 격리 포트를 공급받았을 때만 사용한다. 양수 History 창의 전체 Source/Context digest를 결속해 DB 영수증의 목록·원본 IDs·불허 표식을 정밀 검사한다. 보통의 운영 경로에는 새 포트가 공급되지 않으며 기본 개인기록 Projector도 비활성이다.
+- **승인 경계:** 저장 형태는 `historicalCandidateProof` (`seyeon-g1-historical-source-candidate-v1`)이지 기존 `positiveProof`가 아니다. `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`이고 **저장 성공 시에도 반드시 AI Interpreter 호출 전에 중단**한다. 기존 G2 Atomic Commit과 G3 Reveal은 이 타입을 허가하지 않는다. 이는 원본 출처를 저장하는 후보까지의 구현이며 **정식 양수 History G1/G2/G3 허가가 아니다**.
+- **검증:** `test/seyeon-g1-historical-owner-candidate-w48.test.ts`에 정확한 DB 후보/역할·source 변경/권한 플래그 변조/모델 중단 계약을 추가. 단위 테스트는 소스에 작성했으나 최종 HEAD 실제 실행·PostgreSQL 독립 2세션 및 운영 CI 확인 이전에는 PASS 판정 금지.
+- **미완료:** Reader·Relationship·인용/복사된 파생 출처 전체, 양수 History 정상 답변 생성/동일 TX Commit/최초 공개·Replay, G0 최종 승인, 실제 DB·HTTP Race 증명과 G6. 운영 DDL·유료 Provider·공개 API·PR 병합 없음; `HOLD_FORWARD_STOPPED` 유지.
+
+
+### 2026-11-02 · W48 후속 · 격리 History 후보 저장 후 실패 처리 충돌 분리 (HOLD)
+
+- 최신 이관 HEAD `e87de2c47c7f5724a67828470d84355e179fc83b`에서 W48 후보 Pin 성공 뒤 의도적 예외가 일반 `failAttempt`를 호출하는 경로를 확인했다. 후보는 모델·Commit·Reveal 허가가 아닌데도 일반 실패 상태 전환이 불변 `context_ready` 증빙과 충돌할 수 있으므로, 성공적으로 저장한 후보만 별도의 `SeyeonHistoricalCandidatePersistedHoldV1`으로 구분하고 일반 실패 처리를 호출하지 않도록 수정했다. DB 저장 실패 또는 후보 준비 실패는 기존 일반 실패 경로를 유지한다.
+- 새 보안 권한·SQL·Source Registry·운영 Role·공개 Route·외부 Provider 호출을 추가하지 않았다. W48 후보는 세 권한 플래그가 모두 false이며, 성공 경로는 Interpreter 호출 전에 계속 HOLD한다. 다른 이력 출처는 자동 승인하지 않는다.
+- W48 및 과거 모델 입력 Census의 표적 Vitest 32개 통과. 전체 TypeScript 검사는 별도 기존 모바일 API-client 타입 중복 및 테스트 계약 오류로 실패; 해당 오류를 이번 수정의 PASS로 대체하지 않는다. 로컬 PostgreSQL 17 실행 서버가 응답하지 않아 격리 DB 설치, 실제 커밋 이후 후보 재조회, Owner 함수 권한 및 두 세션 경합은 미검증이다.
+- 다음 작업: 폐기형 PostgreSQL 17에서 W48 원본 후보 저장→실제 커밋→예외 후 재조회와 실패/철회 0건을 검증하고, 저장 증거가 확인되면 기존 G0/G1 양수 History 정식 출처 계약을 진행한다. 운영 상태는 `HOLD_FORWARD_STOPPED`이며 Draft PR의 운영 병합·배포는 금지한다.
+
+
+### 2026-11-03 · W48 Docker PostgreSQL 17.11 검증 완료 — 격리 범위 PASS / 운영 HOLD
+
+- GitHub PR #2761의 W48 후속을 **독립 로컬 Docker `postgres:17.11`**, 이름이 고정된 폐기형 `myeongha_seyeon_security_s0_test`에서 확인했다. Supabase Auth CI stub, 기존 DB migration 207개, 격리 S0 SQL 24개 설치 후 `test/seyeon-security-s0-postgres.e2e.test.ts` **23/23 통과**. 실제 유료 AI Provider·Production DB·개인정보·공개 Route 전송은 없었다.
+- 원본 Member User 메시지와 History를 검증할 때 일반 API/제한 Owner에 UPDATE 권한을 추가하지 않고 **기존 DB 전용 원본 행 잠금**을 사용하도록 G1/G0/G2 SQL을 정리했다. 이 변경으로 기존 Memory/Grant 정합성, Reader/파생 History 거부, 원본 내용 철회 경합을 포함하는 S0 테스트가 실제 PostgreSQL에서 동작한다.
+- W48 통합 사례는 과거 원본 User+Assistant, 현재 원본 User, 정확한 원래 Memory/Grant를 함께 검증한 뒤 `historicalCandidateProof`를 커밋·재조회한다. 저장된 Attempt는 `running`이며 `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`를 유지하고 일반 API에게 후보 발급 RPC 실행 권한이 없다. 이 기록은 G1 모델 입력 Positive authority가 아니다.
+- 기존 첫 답변 재열람 테스트에서 **원본 동의 철회가 SQL 권한 거부를 발생시켜 HTTP 연결을 끊던 문제**를 수정했다. 철회·원본 출처 부재의 지정된 `insufficient_privilege` 경계는 결과 0행으로 처리하여 기존 Node의 **고정 503 비개인정보 응답**을 허용한다. 실제 승인된 원본을 읽어 공개하는 결정을 새로 만들지 않는다. 다른 DB 오류·운영 권한 부족·단절은 자동 승격하지 않는다.
+- 검증 판정은 **W48 후보 보존 및 S0 Docker 통합 경로 완료**에 한정한다. G0 파생 출처 최종 승인, 실 Provider 인증·요금 영수증, 운영 G2/G3 양수 공개, DR/G6, Prod Migration/Role/Main 병합은 계속 `HOLD_FORWARD_STOPPED`. 별도 CI/전체 TypeScript는 현재 정확한 커밋 결과를 확인할 때까지 성공으로 단정하지 않는다.
+
+### 2026-11-03 — W49 — Historical-source Pin vs. original Grant revoke, independent PostgreSQL sessions (S0 / HOLD)
+
+- Baseline: PR #2761 exact HEAD `3bf297678deaf12f441d6dc6224bcb67217c5b6a` passed CI, Work Track security, db-authority-core, PostgreSQL 17, Web and Governance. Latest `main` (at merge time `13f1c6fc`) was integrated via merge `577ff252`; integration checks for later HEAD must be confirmed separately.
+- Roadmap G5 evidence work: added a two-physical-session PostgreSQL race to the existing `test/seyeon-security-s0-postgres.e2e.test.ts`. An owner-issued original Memory Grant is locked and revoked in one session while the other attempts to persist the W48 historical-source candidate, verifying PostgreSQL lock wait, fail-closed revocation, and zero persisted source Pin. The existing W48 no-Provider historical candidate test remains intact.
+- Scope: synthetic isolated S0 only. No Production migration, DB ACL relaxation, Projector enablement, public HTTP route, paid Provider call, model/Commit/Reveal authorization or auto-merge. New test is a targeted G5 negative case, **not** G5/G6 completion or an approved positive historical-source scope.
+- Local isolated PostgreSQL 17.11: new independent two-session Grant revoke vs historical candidate pin test PASS (one targeted test). Full exact-head CI remains unverified.
+- Pending evidence: exact-head PostgreSQL 17 full E2E and required GitHub CI results; G1 positive historical-source permission, G2 current Grant Commit, G3 Reveal/replay, current Reader/quoted/Relationship closure, G4 and G6 remain HOLD. `HOLD_FORWARD_STOPPED`.
+
+### 2026-11-03 — W50 — G5 historical-source Pin first / revoke second two-session race (S0 / HOLD)
+
+- Prior PR #2761 head `5eb59e3cc3994d680de6515cfba9d226773915db`: CI, db-authority-core, Work Track security, PostgreSQL17, Web and Governance GREEN. Latest `main` through `00efd487` integrated; new exact-head CI result must be checked separately.
+- Implemented the reciprocal PostgreSQL race in the existing S0 source-owner E2E suite. A historical-source candidate first holds its exact original Memory/Grant locks in one DB session; the independent revoker session is observed waiting on the PostgreSQL lock. After candidate commit, the waiting revoke commits; the persisted proof continues to report `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false` and no `positiveProof`.
+- Post-revoke G0 historical source retrieval rejects the same original Grant with `seyeon_source_lock_original_grant_required`: a saved candidate does not inherit future/current authority. Exact two-session targeted test PASS on isolated loopback PostgreSQL17; no production credentials or personal records used. This complements W49 revoke-first → pin-denied evidence, not a G5 operational PASS declaration.
+- Current gating: unchanged positive Projector/HTTP/Provider OFF, no Production migration, model run, grant expansion or automated merge. Historical positive model admission and G2/G3/G4, full G5, G6 remain `HOLD_FORWARD_STOPPED`. Exact-head CI and complete integrated evidence still pending.
+
+### 2026-11-04 — W51 — Exact historical Assistant original Memory/Grant lineage in G1 candidate (S0 / HOLD)
+
+- Baseline: PR #2761 prior HEAD `0ce4d7f2734b029ea45d47f37729fc89d0f33390` CI, PostgreSQL17, DB, Web, Mobile and Governance all GREEN. Merged latest available `main` at `2094040675ae2f08f20971fe956dbc70a0b1250d`, retaining both the private-memory visibility text and upstream multilingual report text in `apps/web/ui-i18n.js`.
+- G1 implementation: the existing isolated Owner historical candidate now persists a distinct **DB-issued original lineage manifest** for each historical Se-yeon Assistant: committed message/turn/attempt, its original Member User message ID+UTF-8 body hash, exact original Memory ID, exact original Grant ID, original PostgreSQL JSONB digest and record type/schema/projector. It derives these strictly from the committed Attempt's immutable `positiveProof` and validated `personalRecordProvenance` after G0 has rechecked the entire live original source window and locked the old Grant. A later/replacement Grant never substitutes for that original ID. Historical User rows are not assigned invented Memory/Grant provenance.
+- The Owner's candidate receipt schema is explicitly versioned `seyeon-g1-historical-source-candidate-v2`; the Node port verifies the DB-returned assistant lineage count, ordered message IDs, exact fields and digest formats before accepting the candidate receipt. The new manifest and its DB JSONB digest remain inside the existing immutable `historicalCandidateProof`, never `positiveProof`. `authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false` remain mandatory.
+- Local verification: targeted source/receipt Vitest **20/20 PASS**, modified TypeScript files have 0 reported diagnostics, and diff whitespace check PASS. Existing S0 PostgreSQL E2E now asserts the original User/Memory/Grant fields and receipt schema v2. That exact SQL/E2E must still pass the next fresh PostgreSQL17 CI; no current local S0 database was reused or modified.
+- Explicit HOLD: this proves a candidate's per-Assistant **known original** provenance only, not quoted/copied or Reader/Relationship cross-source closure, multiple approved Records, G1 positive model admission, G2 current Grant Commit, G3 HTTP Reveal/replay, G4 operational billing, G5 total coverage, G6 approval or production rollout. No production migration/ACL, paid Provider, public route or auto-merge. `HOLD_FORWARD_STOPPED`.
+### 2026-11-04 — W51 — S0 G1 historical Owner receipt exact JSONB census digest binding (HOLD)
+
+- Previous exact-head PR #2761 `0ce4d7f2`: CI, PostgreSQL17, db-authority-core, Web, Mobile and Governance GREEN. Merged current main through `20940406`, retaining both the existing private-history visibility translations and the newer common-header report translations.
+- The isolated `postgres-seyeon-g1-historical-candidate-port-v1.ts` now returns the DB Owner receipt together with an independent PostgreSQL `$16::jsonb::text` SHA-256 digest of the **exact sent historical manifest** in the same statement/transaction. Node rejects an otherwise plausible receipt if its `historicalSourceCensusDigest` differs. No authorization flag is elevated.
+- Updated existing W48 negative receipt cases to include a valid-shape but mismatched historical manifest digest. Local 19 focused tests PASS; zero TypeScript diagnostics in changed source/test. Full new-head CI/PostgreSQL17 integration still pending.
+- All G0–G6 operating approvals remain unfinished. Default historical source candidate is non-publishable (`authorizesModel=false`, `permitsAtomicCommit=false`, `permitsHttpReveal=false`); no production SQL, paid Provider, source Projector, external route, consent expansion or merge activation. `HOLD_FORWARD_STOPPED`.
+
+### 2026-11-04 — W52 — G1 historical Assistant original Member User proof recheck (S0 / HOLD)
+
+- Verified PR #2761 previous head `9fda8b21f296c0eeceee815d9267ed5e06d0ce1c`: PostgreSQL17, Work Track security, db-authority-core, CI, Governance, Web and Mobile all GREEN. No G0–G6 approval has been granted.
+- The existing S0-only G1 historical candidate Owner now re-authorizes each historical Assistant's recorded **original Member User message** with the existing private G0 original function, then re-reads its **same committed Assistant Turn**, Subject/Thread, unredacted original User text, and computes the live PostgreSQL UTF-8 SHA-256. A missing, relocated, redacted, or changed User source rejects the entire candidate transaction before storing any new proof; historical User text is not accepted solely from a prior positiveProof digest.
+- The exact historical Assistant Memory/Grant lineage and non-publishable `historicalCandidateProof` remain unchanged. Every model, G2 Commit, and G3 HTTP Reveal flag stays false. Production SQL migration, source Projector, Provider, HTTP route and merge remain disabled under `HOLD_FORWARD_STOPPED`.
+- W48 source contract and isolated original-provenance checks updated; local focused Vitest 35 PASS, changed TS diagnostics zero. An empty local PG17 container lacked the mandatory application schema and could not run the end-to-end suite; exact new-head PG17 CI remains authoritative/pending. G1 positive history admission, quoted/copied derivative sources, Reader/relationship, G2–G6 remain unfinished.
+
+### 2026-11-04 — W53 — G1 historical Assistant original-lineage JSONB digest cross-check (S0 / HOLD)
+
+- Prior PR #2761 head `4273bb5bff7aaffd841b56a23ee11192b798d9f6`: CI, PostgreSQL17 DB dependency, DB authority core, Work Track security, Web, Mobile and Governance all GREEN; official G0–G6 completion checklist remains open.
+- The isolated G1 historical candidate Node Owner port now executes the existing Owner Pin once in a `MATERIALIZED` PostgreSQL CTE and derives the SHA-256 of **the exact DB-returned historicalAssistantOriginalSources JSONB array** in the same transaction. Before returning any candidate it requires the Owner receipt's `historicalAssistantOriginalSourcesDigest` to match this independent DB computation, as well as the already required exact historical census digest and false model/Commit/Reveal flags.
+- The W48 focused tests include an otherwise valid-format but stale lineage digest and changed historical original User digest with a simulated PostgreSQL recomputation; both reject receipt acceptance. Local 37 focused Vitest PASS, a standalone PG17.11 `MATERIALIZED` JSONB digest calculation PASS. Full actual Owner + PG17 end-to-end and exact-head GitHub CI must independently pass before any completion claim.
+- No new public RPC, grant, provider/model invocation, streaming, persistent production role, migration, positive admission, merge or approval. `HOLD_FORWARD_STOPPED`; G1 approved positive historical-context admission, G2 current-Grant atomic Commit, G3 re-Reveal, G4 operations, G5 full integration, G6 controlled release remain open.
+
+### 2026-11-04 — W54 — historical original User redaction vs G1 candidate, independent PG17 sessions (G5 / S0 HOLD)
+
+- Previous exact PR #2761 head `369cbcaebe8377b8306fecb5c7e5d20327bb3f61`: CI, PostgreSQL17, db-authority-core, security, Web, Mobile and Governance GREEN. G0–G6 final checkboxes remain unchecked.
+- Extended the existing S0 PostgreSQL17 end-to-end suite. The original historical Member User and Assistant and their original Memory/Grant are pinned as a **non-model-use** historical candidate in session A. Independently, session B updates only the prior Member User's `redacted_at` on synthetic disposable PG17; the redaction must wait on the G0 original-message row lock until the candidate transaction commits. After redaction commits, fresh G0 historical context retrieval must deny the whole window (`seyeon_g0_context_window_source_missing`); the saved candidate must still have no `positiveProof` and all model, atomic Commit and HTTP Reveal flags false. This complements the earlier opposite-direction original Grant revocation races.
+- Strengthened the existing W48 original-source positive E2E assertion: the saved historical Assistant lineage digest must equal an independently computed PostgreSQL SHA-256 over the exact persisted JSONB array, not merely match a hash string regex.
+- Current local verification covers TypeScript changed-test diagnostics zero and diff checks. Full fresh PostgreSQL17 E2E, lock-wait timing and exact-head CI must be confirmed; do not infer successful concurrency from static checks. Isolated test only; no Production migration, paid Provider, public route, merged PR, new Grant or grant-based production release. `HOLD_FORWARD_STOPPED`, G5 and G6 uncompleted.
+
+### 2026-11-04 — W54 CI red fix: restore valid original-User redaction fixture (G5 / HOLD)
+
+- PR #2761 `00a2be7515510d946676b37be61b3c91a49257a8` PostgreSQL17 CI #41771654566 RED: only new original-User redaction race test failed at `expect(blocked).toBe(true)`. The fixture UPDATE supplied `redacted_at` without the **mandatory** `redaction_reason` (constraint `conversation_messages_redaction_reason_check` in migration 0040), so the request was rejected before acquiring a conflicting message lock; it did not establish a race.
+- Updated only the synthetic test UPDATE to include `redaction_reason='g5_synthetic_original_user_redaction'`. The existing two-session lock-wait, post-redaction whole-window denial, and all `authorizesModel/permitsAtomicCommit/permitsHttpReveal=false` assertions remain unchanged. Disposable PostgreSQL17.11 successfully accepted the complete redaction UPDATE under the same schema constraint; focused Vitest 37/37 PASS and changed-file TypeScript errors zero. Full new-head PG17 CI result still pending.
+- Production projectors, migration, paid Provider, HTTP Reveal and merge remain disabled; `HOLD_FORWARD_STOPPED`. No G0–G6 final gate completed by this CI-only test correction.
+
+### 2026-11-04 — W55 — G1 per-historical-Assistant exact original Grant issuance (S0 / HOLD)
+
+- Previous PR #2761 exact HEAD `4ca61bc5652bbefe1a440a67e82fa4c285f450da` had CI, PostgreSQL17, db-authority-core, security, Web, Mobile and Governance GREEN. Issue #1866 G0–G6 remains open/unapproved.
+- The S0 historical candidate Owner now records each prior Assistant's **originalGrantId AND originalGrantedAt**, preserving the exact issuance moment already independently checked against the live old Grant by the locked G0 original-lineage verifier. A missing/malformed historical issuance is denied before candidate persistence. Owner proof schema is explicitly advanced to `seyeon-g1-historical-source-candidate-v3`; this is evidence only, never `positiveProof`.
+- Node's Owner receipt port requires the new issuance on every historical Assistant, validates its date, exact field set and independent DB-issued complete lineage digest. The existing S0 PostgreSQL E2E expectation compares the new issuance against the prior positive source and its DB Grant timestamp. Focused Vitest 39/39 PASS, changed TypeScript diagnostics zero, standalone PG17.11 function creation PASS. Exact new-head full PostgreSQL17 CI still pending.
+- No newly approved source/projector, positive model permission, G2 Commit or G3 Reveal; no production migration, paid Provider, external route or auto-merge. `HOLD_FORWARD_STOPPED`; official G1 through G6 completion still blocked by the remaining exact authority, race and controlled operational evidence.
+
+### 2026-11-04 — W56 — redaction-first G5 historical source candidate race (S0 / HOLD)
+
+- Previous PR #2761 head `8a29a656f83804280cac1168ca2c79d3e0403620`: CI, PostgreSQL17, db-authority-core, security, Web, Mobile and Governance GREEN; official issue #1866 G0–G6 completion gates all remain unchecked.
+- Added the reciprocal independent two-physical-session PostgreSQL17 race to `test/seyeon-security-s0-postgres.e2e.test.ts`: session B first holds an uncommitted, constraint-valid redaction of the **exact historical original Member User**; session A then attempts a DB-owned G1 historical candidate in the same Subject/Thread. The test requires A to block on the source-row lock; after B commits, A must receive the exact fail-closed original-message denial, and the new attempt must remain `planned` with no Pin or pinned timestamp. This complements the previously GREEN candidate-first/redaction-second test.
+- Local focused source/receipt Vitest 39/39 PASS, new E2E TypeScript diagnostics zero, diff checks PASS. The new two-session race's actual lock-wait and negative DB outcome require exact-head PostgreSQL17 Actions; do not infer integration success before that result.
+- Synthetic isolated S0 only: no model/Commit/Reveal authorization, SQL migration, production approval, role grant, paid provider, public HTTP route or merge. `HOLD_FORWARD_STOPPED`; G5/G6 and the remaining G0–G4 completion requirements stay open.
+
+### 2026-11-04 — W57 — G2 immutable historical candidate cannot become committed authority (S0 / HOLD)
+
+- Previous PR #2761 head `da680a0dd24322498f4238ca3868613b06cff060`: CI #41776813098 plus PostgreSQL17 dependency, DB authority core, Work Track security, Web, Mobile and Governance GREEN; issue #1866 G0–G6 official completion gates remain open.
+- Added an explicit fail-closed branch to the existing **S0-only** `tr_seyeon_zero_source_pin_immutable_v1()` function: if the original Attempt has `historicalCandidateProof`, reject any direct/legacy promotion to `validated`, `committed` or `delivered` using `seyeon_g2_historical_candidate_not_authority`. This is before the approved zero/positive G2 branch, so a historical G1 audit proof cannot become a real assistant/Outbox Commit even when a caller bypasses the higher-level positive wrapper. No new authorization, model access, or public API route is added.
+- Extended the S0 actual DB E2E historical candidate test to attempt unauthorized direct Attempt-state promotions and assert **no generated Assistant row** and original `running` Attempt/`context_ready` Turn; added a static contract check. Local focused Vitest **39 PASS**, changed TypeScript diagnostics **0**, diff checks PASS. A disposable PostgreSQL17.11 run executed the exact updated trigger source and proved `validated`/`committed`/`delivered` all denied with no state mutation.
+- Full S0 actual DB E2E and new exact-head GitHub CI remain authoritative. `HOLD_FORWARD_STOPPED` continues; positive historical-context admission, G2 actual authorized Commit, G3 current Grant-first Reveal/replay, G4 owner budgets and G5/G6 complete evidence remain pending.
+
+### 2026-11-04 — W57 CI red repair: use the first effective database state guard (S0 / HOLD)
+
+- PR #2761 exact HEAD `f8dbe6da23465c43c4aeb24fe84ebee725dc0967`, GitHub Actions CI run #41778388475 attempt 1 RED: PostgreSQL17 test `W48 keeps a DB-original historical candidate durable without model/Commit/Reveal rights` failed at the newly added direct `running -> validated/committed` state mutation expectation. **38 of 39 actual PostgreSQL S0 E2E tests PASS**. The actual constraint is `tr_chat_turn_attempt_state_transition` (original migration 0220), not the later isolated S0 candidate guard `seyeon_g2_historical_candidate_not_authority`.
+- Root cause: The original Attempt progression trigger rejects an illegal direct `running` to `validated`/`committed` transition **before** the isolated historical G2 guard can execute. The user-source HOLD remains effective; changing existing production trigger order or weakening guards to force a later diagnostic would be incorrect.
+- Updated the S0 actual DB E2E to require the exact **first authoritative** native progression constraint `tr_chat_turn_attempt_state_transition` and preserved post-rejection assertions: unchanged running Attempt, context_ready Turn, no Assistant row. The isolated S0 custom historical guard and its strict source-contract check are left unchanged, as the prior standalone PostgreSQL17 direct trigger test independently proved its 3 denied target states.
+- Local focused Vitest 39/39 PASS, TypeScript diagnostics in the modified test zero, diff check clean. Full exact-head PostgreSQL17 and whole PR CI must run again and be confirmed. No operation/production migration, provider, public Reveal, approval, or merge; `HOLD_FORWARD_STOPPED`.
+
+### 2026-11-04 — W58 — G3 original Assistant replay vs concurrent Grant withdrawal (S0 / HOLD)
+
+- Previous PR #2761 HEAD `db11ec346ccfb34d37cd4bbad969b34524933c5e`: GitHub Actions CI #41779750932 plus PostgreSQL17, db-authority-core, security, Web, Mobile and Governance GREEN. Issue #1866 formal G0–G6 completion checkboxes remain unchecked.
+- Added an independent **two physical PostgreSQL-session G3 replay-first / revoke-second race** to the existing actual S0 original-reply E2E suite. Session A locks the exact original Member's first Se-yeon Assistant and its current original Memory/Grant in `qry_seyeon_first_original_assistant_replay_s0_v1`, retaining the transaction while session B issues `cmd_request_seyeon_memory_revoke_v1`. The test observes B waiting on the PostgreSQL lock, then commits A and B, re-reads via fresh original-rights authorization and requires zero replay rows. The original Grant must be revoked or withdrawal-marked. This is not an HTTP route activation and does not admit historical model source candidates.
+- Evidence: local source/receipt focused Vitest **39/39 PASS**, changed E2E TypeScript diagnostics **0**, git diff check PASS. On a newly created, isolated Docker PostgreSQL **17.11** database (disposable `myeongha_ci_case_569`, loopback port 55443), the exact S0 schema/owner installer ran and the **new actual DB two-session test PASS (1 passed, 39 skipped)**. Full exact-HEAD GitHub CI is still required for completion of this change.
+- Production G3 route/streaming, historical source approval, broad replay, complete G2/G4/G5 evidence and G6 remain unapproved/unfinished. No production migration, new model admission, paid Provider, external Reveal, spending, or merge. `HOLD_FORWARD_STOPPED`.
+
+### 2026-11-04 — W59 — G3 withdrawal-first vs original Assistant replay, reciprocal independent PostgreSQL sessions (S0 / HOLD)
+
+- Previous PR #2761 exact head `4f163f9d661bb9cedb71a4a7e637013f7a9c2ba9`: CI #41781683848, PostgreSQL17, db-authority-core, Work Track security, Web, Mobile and Governance all GREEN. Issue #1866 G0–G6 final checkboxes remain unchecked.
+- Added the reciprocal G3 **revoke-first / replay-second** isolated race. A committed and already-delivered synthetic original Se-yeon Assistant has an original Member Memory/Grant. Session A requests the real private original Grant withdrawal and retains the DB transaction. Separate session B attempts `qry_seyeon_first_original_assistant_replay_s0_v1` and must visibly block on PostgreSQL lock. On A COMMIT, B must return no private Assistant rows; a fresh third transaction must also return no replay, with original Grant revoked or withdrawal-pending. This complements W58 replay-first/revoke-second and preserves the strict original-Grant-only rule (replacement Grants do not resurrect old replies).
+- Test fixture uses actual S0 PostgreSQL owner SQL and private paths, no paid Provider or production endpoint. Local focused Vitest **39/39 PASS**, changed-file TypeScript diagnostics **0**, and **full local PostgreSQL17.11 S0 E2E 41/41 PASS** on a separately created disposable loopback DB after hash-verified isolated schema replay. A prior first-run assertion expected pending-withdrawal fields but real delivered-reply withdrawal atomically returned `status:'committed', revokedGrantCount:1, replayed:false`; corrected to this exact DB contract before the 41-test full rerun. Scratch resources removed after verification.
+- Do not infer latest remote GitHub CI PASS from local tests. G0–G6 remain open; `HOLD_FORWARD_STOPPED`, no production migration, external Replay/Reveal or streaming route, Model/Commit admission, billing activation, approval or merge.
+
+### 2026-11-04 — W60 — G3 original Member User redaction-first vs original dialogue / reply disclosure (S0 / HOLD)
+
+- Prior PR #2761 head `a15bea9cf457acbaf3550ac9f4b22407d3d260e8`: GitHub Actions CI #41783977268, PostgreSQL17, db-authority-core, security, Web, Mobile and Governance GREEN. Official issue #1866 G0–G6 completion remains 0/7 unchecked.
+- Added an original Member User **redaction-first** concurrency proof to the real isolated S0 PostgreSQL17 E2E: independently connected session B first changes only the exact committed original User message's `redacted_at` AND mandatory `redaction_reason` without revoking its original Memory/Grant. Concurrent session A attempts current-rights `qry_seyeon_first_original_dialogue_pair_s0_v1`; it must visibly wait on the original message row lock. After the redaction commits, the pair must return zero rows, while the exact Grant is independently confirmed **still active**.
+- The same test uses actual loopback direct Node handlers for both `/original-pair` and `/original-replay`, each with fresh canonical-Member DB validation. Both must return fixed HTTP 503 and neither original Member User nor Assistant private body. This proves a still-current Grant cannot override a redacted original prompting message. Historical source admission, generic History, and proxy streaming remain HOLD.
+- Local focused Vitest **39/39 PASS**, modified-file TypeScript diagnostics **zero**, diff check PASS. Fresh scratch Docker PostgreSQL **17.11**: exact new G3 targeted test PASS (1/42), then a separately restored empty-schema scratch database executed the **entire real S0 PostgreSQL17 E2E 42/42 PASS**. The test uses only synthetic IDs and no paid Provider, real credentials, production API, or production migrations.
+- The exact new PR HEAD's GitHub CI still requires its own verification. All G0–G6 formal approval gates and G6 rollout evidence remain open; `HOLD_FORWARD_STOPPED`, no production activation, no auto-merge.
+
+### 2026-11-04 — W61 — G3 original-dialogue replay-first vs independent Member User redaction (S0 / HOLD)
+
+- Prior PR #2761 exact head `68975efbdf6ffd69ea02a3cab814b7ea90916e38`: GitHub Actions CI #41785756434, PostgreSQL17 dependency, db-authority-core, Work Track security, Web, Mobile and Governance GREEN. Issue #1866 all G0–G6 final checkboxes remain unchecked.
+- Implemented reciprocal **replay-first / redaction-second** independent-physical-session G3 test. Session A uses the actual S0 private `qry_seyeon_first_original_dialogue_pair_s0_v1` to read the exact committed original Member User + Assistant and retains its current-source SHARE locks throughout the pending response transaction. Session B then attempts a constrained `conversation_messages.redacted_at` update with mandatory `redaction_reason`; the test observes B **waiting on the original source row lock**. After A COMMIT the redaction completes, and a fresh subject-bound DB transaction must return **zero rows** from both original dialogue-pair and original assistant-replay queries. The original Memory Grant remains **current/active** throughout, so the denial depends on the original User's redaction, never inferred Grant revocation. W60 tested the opposite redaction-first ordering.
+- Focused unit tests **39 PASS**, modified E2E TypeScript diagnostics **zero**, diff check clean. Newly installed standalone Docker PostgreSQL **17.11** executed the exact new isolated two-session test PASS (1/43), and a separate disposable clean-schema database executed the **entire actual S0 PostgreSQL17 E2E suite 43/43 PASS**. Synthetic/test-only; no production DB, external Provider, API exposure or rollout. Scratch Docker removed after verification.
+- Formal G0–G6 gates, broader historical model admission, G2 full authority, streaming, G4 owner budgets, complete G5 and G6 approvals remain open. New PR exact-head GitHub CI must independently confirm the change. `HOLD_FORWARD_STOPPED`, no production migration, public HTTP route or auto-merge.
+
+### 2026-11-04 — W62 — G3 original Assistant redaction-first denies direct replay and dialogue even with live Grant (S0 / HOLD)
+
+- Previous PR #2761 head `b43357ea39f640784beb6cc1fda032e95f4ea2c4`: CI #41787651824 including PostgreSQL17, db-authority-core, Work Track security, Governance, Mobile and Web all GREEN. Official issue #1866 G0–G6 completion gates remain 0/7 unchecked.
+- Added G3 **original Assistant redaction-first / replay-second** to real S0 PostgreSQL17 E2E. DB session A redacts exactly the already-delivered original Se-yeon Assistant message with non-null reason, while session B attempts original replay and is observed waiting on a PostgreSQL row lock. After A commits, B must return zero private reply rows. Assert original Member User remains current and original Memory Grant is still active: redaction of the Assistant **alone** invalidates derived disclosure.
+- The same test starts fresh canonical-Member transactions for both private S0 SQL read paths (first Assistant replay and first User+Assistant pair), and checks actual unmounted loopback Node HTTP endpoints `/original-replay` and `/original-pair` both return no-store HTTP 503 without original Member User or Assistant text. No HTTP/proxy/production route was enabled.
+- Local focused Vitest **39/39 PASS**, modified E2E TypeScript diagnostic **0**, diff check clean. Clean disposable PostgreSQL **17.11**: targeted new G3 1/1 PASS, separately restored empty-schema full real S0 E2E suite **44/44 PASS**. Synthetic-only; no paid Provider, DB secrets, production migration, external output or new authorization.
+- Formal roadmap G0–G6, historical sources, streaming and current-rights on production paths remain HOLD. New exact-head CI to be independently checked; `HOLD_FORWARD_STOPPED`, no auto-merge or ROADMAP_COMPLETE.
+
+### 2026-11-04 — W63 — G3 original Assistant replay-first vs independent Assistant redaction (S0 / HOLD)
+
+- Previous PR #2761 head `11b3e03c6a385a52e4d3fc1b46d70ed045506b37`: GitHub Actions CI #41789190000, PostgreSQL17, db-authority-core, Work Track security, Web, Mobile and Governance all GREEN. Issue #1866 official G0–G6 completion checkboxes remain 0/7.
+- Added the reciprocal G3 **original Assistant replay-first / Assistant redaction-second** test using separate real PostgreSQL17 sessions. Session A successfully reads the exact committed first original Se-yeon Assistant with the private current-Grant replay query and retains its source locks until transaction completion. Session B then tries to redact the same original Assistant with a mandatory non-null redaction reason; PostgreSQL `pg_stat_activity.wait_event_type='Lock'` must prove B waits before A commits. B can complete only after A commits.
+- After redaction commits, new subject-bound transactions return **zero original Assistant and dialogue pair rows**. The original Member User remains unredacted and the original Memory Grant remains current; redaction of the original Assistant alone independently denies subsequent disclosure. Both still-unmounted direct Node `/original-replay` and `/original-pair` HTTP probes must return no-store HTTP 503 without the original User or Assistant body. This complements W62 redaction-first/replay-second and stays isolated from production.
+- Focused Vitest **39/39 PASS**, modified E2E TypeScript diagnostics **zero**, diff check clean. A disposable PostgreSQL **17.11** database ran the new targeted 1/1 PASS; a separate clean-schema disposable database ran the **entire real S0 PG17 E2E suite 45/45 PASS**. Synthetic-only; no live Provider, production migrations, public HTTP mount, or additional authority. Full exact-head GitHub CI still required.
+- Formal G0–G6 gates remain open, including production G2 Commit, streaming/replay policy, exact historical/context authority, G4/G5 completeness and G6 approvals. `HOLD_FORWARD_STOPPED`, no merge or ROADMAP_COMPLETE.
+
+### 2026-11-04 — W64 — G3 original User+Assistant dialogue pair vs exact original Grant withdrawal (S0 / HOLD)
+
+- Previous PR #2761 exact head `a77ab41f55051e790a134f53352f67ec95029209`: GitHub Actions CI #41790906409, DB dependency PostgreSQL17, db-authority-core, Work Track security, Governance, Mobile, Web all GREEN. Issue #1866 official G0–G6 completion checkboxes remain 0/7.
+- Added **both directions** of an actual two-physical-PostgreSQL-session original **User+Assistant dialogue-pair vs original Grant withdrawal** race, rather than only Assistant-alone replay. Pair-first: original subject-bound `qry_seyeon_first_original_dialogue_pair_s0_v1` returns the exact first Member User and first Se-yeon Assistant and retains current-Grant row locks until the reader transaction commits. Independently initiated `cmd_request_seyeon_memory_revoke_v1` must visibly wait on a PostgreSQL lock, then commit an actual original Grant revoke; any subsequent pair reread returns zero rows.
+- Withdrawal-first: session A requests and holds the committed Grant revoke; session B attempts original pair and must visibly wait for the lock. After withdrawal commits, B returns no private User or Assistant rows. A fresh canonical-Member direct Node `/original-pair` socket request returns no-store HTTP 503 with neither private body. The original Grant row is independently proven revoked, not merely a generic exception.
+- Local focused Vitest **39/39 PASS**, E2E TypeScript diagnostics **zero**, diff check clean. Newly installed disposable Docker PostgreSQL **17.11**: both targeted tests **2/2 PASS**; separate fresh empty-schema database ran **all S0 PG17 E2E 47/47 PASS**. Synthetic/test-only; no production migrations, Provider, public route or activation. New exact-HEAD GitHub CI remains a separate release/implementation gate.
+- G0–G6 formal gates remain unchecked: production G2, historical source and streaming admission, G4 budgets, comprehensive G5 and G6 approval are NOT complete. `HOLD_FORWARD_STOPPED`, no auto-merge.
+
+### 2026-11-04 — W65 — G3/G5 account deletion vs current original dialogue re-disclosure (S0 / HOLD)
+
+- Prior PR #2761 exact head `476683a872cd849f6ebbe133544900ced962728c`: CI #41792768781, PostgreSQL17 dependency, db-authority-core, Work Track security, Governance, Web and Mobile all GREEN. Official issue #1866 G0–G6 final completion remains 0/7.
+- Added two opposite **independent PostgreSQL17 session** account-deletion vs original dialogue-pair races, using actual `public.cmd_start_account_deletion_v1` and `seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1`. Pair-first: original Member User+Assistant read holds the canonical active Subject lock; real account-deletion start must visibly wait on a PostgreSQL lock until read COMMIT, then produce `deletion_pending` and prohibit fresh original dialogue reads. Deletion-first: account deletion holds the Subject row in its transaction; incoming original dialogue read visibly blocks until deletion COMMIT, then fails closed without returning private rows.
+- Both fixtures independently verify the **same original Memory Grant is still active**. Account deletion, not Grant withdrawal or post-hoc cache state, is the reason new history disclosure is denied. A fresh canonical-Member still-unmounted direct Node `/original-pair` HTTP request after deletion returns no-store 503 with no original Member User or Assistant content. No new paid/provider path or production history route.
+- Focused unit Vitest **39/39 PASS**, modified E2E TypeScript diagnostics **zero**, diff check clean. Disposable local Docker PostgreSQL **17.11**: targeted G5 pair **2/2 PASS**, separately restored fresh empty-schema database full real S0 PG17 E2E **49/49 PASS**. Test-only synthetic IDs, no production migrations or public exposure. Exact new PR HEAD GitHub CI must independently pass.
+- Formal G0–G6 remain unchecked, including production G2, full G3 derived/history/streaming rights, G4/G5 broader scope and G6 explicit rollout approvals. `HOLD_FORWARD_STOPPED`, no auto-merge or ROADMAP_COMPLETE.
+
+### 2026-11-04 — W66 — G1/G5 historical Model Context candidate Pin vs real Member account deletion (S0 / HOLD)
+
+- Previous PR #2761 exact head `2664696d9ceba3e377e72aad8045846802a80377`: GitHub Actions CI #41794977657, PostgreSQL17 dependency, db-authority-core, Work Track security, Governance, Web and Mobile all GREEN. Official issue #1866 G0–G6 remain 0/7 unchecked.
+- Added **reciprocal historical context G1 candidate-Pin vs account-deletion start** concurrency tests to the real S0 PostgreSQL17 integration. Uses actual committed original first Member User + original first Se-yeon Assistant, a second planned User Turn/Attempt, the production-owner history candidate DB port and actual `public.cmd_start_account_deletion_v1`. Never fabricates a model input, skips DB current-rights verification or authorizes Provider use.
+- **Pin-first:** historical DB owner verifies exact old User/Assistant, original Memory Record/Grant, per-source SHA, and writes durable `historicalCandidateProof` with all `authorizesModel/permitsAtomicCommit/permitsHttpReveal=false`. Independent account-deletion session is observed waiting on the original active Subject lock; after Pin COMMIT, deletion can enter `deletion_pending`, without upgrading the old candidate to authority. **Deletion-first:** account-deletion transaction locks the Subject; historical DB Owner Pin is proven waiting for the same PostgreSQL row lock, then explicitly fails with `seyeon_source_lock_member_required` once deletion commits. Verify no Pin, Turn still planned, and no model authority.
+- Both orders independently preserve the original Grant as still active, verify canonical Member is `deletion_pending`, and require fresh G0 original recent-context read to reject after deletion. No production HTTP, API role grant, streaming, paid model, real Member ID, deployment or PR merge.
+- Local isolated disposable Docker PostgreSQL **17.11**: targeted two-session scenarios **2/2 PASS**; separate fresh schema-only restored database **entire S0 real PG17 E2E 51/51 PASS**. Local TypeScript and focused unit evidence below; exact new PR SHA CI remains separately required.
+- G0–G6 formal gates remain unchecked, positive historical Model Context execution and release remain HOLD. `HOLD_FORWARD_STOPPED` and no `ROADMAP_COMPLETE`.
+
+### 2026-11-04 — W67 — S0 historical candidate original-rights recheck before future G2 integration (HOLD)
+
+- Prior PR #2761 exact head `7f2406567233524665d6b21aed0403a1e612490b`: CI #41796968267, PostgreSQL17, db-authority-core, Work Track security, Web, Mobile and Governance all GREEN. Official issue #1866 G0–G6 remain 0/7 unchecked.
+- Implemented **new isolated S0 PostgreSQL Owner function** `seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(subject,thread,turn,attempt)` in `scripts/operations/seyeon-security-s0/23-g1-original-historical-current-audit.sql`. Wired the source into the hashed S0 installation plan, not `supabase/migrations`. It accepts only the exact durable historicalCandidateProof and current running Attempt/context_ready Turn, binds the canonical subject, locks the original source scope, and rechecks **every original User and Assistant** through the G0 current-rights reader, the complete historical body digests, the previous Assistant's original Attempt/User/Grant lineage, and the selected original Memory/Grant current status and PostgreSQL JSONB digest. Any missing, stale or substituted source is rejected. No protected User/Assistant body is emitted by the new function.
+- The output is explicitly **audit only**, `authorizesModel:false`, `permitsAtomicCommit:false`, `permitsHttpReveal:false`; this does **not** connect to live `cmd_commit_seyeon_chat_turn_runtime_v2`, model runtime, Vercel/Node HTTP or any public endpoint. It cannot authorize late model/Commit/Reveal. No new model/schema type is enabled.
+- The installer verifies **no `myeongha_api_executor` EXECUTE** for the new audit function. Real PostgreSQL17 S0 E2E verifies default denied ACL, grants EXECUTE only inside the isolated synthetic fixture, checks current source audit, wrong Turn rejection, revocation rejection, **regrant cannot revive the original Attempt**, and revokes fixture EXECUTE even on test failure.
+- Local isolated Docker PostgreSQL **17.11**: newly installed source audit targeted test PASS; two separate fresh-schema real S0 PostgreSQL E2E runs **51/51 PASS**, including the final added regrant-negative assertion. Focused historical tests **39/39 PASS**, changed E2E TypeScript diagnostics 0, source plan/installer checks PASS. Exact new PR SHA CI remains pending until verified.
+- G1 full selected positive Memory/Life Fact use, G2 same-transaction operating Commit, G3 replay/derived history and proxy/streaming, G4/G5 completeness and G6 production approval remain HOLD. `HOLD_FORWARD_STOPPED`; do not declare `ROADMAP_COMPLETE` or merge.
+
+
+### 2026-11-05 — W68 — G1 historical full model-context digest candidate bound to actual planner (S0 / HOLD)
+
+- **Starting facts:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761) prior exact HEAD `d23bd04bdf14249044b6e2bd4a0d7ee1e76d59f6` completed GitHub CI #41800555533, Web, Mobile and Governance SUCCESS; issue #1866 official G0–G6 checkboxes remain **0/7**. Current `main` has advanced independently; no merge attempted.
+- **Implementation:** Added `buildSeyeonG1HistoricalFinalContextCandidateSealV1` to existing G1 historical census. The real `seyeon-production-chat-execution-v1.ts` candidate path now deterministically constructs the **bounded, selected entire pre-Interpreter model context** (source-pinned User/Assistant history + one approved Memory, no relationship/derived/Preflight disclosure), validates the original historical manifest, and sends its expected full-context digest with the pre-model input digest to the existing DB Owner candidate port. The actual Provider packet after governed Preflight has **not** been verified and model dispatch remains prohibited.
+- **Immutable DB contract:** The isolated `22-g1-original-historical-candidate-pin.sql` now stores `expectedFinalModelContextDigest` in `historicalCandidateProof` schema v4. The PostgreSQL owner port validates the receipt's exact digest; `23-g1-original-historical-current-audit.sql` requires v4 and a valid full-context digest during the current-rights recheck. No existing `positiveProof`, executable G2 admission, final HTTP Reveal or post-Preflight source privilege is created.
+- **Verification scope:** Added deterministic candidate/modified-history/Grant-negative unit tests and updated six real PostgreSQL17 S0 fixture calls for the extended owner signature. Exact source-code HEAD before this worklog: `0c1f006b85d8cc81e2f3adb6fdbf21d2af2a50b0`. GitHub checks [PR #2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks) / [CI #41872955344](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41872955344) **pending at log write**; local full TypeScript/PostgreSQL validation NOT claimed.
+- **Next required implementation:** In the authorized bounded scope, compare the actual post-Preflight Interpreter context against the immutable candidate, then implement an approved positive historical G1 admission and **same-transaction original-rights G2 Commit validation** before any model activation. G3 initial/replay/streaming rights, G4 paid credit, full G5/G6 and explicit owner production approval remain open. No `supabase/migrations`, production DB/ACL, paid Provider, public HTTP, auto-merge or production activation. `HOLD_FORWARD_STOPPED`, `ROADMAP_COMPLETE` not reached.
+
+
+### 2026-11-05 — W69 — CI TypeScript fixture and isolated SQL reconstruction after W68 (S0 / HOLD)
+
+- **Failure reproduced from hosted evidence:** [CI #41873128106](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41873128106), [Work Track · security failed job #126725503476](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41873128106/job/126725503476). TypeScript `TS2741` in `test/seyeon-g1-historical-owner-candidate-w48.test.ts:33`: existing fixture omitted the newly required `expectedFinalModelContextDigest`, so the check terminated before API client/test/DB integration tasks.
+- **Direct fixes:** Updated W48 owner-port fixture with schema v4 receipt, required full-context digest, 17 PostgreSQL arguments and substituted-digest negative case. Audited the W68 SQL writes and discovered invalid repeated SQL content in both `22-g1-original-historical-candidate-pin.sql` and `23-g1-original-historical-current-audit.sql`; reconstructed each from the last working original revision with only intended v4 argument, regex, receipt, audit and ACL signature updates. Rechecked the bounded files (22 = 337 lines; 23 = 217 lines) and preserved HOLD/default ACL deny.
+- **Code-fix commit sequence:** `5570e985eda74336c46cd77651a0a721fd7955b3`, `4937e5ec6f709a2c455fb590c2fd6edc49e3e67b`, `da282e4249a39d486306b967fe8838448b04e40c` on [PR #2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761). [Retry checks](https://github.com/gycha0109-beep/MyeongHa/pull/2761/checks) were queued/running when this entry was written. **No new CI SUCCESS / full PostgreSQL17 PASS is claimed.** No deployment, production SQL, paid Provider, reveal, merge, or authorization change.
+- **Remaining:** Confirm exact new HEAD's TypeScript, S0 PG17 E2E, Governance, Web and Mobile checks. Official issue #1866 G0–G6 remains 0/7. Subsequent G1 positive historical authorization and G2 same-transaction original-source authority remain unimplemented. `HOLD_FORWARD_STOPPED`; no production rollout or `ROADMAP_COMPLETE`.
+
+
+### 2026-11-05 — W70 — G1 historical post-Preflight actual Interpreter context equality (S0 / HOLD)
+
+- **Baseline:** PR [#2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761) previous exact HEAD `54ee79e99079c556182a22a22e5c8225fd51fbcd` passed [CI #41874746030](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41874746030) including security, db-authority-core, PostgreSQL17, Web, Mobile and Governance. Official issue #1866 G0–G6 remains **0/7**.
+- **Implementation:** Added isolated `apps/api/src/seyeon-g1-historical-final-context-proof-v1.ts` to validate an **actual post-Preflight assembled Interpreter context** against the immutable historical G1 v4 candidate's deterministic expected final-context digest. It independently reselects the exact bounded original User/Assistant window and approved Memory from the normalizer/source candidates; requires the exact original Record/Grant, source census digests and historical manifest; checks the DB candidate pre-model and expected-final digests; rejects any altered history, Memory, Bible/policy context or Preflight-derived private/integrity material. This is a source-only comparison function, **not connected to the blocked production historical Provider path** and never asserts Model/Commit/Reveal permission.
+- **Verification:** Added `test/seyeon-g1-historical-final-context-proof-v1.test.ts` with six successful isolated cases including mismatched final content and stale/unapproved original source. On a separate temporary home-PC Git clone, `npm ci --ignore-scripts`, `npx tsc -p tsconfig.json --noEmit` and focused three-file Vitest suite **52/52 PASS**. No production PostgreSQL test or exact-new-HEAD hosted CI result is claimed in this entry.
+- **Outstanding:** The actual model execution branch remains `SeyeonHistoricalCandidatePersistedHoldV1` before Provider; full historical positive G1 authority, same-transaction G2 original source revalidation, G3 Reveal/Replay, G4 paid credit and full G5/G6 evidence remain unfinished. No `supabase/migrations`, paid model execution, HTTP publishing, production grants, auto-merge or rollout. `HOLD_FORWARD_STOPPED`; `ROADMAP_COMPLETE` not reached.

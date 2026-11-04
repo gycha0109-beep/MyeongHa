@@ -25,6 +25,8 @@ import type {
   ProductionUserDataRuntimeConfigV1,
   ProductionUserDataRuntimeEnvV1,
 } from './production-user-data-runtime-config.js';
+import { createSeyeonPostTurnPlannerMemoryPortV1 }
+  from './seyeon-post-turn-planner-memory-port-v1.js';
 import {
   processSeyeonPostTurnAnalysisV1,
   type ProcessSeyeonPostTurnAnalysisResultV1,
@@ -240,6 +242,14 @@ export function createProductionSeyeonPostTurnWorkerRuntimeV1(
         leaseExpiresAt: runInput.leaseExpiresAt,
         outboxPort: meteredOutbox,
         extractorProvider: meteredProvider,
+        // This port is bound to the canonical server Member + governed
+        // Provider; the existing Production source preflight is OFF-only,
+        // and Planner admission remains DENY even if an unsafe claim leaks.
+        plannerMemoryPort: createSeyeonPostTurnPlannerMemoryPortV1({
+          pool: poolLease.pool,
+          verifiedEvidence: runInput.verifiedEvidence,
+          governedProvider: meteredProvider,
+        }),
         enforceCurrentSourceAuthority: true,
         relationshipSyncOutboxPort:
           ports.relationshipSyncOutbox,

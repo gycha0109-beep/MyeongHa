@@ -49,11 +49,34 @@ begin
     on th.id=t.thread_id and th.subject_id=t.subject_id
   where t.id=p_turn and t.subject_id=p_subject and t.thread_id=p_thread
     and a.id=p_attempt
-    and ((t.state='planned' and a.state='running')
-      or (t.state='validated' and a.state='validated'))
     and a.planner_version='seyeon-production-chat-planner-v1'
     and a.seyeon_personal_source_pin_jsonb is null
     and th.status='active'
+    and (
+      (t.state='planned' and a.state='running')
+      or (t.state='validated' and a.state='validated')
+      or (
+        -- Isolated R21 two-original ContextReady may inspect the exact
+        -- immutable set after its DB Owner atomic transition, never an
+        -- unpinned/zero/one-source or a committed/replayed attempt.
+        t.state='context_ready'
+        and exists (
+          select 1
+          from seyeon_positive_candidate.source_sets_r1 s
+          join seyeon_positive_candidate.attempt_source_pins pin
+            on pin.attempt_id=s.attempt_id and pin.subject_id=s.subject_id
+            and pin.thread_id=s.thread_id and pin.turn_id=s.turn_id
+          join seyeon_positive_candidate.source_edges_r1 e0
+            on e0.attempt_id=s.attempt_id and e0.ordinal=0
+            and e0.memory_id=pin.original_memory_id
+            and e0.original_grant_id=pin.original_grant_id
+            and e0.pg_payload_digest=pin.original_raw_digest
+          where s.attempt_id=p_attempt and s.subject_id=p_subject
+            and s.thread_id=p_thread and s.turn_id=p_turn
+            and s.source_count=2 and pin.state='pinned'
+        )
+      )
+    )
   for share of t,a,th;
   if not found then return null; end if;
 

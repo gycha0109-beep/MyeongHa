@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { canonicalJson } from '../packages/domain/src/index.js';
 import {
@@ -12,10 +12,22 @@ import {
   type PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 import { createSeyeonPositiveS0OwnerDbPortsV1 } from '../apps/api/src/postgres-seyeon-positive-memory-source-runtime-v1.js';
+import { createSeyeonG1HistoricalCandidateOwnerPortV1 } from '../apps/api/src/postgres-seyeon-g1-historical-candidate-port-v1.js';
 import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
 import { createSeyeonOwnedOriginalGrantV1 } from '../apps/api/src/postgres-seyeon-owned-original-grant-v1.js';
+import { readSeyeonPendingPlannerMemoryDecisionSourceV1 } from '../apps/api/src/postgres-seyeon-planner-memory-decision-source-v1.js';
+import { createPendingSeyeonPlannerMemoryProposalV1 } from '../apps/api/src/postgres-seyeon-planner-memory-proposal-producer-v1.js';
+import { verifySeyeonPlannerPreModelSourceV1 } from '../apps/api/src/postgres-seyeon-planner-pre-model-source-v1.js';
+import { inspectSeyeonPlannerDisplayCandidateS0V1 } from '../apps/api/src/postgres-seyeon-planner-memory-display-candidate-v1.js';
+import { handleSeyeonPendingPlannerNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-pending-proposal-node-http-s0-v1.js';
+import { handleSeyeonPlannerDecisionNodeHttpS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-node-http-s0-v1.js';
+import { handleSeyeonFirstOriginalAssistantReplayNodeS0V1 } from '../apps/api/src/seyeon-first-original-assistant-replay-node-s0-v1.js';
+import { handleSeyeonFirstOriginalDialoguePairNodeS0V1 } from '../apps/api/src/seyeon-first-original-dialogue-pair-node-s0-v1.js';
+import { planSeyeonPlannerMemoryDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-v1.js';
+import { commitSeyeonSingleCharacterPlannerGrantDecisionV1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
+import { commitSeyeonPlannerMemoryDecisionS0V1 } from '../apps/api/src/seyeon-planner-memory-decision-commit-v1.js';
 import { handleSeyeonFirstPositiveMemoryDirectNodeHttpV1 } from '../apps/api/src/seyeon-first-positive-memory-node-http-ingress-v1.js';
 import { handleSeyeonFirstPositiveMemoryFetchV1,handleSeyeonPositiveReplyReceiptV1 } from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
 import { handleSeyeonPositiveReceiptAndCreditCandidateV1 }
@@ -92,6 +104,21 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         uuid,uuid,uuid) to myeongha_api_executor;
       grant execute on function public.cmd_grant_seyeon_owned_conversation_recall_v1(
         uuid,uuid,uuid) to myeongha_api_executor;
+      grant usage on schema seyeon_private to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_pending_planner_memory_decision_v1(uuid,uuid)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.cmd_create_pending_seyeon_planner_memory_v1(uuid,uuid,uuid,uuid,uuid,text,text)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.cmd_resolve_pending_seyeon_planner_non_durable_v1(uuid,uuid,text)
+        to myeongha_api_executor;
+       grant execute on function seyeon_private.qry_pending_seyeon_planner_display_candidate_v1(uuid,uuid,uuid)
+         to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_planner_pre_model_source_v1(uuid,uuid,uuid,uuid,text,text)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(uuid,uuid,uuid)
+        to myeongha_api_executor;
+      grant execute on function seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(uuid,uuid,uuid)
+        to myeongha_api_executor;
       grant execute on function public.cmd_issue_seyeon_positive_first_reply_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,bytea),
         seyeon_private.cmd_ack_seyeon_positive_reply_v1(uuid,text),
@@ -105,17 +132,14 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
     const userText = virtual === undefined ? 'Synthetic first hello' : '내가 주말에 뭐 한다고 했지?';
+    const contentBundleHash = createHash('sha256')
+      .update('seyeon-s0-pg17-content-bundle-fixture:v1:' + String(n))
+      .digest('hex');
     const adapt = (sql: string) => sql.replaceAll('000000000001', String(n).padStart(12, '0'))
       .replaceAll('first-zero-test-v1', 'first-zero-test-v1-' + n)
       .replaceAll('first-zero-test-release', 'first-zero-test-release-' + n)
       .replaceAll('first-zero-disposable-v1', uuid(30, n))
-      // After fixture 15, hex numbering has two characters: repeating the
-      // entire numeral 64 times would violate the exact 64-hex hash contract.
-      // Preserve existing fixtures 1–15 unchanged; derive unique valid hashes
-      // for the new G5 receipts without colliding with older seeded bundles.
-      .replaceAll("repeat('a',64)", n <= 15
-        ? "repeat('" + n.toString(16) + "',64)"
-        : "'" + createHash('sha256').update('s0-g5-content-'+n).digest('hex') + "'")
+      .replaceAll("repeat('a',64)", "'" + contentBundleHash + "'")
       .replaceAll('Synthetic first hello', userText);
     await pool.query(adapt(baseline.slice(0, seedEnd)));
     await pool.query(`insert into public.memory_items(
@@ -178,6 +202,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
     await run(({ client }) => createSeyeonPositiveS0OwnerDbPortsV1(client).pinBeforeModel({
       subjectId: subject, threadId: thread, turnId: turn, attemptId: attempt,
+      currentUserMessageId:user,
+      currentUserTextDigest:'sha256:wire-utf8:v1:'+
+        createHash('sha256').update(userText,'utf8').digest('hex'),
       originalMemoryId: memory, originalGrantId: grant, recordType: source.recordType,
       schemaVersion: source.schemaVersion, projectorVersion: source.projectorVersion,
       selectedSources: [source], selectedSourcesDigest: selectionDigest,
@@ -401,6 +428,529 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await expect(f.run(({ client }) => acceptSeyeonPrivateConversationRecallProposalV1(client, {
       subjectId: f.subject, proposalId: invalidProposal, memoryItemId: uuid(28, 99), grantChoice: { mode: 'private' },
     }))).rejects.toMatchObject({ constraint: 'seyeon_private_memory_accept_summary_invalid' });
+  });
+
+  it('DB Planner Character source admits atomic Member Memory+Grant, manual UserMessage denied',async()=>{
+    // Dedicated S0 Planner fixture namespace (201-202); history-presence uses 13.
+    const f=await prepare(201);
+    await f.commit();
+    const id=uuid(27,201);
+    const producerInput={
+      canonicalMemberSubjectId:f.subject,proposalId:id,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자가 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    };
+    const created=await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,producerInput));
+    expect(created).toEqual({proposalId:id,proposalState:'pending',replayed:false});
+    const replay=await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,producerInput));
+    expect(replay).toEqual({proposalId:id,proposalState:'pending',replayed:true});
+    const {rows:[beforeConsent]}=await pool.query(
+      'select count(*)::int as n from public.memory_items where subject_id=$1 and source_turn_id=$2',
+      [f.subject,f.turn]);
+    expect(beforeConsent.n).toBe(0);
+    const receipt=await f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId:id,
+      });
+      expect(source.currentEligibleCharacterIds).toEqual(['seyeon']);
+      expect(source.candidate.sourceAuthority).toBe('db_verified_dialogue_planner');
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+        choice:'character_only',currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+      });
+      return commitSeyeonSingleCharacterPlannerGrantDecisionV1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    expect(receipt).toEqual({proposalId:id,decision:'character_only',
+      status:'resolved',persisted:true,grantCount:1,payloadPurged:false});
+    const {rows:[record]}=await pool.query(`select p.status,m.content_jsonb as body,
+      (select count(*)::int from public.record_access_grants g
+        where g.memory_item_id=m.id and g.grantee_character_id='seyeon') as grants
+      from public.memory_proposals p join public.memory_items m
+        on m.id=p.accepted_memory_item_id where p.id=$1`,[id]);
+    expect(record).toEqual({status:'accepted',body:{summary:'사용자가 인사를 했다'},grants:1});
+    // A completed decision cannot recreate a pending browser offer on replay.
+    // Re-approval or later withdrawal must never resurrect the old proposal.
+    expect(await f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.assistant,
+      approvedInternalS0Inspection:()=>true,
+    }))).toBeNull();
+    await expect(f.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+      client,canonicalMemberSubjectId:f.subject,proposalId:id,
+    }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+
+    const other=await prepare(202);
+    await other.commit();
+    const manual=uuid(27,202);
+    await expect(other.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:other.subject,proposalId:manual,turnId:other.turn,
+      assistantMessageId:other.user,userMessageId:other.user,
+      candidate:{summary:'사용자가 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }))).rejects.toThrow();
+    await expect(other.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:other.subject,proposalId:manual,turnId:other.turn,
+      assistantMessageId:other.assistant,userMessageId:other.user,
+      candidate:{summary:'근거 없는 사용자 정보',userEvidenceQuote:'user did not say this'},
+    }))).rejects.toThrow();
+    const {rows:[noManual]}=await pool.query(
+      'select count(*)::int as n from public.memory_proposals where id=$1',[manual]);
+    expect(noManual.n).toBe(0);
+
+    // A public Proposal row bearing the Planner dedupe label is not proof
+    // that the Owner's actual producer created it.
+    await pool.query(`insert into public.memory_proposals(
+      id,subject_id,character_id,proposal_kind,record_type,schema_version,
+      proposed_value_jsonb,source_turn_id,source_message_id,
+      proposal_dedupe_key,status,created_at)
+      values($1,$2,'seyeon','memory','conversation_recall','v1',
+        '{"summary":"forged assistant proposal"}',$3,$4,
+        'seyeon-dialogue-planner:v1','pending',clock_timestamp())`,
+      [manual,other.subject,other.turn,other.assistant]);
+    await expect(other.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+      client,canonicalMemberSubjectId:other.subject,proposalId:manual,
+    }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    const {rows:[ownerEvidence]}=await pool.query(
+      'select count(*)::int as n from seyeon_private.planner_memory_proposal_sources_v1 where proposal_id=$1',
+      [manual]);
+    expect(ownerEvidence.n).toBe(0);
+  });
+
+  it('serializes two independent Member decisions: discard prevents concurrent durable consent',async()=>{
+    const f=await prepare(209);
+    await f.commit();
+    const proposalId=uuid(27,209);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+
+    let sourceLocked!:()=>void,release!:()=>void;
+    const locked=new Promise<void>(resolve=>{sourceLocked=resolve;});
+    const proceed=new Promise<void>(resolve=>{release=resolve;});
+    const resolveChoice=(choice:'discard'|'character_only')=>f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      });
+      if(choice==='discard'){sourceLocked();await proceed;}
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,choice,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+      });
+      return commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    const first=resolveChoice('discard');
+    await locked;
+    const second=resolveChoice('character_only')
+      .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+
+    let waited=false;
+    for(let i=0;i<100;i++){
+      const {rows:[waiting]}=await pool.query(`select exists(
+        select 1 from pg_stat_activity
+        where datname=current_database() and wait_event_type='Lock'
+          and pid<>pg_backend_pid()) as waiting`);
+      if(waiting.waiting===true){waited=true;break;}
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    try{expect(waited).toBe(true);}
+    finally{release();}
+    expect(await first).toMatchObject({
+      proposalId,decision:'discard',status:'resolved',
+      persisted:false,grantCount:0,payloadPurged:true,
+    });
+    const losing=await second;
+    expect(losing.ok).toBe(false);
+    if(!losing.ok)expect(losing.error).toMatchObject({
+      code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE',
+    });
+    const {rows:[state]}=await pool.query(`select p.status,p.proposed_value_jsonb as payload,
+      (select count(*)::int from public.memory_items m where m.subject_id=p.subject_id
+        and m.source_turn_id=p.source_turn_id) as memories,
+      (select count(*)::int from public.record_access_grants g
+        join public.memory_items m on m.id=g.memory_item_id
+        where m.subject_id=p.subject_id and m.source_turn_id=p.source_turn_id) as grants
+      from public.memory_proposals p where p.id=$1`,[proposalId]);
+    expect(state).toEqual({status:'rejected',payload:{},memories:0,grants:0});
+    expect(await f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.assistant,
+      approvedInternalS0Inspection:()=>true,
+    }))).toBeNull();
+  });
+
+
+  it('UC-06 G3 S0 sends only current pending proposal via a locked real Node HTTP response',async()=>{
+    const f=await prepare(211);
+    await f.commit();
+    const proposalId=uuid(27,211);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+
+    const send=async(evidence:typeof f.evidence,threadId=f.thread,
+      assistantId=f.assistant,authorized=true)=>{
+      let resolveOutcome!:(outcome:string)=>void;
+      const complete=new Promise<string>(resolve=>{resolveOutcome=resolve;});
+      const server=createServer((incoming,response)=>{
+        void handleSeyeonPendingPlannerNodeHttpS0V1({
+          incoming,response,pool:subjectPool,requestId:'s0-proposal-211',
+          identityEvidenceVerifier:{verifyRequestIdentity:async(request)=>
+            request.headers.get('authorization')==='Bearer synthetic-member'
+              ? evidence : null},
+        }).then(resolveOutcome,()=>resolveOutcome('error'));
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${threadId}/planner-proposals/${assistantId}`;
+        const response=await fetch(url,{headers:authorized
+          ?{Authorization:'Bearer synthetic-member'}:{}});
+        const raw=await response.text();
+        const outcome=await complete;
+        return {status:response.status,cache:response.headers.get('Cache-Control'),
+          payload:JSON.parse(raw) as Record<string,unknown>,outcome,raw};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+
+    const visible=await send(f.evidence);
+    expect(visible.status).toBe(200);
+    expect(visible.cache).toContain('no-store');
+    expect(visible.outcome).toBe('proposal_sent');
+    expect(visible.payload).toEqual({ok:true,
+      data:{threadId:f.thread,assistantMessageId:f.assistant,
+        memoryProposal:{sourceAuthority:'server_dialogue_planner',
+          characterId:'seyeon',proposalId,proposalKind:'memory',
+          proposalState:'pending',summary:'사용자는 인사를 했다'}},
+      meta:{apiContractVersion:'v0.9',requestId:'s0-proposal-211'},
+    });
+    expect(visible.raw).not.toContain('Synthetic first hello');
+
+    const unauthenticated=await send(f.evidence,f.thread,f.assistant,false);
+    expect(unauthenticated.status).toBe(401);
+    expect(unauthenticated.outcome).toBe('preflight_denied');
+    expect(unauthenticated.raw).not.toContain('사용자는 인사를 했다');
+
+    const other=await prepare(212);
+    await other.commit();
+    const wrongMember=await send(other.evidence);
+    expect(wrongMember.status).toBe(503);
+    expect(wrongMember.outcome).toBe('proposal_withheld');
+    expect(wrongMember.raw).not.toContain('사용자는 인사를 했다');
+
+    const wrongMessage=await send(f.evidence,f.thread,f.user);
+    expect(wrongMessage.status).toBe(503);
+    expect(wrongMessage.raw).not.toContain('사용자는 인사를 했다');
+
+    await f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      });
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,choice:'discard',
+      });
+      return commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    const afterDiscard=await send(f.evidence);
+    expect(afterDiscard.status).toBe(503);
+    expect(afterDiscard.outcome).toBe('proposal_withheld');
+    expect(afterDiscard.raw).not.toContain('사용자는 인사를 했다');
+  });
+
+  it('UC-06/07 real Node GET -> explicit POST discard -> replay denied on the same Member',async()=>{
+    const f=await prepare(213);
+    await f.commit();
+    const proposalId=uuid(27,213);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+    const identityEvidenceVerifier={
+      verifyRequestIdentity:async(request:Request)=>
+        request.headers.get('authorization')==='Bearer synthetic-member'
+          ?f.evidence:null,
+    };
+    const server=createServer((incoming,response)=>{
+      const input={incoming,response,pool:subjectPool,identityEvidenceVerifier,
+        requestId:'planner-node-flow-213'};
+      if(incoming.method==='POST'){
+        void handleSeyeonPlannerDecisionNodeHttpS0V1(input);
+      }else{
+        void handleSeyeonPendingPlannerNodeHttpS0V1(input);
+      }
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const origin=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    const getUrl=origin+'/api/chat/'+f.thread+'/planner-proposals/'+f.assistant;
+    const postUrl=origin+'/api/memory/proposals/'+proposalId+'/decision';
+    try{
+      const visible=await fetch(getUrl,{headers:{Authorization:'Bearer synthetic-member'}});
+      expect(visible.status).toBe(200);
+      const offered=await visible.json();
+      expect(offered.data.memoryProposal).toMatchObject({
+        proposalId,sourceAuthority:'server_dialogue_planner',proposalState:'pending',
+        summary:'사용자는 인사를 했다',
+      });
+      const denied=await fetch(postUrl,{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'discard'}})});
+      expect(denied.status).toBe(401);
+      const confirmed=await fetch(postUrl,{method:'POST',
+        headers:{Authorization:'Bearer synthetic-member','Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'discard'}})});
+      expect(confirmed.status).toBe(200);
+      expect(confirmed.headers.get('Cache-Control')).toBe('no-store');
+      expect((await confirmed.json()).data).toEqual({
+        proposalId,decision:'discard',status:'resolved',persisted:false,grantCount:0,
+      });
+      const again=await fetch(getUrl,{headers:{Authorization:'Bearer synthetic-member'}});
+      expect(again.status).toBe(503);
+      const withheld=await again.text();
+      expect(withheld).not.toContain('사용자는 인사를 했다');
+      expect(withheld).not.toContain('Synthetic first hello');
+      const replay=await fetch(postUrl,{method:'POST',
+        headers:{Authorization:'Bearer synthetic-member','Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'discard'}})});
+      expect(replay.status).toBe(503);
+      const {rows:[db]}=await pool.query(`select status,
+        proposed_value_jsonb as payload,
+        (select count(*)::int from public.memory_items m
+          where m.source_turn_id=memory_proposals.source_turn_id
+          and m.subject_id=memory_proposals.subject_id) as memories
+        from public.memory_proposals where id=$1`,[proposalId]);
+      expect(db).toEqual({status:'rejected',payload:{},memories:0});
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
+  it('UC-07 real Node Member POST creates exactly one accepted Memory and original Se-yeon Grant',async()=>{
+    const f=await prepare(215);
+    await f.commit();
+    const proposalId=uuid(27,215);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+    const identityEvidenceVerifier={
+      verifyRequestIdentity:async()=>f.evidence,
+    };
+    const server=createServer((incoming,response)=>{
+      const args={incoming,response,pool:subjectPool,identityEvidenceVerifier,
+        requestId:'node-member-accept-215'};
+      if(incoming.method==='POST'){
+        void handleSeyeonPlannerDecisionNodeHttpS0V1(args);
+      }else{
+        void handleSeyeonPendingPlannerNodeHttpS0V1(args);
+      }
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    const origin=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+    try{
+      const response=await fetch(
+        origin+'/api/memory/proposals/'+proposalId+'/decision',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({choice:{mode:'character_only',characterId:'seyeon'}}),
+      });
+      expect(response.status).toBe(200);
+      expect((await response.json()).data).toEqual({
+        proposalId,decision:'character_only',status:'resolved',
+        persisted:true,grantCount:1,
+      });
+      const {rows:[state]}=await pool.query(`select p.status,
+        (select count(*)::int from public.memory_items m
+          where m.id=p.accepted_memory_item_id) as memories,
+        (select count(*)::int from public.record_access_grants g
+          where g.memory_item_id=p.accepted_memory_item_id
+            and g.grantee_character_id='seyeon') as grants
+        from public.memory_proposals p where p.id=$1`,[proposalId]);
+      expect(state).toEqual({status:'accepted',memories:1,grants:1});
+      const replay=await fetch(origin+'/api/chat/'+f.thread+
+        '/planner-proposals/'+f.assistant);
+      expect(replay.status).toBe(503);
+      const body=await replay.text();
+      expect(body).not.toContain('사용자는 인사를 했다');
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
+  it('UC-07 session-only and discard resolve pending without long-term Memory or Grants',async()=>{
+    for(const [n,choice,status] of [
+      [203,'session_only','expired'],
+      [204,'discard','rejected'],
+    ] as const){
+      const f=await prepare(n);
+      await f.commit();
+      const proposalId=uuid(27,n);
+      await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+        canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+        assistantMessageId:f.assistant,userMessageId:f.user,
+        candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+      }));
+      const receipt=await f.run(async({client})=>{
+        const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+          client,canonicalMemberSubjectId:f.subject,proposalId,
+        });
+        const plan=planSeyeonPlannerMemoryDecisionV1({
+          candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+          currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+          choice,
+        });
+        return commitSeyeonPlannerMemoryDecisionS0V1({
+          client,canonicalMemberSubjectId:f.subject,plan,
+        });
+      });
+      expect(receipt).toEqual({proposalId,decision:choice,status:'resolved',
+        persisted:false,grantCount:0,payloadPurged:true});
+      const {rows:[row]}=await pool.query(`select p.status,p.proposed_value_jsonb as payload,
+        (select count(*)::int from public.memory_items m where m.subject_id=p.subject_id
+          and m.source_turn_id=p.source_turn_id) as memories,
+        (select count(*)::int from public.record_access_grants g
+          join public.memory_items m on m.id=g.memory_item_id
+          where m.subject_id=p.subject_id and m.source_turn_id=p.source_turn_id) as grants
+        from public.memory_proposals p where p.id=$1`,[proposalId]);
+      expect(row).toEqual({status,payload:{},memories:0,grants:0});
+      await expect(f.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    }
+  });
+
+  it('SRC-05 bounded pending Planner expiry erases only overdue DB-owned proposals',async()=>{
+    const overdue=await prepare(205);
+    await overdue.commit();
+    const overdueId=uuid(27,205);
+    const current=await prepare(206);
+    await current.commit();
+    const currentId=uuid(27,206);
+    const rejected=await prepare(207);
+    await rejected.commit();
+    const rejectedId=uuid(27,207);
+
+    for(const [f,proposalId] of [
+      [overdue,overdueId],[current,currentId],[rejected,rejectedId],
+    ] as const){
+      await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+        canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+        assistantMessageId:f.assistant,userMessageId:f.user,
+        candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+      }));
+    }
+    const rejectedReceipt=await rejected.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:rejected.subject,proposalId:rejectedId,
+      });
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:rejected.subject,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+        choice:'discard',
+      });
+      return commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:rejected.subject,plan,
+      });
+    });
+    expect(rejectedReceipt.payloadPurged).toBe(true);
+
+    await pool.query(`update public.memory_proposals
+      set created_at=clock_timestamp()-interval '3 days'
+      where id in ($1,$2)`,[overdueId,rejectedId]);
+    const cutoff=new Date(Date.now()-24*60*60*1000).toISOString();
+    const {rows:[acl]}=await pool.query(`select has_function_privilege(
+      'myeongha_api_executor',
+      'seyeon_private.cmd_expire_pending_planner_memory_batch_v1(timestamptz,integer)',
+      'EXECUTE') as allowed`);
+    expect(acl.allowed).toBe(false);
+
+    const {rows:expired}=await pool.query(`select proposal_id::text as id,
+      subject_id::text as subject, payload_purged as purged
+      from seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        $1::timestamptz,$2::integer)`,[cutoff,1]);
+    expect(expired).toEqual([{
+      id:overdueId,subject:overdue.subject,purged:true,
+    }]);
+    const {rows:records}=await pool.query(`select id::text as id,status,
+      proposed_value_jsonb as payload from public.memory_proposals
+      where id=any($1::uuid[]) order by id`,
+      [[overdueId,currentId,rejectedId]]);
+    const status=new Map(records.map(x=>[x.id,{status:x.status,payload:x.payload}]));
+    expect(status.get(overdueId)).toEqual({status:'expired',payload:{}});
+    expect(status.get(currentId)).toEqual({
+      status:'pending',payload:{summary:'사용자는 인사를 했다'},
+    });
+    expect(status.get(rejectedId)).toEqual({status:'rejected',payload:{}});
+    const {rows:replayed}=await pool.query(`select proposal_id from
+      seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        $1::timestamptz,$2::integer)`,[cutoff,1]);
+    expect(replayed).toHaveLength(0);
+    await expect(overdue.run(({client})=>readSeyeonPendingPlannerMemoryDecisionSourceV1({
+      client,canonicalMemberSubjectId:overdue.subject,proposalId:overdueId,
+    }))).rejects.toMatchObject({code:'SEYEON_PLANNER_DECISION_SOURCE_UNAVAILABLE'});
+    await expect(pool.query(`select * from
+      seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        clock_timestamp()+interval '1 day',1)`))
+      .rejects.toMatchObject({constraint:'seyeon_planner_expiry_policy_required'});
+    await expect(pool.query(`select * from
+      seyeon_private.cmd_expire_pending_planner_memory_batch_v1(
+        clock_timestamp()-interval '1 day',101)`))
+      .rejects.toMatchObject({constraint:'seyeon_planner_expiry_policy_required'});
+  });
+
+  it('S0 pending Planner display candidate is owner-bound, never a public G3 Reveal',async()=>{
+    const f=await prepare(208);
+    await f.commit();
+    const proposalId=uuid(27,208);
+    await f.run(({client})=>createPendingSeyeonPlannerMemoryProposalV1(client,{
+      canonicalMemberSubjectId:f.subject,proposalId,turnId:f.turn,
+      assistantMessageId:f.assistant,userMessageId:f.user,
+      candidate:{summary:'사용자는 인사를 했다',userEvidenceQuote:'Synthetic first hello'},
+    }));
+
+    const inspect=()=>f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.assistant,
+      approvedInternalS0Inspection:()=>true,
+    }));
+    expect(await inspect()).toEqual({
+      sourceAuthority:'db_owner_planner_inspection_only',
+      disclosureAuthorized:false,subjectId:f.subject,threadId:f.thread,
+      assistantMessageId:f.assistant,proposalId,proposalKind:'memory',
+      summary:'사용자는 인사를 했다',
+    });
+    expect(await f.run(({client})=>inspectSeyeonPlannerDisplayCandidateS0V1({
+      client,canonicalMemberSubjectId:f.subject,
+      threadId:f.thread,assistantMessageId:f.user,
+      approvedInternalS0Inspection:()=>true,
+    }))).toBeNull();
+    await f.run(async({client})=>{
+      const source=await readSeyeonPendingPlannerMemoryDecisionSourceV1({
+        client,canonicalMemberSubjectId:f.subject,proposalId,
+      });
+      const plan=planSeyeonPlannerMemoryDecisionV1({
+        candidate:source.candidate,canonicalMemberSubjectId:f.subject,
+        currentEligibleCharacterIds:source.currentEligibleCharacterIds,
+        choice:'discard',
+      });
+      await commitSeyeonPlannerMemoryDecisionS0V1({
+        client,canonicalMemberSubjectId:f.subject,plan,
+      });
+    });
+    expect(await inspect()).toBeNull();
   });
 
   it('rejects a revoked original Grant at atomic Commit even after a fresh replacement Grant', async () => {
@@ -675,6 +1225,1474 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     });
   });
 
+  it('G3 S0 replays the first delivered original Assistant over a real Node HTTP socket only while its original Grant is current',async()=>{
+    const f=await prepare(216,{summary:'synthetic original memory for replay'});
+    await f.commit();
+    let firstText:string|null=null;
+    await f.locked()({signal:new AbortController().signal,deliver:async text=>{
+      firstText=text;
+    }});
+    expect(firstText).toBe(f.assistantText);
+
+    // Before testing the socket, prove the DB-authoritative replay row is
+    // eligible. A failing expectation here identifies a SQL authority gap
+    // rather than misdiagnosing the 503 as a transport error.
+    const diagnosticClient=await pool.connect();
+    let replayRows;
+    try{
+      await diagnosticClient.query('BEGIN');
+      await diagnosticClient.query(
+        "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+      );
+      const metadata=await diagnosticClient.query(`select t.state,t.delivered_at is not null as "deliveredAt",
+        a.seyeon_positive_delivery_issued_at is null as "noIssuedReceipt",
+        m.body_text=a.generated_body_text as "sameOriginalText",
+        c.left_at is null as "participantCurrent"
+        from public.conversation_messages m
+        join public.chat_turns t on t.id=m.turn_id
+        join public.chat_turn_attempts a on a.id=t.committed_attempt_id
+        join public.conversation_thread_characters c on c.id=m.thread_character_id
+        where m.id=$1`,[f.assistant]);
+      const rows=await diagnosticClient.query(
+        'select assistant_text as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1($1::uuid,$2::uuid,$3::uuid)',
+        [f.subject,f.thread,f.assistant],
+      );
+      replayRows={metadata:metadata.rows,replay:rows.rows};
+    }finally{
+      await diagnosticClient.query('ROLLBACK');
+      diagnosticClient.release();
+    }
+    expect(replayRows).toEqual({
+      metadata:[{state:'delivered',deliveredAt:true,noIssuedReceipt:true,
+        sameOriginalText:true,participantCurrent:true}],
+      replay:[{assistantText:f.assistantText}],
+    });
+
+    const other=await prepare(217);
+    await other.commit();
+    const send=async(evidence:typeof f.evidence,assistantId=f.assistant,
+      authorization=true)=>{
+      const server=createServer((incoming,response)=>{
+        void handleSeyeonFirstOriginalAssistantReplayNodeS0V1({
+          incoming,response,pool:subjectPool,requestId:'original-replay-216',
+          identityEvidenceVerifier:{verifyRequestIdentity:async(request)=>
+            authorization && request.headers.get('authorization')==='Bearer synthetic-member'
+              ?evidence:null},
+        });
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-replay/${assistantId}`,{
+          headers:authorization?{Authorization:'Bearer synthetic-member'}:{},
+        });
+        return {status:response.status,cache:response.headers.get('Cache-Control'),
+          body:await response.text()};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+
+    const first=await send(f.evidence);
+    expect(first.status).toBe(200);
+    expect(first.cache).toContain('no-store');
+    expect(first.body).toContain(f.assistantText);
+    const second=await send(f.evidence);
+    expect(second.status).toBe(200);
+    expect(second.body).toContain(f.assistantText);
+
+    // A distinct, still-unmounted direct Node path combines the exact
+    // Member-authored first User with this same original-Grant-locked reply.
+    const sendPair=async(evidence:typeof f.evidence,authorized=true)=>{
+      const server=createServer((incoming,response)=>{
+        void handleSeyeonFirstOriginalDialoguePairNodeS0V1({
+          incoming,response,pool:subjectPool,requestId:'original-pair-216',
+          identityEvidenceVerifier:{verifyRequestIdentity:async(request)=>
+            authorized && request.headers.get('authorization')==='Bearer synthetic-member'
+              ?evidence:null},
+        });
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-pair/${f.assistant}`,{
+          headers:authorized?{Authorization:'Bearer synthetic-member'}:{},
+        });
+        return {status:response.status,body:await response.text()};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+    const firstPair=await sendPair(f.evidence);
+    expect(firstPair.status).toBe(200);
+    expect(JSON.parse(firstPair.body).data).toMatchObject({
+      threadId:f.thread,userMessageId:f.user,userText:f.userText,
+      assistantMessageId:f.assistant,assistantText:f.assistantText,
+    });
+    expect((await sendPair(other.evidence)).status).toBe(503);
+    const unverifiedPair=await sendPair(f.evidence,false);
+    expect(unverifiedPair.status).toBe(401);
+    expect(unverifiedPair.body).not.toContain(f.userText);
+
+    const unverified=await send(f.evidence,f.assistant,false);
+    expect(unverified.status).toBe(401);
+    expect(unverified.body).not.toContain(f.assistantText);
+    const foreign=await send(other.evidence);
+    expect(foreign.status).toBe(503);
+    expect(foreign.body).not.toContain(f.assistantText);
+    const wrongOriginal=await send(f.evidence,f.user);
+    expect(wrongOriginal.status).toBe(503);
+    expect(wrongOriginal.body).not.toContain(f.assistantText);
+
+    await f.revoke();
+    const withdrawn=await send(f.evidence);
+    expect(withdrawn.status).toBe(503);
+    expect(withdrawn.body).not.toContain(f.assistantText);
+    const withdrawnPair=await sendPair(f.evidence);
+    expect(withdrawnPair.status).toBe(503);
+    expect(withdrawnPair.body).not.toContain(f.userText);
+    expect(withdrawnPair.body).not.toContain(f.assistantText);
+
+    // Reconsent issues a distinct Grant; it must never revive this Attempt.
+    await pool.query(`insert into public.record_access_grants(
+      id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
+      values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`,
+      [uuid(29,216),f.subject,f.memory]);
+    const newlyGranted=await send(f.evidence);
+    expect(newlyGranted.status).toBe(503);
+    expect(newlyGranted.body).not.toContain(f.assistantText);
+    const regrantedPair=await sendPair(f.evidence);
+    expect(regrantedPair.status).toBe(503);
+    expect(regrantedPair.body).not.toContain(f.userText);
+  });
+
+  it('G3 replay-first serializes independent Grant withdrawal, then denies a second disclosure',async()=>{
+    const f=await prepare(225,{summary:'synthetic G3 original Replay Grant'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const replay=await pool.connect(),revoker=await pool.connect();
+    const marker='seyeon_g3_replay_grant_withdrawal_waiter';
+    try{
+      await replay.query('BEGIN');
+      await replay.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await replay.query<{assistantText:string}>(`select assistant_text
+        as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{assistantText:f.assistantText}]);
+      // This distinct backend must not withdraw the original Grant while the
+      // first backend has authority locked for the pending replay response.
+      await revoker.query("select set_config('application_name',$1,false)",[marker]);
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=revoker.query(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await replay.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      await revoker.query('COMMIT');
+    }finally{
+      await replay.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      replay.release();revoker.release();
+    }
+    const after=await f.run(({client})=>client.query(`select assistant_text
+      as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]));
+    expect(after.rows).toEqual([]);
+    const {rows:[grant]}=await pool.query(`select
+      revoked_at is not null as revoked,
+      seyeon_revoke_requested_at is not null as requested
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant.revoked||grant.requested).toBe(true);
+  });
+
+  it('G3 withdrawal-first blocks independent original Replay, then denies its private reply',async()=>{
+    const f=await prepare(226,{summary:'synthetic original Grant withdrawal-first replay'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const revoker=await pool.connect(),replay=await pool.connect();
+    const marker='seyeon_g3_replay_waits_on_original_grant_withdrawal';
+    try{
+      // The original Grant withdrawal enters its DB transaction first.
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const {rows:[request]}=await revoker.query<{result:Record<string,unknown>}>(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory]);
+      expect(request?.result).toMatchObject({
+        status:'committed',revokedGrantCount:1,replayed:false,
+      });
+      await replay.query("select set_config('application_name',$1,false)",[marker]);
+      await replay.query('BEGIN');
+      await replay.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=replay.query<{assistantText:string}>(`select assistant_text
+        as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await revoker.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows).toEqual([]);
+      await replay.query('COMMIT');
+    }finally{
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await replay.query('ROLLBACK').catch(()=>undefined);
+      await replay.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      revoker.release();replay.release();
+    }
+    // A fresh third physical DB transaction still refuses private disclosure.
+    const after=await f.run(({client})=>client.query(`select assistant_text
+      as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]));
+    expect(after.rows).toEqual([]);
+    const {rows:[grant]}=await pool.query(`select
+      revoked_at is not null as revoked,
+      seyeon_revoke_requested_at is not null as requested
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant.revoked||grant.requested).toBe(true);
+  });
+
+  it('G3 original User redaction-first blocks original pair and all later replay HTTP disclosure',async()=>{
+    const f=await prepare(227,{summary:'synthetic original User redaction for G3'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const redactor=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g3_original_pair_waits_on_user_redaction';
+    try{
+      // Original Grant stays ACTIVE: redaction of the exact Member User
+      // alone must invalidate every derived historical disclosure.
+      await redactor.query('BEGIN');
+      const redacted=await redactor.query(
+        'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=$2::text where id=$1::uuid',
+        [f.user,'g3_synthetic_original_user_redaction_first'],
+      );
+      expect(redacted.rowCount).toBe(1);
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query(`select user_text as "userText",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await redactor.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows).toEqual([]);
+      await reader.query('COMMIT');
+    }finally{
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      redactor.release();reader.release();
+    }
+    const {rows:[current]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      m.redacted_at is not null as user_redacted
+      from public.record_access_grants g,public.conversation_messages m
+      where g.id=$1 and m.id=$2`,[f.grant,f.user]);
+    expect(current).toEqual({grant_active:true,user_redacted:true});
+
+    // Both still-unmounted direct Node response paths start a fresh current
+    // original-source check; neither can disclose either private message.
+    const send=async(kind:'pair'|'replay')=>{
+      const server=createServer((incoming,response)=>{
+        const args={incoming,response,pool:subjectPool,
+          requestId:'g3-user-redaction-227',
+          identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence}};
+        if(kind==='pair')void handleSeyeonFirstOriginalDialoguePairNodeS0V1(args);
+        else void handleSeyeonFirstOriginalAssistantReplayNodeS0V1(args);
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const path=kind==='pair'?'original-pair':'original-replay';
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/${path}/${f.assistant}`);
+        return {status:response.status,body:await response.text()};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+    for(const kind of ['pair','replay'] as const){
+      const result=await send(kind);
+      expect(result.status).toBe(503);
+      expect(result.body).not.toContain(f.userText);
+      expect(result.body).not.toContain(f.assistantText);
+    }
+  });
+
+  it('G3 original dialogue replay-first holds Member User source against concurrent redaction, then denies later reuse',async()=>{
+    const f=await prepare(228,{summary:'synthetic original User protected during G3 replay'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const reader=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g3_original_user_redaction_waits_on_replay';
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{userText:string,assistantText:string}>(`select
+        user_text as "userText",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{userText:f.userText,assistantText:f.assistantText}]);
+      // The first session keeps original source SHARE locks through the
+      // pending disclosure; the distinct redaction writer must actually wait.
+      await redactor.query("select set_config('application_name',$1,false)",[marker]);
+      await redactor.query('BEGIN');
+      const pending=redactor.query(`update public.conversation_messages
+        set redacted_at=clock_timestamp(),redaction_reason=$2::text
+        where id=$1::uuid`,[f.user,'g3_synthetic_original_user_redaction_after_replay'])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome.ok).toBe(true);
+      if(outcome.ok)expect(outcome.value.rowCount).toBe(1);
+      await redactor.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();redactor.release();
+    }
+    const after=await f.run(async({client})=>{
+      const pair=await client.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      const reply=await client.query(`select assistant_text
+        from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      return {pair:pair.rows,reply:reply.rows};
+    });
+    expect(after).toEqual({pair:[],reply:[]});
+    const {rows:[source]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      m.redacted_at is not null as user_redacted
+      from public.record_access_grants g,public.conversation_messages m
+      where g.id=$1 and m.id=$2`,[f.grant,f.user]);
+    expect(source).toEqual({grant_active:true,user_redacted:true});
+  });
+
+  it('G3 original Assistant redaction-first denies exact-Grant replay and dialogue HTTP disclosure',async()=>{
+    const f=await prepare(229,{summary:'synthetic original Assistant redaction for G3'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const redactor=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g3_assistant_replay_waits_on_original_redaction';
+    try{
+      await redactor.query('BEGIN');
+      const redacted=await redactor.query(`update public.conversation_messages
+        set redacted_at=clock_timestamp(),redaction_reason=$2::text
+        where id=$1::uuid`,[f.assistant,'g3_synthetic_assistant_redaction_first']);
+      expect(redacted.rowCount).toBe(1);
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query<{assistantText:string}>(`select assistant_text
+        as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await redactor.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows).toEqual([]);
+      await reader.query('COMMIT');
+    }finally{
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      redactor.release();reader.release();
+    }
+    const {rows:[source]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      u.redacted_at is null as original_user_available,
+      a.redacted_at is not null as assistant_redacted
+      from public.record_access_grants g
+      join public.conversation_messages u on u.id=$2
+      join public.conversation_messages a on a.id=$3
+      where g.id=$1`,[f.grant,f.user,f.assistant]);
+    expect(source).toEqual({
+      grant_active:true,original_user_available:true,assistant_redacted:true,
+    });
+    const fresh=await f.run(async({client})=>{
+      const replay=await client.query(`select assistant_text
+        from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      const pair=await client.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      return {replay:replay.rows,pair:pair.rows};
+    });
+    expect(fresh).toEqual({replay:[],pair:[]});
+
+    for(const kind of ['replay','pair'] as const){
+      const server=createServer((incoming,response)=>{
+        const args={incoming,response,pool:subjectPool,
+          requestId:'g3-assistant-redaction-229',
+          identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence}};
+        if(kind==='pair')void handleSeyeonFirstOriginalDialoguePairNodeS0V1(args);
+        else void handleSeyeonFirstOriginalAssistantReplayNodeS0V1(args);
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const path=kind==='pair'?'original-pair':'original-replay';
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/${path}/${f.assistant}`);
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Cache-Control')).toContain('no-store');
+        const body=await response.text();
+        expect(body).not.toContain(f.userText);
+        expect(body).not.toContain(f.assistantText);
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    }
+  });
+
+  it('G3 original Assistant replay-first holds source against redaction, then blocks later disclosure',async()=>{
+    const f=await prepare(230,{summary:'synthetic original Assistant replay held before redaction'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const reader=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g3_assistant_redaction_waits_on_original_replay';
+    try{
+      // DB current-rights replay is the first transaction. Its source lock
+      // must be held through the protected send transaction, not just lookup.
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{assistantText:string}>(`select assistant_text
+        as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{assistantText:f.assistantText}]);
+
+      await redactor.query("select set_config('application_name',$1,false)",[marker]);
+      await redactor.query('BEGIN');
+      const pending=redactor.query(`update public.conversation_messages
+        set redacted_at=clock_timestamp(),redaction_reason=$2::text
+        where id=$1::uuid`,[f.assistant,'g3_synthetic_assistant_redaction_after_replay'])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rowCount).toBe(1);
+      await redactor.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();redactor.release();
+    }
+    const {rows:[source]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      u.redacted_at is null as original_user_available,
+      a.redacted_at is not null as assistant_redacted
+      from public.record_access_grants g
+      join public.conversation_messages u on u.id=$2
+      join public.conversation_messages a on a.id=$3
+      where g.id=$1`,[f.grant,f.user,f.assistant]);
+    expect(source).toEqual({
+      grant_active:true,original_user_available:true,assistant_redacted:true,
+    });
+
+    // New DB sessions cannot reuse a previously authorized, now redacted
+    // Assistant for either original-only replay or its source User pair.
+    const after=await f.run(async({client})=>{
+      const replay=await client.query(`select assistant_text
+        from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      const pair=await client.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      return {replay:replay.rows,pair:pair.rows};
+    });
+    expect(after).toEqual({replay:[],pair:[]});
+
+    for(const kind of ['replay','pair'] as const){
+      const server=createServer((incoming,response)=>{
+        const args={incoming,response,pool:subjectPool,
+          requestId:'g3-assistant-redaction-replay-first-230',
+          identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence}};
+        if(kind==='pair')void handleSeyeonFirstOriginalDialoguePairNodeS0V1(args);
+        else void handleSeyeonFirstOriginalAssistantReplayNodeS0V1(args);
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const path=kind==='pair'?'original-pair':'original-replay';
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/${path}/${f.assistant}`);
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Cache-Control')).toContain('no-store');
+        const body=await response.text();
+        expect(body).not.toContain(f.userText);
+        expect(body).not.toContain(f.assistantText);
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    }
+  });
+
+  it('G3 original dialogue pair first holds the original Grant until read completes, then refuses replay',async()=>{
+    const f=await prepare(231,{summary:'synthetic G3 first original pair Grant lock'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const reader=await pool.connect(),revoker=await pool.connect();
+    const marker='seyeon_g3_pair_first_revoke_waiter';
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{
+        userMessageId:string,userText:string,assistantMessageId:string,assistantText:string
+      }>(`select user_message_id::text as "userMessageId",user_text as "userText",
+        assistant_message_id::text as "assistantMessageId",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{
+        userMessageId:f.user,userText:f.userText,
+        assistantMessageId:f.assistant,assistantText:f.assistantText,
+      }]);
+      await revoker.query("select set_config('application_name',$1,false)",[marker]);
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=revoker.query<{result:Record<string,unknown>}>(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows[0]?.result).toMatchObject({
+        status:'committed',revokedGrantCount:1,replayed:false,
+      });
+      await revoker.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();revoker.release();
+    }
+    const after=await f.run(({client})=>client.query(`select user_text,assistant_text
+      from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]));
+    expect(after.rows).toEqual([]);
+    const {rows:[original]}=await pool.query(`select revoked_at is not null
+      as revoked from public.record_access_grants where id=$1`,[f.grant]);
+    expect(original?.revoked).toBe(true);
+  });
+
+  it('G3 original Grant withdrawal first blocks the original dialogue pair before any User or Assistant text',async()=>{
+    const f=await prepare(232,{summary:'synthetic G3 original pair withdrawal first'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const revoker=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g3_pair_waits_on_original_grant_withdrawal';
+    try{
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const {rows:[withdrawal]}=await revoker.query<{result:Record<string,unknown>}>(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory]);
+      expect(withdrawal?.result).toMatchObject({
+        status:'committed',revokedGrantCount:1,replayed:false,
+      });
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await revoker.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows).toEqual([]);
+      await reader.query('COMMIT');
+    }finally{
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      revoker.release();reader.release();
+    }
+    const {rows:[original]}=await pool.query(`select revoked_at is not null
+      as revoked from public.record_access_grants where id=$1`,[f.grant]);
+    expect(original?.revoked).toBe(true);
+    // Verify a fresh direct Node HTTP read cannot reveal either original text.
+    const server=createServer((incoming,response)=>{
+      void handleSeyeonFirstOriginalDialoguePairNodeS0V1({
+        incoming,response,pool:subjectPool,requestId:'g3-original-pair-grant-revoked-232',
+        identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+      });
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    try{
+      const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-pair/${f.assistant}`);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Cache-Control')).toContain('no-store');
+      const body=await response.text();
+      expect(body).not.toContain(f.userText);
+      expect(body).not.toContain(f.assistantText);
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
+  it('G5 original dialogue read holds active Subject against account deletion, then blocks future replay',async()=>{
+    const f=await prepare(233,{summary:'synthetic original dialogue before account deletion'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const reader=await pool.connect(),deletion=await pool.connect();
+    const marker='seyeon_g5_deletion_waits_on_original_dialogue';
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{userText:string,assistantText:string}>(`select
+        user_text as "userText",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{userText:f.userText,assistantText:f.assistantText}]);
+      await deletion.query("select set_config('application_name',$1,false)",[marker]);
+      await deletion.query('BEGIN');
+      const pending=deletion.query(`select * from public.cmd_start_account_deletion_v1(
+        $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+        f.subject,uuid(26,f.n),'g5-original-pair-after-read-'+f.n,uuid(27,f.n),
+      ]).then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows[0]).toMatchObject({
+        deletion_job_status:'running',replayed:false,
+      });
+      await deletion.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await deletion.query('ROLLBACK').catch(()=>undefined);
+      await deletion.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();deletion.release();
+    }
+    const {rows:[subject]}=await pool.query('select status from public.subjects where id=$1',[f.subject]);
+    expect(subject?.status).toBe('deletion_pending');
+    await expect(f.run(({client})=>client.query(`select user_text,assistant_text
+      from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]))).rejects.toThrow();
+    const {rows:[grant]}=await pool.query(`select revoked_at is null
+      and seyeon_revoke_requested_at is null as grant_active
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant?.grant_active).toBe(true);
+  });
+
+  it('G5 account deletion first blocks original dialogue read and HTTP disclosure with original Grant still active',async()=>{
+    const f=await prepare(234,{summary:'synthetic deletion pending before original dialogue'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const deletion=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g5_original_dialogue_waits_on_account_deletion';
+    try{
+      await deletion.query('BEGIN');
+      const {rows:[job]}=await deletion.query(`select * from public.cmd_start_account_deletion_v1(
+        $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+        f.subject,uuid(26,f.n),'g5-original-pair-deletion-first-'+f.n,uuid(27,f.n),
+      ]);
+      expect(job).toMatchObject({deletion_job_status:'running',replayed:false});
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await deletion.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(false);
+      if(!result.ok)expect(String(result.error)).toContain('active Member');
+    }finally{
+      await deletion.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      deletion.release();reader.release();
+    }
+    const {rows:[subject]}=await pool.query('select status from public.subjects where id=$1',[f.subject]);
+    expect(subject?.status).toBe('deletion_pending');
+    const {rows:[grant]}=await pool.query(`select revoked_at is null
+      and seyeon_revoke_requested_at is null as grant_active
+      from public.record_access_grants where id=$1`,[f.grant]);
+    expect(grant?.grant_active).toBe(true);
+    const server=createServer((incoming,response)=>{
+      void handleSeyeonFirstOriginalDialoguePairNodeS0V1({
+        incoming,response,pool:subjectPool,requestId:'g5-original-pair-deleted-member-234',
+        identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+      });
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    try{
+      const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-pair/${f.assistant}`);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Cache-Control')).toContain('no-store');
+      const body=await response.text();
+      expect(body).not.toContain(f.userText);
+      expect(body).not.toContain(f.assistantText);
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
+  it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
+    const f=await prepare(210);
+    await f.commit();
+    const source={canonicalMemberSubjectId:f.subject,turnId:f.turn,
+      userMessageId:f.user,userText:f.userText,
+      assistantMessageId:f.assistant,assistantText:f.assistantText};
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,source,
+    ))).resolves.toBeUndefined();
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,{...source,userText:'Synthetic forged user text'},
+    ))).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,{...source,assistantText:'Synthetic forged assistant text'},
+    ))).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    await expect(f.run(({client})=>verifySeyeonPlannerPreModelSourceV1(
+      client,{...source,assistantMessageId:f.user},
+    ))).rejects.toMatchObject({code:'SEYEON_PLANNER_PRE_MODEL_SOURCE_HOLD'});
+    const {rows:[count]}=await pool.query(`select
+      (select count(*)::int from public.memory_proposals
+       where source_turn_id=$1) as proposals,
+      (select count(*)::int from public.record_access_grants
+       where subject_id=$2) as grants`,[f.turn,f.subject]);
+    expect(count).toEqual({proposals:0,grants:1});
+  });
+
+  it('W48 keeps a DB-original historical candidate durable without model/Commit/Reveal rights', async () => {
+    const f = await prepare(218, { summary: 'synthetic approved recall' });
+    await f.commit();
+    await f.locked()({ signal: new AbortController().signal, deliver: async value => {
+      expect(value).toBe(f.assistantText);
+    } });
+    const currentTurn=uuid(16,1218), currentAttempt=uuid(17,1218);
+    const currentUser=uuid(18,1218), currentText='Second original message for historical W48';
+    const receive=await pool.connect();
+    try {
+      await receive.query('BEGIN');
+      await receive.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receive.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1218),hash({second:'W48'}),
+        'chat-request-v1',JSON.stringify({text:currentText}),
+        uuid(13,218),uuid(12,218),currentTurn,currentUser,
+        currentText,null,hash({message:currentText}),
+      ]);
+      await receive.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,currentTurn,currentAttempt,'seyeon-production-chat-planner-v1']
+      );
+      await receive.query('COMMIT');
+    } catch(error) {
+      await receive.query('ROLLBACK'); throw error;
+    } finally { receive.release(); }
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(text:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(text,'utf8').digest('hex');
+    const history=[
+      {messageId:f.user,role:'user' as const,textDigest:wire(f.userText)},
+      {messageId:f.assistant,role:'assistant' as const,textDigest:wire(f.assistantText)},
+    ];
+    const client=await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const proof=await createSeyeonG1HistoricalCandidateOwnerPortV1(client)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:currentTurn,attemptId:currentAttempt,
+          currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'W48'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"W48"}),
+          historicalSources:history,
+        });
+      expect(proof.historicalSourceCount).toBe(2);
+      expect(proof.authorizesModel).toBe(false);
+      expect(proof.permitsAtomicCommit).toBe(false);
+      expect(proof.permitsHttpReveal).toBe(false);
+      await client.query('COMMIT');
+    } catch(error) {
+      await client.query('ROLLBACK'); throw error;
+    } finally { client.release(); }
+    const {rows:[saved]}=await pool.query(`select
+      state,seyeon_personal_source_pin_jsonb as proof
+      from public.chat_turn_attempts where id=$1`,[currentAttempt]);
+    expect(saved.state).toBe('running');
+    expect(saved.proof.historicalCandidateProof.historicalSourceCount).toBe(2);
+    expect(saved.proof.historicalCandidateProof.expectedFinalModelContextDigest)
+      .toBe(hash({expectedFinalContext:'W48'}));
+    expect(saved.proof.historicalCandidateProof.schemaVersion)
+      .toBe('seyeon-g1-historical-source-candidate-v4');
+    const {rows:[priorGrant]}=await pool.query(`select
+      a.seyeon_personal_source_pin_jsonb->'positiveProof'->>'originalGrantedAt' as original_granted_at,
+      g.granted_at as database_granted_at
+      from public.chat_turn_attempts a,public.record_access_grants g
+      where a.id=$1 and g.id=$2`,[f.attempt,f.grant]);
+    expect(Date.parse(priorGrant.original_granted_at))
+      .toBe(new Date(priorGrant.database_granted_at).getTime());
+    expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSources)
+      .toEqual([{
+        messageId:f.assistant,turnId:f.turn,attemptId:f.attempt,
+        originalUserMessageId:f.user,originalUserTextDigest:wire(f.userText),
+        recordId:f.memory,originalGrantId:f.grant,
+        originalGrantedAt:priorGrant.original_granted_at,
+        originalPgJsonbDigest:original.digest,
+        recordType:'conversation_recall',recordSchemaVersion:'v1',
+        projectorVersion:'seyeon-conversation-recall-projector-v1',
+      }]);
+    const {rows:[digestCheck]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(
+        (seyeon_personal_source_pin_jsonb->'historicalCandidateProof'
+         ->'historicalAssistantOriginalSources')::text,'UTF8')),'hex') as digest
+      from public.chat_turn_attempts where id=$1`,[currentAttempt]);
+    expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSourcesDigest)
+      .toBe(digestCheck.digest);
+    expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
+    const {rows:[acl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',
+      'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,jsonb)',
+      'EXECUTE') as denied`);
+    expect(acl.denied).toBe(true);
+    // Native Attempt progression rejects an illegal running -> validated/
+    // committed jump before the S0 G2 guard can run. Both layers must HOLD;
+    // do not require the later guard's error name for an earlier rejection.
+    for(const state of ['validated','committed'] as const){
+      await expect(pool.query(`update public.chat_turn_attempts
+        set state=$2 where id=$1::uuid`,[currentAttempt,state]))
+        .rejects.toMatchObject({
+          code:'23514',constraint:'tr_chat_turn_attempt_state_transition',
+        });
+    }
+    const {rows:[afterDenied]}=await pool.query(`select
+      a.state as attempt_state,t.state as turn_state,
+      (select count(*)::int from public.conversation_messages m
+       where m.turn_id=t.id and m.sender_type='character') as assistant_count
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1::uuid`,[currentAttempt]);
+    expect(afterDenied).toEqual({
+      attempt_state:'running',turn_state:'context_ready',assistant_count:0,
+    });
+    // Fresh DB-owner current-rights audit is separate from (and never
+    // upgrades) the durable historicalCandidateProof.
+    const audit=()=>f.run(async({client})=>{
+      const {rows:[result]}=await client.query<{audit:Record<string,unknown>}>(
+        'select seyeon_private.qry_recheck_historical_candidate_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid) as audit',
+        [f.subject,f.thread,currentTurn,currentAttempt],
+      );
+      return result?.audit;
+    });
+    const auditSignature=
+      'seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)';
+    const {rows:[auditAcl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',$1,'EXECUTE') as closed`,[auditSignature]);
+    expect(auditAcl.closed).toBe(true); // Default installation remains API-closed.
+    // Dedicated synthetic fixture only: the owner never grants public use.
+    await pool.query(`grant execute on function
+      seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)
+      to myeongha_api_executor`);
+    try{
+      expect(await audit()).toEqual({
+        schemaVersion:'seyeon-historical-current-originals-audit-s0-v1',
+        historicalSourceCount:2,originalsCurrentForAudit:true,
+        authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+      });
+      await expect(f.run(({client})=>client.query(
+        'select seyeon_private.qry_recheck_historical_candidate_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+        [f.subject,f.thread,f.turn,currentAttempt],
+      ))).rejects.toMatchObject({constraint:'seyeon_history_recheck_candidate_invalid'});
+      await f.revoke();
+      await expect(audit()).rejects.toMatchObject({
+        constraint:'seyeon_source_lock_original_grant_required',
+      });
+      // A new Grant for the same Memory must never resurrect the old
+      // immutable historical Assistant/Attempt provenance.
+      await pool.query(`insert into public.record_access_grants(
+        id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
+        values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`,
+        [uuid(29,218),f.subject,f.memory]);
+      await expect(audit()).rejects.toMatchObject({
+        constraint:'seyeon_source_lock_original_grant_required',
+      });
+    }finally{
+      await pool.query(`revoke execute on function
+        seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)
+        from myeongha_api_executor`);
+    }
+    const {rows:[afterAuditAcl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',$1,'EXECUTE') as closed`,[auditSignature]);
+    expect(afterAuditAcl.closed).toBe(true);
+  });
+
+  it('G5 historical candidate cannot pin a revoked original Grant during an independent DB race', async () => {
+    const f=await prepare(220,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const currentTurn=uuid(16,1220),currentAttempt=uuid(17,1220);
+    const currentUser=uuid(18,1220),currentText='Fresh user turn after a sealed Assistant reply';
+    const setup=await pool.connect();
+    try {
+      await setup.query('BEGIN');
+      await setup.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await setup.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1220),hash({second:'G5-history-race'}),
+        'chat-request-v1',JSON.stringify({text:currentText}),
+        uuid(13,220),uuid(12,220),currentTurn,currentUser,
+        currentText,null,hash({message:currentText}),
+      ]);
+      await setup.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,currentTurn,currentAttempt,'seyeon-production-chat-planner-v1']
+      );
+      await setup.query('COMMIT');
+    }catch(error){
+      await setup.query('ROLLBACK');throw error;
+    }finally{setup.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(text:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(text,'utf8').digest('hex');
+    const revoker=await pool.connect();
+    const candidate=await pool.connect();
+    const marker='seyeon_g5_historical_candidate_revoke_waiter';
+    try{
+      await revoker.query('BEGIN');
+      await revoker.query(
+        'select id from public.record_access_grants where id=$1::uuid for update',
+        [f.grant],
+      );
+      await revoker.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [f.grant],
+      );
+      await candidate.query("select set_config('application_name',$1,false)",[marker]);
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:currentTurn,attemptId:currentAttempt,
+          currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-revoke-race'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-revoke-race"}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        }).then(receipt=>({ok:true as const,receipt}),
+          error=>({ok:false as const,error}));
+      let wasBlocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){wasBlocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(wasBlocked).toBe(true);
+      await revoker.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome.ok).toBe(false);
+      if(!outcome.ok)expect(outcome.error).toMatchObject({
+        code:'42501',constraint:'seyeon_source_lock_original_grant_required',
+      });
+    }finally{
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      revoker.release();candidate.release();
+    }
+    const {rows:[state]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin,
+      a.seyeon_personal_source_pinned_at as pinned_at
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[currentAttempt]);
+    expect(state).toMatchObject({turn_state:'planned',pin:null,pinned_at:null});
+  });
+
+  it('G5 original historical candidate pins first, revoke waits, then all current source reads deny',async()=>{
+    const f=await prepare(221,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const turn=uuid(16,1221),attempt=uuid(17,1221);
+    const user=uuid(18,1221),text='Fresh historical source user with revoke pending';
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1221),hash({second:'G5-history-pin-first'}),
+        'chat-request-v1',JSON.stringify({text}),
+        uuid(13,221),uuid(12,221),turn,user,text,null,hash({message:text}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,turn,attempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const candidate=await pool.connect();
+    const revoker=await pool.connect();
+    const marker='seyeon_g5_historical_revoke_after_pin_waiter';
+    try{
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const proof=await createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:turn,attemptId:attempt,
+          currentUserMessageId:user,currentUserTextDigest:wire(text),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-pin-first'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-pin-first"}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        });
+      expect(proof).toMatchObject({
+        historicalSourceCount:2,authorizesModel:false,
+        permitsAtomicCommit:false,permitsHttpReveal:false,
+      });
+      await revoker.query("select set_config('application_name',$1,false)",[marker]);
+      await revoker.query('BEGIN');
+      const pending=revoker.query(
+        'update public.record_access_grants set revoked_at=clock_timestamp() where id=$1::uuid',
+        [f.grant],
+      ).then(result=>({ok:true as const,count:result.rowCount}),
+        error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await candidate.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome).toMatchObject({ok:true,count:1});
+      await revoker.query('COMMIT');
+    }finally{
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      candidate.release();revoker.release();
+    }
+    const {rows:[saved]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[attempt]);
+    expect(saved.turn_state).toBe('context_ready');
+    expect(saved.pin).toMatchObject({historicalCandidateProof:{
+      authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    }});
+    expect(saved.pin).not.toHaveProperty('positiveProof');
+    const reader=await pool.connect();
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await expect(reader.query(
+        'select * from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,$4::integer)',
+        [f.subject,f.thread,user,3],
+      )).rejects.toMatchObject({
+        code:'42501',constraint:'seyeon_source_lock_original_grant_required',
+      });
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      reader.release();
+    }
+  });
+
+  it('G5 held historical User provenance blocks redaction, then refuses all later G0 reuse',async()=>{
+    const f=await prepare(223,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const turn=uuid(16,1223),attempt=uuid(17,1223);
+    const user=uuid(18,1223),text='Fresh User after historical Assistant';
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1223),hash({second:'G5-original-user-redaction'}),
+        'chat-request-v1',JSON.stringify({text}),
+        uuid(13,223),uuid(12,223),turn,user,text,null,hash({message:text}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,turn,attempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const candidate=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g5_original_user_redaction_waiter';
+    try{
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const proof=await createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:turn,attemptId:attempt,
+          currentUserMessageId:user,currentUserTextDigest:wire(text),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-original-user-redaction'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-original-user-redaction"}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        });
+      expect(proof).toMatchObject({
+        authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+      });
+      await redactor.query("select set_config('application_name',$1,false)",[marker]);
+      await redactor.query('BEGIN');
+      const pending=redactor.query(
+        'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=$2::text where id=$1::uuid',
+        [f.user,'g5_synthetic_original_user_redaction'],
+      ).then(result=>({ok:true as const,count:result.rowCount}),
+        error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await candidate.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome).toMatchObject({ok:true,count:1});
+      await redactor.query('COMMIT');
+    }finally{
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      candidate.release();redactor.release();
+    }
+    const {rows:[saved]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[attempt]);
+    expect(saved.turn_state).toBe('context_ready');
+    expect(saved.pin).toMatchObject({historicalCandidateProof:{
+      authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    }});
+    expect(saved.pin).not.toHaveProperty('positiveProof');
+    const reader=await pool.connect();
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await expect(reader.query(
+        'select * from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,$4::integer)',
+        [f.subject,f.thread,user,3],
+      )).rejects.toMatchObject({
+        code:'42501',constraint:'seyeon_g0_context_window_source_missing',
+      });
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      reader.release();
+    }
+  });
+
+  it('G5 redaction-first blocks historical candidate and rejects stale original User provenance',async()=>{
+    const f=await prepare(224,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const turn=uuid(16,1224),attempt=uuid(17,1224);
+    const user=uuid(18,1224),text='Fresh User after historical Assistant';
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1224),hash({second:'G5-original-user-redaction-first'}),
+        'chat-request-v1',JSON.stringify({text}),
+        uuid(13,224),uuid(12,224),turn,user,text,null,hash({message:text}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,turn,attempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const candidate=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g5_original_user_pin_waits_on_redaction';
+    try{
+      // Independent redaction owns the exact original User row before G1.
+      await redactor.query('BEGIN');
+      const redacted=await redactor.query(
+        'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=$2::text where id=$1::uuid',
+        [f.user,'g5_synthetic_original_user_redaction_first'],
+      );
+      expect(redacted.rowCount).toBe(1);
+      await candidate.query("select set_config('application_name',$1,false)",[marker]);
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:turn,attemptId:attempt,
+          currentUserMessageId:user,currentUserTextDigest:wire(text),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-original-user-redaction-first'}),
+          expectedFinalModelContextDigest:hash({expectedFinalContext:"G5-original-user-redaction-first"}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        }).then(receipt=>({ok:true as const,receipt}),
+          error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await redactor.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome.ok).toBe(false);
+      if(!outcome.ok)expect(outcome.error).toMatchObject({
+        code:'42501',constraint:'seyeon_source_lock_message_required',
+      });
+    }finally{
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      candidate.release();redactor.release();
+    }
+    const {rows:[saved]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[attempt]);
+    expect(saved.turn_state).toBe('planned');
+    expect(saved.pin).toBeNull();
+    const {rows:[attemptState]}=await pool.query(`select
+      seyeon_personal_source_pinned_at as pinned_at from public.chat_turn_attempts
+      where id=$1`,[attempt]);
+    expect(attemptState.pinned_at).toBeNull();
+  });
+
   // Real S0 original receipt + private G4 credit on ONE disposable PostgreSQL.
   // It intentionally uses the existing prepare/fetchReply S0 test fixtures.
   let g5CreditSchemaInstalled=false;
@@ -769,6 +2787,157 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   if(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'&&
      process.env.DB_SUITE==='postgres17'&&process.env.PGHOST==='localhost'&&
      /^myeongha_ci_case_[0-9]+$/u.test(process.env.PGDATABASE??'')){
+
+  // G1/G5: the original User + Assistant historical candidate is NOT a
+  // model permission. Deletion must serialize with its DB-owner Pin.
+  async function historicalDeletionFixture(n:number){
+    const f=await prepare(n,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async value=>expect(value).toBe(f.assistantText)});
+    const currentTurn=uuid(16,1000+n),currentAttempt=uuid(17,1000+n);
+    const currentUser=uuid(18,1000+n);
+    const currentText='Second original User for historical deletion '+n;
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1000+n),hash({second:'G5-history-delete-'+n}),
+        'chat-request-v1',JSON.stringify({text:currentText}),
+        uuid(13,n),uuid(12,n),currentTurn,currentUser,currentText,
+        null,hash({message:currentText}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,currentTurn,currentAttempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const pin=(client:PoolClient)=>createSeyeonG1HistoricalCandidateOwnerPortV1(client)
+      .pinBeforeModel({
+        subjectId:f.subject,threadId:f.thread,turnId:currentTurn,attemptId:currentAttempt,
+        currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
+        selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+        preModelContextDigest:hash({historical:'G5-delete-'+n}),
+        expectedFinalModelContextDigest:hash({expectedFinalContext:'G5-delete-'+n}),
+        historicalSources:[
+          {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+          {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+        ],
+      });
+    return {f,currentTurn,currentAttempt,pin};
+  }
+
+  it.each([
+    ['historical Pin first, deletion must wait',235,false],
+    ['account deletion first, historical Pin must deny',236,true],
+  ] as const)('G5 %s (independent PostgreSQL17 sessions)',async(_label,n,deletionFirst)=>{
+    const {f,currentAttempt,pin}=await historicalDeletionFixture(n);
+    const candidate=await pool.connect(),deletion=await pool.connect();
+    const marker='seyeon_g5_historical_pin_deletion_race_'+n;
+    let pending:Promise<{ok:boolean;value?:unknown;error?:unknown}>|undefined;
+    try{
+      if(deletionFirst){
+        await deletion.query('BEGIN');
+        const {rows:[job]}=await deletion.query(`select * from public.cmd_start_account_deletion_v1(
+          $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+          f.subject,uuid(26,n),'g5-historical-delete-first-'+n,uuid(27,n),
+        ]);
+        expect(job).toMatchObject({deletion_job_status:'running',replayed:false});
+        await candidate.query("select set_config('application_name',$1,false)",[marker]);
+        await candidate.query('BEGIN');
+        await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+        pending=pin(candidate).then(value=>({ok:true,value}),error=>({ok:false,error}));
+      }else{
+        await candidate.query('BEGIN');
+        await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+        const proof=await pin(candidate);
+        expect(proof).toMatchObject({
+          historicalSourceCount:2,authorizesModel:false,
+          permitsAtomicCommit:false,permitsHttpReveal:false,
+        });
+        await deletion.query("select set_config('application_name',$1,false)",[marker]);
+        await deletion.query('BEGIN');
+        pending=deletion.query(`select * from public.cmd_start_account_deletion_v1(
+          $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+          f.subject,uuid(26,n),'g5-historical-pin-first-'+n,uuid(27,n),
+        ]).then(value=>({ok:true,value}),error=>({ok:false,error}));
+      }
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      if(deletionFirst)await deletion.query('COMMIT');
+      else await candidate.query('COMMIT');
+      const result=await pending;
+      expect(result?.ok).toBe(!deletionFirst);
+      if(deletionFirst){
+        expect(result?.error).toMatchObject({
+          code:'42501',constraint:'seyeon_source_lock_member_required',
+        });
+      }else{
+        const outcome=result?.value as {rows:Record<string,unknown>[]};
+        expect(outcome.rows[0]).toMatchObject({
+          deletion_job_status:'running',replayed:false,
+        });
+        await deletion.query('COMMIT');
+      }
+    }finally{
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await deletion.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query("select set_config('application_name','',false)").catch(()=>undefined);
+      await deletion.query("select set_config('application_name','',false)").catch(()=>undefined);
+      candidate.release();deletion.release();
+    }
+    const {rows:[state]}=await pool.query(`select
+      s.status as member_status,t.state as turn_state,
+      a.seyeon_personal_source_pin_jsonb as pin,
+      a.seyeon_personal_source_pinned_at as pinned_at,
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_current
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      join public.subjects s on s.id=a.subject_id
+      join public.record_access_grants g on g.id=$2
+      where a.id=$1`,[currentAttempt,f.grant]);
+    expect(state.member_status).toBe('deletion_pending');
+    expect(state.grant_current).toBe(true);
+    if(deletionFirst){
+      expect(state).toMatchObject({turn_state:'planned',pin:null,pinned_at:null});
+    }else{
+      expect(state.turn_state).toBe('context_ready');
+      expect(state.pin).toMatchObject({historicalCandidateProof:{
+        authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+      }});
+      expect(state.pin).not.toHaveProperty('positiveProof');
+    }
+    // Persisted historical metadata never becomes a model/Commit/Reveal license.
+    await expect(f.run(({client})=>client.query(
+      'select * from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,$4::integer)',
+      [f.subject,f.thread,uuid(18,1000+n),3],
+    ))).rejects.toThrow();
+  });
 
   it('G5 separate DB role sessions deny ordinary API and allow only private Commerce catalog/settlement RPCs',async()=>{
     await installDisposableG5Credit();

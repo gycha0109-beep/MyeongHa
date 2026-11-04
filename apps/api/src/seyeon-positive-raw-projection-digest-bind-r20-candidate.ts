@@ -47,6 +47,8 @@ export interface PersistSeyeonR20OfflineDigestBoundInputV1 {
   readonly maxRetrievedMemories?:number;
   readonly selection:SeyeonExactModelPersonalSourceSelectionV1;
   readonly sourceEnvelope:SeyeonR21OfflineDerivedSourceEnvelopeV1;
+  /** Offline only: connect exactly two originals to actual ContextReady. */
+  readonly twoOriginalContextReady?:true;
 }
 export interface SeyeonR20OfflineDigestBoundReceiptV1 {
   readonly status:'disposable_original_and_projection_digests_committed';
@@ -54,6 +56,7 @@ export interface SeyeonR20OfflineDigestBoundReceiptV1 {
   readonly selectedSourcesDigest:string;
   /** SHA of checked model packet; not persisted as DB authority or a signature. */
   readonly finalModelContextDigest:string;
+  readonly contextReady?:true;
   readonly permitsProvider:false;
   readonly permitsAtomicCommit:false;
   readonly permitsHttpReveal:false;
@@ -87,10 +90,16 @@ export async function persistSeyeonR20OfflineDigestBoundPinV1(
 
     // R21: deny unpinned History/Relationship/Reader/Worker/Preflight
     // before R20 creates any positive Parent/Edge in PostgreSQL.
+    // The caller's proposed source count is rechecked against the real
+    // selector and immutable DB originals below; never widen to other counts.
+    const expectedCount=input.selection?.selectedPersonalRecordCount;
+    if(expectedCount!==1&&expectedCount!==2)
+      throw new SeyeonR20OfflineDigestHoldV1();
     assertSeyeonR21OfflineDerivedSourceClosureV1({
       envelope:input.sourceEnvelope,
       retrievedMemories:input.retrievedMemories,
       sourceCandidates:input.sourceCandidates,
+      expectedOriginalMemoryCount:expectedCount,
     });
 
     // R34: an R20 selection can be internally correct while a separate final
@@ -125,6 +134,8 @@ export async function persistSeyeonR20OfflineDigestBoundPinV1(
         maxRetrievedMemories:input.maxRetrievedMemories}),
     });
     if(canonicalJson(selected)!==canonicalJson(input.selection)
+      || (input.twoOriginalContextReady!==undefined&&input.twoOriginalContextReady!==true)
+      || (input.twoOriginalContextReady===true&&selected.selectedPersonalRecordCount!==2)
       || selected.selectedPersonalRecordCount<1
       || selected.selectedPersonalRecordCount>2
       || selected.selectedPersonalRecordCount!==selected.selectedMemoryCount
@@ -155,6 +166,28 @@ export async function persistSeyeonR20OfflineDigestBoundPinV1(
           throw new SeyeonR20OfflineDigestHoldV1();
         await client.query("SET LOCAL lock_timeout = '2000ms'");
         await client.query("SET LOCAL statement_timeout = '5000ms'");
+        if(input.twoOriginalContextReady===true){
+          // R21 atomically writes both source edges, scalar first-edge check,
+          // and real ContextReady. Never separately pre-pin in R20.
+          const result=await client.query<{receipt:unknown}>(`
+select seyeon_positive_candidate.pin_two_and_context_ready_r21(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text
+) as receipt
+`.trim(),[
+            resolvedSubject.subjectId,input.threadId,input.turnId,input.attemptId,
+            JSON.stringify(originalIds),selected.selectedSourcesDigest,
+          ]);
+          const receipt=result.rows.length===1?result.rows[0]?.receipt:null;
+          if(!receipt||typeof receipt!=='object'||Array.isArray(receipt))
+            throw new SeyeonR20OfflineDigestHoldV1();
+          const v=receipt as Record<string,unknown>;
+          if(Object.keys(v).length!==7||v.attemptId!==input.attemptId
+            ||v.selectedSourcesDigest!==selected.selectedSourcesDigest
+            ||v.originalSourceCount!==2||v.contextReady!==true
+            ||v.permitsProvider!==false||v.permitsAtomicCommit!==false
+            ||v.permitsHttpReveal!==false)
+            throw new SeyeonR20OfflineDigestHoldV1();
+        }else{
         const pin=await client.query<{pinned:unknown}>(`
 select seyeon_positive_candidate.pin_source_set_r1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::jsonb,$6::text
@@ -165,6 +198,7 @@ select seyeon_positive_candidate.pin_source_set_r1(
         ]);
         if(pin.rows.length!==1||pin.rows[0]?.pinned!==true)
           throw new SeyeonR20OfflineDigestHoldV1();
+        }
         const inspected=await client.query<{original:DBOriginalSet|null}>(`
 select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid
@@ -178,6 +212,8 @@ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
           ||!Array.isArray(proof.sources)
           ||proof.sources.length!==selected.selectedPersonalRecordCount)
           throw new SeyeonR20OfflineDigestHoldV1();
+        // R21 Owner response already proves the real ContextReady transition;
+        // avoid granting the ordinary API role direct turn/attempt table reads.
         for(let i=0;i<proof.sources.length;i++){
           const row=proof.sources[i] as OriginalRow;
           const src=selected.selectedSources[i]!;
@@ -203,6 +239,7 @@ select seyeon_positive_candidate.inspect_pinned_raw_source_r20(
       selectedPersonalRecordCount:selected.selectedPersonalRecordCount,
       selectedSourcesDigest:selected.selectedSourcesDigest,
       finalModelContextDigest,
+      ...(input.twoOriginalContextReady===true?{contextReady:true as const}:{}),
       permitsProvider:false as const,permitsAtomicCommit:false as const,
       permitsHttpReveal:false as const,
     });

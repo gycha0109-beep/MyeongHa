@@ -1,6 +1,7 @@
 // Watchtower-Track: security
 // Positive G1 SQL owner receipt shape: synthetic-only, no production deployment.
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {canonicalJson} from '../packages/domain/src/index.js';
 import {describe, expect, it} from 'vitest';
 import {
@@ -30,6 +31,9 @@ const input:SeyeonPositiveS0SourcePinInputV1={
   threadId:UUID(2),
   turnId:UUID(3),
   attemptId:UUID(4),
+  currentUserMessageId:UUID(7),
+  currentUserTextDigest:'sha256:wire-utf8:v1:'+
+    createHash('sha256').update('synthetic DB-original user','utf8').digest('hex'),
   originalMemoryId:UUID(5),
   originalGrantId:UUID(6),
   recordType:'shared_detail',
@@ -50,6 +54,10 @@ function actualDbProof():Record<string,unknown>{
     turnId:input.turnId,
     attemptId:input.attemptId,
     characterId:'seyeon',
+    currentUserMessageId:input.currentUserMessageId,
+    currentUserTextDigest:input.currentUserTextDigest,
+    historicalSourceCount:0,
+    historicalSourceCensusDigest:selectedDigest([]),
     recordKind:'memory',
     recordId:input.originalMemoryId,
     originalGrantId:input.originalGrantId,
@@ -95,6 +103,10 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
     ['untrusted extra authority',{newSourceAuthority:'unexpected'}],
     ['mismatched original source digest',{originalPgJsonbDigest:PG_DIGEST.replace('e','f')}],
     ['replaced original Grant',{originalGrantId:UUID(7)}],
+    ['another User message',{currentUserMessageId:UUID(8)}],
+    ['different current User text',{currentUserTextDigest:'sha256:wire-utf8:v1:'+'a'.repeat(64)}],
+    ['forged historical count',{historicalSourceCount:1}],
+    ['untrusted historical source set',{historicalSourceCensusDigest:DIGEST('e')}],
   ] as const)('rejects %s in the DB G1 proof rather than accepting model authorization',async(_name,patch)=>{
     const {port,sql}=fakeOwner({...actualDbProof(),...patch});
     await expect(port.pinBeforeModel(input)).rejects.toThrow(/Pin receipt mismatch/u);
@@ -140,4 +152,31 @@ describe('S3/G1 exact DB owner original Memory Pin receipt',()=>{
     const {port}=fakeOwner(proof);
     await expect(port.pinBeforeModel(input)).rejects.toThrow(/Pin receipt mismatch/u);
   });
+  it('refuses invalid caller-owned current User identity/digest before the G1 owner RPC',async()=>{
+    for(const forged of [
+      {...input,currentUserMessageId:'not-uuid'},
+      {...input,currentUserTextDigest:'sha256:v1:'+'f'.repeat(64)},
+    ]){
+      const {port,sql}=fakeOwner(actualDbProof());
+      await expect(port.pinBeforeModel(forged)).rejects.toThrow(/exact server-created source/u);
+      expect(sql).toHaveLength(0);
+    }
+  });
+
+  it('G1 DB Owner rechecks exactly one current DB-original User row before Pin',()=>{
+    const sql=readFileSync(new URL(
+      '../scripts/operations/seyeon-security-s0/01-source-pin.sql',
+      import.meta.url,
+    ),'utf8');
+    expect(sql).toContain("constraint='seyeon_positive_g1_user_message_count_invalid'");
+    expect(sql).toContain("constraint='seyeon_positive_g1_user_original_invalid'");
+    expect(sql).toContain('msg.sender_type=\'user\'');
+    expect(sql).toContain('perform seyeon_private.lock_memory_source_message_v1(');
+    expect(sql).toContain("'currentUserMessageId',v_user_message.id::text");
+    expect(sql).toContain("'currentUserTextDigest',v_user_text_digest");
+    expect(sql).toContain("constraint='seyeon_positive_g1_historical_source_unpinned'");
+    expect(sql).toContain("'historicalSourceCount',0");
+    expect(sql).toContain("'historicalSourceCensusDigest',");
+  });
+
 });

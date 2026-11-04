@@ -13,10 +13,11 @@ create function seyeon_private.assert_current_original_member_user_message_v1(
   p_subject_id uuid,p_thread_id uuid,p_user_message_id uuid
 ) returns void
 language plpgsql security definer
-set search_path=pg_catalog,public
+set search_path=pg_catalog,public set row_security=on
 as $user_origin$
 declare
   v_id uuid;
+  v_origin_turn_id uuid;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   if p_thread_id is null or p_user_message_id is null then
@@ -25,6 +26,18 @@ begin
       message='Current original Member source is unavailable';
   end if;
 
+  -- Exact original-row lock uses the existing private owner command.
+  select msg.turn_id into v_origin_turn_id
+  from public.conversation_messages msg
+  where msg.id=p_user_message_id and msg.subject_id=p_subject_id
+    and msg.thread_id=p_thread_id and msg.sender_type='user';
+  if v_origin_turn_id is null then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_user_origin_unverifiable';
+  end if;
+  perform seyeon_private.lock_memory_source_message_v1(
+    p_subject_id,v_origin_turn_id,p_user_message_id
+  );
   -- Exact message + committed Turn, same subject and thread, one canonical
   -- Member-authored User input. Never derive this authority from message
   -- prose, model sources, a user-provided SourceRef or an Event field.
@@ -48,7 +61,7 @@ begin
     and nullif(btrim(t.request_contract_version),'') is not null
     and jsonb_typeof(t.request_snapshot_jsonb)='object'
     and thread.status in ('active','archived')
-  for share of msg,t,thread;
+  for share of t,thread;
 
   if v_id is distinct from p_user_message_id then
     raise exception using errcode='42501',

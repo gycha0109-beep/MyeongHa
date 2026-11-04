@@ -18,13 +18,15 @@ create function seyeon_private.assert_current_original_assistant_lineage_v1(
   p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid
 ) returns void
 language plpgsql security definer
-set search_path=pg_catalog,public
+set search_path=pg_catalog,public set row_security=on
 as $original_lineage$
 declare
   v_pin jsonb;
   v_grant uuid;
   v_record uuid;
   v_original record;
+  v_original_user record;
+  v_user_count bigint;
   v_turn text;
   v_attempt text;
 begin
@@ -73,6 +75,18 @@ begin
      or v_pin->>'attemptId' is distinct from v_attempt
      or v_pin->>'characterId' is distinct from 'seyeon'
      or v_pin->>'recordKind' is distinct from 'memory'
+     -- A historical Assistant without its ORIGINAL Member prompt is
+     -- not trusted derived context, even if its Memory Grant is current.
+     or v_pin->>'currentUserMessageId' is null
+     or v_pin->>'currentUserMessageId'
+          !~ '^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$'
+     or v_pin->>'currentUserTextDigest'
+          !~ '^sha256:wire-utf8:v1:[a-f0-9]{64}$'
+     -- This G0 verifier only admits the G1 source contract with zero
+     -- historical messages. Future nonzero contracts require new lineage.
+     or v_pin->>'historicalSourceCount' is distinct from '0'
+     or v_pin->>'historicalSourceCensusDigest' is distinct from
+        'sha256:v1:'||encode(sha256(convert_to('[]','UTF8')),'hex')
      or v_pin->>'recordId' is null
      or v_pin->>'originalGrantId' is null
      or v_pin->>'originalPgJsonbDigest'
@@ -84,6 +98,41 @@ begin
     raise exception using errcode='42501',
       constraint='seyeon_g0_original_lineage_unverifiable',
       message='Current source lineage is not available';
+  end if;
+
+  -- W46: G1's DB-original current User identity is part of the
+  -- Assistant's historical lineage. A revoked, redacted, replaced or
+  -- modified original prompt invalidates ALL derived reuse. The Message
+  -- SHARE lock holds this decision until the calling read TX finishes.
+  select count(*) into v_user_count
+  from public.conversation_messages um
+  where um.subject_id=p_subject_id and um.thread_id=p_thread_id
+    and um.turn_id=v_turn::uuid and um.sender_type='user';
+  if v_user_count<>1 then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_assistant_original_user_missing',
+      message='Historical Assistant original User source is unavailable';
+  end if;
+  perform seyeon_private.lock_memory_source_message_v1(
+    p_subject_id,v_turn::uuid,(v_pin->>'currentUserMessageId')::uuid
+  );
+  select um.id,um.body_text into v_original_user
+  from public.conversation_messages um
+  where um.id=(v_pin->>'currentUserMessageId')::uuid
+    and um.subject_id=p_subject_id and um.thread_id=p_thread_id
+    and um.turn_id=v_turn::uuid and um.sender_type='user'
+    and um.thread_character_id is null
+    and um.character_content_bundle_id is null
+    and um.redacted_at is null and um.body_text is not null
+    and length(btrim(um.body_text))>0
+    and nullif(btrim(um.content_hash),'') is not null;
+  if not found
+     or 'sha256:wire-utf8:v1:'||
+        encode(sha256(convert_to(v_original_user.body_text,'UTF8')),'hex')
+        is distinct from v_pin->>'currentUserTextDigest' then
+    raise exception using errcode='42501',
+      constraint='seyeon_g0_assistant_original_user_changed',
+      message='Historical Assistant original User source is unavailable';
   end if;
 
   -- Require the exact original Grant ID; a newer grant for the same Record
@@ -119,8 +168,7 @@ begin
     -- under a held SHARE lock; do not request extra grant-table columns.
     and m.revoked_at is null and m.source_kind='user_approved'
     and m.memory_type=v_pin->>'recordType'
-    and m.schema_version=v_pin->>'recordSchemaVersion'
-  for share of g,m;
+    and m.schema_version=v_pin->>'recordSchemaVersion';
 
   if not found or v_pin->>'originalGrantedAt' is null
      or v_original.granted_at::text is distinct from
@@ -148,7 +196,7 @@ create function public.qry_seyeon_g0_current_source_recent_messages_v1(
   character_id text, body_text text, created_at timestamptz
 )
 language plpgsql security definer
-set search_path=pg_catalog,public
+set search_path=pg_catalog,public set row_security=on
 as $context_window$
 declare
   v_row record;
@@ -179,19 +227,31 @@ begin
   -- Select only metadata here. The source text is not touched until all
   -- selected messages and original grant rows have passed owner checks.
   for v_row in
-    select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no,m.content_hash
+    select m.id,m.turn_id,m.sender_type,c.character_id,m.sequence_no,
+           m.content_hash,m.redacted_at,m.has_body
     from (
+      -- Census every message in the requested sequence window, including
+      -- redacted / blank / missing-body rows. Filtering them out here would
+      -- silently return a different, apparently fully-authorized history.
       select src.id,src.turn_id,src.sender_type,src.thread_character_id,
-             src.thread_id,src.sequence_no,src.content_hash
+             src.thread_id,src.sequence_no,src.content_hash,src.redacted_at,
+             nullif(btrim(src.body_text),'') is not null as has_body
       from public.conversation_messages src
       where src.subject_id=p_subject_id and src.thread_id=p_thread_id
-        and src.redacted_at is null and src.body_text is not null
       order by src.sequence_no desc limit p_limit
     ) m
     left join public.conversation_thread_characters c
       on c.id=m.thread_character_id and c.thread_id=m.thread_id
     order by m.sequence_no asc
   loop
+    -- A removed, redacted or empty candidate is an unknown source, not
+    -- permission to backfill the window with an older message. HOLD all.
+    if v_row.redacted_at is not null or v_row.has_body is distinct from true
+       or nullif(btrim(v_row.content_hash),'') is null then
+      raise exception using errcode='42501',
+        constraint='seyeon_g0_context_window_source_missing',
+        message='Current model context source is unavailable';
+    end if;
     v_total:=v_total+1;
     v_ids:=array_append(v_ids,v_row.id);
     v_hashes:=array_append(v_hashes,v_row.content_hash);
