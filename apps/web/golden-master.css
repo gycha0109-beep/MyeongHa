@@ -493,7 +493,11 @@ body.gm-page .mobile-bottom-nav { display: none; }
   .gm-recent-time { display: none; }
   .gm-saju-hero { background-position: center; }
   .gm-saju-quote { display: none; }
-  body.gm-page .mobile-bottom-nav { display: flex; }
+}
+
+/* Keep the bottom nav on the same mobile breakpoint as the shared header. */
+@media (max-width: 767px) {
+  body.gm-page .mobile-bottom-nav { display: grid; }
   body.gm-page { padding-bottom: 76px; }
 }
 
