@@ -72,7 +72,9 @@ describe('S0 G0->G1 exact historical model-input window (offline HOLD)',()=>{
     expect(receipt).toBeGreaterThan(assertion);
     expect(dbPin).toBeGreaterThan(receipt);
     expect(exactContext).toBeGreaterThan(dbPin);
-    expect(safeHold).toBeGreaterThan(exactContext);
+    const audit=exec.indexOf('await input.historicalCurrentOriginalAuditDbPort.recheckCurrentOriginals({',exactContext);
+    expect(audit).toBeGreaterThan(exactContext);
+    expect(safeHold).toBeGreaterThan(audit);
     expect(provider).toBeGreaterThan(safeHold);
   });
 });

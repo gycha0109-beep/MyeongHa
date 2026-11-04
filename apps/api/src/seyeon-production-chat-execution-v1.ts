@@ -52,6 +52,7 @@ import {
 import {buildSeyeonG1HistoricalFinalContextCandidateSealV1,buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
 import {assertSeyeonG1HistoricalPostPreflightContextCandidateV1} from './seyeon-g1-historical-final-context-proof-v1.js';
 import type {SeyeonG1HistoricalCandidateDbPortV1} from './postgres-seyeon-g1-historical-candidate-port-v1.js';
+import type {SeyeonG1HistoricalCurrentOriginalsAuditPortV1} from './postgres-seyeon-g1-historical-current-audit-port-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
 import type { SeyeonG1CombinedModelPinRequestV1 } from './seyeon-g1-positive-combined-source-port-v1.js';
 import type {
@@ -286,6 +287,8 @@ extends BaseProductionSliceInputV1 {
   readonly positivePersonalSourcePort?: SeyeonPositiveS0OwnerDbPortsV1;
   /** Explicit S0 Owner port; historical evidence is never model authority. */
   readonly historicalSourceCandidateDbPort?: SeyeonG1HistoricalCandidateDbPortV1;
+  /** Optional isolated Owner audit; never G2 or Model/Reveal authority. */
+  readonly historicalCurrentOriginalAuditDbPort?: SeyeonG1HistoricalCurrentOriginalsAuditPortV1;
 
   readonly combinedSourcePinPort?: Readonly<{
     pinBeforeModel(input: SeyeonG1CombinedModelPinRequestV1): Promise<Readonly<Record<string, unknown>>>;
@@ -870,6 +873,16 @@ export async function runSeyeonProductionChatExecutionV1(
                   persistedHistoricalCandidateProof,
                   assembledContext:assembledCandidateContext,
                 });
+                // The existing W67 Owner function rechecks the exact
+                // original User/Assistant and Grant against CURRENT DB state.
+                // This is a candidate-only audit, NOT the actual G2 Commit TX.
+                if(input.historicalCurrentOriginalAuditDbPort!==undefined){
+                  await input.historicalCurrentOriginalAuditDbPort.recheckCurrentOriginals({
+                    subjectId,threadId,turnId:receivedTurn.turnId,
+                    attemptId:attempt.attemptId,
+                    expectedHistoricalSourceCount:census.historicalSourceCount,
+                  });
+                }
               } catch {
                 // The candidate has already been committed by DB Owner.
                 // Never call failAttempt on its immutable, context_ready row.
