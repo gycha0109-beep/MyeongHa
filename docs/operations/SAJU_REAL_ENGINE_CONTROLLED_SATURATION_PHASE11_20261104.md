@@ -36,12 +36,6 @@ The result is explicitly **diagnostic evidence only**. A rising p95, CPU throttl
 
 All production/DR governance flags stay **false**: `saturationKneeApproved`, `sajuSaturationCeilingProven`, `productionSajuCpuMemoryCeilingProven`, `productionCapacityProven`, `productionScalingThresholdApproved`, `drReady`, `serviceResumptionAllowed`, `outputContainsIdentifiers`. Hosted recovery and migration-history issue [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN. There is no Production restart permission.
 
-## First actual GitHub Linux attempt — 2026-11-04 (blocked, not a measurement)
-
-The first main-only `saturation` dispatch [#41786718871](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41786718871), exact MyeongHa main `512ef9d5b20888553eb5cfe6b15fd3b9e3b3643b`, **FAILED** before completing the first measured stage. GitHub uploaded artifact `13301855853`, name `isolated-saju-saturation-phase11-41786718871`, containing only `BLOCKED_INCOMPLETE` and the all-false Production/DR gates. No usable 120,000-slot, eight-stage data exists from that run.
-
-The failure was independently reproduced against the pinned clean Saju source on offline local Linux Docker: the driver function's numeric `round` parameter shadowed its existing `round()` metric-rounding function. The stage failed with `round is not a function` after its first bounded 15-second observation window. This was a **driver implementation defect**, not evidence of a saturated Saju service. The corrective change renames only the numeric stage-round parameter to `roundNumber`, preserves the JSON `round` field and original rounding helper, and adds a regression test that fails on the previous shadowed name. The original GitHub failed artifact remains classified incomplete; do not report its wall-clock exit as a service saturation knee.
-
 ## Required evidence after merge
 
 Run `saju-isolated-rate-ladder-phase11.yml` with `experiment=saturation` exactly once on the merged `main` only if no successful matching run exists. Obtain the original sanitized artifact `isolated-saju-saturation-phase11-<run-id>`, bind its SHA-256 to the exact GitHub main + Saju SHAs, verify two rounds/eight 15-second stages/120,000 scheduled slots and kernel quotas, preserve it in the operations evidence directory and update the Production Operations worklog with **observed** counters only. Keep the service ceiling and Phase 12/13 decisions blocked until representative topology and independently supported acceptance evidence exist.

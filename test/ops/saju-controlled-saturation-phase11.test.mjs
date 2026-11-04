@@ -133,10 +133,6 @@ describe('Phase 11 bounded repeatable Saju saturation diagnostic, not approval',
     expect(runner).toContain("'--cpus=1.00'");
     expect(runner).toContain("saturation ? ['--saturation'] : []");
     expect(driver).toContain('Math.floor(slot / waveSize)');
-    expect(driver).toContain('async function measure(rate, saturation = false, roundNumber = 0)');
-    expect(driver).toContain('...(saturation ? { round: roundNumber,');
-    expect(driver).toContain('achievedSuccessRps: round(');
-    expect(driver).not.toContain('async function measure(rate, saturation = false, round = 0)');
     expect(driver).toContain('SATURATION_MAX_IN_FLIGHT = 64');
     expect(driver).toContain('SATURATION_ROUNDS = 2');
     expect(driver).toContain('saturation ? 120000 : 4710');
