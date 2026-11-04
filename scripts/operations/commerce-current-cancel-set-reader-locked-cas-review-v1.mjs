@@ -26,6 +26,7 @@ const hold=(kind,extra={})=>Object.freeze({
  authenticatedProviderSetMatched:false,postGetDbSnapshotStable:false,
  exactReaderGrantLockedAndCasChecked:false,
  readerS1LockAndScopeRecheckObserved:false,
+ singleExactFullCancellationObservedAtGet:false,
  sourceOrderClassification:'INCOMPARABLE',
  providerOrderingProven:false,
  currentProviderFinalityProven:false,
@@ -69,6 +70,7 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
     setCheck.observedProviderSetMatched!==true||
     setCheck.postGetDbSnapshotStable!==true||
     setCheck.exactProviderEventIncluded!==true||
+    typeof setCheck.singleExactFullCancellationObservedAtGet!=='boolean'||
     setCheck.providerOrderingProven!==false||
     setCheck.currentProviderStateVerified!==false||
     setCheck.grantRevocationAuthorized!==false||
@@ -81,6 +83,11 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
   authenticatedProviderSetMatched:true,
   postGetDbSnapshotStable:true,
  };
+ // Only one exact SUCCEEDED full cancellation may enter purchase Grant CAS.
+ // A 3000+5900 aggregate or any pending item must not lock/revoke a Grant.
+ if(setCheck.singleExactFullCancellationObservedAtGet!==true)
+  return hold('current_cancel_set_is_not_one_exact_full_item',observed);
+ const fullObserved={...observed,singleExactFullCancellationObservedAtGet:true};
  const locked=await (lockedCasInspector??
   inspectLockedReaderRevokeCasPreflightV1)(dbClient,{
   providerEventId,entitlementGrantId,expectedReceiptId:receiptId,
@@ -105,7 +112,7 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
    locked.exactReaderGrantLocked===true&&locked.revisionProven===true;
  if(locked.kind==='exact_event_revoke_replay_observed'&&completeS1Cas)
   return hold('existing_exact_event_revoke_replay_observed',{
-   ...observed,exactReaderGrantLockedAndCasChecked:true,
+   ...fullObserved,exactReaderGrantLockedAndCasChecked:true,
    readerS1LockAndScopeRecheckObserved:true,
    sourceOrderClassification:'SAME',
   });
@@ -116,8 +123,8 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
      'single_cancel_does_not_cover_full_reader_purchase',
      'exact_refund_amount_evidence_missing'].includes(locked.kind))
   return hold('exact_reader_locked_cas_consistent_but_authority_held',{
-   ...observed,exactReaderGrantLockedAndCasChecked:true,
+   ...fullObserved,exactReaderGrantLockedAndCasChecked:true,
    readerS1LockAndScopeRecheckObserved:true,
   });
- return hold('exact_reader_locked_cas_or_source_changed',observed);
+ return hold('exact_reader_locked_cas_or_source_changed',fullObserved);
 }

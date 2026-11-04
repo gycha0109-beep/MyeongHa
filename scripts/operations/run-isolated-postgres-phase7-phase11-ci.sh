@@ -91,7 +91,51 @@ jq -e '
 ' "$scratch/capacity.json" >/dev/null || fail 'Isolated capacity measurements failed exact safety contract.'
 echo 'PASS real ephemeral PostgreSQL 18 synthetic pool saturation and post-pressure recovery'
 
-jq -n --slurpfile metrics "$scratch/capacity.json" '{
+# Reuse the existing manual PG18 runner to measure the real product DB path.
+# This fixture contains only local synthetic owners; Auth/Saju are loopback HTTP.
+if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.test.mjs --reporter=verbose >"$scratch/product-path.log" 2>&1; then
+  echo '::group::Isolated PostgreSQL product-path diagnostics (sanitized)' >&2
+  tail -n 75 "$scratch/product-path.log" | sed -E \
+    -e 's/[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}/[SYNTHETIC_UUID]/g' \
+    -e 's#postgres(ql)?://[^[:space:]]+#[DATABASE_URL_REDACTED]#g' \
+    -e 's/([Pp]assword|[Tt]oken|[Ss]ecret|[Kk]ey)=([^[:space:]]+)/\1=[REDACTED]/g' >&2
+  echo '::endgroup::' >&2
+  fail 'Real PostgreSQL18 product-path request test failed.'
+fi
+grep -F '1 passed' "$scratch/product-path.log" >/dev/null \
+  || fail 'Exactly one PostgreSQL18 product-path test must pass.'
+sed -n 's/^MYEONGHA_REAL_PG18_PRODUCT_PATH_PHASE10_11_PASS //p' "$scratch/product-path.log" \
+  >"$scratch/product-path.json"
+[[ -s "$scratch/product-path.json" ]] || fail 'Actual product-path measurement marker missing.'
+jq -e '
+  .schema == "myeongha-isolated-pg18-product-path-phase10-phase11-v1"
+  and .result == "PASS"
+  and .databaseTransport == "actual_ephemeral_postgres18_rls"
+  and .sajuEngineTransport == "synthetic_response_not_real_engine"
+  and .baseline.requested == 12
+  and .baseline.successful == 12
+  and .contended.requested == 32
+  and .contended.concurrency == 8
+  and .contended.unavailable > 0
+  and .contended.unexpected == 0
+  and .dbPeak <= 2
+  and .dbBudget == 2
+  and (.dbAcquireP95Ms | type == "number")
+  and (.dbQueryP95Ms | type == "number")
+  and .sajuTimeoutUnavailable == 1
+  and .authUnavailable == 1
+  and .dbUnavailable == 1
+  and .healthUnaffected == true
+  and .productionCapacityProven == false
+  and .productionScalingThresholdApproved == false
+  and .drReady == false
+  and .serviceResumptionAllowed == false
+  and .outputContainsIdentifiers == false
+' "$scratch/product-path.json" >/dev/null \
+  || fail 'Real PostgreSQL18 product-path observations failed bounded safety contract.'
+echo 'PASS isolated real PostgreSQL18 product path: Auth/Saju local HTTP, pool pressure, dependency failures.'
+
+jq -n --slurpfile metrics "$scratch/capacity.json" --slurpfile product "$scratch/product-path.json" '{
   schema: "myeongha-ops-isolated-pg18-phase7-phase11-v1",
   scope: "temporary-github-runner-local-postgres18",
   status: "PASS",
@@ -99,6 +143,7 @@ jq -n --slurpfile metrics "$scratch/capacity.json" '{
   isolatedRlsCaseCount: 1,
   isolatedPoolSaturationProven: true,
   syntheticCapacityMeasurements: $metrics[0],
+  isolatedProductPath: $product[0],
   productionRlsProven: false,
   productionCapacityProven: false,
   sajuResourceCeilingProven: false,
@@ -114,6 +159,7 @@ if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     echo
     echo '- Local real RLS role/subject isolation: **1/1 PASS**'
     echo '- Local synthetic pool acquisition pressure and recovery: **PASS**'
+    echo '- Actual PostgreSQL18 Product Auth/DB/Saju HTTP path with synthetic Member and Saju response: **PASS**'
     echo '- Actual numeric measurements: see identifier-free run artifact'
     echo '- Source: new temporary loopback PostgreSQL 18 clusters, no provider/Production access'
     echo '- Production DB RLS, real queries, DB saturation ceiling, Saju CPU/memory, scaling trigger: **NOT PROVEN**'
