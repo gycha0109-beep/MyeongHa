@@ -35,6 +35,8 @@ export function createAdminAccessGateV1(config: AdminAccessConfigurationV1, opti
     return false;
   };
   return async (request: Request): Promise<boolean> => {
+    let stage = 'claims_decode';
+    let keyRequestSignal: AbortSignal | undefined;
     try {
       // Hostname-based Access browser sessions may arrive via CF_Authorization
       // rather than the origin assertion header. Both paths MUST verify the
@@ -62,21 +64,40 @@ export function createAdminAccessGateV1(config: AdminAccessConfigurationV1, opti
           (claims.iat !== undefined && (typeof claims.iat !== 'number' || claims.iat > now + 30))) return deny('token_time_invalid');
       if (typeof claims.email !== 'string' || claims.email.toLowerCase() !== binding.ownerEmail)
         return deny('owner_claim_invalid');
-      const signal = AbortSignal.timeout(3000);
+      // Allow a bounded remote signing-key lookup; the previous 3s deadline
+      // can reject valid Access users when the key endpoint is slow.
+      stage = 'key_fetch';
+      keyRequestSignal = AbortSignal.timeout(8000);
       const response = await (options.fetchImpl ?? fetch)(binding.issuer + '/cdn-cgi/access/certs', {
-        redirect: 'error', signal, headers: { Accept: 'application/json' }, cache: 'no-store',
+        redirect: 'error', signal: keyRequestSignal, headers: { Accept: 'application/json' }, cache: 'no-store',
       });
       if (!response.ok) return deny('signing_keys_unavailable');
-      const jwks: unknown = JSON.parse(await readBoundedUpstreamJsonTextV1(response, { maximumBodyBytes: 65_536, signal }));
+      stage = 'key_body';
+      const bodyText = await readBoundedUpstreamJsonTextV1(response, { maximumBodyBytes: 65_536, signal: keyRequestSignal });
+      stage = 'key_json';
+      const jwks: unknown = JSON.parse(bodyText);
       if (!object(jwks) || !Array.isArray(jwks.keys) || jwks.keys.length > 20) return deny('signing_keys_invalid');
       const keys = jwks.keys.filter((key: unknown) => object(key) && key.kid === header.kid && key.kty === 'RSA' &&
         (key.use === undefined || key.use === 'sig') && (key.alg === undefined || key.alg === 'RS256'));
       if (keys.length !== 1 || !/^[A-Za-z0-9_-]+$/u.test(parts[2]!)) return deny('signing_key_or_signature_invalid');
+      stage = 'key_import';
       const key = await crypto.subtle.importKey('jwk', keys[0] as JsonWebKey,
         { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
+      stage = 'signature_verify';
       const signed=await crypto.subtle.verify('RSASSA-PKCS1-v1_5', key, Buffer.from(parts[2]!, 'base64url'),
         new TextEncoder().encode(parts[0] + '.' + parts[1]));
       return signed || deny('signature_invalid');
-    } catch { return deny('verification_exception'); }
+    } catch {
+      // The categories are fixed strings, never exception messages, URLs,
+      // credentials, claims or signing-key contents.
+      if (keyRequestSignal?.aborted && ['key_fetch', 'key_body'].includes(stage))
+        return deny('signing_keys_timeout');
+      if (stage === 'key_fetch') return deny('signing_keys_fetch_exception');
+      if (stage === 'key_body') return deny('signing_keys_body_exception');
+      if (stage === 'key_json') return deny('signing_keys_json_exception');
+      if (stage === 'key_import') return deny('signing_keys_import_exception');
+      if (stage === 'signature_verify') return deny('signature_verify_exception');
+      return deny('verification_exception');
+    }
   };
 }

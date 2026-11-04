@@ -1481,6 +1481,87 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(grant.revoked||grant.requested).toBe(true);
   });
 
+  it('G3 original User redaction-first blocks original pair and all later replay HTTP disclosure',async()=>{
+    const f=await prepare(227,{summary:'synthetic original User redaction for G3'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const redactor=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g3_original_pair_waits_on_user_redaction';
+    try{
+      // Original Grant stays ACTIVE: redaction of the exact Member User
+      // alone must invalidate every derived historical disclosure.
+      await redactor.query('BEGIN');
+      const redacted=await redactor.query(
+        'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=$2::text where id=$1::uuid',
+        [f.user,'g3_synthetic_original_user_redaction_first'],
+      );
+      expect(redacted.rowCount).toBe(1);
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query(`select user_text as "userText",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await redactor.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows).toEqual([]);
+      await reader.query('COMMIT');
+    }finally{
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      redactor.release();reader.release();
+    }
+    const {rows:[current]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      m.redacted_at is not null as user_redacted
+      from public.record_access_grants g,public.conversation_messages m
+      where g.id=$1 and m.id=$2`,[f.grant,f.user]);
+    expect(current).toEqual({grant_active:true,user_redacted:true});
+
+    // Both still-unmounted direct Node response paths start a fresh current
+    // original-source check; neither can disclose either private message.
+    const send=async(kind:'pair'|'replay')=>{
+      const server=createServer((incoming,response)=>{
+        const args={incoming,response,pool:subjectPool,
+          requestId:'g3-user-redaction-227',
+          identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence}};
+        if(kind==='pair')void handleSeyeonFirstOriginalDialoguePairNodeS0V1(args);
+        else void handleSeyeonFirstOriginalAssistantReplayNodeS0V1(args);
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const path=kind==='pair'?'original-pair':'original-replay';
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/${path}/${f.assistant}`);
+        return {status:response.status,body:await response.text()};
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    };
+    for(const kind of ['pair','replay'] as const){
+      const result=await send(kind);
+      expect(result.status).toBe(503);
+      expect(result.body).not.toContain(f.userText);
+      expect(result.body).not.toContain(f.assistantText);
+    }
+  });
+
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
     const f=await prepare(210);
     await f.commit();
