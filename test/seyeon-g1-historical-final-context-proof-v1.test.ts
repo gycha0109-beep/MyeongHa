@@ -1,7 +1,9 @@
 // Watchtower-Track: security
 // Post-Preflight G1 historical source closure; no Provider admission.
 import {createHash} from 'node:crypto';
-import {describe,expect,it} from 'vitest';
+import {describe,expect,it,vi} from 'vitest';
+import {runSeyeonCharacterTurnV2,type SeyeonStructuredProviderPortV2} from '../apps/api/src/seyeon-character-runtime-v2.js';
+import {createIntegrityClassifier,createDisclosureClassifier} from '../apps/api/src/seyeon-production-governance-v1.js';
 import {canonicalJson} from '../packages/domain/src/index.js';
 import {assembleSeyeonRuntimeContextV2} from '../packages/domain/src/seyeon-runtime-context-v2.js';
 import {
@@ -131,5 +133,90 @@ describe('S0 G1 historical post-Preflight Interpreter context closure (HOLD)',()
     expect(()=>assertSeyeonG1HistoricalPostPreflightContextCandidateV1({
       ...base,persistedHistoricalCandidateProof:{...proof,authorizesModel:true},
     })).toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
+  });
+});
+
+
+describe('G1 post-Preflight runtime verification before historical Provider (offline)',()=>{
+  function preflightHarness(injectClaim=false){
+    const called:string[]=[];
+    const generate=vi.fn(async(request:Readonly<{purpose:string}>):Promise<unknown>=>{
+      called.push(request.purpose);
+      if(request.purpose==='integrity_classification')return {
+        claims:injectClaim?[{
+          claimId:'synthetic-claim',kind:'SHARED_EVENT_CLAIM',
+          statement:'synthetic unverified assertion',
+        }]:[],
+      };
+      if(request.purpose==='disclosure_classification')return {
+        topicKey:null,questionContext:'casual_curiosity',
+      };
+      throw Error('HISTORICAL_PROVIDER_MUST_NOT_RUN');
+    });
+    const provider:SeyeonStructuredProviderPortV2={
+      providerKey:'offline-synthetic',modelKey:'no-external-ai',
+      generate,
+    };
+    const checked={reached:false,matched:false,preflightClosed:false};
+    const governance={
+      relationship:{gate:'PUBLIC' as const,trustBand:'low' as const,
+        relevantSharedHistoryRefs:[]},
+      integrity:{
+        classifier:createIntegrityClassifier(provider),
+        authorityResolver:{resolve:async()=>({
+          state:'MISSING' as const,authorityRefs:[],
+          provenanceRefs:['synthetic:unverified'],
+        })},
+      },
+      disclosure:{
+        classifier:createDisclosureClassifier(provider),
+        sourceDescriptor:{
+          readDescriptor(){throw Error('PRIVATE_SOURCE_DESCRIPTOR_FORBIDDEN');},
+        },
+        factAuthorityResolver:{
+          resolve(){throw Error('PRIVATE_SOURCE_AUTHORITY_FORBIDDEN');},
+        },
+        retriever:{retrieve(){throw Error('PRIVATE_SOURCE_RETRIEVAL_FORBIDDEN');}},
+      },
+    };
+    const run=runSeyeonCharacterTurnV2({
+      userMessageRef:id(5),userText:recent[2]!.text,
+      contextInput:c,governance,
+      assertGovernedPreflightSourceClosure:(checkedPreflight)=>{
+        checked.preflightClosed=true;
+        if(checkedPreflight.retrievedPrivateSources.length!==0)
+          throw Error('UNPINNED_PRIVATE_SOURCE');
+      },
+      assertBeforeModelContext:(actual)=>{
+        checked.reached=true;
+        assertSeyeonG1HistoricalPostPreflightContextCandidateV1({
+          ...base,assembledContext:actual,
+        });
+        checked.matched=true;
+        // The real runtime has passed the exact final-context comparison,
+        // but historical G1/G2 permission is not granted. Stop NOW.
+        throw new SeyeonG1HistoricalPostPreflightContextHoldV1();
+      },
+      interpreterProvider:provider,rendererProvider:provider,
+      semanticReviewerProvider:provider,
+    });
+    return {run,called,generate,checked};
+  }
+  it('compares the actual governed Preflight Interpreter input then HOLDs before any model dispatch',async()=>{
+    const h=preflightHarness();
+    await expect(h.run).rejects.toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
+    expect(h.checked.preflightClosed).toBe(true);
+    expect(h.checked.reached).toBe(true);
+    expect(h.checked.matched).toBe(true);
+    expect(h.called).toEqual(['integrity_classification','disclosure_classification']);
+    expect(h.generate).toHaveBeenCalledTimes(2);
+  });
+  it('rejects new Preflight integrity-derived authority that was not in the original G1 candidate',async()=>{
+    const h=preflightHarness(true);
+    await expect(h.run).rejects.toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
+    expect(h.checked.preflightClosed).toBe(true);
+    expect(h.checked.reached).toBe(true);
+    expect(h.checked.matched).toBe(false);
+    expect(h.called).toEqual(['integrity_classification','disclosure_classification']);
   });
 });

@@ -185,6 +185,16 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     const g2=readFileSync(new URL('../scripts/operations/seyeon-security-s0/02-atomic-commit.sql',import.meta.url),'utf8');
     expect(g2).toContain("old.seyeon_personal_source_pin_jsonb ? 'historicalCandidateProof'");
     expect(g2).toContain('seyeon_g2_historical_candidate_not_authority');
+    // The raw v2 Commit transition invokes the BEFORE trigger even when
+    // a caller bypasses the positive G2 wrapper. A forged positiveProof
+    // carrying history must not pass the one-User-only S0 Commit path.
+    const trigger=g2.slice(0,g2.indexOf('create function public.cmd_commit_seyeon_positive_chat_turn_v1('));
+    expect(trigger).toContain("v_positive->>'historicalSourceCount' is distinct from '0'");
+    expect(trigger).toContain("v_positive->>'historicalSourceCensusDigest' is distinct from");
+    expect(trigger).toContain('seyeon_positive_g2_historical_originals_not_authorized');
+    expect(trigger).toContain("encode(sha256(convert_to('[]','UTF8')),'hex')");
+    expect(trigger.indexOf('seyeon_positive_g2_historical_originals_not_authorized'))
+      .toBeLessThan(trigger.indexOf('lock_original_memory_grant_v1('));
     expect(g2).toContain("old.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
     expect(g2).toContain("a.seyeon_personal_source_pin_jsonb -> 'positiveProof'");
   });

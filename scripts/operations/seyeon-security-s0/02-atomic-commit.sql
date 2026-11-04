@@ -88,6 +88,22 @@ begin
           message='Positive Commit requires exact original immutable Pin';
       end if;
 
+      -- G1 historicalCandidateProof is already rejected above. The other
+      -- possible bypass is forging a legacy positiveProof that silently
+      -- mentions historical User/Assistant sources and calling the raw v2
+      -- Commit directly. The actual BEFORE-transition trigger must deny
+      -- that shape; the wrapper check alone is not sufficient authority.
+      -- This is intentionally a zero-history restriction, NOT the future
+      -- G2 positive historical proof admission path.
+      if v_positive->>'historicalSourceCount' is distinct from '0'
+         or v_positive->>'historicalSourceCensusDigest' is distinct from
+            'sha256:v1:'||
+            encode(sha256(convert_to('[]','UTF8')),'hex') then
+        raise exception using errcode='23514',
+          constraint='seyeon_positive_g2_historical_originals_not_authorized',
+          message='Historical original sources require an independent G1/G2 authority';
+      end if;
+
       -- Every positive G2 Commit must carry the exact G1 current-User
       -- source certificate. Legacy Memory-only pins are NOT sufficient.
       v_recent:=nullif(to_jsonb(old)->'seyeon_recent_source_pin_jsonb','null'::jsonb);
