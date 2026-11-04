@@ -4,6 +4,8 @@ import type {
   ReadingHistoryItemV1,
 } from '@myeongha/api-client';
 
+import type { MobileUiLocale } from '../../ui/mobile-ui-copy.js';
+
 import type {
   MobileRecordsCollectionKeyV1,
   MobileRecordsSnapshotsV1,
@@ -43,9 +45,28 @@ const readingTitles: Readonly<Record<string, string>> = Object.freeze({
   question_specific: '지금 고민으로 보기',
 });
 
-export function formatRecordDateV1(value: string): string {
+const RECORD_MONTH_NAMES_EN = Object.freeze([
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+] as const);
+
+/** Display-only: preserve the date portion of the server timestamp verbatim.
+ * Do not reinterpret a source-owned UTC/offset timestamp as the device timezone.
+ */
+export function formatRecordDateV1(value: string, locale: MobileUiLocale = 'ko-KR'): string {
   const match = /^(\d{4})-(\d{2})-(\d{2})/u.exec(value);
-  return match === null ? '—' : `${match[1]}.${match[2]}.${match[3]}`;
+  if (match === null) return '—';
+  const year = match[1] ?? '';
+  const month = match[2] ?? '';
+  const day = match[3] ?? '';
+  if (locale === 'en-US') {
+    const monthName = RECORD_MONTH_NAMES_EN[Number(month) - 1] ?? month;
+    return `${monthName} ${Number(day)}, ${year}`;
+  }
+  if (locale === 'ja-JP' || locale === 'zh-TW' || locale === 'zh-CN') {
+    return `${year}年${Number(month)}月${Number(day)}日`;
+  }
+  return `${year}.${month}.${day}`;
 }
 
 export function readingIsArchiveOpenableV1(value: string): boolean {
