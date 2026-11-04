@@ -724,6 +724,16 @@ SQL
     apply_pg17_migrations_without_birth_authority
     bash test/db/commerce_portone_cancellation_set_pg17.sh
     ;;
+  commerce-portone-cancellation-persist-full-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
+        && "${PGHOST:-}" == localhost && "${PGPORT:-}" == 5432
+        && "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMERCE_CANCEL_EVENT_PERSIST_NOT_DISPOSABLE_PG17 >&2; exit 1;
+    }
+    apply_pg17_migrations_without_birth_authority
+    bash test/db/commerce_portone_cancellation_persist_full_pg17.sh
+    ;;
   commerce-portone-cancellation-partial-set-pg17)
     verify_pg17
     [[ "${GITHUB_ACTIONS:-}" == true && "${DB_SUITE:-}" == postgres17
