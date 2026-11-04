@@ -4,7 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import { preflightSeyeonChatTurnSendRequestV1 } from './chat-turn-send-http.js';
 import { createSeyeonCloudflareStaticPreflightDenialV1 } from './seyeon-cloudflare-offline-reveal-fence-v1.js';
-import {assertSeyeonZeroSourceHttpReceiptReadyV1, SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1} from './seyeon-zero-source-http-receipt-ready-v1.js';
+import {assertSeyeonZeroSourceHttpReceiptReadyV1, SEYEON_G0_RECEIPT_ISSUER_V1} from './seyeon-zero-source-http-receipt-ready-v1.js';
 import { executePostgresSubjectTransactionV1, type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { ProductionSeyeonChatRuntimeV1 } from './production-seyeon-chat-runtime-v1.js';
 import { recoverSeyeonUnissuedZeroReplyV1 } from './seyeon-unissued-zero-reply-recovery-v1.js';
@@ -142,9 +142,9 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
       }});
     if(input.request.signal.aborted)return held();
 
-    // Explicit failed-turn retry never recovers an already-issued Assistant;
-    // it may proceed only through the original failed User's exact ID.
-    if(zeroSource && retryHeader!=='v1'){
+    // Exact committed, never-issued G0 replies recover before any paid inference,
+    // including explicit owner retry. An already-issued Assistant is never replayed.
+    if(zeroSource){
       stage='unissued_recovery';
       const recovered=await recoverSeyeonUnissuedZeroReplyV1({pool:input.pool,
         verifiedEvidence:preflight.verifiedEvidence,threadId:preflight.threadId,
@@ -260,7 +260,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
         if(resolvedSubject.subjectKind!=='member'||resolvedSubject.subjectId!==result.subjectId||
            input.request.signal.aborted)throw Error('Original Subject unavailable');
         const r=await client.query<{assistantText:unknown}>(`select assistant_text as "assistantText"
-          from ${zeroSource ? SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1 : 'public.cmd_issue_seyeon_positive_first_reply_v1'}(
+          from ${zeroSource ? SEYEON_G0_RECEIPT_ISSUER_V1 : 'public.cmd_issue_seyeon_positive_first_reply_v1'}(
             $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text,$9::bytea)`,[
           resolvedSubject.subjectId,preflight.threadId,e.committedTurn.turnId,e.committedTurn.attemptId,
           e.receivedTurn.userMessageId,e.committedTurn.assistantMessageId,
