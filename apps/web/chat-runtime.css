@@ -117,3 +117,20 @@ html[data-theme="dark"] .character-room-retry {
   font-size: .73rem;
   line-height: 1.4;
 }
+.chat-message-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: .38rem;
+  padding: .32rem .7rem;
+  border: 1px solid var(--mh-brass-strong, #ae8550);
+  border-radius: 999px;
+  background: var(--mh-surface, #fffaf3);
+  color: var(--mh-ink-strong, #263035);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+}
+.chat-message-retry:disabled { opacity: .5; cursor: not-allowed; }
+.chat-message-retry:focus-visible { outline: 2px solid var(--mh-brass-strong, #ae8550); outline-offset: 2px; }
+html[data-theme="dark"] .chat-message-retry { background: #15232b; color: #f1e6d7; }

@@ -2,6 +2,34 @@
 
 This handoff contains **no secrets**. It is for continuing the existing Admin track from a second Windows PC without copying credentials from the school PC.
 
+## 2026-11-04 follow-up: Cloudflare policy simulation and remaining gates
+
+- [Admin work-log PR #2963](https://github.com/gycha0109-beep/MyeongHa/pull/2963) merged after [11/11 integration jobs succeeded](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41790239741). No production Worker code or credentials changed.
+- Re-read the **live** `MyeongHa Admin Owner Only` Cloudflare Access application and single exact-email allow policy. Confirmed exact hostname, Access AUD and Owner binding match; no Everyone / Bypass or additional policy. The dedicated Worker remains deployed with all four activation flags `false`, Reader and Audit Hyperdrive bindings present. Anonymous requests to `/admin/`, `/admin/index.html`, and `/api/admin/session` each redirected to Access (HTTP 302) rather than returning privileged content.
+- Ran Cloudflare's **policy simulation against the exact configured Owner-only rule**. Simulation ID `281e584c0e442c56c104f3f70cdde8357d84280b2a50e57f4eed97d4620ea810` completed: **1 existing authenticated user evaluated, 1 allowed, 0 blocked, 0 errored**. This is **not** a non-Owner denial test because the test population contained no other authenticated user. It does not prove a second person's real login is denied.
+- A real **Owner** browser previously returned `ADMIN_PRIVATE_DISABLED` after signing/Owner validation, and remains the recorded acceptance evidence. Do not mistake the simulation or anonymous 302s for a second account's real session.
+- **Next blocked existing gate:** a genuine non-Owner login attempt/session must be observed without creating a fictitious user or storing JWTs/cookies. The existing dual-session `apps/admin/inactive-stage-owner-probe.mjs` cannot run truthfully with only the Owner's session.
+- **Independent gates before read-only operational launch:** real Member identity binding (email plus auth UUID in the same verified provider result) and actual Reader/Audit production request/permission behavior, distinct from the already-passed rollback-only DB role preflights. These require a separately controlled test/release path and cannot be claimed from an inactive `MYEONGHA_ADMIN_PRIVATE_ENABLED=false` Worker. An actual change to operational readiness/activation requires the user's **explicit approval**; no activation was made.
+- Credit commands, refunds/account actions, retention and analytics maintenance remain disabled. No new roadmap tasks were introduced.
+
+## Current Admin evidence and work log — 2026-11-04 (latest)
+
+**Scope:** isolated `myeongha-admin` Worker and Owner-only Access gate; no customer-facing Worker, customer DML, credit command, or operational activation change in this verification.
+
+| Step | Verified outcome | Evidence |
+| --- | --- | --- |
+| Access Owner gate failure diagnosed | Repeated real browser denials `ADMIN_ACCESS_REQUIRED`; Cloudflare Workers telemetry showed `source=assertion`, then fixed denial stage `signing_keys_fetch_exception`. No JWT/cookie/email logged. | PRs [#2954](https://github.com/gycha0109-beep/MyeongHa/pull/2954) and [#2955](https://github.com/gycha0109-beep/MyeongHa/pull/2955) |
+| Workers runtime compatibility fixed | Signing key retrieval changed to Workers-supported manual redirect handling; unexpected 3xx responses still explicitly denied and RS256/issuer/AUD/expiry/exact Owner signature validation preserved. | [PR #2959](https://github.com/gycha0109-beep/MyeongHa/pull/2959), [integration CI (11/11 success)](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41785645208) |
+| Inactive stage deployed | Latest verified inactive deploy from `main` commit `4bfd9f62142651ab69b136586d76498b1992247d`; both private-build and inactive-stage jobs passed, including live policy/role checks and anonymous denial. | [Admin Console Private Build #41787539667](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41787539667) |
+| Real Owner browser passed gate | User-observed screenshot on 2026-11-04 showed precisely `{"error":"ADMIN_PRIVATE_DISABLED"}`, not the former `ADMIN_ACCESS_REQUIRED`; this is the expected success response **only after** signing and Owner validation while the console itself remains off. No live session credential retained. | User-supplied visual acceptance evidence in conversation, not stored in repository |
+| Post-acceptance read-only checks | Cloudflare app still has a single exact-email allow policy, its AUD and Owner identity match Worker bindings, separate Reader and Audit Hyperdrives remain present, and all four feature flags stay `false`. Unauthenticated HTTP checks of `/admin/`, `/admin/index.html`, `/api/admin/session` return Access redirects (302), not content. | Cloudflare read-only policy/binding review and anonymous HTTP probe on 2026-11-04 |
+
+**Not completed:** Actual **non-Owner Access session** denial has **not** been exercised live. The existing `apps/admin/inactive-stage-owner-probe.mjs` requires two distinct ephemeral, real Access JWTs and tests the inactive boundary only. Do not create a fictitious user, store tokens in Secrets, paste tokens into a chat, or count anonymous 302 / synthetically signed unit tests as a real non-Owner session.
+
+**Remaining approved order:** (1) obtain authorized, ephemeral non-Owner session and run that probe without persisting credentials; (2) independently verify Member identity and real Reader/Audit operational read behavior under the approved release procedure; (3) seek separate Owner approval **before** enabling read-only Admin functionality. Credit commands, retention, and analytics maintenance must remain disabled pending their own prerequisites and explicit approval.
+
+**Roadmap status:** `ROADMAP_COMPLETE` **not reached**; Owner authentication and isolated inactive staging are complete, operational read activation is not. Older historical status sections below must not override this latest evidence.
+
 ## Current verified status — 2026-11-04 (supersedes the dated handoff below)
 
 - PR #2940 merged after the required integration CI passed: https://github.com/gycha0109-beep/MyeongHa/pull/2940.
