@@ -14,6 +14,7 @@ on:
           - split
           - sustained
           - four-client-waves
+          - saturation
 
 permissions:
   contents: read
@@ -80,6 +81,14 @@ jobs:
             --out "$RUNNER_TEMP/myeongha-isolated-saju-four-client-waves-phase11-proof.json" \
             --four-client-waves
 
+      - name: Measure isolated bounded repeated Saju saturation candidate
+        if: ${{ inputs.experiment == 'saturation' }}
+        run: |
+          node scripts/operations/run-isolated-saju-split-rate-ladder-phase11.mjs \
+            --saju-repo "$GITHUB_WORKSPACE/_isolated_saju" \
+            --out "$RUNNER_TEMP/myeongha-isolated-saju-saturation-phase11-proof.json" \
+            --saturation
+
       - name: Upload sanitized synthetic rate measurements
         if: ${{ always() && inputs.experiment == 'shared' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -95,6 +104,15 @@ jobs:
         with:
           name: isolated-saju-four-client-waves-phase11-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-isolated-saju-four-client-waves-phase11-proof.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload sanitized bounded Saju saturation probe
+        if: ${{ always() && inputs.experiment == 'saturation' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: isolated-saju-saturation-phase11-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-isolated-saju-saturation-phase11-proof.json
           if-no-files-found: ignore
           retention-days: 14
 
