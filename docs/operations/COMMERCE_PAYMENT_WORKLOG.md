@@ -524,3 +524,11 @@
 - **증거:** test/db/commerce_cancel_same_item_real_race_pg17.mjs, 기존 test/db/commerce_portone_cancellation_persist_full_pg17.sh 연결. 이 PR HEAD 통합 CI 완료 전 PG17 실행 성공은 미확정.
 - **남은 것:** 신뢰 가능한 Provider NEWER/STALE, 기존 Reader T2/Entitlement Writer 실제 결속, 고객 전달 입증 및 구매→취소→삭제 전체 격리 검증.
 - **안전:** 운영 DB·Live 상품·PortOne GET/POST·실제 환불/권한 회수·공개 라우트 미변경.
+
+### 2026-11-05 — 고객 청약철회 원본 구매의 저장된 취소 Event 내부 검토 연결
+
+- **로드맵:** 6절 1·3·5번의 원본 결제/청약철회 접수/취소 증거 결속. 기존 `reviewRecordedReadingWithdrawalPrivateV1`의 단일 전체 가시성 READ ONLY 스냅샷에 원본 구매별 취소 원장 관측을 추가했습니다.
+- **실제 구현:** 저장된 Claim Subject·Purchase Intent·Checkout Unit을 원본 Notice/검증 Receipt/Reader Grant에 묶어 기존 Commerce Provider Event에서 취소 항목을 조회합니다. `commerce-recorded-reader-cancellation-evidence-v1.ts`에서 정확히 단일 전액 기록, 다건 부분 취소 및 기록 부재를 구분하고 원본 Receipt/Subject 교차 혼입·취소 HMAC 중복·증거 필드 위조·과금액을 안전 보류합니다. 호출자는 Event/Receipt/Grant를 지정할 수 없습니다.
+- **검증:** 단일 전액·다건 부분 취소(3000+5900)·원본 계보 불일치·위조·중복·DB 장애에 대한 기존 청약철회 검토기 회귀 테스트 추가. 신규 PR CI 결과 전까지 PASS 미선언.
+- **한계:** 저장 원장은 Provider 최신 GET·시간 순서·최종 환불/법적 청약철회/소비자 실제 전달 입증이 아닙니다. 모든 결과의 Provider 환불 허용·Reader Grant 변경 허용은 false이고 기존 S7 ACK도 사람의 실제 소비 증명으로 승격하지 않습니다.
+- **운영 경계:** 기존 private read-only 기능에만 연결. 신규 SQL 마이그레이션/테이블/권한, 공개 API, 실제 PG 환불 POST, 운영 DB·LIVE·자동 권한 회수 변경 없음.
