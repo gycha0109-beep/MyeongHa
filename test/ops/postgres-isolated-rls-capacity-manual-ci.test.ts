@@ -69,7 +69,7 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(runner).toContain('synthetic_response_not_real_engine');
     expect(runner).toContain('isolatedProductPath: $product[0]');
     expect(product).toContain('const isolated = BIN ? describe : describe.skip');
-    expect(product).toContain('postgresql');
+    expect(product).toContain('PostgreSQL 18');
     expect(product).toContain('CREATE POLICY ops_phase11_owner');
     expect(product).toContain('NOINHERIT');
     expect(product).toContain('http://127.0.0.1:');
