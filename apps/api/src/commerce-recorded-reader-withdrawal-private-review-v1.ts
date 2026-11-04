@@ -9,6 +9,10 @@ import type {
   DigitalReadingWithdrawalReviewV1,
 } from './commerce-digital-reading-withdrawal-review-v1.js';
 import {
+  readRecordedReaderS7ClaimTimelineV1,
+  type RecordedReaderS7ClaimTimelineV1,
+} from './commerce-recorded-reader-s7-evidence-v1.js';
+import {
   createPostgresDigitalReadingWithdrawalEvidencePrivateV1,
 } from './postgres-digital-reading-withdrawal-evidence-private-v1.js';
 
@@ -81,10 +85,11 @@ export type RecordedReadingWithdrawalPrivateReviewV1 = Readonly<{
     | 'exact_unit_manual_review'
     | 'exact_unit_evidence_unavailable';
   /**
-   * This reviewer does not read S7 consumer delivery evidence and cannot
-   * establish actual supply. No returned classification is a legal decision.
+   * S7 retained transport evidence is descriptive and NEVER establishes
+   * actual consumer supply or a legal decision.
    */
   review: DigitalReadingWithdrawalReviewV1 | null;
+  retainedReaderS7Timeline: RecordedReaderS7ClaimTimelineV1 | null;
   sourceClaimImmutable: true;
   requiresSeparateLegalDecision: true;
   consumerDeliveryProven: false;
@@ -116,9 +121,10 @@ function view(
   claimId:string, receivedAt:string,
   kind:RecordedReadingWithdrawalPrivateReviewV1['kind'],
   review:DigitalReadingWithdrawalReviewV1|null,
+  retainedReaderS7Timeline:RecordedReaderS7ClaimTimelineV1|null=null,
 ): RecordedReadingWithdrawalPrivateReviewV1 {
   return Object.freeze({
-    claimId, receivedAt, kind, review,
+    claimId, receivedAt, kind, review, retainedReaderS7Timeline,
     recordedCustomerClaim:true,
     sourceClaimImmutable:true,
     requiresSeparateLegalDecision:true,
@@ -196,8 +202,18 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
         'exact_unit_evidence_unavailable',null);
     }
 
+    // Correlate the original paid S5 body and currently retained S7 attempts
+    // only after the exact Claim->paid Receipt/checkout evidence is established.
+    // The DB derives the Grant/body from the immutable Claim's Subject/Unit.
+    const retainedReaderS7Timeline = await readRecordedReaderS7ClaimTimelineV1(
+      connection,{
+        subjectId:claim.subjectId,
+        purchaseIntentId:claim.purchaseIntentId,
+        unitId:claim.unitId,
+      },
+    );
     return view(claim.claimId,receivedAt,
-      'exact_unit_manual_review',preflight.review);
+      'exact_unit_manual_review',preflight.review,retainedReaderS7Timeline);
   } catch {
     return failure();
   } finally {
