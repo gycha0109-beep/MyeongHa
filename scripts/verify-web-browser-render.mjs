@@ -191,8 +191,14 @@ async function inspectSharedHeader(client) {
       texture: css('.product-header')?.backgroundImage ?? '',
       cssLoaded: [...document.styleSheets].some(sheet => sheet.href?.endsWith('/shared-product-header.css')),
       themeSprite: getComputedStyle(document.querySelector('.product-theme-toggle-mark'), '::before').backgroundImage,
-      reportSprite: getComputedStyle(document.querySelector('.product-report-link'), '::before').backgroundImage,
-      reportWidth: rect('.product-report-link')?.width ?? 0,
+      localeSprite: getComputedStyle(document.querySelector('.ui-locale-picker'), '::before').backgroundImage,
+      notificationSprite: getComputedStyle(document.querySelector('.product-icon-button'), '::before').backgroundImage,
+      hasReport: !!document.querySelector('.product-report-link'),
+      controlOrder: [...(document.querySelector('.product-utilities')?.children ?? [])].map(node =>
+        node.classList.contains('product-theme-toggle') ? 'theme' :
+        node.classList.contains('product-icon-button') ? 'notification' :
+        node.classList.contains('product-profile') ? 'profile' :
+        node.classList.contains('ui-locale-picker') ? 'locale' : 'unexpected').join(','),
     };
   })()`);
 }
@@ -204,24 +210,20 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
     await waitForVisible(client, '.product-header .ui-locale-select');
     const header = await inspectSharedHeader(client);
     assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
-    assert(header.themeSprite.includes('header-ui-glyphs-v1.png') && header.reportSprite.includes('header-ui-glyphs-v1.png'),
+    assert([header.themeSprite, header.localeSprite, header.notificationSprite].every(sprite => sprite.includes('header-ui-glyphs-v2.png')),
       `Shared header image assets missing on ${pathname}: ${JSON.stringify(header)}`);
-    assert(header.reportWidth > 0, `Report icon missing on ${pathname}`);
+    assert(!header.hasReport && header.controlOrder === 'theme,notification,profile,locale',
+      `Header control order mismatch on ${pathname}: ${JSON.stringify(header)}`);
     assert(Math.abs(header.height - expectedHeight) <= 1 && Math.abs(header.innerHeight - (expectedHeight - 1)) <= 2,
       `Unexpected header height on ${pathname}: ${JSON.stringify(header)}`);
     if (expectedHeight === 92) {
       assert(header.navDisplay === 'flex' && header.profileHeight > 0, `Desktop header is missing nav/profile on ${pathname}`);
     } else {
-      assert(header.navDisplay === 'none' && header.profileHeight === 0, `Mobile header must hide desktop nav/profile on ${pathname}`);
+      assert(header.navDisplay === 'none' && header.profileHeight > 0, `Mobile header must hide desktop nav and keep icon-only My on ${pathname}`);
     }
-    // Authentication intentionally has no notifications button. Check the size
-    // of shared controls, but do not require a control absent by design.
-    if (pathname !== '/auth.html' && expectedHeight === 92) {
-      assert(header.iconWidth > 0, `Notification control unexpectedly missing on ${pathname}`);
-    }
+    assert(header.iconWidth > 0, `Notification control unexpectedly missing on ${pathname}`);
     if (!baseline) { baseline = header; continue; }
     for (const key of ['height','innerHeight','brandFont','navFont','navGap','navDisplay','navHeight','iconWidth','themeWidth','profileHeight','localeWidth']) {
-      if (key === 'iconWidth' && (header.iconWidth === 0 || baseline.iconWidth === 0)) continue;
       const ok = typeof header[key] === 'number'
         ? Math.abs(header[key] - baseline[key]) <= 1
         : header[key] === baseline[key];
