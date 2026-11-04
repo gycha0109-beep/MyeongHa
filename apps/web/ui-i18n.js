@@ -49,6 +49,16 @@ registerStaticCopy('세연의 답장을 기다리는 중', { 'ja-JP': 'セヨン
 registerStaticCopy('답장하는 중', { 'ja-JP': '返信中', 'zh-TW': '正在回覆', 'en-US': 'Typing', 'zh-CN': '正在回复' });
 registerStaticCopy('전송을 종료한 메시지', { 'ja-JP': '送信を終了したメッセージ', 'zh-TW': '已停止傳送的訊息', 'en-US': 'Message sending ended', 'zh-CN': '已停止发送的消息' });
 registerStaticCopy('답변 처리에 실패한 메시지 · 다시 전송할 수 있습니다.', { 'ja-JP': '返信の処理に失敗したメッセージ · 再送信できます。', 'zh-TW': '回覆處理失敗的訊息 · 可以重新傳送。', 'en-US': 'Reply failed · You can send this message again.', 'zh-CN': '回复处理失败的消息 · 可以重新发送。' });
+registerStaticCopy('답변 처리에 실패한 메시지', { 'ja-JP': '返信処理に失敗したメッセージ', 'zh-TW': '回覆處理失敗的訊息', 'en-US': 'Reply failed', 'zh-CN': '回复处理失败的消息' });
+registerStaticCopy('답변 처리가 종료된 메시지', { 'ja-JP': '返信処理が終了したメッセージ', 'zh-TW': '回覆處理已結束的訊息', 'en-US': 'Reply processing ended', 'zh-CN': '回复处理已结束的消息' });
+registerStaticCopy('다시 전송', { 'ja-JP': '再送信', 'zh-TW': '重新傳送', 'en-US': 'Retry sending', 'zh-CN': '重新发送' });
+registerStaticCopy('이 메시지 다시 전송', { 'ja-JP': 'このメッセージを再送信', 'zh-TW': '重新傳送此訊息', 'en-US': 'Retry this message', 'zh-CN': '重新发送此消息' });
+registerStaticCopy('다른 미완료 전송이 남아 있습니다. 먼저 전송 상태를 확인해 주세요.', { 'ja-JP': '別の未完了の送信があります。先に送信状態を確認してください。', 'zh-TW': '尚有另一則未完成的傳送。請先確認傳送狀態。', 'en-US': 'Another send is unfinished. Check its status first.', 'zh-CN': '还有另一条未完成的发送。请先确认发送状态。' });
+registerStaticCopy('재전송 가능한 메시지인지 확인하고 있습니다…', { 'ja-JP': '再送信できるメッセージか確認しています…', 'zh-TW': '正在確認訊息是否可重新傳送…', 'en-US': 'Checking whether this message can be retried…', 'zh-CN': '正在确认此消息是否可以重发…' });
+registerStaticCopy('메시지 상태가 변경되었습니다. 대화를 다시 확인해 주세요.', { 'ja-JP': 'メッセージの状態が変わりました。会話を再確認してください。', 'zh-TW': '訊息狀態已變更。請重新檢查對話。', 'en-US': 'The message status changed. Check the conversation again.', 'zh-CN': '消息状态已改变。请重新检查对话。' });
+registerStaticCopy('재전송 상태를 확인하지 못했습니다. 대화를 다시 연결해 주세요.', { 'ja-JP': '再送信状態を確認できませんでした。会話に再接続してください。', 'zh-TW': '無法確認重新傳送狀態。請重新連接對話。', 'en-US': 'Could not verify retry status. Reconnect to the conversation.', 'zh-CN': '无法确认重发状态。请重新连接对话。' });
+registerStaticCopy('이전 메시지를 다시 전송하고 있습니다…', { 'ja-JP': '前のメッセージを再送信しています…', 'zh-TW': '正在重新傳送先前的訊息…', 'en-US': 'Retrying the earlier message…', 'zh-CN': '正在重新发送之前的消息…' });
+registerStaticCopy('메시지를 다시 전송했습니다.', { 'ja-JP': 'メッセージを再送信しました。', 'zh-TW': '已重新傳送訊息。', 'en-US': 'Message retried successfully.', 'zh-CN': '已重新发送消息。' });
 registerStaticCopy('이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.', { 'ja-JP': 'プライバシー保護のため、以前の会話履歴は表示できません。', 'zh-TW': '基於隱私保護，無法顯示先前的對話紀錄。', 'en-US': 'Previous chat history is hidden to protect privacy.', 'zh-CN': '为保护隐私，无法显示此前的聊天记录。' });
 registerStaticCopy('이전 대화 기록은 개인정보 보호를 위해 표시하지 않습니다. 새 AI 답변은 아직 준비 중입니다.', { 'ja-JP': 'プライバシー保護のため、以前の会話履歴は表示しません。新しい AI の返答はまだ準備中です。', 'zh-TW': '為保護隱私，先前的對話紀錄不會顯示。新的 AI 回覆尚在準備中。', 'en-US': 'Previous chat history is hidden for privacy. New AI replies are not yet available.', 'zh-CN': '为保护隐私，之前的聊天记录不会显示。新的 AI 回复尚未就绪。' });
 registerStaticCopy('현재 세연의 AI 메시지 전송은 운영 준비 중입니다. 크레딧 예약·정산 연결이 완료되지 않아 전송할 수 없으며, 입력한 내용은 보존했습니다.', { 'ja-JP': '現在、セヨンの AI メッセージ送信は準備中です。クレジットの予約・精算処理が未接続のため送信できませんが、入力した内容は保持されています。', 'zh-TW': 'Seyeon 的 AI 訊息傳送功能尚在準備中。由於點數預留與結算尚未接通，無法傳送，但輸入內容已保留。', 'en-US': 'Seyeon AI messaging is not yet available. Credit reservation and settlement are not connected, so the message was not sent. Your draft is saved.', 'zh-CN': 'Seyeon 的 AI 消息发送功能尚未就绪。由于点数预留和结算尚未接通，消息无法发送，但输入内容已保留。' });

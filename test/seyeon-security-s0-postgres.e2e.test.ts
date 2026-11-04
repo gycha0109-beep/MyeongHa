@@ -1810,6 +1810,135 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('G3 original dialogue pair first holds the original Grant until read completes, then refuses replay',async()=>{
+    const f=await prepare(231,{summary:'synthetic G3 first original pair Grant lock'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const reader=await pool.connect(),revoker=await pool.connect();
+    const marker='seyeon_g3_pair_first_revoke_waiter';
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{
+        userMessageId:string,userText:string,assistantMessageId:string,assistantText:string
+      }>(`select user_message_id::text as "userMessageId",user_text as "userText",
+        assistant_message_id::text as "assistantMessageId",assistant_text as "assistantText"
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{
+        userMessageId:f.user,userText:f.userText,
+        assistantMessageId:f.assistant,assistantText:f.assistantText,
+      }]);
+      await revoker.query("select set_config('application_name',$1,false)",[marker]);
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=revoker.query<{result:Record<string,unknown>}>(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows[0]?.result).toMatchObject({
+        status:'committed',revokedGrantCount:1,replayed:false,
+      });
+      await revoker.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await revoker.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();revoker.release();
+    }
+    const after=await f.run(({client})=>client.query(`select user_text,assistant_text
+      from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+        $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]));
+    expect(after.rows).toEqual([]);
+    const {rows:[original]}=await pool.query(`select revoked_at is not null
+      as revoked from public.record_access_grants where id=$1`,[f.grant]);
+    expect(original?.revoked).toBe(true);
+  });
+
+  it('G3 original Grant withdrawal first blocks the original dialogue pair before any User or Assistant text',async()=>{
+    const f=await prepare(232,{summary:'synthetic G3 original pair withdrawal first'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async text=>expect(text).toBe(f.assistantText)});
+    const revoker=await pool.connect(),reader=await pool.connect();
+    const marker='seyeon_g3_pair_waits_on_original_grant_withdrawal';
+    try{
+      await revoker.query('BEGIN');
+      await revoker.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const {rows:[withdrawal]}=await revoker.query<{result:Record<string,unknown>}>(`select
+        seyeon_private.cmd_request_seyeon_memory_revoke_v1($1::uuid,$2::uuid)
+        as result`,[f.subject,f.memory]);
+      expect(withdrawal?.result).toMatchObject({
+        status:'committed',revokedGrantCount:1,replayed:false,
+      });
+      await reader.query("select set_config('application_name',$1,false)",[marker]);
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=reader.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await revoker.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rows).toEqual([]);
+      await reader.query('COMMIT');
+    }finally{
+      await revoker.query('ROLLBACK').catch(()=>undefined);
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await reader.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      revoker.release();reader.release();
+    }
+    const {rows:[original]}=await pool.query(`select revoked_at is not null
+      as revoked from public.record_access_grants where id=$1`,[f.grant]);
+    expect(original?.revoked).toBe(true);
+    // Verify a fresh direct Node HTTP read cannot reveal either original text.
+    const server=createServer((incoming,response)=>{
+      void handleSeyeonFirstOriginalDialoguePairNodeS0V1({
+        incoming,response,pool:subjectPool,requestId:'g3-original-pair-grant-revoked-232',
+        identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},
+      });
+    });
+    await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+    try{
+      const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/original-pair/${f.assistant}`);
+      expect(response.status).toBe(503);
+      expect(response.headers.get('Cache-Control')).toContain('no-store');
+      const body=await response.text();
+      expect(body).not.toContain(f.userText);
+      expect(body).not.toContain(f.assistantText);
+    }finally{
+      server.closeAllConnections();
+      await new Promise<void>(resolve=>server.close(()=>resolve()));
+    }
+  });
+
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
     const f=await prepare(210);
     await f.commit();

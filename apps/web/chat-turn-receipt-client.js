@@ -6,7 +6,8 @@ import {
 } from '../../packages/api-client/src/index.ts';
 
 export async function sendSeyeonBrowserTurnWithReceiptV1({
-  origin, bearer, threadId, turn, language, localeHeaders, supersedeFailed = false, fetchImpl = fetch,
+  origin, bearer, threadId, turn, language, localeHeaders,
+  supersedeFailed = false, retryFailed = false, fetchImpl = fetch,
 }) {
   const client = new MyeongHaApiClientV1({
     origin,
@@ -23,6 +24,13 @@ export async function sendSeyeonBrowserTurnWithReceiptV1({
           options?.method === 'POST' &&
           target.pathname === `/api/chat/${encodeURIComponent(threadId)}/turns`) {
         headers.set('X-MyeongHa-Seyeon-Explicit-Supersede', 'v1');
+      }
+      if (retryFailed === true && supersedeFailed !== true &&
+          target.origin === new URL(origin).origin &&
+          options?.method === 'POST' &&
+          target.pathname === `/api/chat/${encodeURIComponent(threadId)}/turns`) {
+        // A retry must re-use the original failed User turn, never open a new one.
+        headers.set('X-MyeongHa-Seyeon-Explicit-Retry', 'v1');
       }
       return fetchImpl(url, {
         ...options,

@@ -55,11 +55,12 @@ describe('Chat Runtime authored UI locale boundary', () => {
   });
 
   it('renders ACKed current-session conversation without fetching held history', () => {
-    const send = runtime.slice(runtime.indexOf('async function sendTurn(message)'),
+    const send = runtime.slice(runtime.indexOf('async function sendTurn(message,'),
       runtime.indexOf('function submitTurn(event)'));
     expect(send).toContain('acknowledgedReply = await sendSeyeonBrowserTurnWithReceiptV1');
     expect(send).toContain('renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn)');
-    expect(send).not.toContain('await loadRoomState()');
+    expect(send).toContain('if (retryFailed) {');
+    expect(send).toContain('const refreshed = await loadRoomState();');
     expect(send.indexOf('clearPendingTurn(pendingTurn.clientTurnId, submittedThreadId)')).toBeLessThan(
       send.indexOf('const currentBearer = await getActiveBearer();'),
     );
