@@ -6,6 +6,7 @@ import type {
   MobileMyBirthViewV1,
   MobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
+import { mobileMySectionStaticErrorV1 } from './mobile-my-section-error-copy';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileTheme } from '@/ui/mobile-theme';
@@ -257,9 +258,14 @@ export function MySectionError({
   onRetry: () => void;
 }) {
   const themedStyles = useMobileThemedStyles(styles);
+  // Translate only the two authored My-screen failure messages.
+  // Unexpected/server-provided error text remains untouched.
+  const knownError = mobileMySectionStaticErrorV1(message);
   return (
     <View style={themedStyles.card}>
-      <Text style={themedStyles.error}>{message}</Text>
+      {knownError === null
+        ? <Text style={themedStyles.error}>{message}</Text>
+        : <MobileUiText style={themedStyles.error}>{knownError}</MobileUiText>}
       <Pressable accessibilityRole="button" onPress={onRetry} style={themedStyles.retry}>
         <MobileUiText style={themedStyles.retryText}>다시 시도</MobileUiText>
       </Pressable>
