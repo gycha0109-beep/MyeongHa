@@ -60,6 +60,8 @@ join public.standard_reading_reader_access_grants access
 join public.official_reader_paid_answer_bodies b
  on b.subject_id=pi.subject_id
  and b.originating_entitlement_grant_id=grant_row.id
+ and b.product_id=offer.product_id
+ and b.committed_at>=receipt.verified_at
  and b.official_reading_id=access.official_reading_id
  and b.reader_character_id=access.reader_character_id
  and b.reader_content_bundle_id=access.reader_content_bundle_id
