@@ -148,7 +148,10 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
         'select message_id::text as "messageId",sender_type as "senderType" from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,10)',
         [resolvedSubject.subjectId,thread,nextUser]),
     });
-    await expect(context()).rejects.toMatchObject({code:'42501'});
+    // The disposable DB already contains the governed 19/22 history rules.
+    // Install the original-source lock-only 26 bridge BEFORE reading history:
+    // the old owner-scoped SHARE helper cannot safely re-check received
+    // message lineage under RLS during recovery issuance.
     await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
     const result=await context();
     expect(result.rows.map(x=>x.senderType)).toEqual(['user','character','user']);
