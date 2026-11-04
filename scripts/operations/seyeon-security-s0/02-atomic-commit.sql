@@ -73,6 +73,25 @@ begin
          or (select count(*) from jsonb_object_keys(
               old.seyeon_personal_source_pin_jsonb
             ))<>1
+         -- The immutable G1 Owner issues exactly 21 positive-proof keys.
+         -- Reject hidden historicalSources, alternate Grants, or other
+         -- unrecognized model authority even if the zero-history digest was
+         -- copied from a legitimate single-Memory Pin. This check sits in
+         -- the raw v2 validated->committed transition, not just its wrapper.
+         or (select count(*) from jsonb_object_keys(v_positive))<>21
+         or exists (
+           select 1
+           from jsonb_object_keys(v_positive) as key_name(field)
+           where key_name.field not in (
+             'schemaVersion','subjectId','threadId','turnId','attemptId',
+             'characterId','currentUserMessageId','currentUserTextDigest',
+             'historicalSourceCount','historicalSourceCensusDigest',
+             'recordKind','recordId','originalGrantId','originalGrantedAt',
+             'recordType','recordSchemaVersion','projectorVersion',
+             'selectedSourcesDigest','projectedMemoryDigest',
+             'originalPgJsonbDigest','finalModelContextDigest'
+           )
+         )
          or v_positive ->> 'schemaVersion' is distinct from
               'seyeon-positive-original-memory-source-pin-v1'
          or v_positive ->> 'subjectId' is distinct from old.subject_id::text

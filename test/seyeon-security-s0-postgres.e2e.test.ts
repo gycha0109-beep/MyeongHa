@@ -342,6 +342,21 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
 
   it('persists exact G1, commits actual v2 plus two Outboxes, consumes first Reveal once, and keeps private acceptance at zero grants', async () => {
     const f = await prepare(1);
+    // The same raw v2 transition trigger now checks an EXACT 21-field
+    // one-Memory G1 proof. Prove its real DB-issued shape stays compatible
+    // with the legitimate zero-historical-source Commit path.
+    const {rows:[positiveShape]}=await pool.query(`select
+      (select count(*)::int from jsonb_object_keys(
+         a.seyeon_personal_source_pin_jsonb->'positiveProof'
+       )) as fields,
+       a.seyeon_personal_source_pin_jsonb->'positiveProof' ? 'historicalSources'
+         as has_unpinned_history,
+       a.seyeon_personal_source_pin_jsonb->'positiveProof'->>'historicalSourceCount'
+         as history_count
+      from public.chat_turn_attempts a where a.id=$1`,[f.attempt]);
+    expect(positiveShape).toEqual({
+      fields:21,has_unpinned_history:false,history_count:'0',
+    });
     let complete!: () => void;
     const handled = new Promise<void>(resolve => { complete = resolve; });
     const server = createServer((incoming, response) => {

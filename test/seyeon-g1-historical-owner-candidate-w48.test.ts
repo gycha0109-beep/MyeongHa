@@ -192,6 +192,26 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(trigger).toContain("v_positive->>'historicalSourceCount' is distinct from '0'");
     expect(trigger).toContain("v_positive->>'historicalSourceCensusDigest' is distinct from");
     expect(trigger).toContain('seyeon_positive_g2_historical_originals_not_authorized');
+    // Compare the raw Commit transition's closed positiveProof keyset with
+    // the exact G1 Owner-produced durable proof shape. No spare payload field
+    // may silently carry unpinned historical or replacement-Grant material.
+    const g1=readFileSync(new URL(
+      '../scripts/operations/seyeon-security-s0/01-source-pin.sql',
+      import.meta.url,
+    ),'utf8');
+    const emitted=g1.match(/v_positive:=jsonb_build_object\(([\s\S]*?)\n  \);/u)?.[1];
+    const permitted=trigger.match(/key_name\.field not in \(\s*([\s\S]*?)\n\s*\)/u)?.[1];
+    expect(emitted).toBeDefined();
+    expect(permitted).toBeDefined();
+    const g1Fields=[...(emitted??'').matchAll(/^\s*'([A-Za-z][A-Za-z0-9]*)',/gmu)]
+      .map(match=>match[1]).sort();
+    const g2Fields=[...(permitted??'').matchAll(/'([A-Za-z][A-Za-z0-9]*)'/gu)]
+      .map(match=>match[1]).sort();
+    expect(g1Fields).toHaveLength(21);
+    expect(g2Fields).toEqual(g1Fields);
+    expect(trigger).toContain('jsonb_object_keys(v_positive))<>21');
+    expect(g2Fields).not.toContain('historicalSources');
+    expect(g2Fields).not.toContain('replacementGrantId');
     expect(trigger).toContain("encode(sha256(convert_to('[]','UTF8')),'hex')");
     expect(trigger.indexOf('seyeon_positive_g2_historical_originals_not_authorized'))
       .toBeLessThan(trigger.indexOf('lock_original_memory_grant_v1('));
