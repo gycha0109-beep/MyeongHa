@@ -65,7 +65,7 @@ describe('Web Character Room continuous open and resume', () => {
     expect(scrub).toContain('if (chatIntro) chatIntro.hidden = true');
     expect(scrub).toContain('if (contextPill) contextPill.hidden = true');
     expect(reload).toContain('clearOwnerScopedRoomStateForAuthorityChange()');
-    expect(reload).toContain("error.message === 'SEYEON_HISTORY_REVEAL_HOLD'");
+    expect(reload).toContain("'현재 대화 기록 연결을 사용할 수 없습니다.'");
     expect(reload.indexOf('clearOwnerScopedRoomStateForAuthorityChange()'))
       .toBeLessThan(reload.lastIndexOf('return false;'));
     expect(scrub).not.toContain('sessionStorage.setItem(');
