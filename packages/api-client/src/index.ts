@@ -170,3 +170,14 @@ export {
   type ReaderInterpretationSegmentKindV1,
 } from './reader-interpretation.js';
 
+export {
+  DIGITAL_READING_WITHDRAWAL_ENDPOINT_V1,
+  DIGITAL_READING_WITHDRAWAL_REASONS_V1,
+  submitDigitalReadingWithdrawalClaimV1,
+  readDigitalReadingWithdrawalClaimStatusV1,
+  type DigitalReadingWithdrawalReasonV1,
+  type SubmitDigitalReadingWithdrawalRequestV1,
+  type SubmittedDigitalReadingWithdrawalClaimV1,
+  type DigitalReadingWithdrawalClaimStatusV1,
+  type DigitalReadingWithdrawalClaimStatusResponseV1,
+} from './withdrawal-claims.js';
