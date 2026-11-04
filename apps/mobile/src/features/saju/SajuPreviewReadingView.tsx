@@ -7,6 +7,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 
 import {
   MOBILE_SAJU_TOPIC_SECTIONS_V1,
+  type MobileHomeSajuFocusKeyV1,
   type MobileSajuTopicV1,
 } from './mobile-saju-topic-catalog';
 import { mobileSajuPreviewServiceV1 } from './native-mobile-saju-preview-service';
@@ -98,7 +99,21 @@ function errorCopy(error: unknown): Readonly<{ message: string; retryable: boole
   });
 }
 
-export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (topic: MobileSajuTopicV1) => void }) {
+const HOME_FOCUS_NOTICE = Object.freeze({
+  'ko-KR': '홈에서 선택한 주제입니다. 아래에서 다시 선택하면 프리뷰로 이동합니다.',
+  'ja-JP': 'ホームで選んだテーマです。以下で選択するとプレビューに進みます。',
+  'zh-TW': '這是您在首頁選擇的主題。請在下方再次選擇以進入預覽。',
+  'en-US': 'Selected from Home. Choose this topic below to open its preview.',
+  'zh-CN': '这是您在首页选择的主题。请在下方再次选择以进入预览。',
+});
+
+export function SajuPreviewReadingView({
+  onOpenPreview,
+  focusTopicKey = null,
+}: {
+  onOpenPreview?: (topic: MobileSajuTopicV1) => void;
+  focusTopicKey?: MobileHomeSajuFocusKeyV1 | null;
+}) {
   const styles = useMobileThemedStyles(staticStyles);
   const { t, locale } = useMobileUiLocale();
   const [state, setState] = useState<PreviewStateV1>({ kind: 'idle' });
@@ -154,7 +169,7 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
     }));
   }
 
-  const selectedKey = state.kind === 'idle' ? null : state.topic.key;
+  const selectedKey = state.kind === 'idle' ? focusTopicKey : state.topic.key;
   const pending = state.kind === 'loading';
 
   return (
@@ -170,6 +185,12 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
           다른 주제의 풀이로 자동 대체하지 않습니다.
         </MobileUiText>
       </View>
+
+      {focusTopicKey !== null ? (
+        <View style={styles.homeFocusCard}>
+          <Text style={styles.homeFocusNotice}>{HOME_FOCUS_NOTICE[locale]}</Text>
+        </View>
+      ) : null}
 
       {MOBILE_SAJU_TOPIC_SECTIONS_V1.map((section) => (
         <View key={section.key} style={styles.topicSection}>
@@ -345,6 +366,8 @@ export function SajuPreviewReadingView({ onOpenPreview }: { onOpenPreview?: (top
 
 const styles = StyleSheet.create({
   section: { gap: 18 },
+  homeFocusCard: { borderRadius: 12, borderColor: mobileColors.gold, borderWidth: 1, backgroundColor: mobileColors.surface, padding: 14 },
+  homeFocusNotice: { color: mobileColors.ink, fontSize: 13, lineHeight: 20 },
   headerCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,

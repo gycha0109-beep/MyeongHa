@@ -224,13 +224,30 @@ export function HomeReadingTopics({
 
       <View style={styles.topicGrid}>
         {topics.map((topic) => (
-          <View key={topic.key} style={styles.topicCard}>
+          <Pressable
+            key={topic.key}
+            accessibilityRole="button"
+            accessibilityLabel={t(topic.title)}
+            onPress={() => {
+              // Home is presentation/navigation only. The Saju screen must
+              // require a separate user tap and server approval for any Preview.
+              if (topic.key === 'general') {
+                router.push('/reading');
+                return;
+              }
+              router.push({
+                pathname: '/reading',
+                params: { topic: topic.key === 'wealth' ? 'money' : topic.key },
+              });
+            }}
+            style={({ pressed }) => [styles.topicCard, pressed && styles.topicCardPressed]}
+          >
             <Text style={styles.topicSymbol}>
               {topic.key === 'general' ? '命' : topic.key === 'career' ? '業' : topic.key === 'wealth' ? '財' : '緣'}
             </Text>
             <Text style={styles.topicTitle}>{t(topic.title)}</Text>
             <Text style={styles.topicBody}>{t(topic.subtitle)}</Text>
-          </View>
+          </Pressable>
         ))}
       </View>
       <MobileUiText style={styles.caption}>
@@ -361,6 +378,7 @@ const styles = StyleSheet.create({
     padding: 15,
     gap: 7,
   },
+  topicCardPressed: { opacity: 0.78 },
   topicSymbol: { color: mobileColors.gold, fontSize: 21, fontWeight: '900' },
   topicTitle: { color: mobileColors.ink, fontSize: 15, fontWeight: '800' },
   topicBody: { color: mobileColors.muted, fontSize: 12, lineHeight: 18 },

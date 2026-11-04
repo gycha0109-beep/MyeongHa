@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -16,6 +16,7 @@ import {
 import { loadMobileCurrentSajuV1, type MobileSajuLoadStateV1 } from '@/features/saju/mobile-saju-loader';
 import { mobileSajuServiceV1 } from '@/features/saju/native-mobile-saju-service';
 import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
+import { resolveMobileHomeSajuFocusV1 } from '@/features/saju/mobile-saju-topic-catalog';
 import { SajuEditorialSummary } from '@/features/saju/SajuEditorialSummary';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
@@ -45,6 +46,8 @@ function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required
 export default function SajuScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { t } = useMobileUiLocale();
+  const { topic: requestedHomeTopic } = useLocalSearchParams<{ topic?: string | string[] }>();
+  const homeFocusTopic = resolveMobileHomeSajuFocusV1(requestedHomeTopic);
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
 
@@ -122,6 +125,8 @@ export default function SajuScreen() {
             <MobileUiText style={styles.primaryButtonText}>선택한 연결자로 사주 읽기 시작 →</MobileUiText>
           </Pressable>
           <SajuPreviewReadingView
+            key={homeFocusTopic ?? 'no-home-focus'}
+            focusTopicKey={homeFocusTopic}
             onOpenPreview={(topic) => router.push({
               pathname: '/reading/scene',
               params: { reader: presentationReader, topic: topic.key },
