@@ -35,6 +35,7 @@ const input:SeyeonG1HistoricalCandidatePinInputV1={
   currentUserMessageId:id(5),currentUserTextDigest:wire('current User'),
   selectedOriginalMemory:original,selectedSourcesDigest:sha([original]),
   preModelContextDigest:sha({fixture:'full pre-model Context'}),
+  expectedFinalModelContextDigest:sha({fixture:'deterministic full Interpreter Context'}),
   historicalSources,
 };
 const historicalAssistantOriginal={
@@ -47,7 +48,7 @@ const historicalAssistantOriginal={
   projectorVersion:original.projectorVersion,
 };
 const proof=()=>({
-  schemaVersion:'seyeon-g1-historical-source-candidate-v3',
+  schemaVersion:'seyeon-g1-historical-source-candidate-v4',
   subjectId:input.subjectId,threadId:input.threadId,turnId:input.turnId,
   attemptId:input.attemptId,characterId:'seyeon',
   currentUserMessageId:input.currentUserMessageId,
@@ -61,6 +62,7 @@ const proof=()=>({
   selectedSourcesDigest:input.selectedSourcesDigest,
   projectedMemoryDigest:original.projectedMemoryDigest,
   preModelContextDigest:input.preModelContextDigest,
+  expectedFinalModelContextDigest:input.expectedFinalModelContextDigest,
   historicalSourceCount:2,historicalSources,
   historicalSourceCensusDigest:'sha256:pg-jsonb:v1:'+'a'.repeat(64),
   historicalAssistantOriginalSources:[historicalAssistantOriginal],
@@ -98,10 +100,11 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     expect(calls).toHaveLength(1);
     expect(calls[0]?.sql).toContain('cmd_pin_seyeon_historical_source_candidate_s0_v1');
     expect(calls[0]?.sql).toContain('with pinned as materialized (');
-    expect(calls[0]?.sql).toContain("sha256(convert_to($16::jsonb::text,'UTF8'))");
+    expect(calls[0]?.sql).toContain("sha256(convert_to($17::jsonb::text,'UTF8'))");
     expect(calls[0]?.sql).toContain("(pinned.receipt->'historicalAssistantOriginalSources')::text");
-    expect(calls[0]?.params).toHaveLength(16);
-    expect(calls[0]?.params[15]).toEqual(JSON.stringify(historicalSources));
+    expect(calls[0]?.params).toHaveLength(17);
+    expect(calls[0]?.params[15]).toBe(input.expectedFinalModelContextDigest);
+    expect(calls[0]?.params[16]).toEqual(JSON.stringify(historicalSources));
     expect(response.authorizesModel).toBe(false);
     expect(response.permitsAtomicCommit).toBe(false);
     expect(response.permitsHttpReveal).toBe(false);
@@ -111,6 +114,7 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
     ['Commit permission',{permitsAtomicCommit:true}],
     ['Reveal permission',{permitsHttpReveal:true}],
     ['forged old Grant',{originalGrantId:id(10)}],
+    ['substituted sealed model context',{expectedFinalModelContextDigest:sha({fixture:'tampered Interpreter Context'})}],
     ['changed original User',{currentUserTextDigest:wire('forged')}],
     ['source count mismatch',{historicalSourceCount:1}],
     ['source digest mismatch',{historicalSourceCensusDigest:'sha256:pg-jsonb:v1:'+'b'.repeat(64)}],
@@ -146,6 +150,7 @@ describe('W48 DB-owned historical G1 candidate (HOLD)',()=>{
   });
   it.each([
     ['invalid raw digest',{...input,selectedOriginalMemory:{...original,rawRecordPgDigest:'fake'}}],
+    ['invalid sealed context digest',{...input,expectedFinalModelContextDigest:'invalid'}],
     ['swapped original Grant',{...input,selectedOriginalMemory:{...original,grantId:id(10)}}],
     ['duplicated historical message',{...input,historicalSources:[historicalSources[0]!,historicalSources[0]!]}],
     ['current User reinserted',{...input,historicalSources:[{...historicalSources[0]!,messageId:id(5)}]}],
