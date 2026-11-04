@@ -1,7 +1,9 @@
 import {reconcileStoredPortOneCancellationSetWithGetPrivateV1} from
  './commerce-portone-cancellation-set-ledger-audit-v1.mjs';
-import {inspectLockedReaderRevokeCasPreflightV1} from
- './commerce-exact-reader-revoke-cas-locked-preflight-v1.mjs';
+import {
+ COMMERCE_READER_REVOKE_LOCK_CAS_PREFLIGHT_V1,
+ inspectLockedReaderRevokeCasPreflightV1,
+} from './commerce-exact-reader-revoke-cas-locked-preflight-v1.mjs';
 
 // Internal staged review ONLY. No public route, refund POST, revoke writer,
 // legal conclusion, provider comparator or shared Reader R2/T2 lock.
@@ -23,6 +25,7 @@ const hold=(kind,extra={})=>Object.freeze({
  kind,exactProviderEventInStoredSet:false,
  authenticatedProviderSetMatched:false,postGetDbSnapshotStable:false,
  exactReaderGrantLockedAndCasChecked:false,
+ readerS1LockAndScopeRecheckObserved:false,
  sourceOrderClassification:'INCOMPARABLE',
  providerOrderingProven:false,
  currentProviderFinalityProven:false,
@@ -84,6 +87,7 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
   expectedGrantRevision,expectedLastProviderOrderingKey,
  });
  if(!locked||typeof locked.kind!=='string'||
+    locked.schemaVersion!==COMMERCE_READER_REVOKE_LOCK_CAS_PREFLIGHT_V1.schemaVersion||
     locked.grantRevocationAuthorized!==false||
     locked.entitlementEffectInvoked!==false||
     locked.writesPerformed!==false||
@@ -93,23 +97,27 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
     locked.refundFinalityProven!==false)
   throw Error('UNSAFE_READER_LOCK_PREFLIGHT_AUTHORITY_RESULT');
 
- if(locked.kind==='exact_event_revoke_replay_observed'&&
-    locked.sourceEventLocked===true&&
-    locked.exactReaderGrantLocked===true&&locked.revisionProven===true)
+ // Event/Grant locks alone do not prove shared Reader S1 scope admission.
+ // Positive and SAME classifications also require S1 acquisition and scope
+ // recheck inside the same rolled-back preflight transaction.
+ const completeS1Cas=locked.readerS1ScopesLocked===true&&
+   locked.sourceEventLocked===true&&
+   locked.exactReaderGrantLocked===true&&locked.revisionProven===true;
+ if(locked.kind==='exact_event_revoke_replay_observed'&&completeS1Cas)
   return hold('existing_exact_event_revoke_replay_observed',{
    ...observed,exactReaderGrantLockedAndCasChecked:true,
+   readerS1LockAndScopeRecheckObserved:true,
    sourceOrderClassification:'SAME',
   });
 
- if(locked.sourceEventLocked===true&&
-    locked.exactReaderGrantLocked===true&&
-    locked.revisionProven===true&&
+ if(completeS1Cas&&
     ['trusted_provider_order_missing','provider_order_comparator_unavailable',
      'partial_cancellation_review_required',
      'single_cancel_does_not_cover_full_reader_purchase',
      'exact_refund_amount_evidence_missing'].includes(locked.kind))
   return hold('exact_reader_locked_cas_consistent_but_authority_held',{
    ...observed,exactReaderGrantLockedAndCasChecked:true,
+   readerS1LockAndScopeRecheckObserved:true,
   });
  return hold('exact_reader_locked_cas_or_source_changed',observed);
 }
