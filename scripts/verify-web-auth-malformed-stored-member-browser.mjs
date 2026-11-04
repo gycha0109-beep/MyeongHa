@@ -192,7 +192,7 @@ async function readAuthority(client) {
   return client.evaluate(`(() => ({
     state: document.querySelector('.product-profile')?.dataset.authState ?? null,
     href: document.querySelector('.product-profile')?.getAttribute('href') ?? null,
-    label: document.querySelector('.product-profile')?.innerText ?? null,
+    label: document.querySelector('.product-profile')?.getAttribute('aria-label') ?? null,
     member: localStorage.getItem(${JSON.stringify(memberKey)}),
     active: sessionStorage.getItem(${JSON.stringify(activeBearerKey)}),
     pending: sessionStorage.getItem(${JSON.stringify(pendingGuestKey)}),
