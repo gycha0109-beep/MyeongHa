@@ -24,6 +24,13 @@ CREATE TABLE public.conversation_messages(
  sender_type text,thread_character_id uuid,body_text text,message_schema_version text,
  created_at timestamptz,redacted_at timestamptz);
 ALTER TABLE public.conversation_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversation_thread_characters ENABLE ROW LEVEL SECURITY;
+CREATE FUNCTION public.current_myeongha_subject_id()
+ RETURNS uuid LANGUAGE sql STABLE SET search_path='' AS $$
+  SELECT NULLIF(pg_catalog.current_setting('history.subject',true),'')::uuid
+ $$;
 CREATE FUNCTION public.assert_myeongha_subject_context_v1(p_subject uuid)
  RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $$
 BEGIN
@@ -112,6 +119,21 @@ BEGIN
    RAISE EXCEPTION 'Revoked assistant source remained exposed';
  END IF;
 END $assert$;
+RESET ROLE;
+-- The private read-only owner must still obey native RLS on foreign rows.
+SET ROLE myeongha_chat_history_reader_v1;
+SELECT set_config('history.subject','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',false);
+DO $rls$
+BEGIN
+ IF EXISTS(
+    SELECT 1 FROM public.conversation_messages
+    WHERE subject_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid
+ ) THEN RAISE EXCEPTION 'Private reader bypassed foreign-message RLS'; END IF;
+ IF EXISTS(
+    SELECT 1 FROM public.subjects
+    WHERE id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'::uuid
+ ) THEN RAISE EXCEPTION 'Private reader bypassed foreign-subject RLS'; END IF;
+END $rls$;
 RESET ROLE;
 DO $acl$
 BEGIN

@@ -9,13 +9,79 @@ BEGIN
   IF current_user <> 'postgres'
     OR to_regprocedure('public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)') IS NOT NULL
     OR to_regprocedure('seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)') IS NULL
+    OR to_regnamespace('chat_private') IS NOT NULL
     OR NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='myeongha_api_executor'
       AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls)
     OR has_table_privilege('myeongha_api_executor','public.conversation_messages','SELECT')
   THEN RAISE EXCEPTION 'Common Chat history read prerequisites drifted'; END IF;
 END $guard$;
 
-CREATE FUNCTION public.qry_chat_thread_owner_visible_history_v1(
+-- The web's public API function stays SECURITY INVOKER. A separate, private
+-- DEFINER is owned by a non-login, non-bypass, read-only role, not postgres.
+-- Postgres RLS remains active for every protected table.
+DO $role$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='myeongha_chat_history_reader_v1')
+  THEN
+    EXECUTE 'CREATE ROLE myeongha_chat_history_reader_v1 NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_roles r
+    WHERE r.rolname='myeongha_chat_history_reader_v1'
+      AND NOT r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls
+      AND NOT r.rolinherit AND NOT r.rolcreaterole AND NOT r.rolcreatedb
+  ) OR EXISTS (
+    SELECT 1 FROM pg_auth_members a
+    WHERE a.member='myeongha_chat_history_reader_v1'::regrole
+  ) THEN RAISE EXCEPTION 'Chat history reader role privilege drift'; END IF;
+END $role$;
+
+CREATE SCHEMA chat_private AUTHORIZATION myeongha_chat_history_reader_v1;
+REVOKE ALL ON SCHEMA chat_private FROM PUBLIC,anon,authenticated,service_role;
+GRANT USAGE ON SCHEMA chat_private TO myeongha_api_executor;
+GRANT USAGE ON SCHEMA seyeon_private TO myeongha_chat_history_reader_v1;
+GRANT EXECUTE ON FUNCTION public.assert_myeongha_subject_context_v1(uuid)
+  TO myeongha_chat_history_reader_v1;
+GRANT EXECUTE ON FUNCTION public.current_myeongha_subject_id()
+  TO myeongha_chat_history_reader_v1;
+GRANT EXECUTE ON FUNCTION seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)
+  TO myeongha_chat_history_reader_v1;
+
+-- Column-limited read rights. API executor receives none of these.
+GRANT SELECT(id,status,merged_into_subject_id) ON public.subjects
+  TO myeongha_chat_history_reader_v1;
+GRANT SELECT(id,subject_id,status) ON public.conversation_threads
+  TO myeongha_chat_history_reader_v1;
+GRANT SELECT(id,subject_id,thread_id,turn_id,sequence_no,sender_type,
+             thread_character_id,body_text,message_schema_version,created_at,redacted_at)
+  ON public.conversation_messages TO myeongha_chat_history_reader_v1;
+GRANT SELECT(id,thread_id,character_id) ON public.conversation_thread_characters
+  TO myeongha_chat_history_reader_v1;
+GRANT SELECT(id,subject_id,thread_id,state,delivered_at,committed_attempt_id)
+  ON public.chat_turns TO myeongha_chat_history_reader_v1;
+GRANT SELECT(id,subject_id,turn_id,state,committed_message_id,
+             seyeon_positive_delivery_received_at)
+  ON public.chat_turn_attempts TO myeongha_chat_history_reader_v1;
+
+-- These RLS policies match the verified, transaction-scoped Subject.
+CREATE POLICY chat_history_subject_reader_v1 ON public.subjects
+  FOR SELECT TO myeongha_chat_history_reader_v1
+  USING(id=public.current_myeongha_subject_id());
+CREATE POLICY chat_history_thread_reader_v1 ON public.conversation_threads
+  FOR SELECT TO myeongha_chat_history_reader_v1
+  USING(subject_id=public.current_myeongha_subject_id());
+CREATE POLICY chat_history_message_reader_v1 ON public.conversation_messages
+  FOR SELECT TO myeongha_chat_history_reader_v1
+  USING(subject_id=public.current_myeongha_subject_id());
+CREATE POLICY chat_history_participant_reader_v1 ON public.conversation_thread_characters
+  FOR SELECT TO myeongha_chat_history_reader_v1
+  USING(EXISTS (
+    SELECT 1 FROM public.conversation_threads thread
+    WHERE thread.id=thread_id
+      AND thread.subject_id=public.current_myeongha_subject_id()
+  ));
+
+CREATE FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(
   p_subject_id uuid,p_thread_id uuid,p_after_sequence_no bigint,p_page_size integer
 )
 RETURNS TABLE(
@@ -24,7 +90,7 @@ RETURNS TABLE(
   created_at timestamptz,redacted boolean,redacted_at timestamptz,turn_state text
 )
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER
-SET search_path=pg_catalog,public SET row_security=off
+SET search_path='' SET row_security=on
 AS $history$
 DECLARE
   v_row record;
@@ -126,18 +192,53 @@ BEGIN
   END LOOP;
 END $history$;
 
+ALTER FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
+  OWNER TO myeongha_chat_history_reader_v1;
+REVOKE ALL ON FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
+  FROM PUBLIC,anon,authenticated,service_role;
+GRANT EXECUTE ON FUNCTION chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
+  TO myeongha_api_executor;
+
+-- The public RPC surface is an invoker-only delegate, without table reads.
+CREATE FUNCTION public.qry_chat_thread_owner_visible_history_v1(
+  p_subject_id uuid,p_thread_id uuid,p_after_sequence_no bigint,p_page_size integer
+)
+RETURNS TABLE(
+  message_id uuid,sequence_no bigint,sender_type text,character_id text,
+  body_text text,message_payload_jsonb jsonb,message_schema_version text,
+  created_at timestamptz,redacted boolean,redacted_at timestamptz,turn_state text
+)
+LANGUAGE sql VOLATILE SECURITY INVOKER SET search_path=''
+AS $wrapper$
+  SELECT * FROM chat_private.qry_chat_thread_owner_visible_history_v1(
+    p_subject_id,p_thread_id,p_after_sequence_no,p_page_size);
+$wrapper$;
+
 REVOKE ALL ON FUNCTION public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
   FROM PUBLIC,anon,authenticated,service_role;
 GRANT EXECUTE ON FUNCTION public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)
   TO myeongha_api_executor;
 
 DO $post$
-DECLARE f oid;
+DECLARE f oid; private_f oid;
 BEGIN
   f:=to_regprocedure('public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)')::oid;
+  private_f:=to_regprocedure('chat_private.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)')::oid;
   IF f IS NULL
     OR (SELECT proowner FROM pg_proc WHERE oid=f) <> to_regrole('postgres')::oid
-    OR NOT (SELECT prosecdef FROM pg_proc WHERE oid=f)
+    OR (SELECT prosecdef FROM pg_proc WHERE oid=f)
+    OR private_f IS NULL
+    OR (SELECT proowner FROM pg_proc WHERE oid=private_f)
+       <> to_regrole('myeongha_chat_history_reader_v1')::oid
+    OR NOT (SELECT prosecdef FROM pg_proc WHERE oid=private_f)
+    OR NOT EXISTS (SELECT 1 FROM pg_proc WHERE oid=private_f
+        AND 'row_security=on'=ANY(proconfig)
+        AND 'search_path=""'=ANY(proconfig))
+    OR has_schema_privilege('myeongha_api_executor','chat_private','CREATE')
+    OR NOT has_function_privilege('myeongha_api_executor',private_f,'EXECUTE')
+    OR EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname IN
+         ('anon','authenticated','service_role')
+         AND has_function_privilege(r.oid,private_f,'EXECUTE'))
     OR NOT has_function_privilege('myeongha_api_executor',f,'EXECUTE')
     OR EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname IN
       ('anon','authenticated','service_role')
