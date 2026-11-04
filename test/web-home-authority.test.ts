@@ -64,12 +64,14 @@ describe('web Home authority boundary', () => {
   });
 
   it('keeps the static My fallback while delegating live header auth state to the shared renderer', () => {
-    expect(html).toContain('id="home-profile-name">마이</span>');
+    expect(html).toContain('id="home-profile-link" href="my.html"');
+    expect(html).toContain('class="product-profile-mark" aria-hidden="true"');
+    expect(html).not.toContain('id="home-profile-name">마이</span>');
     expect(page).not.toContain('home-profile-name');
     expect(page).not.toContain('createHomeRuntimeClient');
-    expect(authUi).toContain("const label = profile.querySelector('.product-profile-mark + span')");
-    expect(authUi).toContain("if (label) label.textContent = '마이'");
-    expect(authUi).toContain("if (label) label.textContent = '로그인'");
+    expect(authUi).toContain("profile.setAttribute('aria-label', '마이 페이지');");
+    expect(authUi).toContain("profile.setAttribute('aria-label', '로그인');");
+    expect(authUi).not.toContain('label.textContent');
     expect(page).not.toContain('innerHTML');
   });
 });

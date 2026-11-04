@@ -95,18 +95,19 @@ describe('web My profile authority boundary', () => {
   });
 
   it('aligns Home, Saju hub, and Reading detail profile affordances with the My destination', () => {
-    expect(hall).toContain('<span id="home-profile-name">마이</span>');
+    expect(hall).toContain('id="home-profile-link" href="my.html"');
+    expect(hall).not.toContain('<span id="home-profile-name">마이</span>');
     expect(homePage).not.toContain('home-profile-name');
-    expect(productAuthUi).toContain("const label = profile.querySelector('.product-profile-mark + span')");
-    expect(productAuthUi).toContain("if (label) label.textContent = '마이'");
-    expect(productAuthUi).toContain("if (label) label.textContent = '로그인'");
+    expect(productAuthUi).toContain("profile.setAttribute('aria-label', '마이 페이지');");
+    expect(productAuthUi).toContain("profile.setAttribute('aria-label', '로그인');");
+    expect(productAuthUi).not.toContain('label.textContent');
 
     expect(reading).not.toContain('<span>지환</span>');
-    expect(reading).toContain('<span>마이</span>');
+    expect(reading).not.toMatch(/class="product-profile"[^>]*>[\s\S]*?<span>마이<\/span>/);
     expect(reading).toContain('href="my.html" aria-label="내 프로필"');
 
     expect(readingDetail).not.toContain('<span>지환</span>');
-    expect(readingDetail).toContain('<span>마이</span>');
+    expect(readingDetail).not.toMatch(/class="product-profile"[^>]*>[\s\S]*?<span>마이<\/span>/);
     expect(readingDetail).toContain('href="my.html" aria-label="내 프로필"');
     expect(readingDetail).toContain('src="/src/reading-detail/main.tsx"');
     expect(readingDetail).toContain('data-reader="seyeon"');

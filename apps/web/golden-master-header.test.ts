@@ -30,7 +30,8 @@ describe('Home/Saju shared product header', () => {
     expect(shared).toContain('body.product-page .product-header .product-profile { display: none !important; }');
     expect(authUi).toContain("profile.href = `auth.html?next=${encodeURIComponent(safeNextHref())}`;");
     expect(authUi).toContain("profile.setAttribute('aria-label', '로그인');");
-    expect(authUi).toContain("label.textContent = '로그인';");
+    expect(authUi).toContain("profile.setAttribute('aria-label', '마이 페이지');");
+    expect(authUi).not.toContain('label.textContent');
   });
 
   it.each(['hall.html', 'reading.html'])('%s uses the same header shell/brand contract as Chat', (page) => {
