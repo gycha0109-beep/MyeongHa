@@ -32,7 +32,7 @@ jobs:
     environment: production
     timeout-minutes: 15
     concurrency:
-      group: myeongha-admin-inactive-stage
+      group: myeongha-admin-deployment
       cancel-in-progress: false
     permissions:
       contents: read
