@@ -5,7 +5,7 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 ## Current state
 
 - Track: `applizing`
-- Phase: **M9-A Push registration plumbing + Push Production activation + Android physical-smoke build + M4-E Target Person create + M11-A4 hardening**
+- Phase: **M0~M11 existing implementation audited 2026-11-05; Seyeon Member send and Push device registration partial; web-native parity, exact-main APK/device and product-release gates remain**
 - Runtime: **Expo SDK 57 / React Native 0.86.x**
 - Navigation: **Expo Router**
 - Secure Guest credential persistence: **Expo SecureStore**
@@ -14,6 +14,8 @@ MyeongHa Mobile is a first-class React Native client of the existing MyeongHa se
 - Web DOM/UI component reuse: **not adopted**
 - Primary navigation: **Home / Saju / Chat / Records / My**
 - Reading sub-navigation: **Saju(default) / Face**
+
+For evidence, current exceptions and the existing-track continuation order see [2026-11-05 implementation audit and roadmap](../../docs/applizing/MOBILE_IMPLEMENTATION_AUDIT_AND_ROADMAP_20261105.md).
 
 ## Current authority boundary
 
@@ -33,11 +35,12 @@ Mobile now has:
 - owner-scoped Target Persons list in My plus source-authorized create-only registration for Target metadata + Target Birth revision 1;
 - Home projection composed from current Profile, Birth, latest Reading History, and calculation-only Saju evidence;
 - known-thread Chat read through `GET /api/chat/:threadId` with forward cursor pagination and redaction-safe rendering;
-- Member-only Chat open/reuse through `POST /api/chat`, with six characters listed in the current mobile discovery UI. Server-recognized historical nine identity IDs, thread ownership, publication/availability, and concurrency convergence remain authoritative on the server;
+- Member-only Chat open/reuse through `POST /api/chat`, with six publicly launched characters. The mobile Chat Hub still has a separate inactive three-Character COMING SOON list (a presentational mismatch with the newer Web selector); canonical nine identities and old-thread access remain server-owned;
+- Member-only Seyeon Chat send, pending-turn idempotent replay and authoritative transcript reread. Other characters have no general Chat send authorization;
 - Face Reading camera/library photo staging through Expo ImagePicker with image-only selection, 16MB client bound, local preview, and no server analysis;
 - source-authorized Expo Push Device Installation registration/refresh/rebind/revoke plumbing with SecureStore installation identity, user-initiated OS permission request, startup no-prompt sync, and account-switch fail-closed revoke;
 - activated EAS project identity `5c20243c-60a8-44f3-9d8c-ca06ccc8bebe` bound to `@johnny0109/myeongha-mobile` and EAS Production;
-- historical no-production-signing `:app:assembleDebug` physical-smoke artifact (`2e5b3093-5f09-469a-a99d-38cc53e5f117`) only; that result does **not** prove offline standalone launch. The current EAS profile uses `:app:assembleRelease`, but fresh exact-main APK bytes and a Metro-free physical-device launch still require validation;
+- a historical no-production-signing `:app:assembleDebug` artifact (`2e5b3093-5f09-469a-a99d-38cc53e5f117`), which does not prove standalone launch. The present GitHub-hosted local EAS APK workflow builds an `:app:assembleRelease` candidate and checks the embedded JS bundle and APK metadata; exact-current-main artifact and Metro-free physical-device acceptance remain unverified;
 - release-readiness preflight with iOS buildNumber / Android versionCode sequencing and fail-closed platform identity checks;
 - release-only API origin guard that requires the canonical Production origin and rejects staging/local overrides while preserving flexible development runtime configuration;
 - CI export smoke for both Android and iOS from the same Expo source, using isolated output directories after release preflight;
@@ -45,17 +48,17 @@ Mobile now has:
 
 Home does not invent a separate server authority. It does not call unimplemented `/api/home` or `/api/characters`, does not infer a recent Chat thread, does not auto-run Preview Reading, and does not synthesize daily-fortune claims from calculation-only Saju evidence. Preview Reading is user-triggered only from the Saju surface.
 
-Still gated after M3-B / M11-A4:
+Still gated or requiring additional evidence after the existing M0~M11 foundation:
 
 - full account management and Guest→existing-Member merge; existing-member merge remains blocked by SRC-24;
 - Chat thread discovery / recent-thread listing;
-- Chat send;
+- general Chat send for Characters other than Se-yeon, and any paid Official Reader Chat/interpretation release;
 - Target Person post-create metadata edit, deletion, birth correction, and Compatibility execution;
 - production Character catalog/recommendation projection;
 - Face Reading engine intake / analysis upload. M7 does not treat `exif: false` as proof that selected file bytes are metadata-stripped;
 - Mobile iOS/Android transport is selected as Expo Push Notifications, but notification sending, attempt-provider provenance/resolution, retry/failover, and autonomous scheduling remain blocked by SRC-31 / SRC-32; M9-A only registers, refreshes, rebinds, and revokes the current device;
-- Push Production activation completed, but the historical Android debug build is not a standalone acceptance. User-reported `Unable to load script` on a stale debug APK is recorded; fresh main release APK verification and physical-device register/relaunch/logout/rebind evidence remain pending;
-- native store commerce;
+- Push device registration plumbing exists, but the My opt-in card was removed by product request. Do not claim full register/relaunch/logout/rebind device acceptance until an approved opt-in route and actual device evidence exist. The stale debug APK `Unable to load script` incident is historical;
+- native store commerce; the source contains dormant paid Reader delivery/receipt and Member withdrawal intake/status clients, but production sale/receipt/refund permissions and UI stay OFF;
 - signed store distribution still requires external Apple/Google developer-account and signing authority; production app identity is fixed to `com.myeongha.app` on both platforms.
 
 ## Commands
@@ -98,6 +101,6 @@ That mode still fails on malformed release configuration and any non-canonical `
 ## 2026-10-15 launch menu and authentication evidence boundary
 
 - Web presentation assets were reused as immutable, locally bundled Android WebP portraits; the Yeoul SVG's embedded existing WebP data was extracted without inventing or regenerating artwork. Six binary files are required by the mobile portrait manifest.
-- Google/Kakao/Naver source and app buttons exist, but **live Production provider activation remains unverified** and depends on independently authorized Vercel/Supabase/provider console configuration per `docs/MOBILE_SOCIAL_AUTH_V1.md`. An APK code change alone cannot enable providers. Do not claim phone login passed without a real roundtrip.
+- Google/Kakao/Naver source and app buttons exist, but **current Production provider roundtrip remains unverified**. Historical Vercel bridge references in `docs/MOBILE_SOCIAL_AUTH_V1.md` require rechecking against the migrated Cloudflare routing and the governed Supabase/provider configurations. An APK code change alone does not activate OAuth; do not claim phone login passed without a real roundtrip.
 - Seyeon Chat read/send remains available to a verified **Member** via the existing Chat room API. If login fails, the member-only Chat open will also fail; no Guest bypass is added.
 - A guest/member's current Saju calculation is bound to the current Birth revision and checked for match; the selected decorative Reader perspective does not change the server's Preview Reading response. No per-Reader generated interpretation is enabled.

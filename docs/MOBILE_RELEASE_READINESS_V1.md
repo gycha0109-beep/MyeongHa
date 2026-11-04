@@ -1,15 +1,17 @@
 # Mobile Release Readiness v1
 
 > Track: `applizing`  
-> Status: **M11-A4 IMPLEMENTED / DEBUG APK HISTORY VERIFIED / STANDALONE PHYSICAL DEVICE ACCEPTANCE PENDING / SIGNING EXTERNAL**  
-> Date: **2026-10-03**
+> Status: **M11-A4 IMPLEMENTED / local release-variant APK workflow configured / EXACT MAIN ARTIFACT + STANDALONE PHYSICAL DEVICE ACCEPTANCE UNVERIFIED / SIGNING EXTERNAL**  
+> Initial baseline: **2026-10-03** / implementation facts refreshed **2026-11-05**
+
+The evidence-led implementation matrix and remaining work are maintained in [2026-11-05 App audit and roadmap](applizing/MOBILE_IMPLEMENTATION_AUDIT_AND_ROADMAP_20261105.md). This document preserves the original Android debug failure history without promoting it to current acceptance.
 
 ## Production API origin guard
 
 Release builds are bound to the existing canonical Production API origin:
 
 ```text
-https://myeongha.vercel.app
+https://myeongha.gycha0109.workers.dev
 ```
 
 Development may continue to use governed HTTPS overrides and local/private HTTP
@@ -23,7 +25,7 @@ localhost, a private LAN address, or another HTTPS host.
 ## Current executable baseline
 
 ```text
-Expo version        0.1.0
+App version         0.1.0
 iOS buildNumber     1
 Android versionCode 1
 ```
@@ -104,15 +106,17 @@ NOT a rerun of the old successful job, is mandatory. The merge-triggered
 fresh workflow's APK validation and actual on-phone launch must both pass
 before standalone acceptance may be recorded.
 
+The earlier October build evidence below is historical. In November, the codebase uses a GitHub-hosted local EAS release-variant APK workflow, but this audit has **not verified a successful APK artifact for the exact audited main SHA**, let alone a device launch. Source contract checks and an APK build run alone must never be reported as on-phone acceptance.
+
 The remaining release-readiness evidence is physical-device smoke:
 
 1. install the successful Android artifact on a physical device;
 2. launch the newly verified release-variant APK with Metro, USB and PC all disconnected;
-3. explicitly enable Push from My;
-4. verify Device Installation registration;
-5. relaunch and verify no-prompt refresh;
-6. verify logout revokes the binding;
-7. verify re-login/rebind behavior.
+3. check whether a currently approved user-facing Push permission/opt-in entry exists: the earlier My registration card was removed by product request and must **not** be silently restored for smoke;
+4. when an approved entry path is available, verify Device Installation registration (otherwise report the Push subtest as pending/unavailable);
+5. relaunch and verify no-prompt refresh when a binding exists;
+6. verify logout revokes that binding;
+7. verify re-login/rebind behavior when an approved entry path exists.
 
 Physical-device smoke is evidence work only. It does not authorize notification
 sending, retry/failover, or scheduling.

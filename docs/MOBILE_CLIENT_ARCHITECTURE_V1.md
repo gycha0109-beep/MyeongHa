@@ -1,10 +1,12 @@
 # MyeongHa Mobile Client Architecture v1
 
 > Track: `applizing`  
-> Status: M4-D Official Reading reread + M3-B Preview + M11-A4 hardening implemented  
-> Date: 2026-10-01  
+> Status: M0~M11 implementation audit refreshed 2026-11-05 (Seyeon Chat send / Push registration PARTIAL; paid Reader and store release HOLD)  
+> Initial baseline: 2026-10-01; implementation status rechecked: 2026-11-05  
 > Server authority: existing MyeongHa API / PostgreSQL  
 > Client principle: Web and Mobile are separate first-class clients of the same server world.
+
+The current-source audit and next steps are recorded at [Mobile implementation audit and roadmap (2026-11-05)](applizing/MOBILE_IMPLEMENTATION_AUDIT_AND_ROADMAP_20261105.md). This architecture's original phase definitions remain in force; the revised ledger below distinguishes implemented capabilities from product-release gates.
 
 ## 1. Decision summary
 
@@ -163,9 +165,9 @@ Native media capture can be prepared independently, but the client must not inve
 
 ### Chat
 
-Current Production state permits known-thread read plus Member single-Character open/reuse for the exact approved Launch 9 canonical ids.
+Current code supports known-thread read and Member single-Character open/reuse. The server retains nine canonical historical Character identities, while the current mobile public selector lists six (seyeon, baekheon, yeoul, rahyeon, taegyeom, yunho). Three inactive historical ids are not enabled for Chat open.
 
-Mobile may present only the source-approved Launch membership, canonical ids, and official display names for this selector. Publication/availability and thread creation/reuse remain server-authoritative. Guest open, recent-thread discovery, detailed Character catalog content, and Chat send remain blocked unless separately authorized.
+Publication/availability and thread creation/reuse remain server-authoritative. Guest open, recent-thread discovery, and detailed Character catalog content remain unavailable. A **separate, Member-only Seyeon Chat send service** is now implemented; this is not permission for general Chat sends, other Characters, or Official Reader paid interpretation. Historical identity resolution must remain available after display delisting.
 
 Mobile must not locally commit synthetic assistant/user turns.
 
@@ -208,20 +210,20 @@ M2-B Guest→new Member same-subject enrollment             DONE
 M3  Saju + Birth vertical slice                          DONE
 M3-B source-authorized Saju Preview Reading               DONE
 M4  Records + My                                         DONE
-M4-E Target Persons read-only projection                  DONE
+M4-E Target Persons read/create contracts (My UI gated) DONE
 M4-D Official Reading archive reread                       DONE
 M5  Home projection composition                          DONE
 M6  Chat Hub + server-authorized read path               DONE
 M7  Face Reading media path                              DONE
 M8-A Member Chat open/reuse + exact Launch roster         DONE
-M8-B Chat send after authority unblock                    BLOCKED
-M9  Push after notification authority unblock             BLOCKED
+M8-B Seyeon Member send implemented; other Chat send    PARTIAL/HOLD
+M9  Device registration implemented; Push send/schedule   PARTIAL/HOLD
 M10 native store commerce after rail decision             NOT IN LAUNCH RAIL
 M11-A Android/iOS release-readiness preflight             DONE
 M11-A2 Production API origin release guard                DONE
 M11-A3 Android+iOS Expo export smoke                       DONE
 M11-A4 Export artifact structure verification              DONE
-M11-B production app identity + signed store builds       BLOCKED
+M11-B app identity set; signed store builds/device E2E BLOCKED
 ```
 
 ## 10. M0 acceptance criteria
@@ -339,11 +341,11 @@ M8-A invariants:
 - Guest Chat open remains disabled.
 - Mobile sends exactly one authority-bearing request field: canonical `characterId`.
 - the client does not send subject, release, bundle, presentation key, thread candidate ids, or idempotency keys.
-- the selector exposes only source-approved Launch membership + exact canonical id + official display name; it does not invent detailed Character canon, title, portrait, recommendation, or availability state.
+- the public selector shows the approved launch presentation subset (six Reader cards) while the historical nine ids remain resolvable for old threads; presentation never grants server access.
 - the server remains authoritative for active Member eligibility, publication/availability, current default release/bundle, existing-thread reuse, new-thread creation, and concurrency convergence.
 - successful open/reuse navigates to the existing known-thread read surface.
 - recent-thread discovery remains unavailable.
-- Chat send remains disabled.
+- Member-only Se-yeon Chat send is implemented behind the live server permissions; all other Character send paths and paid Reader interpretation remain disabled.
 
 
 ## 15. M11-A release-readiness preflight
@@ -365,7 +367,7 @@ ios.bundleIdentifier
 android.package
 ```
 
-Those two values are long-lived platform application identities. The current source/repository does not authorize their exact values, so M11-A deliberately leaves them unset and reports them as blockers instead of deriving them from the GitHub owner, Vercel hostname, Expo slug, or product display name.
+These two long-lived application identities were originally unresolved at M11-A. The later approved mobile app configuration now explicitly fixes **both** to com.myeongha.app (apps/mobile/app.json). Their presence closes the identity-configuration blocker, **not** store-signing, actual-device or submission requirements. The canonical release API origin is now Cloudflare Workers, not the historic Vercel host.
 
 M11-A invariants:
 
@@ -374,7 +376,7 @@ M11-A invariants:
 - Android versionCode must be a positive integer;
 - configured platform ids must be valid reverse-DNS identifiers;
 - strict release verification fails while either platform identity is absent;
-- CI contract verification may continue while those exact documented identity blockers remain unresolved;
+- CI contract verification remains available; the currently configured identities pass the structural requirement, but signing and device evidence remain separate;
 - malformed release configuration always fails CI;
 - M11-A does not configure signing credentials, Apple/Google developer accounts, store listing metadata, OTA update authority, or native payment rails.
 
@@ -574,7 +576,7 @@ M4-D invariants:
   to current Preview or another Reading.
 
 
-## 20. M4-E Target Persons read-only projection
+## 20. M4-E Target Persons read projection + gated create-only contract
 
 Mobile My may read the current subject's existing Target Persons through:
 
@@ -589,5 +591,5 @@ M4-E invariants:
 - Target Person ids, Birth Profile ids, and current revision ids are validated as UUIDs;
 - duplicate Target Person or Birth Profile identities fail closed;
 - only the server-returned display label, relationship label, and current Birth revision input are rendered;
-- Target Person create, edit, deletion, birth correction, comparison, compatibility scoring, or Reading execution are not activated;
+- Target Person **create-only** client/service contract is implemented, while its My entry UI stays hidden under current product policy; edit, deletion, birth correction, compatibility execution and related Reading are not activated;
 - My Profile and self Birth remain usable when the Target Person read independently fails.
