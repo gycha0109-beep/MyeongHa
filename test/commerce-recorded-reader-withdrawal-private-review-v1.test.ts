@@ -112,7 +112,7 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(status(result)).not.toContain(PURCHASE);
     expect(status(result)).not.toContain(UNIT);
     expect(status(result)).not.toContain('notice-v1');
-    expect(f.statements.map(s=>s.sql).join('\n')).not.toMatch(/\\b(?:INSERT|UPDATE|DELETE|GRANT)\\b/iu);
+    expect(f.statements.map(s=>s.sql).join('\n')).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|GRANT)\b/iu);
   });
 
   it('keeps a change-of-mind claim in manual evidence review when legal delivery is not proven',async()=>{
