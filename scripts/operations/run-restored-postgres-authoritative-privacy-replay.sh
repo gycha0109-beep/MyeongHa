@@ -181,10 +181,8 @@ jq -e '
 "${psql_base[@]}" -f "$plan" >/dev/null
 "${psql_base[@]}" -f "$plan" >/dev/null
 
-# The staged private withdrawal-claim table exists only after migration 2320.
-# Historical restored backups must not claim a private-claim DELETE proof.
-# A restored schema containing it must prove exact-Subject removal after
-# governed finalization, even when ordinary privacy replay already passed.
+# Exact Commerce private withdrawal Claim privacy proof after restored replay.
+# Older backups without this staged table must not claim the DELETE was checked.
 restored_claim_relation="$("${psql_base[@]}" -Atqc "
   select case when to_regclass('public.digital_reading_withdrawal_claims_private_v1')
     is null then 'absent' else 'present' end;
@@ -193,7 +191,7 @@ restored_claim_relation="$("${psql_base[@]}" -Atqc "
 private_claim_verified_subjects=0
 
 account_deletion_count=0
-while IFS=
+while IFS=$'\t' read -r subject_id deletion_job_id outbox_event_id; do
   [[ "$subject_id" =~ ^[0-9a-fA-F-]{36}$ ]]
   [[ "$deletion_job_id" =~ ^[0-9a-fA-F-]{36}$ ]]
   [[ "$outbox_event_id" =~ ^[0-9a-fA-F-]{36}$ ]]
@@ -242,8 +240,7 @@ while IFS=
   [[ "$finalizer" == "1|0|1" ]]
 
   if [[ "$restored_claim_relation" == "present" ]]; then
-    # Exact Subject only. No row payloads or identities enter the evidence file.
-    # A non-zero count means restored private customer claims survived deletion.
+    # Exact Subject only. The result never contains claim data or identities.
     private_claim_count="$("${psql_base[@]}" -Atqc "
       select count(*) from public.digital_reading_withdrawal_claims_private_v1
       where subject_id='$subject_id'::uuid;
@@ -324,7 +321,6 @@ while IFS=
     commit;
   ")"
   [[ "$completion_replay" == "1|1" ]]
-
   if [[ "$restored_claim_relation" == "present" ]]; then
     private_claim_replay_count="$("${psql_base[@]}" -Atqc "
       select count(*) from public.digital_reading_withdrawal_claims_private_v1
@@ -386,185 +382,9 @@ const evidence = {
   hosted_auth_provider_ack: 'production-canary-separate-plus-isolated-row-removal',
   personalization_access_resurrection_guard: 'pass',
   commerce_p5y_retention_guard: 'pass',
-  // Absent on historical backups: do NOT misreport a claim cleanup PASS.
   private_withdrawal_claim_replay_guard: restoredClaimRelation === 'present'
     ? 'exact-subject-after-finalizer-and-completion-pass'
     : 'schema-absent-no-private-claim-proof',
-  replay_event_count: report.eventCount,
-  event_type_counts: report.eventTypeCounts,
-  replay_result: 'pass',
-  second_identical_replay: 'idempotent-pass',
-  completion_replay: 'idempotent-pass',
-  output_contains_identifiers: false,
-  output_contains_row_payloads: false,
-  dr_ready: false,
-};
-
-await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, {
-  encoding: 'utf8',
-  mode: 0o600,
-});
-NODE
-
-echo 'Authoritative Production privacy ledger replay completed on isolated restored PostgreSQL.'
-\t' read -r subject_id deletion_job_id outbox_event_id; do
-  [[ "$subject_id" =~ ^[0-9a-fA-F-]{36}$ ]]
-  [[ "$deletion_job_id" =~ ^[0-9a-fA-F-]{36}$ ]]
-  [[ "$outbox_event_id" =~ ^[0-9a-fA-F-]{36}$ ]]
-  account_deletion_count=$((account_deletion_count + 1))
-
-  auth_user_id="$("${psql_base[@]}" -Atc "select auth_user_id::text from public.subjects where id='$subject_id'::uuid;")"
-  [[ "$auth_user_id" =~ ^[0-9a-fA-F-]{36}$ ]]
-
-  lock_owner="privacy-restore-${GITHUB_RUN_ID:-local}-$account_deletion_count"
-  claim="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select subject_id::text||'|'||deletion_job_id::text||'|'||(reclaimed::int)
-    from public.internal_claim_account_deletion_outbox_v1(
-      '$outbox_event_id'::uuid,
-      '$lock_owner',
-      clock_timestamp()+interval '10 minutes'
-    );
-    commit;
-  ")"
-  [[ "$claim" == "$subject_id|$deletion_job_id|0" || "$claim" == "$subject_id|$deletion_job_id|1" ]]
-
-  phase="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select phase from public.internal_account_deletion_resume_state_v1(
-      '$subject_id'::uuid,
-      '$deletion_job_id'::uuid,
-      '$lock_owner'
-    );
-    commit;
-  ")"
-  [[ "$phase" == "db_finalization_required" ]]
-
-  finalizer="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int)
-    from public.internal_finalize_account_deletion_db_v1(
-      '$subject_id'::uuid,
-      '$deletion_job_id'::uuid,
-      '$lock_owner'
-    );
-    commit;
-  ")"
-  [[ "$finalizer" == "1|0|1" ]]
-
-  post_db_phase="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select phase from public.internal_account_deletion_resume_state_v1(
-      '$subject_id'::uuid,
-      '$deletion_job_id'::uuid,
-      '$lock_owner'
-    );
-    commit;
-  ")"
-  [[ "$post_db_phase" == "auth_deletion_required" ]]
-
-  "${psql_base[@]}" -c "delete from auth.users where id='$auth_user_id'::uuid;" >/dev/null
-
-  post_auth_phase="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select phase from public.internal_account_deletion_resume_state_v1(
-      '$subject_id'::uuid,
-      '$deletion_job_id'::uuid,
-      '$lock_owner'
-    );
-    commit;
-  ")"
-  [[ "$post_auth_phase" == "completion_ack_required" ]]
-
-  completion="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select (completed::int)||'|'||(replayed::int)
-    from public.internal_complete_account_deletion_v1(
-      '$subject_id'::uuid,
-      '$deletion_job_id'::uuid,
-      '$lock_owner'
-    );
-    commit;
-  ")"
-  [[ "$completion" == "1|0" ]]
-
-  terminal="$("${psql_base[@]}" -Atc "
-    select
-      (select status from public.subjects where id='$subject_id'::uuid)||'|'||
-      (select case when auth_user_id is null then 'NOAUTH' else 'AUTH' end from public.subjects where id='$subject_id'::uuid)||'|'||
-      (select count(*) from auth.users where id='$auth_user_id'::uuid)||'|'||
-      (select count(*) from public.profiles where subject_id='$subject_id'::uuid)||'|'||
-      (select count(*) from public.readings where subject_id='$subject_id'::uuid)||'|'||
-      (select count(*) from public.share_artifacts where subject_id='$subject_id'::uuid)||'|'||
-      (select count(*) from public.device_installations where subject_id='$subject_id'::uuid)||'|'||
-      (select count(*) from public.notifications where subject_id='$subject_id'::uuid)||'|'||
-      (select count(*) from public.memory_items where subject_id='$subject_id'::uuid)||'|'||
-      (select count(*) from public.life_facts where subject_id='$subject_id'::uuid)||'|'||
-      (select status from public.data_deletion_jobs where id='$deletion_job_id'::uuid)||'|'||
-      (select status from public.outbox_events where id='$outbox_event_id'::uuid)||'|'||
-      (select count(*) from public.commerce_account_links where subject_id='$subject_id'::uuid and (status <> 'revoked' or revoked_at is null));
-  ")"
-  [[ "$terminal" == "deleted|NOAUTH|0|0|0|0|0|0|0|0|completed|processed|0" ]]
-
-  completion_replay="$("${psql_base[@]}" -Atqc "
-    begin;
-    set local role myeongha_system_executor;
-    select (completed::int)||'|'||(replayed::int)
-    from public.internal_complete_account_deletion_v1(
-      '$subject_id'::uuid,
-      '$deletion_job_id'::uuid,
-      '$lock_owner'
-    );
-    commit;
-  ")"
-  [[ "$completion_replay" == "1|1" ]]
-done < <(jq -r '.events[] | select(.type == "ACCOUNT_DELETION_STARTED") | [.subjectId, .deletionJobId, .outboxEventId] | @tsv' "$manifest")
-
-[[ "$account_deletion_count" -ge 1 ]]
-[[ "$account_deletion_count" -eq "$(jq -r '.eventTypeCounts.ACCOUNT_DELETION_STARTED' "$public_manifest")" ]]
-
-mkdir -p "$(dirname "$PRIVACY_RECONCILIATION_EVIDENCE_PATH")"
-node - \
-  "$report" \
-  "$public_manifest" \
-  "$PRIVACY_RECONCILIATION_EVIDENCE_PATH" \
-  "$PRIVACY_RECONCILIATION_BACKUP_RUN_ID" \
-  "$PRIVACY_RECONCILIATION_LEDGER_RUN_ID" \
-  "$PRODUCTION_PRIVACY_CANARY_RUN_ID" \
-  "$PRIVACY_RECONCILIATION_INCIDENT_REFERENCE_UTC" <<'NODE'
-import { readFile, writeFile } from 'node:fs/promises';
-
-const report = JSON.parse(await readFile(process.argv[2], 'utf8'));
-const publicManifest = JSON.parse(await readFile(process.argv[3], 'utf8'));
-const outputPath = process.argv[4];
-const backupRunId = Number(process.argv[5]);
-const ledgerRunId = Number(process.argv[6]);
-const canaryRunId = Number(process.argv[7]);
-const incidentReferenceUtc = process.argv[8];
-
-const evidence = {
-  schema_version: 'myeongha-postgres-restored-db-authoritative-privacy-reconciliation-v1',
-  backup_workflow_run_id: backupRunId,
-  privacy_ledger_workflow_run_id: ledgerRunId,
-  production_privacy_canary_run_id: canaryRunId,
-  incident_reference_utc: incidentReferenceUtc,
-  authoritative_coverage_through: publicManifest.authoritativeCoverageThrough,
-  execution_target: 'isolated-restored-postgres',
-  production_nonzero_authoritative_delta: true,
-  authoritative_post_backup_source: true,
-  authoritative_source_scope: 'captured-window-only',
-  authoritative_privacy_reconciliation: true,
-  future_safe_privacy_reconciliation: false,
-  recovered_state_finalization: 'production-ledger-isolated-pass',
-  hosted_auth_provider_ack: 'production-canary-separate-plus-isolated-row-removal',
-  personalization_access_resurrection_guard: 'pass',
-  commerce_p5y_retention_guard: 'pass',
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
