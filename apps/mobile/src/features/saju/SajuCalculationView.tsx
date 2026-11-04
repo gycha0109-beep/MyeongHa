@@ -1,18 +1,25 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileSajuViewModelV1 } from './saju-view-model';
+import { MOBILE_SAJU_BIRTH_FIELDS_V1, mobileSajuBirthLabelV1, projectMobileSajuBirthFactsV1 } from './mobile-saju-birth-display';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 
-export function BirthSummaryCard({ summary }: { summary: string }) {
+export function BirthSummaryCard({ birthInput }: Pick<MobileSajuViewModelV1, 'birthInput'>) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { locale } = useMobileUiLocale();
+  const facts = projectMobileSajuBirthFactsV1(birthInput, locale);
   return (
     <View style={styles.card}>
-      <Text style={styles.eyebrow}>CURRENT BIRTH</Text>
-      <Text style={styles.summary}>{summary.split(' · ').map((part) => t(part)).join(' · ')}</Text>
+      <Text style={styles.eyebrow}>{mobileSajuBirthLabelV1('heading', locale)}</Text>
+      {MOBILE_SAJU_BIRTH_FIELDS_V1.map((key) => (
+        <View key={key} style={styles.birthDetailRow}>
+          <Text style={styles.birthDetailLabel}>{mobileSajuBirthLabelV1(key, locale)}</Text>
+          <Text style={styles.birthDetailValue}>{facts[key]}</Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -126,6 +133,12 @@ const styles = StyleSheet.create({
   },
   eyebrow: { color: mobileColors.gold, fontSize: 11, fontWeight: '800', letterSpacing: 1.1 },
   summary: { color: mobileColors.navy, fontSize: 17, fontWeight: '700' },
+  birthDetailRow: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+    paddingVertical: 7, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: mobileColors.border,
+  },
+  birthDetailLabel: { flex: 1, color: mobileColors.muted, fontSize: 13, lineHeight: 20 },
+  birthDetailValue: { flex: 2, textAlign: 'right', color: mobileColors.navy, fontSize: 13, lineHeight: 20, fontWeight: '700' },
   sectionTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
   pillarRow: { flexDirection: 'row', gap: 8 },
   pillarCard: {

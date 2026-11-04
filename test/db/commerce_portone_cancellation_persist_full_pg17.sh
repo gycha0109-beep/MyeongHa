@@ -22,3 +22,10 @@ node test/db/commerce_stored_portone_hmac_lineage_pg17_generator.mjs --fixture |
 # transaction-local and explicitly ROLLBACK; no staged migration is installed.
 psql -X -v ON_ERROR_STOP=1 -f test/db/commerce_portone_cancellation_persist_full_pg17.sql
 echo 'PASS: PostgreSQL17 full schema cancellation candidate exact B2 Receipt, stable replay, B3 preserved; no real refund/revoke'
+
+# The previous SQL verification intentionally rolls back its candidate DDL.
+# Reinstall the reviewed candidate ONLY into this disposable case database for
+# two actual PostgreSQL 17 sessions. The CI case DB is destroyed afterward.
+psql -X -v ON_ERROR_STOP=1 \
+  -f docs/operations/candidates/commerce_portone_cancellation_event_persistence_v1.sql >/dev/null
+node test/db/commerce_cancel_same_item_real_race_pg17.mjs
