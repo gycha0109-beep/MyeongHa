@@ -182,11 +182,17 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     const execute=(action:Parameters<typeof executePostgresSubjectTransactionV1>[0]['execute'])=>
       executePostgresSubjectTransactionV1({pool:subjectPool,verifiedEvidence:evidence,execute:action});
 
-    await execute(async({client})=>{
-      const allocated=await client.query('select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+    // Attempt allocation belongs to the trusted DB runtime operator; the
+    // HTTP executor has no direct EXECUTE grant on this internal mutation.
+    const allocator=await pool.connect();
+    try {
+      await allocator.query('BEGIN');
+      await allocator.query('select set_config($1,$2,true)', ['myeongha.subject_id',subject]);
+      const allocated=await allocator.query('select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
         [subject,turn,attempt,'seyeon-production-chat-planner-v1']);
       expect(allocated.rows.length).toBeGreaterThan(0);
-    });
+      await allocator.query('COMMIT');
+    }catch(error){await allocator.query('ROLLBACK');throw error;}finally{allocator.release();}
     const recentMessages=[
       {messageId:uuid(18,90),role:'user' as const,text:'Synthetic first hello'},
       {messageId:uuid(19,90),role:'assistant' as const,text:'DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK'},
