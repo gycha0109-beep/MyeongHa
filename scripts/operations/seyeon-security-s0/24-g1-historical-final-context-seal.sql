@@ -20,7 +20,8 @@ begin
   end if;
   if old.seyeon_historical_final_context_seal_jsonb is null
      and new.seyeon_historical_final_context_seal_jsonb is not null
-     and (old.state is distinct from 'running'
+     and (current_user is distinct from 'myeongha_seyeon_chat_runtime_owner'
+       or old.state is distinct from 'running'
        or new.state is distinct from 'running'
        or old.seyeon_personal_source_pin_jsonb is null
        or old.seyeon_personal_source_pin_jsonb
