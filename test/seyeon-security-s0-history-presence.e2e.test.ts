@@ -47,8 +47,9 @@ describe.skipIf(!enabled)('G3 S0 history-presence authority in real PostgreSQL 1
   it('reports former and current Se-yeon participants using only owner-bound metadata',async()=>{
     const initial=await owned(1);
     expect(initial.rows).toEqual([{everInvolved:true}]);
-    // An old participant row no longer visible to active-binding must still
-    // prevent every paginated transcript replay, including after leave.
+    // An old participant remains in the original DB history, even when the
+    // active binding changes. Authorization for displaying actual messages
+    // must still come from the newly required common history read authority.
     const change=await pool.query(`update public.conversation_thread_characters
       set left_at=clock_timestamp()
       where thread_id=$1 and character_id='seyeon' and left_at is null
@@ -59,7 +60,8 @@ describe.skipIf(!enabled)('G3 S0 history-presence authority in real PostgreSQL 1
 
     // Preserve the original Se-yeon message and the LEFT participant row,
     // but bind the current room to another primary Character in this
-    // disposable DB. A page that contains no Se-yeon message is STILL held.
+    // disposable DB. This fixture intentionally does NOT install the common
+    // history read authority; the API must fail closed rather than downgrade.
     await pool.query(`insert into public.characters(character_id,created_at)
       values('yeoul',clock_timestamp()) on conflict do nothing`);
     await pool.query(`insert into public.character_runtime_catalog(
@@ -110,10 +112,12 @@ describe.skipIf(!enabled)('G3 S0 history-presence authority in real PostgreSQL 1
     expect(http.status).toBe(503);
     expect(http.headers.get('cache-control')).toBe('no-store');
     const body=await http.text();
-    expect(body).toContain('SEYEON_HISTORY_REVEAL_HOLD');
+    expect(body).toContain('CHAT_HISTORY_AUTHORITY_UNAVAILABLE');
     expect(body).not.toContain('DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK');
-    expect(executedSql.some(sql=>sql.includes('from public.qry_seyeon_thread_ever_involved_v1')))
+    expect(executedSql.some(sql=>sql.includes('to_regprocedure(')))
       .toBe(true);
+    expect(executedSql.some(sql=>sql.includes('from public.qry_chat_thread_owner_visible_history_v1')))
+      .toBe(false);
     expect(executedSql.some(sql=>sql.includes('from public.qry_chat_thread_stream_v2')))
       .toBe(false);
     expect(executedSql.some(sql=>sql.includes('from public.qry_character_relationship_v1')))
