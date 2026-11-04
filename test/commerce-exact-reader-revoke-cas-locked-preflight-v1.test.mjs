@@ -239,6 +239,15 @@ describe('P4 locked source-event Receipt identity pinned to authenticated cancel
   expect(c.calls.some(x=>x.sql===EVIDENCE_SQL)).toBe(false);
   expect(c.calls.at(-1).sql).toBe('rollback');
  });
+ it('accepts canonical PostgreSQL UUIDs from legacy fixture, but rejects a different receipt',async()=>{
+  const c=client();
+  const r=await inspect(c,{
+   ...INPUT,expectedReceiptId:'12192000-0000-0000-0000-000000000002',
+  });
+  expect(r.kind).toBe('reader_s1_scope_or_receipt_changed');
+  expect(r.grantRevocationAuthorized).toBe(false);
+  expect(c.calls[0].sql).toBe('begin isolation level read committed');
+ });
  it('invalid expected Receipt is rejected before acquiring any lock',async()=>{
   const c=client();
   await expect(inspect(c,{...INPUT,expectedReceiptId:'not-uuid'}))
