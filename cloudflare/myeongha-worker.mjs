@@ -11,6 +11,7 @@ import {createSeyeonGlmContextCapacityGovernorV1} from '../apps/api/src/seyeon-g
 import { cloudflareAuthRoute, handleCloudflareAuthRequest, rateLimitCloudflareRequestV1 } from './member-auth-worker.mjs';
 import {approvedCloudflareAuthOriginV1} from '../workers/cloudflare-auth-db-api.mjs';
 import { matchCloudflareApiRoute } from '../workers/cloudflare-api-router.mjs';
+import { renderPublicWebErrorResponseV1 } from '../workers/cloudflare-web-error-page.mjs';
 import { executeSecurityObservedRequestV1 } from '../apps/api/src/security-observability.ts';
 import { handleCloudflarePresentationFeedV1, PUBLIC_PRESENTATION_PATH_V1 } from '../workers/cloudflare-presentation-feed.mjs';
 
@@ -45,6 +46,21 @@ function malformedApiRoot(pathname) {
     } catch { return true; }
   }
   return /^api(?:$|[\/\\.;\u0000%])/iu.test(segment);
+}
+
+
+/** Only static web requests may gain a branded HTML error body.
+ * API routes, encoded API aliases and protected ingress do not call this.
+ * Preserve the original status and security headers rather than redirecting. */
+async function servePublicWebAssetV1(request, env, ctx) {
+  let response;
+  try {
+    response = await sealedRuntime.fetch(request, env, ctx);
+  } catch {
+    // Static asset failures must not leak platform diagnostics.
+    response = new Response(null, { status: 503, headers: HEALTH_HEADERS });
+  }
+  return renderPublicWebErrorResponseV1({ request, response, assets: env?.ASSETS });
 }
 
 export default {
@@ -177,11 +193,20 @@ export default {
         status:response.status,statusText:response.statusText,headers,
       }),env);
     }
+    // The standalone error template must never be served with a false 200.
+    if (url.pathname === '/error.html' &&
+        (request.method === 'GET' || request.method === 'HEAD')) {
+      return renderPublicWebErrorResponseV1({
+        request,
+        response: new Response(null, { status: 404, headers: HEALTH_HEADERS }),
+        assets: env?.ASSETS,
+      });
+    }
     if (url.pathname === '/' && (request.method === 'GET' || request.method === 'HEAD')) {
       const index = new URL(url);
       index.pathname = '/index.html';
-      return sealedRuntime.fetch(new Request(index, request), env, ctx);
+      return servePublicWebAssetV1(new Request(index, request), env, ctx);
     }
-    return sealedRuntime.fetch(request, env, ctx);
+    return servePublicWebAssetV1(request, env, ctx);
   },
 };
