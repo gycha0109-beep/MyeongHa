@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <meta name="description" content="명하 페이지 오류 안내" />
+  <title>페이지 안내 · 명하</title>
+  <script src="/error-page.js"></script>
+  <link rel="stylesheet" href="/error.css" />
+</head>
+<body class="mh-error-page">
+  <header class="mh-error-header">
+    <a href="/hall.html" class="mh-error-brand" aria-label="명하 홈으로 이동">
+      <span class="mh-error-brand-name">명하</span>
+      <span class="mh-error-brand-en">MyeongHa</span>
+    </a>
+    <a href="/contact.html" class="mh-error-header-help">문의하기</a>
+  </header>
+  <main class="mh-error-main" data-error-status="404">
+    <div class="mh-error-content" role="main">
+      <span class="mh-error-kicker">서비스 안내</span>
+      <div class="mh-error-code"><span data-error-code>404</span></div>
+      <div class="mh-error-rule" aria-hidden="true"><span></span></div>
+      <h1 data-error-title>페이지를 찾을 수 없습니다.</h1>
+      <p data-error-description>요청하신 페이지가 없거나 주소가 변경되었을 수 있습니다.</p>
+      <div class="mh-error-actions">
+        <a class="mh-error-primary" href="/hall.html">홈으로 이동</a>
+        <button class="mh-error-retry" type="button" data-error-retry>다시 시도</button>
+        <a class="mh-error-secondary" href="/hall.html" data-error-back>이전 페이지</a>
+      </div>
+      <a class="mh-error-support" href="/contact.html">문제가 계속되면 문의해 주세요.</a>
+    </div>
+  </main>
+</body>
+</html>

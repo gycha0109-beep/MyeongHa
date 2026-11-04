@@ -70,6 +70,14 @@ for (const [source, localized] of Object.entries({
   },
 })) registerStaticCopy(source, localized);
 
+// The header report control is localized in every supported non-Korean UI locale.
+registerStaticCopy('콘텐츠 신고', {
+  'ja-JP': 'コンテンツを報告',
+  'zh-TW': '檢舉內容',
+  'en-US': 'Report content',
+  'zh-CN': '举报内容',
+});
+
 export function normalizeUiLocale(value) {
   return SUPPORTED_UI_LOCALES.includes(value) ? value : 'ko-KR';
 }
