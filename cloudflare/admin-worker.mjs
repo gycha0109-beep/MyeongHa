@@ -31,19 +31,33 @@ export function validateAdminMaintenanceBindingsV1(env) {
  * it reaches ctx.access. Recheck this app's audience and the single Owner email.
  * Keep the independent signed JWT verifier for direct/header-based requests. */
 export async function verifyAdminWorkerOwnerAccessV1(request,env,ctx) {
+  let gateReason='unspecified';
   const gate=createAdminAccessGateV1({issuer:env.MYEONGHA_ADMIN_ACCESS_ISSUER,
-    audience:env.MYEONGHA_ADMIN_ACCESS_AUD,ownerEmail:env.MYEONGHA_ADMIN_OWNER_EMAIL});
+    audience:env.MYEONGHA_ADMIN_ACCESS_AUD,ownerEmail:env.MYEONGHA_ADMIN_OWNER_EMAIL},
+    {onDenied:reason=>{gateReason=reason;}});
   if(await gate(request))return true;
   // Cloudflare Access for Workers may supply its verified identity as ctx.access
   // without making the JWT header available to this Worker invocation.
   const access=ctx?.access;
-  if(!access||typeof access.aud!=='string'||access.aud!==env.MYEONGHA_ADMIN_ACCESS_AUD||
-     typeof access.getIdentity!=='function')return false;
-  try {
-    const identity=await access.getIdentity();
-    return typeof identity?.email==='string'&&
-      identity.email.toLowerCase()===env.MYEONGHA_ADMIN_OWNER_EMAIL.toLowerCase();
-  }catch{return false;}
+  let workerReason='context_unavailable';
+  if(access){
+    if(access.aud!==env.MYEONGHA_ADMIN_ACCESS_AUD)workerReason='context_audience_invalid';
+    else if(typeof access.getIdentity!=='function')workerReason='context_identity_unavailable';
+    else try {
+      const identity=await access.getIdentity();
+      if(typeof identity?.email==='string'&&
+        identity.email.toLowerCase()===env.MYEONGHA_ADMIN_OWNER_EMAIL.toLowerCase())return true;
+      workerReason='context_owner_invalid';
+    }catch{workerReason='context_identity_lookup_failed';}
+  }
+  // Private stage only: persist reason codes, never tokens, cookies, email,
+  // claim payloads, request URLs or other personal information.
+  if(env.MYEONGHA_ADMIN_PRIVATE_ENABLED!=='true'){
+    const source=request.headers.has('cf-access-jwt-assertion')?'assertion':
+      request.headers.get('cookie')?.split(';').some(p=>p.trim().startsWith('CF_Authorization='))?'cookie':'none';
+    console.warn('ADMIN_ACCESS_DIAGNOSTIC_V1', {source,gateReason,workerReason});
+  }
+  return false;
 }
 
 export default {
