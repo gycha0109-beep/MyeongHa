@@ -27,6 +27,25 @@ export function validateAdminMaintenanceBindingsV1(env) {
   return{auditEnabled,analyticsEnabled};
 }
 
+/** A Workers-native Cloudflare Access identity is verified by Cloudflare before
+ * it reaches ctx.access. Recheck this app's audience and the single Owner email.
+ * Keep the independent signed JWT verifier for direct/header-based requests. */
+export async function verifyAdminWorkerOwnerAccessV1(request,env,ctx) {
+  const gate=createAdminAccessGateV1({issuer:env.MYEONGHA_ADMIN_ACCESS_ISSUER,
+    audience:env.MYEONGHA_ADMIN_ACCESS_AUD,ownerEmail:env.MYEONGHA_ADMIN_OWNER_EMAIL});
+  if(await gate(request))return true;
+  // Cloudflare Access for Workers may supply its verified identity as ctx.access
+  // without making the JWT header available to this Worker invocation.
+  const access=ctx?.access;
+  if(!access||typeof access.aud!=='string'||access.aud!==env.MYEONGHA_ADMIN_ACCESS_AUD||
+     typeof access.getIdentity!=='function')return false;
+  try {
+    const identity=await access.getIdentity();
+    return typeof identity?.email==='string'&&
+      identity.email.toLowerCase()===env.MYEONGHA_ADMIN_OWNER_EMAIL.toLowerCase();
+  }catch{return false;}
+}
+
 export default {
   async scheduled(_event,env,ctx){
     const {auditEnabled,analyticsEnabled}=validateAdminMaintenanceBindingsV1(env);
@@ -52,11 +71,10 @@ export default {
   async fetch(request, env, ctx) {
     let reader; let audit; let command;
     try {
-      const gate = createAdminAccessGateV1({ issuer: env.MYEONGHA_ADMIN_ACCESS_ISSUER, audience: env.MYEONGHA_ADMIN_ACCESS_AUD,
-        ownerEmail: env.MYEONGHA_ADMIN_OWNER_EMAIL });
-      // Gate before opening any database connection, including static assets.
-      if (!await gate(request)) return Response.json({ error:'ADMIN_ACCESS_REQUIRED' }, {status:403,headers:{'Cache-Control':'no-store'}});
-      // Inactive staging still verifies Access signatures and exact Owner claims.
+      // Verify the signed header or Cloudflare's own authenticated Worker context
+      // before opening any database connection, including static assets.
+      if (!await verifyAdminWorkerOwnerAccessV1(request,env,ctx)) return Response.json({ error:'ADMIN_ACCESS_REQUIRED' }, {status:403,headers:{'Cache-Control':'no-store'}});
+      // Inactive staging still verifies the Access-authenticated Owner identity.
       // A verified Owner gets a distinct disabled response, with no DB or asset I/O.
       if (env.MYEONGHA_ADMIN_PRIVATE_ENABLED !== 'true') return Response.json({error:'ADMIN_PRIVATE_DISABLED'},
         {status:503,headers:{'Cache-Control':'no-store'}});
