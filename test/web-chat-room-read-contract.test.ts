@@ -75,6 +75,7 @@ describe('browser Chat room read contract', () => {
           createdAt: '2026-09-05T15:00:00.000Z',
           redacted: false,
           redactedAt: null,
+          turnState: null,
         },
         {
           messageId: '96000000-0000-4000-8000-000000000002',
@@ -85,7 +86,8 @@ describe('browser Chat room read contract', () => {
           createdAt: '2026-09-05T15:01:00.000Z',
           redacted: false,
           redactedAt: null,
-        },
+          turnState: null,
+        }
       ],
       pagination: {
         pageSize: 50,
@@ -99,23 +101,18 @@ describe('browser Chat room read contract', () => {
     expect(result.messages[0]).not.toHaveProperty('messagePayloadJsonb');
   });
 
-  it('admits only a metadata-only protected Se-yeon room and refuses any hidden-history body',()=>{
+  it('rejects withheld shells rather than silently treating stored messages as an empty room',()=>{
     const shell={
       threadId:THREAD_ID,characterId:'seyeon',
-      afterSequenceNo:0,lastSequenceNo:0,
-      messages:[],historyWithheld:true,
+      afterSequenceNo:0,lastSequenceNo:0,messages:[],historyWithheld:true,
       pagination:{pageSize:50,hasMore:false,nextAfterSequenceNo:null},
     };
-    expect(parseChatRoomReadPayloadV1(shell,{expectedThreadId:THREAD_ID}))
-      .toMatchObject({characterId:'seyeon',messages:[],historyWithheld:true});
+    expect(()=>parseChatRoomReadPayloadV1(shell,{expectedThreadId:THREAD_ID}))
+      .toThrow('must not return a withheld shell');
     expect(()=>parseChatRoomReadPayloadV1({...shell,characterId:'baekheon'},
-      {expectedThreadId:THREAD_ID})).toThrow('protected Se-yeon room shell');
+      {expectedThreadId:THREAD_ID})).toThrow('must not return a withheld shell');
     expect(()=>parseChatRoomReadPayloadV1({...shell,historyWithheld:'true'},
       {expectedThreadId:THREAD_ID})).toThrow('historyWithheld is invalid');
-    expect(()=>parseChatRoomReadPayloadV1({...shell,messages:payload().messages,lastSequenceNo:2},
-      {expectedThreadId:THREAD_ID})).toThrow('protected Se-yeon room shell');
-    expect(()=>parseChatRoomReadPayloadV1({...shell,afterSequenceNo:1,lastSequenceNo:1},
-      {expectedThreadId:THREAD_ID,expectedAfterSequenceNo:1})).toThrow('protected Se-yeon room shell');
   });
 
   it('accepts only character-authored, server Planner pending Memory or Life Fact', () => {
@@ -176,7 +173,7 @@ describe('browser Chat room read contract', () => {
       {...room.messages[0],memoryProposalOffer:legacy},room.messages[1],
     ]},{expectedThreadId:THREAD_ID})).toThrow('manual original-message Memory offer is unsupported');
     expect(()=>parseChatRoomReadPayloadV1({...room,historyWithheld:true},
-      {expectedThreadId:THREAD_ID})).toThrow('protected Se-yeon room shell');
+      {expectedThreadId:THREAD_ID})).toThrow('authorized Chat history endpoint');
   });
 
   it('requires bounded pagination metadata to match the authoritative stream', () => {

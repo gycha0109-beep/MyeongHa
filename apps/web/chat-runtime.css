@@ -108,3 +108,12 @@ html[data-theme="dark"] .character-room-retry {
   .conversation-live-message[data-pending="true"],
   .conversation-live-dots span { animation: none; }
 }
+
+/* Persistent owner-verified Chat history: a failed or abandoned user turn stays visible. */
+.chat-message-state {
+  display: block;
+  margin-top: .3rem;
+  color: var(--mh-ink-muted, #756c64);
+  font-size: .73rem;
+  line-height: 1.4;
+}

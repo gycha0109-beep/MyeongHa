@@ -24,8 +24,11 @@ describe('Se-yeon history Reveal HOLD on mobile', () => {
     expect(ui).toContain('SEYEON_HISTORY_REVEAL_HOLD');
     expect(ui).toContain('if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;');
     expect(ui).toContain('세연 대화는 서버의 보호 조치로 잠시 중단되었습니다');
-    expect(server).toContain("throw new SeyeonChatHistoryRevealHoldV1()");
-    expect(server).toContain("'SEYEON_HISTORY_REVEAL_HOLD'");
+    // Preserve mobile compatibility for an older server HOLD response,
+    // but never require the server to suppress the history of an owned room.
+    expect(server).toContain("streamAuthority: 'public.qry_chat_thread_owner_visible_history_v1'");
+    expect(server).toContain('throw new ChatHistoryAuthorityUnavailableV1()');
+    expect(server).not.toContain('throw new SeyeonChatHistoryRevealHoldV1()');
     expect(server).toContain("binding.participantCharacterIds.includes('seyeon')");
   });
 });

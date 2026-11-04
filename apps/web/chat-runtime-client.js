@@ -221,6 +221,10 @@ function createStreamMessage(message, authoritativeCharacterId) {
   article.className = 'conversation-message';
   article.dataset.sender = message.senderType;
   article.dataset.redacted = String(message.redacted === true);
+  if (message.senderType === 'user' &&
+      ['failed_retryable','failed_final','abandoned'].includes(message.turnState)) {
+    article.dataset.turnState = message.turnState;
+  }
   if (message.senderType === 'character') {
     const canonical = resolveCanonicalCharacterPresentationV1(message.characterId);
     if (canonical) article.dataset.messageCharacterId = canonical.presentationKey;
@@ -258,6 +262,15 @@ function createStreamMessage(message, authoritativeCharacterId) {
     paragraph.textContent = uiText(safeMessageText(message));
   }
   body.append(heading, paragraph);
+  if (message.senderType === 'user' &&
+      ['failed_retryable','failed_final','abandoned'].includes(message.turnState)) {
+    const note = document.createElement('small');
+    note.className = 'chat-message-state';
+    note.dataset.chatUiPlaceholder = message.turnState === 'abandoned'
+      ? '전송을 종료한 메시지' : '답변 처리에 실패한 메시지 · 다시 전송할 수 있습니다.';
+    note.textContent = uiText(note.dataset.chatUiPlaceholder);
+    body.append(note);
+  }
   article.append(avatar, body);
   return article;
 }
@@ -446,7 +459,7 @@ async function loadRoomState() {
 
     for (;;) {
       const page = await readChatPage(activeBearer, afterSequenceNo);
-      if (page.historyWithheld === true) protectedHistory = true;
+      if (page.historyWithheld === true) throw new Error('CHAT_HISTORY_AUTHORITY_UNAVAILABLE');
       if (characterId === null) {
         characterId = page.characterId;
       } else if (page.characterId !== characterId) {
@@ -501,9 +514,7 @@ async function loadRoomState() {
     // This also applies to malformed denial envelopes and changed owners.
     clearOwnerScopedRoomStateForAuthorityChange();
     setComposeStatus(
-      error instanceof Error && error.message === 'SEYEON_HISTORY_REVEAL_HOLD'
-        ? '이전 대화 기록은 서버의 개인정보 보호 조치로 표시할 수 없습니다.'
-        : '현재 대화 기록 연결을 사용할 수 없습니다.',
+      '현재 대화 기록 연결을 사용할 수 없습니다.',
     );
     return false;
   }
@@ -539,9 +550,7 @@ function ensureRoomReady() {
       if (!loaded || sourceVisibilityEpoch !== initialVisibilityEpoch) return false;
       roomReady = true;
       if (retryButton) retryButton.hidden = true;
-      setComposeStatus(historyWithheld
-        ? '이전 대화 기록은 개인정보 보호를 위해 표시하지 않습니다. 새 AI 답변은 아직 준비 중입니다.'
-        : '');
+      setComposeStatus('');
       restorePendingDraft();
       return true;
     } catch (error) {

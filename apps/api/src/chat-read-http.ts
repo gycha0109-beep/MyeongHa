@@ -15,20 +15,15 @@ const ROUTE_PREFIX = '/api/chat/' as const;
 const API_CONTRACT_VERSION = 'v0.9' as const;
 const NO_STORE = 'no-store' as const;
 
-/** G3/S5: no DB-current-rights Reveal for historical Se-yeon material yet. */
-class SeyeonChatHistoryRevealHoldV1 extends Error {
-  constructor() {
-    super('Se-yeon chat history Reveal requires current source authorization.');
-    this.name = 'SeyeonChatHistoryRevealHoldV1';
-  }
-}
+/** Every room read requires current subject and historical source authority. */
+class ChatHistoryAuthorityUnavailableV1 extends Error {}
 
 export const CHAT_READ_HTTP_BINDING_V1 = Object.freeze({
   method: GET_METHOD,
   route: '/api/chat/:threadId',
   threadBindingAuthority: 'public.qry_chat_thread_runtime_binding_v1',
   primaryCharacterAuthority: 'ordered-participant-character-ids[0]:v1',
-  streamAuthority: 'public.qry_chat_thread_stream_v2',
+  streamAuthority: 'public.qry_chat_thread_owner_visible_history_v1',
   relationshipAuthority: 'public.qry_character_relationship_v1',
   apiContractVersion: API_CONTRACT_VERSION,
 } as const);
@@ -67,6 +62,7 @@ type StreamRow = Readonly<{
   createdAt: unknown;
   redacted: unknown;
   redactedAt: unknown;
+  turnState: unknown;
 }>;
 
 type RelationshipRow = Readonly<{
@@ -104,31 +100,16 @@ select
   message_schema_version as "messageSchemaVersion",
   created_at as "createdAt",
   redacted,
-  redacted_at as "redactedAt"
-from public.qry_chat_thread_stream_v2($1::uuid, $2::uuid, $3::bigint, $4::integer)
+  redacted_at as "redactedAt",
+  turn_state as "turnState"
+from public.qry_chat_thread_owner_visible_history_v1($1::uuid, $2::uuid, $3::bigint, $4::integer)
 `.trim();
 
-// Owner-scoped metadata-only Se-yeon room shell: PostgreSQL returns a
-// boolean, never the body/payload of an existing, protected message.
-const SEYEON_HAS_MESSAGES_SQL = `
-select exists (
-  select 1 from public.qry_chat_thread_stream_v2(
-    $1::uuid, $2::uuid, 0::bigint, 1::integer
-  )
-) as "hasMessages"
-`.trim();
-
-// Check every historical participant, not just the current active bundle or
-// the paginated stream. The SQL definer is Member/Subject-owned metadata only.
-// The owner-scoped SQL must exist or the entire transcript read is held.
-// This guard alone cannot certify full G3 Reveal/Replay/streaming.
-const SEYEON_HISTORY_GUARD_AVAILABLE_SQL = `
-select to_regprocedure('public.qry_seyeon_thread_ever_involved_v1(uuid,uuid)')
-  is not null as "installed"
-`.trim();
-const SEYEON_HISTORY_GUARD_SQL = `
-select ever_involved as "everInvolved"
-from public.qry_seyeon_thread_ever_involved_v1($1::uuid,$2::uuid)
+// No downgrade to unverified legacy transcript reads when this authority is absent.
+const HISTORY_READ_AUTHORITY_AVAILABLE_SQL = `
+select to_regprocedure(
+  'public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)'
+) is not null as "installed"
 `.trim();
 
 const READ_RELATIONSHIP_SQL = `
@@ -317,6 +298,8 @@ function mapStreamRow(row: StreamRow) {
     createdAt: timestampValue('message timestamp', row.createdAt),
     redacted: row.redacted,
     redactedAt: nullableTimestamp('redaction timestamp', row.redactedAt),
+    turnState: row.turnState === null || row.turnState === undefined
+      ? null : stringValue('message turn state', row.turnState),
   });
 }
 
@@ -353,94 +336,25 @@ async function readChatState(
   }
   const binding = mapThreadBinding(bindingResult.rows[0], parsed.threadId);
 
-  // A single-participant Se-yeon GET is a metadata-only shell. The caller
-  // is already owner-scoped; neither existing body text nor even a redacted
-  // message row may cross this boundary before History/Replay approval.
-  // Do not substitute a false "empty history": explicitly mark withheld data.
-  if (binding.participantCharacterIds.length === 1 &&
-      binding.primaryCharacterId === 'seyeon') {
-    if (parsed.afterSequenceNo !== 0) throw new SeyeonChatHistoryRevealHoldV1();
-    // The existence query is metadata-only, but its failure must not leak
-    // DB details or downgrade the protected shell into an ordinary 500.
-    // Keep all assistant/relationship bodies withheld on unknown results.
-    let hasMessages: boolean;
-    try {
-      const existence = await client.query<{hasMessages:boolean}>(SEYEON_HAS_MESSAGES_SQL, [
-        subjectId,parsed.threadId,
-      ]);
-      if (existence.rows.length !== 1 ||
-          typeof existence.rows[0]?.hasMessages !== 'boolean') {
-        throw new SeyeonChatHistoryRevealHoldV1();
-      }
-      hasMessages = existence.rows[0].hasMessages;
-    } catch {
-      throw new SeyeonChatHistoryRevealHoldV1();
-    }
-    return Object.freeze({
-      threadId:binding.threadId,
-      characterId:'seyeon',
-      afterSequenceNo:0,
-      lastSequenceNo:0,
-      messages:Object.freeze([]),
-      pagination:Object.freeze({
-        pageSize:parsed.pageSize,
-        hasMore:false,
-        nextAfterSequenceNo:null,
-      }),
-      historyWithheld:hasMessages,
-      latestCharacterMessage:null,
-      relationship:null,
-    });
+  // One owner-scoped, source-verified history projection for every Character.
+  const capability = await client.query<{installed:boolean}>(
+    HISTORY_READ_AUTHORITY_AVAILABLE_SQL,
+  );
+  if (capability.rows.length !== 1 || capability.rows[0]?.installed !== true) {
+    throw new ChatHistoryAuthorityUnavailableV1();
   }
-  if (binding.participantCharacterIds.includes('seyeon')) {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
-  // A former Se-yeon participant disappears from the active binding when
-  // left_at is set or a new content bundle is selected. A page-local check
-  // cannot prove that an earlier/later page is safe to replay.
-  // PostgreSQL may throw when the catalog probe or owner-scoped history
-  // function is unavailable (DDL/ACL drift, timeout or partial restore).
-  // Such failures are NOT ordinary chat errors: always return the same
-  // no-store 503 HOLD before reading body or relationship-derived material.
-  try {
-    const capability = await client.query<{ installed: boolean }>(
-      SEYEON_HISTORY_GUARD_AVAILABLE_SQL,
-    );
-    if (capability.rows.length !== 1 ||
-        typeof capability.rows[0]?.installed !== 'boolean' ||
-        !capability.rows[0].installed) {
-      throw new SeyeonChatHistoryRevealHoldV1();
-    }
-    const history = await client.query<{ everInvolved: boolean }>(
-      SEYEON_HISTORY_GUARD_SQL, [subjectId, parsed.threadId],
-    );
-    if (history.rows.length !== 1 ||
-        typeof history.rows[0]?.everInvolved !== 'boolean' ||
-        history.rows[0].everInvolved) {
-      throw new SeyeonChatHistoryRevealHoldV1();
-    }
-  } catch {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
-
   const streamResult = await client.query<StreamRow>(READ_STREAM_SQL, [
-    subjectId,
-    parsed.threadId,
-    parsed.afterSequenceNo,
-    parsed.pageSize,
+    subjectId, parsed.threadId, parsed.afterSequenceNo, parsed.pageSize,
   ]);
-  // A current participant set is not proof about the entire history.
-  // A formerly participating Se-yeon can still own a committed message
-  // after the thread is reconfigured to contain other Characters only.
-  // Check the full bounded stream page (including the extra cursor row)
-  // BEFORE retrieving relationship state or serializing any message body.
-  if (streamResult.rows.some((row) => row.characterId === 'seyeon')) {
-    throw new SeyeonChatHistoryRevealHoldV1();
-  }
-  const relationshipResult = await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
-    subjectId,
-    binding.primaryCharacterId,
-  ]);
+  // Historical Chat bodies are separately authorized; relationship state is
+  // not proof of current disclosure rights. Retain the existing Se-yeon hold
+  // on relationship projection while restoring the verified message stream.
+  const relationshipResult = binding.participantCharacterIds.includes('seyeon')
+    ? { rows: [] as RelationshipRow[] }
+    : await client.query<RelationshipRow>(READ_RELATIONSHIP_SQL, [
+        subjectId,
+        binding.primaryCharacterId,
+      ]);
 
   const hasMore = streamResult.rows.length > parsed.pageSize;
   const pageRows = hasMore ? streamResult.rows.slice(0, parsed.pageSize) : streamResult.rows;
@@ -510,8 +424,8 @@ export async function handleChatReadRequestV1(
       stringValue('server time', input.serverTime),
     );
   } catch (error) {
-    if (error instanceof SeyeonChatHistoryRevealHoldV1) {
-      return jsonError(503, 'SEYEON_HISTORY_REVEAL_HOLD', 'chat.unavailable', input.requestId);
+    if (error instanceof ChatHistoryAuthorityUnavailableV1) {
+      return jsonError(503, 'CHAT_HISTORY_AUTHORITY_UNAVAILABLE', 'chat.unavailable', input.requestId);
     }
     const constraint = postgresConstraint(error);
     if (constraint !== null && (
