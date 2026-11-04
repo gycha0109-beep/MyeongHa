@@ -99,6 +99,12 @@ function db({setRows=[DB_ROW],setAfter=null,eventRows=[
    expect(args).toEqual([RECEIPT]);
    return {rows:setReads===2&&setAfter!==null?setAfter:setRows};
   }
+  if(sql.includes("current_setting('myeongha.subject_id',true)"))
+   return {rows:[{boundSubjectId:null}]};
+  if(sql.includes("set_config('myeongha.subject_id'")){
+   expect(args).toEqual([SUBJECT]);
+   return {rows:[{boundSubjectId:SUBJECT}]};
+  }
   if(sql===S1_SCOPES_SQL){
    expect(args).toEqual([EVENT,GRANT]);return {rows:[SCOPE]};
   }
