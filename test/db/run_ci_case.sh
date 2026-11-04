@@ -212,6 +212,15 @@ case "$case_name" in
     apply_pg17_migrations_through_seyeon_production_frontier
     bash test/db/seyeon_c08_first_turn_local_pg17.sh
     ;;
+  chat-owner-history-disposable-pg17)
+    verify_pg17
+    [[ "${GITHUB_ACTIONS:-}" == true && "${CI:-}" == true &&
+      "${DB_SUITE:-}" == postgres17 && "${PGHOST:-}" == localhost &&
+      "${PGDATABASE:-}" =~ ^myeongha_ci_case_[0-9]+$ ]] || {
+      echo HOLD_COMMON_CHAT_HISTORY_NOT_DISPOSABLE >&2; exit 1;
+    }
+    psql -v ON_ERROR_STOP=1 -f test/db/chat_owner_history_disposable_pg17.sql
+    ;;
   seyeon-first-zero-locked-reveal-disposable-pg17)
     verify_pg17
     # Only the local --network none Docker scratch DB or the existing isolated
