@@ -125,6 +125,6 @@ describe('native paid Reader delivery: protected S6 GET and S7 ACK',()=>{
     expect(source).toContain('cannot mark S5 committed_at as delivered_at');
     const service=readFileSync(new URL('../apps/mobile/src/features/chat/mobile-paid-reader-delivery-service.ts',import.meta.url),'utf8');
     expect(service).toContain('credentials:');
-    expect((service.match(/credentials: 'omit'/gu)??[]).toHaveLength(2);
+    expect((service.match(/credentials: 'omit'/gu)??[])).toHaveLength(2);
   });
 });
