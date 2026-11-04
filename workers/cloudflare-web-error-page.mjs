@@ -52,6 +52,10 @@ export function isPublicWebDocumentRequestV1(request) {
     } catch { return false; }
   }
   if (isApiRootSegment(first)) return false;
+  // A script, stylesheet, font, image or data asset remains a non-HTML 404
+  // even when someone navigates to its URL directly in the address bar.
+  const extension = url.pathname.match(/\.([a-z0-9]{1,12})$/iu)?.[1]?.toLowerCase();
+  if (extension && extension !== 'html' && extension !== 'htm') return false;
   const accept = request.headers.get('accept') ?? '';
   return request.headers.get('sec-fetch-mode') === 'navigate'
     || request.headers.get('sec-fetch-dest') === 'document'

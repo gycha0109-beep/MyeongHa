@@ -59,6 +59,9 @@ describe('Cloudflare public web error page', () => {
       request('/%61pi/chat', 'GET', { Accept: 'text/html' }),
       request('/not-found.js', 'GET', { Accept: '*/*' }),
       request('/missing.png', 'GET', { Accept: 'image/png' }),
+      request('/missing.js', 'GET', { Accept: 'text/html', 'Sec-Fetch-Mode': 'navigate' }),
+      request('/missing.css', 'GET', { Accept: 'text/html' }),
+      request('/missing.svg', 'GET', { Accept: 'text/html' }),
       request('/missing.html', 'POST'),
     ];
     for (const req of excluded) {
