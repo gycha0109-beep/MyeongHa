@@ -3,6 +3,8 @@ import {
  COMMERCE_READER_REVOKE_LOCK_CAS_PREFLIGHT_V1 as CONFIG,
  COMMERCE_REVOKE_SOURCE_EVENT_LOCK_SQL_V1 as EVENT_SQL,
  COMMERCE_REVOKE_EXACT_READER_GRANT_LOCK_SQL_V1 as GRANT_SQL,
+ COMMERCE_REVOKE_READER_S1_SCOPES_SQL_V1 as S1_SCOPES_SQL,
+ COMMERCE_ACQUIRE_READER_S1_SCOPE_SQL_V1 as S1_LOCK_SQL,
  inspectLockedReaderRevokeCasPreflightV1 as inspect,
 } from '../scripts/operations/commerce-exact-reader-revoke-cas-locked-preflight-v1.mjs';
 import {
@@ -14,6 +16,9 @@ const GRANT='00000000-0000-4000-8000-000000000002';
 const RECEIPT='00000000-0000-4000-8000-000000000003';
 const SUBJECT='00000000-0000-4000-8000-000000000004';
 const INTENT='00000000-0000-4000-8000-000000000005';
+const READING='00000000-0000-4000-8000-000000000007';
+const SCOPE={subjectId:SUBJECT,officialReadingId:READING,
+ readerCharacterId:'seyeon',receiptId:RECEIPT,purchaseIntentId:INTENT};
 const SOURCE={providerEventId:EVENT,receiptId:RECEIPT,
  subjectId:SUBJECT,purchaseIntentId:INTENT};
 const GRANT_ROW={grantId:GRANT,grantRevision:'3',
@@ -38,13 +43,25 @@ const INPUT={providerEventId:EVENT,entitlementGrantId:GRANT,
 
 function client({
  eventRows=[SOURCE],grantRows=[GRANT_ROW],evidenceRows=[ROW],
+ scopeRows=[SCOPE],scopeAfterWait=null,scopeAfterGrant=null,
  authority={writable:true,completeVisibility:true,currentUser:'postgres'},
  failSql,
 }={}){
- const calls=[];
+ const calls=[];let scopeReads=0;
  const query=vi.fn(async(sql,args)=>{
   calls.push({sql,args});
   if(sql.includes('pg_catalog.pg_roles'))return {rows:[authority]};
+  if(sql===S1_SCOPES_SQL){
+   expect(args).toEqual([EVENT,GRANT]);
+   scopeReads++;
+   if(scopeReads===2&&scopeAfterWait!==null)return {rows:scopeAfterWait};
+   if(scopeReads===3&&scopeAfterGrant!==null)return {rows:scopeAfterGrant};
+   return {rows:scopeRows};
+  }
+  if(sql===S1_LOCK_SQL){
+   expect(args).toEqual([SUBJECT,READING,'seyeon']);
+   return {rows:[{}]};
+  }
   if(sql===EVENT_SQL){
    expect(args).toEqual([EVENT]);
    return {rows:eventRows};
@@ -91,11 +108,15 @@ describe('P4 exact Reader revoke Provider Event -> Grant atomic CAS lock bridge'
   const c=client(),r=await inspect(c,INPUT);
   expect(r).toMatchObject({
    kind:'trusted_provider_order_missing',
-   sourceEventLocked:true,exactReaderGrantLocked:true,revisionProven:true,
+   readerS1ScopesLocked:true,sourceEventLocked:true,exactReaderGrantLocked:true,revisionProven:true,
    grantRevocationAuthorized:false,entitlementEffectInvoked:false,writesPerformed:false,
   });
   expect(locked(c).map(x=>x.sql)).toEqual([EVENT_SQL,GRANT_SQL]);
-  expect(c.calls[0].sql).toBe('begin isolation level serializable');
+  expect(c.calls[0].sql).toBe('begin isolation level read committed');
+  expect(c.calls.filter(x=>x.sql===S1_SCOPES_SQL)).toHaveLength(3);
+  expect(c.calls.filter(x=>x.sql===S1_LOCK_SQL)).toHaveLength(1);
+  expect(c.calls.findIndex(x=>x.sql===S1_LOCK_SQL))
+    .toBeLessThan(c.calls.findIndex(x=>x.sql===EVENT_SQL));
   expect(c.calls.at(-1).sql).toBe('rollback');
   expect(c.calls.some(x=>x.sql===EVIDENCE_SQL)).toBe(true);
   for(const secret of [SUBJECT,RECEIPT,INTENT,EVENT,GRANT])
@@ -134,6 +155,32 @@ describe('P4 exact Reader revoke Provider Event -> Grant atomic CAS lock bridge'
   const c=client({evidenceRows:[{...ROW,grantSourceReceiptId:INTENT}]});
   await expect(inspect(c,INPUT)).rejects.toThrow('LINEAGE_CHANGED');
   expect(c.calls.at(-1).sql).toBe('rollback');
+ });
+ it('will not take a Provider Event lock without an exact Reader S1 scope',async()=>{
+  const c=client({scopeRows:[]}),r=await inspect(c,INPUT);
+  expect(r.kind).toBe('exact_reader_scope_not_found');
+  expect(c.calls.some(x=>x.sql===S1_LOCK_SQL||x.sql===EVENT_SQL)).toBe(false);
+  holds(r);
+ });
+ it('detects a changing Reader binding after acquiring its shared scope lock',async()=>{
+  const c=client({scopeAfterWait:[]}),r=await inspect(c,INPUT);
+  expect(r.kind).toBe('reader_s1_scopes_changed_during_lock');
+  expect(c.calls.some(x=>x.sql===EVENT_SQL)).toBe(false);
+  holds(r);
+ });
+ it('detects a changed Reader scope after exact Grant row locks',async()=>{
+  const c=client({scopeAfterGrant:[{...SCOPE,readerCharacterId:'other-reader'}]});
+  const r=await inspect(c,INPUT);
+  expect(r.kind).toBe('reader_s1_scopes_changed_after_grant_lock');
+  expect(c.calls.some(x=>x.sql===EVIDENCE_SQL)).toBe(false);
+  holds(r);
+ });
+ it('does not accept a different Receipt lineage even when S1 scope is present',async()=>{
+  const c=client({scopeRows:[{...SCOPE,receiptId:INTENT}]});
+  const r=await inspect(c,INPUT);
+  expect(r.kind).toBe('reader_s1_lineage_changed_under_lock');
+  expect(r.grantRevocationAuthorized).toBe(false);
+  holds(r);
  });
  it('same provider event already revoked is only an observed replay',async()=>{
   const c=client({grantRows:[{...GRANT_ROW,grantStatus:'revoked'}],
@@ -230,12 +277,12 @@ describe('P4 locked source-event Receipt identity pinned to authenticated cancel
    ...INPUT,expectedReceiptId:'00000000-0000-4000-8000-000000000099',
   });
   expect(r).toMatchObject({
-   kind:'exact_cancellation_receipt_scope_changed',
-   sourceEventLocked:true,exactReaderGrantLocked:false,
+   kind:'reader_s1_scope_or_receipt_changed',
+   sourceEventLocked:false,exactReaderGrantLocked:false,
    grantRevocationAuthorized:false,readerT2LockHeld:false,
    entitlementEffectInvoked:false,writesPerformed:false,
   });
-  expect(locked(c).map(x=>x.sql)).toEqual([EVENT_SQL]);
+  expect(locked(c).map(x=>x.sql)).toEqual([]);
   expect(c.calls.some(x=>x.sql===EVIDENCE_SQL)).toBe(false);
   expect(c.calls.at(-1).sql).toBe('rollback');
  });
