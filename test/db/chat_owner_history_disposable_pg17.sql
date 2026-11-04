@@ -1,9 +1,18 @@
 \set ON_ERROR_STOP on
 -- Disposable PG17: common historical transcript authorization and isolation.
-CREATE ROLE myeongha_api_executor NOLOGIN NOSUPERUSER NOBYPASSRLS;
-CREATE ROLE anon NOLOGIN;
-CREATE ROLE authenticated NOLOGIN;
-CREATE ROLE service_role NOLOGIN;
+-- The CI PG17 suite creates each case in a new DB on one shared cluster.
+-- Roles are cluster-wide; use existing synthetic roles when prior cases made them.
+DO $roles$
+DECLARE role_name text;
+BEGIN
+ FOR role_name IN SELECT unnest(ARRAY[
+   'myeongha_api_executor','anon','authenticated','service_role'
+ ]) LOOP
+   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname=role_name) THEN
+     EXECUTE format('CREATE ROLE %I NOLOGIN NOSUPERUSER NOBYPASSRLS',role_name);
+   END IF;
+ END LOOP;
+END $roles$;
 CREATE SCHEMA seyeon_private;
 CREATE TABLE public.subjects(id uuid PRIMARY KEY,status text,merged_into_subject_id uuid);
 CREATE TABLE public.conversation_threads(id uuid PRIMARY KEY,subject_id uuid,status text);
