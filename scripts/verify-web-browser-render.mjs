@@ -461,12 +461,18 @@ try {
       enabledCount: dialog?.querySelectorAll('[data-reader-key]:not(:disabled)').length ?? 0,
       seyeonEnabled: !(dialog?.querySelector('[data-reader-key="seyeon"]')?.disabled ?? true),
       othersDisabled: [...(dialog?.querySelectorAll('[data-reader-key]:not([data-reader-key="seyeon"])') ?? [])].every((item) => item.disabled),
+      visibleKeys: [...(dialog?.querySelectorAll('[data-reader-key]') ?? [])].map((item) => item.dataset.readerKey),
       note: dialog?.querySelector('.reading-reader-picker-note')?.textContent?.trim() ?? '',
       target: dialog?.querySelector('[data-reader-picker-target]')?.textContent?.trim() ?? '',
     };
   })()`);
   assert(pickerOpen.triggerFound && pickerOpen.open, 'Saju Reading entry did not open the Reader picker');
-  assert(pickerOpen.optionCount === 9, `Saju Reader catalog must retain nine Readers, got ${pickerOpen.optionCount}`);
+  // Only six Readers are publicly listed. The three hidden ones remain in the
+  // canonical catalog and must not be removed from historical identity routes.
+  const launchReaderKeys = ['seyeon', 'baekheon', 'yeoul', 'rahyeon', 'taegyeom', 'yunho'];
+  assert(pickerOpen.optionCount === launchReaderKeys.length &&
+    JSON.stringify(pickerOpen.visibleKeys) === JSON.stringify(launchReaderKeys),
+    `Saju picker must list exactly six public Readers: ${JSON.stringify(pickerOpen)}`);
   assert(pickerOpen.enabledCount === 1 && pickerOpen.seyeonEnabled && pickerOpen.othersDisabled, `Only Seyeon Preview must be selectable: ${JSON.stringify(pickerOpen)}`);
   assert(pickerOpen.note.includes('이 선택은 프리뷰 화면 연출에만 적용됩니다.'), `Reader presentation-only note missing: ${pickerOpen.note}`);
   await artifact(client, '-saju-reader-picker');
