@@ -49,7 +49,7 @@ describe('mobile chat Launch roster presentation', () => {
     expect(hub).not.toContain('styles.pendingSection');
     expect(hub).not.toContain('COMING SOON');
     expect(hub).not.toContain('연결자 등록 중');
-    expect(roster).not.toContain('MOBILE_CHAT_PENDING_ROSTER_V1');
+    expect(roster).toContain('MOBILE_CHAT_PENDING_ROSTER_V1');
     expect(roster).toContain('MOBILE_CHAT_KNOWN_CHARACTERS_V1');
   });
 });
