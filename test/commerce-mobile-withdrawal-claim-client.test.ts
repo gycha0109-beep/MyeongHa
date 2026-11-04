@@ -80,7 +80,7 @@ describe('mobile withdrawal claim transport and Member boundary',()=>{
       refundApproved:true,providerRefundCompleted:false},
     {claimId:CLAIM,receivedAt:RECEIVED,status:'received',replayed:false,
       refundApproved:false,providerRefundCompleted:true},
-    {...GOOD,claimId:UNIT},
+    {...GOOD,claimId:'not-a-valid-uuid'},
     {...GOOD,receivedAt:'invalid'},
   ])('never shows an unverified POST result as accepted: %j',async data=>{
     const client=new MyeongHaApiClientV1({
