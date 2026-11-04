@@ -89,7 +89,7 @@ function db({setRows=[DB_ROW],setAfter=null,eventRows=[
  const calls=[];let setReads=0,mode='read';
  const query=vi.fn(async(sql,args)=>{
   calls.push({sql,args});
-  if(sql==='begin isolation level serializable'){mode='write';return {rows:[]};}
+  if(sql==='begin isolation level read committed'){mode='write';return {rows:[]};}
   if(sql==='begin isolation level repeatable read read only'){mode='read';return {rows:[]};}
   if(sql.includes('pg_catalog.pg_roles'))return {rows:[mode==='write'?
    {writable:true,completeVisibility:true,currentUser:'postgres'}:
