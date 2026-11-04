@@ -94,6 +94,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
       f.subject,f.thread,f.turn,f.attempt,uuid(18,90),uuid(19,90),uuid(23,90),uuid(30,90)]));
     expect(denied.rows).toHaveLength(0);
     await pool.query(operation('production-25-unissued-zero-receipt-recovery-20261103.sql'));
+    await pool.query(operation('production-27-g0-committed-followup-receipt-20261105.sql'));
     const runtime=vi.fn(async()=>{throw Error('A committed reply must never invoke inference.');});
     const recover=()=>recoverSeyeonUnissuedZeroReplyV1({pool:subjectPool,verifiedEvidence:f.evidence,threadId:f.thread,
       text:f.text,signal:new AbortController().signal,requestId:'repeat',serverTime:new Date().toISOString()});
@@ -106,7 +107,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
           requestId:'synthetic-recovery',serverTime:new Date().toISOString(),pool:subjectPool,
           identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},runtime:{run:runtime},zeroSourceFirstReplyApproved:true});
         expect(response.status).toBe(200);
-        await expect(recover()).rejects.toMatchObject({constraint:'seyeon_unissued_reply_not_recoverable'});
+        expect(await recover()).toBeNull();
         return response;
       }
       return handleSeyeonPositiveReplyReceiptV1({pool:subjectPool,requestId:'synthetic-ack',request});
@@ -120,7 +121,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     expect(calls).toEqual([`/api/chat/${f.thread}/turns`,`/api/chat/delivery-receipts/${f.attempt}`]);
     expect((await pool.query('select count(*)::int as n from public.conversation_messages where thread_id=$1',[f.thread])).rows[0].n).toBe(3);
     expect((await pool.query('select state from public.chat_turns where id=$1',[f.turn])).rows[0].state).toBe('delivered');
-    await expect(recover()).rejects.toMatchObject({constraint:'seyeon_unissued_reply_not_recoverable'});
+    expect(await recover()).toBeNull();
   },30000);
 
 
