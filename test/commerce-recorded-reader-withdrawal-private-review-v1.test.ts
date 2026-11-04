@@ -22,6 +22,13 @@ const PURCHASED=Object.freeze({
   subjectId:SUBJECT,purchaseIntentId:PURCHASE,unitId:UNIT,
   productSpecVersion:'reading-v1',
 });
+const S7=Object.freeze({
+  bodyId:'55555555-5555-4555-8555-555555555555',
+  s5CommittedAt:'2026-11-04 00:00:00+00',
+  retainedPreparedCount:'2',retainedAcknowledgedCount:'1',
+  firstPreparedAt:'2026-11-04 00:00:01+00',
+  firstAcknowledgedAt:'2026-11-04 00:00:02+00',
+});
 const NOTICE=Object.freeze({
   purchaseIntentId:PURCHASE,unitId:UNIT,productSpecVersion:'reading-v1',
   noticeRevision:'notice-v1',previewOrInformationRevision:'preview-v1',
@@ -30,9 +37,10 @@ type Options=Readonly<{
   claimRows?:readonly unknown[];
   purchasedRows?:readonly unknown[];
   noticeRows?:readonly unknown[];
+  s7Rows?:readonly unknown[];
   visibility?:boolean;
   readOnly?:boolean;
-  queryFailure?:'claim'|'purchase'|'notice'|'begin'|'rollback';
+  queryFailure?:'claim'|'purchase'|'notice'|'s7'|'begin'|'rollback';
   releaseFailure?:boolean;
 }>;
 function fixture(options:Options={}) {
@@ -54,6 +62,15 @@ function fixture(options:Options={}) {
       expect(args).toEqual([CLAIM]);
       expect(sql).toContain("s.kind='member'");
       return {rows:(options.claimRows??[ROW]) as T[]};
+    }
+    if(sql.includes('official_reader_paid_delivery_attempts_v1')){
+      if(options.queryFailure==='s7')throw Error('S7 journal unavailable');
+      expect(args).toEqual([PURCHASE,SUBJECT,UNIT]);
+      expect(sql).toContain('grant_row.source_receipt_id=receipt.id');
+      expect(sql).toContain('b.originating_entitlement_grant_id=grant_row.id');
+      expect(sql).toContain('presentation.unit_id=$3::uuid');
+      expect(sql).toContain('d.retention_until>pg_catalog.clock_timestamp()');
+      return {rows:(options.s7Rows??[S7]) as T[]};
     }
     if(sql.includes('from public.purchase_intents pi')){
       if(options.queryFailure==='purchase')throw Error('purchase SQL down');
@@ -91,6 +108,12 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(result).toMatchObject({
       claimId:CLAIM,receivedAt:ISO,recordedCustomerClaim:true,
       kind:'exact_unit_manual_review',sourceClaimImmutable:true,
+      retainedReaderS7Timeline:{
+        kind:'s7_client_ack_retained_delivery_unproven',
+        retainedPreparedCount:2,retainedAcknowledgedCount:1,
+        consumerDeliveryProven:false,legallyProvenDeliveredAt:null,
+        providerRefundAuthorized:false,grantMutationAuthorized:false,
+      },
       review:{classification:'statutory_exception_review',
         reason:'LEGAL_EXCEPTION_OR_COMPLAINT',
         automaticDenialAuthorized:false,providerRefundAuthorized:false,
@@ -105,6 +128,7 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       expect.stringContaining('digital_reading_withdrawal_claims_private_v1'),
       expect.stringContaining('receipt.verification_status'),
       expect.stringContaining('digital_reading_checkout_notice_acknowledgments_v1'),
+      expect.stringContaining('official_reader_paid_delivery_attempts_v1'),
       'ROLLBACK',
     ]);
     expect(f.release).toHaveBeenCalledWith(undefined);
@@ -113,6 +137,51 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(status(result)).not.toContain(UNIT);
     expect(status(result)).not.toContain('notice-v1');
     expect(f.statements.map(s=>s.sql).join('\n')).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|GRANT)\b/iu);
+  });
+
+  it('does not assume an expired or absent S7 receipt proves content was never supplied',async()=>{
+    const f=fixture({s7Rows:[{
+      ...S7,retainedPreparedCount:'0',retainedAcknowledgedCount:'0',
+      firstPreparedAt:null,firstAcknowledgedAt:null,
+    }]});
+    const result=await run(f);
+    expect(result?.retainedReaderS7Timeline).toMatchObject({
+      kind:'s5_committed_no_retained_s7',
+      retainedPreparedCount:0,consumerDeliveryProven:false,
+      legallyProvenDeliveredAt:null,
+    });
+    expect(result?.review?.automaticDenialAuthorized).toBe(false);
+  });
+
+  it('recognizes a prepared server response without a retained authenticated client ACK',async()=>{
+    const f=fixture({s7Rows:[{
+      ...S7,retainedPreparedCount:'1',retainedAcknowledgedCount:'0',
+      firstAcknowledgedAt:null,
+    }]});
+    const result=await run(f);
+    expect(result?.retainedReaderS7Timeline).toMatchObject({
+      kind:'s7_response_prepared_without_ack',
+      retainedPreparedCount:1,retainedAcknowledgedCount:0,
+      consumerDeliveryProven:false,
+    });
+  });
+
+  it('does not adopt a body from a sibling Reader or ambiguous paid answers',async()=>{
+    const f=fixture({s7Rows:[S7,S7]});
+    const result=await run(f);
+    expect(result?.retainedReaderS7Timeline).toBeNull();
+    expect(result?.recordedCustomerClaim).toBe(true);
+    expect(result?.providerRefundAuthorized).toBe(false);
+  });
+
+  it('does not produce a legal review result from corrupt retained S7 data',async()=>{
+    const f=fixture({s7Rows:[{...S7,
+      retainedPreparedCount:'1',retainedAcknowledgedCount:'2',
+    }]});
+    await expect(run(f)).rejects.toMatchObject({
+      code:'RECORDED_READING_WITHDRAWAL_PRIVATE_REVIEW_UNAVAILABLE',
+    });
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
   it('keeps a change-of-mind claim in manual evidence review when legal delivery is not proven',async()=>{
