@@ -12,9 +12,8 @@ if [[ "${GITHUB_ACTIONS:-}" != true ||
  exit 1
 fi
 
-# Existing proven separate B2/B3 Reader purchases and distinct Receipt Grants.
-node test/db/commerce_stored_portone_hmac_lineage_pg17_generator.mjs --fixture |
- psql -X -v ON_ERROR_STOP=1 -f - >/dev/null
+# The caller already installed the proven B2/B3 independent Reader fixture.
+# Do not reapply it or add an extra full-migration database to the CI suite.
 # A synthetic verified B2 cancellation. No real PortOne GET/POST.
 psql -X -v ON_ERROR_STOP=1 -f test/db/commerce_reader_s1_cas_race_pg17_seed.sql >/dev/null
 # Real independent clients coordinate on the existing S1 advisory lock.
