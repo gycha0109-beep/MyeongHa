@@ -127,7 +127,7 @@ export default function SajuScreen() {
               params: { reader: presentationReader, topic: topic.key },
             })}
           />
-          <BirthSummaryCard summary={viewModel.birthSummary} />
+          <BirthSummaryCard birthInput={viewModel.birthInput} />
           <SajuPillarGrid pillars={viewModel.pillars} />
           <DayMasterCard dayMaster={viewModel.dayMaster} />
           <ElementBalance elementBalance={viewModel.elementBalance} />
