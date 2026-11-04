@@ -206,6 +206,24 @@ begin
   return;
  end if;
 
+ -- Two signed webhook envelopes may refer to the SAME PortOne cancellation.
+ -- The original Receipt FOR UPDATE lock above serializes concurrent attempts.
+ -- Same webhook ID is handled as exact replay above; a DIFFERENT webhook ID
+ -- for this same provider cancellation item must not mint another Event.
+ -- Legacy duplicate rows remain detectable by the read-only set auditor.
+ if exists (
+  select 1
+  from public.commerce_provider_events e
+  where e.provider='portone_v2'
+    and e.resolved_receipt_id=v_receipt.id
+    and e.event_type in ('Transaction.Cancelled','Transaction.PartialCancelled')
+    and e.verified_payload_jsonb->>'cancellationIdHmac'=p_cancellation_id_hmac
+ ) then
+  raise exception using errcode='23505',
+   constraint='cancellation_event_persist_same_item_webhook_conflict',
+   message='One provider cancellation item cannot create multiple canonical events';
+ end if;
+
  v_now:=pg_catalog.clock_timestamp();
  insert into public.commerce_provider_events(
   id,provider,external_event_id,event_type,external_transaction_id,

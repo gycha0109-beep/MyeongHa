@@ -93,6 +93,7 @@ declare
  v_id_again uuid; v_fingerprint text;
  v_count bigint; v_status text; v_original text;
  v_readback jsonb;
+ v_rejected_constraint text;
 begin
  select provider_event_id,replayed into v_id,v_replay
  from public.internal_persist_portone_cancellation_event_v1(
@@ -139,6 +140,28 @@ begin
  if (select provider_ordering_key from public.commerce_provider_events
     where id=v_id) is not null then
   raise exception 'received-at or webhook timestamp cannot fabricate provider order';
+ end if;
+
+ -- A second webhook envelope for the SAME PortOne cancellation item is
+ -- NOT a second payment cancellation and may not mint another Provider Event.
+ begin
+  perform public.internal_persist_portone_cancellation_event_v1(
+   'pmt-A','webhook-A-second','Transaction.Cancelled','tx-A',
+   'full_cancel_shape_observed',
+   'hmac-sha256:k1:'||repeat('a',64),
+   'hmac-sha256:k1:'||repeat('b',64),
+   'hmac-sha256:k1:'||repeat('d',64),8900,8900
+  );
+  raise exception 'duplicate cancellation item with a new webhook ID was persisted';
+ exception when unique_violation then
+  get stacked diagnostics v_rejected_constraint = constraint_name;
+  if v_rejected_constraint <> 'cancellation_event_persist_same_item_webhook_conflict' then
+   raise;
+  end if;
+ end;
+ if (select count(*) from public.commerce_provider_events
+       where resolved_receipt_id='00000000-0000-4000-8000-000000000006'::uuid)<>1 then
+  raise exception 'duplicate cancellation item mutated Reader A ledger';
  end if;
 
  -- Same webhook ID changed payload: conflict, not silent reparent.
