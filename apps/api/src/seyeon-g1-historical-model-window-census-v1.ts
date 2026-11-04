@@ -3,6 +3,8 @@
 // This produces NO persisted G1 Pin, paid-model or HTTP Reveal permission.
 import {createHash} from 'node:crypto';
 import {canonicalJson} from '../../../packages/domain/src/index.js';
+import {assembleSeyeonRuntimeContextV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
+import type {RunSeyeonCharacterTurnV2Input} from './seyeon-character-runtime-v2.js';
 import type {SeyeonRecentMessageV2} from '../../../packages/domain/src/seyeon-runtime-context-v2.js';
 import type {SeyeonProductionRecentMessageAuthorityRowV1} from './seyeon-production-context-read-v1.js';
 
@@ -105,4 +107,86 @@ export function buildSeyeonG1HistoricalModelWindowCensusV1(input:Readonly<{
   } catch {
     throw new SeyeonG1HistoricalModelWindowHoldV1();
   }
+}
+
+/**
+ * Seal the complete deterministic historical Interpreter context that WOULD
+ * be assembled with no derived/Preflight additions. This is not an actual
+ * Provider packet and cannot authorize a model, G2 Commit, or HTTP Reveal.
+ * G1 must later compare the real post-Preflight packet to this digest before
+ * any Provider invocation; G2 must recheck original rights atomically.
+ */
+export function buildSeyeonG1HistoricalFinalContextCandidateSealV1(input:Readonly<{
+  contextInput:RunSeyeonCharacterTurnV2Input['contextInput'];
+  currentUserMessageId:string;
+  currentUserText:string;
+  census:ReturnType<typeof buildSeyeonG1HistoricalModelWindowCensusV1>;
+  originalMemory:Readonly<{recordId:string;grantId:string}>;
+  selectedSourcesDigest:string;
+  selectedModelSourceCensusDigest:string;
+}>):Readonly<{
+  preModelContextDigest:string;
+  expectedFinalModelContextDigest:string;
+}>{
+  try{
+    const c=input.contextInput;
+    const selected=c?.recentMessages;
+    const memory=c?.retrievedMemories;
+    const past=input.census;
+    if(!c||c.relationship!==null||!Array.isArray(selected)
+      ||selected.length<2||selected.length>24
+      ||!Array.isArray(memory)||memory.length!==1
+      ||!input.currentUserMessageId||!input.currentUserText
+      ||!past||past.authorizesModel!==false
+      ||past.persistedBeforeModel!==false||past.permitsHttpReveal!==false
+      ||past.historicalSourceCount!==selected.length-1
+      ||past.historicalSources.length!==selected.length-1
+      ||selected[selected.length-1]?.messageId!==input.currentUserMessageId
+      ||selected[selected.length-1]?.role!=='user'
+      ||selected[selected.length-1]?.text!==input.currentUserText
+      ||memory[0]?.kind!=='memory'
+      ||memory[0]?.sourceRef!=='memory:'+input.originalMemory.recordId
+        +':grant:'+input.originalMemory.grantId
+      ||!/^sha256:v1:[a-f0-9]{64}$/u.test(input.selectedSourcesDigest)
+      ||!/^sha256:v1:[a-f0-9]{64}$/u.test(input.selectedModelSourceCensusDigest))
+      throw new SeyeonG1HistoricalModelWindowHoldV1();
+
+    const exact=selected.map((m,i)=>{
+      if(!m||!m.messageId||!m.text||!['user','assistant'].includes(m.role))
+        throw new SeyeonG1HistoricalModelWindowHoldV1();
+      if(i<selected.length-1){
+        const h=past.historicalSources[i];
+        if(!h||h.messageId!==m.messageId||h.role!==m.role
+          ||h.textDigest!=='sha256:wire-utf8:v1:'+
+             createHash('sha256').update(m.text,'utf8').digest('hex'))
+          throw new SeyeonG1HistoricalModelWindowHoldV1();
+      }
+      return {messageId:m.messageId,role:m.role,textDigest:hash(m.text)};
+    });
+    if(hash(exact)!==past.selectedCompleteModelWindowDigest)
+      throw new SeyeonG1HistoricalModelWindowHoldV1();
+
+    const assembled=assembleSeyeonRuntimeContextV2({
+      ...c,
+      relationship:null,
+      relationshipSemantics:null,
+      integrityDecisions:[],
+      governedPreflightApplied:true,
+      disclosure:{decision:null,retrievedSources:[]},
+    });
+    if(canonicalJson(assembled.recentConversation)!==canonicalJson(selected)
+      ||assembled.retrievedMemories.length!==1
+      ||assembled.integrity.decisions.length!==0
+      ||assembled.disclosure.retrievedSources.length!==0)
+      throw new SeyeonG1HistoricalModelWindowHoldV1();
+
+    return Object.freeze({
+      preModelContextDigest:hash({
+        contextInput:c,
+        selectedModelSourceCensusDigest:input.selectedModelSourceCensusDigest,
+        completeHistoryDigest:past.selectedCompleteModelWindowDigest,
+      }),
+      expectedFinalModelContextDigest:hash(assembled),
+    });
+  }catch{throw new SeyeonG1HistoricalModelWindowHoldV1();}
 }
