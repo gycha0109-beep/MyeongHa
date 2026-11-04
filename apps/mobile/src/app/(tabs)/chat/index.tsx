@@ -3,10 +3,7 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'rea
 
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
-import {
-  MOBILE_CHAT_LAUNCH_ROSTER_V1,
-  MOBILE_CHAT_PENDING_ROSTER_V1,
-} from '@/features/chat/chat-launch-roster';
+import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -134,26 +131,6 @@ export default function ChatHubScreen() {
         <View style={styles.errorPanel}><Text style={styles.errorText}>{state.errorMessage}</Text></View>
       ) : null}
 
-      <View style={styles.pendingSection}>
-        <Text style={styles.kicker}>COMING SOON</Text>
-        <MobileUiText style={styles.pendingTitle}>연결자 등록 중</MobileUiText>
-        <MobileUiText style={styles.note}>조금 더 준비가 필요한 인물들입니다. 현재 대화는 열 수 없습니다.</MobileUiText>
-        <View style={styles.pendingList}>
-          {MOBILE_CHAT_PENDING_ROSTER_V1.map((character) => {
-            const presentation = resolveMobileChatCharacterPresentationV1(character.characterId);
-            return (
-              <View key={character.characterId} style={styles.pendingRow}>
-                <View style={styles.pendingMark}><Text style={styles.pendingMarkText}>◇</Text></View>
-                <View style={styles.pendingCopy}>
-                  <Text style={styles.pendingName}>{character.displayName} <Text style={styles.pendingRole}>· {t(presentation.title)}</Text></Text>
-                  <MobileUiText style={styles.note}>캐릭터 소개 준비 중</MobileUiText>
-                </View>
-                <MobileUiText style={styles.pendingPill}>등록 중</MobileUiText>
-              </View>
-            );
-          })}
-        </View>
-      </View>
     </MobileScreen>
   );
 }
@@ -263,23 +240,5 @@ const styles = StyleSheet.create({
     borderColor: mobileColors.border, padding: 12,
   },
   errorText: { color: mobileColors.seal, fontSize: 12, lineHeight: 18 },
-  pendingSection: { gap: 11, paddingTop: 20, borderTopWidth: 1, borderTopColor: mobileColors.border },
-  pendingTitle: { color: mobileColors.ink, fontSize: 21, fontWeight: '800' },
-  pendingList: { gap: 9, paddingTop: 3 },
-  pendingRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 11,
-    borderRadius: 14, borderWidth: 1, borderColor: mobileColors.border,
-    padding: 12, backgroundColor: mobileColors.surface,
-  },
-  pendingMark: {
-    width: 45, height: 45, borderRadius: 11,
-    borderWidth: 1, borderColor: mobileColors.border,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  pendingMarkText: { color: mobileColors.gold, fontSize: 20 },
-  pendingCopy: { flex: 1, gap: 3 },
-  pendingName: { color: mobileColors.ink, fontSize: 15, fontWeight: '800' },
-  pendingRole: { color: mobileColors.muted, fontSize: 11, fontWeight: '600' },
-  pendingPill: { color: mobileColors.gold, fontSize: 11, fontWeight: '800' },
 });
 const staticStyles = styles;
