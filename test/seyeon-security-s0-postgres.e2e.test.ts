@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { canonicalJson } from '../packages/domain/src/index.js';
 import {
@@ -2731,6 +2731,156 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   if(process.env.CI==='true'&&process.env.GITHUB_ACTIONS==='true'&&
      process.env.DB_SUITE==='postgres17'&&process.env.PGHOST==='localhost'&&
      /^myeongha_ci_case_[0-9]+$/u.test(process.env.PGDATABASE??'')){
+
+  // G1/G5: the original User + Assistant historical candidate is NOT a
+  // model permission. Deletion must serialize with its DB-owner Pin.
+  async function historicalDeletionFixture(n:number){
+    const f=await prepare(n,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,
+      deliver:async value=>expect(value).toBe(f.assistantText)});
+    const currentTurn=uuid(16,1000+n),currentAttempt=uuid(17,1000+n);
+    const currentUser=uuid(18,1000+n);
+    const currentText='Second original User for historical deletion '+n;
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1000+n),hash({second:'G5-history-delete-'+n}),
+        'chat-request-v1',JSON.stringify({text:currentText}),
+        uuid(13,n),uuid(12,n),currentTurn,currentUser,currentText,
+        null,hash({message:currentText}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,currentTurn,currentAttempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const pin=(client:PoolClient)=>createSeyeonG1HistoricalCandidateOwnerPortV1(client)
+      .pinBeforeModel({
+        subjectId:f.subject,threadId:f.thread,turnId:currentTurn,attemptId:currentAttempt,
+        currentUserMessageId:currentUser,currentUserTextDigest:wire(currentText),
+        selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+        preModelContextDigest:hash({historical:'G5-delete-'+n}),
+        historicalSources:[
+          {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+          {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+        ],
+      });
+    return {f,currentTurn,currentAttempt,pin};
+  }
+
+  it.each([
+    ['historical Pin first, deletion must wait',235,false],
+    ['account deletion first, historical Pin must deny',236,true],
+  ] as const)('G5 %s (independent PostgreSQL17 sessions)',async(_label,n,deletionFirst)=>{
+    const {f,currentAttempt,pin}=await historicalDeletionFixture(n);
+    const candidate=await pool.connect(),deletion=await pool.connect();
+    const marker='seyeon_g5_historical_pin_deletion_race_'+n;
+    let pending:Promise<{ok:boolean;value?:unknown;error?:unknown}>|undefined;
+    try{
+      if(deletionFirst){
+        await deletion.query('BEGIN');
+        const {rows:[job]}=await deletion.query(`select * from public.cmd_start_account_deletion_v1(
+          $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+          f.subject,uuid(26,n),'g5-historical-delete-first-'+n,uuid(27,n),
+        ]);
+        expect(job).toMatchObject({deletion_job_status:'running',replayed:false});
+        await candidate.query("select set_config('application_name',$1,false)",[marker]);
+        await candidate.query('BEGIN');
+        await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+        pending=pin(candidate).then(value=>({ok:true,value}),error=>({ok:false,error}));
+      }else{
+        await candidate.query('BEGIN');
+        await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+        const proof=await pin(candidate);
+        expect(proof).toMatchObject({
+          historicalSourceCount:2,authorizesModel:false,
+          permitsAtomicCommit:false,permitsHttpReveal:false,
+        });
+        await deletion.query("select set_config('application_name',$1,false)",[marker]);
+        await deletion.query('BEGIN');
+        pending=deletion.query(`select * from public.cmd_start_account_deletion_v1(
+          $1::uuid,$2::uuid,$3::text,$4::uuid)`,[
+          f.subject,uuid(26,n),'g5-historical-pin-first-'+n,uuid(27,n),
+        ]).then(value=>({ok:true,value}),error=>({ok:false,error}));
+      }
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      if(deletionFirst)await deletion.query('COMMIT');
+      else await candidate.query('COMMIT');
+      const result=await pending;
+      expect(result?.ok).toBe(!deletionFirst);
+      if(deletionFirst){
+        expect(result?.error).toMatchObject({
+          code:'42501',constraint:'seyeon_source_lock_member_required',
+        });
+      }else{
+        const outcome=result?.value as {rows:Record<string,unknown>[]};
+        expect(outcome.rows[0]).toMatchObject({
+          deletion_job_status:'running',replayed:false,
+        });
+        await deletion.query('COMMIT');
+      }
+    }finally{
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await deletion.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query("select set_config('application_name','',false)").catch(()=>undefined);
+      await deletion.query("select set_config('application_name','',false)").catch(()=>undefined);
+      candidate.release();deletion.release();
+    }
+    const {rows:[state]}=await pool.query(`select
+      s.status as member_status,t.state as turn_state,
+      a.seyeon_personal_source_pin_jsonb as pin,
+      a.seyeon_personal_source_pinned_at as pinned_at,
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_current
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      join public.subjects s on s.id=a.subject_id
+      join public.record_access_grants g on g.id=$2
+      where a.id=$1`,[currentAttempt,f.grant]);
+    expect(state.member_status).toBe('deletion_pending');
+    expect(state.grant_current).toBe(true);
+    if(deletionFirst){
+      expect(state).toMatchObject({turn_state:'planned',pin:null,pinned_at:null});
+    }else{
+      expect(state.turn_state).toBe('context_ready');
+      expect(state.pin).toMatchObject({historicalCandidateProof:{
+        authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+      }});
+      expect(state.pin).not.toHaveProperty('positiveProof');
+    }
+    // Persisted historical metadata never becomes a model/Commit/Reveal license.
+    await expect(f.run(({client})=>client.query(
+      'select * from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,$4::integer)',
+      [f.subject,f.thread,uuid(18,1000+n),3],
+    ))).rejects.toThrow();
+  });
 
   it('G5 separate DB role sessions deny ordinary API and allow only private Commerce catalog/settlement RPCs',async()=>{
     await installDisposableG5Credit();

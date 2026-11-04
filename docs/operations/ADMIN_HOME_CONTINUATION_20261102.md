@@ -2,6 +2,16 @@
 
 This handoff contains **no secrets**. It is for continuing the existing Admin track from a second Windows PC without copying credentials from the school PC.
 
+## 2026-11-04 non-Owner gate verification correction (implementation only)
+
+The Cloudflare Access policy denies unauthorized identities **at the edge**; those users do not receive a valid JWT for the protected Admin application. The original two-JWT `inactive-stage-owner-probe.mjs` remains a separate test for two independently issued app JWTs, but **cannot be used as the only proof of a denied login** and must never be satisfied by an invented JWT.
+
+`apps/admin/inactive-stage-denied-login-log.mjs` is the alternative for the existing non-Owner real-session gate. After an actual attempt from an existing non-Owner email address, it reads the **live Cloudflare Access authentication log** for exactly that email and application within an explicitly bounded 30-minute interval. It accepts only `action=login`, `allowed=false`, the exact app ID and exact non-Owner identity; an allowed login for that identity in the window fails. Log values, token, and identity are not printed or stored; the CLI only emits redacted pass/fail counts. It does not create accounts or sessions. This evidence must be combined with the separately verified Owner acceptance, Access policy readback and anonymous denial before claiming the full Access gate.
+
+**Execution prerequisite not yet met:** no real non-Owner login attempt is on record. Tests with synthetic log fixtures do not count as this gate. The user does not need to create a new account if an existing different email identity is available. Never store the email/session/API token in the repository or CI secrets solely for this probe, and never broaden Owner allow rules to create a test.
+
+Member identity and real operational Reader/Audit request verification remain separate uncompleted gates; read-only activation requires explicit approval.
+
 ## 2026-11-04 follow-up: Cloudflare policy simulation and remaining gates
 
 - [Admin work-log PR #2963](https://github.com/gycha0109-beep/MyeongHa/pull/2963) merged after [11/11 integration jobs succeeded](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41790239741). No production Worker code or credentials changed.
