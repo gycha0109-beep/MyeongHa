@@ -2,6 +2,27 @@
 
 This handoff contains **no secrets**. It is for continuing the existing Admin track from a second Windows PC without copying credentials from the school PC.
 
+## 2026-11-04 live read-only authorization verification — no activation
+
+**Execution:** Read-only Cloudflare configuration/Access-log API and read-only PostgreSQL privilege-catalog queries through the connected MyeongHa Supabase project. No production customer rows, secrets, tokens, or session details were read out, and no DB role grants, Worker flags, policies, or deployment were changed.
+
+| Boundary | Live evidence | Status |
+| --- | --- | --- |
+| Cloudflare Access configuration | Exact Admin hostname, single exact Owner-email allow rule, binding email/AUD match; no additional allow/bypass rule detected | Verified configuration; real non-Owner app-policy denial still unobserved |
+| Anonymous/other-account observation | Owner has previously returned `ADMIN_PRIVATE_DISABLED`. A second-account browser showed `Cloudflare sign-in is restricted to members of the account.`; this proves login did not continue, **not** that the Admin app's Owner policy was evaluated | Edge restriction observed; separate app-policy evidence missing |
+| Cloudflare Access auth logs | Query of app authentication logs from 2026-11-04 00:00 UTC returned one allowed login and zero denied logins; second-account attempt did **not** yield an app-specific denied-login record | Do not run or mark the log-based denied-user proof as passed |
+| Worker bindings | Four Admin activation flags `false`, dedicated Reader/Audit Hyperdrive bindings present, Member verification key secret binding present. Most recently verified inactive deployment 2026-11-04 06:47 UTC | Disabled and isolated |
+| Supabase Production | Correct project reported `ACTIVE_HEALTHY`, PostgreSQL 17.6.1.166. Both dedicated Reader/Audit Writer roles exist with LOGIN, NOINHERIT, no superuser/CREATEROLE/CREATEDB/BYPASSRLS and no inherited role memberships | Live catalog properties verified, not a fresh scoped TLS login |
+| Reader DB privileges | Can SELECT public subject ID and audit metadata; cannot edit subjects or audit entries, insert audit events, or select birth date, payment receipt payload, Reading input snapshots | Live privilege checks passed |
+| Audit Writer DB privileges | Can INSERT audit request ID; cannot SELECT audit entries, modify/delete audit rows, read/modify subjects or access commerce receipts | Live privilege checks passed |
+| Audit protections | Audit table has RLS and FORCE RLS, with six current policies | Live catalog checks passed |
+| Dedicated TLS and rolled-back audit probes | Previously passed in inactive stage job on [GitHub Actions #41787539667](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41787539667); not repeated in this read-only audit | Existing evidence retained, not misrepresented as a new test |
+| Member authentication & real Admin reads | Active route requires `MYEONGHA_ADMIN_PRIVATE_ENABLED=true`, but verified current Worker is deliberately `false`. No short-lived authenticated Member credential provided or stored | **Not tested**. No claim of successful end-to-end Member auth/API reads |
+
+**Next existing roadmap gates:** obtain accurate non-Owner app Access deny evidence when possible without creating a fictitious token; then perform controlled real Member email+Auth UUID binding and least-privilege Reader/Audit API behavior verification **only through a separately approved secure release/test path**. A real read-only activation or temporary enablement requires the user's explicit approval; do not silently toggle the Admin feature. Credit commands, retention, analytics and unrelated public Worker remain disabled/unmodified.
+
+**Completion:** `ROADMAP_COMPLETE` not reached.
+
 ## 2026-11-04 non-Owner gate verification correction (implementation only)
 
 The Cloudflare Access policy denies unauthorized identities **at the edge**; those users do not receive a valid JWT for the protected Admin application. The original two-JWT `inactive-stage-owner-probe.mjs` remains a separate test for two independently issued app JWTs, but **cannot be used as the only proof of a denied login** and must never be satisfied by an invented JWT.
