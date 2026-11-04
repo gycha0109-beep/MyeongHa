@@ -206,8 +206,19 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     // A revoked/missing Receipt, missing original notice, DB failure or an
     // ambiguous unit must NEVER be converted into positive refund/denial proof.
     if (preflight.kind !== 'manual_review_candidate') {
+      // A verified purchase may later be marked revoked. The original
+      // immutable Claim and its canonical cancellation history remain
+      // reviewable even though CURRENT verified-purchase/notice evidence
+      // cannot admit a positive delivery or statutory outcome.
+      const sourceOnly=await readRecordedReaderCancellationForClaimV1(
+        connection,{
+          subjectId:claim.subjectId as string,
+          purchaseIntentId:claim.purchaseIntentId,
+          unitId:claim.unitId as string,
+        },
+      );
       return view(claim.claimId,receivedAt,
-        'exact_unit_evidence_unavailable',null);
+        'exact_unit_evidence_unavailable',null,null,sourceOnly);
     }
 
     // Correlate the original paid S5 body and currently retained S7 attempts
