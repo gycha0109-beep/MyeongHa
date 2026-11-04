@@ -546,3 +546,9 @@
 - **실제 실패 근거:** CI 실행 [41901612252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41901612252)의 Commerce TypeScript 검사에서 `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts` 220~221행에 `TS2345/TS2322`가 발생했습니다.
 - **원인/수정:** 중복 Provider Event 2행을 포함한 `it.each` 데이터에서 행 배열이 테스트 함수의 여러 인자로 펼쳐져 타입에 맞지 않았습니다. 각 테스트 사례를 `{cancelRows:[...]}` 하나의 객체로 묶고 구조분해하여 전달합니다. 원본 취소·Grant·환불 비즈니스 로직은 무변경입니다.
 - **검증 상태:** 수정 커밋의 CI 성공 확인 전까지는 GREEN으로 보고하지 않습니다. 자동 병합/필수 통합 CI 요건은 그대로 유지합니다.
+
+### 2026-11-05 — 회수된 Reader 구매의 청약철회 원본 취소 내역 보존
+
+- **수정:** 청약철회 내부 검토에서 현재 `verified` Receipt 사전검사 실패(예: 원본 구매권이 회수됨)가 발생하더라도 접수된 Claim을 유지하고, 동일 DB 읽기 전용 스냅샷에서 정확한 원본 Receipt/Subject/Unit에 결속된 **저장된** 취소 Event를 별도 조회하도록 연결했습니다. 다른 Reader 구매권·임의 Event로 대체하지 않습니다.
+- **안전:** 구매·공지 사전검사가 충족되지 않은 경우 기존과 같이 `exact_unit_evidence_unavailable`·법적 검토 결과 null을 유지하며, 저장된 취소 기록이 단일 전액이어도 Provider 최신 GET·환불/정산 최종성·Reader 권한 회수 승인·고객 실제 제공 입증은 전부 false입니다.
+- **검증:** 회수 등으로 현재 Verified 구매 증거가 사라진 경우에도 Claim 원본 취소 기록만 비공개 관측하고 다른 권한·법적 판단이 생성되지 않는 회귀 테스트 추가. 새 커밋 CI 및 필수 통합 검증 결과가 나오기 전까지 성공 미판정.
