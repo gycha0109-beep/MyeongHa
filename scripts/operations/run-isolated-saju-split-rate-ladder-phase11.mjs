@@ -1,3 +1,4 @@
+import { validateSajuSaturationReport } from './validate-isolated-saju-saturation-phase11.mjs';
 import { validateFourClientWavesReport } from './validate-isolated-saju-four-client-waves-phase11.mjs';
 import { validateSajuSustainedReport } from './validate-isolated-saju-sustained-phase11.mjs';
 import { execFileSync } from 'node:child_process';
@@ -72,15 +73,18 @@ async function main(argv) {
   const local = argv.includes('--local');
   const sustained = argv.includes('--sustained');
   const fourClientWaves = argv.includes('--four-client-waves');
-  required(!(sustained && fourClientWaves), 'Cannot combine independent measurements');
-  const parts = argv.filter(x => x !== '--local' && x !== '--sustained' && x !== '--four-client-waves');
+  const saturation = argv.includes('--saturation');
+  required([sustained, fourClientWaves, saturation].filter(Boolean).length <= 1,
+    'Cannot combine independent measurements');
+  const parts = argv.filter(x => !['--local', '--sustained', '--four-client-waves', '--saturation'].includes(x));
   required(parts.length === 4 && parts[0] === '--saju-repo' && parts[2] === '--out',
-    'Required arguments: --saju-repo <path> --out <file> [--local] [--sustained | --four-client-waves]');
+    'Required arguments: --saju-repo <path> --out <file> [--local] [--sustained | --four-client-waves | --saturation]');
   const saju = resolve(parts[1]), out = resolve(parts[3]);
   writeFileSync(out, JSON.stringify({
     ...BLOCKED,
-    schema: fourClientWaves ? 'myeongha-ops-saju-split-cgroup-four-client-waves-phase11-v1' :
-      sustained ? 'myeongha-ops-saju-split-cgroup-sustained-phase11-v1' : SCHEMA,
+    schema: saturation ? 'myeongha-ops-saju-split-cgroup-controlled-saturation-phase11-v1' :
+      fourClientWaves ? 'myeongha-ops-saju-split-cgroup-four-client-waves-phase11-v1' :
+        sustained ? 'myeongha-ops-saju-split-cgroup-sustained-phase11-v1' : SCHEMA,
   }, null, 2) + '\n', 'utf8');
   let server;
   try {
@@ -148,12 +152,12 @@ async function main(argv) {
       '--cpus=1.00', '--memory=256m', '--memory-swap=256m',
       ...base, ...readonly(driverScript, '/usr/local/bin/mh-saju-driver.mjs'),
       image, 'node', '/usr/local/bin/mh-saju-driver.mjs',
-      ...(fourClientWaves ? ['--four-client-waves'] : []),
-    ], sustained ? 1_320_000 : fourClientWaves ? 1_020_000 : 120000);
+      ...(fourClientWaves ? ['--four-client-waves'] : saturation ? ['--saturation'] : []),
+    ], sustained ? 1_320_000 : fourClientWaves ? 1_020_000 : saturation ? 240000 : 120000);
     required(stdout.split(/\r?\n/u).length === 1, 'Unexpected driver stdout');
-    const report = fourClientWaves ? validateFourClientWavesReport(JSON.parse(stdout)) :
-      sustained ? validateSajuSustainedReport(JSON.parse(stdout)) :
-        validate(JSON.parse(stdout));
+    const report = saturation ? validateSajuSaturationReport(JSON.parse(stdout)) :
+      fourClientWaves ? validateFourClientWavesReport(JSON.parse(stdout)) :
+        sustained ? validateSajuSustainedReport(JSON.parse(stdout)) : validate(JSON.parse(stdout));
     const result = {
       ...report,
       nodeImageDigest: image,
@@ -164,7 +168,9 @@ async function main(argv) {
     required(call('docker', ['inspect', '-f', '{{.State.Running}}', cid]) === 'true',
       'Saju service not alive after exercise');
     writeFileSync(out, JSON.stringify(result, null, 2) + '\n', 'utf8');
-    console.log(fourClientWaves ?
+    console.log(saturation ?
+      'ISOLATED_SAJU_SATURATION_PROBE_OBSERVED: two bounded synthetic rounds; no Production ceiling approved' :
+      fourClientWaves ?
       'ISOLATED_SAJU_FOUR_CLIENT_WAVES_OBSERVED: 4 overlapping client request promises; actual host CPU concurrency not proven' :
       sustained ? 'ISOLATED_SAJU_SUSTAINED_OBSERVED: actual 5m/15m Linux split-cgroup envelopes; production approval blocked' :
         'ISOLATED_SAJU_SPLIT_CGROUP_OBSERVED: actual Saju and driver separately constrained; production approval remains blocked');
