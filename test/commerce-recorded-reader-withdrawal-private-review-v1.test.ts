@@ -36,7 +36,7 @@ type Options=Readonly<{
   releaseFailure?:boolean;
 }>;
 function fixture(options:Options={}) {
-  const statements:Array<{sql:string;args?:readonly unknown[]}>= [];
+  const statements:Array<{sql:string;args:readonly unknown[]|undefined}>= [];
   const release=vi.fn((discard?:unknown)=>{
     if(options.releaseFailure)throw Error('release failed');
     return discard;
