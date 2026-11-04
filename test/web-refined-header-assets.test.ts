@@ -3,66 +3,82 @@ import { describe, expect, it } from 'vitest';
 
 const root = new URL('../apps/web/', import.meta.url);
 const read = (path: string) => readFile(new URL(path, root), 'utf8');
+const routes = ['hall','reading','face-reading','chat-hub','chat','records','my','reading-detail','auth','contact'];
 
 describe('shared refined header', () => {
-  it('keeps the paper-textured header local, theme-aware, and compact', async () => {
+  it('keeps approved paper texture and compact four-button geometry', async () => {
     const css = await read('shared-product-header.css');
     expect(css).toContain('myeongha-header-light-texture-v2.webp');
     expect(css).toContain('myeongha-header-dark-texture-v2.webp');
     expect(css).toContain('--mh-header-height-desktop: 92px;');
     expect(css).toContain('--mh-header-height-mobile: 86px;');
-    expect(css).toContain('height: 100%;');
     expect(css).toContain('html { overflow-y: scroll; }');
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
-    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 382px !important;');
-    expect(css).toContain('grid-template-columns: 146px minmax(200px, 1fr) 322px !important;');
-    expect(css).toContain('flex: 0 0 112px;');
-    expect(css).toContain('header-ui-glyphs-v1.png');
+    expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 250px !important;');
+    expect(css).toContain('grid-template-columns: 146px minmax(200px, 1fr) 219px !important;');
+    expect(css).toContain('header-ui-glyphs-v2.png');
     expect(css).toContain('background-size: 140px 56px !important;');
-    expect(css).toContain('--mh-glyph-row: -28px;');
-    expect(css).toContain('.product-report-link::before');
-    expect(css).not.toContain('--mh-header-bell');
-    for (const legacy of ['golden-master.css', 'golden-master-lock.css', 'home-moonlight.css']) {
+    expect(css).toContain('background-position: -28px var(--mh-glyph-row) !important;');
+    expect(css).not.toContain('.product-report-link');
+    for (const legacy of ['golden-master.css','golden-master-lock.css','home-moonlight.css']) {
       expect(await read(legacy)).not.toMatch(/body\.gm-page(?:\[data-page="home"\])? \.product-(?:header|brand|nav|utilities|profile|icon-button|theme-toggle)/);
     }
     expect(await read('ui-i18n.css')).not.toContain('body.product-page .product-header');
-    for (const filename of ['light', 'dark']) {
-      const file = new URL(`assets/header/myeongha-header-${filename}-texture-v2.webp`, root);
-      const bytes = await readFile(file);
+    for (const name of ['light','dark']) {
+      const bytes = await readFile(new URL('assets/header/myeongha-header-' + name + '-texture-v2.webp', root));
       expect(bytes.byteLength).toBeGreaterThan(1000);
       expect(bytes.toString('ascii', 0, 4)).toBe('RIFF');
       expect(bytes.toString('ascii', 8, 12)).toBe('WEBP');
     }
   });
 
-  it('uses five section links, with My represented by the real profile link', async () => {
-    for (const page of ['hall','reading','face-reading','chat-hub','chat','records','my','reading-detail','auth','contact']) {
+  it('renders requested order, icon-only My and real language select across ten routes', async () => {
+    for (const page of routes) {
       const html = await read(page + '.html');
-      expect(html).not.toMatch(/class="product-nav-link" href="my\.html"/);
-      expect(html).not.toContain('<span aria-hidden="true">⌄</span>');
-      expect(html).toContain('class="product-profile"');
-      expect(html).toContain('class="product-nav"');
-      expect(html).toContain('class="product-report-link"');
-      expect(html).toContain('href="contact.html?report=content"');
-      expect((html.match(/class="product-theme-toggle"/g) ?? []).length).toBe(1);
-      expect((html.match(/data-ui-locale-picker/g) ?? []).length).toBe(1);
-      expect((html.match(/class="ui-locale-select"/g) ?? []).length).toBe(1);
-      expect(html.indexOf('class="product-theme-toggle"')).toBeLessThan(html.indexOf('class="product-profile"'));
-      expect(html.indexOf('class="ui-locale-picker"')).toBeLessThan(html.indexOf('class="product-profile"'));
-      expect(html.indexOf('class="product-report-link"')).toBeGreaterThan(html.indexOf('class="product-profile"'));
-      expect(html).toContain('ui-i18n.css');
-      expect(html).toContain('shared-product-header.css');
+      const header = html.slice(html.indexOf('<header class="product-header'), html.indexOf('</header>'));
+      const controls = ['product-theme-toggle','product-icon-button','product-profile','ui-locale-picker'];
+      for (const item of controls) expect((header.match(new RegExp('class="' + item + '"','g')) ?? []).length).toBe(1);
+      const positions = controls.map(item => header.indexOf('class="' + item + '"'));
+      expect(positions.every((value,index) => value >= 0 && (index === 0 || value > positions[index-1]!))).toBe(true);
+      expect(header).toContain('class="product-nav"');
+      expect(header).not.toContain('product-report-link');
+      expect(header).not.toContain('contact.html?report=content');
+      expect(header).not.toMatch(/<span(?: id="home-profile-name")?>마이<\/span>/);
+      expect(header.match(/<option value=/g)).toHaveLength(5);
       expect(html.indexOf('shared-product-header.css')).toBeGreaterThan(html.indexOf('ui-i18n.css'));
     }
     expect(await read('my.html')).toContain('aria-current="page"');
-    const png = await readFile(new URL('assets/header/header-ui-glyphs-v1.png', root));
-    expect(png.toString('hex', 0, 8)).toBe('89504e470d0a1a0a');
+    const auth = await read('product-auth-ui.js');
+    expect(auth).not.toContain("label.textContent = '마이'");
+    expect(auth).not.toContain("label.textContent = '로그인'");
+    expect(auth).toContain("profile.setAttribute('aria-label', '로그인')");
+    const contact = await read('contact.js');
+    expect(contact).not.toContain("searchParams.get('report')");
+    expect(contact).toContain("fetch('/api/contact'");
+  });
+
+  it('makes pink unread-dot palette entries fully transparent in the supplied light/dark icon', async () => {
+    const png = await readFile(new URL('assets/header/header-ui-glyphs-v2.png', root));
+    expect(png.toString('hex',0,8)).toBe('89504e470d0a1a0a');
     expect(png.readUInt32BE(16)).toBe(240);
     expect(png.readUInt32BE(20)).toBe(96);
-    const theme = await read('product-theme.js');
-    expect(theme).not.toContain("mark.textContent = dark ? '☀' : '☾'");
-    const contact = await read('contact.js');
-    expect(contact).toContain("searchParams.get('report') === 'content'");
-    expect(contact).toContain("category.value = 'other'");
+    let offset = 8;
+    let palette: Uint8Array | null = null;
+    let opacity: Uint8Array | null = null;
+    while (offset < png.byteLength) {
+      const len = png.readUInt32BE(offset);
+      const tag = png.toString('ascii',offset+4,offset+8);
+      if (tag === 'PLTE') palette = png.subarray(offset+8,offset+8+len);
+      if (tag === 'tRNS') opacity = png.subarray(offset+8,offset+8+len);
+      offset += 12+len;
+    }
+    expect(palette).not.toBeNull();
+    expect(opacity).not.toBeNull();
+    const colors = palette as Uint8Array;
+    const alphas = opacity as Uint8Array;
+    for (let index = 0; index < colors.length/3; index++) {
+      const r=colors[3*index]!,g=colors[3*index+1]!,b=colors[3*index+2]!;
+      if (r>g+15 && r>b+7) expect(alphas[index]).toBe(0);
+    }
   });
 });

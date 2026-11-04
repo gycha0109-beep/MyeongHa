@@ -123,7 +123,8 @@ describe('read-only dedicated origin preflight',()=>{
   for(const [table,column] of ADMIN_READER_SENSITIVE_COLUMNS_V1){
     expect(readerSql).toContain(`NOT has_column_privilege(current_user,'${table}','${column}','SELECT')`);
   }
-  expect(readerSql).toContain("NOT has_table_privilege(current_user,'auth.users','SELECT')");
+  expect(readerSql).toContain("NOT has_table_privilege(current_user,(SELECT c.oid FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='auth' AND c.relname='users'),'SELECT')");
+  expect(readerSql).not.toContain("has_table_privilege(current_user,'auth.users'");
   expect(readerSql).toContain("has_column_privilege(current_user,'public.commerce_receipts','id','SELECT')");
   expect(auditSql).toContain("NOT has_column_privilege(current_user,'myeongha_admin_ops.admin_audit_events_v1','request_id','SELECT')");
   expect(auditSql).toContain("NOT has_table_privilege(current_user,'public.subjects','SELECT,INSERT,UPDATE,DELETE')");

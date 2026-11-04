@@ -15,14 +15,12 @@ function render() {
   const profile = document.querySelector('.product-profile');
   if (!(profile instanceof HTMLAnchorElement)) return;
   const mark = profile.querySelector('.product-profile-mark');
-  const label = profile.querySelector('.product-profile-mark + span');
   const member = readMemberSession();
 
   if (member) {
     profile.href = 'my.html';
     profile.setAttribute('aria-label', '마이 페이지');
     if (mark) mark.textContent = '之';
-    if (label) label.textContent = '마이';
     profile.dataset.authState = 'member';
     return;
   }
@@ -30,7 +28,6 @@ function render() {
   profile.href = `auth.html?next=${encodeURIComponent(safeNextHref())}`;
   profile.setAttribute('aria-label', '로그인');
   if (mark) mark.textContent = '入';
-  if (label) label.textContent = '로그인';
   profile.dataset.authState = 'guest';
 }
 

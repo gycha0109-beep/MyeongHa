@@ -32,18 +32,6 @@ form?.addEventListener('change', () => { if (!sending) submissionId = undefined;
 restoreButton();
 localizeContactPage();
 
-// Reuse the existing supported contact-delivery path for content reports.
-if (new URL(location.href).searchParams.get('report') === 'content') {
-  const category = document.getElementById('contact-category');
-  const subject = document.getElementById('contact-subject');
-  const message = document.getElementById('contact-message');
-  if (category instanceof HTMLSelectElement) category.value = 'other';
-  if (subject instanceof HTMLInputElement && !subject.value) subject.value = '콘텐츠 신고';
-  if (message instanceof HTMLTextAreaElement) {
-    message.placeholder = '신고할 콘텐츠의 화면 또는 주소와 문제가 되는 이유를 적어주세요.';
-  }
-}
-
 form?.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!form.reportValidity() || sending) return;

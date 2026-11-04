@@ -318,12 +318,13 @@ try {
       state: profile?.dataset.authState,
       href: profile?.getAttribute('href'),
       text: profile?.innerText,
+      label: profile?.getAttribute('aria-label'),
       activeToken: sessionStorage.getItem('myeongha.guestBearer.v1'),
     };
   })()`);
   assert(memberHeader.state === 'member', 'Header member state missing');
   assert(memberHeader.href === 'my.html', `Member header href is incorrect: ${memberHeader.href}`);
-  assert(memberHeader.text?.includes('마이'), 'Member header label is missing');
+  assert(memberHeader.label === '마이 페이지' && !memberHeader.text?.includes('마이'), 'Member icon-only header accessible label is missing');
   assert(memberHeader.activeToken === 'header.payload.signature', 'Member bearer was not staged for existing product clients');
 
   await client.evaluate(`(() => {
@@ -343,11 +344,12 @@ try {
       state: profile?.dataset.authState,
       href: profile?.getAttribute('href'),
       text: profile?.innerText,
+      label: profile?.getAttribute('aria-label'),
     };
   })()`);
   assert(guestHeader.state === 'guest', 'Header guest state missing');
   assert(guestHeader.href?.startsWith('auth.html?next='), `Guest header href is incorrect: ${guestHeader.href}`);
-  assert(guestHeader.text?.includes('로그인'), 'Guest header login label is missing');
+  assert(guestHeader.label === '로그인' && !guestHeader.text?.includes('로그인'), 'Guest icon-only login accessible label is missing');
 
   console.log('MyeongHa_WEB_AUTH_BROWSER_PASS');
 } catch (error) {
