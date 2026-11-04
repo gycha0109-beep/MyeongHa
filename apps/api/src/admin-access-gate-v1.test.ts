@@ -66,7 +66,7 @@ describe('private hosted administrator boundary',()=>{
       kty:'RSA',kid:'test-key',use:'sig',n:'broken',e:'AQAB',
     }]})) as typeof fetch)(request)).toBe(false);
     expect(reasons).toEqual([
-      'signing_keys_fetch_exception','signing_keys_json_exception','signing_keys_import_exception',
+      'signing_keys_fetch_exception','signing_keys_json_exception','signature_invalid',
     ]);
     expect(JSON.stringify(reasons)).not.toContain('private exception detail');
   });
