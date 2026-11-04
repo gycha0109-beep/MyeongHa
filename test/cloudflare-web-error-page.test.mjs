@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it, vi } from 'vitest';
 import {
   WEB_DOCUMENT_ERROR_COPY_V1,
@@ -110,5 +111,86 @@ describe('Cloudflare public web error page', () => {
     expect(page).toContain('data-error-retry');
     expect(css).toContain('data-error-status="503"');
     expect(script).toContain('myeongha.productTheme.v1');
+  });
+});
+
+
+describe('localized public error presentation', () => {
+  const scriptUrl = new URL('../apps/web/error-page.js', import.meta.url);
+  const textKeys = [
+    'title', 'description', 'kicker', 'contact', 'home', 'retry', 'back', 'support',
+  ];
+  const chromeSelectors = {
+    kicker: '.mh-error-kicker',
+    contact: '.mh-error-header-help',
+    home: '.mh-error-primary',
+    retry: '[data-error-retry]',
+    back: '[data-error-back]',
+    support: '.mh-error-support',
+  };
+  const mount = async (status, startingLocale) => {
+    const js = await readFile(scriptUrl, 'utf8');
+    const makeNode = (content = '') => ({
+      textContent: content,
+      attrs: {},
+      getAttribute(key) { return this.attrs[key] ?? null; },
+      setAttribute(key, value) { this.attrs[key] = value; },
+      addEventListener() {},
+    });
+    const nodes = new Map([
+      ['[data-error-code]', makeNode(String(status))],
+      ['[data-error-title]', makeNode(WEB_DOCUMENT_ERROR_COPY_V1[status].title)],
+      ['[data-error-description]', makeNode(WEB_DOCUMENT_ERROR_COPY_V1[status].description)],
+      ['meta[name="description"]', makeNode()],
+      ['.mh-error-brand', makeNode()],
+      ...Object.values(chromeSelectors).map(key => [key, makeNode('서비스 안내')]),
+      ['[data-error-status]', makeNode(String(status))],
+    ]);
+    nodes.get('meta[name="description"]').attrs.content = '명하 페이지 오류 안내';
+    nodes.get('.mh-error-brand').attrs['aria-label'] = '명하 홈으로 이동';
+    const handlers = new Map();
+    let locale = startingLocale;
+    const document = {
+      title: '페이지 안내 · 명하',
+      documentElement: { dataset: {}, style: {}, lang: 'ko' },
+      querySelector(selector) { return nodes.get(selector) ?? null; },
+      addEventListener(event, callback) { handlers.set(event, callback); },
+    };
+    const window = {
+      matchMedia: () => ({ matches: false }),
+      addEventListener(event, callback) { handlers.set(event, callback); },
+    };
+    const localStorage = { getItem(key) {
+      return key === 'myeongha.ui.locale.v1' ? locale : key === 'myeongha.productTheme.v1' ? 'light' : null;
+    } };
+    runInNewContext(js, { document, window, localStorage, URL, location: {}, history: {} });
+    handlers.get('DOMContentLoaded')();
+    return {
+      document, nodes,
+      switchTo(value) { locale = value; handlers.get('storage')({ key: 'myeongha.ui.locale.v1' }); },
+    };
+  };
+  it.each([404, 500, 501, 502, 503, 504])('localizes the complete %i error page in every supported locale', async (status) => {
+    for (const locale of ['ja-JP','zh-TW','en-US','zh-CN']) {
+      const view = await mount(status, locale);
+      const strings = [
+        view.document.title,
+        view.nodes.get('[data-error-title]').textContent,
+        view.nodes.get('[data-error-description]').textContent,
+        ...Object.values(chromeSelectors).map(key => view.nodes.get(key).textContent),
+        view.nodes.get('.mh-error-brand').getAttribute('aria-label'),
+        view.nodes.get('meta[name="description"]').getAttribute('content'),
+      ];
+      expect(view.document.documentElement.lang).toBe(locale);
+      for (const value of strings) {
+        expect(value).toBeTruthy();
+        expect(value).not.toMatch(/[가-힣]/u);
+      }
+      expect(view.nodes.get('[data-error-code]').textContent).toBe(String(status));
+      view.switchTo('ko-KR');
+      expect(view.nodes.get('[data-error-title]').textContent).toBe(WEB_DOCUMENT_ERROR_COPY_V1[status].title);
+      expect(view.nodes.get('[data-error-description]').textContent).toBe(WEB_DOCUMENT_ERROR_COPY_V1[status].description);
+      expect(view.document.documentElement.lang).toBe('ko-KR');
+    }
   });
 });

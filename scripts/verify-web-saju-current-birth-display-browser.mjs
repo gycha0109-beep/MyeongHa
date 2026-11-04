@@ -156,6 +156,31 @@ try {
   assert(ok.sex === '남성', 'Current saved gender not displayed: ' + JSON.stringify(ok));
   assert(ok.calendar.includes('양력'), 'Current saved calendar not displayed: ' + JSON.stringify(ok));
   assert(ok.summary.includes('1996.01.09'), 'Summary not bound to current saved birth date: ' + JSON.stringify(ok));
+  // English and Simplified Chinese must localize server-derived facts without changing the Birth Profile.
+  const changeLocale = async (locale) => {
+    await evaluate(`(() => {
+      const picker = document.querySelector('.ui-locale-select');
+      picker.value = ${JSON.stringify(locale)};
+      picker.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await sleep(180);
+    return readFields();
+  };
+  const english = await changeLocale('en-US');
+  assert(english.date.includes('January') && english.date.includes('1996') &&
+    english.time.includes('AM') && english.sex === 'Male' &&
+    english.calendar.includes('Solar') && english.summary.includes('Solar') &&
+    !/[가-힣]/u.test([english.date,english.time,english.sex,english.calendar,english.summary].join(' ')),
+    'English birth details not localized: ' + JSON.stringify(english));
+  const simplified = await changeLocale('zh-CN');
+  assert(simplified.date.includes('1996年1月9日') && simplified.time === '09:30' &&
+    simplified.sex === '男性' && simplified.calendar.includes('公历') &&
+    simplified.summary.includes('公历') &&
+    !/[가-힣]/u.test([simplified.date,simplified.time,simplified.sex,simplified.calendar,simplified.summary].join(' ')),
+    'Simplified Chinese birth details not localized: ' + JSON.stringify(simplified));
+  const restored = await changeLocale('ko-KR');
+  assert(restored.sex === '남성' && restored.calendar.includes('양력') && restored.time.includes('9시'),
+    'Returning to Korean did not restore original birth facts: ' + JSON.stringify(restored));
   const initialTabs = await evaluate("({count:document.querySelectorAll('.saju-design-chart-tabs [role=tab]').length, active:document.querySelector('[role=tab][aria-selected=true]')?.id, statusPanel:!!document.querySelector('.saju-design-structure-panel'), badge:document.getElementById('saju-completeness-title')?.textContent})");
   assert(initialTabs.count === 2 && initialTabs.active === 'saju-pillars-tab' &&
     !initialTabs.statusPanel && initialTabs.badge,
