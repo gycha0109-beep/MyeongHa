@@ -10,6 +10,7 @@ import {
  COMMERCE_PORTONE_CANCEL_SET_AUDIT_SQL_V1 as SET_SQL,
 } from '../scripts/operations/commerce-portone-cancellation-set-ledger-audit-v1.mjs';
 import {
+ COMMERCE_READER_REVOKE_LOCK_CAS_PREFLIGHT_V1 as PREFLIGHT_CONFIG,
  COMMERCE_REVOKE_SOURCE_EVENT_LOCK_SQL_V1 as EVENT_SQL,
  COMMERCE_REVOKE_EXACT_READER_GRANT_LOCK_SQL_V1 as GRANT_SQL,
  COMMERCE_REVOKE_READER_S1_SCOPES_SQL_V1 as S1_SCOPES_SQL,
@@ -159,6 +160,7 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
    authenticatedProviderSetMatched:true,
    postGetDbSnapshotStable:true,
    exactReaderGrantLockedAndCasChecked:true,
+   readerS1LockAndScopeRecheckObserved:true,
    sourceOrderClassification:'INCOMPARABLE',
   });
   expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -222,6 +224,7 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
   expect(result).toMatchObject({
    kind:'exact_reader_locked_cas_consistent_but_authority_held',
    exactReaderGrantLockedAndCasChecked:true,
+   readerS1LockAndScopeRecheckObserved:true,
    sourceOrderClassification:'INCOMPARABLE',
    grantRevocationAuthorized:false,
   });
@@ -272,6 +275,40 @@ describe('P4 authenticated entire cancellation set -> exact Reader Event/Grant l
   expect(lockedCasInspector).not.toHaveBeenCalled();
   expectedNoEffect(result);
  });
+ it.each(['trusted_provider_order_missing',
+  'exact_event_revoke_replay_observed'])(
+  'does not report %s as consistent or SAME without the shared Reader S1 lock',
+  async(kind)=>{
+   const result=await run(db(),{lockedCasInspector:async()=>({
+    schemaVersion:PREFLIGHT_CONFIG.schemaVersion,kind,
+    readerS1ScopesLocked:false,sourceEventLocked:true,
+    exactReaderGrantLocked:true,revisionProven:true,
+    grantRevocationAuthorized:false,entitlementEffectInvoked:false,
+    writesPerformed:false,readerT2LockHeld:false,
+    providerOrderingComparable:false,legalRevocationAuthorized:false,
+    refundFinalityProven:false,
+   })});
+   expect(result).toMatchObject({
+    kind:'exact_reader_locked_cas_or_source_changed',
+    exactReaderGrantLockedAndCasChecked:false,
+    readerS1LockAndScopeRecheckObserved:false,
+    sourceOrderClassification:'INCOMPARABLE',
+   });
+   expectedNoEffect(result);
+  },
+ );
+ it('rejects an unknown locked-review contract even when S1 proof is forged',
+  async()=>{
+   await expect(run(db(),{lockedCasInspector:async()=>({
+    schemaVersion:'unrecognized-contract',kind:'trusted_provider_order_missing',
+    readerS1ScopesLocked:true,sourceEventLocked:true,
+    exactReaderGrantLocked:true,revisionProven:true,
+    grantRevocationAuthorized:false,entitlementEffectInvoked:false,
+    writesPerformed:false,readerT2LockHeld:false,
+    providerOrderingComparable:false,legalRevocationAuthorized:false,
+    refundFinalityProven:false,
+   })})).rejects.toThrow('UNSAFE_READER_LOCK_PREFLIGHT_AUTHORITY_RESULT');
+  });
  it('rejects an elevated locked CAS result even when source set appeared valid',async()=>{
   const c=db();
   await expect(run(c,{lockedCasInspector:async()=>({

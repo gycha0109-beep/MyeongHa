@@ -28,3 +28,9 @@
 - 다음 안전 관문은 승인된 Provider NEWER/STALE 판단 혹은 동등 최신 상태 조정, 합법적인 독서·청약철회 판단 근거, Reader 최종 R2/T2 잠금과 기존 실제 Effect writer의 동일 트랜잭션 결속입니다.
 
 참고: PortOne V2 결제취소 가이드 https://developers.portone.io/opi/ko/integration/cancel/v2/readme
+
+## 2026-11-05 — Reader 공통 S1 잠금 증거를 상위 판정에 필수 결속
+
+- 상위 취소 집합 검토기의 긍정 판정은 기존 Reader 잠금 검토기의 정확한 계약 버전과 **공통 S1 범위 잠금·재확인, 원본 Provider Event 및 구매 Grant 잠금, revision 확인**을 모두 요구합니다. Event/Grant 행 잠금만 있거나 S1 관측이 누락되면 정상·SAME 재실행 분류를 보고하지 않습니다.
+- `readerS1LockAndScopeRecheckObserved`는 사전 검토 시점의 관측이며, 실제 운영 권한 획득이나 장기 유지 잠금이 아닙니다. 트랜잭션은 항상 ROLLBACK하고 환불·Entitlement Writer를 실행하지 않습니다.
+- S1 없이 긍정·SAME을 반환하는 위조 검토 결과와 알 수 없는 검토기 계약 버전은 회귀 테스트에서 거부합니다. Provider NEWER/STALE 의미 비교, 실제 T2·Effect, 법적 전달·환불 판단, 공개 라우트와 LIVE는 여전히 보류입니다.
