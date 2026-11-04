@@ -89,7 +89,7 @@ async function calculation() {
     return { kind: 'transport', latency: performance.now() - started };
   }
 }
-async function measure(rate, saturation = false, round = 0) {
+async function measure(rate, saturation = false, roundNumber = 0) {
   const [serviceBefore, driverBefore] = await Promise.all([serverMetrics(), clientMetrics()]);
   const intervalMs = saturation ? 1000 / SATURATION_WAVES_PER_SECOND : 1000 / rate;
   const waveSize = saturation ? rate / SATURATION_WAVES_PER_SECOND : 1;
@@ -127,7 +127,7 @@ async function measure(rate, saturation = false, round = 0) {
   const count = kind => completed.filter(result => result.kind === kind).length;
   return {
     targetRps: rate, intervalSeconds: stageSeconds, plannedSlots: planned,
-    ...(saturation ? { round, wavesPerSecond: SATURATION_WAVES_PER_SECOND, waveSize } : {}),
+    ...(saturation ? { round: roundNumber, wavesPerSecond: SATURATION_WAVES_PER_SECOND, waveSize } : {}),
     attempted: completed.length, successfulCalculations: successes.length,
     non200: count('non200'), transportFailures: count('transport'),
     invalidResponses: count('invalid'), skippedSchedulingLag, skippedInFlightCap,

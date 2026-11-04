@@ -1715,6 +1715,101 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('G3 original Assistant replay-first holds source against redaction, then blocks later disclosure',async()=>{
+    const f=await prepare(230,{summary:'synthetic original Assistant replay held before redaction'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async body=>{
+      expect(body).toBe(f.assistantText);
+    }});
+    const reader=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g3_assistant_redaction_waits_on_original_replay';
+    try{
+      // DB current-rights replay is the first transaction. Its source lock
+      // must be held through the protected send transaction, not just lookup.
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const first=await reader.query<{assistantText:string}>(`select assistant_text
+        as "assistantText" from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      expect(first.rows).toEqual([{assistantText:f.assistantText}]);
+
+      await redactor.query("select set_config('application_name',$1,false)",[marker]);
+      await redactor.query('BEGIN');
+      const pending=redactor.query(`update public.conversation_messages
+        set redacted_at=clock_timestamp(),redaction_reason=$2::text
+        where id=$1::uuid`,[f.assistant,'g3_synthetic_assistant_redaction_after_replay'])
+        .then(value=>({ok:true as const,value}),error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await reader.query('COMMIT');
+      const result=await pending;
+      expect(result.ok).toBe(true);
+      if(result.ok)expect(result.value.rowCount).toBe(1);
+      await redactor.query('COMMIT');
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      reader.release();redactor.release();
+    }
+    const {rows:[source]}=await pool.query(`select
+      g.revoked_at is null and g.seyeon_revoke_requested_at is null as grant_active,
+      u.redacted_at is null as original_user_available,
+      a.redacted_at is not null as assistant_redacted
+      from public.record_access_grants g
+      join public.conversation_messages u on u.id=$2
+      join public.conversation_messages a on a.id=$3
+      where g.id=$1`,[f.grant,f.user,f.assistant]);
+    expect(source).toEqual({
+      grant_active:true,original_user_available:true,assistant_redacted:true,
+    });
+
+    // New DB sessions cannot reuse a previously authorized, now redacted
+    // Assistant for either original-only replay or its source User pair.
+    const after=await f.run(async({client})=>{
+      const replay=await client.query(`select assistant_text
+        from seyeon_private.qry_seyeon_first_original_assistant_replay_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      const pair=await client.query(`select user_text,assistant_text
+        from seyeon_private.qry_seyeon_first_original_dialogue_pair_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid)`,[f.subject,f.thread,f.assistant]);
+      return {replay:replay.rows,pair:pair.rows};
+    });
+    expect(after).toEqual({replay:[],pair:[]});
+
+    for(const kind of ['replay','pair'] as const){
+      const server=createServer((incoming,response)=>{
+        const args={incoming,response,pool:subjectPool,
+          requestId:'g3-assistant-redaction-replay-first-230',
+          identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence}};
+        if(kind==='pair')void handleSeyeonFirstOriginalDialoguePairNodeS0V1(args);
+        else void handleSeyeonFirstOriginalAssistantReplayNodeS0V1(args);
+      });
+      await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+      try{
+        const path=kind==='pair'?'original-pair':'original-replay';
+        const response=await fetch(`http://127.0.0.1:${(server.address() as AddressInfo).port}/api/chat/${f.thread}/${path}/${f.assistant}`);
+        expect(response.status).toBe(503);
+        expect(response.headers.get('Cache-Control')).toContain('no-store');
+        const body=await response.text();
+        expect(body).not.toContain(f.userText);
+        expect(body).not.toContain(f.assistantText);
+      }finally{
+        server.closeAllConnections();
+        await new Promise<void>(resolve=>server.close(()=>resolve()));
+      }
+    }
+  });
+
   it('UC-06 verifies exact committed DB originals before any metered Planner call',async()=>{
     const f=await prepare(210);
     await f.commit();
