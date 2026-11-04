@@ -153,3 +153,13 @@ Watchtower-Track: security
 - [Machine-readable exercise evidence](A09_ISOLATED_ATTACK_NOTIFICATION_EVIDENCE_20261103.json); reproduction script `scripts/verify-a09-isolated-attack-delivery.mjs`. This meets the user's requested **safe simulation** while maintaining accurate A09/umbrella closure authority. #1527 and #1529 remain OPEN until actual provider automated trigger/organic attribution is proved or the acceptance scope is explicitly revised.
 
 Watchtower-Track: security
+
+## 2026-11-04 A09 termination scope clarification and provider-control result (latest)
+
+- **Authority:** The user explicitly rejected requiring an actual malicious incident or organically triggered alert as the A09 exit gate. Restore the written #1527 acceptance sequence: actual event coverage → bounded Production baseline with uncertainty → no arbitrary numeric threshold → provider-native anomaly decision/activation/readback → durable documentation → exact-head CI and post-merge verification.
+- **What is proved:** Primary `myeongha` logs include 401/403/429 with privacy-safe events; 202 retained samples, 19 bounded synthetic exclusions, 183 unknown-attribution remaining. The active Production `zscore_spike` monitor is scoped to the right Worker, source and codes. A separate isolated Worker *actually* triggered Cloudflare's native **threshold** monitor, and the connected mailbox received the automatic alert. Temporary lab Worker/policies were fully deleted.
+- **What is *not* proved:** Those 183 events are organic, a real attack occurred, or the Production native `zscore_spike` algorithm itself fired. These claims remain false; they are **not** additional acceptance gates created by this project. Keep separate operational limitations in the runbook rather than silently upgrading evidence.
+- **Provider configuration finding:** A disabled Cloudflare API creation test accepted the existing `zscore_spike` / `<` operator; it rejected `>`. Leaving the execution interval at provider default returned `1m`. Do not mutate the active policy on unsupported guesses. No fixed production event-count threshold was introduced.
+- **Exit sequence:** [Immutable evidence](A09_CLOUDFLARE_NATIVE_MONITOR_VALIDATION_20261104.json) + [runbook](../operations/PRODUCTION_SECURITY_ALERTING_RUNBOOK_V1.md) are to be merged with required exact-head CI, followed by independent Cloudflare primary policy readback, then decide #1527/#1529 closure from their actual accepted scope. Do not mark ROADMAP_COMPLETE before these checks.
+
+Watchtower-Track: security

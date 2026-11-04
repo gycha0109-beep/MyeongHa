@@ -43,6 +43,17 @@
     "rawEmailBodyOrAddressPersisted": false,
     "organicAnomalyTriggerTested": false
   },
+  "nativeControlledDeliveryEvidence": {
+    "source": "docs/security/A09_CLOUDFLARE_NATIVE_MONITOR_VALIDATION_20261104.json",
+    "separateLabPolicyId": "d6a12666dda149398edc708214889534",
+    "labNativeAutomaticThresholdAlertDelivered": true,
+    "labNativeAnomalyAlertDelivered": false,
+    "productionNativeAnomalyAlertObserved": false,
+    "productionPolicyConfigurationChanged": false,
+    "retainedProductionAnomalyOperator": "<",
+    "retainedProductionExecutionInterval": "1m",
+    "temporaryResourcesDeleted": true
+  },
   "organicBaselineEstablished": false,
   "authorization": "User requested completion including alert activation; clarified Cloudflare as primary server.",
   "observedDateKst": "2026-11-03",
