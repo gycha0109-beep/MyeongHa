@@ -46,7 +46,34 @@ function fakeLinuxProof() {
     nodeImageDigest:'node@sha256:'+'b'.repeat(64),githubMainSha:MAIN,
   };
 }
-describe('Independent future raw Linux saturation evidence (no result invented)',()=>{
+describe('Independent original Linux saturation evidence (bounded synthetic, no Production approval)',()=>{
+  it('verifies exact GitHub 2-round 15s saturation original bytes and both CPU cgroups',()=>{
+    const file='docs/operations/SAJU_REAL_ENGINE_CONTROLLED_SATURATION_LINUX_OBSERVATION_20261104.json';
+    const hash='73ca63552f3cd3469cba44769094ba94b2feed9a3187f7c7ff12ccc4cdd833ae';
+    const main='11045d4b9662f1c8c50d92f58db6ea8916a643e0';
+    const report=verifySaturationLinuxProofFile(file,hash,main);
+    expect(report).toMatchObject({
+      sha256:hash,githubMainSha:main,planned:120000,attempted:114174,
+      successful:114174,skippedScheduling:0,skippedConcurrency:5826,
+      non200:0,transportFailures:0,invalidResponses:0,
+      serviceThrottledPeriods:346,driverThrottledPeriods:1,
+      servicePeakMemoryBytes:68313088,driverPeakMemoryBytes:66572288,
+      recovery:true,productionReady:false,
+    });
+    expect(report.rateStages).toHaveLength(8);
+    expect(report.rateStages[3]).toMatchObject({
+      round:1,targetRps:1600,success:21131,skippedConcurrency:2869,
+      observedInFlight:64,successfulP95Ms:51.366,serviceThrottledPeriods:150,
+      driverThrottledPeriods:0,
+    });
+    expect(report.rateStages[7]).toMatchObject({
+      round:2,targetRps:1600,success:21356,skippedConcurrency:2644,
+      observedInFlight:64,successfulP95Ms:48.708,serviceThrottledPeriods:150,
+      driverThrottledPeriods:0,
+    });
+    expect(()=>verifySaturationLinuxProofFile(file,'0'.repeat(64),main)).toThrow();
+    expect(()=>verifySaturationLinuxProofFile(file,hash,'0'.repeat(40))).toThrow();
+  });
   it('accepts an exact synthetic fixture with two rounds and never claims Production readiness',()=>{
     expect(validateSaturationLinuxProof(fakeLinuxProof(),MAIN)).toMatchObject({
       planned:120000,attempted:120000,successful:120000,
