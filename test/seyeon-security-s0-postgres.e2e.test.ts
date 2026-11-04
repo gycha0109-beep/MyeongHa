@@ -1822,6 +1822,105 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }
   });
 
+  it('G5 redaction-first blocks historical candidate and rejects stale original User provenance',async()=>{
+    const f=await prepare(224,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const turn=uuid(16,1224),attempt=uuid(17,1224);
+    const user=uuid(18,1224),text='Fresh User after historical Assistant';
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1224),hash({second:'G5-original-user-redaction-first'}),
+        'chat-request-v1',JSON.stringify({text}),
+        uuid(13,224),uuid(12,224),turn,user,text,null,hash({message:text}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,turn,attempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const candidate=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g5_original_user_pin_waits_on_redaction';
+    try{
+      // Independent redaction owns the exact original User row before G1.
+      await redactor.query('BEGIN');
+      const redacted=await redactor.query(
+        'update public.conversation_messages set redacted_at=clock_timestamp(), redaction_reason=$2::text where id=$1::uuid',
+        [f.user,'g5_synthetic_original_user_redaction_first'],
+      );
+      expect(redacted.rowCount).toBe(1);
+      await candidate.query("select set_config('application_name',$1,false)",[marker]);
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const pending=createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:turn,attemptId:attempt,
+          currentUserMessageId:user,currentUserTextDigest:wire(text),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-original-user-redaction-first'}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        }).then(receipt=>({ok:true as const,receipt}),
+          error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await redactor.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome.ok).toBe(false);
+      if(!outcome.ok)expect(outcome.error).toMatchObject({
+        code:'42501',constraint:'seyeon_source_lock_message_required',
+      });
+    }finally{
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await candidate.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      candidate.release();redactor.release();
+    }
+    const {rows:[saved]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[attempt]);
+    expect(saved.turn_state).toBe('planned');
+    expect(saved.pin).toBeNull();
+    const {rows:[attemptState]}=await pool.query(`select
+      seyeon_personal_source_pinned_at as pinned_at from public.chat_turn_attempts
+      where id=$1`,[attempt]);
+    expect(attemptState.pinned_at).toBeNull();
+  });
+
   // Real S0 original receipt + private G4 credit on ONE disposable PostgreSQL.
   // It intentionally uses the existing prepare/fetchReply S0 test fixtures.
   let g5CreditSchemaInstalled=false;
