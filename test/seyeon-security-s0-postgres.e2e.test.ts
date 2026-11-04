@@ -1495,13 +1495,14 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,jsonb)',
       'EXECUTE') as denied`);
     expect(acl.denied).toBe(true);
-    // G2 must reject a saved historical audit candidate even from a direct
-    // legacy Attempt-state update, not just the positive Commit wrapper.
+    // Native Attempt progression rejects an illegal running -> validated/
+    // committed jump before the S0 G2 guard can run. Both layers must HOLD;
+    // do not require the later guard's error name for an earlier rejection.
     for(const state of ['validated','committed'] as const){
       await expect(pool.query(`update public.chat_turn_attempts
         set state=$2 where id=$1::uuid`,[currentAttempt,state]))
         .rejects.toMatchObject({
-          code:'23514',constraint:'seyeon_g2_historical_candidate_not_authority',
+          code:'23514',constraint:'tr_chat_turn_attempt_state_transition',
         });
     }
     const {rows:[afterDenied]}=await pool.query(`select
