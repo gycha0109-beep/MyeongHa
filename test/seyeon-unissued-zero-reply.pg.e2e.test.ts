@@ -29,12 +29,16 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     pool=new Pool({host:process.env.PGHOST,port:Number(process.env.PGPORT??5432),
       user:'postgres',database:db,password:process.env.PGPASSWORD,ssl:false,max:4,statement_timeout:5000});
     subjectPool=pool as unknown as PostgresSubjectPoolV1;
-    // Install the unchanged existing G1 functional rewrite blocks in the
-    // scratch bootstrap-superuser DB. Managed Production operator membership
-    // is not simulated here; operation 25 below is tested in its entirety.
+    // The disposable DB must reflect the installed multi-turn G0 source
+    // authority before proving a second-turn receipt. In particular, the
+    // earlier 18-only fixture explicitly DENIES nonempty recent-history pins.
+    // Apply the unchanged 19 and 22 function rewrites in dependency order;
+    // their production-only operator role choreography is not simulated here.
     for(const [file,block] of [
       ['production-17-zero-source-selection-census-pin-20261101.sql','replace'],
       ['production-18-zero-source-current-user-pin-20261101.sql','change'],
+      ['production-19-zero-source-verified-history-pin-20261101.sql','rewrite'],
+      ['production-22-ignore-abandoned-g0-history-20261102.sql','patch'],
     ]){
       const source=operation(file!);
       const begin=source.indexOf('do $'+block+'$');
