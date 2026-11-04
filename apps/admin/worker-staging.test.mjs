@@ -29,6 +29,30 @@ describe('inactive Worker verifies Access before its disabled boundary',()=>{
   }
   expect(io).toBe(0);expect(fetch).not.toHaveBeenCalled();
  });
+ it('uses only Cloudflare-verified Owner context when the JWT header is unavailable',async()=>{
+  const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(()=>{throw Error('unexpected network');});
+  let io=0;
+  const bindings={...env,get ADMIN_READ_HYPERDRIVE(){io++;throw Error('unexpected DB');},
+    ASSETS:{fetch(){io++;throw Error('unexpected asset');}}};
+  const request=new Request('https://myeongha-admin.gycha0109.workers.dev/admin/');
+  const context=(aud,email)=>({access:{aud,getIdentity:async()=>({email})},waitUntil(){io++;}});
+  const allowed=await worker.fetch(request,bindings,context(env.MYEONGHA_ADMIN_ACCESS_AUD,'OWNER@example.test'));
+  expect(allowed.status).toBe(503);
+  expect(await allowed.json()).toEqual({error:'ADMIN_PRIVATE_DISABLED'});
+  for(const ctx of [
+    context('wrong-audience','owner@example.test'),
+    context(env.MYEONGHA_ADMIN_ACCESS_AUD,'other@example.test'),
+    {access:{aud:env.MYEONGHA_ADMIN_ACCESS_AUD,getIdentity:async()=>{throw Error('not authenticated');}}},
+    {access:{aud:env.MYEONGHA_ADMIN_ACCESS_AUD}},
+    {access:{aud:env.MYEONGHA_ADMIN_ACCESS_AUD,getIdentity:async()=>null}},
+  ]){
+    const denied=await worker.fetch(request,bindings,ctx);
+    expect(denied.status).toBe(403);
+    expect(await denied.json()).toEqual({error:'ADMIN_ACCESS_REQUIRED'});
+  }
+  expect(io).toBe(0);
+  expect(fetch).not.toHaveBeenCalled();
+ });
  it('returns a distinct disabled response only for an actually signed Owner token',async()=>{
   const fetch=vi.spyOn(globalThis,'fetch').mockImplementation(async()=>Response.json({
    keys:[{...publicKey.export({format:'jwk'}),kid:'test-key',use:'sig'}],

@@ -49,3 +49,12 @@ A partial cancellation notification can be delivered after the provider payment 
 The exact-Reader private preflight now reads this source-v2 amount provenance and explicitly classifies `cumulative_payment_cancel_does_not_prove_single_item_full` when a payment's **cumulative full** cancellation actually consists of multiple partial items. Even an exact whole-item amount cannot authorize a revoke without trustworthy provider order, statutory determination, delivery evidence and Reader R2/T2 atomic locking. All operations remain **internal candidates, not mounted**, with no refund execution, public route or Entitlement Effect. Current v2 SQL replaces the **non-deployable candidate only**, not any existing deployed database function.
 
 PortOne API schema for GET/payment cancellation values: https://developers.portone.io/api/rest-v2/payment . All amounts are minor currency units and are not a consumer refund determination.
+
+
+## 2026-11-04 — 별도 웹훅 ID에서 동일 PortOne 취소 항목 중복 저장 차단
+
+- 동일한 `cancellationId`가 다른 signed webhook envelope ID로 재전송될 수 있는 경우, 기존 Provider Event의 웹훅 ID 유니크 키만으로는 **같은 원본 Receipt의 취소 항목이 두 번 저장되는 것을 차단하지 못했습니다**.
+- 비배포 SQL 후보의 기존 `commerce_receipts FOR UPDATE` 잠금 아래에서 정확한 Receipt ID와 서버 HMAC 처리된 `cancellationId`를 대조합니다. 같은 웹훅 ID는 기존 불변 replay로, 다른 웹훅 ID가 이미 저장된 동일 취소 항목을 주장하면 `cancellation_event_persist_same_item_webhook_conflict`로 거부합니다.
+- 다른 취소 항목 HMAC은 그대로 별도 원장 행으로 저장합니다. Reader B의 3000+5900 부분 취소는 유지하고, 두 웹훅 ID가 같은 취소 항목을 재주장하면 원장을 2회 증가시키지 않도록 실제 PostgreSQL 17 부분 집합 테스트를 변경했습니다. 기존 독립 SQL smoke와 정적 계약 테스트도 추가했습니다.
+- 과거에 이미 저장된 중복 취소 항목은 기존 read-only cancellation set auditor가 `duplicate_cancellation_item_fingerprint`으로 계속 탐지합니다. 이 후보가 기존 원장 정리를 자동 수행하는 것은 아닙니다.
+- **여전히 미완료:** 신뢰할 수 있는 Provider NEWER/STALE 순서 비교, 법적 환불·실제 전달 검증, Reader/T2 최종 잠금과 정확한 Entitlement Effect. `provider_ordering_key`를 추측 생성하거나 실제 권한 회수를 수행하지 않습니다. 운영 migration/웹훅·PG 환불·LIVE 활성화 없음.

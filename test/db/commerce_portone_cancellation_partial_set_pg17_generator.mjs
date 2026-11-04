@@ -83,30 +83,41 @@ begin
 end;
 $partial_set$;
 
--- A different webhook claiming the SAME cancellation item HMAC is not a
--- second cancellation. The real ledger can expose this conflicting evidence;
--- the read-only JS set audit must flag duplicate_cancellation_item_fingerprint.
-savepoint duplicate_item_test;
-select * from public.internal_persist_portone_cancellation_event_v1(
- 'pmt-B','webhook-B-duplicate','Transaction.Cancelled','tx-B',
- 'full_cancel_shape_observed',
- 'hmac-sha256:k1:'||repeat('e',64),
- 'hmac-sha256:k1:'||repeat('b',64),
- 'hmac-sha256:k1:'||repeat('c',64),5900,8900
-);
+-- A different webhook ID for the SAME cancellationId HMAC must not
+-- mint a second canonical Provider Event. The original Receipt row lock
+-- serializes both attempts, and the conflict is explicit.
+-- The read-only set auditor still detects legacy duplicate evidence.
 do $duplicate_item$
-declare n bigint;
+declare
+ n bigint;
+ rejected_constraint text;
 begin
+ begin
+  perform public.internal_persist_portone_cancellation_event_v1(
+   'pmt-B','webhook-B-duplicate','Transaction.Cancelled','tx-B',
+   'full_cancel_shape_observed',
+   'hmac-sha256:k1:'||repeat('e',64),
+   'hmac-sha256:k1:'||repeat('b',64),
+   'hmac-sha256:k1:'||repeat('c',64),5900,8900
+  );
+  raise exception 'PG17_DUPLICATE_CANCELLATION_ITEM_WAS_ACCEPTED';
+ exception when unique_violation then
+  get stacked diagnostics rejected_constraint = constraint_name;
+  if rejected_constraint <> 'cancellation_event_persist_same_item_webhook_conflict' then
+   raise;
+  end if;
+ end;
  select count(*) into n from public.commerce_provider_events
  where resolved_receipt_id='00000000-0000-4000-8000-000000000016'::uuid
    and verified_payload_jsonb->>'cancellationIdHmac'=
-      'hmac-sha256:k1:'||repeat('c',64);
- if n<>2 then
-  raise exception 'PG17_DUPLICATE_CANCELLATION_HMAC_NEGATIVE_CASE_MISSING';
+       'hmac-sha256:k1:'||repeat('c',64);
+ if n<>1 or (select count(*) from public.commerce_provider_events)<>3 then
+  raise exception 'PG17_DUPLICATE_CANCELLATION_ITEM_MUTATED_CANONICAL_LEDGER';
  end if;
+ raise notice 'PASS unique provider cancellation item even with a different webhook ID';
 end;
 $duplicate_item$;
-rollback to savepoint duplicate_item_test;
+
 select 'COMMERCE_PORTONE_CANCELLATION_PARTIAL_SET_PG17_PASS' as result;
 `,
 ].join('\n');

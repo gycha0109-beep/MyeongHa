@@ -69,11 +69,12 @@ describe('P4 canonical cancellation-item-set SQL on real isolated PostgreSQL17 s
   expect(partialWrapper).toContain('^17[0-9]{4}$');
   expect(partialGenerated).toContain(SOURCE_SQL);
   expect(partialGenerated).toContain('PG17_CANCELLATION_PARTIAL_SET_NOT_COMPLETE');
-  expect(partialGenerated).toContain('PG17_DUPLICATE_CANCELLATION_HMAC_NEGATIVE_CASE_MISSING');
+  expect(partialGenerated).toContain('PG17_DUPLICATE_CANCELLATION_ITEM_MUTATED_CANONICAL_LEDGER');
+  expect(partialGenerated).toContain('cancellation_event_persist_same_item_webhook_conflict');
   expect(partialGenerated).toContain('8900');
   expect(partialGenerated).toContain('3000');
   expect(partialGenerated).toContain('5900');
-  expect(partialGenerated).toContain('rollback to savepoint duplicate_item_test;');
+  expect(partialGenerated).toContain('raise notice \'PASS unique provider cancellation item even with a different webhook ID\'');
   expect(partialGenerated.trimEnd().endsWith('rollback;')).toBe(true);
   expect(partialGenerated).not.toMatch(/\bcommit\s*;/iu);
  });

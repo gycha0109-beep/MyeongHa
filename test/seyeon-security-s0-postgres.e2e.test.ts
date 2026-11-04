@@ -1474,8 +1474,13 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         recordType:'conversation_recall',recordSchemaVersion:'v1',
         projectorVersion:'seyeon-conversation-recall-projector-v1',
       }]);
+    const {rows:[digestCheck]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(
+        (seyeon_personal_source_pin_jsonb->'historicalCandidateProof'
+         ->'historicalAssistantOriginalSources')::text,'UTF8')),'hex') as digest
+      from public.chat_turn_attempts where id=$1`,[currentAttempt]);
     expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSourcesDigest)
-      .toMatch(/^sha256:pg-jsonb:v1:[a-f0-9]{64}$/u);
+      .toBe(digestCheck.digest);
     expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
     const {rows:[acl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',
@@ -1691,6 +1696,117 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         [f.subject,f.thread,user,3],
       )).rejects.toMatchObject({
         code:'42501',constraint:'seyeon_source_lock_original_grant_required',
+      });
+    }finally{
+      await reader.query('ROLLBACK').catch(()=>undefined);
+      reader.release();
+    }
+  });
+
+  it('G5 held historical User provenance blocks redaction, then refuses all later G0 reuse',async()=>{
+    const f=await prepare(223,{summary:'synthetic approved recall'});
+    await f.commit();
+    await f.locked()({signal:new AbortController().signal,deliver:async value=>{
+      expect(value).toBe(f.assistantText);
+    }});
+    const turn=uuid(16,1223),attempt=uuid(17,1223);
+    const user=uuid(18,1223),text='Fresh User after historical Assistant';
+    const receiver=await pool.connect();
+    try{
+      await receiver.query('BEGIN');
+      await receiver.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await receiver.query(`select * from public.cmd_receive_chat_turn_v1(
+        $1::uuid,$2::uuid,$3::text,$4::text,$5::text,$6::jsonb,
+        $7::uuid,$8::uuid,$9::uuid,$10::uuid,$11::text,$12::jsonb,$13::text
+      )`,[
+        f.subject,f.thread,uuid(30,1223),hash({second:'G5-original-user-redaction'}),
+        'chat-request-v1',JSON.stringify({text}),
+        uuid(13,223),uuid(12,223),turn,user,text,null,hash({message:text}),
+      ]);
+      await receiver.query(
+        'select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [f.subject,turn,attempt,'seyeon-production-chat-planner-v1']);
+      await receiver.query('COMMIT');
+    }catch(error){await receiver.query('ROLLBACK');throw error;}
+    finally{receiver.release();}
+    const {rows:[original]}=await pool.query(`select
+      'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
+      as digest from public.memory_items where id=$1`,[f.memory]);
+    const selected={
+      recordKind:'memory' as const,recordId:f.memory,grantId:f.grant,
+      recordType:'conversation_recall',schemaVersion:'v1',
+      rawRecordDigest:hash({summary:'synthetic approved recall'}),
+      rawRecordPgDigest:original.digest as string,
+      projectedMemoryDigest:hash({memoryId:f.memory,summary:'synthetic approved recall'}),
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+    };
+    const wire=(value:string)=>'sha256:wire-utf8:v1:'+
+      createHash('sha256').update(value,'utf8').digest('hex');
+    const candidate=await pool.connect(),redactor=await pool.connect();
+    const marker='seyeon_g5_original_user_redaction_waiter';
+    try{
+      await candidate.query('BEGIN');
+      await candidate.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      const proof=await createSeyeonG1HistoricalCandidateOwnerPortV1(candidate)
+        .pinBeforeModel({
+          subjectId:f.subject,threadId:f.thread,turnId:turn,attemptId:attempt,
+          currentUserMessageId:user,currentUserTextDigest:wire(text),
+          selectedOriginalMemory:selected,selectedSourcesDigest:hash([selected]),
+          preModelContextDigest:hash({historical:'G5-original-user-redaction'}),
+          historicalSources:[
+            {messageId:f.user,role:'user',textDigest:wire(f.userText)},
+            {messageId:f.assistant,role:'assistant',textDigest:wire(f.assistantText)},
+          ],
+        });
+      expect(proof).toMatchObject({
+        authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+      });
+      await redactor.query("select set_config('application_name',$1,false)",[marker]);
+      await redactor.query('BEGIN');
+      const pending=redactor.query(
+        'update public.conversation_messages set redacted_at=clock_timestamp() where id=$1::uuid',
+        [f.user],
+      ).then(result=>({ok:true as const,count:result.rowCount}),
+        error=>({ok:false as const,error}));
+      let blocked=false;
+      for(let i=0;i<80;i++){
+        const {rows}=await pool.query<{blocked:boolean}>(`select exists(
+          select 1 from pg_catalog.pg_stat_activity
+          where application_name=$1 and wait_event_type='Lock'
+        ) as blocked`,[marker]);
+        if(rows[0]?.blocked){blocked=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
+      expect(blocked).toBe(true);
+      await candidate.query('COMMIT');
+      const outcome=await pending;
+      expect(outcome).toMatchObject({ok:true,count:1});
+      await redactor.query('COMMIT');
+    }finally{
+      await candidate.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query('ROLLBACK').catch(()=>undefined);
+      await redactor.query("select set_config('application_name','',false)")
+        .catch(()=>undefined);
+      candidate.release();redactor.release();
+    }
+    const {rows:[saved]}=await pool.query(`select
+      t.state as turn_state,a.seyeon_personal_source_pin_jsonb as pin
+      from public.chat_turn_attempts a join public.chat_turns t on t.id=a.turn_id
+      where a.id=$1`,[attempt]);
+    expect(saved.turn_state).toBe('context_ready');
+    expect(saved.pin).toMatchObject({historicalCandidateProof:{
+      authorizesModel:false,permitsAtomicCommit:false,permitsHttpReveal:false,
+    }});
+    expect(saved.pin).not.toHaveProperty('positiveProof');
+    const reader=await pool.connect();
+    try{
+      await reader.query('BEGIN');
+      await reader.query("select set_config('myeongha.subject_id',$1,true)",[f.subject]);
+      await expect(reader.query(
+        'select * from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,$4::integer)',
+        [f.subject,f.thread,user,3],
+      )).rejects.toMatchObject({
+        code:'42501',constraint:'seyeon_g0_context_window_source_missing',
       });
     }finally{
       await reader.query('ROLLBACK').catch(()=>undefined);
