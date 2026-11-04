@@ -39,7 +39,7 @@ export function projectMobileSajuBirthFactsV1(
   input: BirthInputV1,
   locale: MobileUiLocale,
 ): Readonly<Record<FieldV1, string>> {
-  const birthDate = /^(\\d{4})-(\\d{2})-(\\d{2})$/u.exec(input.birthDate);
+  const birthDate = /^(\d{4})-(\d{2})-(\d{2})$/u.exec(input.birthDate);
   const parsed = birthDate?.slice(1).map(Number);
   const [year, month, day] = parsed ?? [0, 0, 0];
   const validDate = year > 0 && month >= 1 && month <= 12 && day >= 1 && day <= 31;
@@ -48,7 +48,7 @@ export function projectMobileSajuBirthFactsV1(
     : locale === 'en-US' ? `${MONTHS[month - 1]} ${day}, ${year}`
     : `${year}年${month}月${day}日`;
   const sourceTime = input.timeKnown
-    ? /^(\\d{2}):(\\d{2})(?::\\d{2}(?:\\.\\d+)?)?$/u.exec(input.birthTime ?? '')
+    ? /^(\d{2}):(\d{2})(?::\d{2}(?:\.\d+)?)?$/u.exec(input.birthTime ?? '')
     : null;
   const hour = Number(sourceTime?.[1]);
   const minute = Number(sourceTime?.[2]);
