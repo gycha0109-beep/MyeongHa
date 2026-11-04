@@ -77,6 +77,8 @@ try {
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.lock_memory_subject_v1(uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
       'public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)', 'EXECUTE')
