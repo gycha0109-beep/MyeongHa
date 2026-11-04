@@ -10,6 +10,22 @@ BEGIN
     OR to_regprocedure('public.qry_chat_thread_owner_visible_history_v1(uuid,uuid,bigint,integer)') IS NOT NULL
     OR to_regprocedure('seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)') IS NULL
     OR to_regnamespace('chat_private') IS NOT NULL
+    OR (SELECT pg_get_userbyid(p.proowner)
+        FROM pg_proc p WHERE p.oid=
+        'seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)'::regprocedure)
+       IS DISTINCT FROM 'myeongha_seyeon_chat_runtime_owner'
+    OR NOT EXISTS (
+      SELECT 1 FROM pg_roles operator
+      LEFT JOIN pg_auth_members membership
+        ON membership.member=operator.oid
+       AND membership.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+      WHERE operator.rolname='postgres'
+        AND (operator.rolsuper OR (
+          membership.admin_option
+          AND NOT membership.set_option
+          AND NOT membership.inherit_option
+        ))
+    )
     OR NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='myeongha_api_executor'
       AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls)
     OR has_table_privilege('myeongha_api_executor','public.conversation_messages','SELECT')
@@ -52,8 +68,16 @@ GRANT EXECUTE ON FUNCTION public.assert_myeongha_subject_context_v1(uuid)
   TO myeongha_chat_history_reader_v1;
 GRANT EXECUTE ON FUNCTION public.current_myeongha_subject_id()
   TO myeongha_chat_history_reader_v1;
+-- The original source checker belongs to the Se-yeon runtime owner, not
+-- the managed migration role. Grant ONLY this checker's EXECUTE from its
+-- actual owner, with transaction-scoped SET privileges immediately revoked.
+GRANT myeongha_seyeon_chat_runtime_owner TO postgres
+  WITH INHERIT FALSE, SET TRUE;
+SET LOCAL ROLE myeongha_seyeon_chat_runtime_owner;
 GRANT EXECUTE ON FUNCTION seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)
   TO myeongha_chat_history_reader_v1;
+RESET ROLE;
+REVOKE SET OPTION FOR myeongha_seyeon_chat_runtime_owner FROM postgres;
 
 -- Column-limited read rights. API executor receives none of these.
 GRANT SELECT(id,status,merged_into_subject_id) ON public.subjects
@@ -262,6 +286,14 @@ BEGIN
     OR EXISTS (SELECT 1 FROM pg_auth_members a
       WHERE a.roleid='myeongha_chat_history_reader_v1'::regrole
         AND a.member='postgres'::regrole AND a.set_option)
+    OR EXISTS (SELECT 1 FROM pg_auth_members a
+        WHERE a.member='postgres'::regrole
+          AND a.roleid='myeongha_seyeon_chat_runtime_owner'::regrole
+          AND a.set_option)
+    OR NOT has_function_privilege('myeongha_chat_history_reader_v1',
+       'seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)', 'EXECUTE')
+    OR has_function_privilege('authenticated',
+       'seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)', 'EXECUTE')
     OR has_schema_privilege('myeongha_api_executor','chat_private','CREATE')
     OR NOT has_function_privilege('myeongha_api_executor',private_f,'EXECUTE')
     OR EXISTS (SELECT 1 FROM pg_roles r WHERE r.rolname IN

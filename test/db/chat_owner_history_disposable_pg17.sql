@@ -47,6 +47,24 @@ BEGIN
  END IF;
 END $$;
 
+-- Model production's independently owned private Se-yeon source checker.
+DO $original_role$
+BEGIN
+ IF NOT EXISTS (
+   SELECT 1 FROM pg_roles WHERE rolname='myeongha_seyeon_chat_runtime_owner'
+ ) THEN
+   CREATE ROLE myeongha_seyeon_chat_runtime_owner
+     NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS;
+ END IF;
+END $original_role$;
+GRANT USAGE,CREATE ON SCHEMA seyeon_private TO myeongha_seyeon_chat_runtime_owner;
+REVOKE ALL ON FUNCTION seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)
+  FROM PUBLIC,anon,authenticated,service_role;
+GRANT myeongha_seyeon_chat_runtime_owner TO postgres WITH INHERIT FALSE,SET TRUE;
+ALTER FUNCTION seyeon_private.assert_current_original_assistant_lineage_v1(uuid,uuid,uuid)
+  OWNER TO myeongha_seyeon_chat_runtime_owner;
+REVOKE SET OPTION FOR myeongha_seyeon_chat_runtime_owner FROM postgres;
+
 \ir ../../scripts/operations/chat-history/production-01-owner-history-read.sql
 
 INSERT INTO public.subjects VALUES
