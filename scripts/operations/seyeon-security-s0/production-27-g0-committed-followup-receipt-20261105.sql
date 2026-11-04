@@ -207,8 +207,62 @@ begin
       perform seyeon_private.assert_current_original_member_user_message_v1(
         p_subject_id,p_thread_id,v_previous_ids[v_i+1]);
     else
-      perform seyeon_private.assert_current_original_assistant_lineage_v1(
-        p_subject_id,p_thread_id,v_previous_ids[v_i+1]);
+      -- The historical zero-Assistant was committed with an immutable G0
+      -- proof. Verify that exact DB provenance in this postgres-owned,
+      -- row_security=off issuer; the old runtime-owner helper's SELECT is
+      -- RLS-filtered when this issuer correctly disables row security.
+      perform 1
+      from public.conversation_messages prior
+      join public.chat_turns prior_turn
+        on prior_turn.id=prior.turn_id
+        and prior_turn.subject_id=prior.subject_id
+        and prior_turn.thread_id=prior.thread_id
+        and prior_turn.state='delivered'
+        and prior_turn.delivered_at is not null
+        and prior_turn.committed_at is not null
+      join public.chat_turn_attempts prior_attempt
+        on prior_attempt.id=prior_turn.committed_attempt_id
+        and prior_attempt.turn_id=prior_turn.id
+        and prior_attempt.subject_id=prior_turn.subject_id
+        and prior_attempt.state='committed'
+        and prior_attempt.committed_message_id=prior.id
+      join public.conversation_thread_characters prior_character
+        on prior_character.id=prior.thread_character_id
+        and prior_character.thread_id=prior.thread_id
+        and prior_character.character_id='seyeon'
+      where prior.id=v_previous_ids[v_i+1]
+        and prior.subject_id=p_subject_id and prior.thread_id=p_thread_id
+        and prior.sender_type='character'
+        and prior.redacted_at is null
+        and prior.body_text=prior_attempt.generated_body_text
+        and prior_attempt.planner_version='seyeon-production-chat-planner-v1'
+        and prior_attempt.seyeon_personal_source_pinned_at is not null
+        and jsonb_typeof(prior_attempt.seyeon_personal_source_pin_jsonb)='object'
+        and (select count(*) from jsonb_object_keys(prior_attempt.seyeon_personal_source_pin_jsonb))=2
+        and prior_attempt.validation_result_jsonb->'passed'='true'::jsonb
+        and prior_attempt.validation_result_jsonb->'personalRecordProvenance'
+            =prior_attempt.seyeon_personal_source_pin_jsonb->'zeroProof'
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,schemaVersion}'
+            ='seyeon-attempt-zero-personal-proof-v1'
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,subjectId}'=p_subject_id::text
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,threadId}'=p_thread_id::text
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,turnId}'=prior_turn.id::text
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,attemptId}'=prior_attempt.id::text
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,characterId}'='seyeon'
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>>'{zeroProof,recordState}'='explicit_zero_admitted'
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>'{zeroProof,recordCount}'='0'::jsonb
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>'{zeroProof,records}'='[]'::jsonb
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>'{exactModelSourceSelection,selectedMemoryCount}'='0'::jsonb
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>'{exactModelSourceSelection,selectedPersonalRecordCount}'='0'::jsonb
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>'{exactModelSourceSelection,selectedSources}'='[]'::jsonb
+        and prior_attempt.seyeon_personal_source_pin_jsonb#>'{exactModelSourceSelection,selectedUnpinnedDerivedSources}'='[]'::jsonb
+      for share of prior_turn,prior_attempt;
+      if not found then return; end if;
+      -- Lock the exact original message through the already-installed,
+      -- postgres-owned helper; it returns no text and requires the matching
+      -- Member + committed Turn + Se-yeon message lineage.
+      perform seyeon_private.lock_g0_original_message_v1(
+        p_subject_id,p_thread_id,v_previous_ids[v_i+1],'character');
     end if;
     v_digest:='sha256:v1:'||encode(sha256(convert_to(
       '{"messageId":'||to_json(v_previous_ids[v_i+1]::text)::text||
