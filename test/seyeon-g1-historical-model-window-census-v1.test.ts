@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 import {
   buildSeyeonG1HistoricalModelWindowCensusV1,
+  buildSeyeonG1HistoricalFinalContextCandidateSealV1,
   SeyeonG1HistoricalModelWindowHoldV1,
 } from '../apps/api/src/seyeon-g1-historical-model-window-census-v1.js';
 
@@ -63,5 +64,62 @@ describe('S0 G0->G1 exact historical model-input window (offline HOLD)',()=>{
     expect(reread).toBeLessThan(assertion);
     expect(assertion).toBeLessThan(hold);
     expect(hold).toBeLessThan(actualPin);
+  });
+});
+
+const historicalContextCandidate={
+  relationship:null,
+  recentMessages:context,
+  retrievedMemories:[{
+    memoryId:'synthetic-memory',
+    kind:'memory' as const,
+    claimKind:'fact' as const,
+    summary:'synthetic authorized detail',
+    sourceRef:'memory:synthetic-memory:grant:synthetic-grant',
+    relevance:0.5,salience:0.5,
+  }],
+};
+const finalCandidateInput={
+  contextInput:historicalContextCandidate,
+  currentUserMessageId:'current-user',
+  currentUserText:'synthetic live Turn',
+  census:buildSeyeonG1HistoricalModelWindowCensusV1(base),
+  originalMemory:{recordId:'synthetic-memory',grantId:'synthetic-grant'},
+  selectedSourcesDigest:'sha256:v1:'+'a'.repeat(64),
+  selectedModelSourceCensusDigest:'sha256:v1:'+'b'.repeat(64),
+};
+describe('S0 historical G1 complete model-context candidate (still HOLD)',()=>{
+  it('seals the entire deterministic pre-Interpreter context without granting AI access',()=>{
+    const a=buildSeyeonG1HistoricalFinalContextCandidateSealV1(finalCandidateInput);
+    expect(a.expectedFinalModelContextDigest).toMatch(/^sha256:v1:[a-f0-9]{64}$/u);
+    expect(a.preModelContextDigest).toMatch(/^sha256:v1:[a-f0-9]{64}$/u);
+    expect(a.expectedFinalModelContextDigest).not.toBe(a.preModelContextDigest);
+    expect(buildSeyeonG1HistoricalFinalContextCandidateSealV1(finalCandidateInput)).toEqual(a);
+    const changed=buildSeyeonG1HistoricalFinalContextCandidateSealV1({
+      ...finalCandidateInput,
+      contextInput:{...historicalContextCandidate,retrievedMemories:[{
+        ...historicalContextCandidate.retrievedMemories[0]!,
+        summary:'new synthetic authorized detail',
+      }]},
+    });
+    expect(changed.expectedFinalModelContextDigest).not.toBe(a.expectedFinalModelContextDigest);
+  });
+
+  it.each([
+    ['altered original Assistant', {...historicalContextCandidate,recentMessages:[
+      context[0]!,{...context[1]!,text:'forged Assistant'},context[2]!,
+    ]}],
+    ['missing memory',{...historicalContextCandidate,retrievedMemories:[]}],
+    ['replaced original Grant',{...historicalContextCandidate,retrievedMemories:[{
+      ...historicalContextCandidate.retrievedMemories[0]!,
+      sourceRef:'memory:synthetic-memory:grant:replacement',
+    }]}],
+    ['injected recent source',{...historicalContextCandidate,recentMessages:[
+      context[0]!,context[1]!,context[1]!,context[2]!,
+    ]}],
+  ] as const)('rejects %s before historical G1 DB Pin',(_label,contextInput)=>{
+    expect(()=>buildSeyeonG1HistoricalFinalContextCandidateSealV1({
+      ...finalCandidateInput,contextInput,
+    })).toThrow(SeyeonG1HistoricalModelWindowHoldV1);
   });
 });
