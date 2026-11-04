@@ -32,7 +32,7 @@ import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function MyScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const { colors } = useMobileTheme();
   const {
     state,
@@ -206,7 +206,7 @@ export default function MyScreen() {
       ) : state.birth.kind === 'empty' ? (
         <MyBirthEmptyCard />
       ) : (
-        <MyBirthCard birth={createMobileMyBirthViewV1(state.birth.birth)} />
+        <MyBirthCard birth={createMobileMyBirthViewV1(state.birth.birth, locale)} />
       )}
 
       {MOBILE_WITHDRAWAL_CLAIM_UI_ENABLED_V1 && currentAccount === 'member' ? (
