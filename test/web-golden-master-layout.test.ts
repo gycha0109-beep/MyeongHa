@@ -119,6 +119,17 @@ describe('Web Golden Master', () => {
     expect(design).toContain('@media (max-width:690px)');
   });
 
+  it('keeps Home/Saju bottom navigation in the shared mobile grid', async () => {
+    const [golden, product] = await Promise.all([
+      readWebFile('golden-master.css'),
+      readWebFile('product.css'),
+    ]);
+
+    expect(product).toContain('grid-template-columns: repeat(6, 1fr);');
+    expect(golden).toMatch(/@media \(max-width: 767px\) \{\s*body\.gm-page \.mobile-bottom-nav \{ display: grid; \}/u);
+    expect(golden).not.toContain('body.gm-page .mobile-bottom-nav { display: flex; }');
+  });
+
   it('pins the desktop geometry and post-theme lock layer', async () => {
     const [golden, lock, theme] = await Promise.all([
       readWebFile('golden-master.css'),
