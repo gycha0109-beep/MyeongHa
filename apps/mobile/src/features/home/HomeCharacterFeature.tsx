@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
+import { MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1 } from '@/features/reading/mobile-reader-presentation';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -11,6 +12,10 @@ import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
  * Uses the bundled canonical character portrait. This never grants Chat
  * access, implies a working AI response, or exposes held thread history.
  */
+const HOME_OTHER_FEATURED_READERS_V1 = Object.freeze(
+  MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1.filter(({ key }) => key === 'baekheon' || key === 'yeoul'),
+);
+
 export function HomeCharacterFeature() {
   const { colors } = useMobileTheme();
   const { t } = useMobileUiLocale();
@@ -43,6 +48,34 @@ export function HomeCharacterFeature() {
             <Text style={styles.heroActionArrow} accessible={false}>→</Text>
           </Pressable>
         </View>
+      </View>
+      <View style={styles.featuredReaderList}>
+        {HOME_OTHER_FEATURED_READERS_V1.map((reader) => {
+          const readerPortrait = resolveMobileChatPortraitV1(reader.key);
+          return (
+            <Pressable
+              key={reader.key}
+              accessibilityRole="button"
+              accessibilityLabel={t(reader.name)}
+              onPress={() => router.push('/chat')}
+              style={({ pressed }) => [
+                styles.featuredReaderCard,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                pressed && styles.actionPressed,
+              ]}
+            >
+              {readerPortrait !== null ? (
+                <Image source={readerPortrait} style={styles.featuredReaderPortrait} resizeMode="cover" accessible={false} />
+              ) : null}
+              <View style={styles.featuredReaderCopy}>
+                <Text style={[styles.featuredReaderName, { color: colors.ink }]}>{t(reader.name)}</Text>
+                <Text style={[styles.featuredReaderRole, { color: colors.gold }]}>{t(reader.title)}</Text>
+                <Text style={[styles.featuredReaderTone, { color: colors.muted }]}>{t(reader.tone)}</Text>
+              </View>
+              <Text style={[styles.featuredReaderArrow, { color: colors.navy }]} accessible={false}>›</Text>
+            </Pressable>
+          );
+        })}
       </View>
       <View style={styles.quickActions}>
         <Pressable
@@ -164,6 +197,17 @@ const styles = StyleSheet.create({
   heroActionText: { color: '#102337', fontSize: 14, fontWeight: '900' },
   heroActionArrow: { color: '#102337', fontSize: 18, fontWeight: '800' },
   actionPressed: { opacity: 0.78 },
+  featuredReaderList: { gap: 10 },
+  featuredReaderCard: {
+    minHeight: 104, borderWidth: 1, borderRadius: 17,
+    padding: 12, flexDirection: 'row', alignItems: 'center', gap: 13,
+  },
+  featuredReaderPortrait: { width: 76, height: 78, borderRadius: 11 },
+  featuredReaderCopy: { flex: 1, gap: 3 },
+  featuredReaderName: { fontSize: 17, fontWeight: '900' },
+  featuredReaderRole: { fontSize: 12, fontWeight: '800' },
+  featuredReaderTone: { fontSize: 12, lineHeight: 17 },
+  featuredReaderArrow: { fontSize: 23, fontWeight: '800' },
   quickActions: { flexDirection: 'row', gap: 10 },
   quickAction: {
     flex: 1,
