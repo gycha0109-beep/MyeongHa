@@ -169,17 +169,42 @@
     ]
   }
 });
+  let sourceDocumentCopy = null;
+  const sourceFields = Object.freeze({
+    brand: ['.mh-error-brand', 'aria-label'],
+    contact: ['.mh-error-header-help', 'textContent'],
+    kicker: ['.mh-error-kicker', 'textContent'],
+    home: ['.mh-error-primary', 'textContent'],
+    retry: ['[data-error-retry]', 'textContent'],
+    back: ['[data-error-back]', 'textContent'],
+    support: ['.mh-error-support', 'textContent'],
+  });
   function paintErrorLocale() {
+    if (!sourceDocumentCopy) {
+      sourceDocumentCopy = {
+        title: document.title,
+        meta: document.querySelector('meta[name="description"]')?.getAttribute('content') ?? '',
+        statusTitle: document.querySelector('[data-error-title]')?.textContent ?? '',
+        statusDescription: document.querySelector('[data-error-description]')?.textContent ?? '',
+        chrome: Object.fromEntries(Object.entries(sourceFields).map(([key, [selector, property]]) => {
+          const node = document.querySelector(selector);
+          return [key, property === 'textContent' ? node?.textContent ?? '' : node?.getAttribute(property) ?? ''];
+        })),
+      };
+    }
     let locale = 'ko-KR';
     try {
       const value = localStorage.getItem('myeongha.ui.locale.v1');
       if (Object.hasOwn(ERROR_CHROME, value)) locale = value;
     } catch { /* restricted browsing: keep Korean source */ }
     document.documentElement.lang = locale;
-    if (locale === 'ko-KR') return;
-    const chrome = ERROR_CHROME[locale];
+    const chrome = locale === 'ko-KR'
+      ? { ...sourceDocumentCopy.chrome, title: sourceDocumentCopy.title, meta: sourceDocumentCopy.meta }
+      : ERROR_CHROME[locale];
     const code = document.querySelector('[data-error-code]')?.textContent?.trim() ?? '404';
-    const copy = (ERROR_COPY[code] ?? ERROR_COPY[404])[locale];
+    const copy = locale === 'ko-KR'
+      ? [sourceDocumentCopy.statusTitle, sourceDocumentCopy.statusDescription]
+      : (ERROR_COPY[code] ?? ERROR_COPY[404])[locale];
     const setText = (selector, value) => {
       const element = document.querySelector(selector);
       if (element) element.textContent = value;
