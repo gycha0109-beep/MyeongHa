@@ -39,3 +39,32 @@ jobs:
           path: ${{ runner.temp }}/myeongha-ops-isolated-pg18-proof.json
           if-no-files-found: ignore
           retention-days: 14
+
+      # Separate opt-in slice of the same manual, main-only and credential-free job.
+      # The pre-existing PostgreSQL/RLS artifact above remains independently inspectable.
+      - name: Checkout pinned public actual Saju engine
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: gycha0109-beep/Saju
+          ref: 9807ce89c08afc61b587560d515a475efd819032
+          path: _isolated_saju
+          persist-credentials: false
+      - name: Build isolated Saju production calculation host
+        working-directory: _isolated_saju
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm run build
+      - name: Measure actual disposable GoTrue, PostgreSQL 18 and pinned Saju product chain
+        shell: bash
+        env:
+          PG_BIN_DIR: /usr/lib/postgresql/18/bin
+          MH_OPS_REPO_ROOT: ${{ github.workspace }}
+        run: bash scripts/operations/run-isolated-real-product-chain-phase11-ci.sh
+      - name: Upload actual isolated three-dependency product observation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: isolated-real-product-chain-phase11-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-ops-real-product-chain-phase11-proof.json
+          if-no-files-found: ignore
+          retention-days: 14
