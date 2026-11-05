@@ -11,6 +11,7 @@ import type {
 import {
   SeyeonProductionChatExecutionErrorV1,
   SeyeonCommittedReplayRevealHoldV1,
+  type RunSeyeonProductionChatExecutedResultV1,
 } from './seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from './production-seyeon-chat-runtime-v1.js';
 import { resolveRequestUiLocaleV1 } from './request-ui-locale-v1.js';
@@ -83,13 +84,31 @@ function methodNotAllowed(): Response {
   return createSeyeonVercelEmptyPreflightDenialV1('method_not_allowed');
 }
 
-function projectResult(result: RunProductionSeyeonChatResultV1) {
-  const execution = result.execution;
-  // No success serialization may ever include committed replay material,
-  // even if an alternate runtime returns a replay result instead of throwing.
-  if (execution.disposition === 'committed_replay') {
+/**
+ * G3 HTTP egress defense: never serialize an already committed assistant
+ * answer as a new first response. The request-entry first-Reveal HOLD is
+ * independent and remains unconditional; passing this is NOT permission
+ * to disclose bytes or to skip DB-owner current-rights linearization.
+ */
+export function assertSeyeonFreshHttpExecutionNotReplayV1(
+  execution: RunProductionSeyeonChatResultV1['execution'],
+): asserts execution is RunSeyeonProductionChatExecutedResultV1 {
+  if (!execution || execution.disposition !== 'executed'
+      || execution.receivedTurn?.replayed !== false
+      || execution.receivedTurn.committedTurn !== null
+      || execution.committedTurn?.replayed !== false
+      || execution.receivedTurn.turnId !== execution.committedTurn.turnId
+      || execution.attempt?.replayed !== false
+      || execution.attempt.attemptId !== execution.committedTurn.attemptId) {
     throw new SeyeonCommittedReplayRevealHoldV1();
   }
+}
+
+function projectResult(result: RunProductionSeyeonChatResultV1) {
+  const execution = result.execution;
+  // Do not trust disposition alone: a replayed receipt or already-committed
+  // receive can be wrapped in a forged 'executed' envelope.
+  assertSeyeonFreshHttpExecutionNotReplayV1(execution);
   const assistantText = execution.runtimeResult.envelope.utterance;
   return Object.freeze({
     turnId: execution.committedTurn.turnId,

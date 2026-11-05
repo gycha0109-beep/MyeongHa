@@ -1,7 +1,10 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { SeyeonCommittedReplayRevealHoldV1 } from '../apps/api/src/seyeon-production-chat-execution-v1.js';
 import { SeyeonProductionPinMigrationRequiredV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
 import {
   handleSeyeonChatTurnSendRequestV1,
+  assertSeyeonFreshHttpExecutionNotReplayV1,
 } from '../apps/api/src/chat-turn-send-http.js';
 
 const THREAD_ID = '123e4567-e89b-42d3-a456-426614174000';
@@ -49,6 +52,55 @@ function replayResult() {
     },
   } as const;
 }
+
+describe('W87 G3 HTTP first response must reject replay-shaped material',()=>{
+  const fresh=()=>({
+    ...replayResult().execution,
+    disposition:'executed' as const,
+    receivedTurn:{
+      turnId:TURN_ID,replayed:false,committedTurn:null,
+    },
+    attempt:{attemptId:'attempt',replayed:false},
+    committedTurn:{...replayResult().execution.committedTurn,replayed:false},
+    runtimeResult:{envelope:{utterance:'SYNTHETIC_UNRELEASED_FIRST_REPLY'}},
+  });
+  it('checks a structurally fresh receipt without granting HTTP release',()=>{
+    expect(()=>assertSeyeonFreshHttpExecutionNotReplayV1(fresh() as never))
+      .not.toThrow();
+    // The separate first-Reveal entry guard still unconditionally HOLDS.
+    const source=readFileSync(new URL(
+      '../apps/api/src/chat-turn-send-http.ts',import.meta.url,
+    ),'utf8');
+    const entry=source.indexOf('assertSeyeonFirstHttpRevealAuthorizedV1();');
+    const runtime=source.indexOf('const result = await input.runtime.run({');
+    const check=source.indexOf('assertSeyeonFreshHttpExecutionNotReplayV1(execution);');
+    const bytes=source.indexOf('const assistantText = execution.runtimeResult.envelope.utterance;');
+    expect(entry).toBeGreaterThan(0);
+    expect(runtime).toBeGreaterThan(entry);
+    expect(check).toBeGreaterThan(0);
+    expect(bytes).toBeGreaterThan(check);
+  });
+  it.each([
+    ['declared committed replay',{...fresh(),disposition:'committed_replay'}],
+    ['commit receipt replay flag',{...fresh(),committedTurn:{...fresh().committedTurn,replayed:true}}],
+    ['original receive replay flag',{...fresh(),receivedTurn:{...fresh().receivedTurn,replayed:true}}],
+    ['prior committed receive material',{...fresh(),receivedTurn:{...fresh().receivedTurn,committedTurn:{assistantText:'UNAUTHORIZED_PRIOR_CANARY'}}}],
+    ['mismatched original Turn',{...fresh(),receivedTurn:{...fresh().receivedTurn,turnId:'forged-turn'}}],
+    ['reused Attempt',{...fresh(),attempt:{...fresh().attempt,replayed:true}}],
+    ['swapped Attempt ID',{...fresh(),attempt:{...fresh().attempt,attemptId:'another-attempt'}}],
+    ['missing Attempt',{...fresh(),attempt:null}],
+  ] as const)('rejects %s before exposing assistant bytes',(_reason,result)=>{
+    expect(()=>assertSeyeonFreshHttpExecutionNotReplayV1(result as never))
+      .toThrow(SeyeonCommittedReplayRevealHoldV1);
+    try{
+      assertSeyeonFreshHttpExecutionNotReplayV1(result as never);
+    }catch(error){
+      expect((error as SeyeonCommittedReplayRevealHoldV1).code)
+        .toBe('SEYEON_REPLAY_REVEAL_HOLD');
+      expect((error as Error).message).not.toContain('UNAUTHORIZED_PRIOR_CANARY');
+    }
+  });
+});
 
 describe('Seyeon Member turn-send HTTP', () => {
   it.each(['committed_replay', 'executed'] as const)(
