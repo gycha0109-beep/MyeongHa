@@ -1,3 +1,4 @@
+import { adminFetchWithDeadlineV1,adminReadResponseBodyV1 } from './admin-request-deadline-v1.js';
 import { useEffect,useState } from 'react';
 import type { FormEvent } from 'react';
 import { AdminAccessDeniedErrorV1 } from './admin-client.js';
@@ -10,9 +11,10 @@ const LABELS:Record<string,string>={'credit-adjust':'크레딧 지급·회수','
 const FORM_EMPTY={kind:'notice',title:'',body:'',linkPath:'',status:'draft',startsAt:'',endsAt:'',reason:''};
 
 async function api(token:string,path:string,body?:unknown):Promise<Record<string,unknown>> {
- const res=await fetch(path,{method:body===undefined?'GET':'POST',headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json'})},credentials:'same-origin',cache:'no-store',...(body===undefined?{}:{body:JSON.stringify(body)})});
+ const init:RequestInit={method:body===undefined?'GET':'POST',headers:{Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json'})},credentials:'same-origin',cache:'no-store',...(body===undefined?{}:{body:JSON.stringify(body)})};
+ const res=body===undefined?await adminFetchWithDeadlineV1(path,init):await fetch(path,init);
  if(res.status===401||res.status===403)throw new AdminAccessDeniedErrorV1();
- const data=await res.json() as Record<string,unknown>;
+ const data=await adminReadResponseBodyV1(()=>res.json()) as Record<string,unknown>;
  if(!res.ok){const error=new Error(typeof data.error==='string'?data.error:'관리자 명령을 완료할 수 없습니다.');throw error;}
  return data;
 }

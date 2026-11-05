@@ -12,6 +12,23 @@ function secure(response: Response): Response {
   result.headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; form-action 'self'");
   return result;
 }
+/** The browser has a shorter deadline; the private server also terminates
+ * stalled GET reads without granting access or retrying a non-idempotent action.
+ */
+export const ADMIN_HOSTED_READ_DEADLINE_MS_V1 = 15_000;
+function boundHostedAdminReadV1(pending: Promise<Response>, category: 'session' | 'data'): Promise<Response> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<Response>((resolve) => {
+    timeout = setTimeout(() => {
+      console.warn('ADMIN_READ_DEADLINE_V1', { category });
+      resolve(reply(504, 'ADMIN_READ_TIMEOUT'));
+    }, ADMIN_HOSTED_READ_DEADLINE_MS_V1);
+  });
+  return Promise.race([pending, deadline]).finally(() => {
+    if (timeout !== undefined) clearTimeout(timeout);
+  });
+}
+
 function bareHttps(value: string): string {
   const url = new URL(value);
   if (url.protocol !== 'https:' || url.username || url.password || url.pathname !== '/' || url.search || url.hash) throw new Error('Invalid hosted origin');
@@ -67,7 +84,13 @@ export function createAdminHostedHttpV1(input: {
         return secure(Response.json({ ok:true, data:{ status:'authenticated', session:{ mode:'cookie' } } },
           { headers:{'Set-Cookie':cookie} }));
       }
-      if (url.pathname.startsWith('/api/admin/')) return secure(await input.api(withAdminSessionCookieV1(request)));
+      if (url.pathname.startsWith('/api/admin/')) {
+        const pending=Promise.resolve().then(()=>input.api(withAdminSessionCookieV1(request)));
+        const result=request.method==='GET'
+          ? await boundHostedAdminReadV1(pending,url.pathname==='/api/admin/session'?'session':'data')
+          : await pending;
+        return secure(result);
+      }
       if (!['GET','HEAD'].includes(request.method)) return secure(reply(405, 'METHOD_NOT_ALLOWED'));
       if (!url.pathname.startsWith('/admin')) return secure(reply(404, 'NOT_FOUND'));
       const path = url.pathname.replace(/^\/admin\/?/u, '/');
