@@ -335,6 +335,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [result, setResult] = useState<AdminReadResponse | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [retryCounter, setRetryCounter] = useState(0);
 
   useEffect(() => {
     let mounted = true;
@@ -355,7 +356,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, retryCounter]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -710,7 +711,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     {tab === 'issues' && <p className="readiness-explainer">저장된 실패·시도·임대 상태입니다. 재시도 가능 여부, 최종 실패 분류 또는 재실행 권한으로 해석하지 않습니다.</p>}
     {tab === 'provider-events' && <p className="readiness-explainer">수신·검증·처리 상태와 정확히 결속된 영수증만 표시합니다. 결제사 이벤트 유형 또는 revoked 상태만으로 실제 환불 완료를 선언하지 않습니다. 외부 거래 ID·원본 영수증·결제사 payload는 조회하지 않습니다.</p>}
     {loading ? <StatusPanel kind="loading" /> : error
-      ? <StatusPanel kind={error.includes('권한') ? 'forbidden' : 'error'} detail={error} />
+      ? <StatusPanel kind={error.includes('권한') ? 'forbidden' : 'error'} detail={error} action={<button type="button" onClick={() => setRetryCounter(value => value + 1)}>{'\uB2E4\uC2DC \uC870\uD68C'}</button>} />
       : result ? <>
         <DataTable result={result} section={section} onDetail={setDetail} onAllocation={id => {
           setTab('credit-allocations');

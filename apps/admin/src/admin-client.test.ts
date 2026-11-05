@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1, AdminReadUnavailableErrorV1, shouldClearAdminSessionAfterVerificationFailureV1 } from './admin-client.js';
 const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
 describe('admin browser API client', () => {
   it('extracts only a bounded expiry for UI revocation, without granting access from claims', () => {
@@ -41,6 +41,19 @@ describe('admin browser API client', () => {
         name:'AdminSignInFailureV1',reason,
       });
     }
+  });
+  it('retains the memory-only Owner session after transient verification failure',()=>{
+    expect(shouldClearAdminSessionAfterVerificationFailureV1(new AdminAccessDeniedErrorV1())).toBe(true);
+    expect(shouldClearAdminSessionAfterVerificationFailureV1(new Error('temporary 503'))).toBe(false);
+    expect(shouldClearAdminSessionAfterVerificationFailureV1(new AdminReadUnavailableErrorV1(503,null))).toBe(false);
+  });
+  it('shows only HTTP status and allowlisted error codes for failed reads',async()=>{
+    const unavailable=(async()=>Response.json({error:'ADMIN_HOSTED_UNAVAILABLE',secret:'must-not-display'},{status:503})) as typeof fetch;
+    await expect(fetchAdminReadV1('/api/admin/users?limit=20',JWT,unavailable)).rejects.toMatchObject({name:'AdminReadUnavailableErrorV1',status:503,reason:'ADMIN_HOSTED_UNAVAILABLE'});
+    const unsafe=(async()=>Response.json({error:'password=secret'},{status:502})) as typeof fetch;
+    await expect(fetchAdminReadV1('/api/admin/users',JWT,unsafe)).rejects.toMatchObject({status:502,reason:null});
+    const limited=(async()=>Response.json({error:'ADMIN_RATE_LIMITED'},{status:429})) as typeof fetch;
+    await expect(fetchAdminReadV1('/api/admin/users',JWT,limited)).rejects.toThrow('HTTP 429');
   });
   it('treats 403 as denied, never as a successful empty result', async () => {
     const fake = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;

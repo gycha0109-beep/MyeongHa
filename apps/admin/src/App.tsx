@@ -4,7 +4,7 @@ import { adminRoutes, getAdminRoute } from './routes.js';
 import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
-import { fetchAdminReadV1, verifyAdminOwnerSessionV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1 } from './admin-client.js';
+import { fetchAdminReadV1, verifyAdminOwnerSessionV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, shouldClearAdminSessionAfterVerificationFailureV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import { BetaAnalyticsReadiness } from './AdminOperationalReadiness.js';
 import { AdminOperatorConsole } from './AdminOperatorConsole.js';
@@ -227,7 +227,7 @@ export function App() {
       if (checking || document.visibilityState === 'hidden') return;
       checking = true;
       try { await verifyAdminOwnerSessionV1(ownerToken); }
-      catch { expire(); }
+      catch (error) { if (shouldClearAdminSessionAfterVerificationFailureV1(error)) expire(); }
       finally { checking = false; }
     };
     const timer = window.setTimeout(expire, Math.min(expiresAt - Date.now(), 2_147_483_647));
