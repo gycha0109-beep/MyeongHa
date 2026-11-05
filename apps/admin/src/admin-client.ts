@@ -1,4 +1,4 @@
-import { adminFetchWithDeadlineV1, ADMIN_READ_DEADLINE_MS_V1, ADMIN_SESSION_DEADLINE_MS_V1 } from './admin-request-deadline-v1.js';
+import { adminFetchWithDeadlineV1, adminReadResponseBodyV1, ADMIN_READ_DEADLINE_MS_V1, ADMIN_SESSION_DEADLINE_MS_V1 } from './admin-request-deadline-v1.js';
 
 export const ADMIN_SESSION_MARKER_V1 = 'cookie-session' as const;
 
@@ -90,7 +90,7 @@ export async function signInForAdminSessionV1(
     throw new AdminSignInFailureV1(response.status === 401 ? 'invalid-credentials'
       : response.status === 429 ? 'rate-limited' : 'upstream-unavailable');
   }
-  const payload: unknown = await response.json();
+  const payload: unknown = await adminReadResponseBodyV1(() => response.json());
   const data = isRecord(payload) && payload.ok === true ? payload.data : null;
   const session = isRecord(data) && data.status === 'authenticated' ? data.session : null;
   if (!isRecord(session) || session.mode !== 'cookie') {
@@ -120,7 +120,7 @@ export async function fetchAdminReadV1(
     let reason: string | null = null;
     if (response.headers.get('content-type')?.includes('application/json')) {
       try {
-        const raw: unknown = await response.json();
+        const raw: unknown = await adminReadResponseBodyV1(() => response.json());
         if (isRecord(raw) && typeof raw.error === 'string' &&
             /^ADMIN_[A-Z_]{3,64}$/u.test(raw.error)) reason = raw.error;
       } catch {
@@ -129,7 +129,7 @@ export async function fetchAdminReadV1(
     }
     throw new AdminReadUnavailableErrorV1(response.status, reason);
   }
-  const payload: unknown = await response.json();
+  const payload: unknown = await adminReadResponseBodyV1(() => response.json());
   if (!isRecord(payload) || !Array.isArray(payload.rows) ||
     payload.rows.length > 50 ||
     !(payload.nextCursor === null || typeof payload.nextCursor === 'string')) {
@@ -172,7 +172,7 @@ export async function verifyAdminOwnerSessionV1(
     let reason: string | null = null;
     if (response.headers.get('content-type')?.includes('application/json')) {
       try {
-        const body: unknown = await response.json();
+        const body: unknown = await adminReadResponseBodyV1(() => response.json());
         if (isRecord(body) && typeof body.error === 'string' &&
             /^ADMIN_[A-Z_]{3,64}$/u.test(body.error)) reason = body.error;
       } catch {
@@ -181,7 +181,7 @@ export async function verifyAdminOwnerSessionV1(
     }
     throw new AdminReadUnavailableErrorV1(response.status, reason);
   }
-  const payload: unknown = await response.json();
+  const payload: unknown = await adminReadResponseBodyV1(() => response.json());
   if (!isRecord(payload) || payload.authorized !== true) {
     throw new Error('관리자 권한을 확인하지 못했습니다.');
   }
@@ -205,7 +205,7 @@ export async function fetchAdminIssuesCsvV1(
   if (!res.ok || !res.headers.get('content-type')?.startsWith('text/csv')) {
     throw new Error('감사된 운영 이슈 내보내기를 완료하지 못했습니다.');
   }
-  const content = await res.text();
+  const content = await adminReadResponseBodyV1(() => res.text());
   if (content.length > 64 * 1024) throw new Error('내보내기 결과가 최대 크기를 초과했습니다.');
   return content;
 }
