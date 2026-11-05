@@ -44,8 +44,8 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
         ) : null}
         <View style={styles.headingCopy}>
           <MobileUiText style={styles.kicker}>READER · 세연 프리뷰 장면</MobileUiText>
-          <Text style={styles.title}>{reader.name} <Text style={styles.subtitle}>· {reader.title}</Text></Text>
-          <Text style={styles.tone}>{reader.tone}</Text>
+          <Text style={styles.title}>{reader.name} <Text style={styles.subtitle}>· {t(reader.title)}</Text></Text>
+          <Text style={styles.tone}>{t(reader.tone)}</Text>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -85,9 +85,9 @@ export function MobileReaderPicker({ selected, onChange, vertical }: MobileReade
                 {option.name}
               </Text>
               <Text style={[styles.optionTitle, effectiveSelected === option.key && styles.selectedText]}>
-                {option.title}
+                {t(option.title)}
               </Text>
-              <Text style={styles.optionTone}>{option.tone}</Text>
+              <Text style={styles.optionTone}>{t(option.tone)}</Text>
               <Text style={styles.optionStatus}>
                 {t(accessView.previewPresentation === 'preview_available' ? '프리뷰만' : '컨셉 준비 중')}
               </Text>
