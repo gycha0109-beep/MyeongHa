@@ -1,5 +1,19 @@
 # Phase 11 — Controlled non-production loopback capacity probe
 
+## Actual local Workers runtime observation
+
+On 2026-11-05 KST, the actual `workerd` process ran the main Worker entrypoint from `9ea61382aad65231d8fbda095a7f5b1da9f515b9` under the repository's pinned Wrangler 4.152.0 (`workerd` 1.20261019.1, Windows Node 24.20.0). The 127.0.0.1 listener used a temporary Wrangler configuration with the source compatibility date and flags, a local-only name, and no bindings or credentials. [Original 1,149-byte observation](LOCAL_WORKERD_HEALTH_OBSERVATION_20261105.json), SHA-256 `6e23bc849965c3906b28ff7868e86a881556eccc2912f7266f8aa777f129076a`.
+
+| `/api/health` scenario | Successful / measured | p50 / p95 / p99 (ms) |
+| --- | ---: | ---: |
+| Baseline after 5 warmups | 50 / 50 | 15.442 / 18.901 / 22.390 |
+| Concurrency 4 | 100 / 100 | 10.070 / 12.927 / 14.758 |
+| Concurrency 8 | 100 / 100 | 17.355 / 21.748 / 22.366 |
+
+Health returned 200, its unsupported method returned 405, and Member/calculation/preview routes returned the default 404 with all five responses marked `no-store`. These are local runtime ingress and fail-closed observations. The origin/transport admission rules still require a separately configured isolated HTTPS origin and approved dependency bindings for positive Worker-path measurement. This run recorded no Auth, SQL, Saju, Production capacity, or scaling evidence.
+
+To reproduce, create a temporary Wrangler JSON config outside the checkout with only a distinct local `name`, the absolute path to `cloudflare/myeongha-worker.mjs`, `compatibility_date`, and `compatibility_flags` copied from the current source config. Launch the pinned Wrangler from the temporary directory with `dev --local --config <temporary-config> --ip 127.0.0.1 --port 0`. Use the printed local port with `collect-loopback-api-performance-baseline.mjs` and `measure-controlled-loopback-capacity.mjs` as documented below, then stop the local process. [Cloudflare local development](https://developers.cloudflare.com/workers/local-development/).
+
 ## Real product path sustained experiment
 
 Run the existing main-only GitHub Linux workflow with `experiment=sustained` after the implementation is merged. Its default `short` mode remains the short GoTrue, PostgreSQL18 and pinned Saju experiment.
