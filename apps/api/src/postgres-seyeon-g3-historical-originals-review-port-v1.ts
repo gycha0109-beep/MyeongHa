@@ -9,6 +9,17 @@ const RECEIPT_FIELDS=[
   'authorizesFirstReveal','authorizesCommittedReplay',
   'permitsStreaming','permitsHttpReveal',
 ] as const;
+// G5 request allowlist: no cached permission, replay marker, private
+// content, or caller-supplied release instruction may enter this DB port.
+const AUDIT_REQUEST_FIELDS=[
+  'subjectId','threadId','turnId','attemptId','purpose',
+  'historicalSourceCount',
+] as const;
+const FIRST_REQUEST_FIELDS=[
+  ...AUDIT_REQUEST_FIELDS,
+  'expectedUserMessageId','expectedAssistantMessageId',
+  'expectedPostTurnOutboxEventId','expectedClientTurnId',
+] as const;
 
 export type SeyeonG3HistoricalReviewPurposeV1=
   'audit_only'|'first'|'committed_replay';
@@ -59,7 +70,14 @@ export function createSeyeonG3HistoricalOriginalsReviewPortV1(
   return Object.freeze({
     async reviewCurrentOriginals(req:SeyeonG3HistoricalOriginalsReviewRequestV1){
       // Never turn replay into 'first' by passing old Committed receipts.
-      if(!req || ![req.subjectId,req.threadId,req.turnId,req.attemptId]
+      if(!req || typeof req!=='object' || Array.isArray(req))
+        throw new SeyeonG3HistoricalOriginalsReviewHoldV1();
+      const expectedFields=req.purpose==='first'
+        ?FIRST_REQUEST_FIELDS:AUDIT_REQUEST_FIELDS;
+      if(Reflect.ownKeys(req).length!==expectedFields.length
+        ||expectedFields.some(key=>!Object.hasOwn(req,key)))
+        throw new SeyeonG3HistoricalOriginalsReviewHoldV1();
+      if(![req.subjectId,req.threadId,req.turnId,req.attemptId]
           .every(value=>typeof value==='string'&&UUID.test(value))
         ||!Number.isSafeInteger(req.historicalSourceCount)
         ||req.historicalSourceCount<1||req.historicalSourceCount>23

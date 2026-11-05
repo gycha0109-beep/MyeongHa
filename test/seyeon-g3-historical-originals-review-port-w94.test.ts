@@ -86,6 +86,16 @@ describe('W94 restricted G3 historical original-rights DB review port (HOLD)',()
     ['empty sources',{...input,historicalSourceCount:0}],
     ['too many sources',{...input,historicalSourceCount:24}],
     ['unexpected first locators in audit',{...input,expectedAssistantMessageId:id(6)}],
+    ['audit optional locator present but undefined',{
+      ...input,expectedAssistantMessageId:undefined,
+    }],
+    ['extra private body',{...input,assistantText:'PRIVATE_CANARY'}],
+    ['forged first permit',{...input,authorizesFirstReveal:true}],
+    ['forged replay permit',{...first,authorizesCommittedReplay:true}],
+    ['forged source record',{...first,originalRecordId:id(9)}],
+    ['non-enumerable extra object key',Object.defineProperty(
+      {...input},'privateSource',{value:'PRIVATE_CANARY',enumerable:false},
+    )],
     ['missing first message',{...first,expectedAssistantMessageId:undefined}],
     ['incorrect original User',{...first,expectedUserMessageId:'forged'}],
     ['invalid post-turn Outbox',{...first,expectedPostTurnOutboxEventId:'forged'}],
@@ -97,6 +107,20 @@ describe('W94 restricted G3 historical original-rights DB review port (HOLD)',()
     await expect(port.reviewCurrentOriginals(request as never))
       .rejects.toBeInstanceOf(SeyeonG3HistoricalOriginalsReviewHoldV1);
     expect(calls).toHaveLength(0);
+  });
+  it('treats hostile Client Turn text ONLY as a parameter, not SQL',async()=>{
+    const injection="client-turn-x'); drop table public.memory_items; --";
+    const {port,calls}=fake(valid);
+    const receipt=await port.reviewCurrentOriginals({
+      ...first,expectedClientTurnId:injection,
+    });
+    expect(receipt.permitsHttpReveal).toBe(false);
+    expect(receipt.authorizesFirstReveal).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.params[8]).toBe(injection);
+    expect(calls[0]?.sql).toContain('$9::text');
+    expect(calls[0]?.sql).not.toContain(injection);
+    expect(calls[0]?.sql).not.toContain('drop table');
   });
   it('does not turn DB exceptions into a disclosure or permit',async()=>{
     const {port}=fake(valid,true);
