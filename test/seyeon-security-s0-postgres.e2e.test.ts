@@ -2538,6 +2538,110 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       `);
       expect(restoredG3SourceType).toEqual({enabled:true});
 
+      // W96 G3/G5: TYPE DISABLE COMMITS FIRST, while a separate restricted
+      // G3 review has started against the original pre-disable snapshot.
+      // The waiting review must resume by rejecting the CURRENT disabled
+      // row. An obsolete G1 admission must never become a Reveal permit.
+      const g3CommittedDisabler=await pool.connect();
+      const g3AfterDisableReviewer=await subjectPool.connect();
+      let pendingDisabledReview:
+        Promise<{ok:true;review:Record<string,unknown>}|
+                {ok:false;error:unknown}>|undefined;
+      let disabledReviewOutcome:
+        {ok:true;review:Record<string,unknown>}|
+        {ok:false;error:unknown}|undefined;
+      let committedTypeDisable=false;
+      let g3ReviewBlockedByTypeDisable=false;
+      try{
+        await g3CommittedDisabler.query('BEGIN');
+        const {rows:[disablerPid]}=await g3CommittedDisabler.query<{
+          pid:number
+        }>('select pg_backend_pid() as pid');
+        expect(disablerPid?.pid).toBeGreaterThan(0);
+        const disabled=await g3CommittedDisabler.query(`
+          update public.seyeon_positive_source_type_registry_v1
+          set enabled=false
+          where record_kind='memory' and record_type='conversation_recall'
+            and schema_version='v1'
+            and projector_version='seyeon-conversation-recall-projector-v1'
+            and enabled=true`);
+        expect(disabled.rowCount).toBe(1);
+        await g3AfterDisableReviewer.query('BEGIN');
+        await g3AfterDisableReviewer.query(
+          'SET LOCAL ROLE myeongha_api_executor',
+        );
+        await g3AfterDisableReviewer.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        const {rows:[reviewerPid]}=await g3AfterDisableReviewer.query<{
+          pid:number
+        }>('select pg_backend_pid() as pid');
+        expect(reviewerPid?.pid).toBeGreaterThan(0);
+        expect(reviewerPid?.pid).not.toBe(disablerPid?.pid);
+        pendingDisabledReview=g3AfterDisableReviewer.query<{
+          review:Record<string,unknown>
+        }>(`select
+          seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,
+            $6::uuid,$7::uuid,$8::uuid,$9::text
+          ) as review`,[
+            f.subject,f.thread,currentTurn,currentAttempt,'audit_only',
+            null,null,null,null,
+          ]).then(
+            result=>({ok:true as const,review:result.rows[0]!.review}),
+            (error:unknown)=>({ok:false as const,error}),
+          );
+        for(let i=0;i<100;i++){
+          const {rows:[waiting]}=await pool.query<{blocked:boolean}>(`
+            select $1::int=any(pg_catalog.pg_blocking_pids($2::int))
+              as blocked
+          `,[disablerPid!.pid,reviewerPid!.pid]);
+          if(waiting?.blocked){g3ReviewBlockedByTypeDisable=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        expect(g3ReviewBlockedByTypeDisable).toBe(true);
+        // The disabling transaction COMMITs instead of rolling back.
+        // READ COMMITTED's FOR SHARE must re-check enabled after the wait.
+        await g3CommittedDisabler.query('COMMIT');
+        committedTypeDisable=true;
+        if(pendingDisabledReview)
+          disabledReviewOutcome=await pendingDisabledReview;
+        expect(disabledReviewOutcome?.ok).toBe(false);
+        if(disabledReviewOutcome?.ok===false)
+          expect(disabledReviewOutcome.error).toMatchObject({
+            constraint:'seyeon_historical_g3_source_type_disabled',
+          });
+      }finally{
+        if(!committedTypeDisable)
+          await g3CommittedDisabler.query('ROLLBACK').catch(()=>undefined);
+        g3CommittedDisabler.release();
+        if(pendingDisabledReview && !disabledReviewOutcome)
+          disabledReviewOutcome=await pendingDisabledReview;
+        await g3AfterDisableReviewer.query('ROLLBACK').catch(()=>undefined);
+        g3AfterDisableReviewer.release();
+        // Restore the synthetic registry only AFTER the blocked reader has
+        // completed. Do not silently alter later G2 or original-Grant tests.
+        if(committedTypeDisable)
+          await pool.query(`update public.seyeon_positive_source_type_registry_v1
+            set enabled=true
+            where record_kind='memory' and record_type='conversation_recall'
+              and schema_version='v1'
+              and projector_version='seyeon-conversation-recall-projector-v1'
+              and enabled=false`);
+      }
+      const {rows:[afterCommittedDisableRace]}=await pool.query(`
+        select enabled from public.seyeon_positive_source_type_registry_v1
+        where record_kind='memory' and record_type='conversation_recall'
+          and schema_version='v1'
+          and projector_version='seyeon-conversation-recall-projector-v1'
+      `);
+      expect(afterCommittedDisableRace).toEqual({enabled:true});
+      expect(await g3PortAudit()).toMatchObject({
+        originalsCurrentForReview:true,authorizesFirstReveal:false,
+        authorizesCommittedReplay:false,permitsStreaming:false,
+        permitsHttpReveal:false,
+      });
+
       // W90 G3/G5: independent DB sessions. The G3 CURRENT-originals
       // review holds the exact original Memory Grant through its transaction.
       // A concurrent consent withdrawal marker must WAIT specifically on
