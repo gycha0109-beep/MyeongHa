@@ -15,6 +15,12 @@ node scripts/operations/derive-isolated-product-scaling-review.mjs \
 
 The review checks the source, original bytes, complete request accounting, cleanup and the observed Saju constraints. It keeps the short concurrency ramp separate from the sustained windows. The 15-minute run handled four arrivals per second with a measured peak of one request in flight. SQL p95 was 81.435ms including the fixture's deliberate 80ms delay, Auth response headers p95 was 27.185ms and Saju adapter p95 was 1.954ms. Saju recorded zero CPU throttle periods and zero OOM kills in both windows. These observations leave sustained overlapping-request limits, Worker product-runtime capacity and Production scaling or downscaling thresholds open.
 
+### Overlapping arrivals and measured DB pressure
+
+The [15-minute four-way observation](REAL_GOTRUE_PG18_SAJU_OVERLAP_LINUX_OBSERVATION_20261105.json) uses the same command with main `d08636181b0957721b5a318898510f4045264b96` and SHA-256 `c8691b44ab15ac67874a3526778bbf0593ab21b603e425dd00b7adec29db8941`. The analyzer verifies the four-client wave, four concurrent calculations at the gateway and short-probe DB acquisition counts before returning the review.
+
+The paced and overlapping trials each offered 4 requests/s. In the overlapping trial the gateway admitted four concurrent requests in all 900 waves, and DB acquisition p95 was 83.171 ms compared with 0.066 ms in the earlier paced trial. Both trials used the two-connection fixture with an 80 ms SQL delay. This is a cross-run observation for those constraints. The short concurrency-8 ramp in the overlap run recorded 16 acquisition failures and 16 HTTP 503 responses. This supports reviewing pool headroom, bounded acquisition waits and query duration before increasing API concurrency. The successful overlap trial, without Saju throttling, leaves the combined Saju ceiling and Production scaling settings unapproved.
+
 ## Public diagnostic route review
 
 `scripts/derive-observed-scaling-review.mjs` consumes an **array of actual Phase 11 collector JSON reports** from a single controlled non-production loopback diagnostic route. It combines repeated measurements at the same concurrency level conservatively, preserving any observed non-200 or transport failures. It does **not** invent a numeric service SLO, scaling ceiling, production target or Saju/DB performance claim.

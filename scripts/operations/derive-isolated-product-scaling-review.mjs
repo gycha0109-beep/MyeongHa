@@ -21,10 +21,11 @@ function batch(p, requested, concurrency) {
   assert.equal(p.successful + p.unavailable, requested);
   quantiles(p);
 }
-function window(p, durationSeconds, requestsPerSecond, concurrency) {
+function window(p, durationSeconds, requestsPerSecond, concurrency, overlap = false) {
+  const overlapKeys = overlap ? 'waveSize apiPeak apiFourWayAdmissions' : '';
   safeKeys(p, `durationSeconds requestsPerSecond concurrency scheduled skipped peak elapsedMs
     successful unavailable transportFailures p50Ms p95Ms p99Ms dbAcquireFailures dbAcquireP95Ms
-    dbQueryP95Ms authHeadersP95Ms sajuP95Ms saju`);
+    dbQueryP95Ms authHeadersP95Ms sajuP95Ms saju ${overlapKeys}`);
   assert.equal(p.durationSeconds, durationSeconds);
   assert.equal(p.requestsPerSecond, requestsPerSecond);
   assert.equal(p.concurrency, concurrency);
@@ -42,6 +43,14 @@ function window(p, durationSeconds, requestsPerSecond, concurrency) {
   assert.equal(p.saju.oomKills, 0);
   assert([p.saju.memoryPeakBytes, p.saju.cpuUsageUsec, p.saju.cpuThrottledPeriods].every(saneCount));
   assert(p.saju.memoryPeakBytes > 0 && p.saju.memoryPeakBytes <= p.saju.memoryLimitBytes);
+  if (overlap) {
+    assert.equal(p.waveSize, 4);
+    assert.equal(p.peak, p.waveSize);
+    assert.equal(p.apiPeak, p.waveSize);
+    assert.equal(p.skipped % p.waveSize, 0);
+    assert(saneCount(p.apiFourWayAdmissions) && p.apiFourWayAdmissions > 0);
+    assert(p.apiFourWayAdmissions <= (p.scheduled - p.skipped) / p.waveSize);
+  }
 }
 export function deriveIsolatedProductScalingReview(bytes, sourceSha, expectedSha256) {
   assert(Buffer.isBuffer(bytes));
@@ -75,19 +84,29 @@ export function deriveIsolatedProductScalingReview(bytes, sourceSha, expectedSha
   ]) assert.equal(p[key], false);
   assert([p.dbAcquireP95Ms, p.dbQueryP95Ms].every(saneTime));
   assert([p.authHttpCalls, p.sajuCalculationCalls].every(saneCount));
-  safeKeys(p.sustained, 'ramp windows injectedDbUnavailable recoverySucceeded');
+  const overlap = Object.hasOwn(p.sustained, 'shortDbAcquireFailures');
+  safeKeys(p.sustained, `ramp windows injectedDbUnavailable recoverySucceeded
+    ${overlap ? 'shortDbAcquireFailures' : ''}`);
   assert.equal(p.sustained.injectedDbUnavailable, 1);
   assert.equal(p.sustained.recoverySucceeded, true);
+  assert(Array.isArray(p.sustained.ramp) && Array.isArray(p.sustained.windows));
   assert.equal(p.sustained.ramp.length, 2);
-  assert.equal(p.sustained.windows.length, 2);
+  assert.equal(p.sustained.windows.length, overlap ? 1 : 2);
   batch(p.baseline, 12, 1);
   assert.equal(p.baseline.successful, 12);
   batch(p.sustained.ramp[0], 24, 2);
   batch(p.sustained.ramp[1], 24, 4);
   batch(p.contended, 32, 8);
-  window(p.sustained.windows[0], 300, 1, 1);
-  window(p.sustained.windows[1], 900, 4, 4);
   const shortProbes = [p.baseline, ...p.sustained.ramp, p.contended];
+  if (overlap) {
+    window(p.sustained.windows[0], 900, 4, 4, true);
+    const failures = p.sustained.shortDbAcquireFailures;
+    assert(Array.isArray(failures) && failures.length === shortProbes.length);
+    assert(failures.every((count, index) => saneCount(count) && count <= shortProbes[index].unavailable));
+  } else {
+    window(p.sustained.windows[0], 300, 1, 1);
+    window(p.sustained.windows[1], 900, 4, 4);
+  }
   const firstFailure = shortProbes.findIndex(probe => probe.unavailable > 0);
   const consistentBoundary = firstFailure > 0 &&
     shortProbes.slice(firstFailure).every(probe => probe.unavailable > 0);
@@ -103,6 +122,11 @@ export function deriveIsolatedProductScalingReview(bytes, sourceSha, expectedSha
     reviewDbPoolHeadroom: consistentBoundary && poolBudgetReached,
     sustainedWindows: p.sustained.windows,
     highestObservedSustainedConcurrency: Math.max(...p.sustained.windows.map(window => window.peak)),
+    ...(overlap && {
+      shortDbAcquireFailures: p.sustained.shortDbAcquireFailures,
+      highestObservedGatewayConcurrency: p.sustained.windows[0].apiPeak,
+      gatewayFourWayAdmissions: p.sustained.windows[0].apiFourWayAdmissions,
+    }),
     sajuCpuThrottlingObserved: p.sustained.windows.some(window => window.saju.cpuThrottledPeriods > 0),
     productionCapacityProven: false,
     productionScalingThresholdApproved: false,

@@ -39,7 +39,15 @@ The manual Linux workflow also offers `experiment=overlap` for a distinct 15-min
 gh workflow run postgres-isolated-rls-capacity-acceptance.yml --ref main -f experiment=overlap
 ```
 
-Use this option after its source is merged. Its overlapping-request result requires a successful Linux run with the new mode.
+### Verified first 15-minute overlap run
+
+[Linux #41996074287](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41996074287) succeeded on `main` `d08636181b0957721b5a318898510f4045264b96`. [Artifact 13400763590](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41996074287/artifacts/13400763590) contains the [original 2,897-byte JSON](REAL_GOTRUE_PG18_SAJU_OVERLAP_LINUX_OBSERVATION_20261105.json) with raw SHA-256 `c8691b44ab15ac67874a3526778bbf0593ab21b603e425dd00b7adec29db8941`.
+
+- All 3,600 requests succeeded in 900 waves. The Node gateway observed 900 admissions reaching four concurrent requests. HTTP 503, transport failures, skipped slots and DB acquisition failures were all zero in this window. Successful p50/p95/p99 was 165.099/205.932/209.881 ms.
+- DB acquisition p95 was 83.171 ms and SQL p95 was 81.696 ms with the fixture's 80 ms query delay. Auth response headers p95 was 36.953 ms and Saju adapter p95 was 2.674 ms. The 0.5 CPU/256 MiB Saju cgroup peaked at 53,592,064 bytes, with zero CPU throttles and OOM kills.
+- The separate short ramp at concurrency 8 recorded 16 successful responses and 16 HTTP 503, with 16 DB acquisition failures. At concurrency 1/2/4, all 60 short requests succeeded and no DB acquisition failed. The injected DB outage returned 503, four recovery calculations passed, and both cleanup guards passed.
+
+The trial demonstrates overlap at the tested arrival rate and fixture constraints. It leaves the combined Saju saturation point, Worker product-path capacity and Production scaling thresholds open.
 
 ## What this experiment does not prove
 

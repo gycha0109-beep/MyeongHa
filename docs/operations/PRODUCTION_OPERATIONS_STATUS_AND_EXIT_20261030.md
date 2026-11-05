@@ -10,6 +10,11 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Phase 11 실제 지속 동시 요청 및 DB 연결 압력 확인
+
+- [Linux #41996074287](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41996074287)에서 15분 동안 900회 모두 API 요청 4개가 실제로 겹쳤다. 3,600/3,600건 성공, p95 205.932ms, 장애 주입 후 복귀와 자원 정리 통과. [원본·SHA-256·측정 범위](REAL_GOTRUE_PG18_SAJU_PRODUCT_CHAIN_PHASE11_20261105.md).
+- 별도 짧은 동시성 8 구간에서는 HTTP 503 16건과 DB 연결 획득 실패 16건을 관측했다. [Phase 12 검증기](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md)에 짧은 연결 압력과 지속 동시성의 분리 판정을 추가했다. Saju 통합 포화점, Workers 제품 경로와 운영 확장 수치는 미수용이다.
+
 ### 2026-11-05 KST — Phase 10–12 지속 부하 실증과 확장 진단
 
 - [격리 Linux #41987403626](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41987403626)에서 5분 300/300, 15분 3,600/3,600 계산이 성공했다. 15분 구간의 p95는 112.824ms, 실제 최대 동시 요청은 1개였다. 0.5 CPU·256 MiB Saju 제약, 실패 주입 뒤 정상 복귀, 런타임·Docker 자원 정리를 확인했다. [원본·해시·계측 범위](API_CONTROLLED_CAPACITY_PHASE11_20261030.md).
@@ -566,51 +571,53 @@
 
 Cloudflare Provider observability 설정은 `enabled=true`, `logs.enabled=true`, `invocation_logs=false`로 읽혔음. 과거 버전 `cc165497-...`에 대해 읽은 bounded analytics 구간(2026-10-30T06:40:35Z–06:57:00Z)은 Worker 요청 11, 오류 0, subrequest 3. **작은 적응형 표본·Worker 단위 메트릭**이지 라우트별 p95, DB/Saju 경로 지연, 실제 용량, 로그 redaction 실증, 경보 전달 또는 승인된 SLO가 아님.
 
-## 4. Phase 1–13 구현 현황 — 코드 구현과 수용 검증 분리
+## 4. Phase 1–13 구현 현황 — 2026-11-05 KST 증거 기준
 
 | 단계 | 실제 확보한 구현/증거 | 종료에 남은 것 |
 | --- | --- | --- |
 | **1. 토폴로지/서비스 목록** | 운영 아키텍처와 Cloudflare primary source·build 추적 | 새로운 배포/설정 변화 때 증거 최신화 |
 | **2. Saju Production 호스팅** | Cloud Run 운영·Production 연동 기존 이력 [#388](https://github.com/gycha0109-beep/MyeongHa/issues/388) | **최신 Worker 버전** 기준 실 Saju 계산·계약/버전 검증 |
 | **3. 비밀/환경** | Worker 환경/비밀 경계, auth 경계 테스트, `main` 및 Production 환경 정책 문서 | 비밀 로테이션·음성/양성·격리의 실제 시점별 검증을 누락 없이 수용 |
-| **4. 배포/Health/롤백** | GitHub main 배포 근거, Cloudflare 100% 버전, 이전 버전 health/readiness 실측 | 새 배포 정확 버전의 live smoke, 의존성 readiness, 실제 rollback 후보/전환 근거 |
-| **5. 구조화 로그** | 관련 로깅/비식별화 코드와 Cloudflare 로그 활성화 설정 | 해당 배포 버전의 실제 샘플 존재·redaction 검증 |
+| **4. 배포/Health/롤백** | 정확한 Worker 빌드·트래픽 버전, 익명 스모크, 직전 배포 후보 식별 | 전체 의존성 readiness·정확한 후보의 호환성 및 실제 롤백 검증 |
+| **5. 구조화 로그** | 공통 보안 이벤트, 비식별화 회귀, 배포 버전에 묶인 인증 거부 표본 | 다른 이벤트와 필드의 비식별화, 최신 배포의 표본 재확인 |
 | **6. 메트릭/경보** | Cloudflare Worker bounded analytics 조회, 보안 경보 설정·테스트 이력 | 의존성별 golden signal, 생산 로그 연동, 실제 장애/알림 전달 및 보존 근거 |
-| **7. 장애 격리/시간 제한** | 기존 예외·차단 경계 및 테스트 | DB/Saju/인증 실패 주입의 실제 제한·복원 실증 |
-| **8. 백업/복구** | 암호화된 실제 DB 백업 [#40812111605](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40812111605), 격리 PG17 복원 [#40817391430](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40817391430) 성공 | **Hosted Auth/Storage, 개인정보 연속성, 스키마 동등성, 전체 서비스 RPO/RTO 미증명 — DR 차단** |
-| **9. 캐시/CDN** | 동적 API 경로별 `no-store` 코드·회귀 검증, 이전 버전 live 헤더 검사 | 새 버전의 동일 정책 유지 근거 및 외부 CDN 계약 분리 |
-| **10. 지연시간 기준선** | [루프백 p50/p95/p99 수집기](API_PERFORMANCE_BASELINE_PHASE10_20261030.md) | 실제 Auth/DB/Saju·제품 경로의 대표 지연 실측 및 병목 파악 |
-| **11. 부하/용량** | [20–500 요청 1–8 동시성 수집기 + 5/15분 envelope](API_CONTROLLED_CAPACITY_PHASE11_20261030.md) | 격리된 실제 환경에서 지속 실측·DB/Saju 포화 한계 측정 |
-| **12. 확장 임계치** | [측정 실패 경계 기반 진단 분석기](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md) | DB pool/CPU·메모리·실제 서비스 수치를 사용한 수용 가능한 기준, 자동 확장 주장 금지 |
-| **13. 최종 운영 수용** | 정확한 main SHA 증거 수집기, Cloudflare live 익명 E2E·Provider 버전 증거 | §33 14개 요건을 현재 배포 버전 기준으로 연결하고 미검증 항목 별도 처리 |
+| **7. 장애 격리/시간 제한** | 격리 DB 압력·회복, 제품 경로 DB 어댑터 장애 주입 후 회복, 독립 Health | 전체 혼돈 행렬 및 Worker 제품 경로의 실제 의존성 장애·복구 |
+| **8. 백업/복구** | 암호화 DB 백업 [#41935300674](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41935300674), 앞선 백업의 격리 PG17 복원 [#41240770891](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240770891) | **Hosted Auth/Storage, 개인정보 연속성, 스키마 동등성, 전체 서비스 RPO/RTO 미증명 — DR 차단** |
+| **9. 캐시/CDN** | 경로 분류와 `no-store` 회귀, 운영 익명 스모크 및 실제 로컬 Worker 차단 경로 헤더 | 해당 배포의 양성 비공개 경로 전체와 외부 CDN 계약 검증 |
+| **10. 지연시간 기준선** | [실제 격리 제품 경로의 p50/p95/p99와 의존성 시간](API_CONTROLLED_CAPACITY_PHASE11_20261030.md), 별도 로컬 Worker Health | Worker 제품 경로와 대표 트래픽의 지연·병목 |
+| **11. 부하/용량** | [실제 GoTrue·PG18·Saju 격리 단기·지속 부하 및 자원 제약](API_CONTROLLED_CAPACITY_PHASE11_20261030.md) | 제품 경로의 Saju 포화 한계, Workers 런타임에 의존성을 연결한 실측 |
+| **12. 확장 임계치** | [검증된 격리 실측을 입력으로 받는 DB 풀 여유 진단](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md) | 운영 요청·자원 근거에 따른 확장 및 축소 판단 기준과 승인 |
+| **13. 최종 운영 수용** | 실제 `main` 이력을 확인하는 증거 수집기, 배포 버전에 묶인 익명 관측 | 아래 §33 항목의 미검증 범위와 #1887 해소 |
 
 **Phase 8 상세 차단 근거:** [PostgreSQL DR 상태](POSTGRES_DR_READINESS_STATUS_V1.md) 및 [Hosted Auth/Storage gap matrix](HOSTED_AUTH_STORAGE_DR_GAP_MATRIX_V1.md). 당시 Production 원격 migration `20261029012948` vs 저장소 `20261029012000`, 원격 전용 `20261008090417` 등 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)의 불일치 미해결. 최신 실제 격리 복원은 성공했지만 일부 Provider 원본 행/관계가 빠져 **전체 Hosted 복구 동등성 아님**. 로컬 합성 Auth/Storage·JWT 폐기 테스트 PASS는 Production 연속성 증거로 승격하지 않음. 승인 RPO `PT24H` / RTO `PT6H` 충족도 미입증. `dr_ready=false`, `future_safe_privacy_reconciliation=false`, `serviceResumptionAllowed=false` 유지.
 
-## 5. §33 Production 최소 14항목 수용 판정 — 현 시점
+## 5. §33 Production 최소 14항목 수용 판정 — 2026-11-05 KST 관측
+
+17:44 KST 운영 익명 스모크는 `af740750-93ff-4f2d-b5ce-e5fc0747e86d`를 관측했다. 같은 버전에 트래픽 100%와 빌드 소스 `cd8d06c73f2a131f85d4caeaa2715399f9b6552f`를 대조했다. [Cloudflare 빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/e5f623fd-e3fd-4644-a94d-4df1a86f7d77).
 
 | ID | 확인 대상 | 판정 / 한계 |
 | --- | --- | --- |
 | 1 | 기대 소스 SHA·OCI digest | **부분 실증:** 최신 Worker Build의 GitHub main SHA 확인. Saju exact OCI/digest 수용은 별도 |
 | 2 | Provider 배포 상태 | **관측:** 최신 Worker 100% 트래픽 및 성공 빌드. Saju/DB 전체 readiness와는 별개 |
 | 3 | 비밀 비노출 구성 사전점검 | **미수용:** 전체 live preflight 증거 묶음 미확인 |
-| 4 | Liveness | **현 배포 `f549bc9f-...` 실서비스 Health 200 PASS** ([#41022755702](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41022755702)) |
-| 5 | Readiness·capability | **현 버전 config-only 200 PASS**, 양성 DB/Saju 호출 실측 PASS; **전 의존성·장애시 readiness는 미수용** |
+| 4 | Liveness | **관측 버전에서 실서비스 Health 200 통과** |
+| 5 | Readiness·capability | **관측 버전에서 설정 기반 readiness 200**. 실제 의존성·장애 시 readiness는 미수용 |
 | 6 | 음성 인증 smoke | **현 버전 익명 Member/Saju/preview 401 PASS**, cross-origin 403 PASS |
-| 7 | 양성 인증 synthetic smoke | **현 버전 양성 실서비스 PASS:** Member 로그인·주체 귀속 DB·Birth Revision·Saju 계산-only 각 200 ([#41022084481](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41022084481)); 다른 기능 포함 전체 수용은 별도 |
-| 8 | 필수 의존성 점검 | **부분 실증:** 현 버전 Member/Auth/DB/Saju 실제 정상 경로 200; 장애 시 지연·timeout·DB pool 가용성 미수용 |
-| 9 | MyeongHa↔Saju 호환성 | **계산-only 실서비스 통합 PASS**; 전체 해석 계약·배포 간 호환성·장애 조건은 별도 수용 |
-| 10 | 사용자 비공개 캐시 | **현 버전 익명·양성 검증 API no-store 헤더 검사 PASS**; 모든 개인 데이터 경로와 외부 CDN 계약은 별도 |
-| 11 | 비밀 반사 금지 | **일부 실증:** 현 버전 익명·양성 검증 응답의 비밀/헤더 경계 검사 PASS. 전체 로그·본문·크로스서비스 검증 미수용 |
-| 12 | 로그 존재·redaction | **설정 확인**. 실제 배포 샘플 및 redaction 증거 미수용 |
-| 13 | 메트릭 존재 | **현 버전 Cloudflare Worker 집계 관측** (지정 구간 108건/Worker 오류 0건); 의존성 지표·운영 SLO는 미수용 |
-| 14 | 롤백 후보 확인 | **이전 버전 후보 식별** (`9c79b61f-...`, 기존 main `80268c01...`); 호환성 검증 및 실제 롤백 drill 미수용 |
+| 7 | 양성 인증 synthetic smoke | **이전 버전**의 Member·DB·Birth Revision·계산-only 성공 [#41240560177](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240560177). 관측 버전의 양성 검증은 미수용 |
+| 8 | 필수 의존성 점검 | **이전 운영 정상 호출과 격리 실제 의존성 실증**. 관측 버전의 실제 의존성 연결·실패 시 동작 미수용 |
+| 9 | MyeongHa↔Saju 호환성 | **이전 운영 계산과 최신 격리 계산 실증**. 관측 버전 및 전체 해석·장애 조건 미수용 |
+| 10 | 사용자 비공개 캐시 | **관측 버전의 익명 거부 응답 `no-store` 통과**. 양성 비공개 경로 전체와 CDN 계약은 별도 |
+| 11 | 비밀 반사 금지 | **익명 스모크의 제한된 헤더·응답 검사 및 앞선 합성 표본 통과**. 전체 로그·본문·크로스서비스 미수용 |
+| 12 | 로그 존재·redaction | **앞선 운영 버전에서 인증 거부 표본과 합성 문자열 비노출 관측**. 관측 버전 및 다른 필드의 증거는 미수용 |
+| 13 | 메트릭 존재 | **앞선 구간 Worker 집계 관측**. 현 배포 버전별 지표, 의존성 지표·운영 SLO 미수용 |
+| 14 | 롤백 후보 확인 | **직전 배포 후보** `a5a350bb-9869-43ca-98da-2e1fd496b235`, 소스 `d08636181b0957721b5a318898510f4045264b96` [빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/d99d11d4-4fcf-4065-a216-de187a057b92). 호환성과 실제 전환 미수용 |
 
 이 표는 별도 실증 결과를 수작업으로 구분한 **상태 보고**이며 `scripts/operations/inspect-main-operations-acceptance.mjs`가 자동으로 전 항목을 PASS 판정한 결과가 아님. 그 스크립트는 read-only GitHub workflow 증거만 수집하고 `acceptanceDecision=NOT_EVALUATED_BY_COLLECTOR`를 반환함.
 
 ## 6. 실제 종료까지의 실행 순서와 금지 사항
 
-1. **새 배포의 익명 수용 (현 `f549bc9f-...` 버전 PASS):** Cloudflare에서 실제 100% 버전 재확인 → 같은 버전의 `/`, `/hall.html`, `/api/health`, `/api/readiness`, `/api/me`, `/api/me/saju/calculation`, `/api/me/saju/preview-reading`, `/api/auth/sign-in`를 기존 익명 운영 E2E로 검증 → 워크플로 URL·시각·버전 기록. 버전이 바뀌면 결과도 갱신.
-2. **양성 의존성 수용 (현 `f549bc9f-...`의 Member/DB/Saju 계산-only PASS):** 이미 존재하는 governed `cloudflare-primary-e2e-member.yml` 사용. 별도 확인한 현재 Worker 버전 및 Production 합성/전용 Member 비밀의 범위 내에서 로그인, 주체 귀속 DB, Birth revision, 계산-only Saju 경로 검증. 비밀 값을 보고서/로그에 출력하지 않음.
+1. **새 배포의 익명 수용**. Cloudflare 100% 버전과 같은 버전의 화면·Health·readiness·인증 거부를 기존 익명 운영 E2E로 대조한다. 시각과 버전 근거를 보존한다.
+2. **양성 의존성 수용**. 별도 확인한 현재 Worker 버전과 승인된 Production 합성 전용 Member 범위에서 `cloudflare-primary-e2e-member.yml`로 로그인·주체 귀속 DB·Birth revision·계산 경로를 확인한다. 보고서에는 비밀 값을 포함하지 않는다.
 3. **운영 장애·관측 수용:** 실제 버전 로그/redaction·의존성 메트릭·알림·롤백 근거를 확보. 안전한 **비운영** 환경에서 DB/Saju timeout/장애, 5/15분 실측, 부하·용량 및 확장 기준을 검증. 테스트 도구의 존재만으로 실측 완료 처리 금지.
 4. **DR 통합 수용:** 실제 백업과 migration/DDL/ACL 동등성, 지속적인 독립 개인정보 삭제/철회 기록, Hosted Auth/Storage 복원, 전체 서비스 복구 및 RPO/RTO 확인. 관련 권한·안전 조건이 충족되기 전에는 서비스 재개 게이트를 열지 않음.
 5. **종료 결정:** 위 증거를 §33 항목별 PASS/NOT_OBSERVED/BLOCKED로 묶어 최종 판정. **전부 충족하지 못했다면 전체 Production 운영 준비 완료를 선언하지 않고 차단 항목을 명시한 채 종료 가능 범위만 종료**. 임의 추가 기능/별도 승인자·외부업체 문의/근거 없는 완료율을 만들지 않음.
@@ -628,7 +635,7 @@ Cloudflare Provider observability 설정은 `enabled=true`, `logs.enabled=true`,
 | Phase 9–12 근거 | [캐시](API_CACHE_ISOLATION_PHASE9_20261030.md), [지연](API_PERFORMANCE_BASELINE_PHASE10_20261030.md), [부하](API_CONTROLLED_CAPACITY_PHASE11_20261030.md), [확장](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md) |
 | Phase 13 구체적 운영 evidence | [`MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md`](MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md) 및 [PR #2770 실측 댓글](https://github.com/gycha0109-beep/MyeongHa/pull/2770) |
 
-**최신 실측 증거:** 이 보고서 상단의 2026-10-30 16:52 KST 추가 검증이 아래 초기 §3.2/§5 스냅샷보다 최신입니다.
+**최신 실측 증거**는 상단 Worklog와 §4–5의 날짜별 판정에 기록한다. §3의 배포는 초기 스냅샷이다.
 
 **보고서 자체의 한계:** 이 파일을 병합하는 것은 **현황과 종료 조건의 권위 있는 스냅샷 기록**이지 Phase 1–13 수용의 완료 또는 새로운 Production 배포에 대한 자동 보증이 아님. 병합 후 main SHA나 Worker 버전이 바뀌면 재확인해야 함.
 
