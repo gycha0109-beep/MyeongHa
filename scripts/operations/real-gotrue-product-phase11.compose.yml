@@ -24,6 +24,8 @@ services:
         condition: service_healthy
     ports:
       - "127.0.0.1:${MH_OPS_GOTRUE_PORT:?}:9999"
+    # The Docker bridge above is intentionally non-internal so the host-only
+    # published port can be reached; this container holds synthetic credentials only.
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: "9999"
@@ -39,9 +41,15 @@ services:
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_DISABLE_SIGNUP: "false"
       GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
-    networks: [disposable]
+    networks: [disposable, host-loopback]
 networks:
   disposable:
     internal: true
+  # Only GoTrue joins a second project-scoped bridge for the loopback-published port.
+  # The auth database stays on the strictly internal bridge and has no published port.
+  host-loopback:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: '127.0.0.1'
 volumes:
   auth-data:
