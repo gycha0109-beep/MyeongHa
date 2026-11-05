@@ -2833,13 +2833,14 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           await abortedReviewer.query(
             "select set_config('myeongha.subject_id',$1,true)",[f.subject],
           );
-          await abortedReviewer.query(
-            "SET LOCAL statement_timeout = '4000ms'",
-          );
+          // The DB Owner's canonical Subject-lock function sets its own
+          // 5000ms lock_timeout. A caller's smaller setting is overridden.
+          // Give that original-owner lock timer enough room to fire before
+          // statement_timeout; cancellation uses a shorter safety bound.
           await abortedReviewer.query(
             failureMode==='lock_timeout'
-              ? "SET LOCAL lock_timeout = '750ms'"
-              : "SET LOCAL lock_timeout = '3500ms'",
+              ? "SET LOCAL statement_timeout = '8000ms'"
+              : "SET LOCAL statement_timeout = '4000ms'",
           );
           const {rows:[reviewBackend]}=await abortedReviewer.query<{
             pid:number
