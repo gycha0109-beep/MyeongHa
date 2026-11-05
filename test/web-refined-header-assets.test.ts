@@ -16,25 +16,12 @@ describe('shared refined header', () => {
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 274px !important;');
     expect(css).toContain('grid-template-columns: 146px minmax(200px, 1fr) 244px !important;');
-    expect(css).toContain('header-ui-glyphs-v2.png');
-    expect(css).toContain('background-size: 140px 56px !important;');
-    expect(css).toContain('background-position: -28px var(--mh-glyph-row) !important;');
-    expect(css).not.toContain('translate(calc(-50% + 3px), -50%)');
-    expect(css).toContain('background-image: url("assets/header/header-bell-light.svg") !important;');
-    expect(css).toContain('background-image: url("assets/header/header-bell-dark.svg") !important;');
-    expect(css).toContain('background-position: center center !important;');
+    expect(css).not.toContain('header-ui-glyphs-v2.png');
+    expect(css).toContain('--mh-header-icon: url("data:image/svg+xml,');
+    expect(css).toContain('-webkit-mask: var(--mh-header-icon) center / 24px 24px no-repeat !important;');
     expect(css).toContain('transform: translate(-50%, -50%) !important;');
     expect(css).toContain('.product-icon-button[data-unread="true"]::after');
     expect(css).toMatch(/\.product-icon-button\[data-unread="true"\]::after\s*\{[^}]*top: calc\(15% - 4px\);[^}]*right: calc\(15% - 4px\);/);
-    for (const [mode, stroke] of [['light', '#313844'], ['dark', '#f3f5f8']] as const) {
-      const bell = await read('assets/header/header-bell-' + mode + '.svg');
-      expect(bell).toContain('viewBox="0 0 28 28"');
-      expect(bell).toContain('stroke="' + stroke + '"');
-      expect(bell).toContain('M14 4.5');
-      expect(bell).toContain('<g transform="translate(0 -1.5)">');
-      expect(bell).not.toContain('circle');
-      expect(bell).not.toContain('clipPath');
-    }
     expect(css).toContain('padding: 0 27px 0 43px !important;');
     expect(css).toContain('background-position: right 11px center !important;');
     expect(css).not.toContain('.product-report-link');
@@ -80,28 +67,11 @@ describe('shared refined header', () => {
     expect(contact).toContain("fetch('/api/contact'");
   });
 
-  it('makes pink unread-dot palette entries fully transparent in the supplied light/dark icon', async () => {
-    const png = await readFile(new URL('assets/header/header-ui-glyphs-v2.png', root));
-    expect(png.toString('hex',0,8)).toBe('89504e470d0a1a0a');
-    expect(png.readUInt32BE(16)).toBe(240);
-    expect(png.readUInt32BE(20)).toBe(96);
-    let offset = 8;
-    let palette: Uint8Array | null = null;
-    let opacity: Uint8Array | null = null;
-    while (offset < png.byteLength) {
-      const len = png.readUInt32BE(offset);
-      const tag = png.toString('ascii',offset+4,offset+8);
-      if (tag === 'PLTE') palette = png.subarray(offset+8,offset+8+len);
-      if (tag === 'tRNS') opacity = png.subarray(offset+8,offset+8+len);
-      offset += 12+len;
-    }
-    expect(palette).not.toBeNull();
-    expect(opacity).not.toBeNull();
-    const colors = palette as Uint8Array;
-    const alphas = opacity as Uint8Array;
-    for (let index = 0; index < colors.length/3; index++) {
-      const r=colors[3*index]!,g=colors[3*index+1]!,b=colors[3*index+2]!;
-      if (r>g+15 && r>b+7) expect(alphas[index]).toBe(0);
-    }
+  it('draws all controls as equally sized vectors', async () => {
+    const css = await read('shared-product-header.css');
+    expect(css.match(/--mh-header-icon: url\("data:image\/svg\+xml,/g)).toHaveLength(5);
+    expect(css).toContain('background: currentColor !important;');
+    expect(css).not.toContain('header-bell-light.svg');
+    expect(css).not.toContain('header-bell-dark.svg');
   });
 });
