@@ -17,7 +17,7 @@ describe('shared refined header', () => {
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 274px !important;');
     expect(css).toContain('grid-template-columns: 146px minmax(200px, 1fr) 244px !important;');
     expect(css).not.toContain('header-ui-glyphs-v2.png');
-    expect(css).toContain('--mh-header-icon: url("data:image/svg+xml,');
+    expect(css).toContain('--mh-header-icon: url("assets/myeongha-icons/');
     expect(css).toContain('-webkit-mask: var(--mh-header-icon) center / 24px 24px no-repeat !important;');
     expect(css).toContain('transform: translate(-50%, -50%) !important;');
     expect(css).toContain('.product-icon-button[data-unread="true"]::after');
@@ -69,7 +69,8 @@ describe('shared refined header', () => {
 
   it('draws all controls as equally sized vectors', async () => {
     const css = await read('shared-product-header.css');
-    expect(css.match(/--mh-header-icon: url\("data:image\/svg\+xml,/g)).toHaveLength(5);
+    expect(css.match(/--mh-header-icon: url\("assets\/myeongha-icons\//g)).toHaveLength(5);
+    expect(css).toContain('product-profile-mark { --mh-header-icon: url("assets/myeongha-icons/my.svg")');
     expect(css).toContain('background: currentColor !important;');
     expect(css).not.toContain('header-bell-light.svg');
     expect(css).not.toContain('header-bell-dark.svg');

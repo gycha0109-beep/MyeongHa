@@ -214,7 +214,7 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
     const header = await inspectSharedHeader(client);
     assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
     assert([header.themeMask, header.localeMask, header.notificationMask, header.profileMask]
-      .every(mask => mask.includes('data:image/svg+xml,')),
+      .every(mask => mask.includes('/assets/myeongha-icons/') && mask.includes('.svg')),
       `Shared header vector icons missing on ${pathname}: ${JSON.stringify(header)}`);
     assert(header.notificationTransform === 'matrix(1, 0, 0, 1, -12, -12)' && header.unreadBadgeDisplay === 'none',
       `Centered bell or default unread badge mismatch on ${pathname}: ${JSON.stringify(header)}`);
