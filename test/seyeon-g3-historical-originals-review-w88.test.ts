@@ -60,8 +60,17 @@ describe('W88 G3 historical first Reveal original-source review (no right to dis
     ])expect(g3).toContain(requirement);
   });
   it('binds the ACTUAL stored assistant to its staged payload, full-envelope digest, Renderer and Output Guard',()=>{
-    const first=g3.slice(g3.indexOf("if p_purpose='first' then"));
-    for(const requirement of [
+    // Staged columns must be read from the persisted original Attempt,
+    // BEFORE the first-only validation block. W92 originally searched the
+    // first-only block for those SELECT columns and caused a false CI failure.
+    const selectionStart=g3.indexOf(
+      "select a.seyeon_personal_source_pin_jsonb->'historicalCandidateProof'"
+    );
+    const selectionEnd=g3.indexOf('from public.chat_turns t',selectionStart);
+    expect(selectionStart).toBeGreaterThan(0);
+    expect(selectionEnd).toBeGreaterThan(selectionStart);
+    const originalAttemptSelection=g3.slice(selectionStart,selectionEnd);
+    for(const column of [
       'a.generated_content_hash',
       'a.generated_body_text',
       'a.generated_message_payload_jsonb',
@@ -69,6 +78,11 @@ describe('W88 G3 historical first Reveal original-source review (no right to dis
       'a.generation_ai_execution_log_id',
       'a.validation_ai_execution_log_id',
       'a.validation_result_jsonb',
+    ])expect(originalAttemptSelection).toContain(column);
+    const firstStart=g3.indexOf("if p_purpose='first' then");
+    expect(firstStart).toBeGreaterThan(selectionEnd);
+    const first=g3.slice(firstStart);
+    for(const requirement of [
       "v_generated_hash !~ '^sha256:v1:[a-f0-9]{64}$'",
       "v_validation->>'schemaVersion' is distinct from",
       "'seyeon-production-chat-validation-v1'",
