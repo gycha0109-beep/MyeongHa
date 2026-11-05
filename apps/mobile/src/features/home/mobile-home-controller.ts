@@ -16,7 +16,17 @@ export interface MobileHomeControllerV1 {
   getSnapshot(): MobileHomeControllerSnapshotV1;
   load(options?: Readonly<{ force?: boolean }>): Promise<MobileHomeControllerSnapshotV1>;
   invalidate(): MobileHomeControllerSnapshotV1;
+  reset(): MobileHomeControllerSnapshotV1;
 }
+
+/** Blank screen-safe state. Never mount a screen using a module-global
+ * controller snapshot that may belong to a previous login Subject. */
+export const MOBILE_HOME_BLANK_SNAPSHOT_V1: MobileHomeControllerSnapshotV1 = Object.freeze({
+  state: MOBILE_HOME_LOADING_STATE_V1,
+  hasLoaded: false,
+  refreshing: false,
+  loadedAtEpochMs: null,
+});
 
 export function createMobileHomeControllerV1(input: {
   readonly service: MobileHomeServiceV1;
@@ -29,13 +39,9 @@ export function createMobileHomeControllerV1(input: {
   }
   const nowEpochMs = input.nowEpochMs ?? Date.now;
 
-  let snapshot: MobileHomeControllerSnapshotV1 = Object.freeze({
-    state: MOBILE_HOME_LOADING_STATE_V1,
-    hasLoaded: false,
-    refreshing: false,
-    loadedAtEpochMs: null,
-  });
+  let snapshot: MobileHomeControllerSnapshotV1 = MOBILE_HOME_BLANK_SNAPSHOT_V1;
   let inFlight: Promise<MobileHomeControllerSnapshotV1> | null = null;
+  let generation = 0;
 
   function publish(next: MobileHomeControllerSnapshotV1) {
     snapshot = Object.freeze(next);
@@ -63,8 +69,11 @@ export function createMobileHomeControllerV1(input: {
       loadedAtEpochMs: snapshot.loadedAtEpochMs,
     });
 
+    const requestGeneration = generation;
     const pending = (async () => {
       const state = await loadMobileHomeV1(input.service);
+      // A credential change invalidates every earlier owner-scoped result.
+      if (requestGeneration !== generation) return snapshot;
       return publish({
         state,
         hasLoaded: true,
@@ -80,6 +89,14 @@ export function createMobileHomeControllerV1(input: {
     }
   }
 
+  /** Clear owner-scoped projection and detach any previous in-flight read.
+   * A late response from the previous Subject cannot repopulate Home. */
+  function reset(): MobileHomeControllerSnapshotV1 {
+    generation += 1;
+    inFlight = null;
+    return publish(MOBILE_HOME_BLANK_SNAPSHOT_V1);
+  }
+
   function invalidate(): MobileHomeControllerSnapshotV1 {
     return publish({
       ...snapshot,
@@ -91,5 +108,6 @@ export function createMobileHomeControllerV1(input: {
     getSnapshot: () => snapshot,
     load,
     invalidate,
+    reset,
   });
 }
