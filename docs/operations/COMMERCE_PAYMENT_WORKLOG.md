@@ -594,3 +594,18 @@
 - **수정:** 기존 `getPortOneV2PaymentReadbackPrivateV1` 공통 GET에 요청 `cache:'no-store'`, `Cache-Control: no-cache, no-store`, `Pragma: no-cache`를 지정. 응답에 RFC 9111 `Age`가 있거나 RFC 9211 `Cache-Status; hit`, 알려진 중간 캐시 `HIT/STALE/UPDATING/REVALIDATED`가 표시되면 본문 사용 전 실패 처리. `MISS/BYPASS`는 캐시 사용 증거로 오인하지 않음. 모든 실패는 기존 읽기 전용 보류 경로로 귀결.
 - **회귀 검증:** 개별/전체 HMAC 취소 GET에서 새 요청 설정 확인, 캐시 적중·0초 `Age`·STALE 헤더 차단, 전체 집합 재검증이 캐시 신호 발생 시 두 번째 DB 스냅샷/Reader CAS로 진입하지 않음을 테스트. 커밋의 CI 및 최종 통합 검증 통과 전 실제 성공 판정하지 않음.
 - **유지 한계:** 헤더가 없는 응답도 Provider 최신 상태나 취소 Event 순서를 증명하지 않음. `providerOrderingProven=false`, 법정 환불/고객 제공·Reader T2/Entitlement Effect 승인 false, 운영 환불 POST·운영 DB·LIVE·상품 활성화 불변. 취소 NEWER/STALE의 신뢰 가능한 비교 근거와 실제 안전한 권한 회수 결속은 추가 구현 필요.
+
+### 2026-11-05 — 단일 Reader 실구매·청약철회 Claim→계정 삭제 Finalizer PG17 결속 (§6-4/5)
+
+- **현황 근거:** #2991 필수 통합 CI/병합 완료. 기존 `2320` 개인정보 삭제 finalizer의 개인 청약철회 Claim 삭제 및 복원 후 재삭제 guard와 독립 PG17 대표 데이터 검증은 구현돼 있었으나, **#2991에서 실제 구매·Notice·청약철회 접수를 만든 동일 Subject**에 최종 계정 삭제 명령을 연속 실행한 E2E는 누락됐습니다.
+- **이번 구현:** 기존 `commerce-verified-reader-claim-cancel-effect-pg17.sql`의 원본 B2/B3 구매/검증/Notice → 정식 회원 청약철회 Claim/멱등 접수 → 원본 취소 Event → 합성 B2 Effect 및 B3 보존 직후, **동일 Subject**에서 기존 `cmd_start_account_deletion_v1`과 실제 Outbox 작업자 소유·`internal_finalize_account_deletion_db_v1`를 호출합니다. 올바른 인증·회원 Subject를 별도 합성 자료로 구성하며 기존 배포/권한 SQL은 변경하지 않습니다.
+- **검증 주장:** 대상 Claim이 실제 계정 최종 처리 뒤 0건, 다른 회원의 독립된 미연결 Claim은 유지, B2/B3의 원본 Commerce Receipts 및 취소 Event는 장기 금융 증거로 보존, 개인 Reader 접근·본문 계보 자식은 제거, Subject는 삭제 상태, 동일 작업자/Job finalizer 재실행은 멱등으로 검증합니다. 모든 시나리오는 합성 격리 PostgreSQL 17의 기존 **ROLLBACK** 트랜잭션.
+- **제약:** 본 테스트가 통과해도 실제 운영 백업 복원 실행, Provider NEWER/STALE 순서, 사람의 법적 콘텐츠 제공/소비 입증, 실제 T2 회수 승인, 전체 단일 Reading 전달 E2E가 완료된 것은 아닙니다. 최종 CI 통과 전 PASS 보류. 운영 DB/PG POST/LIVE/유료 공개 기능 무변경.
+
+
+### 2026-11-05 — #3007 전체 통합 PostgreSQL 17 삭제 사전조건 복구
+
+- **실제 실패:** [통합 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41960727487)에서 기본 CI는 성공했지만 독립 `commerce-verified-reader-claim-cancel-effect-pg17` 사례가 기존 최종 삭제 함수의 `account deletion DB finalizer preflight failed closed`로 실패함. 동일 원본 Reader 구매와 합성 구매권 효과가 `ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED` 대기 Outbox를 생성하지만, 테스트가 해당 작업의 종료 없이 삭제 Finalizer를 호출한 것이 원인.
+- **수정:** 실제 `internal_account_deletion_finalization_preflight_v1`로 미처리 Outbox가 삭제를 막는 것을 먼저 검증. 일회용 ROLLBACK 테스트 트랜잭션 안에서만 **정확한 Subject의 Entitlement 변경 알림 Outbox**가 기존 정상 형태인지 엄격하게 검증하고, 외부 Worker 완료를 합성한 후 다시 `db_preconditions_met=true`를 확인해 기존 Finalizer를 호출함. 예상하지 못한 대기 작업이 있으면 계속 차단.
+- **불변 경계:** 운영 Outbox Writer/Worker·비공개 DB 삭제 함수·실제 Entitlement Grant·운영 DB·PG/환불 POST·LIVE 변경 없음. 테스트상의 Outbox 처리 상태는 실제 고객 전달/법적 수령 증명이 아님.
+- **증거 및 남은 것:** 복구 커밋의 기본 및 전체 통합 CI가 성공하기 전까지 통합 E2E PASS 미선언. 최신 Provider NEWER/STALE 검증, Reader T2 운영 회수, 고객 제공 입증 및 전체 정책/운영 통합 검증은 기존 보류 유지.

@@ -44,6 +44,16 @@ declare
  v_constraint text;
  v_scope record;
  v_scopes_locked integer:=0;
+ v_other_subject uuid:='1219e000-0000-4000-8000-000000000001'::uuid;
+ v_other_claim uuid;
+ v_other_claim_replay boolean;
+ v_deletion_job uuid:='1219f000-0000-4000-8000-000000000001'::uuid;
+ v_deletion_outbox uuid:='1219f000-0000-4000-8000-000000000002'::uuid;
+ v_lock_owner text:='commerce-reader-claim-delete-pg17';
+ v_deleted record;
+ v_deleted_replay record;
+ v_preflight record;
+ v_rows integer;
  v_effective_at timestamptz:=transaction_timestamp();
 begin
  -- Exact real verified paid Reading and pre-payment server notice.
@@ -288,7 +298,155 @@ begin
           and e.event_type in ('Transaction.Cancelled','Transaction.PartialCancelled'))<>0 then
   raise exception 'CLAIM_E2E_CROSS_READER_CLAIM_OR_STATE_CORRUPT';
  end if;
- raise notice 'PASS guest intake denied -> synthetic verified Member B2 + pre-payment notice + real private Claim intake/replay + original cancellation persistence + exact B2 Effect/replay + B3 preserved (ROLLED BACK)';
+ -- Privacy roadmap 4/5: the SAME Reader B2 Subject, actually paid,
+ -- noticed, member-claimed, canonically cancelled and synthetically revoked,
+ -- must be finalized through the REAL approved account deletion DB function.
+ -- A separate Member's unlinked private Claim must survive untouched.
+ insert into auth.users(id)
+ values ('1219e000-0000-4000-8000-000000000002'::uuid);
+ insert into public.subjects(
+   id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at
+ ) values (
+   v_other_subject,'member',
+   '1219e000-0000-4000-8000-000000000002'::uuid,
+   'active',null,clock_timestamp(),clock_timestamp()
+ );
+ perform pg_catalog.set_config('myeongha.subject_id',v_other_subject::text,true);
+ select t.claim_id,t.replayed into strict v_other_claim,v_other_claim_replay
+ from public.cmd_receive_digital_reading_withdrawal_claim_v1(
+   v_other_subject,null,null,'not_provided',
+   'hmac-sha256:k1:'||repeat('1',64),
+   'sha256:v1:'||repeat('2',64)
+ ) t;
+ if v_other_claim_replay is distinct from false then
+   raise exception 'CLAIM_E2E_UNRELATED_MEMBER_CLAIM_REPLAYED';
+ end if;
+ perform pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
+
+ perform public.cmd_start_account_deletion_v1(
+   v_subject,v_deletion_job,
+   'commerce-reader-claim-e2e-delete',
+   v_deletion_outbox
+ );
+ update public.outbox_events
+ set status='processing',locked_at=clock_timestamp(),
+     lock_owner=v_lock_owner,
+     lease_expires_at=clock_timestamp()+interval '10 minutes'
+ where id=v_deletion_outbox and aggregate_type='data_deletion_job'
+   and aggregate_id=v_deletion_job::text
+   and event_type='ACCOUNT_DELETION_STARTED';
+ get diagnostics v_rows=row_count;
+ if v_rows<>1 then
+   raise exception 'CLAIM_E2E_DELETE_WORKER_LEASE_NOT_BOUND';
+ end if;
+
+ -- The exact original B2/B3 purchase and the synthetic B2 revoke can emit
+ -- pending ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED outbox work. The real account
+ -- finalizer MUST refuse deletion while that same-Subject work is unfinished.
+ select * into strict v_preflight
+ from public.internal_account_deletion_finalization_preflight_v1(
+   v_subject,v_deletion_job,v_lock_owner
+ );
+ if v_preflight.db_preconditions_met is distinct from false
+    or v_preflight.blocking_outbox_count<1 then
+   raise exception 'CLAIM_E2E_PENDING_ENTITLEMENT_OUTBOX_DID_NOT_BLOCK_DELETE';
+ end if;
+
+ -- Disposable ROLLBACK fixture only: represent the independent entitlement
+ -- delivery worker completing its exact generated outbox events. This is NOT
+ -- a production outbox worker, real consumer delivery, or a grant/revoke
+ -- authorization. No other Subject or unexpected work may be fabricated
+ -- as terminal to let the deletion preflight pass.
+ if exists (
+   select 1 from public.outbox_events oe
+   where oe.id<>v_deletion_outbox
+     and (
+       oe.payload_jsonb->>'subjectId'=v_subject::text
+       or (oe.aggregate_type='entitlement' and exists (
+         select 1 from public.entitlements ent
+         where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+       ))
+     )
+     and oe.status<>'processed'
+     and not (
+       oe.aggregate_type='entitlement'
+       and oe.event_type='ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED'
+       and oe.status='pending'
+       and oe.payload_jsonb->>'subjectId'=v_subject::text
+       and exists (
+         select 1 from public.entitlements ent
+         where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+       )
+     )
+ ) then
+   raise exception 'CLAIM_E2E_UNEXPECTED_SUBJECT_OUTBOX_BLOCKER';
+ end if;
+ update public.outbox_events oe
+ set status='processed',processed_at=clock_timestamp()
+ where oe.aggregate_type='entitlement'
+   and oe.event_type='ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED'
+   and oe.status='pending'
+   and oe.payload_jsonb->>'subjectId'=v_subject::text
+   and exists (
+     select 1 from public.entitlements ent
+     where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+   );
+ get diagnostics v_rows=row_count;
+ if v_rows<1 then
+   raise exception 'CLAIM_E2E_NO_EXACT_ENTITLEMENT_OUTBOX_SETTLED';
+ end if;
+ select * into strict v_preflight
+ from public.internal_account_deletion_finalization_preflight_v1(
+   v_subject,v_deletion_job,v_lock_owner
+ );
+ if v_preflight.db_preconditions_met is distinct from true
+    or v_preflight.blocking_outbox_count<>0 then
+   raise exception 'CLAIM_E2E_ACCOUNT_DELETE_PREFLIGHT_STILL_BLOCKED';
+ end if;
+
+ select finalized,replayed,auth_mapping_present
+ into strict v_deleted
+ from public.internal_finalize_account_deletion_db_v1(
+   v_subject,v_deletion_job,v_lock_owner
+ );
+ if v_deleted.finalized is distinct from true
+    or v_deleted.replayed is distinct from false
+    or v_deleted.auth_mapping_present is distinct from true
+    or (select count(*) from public.digital_reading_withdrawal_claims_private_v1
+        where subject_id=v_subject)<>0
+    or (select count(*) from public.digital_reading_withdrawal_claims_private_v1
+        where id=v_other_claim and subject_id=v_other_subject
+          and state='received')<>1
+    or (select count(*) from public.commerce_receipts
+        where id in (v_receipt.id,v_other_receipt.id)
+          and subject_id=v_subject)<>2
+    or (select count(*) from public.commerce_provider_events
+        where id=v_cancel_event and resolved_receipt_id=v_receipt.id
+          and resolved_subject_id=v_subject)<>1
+    or (select count(*) from public.standard_reading_reader_access_grants
+        where subject_id=v_subject)<>0
+    or (select count(*) from public.subjects
+        where id=v_subject and status='deleted')<>1
+ then
+   raise exception 'CLAIM_E2E_ACCOUNT_PRIVACY_FINALIZER_RETENTION_OR_ISOLATION_FAILED';
+ end if;
+ select finalized,replayed,auth_mapping_present
+ into strict v_deleted_replay
+ from public.internal_finalize_account_deletion_db_v1(
+   v_subject,v_deletion_job,v_lock_owner
+ );
+ if v_deleted_replay.finalized is distinct from true
+    or v_deleted_replay.replayed is distinct from true
+    or v_deleted_replay.auth_mapping_present is distinct from true
+    or (select count(*) from public.digital_reading_withdrawal_claims_private_v1
+        where subject_id=v_subject)<>0
+    or (select count(*) from public.digital_reading_withdrawal_claims_private_v1
+        where id=v_other_claim and subject_id=v_other_subject)<>1
+ then
+   raise exception 'CLAIM_E2E_ACCOUNT_PRIVACY_FINALIZER_REPLAY_REGRESSED';
+ end if;
+
+ raise notice 'PASS verified B2 notice + Member Claim + original cancellation + exact B2 revoke + B3 pre-delete preservation + actual account deletion/replay + unrelated claim and financial receipts retained (ROLLED BACK)';
 end;
 $commerce_claim_e2e$;
 
