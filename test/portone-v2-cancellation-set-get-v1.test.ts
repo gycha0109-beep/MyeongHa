@@ -60,8 +60,11 @@ describe('Authenticated PortOne V2 whole cancellation set HMAC projection',()=>{
    'https://api.portone.io/payments/payment-exact-source'
   );
   expect(fetchImpl.mock.calls[0]?.[1]).toMatchObject({
-   method:'GET',redirect:'manual',
-   headers:{accept:'application/json',authorization:'PortOne '+API},
+   method:'GET',redirect:'manual',cache:'no-store',
+   headers:{
+    accept:'application/json',authorization:'PortOne '+API,
+    'cache-control':'no-cache, no-store',pragma:'no-cache',
+   },
   });
   for(const forbidden of [A,B,SECRET,API,PAYMENT_ID,ORIGINAL_TX])
    expect(JSON.stringify(r)).not.toContain(forbidden);
