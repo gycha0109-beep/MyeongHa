@@ -134,10 +134,14 @@ export function useMobileChatThreadV1(threadId: string) {
     sendingRef.current = true;
     setSending(true);
     setSendStatus('세연이 답하고 있습니다…');
+    // Capture the authenticated owner once. A later Member change must never
+    // allow error cleanup to delete another owner's local pending turn.
+    let sendOwnerId: string | null = null;
     try {
       const member = await nativeMobileRuntimeV1.memberSession.read();
       if (!stillCurrent()) return;
-      const ownerId = member?.user.id;
+      const ownerId = member?.user.id ?? null;
+      sendOwnerId = ownerId;
       const request = pendingTurn.current?.text === text
         ? pendingTurn.current
         : Object.freeze({ clientTurnId: createMobileChatTurnIdV1(), text });
@@ -184,9 +188,8 @@ export function useMobileChatThreadV1(threadId: string) {
       if (!stillCurrent()) return;
       if (error instanceof MyeongHaApiClientErrorV1 && error.code === 'IDEMPOTENCY_CONFLICT') {
         pendingTurn.current = null;
-        const member = await nativeMobileRuntimeV1.memberSession.read().catch(() => null);
-        if (member?.user.id) {
-          await mobileChatPendingTurnStoreV1.clear(threadId, member.user.id).catch(() => undefined);
+        if (sendOwnerId !== null) {
+          await mobileChatPendingTurnStoreV1.clear(threadId, sendOwnerId).catch(() => undefined);
         }
       }
       if (stillCurrent()) setSendStatus(sendErrorMessage(error));
