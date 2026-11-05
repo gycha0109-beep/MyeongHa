@@ -574,3 +574,9 @@
 - **원인:** 역사적 fixture 보호를 위한 `test/db/staged_commerce_migration_policy.sh`에서 2026-10-27 Checkout Notice 이력을 의도적으로 제외합니다. 신규 케이스도 기본 `historical` Reader 범위를 사용해 2320 개인 Claim RPC가 필요한 Reader 통합 스키마를 로드하지 않았습니다.
 - **수정:** `test/db/run_ci_case.sh`에서 **이 새 사례만** 기존 `reader-integrated` 스키마로 지정. `test/db/commerce_verified_reader_claim_cancel_effect_pg17.sh`가 일회용 PostgreSQL17 CI DB 및 Claim RPC 존재를 확인한 뒤, 기존 고정 해시로 검토된 **원본 Notice migration**을 이 테스트 DB에서만 설치합니다. 이후 3개 Notice 테이블 존재를 재검증하고 기존 B2/B3 구매 Fixture를 실행합니다.
 - **안전:** 기존 역사적 CI fixture·스테이징 제외 규칙의 의미는 유지. `supabase/migrations/` 파일 자체, 운영 DB, LIVE 라우트/PG 취소/실제 구매권 회수는 변경하지 않습니다. 새 커밋의 DB 종속 CI 성공 확인 전까지 PASS를 선언하지 않습니다.
+
+### 2026-11-05 — #2991 PG17 두 번째 레드: 회원 전용 청약철회 접수 경계의 합성 Fixture 수정
+
+- **실제 실패:** [PostgreSQL 17 작업 41947551528](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41947551528/job/126983825528)에서 기존 Notice 스키마는 로드되었지만 신규 B2 Claim 통합 검증 중 `Verified member unavailable` (SQLSTATE 42501)이 발생했습니다. 기존 공식 B2/B3 Reader 구매 Fixture의 원본 Subject는 `guest`이며, 정식 `cmd_receive_digital_reading_withdrawal_claim_v1`는 정확한 `member`만 접수하도록 설계돼 있습니다.
+- **수정:** 원본 구매/Receipt/Reader를 새 계정으로 위조하거나 회원 검증을 완화하지 않습니다. 단일 격리 PostgreSQL 17 트랜잭션에서 먼저 게스트의 Claim 접수가 명시적으로 거부되고 접수 기록이 생성되지 않음을 확인합니다. 이후 `auth.users`에 테스트용 인증 식별자를 삽입하고 *동일한 구매 Subject*를 `member`로 결속하여 실제 회원 전용 접수·멱등 재실행 경로를 검증합니다.
+- **안전:** 회원 전용 운영 권한·인증 함수·마이그레이션 정책 불변. 합성 인증 레코드, Claim, Event, Effect는 기존 `ROLLBACK`으로 폐기. 새 커밋 CI 및 필수 통합 성공 전까지 PASS를 선언하지 않습니다.
