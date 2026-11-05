@@ -567,3 +567,10 @@
 - **원본 취소/권한:** 기존 비배포 원본 취소 저장 함수를 실행하여 해당 B2 Receipt에 단일 SUCCEEDED 전액 이벤트를 저장하고, 같은 격리 트랜잭션 안에서 실제 `internal_apply_entitlement_effect_v1`를 *명시적으로 합성 권한에서만* 실행해 B2 효과 1건·멱등 재실행·B3 원본 Grant 보존과 B3 교차 회수 거부를 검사합니다. 고객 Claim 상태는 승인이나 전달로 변형하지 않고 `received`를 유지합니다.
 - **검증:** `commerce-verified-reader-claim-cancel-effect-pg17`라는 독립 PostgreSQL17 CI 사례를 전체 DB 스키마에 연결. 신규 후보 DDL·합성 Source/Effect·Claim은 테스트 트랜잭션에서 모두 **ROLLBACK**합니다. Fixture는 일회용 DB에서만 생성하고 다른 B3 권한을 보존합니다. PR 통합 CI 결과 전 PASS 미확정.
 - **안전/남은 것:** Provider NEWER/STALE 판정, 실제 환불·R2/T2 공유 잠금과 회수 권한, 사람의 소비/법적 제공 입증, 동일 Subject 실제 privacy finalizer까지 이어지는 완전 E2E는 미완료. 운영 DB/마이그레이션, PG API, 공개 API, LIVE, 자동 회수는 변경하지 않습니다.
+
+### 2026-11-05 — #2991 PG17 DB 의존성 레드: 격리 Notice 스키마 누락 복구
+
+- **실패 확인:** [PostgreSQL 17 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41945250703/job/126975938906)에서 신규 `commerce-verified-reader-claim-cancel-effect-pg17`만 실패. 실제 로그: `psql:<stdin>:1012: ERROR: relation "public.digital_reading_checkout_notice_revisions_v1" does not exist`. DB 종합 CI 레드의 직접 원인으로 확인.
+- **원인:** 역사적 fixture 보호를 위한 `test/db/staged_commerce_migration_policy.sh`에서 2026-10-27 Checkout Notice 이력을 의도적으로 제외합니다. 신규 케이스도 기본 `historical` Reader 범위를 사용해 2320 개인 Claim RPC가 필요한 Reader 통합 스키마를 로드하지 않았습니다.
+- **수정:** `test/db/run_ci_case.sh`에서 **이 새 사례만** 기존 `reader-integrated` 스키마로 지정. `test/db/commerce_verified_reader_claim_cancel_effect_pg17.sh`가 일회용 PostgreSQL17 CI DB 및 Claim RPC 존재를 확인한 뒤, 기존 고정 해시로 검토된 **원본 Notice migration**을 이 테스트 DB에서만 설치합니다. 이후 3개 Notice 테이블 존재를 재검증하고 기존 B2/B3 구매 Fixture를 실행합니다.
+- **안전:** 기존 역사적 CI fixture·스테이징 제외 규칙의 의미는 유지. `supabase/migrations/` 파일 자체, 운영 DB, LIVE 라우트/PG 취소/실제 구매권 회수는 변경하지 않습니다. 새 커밋의 DB 종속 CI 성공 확인 전까지 PASS를 선언하지 않습니다.
