@@ -41,6 +41,7 @@ export class MobileChatReadRepositoryErrorV1 extends Error {
 
 export interface MobileChatReadRepositoryV1 {
   getSnapshot(): MobileChatThreadSnapshotV1;
+  reset(): MobileChatThreadSnapshotV1;
   loadInitial(): Promise<MobileChatThreadSnapshotV1>;
   loadMore(): Promise<MobileChatThreadSnapshotV1>;
 }
@@ -69,6 +70,27 @@ export function createMobileChatReadRepositoryV1(input: {
     errorCode: null,
   });
   let inFlight: Promise<MobileChatThreadSnapshotV1> | null = null;
+  let generation = 0;
+
+  function reset(): MobileChatThreadSnapshotV1 {
+    // In-flight reads from a former Subject may complete, but must never
+    // publish a transcript or a Relationship for a different login.
+    generation += 1;
+    inFlight = null;
+    return publish({
+      status: 'idle',
+      threadId: input.threadId,
+      characterId: null,
+      messages: Object.freeze([]),
+      relationship: null,
+      hasMore: true,
+      nextAfterSequenceNo: 0,
+      contentReleaseId: null,
+      contentBundleId: null,
+      contentRevision: null,
+      errorCode: null,
+    });
+  }
 
   function invalidatesCurrentReadAuthority(error: unknown, code: string): boolean {
     // A later denial of identity/ownership or an incompatible authoritative
@@ -155,6 +177,7 @@ export function createMobileChatReadRepositoryV1(input: {
 
   async function loadInitial(): Promise<MobileChatThreadSnapshotV1> {
     if (inFlight !== null) return inFlight;
+    const requestGeneration = generation;
     // Clear previously displayed owner data before the next Member/Guest read.
     // On account changes, an old owner's messages must not remain on screen.
     publish({
@@ -176,8 +199,10 @@ export function createMobileChatReadRepositoryV1(input: {
           afterSequenceNo: 0,
           pageSize,
         });
+        if (requestGeneration !== generation) return snapshot;
         return publish(bindPage(Object.freeze([]), page, 0));
       } catch (error) {
+        if (requestGeneration !== generation) return snapshot;
         publish({
           ...snapshot,
           status: 'error',
@@ -194,7 +219,7 @@ export function createMobileChatReadRepositoryV1(input: {
         });
         throw error;
       } finally {
-        inFlight = null;
+        if (requestGeneration === generation) inFlight = null;
       }
     })();
     inFlight = pending;
@@ -215,6 +240,7 @@ export function createMobileChatReadRepositoryV1(input: {
       throw error;
     }
 
+    const requestGeneration = generation;
     publish({ ...snapshot, status: 'loading_more', errorCode: null });
     const pending = (async () => {
       try {
@@ -222,8 +248,10 @@ export function createMobileChatReadRepositoryV1(input: {
           afterSequenceNo: cursor,
           pageSize,
         });
+        if (requestGeneration !== generation) return snapshot;
         return publish(bindPage(snapshot.messages, page, cursor));
       } catch (error) {
+        if (requestGeneration !== generation) return snapshot;
         const errorCode =
           error instanceof MobileChatReadRepositoryErrorV1
             ? error.code
@@ -256,7 +284,7 @@ export function createMobileChatReadRepositoryV1(input: {
         }
         throw error;
       } finally {
-        inFlight = null;
+        if (requestGeneration === generation) inFlight = null;
       }
     })();
     inFlight = pending;
@@ -265,6 +293,7 @@ export function createMobileChatReadRepositoryV1(input: {
 
   return Object.freeze({
     getSnapshot: () => snapshot,
+    reset,
     loadInitial,
     loadMore,
   });

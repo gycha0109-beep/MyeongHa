@@ -3,6 +3,7 @@ import type { MobileChatReadRepositoryV1 } from './mobile-chat-read-repository.j
 
 export interface MobileChatReadControllerV1 {
   getSnapshot(): MobileChatThreadSnapshotV1;
+  reset(): MobileChatThreadSnapshotV1;
   loadInitial(): Promise<MobileChatThreadSnapshotV1>;
   loadMore(): Promise<MobileChatThreadSnapshotV1>;
 }
@@ -28,6 +29,7 @@ export function createMobileChatReadControllerV1(
 
   return Object.freeze({
     getSnapshot: () => repository.getSnapshot(),
+    reset: () => repository.reset(),
     loadInitial,
     loadMore,
   });

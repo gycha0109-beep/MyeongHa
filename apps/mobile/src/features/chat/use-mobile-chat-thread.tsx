@@ -69,7 +69,12 @@ export function useMobileChatThreadV1(threadId: string) {
         setSendStatus(null);
         setSending(false);
         sendingRef.current = false;
+        setSnapshot(controller.reset());
       });
+      // Always isolate the next focused read from a previous in-flight read.
+      setSnapshot(controller.reset());
+      sendingRef.current = false;
+      setSending(false);
       setSendStatus(null);
       const loading = controller.loadInitial();
       setSnapshot(controller.getSnapshot());
@@ -96,6 +101,8 @@ export function useMobileChatThreadV1(threadId: string) {
         active = false;
         focused.current = false;
         subjectEpoch.current += 1;
+        sendingRef.current = false;
+        setSnapshot(controller.reset());
       };
     }, [controller, threadId]),
   );

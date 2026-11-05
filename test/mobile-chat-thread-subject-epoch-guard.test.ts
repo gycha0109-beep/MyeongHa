@@ -10,6 +10,7 @@ describe('mobile Chat detail prevents old-subject async send effects', () => {
     expect(hook).toContain("setDraft('')");
     expect(hook).toContain('setSendStatus(null)');
     expect(hook).toContain('unsubscribe()');
+    expect(hook).toContain('setSnapshot(controller.reset())');
     expect(hook).toContain('if (!active || epoch !== subjectEpoch.current || saved === null) return');
     expect(hook).toContain('if (active && epoch === subjectEpoch.current) setSnapshot(next)');
   });
