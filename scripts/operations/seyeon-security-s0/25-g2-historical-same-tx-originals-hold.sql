@@ -17,6 +17,9 @@ declare
   v_candidate jsonb;
   v_seal jsonb;
   v_validation jsonb;
+  v_generation_id uuid;
+  v_output_guard_id uuid;
+  v_generated_hash text;
   v_audit jsonb;
   v_count integer;
 begin
@@ -30,8 +33,12 @@ begin
   select t.state,a.state,a.seyeon_personal_source_pin_jsonb
            ->'historicalCandidateProof',
          a.seyeon_historical_final_context_seal_jsonb,
-         a.validation_result_jsonb
-    into v_turn_state,v_attempt_state,v_candidate,v_seal,v_validation
+         a.validation_result_jsonb,
+         a.generation_ai_execution_log_id,
+         a.validation_ai_execution_log_id,
+         a.generated_content_hash
+    into v_turn_state,v_attempt_state,v_candidate,v_seal,v_validation,
+         v_generation_id,v_output_guard_id,v_generated_hash
   from public.chat_turns t
   join public.chat_turn_attempts a
     on a.turn_id=t.id and a.subject_id=t.subject_id
@@ -90,10 +97,45 @@ begin
   -- cannot borrow an old running Context seal as a model receipt.
   if v_attempt_state='validated' and (
        jsonb_typeof(v_validation) is distinct from 'object'
+       or v_validation->>'schemaVersion' is distinct from
+          'seyeon-production-chat-validation-v1'
+       or v_validation->>'passed' is distinct from 'true'
+       or v_generated_hash is null
+       or v_generated_hash !~ '^sha256:v1:[a-f0-9]{64}$'
+       or v_validation->>'generatedContentHash'
+          is distinct from v_generated_hash
        or v_validation->>'historicalFinalModelContextDigest'
-         is distinct from v_seal->>'finalModelContextDigest'
+          is distinct from v_seal->>'finalModelContextDigest'
        or v_validation->>'historicalCandidatePgJsonbDigest'
-         is distinct from v_seal->>'candidatePgJsonbDigest'
+          is distinct from v_seal->>'candidatePgJsonbDigest'
+       -- A caller-controlled validation JSON document cannot substitute
+       -- for durable DB-written Renderer and Output Guard stage records.
+       -- Neither stage log alone proves G1 Interpreter source admission.
+       or v_generation_id is null or v_output_guard_id is null
+       or not exists (
+         select 1 from public.ai_execution_logs generation
+         where generation.id=v_generation_id
+           and generation.subject_id=p_subject_id
+           and generation.turn_id=p_turn_id
+           and generation.turn_attempt_id=p_attempt_id
+           and generation.character_id='seyeon'
+           and generation.stage='renderer'
+           and generation.status='success'
+           and generation.output_ref_jsonb->>'generatedContentHash'
+             is not distinct from v_generated_hash
+       )
+       or not exists (
+         select 1 from public.ai_execution_logs output_guard
+         where output_guard.id=v_output_guard_id
+           and output_guard.subject_id=p_subject_id
+           and output_guard.turn_id=p_turn_id
+           and output_guard.turn_attempt_id=p_attempt_id
+           and output_guard.character_id='seyeon'
+           and output_guard.stage='output_guard'
+           and output_guard.status='success'
+           and output_guard.output_ref_jsonb->>'generatedContentHash'
+             is not distinct from v_generated_hash
+       )
      ) then
     raise exception using errcode='42501',
       constraint='seyeon_historical_g2_validated_model_receipt_required',

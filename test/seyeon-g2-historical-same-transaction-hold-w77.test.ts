@@ -41,6 +41,29 @@ describe('W77 historical G2 exact original sources remain closed within v2 Commi
     expect(wrapper).not.toContain('COMMIT;');
     expect(wrapper).not.toContain('BEGIN TRANSACTION');
   });
+  it('requires the actual Renderer and Output Guard execution logs for any later validated historical Commit',()=>{
+    const check=g2.slice(g2.indexOf("if v_attempt_state='validated' and ("),
+      g2.indexOf("v_count:=(v_candidate->>'historicalSourceCount')"));
+    expect(check).toContain("v_validation->>'schemaVersion' is distinct from");
+    expect(check).toContain("'seyeon-production-chat-validation-v1'");
+    expect(check).toContain("v_validation->>'passed' is distinct from 'true'");
+    expect(check).toContain("v_validation->>'generatedContentHash'");
+    expect(check).toContain("v_generated_hash !~ '^sha256:v1:[a-f0-9]{64}$'");
+    expect(check).toContain("generation.id=v_generation_id");
+    expect(check).toContain("generation.subject_id=p_subject_id");
+    expect(check).toContain("generation.turn_attempt_id=p_attempt_id");
+    expect(check).toContain("generation.stage='renderer'");
+    expect(check).toContain("generation.status='success'");
+    expect(check).toContain("output_guard.id=v_output_guard_id");
+    expect(check).toContain("output_guard.subject_id=p_subject_id");
+    expect(check).toContain("output_guard.turn_attempt_id=p_attempt_id");
+    expect(check).toContain("output_guard.stage='output_guard'");
+    expect(check).toContain("output_guard.status='success'");
+    expect(check).toContain("generation.output_ref_jsonb->>'generatedContentHash'");
+    expect(check).toContain("output_guard.output_ref_jsonb->>'generatedContentHash'");
+    // The current G1 positive source grant is still not issued in S0.
+    expect(legacy).toContain('seyeon_g2_historical_candidate_not_authority');
+  });
   it('blocks direct v2 bypass, every API ACL, and payment/model/HTTP opening',()=>{
     expect(legacy).toContain('seyeon_g2_historical_candidate_not_authority');
     expect(legacy).toContain('seyeon_positive_g2_historical_originals_not_authorized');
