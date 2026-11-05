@@ -32,7 +32,7 @@ export default function HomeScreen() {
           />
         }
       >
-        <HomeBrandHeader greeting={view.greeting} subheading={view.subheading} />
+        <HomeBrandHeader greeting={view.greeting} subheading={view.subheading} greetingUsesFallbackName={view.greetingUsesFallbackName} />
         <HomeCharacterFeature />
         <HomeTodayCard card={view.today} />
         <MobileFortuneCookie />
