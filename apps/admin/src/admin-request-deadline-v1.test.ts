@@ -47,6 +47,16 @@ describe('Owner browser read requests never load indefinitely', () => {
     await assertion;
   });
 
+  it('ends loading even if HTTP headers arrive but the JSON body never finishes',async()=>{
+    vi.useFakeTimers();
+    const fake=(async()=>new Response(new ReadableStream<Uint8Array>({
+      start(controller){controller.enqueue(new TextEncoder().encode('{\"kind\":\"users\"'));}
+    }),{status:200,headers:{'Content-Type':'application/json'}})) as typeof fetch;
+    const request=fetchAdminReadV1('/api/admin/users',ADMIN_SESSION_MARKER_V1,fake);
+    const assertion=expect(request).rejects.toBeInstanceOf(AdminRequestDeadlineErrorV1);
+    await vi.advanceTimersByTimeAsync(ADMIN_READ_DEADLINE_MS_V1);
+    await assertion;
+  });
   it('does not treat a transient network timeout as Owner access denial', async () => {
     vi.useFakeTimers();
     const pending = (async () => new Promise<Response>(() => {})) as typeof fetch;
