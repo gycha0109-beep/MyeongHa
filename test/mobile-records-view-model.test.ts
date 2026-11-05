@@ -71,4 +71,23 @@ describe('mobile Records view model', () => {
     expect(readingReaderLabelV1(['character-a'])).toBe('연결자와 본 풀이');
     expect(readingReaderLabelV1(['character-a', 'character-b'])).toBe('연결자 2명과 본 풀이');
   });
+  it('localizes Reader-count captions without exposing Reader identities', () => {
+    const ids = Object.freeze(['opaque-reader-a', 'opaque-reader-b']);
+    const samples = [
+      { locale: 'ko-KR', zero: 'Reader 기록 없음', one: '연결자와 본 풀이', multiple: '연결자 2명과 본 풀이' },
+      { locale: 'ja-JP', zero: '案内人の記録なし', one: '案内人と行った鑑定', multiple: '2人の案内人と行った鑑定' },
+      { locale: 'zh-TW', zero: '無引路人紀錄', one: '與引路人共同進行的解讀', multiple: '與 2 位引路人共同進行的解讀' },
+      { locale: 'en-US', zero: 'No reader recorded', one: 'Reading with a reader', multiple: 'Reading with 2 readers' },
+      { locale: 'zh-CN', zero: '未记录引路人', one: '与引路人共同进行的解读', multiple: '与 2 位引路人共同进行的解读' },
+    ] as const;
+    for (const row of samples) {
+      expect(readingReaderLabelV1([], row.locale)).toBe(row.zero);
+      expect(readingReaderLabelV1([ids[0]!], row.locale)).toBe(row.one);
+      const caption = readingReaderLabelV1(ids, row.locale);
+      expect(caption).toBe(row.multiple);
+      expect(caption).not.toContain('opaque-reader');
+    }
+    expect(ids).toEqual(['opaque-reader-a', 'opaque-reader-b']);
+  });
+
 });
