@@ -30,14 +30,11 @@ describe('Birth form authored errors in five supported UI languages', () => {
   });
 
   it('covers the exact Birth screen, date and 12-hour clock validation sources', async () => {
-    const paths = [
-      'apps/mobile/src/features/birth/birth-input.ts',
-      'apps/mobile/src/features/birth/birth-clock-12hour.ts',
-      'apps/mobile/src/app/birth/index.tsx',
-    ] as const;
-    const [date, clock, screen] = await Promise.all(paths.map(path =>
-      readFile(new URL(`../${path}`, import.meta.url), 'utf8'),
-    ));
+    const [date, clock, screen] = await Promise.all([
+      readFile(new URL('../apps/mobile/src/features/birth/birth-input.ts', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/features/birth/birth-clock-12hour.ts', import.meta.url), 'utf8'),
+      readFile(new URL('../apps/mobile/src/app/birth/index.tsx', import.meta.url), 'utf8'),
+    ]);
     for (const value of MOBILE_BIRTH_AUTHORED_ERRORS_V1) {
       const fromTemplate = /^(출생 월|출생 일)(을 입력해 주세요\.|을 확인해 주세요\.)$/u.exec(value);
       if (fromTemplate !== null) {
