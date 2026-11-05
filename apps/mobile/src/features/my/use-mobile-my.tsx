@@ -3,7 +3,8 @@ import {
   type TargetPersonCreateRequestV1,
 } from '@myeongha/api-client';
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 
 import {
   loadMobileMyV1,
@@ -24,53 +25,82 @@ export function useMobileMyV1() {
   const [state, setState] = useState<MobileMyStateV1>(MOBILE_MY_LOADING_STATE_V1);
   const [targetPersonCreate, setTargetPersonCreate] =
     useState<TargetPersonCreateStateV1>({ kind: 'idle' });
+  const focused = useRef(false);
+  const subjectEpoch = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
-      let active = true;
-      setState(MOBILE_MY_LOADING_STATE_V1);
-      void loadMobileMyV1(mobileMyServiceV1).then((next) => {
-        if (active) setState(next);
-      });
+      focused.current = true;
+      const restartForCurrentSubject = () => {
+        const epoch = ++subjectEpoch.current;
+        setState(MOBILE_MY_LOADING_STATE_V1);
+        setTargetPersonCreate({ kind: 'idle' });
+        void loadMobileMyV1(mobileMyServiceV1).then((next) => {
+          if (focused.current && epoch === subjectEpoch.current) setState(next);
+        });
+      };
+      // Listen only to verified credential-store mutations. An old account
+      // response must not be painted after a Member/Guest change.
+      const unsubscribe = subscribeMobileSubjectCredentialChangesV1(restartForCurrentSubject);
+      restartForCurrentSubject();
       return () => {
-        active = false;
+        unsubscribe();
+        focused.current = false;
+        subjectEpoch.current += 1;
+        setState(MOBILE_MY_LOADING_STATE_V1);
+        setTargetPersonCreate({ kind: 'idle' });
       };
     }, []),
   );
 
   const retryProfile = useCallback(async () => {
+    if (!focused.current) return;
+    const epoch = subjectEpoch.current;
     setState((current) => Object.freeze({
       ...current,
       profile: Object.freeze({ kind: 'loading' as const }),
     }));
     const profile = await reloadMobileMyProfileV1(mobileMyServiceV1);
-    setState((current) => Object.freeze({ ...current, profile }));
+    if (focused.current && epoch === subjectEpoch.current) {
+      setState((current) => Object.freeze({ ...current, profile }));
+    }
   }, []);
 
   const retryBirth = useCallback(async () => {
+    if (!focused.current) return;
+    const epoch = subjectEpoch.current;
     setState((current) => Object.freeze({
       ...current,
       birth: Object.freeze({ kind: 'loading' as const }),
     }));
     const birth = await reloadMobileMyBirthV1(mobileMyServiceV1);
-    setState((current) => Object.freeze({ ...current, birth }));
+    if (focused.current && epoch === subjectEpoch.current) {
+      setState((current) => Object.freeze({ ...current, birth }));
+    }
   }, []);
 
   const retryTargetPersons = useCallback(async () => {
+    if (!focused.current) return;
+    const epoch = subjectEpoch.current;
     setState((current) => Object.freeze({
       ...current,
       targetPersons: Object.freeze({ kind: 'loading' as const }),
     }));
     const targetPersons = await reloadMobileMyTargetPersonsV1(mobileMyServiceV1);
-    setState((current) => Object.freeze({ ...current, targetPersons }));
+    if (focused.current && epoch === subjectEpoch.current) {
+      setState((current) => Object.freeze({ ...current, targetPersons }));
+    }
   }, []);
 
   const createTargetPerson = useCallback(
     async (request: TargetPersonCreateRequestV1): Promise<boolean> => {
+      if (!focused.current) return false;
+      const epoch = subjectEpoch.current;
       setTargetPersonCreate({ kind: 'submitting' });
       try {
         await mobileMyServiceV1.createTargetPerson(request);
         const targetPersons = await reloadMobileMyTargetPersonsV1(mobileMyServiceV1);
+        if (!focused.current || epoch !== subjectEpoch.current) return false;
         setState((current) => Object.freeze({ ...current, targetPersons }));
         setTargetPersonCreate({ kind: 'idle' });
         return true;
@@ -83,7 +113,9 @@ export function useMobileMyV1() {
             message = '입력한 출생정보를 확인해 주세요.';
           }
         }
-        setTargetPersonCreate({ kind: 'error', message });
+        if (focused.current && epoch === subjectEpoch.current) {
+          setTargetPersonCreate({ kind: 'error', message });
+        }
         return false;
       }
     },
