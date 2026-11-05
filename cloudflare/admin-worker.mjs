@@ -74,6 +74,16 @@ export function createAdminMemberAuthServiceFetchV1(env) {
   };
 }
 
+/** Stable per-Owner API scopes keep sign-in/read quotas isolated.
+ * Static assets never reach this function; no user-supplied key material is trusted.
+ */
+export function adminRateLimitKeyV1(ownerId, request) {
+  const url = new URL(request.url);
+  const category = url.pathname === '/api/auth/sign-in' ? 'sign-in'
+    : request.method === 'GET' ? 'read' : 'other';
+  return ownerId + ':' + category;
+}
+
 export default {
   async scheduled(_event,env,ctx){
     const {auditEnabled,analyticsEnabled}=validateAdminMaintenanceBindingsV1(env);
@@ -126,7 +136,7 @@ export default {
       const runtime = createAdminPrivateRuntimeV1({env,readPool:reader,auditPool:audit,...(command?{commandPool:command}:{})});
       const handler = createAdminHostedHttpV1({origin:env.MYEONGHA_ADMIN_ORIGIN,memberAuthOrigin:env.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN,
         verifyAccess:async()=>true, // The signed, exact Owner gate already ran above.
-        allowRequest:async()=>Boolean((await env.ADMIN_RATE_LIMITER.limit({key:env.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID})).success),
+        allowRequest:async(apiRequest)=>Boolean((await env.ADMIN_RATE_LIMITER.limit({key:adminRateLimitKeyV1(env.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID,apiRequest)})).success),
         api:runtime.handleRequest,assets:request=>env.ASSETS.fetch(request),fetchImpl:memberAuthFetch});
       phase='hosted-request';
       return await handler(request);
