@@ -11,6 +11,7 @@ import {
 
 import type { BirthCalendarTypeV1 } from '@myeongha/api-client';
 import { mobileColors } from '@/ui/mobile-colors';
+import { mobileBirthCalendarLocaleLabelsV1 } from './mobile-birth-calendar-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -19,7 +20,6 @@ type PickerStep = 'year' | 'month' | 'day';
 export type BirthDateParts = Readonly<{ year: string; month: string; day: string }>;
 
 const MIN_YEAR = 1800;
-const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 
 function validYear(value: string): number | null {
@@ -50,12 +50,9 @@ export function BirthDateCalendar({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { locale, t } = useMobileUiLocale();
-  const yearUnit = locale === 'ko-KR' ? '년' : '年';
-  const monthUnit = locale === 'ja-JP' ? '月' : locale === 'zh-TW' ? '月' : '월';
-  const dayUnit = locale === 'ko-KR' ? '일' : '日';
-  const weekdayLabels = locale === 'ko-KR' ? WEEKDAYS
-    : locale === 'ja-JP' ? ['日','月','火','水','木','金','土']
-      : ['日','一','二','三','四','五','六'];
+  const { yearUnit, monthUnit, dayUnit, weekdays: weekdayLabels } =
+    mobileBirthCalendarLocaleLabelsV1(locale);
+  const dayStepLabel = locale === 'en-US' ? t('출생 일') : dayUnit;
   const selectedYear = validYear(value.year);
   const [step, setStep] = useState<PickerStep>('year');
   const [year, setYear] = useState(2000);
@@ -119,7 +116,7 @@ export function BirthDateCalendar({
               <Text style={[styles.crumbText, step === 'month' && styles.crumbTextActive]}>{month}{monthUnit}</Text>
             </Pressable>
             <Text style={styles.crumbArrow}>›</Text>
-            <Text style={styles.currentStep}>{step === 'day' ? t('날짜 선택') : dayUnit}</Text>
+            <Text style={styles.currentStep}>{step === 'day' ? t('날짜 선택') : dayStepLabel}</Text>
           </View>
 
           <ScrollView style={styles.pickerScroll} contentContainerStyle={styles.pickerBody}>
@@ -140,7 +137,7 @@ export function BirthDateCalendar({
                   {yearChoices.map((choice) => {
                     const disabled = choice < MIN_YEAR || choice > todayYear;
                     return (
-                      <Pressable key={choice} accessibilityRole="button" accessibilityLabel={choice + yearUnit}
+                      <Pressable key={choice} accessibilityRole="button" accessibilityLabel={locale === 'en-US' ? `${t('출생 연도')} ${choice}` : choice + yearUnit}
                         disabled={disabled} onPress={() => { setYear(choice); setStep('month'); }}
                         style={[styles.choice, choice === year && styles.selected, disabled && styles.disabled]}>
                         <Text style={[styles.choiceText, choice === year && styles.selectedText]}>{choice}</Text>
@@ -155,7 +152,7 @@ export function BirthDateCalendar({
                 <Text style={styles.sectionTitle}>{year}{yearUnit} · {t('출생 월')}</Text>
                 <View style={styles.choiceGrid}>
                   {MONTHS.map((choice) => (
-                    <Pressable key={choice} accessibilityRole="button" accessibilityLabel={choice + monthUnit}
+                    <Pressable key={choice} accessibilityRole="button" accessibilityLabel={locale === 'en-US' ? `${t('출생 월')} ${choice}` : choice + monthUnit}
                       onPress={() => { setMonth(choice); setStep('day'); }}
                       style={[styles.choice, choice === month && styles.selected]}>
                       <Text style={[styles.choiceText, choice === month && styles.selectedText]}>{choice}{monthUnit}</Text>
@@ -200,7 +197,7 @@ export function BirthDateCalendar({
                         Number(value.month) === month && Number(value.day) === choice;
                       return (
                         <Pressable key={choice} accessibilityRole="button"
-                          accessibilityLabel={year + yearUnit + ' ' + month + monthUnit + ' ' + choice + dayUnit}
+                          accessibilityLabel={locale === 'en-US' ? `${year}-${String(month).padStart(2, '0')}-${String(choice).padStart(2, '0')}` : year + yearUnit + ' ' + month + monthUnit + ' ' + choice + dayUnit}
                           accessibilityState={{ selected: active }}
                           onPress={() => finish(choice)}
                           style={[styles.dayCell, active && styles.selected]}>
@@ -218,7 +215,7 @@ export function BirthDateCalendar({
                           Number(value.month) === month && Number(value.day) === choice;
                         return (
                           <Pressable key={choice} accessibilityRole="button"
-                            accessibilityLabel={dateLabel + ' ' + year + yearUnit + ' ' + month + monthUnit + ' ' + choice + dayUnit}
+                            accessibilityLabel={locale === 'en-US' ? `${dateLabel} ${year}-${String(month).padStart(2, '0')}-${String(choice).padStart(2, '0')}` : dateLabel + ' ' + year + yearUnit + ' ' + month + monthUnit + ' ' + choice + dayUnit}
                             accessibilityState={{ selected: active }}
                             onPress={() => finish(choice)}
                             style={[styles.dayCell, active && styles.selected]}>
