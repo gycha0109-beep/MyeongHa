@@ -22,7 +22,8 @@ apply_pg17_migrations_without_birth_authority() {
   local reader_scope='historical'
   case "$case_name" in
     commerce-private-claim-full-finalizer-pg17|commerce-stored-portone-hmac-lineage-pg17|\
-    commerce-portone-cancellation-set-audit-pg17|commerce-exact-reader-withdrawal-hold-pg17)
+    commerce-portone-cancellation-set-audit-pg17|commerce-exact-reader-withdrawal-hold-pg17|\
+    commerce-verified-reader-claim-cancel-effect-pg17)
       reader_scope='reader-integrated' ;;
   esac
   for migration in supabase/migrations/*.sql; do
