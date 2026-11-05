@@ -13,6 +13,13 @@ const input={
   finalModelContextDigest:sha('a'),candidatePgJsonbDigest:pg('b'),
   originalRecordId:id(6),originalGrantId:id(7),historicalSourceCount:2,
   historicalSourceCensusDigest:pg('c'),
+  historicalAssistantOriginalSourcesDigest:pg('1'),
+  recordType:'conversation_recall',
+  recordSchemaVersion:'v1',
+  projectorVersion:'seyeon-conversation-recall-projector-v1',
+  originalPgJsonbDigest:pg('d'),
+  selectedSourcesDigest:sha('e'),
+  projectedMemoryDigest:sha('f'),
 };
 const valid={
   schemaVersion:'seyeon-g1-historical-source-admission-s0-v1',
@@ -72,6 +79,13 @@ describe('W82 DB-issued immutable G1 source-selection admission port (HOLD)',()=
     ['not current originals',{...valid,originalsCurrentAtAdmission:false}],
     ['no source authorization',{...valid,authorizesSourceSelection:false}],
     ['invalid source digest',{...valid,projectedMemoryDigest:'invalid'}],
+    ['different valid original JSONB digest',{...valid,originalPgJsonbDigest:pg('9')}],
+    ['different valid selected-source digest',{...valid,selectedSourcesDigest:sha('9')}],
+    ['different valid projected Memory digest',{...valid,projectedMemoryDigest:sha('9')}],
+    ['different valid Assistant-lineage digest',{...valid,historicalAssistantOriginalSourcesDigest:pg('9')}],
+    ['different record type',{...valid,recordType:'alternate_type'}],
+    ['different schema',{...valid,recordSchemaVersion:'v2'}],
+    ['different projector',{...valid,projectorVersion:'alternate_projector'}],
   ] as const)('rejects %s',async(_name,response)=>{
     const {port}=fake(response);
     await expect(port.admitExactSources(input)).rejects.toThrow(
@@ -85,6 +99,12 @@ describe('W82 DB-issued immutable G1 source-selection admission port (HOLD)',()=
     ['zero history',{...input,historicalSourceCount:0}],
     ['too many messages',{...input,historicalSourceCount:24}],
     ['invalid original census',{...input,historicalSourceCensusDigest:sha('c')}],
+    ['missing assistant-lineage digest',{...input,historicalAssistantOriginalSourcesDigest:'invalid'}],
+    ['invalid original record digest',{...input,originalPgJsonbDigest:sha('d')}],
+    ['invalid projection digest',{...input,projectedMemoryDigest:pg('f')}],
+    ['invalid source selection digest',{...input,selectedSourcesDigest:pg('e')}],
+    ['empty record type',{...input,recordType:''}],
+    ['empty schema',{...input,recordSchemaVersion:''}],
   ] as const)('holds %s before database call',async(_name,bad)=>{
     const {port,calls}=fake(valid);
     await expect(port.admitExactSources(bad)).rejects.toThrow('request invalid');

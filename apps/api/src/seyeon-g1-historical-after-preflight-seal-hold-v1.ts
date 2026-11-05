@@ -85,11 +85,26 @@ export function createSeyeonG1HistoricalPostPreflightSealHoldV1(
       });
       const originalRecordId=input.persistedHistoricalCandidateProof.recordId;
       const originalGrantId=input.persistedHistoricalCandidateProof.originalGrantId;
-      const historicalSourceCensusDigest=
-        input.persistedHistoricalCandidateProof.historicalSourceCensusDigest;
+      const original= input.persistedHistoricalCandidateProof;
+      const historicalSourceCensusDigest=original.historicalSourceCensusDigest;
+      const historicalAssistantOriginalSourcesDigest=
+        original.historicalAssistantOriginalSourcesDigest;
+      const recordType=original.recordType;
+      const recordSchemaVersion=original.recordSchemaVersion;
+      const projectorVersion=original.projectorVersion;
+      const originalPgJsonbDigest=original.originalPgJsonbDigest;
+      const selectedSourcesDigest=original.selectedSourcesDigest;
+      const projectedMemoryDigest=original.projectedMemoryDigest;
       if(typeof originalRecordId!=='string'
         ||typeof originalGrantId!=='string'
-        ||typeof historicalSourceCensusDigest!=='string')
+        ||typeof historicalSourceCensusDigest!=='string'
+        ||typeof historicalAssistantOriginalSourcesDigest!=='string'
+        ||typeof recordType!=='string'
+        ||typeof recordSchemaVersion!=='string'
+        ||typeof projectorVersion!=='string'
+        ||typeof originalPgJsonbDigest!=='string'
+        ||typeof selectedSourcesDigest!=='string'
+        ||typeof projectedMemoryDigest!=='string')
         throw new SeyeonG1HistoricalPostPreflightContextHoldV1();
 
       // Recheck the original records and exact consent once more under
@@ -106,6 +121,13 @@ export function createSeyeonG1HistoricalPostPreflightSealHoldV1(
         originalGrantId,
         historicalSourceCount:input.census.historicalSourceCount,
         historicalSourceCensusDigest,
+        historicalAssistantOriginalSourcesDigest,
+        recordType,
+        recordSchemaVersion,
+        projectorVersion,
+        originalPgJsonbDigest,
+        selectedSourcesDigest,
+        projectedMemoryDigest,
       });
     } catch {
       // Any interrupted or already-committed S0 seal stays non-retryable.

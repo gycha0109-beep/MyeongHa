@@ -27,6 +27,13 @@ export interface SeyeonG1HistoricalSourceAdmissionRequestV1 {
   readonly originalGrantId:string;
   readonly historicalSourceCount:number;
   readonly historicalSourceCensusDigest:string;
+  readonly recordType:string;
+  readonly recordSchemaVersion:string;
+  readonly projectorVersion:string;
+  readonly originalPgJsonbDigest:string;
+  readonly selectedSourcesDigest:string;
+  readonly projectedMemoryDigest:string;
+  readonly historicalAssistantOriginalSourcesDigest:string;
 }
 export interface SeyeonG1HistoricalSourceAdmissionReceiptV1 {
   readonly schemaVersion:'seyeon-g1-historical-source-admission-s0-v1';
@@ -76,6 +83,13 @@ export function createSeyeonG1HistoricalSourceAdmissionPortV1(
         ||!SHA.test(req.finalModelContextDigest)
         ||!PG_SHA.test(req.candidatePgJsonbDigest)
         ||!PG_SHA.test(req.historicalSourceCensusDigest)
+        ||!PG_SHA.test(req.historicalAssistantOriginalSourcesDigest)
+        ||!PG_SHA.test(req.originalPgJsonbDigest)
+        ||!SHA.test(req.selectedSourcesDigest)
+        ||!SHA.test(req.projectedMemoryDigest)
+        ||![req.recordType,req.recordSchemaVersion,req.projectorVersion]
+          .every(value=>typeof value==='string'&&value.length>0
+            &&value.length<=100)
         ||!Number.isSafeInteger(req.historicalSourceCount)
         ||req.historicalSourceCount<1||req.historicalSourceCount>23)
         throw Error('Historical G1 source admission request invalid');
@@ -102,15 +116,14 @@ select seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(
         ||proof.candidatePgJsonbDigest!==req.candidatePgJsonbDigest
         ||proof.finalModelContextDigest!==req.finalModelContextDigest
         ||proof.historicalSourceCensusDigest!==req.historicalSourceCensusDigest
-        ||!['recordType','recordSchemaVersion','projectorVersion']
-          .every(key=>typeof proof[key]==='string'
-            &&(proof[key] as string).length>0)
-        ||!['selectedSourcesDigest','projectedMemoryDigest']
-          .every(key=>typeof proof[key]==='string'
-            &&SHA.test(proof[key] as string))
-        ||!['originalPgJsonbDigest','historicalAssistantOriginalSourcesDigest']
-          .every(key=>typeof proof[key]==='string'
-            &&PG_SHA.test(proof[key] as string))
+        ||proof.historicalAssistantOriginalSourcesDigest
+          !==req.historicalAssistantOriginalSourcesDigest
+        ||proof.recordType!==req.recordType
+        ||proof.recordSchemaVersion!==req.recordSchemaVersion
+        ||proof.projectorVersion!==req.projectorVersion
+        ||proof.originalPgJsonbDigest!==req.originalPgJsonbDigest
+        ||proof.selectedSourcesDigest!==req.selectedSourcesDigest
+        ||proof.projectedMemoryDigest!==req.projectedMemoryDigest
         ||proof.originalsCurrentAtAdmission!==true
         ||proof.authorizesSourceSelection!==true
         ||proof.permitsModelDispatch!==false

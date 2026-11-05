@@ -84,6 +84,7 @@ const proof={
   historicalSourceCount:census.historicalSourceCount,
   historicalSources:census.historicalSources,
   historicalSourceCensusDigest:'sha256:pg-jsonb:v1:'+'c'.repeat(64),
+  historicalAssistantOriginalSourcesDigest:'sha256:pg-jsonb:v1:'+'d'.repeat(64),
   recordKind:'memory',recordId:id(6),originalGrantId:id(7),
   recordType:candidate.recordType,recordSchemaVersion:candidate.schemaVersion,
   projectorVersion:candidate.projectorVersion,
@@ -228,6 +229,13 @@ describe('W76 isolated G1 real Preflight -> database final seal -> unconditional
       originalRecordId:id(6),originalGrantId:id(7),
       historicalSourceCount:2,
       historicalSourceCensusDigest:proof.historicalSourceCensusDigest,
+      historicalAssistantOriginalSourcesDigest:proof.historicalAssistantOriginalSourcesDigest,
+      recordType:proof.recordType,
+      recordSchemaVersion:proof.recordSchemaVersion,
+      projectorVersion:proof.projectorVersion,
+      originalPgJsonbDigest:proof.originalPgJsonbDigest,
+      selectedSourcesDigest:proof.selectedSourcesDigest,
+      projectedMemoryDigest:proof.projectedMemoryDigest,
     });
     expect(h.generate).toHaveBeenCalledTimes(2);
   });
