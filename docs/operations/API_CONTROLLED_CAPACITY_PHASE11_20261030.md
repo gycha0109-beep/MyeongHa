@@ -1,5 +1,19 @@
 # Phase 11 — Controlled non-production loopback capacity probe
 
+## Actual local Workers runtime observation
+
+On 2026-11-05 KST, the actual `workerd` process ran the main Worker entrypoint from `9ea61382aad65231d8fbda095a7f5b1da9f515b9` under the repository's pinned Wrangler 4.152.0 (`workerd` 1.20261019.1, Windows Node 24.20.0). The 127.0.0.1 listener used a temporary Wrangler configuration with the source compatibility date and flags, a local-only name, and no bindings or credentials. [Original 1,149-byte observation](LOCAL_WORKERD_HEALTH_OBSERVATION_20261105.json), SHA-256 `6e23bc849965c3906b28ff7868e86a881556eccc2912f7266f8aa777f129076a`.
+
+| `/api/health` scenario | Successful / measured | p50 / p95 / p99 (ms) |
+| --- | ---: | ---: |
+| Baseline after 5 warmups | 50 / 50 | 15.442 / 18.901 / 22.390 |
+| Concurrency 4 | 100 / 100 | 10.070 / 12.927 / 14.758 |
+| Concurrency 8 | 100 / 100 | 17.355 / 21.748 / 22.366 |
+
+Health returned 200, its unsupported method returned 405, and Member/calculation/preview routes returned the default 404 with all five responses marked `no-store`. These are local runtime ingress and fail-closed observations. The origin/transport admission rules still require a separately configured isolated HTTPS origin and approved dependency bindings for positive Worker-path measurement. This run recorded no Auth, SQL, Saju, Production capacity, or scaling evidence.
+
+To reproduce, create a temporary Wrangler JSON config outside the checkout with only a distinct local `name`, the absolute path to `cloudflare/myeongha-worker.mjs`, `compatibility_date`, and `compatibility_flags` copied from the current source config. Launch the pinned Wrangler from the temporary directory with `dev --local --config <temporary-config> --ip 127.0.0.1 --port 0`. Use the printed local port with `collect-loopback-api-performance-baseline.mjs` and `measure-controlled-loopback-capacity.mjs` as documented below, then stop the local process. [Cloudflare local development](https://developers.cloudflare.com/workers/local-development/).
+
 ## Real product path sustained experiment
 
 Run the existing main-only GitHub Linux workflow with `experiment=sustained` after the implementation is merged. Its default `short` mode remains the short GoTrue, PostgreSQL18 and pinned Saju experiment.
@@ -13,6 +27,19 @@ The sustained mode adds a short concurrency ramp at 1/2/4/8, five minutes at one
 The artifact separates successful calculations, HTTP 503, transport failures and unstarted slots. Each sustained window includes successful p50/p95/p99, separate DB connection and SQL timing, Auth HTTP header timing, Saju request timing, CPU throttle counts and cgroup memory peak. The runner injects one local DB-adapter failure and requires four successful calculations after the adapter is restored. Runtime and Docker cleanup must both succeed before the artifact can record success.
 
 Only an actual successful manual run provides sustained evidence. These fixed probe loads are experimental inputs. The Node gateway, synthetic SQL fixture, and Saju limits apply to the isolated run. Workers runtime, Production capacity, automatic scaling and Hosted disaster recovery require separate evidence.
+
+### Verified first sustained Linux run
+
+[Run #41987403626](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41987403626) passed at exact `main` `9ea61382aad65231d8fbda095a7f5b1da9f515b9`. The [original 3,503-byte JSON](REAL_GOTRUE_PG18_SAJU_SUSTAINED_LINUX_OBSERVATION_20261105.json) is preserved from [artifact 13398260151](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41987403626/artifacts/13398260151). Raw JSON SHA-256 `10513f4219f80eaf0f7d1b194683be6f00c4a8585505ac0ce6dd3eb53f9da90e`.
+
+| Window | Success / scheduled | 503 / transport / skipped | Actual peak in flight | p50 / p95 / p99 (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| 5 min, 1/s | 300 / 300 | 0 / 0 / 0 | 1 | 111.877 / 114.150 / 117.387 |
+| 15 min, 4/s | 3600 / 3600 | 0 / 0 / 0 | 1 | 110.218 / 112.824 / 116.510 |
+
+Short tests succeeded at 1/2/4 concurrency. At 8, 20/32 succeeded and 12 returned 503. The pool reached two connections across the run and both sustained windows had zero acquisition failures. Saju's constrained cgroup recorded zero throttle periods and OOM kills. The 15-minute cgroup memory peak was 46,780,416 bytes out of 268,435,456. One injected DB adapter failure returned 503, all four recovery requests succeeded and the runtime and Docker cleanup checks passed.
+
+The sustained trial observed paced throughput through the three dependencies on the Node gateway. Actual simultaneous sustained arrivals, per-failure dependency attribution in the short concurrency ramp, and a Saju saturation ceiling in this topology remain open. [Phase 12 diagnostic review](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md).
 
 ## 2026-11-01 — actual isolated PostgreSQL 18 CI execution (manual, synthetic-only)
 
