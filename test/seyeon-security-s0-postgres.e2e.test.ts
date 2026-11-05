@@ -2401,6 +2401,117 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         permitsStreaming:false,permitsHttpReveal:false,
       });
       expect(Object.isFrozen(verifiedG3PortReceipt)).toBe(true);
+      // W97 G5: independent real member/Subject B must never read the
+      // immutable historical source of Subject A. Likewise Subject A
+      // cannot substitute B's Thread, Turn or Attempt. The restricted G3
+      // adapter must expose one generic HOLD, not original DB locators.
+      const foreign=await prepare(219);
+      const originalReviewRequest={
+        subjectId:f.subject,threadId:f.thread,turnId:currentTurn,
+        attemptId:currentAttempt,purpose:'audit_only' as const,
+        historicalSourceCount:2,
+      };
+      const g3ForeignAttempts=[
+        ['foreign identity claims original subject',foreign.run,
+          {...originalReviewRequest}],
+        ['foreign identity supplies own subject but original Turn',
+          foreign.run,{...originalReviewRequest,subjectId:foreign.subject}],
+      ] as const;
+      for(const [_case,execute,request] of g3ForeignAttempts){
+        await expect(execute(({client})=>
+          createSeyeonG3HistoricalOriginalsReviewPortV1(client)
+            .reviewCurrentOriginals(request),
+        )).rejects.toMatchObject({
+          code:'SEYEON_G3_HISTORICAL_ORIGINALS_REVIEW_HOLD',
+          message:'Historical G3 original rights review unavailable.',
+        });
+      }
+      const originalIdentitySubstitutions=[
+        ['foreign Thread',{threadId:foreign.thread}],
+        ['foreign Turn',{turnId:foreign.turn}],
+        ['foreign Attempt',{attemptId:foreign.attempt}],
+        ['foreign Turn+Attempt',{
+          turnId:foreign.turn,attemptId:foreign.attempt,
+        }],
+      ] as const;
+      for(const [_case,substitution] of originalIdentitySubstitutions){
+        await expect(f.run(({client})=>
+          createSeyeonG3HistoricalOriginalsReviewPortV1(client)
+            .reviewCurrentOriginals({
+              ...originalReviewRequest,...substitution,
+            }),
+        )).rejects.toMatchObject({
+          code:'SEYEON_G3_HISTORICAL_ORIGINALS_REVIEW_HOLD',
+          message:'Historical G3 original rights review unavailable.',
+        });
+      }
+      // A failed cross-Subject/Thread/Turn/Attempt audit cannot damage
+      // the original exact, non-authorizing source review.
+      expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
+      const {rows:[originalAfterIsolation]}=await pool.query(`
+        select t.state as turn_state,a.state as attempt_state,
+          a.seyeon_personal_source_pin_jsonb->'historicalCandidateProof'
+            ->>'subjectId' as original_subject
+        from public.chat_turns t
+        join public.chat_turn_attempts a on a.turn_id=t.id
+        where t.id=$1::uuid and a.id=$2::uuid
+      `,[currentTurn,currentAttempt]);
+      expect(originalAfterIsolation).toEqual({
+        turn_state:'context_ready',attempt_state:'running',
+        original_subject:f.subject,
+      });
+      // Real independent concurrent backends: verified Subject A may
+      // inspect its own original, Subject B may not use the SAME request,
+      // even when both are active at the same time and share a pool.
+      const subjectAReview=await subjectPool.connect();
+      const subjectBReview=await subjectPool.connect();
+      try{
+        await Promise.all([
+          subjectAReview.query('BEGIN'),subjectBReview.query('BEGIN'),
+        ]);
+        await Promise.all([
+          subjectAReview.query('SET LOCAL ROLE myeongha_api_executor'),
+          subjectBReview.query('SET LOCAL ROLE myeongha_api_executor'),
+        ]);
+        await Promise.all([
+          subjectAReview.query(
+            "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+          ),
+          subjectBReview.query(
+            "select set_config('myeongha.subject_id',$1,true)",
+            [foreign.subject],
+          ),
+        ]);
+        const [{rows:[aPid]},{rows:[bPid]}]=await Promise.all([
+          subjectAReview.query<{pid:number}>('select pg_backend_pid() as pid'),
+          subjectBReview.query<{pid:number}>('select pg_backend_pid() as pid'),
+        ]);
+        expect(aPid?.pid).toBeGreaterThan(0);
+        expect(bPid?.pid).toBeGreaterThan(0);
+        expect(aPid?.pid).not.toBe(bPid?.pid);
+        const [aResult,bResult]=await Promise.allSettled([
+          createSeyeonG3HistoricalOriginalsReviewPortV1(subjectAReview)
+            .reviewCurrentOriginals(originalReviewRequest),
+          createSeyeonG3HistoricalOriginalsReviewPortV1(subjectBReview)
+            .reviewCurrentOriginals(originalReviewRequest),
+        ]);
+        expect(aResult.status).toBe('fulfilled');
+        if(aResult.status==='fulfilled')
+          expect(aResult.value).toEqual(verifiedG3PortReceipt);
+        expect(bResult.status).toBe('rejected');
+        if(bResult.status==='rejected')
+          expect(bResult.reason).toMatchObject({
+            code:'SEYEON_G3_HISTORICAL_ORIGINALS_REVIEW_HOLD',
+            message:'Historical G3 original rights review unavailable.',
+          });
+      }finally{
+        await Promise.all([
+          Promise.resolve(subjectAReview.query('ROLLBACK')).catch(()=>undefined),
+          Promise.resolve(subjectBReview.query('ROLLBACK')).catch(()=>undefined),
+        ]);
+        subjectAReview.release();
+        subjectBReview.release();
+      }
       await expect(f.run(({client})=>
         createSeyeonG3HistoricalOriginalsReviewPortV1(client)
           .reviewCurrentOriginals({
