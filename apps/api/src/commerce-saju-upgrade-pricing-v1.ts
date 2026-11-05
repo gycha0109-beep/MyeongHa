@@ -125,7 +125,7 @@ export function quoteSajuUpgradeFromVerifiedLedgerV1(
       || !Array.isArray(input.pendingPurchases)) return invalid();
   const target = COMMERCE_SAJU_PRODUCTS_V1[targetProductKey];
   const targetFields = new Set<string>(target.fields);
-  const owned = new Set<SajuFieldV1>();
+  const owned = new Set<string>();
   for (const field of input.ownedFields) {
     if (typeof field !== 'string' || !fields.has(field)) return invalid();
     owned.add(field);
@@ -248,7 +248,7 @@ export function quoteSajuUpgradeFromVerifiedLedgerV1(
     targetListPriceMinor: target.priceMinor,
     recognizedNetPaymentMinor: credit,
     creditedReceiptIds: Object.freeze(credited),
-    ownedFields: Object.freeze([...owned]),
+    ownedFields: Object.freeze([...owned] as SajuFieldV1[]),
     checkoutAuthorized: false,
     requiresAtomicCheckoutAdmission: true,
     refundAllocationApplied: false,
