@@ -1,9 +1,22 @@
 # Operations Phase 11 — disposable real GoTrue → PostgreSQL18 → Saju product request chain
 
-> Track: `ops` | Implementation status: **CODE ONLY / real Linux observation NOT YET RUN** (2026-11-05 KST)
+> Track: `ops` | **Short real Linux observation verified** (2026-11-05 KST)
 >
 > Approved authority: [Production Operations Architecture §38 Phase 10–12](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md).
 > Do not promote isolated observations to Production readiness.
+
+## Verified Linux baseline and contention
+
+[Run #41979084279](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41979084279) succeeded at `main` `429b82e6eace9963d39bb97bf6d642e9516d4d26` after the member-mapping fix merged in [#3021](https://github.com/gycha0109-beep/MyeongHa/pull/3021). The [original 1,336-byte JSON](REAL_GOTRUE_PG18_SAJU_LINUX_OBSERVATION_20261105.json) from [artifact 13393376541](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41979084279/artifacts/13393376541) has raw SHA-256 `cbb0ae2a1c7f9a3b36cd6a23fa0899c32ede31eb946867cf1fd00eec4c9d30ed`.
+
+| Scenario | 200 | 503 | Other | Successful p50 / p95 / p99 (ms) |
+| --- | ---: | ---: | ---: | ---: |
+| Sequential, 12 requests | 12 | 0 | 0 | 110.083 / 127.595 / 137.235 |
+| Concurrency 8, 32 requests | 18 | 14 | 0 | 196.154 / 254.166 / 255.515 |
+
+The pool peaked at its two-connection limit. Successful acquisition p95 was 108.871 ms and SQL p95 was 81.742 ms in a fixture that includes an 80 ms SQL delay. The Node gateway made 44 authenticated GoTrue calls and 30 calculation calls. Anonymous access was rejected and Health stayed available. The job succeeded through the runner's Docker cleanup guard. The JSON contains no member identifiers, tokens or request bodies.
+
+The test used a Node gateway, a disposable PostgreSQL RLS fixture and an unconstrained pinned Saju host. Sustained load, Saju cgroup limits, per-failure attribution, post-pressure calculation recovery and Cloudflare Workers runtime behavior still need evidence. Production capacity and scaling thresholds remain unapproved.
 
 ## Actual components and authority boundary
 

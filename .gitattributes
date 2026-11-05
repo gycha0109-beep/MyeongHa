@@ -12,3 +12,4 @@ docs/operations/SAJU_REAL_ENGINE_CONTROLLED_SATURATION_LINUX_OBSERVATION_2026110
 
 # Preserve the original isolated PostgreSQL18 product-path proof bytes.
 docs/operations/POSTGRES_REAL_PRODUCT_PATH_LINUX_OBSERVATION_20261105.json text eol=lf
+docs/operations/REAL_GOTRUE_PG18_SAJU_LINUX_OBSERVATION_20261105.json text eol=lf

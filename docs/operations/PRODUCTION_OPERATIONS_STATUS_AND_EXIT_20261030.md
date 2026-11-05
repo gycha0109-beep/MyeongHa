@@ -10,6 +10,12 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Phase 11 실제 GoTrue·PG18·Saju 단기 통합 실측 성공
+
+- [Linux #41979084279](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41979084279)가 `main` `429b82e6eace9963d39bb97bf6d642e9516d4d26`에서 성공했다. 순차 12/12 성공, 동시성 8에서 18/32 성공·14건 503을 관측했다. 성공 응답 p95는 각각 127.595ms와 254.166ms였다. [원본·해시·범위](REAL_GOTRUE_PG18_SAJU_PRODUCT_CHAIN_PHASE11_20261105.md).
+- 같은 `main`의 Worker 버전 `07bcdaf3-0636-47e7-9182-04ffb6a40661`에 운영 트래픽 100%와 익명 스모크 11개 항목 통과를 확인했다. [정확한 Cloudflare 빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/f3eca7de-e36c-4885-b759-eca845b60eaf). 양성 의존성 증거와 전체 운영 수용은 별도다.
+- 다음 검증은 동일 격리 제품 경로의 5분·15분 지속 부하와 자원 제한 및 복구다. 운영 처리량·확장 기준과 [#1887 Hosted DR](https://github.com/gycha0109-beep/MyeongHa/issues/1887)은 미수용이다.
+
 ### 2026-11-05 KST — 현행 Worker 익명 검증과 단계별 수용 재점검
 
 - **운영 버전:** 읽기 전용 Cloudflare API 조회에서 `myeongha` 배포 `d803e185-51e8-4e86-ab07-e60fd082c0d3`가 버전 `481049f1-6672-43cc-81be-3c241d1ade7b`에 100% 할당됨을 확인했다. [빌드 `fd42179b-c8a1-4ca9-b13f-cca05226eda4`](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/fd42179b-c8a1-4ca9-b13f-cca05226eda4)는 `main` `8f7ab1b73510733960c760ecd92e0a02f88c1079`에서 성공했다. 동일 버전을 기존 읽기 전용 `operations` 검사로 확인했다. Health 200, 설정 readiness 200, 익명 Member/Saju/preview 401, 교차 Origin 로그인 403, 비공개 응답 `no-store`를 관측했다. 이후 배포는 별도 증거가 필요하다.
