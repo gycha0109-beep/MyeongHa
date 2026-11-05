@@ -8,6 +8,7 @@ import type {
 } from '@/features/home/home-view-model';
 import { formatRecordDateV1 } from '@/features/records/records-view-model';
 import { formatMobileHomeCompletenessV1 } from '@/features/home/mobile-home-completeness';
+import { formatMobileHomeDayStemV1, formatMobileHomeElementV1 } from '@/features/home/mobile-home-saju-facts';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -111,8 +112,8 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
         <Text style={styles.authorityChip}>{t(card.label)}</Text>
       </View>
       <View style={styles.dayMasterRow}>
-        <Text style={styles.dayMaster}>{card.dayMaster}</Text>
-        <Text style={styles.elementBadge}>{t(card.element)}</Text>
+        <Text style={styles.dayMaster}>{formatMobileHomeDayStemV1(card.dayMaster, locale)}</Text>
+        <Text style={styles.elementBadge}>{formatMobileHomeElementV1(card.element, locale)}</Text>
       </View>
       <Text style={styles.completeness}>{formatMobileHomeCompletenessV1(card.fullyResolved, card.resolvedPillarCount, locale)}</Text>
       <MobileUiText style={styles.caption}>

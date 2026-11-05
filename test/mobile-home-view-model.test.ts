@@ -14,6 +14,7 @@ import {
 import type { MobileHomeStateV1 } from '../apps/mobile/src/features/home/mobile-home-loader.js';
 import { formatRecordDateV1 } from '../apps/mobile/src/features/records/records-view-model.js';
 import { formatMobileHomeCompletenessV1 } from '../apps/mobile/src/features/home/mobile-home-completeness.js';
+import { formatMobileHomeDayStemV1, formatMobileHomeElementV1 } from '../apps/mobile/src/features/home/mobile-home-saju-facts.js';
 
 const profile: CurrentSubjectProfileV1 = {
   subjectId: 'subject-1',
@@ -149,6 +150,35 @@ describe('mobile Home view model', () => {
     expect(formatMobileHomeCompletenessV1(true, 4, 'ko-KR')).toBe('네 기둥 계산 완료');
     expect(formatMobileHomeCompletenessV1(true, 4, 'en-US')).toBe('All four pillars calculated');
     expect(formatMobileHomeCompletenessV1(true, 4, 'zh-CN')).toBe('四柱计算完成');
+  });
+
+  it('uses Saju-consistent five-language labels for Home calculation facts only', () => {
+    const stems = [
+      ['ko-KR', '丙 · 병'],
+      ['ja-JP', '丙 · ひのえ'],
+      ['zh-TW', '丙'],
+      ['en-US', '丙'],
+      ['zh-CN', '丙'],
+    ] as const;
+    const elements = [
+      ['ko-KR', '화'],
+      ['ja-JP', '火'],
+      ['zh-TW', '火'],
+      ['en-US', 'Fire'],
+      ['zh-CN', '火'],
+    ] as const;
+    for (const [locale, label] of stems) {
+      expect(formatMobileHomeDayStemV1('丙 · 병', locale)).toBe(label);
+    }
+    for (const [locale, label] of elements) {
+      expect(formatMobileHomeElementV1('화', locale)).toBe(label);
+    }
+    expect(formatMobileHomeDayStemV1('일간 미확정', 'en-US')).toBe('Day stem not confirmed');
+    expect(formatMobileHomeDayStemV1('일간 미확정', 'zh-CN')).toBe('日干尚未确认');
+    expect(formatMobileHomeElementV1('오행 미확정', 'en-US')).toBe('Element not confirmed');
+    expect(formatMobileHomeElementV1('오행 미확정', 'zh-CN')).toBe('五行尚未确认');
+    expect(formatMobileHomeDayStemV1('unverified · identity', 'ja-JP')).toBe('unverified · identity');
+    expect(formatMobileHomeElementV1('not-in-the-calculation', 'en-US')).toBe('not-in-the-calculation');
   });
 
   it('projects the latest Reading as a continuation card without Character inference', () => {
