@@ -586,3 +586,10 @@
 - **실패 근거:** [DB dependency · postgres17 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41950832634/job/126994675538)에서 신규 청약철회 Claim/원본 취소 Event 작성 후 기존 `internal_apply_entitlement_effect_v1` 호출이 `official_reader_s2_legacy_effect_scope_lock_required` / `Legacy Reader provider effect cannot bypass the S1 scope lock`로 차단됐습니다. 이는 운영 DB 보호 기능의 정상적인 거부입니다.
 - **수정:** 새로운 통합 검증이 대상 B2와 별도 B3의 원본 `standard_reading_reader_access_grants`에서 Subject·Official Reading·Reader의 고유 스코프를 조회하고, 데이터베이스의 정해진 순서로 기존 `internal_acquire_official_reader_scope_lock_v1`를 사용해 S1 트랜잭션 잠금을 먼저 획득하도록 했습니다. 두 독립 구매의 스코프 존재를 확인한 후에만 원본 취소 Event/구매권 Effect 경로를 검사합니다.
 - **안전:** 기존 1790 Reader 회수 방어·접수 회원 자격·기존 이벤트/Grant Writer 변경 없음. 합성 PG17 트랜잭션은 ROLLBACK, 운영 권한·실제 결제/환불/LIVE 변경 없음. 새 HEAD의 CI·통합 검사 결과 전까지 성공 미판정.
+
+### 2026-11-05 — 단일 Reader 실구매·청약철회 Claim→계정 삭제 Finalizer PG17 결속 (§6-4/5)
+
+- **현황 근거:** #2991 필수 통합 CI/병합 완료. 기존 `2320` 개인정보 삭제 finalizer의 개인 청약철회 Claim 삭제 및 복원 후 재삭제 guard와 독립 PG17 대표 데이터 검증은 구현돼 있었으나, **#2991에서 실제 구매·Notice·청약철회 접수를 만든 동일 Subject**에 최종 계정 삭제 명령을 연속 실행한 E2E는 누락됐습니다.
+- **이번 구현:** 기존 `commerce-verified-reader-claim-cancel-effect-pg17.sql`의 원본 B2/B3 구매/검증/Notice → 정식 회원 청약철회 Claim/멱등 접수 → 원본 취소 Event → 합성 B2 Effect 및 B3 보존 직후, **동일 Subject**에서 기존 `cmd_start_account_deletion_v1`과 실제 Outbox 작업자 소유·`internal_finalize_account_deletion_db_v1`를 호출합니다. 올바른 인증·회원 Subject를 별도 합성 자료로 구성하며 기존 배포/권한 SQL은 변경하지 않습니다.
+- **검증 주장:** 대상 Claim이 실제 계정 최종 처리 뒤 0건, 다른 회원의 독립된 미연결 Claim은 유지, B2/B3의 원본 Commerce Receipts 및 취소 Event는 장기 금융 증거로 보존, 개인 Reader 접근·본문 계보 자식은 제거, Subject는 삭제 상태, 동일 작업자/Job finalizer 재실행은 멱등으로 검증합니다. 모든 시나리오는 합성 격리 PostgreSQL 17의 기존 **ROLLBACK** 트랜잭션.
+- **제약:** 본 테스트가 통과해도 실제 운영 백업 복원 실행, Provider NEWER/STALE 순서, 사람의 법적 콘텐츠 제공/소비 입증, 실제 T2 회수 승인, 전체 단일 Reading 전달 E2E가 완료된 것은 아닙니다. 최종 CI 통과 전 PASS 보류. 운영 DB/PG POST/LIVE/유료 공개 기능 무변경.
