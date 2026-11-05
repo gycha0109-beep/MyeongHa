@@ -7,6 +7,7 @@ const read=(name:string)=>readFileSync(new URL('../'+name,import.meta.url),'utf8
 
 describe('G0 committed follow-up receipt recovery contract',()=>{
   const sql=read('scripts/operations/seyeon-security-s0/production-27-g0-committed-followup-receipt-20261105.sql');
+  const ownerLockFix=read('scripts/operations/seyeon-security-s0/production-28-g0-followup-owner-original-user-lock-20261105.sql');
   const live=read('apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.ts');
   const recovery=read('apps/api/src/seyeon-unissued-zero-reply-recovery-v1.ts');
   const ui=read('apps/web/chat-runtime-client.js');
@@ -33,7 +34,9 @@ describe('G0 committed follow-up receipt recovery contract',()=>{
     expect(sql).toContain("v_selection->'selectedSources' is distinct from '[]'::jsonb");
     expect(sql).toContain("v_selection->'selectedUnpinnedDerivedSources' is distinct from '[]'::jsonb");
     expect(sql).toContain('seyeon_private.assert_current_original_assistant_lineage_v1(');
-    expect(sql).toContain('seyeon_private.assert_current_original_member_user_message_v1(');
+    expect(sql).toContain("v_previous_ids[v_i+1],'user');");
+    expect(sql).not.toContain('perform seyeon_private.assert_current_original_member_user_message_v1(');
+    expect(sql).toContain('seyeon_private.lock_g0_original_message_v1(');
     expect(sql).toContain('a.seyeon_positive_delivery_issued_at is null');
     expect(sql).toContain('a.seyeon_positive_delivery_received_at is null');
     expect(sql).toContain('a.seyeon_positive_delivery_receipt_hash is null');
@@ -50,6 +53,17 @@ describe('G0 committed follow-up receipt recovery contract',()=>{
     expect(sql).toContain('p_user_text');
     expect(sql).toContain("and t.delivered_at is null");
     expect(sql).toContain('and a.seyeon_positive_delivery_issued_at is null');
+  });
+
+  it('keeps the production postgres owner within the existing protected User lock',()=>{
+    expect(ownerLockFix).toContain('create or replace function public.cmd_issue_seyeon_zero_source_followup_reply_v1(');
+    expect(ownerLockFix).toContain("v_previous_ids[v_i+1],'user');");
+    expect(ownerLockFix).toContain('seyeon_private.lock_g0_original_message_v1(');
+    expect(ownerLockFix.split('do $postflight$')[0]).not.toContain('perform seyeon_private.assert_current_original_member_user_message_v1(');
+    expect(ownerLockFix).toContain("not has_function_privilege('myeongha_api_executor',p.oid,'EXECUTE')");
+    expect(ownerLockFix).not.toMatch(/\bgrant\s+execute\b/iu);
+    expect(ownerLockFix).not.toMatch(/\bdisable\s+trigger\b/iu);
+    expect(ownerLockFix.trimEnd()).toMatch(/commit;$/iu);
   });
 
   it('routes recovery before any model execution and preserves original messages',()=>{
