@@ -594,3 +594,11 @@
 - **수정:** 기존 `getPortOneV2PaymentReadbackPrivateV1` 공통 GET에 요청 `cache:'no-store'`, `Cache-Control: no-cache, no-store`, `Pragma: no-cache`를 지정. 응답에 RFC 9111 `Age`가 있거나 RFC 9211 `Cache-Status; hit`, 알려진 중간 캐시 `HIT/STALE/UPDATING/REVALIDATED`가 표시되면 본문 사용 전 실패 처리. `MISS/BYPASS`는 캐시 사용 증거로 오인하지 않음. 모든 실패는 기존 읽기 전용 보류 경로로 귀결.
 - **회귀 검증:** 개별/전체 HMAC 취소 GET에서 새 요청 설정 확인, 캐시 적중·0초 `Age`·STALE 헤더 차단, 전체 집합 재검증이 캐시 신호 발생 시 두 번째 DB 스냅샷/Reader CAS로 진입하지 않음을 테스트. 커밋의 CI 및 최종 통합 검증 통과 전 실제 성공 판정하지 않음.
 - **유지 한계:** 헤더가 없는 응답도 Provider 최신 상태나 취소 Event 순서를 증명하지 않음. `providerOrderingProven=false`, 법정 환불/고객 제공·Reader T2/Entitlement Effect 승인 false, 운영 환불 POST·운영 DB·LIVE·상품 활성화 불변. 취소 NEWER/STALE의 신뢰 가능한 비교 근거와 실제 안전한 권한 회수 결속은 추가 구현 필요.
+
+### 2026-11-05 — 회수된 Reader 청약철회의 역사적 S7 수신 확인 증거 보존 (§6-3/5)
+
+- **현황:** #2991이 구매·Claim·취소→정확한 Reader Effect의 격리 PG17 검증을 완료하고 #3007은 동일 구매 Subject의 계정 삭제까지 E2E 검증 중. 기존 고객 Claim 비공개 검토는 원본 Receipt가 현재 `verified`가 아니면 저장된 취소 Event만 조회하여, 아직 보존 중인 S5 생성 및 S7 서버 준비·고객 단말 ACK 이력이 빠졌습니다.
+- **수정:** `reviewRecordedReadingWithdrawalPrivateV1`의 `exact_unit_evidence_unavailable` 경로에서도 **원본 Claim Subject/구매 Intent/Unit**으로 기존 `readRecordedReaderS7ClaimTimelineV1`를 읽습니다. 해당 SQL은 원본 `verified/revoked` Receipt·구매 Grant·해당 Reader 본문·남은 S7 기록이 정확히 결속될 때만 응답합니다. 원본 Claim의 일괄 비공개 반복가능 읽기 트랜잭션을 유지합니다.
+- **실패/삭제 안전:** 개인 S7 증거는 개인정보 삭제나 보존기간 만료로 부재할 수 있습니다. 이 경우 **미전달 확정, 법적 거절, 환불/권한 회수 승인**으로 변환하지 않고 null만 반환합니다. PostgreSQL 이력 조회 오류 시 SAVEPOINT를 복구한 뒤 동일 스냅샷에서 기존 원본 취소 조회를 수행하되 Claim 자체를 변경하지 않습니다.
+- **검증:** 회수로 기존 구매 Preflight가 실패하는 Claim에서 원본 S7 준비/ACK 이력 보존, 역사적 증거 부재, S7 SQL 실패 후 원본 취소 기록 유지, 타 Subject 혼입 거부 회귀 검증을 추가. 신규 HEAD CI/통합 CI 성공 전까지 PASS 미선언.
+- **불변 조건:** 실제 사람이 해설을 받았거나 읽었다는 법적 제공 확정은 불가(`consumerDeliveryProven:false`). 현장 S7 사용 승인·공개 라우트·실제 PG 환불·운영 권한 회수·LIVE DB·신규 마이그레이션 무변경.

@@ -76,7 +76,11 @@ function fixture(options:Options={}) {
     statements.push({sql,args});
     if(options.queryFailure==='begin'&&sql.startsWith('BEGIN'))throw Error('BEGIN failed');
     if(options.queryFailure==='rollback'&&sql==='ROLLBACK')throw Error('ROLLBACK failed');
-    if(sql.startsWith('BEGIN')||sql==='ROLLBACK')return {rows:[] as T[]};
+    if(sql.startsWith('BEGIN')||sql==='ROLLBACK'||
+       sql==='SAVEPOINT commerce_optional_s7_history'||
+       sql==='ROLLBACK TO SAVEPOINT commerce_optional_s7_history'||
+       sql==='RELEASE SAVEPOINT commerce_optional_s7_history')
+      return {rows:[] as T[]};
     if(sql.includes('pg_catalog.pg_roles'))return {rows:[{
       fullVisibility:options.visibility!==false,readOnly:options.readOnly!==false,
     } as T]};
@@ -88,11 +92,19 @@ function fixture(options:Options={}) {
     }
     if(sql.includes('official_reader_paid_delivery_attempts_v1')){
       if(options.queryFailure==='s7')throw Error('S7 journal unavailable');
-      expect(args).toEqual([PURCHASE,SUBJECT,UNIT]);
+      // Original Claim Subject only: a sibling user cannot borrow S7.
+      const claimedSubject=(options.claimRows?.[0] as
+        {subjectId?:unknown}|undefined)?.subjectId??SUBJECT;
+      expect(args).toEqual([PURCHASE,claimedSubject,UNIT]);
       expect(sql).toContain('grant_row.source_receipt_id=receipt.id');
       expect(sql).toContain('b.originating_entitlement_grant_id=grant_row.id');
       expect(sql).toContain('presentation.unit_id=$3::uuid');
+      expect(sql).toContain("receipt.verification_status in ('verified','revoked')");
       expect(sql).toContain('d.retention_until>pg_catalog.clock_timestamp()');
+      if(claimedSubject!==SUBJECT ||
+          (options.purchasedRows?.length===0 && options.s7Rows===undefined) ||
+          (options.queryFailure==='purchase'||options.queryFailure==='notice'))
+        return {rows:[] as T[]};
       return {rows:(options.s7Rows??[S7]) as T[]};
     }
     if(sql.includes('left join public.commerce_provider_events event')){
@@ -325,12 +337,18 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
   it('keeps a revoked exact purchase\'s stored cancellation for private review without claiming delivery',async()=>{
     // No CURRENT verified Receipt evidence, as happens after exact B2 revoke.
     // The canonical Event may still be attached to the immutable Claim.
-    const f=fixture({purchasedRows:[],cancelRows:[FULL_CANCEL]});
+    const f=fixture({purchasedRows:[],cancelRows:[FULL_CANCEL],s7Rows:[S7]});
     const result=await run(f);
     expect(result).toMatchObject({
       kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
       review:null,consumerDeliveryProven:false,
       providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+      retainedReaderS7Timeline:{
+        kind:'s7_client_ack_retained_delivery_unproven',
+        retainedPreparedCount:2,retainedAcknowledgedCount:1,
+        consumerDeliveryProven:false,legallyProvenDeliveredAt:null,
+        providerRefundAuthorized:false,grantMutationAuthorized:false,
+      },
       storedCancellationEvidence:{
         kind:'one_exact_full_cancel_recorded_only',
         recordedSuccessfulItems:1,
@@ -343,6 +361,33 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       expect.stringContaining('left join public.commerce_provider_events event'),
       [PURCHASE,SUBJECT,UNIT],
     );
+  });
+
+  it('does not mistake purged S7 history for proof of non-delivery after revocation',async()=>{
+    const f=fixture({purchasedRows:[],cancelRows:[FULL_CANCEL],s7Rows:[]});
+    const result=await run(f);
+    expect(result).toMatchObject({
+      kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
+      retainedReaderS7Timeline:null,consumerDeliveryProven:false,
+      requiresSeparateLegalDecision:true,automaticDenialAuthorized:false,
+      storedCancellationEvidence:{kind:'one_exact_full_cancel_recorded_only'},
+    });
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+  });
+
+  it('preserves the Claim and cancellation evidence when historical S7 read fails',async()=>{
+    const f=fixture({purchasedRows:[],cancelRows:[FULL_CANCEL],queryFailure:'s7'});
+    const result=await run(f);
+    expect(result).toMatchObject({
+      kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
+      retainedReaderS7Timeline:null,consumerDeliveryProven:false,
+      storedCancellationEvidence:{kind:'one_exact_full_cancel_recorded_only'},
+    });
+    expect(result?.providerRefundAuthorized).toBe(false);
+    expect(f.statements.map(x=>x.sql)).toContain(
+      'ROLLBACK TO SAVEPOINT commerce_optional_s7_history',
+    );
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
   it('keeps another Subject\'s claim recorded but never borrows this Subject\'s receipt evidence',async()=>{

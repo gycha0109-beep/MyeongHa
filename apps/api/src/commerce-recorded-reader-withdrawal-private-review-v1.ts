@@ -206,10 +206,33 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     // A revoked/missing Receipt, missing original notice, DB failure or an
     // ambiguous unit must NEVER be converted into positive refund/denial proof.
     if (preflight.kind !== 'manual_review_candidate') {
-      // A verified purchase may later be marked revoked. The original
-      // immutable Claim and its canonical cancellation history remain
-      // reviewable even though CURRENT verified-purchase/notice evidence
-      // cannot admit a positive delivery or statutory outcome.
+      // A currently revoked purchase may still have historical S5/S7
+      // transport receipts. Read ONLY the exact original Claim lineage:
+      // the S7 resolver independently requires the original Receipt, Unit,
+      // Reader Grant and body even when the Receipt is now revoked.
+      // No retained S7 row is NOT evidence that nothing was supplied;
+      // S4 privacy cleanup or retention expiry may have removed the row.
+      // Failure of this optional historical lookup cannot erase a recorded
+      // customer Claim or fabricate a delivered outcome.
+      let historicalS7:RecordedReaderS7ClaimTimelineV1|null=null;
+      // A failed PostgreSQL read aborts the transaction until rolled back.
+      // Isolate optional S7 history with a SAVEPOINT so cancellation evidence
+      // can still be reviewed in the SAME immutable Claim snapshot.
+      await connection.query('SAVEPOINT commerce_optional_s7_history');
+      try {
+        historicalS7=await readRecordedReaderS7ClaimTimelineV1(
+          connection,{
+            subjectId:claim.subjectId as string,
+            purchaseIntentId:claim.purchaseIntentId,
+            unitId:claim.unitId as string,
+          },
+        );
+        await connection.query('RELEASE SAVEPOINT commerce_optional_s7_history');
+      } catch {
+        await connection.query('ROLLBACK TO SAVEPOINT commerce_optional_s7_history');
+        await connection.query('RELEASE SAVEPOINT commerce_optional_s7_history');
+        historicalS7=null;
+      }
       const sourceOnly=await readRecordedReaderCancellationForClaimV1(
         connection,{
           subjectId:claim.subjectId as string,
@@ -218,7 +241,7 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
         },
       );
       return view(claim.claimId,receivedAt,
-        'exact_unit_evidence_unavailable',null,null,sourceOnly);
+        'exact_unit_evidence_unavailable',null,historicalS7,sourceOnly);
     }
 
     // Correlate the original paid S5 body and currently retained S7 attempts
