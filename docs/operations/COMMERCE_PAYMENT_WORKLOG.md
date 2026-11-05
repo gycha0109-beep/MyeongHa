@@ -559,3 +559,30 @@
 - **원인:** Claim의 다른 Subject를 내부 취소 기록에 정확히 전달하도록 구현한 뒤에도 테스트의 DB 모의 응답이 기존 Subject를 고정 기대하고, 실제 SQL이라면 조회되지 않을 타인의 원본 Receipt를 가짜 행으로 반환했습니다.
 - **수정:** 모의 DB의 취소 조회에서 원본 Claim Subject가 실제로 전달됐는지 검사하며, 타인 Subject일 때는 조회 결과가 0건이 되도록 조정했습니다. 반환 결과가 보류되고 타인의 구매·취소 기록과 환불·회수 권한이 포함되지 않는 검증을 유지했습니다.
 - **검증 상태:** 새 커밋의 GitHub Actions 결과 대기. 운영 코드·DB/PG/LIVE/권한 회수 동작 무변경.
+
+### 2026-11-05 — 검증된 Reader 구매→고객 접수→원본 취소→정확한 구매권 효과 PG17 통합 검증
+
+- **로드맵:** 6절 1·2·3·5번 실제 연결 중, 정확한 Reader 구매부터 유료 권한 효과까지. 기존 개별 합성 Event/Claim 테스트를 재구현하지 않고, 공식 B2/B3 독립 Reader 구매 Fixture의 실제 전체 마이그레이션 스키마에서 하나의 연결 경로를 검증할 CI 사례를 추가했습니다.
+- **구현:** B2 결제 검증 전 기존 서버 Notice 승인·표시·서버 확인 트리거 증거를 생성하고, 실제 Verified PortOne Receipt 이후 기존 `cmd_receive_digital_reading_withdrawal_claim_v1` 및 `qry_received_digital_reading_withdrawal_claim_v1`로 원본 B2 단위 Claim 수신·멱등 재전송을 검증합니다. B3 구매 단위로의 Claim 혼입은 거부합니다.
+- **원본 취소/권한:** 기존 비배포 원본 취소 저장 함수를 실행하여 해당 B2 Receipt에 단일 SUCCEEDED 전액 이벤트를 저장하고, 같은 격리 트랜잭션 안에서 실제 `internal_apply_entitlement_effect_v1`를 *명시적으로 합성 권한에서만* 실행해 B2 효과 1건·멱등 재실행·B3 원본 Grant 보존과 B3 교차 회수 거부를 검사합니다. 고객 Claim 상태는 승인이나 전달로 변형하지 않고 `received`를 유지합니다.
+- **검증:** `commerce-verified-reader-claim-cancel-effect-pg17`라는 독립 PostgreSQL17 CI 사례를 전체 DB 스키마에 연결. 신규 후보 DDL·합성 Source/Effect·Claim은 테스트 트랜잭션에서 모두 **ROLLBACK**합니다. Fixture는 일회용 DB에서만 생성하고 다른 B3 권한을 보존합니다. PR 통합 CI 결과 전 PASS 미확정.
+- **안전/남은 것:** Provider NEWER/STALE 판정, 실제 환불·R2/T2 공유 잠금과 회수 권한, 사람의 소비/법적 제공 입증, 동일 Subject 실제 privacy finalizer까지 이어지는 완전 E2E는 미완료. 운영 DB/마이그레이션, PG API, 공개 API, LIVE, 자동 회수는 변경하지 않습니다.
+
+### 2026-11-05 — #2991 PG17 DB 의존성 레드: 격리 Notice 스키마 누락 복구
+
+- **실패 확인:** [PostgreSQL 17 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41945250703/job/126975938906)에서 신규 `commerce-verified-reader-claim-cancel-effect-pg17`만 실패. 실제 로그: `psql:<stdin>:1012: ERROR: relation "public.digital_reading_checkout_notice_revisions_v1" does not exist`. DB 종합 CI 레드의 직접 원인으로 확인.
+- **원인:** 역사적 fixture 보호를 위한 `test/db/staged_commerce_migration_policy.sh`에서 2026-10-27 Checkout Notice 이력을 의도적으로 제외합니다. 신규 케이스도 기본 `historical` Reader 범위를 사용해 2320 개인 Claim RPC가 필요한 Reader 통합 스키마를 로드하지 않았습니다.
+- **수정:** `test/db/run_ci_case.sh`에서 **이 새 사례만** 기존 `reader-integrated` 스키마로 지정. `test/db/commerce_verified_reader_claim_cancel_effect_pg17.sh`가 일회용 PostgreSQL17 CI DB 및 Claim RPC 존재를 확인한 뒤, 기존 고정 해시로 검토된 **원본 Notice migration**을 이 테스트 DB에서만 설치합니다. 이후 3개 Notice 테이블 존재를 재검증하고 기존 B2/B3 구매 Fixture를 실행합니다.
+- **안전:** 기존 역사적 CI fixture·스테이징 제외 규칙의 의미는 유지. `supabase/migrations/` 파일 자체, 운영 DB, LIVE 라우트/PG 취소/실제 구매권 회수는 변경하지 않습니다. 새 커밋의 DB 종속 CI 성공 확인 전까지 PASS를 선언하지 않습니다.
+
+### 2026-11-05 — #2991 PG17 두 번째 레드: 회원 전용 청약철회 접수 경계의 합성 Fixture 수정
+
+- **실제 실패:** [PostgreSQL 17 작업 41947551528](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41947551528/job/126983825528)에서 기존 Notice 스키마는 로드되었지만 신규 B2 Claim 통합 검증 중 `Verified member unavailable` (SQLSTATE 42501)이 발생했습니다. 기존 공식 B2/B3 Reader 구매 Fixture의 원본 Subject는 `guest`이며, 정식 `cmd_receive_digital_reading_withdrawal_claim_v1`는 정확한 `member`만 접수하도록 설계돼 있습니다.
+- **수정:** 원본 구매/Receipt/Reader를 새 계정으로 위조하거나 회원 검증을 완화하지 않습니다. 단일 격리 PostgreSQL 17 트랜잭션에서 먼저 게스트의 Claim 접수가 명시적으로 거부되고 접수 기록이 생성되지 않음을 확인합니다. 이후 `auth.users`에 테스트용 인증 식별자를 삽입하고 *동일한 구매 Subject*를 `member`로 결속하여 실제 회원 전용 접수·멱등 재실행 경로를 검증합니다.
+- **안전:** 회원 전용 운영 권한·인증 함수·마이그레이션 정책 불변. 합성 인증 레코드, Claim, Event, Effect는 기존 `ROLLBACK`으로 폐기. 새 커밋 CI 및 필수 통합 성공 전까지 PASS를 선언하지 않습니다.
+
+### 2026-11-05 — #2991 PG17 세 번째 레드: Reader S1 잠금 누락 수정
+
+- **실패 근거:** [DB dependency · postgres17 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41950832634/job/126994675538)에서 신규 청약철회 Claim/원본 취소 Event 작성 후 기존 `internal_apply_entitlement_effect_v1` 호출이 `official_reader_s2_legacy_effect_scope_lock_required` / `Legacy Reader provider effect cannot bypass the S1 scope lock`로 차단됐습니다. 이는 운영 DB 보호 기능의 정상적인 거부입니다.
+- **수정:** 새로운 통합 검증이 대상 B2와 별도 B3의 원본 `standard_reading_reader_access_grants`에서 Subject·Official Reading·Reader의 고유 스코프를 조회하고, 데이터베이스의 정해진 순서로 기존 `internal_acquire_official_reader_scope_lock_v1`를 사용해 S1 트랜잭션 잠금을 먼저 획득하도록 했습니다. 두 독립 구매의 스코프 존재를 확인한 후에만 원본 취소 Event/구매권 Effect 경로를 검사합니다.
+- **안전:** 기존 1790 Reader 회수 방어·접수 회원 자격·기존 이벤트/Grant Writer 변경 없음. 합성 PG17 트랜잭션은 ROLLBACK, 운영 권한·실제 결제/환불/LIVE 변경 없음. 새 HEAD의 CI·통합 검사 결과 전까지 성공 미판정.
