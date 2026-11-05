@@ -2384,6 +2384,69 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         await disabledAtG2.query('ROLLBACK').catch(()=>undefined);
         disabledAtG2.release();
       }
+      // W86 G5: independent ordinary G2 reader + admin registry updater.
+      // The first transaction holds the exact enabled source-type row via
+      // FOR SHARE. A concurrent disabling UPDATE must wait ON THAT backend,
+      // rather than racing past its G2 source admission. Both roll back;
+      // no type approval is changed outside the disposable fixture.
+      const typeHolder=await subjectPool.connect();
+      const typeDisabler=await pool.connect();
+      let disablePending:Promise<{ok:true;rowCount:number|null}|{ok:false;error:unknown}>|undefined;
+      let disableOutcome:{ok:true;rowCount:number|null}|{ok:false;error:unknown}|undefined;
+      let typeDisableWasBlocked=false;
+      try{
+        await typeHolder.query('BEGIN');
+        await typeHolder.query('SET LOCAL ROLE myeongha_api_executor');
+        await typeHolder.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        await typeHolder.query(
+          'select seyeon_private.assert_historical_g2_sealed_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+          [f.subject,f.thread,currentTurn,currentAttempt],
+        );
+        const {rows:[g2Pid]}=await typeHolder.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        expect(g2Pid?.pid).toBeGreaterThan(0);
+        await typeDisabler.query('BEGIN');
+        const {rows:[disablePid]}=await typeDisabler.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        expect(disablePid?.pid).toBeGreaterThan(0);
+        expect(disablePid?.pid).not.toBe(g2Pid?.pid);
+        disablePending=typeDisabler.query(`update public.seyeon_positive_source_type_registry_v1
+          set enabled=false where record_kind='memory'
+            and record_type='conversation_recall'
+            and schema_version='v1'
+            and projector_version='seyeon-conversation-recall-projector-v1'
+            and enabled=true`).then(
+          result=>({ok:true as const,rowCount:result.rowCount}),
+          (error:unknown)=>({ok:false as const,error}),
+        );
+        for(let attempt=0;attempt<100;attempt++){
+          const {rows:[waiting]}=await pool.query(`select
+            $1::int=any(pg_catalog.pg_blocking_pids($2::int)) as blocked`,
+            [g2Pid!.pid,disablePid!.pid]);
+          if(waiting.blocked){typeDisableWasBlocked=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        expect(typeDisableWasBlocked).toBe(true);
+      }finally{
+        await typeHolder.query('ROLLBACK').catch(()=>undefined);
+        typeHolder.release();
+        if(disablePending)disableOutcome=await disablePending;
+        await typeDisabler.query('ROLLBACK').catch(()=>undefined);
+        typeDisabler.release();
+      }
+      expect(disableOutcome).toMatchObject({ok:true,rowCount:1});
+      // A cancelled source-type change MUST leave the original active.
+      const {rows:[currentType]}=await pool.query(`select enabled
+        from public.seyeon_positive_source_type_registry_v1
+        where record_kind='memory' and record_type='conversation_recall'
+        and schema_version='v1'
+        and projector_version='seyeon-conversation-recall-projector-v1'`);
+      expect(currentType).toEqual({enabled:true});
+
       // Registry rollback restores exact current eligibility for the next
       // still-HOLDed original-source audit; no Provider or Commit happens.
       await expect(sourceAdmission()).rejects.toMatchObject({
