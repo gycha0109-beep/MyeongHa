@@ -49,7 +49,9 @@ describe('mobile premium My and Records presentation', () => {
     expect(header).toContain("itemCount === null");
     expect(header).toContain("t('기록을 확인하는 중')");
     expect(header).toContain("t(tabLabels[selected])");
-    expect(header).toContain('현재 불러온 기록');
+    expect(header).toContain('formatLoadedRecordsCountV1(itemCount, locale)');
+    const countFormatter = await source('apps/mobile/src/features/records/records-view-model.ts');
+    expect(countFormatter).toContain('현재 불러온 기록');
     expect(screen).toContain('<RecordsTabs selected={tab} onSelect={setTab} />');
     expect(screen).toContain('failedCollectionLabelsV1');
     expect(screen).toContain('loadMore(tab)');

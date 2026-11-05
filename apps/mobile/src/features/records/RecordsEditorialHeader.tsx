@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { RecordsTabV1 } from '@/features/records/records-view-model';
+import { formatLoadedRecordsCountV1, type RecordsTabV1 } from '@/features/records/records-view-model';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -40,9 +40,7 @@ export function RecordsEditorialHeader({
         <View style={styles.countDivider} />
         <Text style={styles.countText}>{itemCount === null
             ? t('기록을 확인하는 중')
-            : locale === 'ja-JP' ? `読み込み済み ${itemCount}件`
-              : locale === 'zh-TW' ? `已載入 ${itemCount}筆紀錄`
-                : `현재 불러온 기록 ${itemCount}건`}</Text>
+            : formatLoadedRecordsCountV1(itemCount, locale)}</Text>
       </View>
     </View>
   );
