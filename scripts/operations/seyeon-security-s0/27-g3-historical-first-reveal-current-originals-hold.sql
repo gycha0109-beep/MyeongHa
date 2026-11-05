@@ -85,10 +85,9 @@ begin
      or v_candidate->>'threadId' is distinct from p_thread_id::text
      or v_candidate->>'turnId' is distinct from p_turn_id::text
      or v_candidate->>'attemptId' is distinct from p_attempt_id::text
-     or v_candidate->>'currentUserMessageId' is distinct from
-        case when p_purpose='first'
-          then p_expected_user_message_id::text
-          else v_candidate->>'currentUserMessageId' end
+     or (p_purpose='first' and
+         v_candidate->>'currentUserMessageId' is distinct from
+         p_expected_user_message_id::text)
      or v_admission->>'recordId' is distinct from v_candidate->>'recordId'
      or v_admission->>'originalGrantId' is distinct from
         v_candidate->>'originalGrantId'

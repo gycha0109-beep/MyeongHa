@@ -26,6 +26,8 @@ describe('W88 G3 historical first Reveal original-source review (no right to dis
       "a.seyeon_positive_delivery_issued_at is null",
       "t.client_turn_id=p_expected_client_turn_id",
       "a.committed_message_id=p_expected_assistant_message_id",
+      "v_candidate->>'currentUserMessageId' is distinct from",
+      "p_expected_user_message_id::text",
       "constraint='seyeon_historical_g3_original_commit_required'",
       'p_expected_post_turn_outbox_event_id',
       "oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'",
