@@ -1,6 +1,6 @@
 import { parseChatThreadIdV1 } from '@myeongha/api-client';
-import { router, useLocalSearchParams } from 'expo-router';
-import { useRef } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import {
   ImageBackground, KeyboardAvoidingView, Platform, Pressable, RefreshControl,
   SafeAreaView, ScrollView, StyleSheet, Text, View,
@@ -13,6 +13,7 @@ import {
   ChatReadMore,
 } from '@/features/chat/ChatReadComponents';
 import { useMobileChatThreadV1 } from '@/features/chat/use-mobile-chat-thread';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -37,7 +38,32 @@ function ValidChatThread({ threadId }: { threadId: string }) {
     useMobileChatThreadV1(threadId);
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refresh);
   const scrollRef = useRef<ScrollView>(null);
+  const [ownerChanged, setOwnerChanged] = useState(false);
+  useFocusEffect(useCallback(() => {
+    // A verified Member/Guest switch immediately invalidates all previously
+    // visible Thread rows and any unsent draft. Never navigate the old
+    // owner-bound Thread under the new Subject's session.
+    const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => {
+      setOwnerChanged(true);
+      router.replace('/chat');
+    });
+    return unsubscribe;
+  }, []));
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
+
+  if (ownerChanged) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.invalidContent}>
+          <MobileUiText style={styles.invalidTitle}>계정이 바뀌어 이전 대화방을 닫았습니다</MobileUiText>
+          <MobileUiText style={styles.invalidBody}>현재 계정의 대화 목록에서 다시 열어 주세요.</MobileUiText>
+          <Pressable accessibilityRole="button" onPress={() => router.replace('/chat')} style={styles.invalidAction}>
+            <MobileUiText style={styles.invalidActionText}>대화 목록으로 돌아가기</MobileUiText>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   const threadContent = (
     <KeyboardAvoidingView
