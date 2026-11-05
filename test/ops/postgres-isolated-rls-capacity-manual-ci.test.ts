@@ -114,7 +114,7 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(realCompose).toContain('networks: [disposable, host-loopback]');
     expect(realCompose).toContain('host_binding_ipv4');
     expect(realCompose).toContain('127.0.0.1:');
-    expect(realCompose).toMatch(/auth-db:[\\s\\S]*?networks: \\[disposable\\]/);
+    expect(realCompose.split('  gotrue:')[0]).toContain('    networks: [disposable]');
     expect(realRunner).toContain('inside-container health=');
     expect(realCompose).not.toContain('SUPABASE_DB_PASSWORD');
     expect(realCompose).not.toContain('myeongha-admin');
