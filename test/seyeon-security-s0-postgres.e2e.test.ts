@@ -2321,6 +2321,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       expect(noCommit).toEqual({
         attempt_state:'running',turn_state:'context_ready',assistant_count:0,
       });
+      const {rows:[outboxAfterHold]}=await pool.query(`select count(*)::int as n
+        from public.outbox_events where id in ($1::uuid,$2::uuid)`,
+        [uuid(22,1218),uuid(23,1218)]);
+      expect(outboxAfterHold.n).toBe(0);
       await expect(seal()).rejects.toMatchObject({
         constraint:'seyeon_history_final_context_candidate_mismatch',
       });
@@ -2352,6 +2356,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           'select seyeon_private.assert_historical_g2_sealed_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
           [f.subject,f.thread,currentTurn,currentAttempt],
         );
+        const {rows:[lockHolder]}=await holder.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        expect(lockHolder?.pid).toBeGreaterThan(0);
         revoking=f.revoke().then(
           ()=>({ok:true as const}),
           (error:unknown)=>({ok:false as const,error}),
@@ -2362,7 +2370,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
             select 1 from pg_catalog.pg_stat_activity
             where datname=current_database()
               and wait_event_type='Lock' and pid<>pg_backend_pid()
-          ) as blocked`);
+              and $1::int=any(pg_catalog.pg_blocking_pids(pid))
+          ) as blocked`,[lockHolder!.pid]);
           if(wait.blocked){sawBlockedRevoke=true;break;}
           await new Promise(resolve=>setTimeout(resolve,10));
         }
