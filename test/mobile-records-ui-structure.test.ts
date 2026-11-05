@@ -102,3 +102,40 @@ describe('Records list completeness and failure disclosure', () => {
     expect(screen).not.toContain('initialLoadingForTab(');
   });
 });
+
+describe('Records pagination requires verified ready sources for automatic fetching', () => {
+  it('never auto-retries failures, uninitialized sections or an empty archive', async () => {
+    const { recordsCanAutoLoadMoreV1 } = await import('../apps/mobile/src/features/records/records-view-model.js');
+    type Status = 'idle' | 'loading_initial' | 'ready' | 'loading_more' | 'error';
+    const snapshotsFor = (life: Status, readings: Status, memories: Status, more = true) => {
+      const section = (status: Status) => ({
+        status, items: [], hasMore: more, nextCursor: null,
+        errorCode: status === 'error' ? 'READ_FAILED' : null,
+      });
+      return { life: section(life), readings: section(readings), memories: section(memories) };
+    };
+    const ready = snapshotsFor('ready', 'ready', 'ready');
+    expect(recordsCanAutoLoadMoreV1(ready, 'all', 2)).toBe(true);
+    expect(recordsCanAutoLoadMoreV1(ready, 'all', 0)).toBe(false);
+    expect(recordsCanAutoLoadMoreV1(snapshotsFor('ready', 'ready', 'ready', false), 'all', 2)).toBe(false);
+    const pending = snapshotsFor('ready', 'idle', 'ready');
+    expect(recordsCanAutoLoadMoreV1(pending, 'all', 2)).toBe(false);
+    expect(recordsCanAutoLoadMoreV1(pending, 'life', 2)).toBe(true);
+    expect(recordsCanAutoLoadMoreV1(snapshotsFor('loading_more', 'ready', 'ready'), 'all', 2)).toBe(false);
+    const failed = snapshotsFor('error', 'ready', 'ready');
+    expect(recordsCanAutoLoadMoreV1(failed, 'all', 2)).toBe(false);
+    expect(recordsCanAutoLoadMoreV1(failed, 'life', 2)).toBe(false);
+    expect(recordsCanAutoLoadMoreV1(failed, 'readings', 2)).toBe(true);
+  });
+
+  it('allows manual retry, but list-end pagination only under verified conditions', async () => {
+    const screen = await readRepoFile('apps/mobile/src/app/(tabs)/records/index.tsx');
+    const controller = await readRepoFile('apps/mobile/src/features/records/use-mobile-records.tsx');
+    expect(screen).toContain('recordsCanAutoLoadMoreV1(snapshots, tab, items.length)');
+    expect(screen).toContain('if (canAutoLoadMore) {');
+    expect(screen).not.toContain('if (!loadingMore && hasMore && items.length > 0)');
+    expect(screen).toContain('onRetry={() => void retryFailed(tab)}');
+    expect(screen).toContain('onRetry={() => void loadMore(tab)}');
+    expect(controller).toContain('mobileRecordsControllerV1.loadMoreAll()');
+  });
+});
