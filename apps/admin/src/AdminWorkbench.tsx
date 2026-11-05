@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1 } from './admin-client.js';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1, AdminReadUnavailableErrorV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -252,6 +252,8 @@ export function AdminLogin({ onSession }: {
     } catch (error) {
       if (error instanceof AdminAccessDeniedErrorV1) {
         setError('회원 로그인 이후 관리자 Owner 권한 확인이 거부되었습니다.');
+      } else if (error instanceof AdminReadUnavailableErrorV1) {
+        setError('Owner 세션 검증 실패 (HTTP ' + error.status + (error.reason ? ' · ' + error.reason : '') + ').');
       } else if (error instanceof AdminSignInFailureV1) {
         const messages = {
           'invalid-credentials': '명하 회원 계정의 이메일 또는 비밀번호를 확인해 주세요.',

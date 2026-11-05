@@ -25,6 +25,36 @@ describe('admin browser API client', () => {
     const spoof = (async () => Response.json({ ok: true })) as typeof fetch;
     await expect(verifyAdminOwnerSessionV1(JWT, spoof)).rejects.toThrow('권한');
   });
+  it('retries only transient session errors while still requiring server Owner authorization', async () => {
+    let calls = 0;
+    const recover = (async () => {
+      calls++;
+      return calls === 1 ? Response.json({ error: 'ADMIN_AUTH_UNAVAILABLE' }, { status: 503 })
+        : Response.json({ authorized: true });
+    }) as typeof fetch;
+    await expect(verifyAdminOwnerSessionV1(JWT, recover)).resolves.toBeUndefined();
+    expect(calls).toBe(2);
+    calls = 0;
+    const denied = (async () => { calls++; return Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 }); }) as typeof fetch;
+    await expect(verifyAdminOwnerSessionV1(JWT, denied)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
+    expect(calls).toBe(1);
+    calls = 0;
+    const throttled = (async () => { calls++; return Response.json({ error: 'ADMIN_RATE_LIMITED' }, { status: 429 }); }) as typeof fetch;
+    await expect(verifyAdminOwnerSessionV1(JWT, throttled)).rejects.toMatchObject({ status: 429 });
+    expect(calls).toBe(1);
+  });
+  it('distinguishes session verification 429, 503 and untrusted server bodies', async () => {
+    for (const [status, code] of [[429, 'ADMIN_RATE_LIMITED'], [503, 'ADMIN_AUTH_UNAVAILABLE'], [503, 'ADMIN_HOSTED_UNAVAILABLE']] as const) {
+      const fake = (async () => Response.json({ error: code, token: 'not-for-display' }, { status })) as typeof fetch;
+      await expect(verifyAdminOwnerSessionV1(JWT, fake)).rejects.toMatchObject({
+        name: 'AdminReadUnavailableErrorV1', status, reason: code,
+      });
+    }
+    const unsafe = (async () => Response.json({ error: 'token:unsafe' }, { status: 502 })) as typeof fetch;
+    await expect(verifyAdminOwnerSessionV1(JWT, unsafe)).rejects.toMatchObject({
+      status: 502, reason: null,
+    });
+  });
   it('uses the existing Member auth endpoint but does not trust it as admin access', async () => {
     let path: RequestInfo | URL | undefined;
     const fake = (async (url: RequestInfo | URL) => {
