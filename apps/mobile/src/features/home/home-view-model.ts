@@ -1,4 +1,5 @@
 import type { ReadingHistoryItemV1 } from '@myeongha/api-client';
+import { translateMobileUiCopy, type MobileUiLocale } from '../../ui/mobile-ui-copy.js';
 
 import { createMobileSajuViewModelV1 } from '../saju/saju-view-model.js';
 import type { MobileHomeStateV1 } from './mobile-home-loader.js';
@@ -67,6 +68,8 @@ export type MobileHomeContinuationCardV1 =
 
 export interface MobileHomeViewModelV1 {
   readonly greeting: string;
+  /** Whether the greeting name is a client-authored placeholder, not a user profile name. */
+  readonly greetingUsesFallbackName: boolean;
   readonly subheading: string;
   readonly today: MobileHomeTodayCardV1;
   readonly continuation: MobileHomeContinuationCardV1;
@@ -88,6 +91,23 @@ export function createHomeGreetingV1(now: Date, name: string): string {
   const hour = now.getHours();
   const period = hour < 12 ? '좋은 아침이에요' : hour < 18 ? '좋은 오후예요' : '좋은 저녁이에요';
   return `${period}, ${name}`;
+}
+
+/** Localize the authored greeting only; do not translate any user-authored name.
+ * If no profile display name is available, use a natural unaddressed greeting
+ * outside Korean rather than showing the Korean fallback 호칭.
+ */
+export function formatMobileHomeGreetingV1(
+  source: string,
+  usesFallbackName: boolean,
+  locale: MobileUiLocale,
+): string {
+  const periods = ['좋은 아침이에요', '좋은 오후예요', '좋은 저녁이에요'];
+  const prefix = periods.find(value => source.startsWith(`${value}, `));
+  if (prefix === undefined) return source;
+  const localized = translateMobileUiCopy(prefix, locale);
+  if (usesFallbackName && locale !== 'ko-KR') return localized;
+  return `${localized}, ${source.slice(prefix.length + 2)}`;
 }
 
 function readingTitle(item: ReadingHistoryItemV1): string {
@@ -176,6 +196,8 @@ export function createMobileHomeViewModelV1(
 ): MobileHomeViewModelV1 {
   return Object.freeze({
     greeting: createHomeGreetingV1(now, displayName(state)),
+    greetingUsesFallbackName: state.profile.kind !== 'ready'
+      || !state.profile.profile.profile?.displayName?.trim(),
     subheading: '오늘도 명하에서 이어가 볼까요?',
     today: todayCard(state),
     continuation: continuationCard(state),

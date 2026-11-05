@@ -9,6 +9,7 @@ import type {
 import {
   HOME_READING_TOPICS_V1,
   createHomeGreetingV1,
+  formatMobileHomeGreetingV1,
   createMobileHomeViewModelV1,
 } from '../apps/mobile/src/features/home/home-view-model.js';
 import type { MobileHomeStateV1 } from '../apps/mobile/src/features/home/mobile-home-loader.js';
@@ -122,6 +123,29 @@ describe('mobile Home view model', () => {
     expect(createHomeGreetingV1(new Date(2026, 8, 29, 8, 0), '명하')).toBe('좋은 아침이에요, 명하');
     expect(createHomeGreetingV1(new Date(2026, 8, 29, 13, 0), '명하')).toBe('좋은 오후예요, 명하');
     expect(createHomeGreetingV1(new Date(2026, 8, 29, 20, 0), '명하')).toBe('좋은 저녁이에요, 명하');
+  });
+
+  it('localizes authored Home greeting without translating the user profile name', () => {
+    const generic = createMobileHomeViewModelV1({
+      ...state,
+      profile: { kind: 'error', code: 'temporarily_unavailable' },
+    } as MobileHomeStateV1, new Date(2026, 8, 29, 8));
+    expect(generic.greeting).toBe('좋은 아침이에요, 당신');
+    expect(generic.greetingUsesFallbackName).toBe(true);
+    expect(formatMobileHomeGreetingV1(generic.greeting, true, 'ko-KR')).toBe('좋은 아침이에요, 당신');
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+      const localized = formatMobileHomeGreetingV1(generic.greeting, true, locale);
+      expect(localized).not.toContain('당신');
+      expect(localized).not.toContain(', ');
+      expect(localized.length).toBeGreaterThan(0);
+    }
+    const configured = createMobileHomeViewModelV1(state, new Date(2026, 8, 29, 8));
+    expect(configured.greetingUsesFallbackName).toBe(false);
+    for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+      expect(formatMobileHomeGreetingV1(configured.greeting, false, locale)).toContain('명하');
+    }
+    // A profile nickname that happens to equal the Korean fallback is still user-owned.
+    expect(formatMobileHomeGreetingV1('좋은 아침이에요, 당신', false, 'en-US')).toContain('당신');
   });
 
   it('projects only calculation facts into the Home current-chart card', () => {

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import type {
   HomeReadingTopicV1,
+  formatMobileHomeGreetingV1,
   MobileHomeContinuationCardV1,
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
@@ -16,17 +17,15 @@ import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 export function HomeBrandHeader({
   greeting,
   subheading,
+  greetingUsesFallbackName = false,
 }: {
   greeting: string;
   subheading: string;
+  greetingUsesFallbackName?: boolean;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
-  const knownGreetings = ['좋은 아침이에요', '좋은 오후예요', '좋은 저녁이에요'];
-  const greetingPrefix = knownGreetings.find((prefix) => greeting.startsWith(`${prefix}, `));
-  const localizedGreeting = greetingPrefix === undefined
-    ? greeting
-    : `${t(greetingPrefix)}, ${greeting.slice(greetingPrefix.length + 2)}`;
+  const { t, locale } = useMobileUiLocale();
+  const localizedGreeting = formatMobileHomeGreetingV1(greeting, greetingUsesFallbackName, locale);
   return (
     <View style={styles.brandSection}>
       <View style={styles.brandRow}>
