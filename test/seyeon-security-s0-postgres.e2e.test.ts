@@ -2388,6 +2388,87 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await expect(g3Review('committed_replay')).rejects.toMatchObject({
         constraint:'seyeon_historical_g3_replay_never_authorized',
       });
+      // W90 G3/G5: independent DB sessions. The G3 CURRENT-originals
+      // review holds the exact original Memory Grant through its transaction.
+      // A concurrent consent withdrawal marker must WAIT specifically on
+      // the reviewing backend. Both sides roll back in this disposable
+      // fixture: no positive Reveal or permanent consent change occurs.
+      const g3Holder=await subjectPool.connect();
+      const g3Withdrawer=await pool.connect();
+      let pendingG3Withdrawal:
+        Promise<{ok:true;rowCount:number|null}|{ok:false;error:unknown}>|undefined;
+      let g3WithdrawalResult:
+        {ok:true;rowCount:number|null}|{ok:false;error:unknown}|undefined;
+      let sawExactG3WithdrawalWait=false;
+      try {
+        await g3Holder.query('BEGIN');
+        await g3Holder.query('SET LOCAL ROLE myeongha_api_executor');
+        await g3Holder.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        const {rows:[lockedG3Review]}=await g3Holder.query<{
+          review:Record<string,unknown>
+        }>(`select seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,
+          $6::uuid,$7::uuid,$8::uuid,$9::text
+        ) as review`,[
+          f.subject,f.thread,currentTurn,currentAttempt,'audit_only',
+          currentUser,uuid(19,1218),uuid(23,1218),'historical-s0-fixture',
+        ]);
+        expect(lockedG3Review?.review).toMatchObject({
+          originalsCurrentForReview:true,authorizesFirstReveal:false,
+          authorizesCommittedReplay:false,permitsStreaming:false,
+          permitsHttpReveal:false,
+        });
+        const {rows:[g3HolderBackend]}=await g3Holder.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        expect(g3HolderBackend?.pid).toBeGreaterThan(0);
+        await g3Withdrawer.query('BEGIN');
+        const {rows:[g3WithdrawerBackend]}=await g3Withdrawer.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        expect(g3WithdrawerBackend?.pid).toBeGreaterThan(0);
+        expect(g3WithdrawerBackend?.pid).not.toBe(g3HolderBackend?.pid);
+        pendingG3Withdrawal=g3Withdrawer.query(`
+          update public.record_access_grants
+          set seyeon_revoke_requested_at=clock_timestamp()
+          where id=$1::uuid and subject_id=$2::uuid
+            and memory_item_id=$3::uuid
+            and seyeon_revoke_requested_at is null
+        `,[f.grant,f.subject,f.memory]).then(
+          result=>({ok:true as const,rowCount:result.rowCount}),
+          (error:unknown)=>({ok:false as const,error}),
+        );
+        for(let i=0;i<100;i++){
+          const {rows:[waiting]}=await pool.query<{blocked:boolean}>(`
+            select $1::int=any(pg_catalog.pg_blocking_pids($2::int)) as blocked
+          `,[g3HolderBackend!.pid,g3WithdrawerBackend!.pid]);
+          if(waiting?.blocked){sawExactG3WithdrawalWait=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        expect(sawExactG3WithdrawalWait).toBe(true);
+      } finally {
+        await g3Holder.query('ROLLBACK').catch(()=>undefined);
+        g3Holder.release();
+        if(pendingG3Withdrawal)g3WithdrawalResult=await pendingG3Withdrawal;
+        await g3Withdrawer.query('ROLLBACK').catch(()=>undefined);
+        g3Withdrawer.release();
+      }
+      expect(g3WithdrawalResult).toEqual({ok:true,rowCount:1});
+      const {rows:[g3RestoredOriginal]}=await pool.query(`
+        select revoked_at, seyeon_revoke_requested_at
+        from public.record_access_grants
+        where id=$1::uuid and subject_id=$2::uuid
+      `,[f.grant,f.subject]);
+      expect(g3RestoredOriginal).toEqual({
+        revoked_at:null,seyeon_revoke_requested_at:null,
+      });
+      expect(await g3Review('audit_only')).toMatchObject({
+        originalsCurrentForReview:true,authorizesFirstReveal:false,
+        authorizesCommittedReplay:false,permitsStreaming:false,
+        permitsHttpReveal:false,
+      });
       // W85: source type was approved when G1 issued admission, but that
       // approval is revoked BEFORE G2. A past immutable receipt must NOT
       // overrule current registry state, even with the original Grant active.
