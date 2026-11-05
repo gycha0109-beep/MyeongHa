@@ -4,6 +4,7 @@ import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, f
 import type { AdminReadResponse } from './admin-client.js';
 import type { AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
+import { AdminRequestDeadlineErrorV1 } from './admin-request-deadline-v1.js';
 
 type ListSection = Exclude<AdminSection, 'overview'>;
 type ReadTab = 'users' | 'commerce' | 'commerce-alerts' | 'entitlements' | 'entitlement-events' | 'provider-events' | 'credits' | 'readings' | 'reading-attempts' | 'reading-ai-usage' | 'reading-generation-cost' | 'ai-costs' | 'ai-errors' | 'ai-estimates' | 'credit-reservations' | 'credit-allocations' | 'issues' | 'audit' | 'catalog' | 'characters' | 'content-releases' | 'deletion-jobs';
@@ -254,6 +255,8 @@ export function AdminLogin({ onSession }: {
         setError('회원 로그인 이후 관리자 Owner 권한 확인이 거부되었습니다.');
       } else if (error instanceof AdminReadUnavailableErrorV1) {
         setError('Owner 세션 검증 실패 (HTTP ' + error.status + (error.reason ? ' · ' + error.reason : '') + ').');
+      } else if (error instanceof AdminRequestDeadlineErrorV1) {
+        setError(error.message);
       } else if (error instanceof AdminSignInFailureV1) {
         const messages = {
           'invalid-credentials': '명하 회원 계정의 이메일 또는 비밀번호를 확인해 주세요.',
