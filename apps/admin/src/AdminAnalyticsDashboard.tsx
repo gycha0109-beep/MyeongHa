@@ -1,4 +1,4 @@
-import { adminFetchWithDeadlineV1 } from './admin-request-deadline-v1.js';
+import { adminFetchWithDeadlineV1,adminReadResponseBodyV1 } from './admin-request-deadline-v1.js';
 import { useEffect, useState } from 'react';
 import { AdminAccessDeniedErrorV1, ADMIN_SESSION_MARKER_V1 } from './admin-client.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -21,7 +21,7 @@ export async function fetchAdminAnalyticsDashboardV1(token:string,query:URLSearc
   const response=await adminFetchWithDeadlineV1('/api/admin/analytics-dashboard?'+query.toString(),{method:'GET',headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'},fetchImpl);
   if(response.status===401||response.status===403)throw new AdminAccessDeniedErrorV1();
   if(!response.ok)throw Error('실제 분석·결제 근거를 조회할 수 없습니다. 권한·DB·감사 연결을 확인해 주세요.');
-  const payload:unknown=await response.json();if(!validResult(payload))throw Error('분석 응답 계약이 유효하지 않습니다.');return payload;
+  const payload:unknown=await adminReadResponseBodyV1(()=>response.json());if(!validResult(payload))throw Error('분석 응답 계약이 유효하지 않습니다.');return payload;
 }
 
 const number=(value:number|null,unit='')=>value===null?'—':value.toLocaleString('ko-KR',{maximumFractionDigits:2})+unit;
