@@ -1,4 +1,6 @@
 import { readFile } from 'node:fs/promises';
+import { translateMobileUiCopy } from '../apps/mobile/src/ui/mobile-ui-copy.js';
+import { MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1 } from '../apps/mobile/src/features/reading/mobile-reader-presentation.js';
 import { describe, expect, it } from 'vitest';
 
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1, MOBILE_CHAT_PENDING_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
@@ -39,6 +41,29 @@ describe('mobile chat + Reader portrait + Fortune Cookie parity', () => {
     expect(picker).toContain('style={styles.optionPortrait}');
     expect(face).toContain('<MobileReaderPicker');
     expect(saju).toContain('<MobileReaderPicker');
+  });
+
+
+  it('localizes only approved Reader role and tone UI, never Character names or grant state', async () => {
+    const picker = await source('apps/mobile/src/features/reading/MobileReaderPicker.tsx');
+    expect(picker).toContain('{t(reader.title)}');
+    expect(picker).toContain('{t(reader.tone)}');
+    expect(picker).toContain('{t(option.title)}');
+    expect(picker).toContain('{t(option.tone)}');
+    expect(picker).toContain('{reader.name}');
+    expect(picker).toContain('{option.name}');
+    expect(picker).toContain('disabled={!available}');
+    expect(picker).toContain('isMobileReaderPreviewSelectableV1(option.key)');
+    expect(MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1).toHaveLength(6);
+    for (const reader of MOBILE_READER_VISIBLE_LAUNCH_PRESENTATIONS_V1) {
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+        for (const copy of [reader.title, reader.tone]) {
+          const localized = translateMobileUiCopy(copy, locale);
+          expect(localized, `${reader.key} / ${locale} / ${copy}`).not.toBe(copy);
+          expect(localized).not.toMatch(/[가-힣]/u);
+        }
+      }
+    }
   });
 
   it('keeps Web and Android fortune-cookie messages byte-for-byte identical and nonrepeating', async () => {
