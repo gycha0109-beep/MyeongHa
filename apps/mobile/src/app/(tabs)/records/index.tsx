@@ -27,6 +27,8 @@ import { useMobileRecordsV1 } from '@/features/records/use-mobile-records';
 import {
   buildAllRecordTimelineV1,
   failedCollectionLabelsV1,
+  recordsInitiallyLoadingV1,
+  recordsConfirmedEmptyV1,
   type RecordTimelineItemV1,
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
@@ -93,16 +95,6 @@ function loadingMoreForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof useMo
   return snapshots[tab].status === 'loading_more';
 }
 
-function initialLoadingForTab(tab: RecordsTabV1, snapshots: ReturnType<typeof useMobileRecordsV1>['snapshots']) {
-  const selected = tab === 'all'
-    ? [snapshots.life, snapshots.readings, snapshots.memories]
-    : [snapshots[tab]];
-  return selected.every((snapshot) =>
-    snapshot.items.length === 0 &&
-    (snapshot.status === 'idle' || snapshot.status === 'loading_initial'),
-  );
-}
-
 export default function RecordsScreen() {
   const styles = useMobileThemedStyles(staticStyles);
   const { colors } = useMobileTheme();
@@ -117,7 +109,8 @@ export default function RecordsScreen() {
   const failedLabels = failedCollectionLabelsV1(snapshots, tab);
   const hasMore = hasMoreForTab(tab, snapshots);
   const loadingMore = loadingMoreForTab(tab, snapshots);
-  const initialLoading = initialLoadingForTab(tab, snapshots);
+  const initialLoading = recordsInitiallyLoadingV1(snapshots, tab);
+  const confirmedEmpty = recordsConfirmedEmptyV1(snapshots, tab);
   const openReading = (readingId: string) => {
     router.push(`/reading/${readingId}`);
   };
@@ -172,7 +165,7 @@ export default function RecordsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          initialLoading ? null : <RecordsEmptyState label={
+          !confirmedEmpty ? null : <RecordsEmptyState label={
             tab === 'all' ? '기록' :
             tab === 'life' ? '현세록' :
             tab === 'readings' ? '지난 읽기' : '기억'
