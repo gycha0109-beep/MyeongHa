@@ -4,6 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { MobileMemberSessionErrorV1 } from '@/core/session/mobile-member-session';
 import { mobileChatPendingTurnStoreV1 } from '@/features/chat/native-mobile-chat-pending-turn-store';
 import { mobileChatTurnSendServiceV1 } from '@/features/chat/native-mobile-chat-turn-send-service';
@@ -51,15 +52,29 @@ export function useMobileChatThreadV1(threadId: string) {
   const [sendStatus, setSendStatus] = useState<string | null>(null);
   const pendingTurn = useRef<SeyeonChatTurnSendRequestV1 | null>(null);
   const sendingRef = useRef(false);
+  const focused = useRef(false);
+  const subjectEpoch = useRef(0);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      focused.current = true;
+      const epoch = ++subjectEpoch.current;
+      const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => {
+        // The detail screen also closes on this event. Clear local Owner
+        // data immediately, before its route replacement is painted.
+        subjectEpoch.current += 1;
+        pendingTurn.current = null;
+        setDraft('');
+        setSendStatus(null);
+        setSending(false);
+        sendingRef.current = false;
+      });
       setSendStatus(null);
       const loading = controller.loadInitial();
       setSnapshot(controller.getSnapshot());
       void loading.then((next) => {
-        if (active) setSnapshot(next);
+        if (active && epoch === subjectEpoch.current) setSnapshot(next);
       });
 
       void nativeMobileRuntimeV1.memberSession.read()
@@ -67,37 +82,48 @@ export function useMobileChatThreadV1(threadId: string) {
           const ownerId = member?.user.id;
           if (!ownerId) return;
           const saved = await mobileChatPendingTurnStoreV1.read(threadId, ownerId);
-          if (!active || saved === null) return;
+          if (!active || epoch !== subjectEpoch.current || saved === null) return;
           pendingTurn.current = saved;
           setDraft((current) => current.trim().length > 0 ? current : saved.text);
           setSendStatus('완료되지 않은 메시지를 복원했습니다. 다시 보내면 중복 없이 이어집니다.');
         })
         .catch(() => {
-          if (active) setSendStatus('이전 전송 내용을 확인할 수 없습니다.');
+          if (active && epoch === subjectEpoch.current) setSendStatus('이전 전송 내용을 확인할 수 없습니다.');
         });
 
-      return () => { active = false; };
+      return () => {
+        unsubscribe();
+        active = false;
+        focused.current = false;
+        subjectEpoch.current += 1;
+      };
     }, [controller, threadId]),
   );
 
   const refresh = useCallback(async () => {
-    if (sendingRef.current) return;
+    if (!focused.current || sendingRef.current) return;
+    const epoch = subjectEpoch.current;
     // Re-read only the authoritative transcript; keep any unsent draft and
     // preserved pending turn ID untouched for idempotent retry.
     const pending = controller.loadInitial();
     setSnapshot(controller.getSnapshot());
-    setSnapshot(await pending);
+    const next = await pending;
+    if (focused.current && epoch === subjectEpoch.current) setSnapshot(next);
   }, [controller]);
 
   const loadMore = useCallback(async () => {
+    if (!focused.current) return;
+    const epoch = subjectEpoch.current;
     const pending = controller.loadMore();
     setSnapshot(controller.getSnapshot());
     const next = await pending;
-    setSnapshot(next);
+    if (focused.current && epoch === subjectEpoch.current) setSnapshot(next);
   }, [controller]);
 
   const send = useCallback(async () => {
-    if (sendingRef.current) return;
+    if (!focused.current || sendingRef.current) return;
+    const epoch = subjectEpoch.current;
+    const stillCurrent = () => focused.current && epoch === subjectEpoch.current;
     const current = controller.getSnapshot();
     const text = draft.trim();
     if (current.status !== 'ready' || current.characterId !== 'seyeon') return;
@@ -110,6 +136,7 @@ export function useMobileChatThreadV1(threadId: string) {
     setSendStatus('세연이 답하고 있습니다…');
     try {
       const member = await nativeMobileRuntimeV1.memberSession.read();
+      if (!stillCurrent()) return;
       const ownerId = member?.user.id;
       const request = pendingTurn.current?.text === text
         ? pendingTurn.current
@@ -118,24 +145,28 @@ export function useMobileChatThreadV1(threadId: string) {
       // Durable replay requires a stable Member id. If unavailable, keep the
       // request in memory and rely on the server-side Member gate.
       if (ownerId) await mobileChatPendingTurnStoreV1.write(threadId, ownerId, request);
+      if (!stillCurrent()) return;
       const result = await mobileChatTurnSendServiceV1.send({
         threadId,
         characterId: current.characterId,
         request,
       });
 
+      if (!stillCurrent()) return;
       // Server-owned forward cursor: the thread may have >30 messages.
       // Only committed records, never speculative assistant text, are rendered.
       let next = controller.getSnapshot();
       if (!next.messages.some((message) => message.messageId === result.assistantMessageId)) {
         if (!next.hasMore) {
           next = await controller.loadInitial();
+          if (!stillCurrent()) return;
           setSnapshot(next);
         }
         for (let page = 0; page < 200 &&
           !next.messages.some((message) => message.messageId === result.assistantMessageId) &&
           next.hasMore; page++) {
           next = await controller.loadMore();
+          if (!stillCurrent()) return;
           setSnapshot(next);
           if (next.status !== 'ready') break;
         }
@@ -143,11 +174,14 @@ export function useMobileChatThreadV1(threadId: string) {
       if (!next.messages.some((message) => message.messageId === result.assistantMessageId)) {
         throw new Error('CHAT_REREAD_PENDING');
       }
+      if (!stillCurrent()) return;
       pendingTurn.current = null;
       if (ownerId) await mobileChatPendingTurnStoreV1.clear(threadId, ownerId).catch(() => undefined);
+      if (!stillCurrent()) return;
       setDraft('');
       setSendStatus('세연의 답변이 도착했습니다.');
     } catch (error) {
+      if (!stillCurrent()) return;
       if (error instanceof MyeongHaApiClientErrorV1 && error.code === 'IDEMPOTENCY_CONFLICT') {
         pendingTurn.current = null;
         const member = await nativeMobileRuntimeV1.memberSession.read().catch(() => null);
@@ -155,10 +189,12 @@ export function useMobileChatThreadV1(threadId: string) {
           await mobileChatPendingTurnStoreV1.clear(threadId, member.user.id).catch(() => undefined);
         }
       }
-      setSendStatus(sendErrorMessage(error));
+      if (stillCurrent()) setSendStatus(sendErrorMessage(error));
     } finally {
-      sendingRef.current = false;
-      setSending(false);
+      if (stillCurrent()) {
+        sendingRef.current = false;
+        setSending(false);
+      }
     }
   }, [controller, draft, threadId]);
 
