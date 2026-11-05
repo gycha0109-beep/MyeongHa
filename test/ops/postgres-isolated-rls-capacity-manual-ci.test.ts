@@ -116,6 +116,16 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(realCompose).toContain('127.0.0.1:');
     expect(realCompose.split('  gotrue:')[0]).toContain('    networks: [disposable]');
     expect(realRunner).toContain('inside-container health=');
+    expect(realRunner).toContain('MYEONGHA_REAL_CHAIN_FAILURE_STAGE:');
+    expect(realRunner).toContain('No allowlisted stage emitted');
+    expect(realRunner).not.toContain('cat "$scratch/vitest.log"');
+    expect(realRunner).not.toContain('tail -n 75 "$scratch/vitest.log"');
+    expect(product).toContain("phase='member_signup'");
+    expect(product).toContain("phase='isolated_pg18_start'");
+    expect(product).toContain("phase='real_saju_start'");
+    expect(product).toContain("phase='baseline_requests'");
+    expect(product).toContain("phase='contended_requests'");
+    expect(product).toContain("console.error('MYEONGHA_REAL_CHAIN_FAILURE_STAGE: '+phase)");
     expect(realCompose).not.toContain('SUPABASE_DB_PASSWORD');
     expect(realCompose).not.toContain('myeongha-admin');
 

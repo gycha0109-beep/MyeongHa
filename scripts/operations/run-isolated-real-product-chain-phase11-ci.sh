@@ -96,6 +96,15 @@ export MH_OPS_REAL_SAJU_CHECKOUT="$saju"
 export MH_OPS_REAL_PRODUCT_PROOF_PATH="$scratch/real-product.json"
 if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.test.mjs \
   --reporter=verbose --testNamePattern='four authenticated synthetic members' >"$scratch/vitest.log" 2>&1; then
+  # The raw test output is deliberately private because it can contain
+  # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
+  # Report only recognized, controlled stage labels, never raw lines or paths.
+  if grep -Eq 'MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|proof_write|complete)' "$scratch/vitest.log"; then
+    stage="$(grep -oE 'MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|proof_write|complete)' "$scratch/vitest.log" | tail -n 1)"
+    echo "::error title=Isolated three-dependency failure stage::$stage" >&2
+  else
+    echo '::error title=Isolated three-dependency failure stage::No allowlisted stage emitted; inspect harness/integration in a private sandbox.' >&2
+  fi
   fail 'Real GoTrue, PostgreSQL18 and Saju calculation test failed.'
 fi
 grep -F '1 passed' "$scratch/vitest.log" >/dev/null ||
