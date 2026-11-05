@@ -8,6 +8,8 @@ import { projectMobileSajuBirthFactsV1 } from '../saju/mobile-saju-birth-display
 
 export interface MobileMyProfileViewV1 {
   readonly displayName: string;
+  /** True only for a client-authored placeholder, never a user-entered name. */
+  readonly displayNameIsFallback: boolean;
   readonly subjectLabel: string;
   readonly statusLabel: string;
   readonly locale: string | null;
@@ -46,8 +48,10 @@ export function createMobileMyProfileViewV1(
   profile: CurrentSubjectProfileV1,
 ): MobileMyProfileViewV1 {
   const displayName = profile.profile?.displayName?.trim();
+  const displayNameIsFallback = !displayName;
   return Object.freeze({
-    displayName: displayName && displayName.length > 0 ? displayName : '호칭 미설정',
+    displayName: displayNameIsFallback ? '호칭 미설정' : displayName,
+    displayNameIsFallback,
     subjectLabel:
       profile.subjectKind === 'guest'
         ? '게스트로 이용 중'

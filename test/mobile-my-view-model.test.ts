@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { translateMobileUiCopy } from '../apps/mobile/src/ui/mobile-ui-copy.js';
 
 import {
   createMobileMyBirthViewV1,
@@ -14,6 +15,7 @@ describe('mobile My view model', () => {
       profile: null,
     })).toMatchObject({
       displayName: '호칭 미설정',
+      displayNameIsFallback: true,
       subjectLabel: '게스트로 이용 중',
       statusLabel: '사용 중',
     });
@@ -31,9 +33,38 @@ describe('mobile My view model', () => {
       },
     })).toMatchObject({
       displayName: '명하',
+      displayNameIsFallback: false,
       subjectLabel: '회원으로 이용 중',
       statusLabel: '삭제 요청 진행 중',
     });
+  });
+
+  it('preserves a user-selected name even if it equals the Korean fallback UI copy', () => {
+    const base = {
+      subjectId: 'subject-3',
+      subjectKind: 'member' as const,
+      subjectStatus: 'active' as const,
+      profile: {
+        displayName: '호칭 미설정',
+        locale: 'en-US',
+        timezone: 'Asia/Seoul',
+        onboardingState: null,
+        updatedAt: '2026-11-05T00:00:00.000Z',
+      },
+    };
+    const userName = createMobileMyProfileViewV1(base);
+    expect(userName.displayName).toBe('호칭 미설정');
+    expect(userName.displayNameIsFallback).toBe(false);
+    const emptyName = createMobileMyProfileViewV1({ ...base, profile: { ...base.profile, displayName: '   ' } });
+    expect(emptyName.displayNameIsFallback).toBe(true);
+    for (const locale of ['ko-KR', 'ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+      const authenticName = userName.displayNameIsFallback
+        ? translateMobileUiCopy(userName.displayName, locale) : userName.displayName;
+      const fallbackLabel = emptyName.displayNameIsFallback
+        ? translateMobileUiCopy(emptyName.displayName, locale) : emptyName.displayName;
+      expect(authenticName).toBe('호칭 미설정');
+      expect(fallbackLabel).toBe(translateMobileUiCopy('호칭 미설정', locale));
+    }
   });
 
   it('formats only canonical Birth input facts', () => {

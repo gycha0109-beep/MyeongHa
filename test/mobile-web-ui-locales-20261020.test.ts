@@ -194,7 +194,9 @@ describe('Mobile / Web UI localization parity', () => {
     expect(chat).toContain('t(presentation.openingLine)');
     expect(saju).toContain('t(topic.availability.statusLabel)');
     expect(saju).toContain('{step.primary}');
-    expect(profile).toContain("profile.displayName === '호칭 미설정'");
+    expect(profile).toContain('profile.displayNameIsFallback ? t(profile.displayName) : profile.displayName');
+    const profileModel = await source('apps/mobile/src/features/my/my-view-model.ts');
+    expect(profileModel).toContain('displayNameIsFallback');
   });
 
   it('localizes UI-only Saju and Reader error/HOLD states in new locales without translating source payloads', async () => {
