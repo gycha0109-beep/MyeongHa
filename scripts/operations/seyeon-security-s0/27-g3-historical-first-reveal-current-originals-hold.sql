@@ -18,6 +18,13 @@ declare
   v_seal jsonb;
   v_admission jsonb;
   v_audit jsonb;
+  v_validation jsonb;
+  v_generated_hash text;
+  v_generated_body text;
+  v_generated_payload jsonb;
+  v_generated_schema text;
+  v_generation_log_id uuid;
+  v_output_guard_log_id uuid;
   v_count integer;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -33,8 +40,17 @@ begin
   perform seyeon_private.lock_memory_subject_v1(p_subject_id);
   select a.seyeon_personal_source_pin_jsonb->'historicalCandidateProof',
          a.seyeon_historical_final_context_seal_jsonb,
-         a.seyeon_historical_g1_source_admission_jsonb
-    into v_candidate,v_seal,v_admission
+         a.seyeon_historical_g1_source_admission_jsonb,
+         a.generated_content_hash,
+         a.generated_body_text,
+         a.generated_message_payload_jsonb,
+         a.generated_message_schema_version,
+         a.generation_ai_execution_log_id,
+         a.validation_ai_execution_log_id,
+         a.validation_result_jsonb
+    into v_candidate,v_seal,v_admission,v_generated_hash,
+         v_generated_body,v_generated_payload,v_generated_schema,
+         v_generation_log_id,v_output_guard_log_id,v_validation
   from public.chat_turns t
   join public.chat_turn_attempts a on a.id=p_attempt_id
     and a.turn_id=t.id and a.subject_id=t.subject_id
@@ -151,6 +167,55 @@ begin
   end if;
 
   if p_purpose='first' then
+    -- A real first Reveal cannot trust a matching assistant Message ID
+    -- alone. Recheck the exact staged answer BODY, payload, schema and
+    -- digest against the committed DB Message, then both immutable model
+    -- execution log identities. The digest is for the full response
+    -- envelope; it is NOT the SHA256 of body_text alone.
+    if v_generated_hash !~ '^sha256:v1:[a-f0-9]{64}$'
+       or v_generated_body is null
+       or btrim(v_generated_body)=''
+       or jsonb_typeof(v_generated_payload) is distinct from 'object'
+       or v_generated_schema is null
+       or v_generation_log_id is null
+       or v_output_guard_log_id is null
+       or jsonb_typeof(v_validation) is distinct from 'object'
+       or v_validation->>'schemaVersion' is distinct from
+          'seyeon-production-chat-validation-v1'
+       or v_validation->>'passed' is distinct from 'true'
+       or v_validation->>'generatedContentHash' is distinct from
+          v_generated_hash
+       or v_validation->>'historicalFinalModelContextDigest'
+          is distinct from v_seal->>'finalModelContextDigest'
+       or v_validation->>'historicalCandidatePgJsonbDigest'
+          is distinct from v_seal->>'candidatePgJsonbDigest'
+    then
+      raise exception using errcode='42501',
+        constraint='seyeon_historical_g3_original_generation_invalid',
+        message='Historical G3 original validated generation is unavailable';
+    end if;
+    perform 1 from public.ai_execution_logs gen
+      join public.ai_execution_logs guard on guard.id=v_output_guard_log_id
+    where gen.id=v_generation_log_id
+      and gen.subject_id=p_subject_id
+      and gen.turn_id=p_turn_id
+      and gen.turn_attempt_id=p_attempt_id
+      and gen.character_id='seyeon'
+      and gen.stage='renderer' and gen.status='success'
+      and gen.output_ref_jsonb->>'generatedContentHash'=v_generated_hash
+      and guard.subject_id=p_subject_id
+      and guard.turn_id=p_turn_id
+      and guard.turn_attempt_id=p_attempt_id
+      and guard.character_id='seyeon'
+      and guard.stage='output_guard' and guard.status='success'
+      and guard.output_ref_jsonb->>'generatedContentHash'=v_generated_hash
+    for share of gen,guard;
+    if not found then
+      raise exception using errcode='42501',
+        constraint='seyeon_historical_g3_original_ai_logs_missing',
+        message='Historical G3 actual Renderer or Output Guard is unavailable';
+    end if;
+
     -- Bind the actual G2 post-Turn Outbox and committed assistant exactly.
     -- This is NOT a receipt for a previously delivered/replayed answer.
     perform 1 from public.conversation_messages assistant
@@ -163,6 +228,12 @@ begin
       and assistant.sender_type='character'
       and assistant.redacted_at is null
       and assistant.body_text is not null
+      and assistant.body_text=v_generated_body
+      and assistant.message_payload_jsonb is not distinct from
+          v_generated_payload
+      and assistant.message_schema_version is not distinct from
+          v_generated_schema
+      and assistant.content_hash=v_generated_hash
       and oe.aggregate_type='chat_turn'
       and oe.aggregate_id=p_turn_id::text
       and oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'

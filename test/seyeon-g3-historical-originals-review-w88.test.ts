@@ -59,6 +59,41 @@ describe('W88 G3 historical first Reveal original-source review (no right to dis
       "constraint='seyeon_historical_g3_original_grant_revoked'",
     ])expect(g3).toContain(requirement);
   });
+  it('binds the ACTUAL stored assistant to its staged payload, full-envelope digest, Renderer and Output Guard',()=>{
+    const first=g3.slice(g3.indexOf("if p_purpose='first' then"));
+    for(const requirement of [
+      'a.generated_content_hash',
+      'a.generated_body_text',
+      'a.generated_message_payload_jsonb',
+      'a.generated_message_schema_version',
+      'a.generation_ai_execution_log_id',
+      'a.validation_ai_execution_log_id',
+      'a.validation_result_jsonb',
+      "v_generated_hash !~ '^sha256:v1:[a-f0-9]{64}$'",
+      "v_validation->>'schemaVersion' is distinct from",
+      "'seyeon-production-chat-validation-v1'",
+      "v_validation->>'passed' is distinct from 'true'",
+      "v_validation->>'generatedContentHash' is distinct from",
+      "v_validation->>'historicalFinalModelContextDigest'",
+      "v_validation->>'historicalCandidatePgJsonbDigest'",
+      "gen.stage='renderer' and gen.status='success'",
+      "guard.stage='output_guard' and guard.status='success'",
+      "gen.output_ref_jsonb->>'generatedContentHash'=v_generated_hash",
+      "guard.output_ref_jsonb->>'generatedContentHash'=v_generated_hash",
+      'for share of gen,guard',
+      'assistant.body_text=v_generated_body',
+      'assistant.message_payload_jsonb is not distinct from',
+      'assistant.message_schema_version is not distinct from',
+      'assistant.content_hash=v_generated_hash',
+      "constraint='seyeon_historical_g3_original_generation_invalid'",
+      "constraint='seyeon_historical_g3_original_ai_logs_missing'",
+      "constraint='seyeon_historical_g3_commit_receipt_missing'",
+    ])expect(first).toContain(requirement);
+    // The source review checks only persisted fields; it never returns them.
+    const returned=first.slice(first.lastIndexOf('return jsonb_build_object('));
+    expect(returned).not.toContain('v_generated_body');
+    expect(returned).not.toContain('assistant.body_text');
+  });
   it('returns ONLY non-authorizing source review, never private bytes or API EXECUTE',()=>{
     for(const denied of [
       "'authorizesFirstReveal',false",
