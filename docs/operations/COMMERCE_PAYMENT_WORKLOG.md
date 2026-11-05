@@ -532,3 +532,11 @@
 - **안전:** 실제 PG GET/POST, 운영 DB, 운영 schema migrations, LIVE, 사용자 대상 권한 회수 없음. 합성 Event/Effect 및 비배포 DDL은 같은 트랜잭션에서 **ROLLBACK**됩니다.
 - **검증:** `commerce-persisted-cancel-reader-effect-pg17` 독립 CI 사례 추가. PR의 실제 CI·통합 결과가 나오기 전까지 PASS 미판정.
 - **미완료:** Provider 신뢰 가능한 최신 사건 순서/최종성, 법적 판단, 실제 Reader R2/T2 권한 회수, 고객 전달/청약철회와 개인정보 삭제 연결, 전체 E2E. 이 합성 검증만으로 운영 회수를 허용하지 않습니다.
+
+### 2026-11-05 — 검증된 Reader 구매→고객 접수→원본 취소→정확한 구매권 효과 PG17 통합 검증
+
+- **로드맵:** 6절 1·2·3·5번 실제 연결 중, 정확한 Reader 구매부터 유료 권한 효과까지. 기존 개별 합성 Event/Claim 테스트를 재구현하지 않고, 공식 B2/B3 독립 Reader 구매 Fixture의 실제 전체 마이그레이션 스키마에서 하나의 연결 경로를 검증할 CI 사례를 추가했습니다.
+- **구현:** B2 결제 검증 전 기존 서버 Notice 승인·표시·서버 확인 트리거 증거를 생성하고, 실제 Verified PortOne Receipt 이후 기존 `cmd_receive_digital_reading_withdrawal_claim_v1` 및 `qry_received_digital_reading_withdrawal_claim_v1`로 원본 B2 단위 Claim 수신·멱등 재전송을 검증합니다. B3 구매 단위로의 Claim 혼입은 거부합니다.
+- **원본 취소/권한:** 기존 비배포 원본 취소 저장 함수를 실행하여 해당 B2 Receipt에 단일 SUCCEEDED 전액 이벤트를 저장하고, 같은 격리 트랜잭션 안에서 실제 `internal_apply_entitlement_effect_v1`를 *명시적으로 합성 권한에서만* 실행해 B2 효과 1건·멱등 재실행·B3 원본 Grant 보존과 B3 교차 회수 거부를 검사합니다. 고객 Claim 상태는 승인이나 전달로 변형하지 않고 `received`를 유지합니다.
+- **검증:** `commerce-verified-reader-claim-cancel-effect-pg17`라는 독립 PostgreSQL17 CI 사례를 전체 DB 스키마에 연결. 신규 후보 DDL·합성 Source/Effect·Claim은 테스트 트랜잭션에서 모두 **ROLLBACK**합니다. Fixture는 일회용 DB에서만 생성하고 다른 B3 권한을 보존합니다. PR 통합 CI 결과 전 PASS 미확정.
+- **안전/남은 것:** Provider NEWER/STALE 판정, 실제 환불·R2/T2 공유 잠금과 회수 권한, 사람의 소비/법적 제공 입증, 동일 Subject 실제 privacy finalizer까지 이어지는 완전 E2E는 미완료. 운영 DB/마이그레이션, PG API, 공개 API, LIVE, 자동 회수는 변경하지 않습니다.
