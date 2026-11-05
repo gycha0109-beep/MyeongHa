@@ -1,5 +1,5 @@
-import {describe,it,expect} from 'vitest';
-import {createAdminHostedHttpV1} from './admin-hosted-http-v1.js';
+import {describe,it,expect,vi,afterEach} from 'vitest';
+import {createAdminHostedHttpV1,ADMIN_HOSTED_READ_DEADLINE_MS_V1} from './admin-hosted-http-v1.js';
 
 const ORIGIN='https://myeongha-admin.gycha0109.workers.dev';
 const MEMBER='https://member.example.test';
@@ -18,6 +18,27 @@ function setup(authorized=true){
  });
  return {handler,called};
 }
+afterEach(() => vi.useRealTimers());
+describe('bounded private Admin API reads',()=>{
+ it('ends a stalled authorized GET with a safe 504 instead of hanging',async()=>{
+  vi.useFakeTimers();
+  const warn=vi.spyOn(console,'warn').mockImplementation(()=>{});
+  const handler=createAdminHostedHttpV1({origin:ORIGIN,memberAuthOrigin:MEMBER,
+    async verifyAccess(){return true;},
+    async allowRequest(){return true;},
+    async assets(){throw Error('No assets expected');},
+    async api(){return new Promise<Response>(()=>{});},
+  });
+  const request=handler(new Request(ORIGIN+'/api/admin/users'));
+  await vi.advanceTimersByTimeAsync(0);
+  await vi.advanceTimersByTimeAsync(ADMIN_HOSTED_READ_DEADLINE_MS_V1);
+  const response=await request;
+  expect(response.status).toBe(504);
+  expect(await response.json()).toEqual({error:'ADMIN_READ_TIMEOUT'});
+  expect(warn).toHaveBeenCalledWith('ADMIN_READ_DEADLINE_V1',{category:'data'});
+  warn.mockRestore();
+ });
+});
 describe('Cloudflare workers.dev private Admin URL',()=>{
  it('delivers SPA navigation only after Access and sets response privacy headers',async()=>{
   const {handler,called}=setup();
