@@ -16,6 +16,7 @@ declare
   v_attempt_state text;
   v_candidate jsonb;
   v_seal jsonb;
+  v_source_admission jsonb;
   v_validation jsonb;
   v_generation_id uuid;
   v_output_guard_id uuid;
@@ -33,12 +34,13 @@ begin
   select t.state,a.state,a.seyeon_personal_source_pin_jsonb
            ->'historicalCandidateProof',
          a.seyeon_historical_final_context_seal_jsonb,
+         a.seyeon_historical_g1_source_admission_jsonb,
          a.validation_result_jsonb,
          a.generation_ai_execution_log_id,
          a.validation_ai_execution_log_id,
          a.generated_content_hash
-    into v_turn_state,v_attempt_state,v_candidate,v_seal,v_validation,
-         v_generation_id,v_output_guard_id,v_generated_hash
+    into v_turn_state,v_attempt_state,v_candidate,v_seal,v_source_admission,
+         v_validation,v_generation_id,v_output_guard_id,v_generated_hash
   from public.chat_turns t
   join public.chat_turn_attempts a
     on a.turn_id=t.id and a.subject_id=t.subject_id
@@ -96,7 +98,45 @@ begin
   -- No such validated authorization is issued in S0, so synthetic jumps
   -- cannot borrow an old running Context seal as a model receipt.
   if v_attempt_state='validated' and (
-       jsonb_typeof(v_validation) is distinct from 'object'
+       -- A future positive historical Commit must have a DB-issued source
+       -- admission bound to the exact immutable G1 candidate and final seal.
+       -- This admission itself NEVER allows Provider/Commit/Reveal.
+       jsonb_typeof(v_source_admission) is distinct from 'object'
+       or v_source_admission->>'schemaVersion' is distinct from
+          'seyeon-g1-historical-source-admission-s0-v1'
+       or v_source_admission->>'subjectId' is distinct from p_subject_id::text
+       or v_source_admission->>'threadId' is distinct from p_thread_id::text
+       or v_source_admission->>'turnId' is distinct from p_turn_id::text
+       or v_source_admission->>'attemptId' is distinct from p_attempt_id::text
+       or v_source_admission->>'originalGrantId' is distinct from
+          v_candidate->>'originalGrantId'
+       or v_source_admission->>'recordId' is distinct from
+          v_candidate->>'recordId'
+       or v_source_admission->>'recordKind' is distinct from 'memory'
+       or v_source_admission->>'recordType' is distinct from
+          v_candidate->>'recordType'
+       or v_source_admission->>'recordSchemaVersion' is distinct from
+          v_candidate->>'recordSchemaVersion'
+       or v_source_admission->>'projectorVersion' is distinct from
+          v_candidate->>'projectorVersion'
+       or v_source_admission->>'projectedMemoryDigest' is distinct from
+          v_candidate->>'projectedMemoryDigest'
+       or v_source_admission->>'historicalSourceCensusDigest' is distinct from
+          v_candidate->>'historicalSourceCensusDigest'
+       or v_source_admission->>'historicalSourceCount' is distinct from
+          v_candidate->>'historicalSourceCount'
+       or v_source_admission->>'originalsCurrentAtAdmission' is distinct from 'true'
+       or v_source_admission->>'originalPgJsonbDigest' is distinct from
+          v_candidate->>'originalPgJsonbDigest'
+       or v_source_admission->>'candidatePgJsonbDigest' is distinct from
+          v_seal->>'candidatePgJsonbDigest'
+       or v_source_admission->>'finalModelContextDigest' is distinct from
+          v_seal->>'finalModelContextDigest'
+       or v_source_admission->>'authorizesSourceSelection' is distinct from 'true'
+       or v_source_admission->>'permitsModelDispatch' is distinct from 'false'
+       or v_source_admission->>'permitsAtomicCommit' is distinct from 'false'
+       or v_source_admission->>'permitsHttpReveal' is distinct from 'false'
+       or jsonb_typeof(v_validation) is distinct from 'object'
        or v_validation->>'schemaVersion' is distinct from
           'seyeon-production-chat-validation-v1'
        or v_validation->>'passed' is distinct from 'true'

@@ -79,6 +79,8 @@ try {
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
+      'seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text)', 'EXECUTE')
+    and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid)', 'EXECUTE')
     and not has_function_privilege('myeongha_api_executor',
       'seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)', 'EXECUTE')

@@ -2249,6 +2249,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[sealAcl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',$1,'EXECUTE') as closed`,[sealSignature]);
     expect(sealAcl.closed).toBe(true);
+    const sourceAdmissionSignature=
+      'seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text)';
+    const {rows:[sourceAdmissionAcl]}=await pool.query(`select not has_function_privilege(
+      'myeongha_api_executor',$1,'EXECUTE') as closed`,[sourceAdmissionSignature]);
+    expect(sourceAdmissionAcl.closed).toBe(true);
     const guardSignature='seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid)';
     const commitHoldSignature='seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)';
     const {rows:[beforeGuardAcl]}=await pool.query(`select
@@ -2260,6 +2265,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     await pool.query(`grant execute on function
       seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid),
       seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text),
+      seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text),
       seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid),
       seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)
       to myeongha_api_executor`);
@@ -2296,6 +2302,67 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       expect(sealed.final_seal).toEqual(exactSeal);
       expect(sealed.personal.historicalCandidateProof).toEqual(saved.proof.historicalCandidateProof);
       expect(sealed.state).toBe('running');
+      // W81: SOURCE authorization is independent from Model dispatch.
+      // The disposable fixture opts in to the one-Memory type registry;
+      // installed Production registry remains empty and API EXECUTE denied.
+      const sourceAdmission=(contextDigest=sealInput.actualFinalModelContextDigest)=>
+        f.run(({client})=>client.query<{admission:Record<string,unknown>}>(`
+          select seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text
+          ) as admission`,[
+            f.subject,f.thread,currentTurn,currentAttempt,contextDigest,
+          ]));
+      await expect(sourceAdmission(hash({forged:'W81'}))).rejects.toMatchObject({
+        constraint:'seyeon_historical_g1_admission_source_mismatch',
+      });
+      // A registry row disabled in THIS isolated transaction must stop
+      // source eligibility, even when the candidate and sealed Context match.
+      // Rollback restores the fixture registry without widening Production.
+      const registryProbe=await pool.connect();
+      try {
+        await registryProbe.query('BEGIN');
+        await registryProbe.query(`update public.seyeon_positive_source_type_registry_v1
+          set enabled=false where record_kind='memory'
+          and record_type='conversation_recall' and schema_version='v1'
+          and projector_version='seyeon-conversation-recall-projector-v1'`);
+        await registryProbe.query('SET LOCAL ROLE myeongha_api_executor');
+        await registryProbe.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        await expect(registryProbe.query(`
+          select seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text
+          )`,[f.subject,f.thread,currentTurn,currentAttempt,
+          sealInput.actualFinalModelContextDigest])).rejects.toMatchObject({
+            constraint:'seyeon_historical_g1_model_source_type_unapproved',
+          });
+      } finally {
+        await registryProbe.query('ROLLBACK').catch(()=>undefined);
+        registryProbe.release();
+      }
+      const {rows:[issued]}=await sourceAdmission();
+      expect(issued.admission).toMatchObject({
+        schemaVersion:'seyeon-g1-historical-source-admission-s0-v1',
+        recordId:f.memory,originalGrantId:f.grant,recordKind:'memory',
+        historicalSourceCount:2,originalsCurrentAtAdmission:true,
+        finalModelContextDigest:sealInput.actualFinalModelContextDigest,
+        authorizesSourceSelection:true,
+        permitsModelDispatch:false,permitsAtomicCommit:false,
+        permitsHttpReveal:false,
+      });
+      const {rows:[persistedAdmission]}=await pool.query(`select
+        seyeon_historical_g1_source_admission_jsonb as admission,
+        state from public.chat_turn_attempts where id=$1`,[currentAttempt]);
+      expect(persistedAdmission.admission).toEqual(issued.admission);
+      expect(persistedAdmission.state).toBe('running');
+      await expect(sourceAdmission()).rejects.toMatchObject({
+        constraint:'seyeon_historical_g1_admission_source_mismatch',
+      });
+      await expect(pool.query(`update public.chat_turn_attempts
+        set seyeon_historical_g1_source_admission_jsonb='{}'::jsonb
+        where id=$1`,[currentAttempt])).rejects.toMatchObject({
+        constraint:'seyeon_historical_g1_source_admission_immutable',
+      });
       const sameTxGuard=()=>f.run(({client})=>client.query(
         'select seyeon_private.assert_historical_g2_sealed_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
         [f.subject,f.thread,currentTurn,currentAttempt],
@@ -2403,6 +2470,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await pool.query(`revoke execute on function
         seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid),
         seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text),
+        seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text),
         seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid),
         seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)
         from myeongha_api_executor`);
@@ -2413,6 +2481,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[afterSealAcl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',$1,'EXECUTE') as closed`,[sealSignature]);
     expect(afterSealAcl.closed).toBe(true);
+    const {rows:[afterSourceAdmissionAcl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as closed`,
+      [sourceAdmissionSignature]);
+    expect(afterSourceAdmissionAcl.closed).toBe(true);
     const {rows:[afterG2Acl]}=await pool.query(`select
       not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as guard_closed,
       not has_function_privilege('myeongha_api_executor',$2,'EXECUTE') as commit_closed`,
