@@ -15,6 +15,7 @@ import { createSeyeonPositiveS0OwnerDbPortsV1 } from '../apps/api/src/postgres-s
 import { createSeyeonG1HistoricalCandidateOwnerPortV1 } from '../apps/api/src/postgres-seyeon-g1-historical-candidate-port-v1.js';
 import { createSeyeonG1HistoricalFinalContextSealPortV1 } from '../apps/api/src/postgres-seyeon-g1-historical-final-context-seal-port-v1.js';
 import { createSeyeonG3HistoricalOriginalsReviewPortV1 } from '../apps/api/src/postgres-seyeon-g3-historical-originals-review-port-v1.js';
+import { createPostgresReaderContextNonMemoryReadAuthorityPortV1 } from '../apps/api/src/postgres-reader-context-non-memory.js';
 import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
@@ -2406,6 +2407,47 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       // cannot substitute B's Thread, Turn or Attempt. The restricted G3
       // adapter must expose one generic HOLD, not original DB locators.
       const foreign=await prepare(219);
+      // W98 G5 Reader/Se-yeon cross-product isolation: the actual
+      // production Reader ordinary-history port must remain scoped to the
+      // VERIFIED member and exact Thread. Even a successful own-Thread
+      // Reader read is not G1 Memory selection or G3 Reveal authority.
+      const readerContext=(execute:typeof f.run,subjectId:string,
+        threadId:string)=>execute(({client})=>
+          createPostgresReaderContextNonMemoryReadAuthorityPortV1(client)
+            .readRecentMessages({subjectId,threadId,limit:12}),
+        );
+      const [ownerReaderHistory,foreignReaderHistory]=await Promise.all([
+        readerContext(f.run,f.subject,f.thread),
+        readerContext(foreign.run,foreign.subject,foreign.thread),
+      ]);
+      expect(ownerReaderHistory.some(row=>row.messageId===f.user)).toBe(true);
+      expect(ownerReaderHistory.some(row=>row.messageId===f.assistant)).toBe(true);
+      expect(ownerReaderHistory.some(row=>row.messageId===currentUser)).toBe(true);
+      expect(ownerReaderHistory.every(row=>row.senderType!=='system')).toBe(true);
+      expect(foreignReaderHistory.some(row=>row.messageId===foreign.user))
+        .toBe(true);
+      expect(ownerReaderHistory.some(row=>row.messageId===foreign.user))
+        .toBe(false);
+      expect(foreignReaderHistory.some(row=>row.messageId===f.user))
+        .toBe(false);
+      // Claiming the other member's Subject must be rejected before any
+      // Reader contents can be used as historical model/replay sources.
+      await expect(readerContext(
+        foreign.run,f.subject,f.thread,
+      )).rejects.toMatchObject({code:'SUBJECT_INELIGIBLE'});
+      await expect(readerContext(
+        f.run,foreign.subject,foreign.thread,
+      )).rejects.toMatchObject({code:'SUBJECT_INELIGIBLE'});
+      // A valid own Subject still cannot swap in a different Thread.
+      await expect(readerContext(
+        foreign.run,foreign.subject,f.thread,
+      )).rejects.toMatchObject({code:'THREAD_UNAVAILABLE'});
+      await expect(readerContext(
+        f.run,f.subject,foreign.thread,
+      )).rejects.toMatchObject({code:'THREAD_UNAVAILABLE'});
+      // A private G3 original review is independent of Reader's ordinary
+      // read policy and must remain non-authorizing after denied reads.
+      expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
       const originalReviewRequest={
         subjectId:f.subject,threadId:f.thread,turnId:currentTurn,
         attemptId:currentAttempt,purpose:'audit_only' as const,
