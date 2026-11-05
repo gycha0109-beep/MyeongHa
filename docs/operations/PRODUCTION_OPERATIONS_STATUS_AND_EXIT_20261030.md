@@ -10,6 +10,14 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — 현행 Worker 익명 검증과 단계별 수용 재점검
+
+- **운영 버전:** 읽기 전용 Cloudflare API 조회에서 `myeongha` 배포 `d803e185-51e8-4e86-ab07-e60fd082c0d3`가 버전 `481049f1-6672-43cc-81be-3c241d1ade7b`에 100% 할당됨을 확인했다. [빌드 `fd42179b-c8a1-4ca9-b13f-cca05226eda4`](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/fd42179b-c8a1-4ca9-b13f-cca05226eda4)는 `main` `8f7ab1b73510733960c760ecd92e0a02f88c1079`에서 성공했다. 동일 버전을 기존 읽기 전용 `operations` 검사로 확인했다. Health 200, 설정 readiness 200, 익명 Member/Saju/preview 401, 교차 Origin 로그인 403, 비공개 응답 `no-store`를 관측했다. 이후 배포는 별도 증거가 필요하다.
+- **01–04:** 토폴로지의 Worker 배포·소스 근거를 갱신했다. 현 버전의 양성 Member/Auth/DB/Saju 검증, Saju OCI digest·롤백 호환성, 실제 비밀 회전·격리 검증 및 의존성 readiness·롤백 증거는 미수용이다. [이전 양성 실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240560177)의 적용 범위는 당시 Worker 버전이다.
+- **05–07, 09–10:** 구조화 로그·비식별화, 모니터링, 장애 매핑, 캐시 분류 및 계측 코드는 기존 경로에 있다. 현 배포의 실제 로그와 비식별화 표본, 의존성 지표 및 실제 알림 전달, 전체 혼돈 실험, 미검사 비공개 경로의 헤더와 대표 제품 지연을 추가 확인해야 한다.
+- **08:** [최신 예정 백업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41935300674)과 [개인정보 원장 최신성 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41962289283)는 성공했다. [최근 격리 복원](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240770891)은 앞선 백업을 사용했으며, [DR 수용 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41405052078)는 migration 진전이 날짜가 고정된 증거에 포함되지 않아 실패했다. [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)을 해소하려면 버전별 원본 SQL·적용 증거, 정합화 방식 승인, 격리 Hosted 복원 대상 및 Auth·Storage·삭제/보존 정합성 증거가 필요하다. 전체 서비스 PT24H/PT6H는 미입증이다.
+- **11–13:** [Linux 통합 실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41972622365)은 회원 RLS 매핑에서 중단됐고 [교정 PR #3021](https://github.com/gycha0109-beep/MyeongHa/pull/3021)으로 추적한다. 통합 기본 계측 후 5/15분 지속 부하·자원 제약을 확인해야 확장 검토를 진행할 수 있다. §33 수집기는 실제 `main` 이력 검증을 요구한다. 운영 수용은 차단 상태다.
+
 ### 2026-11-05 KST — Phase 11 real disposable GoTrue + PostgreSQL18 + pinned Saju integrated product-path measurement implemented, manual Linux execution pending
 
 - **Implementation in this branch (NOT a measured PASS):** Extend the existing main-only manual isolated PG18 workflow, retaining previous independent proof, to launch actual disposable GoTrue v2.196.0 backed by a separate PostgreSQL 15 Docker auth database, issue and verify real signed JWTs for four random synthetic `example.invalid` members, map them to four temporary forced-RLS owner records in an actual ephemeral PostgreSQL18 instance, and execute the real current-subject MyeongHa calculation API handler against the pinned public Saju engine production calculation HTTP host (`9807ce89c08afc61b587560d515a475efd819032`). Capture 12 baseline requests and 32 requests at concurrency 8 with response/latency, DB acquisition/query timing and independent Health. [Scope and safety contract](REAL_GOTRUE_PG18_SAJU_PRODUCT_CHAIN_PHASE11_20261105.md).

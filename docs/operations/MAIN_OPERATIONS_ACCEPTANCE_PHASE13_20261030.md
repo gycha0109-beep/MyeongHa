@@ -14,6 +14,8 @@ The same script supports `GITHUB_TOKEN` in GitHub Actions. It **only** performs 
 
 It pins each observed CI, Governance, Web Browser Smoke and Supabase Production run to `head_sha == requestedSha`, `head_branch == main` and `event == push`. It uses the latest run per workflow so an old green run does not conceal a newer RED, cancellation, or pending run. The exact selected run IDs and links are part of the output.
 
+For a historical SHA, the collector also compares it with the immutable `main` tip captured for that invocation. GitHub must report the requested SHA as the merge base and the pinned tip as strictly ahead, with zero commits behind. A PR-only SHA or an unavailable comparison prevents an evidence report.
+
 For the Supabase Production workflow, a green workflow is **not** interpreted as a successful SQL deployment: the script additionally looks up its `deploy-migrations` job and reports `SUCCESS`, `SKIPPED`, `FAILURE` or `NOT_OBSERVED` independently. `sourceIsCurrentMain` also distinguishes a successfully checked historical merge SHA from a newer current main.
 
 The §33 fourteen-point Production acceptance list is included with **observed only** evidence; it does not automatically turn local CI/browser tests into live liveness, authenticated synthetic smoke, metric visibility, Saju compatibility, provider deployment state or rollback proof. The command emits `acceptanceDecision=NOT_EVALUATED_BY_COLLECTOR`; no extra promotion or DR gate is installed.
