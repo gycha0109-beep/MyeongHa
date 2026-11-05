@@ -52,6 +52,7 @@ declare
  v_lock_owner text:='commerce-reader-claim-delete-pg17';
  v_deleted record;
  v_deleted_replay record;
+ v_preflight record;
  v_rows integer;
  v_effective_at timestamptz:=transaction_timestamp();
 begin
@@ -337,6 +338,70 @@ begin
  get diagnostics v_rows=row_count;
  if v_rows<>1 then
    raise exception 'CLAIM_E2E_DELETE_WORKER_LEASE_NOT_BOUND';
+ end if;
+
+ -- The exact original B2/B3 purchase and the synthetic B2 revoke can emit
+ -- pending ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED outbox work. The real account
+ -- finalizer MUST refuse deletion while that same-Subject work is unfinished.
+ select * into strict v_preflight
+ from public.internal_account_deletion_finalization_preflight_v1(
+   v_subject,v_deletion_job,v_lock_owner
+ );
+ if v_preflight.db_preconditions_met is distinct from false
+    or v_preflight.blocking_outbox_count<1 then
+   raise exception 'CLAIM_E2E_PENDING_ENTITLEMENT_OUTBOX_DID_NOT_BLOCK_DELETE';
+ end if;
+
+ -- Disposable ROLLBACK fixture only: represent the independent entitlement
+ -- delivery worker completing its exact generated outbox events. This is NOT
+ -- a production outbox worker, real consumer delivery, or a grant/revoke
+ -- authorization. No other Subject or unexpected work may be fabricated
+ -- as terminal to let the deletion preflight pass.
+ if exists (
+   select 1 from public.outbox_events oe
+   where oe.id<>v_deletion_outbox
+     and (
+       oe.payload_jsonb->>'subjectId'=v_subject::text
+       or (oe.aggregate_type='entitlement' and exists (
+         select 1 from public.entitlements ent
+         where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+       ))
+     )
+     and oe.status<>'processed'
+     and not (
+       oe.aggregate_type='entitlement'
+       and oe.event_type='ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED'
+       and oe.status='pending'
+       and oe.payload_jsonb->>'subjectId'=v_subject::text
+       and exists (
+         select 1 from public.entitlements ent
+         where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+       )
+     )
+ ) then
+   raise exception 'CLAIM_E2E_UNEXPECTED_SUBJECT_OUTBOX_BLOCKER';
+ end if;
+ update public.outbox_events oe
+ set status='processed',processed_at=clock_timestamp()
+ where oe.aggregate_type='entitlement'
+   and oe.event_type='ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED'
+   and oe.status='pending'
+   and oe.payload_jsonb->>'subjectId'=v_subject::text
+   and exists (
+     select 1 from public.entitlements ent
+     where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+   );
+ get diagnostics v_rows=row_count;
+ if v_rows<1 then
+   raise exception 'CLAIM_E2E_NO_EXACT_ENTITLEMENT_OUTBOX_SETTLED';
+ end if;
+ select * into strict v_preflight
+ from public.internal_account_deletion_finalization_preflight_v1(
+   v_subject,v_deletion_job,v_lock_owner
+ );
+ if v_preflight.db_preconditions_met is distinct from true
+    or v_preflight.blocking_outbox_count<>0 then
+   raise exception 'CLAIM_E2E_ACCOUNT_DELETE_PREFLIGHT_STILL_BLOCKED';
  end if;
 
  select finalized,replayed,auth_mapping_present
