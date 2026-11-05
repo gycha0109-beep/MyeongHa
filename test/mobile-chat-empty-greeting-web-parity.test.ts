@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '../apps/mobile/src/features/chat/chat-launch-roster.js';
 import { resolveMobileChatCharacterPresentationV1 } from '../apps/mobile/src/features/chat/chat-character-presentation.js';
 import { projectMobileChatEmptyGreetingV1 } from '../apps/mobile/src/features/chat/mobile-chat-empty-greeting.js';
+import { translateMobileUiCopy } from '../apps/mobile/src/ui/mobile-ui-copy.js';
 import type { MobileChatEmptyGreetingInputV1 } from '../apps/mobile/src/features/chat/mobile-chat-empty-greeting.js';
 
 function snapshot(overrides: Partial<MobileChatEmptyGreetingInputV1> = {}): MobileChatEmptyGreetingInputV1 {
@@ -33,6 +34,23 @@ describe('mobile Character Room verified-empty greeting matches web', () => {
     }
   });
 
+  it('localizes only the client-authored empty-room greeting for all nine canonical Characters', () => {
+    for (const character of MOBILE_CHAT_LAUNCH_ROSTER_V1) {
+      const greeting = projectMobileChatEmptyGreetingV1(snapshot({ characterId: character.characterId }));
+      expect(greeting).not.toBeNull();
+      const authored = greeting!.openingLine;
+      expect(translateMobileUiCopy(authored, 'ko-KR')).toBe(authored);
+      for (const locale of ['ja-JP', 'zh-TW', 'en-US', 'zh-CN'] as const) {
+        const translated = translateMobileUiCopy(authored, locale);
+        expect(translated, `${character.characterId} / ${locale}`).not.toBe(authored);
+        expect(translated).not.toMatch(/[가-힣]/u);
+      }
+    }
+    // An actual stored Chat body is never passed through the UI dictionary.
+    expect(translateMobileUiCopy('사용자만 작성한 비공개 메시지', 'ja-JP'))
+      .toBe('사용자만 작성한 비공개 메시지');
+  });
+
   it('never substitutes a greeting for loading, error, unknown ownership or paged history', () => {
     for (const state of [
       snapshot({ status: 'idle' }),
@@ -61,7 +79,8 @@ describe('mobile Character Room verified-empty greeting matches web', () => {
     expect(webRuntime).toContain('chatStream.replaceChildren(chatIntro)');
     expect(webRuntime).toContain('void ensureRoomReady()');
     expect(components).toContain('projectMobileChatEmptyGreetingV1(snapshot)');
-    expect(components).toContain('{greeting.openingLine}');
+    expect(components).toContain('{t(greeting.openingLine)}');
+    expect(components).toContain('{message.body}');
     expect(components).toContain('const allowed = ready && seyeon');
     expect(hub).toContain('const result = await openCharacter(characterId)');
     expect(serverOpen).toContain('openMemberCharacterThreadV1');
