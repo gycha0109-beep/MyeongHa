@@ -190,9 +190,10 @@ async function inspectSharedHeader(client) {
       localeWidth: rect('.ui-locale-select')?.width ?? 0,
       texture: css('.product-header')?.backgroundImage ?? '',
       cssLoaded: [...document.styleSheets].some(sheet => sheet.href?.endsWith('/shared-product-header.css')),
-      themeSprite: getComputedStyle(document.querySelector('.product-theme-toggle-mark'), '::before').backgroundImage,
-      localeSprite: getComputedStyle(document.querySelector('.ui-locale-picker'), '::before').backgroundImage,
-      notificationSprite: getComputedStyle(document.querySelector('.product-icon-button'), '::before').backgroundImage,
+      themeMask: getComputedStyle(document.querySelector('.product-theme-toggle-mark'), '::before').maskImage,
+      localeMask: getComputedStyle(document.querySelector('.ui-locale-picker'), '::before').maskImage,
+      notificationMask: getComputedStyle(document.querySelector('.product-icon-button'), '::before').maskImage,
+      profileMask: getComputedStyle(document.querySelector('.product-profile-mark'), '::before').maskImage,
       notificationTransform: getComputedStyle(document.querySelector('.product-icon-button'), '::before').transform,
       unreadBadgeDisplay: getComputedStyle(document.querySelector('.product-icon-button'), '::after').display,
       hasReport: !!document.querySelector('.product-report-link'),
@@ -212,10 +213,10 @@ async function verifySharedHeaderGeometry(client, origin, routes, expectedHeight
     await waitForVisible(client, '.product-header .ui-locale-select');
     const header = await inspectSharedHeader(client);
     assert(header.cssLoaded, `Shared header CSS missing on ${pathname}`);
-    assert([header.themeSprite, header.localeSprite].every(sprite => sprite.includes('header-ui-glyphs-v2.png'))
-      && /header-bell-(?:light|dark)\.svg/.test(header.notificationSprite),
-      `Shared header image assets missing on ${pathname}: ${JSON.stringify(header)}`);
-    assert(header.notificationTransform === 'matrix(1, 0, 0, 1, -14, -14)' && header.unreadBadgeDisplay === 'none',
+    assert([header.themeMask, header.localeMask, header.notificationMask, header.profileMask]
+      .every(mask => mask.includes('data:image/svg+xml,')),
+      `Shared header vector icons missing on ${pathname}: ${JSON.stringify(header)}`);
+    assert(header.notificationTransform === 'matrix(1, 0, 0, 1, -12, -12)' && header.unreadBadgeDisplay === 'none',
       `Centered bell or default unread badge mismatch on ${pathname}: ${JSON.stringify(header)}`);
     assert(!header.hasReport && header.controlOrder === 'theme,notification,profile,locale',
       `Header control order mismatch on ${pathname}: ${JSON.stringify(header)}`);
