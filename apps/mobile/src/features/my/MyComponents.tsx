@@ -7,6 +7,7 @@ import type {
   MobileMyProfileViewV1,
 } from '@/features/my/my-view-model';
 import { mobileMySectionStaticErrorV1 } from './mobile-my-section-error-copy';
+import { localizeMobileMemberAuthCopyV1 } from './mobile-member-auth-copy';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileTheme } from '@/ui/mobile-theme';
@@ -73,7 +74,7 @@ export function MyMemberAuthCard({
   onCancelSocialSignIn: () => void;
 }) {
   const themedStyles = useMobileThemedStyles(styles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   if (subjectKind === 'member') {
     return (
       <View style={themedStyles.card}>
@@ -82,7 +83,7 @@ export function MyMemberAuthCard({
         <MobileUiText style={themedStyles.body}>
           이 기기에서는 회원 세션을 우선 사용합니다.
         </MobileUiText>
-        {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
+        {errorMessage !== null ? <Text style={themedStyles.error}>{localizeMobileMemberAuthCopyV1(errorMessage, locale)}</Text> : null}
         <Pressable
           accessibilityRole="button"
           disabled={pending}
@@ -171,7 +172,7 @@ export function MyMemberAuthCard({
             style={themedStyles.authInput}
             value={password}
           />
-          {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
+          {errorMessage !== null ? <Text style={themedStyles.error}>{localizeMobileMemberAuthCopyV1(errorMessage, locale)}</Text> : null}
           <Pressable
             accessibilityRole="button"
             disabled={pending || email.trim().length === 0 || password.length === 0}
@@ -204,7 +205,7 @@ export function MyMemberAuthCard({
         </>
       ) : (
         <>
-          <Text style={themedStyles.body}>{verificationRequired.message}</Text>
+          <Text style={themedStyles.body}>{localizeMobileMemberAuthCopyV1(verificationRequired.message, locale)}</Text>
           <Text style={themedStyles.verificationEmail}>{verificationRequired.email}</Text>
           <MobileUiText style={themedStyles.caption}>
             확인 링크는 현재 Web 확인 화면으로 열립니다. 이메일 확인을 마친 뒤 앱으로 돌아와 비밀번호를 다시 입력해 주세요.
@@ -222,7 +223,7 @@ export function MyMemberAuthCard({
             style={themedStyles.authInput}
             value={password}
           />
-          {errorMessage !== null ? <Text style={themedStyles.error}>{errorMessage}</Text> : null}
+          {errorMessage !== null ? <Text style={themedStyles.error}>{localizeMobileMemberAuthCopyV1(errorMessage, locale)}</Text> : null}
           <Pressable
             accessibilityRole="button"
             disabled={pending || password.length === 0}
