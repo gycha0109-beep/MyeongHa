@@ -366,16 +366,44 @@ begin
          select 1 from public.entitlements ent
          where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
        ))
+       or (oe.aggregate_type='reading' and exists (
+         select 1 from public.readings rd
+         where rd.id::text=oe.aggregate_id and rd.subject_id=v_subject
+       ))
+       or (oe.aggregate_type='chat_turn' and exists (
+         select 1 from public.chat_turns ct
+         where ct.id::text=oe.aggregate_id and ct.subject_id=v_subject
+       ))
+       or (oe.aggregate_type='data_deletion_job' and exists (
+         select 1 from public.data_deletion_jobs dj
+         where dj.id::text=oe.aggregate_id and dj.subject_id=v_subject
+       ))
      )
      and oe.status<>'processed'
      and not (
-       oe.aggregate_type='entitlement'
-       and oe.event_type='ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED'
-       and oe.status='pending'
-       and oe.payload_jsonb->>'subjectId'=v_subject::text
-       and exists (
-         select 1 from public.entitlements ent
-         where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+       (
+         oe.aggregate_type='entitlement'
+         and oe.event_type='ENTITLEMENT_EFFECTIVE_RIGHT_CHANGED'
+         and oe.status='pending'
+         and oe.payload_jsonb->>'subjectId'=v_subject::text
+         and exists (
+           select 1 from public.entitlements ent
+           where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+         )
+       )
+       or (
+         oe.aggregate_type='reading'
+         and oe.event_type='READING_FINALIZED'
+         and oe.status='pending'
+         and exists (
+           select 1 from public.standard_reading_reader_access_grants access
+           join public.readings rd
+             on rd.id=access.official_reading_id
+            and rd.subject_id=access.subject_id
+           where rd.id::text=oe.aggregate_id
+             and access.subject_id=v_subject
+             and access.purchase_intent_id in (v_purchase,v_other_purchase)
+         )
        )
      )
  ) then
@@ -394,6 +422,29 @@ begin
  get diagnostics v_rows=row_count;
  if v_rows<1 then
    raise exception 'CLAIM_E2E_NO_EXACT_ENTITLEMENT_OUTBOX_SETTLED';
+ end if;
+
+ -- The preflight also links READING_FINALIZED by Reading aggregate even when
+ -- no subjectId appears in its payload. The fixture's authorized Reader B2/B3
+ -- finalization events must be independently completed, never silently ignored.
+ -- Simulate only the exact two original official Reading outbox events inside
+ -- this one ROLLBACK, without altering any production worker semantics.
+ update public.outbox_events oe
+ set status='processed',processed_at=clock_timestamp()
+ where oe.aggregate_type='reading'
+   and oe.event_type='READING_FINALIZED'
+   and oe.status='pending'
+   and exists (
+     select 1 from public.standard_reading_reader_access_grants access
+     join public.readings rd on rd.id=access.official_reading_id
+                            and rd.subject_id=access.subject_id
+     where rd.id::text=oe.aggregate_id
+       and access.subject_id=v_subject
+       and access.purchase_intent_id in (v_purchase,v_other_purchase)
+   );
+ get diagnostics v_rows=row_count;
+ if v_rows<1 then
+   raise exception 'CLAIM_E2E_NO_EXACT_READER_FINALIZED_OUTBOX_SETTLED';
  end if;
  select * into strict v_preflight
  from public.internal_account_deletion_finalization_preflight_v1(
