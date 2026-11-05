@@ -23,7 +23,7 @@ export function createAdminHostedHttpV1(input: {
   readonly origin: string;
   readonly memberAuthOrigin: string;
   readonly verifyAccess: (request: Request) => Promise<boolean>;
-  readonly allowRequest: () => Promise<boolean>;
+  readonly allowRequest: (request: Request) => Promise<boolean>;
   readonly api: (request: Request) => Promise<Response>;
   readonly assets: (request: Request) => Promise<Response>;
   readonly fetchImpl?: typeof fetch;
@@ -34,7 +34,9 @@ export function createAdminHostedHttpV1(input: {
       const url = new URL(request.url);
       if (url.origin !== origin) return secure(reply(421, 'ADMIN_ORIGIN_REQUIRED'));
       if (!await input.verifyAccess(request)) return secure(reply(403, 'ADMIN_ACCESS_REQUIRED'));
-      if (!await input.allowRequest()) {
+      // Public-facing HTML and asset loads are Access-gated, but must not consume
+      // the Owner API quota or become a raw 429 JSON document during navigation.
+      if (url.pathname.startsWith('/api/') && !await input.allowRequest(request)) {
         const limited = reply(429, 'ADMIN_RATE_LIMITED'); limited.headers.set('Retry-After', '60'); return secure(limited);
       }
       if (request.headers.has('origin') && request.headers.get('origin') !== origin) return secure(reply(403, 'ADMIN_ORIGIN_REQUIRED'));
