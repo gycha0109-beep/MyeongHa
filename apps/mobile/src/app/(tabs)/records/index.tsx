@@ -29,6 +29,7 @@ import {
   failedCollectionLabelsV1,
   recordsInitiallyLoadingV1,
   recordsConfirmedEmptyV1,
+  recordsCanAutoLoadMoreV1,
   type RecordTimelineItemV1,
   type RecordsTabV1,
 } from '@/features/records/records-view-model';
@@ -111,6 +112,7 @@ export default function RecordsScreen() {
   const loadingMore = loadingMoreForTab(tab, snapshots);
   const initialLoading = recordsInitiallyLoadingV1(snapshots, tab);
   const confirmedEmpty = recordsConfirmedEmptyV1(snapshots, tab);
+  const canAutoLoadMore = recordsCanAutoLoadMoreV1(snapshots, tab, items.length);
   const openReading = (readingId: string) => {
     router.push(`/reading/${readingId}`);
   };
@@ -137,7 +139,7 @@ export default function RecordsScreen() {
         contentContainerStyle={styles.content}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         onEndReached={() => {
-          if (!loadingMore && hasMore && items.length > 0) {
+          if (canAutoLoadMore) {
             void loadMore(tab);
           }
         }}

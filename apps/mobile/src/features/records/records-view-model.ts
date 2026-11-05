@@ -207,3 +207,19 @@ export function recordsConfirmedEmptyV1(
     return section.status === 'ready' && section.items.length === 0 && !section.hasMore;
   });
 }
+
+/**
+ * Automatic list-end pagination must not retry failed collections, race initial
+ * loading, or fetch a page before any verified row is visible.
+ * Failure recovery stays an explicit user action via the existing retry controls.
+ */
+export function recordsCanAutoLoadMoreV1(
+  snapshots: MobileRecordsSnapshotsV1,
+  tab: RecordsTabV1,
+  visibleRowCount: number,
+): boolean {
+  if (visibleRowCount <= 0) return false;
+  const selected = collectionKeysForTabV1(tab).map((key) => snapshots[key]);
+  return selected.every((section) => section.status === 'ready') &&
+    selected.some((section) => section.hasMore);
+}
