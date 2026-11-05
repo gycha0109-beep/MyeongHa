@@ -24,7 +24,7 @@ describe('Cloudflare workers.dev private Admin URL',()=>{
   const res=await handler(new Request(ORIGIN+'/admin/users'));
   expect(res.status).toBe(200);
   expect(await res.text()).toContain('Owner console');
-  expect(called).toEqual(['access','rate','asset:/users','asset:/index.html']);
+  expect(called).toEqual(['access','asset:/users','asset:/index.html']);
   expect(res.headers.get('cache-control')).toBe('no-store');
   expect(res.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
  });
@@ -33,7 +33,30 @@ describe('Cloudflare workers.dev private Admin URL',()=>{
   const res=await handler(new Request(ORIGIN+'/admin/assets/index.js'));
   expect(res.status).toBe(200);
   expect(await res.text()).toContain('loaded=true');
-  expect(called).toEqual(['access','rate','asset:/assets/index.js']);
+  expect(called).toEqual(['access','asset:/assets/index.js']);
+ });
+ it('does not render a raw 429 JSON document for authenticated page or asset loads',async()=>{
+  let rateCalls=0;let assetCalls=0;
+  const handler=createAdminHostedHttpV1({origin:ORIGIN,memberAuthOrigin:MEMBER,
+    async verifyAccess(){return true;},
+    async allowRequest(request){rateCalls++;expect(new URL(request.url).pathname).toMatch(/^\/api\//u);return false;},
+    async api(){throw Error('API must not run when quota exhausted');},
+    async assets(request){assetCalls++;
+      return new Response('<html>Owner console</html>',{headers:{'Content-Type':'text/html'}});
+    }
+  });
+  for(const url of ['/admin/','/admin/users','/admin/assets/index.js','/admin/assets/index.css']){
+    const response=await handler(new Request(ORIGIN+url));
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain('Owner console');
+  }
+  expect(assetCalls).toBeGreaterThanOrEqual(4);
+  expect(rateCalls).toBe(0);
+  const response=await handler(new Request(ORIGIN+'/api/admin/session'));
+  expect(response.status).toBe(429);
+  expect(response.headers.get('Retry-After')).toBe('60');
+  expect(await response.json()).toEqual({error:'ADMIN_RATE_LIMITED'});
+  expect(rateCalls).toBe(1);
  });
  it('denies Access failures before assets or API, including the sign-in path',async()=>{
   const {handler,called}=setup(false);
@@ -49,7 +72,7 @@ describe('Cloudflare workers.dev private Admin URL',()=>{
   expect((await handler(new Request('https://untrusted.example/admin'))).status).toBe(421);
   expect((await handler(new Request(ORIGIN+'/'))).status).toBe(404);
   expect((await handler(new Request(ORIGIN+'/admin/not-a-real-page'))).status).toBe(404);
-  expect(called).toEqual(['access','rate','access','rate','asset:/not-a-real-page']);
+  expect(called).toEqual(['access','access','asset:/not-a-real-page']);
  });
  it('requires Owner-gated same-origin requests to proxy a Member sign-in',async()=>{
   let forwarded=0;
