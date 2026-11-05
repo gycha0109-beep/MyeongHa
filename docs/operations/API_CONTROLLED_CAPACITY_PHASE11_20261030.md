@@ -1,5 +1,19 @@
 # Phase 11 — Controlled non-production loopback capacity probe
 
+## Real product path sustained experiment
+
+Run the existing main-only GitHub Linux workflow with `experiment=sustained` after the implementation is merged. Its default `short` mode remains the short GoTrue, PostgreSQL18 and pinned Saju experiment.
+
+```sh
+gh workflow run postgres-isolated-rls-capacity-acceptance.yml --ref main -f experiment=sustained
+```
+
+The sustained mode adds a short concurrency ramp at 1/2/4/8, five minutes at one scheduled request per second for one synthetic member, and 15 minutes at four per second with at most four outstanding requests across the synthetic members. Overdue or full-capacity slots are counted and skipped. The experiment uses a disposable GoTrue token lifetime that covers both windows. The Saju container uses its own bridge with loopback-only published ports and kernel-checked limits of 0.5 CPU, 256 MiB RAM and no swap. The API test gateway and PostgreSQL18 remain separate from that cgroup.
+
+The artifact separates successful calculations, HTTP 503, transport failures and unstarted slots. Each sustained window includes successful p50/p95/p99, separate DB connection and SQL timing, Auth HTTP header timing, Saju request timing, CPU throttle counts and cgroup memory peak. The runner injects one local DB-adapter failure and requires four successful calculations after the adapter is restored. Runtime and Docker cleanup must both succeed before the artifact can record success.
+
+Only an actual successful manual run provides sustained evidence. These fixed probe loads are experimental inputs. The Node gateway, synthetic SQL fixture, and Saju limits apply to the isolated run. Workers runtime, Production capacity, automatic scaling and Hosted disaster recovery require separate evidence.
+
 ## 2026-11-01 — actual isolated PostgreSQL 18 CI execution (manual, synthetic-only)
 
 The existing `scripts/operations/measure-isolated-postgres-capacity-phase11.mjs` has previously run against the user's standalone PostgreSQL 18 installation with a real temporary database and measured connection pool contention. The existing Phase 7 subject/RLS test `test/postgres-subject-rls-isolated-phase7.test.ts` has also run locally, but **without `PG_BIN_DIR` it is skipped by ordinary GitHub CI**. This is not an admissible Linux DB proof.

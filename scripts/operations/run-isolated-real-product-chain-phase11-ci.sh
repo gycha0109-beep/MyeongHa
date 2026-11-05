@@ -22,6 +22,13 @@ for k in docker jq node git openssl curl; do command -v "$k" >/dev/null || fail 
 [[ "$(docker context inspect --format '{{.Endpoints.docker.Host}}')" == unix://* ]] ||
   fail 'Remote Docker context forbidden.'
 docker compose version >/dev/null || fail 'Docker Compose v2 missing.'
+experiment="${MH_OPS_REAL_PRODUCT_EXPERIMENT:-short}"
+export COMPOSE_PROFILES= MH_OPS_AUTH_JWT_EXP_SECONDS=300
+case "$experiment" in
+  short) ;;
+  sustained) COMPOSE_PROFILES=sustained; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
+  *) fail 'Unknown isolated product experiment.' ;;
+esac
 
 source_sha=9807ce89c08afc61b587560d515a475efd819032
 saju="$GITHUB_WORKSPACE/_isolated_saju"
@@ -42,12 +49,16 @@ blocked(){
 blocked
 cleanup(){
   local code=$?
+  local containers volumes networks
   trap - EXIT
   docker compose --project-name "$project" -f "$compose" down --volumes --remove-orphans >/dev/null 2>&1 || code=1
-  if [[ -n "$(docker ps -aq --filter "label=com.docker.compose.project=$project")" ||
-     -n "$(docker volume ls -q --filter "label=com.docker.compose.project=$project")" ||
-     -n "$(docker network ls -q --filter "label=com.docker.compose.project=$project")" ]]; then
-    code=1
+  containers="$(docker ps -aq --filter "label=com.docker.compose.project=$project")" || code=1
+  volumes="$(docker volume ls -q --filter "label=com.docker.compose.project=$project")" || code=1
+  networks="$(docker network ls -q --filter "label=com.docker.compose.project=$project")" || code=1
+  [[ -z "$containers$volumes$networks" ]] || code=1
+  if ((code == 0)); then
+    jq '.dockerCleanupVerified=true' "$output" >"$scratch/complete.json" &&
+      mv -- "$scratch/complete.json" "$output" || code=1
   fi
   if ((code != 0)); then blocked; echo '::error title=Isolated product proof::Proof or disposable cleanup failed.' >&2; fi
   rm -rf -- "$scratch"
@@ -90,17 +101,38 @@ if [[ "$ready" != true ]]; then
   fail 'Actual GoTrue host-only health did not pass.'
 fi
 
+if [[ "$experiment" == sustained ]]; then
+  docker compose --project-name "$project" -f "$compose" up --detach saju >/dev/null ||
+    fail 'Disposable constrained Saju container failed.'
+  calculation="$(docker compose --project-name "$project" -f "$compose" port saju 43007)"
+  metrics="$(docker compose --project-name "$project" -f "$compose" port saju 43008)"
+  [[ "$calculation" =~ ^127\.0\.0\.1:[0-9]{4,5}$ && "$metrics" =~ ^127\.0\.0\.1:[0-9]{4,5}$ ]] ||
+    fail 'Constrained Saju published outside loopback.'
+  export MH_OPS_REAL_SAJU_ORIGIN="http://$calculation"
+  export MH_OPS_REAL_SAJU_METRICS_ORIGIN="http://$metrics"
+  ready=false
+  for _ in $(seq 1 30); do
+    if curl --fail --silent --max-time 2 "$MH_OPS_REAL_SAJU_METRICS_ORIGIN/metrics" >/dev/null; then
+      ready=true; break
+    fi
+    sleep 1
+  done
+  [[ "$ready" == true ]] || fail 'Constrained Saju metrics did not become ready.'
+fi
+
 cd "$GITHUB_WORKSPACE"
 export MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN="http://127.0.0.1:$MH_OPS_GOTRUE_PORT"
 export MH_OPS_REAL_SAJU_CHECKOUT="$saju"
 export MH_OPS_REAL_PRODUCT_PROOF_PATH="$scratch/real-product.json"
+export MH_OPS_REAL_PRODUCT_EXPERIMENT="$experiment"
 if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.test.mjs \
   --reporter=verbose --testNamePattern='four authenticated synthetic members' >"$scratch/vitest.log" 2>&1; then
   # The raw test output is deliberately private because it can contain
   # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
   # Report only recognized, controlled stage labels, never raw lines or paths.
-  if grep -Eq 'MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|proof_write|complete)' "$scratch/vitest.log"; then
-    stage="$(grep -oE 'MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|proof_write|complete)' "$scratch/vitest.log" | tail -n 1)"
+  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
+  if grep -Eq "$stage_pattern" "$scratch/vitest.log"; then
+    stage="$(grep -oE "$stage_pattern" "$scratch/vitest.log" | tail -n 1)"
     echo "::error title=Isolated three-dependency failure stage::$stage" >&2
   else
     echo '::error title=Isolated three-dependency failure stage::No allowlisted stage emitted; inspect harness/integration in a private sandbox.' >&2
@@ -110,7 +142,7 @@ fi
 grep -F '1 passed' "$scratch/vitest.log" >/dev/null ||
   fail 'Exactly one real integrated test required.'
 [[ -s "$scratch/real-product.json" ]] || fail 'Actual private evidence not created.'
-jq -e --arg sha "$source_sha" '
+jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
   .schema=="myeongha-ops-real-gotrue-pg18-saju-product-phase11-v1"
   and .status=="OBSERVED_ISOLATED_REAL_CHAIN"
   and .scope=="disposable-main-only-local-gotrue-postgres18-and-pinned-saju"
@@ -127,7 +159,16 @@ jq -e --arg sha "$source_sha" '
   and (.dbAcquireP95Ms|type=="number") and (.dbQueryP95Ms|type=="number")
   and .authHttpCalls>=44 and .sajuCalculationCalls>=.baseline.successful
   and .anonymousDenied==true and .healthUnaffected==true
-  and .actualSajuResourceCgroupConstrained==false
+  and .runtimeCleanupVerified==true
+  and (if $experiment == "short" then .actualSajuResourceCgroupConstrained==false and .sustained==null
+    else .actualSajuResourceCgroupConstrained==true and .sustained.recoverySucceeded==true
+      and .sustained.injectedDbUnavailable==1
+      and (.sustained.windows | map(.durationSeconds))==[300,900]
+      and (.sustained.windows | map(.scheduled))==[300,3600]
+      and (all(.sustained.windows[]; .scheduled==(.successful+.unavailable+.transportFailures+.skipped)
+        and .successful>0 and .elapsedMs >= (.durationSeconds*1000)
+        and .saju.memoryPeakBytes <= 268435456 and .saju.oomKills==0))
+    end)
   and .productionCapacityProven==false and .productionScalingThresholdApproved==false
   and .drReady==false and .serviceResumptionAllowed==false
   and .outputContainsIdentifiers==false

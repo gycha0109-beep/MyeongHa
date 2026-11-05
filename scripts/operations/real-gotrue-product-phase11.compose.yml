@@ -36,18 +36,42 @@ services:
       GOTRUE_JWT_SECRET: ${MH_OPS_AUTH_JWT_SECRET:?}
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
-      GOTRUE_JWT_EXP: "300"
+      GOTRUE_JWT_EXP: "${MH_OPS_AUTH_JWT_EXP_SECONDS:-300}"
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_DISABLE_SIGNUP: "false"
       GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
     networks: [disposable, host-loopback]
+  saju:
+    profiles: [sustained]
+    image: node:24-bookworm-slim
+    command: [node, /probe/saju-split-service-phase11.mjs]
+    environment:
+      MH_OPS_SAJU_BRIDGE: "1"
+    cpus: 0.50
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 128
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    read_only: true
+    volumes:
+      - ../../_isolated_saju:/saju:ro
+      - ./saju-split-service-phase11.mjs:/probe/saju-split-service-phase11.mjs:ro
+    ports:
+      - "127.0.0.1::43007"
+      - "127.0.0.1::43008"
+    networks: [saju-loopback]
 networks:
   disposable:
     internal: true
   # Only GoTrue joins a second project-scoped bridge for the loopback-published port.
   # The auth database stays on the strictly internal bridge and has no published port.
   host-loopback:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: '127.0.0.1'
+  saju-loopback:
     driver: bridge
     driver_opts:
       com.docker.network.bridge.host_binding_ipv4: '127.0.0.1'

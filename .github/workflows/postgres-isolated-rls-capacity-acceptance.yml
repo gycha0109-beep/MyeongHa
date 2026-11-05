@@ -3,6 +3,12 @@ run-name: "[WT:ops] Phase 7/11 isolated PostgreSQL 18 proof"
 
 on:
   workflow_dispatch:
+    inputs:
+      experiment:
+        description: Isolated product-chain experiment
+        type: choice
+        options: [short, sustained]
+        default: short
 
 permissions:
   contents: read
@@ -15,7 +21,7 @@ jobs:
   isolated-postgres-proof:
     if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - name: Checkout exact main source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -59,6 +65,7 @@ jobs:
         env:
           PG_BIN_DIR: /usr/lib/postgresql/18/bin
           MH_OPS_REPO_ROOT: ${{ github.workspace }}
+          MH_OPS_REAL_PRODUCT_EXPERIMENT: ${{ inputs.experiment }}
         run: bash scripts/operations/run-isolated-real-product-chain-phase11-ci.sh
       - name: Upload actual isolated three-dependency product observation
         if: ${{ always() }}
