@@ -41,7 +41,7 @@ export function ChatReadHeader({
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   const meta = presentation === null
     ? t('서버가 확인한 대화방')
-    : `${presentation.title} · ${t('대화 기록')}`;
+    : `${t(presentation.title)} · ${t('대화 기록')}`;
 
   return (
     <View style={[styles.headerCard, isSeyeonTheme && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}>
