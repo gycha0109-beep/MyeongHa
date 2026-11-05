@@ -14,6 +14,7 @@ import {
 import { createSeyeonPositiveS0OwnerDbPortsV1 } from '../apps/api/src/postgres-seyeon-positive-memory-source-runtime-v1.js';
 import { createSeyeonG1HistoricalCandidateOwnerPortV1 } from '../apps/api/src/postgres-seyeon-g1-historical-candidate-port-v1.js';
 import { createSeyeonG1HistoricalFinalContextSealPortV1 } from '../apps/api/src/postgres-seyeon-g1-historical-final-context-seal-port-v1.js';
+import { createSeyeonG3HistoricalOriginalsReviewPortV1 } from '../apps/api/src/postgres-seyeon-g3-historical-originals-review-port-v1.js';
 import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
@@ -2381,6 +2382,38 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         historicalSourceCount:2,originalsCurrentForReview:true,
         authorizesFirstReveal:false,authorizesCommittedReplay:false,
         permitsStreaming:false,permitsHttpReveal:false,
+      });
+      // W94: real restricted DB + TypeScript receipt boundary together,
+      // never a text-delivery authority even when audit_only is current.
+      const g3PortAudit=()=>f.run(({client})=>
+        createSeyeonG3HistoricalOriginalsReviewPortV1(client)
+          .reviewCurrentOriginals({
+            subjectId:f.subject,threadId:f.thread,turnId:currentTurn,
+            attemptId:currentAttempt,purpose:'audit_only',
+            historicalSourceCount:2,
+          }),
+      );
+      const verifiedG3PortReceipt=await g3PortAudit();
+      expect(verifiedG3PortReceipt).toEqual({
+        schemaVersion:'seyeon-g3-historical-current-originals-review-s0-v1',
+        historicalSourceCount:2,originalsCurrentForReview:true,
+        authorizesFirstReveal:false,authorizesCommittedReplay:false,
+        permitsStreaming:false,permitsHttpReveal:false,
+      });
+      expect(Object.isFrozen(verifiedG3PortReceipt)).toBe(true);
+      await expect(f.run(({client})=>
+        createSeyeonG3HistoricalOriginalsReviewPortV1(client)
+          .reviewCurrentOriginals({
+            subjectId:f.subject,threadId:f.thread,turnId:currentTurn,
+            attemptId:currentAttempt,purpose:'first',
+            historicalSourceCount:2,
+            expectedUserMessageId:currentUser,
+            expectedAssistantMessageId:uuid(19,1218),
+            expectedPostTurnOutboxEventId:uuid(23,1218),
+            expectedClientTurnId:'historical-s0-fixture',
+          }),
+      )).rejects.toMatchObject({
+        code:'SEYEON_G3_HISTORICAL_ORIGINALS_REVIEW_HOLD',
       });
       await expect(g3Review('first')).rejects.toMatchObject({
         constraint:'seyeon_historical_g3_original_commit_required',

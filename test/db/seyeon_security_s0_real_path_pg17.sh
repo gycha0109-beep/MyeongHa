@@ -11,6 +11,8 @@ set -euo pipefail
 }
 node scripts/operations/seyeon-security-s0/install-isolated.mjs
 ./node_modules/.bin/vitest run \
+  test/seyeon-g3-historical-originals-review-port-w94.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run \
   test/seyeon-g3-historical-originals-review-w88.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \
   test/seyeon-chat-turn-send-http.test.ts --maxWorkers=1
