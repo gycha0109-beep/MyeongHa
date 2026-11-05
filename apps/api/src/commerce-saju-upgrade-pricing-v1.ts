@@ -125,7 +125,7 @@ export function quoteSajuUpgradeFromVerifiedLedgerV1(
       || !Array.isArray(input.pendingPurchases)) return invalid();
   const target = COMMERCE_SAJU_PRODUCTS_V1[targetProductKey];
   const targetFields = new Set<string>(target.fields);
-  const owned = new Set<string>();
+  const owned = new Set<SajuFieldV1>();
   for (const field of input.ownedFields) {
     if (typeof field !== 'string' || !fields.has(field)) return invalid();
     owned.add(field);
@@ -145,7 +145,8 @@ export function quoteSajuUpgradeFromVerifiedLedgerV1(
     const paid = money(raw.verifiedPaidMinor);
     const refunded = money(raw.refundedMinor);
     if (paid <= 0 || refunded > paid) return invalid();
-    if ((raw.refundState === 'none' && refunded !== 0)
+    if (!['none', 'partial', 'full'].includes(raw.refundState)
+        || (raw.refundState === 'none' && refunded !== 0)
         || (raw.refundState === 'partial' && !(refunded > 0 && refunded < paid))
         || (raw.refundState === 'full' && refunded !== paid)) return invalid();
     if (!Array.isArray(raw.upgradeFromReceiptIds)
