@@ -126,18 +126,25 @@ export default {
       // when Wrangler assigned different binding names.
       validateAdminHttpBindingsV1(env);
       const memberAuthFetch=createAdminMemberAuthServiceFetchV1(env);
-      reader = new Pool({connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
-      audit = new Pool({connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
-      if(env.ADMIN_COMMAND_HYPERDRIVE?.connectionString){
-        if(typeof env.MYEONGHA_ADMIN_CONFIRMATION_SECRET!=='string'||env.MYEONGHA_ADMIN_CONFIRMATION_SECRET.length<32)throw Error('Command confirmation unavailable');
-        command=new Pool({connectionString:env.ADMIN_COMMAND_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
-      }
-      phase='private-runtime';
-      const runtime = createAdminPrivateRuntimeV1({env,readPool:reader,auditPool:audit,...(command?{commandPool:command}:{})});
+      // Static HTML/JS/CSS and Member sign-in never need a PostgreSQL connection.
+      // Allocate and close dedicated read/audit pools only for an admitted Admin API request.
+      const handleAdminApi=async(apiRequest)=>{
+        phase='private-runtime';
+        const poolOptions={max:1,connectionTimeoutMillis:3000,statement_timeout:5000,query_timeout:8000};
+        reader=new Pool({connectionString:env.ADMIN_READ_HYPERDRIVE.connectionString,...poolOptions});
+        audit=new Pool({connectionString:env.ADMIN_AUDIT_HYPERDRIVE.connectionString,...poolOptions});
+        if(env.ADMIN_COMMAND_HYPERDRIVE?.connectionString){
+          if(typeof env.MYEONGHA_ADMIN_CONFIRMATION_SECRET!=='string'||env.MYEONGHA_ADMIN_CONFIRMATION_SECRET.length<32)throw Error('Command confirmation unavailable');
+          command=new Pool({connectionString:env.ADMIN_COMMAND_HYPERDRIVE.connectionString,...poolOptions});
+        }
+        const runtime=createAdminPrivateRuntimeV1({env,readPool:reader,auditPool:audit,...(command?{commandPool:command}:{})});
+        phase='hosted-request';
+        return runtime.handleRequest(apiRequest);
+      };
       const handler = createAdminHostedHttpV1({origin:env.MYEONGHA_ADMIN_ORIGIN,memberAuthOrigin:env.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN,
         verifyAccess:async()=>true, // The signed, exact Owner gate already ran above.
         allowRequest:async(apiRequest)=>Boolean((await env.ADMIN_RATE_LIMITER.limit({key:adminRateLimitKeyV1(env.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID,apiRequest)})).success),
-        api:runtime.handleRequest,assets:request=>env.ASSETS.fetch(request),fetchImpl:memberAuthFetch});
+        api:handleAdminApi,assets:request=>env.ASSETS.fetch(request),fetchImpl:memberAuthFetch});
       phase='hosted-request';
       return await handler(request);
     } catch {
