@@ -506,13 +506,21 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
     if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
        process.env.GITHUB_REF!=='refs/heads/main')
       throw Error('Actual multi-service test is manual-main-only');
-    const members=await registerDisposableGoTrueMembers(process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN);
+    // Phase names are a fixed allowlist: no synthetic JWT, auth UUID or SQL error
+    // details may escape the private Vitest log when this actual Linux job fails.
+    let phase='member_signup';
     let database, saju;
     const servers=[];
     try {
+      const members=await registerDisposableGoTrueMembers(
+        process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN);
+      phase='isolated_pg18_start';
       database=await startIsolatedPg18();
+      phase='subject_rls_map';
       await database.bindRealMembers(members);
+      phase='real_saju_start';
       saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT);
+      phase='api_setup';
       const state={
         dbActive:0,dbPeak:0,dbAcquisitions:0,
         dbMode:'healthy',dbAcquireMs:[],dbQueryMs:[],authCalls:0,sajuCalls:0,
@@ -566,20 +574,24 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         }
       });
       servers.push(api);
+      phase='baseline_requests';
       const tokens=members.map(m=>m.token);
       const baseline=await measuredBatch(api.origin,12,1,tokens);
       expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
+      phase='contended_requests';
       const contended=await measuredBatch(api.origin,32,8,tokens);
       expect(contended.unexpected).toBe(0);
       expect(contended.successful+contended.unavailable).toBe(32);
       expect(contended.successful).toBeGreaterThan(0);
       expect(state.dbPeak).toBeLessThanOrEqual(2);
+      phase='anonymous_and_health';
       const noCredentials=await fetch(api.origin+'/api/me/saju/calculation',{method:'POST'});
       expect(noCredentials.status).toBe(401);
       const health=await fetch(api.origin+'/api/health');
       expect(health.status).toBe(200);
       expect(state.dbActive).toBe(0);
       expect(state.sajuCalls).toBeGreaterThanOrEqual(baseline.successful+contended.successful);
+      phase='proof_write';
       const proof={
         schema:'myeongha-ops-real-gotrue-pg18-saju-product-phase11-v1',
         status:'OBSERVED_ISOLATED_REAL_CHAIN',
@@ -602,7 +614,13 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       await writeFile(process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH,JSON.stringify(proof),{
         flag:'wx',mode:0o600,
       });
+      phase='complete';
       console.log('MYEONGHA_REAL_GOTRUE_PG18_SAJU_CHAIN_PHASE11_PASS');
+    }catch{
+      // Failure detail stays in private temporary Vitest log. Only the controlled
+      // stage is emitted; it cannot contain tokens, UUIDs, email or DB material.
+      console.error('MYEONGHA_REAL_CHAIN_FAILURE_STAGE: '+phase);
+      throw Error('Isolated three-dependency product-path test failed at the classified stage');
     }finally{
       for(const server of servers.reverse())await server.close().catch(()=>undefined);
       await saju?.close().catch(()=>undefined);
