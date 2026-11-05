@@ -151,9 +151,7 @@ export default function MyScreen() {
     >
       <MyEditorialWelcome account={currentAccount} />
       <MyMemberAuthCard
-          subjectKind={state.profile.kind === 'ready'
-            ? state.profile.profile.subjectKind
-            : memberSessionPresent === true ? 'member' : 'guest'}
+          subjectKind={currentAccount}
           email={email}
           password={password}
           pending={
