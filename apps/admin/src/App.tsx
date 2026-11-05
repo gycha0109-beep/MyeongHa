@@ -215,6 +215,8 @@ export function App() {
   const [ownerToken, setOwnerToken] = useState<string | null>(null);
   const [restoringSession, setRestoringSession] = useState(true);
   const [logoutError, setLogoutError] = useState('');
+  const [sessionRestoreError, setSessionRestoreError] = useState<string | null>(null);
+  const [sessionRetry, setSessionRetry] = useState(0);
   const sessionVersion = useRef(0);
   const route = getAdminRoute(path.split('?')[0] ?? path);
 
@@ -227,9 +229,19 @@ export function App() {
       const version = sessionVersion.current;
       try {
         await verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1);
-        if (active && version === sessionVersion.current) setOwnerToken(ADMIN_SESSION_MARKER_V1);
+        if (active && version === sessionVersion.current) {
+          setOwnerToken(ADMIN_SESSION_MARKER_V1);
+          setSessionRestoreError(null);
+        }
       } catch (error) {
-        if (active && version === sessionVersion.current && shouldClearAdminSessionAfterVerificationFailureV1(error)) setOwnerToken(null);
+        if (active && version === sessionVersion.current) {
+          if (shouldClearAdminSessionAfterVerificationFailureV1(error)) {
+            setOwnerToken(null);
+            setSessionRestoreError(null);
+          } else {
+            setSessionRestoreError(error instanceof Error ? error.message : '관리자 세션 응답 지연');
+          }
+        }
       } finally {
         checking = false;
         if (active) setRestoringSession(false);
@@ -246,11 +258,12 @@ export function App() {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, []);
+  }, [sessionRetry]);
   const establishSession = (marker: string) => {
     sessionVersion.current++;
     setOwnerToken(marker);
     setLogoutError('');
+    setSessionRestoreError(null);
   };
   async function logout() {
     sessionVersion.current++;
@@ -258,6 +271,7 @@ export function App() {
       await signOutAdminSessionV1();
       setOwnerToken(null);
       setLogoutError('');
+      setSessionRestoreError(null);
     } catch {
       setLogoutError('로그아웃 연결에 실패했습니다. 다시 시도해 주세요.');
     }
@@ -307,8 +321,12 @@ export function App() {
           {route ? (
             <>
               <SectionIntro route={route} />
-              {ownerToken === null && !restoringSession ? <LockNotice /> : null}
-              {ownerToken === null && restoringSession ? <StatusPanel kind="loading" title="관리자 세션 확인 중" /> : route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => { void logout(); }} />{ownerToken === null && <AdminLogin onSession={establishSession} />}</> : ownerToken === null
+              {ownerToken === null && !restoringSession && sessionRestoreError === null ? <LockNotice /> : null}
+              {ownerToken === null && restoringSession ? <StatusPanel kind="loading" title="관리자 세션 확인 중" />
+                : ownerToken === null && sessionRestoreError !== null
+                  ? <StatusPanel kind="error" title="관리자 세션 응답 지연" detail={sessionRestoreError}
+                    action={<button type="button" onClick={() => { setRestoringSession(true); setSessionRetry(count => count + 1); }}>서버 연결 재시도</button>} />
+                  : route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => { void logout(); }} />{ownerToken === null && <AdminLogin onSession={establishSession} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={establishSession} /></>
                 : <>{route.section === 'analytics'
                   ? <><AdminAnalyticsDashboard token={ownerToken} onSessionExpired={() => { void logout(); }} />
