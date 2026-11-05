@@ -82,4 +82,45 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(product).not.toContain('process.env.DATABASE_URL');
     expect(product).not.toContain('process.env.SUPABASE_DB_PASSWORD');
   });
+  it('runs a distinct actual GoTrue, PG18 and pinned Saju experiment with no hosted environment', () => {
+    const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const realCompose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
+    const product = readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8');
+
+    expect(workflow).toContain('run-isolated-real-product-chain-phase11-ci.sh');
+    expect(workflow).toContain('9807ce89c08afc61b587560d515a475efd819032');
+    expect(workflow).toContain('repository: gycha0109-beep/Saju');
+    expect(workflow).toContain('isolated-real-product-chain-phase11-');
+    expect(workflow).not.toContain('environment: production');
+    expect(workflow).not.toContain('secrets.');
+
+    expect(realRunner).toContain('GITHUB_EVENT_NAME:-');
+    expect(realRunner).toContain('GITHUB_REF:-');
+    expect(realRunner).toContain('SUPABASE_DB_PASSWORD');
+    expect(realRunner).toContain('docker context inspect');
+    expect(realRunner).toContain('up --detach gotrue');
+    expect(realRunner).toContain('down --volumes --remove-orphans');
+    expect(realRunner).toContain('MH_OPS_REAL_PRODUCT_PROOF_PATH');
+    expect(realRunner).toContain('BLOCKED_INCOMPLETE');
+    expect(realRunner).toContain('OBSERVED_ISOLATED_REAL_CHAIN');
+    expect(realRunner).toContain('cloudflareWorkerRuntimeMeasured==false');
+    expect(realRunner).toContain('actualSajuResourceCgroupConstrained==false');
+    expect(realRunner).toContain('outputContainsIdentifiers==false');
+
+    expect(realCompose).toContain('image: supabase/gotrue:v2.196.0');
+    expect(realCompose).toContain('image: postgres:15');
+    expect(realCompose).toContain('127.0.0.1:');
+    expect(realCompose).toContain('internal: true');
+    expect(realCompose).not.toContain('SUPABASE_DB_PASSWORD');
+    expect(realCompose).not.toContain('myeongha-admin');
+
+    expect(product).toContain('registerDisposableGoTrueMembers');
+    expect(product).toContain('startIsolatedPg18');
+    expect(product).toContain('launchActualSajuHost');
+    expect(product).toContain("memberCount:4");
+    expect(product).toContain("productionCapacityProven:false");
+    expect(product).toContain("actualSajuResourceCgroupConstrained:false");
+    expect(product).toContain('flag:\'wx\'');
+  });
+
 });
