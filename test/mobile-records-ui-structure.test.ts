@@ -62,3 +62,43 @@ describe('mobile M4-D Official Reading reread structure', () => {
     expect(client).not.toContain('responseHash:');
   });
 });
+
+
+describe('Records list completeness and failure disclosure', () => {
+  it('never claims an empty archive while selected sources are pending or failed', async () => {
+    const { recordsInitiallyLoadingV1, recordsConfirmedEmptyV1 } =
+      await import('../apps/mobile/src/features/records/records-view-model.js');
+    type Status = 'idle' | 'loading_initial' | 'ready' | 'loading_more' | 'error';
+    const create = (life: Status, readings: Status, memories: Status) => {
+      const section = (status: Status) => ({
+        status, items: [], hasMore: false, nextCursor: null, errorCode: status === 'error' ? 'READ_FAILED' : null,
+      });
+      return {
+        life: section(life), readings: section(readings), memories: section(memories),
+      };
+    };
+    const pending = create('ready', 'loading_initial', 'ready');
+    expect(recordsInitiallyLoadingV1(pending, 'all')).toBe(true);
+    expect(recordsConfirmedEmptyV1(pending, 'all')).toBe(false);
+    expect(recordsConfirmedEmptyV1(pending, 'life')).toBe(true);
+    const failed = create('error', 'ready', 'ready');
+    expect(recordsInitiallyLoadingV1(failed, 'all')).toBe(false);
+    expect(recordsConfirmedEmptyV1(failed, 'all')).toBe(false);
+    expect(recordsConfirmedEmptyV1(failed, 'life')).toBe(false);
+    expect(recordsConfirmedEmptyV1(failed, 'readings')).toBe(true);
+    const complete = create('ready', 'ready', 'ready');
+    expect(recordsInitiallyLoadingV1(complete, 'all')).toBe(false);
+    expect(recordsConfirmedEmptyV1(complete, 'all')).toBe(true);
+    const paged = { ...complete, life: { ...complete.life, hasMore: true } };
+    expect(recordsConfirmedEmptyV1(paged, 'all')).toBe(false);
+  });
+
+  it('keeps error retry available while suppressing false no-record messages', async () => {
+    const screen = await readRepoFile('apps/mobile/src/app/(tabs)/records/index.tsx');
+    expect(screen).toContain('recordsInitiallyLoadingV1(snapshots, tab)');
+    expect(screen).toContain('recordsConfirmedEmptyV1(snapshots, tab)');
+    expect(screen).toContain('!confirmedEmpty ? null : <RecordsEmptyState');
+    expect(screen).toContain('onRetry={() => void retryFailed(tab)}');
+    expect(screen).not.toContain('initialLoadingForTab(');
+  });
+});

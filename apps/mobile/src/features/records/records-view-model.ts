@@ -182,3 +182,28 @@ export function failedCollectionLabelsV1(
       .map((key) => labels[key]),
   );
 }
+
+/** A zero-row state is still loading when any selected source is pending.
+ * Prevents a completed empty collection from masking other pending sources.
+ */
+export function recordsInitiallyLoadingV1(
+  snapshots: MobileRecordsSnapshotsV1,
+  tab: RecordsTabV1,
+): boolean {
+  const selected = collectionKeysForTabV1(tab).map((key) => snapshots[key]);
+  return selected.every((section) => section.items.length === 0) &&
+    selected.some((section) => section.status === 'idle' || section.status === 'loading_initial');
+}
+
+/** Display "no records" only when every selected source finished successfully.
+ * Partial server errors and unknown ownership are NOT proof of an empty archive.
+ */
+export function recordsConfirmedEmptyV1(
+  snapshots: MobileRecordsSnapshotsV1,
+  tab: RecordsTabV1,
+): boolean {
+  return collectionKeysForTabV1(tab).every((key) => {
+    const section = snapshots[key];
+    return section.status === 'ready' && section.items.length === 0 && !section.hasMore;
+  });
+}
