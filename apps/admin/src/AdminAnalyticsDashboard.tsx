@@ -1,3 +1,4 @@
+import { adminFetchWithDeadlineV1 } from './admin-request-deadline-v1.js';
 import { useEffect, useState } from 'react';
 import { AdminAccessDeniedErrorV1, ADMIN_SESSION_MARKER_V1 } from './admin-client.js';
 import { StatusPanel } from './StatusPanel.js';
@@ -17,7 +18,7 @@ function validResult(value: unknown): value is AdminAnalyticsDashboardResultV1 {
 export async function fetchAdminAnalyticsDashboardV1(token:string,query:URLSearchParams,fetchImpl:typeof fetch=fetch):Promise<AdminAnalyticsDashboardResultV1> {
   for(const key of query.keys())if(!['from','to','grain','campaignKey'].includes(key))throw Error('허용되지 않은 분석 조건입니다.');
   if(token!==ADMIN_SESSION_MARKER_V1)throw Error('관리자 세션이 유효하지 않습니다.');
-  const response=await fetchImpl('/api/admin/analytics-dashboard?'+query.toString(),{method:'GET',headers:{Accept:'application/json',},credentials:'same-origin',cache:'no-store'});
+  const response=await adminFetchWithDeadlineV1('/api/admin/analytics-dashboard?'+query.toString(),{method:'GET',headers:{Accept:'application/json'},credentials:'same-origin',cache:'no-store'},fetchImpl);
   if(response.status===401||response.status===403)throw new AdminAccessDeniedErrorV1();
   if(!response.ok)throw Error('실제 분석·결제 근거를 조회할 수 없습니다. 권한·DB·감사 연결을 확인해 주세요.');
   const payload:unknown=await response.json();if(!validResult(payload))throw Error('분석 응답 계약이 유효하지 않습니다.');return payload;
