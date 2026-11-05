@@ -13,6 +13,7 @@ import {
 } from '@/features/my/MyComponents';
 import { MyEditorialWelcome } from '@/features/my/MyEditorialWelcome';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { useMobileMemberAuthV1 } from '@/features/my/use-mobile-member-auth';
 import { useMobileMyV1 } from '@/features/my/use-mobile-my';
 import {
@@ -46,14 +47,26 @@ export default function MyScreen() {
 
   useFocusEffect(useCallback(() => {
     let active = true;
-    void nativeMobileRuntimeV1.memberSession.read()
-      .then((session) => {
-        if (active) setMemberSessionPresent(session !== null);
-      })
-      .catch(() => {
-        if (active) setMemberSessionPresent(null);
-      });
-    return () => { active = false; };
+    let epoch = 0;
+    const refreshSessionForCurrentSubject = () => {
+      const requestEpoch = ++epoch;
+      setMemberSessionPresent(null);
+      void nativeMobileRuntimeV1.memberSession.read()
+        .then((session) => {
+          if (active && requestEpoch === epoch) setMemberSessionPresent(session !== null);
+        })
+        .catch(() => {
+          if (active && requestEpoch === epoch) setMemberSessionPresent(null);
+        });
+    };
+    const unsubscribe = subscribeMobileSubjectCredentialChangesV1(refreshSessionForCurrentSubject);
+    refreshSessionForCurrentSubject();
+    return () => {
+      unsubscribe();
+      active = false;
+      epoch += 1;
+      setMemberSessionPresent(null);
+    };
   }, []));
 
   const reloadOwnerProjection = useCallback(async () => {
