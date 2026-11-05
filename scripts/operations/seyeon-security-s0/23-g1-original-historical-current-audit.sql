@@ -30,8 +30,10 @@ begin
   join public.chat_turn_attempts a
     on a.id=p_attempt_id and a.turn_id=t.id and a.subject_id=t.subject_id
   where t.id=p_turn_id and t.subject_id=p_subject_id
-    and t.thread_id=p_thread_id and t.state='context_ready'
-    and a.state='running' and a.seyeon_personal_source_pinned_at is not null
+    and t.thread_id=p_thread_id
+    and ((t.state='context_ready' and a.state='running')
+      or (t.state='validated' and a.state='validated'))
+    and a.seyeon_personal_source_pinned_at is not null
     and a.seyeon_personal_source_pin_jsonb=
       jsonb_build_object('historicalCandidateProof',
                          a.seyeon_personal_source_pin_jsonb->'historicalCandidateProof')

@@ -2249,10 +2249,19 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[sealAcl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',$1,'EXECUTE') as closed`,[sealSignature]);
     expect(sealAcl.closed).toBe(true);
+    const guardSignature='seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid)';
+    const commitHoldSignature='seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)';
+    const {rows:[beforeGuardAcl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as guard_closed,
+      not has_function_privilege('myeongha_api_executor',$2,'EXECUTE') as commit_closed`,
+      [guardSignature,commitHoldSignature]);
+    expect(beforeGuardAcl).toEqual({guard_closed:true,commit_closed:true});
     // Dedicated synthetic fixture only; installed S0 default remains closed.
     await pool.query(`grant execute on function
       seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid),
-      seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text)
+      seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text),
+      seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid),
+      seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)
       to myeongha_api_executor`);
     try{
       expect(await audit()).toEqual({
@@ -2287,6 +2296,31 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       expect(sealed.final_seal).toEqual(exactSeal);
       expect(sealed.personal.historicalCandidateProof).toEqual(saved.proof.historicalCandidateProof);
       expect(sealed.state).toBe('running');
+      const sameTxGuard=()=>f.run(({client})=>client.query(
+        'select seyeon_private.assert_historical_g2_sealed_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+        [f.subject,f.thread,currentTurn,currentAttempt],
+      ));
+      await expect(sameTxGuard()).resolves.toBeDefined();
+      const blockedCommit=()=>f.run(({client})=>client.query(
+        `select * from seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(
+          $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::jsonb,$9::text
+        )`,
+        [f.subject,f.thread,currentTurn,currentAttempt,
+          uuid(19,1218),uuid(22,1218),uuid(23,1218),
+          JSON.stringify({synthetic:'G2 current original no permission'}),
+          hash({synthetic:'G2 no permission'})],
+      ));
+      await expect(blockedCommit()).rejects.toThrow();
+      const {rows:[noCommit]}=await pool.query(`select
+        a.state as attempt_state,t.state as turn_state,
+        (select count(*)::int from public.conversation_messages m
+          where m.turn_id=t.id and m.sender_type='character') as assistant_count
+        from public.chat_turn_attempts a
+        join public.chat_turns t on t.id=a.turn_id
+        where a.id=$1`,[currentAttempt]);
+      expect(noCommit).toEqual({
+        attempt_state:'running',turn_state:'context_ready',assistant_count:0,
+      });
       await expect(seal()).rejects.toMatchObject({
         constraint:'seyeon_history_final_context_candidate_mismatch',
       });
@@ -2300,6 +2334,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         [f.subject,f.thread,f.turn,currentAttempt],
       ))).rejects.toMatchObject({constraint:'seyeon_history_recheck_candidate_invalid'});
       await f.revoke();
+      await expect(sameTxGuard()).rejects.toMatchObject({
+        constraint:'seyeon_source_lock_original_grant_required',
+      });
       await expect(audit()).rejects.toMatchObject({
         constraint:'seyeon_source_lock_original_grant_required',
       });
@@ -2315,7 +2352,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     }finally{
       await pool.query(`revoke execute on function
         seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid),
-        seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text)
+        seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text),
+        seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid),
+        seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)
         from myeongha_api_executor`);
     }
     const {rows:[afterAuditAcl]}=await pool.query(`select not has_function_privilege(
@@ -2324,6 +2363,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[afterSealAcl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',$1,'EXECUTE') as closed`,[sealSignature]);
     expect(afterSealAcl.closed).toBe(true);
+    const {rows:[afterG2Acl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as guard_closed,
+      not has_function_privilege('myeongha_api_executor',$2,'EXECUTE') as commit_closed`,
+      [guardSignature,commitHoldSignature]);
+    expect(afterG2Acl).toEqual({guard_closed:true,commit_closed:true});
   });
 
   it('G5 historical candidate cannot pin a revoked original Grant during an independent DB race', async () => {
