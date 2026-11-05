@@ -53,7 +53,7 @@ export function MyMemberAuthCard({
   onSocialSignIn,
   onCancelSocialSignIn,
 }: {
-  subjectKind: 'guest' | 'member';
+  subjectKind: 'checking' | 'guest' | 'member';
   email: string;
   password: string;
   pending: boolean;
@@ -75,6 +75,14 @@ export function MyMemberAuthCard({
 }) {
   const themedStyles = useMobileThemedStyles(styles);
   const { t, locale } = useMobileUiLocale();
+  if (subjectKind === 'checking') {
+    return (
+      <View style={themedStyles.card}>
+        <Text style={themedStyles.kicker}>ACCOUNT</Text>
+        <Text style={themedStyles.body}>{t('회원 상태를 확인하는 중입니다…')}</Text>
+      </View>
+    );
+  }
   if (subjectKind === 'member') {
     return (
       <View style={themedStyles.card}>
