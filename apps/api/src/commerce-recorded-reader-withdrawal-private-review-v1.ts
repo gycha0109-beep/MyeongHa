@@ -215,6 +215,10 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
       // Failure of this optional historical lookup cannot erase a recorded
       // customer Claim or fabricate a delivered outcome.
       let historicalS7:RecordedReaderS7ClaimTimelineV1|null=null;
+      // A failed PostgreSQL read aborts the transaction until rolled back.
+      // Isolate optional S7 history with a SAVEPOINT so cancellation evidence
+      // can still be reviewed in the SAME immutable Claim snapshot.
+      await connection.query('SAVEPOINT commerce_optional_s7_history');
       try {
         historicalS7=await readRecordedReaderS7ClaimTimelineV1(
           connection,{
@@ -223,7 +227,10 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
             unitId:claim.unitId as string,
           },
         );
+        await connection.query('RELEASE SAVEPOINT commerce_optional_s7_history');
       } catch {
+        await connection.query('ROLLBACK TO SAVEPOINT commerce_optional_s7_history');
+        await connection.query('RELEASE SAVEPOINT commerce_optional_s7_history');
         historicalS7=null;
       }
       const sourceOnly=await readRecordedReaderCancellationForClaimV1(
