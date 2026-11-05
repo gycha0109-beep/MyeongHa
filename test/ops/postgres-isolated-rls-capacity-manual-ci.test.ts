@@ -134,8 +134,23 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(product).toContain('launchActualSajuHost');
     expect(product).toContain("memberCount:4");
     expect(product).toContain("productionCapacityProven:false");
-    expect(product).toContain("actualSajuResourceCgroupConstrained:false");
+    expect(product).toContain("actualSajuResourceCgroupConstrained:sustainedExperiment");
     expect(product).toContain('flag:\'wx\'');
+  });
+
+  it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
+    const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
+    expect(workflow).toContain('options: [short, sustained]');
+    expect(workflow).toContain('default: short');
+    expect(compose).toContain('profiles: [sustained]');
+    expect(compose).toContain('cpus: 0.50');
+    expect(compose).toContain('memswap_limit: 256m');
+    expect(compose).toContain('127.0.0.1::43007');
+    expect(compose).toContain('127.0.0.1::43008');
+    expect(realRunner).toContain('.sustained.recoverySucceeded==true');
+    expect(realRunner).toContain('.runtimeCleanupVerified==true');
+    expect(realRunner).toContain('.dockerCleanupVerified=true');
   });
 
 });

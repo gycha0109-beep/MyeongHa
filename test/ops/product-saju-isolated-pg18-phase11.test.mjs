@@ -14,6 +14,7 @@ import { describe, expect, it } from 'vitest';
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../../apps/api/src/current-subject-saju-calculation-http.js';
 import { SupabaseMemberIdentityEvidenceVerifierV1 } from '../../apps/api/src/supabase-member-identity-verifier.js';
 import { createSajuProductionCalculationHttpAdapterV1 } from '../../apps/api/src/saju-production-calculation-http-adapter.js';
+import { measureIsolatedProductWindow } from '../../scripts/operations/measure-isolated-product-window-phase11.mjs';
 
 const pgToolExec = promisify(execFileCallback);
 const BIN = process.env.PG_BIN_DIR;
@@ -117,11 +118,10 @@ END;
 $member_context$;`);
       },
       async close(){
-        await login.end().catch(()=>undefined);
-        await admin.end().catch(()=>undefined);
-        if(started) await pgTool('pg_ctl',['-D',dir,'-m','immediate','-w','-t','20','stop'])
-          .catch(()=>undefined);
-        await rm(dir,{recursive:true,force:true}).catch(()=>undefined);
+        const pools = await Promise.allSettled([login.end(), admin.end()]);
+        await pgTool('pg_ctl',['-D',dir,'-m','immediate','-w','-t','20','stop']);
+        await rm(dir,{recursive:true,force:true});
+        if (pools.some(pool => pool.status === 'rejected')) throw Error('Isolated database pool cleanup failed');
       },
     };
   } catch(e) {
@@ -139,7 +139,10 @@ function createRealDb(pg,state) {
       if(state.dbMode==='unavailable') throw Error('synthetic injected DB outage');
       state.dbAcquisitions++;
       const start=performance.now();
-      const client=await pg.connect();
+      const client=await pg.connect().catch(error => {
+        state.dbAcquireFailures = (state.dbAcquireFailures ?? 0) + 1;
+        throw error;
+      });
       state.dbAcquireMs.push(performance.now()-start);
       state.dbActive++;
       state.dbPeak=Math.max(state.dbPeak,state.dbActive);
@@ -260,18 +263,8 @@ async function measuredBatch(origin, count, concurrency, bearerTokens = [MEMBER_
       index++;
       const token = bearerTokens[(index - 1) % bearerTokens.length];
       const started = performance.now();
-      const response = await fetch(origin + '/api/me/saju/calculation', {
-        method: 'POST',
-        headers: { authorization: 'Bearer ' + token },
-        signal: AbortSignal.timeout(5000),
-      });
-      const body = await response.text();
-      expect(response.headers.get('cache-control')).toBe('no-store');
-      for (const forbidden of [...bearerTokens, SAJU_TOKEN, API_KEY,
-        'synthetic private database', 'postgresql://', '127.0.0.1:']) {
-        expect(body).not.toContain(forbidden);
-      }
-      samples.push({ status: response.status, ms: performance.now() - started });
+      const status = await requestCalculation(origin, token, bearerTokens);
+      samples.push({ status, ms: performance.now() - started });
     }
   }));
   const success = samples.filter(r => r.status === 200).map(r => r.ms);
@@ -282,6 +275,78 @@ async function measuredBatch(origin, count, concurrency, bearerTokens = [MEMBER_
     p50Ms: quantile(success, 0.5),
     p95Ms: quantile(success, 0.95),
     p99Ms: quantile(success, 0.99),
+  };
+}
+
+async function requestCalculation(origin, token, bearerTokens) {
+  let response, body;
+  try {
+    response = await fetch(origin + '/api/me/saju/calculation', {
+      method: 'POST',
+      headers: { authorization: 'Bearer ' + token },
+      redirect: 'manual',
+      signal: AbortSignal.timeout(5000),
+    });
+    body = await response.text();
+  } catch {
+    return null;
+  }
+  expect(response.headers.get('cache-control')).toBe('no-store');
+  for (const forbidden of [...bearerTokens, SAJU_TOKEN, API_KEY,
+    'synthetic private database', 'postgresql://', '127.0.0.1:']) {
+    expect(body).not.toContain(forbidden);
+  }
+  return response.status;
+}
+
+function requireLoopbackOrigin(origin) {
+  if (!/^http:\/\/127\.0\.0\.1:[0-9]{4,5}$/u.test(origin)) {
+    throw new Error('Only the disposable loopback origin is allowed');
+  }
+  return origin;
+}
+
+async function readSajuCgroup(metricsOrigin) {
+  const response = await fetch(metricsOrigin + '/metrics', {
+    redirect: 'error', signal: AbortSignal.timeout(2000),
+  });
+  expect(response.status).toBe(200);
+  const metrics = await response.json();
+  expect(metrics).toMatchObject({ cpuCores: 0.5, memoryLimitBytes: 268435456, swapLimitBytes: 0, oomKills: 0 });
+  expect(metrics.memoryPeakBytes).toBeGreaterThan(0);
+  expect(metrics.memoryPeakBytes).toBeLessThanOrEqual(metrics.memoryLimitBytes);
+  return metrics;
+}
+
+async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin, state) {
+  const before = await readSajuCgroup(metricsOrigin);
+  const offset = Object.fromEntries(['dbAcquireMs', 'dbQueryMs', 'authHeaderMs', 'sajuMs']
+    .map(key => [key, state[key].length]));
+  const failedAcquisitionsBefore = state.dbAcquireFailures ?? 0;
+  const { samples, ...window } = await measureIsolatedProductWindow(profile, (slot) =>
+    requestCalculation(origin, tokens[profile === 'baseline' ? 0 : slot % tokens.length], tokens));
+  const after = await readSajuCgroup(metricsOrigin);
+  const successes = samples.filter(sample => sample.status === 200).map(sample => sample.elapsedMs);
+  const unavailable = samples.filter(sample => sample.status === 503).length;
+  const transportFailures = samples.filter(sample => sample.status === null).length;
+  expect(successes.length).toBeGreaterThan(0);
+  expect(successes.length + unavailable + transportFailures + window.skipped).toBe(window.scheduled);
+  expect(state.dbActive).toBe(0);
+  expect(after.cpuUsageUsec).toBeGreaterThanOrEqual(before.cpuUsageUsec);
+  expect(after.cpuThrottledPeriods).toBeGreaterThanOrEqual(before.cpuThrottledPeriods);
+  return {
+    ...window, successful: successes.length, unavailable, transportFailures,
+    p50Ms: quantile(successes, 0.50), p95Ms: quantile(successes, 0.95), p99Ms: quantile(successes, 0.99),
+    dbAcquireFailures: (state.dbAcquireFailures ?? 0) - failedAcquisitionsBefore,
+    dbAcquireP95Ms: quantile(state.dbAcquireMs.slice(offset.dbAcquireMs), 0.95),
+    dbQueryP95Ms: quantile(state.dbQueryMs.slice(offset.dbQueryMs), 0.95),
+    authHeadersP95Ms: quantile(state.authHeaderMs.slice(offset.authHeaderMs), 0.95),
+    sajuP95Ms: quantile(state.sajuMs.slice(offset.sajuMs), 0.95),
+    saju: {
+      cpuCores: after.cpuCores, cpuUsageUsec: after.cpuUsageUsec - before.cpuUsageUsec,
+      cpuThrottledPeriods: after.cpuThrottledPeriods - before.cpuThrottledPeriods,
+      memoryLimitBytes: after.memoryLimitBytes, memoryPeakBytes: after.memoryPeakBytes, oomKills: after.oomKills,
+    },
   };
 }
 
@@ -501,6 +566,7 @@ async function launchActualSajuHost(sourceDirectory) {
 
 const actualChainEnabled = Boolean(BIN && process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN &&
   process.env.MH_OPS_REAL_SAJU_CHECKOUT && process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH);
+const sustainedExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'sustained';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
     if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
@@ -519,18 +585,27 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       phase='subject_rls_map';
       await database.bindRealMembers(members);
       phase='real_saju_start';
-      saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT);
+      let metricsOrigin;
+      if (sustainedExperiment) {
+        saju={ origin: requireLoopbackOrigin(process.env.MH_OPS_REAL_SAJU_ORIGIN) };
+        metricsOrigin=requireLoopbackOrigin(process.env.MH_OPS_REAL_SAJU_METRICS_ORIGIN);
+        await readSajuCgroup(metricsOrigin);
+      } else {
+        saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT);
+      }
       phase='api_setup';
       const state={
         dbActive:0,dbPeak:0,dbAcquisitions:0,
-        dbMode:'healthy',dbAcquireMs:[],dbQueryMs:[],authCalls:0,sajuCalls:0,
+        dbMode:'healthy',dbAcquireMs:[],dbQueryMs:[],authCalls:0,sajuCalls:0,authHeaderMs:[],sajuMs:[],
       };
       const authOrigin=process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN;
       const identityEvidenceVerifier=new SupabaseMemberIdentityEvidenceVerifierV1({
         supabaseOrigin:'https://synthetic.invalid',supabaseApiKey:API_KEY,
-        fetchImpl:(_url,init)=>{
+        fetchImpl:async (_url,init)=>{
           state.authCalls++;
-          return fetch(authOrigin+'/user',init);
+          const started=performance.now();
+          try { return await fetch(authOrigin+'/user',init); }
+          finally { state.authHeaderMs.push(performance.now()-started); }
         },
         timeoutMs:2000,
       });
@@ -540,7 +615,9 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       const countedAdapter={
         async calculate(binding){
           state.sajuCalls++;
-          return realAdapter.calculate(binding);
+          const started=performance.now();
+          try { return await realAdapter.calculate(binding); }
+          finally { state.sajuMs.push(performance.now()-started); }
         },
       };
       const db=createRealDb(database.pool,state);
@@ -579,6 +656,15 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       const baseline=await measuredBatch(api.origin,12,1,tokens);
       expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
       phase='contended_requests';
+      const ramp=[];
+      if (sustainedExperiment) {
+        for (const concurrency of [2, 4]) {
+          const result = await measuredBatch(api.origin, 24, concurrency, tokens);
+          expect(result.unexpected).toBe(0);
+          expect(result.successful).toBeGreaterThan(0);
+          ramp.push(result);
+        }
+      }
       const contended=await measuredBatch(api.origin,32,8,tokens);
       expect(contended.unexpected).toBe(0);
       expect(contended.successful+contended.unavailable).toBe(32);
@@ -591,6 +677,27 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       expect(health.status).toBe(200);
       expect(state.dbActive).toBe(0);
       expect(state.sajuCalls).toBeGreaterThanOrEqual(baseline.successful+contended.successful);
+      let sustained;
+      if (sustainedExperiment) {
+        phase='sustained_baseline';
+        const single=await measureRealSustainedWindow('baseline',api.origin,tokens,metricsOrigin,state);
+        phase='sustained_concurrent';
+        const concurrent=await measureRealSustainedWindow('concurrent',api.origin,tokens,metricsOrigin,state);
+        phase='post_pressure_recovery';
+        state.dbMode='unavailable';
+        const unavailable=await measuredBatch(api.origin,1,1,tokens);
+        expect(unavailable).toMatchObject({successful:0,unavailable:1,unexpected:0});
+        state.dbMode='healthy';
+        const recovery=await measuredBatch(api.origin,4,1,tokens);
+        expect(recovery).toMatchObject({successful:4,unavailable:0,unexpected:0});
+        sustained={ ramp, windows:[single,concurrent], injectedDbUnavailable:1, recoverySucceeded:true };
+      }
+      phase='runtime_cleanup';
+      const apiServer=servers.pop();
+      const cleanup=await Promise.allSettled([apiServer.close(), saju.close?.(), database.close()]);
+      database=undefined;
+      saju=undefined;
+      if (cleanup.some(result => result.status === 'rejected')) throw Error('Disposable runtime cleanup failed');
       phase='proof_write';
       const proof={
         schema:'myeongha-ops-real-gotrue-pg18-saju-product-phase11-v1',
@@ -607,7 +714,9 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         authHttpCalls:state.authCalls,sajuCalculationCalls:state.sajuCalls,
         anonymousDenied:noCredentials.status===401,
         healthUnaffected:health.status===200,
-        actualSajuResourceCgroupConstrained:false,
+        runtimeCleanupVerified:true,
+        actualSajuResourceCgroupConstrained:sustainedExperiment,
+        ...(sustained && { sustained }),
         productionCapacityProven:false,productionScalingThresholdApproved:false,
         drReady:false,serviceResumptionAllowed:false,outputContainsIdentifiers:false,
       };
@@ -623,8 +732,8 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       throw error;
     }finally{
       for(const server of servers.reverse())await server.close().catch(()=>undefined);
-      await saju?.close().catch(()=>undefined);
+      await saju?.close?.().catch(()=>undefined);
       await database?.close();
     }
-  },120000);
+  },sustainedExperiment ? 1320000 : 120000);
 });

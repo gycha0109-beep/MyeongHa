@@ -2,8 +2,11 @@ import { readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { pathToFileURL } from 'node:url';
 
-const BEARER = 'isolated-phase11-rate-ladder-synthetic-only';
 const CAP = 268435456;
+// Docker-published product probes bind inside their dedicated bridge only.
+const productProbe = process.env.MH_OPS_SAJU_BRIDGE === '1';
+const bindHost = productProbe ? '0.0.0.0' : '127.0.0.1';
+const BEARER = productProbe ? 'synthetic-saju-only-bearer' : 'isolated-phase11-rate-ladder-synthetic-only';
 const numberFrom = (value, key) => {
   const line = value.split(/\r?\n/u).find(entry => entry.startsWith(key + ' '));
   if (!line) throw Error('Missing kernel counter');
@@ -57,11 +60,11 @@ async function main() {
   });
   await new Promise((resolve, reject) => {
     service.once('error', reject);
-    service.listen(43007, '127.0.0.1', resolve);
+    service.listen(43007, bindHost, resolve);
   });
   await new Promise((resolve, reject) => {
     metricServer.once('error', reject);
-    metricServer.listen(43008, '127.0.0.1', resolve);
+    metricServer.listen(43008, bindHost, resolve);
   });
   console.log('ISOLATED_SAJU_SPLIT_SERVICE_READY');
 }
