@@ -128,7 +128,7 @@ describe('mobile Home view model', () => {
   it('localizes authored Home greeting without translating the user profile name', () => {
     const generic = createMobileHomeViewModelV1({
       ...state,
-      profile: { kind: 'error', code: 'temporarily_unavailable' },
+      profile: { kind: 'error', retryable: true },
     } as MobileHomeStateV1, new Date(2026, 8, 29, 8));
     expect(generic.greeting).toBe('좋은 아침이에요, 당신');
     expect(generic.greetingUsesFallbackName).toBe(true);
