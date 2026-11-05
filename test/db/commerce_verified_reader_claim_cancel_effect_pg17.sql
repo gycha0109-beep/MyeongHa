@@ -412,8 +412,26 @@ begin
        'status',oe.status,'isExactDeletionStart',oe.id=v_deletion_outbox
      )),'[]'::jsonb)
       from public.outbox_events oe
-      where oe.payload_jsonb->>'subjectId'=v_subject::text
-        and oe.status<>'processed');
+      where oe.status<>'processed'
+        and (
+          oe.payload_jsonb->>'subjectId'=v_subject::text
+          or (oe.aggregate_type='chat_turn' and exists (
+            select 1 from public.chat_turns ct
+            where ct.id::text=oe.aggregate_id and ct.subject_id=v_subject
+          ))
+          or (oe.aggregate_type='reading' and exists (
+            select 1 from public.readings rd
+            where rd.id::text=oe.aggregate_id and rd.subject_id=v_subject
+          ))
+          or (oe.aggregate_type='data_deletion_job' and exists (
+            select 1 from public.data_deletion_jobs dj
+            where dj.id::text=oe.aggregate_id and dj.subject_id=v_subject
+          ))
+          or (oe.aggregate_type='entitlement' and exists (
+            select 1 from public.entitlements ent
+            where ent.id::text=oe.aggregate_id and ent.subject_id=v_subject
+          ))
+        ));
  end if;
 
  select finalized,replayed,auth_mapping_present
