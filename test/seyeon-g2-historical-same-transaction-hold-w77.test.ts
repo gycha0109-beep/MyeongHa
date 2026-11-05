@@ -44,6 +44,24 @@ describe('W77 historical G2 exact original sources remain closed within v2 Commi
   it('blocks direct v2 bypass, every API ACL, and payment/model/HTTP opening',()=>{
     expect(legacy).toContain('seyeon_g2_historical_candidate_not_authority');
     expect(legacy).toContain('seyeon_positive_g2_historical_originals_not_authorized');
+    const rawTrigger=legacy.slice(0,legacy.indexOf(
+      'create function public.cmd_commit_seyeon_positive_chat_turn_v1('
+    ));
+    const historicalBranch=rawTrigger.slice(
+      rawTrigger.indexOf("old.seyeon_personal_source_pin_jsonb ? 'historicalCandidateProof'"),
+      rawTrigger.indexOf("if old.state='validated' and new.state='committed' and")
+    );
+    expect(historicalBranch).toContain(
+      "if old.state='validated' and new.state='committed' then"
+    );
+    const exactGuard=historicalBranch.indexOf(
+      'perform seyeon_private.assert_historical_g2_sealed_originals_s0_v1('
+    );
+    const unconditionalHold=historicalBranch.indexOf(
+      "constraint='seyeon_g2_historical_candidate_not_authority'"
+    );
+    expect(exactGuard).toBeGreaterThan(0);
+    expect(unconditionalHold).toBeGreaterThan(exactGuard);
     const install=readFileSync(new URL(
       '../scripts/operations/seyeon-security-s0/install-isolated.mjs',
       import.meta.url,

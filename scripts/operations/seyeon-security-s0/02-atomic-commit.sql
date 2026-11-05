@@ -49,6 +49,19 @@ begin
   if new.planner_version='seyeon-production-chat-planner-v1'
      and old.seyeon_personal_source_pin_jsonb ? 'historicalCandidateProof'
      and new.state in ('validated','committed','delivered') then
+    -- W78: A direct raw-v2 Commit must run the same owner-original
+    -- validation under THIS transaction, even when the caller bypasses
+    -- the S0 test-only wrapper. No separate SELECT-before-COMMIT can
+    -- establish G2 authority. The unconditional exception below remains:
+    -- a verified historical candidate is STILL NOT permission to Commit.
+    if old.state='validated' and new.state='committed' then
+      perform seyeon_private.assert_historical_g2_sealed_originals_s0_v1(
+        old.subject_id,
+        (old.seyeon_personal_source_pin_jsonb->'historicalCandidateProof'
+          ->>'threadId')::uuid,
+        old.turn_id,old.id
+      );
+    end if;
     raise exception using errcode='23514',
       constraint='seyeon_g2_historical_candidate_not_authority',
       message='Historical model source candidate cannot authorize Commit';

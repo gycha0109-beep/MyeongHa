@@ -2333,7 +2333,48 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         'select seyeon_private.qry_recheck_historical_candidate_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
         [f.subject,f.thread,f.turn,currentAttempt],
       ))).rejects.toMatchObject({constraint:'seyeon_history_recheck_candidate_invalid'});
-      await f.revoke();
+      // W78 G5: two independent DB sessions. The historical G2 original-
+      // source guard holds the ORIGINAL Memory/Grant while revoke requests
+      // current rights. A separate pre-Commit SELECT is never sufficient:
+      // the true G2 wrapper must take these locks in its own Commit TX.
+      const holder=await subjectPool.connect();
+      let revoking:Promise<{ok:true}|{ok:false;error:unknown}>|undefined;
+      let revokeOutcome:{ok:true}|{ok:false;error:unknown}|undefined;
+      let sawBlockedRevoke=false;
+      try {
+        await holder.query('BEGIN');
+        // Match the actual ordinary API connection's restricted role.
+        await holder.query('SET LOCAL ROLE myeongha_api_executor');
+        await holder.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        await holder.query(
+          'select seyeon_private.assert_historical_g2_sealed_originals_s0_v1($1::uuid,$2::uuid,$3::uuid,$4::uuid)',
+          [f.subject,f.thread,currentTurn,currentAttempt],
+        );
+        revoking=f.revoke().then(
+          ()=>({ok:true as const}),
+          (error:unknown)=>({ok:false as const,error}),
+        );
+        // Confirm an actual PostgreSQL lock wait, not an elapsed-time guess.
+        for(let i=0;i<100;i++){
+          const {rows:[wait]}=await pool.query(`select exists(
+            select 1 from pg_catalog.pg_stat_activity
+            where datname=current_database()
+              and wait_event_type='Lock' and pid<>pg_backend_pid()
+          ) as blocked`);
+          if(wait.blocked){sawBlockedRevoke=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        expect(sawBlockedRevoke).toBe(true);
+      } finally {
+        await holder.query('ROLLBACK').catch(()=>undefined);
+        holder.release();
+        // Drain revocation even if lock assertion fails, preventing a
+        // pending DB command from leaking into the next fixture.
+        if(revoking)revokeOutcome=await revoking;
+      }
+      expect(revokeOutcome?.ok).toBe(true);
       await expect(sameTxGuard()).rejects.toMatchObject({
         constraint:'seyeon_source_lock_original_grant_required',
       });
