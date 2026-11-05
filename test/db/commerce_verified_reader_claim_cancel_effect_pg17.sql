@@ -401,7 +401,19 @@ begin
  );
  if v_preflight.db_preconditions_met is distinct from true
     or v_preflight.blocking_outbox_count<>0 then
-   raise exception 'CLAIM_E2E_ACCOUNT_DELETE_PREFLIGHT_STILL_BLOCKED';
+   raise exception 'CLAIM_E2E_ACCOUNT_DELETE_PREFLIGHT_STILL_BLOCKED: member=%, pending=%, job=%, running=%, start=%, auth=%, linked=%, blocking=%, ready=%; blockers=%',
+     v_preflight.subject_member,v_preflight.subject_deletion_pending,
+     v_preflight.deletion_job_found,v_preflight.deletion_job_account_running,
+     v_preflight.account_start_outbox_ready,v_preflight.auth_mapping_present,
+     v_preflight.linked_outbox_count,v_preflight.blocking_outbox_count,
+     v_preflight.db_preconditions_met,
+     (select coalesce(jsonb_agg(jsonb_build_object(
+       'aggregateType',oe.aggregate_type,'eventType',oe.event_type,
+       'status',oe.status,'isExactDeletionStart',oe.id=v_deletion_outbox
+     )),'[]'::jsonb)
+      from public.outbox_events oe
+      where oe.payload_jsonb->>'subjectId'=v_subject::text
+        and oe.status<>'processed');
  end if;
 
  select finalized,replayed,auth_mapping_present
