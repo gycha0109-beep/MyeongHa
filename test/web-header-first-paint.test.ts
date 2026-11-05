@@ -31,7 +31,7 @@ describe('first-paint header controls', () => {
     expect(css).toContain('html { overflow-y: scroll; }');
     expect(css).not.toContain('scrollbar-gutter: stable both-edges;');
     expect(css).toContain('grid-template-columns: 205px minmax(335px, 1fr) 274px !important;');
-    expect(css).toContain('--mh-header-icon: url("data:image/svg+xml,');
+    expect(css).toContain('--mh-header-icon: url("assets/myeongha-icons/');
     expect(css).toContain('mask: var(--mh-header-icon) center / 24px 24px no-repeat !important;');
     expect(css).not.toContain('translate(calc(-50% + 3px), -50%)');
     expect(css).toContain('top: calc(15% - 4px);');

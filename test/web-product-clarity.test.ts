@@ -15,9 +15,15 @@ describe('product-wide identity and clarity', () => {
   it('renders one matched vector family across the six bottom menu choices', async () => {
     const css = await read('product-clarity.css');
     for (const href of ["hall.html","reading.html","face-reading.html","chat-hub.html","records.html","my.html"]) expect(css).toContain('mobile-nav-link[href="' + href + '"]');
-    expect(css.match(/--mh-nav-icon: url\("data:image\/svg\+xml,/g)).toHaveLength(6);
+    expect(css.match(/--mh-nav-icon: url\("assets\/myeongha-icons\//g)).toHaveLength(6);
+    for (const name of ['home','saju','face','chat','records','my','theme-sun','theme-moon','notification','language']) {
+      const svg = await read('assets/myeongha-icons/' + name + '.svg');
+      expect(svg).toContain('viewBox="0 0 192 192"');
+      expect(svg).toContain('fill-rule="evenodd"');
+    }
     expect(css).toContain('grid-template-columns: repeat(6, minmax(0, 1fr));');
     expect(css).toContain('font-size: 0 !important;');
+    expect(css).toContain('mobile-nav-link[href="my.html"] { --mh-nav-icon: url("assets/myeongha-icons/my.svg")');
   });
   it('applies legible copy rules to Home, Saju, Chat, Records, My and Face', async () => {
     const css = await read('product-clarity.css');
