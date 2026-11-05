@@ -10,6 +10,12 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Phase 10–12 지속 부하 실증과 확장 진단
+
+- [격리 Linux #41987403626](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41987403626)에서 5분 300/300, 15분 3,600/3,600 계산이 성공했다. 15분 구간의 p95는 112.824ms, 실제 최대 동시 요청은 1개였다. 0.5 CPU·256 MiB Saju 제약, 실패 주입 뒤 정상 복귀, 런타임·Docker 자원 정리를 확인했다. [원본·해시·계측 범위](API_CONTROLLED_CAPACITY_PHASE11_20261030.md).
+- 동일 소스 `9ea61382aad65231d8fbda095a7f5b1da9f515b9`의 실제 로컬 `workerd`에서는 Health 예열 5건과 계측 250건이 성공했고, 운영 바인딩 없이 비공개 경로 세 곳은 404·`no-store`였다. 실제 제품 의존성 연결은 위 Linux Node 경로에서 관측했다.
+- [Phase 12 진단](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md)은 짧은 동시성 4 성공, 동시성 8의 503 12건, 실험의 DB 풀 한도 도달을 함께 제시한다. 지속 동시 부하와 Saju 포화점, 운영 확장 수치 및 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) Hosted DR은 미수용이다.
+
 ### 2026-11-05 KST — Phase 5/6 운영 보안 로그 표본과 비노출 확인
 
 - `myeongha` Worker 버전 `73097a34-db6b-4cf9-99c8-24dfcc4a73e3`에 운영 트래픽 100%를 확인했다. [Cloudflare 빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/7d3fb74f-01c1-4b19-aa61-3183d7519404)의 소스는 `7b80e9336cb80959c5c25b62f9b65aa999b90e57`이다.

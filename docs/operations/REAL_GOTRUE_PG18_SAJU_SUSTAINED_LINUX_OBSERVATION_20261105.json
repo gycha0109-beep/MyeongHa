@@ -1,0 +1,133 @@
+{
+  "schema": "myeongha-ops-real-gotrue-pg18-saju-product-phase11-v1",
+  "status": "OBSERVED_ISOLATED_REAL_CHAIN",
+  "scope": "disposable-main-only-local-gotrue-postgres18-and-pinned-saju",
+  "memberCount": 4,
+  "actualGoTrueJwtVerified": true,
+  "realGoTrueHttp": true,
+  "actualPostgres18Rls": true,
+  "actualPinnedSajuProductionEngine": true,
+  "sajuSourceSha": "9807ce89c08afc61b587560d515a475efd819032",
+  "cloudflareWorkerRuntimeMeasured": false,
+  "databasePoolMax": 2,
+  "dbPeak": 2,
+  "baseline": {
+    "requested": 12,
+    "concurrency": 1,
+    "successful": 12,
+    "unavailable": 0,
+    "unexpected": 0,
+    "p50Ms": 113.742,
+    "p95Ms": 138.258,
+    "p99Ms": 151.74
+  },
+  "contended": {
+    "requested": 32,
+    "concurrency": 8,
+    "successful": 20,
+    "unavailable": 12,
+    "unexpected": 0,
+    "p50Ms": 224.543,
+    "p95Ms": 265.977,
+    "p99Ms": 282.05
+  },
+  "dbAcquireP95Ms": 0.072,
+  "dbQueryP95Ms": 81.438,
+  "authHttpCalls": 3997,
+  "sajuCalculationCalls": 3984,
+  "anonymousDenied": true,
+  "healthUnaffected": true,
+  "runtimeCleanupVerified": true,
+  "actualSajuResourceCgroupConstrained": true,
+  "sustained": {
+    "ramp": [
+      {
+        "requested": 24,
+        "concurrency": 2,
+        "successful": 24,
+        "unavailable": 0,
+        "unexpected": 0,
+        "p50Ms": 120.61,
+        "p95Ms": 125.834,
+        "p99Ms": 126.023
+      },
+      {
+        "requested": 24,
+        "concurrency": 4,
+        "successful": 24,
+        "unavailable": 0,
+        "unexpected": 0,
+        "p50Ms": 168.393,
+        "p95Ms": 214.125,
+        "p99Ms": 225.025
+      }
+    ],
+    "windows": [
+      {
+        "durationSeconds": 300,
+        "requestsPerSecond": 1,
+        "concurrency": 1,
+        "scheduled": 300,
+        "skipped": 0,
+        "peak": 1,
+        "elapsedMs": 300001.762691,
+        "successful": 300,
+        "unavailable": 0,
+        "transportFailures": 0,
+        "p50Ms": 111.877,
+        "p95Ms": 114.15,
+        "p99Ms": 117.387,
+        "dbAcquireFailures": 0,
+        "dbAcquireP95Ms": 0.086,
+        "dbQueryP95Ms": 81.454,
+        "authHeadersP95Ms": 27.243,
+        "sajuP95Ms": 2.474,
+        "saju": {
+          "cpuCores": 0.5,
+          "cpuUsageUsec": 525857,
+          "cpuThrottledPeriods": 0,
+          "memoryLimitBytes": 268435456,
+          "memoryPeakBytes": 35602432,
+          "oomKills": 0
+        }
+      },
+      {
+        "durationSeconds": 900,
+        "requestsPerSecond": 4,
+        "concurrency": 4,
+        "scheduled": 3600,
+        "skipped": 0,
+        "peak": 1,
+        "elapsedMs": 900001.1754360001,
+        "successful": 3600,
+        "unavailable": 0,
+        "transportFailures": 0,
+        "p50Ms": 110.218,
+        "p95Ms": 112.824,
+        "p99Ms": 116.51,
+        "dbAcquireFailures": 0,
+        "dbAcquireP95Ms": 0.066,
+        "dbQueryP95Ms": 81.435,
+        "authHeadersP95Ms": 27.185,
+        "sajuP95Ms": 1.954,
+        "saju": {
+          "cpuCores": 0.5,
+          "cpuUsageUsec": 3736165,
+          "cpuThrottledPeriods": 0,
+          "memoryLimitBytes": 268435456,
+          "memoryPeakBytes": 46780416,
+          "oomKills": 0
+        }
+      }
+    ],
+    "injectedDbUnavailable": 1,
+    "recoverySucceeded": true
+  },
+  "productionCapacityProven": false,
+  "productionScalingThresholdApproved": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "outputContainsIdentifiers": false,
+  "githubMainSha": "9ea61382aad65231d8fbda095a7f5b1da9f515b9",
+  "dockerCleanupVerified": true
+}
