@@ -41,3 +41,11 @@ it('launches four distinct requests together, one wave per second with no catch-
     [0, 0], [1, 0], [2, 0], [3, 0], [8, 2000], [9, 2000], [10, 2000], [11, 2000],
   ]);
 });
+
+it('uses the same bounded 240 slots for either one-minute CPU comparison window', async () => {
+  let now = 0;
+  const result = await measureIsolatedProductWindow('cpu', async () => 200,
+    () => now, async (ms) => { await yieldToRequests(); now += ms; });
+  expect(result).toMatchObject({ elapsedMs: 60000, scheduled: 240, skipped: 0, peak: 4 });
+  expect(result.samples).toHaveLength(240);
+});

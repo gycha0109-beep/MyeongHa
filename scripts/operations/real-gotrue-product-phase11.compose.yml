@@ -1,6 +1,22 @@
 # Phase 11 disposable actual GoTrue used only by the manual main-only PG18/Saju proof.
 # Never bind this network to Cloudflare, Admin, Hosted Supabase, or Production.
 name: myeongha-ops-phase11-real-auth
+x-isolated-saju: &isolated-saju
+  image: node:24-bookworm-slim
+  command: [node, /probe/saju-split-service-phase11.mjs]
+  mem_limit: 256m
+  memswap_limit: 256m
+  pids_limit: 128
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  read_only: true
+  volumes:
+    - ../../_isolated_saju:/saju:ro
+    - ./saju-split-service-phase11.mjs:/probe/saju-split-service-phase11.mjs:ro
+  ports:
+    - "127.0.0.1::43007"
+    - "127.0.0.1::43008"
+  networks: [saju-loopback]
 services:
   auth-db:
     image: postgres:15
@@ -43,25 +59,18 @@ services:
       GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
     networks: [disposable, host-loopback]
   saju:
+    <<: *isolated-saju
     profiles: [sustained]
-    image: node:24-bookworm-slim
-    command: [node, /probe/saju-split-service-phase11.mjs]
     environment:
       MH_OPS_SAJU_BRIDGE: "1"
     cpus: 0.50
-    mem_limit: 256m
-    memswap_limit: 256m
-    pids_limit: 128
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    read_only: true
-    volumes:
-      - ../../_isolated_saju:/saju:ro
-      - ./saju-split-service-phase11.mjs:/probe/saju-split-service-phase11.mjs:ro
-    ports:
-      - "127.0.0.1::43007"
-      - "127.0.0.1::43008"
-    networks: [saju-loopback]
+  saju-cpu-pressure:
+    <<: *isolated-saju
+    profiles: [cpu-pressure]
+    cpus: 0.01
+    environment:
+      MH_OPS_SAJU_BRIDGE: "1"
+      MH_OPS_SAJU_LOW_CPU: "1"
 networks:
   disposable:
     internal: true

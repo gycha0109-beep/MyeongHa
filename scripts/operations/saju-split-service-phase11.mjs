@@ -7,6 +7,7 @@ const CAP = 268435456;
 const productProbe = process.env.MH_OPS_SAJU_BRIDGE === '1';
 const bindHost = productProbe ? '0.0.0.0' : '127.0.0.1';
 const BEARER = productProbe ? 'synthetic-saju-only-bearer' : 'isolated-phase11-rate-ladder-synthetic-only';
+const lowCpuProbe = productProbe && process.env.MH_OPS_SAJU_LOW_CPU === '1';
 const numberFrom = (value, key) => {
   const line = value.split(/\r?\n/u).find(entry => entry.startsWith(key + ' '));
   if (!line) throw Error('Missing kernel counter');
@@ -16,7 +17,7 @@ const numberFrom = (value, key) => {
 };
 function metrics() {
   const read = name => readFileSync('/sys/fs/cgroup/' + name, 'utf8').trim();
-  if (read('cpu.max') !== '50000 100000' ||
+  if (read('cpu.max') !== (lowCpuProbe ? '1000 100000' : '50000 100000') ||
     read('memory.max') !== String(CAP) || read('memory.swap.max') !== '0') {
     throw Error('Service cgroup limits not enforced');
   }
@@ -27,7 +28,7 @@ function metrics() {
     throw Error('Service memory cgroup invalid');
   }
   return {
-    cpuCores: 0.5, memoryLimitBytes: CAP, swapLimitBytes: 0,
+    cpuCores: lowCpuProbe ? 0.01 : 0.5, memoryLimitBytes: CAP, swapLimitBytes: 0,
     cpuUsageUsec: numberFrom(cpu, 'usage_usec'),
     cpuThrottledPeriods: numberFrom(cpu, 'nr_throttled'),
     cpuThrottledUsec: numberFrom(cpu, 'throttled_usec'),

@@ -306,20 +306,20 @@ function requireLoopbackOrigin(origin) {
   return origin;
 }
 
-async function readSajuCgroup(metricsOrigin) {
+async function readSajuCgroup(metricsOrigin, cpuCores = 0.5) {
   const response = await fetch(metricsOrigin + '/metrics', {
     redirect: 'error', signal: AbortSignal.timeout(2000),
   });
   expect(response.status).toBe(200);
   const metrics = await response.json();
-  expect(metrics).toMatchObject({ cpuCores: 0.5, memoryLimitBytes: 268435456, swapLimitBytes: 0, oomKills: 0 });
+  expect(metrics).toMatchObject({ cpuCores, memoryLimitBytes: 268435456, swapLimitBytes: 0, oomKills: 0 });
   expect(metrics.memoryPeakBytes).toBeGreaterThan(0);
   expect(metrics.memoryPeakBytes).toBeLessThanOrEqual(metrics.memoryLimitBytes);
   return metrics;
 }
 
-async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin, state) {
-  const before = await readSajuCgroup(metricsOrigin);
+async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin, state, cpuCores = 0.5) {
+  const before = await readSajuCgroup(metricsOrigin, cpuCores);
   const offset = Object.fromEntries(['dbAcquireMs', 'dbQueryMs', 'authHeaderMs', 'sajuMs']
     .map(key => [key, state[key].length]));
   const failedAcquisitionsBefore = state.dbAcquireFailures ?? 0;
@@ -327,7 +327,7 @@ async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin
   state.apiFourWayAdmissions = 0;
   const { samples, ...window } = await measureIsolatedProductWindow(profile, (slot) =>
     requestCalculation(origin, tokens[profile === 'baseline' ? 0 : slot % tokens.length], tokens));
-  const after = await readSajuCgroup(metricsOrigin);
+  const after = await readSajuCgroup(metricsOrigin, cpuCores);
   const successes = samples.filter(sample => sample.status === 200).map(sample => sample.elapsedMs);
   const unavailable = samples.filter(sample => sample.status === 503).length;
   const transportFailures = samples.filter(sample => sample.status === null).length;
@@ -350,7 +350,7 @@ async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin
       cpuThrottledPeriods: after.cpuThrottledPeriods - before.cpuThrottledPeriods,
       memoryLimitBytes: after.memoryLimitBytes, memoryPeakBytes: after.memoryPeakBytes, oomKills: after.oomKills,
     },
-    ...(profile === 'overlap' && { waveSize: 4, apiPeak: state.apiPeak,
+    ...((profile === 'overlap' || profile === 'cpu') && { waveSize: 4, apiPeak: state.apiPeak,
       apiFourWayAdmissions: state.apiFourWayAdmissions }),
   };
 }
@@ -573,6 +573,8 @@ const actualChainEnabled = Boolean(BIN && process.env.MH_OPS_REAL_GOTRUE_LOCAL_O
   process.env.MH_OPS_REAL_SAJU_CHECKOUT && process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH);
 const overlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'overlap';
 const sustainedExperiment = overlapExperiment || process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'sustained';
+const cpuExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'saju_cpu';
+const constrainedSajuExperiment = sustainedExperiment || cpuExperiment;
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
     if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
@@ -592,7 +594,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       await database.bindRealMembers(members);
       phase='real_saju_start';
       let metricsOrigin;
-      if (sustainedExperiment) {
+      if (constrainedSajuExperiment) {
         saju={ origin: requireLoopbackOrigin(process.env.MH_OPS_REAL_SAJU_ORIGIN) };
         metricsOrigin=requireLoopbackOrigin(process.env.MH_OPS_REAL_SAJU_METRICS_ORIGIN);
         await readSajuCgroup(metricsOrigin);
@@ -616,14 +618,16 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         },
         timeoutMs:2000,
       });
-      const realAdapter=createSajuProductionCalculationHttpAdapterV1({
-        baseUrl:saju.origin,bearerToken:SAJU_TOKEN,timeoutMs:3000,
+      const createSajuAdapter=baseUrl=>createSajuProductionCalculationHttpAdapterV1({
+        baseUrl,bearerToken:SAJU_TOKEN,timeoutMs:3000,
       });
+      const referenceAdapter=createSajuAdapter(saju.origin);
+      let activeAdapter=referenceAdapter;
       const countedAdapter={
         async calculate(binding){
           state.sajuCalls++;
           const started=performance.now();
-          try { return await realAdapter.calculate(binding); }
+          try { return await activeAdapter.calculate(binding); }
           finally { state.sajuMs.push(performance.now()-started); }
         },
       };
@@ -694,8 +698,29 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       expect(health.status).toBe(200);
       expect(state.dbActive).toBe(0);
       expect(state.sajuCalls).toBeGreaterThanOrEqual(baseline.successful+contended.successful);
-      let sustained;
-      if (sustainedExperiment) {
+      let sustained, cpuComparison;
+      if (cpuExperiment) {
+        const pressureMetricsOrigin=requireLoopbackOrigin(process.env.MH_OPS_PRESSURE_SAJU_METRICS_ORIGIN);
+        const pressureAdapter=createSajuAdapter(requireLoopbackOrigin(process.env.MH_OPS_PRESSURE_SAJU_ORIGIN));
+        phase='cpu_pressure';
+        activeAdapter=pressureAdapter;
+        const warmup=await measuredBatch(api.origin,4,1,tokens);
+        expect(warmup.unexpected).toBe(0);
+        expect(warmup.successful).toBeGreaterThan(0);
+        phase='cpu_reference';
+        activeAdapter=referenceAdapter;
+        const reference=await measureRealSustainedWindow('cpu',api.origin,tokens,metricsOrigin,state);
+        phase='cpu_pressure';
+        activeAdapter=pressureAdapter;
+        const pressure=await measureRealSustainedWindow('cpu',api.origin,tokens,pressureMetricsOrigin,state,0.01);
+        expect(reference).toMatchObject({peak:4,apiPeak:4});
+        expect(pressure).toMatchObject({peak:4,apiPeak:4});
+        phase='post_pressure_recovery';
+        activeAdapter=referenceAdapter;
+        const recovery=await measuredBatch(api.origin,4,1,tokens);
+        expect(recovery).toMatchObject({successful:4,unavailable:0,unexpected:0});
+        cpuComparison={reference,pressure,recoverySucceeded:true};
+      } else if (sustainedExperiment) {
         const windows=[];
         for (const profile of overlapExperiment ? ['overlap'] : ['baseline', 'concurrent']) {
           phase='sustained_'+profile;
@@ -735,8 +760,9 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         anonymousDenied:noCredentials.status===401,
         healthUnaffected:health.status===200,
         runtimeCleanupVerified:true,
-        actualSajuResourceCgroupConstrained:sustainedExperiment,
+        actualSajuResourceCgroupConstrained:constrainedSajuExperiment,
         ...(sustained && { sustained }),
+        ...(cpuComparison && { cpuComparison }),
         productionCapacityProven:false,productionScalingThresholdApproved:false,
         drReady:false,serviceResumptionAllowed:false,outputContainsIdentifiers:false,
       };
@@ -755,5 +781,5 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       await saju?.close?.().catch(()=>undefined);
       await database?.close();
     }
-  },sustainedExperiment ? 1320000 : 120000);
+  },sustainedExperiment ? 1320000 : cpuExperiment ? 240000 : 120000);
 });

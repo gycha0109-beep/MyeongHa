@@ -16,6 +16,12 @@ To reproduce, create a temporary Wrangler JSON config outside the checkout with 
 
 ## Real product path sustained experiment
 
+### Controlled Saju CPU quota comparison
+
+After the comparison code merges, dispatch the existing manual Linux workflow with `experiment=saju_cpu` to compare 0.50 and 0.01 CPU on the same runner and product path. Both pinned Saju containers use 256 MiB with no swap and loopback-only published ports. Each resource setting receives the same one-minute, four-request wave profile with the same temporary GoTrue, PostgreSQL18 and Node gateway. The workflow records the kernel quota, CPU throttling, adapter and end-to-end latencies, request outcomes and recovery after returning to the reference container.
+
+The low quota is a controlled pressure input. Its effect and any Saju throttling require a successful Linux observation. It provides neither a standard service sizing target nor a portable Saju capacity ceiling.
+
 Run the existing main-only GitHub Linux workflow with `experiment=sustained` after the implementation is merged. Its default `short` mode remains the short GoTrue, PostgreSQL18 and pinned Saju experiment.
 
 ```sh

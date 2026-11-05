@@ -134,14 +134,14 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(product).toContain('launchActualSajuHost');
     expect(product).toContain("memberCount:4");
     expect(product).toContain("productionCapacityProven:false");
-    expect(product).toContain("actualSajuResourceCgroupConstrained:sustainedExperiment");
+    expect(product).toContain("actualSajuResourceCgroupConstrained:constrainedSajuExperiment");
     expect(product).toContain('flag:\'wx\'');
   });
 
   it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
     const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
     const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
-    expect(workflow).toContain('options: [short, sustained, overlap]');
+    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu]');
     expect(workflow).toContain('default: short');
     expect(compose).toContain('profiles: [sustained]');
     expect(compose).toContain('cpus: 0.50');
@@ -153,6 +153,17 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(realRunner).toContain('.sustained.windows[0].apiFourWayAdmissions>0');
     expect(realRunner).toContain('.runtimeCleanupVerified==true');
     expect(realRunner).toContain('.dockerCleanupVerified=true');
+  });
+
+  it('compares disposable Saju CPU quotas with the same loopback Compose isolation', () => {
+    const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
+    expect(compose).toContain('<<: *isolated-saju');
+    expect(compose).toContain('cpus: 0.01');
+    expect(compose).toContain('profiles: [cpu-pressure]');
+    expect(realRunner).toContain('saju_loopback_origin saju-cpu-pressure');
+    expect(realRunner).toContain('.cpuComparison.recoverySucceeded==true');
+    expect(realRunner).toContain('==[0.5,0.01]');
   });
 
 });
