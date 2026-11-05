@@ -18,30 +18,23 @@ describe('product-wide identity and clarity', () => {
     expect(css.match(/--mh-nav-icon: url\("assets\/myeongha-icons\//g)).toHaveLength(6);
     for (const name of ['home','saju','face','chat','records','my','theme-sun','theme-moon','notification','language']) {
       const svg = await read('assets/myeongha-icons/' + name + '.svg');
-      const box = svg.match(/viewBox="(-?[0-9]+) (-?[0-9]+) ([0-9]+) ([0-9]+)"/);
-      expect(box).not.toBeNull();
-      const x = Number(box?.[1]);
-      const y = Number(box?.[2]);
-      const width = Number(box?.[3]);
-      const height = Number(box?.[4]);
-      expect([x, y, width, height].every(Number.isFinite)).toBe(true);
-      expect(width).toBe(height);
-      const points = [...svg.matchAll(/(-?[0-9]+),(-?[0-9]+)/g)].map(m => ({ x: Number(m[1]), y: Number(m[2]) }));
-      expect(points.length).toBeGreaterThan(10);
-      const xs = points.map(p => p.x);
-      const ys = points.map(p => p.y);
-      const left = Math.min(...xs); const right = Math.max(...xs);
-      const top = Math.min(...ys); const bottom = Math.max(...ys);
-      expect(Math.max(right-left, bottom-top) / width).toBeGreaterThan(0.84);
-      expect(left).toBeGreaterThanOrEqual(x);
-      expect(right).toBeLessThanOrEqual(x+width);
-      expect(top).toBeGreaterThanOrEqual(y);
-      expect(bottom).toBeLessThanOrEqual(y+height);
-      expect(svg).toContain('fill-rule="evenodd"');
+      // Hand-drawn smooth SVGs at a stable 24px optical scale; never restore traced polygon outlines.
+      expect(svg).toContain('viewBox="0 0 96 96"');
+      expect(svg).toContain('fill="none"');
+      expect(svg).toContain('stroke-width="7"');
+      expect(svg).toContain('stroke-linecap="round"');
+      expect(svg).toContain('stroke-linejoin="round"');
+      expect(svg).toMatch(/<path d="[^"]*[CcQq][^"]*"/);
+      expect(svg).not.toContain('fill-rule="evenodd"');
+      expect(svg).not.toContain('<polygon');
+      expect(svg).not.toContain('data:image/');
+      expect(svg.length).toBeLessThan(2400);
     }
     expect(css).toContain('grid-template-columns: repeat(6, minmax(0, 1fr));');
     expect(css).toContain('font-size: 0 !important;');
     expect(css).toContain('mobile-nav-link[href="my.html"] { --mh-nav-icon: url("assets/myeongha-icons/my.svg")');
+    const header = await read('shared-product-header.css');
+    expect(header).toContain('product-profile-mark { --mh-header-icon: url("assets/myeongha-icons/my.svg")');
   });
   it('applies legible copy rules to Home, Saju, Chat, Records, My and Face', async () => {
     const css = await read('product-clarity.css');
