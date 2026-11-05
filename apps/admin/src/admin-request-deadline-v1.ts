@@ -41,3 +41,21 @@ export async function adminFetchWithDeadlineV1(
     if (timer !== undefined) clearTimeout(timer);
   }
 }
+
+/** The response may deliver HTTP headers while its JSON/CSV stream stalls.
+ * Bound body consumption separately so a never-ending stream cannot pin UI loading.
+ */
+export async function adminReadResponseBodyV1<T>(
+  read: () => Promise<T>,
+  deadlineMs: number = ADMIN_READ_DEADLINE_MS_V1,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(() => reject(new AdminRequestDeadlineErrorV1()), deadlineMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(read), deadline]);
+  } finally {
+    if (timer !== undefined) clearTimeout(timer);
+  }
+}
