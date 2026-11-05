@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1, AdminReadUnavailableErrorV1, shouldClearAdminSessionAfterVerificationFailureV1 } from './admin-client.js';
-const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.signature';
+import { fetchAdminReadV1, signInForAdminSessionV1, verifyAdminOwnerSessionV1, fetchAdminIssuesCsvV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, AdminSignInFailureV1, AdminReadUnavailableErrorV1, shouldClearAdminSessionAfterVerificationFailureV1, ADMIN_SESSION_MARKER_V1 } from './admin-client.js';
 describe('admin browser API client', () => {
   it('extracts only a bounded expiry for UI revocation, without granting access from claims', () => {
     const token = (claims: unknown) => 'header.' + btoa(JSON.stringify(claims)) + '.signature';
@@ -12,18 +11,18 @@ describe('admin browser API client', () => {
   });
   it('downloads only audited issues CSV and rejects plain JSON substitutes', async () => {
     const csv = (async () => new Response('issueId,category\r\n', { headers: { 'Content-Type': 'text/csv; charset=utf-8' } })) as typeof fetch;
-    expect(await fetchAdminIssuesCsvV1(JWT, new URLSearchParams({ limit: '50' }), csv)).toContain('issueId');
+    expect(await fetchAdminIssuesCsvV1(ADMIN_SESSION_MARKER_V1, new URLSearchParams({ limit: '50' }), csv)).toContain('issueId');
     const spoof = (async () => Response.json({ data: 'not CSV' })) as typeof fetch;
-    await expect(fetchAdminIssuesCsvV1(JWT, new URLSearchParams(), spoof)).rejects.toThrow();
-    await expect(fetchAdminIssuesCsvV1(JWT, new URLSearchParams({ secret: 'true' }), csv)).rejects.toThrow();
+    await expect(fetchAdminIssuesCsvV1(ADMIN_SESSION_MARKER_V1, new URLSearchParams(), spoof)).rejects.toThrow();
+    await expect(fetchAdminIssuesCsvV1(ADMIN_SESSION_MARKER_V1, new URLSearchParams({ secret: 'true' }), csv)).rejects.toThrow();
   });
   it('never grants Admin screen access from a regular Member token', async () => {
     const denied = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, denied)).rejects.toThrow('권한');
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, denied)).rejects.toThrow('권한');
     const approved = (async () => Response.json({ authorized: true })) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, approved)).resolves.toBeUndefined();
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, approved)).resolves.toBeUndefined();
     const spoof = (async () => Response.json({ ok: true })) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, spoof)).rejects.toThrow('권한');
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, spoof)).rejects.toThrow('권한');
   });
   it('retries only transient session errors while still requiring server Owner authorization', async () => {
     let calls = 0;
@@ -32,26 +31,26 @@ describe('admin browser API client', () => {
       return calls === 1 ? Response.json({ error: 'ADMIN_AUTH_UNAVAILABLE' }, { status: 503 })
         : Response.json({ authorized: true });
     }) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, recover)).resolves.toBeUndefined();
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, recover)).resolves.toBeUndefined();
     expect(calls).toBe(2);
     calls = 0;
     const denied = (async () => { calls++; return Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 }); }) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, denied)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, denied)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
     expect(calls).toBe(1);
     calls = 0;
     const throttled = (async () => { calls++; return Response.json({ error: 'ADMIN_RATE_LIMITED' }, { status: 429 }); }) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, throttled)).rejects.toMatchObject({ status: 429 });
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, throttled)).rejects.toMatchObject({ status: 429 });
     expect(calls).toBe(1);
   });
   it('distinguishes session verification 429, 503 and untrusted server bodies', async () => {
     for (const [status, code] of [[429, 'ADMIN_RATE_LIMITED'], [503, 'ADMIN_AUTH_UNAVAILABLE'], [503, 'ADMIN_HOSTED_UNAVAILABLE']] as const) {
       const fake = (async () => Response.json({ error: code, token: 'not-for-display' }, { status })) as typeof fetch;
-      await expect(verifyAdminOwnerSessionV1(JWT, fake)).rejects.toMatchObject({
+      await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, fake)).rejects.toMatchObject({
         name: 'AdminReadUnavailableErrorV1', status, reason: code,
       });
     }
     const unsafe = (async () => Response.json({ error: 'token:unsafe' }, { status: 502 })) as typeof fetch;
-    await expect(verifyAdminOwnerSessionV1(JWT, unsafe)).rejects.toMatchObject({
+    await expect(verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1, unsafe)).rejects.toMatchObject({
       status: 502, reason: null,
     });
   });
@@ -59,9 +58,9 @@ describe('admin browser API client', () => {
     let path: RequestInfo | URL | undefined;
     const fake = (async (url: RequestInfo | URL) => {
       path = url;
-      return Response.json({ ok: true, data: { status: 'authenticated', session: { accessToken: JWT, refreshToken: 'never-store' } } });
+      return Response.json({ ok: true, data: { status: 'authenticated', session: { mode: 'cookie' } } });
     }) as typeof fetch;
-    expect(await signInForAdminSessionV1('owner@example.com', 'test-password', fake)).toBe(JWT);
+    expect(await signInForAdminSessionV1('owner@example.com', 'test-password', fake)).toBe(ADMIN_SESSION_MARKER_V1);
     expect(path).toBe('/api/auth/sign-in');
   });
   it('distinguishes Member login errors without exposing remote response bodies',async()=>{
@@ -79,15 +78,15 @@ describe('admin browser API client', () => {
   });
   it('shows only HTTP status and allowlisted error codes for failed reads',async()=>{
     const unavailable=(async()=>Response.json({error:'ADMIN_HOSTED_UNAVAILABLE',secret:'must-not-display'},{status:503})) as typeof fetch;
-    await expect(fetchAdminReadV1('/api/admin/users?limit=20',JWT,unavailable)).rejects.toMatchObject({name:'AdminReadUnavailableErrorV1',status:503,reason:'ADMIN_HOSTED_UNAVAILABLE'});
+    await expect(fetchAdminReadV1('/api/admin/users?limit=20',ADMIN_SESSION_MARKER_V1,unavailable)).rejects.toMatchObject({name:'AdminReadUnavailableErrorV1',status:503,reason:'ADMIN_HOSTED_UNAVAILABLE'});
     const unsafe=(async()=>Response.json({error:'password=secret'},{status:502})) as typeof fetch;
-    await expect(fetchAdminReadV1('/api/admin/users',JWT,unsafe)).rejects.toMatchObject({status:502,reason:null});
+    await expect(fetchAdminReadV1('/api/admin/users',ADMIN_SESSION_MARKER_V1,unsafe)).rejects.toMatchObject({status:502,reason:null});
     const limited=(async()=>Response.json({error:'ADMIN_RATE_LIMITED'},{status:429})) as typeof fetch;
-    await expect(fetchAdminReadV1('/api/admin/users',JWT,limited)).rejects.toThrow('HTTP 429');
+    await expect(fetchAdminReadV1('/api/admin/users',ADMIN_SESSION_MARKER_V1,limited)).rejects.toThrow('HTTP 429');
   });
   it('treats 403 as denied, never as a successful empty result', async () => {
     const fake = (async () => Response.json({ error: 'ADMIN_FORBIDDEN' }, { status: 403 })) as typeof fetch;
-    await expect(fetchAdminReadV1('/api/admin/users', JWT, fake)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
+    await expect(fetchAdminReadV1('/api/admin/users', ADMIN_SESSION_MARKER_V1, fake)).rejects.toBeInstanceOf(AdminAccessDeniedErrorV1);
   });
   it('allows safe lifecycle and incident filter paths but rejects path traversal', async () => {
     const requests: string[] = [];
@@ -100,7 +99,7 @@ describe('admin browser API client', () => {
       '/api/admin/issues?status=dead_lettered&category=reading.failed',
       '/api/admin/readings?readingStatus=failed&limit=20',
     ]) {
-      await expect(fetchAdminReadV1(path, JWT, fake)).resolves.toBeDefined();
+      await expect(fetchAdminReadV1(path, ADMIN_SESSION_MARKER_V1, fake)).resolves.toBeDefined();
     }
     expect(requests).toHaveLength(3);
     for (const path of [
@@ -109,7 +108,7 @@ describe('admin browser API client', () => {
       '/api/admin/../../../auth/secret',
       '/api/admin/users?subjectStatus=active&password=hello world',
     ]) {
-      await expect(fetchAdminReadV1(path, JWT, fake)).rejects.toThrow();
+      await expect(fetchAdminReadV1(path, ADMIN_SESSION_MARKER_V1, fake)).rejects.toThrow();
     }
     expect(requests).toHaveLength(3);
   });
@@ -117,6 +116,6 @@ describe('admin browser API client', () => {
     const fake = (async () => Response.json({
       kind: 'users', rows: [{ subjectId: 'safe', kind: 'member' }], nextCursor: null,
     })) as typeof fetch;
-    expect((await fetchAdminReadV1('/api/admin/users', JWT, fake)).rows).toHaveLength(1);
+    expect((await fetchAdminReadV1('/api/admin/users', ADMIN_SESSION_MARKER_V1, fake)).rows).toHaveLength(1);
   });
 });

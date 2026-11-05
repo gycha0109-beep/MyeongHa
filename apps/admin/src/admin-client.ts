@@ -1,3 +1,5 @@
+export const ADMIN_SESSION_MARKER_V1 = 'cookie-session' as const;
+
 export type AdminSignInFailureReasonV1 = 'invalid-credentials' | 'rate-limited' | 'upstream-unavailable' | 'invalid-session';
 
 export class AdminSignInFailureV1 extends Error {
@@ -60,8 +62,8 @@ export function adminTokenExpiresAtV1(token: string): number | null {
 /**
  * Uses the existing customer Member authentication transport, but never trusts
  * its claims for Admin authorization. Every admin read is independently checked
- * by the server-side Owner allowlist. The token remains in component memory;
- * no localStorage, sessionStorage or refresh-token custody is introduced.
+ * The token is stored only in a server-issued HttpOnly host-only cookie;
+ * no JavaScript token, localStorage, sessionStorage or refresh-token custody exists.
  */
 export async function signInForAdminSessionV1(
   email: string,
@@ -89,11 +91,10 @@ export async function signInForAdminSessionV1(
   const payload: unknown = await response.json();
   const data = isRecord(payload) && payload.ok === true ? payload.data : null;
   const session = isRecord(data) && data.status === 'authenticated' ? data.session : null;
-  const accessToken = isRecord(session) ? session.accessToken : null;
-  if (!jwtLike(accessToken)) {
+  if (!isRecord(session) || session.mode !== 'cookie') {
     throw new AdminSignInFailureV1('invalid-session');
   }
-  return accessToken;
+  return ADMIN_SESSION_MARKER_V1;
 }
 
 export async function fetchAdminReadV1(
@@ -101,12 +102,12 @@ export async function fetchAdminReadV1(
   token: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<AdminReadResponse> {
-  if (!jwtLike(token) || !/^\/api\/admin\/[a-z0-9\/-]+(?:\?[A-Za-z0-9_.:%=&-]+)?$/iu.test(path) || path.length > 1024) {
+  if (token !== ADMIN_SESSION_MARKER_V1 || !/^\/api\/admin\/[a-z0-9\/-]+(?:\?[A-Za-z0-9_.:%=&-]+)?$/iu.test(path) || path.length > 1024) {
     throw new Error('관리자 조회 경로 또는 세션이 유효하지 않습니다.');
   }
   const response = await fetchImpl(path, {
     method: 'GET',
-    headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
+    headers: { Accept: 'application/json' },
     cache: 'no-store',
     credentials: 'same-origin',
   });
@@ -154,10 +155,10 @@ export async function verifyAdminOwnerSessionV1(
   token: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
-  if (!jwtLike(token)) throw new Error('관리자 세션 자격 증명이 유효하지 않습니다.');
+  if (token !== ADMIN_SESSION_MARKER_V1) throw new Error('관리자 세션이 유효하지 않습니다.');
   const requestSession = () => fetchImpl('/api/admin/session', {
     method: 'GET',
-    headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
+    headers: { Accept: 'application/json' },
     credentials: 'same-origin',
     cache: 'no-store',
   });
@@ -189,12 +190,12 @@ export async function fetchAdminIssuesCsvV1(
   query: URLSearchParams,
   fetchImpl: typeof fetch = fetch,
 ): Promise<string> {
-  if (!jwtLike(token)) throw new Error('관리자 세션이 유효하지 않습니다.');
+  if (token !== ADMIN_SESSION_MARKER_V1) throw new Error('관리자 세션이 유효하지 않습니다.');
   const allowed = new Set(['limit', 'cursor', 'from', 'to', 'status', 'category']);
   for (const key of query.keys()) if (!allowed.has(key)) throw new Error('허용되지 않은 내보내기 조건입니다.');
   const res = await fetchImpl('/api/admin/issues.csv?' + query.toString(), {
     method: 'GET',
-    headers: { Accept: 'text/csv', Authorization: 'Bearer ' + token },
+    headers: { Accept: 'text/csv' },
     credentials: 'same-origin',
     cache: 'no-store',
   });
@@ -205,4 +206,13 @@ export async function fetchAdminIssuesCsvV1(
   const content = await res.text();
   if (content.length > 64 * 1024) throw new Error('내보내기 결과가 최대 크기를 초과했습니다.');
   return content;
+}
+
+/** Explicit logout expires the host-only session cookie. */
+export async function signOutAdminSessionV1(fetchImpl: typeof fetch = fetch): Promise<void> {
+  const response = await fetchImpl('/api/admin/logout', {
+    method: 'POST',
+    credentials: 'same-origin', cache: 'no-store',
+  });
+  if (response.status !== 204) throw new Error('관리자 로그아웃을 완료하지 못했습니다.');
 }

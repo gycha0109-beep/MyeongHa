@@ -1,4 +1,5 @@
 import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
+import { createAdminSessionCookieV1, clearAdminSessionCookieV1, withAdminSessionCookieV1 } from './admin-cookie-session-v1.js';
 
 function reply(status: number, error: string) {
   return Response.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -37,6 +38,12 @@ export function createAdminHostedHttpV1(input: {
         const limited = reply(429, 'ADMIN_RATE_LIMITED'); limited.headers.set('Retry-After', '60'); return secure(limited);
       }
       if (request.headers.has('origin') && request.headers.get('origin') !== origin) return secure(reply(403, 'ADMIN_ORIGIN_REQUIRED'));
+      if (url.pathname === '/api/admin/logout') {
+        if (request.method !== 'POST' || url.search !== '' || request.headers.get('origin') !== origin) {
+          return secure(reply(403, 'ADMIN_ORIGIN_REQUIRED'));
+        }
+        return secure(new Response(null, {status:204, headers:{'Set-Cookie':clearAdminSessionCookieV1()}}));
+      }
       if (url.pathname === '/api/auth/sign-in') {
         if (request.method !== 'POST' || url.search) return secure(reply(405, 'METHOD_NOT_ALLOWED'));
         if (request.headers.get('origin') !== origin || !request.headers.get('content-type')?.startsWith('application/json')) return secure(reply(403, 'ADMIN_ORIGIN_REQUIRED'));
@@ -54,9 +61,11 @@ export function createAdminHostedHttpV1(input: {
         const payload = JSON.parse(await readBoundedUpstreamJsonTextV1(response, { maximumBodyBytes: 65_536, signal })) as { ok?: unknown; data?: { status?: unknown; session?: { accessToken?: unknown } } };
         const token = payload.ok === true && payload.data?.status === 'authenticated' ? payload.data.session?.accessToken : null;
         if (typeof token !== 'string' || token.length > 8192 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/u.test(token)) return secure(reply(503, 'ADMIN_AUTH_SESSION_UNAVAILABLE'));
-        return secure(Response.json({ ok: true, data: { status: 'authenticated', session: { accessToken: token } } }));
+        const cookie = createAdminSessionCookieV1(token);
+        return secure(Response.json({ ok:true, data:{ status:'authenticated', session:{ mode:'cookie' } } },
+          { headers:{'Set-Cookie':cookie} }));
       }
-      if (url.pathname.startsWith('/api/admin/')) return secure(await input.api(request));
+      if (url.pathname.startsWith('/api/admin/')) return secure(await input.api(withAdminSessionCookieV1(request)));
       if (!['GET','HEAD'].includes(request.method)) return secure(reply(405, 'METHOD_NOT_ALLOWED'));
       if (!url.pathname.startsWith('/admin')) return secure(reply(404, 'NOT_FOUND'));
       const path = url.pathname.replace(/^\/admin\/?/u, '/');

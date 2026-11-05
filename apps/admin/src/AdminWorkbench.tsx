@@ -282,7 +282,7 @@ export function AdminLogin({ onSession }: {
       <button type="submit" disabled={busy}>{busy ? '확인 중' : '인증 요청'}</button>
     </form>
     {error && <p className="login-error" role="alert">{error}</p>}
-    <p className="login-footnote">토큰은 이 화면의 메모리에만 유지됩니다. 새로고침하거나 로그아웃하면 다시 인증해야 합니다. 독립 관리자 서버가 연결되지 않았다면 사용할 수 없습니다.</p>
+    <p className="login-footnote">보안 쿠키로 관리자 로그인 상태를 유지합니다. 새로고침·새 탭에서도 세션이 유효하면 로그인할 필요가 없습니다. 로그아웃하거나 회원 세션이 만료되면 다시 인증해야 합니다.</p>
   </section>;
 }
 
