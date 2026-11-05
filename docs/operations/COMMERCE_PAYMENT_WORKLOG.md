@@ -620,3 +620,10 @@
 - **결제 출처 읽기:** `apps/api/src/commerce-saju-verified-ledger-source-v1.ts`에 DB 원장→실제 Receipt 금액/환불액/업그레이드 원본 연결 읽기와 기존 가격 계산기를 연결했습니다. 결제 원본/Subject/사주 기록/명식 revision 및 취소의 정산 누락·중복 Receipt·불일치/미승인 영수증을 차단합니다. 현재 분야별 유효 권한의 동일 DB 스냅샷 증명 없이는 실제 checkout으로 연결할 수 없습니다.
 - **테스트:** 대표 9,900→15,000→10,000, 부분 환불, 진행 중 중복 주문, 취소 정산 누락, 위조 연결, 다른 Subject, 폐기 상품, 두 테마 보유 시 추가 결제 0원 등을 자동 회귀 테스트로 추가했습니다. 새로운 PR 통과 전 PASS 판정은 유보합니다.
 - **실제 남은 경계:** 원장 SQL은 **staged candidate only**로 전체 PostgreSQL17 검증·개인정보 삭제 그래프 적용·출생정보 변경 경계의 결제 동시성 보장·공식 권한 읽기·원본 환불 검증 생산자 연결 전에는 migration에 넣거나 배포하지 않습니다. API 공개/Charge Terms·Product/Offer seed/실결제·LIVE·자동 환불은 전부 비활성화 상태입니다.
+
+### 2026-11-05 — 사주 원본 결제·업그레이드·환불 후보의 격리 PostgreSQL 17 검증 연결
+
+- **현황:** #3018의 정정된 순결제액 계산은 CI 성공 후 main에 병합됐습니다. #3023의 DB 원장 후보는 #3018 병합 뒤 최신 main에 재정렬해 충돌을 해소했고, 별도 필수 통합 검증은 결과 대기입니다.
+- **새 검증:** #3032에서 `commerce-saju-record-ledger-candidate-pg17` 사례를 전체 이관된 별도 PostgreSQL 17 DB 스위트에 등록했습니다. 기존 검증된 합성 B2 원본 Receipt/출생 revision을 재사용해, 구매 확정 전 기록 revision 변경 허용·검증된 구매 후 변경 금지, 실제 원본 Receipt 업그레이드 연결, Provider 개별 취소액과 환불 원장 일치, 공개·API 직접 권한 부재를 검사합니다.
+- **실행 안전:** 후보 DDL·가짜 결제/환불/업그레이드 데이터는 한 SQL `BEGIN…ROLLBACK` 안에만 존재합니다. 스크립트가 GitHub Actions의 격리 PostgreSQL 17 DB 이외 실행을 거부합니다. **새 CI 완료 전 검증 통과를 선언하지 않습니다.**
+- **남은 일:** 원본 Reader fixture와 신규 사주 Product 의미를 운영에서 혼동하지 않으며, 사주 공식 상품·분야권한·출생정보 결제 직전 확인·청구 원자성·법정 환불/부분 제공·개인정보 삭제 그래프에 연결하기 전에는 이 후보를 Production migration에 설치하지 않습니다.
