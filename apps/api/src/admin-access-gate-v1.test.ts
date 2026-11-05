@@ -122,8 +122,9 @@ describe('private hosted administrator boundary',()=>{
     const handler=createAdminHostedHttpV1({origin:'https://admin.example.test',memberAuthOrigin:'https://member.example.test',
       verifyAccess:async()=>true,allowRequest:async()=>allow,api:async()=>Response.json({}),
       assets:async request=>{paths.push(new URL(request.url).pathname);return new Response('app');}});
-    expect((await handler(new Request('https://admin.example.test/admin/assets/app.js'))).status).toBe(429);
-    allow=true;expect((await handler(new Request('https://admin.example.test/admin/assets/app.js'))).status).toBe(200);
+    expect((await handler(new Request('https://admin.example.test/admin/assets/app.js'))).status).toBe(200);
+    expect((await handler(new Request('https://admin.example.test/api/admin/session'))).status).toBe(429);
+    allow=true;expect((await handler(new Request('https://admin.example.test/api/admin/session'))).status).toBe(200);
     expect(paths).toEqual(['/assets/app.js']);
   });
 });

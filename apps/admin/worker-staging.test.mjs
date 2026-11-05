@@ -1,6 +1,6 @@
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {afterEach,describe,it,expect,vi} from 'vitest';
-import worker,{createAdminMemberAuthServiceFetchV1} from '../../cloudflare/admin-worker.mjs';
+import worker,{createAdminMemberAuthServiceFetchV1,adminRateLimitKeyV1} from '../../cloudflare/admin-worker.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const env={MYEONGHA_ADMIN_PRIVATE_ENABLED:'false',
@@ -13,6 +13,14 @@ function jwt(extra={}){
  return data+'.'+sign('RSA-SHA256',Buffer.from(data),privateKey).toString('base64url');
 }
 afterEach(()=>vi.restoreAllMocks());
+describe('Owner API request classification',()=>{
+ it('isolates read and sign-in request quota keys',()=>{
+   const owner='test';
+   const domain='https://example.test';
+   expect(adminRateLimitKeyV1(owner,new Request(domain+'/api/admin/users'))).toBe('test:read');
+   expect(adminRateLimitKeyV1(owner,new Request(domain+'/api/auth/sign-in',{method:'POST'}))).toBe('test:sign-in');
+ });
+});
 describe('scoped same-account Member authentication transport',()=>{
  it('permits only the original Member sign-in on the dedicated binding',async()=>{
   const url='https://myeongha.gycha0109.workers.dev/api/auth/sign-in';
