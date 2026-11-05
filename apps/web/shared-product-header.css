@@ -262,81 +262,43 @@ html[data-theme="dark"] body.product-page .product-header .ui-locale-select {
 }
 
 
-/* Four first-paint controls: theme / notification / icon-only My / globe locale.
-   The source-derived v2 sprite has no decorative unread marker. */
-body.product-page .product-header { --mh-glyph-sprite: url("assets/header/header-ui-glyphs-v2.png"); --mh-glyph-row: 0px; }
-html[data-theme="dark"] body.product-page .product-header { --mh-glyph-row: -28px; }
+/* One 24px optical vector standard for theme, bell, profile and locale. */
 body.product-page .product-header .product-icon-button,
 body.product-page .product-header .product-theme-toggle,
 body.product-page .product-header .product-profile {
   display: inline-grid !important;
-  place-items: center;
-  position: relative;
-  box-sizing: border-box;
-  flex: 0 0 40px !important;
-  width: 40px !important;
-  min-width: 40px !important;
-  max-width: 40px !important;
-  min-height: 40px !important;
-  height: 40px !important;
-  padding: 0 !important;
-  border-radius: 50% !important;
+  place-items: center; position: relative; box-sizing: border-box;
+  flex: 0 0 40px !important; width: 40px !important; min-width: 40px !important;
+  max-width: 40px !important; min-height: 40px !important; height: 40px !important;
+  padding: 0 !important; border-radius: 50% !important;
 }
 body.product-page .product-header .product-profile { gap: 0 !important; text-decoration: none; }
 body.product-page .product-header .product-profile > span:not(.product-profile-mark) { display: none !important; }
 body.product-page .product-header .product-theme-toggle-mark,
 body.product-page .product-header .product-profile-mark {
-  display: block;
-  position: relative;
-  flex: 0 0 28px;
-  width: 28px !important;
-  height: 28px !important;
-  font-size: 0 !important;
-  border: 0 !important;
-  padding: 0 !important;
-  background: transparent !important;
+  display: block; position: relative; flex: 0 0 28px; width: 28px !important;
+  height: 28px !important; font-size: 0 !important; border: 0 !important;
+  padding: 0 !important; background: transparent !important;
 }
+body.product-page .product-header .product-theme-toggle-mark { --mh-header-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%224%22%2F%3E%3Cpath%20d%3D%22M12%202v2m0%2016v2M4.93%204.93l1.42%201.42m11.3%2011.3%201.42%201.42M2%2012h2m16%200h2M4.93%2019.07l1.42-1.42M17.65%206.35l1.42-1.42%22%2F%3E%3C%2Fsvg%3E"); }
+html[data-theme="dark"] body.product-page .product-header .product-theme-toggle-mark { --mh-header-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20.7%2014.5A8.6%208.6%200%200%201%209.5%203.3%208.5%208.5%200%201%200%2020.7%2014.5Z%22%2F%3E%3C%2Fsvg%3E"); }
+body.product-page .product-header .product-icon-button { --mh-header-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M18%208.5a6%206%200%200%200-12%200c0%206.8-3%207.6-3%208.5h18c0-.9-3-1.7-3-8.5Z%22%2F%3E%3Cpath%20d%3D%22M10%2020.5c.5.9%201.1%201.4%202%201.4s1.5-.5%202-1.4%22%2F%3E%3C%2Fsvg%3E"); }
+body.product-page .product-header .product-profile-mark { --mh-header-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%228%22%20r%3D%223.5%22%2F%3E%3Cpath%20d%3D%22M5.3%2021v-1.8a6.7%206.7%200%200%201%2013.4%200V21Z%22%2F%3E%3C%2Fsvg%3E"); }
+body.product-page .product-header .ui-locale-picker { --mh-header-icon: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.8%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%229%22%2F%3E%3Cpath%20d%3D%22M3%2012h18M12%203c2.8%202.2%204.2%205.3%204.2%209s-1.4%206.8-4.2%209M12%203c-2.8%202.2-4.2%205.3-4.2%209s1.4%206.8%204.2%209%22%2F%3E%3C%2Fsvg%3E"); }
 body.product-page .product-header .product-icon-button::before,
 body.product-page .product-header .product-theme-toggle-mark::before,
 body.product-page .product-header .product-profile-mark::before,
 body.product-page .product-header .ui-locale-picker::before {
-  content: "" !important;
-  display: block !important;
-  position: absolute !important;
-  top: 50% !important;
-  left: 50% !important;
-  width: 28px !important;
-  height: 28px !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  transform: translate(-50%, -50%) !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  background: var(--mh-glyph-sprite) no-repeat !important;
-  background-size: 140px 56px !important;
-  -webkit-mask: none !important;
-  mask: none !important;
+  content: "" !important; display: block !important; position: absolute !important;
+  top: 50% !important; left: 50% !important; width: 24px !important; height: 24px !important;
+  margin: 0 !important; padding: 0 !important; transform: translate(-50%, -50%) !important;
+  border: 0 !important; border-radius: 0 !important; box-shadow: none !important;
+  background: currentColor !important;
+  -webkit-mask: var(--mh-header-icon) center / 24px 24px no-repeat !important;
+  mask: var(--mh-header-icon) center / 24px 24px no-repeat !important;
   pointer-events: none;
 }
-body.product-page .product-header .product-theme-toggle-mark::before { background-position: 0 var(--mh-glyph-row) !important; }
-/* Center the complete bell independently of the old sprite cutout.
-   Both SVGs balance their ink vertically by 1.5px, with a symmetric x axis. */
-body.product-page .product-header .product-icon-button::before {
-  background-image: url("assets/header/header-bell-light.svg") !important;
-  background-position: center center !important;
-  background-size: 28px 28px !important;
-  transform: translate(-50%, -50%) !important;
-}
-html[data-theme="dark"] body.product-page .product-header .product-icon-button::before {
-  background-image: url("assets/header/header-bell-dark.svg") !important;
-}
-body.product-page .product-header .product-profile-mark::before { background-position: -84px var(--mh-glyph-row) !important; }
-body.product-page .product-header .ui-locale-picker::before {
-  left: 22px !important;
-  z-index: 1;
-  background-position: -28px var(--mh-glyph-row) !important;
-}
+body.product-page .product-header .ui-locale-picker::before { left: 20px !important; z-index: 1; }
 body.product-page .product-header .product-icon-button::after,
 body.product-page .product-header .product-profile-mark::after,
 body.product-page .product-header .product-theme-toggle-mark::after { content: none !important; display: none !important; }
@@ -445,3 +407,8 @@ body.product-page .product-header .ui-locale-select:focus-visible { outline: 2px
   }
   body.product-page .product-header .ui-locale-picker::before { left: 19px !important; }
 }
+
+/* Shared brand lettering remains legible without changing header geometry. */
+body.product-page .product-header .product-brand-seal { font-size: 13px; font-weight: 650; }
+body.product-page .product-header .product-brand-sub { font-size: 11px; color: #68554f; }
+html[data-theme="dark"] body.product-page .product-header .product-brand-sub { color: #ddcbbc; }
