@@ -7,6 +7,7 @@ import type {
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
 import { formatRecordDateV1 } from '@/features/records/records-view-model';
+import { formatMobileHomeCompletenessV1 } from '@/features/home/mobile-home-completeness';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -47,7 +48,7 @@ export function HomeBrandHeader({
 
 export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   if (card.kind === 'loading') {
     return (
       <View style={styles.heroCard}>
@@ -113,7 +114,7 @@ export function HomeTodayCard({ card }: { card: MobileHomeTodayCardV1 }) {
         <Text style={styles.dayMaster}>{card.dayMaster}</Text>
         <Text style={styles.elementBadge}>{t(card.element)}</Text>
       </View>
-      <Text style={styles.completeness}>{t(card.completeness)}</Text>
+      <Text style={styles.completeness}>{formatMobileHomeCompletenessV1(card.fullyResolved, card.resolvedPillarCount, locale)}</Text>
       <MobileUiText style={styles.caption}>
         현재 출생정보를 기준으로 계산된 명식 사실만 보여줍니다.
       </MobileUiText>

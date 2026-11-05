@@ -46,6 +46,8 @@ export type MobileHomeTodayCardV1 =
       dayMaster: string;
       element: string;
       completeness: string;
+      resolvedPillarCount: number;
+      fullyResolved: boolean;
     }>
   | Readonly<{ kind: 'birth_required' }>
   | Readonly<{ kind: 'loading' }>
@@ -146,6 +148,8 @@ function todayCard(state: MobileHomeStateV1): MobileHomeTodayCardV1 {
     dayMaster,
     element,
     completeness: saju.completeness.headline,
+    resolvedPillarCount: saju.completeness.resolvedPillarCount,
+    fullyResolved: saju.completeness.fullyResolved,
   });
 }
 

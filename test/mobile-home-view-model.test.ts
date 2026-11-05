@@ -13,6 +13,7 @@ import {
 } from '../apps/mobile/src/features/home/home-view-model.js';
 import type { MobileHomeStateV1 } from '../apps/mobile/src/features/home/mobile-home-loader.js';
 import { formatRecordDateV1 } from '../apps/mobile/src/features/records/records-view-model.js';
+import { formatMobileHomeCompletenessV1 } from '../apps/mobile/src/features/home/mobile-home-completeness.js';
 
 const profile: CurrentSubjectProfileV1 = {
   subjectId: 'subject-1',
@@ -131,9 +132,23 @@ describe('mobile Home view model', () => {
       dayMaster: '丙 · 병',
       element: '화',
       completeness: '네 기둥 계산 완료',
+      resolvedPillarCount: 4,
+      fullyResolved: true,
     });
     expect(JSON.stringify(view.today)).not.toContain('운세');
     expect(JSON.stringify(view.today)).not.toContain('좋습니다');
+  });
+
+  it('localizes partial four-pillar status without treating it as a prediction', () => {
+    expect(formatMobileHomeCompletenessV1(false, 3, 'ko-KR')).toBe('3/4 기둥 확정');
+    expect(formatMobileHomeCompletenessV1(false, 3, 'ja-JP')).toBe('確定済み 3/4 柱');
+    expect(formatMobileHomeCompletenessV1(false, 3, 'zh-TW')).toBe('已確認 3/4 柱');
+    expect(formatMobileHomeCompletenessV1(false, 3, 'en-US')).toBe('3/4 pillars confirmed');
+    expect(formatMobileHomeCompletenessV1(false, 3, 'zh-CN')).toBe('已确认3/4柱');
+    expect(formatMobileHomeCompletenessV1(false, 0, 'ko-KR')).toBe('0/4 기둥 확정');
+    expect(formatMobileHomeCompletenessV1(true, 4, 'ko-KR')).toBe('네 기둥 계산 완료');
+    expect(formatMobileHomeCompletenessV1(true, 4, 'en-US')).toBe('All four pillars calculated');
+    expect(formatMobileHomeCompletenessV1(true, 4, 'zh-CN')).toBe('四柱计算完成');
   });
 
   it('projects the latest Reading as a continuation card without Character inference', () => {
