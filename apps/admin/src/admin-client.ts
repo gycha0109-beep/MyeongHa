@@ -155,14 +155,29 @@ export async function verifyAdminOwnerSessionV1(
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   if (!jwtLike(token)) throw new Error('관리자 세션 자격 증명이 유효하지 않습니다.');
-  const response = await fetchImpl('/api/admin/session', {
+  const requestSession = () => fetchImpl('/api/admin/session', {
     method: 'GET',
     headers: { Accept: 'application/json', Authorization: 'Bearer ' + token },
     credentials: 'same-origin',
     cache: 'no-store',
   });
+  let response = await requestSession();
+  // One bounded retry for transient upstream failure. Never retry explicit denial or throttling.
+  if (response.status === 502 || response.status === 503) response = await requestSession();
   if (response.status === 401 || response.status === 403) throw new AdminAccessDeniedErrorV1();
-  if (!response.ok) throw new Error('관리자 권한을 확인하지 못했습니다.');
+  if (!response.ok) {
+    let reason: string | null = null;
+    if (response.headers.get('content-type')?.includes('application/json')) {
+      try {
+        const body: unknown = await response.json();
+        if (isRecord(body) && typeof body.error === 'string' &&
+            /^ADMIN_[A-Z_]{3,64}$/u.test(body.error)) reason = body.error;
+      } catch {
+        // Never reflect arbitrary response bodies, tokens or credentials.
+      }
+    }
+    throw new AdminReadUnavailableErrorV1(response.status, reason);
+  }
   const payload: unknown = await response.json();
   if (!isRecord(payload) || payload.authorized !== true) {
     throw new Error('관리자 권한을 확인하지 못했습니다.');

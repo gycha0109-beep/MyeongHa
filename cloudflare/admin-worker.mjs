@@ -98,6 +98,8 @@ export default {
   },
   async fetch(request, env, ctx) {
     let reader; let audit; let command;
+    // Log only fixed phase names; never credentials, personal data or URLs.
+    let phase='owner-access';
     try {
       // Verify the signed header or Cloudflare's own authenticated Worker context
       // before opening any database connection, including static assets.
@@ -106,6 +108,7 @@ export default {
       // A verified Owner gets a distinct disabled response, with no DB or asset I/O.
       if (env.MYEONGHA_ADMIN_PRIVATE_ENABLED !== 'true') return Response.json({error:'ADMIN_PRIVATE_DISABLED'},
         {status:503,headers:{'Cache-Control':'no-store'}});
+      phase='readonly-bindings';
       if (env.MYEONGHA_ADMIN_HYPERDRIVE_POLICY !== 'dedicated-admin-verify-full-v1' ||
           !env.ADMIN_READ_HYPERDRIVE?.connectionString || !env.ADMIN_AUDIT_HYPERDRIVE?.connectionString || !env.ADMIN_RATE_LIMITER) throw Error('Unconfigured');
       // Access has authenticated the Owner. Before a single SQL query can run,
@@ -119,13 +122,18 @@ export default {
         if(typeof env.MYEONGHA_ADMIN_CONFIRMATION_SECRET!=='string'||env.MYEONGHA_ADMIN_CONFIRMATION_SECRET.length<32)throw Error('Command confirmation unavailable');
         command=new Pool({connectionString:env.ADMIN_COMMAND_HYPERDRIVE.connectionString,max:1,connectionTimeoutMillis:3000,statement_timeout:5000});
       }
+      phase='private-runtime';
       const runtime = createAdminPrivateRuntimeV1({env,readPool:reader,auditPool:audit,...(command?{commandPool:command}:{})});
       const handler = createAdminHostedHttpV1({origin:env.MYEONGHA_ADMIN_ORIGIN,memberAuthOrigin:env.MYEONGHA_ADMIN_MEMBER_AUTH_ORIGIN,
         verifyAccess:async()=>true, // The signed, exact Owner gate already ran above.
         allowRequest:async()=>Boolean((await env.ADMIN_RATE_LIMITER.limit({key:env.MYEONGHA_ADMIN_OWNER_AUTH_USER_ID})).success),
         api:runtime.handleRequest,assets:request=>env.ASSETS.fetch(request),fetchImpl:memberAuthFetch});
+      phase='hosted-request';
       return await handler(request);
-    } catch { return Response.json({error:'ADMIN_HOSTED_UNAVAILABLE'},{status:503,headers:{'Cache-Control':'no-store'}}); }
+    } catch {
+      console.warn('ADMIN_WORKER_SETUP_FAILED_V1', {phase});
+      return Response.json({error:'ADMIN_HOSTED_UNAVAILABLE'},{status:503,headers:{'Cache-Control':'no-store'}});
+    }
     finally { if(reader||audit||command) ctx.waitUntil(Promise.allSettled([reader?.end(),audit?.end(),command?.end()])); }
   },
 };
