@@ -9,6 +9,10 @@ import type {
   DigitalReadingWithdrawalReviewV1,
 } from './commerce-digital-reading-withdrawal-review-v1.js';
 import {
+  readRecordedReaderCancellationForClaimV1,
+  type RecordedReaderCancelClaimEvidenceV1,
+} from './commerce-recorded-reader-cancellation-evidence-v1.js';
+import {
   readRecordedReaderS7ClaimTimelineV1,
   type RecordedReaderS7ClaimTimelineV1,
 } from './commerce-recorded-reader-s7-evidence-v1.js';
@@ -90,6 +94,8 @@ export type RecordedReadingWithdrawalPrivateReviewV1 = Readonly<{
    */
   review: DigitalReadingWithdrawalReviewV1 | null;
   retainedReaderS7Timeline: RecordedReaderS7ClaimTimelineV1 | null;
+  /** Source-only observation; cannot decide refund or Reader revoke. */
+  storedCancellationEvidence: RecordedReaderCancelClaimEvidenceV1 | null;
   sourceClaimImmutable: true;
   requiresSeparateLegalDecision: true;
   consumerDeliveryProven: false;
@@ -122,9 +128,11 @@ function view(
   kind:RecordedReadingWithdrawalPrivateReviewV1['kind'],
   review:DigitalReadingWithdrawalReviewV1|null,
   retainedReaderS7Timeline:RecordedReaderS7ClaimTimelineV1|null=null,
+  storedCancellationEvidence:RecordedReaderCancelClaimEvidenceV1|null=null,
 ): RecordedReadingWithdrawalPrivateReviewV1 {
   return Object.freeze({
     claimId, receivedAt, kind, review, retainedReaderS7Timeline,
+    storedCancellationEvidence,
     recordedCustomerClaim:true,
     sourceClaimImmutable:true,
     requiresSeparateLegalDecision:true,
@@ -198,8 +206,19 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     // A revoked/missing Receipt, missing original notice, DB failure or an
     // ambiguous unit must NEVER be converted into positive refund/denial proof.
     if (preflight.kind !== 'manual_review_candidate') {
+      // A verified purchase may later be marked revoked. The original
+      // immutable Claim and its canonical cancellation history remain
+      // reviewable even though CURRENT verified-purchase/notice evidence
+      // cannot admit a positive delivery or statutory outcome.
+      const sourceOnly=await readRecordedReaderCancellationForClaimV1(
+        connection,{
+          subjectId:claim.subjectId as string,
+          purchaseIntentId:claim.purchaseIntentId,
+          unitId:claim.unitId as string,
+        },
+      );
       return view(claim.claimId,receivedAt,
-        'exact_unit_evidence_unavailable',null);
+        'exact_unit_evidence_unavailable',null,null,sourceOnly);
     }
 
     // Correlate the original paid S5 body and currently retained S7 attempts
@@ -212,8 +231,19 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
         unitId:claim.unitId as string,
       },
     );
+    // This is only the canonical STORED cancellation source in the same
+    // read-only Claim snapshot, never a latest Provider GET/finality finding.
+    // Do not derive another Reader/Receipt from client input.
+    const storedCancellationEvidence=await readRecordedReaderCancellationForClaimV1(
+      connection,{
+        subjectId:claim.subjectId as string,
+        purchaseIntentId:claim.purchaseIntentId,
+        unitId:claim.unitId as string,
+      },
+    );
     return view(claim.claimId,receivedAt,
-      'exact_unit_manual_review',preflight.review,retainedReaderS7Timeline);
+      'exact_unit_manual_review',preflight.review,
+      retainedReaderS7Timeline,storedCancellationEvidence);
   } catch {
     return failure();
   } finally {

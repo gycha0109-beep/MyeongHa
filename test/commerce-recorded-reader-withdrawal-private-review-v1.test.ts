@@ -29,6 +29,28 @@ const S7=Object.freeze({
   firstPreparedAt:'2026-11-04 00:00:01+00',
   firstAcknowledgedAt:'2026-11-04 00:00:02+00',
 });
+const RECEIPT='66666666-6666-4666-8666-666666666666';
+const EVENT='77777777-7777-4777-8777-777777777777';
+const NO_CANCEL=Object.freeze({
+  receiptId:RECEIPT,paidMinor:'8900',currency:'KRW',
+  originalTransactionId:'tx-claim',eventId:null,
+});
+const FULL_CANCEL=Object.freeze({
+  ...NO_CANCEL,eventId:EVENT,eventType:'Transaction.Cancelled',
+  eventStatus:'verified',eventProvider:'portone_v2',
+  eventEnvironment:'production',eventSourceType:'receipt',
+  eventSubjectId:SUBJECT,eventReceiptId:RECEIPT,
+  eventTransactionId:'tx-claim',eventOriginalTransactionId:'tx-claim',
+  providerOrderingKey:null,verifierRevision:'portone-cancel-readback-v2',
+  sourceSchema:'commerce-portone-cancellation-source-v2',
+  sourceEventType:'Transaction.Cancelled',
+  cancellationIdHmac:'hmac-sha256:k1:'+'c'.repeat(64),
+  cancellationStatus:'SUCCEEDED',
+  exactAmountMinor:'8900',cumulativeAmountMinor:'8900',
+  originalPaidMinor:'8900',sourceCurrency:'KRW',
+  orderingProven:'false',refundExecutionAuthorized:'false',
+  entitlementRevocationAuthorized:'false',
+});
 const NOTICE=Object.freeze({
   purchaseIntentId:PURCHASE,unitId:UNIT,productSpecVersion:'reading-v1',
   noticeRevision:'notice-v1',previewOrInformationRevision:'preview-v1',
@@ -38,9 +60,10 @@ type Options=Readonly<{
   purchasedRows?:readonly unknown[];
   noticeRows?:readonly unknown[];
   s7Rows?:readonly unknown[];
+  cancelRows?:readonly unknown[];
   visibility?:boolean;
   readOnly?:boolean;
-  queryFailure?:'claim'|'purchase'|'notice'|'s7'|'begin'|'rollback';
+  queryFailure?:'claim'|'purchase'|'notice'|'s7'|'cancel'|'begin'|'rollback';
   releaseFailure?:boolean;
 }>;
 function fixture(options:Options={}) {
@@ -71,6 +94,22 @@ function fixture(options:Options={}) {
       expect(sql).toContain('presentation.unit_id=$3::uuid');
       expect(sql).toContain('d.retention_until>pg_catalog.clock_timestamp()');
       return {rows:(options.s7Rows??[S7]) as T[]};
+    }
+    if(sql.includes('left join public.commerce_provider_events event')){
+      if(options.queryFailure==='cancel')throw Error('source Event snapshot unavailable');
+      // The read-only reviewer MUST use the immutable Claim's Subject,
+      // never a test fixture's default Subject or a sibling purchase.
+      const claimSubject=(options.claimRows?.[0] as
+        {subjectId?:unknown}|undefined)?.subjectId??SUBJECT;
+      expect(args).toEqual([PURCHASE,claimSubject,UNIT]);
+      expect(sql).toContain('grant_row.source_receipt_id=receipt.id');
+      expect(sql).toContain('access.purchase_intent_id=pi.id');
+      expect(sql).toContain('notice.unit_id=$3::uuid');
+      expect(sql).toContain("event.resolved_receipt_id=receipt.id");
+      // Real SQL would return zero rows for an unowned Receipt/Grant.
+      // Do not forge the default Subject's cancellation in that scenario.
+      if(claimSubject!==SUBJECT)return {rows:[] as T[]};
+      return {rows:(options.cancelRows??[NO_CANCEL]) as T[]};
     }
     if(sql.includes('from public.purchase_intents pi')){
       if(options.queryFailure==='purchase')throw Error('purchase SQL down');
@@ -108,6 +147,13 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(result).toMatchObject({
       claimId:CLAIM,receivedAt:ISO,recordedCustomerClaim:true,
       kind:'exact_unit_manual_review',sourceClaimImmutable:true,
+      storedCancellationEvidence:{
+        kind:'no_recorded_successful_cancellation',
+        recordedSuccessfulItems:0,originalPaidMinor:'8900',
+        currentProviderGetObserved:false,providerOrderingProven:false,
+        refundFinalityProven:false,providerRefundAuthorized:false,
+        entitlementMutationAuthorized:false,
+      },
       retainedReaderS7Timeline:{
         kind:'s7_client_ack_retained_delivery_unproven',
         retainedPreparedCount:2,retainedAcknowledgedCount:1,
@@ -129,6 +175,7 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       expect.stringContaining('receipt.verification_status'),
       expect.stringContaining('digital_reading_checkout_notice_acknowledgments_v1'),
       expect.stringContaining('official_reader_paid_delivery_attempts_v1'),
+      expect.stringContaining('left join public.commerce_provider_events event'),
       'ROLLBACK',
     ]);
     expect(f.release).toHaveBeenCalledWith(undefined);
@@ -137,6 +184,63 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(status(result)).not.toContain(UNIT);
     expect(status(result)).not.toContain('notice-v1');
     expect(f.statements.map(s=>s.sql).join('\n')).not.toMatch(/\b(?:INSERT|UPDATE|DELETE|GRANT)\b/iu);
+  });
+
+
+  it('links exactly one stored full cancellation, without refund or revoke authority',async()=>{
+    const f=fixture({cancelRows:[FULL_CANCEL]});
+    const result=await run(f);
+    expect(result?.storedCancellationEvidence).toMatchObject({
+      kind:'one_exact_full_cancel_recorded_only',
+      recordedSuccessfulItems:1,originalPaidMinor:'8900',
+      currentProviderGetObserved:false,providerOrderingProven:false,
+      refundFinalityProven:false,providerRefundAuthorized:false,
+      entitlementMutationAuthorized:false,
+    });
+    expect(result?.consumerDeliveryProven).toBe(false);
+    expect(result?.providerRefundAuthorized).toBe(false);
+  });
+
+  it('never mistakes two partial items totaling the receipt for one full item',async()=>{
+    const first={...FULL_CANCEL,eventType:'Transaction.PartialCancelled',
+      sourceEventType:'Transaction.PartialCancelled',
+      exactAmountMinor:'3000',cumulativeAmountMinor:'3000'};
+    const second={...first,
+      eventId:'88888888-8888-4888-8888-888888888888',
+      cancellationIdHmac:'hmac-sha256:k1:'+'d'.repeat(64),
+      exactAmountMinor:'5900',cumulativeAmountMinor:'8900'};
+    const f=fixture({cancelRows:[first,second]});
+    const result=await run(f);
+    expect(result?.storedCancellationEvidence).toMatchObject({
+      kind:'partial_or_multiple_cancel_items_recorded',
+      recordedSuccessfulItems:2,originalPaidMinor:'8900',
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+    });
+  });
+
+  it.each([
+    {cancelRows:[{...FULL_CANCEL,eventReceiptId:UNIT}]},
+    {cancelRows:[{...FULL_CANCEL,eventSubjectId:UNIT}]},
+    {cancelRows:[{...FULL_CANCEL,orderingProven:'true'}]},
+    {cancelRows:[{...FULL_CANCEL,exactAmountMinor:'9000'}]},
+    {cancelRows:[FULL_CANCEL,FULL_CANCEL]},
+  ])('holds inconsistent/cross-Reader/duplicated cancellation Event evidence',async ({cancelRows})=>{
+    const f=fixture({cancelRows});
+    const result=await run(f);
+    expect(result?.storedCancellationEvidence).toMatchObject({
+      kind:'stored_cancel_source_untrusted',
+      currentProviderGetObserved:false,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+    });
+    expect(result?.review?.automaticDenialAuthorized).toBe(false);
+  });
+
+  it('does not assert a trustworthy cancellation result on snapshot DB failure',async()=>{
+    const f=fixture({queryFailure:'cancel'});
+    await expect(run(f)).rejects.toMatchObject({
+      code:'RECORDED_READING_WITHDRAWAL_PRIVATE_REVIEW_UNAVAILABLE',
+    });
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
   it('does not assume an expired or absent S7 receipt proves content was never supplied',async()=>{
@@ -218,6 +322,29 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
+  it('keeps a revoked exact purchase\'s stored cancellation for private review without claiming delivery',async()=>{
+    // No CURRENT verified Receipt evidence, as happens after exact B2 revoke.
+    // The canonical Event may still be attached to the immutable Claim.
+    const f=fixture({purchasedRows:[],cancelRows:[FULL_CANCEL]});
+    const result=await run(f);
+    expect(result).toMatchObject({
+      kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
+      review:null,consumerDeliveryProven:false,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+      storedCancellationEvidence:{
+        kind:'one_exact_full_cancel_recorded_only',
+        recordedSuccessfulItems:1,
+        currentProviderGetObserved:false,providerOrderingProven:false,
+        refundFinalityProven:false,
+      },
+    });
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+    expect(f.query).toHaveBeenCalledWith(
+      expect.stringContaining('left join public.commerce_provider_events event'),
+      [PURCHASE,SUBJECT,UNIT],
+    );
+  });
+
   it('keeps another Subject\'s claim recorded but never borrows this Subject\'s receipt evidence',async()=>{
     const f=fixture({claimRows:[{...ROW,subjectId:UNIT}]});
     const result=await run(f);
@@ -225,7 +352,15 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       kind:'exact_unit_evidence_unavailable',review:null,
       recordedCustomerClaim:true,providerRefundAuthorized:false,
     });
+    expect(result?.storedCancellationEvidence).toMatchObject({
+      kind:'stored_cancel_source_untrusted',
+      recordedSuccessfulItems:0,
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
+    });
     expect(status(result)).not.toContain(SUBJECT);
+    expect(f.statements.find(s=>
+      s.sql.includes('left join public.commerce_provider_events event'))?.args
+    ).toEqual([PURCHASE,UNIT,UNIT]);
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 

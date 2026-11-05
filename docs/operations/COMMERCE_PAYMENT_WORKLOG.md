@@ -532,3 +532,30 @@
 - **안전:** 실제 PG GET/POST, 운영 DB, 운영 schema migrations, LIVE, 사용자 대상 권한 회수 없음. 합성 Event/Effect 및 비배포 DDL은 같은 트랜잭션에서 **ROLLBACK**됩니다.
 - **검증:** `commerce-persisted-cancel-reader-effect-pg17` 독립 CI 사례 추가. PR의 실제 CI·통합 결과가 나오기 전까지 PASS 미판정.
 - **미완료:** Provider 신뢰 가능한 최신 사건 순서/최종성, 법적 판단, 실제 Reader R2/T2 권한 회수, 고객 전달/청약철회와 개인정보 삭제 연결, 전체 E2E. 이 합성 검증만으로 운영 회수를 허용하지 않습니다.
+
+### 2026-11-05 — 고객 청약철회 원본 구매의 저장된 취소 Event 내부 검토 연결
+
+- **로드맵:** 6절 1·3·5번의 원본 결제/청약철회 접수/취소 증거 결속. 기존 `reviewRecordedReadingWithdrawalPrivateV1`의 단일 전체 가시성 READ ONLY 스냅샷에 원본 구매별 취소 원장 관측을 추가했습니다.
+- **실제 구현:** 저장된 Claim Subject·Purchase Intent·Checkout Unit을 원본 Notice/검증 Receipt/Reader Grant에 묶어 기존 Commerce Provider Event에서 취소 항목을 조회합니다. `commerce-recorded-reader-cancellation-evidence-v1.ts`에서 정확히 단일 전액 기록, 다건 부분 취소 및 기록 부재를 구분하고 원본 Receipt/Subject 교차 혼입·취소 HMAC 중복·증거 필드 위조·과금액을 안전 보류합니다. 호출자는 Event/Receipt/Grant를 지정할 수 없습니다.
+- **검증:** 단일 전액·다건 부분 취소(3000+5900)·원본 계보 불일치·위조·중복·DB 장애에 대한 기존 청약철회 검토기 회귀 테스트 추가. 신규 PR CI 결과 전까지 PASS 미선언.
+- **한계:** 저장 원장은 Provider 최신 GET·시간 순서·최종 환불/법적 청약철회/소비자 실제 전달 입증이 아닙니다. 모든 결과의 Provider 환불 허용·Reader Grant 변경 허용은 false이고 기존 S7 ACK도 사람의 실제 소비 증명으로 승격하지 않습니다.
+- **운영 경계:** 기존 private read-only 기능에만 연결. 신규 SQL 마이그레이션/테이블/권한, 공개 API, 실제 PG 환불 POST, 운영 DB·LIVE·자동 권한 회수 변경 없음.
+
+### 2026-11-05 — #2986 TypeScript CI 레드 원인 수정
+
+- **실제 실패 근거:** CI 실행 [41901612252](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41901612252)의 Commerce TypeScript 검사에서 `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts` 220~221행에 `TS2345/TS2322`가 발생했습니다.
+- **원인/수정:** 중복 Provider Event 2행을 포함한 `it.each` 데이터에서 행 배열이 테스트 함수의 여러 인자로 펼쳐져 타입에 맞지 않았습니다. 각 테스트 사례를 `{cancelRows:[...]}` 하나의 객체로 묶고 구조분해하여 전달합니다. 원본 취소·Grant·환불 비즈니스 로직은 무변경입니다.
+- **검증 상태:** 수정 커밋의 CI 성공 확인 전까지는 GREEN으로 보고하지 않습니다. 자동 병합/필수 통합 CI 요건은 그대로 유지합니다.
+
+### 2026-11-05 — 회수된 Reader 구매의 청약철회 원본 취소 내역 보존
+
+- **수정:** 청약철회 내부 검토에서 현재 `verified` Receipt 사전검사 실패(예: 원본 구매권이 회수됨)가 발생하더라도 접수된 Claim을 유지하고, 동일 DB 읽기 전용 스냅샷에서 정확한 원본 Receipt/Subject/Unit에 결속된 **저장된** 취소 Event를 별도 조회하도록 연결했습니다. 다른 Reader 구매권·임의 Event로 대체하지 않습니다.
+- **안전:** 구매·공지 사전검사가 충족되지 않은 경우 기존과 같이 `exact_unit_evidence_unavailable`·법적 검토 결과 null을 유지하며, 저장된 취소 기록이 단일 전액이어도 Provider 최신 GET·환불/정산 최종성·Reader 권한 회수 승인·고객 실제 제공 입증은 전부 false입니다.
+- **검증:** 회수 등으로 현재 Verified 구매 증거가 사라진 경우에도 Claim 원본 취소 기록만 비공개 관측하고 다른 권한·법적 판단이 생성되지 않는 회귀 테스트 추가. 새 커밋 CI 및 필수 통합 검증 결과가 나오기 전까지 성공 미판정.
+
+### 2026-11-05 — #2986 교차 Subject 청약철회 CI 테스트 실패 수정
+
+- **실패 확인:** [Commerce CI 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41905223372/job/126838099760)에서 TypeScript와 일반 테스트 1,983건은 통과했으나, 기존 교차 Subject 청약철회 회귀 테스트 1건이 실패했습니다.
+- **원인:** Claim의 다른 Subject를 내부 취소 기록에 정확히 전달하도록 구현한 뒤에도 테스트의 DB 모의 응답이 기존 Subject를 고정 기대하고, 실제 SQL이라면 조회되지 않을 타인의 원본 Receipt를 가짜 행으로 반환했습니다.
+- **수정:** 모의 DB의 취소 조회에서 원본 Claim Subject가 실제로 전달됐는지 검사하며, 타인 Subject일 때는 조회 결과가 0건이 되도록 조정했습니다. 반환 결과가 보류되고 타인의 구매·취소 기록과 환불·회수 권한이 포함되지 않는 검증을 유지했습니다.
+- **검증 상태:** 새 커밋의 GitHub Actions 결과 대기. 운영 코드·DB/PG/LIVE/권한 회수 동작 무변경.
