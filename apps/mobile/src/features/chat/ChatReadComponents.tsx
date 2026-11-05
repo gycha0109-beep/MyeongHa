@@ -3,6 +3,7 @@ import { groupMobileChatMessagesV1 } from '@/features/chat/chat-view-model';
 import { isSeyeonHistoryRevealHoldV1 } from '@/features/chat/seyeon-history-hold-state';
 import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-character-presentation';
 import { projectMobileChatEmptyGreetingV1 } from '@/features/chat/mobile-chat-empty-greeting';
+import { isMobileChatContinuationReadFailureV1, mobileChatContinuationErrorCopyV1 } from './mobile-chat-pagination-error-ui';
 import { MOBILE_CHAT_KNOWN_CHARACTERS_V1 } from '@/features/chat/chat-launch-roster';
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { mobileColors } from '@/ui/mobile-colors';
@@ -239,12 +240,31 @@ export function ChatReadMore({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
+  const { locale, t } = useMobileUiLocale();
   if (isSeyeonHistoryRevealHoldV1(snapshot)) return null;
   if (snapshot.status === 'error' && snapshot.messages.length === 0) {
     return onRetry === undefined ? null : (
       <Pressable accessibilityRole="button" onPress={onRetry} style={styles.loadMore}>
         <MobileUiText style={styles.loadMoreText}>대화 다시 불러오기 ↻</MobileUiText>
       </Pressable>
+    );
+  }
+  if (isMobileChatContinuationReadFailureV1(snapshot)) {
+    return (
+      <View style={styles.continuationError}>
+        <Text style={styles.continuationErrorText}>{mobileChatContinuationErrorCopyV1(locale)}</Text>
+        {snapshot.errorCode !== null ? (
+          <Text style={styles.diagnosticText}>{t('오류 코드')}: {snapshot.errorCode}</Text>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('더 불러오기 다시 시도')}
+          onPress={onLoadMore}
+          style={[styles.loadMore, snapshot.characterId === 'seyeon' && (theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface)]}
+        >
+          <MobileUiText style={styles.loadMoreText}>더 불러오기 다시 시도</MobileUiText>
+        </Pressable>
+      </View>
     );
   }
   if (!snapshot.hasMore) {
@@ -397,6 +417,8 @@ const styles = StyleSheet.create({
     padding: 22,
   },
   stateText: { color: mobileColors.muted, fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  continuationError: { paddingVertical: 12, gap: 9 },
+  continuationErrorText: { color: mobileColors.seal, fontSize: 13, lineHeight: 19, textAlign: 'center' },
   diagnosticText: { color: mobileColors.seal, fontSize: 12, fontWeight: '700', textAlign: 'center' },
   errorTitle: { color: mobileColors.ink, fontSize: 17, fontWeight: '800', textAlign: 'center' },
   emptyMark: { color: mobileColors.gold, fontSize: 24, fontWeight: '800' },
