@@ -8,6 +8,7 @@ import type {SeyeonRuntimeContextV2} from '../../../packages/domain/src/seyeon-r
 import type {RunSeyeonCharacterTurnV2Input} from './seyeon-character-runtime-v2.js';
 import type {SeyeonPersonalRecordProjectionCandidateV1} from './seyeon-production-context-v1.js';
 import type {SeyeonG1HistoricalFinalContextSealPortV1} from './postgres-seyeon-g1-historical-final-context-seal-port-v1.js';
+import type {SeyeonG1HistoricalSourceAdmissionPortV1} from './postgres-seyeon-g1-historical-source-admission-port-v1.js';
 import {
   assertSeyeonG1HistoricalPostPreflightContextCandidateV1,
   SeyeonG1HistoricalPostPreflightContextHoldV1,
@@ -28,6 +29,8 @@ export interface SeyeonG1HistoricalPostPreflightSealHoldInputV1 {
   readonly census:HistoricalCensus;
   readonly persistedHistoricalCandidateProof:Readonly<Record<string,unknown>>;
   readonly sealPort:SeyeonG1HistoricalFinalContextSealPortV1;
+  /** S0-only DB Owner source-selection admission; NEVER Model dispatch. */
+  readonly sourceAdmissionPort:SeyeonG1HistoricalSourceAdmissionPortV1;
 }
 
 /**
@@ -36,8 +39,9 @@ export interface SeyeonG1HistoricalPostPreflightSealHoldInputV1 {
  * 1) Check the assembled packet AFTER governed Preflight.
  * 2) Inside the DB Owner transaction, recheck ALL current originals and
  *    persist a separate immutable historical final-context receipt.
- * 3) ALWAYS HOLD, even if every check succeeds: no historical G1 Model
- *    permission, G2 atomic Commit or G3 first Reveal is issued here.
+ * 3) Require DB Owner to issue immutable exact-source selection approval
+ *    after the seal. A success still forbids Model dispatch/Commit/Reveal.
+ * 4) ALWAYS HOLD, even if every check succeeds.
  *
  * A DB call or receipt failure also HOLDS. The callback MUST be awaited by
  * the runtime before Interpreter. Never run this in a swallowed catch that
@@ -70,7 +74,7 @@ export function createSeyeonG1HistoricalPostPreflightSealHoldV1(
       // Subject, Turn, Attempt, ALL originals and approved Memory Grant.
       // Caller supplies an independently committed DB Owner port. A
       // successful receipt is NOT an admission and MUST NOT resume runtime.
-      await input.sealPort.sealAfterContextVerification({
+      const sealed=await input.sealPort.sealAfterContextVerification({
         subjectId:input.subjectId,
         threadId:input.threadId,
         turnId:input.turnId,
@@ -78,6 +82,30 @@ export function createSeyeonG1HistoricalPostPreflightSealHoldV1(
         actualFinalModelContextDigest,
         preModelContextDigest,
         historicalSourceCount:input.census.historicalSourceCount,
+      });
+      const originalRecordId=input.persistedHistoricalCandidateProof.recordId;
+      const originalGrantId=input.persistedHistoricalCandidateProof.originalGrantId;
+      const historicalSourceCensusDigest=
+        input.persistedHistoricalCandidateProof.historicalSourceCensusDigest;
+      if(typeof originalRecordId!=='string'
+        ||typeof originalGrantId!=='string'
+        ||typeof historicalSourceCensusDigest!=='string')
+        throw new SeyeonG1HistoricalPostPreflightContextHoldV1();
+
+      // Recheck the original records and exact consent once more under
+      // the Owner admission TX; the source selection receipt is independent
+      // from (and cannot upgrade) historical Model/G2/G3 authority.
+      await input.sourceAdmissionPort.admitExactSources({
+        subjectId:input.subjectId,
+        threadId:input.threadId,
+        turnId:input.turnId,
+        attemptId:input.attemptId,
+        finalModelContextDigest:sealed.finalModelContextDigest,
+        candidatePgJsonbDigest:sealed.candidatePgJsonbDigest,
+        originalRecordId,
+        originalGrantId,
+        historicalSourceCount:input.census.historicalSourceCount,
+        historicalSourceCensusDigest,
       });
     } catch {
       // Any interrupted or already-committed S0 seal stays non-retryable.

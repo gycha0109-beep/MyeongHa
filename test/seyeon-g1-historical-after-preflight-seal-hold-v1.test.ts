@@ -8,6 +8,8 @@ import {
   runSeyeonCharacterTurnV2,
   type SeyeonStructuredProviderPortV2,
 } from '../apps/api/src/seyeon-character-runtime-v2.js';
+import type {SeyeonG1HistoricalSourceAdmissionRequestV1,SeyeonG1HistoricalSourceAdmissionReceiptV1}
+  from '../apps/api/src/postgres-seyeon-g1-historical-source-admission-port-v1.js';
 import {createIntegrityClassifier,createDisclosureClassifier}
   from '../apps/api/src/seyeon-production-governance-v1.js';
 import {
@@ -81,6 +83,7 @@ const proof={
   currentUserTextDigest:wire(recent[2]!.text),
   historicalSourceCount:census.historicalSourceCount,
   historicalSources:census.historicalSources,
+  historicalSourceCensusDigest:'sha256:pg-jsonb:v1:'+'c'.repeat(64),
   recordKind:'memory',recordId:id(6),originalGrantId:id(7),
   recordType:candidate.recordType,recordSchemaVersion:candidate.schemaVersion,
   projectorVersion:candidate.projectorVersion,
@@ -91,7 +94,7 @@ const proof={
   expectedFinalModelContextDigest:candidateSeal.expectedFinalModelContextDigest,
 };
 
-function offline(injectClaim=false,failedSeal=false,originalProof:Readonly<Record<string,unknown>>=proof){
+function offline(injectClaim=false,failedSeal=false,originalProof:Readonly<Record<string,unknown>>=proof,failedAdmission=false){
   const called:string[]=[];
   const generate=vi.fn(async(req:{purpose:string}):Promise<unknown>=>{
     called.push(req.purpose);
@@ -127,6 +130,32 @@ function offline(injectClaim=false,failedSeal=false,originalProof:Readonly<Recor
       permitsAtomicCommit:false as const,permitsHttpReveal:false as const,
     };
   });
+  const admitExactSources=vi.fn(async (
+    request:SeyeonG1HistoricalSourceAdmissionRequestV1,
+  ):Promise<SeyeonG1HistoricalSourceAdmissionReceiptV1>=>{
+    if(failedAdmission)throw Error('SIMULATED_REGISTRY_OR_ORIGINAL_GRANT_REJECTED');
+    return {
+      schemaVersion:'seyeon-g1-historical-source-admission-s0-v1',
+      subjectId:request.subjectId,threadId:request.threadId,
+      turnId:request.turnId,attemptId:request.attemptId,
+      characterId:'seyeon',recordKind:'memory',
+      recordId:request.originalRecordId,
+      originalGrantId:request.originalGrantId,
+      recordType:'conversation_recall',recordSchemaVersion:'v1',
+      projectorVersion:'seyeon-conversation-recall-projector-v1',
+      originalPgJsonbDigest:'sha256:pg-jsonb:v1:'+'a'.repeat(64),
+      selectedSourcesDigest:selection.selectedSourcesDigest,
+      projectedMemoryDigest:candidate.projectedMemoryDigest,
+      historicalSourceCensusDigest:request.historicalSourceCensusDigest,
+      historicalAssistantOriginalSourcesDigest:'sha256:pg-jsonb:v1:'+'d'.repeat(64),
+      historicalSourceCount:request.historicalSourceCount,
+      candidatePgJsonbDigest:request.candidatePgJsonbDigest,
+      finalModelContextDigest:request.finalModelContextDigest,
+      originalsCurrentAtAdmission:true,authorizesSourceSelection:true,
+      permitsModelDispatch:false,permitsAtomicCommit:false,
+      permitsHttpReveal:false,
+    };
+  });
   const callback=createSeyeonG1HistoricalPostPreflightSealHoldV1({
     subjectId:id(1),threadId:id(2),turnId:id(3),attemptId:id(4),
     pinnedContextInput:contextInput,currentUserMessageId:id(5),
@@ -134,6 +163,7 @@ function offline(injectClaim=false,failedSeal=false,originalProof:Readonly<Recor
     sourceCandidates:[candidate],census,
     persistedHistoricalCandidateProof:originalProof,
     sealPort:{sealAfterContextVerification},
+    sourceAdmissionPort:{admitExactSources},
   });
   const governance={
     relationship:{gate:'PUBLIC' as const,trustBand:'low' as const,
@@ -163,7 +193,7 @@ function offline(injectClaim=false,failedSeal=false,originalProof:Readonly<Recor
     interpreterProvider:provider,rendererProvider:provider,
     semanticReviewerProvider:provider,
   });
-  return {run,called,generate,sealAfterContextVerification};
+  return {run,called,generate,sealAfterContextVerification,admitExactSources};
 }
 
 describe('W76 isolated G1 real Preflight -> database final seal -> unconditional HOLD',()=>{
@@ -191,24 +221,43 @@ describe('W76 isolated G1 real Preflight -> database final seal -> unconditional
       preModelContextDigest:proof.preModelContextDigest,
       historicalSourceCount:2,
     });
+    expect(h.admitExactSources).toHaveBeenCalledExactlyOnceWith({
+      subjectId:id(1),threadId:id(2),turnId:id(3),attemptId:id(4),
+      finalModelContextDigest:proof.expectedFinalModelContextDigest,
+      candidatePgJsonbDigest:'sha256:pg-jsonb:v1:'+'b'.repeat(64),
+      originalRecordId:id(6),originalGrantId:id(7),
+      historicalSourceCount:2,
+      historicalSourceCensusDigest:proof.historicalSourceCensusDigest,
+    });
     expect(h.generate).toHaveBeenCalledTimes(2);
   });
   it('does not persist a seal when actual Preflight introduced unpinned integrity context',async()=>{
     const h=offline(true);
     await expect(h.run).rejects.toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
     expect(h.sealAfterContextVerification).not.toHaveBeenCalled();
+    expect(h.admitExactSources).not.toHaveBeenCalled();
     expect(h.called).toEqual(['integrity_classification','disclosure_classification']);
   });
   it('holds if DB Owner sees revoked originals after Preflight validation',async()=>{
     const h=offline(false,true);
     await expect(h.run).rejects.toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
     expect(h.sealAfterContextVerification).toHaveBeenCalledTimes(1);
+    expect(h.admitExactSources).not.toHaveBeenCalled();
     expect(h.called).toEqual(['integrity_classification','disclosure_classification']);
+  });
+  it('HOLDs on DB admission rejection after an exact seal, without dispatching any Interpreter',async()=>{
+    const h=offline(false,false,proof,true);
+    await expect(h.run).rejects.toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
+    expect(h.sealAfterContextVerification).toHaveBeenCalledTimes(1);
+    expect(h.admitExactSources).toHaveBeenCalledTimes(1);
+    expect(h.called).toEqual(['integrity_classification','disclosure_classification']);
+    expect(h.generate).toHaveBeenCalledTimes(2);
   });
   it('does not persist or dispatch when historical original Grant changes after candidate Pin',async()=>{
     const h=offline(false,false,{...proof,originalGrantId:id(10)});
     await expect(h.run).rejects.toThrow(SeyeonG1HistoricalPostPreflightContextHoldV1);
     expect(h.sealAfterContextVerification).not.toHaveBeenCalled();
+    expect(h.admitExactSources).not.toHaveBeenCalled();
     expect(h.called).toEqual(['integrity_classification','disclosure_classification']);
   });
 });

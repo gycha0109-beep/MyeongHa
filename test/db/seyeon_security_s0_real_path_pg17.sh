@@ -13,6 +13,10 @@ node scripts/operations/seyeon-security-s0/install-isolated.mjs
 ./node_modules/.bin/vitest run \
   test/seyeon-g1-historical-source-admission-w81.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \
+  test/seyeon-g1-historical-source-admission-port-w82.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run \
+  test/seyeon-g1-historical-after-preflight-seal-hold-v1.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run \
   test/seyeon-g2-historical-same-transaction-hold-w77.test.ts --maxWorkers=1
 SEYEON_SECURITY_S0_REAL_PG=1 ./node_modules/.bin/vitest run \
   test/seyeon-security-s0-postgres.e2e.test.ts --maxWorkers=1
