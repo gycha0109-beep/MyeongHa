@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createMobileChatMessageViewV1, groupMobileChatMessagesV1 } from '../apps/mobile/src/features/chat/chat-view-model.js';
+import { createMobileChatMessageViewV1, formatMobileChatTimeV1, groupMobileChatMessagesV1 } from '../apps/mobile/src/features/chat/chat-view-model.js';
 import type { ChatMessageV1 } from '../packages/api-client/src/chat.js';
 
 describe('mobile Chat message view model', () => {
@@ -99,6 +99,48 @@ describe('mobile Chat message view model', () => {
     ]);
     expect(grouped[3]?.messages[0]?.body).toBe('가려진 메시지');
     expect(JSON.stringify(grouped)).not.toContain('secret');
+  });
+
+  it('localizes only authored placeholders and system labels, never a supplied message body', () => {
+    const secret = makeMessage(10, 'character', '2026-10-16T10:00:00.000Z', {
+      redacted: true, bodyText: 'private source text',
+    });
+    const ordinary = makeMessage(11, 'user', '2026-10-16T10:01:00.000Z', {
+      bodyText: '가려진 메시지',
+    });
+    const noText = makeMessage(12, 'system', '2026-10-16T10:02:00.000Z', {
+      bodyText: null,
+    });
+    const redactions = {
+      'ko-KR': '가려진 메시지',
+      'ja-JP': '非表示のメッセージ',
+      'zh-TW': '已隱藏的訊息',
+      'en-US': 'Hidden message',
+      'zh-CN': '已隐藏的消息',
+    } as const;
+    for (const [locale, expected] of Object.entries(redactions) as [keyof typeof redactions, string][]) {
+      const hidden = createMobileChatMessageViewV1(secret, '세연', locale);
+      expect(hidden.body).toBe(expected);
+      expect(JSON.stringify(hidden)).not.toContain('private source text');
+      expect(createMobileChatMessageViewV1(ordinary, undefined, locale).body).toBe('가려진 메시지');
+      expect(createMobileChatMessageViewV1(noText, undefined, locale).body.length).toBeGreaterThan(0);
+    }
+    expect(createMobileChatMessageViewV1(noText, undefined, 'en-US').label).toBe('Notice');
+    expect(createMobileChatMessageViewV1(noText, undefined, 'en-US').body).toBe('Message without displayable text');
+    expect(createMobileChatMessageViewV1(noText).body).toBe('표시할 수 있는 텍스트가 없는 메시지');
+  });
+
+  it('uses selected UI clock format without altering message timestamps or grouping', () => {
+    const source = makeMessage(15, 'character', new Date(2026, 9, 16, 15, 45).toISOString());
+    const ko = createMobileChatMessageViewV1(source, '세연', 'ko-KR');
+    const en = createMobileChatMessageViewV1(source, '세연', 'en-US');
+    expect(ko.timeLabel).toBe(formatMobileChatTimeV1(source.createdAt, 'ko-KR'));
+    expect(en.timeLabel).toBe(formatMobileChatTimeV1(source.createdAt, 'en-US'));
+    expect(en.timeLabel).toMatch(/PM/u);
+    expect(ko.timeLabel).not.toBe(en.timeLabel);
+    expect(formatMobileChatTimeV1('not-a-date', 'en-US')).toBe('');
+    expect(groupMobileChatMessagesV1([source], '세연', 'en-US')[0]?.timeLabel).toBe(en.timeLabel);
+    expect(source.createdAt).toBe(new Date(2026, 9, 16, 15, 45).toISOString());
   });
 
 });

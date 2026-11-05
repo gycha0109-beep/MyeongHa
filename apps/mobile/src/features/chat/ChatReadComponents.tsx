@@ -75,7 +75,7 @@ export function ChatReadMessages({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const isSeyeonTheme = snapshot.characterId === 'seyeon';
   if (snapshot.status === 'loading_initial' || snapshot.status === 'idle') {
     return (
@@ -146,7 +146,7 @@ export function ChatReadMessages({
   );
   // The room's verified Character identity, not a guess from a message body.
   const displayName = character?.displayName ?? t('대화 상대');
-  const groups = groupMobileChatMessagesV1(snapshot.messages, displayName);
+  const groups = groupMobileChatMessagesV1(snapshot.messages, displayName, locale);
 
   return (
     <View style={styles.messages}>
