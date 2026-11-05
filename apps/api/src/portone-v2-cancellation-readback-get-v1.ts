@@ -22,6 +22,31 @@ function validIdentity(v:unknown):v is string {
 function providerError():Error{
   return new Error('PortOne V2 cancellation readback unavailable.');
 }
+/**
+ * Caching is not a Provider event ordering source. However, a shared HTTP
+ * cache must not silently turn this GET into an older payment observation.
+ * Block explicit reused-response signals BEFORE reading payment details.
+ * Absence of these headers is NOT origin freshness or NEWER/STALE proof.
+ */
+function rejectCachedCancellationReadback(response: Response): void {
+  // RFC 9111: even Age: 0 indicates a representation obtained from a cache.
+  if (response.headers.has('age')) throw providerError();
+  const status = response.headers.get('cache-status');
+  // RFC 9211: hit / hit=?1 means a cached response was used.
+  if (status !== null && (
+    status.length > 2048 ||
+    /(?:^|[,;])\s*hit\s*(?:[,;]|$|=\s*\?1(?:[,;]|$))/iu.test(status)
+  )) throw providerError();
+  // Common intermediary diagnostics. MISS/BYPASS/DYNAMIC alone are not hits.
+  for (const name of ['x-cache', 'cf-cache-status', 'x-vercel-cache', 'x-proxy-cache']) {
+    const value = response.headers.get(name);
+    if (value !== null && (
+      value.length > 2048 ||
+      /(?:^|[^a-z])(?:hit|stale|updating|revalidated)(?:$|[^a-z])/iu.test(value)
+    )) throw providerError();
+  }
+}
+
 async function readBoundedJson(
   response:Response,
   maxBytes:number,
@@ -90,10 +115,16 @@ export async function getPortOneV2PaymentReadbackPrivateV1(input:Readonly<{
     const operation=(async()=>{
       const response=await (input.fetchImpl??fetch)(
         `${PORTONE_V2_CANCELLATION_READBACK_GET_V1.endpoint}/payments/${encodeURIComponent(input.providerPaymentId)}`,
-        {method:'GET',redirect:'manual',signal,
-          headers:{accept:'application/json',authorization:`PortOne ${input.apiSecret}`}},
+        {method:'GET',redirect:'manual',cache:'no-store',signal,
+          headers:{
+            accept:'application/json',
+            authorization:`PortOne ${input.apiSecret}`,
+            'cache-control':'no-cache, no-store',
+            pragma:'no-cache',
+          }},
       );
       if(response.status!==200)throw providerError();
+      rejectCachedCancellationReadback(response);
       return readBoundedJson(response,PORTONE_V2_CANCELLATION_READBACK_GET_V1.maxResponseBytes);
     })();
     return await Promise.race([operation,deadline]);
