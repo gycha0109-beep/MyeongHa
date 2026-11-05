@@ -69,6 +69,15 @@ export function formatRecordDateV1(value: string, locale: MobileUiLocale = 'ko-K
   return `${year}.${month}.${day}`;
 }
 
+/** Locale-only loaded row count, not a server-side collection total. */
+export function formatLoadedRecordsCountV1(count: number, locale: MobileUiLocale = 'ko-KR'): string {
+  if (locale === 'ja-JP') return `読み込み済み ${count}件`;
+  if (locale === 'zh-TW') return `已載入 ${count}筆紀錄`;
+  if (locale === 'en-US') return `Loaded ${count} ${count === 1 ? 'record' : 'records'}`;
+  if (locale === 'zh-CN') return `已加载 ${count} 条记录`;
+  return `현재 불러온 기록 ${count}건`;
+}
+
 export function readingIsArchiveOpenableV1(value: string): boolean {
   return value === 'delivered' || value === 'delivered_with_fallback';
 }
