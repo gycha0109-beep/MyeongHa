@@ -23,6 +23,9 @@ describe('mobile Chat detail prevents old-subject async send effects', () => {
     expect(send).toContain('mobileChatPendingTurnStoreV1.write(threadId, ownerId, request)');
     expect(send).toContain('mobileChatTurnSendServiceV1.send({');
     expect(send).toContain('mobileChatPendingTurnStoreV1.clear(threadId, ownerId)');
+    expect(send).toContain('sendOwnerId = ownerId');
+    expect(send).toContain('mobileChatPendingTurnStoreV1.clear(threadId, sendOwnerId)');
+    expect(send).not.toContain('memberSession.read().catch(() => null)');
     expect(send).toContain('if (!stillCurrent()) return');
     expect(send.split('if (!stillCurrent()) return').length - 1).toBeGreaterThanOrEqual(7);
     expect(send).toContain('if (stillCurrent()) setSendStatus(sendErrorMessage(error))');
