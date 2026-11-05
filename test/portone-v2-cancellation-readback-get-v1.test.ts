@@ -51,12 +51,49 @@ describe('PortOne V2 cancellation readback read-only GET candidate',()=>{
   expect(url).toBe('https://api.portone.io/payments/paid-order-1');
   expect(init.method).toBe('GET');
   expect(init.redirect).toBe('manual');
+  expect(init.cache).toBe('no-store');
   expect(init.headers).toMatchObject({
     authorization:'PortOne local-only-test-portone-secret-value',
     accept:'application/json',
+    'cache-control':'no-cache, no-store',
+    pragma:'no-cache',
   });
   expect(result).not.toHaveProperty('apiSecret');
   expect(result).not.toHaveProperty('paymentId');
+ });
+ it.each([
+  ['age','0'],
+  ['age','7'],
+  ['age','not-a-number'],
+  ['cache-status','Edge; hit; ttl=120'],
+  ['cache-status','Edge; hit=?1'],
+  ['cache-status','Origin; fwd=uri-miss, Edge; hit'],
+  ['x-cache','TCP_HIT from proxy'],
+  ['cf-cache-status','STALE'],
+  ['cf-cache-status','UPDATING'],
+  ['x-vercel-cache','HIT'],
+  ['x-proxy-cache','REVALIDATED'],
+ ])('rejects cached private payment readback: %s = %s',async(name,value)=>{
+  const fetchImpl=vi.fn(async (_url:string,_init?:RequestInit)=>new Response(
+    JSON.stringify(PAYMENT),{
+      status:200,
+      headers:{'content-type':'application/json',[name]:value},
+    },
+  )) as unknown as typeof fetch;
+  await expect(run({...ORIGINAL,fetchImpl})).rejects.toThrow('unavailable');
+ });
+ it('accepts a successful uncached transport shape but never asserts Provider order',async()=>{
+  const fetchImpl=vi.fn(async (_url:string,_init?:RequestInit)=>new Response(
+    JSON.stringify(PAYMENT),{status:200,headers:{
+      'content-type':'application/json',
+      'cache-status':'Origin; fwd=uri-miss',
+      'x-cache':'MISS',
+      'cf-cache-status':'BYPASS',
+    }},
+  )) as unknown as typeof fetch;
+  const result=await run({...ORIGINAL,fetchImpl});
+  expect(result.kind).toBe('full_cancel_shape_observed');
+  expect(result.entitlementRevocationAuthorized).toBe(false);
  });
  it('recognizes partial cancellation without revocation',async()=>{
   const fetchImpl=fakeFetch({

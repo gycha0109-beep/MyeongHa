@@ -113,6 +113,24 @@ describe('P4 stored canonical set vs authenticated current PortOne cancellation 
   expect(client.calls.filter(x=>x.sql==='rollback')).toHaveLength(2);
   safe(result);
  });
+ it.each([
+  ['age','0'],
+  ['cache-status','Edge; hit; ttl=3600'],
+  ['cf-cache-status','STALE'],
+ ])('holds full-set reconciliation when Provider GET carries reused cache signal: %s',async(name,value)=>{
+  const client=db();
+  const fetchImpl=vi.fn(async()=>new Response(
+   JSON.stringify(PAYMENT),{status:200,headers:{
+    'content-type':'application/json',[name]:value,
+   }},
+  ));
+  const result=await run(client,{fetchImpl});
+  expect(result.kind).toBe('current_provider_cancel_set_get_unavailable');
+  expect(result.observedProviderSetMatched).toBe(false);
+  expect(client.calls.filter(x=>x.sql===SQL)).toHaveLength(1);
+  expect(client.calls.filter(x=>x.sql==='rollback')).toHaveLength(1);
+  safe(result);
+ });
  it('detects same aggregate but changed individual item amounts',async()=>{
   const result=await run(db(),{fetchImpl:fetchFor({
    ...PAYMENT,cancellations:[

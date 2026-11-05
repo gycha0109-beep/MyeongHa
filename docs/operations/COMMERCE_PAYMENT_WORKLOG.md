@@ -586,3 +586,11 @@
 - **실패 근거:** [DB dependency · postgres17 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41950832634/job/126994675538)에서 신규 청약철회 Claim/원본 취소 Event 작성 후 기존 `internal_apply_entitlement_effect_v1` 호출이 `official_reader_s2_legacy_effect_scope_lock_required` / `Legacy Reader provider effect cannot bypass the S1 scope lock`로 차단됐습니다. 이는 운영 DB 보호 기능의 정상적인 거부입니다.
 - **수정:** 새로운 통합 검증이 대상 B2와 별도 B3의 원본 `standard_reading_reader_access_grants`에서 Subject·Official Reading·Reader의 고유 스코프를 조회하고, 데이터베이스의 정해진 순서로 기존 `internal_acquire_official_reader_scope_lock_v1`를 사용해 S1 트랜잭션 잠금을 먼저 획득하도록 했습니다. 두 독립 구매의 스코프 존재를 확인한 후에만 원본 취소 Event/구매권 Effect 경로를 검사합니다.
 - **안전:** 기존 1790 Reader 회수 방어·접수 회원 자격·기존 이벤트/Grant Writer 변경 없음. 합성 PG17 트랜잭션은 ROLLBACK, 운영 권한·실제 결제/환불/LIVE 변경 없음. 새 HEAD의 CI·통합 검사 결과 전까지 성공 미판정.
+
+### 2026-11-05 — 결제 취소 최신 상태 확인의 HTTP 캐시 재사용 차단 (로드맵 §6-1)
+
+- **현재 상태:** [#2991](https://github.com/gycha0109-beep/MyeongHa/pull/2991) 결제→청약철회→원본 취소→정확한 Reader Effect 격리 PG17 통합 검증은 필수 통합 CI까지 통과하여 main에 병합됨. 로드맵 §6-1의 PortOne 신뢰 가능한 NEWER/STALE 이벤트 순서 판정은 **여전히 미완료**.
+- **발견:** 개별 취소 조회와 전체 취소 집합 대조에서 공통 사용하는 PortOne 인증 GET가 응답 상태·금액·HMAC을 정확히 검사하더라도, 중간 캐시가 과거의 유효한 취소 집합을 재사용했다는 명시적 신호를 차단하는 HTTP 경계가 없었음. 두 시점 DB 조회가 일치해도 외부 GET 과거 응답을 최신으로 단정할 수 없음.
+- **수정:** 기존 `getPortOneV2PaymentReadbackPrivateV1` 공통 GET에 요청 `cache:'no-store'`, `Cache-Control: no-cache, no-store`, `Pragma: no-cache`를 지정. 응답에 RFC 9111 `Age`가 있거나 RFC 9211 `Cache-Status; hit`, 알려진 중간 캐시 `HIT/STALE/UPDATING/REVALIDATED`가 표시되면 본문 사용 전 실패 처리. `MISS/BYPASS`는 캐시 사용 증거로 오인하지 않음. 모든 실패는 기존 읽기 전용 보류 경로로 귀결.
+- **회귀 검증:** 개별/전체 HMAC 취소 GET에서 새 요청 설정 확인, 캐시 적중·0초 `Age`·STALE 헤더 차단, 전체 집합 재검증이 캐시 신호 발생 시 두 번째 DB 스냅샷/Reader CAS로 진입하지 않음을 테스트. 커밋의 CI 및 최종 통합 검증 통과 전 실제 성공 판정하지 않음.
+- **유지 한계:** 헤더가 없는 응답도 Provider 최신 상태나 취소 Event 순서를 증명하지 않음. `providerOrderingProven=false`, 법정 환불/고객 제공·Reader T2/Entitlement Effect 승인 false, 운영 환불 POST·운영 DB·LIVE·상품 활성화 불변. 취소 NEWER/STALE의 신뢰 가능한 비교 근거와 실제 안전한 권한 회수 결속은 추가 구현 필요.
