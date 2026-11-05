@@ -18,7 +18,25 @@ describe('product-wide identity and clarity', () => {
     expect(css.match(/--mh-nav-icon: url\("assets\/myeongha-icons\//g)).toHaveLength(6);
     for (const name of ['home','saju','face','chat','records','my','theme-sun','theme-moon','notification','language']) {
       const svg = await read('assets/myeongha-icons/' + name + '.svg');
-      expect(svg).toContain('viewBox="0 0 192 192"');
+      const box = svg.match(/viewBox="(-?[0-9]+) (-?[0-9]+) ([0-9]+) ([0-9]+)"/);
+      expect(box).not.toBeNull();
+      const x = Number(box?.[1]);
+      const y = Number(box?.[2]);
+      const width = Number(box?.[3]);
+      const height = Number(box?.[4]);
+      expect([x, y, width, height].every(Number.isFinite)).toBe(true);
+      expect(width).toBe(height);
+      const points = [...svg.matchAll(/(-?[0-9]+),(-?[0-9]+)/g)].map(m => ({ x: Number(m[1]), y: Number(m[2]) }));
+      expect(points.length).toBeGreaterThan(10);
+      const xs = points.map(p => p.x);
+      const ys = points.map(p => p.y);
+      const left = Math.min(...xs); const right = Math.max(...xs);
+      const top = Math.min(...ys); const bottom = Math.max(...ys);
+      expect(Math.max(right-left, bottom-top) / width).toBeGreaterThan(0.84);
+      expect(left).toBeGreaterThanOrEqual(x);
+      expect(right).toBeLessThanOrEqual(x+width);
+      expect(top).toBeGreaterThanOrEqual(y);
+      expect(bottom).toBeLessThanOrEqual(y+height);
       expect(svg).toContain('fill-rule="evenodd"');
     }
     expect(css).toContain('grid-template-columns: repeat(6, minmax(0, 1fr));');
