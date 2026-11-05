@@ -10,6 +10,13 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-05 KST — Phase 5/6 운영 보안 로그 표본과 비노출 확인
+
+- `myeongha` Worker 버전 `73097a34-db6b-4cf9-99c8-24dfcc4a73e3`에 운영 트래픽 100%를 확인했다. [Cloudflare 빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/7d3fb74f-01c1-4b19-aa61-3183d7519404)의 소스는 `7b80e9336cb80959c5c25b62f9b65aa999b90e57`이다.
+- 해당 버전의 `GET /api/me`에 실제 자격 증명 대신 무작위 합성 문자열을 한 번 보냈다. 응답은 401·`no-store`였고 합성 문자열을 반사하지 않았다. 15:44:14–15:44:57 KST에 Cloudflare 텔레메트리를 집계한 결과 서비스 이벤트 1개, 구조화 `ACCESS_DENIED` 이벤트 1개, 합성 문자열 일치 0개였다. 로그 원문, 요청 식별자, 헤더 값은 보존하지 않았다. 단일 검증 구간의 비노출이며 요청 ID를 통한 개별 이벤트 연결과 다른 로그 필드의 비식별화는 미검증이다.
+- 집계를 재현할 때는 확인한 Worker 버전에서 동일한 음성 요청을 한 번 실행한 뒤, Cloudflare Observability Query에 `dry=true`, `view=calculations`, `count`를 사용한다. 좁은 시간 범위에서 `$metadata.service=myeongha` 전체, `MYEONGHA_SECURITY_EVENT`와 `ACCESS_DENIED`가 있는 메시지, 합성 문자열과 일치하는 이벤트를 각각 센다. 로그 원문을 조회할 필요가 없다. [Cloudflare 집계 API](https://developers.cloudflare.com/api/resources/workers/subresources/observability/subresources/telemetry/methods/query/).
+- 앞선 14:55:39–15:25:39 KST에 Worker 집계 요청 174건과 Worker 오류 0건을 확인했다. 이 구간은 서비스 단위 적응형 집계다. 배포 버전별 오류율, 의존성별 지표, 알림 전달과 보존 기간은 별도 검증 대상이다. 구조화 로그 관련 로컬 테스트 32개와 거버넌스 검사도 통과했다.
+
 ### 2026-11-05 KST — Phase 11 실제 GoTrue·PG18·Saju 단기 통합 실측 성공
 
 - [Linux #41979084279](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41979084279)가 `main` `429b82e6eace9963d39bb97bf6d642e9516d4d26`에서 성공했다. 순차 12/12 성공, 동시성 8에서 18/32 성공·14건 503을 관측했다. 성공 응답 p95는 각각 127.595ms와 254.166ms였다. [원본·해시·범위](REAL_GOTRUE_PG18_SAJU_PRODUCT_CHAIN_PHASE11_20261105.md).
