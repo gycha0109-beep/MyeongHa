@@ -104,6 +104,8 @@ begin
        jsonb_typeof(v_source_admission) is distinct from 'object'
        or v_source_admission->>'schemaVersion' is distinct from
           'seyeon-g1-historical-source-admission-s0-v1'
+       or (select count(*) from jsonb_object_keys(v_source_admission))<>25
+       or v_source_admission->>'characterId' is distinct from 'seyeon'
        or v_source_admission->>'subjectId' is distinct from p_subject_id::text
        or v_source_admission->>'threadId' is distinct from p_thread_id::text
        or v_source_admission->>'turnId' is distinct from p_turn_id::text
@@ -121,6 +123,11 @@ begin
           v_candidate->>'projectorVersion'
        or v_source_admission->>'projectedMemoryDigest' is distinct from
           v_candidate->>'projectedMemoryDigest'
+       or v_source_admission->>'selectedSourcesDigest' is distinct from
+          v_candidate->>'selectedSourcesDigest'
+       or v_source_admission->>'historicalAssistantOriginalSourcesDigest'
+          is distinct from
+          v_candidate->>'historicalAssistantOriginalSourcesDigest'
        or v_source_admission->>'historicalSourceCensusDigest' is distinct from
           v_candidate->>'historicalSourceCensusDigest'
        or v_source_admission->>'historicalSourceCount' is distinct from
@@ -189,6 +196,23 @@ begin
       constraint='seyeon_historical_g2_window_invalid',
       message='G2 historical originals are incomplete';
   end if;
+  -- A G1 SOURCE admission is not a permanent entitlement. The exact
+  -- original Memory type/schema/projector must remain enabled AT G2 Commit.
+  -- This SHARE lock is retained with the Turn/Attempt and original Grant
+  -- locks in this very DB transaction. Disabling a source type cannot race
+  -- through the native v2 Commit after an earlier G1 admission.
+  perform 1 from public.seyeon_positive_source_type_registry_v1 reg
+  where reg.record_kind='memory' and reg.enabled
+    and reg.record_type=v_candidate->>'recordType'
+    and reg.schema_version=v_candidate->>'recordSchemaVersion'
+    and reg.projector_version=v_candidate->>'projectorVersion'
+  for share of reg;
+  if not found then
+    raise exception using errcode='42501',
+      constraint='seyeon_historical_g2_source_type_disabled',
+      message='Historical original model source type is no longer enabled at Commit';
+  end if;
+
   -- The G0 audit compares the COMPLETE original User/Assistant window,
   -- previous Assistant's original User/Record/Grant and selected Memory.
   -- Subject, Turn, Attempt and each original remain locked until COMMIT.

@@ -2355,6 +2355,37 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         state from public.chat_turn_attempts where id=$1`,[currentAttempt]);
       expect(persistedAdmission.admission).toEqual(issued.admission);
       expect(persistedAdmission.state).toBe('running');
+      // W85: source type was approved when G1 issued admission, but that
+      // approval is revoked BEFORE G2. A past immutable receipt must NOT
+      // overrule current registry state, even with the original Grant active.
+      const disabledAtG2=await pool.connect();
+      try{
+        await disabledAtG2.query('BEGIN');
+        const disabled=await disabledAtG2.query(`update
+          public.seyeon_positive_source_type_registry_v1 set enabled=false
+          where record_kind='memory'
+            and record_type='conversation_recall'
+            and schema_version='v1'
+            and projector_version='seyeon-conversation-recall-projector-v1'
+            and enabled=true`);
+        expect(disabled.rowCount).toBe(1);
+        await disabledAtG2.query('SET LOCAL ROLE myeongha_api_executor');
+        await disabledAtG2.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        await expect(disabledAtG2.query(`
+          select seyeon_private.assert_historical_g2_sealed_originals_s0_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid
+          )`,[f.subject,f.thread,currentTurn,currentAttempt]))
+          .rejects.toMatchObject({
+            constraint:'seyeon_historical_g2_source_type_disabled',
+          });
+      } finally {
+        await disabledAtG2.query('ROLLBACK').catch(()=>undefined);
+        disabledAtG2.release();
+      }
+      // Registry rollback restores exact current eligibility for the next
+      // still-HOLDed original-source audit; no Provider or Commit happens.
       await expect(sourceAdmission()).rejects.toMatchObject({
         constraint:'seyeon_historical_g1_admission_source_mismatch',
       });

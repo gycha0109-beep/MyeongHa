@@ -24,6 +24,39 @@ describe('W77 historical G2 exact original sources remain closed within v2 Commi
     expect(g0).toContain('lock_original_memory_grant_v1(');
     expect(g0).toContain('lock_memory_subject_v1(');
   });
+  it('rechecks the currently enabled original Memory type under the G2 transaction',()=>{
+    const sourceAdmission=sql('26-g1-historical-source-admission.sql');
+    const g1Registry=sourceAdmission.indexOf(
+      'perform 1 from public.seyeon_positive_source_type_registry_v1 reg'
+    );
+    const g2Registry=g2.indexOf(
+      'perform 1 from public.seyeon_positive_source_type_registry_v1 reg'
+    );
+    const g2Audit=g2.indexOf(
+      'v_audit:=seyeon_private.qry_recheck_historical_candidate_originals_s0_v1('
+    );
+    expect(g1Registry).toBeGreaterThan(0);
+    expect(g2Registry).toBeGreaterThan(0);
+    expect(g2Audit).toBeGreaterThan(g2Registry);
+    for(const rule of [
+      "reg.record_kind='memory' and reg.enabled",
+      "reg.record_type=v_candidate->>'recordType'",
+      "reg.schema_version=v_candidate->>'recordSchemaVersion'",
+      "reg.projector_version=v_candidate->>'projectorVersion'",
+      'for share of reg',
+      "constraint='seyeon_historical_g2_source_type_disabled'",
+    ])expect(g2).toContain(rule);
+    // An exact, previously issued 25-field source receipt is checked
+    // AGAINST the original candidate; no extra source claims are accepted.
+    expect(g2).toContain('jsonb_object_keys(v_source_admission))<>25');
+    for(const field of [
+      'selectedSourcesDigest','historicalAssistantOriginalSourcesDigest',
+    ])expect(g2).toMatch(new RegExp(
+      "v_source_admission->>'"+field+"'\\s+is distinct from"
+    ));
+    expect(g2).toContain("v_source_admission->>'characterId' is distinct from 'seyeon'");
+    expect(legacy).toContain('seyeon_g2_historical_candidate_not_authority');
+  });
   it('executes historical current-rights assertion and real v2 Commit in one DB function',()=>{
     const wrapper=g2.slice(g2.indexOf(
       'create function seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1('
