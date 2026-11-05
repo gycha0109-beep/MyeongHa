@@ -57,7 +57,7 @@ export type MobileHomeContinuationCardV1 =
       readingId: string;
       title: string;
       status: string;
-      dateLabel: string;
+      completedAt: string;
     }>
   | Readonly<{ kind: 'empty' }>
   | Readonly<{ kind: 'loading' }>
@@ -111,11 +111,6 @@ function readingStatus(item: ReadingHistoryItemV1): string {
   return '저장됨';
 }
 
-function dateLabel(value: string): string {
-  const match = /^(\d{4})-(\d{2})-(\d{2})/u.exec(value);
-  return match === null ? '—' : `${match[1]}.${match[2]}.${match[3]}`;
-}
-
 function todayCard(state: MobileHomeStateV1): MobileHomeTodayCardV1 {
   if (state.birth.kind === 'loading' || state.saju.kind === 'loading') {
     return Object.freeze({ kind: 'loading' });
@@ -167,7 +162,7 @@ function continuationCard(
     readingId: item.readingId,
     title: readingTitle(item),
     status: readingStatus(item),
-    dateLabel: dateLabel(item.completedAt),
+    completedAt: item.completedAt,
   });
 }
 

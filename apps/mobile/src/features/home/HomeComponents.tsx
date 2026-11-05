@@ -6,6 +6,7 @@ import type {
   MobileHomeContinuationCardV1,
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
+import { formatRecordDateV1 } from '@/features/records/records-view-model';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
@@ -133,7 +134,7 @@ export function HomeContinuationCard({
   card: MobileHomeContinuationCardV1;
 }) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHeading}>
@@ -153,7 +154,7 @@ export function HomeContinuationCard({
         <View style={styles.card}>
           <View style={styles.continuationTop}>
             <Text style={styles.recordSymbol}>命</Text>
-            <Text style={styles.date}>{card.dateLabel}</Text>
+            <Text style={styles.date}>{formatRecordDateV1(card.completedAt, locale)}</Text>
           </View>
           <Text style={styles.cardTitle}>{t(card.title)}</Text>
           <MobileUiText style={styles.body}>가장 최근 저장된 공식 사주 풀이</MobileUiText>

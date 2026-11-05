@@ -12,6 +12,7 @@ import {
   createMobileHomeViewModelV1,
 } from '../apps/mobile/src/features/home/home-view-model.js';
 import type { MobileHomeStateV1 } from '../apps/mobile/src/features/home/mobile-home-loader.js';
+import { formatRecordDateV1 } from '../apps/mobile/src/features/records/records-view-model.js';
 
 const profile: CurrentSubjectProfileV1 = {
   subjectId: 'subject-1',
@@ -142,9 +143,17 @@ describe('mobile Home view model', () => {
       readingId: 'reading-1',
       title: '직업 · 커리어',
       status: '완료',
-      dateLabel: '2026.09.28',
+      completedAt: '2026-09-28T01:00:00.000Z',
     });
     expect(JSON.stringify(view.continuation)).not.toContain('character-a');
+    if (view.continuation.kind !== 'ready') throw new Error('Expected recent Reading');
+    const timestamp = view.continuation.completedAt;
+    expect(formatRecordDateV1(timestamp, 'ko-KR')).toBe('2026.09.28');
+    expect(formatRecordDateV1(timestamp, 'ja-JP')).toBe('2026年9月28日');
+    expect(formatRecordDateV1(timestamp, 'zh-TW')).toBe('2026年9月28日');
+    expect(formatRecordDateV1(timestamp, 'en-US')).toBe('September 28, 2026');
+    expect(formatRecordDateV1(timestamp, 'zh-CN')).toBe('2026年9月28日');
+    expect(reading.completedAt).toBe(timestamp);
   });
 
   it('keeps the four Home topics source-bounded and non-executing', () => {
