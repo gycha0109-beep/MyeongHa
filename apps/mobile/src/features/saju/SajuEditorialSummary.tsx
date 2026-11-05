@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
+import { mobileSajuDayNameV1, mobileSajuDayQualifiersV1 } from '@/features/saju/mobile-saju-day-labels';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -11,7 +12,7 @@ import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
  */
 export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewModelV1 }) {
   const { theme } = useMobileTheme();
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const day = viewModel.dayMaster;
   const dayConfirmed = day.status === 'resolved';
 
@@ -30,9 +31,9 @@ export function SajuEditorialSummary({ viewModel }: { viewModel: MobileSajuViewM
         </View>
         <View style={styles.factCopy}>
           <MobileUiText style={styles.factLabel}>나의 일간</MobileUiText>
-          <Text style={styles.factPrimary}>{t(dayConfirmed ? day.hangul : '계산 상태 확인 필요')}</Text>
+          <Text style={styles.factPrimary}>{dayConfirmed ? mobileSajuDayNameV1(day, locale) : t('계산 상태 확인 필요')}</Text>
           <Text style={styles.factSecondary}>
-            {dayConfirmed ? [day.element, day.yinYang].filter(Boolean).map((part) => t(part ?? '')).join(' · ') : t('확정된 기둥만 표시합니다.')}
+            {dayConfirmed ? mobileSajuDayQualifiersV1(day, locale) : t('확정된 기둥만 표시합니다.')}
           </Text>
         </View>
       </View>
