@@ -98,6 +98,9 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
       f.subject,f.thread,f.turn,f.attempt,uuid(18,90),uuid(19,90),uuid(23,90),uuid(30,90)]));
     expect(denied.rows).toHaveLength(0);
     await pool.query(operation('production-25-unissued-zero-receipt-recovery-20261103.sql'));
+    // Operation 26 creates the postgres-owned protected original-message lock.
+    // Production 28 fails closed unless that dependency is already installed.
+    await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
     await pool.query(operation('production-27-g0-committed-followup-receipt-20261105.sql'));
     await pool.query(operation('production-28-g0-followup-owner-original-user-lock-20261105.sql'));
     const runtime=vi.fn(async()=>{throw Error('A committed reply must never invoke inference.');});
@@ -149,11 +152,8 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
         'select message_id::text as "messageId",sender_type as "senderType" from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,10)',
         [resolvedSubject.subjectId,thread,nextUser]),
     });
-    // The disposable DB already contains the governed 19/22 history rules.
-    // Install the original-source lock-only 26 bridge BEFORE reading history:
-    // the old owner-scoped SHARE helper cannot safely re-check received
-    // message lineage under RLS during recovery issuance.
-    await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
+    // Original-source lock-only operation 26 is installed once above,
+    // before the follow-up issuer and this guarded history read.
     const result=await context();
     expect(result.rows.map(x=>x.senderType)).toEqual(['user','character','user']);
     expect(result.rows.at(-1)?.messageId).toBe(nextUser);
