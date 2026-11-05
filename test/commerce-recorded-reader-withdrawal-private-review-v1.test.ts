@@ -76,7 +76,11 @@ function fixture(options:Options={}) {
     statements.push({sql,args});
     if(options.queryFailure==='begin'&&sql.startsWith('BEGIN'))throw Error('BEGIN failed');
     if(options.queryFailure==='rollback'&&sql==='ROLLBACK')throw Error('ROLLBACK failed');
-    if(sql.startsWith('BEGIN')||sql==='ROLLBACK')return {rows:[] as T[]};
+    if(sql.startsWith('BEGIN')||sql==='ROLLBACK'||
+       sql==='SAVEPOINT commerce_optional_s7_history'||
+       sql==='ROLLBACK TO SAVEPOINT commerce_optional_s7_history'||
+       sql==='RELEASE SAVEPOINT commerce_optional_s7_history')
+      return {rows:[] as T[]};
     if(sql.includes('pg_catalog.pg_roles'))return {rows:[{
       fullVisibility:options.visibility!==false,readOnly:options.readOnly!==false,
     } as T]};
@@ -380,6 +384,9 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       storedCancellationEvidence:{kind:'one_exact_full_cancel_recorded_only'},
     });
     expect(result?.providerRefundAuthorized).toBe(false);
+    expect(f.statements.map(x=>x.sql)).toContain(
+      'ROLLBACK TO SAVEPOINT commerce_optional_s7_history',
+    );
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
