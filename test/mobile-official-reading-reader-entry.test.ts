@@ -4,6 +4,8 @@ import { describe, expect, it } from 'vitest';
 import { createMobileReaderAccessViewStateV1 } from '../apps/mobile/src/features/reading/mobile-reader-access-view-model.js';
 import { projectMobileOfficialReadingReaderEntryV1 } from '../apps/mobile/src/features/reading/mobile-official-reading-reader-entry-view-model.js';
 import { MOBILE_READER_PRESENTATIONS_V1 } from '../apps/mobile/src/features/reading/mobile-reader-presentation.js';
+import { localizeMobileOfficialReaderToneV1 } from '../apps/mobile/src/features/reading/mobile-official-reader-intro-locale.js';
+import { translateMobileUiCopy } from '../apps/mobile/src/ui/mobile-ui-copy.js';
 
 const official = { readingId: '11111111-1111-4111-8111-111111111111' };
 type Access = ReturnType<typeof createMobileReaderAccessViewStateV1>;
@@ -68,6 +70,22 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
     }
   });
 
+  it('displays all nine fixed archive Reader roles and tones in the five UI locales', () => {
+    expect(MOBILE_READER_PRESENTATIONS_V1).toHaveLength(9);
+    for (const reader of MOBILE_READER_PRESENTATIONS_V1) {
+      expect(localizeMobileOfficialReaderToneV1(reader.tone, 'ko-KR')).toBe(reader.tone);
+      for (const locale of ['ja-JP','zh-TW','en-US','zh-CN'] as const) {
+        const role = translateMobileUiCopy(reader.title, locale);
+        const tone = localizeMobileOfficialReaderToneV1(reader.tone, locale);
+        expect(role, `${reader.key} role ${locale}`).not.toBe(reader.title);
+        expect(tone, `${reader.key} tone ${locale}`).not.toBe(reader.tone);
+        expect(role).not.toMatch(/[가-힣]/u);
+        expect(tone).not.toMatch(/[가-힣]/u);
+      }
+    }
+    expect(localizeMobileOfficialReaderToneV1('회원이 직접 작성한 문구', 'en-US')).toBe('회원이 직접 작성한 문구');
+  });
+
   it('uses the validated archive and offers no Reader admission or Thread action', async () => {
     const read = (path: string) => readFile(new URL('../' + path, import.meta.url), 'utf8');
     const [screen, view, native] = await Promise.all([
@@ -87,7 +105,11 @@ describe('mobile M3-alpha Official Reading Reader entry', () => {
     expect(view).toContain('accessibilityState={{ selected: selectedReaderId === reader.key }}');
     expect(view).toContain('findMobileReaderPresentationV1(selectedReaderId)');
     expect(view).toContain('projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId)');
-    expect(view).toContain('{selectedReader.tone}');
+    expect(view).toContain('localizeMobileOfficialReaderToneV1(selectedReader.tone, locale)');
+    expect(view).toContain('{t(reader.title)}');
+    expect(view).toContain('{t(selectedReader.title)}');
+    expect(view).toContain('{reader.name}');
+    expect(view).toContain('{selectedReader.name}');
     expect(view).toContain('해설 서비스 준비 중');
     expect(view).not.toContain('fetch(');
     expect(view).not.toContain('router.push(');

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { projectMobileOfficialReadingReaderEntryV1 } from '@/features/reading/mobile-official-reading-reader-entry-view-model';
+import { localizeMobileOfficialReaderToneV1 } from '@/features/reading/mobile-official-reader-intro-locale';
 import {
   MOBILE_READER_PRESENTATIONS_V1,
   findMobileReaderPresentationV1,
@@ -17,7 +18,7 @@ export function MobileOfficialReadingReaderEntry({
   record,
 }: Readonly<{ record: OfficialReadingRecordV1 }>) {
   // Local presentation selection is not a purchase, interpretation or Thread action.
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const [selectedReaderId, setSelectedReaderId] = useState<MobileReaderPresentationIdV1>('seyeon');
   const selectedReader = findMobileReaderPresentationV1(selectedReaderId);
   const entry = projectMobileOfficialReadingReaderEntryV1(record, selectedReaderId);
@@ -43,7 +44,7 @@ export function MobileOfficialReadingReaderEntry({
             ]}
           >
             <Text style={styles.name}>{reader.name}</Text>
-            <Text style={styles.sub}>{reader.title}</Text>
+            <Text style={styles.sub}>{t(reader.title)}</Text>
             <Text style={styles.sub}>
               {t(isMobileReaderPreviewSelectableV1(reader.key) ? '프리뷰 소개' : '컨셉 준비 중')}
             </Text>
@@ -51,8 +52,8 @@ export function MobileOfficialReadingReaderEntry({
         ))}
       </View>
       <View style={styles.introduction} accessibilityLiveRegion="polite">
-        <Text style={styles.introductionTitle}>{selectedReader.name} · {selectedReader.title}</Text>
-        <Text style={styles.copy}>{selectedReader.tone}</Text>
+        <Text style={styles.introductionTitle}>{selectedReader.name} · {t(selectedReader.title)}</Text>
+        <Text style={styles.copy}>{localizeMobileOfficialReaderToneV1(selectedReader.tone, locale)}</Text>
         <MobileUiText style={styles.copy}>
           현재 선택은 인물 소개를 보기 위한 것입니다. 이 Reader의 구매 접근권, 공식 Reading 열람 또는 전용 Thread가 생성되지 않습니다.
         </MobileUiText>
