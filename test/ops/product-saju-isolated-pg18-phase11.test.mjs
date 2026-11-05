@@ -323,6 +323,8 @@ async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin
   const offset = Object.fromEntries(['dbAcquireMs', 'dbQueryMs', 'authHeaderMs', 'sajuMs']
     .map(key => [key, state[key].length]));
   const failedAcquisitionsBefore = state.dbAcquireFailures ?? 0;
+  state.apiPeak = 0;
+  state.apiFourWayAdmissions = 0;
   const { samples, ...window } = await measureIsolatedProductWindow(profile, (slot) =>
     requestCalculation(origin, tokens[profile === 'baseline' ? 0 : slot % tokens.length], tokens));
   const after = await readSajuCgroup(metricsOrigin);
@@ -332,6 +334,7 @@ async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin
   expect(successes.length).toBeGreaterThan(0);
   expect(successes.length + unavailable + transportFailures + window.skipped).toBe(window.scheduled);
   expect(state.dbActive).toBe(0);
+  expect(state.apiActive).toBe(0);
   expect(after.cpuUsageUsec).toBeGreaterThanOrEqual(before.cpuUsageUsec);
   expect(after.cpuThrottledPeriods).toBeGreaterThanOrEqual(before.cpuThrottledPeriods);
   return {
@@ -347,6 +350,8 @@ async function measureRealSustainedWindow(profile, origin, tokens, metricsOrigin
       cpuThrottledPeriods: after.cpuThrottledPeriods - before.cpuThrottledPeriods,
       memoryLimitBytes: after.memoryLimitBytes, memoryPeakBytes: after.memoryPeakBytes, oomKills: after.oomKills,
     },
+    ...(profile === 'overlap' && { waveSize: 4, apiPeak: state.apiPeak,
+      apiFourWayAdmissions: state.apiFourWayAdmissions }),
   };
 }
 
@@ -566,7 +571,8 @@ async function launchActualSajuHost(sourceDirectory) {
 
 const actualChainEnabled = Boolean(BIN && process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN &&
   process.env.MH_OPS_REAL_SAJU_CHECKOUT && process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH);
-const sustainedExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'sustained';
+const overlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'overlap';
+const sustainedExperiment = overlapExperiment || process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'sustained';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
     if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
@@ -596,6 +602,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       phase='api_setup';
       const state={
         dbActive:0,dbPeak:0,dbAcquisitions:0,
+        dbAcquireFailures:0,apiActive:0,apiPeak:0,apiFourWayAdmissions:0,
         dbMode:'healthy',dbAcquireMs:[],dbQueryMs:[],authCalls:0,sajuCalls:0,authHeaderMs:[],sajuMs:[],
       };
       const authOrigin=process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN;
@@ -631,6 +638,9 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           res.writeHead(404).end();
           return;
         }
+        state.apiActive++;
+        state.apiPeak=Math.max(state.apiPeak,state.apiActive);
+        if(state.apiActive===4)state.apiFourWayAdmissions++;
         try{
           const result=await handleCurrentSubjectSajuCalculationRequestV1({
             request:new Request('https://myeongha.synthetic/api/me/saju/calculation',{
@@ -648,6 +658,8 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         }catch{
           res.writeHead(503,{'content-type':'application/json','cache-control':'no-store'})
             .end('{"ok":false,"error":{"code":"DEPENDENCY_UNAVAILABLE"}}');
+        }finally{
+          state.apiActive--;
         }
       });
       servers.push(api);
@@ -655,17 +667,22 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       const tokens=members.map(m=>m.token);
       const baseline=await measuredBatch(api.origin,12,1,tokens);
       expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
+      const shortDbAcquireFailures=[state.dbAcquireFailures];
       phase='contended_requests';
       const ramp=[];
       if (sustainedExperiment) {
         for (const concurrency of [2, 4]) {
+          const failedBefore=state.dbAcquireFailures;
           const result = await measuredBatch(api.origin, 24, concurrency, tokens);
           expect(result.unexpected).toBe(0);
           expect(result.successful).toBeGreaterThan(0);
           ramp.push(result);
+          shortDbAcquireFailures.push(state.dbAcquireFailures-failedBefore);
         }
       }
+      const failedBeforeContended=state.dbAcquireFailures;
       const contended=await measuredBatch(api.origin,32,8,tokens);
+      shortDbAcquireFailures.push(state.dbAcquireFailures-failedBeforeContended);
       expect(contended.unexpected).toBe(0);
       expect(contended.successful+contended.unavailable).toBe(32);
       expect(contended.successful).toBeGreaterThan(0);
@@ -679,10 +696,12 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       expect(state.sajuCalls).toBeGreaterThanOrEqual(baseline.successful+contended.successful);
       let sustained;
       if (sustainedExperiment) {
-        phase='sustained_baseline';
-        const single=await measureRealSustainedWindow('baseline',api.origin,tokens,metricsOrigin,state);
-        phase='sustained_concurrent';
-        const concurrent=await measureRealSustainedWindow('concurrent',api.origin,tokens,metricsOrigin,state);
+        const windows=[];
+        for (const profile of overlapExperiment ? ['overlap'] : ['baseline', 'concurrent']) {
+          phase='sustained_'+profile;
+          windows.push(await measureRealSustainedWindow(profile,api.origin,tokens,metricsOrigin,state));
+        }
+        if (overlapExperiment) expect(windows[0]).toMatchObject({peak:4,apiPeak:4});
         phase='post_pressure_recovery';
         state.dbMode='unavailable';
         const unavailable=await measuredBatch(api.origin,1,1,tokens);
@@ -690,7 +709,8 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         state.dbMode='healthy';
         const recovery=await measuredBatch(api.origin,4,1,tokens);
         expect(recovery).toMatchObject({successful:4,unavailable:0,unexpected:0});
-        sustained={ ramp, windows:[single,concurrent], injectedDbUnavailable:1, recoverySucceeded:true };
+        sustained={ ramp, windows, injectedDbUnavailable:1, recoverySucceeded:true,
+          ...(overlapExperiment && { shortDbAcquireFailures }) };
       }
       phase='runtime_cleanup';
       const apiServer=servers.pop();

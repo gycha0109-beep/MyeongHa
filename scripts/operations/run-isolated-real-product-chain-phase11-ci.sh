@@ -26,7 +26,7 @@ experiment="${MH_OPS_REAL_PRODUCT_EXPERIMENT:-short}"
 export COMPOSE_PROFILES= MH_OPS_AUTH_JWT_EXP_SECONDS=300
 case "$experiment" in
   short) ;;
-  sustained) COMPOSE_PROFILES=sustained; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
+  sustained|overlap) COMPOSE_PROFILES=sustained; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   *) fail 'Unknown isolated product experiment.' ;;
 esac
 
@@ -101,7 +101,7 @@ if [[ "$ready" != true ]]; then
   fail 'Actual GoTrue host-only health did not pass.'
 fi
 
-if [[ "$experiment" == sustained ]]; then
+if [[ "$experiment" != short ]]; then
   docker compose --project-name "$project" -f "$compose" up --detach saju >/dev/null ||
     fail 'Disposable constrained Saju container failed.'
   calculation="$(docker compose --project-name "$project" -f "$compose" port saju 43007)"
@@ -130,7 +130,7 @@ if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.
   # The raw test output is deliberately private because it can contain
   # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
   # Report only recognized, controlled stage labels, never raw lines or paths.
-  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
+  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
   if grep -Eq "$stage_pattern" "$scratch/vitest.log"; then
     stage="$(grep -oE "$stage_pattern" "$scratch/vitest.log" | tail -n 1)"
     echo "::error title=Isolated three-dependency failure stage::$stage" >&2
@@ -163,8 +163,17 @@ jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
   and (if $experiment == "short" then .actualSajuResourceCgroupConstrained==false and .sustained==null
     else .actualSajuResourceCgroupConstrained==true and .sustained.recoverySucceeded==true
       and .sustained.injectedDbUnavailable==1
-      and (.sustained.windows | map(.durationSeconds))==[300,900]
-      and (.sustained.windows | map(.scheduled))==[300,3600]
+      and (if $experiment == "overlap" then
+        (.sustained.windows | map(.durationSeconds))==[900]
+        and (.sustained.windows | map(.scheduled))==[3600]
+        and .sustained.windows[0].waveSize==4 and .sustained.windows[0].peak==4
+        and .sustained.windows[0].apiPeak==4 and .sustained.windows[0].apiFourWayAdmissions>0
+        and .sustained.windows[0].apiFourWayAdmissions<=900
+        and (.sustained.shortDbAcquireFailures | length)==4
+        and (all(.sustained.shortDbAcquireFailures[]; type=="number" and .>=0 and .<=32))
+      else (.sustained.windows | map(.durationSeconds))==[300,900]
+        and (.sustained.windows | map(.scheduled))==[300,3600]
+      end)
       and (all(.sustained.windows[]; .scheduled==(.successful+.unavailable+.transportFailures+.skipped)
         and .successful>0 and .elapsedMs >= (.durationSeconds*1000)
         and .saju.memoryPeakBytes <= 268435456 and .saju.oomKills==0))

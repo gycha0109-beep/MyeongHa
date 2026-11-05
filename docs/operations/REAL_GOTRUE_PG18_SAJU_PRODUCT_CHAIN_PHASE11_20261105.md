@@ -31,6 +31,16 @@ Existing `postgres-isolated-rls-capacity-acceptance.yml` manual, `main`-only wor
 
 **Reuse:** Existing isolated Postgres18 functions, GoTrue `scripts/local/saju-bridge-auth-init.sql` and pinned Saju host are reused. The existing administrator `myeongha-admin` Worker and its Production Reader/Audit Hyperdrive credentials are deliberately excluded, since load tests must not target live administrator/Hosted data.
 
+## Optional 15-minute overlap trial
+
+The manual Linux workflow also offers `experiment=overlap` for a distinct 15-minute concurrent trial. Each one-second wave schedules four synthetic members together, up to 3,600 slots. A late or full wave is skipped as a group. The runner records both client in-flight counts and arrivals that reach four concurrent calculations at the Node gateway, plus short-ramp database acquisition failures at concurrency 1/2/4/8. It uses the same constrained Saju cgroup, recovery check and resource cleanup as `sustained`.
+
+```sh
+gh workflow run postgres-isolated-rls-capacity-acceptance.yml --ref main -f experiment=overlap
+```
+
+Use this option after its source is merged. Its overlapping-request result requires a successful Linux run with the new mode.
+
 ## What this experiment does not prove
 
 - Cloudflare runtime behavior, its network routing/limits, remote TLS, real Hosted Supabase Auth or the Customer Worker deployment itself.
