@@ -18,6 +18,7 @@ import { mobileSajuServiceV1 } from '@/features/saju/native-mobile-saju-service'
 import { SajuPreviewReadingView } from '@/features/saju/SajuPreviewReadingView';
 import { resolveMobileHomeSajuFocusV1 } from '@/features/saju/mobile-saju-topic-catalog';
 import { SajuEditorialSummary } from '@/features/saju/SajuEditorialSummary';
+import { mobileSajuErrorCopyV1 } from '@/features/saju/mobile-saju-error-copy';
 import { createMobileSajuViewModelV1 } from '@/features/saju/saju-view-model';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
@@ -30,22 +31,9 @@ type ScreenState =
   | Readonly<{ kind: 'loading' }>
   | MobileSajuLoadStateV1;
 
-function errorCopy(state: Exclude<MobileSajuLoadStateV1, { kind: 'birth_required' | 'ready' }>) {
-  switch (state.kind) {
-    case 'auth_error':
-      return '세션을 다시 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.';
-    case 'saju_unavailable':
-      return '현재 명식 계산 서비스를 사용할 수 없습니다. 잠시 후 다시 시도해 주세요.';
-    case 'authority_mismatch':
-      return '출생정보는 등록되어 있지만 현재 명식과 연결하지 못했습니다.';
-    case 'error':
-      return '현재 사주 정보를 불러오지 못했습니다.';
-  }
-}
-
 export default function SajuScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const { topic: requestedHomeTopic } = useLocalSearchParams<{ topic?: string | string[] }>();
   const homeFocusTopic = resolveMobileHomeSajuFocusV1(requestedHomeTopic);
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
@@ -145,7 +133,7 @@ export default function SajuScreen() {
       state.kind === 'authority_mismatch' ||
       state.kind === 'error' ? (
         <View style={styles.stateCard}>
-          <Text style={styles.error}>{errorCopy(state)}</Text>
+          <Text style={styles.error}>{mobileSajuErrorCopyV1(state.kind, locale)}</Text>
           {state.retryable ? (
             <Pressable
               accessibilityRole="button"
