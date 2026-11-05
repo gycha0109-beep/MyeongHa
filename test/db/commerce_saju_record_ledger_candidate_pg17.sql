@@ -25,10 +25,10 @@ begin
   and cr.verification_status='verified'
   and cr.environment='production';
  v_subject:=v_receipt.subject_id;
- select rs.source_birth_revision_id into strict v_source_revision
+ select b.source_birth_revision_id into strict v_source_revision
  from public.standard_reading_reader_access_grants a
- join public.readings r on r.id=a.official_reading_id
- join public.reading_sessions rs on rs.id=r.reading_session_id
+ join public.standard_reading_official_bindings b
+   on b.reading_id=a.official_reading_id and b.subject_id=a.subject_id
  where a.purchase_intent_id=v_b2_purchase
    and a.subject_id=v_subject;
  if v_source_revision is null
