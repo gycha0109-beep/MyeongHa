@@ -16,7 +16,7 @@ type Overrides = Partial<SajuPurchaseLedgerRowV1>;
 function charge(
   n: number,
   productKey: SajuProductKeyV1,
-  verifiedPaidMinor = COMMERCE_SAJU_PRODUCTS_V1[productKey].priceMinor,
+  verifiedPaidMinor: number = COMMERCE_SAJU_PRODUCTS_V1[productKey].priceMinor,
   parents: readonly number[] = [],
   override: Overrides = {},
 ): SajuPurchaseLedgerRowV1 {
