@@ -5,6 +5,7 @@ import { resolveMobileChatCharacterPresentationV1 } from '@/features/chat/chat-c
 import { resolveMobileChatPortraitV1 } from '@/features/chat/chat-character-portraits';
 import { MOBILE_CHAT_LAUNCH_ROSTER_V1 } from '@/features/chat/chat-launch-roster';
 import { useMobileChatOpenV1 } from '@/features/chat/use-mobile-chat-open';
+import { localizeMobileChatHubErrorV1 } from '@/features/chat/mobile-chat-hub-error-copy';
 import { MobileScreen } from '@/ui/MobileScreen';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
 import { MobileUiText } from '@/ui/MobileUiText';
@@ -14,7 +15,7 @@ import { useMobilePullRefreshV1 } from '@/ui/use-mobile-pull-refresh';
 
 export default function ChatHubScreen() {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   const { state, openCharacter, refreshAccess } = useMobileChatOpenV1();
   const { refreshing, onRefresh } = useMobilePullRefreshV1(refreshAccess);
 
@@ -53,7 +54,7 @@ export default function ChatHubScreen() {
             <MobileUiText style={styles.loginActionText}>로그인 후 대화하기  →</MobileUiText>
           </Pressable>
         ) : state.access === 'error' ? (
-          <Text style={styles.errorText}>{state.errorMessage}</Text>
+          <Text style={styles.errorText}>{localizeMobileChatHubErrorV1(state.errorMessage ?? '', locale)}</Text>
         ) : null}
       </View>
 
@@ -128,7 +129,7 @@ export default function ChatHubScreen() {
       </View>
 
       {state.errorMessage !== null && state.access !== 'error' ? (
-        <View style={styles.errorPanel}><Text style={styles.errorText}>{state.errorMessage}</Text></View>
+        <View style={styles.errorPanel}><Text style={styles.errorText}>{localizeMobileChatHubErrorV1(state.errorMessage ?? '', locale)}</Text></View>
       ) : null}
 
     </MobileScreen>
