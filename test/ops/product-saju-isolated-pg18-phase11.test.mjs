@@ -82,6 +82,8 @@ async function startIsolatedPg18() {
           throw Error('Exactly four independent synthetic GoTrue identities are required');
         }
         await admin.query('CREATE TABLE public.ops_phase11_real_auth_map(auth_user_id uuid PRIMARY KEY, owner_id uuid UNIQUE NOT NULL)');
+        // Fixture inserts run only during initialization; FORCE RLS is restored before requests.
+        await admin.query('ALTER TABLE public.ops_phase11_birth NO FORCE ROW LEVEL SECURITY');
         for (let i=0;i<members.length;i++) {
           const digit=String(i+1).padStart(2,'0');
           const owner='92000000-0000-4000-8000-0000000000'+digit;
@@ -94,6 +96,10 @@ async function startIsolatedPg18() {
           await admin.query('INSERT INTO public.ops_phase11_birth VALUES($1,$2,$3)',
             [owner,profile,revision]);
         }
+        await admin.query('ALTER TABLE public.ops_phase11_birth FORCE ROW LEVEL SECURITY');
+        const rls = await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.ops_phase11_birth'::regclass");
+        if (!rls.rows[0]?.relrowsecurity || !rls.rows[0]?.relforcerowsecurity)
+          throw Error('Synthetic owner RLS was not restored');
         await admin.query(`
 CREATE OR REPLACE FUNCTION public.begin_member_subject_context_v1(auth_user uuid)
 RETURNS TABLE(subject_id uuid,subject_kind text)
