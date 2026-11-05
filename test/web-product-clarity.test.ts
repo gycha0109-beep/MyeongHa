@@ -18,13 +18,18 @@ describe('product-wide identity and clarity', () => {
     expect(css.match(/--mh-nav-icon: url\("assets\/myeongha-icons\//g)).toHaveLength(6);
     for (const name of ['home','saju','face','chat','records','my','theme-sun','theme-moon','notification','language']) {
       const svg = await read('assets/myeongha-icons/' + name + '.svg');
-      const box = svg.match(/viewBox="(-?\\d+) (-?\\d+) (\\d+) (\\d+)"/);
+      const box = svg.match(/viewBox="(-?[0-9]+) (-?[0-9]+) ([0-9]+) ([0-9]+)"/);
       expect(box).not.toBeNull();
-      const [, x, y, width, height] = box!.map(Number);
+      const x = Number(box?.[1]);
+      const y = Number(box?.[2]);
+      const width = Number(box?.[3]);
+      const height = Number(box?.[4]);
+      expect([x, y, width, height].every(Number.isFinite)).toBe(true);
       expect(width).toBe(height);
-      const points = [...svg.matchAll(/(-?\\d+),(-?\\d+)/g)].map(m => [Number(m[1]), Number(m[2])]);
-      const xs = points.map(p => p[0]);
-      const ys = points.map(p => p[1]);
+      const points = [...svg.matchAll(/(-?[0-9]+),(-?[0-9]+)/g)].map(m => ({ x: Number(m[1]), y: Number(m[2]) }));
+      expect(points.length).toBeGreaterThan(10);
+      const xs = points.map(p => p.x);
+      const ys = points.map(p => p.y);
       const left = Math.min(...xs); const right = Math.max(...xs);
       const top = Math.min(...ys); const bottom = Math.max(...ys);
       expect(Math.max(right-left, bottom-top) / width).toBeGreaterThan(0.84);
