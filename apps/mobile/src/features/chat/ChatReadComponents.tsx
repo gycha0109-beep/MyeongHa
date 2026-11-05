@@ -126,7 +126,7 @@ export function ChatReadMessages({
             <View style={styles.messageGroupStack}>
               <Text style={styles.messageGroupName}>{greeting.displayName}</Text>
               <View style={[styles.bubble, isSeyeonTheme && (theme === 'dark' ? styles.seyeonBubbleDark : styles.seyeonBubble)]}>
-                <Text style={styles.messageBody}>{greeting.openingLine}</Text>
+                <Text style={styles.messageBody}>{t(greeting.openingLine)}</Text>
               </View>
             </View>
           </View>
