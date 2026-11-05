@@ -27,3 +27,17 @@ it('fails closed when a request detects an unsafe response', async () => {
   await expect(measureIsolatedProductWindow('baseline', async () => { throw new Error('Unsafe response'); },
     () => now, async (ms) => { now += ms; })).rejects.toThrow('Unsafe response');
 });
+
+it('launches four distinct requests together, one wave per second with no catch-up', async () => {
+  let now = 0;
+  const starts = [];
+  const result = await measureIsolatedProductWindow('overlap', async (slot) => {
+    starts.push([slot, now]);
+    return 200;
+  }, () => now, async (ms) => { await yieldToRequests(); now += ms + (now === 0 ? 1000 : 0); });
+  expect(result).toMatchObject({ elapsedMs: 900000, scheduled: 3600, skipped: 4, peak: 4 });
+  expect(result.samples).toHaveLength(3596);
+  expect(starts.slice(0, 8)).toEqual([
+    [0, 0], [1, 0], [2, 0], [3, 0], [8, 2000], [9, 2000], [10, 2000], [11, 2000],
+  ]);
+});

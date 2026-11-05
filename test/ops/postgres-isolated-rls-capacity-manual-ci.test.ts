@@ -141,7 +141,7 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
   it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
     const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
     const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
-    expect(workflow).toContain('options: [short, sustained]');
+    expect(workflow).toContain('options: [short, sustained, overlap]');
     expect(workflow).toContain('default: short');
     expect(compose).toContain('profiles: [sustained]');
     expect(compose).toContain('cpus: 0.50');
@@ -149,6 +149,8 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(compose).toContain('127.0.0.1::43007');
     expect(compose).toContain('127.0.0.1::43008');
     expect(realRunner).toContain('.sustained.recoverySucceeded==true');
+    expect(realRunner).toContain('.sustained.windows[0].apiPeak==4');
+    expect(realRunner).toContain('.sustained.windows[0].apiFourWayAdmissions>0');
     expect(realRunner).toContain('.runtimeCleanupVerified==true');
     expect(realRunner).toContain('.dockerCleanupVerified=true');
   });
