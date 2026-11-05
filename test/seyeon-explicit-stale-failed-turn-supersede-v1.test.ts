@@ -43,7 +43,8 @@ describe('Se-yeon stale failed User turn differs from current draft',()=>{
     expect(handler.indexOf('if(recovered===null && supersedeHeader')).toBeLessThan(handler.indexOf("stage='model_execution'"));
     expect(handler).toContain("kind:'turn_in_flight',requestId:input.requestId");
     expect(handler).toContain("e.receivedTurn.committedTurn!==null||e.attempt.replayed");
-    expect(handler).toContain('SEYEON_ZERO_FIRST_RECEIPT_ISSUER_V1');
+    expect(handler).toContain('SEYEON_G0_RECEIPT_ISSUER_V1');
+    expect(source('scripts/operations/seyeon-security-s0/production-27-g0-committed-followup-receipt-20261105.sql')).toContain('public.cmd_issue_seyeon_zero_source_first_reply_v1(');
   });
   it('excludes abandoned messages from BOTH exact G0 reader and the 12-key DB source Pin',()=>{
     expect(g0).toContain('qry_seyeon_g0_current_source_recent_messages_v1');

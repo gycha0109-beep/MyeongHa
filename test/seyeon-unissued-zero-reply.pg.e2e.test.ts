@@ -29,12 +29,16 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     pool=new Pool({host:process.env.PGHOST,port:Number(process.env.PGPORT??5432),
       user:'postgres',database:db,password:process.env.PGPASSWORD,ssl:false,max:4,statement_timeout:5000});
     subjectPool=pool as unknown as PostgresSubjectPoolV1;
-    // Install the unchanged existing G1 functional rewrite blocks in the
-    // scratch bootstrap-superuser DB. Managed Production operator membership
-    // is not simulated here; operation 25 below is tested in its entirety.
+    // The disposable DB must reflect the installed multi-turn G0 source
+    // authority before proving a second-turn receipt. In particular, the
+    // earlier 18-only fixture explicitly DENIES nonempty recent-history pins.
+    // Apply the unchanged 19 and 22 function rewrites in dependency order;
+    // their production-only operator role choreography is not simulated here.
     for(const [file,block] of [
       ['production-17-zero-source-selection-census-pin-20261101.sql','replace'],
       ['production-18-zero-source-current-user-pin-20261101.sql','change'],
+      ['production-19-zero-source-verified-history-pin-20261101.sql','rewrite'],
+      ['production-22-ignore-abandoned-g0-history-20261102.sql','patch'],
     ]){
       const source=operation(file!);
       const begin=source.indexOf('do $'+block+'$');
@@ -94,6 +98,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
       f.subject,f.thread,f.turn,f.attempt,uuid(18,90),uuid(19,90),uuid(23,90),uuid(30,90)]));
     expect(denied.rows).toHaveLength(0);
     await pool.query(operation('production-25-unissued-zero-receipt-recovery-20261103.sql'));
+    await pool.query(operation('production-27-g0-committed-followup-receipt-20261105.sql'));
     const runtime=vi.fn(async()=>{throw Error('A committed reply must never invoke inference.');});
     const recover=()=>recoverSeyeonUnissuedZeroReplyV1({pool:subjectPool,verifiedEvidence:f.evidence,threadId:f.thread,
       text:f.text,signal:new AbortController().signal,requestId:'repeat',serverTime:new Date().toISOString()});
@@ -106,7 +111,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
           requestId:'synthetic-recovery',serverTime:new Date().toISOString(),pool:subjectPool,
           identityEvidenceVerifier:{verifyRequestIdentity:async()=>f.evidence},runtime:{run:runtime},zeroSourceFirstReplyApproved:true});
         expect(response.status).toBe(200);
-        await expect(recover()).rejects.toMatchObject({constraint:'seyeon_unissued_reply_not_recoverable'});
+        expect(await recover()).toBeNull();
         return response;
       }
       return handleSeyeonPositiveReplyReceiptV1({pool:subjectPool,requestId:'synthetic-ack',request});
@@ -120,7 +125,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     expect(calls).toEqual([`/api/chat/${f.thread}/turns`,`/api/chat/delivery-receipts/${f.attempt}`]);
     expect((await pool.query('select count(*)::int as n from public.conversation_messages where thread_id=$1',[f.thread])).rows[0].n).toBe(3);
     expect((await pool.query('select state from public.chat_turns where id=$1',[f.turn])).rows[0].state).toBe('delivered');
-    await expect(recover()).rejects.toMatchObject({constraint:'seyeon_unissued_reply_not_recoverable'});
+    expect(await recover()).toBeNull();
   },30000);
 
 
@@ -143,7 +148,10 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
         'select message_id::text as "messageId",sender_type as "senderType" from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,10)',
         [resolvedSubject.subjectId,thread,nextUser]),
     });
-    await expect(context()).rejects.toMatchObject({code:'42501'});
+    // The disposable DB already contains the governed 19/22 history rules.
+    // Install the original-source lock-only 26 bridge BEFORE reading history:
+    // the old owner-scoped SHARE helper cannot safely re-check received
+    // message lineage under RLS during recovery issuance.
     await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
     const result=await context();
     expect(result.rows.map(x=>x.senderType)).toEqual(['user','character','user']);
@@ -168,6 +176,124 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
       await holder.query('ROLLBACK').catch(()=>undefined);
       writer.release();holder.release();
     }
+  },30000);
+
+
+  it('delivers the original second-turn G0 Assistant with zero inference and one receipt ACK',async()=>{
+    const subject=uuid(11,90),thread=uuid(14,90),turn=uuid(46,90);
+    const attempt=uuid(49,90),user=uuid(48,90);
+    const assistant=uuid(50,90),generated=uuid(51,90),guard=uuid(52,90);
+    const outbox=uuid(53,90),generatedText='DB_LOCKED_G0_FOLLOWUP_SYNTHETIC_OK';
+    const currentText='Synthetic continued hello';
+    const evidence={kind:'member' as const,verifiedAuthUserId:uuid(10,90)};
+    const execute=(action:Parameters<typeof executePostgresSubjectTransactionV1>[0]['execute'])=>
+      executePostgresSubjectTransactionV1({pool:subjectPool,verifiedEvidence:evidence,execute:action});
+
+    // Attempt allocation belongs to the trusted DB runtime operator; the
+    // HTTP executor has no direct EXECUTE grant on this internal mutation.
+    const allocator=await pool.connect();
+    try {
+      await allocator.query('BEGIN');
+      await allocator.query('select set_config($1,$2,true)', ['myeongha.subject_id',subject]);
+      const allocated=await allocator.query('select * from public.cmd_allocate_chat_turn_attempt_v1($1::uuid,$2::uuid,$3::uuid,$4::text)',
+        [subject,turn,attempt,'seyeon-production-chat-planner-v1']);
+      expect(allocated.rows.length).toBeGreaterThan(0);
+      await allocator.query('COMMIT');
+    }catch(error){await allocator.query('ROLLBACK');throw error;}finally{allocator.release();}
+    const recentMessages=[
+      {messageId:uuid(18,90),role:'user' as const,text:'Synthetic first hello'},
+      {messageId:uuid(19,90),role:'assistant' as const,text:'DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK'},
+      {messageId:user,role:'user' as const,text:currentText},
+    ];
+    const zeroProof=createSeyeonAttemptZeroPersonalProofV1({
+      subjectId:subject,threadId:thread,turnId:turn,attemptId:attempt,
+      context:{version:'seyeon-production-context-v1',retrievedMemories:[],
+        personalRecordAdmissions:[],personalRecordProjectionCandidates:[]},
+    });
+    const selected=selectSeyeonExactModelPersonalSourcesV1({
+      retrievedMemories:[],sourceCandidates:[],requiredPersonalRecordCount:0,
+      recentMessages,currentUserMessageId:user,
+    });
+    expect(selected.selectedUnpinnedRecentSources).toHaveLength(2);
+    await execute(({client})=>client.query(
+      'select public.cmd_mark_seyeon_chat_context_ready_pinned_v1($1::uuid,$2::uuid,$3::uuid,$4::jsonb)',
+      [subject,turn,attempt,JSON.stringify({zeroProof,exactModelSourceSelection:selected})],
+    ));
+
+    const actor=await pool.connect();
+    try {
+      await actor.query('BEGIN');
+      await actor.query('select set_config($1,$2,true)', ['myeongha.subject_id',subject]);
+      await actor.query('update public.conversation_threads set next_sequence_no=5 where id=$1 and subject_id=$2',[thread,subject]);
+      const log=(id:string,stage:string,output:unknown)=>actor.query(
+        `insert into public.ai_execution_logs(
+          id,subject_id,turn_id,turn_attempt_id,stage,provider,model,prompt_version,
+          content_release_id,content_bundle_id,character_id,input_ref_jsonb,
+          output_ref_jsonb,status,created_at)
+          select $1::uuid,t.subject_id,t.id,$2::uuid,$3,'synthetic','offline','synthetic-v1',
+            t.resolved_content_release_id,t.resolved_content_bundle_id,'seyeon','{}'::jsonb,
+            $4::jsonb,'success',now()
+          from public.chat_turns t where t.id=$5::uuid`,
+        [id,attempt,stage,JSON.stringify(output),turn]);
+      await log(generated,'renderer',{});
+      await actor.query(
+        'select public.cmd_mark_chat_turn_generated_v1($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11::jsonb)',
+        [subject,turn,attempt,generated,'synthetic-v1',uuid(15,90),generatedText,
+         JSON.stringify({text:generatedText}),'v1','sha256:v1:'+'1'.repeat(64),JSON.stringify([])],
+      );
+      await log(guard,'output_guard',{generatedContentHash:'sha256:v1:'+'1'.repeat(64)});
+      await actor.query(
+        'select public.cmd_validate_chat_turn_attempt_v1($1,$2,$3,$4,$5,$6::jsonb,$7,$8)',
+        [subject,turn,attempt,guard,'synthetic-output-guard-v1',
+          JSON.stringify({passed:true,personalRecordProvenance:zeroProof}),true,'failed_final'],
+      );
+      const commit=await actor.query(
+        'select * from public.cmd_commit_seyeon_chat_turn_runtime_v2($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)',
+        [subject,thread,turn,attempt,assistant,uuid(54,90),outbox,
+         JSON.stringify({schemaVersion:'seyeon-post-turn-analysis-snapshot-v1',
+           turnId:turn,userMessageId:user,assistantMessageId:assistant}),
+         'sha256:v1:'+'2'.repeat(64)]);
+      expect(commit.rows).toHaveLength(1);
+      await actor.query('COMMIT');
+    }catch(error){await actor.query('ROLLBACK');throw error;}finally{actor.release();}
+
+    const {rows:[before]}=await pool.query(
+      'select state,delivered_at from public.chat_turns where id=$1',[turn]);
+    expect(before).toEqual({state:'committed',delivered_at:null});
+    const {rows:[original]}=await pool.query(
+      'select seyeon_positive_delivery_issued_at as issued, seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',[attempt]);
+    expect(original).toEqual({issued:null,received:null});
+    const model=vi.fn(async()=>{throw Error('A stored Assistant must never invoke the provider');});
+    const client=new MyeongHaApiClientV1({origin:'https://receipt.test',
+      fetchImpl:async(url,init)=>{
+        const request=new Request(String(url),init);
+        if(request.url.endsWith('/turns')){
+          const response=await handleSeyeonFirstPositiveMemoryFetchV1({
+            request,requestId:'synthetic-g0-followup',serverTime:new Date().toISOString(),
+            pool:subjectPool,identityEvidenceVerifier:{verifyRequestIdentity:async()=>evidence},
+            runtime:{run:model},zeroSourceFirstReplyApproved:true,
+          });
+          expect(response.status).toBe(200);
+          return response;
+        }
+        return handleSeyeonPositiveReplyReceiptV1({request,pool:subjectPool,requestId:'synthetic-g0-ack'});
+      }});
+    const reply=await sendSeyeonChatTurnV1(client,'synthetic-member',thread,
+      {clientTurnId:uuid(55,90),text:currentText},{requireDeliveryReceipt:true});
+    expect(reply).toMatchObject({turnId:turn,assistantMessageId:assistant,
+      assistantText:generatedText,replayed:false});
+    expect(reply).not.toHaveProperty('deliveryReceipt');
+    expect(model).not.toHaveBeenCalled();
+    expect((await pool.query('select state from public.chat_turns where id=$1',[turn])).rows[0].state)
+      .toBe('delivered');
+    const after=await pool.query(
+      'select seyeon_positive_delivery_issued_at as issued, seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',[attempt]);
+    expect(after.rows[0]?.issued).not.toBeNull();
+    expect(after.rows[0]?.received).not.toBeNull();
+    expect(await recoverSeyeonUnissuedZeroReplyV1({
+      pool:subjectPool,verifiedEvidence:evidence,threadId:thread,text:currentText,
+      signal:new AbortController().signal,requestId:'no-replay',serverTime:new Date().toISOString(),
+    })).toBeNull();
   },30000);
 
   it('rejects active failed history and changed source text, and never issues a receipt for them',async()=>{

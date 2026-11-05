@@ -222,7 +222,7 @@ function createStreamMessage(message, authoritativeCharacterId) {
   article.dataset.sender = message.senderType;
   article.dataset.redacted = String(message.redacted === true);
   if (message.senderType === 'user' &&
-      ['failed_retryable','failed_final','abandoned'].includes(message.turnState)) {
+      ['failed_retryable','failed_final','abandoned','committed'].includes(message.turnState)) {
     article.dataset.turnState = message.turnState;
   }
   if (message.senderType === 'character') {
@@ -263,14 +263,17 @@ function createStreamMessage(message, authoritativeCharacterId) {
   }
   body.append(heading, paragraph);
   if (message.senderType === 'user' &&
-      ['failed_retryable','failed_final','abandoned'].includes(message.turnState)) {
+      ['failed_retryable','failed_final','abandoned','committed'].includes(message.turnState)) {
     const note = document.createElement('small');
     note.className = 'chat-message-state';
-    const canRetry = message.turnState === 'failed_retryable' &&
+    const committedRecovery = message.turnState === 'committed' && authoritativeCharacterId === 'seyeon';
+    const canRetry = ['failed_retryable','committed'].includes(message.turnState) &&
       authoritativeCharacterId === 'seyeon' &&
       message.redacted !== true &&
       typeof message.bodyText === 'string' && message.bodyText.trim().length > 0;
-    note.dataset.chatUiPlaceholder = message.turnState === 'abandoned'
+    note.dataset.chatUiPlaceholder = committedRecovery
+      ? '답변이 확정되었지만 아직 전달되지 않았습니다.'
+      : message.turnState === 'abandoned'
       ? '전송을 종료한 메시지'
       : message.turnState === 'failed_final'
         ? '답변 처리가 종료된 메시지'
@@ -283,11 +286,11 @@ function createStreamMessage(message, authoritativeCharacterId) {
       retry.type = 'button';
       retry.className = 'chat-message-retry';
       retry.dataset.chatMessageRetry = '';
-      retry.dataset.chatUiPlaceholder = '다시 전송';
-      retry.textContent = uiText('다시 전송');
-      retry.setAttribute('aria-label', uiText('이 메시지 다시 전송'));
+      retry.dataset.chatUiPlaceholder = committedRecovery ? '확정된 답변 받기' : '다시 전송';
+      retry.textContent = uiText(retry.dataset.chatUiPlaceholder);
+      retry.setAttribute('aria-label', uiText(committedRecovery ? '이 메시지의 확정된 답변 받기' : '이 메시지 다시 전송'));
       retry.disabled = sendingTurn || checkingFailedTurnRetry;
-      retry.addEventListener('click', () => { void retryFailedMessage(message); });
+      retry.addEventListener('click', () => { void retryOriginalMessage(message); });
       body.append(retry);
     }
   }
@@ -324,7 +327,8 @@ document.addEventListener('myeongha:localechange', () => {
       placeholder.textContent = uiText(placeholder.dataset.chatUiPlaceholder);
     }
     const retryButton = article.querySelector('[data-chat-message-retry]');
-    if (retryButton) retryButton.setAttribute('aria-label', uiText('이 메시지 다시 전송'));
+    if (retryButton) retryButton.setAttribute('aria-label', uiText(article.dataset.turnState === 'committed'
+      ? '이 메시지의 확정된 답변 받기' : '이 메시지 다시 전송'));
     const senderType = article.dataset.sender;
     const characterId = article.dataset.messageCharacterId ?? null;
     const heading = article.querySelector('.conversation-message-heading strong');
@@ -578,10 +582,10 @@ function ensureRoomReady() {
 // message. A fresh read rejects stale, redacted, delivered or foreign-owner
 // messages before any metered send; the server repeats the same check when
 // the explicit retry reaches its original-turn recovery authority.
-async function retryFailedMessage(message) {
+async function retryOriginalMessage(message) {
   if (sendingTurn || checkingFailedTurnRetry || !roomReady || invalidThreadRoute ||
       !threadId || authoritativeCharacterId !== 'seyeon' ||
-      message?.senderType !== 'user' || message?.turnState !== 'failed_retryable' ||
+      message?.senderType !== 'user' || !['failed_retryable','committed'].includes(message?.turnState) ||
       message.redacted === true || typeof message.bodyText !== 'string' ||
       !message.bodyText.trim() || !Number.isSafeInteger(message.sequenceNo) ||
       message.sequenceNo < 1) return;
@@ -594,7 +598,9 @@ async function retryFailedMessage(message) {
   }
   checkingFailedTurnRetry = true;
   setComposerBusy(true);
-  setComposeStatus('재전송 가능한 메시지인지 확인하고 있습니다…');
+  setComposeStatus(message.turnState === 'committed'
+    ? '확정된 답변의 현재 상태를 확인하고 있습니다…'
+    : '재전송 가능한 메시지인지 확인하고 있습니다…');
   try {
     const bearer = await getActiveBearer();
     if (!bearer || bearer.kind !== 'member') throw new Error('AUTH_REQUIRED');
@@ -607,7 +613,7 @@ async function retryFailedMessage(message) {
       candidate.messageId === message.messageId &&
       candidate.sequenceNo === message.sequenceNo);
     if (!refreshed || refreshed.senderType !== 'user' ||
-        refreshed.turnState !== 'failed_retryable' ||
+        refreshed.turnState !== message.turnState ||
         refreshed.redacted === true || refreshed.bodyText !== message.bodyText) {
       await loadRoomState();
       setComposeStatus('메시지 상태가 변경되었습니다. 대화를 다시 확인해 주세요.');
@@ -618,7 +624,8 @@ async function retryFailedMessage(message) {
         sameBearer.token !== bearer.token || !roomReady ||
         threadId !== originalThreadId) throw new Error('AUTH_CHANGED');
     checkingFailedTurnRetry = false;
-    await sendTurn(message.bodyText, { retryFailed: true });
+    await sendTurn(message.bodyText, { retryFailed: true,
+      recoverCommitted: message.turnState === 'committed' });
   } catch {
     // A failed fresh owner read must remove stale authorized chat nodes.
     clearOwnerScopedRoomStateForAuthorityChange();
@@ -629,7 +636,7 @@ async function retryFailedMessage(message) {
   }
 }
 
-async function sendTurn(message, { retryFailed = false } = {}) {
+async function sendTurn(message, { retryFailed = false, recoverCommitted = false } = {}) {
   if (authoritativeCharacterId !== 'seyeon') {
     setComposeStatus('현재 운영 메시지 전송은 세연 대화에서만 사용할 수 있습니다.');
     return;
@@ -639,7 +646,8 @@ async function sendTurn(message, { retryFailed = false } = {}) {
 
   sendingTurn = true;
   setComposerBusy(true);
-  setComposeStatus(retryFailed ? '이전 메시지를 다시 전송하고 있습니다…' : '세연이 답하고 있습니다…');
+  setComposeStatus(recoverCommitted ? '확정된 답변을 복구하고 있습니다…'
+    : retryFailed ? '이전 메시지를 다시 전송하고 있습니다…' : '세연이 답하고 있습니다…');
   const pendingTurn = getOrCreatePendingTurn(message);
   const submittedThreadId = threadId;
   // Clear the composer as soon as the send starts. The durable pending Turn
@@ -760,7 +768,7 @@ async function sendTurn(message, { retryFailed = false } = {}) {
       // owner-scoped history read can replace its prior failed-state badge.
       const refreshed = await loadRoomState();
       setComposeStatus(refreshed
-        ? '메시지를 다시 전송했습니다.'
+        ? recoverCommitted ? '확정된 답변을 받았습니다.' : '메시지를 다시 전송했습니다.'
         : '현재 대화 기록 연결을 사용할 수 없습니다.');
     } else {
       const presented = renderAcknowledgedSeyeonTurn(acknowledgedReply, pendingTurn);
