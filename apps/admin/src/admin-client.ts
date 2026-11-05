@@ -1,3 +1,5 @@
+import { adminFetchWithDeadlineV1, ADMIN_READ_DEADLINE_MS_V1, ADMIN_SESSION_DEADLINE_MS_V1 } from './admin-request-deadline-v1.js';
+
 export const ADMIN_SESSION_MARKER_V1 = 'cookie-session' as const;
 
 export type AdminSignInFailureReasonV1 = 'invalid-credentials' | 'rate-limited' | 'upstream-unavailable' | 'invalid-session';
@@ -73,7 +75,7 @@ export async function signInForAdminSessionV1(
   if (email.length > 254 || password.length === 0 || password.length > 1024) {
     throw new Error('로그인 입력을 확인해 주세요.');
   }
-  const response = await fetchImpl('/api/auth/sign-in', {
+  const response = await adminFetchWithDeadlineV1('/api/auth/sign-in', {
     method: 'POST',
     headers: {
       Accept: 'application/json',
@@ -83,7 +85,7 @@ export async function signInForAdminSessionV1(
     credentials: 'same-origin',
     cache: 'no-store',
     body: JSON.stringify({ email, password }),
-  });
+  }, fetchImpl, ADMIN_READ_DEADLINE_MS_V1);
   if (!response.ok) {
     throw new AdminSignInFailureV1(response.status === 401 ? 'invalid-credentials'
       : response.status === 429 ? 'rate-limited' : 'upstream-unavailable');
@@ -105,12 +107,12 @@ export async function fetchAdminReadV1(
   if (token !== ADMIN_SESSION_MARKER_V1 || !/^\/api\/admin\/[a-z0-9\/-]+(?:\?[A-Za-z0-9_.:%=&-]+)?$/iu.test(path) || path.length > 1024) {
     throw new Error('관리자 조회 경로 또는 세션이 유효하지 않습니다.');
   }
-  const response = await fetchImpl(path, {
+  const response = await adminFetchWithDeadlineV1(path, {
     method: 'GET',
     headers: { Accept: 'application/json' },
     cache: 'no-store',
     credentials: 'same-origin',
-  });
+  }, fetchImpl, ADMIN_READ_DEADLINE_MS_V1);
   if (response.status === 403 || response.status === 401) {
     throw new AdminAccessDeniedErrorV1();
   }
@@ -156,12 +158,12 @@ export async function verifyAdminOwnerSessionV1(
   fetchImpl: typeof fetch = fetch,
 ): Promise<void> {
   if (token !== ADMIN_SESSION_MARKER_V1) throw new Error('관리자 세션이 유효하지 않습니다.');
-  const requestSession = () => fetchImpl('/api/admin/session', {
+  const requestSession = () => adminFetchWithDeadlineV1('/api/admin/session', {
     method: 'GET',
     headers: { Accept: 'application/json' },
     credentials: 'same-origin',
     cache: 'no-store',
-  });
+  }, fetchImpl, ADMIN_SESSION_DEADLINE_MS_V1);
   let response = await requestSession();
   // One bounded retry for transient upstream failure. Never retry explicit denial or throttling.
   if (response.status === 502 || response.status === 503) response = await requestSession();
@@ -193,12 +195,12 @@ export async function fetchAdminIssuesCsvV1(
   if (token !== ADMIN_SESSION_MARKER_V1) throw new Error('관리자 세션이 유효하지 않습니다.');
   const allowed = new Set(['limit', 'cursor', 'from', 'to', 'status', 'category']);
   for (const key of query.keys()) if (!allowed.has(key)) throw new Error('허용되지 않은 내보내기 조건입니다.');
-  const res = await fetchImpl('/api/admin/issues.csv?' + query.toString(), {
+  const res = await adminFetchWithDeadlineV1('/api/admin/issues.csv?' + query.toString(), {
     method: 'GET',
     headers: { Accept: 'text/csv' },
     credentials: 'same-origin',
     cache: 'no-store',
-  });
+  }, fetchImpl, ADMIN_READ_DEADLINE_MS_V1);
   if (res.status === 401 || res.status === 403) throw new AdminAccessDeniedErrorV1();
   if (!res.ok || !res.headers.get('content-type')?.startsWith('text/csv')) {
     throw new Error('감사된 운영 이슈 내보내기를 완료하지 못했습니다.');
@@ -210,9 +212,9 @@ export async function fetchAdminIssuesCsvV1(
 
 /** Explicit logout expires the host-only session cookie. */
 export async function signOutAdminSessionV1(fetchImpl: typeof fetch = fetch): Promise<void> {
-  const response = await fetchImpl('/api/admin/logout', {
+  const response = await adminFetchWithDeadlineV1('/api/admin/logout', {
     method: 'POST',
     credentials: 'same-origin', cache: 'no-store',
-  });
+  }, fetchImpl, ADMIN_READ_DEADLINE_MS_V1);
   if (response.status !== 204) throw new Error('관리자 로그아웃을 완료하지 못했습니다.');
 }
