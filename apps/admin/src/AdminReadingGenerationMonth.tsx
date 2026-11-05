@@ -1,3 +1,4 @@
+import { adminFetchWithDeadlineV1 } from './admin-request-deadline-v1.js';
 import { useEffect,useState } from 'react';
 import type {AdminReadingGenerationMonthV1} from '../../api/src/admin-reading-generation-month-v1.js';
 import {AdminAccessDeniedErrorV1} from './admin-client.js';
@@ -28,7 +29,7 @@ export function AdminReadingGenerationMonth({token,month,onSessionExpired}:{
   useEffect(()=>{
     let alive=true;setData(null);setUnavailable(false);
     const url='/api/admin/reading-generation-cost/monthly?'+new URLSearchParams({month});
-    void fetch(url,{headers:{},credentials:'same-origin',cache:'no-store'})
+    void adminFetchWithDeadlineV1(url,{headers:{},credentials:'same-origin',cache:'no-store'})
       .then(async r=>{
         if(!alive)return;
         if(r.status===403||r.status===401)throw new AdminAccessDeniedErrorV1();
