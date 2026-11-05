@@ -51,6 +51,8 @@ import {
 } from './seyeon-positive-g1-final-model-context-seal-v1.js';
 import {buildSeyeonG1HistoricalFinalContextCandidateSealV1,buildSeyeonG1HistoricalModelWindowCensusV1} from './seyeon-g1-historical-model-window-census-v1.js';
 import {assertSeyeonG1HistoricalPostPreflightContextCandidateV1} from './seyeon-g1-historical-final-context-proof-v1.js';
+import {classifySeyeonG1OriginalSourceStateV1,SeyeonG1OriginalSourceStateHoldV1}
+  from './seyeon-g1-original-source-state-v1.js';
 import type {SeyeonG1HistoricalCandidateDbPortV1} from './postgres-seyeon-g1-historical-candidate-port-v1.js';
 import type {SeyeonG1HistoricalCurrentOriginalsAuditPortV1} from './postgres-seyeon-g1-historical-current-audit-port-v1.js';
 import type { SeyeonPositiveS0OwnerDbPortsV1 } from './postgres-seyeon-positive-memory-source-runtime-v1.js';
@@ -732,6 +734,19 @@ export async function runSeyeonProductionChatExecutionV1(
           userMessageId: receivedTurn.userMessageId,
           userText: receivedTurn.userText,
         });
+
+        // G1 must distinguish an intentional zero projection from a
+        // missing original, unknown lineage or unsupported selected kind.
+        // This is a pre-model HOLD check, never a positive model permit.
+        // Existing zero-source Precommit guard still independently rejects
+        // derived history and other ambiguous no-Memory contexts.
+        const originalState=classifySeyeonG1OriginalSourceStateV1({
+          context:productionContext,modelInput:contextInput,
+        });
+        if(originalState.selectedPersonalRecordCount>0
+          &&originalState.state!=='ONE_MEMORY_CANDIDATE_ONLY'){
+          throw new SeyeonG1OriginalSourceStateHoldV1(originalState.state);
+        }
 
         // Exact sorted/truncated source set used by the model, not an
         // unbounded list from DB or an LLM-selected free-text sourceRef.

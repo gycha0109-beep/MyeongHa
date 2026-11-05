@@ -11,6 +11,8 @@ set -euo pipefail
 }
 node scripts/operations/seyeon-security-s0/install-isolated.mjs
 ./node_modules/.bin/vitest run \
+  test/seyeon-g1-original-source-state-w84.test.ts --maxWorkers=1
+./node_modules/.bin/vitest run \
   test/seyeon-g1-historical-source-admission-w81.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \
   test/seyeon-g1-historical-source-admission-port-w82.test.ts --maxWorkers=1
