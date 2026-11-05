@@ -74,7 +74,21 @@ for _ in $(seq 1 60); do
   fi
   sleep 1
 done
-[[ "$ready" == true ]] || fail 'Actual GoTrue health did not pass.'
+if [[ "$ready" != true ]]; then
+  # Never print Docker logs or full inspect output: these may contain synthetic
+  # auth DB URLs, JWT signing keys or generated identities.
+  container="$(docker compose --project-name "$project" -f "$compose" ps -q gotrue 2>/dev/null || true)"
+  state=missing
+  if [[ -n "$container" ]]; then
+    state="$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || echo unknown)"
+  fi
+  inside=unavailable
+  if docker compose --project-name "$project" -f "$compose" exec -T gotrue \
+    wget --no-verbose --tries=1 --spider http://127.0.0.1:9999/health \
+    >/dev/null 2>&1; then inside=healthy; fi
+  echo "::error title=Isolated GoTrue health::Container state=$state; inside-container health=$inside; host loopback was not reachable." >&2
+  fail 'Actual GoTrue host-only health did not pass.'
+fi
 
 cd "$GITHUB_WORKSPACE"
 export MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN="http://127.0.0.1:$MH_OPS_GOTRUE_PORT"
