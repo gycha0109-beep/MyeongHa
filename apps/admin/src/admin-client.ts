@@ -14,6 +14,20 @@ export class AdminAccessDeniedErrorV1 extends Error {
   }
 }
 
+/** Display only a bounded HTTP status and an allowlisted server reason; no response body is trusted. */
+export class AdminReadUnavailableErrorV1 extends Error {
+  constructor(readonly status: number, readonly reason: string | null) {
+    super(status === 429
+      ? 'Read request rate limited (HTTP 429). Retry after a short interval.'
+      : 'Admin read failed (HTTP ' + status + (reason ? ' / ' + reason : '') + ').');
+    this.name = 'AdminReadUnavailableErrorV1';
+  }
+}
+
+export function shouldClearAdminSessionAfterVerificationFailureV1(error: unknown): boolean {
+  return error instanceof AdminAccessDeniedErrorV1;
+}
+
 export interface AdminReadResponse {
   readonly kind: string;
   readonly rows: readonly Readonly<Record<string, string | number | boolean | null>>[];
@@ -100,7 +114,17 @@ export async function fetchAdminReadV1(
     throw new AdminAccessDeniedErrorV1();
   }
   if (!response.ok) {
-    throw new Error('관리자 읽기 서버를 이용할 수 없습니다.');
+    let reason: string | null = null;
+    if (response.headers.get('content-type')?.includes('application/json')) {
+      try {
+        const raw: unknown = await response.json();
+        if (isRecord(raw) && typeof raw.error === 'string' &&
+            /^ADMIN_[A-Z_]{3,64}$/u.test(raw.error)) reason = raw.error;
+      } catch {
+        // Never relay arbitrary error bodies or authentication details.
+      }
+    }
+    throw new AdminReadUnavailableErrorV1(response.status, reason);
   }
   const payload: unknown = await response.json();
   if (!isRecord(payload) || !Array.isArray(payload.rows) ||
