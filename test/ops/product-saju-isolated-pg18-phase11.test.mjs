@@ -616,11 +616,11 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       });
       phase='complete';
       console.log('MYEONGHA_REAL_GOTRUE_PG18_SAJU_CHAIN_PHASE11_PASS');
-    }catch{
-      // Failure detail stays in private temporary Vitest log. Only the controlled
-      // stage is emitted; it cannot contain tokens, UUIDs, email or DB material.
+    }catch(error){
+      // The original failure stays in the runner's private scratch file;
+      // the shell reveals only this fixed stage, never raw Vitest output.
       console.error('MYEONGHA_REAL_CHAIN_FAILURE_STAGE: '+phase);
-      throw Error('Isolated three-dependency product-path test failed at the classified stage');
+      throw error;
     }finally{
       for(const server of servers.reverse())await server.close().catch(()=>undefined);
       await saju?.close().catch(()=>undefined);
