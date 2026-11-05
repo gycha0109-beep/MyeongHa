@@ -2107,6 +2107,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(count).toEqual({proposals:0,grants:1});
   });
 
+  // W102: this single G1/G2/G3 race test intentionally waits up to 5 seconds
+  // on the DB Owner's immutable original-Grant lock_timeout, so it needs
+  // a test deadline longer than the DB deadline; never weaken DB locks.
   it('W48 keeps a DB-original historical candidate durable without model/Commit/Reveal rights', async () => {
     const f = await prepare(218, { summary: 'synthetic approved recall' });
     await f.commit();
@@ -3336,7 +3339,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       not has_function_privilege('myeongha_api_executor',$2,'EXECUTE') as commit_closed`,
       [guardSignature,commitHoldSignature]);
     expect(afterG2Acl).toEqual({guard_closed:true,commit_closed:true});
-  });
+  }, 20_000);
 
   it('G5 historical candidate cannot pin a revoked original Grant during an independent DB race', async () => {
     const f=await prepare(220,{summary:'synthetic approved recall'});
