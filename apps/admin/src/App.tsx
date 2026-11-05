@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MouseEvent } from 'react';
 import { adminRoutes, getAdminRoute } from './routes.js';
 import type { AdminRoute, AdminSection } from './routes.js';
 import { StatusPanel } from './StatusPanel.js';
 import { AdminLogin, AdminWorkbench } from './AdminWorkbench.js';
-import { fetchAdminReadV1, verifyAdminOwnerSessionV1, adminTokenExpiresAtV1, AdminAccessDeniedErrorV1, shouldClearAdminSessionAfterVerificationFailureV1 } from './admin-client.js';
+import { fetchAdminReadV1, verifyAdminOwnerSessionV1, AdminAccessDeniedErrorV1, shouldClearAdminSessionAfterVerificationFailureV1, ADMIN_SESSION_MARKER_V1, signOutAdminSessionV1 } from './admin-client.js';
 import type { AdminReadResponse } from './admin-client.js';
 import { BetaAnalyticsReadiness } from './AdminOperationalReadiness.js';
 import { AdminOperatorConsole } from './AdminOperatorConsole.js';
@@ -213,36 +213,55 @@ function PendingSection({ section }: { readonly section: Exclude<AdminSection, '
 export function App() {
   const [path, setPath] = useState(() => window.location.pathname + window.location.search);
   const [ownerToken, setOwnerToken] = useState<string | null>(null);
+  const [restoringSession, setRestoringSession] = useState(true);
+  const [logoutError, setLogoutError] = useState('');
+  const sessionVersion = useRef(0);
   const route = getAdminRoute(path.split('?')[0] ?? path);
 
   useEffect(() => {
-    if (ownerToken === null) return;
-    const expiresAt = adminTokenExpiresAtV1(ownerToken);
-    if (expiresAt === null || expiresAt <= Date.now()) { setOwnerToken(null); return; }
     let active = true;
     let checking = false;
-    const expire = () => { if (active) setOwnerToken(null); };
     const check = async () => {
-      if (expiresAt <= Date.now()) { expire(); return; }
       if (checking || document.visibilityState === 'hidden') return;
       checking = true;
-      try { await verifyAdminOwnerSessionV1(ownerToken); }
-      catch (error) { if (shouldClearAdminSessionAfterVerificationFailureV1(error)) expire(); }
-      finally { checking = false; }
+      const version = sessionVersion.current;
+      try {
+        await verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1);
+        if (active && version === sessionVersion.current) setOwnerToken(ADMIN_SESSION_MARKER_V1);
+      } catch (error) {
+        if (active && version === sessionVersion.current && shouldClearAdminSessionAfterVerificationFailureV1(error)) setOwnerToken(null);
+      } finally {
+        checking = false;
+        if (active) setRestoringSession(false);
+      }
     };
-    const timer = window.setTimeout(expire, Math.min(expiresAt - Date.now(), 2_147_483_647));
+    void check();
     const interval = window.setInterval(() => { void check(); }, 60_000);
     const onVisible = () => { void check(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
       active = false;
-      window.clearTimeout(timer);
       window.clearInterval(interval);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('focus', onVisible);
     };
-  }, [ownerToken]);
+  }, []);
+  const establishSession = (marker: string) => {
+    sessionVersion.current++;
+    setOwnerToken(marker);
+    setLogoutError('');
+  };
+  async function logout() {
+    sessionVersion.current++;
+    try {
+      await signOutAdminSessionV1();
+      setOwnerToken(null);
+      setLogoutError('');
+    } catch {
+      setLogoutError('로그아웃 연결에 실패했습니다. 다시 시도해 주세요.');
+    }
+  }
 
   useEffect(() => {
     const onPopState = () => setPath(window.location.pathname + window.location.search);
@@ -281,23 +300,24 @@ export function App() {
         <header className="topbar">
           <span className="topbar__title">명하 운영 콘솔 <span>/ 내부 운영 도구</span></span>
           <span className="topbar__security"><span aria-hidden="true" /> {ownerToken ? "Owner 세션 · 서버 검증" : "Owner 인증 전 · 접근 잠금"}</span>
-          {ownerToken !== null && <button type="button" onClick={() => setOwnerToken(null)}>로그아웃</button>}
+          {ownerToken !== null && <button type="button" onClick={() => { void logout(); }}>로그아웃</button>}
+          {logoutError && <span role="alert">{logoutError}</span>}
         </header>
         <main id="main-content" className="main">
           {route ? (
             <>
               <SectionIntro route={route} />
-              {ownerToken === null ? <LockNotice /> : null}
-              {route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />{ownerToken === null && <AdminLogin onSession={setOwnerToken} />}</> : ownerToken === null
-                ? <><PendingSection section={route.section} /><AdminLogin onSession={setOwnerToken} /></>
+              {ownerToken === null && !restoringSession ? <LockNotice /> : null}
+              {ownerToken === null && restoringSession ? <StatusPanel kind="loading" title="관리자 세션 확인 중" /> : route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => { void logout(); }} />{ownerToken === null && <AdminLogin onSession={establishSession} />}</> : ownerToken === null
+                ? <><PendingSection section={route.section} /><AdminLogin onSession={establishSession} /></>
                 : <>{route.section === 'analytics'
-                  ? <><AdminAnalyticsDashboard token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />
-                      <details className="surface"><summary>이벤트 등록·분모·분자 근거 보기</summary><BetaAnalyticsReadiness token={ownerToken} onSessionExpired={() => setOwnerToken(null)} /></details></>
+                  ? <><AdminAnalyticsDashboard token={ownerToken} onSessionExpired={() => { void logout(); }} />
+                      <details className="surface"><summary>이벤트 등록·분모·분자 근거 보기</summary><BetaAnalyticsReadiness token={ownerToken} onSessionExpired={() => { void logout(); }} /></details></>
                   : <AdminWorkbench key={route.section + ':' + path} section={route.section} token={ownerToken}
-                      onSessionExpired={() => setOwnerToken(null)} onNavigate={onNavigate} />}
-                    {route.section === 'readings' && <><AdminAiBudget token={ownerToken} onSessionExpired={() => setOwnerToken(null)}/><AdminAiFinance token={ownerToken} onSessionExpired={() => setOwnerToken(null)} /></>}
+                      onSessionExpired={() => { void logout(); }} onNavigate={onNavigate} />}
+                    {route.section === 'readings' && <><AdminAiBudget token={ownerToken} onSessionExpired={() => { void logout(); }}/><AdminAiFinance token={ownerToken} onSessionExpired={() => { void logout(); }} /></>}
                     {['users', 'commerce', 'issues'].includes(route.section) &&
-                      <AdminOperatorConsole token={ownerToken} onSessionExpired={() => setOwnerToken(null)} />}</>}
+                      <AdminOperatorConsole token={ownerToken} onSessionExpired={() => { void logout(); }} />}</>}
             </>
           ) : (
             <>

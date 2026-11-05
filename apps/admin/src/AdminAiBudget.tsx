@@ -8,7 +8,7 @@ export function AdminAiBudget({token,onSessionExpired}:{readonly token:string;re
  const[month,setMonth]=useState(()=>new Date(Date.now()+9*3600_000).toISOString().slice(0,7));
  const[data,setData]=useState<Budget|null>(null),[error,setError]=useState(false);
  useEffect(()=>{let active=true;setData(null);setError(false);
-  void fetch('/api/admin/ai-budget?'+new URLSearchParams({month}),{headers:{Authorization:'Bearer '+token},credentials:'same-origin',cache:'no-store'}).then(async r=>{
+  void fetch('/api/admin/ai-budget?'+new URLSearchParams({month}),{headers:{},credentials:'same-origin',cache:'no-store'}).then(async r=>{
    if(!active)return;if(r.status===401||r.status===403){onSessionExpired();return;}if(!r.ok)throw Error('Budget unavailable');const v=await r.json() as Budget;
    if(v?.version!=='admin-ai-monthly-budget-v1'||!Array.isArray(v.warnings)||v.warnings.length>4||v.budgetKrw!==100_000)throw Error('Invalid budget contract');if(active)setData(v);
   }).catch(()=>{if(active)setError(true);});return()=>{active=false;};

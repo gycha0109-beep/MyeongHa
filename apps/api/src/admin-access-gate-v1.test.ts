@@ -104,7 +104,7 @@ describe('private hosted administrator boundary',()=>{
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
   it('strips upstream refresh cookies/identity and rejects cross-origin sign-in',async()=>{
-    const jwt='header.payload.signature';let calls=0;
+    const jwt='header.' + Buffer.from(JSON.stringify({exp:Math.floor(Date.now()/1000)+1800})).toString('base64url') + '.signature';let calls=0;
     const handler=createAdminHostedHttpV1({origin:'https://admin.example.test',memberAuthOrigin:'https://member.example.test',
       verifyAccess:async()=>true,allowRequest:async()=>true,api:async()=>Response.json({}),assets:async()=>new Response('app'),
       fetchImpl:(async()=>{calls++;return Response.json({ok:true,data:{status:'authenticated',session:{accessToken:jwt,refreshToken:'never-forward'},email:'never-forward'}},{headers:{'Set-Cookie':'secret=1'}});}) as typeof fetch});
@@ -112,7 +112,9 @@ describe('private hosted administrator boundary',()=>{
       headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({email:'owner@example.test',password:'synthetic'})}));
     expect((await login('https://evil.example')).status).toBe(403);
     const response=await login('https://admin.example.test');expect(response.status).toBe(200);expect(calls).toBe(1);
-    expect(response.headers.get('set-cookie')).toBeNull();expect(await response.text()).not.toContain('never-forward');
+    expect(response.headers.get('set-cookie')).toContain('Secure; HttpOnly; SameSite=Strict');
+    expect(response.headers.get('set-cookie')).not.toContain('secret=1');
+    const responseBody=await response.text();expect(responseBody).not.toContain('never-forward');expect(responseBody).not.toContain(jwt);
     expect(response.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
   });
   it('bounds requests before API and strips the admin prefix from asset paths',async()=>{
