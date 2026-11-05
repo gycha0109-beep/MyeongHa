@@ -92,10 +92,35 @@ export function readingTitleV1(value: string): string {
   return readingTitles[value] ?? '사주 풀이';
 }
 
-export function readingReaderLabelV1(ids: readonly string[]): string {
-  if (ids.length === 0) return 'Reader 기록 없음';
-  if (ids.length === 1) return '연결자와 본 풀이';
-  return `연결자 ${ids.length}명과 본 풀이`;
+/** Count-only display caption; opaque Reader IDs are never rendered as names or grants. */
+export function readingReaderLabelV1(
+  ids: readonly string[],
+  locale: MobileUiLocale = 'ko-KR',
+): string {
+  const count = ids.length;
+  if (count === 0) {
+    return ({
+      'ko-KR': 'Reader 기록 없음',
+      'ja-JP': '案内人の記録なし',
+      'zh-TW': '無引路人紀錄',
+      'en-US': 'No reader recorded',
+      'zh-CN': '未记录引路人',
+    } as const)[locale];
+  }
+  if (count === 1) {
+    return ({
+      'ko-KR': '연결자와 본 풀이',
+      'ja-JP': '案内人と行った鑑定',
+      'zh-TW': '與引路人共同進行的解讀',
+      'en-US': 'Reading with a reader',
+      'zh-CN': '与引路人共同进行的解读',
+    } as const)[locale];
+  }
+  if (locale === 'ja-JP') return `${count}人の案内人と行った鑑定`;
+  if (locale === 'zh-TW') return `與 ${count} 位引路人共同進行的解讀`;
+  if (locale === 'en-US') return `Reading with ${count} readers`;
+  if (locale === 'zh-CN') return `与 ${count} 位引路人共同进行的解读`;
+  return `연결자 ${count}명과 본 풀이`;
 }
 
 export function buildAllRecordTimelineV1(
