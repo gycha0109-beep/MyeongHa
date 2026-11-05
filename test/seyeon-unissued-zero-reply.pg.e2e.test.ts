@@ -99,6 +99,7 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     expect(denied.rows).toHaveLength(0);
     await pool.query(operation('production-25-unissued-zero-receipt-recovery-20261103.sql'));
     await pool.query(operation('production-27-g0-committed-followup-receipt-20261105.sql'));
+    await pool.query(operation('production-28-g0-followup-owner-original-user-lock-20261105.sql'));
     const runtime=vi.fn(async()=>{throw Error('A committed reply must never invoke inference.');});
     const recover=()=>recoverSeyeonUnissuedZeroReplyV1({pool:subjectPool,verifiedEvidence:f.evidence,threadId:f.thread,
       text:f.text,signal:new AbortController().signal,requestId:'repeat',serverTime:new Date().toISOString()});
