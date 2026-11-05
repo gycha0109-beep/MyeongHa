@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { formatMobileHomeGreetingV1 } from '@/features/home/home-view-model';
 import type {
   HomeReadingTopicV1,
-  formatMobileHomeGreetingV1,
   MobileHomeContinuationCardV1,
   MobileHomeTodayCardV1,
 } from '@/features/home/home-view-model';
