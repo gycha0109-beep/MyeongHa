@@ -152,7 +152,7 @@ begin
     or v_event.verified_payload_jsonb->>'currency'
          is distinct from v_receipt.verified_currency
     or v_event.verified_payload_jsonb->>'cancellationIdHmac'
-         !~ '^hmac-sha256:k1:[0-9a-f]{64}
+         !~ '^hmac-sha256:k1:[0-9a-f]{64}$' then
     raise exception 'SAJU_REFUND_SOURCE_NOT_VERIFIED';
   end if;
   select coalesce(sum(r.refunded_minor),0) into v_existing_refunds
@@ -226,89 +226,6 @@ revoke all on public.commerce_saju_records_v1,
 revoke all on function public.tr_commerce_saju_refund_effect_verified_v1(),
   public.tr_commerce_saju_record_paid_revision_guard_v1(),
   public.tr_commerce_saju_upgrade_link_source_v1(),
-  public.tr_commerce_saju_ledger_immutable_v1() from public;
-
--- Any eventual read-only snapshot must verify:
---  * linked Receipt/Intent/Product/record/revision/Subject/source integrity,
---  * all upgrade sources are earlier, same-record receipts, and acyclic,
---  * unsettled provider cancellation -> HOLD, not 0 refunded,
---  * receipt unique sum and real settled refund sum,
---  * live ownedFields from exact record-scoped effective Grant aggregate,
---  * unresolved Purchase Intents before charging under a single DB lock,
---  * account-deletion/restore graph includes these new Subject-private rows.
- then
-    raise exception 'SAJU_REFUND_SOURCE_NOT_VERIFIED';
-  end if;
-  select coalesce(sum(r.refunded_minor),0) into v_existing_refunds
-  from public.commerce_saju_verified_refund_effects_v1 r
-  where r.receipt_id=new.receipt_id;
-  if v_existing_refunds+new.refunded_minor > v_receipt.verified_amount_minor then
-    raise exception 'SAJU_REFUND_EXCEEDS_VERIFIED_CHARGE';
-  end if;
-  return new;
-end;
-$$;
-create trigger tr_commerce_saju_refund_effect_verified_v1
- before insert on public.commerce_saju_verified_refund_effects_v1
- for each row execute function public.tr_commerce_saju_refund_effect_verified_v1();
-
--- Record editing remains permitted before payment. Pending/failed Intent rows
--- are NOT sufficient to freeze this source revision permanently. Checkout-time
--- locking and a later verified-Receipt binding gate remain required.
-create or replace function public.tr_commerce_saju_record_paid_revision_guard_v1()
-returns trigger language plpgsql security invoker
-set search_path = pg_catalog, public as $$
-begin
-  if new.subject_id is distinct from old.subject_id
-    or new.id is distinct from old.id
-    or new.created_at is distinct from old.created_at then
-    raise exception 'SAJU_RECORD_IDENTITY_IMMUTABLE';
-  end if;
-  if new.birth_revision_id is distinct from old.birth_revision_id
-    and exists (
-      select 1
-      from public.commerce_saju_purchase_origins_v1 origin
-      join public.commerce_receipts receipt
-        on receipt.purchase_intent_id=origin.purchase_intent_id
-        and receipt.subject_id=origin.subject_id
-      where origin.saju_record_id=old.id
-        and origin.subject_id=old.subject_id
-        and receipt.verification_status in ('verified','revoked')
-    ) then
-    raise exception 'SAJU_PAID_RECORD_BIRTH_REVISION_FROZEN';
-  end if;
-  return new;
-end;
-$$;
-create trigger tr_commerce_saju_record_paid_revision_guard_v1
- before update on public.commerce_saju_records_v1
- for each row execute function public.tr_commerce_saju_record_paid_revision_guard_v1();
-
--- Purchase association itself cannot be retargeted to a different Record.
-create or replace function public.tr_commerce_saju_ledger_immutable_v1()
-returns trigger language plpgsql security invoker
-set search_path = pg_catalog, public as $$
-begin
-  raise exception 'SAJU_SOURCE_LEDGER_IMMUTABLE';
-end;
-$$;
-create trigger tr_commerce_saju_origin_immutable_v1
- before update or delete on public.commerce_saju_purchase_origins_v1
- for each row execute function public.tr_commerce_saju_ledger_immutable_v1();
-create trigger tr_commerce_saju_upgrade_link_immutable_v1
- before update or delete on public.commerce_saju_upgrade_receipt_links_v1
- for each row execute function public.tr_commerce_saju_ledger_immutable_v1();
-create trigger tr_commerce_saju_refund_immutable_v1
- before update or delete on public.commerce_saju_verified_refund_effects_v1
- for each row execute function public.tr_commerce_saju_ledger_immutable_v1();
-
--- No new service principal / public table read or mutation privileges.
-revoke all on public.commerce_saju_records_v1,
-  public.commerce_saju_purchase_origins_v1,
-  public.commerce_saju_upgrade_receipt_links_v1,
-  public.commerce_saju_verified_refund_effects_v1 from public;
-revoke all on function public.tr_commerce_saju_refund_effect_verified_v1(),
-  public.tr_commerce_saju_record_paid_revision_guard_v1(),
   public.tr_commerce_saju_ledger_immutable_v1() from public;
 
 -- Any eventual read-only snapshot must verify:
