@@ -1,0 +1,47 @@
+# Phase 11 disposable actual GoTrue used only by the manual main-only PG18/Saju proof.
+# Never bind this network to Cloudflare, Admin, Hosted Supabase, or Production.
+name: myeongha-ops-phase11-real-auth
+services:
+  auth-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${MH_OPS_AUTH_DB_PASSWORD:?}
+      POSTGRES_DB: myeongha_saju_gotrue_verify
+    volumes:
+      - auth-data:/var/lib/postgresql/data
+      - ../local/saju-bridge-auth-init.sql:/docker-entrypoint-initdb.d/01-gotrue-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d myeongha_saju_gotrue_verify"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    networks: [disposable]
+  gotrue:
+    image: supabase/gotrue:v2.196.0
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${MH_OPS_GOTRUE_PORT:?}:9999"
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: "9999"
+      API_EXTERNAL_URL: http://gotrue:9999
+      GOTRUE_SITE_URL: http://127.0.0.1:3000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: ${MH_OPS_AUTH_DB_URL:?}
+      GOTRUE_JWT_SECRET: ${MH_OPS_AUTH_JWT_SECRET:?}
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "300"
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+    networks: [disposable]
+networks:
+  disposable:
+    internal: true
+volumes:
+  auth-data:

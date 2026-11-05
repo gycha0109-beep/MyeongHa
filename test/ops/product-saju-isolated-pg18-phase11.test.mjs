@@ -8,6 +8,8 @@ import { Pool } from 'pg';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
 import { performance } from 'node:perf_hooks';
+import { randomBytes } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../../apps/api/src/current-subject-saju-calculation-http.js';
 import { SupabaseMemberIdentityEvidenceVerifierV1 } from '../../apps/api/src/supabase-member-identity-verifier.js';
@@ -72,6 +74,48 @@ async function startIsolatedPg18() {
       .rejects.toMatchObject({code:'42501'});
     return {
       pool:login,
+      // Real disposable GoTrue UUIDs are generated at test runtime and are never written to proofs.
+      async bindRealMembers(members) {
+        if (!Array.isArray(members) || members.length !== 4 ||
+            new Set(members.map(m=>m.id)).size !== 4 ||
+            !members.every(m=>/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu.test(m.id))) {
+          throw Error('Exactly four independent synthetic GoTrue identities are required');
+        }
+        await admin.query('CREATE TABLE public.ops_phase11_real_auth_map(auth_user_id uuid PRIMARY KEY, owner_id uuid UNIQUE NOT NULL)');
+        // Fixture inserts run only during initialization; FORCE RLS is restored before requests.
+        await admin.query('ALTER TABLE public.ops_phase11_birth NO FORCE ROW LEVEL SECURITY');
+        for (let i=0;i<members.length;i++) {
+          const digit=String(i+1).padStart(2,'0');
+          const owner='92000000-0000-4000-8000-0000000000'+digit;
+          const profile='93000000-0000-4000-8000-0000000000'+digit;
+          const revision='94000000-0000-4000-8000-0000000000'+digit;
+          await admin.query('INSERT INTO public.ops_phase11_real_auth_map VALUES ($1,$2)',
+            [members[i].id,owner]);
+          // The original fixture already has the first two rows (..0011 and ..0022).
+          // Real-GoTrue accounts use different test-only owners to avoid replacing those rows.
+          await admin.query('INSERT INTO public.ops_phase11_birth VALUES($1,$2,$3)',
+            [owner,profile,revision]);
+        }
+        await admin.query('ALTER TABLE public.ops_phase11_birth FORCE ROW LEVEL SECURITY');
+        const rls = await admin.query("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid='public.ops_phase11_birth'::regclass");
+        if (!rls.rows[0]?.relrowsecurity || !rls.rows[0]?.relforcerowsecurity)
+          throw Error('Synthetic owner RLS was not restored');
+        await admin.query(`
+CREATE OR REPLACE FUNCTION public.begin_member_subject_context_v1(auth_user uuid)
+RETURNS TABLE(subject_id uuid,subject_kind text)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+DECLARE mapped uuid;
+BEGIN
+  SELECT m.owner_id INTO mapped FROM public.ops_phase11_real_auth_map m
+  WHERE m.auth_user_id=auth_user;
+  IF mapped IS NULL THEN
+    RAISE EXCEPTION 'Unresolved isolated user' USING ERRCODE='28000';
+  END IF;
+  PERFORM set_config('myeongha.subject_id',mapped::text,true);
+  RETURN QUERY SELECT mapped,'member'::text;
+END;
+$;`);
+      },
       async close(){
         await login.end().catch(()=>undefined);
         await admin.end().catch(()=>undefined);
@@ -208,21 +252,22 @@ function responseFixture() {
     },
   };
 }
-async function measuredBatch(origin, count, concurrency) {
+async function measuredBatch(origin, count, concurrency, bearerTokens = [MEMBER_TOKEN]) {
   let index = 0;
   const samples = [];
   await Promise.all(Array.from({ length: concurrency }, async () => {
     while (index < count) {
       index++;
+      const token = bearerTokens[(index - 1) % bearerTokens.length];
       const started = performance.now();
       const response = await fetch(origin + '/api/me/saju/calculation', {
         method: 'POST',
-        headers: { authorization: 'Bearer ' + MEMBER_TOKEN },
-        signal: AbortSignal.timeout(3000),
+        headers: { authorization: 'Bearer ' + token },
+        signal: AbortSignal.timeout(5000),
       });
       const body = await response.text();
       expect(response.headers.get('cache-control')).toBe('no-store');
-      for (const forbidden of [MEMBER_TOKEN, SAJU_TOKEN, API_KEY,
+      for (const forbidden of [...bearerTokens, SAJU_TOKEN, API_KEY,
         'synthetic private database', 'postgresql://', '127.0.0.1:']) {
         expect(body).not.toContain(forbidden);
       }
@@ -390,4 +435,178 @@ isolated('Phase 10/11 actual isolated PostgreSQL 18 + Auth/Saju loopback product
       await database?.close();
     }
   }, 90000);
+});
+
+
+async function registerDisposableGoTrueMembers(origin) {
+  if (!/^http:\/\/127\.0\.0\.1:[0-9]{2,5}$/u.test(origin)) {
+    throw Error('Only the private GoTrue loopback origin is allowed');
+  }
+  const members=[];
+  for (let i=0;i<4;i++) {
+    const email='phase11-'+randomBytes(12).toString('hex')+'@example.invalid';
+    const password=randomBytes(30).toString('base64url');
+    const signup=await fetch(origin+'/signup',{
+      method:'POST', headers:{'content-type':'application/json'},redirect:'manual',
+      body:JSON.stringify({email,password}),signal:AbortSignal.timeout(12000),
+    });
+    if(signup.status!==200)throw Error('Disposable GoTrue signup rejected');
+    const created=await signup.json();
+    const id=created?.user?.id;
+    if(typeof id!=='string')throw Error('Actual GoTrue UUID not issued');
+    let token=created.access_token;
+    if(typeof token!=='string') {
+      const login=await fetch(origin+'/token?grant_type=password',{
+        method:'POST',headers:{'content-type':'application/json'},redirect:'manual',
+        body:JSON.stringify({email,password}),signal:AbortSignal.timeout(12000),
+      });
+      if(!login.ok)throw Error('Actual GoTrue password grant rejected');
+      token=(await login.json()).access_token;
+    }
+    if(typeof token!=='string'||token.split('.').length!==3)
+      throw Error('Actual signed GoTrue JWT missing');
+    const verified=await fetch(origin+'/user',{
+      headers:{authorization:'Bearer '+token},signal:AbortSignal.timeout(12000),
+      redirect:'manual',
+    });
+    if(!verified.ok||(await verified.json()).id!==id)
+      throw Error('Actual GoTrue JWT and user identity did not match');
+    members.push({id,token});
+  }
+  return members;
+}
+async function launchActualSajuHost(sourceDirectory) {
+  if(typeof sourceDirectory!=='string' ||
+    !sourceDirectory.endsWith('/_isolated_saju') ||
+    !sourceDirectory.startsWith(process.cwd()+'/')) {
+    throw Error('Expected only pinned GitHub checkout of Saju');
+  }
+  const {createMyeonghwaProductionCalculationHostServer}=await import(
+    pathToFileURL(join(sourceDirectory,'dist','production-calculation-host.js')).href);
+  if(typeof createMyeonghwaProductionCalculationHostServer!=='function')
+    throw Error('Real pinned Saju calculation server export is missing');
+  const server=createMyeonghwaProductionCalculationHostServer({serviceBearer:SAJU_TOKEN});
+  server.listen(0,'127.0.0.1');
+  await once(server,'listening');
+  const address=server.address();
+  if(!address||typeof address==='string')throw Error('Real Saju listener unavailable');
+  return {
+    origin:'http://127.0.0.1:'+address.port,
+    async close(){
+      server.closeAllConnections();
+      await new Promise((resolve,reject)=>server.close(e=>e?reject(e):resolve()));
+    },
+  };
+}
+
+const actualChainEnabled = Boolean(BIN && process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN &&
+  process.env.MH_OPS_REAL_SAJU_CHECKOUT && process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH);
+isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
+  it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
+    if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
+       process.env.GITHUB_REF!=='refs/heads/main')
+      throw Error('Actual multi-service test is manual-main-only');
+    const members=await registerDisposableGoTrueMembers(process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN);
+    let database, saju;
+    const servers=[];
+    try {
+      database=await startIsolatedPg18();
+      await database.bindRealMembers(members);
+      saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT);
+      const state={
+        dbActive:0,dbPeak:0,dbAcquisitions:0,
+        dbMode:'healthy',dbAcquireMs:[],dbQueryMs:[],authCalls:0,sajuCalls:0,
+      };
+      const authOrigin=process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN;
+      const identityEvidenceVerifier=new SupabaseMemberIdentityEvidenceVerifierV1({
+        supabaseOrigin:'https://synthetic.invalid',supabaseApiKey:API_KEY,
+        fetchImpl:(_url,init)=>{
+          state.authCalls++;
+          return fetch(authOrigin+'/user',init);
+        },
+        timeoutMs:2000,
+      });
+      const realAdapter=createSajuProductionCalculationHttpAdapterV1({
+        baseUrl:saju.origin,bearerToken:SAJU_TOKEN,timeoutMs:3000,
+      });
+      const countedAdapter={
+        async calculate(binding){
+          state.sajuCalls++;
+          return realAdapter.calculate(binding);
+        },
+      };
+      const db=createRealDb(database.pool,state);
+      const api=await listen(async(req,res)=>{
+        if(req.url==='/api/health'&&req.method==='GET'){
+          res.writeHead(200,{'content-type':'application/json','cache-control':'no-store'})
+            .end('{"status":"ok"}');
+          return;
+        }
+        if(req.url!=='/api/me/saju/calculation'||req.method!=='POST'){
+          res.writeHead(404).end();
+          return;
+        }
+        try{
+          const result=await handleCurrentSubjectSajuCalculationRequestV1({
+            request:new Request('https://myeongha.synthetic/api/me/saju/calculation',{
+              method:'POST',headers:{authorization:req.headers.authorization??''},
+            }),
+            requestId:'b0000000-0000-4000-8000-000000000011',
+            serverTime:'2026-11-05T00:00:00.000Z',
+            identityEvidenceVerifier,pool:db,sajuAdapter:countedAdapter,
+          });
+          res.writeHead(result.status,{
+            'content-type':result.headers.get('content-type')??'application/json',
+            'cache-control':'no-store',
+          });
+          res.end(Buffer.from(await result.arrayBuffer()));
+        }catch{
+          res.writeHead(503,{'content-type':'application/json','cache-control':'no-store'})
+            .end('{"ok":false,"error":{"code":"DEPENDENCY_UNAVAILABLE"}}');
+        }
+      });
+      servers.push(api);
+      const tokens=members.map(m=>m.token);
+      const baseline=await measuredBatch(api.origin,12,1,tokens);
+      expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
+      const contended=await measuredBatch(api.origin,32,8,tokens);
+      expect(contended.unexpected).toBe(0);
+      expect(contended.successful+contended.unavailable).toBe(32);
+      expect(contended.successful).toBeGreaterThan(0);
+      expect(state.dbPeak).toBeLessThanOrEqual(2);
+      const noCredentials=await fetch(api.origin+'/api/me/saju/calculation',{method:'POST'});
+      expect(noCredentials.status).toBe(401);
+      const health=await fetch(api.origin+'/api/health');
+      expect(health.status).toBe(200);
+      expect(state.dbActive).toBe(0);
+      expect(state.sajuCalls).toBeGreaterThanOrEqual(baseline.successful+contended.successful);
+      const proof={
+        schema:'myeongha-ops-real-gotrue-pg18-saju-product-phase11-v1',
+        status:'OBSERVED_ISOLATED_REAL_CHAIN',
+        scope:'disposable-main-only-local-gotrue-postgres18-and-pinned-saju',
+        memberCount:4,actualGoTrueJwtVerified:true,realGoTrueHttp:true,
+        actualPostgres18Rls:true,actualPinnedSajuProductionEngine:true,
+        sajuSourceSha:'9807ce89c08afc61b587560d515a475efd819032',
+        cloudflareWorkerRuntimeMeasured:false,
+        databasePoolMax:2,dbPeak:state.dbPeak,
+        baseline,contended,
+        dbAcquireP95Ms:quantile(state.dbAcquireMs,.95),
+        dbQueryP95Ms:quantile(state.dbQueryMs,.95),
+        authHttpCalls:state.authCalls,sajuCalculationCalls:state.sajuCalls,
+        anonymousDenied:noCredentials.status===401,
+        healthUnaffected:health.status===200,
+        actualSajuResourceCgroupConstrained:false,
+        productionCapacityProven:false,productionScalingThresholdApproved:false,
+        drReady:false,serviceResumptionAllowed:false,outputContainsIdentifiers:false,
+      };
+      await writeFile(process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH,JSON.stringify(proof),{
+        flag:'wx',mode:0o600,
+      });
+      console.log('MYEONGHA_REAL_GOTRUE_PG18_SAJU_CHAIN_PHASE11_PASS');
+    }finally{
+      for(const server of servers.reverse())await server.close().catch(()=>undefined);
+      await saju?.close().catch(()=>undefined);
+      await database?.close();
+    }
+  },120000);
 });
