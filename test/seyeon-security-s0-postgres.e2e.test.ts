@@ -3303,12 +3303,76 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       });
       // A new Grant for the same Memory must never resurrect the old
       // immutable historical Assistant/Attempt provenance.
+      const replacementGrant1=uuid(29,218);
+      const replacementGrant2=uuid(31,218);
       await pool.query(`insert into public.record_access_grants(
         id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
         values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`,
-        [uuid(29,218),f.subject,f.memory]);
-      await expect(audit()).rejects.toMatchObject({
-        constraint:'seyeon_source_lock_original_grant_required',
+        [replacementGrant1,f.subject,f.memory]);
+      // W103 G5: authorization is tied to the original immutable Grant ID,
+      // not a current replacement with the same Subject, Memory, Character.
+      for(const check of [audit,sameTxGuard,()=>g3Review('audit_only')]){
+        await expect(check()).rejects.toMatchObject({
+          constraint:'seyeon_source_lock_original_grant_required',
+        });
+      }
+      // A second independent grant rotation: revoke the first replacement
+      // and issue a new current replacement without reissuing the historic
+      // assistant or modifying its permanently pinned original grant.
+      const {rows:[replacement1Revoked]}=await pool.query<{
+        id:string;revoked_at:Date
+      }>(`update public.record_access_grants
+        set revoked_at=clock_timestamp()
+        where id=$1::uuid and subject_id=$2::uuid
+          and memory_item_id=$3::uuid and revoked_at is null
+        returning id,revoked_at`,
+        [replacementGrant1,f.subject,f.memory]);
+      expect(replacement1Revoked?.id).toBe(replacementGrant1);
+      expect(replacement1Revoked?.revoked_at).not.toBeNull();
+      await pool.query(`insert into public.record_access_grants(
+        id,subject_id,memory_item_id,grantee_character_id,grant_reason,granted_at)
+        values($1,$2,$3,'seyeon','user_choice',clock_timestamp())`,
+        [replacementGrant2,f.subject,f.memory]);
+      const {rows:grantLineage}=await pool.query<{
+        id:string;revoked_at:Date|null;seyeon_revoke_requested_at:Date|null
+      }>(`select id,revoked_at,seyeon_revoke_requested_at
+        from public.record_access_grants
+        where subject_id=$1::uuid and memory_item_id=$2::uuid
+          and id=any($3::uuid[])
+        order by id`,[f.subject,f.memory,
+          [f.grant,replacementGrant1,replacementGrant2]]);
+      expect(grantLineage).toHaveLength(3);
+      expect(grantLineage.map(g=>g.id).sort()).toEqual(
+        [f.grant,replacementGrant1,replacementGrant2].sort(),
+      );
+      expect(grantLineage.filter(g=>g.revoked_at===null)).toHaveLength(1);
+      expect(grantLineage.find(g=>g.id===replacementGrant1)?.revoked_at)
+        .not.toBeNull();
+      expect(grantLineage.find(g=>g.id===replacementGrant2)).toMatchObject({
+        revoked_at:null,seyeon_revoke_requested_at:null,
+      });
+      // The original remains revoked after both fresh authorizations.
+      // Neither G1 current-original audit, G2 same-TX guard, nor G3 review
+      // may substitute a later Grant; no model, Commit or Reply is issued.
+      for(const check of [audit,sameTxGuard,()=>g3Review('audit_only')]){
+        await expect(check()).rejects.toMatchObject({
+          constraint:'seyeon_source_lock_original_grant_required',
+        });
+      }
+      const {rows:[postRotation]}=await pool.query(`
+        select a.state as attempt_state,t.state as turn_state,
+          a.seyeon_personal_source_pin_jsonb->'historicalCandidateProof'
+            ->>'originalGrantId' as pinned_original_grant,
+          (select count(*)::int from public.conversation_messages m
+             where m.turn_id=t.id and m.sender_type='character'
+          ) as committed_assistant_count
+        from public.chat_turn_attempts a
+        join public.chat_turns t on t.id=a.turn_id
+        where a.id=$1::uuid
+      `,[currentAttempt]);
+      expect(postRotation).toEqual({
+        attempt_state:'running',turn_state:'context_ready',
+        pinned_original_grant:f.grant,committed_assistant_count:0,
       });
     }finally{
       await pool.query(`revoke execute on function
