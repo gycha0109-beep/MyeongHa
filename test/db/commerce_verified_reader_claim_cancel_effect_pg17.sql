@@ -42,6 +42,8 @@ declare
  v_original_other_revision bigint;
  v_wrong_grant_rejected boolean:=false;
  v_constraint text;
+ v_scope record;
+ v_scopes_locked integer:=0;
  v_effective_at timestamptz:=transaction_timestamp();
 begin
  -- Exact real verified paid Reading and pre-payment server notice.
@@ -144,6 +146,38 @@ begin
   raise exception 'CLAIM_E2E_OTHER_READER_PURCHASE_ACCEPTED';
  end if;
  v_wrong_grant_rejected:=false;
+
+ -- S1 MUST be acquired BEFORE provider Event / Grant row locks of
+ -- the legacy effect writer. Pin ALL original B2/B3 Reader access scopes in
+ -- the same canonical DB sort order as the existing S2 dispatch logic.
+ -- This is only a disposable synthetic transaction; no LIVE T2 admission.
+ for v_scope in
+   select distinct access.subject_id,access.official_reading_id,
+                   access.reader_character_id
+   from public.standard_reading_reader_access_grants access
+   where access.purchase_intent_id in (v_purchase,v_other_purchase)
+     and access.subject_id=v_subject
+     and access.official_reading_id is not null
+     and access.reader_character_id is not null
+   order by access.subject_id,access.official_reading_id,
+            access.reader_character_id
+ loop
+   perform public.internal_acquire_official_reader_scope_lock_v1(
+     v_scope.subject_id,v_scope.official_reading_id,
+     v_scope.reader_character_id
+   );
+   v_scopes_locked:=v_scopes_locked+1;
+ end loop;
+ if v_scopes_locked=0
+    or not exists (
+      select 1 from public.standard_reading_reader_access_grants access
+      where access.purchase_intent_id=v_purchase and access.subject_id=v_subject)
+    or not exists (
+      select 1 from public.standard_reading_reader_access_grants access
+      where access.purchase_intent_id=v_other_purchase and access.subject_id=v_subject)
+ then
+   raise exception 'CLAIM_E2E_READER_S1_SCOPE_LOCK_SET_INCOMPLETE';
+ end if;
 
  -- New source event is persisted against B2 ORIGINAL receipt, not a
  -- manufactured event ID / client-provided Grant.
