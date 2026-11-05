@@ -27,6 +27,7 @@ export const SEYEON_SECURITY_S0_SQL_SOURCES = Object.freeze([
   '24-g1-historical-final-context-seal.sql',
   '26-g1-historical-source-admission.sql',
   '25-g2-historical-same-tx-originals-hold.sql',
+  '27-g3-historical-first-reveal-current-originals-hold.sql',
   '16-g1-model-recent-source-pin.sql',
   '17-g1-positive-combined-model-source-pin.sql',
 ]);

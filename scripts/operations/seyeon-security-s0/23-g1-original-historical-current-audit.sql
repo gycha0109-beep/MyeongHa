@@ -32,7 +32,12 @@ begin
   where t.id=p_turn_id and t.subject_id=p_subject_id
     and t.thread_id=p_thread_id
     and ((t.state='context_ready' and a.state='running')
-      or (t.state='validated' and a.state='validated'))
+      or (t.state='validated' and a.state='validated')
+      -- G3 can audit an already committed original source ONLY; this is
+      -- not a first/streaming/replay Reveal authority or a returned text.
+      or (t.state='committed' and a.state='committed'
+          and t.committed_at is not null
+          and t.committed_attempt_id=a.id))
     and a.seyeon_personal_source_pinned_at is not null
     and a.seyeon_personal_source_pin_jsonb=
       jsonb_build_object('historicalCandidateProof',

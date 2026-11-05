@@ -2249,6 +2249,12 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[sealAcl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',$1,'EXECUTE') as closed`,[sealSignature]);
     expect(sealAcl.closed).toBe(true);
+    const g3ReviewSignature=
+      'seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text)';
+    const {rows:[g3ReviewAcl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as closed`,
+      [g3ReviewSignature]);
+    expect(g3ReviewAcl.closed).toBe(true);
     const sourceAdmissionSignature=
       'seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text)';
     const {rows:[sourceAdmissionAcl]}=await pool.query(`select not has_function_privilege(
@@ -2267,7 +2273,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text),
       seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text),
       seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid),
-      seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)
+      seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text),
+      seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text)
       to myeongha_api_executor`);
     try{
       expect(await audit()).toEqual({
@@ -2355,6 +2362,32 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         state from public.chat_turn_attempts where id=$1`,[currentAttempt]);
       expect(persistedAdmission.admission).toEqual(issued.admission);
       expect(persistedAdmission.state).toBe('running');
+      // W88 G3 current-rights review is a distinct non-authorizing DB
+      // transaction. It returns neither assistant bytes nor a Reveal grant.
+      const g3Review=(purpose:'audit_only'|'first'|'committed_replay')=>
+        f.run(async({client})=>{
+          const {rows:[result]}=await client.query<{review:Record<string,unknown>}>(`
+            select seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(
+              $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,
+              $6::uuid,$7::uuid,$8::uuid,$9::text
+            ) as review`,[
+              f.subject,f.thread,currentTurn,currentAttempt,purpose,
+              currentUser,uuid(19,1218),uuid(23,1218),'historical-s0-fixture',
+            ]);
+          return result?.review;
+        });
+      expect(await g3Review('audit_only')).toEqual({
+        schemaVersion:'seyeon-g3-historical-current-originals-review-s0-v1',
+        historicalSourceCount:2,originalsCurrentForReview:true,
+        authorizesFirstReveal:false,authorizesCommittedReplay:false,
+        permitsStreaming:false,permitsHttpReveal:false,
+      });
+      await expect(g3Review('first')).rejects.toMatchObject({
+        constraint:'seyeon_historical_g3_original_commit_required',
+      });
+      await expect(g3Review('committed_replay')).rejects.toMatchObject({
+        constraint:'seyeon_historical_g3_replay_never_authorized',
+      });
       // W85: source type was approved when G1 issued admission, but that
       // approval is revoked BEFORE G2. A past immutable receipt must NOT
       // overrule current registry state, even with the original Grant active.
@@ -2548,6 +2581,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await expect(sameTxGuard()).rejects.toMatchObject({
         constraint:'seyeon_source_lock_original_grant_required',
       });
+      await expect(g3Review('audit_only')).rejects.toMatchObject({
+        constraint:'seyeon_source_lock_original_grant_required',
+      });
       await expect(audit()).rejects.toMatchObject({
         constraint:'seyeon_source_lock_original_grant_required',
       });
@@ -2566,7 +2602,8 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         seyeon_private.cmd_seal_historical_final_context_s0_v1(uuid,uuid,uuid,uuid,text,text),
         seyeon_private.cmd_admit_historical_g1_model_sources_s0_v1(uuid,uuid,uuid,uuid,text),
         seyeon_private.assert_historical_g2_sealed_originals_s0_v1(uuid,uuid,uuid,uuid),
-        seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text)
+        seyeon_private.cmd_attempt_historical_same_tx_commit_hold_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text),
+        seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(uuid,uuid,uuid,uuid,text,uuid,uuid,uuid,text)
         from myeongha_api_executor`);
     }
     const {rows:[afterAuditAcl]}=await pool.query(`select not has_function_privilege(
@@ -2575,6 +2612,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     const {rows:[afterSealAcl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',$1,'EXECUTE') as closed`,[sealSignature]);
     expect(afterSealAcl.closed).toBe(true);
+    const {rows:[afterG3Acl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as closed`,
+      [g3ReviewSignature]);
+    expect(afterG3Acl.closed).toBe(true);
     const {rows:[afterSourceAdmissionAcl]}=await pool.query(`select
       not has_function_privilege('myeongha_api_executor',$1,'EXECUTE') as closed`,
       [sourceAdmissionSignature]);

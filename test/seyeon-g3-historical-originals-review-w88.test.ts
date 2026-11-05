@@ -1,0 +1,76 @@
+// Watchtower-Track: security
+import {readFileSync} from 'node:fs';
+import {describe,expect,it} from 'vitest';
+const sql=(name:string)=>readFileSync(new URL(
+  '../scripts/operations/seyeon-security-s0/'+name,import.meta.url,
+),'utf8');
+describe('W88 G3 historical first Reveal original-source review (no right to disclose)',()=>{
+  const g0=sql('23-g1-original-historical-current-audit.sql');
+  const g3=sql('27-g3-historical-first-reveal-current-originals-hold.sql');
+  const install=readFileSync(new URL(
+    '../scripts/operations/seyeon-security-s0/install-isolated.mjs',import.meta.url,
+  ),'utf8');
+  it('limits committed-original auditing to exact committed Turn/Attempt pairs',()=>{
+    expect(g0).toContain("t.state='committed' and a.state='committed'");
+    expect(g0).toContain('t.committed_at is not null');
+    expect(g0).toContain('t.committed_attempt_id=a.id');
+    expect(g0).toContain("t.state='context_ready' and a.state='running'");
+  });
+  it('holds first Reveal and replay unless there is exact DB-owned Commit evidence',()=>{
+    for(const requirement of [
+      "p_purpose not in ('audit_only','first')",
+      "constraint='seyeon_historical_g3_replay_never_authorized'",
+      "p_purpose='first' and t.state='committed'",
+      "t.delivered_at is null and t.committed_at is not null",
+      "t.committed_attempt_id=a.id",
+      "a.seyeon_positive_delivery_issued_at is null",
+      "t.client_turn_id=p_expected_client_turn_id",
+      "a.committed_message_id=p_expected_assistant_message_id",
+      "constraint='seyeon_historical_g3_original_commit_required'",
+      'p_expected_post_turn_outbox_event_id',
+      "oe.event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'",
+      "assistant.sender_type='character'",
+    ])expect(g3).toContain(requirement);
+  });
+  it('rechecks immutable original candidate, G1 final Context, source admission, registry and current Grants',()=>{
+    const owner=g3.indexOf('perform seyeon_private.lock_memory_subject_v1(');
+    const locked=g3.indexOf('for update of t,a');
+    const registry=g3.indexOf(
+      'perform 1 from public.seyeon_positive_source_type_registry_v1 reg'
+    );
+    const audit=g3.indexOf(
+      'v_audit:=seyeon_private.qry_recheck_historical_candidate_originals_s0_v1('
+    );
+    expect(owner).toBeGreaterThan(0);
+    expect(locked).toBeGreaterThan(owner);
+    expect(registry).toBeGreaterThan(locked);
+    expect(audit).toBeGreaterThan(registry);
+    for(const requirement of [
+      "v_seal->>'candidatePgJsonbDigest'",
+      "v_admission->>'originalGrantId'",
+      "v_admission->>'historicalAssistantOriginalSourcesDigest'",
+      "v_admission->>'historicalSourceCensusDigest'",
+      "reg.record_kind='memory' and reg.enabled",
+      "reg.projector_version=v_candidate->>'projectorVersion'",
+      'for share of reg',
+      "constraint='seyeon_historical_g3_source_type_disabled'",
+      "constraint='seyeon_historical_g3_original_grant_revoked'",
+    ])expect(g3).toContain(requirement);
+  });
+  it('returns ONLY non-authorizing source review, never private bytes or API EXECUTE',()=>{
+    for(const denied of [
+      "'authorizesFirstReveal',false",
+      "'authorizesCommittedReplay',false",
+      "'permitsStreaming',false",
+      "'permitsHttpReveal',false",
+    ])expect(g3).toContain(denied);
+    expect(g3).not.toContain("return query select");
+    expect(g3).not.toContain("set state='delivered'");
+    expect(g3).toContain(
+      'revoke all on function seyeon_private.qry_review_historical_first_reveal_originals_s0_v1('
+    );
+    expect(install).toContain(
+      'seyeon_private.qry_review_historical_first_reveal_originals_s0_v1('
+    );
+  });
+});
