@@ -2795,6 +2795,139 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         permitsHttpReveal:false,
       });
 
+      // W99 G5: a current-originals review that cannot acquire its
+      // original Grant lock within the DB timeout must fail closed.
+      // Also cancel an in-flight blocked backend from a third DB session.
+      // Both are REAL PG17 calls via the restricted G3 TypeScript port,
+      // not fake clock sleeps or simulated failures. The original Grant,
+      // candidate, and all disclosure rights remain unchanged.
+      for(const failureMode of ['lock_timeout','backend_cancel'] as const){
+        const blockingOwner=await pool.connect();
+        const abortedReviewer=await subjectPool.connect();
+        let reviewPromise:Promise<{ok:true;review:unknown}|
+          {ok:false;error:unknown}>|undefined;
+        let failureResult:{ok:true;review:unknown}|
+          {ok:false;error:unknown}|undefined;
+        let sawOriginalGrantBlock=false;
+        let actualPgFailureCode:string|undefined;
+        let blockerPid:number|undefined;
+        let reviewPid:number|undefined;
+        try{
+          await blockingOwner.query('BEGIN');
+          const {rows:[ownerBackend]}=await blockingOwner.query<{pid:number}>(
+            'select pg_backend_pid() as pid',
+          );
+          blockerPid=ownerBackend?.pid;
+          expect(blockerPid).toBeGreaterThan(0);
+          const marker=await blockingOwner.query(`
+            update public.record_access_grants
+            set seyeon_revoke_requested_at=clock_timestamp()
+            where id=$1::uuid and subject_id=$2::uuid
+              and memory_item_id=$3::uuid
+              and revoked_at is null
+              and seyeon_revoke_requested_at is null
+          `,[f.grant,f.subject,f.memory]);
+          expect(marker.rowCount).toBe(1);
+          await abortedReviewer.query('BEGIN');
+          await abortedReviewer.query('SET LOCAL ROLE myeongha_api_executor');
+          await abortedReviewer.query(
+            "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+          );
+          await abortedReviewer.query(
+            "SET LOCAL statement_timeout = '4000ms'",
+          );
+          await abortedReviewer.query(
+            failureMode==='lock_timeout'
+              ? "SET LOCAL lock_timeout = '750ms'"
+              : "SET LOCAL lock_timeout = '3500ms'",
+          );
+          const {rows:[reviewBackend]}=await abortedReviewer.query<{
+            pid:number
+          }>('select pg_backend_pid() as pid');
+          reviewPid=reviewBackend?.pid;
+          expect(reviewPid).toBeGreaterThan(0);
+          expect(reviewPid).not.toBe(blockerPid);
+          // Inspect PostgreSQL SQLSTATE internally, while the app-facing
+          // port must still disclose only its stable generic HOLD.
+          const observedDbClient={
+            async query<Row=Record<string,unknown>>(
+              sql:string,params:readonly unknown[]=[],
+            ){
+              try{
+                return await abortedReviewer.query<Row>(sql,params);
+              }catch(error){
+                actualPgFailureCode=(error as {code?:string}).code;
+                throw error;
+              }
+            },
+          };
+          reviewPromise=createSeyeonG3HistoricalOriginalsReviewPortV1(
+            observedDbClient,
+          ).reviewCurrentOriginals({
+            subjectId:f.subject,threadId:f.thread,turnId:currentTurn,
+            attemptId:currentAttempt,purpose:'audit_only',
+            historicalSourceCount:2,
+          }).then(
+            review=>({ok:true as const,review}),
+            (error:unknown)=>({ok:false as const,error}),
+          );
+          for(let i=0;i<60;i++){
+            const {rows:[waiting]}=await pool.query<{blocked:boolean}>(`
+              select $1::int=any(pg_catalog.pg_blocking_pids($2::int))
+                as blocked
+            `,[blockerPid,reviewPid]);
+            if(waiting?.blocked){sawOriginalGrantBlock=true;break;}
+            await new Promise(resolve=>setTimeout(resolve,10));
+          }
+          expect(sawOriginalGrantBlock).toBe(true);
+          if(failureMode==='backend_cancel'){
+            const {rows:[cancellation]}=await pool.query<{cancelled:boolean}>(`
+              select pg_catalog.pg_cancel_backend($1::int) as cancelled
+            `,[reviewPid]);
+            expect(cancellation?.cancelled).toBe(true);
+          }
+          failureResult=await reviewPromise;
+          expect(failureResult.ok).toBe(false);
+          expect(actualPgFailureCode).toBe(
+            failureMode==='lock_timeout'?'55P03':'57014',
+          );
+          if(failureResult.ok===false)
+            expect(failureResult.error).toMatchObject({
+              code:'SEYEON_G3_HISTORICAL_ORIGINALS_REVIEW_HOLD',
+              message:'Historical G3 original rights review unavailable.',
+            });
+        }finally{
+          // Release the lock and aborted transaction even if timing fails.
+          // Cancellation only targets this disposable test backend.
+          if(reviewPromise && !failureResult){
+            await pool.query(
+              'select pg_catalog.pg_cancel_backend($1::int)',
+              [reviewPid],
+            ).catch(()=>undefined);
+          }
+          await blockingOwner.query('ROLLBACK').catch(()=>undefined);
+          blockingOwner.release();
+          if(reviewPromise && !failureResult)
+            failureResult=await reviewPromise;
+          await abortedReviewer.query('ROLLBACK').catch(()=>undefined);
+          abortedReviewer.release();
+        }
+        expect(sawOriginalGrantBlock).toBe(true);
+        expect(failureResult).toMatchObject({
+          ok:false,
+          error:{code:'SEYEON_G3_HISTORICAL_ORIGINALS_REVIEW_HOLD'},
+        });
+        const {rows:[grantAfterAbort]}=await pool.query(`
+          select revoked_at,seyeon_revoke_requested_at
+          from public.record_access_grants
+          where id=$1::uuid and subject_id=$2::uuid
+        `,[f.grant,f.subject]);
+        expect(grantAfterAbort).toEqual({
+          revoked_at:null,seyeon_revoke_requested_at:null,
+        });
+        expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
+      }
+
       // W90 G3/G5: independent DB sessions. The G3 CURRENT-originals
       // review holds the exact original Memory Grant through its transaction.
       // A concurrent consent withdrawal marker must WAIT specifically on
