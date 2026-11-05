@@ -20,6 +20,7 @@ function summarize(runs, jobs = []) {
     requestedSha: SHA,
     confirmedCommitSha: SHA,
     currentMainSha: NEW_MAIN,
+    historicalMainAncestorConfirmed: true,
     runs,
     productionJobs: jobs,
   });
@@ -138,5 +139,27 @@ describe('Phase 13 exact-commit operations acceptance evidence inventory', () =>
       sha: 'not-a-sha',
       request: async () => { throw Error('should not make requests'); },
     })).rejects.toThrow('exact 40-character commit SHA');
+  });
+
+  it('requires GitHub to confirm historical source ancestry against the pinned main tip', async () => {
+    const comparePath = '/compare/' + SHA + '...' + NEW_MAIN + '?per_page=1';
+    const collect = (comparison) => collectMainOperationsEvidenceV1({
+      sha: SHA,
+      request: async (url) => {
+        let value;
+        if (url.endsWith('/commits/' + SHA)) value = { sha: SHA };
+        else if (url.endsWith('/git/ref/heads/main')) value = { object: { sha: NEW_MAIN } };
+        else if (new URL(url).pathname.endsWith('/actions/runs')) value = {
+          total_count: 0, workflow_runs: [],
+        };
+        else if (url.endsWith(comparePath)) value = comparison;
+        else throw Error('unexpected request');
+        return { status: 200, json: async () => value };
+      },
+    });
+    await expect(collect({ status: 'ahead', behind_by: 0, merge_base_commit: { sha: SHA } }))
+      .resolves.toMatchObject({ sourceIsCurrentMain: false, observedMinimumRequirementCount: 1 });
+    await expect(collect({ status: 'diverged', behind_by: 1, merge_base_commit: { sha: 'c'.repeat(40) } }))
+      .rejects.toThrow('outside main history');
   });
 });

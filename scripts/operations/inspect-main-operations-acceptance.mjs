@@ -32,12 +32,14 @@ export function summarizeMainOperationsEvidenceV1({
   requestedSha,
   confirmedCommitSha,
   currentMainSha,
+  historicalMainAncestorConfirmed = false,
   runs,
   productionJobs = [],
 }) {
   if (!SHA.test(requestedSha) || !SHA.test(confirmedCommitSha) ||
       requestedSha !== confirmedCommitSha ||
       !SHA.test(currentMainSha) ||
+      (requestedSha !== currentMainSha && historicalMainAncestorConfirmed !== true) ||
       !Array.isArray(runs) || !Array.isArray(productionJobs)) {
     error('commit provenance or GitHub response is invalid');
   }
@@ -132,9 +134,17 @@ export async function collectMainOperationsEvidenceV1({
   ]);
   if (!Array.isArray(workflowResponse?.workflow_runs) ||
       workflowResponse.total_count > 100 ||
-      typeof commit?.sha !== 'string' ||
-      typeof ref?.object?.sha !== 'string') {
+      commit?.sha !== sha ||
+      !SHA.test(ref?.object?.sha ?? '')) {
     error('incomplete commit-bound workflow evidence');
+  }
+  const currentMainSha = ref.object.sha;
+  let historicalMainAncestorConfirmed = false;
+  if (sha !== currentMainSha) {
+    const comparison = await get('/compare/' + sha + '...' + currentMainSha + '?per_page=1');
+    historicalMainAncestorConfirmed = comparison?.status === 'ahead' &&
+      comparison.behind_by === 0 && comparison.merge_base_commit?.sha === sha;
+    if (!historicalMainAncestorConfirmed) error('requested commit is outside main history');
   }
   const candidates = workflowResponse.workflow_runs
     .filter(run => safeRun(run, sha) && run.name === 'Supabase Production')
@@ -151,7 +161,8 @@ export async function collectMainOperationsEvidenceV1({
   return summarizeMainOperationsEvidenceV1({
     requestedSha: sha,
     confirmedCommitSha: commit.sha,
-    currentMainSha: ref.object.sha,
+    currentMainSha,
+    historicalMainAncestorConfirmed,
     runs: workflowResponse.workflow_runs,
     productionJobs,
   });
