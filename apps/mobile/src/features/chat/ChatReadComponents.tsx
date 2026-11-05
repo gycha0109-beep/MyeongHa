@@ -10,6 +10,7 @@ import { MobileUiText } from '@/ui/MobileUiText';
 import { useMobileThemedStyles } from '@/ui/use-mobile-themed-styles';
 import { useMobileTheme } from '@/ui/mobile-theme';
 import { useMobileUiLocale } from '@/ui/mobile-ui-locale';
+import { localizeMobileChatComposerStatusV1 } from './mobile-chat-composer-status-copy';
 import {
   ActivityIndicator,
   Image,
@@ -278,7 +279,7 @@ export function ChatComposer({
 }) {
   const styles = useMobileThemedStyles(staticStyles);
   const { theme } = useMobileTheme();
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   if (isSeyeonHistoryRevealHoldV1(snapshot)) {
     return (
       <View style={[styles.pendingCard, theme === 'dark' ? styles.seyeonSurfaceDark : styles.seyeonSurface]}>
@@ -335,7 +336,7 @@ export function ChatComposer({
             : <MobileUiText style={styles.sendActionText}>전송</MobileUiText>}
         </Pressable>
       </View>
-      <Text style={styles.composerHelp}>{status ?? t('회원 전용 · 세연과의 대화는 서버에 보관됩니다.')}</Text>
+      <Text style={styles.composerHelp}>{status === null ? t('회원 전용 · 세연과의 대화는 서버에 보관됩니다.') : localizeMobileChatComposerStatusV1(status, locale)}</Text>
     </View>
   );
 }
