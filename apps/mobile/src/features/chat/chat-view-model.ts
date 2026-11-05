@@ -1,4 +1,5 @@
 import type { ChatMessageV1 } from '@myeongha/api-client';
+import type { MobileUiLocale } from '../../ui/mobile-ui-copy.js';
 
 export interface MobileChatMessageViewV1 {
   readonly id: string;
@@ -10,25 +11,43 @@ export interface MobileChatMessageViewV1 {
   readonly timeLabel: string;
 }
 
-function timeLabel(value: string): string {
+/** Fixed client-owned placeholders only; never translate actual message bodies. */
+const CHAT_UI_LABELS_V1: Readonly<Record<MobileUiLocale, Readonly<{
+  me: string;
+  participant: string;
+  system: string;
+  redacted: string;
+  noText: string;
+}>>> = Object.freeze({
+  'ko-KR': Object.freeze({ me: '나', participant: '대화 상대', system: '안내', redacted: '가려진 메시지', noText: '표시할 수 있는 텍스트가 없는 메시지' }),
+  'ja-JP': Object.freeze({ me: '自分', participant: '話し相手', system: '案内', redacted: '非表示のメッセージ', noText: '表示できるテキストがないメッセージ' }),
+  'zh-TW': Object.freeze({ me: '我', participant: '對話對象', system: '提示', redacted: '已隱藏的訊息', noText: '沒有可顯示文字的訊息' }),
+  'en-US': Object.freeze({ me: 'Me', participant: 'Chat participant', system: 'Notice', redacted: 'Hidden message', noText: 'Message without displayable text' }),
+  'zh-CN': Object.freeze({ me: '我', participant: '聊天对象', system: '提示', redacted: '已隐藏的消息', noText: '没有可显示文本的消息' }),
+});
+
+/** Render timestamps in the device timezone, under the selected UI language. */
+export function formatMobileChatTimeV1(value: string, locale: MobileUiLocale = 'ko-KR'): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat(locale, {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hour12: locale === 'en-US',
   }).format(date);
 }
 
 export function createMobileChatMessageViewV1(
   message: ChatMessageV1,
   verifiedCharacterDisplayName?: string,
+  locale: MobileUiLocale = 'ko-KR',
 ): MobileChatMessageViewV1 {
   const role = message.senderType;
+  const labels = CHAT_UI_LABELS_V1[locale];
   const label =
-    role === 'user' ? '나' :
-    role === 'character' ? (verifiedCharacterDisplayName?.trim() || '대화 상대') :
-    '안내';
+    role === 'user' ? labels.me :
+    role === 'character' ? (verifiedCharacterDisplayName?.trim() || labels.participant) :
+    labels.system;
 
   return Object.freeze({
     id: message.messageId,
@@ -36,10 +55,10 @@ export function createMobileChatMessageViewV1(
     role,
     label,
     body: message.redacted
-      ? '가려진 메시지'
-      : message.bodyText ?? '표시할 수 있는 텍스트가 없는 메시지',
+      ? labels.redacted
+      : message.bodyText ?? labels.noText,
     redacted: message.redacted,
-    timeLabel: timeLabel(message.createdAt),
+    timeLabel: formatMobileChatTimeV1(message.createdAt, locale),
   });
 }
 
@@ -58,6 +77,7 @@ export interface MobileChatMessageGroupV1 {
 export function groupMobileChatMessagesV1(
   messages: readonly ChatMessageV1[],
   verifiedCharacterDisplayName?: string,
+  locale: MobileUiLocale = 'ko-KR',
 ): readonly MobileChatMessageGroupV1[] {
   type MutableGroup = {
     id: string;
@@ -69,7 +89,7 @@ export function groupMobileChatMessagesV1(
   const groups: MutableGroup[] = [];
   let previous: ChatMessageV1 | null = null;
   for (const message of messages) {
-    const view = createMobileChatMessageViewV1(message, verifiedCharacterDisplayName);
+    const view = createMobileChatMessageViewV1(message, verifiedCharacterDisplayName, locale);
     const last: MutableGroup | undefined = groups[groups.length - 1];
     const currentTime = Date.parse(message.createdAt);
     const previousTime = previous === null ? Number.NaN : Date.parse(previous.createdAt);
