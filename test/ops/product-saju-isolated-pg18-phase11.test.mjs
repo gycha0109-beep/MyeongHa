@@ -103,7 +103,7 @@ async function startIsolatedPg18() {
         await admin.query(`
 CREATE OR REPLACE FUNCTION public.begin_member_subject_context_v1(auth_user uuid)
 RETURNS TABLE(subject_id uuid,subject_kind text)
-LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,public AS $member_context$
 DECLARE mapped uuid;
 BEGIN
   SELECT m.owner_id INTO mapped FROM public.ops_phase11_real_auth_map m
@@ -114,7 +114,7 @@ BEGIN
   PERFORM set_config('myeongha.subject_id',mapped::text,true);
   RETURN QUERY SELECT mapped,'member'::text;
 END;
-$;`);
+$member_context$;`);
       },
       async close(){
         await login.end().catch(()=>undefined);
