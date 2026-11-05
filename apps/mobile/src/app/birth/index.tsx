@@ -18,6 +18,7 @@ import {
   buildMobileBirthProfileCreateRequestV1,
 } from '@/features/birth/birth-input';
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
+import { mobileBirthAuthoredErrorCopyV1 } from '@/features/birth/mobile-birth-error-copy';
 import { BirthDateCalendar } from '@/features/birth/BirthDateCalendar';
 import { BirthTime12HourField } from '@/features/birth/BirthTime12HourField';
 import {
@@ -283,7 +284,7 @@ export default function BirthInputScreen() {
           </View>
         </View>
 
-        {error ? <Text style={styles.error}>{t(error)}</Text> : null}
+        {error ? <Text style={styles.error}>{mobileBirthAuthoredErrorCopyV1(error, locale)}</Text> : null}
 
         <Pressable
           accessibilityRole="button"
