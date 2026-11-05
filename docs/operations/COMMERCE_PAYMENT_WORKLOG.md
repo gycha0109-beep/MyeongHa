@@ -580,3 +580,9 @@
 - **실제 실패:** [PostgreSQL 17 작업 41947551528](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41947551528/job/126983825528)에서 기존 Notice 스키마는 로드되었지만 신규 B2 Claim 통합 검증 중 `Verified member unavailable` (SQLSTATE 42501)이 발생했습니다. 기존 공식 B2/B3 Reader 구매 Fixture의 원본 Subject는 `guest`이며, 정식 `cmd_receive_digital_reading_withdrawal_claim_v1`는 정확한 `member`만 접수하도록 설계돼 있습니다.
 - **수정:** 원본 구매/Receipt/Reader를 새 계정으로 위조하거나 회원 검증을 완화하지 않습니다. 단일 격리 PostgreSQL 17 트랜잭션에서 먼저 게스트의 Claim 접수가 명시적으로 거부되고 접수 기록이 생성되지 않음을 확인합니다. 이후 `auth.users`에 테스트용 인증 식별자를 삽입하고 *동일한 구매 Subject*를 `member`로 결속하여 실제 회원 전용 접수·멱등 재실행 경로를 검증합니다.
 - **안전:** 회원 전용 운영 권한·인증 함수·마이그레이션 정책 불변. 합성 인증 레코드, Claim, Event, Effect는 기존 `ROLLBACK`으로 폐기. 새 커밋 CI 및 필수 통합 성공 전까지 PASS를 선언하지 않습니다.
+
+### 2026-11-05 — #2991 PG17 세 번째 레드: Reader S1 잠금 누락 수정
+
+- **실패 근거:** [DB dependency · postgres17 작업](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41950832634/job/126994675538)에서 신규 청약철회 Claim/원본 취소 Event 작성 후 기존 `internal_apply_entitlement_effect_v1` 호출이 `official_reader_s2_legacy_effect_scope_lock_required` / `Legacy Reader provider effect cannot bypass the S1 scope lock`로 차단됐습니다. 이는 운영 DB 보호 기능의 정상적인 거부입니다.
+- **수정:** 새로운 통합 검증이 대상 B2와 별도 B3의 원본 `standard_reading_reader_access_grants`에서 Subject·Official Reading·Reader의 고유 스코프를 조회하고, 데이터베이스의 정해진 순서로 기존 `internal_acquire_official_reader_scope_lock_v1`를 사용해 S1 트랜잭션 잠금을 먼저 획득하도록 했습니다. 두 독립 구매의 스코프 존재를 확인한 후에만 원본 취소 Event/구매권 Effect 경로를 검사합니다.
+- **안전:** 기존 1790 Reader 회수 방어·접수 회원 자격·기존 이벤트/Grant Writer 변경 없음. 합성 PG17 트랜잭션은 ROLLBACK, 운영 권한·실제 결제/환불/LIVE 변경 없음. 새 HEAD의 CI·통합 검사 결과 전까지 성공 미판정.
