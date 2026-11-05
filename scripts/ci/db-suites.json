@@ -92,6 +92,7 @@
       "commerce-portone-cancellation-persist-full-pg17",
       "commerce-persisted-cancel-reader-effect-pg17",
       "commerce-verified-reader-claim-cancel-effect-pg17",
+      "commerce-saju-record-ledger-candidate-pg17",
       "commerce-portone-cancellation-partial-set-pg17",
       "commerce-exact-reader-withdrawal-hold-pg17"
     ]

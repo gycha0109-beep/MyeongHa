@@ -64,7 +64,7 @@ create table public.commerce_saju_upgrade_receipt_links_v1 (
 -- and source Birth revision. This does not execute any checkout.
 create or replace function public.tr_commerce_saju_upgrade_link_source_v1()
 returns trigger language plpgsql security invoker
-set search_path = pg_catalog, public as $
+set search_path = pg_catalog, public as $$
 declare
   v_child public.commerce_saju_purchase_origins_v1%rowtype;
   v_parent public.commerce_saju_purchase_origins_v1%rowtype;
@@ -94,7 +94,8 @@ begin
     raise exception 'SAJU_UPGRADE_CREDIT_SOURCE_MISMATCH';
   end if;
   return new;
-end $;
+end;
+$$;
 create trigger tr_commerce_saju_upgrade_link_source_v1
  before insert on public.commerce_saju_upgrade_receipt_links_v1
  for each row execute function public.tr_commerce_saju_upgrade_link_source_v1();
@@ -161,7 +162,7 @@ begin
     raise exception 'SAJU_REFUND_EXCEEDS_VERIFIED_CHARGE';
   end if;
   return new;
-end
+end;
 $$;
 create trigger tr_commerce_saju_refund_effect_verified_v1
  before insert on public.commerce_saju_verified_refund_effects_v1
@@ -193,7 +194,7 @@ begin
     raise exception 'SAJU_PAID_RECORD_BIRTH_REVISION_FROZEN';
   end if;
   return new;
-end
+end;
 $$;
 create trigger tr_commerce_saju_record_paid_revision_guard_v1
  before update on public.commerce_saju_records_v1
@@ -205,7 +206,8 @@ returns trigger language plpgsql security invoker
 set search_path = pg_catalog, public as $$
 begin
   raise exception 'SAJU_SOURCE_LEDGER_IMMUTABLE';
-end $$;
+end;
+$$;
 create trigger tr_commerce_saju_origin_immutable_v1
  before update or delete on public.commerce_saju_purchase_origins_v1
  for each row execute function public.tr_commerce_saju_ledger_immutable_v1();
@@ -244,7 +246,7 @@ revoke all on function public.tr_commerce_saju_refund_effect_verified_v1(),
     raise exception 'SAJU_REFUND_EXCEEDS_VERIFIED_CHARGE';
   end if;
   return new;
-end
+end;
 $$;
 create trigger tr_commerce_saju_refund_effect_verified_v1
  before insert on public.commerce_saju_verified_refund_effects_v1
@@ -276,7 +278,7 @@ begin
     raise exception 'SAJU_PAID_RECORD_BIRTH_REVISION_FROZEN';
   end if;
   return new;
-end
+end;
 $$;
 create trigger tr_commerce_saju_record_paid_revision_guard_v1
  before update on public.commerce_saju_records_v1
@@ -288,7 +290,8 @@ returns trigger language plpgsql security invoker
 set search_path = pg_catalog, public as $$
 begin
   raise exception 'SAJU_SOURCE_LEDGER_IMMUTABLE';
-end $$;
+end;
+$$;
 create trigger tr_commerce_saju_origin_immutable_v1
  before update or delete on public.commerce_saju_purchase_origins_v1
  for each row execute function public.tr_commerce_saju_ledger_immutable_v1();
