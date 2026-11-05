@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { MobileSajuViewModelV1 } from './saju-view-model';
+import { mobileSajuDayNameV1, mobileSajuDayQualifiersV1 } from './mobile-saju-day-labels';
 import { MOBILE_SAJU_BIRTH_FIELDS_V1, mobileSajuBirthLabelV1, projectMobileSajuBirthFactsV1 } from './mobile-saju-birth-display';
 import { mobileColors } from '@/ui/mobile-colors';
 import { MobileUiText } from '@/ui/MobileUiText';
@@ -64,14 +65,14 @@ export function SajuPillarGrid({ pillars }: Pick<MobileSajuViewModelV1, 'pillars
 
 export function DayMasterCard({ dayMaster }: Pick<MobileSajuViewModelV1, 'dayMaster'>) {
   const styles = useMobileThemedStyles(staticStyles);
-  const { t } = useMobileUiLocale();
+  const { t, locale } = useMobileUiLocale();
   return (
     <View style={styles.card}>
       <MobileUiText style={styles.sectionTitle}>나의 일간</MobileUiText>
       <Text style={styles.dayMasterHanja}>{dayMaster.hanja}</Text>
-      <Text style={styles.dayMasterHangul}>{t(dayMaster.hangul)}</Text>
+      <Text style={styles.dayMasterHangul}>{mobileSajuDayNameV1(dayMaster, locale)}</Text>
       {dayMaster.status === 'resolved' ? (
-        <Text style={styles.muted}>{t(dayMaster.element ?? '')} · {t(dayMaster.yinYang ?? '')}</Text>
+        <Text style={styles.muted}>{mobileSajuDayQualifiersV1(dayMaster, locale)}</Text>
       ) : (
         <MobileUiText style={styles.muted}>일주가 확정되면 일간을 표시합니다.</MobileUiText>
       )}
