@@ -35,3 +35,10 @@ Until genuine measured evidence exists, all `productionCapacityProven=false`, `p
 4. If successful, the remaining Phase 11 gap is a representative controlled 5/15-minute Worker-runtime/Saju resource-cgroup combined capacity measurement. Phase 12 may derive a review threshold from controlled observations but never invent Production scale targets.
 
 Watchtower-Track: ops
+
+## First actual main-only Linux attempt: RED, health transport not established (2026-11-05 KST)
+
+- [GitHub Actions #41959169370](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41959169370), source SHA `e022e4c9078d3d468354a3d29d289b4699fc6544`, **FAILURE**. Previous actual PostgreSQL18 RLS/pool/product fixture step PASS, pinned Saju source checkout/build PASS; temporary Docker Auth PostgreSQL15 reported Healthy and GoTrue container reported Started, but the runner's 127.0.0.1 `/health` probe did not succeed within its 60-second bound. **No real GoTrue member / actual integrated Saju performance observations exist from this run.** New product artifact `13384148817` was `BLOCKED_INCOMPLETE` and must not be treated as PASS.
+- **Targeted correction in this fix PR (still unverified):** The Auth PostgreSQL container remains attached **only** to a private `internal:true` Docker network without published ports. GoTrue now additionally joins a separate project-owned bridge with a published `127.0.0.1` port; this follows the Docker documented hybrid network separation and permits the host test client to connect without admitting external hosts. Neither Worker nor Hosted/Production connection is introduced.
+- The fail-closed health check now emits only Docker GoTrue's coarse lifecycle state and a local-only internal health boolean when host loopback remains unreachable, rather than any container logs, credentials or personal identifiers. After PR CI/integration and merge, rerun the **existing** main-only manual workflow to distinguish network transport issues from GoTrue startup issues based on actual Linux evidence.
+- No 8th-phase recovery, production-capacity, scaling or DR acceptance claim was changed; all production safety gates stay false.
