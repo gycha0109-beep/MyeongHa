@@ -2421,6 +2421,123 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await expect(g3Review('committed_replay')).rejects.toMatchObject({
         constraint:'seyeon_historical_g3_replay_never_authorized',
       });
+      // W95 G3/G5: a previously admitted Memory type can be disabled
+      // BEFORE first-Reveal review. The DB owner checks the current registry,
+      // not the stale G1 admission. This is a disposable transaction only.
+      const g3TypeDisabledFirst=await pool.connect();
+      try{
+        await g3TypeDisabledFirst.query('BEGIN');
+        const disabled=await g3TypeDisabledFirst.query(`
+          update public.seyeon_positive_source_type_registry_v1
+          set enabled=false
+          where record_kind='memory' and record_type='conversation_recall'
+            and schema_version='v1'
+            and projector_version='seyeon-conversation-recall-projector-v1'
+            and enabled=true`);
+        expect(disabled.rowCount).toBe(1);
+        await g3TypeDisabledFirst.query('SET LOCAL ROLE myeongha_api_executor');
+        await g3TypeDisabledFirst.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        await expect(g3TypeDisabledFirst.query(`
+          select seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,
+            $6::uuid,$7::uuid,$8::uuid,$9::text
+          )`,[
+            f.subject,f.thread,currentTurn,currentAttempt,'audit_only',
+            null,null,null,null,
+          ])).rejects.toMatchObject({
+            constraint:'seyeon_historical_g3_source_type_disabled',
+          });
+      }finally{
+        await g3TypeDisabledFirst.query('ROLLBACK').catch(()=>undefined);
+        g3TypeDisabledFirst.release();
+      }
+      expect(await g3Review('audit_only')).toMatchObject({
+        originalsCurrentForReview:true,authorizesFirstReveal:false,
+        authorizesCommittedReplay:false,permitsStreaming:false,
+        permitsHttpReveal:false,
+      });
+
+      // W95 G3/G5 reverse ordering: G3 first acquires the CURRENT
+      // enabled type's FOR SHARE lock. A distinct admin backend attempts
+      // to disable EXACTLY that kind/schema/projector and MUST wait on
+      // the G3 review PID; no stale type entitlement can race through.
+      const g3TypeHolder=await subjectPool.connect();
+      const g3TypeDisabler=await pool.connect();
+      let pendingG3TypeDisable:Promise<{
+        ok:true;rowCount:number|null
+      }|{ok:false;error:unknown}>|undefined;
+      let g3TypeDisableOutcome:{
+        ok:true;rowCount:number|null
+      }|{ok:false;error:unknown}|undefined;
+      let g3TypeWaitsForReviewer=false;
+      try{
+        await g3TypeHolder.query('BEGIN');
+        await g3TypeHolder.query('SET LOCAL ROLE myeongha_api_executor');
+        await g3TypeHolder.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        const {rows:[g3TypeReceipt]}=await g3TypeHolder.query<{
+          review:Record<string,unknown>
+        }>(`select
+          seyeon_private.qry_review_historical_first_reveal_originals_s0_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::text,
+            $6::uuid,$7::uuid,$8::uuid,$9::text
+          ) as review`,[
+            f.subject,f.thread,currentTurn,currentAttempt,'audit_only',
+            null,null,null,null,
+          ]);
+        expect(g3TypeReceipt?.review).toMatchObject({
+          originalsCurrentForReview:true,authorizesFirstReveal:false,
+          authorizesCommittedReplay:false,permitsStreaming:false,
+          permitsHttpReveal:false,
+        });
+        const {rows:[g3TypeHolderPid]}=await g3TypeHolder.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        await g3TypeDisabler.query('BEGIN');
+        const {rows:[g3TypeDisablerPid]}=await g3TypeDisabler.query<{pid:number}>(
+          'select pg_backend_pid() as pid',
+        );
+        expect(g3TypeHolderPid?.pid).toBeGreaterThan(0);
+        expect(g3TypeDisablerPid?.pid).toBeGreaterThan(0);
+        expect(g3TypeHolderPid?.pid).not.toBe(g3TypeDisablerPid?.pid);
+        pendingG3TypeDisable=g3TypeDisabler.query(`
+          update public.seyeon_positive_source_type_registry_v1
+          set enabled=false
+          where record_kind='memory' and record_type='conversation_recall'
+            and schema_version='v1'
+            and projector_version='seyeon-conversation-recall-projector-v1'
+            and enabled=true`).then(
+            result=>({ok:true as const,rowCount:result.rowCount}),
+            (error:unknown)=>({ok:false as const,error}),
+          );
+        for(let i=0;i<100;i++){
+          const {rows:[waiting]}=await pool.query<{blocked:boolean}>(`
+            select $1::int=any(pg_catalog.pg_blocking_pids($2::int)) as blocked
+          `,[g3TypeHolderPid!.pid,g3TypeDisablerPid!.pid]);
+          if(waiting?.blocked){g3TypeWaitsForReviewer=true;break;}
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        expect(g3TypeWaitsForReviewer).toBe(true);
+      }finally{
+        await g3TypeHolder.query('ROLLBACK').catch(()=>undefined);
+        g3TypeHolder.release();
+        if(pendingG3TypeDisable)
+          g3TypeDisableOutcome=await pendingG3TypeDisable;
+        await g3TypeDisabler.query('ROLLBACK').catch(()=>undefined);
+        g3TypeDisabler.release();
+      }
+      expect(g3TypeDisableOutcome).toEqual({ok:true,rowCount:1});
+      const {rows:[restoredG3SourceType]}=await pool.query(`
+        select enabled from public.seyeon_positive_source_type_registry_v1
+        where record_kind='memory' and record_type='conversation_recall'
+          and schema_version='v1'
+          and projector_version='seyeon-conversation-recall-projector-v1'
+      `);
+      expect(restoredG3SourceType).toEqual({enabled:true});
+
       // W90 G3/G5: independent DB sessions. The G3 CURRENT-originals
       // review holds the exact original Memory Grant through its transaction.
       // A concurrent consent withdrawal marker must WAIT specifically on
