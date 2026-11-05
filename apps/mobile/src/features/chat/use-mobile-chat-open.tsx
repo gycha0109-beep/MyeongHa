@@ -10,6 +10,7 @@ import {
   MobileMemberSessionErrorV1,
 } from '@/core/session/mobile-member-session';
 import { nativeMobileRuntimeV1 } from '@/core/runtime/native-mobile-runtime';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { mobileChatOpenServiceV1 } from '@/features/chat/native-mobile-chat-open-service';
 
 export type MobileChatOpenAccessV1 = 'checking' | 'guest' | 'member' | 'error';
@@ -58,6 +59,7 @@ export function useMobileChatOpenV1() {
     setState((current) => Object.freeze({
       ...current,
       access: 'checking' as const,
+      openingCharacterId: null,
       errorMessage: null,
     }));
     try {
@@ -83,10 +85,21 @@ export function useMobileChatOpenV1() {
   useFocusEffect(
     useCallback(() => {
       focused.current = true;
+      // A verified credential-store update invalidates both the visible
+      // Member-only controls and any open request from the previous Subject.
+      const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => {
+        void refreshAccess();
+      });
       void refreshAccess();
       return () => {
+        unsubscribe();
         focused.current = false;
         requestEpoch.current += 1;
+        setState(Object.freeze({
+          access: 'checking',
+          openingCharacterId: null,
+          errorMessage: null,
+        }));
       };
     }, [refreshAccess]),
   );
@@ -94,6 +107,10 @@ export function useMobileChatOpenV1() {
   const openCharacter = useCallback(async (
     characterId: ChatLaunchCharacterIdV1,
   ): Promise<ChatOpenResultV1 | null> => {
+    // A button press is not an authority grant. Read verified Member access
+    // again through the existing service; prevent stale results navigating.
+    if (!focused.current || state.access !== 'member' || state.openingCharacterId !== null) return null;
+    const epoch = ++requestEpoch.current;
     setState((current) => Object.freeze({
       ...current,
       openingCharacterId: characterId,
@@ -102,6 +119,7 @@ export function useMobileChatOpenV1() {
 
     try {
       const result = await mobileChatOpenServiceV1.open(characterId);
+      if (!focused.current || epoch !== requestEpoch.current) return null;
       setState((current) => Object.freeze({
         ...current,
         access: 'member' as const,
@@ -110,12 +128,18 @@ export function useMobileChatOpenV1() {
       }));
       return result;
     } catch (error) {
+      if (!focused.current || epoch !== requestEpoch.current) return null;
       let access: MobileChatOpenAccessV1 = 'member';
       if (error instanceof MobileMemberSessionErrorV1) {
-        access = (await nativeMobileRuntimeV1.memberSession.read()) === null
-          ? 'guest'
-          : 'member';
+        try {
+          access = (await nativeMobileRuntimeV1.memberSession.read()) === null
+            ? 'guest'
+            : 'member';
+        } catch {
+          access = 'error';
+        }
       }
+      if (!focused.current || epoch !== requestEpoch.current) return null;
       setState(Object.freeze({
         access,
         openingCharacterId: null,
@@ -123,7 +147,7 @@ export function useMobileChatOpenV1() {
       }));
       return null;
     }
-  }, []);
+  }, [state.access, state.openingCharacterId]);
 
   return Object.freeze({ state, openCharacter, refreshAccess });
 }
