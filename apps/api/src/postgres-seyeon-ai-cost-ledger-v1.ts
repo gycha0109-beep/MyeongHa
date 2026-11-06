@@ -417,11 +417,31 @@ export function createPersistingSeyeonAiProviderV1(input: {
   /** Explicit opt-in, server-only. Undefined retains legacy ledger behavior. */
   readonly governor?: SeyeonAiGovernorAdmissionV1;
 }): SeyeonStructuredProviderPortV2 {
-  if (input.governor !== undefined) {
-    const p = validateSeyeonCostGovernorModelPolicyV1(input.governor.policy);
-    const price = input.config.priceQuote;
-    if (input.config.model !== p.modelKey ||
-        input.config.maxOutputTokens !== p.maximumOutputTokens ||
+  // An injected or mutable server configuration must never change the
+  // approved model, rate card, output ceiling or token-certification callback
+  // after assembly but before the paid Provider dispatch. The production
+  // factory pins these independently; enforce the same invariant here.
+  const approved = input.governor === undefined ? undefined :
+    validateSeyeonCostGovernorModelPolicyV1(input.governor.policy);
+  const governor = approved === undefined ? undefined : Object.freeze({
+    policy: Object.freeze({
+      ...approved,
+      allowedPurposes: Object.freeze([...approved.allowedPurposes]),
+      priceQuote: Object.freeze({...approved.priceQuote}),
+    }),
+    certifiedInputTokenUpperBound: input.governor!.certifiedInputTokenUpperBound,
+  });
+  const config = governor === undefined ? input.config : Object.freeze({
+    ...input.config,
+    ...(input.config.priceQuote === undefined ? {} : {
+      priceQuote: Object.freeze({...input.config.priceQuote}),
+    }),
+  });
+  if (governor !== undefined) {
+    const p = governor.policy;
+    const price = config.priceQuote;
+    if (config.model !== p.modelKey ||
+        config.maxOutputTokens !== p.maximumOutputTokens ||
         price === undefined ||
         price.providerKey !== p.providerKey ||
         price.modelKey !== p.modelKey ||
@@ -432,7 +452,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
       throw new Error('Se-yeon governed provider is missing exact server price/output policy.');
     }
   }
-  const descriptor = createOpenAiSeyeonStructuredProviderV1(input.config);
+  const descriptor = createOpenAiSeyeonStructuredProviderV1(config);
   return Object.freeze({
     providerKey: descriptor.providerKey,
     modelKey: descriptor.modelKey,
@@ -441,7 +461,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
       const durableProviderReceipts = new Set<string>();
       const settledGovernedCallIds = new Set<string>();
       let providerSucceeded = false;
-      const observer = input.config.observeMetric;
+      const observer = config.observeMetric;
       const state: {
         binding: SeyeonAiCostLedgerBindingV1 | null;
         callId: string | null;
@@ -450,7 +470,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         binding: null, callId: null, admittedQuote: null,
       };
       const provider = createOpenAiSeyeonStructuredProviderV1({
-        ...input.config,
+        ...config,
         async meteredBeforeDispatch(call, serializedRequestBody) {
           // Metadata-only external hook runs separately in the raw Provider.
           // Only this server-owned metering hook accesses the full request.
@@ -459,7 +479,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             throw new Error('AI cost binding is unavailable before dispatch.');
           }
-          if (input.governor === undefined) {
+          if (governor === undefined) {
             await input.runner.run(binding.subjectId, client =>
               startSeyeonAiCallV1(client,binding,call),
             );
@@ -469,18 +489,18 @@ export function createPersistingSeyeonAiProviderV1(input: {
                   call.requestBodyBytes) {
               throw new Error('Governed token count requires the final immutable body.');
             }
-            const bound = await input.governor.certifiedInputTokenUpperBound(
+            const bound = await governor.certifiedInputTokenUpperBound(
               request, call.requestBodyBytes, serializedRequestBody,
             );
             const quote = quoteSeyeonCostGovernorMaximumV1({
-              policy: input.governor.policy,
+              policy: governor.policy,
               request: {
                 purpose: call.purpose,
                 providerKey: call.providerKey,
                 modelKey: call.modelKey,
                 verifiedInputTokenUpperBound: bound,
                 serializedRequestBytes: call.requestBodyBytes,
-                enforcedOutputTokenLimit: input.config.maxOutputTokens ?? null,
+                enforcedOutputTokenLimit: config.maxOutputTokens ?? null,
               },
             });
             try {
@@ -506,7 +526,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
           state.callId = call.callId;
         },
         async meteredAfterOutcome(event) {
-          if (input.governor===undefined) return;
+          if (governor===undefined) return;
           const binding=state.binding;
           if (binding===null || state.callId!==event.callId) {
             throw new Error('Governed Provider receipt is missing reserved call context.');
@@ -536,7 +556,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         // Chat Commit or a successful reply: the server must have stored the
         // actual outcome against its pre-dispatch reservation. Never issue a
         // second inference to repair a lost receipt.
-        if (input.governor !== undefined &&
+        if (governor !== undefined &&
             (state.callId === null ||
              !durableProviderReceipts.has(state.callId))) {
           throw new Error('Governed Provider outcome receipt was not persisted; Chat Commit denied.');
@@ -549,7 +569,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             continue;
           }
-          if (input.governor!==undefined &&
+          if (governor!==undefined &&
               !durableProviderReceipts.has(event.callId)) {
             // Provider completed but outcome was not committed: do not
             // fabricate evidence, settle, or retry a potentially paid call.
@@ -557,7 +577,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
             continue;
           }
           try {
-            if (input.governor === undefined) {
+            if (governor === undefined) {
               await input.runner.run(state.binding.subjectId, client =>
                 settleSeyeonAiCallV1(client,state.binding!,event),
               );
@@ -582,7 +602,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         }
         // A durable Provider outcome alone cannot authorize Chat Commit:
         // the bounded DB settlement must also acknowledge the exact call.
-        if (input.governor !== undefined && providerSucceeded &&
+        if (governor !== undefined && providerSucceeded &&
             (events.length !== 1 || state.callId === null ||
              !settledGovernedCallIds.has(state.callId))) {
           throw new Error('Governed cost settlement was not confirmed; Chat Commit denied.');
@@ -592,7 +612,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         // quote while breaking an individually approved token ceiling.
         // Account for the paid call first, then deny any unproven or
         // out-of-contract successful Provider reply without retrying.
-        if (input.governor !== undefined && providerSucceeded) {
+        if (governor !== undefined && providerSucceeded) {
           const event = events[0];
           const quote = state.admittedQuote;
           if (quote === null || event === undefined ||

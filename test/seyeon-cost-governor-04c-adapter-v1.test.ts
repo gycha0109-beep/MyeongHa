@@ -136,6 +136,90 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     } finally { info.mockRestore(); }
   });
 
+  it('W112 pins governed model, price and count authority against post-assembly mutation', async () => {
+    const order:string[]=[];
+    const mutablePolicy:SeyeonCostGovernorModelPolicyV1={
+      ...policy,
+      allowedPurposes:[...policy.allowedPurposes],
+      priceQuote:{...policy.priceQuote},
+    };
+    const certify=vi.fn(async ()=>{
+      order.push('certify');
+      return 500;
+    });
+    const mutableGovernor={
+      policy:mutablePolicy,
+      certifiedInputTokenUpperBound:certify,
+    };
+    const fetchImpl=vi.fn(async (_url:string,init:RequestInit)=>{
+      order.push('fetch');
+      const body=JSON.parse(String(init.body));
+      expect(body.model).toBe('test-model');
+      expect(body.max_output_tokens).toBe(800);
+      return response();
+    });
+    const mutableConfig={
+      ...config,priceQuote:{...config.priceQuote},fetchImpl,
+    };
+    let reservedCall='';
+    const query=vi.fn(async (sql:string,values:unknown[])=>{
+      if(sql.includes('cmd_governed_start_seyeon_ai_call_v1')){
+        order.push('admit');
+        reservedCall=String(values[4]);
+        expect(values.slice(5,12)).toEqual([
+          'dialogue_render','openai-responses','test-model',
+          'offline-policy-v1','offline-rate-v1',500,800,
+        ]);
+        return {rows:[{
+          callId:reservedCall,ceilingMicroUsd:'3700',bucketUtcDate:'2026-11-06',
+        }]};
+      }
+      if(sql.includes('cmd_store_seyeon_provider_receipt_v1')){
+        order.push('store');
+        return {rows:[{callId:JSON.parse(String(values[4])).callId,replayed:false}]};
+      }
+      if(sql.includes('cmd_governed_settle_seyeon_ai_call_v1')){
+        order.push('settle');
+        return {rows:[{
+          callId:JSON.parse(String(values[4])).callId,replayed:false,
+          occupiedMicroUsd:'130',overCeiling:false,
+        }]};
+      }
+      throw Error('W112 unexpected SQL');
+    });
+    const provider=createPersistingSeyeonAiProviderV1({
+      config:mutableConfig,runner:runner(query),getBinding:()=>binding,
+      governor:mutableGovernor,
+    });
+    // TypeScript readonly is NOT a runtime trust boundary. A caller may
+    // mutate its object references while the asynchronous turn is pending.
+    Object.assign(mutablePolicy,{
+      policyVersion:'altered-after-assembly',
+      maximumInputTokens:1,maximumOutputTokens:1,
+    });
+    (mutablePolicy.allowedPurposes as string[]).push('event_extraction');
+    Object.assign(mutablePolicy.priceQuote,{outputMicroUsdPerMillion:1});
+    Object.assign(mutableConfig,{model:'altered-model',maxOutputTokens:1});
+    Object.assign(mutableConfig.priceQuote,{outputMicroUsdPerMillion:1});
+    Object.assign(mutableGovernor,{
+      certifiedInputTokenUpperBound:async ()=>null,
+    });
+    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+    try{
+      await expect(provider.generate(request)).resolves.toEqual({ok:true});
+      expect(certify).toHaveBeenCalledOnce();
+      expect(order).toEqual(['certify','admit','fetch','store','settle']);
+      expect(query).toHaveBeenCalledTimes(3);
+      expect(JSON.stringify(query.mock.calls)).not.toContain('altered-after-assembly');
+      expect(JSON.stringify(query.mock.calls)).not.toContain('altered-model');
+      expect(errors).not.toHaveBeenCalled();
+    }finally{
+      errors.mockRestore();
+      info.mockRestore();
+    }
+  });
+
   it('refuses missing or uncertified token bound before any DB write or fetch', async () => {
     const query = vi.fn();
     const fetchImpl = vi.fn(async () => response());
