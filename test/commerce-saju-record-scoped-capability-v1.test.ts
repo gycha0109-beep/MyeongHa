@@ -37,7 +37,7 @@ describe('Saju Record-scoped Capability authority',()=>{
     const fieldEnd=migration.indexOf('$saju_overlap_fields$;',fieldStart);
     const fieldFragment=migration.slice(fieldStart,fieldEnd);
     const productFields=new Map(
-      [...fieldFragment.matchAll(/when '([^']+)' then array\\[([^\\]]+)\\]::text\\[\\]/gu)]
+      [...fieldFragment.matchAll(/when '([^']+)' then array\[([^\]]+)\]::text\[\]/gu)]
         .map(match=>[match[1]!,[...match[2]!.matchAll(/'([^']+)'/gu)].map(x=>x[1]!)]),
     );
     expect(productFields.size).toBe(Object.keys(COMMERCE_SAJU_PRODUCTS_V1).length);
