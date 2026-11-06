@@ -372,6 +372,28 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).not.toMatch(/request_body|payload_jsonb|auth_token/iu);
   });
 
+  it('searches safe projected metadata before applying server-side pagination', async () => {
+    const h = harness();
+    await h.port.read({ ...filters('audit'), search: 'read:users' });
+    expect(h.sql[2]).toContain('position(lower($6::text) IN lower(to_jsonb(base_rows)::text)) > 0');
+    expect(h.sql[2]).toContain('LIMIT $1::int OFFSET $2::int');
+    expect(h.sql[2]).not.toContain('read:users');
+    expect(h.params[2]).toEqual([21, 0, null, null, null, 'read:users']);
+    expect(h.sql[2].indexOf('position(lower')).toBeLessThan(h.sql[2].lastIndexOf('LIMIT $1::int'));
+  });
+  it('supports search across every SQL-backed list route without bypassing fixed queries', async () => {
+    const excluded = new Set(['overview','user-detail','commerce-detail','reading-detail','analytics']);
+    for (const kind of Object.keys(ADMIN_READ_SQL_V1) as AdminListFiltersV1['kind'][]) {
+      if (excluded.has(kind) || ADMIN_READ_SQL_V1[kind] === null) continue;
+      const h = harness();
+      const exact = kind === 'reading-attempts' || kind === 'reading-ai-usage'
+        ? { recordId: SUBJECT } : {};
+      await h.port.read({ ...filters(kind), ...exact, search: 'needle' });
+      expect(h.sql[2], kind).toContain('position(lower(');
+      expect(h.params[2]?.at(-1), kind).toBe('needle');
+      expect(h.sql[2], kind).not.toContain('needle');
+    }
+  });
   it('provides bounded pagination', async () => {
     const h = harness('myeongha_admin_reader',Array.from({length:3},()=>({subjectId:SUBJECT})));
     const result = await h.port.read({ ...filters(),limit:2 });
