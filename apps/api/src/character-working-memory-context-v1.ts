@@ -11,6 +11,7 @@ import type {
 import {
   buildCharacterWorkingMemoryProjectionV1,
   type CharacterWorkingMemoryProjectionV1,
+  type CharacterWorkingMemoryRecordProjectorV1,
 } from '../../../packages/domain/src/character-working-memory-projection-v1.js';
 
 export interface PrepareCharacterWorkingMemoryContextInputV1 {
@@ -27,6 +28,8 @@ export interface PrepareCharacterWorkingMemoryContextInputV1 {
   readonly memoryAuthorityPort: ReaderContextMemoryReadAuthorityPortV1;
   readonly nonMemoryAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1;
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
+  /** Server-owned positive projector registry; intentionally empty until source-approved. */
+  readonly projectors?: readonly CharacterWorkingMemoryRecordProjectorV1[];
 }
 
 function requirePositiveLimit(value: number, label: string): number {
@@ -121,5 +124,6 @@ export async function prepareCharacterWorkingMemoryContextV1(
     relationship: relationshipResponse.relationship,
     relationshipEvents,
     recentMessages,
+    projectors: input.projectors,
   });
 }

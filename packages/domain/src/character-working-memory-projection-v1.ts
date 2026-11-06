@@ -2,6 +2,13 @@ export const CHARACTER_WORKING_MEMORY_PROJECTION_SCHEMA_VERSION_V1 =
   'character-working-memory-projection-v1' as const;
 
 export type CharacterWorkingMemoryRecordKindV1 = 'life_fact' | 'memory';
+export type CharacterWorkingMemoryLifeFactSourceKindV1 =
+  | 'user_explicit'
+  | 'profile_edit'
+  | 'merge_import';
+export type CharacterWorkingMemoryMemorySourceKindV1 =
+  | 'user_approved'
+  | 'merge_import';
 export type CharacterWorkingMemoryClaimKindV1 =
   | 'fact'
   | 'character_interpretation';
@@ -31,6 +38,15 @@ export interface CharacterWorkingMemoryLifeFactSourceV1 {
   readonly value: unknown;
   readonly grantId: string;
   readonly granteeCharacterId: string;
+  readonly grantReason: 'user_choice' | 'merge_import';
+  readonly grantedAt: string;
+  readonly sourceKind: CharacterWorkingMemoryLifeFactSourceKindV1;
+  readonly sourceMessageId: string | null;
+  readonly sourceMergeActionId: string | null;
+  readonly validFrom: string | null;
+  readonly validTo: string | null;
+  readonly confirmedAt: string;
+  readonly createdAt: string;
 }
 
 export interface CharacterWorkingMemoryMemorySourceV1 {
@@ -44,6 +60,10 @@ export interface CharacterWorkingMemoryMemorySourceV1 {
   readonly granteeCharacterId: string;
   readonly grantReason: 'user_choice' | 'merge_import';
   readonly grantedAt: string;
+  readonly sourceKind: CharacterWorkingMemoryMemorySourceKindV1;
+  readonly sourceTurnId: string | null;
+  readonly sourceMessageId: string | null;
+  readonly sourceMergeActionId: string | null;
 }
 
 export interface CharacterWorkingMemoryRelationshipSourceV1 {
@@ -104,9 +124,17 @@ export interface CharacterWorkingMemoryProjectedRecordV1 {
   readonly sourceRef: string;
   readonly grantId: string;
   readonly granteeCharacterId: string;
-  readonly grantReason?: 'user_choice' | 'merge_import';
-  readonly grantedAt?: string;
-  readonly createdAt?: string;
+  readonly grantReason: 'user_choice' | 'merge_import';
+  readonly grantedAt: string;
+  readonly sourceKind: CharacterWorkingMemoryLifeFactSourceKindV1 |
+    CharacterWorkingMemoryMemorySourceKindV1;
+  readonly sourceTurnId?: string | null;
+  readonly sourceMessageId: string | null;
+  readonly sourceMergeActionId: string | null;
+  readonly validFrom?: string | null;
+  readonly validTo?: string | null;
+  readonly confirmedAt?: string;
+  readonly createdAt: string;
   readonly createdByCharacterId?: string | null;
   readonly relevance: number;
   readonly salience: number;
@@ -257,9 +285,17 @@ function projectRecord(input: Readonly<{
   payload: unknown;
   grantId: string;
   granteeCharacterId: string;
-  grantReason?: 'user_choice' | 'merge_import';
-  grantedAt?: string;
-  createdAt?: string;
+  grantReason: 'user_choice' | 'merge_import';
+  grantedAt: string;
+  sourceKind: CharacterWorkingMemoryLifeFactSourceKindV1 |
+    CharacterWorkingMemoryMemorySourceKindV1;
+  sourceTurnId?: string | null;
+  sourceMessageId: string | null;
+  sourceMergeActionId: string | null;
+  validFrom?: string | null;
+  validTo?: string | null;
+  confirmedAt?: string;
+  createdAt: string;
   createdByCharacterId?: string | null;
   registry: ReadonlyMap<string, CharacterWorkingMemoryRecordProjectorV1>;
 }>): Readonly<{
@@ -275,6 +311,59 @@ function projectRecord(input: Readonly<{
     'granteeCharacterId',
     128,
   );
+  const sourceKind = requireText(input.sourceKind, 'sourceKind', 64);
+  const allowedSourceKinds = input.recordKind === 'life_fact'
+    ? ['user_explicit', 'profile_edit', 'merge_import']
+    : ['user_approved', 'merge_import'];
+  if (!allowedSourceKinds.includes(sourceKind)) {
+    throw new CharacterWorkingMemoryProjectionErrorV1(
+      'INVALID_SOURCE_KIND',
+      'Record source kind is unsupported for this record type.',
+    );
+  }
+  const sourceMessageId = input.sourceMessageId === null
+    ? null
+    : requireText(input.sourceMessageId, 'sourceMessageId', 256);
+  const sourceMergeActionId = input.sourceMergeActionId === null
+    ? null
+    : requireText(input.sourceMergeActionId, 'sourceMergeActionId', 256);
+  const sourceTurnId = input.sourceTurnId === undefined || input.sourceTurnId === null
+    ? input.sourceTurnId ?? null
+    : requireText(input.sourceTurnId, 'sourceTurnId', 256);
+  const grantReason = input.grantReason;
+  if (grantReason !== 'user_choice' && grantReason !== 'merge_import') {
+    throw new CharacterWorkingMemoryProjectionErrorV1(
+      'INVALID_GRANT_REASON',
+      'Record grant reason is unsupported.',
+    );
+  }
+  const grantedAt = requireTimestamp(input.grantedAt, 'grantedAt');
+  const createdAt = requireTimestamp(input.createdAt, 'createdAt');
+  const validFrom = input.validFrom === undefined
+    ? undefined
+    : input.validFrom === null ? null : requireTimestamp(input.validFrom, 'validFrom');
+  const validTo = input.validTo === undefined
+    ? undefined
+    : input.validTo === null ? null : requireTimestamp(input.validTo, 'validTo');
+  if (
+    validFrom !== undefined && validFrom !== null &&
+    validTo !== undefined && validTo !== null &&
+    Date.parse(validTo) < Date.parse(validFrom)
+  ) {
+    throw new CharacterWorkingMemoryProjectionErrorV1(
+      'INVALID_VALIDITY_RANGE',
+      'Life Fact validity end cannot precede its start.',
+    );
+  }
+  const confirmedAt = input.confirmedAt === undefined
+    ? undefined
+    : requireTimestamp(input.confirmedAt, 'confirmedAt');
+  if (input.recordKind === 'life_fact' && confirmedAt === undefined) {
+    throw new CharacterWorkingMemoryProjectionErrorV1(
+      'MISSING_CONFIRMATION_TIME',
+      'Life Fact projection requires its authoritative confirmation timestamp.',
+    );
+  }
   const sourceRef =
     input.recordKind + ':' + recordId + ':grant:' + grantId;
   const projector = input.registry.get(
@@ -337,15 +426,17 @@ function projectRecord(input: Readonly<{
     sourceRef,
     grantId,
     granteeCharacterId,
-    ...(input.grantReason === undefined ? {} : {
-      grantReason: input.grantReason,
-    }),
-    ...(input.grantedAt === undefined ? {} : {
-      grantedAt: requireTimestamp(input.grantedAt, 'grantedAt'),
-    }),
-    ...(input.createdAt === undefined ? {} : {
-      createdAt: requireTimestamp(input.createdAt, 'createdAt'),
-    }),
+    grantReason,
+    grantedAt,
+    sourceKind: sourceKind as CharacterWorkingMemoryLifeFactSourceKindV1 |
+      CharacterWorkingMemoryMemorySourceKindV1,
+    sourceMessageId,
+    sourceMergeActionId,
+    ...(input.sourceTurnId === undefined ? {} : { sourceTurnId }),
+    ...(validFrom === undefined ? {} : { validFrom }),
+    ...(validTo === undefined ? {} : { validTo }),
+    ...(confirmedAt === undefined ? {} : { confirmedAt }),
+    createdAt,
     ...(input.createdByCharacterId === undefined ? {} : {
       createdByCharacterId: input.createdByCharacterId === null
         ? null
@@ -683,6 +774,15 @@ export function buildCharacterWorkingMemoryProjectionV1(
       payload: fact.value,
       grantId: fact.grantId,
       granteeCharacterId: fact.granteeCharacterId,
+      grantReason: fact.grantReason,
+      grantedAt: fact.grantedAt,
+      sourceKind: fact.sourceKind,
+      sourceMessageId: fact.sourceMessageId,
+      sourceMergeActionId: fact.sourceMergeActionId,
+      validFrom: fact.validFrom,
+      validTo: fact.validTo,
+      confirmedAt: fact.confirmedAt,
+      createdAt: fact.createdAt,
       registry,
     });
     admissions.push(result.admission);
@@ -706,6 +806,10 @@ export function buildCharacterWorkingMemoryProjectionV1(
       granteeCharacterId: memory.granteeCharacterId,
       grantReason: memory.grantReason,
       grantedAt: memory.grantedAt,
+      sourceKind: memory.sourceKind,
+      sourceTurnId: memory.sourceTurnId,
+      sourceMessageId: memory.sourceMessageId,
+      sourceMergeActionId: memory.sourceMergeActionId,
       createdAt: memory.createdAt,
       createdByCharacterId: memory.createdByCharacterId,
       registry,

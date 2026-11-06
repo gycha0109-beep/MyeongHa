@@ -631,3 +631,14 @@ export {
   type ModelTokenCountAdapterV1,
   type ModelTokenCountExactRequestV1,
 } from './model-token-budget-profile-v1.js';
+
+
+export {
+  CHARACTER_MEMORY_RETRIEVAL_POLICY_VERSION_V1,
+  detectExplicitMemoryCallbackRequestedV1,
+  retrieveCharacterWorkingMemoryV1,
+  type CharacterMemoryRetrievalExclusionV1,
+  type CharacterMemoryRetrievalResultV1,
+  type CharacterMemoryRetrievedRecordV1,
+  type RetrieveCharacterWorkingMemoryInputV1,
+} from './character-memory-retrieval-v1.js';
