@@ -9,6 +9,13 @@
 > 최종 판정: **코드·배포·익명 운영 점검 일부 확인 / 전체 Production Operations ACCEPTANCE = 미완료**. `dr_ready=false`, `serviceResumptionAllowed=false` 상태를 변경하지 않음.
 
 ## Worklog — 운영 트랙 작업 이력
+
+### 2026-11-06 KST — Phase 11 isolated workerd 15-minute overlapping load mode implemented; actual Linux run pending
+
+- [Workerd outage/recovery proof PR #3076](https://github.com/gycha0109-beep/MyeongHa/pull/3076) merged after [integration CI #42198631271](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42198631271) SUCCESS. Previous [Linux #42197099729](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42197099729) remains a valid **12/12 sequential baseline and 4/4 post-outage recovery**, and its original 1,414-byte evidence / SHA-256 is preserved; it does not establish sustained workerd capacity.
+- **Implementation in this branch, NOT evidence of a Linux PASS:** extend the **existing** manual main-only Phase 11 runner with opt-in `experiment=workerd_overlap`: 900 four-request waves over 900 seconds (3,600 offered), fixed local Wrangler 4.152.0, real temporary GoTrue / forced-RLS PostgreSQL18 / pinned Saju, 1,800-second synthetic JWT lifetime. Retain fail-closed evidence, anonymous/health assertions, Saju outage/recovery, and disposable cleanup. Strict proof counts success/503/transport failures/skipped/unexpected statuses, successful-only latency quantiles, and **client-side pending concurrency** without falsely claiming Worker admission. [Scope](WORKERD_ISOLATED_PRODUCT_PATH_PHASE11_20261106.md).
+- **Next:** finish ordinary and full integration CI, merge, run existing manual Ubuntu workflow once on exact `main` with `experiment=workerd_overlap`, independently inspect sanitized artifact and byte hash, then preserve the original observation. No acceptance until an actual run succeeds. **No Production/Hosted Worker traffic or DB access**. `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`; [P0 #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) stays open.
+
 ### 2026-11-06 KST — Phase 7/11 GitHub Linux workerd Saju outage and recovery: measured PASS
 
 - The existing main-only [GitHub Linux run #42197099729](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42197099729) completed **SUCCESS** at exact `main` `af41b57575536ba39e5b4ff138dcca80252d30fc`, after [#3073](https://github.com/gycha0109-beep/MyeongHa/pull/3073) merged. Actual local Wrangler 4.152.0/workerd 1.20261019.1, four disposable signed GoTrue members, native PostgreSQL18 forced RLS and pinned Saju `9807ce89c08afc61b587560d515a475efd819032` were exercised. Sequential baseline 12/12 successes (p50/p95/p99 127.809/141.546/153.991 ms).
