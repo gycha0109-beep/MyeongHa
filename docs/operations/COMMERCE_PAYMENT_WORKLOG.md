@@ -736,3 +736,11 @@
 - **보존:** 과거 Guest-owned Purchase Intent/Payment Attempt 행은 변경·삭제하지 않습니다. 과거 기록의 replay를 신규 유료 checkout 수단으로 사용할 수 없게만 차단합니다.
 - **회귀 검사:** Guest 신규 Purchase Intent v2/v3, 과거 Guest Purchase Intent replay, Guest 신규 Payment Attempt, 과거 Guest Payment Attempt replay를 각각 거부하고, 역사적 행이 그대로 남는지 확인하도록 DB 테스트를 추가했습니다.
 - **정책 범위:** Guest 무료 오늘의 운세 및 추후 지정할 무료 사주 상품 1종 경로는 paid Commerce command와 분리된 상태로 유지합니다. LIVE 판매 및 Production 적용 승인은 포함하지 않습니다.
+
+
+### 2026-11-07 — Provider handoff-context Guest 차단 (P0-CM-05)
+
+- **추가 발견:** Payment Attempt 생성은 Member-only였지만, 이미 생성된 Attempt의 pre-browser handoff-context read는 인증 Guest에게도 열려 있었습니다. 이 조회는 PSP `paymentId`와 고정 결제 금액을 반환하므로 Guest가 기존 Guest Attempt를 이어서 결제하는 경로가 될 수 있습니다.
+- **수정:** 신규 forward-only migration `2360_paid_handoff_member_gate_v1.sql`에서 handoff-context query를 Member 검증 wrapper로 교체하고, 이전 query 구현은 API executor가 직접 실행할 수 없도록 내부 전용으로 전환했습니다. HTTP 경계도 Guest를 `LOGIN_REQUIRED`로 PostgreSQL 연결 전에 거부합니다.
+- **검증:** Guest handoff-context DB query 거부, API HTTP Guest 거부, private query ACL을 회귀 검사에 추가했습니다.
+- **범위 보존:** server-side payment verification은 이미 발생한 provider 사실을 확인하는 별도 경로이므로 이 변경으로 막지 않습니다. Guest 무료 이용 흐름도 변경하지 않습니다.

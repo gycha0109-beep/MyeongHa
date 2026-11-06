@@ -525,7 +525,7 @@ active authenticated Member
 → 기존 Commerce 검증 흐름
 ```
 
-모든 유료 구매는 `subjects.kind='member'`, `status='active'`, `auth_user_id IS NOT NULL`인 서버 확인 Member만 가능하다. Purchase Intent v2/v3 및 Payment Attempt DB command는 신규 생성과 멱등 재호출 모두에서 Guest를 먼저 거부하며, INSERT trigger도 직접 쓰기를 차단한다. 무료 경험은 paid Purchase Intent/Payment Attempt를 사용하지 않는다. 과거 Guest-owned Commerce row가 있더라도 canonical `subjects.id`와 역사적 Receipt/Event/Grant provenance는 변경하지 않는다. Guest 무료 이용 정책은 saleable Product/SKU나 `P0-CM-03` 판매 승인을 만들지 않는다.
+모든 유료 구매는 `subjects.kind='member'`, `status='active'`, `auth_user_id IS NOT NULL`인 서버 확인 Member만 가능하다. Purchase Intent v2/v3 및 Payment Attempt DB command는 신규 생성과 멱등 재호출 모두에서 Guest를 먼저 거부하며, INSERT trigger도 직접 쓰기를 차단한다. Provider handoff-context 조회도 Member만 허용하여 Guest에게 PSP handoff identity와 결제 authority를 반환하지 않는다. 무료 경험은 paid Purchase Intent/Payment Attempt를 사용하지 않는다. 과거 Guest-owned Commerce row가 있더라도 canonical `subjects.id`와 역사적 Receipt/Event/Grant provenance는 변경하지 않는다. Guest 무료 이용 정책은 saleable Product/SKU나 `P0-CM-03` 판매 승인을 만들지 않는다.
 
 ---
 
