@@ -40,7 +40,7 @@ declare
  v_applied_again record;
  v_original_grant_revision bigint;
  v_original_other_revision bigint;
- v_wrong_grant_rejected boolean:=false;
+
  v_constraint text;
  v_scope record;
  v_scopes_locked integer:=0;
@@ -80,42 +80,19 @@ begin
   raise exception 'CLAIM_E2E_EXACT_CHECKOUT_NOTICE_OR_VERIFIED_RECEIPT_INVALID';
  end if;
 
- -- The official Reader B2/B3 paid fixture uses a GUEST Subject because
- -- its own scope tests explicitly cover guest access. Customer withdrawal
- -- intake is MEMBER-only by design: prove guest denial, then synthesize the
- -- same Subject's member-auth identity only in this ROLLBACK transaction.
+ -- The official Reader B2/B3 paid fixture is an authenticated Member
+ -- under P0-CM-05. Claim intake remains Member-only; never rewrite historical
+ -- Guest ownership to make a paid fixture eligible.
  perform pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
- if (select s.kind from public.subjects s where s.id=v_subject)<>'guest' then
-  raise exception 'CLAIM_E2E_OFFICIAL_READER_FIXTURE_NOT_GUEST';
- end if;
- begin
-  perform public.cmd_receive_digital_reading_withdrawal_claim_v1(
-   v_subject,v_purchase,v_unit,'delivery_failed',
-   'hmac-sha256:k1:'||repeat('e',64),
-   'sha256:v1:'||repeat('f',64));
- exception when insufficient_privilege then
-  v_wrong_grant_rejected:=true;
- end;
- if not v_wrong_grant_rejected
-    or exists(select 1 from public.digital_reading_withdrawal_claims_private_v1
-              where subject_id=v_subject) then
-  raise exception 'CLAIM_E2E_GUEST_WAS_ALLOWED_TO_SUBMIT_WITHDRAWAL';
- end if;
- v_wrong_grant_rejected:=false;
-
- insert into auth.users(id)
- values ('1219a000-0000-4000-8000-000000000002'::uuid);
- update public.subjects
- set kind='member',auth_user_id='1219a000-0000-4000-8000-000000000002'::uuid,
-     updated_at=clock_timestamp()
- where id=v_subject and kind='guest' and status='active'
-  and auth_user_id is null;
- if not found or
-    (select count(*) from public.subjects s
-       join auth.users au on au.id=s.auth_user_id
-       where s.id=v_subject and s.kind='member'
-         and s.status='active')<>1 then
-  raise exception 'CLAIM_E2E_SYNTHETIC_MEMBER_AUTH_BINDING_FAILED';
+ if not exists (
+  select 1
+  from public.subjects s
+  join auth.users au on au.id=s.auth_user_id
+  where s.id=v_subject
+    and s.kind='member'
+    and s.status='active'
+ ) then
+  raise exception 'CLAIM_E2E_OFFICIAL_READER_FIXTURE_NOT_ACTIVE_MEMBER';
  end if;
 
  select t.claim_id,t.replayed into strict v_claim,v_claim_replayed
