@@ -21,6 +21,7 @@ Watchtower-Track: security
 1. 인증된 현재 Member와 현재 Thread/Turn/Attempt.
 2. 사용자가 명시적으로 허용한 원본 `conversation_recall/v1` Memory **정확히 1건**.
 3. 현재 요청의 원본 User 메시지 1건.
+   - 이 User 메시지는 현재 요청의 입력 출처이며 장기 Memory가 아니다. Memory Grant를 대신하지 않고, 별도 동의 없이 장기 기억으로 저장하지 않는다.
 4. 위 두 입력의 출처·권한을 서버와 DB가 확인하고, 모델 호출 전에 정확한 사용 집합을 불변 Pin.
 5. 최초 AI 답변 1회, **비스트리밍** 전달.
 6. 동일 원본 Grant의 현재 권한을 Commit·최초 공개 시점에 재검증하고, 전달 receipt/ACK 및 철회 경계를 확인.
