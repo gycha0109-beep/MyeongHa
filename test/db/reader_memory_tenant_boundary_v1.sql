@@ -319,6 +319,13 @@ BEGIN
   IF v_count <> 0 THEN
     RAISE EXCEPTION 'Revoked Reader A grant still visible in Working Memory';
   END IF;
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Reader A grant still visible in Memory v2';
+  END IF;
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
