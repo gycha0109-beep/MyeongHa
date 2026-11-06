@@ -283,7 +283,9 @@ revoke all on public.commerce_saju_records_v1,
   public.commerce_saju_purchase_origins_v1,
   public.commerce_saju_upgrade_receipt_links_v1,
   public.commerce_saju_verified_refund_effects_v1 from public;
-revoke all on function public.tr_commerce_saju_refund_effect_verified_v1(),
+revoke all on function public.tr_commerce_saju_origin_revision_lock_v1(),
+  public.tr_commerce_saju_verified_receipt_revision_lock_v1(),
+  public.tr_commerce_saju_refund_effect_verified_v1(),
   public.tr_commerce_saju_record_paid_revision_guard_v1(),
   public.tr_commerce_saju_upgrade_link_source_v1(),
   public.tr_commerce_saju_ledger_immutable_v1() from public;
