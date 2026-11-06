@@ -410,6 +410,7 @@ implementation_impact:
   - preserve Guest bootstrap and the free Today's Fortune path; do not route free experiences through paid Purchase Intent.
   - add database-level guards so internal command paths cannot create new Guest paid checkout records.
   - enforce active authenticated Member eligibility before Purchase Intent v2/v3 and Payment Attempt idempotent replay, not only before INSERT.
+  - require an active authenticated Member before the pre-browser Payment Attempt handoff-context read; Guest must receive LOGIN_REQUIRED before provider handoff.
 independent_gates_preserved:
   - P0-CM-01 Web + one-off launch rail
   - P0-CM-02 PortOne V2 selection; live merchant/credential/Production activation remains separately gated
