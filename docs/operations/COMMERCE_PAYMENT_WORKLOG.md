@@ -658,3 +658,11 @@
 - **거부:** 현재 유효 Grant가 없으면 구매 Product만 보고 분야권한을 만들지 않습니다. 타 Subject/Record/revision, 상품에 없는 필드, 임의 권한, 동일 Grant 중복, 같은 Receipt·필드 중복, 실제 환불 또는 미정산 취소에 걸린 권한 증거를 차단합니다. 결과는 계속 `checkoutAuthorized:false`이며 권한 발급/회수/결제 없이 내부 계산에만 사용됩니다.
 - **테스트:** 정확한 Grant 1개로 직업 9,900원 인정 → 커리어·경제 추가 15,000원, 분야 권한 없는 결제의 불인정, 서로 다른 필드 Grant, 잘못된/중복된 권한/환불·취소 증거의 트랜잭션 롤백 및 실제 읽기 전용 DB 조회 계약을 검사합니다. **새 HEAD의 CI 통과 전 검증 완료를 선언하지 않습니다.**
 - **미완료:** 새 사주 상품/분야에 대한 운영 Product Capability·Grant 발행 계약/별도 Saju Record 접근 제어는 아직 배포·승인되지 않았습니다. 이 조회기는 이미 일치하는 활성 Grant가 DB에 있을 때에만 분야 소유를 입증하는 **비배포 후보**이고, 고유한 user-owned Record 권한 scope를 새로 발급하지 않습니다. 실제 Merchant/Offer·Checkout·Production DB migration·개인정보 처리·LIVE 활성화는 없습니다.
+
+### 2026-11-06 — 사주 유료 권한 조회의 환불·취소 후 잔존 Grant 검출 (P2/P3/P5)
+
+- **선행 검증:** #3070 고정 HEAD `3a3fa90` 일반·전체 통합 CI 성공, `main` 병합 `06551c5` 확인. 기존 단일 스냅샷 견적과 비판매 경계 유지.
+- **발견:** 최초 분야권한 조회 SQL은 `verified` 영수증·정확한 Capability·유효 Entitlement에 **내부 조인**을 사용했습니다. 따라서 이미 `revoked` 처리되었거나 환불·권한 원천 불일치·Capability 정의 불일치가 있는 영수증에 **활성 Grant가 남아 있어도** 조회 결과에서 완전히 누락될 수 있었습니다. 원본 결제금만 환불된 상태의 재구매 견적이 그 잔존 권한을 무시할 위험이 있었습니다.
+- **수정:** 동일한 실제 Saju Record/Subject/Birth revision 및 원본 Receipt를 따르는 **활성 Grant 전부**를 먼저 조회하고, Production Verified Receipt 원본 시각·동일 Offer/실제 금액·통화, 원본 Receipt Grant source key, 고정 Capability Set/Item, 현재 유효 Entitlement 투영, 전액·부분 환불 합계, 미정산 Provider 취소 사실을 각각 확인하도록 전환했습니다. 누락·타 출처·중복·미정산·환불 후 활성화는 `HOLD`·전체 읽기 트랜잭션 `ROLLBACK`입니다. 적법하게 폐기된 Grant는 보유 분야로 인정하지 않습니다.
+- **테스트:** 정상 권한의 직업 → 커리어·경제 실제 차액 견적을 유지하며, 영수증 revoked 후 활성 Grant 잔존, sandbox/검증 시각 누락, 잘못된 원본 Offer/금액/Grant 출처, 고정 Capability 누락, 유효 Entitlement 누락, 부분 환불·미정산 취소를 거부하는 회귀 사례를 추가했습니다. **본 수정의 CI 결과 전에는 PASS를 주장하지 않습니다.**
+- **한계:** Product Capability/Grant의 Saju Record 전용 발행 계약, 기존 일반 Grant 접근 제어, 실제 권한 부여·취소 실행과 운영 데이터베이스 적용은 여전히 미완료입니다. 이 PR은 비배포 후보의 조회 무결성만 강화하며, 실제 판매/환불·공개 API/Reader 배송·LIVE를 켜지 않습니다.

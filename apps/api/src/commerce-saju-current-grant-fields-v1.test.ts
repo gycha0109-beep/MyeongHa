@@ -26,6 +26,12 @@ const original={
 function evidence(field='career',grant=id(9007)) {
   return {
     subjectId,sajuRecordId,natalVersion,receiptId,grantId:grant,
+    receiptOfferId:offerId,intentOfferId:offerId,
+    receiptStatus:'verified',receiptEnvironment:'production',
+    receiptVerifiedAt:true,verifiedPaidMinor:'9900',expectedPaidMinor:'9900',
+    currency:'KRW',expectedCurrency:'KRW',
+    grantSourceType:'purchase',grantKey:'receipt:'+receiptId,
+    capabilityBound:true,effectiveCurrent:true,
     productKey:'standard.career',field,refundedMinor:'0',
     unsettledCancellationCount:'0',
   };
@@ -112,6 +118,25 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
     }
   });
 
+  it('holds a still-active Grant after full refund, source revocation or a failed Capability join',async()=>{
+    for(const row of [
+      {...evidence(),receiptStatus:'revoked',refundedMinor:'9900'},
+      {...evidence(),receiptEnvironment:'sandbox'},
+      {...evidence(),receiptVerifiedAt:false},
+      {...evidence(),receiptOfferId:id(9908)},
+      {...evidence(),verifiedPaidMinor:'10000'},
+      {...evidence(),grantSourceType:'promo'},
+      {...evidence(),grantKey:'receipt:'+id(9909)},
+      {...evidence(),capabilityBound:false,field:null},
+      {...evidence(),effectiveCurrent:false},
+      {...evidence(),field:null},
+    ]){
+      const x=setup([row]);
+      await expect(quote(x)).rejects.toThrow('SAJU_CURRENT_GRANT_EVIDENCE_UNPROVEN');
+      expect(x.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+    }
+  });
+
   it('blocks duplicated Grant source, duplicate receipt field, partial refunds and unsettled cancellations',async()=>{
     for(const rows of [
       [evidence(),evidence('career',id(9008))],
@@ -132,11 +157,12 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
       'origin.birth_revision_id=$3::uuid',
       'capability.id=offer.capability_set_id',
       'intent.capability_snapshot_jsonb=pg_catalog.jsonb_build_object',
-      "receipt.verification_status='verified'",
-      "receipt.environment='production'",
-      "grant_row.grant_source_type='purchase'",
-      "grant_row.grant_key='receipt:'||receipt.id::text",
+      "receipt.product_offer_id=offer.id",
+      "grant_row.source_receipt_id=receipt.id",
       "grant_row.status='active'",
+      'left join public.product_capability_sets capability',
+      'left join public.product_capability_items item',
+      'left join public.entitlements effective',
       "effective.status='active'",
       'active_grant_count>0',
       'commerce_saju_verified_refund_effects_v1',

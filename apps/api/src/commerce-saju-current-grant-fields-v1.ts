@@ -28,7 +28,20 @@ select
   origin.saju_record_id::text as "sajuRecordId",
   origin.birth_revision_id::text as "natalVersion",
   receipt.id::text as "receiptId",
+  receipt.product_offer_id::text as "receiptOfferId",
+  offer.id::text as "intentOfferId",
+  receipt.verification_status as "receiptStatus",
+  receipt.environment as "receiptEnvironment",
+  (receipt.verified_at is not null) as "receiptVerifiedAt",
+  receipt.verified_amount_minor::text as "verifiedPaidMinor",
+  intent.expected_amount_minor::text as "expectedPaidMinor",
+  receipt.verified_currency as "currency",
+  intent.expected_currency as "expectedCurrency",
   grant_row.id::text as "grantId",
+  grant_row.grant_source_type as "grantSourceType",
+  grant_row.grant_key as "grantKey",
+  (capability.id is not null) as "capabilityBound",
+  (effective.id is not null) as "effectiveCurrent",
   product.product_key as "productKey",
   item.item_key as "field",
   coalesce(refunds.refunded_minor,0)::text as "refundedMinor",
@@ -44,7 +57,7 @@ join public.purchase_intents intent
  and intent.status='verified'
 join public.product_offers offer on offer.id=intent.product_offer_id
 join public.products product on product.id=offer.product_id
-join public.product_capability_sets capability
+left join public.product_capability_sets capability
   on capability.id=intent.capability_set_id
  and capability.id=offer.capability_set_id
  and capability.product_id=offer.product_id
@@ -59,28 +72,20 @@ join public.commerce_receipts receipt
   on receipt.purchase_intent_id=intent.id
  and receipt.subject_id=intent.subject_id
  and receipt.product_offer_id=offer.id
- and receipt.verification_status='verified'
- and receipt.environment='production'
- and receipt.verified_at is not null
- and receipt.verified_amount_minor=intent.expected_amount_minor
- and receipt.verified_currency=intent.expected_currency
- and receipt.verified_currency='KRW'
 join public.entitlement_grants grant_row
   on grant_row.source_receipt_id=receipt.id
  and grant_row.subject_id=receipt.subject_id
- and grant_row.grant_source_type='purchase'
- and grant_row.grant_key='receipt:'||receipt.id::text
  and grant_row.status='active'
  and grant_row.valid_from<=pg_catalog.transaction_timestamp()
  and (grant_row.valid_until is null
       or grant_row.valid_until>pg_catalog.transaction_timestamp())
-join public.product_capability_items item
+left join public.product_capability_items item
   on item.capability_set_id=capability.id
  and item.entitlement_key=grant_row.entitlement_key
  and grant_row.scope_key is not distinct from
      (case when item.scope_mode='global' then null
            else item.fixed_scope_key end)
-join public.entitlements effective
+left join public.entitlements effective
   on effective.subject_id=grant_row.subject_id
  and effective.entitlement_key=grant_row.entitlement_key
  and effective.scope_key_norm=grant_row.scope_key_norm
@@ -114,8 +119,14 @@ order by receipt.id,item.item_key,grant_row.id
 
 type FieldEvidenceRow = Readonly<{
   subjectId: unknown; sajuRecordId: unknown; natalVersion: unknown;
-  receiptId: unknown; grantId: unknown; productKey: unknown;
-  field: unknown; refundedMinor: unknown; unsettledCancellationCount: unknown;
+  receiptId: unknown; receiptOfferId: unknown; intentOfferId: unknown;
+  receiptStatus: unknown; receiptEnvironment: unknown;
+  receiptVerifiedAt: unknown; verifiedPaidMinor: unknown;
+  expectedPaidMinor: unknown; currency: unknown; expectedCurrency: unknown;
+  grantId: unknown; grantSourceType: unknown; grantKey: unknown;
+  capabilityBound: unknown; effectiveCurrent: unknown;
+  productKey: unknown; field: unknown; refundedMinor: unknown;
+  unsettledCancellationCount: unknown;
 }>;
 const UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu;
 const MONEY = /^(0|[1-9][0-9]*)$/u;
@@ -155,6 +166,18 @@ export const CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1:
             || uid(row.natalVersion)!==natalVersion) hold();
         const receiptId=uid(row.receiptId);
         const grantId=uid(row.grantId);
+        if (uid(row.receiptOfferId)!==uid(row.intentOfferId)
+            || row.receiptStatus!=='verified'
+            || row.receiptEnvironment!=='production'
+            || row.receiptVerifiedAt!==true
+            || row.currency!=='KRW' || row.expectedCurrency!=='KRW'
+            || !MONEY.test(String(row.verifiedPaidMinor))
+            || !MONEY.test(String(row.expectedPaidMinor))
+            || row.verifiedPaidMinor!==row.expectedPaidMinor
+            || row.grantSourceType!=='purchase'
+            || row.grantKey!=='receipt:'+receiptId
+            || row.capabilityBound!==true
+            || row.effectiveCurrent!==true) hold();
         if (!MONEY.test(String(row.refundedMinor))
             || !MONEY.test(String(row.unsettledCancellationCount))
             || row.refundedMinor!=='0'
