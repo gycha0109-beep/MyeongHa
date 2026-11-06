@@ -40,7 +40,7 @@ describe('Four non-Se-yeon Character chat-open independent release admission',()
     expect(policy).toContain('cr.id = active_content_release_id');
     expect(policy).toContain('cr.content_bundle_id = active_content_bundle_id');
     expect(source).not.toContain('drop policy if exists conversation_threads_chat_thread_open_insert_v1');
-    expect(policy).not.toMatch(/\\bgrant\\s+(?:insert|all)\\b/iu);
+    expect(policy).not.toMatch(/\bgrant\s+(?:insert|all)\b/iu);
   });
   it('retains member-owned single thread, immutable pinned bundle, and least-privilege executor',()=>{
     expect(source).toContain("perform public.assert_myeongha_subject_context_v1(p_subject_id)");
