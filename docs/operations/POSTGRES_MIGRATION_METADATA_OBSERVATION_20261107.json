@@ -958,29 +958,29 @@
       "rlsDisabledTablesWithPolicies": {
         "ai_execution_groundings": {
           "policyCount": 1,
-          "apiExecutorDirectTablePrivilege": false
+          "apiExecutorDirectTableAndColumnPrivileges": false
         },
         "ai_execution_logs": {
           "policyCount": 1,
-          "apiExecutorDirectTablePrivilege": false
+          "apiExecutorDirectTableAndColumnPrivileges": false
         },
         "chat_turns": {
           "policyCount": 3,
-          "apiExecutorDirectTablePrivilege": false,
-          "subjectScopeInCurrentS0DefinerFunctions": true
+          "subjectScopeInCurrentS0DefinerFunctions": true,
+          "apiExecutorDirectTableAndColumnPrivileges": false
         },
         "chat_turn_attempts": {
           "policyCount": 3,
-          "apiExecutorDirectTablePrivilege": false,
-          "subjectScopeInCurrentS0DefinerFunctions": true
+          "subjectScopeInCurrentS0DefinerFunctions": true,
+          "apiExecutorDirectTableAndColumnPrivileges": false
         },
         "memory_proposals": {
           "policyCount": 2,
-          "apiExecutorDirectTablePrivilege": false,
           "anonDirectTablePrivilege": false,
           "authenticatedDirectTablePrivilege": false,
           "chatOwnerColumnPrivileges": true,
-          "serviceRoleBroadPrivilege": true
+          "serviceRoleBroadPrivilege": true,
+          "apiExecutorDirectTableAndColumnPrivileges": false
         }
       },
       "memoryProposalFailClosedBoundary": {
@@ -996,7 +996,14 @@
         "proposalAcceptanceAnonExecute": false,
         "proposalAcceptanceAuthenticatedExecute": false,
         "catalogFunctionCallersFound": 0,
-        "disposition": "No API entrypoint is currently available for the new S0 proposal-acceptance function and the registered conversation_recall type is disabled. RLS policies on memory_proposals are dormant; before enabling this type, RLS must be enabled or a formally accepted alternative row-scope control must be evidenced."
+        "disposition": "No API entrypoint is currently available for the new S0 proposal-acceptance function and the registered conversation_recall type is disabled. RLS policies on memory_proposals are dormant; before enabling this type, RLS must be enabled or a formally accepted alternative row-scope control must be evidenced.",
+        "apiExecutorDirectTablePrivilege": false,
+        "apiExecutorDirectColumnPrivilege": false,
+        "ownerRoleColumnPrivileges": {
+          "select": true,
+          "update": true,
+          "insert": false
+        }
       },
       "apiOnlyS0Functions": [
         "public.qry_seyeon_g0_current_source_recent_messages_v1",
@@ -1034,7 +1041,7 @@
         "legacyCommitFunctionSecurityDefiner": false,
         "legacyCommitFunctionServiceRoleExecute": true,
         "legacyCommitFunctionApiExecutorExecute": false,
-        "legacyCommitFunctionNote": "Separate legacy service_role-only user-choice proposal path; it does not reference the new positive-source registry. Do not claim that the registry disables all legacy memory acceptance."
+        "legacyCommitFunctionNote": "Separate legacy service_role-only user-choice proposal path; it can persist memory_proposals through the existing chat commit flow and does not reference the new positive-source registry. API executor, anon and authenticated cannot execute this legacy function. Treat it as a distinct trusted-backend path rather than claiming the registry disables all memory acceptance."
       }
     }
   }
