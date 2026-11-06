@@ -299,5 +299,82 @@ pass "thread open wrapper preserves command-only least-privilege runtime authori
 if [[ "${CI:-}" == 'true' && "${PGDATABASE:-}" == myeongha_ci_case_* ]] &&
    (( $(psql -X -qAt -v ON_ERROR_STOP=1 -c 'show server_version_num') >= 170000 )); then
   bash test/db/seyeon_relationship_isolated_restore_proof.sh
+
+  # Four additional Character chat-open branches must work with exact
+  # independently published releases in disposable PG17, not Production.
+  psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/character-chat/production-01-four-character-independent-release-open-20261106.sql >/dev/null
+  psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+insert into public.content_bundles(
+ id,content_version,content_hash,artifact_ref,artifact_schema_version,
+ min_client_capability,asset_manifest_hash,cue_schema_version,manifest_jsonb,
+ published_at,retired_at)
+values ('c3000000-0000-0000-0000-000000000003','four-test',
+ 'sha256:four-test','artifact://four-test','v1','web-v1',
+ 'asset-test','cue-v1','{}'::jsonb,clock_timestamp(),null);
+insert into public.content_releases(
+ id,release_key,content_bundle_id,status,is_default,rollout_jsonb,
+ rollout_policy_version,rollout_seed,activated_at,retired_at,created_at)
+values ('c4000000-0000-0000-0000-000000000003','four-test-release',
+ 'c3000000-0000-0000-0000-000000000003','active',false,null,
+ 'uniform-default-v1','synthetic',clock_timestamp(),null,clock_timestamp());
+insert into public.characters(character_id,created_at,retired_at) values
+ ('baekheon',clock_timestamp(),null),('yeoul',clock_timestamp(),null),
+ ('rahyeon',clock_timestamp(),null),('taegyeom',clock_timestamp(),null),
+ ('yunho',clock_timestamp(),null);
+insert into public.character_runtime_catalog(
+ character_id,content_bundle_id,availability,enabled,release_at,retire_at,published_at)
+select character_id,'c3000000-0000-0000-0000-000000000003',
+ 'available',true,null,null,clock_timestamp()
+from public.characters where character_id in
+ ('baekheon','yeoul','rahyeon','taegyeom','yunho');
+SQL
+  case_index=0
+  for target in baekheon yeoul rahyeon taegyeom; do
+    case_index=$((case_index+1))
+    candidate_thread="$(printf 'c5000000-0000-0000-0000-%012d' "$case_index")"
+    candidate_part="$(printf 'c6000000-0000-0000-0000-%012d' "$case_index")"
+    expected="$target|t|c4000000-0000-0000-0000-000000000003|c3000000-0000-0000-0000-000000000003"
+    actual="$(psql -X -qAt -v ON_ERROR_STOP=1 <<SQL
+begin;
+set local role myeongha_api_executor;
+set local myeongha.subject_id='b2000000-0000-0000-0000-000000000003';
+select character_id,created,active_content_release_id,active_content_bundle_id
+from public.cmd_open_member_single_character_thread_v1(
+'b2000000-0000-0000-0000-000000000003','$target','$candidate_thread','$candidate_part');
+commit;
+SQL
+)"
+    [[ "$actual" == "$expected" ]] || fail "four-character independent $target open failed: $actual"
+    again="$(psql -X -qAt -v ON_ERROR_STOP=1 <<SQL
+begin;
+set local role myeongha_api_executor;
+set local myeongha.subject_id='b2000000-0000-0000-0000-000000000003';
+select thread_id,created
+from public.cmd_open_member_single_character_thread_v1(
+'b2000000-0000-0000-0000-000000000003','$target',
+'c7000000-0000-0000-0000-000000000099',
+'c8000000-0000-0000-0000-000000000099');
+commit;
+SQL
+)"
+    [[ "$again" == "$candidate_thread|f" ]] || fail "four-character independent $target reuse failed: $again"
+    pass "independent $target chat room opens and reuses without rebinding"
+  done
+  set +e
+  yunho_out="$(psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL' 2>&1
+begin;
+set local role myeongha_api_executor;
+set local myeongha.subject_id='b2000000-0000-0000-0000-000000000003';
+select * from public.cmd_open_member_single_character_thread_v1(
+'b2000000-0000-0000-0000-000000000003','yunho',
+'c5000000-0000-0000-0000-000000000099',
+'c6000000-0000-0000-0000-000000000099');
+commit;
+SQL
+)"
+  yunho_rc=$?
+  set -e
+  [[ "$yunho_rc" -ne 0 && "$yunho_out" == *"selected Character has no active published content release"* ]] || fail "Yunho independent release must remain disconnected"
+  pass "Yunho discovery remains untouched, but non-default chat-open stays denied"
 fi
 echo "Member Character thread open persistence/concurrency tests passed"
