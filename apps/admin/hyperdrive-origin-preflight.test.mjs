@@ -5,13 +5,13 @@ const read='a'.repeat(32),audit='b'.repeat(32);
 const base={id:read,name:'myeongha-admin-reader-test',
  caching:{disabled:true},
  mtls:{sslmode:'verify-full',ca_certificate_id:'d25c14bc-d654-46b8-89cf-5c4baf931771'},
- origin:{host:'aws-0-ap-southeast-1.pooler.supabase.com',port:6543,scheme:'postgresql',
-  user:'myeongha_admin_reader.cnsfpcdiyofqvhpcegfc',database:'postgres'},
+ origin:{host:'db.cnsfpcdiyofqvhpcegfc.supabase.co',port:5432,scheme:'postgresql',
+  user:'myeongha_admin_reader',database:'postgres'},
 };
 const auditConfig={...base,id:audit,name:'myeongha-admin-audit-test',
- origin:{...base.origin,user:'myeongha_admin_audit_writer.cnsfpcdiyofqvhpcegfc'}};
+ origin:{...base.origin,user:'myeongha_admin_audit_writer'}};
 describe('dedicated Admin Hyperdrive origin preflight',()=>{
- it('checks live IDs, actual project-specific logins, verify-full and disabled caching',async()=>{
+ it('checks live IDs, exact isolated direct-origin logins, verify-full and disabled caching',async()=>{
   const calls=[];
   const result=await verifyAdminHyperdriveOriginsV1({
    accountId:'c'.repeat(32),apiToken:'synthetic-api-token-only',
@@ -33,13 +33,14 @@ describe('dedicated Admin Hyperdrive origin preflight',()=>{
   const check=x=>inspectAdminHyperdriveOriginV1(x,'myeongha_admin_reader',read);
   expect(check(base).verified).toBe(true);
   for(const changed of [
-   {...base,origin:{...base.origin,user:'postgres.cnsfpcdiyofqvhpcegfc'}},
+   {...base,origin:{...base.origin,user:'postgres'}},
+   {...base,origin:{...base.origin,host:'aws-0-ap-southeast-1.pooler.supabase.com',port:6543,user:'myeongha_admin_reader.cnsfpcdiyofqvhpcegfc'}},
    {...base,origin:{...base.origin,host:'db.some-other-project.supabase.co'}},
    {...base,mtls:{...base.mtls,sslmode:'require'}},
    {...base,caching:{disabled:false}},
    {...base,id:audit},
    {...base,origin:{...base.origin,database:'other'}},
-   {...base,origin:{...base.origin,port:5432}},
+   {...base,origin:{...base.origin,port:6543}},
   ])expect(()=>check(changed)).toThrow();
  });
  it('fails closed if live origin metadata is missing or unavailable',async()=>{
