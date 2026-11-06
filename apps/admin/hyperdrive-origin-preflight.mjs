@@ -6,7 +6,9 @@ import {pathToFileURL} from 'node:url';
 // Worker Hyperdrive ID. Never log origins, credentials or API response bodies.
 const PROJECT = 'cnsfpcdiyofqvhpcegfc';
 const CA_ID = 'd25c14bc-d654-46b8-89cf-5c4baf931771';
-const POOLER = 'aws-0-ap-southeast-1.pooler.supabase.com';
+// Cloudflare Hyperdrive is itself a transaction pooler; nesting Supavisor's
+// transaction pooler (port 6543) caused production Admin read failures.
+// Only a direct, dedicated role connection may back the isolated Admin Worker.
 const DIRECT = 'db.'+PROJECT+'.supabase.co';
 const ID = /^[a-f0-9]{32}$/iu;
 
@@ -20,11 +22,10 @@ export function inspectAdminHyperdriveOriginV1(config,role,id){
   throw Error('Dedicated Admin Hyperdrive configuration mismatch');
  }
  const origin=config.origin;
- if(origin?.host!==POOLER&&origin?.host!==DIRECT)
+ if(origin?.host!==DIRECT)
   throw Error('Dedicated Admin origin host mismatch');
- const user=origin.host===POOLER?role+'.'+PROJECT:role;
- if(origin.user!==user||origin.database!=='postgres'||
-    origin.port!==(origin.host===POOLER?6543:5432)||
+ if(origin.user!==role||origin.database!=='postgres'||
+    origin.port!==5432||
     !['postgres','postgresql'].includes(origin.scheme))
   throw Error('Dedicated Admin origin principal mismatch');
  return Object.freeze({role,verified:true});
