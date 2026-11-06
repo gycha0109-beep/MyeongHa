@@ -187,9 +187,23 @@ export async function startGovernedSeyeonAiCallV1(
 ): Promise<{ callId: string; ceilingMicroUsd: bigint; bucketUtcDate: string }> {
   const args = bindingParams(binding);
   const callId = uuid(call.callId, 'callId');
-  if (call.purpose !== call.quote.purpose ||
-      call.providerKey !== call.quote.providerKey ||
-      call.modelKey !== call.quote.modelKey ||
+  const quote = call.quote;
+  // Reject malformed or caller-injected model/policy metadata BEFORE any
+  // SQL reservation. The DB separately authenticates its server-owned
+  // active policy and rate, so this preflight is not admission authority.
+  const policyId = (value: unknown): boolean =>
+    typeof value === 'string' &&
+    /^[a-zA-Z0-9_.:/-]{1,128}$/u.test(value);
+  if (quote === null || typeof quote !== 'object' ||
+      typeof call.purpose !== 'string' ||
+      !/^[a-z_]{1,64}$/u.test(call.purpose) ||
+      !policyId(call.providerKey) ||
+      !policyId(call.modelKey) ||
+      !policyId(quote.policyVersion) ||
+      !policyId(quote.rateCardVersion) ||
+      call.purpose !== quote.purpose ||
+      call.providerKey !== quote.providerKey ||
+      call.modelKey !== quote.modelKey ||
       !Number.isSafeInteger(call.requestBodyBytes) ||
       call.requestBodyBytes < 1 ||
       !Number.isSafeInteger(call.quote.inputCeilingTokens) ||

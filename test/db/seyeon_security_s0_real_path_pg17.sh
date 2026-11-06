@@ -12,6 +12,9 @@ set -euo pipefail
 node scripts/operations/seyeon-security-s0/install-isolated.mjs
 ./node_modules/.bin/vitest run \
   test/seyeon-g3-historical-originals-review-port-w94.test.ts --maxWorkers=1
+# G4 governed admission input hardening runs offline; HTTP and DB are mocks.
+./node_modules/.bin/vitest run \
+  test/seyeon-cost-governor-04c-adapter-v1.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \
   test/seyeon-g3-historical-originals-review-w88.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \

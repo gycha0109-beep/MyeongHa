@@ -195,6 +195,62 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     )).rejects.toThrow('DB receipt');
   });
 
+  it('W110 rejects malformed governed policy/rate/role metadata before any DB reservation', async () => {
+    const valid: Parameters<typeof startGovernedSeyeonAiCallV1>[2] = {
+      callId,purpose:'dialogue_render',providerKey:'openai-responses',
+      modelKey:'test-model',requestBodyBytes:500,
+      quote:{
+        policyVersion:'offline-policy-v1',rateCardVersion:'offline-rate-v1',
+        providerKey:'openai-responses',modelKey:'test-model',
+        purpose:'dialogue_render',inputCeilingTokens:500,
+        outputCeilingTokens:800,ceilingMicroUsd:3700,
+      },
+    };
+    const malformed: readonly [string,unknown][] = [
+      ['no policy version',{...valid,quote:{...valid.quote,policyVersion:''}}],
+      ['oversized policy version',{...valid,quote:{...valid.quote,
+        policyVersion:'p'.repeat(129)}}],
+      ['SQL-like rate version',{...valid,quote:{...valid.quote,
+        rateCardVersion:"v1'; drop table public.seyeon_ai_call_cost_events; --"}}],
+      ['missing rate version',{...valid,quote:{...valid.quote,
+        rateCardVersion:undefined}}],
+      ['matched but invalid provider',{...valid,providerKey:'bad provider',
+        quote:{...valid.quote,providerKey:'bad provider'}}],
+      ['matched but invalid model',{...valid,modelKey:'bad model',
+        quote:{...valid.quote,modelKey:'bad model'}}],
+      ['matched but invalid purpose',{...valid,purpose:'dialogue_render;drop',
+        quote:{...valid.quote,purpose:'dialogue_render;drop'}}],
+      ['missing quote',{...valid,quote:undefined}],
+      ['array quote',{...valid,quote:[]}],
+      ['zero byte request',{...valid,requestBodyBytes:0}],
+    ];
+    const query=vi.fn(async (_sql:string,_params:unknown[])=>({
+      rows:[] as Array<{callId:string;ceilingMicroUsd:string;bucketUtcDate:string}>,
+    }));
+    const client={query} as unknown as PostgresTransactionQueryV1;
+    for(const [label,input] of malformed){
+      await expect(startGovernedSeyeonAiCallV1(
+        client,binding,input as Parameters<typeof startGovernedSeyeonAiCallV1>[2],
+      ),label).rejects.toThrow('authoritative bounded quote');
+      expect(query,label).not.toHaveBeenCalled();
+    }
+    // The unchanged, valid shape still reaches only the governed SQL
+    // reservation with parameterized server-owned price/policy versions.
+    query.mockResolvedValueOnce({rows:[{
+      callId,ceilingMicroUsd:'3700',bucketUtcDate:'2026-11-06',
+    }]});
+    await expect(startGovernedSeyeonAiCallV1(
+      client,binding,valid,
+    )).resolves.toMatchObject({callId,ceilingMicroUsd:3700n});
+    expect(query).toHaveBeenCalledOnce();
+    expect(String(query.mock.calls[0]?.[0])).toContain(
+      'cmd_governed_start_seyeon_ai_call_v1',
+    );
+    expect(query.mock.calls[0]?.[1]?.slice(8,10)).toEqual([
+      'offline-policy-v1','offline-rate-v1',
+    ]);
+  });
+
   it('holds the full reservation when the Provider result cannot commit, with no second inference', async () => {
     const order:string[]=[];
     let admittedId='';
