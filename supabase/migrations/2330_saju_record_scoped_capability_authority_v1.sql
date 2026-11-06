@@ -487,7 +487,7 @@ begin
   end if;
   raise exception 'SAJU_SOURCE_LEDGER_IMMUTABLE';
 end;
-$;
+$$;
 create trigger tr_commerce_saju_origin_immutable_v1
  before update or delete on public.commerce_saju_purchase_origins_v1
  for each row execute function public.tr_commerce_saju_ledger_immutable_v1();
@@ -1620,7 +1620,7 @@ returns table (
 language plpgsql
 security definer
 set search_path = pg_catalog, public
-as $
+as $$
 #variable_conflict use_column
 declare
   v_existing_id uuid;
@@ -2133,7 +2133,7 @@ begin
            v_existing_capability_snapshot_hash,
            true;
 end;
-$;
+$$;
 
 -- One atomic server-owned admission: Record lock -> validated Offer/Capability ->
 -- existing Purchase Intent v3 command -> immutable Origin -> exact upgrade links.
