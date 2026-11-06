@@ -1,13 +1,20 @@
-# 세연 AI 보안 트랙 — 구현 현황·목적·엔드포인트·종료 조건 (2026-10-30)
+# 세연 AI 보안 트랙 — 구현 현황·목적·엔드포인트·종료 조건
 
 Watchtower-Track: security
 
-- **상태:** **HOLD_FORWARD_STOPPED / 트랙 미종료**. 소스 구현·PR CI 통과는 실제 운영 DB 적용, 실서비스 공개, G0~G6 완료와 다르다.
-- **대상:** 명하 세연 AI의 개인기록 동의·AI 입력·생성·커밋·첫 공개·과거 대화/관계 재사용·취소·비용 통제.
-- **이번 병합 단위:** [PR #2768](https://github.com/gycha0109-beep/MyeongHa/pull/2768), 검증된 보고서 작성 전 HEAD `fd5465dc13170c684f27972705d79d40c7313c9d`. [기본 CI #41017140338](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41017140338) SUCCESS, Governance/Web SUCCESS. 보고서 커밋 이후 최종 HEAD의 CI/Integration 증거는 **별도로 확정**한다.
-- **종료 판정 정본:** [G0~G6 완료·증거 계약](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [G0 동의 취소·파생 출처 후보](SEYEON_G0_REVOKE_REGRANT_REVEAL_POLICY_CANDIDATE_V1.md), [운영 G3 읽기 전용 검증 범위](SEYEON_G3_PRODUCTION_READONLY_PREFLIGHT_20261029.md), [상위 원장 #1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866). 과거 문서에서 참조하는 `docs/operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md`는 이번 main tree 조회에서 찾지 못했으므로, 이 문서에서 로드맵 원문을 새로 추정하지 않는다.
+> 최초 작성: 2026-10-30 · 실행 기준 갱신: 2026-11-07
+
+- **상태:** `HOLD_FORWARD_STOPPED` / S0 제품 미완료. 소스 구현·PR CI 통과는 운영 DB 적용, 실제 HTTP 송출, 서비스 공개 또는 G0~G6 완료와 다르다.
+- **현재 출시 범위:** 2026-10-25에 확정된 S0 — 현재 Member/Turn의 원본 `conversation_recall/v1` Memory 1건 + 현재 User 메시지 1건 + 최초 비스트리밍 답변 1회. 일반 고객 크레딧·비용 정산과 receipt/철회 경계까지 포함한다.
+- **S0 제외:** 새 Memory UI, History/Replay, Reader, Relationship/과거 대화의 모델 재사용, 다중 Memory/Life Fact, Streaming. 이 경로는 활성화하지 않고 계속 HOLD한다.
+- **최신 실행 순서:** [세연 AI 보안 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md). 기존 구현을 재사용하고 실제로 끊긴 연결만 마무리한다.
+- **완료 증거 정본:** [G0~G6 완료·증거 계약](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md), [상위 원장 #1866](https://github.com/gycha0109-beep/MyeongHa/issues/1866). G0~G6는 엄격한 합격 기준이며, `0/7`은 개발량/전체 진척률이 아니다.
+- **기준 main:** `1609aa879aa63120072b4d21b35f4c469dc650ed`. W121은 [PR #3089](https://github.com/gycha0109-beep/MyeongHa/pull/3089)로 병합되었고, PostgreSQL 15/17 권한 검증 호환성 수정과 전체 Integration 증거를 보유한다.
+- **주의:** 이 문서·로드맵 병합은 운영 DB/ACL/Secret 변경, 유료 Provider 호출, 공개 Route 활성화 또는 배포 승인이 아니다.
 
 ## 1. 무엇을 완성하려는가 — 최종 엔드포인트(종료점)
+
+> 이 절과 다음 G0~G6 표는 장기 보안 아키텍처의 전체 위험·구현 인벤토리다. **현재 S0 출시 범위는 이 전체 인벤토리와 동일하지 않으며**, 원본 Memory 1건·현재 User 메시지 1건·최초 비스트리밍 답변으로 제한한다. S0에서 제외된 과거 대화/Relationship/Reader/Replay/Streaming은 구현하거나 공개하지 않고 계속 HOLD한다. 실행 기준은 [로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md)다.
 
 기존에 사용자와 세연 사이에서 허용한 기억이 **현재도 동일한 원본 Grant로 허용되는 경우에만** 모델 입력과 공개에 쓰이도록 한다. 생성된 답변·과거 User 텍스트·관계 이벤트·Reader 자료가 다시 컨텍스트로 들어올 때도 원본까지 역추적하고, 출처 미상·철회·재승인·Record 수정·DB 오류는 **부분 필터링 없이 HOLD**한다.
 
@@ -65,27 +72,29 @@ Watchtower-Track: security
 
 **#2768 정확한 변경 목록:** `scripts/operations/seyeon-security-s0/13-g0-current-original-lineage-context.sql`, `scripts/operations/seyeon-security-s0/plan.mjs`, `apps/api/src/seyeon-production-context-read-v1.ts`, `apps/api/src/seyeon-production-context-v1.ts`, `apps/api/src/postgres-seyeon-production-context-read-v1.ts` 및 기존 정합성 테스트 두 파일. 격리 설치 묶음에 `13`을 넣은 것은 테스트 실행에 필요한 DB 함수 설치이며 **운영 SQL 자동 설치가 아니다**.
 
-## 5. 아직 미완성인 **벽의 핵심** — 다음 실제 구현 순서
+## 5. S0 범위의 남은 작업 — 기존 구현을 완성하는 순서
 
-1. **G0-D3 파생 출처 전체:** 현재 1 Memory 원본에서 만든 Assistant 메시지 이외에 **과거 User 메시지·Relationship Event·Reader Knowledge**의 DB 기록/원본·Grant 관계를 정의하고 같은 Owner 권한 조회로 연결한다. 과거 출처가 불명확하면 현재처럼 HOLD한다.
-2. **G0-D1/G1 최종 모델 사용 집합:** 혼합 Memory/Life Fact·다중 기록·상한/재정렬/Preflight 파생 컨텍스트를 포함해 Provider 이전 정확한 Attempt Pin을 완성한다. 미승인 타입/Projector를 임의 허용하지 않는다.
-3. **G2/G3 원자적 사용·공개:** 전체 출처에 대해 실제 Commit과 최초 HTTP/Replay/History의 현재 Grant 검증을 연결하고, 철회·재승인·원문 변경 시 부분 성공이나 과거 본문 재노출이 없도록 한다.
-4. **G4 일반 유료/크레딧 종단:** 기존 `creditBilling.productionMounted:false`를 끝내려면 원자 예약/수신 ACK/정산을 실제 서비스에 연결해야 한다. 임의 ON 금지.
-5. **G5/G6 종료:** 승인된 단일 Scope의 정확한 main/deploy HEAD, 실 DB 독립 세션·실 HTTP·forward stop/복구·비용/유출 0, 최종 활성화 결정을 문서화한다. 필요 증거가 없는 항목은 HOLD다.
+1. **G0 범위 계약 마감:** 현재 Member + 원본 `conversation_recall/v1` Memory 1건 + 현재 User 메시지 1건 + 최초 비스트리밍 답변만 허용한다. 과거 대화/Relationship/Reader/Replay/Streaming은 S0에서 제외하고 계속 HOLD한다. 철회·재승인·Record 변경·전송 순서의 남은 기술 계약만 마감한다.
+2. **G1 양수 Pin 연결 확인:** 기존 0건 Pin, 단일 Memory+현재 User 결합 Pin SQL/서버 adapter를 재사용한다. 모델 호출 전에 정확한 source set이 불변 저장되는지 실제 S0 실행 경로에서 확인하고, 누락/오류 시 Provider 0회를 보장한다. 새 출처 유형을 추가하지 않는다.
+3. **G4 Governor·고객 크레딧:** W115~W121 코드를 재작성하지 않는다. W121의 전용 실행 역할 검사를 운영 자격증명/TLS/DB에서 확인하고, 일반 고객의 예약→최초 응답 receipt/ACK→정산을 Runtime에 연결한다. 현재 `creditBilling.productionMounted=false`를 증거 없이 ON으로 바꾸지 않는다.
+4. **G2 원자 Commit:** 기존 `cmd_commit_seyeon_chat_turn_runtime_v2`와 S0 Commit 경로를 사용한다. G1 Pin과 현재 원본 Grant/Record를 같은 DB 트랜잭션에서 잠그고 검증하며, 별도 SELECT-before-COMMIT 경로를 허용하지 않는다.
+5. **G3 최초 HTTP 공개:** 실제 Cloudflare Worker transport에서 최초 비스트리밍 답변·receipt/ACK·철회 경합을 끝까지 증명한다. Node 응답 완료나 Fetch Response 생성만으로 실제 브라우저 송출을 추정하지 않는다. History/Replay/Worker 후속 공개는 계속 HOLD한다.
+6. **G5 통합 검증:** 기존 PostgreSQL 15/17, S0 E2E, Worker/HTTP, db-authority-core, 전체 Integration을 재사용한다. 정확한 S0 경로에서 빠진 DB 독립 2세션 경쟁·HTTP·비용 증거만 보충한다. 새 CI Workflow를 만들지 않는다.
+7. **G6 제한 운영:** 사용자 승인된 범위에서 제한 smoke, 안전 로그/알림, forward stop, receipt/철회 보존, 복구/롤백, 배포 SHA를 확인하고 증거를 묶는다.
 
-**우선순위 규칙:** 현재 범위를 완성하기 전 새로운 방어 레이어·우회 체크·광범위 테스트 추가를 작업 목표로 만들지 않는다. 기존 실제 실패의 필수 수정은 예외다. 이전에 만든 방어/검증은 그대로 유지하되 **핵심 본체 G0 → G1/G2 → G3 → G4 → G5/G6** 순서로 끝낸다.
+**우선순위 규칙:** 기존 코드와 통과한 검증을 다시 만들거나 반복하지 않는다. 실제 S0 실행을 막는 결손만 수정한다. S0 밖의 기능·출처 유형·광역 보안 재감사를 새 선행 조건으로 끌어오지 않는다. 제외 경로는 구현 대신 차단 상태를 유지한다.
+## 6. S0 증거와 현재 블로커
 
-## 6. 증거와 현재 블로커
+- **기준 main:** `1609aa879aa63120072b4d21b35f4c469dc650ed`. W121의 권한 검사·PostgreSQL 15/17 호환성 수정은 [PR #3089](https://github.com/gycha0109-beep/MyeongHa/pull/3089)로 병합됐고 전체 Integration 성공 증거가 있다.
+- **실제 S0 운영 장애 기록:** 2026-10-26 첫 hosted 시도는 `governed_preflight`에서 HTTP 503으로 종료되어 Provider 호출·receipt 발급이 0건이었다. 후속 시도는 `response_headers` 단계에서 HTTP status가 확인되지 않아 DB Governor 진입 전에 중단됐다. 2026-11-01 첫 답변 경계 복구 문서도 실제 모델 실행→HTTP 응답→receipt ACK→비용 기록의 성공 증거는 아직 없다고 명시한다.
+- **G0/G1:** S0 제품 범위는 고정했지만, 철회·재승인·실제 Worker 전송 순서의 기술 계약과 대상 DB에서 positive Memory 1건의 모델 전 Pin 성공 증거가 남아 있다. 전체 SRC-25 타입 레지스트리나 모든 파생 출처 승인은 S0 선행 조건으로 확장하지 않는다.
+- **G2/G3:** 기존 원자 Commit·최초 공개·receipt/철회 코드와 SQL은 재사용한다. 실제 대상 Cloudflare Worker의 최초 비스트리밍 응답, receipt/ACK, Commit·Reveal 취소 경쟁을 끝까지 통과한 증거가 남아 있다. History/Replay/후속 Worker 공개는 S0에서 계속 HOLD한다.
+- **G4:** W115~W121은 구현·병합됐지만 `creditBilling.productionMounted=false`다. 운영 전용 LOGIN/Secret/TLS 연결과 일반 고객의 예약→receipt→정산 Runtime 장착이 남아 있다. Owner Admin 면제 smoke는 일반 고객 크레딧 완료 증거가 아니다.
+- **G5/G6:** 기존 격리 PostgreSQL/CI 증거는 재사용한다. S0 전체 요청의 실제 DB 독립 세션·HTTP 경합 검증, 제한 운영 smoke·안전 관측·forward stop/복구 및 최종 승인 증거가 남아 있다.
+- **장기 후속 범위:** 과거 대화/Relationship/Reader/Replay/다중 Memory/Life Fact/Streaming의 전체 출처 계보는 S0 출시를 막는 현재 작업으로 취급하지 않는다. 해당 경로는 비활성/HOLD로 유지한다.
+- **운영 경계:** 이 로드맵 PR은 문서만 변경한다. Production DB/ACL/Role/Secret, Provider, 공개 Route, credit billing, 배포/트래픽 변경은 수행하지 않았다. 최종 운영 활성화는 별도 사용자 승인과 G6 증거가 필요하다.
 
-- **병합 대상:** [#2768](https://github.com/gycha0109-beep/MyeongHa/pull/2768). 현황 보고서 작성 시점의 이전 HEAD CI [#41017140338](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41017140338) PASS. 최종 문서 커밋 HEAD의 통합/병합 상태는 CI 결과로 갱신해야 한다.
-- **최근 인접 구현:** [#2764](https://github.com/gycha0109-beep/MyeongHa/pull/2764) 관계 Worker HOLD, [#2765](https://github.com/gycha0109-beep/MyeongHa/pull/2765) 관계 Outbox Node 어댑터 HOLD, [#2767](https://github.com/gycha0109-beep/MyeongHa/pull/2767) DB 직접 RPC ACL 회수 후보. 각각의 **소스 병합**을 운영 DB 차단 완료로 간주하지 않는다.
-- **운영 근거 한계:** 2026-10-29 문서의 G3 운영 HTTP 검증은 읽기 전용 preflight/수동 workflow 정의이며, 실제 인증 HTTP 성공/Worker version/현재 Catalog 전부가 확인된 G3 PASS는 아니다. 이번 작업에서 운영 DB/Cloudflare/Supabase 자격증명·정책·트래픽 변경을 실행하지 않았다.
-- **블로커:** SRC-25 승인된 전체 타입/원본 증명, G0-D1~D5의 미완료 derived/transport 계약, G4 일반 크레딧 정산 종단, 실환경 운영 증거와 G5/G6.
-- **사용자 결정:** 적용 범위와 최종 운영 활성화는 사용자에게 있다. 이미 정해진 거부 우선 설계 안의 소스 구현·CI·PR 병합은 추가 결정을 기다리지 않는다.
-
-> **최종 보고 결론:** `#2768 SOURCE_IMPLEMENTED / 기존 HEAD CI_GREEN / OPERATIONS_HOLD / SECURITY_TRACK_OPEN`. 이 파일 자체가 운영 권한을 부여하거나 G0~G6 PASS 증거를 생성하지 않는다.
-
-
+> **현재 결론:** `W121_MERGED / S0_IMPLEMENTATION_PARTIAL / PRODUCTION_HOLD / SECURITY_TRACK_OPEN`. G0~G6의 완료 수를 개발량이나 전체 진척률로 표시하지 않는다.
 ## 7. Worklog — 작업 단위 누적 기록
 
 > 기록 규칙: 이후 Security 트랙 개발 PR마다 **작업일·목적·변경한 실제 경로·정확한 PR/HEAD·CI/Integration·남은 범위·운영 상태**를 이 섹션에 누적한다. 문서 작성 시점의 검사는 확정된 결과만 적으며, 이후 검사 결과를 성공으로 추정하지 않는다. 과거 항목은 후속 작업에서 덮어쓰지 않는다.
@@ -538,3 +547,13 @@ Watchtower-Track: security
 - **사전검사 결과 직렬화:** 런타임 권한 결과 71개 필드를 71쌍의 `jsonb_build_object` 인자로 넘기던 테스트가 PostgreSQL의 함수 인자 상한 100개를 초과했다. 전체 레코드는 `to_jsonb(preflight)`로 직렬화하고, 예상 필드 목록을 별도 JSON 값으로 함께 반환해 71개 필드 누락/변형을 확인하도록 변경했다.
 - **현재 검증 증거:** 코드 HEAD `5b3eb53b0f8a6d56f662fad6b934b9f9e6449dcc`의 [CI run 42263568899](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42263568899)에서 `Work Track · security`와 PostgreSQL 15 `db-authority-core`가 SUCCESS. `W121_GOVERNED_LOGIN_PREFLIGHT_SQL_VERSIONED_PASS`, 독립 LOGIN 경계 및 기존 D4A 권한·비용 경합 테스트까지 확인했다. **동일 run의 PostgreSQL 17 검증은 기록 시점에 진행 중이므로 전체 CI GREEN이나 W121 최종 PASS로 간주하지 않는다.** 이 Worklog 변경 자체로 새 exact-head CI도 다시 실행된다.
 - **운영 경계:** Production DB ACL/ROLE/Secret 변경, 운영 연결·배포, 유료 Provider 호출, 과금·스케줄러 활성화 및 PR 병합은 수행하지 않았다. 기존 `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false`, G5 `productionMounted=false`, `scheduled=false`를 유지한다. G0–G6 전체 완료를 선언하지 않는다.
+
+### 2026-11-07 / W122 — S0 제품 완성 중심 실행 로드맵 v3
+
+- **목적:** 새 보안 기능을 계속 추가하는 방식에서 벗어나, 2026-10-25에 정한 S0(원본 `conversation_recall/v1` Memory 1건 + 현재 User 메시지 1건 + 최초 비스트리밍 답변 1회)을 실제 서비스로 완성하도록 실행 순서를 재정렬한다.
+- **변경 문서:** `docs/security/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md` 신설. `SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md`에 S0 Scope Overlay를 추가하고, 본 구현 현황 문서의 실행 순서·오래된 V2 참조를 갱신했다.
+- **정책:** G0~G6의 증거·보안 합격 기준은 유지한다. S0에서는 History/Replay/Reader/Relationship·과거 대화 재사용/다중 Memory/Life Fact/Streaming을 구현하지 않고 계속 HOLD한다. 제외 경로가 실제 모델 Context에 섞이면 전체 요청을 HOLD한다.
+- **실행 순서:** G0 S0 계약 → G1 단일 원본 Pin → G4 Governor/일반 고객 크레딧 → G2 원자 Commit → G3 최초 HTTP/receipt/철회 → G5 정확한 S0 통합 검증 → G6 제한 운영 smoke/복구.
+- **기존 구현 재사용:** W115~W121 및 PR #3089의 전용 DB 실행 역할·PostgreSQL 15/17 권한 검증은 재작성하지 않는다. S0의 Pin/Commit/Reveal 및 기존 격리 테스트도 통과한 부분은 재사용하고, 실제로 끊긴 운영 연결만 마무리한다.
+- **PR:** [#3094](https://github.com/gycha0109-beep/MyeongHa/pull/3094), 기준 main `1609aa879aa63120072b4d21b35f4c469dc650ed`. 이 기록 직전 문서 HEAD `02b5e20a65739795b9cb3c59cae0631624bcec0e`; PR의 최종 exact-head CI/Integration은 해당 실행 결과로 판정한다.
+- **운영 경계:** 문서 변경만 수행. Production DB/ACL/Role/Secret, Provider, 공개 Route, credit billing, deployment/traffic 변경 0. `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false` 및 G5/G6 HOLD 유지.
