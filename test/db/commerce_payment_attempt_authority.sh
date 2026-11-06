@@ -43,7 +43,8 @@ on conflict do nothing;
 
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
   ('b1010000-0000-0000-0000-000000000001','member','b1000000-0000-0000-0000-000000000001','active',null,'2026-09-13T00:00:00Z','2026-09-13T00:00:00Z'),
-  ('b1010000-0000-0000-0000-000000000002','member','b1000000-0000-0000-0000-000000000002','active',null,'2026-09-13T00:00:00Z','2026-09-13T00:00:00Z');
+  ('b1010000-0000-0000-0000-000000000002','member','b1000000-0000-0000-0000-000000000002','active',null,'2026-09-13T00:00:00Z','2026-09-13T00:00:00Z'),
+  ('b1010000-0000-0000-0000-000000000003','guest',null,'active',null,'2026-09-13T00:00:00Z','2026-09-13T00:00:00Z');
 
 insert into public.products(id,product_key,product_type,enabled,created_at,retired_at)
 values ('b1020000-0000-0000-0000-000000000001','payment-attempt-authority-fixture','reading',true,'2026-09-13T00:00:00Z',null);
@@ -170,5 +171,26 @@ race_id_two=${race_two%%|*}
 flags=$(printf '%s\n%s\n' "$race_one" "$race_two" | awk -F'|' '{print $8}' | sort | tr '\n' ' ')
 [[ "$flags" == 'f t ' ]] || { echo "$race_one"; echo "$race_two"; fail "concurrent retry did not yield one create and one replay"; }
 pass "concurrent identical retry converges on one canonical attempt"
+
+# Historical Guest-owned Purchase Intent fixture: this represents a legacy row,
+# not a currently permitted Guest purchase. Disable only the new insert guard while
+# seeding this old row, then immediately restore it.
+"${psql_base[@]}" <<'SQL'
+alter table public.purchase_intents disable trigger tr_purchase_intent_member_required_v1;
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,
+  offer_snapshot_jsonb,offer_snapshot_hash,status,expected_amount_minor,expected_currency,
+  charge_terms_version,created_at,updated_at
+) values (
+  'b1050000-0000-0000-0000-000000000003',
+  'b1010000-0000-0000-0000-000000000003',
+  'b1030000-0000-0000-0000-000000000001',
+  null,'legacy-guest-intent','sha256:legacy-guest-intent',
+  '{"productOfferId":"b1030000-0000-0000-0000-000000000001","productId":"b1020000-0000-0000-0000-000000000001","platform":"web","provider":"testpay","externalProductId":"attempt-web"}'::jsonb,
+  'sha256:legacy-guest-offer','created',12345,'KRW','attempt-charge-v1',now(),now()
+);
+alter table public.purchase_intents enable trigger tr_purchase_intent_member_required_v1;
+SQL
+expect_fail "Guest cannot start a new Payment Attempt from historical Purchase Intent" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='b1010000-0000-0000-0000-000000000003'; select * from public.cmd_create_payment_attempt_v1('b1010000-0000-0000-0000-000000000003','b1060000-0000-0000-0000-000000000030','b1050000-0000-0000-0000-000000000003','sandbox','guest-attempt-denied','merchant-guest-attempt-denied'); commit;"
 
 echo "commerce payment attempt authority passed"
