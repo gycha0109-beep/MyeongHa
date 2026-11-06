@@ -2139,6 +2139,38 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     } catch(error) {
       await receive.query('ROLLBACK'); throw error;
     } finally { receive.release(); }
+    // W104 G4/G5: this historical S0 Turn is not admitted to ANY paid
+    // Provider stage. Compare the real cost ledger, actual AI execution log
+    // and daily global budget counters before/after every held transition.
+    const readHistoricalCostFence=async()=>{
+      const {rows:[usage]}=await pool.query<{
+        model_calls:number;governed_calls:number;execution_logs:number;
+        daily_budgets:unknown
+      }>(`select
+        (select count(*)::int from public.seyeon_ai_call_cost_events c
+          where c.subject_id=$1::uuid and c.turn_id=$2::uuid
+            and c.attempt_id=$3::uuid) as model_calls,
+        (select count(*)::int from public.seyeon_ai_call_cost_events c
+          where c.subject_id=$1::uuid and c.turn_id=$2::uuid
+            and c.attempt_id=$3::uuid
+            and c.governor_bucket_utc_date is not null) as governed_calls,
+        (select count(*)::int from public.ai_execution_logs l
+          where l.subject_id=$1::uuid and l.turn_id=$2::uuid
+            and l.turn_attempt_id=$3::uuid) as execution_logs,
+        (select coalesce(jsonb_agg(jsonb_build_object(
+           'date',b.bucket_utc_date,
+           'occupiedMicroUsd',b.occupied_micro_usd,
+           'globalLimitMicroUsd',b.global_limit_micro_usd,
+           'subjectLimitMicroUsd',b.subject_limit_micro_usd
+         ) order by b.bucket_utc_date),'[]'::jsonb)
+         from public.seyeon_ai_governor_daily_budgets_v1 b)
+           as daily_budgets`,[f.subject,currentTurn,currentAttempt]);
+      return usage;
+    };
+    const originalCostFence=await readHistoricalCostFence();
+    expect(originalCostFence).toMatchObject({
+      model_calls:0,governed_calls:0,execution_logs:0,
+    });
     const {rows:[original]}=await pool.query(`select
       'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
       as digest from public.memory_items where id=$1`,[f.memory]);
@@ -2211,6 +2243,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(saved.proof.historicalCandidateProof.historicalAssistantOriginalSourcesDigest)
       .toBe(digestCheck.digest);
     expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
+    expect(await readHistoricalCostFence()).toEqual(originalCostFence);
     const {rows:[acl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',
       'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,jsonb)',
@@ -3229,6 +3262,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       expect(noCommit).toEqual({
         attempt_state:'running',turn_state:'context_ready',assistant_count:0,
       });
+      // A rejected G2 Commit cannot leave an actual model call, reserved
+      // budget, AI execution event or change the global daily cost counters.
+      expect(await readHistoricalCostFence()).toEqual(originalCostFence);
       const {rows:[outboxAfterHold]}=await pool.query(`select count(*)::int as n
         from public.outbox_events where id in ($1::uuid,$2::uuid)`,
         [uuid(22,1218),uuid(23,1218)]);
@@ -3374,6 +3410,9 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         attempt_state:'running',turn_state:'context_ready',
         pinned_original_grant:f.grant,committed_assistant_count:0,
       });
+      // Even two fresh Grants may not turn this historical G1/G2/G3
+      // candidate into an invoiced model request or budget occupation.
+      expect(await readHistoricalCostFence()).toEqual(originalCostFence);
     }finally{
       await pool.query(`revoke execute on function
         seyeon_private.qry_recheck_historical_candidate_originals_s0_v1(uuid,uuid,uuid,uuid),
