@@ -84,7 +84,7 @@ export interface SajuPurchaseOriginInputV1 {
   readonly sajuRecordId: string;
   readonly birthRevisionId: string;
   readonly purchaseKind: 'original';
-  readonly sourceReceiptIds: readonly [];
+  readonly sourceReceiptIds: readonly string[];
 }
 
 export interface PurchaseIntentCreateAuthorityInputV3 {
