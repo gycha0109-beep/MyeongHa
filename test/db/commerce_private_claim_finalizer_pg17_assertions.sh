@@ -147,8 +147,7 @@ SQL
     ||'|'||
     (select count(*) from public.commerce_saju_purchase_origins_v1 where subject_id='$subject_id'::uuid)::text
     ||'|'||
-    (select count(*) from public.purchase_intents where id='fb750000-0000-0000-0000-000000000005'::uuid)::text
-;")"
+    (select count(*) from public.purchase_intents where id='fb750000-0000-0000-0000-000000000005'::uuid)::text;")"
   [[ "$saju_state" == '0|0|1' ]] || fail "account deletion did not erase only personal Saju mapping and retain Intent: $saju_state"
 
   # Restored/synthetic residue after the already-deleted replay boundary must
