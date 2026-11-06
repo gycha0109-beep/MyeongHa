@@ -637,6 +637,12 @@
       "prMode": "manual-only",
       "mainMode": "manual-only",
       "workTrackAttribution": "admin-console"
+    },
+    "admin-console-scoped-readback.yml": {
+      "responsibility": "On-demand isolated Admin least-privilege read-only production data query verification without worker deployment",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "admin-console"
     }
   }
 }

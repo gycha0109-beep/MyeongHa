@@ -57,6 +57,7 @@ jobs:
           node apps/admin/access-policy-preflight.mjs
           node apps/admin/hyperdrive-origin-preflight.mjs
           npm run verify:origins -w @myeongha/admin
+          node apps/admin/production-read-query-readback.mjs
           node apps/admin/audit-write-preflight.mjs
       - name: Prepare isolated Admin Worker deployment
         shell: bash
