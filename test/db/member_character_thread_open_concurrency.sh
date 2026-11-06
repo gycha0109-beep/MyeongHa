@@ -465,7 +465,7 @@ SQL
     select public.cmd_mark_four_character_chat_context_ready_runtime_v1(
       '$member_id','$turn_id','$attempt_id'
     );")
-  [[ "$context_ready" == 't' ]] || fail "four-Character context-ready transition failed: $context_ready"
+  [[ "$context_ready" == 'f' ]] || fail "four-Character context-ready transition was unexpectedly replayed: $context_ready"
 
   generated=$(runtime_query "$member_id" "
     select public.cmd_persist_four_character_chat_generated_runtime_v1(
