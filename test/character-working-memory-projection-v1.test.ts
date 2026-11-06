@@ -12,9 +12,9 @@ const factProjector: CharacterWorkingMemoryRecordProjectorV1 = Object.freeze({
   recordType: 'occupation',
   schemaVersion: 'life-fact-v1',
   projectorVersion: 'occupation-projector-v1',
-  project: ({ payload }) => ({
+  project: ({ payload }: Readonly<{ recordId: string; payload: unknown }>) => ({
     summary: '사용자의 직업은 디자이너입니다.',
-    claimKind: 'fact',
+    claimKind: 'fact' as const,
     relevance: 0.8,
     salience: 0.7,
   }),
@@ -25,14 +25,14 @@ const memoryProjector: CharacterWorkingMemoryRecordProjectorV1 = Object.freeze({
   recordType: 'conversation_recall',
   schemaVersion: 'v1',
   projectorVersion: 'conversation-recall-projector-v1',
-  project: ({ payload }) => {
+  project: ({ payload }: Readonly<{ recordId: string; payload: unknown }>) => {
     const row = payload as { summary?: unknown };
     if (typeof row.summary !== 'string') {
       throw new TypeError('invalid conversation recall payload');
     }
     return {
       summary: row.summary,
-      claimKind: 'character_interpretation',
+      claimKind: 'character_interpretation' as const,
       relevance: 0.5,
       salience: 0.6,
     };

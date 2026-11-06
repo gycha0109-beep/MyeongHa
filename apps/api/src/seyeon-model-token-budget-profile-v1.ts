@@ -4,6 +4,7 @@ import {
   validateModelTokenBudgetProfileV1,
   type ModelTokenBudgetProfileV1,
   type ModelTokenCountAdapterV1,
+  type ModelTokenCountExactRequestV1,
 } from '../../../packages/domain/src/model-token-budget-profile-v1.js';
 import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
 import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
@@ -84,7 +85,7 @@ function adaptSeyeonOpenAiInputTokenCountAdmissionV1(
     supportedRequestFormat: SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1,
     reservedHeadroomTokens,
     inputBoundSemantics: MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
-    countExactRequest: (input) => admission.certifiedInputTokenUpperBound(
+    countExactRequest: (input: ModelTokenCountExactRequestV1<SeyeonStructuredProviderRequestV2>) => admission.certifiedInputTokenUpperBound(
       input.request,
       input.serializedRequestBodyBytes,
       input.serializedRequestBody,

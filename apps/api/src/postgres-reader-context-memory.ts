@@ -244,10 +244,11 @@ implements ReaderContextMemoryReadAuthorityPortV1 {
         [input.subjectId, input.characterId],
       );
       return Object.freeze(result.rows.map((row) => {
-        const grantReason = requireString('Memory grant reason', row.grantReason);
-        if (grantReason !== 'user_choice' && grantReason !== 'merge_import') {
+        const rawGrantReason = requireString('Memory grant reason', row.grantReason);
+        if (rawGrantReason !== 'user_choice' && rawGrantReason !== 'merge_import') {
           throw new Error('Reader Memory PostgreSQL grant reason is unsupported.');
         }
+        const grantReason: 'user_choice' | 'merge_import' = rawGrantReason;
         return Object.freeze({
           memoryItemId: requireString('Memory Item id', row.memoryItemId),
           memoryType: requireString('Memory type', row.memoryType),

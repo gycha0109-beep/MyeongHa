@@ -24,7 +24,7 @@ describe('prepareCharacterWorkingMemoryContextV1', () => {
         createdAt: '2026-11-01T10:00:00.000Z',
         grantId: 'grant-a',
         granteeCharacterId: 'seyeon',
-        grantReason: 'user_choice',
+        grantReason: 'user_choice' as const,
         grantedAt: '2026-11-01T10:01:00.000Z',
       }]),
     };
