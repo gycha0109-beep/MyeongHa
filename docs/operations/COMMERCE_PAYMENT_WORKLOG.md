@@ -627,3 +627,11 @@
 - **새 검증:** #3032에서 `commerce-saju-record-ledger-candidate-pg17` 사례를 전체 이관된 별도 PostgreSQL 17 DB 스위트에 등록했습니다. 기존 검증된 합성 B2 원본 Receipt/출생 revision을 재사용해, 구매 확정 전 기록 revision 변경 허용·검증된 구매 후 변경 금지, 실제 원본 Receipt 업그레이드 연결, Provider 개별 취소액과 환불 원장 일치, 공개·API 직접 권한 부재를 검사합니다.
 - **실행 안전:** 후보 DDL·가짜 결제/환불/업그레이드 데이터는 한 SQL `BEGIN…ROLLBACK` 안에만 존재합니다. 스크립트가 GitHub Actions의 격리 PostgreSQL 17 DB 이외 실행을 거부합니다. **새 CI 완료 전 검증 통과를 선언하지 않습니다.**
 - **남은 일:** 원본 Reader fixture와 신규 사주 Product 의미를 운영에서 혼동하지 않으며, 사주 공식 상품·분야권한·출생정보 결제 직전 확인·청구 원자성·법정 환불/부분 제공·개인정보 삭제 그래프에 연결하기 전에는 이 후보를 Production migration에 설치하지 않습니다.
+
+### 2026-11-06 — 사주 구매 원장 연결 시 출생정보 버전 변경 경계 보강 (P2/P3/P4)
+
+- **선행 검증:** #3032 고정 HEAD `141ac4d` 격리 PostgreSQL 17 및 전체 통합 CI 성공, main 병합 `8585308` 확인. 이전 synthetic B2/B3 원장 검증은 반복 구현하지 않습니다.
+- **발견:** 비배포 `commerce_saju_purchase_origins_v1`의 기존 FK는 원장과 출생 revision이 동일 Subject에 속한다는 사실만 강제했습니다. 실제 사주 기록이 가리키는 **현재 revision과 동일한지** INSERT 시 검사하지 않아, 이전 revision을 가진 구매 연결이 별도 코드 경로에서 삽입될 수 있었습니다. 연결 뒤 출생정보가 바뀌고 나중에 영수증이 verified 상태가 되는 경계도 원장에 남아 있었습니다.
+- **수정:** 구매 Intent→Record 원장 연결 시 정확한 Subject·Record 행을 `FOR UPDATE`로 잠근 뒤 현재 Birth revision과 삽입값을 대조합니다. 사주에 연결된 영수증이 나중에 verified/revoked 상태로 삽입·전환될 때에도 같은 Record 잠금·revision 검사를 수행합니다. 일반 Reader 등 연결되지 않은 Commerce 영수증의 실행 권한·의미는 변경하지 않습니다.
+- **격리 검증:** 기존 `commerce-saju-record-ledger-candidate-pg17`에 동일 소유자의 **다른 유효 Birth revision을 현재 원장에 위조 결속하는 실패 사례**, 잘못된 연결이 남지 않는 검사, 후기 영수증 검증 보호 트리거 존재 검사를 추가했습니다. 기존 구매·업그레이드·취소/환불 원장 시나리오는 그대로 유지합니다. **새 커밋의 실제 PostgreSQL 17 CI 및 전체 통합 결과는 확인 전까지 PASS 미선언**입니다.
+- **한계:** 이 수정은 일회용 데이터베이스에서 검증하는 **비배포 후보**입니다. 결제 직전 원자적 전체 Quote/Grant 재확인, Reader 공식 권한 소유 분야 확인, 개인정보 삭제 그래프·복원, Provider 결제 확정과 실제 생산자 연동은 여전히 미완료입니다. 운영 DB 적용·공개 API·Offer/Charge Terms·LIVE 판매·실제 PG 환불·운영 권한 회수 모두 변경하지 않습니다.
