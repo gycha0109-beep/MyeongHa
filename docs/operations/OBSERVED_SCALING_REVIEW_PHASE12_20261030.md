@@ -45,6 +45,19 @@ The local-only input array was preserved outside the repository as `myeongha-pha
 This is a small in-process Worker health-route diagnostic, not a workerd runtime, deployed Cloudflare Worker, full product chain, DB pool, Saju CPU/memory, or Production measurement. The result therefore yields **no scaling trigger** and does not change `automaticScalingEnabled=false`, `productionCapacityProven=false`, or `numericalProductionScalingThresholdApproved=false`.
 
 
+### 2026-11-07 corrected local workerd product-chain overlap — 15-minute observation
+
+The corrected main-only [Phase 11 run #42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347) completed SUCCESS after repairing the experiment argument in both proof validators. It ran Wrangler 4.152.0 / workerd 1.20261019.1 against four synthetic members, actual disposable GoTrue JWT verification, temporary PostgreSQL 18 RLS, and the pinned Saju production calculation engine (source `9807ce89c08afc61b587560d515a475efd819032`).
+
+- 900 seconds at 4 requests/second, concurrency 4: 3,600 scheduled, **3,600 successful**, zero skipped/unavailable/transport/unexpected, peak 4, p95 174.231ms, p99 184.088ms.
+- Baseline: 12/12 successful, p95 143.776ms. Client pending peak 4 is explicitly not Worker admission saturation.
+- Saju outage simulation: calculation returned 503 while health remained 200; post-recovery requests 4/4 successful. Anonymous access denied and runtime cleanup verified.
+- Sanitized original artifact `myeongha-ops-real-product-chain-phase11-proof.json`: 1,909 bytes, SHA-256 `96c29b2083b2479d6a9293102638e916d45f9d9647748274f695213b7dde9a8f`.
+
+This confirms the isolated local workerd product path only. The artifact explicitly keeps `productionWorkerAdmissionMeasured=false`, `hostedHyperdriveMeasured=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, and `serviceResumptionAllowed=false`. Do not promote these timings to a Production capacity or autoscaling threshold.
+
+
+
 `scripts/derive-observed-scaling-review.mjs` consumes an **array of actual Phase 11 collector JSON reports** from a single controlled non-production loopback diagnostic route. It combines repeated measurements at the same concurrency level conservatively, preserving any observed non-200 or transport failures. It does **not** invent a numeric service SLO, scaling ceiling, production target or Saju/DB performance claim.
 
 ## Execute
