@@ -40,7 +40,7 @@ function fakeDb(rows: readonly Readonly<Record<string, unknown>>[] = [row]) {
     values?: readonly unknown[],
   ) => {
     sqlCalls.push(values === undefined ? { text } : { text, values });
-    return { rows: rows as T[] };
+    return { rows: rows as unknown as T[] };
   };
   return { client: { query } satisfies PostgresTransactionQueryV1, sqlCalls };
 }
@@ -116,7 +116,10 @@ describe('four published Character DB artifact authority', () => {
     const db = fakeDb();
     const runner = {
       resolveSubject: vi.fn(async () => ({ subjectId, subjectKind: 'member' as const })),
-      run: vi.fn(async (_subjectId: string, execute) => execute(db.client, {
+      run: vi.fn(async (_subjectId: string, execute: (
+        client: PostgresTransactionQueryV1,
+        subject: { subjectId: string; subjectKind: 'member' },
+      ) => unknown) => execute(db.client, {
         subjectId, subjectKind: 'member' as const,
       })),
     } as unknown as SeyeonProductionSubjectTransactionRunnerV1;
