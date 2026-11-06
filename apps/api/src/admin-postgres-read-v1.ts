@@ -122,10 +122,10 @@ async function runQuery(
   let queryArgs: readonly unknown[] = args;
   if (filters.search !== null && filters.search !== undefined && filters.search.length > 0) {
     if (detail || filters.kind === 'overview' || filters.search.length > 100 ||
-        /[\\x00-\\x1f\\x7f]/u.test(filters.search)) {
+        /[\x00-\x1f\x7f]/u.test(filters.search)) {
       throw new Error('Invalid bounded administrator search.');
     }
-    const pagination = /\\s+LIMIT\\s+\\$1::int\\s+OFFSET\\s+\\$(\\d+)::int\\s*$/iu.exec(query);
+    const pagination = /\s+LIMIT\s+\$1::int\s+OFFSET\s+\$(\d+)::int\s*$/iu.exec(query);
     if (pagination === null || pagination.index === undefined || pagination[1] === undefined) {
       throw new AdminReadAuthorityUnavailableV1();
     }
