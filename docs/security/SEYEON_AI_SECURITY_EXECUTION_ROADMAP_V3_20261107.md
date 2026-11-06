@@ -55,7 +55,7 @@ Watchtower-Track: security
 
 ### 기준 커밋과 작업 정리
 
-- 기준 main: `cdf71d9453c96b42489a27857a6159936155065e` (PR #3094 병합, 전체 Integration run `42282815736` GREEN).
+- 기준 main: `0f60f5d74f509f8ede422130efc65839480726ed` (PR #3094 병합, 전체 Integration run `42282815736` GREEN; 이후 최신 main 기준으로 재정렬).
 - W121 권한 검사 및 PostgreSQL 15/17 호환성 수정은 [PR #3089](https://github.com/gycha0109-beep/MyeongHa/pull/3089)로 병합됐다. 해당 PR의 전체 Integration 성공을 기존 근거로 재사용한다.
 - 오래된 [PR #2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)은 오래된 base·155개 파일·충돌 상태의 누적 브랜치다. 이 로드맵의 작업 기준이나 재개 브랜치로 사용하지 않는다. 이미 main에 들어간 변경은 main에서 재사용한다.
 - 기존 작업 기록은 `SEYEON_AI_SECURITY_IMPLEMENTATION_STATUS_AND_ENDPOINTS_20261030.md`의 W01~W123을 보존한다.
