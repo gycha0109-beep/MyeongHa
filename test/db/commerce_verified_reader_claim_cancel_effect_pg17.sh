@@ -44,4 +44,12 @@ node test/db/commerce_claim_noticed_reader_fixture_pg17_generator.mjs |
 # run only in one synthetic ROLLBACK transaction. Nothing is deployed.
 psql -X -v ON_ERROR_STOP=1 \
   -f test/db/commerce_verified_reader_claim_cancel_effect_pg17.sql
+# Exercise the exact private Claim review's cancellation and S7 SQL on real
+# migrated PG17. Separate ROLLBACK: the previous E2E tested the actual writer,
+# while this probe checks current source-only reviewer evidence without
+# manufacturing an S5/S7 delivery or a legal refund determination.
+node test/db/commerce_recorded_reader_claim_review_pg17_generator.mjs |
+  psql -X -v ON_ERROR_STOP=1 -f -
+
 echo 'PASS: verified purchased Reader -> Claim -> cancellation Event -> exact Effect, isolated PG17 ROLLBACK'
+echo 'PASS: exact recorded Claim cancellation review and S7 no-delivery boundary, isolated PG17 ROLLBACK'
