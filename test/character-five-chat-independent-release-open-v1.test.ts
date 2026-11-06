@@ -22,6 +22,26 @@ describe('Four non-Se-yeon Character chat-open independent release admission',()
     expect(source).toContain("v_character_published := found;");
     expect(source).toContain("if v_default_count <> 1 then");
   });
+  it('admits the four independent releases through a narrow owner-only RLS slice, not by removing the default rule',()=>{
+    const start=source.indexOf('create policy conversation_threads_chat_thread_open_independent_insert_v1');
+    const end=source.indexOf('create or replace function public.cmd_open_member_single_character_thread_v1',start);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const policy=source.slice(start,end);
+    expect(policy).toContain('for insert');
+    expect(policy).toContain('to myeongha_chat_thread_open_owner');
+    expect(policy).toContain('subject_id = public.current_myeongha_subject_id()');
+    expect(policy).toContain("cr.status = 'active'");
+    expect(policy).toContain('cr.is_default = false');
+    expect(policy).toContain("crc.character_id in ('baekheon','yeoul','rahyeon','taegyeom')");
+    expect(policy).toContain('cb.retired_at is null');
+    expect(policy).toContain('crc.enabled is true');
+    expect(policy).toContain("crc.availability = 'available'");
+    expect(policy).toContain('cr.id = active_content_release_id');
+    expect(policy).toContain('cr.content_bundle_id = active_content_bundle_id');
+    expect(source).not.toContain('drop policy if exists conversation_threads_chat_thread_open_insert_v1');
+    expect(policy).not.toMatch(/\\bgrant\\s+(?:insert|all)\\b/iu);
+  });
   it('retains member-owned single thread, immutable pinned bundle, and least-privilege executor',()=>{
     expect(source).toContain("perform public.assert_myeongha_subject_context_v1(p_subject_id)");
     expect(source).toContain("where s.id = p_subject_id");
