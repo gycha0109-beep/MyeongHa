@@ -174,7 +174,7 @@ grep -F '1 passed' "$scratch/vitest.log" >/dev/null ||
   fail 'Exactly one real integrated test required.'
 [[ -s "$scratch/real-product.json" ]] || fail 'Actual private evidence not created.'
 if [[ "$experiment" == workerd || "$experiment" == workerd_overlap ]]; then
-  jq -e --arg sha "$source_sha" '
+  jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
     .schema=="myeongha-ops-workerd-local-product-phase11-v1" and .status=="OBSERVED_ISOLATED_WORKERD_PRODUCT"
     and .scope=="wrangler-local-loopback-go-true-pg18-and-pinned-saju" and .wranglerVersion=="4.152.0"
     and (.workerdVersion | test("^[0-9.]+$")) and .sajuSourceSha==$sha and .memberCount==4
