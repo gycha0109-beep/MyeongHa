@@ -141,7 +141,7 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
   it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
     const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
     const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
-    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu, workerd]');
+    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap]');
     expect(workflow).toContain('default: short');
     expect(compose).toContain('profiles: [sustained]');
     expect(compose).toContain('cpus: 0.50');
@@ -178,6 +178,13 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(launcher).not.toContain("'--remote'");
     expect(launcher).toContain("'--ip', '127.0.0.1'");
     expect(launcher).toContain('localConnectionString');
+    expect(runner).toContain('workerd_overlap) MH_OPS_AUTH_JWT_EXP_SECONDS=1800');
+    expect(runner).toContain('workerd_sustained_overlap');
+    expect(runner).toContain('.workerdWindow.clientPendingOnlyNotWorkerAdmission==true');
+    expect(runner).toContain('.workerdWindow.scheduled==3600');
+    expect(runner).toContain('.workerdWindow.sajuResourceCgroupConstrained==false');
+    expect(runner).toContain('else .workerdWindow==null end');
+    expect(readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8')).toContain("const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap'");
     expect(worker).toContain('SELECT session_user AS role');
     expect(worker).toContain('myeongha_ops_phase11_login');
     expect(worker).toContain('handleCurrentSubjectSajuCalculationRequestV1');

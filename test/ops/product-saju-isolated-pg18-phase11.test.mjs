@@ -577,7 +577,9 @@ const overlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'overla
 const sustainedExperiment = overlapExperiment || process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'sustained';
 const cpuExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'saju_cpu';
 const constrainedSajuExperiment = sustainedExperiment || cpuExperiment;
-const workerdExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
+const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap';
+const workerdExperiment = workerdOverlapExperiment ||
+  process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
     if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
@@ -616,6 +618,37 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         const tokens=members.map(member=>member.token);
         const baseline=await measuredBatch(worker.origin,12,1,tokens);
         expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
+        let workerdWindow;
+        if (workerdOverlapExperiment) {
+          // Fixed 900 x four-request local-only waves; the in-flight count is a
+          // client-side observation, NOT Worker-side admission or Hosted pooling.
+          phase='workerd_sustained_overlap';
+          const {samples,...window}=await measureIsolatedProductWindow('overlap',slot=>
+            requestCalculation(worker.origin,tokens[slot % tokens.length],tokens));
+          const successfulSamples=samples.filter(s=>s.status===200).map(s=>s.elapsedMs);
+          const unavailable=samples.filter(s=>s.status===503).length;
+          const transportFailures=samples.filter(s=>s.status===null).length;
+          const unexpected=samples.filter(s=>s.status!==200 && s.status!==503 && s.status!==null).length;
+          expect(window).toMatchObject({
+            durationSeconds:900,requestsPerSecond:4,concurrency:4,scheduled:3600,peak:4,
+          });
+          expect(window.elapsedMs).toBeGreaterThanOrEqual(900000);
+          // Do not accept a purported 900-wave experiment if the runner
+          // silently dropped any scheduled four-request wave.
+          expect(window.skipped).toBe(0);
+          expect(successfulSamples.length).toBeGreaterThan(0);
+          expect(unexpected).toBe(0);
+          expect(successfulSamples.length+unavailable+transportFailures+unexpected+window.skipped).toBe(3600);
+          workerdWindow={
+            ...window,waveSize:4,clientPendingPeak:window.peak,
+            clientPendingOnlyNotWorkerAdmission:true,
+            successful:successfulSamples.length,unavailable,transportFailures,unexpected,
+            p50Ms:quantile(successfulSamples,.5),
+            p95Ms:quantile(successfulSamples,.95),
+            p99Ms:quantile(successfulSamples,.99),
+            sajuResourceCgroupConstrained:false,
+          };
+        }
         const denied=await fetch(worker.origin+'/api/me/saju/calculation',{
           method:'POST',redirect:'error',signal:AbortSignal.timeout(3000),
         });
@@ -656,7 +689,8 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           scope:'wrangler-local-loopback-go-true-pg18-and-pinned-saju',
           wranglerVersion:worker.wranglerVersion, workerdVersion:worker.workerdVersion,
           sajuSourceSha:'9807ce89c08afc61b587560d515a475efd819032',
-          memberCount:4, baseline, actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
+          memberCount:4, baseline, ...(workerdWindow && {workerdWindow}),
+          actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
           actualPinnedSajuProductionEngine:true, localWorkerdProductPathMeasured:true,
           sajuOutage:{calculationStatus,healthStatus,recovery},
           anonymousDenied:true, healthUnaffected:true, runtimeCleanupVerified:true,
@@ -846,5 +880,5 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
       await saju?.close?.().catch(()=>undefined);
       await database?.close();
     }
-  },sustainedExperiment ? 1320000 : cpuExperiment ? 240000 : 120000);
+  },sustainedExperiment || workerdOverlapExperiment ? 1320000 : cpuExperiment ? 240000 : 120000);
 });
