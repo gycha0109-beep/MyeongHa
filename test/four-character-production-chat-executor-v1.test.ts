@@ -128,6 +128,7 @@ describe('four independent published Character AI execution', () => {
       );
       expect(h.calls).toEqual(['source','reserve','model','guard','commit']);
       expect(h.readPublishedSource).toHaveBeenCalledWith({
+        subjectId, threadId,
         characterId, releaseId, bundleId, contentVersion: 'approved-published-v1',
       });
       expect(h.reserveAttempt).toHaveBeenCalledWith(expect.objectContaining({
