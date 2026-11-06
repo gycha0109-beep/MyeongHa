@@ -513,6 +513,19 @@ grant select (
 grant select (
   provider_event_id,receipt_id,subject_id,refunded_minor,created_at
 ) on public.commerce_saju_verified_refund_effects_v1 to myeongha_commerce_internal_executor;
+
+-- The existing Commerce worker (when provisioned) receives only the columns
+-- needed by the internal Receipt Grant writer. No direct table mutation access.
+do $saju_commerce_worker_acl$
+begin
+  if exists(select 1 from pg_catalog.pg_roles where rolname='myeongha_commerce_worker') then
+    execute 'revoke all on public.commerce_saju_records_v1, public.commerce_saju_purchase_origins_v1, public.commerce_saju_upgrade_receipt_links_v1, public.commerce_saju_verified_refund_effects_v1 from myeongha_commerce_worker';
+    execute 'grant select (id,subject_id,entitlement_scope_id,birth_revision_id) on public.commerce_saju_records_v1 to myeongha_commerce_worker';
+    execute 'grant select (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind) on public.commerce_saju_purchase_origins_v1 to myeongha_commerce_worker';
+    execute 'grant execute on function public.internal_commerce_saju_entitlement_key_v1(text) to myeongha_commerce_worker';
+  end if;
+end;
+$saju_commerce_worker_acl$;
 revoke all on function public.tr_commerce_saju_origin_revision_lock_v1(),
   public.tr_commerce_saju_verified_receipt_revision_lock_v1(),
   public.tr_commerce_saju_refund_effect_verified_v1(),
