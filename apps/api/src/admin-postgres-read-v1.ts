@@ -155,10 +155,10 @@ async function runQuery(
         to_jsonb(base_rows)::text ASC
       ) AS "__adminSearchOrder"
       FROM (${baseQuery}) AS base_rows
-      WHERE position(lower(${searchParameter}::text) IN lower(to_jsonb(base_rows)::text)) > 0
+      WHERE position(lower($${searchParameter}::text) IN lower(to_jsonb(base_rows)::text)) > 0
     ) AS searched
     ORDER BY searched."__adminSearchOrder"
-    LIMIT $1::int OFFSET ${pagination[1]}::int`;
+    LIMIT $1::int OFFSET $${pagination[1]}::int`;
     queryArgs = [...args, filters.search];
   }
   const result = await client.query<Record<string, unknown>>(queryText, queryArgs);
