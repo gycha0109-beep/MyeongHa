@@ -22,8 +22,10 @@ run_v3() {
 }
 
 "${psql_base[@]}" <<'SQL'
+insert into auth.users(id) values ('a1070000-0000-0000-0000-000000000001') on conflict do nothing;
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
-  ('a1071000-0000-0000-0000-000000000001','guest',null,'active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z');
+  ('a1071000-0000-0000-0000-000000000001','member','a1070000-0000-0000-0000-000000000001','active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z'),
+  ('a1071000-0000-0000-0000-000000000002','guest',null,'active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z');
 
 insert into public.products(id,product_key,product_type,enabled,created_at,retired_at) values
   ('a1072000-0000-0000-0000-000000000001','v3-capability-pinned','reading',true,'2026-09-17T00:00:00Z',null),
@@ -71,6 +73,10 @@ capability_hash='sha256:v1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 created=$(run_v3 'a1071000-0000-0000-0000-000000000001' 'a1076000-0000-0000-0000-000000000001' 'a1074000-0000-0000-0000-000000000001' 'v3-capability-1' 'sha256:v3:request-1' "$offer_snapshot" 'sha256:v3:offer-snapshot-1' "$capability_snapshot" "$capability_hash")
 [[ "$created" == *'a1076000-0000-0000-0000-000000000001|created|12900|KRW|charge-v1|a1073000-0000-0000-0000-000000000001|'*"${capability_hash}|f" ]] || { echo "$created" >&2; fail "v3 created result mismatch"; }
 pass "Purchase Intent v3 pins authoritative charge and Capability provenance"
+
+expect_fail "v3 denies active Guest paid Purchase Intent" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='a1071000-0000-0000-0000-000000000002'; select * from public.cmd_create_purchase_intent_v3('a1071000-0000-0000-0000-000000000002','a1076000-0000-0000-0000-000000000030','a1074000-0000-0000-0000-000000000001',null,'guest-paid-denied','sha256:v3:guest-paid-denied','${offer_snapshot}'::jsonb,'sha256:v3:guest-paid-offer','${capability_snapshot}'::jsonb,'${capability_hash}'); commit;"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.purchase_intents where id='a1076000-0000-0000-0000-000000000030';")" == '0' ]] || fail "Guest paid Purchase Intent v3 was persisted"
+pass "Guest paid Purchase Intent v3 is denied without a row"
 
 stored=$("${psql_base[@]}" -At -F '|' -c "select capability_set_id,capability_snapshot_jsonb::text,capability_snapshot_hash from public.purchase_intents where id='a1076000-0000-0000-0000-000000000001';")
 [[ "$stored" == *"a1073000-0000-0000-0000-000000000001|"*"${capability_hash}" ]] || { echo "$stored" >&2; fail "v3 capability provenance was not persisted"; }
