@@ -312,13 +312,13 @@ begin
    (v_disjoint_intent,v_disjoint_offer,v_disjoint_product,
     'saju-career-disjoint','synthetic-saju-career-disjoint',9900::bigint)
  ) as fixture(new_intent,offer_id,product_id,idempotency,external_id,price_minor);
- if public.internal_commerce_saju_candidate_overlap_fields_v1('standard.love_relationship')
+ if public.internal_commerce_saju_product_fields_v1('standard.love_relationship')
       is distinct from array['relationship']::text[]
-    or public.internal_commerce_saju_candidate_overlap_fields_v1('bundle.love_relationship')
+    or public.internal_commerce_saju_product_fields_v1('bundle.love_relationship')
       is distinct from array['relationship','family','spouse']::text[]
-    or public.internal_commerce_saju_candidate_overlap_fields_v1('bundle.full_saju')
+    or public.internal_commerce_saju_product_fields_v1('bundle.full_saju')
       is distinct from array['career','wealth','business','relationship','family','spouse']::text[]
-    or public.internal_commerce_saju_candidate_overlap_fields_v1('unknown.saleable.product')
+    or public.internal_commerce_saju_product_fields_v1('unknown.saleable.product')
       is not null then
    raise exception 'SAJU_PENDING_FIELD_INVENTORY_DRIFT';
  end if;
