@@ -32,6 +32,8 @@ function evidence(field='career',grant=id(9007)) {
     currency:'KRW',expectedCurrency:'KRW',
     grantSourceType:'purchase',grantKey:'receipt:'+receiptId,
     capabilityBound:true,effectiveCurrent:true,
+    receiptGrantedEventCount:'1',validReceiptGrantedEventCount:'1',
+    providerRevocationEventCount:'0',
     productKey:'standard.career',field,refundedMinor:'0',
     unsettledCancellationCount:'0',
   };
@@ -118,6 +120,22 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
     }
   });
 
+  it('requires exactly one legitimate original Receipt issuance event for each active Grant',async()=>{
+    for (const row of [
+      {...evidence(),receiptGrantedEventCount:'0',validReceiptGrantedEventCount:'0'},
+      {...evidence(),receiptGrantedEventCount:'1',validReceiptGrantedEventCount:'0'},
+      {...evidence(),receiptGrantedEventCount:'2',validReceiptGrantedEventCount:'1'},
+      {...evidence(),receiptGrantedEventCount:'1',validReceiptGrantedEventCount:'2'},
+      {...evidence(),providerRevocationEventCount:'1'},
+      {...evidence(),receiptGrantedEventCount:null},
+      {...evidence(),validReceiptGrantedEventCount:'not-a-number'},
+    ]) {
+      const x=setup([row]);
+      await expect(quote(x)).rejects.toThrow('SAJU_CURRENT_GRANT_EVIDENCE_UNPROVEN');
+      expect(x.query.mock.calls.at(-1)?.[0]).toBe('ROLLBACK');
+    }
+  });
+
   it('holds a still-active Grant after full refund, source revocation or a failed Capability join',async()=>{
     for(const row of [
       {...evidence(),receiptStatus:'revoked',refundedMinor:'9900'},
@@ -167,6 +185,14 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
       'active_grant_count>0',
       'commerce_saju_verified_refund_effects_v1',
       'commerce_provider_events',
+      'from public.entitlement_events event',
+      "event.source_type='receipt'",
+      "event.event_type='granted'",
+      'event.source_receipt_id=receipt.id',
+      "event.event_schema_version='ent-event-v2'",
+      'event.product_id=offer.product_id',
+      "event.target_status='active'",
+      "event.event_type='revoked'",
     ])expect(sql).toContain(condition);
     expect(sql.startsWith('select')).toBe(true);
     expect(sql).not.toMatch(/\b(insert|update|delete|grant)\s+(into|public|on)\b/iu);

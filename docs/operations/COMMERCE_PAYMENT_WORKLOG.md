@@ -666,3 +666,11 @@
 - **수정:** 동일한 실제 Saju Record/Subject/Birth revision 및 원본 Receipt를 따르는 **활성 Grant 전부**를 먼저 조회하고, Production Verified Receipt 원본 시각·동일 Offer/실제 금액·통화, 원본 Receipt Grant source key, 고정 Capability Set/Item, 현재 유효 Entitlement 투영, 전액·부분 환불 합계, 미정산 Provider 취소 사실을 각각 확인하도록 전환했습니다. 누락·타 출처·중복·미정산·환불 후 활성화는 `HOLD`·전체 읽기 트랜잭션 `ROLLBACK`입니다. 적법하게 폐기된 Grant는 보유 분야로 인정하지 않습니다.
 - **테스트:** 정상 권한의 직업 → 커리어·경제 실제 차액 견적을 유지하며, 영수증 revoked 후 활성 Grant 잔존, sandbox/검증 시각 누락, 잘못된 원본 Offer/금액/Grant 출처, 고정 Capability 누락, 유효 Entitlement 누락, 부분 환불·미정산 취소를 거부하는 회귀 사례를 추가했습니다. **본 수정의 CI 결과 전에는 PASS를 주장하지 않습니다.**
 - **한계:** Product Capability/Grant의 Saju Record 전용 발행 계약, 기존 일반 Grant 접근 제어, 실제 권한 부여·취소 실행과 운영 데이터베이스 적용은 여전히 미완료입니다. 이 PR은 비배포 후보의 조회 무결성만 강화하며, 실제 판매/환불·공개 API/Reader 배송·LIVE를 켜지 않습니다.
+
+### 2026-11-06 — 사주 분야권한의 정확한 원본 Receipt 발급 이력 검증 (개발 로드맵 2·5)
+
+- **선행:** #3075 고정 HEAD `408593d` 일반 CI·전체 통합 성공, `main` 병합 `68c24f6` 확인. 기존 비공개 사주 견적·DB 원장 조회는 운영에 배포하지 않았습니다.
+- **발견:** 활성 Entitlement Grant 행과 현재 유효 권한 투영만 검사하면, 실제 원본 Receipt가 기존 `internal_apply_entitlement_effect_v1`으로 **그 Grant를 발급했다는 불변 Event 이력** 없이도 사주 분야 소유를 계산할 수 있었습니다. 이 결손은 Grant/Receipt 식별자가 연결됐다는 사실만으로는 해결되지 않습니다.
+- **수정:** 같은 Grant/Subject/entitlement/scope에 관한 `entitlement_events`를 함께 읽고, 원본 Receipt로 발급된 `receipt + granted + ent-event-v2` 이벤트가 정확히 1개인지, Source Receipt·Product·활성 목표 상태가 일치하는지 확인합니다. 다른/중복 발급 이벤트, 발급 이벤트 누락, 확인된 Provider revoked 이벤트가 있는데 활성 Grant가 남은 경우는 `HOLD`로 거부하고 읽기 트랜잭션을 롤백합니다. 기존 차액 계산·Grant 쓰기·회수 의미는 변경하지 않습니다.
+- **검증 추가:** 새 발급 이벤트 결손·중복·불일치·revoked 이력에 대한 테스트를 추가했습니다. 기존 **격리 PostgreSQL 17** 사주 원장 스위트에 실제 TypeScript 코드가 사용하는 세 SQL(Record/원장/현재 Grant)을 추출하여 전체 migration + ROLLBACK 후보 테이블에서 직접 실행하는 검증을 연결했습니다. SQL 문법/컬럼/실행 계약을 단순 mock으로만 검사하지 않습니다. 동일 B2 Reader Fixture는 쿼리 실행을 위한 가짜 거래이고 Saju 상품/권한으로 승인하거나 간주하지 않습니다. **새 CI/통합 성공 이전에는 PASS 미선언**입니다.
+- **잔여:** Saju Record-scoped Capability/Grant를 실제 발행하는 공식 계약, 승인된 Product/Offer, 구매 직전의 원자적 재검증, 실제 지급·회수 및 개인정보 삭제/통합 E2E는 미완료입니다. 운영 DB·LIVE·실제 결제/환불·공개 API 변경 없음.

@@ -42,6 +42,9 @@ select
   grant_row.grant_key as "grantKey",
   (capability.id is not null) as "capabilityBound",
   (effective.id is not null) as "effectiveCurrent",
+  issuance.receipt_granted_events::text as "receiptGrantedEventCount",
+  issuance.valid_receipt_granted_events::text as "validReceiptGrantedEventCount",
+  issuance.provider_revocation_events::text as "providerRevocationEventCount",
   product.product_key as "productKey",
   item.item_key as "field",
   coalesce(refunds.refunded_minor,0)::text as "refundedMinor",
@@ -93,6 +96,33 @@ left join public.entitlements effective
  and effective.active_grant_count>0
  and (effective.effective_valid_until is null
       or effective.effective_valid_until>pg_catalog.transaction_timestamp())
+-- A Grant row or active projection alone is NOT issuance evidence. A real
+-- paid right must have exactly one 1080 receipt-issued Entitlement Event
+-- attached to this original Receipt and exact Grant identity.
+left join lateral (
+  select
+    count(*) filter (
+      where event.source_type='receipt' and event.event_type='granted'
+    ) as receipt_granted_events,
+    count(*) filter (
+      where event.source_type='receipt'
+        and event.source_receipt_id=receipt.id
+        and event.source_provider_event_id is null
+        and event.event_type='granted'
+        and event.event_schema_version='ent-event-v2'
+        and event.product_id=offer.product_id
+        and event.target_status='active'
+    ) as valid_receipt_granted_events,
+    count(*) filter (
+      where event.source_type='provider_event'
+        and event.event_type='revoked'
+    ) as provider_revocation_events
+  from public.entitlement_events event
+  where event.grant_id=grant_row.id
+    and event.subject_id=grant_row.subject_id
+    and event.entitlement_key=grant_row.entitlement_key
+    and event.scope_key_norm=grant_row.scope_key_norm
+) issuance on true
 left join lateral (
   select sum(effect.refunded_minor) as refunded_minor
   from public.commerce_saju_verified_refund_effects_v1 effect
@@ -125,6 +155,9 @@ type FieldEvidenceRow = Readonly<{
   expectedPaidMinor: unknown; currency: unknown; expectedCurrency: unknown;
   grantId: unknown; grantSourceType: unknown; grantKey: unknown;
   capabilityBound: unknown; effectiveCurrent: unknown;
+  receiptGrantedEventCount: unknown;
+  validReceiptGrantedEventCount: unknown;
+  providerRevocationEventCount: unknown;
   productKey: unknown; field: unknown; refundedMinor: unknown;
   unsettledCancellationCount: unknown;
 }>;
@@ -177,7 +210,10 @@ export const CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1:
             || row.grantSourceType!=='purchase'
             || row.grantKey!=='receipt:'+receiptId
             || row.capabilityBound!==true
-            || row.effectiveCurrent!==true) hold();
+            || row.effectiveCurrent!==true
+            || row.receiptGrantedEventCount!=='1'
+            || row.validReceiptGrantedEventCount!=='1'
+            || row.providerRevocationEventCount!=='0') hold();
         if (!MONEY.test(String(row.refundedMinor))
             || !MONEY.test(String(row.unsettledCancellationCount))
             || row.refundedMinor!=='0'
