@@ -97,6 +97,8 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(generic).toContain('context.transaction_id=pg_catalog.txid_current()');
     expect(generic).toContain('context.subject_id=p_subject_id');
     expect(generic).toContain('context.product_offer_id=p_product_offer_id');
+    expect(generic).toContain('p.product_key');
+    expect(generic).toContain('v_product_key');
     expect(generic).toContain('cmd_purchase_intent_v3_saju_scope_mode_mismatch');
     expect(generic).toContain('v_existing_offer_id');
   });
