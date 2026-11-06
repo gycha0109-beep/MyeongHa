@@ -41,7 +41,7 @@ grant myeongha_api_executor
   to myeongha_seyeon_ordinary_login_ci;
 SQL
 
-# W121: run the exact runtime checkout catalog query against PostgreSQL 17.
+# W121: run the exact runtime checkout catalog query on PostgreSQL 15 and 17.
 # The ordinary API role intentionally retains pre-cutover RPC grants, so this
 # fixture must prove the query sees the bypass and keeps ENFORCE fail-closed.
 node --input-type=module - "$preflight_file" "$governed_login" <<'NODE'
@@ -81,12 +81,14 @@ const fields=[
  'executorDirectBudgetColumns','executorDirectRateCardColumns',
  'executorDirectReceiptQueueColumns'
 ];
-const json=`select pg_catalog.jsonb_build_object(${fields.map(k=>`'${k}', preflight."${k}"`).join(',')}) from (${query}) as preflight;`;
+const expectedFields=JSON.stringify(fields).replaceAll("'","''");
+const json=`select pg_catalog.jsonb_build_object('row', pg_catalog.to_jsonb(preflight), 'expectedFields', '${expectedFields}'::jsonb) from (${query}) as preflight;`;
 writeFileSync(output,`set session authorization ${login};\n${json}\nreset session authorization;\n`);
 NODE
 preflight_json="$(psql -X -qAt -v ON_ERROR_STOP=1 -f "$preflight_file")"
 node --input-type=module - "$preflight_json" "$governed_login" <<'NODE'
-const [json,login]=process.argv.slice(2);const row=JSON.parse(json);
+const [json,login]=process.argv.slice(2);const payload=JSON.parse(json);const row=payload.row;const expectedFields=payload.expectedFields;
+if(!Array.isArray(expectedFields)||expectedFields.length!==Object.keys(row).length||expectedFields.some(k=>!Object.hasOwn(row,k))) throw new Error('W121 runtime preflight field projection mismatch');
 const yes=['canLogin','hasGovernedRoleMembership','executorCanUsePublicSchema',
  'executorCanResolveSubject','executorCanAssertSubject','executorCanBeginMemberContext',
  'executorCanBeginGovernedGuestContext','executorCanGovernedStart',
@@ -114,7 +116,7 @@ const no=['isSuper','canBypassRls','canInherit','canCreateDb','canCreateRole',
 if(row.sessionUser!==login||row.currentUser!==login||row.otherMemberships!==0||
    row.executorOtherMemberships!==0||yes.some(k=>row[k]!==true)||no.some(k=>row[k]!==false))
  throw new Error('W121 runtime PostgreSQL17 preflight catalog contract mismatch');
-console.log('W121_GOVERNED_LOGIN_PREFLIGHT_SQL_PG17_PASS');
+console.log('W121_GOVERNED_LOGIN_PREFLIGHT_SQL_VERSIONED_PASS');
 NODE
 # Each psql process gets a fresh connection and a different session_user.
 # On older PG versions, pg_has_role supports MEMBER, not SET; the actual
