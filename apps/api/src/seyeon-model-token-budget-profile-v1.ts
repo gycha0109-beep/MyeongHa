@@ -1,6 +1,7 @@
 import {
   MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
   MODEL_TOKEN_BUDGET_PROFILE_SCHEMA_VERSION_V1,
+  MODEL_TOKEN_BUDGET_RECEIPT_SCHEMA_VERSION_V1,
   validateModelTokenBudgetProfileV1,
   type ModelTokenBudgetProfileV1,
   type ModelTokenCountAdapterV1,
@@ -84,15 +85,24 @@ export function quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1(input: Read
 }>): SeyeonCostGovernorQuoteV1 {
   const policy = validateSeyeonCostGovernorModelPolicyV1(input.policy);
   const receipt = input.receipt;
+  const expectedProfileId = [
+    'model-token-budget',
+    policy.providerKey,
+    policy.modelKey,
+    policy.policyVersion,
+    policy.priceQuote.priceVersion,
+  ].join(':');
   const expectedAvailableInputTokens = Math.min(
     policy.maximumInputTokens,
     policy.contextWindowTokens - policy.maximumOutputTokens,
   );
 
   if (
-    receipt.schemaVersion !== 'model-token-budget-receipt-v1' ||
-    typeof receipt.profileId !== 'string' ||
-    receipt.profileId.trim().length === 0 ||
+    receipt.schemaVersion !== MODEL_TOKEN_BUDGET_RECEIPT_SCHEMA_VERSION_V1 ||
+    receipt.profileId !== expectedProfileId ||
+    receipt.tokenCounterAdapterId !== SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1 ||
+    receipt.tokenCounterAdapterVersion !== SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1 ||
+    receipt.requestFormat !== SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1 ||
     receipt.providerKey !== policy.providerKey ||
     receipt.modelKey !== policy.modelKey ||
     receipt.policyVersion !== policy.policyVersion ||

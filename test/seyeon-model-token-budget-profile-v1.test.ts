@@ -5,6 +5,7 @@ import {
 } from '../packages/domain/src/model-token-budget-profile-v1.js';
 import {
   createSeyeonOpenAiModelTokenBudgetBindingV1,
+  quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1,
   SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1,
 } from '../apps/api/src/seyeon-model-token-budget-profile-v1.js';
 import type {
@@ -108,6 +109,28 @@ describe('Se-yeon OpenAI model token budget binding (offline)', () => {
       reservedHeadroomTokens: 64,
       outputTokenLimit: 800,
     });
+    const quote = quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1({
+      policy,
+      purpose: 'dialogue_render',
+      receipt,
+    });
+    expect(quote).toMatchObject({
+      policyVersion: 'synthetic-policy-v1',
+      rateCardVersion: 'synthetic-price-v1',
+      providerKey: 'openai-responses',
+      modelKey: 'synthetic-model',
+      inputCeilingTokens: 164,
+      outputCeilingTokens: 800,
+      ceilingMicroUsd: 3364,
+    });
+    expect(() => quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1({
+      policy: {
+        ...policy,
+        priceQuote: { ...policy.priceQuote, priceVersion: 'different-price-v1' },
+      },
+      purpose: 'dialogue_render',
+      receipt,
+    })).toThrow(/does not match the exact model, policy, price, or token ceilings/);
     expect(countFetch).toHaveBeenCalledOnce();
     expect(JSON.stringify(receipt)).not.toContain('Synthetic 한글');
   });
