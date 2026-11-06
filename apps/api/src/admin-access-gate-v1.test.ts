@@ -124,7 +124,7 @@ describe('private hosted administrator boundary',()=>{
       assets:async request=>{paths.push(new URL(request.url).pathname);return new Response('app');}});
     expect((await handler(new Request('https://admin.example.test/admin/assets/app.js'))).status).toBe(200);
     expect((await handler(new Request('https://admin.example.test/api/admin/session'))).status).toBe(429);
-    allow=true;expect((await handler(new Request('https://admin.example.test/api/admin/session'))).status).toBe(200);
+    allow=true;expect((await handler(new Request('https://admin.example.test/api/admin/session'))).status).toBe(401);
     expect(paths).toEqual(['/assets/app.js']);
   });
 });
