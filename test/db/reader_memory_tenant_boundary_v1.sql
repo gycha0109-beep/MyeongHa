@@ -3,6 +3,32 @@
 -- This test verifies DB isolation, NOT resistance of an LLM to malicious text.
 BEGIN;
 
+DO $
+BEGIN
+  IF NOT pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'API executor must have the Character-scoped Memory read';
+  END IF;
+  IF pg_catalog.has_function_privilege(
+    'anon',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'service_role',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'Browser and service roles must not execute the Character-scoped Memory read';
+  END IF;
+END $;
+
 INSERT INTO auth.users(id) VALUES
   ('a7100000-0000-4000-8000-000000000001'),
   ('a7100000-0000-4000-8000-000000000002')
@@ -102,7 +128,7 @@ BEGIN
       'security-reader-a'
     );
     RAISE EXCEPTION 'CROSS_SUBJECT_GRANTED_MEMORY_LEAK';
-  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+  EXCEPTION WHEN SQLSTATE '42501' THEN
     GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
     IF v_constraint <> 'myeongha_subject_context_mismatch' THEN
       RAISE EXCEPTION 'Unexpected cross-subject context failure %', v_constraint;
