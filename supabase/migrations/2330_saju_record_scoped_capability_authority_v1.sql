@@ -87,6 +87,61 @@ $saju_overlap_fields$;
 revoke all on function public.internal_commerce_saju_product_fields_v1(text)
  from public,anon,authenticated,service_role,myeongha_api_executor;
 
+-- Canonical internal entitlement keys are derived from the governed Saju fields.
+-- This is not a public key and cannot be supplied by a client.
+create function public.internal_commerce_saju_entitlement_key_v1(
+  p_field text
+) returns text
+language sql immutable strict security invoker
+set search_path=pg_catalog,public
+as $saju_entitlement_key$
+  select case p_field
+    when 'career' then 'saju.career'
+    when 'wealth' then 'saju.wealth'
+    when 'relationship' then 'saju.relationship'
+    when 'business' then 'saju.business'
+    when 'family' then 'saju.family'
+    when 'spouse' then 'saju.spouse'
+    when 'year' then 'saju.year'
+    when 'month' then 'saju.month'
+    when 'compatibility' then 'saju.compatibility'
+    when 'current_concern' then 'saju.current_concern'
+    else null::text
+  end
+$saju_entitlement_key$;
+revoke all on function public.internal_commerce_saju_entitlement_key_v1(text)
+ from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+
+-- Keep the approved 13 Product list prices identical to the quote policy.
+-- Static Offer Charge Terms must match this amount before an original Saju
+-- purchase can be admitted. Upgrade deltas need a separate immutable quote
+-- Charge Terms contract and are deliberately held by the admission command.
+create function public.internal_commerce_saju_product_price_minor_v1(
+  p_product_key text
+) returns bigint
+language sql immutable strict security invoker
+set search_path=pg_catalog,public
+as $saju_product_price$
+  select case p_product_key
+    when 'standard.career' then 9900::bigint
+    when 'standard.wealth' then 9900::bigint
+    when 'standard.love_relationship' then 9900::bigint
+    when 'standard.business' then 9900::bigint
+    when 'standard.family' then 6900::bigint
+    when 'standard.spouse' then 9900::bigint
+    when 'standard.year' then 7900::bigint
+    when 'standard.month' then 4900::bigint
+    when 'standard.compatibility' then 12900::bigint
+    when 'standard.current_concern' then 9900::bigint
+    when 'bundle.career_economy' then 24900::bigint
+    when 'bundle.love_relationship' then 21900::bigint
+    when 'bundle.full_saju' then 34900::bigint
+    else null::bigint
+  end
+$saju_product_price$;
+revoke all on function public.internal_commerce_saju_product_price_minor_v1(text)
+ from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+
 -- Keep the exact Birth revision stable while an Intent is bound to a
 -- Saju Record. The Record row FOR UPDATE serializes both this association and
 -- unresolved-Intent admission against concurrent inserts. The reviewed
@@ -664,6 +719,9 @@ begin
          'definitionHash', v_capability_definition_hash
        )
        or (v_scope_mode='saju_record' and v_scope_key is null)
+       or (v_scope_mode='saju_record'
+           and v_entitlement_key is distinct from
+             public.internal_commerce_saju_entitlement_key_v1(p_capability_item_key))
        or (
          v_product_key in (
            'standard.career','standard.wealth','standard.love_relationship',
@@ -2116,6 +2174,8 @@ declare
   v_origin public.commerce_saju_purchase_origins_v1%rowtype;
   v_product_key text;
   v_offer_capability_set_id uuid;
+  v_offer_amount_minor bigint;
+  v_offer_currency text;
   v_item_count integer;
   v_saju_scope_item_count integer;
   v_expected_fields text[];
@@ -2200,13 +2260,32 @@ begin
      or exists (
        select 1 from public.product_capability_items item
        where item.capability_set_id=v_offer_capability_set_id
-         and not (item.item_key=any(v_expected_fields))
+         and (
+           not (item.item_key=any(v_expected_fields))
+           or item.entitlement_key is distinct from
+             public.internal_commerce_saju_entitlement_key_v1(item.item_key)
+         )
      ) then
     raise exception using errcode='P0001',
       constraint='cmd_saju_purchase_admission_capability_scope_invalid',
       message='Every Saju Capability Item must match the approved Product fields and use Saju Record scope';
   end if;
   v_scope_key:='saju-record:'||v_record.entitlement_scope_id::text;
+
+  select terms.amount_minor,terms.currency
+    into v_offer_amount_minor,v_offer_currency
+  from public.product_offer_charge_terms terms
+  where terms.product_offer_id=p_product_offer_id
+    and terms.retired_at is null
+  for share;
+  if not found
+     or v_offer_amount_minor is distinct from
+       public.internal_commerce_saju_product_price_minor_v1(v_product_key)
+     or v_offer_currency is distinct from 'KRW' then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_charge_terms_mismatch',
+      message='Saju original Offer Charge Terms must exactly match the approved KRW Product price';
+  end if;
 
   -- Until a quote-specific immutable Charge Terms contract exists, original
   -- purchase admission is denied when any requested field already has active
