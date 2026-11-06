@@ -84,7 +84,8 @@ P0-CM-04가 유효했던 과거에 생성된 Guest 소유 Commerce 기록이 있
 - Saju Record 구매 Admission: 활성 인증 Member만 허용.
 - Payment Attempt 생성: 활성 인증 Member만 허용.
 - Guest가 유료 구매를 요청하면 안정적인 `LOGIN_REQUIRED` 응답을 반환한다.
-- DB trigger가 내부 명령 경로에서 Guest 유료 구매가 생성되는 우회를 차단한다.
+- DB command wrapper가 Purchase Intent v2/v3 및 Payment Attempt의 신규 생성과 멱등 재호출 모두에서 활성 Member를 먼저 확인한다.
+- DB INSERT trigger도 직접 쓰기 경로에서 Guest 유료 구매가 생성되는 우회를 차단한다.
 - Guest bootstrap 및 무료 오늘의 운세 경로는 이 변경으로 막지 않는다.
 
 ## 6. 이 결정이 승인하지 않는 것

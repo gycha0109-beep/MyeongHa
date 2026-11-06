@@ -258,7 +258,7 @@ Guest selects paid Product
 → provider checkout
 ```
 
-DB에서도 다음 조건을 강제한다.
+Purchase Intent v2/v3와 Payment Attempt의 DB command wrapper는 멱등 재호출보다 먼저 다음 조건을 강제한다. INSERT trigger는 직접 쓰기 경로를 위한 추가 방어선이다.
 
 ```text
 subjects.kind = 'member'
