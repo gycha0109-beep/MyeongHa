@@ -697,6 +697,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           if (from !== null && to !== null) { query.set('from', from); query.set('to', to); }
           if (issueStatus !== 'all') query.set('status', issueStatus);
           if (issueCategory !== '') query.set('category', issueCategory);
+          if (search !== '') query.set('search', search);
           void fetchAdminIssuesCsvV1(token, query)
             .then(content => {
               const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
