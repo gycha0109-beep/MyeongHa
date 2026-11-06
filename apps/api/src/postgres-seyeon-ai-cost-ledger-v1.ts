@@ -75,6 +75,14 @@ select
  pg_catalog.has_function_privilege($2::name,
    'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
    'EXECUTE') as "canOrdinaryStoreReceipt",
+ -- Internal budget ledger helpers are also SECURITY DEFINER entrypoints.
+ -- They must remain inaccessible to the ordinary API role.
+ pg_catalog.has_function_privilege($2::name,
+   'public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
+   'EXECUTE') as "canOrdinaryInternalStart",
+ pg_catalog.has_function_privilege($2::name,
+   'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryInternalSettle",
  -- NOINHERIT does not remove SET ROLE. A common executor with either
  -- privileged membership can still assume the private authority role.
  pg_catalog.pg_has_role($2::name,$1::name,'MEMBER')

@@ -81,6 +81,22 @@ begin
   raise notice 'D3B2B-3A verified TEMPORARY LEGACY EXPOSURE: Start/Settle/Record available under myeongha_api_executor; Production ENFORCE remains HOLD';
 end $audit$;
 
+-- W120: internal SECURITY DEFINER budget helpers must remain private too.
+begin;
+grant execute on function public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text) to myeongha_api_executor;
+grant execute on function public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb) to myeongha_api_executor;
+do $internal$
+begin
+  if not pg_catalog.has_function_privilege('myeongha_api_executor',
+      'public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text)','EXECUTE')
+     or not pg_catalog.has_function_privilege('myeongha_api_executor',
+      'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE') then
+    raise exception 'W120 private internal function grant was not visible to ordinary API role';
+  end if;
+end
+$internal$;
+rollback;
+
 -- W119: the ordinary executor itself must have no direct ledger, budget or
 -- model-rate table privileges, including read-only and maintenance rights.
 begin;
