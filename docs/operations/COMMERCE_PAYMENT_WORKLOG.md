@@ -690,3 +690,11 @@
 - **정책 경계:** 이 분야 목록은 이미 존재하는 `COMMERCE_SAJU_PRODUCTS_V1`의 구매 **충돌 보류용 목록**입니다. 새 Entitlement Key/Scope/Grant mapping을 만들거나 지급하지 않으며, 다른 상품에 대한 목록이 없는 경우 임의로 겹치지 않는다고 판정하지 않고 HOLD합니다. 새 Product/Offer를 배포하지 않습니다. Pending 결속은 Record 잠금 후 최신 상태를 읽을 수 있는 `READ COMMITTED`에서만 허용합니다.
 - **검증:** 저장소의 13개 상품 정의와 후보 SQL 분야 구성이 정확히 같은지 확인하는 테스트를 추가했습니다. 격리 PostgreSQL17 테스트에서는 기존 B2 Reader 결제 fixture를 사주 권한으로 재해석하지 않고, 기존 **판매 비활성** `standard.love_relationship` Product와 rollback-only Offer/Intent를 만들어 동일 상품 중복, 연애 단품→연애·가족·배우자 패키지 중복, 독립 직업 단품, 다른 명식 격리를 검증합니다. 모든 후보 상품·Offer·Intent/Origin은 `BEGIN/ROLLBACK` 범위이며 LIVE/운영 변경이 없습니다. **신규 CI/Integration 성공 전 PASS를 선언하지 않습니다.**
 - **미완료:** 원본 Receipt·권한·환불을 결제 직전 실제로 잠그고 검증하는 운영 Checkout Admission, 상품의 실제 Record-scoped Capability/Grant 발급·취소와 전체 결제→Reading 제공→철회→삭제 E2E는 별개로 남습니다. 이 Candidate는 결제/권한 지급·회수/실제 PG 호출·공개 API/운영 DB 적용을 하지 않습니다.
+
+### 2026-11-06 — 고객 원본 청약철회 검토의 취소·전달 증거 동일 PostgreSQL17 검증 (개발 로드맵 3·5)
+
+- **선행:** #3082 고정 HEAD `38911be` 일반·전체 통합 CI 성공, `5327cba`로 main 병합 확인. 사주 미완료 단품/패키지 겹침 방어는 운영 비배포 상태를 유지합니다.
+- **공백:** 기존 회원 청약철회→정확한 B2 Reader 원본 Receipt→Provider 취소→단일 Grant Effect→개인정보 삭제·재실행 PostgreSQL17 통합 검증은 있었으나, 고객 Claim 심사기에 사용되는 `RECORDED_READER_CANCEL_EXACT_CLAIM_SQL_V1` 및 `RECORDED_READER_S7_EXACT_PURCHASE_SQL_V1`의 실제 스키마 실행·다른 Reader 경계는 그 통합 케이스에 포함되지 않았습니다.
+- **연결:** 기존 검증용 PostgreSQL17 단일 스위트에 추가 `BEGIN/ROLLBACK` 검증을 연결했습니다. 현재 TypeScript의 **정확한 원본 Claim 취소/S7 SQL**을 추출하여 B2·B3 구매/Subject/Checkout 단위로 실행하고, 기존 합성 B2 PortOne cancellation을 같은 원본 Receipt에 결속·중복 replay해 (1) B2 취소 원본 HMAC·금액·상태 보존, (2) 독립 B3에 동일 취소가 전파되지 않음, (3) S5 본문이 없는 상태에서 S7 응답 준비·클라이언트 ACK 및 전달 완료를 만들어내지 않음을 검증합니다.
+- **정확한 의미:** 이는 원본 저장 취소 증거와 S7 **기록 부재**를 실DB에서 대조하는 음성/출처 검증이지, 합법적인 전달 완료 또는 실제 고객 미제공 확정이 아닙니다. Reader S5 Production 발행은 여전히 HOLD이고, 근거 없는 protected body를 생성하지 않습니다. 전체 회원 청약철회·Reader exact revoke·개인정보 finalizer 테스트는 별도 기존 케이스에서 그대로 통과해야 합니다.
+- **경계:** 모든 후보 취소 함수와 신규 Event는 격리 DB 트랜잭션 내에서만 생성/롤백합니다. 기존 고객 접수·S7·Provider 처리 코드를 바꾸지 않고 운영 DB SQL, 공개 API, Saju 발급 계약, LIVE 결제/환불·전달을 활성화하지 않습니다. 새 고정 HEAD의 CI/통합 결과 확인 전에는 PASS나 ROADMAP_COMPLETE 선언을 하지 않습니다.
