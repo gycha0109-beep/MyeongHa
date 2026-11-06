@@ -727,3 +727,12 @@
 - **기록 보존:** 과거 Guest-owned Commerce row가 있더라도 Receipt/Event/Grant의 원래 `subject_id`를 재작성하지 않습니다. Guest free flow와 Guest bootstrap은 유지합니다.
 - **검증 범위:** Guest paid-create 거부, Guest payment-attempt 거부, HTTP `LOGIN_REQUIRED`, historical Guest purchase history read를 회귀 검사에 포함합니다. 새 HEAD의 CI/PG17 결과 전 PASS를 선언하지 않습니다.
 - **운영 경계:** Saleable Offer/Charge Terms, public Checkout route, LIVE PortOne, Production DB 적용 및 실제 판매는 계속 HOLD.
+
+
+### 2026-11-07 — Guest 유료 구매 replay 경계 추가 하드닝 (P0-CM-05)
+
+- **추가 발견:** 2340 INSERT trigger만으로는 기존 Guest-owned Purchase Intent 또는 Payment Attempt의 멱등 replay 경로를 막지 못합니다. v2/v3 Purchase Intent와 Payment Attempt command는 원래 replay 조회가 신규 insert보다 먼저 실행됩니다.
+- **수정:** 신규 forward-only migration `2350_paid_checkout_member_command_gate_v1.sql`에서 기존 구현을 내부 전용 이름으로 보존하고, 공개 command 이름은 활성 인증 Member를 replay보다 먼저 검증하는 wrapper로 교체합니다. 기존 내부 구현은 API executor를 포함한 런타임 역할에서 직접 실행할 수 없도록 권한을 회수합니다.
+- **보존:** 과거 Guest-owned Purchase Intent/Payment Attempt 행은 변경·삭제하지 않습니다. 과거 기록의 replay를 신규 유료 checkout 수단으로 사용할 수 없게만 차단합니다.
+- **회귀 검사:** Guest 신규 Purchase Intent v2/v3, 과거 Guest Purchase Intent replay, Guest 신규 Payment Attempt, 과거 Guest Payment Attempt replay를 각각 거부하고, 역사적 행이 그대로 남는지 확인하도록 DB 테스트를 추가했습니다.
+- **정책 범위:** Guest 무료 오늘의 운세 및 추후 지정할 무료 사주 상품 1종 경로는 paid Commerce command와 분리된 상태로 유지합니다. LIVE 판매 및 Production 적용 승인은 포함하지 않습니다.
