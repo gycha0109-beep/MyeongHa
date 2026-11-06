@@ -201,7 +201,10 @@ describe('four independent published Character AI execution', () => {
 
   it('records a bounded failed attempt on a Provider exception', async () => {
     const h=harness('rahyeon');
-    h.generate.mockRejectedValueOnce(new Error('upstream service unavailable'));
+    h.generate.mockImplementationOnce(async () => {
+      h.calls.push('model');
+      throw new Error('upstream service unavailable');
+    });
     await expect(createFourCharacterProductionChatExecutorV1('rahyeon',h.ports)(
       turnFor('rahyeon'),
     )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
