@@ -160,7 +160,7 @@ if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.
   # The raw test output is deliberately private because it can contain
   # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
   # Report only recognized, controlled stage labels, never raw lines or paths.
-  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|workerd_runtime|workerd_requests|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
+  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|workerd_runtime|workerd_requests|workerd_saju_outage|workerd_saju_recovery|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
   if grep -Eq "$stage_pattern" "$scratch/vitest.log"; then
     stage="$(grep -oE "$stage_pattern" "$scratch/vitest.log" | tail -n 1)"
     echo "::error title=Isolated three-dependency failure stage::$stage" >&2
@@ -180,6 +180,9 @@ if [[ "$experiment" == workerd ]]; then
     and .baseline.requested==12 and .baseline.concurrency==1 and .baseline.successful==12
     and .baseline.unavailable==0 and .baseline.unexpected==0
     and .baseline.p50Ms>=0 and .baseline.p95Ms>=.baseline.p50Ms and .baseline.p99Ms>=.baseline.p95Ms
+    and .sajuOutage.calculationStatus==503 and .sajuOutage.healthStatus==200
+    and (.sajuOutage.recovery | .requested==4 and .concurrency==4 and .successful==4
+      and .unavailable==0 and .unexpected==0)
     and .actualGoTrueJwtVerified==true and .actualPostgres18Rls==true and .actualPinnedSajuProductionEngine==true
     and .localWorkerdProductPathMeasured==true and .anonymousDenied==true and .healthUnaffected==true
     and .runtimeCleanupVerified==true and .productionWorkerAdmissionMeasured==false and .hostedHyperdriveMeasured==false

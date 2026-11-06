@@ -547,7 +547,7 @@ async function registerDisposableGoTrueMembers(origin) {
   }
   return members;
 }
-async function launchActualSajuHost(sourceDirectory) {
+async function launchActualSajuHost(sourceDirectory, port = 0) {
   if(typeof sourceDirectory!=='string' ||
     !sourceDirectory.endsWith('/_isolated_saju') ||
     !sourceDirectory.startsWith(process.cwd()+'/')) {
@@ -558,7 +558,7 @@ async function launchActualSajuHost(sourceDirectory) {
   if(typeof createMyeonghwaProductionCalculationHostServer!=='function')
     throw Error('Real pinned Saju calculation server export is missing');
   const server=createMyeonghwaProductionCalculationHostServer({serviceBearer:SAJU_TOKEN});
-  server.listen(0,'127.0.0.1');
+  server.listen(port,'127.0.0.1');
   await once(server,'listening');
   const address=server.address();
   if(!address||typeof address==='string')throw Error('Real Saju listener unavailable');
@@ -625,6 +625,24 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         expect(health.status).toBe(200);
         await denied.arrayBuffer();
         await health.arrayBuffer();
+
+        phase='workerd_saju_outage';
+        const sajuPort=Number(new URL(saju.origin).port);
+        await saju.close();
+        saju=undefined;
+        const calculationStatus=await requestCalculation(worker.origin,tokens[0],tokens);
+        expect(calculationStatus).toBe(503);
+        const outageHealth=await fetch(worker.origin+'/health',{
+          redirect:'error',signal:AbortSignal.timeout(3000),
+        });
+        const healthStatus=outageHealth.status;
+        await outageHealth.arrayBuffer();
+        expect(healthStatus).toBe(200);
+
+        phase='workerd_saju_recovery';
+        saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT,sajuPort);
+        const recovery=await measuredBatch(worker.origin,4,4,tokens);
+        expect(recovery).toMatchObject({requested:4,successful:4,unavailable:0,unexpected:0});
         phase='runtime_cleanup';
         await worker.close();
         servers.pop();
@@ -640,6 +658,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           sajuSourceSha:'9807ce89c08afc61b587560d515a475efd819032',
           memberCount:4, baseline, actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
           actualPinnedSajuProductionEngine:true, localWorkerdProductPathMeasured:true,
+          sajuOutage:{calculationStatus,healthStatus,recovery},
           anonymousDenied:true, healthUnaffected:true, runtimeCleanupVerified:true,
           productionWorkerAdmissionMeasured:false, hostedHyperdriveMeasured:false,
           productionCapacityProven:false, productionScalingThresholdApproved:false,
