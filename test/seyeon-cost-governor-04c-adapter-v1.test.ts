@@ -380,6 +380,76 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     }
   });
 
+  for (const replayCase of ['provider_receipt','governed_settlement'] as const) {
+    it('W113 refuses ' + replayCase +
+      ' idempotent DB replay as proof of a new paid reply', async () => {
+      const order:string[]=[];
+      let reservedCall='';
+      const query=vi.fn(async (sql:string,values:unknown[])=>{
+        if(sql.includes('cmd_governed_start_seyeon_ai_call_v1')){
+          order.push('admit');
+          reservedCall=String(values[4]);
+          return {rows:[{
+            callId:reservedCall,ceilingMicroUsd:'3700',
+            bucketUtcDate:'2026-11-06',
+          }]};
+        }
+        if(sql.includes('cmd_store_seyeon_provider_receipt_v1')){
+          order.push('store');
+          expect(JSON.parse(String(values[4])).callId).toBe(reservedCall);
+          return {rows:[{
+            callId:reservedCall,replayed:replayCase==='provider_receipt',
+          }]};
+        }
+        if(sql.includes('cmd_governed_settle_seyeon_ai_call_v1')){
+          order.push('settle');
+          expect(replayCase).toBe('governed_settlement');
+          return {rows:[{
+            callId:reservedCall,replayed:true,
+            occupiedMicroUsd:'130',overCeiling:false,
+          }]};
+        }
+        throw new Error('Unexpected W113 SQL');
+      });
+      const fetchImpl=vi.fn(async()=>{
+        order.push('fetch');
+        return response();
+      });
+      const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+      const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+      try{
+        const provider=createPersistingSeyeonAiProviderV1({
+          config:{...config,fetchImpl},
+          runner:runner(query),getBinding:()=>binding,
+          governor:{policy,certifiedInputTokenUpperBound:()=>500},
+        });
+        await expect(provider.generate(request)).rejects.toThrow(
+          replayCase==='provider_receipt'
+            ? 'Governed Provider outcome receipt was not persisted; Chat Commit denied.'
+            : 'Governed cost settlement was not confirmed; Chat Commit denied.',
+        );
+        expect(order).toEqual(replayCase==='provider_receipt'
+          ? ['admit','fetch','store']
+          : ['admit','fetch','store','settle']);
+        expect(fetchImpl).toHaveBeenCalledOnce();
+        expect(query).toHaveBeenCalledTimes(
+          replayCase==='provider_receipt' ? 2 : 3,
+        );
+        expect(errors.mock.calls.map(x=>x[0])).toContain(
+          replayCase==='provider_receipt'
+            ? 'MYEONGHA_SEYEON_PROVIDER_RECEIPT_REPLAYED'
+            : 'MYEONGHA_SEYEON_COST_SETTLEMENT_REPLAYED',
+        );
+        expect(JSON.stringify(errors.mock.calls)).not.toContain(
+          'sk-synthetic-test-placeholder',
+        );
+      }finally{
+        errors.mockRestore();
+        info.mockRestore();
+      }
+    });
+  }
+
   for (const settlementCase of ['db_failure','over_ceiling'] as const) {
     it('blocks a successful Provider answer when governed settlement is ' + settlementCase, async () => {
       const order: string[] = [];

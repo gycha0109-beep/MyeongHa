@@ -531,9 +531,16 @@ export function createPersistingSeyeonAiProviderV1(input: {
           if (binding===null || state.callId!==event.callId) {
             throw new Error('Governed Provider receipt is missing reserved call context.');
           }
-          await input.runner.run(binding.subjectId, client =>
+          const stored = await input.runner.run(binding.subjectId, client =>
             storeGovernedSeyeonProviderReceiptV1(client,binding,event),
           );
+          // A new paid dispatch must receive a *newly* persisted receipt.
+          // The DB's idempotent replay is valid for reconciliation workers,
+          // never fresh evidence that authorizes this Chat Commit.
+          if (stored.replayed) {
+            console.error('MYEONGHA_SEYEON_PROVIDER_RECEIPT_REPLAYED');
+            throw new Error('Governed Provider receipt replay cannot authorize a new reply.');
+          }
           durableProviderReceipts.add(event.callId);
         },
         observeMetric(event) {
@@ -585,7 +592,11 @@ export function createPersistingSeyeonAiProviderV1(input: {
               const receipt = await input.runner.run(state.binding.subjectId, client =>
                 settleGovernedSeyeonAiCallV1(client,state.binding!,event),
               );
-              if (receipt.overCeiling) {
+              if (receipt.replayed) {
+                // A repeated settlement is acceptable for DB reconciliation,
+                // not proof that this particular paid request was settled.
+                console.error('MYEONGHA_SEYEON_COST_SETTLEMENT_REPLAYED');
+              } else if (receipt.overCeiling) {
                 // Paid inference already occurred. Hold the reply, never retry.
                 console.error('MYEONGHA_SEYEON_COST_OVER_CEILING');
               } else {
