@@ -172,6 +172,9 @@ function postgresMessage(error: unknown): string | null {
 
 function mapAuthorityError(error: unknown): never {
   const constraint = postgresConstraint(error);
+  const mapped = (code: ConstructorParameters<typeof PurchaseIntentCreateAuthorityPortErrorV3>[0], message: string): never => {
+    throw new PurchaseIntentCreateAuthorityPortErrorV3(code, message);
+  };
   const message=postgresMessage(error);
   if(message!==null) {
     if(message.includes('SAJU_DUPLICATE_PENDING_SAME_PRODUCT')
@@ -185,10 +188,6 @@ function mapAuthorityError(error: unknown): never {
       return mapped('CAPABILITY_AUTHORITY_MISMATCH','Saju Record purchase authority could not be proven.');
     }
   }
-  const mapped = (code: ConstructorParameters<typeof PurchaseIntentCreateAuthorityPortErrorV3>[0], message: string): never => {
-    throw new PurchaseIntentCreateAuthorityPortErrorV3(code, message);
-  };
-
   switch (constraint) {
     case 'cmd_saju_purchase_admission_record_unavailable':
     case 'cmd_saju_purchase_admission_product_unavailable':
