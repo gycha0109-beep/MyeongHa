@@ -303,13 +303,15 @@ if [[ "${CI:-}" == 'true' && "${PGDATABASE:-}" == myeongha_ci_case_* ]] &&
   # Four additional Character chat-open branches must work with exact
   # independently published releases in disposable PG17, not Production.
   psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/character-chat/production-01-four-character-independent-release-open-20261106.sql >/dev/null
+  psql -X -qAt -v ON_ERROR_STOP=1 -f scripts/operations/character-chat/production-02-four-character-published-artifact-read-20261106.sql >/dev/null
   psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
 insert into public.content_bundles(
  id,content_version,content_hash,artifact_ref,artifact_schema_version,
  min_client_capability,asset_manifest_hash,cue_schema_version,manifest_jsonb,
  published_at,retired_at)
 values ('c3000000-0000-0000-0000-000000000003','four-test',
- 'sha256:four-test','artifact://four-test','v1','web-v1',
+ 'sha256:v1:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee',
+ 'docs/character/four-test-publication-v1.json','v1','web-v1',
  'asset-test','cue-v1','{}'::jsonb,clock_timestamp(),null);
 insert into public.content_releases(
  id,release_key,content_bundle_id,status,is_default,rollout_jsonb,
@@ -359,7 +361,57 @@ SQL
 )"
     [[ "$again" == "$candidate_thread|f" ]] || fail "four-character independent $target reuse failed: $again"
     pass "independent $target chat room opens and reuses without rebinding"
+    evidence="$(runtime_query 'b2000000-0000-0000-0000-000000000003' "
+      select character_id,content_version,artifact_ref
+      from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000003',
+        '$candidate_thread','$target',
+        'c4000000-0000-0000-0000-000000000003',
+        'c3000000-0000-0000-0000-000000000003'
+      );")"
+    [[ "$evidence" == "$target|four-test|docs/character/four-test-publication-v1.json" ]] ||
+      fail "independent $target published artifact read mismatch: $evidence"
+    pass "independent $target published DB artifact is scoped to pinned Member room"
   done
+
+  expect_runtime_fail "foreign Member cannot read another Member pinned publication" \\
+    'b2000000-0000-0000-0000-000000000004' \\
+    'Published Character source is unavailable' "
+      select * from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000004',
+        'c5000000-0000-0000-0000-000000000001',
+        'baekheon',
+        'c4000000-0000-0000-0000-000000000003',
+        'c3000000-0000-0000-0000-000000000003'
+      );"
+
+  expect_runtime_fail "forged publication release must fail closed" \\
+    'b2000000-0000-0000-0000-000000000003' \\
+    'Published Character source is unavailable' "
+      select * from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000003',
+        'c5000000-0000-0000-0000-000000000001',
+        'baekheon',
+        'b4000000-0000-0000-0000-000000000001',
+        'c3000000-0000-0000-0000-000000000003'
+      );"
+
+  expect_runtime_fail "Yunho cannot read non-default Character artifact" \\
+    'b2000000-0000-0000-0000-000000000003' \\
+    'Published Character source is unavailable' "
+      select * from public.qry_four_character_published_artifact_v1(
+        'b2000000-0000-0000-0000-000000000003',
+        'c5000000-0000-0000-0000-000000000001',
+        'yunho',
+        'c4000000-0000-0000-0000-000000000003',
+        'c3000000-0000-0000-0000-000000000003'
+      );"
+
+  published_read_public=$("${psql_base[@]}" -c "select has_function_privilege('public','public.qry_four_character_published_artifact_v1(uuid,uuid,text,uuid,uuid)','EXECUTE')::int;")
+  published_read_executor=$("${psql_base[@]}" -c "select has_function_privilege('myeongha_api_executor','public.qry_four_character_published_artifact_v1(uuid,uuid,text,uuid,uuid)','EXECUTE')::int;")
+  [[ "$published_read_public" == '0' && "$published_read_executor" == '1' ]] ||
+    fail "published artifact reader must be executable only through API role"
+
   set +e
   yunho_out="$(psql -X -qAt -v ON_ERROR_STOP=1 <<'SQL' 2>&1
 begin;
