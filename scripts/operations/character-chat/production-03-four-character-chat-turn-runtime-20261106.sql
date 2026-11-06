@@ -659,7 +659,7 @@ begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
 
   if p_failure_state is distinct from 'failed_retryable'
-     or p_error_code is distinct from 'FOUR_CHARACTER_PRODUCTION_EXECUTION_FAILED' then
+     or p_error_code is distinct from 'CHARACTER_EXECUTION_FAILED' then
     raise exception using
       errcode = '23514',
       constraint = 'four_character_chat_runtime_failure_disposition_invalid',
