@@ -43,17 +43,50 @@ create table public.commerce_saju_purchase_origins_v1 (
 create index commerce_saju_purchase_origins_record_idx
   on public.commerce_saju_purchase_origins_v1(subject_id, saju_record_id, birth_revision_id);
 
+
+-- This short-lived collision inventory mirrors the already reviewed 13-product
+-- Saju quote policy. It is NOT Product Capability/Entitlement authority. Only
+-- pending Origin arbitration consults these field sets. Unknown keys HOLD.
+-- Never deploy as a general-purpose authorization or public RPC.
+create function public.internal_commerce_saju_candidate_overlap_fields_v1(
+  p_product_key text
+) returns text[]
+language sql immutable strict security invoker
+set search_path=pg_catalog,public
+as $saju_overlap_fields$
+  select case p_product_key
+    when 'standard.career' then array['career']::text[]
+    when 'standard.wealth' then array['wealth']::text[]
+    when 'standard.love_relationship' then array['relationship']::text[]
+    when 'standard.business' then array['business']::text[]
+    when 'standard.family' then array['family']::text[]
+    when 'standard.spouse' then array['spouse']::text[]
+    when 'standard.year' then array['year']::text[]
+    when 'standard.month' then array['month']::text[]
+    when 'standard.compatibility' then array['compatibility']::text[]
+    when 'standard.current_concern' then array['current_concern']::text[]
+    when 'bundle.career_economy' then array['career','wealth','business']::text[]
+    when 'bundle.love_relationship' then array['relationship','family','spouse']::text[]
+    when 'bundle.full_saju' then array['career','wealth','business','relationship','family','spouse']::text[]
+    else null::text[]
+  end
+$saju_overlap_fields$;
+revoke all on function public.internal_commerce_saju_candidate_overlap_fields_v1(text)
+ from public,anon,authenticated,service_role,myeongha_api_executor;
+
 -- Keep the exact Birth revision stable while an Intent is bound to a
 -- Saju Record. The Record row FOR UPDATE serializes both this association and
--- same-Product unresolved-Intent admission against concurrent inserts.
--- This is a strictly narrower early duplicate guard, NOT full overlapping
--- field/Package checkout arbitration or permission to charge a payment.
+-- unresolved-Intent admission against concurrent inserts. The reviewed
+-- Saju product field inventory blocks overlap among pending single/bundle
+-- purchases. This is NOT entitlement authority or payment admission.
 create or replace function public.tr_commerce_saju_origin_revision_lock_v1()
 returns trigger language plpgsql security invoker
 set search_path = pg_catalog, public as $saju_origin_lock$
 declare
   v_record_birth_revision uuid;
   v_new_product_id uuid;
+  v_new_product_key text;
+  v_new_fields text[];
   v_new_intent_status text;
 begin
   -- Always acquire the same Record lock BEFORE inspecting other pending
@@ -68,17 +101,18 @@ begin
     raise exception 'SAJU_ORIGIN_RECORD_REVISION_MISMATCH';
   end if;
 
-  select pi.status, po.product_id
-    into v_new_intent_status, v_new_product_id
+  select pi.status, po.product_id, product.product_key
+    into v_new_intent_status, v_new_product_id, v_new_product_key
   from public.purchase_intents pi
   join public.product_offers po on po.id=pi.product_offer_id
+  join public.products product on product.id=po.product_id
   where pi.id=new.purchase_intent_id
     and pi.subject_id=new.subject_id;
   if not found or v_new_product_id is null then
     raise exception 'SAJU_ORIGIN_INTENT_PRODUCT_UNAVAILABLE';
   end if;
 
-  if v_new_intent_status in ('created','pending') then
+  if v_new_intent_status in ('created','pending','verified') then
     -- A stale repeatable-read snapshot cannot safely act as a lock-based
     -- admission check even if it successfully acquired a Record row lock.
     if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
@@ -100,6 +134,38 @@ begin
         and prior_offer.product_id=v_new_product_id
     ) then
       raise exception 'SAJU_DUPLICATE_PENDING_SAME_PRODUCT';
+    end if;
+    v_new_fields := public.internal_commerce_saju_candidate_overlap_fields_v1(
+      v_new_product_key
+    );
+    if v_new_fields is null or cardinality(v_new_fields)=0 then
+      raise exception 'SAJU_PENDING_PRODUCT_FIELDS_UNAVAILABLE';
+    end if;
+    -- The existing exact-Product conflict remains separately identifiable.
+    -- This second lookup catches overlapping fields across different
+    -- Products (for example career single vs career/economy bundle).
+    if exists (
+      select 1 from public.commerce_saju_purchase_origins_v1 prior
+      join public.purchase_intents prior_pi
+        on prior_pi.id=prior.purchase_intent_id
+       and prior_pi.subject_id=prior.subject_id
+      join public.product_offers prior_offer
+        on prior_offer.id=prior_pi.product_offer_id
+      join public.products prior_product
+        on prior_product.id=prior_offer.product_id
+      where prior.subject_id=new.subject_id
+        and prior.saju_record_id=new.saju_record_id
+        and prior.birth_revision_id=new.birth_revision_id
+        and prior.purchase_intent_id<>new.purchase_intent_id
+        and prior_pi.status in ('created','pending')
+        and prior_offer.product_id<>v_new_product_id
+        and coalesce(
+          public.internal_commerce_saju_candidate_overlap_fields_v1(
+            prior_product.product_key
+          ) && v_new_fields, true
+        )
+    ) then
+      raise exception 'SAJU_OVERLAPPING_PENDING_PRODUCT';
     end if;
   end if;
   return new;
