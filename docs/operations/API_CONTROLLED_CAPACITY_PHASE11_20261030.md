@@ -20,7 +20,18 @@ To reproduce, create a temporary Wrangler JSON config outside the checkout with 
 
 After the comparison code merges, dispatch the existing manual Linux workflow with `experiment=saju_cpu` to compare 0.50 and 0.01 CPU on the same runner and product path. Both pinned Saju containers use 256 MiB with no swap and loopback-only published ports. Each resource setting receives the same one-minute, four-request wave profile with the same temporary GoTrue, PostgreSQL18 and Node gateway. The workflow records the kernel quota, CPU throttling, adapter and end-to-end latencies, request outcomes and recovery after returning to the reference container.
 
-The low quota is a controlled pressure input. Its effect and any Saju throttling require a successful Linux observation. It provides neither a standard service sizing target nor a portable Saju capacity ceiling.
+#### Verified Linux CPU comparison, 2026-11-06 KST
+
+[Run #42168622091](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42168622091) succeeded on `main` `4bcad41cda3287c75cbe741f2a2331145514d0d0`. [Artifact 13479993634](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42168622091/artifacts/13479993634) contains the [original 3,147-byte JSON](REAL_GOTRUE_PG18_SAJU_CPU_COMPARISON_LINUX_OBSERVATION_20261106.json) with SHA-256 `646c94a4bb4fb51113b4e8f809c161e4a42f659ab33ae7d5b43037b6283aa3cb`.
+
+| Saju CPU | Success / scheduled | HTTP 503 / transport / skipped | Product p50 / p95 / p99 (ms) | Saju adapter p95 (ms) | CFS throttled periods |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 0.50 | 240 / 240 | 0 / 0 / 0 | 174.645 / 217.156 / 224.348 | 2.939 | 0 |
+| 0.01 | 219 / 240 | 1 / 0 / 20 | 291.515 / 791.162 / 1373.091 | 582.129 | 364 |
+
+Both settings used the same container image, pinned engine, 256 MiB memory limit and no swap. The DB recorded zero acquisition failures, with acquisition p95 at 83.419 and 83.363 ms. The lower quota coincided with higher Saju and product latency at similar DB timings. The response-level cause of the single 503 was not recorded. The launcher restored the reference target, four follow-up calculations passed and runtime plus Docker cleanup checks passed.
+
+The low quota is a controlled pressure input. The observation supplies a diagnostic signal for a Saju CPU investigation when adapter latency and throttling rise together. Production CPU sizing, automated scaling thresholds and the product path under the deployed Worker remain unverified.
 
 Run the existing main-only GitHub Linux workflow with `experiment=sustained` after the implementation is merged. Its default `short` mode remains the short GoTrue, PostgreSQL18 and pinned Saju experiment.
 
