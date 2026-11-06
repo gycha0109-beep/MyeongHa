@@ -1572,7 +1572,7 @@ begin
       constraint='cmd_saju_purchase_admission_requires_read_committed',
       message='Saju purchase admission requires READ COMMITTED';
   end if;
-  if p_purchase_kind not in ('original','upgrade') then
+  if p_purchase_kind is null or p_purchase_kind not in ('original','upgrade') then
     raise exception using errcode='23514',
       constraint='cmd_saju_purchase_admission_kind_invalid',
       message='Saju purchase kind must be original or upgrade';
@@ -1641,7 +1641,7 @@ begin
   );
   if v_intent.product_offer_id is distinct from p_product_offer_id
      or v_intent.capability_set_id is distinct from v_offer_capability_set_id
-     or v_intent.status not in ('created','pending','verified','cancelled','expired','refunded') then
+     or v_intent.status not in ('created','pending','verified','failed','cancelled','expired','refunded') then
     raise exception using errcode='P0001',
       constraint='cmd_saju_purchase_admission_intent_mismatch',
       message='Purchase Intent does not preserve the selected Saju Offer authority';
@@ -1694,7 +1694,7 @@ begin
       child_purchase_intent_id,source_receipt_id
     )
     select v_intent.purchase_intent_id,source_id
-    from unnest(v_source_ids) source_id;
+    from unnest(v_source_ids) as source_rows(source_id);
   end if;
 
   return query select
