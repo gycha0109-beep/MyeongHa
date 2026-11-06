@@ -42,6 +42,14 @@ function fixture(characterId: string, options?: {
     replyLocale: 'ko-KR' as const,
     bindingAuthorityPort: { readRuntimeBinding },
     manifestAuthorityPort: { readBundleManifest },
+    compatibilityProfiles: Object.freeze(Object.fromEntries(
+      liveTargets.map(id => [id, {
+        profileKey: 'approved-test-' + id,
+        supportedClientCapabilities: ['web-v1'],
+        supportedAssetManifestHashes: ['approved-asset-manifest'],
+        supportedCueSchemaVersions: ['v1'],
+      }]),
+    )),
     readRuntimeBinding,
     readBundleManifest,
   };
@@ -120,6 +128,33 @@ describe('owner-pinned five-Character execution gateway', () => {
       ...fixture('baekheon', { charactersInManifest: ['seyeon'] }),
       registeredExecutors: { baekheon: runtime },
     })).rejects.toThrow(CharacterChatExecutorUnavailableV1);
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing Character-specific server-approved compatibility before provider work', async () => {
+    const runtime = vi.fn(async () => 'should-not-run');
+    await expect(runPublishedFiveCharacterChatTurnV1({
+      ...fixture('rahyeon'),
+      compatibilityProfiles: {},
+      registeredExecutors: { rahyeon: runtime },
+    })).rejects.toMatchObject({ code: 'CAPABILITY_UNAVAILABLE' });
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported published asset hashes, cues and client capability', async () => {
+    const runtime = vi.fn(async () => 'should-not-run');
+    const baseline = fixture('baekheon');
+    for (const profile of [
+      { ...baseline.compatibilityProfiles.baekheon!, supportedAssetManifestHashes: ['different'] },
+      { ...baseline.compatibilityProfiles.baekheon!, supportedCueSchemaVersions: ['different'] },
+      { ...baseline.compatibilityProfiles.baekheon!, supportedClientCapabilities: ['different'] },
+    ]) {
+      await expect(runPublishedFiveCharacterChatTurnV1({
+        ...baseline,
+        compatibilityProfiles: { baekheon: profile },
+        registeredExecutors: { baekheon: runtime },
+      })).rejects.toMatchObject({ code: 'CONTENT_INCOMPATIBLE' });
+    }
     expect(runtime).not.toHaveBeenCalled();
   });
 
