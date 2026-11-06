@@ -37,6 +37,7 @@ const expectedProducerFiles = [
   // New verified-Receipt Reader guards replace the same entitlement writer.
   '1790_official_reader_legacy_provider_effect_scope_guard_v1.sql',
   '1800_official_reader_receipt_grant_prelocked_scope_guard_v1.sql',
+  '2330_saju_record_scoped_capability_authority_v1.sql',
 ];
 
 if (JSON.stringify(producerFiles) !== JSON.stringify(expectedProducerFiles)) {
@@ -86,6 +87,7 @@ for (const [path, aggregateType] of [
 for (const name of [
   '1790_official_reader_legacy_provider_effect_scope_guard_v1.sql',
   '1800_official_reader_receipt_grant_prelocked_scope_guard_v1.sql',
+  '2330_saju_record_scoped_capability_authority_v1.sql',
 ]) {
   const text = await readFile('supabase/migrations/' + name, 'utf8');
   const inserts = (text.match(/insert\s+into\s+public\.outbox_events\b/gi) || []).length;

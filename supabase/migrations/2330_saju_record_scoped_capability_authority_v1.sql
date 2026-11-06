@@ -460,7 +460,7 @@ create trigger tr_commerce_saju_record_paid_revision_guard_v1
 -- Purchase association itself cannot be retargeted to a different Record.
 create or replace function public.tr_commerce_saju_ledger_immutable_v1()
 returns trigger language plpgsql security invoker
-set search_path = pg_catalog, public as $
+set search_path = pg_catalog, public as $saju_ledger_immutable$
 declare
   v_subject_id uuid;
   v_finalizer_owner text;
@@ -487,7 +487,7 @@ begin
   end if;
   raise exception 'SAJU_SOURCE_LEDGER_IMMUTABLE';
 end;
-$$;
+$saju_ledger_immutable$;
 create trigger tr_commerce_saju_origin_immutable_v1
  before update or delete on public.commerce_saju_purchase_origins_v1
  for each row execute function public.tr_commerce_saju_ledger_immutable_v1();

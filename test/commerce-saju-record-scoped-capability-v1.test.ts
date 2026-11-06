@@ -83,7 +83,8 @@ describe('Saju Record-scoped Capability authority',()=>{
       "v_product_key in (",
       "v_scope_mode<>'saju_record'",
     ])expect(effect).toContain(part);
-    expect(effect).toContain("v_scope_mode='saju_record' and v_scope_key is not null");
+    expect(effect).toContain("v_scope_mode='saju_record' and v_scope_key is null");
+    expect(effect).toContain("v_scope_mode='saju_record' and pci.scope_mode='saju_record' and v_scope_key is not null");
     expect(effect).toContain('internal_commerce_saju_entitlement_key_v1(p_capability_item_key)');
   });
 
