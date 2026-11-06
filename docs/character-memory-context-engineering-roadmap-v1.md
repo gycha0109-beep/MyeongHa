@@ -1,0 +1,343 @@
+# MyeongHa Persistent Memory & Context Engineering Roadmap v1
+
+> Watchtower-Track: character-memory
+> Status: APPROVED ROADMAP / IMPLEMENTATION NOT COMPLETE
+> Date: 2026-11-07
+> Parent runtime track: PR #3068
+> Baseline commit: `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`
+
+## 1. Goal
+
+Build a shared, provider-neutral Memory and Context Engine for MyeongHa Character Chat. The engine must preserve long-term conversational continuity while sending each model only the information required for the current turn, within a measured model-specific token budget.
+
+The system must:
+- preserve original conversation evidence and provenance;
+- distinguish durable facts, episodic memories, relationship events, session-only context, character knowledge, and protected Saju Reading knowledge;
+- retrieve only information the current Subject and Character are authorized to access;
+- select context according to relevance, causal dependency, salience, unresolved state, recency, and explicit callbacks;
+- measure the exact serialized model request and enforce input/output/cost limits before dispatch;
+- preserve Character Canon, personality, epistemic boundaries, and Saju semantic authority;
+- evaluate recall quality, false recall, privacy boundaries, continuity, cost, and latency over multi-session conversations.
+
+This roadmap extends the existing Character Runtime and Memory authority. It does not replace them with a third-party agent framework or a new independent memory database.
+
+## 2. Baseline and current implementation status
+
+### 2.1 PR #3068 baseline
+
+PR #3068 remains **Open / Draft / not merged**. Its current head is `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`.
+
+At this head, the following implementation and verification are present:
+- independent Character room selection and server-side turn gateway foundations;
+- source-bound four-Character execution orchestration contract;
+- immutable published-source/hash validation foundations;
+- PostgreSQL 17 disposable integration coverage for turn persistence, receipt issuance, ACK/idempotency and DB authority boundaries;
+- shared four-Character length constants and boundary tests;
+- existing message and generated-reply guard: 8,000 UTF-16 code units;
+- existing canonical-context guard: 32,768 UTF-16 code units.
+
+The latest head has 17 completed checks: 13 successful and 4 conditionally skipped. The PR remains Draft because the four additional Characters are not yet production-ready live AI chat targets.
+
+### 2.2 What the current length limits do not mean
+
+The 8,000 / 32,768 values are JavaScript UTF-16 string-length safety bounds. They are **not**:
+- tokenizer measurements;
+- a model Context Window definition;
+- a dynamic context budget;
+- a provider-enforced output-token cap;
+- an AI cost ceiling.
+
+Keep these existing guards while introducing model-specific token accounting. Do not convert character counts into token counts using a fixed multiplier.
+
+### 2.3 Existing implementation that must be reused
+
+- Character Runtime Standard v1: Context Layers, retrieval signals/rules, Memory Rules, Token / Context Pressure Drop Order, evaluation axes.
+- AI Character Runtime Specification v0.4: server retrieval, policy-filtered Context Assembler, Renderer, Output Guard, atomic commit and controlled reveal.
+- Relationship / Life Record / Memory Policy v0.5: Life Fact, Character Memory, Session-only Context, Memory Proposal resolution and access grants.
+- C09 long-term persona-memory and epistemic-boundary research: Fact Memory vs Insight Memory, source/time provenance, character knowledge boundaries, retrieval-versus-mention distinction, multi-session evaluation.
+- Existing Cost Governor and PR-04D2 input-token-count work: reuse their contracts and verified adapters; do not recreate a parallel cost ledger or token-count service.
+
+## 3. Non-negotiable authority and privacy rules
+
+1. **Original conversation is evidence, not automatically durable memory.** Preserve original turns under existing conversation retention/deletion rules. Derived summaries and memories must retain source references.
+2. **Storage is not retrieval.** A record is not placed into every prompt merely because it exists.
+3. **Retrieval is not disclosure.** Disclosure/entitlement/access checks precede sensitive-content retrieval. Do not retrieve private data and rely on a prompt instruction to hide it.
+4. **Retrieval is not mention.** The model may use a relevant memory without explicitly announcing it.
+5. **Subject ownership and grants remain authoritative.** Use existing server-pinned Subject identity, active `record_access_grants`, revocation and Reader Knowledge/entitlement rules. No cross-Subject or cross-Character private-memory leakage.
+6. **Memory proposals are not committed facts.** The LLM can propose; only the server authority can validate, resolve and commit.
+7. **Session-only means non-durable.** It must not appear in durable Life Fact/Memory tables, future threads, other Characters or hidden execution-log shadow memory.
+8. **Insight Memory is not Fact Memory.** A Character's interpretation may be stored as a clearly typed derived perspective, but it cannot become independent evidence about the user.
+9. **Saju authority stays separate.** Only source-approved validated Reading material and the correct Reader/Character entitlement may enter the protected Saju context. Character memory retrieval cannot create or broaden Saju authority.
+10. **No model or provider fallback by guess.** O-C1-07 remains open until the user-approved Provider/model/Fallback decision is recorded.
+
+## 4. Existing source-authority blockers
+
+The roadmap must not silently resolve these gaps through implementation assumptions:
+
+| Gap | Impact | Permitted work before resolution |
+|---|---|---|
+| SRC-25 | Complete versioned positive schemas/allowlists for durable Life Fact and Character Memory values are not finalized | Reuse already-valid record reads, grants, revokes and provenance. Do not create arbitrary new durable values or invent registries. |
+| SRC-05 | Retention/privacy semantics for rejected and session-only proposal payload staging remain unresolved | Do not introduce a long-lived shadow proposal store or silently retain rejected/session-only payloads. |
+| SRC-10 | Grant create/regrant authority remains an independent gate where applicable | Reuse valid existing grants; do not invent grant creation/regrant behavior. |
+| O-C1-07 | Provider, model and fallback selection unresolved | Implement provider-neutral contracts and offline tests; do not set model IDs, token windows, prices or output caps. |
+| Paid-evaluation lock | Real paid model evaluation remains held by the existing cost-incident controls | Offline/mock/fixture evaluation only until a separately approved, hard-capped evaluation path exists. |
+| SRC-15 / SRC-16 | Character source/content publication requirements remain outstanding for the four additional Characters | No invented canon/assets, publication or Production activation. |
+
+SRC-22 governs executable relationship-event scoring/stage/anti-farming semantics. It is required before implementing any new relationship-state mutation policy, but it must not block read-only memory retrieval or Context assembly that consumes the already-authoritative relationship projection.
+
+## 5. Roadmap phases
+
+### Phase 0 — Preserve and close the current chat-runtime baseline
+
+**Status: Implemented at PR #3068 head; PR remains Draft and unmerged.**
+
+- Preserve the six visible discovery cards and current Yunho exclusion.
+- Preserve independent room/thread ownership, immutable source pinning, turn persistence, receipt and ACK authority.
+- Preserve PostgreSQL 17 and DB privilege verification.
+- Keep the existing UTF-16 length guards as defensive bounds.
+- Do not claim live AI execution for Baekheon, Yeoul, Rahyeon or Taegyeom.
+
+**Exit evidence:** latest-head CI, PostgreSQL 17 integration, DB authority, Work Track, browser/auth and Governance checks. Current head evidence: `29f58f4`.
+
+### Phase 1 — Authority contract and data-source inventory
+
+**Status: Not started as a consolidated Context Engine implementation.**
+
+1. Inventory existing conversation, turn, Life Fact, Memory Item, Memory Proposal, access-grant, relationship-event, Reader Knowledge and Reading records.
+2. Map each record type to its authoritative owner, Subject scope, Character visibility, disclosure gate, lifecycle, source turn and revocation behavior.
+3. Define a versioned, read-only Working Memory projection using only already-authoritative fields and existing grants.
+4. Separate the logical memory categories:
+   - episodic event memory;
+   - factual/user-state memory;
+   - derived Character insight;
+   - relationship event/projection;
+   - session-only context;
+   - protected Saju Reading knowledge.
+5. Record unresolved source decisions against SRC-25, SRC-05 and SRC-10. Resolve them through source-authority documents before enabling blocked writes.
+6. Do not add a new vector database, graph database, or replacement memory store. First prove whether existing PostgreSQL structures and indexes can support the required reads.
+
+**Exit criteria:**
+- every Working Memory item has an authoritative source and access decision;
+- cross-Subject, ungranted Character, revoked, expired and unauthorized Reading data are excluded before content reaches the model;
+- session-only data cannot become durable or cross-thread;
+- no arbitrary durable memory writes are possible while SRC-25/SRC-05/SRC-10 remain open.
+
+### Phase 2 — Provider-neutral Token Budget Manager
+
+**Status: Existing length guards are present; actual model token budget is not wired to the four-Character runtime.**
+
+1. Define a provider-neutral model profile contract. It must carry the approved model identifier, context-window capacity, maximum output tokens, input ceiling, reserved headroom, tokenizer/count adapter identity, pricing version and supported request format.
+2. Do not populate real model values until O-C1-07 is resolved.
+3. Count the exact serialized request that will be dispatched. The counted bytes/payload and dispatched bytes/payload must be identical.
+4. Reuse the existing official OpenAI Responses input-token-count adapter only for the exact supported native Responses request shape. Its current opt-in/unsupported-provider/Production-hold constraints remain in force.
+5. For another Provider, require its exact supported tokenizer/count contract. No character-count multiplier or undocumented estimate may authorize dispatch.
+6. Compute the input budget after reserving output tokens and approved headroom. Enforce the Provider's actual `max_output_tokens` independently from application text-length validation.
+7. Bind the resulting reservation to the exact model and price version through the existing Cost Governor.
+8. On unknown model, unsupported request shape, count mismatch, timeout, missing usage, exceeded budget or missing output cap: fail closed before Provider dispatch, or preserve the existing unknown-usage hold semantics after dispatch.
+
+**Exit criteria:**
+- exact request-count parity is tested;
+- over-budget/count-failure paths produce zero Provider calls and zero cost reservations where dispatch has not occurred;
+- output-token cap is present in the actual Provider request;
+- reservation/dispatch/settlement/unknown-usage behavior remains atomic and auditable;
+- no paid Production evaluation or inference is activated by this phase alone.
+
+### Phase 3 — Permission-first Hybrid Memory Retrieval
+
+**Status: Existing authority/read primitives exist; unified retrieval is not complete.**
+
+1. Implement a single server-side retrieval entrypoint scoped to the canonical Subject and selected Character/thread.
+2. Apply disclosure, entitlement, active-grant, revocation, validity and Reader Knowledge checks before returning sensitive memory content.
+3. Combine only supported retrieval signals from Character Runtime Standard:
+   - semantic relevance;
+   - relationship relevance;
+   - Character relevance;
+   - salience;
+   - unresolved weight;
+   - causal dependency;
+   - bounded recency;
+   - explicit callback bonus;
+   - contradiction risk;
+   - repetition penalty.
+4. Use lexical/metadata/temporal retrieval and semantic retrieval where supported by existing storage. Add graph traversal over proven relationships/events where useful. Do not add infrastructure or schema without evidence and authority.
+5. Keep causal event groups together when needed (for example conflict and repair); do not let recency alone evict an older high-salience event.
+6. Return source/provenance references and temporal validity with each retrieved item. Unknown, contradicted, revoked or ungrounded facts must not be presented as known.
+7. Preserve `retrieve != mention`: retrieval makes information available to the Character; it does not force a callback in the response.
+
+**Exit criteria:**
+- relevant authorized memories are retrieved across multiple sessions;
+- irrelevant memories are not injected;
+- temporal updates and superseded/revoked records are handled correctly;
+- cross-user, cross-Character, private and unauthorized Saju data are never returned;
+- missing memory leads to calibrated abstention rather than fabricated recall.
+
+### Phase 4 — Dynamic Context Composer
+
+**Status: Existing policy defines the conceptual layers and drop order; production token-budget integration remains outstanding.**
+
+1. Compose the Working Context from the existing Runtime Standard layers:
+   - System / Safety / Product Authority;
+   - Character Core Anchor;
+   - current Relationship Projection;
+   - current turn state;
+   - Integrity/Claim and Disclosure decisions when applicable;
+   - relevant Bible slices;
+   - retrieved event memory with provenance;
+   - unresolved threads;
+   - recent dialogue window;
+   - protected domain segment when authorized;
+   - repetition-suppression hints;
+   - response task.
+2. Keep fixed context small: authority rules, Character Core Anchor and hard unknown boundaries.
+3. Allocate dynamic context from the remaining model-specific token budget.
+4. Preserve the existing drop order under pressure:
+   1. low-relevance trivia;
+   2. redundant Bible examples;
+   3. resolved low-salience events;
+   4. older recent dialogue already represented by an authoritative event.
+5. Never drop authority/safety, current user turn, immediate recent continuity, current relationship projection, conflict/unresolved causal events or relevant Bible core merely to fit more trivia.
+6. Produce a redacted, inspectable Context assembly trace: included source refs, excluded-item reason, token contribution, policy/version and final budget. Do not log raw private prompt/context or secrets into general observability.
+7. Ensure the exact assembled request is the same request counted by Phase 2.
+
+**Exit criteria:**
+- identical inputs/policy produce deterministic assembly decisions;
+- all included items have authorized source references;
+- drop-order tests prove protected layers survive context pressure;
+- token budget is respected without character-count heuristics;
+- private/raw content is not exposed through logs or diagnostics.
+
+### Phase 5 — Memory Consolidation and Lifecycle
+
+**Status: Existing proposal/approval architecture is defined; full durable consolidation is gated by source authority.**
+
+1. Extract bounded candidates from committed conversation turns: events, user facts, preferences, commitments and unresolved topics.
+2. Keep Fact Memory and Insight Memory distinct. Insight must cite the facts/events it derives from and cannot become an independent user fact.
+3. Deduplicate repeated candidates and detect contradiction, temporal change and supersession.
+4. Preserve source turn, speaker, timestamp, confidence/authority, valid time, extraction version and supersession/revocation lineage.
+5. Use existing Memory Proposal resolution semantics: accept long-term, session-only or reject. LLM output never writes directly to Life Fact, Memory Item or Relationship state.
+6. Enforce source-approved versioned type/value schemas. Do not create a generic arbitrary-JSON durable memory escape hatch.
+7. Preserve current Life Fact history semantics: no overwrite; same-type changes append through valid supersession.
+8. Do not retain rejected/session-only proposal payloads indefinitely or create a shadow archive while SRC-05 is unresolved.
+9. Do not infer relationship score/stage changes from extracted memories. SRC-22 remains the separate relationship mutation authority.
+
+**Exit criteria:**
+- duplicate extraction and retry do not create duplicate durable records;
+- conflicting facts retain history and require valid supersession;
+- session-only/rejected candidates create no durable Life Fact/Memory row;
+- every durable write validates against the approved registry and explicit grant decision;
+- revocation and deletion cannot be undone by consolidation or retrieval.
+
+### Phase 6 — Evidence-preserving Context Compaction
+
+**Status: Not implemented as a shared production capability.**
+
+1. Compact old dialogue into bounded episode summaries only when it improves retrieval or context efficiency.
+2. Keep original turns immutable under existing retention/deletion rules; summaries are derived indexes, not replacements for evidence.
+3. Every summary must include source-turn ranges/IDs, time range, Character/Subject scope, summary version and generation provenance.
+4. Do not repeatedly summarize a previous summary as the sole source. Rebuild a revised summary from canonical source turns and authoritative events.
+5. Preserve event chronology, participants, commitments, unresolved status, corrections and supersession links.
+6. Do not merge private Character memories or protected Reading knowledge into shared summaries.
+7. Treat compaction as retrieval/index maintenance, not automatic durable-memory approval.
+
+**Exit criteria:**
+- summary claims can be traced to source turns/events;
+- temporal order and corrections survive compaction;
+- summary-only evidence cannot override authoritative source records;
+- deleting/revoking source material removes it from future context according to the governing deletion policy;
+- long-session tests demonstrate reduced prompt size without increased false recall.
+
+### Phase 7 — Memory Quality, Context and Cost Evaluation
+
+**Status: Existing Runtime Standard evaluation axes and C09 research are the baseline; integrated evaluation suite remains to be built.**
+
+Create an offline, deterministic evaluation set covering:
+- relevant recall and explicit callback;
+- temporal correctness and changed facts;
+- multi-session continuity and long-horizon recall;
+- causal conflict/repair continuity;
+- provenance correctness;
+- contradiction and supersession;
+- abstention when memory is absent;
+- false recall and unsupported biography;
+- retrieval/disclosure boundary and cross-Subject isolation;
+- Character knowledge boundary and private-memory leakage;
+- persona fidelity and anti-repetition;
+- context truncation/drop-order correctness;
+- input/output token count and budget enforcement;
+- cost reservation, settlement, unknown usage and retry behavior.
+
+Use the existing Character Runtime Standard axes and appropriate research benchmarks (for example LongMemEval-style multi-session fact/update/time reasoning and role/knowledge-boundary probes) as design references, not as claims of benchmark compatibility without an adapter.
+
+Run offline fixtures and database tests first. Paid model evaluation remains locked until a separately approved exact model matrix, maximum output tokens, worst-case spend ceiling, per-case reservation and hard stop are in place.
+
+**Exit criteria:**
+- every quality/security dimension has a reproducible test and recorded result;
+- no test depends on a grader's self-reported claim for security truth;
+- token/cost/latency metrics are tied to actual request and Provider usage metadata;
+- paid evaluation remains disabled unless separately authorized.
+
+### Phase 8 — Provider, Cache and Production Rollout
+
+**Status: Blocked by O-C1-07, independent Character source publication, real Guard/ACK adapters and remaining source gates.**
+
+1. After O-C1-07 is resolved, bind approved model profiles and independent Provider adapters to each eligible Character. No implicit Se-yeon fallback.
+2. Wire the model-specific Token Budget Manager, exact input counter, output cap and Cost Governor into every production inference entrypoint.
+3. Wire the Dynamic Context Composer and permission-first retrieval into the real Provider request path.
+4. Add prompt caching only after correctness and token accounting are proven. Keep stable Character/system prefixes separate from user-private dynamic context; measure cache hit rate and actual cached-token usage. Caching must not broaden access or mix Subjects.
+5. Connect each Character's own Output Guard, transactional persistence, secure receipt and Worker/browser ACK.
+6. Verify independently approved/published content bundles and source hashes for Baekheon, Yeoul, Rahyeon and Taegyeom. Preserve the existing six visible cards and Yunho exclusion.
+7. Complete the required source/content publication and browser compatibility gates before activation.
+8. Roll out one Character at a time with hard cost limits, bounded canary, rollback/hold path and evidence review. No production activation by merge alone.
+
+**Exit criteria:**
+- all five intended chat targets have independent, source-approved runtime and Provider/Guard wiring;
+- real user messages are stored, generated, guarded, committed and ACKed exactly once;
+- actual input/output/cached token usage and cost reconcile with reservations/settlement;
+- context and memory access boundaries pass tenant and Character isolation tests;
+- all publication and client compatibility gates pass;
+- activation is explicitly authorized and observable.
+
+## 6. Work sequencing and parallelism
+
+The order is dependency-aware, not a requirement to wait idly between independent tasks:
+
+- Phase 1 authority/source inventory can proceed alongside provider-neutral contract work in Phase 2.
+- Phase 3 retrieval can begin in read-only mode using already-valid records and grants while blocked durable-write schemas remain unresolved.
+- Phase 4 composer can be implemented with deterministic fixtures before real Provider selection.
+- Phase 5 durable consolidation is gated by SRC-25/SRC-05/SRC-10; candidate extraction and offline validation must not bypass those gates.
+- Phase 6 compaction can be built over synthetic/approved fixtures, but production persistence follows retention and source authority.
+- Phase 7 offline evaluation can proceed without API keys. Paid/live evaluation cannot.
+- Phase 8 depends on O-C1-07, source-complete Character publication, cost enforcement, Output Guard and ACK.
+
+## 7. Definition of done
+
+The Context Engine is complete only when all of the following are evidenced:
+
+1. Model-specific input/output limits are enforced against the exact dispatched request, not estimated from character count.
+2. Context is assembled dynamically from authorized, relevant, source-traceable information.
+3. Long-term memory consolidation preserves authority, provenance, temporal updates, user choice and revocation.
+4. Compaction reduces context size without losing source traceability or increasing false recall.
+5. Character identity, knowledge boundaries, relationship continuity and Saju authority remain intact.
+6. Multi-session offline evaluation passes the agreed memory, privacy, quality and budget gates.
+7. Real Provider, Cost Governor, Output Guard, receipt/ACK and approved content publication are integrated for each activated Character.
+8. No paid inference, Production DB mutation, public route or Character activation occurs merely because this roadmap is approved or merged.
+
+## 8. Immediate next work
+
+1. Keep PR #3068 Draft and preserve the current green CI evidence.
+2. Add this roadmap as the track's authoritative implementation sequence.
+3. Start Phase 1 with a read-only inventory of existing memory/context tables, grants, revocation, Reader Knowledge and current retrieval code.
+4. In parallel, inspect and reuse the existing PR-04D2 token-count adapter and Cost Governor contracts to define the provider-neutral Token Budget Manager boundary.
+5. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
+
+## 9. Governing documents
+
+- `docs/AI_CHARACTER_RUNTIME_SPEC.md`
+- `docs/RELATIONSHIP_MEMORY_POLICY_SPEC.md`
+- `docs/character/CHARACTER_RUNTIME_STANDARD_V1.md`
+- `docs/character/CHARACTER_CHATBOT_COMMON_SPEC_V1_1.md`
+- `docs/character-memory-seyeon-c09-long-term-persona-memory-research-20261029.md`
+- `docs/character-memory-seyeon-c09-epistemic-knowledge-boundary-research-20261029.md`
+- `docs/character-memory-seyeon-cost-governor-contract-v1.md`
+- `docs/character-memory-seyeon-governor-04d2-openai-input-count-v1.md`
+- `docs/SEYEON_SECURITY_EVAL_ADMISSION_READINESS_AND_READER_MEMORY_DB_V1.md`
