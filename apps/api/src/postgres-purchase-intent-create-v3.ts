@@ -192,7 +192,11 @@ function mapAuthorityError(error: unknown): never {
     case 'cmd_saju_purchase_admission_record_unavailable':
     case 'cmd_saju_purchase_admission_product_unavailable':
     case 'cmd_saju_purchase_admission_capability_scope_invalid':
+    case 'cmd_saju_purchase_admission_existing_rights_require_upgrade':
+    case 'cmd_saju_purchase_admission_refund_or_cancellation_hold':
       return mapped('CAPABILITY_UNAVAILABLE','Saju Record or Record-scoped Product authority is unavailable.');
+    case 'cmd_saju_purchase_admission_upgrade_charge_terms_unavailable':
+      return mapped('CHARGE_TERMS_UNAVAILABLE','Saju upgrade Charge Terms authority is not available.');
     case 'cmd_saju_purchase_admission_replay_origin_conflict':
     case 'cmd_saju_purchase_admission_replay_credit_conflict':
       return mapped('IDEMPOTENCY_CONFLICT','Saju Purchase Intent replay conflicts with its immutable Record or Receipt sources.');
