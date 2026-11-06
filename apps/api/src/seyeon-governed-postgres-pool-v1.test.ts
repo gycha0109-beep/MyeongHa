@@ -33,6 +33,8 @@ function safeRow() {
     canOrdinaryStoreReceipt:false,
     ordinaryIsGovernedRoleMember:false,ordinaryIsCostOwnerMember:false,
     canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false,
+    canOrdinaryDirectLedger:false,canOrdinaryDirectBudget:false,
+    canOrdinaryDirectRateCard:false,
   };
 }
 function driver(input: {preflight?:Readonly<Record<string,unknown>>; failSql?:string}={}) {
@@ -125,6 +127,9 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       ['ordinaryIsCostOwnerMember',true],
       ['canDirectLedger',true],['canDirectBudget',true],
       ['canDirectRateCard',true],
+      ['canOrdinaryDirectLedger',true],
+      ['canOrdinaryDirectBudget',true],
+      ['canOrdinaryDirectRateCard',true],
     ] as const) {
       expect(()=>verifySeyeonGovernedLoginPreflightV1(
         [{...safeRow(),[key]:value}],SEYEON_GOVERNED_DB_LOGIN_V1,
@@ -138,6 +143,8 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       'canOrdinaryGovernedStart','canOrdinaryGovernedSettle',
       'canOrdinaryStoreReceipt',
       'ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
+      'canOrdinaryDirectLedger','canOrdinaryDirectBudget',
+      'canOrdinaryDirectRateCard',
     ] as const){
       expect(GOVERNED_LOGIN_PREFLIGHT_SQL_V1).toContain(
         'as "'+key+'"',
@@ -181,7 +188,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     await p.close();
     expect(safe.poolEnded).toBe(true);
 
-    const bad=driver({preflight:{...safeRow(),ordinaryIsGovernedRoleMember:true}});
+    const bad=driver({preflight:{...safeRow(),canOrdinaryDirectLedger:true}});
     const bp=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:bad.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });

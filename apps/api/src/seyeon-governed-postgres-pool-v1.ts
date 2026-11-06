@@ -130,6 +130,8 @@ const LEGACY_OR_DIRECT_FLAGS = [
   // NOINHERIT members may still SET ROLE into these private principals.
   'ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
   'canDirectLedger','canDirectBudget','canDirectRateCard',
+  // Check the ordinary API role itself, not only the dedicated LOGIN.
+  'canOrdinaryDirectLedger','canOrdinaryDirectBudget','canOrdinaryDirectRateCard',
 ] as const;
 
 export function verifySeyeonGovernedLoginPreflightV1(
@@ -157,7 +159,8 @@ export function verifySeyeonGovernedLoginPreflightV1(
   for (const key of LEGACY_OR_DIRECT_FLAGS) {
     if (row[key] !== false) {
       return fail(
-        key.startsWith('canDirect') ? 'DIRECT_SQL_EXPOSED' : 'LEGACY_ROLE_EXPOSED',
+        (key.startsWith('canDirect') || key.startsWith('canOrdinaryDirect'))
+          ? 'DIRECT_SQL_EXPOSED' : 'LEGACY_ROLE_EXPOSED',
         'Governed login can reach forbidden legacy or raw SQL authority.',
       );
     }

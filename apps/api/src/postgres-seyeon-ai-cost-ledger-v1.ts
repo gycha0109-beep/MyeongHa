@@ -83,14 +83,23 @@ select
    'myeongha_seyeon_cost_meter_owner','MEMBER')
    as "ordinaryIsCostOwnerMember",
  pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
    as "canDirectLedger",
  pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE')
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
    as "canDirectBudget",
  pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE')
-   as "canDirectRateCard"
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+   as "canDirectRateCard",
+ pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+   as "canOrdinaryDirectLedger",
+ pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+   as "canOrdinaryDirectBudget",
+ pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+   as "canOrdinaryDirectRateCard"
 from pg_catalog.pg_roles r where r.rolname=session_user
 `.trim();
 

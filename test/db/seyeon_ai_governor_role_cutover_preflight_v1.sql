@@ -68,17 +68,11 @@ begin
   end loop;
 
   if pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_call_cost_events','INSERT')
+      'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
     or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_call_cost_events','UPDATE')
+      'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
     or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_call_cost_events','DELETE')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_governor_model_policies_v1','SELECT') then
+      'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') then
     raise exception 'Common API executor obtained direct cost or policy table rights';
   end if;
 
@@ -86,6 +80,20 @@ begin
   -- It is NOT yet a least-privilege ENFORCE execution identity.
   raise notice 'D3B2B-3A verified TEMPORARY LEGACY EXPOSURE: Start/Settle/Record available under myeongha_api_executor; Production ENFORCE remains HOLD';
 end $audit$;
+
+-- W119: the ordinary executor itself must have no direct ledger, budget or
+-- model-rate table privileges, including read-only and maintenance rights.
+begin;
+grant select on public.seyeon_ai_call_cost_events to myeongha_api_executor;
+do $direct$
+begin
+  if not pg_catalog.has_table_privilege('myeongha_api_executor',
+      'public.seyeon_ai_call_cost_events','SELECT') then
+    raise exception 'W119 direct table grant was not visible to ordinary API role';
+  end if;
+end
+$direct$;
+rollback;
 
 -- W118: NOINHERIT suppresses automatic privilege inheritance, but it does
 -- NOT prevent SET ROLE. The checkout preflight must inspect MEMBER, not only
