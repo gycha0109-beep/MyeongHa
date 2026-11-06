@@ -74,7 +74,7 @@ const people = Object.freeze([
 // Public discovery only. Keep the full historical presentation index above
 // so existing Character Room deep links and past messages are not deleted.
 const launchPeople = Object.freeze(
-  people.filter(({ key }) => key !== 'seorin' && key !== 'mira' && key !== 'doyun'),
+  people.filter(({ key }) => key !== 'seorin' && key !== 'mira' && key !== 'doyun' && key !== 'yunho'),
 );
 
 const portraitArt = Object.freeze({
