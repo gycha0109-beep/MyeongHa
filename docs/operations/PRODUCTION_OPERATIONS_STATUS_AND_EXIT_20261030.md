@@ -1,3 +1,11 @@
+### 2026-11-07 KST — 종료 집중 Production Operations 로드맵 개정
+
+- **개정 문서:** [Production Operations 종료 집중 로드맵](PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md)을 추가했다. 기존 Phase 1–13, Architecture §33의 14개 수용 항목, §34 장애 행렬, §35 Runbook은 변경하지 않고 실행 순서를 Phase 8 DR → Phase 11 잔여 실측 → Phase 12 확장 판단 → Phase 13 최종 수용으로 재정렬했다.
+- **중복 작업 방지:** Phase 11의 15분 workerd overlap #42244701347과 기존 DB/Saju 압력 실측은 유효한 격리 증거로 재사용한다. 동일 부하를 반복하지 않고, 기존 증거에 없는 DB 장애/복구 조합과 최종 수용 증거만 보완한다.
+- **Phase 8 우선:** migration source/DDL/ACL 처분, Provider-equivalent Auth/Storage 복구, 독립 개인정보 연속성, 현재 backup frontier replay, 전체 서비스 RPO `PT24H` / RTO `PT6H` 확인을 단일 P0 종료 경로로 정리했다. #1887과 `dr_ready=false`는 유지한다.
+- **Phase 13 압축:** 최신 Worker 익명 E2E는 확인됐으나 configuration-only readiness다. 양성 Member/DB/Saju, 최신 버전 로그·메트릭·경보, private no-store, rollback 등 미수용 항목만 exact-version 증거로 마무리한다.
+- **승인 경계:** `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` 승인 전 실행 금지. 새 Hosted DR 유료 리소스 또는 Production migration/DDL 변경은 사전 사용자 승인 없이 실행하지 않는다. 이번 개정 자체는 문서 변경만 수행했다.
+
 ### 2026-11-07 KST — current-main Phase 13 anonymous ingress rechecked (read-only)
 
 - **Exact current main:** `1609aa879aa63120072b4d21b35f4c469dc650ed`. Existing anonymous Cloudflare live E2E [#42271216975](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42271216975) SUCCESS on this exact SHA. Observed Worker version `295b9496-795b-44a3-b3f9-141c0b83e47d`; static root/hall and Health 200, readiness 200 (configuration-only), anonymous Member/Saju/preview denied 401, cross-origin auth denied 403, unknown route 404. The run explicitly reports `liveDependencyConnectivityProven=false` and `productionAcceptanceProven=false`.
@@ -12,11 +20,11 @@
 - **Next:** preserve the fail-closed freshness result; continue read-only source/DDL/ACL provenance analysis and independently complete approved non-Production operations work. Dispatch the disposable Production privacy canary only after the explicit owner confirmation above.
 # Production Operations — 구현 목적·실제 엔드포인트·종료 기준 및 현황 보고서
 
-> 기준일: 2026-10-30 KST (관측 시점별 스냅샷이며 지속적인 정상 상태 보증이 아님)
+> 기준일: 2026-11-07 KST (Worklog는 관측 시점별 스냅샷이며 지속적인 정상 상태 보증이 아님)
 >
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`
 >
-> 기준 소스: 병합된 `main` `a3a78bdf6df0824aed018e37cb70c0c1690d5b94` (PR [#2770](https://github.com/gycha0109-beep/MyeongHa/pull/2770))
+> 기준 소스: `main` `1609aa879aa63120072b4d21b35f4c469dc650ed` (2026-11-07 현재 확인 기준; 이후 관측은 각 Worklog에 기록된 SHA에 한정)
 >
 > 최종 판정: **코드·배포·익명 운영 점검 일부 확인 / 전체 Production Operations ACCEPTANCE = 미완료**. `dr_ready=false`, `serviceResumptionAllowed=false` 상태를 변경하지 않음.
 
@@ -689,18 +697,24 @@ Cloudflare Provider observability 설정은 `enabled=true`, `logs.enabled=true`,
 
 이 표는 별도 실증 결과를 수작업으로 구분한 **상태 보고**이며 `scripts/operations/inspect-main-operations-acceptance.mjs`가 자동으로 전 항목을 PASS 판정한 결과가 아님. 그 스크립트는 read-only GitHub workflow 증거만 수집하고 `acceptanceDecision=NOT_EVALUATED_BY_COLLECTOR`를 반환함.
 
-## 6. 실제 종료까지의 실행 순서와 금지 사항
+## 6. 종료 집중 실행 순서 — 2026-11-07 개정
 
-1. **새 배포의 익명 수용**. Cloudflare 100% 버전과 같은 버전의 화면·Health·readiness·인증 거부를 기존 익명 운영 E2E로 대조한다. 시각과 버전 근거를 보존한다.
-2. **양성 의존성 수용**. 별도 확인한 현재 Worker 버전과 승인된 Production 합성 전용 Member 범위에서 `cloudflare-primary-e2e-member.yml`로 로그인·주체 귀속 DB·Birth revision·계산 경로를 확인한다. 보고서에는 비밀 값을 포함하지 않는다.
-3. **운영 장애·관측 수용:** 실제 버전 로그/redaction·의존성 메트릭·알림·롤백 근거를 확보. 안전한 **비운영** 환경에서 DB/Saju timeout/장애, 5/15분 실측, 부하·용량 및 확장 기준을 검증. 테스트 도구의 존재만으로 실측 완료 처리 금지.
-4. **DR 통합 수용:** 실제 백업과 migration/DDL/ACL 동등성, 지속적인 독립 개인정보 삭제/철회 기록, Hosted Auth/Storage 복원, 전체 서비스 복구 및 RPO/RTO 확인. 관련 권한·안전 조건이 충족되기 전에는 서비스 재개 게이트를 열지 않음.
-5. **종료 결정:** 위 증거를 §33 항목별 PASS/NOT_OBSERVED/BLOCKED로 묶어 최종 판정. **전부 충족하지 못했다면 전체 Production 운영 준비 완료를 선언하지 않고 차단 항목을 명시한 채 종료 가능 범위만 종료**. 임의 추가 기능/별도 승인자·외부업체 문의/근거 없는 완료율을 만들지 않음.
+세부 작업·증거·승인 경계의 최신 기준은 [Production Operations 종료 집중 로드맵](PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md)을 따른다. 기존 아키텍처의 목표와 수용 조건은 바꾸지 않는다.
+
+1. **Phase 8 P0:** Production migration 출처·DDL·ACL 정합성, Provider-equivalent PostgreSQL/Auth/Storage 복구, 독립 개인정보 삭제·철회 연속성, 현재 frontier replay, 전체 서비스 RPO `PT24H` / RTO `PT6H`를 입증한다. 해결 전 #1887과 서비스 재개 차단을 유지한다.
+2. **Phase 11:** 이미 성공한 15분 workerd overlap 및 기존 DB/Saju 압력 실측을 재사용한다. 미측정 DB 장애·복구 조합만 비운영 격리 환경에서 보완한다.
+3. **Phase 12:** 실측된 DB/Saju 자원·지연 근거로 수동 확장·축소 판단 기준을 확정한다. 근거 없는 수치나 자동 확장을 만들지 않는다.
+4. **Phase 13:** 최신 배포 버전에 §33 14개 항목을 대조하고, §34 장애 행렬 및 §35 Runbook의 미확인 부분만 수용한다.
+
+Phase 1–7 및 9–10은 새 구현 단계로 되돌리지 않는다. 최신 배포 또는 최종 수용에서 빠진 증거만 보완한다. 상세 종료 조건은 새 로드맵 문서를 기준으로 하며, 문서 병합·CI GREEN·격리 실험 성공만으로 `ROADMAP_COMPLETE`를 선언하지 않는다.
+
+Production 개인정보 canary, migration repair/DDL/DML, 비밀·트래픽 변경, 신규 유료 Hosted DR 자원은 각각 명시된 사용자 승인 경계가 충족되기 전 실행하지 않는다.
 
 ## 7. 실무상 바로 재사용할 파일/검증 진입점
 
 | 구분 | 파일 또는 실행 지점 |
 | --- | --- |
+| **현재 종료 집중 로드맵** | [`PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md`](PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md) |
 | 최상위 실행·수용 원칙 | [`docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md`](../architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md) (§33, §38) |
 | Cloudflare 라우트 인벤토리 | [`workers/cloudflare-api-router.mjs`](../../workers/cloudflare-api-router.mjs) |
 | 실제 익명 검증기·워크플로 | [`scripts/verify-cloudflare-primary-e2e.mjs`](../../scripts/verify-cloudflare-primary-e2e.mjs), [`cloudflare-primary-e2e.yml`](../../.github/workflows/cloudflare-primary-e2e.yml) |
