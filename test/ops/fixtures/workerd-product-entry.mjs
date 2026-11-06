@@ -10,11 +10,14 @@ function loopbackOrigin(value) {
   return value;
 }
 
-function isolatedDatabaseConfig(connectionString) {
+function isolatedDatabaseConfig(binding) {
+  const { connectionString, host } = binding;
   const url = new URL(connectionString);
-  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== '127.0.0.1' ||
+  // Wrangler pins the upstream to loopback. Inside workerd, the binding exposes
+  // a virtual hostname that the runtime maps to that upstream.
+  if (!['postgres:', 'postgresql:'].includes(url.protocol) || url.hostname !== host ||
       url.username !== 'myeongha_ops_phase11_login' || url.pathname !== '/postgres' ||
-      url.search || url.hash) {
+      !['', '?sslmode=disable'].includes(url.search) || url.hash) {
     throw Error('Only the temporary PostgreSQL fixture is supported');
   }
   return { connectionString, ssl: false, connectionTimeoutMillis: 2000, query_timeout: 2000 };
@@ -31,11 +34,11 @@ export default {
     }
     const authOrigin = loopbackOrigin(env.MH_OPS_WORKERD_AUTH_ORIGIN);
     const sajuOrigin = loopbackOrigin(env.MH_OPS_WORKERD_SAJU_ORIGIN);
-    const dbConfig = isolatedDatabaseConfig(env.HYPERDRIVE.connectionString);
+    const dbConfig = isolatedDatabaseConfig(env.HYPERDRIVE);
     const identityEvidenceVerifier = new SupabaseMemberIdentityEvidenceVerifierV1({
       supabaseOrigin: 'https://synthetic.invalid',
       supabaseApiKey: 'synthetic-api-key-transport-material-long-enough',
-      fetchImpl: (_url, init) => fetch(authOrigin + '/user', { ...init, redirect: 'error' }),
+      fetchImpl: (_url, init) => fetch(authOrigin + '/user', { ...init, redirect: 'manual' }),
       timeoutMs: 2000,
     });
     const sajuAdapter = createSajuProductionCalculationHttpAdapterV1({
