@@ -289,7 +289,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
               status: 'in_flight' as const,
               subjectId, threadId,
               threadCharacterId: actualThreadCharacterId,
-              characterId, releaseId, bundleId,
+              characterId, releaseId, bundleId, sourceDigest: digest,
               turnId: actualTurnId, attemptId, costReservationId,
             });
           }
