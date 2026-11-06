@@ -345,7 +345,7 @@ function mapAuthorityError(error: unknown): never {
     case 'SUBJECT_INELIGIBLE':
       throw new ApiCommandError(
         'FORBIDDEN',
-        'Purchase Intent requires an active canonical Guest or Member subject.',
+        'Paid Purchase Intent requires an active authenticated Member.',
       );
     case 'OFFER_NOT_FOUND':
     case 'OFFER_UNAVAILABLE':
