@@ -2171,6 +2171,92 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     expect(originalCostFence).toMatchObject({
       model_calls:0,governed_calls:0,execution_logs:0,
     });
+    // W105 G4: the pre-cutover ordinary API still has three legacy cost
+    // entrypoints. Rehearse the missing ACL cutover in ONE rolled-back DB
+    // transaction. A public/ordinary role must never gain a direct-cost
+    // table write, even if it can execute a legacy cost command today.
+    const legacyCostRpcs=[
+      'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
+      'public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+      'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
+    ] as const;
+    const checkLegacyCostAcl=async()=> {
+      const {rows:[acl]}=await pool.query<{
+        ordinary_legacy_calls:boolean;browser_denied:boolean;
+        no_direct_policy_write:boolean;no_direct_budget_write:boolean;
+        no_direct_cost_write:boolean
+      }>(`select
+        (select bool_and(pg_catalog.has_function_privilege(
+          'myeongha_api_executor',x.signature::regprocedure,'EXECUTE'))
+         from unnest($1::text[]) as x(signature)) as ordinary_legacy_calls,
+        (select bool_and(not pg_catalog.has_function_privilege(
+          'authenticated',x.signature::regprocedure,'EXECUTE')
+          and not pg_catalog.has_function_privilege(
+          'anon',x.signature::regprocedure,'EXECUTE')
+          and not pg_catalog.has_function_privilege(
+          'service_role',x.signature::regprocedure,'EXECUTE'))
+         from unnest($1::text[]) as x(signature)) as browser_denied,
+        not pg_catalog.has_table_privilege('myeongha_api_executor',
+          'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+            as no_direct_policy_write,
+        not pg_catalog.has_table_privilege('myeongha_api_executor',
+          'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
+            as no_direct_budget_write,
+        not pg_catalog.has_table_privilege('myeongha_api_executor',
+          'public.seyeon_ai_call_cost_events','INSERT')
+            as no_direct_cost_write`,[[...legacyCostRpcs]]);
+      return acl;
+    };
+    expect(await checkLegacyCostAcl()).toEqual({
+      ordinary_legacy_calls:true,browser_denied:true,
+      no_direct_policy_write:true,no_direct_budget_write:true,
+      no_direct_cost_write:true,
+    });
+    const legacyCutover=await pool.connect();
+    try {
+      await legacyCutover.query('BEGIN');
+      // Static function signatures; no interpolation of caller input.
+      await legacyCutover.query(`
+        revoke execute on function
+          public.cmd_start_seyeon_ai_call_v1(
+            uuid,uuid,uuid,text,uuid,text,text,text),
+          public.cmd_settle_seyeon_ai_call_v1(
+            uuid,uuid,uuid,text,jsonb),
+          public.cmd_record_seyeon_ai_call_cost_v1(
+            uuid,uuid,uuid,text,jsonb)
+        from myeongha_api_executor`);
+      const {rows:[cutoverAcl]}=await legacyCutover.query<{
+        legacy_still_executable:boolean
+      }>(`select bool_or(pg_catalog.has_function_privilege(
+          'myeongha_api_executor',x.signature::regprocedure,'EXECUTE'))
+        as legacy_still_executable
+        from unnest($1::text[]) as x(signature)`,[[...legacyCostRpcs]]);
+      expect(cutoverAcl).toEqual({legacy_still_executable:false});
+      await legacyCutover.query('SET LOCAL ROLE myeongha_api_executor');
+      await legacyCutover.query(
+        "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+      );
+      // A real SQL call (not just ACL catalog inference) must reject the
+      // ordinary executor BEFORE any cost event can be written.
+      await expect(legacyCutover.query(`select * from
+        public.cmd_start_seyeon_ai_call_v1(
+          $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+          $6::text,$7::text,$8::text)`,[
+        f.subject,currentTurn,currentAttempt,'chat',uuid(35,218),
+        'dialogue_render','synthetic-not-approved','synthetic',
+      ])).rejects.toMatchObject({code:'42501'});
+    } finally {
+      // Revert all three ACL changes even after the expected SQL error.
+      // Never modify live/prod role privileges or turn on a paid Provider.
+      await legacyCutover.query('ROLLBACK').catch(()=>undefined);
+      legacyCutover.release();
+    }
+    expect(await checkLegacyCostAcl()).toEqual({
+      ordinary_legacy_calls:true,browser_denied:true,
+      no_direct_policy_write:true,no_direct_budget_write:true,
+      no_direct_cost_write:true,
+    });
+    expect(await readHistoricalCostFence()).toEqual(originalCostFence);
     const {rows:[original]}=await pool.query(`select
       'sha256:pg-jsonb:v1:'||encode(sha256(convert_to(content_jsonb::text,'UTF8')),'hex')
       as digest from public.memory_items where id=$1`,[f.memory]);
