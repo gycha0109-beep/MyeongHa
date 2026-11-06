@@ -54,6 +54,10 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 4. `20261029012948` 원격 statement와 `20261029012000` main 파일은 현재 Production에 대해 SELECT-only로 직접 비교했다. 양쪽 모두 7,349 bytes이며 exact byte equality, MD5 `c13c8ae6680c9c5aef35909ba81b7b1b`, SHA-256 `b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6`가 일치한다. 정규화 SHA-256도 `0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d`로 일치한다. 따라서 이 쌍의 SQL source equivalence는 확인됐지만 remote/local version identity와 적용 provenance는 해결되지 않았다. 원격 metadata의 `created_by`는 존재하나 인증된 실행자 증명은 아니며 idempotency key와 rollback statement는 없다.
 5. 원격 전용 41개·저장소 전용 76개와 동일 이름/다른 버전 8쌍을 개별 처분한다. 현재 8쌍 중 4개는 byte-exact, 4개는 저장소 끝의 `\n\ncommit;\n` 10 bytes를 제외한 원격 prefix 일치다. Prefix 일치 4쌍은 SQL statement framing 차이를 기록하고, version identity 불일치를 자동으로 정리하지 않는다. 저장소 전용 76개를 자동 배포 실패로 분류하지 않는다.
 6. 전체 schema, function, owner, role membership, grants, RLS/policy 및 provider migration ledger의 복구 동등성을 증명한다.
+7. 현재 Production 기준으로 확인한 권한·정책 상태를 복구 기준으로 사용한다. 과거 bundle은 19 routine / 18 owner transfer / 19 policy이며 현재는 routine 19/19 존재, owner transfer 18/18 일치, 정책 19/19가 이름·테이블·명령·대상 역할 기준으로 일치한다. 관련 현재 정책은 38개로 후속 정책 19개가 추가되어 있으므로 과거 19개와 단순 개수 비교하지 않는다.
+8. `myeongha_seyeon_chat_runtime_owner`의 현재 `postgres` 멤버십 2개 중 하나는 `20261104043413`에서 SET 권한을 임시 부여한 뒤 회수하며 남긴 비상속·비관리자·비SET 멤버십이다. 현재 `pg_has_role` 결과는 MEMBER=true / USAGE=false / SET=false다. 이 마이그레이션은 Production 원장에만 있고 main 파일은 없으므로 remote-only 처분표에 포함한다. 이전 1개 멤버십 postcheck는 현재 frontier 수용 조건으로 재사용하지 않는다.
+9. 적용된 `1640` 원격 SQL(10,303 bytes)과 main 파일(10,147 bytes)은 권한 소유권 전환·회수 방식이 실질적으로 다르다. 원격은 owner 역할로 전환해 legacy EXECUTE를 회수하고 `GRANTED BY postgres`로 임시 멤버십을 제거하지만 main 파일은 `current_user`에 직접 회수한다. 이미 적용된 migration file/history는 수정·재적용하지 않고 source/provenance 차이로 별도 처분한다.
+10. `20261026025332`는 원격 9개 statement를 재구성한 결과와 main 파일의 공백 제거 token stream이 일치한다. statement framing/version identity는 별도 유지한다.
 
 **금지:** blind `migration repair`, migration history rewrite, 추측에 의한 재적용, Production DDL/DML. 실제 정합화가 필요하면 근거 있는 forward-only 계획을 먼저 제시하고 사용자 승인을 받은 뒤 별도 실행한다.
 
