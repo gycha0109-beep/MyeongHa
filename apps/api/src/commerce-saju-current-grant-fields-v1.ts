@@ -1,4 +1,4 @@
-import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
+import type { PostgresSubjectPoolV1, PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import {
   COMMERCE_SAJU_PRODUCTS_V1,
   type SajuFieldV1,
@@ -11,7 +11,6 @@ import {
   quoteSajuFromOnePrivateSnapshotV1,
   type SajuPrivateOwnedFieldSnapshotReaderV1,
 } from './commerce-saju-single-snapshot-private-quote-v1.js';
-import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 /**
  * STAGED, read-only candidate. The Saju origin tables have NOT been deployed
