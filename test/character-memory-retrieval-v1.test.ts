@@ -420,12 +420,13 @@ describe('Character Working Memory retrieval v1', () => {
     });
 
     expect(result.retrieval.records.map((item) => item.record.recordId)).toEqual(['memory-api']);
-    expect(result.projection.currentUserMessage.text).toBe('지난번에 퇴사 고민했던 거 기억나요?');
-    expect(result.projection.scope).toEqual({
+    expect(result.context.currentUserMessage.text).toBe('지난번에 퇴사 고민했던 거 기억나요?');
+    expect(result.context.scope).toEqual({
       subjectId: 'subject-a',
       characterId: 'seyeon',
       threadId: 'thread-a',
       relationshipRevision: null,
     });
+    expect('projectedRecords' in result.context).toBe(false);
   });
 });

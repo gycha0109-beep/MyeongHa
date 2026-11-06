@@ -23,6 +23,8 @@ export interface PrepareCharacterWorkingMemoryContextInputV1 {
   readonly characterId: string;
   readonly currentUserMessageRef: string;
   readonly expectedRelationshipRevision: number | null;
+  /** Server clock instant used to exclude Life Facts outside their valid-time range. */
+  readonly asOf?: string;
   readonly recentMessageLimit: number;
   readonly relationshipEventLimit: number;
   readonly memoryAuthorityPort: ReaderContextMemoryReadAuthorityPortV1;
@@ -30,6 +32,18 @@ export interface PrepareCharacterWorkingMemoryContextInputV1 {
   readonly relationshipAuthorityPort: CharacterRelationshipReadAuthorityPortV1;
   /** Server-owned positive projector registry; intentionally empty until source-approved. */
   readonly projectors?: readonly CharacterWorkingMemoryRecordProjectorV1[];
+}
+
+function requireEvaluationTime(value: string | undefined): Readonly<{
+  iso: string;
+  millis: number;
+}> {
+  const iso = value ?? new Date().toISOString();
+  const millis = Date.parse(iso);
+  if (Number.isNaN(millis)) {
+    throw new TypeError('Working Memory asOf must be a valid timestamp.');
+  }
+  return Object.freeze({ iso, millis });
 }
 
 function requirePositiveLimit(value: number, label: string): number {
@@ -65,6 +79,7 @@ export async function prepareCharacterWorkingMemoryContextV1(
     );
   }
 
+  const evaluation = requireEvaluationTime(input.asOf);
   const recentMessageLimit = requirePositiveLimit(
     input.recentMessageLimit,
     'recentMessageLimit',
@@ -110,6 +125,19 @@ export async function prepareCharacterWorkingMemoryContextV1(
       }),
     ]);
 
+  const validLifeFacts = lifeFacts.filter((fact) => {
+    const validFrom = fact.validFrom === null ? null : Date.parse(fact.validFrom);
+    const validTo = fact.validTo === null ? null : Date.parse(fact.validTo);
+    if (
+      (validFrom !== null && Number.isNaN(validFrom)) ||
+      (validTo !== null && Number.isNaN(validTo))
+    ) {
+      throw new TypeError('Life Fact authority returned an invalid validity timestamp.');
+    }
+    return (validFrom === null || validFrom <= evaluation.millis) &&
+      (validTo === null || validTo >= evaluation.millis);
+  });
+
   return buildCharacterWorkingMemoryProjectionV1({
     scope: {
       subjectId: input.resolvedSubjectId,
@@ -120,7 +148,7 @@ export async function prepareCharacterWorkingMemoryContextV1(
     },
     currentUserMessageRef: input.currentUserMessageRef,
     memories,
-    lifeFacts,
+    lifeFacts: validLifeFacts,
     relationship: relationshipResponse.relationship,
     relationshipEvents,
     recentMessages,

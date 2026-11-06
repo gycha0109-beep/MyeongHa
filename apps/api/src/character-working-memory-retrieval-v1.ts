@@ -24,8 +24,21 @@ export interface RetrieveCharacterWorkingMemoryForTurnInputV1
   readonly explicitCallbackRequested?: boolean;
 }
 
+export type CharacterWorkingMemoryContextMetadataV1 = Pick<
+  CharacterWorkingMemoryProjectionV1,
+  | 'schemaVersion'
+  | 'authority'
+  | 'scope'
+  | 'relationship'
+  | 'currentUserMessage'
+  | 'relationshipEventIndex'
+  | 'recentConversation'
+  | 'excludedMessages'
+  | 'admissions'
+>;
+
 export interface RetrieveCharacterWorkingMemoryForTurnResultV1 {
-  readonly projection: CharacterWorkingMemoryProjectionV1;
+  readonly context: CharacterWorkingMemoryContextMetadataV1;
   readonly retrieval: CharacterMemoryRetrievalResultV1;
 }
 
@@ -58,7 +71,10 @@ export async function retrieveCharacterWorkingMemoryForTurnV1(
     throw new CharacterWorkingMemoryRetrievalGateErrorV1(capability.reason);
   }
 
-  const projection = await prepareCharacterWorkingMemoryContextV1(input);
+  const projection = await prepareCharacterWorkingMemoryContextV1({
+    ...input,
+    asOf: input.now,
+  });
   const retrieval = retrieveCharacterWorkingMemoryV1({
     projection,
     expectedScope: {
@@ -72,5 +88,16 @@ export async function retrieveCharacterWorkingMemoryForTurnV1(
       ? {}
       : { explicitCallbackRequested: input.explicitCallbackRequested }),
   });
-  return Object.freeze({ projection, retrieval });
+  const context: CharacterWorkingMemoryContextMetadataV1 = Object.freeze({
+    schemaVersion: projection.schemaVersion,
+    authority: projection.authority,
+    scope: projection.scope,
+    relationship: projection.relationship,
+    currentUserMessage: projection.currentUserMessage,
+    relationshipEventIndex: projection.relationshipEventIndex,
+    recentConversation: projection.recentConversation,
+    excludedMessages: projection.excludedMessages,
+    admissions: projection.admissions,
+  });
+  return Object.freeze({ context, retrieval });
 }
