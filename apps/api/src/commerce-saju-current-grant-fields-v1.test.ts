@@ -34,7 +34,7 @@ function evidence(field='career',grant=id(9007)) {
     capabilityBound:true,effectiveCurrent:true,
     receiptGrantedEventCount:'1',validReceiptGrantedEventCount:'1',
     providerRevocationEventCount:'0',
-    productKey:'standard.career',field,refundedMinor:'0',
+    productKey:'standard.career',field,entitlementKey:'saju.'+field,refundedMinor:'0',
     unsettledCancellationCount:'0',
   };
 }
@@ -110,6 +110,7 @@ describe('Saju current field Grant evidence — private Record-scoped read',()=>
       {...evidence(),natalVersion:id(9993)},
       {...evidence(),productKey:'standard.business'},
       {...evidence(),field:'custom_unapproved_field'},
+      {...evidence(),entitlementKey:'saju.other'},
       {...evidence(),grantId:'not-a-uuid'},
       {...evidence(),receiptId:'not-a-uuid'},
     ];
@@ -183,6 +184,7 @@ describe('Saju current field Grant evidence — private Record-scoped read',()=>
       "grant_row.status='active'",
       'left join public.product_capability_sets capability',
       'left join public.product_capability_items item',
+      'item.entitlement_key as "entitlementKey"',
       'left join public.entitlements effective',
       "effective.status='active'",
       'active_grant_count>0',
