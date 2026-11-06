@@ -132,6 +132,7 @@ for privilege in SELECT INSERT UPDATE DELETE TRUNCATE; do
   [[ "$has" == 'f' ]] || fail "myeongha_api_executor unexpectedly has ${privilege} on payment attempts"
 done
 [[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('myeongha_api_executor','public.cmd_create_payment_attempt_v1(uuid,uuid,uuid,text,text,text)'::regprocedure,'EXECUTE');")" == 't' ]] || fail "myeongha_api_executor lacks create-payment-attempt command"
+[[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('myeongha_api_executor','public.internal_cmd_create_payment_attempt_v1_pre_member_gate_v1(uuid,uuid,uuid,text,text,text)'::regprocedure,'EXECUTE');")" == 'f' ]] || fail "API executor can bypass the Member-only Payment Attempt wrapper"
 [[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('myeongha_api_executor','public.cmd_transition_payment_attempt_v1(uuid,uuid,text,text,text)'::regprocedure,'EXECUTE');")" == 't' ]] || fail "myeongha_api_executor lacks transition-payment-attempt command"
 for role_name in anon authenticated service_role; do
   [[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('${role_name}','public.cmd_create_payment_attempt_v1(uuid,uuid,uuid,text,text,text)'::regprocedure,'EXECUTE');")" == 'f' ]] || fail "${role_name} unexpectedly executes create-payment-attempt command"
@@ -190,7 +191,25 @@ insert into public.purchase_intents(
   'sha256:legacy-guest-offer','created',12345,'KRW','attempt-charge-v1',now(),now()
 );
 alter table public.purchase_intents enable trigger tr_purchase_intent_member_required_v1;
+alter table public.commerce_payment_attempts disable trigger tr_commerce_payment_attempt_member_required_v1;
+insert into public.commerce_payment_attempts(
+  id,purchase_intent_id,subject_id,product_offer_id,attempt_no,provider,environment,
+  idempotency_key,provider_request_id,provider_transaction_id,status,failure_code,
+  created_at,updated_at
+) values (
+  'b1060000-0000-0000-0000-000000000031',
+  'b1050000-0000-0000-0000-000000000003',
+  'b1010000-0000-0000-0000-000000000003',
+  'b1030000-0000-0000-0000-000000000001',
+  1,'testpay','sandbox','legacy-guest-attempt','merchant-legacy-guest-attempt',
+  null,'created',null,now(),now()
+);
+alter table public.commerce_payment_attempts enable trigger tr_commerce_payment_attempt_member_required_v1;
 SQL
 expect_fail "Guest cannot start a new Payment Attempt from historical Purchase Intent" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='b1010000-0000-0000-0000-000000000003'; select * from public.cmd_create_payment_attempt_v1('b1010000-0000-0000-0000-000000000003','b1060000-0000-0000-0000-000000000030','b1050000-0000-0000-0000-000000000003','sandbox','guest-attempt-denied','merchant-guest-attempt-denied'); commit;"
+
+expect_fail "Guest cannot replay a historical Payment Attempt" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='b1010000-0000-0000-0000-000000000003'; select * from public.cmd_create_payment_attempt_v1('b1010000-0000-0000-0000-000000000003','b1060000-0000-0000-0000-000000000032','b1050000-0000-0000-0000-000000000003','sandbox','legacy-guest-attempt','merchant-legacy-guest-attempt'); commit;"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.commerce_payment_attempts where id='b1060000-0000-0000-0000-000000000031';")" == '1' ]] || fail "historical Guest Payment Attempt was rewritten or removed"
+pass "historical Guest Payment Attempt remains immutable while paid replay is denied"
 
 echo "commerce payment attempt authority passed"

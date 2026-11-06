@@ -65,6 +65,29 @@ second_member=$(run_v2 'a9510000-0000-0000-0000-000000000002' 'a9550000-0000-000
 [[ "$second_member" == 'a9550000-0000-0000-0000-000000000002|created|12900|KRW|charge-v1|f' ]] || { echo "$second_member" >&2; fail "second active Member v2 result mismatch"; }
 pass "second active Member Purchase Intent v2 pins authoritative charge terms"
 
+# Preserve a pre-policy Guest row, but do not let it be replayed as a new paid checkout.
+"${psql_base[@]}" <<SQL
+begin;
+alter table public.purchase_intents disable trigger tr_purchase_intent_member_required_v1;
+insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,
+  offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at,
+  expected_amount_minor,expected_currency,charge_terms_version
+) values (
+  'a9550000-0000-0000-0000-000000000024',
+  'a9510000-0000-0000-0000-000000000005',
+  'a9530000-0000-0000-0000-000000000001',
+  null,'guest-v2-legacy-replay','sha256:v2:guest-legacy-replay',
+  '${snapshot}'::jsonb,'sha256:v2:guest-legacy-snapshot',
+  'created',now(),now(),12900,'KRW','charge-v1'
+);
+alter table public.purchase_intents enable trigger tr_purchase_intent_member_required_v1;
+commit;
+SQL
+expect_fail "Guest cannot replay a historical paid Purchase Intent v2" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='a9510000-0000-0000-0000-000000000005'; select * from public.cmd_create_purchase_intent_v2('a9510000-0000-0000-0000-000000000005','a9550000-0000-0000-0000-000000000025','a9530000-0000-0000-0000-000000000001',null,'guest-v2-legacy-replay','sha256:v2:guest-legacy-replay','${snapshot}'::jsonb,'sha256:v2:guest-legacy-snapshot'); commit;"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.purchase_intents where id='a9550000-0000-0000-0000-000000000024';")" == '1' ]] || fail "historical Guest Purchase Intent was rewritten or removed"
+pass "historical Guest Purchase Intent remains immutable while paid replay is denied"
+
 expect_fail "active Guest cannot create paid Purchase Intent v2" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='a9510000-0000-0000-0000-000000000005'; select * from public.cmd_create_purchase_intent_v2('a9510000-0000-0000-0000-000000000005','a9550000-0000-0000-0000-000000000023','a9530000-0000-0000-0000-000000000001',null,'guest-v2-denied','sha256:v2:guest-denied','${snapshot}'::jsonb,'sha256:v2:guest-denied-snapshot'); commit;"
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.purchase_intents where id='a9550000-0000-0000-0000-000000000023';")" == '0' ]] || fail "Guest paid Purchase Intent was persisted"
 pass "Guest paid Purchase Intent v2 is rejected without a row"
@@ -82,6 +105,9 @@ expect_fail "v2 denies owner override against transaction subject" "subject exec
 expect_fail "deletion-pending Member v2 is denied" "active canonical Guest or Member" "begin; set local myeongha.subject_id='a9510000-0000-0000-0000-000000000003'; select * from public.cmd_create_purchase_intent_v2('a9510000-0000-0000-0000-000000000003','a9550000-0000-0000-0000-000000000012','a9530000-0000-0000-0000-000000000001',null,'pending-member','sha256:v2:pending-member','${snapshot}'::jsonb,'sha256:v2:pending-member-snapshot'); commit;"
 expect_fail "merged Guest v2 is denied" "active canonical Guest or Member" "begin; set local myeongha.subject_id='a9510000-0000-0000-0000-000000000004'; select * from public.cmd_create_purchase_intent_v2('a9510000-0000-0000-0000-000000000004','a9550000-0000-0000-0000-000000000013','a9530000-0000-0000-0000-000000000001',null,'merged-guest','sha256:v2:merged-guest','${snapshot}'::jsonb,'sha256:v2:merged-guest-snapshot'); commit;"
 expect_fail "v2 offer without charge authority is denied" "no current authoritative charge terms" "begin; set local myeongha.subject_id='a9510000-0000-0000-0000-000000000002'; select * from public.cmd_create_purchase_intent_v2('a9510000-0000-0000-0000-000000000002','a9550000-0000-0000-0000-000000000014','a9530000-0000-0000-0000-000000000002',null,'no-terms','sha256:v2:no-terms','${no_terms_snapshot}'::jsonb,'sha256:v2:no-terms-snapshot'); commit;"
+
+[[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('myeongha_api_executor','public.internal_cmd_create_purchase_intent_v2_pre_member_gate_v1(uuid,uuid,uuid,uuid,text,text,jsonb,text)'::regprocedure,'EXECUTE');")" == 'f' ]] || fail "API executor can bypass the Member-only Purchase Intent v2 wrapper"
+pass "private pre-policy Purchase Intent v2 implementation is not executable by API callers"
 
 # Historical v1 remains Member-only. P0-CM-05 also requires Member authentication
 # for all current paid Purchase Intent commands.
