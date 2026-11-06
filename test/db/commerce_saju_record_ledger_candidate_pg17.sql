@@ -4,7 +4,6 @@
 begin;
 set local statement_timeout='40s';
 \ir ../../docs/operations/candidates/commerce_portone_cancellation_event_persistence_v1.sql
-\ir ../../docs/operations/candidates/commerce_saju_record_verified_purchase_ledger_v1.sql
 
 do $saju_ledger_pg17$
 declare
@@ -24,6 +23,19 @@ declare
  v_disjoint_intent uuid:='1219c200-0000-4000-8000-000000000013'::uuid;
  v_pending_product uuid:='11300000-0000-0000-0000-000000000001'::uuid;
  v_pending_offer uuid:='1219c200-0000-4000-8000-000000000014'::uuid;
+ v_scope_offer uuid:='1219c200-0000-4000-8000-000000000015'::uuid;
+ v_scope_capability_set uuid:='1219c200-0000-4000-8000-000000000016'::uuid;
+ v_scope_record uuid:='1219c200-0000-4000-8000-000000000017'::uuid;
+ v_scope_record_b uuid:='1219c200-0000-4000-8000-000000000018'::uuid;
+ v_scope_intent uuid:='1219c200-0000-4000-8000-000000000019'::uuid;
+ v_scope_receipt uuid:='1219c200-0000-4000-8000-000000000020'::uuid;
+ v_scope_intent_b uuid:='1219c200-0000-4000-8000-000000000021'::uuid;
+ v_scope_receipt_b uuid:='1219c200-0000-4000-8000-000000000022'::uuid;
+ v_scope_grant uuid;
+ v_scope_grant_b uuid;
+ v_scope_key text;
+ v_scope_key_b text;
+ v_scope_now timestamptz;
  v_subject uuid;
  v_source_revision uuid;
  v_receipt public.commerce_receipts%rowtype;
@@ -332,6 +344,191 @@ begin
      where purchase_intent_id=v_disjoint_intent and saju_record_id=v_record)<>1 then
    raise exception 'SAJU_DISJOINT_PENDING_PRODUCT_WAS_BLOCKED';
  end if;
+ -- Two Records owned by one Subject must receive independent opaque scope keys.
+ insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
+ values
+   (v_scope_record,v_subject,v_source_revision),
+   (v_scope_record_b,v_subject,v_source_revision);
+ select 'saju-record:'||entitlement_scope_id::text into strict v_scope_key
+ from public.commerce_saju_records_v1 where id=v_scope_record;
+ select 'saju-record:'||entitlement_scope_id::text into strict v_scope_key_b
+ from public.commerce_saju_records_v1 where id=v_scope_record_b;
+ if v_scope_key=v_scope_key_b
+    or v_scope_key='saju-record:'||v_scope_record::text
+    or v_scope_key_b='saju-record:'||v_scope_record_b::text then
+   raise exception 'SAJU_RECORD_OPAQUE_SCOPE_ID_NOT_UNIQUE_OR_PRIVATE';
+ end if;
+
+ -- A disabled, rollback-only Saju Offer and immutable Capability Set exercise
+ -- the real Receipt -> Origin -> Record resolver and existing atomic Grant writer.
+ insert into public.product_capability_sets(
+   id,product_id,definition_version,definition_hash,created_at
+ ) values(
+   v_scope_capability_set,v_pending_product,
+   'test-saju-record-scope-v1','sha256:test:saju-record-scope-v1',clock_timestamp()
+ );
+ insert into public.product_capability_items(
+   capability_set_id,item_key,entitlement_key,scope_mode,fixed_scope_key,
+   validity_mode,duration_seconds
+ ) values(
+   v_scope_capability_set,'relationship','saju.relationship',
+   'saju_record',null,'unbounded',null
+ );
+ insert into public.product_offers(
+   id,product_id,platform,provider,external_product_id,currency,
+   display_price_minor,enabled,created_at,capability_set_id
+ ) values(
+   v_scope_offer,v_pending_product,'web','portone_v2',
+   'synthetic-saju-record-scoped-grant','KRW',9900,false,
+   clock_timestamp(),v_scope_capability_set
+ );
+
+ insert into public.purchase_intents
+ select (pg_catalog.jsonb_populate_record(
+   null::public.purchase_intents,
+   pg_catalog.to_jsonb(pi)||pg_catalog.jsonb_build_object(
+     'id',v_scope_intent,
+     'product_offer_id',v_scope_offer,
+     'provider_account_link_id',null,
+     'idempotency_key','saju-record-scope-grant-a',
+     'request_hash','sha256:test:saju-record-scope-grant-a',
+     'offer_snapshot_jsonb',pg_catalog.jsonb_build_object(
+       'productOfferId',v_scope_offer::text,'productId',v_pending_product::text,
+       'platform','web','provider','portone_v2',
+       'externalProductId','synthetic-saju-record-scoped-grant'),
+     'offer_snapshot_hash','sha256:test:saju-record-scope-offer-a',
+     'expected_amount_minor',9900,
+     'expected_currency','KRW',
+     'charge_terms_version','test-saju-record-scope-charge-v1',
+     'capability_set_id',v_scope_capability_set,
+     'capability_snapshot_jsonb',pg_catalog.jsonb_build_object(
+       'capabilitySetId',v_scope_capability_set::text,
+       'definitionVersion','test-saju-record-scope-v1',
+       'definitionHash','sha256:test:saju-record-scope-v1'),
+     'capability_snapshot_hash','sha256:test:saju-record-scope-cap-a',
+     'status','verified',
+     'created_at',clock_timestamp(),
+     'updated_at',clock_timestamp()
+   )
+ )).* from public.purchase_intents pi where pi.id=v_b2_purchase;
+
+ insert into public.commerce_receipts
+ select (pg_catalog.jsonb_populate_record(
+   null::public.commerce_receipts,
+   pg_catalog.to_jsonb(receipt)||pg_catalog.jsonb_build_object(
+     'id',v_scope_receipt,
+     'purchase_intent_id',v_scope_intent,
+     'provider_account_link_id',null,
+     'product_offer_id',v_scope_offer,
+     'platform','web','provider','portone_v2',
+     'external_transaction_id','saju-record-scope-transaction-a',
+     'external_original_transaction_id',null,
+     'receipt_fingerprint','sha256:test:saju-record-scope-receipt-a',
+     'verification_status','verified',
+     'verified_at',clock_timestamp(),
+     'environment','production',
+     'verifier_revision','test-saju-record-scope-v1',
+     'verified_amount_minor',9900,
+     'verified_currency','KRW'
+   )
+ )).* from public.commerce_receipts receipt where receipt.id=v_receipt.id;
+
+ insert into public.commerce_saju_purchase_origins_v1(
+   purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
+ ) values(v_scope_intent,v_subject,v_scope_record,v_source_revision,'original');
+
+ v_scope_now:=clock_timestamp();
+ select result_grant_id into strict v_scope_grant
+ from public.internal_apply_verified_receipt_capability_effects_v1(
+   v_scope_receipt,
+   array['relationship']::text[],
+   array[v_scope_now]::timestamptz[],
+   array[v_scope_now]::timestamptz[],
+   array[null::timestamptz],
+   array['saju-record-scope-test']::text[]
+ );
+ if (select scope_key from public.entitlement_grants where id=v_scope_grant)
+      is distinct from v_scope_key
+    or (select scope_key_norm from public.entitlement_grants where id=v_scope_grant)
+      is distinct from v_scope_key then
+   raise exception 'SAJU_RECORD_GRANT_SCOPE_RESOLVER_MISMATCH';
+ end if;
+
+ insert into public.purchase_intents
+ select (pg_catalog.jsonb_populate_record(
+   null::public.purchase_intents,
+   pg_catalog.to_jsonb(pi)||pg_catalog.jsonb_build_object(
+     'id',v_scope_intent_b,
+     'product_offer_id',v_scope_offer,
+     'provider_account_link_id',null,
+     'idempotency_key','saju-record-scope-grant-b',
+     'request_hash','sha256:test:saju-record-scope-grant-b',
+     'offer_snapshot_jsonb',pg_catalog.jsonb_build_object(
+       'productOfferId',v_scope_offer::text,'productId',v_pending_product::text,
+       'platform','web','provider','portone_v2',
+       'externalProductId','synthetic-saju-record-scoped-grant'),
+     'offer_snapshot_hash','sha256:test:saju-record-scope-offer-b',
+     'expected_amount_minor',9900,
+     'expected_currency','KRW',
+     'charge_terms_version','test-saju-record-scope-charge-v1',
+     'capability_set_id',v_scope_capability_set,
+     'capability_snapshot_jsonb',pg_catalog.jsonb_build_object(
+       'capabilitySetId',v_scope_capability_set::text,
+       'definitionVersion','test-saju-record-scope-v1',
+       'definitionHash','sha256:test:saju-record-scope-v1'),
+     'capability_snapshot_hash','sha256:test:saju-record-scope-cap-b',
+     'status','verified',
+     'created_at',clock_timestamp(),
+     'updated_at',clock_timestamp()
+   )
+ )).* from public.purchase_intents pi where pi.id=v_b2_purchase;
+
+ insert into public.commerce_receipts
+ select (pg_catalog.jsonb_populate_record(
+   null::public.commerce_receipts,
+   pg_catalog.to_jsonb(receipt)||pg_catalog.jsonb_build_object(
+     'id',v_scope_receipt_b,
+     'purchase_intent_id',v_scope_intent_b,
+     'provider_account_link_id',null,
+     'product_offer_id',v_scope_offer,
+     'platform','web','provider','portone_v2',
+     'external_transaction_id','saju-record-scope-transaction-b',
+     'external_original_transaction_id',null,
+     'receipt_fingerprint','sha256:test:saju-record-scope-receipt-b',
+     'verification_status','verified',
+     'verified_at',clock_timestamp(),
+     'environment','production',
+     'verifier_revision','test-saju-record-scope-v1',
+     'verified_amount_minor',9900,
+     'verified_currency','KRW'
+   )
+ )).* from public.commerce_receipts receipt where receipt.id=v_receipt.id;
+
+ insert into public.commerce_saju_purchase_origins_v1(
+   purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
+ ) values(v_scope_intent_b,v_subject,v_scope_record_b,v_source_revision,'original');
+
+ v_scope_now:=clock_timestamp();
+ select result_grant_id into strict v_scope_grant_b
+ from public.internal_apply_verified_receipt_capability_effects_v1(
+   v_scope_receipt_b,
+   array['relationship']::text[],
+   array[v_scope_now]::timestamptz[],
+   array[v_scope_now]::timestamptz[],
+   array[null::timestamptz],
+   array['saju-record-scope-test']::text[]
+ );
+ if (select scope_key from public.entitlement_grants where id=v_scope_grant_b)
+      is distinct from v_scope_key_b
+    or v_scope_key=v_scope_key_b
+    or (select count(*) from public.entitlements
+        where subject_id=v_subject
+          and entitlement_key='saju.relationship'
+          and status='active'
+          and scope_key_norm in (v_scope_key,v_scope_key_b))<>2 then
+   raise exception 'SAJU_TWO_RECORDS_DID_NOT_KEEP_INDEPENDENT_GRANTS';
+ end if;
+
  -- Original verified Provider cancel item => exact one-time refund settlement.
  select e.provider_event_id into strict v_event
  from public.internal_persist_portone_cancellation_event_v1(
@@ -368,9 +565,9 @@ begin
  then
    raise exception 'SAJU_LEDGER_PG17_PRIVATE_ACL_EXPOSED';
  end if;
- raise notice 'PASS Saju production receipt freeze, pending same-Product and overlapping bundle dedupe, disjoint/other Record isolation, exact upgrade/refund linkage; no API/public access (ROLLBACK)';
+ raise notice 'PASS Saju production receipt freeze, pending same-Product and overlapping bundle dedupe, disjoint/other Record isolation, two independent Record-scoped Grants, exact upgrade/refund linkage; no API/public access (ROLLBACK)';
 end;
 $saju_ledger_pg17$;
 
-select 'COMMERCE_SAJU_RECORD_LEDGER_CANDIDATE_ISOLATED_PG17_PASS' as result;
+select 'COMMERCE_SAJU_RECORD_SCOPED_AUTHORITY_ISOLATED_PG17_PASS' as result;
 rollback;
