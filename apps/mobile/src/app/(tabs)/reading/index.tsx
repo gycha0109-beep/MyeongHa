@@ -1,8 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
 import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import type { MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
@@ -38,20 +39,36 @@ export default function SajuScreen() {
   const homeFocusTopic = resolveMobileHomeSajuFocusV1(requestedHomeTopic);
   const [state, setState] = useState<ScreenState>({ kind: 'loading' });
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
+  const focused = useRef(false);
+  const requestEpoch = useRef(0);
 
   const load = useCallback(async () => {
+    if (!focused.current) return;
+    const epoch = ++requestEpoch.current;
+    // Hide previous Subject's Birth and calculated pillars before re-reading.
     setState({ kind: 'loading' });
-    setState(
-      await loadMobileCurrentSajuV1({
-        birthService: mobileBirthServiceV1,
-        sajuService: mobileSajuServiceV1,
-      }),
-    );
+    const next = await loadMobileCurrentSajuV1({
+      birthService: mobileBirthServiceV1,
+      sajuService: mobileSajuServiceV1,
+    });
+    if (focused.current && epoch === requestEpoch.current) setState(next);
   }, []);
 
   useFocusEffect(
     useCallback(() => {
+      focused.current = true;
+      // The signal is emitted only after a verified credential-store write.
+      // Treat it as invalidation, never as Saju/Reader authorization.
+      const unsubscribe = subscribeMobileSubjectCredentialChangesV1(() => {
+        void load();
+      });
       void load();
+      return () => {
+        unsubscribe();
+        focused.current = false;
+        requestEpoch.current += 1;
+        setState({ kind: 'loading' });
+      };
     }, [load]),
   );
 
