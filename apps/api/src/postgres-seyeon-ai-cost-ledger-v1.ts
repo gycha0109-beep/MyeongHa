@@ -474,11 +474,21 @@ export function createPersistingSeyeonAiProviderV1(input: {
         async meteredBeforeDispatch(call, serializedRequestBody) {
           // Metadata-only external hook runs separately in the raw Provider.
           // Only this server-owned metering hook accesses the full request.
-          const binding = input.getBinding();
-          if (binding === null) {
+          const originalBinding = input.getBinding();
+          if (originalBinding === null) {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             throw new Error('AI cost binding is unavailable before dispatch.');
           }
+          // The producer can reuse/mutate its active Turn binding as a later
+          // step starts. Under Governor ENFORCE, pin the exact authenticated
+          // Subject/Turn/Attempt/phase BEFORE asynchronous token certification
+          // and keep this same identity for reservation, receipt and settle.
+          const binding: SeyeonAiCostLedgerBindingV1 =
+            governor === undefined ? originalBinding : (() => {
+              const [subjectId,turnId,attemptId,phase] =
+                bindingParams(originalBinding);
+              return Object.freeze({subjectId,turnId,attemptId,phase});
+            })();
           if (governor === undefined) {
             await input.runner.run(binding.subjectId, client =>
               startSeyeonAiCallV1(client,binding,call),

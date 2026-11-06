@@ -220,6 +220,76 @@ describe('Se-yeon 04C governed provider adapter (fake HTTP and fake DB)', () => 
     }
   });
 
+  it('W114 pins exact Subject/Turn/Attempt across token count, receipt and settlement', async () => {
+    const mutableBinding={...binding};
+    const originalIdentity=[subjectId,turnId,attemptId,'chat'];
+    const order:string[]=[];
+    let reservedCall='';
+    const query=vi.fn(async (sql:string,values:unknown[])=>{
+      // Every DB operation must preserve the originally authorized
+      // identities even after a caller mutates the active binding object.
+      expect(values.slice(0,4)).toEqual(originalIdentity);
+      if(sql.includes('cmd_governed_start_seyeon_ai_call_v1')){
+        order.push('admit');
+        reservedCall=String(values[4]);
+        return {rows:[{
+          callId:reservedCall,ceilingMicroUsd:'3700',
+          bucketUtcDate:'2026-11-06',
+        }]};
+      }
+      if(sql.includes('cmd_store_seyeon_provider_receipt_v1')){
+        order.push('store');
+        expect(JSON.parse(String(values[4])).callId).toBe(reservedCall);
+        return {rows:[{callId:reservedCall,replayed:false}]};
+      }
+      if(sql.includes('cmd_governed_settle_seyeon_ai_call_v1')){
+        order.push('settle');
+        expect(JSON.parse(String(values[4])).callId).toBe(reservedCall);
+        return {rows:[{
+          callId:reservedCall,replayed:false,
+          occupiedMicroUsd:'130',overCeiling:false,
+        }]};
+      }
+      throw Error('W114 unexpected SQL');
+    });
+    const bound=vi.fn(async ()=>{
+      order.push('certify');
+      // Mutation after getBinding(), before the governed reservation.
+      Object.assign(mutableBinding,{
+        subjectId:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      });
+      return 500;
+    });
+    const fetchImpl=vi.fn(async()=>{
+      order.push('fetch');
+      // Mutation after the reservation, before receipt + settlement.
+      Object.assign(mutableBinding,{
+        turnId:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        attemptId:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        phase:'post_turn',
+      });
+      return response();
+    });
+    const provider=createPersistingSeyeonAiProviderV1({
+      config:{...config,fetchImpl},
+      runner:runner(query),getBinding:()=>mutableBinding,
+      governor:{policy,certifiedInputTokenUpperBound:bound},
+    });
+    const errors=vi.spyOn(console,'error').mockImplementation(()=>undefined);
+    const info=vi.spyOn(console,'info').mockImplementation(()=>undefined);
+    try{
+      await expect(provider.generate(request)).resolves.toEqual({ok:true});
+      expect(order).toEqual(['certify','admit','fetch','store','settle']);
+      expect(bound).toHaveBeenCalledOnce();
+      expect(fetchImpl).toHaveBeenCalledOnce();
+      expect(query).toHaveBeenCalledTimes(3);
+      expect(errors).not.toHaveBeenCalled();
+    }finally{
+      errors.mockRestore();
+      info.mockRestore();
+    }
+  });
+
   it('refuses missing or uncertified token bound before any DB write or fetch', async () => {
     const query = vi.fn();
     const fetchImpl = vi.fn(async () => response());
