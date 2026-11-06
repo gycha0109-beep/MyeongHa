@@ -185,14 +185,14 @@ rollback to savepoint w121_legacy_rpc;
 release savepoint w121_legacy_rpc;
 
 savepoint w121_role_membership;
-grant myeongha_api_executor to myeongha_seyeon_governed_executor
-  with inherit false, set true;
+-- Membership is the runtime preflight signal on PostgreSQL 15 and later;
+-- the actual SET ROLE transition is separately exercised at checkout.
+grant myeongha_api_executor to myeongha_seyeon_governed_executor;
 do $w121_membership$
 begin
   if not pg_catalog.pg_has_role('myeongha_seyeon_governed_executor',
       'myeongha_api_executor','MEMBER')
-    or not pg_catalog.pg_has_role('myeongha_seyeon_governed_executor',
-      'myeongha_api_executor','SET') then
+    then
     raise exception 'W121 private-role membership grant was not visible';
   end if;
 end
