@@ -47,7 +47,8 @@ describe('pull to refresh is available across the app without destroying state',
 
     const chat = await source('features/chat/use-mobile-chat-thread.tsx');
     expect(chat).toContain('const refresh = useCallback(async () => {');
-    expect(chat).toContain('if (sendingRef.current) return;');
+    expect(chat).toContain('if (!focused.current || sendingRef.current) return;');
+    expect(chat).toContain('if (focused.current && epoch === subjectEpoch.current) setSnapshot(next);');
     expect(chat).toContain('controller.loadInitial()');
     const refreshPart = chat.split('const refresh = useCallback(async () => {')[1]?.split('const loadMore =')[0] ?? '';
     expect(refreshPart).not.toContain('setDraft(');

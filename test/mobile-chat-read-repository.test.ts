@@ -283,3 +283,61 @@ describe('mobile Chat read repository', () => {
     expect(calls).toBe(1);
   });
 });
+
+describe('Chat repository subject reset during in-flight network requests', () => {
+  it('discards an old initial response and loads the current owner independently', async () => {
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>(resolve => { releaseOld = resolve; });
+    let calls = 0;
+    const service: MobileChatReadServiceV1 = {
+      async readThreadPage() {
+        calls++;
+        if (calls === 1) {
+          await oldGate;
+          return { ...threadPage(0, [{ ...msg(1), bodyText: 'OLD_OWNER_PRIVATE' }], false) };
+        }
+        return { ...threadPage(0, [{ ...msg(1), bodyText: 'CURRENT_OWNER_ONLY' }], false) };
+      },
+    };
+    const repository = createMobileChatReadRepositoryV1({ threadId, service, pageSize: 2 });
+    const oldRequest = repository.loadInitial();
+    const cleared = repository.reset();
+    expect(cleared.status).toBe('idle');
+    expect(cleared.messages).toEqual([]);
+    const fresh = await repository.loadInitial();
+    expect(fresh.messages[0]?.bodyText).toBe('CURRENT_OWNER_ONLY');
+    releaseOld();
+    await oldRequest;
+    expect(repository.getSnapshot()).toBe(fresh);
+    expect(JSON.stringify(repository.getSnapshot())).not.toContain('OLD_OWNER_PRIVATE');
+    expect(calls).toBe(2);
+  });
+
+  it('discards a late old continuation failure without clearing the current owner', async () => {
+    let releaseOld!: () => void;
+    const oldGate = new Promise<void>(resolve => { releaseOld = resolve; });
+    let oldContinuation = false;
+    const service: MobileChatReadServiceV1 = {
+      async readThreadPage(_thread, options = {}) {
+        const cursor = options.afterSequenceNo ?? 0;
+        if (cursor === 2) {
+          oldContinuation = true;
+          await oldGate;
+          throw new Error('previous owner failed');
+        }
+        return threadPage(0, [msg(1), msg(2)], true);
+      },
+    };
+    const repository = createMobileChatReadRepositoryV1({ threadId, service, pageSize: 2 });
+    await repository.loadInitial();
+    const oldPending = repository.loadMore();
+    expect(oldContinuation).toBe(true);
+    repository.reset();
+    const fresh = await repository.loadInitial();
+    releaseOld();
+    await oldPending;
+    expect(repository.getSnapshot()).toBe(fresh);
+    expect(repository.getSnapshot().status).toBe('ready');
+    expect(repository.getSnapshot().errorCode).toBeNull();
+  });
+});

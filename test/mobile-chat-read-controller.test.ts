@@ -25,6 +25,10 @@ describe('mobile Chat read controller', () => {
     let snapshot = base;
     const repository: MobileChatReadRepositoryV1 = {
       getSnapshot: () => snapshot,
+      reset() {
+        snapshot = base;
+        return snapshot;
+      },
       async loadInitial() {
         snapshot = { ...snapshot, status: 'error', errorCode: 'CHAT_READ_FAILED' };
         throw new Error('network');
