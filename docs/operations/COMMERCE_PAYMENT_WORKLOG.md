@@ -642,3 +642,11 @@
 - **구현:** 기존 `executePostgresCommerceInternalTransactionV1`에 명시적인 `REPEATABLE READ READ ONLY` 실행 옵션을 추가했습니다. 독립된 내부 후보 `quoteSajuFromOnePrivateSnapshotV1`는 단일 연결/동일 DB Snapshot에서 먼저 사주 기록에 귀속된 현재 실제 권한 증거를 요청하고, 같은 연결로 실결제·원본 Receipt·Provider 환불 원장 및 출생 revision을 읽습니다. 권한 출처 누락·타 Subject/Record/revision·DB 예외 시 전체 조회가 실패 및 ROLLBACK하고, 무조건 `checkoutAuthorized:false`를 반환합니다.
 - **검증:** 기존 Commerce 내부 트랜잭션의 실행·롤백 계약 및 신규 동일 연결/격리 레벨·조회 순서·오염된 분야 권한 거부·권한 소스 부재 사례를 단위 테스트로 추가했습니다. **새 고정 HEAD CI·통합 CI 결과 확인 전까지 PASS를 선언하지 않습니다.**
 - **정확한 경계:** 새 사주 단품·패키지를 현재 유효한 Record-scoped Entitlement Grant 분야로 변환하는 공식 Product Capability/Grant 매핑은 아직 미연결입니다. 현재 후보는 `ownedFieldsAuthority`를 동일 스냅샷 안에서 읽을 **미래의 비공개 증명 생산자**로 필수 요구할 뿐, 구매 원장으로 현재 소유 분야를 만들어 내지 않습니다. 이 생산자와 실제 Grant/Record/Reader 권한 검증 및 구매 전 잠금·청구 원자성은 별도 미완료입니다. 이 후보를 운영 checkout에 연결하거나 상품 판매/환불·실제 PG·DB migration·개인정보 삭제 규칙을 변경하지 않습니다.
+
+### 2026-11-06 — 사주 기록 유료 잠금: 샌드박스 검증과 실제 Production 결제 구별
+
+- **선행 검증:** #3061의 고정 HEAD `ca8b2d7` 일반 CI 및 전체 Integration 성공, 병합 `4c1c683` 확인. 동일 DB 스냅샷 견적 후보는 비배포/checkout 불가 상태 유지.
+- **문제:** 비배포 사주 원장 후보의 Record Birth revision 잠금은 Receipt 상태 `verified/revoked`만 검사해, `sandbox` 검증을 실제 결제로 오인하고 출생정보를 영구 잠글 수 있었습니다. 이후 Receipt verified 전환 검사도 이 둘을 구분하지 않았습니다.
+- **수정:** Record 출생정보 변경 차단 및 Receipt 검증 이후 revision 재확인 조건을 `environment='production'`인 실제 확인 영수증(원본 `verified_at` 존재)으로 제한했습니다. 최초 Intent→Record 연결 시점의 같은 Subject/정확한 Birth revision 검사는 유지합니다. 이미 확인된 Production 구매의 Record 고정, 업그레이드 원본/환불 금액 검증은 변경하지 않습니다.
+- **격리 증거:** 기존 실제 PostgreSQL 17 원장 테스트에 같은 Record에 결속된 `sandbox` verified Receipt를 만든 뒤 Birth revision 변경·복원을 허용하고, 이어서 본래 `production` verified Receipt를 결속하면 변경이 거부되는 경계를 추가했습니다. 모든 후보 SQL과 fixture는 격리 DB의 `BEGIN…ROLLBACK` 내부에서만 실행합니다. **신규 고정 HEAD 통합 CI 통과 전 PASS 미선언**입니다.
+- **남은 경계:** 새 사주 Product 필드에 대한 공식 Record-scoped Grant/Capability 매핑, 실제 생산자에 의한 권한 read, 결제 직전 원자적 재검증, privacy graph 및 비운영 전체 E2E는 아직 완료되지 않았습니다. 운영 migration, 소비자 API, 실제 결제·환불·LIVE는 변경하지 않습니다.
