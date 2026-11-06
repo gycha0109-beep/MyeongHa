@@ -1,3 +1,4 @@
+import {COMMERCE_SAJU_PRODUCTS_V1} from '../apps/api/src/commerce-saju-upgrade-pricing-v1.js';
 import {readFileSync} from 'node:fs';
 import {describe,expect,it} from 'vitest';
 
@@ -29,6 +30,20 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(migration).toContain('internal_commerce_saju_entitlement_key_v1');
     expect(migration).toContain('internal_commerce_saju_product_price_minor_v1');
     expect(migration).not.toMatch(/insert into public\.(products|product_offers)\b/iu);
+  });
+
+  it('keeps the database Product price mirror exactly aligned with the governed quote policy',()=>{
+    const start=migration.indexOf('create function public.internal_commerce_saju_product_price_minor_v1(');
+    const end=migration.indexOf('$saju_product_price$;',start);
+    const fragment=migration.slice(start,end);
+    const prices=new Map(
+      [...fragment.matchAll(/when '([^']+)' then (\\d+)::bigint/gu)]
+        .map(match=>[match[1]!,Number(match[2])]),
+    );
+    expect(prices.size).toBe(Object.keys(COMMERCE_SAJU_PRODUCTS_V1).length);
+    for(const [key,policy] of Object.entries(COMMERCE_SAJU_PRODUCTS_V1)) {
+      expect(prices.get(key)).toBe(policy.priceMinor);
+    }
   });
 
   it('resolves a Saju grant only through the exact verified Receipt, Origin, Subject and Birth revision',()=>{
