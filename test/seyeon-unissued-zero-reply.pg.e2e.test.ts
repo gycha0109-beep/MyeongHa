@@ -98,7 +98,11 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
       f.subject,f.thread,f.turn,f.attempt,uuid(18,90),uuid(19,90),uuid(23,90),uuid(30,90)]));
     expect(denied.rows).toHaveLength(0);
     await pool.query(operation('production-25-unissued-zero-receipt-recovery-20261103.sql'));
+    // Operation 26 creates the postgres-owned protected original-message lock.
+    // Production 28 fails closed unless that dependency is already installed.
+    await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
     await pool.query(operation('production-27-g0-committed-followup-receipt-20261105.sql'));
+    await pool.query(operation('production-28-g0-followup-owner-original-user-lock-20261105.sql'));
     const runtime=vi.fn(async()=>{throw Error('A committed reply must never invoke inference.');});
     const recover=()=>recoverSeyeonUnissuedZeroReplyV1({pool:subjectPool,verifiedEvidence:f.evidence,threadId:f.thread,
       text:f.text,signal:new AbortController().signal,requestId:'repeat',serverTime:new Date().toISOString()});
@@ -148,11 +152,8 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
         'select message_id::text as "messageId",sender_type as "senderType" from public.qry_seyeon_g0_current_source_recent_messages_v1($1::uuid,$2::uuid,$3::uuid,10)',
         [resolvedSubject.subjectId,thread,nextUser]),
     });
-    // The disposable DB already contains the governed 19/22 history rules.
-    // Install the original-source lock-only 26 bridge BEFORE reading history:
-    // the old owner-scoped SHARE helper cannot safely re-check received
-    // message lineage under RLS during recovery issuance.
-    await pool.query(operation('production-26-g0-followup-original-lineage-20261103.sql'));
+    // Original-source lock-only operation 26 is installed once above,
+    // before the follow-up issuer and this guarded history read.
     const result=await context();
     expect(result.rows.map(x=>x.senderType)).toEqual(['user','character','user']);
     expect(result.rows.at(-1)?.messageId).toBe(nextUser);
@@ -263,6 +264,95 @@ describe.skipIf(!enabled)('PG17 first issuance recovery with preserved abandoned
     const {rows:[original]}=await pool.query(
       'select seyeon_positive_delivery_issued_at as issued, seyeon_positive_delivery_received_at as received from public.chat_turn_attempts where id=$1',[attempt]);
     expect(original).toEqual({issued:null,received:null});
+    // Assert the synthetic fixture matches each DB-owned receipt source gate.
+    // Only boolean results are reported; never expose any original message text.
+    const {rows:[sourceGates]}=await pool.query<Record<string,boolean>>(`
+      with target as (
+        select t.subject_id,t.thread_id,t.id turn_id,t.client_turn_id,
+          u.id user_id,u.body_text user_body,u.sequence_no user_seq,
+          m.id assistant_id,m.body_text assistant_body,
+          a.seyeon_personal_source_pin_jsonb pin,a.generated_body_text generated_body,
+          a.planner_version,a.validation_result_jsonb validation,
+          a.seyeon_personal_source_pinned_at,a.seyeon_positive_delivery_issued_at
+        from public.chat_turns t
+        join public.chat_turn_attempts a on a.id=t.committed_attempt_id
+        join public.conversation_messages u on u.turn_id=t.id and u.sender_type='user'
+        join public.conversation_messages m on m.id=a.committed_message_id
+        where t.id=$1::uuid and t.state='committed'
+      ), history as (
+        select m.id,m.sender_type,m.body_text,m.sequence_no
+        from public.conversation_messages m
+        join public.chat_turns prior on prior.id=m.turn_id
+        where m.subject_id=$2::uuid and m.thread_id=$3::uuid
+          and m.sequence_no<(select user_seq from target)
+          and prior.state='delivered' and prior.delivered_at is not null
+          and prior.committed_at is not null and prior.committed_attempt_id is not null
+        order by m.sequence_no desc limit 2
+      ), matched as (
+        select v.ordinality,v.value item,h.id,h.sender_type,h.body_text
+        from target t cross join lateral
+          jsonb_array_elements(t.pin#>'{exactModelSourceSelection,selectedUnpinnedRecentSources}')
+          with ordinality v(value,ordinality)
+        left join history h on h.id::text=v.value->>'messageId'
+      )
+      select
+        (select count(*) from public.conversation_messages where turn_id=$1::uuid)=2 as "exactMessages",
+        (select count(*) from public.outbox_events where aggregate_type='chat_turn'
+          and aggregate_id=$1::text and event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+          and dedupe_key='seyeon-post-turn-v1')=1 as "exactOutbox",
+        (select count(*) from public.outbox_events where id=$4::uuid
+          and aggregate_type='chat_turn' and aggregate_id=$1::text
+          and event_type='SEYEON_POST_TURN_ANALYSIS_REQUESTED'
+          and event_schema_version='v1'
+          and dedupe_key='seyeon-post-turn-v1'
+          and payload_jsonb->>'schemaVersion'='seyeon-post-turn-analysis-request-v1'
+          and payload_jsonb->>'subjectId'=$2::text
+          and payload_jsonb->>'characterId'='seyeon'
+          and payload_jsonb->>'turnId'=$1::text
+          and payload_jsonb->>'attemptId'=$5::text
+          and payload_jsonb->>'userMessageId'=(select user_id::text from target)
+          and payload_jsonb->>'assistantMessageId'=(select assistant_id::text from target)
+          and payload_jsonb->'snapshot'->>'schemaVersion'='seyeon-post-turn-analysis-snapshot-v1'
+          and payload_jsonb->'snapshot'->>'turnId'=$1::text
+          and payload_jsonb->'snapshot'->>'userMessageId'=(select user_id::text from target)
+          and payload_jsonb->'snapshot'->>'assistantMessageId'=(select assistant_id::text from target)
+          and payload_jsonb->>'snapshotHash'~'^sha256:v1:[a-f0-9]{64}$')=1 as "outboxProvenance",
+        (select planner_version='seyeon-production-chat-planner-v1'
+          and validation->'passed'='true'::jsonb
+          and validation->'personalRecordProvenance'=pin->'zeroProof'
+          and seyeon_personal_source_pinned_at is not null
+          and seyeon_positive_delivery_issued_at is null
+          and generated_body=assistant_body from target) as "committedProvenance",
+        (select jsonb_typeof(pin)='object'
+          and (select count(*) from jsonb_object_keys(pin))=2
+          and pin#>>'{zeroProof,recordState}'='explicit_zero_admitted'
+          and pin#>'{zeroProof,records}'='[]'::jsonb
+          and pin#>'{exactModelSourceSelection,selectedMemoryCount}'='0'::jsonb
+          and pin#>'{exactModelSourceSelection,selectedPersonalRecordCount}'='0'::jsonb
+          and pin#>'{exactModelSourceSelection,selectedSources}'='[]'::jsonb
+          and pin#>'{exactModelSourceSelection,selectedUnpinnedDerivedSources}'='[]'::jsonb
+          and pin#>>'{exactModelSourceSelection,selectedCurrentUserSource,messageId}'=user_id::text
+          and pin#>'{exactModelSourceSelection,selectedCurrentUserSource,persistedBeforeModel}'='false'::jsonb
+          and pin#>>'{exactModelSourceSelection,selectedCurrentUserSource,selectedModelMessageDigest}'=
+            'sha256:v1:'||encode(sha256(convert_to(
+              '{"messageId":'||to_json(user_id::text)::text||
+              ',"role":"user","text":'||to_json(btrim(user_body))::text||'}','UTF8')),'hex')
+          from target) as "selectionProvenance",
+        (select count(*) from history)=2 as "historyLength",
+        (select count(*)=2 from matched) as "historySelectionLength",
+        (select bool_and(item->>'role'=case sender_type when 'user' then 'user' else 'assistant' end
+          and item->>'selectedModelMessageDigest'=
+            'sha256:v1:'||encode(sha256(convert_to(
+              '{"messageId":'||to_json(id::text)::text||
+              ',"role":'||to_json(item->>'role')::text||
+              ',"text":'||to_json(btrim(body_text))::text||'}','UTF8')),'hex')
+          ) from matched) as "historyExactDigests",
+        (select count(*) from public.relationship_events where subject_id=$2::uuid and character_id='seyeon')=0 as "noRelationshipEvents",
+        (select count(*) from public.relationship_event_records where subject_id=$2::uuid and character_id='seyeon')=0 as "noRelationshipRecords",
+        (select count(*) from public.relationship_history_entries where subject_id=$2::uuid and character_id='seyeon')=0 as "noRelationshipHistory"
+    `,[turn,subject,thread,outbox,attempt]);
+    expect(sourceGates).toBeDefined();
+    expect(Object.fromEntries(Object.entries(sourceGates!).filter(([,ok])=>ok!==true))).toEqual({});
     const model=vi.fn(async()=>{throw Error('A stored Assistant must never invoke the provider');});
     const client=new MyeongHaApiClientV1({origin:'https://receipt.test',
       fetchImpl:async(url,init)=>{

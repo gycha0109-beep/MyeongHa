@@ -204,8 +204,11 @@ begin
          (v_original.sender_type is distinct from 'character' or v_original.character_id is distinct from 'seyeon'))
     then return; end if;
     if v_history_item->>'role'='user' then
-      perform seyeon_private.assert_current_original_member_user_message_v1(
-        p_subject_id,p_thread_id,v_previous_ids[v_i+1]);
+      -- The legacy runtime-owner wrapper is deliberately not executable by
+      -- postgres on production. Call the same postgres-owned original lock
+      -- that the wrapper delegates to, without adding any EXECUTE grant.
+      perform seyeon_private.lock_g0_original_message_v1(
+        p_subject_id,p_thread_id,v_previous_ids[v_i+1],'user');
     else
       -- The historical zero-Assistant was committed with an immutable G0
       -- proof. Verify that exact DB provenance in this postgres-owned,
