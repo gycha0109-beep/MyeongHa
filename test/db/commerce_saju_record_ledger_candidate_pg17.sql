@@ -12,6 +12,8 @@ declare
  v_record uuid:='1219c200-0000-4000-8000-000000000001'::uuid;
  v_new_revision uuid:='1219c200-0000-4000-8000-000000000002'::uuid;
  v_upgrade_intent uuid:='1219c200-0000-4000-8000-000000000003'::uuid;
+ v_duplicate_pending_intent uuid:='1219c200-0000-4000-8000-000000000004'::uuid;
+ v_other_record uuid:='1219c200-0000-4000-8000-000000000005'::uuid;
  v_sandbox_intent uuid:='1219c200-0000-4000-8000-000000000006'::uuid;
  v_sandbox_receipt uuid:='1219c200-0000-4000-8000-000000000007'::uuid;
  v_subject uuid;
@@ -179,6 +181,59 @@ begin
      where child_purchase_intent_id=v_upgrade_intent)<>1 then
    raise exception 'SAJU_LEDGER_PG17_UPGRADE_RECEIPT_LINK_MISSING';
  end if;
+
+ -- Exactly the SAME Product may not be linked twice as an unresolved
+ -- same-Record purchase. The existing origin BEFORE INSERT trigger already
+ -- locks that Record FOR UPDATE; a second attempt must fail while pending.
+ -- This is NOT cross-product field/Package overlap arbitration.
+ insert into public.purchase_intents(
+   id,subject_id,product_offer_id,provider_account_link_id,
+   idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+   status,created_at,updated_at,
+   expected_amount_minor,expected_currency,charge_terms_version,
+   capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash
+ )
+ select v_duplicate_pending_intent,pi.subject_id,pi.product_offer_id,
+   pi.provider_account_link_id,
+   'saju-ledger-pg17-same-product-pending',
+   'sha256:test:saju-ledger-pg17-same-product-pending',
+   pi.offer_snapshot_jsonb,pi.offer_snapshot_hash,
+   'pending',clock_timestamp()+interval '3 seconds',
+   clock_timestamp()+interval '3 seconds',
+   pi.expected_amount_minor,pi.expected_currency,pi.charge_terms_version,
+   pi.capability_set_id,pi.capability_snapshot_jsonb,pi.capability_snapshot_hash
+ from public.purchase_intents pi where pi.id=v_b2_purchase;
+ begin
+   insert into public.commerce_saju_purchase_origins_v1
+     (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
+   values (v_duplicate_pending_intent,v_subject,v_record,v_source_revision,'original');
+   raise exception 'SAJU_LEDGER_PG17_SAME_PRODUCT_PENDING_WAS_ACCEPTED';
+ exception when others then
+   get stacked diagnostics v_error=message_text;
+   if v_error is distinct from 'SAJU_DUPLICATE_PENDING_SAME_PRODUCT' then
+     raise;
+   end if;
+ end;
+ if exists (
+   select 1 from public.commerce_saju_purchase_origins_v1
+   where purchase_intent_id=v_duplicate_pending_intent
+ ) then
+   raise exception 'SAJU_LEDGER_PG17_FAILED_DUPLICATE_ORIGIN_PERSISTED';
+ end if;
+
+ -- The duplicate guard must not borrow a pending purchase from a different
+ -- Record, even for the same Subject/Birth and the same Product.
+ insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
+ values (v_other_record,v_subject,v_source_revision);
+ insert into public.commerce_saju_purchase_origins_v1
+   (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
+ values (v_duplicate_pending_intent,v_subject,v_other_record,v_source_revision,'original');
+ if (select count(*) from public.commerce_saju_purchase_origins_v1
+     where saju_record_id=v_other_record and subject_id=v_subject
+       and purchase_intent_id=v_duplicate_pending_intent
+       and birth_revision_id=v_source_revision)<>1 then
+   raise exception 'SAJU_LEDGER_PG17_INDEPENDENT_RECORD_WAS_BLOCKED';
+ end if;
  -- Original verified Provider cancel item => exact one-time refund settlement.
  select e.provider_event_id into strict v_event
  from public.internal_persist_portone_cancellation_event_v1(
@@ -215,7 +270,7 @@ begin
  then
    raise exception 'SAJU_LEDGER_PG17_PRIVATE_ACL_EXPOSED';
  end if;
- raise notice 'PASS Saju record frozen only after verified original Receipt; exact upgrade and refund linkage; no API/public access (ROLLBACK)';
+ raise notice 'PASS Saju production receipt freeze, pending same-Product same-Record dedupe, other Record isolation, exact upgrade/refund linkage; no API/public access (ROLLBACK)';
 end;
 $saju_ledger_pg17$;
 

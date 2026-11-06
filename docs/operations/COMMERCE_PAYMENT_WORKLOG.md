@@ -674,3 +674,11 @@
 - **수정:** 같은 Grant/Subject/entitlement/scope에 관한 `entitlement_events`를 함께 읽고, 원본 Receipt로 발급된 `receipt + granted + ent-event-v2` 이벤트가 정확히 1개인지, Source Receipt·Product·활성 목표 상태가 일치하는지 확인합니다. 다른/중복 발급 이벤트, 발급 이벤트 누락, 확인된 Provider revoked 이벤트가 있는데 활성 Grant가 남은 경우는 `HOLD`로 거부하고 읽기 트랜잭션을 롤백합니다. 기존 차액 계산·Grant 쓰기·회수 의미는 변경하지 않습니다.
 - **검증 추가:** 새 발급 이벤트 결손·중복·불일치·revoked 이력에 대한 테스트를 추가했습니다. 기존 **격리 PostgreSQL 17** 사주 원장 스위트에 실제 TypeScript 코드가 사용하는 세 SQL(Record/원장/현재 Grant)을 추출하여 전체 migration + ROLLBACK 후보 테이블에서 직접 실행하는 검증을 연결했습니다. SQL 문법/컬럼/실행 계약을 단순 mock으로만 검사하지 않습니다. 동일 B2 Reader Fixture는 쿼리 실행을 위한 가짜 거래이고 Saju 상품/권한으로 승인하거나 간주하지 않습니다. **새 CI/통합 성공 이전에는 PASS 미선언**입니다.
 - **잔여:** Saju Record-scoped Capability/Grant를 실제 발행하는 공식 계약, 승인된 Product/Offer, 구매 직전의 원자적 재검증, 실제 지급·회수 및 개인정보 삭제/통합 E2E는 미완료입니다. 운영 DB·LIVE·실제 결제/환불·공개 API 변경 없음.
+
+### 2026-11-06 — 사주 동일 명식·동일 상품의 미완료 구매 중복 차단 (개발 로드맵 2)
+
+- **선행:** #3077의 고정 HEAD `06fbec0` 일반 CI 및 전체 통합 CI 성공, `af41b57`로 main 병합 확인. 원본 Receipt 발급 Event 검증과 격리 PostgreSQL 17 조회 테스트 유지.
+- **확인한 공백:** 기존 사주 구매 원장 후보에서 구매 Intent를 Record와 결속하는 트리거는 Birth revision만 잠갔습니다. 이미 같은 명식에서 같은 Product의 `created` 또는 `pending` Intent가 존재하는데 또 하나를 생성하는 경합을 원장 계층에서 차단하지 않았습니다.
+- **구현:** 기존 `tr_commerce_saju_origin_revision_lock_v1`의 **Record 행 FOR UPDATE 잠금**을 재사용하고, 동일 Subject·Record·Birth revision 및 **같은 Product ID**에 미완료 `created/pending` Intent가 있으면 신규 `created/pending` Origin 결속을 `SAJU_DUPLICATE_PENDING_SAME_PRODUCT`로 거부합니다. 같은 Product에 여러 Offer가 있어도 Product ID를 기준으로 판정합니다. 스냅샷이 오래되어 잠금 후 재조사가 성립하지 않는 격리 수준에는 신규 미완료 결속을 허용하지 않고 `READ COMMITTED`에서만 적용합니다.
+- **격리 검증:** 기존 비배포 PostgreSQL 17 사주 원장 테스트에서 원본 실결제·사주 Record에 미완료 Upgrade Intent 하나를 결속한 뒤, 동일 상품의 또 다른 `pending` 결속 거부 및 결속 잔여 0건을 확인합니다. 같은 Subject·Birth revision·상품이라도 **다른 Saju Record**에는 결속되는 것을 확인합니다. 모든 후보 스키마와 fixture는 단일 `BEGIN/ROLLBACK` 내부에서 실행합니다. **새 고정 HEAD의 CI 통과 전 PASS 미선언**이며 실제 2세션 경쟁 타이밍 재현은 이 테스트의 주장 범위가 아닙니다.
+- **남은 경계:** 이 제약은 정확히 같은 Product의 중복만 조기 방어합니다. **서로 다른 Product/패키지의 분야 겹침**은 승인된 Saju Record-scoped Capability/Grant 권한 매핑과 결제 직전 원자적 결정이 완료될 때까지 HOLD입니다. 운영 Checkout, 실제 PortOne 결제, 이미 검증된 Entitlement Event/Reader 회수, 운영 DB 마이그레이션/공개 라우트/판매는 변경하지 않습니다.
