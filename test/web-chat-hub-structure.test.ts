@@ -185,7 +185,11 @@ describe('MyeongHa conversation hub relationship-first IA', () => {
     expect(hubCss).not.toContain('transform: scale(var(--portrait-scale');
     expect(js).not.toContain('data-pending-people-grid');
     expect(js).not.toContain("createPersonCard(person, { pending: true })");
-    expect(js).toContain("key !== 'seorin' && key !== 'mira' && key !== 'doyun'");
+    expect(js).toContain("key !== 'seorin' && key !== 'mira' && key !== 'doyun' && key !== 'yunho'");
+    // Historical presentation identity remains, but Yunho is excluded
+    // from the five Character discovery cards until production readiness.
+    expect(js).toContain("key: 'yunho'");
+    expect(js).toContain('const launchPeople = Object.freeze(');
     expect(js).not.toContain('portrait.position');
     expect(js).not.toContain('portrait.scale');
     expect(js).not.toContain('portrait.origin');
