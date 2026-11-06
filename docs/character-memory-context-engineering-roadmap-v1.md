@@ -25,9 +25,9 @@ This roadmap extends the existing Character Runtime and Memory authority. It doe
 
 ### 2.1 PR #3068 baseline
 
-PR #3068 remains **Open / Draft / not merged**. Its current head is `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`.
+PR #3068 remains **Open / Draft / not merged**. The original baseline commit is `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`. Current implementation changes are carried on `feat/character-memory/five-character-chat-runtime-bridge-20261106`; the live head and check results are tracked on PR #3068 rather than duplicated as static counts here.
 
-At this head, the following implementation and verification are present:
+The original baseline contains:
 - independent Character room selection and server-side turn gateway foundations;
 - source-bound four-Character execution orchestration contract;
 - immutable published-source/hash validation foundations;
@@ -36,7 +36,7 @@ At this head, the following implementation and verification are present:
 - existing message and generated-reply guard: 8,000 UTF-16 code units;
 - existing canonical-context guard: 32,768 UTF-16 code units.
 
-The latest head has 17 completed checks: 13 successful and 4 conditionally skipped. The PR remains Draft because the four additional Characters are not yet production-ready live AI chat targets.
+The PR remains Draft because the four additional Characters are not yet production-ready live AI chat targets. Recent Memory retrieval work remains read-only and does not activate those Characters or connect a Production model route.
 
 ### 2.2 What the current length limits do not mean
 
@@ -97,7 +97,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 - Keep the existing UTF-16 length guards as defensive bounds.
 - Do not claim live AI execution for Baekheon, Yeoul, Rahyeon or Taegyeom.
 
-**Exit evidence:** latest-head CI, PostgreSQL 17 integration, DB authority, Work Track, browser/auth and Governance checks. Current head evidence: `29f58f4`.
+**Exit evidence:** the original baseline evidence is anchored at `29f58f4`; subsequent implementation commits and current CI evidence are tracked on PR #3068.
 
 ### Phase 1 — Authority contract and data-source inventory
 
@@ -124,7 +124,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 - Official Reading/Saju is excluded from general Working Memory and remains on its exact Reader-authorized protected path;
 - session-only proposals are not read as durable Memory and this read-only projection has no write/grant/mutation capability.
 
-**Known limitation:** the existing Reader read functions do not return every original source-turn/message field. This projection preserves record and grant references and does not invent missing provenance. Full source-evidence enrichment remains an explicit follow-up, not a guessed field.
+**Known limitation:** the provenance-enriched Reader projections now return source-turn/message/merge references and Life Fact validity/confirmation fields when those values are stored. Missing source references remain NULL; no source field or relationship is inferred.
 
 ### Phase 2 — Provider-neutral Token Budget Manager
 
@@ -150,32 +150,29 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 3 — Permission-first Hybrid Memory Retrieval
 
-**Status: Existing authority/read primitives exist; unified retrieval is not complete.**
+**Status: INITIAL READ-ONLY RETRIEVAL CORE IMPLEMENTED; PHASE 3 NOT COMPLETE.**
 
-1. Implement a single server-side retrieval entrypoint scoped to the canonical Subject and selected Character/thread.
-2. Apply disclosure, entitlement, active-grant, revocation, validity and Reader Knowledge checks before returning sensitive memory content.
-3. Combine only supported retrieval signals from Character Runtime Standard:
-   - semantic relevance;
-   - relationship relevance;
-   - Character relevance;
-   - salience;
-   - unresolved weight;
-   - causal dependency;
-   - bounded recency;
-   - explicit callback bonus;
-   - contradiction risk;
-   - repetition penalty.
-4. Use lexical/metadata/temporal retrieval and semantic retrieval where supported by existing storage. Add graph traversal over proven relationships/events where useful. Do not add infrastructure or schema without evidence and authority.
-5. Keep causal event groups together when needed (for example conflict and repair); do not let recency alone evict an older high-salience event.
-6. Return source/provenance references and temporal validity with each retrieved item. Unknown, contradicted, revoked or ungrounded facts must not be presented as known.
-7. Preserve `retrieve != mention`: retrieval makes information available to the Character; it does not force a callback in the response.
+1. A single server-side entrypoint is implemented as `retrieveCharacterWorkingMemoryForTurnV1`. It is scoped to the canonical Subject, selected Character and server-bound thread. The existing Capability Gate runs before any Memory, Life Fact, relationship or message read. The query is taken from the exact current User message returned by the authoritative thread read.
+2. Access controls currently applied:
+   - server-resolved consent, entitlement, content-policy, world-state and client-capability inputs must pass the existing Capability Gate before reads;
+   - PostgreSQL v2 projections reuse the existing current-owner, exact-Character active-grant, revocation and supersession authorities;
+   - Life Facts outside their valid-time interval are removed using the same server `asOf` instant before projection; future source/grant/confirmation timestamps fail closed during retrieval;
+   - this path does not read Character-private biography or Official Reading/Saju. Character-private sources must continue through the separate disclosure preflight, and Saju remains on the exact Reader Knowledge path.
+3. Implemented retrieval signals:
+   - lexical token coverage and phrase match;
+   - server-owned projector relevance and salience;
+   - explicit callback detection and callback priority;
+   - generic callback fallback when the user asks to recall a previous conversation without a topical keyword; this fallback is Memory-only and prefers the most recent episode;
+   - bounded recency: topical queries use source time only after callback, phrase, lexical, salience and relevance ordering; generic callback fallback uses episode recency first.
+   Exact Subject/Character/grant scope remains a hard filter, not a ranking bonus.
+4. The current retrieval mode is explicitly `lexical+metadata`. Semantic/vector retrieval is not enabled because no approved embedding/index contract is present in the existing source. Graph traversal is not enabled because the current source records do not expose proven causal edges. No new database or vector infrastructure was added.
+5. Causal event grouping, unresolved-thread weighting, relationship relevance, contradiction risk and repetition penalty are not yet implemented. The current source projection does not provide authoritative record-to-event links or approved values for these signals; they will not be guessed from prose.
+6. Selected records retain record/grant IDs, grant reason/time, stored source references and relevant timestamps. The v2 SQL projections return stored Memory source turn/message/merge references and Life Fact source/validity/confirmation/creation fields. Missing references remain NULL and are never fabricated.
+7. `retrieve != mention` is preserved. The API entrypoint returns selected retrieval records plus non-content context metadata; it does not return the entire unselected projection and does not force the Character to mention a recalled fact.
 
-**Exit criteria:**
-- relevant authorized memories are retrieved across multiple sessions;
-- irrelevant memories are not injected;
-- temporal updates and superseded/revoked records are handled correctly;
-- cross-user, cross-Character, private and unauthorized Saju data are never returned;
-- missing memory leads to calibrated abstention rather than fabricated recall.
+**Exit evidence implemented so far:** unit coverage for lexical relevance, explicit/generic callback, unsupported-schema non-exposure, temporal Life Fact validity, exact Subject/Character/thread scope and selected-record-only output; SQL coverage for v2 function ACLs, source provenance, active grants, no-grant Character isolation and cross-Subject denial.
+
+**Remaining Phase 3 exit work:** broaden multi-session recall/abstention evaluation, complete the remaining source-supported retrieval signals if their authoritative fields exist, and verify the full negative matrix for revoked/superseded/unauthorized data on the v2 path. Phase 3 is not complete, and Phase 4 must not be declared complete or started as a production context composer before these criteria are evidenced.
 
 ### Phase 4 — Dynamic Context Composer
 
@@ -330,11 +327,12 @@ The Context Engine is complete only when all of the following are evidenced:
 
 ## 8. Immediate next work
 
-1. Keep PR #3068 Draft and preserve the current green CI evidence.
-2. Phase 1 read-only authority inventory and projection core are implemented; do not wire them into Production model execution until the remaining authority and cost gates are satisfied.
-3. Phase 2 provider-neutral profile and exact-request preflight are implemented. Keep real model profiles and four-Character Production wiring on hold until O-C1-07 and the existing PR-04B/04C/04D operational gates are resolved; do not advance to Phase 3 before Phase 2 exit criteria are met.
-4. Keep source-turn/message provenance gaps visible; do not invent missing source fields.
-5. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
+1. Keep PR #3068 Draft; no Production model route, paid inference, public route or additional Character activation is authorized by these read-only changes.
+2. Phase 1 authority inventory, projection and provenance-enriched read path are implemented. Preserve the existing Subject/Character grant boundaries and keep unsupported schemas closed.
+3. Phase 2 provider-neutral exact-request preflight remains implemented. Offline exit evidence is separate from Production readiness: real model profiles and four-Character Production wiring remain on hold until O-C1-07 and the existing PR-04B/04C/04D operational gates are resolved.
+4. Continue Phase 3 read-only retrieval only: close the remaining negative tests and multi-session evaluation; do not invent semantic, causal, relationship or contradiction signals where source fields are absent.
+5. Keep Character-private disclosure and Official Reading/Saju on their existing separate authority paths. Do not broaden Working Memory into either source.
+6. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
 
 ## 9. Governing documents
 
