@@ -83,17 +83,18 @@ Watchtower-Track: security
 7. **G6 제한 운영:** 사용자 승인된 범위에서 제한 smoke, 안전 로그/알림, forward stop, receipt/철회 보존, 복구/롤백, 배포 SHA를 확인하고 증거를 묶는다.
 
 **우선순위 규칙:** 기존 코드와 통과한 검증을 다시 만들거나 반복하지 않는다. 실제 S0 실행을 막는 결손만 수정한다. S0 밖의 기능·출처 유형·광역 보안 재감사를 새 선행 조건으로 끌어오지 않는다. 제외 경로는 구현 대신 차단 상태를 유지한다.
-## 6. 증거와 현재 블로커
+## 6. S0 증거와 현재 블로커
 
-- **병합 대상:** [#2768](https://github.com/gycha0109-beep/MyeongHa/pull/2768). 현황 보고서 작성 시점의 이전 HEAD CI [#41017140338](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41017140338) PASS. 최종 문서 커밋 HEAD의 통합/병합 상태는 CI 결과로 갱신해야 한다.
-- **최근 인접 구현:** [#2764](https://github.com/gycha0109-beep/MyeongHa/pull/2764) 관계 Worker HOLD, [#2765](https://github.com/gycha0109-beep/MyeongHa/pull/2765) 관계 Outbox Node 어댑터 HOLD, [#2767](https://github.com/gycha0109-beep/MyeongHa/pull/2767) DB 직접 RPC ACL 회수 후보. 각각의 **소스 병합**을 운영 DB 차단 완료로 간주하지 않는다.
-- **운영 근거 한계:** 2026-10-29 문서의 G3 운영 HTTP 검증은 읽기 전용 preflight/수동 workflow 정의이며, 실제 인증 HTTP 성공/Worker version/현재 Catalog 전부가 확인된 G3 PASS는 아니다. 이번 작업에서 운영 DB/Cloudflare/Supabase 자격증명·정책·트래픽 변경을 실행하지 않았다.
-- **블로커:** SRC-25 승인된 전체 타입/원본 증명, G0-D1~D5의 미완료 derived/transport 계약, G4 일반 크레딧 정산 종단, 실환경 운영 증거와 G5/G6.
-- **사용자 결정:** 적용 범위와 최종 운영 활성화는 사용자에게 있다. 이미 정해진 거부 우선 설계 안의 소스 구현·CI·PR 병합은 추가 결정을 기다리지 않는다.
+- **기준 main:** `1609aa879aa63120072b4d21b35f4c469dc650ed`. W121의 권한 검사·PostgreSQL 15/17 호환성 수정은 [PR #3089](https://github.com/gycha0109-beep/MyeongHa/pull/3089)로 병합됐고 전체 Integration 성공 증거가 있다.
+- **실제 S0 운영 장애 기록:** 2026-10-26 첫 hosted 시도는 `governed_preflight`에서 HTTP 503으로 종료되어 Provider 호출·receipt 발급이 0건이었다. 후속 시도는 `response_headers` 단계에서 HTTP status가 확인되지 않아 DB Governor 진입 전에 중단됐다. 2026-11-01 첫 답변 경계 복구 문서도 실제 모델 실행→HTTP 응답→receipt ACK→비용 기록의 성공 증거는 아직 없다고 명시한다.
+- **G0/G1:** S0 제품 범위는 고정했지만, 철회·재승인·실제 Worker 전송 순서의 기술 계약과 대상 DB에서 positive Memory 1건의 모델 전 Pin 성공 증거가 남아 있다. 전체 SRC-25 타입 레지스트리나 모든 파생 출처 승인은 S0 선행 조건으로 확장하지 않는다.
+- **G2/G3:** 기존 원자 Commit·최초 공개·receipt/철회 코드와 SQL은 재사용한다. 실제 대상 Cloudflare Worker의 최초 비스트리밍 응답, receipt/ACK, Commit·Reveal 취소 경쟁을 끝까지 통과한 증거가 남아 있다. History/Replay/후속 Worker 공개는 S0에서 계속 HOLD한다.
+- **G4:** W115~W121은 구현·병합됐지만 `creditBilling.productionMounted=false`다. 운영 전용 LOGIN/Secret/TLS 연결과 일반 고객의 예약→receipt→정산 Runtime 장착이 남아 있다. Owner Admin 면제 smoke는 일반 고객 크레딧 완료 증거가 아니다.
+- **G5/G6:** 기존 격리 PostgreSQL/CI 증거는 재사용한다. S0 전체 요청의 실제 DB 독립 세션·HTTP 경합 검증, 제한 운영 smoke·안전 관측·forward stop/복구 및 최종 승인 증거가 남아 있다.
+- **장기 후속 범위:** 과거 대화/Relationship/Reader/Replay/다중 Memory/Life Fact/Streaming의 전체 출처 계보는 S0 출시를 막는 현재 작업으로 취급하지 않는다. 해당 경로는 비활성/HOLD로 유지한다.
+- **운영 경계:** 이 로드맵 PR은 문서만 변경한다. Production DB/ACL/Role/Secret, Provider, 공개 Route, credit billing, 배포/트래픽 변경은 수행하지 않았다. 최종 운영 활성화는 별도 사용자 승인과 G6 증거가 필요하다.
 
-> **최종 보고 결론:** `#2768 SOURCE_IMPLEMENTED / 기존 HEAD CI_GREEN / OPERATIONS_HOLD / SECURITY_TRACK_OPEN`. 이 파일 자체가 운영 권한을 부여하거나 G0~G6 PASS 증거를 생성하지 않는다.
-
-
+> **현재 결론:** `W121_MERGED / S0_IMPLEMENTATION_PARTIAL / PRODUCTION_HOLD / SECURITY_TRACK_OPEN`. G0~G6의 완료 수를 개발량이나 전체 진척률로 표시하지 않는다.
 ## 7. Worklog — 작업 단위 누적 기록
 
 > 기록 규칙: 이후 Security 트랙 개발 PR마다 **작업일·목적·변경한 실제 경로·정확한 PR/HEAD·CI/Integration·남은 범위·운영 상태**를 이 섹션에 누적한다. 문서 작성 시점의 검사는 확정된 결과만 적으며, 이후 검사 결과를 성공으로 추정하지 않는다. 과거 항목은 후속 작업에서 덮어쓰지 않는다.
