@@ -544,3 +544,13 @@ Watchtower-Track: security
 - **사전검사 결과 직렬화:** 런타임 권한 결과 71개 필드를 71쌍의 `jsonb_build_object` 인자로 넘기던 테스트가 PostgreSQL의 함수 인자 상한 100개를 초과했다. 전체 레코드는 `to_jsonb(preflight)`로 직렬화하고, 예상 필드 목록을 별도 JSON 값으로 함께 반환해 71개 필드 누락/변형을 확인하도록 변경했다.
 - **현재 검증 증거:** 코드 HEAD `5b3eb53b0f8a6d56f662fad6b934b9f9e6449dcc`의 [CI run 42263568899](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42263568899)에서 `Work Track · security`와 PostgreSQL 15 `db-authority-core`가 SUCCESS. `W121_GOVERNED_LOGIN_PREFLIGHT_SQL_VERSIONED_PASS`, 독립 LOGIN 경계 및 기존 D4A 권한·비용 경합 테스트까지 확인했다. **동일 run의 PostgreSQL 17 검증은 기록 시점에 진행 중이므로 전체 CI GREEN이나 W121 최종 PASS로 간주하지 않는다.** 이 Worklog 변경 자체로 새 exact-head CI도 다시 실행된다.
 - **운영 경계:** Production DB ACL/ROLE/Secret 변경, 운영 연결·배포, 유료 Provider 호출, 과금·스케줄러 활성화 및 PR 병합은 수행하지 않았다. 기존 `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false`, G5 `productionMounted=false`, `scheduled=false`를 유지한다. G0–G6 전체 완료를 선언하지 않는다.
+
+### 2026-11-07 / W122 — S0 제품 완성 중심 실행 로드맵 v3
+
+- **목적:** 새 보안 기능을 계속 추가하는 방식에서 벗어나, 2026-10-25에 정한 S0(원본 `conversation_recall/v1` Memory 1건 + 현재 User 메시지 1건 + 최초 비스트리밍 답변 1회)을 실제 서비스로 완성하도록 실행 순서를 재정렬한다.
+- **변경 문서:** `docs/security/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md` 신설. `SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md`에 S0 Scope Overlay를 추가하고, 본 구현 현황 문서의 실행 순서·오래된 V2 참조를 갱신했다.
+- **정책:** G0~G6의 증거·보안 합격 기준은 유지한다. S0에서는 History/Replay/Reader/Relationship·과거 대화 재사용/다중 Memory/Life Fact/Streaming을 구현하지 않고 계속 HOLD한다. 제외 경로가 실제 모델 Context에 섞이면 전체 요청을 HOLD한다.
+- **실행 순서:** G0 S0 계약 → G1 단일 원본 Pin → G4 Governor/일반 고객 크레딧 → G2 원자 Commit → G3 최초 HTTP/receipt/철회 → G5 정확한 S0 통합 검증 → G6 제한 운영 smoke/복구.
+- **기존 구현 재사용:** W115~W121 및 PR #3089의 전용 DB 실행 역할·PostgreSQL 15/17 권한 검증은 재작성하지 않는다. S0의 Pin/Commit/Reveal 및 기존 격리 테스트도 통과한 부분은 재사용하고, 실제로 끊긴 운영 연결만 마무리한다.
+- **PR:** [#3094](https://github.com/gycha0109-beep/MyeongHa/pull/3094), 기준 main `1609aa879aa63120072b4d21b35f4c469dc650ed`. 이 기록 직전 문서 HEAD `02b5e20a65739795b9cb3c59cae0631624bcec0e`; PR의 최종 exact-head CI/Integration은 해당 실행 결과로 판정한다.
+- **운영 경계:** 문서 변경만 수행. Production DB/ACL/Role/Secret, Provider, 공개 Route, credit billing, deployment/traffic 변경 0. `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false` 및 G5/G6 HOLD 유지.
