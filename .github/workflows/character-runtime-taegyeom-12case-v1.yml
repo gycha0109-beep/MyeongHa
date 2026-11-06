@@ -3,7 +3,7 @@ name: "[WT:character-runtime-lab] 태겸 12문항 GLM 런타임 실험"
 on:
   push:
     branches:
-      - experiment/character-runtime-lab-taegyeom-v1
+      - main
     paths:
       - ".github/character-runtime-taegyeom-12case-v1.trigger"
   workflow_dispatch:
@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   evaluate:
-    if: ${{ github.ref == 'refs/heads/experiment/character-runtime-lab-taegyeom-v1' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     environment: production
     timeout-minutes: 15
