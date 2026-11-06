@@ -51,7 +51,7 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 1. 현재 Production 원장과 정확한 main migration 파일을 다시 SELECT-only로 대조한다. 기준 관측은 원격 241개 / 저장소 276개, 원격 전용 40개 / 저장소 전용 75개 / 동일 이름 버전 불일치 1개다.
 2. 모든 불일치 버전을 다음으로 분류한 처분표를 만든다: 원격 적용 출처·실행 주체·시점, 저장소 대응 파일, 실제 statement/DDL checksum, 객체·함수·정책 영향, owner·role·membership·GRANT/REVOKE, rollback/forward-only 방향.
 3. `20261008090417`은 104,021-byte 원격 statement의 wrapper·ACL·ownership·policy와 6개 로컬 migration을 대조한다. 19/19 함수 본문 일치는 범위가 제한된 증거로만 유지한다.
-4. `20261029012948` 원격 statement와 `20261029012000` 저장소 파일의 byte 불일치 원인과 의미를 판정한다. 이름이나 함수 본문 유사성만으로 동등성을 확정하지 않는다.
+4. `20261029012948` 원격 statement와 `20261029012000` 저장소 파일의 비교 범위를 확정한다. 11/05 DR 상태 문서에는 정규화 후 hash 일치 관측이 있으나, 11/07 최신 whole-statement byte 비교에서는 원격 7,349 bytes와 저장소 7,541 bytes(끝 개행 제거 7,539 bytes)의 hash가 달랐다. 두 비교의 입력·정규화 범위를 대조해 차이를 해소하기 전에는 semantic equivalence를 확정하지 않는다.
 5. 원격 전용·저장소 전용 항목은 각각 적용됨/미적용/다른 트랙/역사적 잔존 등 근거 있는 상태로 모두 처분한다. 저장소 전용 75개를 자동으로 배포 실패로 분류하지 않는다.
 6. 전체 schema, function, owner, role membership, grants, RLS/policy 및 provider migration ledger의 복구 동등성을 증명한다.
 
