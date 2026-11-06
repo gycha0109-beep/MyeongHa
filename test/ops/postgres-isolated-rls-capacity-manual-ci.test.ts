@@ -141,7 +141,7 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
   it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
     const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
     const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
-    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu]');
+    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu, workerd]');
     expect(workflow).toContain('default: short');
     expect(compose).toContain('profiles: [sustained]');
     expect(compose).toContain('cpus: 0.50');
@@ -164,6 +164,23 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(realRunner).toContain('saju_loopback_origin saju-cpu-pressure');
     expect(realRunner).toContain('.cpuComparison.recoverySucceeded==true');
     expect(realRunner).toContain('==[0.5,0.01]');
+  });
+
+  it('runs the workerd fixture locally with temporary bindings and a separate proof scope', () => {
+    const runner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const launcher = readFileSync('scripts/operations/start-isolated-workerd-product.mjs', 'utf8');
+    const worker = readFileSync('test/ops/fixtures/workerd-product-entry.mjs', 'utf8');
+    expect(runner).toContain('wrangler@4.152.0');
+    expect(runner).toContain('.localWorkerdProductPathMeasured==true');
+    expect(runner).toContain('.productionWorkerAdmissionMeasured==false');
+    expect(runner).toContain('.hostedHyperdriveMeasured==false');
+    expect(launcher).toContain("'dev', '--local'");
+    expect(launcher).not.toContain("'--remote'");
+    expect(launcher).toContain("'--ip', '127.0.0.1'");
+    expect(launcher).toContain('localConnectionString');
+    expect(worker).toContain('SELECT session_user AS role');
+    expect(worker).toContain('myeongha_ops_phase11_login');
+    expect(worker).toContain('handleCurrentSubjectSajuCalculationRequestV1');
   });
 
 });
