@@ -2420,6 +2420,54 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       'seyeon_ai_governor_day_not_configured',
       'seyeon_ai_governor_model_policy_mismatch',
     ]);
+    // W107 G4/G5: a failed, never-reserved model call cannot be
+    // settled, replayed, or converted into a billed "success" by the
+    // authorized governed Settle function. This is the actual DB port,
+    // not an in-memory accounting mock, and no provider is contacted.
+    const failedReservationCallId=uuid(37,218);
+    const unavailableSettlement={
+      schemaVersion:'seyeon-ai-cost-v1',
+      callId:failedReservationCallId,purpose:'dialogue_render',
+      providerKey:'s0-unapproved-provider',
+      modelKey:'s0-unapproved-model',
+      outcome:'response_received',httpStatus:200,elapsedMs:1,
+      inputTokens:1,outputTokens:1,cachedInputTokens:0,
+      reasoningTokens:0,priceVersion:'s0-unapproved-rate',
+      estimatedCostMicroUsd:1,costStatus:'estimated',
+      invoiceReconciled:false,
+    };
+    const settleUnreserved=()=>verifyGovernedRealCall(`select * from
+      public.cmd_governed_settle_seyeon_ai_call_v1(
+        $1::uuid,$2::uuid,$3::uuid,$4::text,$5::jsonb)`,[
+        f.subject,currentTurn,currentAttempt,'chat',
+        JSON.stringify(unavailableSettlement),
+      ],'23514',['seyeon_ai_governor_settlement_not_owned']);
+    await settleUnreserved();
+    // A repeated external request with the same call ID still cannot
+    // dispatch: no active policy/budget and no existing ledger reservation.
+    await verifyGovernedRealCall(`select * from
+      public.cmd_governed_start_seyeon_ai_call_v1(
+        $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+        $6::text,$7::text,$8::text,$9::text,$10::text,
+        $11::bigint,$12::bigint,$13::bigint)`,[
+      f.subject,currentTurn,currentAttempt,'chat',
+      failedReservationCallId,'dialogue_render','s0-unapproved-provider',
+      's0-unapproved-model','s0-unapproved-policy',
+      's0-unapproved-rate',100,256,1024,
+    ],'23514',[
+      'seyeon_ai_governor_day_not_configured',
+      'seyeon_ai_governor_model_policy_mismatch',
+    ]);
+    await settleUnreserved();
+    const {rows:[neverReserved]}=await pool.query<{
+      attempts:number;ledger_rows:number
+    }>(`select
+      (select count(*)::int from public.seyeon_ai_call_cost_events
+       where call_id=$1::uuid) as ledger_rows,
+      (select count(*)::int from public.seyeon_ai_call_cost_events
+       where call_id=$1::uuid and governor_bucket_utc_date is not null)
+       as attempts`,[failedReservationCallId]);
+    expect(neverReserved).toEqual({attempts:0,ledger_rows:0});
     expect(await readHistoricalCostFence()).toEqual(originalCostFence);
     const {rows:[acl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',
