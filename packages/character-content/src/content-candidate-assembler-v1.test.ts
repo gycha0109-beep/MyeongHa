@@ -230,6 +230,6 @@ describe('independent Character publication-lane candidate assembler v1', () => 
 
     expect(candidate.characters).toHaveLength(1);
     expect(() => validateProductionCharacterPublicationLaneBundleV1(candidate))
-      .toThrow('rahyeon.assetRefs must not be empty');
+      .toThrow('Production character content requires concrete asset refs: rahyeon');
   });
 });
