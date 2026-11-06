@@ -12,7 +12,6 @@ import type {
 
 export interface RetrieveCharacterWorkingMemoryForTurnInputV1
   extends PrepareCharacterWorkingMemoryContextInputV1 {
-  readonly currentUserMessageText: string;
   readonly now: string;
   readonly limit: number;
   readonly explicitCallbackRequested?: boolean;
@@ -43,10 +42,11 @@ export async function retrieveCharacterWorkingMemoryForTurnV1(
       characterId: input.characterId,
       threadId: input.threadBinding.threadId,
     },
-    queryText: input.currentUserMessageText,
     now: input.now,
     limit: input.limit,
-    explicitCallbackRequested: input.explicitCallbackRequested,
+    ...(input.explicitCallbackRequested === undefined
+      ? {}
+      : { explicitCallbackRequested: input.explicitCallbackRequested }),
   });
   return Object.freeze({ projection, retrieval });
 }

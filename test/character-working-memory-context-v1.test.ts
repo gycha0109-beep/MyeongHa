@@ -26,6 +26,10 @@ describe('prepareCharacterWorkingMemoryContextV1', () => {
         granteeCharacterId: 'seyeon',
         grantReason: 'user_choice' as const,
         grantedAt: '2026-11-01T10:01:00.000Z',
+        sourceKind: 'user_approved' as const,
+        sourceTurnId: null,
+        sourceMessageId: null,
+        sourceMergeActionId: null,
       }]),
     };
     const nonMemoryAuthorityPort: ReaderContextNonMemoryReadAuthorityPortV1 = {

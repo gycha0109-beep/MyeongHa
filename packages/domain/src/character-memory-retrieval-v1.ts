@@ -8,7 +8,11 @@ export const CHARACTER_MEMORY_RETRIEVAL_POLICY_VERSION_V1 =
 
 export type CharacterMemoryRetrievalExclusionV1 = Readonly<{
   sourceRef: string;
-  reason: 'NO_LEXICAL_MATCH' | 'SOURCE_TIMESTAMP_IN_FUTURE';
+  reason:
+    | 'NO_LEXICAL_MATCH'
+    | 'SOURCE_TIMESTAMP_IN_FUTURE'
+    | 'NOT_YET_VALID'
+    | 'EXPIRED';
 }>;
 
 export interface CharacterMemoryRetrievedRecordV1 {
@@ -47,7 +51,6 @@ export interface RetrieveCharacterWorkingMemoryInputV1 {
     readonly characterId: string;
     readonly threadId: string;
   }>;
-  readonly queryText: string;
   readonly now: string;
   readonly limit: number;
   readonly explicitCallbackRequested?: boolean;
@@ -140,7 +143,10 @@ export function retrieveCharacterWorkingMemoryV1(
   if (!Number.isSafeInteger(input.limit) || input.limit < 1 || input.limit > 20) {
     throw new TypeError('retrieval limit must be between 1 and 20.');
   }
-  const queryText = requireText(input.queryText, 'queryText');
+  const queryText = requireText(
+    projection.currentUserMessage.text,
+    'projection.currentUserMessage.text',
+  );
   const queryTokens = tokens(queryText);
   const callbackRequested = input.explicitCallbackRequested ??
     detectExplicitMemoryCallbackRequestedV1(queryText);
@@ -159,10 +165,39 @@ export function retrieveCharacterWorkingMemoryV1(
     }
     seenRefs.add(record.sourceRef);
     const effectiveAt = effectiveTimestamp(record);
-    if (Date.parse(record.createdAt) > nowMs) {
+    const sourceTimestamps = [
+      record.createdAt,
+      record.grantedAt,
+      ...(record.confirmedAt === undefined ? [] : [record.confirmedAt]),
+    ];
+    if (sourceTimestamps.some((timestamp) => Date.parse(timestamp) > nowMs)) {
       excluded.push(Object.freeze({
         sourceRef: record.sourceRef,
         reason: 'SOURCE_TIMESTAMP_IN_FUTURE',
+      }));
+      continue;
+    }
+    if (
+      record.recordKind === 'life_fact' &&
+      record.validFrom !== undefined &&
+      record.validFrom !== null &&
+      Date.parse(record.validFrom) > nowMs
+    ) {
+      excluded.push(Object.freeze({
+        sourceRef: record.sourceRef,
+        reason: 'NOT_YET_VALID',
+      }));
+      continue;
+    }
+    if (
+      record.recordKind === 'life_fact' &&
+      record.validTo !== undefined &&
+      record.validTo !== null &&
+      Date.parse(record.validTo) < nowMs
+    ) {
+      excluded.push(Object.freeze({
+        sourceRef: record.sourceRef,
+        reason: 'EXPIRED',
       }));
       continue;
     }

@@ -76,6 +76,10 @@ describe('Reader Memory PostgreSQL runtime authority adapters', () => {
       granteeCharacterId: 'seyeon',
       grantReason: 'user_choice',
       grantedAt: '2026-09-21T00:01:25.000Z',
+      sourceKind: 'user_approved',
+      sourceTurnId: null,
+      sourceMessageId: null,
+      sourceMergeActionId: null,
     }]);
     const port = createPostgresReaderContextGrantedMemoryAuthorityPortV1(queryClient);
 
@@ -93,10 +97,14 @@ describe('Reader Memory PostgreSQL runtime authority adapters', () => {
       granteeCharacterId: 'seyeon',
       grantReason: 'user_choice',
       grantedAt: '2026-09-21T00:01:25.000Z',
+      sourceKind: 'user_approved',
+      sourceTurnId: null,
+      sourceMessageId: null,
+      sourceMergeActionId: null,
     }]);
 
     expect(queryClient.query).toHaveBeenCalledWith(
-      expect.stringContaining('qry_reader_context_granted_memory_items_v1'),
+      expect.stringContaining('qry_reader_context_granted_memory_items_v2'),
       [
         '11111111-1111-4111-8111-111111111111',
         'seyeon',

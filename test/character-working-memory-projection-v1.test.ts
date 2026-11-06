@@ -58,6 +58,15 @@ function baseInput(
       value: { value: 'designer' },
       grantId: 'fact-grant-a',
       granteeCharacterId: 'seyeon',
+      grantReason: 'user_choice',
+      grantedAt: '2026-11-01T10:01:00.000Z',
+      sourceKind: 'user_explicit',
+      sourceMessageId: null,
+      sourceMergeActionId: null,
+      validFrom: null,
+      validTo: null,
+      confirmedAt: '2026-11-01T10:00:00.000Z',
+      createdAt: '2026-11-01T10:00:00.000Z',
     }],
     memories: [{
       memoryItemId: 'memory-a',
@@ -70,6 +79,10 @@ function baseInput(
       granteeCharacterId: 'seyeon',
       grantReason: 'user_choice',
       grantedAt: '2026-11-01T10:01:00.000Z',
+      sourceKind: 'user_approved',
+      sourceTurnId: null,
+      sourceMessageId: null,
+      sourceMergeActionId: null,
     }],
     relationship: {
       stateId: 'relationship-a',
@@ -167,6 +180,14 @@ describe('Character Working Memory projection v1', () => {
       }),
     ]);
     expect(result.relationshipEventIndex.exposure).toBe('metadata_only');
+    expect(result.currentUserMessage).toEqual({
+      messageId: 'message-current-user',
+      sequenceNo: 5,
+      role: 'user',
+      speakerCharacterId: null,
+      text: '오늘은 어떻게 지냈어요?',
+      createdAt: '2026-11-01T09:04:00.000Z',
+    });
     expect(result.recentConversation.map((message) => message.messageId)).toEqual([
       'message-user-1',
       'message-seyeon-1',

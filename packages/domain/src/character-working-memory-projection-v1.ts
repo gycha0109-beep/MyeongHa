@@ -179,6 +179,7 @@ export interface CharacterWorkingMemoryProjectionV1 {
     readonly relationshipRevision: number | null;
   }>;
   readonly relationship: CharacterWorkingMemoryRelationshipSourceV1 | null;
+  readonly currentUserMessage: CharacterWorkingMemoryRecentMessageV1;
   readonly relationshipEventIndex: Readonly<{
     readonly exposure: 'metadata_only';
     readonly events: readonly CharacterWorkingMemoryRelationshipEventSourceV1[];
@@ -577,6 +578,7 @@ function buildRecentConversation(input: Readonly<{
   authorizedThreadCharacterIds: readonly string[];
   currentUserMessageRef: string;
 }>): Readonly<{
+  currentUserMessage: CharacterWorkingMemoryRecentMessageV1;
   recentConversation: readonly CharacterWorkingMemoryRecentMessageV1[];
   excludedMessages: readonly Readonly<{
     messageId: string;
@@ -591,6 +593,7 @@ function buildRecentConversation(input: Readonly<{
   const messageIds: string[] = [];
   const sequenceNumbers: number[] = [];
   let currentMessageFound = false;
+  let currentUserMessage: CharacterWorkingMemoryRecentMessageV1 | null = null;
 
   for (const message of input.messages) {
     const messageId = requireText(message.messageId, 'recentMessage.messageId', 256);
@@ -614,6 +617,14 @@ function buildRecentConversation(input: Readonly<{
       }
       if (messageId === input.currentUserMessageRef) {
         currentMessageFound = true;
+        currentUserMessage = Object.freeze({
+          messageId,
+          sequenceNo: message.sequenceNo,
+          role: 'user' as const,
+          speakerCharacterId: null,
+          text,
+          createdAt,
+        });
         excludedMessages.push(Object.freeze({
           messageId,
           reason: 'CURRENT_USER_MESSAGE_SEPARATE_INPUT' as const,
@@ -685,7 +696,7 @@ function buildRecentConversation(input: Readonly<{
       );
     }
   }
-  if (!currentMessageFound) {
+  if (!currentMessageFound || currentUserMessage === null) {
     throw new CharacterWorkingMemoryProjectionErrorV1(
       'CURRENT_USER_MESSAGE_MISSING',
       'The exact current User message must be present in the authoritative recent-message read.',
@@ -702,6 +713,7 @@ function buildRecentConversation(input: Readonly<{
   }
 
   return Object.freeze({
+    currentUserMessage,
     recentConversation: Object.freeze(recentConversation),
     excludedMessages: Object.freeze(excludedMessages),
   });
@@ -863,6 +875,7 @@ export function buildCharacterWorkingMemoryProjectionV1(
       exposure: 'metadata_only' as const,
       events: relationshipEvents,
     }),
+    currentUserMessage: conversation.currentUserMessage,
     recentConversation: conversation.recentConversation,
     excludedMessages: conversation.excludedMessages,
     projectedRecords: Object.freeze(projectedRecords),

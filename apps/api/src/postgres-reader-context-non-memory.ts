@@ -177,18 +177,22 @@ implements ReaderContextNonMemoryReadAuthorityPortV1 {
         [input.subjectId, input.characterId],
       );
       return Object.freeze(result.rows.map((row) => {
-        const sourceKind = requireString('Life Fact source kind', row.sourceKind);
+        const rawSourceKind = requireString('Life Fact source kind', row.sourceKind);
         if (
-          sourceKind !== 'user_explicit' &&
-          sourceKind !== 'profile_edit' &&
-          sourceKind !== 'merge_import'
+          rawSourceKind !== 'user_explicit' &&
+          rawSourceKind !== 'profile_edit' &&
+          rawSourceKind !== 'merge_import'
         ) {
           throw new Error('Reader Life Fact PostgreSQL source kind is unsupported.');
         }
+        const sourceKind: ReaderGrantedLifeFactAuthorityRowV1['sourceKind'] = rawSourceKind as
+          ReaderGrantedLifeFactAuthorityRowV1['sourceKind'];
         const rawGrantReason = requireString('Life Fact grant reason', row.grantReason);
         if (rawGrantReason !== 'user_choice' && rawGrantReason !== 'merge_import') {
           throw new Error('Reader Life Fact PostgreSQL grant reason is unsupported.');
         }
+        const grantReason: ReaderGrantedLifeFactAuthorityRowV1['grantReason'] = rawGrantReason as
+          ReaderGrantedLifeFactAuthorityRowV1['grantReason'];
         return Object.freeze({
           factId: requireString('Life Fact id', row.factId),
           factType: requireString('Life Fact type', row.factType),
@@ -199,7 +203,7 @@ implements ReaderContextNonMemoryReadAuthorityPortV1 {
             'Life Fact grantee Character id',
             row.granteeCharacterId,
           ),
-          grantReason: rawGrantReason,
+          grantReason,
           grantedAt: requireTimestamp('Life Fact grant timestamp', row.grantedAt),
           sourceKind,
           sourceMessageId: requireNullableString('Life Fact source message id', row.sourceMessageId),

@@ -124,6 +124,6 @@ export async function prepareCharacterWorkingMemoryContextV1(
     relationship: relationshipResponse.relationship,
     relationshipEvents,
     recentMessages,
-    projectors: input.projectors,
+    ...(input.projectors === undefined ? {} : { projectors: input.projectors }),
   });
 }

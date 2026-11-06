@@ -252,11 +252,14 @@ implements ReaderContextMemoryReadAuthorityPortV1 {
         if (rawGrantReason !== 'user_choice' && rawGrantReason !== 'merge_import') {
           throw new Error('Reader Memory PostgreSQL grant reason is unsupported.');
         }
-        const grantReason: 'user_choice' | 'merge_import' = rawGrantReason;
+        const grantReason: ReaderGrantedMemoryAuthorityRowV1['grantReason'] = rawGrantReason as
+          ReaderGrantedMemoryAuthorityRowV1['grantReason'];
         const rawSourceKind = requireString('Memory source kind', row.sourceKind);
         if (rawSourceKind !== 'user_approved' && rawSourceKind !== 'merge_import') {
           throw new Error('Reader Memory PostgreSQL source kind is unsupported.');
         }
+        const sourceKind: ReaderGrantedMemoryAuthorityRowV1['sourceKind'] = rawSourceKind as
+          ReaderGrantedMemoryAuthorityRowV1['sourceKind'];
         return Object.freeze({
           memoryItemId: requireString('Memory Item id', row.memoryItemId),
           memoryType: requireString('Memory type', row.memoryType),
@@ -274,7 +277,7 @@ implements ReaderContextMemoryReadAuthorityPortV1 {
           ),
           grantReason,
           grantedAt: requireTimestamp('Memory grant timestamp', row.grantedAt),
-          sourceKind: rawSourceKind,
+          sourceKind,
           sourceTurnId: requireNullableString('Memory source turn id', row.sourceTurnId),
           sourceMessageId: requireNullableString('Memory source message id', row.sourceMessageId),
           sourceMergeActionId: requireNullableString(
