@@ -17,6 +17,11 @@ import {
   type FiveCharacterChatTargetV1,
 } from './five-character-chat-executor-selection-v1.js';
 import type { RequestUiLocaleV1 } from './request-ui-locale-v1.js';
+import {
+  evaluateCharacterContentCompatibilityV1,
+  type CharacterClientCompatibilityProfileV1,
+} from '../../../packages/domain/src/character-content-compatibility.js';
+import { ApiCommandError } from './api-error.js';
 
 export interface TrustedFiveCharacterChatTurnV1 {
   readonly characterId: FiveCharacterChatTargetV1;
@@ -51,6 +56,12 @@ export interface RunPublishedFiveCharacterChatTurnInputV1<TResult> {
   readonly replyLocale: RequestUiLocaleV1;
   readonly bindingAuthorityPort: ChatThreadRuntimeBindingReadAuthorityPortV1;
   readonly manifestAuthorityPort: ContentBundleManifestReadAuthorityPortV1;
+  /** Exact published profile is certified by the server for this Character.
+   * Absent/unsupported assets, cues or capability must reject before any AI call.
+   */
+  readonly compatibilityProfiles: Readonly<Partial<Record<
+    FiveCharacterChatTargetV1, CharacterClientCompatibilityProfileV1
+  >>>;
   /** Only real independently wired server executors may be registered. */
   readonly registeredExecutors: Readonly<Partial<Record<
     FiveCharacterChatTargetV1, FiveCharacterChatTurnExecutorV1<TResult>
@@ -101,8 +112,34 @@ export async function runPublishedFiveCharacterChatTurnV1<TResult>(
     input.registeredExecutors,
   );
 
+  // The profile is server-installed for the same exact selected Character,
+  // never a browser-selected capability/asset hash. A future published lane
+  // cannot bypass client compatibility just because its DB Pin is valid.
+  const profile = input.compatibilityProfiles[selected.characterId];
+  if (profile === undefined) {
+    throw new ApiCommandError(
+      'CAPABILITY_UNAVAILABLE',
+      'Published Character has no approved server-owned client profile.',
+    );
+  }
+  const decision = evaluateCharacterContentCompatibilityV1({
+    manifest: {
+      minClientCapability: bundleManifest.manifest.minClientCapability,
+      assetManifestHash: bundleManifest.manifest.assetManifestHash,
+      cueSchemaVersion: bundleManifest.manifest.cueSchemaVersion,
+    },
+    clientProfile: profile,
+  });
+  if (!decision.compatible || decision.action !== 'activate') {
+    throw new ApiCommandError(
+      decision.failures.includes('INVALID_COMPATIBILITY_INPUT')
+        ? 'CAPABILITY_UNAVAILABLE' : 'CONTENT_INCOMPATIBLE',
+      'Published Character bundle is incompatible with the approved client profile.',
+    );
+  }
+
   // No provider/receipt work is permitted until all immutable authority
-  // checks and exact per-Character registration have completed.
+  // checks, per-Character registration and client compatibility complete.
   const execution = await selected.executor(Object.freeze({
     characterId: selected.characterId,
     subjectId,
