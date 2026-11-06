@@ -42,6 +42,10 @@ type GrantedMemoryQueryRowV1 = Readonly<{
   granteeCharacterId: unknown;
   grantReason: unknown;
   grantedAt: unknown;
+  sourceKind: unknown;
+  sourceTurnId: unknown;
+  sourceMessageId: unknown;
+  sourceMergeActionId: unknown;
 }>;
 
 const READ_MEMORY_ITEMS_SQL = `
@@ -79,7 +83,7 @@ select
   grantee_character_id as "granteeCharacterId",
   grant_reason as "grantReason",
   granted_at::text as "grantedAt"
-from public.qry_reader_context_granted_memory_items_v1(
+from public.qry_reader_context_granted_memory_items_v2(
   $1::uuid,
   $2::text
 )
@@ -249,6 +253,10 @@ implements ReaderContextMemoryReadAuthorityPortV1 {
           throw new Error('Reader Memory PostgreSQL grant reason is unsupported.');
         }
         const grantReason: 'user_choice' | 'merge_import' = rawGrantReason;
+        const rawSourceKind = requireString('Memory source kind', row.sourceKind);
+        if (rawSourceKind !== 'user_approved' && rawSourceKind !== 'merge_import') {
+          throw new Error('Reader Memory PostgreSQL source kind is unsupported.');
+        }
         return Object.freeze({
           memoryItemId: requireString('Memory Item id', row.memoryItemId),
           memoryType: requireString('Memory type', row.memoryType),
@@ -266,6 +274,13 @@ implements ReaderContextMemoryReadAuthorityPortV1 {
           ),
           grantReason,
           grantedAt: requireTimestamp('Memory grant timestamp', row.grantedAt),
+          sourceKind: rawSourceKind,
+          sourceTurnId: requireNullableString('Memory source turn id', row.sourceTurnId),
+          sourceMessageId: requireNullableString('Memory source message id', row.sourceMessageId),
+          sourceMergeActionId: requireNullableString(
+            'Memory source merge action id',
+            row.sourceMergeActionId,
+          ),
         });
       }));
     } catch (error) {

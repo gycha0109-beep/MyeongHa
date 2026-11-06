@@ -14,6 +14,15 @@ type LifeFactQueryRowV1 = Readonly<{
   value: unknown;
   grantId: unknown;
   granteeCharacterId: unknown;
+  grantReason: unknown;
+  grantedAt: unknown;
+  sourceKind: unknown;
+  sourceMessageId: unknown;
+  sourceMergeActionId: unknown;
+  validFrom: unknown;
+  validTo: unknown;
+  confirmedAt: unknown;
+  createdAt: unknown;
 }>;
 
 type RelationshipEventQueryRowV1 = Readonly<{
@@ -40,8 +49,17 @@ select
   schema_version as "schemaVersion",
   value_jsonb as "value",
   grant_id::text as "grantId",
-  grantee_character_id as "granteeCharacterId"
-from public.qry_reader_context_granted_life_facts_v1(
+  grantee_character_id as "granteeCharacterId",
+  grant_reason as "grantReason",
+  granted_at::text as "grantedAt",
+  source_kind as "sourceKind",
+  source_message_id::text as "sourceMessageId",
+  source_merge_action_id::text as "sourceMergeActionId",
+  valid_from::text as "validFrom",
+  valid_to::text as "validTo",
+  confirmed_at::text as "confirmedAt",
+  created_at::text as "createdAt"
+from public.qry_reader_context_granted_life_facts_v2(
   $1::uuid,
   $2::text
 )
@@ -109,6 +127,10 @@ function requireTimestamp(name: string, value: unknown): string {
   return stored;
 }
 
+function requireNullableTimestamp(name: string, value: unknown): string | null {
+  return value === null ? null : requireTimestamp(name, value);
+}
+
 function postgresConstraint(error: unknown): string | null {
   if (typeof error !== 'object' || error === null) return null;
   const constraint = (error as { constraint?: unknown }).constraint;
@@ -118,6 +140,7 @@ function postgresConstraint(error: unknown): string | null {
 function mapPostgresError(error: unknown): never {
   switch (postgresConstraint(error)) {
     case 'qry_reader_context_life_facts_input_required':
+    case 'qry_reader_context_life_facts_v2_input_required':
     case 'qry_reader_context_relationship_events_input_required':
     case 'qry_reader_context_recent_messages_input_required':
       throw new ReaderContextNonMemoryReadAuthorityPortErrorV1(
@@ -153,17 +176,43 @@ implements ReaderContextNonMemoryReadAuthorityPortV1 {
         READ_GRANTED_LIFE_FACTS_SQL,
         [input.subjectId, input.characterId],
       );
-      return Object.freeze(result.rows.map((row) => Object.freeze({
-        factId: requireString('Life Fact id', row.factId),
-        factType: requireString('Life Fact type', row.factType),
-        schemaVersion: requireString('Life Fact schema version', row.schemaVersion),
-        value: row.value,
-        grantId: requireString('Life Fact grant id', row.grantId),
-        granteeCharacterId: requireString(
-          'Life Fact grantee Character id',
-          row.granteeCharacterId,
-        ),
-      })));
+      return Object.freeze(result.rows.map((row) => {
+        const sourceKind = requireString('Life Fact source kind', row.sourceKind);
+        if (
+          sourceKind !== 'user_explicit' &&
+          sourceKind !== 'profile_edit' &&
+          sourceKind !== 'merge_import'
+        ) {
+          throw new Error('Reader Life Fact PostgreSQL source kind is unsupported.');
+        }
+        const rawGrantReason = requireString('Life Fact grant reason', row.grantReason);
+        if (rawGrantReason !== 'user_choice' && rawGrantReason !== 'merge_import') {
+          throw new Error('Reader Life Fact PostgreSQL grant reason is unsupported.');
+        }
+        return Object.freeze({
+          factId: requireString('Life Fact id', row.factId),
+          factType: requireString('Life Fact type', row.factType),
+          schemaVersion: requireString('Life Fact schema version', row.schemaVersion),
+          value: row.value,
+          grantId: requireString('Life Fact grant id', row.grantId),
+          granteeCharacterId: requireString(
+            'Life Fact grantee Character id',
+            row.granteeCharacterId,
+          ),
+          grantReason: rawGrantReason,
+          grantedAt: requireTimestamp('Life Fact grant timestamp', row.grantedAt),
+          sourceKind,
+          sourceMessageId: requireNullableString('Life Fact source message id', row.sourceMessageId),
+          sourceMergeActionId: requireNullableString(
+            'Life Fact source merge action id',
+            row.sourceMergeActionId,
+          ),
+          validFrom: requireNullableTimestamp('Life Fact valid from', row.validFrom),
+          validTo: requireNullableTimestamp('Life Fact valid to', row.validTo),
+          confirmedAt: requireTimestamp('Life Fact confirmation timestamp', row.confirmedAt),
+          createdAt: requireTimestamp('Life Fact created timestamp', row.createdAt),
+        });
+      }));
     } catch (error) {
       return mapPostgresError(error);
     }
