@@ -1,6 +1,6 @@
 \set ON_ERROR_STOP on
--- Full migrated PostgreSQL 17 only: new candidate schema is created INSIDE
--- a single synthetic ROLLBACK; it is never an operational migration.
+-- Full migrated PostgreSQL 17 only: exercise the forward-migrated Record scope
+-- authority with synthetic purchases/Grants inside one ROLLBACK.
 begin;
 set local statement_timeout='40s';
 \ir ../../docs/operations/candidates/commerce_portone_cancellation_event_persistence_v1.sql
@@ -562,6 +562,13 @@ begin
    'public.commerce_saju_records_v1','SELECT')
     or pg_catalog.has_table_privilege('anon',
    'public.commerce_saju_verified_refund_effects_v1','INSERT')
+    or not pg_catalog.has_column_privilege(
+      'myeongha_commerce_internal_executor',
+      'public.commerce_saju_records_v1','entitlement_scope_id','SELECT')
+    or pg_catalog.has_column_privilege('authenticated',
+      'public.commerce_saju_records_v1','entitlement_scope_id','SELECT')
+    or pg_catalog.has_column_privilege('anon',
+      'public.commerce_saju_records_v1','entitlement_scope_id','SELECT')
  then
    raise exception 'SAJU_LEDGER_PG17_PRIVATE_ACL_EXPOSED';
  end if;
