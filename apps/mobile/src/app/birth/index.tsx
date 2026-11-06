@@ -1,6 +1,6 @@
 import { MyeongHaApiClientErrorV1, type BirthCalendarTypeV1, type BirthSexV1 } from '@myeongha/api-client';
-import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -18,6 +18,7 @@ import {
   buildMobileBirthProfileCreateRequestV1,
 } from '@/features/birth/birth-input';
 import { mobileBirthServiceV1 } from '@/features/birth/native-mobile-birth-service';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { mobileBirthAuthoredErrorCopyV1 } from '@/features/birth/mobile-birth-error-copy';
 import { BirthDateCalendar } from '@/features/birth/BirthDateCalendar';
 import { BirthTime12HourField } from '@/features/birth/BirthTime12HourField';
@@ -54,16 +55,54 @@ export default function BirthInputScreen() {
   const [sex, setSex] = useState<BirthSexV1>('unspecified');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [ownerChanged, setOwnerChanged] = useState(false);
+  const focused = useRef(false);
+  const ownerChangedRef = useRef(false);
+  const ownerEpoch = useRef(0);
+
+  // A Birth draft is private to the Subject who began entering it. A verified
+  // credential mutation must never expose that unsaved data to the next user.
+  useEffect(() => subscribeMobileSubjectCredentialChangesV1(() => {
+    ownerEpoch.current += 1;
+    ownerChangedRef.current = true;
+    setOwnerChanged(true);
+    setCalendarType('solar');
+    setYear('');
+    setMonth('');
+    setDay('');
+    setDatePickerVisible(false);
+    setMeridiem('am');
+    setHour12('');
+    setMinute('00');
+    setTimeKnown(true);
+    setIsLeapMonth(false);
+    setSex('unspecified');
+    setError('');
+    setSubmitting(false);
+    if (focused.current) router.replace('/reading');
+  }), []);
+
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    if (ownerChangedRef.current) router.replace('/reading');
+    return () => {
+      focused.current = false;
+      ownerEpoch.current += 1;
+    };
+  }, []));
 
   const refreshBirthStatus = useCallback(async () => {
-    if (submitting) return;
+    if (submitting || !focused.current || ownerChangedRef.current) return;
+    const epoch = ownerEpoch.current;
     // Inspect current authority without overwriting the unsaved form fields.
     try {
       const current = await mobileBirthServiceV1.readCurrent();
+      if (!focused.current || ownerChangedRef.current || epoch !== ownerEpoch.current) return;
       setError(current === null
         ? ''
         : '이미 등록된 출생정보가 있습니다. 현재 내용은 사주 탭에서 확인해 주세요.');
     } catch {
+      if (!focused.current || ownerChangedRef.current || epoch !== ownerEpoch.current) return;
       setError('현재 출생정보를 다시 확인하지 못했습니다. 입력 내용은 그대로 유지됩니다.');
     }
   }, [submitting]);
@@ -75,6 +114,8 @@ export default function BirthInputScreen() {
   };
 
   const submit = async () => {
+    if (!focused.current || ownerChangedRef.current || submitting) return;
+    const epoch = ownerEpoch.current;
     setError('');
     let request;
     try {
@@ -103,9 +144,11 @@ export default function BirthInputScreen() {
     setSubmitting(true);
     try {
       await mobileBirthServiceV1.create(request);
+      if (!focused.current || ownerChangedRef.current || epoch !== ownerEpoch.current) return;
       mobileHomeControllerV1.invalidate();
       router.replace('/reading');
     } catch (cause) {
+      if (!focused.current || ownerChangedRef.current || epoch !== ownerEpoch.current) return;
       if (
         cause instanceof MyeongHaApiClientErrorV1 &&
         cause.kind === 'http' &&
@@ -113,6 +156,7 @@ export default function BirthInputScreen() {
       ) {
         try {
           const existing = await mobileBirthServiceV1.readCurrent();
+          if (!focused.current || ownerChangedRef.current || epoch !== ownerEpoch.current) return;
           if (existing !== null) {
             mobileHomeControllerV1.invalidate();
             router.replace('/reading');
@@ -134,9 +178,15 @@ export default function BirthInputScreen() {
       }
       setError('출생정보를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.');
     } finally {
-      setSubmitting(false);
+      if (!ownerChangedRef.current) setSubmitting(false);
     }
   };
+
+  // The account-switch listener also clears every sensitive field. Render
+  // no previous-Subject form while the native router replaces this route.
+  if (ownerChanged) {
+    return <SafeAreaView style={styles.safeArea}><ActivityIndicator color={mobileColors.navy} /></SafeAreaView>;
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
