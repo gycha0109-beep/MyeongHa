@@ -9,7 +9,11 @@ import {
   type ModelTokenBudgetReceiptV1,
 } from '../../../packages/domain/src/model-token-budget-profile-v1.js';
 import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
-import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
+import type {
+  SeyeonAiCallStartV1,
+  SeyeonAiGovernorAdmissionV1,
+  SeyeonGovernedStartCallV1,
+} from './postgres-seyeon-ai-cost-ledger-v1.js';
 import {
   createSeyeonOpenAiInputTokenCountAdmissionV1,
   SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
@@ -135,6 +139,38 @@ export function quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1(input: Read
       serializedRequestBytes: receipt.serializedRequestBodyBytes,
       enforcedOutputTokenLimit: receipt.outputTokenLimit,
     },
+  });
+}
+
+/**
+ * Produces the exact input consumed by the existing atomic DB admission.
+ * The caller must pass this result to startGovernedSeyeonAiCallV1 inside the
+ * canonical Subject transaction; this helper itself never reserves or writes.
+ */
+export function buildSeyeonGovernedStartCallFromModelTokenBudgetReceiptV1(input: Readonly<{
+  policy: SeyeonCostGovernorModelPolicyV1;
+  purpose: SeyeonStructuredProviderRequestV2['purpose'];
+  call: SeyeonAiCallStartV1;
+  receipt: ModelTokenBudgetReceiptV1;
+}>): SeyeonGovernedStartCallV1 {
+  if (
+    input.call.purpose !== input.purpose ||
+    input.call.providerKey !== input.receipt.providerKey ||
+    input.call.modelKey !== input.receipt.modelKey
+  ) {
+    throw new TypeError(
+      'Se-yeon governed call identity does not match the certified token budget receipt.',
+    );
+  }
+  const quote = quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1({
+    policy: input.policy,
+    purpose: input.purpose,
+    receipt: input.receipt,
+  });
+  return Object.freeze({
+    ...input.call,
+    quote,
+    requestBodyBytes: input.receipt.serializedRequestBodyBytes,
   });
 }
 

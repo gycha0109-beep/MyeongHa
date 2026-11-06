@@ -4,6 +4,7 @@ import {
   certifyModelTokenBudgetV1,
 } from '../packages/domain/src/model-token-budget-profile-v1.js';
 import {
+  buildSeyeonGovernedStartCallFromModelTokenBudgetReceiptV1,
   createSeyeonOpenAiModelTokenBudgetBindingV1,
   quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1,
   SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1,
@@ -114,6 +115,37 @@ describe('Se-yeon OpenAI model token budget binding (offline)', () => {
       purpose: 'dialogue_render',
       receipt,
     });
+    const governedStart = buildSeyeonGovernedStartCallFromModelTokenBudgetReceiptV1({
+      policy,
+      purpose: 'dialogue_render',
+      call: {
+        callId: '44444444-4444-4444-8444-444444444444',
+        purpose: 'dialogue_render',
+        providerKey: 'openai-responses',
+        modelKey: 'synthetic-model',
+      },
+      receipt,
+    });
+    expect(governedStart).toMatchObject({
+      callId: '44444444-4444-4444-8444-444444444444',
+      requestBodyBytes: receipt.serializedRequestBodyBytes,
+      quote: {
+        policyVersion: 'synthetic-policy-v1',
+        rateCardVersion: 'synthetic-price-v1',
+        ceilingMicroUsd: 3364,
+      },
+    });
+    expect(() => buildSeyeonGovernedStartCallFromModelTokenBudgetReceiptV1({
+      policy,
+      purpose: 'dialogue_render',
+      call: {
+        callId: '44444444-4444-4444-8444-444444444444',
+        purpose: 'dialogue_render',
+        providerKey: 'openai-responses',
+        modelKey: 'other-model',
+      },
+      receipt,
+    })).toThrow(/does not match the certified token budget receipt/);
     expect(quote).toMatchObject({
       policyVersion: 'synthetic-policy-v1',
       rateCardVersion: 'synthetic-price-v1',
