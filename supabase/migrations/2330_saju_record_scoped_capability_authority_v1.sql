@@ -1759,6 +1759,34 @@ begin
         constraint='cmd_purchase_intent_v3_saju_record_context_required',
         message='Saju Purchase Intent must be admitted through the Record-scoped command';
     end if;
+    if exists (
+      select 1
+      from public.product_offers existing_offer
+      join public.products existing_product on existing_product.id=existing_offer.product_id
+      where existing_offer.id=v_existing_offer_id
+        and (
+          (
+            public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is not null
+            and exists (
+              select 1 from public.product_capability_items item
+              where item.capability_set_id=v_existing_capability_set_id
+                and item.scope_mode<>'saju_record'
+            )
+          )
+          or (
+            public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is null
+            and exists (
+              select 1 from public.product_capability_items item
+              where item.capability_set_id=v_existing_capability_set_id
+                and item.scope_mode='saju_record'
+            )
+          )
+        )
+    ) then
+      raise exception using errcode='23514',
+        constraint='cmd_purchase_intent_v3_saju_scope_mode_mismatch',
+        message='Saju Record scope is valid only for Saju Products; every Saju Capability Item must be Record-scoped';
+    end if;
     if v_existing_request_hash is distinct from p_request_hash then
       raise exception using
         errcode = '23505',
@@ -1839,6 +1867,7 @@ begin
          po.platform,
          po.provider,
          po.external_product_id,
+         p.product_key,
          po.enabled,
          po.retired_at,
          po.capability_set_id,
@@ -1933,6 +1962,26 @@ begin
       errcode = '23514',
       constraint = 'cmd_purchase_intent_v3_capability_nonempty',
       message = 'Offer Capability Set must contain at least one immutable Capability Item';
+  end if;
+
+  if (
+    public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+    and exists (
+      select 1 from public.product_capability_items item
+      where item.capability_set_id=v_offer_capability_set_id
+        and item.scope_mode<>'saju_record'
+    )
+  ) or (
+    public.internal_commerce_saju_product_fields_v1(v_product_key) is null
+    and exists (
+      select 1 from public.product_capability_items item
+      where item.capability_set_id=v_offer_capability_set_id
+        and item.scope_mode='saju_record'
+    )
+  ) then
+    raise exception using errcode='23514',
+      constraint='cmd_purchase_intent_v3_saju_scope_mode_mismatch',
+      message='Saju Record scope is valid only for Saju Products; every Saju Capability Item must be Record-scoped';
   end if;
 
   v_expected_capability_snapshot := jsonb_build_object(
