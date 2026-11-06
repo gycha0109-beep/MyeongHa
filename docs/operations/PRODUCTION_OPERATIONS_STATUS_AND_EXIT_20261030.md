@@ -10,6 +10,17 @@
 
 ## Worklog — 운영 트랙 작업 이력
 
+### 2026-11-06 KST — Phase 11 GitHub Linux workerd 제품 경로 실측
+
+- 격리 Linux에서 로컬 workerd, 실제 GoTrue JWT, PostgreSQL 18 강제 RLS, 고정 Saju 엔진을 연결했다. 순차 요청 12/12건이 성공했고 p50/p95/p99는 118.339/134.804/138.106ms였다. 익명 거부, Health 및 런타임·Docker 정리도 확인했다. [Linux 실행](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42184314101), [원본·SHA-256·범위](WORKERD_ISOLATED_PRODUCT_PATH_PHASE11_20261106.md).
+- 동시·지속 요청 및 의존성 장애 관측은 각각의 기존 격리 런타임과 측정 범위에 해당한다. workerd 동시 부하·복귀와 운영 Worker/Hosted Hyperdrive 용량에는 별도 근거가 필요하다.
+
+### 2026-11-06 KST — 최신 Worker 익명 검증과 개인정보 원장 감시
+
+- 16:01 KST 전후 읽기 전용 확인에서 Worker `de4c79c8-163e-4964-b35a-c3e6242b32bb`가 트래픽 100%를 처리했다. 빌드가 가리킨 `main`은 `d21e35357753109b625ac108346e726add571ea8`이었다. 세 응답의 Worker 버전이 일치했고 Health 200, 설정 readiness 200, 익명 `GET /api/me` 401과 `no-store`를 확인했다. 양성 제품 경로·의존성 readiness·롤백은 별도 수용 항목이다. [Cloudflare 빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/09d2cc48-13f7-4fe0-8db8-ee752da2f7a0).
+- 16:58 KST에는 Worker `21888d56-f147-4723-b973-1c1ef224e88a`가 트래픽 100%를 처리했고, 같은 세 요청에서 이전과 동일한 상태 코드·캐시 정책을 확인했다. 해당 빌드 소스는 `main` `28150e3992991e15b7b508c4c6210848836ad704`이다. 이 커밋의 GitHub 근거 수집에서는 운영 마이그레이션 작업이 건너뛰어진 것으로 확인됐다. [Cloudflare 빌드](https://dash.cloudflare.com/410d3f82ed3ccc66609a2b698803859b/workers/services/view/myeongha/production/builds/2f4f0f33-7457-4f31-8745-5275fc49d7d3), [Supabase 워크플로](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42183394287).
+- 개인정보 원장 감시는 검증된 암호화 업로드가 포함된 마지막 수집 작업으로부터 25,009초 경과를 확인해 7,200초 경보 기준에서 실패했다. 이후 16:24 KST에 예약 수집이 완료됐고, 16:58 KST 감시에서는 작업 완료 2,053초와 같은 시도의 암호화 업로드를 확인해 통과했다. 두 수집 완료 사이에 7시간 33분의 공백이 있었다. 독립적인 개인정보 연속성과 전체 서비스 RPO/RTO는 미입증이다. [지연 경보](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42176633142), [새 수집](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42180602725), [통과 감시](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42184381975), [P0 #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887).
+
 ### 2026-11-05 KST — Phase 11 실제 지속 동시 요청 및 DB 연결 압력 확인
 
 - [Linux #41996074287](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41996074287)에서 15분 동안 900회 모두 API 요청 4개가 실제로 겹쳤다. 3,600/3,600건 성공, p95 205.932ms, 장애 주입 후 복귀와 자원 정리 통과. [원본·SHA-256·측정 범위](REAL_GOTRUE_PG18_SAJU_PRODUCT_CHAIN_PHASE11_20261105.md).
@@ -585,7 +596,7 @@ Cloudflare Provider observability 설정은 `enabled=true`, `logs.enabled=true`,
 | **8. 백업/복구** | 암호화 DB 백업 [#41935300674](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41935300674), 앞선 백업의 격리 PG17 복원 [#41240770891](https://github.com/gycha0109-beep/MyeongHa/actions/runs/41240770891) | **Hosted Auth/Storage, 개인정보 연속성, 스키마 동등성, 전체 서비스 RPO/RTO 미증명 — DR 차단** |
 | **9. 캐시/CDN** | 경로 분류와 `no-store` 회귀, 운영 익명 스모크 및 실제 로컬 Worker 차단 경로 헤더 | 해당 배포의 양성 비공개 경로 전체와 외부 CDN 계약 검증 |
 | **10. 지연시간 기준선** | [실제 격리 제품 경로의 p50/p95/p99와 의존성 시간](API_CONTROLLED_CAPACITY_PHASE11_20261030.md), 별도 로컬 Worker Health | Worker 제품 경로와 대표 트래픽의 지연·병목 |
-| **11. 부하/용량** | [실제 GoTrue·PG18·Saju 격리 단기·지속 부하 및 자원 제약](API_CONTROLLED_CAPACITY_PHASE11_20261030.md) | 제품 경로의 Saju 포화 한계, Workers 런타임에 의존성을 연결한 실측 |
+| **11. 부하/용량** | [실제 GoTrue·PG18·Saju 격리 단기·지속 부하 및 자원 제약](API_CONTROLLED_CAPACITY_PHASE11_20261030.md), [Linux workerd 순차 제품 경로](WORKERD_ISOLATED_PRODUCT_PATH_PHASE11_20261106.md) | workerd 동시·지속 부하 및 의존성 장애·복귀, 대표 환경의 자원 포화 및 운영 용량 |
 | **12. 확장 임계치** | [검증된 격리 실측을 입력으로 받는 DB 풀 여유 진단](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md) | 운영 요청·자원 근거에 따른 확장 및 축소 판단 기준과 승인 |
 | **13. 최종 운영 수용** | 실제 `main` 이력을 확인하는 증거 수집기, 배포 버전에 묶인 익명 관측 | 아래 §33 항목의 미검증 범위와 #1887 해소 |
 
