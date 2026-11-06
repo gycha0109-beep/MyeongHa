@@ -52,8 +52,10 @@ describe('host-only Admin cookie authentication',()=>{
     }));
     expect(logout.status).toBe(204);
     expect(logout.headers.get('Set-Cookie')).toContain('Max-Age=0');
-    expect((await handler(new Request(ORIGIN+'/api/admin/session'))).status).toBe(403);
-    expect(verified).toBe(2);
+    const missingSession=await handler(new Request(ORIGIN+'/api/admin/session'));
+    expect(missingSession.status).toBe(401);
+    expect(await missingSession.json()).toEqual({error:'ADMIN_SESSION_REQUIRED'});
+    expect(verified).toBe(1);
     expect((await handler(new Request(ORIGIN+'/api/admin/logout',{
       method:'POST',headers:{Origin:'https://evil.test'},
     }))).status).toBe(403);
