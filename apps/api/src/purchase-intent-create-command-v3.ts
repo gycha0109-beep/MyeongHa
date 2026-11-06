@@ -459,11 +459,11 @@ export async function createPurchaseIntentV3(
   }
   const capabilitySnapshot = normalizeCapabilitySnapshot(resolvedCapabilitySnapshot);
 
+  const sajuOrigin=input.sajuOrigin===undefined?undefined:normalizeSajuPurchaseOriginV1(input.sajuOrigin);
   const purchaseIntentId = requireServerString(
     'generated purchase intent id',
     await input.idPort.nextPurchaseIntentId(),
   );
-  const sajuOrigin=input.sajuOrigin===undefined?undefined:normalizeSajuPurchaseOriginV1(input.sajuOrigin);
   const requestHash = hashCanonical(canonicalPurchaseRequest(request,sajuOrigin));
   const offerSnapshotHash = hashCanonical(offerSnapshot);
   const capabilitySnapshotHash = hashCanonical(capabilitySnapshot);
