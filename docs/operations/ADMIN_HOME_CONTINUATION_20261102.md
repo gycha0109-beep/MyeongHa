@@ -1,5 +1,29 @@
 # Admin Console — home-PC continuation (2026-11-02)
 
+## Current verified status — 2026-11-06 (supersedes all earlier dated status below)
+
+### Protected read-only production release
+
+- PR #3079 was merged: https://github.com/gycha0109-beep/MyeongHa/pull/3079. It expands the dedicated production Reader readback from 9 to 20 existing ID-free Admin query kinds; it does not add a customer-write path.
+- The 20-query protected production readback passed: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42206759314.
+- The current main Admin code was then released through the existing protected read-only release workflow, not by editing Worker settings manually: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42215510970. Main HEAD was 2388332a17025e5d049ace2d001886c703e39efa; all workflow steps passed.
+- Cloudflare readback after deployment confirmed Worker myeongha-admin version d29f88d3-f047-40dd-b28a-0e0d268b0cef at 100% traffic. MYEONGHA_ADMIN_PRIVATE_ENABLED=true; credit commands, audit retention and analytics retention are all false.
+- Live Worker bindings contain only the separate Reader and Audit Writer Hyperdrives, the existing MEMBER_AUTH_SERVICE → myeongha service binding, assets and rate limiter. No Command/Retention/Analytics-Retention Hyperdrive is present. Existing customer Worker myeongha was not redeployed or modified.
+- Cloudflare Access readback confirms the Admin application has exactly one Owner email only allow policy with one email selector. Reader and Audit Writer are distinct database logins; both Hyperdrive origins now use direct PostgreSQL port 5432, TLS verify-full and disabled caching. The release preflight rejects the prior Supavisor transaction pooler/6543 configuration.
+- The current release's protected preflight passed: live Access/Hyperdrive checks, TLS/minimum-role checks, all 20 actual Reader queries, and Audit Writer INSERT/denied-operation rollback verification. Post-deploy Access/Hyperdrive checks and anonymous asset/API denial also passed.
+
+### Remaining acceptance — do not overstate
+
+1. **Fresh authenticated Worker read + audit:** the Reader-origin repair record requires one fresh Owner GET /api/admin/users after the direct-origin correction, then a correlated read:users / allowed audit event. The 20-query DB smoke is not the same as a browser request through the Worker. Earlier user-provided screenshots showed populated user and commerce rows, but their capture time does not establish this post-repair request. The connected browser tab at the latest inspection was at the Owner authentication form; no new request was generated from that tab.
+2. **Non-Owner app-policy denial:** still unverified at the Admin Access application. The previous non-Owner attempt was rejected at Cloudflare account-membership level before the Admin app policy; it is not an app-level denied-login event. Do not fabricate an identity, create an account, change Access policy, or count anonymous redirects as proof.
+3. **A4 Reading-generation costs:** HOLD. Saju PR #2739 remains open: https://github.com/gycha0109-beep/Saju/pull/2739. The production authority mapping a Saju provider request/call to the exact MyeongHa Subject/Reading/execution attempt is not implemented/verified. Saju-native Reading IDs are not interchangeable with MyeongHa DB UUIDs. No provider cost collection or complete-cost claim.
+4. **A5 analytics:** collection and retention remain inactive; consent/version, source-event routes, deletion binding and retention prerequisites are not approved/verified for live collection.
+5. **A6 commands:** customer-changing commands remain unavailable; no Command Executor binding is deployed. Do not enable credit/refund/account commands or mutate customer records without the domain execution contract and explicit Owner approval.
+6. **A7 presentation publishing:** the database installation alone does not activate publishing. Executor binding/authentication and Owner audit verification remain outstanding; public publishing is not enabled.
+
+ROADMAP_COMPLETE remains **not reached**. The successful read-only release and 20-query Reader check complete those specific gates only; they do not complete the entire A0–A7 system.
+
+
 This handoff contains **no secrets**. It is for continuing the existing Admin track from a second Windows PC without copying credentials from the school PC.
 
 ## 2026-11-04 live read-only authorization verification — no activation

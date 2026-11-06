@@ -1,5 +1,29 @@
 # @myeongha/admin
 
+## Latest verified production state — 2026-11-06 (supersedes older dated deployment notes)
+
+The Admin Console is now deployed as an isolated, **Owner-only read-only** Worker. Do not interpret older statements below saying the Worker/Hyperdrive is absent or that the private runtime is still disabled as current state; those are historical snapshots.
+
+- Latest protected release: [Admin Console Read-Only Release #42215510970](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42215510970), main at 2388332a17025e5d049ace2d001886c703e39efa; all release steps passed.
+- Latest Worker deployment: version d29f88d3-f047-40dd-b28a-0e0d268b0cef, 100% traffic. Cloudflare settings readback confirmed MYEONGHA_ADMIN_PRIVATE_ENABLED=true and MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED=false, MYEONGHA_ADMIN_RETENTION_ENABLED=false, MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED=false.
+- The deployed Worker has only the dedicated Reader Hyperdrive, Audit Writer Hyperdrive, existing MEMBER_AUTH_SERVICE → myeongha, static assets and rate limiter. No Command/Retention/Analytics-Retention Hyperdrive is bound. The customer-facing myeongha Worker was not deployed or modified.
+- Cloudflare Access readback confirms the exact Admin application with one Owner email only allow policy containing one email selector. Do not disclose the email or AUD in reports.
+- Reader and Audit Writer Hyperdrives use separate PostgreSQL logins, direct PostgreSQL port 5432, TLS verify-full and disabled Hyperdrive caching. The release preflight rejects the previous Supavisor transaction-pooler/6543 topology.
+- The protected production readback passed all **20 ID-free read-only Admin query kinds** using the production Reader adapter. The same release also passed the dedicated Audit Writer rollback/denied-operation preflight, post-deployment Access/Hyperdrive checks, and anonymous asset/API denial.
+- The Admin UI's current sessionless/timeout handling and Reader-origin correction are included in this latest release. A timeout no longer strands the Owner at a retry-only screen; an unauthenticated session check is rejected before opening Hyperdrive.
+
+### Remaining live acceptance and feature boundaries
+
+- **Still required:** after the Reader Hyperdrive origin repair, obtain one fresh authenticated Owner GET /api/admin/users and confirm its correlated read:users / allowed audit event. The 20-query database smoke is not a substitute for a real Worker request. Earlier Owner screenshots showed populated user/commerce data, but their capture time does not establish that this exact post-repair acceptance was performed. The connected browser tab at the latest inspection was at the Owner authentication form, so no fresh request was made from that tab.
+- Actual non-Owner denial in the Admin Access application's own authentication log remains unverified. The previous other-account attempt was stopped by Cloudflare account-membership restrictions before the Admin app policy; do not count that as an app-level denial or repeat it without a valid authorized non-Owner session.
+- A4 Reading-generation cost ingestion remains HOLD: Saju PR #2739 is still open, and the production mapping from Saju provider request/call IDs to the exact MyeongHa Reading execution attempt is not implemented/verified. Never equate Saju-native Reading IDs with MyeongHa DB UUIDs or infer costs from missing events.
+- A5 analytics collection and retention remain inactive. Production DB installation is not collection approval; explicit consent/version, source-event routes, deletion binding and retention prerequisites remain separate.
+- A6 customer-changing commands remain unavailable. No Command Executor binding is deployed; credit/refund/account commands must not be enabled or executed without their domain contracts and explicit Owner approval.
+- A7 presentation publishing remains unavailable until its separate Executor binding/authentication and Owner audit path are verified. No public presentation publishing was activated.
+
+ROADMAP_COMPLETE remains **not reached**. Read-only release is not completion of A4–A7 or of the remaining live acceptance above.
+
+
 명하 운영자 전용 콘솔의 연속 구현 브랜치(A0~A7 일부)입니다. 코드 구현과 실제 운영 활성화는 분리합니다.
 
 ## 실제 비허용 계정 차단 검증 (2026-11-04)
