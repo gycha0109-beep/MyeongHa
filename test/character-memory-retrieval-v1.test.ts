@@ -9,6 +9,7 @@ import {
   retrieveCharacterWorkingMemoryV1,
 } from '../packages/domain/src/character-memory-retrieval-v1.js';
 import {
+  CharacterWorkingMemoryRetrievalGateErrorV1,
   retrieveCharacterWorkingMemoryForTurnV1,
 } from '../apps/api/src/character-working-memory-retrieval-v1.js';
 import type {
@@ -309,6 +310,51 @@ describe('Character Working Memory retrieval v1', () => {
     expect(JSON.stringify(result)).not.toContain('never expose');
   });
 
+  it('denies before any source read when entitlement or another capability gate fails', async () => {
+    const memoryRead = vi.fn(async () => []);
+    const lifeFactRead = vi.fn(async () => []);
+    const relationshipEventsRead = vi.fn(async () => []);
+    const recentMessagesRead = vi.fn(async () => []);
+    const relationshipRead = vi.fn(async () => []);
+    await expect(retrieveCharacterWorkingMemoryForTurnV1({
+      resolvedSubjectId: 'subject-a',
+      capabilityGateInput: {
+        needsSaju: false,
+        characterCapabilityAllowed: true,
+        userConsentAllowed: true,
+        sajuDomainAvailability: 'not_requested',
+        worldStateAllowed: true,
+        entitlementAllowed: false,
+        contentPolicyAllowed: true,
+        clientCapabilityAllowed: true,
+      },
+      threadBinding: {
+        threadId: 'thread-a',
+        participantCharacterIds: ['seyeon'],
+      },
+      characterId: 'seyeon',
+      currentUserMessageRef: 'current-user',
+      expectedRelationshipRevision: null,
+      recentMessageLimit: 4,
+      relationshipEventLimit: 2,
+      memoryAuthorityPort: { readGrantedMemories: memoryRead },
+      nonMemoryAuthorityPort: {
+        readGrantedLifeFacts: lifeFactRead,
+        readRelationshipEvents: relationshipEventsRead,
+        readRecentMessages: recentMessagesRead,
+      },
+      relationshipAuthorityPort: { readCurrentRelationship: relationshipRead },
+      now: '2026-11-07T00:00:00.000Z',
+      limit: 5,
+    })).rejects.toBeInstanceOf(CharacterWorkingMemoryRetrievalGateErrorV1);
+
+    expect(memoryRead).not.toHaveBeenCalled();
+    expect(lifeFactRead).not.toHaveBeenCalled();
+    expect(relationshipEventsRead).not.toHaveBeenCalled();
+    expect(recentMessagesRead).not.toHaveBeenCalled();
+    expect(relationshipRead).not.toHaveBeenCalled();
+  });
+
   it('uses the exact current User message returned by the authoritative thread read', async () => {
     const memoryAuthorityPort: ReaderContextMemoryReadAuthorityPortV1 = {
       readGrantedMemories: vi.fn(async () => [{
@@ -346,6 +392,16 @@ describe('Character Working Memory retrieval v1', () => {
 
     const result = await retrieveCharacterWorkingMemoryForTurnV1({
       resolvedSubjectId: 'subject-a',
+      capabilityGateInput: {
+        needsSaju: false,
+        characterCapabilityAllowed: true,
+        userConsentAllowed: true,
+        sajuDomainAvailability: 'not_requested',
+        worldStateAllowed: true,
+        entitlementAllowed: true,
+        contentPolicyAllowed: true,
+        clientCapabilityAllowed: true,
+      },
       threadBinding: {
         threadId: 'thread-a',
         participantCharacterIds: ['seyeon'],
