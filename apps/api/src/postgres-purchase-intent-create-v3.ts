@@ -204,6 +204,8 @@ function mapAuthorityError(error: unknown): never {
     case 'cmd_saju_purchase_admission_replay_origin_conflict':
     case 'cmd_saju_purchase_admission_replay_credit_conflict':
       return mapped('IDEMPOTENCY_CONFLICT','Saju Purchase Intent replay conflicts with its immutable Record or Receipt sources.');
+    case 'cmd_saju_purchase_admission_member_required':
+      return mapped('SUBJECT_INELIGIBLE', 'Saju purchase requires an active Member account.');
     case 'cmd_saju_purchase_admission_ids_required':
     case 'cmd_saju_purchase_admission_requires_read_committed':
     case 'cmd_saju_purchase_admission_kind_invalid':

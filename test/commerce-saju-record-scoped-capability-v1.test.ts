@@ -123,6 +123,13 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(admission).toContain('cmd_saju_purchase_admission_existing_rights_require_upgrade');
     expect(admission).toContain('cmd_saju_purchase_admission_refund_or_cancellation_hold');
     expect(admission).toContain('cmd_saju_purchase_admission_upgrade_charge_terms_unavailable');
+    expect(admission).toContain("s.kind='member'");
+    expect(admission).toContain("s.status='active'");
+    expect(admission).toContain('s.auth_user_id is not null');
+    expect(admission).toContain('cmd_saju_purchase_admission_member_required');
+    expect(admission.indexOf('for update')).toBeLessThan(admission.indexOf("s.kind='member'"));
+    expect(adapter).toContain("case 'cmd_saju_purchase_admission_member_required':");
+    expect(adapter).toContain("mapped('SUBJECT_INELIGIBLE', 'Saju purchase requires an active Member account.')");
   });
 
   it('keeps Record context out of the public request and binds it into idempotency',()=>{

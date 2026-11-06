@@ -12,6 +12,7 @@ declare
  v_new_revision uuid:='1219c200-0000-4000-8000-000000000002'::uuid;
  v_upgrade_intent uuid:='1219c200-0000-4000-8000-000000000003'::uuid;
  v_duplicate_pending_intent uuid:='1219c200-0000-4000-8000-000000000004'::uuid;
+ v_guest_rejected_intent uuid:='1219c200-0000-4000-8000-000000000023'::uuid;
  v_other_record uuid:='1219c200-0000-4000-8000-000000000005'::uuid;
  v_sandbox_intent uuid:='1219c200-0000-4000-8000-000000000006'::uuid;
  v_sandbox_receipt uuid:='1219c200-0000-4000-8000-000000000007'::uuid;
@@ -82,6 +83,29 @@ begin
  end if;
  insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
  values (v_record,v_subject,v_source_revision);
+
+ -- The official B2 fixture is an active Guest. Generic Commerce permits it,
+ -- but Saju Record checkout must reject it before creating any Purchase Intent.
+ perform pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
+ begin
+   perform 1 from public.cmd_create_saju_purchase_intent_v1(
+     v_subject,v_guest_rejected_intent,v_record,v_source_revision,
+     '1219c200-0000-4000-8000-000000000024'::uuid,null,
+     'guest-saju-record-checkout','sha256:test:guest-saju-record-checkout',
+     '{}'::jsonb,'sha256:test:guest-offer','{}'::jsonb,
+     'sha256:test:guest-capability','original',array[]::uuid[]
+   );
+   raise exception 'SAJU_GUEST_CHECKOUT_ACCEPTED';
+ exception when others then
+   get stacked diagnostics v_error=message_text;
+   if v_error is distinct from 'SAJU_ACTIVE_MEMBER_REQUIRED' then raise; end if;
+ end;
+ if exists(select 1 from public.purchase_intents where id=v_guest_rejected_intent)
+    or exists(select 1 from public.commerce_saju_purchase_origins_v1
+              where purchase_intent_id=v_guest_rejected_intent) then
+   raise exception 'SAJU_GUEST_CHECKOUT_LEFT_PURCHASE_STATE';
+ end if;
+
  update public.commerce_saju_records_v1
  set birth_revision_id=v_new_revision where id=v_record;
  update public.commerce_saju_records_v1

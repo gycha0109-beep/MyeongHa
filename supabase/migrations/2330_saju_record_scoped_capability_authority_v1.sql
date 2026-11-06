@@ -2300,6 +2300,21 @@ begin
       message='Saju Record is unavailable or its Birth revision is stale';
   end if;
 
+  -- Saju purchase is Member-only even though generic Commerce supports Guest.
+  -- Check after the Record lock without taking a Subject row lock, preserving
+  -- the account-finalizer's Subject -> child-row lock order.
+  if not exists (
+    select 1 from public.subjects s
+    where s.id=p_subject_id
+      and s.kind='member'
+      and s.status='active'
+      and s.auth_user_id is not null
+  ) then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_member_required',
+      message='SAJU_ACTIVE_MEMBER_REQUIRED';
+  end if;
+
   select product.product_key,offer.capability_set_id
     into v_product_key,v_offer_capability_set_id
   from public.product_offers offer
