@@ -35,6 +35,70 @@ insert into public.purchase_intents(
   'fb710000-0000-0000-0000-000000000001',null,'private-claim-delete-other',
   'sha256:v1:private-claim-other','{}'::jsonb,'sha256:v1:private-claim-offer',
   'created',clock_timestamp(),clock_timestamp());
+-- One private Saju Record + pending Intent proves account deletion removes
+-- the personal Record/Origin mapping while retaining the Commerce Intent evidence.
+insert into public.products(id,product_key,product_type,enabled,created_at)
+values ('fb750000-0000-0000-0000-000000000001',
+        'standard.love_relationship','reading',false,clock_timestamp())
+on conflict (product_key) do nothing;
+do $saju_delete_seed$
+declare
+ v_product uuid;
+ v_birth_revision uuid;
+ v_capability_set uuid:='fb750000-0000-0000-0000-000000000002'::uuid;
+ v_offer uuid:='fb750000-0000-0000-0000-000000000003'::uuid;
+ v_record uuid:='fb750000-0000-0000-0000-000000000004'::uuid;
+ v_intent uuid:='fb750000-0000-0000-0000-000000000005'::uuid;
+begin
+ select id into strict v_product from public.products
+ where product_key='standard.love_relationship';
+ select id into strict v_birth_revision from public.birth_profile_revisions
+ where subject_id='$subject_id'::uuid order by revision_no desc limit 1;
+ insert into public.product_capability_sets(
+  id,product_id,definition_version,definition_hash,created_at
+ ) values(v_capability_set,v_product,'saju-delete-test-v1',
+          'sha256:saju-delete-test-v1',clock_timestamp());
+ insert into public.product_capability_items(
+  capability_set_id,item_key,entitlement_key,scope_mode,fixed_scope_key,
+  validity_mode,duration_seconds
+ ) values(v_capability_set,'relationship','saju.relationship',
+          'saju_record',null,'unbounded',null);
+ insert into public.product_offers(
+  id,product_id,platform,provider,external_product_id,currency,
+  display_price_minor,enabled,created_at,capability_set_id
+ ) values(v_offer,v_product,'web','test-provider',
+          'private-claim-saju-delete-offer','KRW',9900,false,
+          clock_timestamp(),v_capability_set);
+ insert into public.purchase_intents(
+  id,subject_id,product_offer_id,provider_account_link_id,
+  idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+  expected_amount_minor,expected_currency,charge_terms_version,
+  capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash,
+  status,created_at,updated_at
+ ) values(
+  v_intent,'$subject_id'::uuid,v_offer,null,'private-claim-saju-delete-intent',
+  'sha256:private-claim-saju-delete-intent',
+  pg_catalog.jsonb_build_object(
+   'productOfferId',v_offer::text,'productId',v_product::text,
+   'platform','web','provider','test-provider',
+   'externalProductId','private-claim-saju-delete-offer'),
+  'sha256:private-claim-saju-delete-offer',9900,'KRW',
+  'saju-delete-test-charge-v1',v_capability_set,
+  pg_catalog.jsonb_build_object(
+   'capabilitySetId',v_capability_set::text,
+   'definitionVersion','saju-delete-test-v1',
+   'definitionHash','sha256:saju-delete-test-v1'),
+  'sha256:private-claim-saju-delete-capability','pending',
+  clock_timestamp(),clock_timestamp()
+ );
+ insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
+ values(v_record,'$subject_id'::uuid,v_birth_revision);
+ insert into public.commerce_saju_purchase_origins_v1(
+  purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
+ ) values(v_intent,'$subject_id'::uuid,v_record,v_birth_revision,'original');
+end;
+$saju_delete_seed$;
+
 insert into public.digital_reading_withdrawal_claims_private_v1(
  id,subject_id,purchase_intent_id,unit_id,reason_code,idempotency_hmac,request_hash
 ) values
@@ -58,7 +122,14 @@ SQL
    ||'|'||
    (select count(*) from public.digital_reading_withdrawal_claims_private_v1 where subject_id='$other_subject_id'::uuid)::text;")"
   [[ "$result" == '1|1' ]] || fail "failed finalization partially deleted claims: $result"
-  echo 'PASS PRIVATE_CLAIM_FINALIZER_PG17 FK failure rolled back exact personal claim DELETE'
+  saju_state="$(p -Atc "select
+    (select count(*) from public.commerce_saju_records_v1 where subject_id='$subject_id'::uuid)::text
+    ||'|'||
+    (select count(*) from public.commerce_saju_purchase_origins_v1 where subject_id='$subject_id'::uuid)::text
+    ||'|'||
+    (select count(*) from public.purchase_intents where id='fb750000-0000-0000-0000-000000000005'::uuid)::text;")"
+  [[ "$saju_state" == '1|1|1' ]] || fail "failed finalization partially deleted Saju Record/Origin or Purchase Intent: $saju_state"
+  echo 'PASS PRIVATE_CLAIM_FINALIZER_PG17 FK failure rolled back exact personal claim DELETE and Saju Record graph'
   ;;
  after-finalization)
   result="$(p -Atc "select
@@ -71,6 +142,15 @@ SQL
        'fb720000-0000-0000-0000-000000000002'::uuid))::text;")"
   [[ "$result" == '0|1|2' ]] ||
     fail "exact deletion / other account / retained Purchase Intent mismatch: $result"
+  saju_state="$(p -Atc "select
+    (select count(*) from public.commerce_saju_records_v1 where subject_id='$subject_id'::uuid)::text
+    ||'|'||
+    (select count(*) from public.commerce_saju_purchase_origins_v1 where subject_id='$subject_id'::uuid)::text
+    ||'|'||
+    (select count(*) from public.purchase_intents where id='fb750000-0000-0000-0000-000000000005'::uuid)::text
+    ||'|'||
+    (select count(*) from public.commerce_saju_verified_refund_effects_v1 where subject_id='$subject_id'::uuid)::text;")"
+  [[ "$saju_state" == '0|0|1|0' ]] || fail "account deletion did not erase only personal Saju mapping and retain Intent: $saju_state"
 
   # Restored/synthetic residue after the already-deleted replay boundary must
   # NOT be treated as successful idempotent finalization. Keep it in a
