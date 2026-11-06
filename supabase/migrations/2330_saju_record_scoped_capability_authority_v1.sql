@@ -1557,6 +1557,8 @@ declare
   v_offer_capability_set_id uuid;
   v_item_count integer;
   v_saju_scope_item_count integer;
+  v_expected_fields text[];
+  v_scope_key text;
   v_source_ids uuid[]:=coalesce(p_source_receipt_ids,array[]::uuid[]);
   v_existing_link_count integer;
 begin
@@ -1585,11 +1587,15 @@ begin
       constraint='cmd_saju_purchase_admission_source_shape_invalid',
       message='Upgrade source Receipts must be a unique one-dimensional UUID list';
   end if;
-  if (p_purchase_kind='original' and cardinality(v_source_ids)<>0)
-     or (p_purchase_kind='upgrade' and cardinality(v_source_ids)=0) then
+  if p_purchase_kind='upgrade' then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_upgrade_charge_terms_unavailable',
+      message='Saju upgrade checkout is held until an immutable quote-specific Charge Terms authority exists';
+  end if;
+  if cardinality(v_source_ids)<>0 then
     raise exception using errcode='23514',
       constraint='cmd_saju_purchase_admission_source_kind_mismatch',
-      message='Original purchases have no credit sources; upgrades require exact prior Receipts';
+      message='Original purchases cannot accept prior Receipt credit sources';
   end if;
 
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -1626,10 +1632,92 @@ begin
     into v_item_count,v_saju_scope_item_count
   from public.product_capability_items pci
   where pci.capability_set_id=v_offer_capability_set_id;
-  if v_item_count<=0 or v_item_count<>v_saju_scope_item_count then
+  v_expected_fields:=public.internal_commerce_saju_candidate_overlap_fields_v1(v_product_key);
+  if v_item_count<=0 or v_item_count<>v_saju_scope_item_count
+     or v_expected_fields is null
+     or cardinality(v_expected_fields)<>v_item_count
+     or exists (
+       select 1 from public.product_capability_items item
+       where item.capability_set_id=v_offer_capability_set_id
+         and not (item.item_key=any(v_expected_fields))
+     ) then
     raise exception using errcode='P0001',
       constraint='cmd_saju_purchase_admission_capability_scope_invalid',
-      message='Every Saju Capability Item must be scoped to the selected Saju Record';
+      message='Every Saju Capability Item must match the approved Product fields and use Saju Record scope';
+  end if;
+  v_scope_key:='saju-record:'||v_record.entitlement_scope_id::text;
+
+  -- Until a quote-specific immutable Charge Terms contract exists, original
+  -- purchase admission is denied when any requested field already has active
+  -- Record-scoped ownership, refund evidence, or an unsettled cancellation.
+  if exists (
+    select 1
+    from public.product_capability_items target_item
+    join public.entitlement_grants grant_row
+      on grant_row.subject_id=p_subject_id
+     and grant_row.entitlement_key=target_item.entitlement_key
+     and grant_row.scope_key=v_scope_key
+     and grant_row.status='active'
+     and grant_row.valid_from<=pg_catalog.transaction_timestamp()
+     and (grant_row.valid_until is null
+          or grant_row.valid_until>pg_catalog.transaction_timestamp())
+    where target_item.capability_set_id=v_offer_capability_set_id
+  ) then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_existing_rights_require_upgrade',
+      message='Existing active Saju fields require an approved upgrade quote, not a second original purchase';
+  end if;
+  if exists (
+    select 1
+    from public.commerce_saju_purchase_origins_v1 prior
+    join public.purchase_intents prior_intent
+      on prior_intent.id=prior.purchase_intent_id
+     and prior_intent.subject_id=prior.subject_id
+    join public.product_offers prior_offer on prior_offer.id=prior_intent.product_offer_id
+    join public.product_capability_items prior_item
+      on prior_item.capability_set_id=prior_intent.capability_set_id
+    join public.product_capability_items target_item
+      on target_item.capability_set_id=v_offer_capability_set_id
+     and target_item.item_key=prior_item.item_key
+    join public.commerce_receipts receipt
+      on receipt.purchase_intent_id=prior_intent.id
+     and receipt.subject_id=prior.subject_id
+    join public.commerce_provider_events event
+      on event.resolved_receipt_id=receipt.id
+     and event.event_type in ('Transaction.Cancelled','Transaction.PartialCancelled')
+     and event.status in ('received','verified','processed','unresolved')
+    where prior.subject_id=p_subject_id
+      and prior.saju_record_id=p_saju_record_id
+      and prior.birth_revision_id=p_birth_revision_id
+      and not exists (
+        select 1 from public.commerce_saju_verified_refund_effects_v1 settled
+        where settled.provider_event_id=event.id
+          and settled.receipt_id=receipt.id
+      )
+  ) or exists (
+    select 1
+    from public.commerce_saju_purchase_origins_v1 prior
+    join public.purchase_intents prior_intent
+      on prior_intent.id=prior.purchase_intent_id
+     and prior_intent.subject_id=prior.subject_id
+    join public.product_capability_items prior_item
+      on prior_item.capability_set_id=prior_intent.capability_set_id
+    join public.product_capability_items target_item
+      on target_item.capability_set_id=v_offer_capability_set_id
+     and target_item.item_key=prior_item.item_key
+    join public.commerce_receipts receipt
+      on receipt.purchase_intent_id=prior_intent.id
+     and receipt.subject_id=prior.subject_id
+    join public.commerce_saju_verified_refund_effects_v1 refund
+      on refund.receipt_id=receipt.id
+     and refund.subject_id=receipt.subject_id
+    where prior.subject_id=p_subject_id
+      and prior.saju_record_id=p_saju_record_id
+      and prior.birth_revision_id=p_birth_revision_id
+  ) then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_refund_or_cancellation_hold',
+      message='Overlapping prior Saju Receipt has unsettled cancellation or refund evidence';
   end if;
 
   select * into strict v_intent
