@@ -151,7 +151,7 @@ export interface FourCharacterProductionExecutionResultV1 {
 
 function requiredText(
   value: unknown,
-  maxLength = FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1,
+  maxLength: number = FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1,
 ): string {
   if (typeof value !== 'string' ||
       value.trim().length === 0 ||
