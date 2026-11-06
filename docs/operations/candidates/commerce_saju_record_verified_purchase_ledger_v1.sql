@@ -43,6 +43,66 @@ create table public.commerce_saju_purchase_origins_v1 (
 create index commerce_saju_purchase_origins_record_idx
   on public.commerce_saju_purchase_origins_v1(subject_id, saju_record_id, birth_revision_id);
 
+-- Keep the exact Birth revision stable while an Intent is bound to a
+-- Saju Record. The Record lock serializes this association against concurrent
+-- Birth revision edits; it does not authorize checkout or payment completion.
+create or replace function public.tr_commerce_saju_origin_revision_lock_v1()
+returns trigger language plpgsql security invoker
+set search_path = pg_catalog, public as $saju_origin_lock$
+declare
+  v_record_birth_revision uuid;
+begin
+  select r.birth_revision_id into v_record_birth_revision
+  from public.commerce_saju_records_v1 r
+  where r.id=new.saju_record_id and r.subject_id=new.subject_id
+  for update;
+  if not found
+    or v_record_birth_revision is distinct from new.birth_revision_id then
+    raise exception 'SAJU_ORIGIN_RECORD_REVISION_MISMATCH';
+  end if;
+  return new;
+end;
+$saju_origin_lock$;
+create trigger tr_commerce_saju_origin_revision_lock_v1
+ before insert on public.commerce_saju_purchase_origins_v1
+ for each row execute function public.tr_commerce_saju_origin_revision_lock_v1();
+
+-- A previously attached, still-pending Intent must not be verified later
+-- against a different Birth revision. This also covers a verified Receipt
+-- inserted before its Saju origin is attached (checked by the origin trigger).
+-- Ordinary non-Saju/Reader Receipts have no Saju origin and are untouched.
+create or replace function public.tr_commerce_saju_verified_receipt_revision_lock_v1()
+returns trigger language plpgsql security invoker
+set search_path = pg_catalog, public as $saju_receipt_lock$
+declare
+  v_origin public.commerce_saju_purchase_origins_v1%rowtype;
+  v_record_birth_revision uuid;
+begin
+  if new.verification_status not in ('verified','revoked') then
+    return new;
+  end if;
+  select * into v_origin
+  from public.commerce_saju_purchase_origins_v1 o
+  where o.purchase_intent_id=new.purchase_intent_id
+    and o.subject_id=new.subject_id;
+  if not found then
+    return new;
+  end if;
+  select r.birth_revision_id into v_record_birth_revision
+  from public.commerce_saju_records_v1 r
+  where r.id=v_origin.saju_record_id and r.subject_id=v_origin.subject_id
+  for update;
+  if not found
+    or v_record_birth_revision is distinct from v_origin.birth_revision_id then
+    raise exception 'SAJU_PAID_RECEIPT_RECORD_REVISION_MISMATCH';
+  end if;
+  return new;
+end;
+$saju_receipt_lock$;
+create trigger tr_commerce_saju_verified_receipt_revision_lock_v1
+ before insert or update of verification_status on public.commerce_receipts
+ for each row execute function public.tr_commerce_saju_verified_receipt_revision_lock_v1();
+
 -- The child refers to previous REAL receipts, never a package's nominal total.
 -- No signed amount can be copied into this link table.
 create table public.commerce_saju_upgrade_receipt_links_v1 (
@@ -223,7 +283,9 @@ revoke all on public.commerce_saju_records_v1,
   public.commerce_saju_purchase_origins_v1,
   public.commerce_saju_upgrade_receipt_links_v1,
   public.commerce_saju_verified_refund_effects_v1 from public;
-revoke all on function public.tr_commerce_saju_refund_effect_verified_v1(),
+revoke all on function public.tr_commerce_saju_origin_revision_lock_v1(),
+  public.tr_commerce_saju_verified_receipt_revision_lock_v1(),
+  public.tr_commerce_saju_refund_effect_verified_v1(),
   public.tr_commerce_saju_record_paid_revision_guard_v1(),
   public.tr_commerce_saju_upgrade_link_source_v1(),
   public.tr_commerce_saju_ledger_immutable_v1() from public;
