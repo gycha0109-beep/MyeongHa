@@ -44,7 +44,7 @@ type GrantedMemoryQueryRowV1 = Readonly<{
   grantedAt: unknown;
 }>;
 
-const READ_MEMORY_ITEMS_SQL = \`
+const READ_MEMORY_ITEMS_SQL = `
 select
   memory_item_id::text as "memoryItemId",
   memory_type as "memoryType",
@@ -53,9 +53,9 @@ select
   created_by_character_id as "createdByCharacterId",
   created_at::text as "createdAt"
 from public.qry_memory_items_v1($1::uuid)
-\`.trim();
+`.trim();
 
-const READ_MEMORY_GRANTS_SQL = \`
+const READ_MEMORY_GRANTS_SQL = `
 select
   grant_id::text as "grantId",
   character_id as "characterId",
@@ -65,9 +65,9 @@ from public.qry_memory_active_grants_v1(
   $1::uuid,
   $2::uuid
 )
-\`.trim();
+`.trim();
 
-const READ_GRANTED_MEMORY_ITEMS_SQL = \`
+const READ_GRANTED_MEMORY_ITEMS_SQL = `
 select
   memory_item_id::text as "memoryItemId",
   memory_type as "memoryType",
@@ -83,11 +83,11 @@ from public.qry_reader_context_granted_memory_items_v1(
   $1::uuid,
   $2::text
 )
-\`.trim();
+`.trim();
 
 function requireString(name: string, value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
-    throw new Error(\`Reader Memory PostgreSQL \${name} is invalid.\`);
+    throw new Error(`Reader Memory PostgreSQL \${name} is invalid.`);
   }
   return value.trim();
 }
@@ -100,7 +100,7 @@ function requireNullableString(name: string, value: unknown): string | null {
 function requireTimestamp(name: string, value: unknown): string {
   const stored = requireString(name, value);
   if (Number.isNaN(Date.parse(stored))) {
-    throw new Error(\`Reader Memory PostgreSQL \${name} is invalid.\`);
+    throw new Error(`Reader Memory PostgreSQL \${name} is invalid.`);
   }
   return stored;
 }
