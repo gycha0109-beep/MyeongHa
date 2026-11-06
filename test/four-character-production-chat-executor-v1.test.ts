@@ -60,11 +60,11 @@ function harness(characterId: FourIndependentChatTargetV1) {
   };
   const reservation = {
     status: 'reserved' as const,
-    subjectId, threadId, characterId, releaseId, bundleId,
+    subjectId, threadId, threadCharacterId: 'participant-1', characterId, releaseId, bundleId,
     turnId: 'turn-1', attemptId: 'attempt-1', costReservationId: 'cost-1',
   };
   const generated = {
-    characterId, bodyText: '테스트 응답 원문',
+    characterId, bodyText: '검증된 응답 본문',
     providerKey: 'approved-independent-provider', modelKey: 'approved-model',
     usage: { inputTokens: 10, outputTokens: 8 },
   };
@@ -72,7 +72,7 @@ function harness(characterId: FourIndependentChatTargetV1) {
     characterId, bodyText: '검증된 응답 본문',
     approved: true as const,
     outputGuardVersion: 'approved-output-guard-v1',
-    groundingRefs: ['source:approved'],
+    groundingRefs: [],
   };
   const receipt = {
     status: 'issued_pending_ack' as const,
@@ -120,7 +120,7 @@ function harness(characterId: FourIndependentChatTargetV1) {
 
 describe('four independent published Character AI execution', () => {
   it.each(FOUR_INDEPENDENT_CHAT_TARGETS_V1)(
-    'reserves cost, runs only %s approved source, persists and issues a held receipt',
+    'reserves a Provider call id, runs only %s approved source, persists and issues a held receipt',
     async characterId => {
       const h=harness(characterId);
       const result=await createFourCharacterProductionChatExecutorV1(characterId,h.ports)(
@@ -235,6 +235,29 @@ describe('four independent published Character AI execution', () => {
     )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
     expect(h.commitValidatedAndIssue).not.toHaveBeenCalled();
     expect(h.failAttempt).toHaveBeenCalledOnce();
+  });
+
+
+  it('rejects a guard that rewrites the generated text or invents unregistered grounding refs', async () => {
+    const h = harness('rahyeon');
+    h.validate.mockResolvedValueOnce({
+      ...h.validated, bodyText: 'rewritten after generation',
+    });
+    await expect(createFourCharacterProductionChatExecutorV1('rahyeon', h.ports)(
+      turnFor('rahyeon'),
+    )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
+    expect(h.commitValidatedAndIssue).not.toHaveBeenCalled();
+    expect(h.failAttempt).toHaveBeenCalledOnce();
+
+    const second = harness('taegyeom');
+    second.validate.mockResolvedValueOnce({
+      ...second.validated, groundingRefs: ['unregistered-source-ref'],
+    });
+    await expect(createFourCharacterProductionChatExecutorV1('taegyeom', second.ports)(
+      turnFor('taegyeom'),
+    )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
+    expect(second.commitValidatedAndIssue).not.toHaveBeenCalled();
+    expect(second.failAttempt).toHaveBeenCalledOnce();
   });
 
   it('does not accept receipt from a foreign Member or completed ACK', async () => {
