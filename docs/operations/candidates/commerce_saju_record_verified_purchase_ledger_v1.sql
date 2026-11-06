@@ -112,7 +112,7 @@ begin
     raise exception 'SAJU_ORIGIN_INTENT_PRODUCT_UNAVAILABLE';
   end if;
 
-  if v_new_intent_status in ('created','pending','verified') then
+  if v_new_intent_status in ('created','pending') then
     -- A stale repeatable-read snapshot cannot safely act as a lock-based
     -- admission check even if it successfully acquired a Record row lock.
     if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
