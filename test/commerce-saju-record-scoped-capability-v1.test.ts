@@ -68,8 +68,9 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(admission.indexOf('for update')).toBeLessThan(admission.indexOf('cmd_create_purchase_intent_v3('));
     expect(admission).toContain('internal_commerce_saju_product_fields_v1(v_product_key)');
     expect(admission).toContain('insert into public.commerce_saju_purchase_origins_v1');
-    expect(admission).toContain('cmd_create_purchase_intent_v3_saju_record_context_required');
-    expect(admission).toContain('SAJU_OVERLAPPING_PENDING_PRODUCT');
+    expect(admission).toContain('commerce_saju_purchase_admission_context_v1');
+    expect(migration).toContain('cmd_purchase_intent_v3_saju_record_context_required');
+    expect(migration).toContain('SAJU_OVERLAPPING_PENDING_PRODUCT');
     expect(admission).toContain('cmd_saju_purchase_admission_existing_rights_require_upgrade');
     expect(admission).toContain('cmd_saju_purchase_admission_refund_or_cancellation_hold');
     expect(admission).toContain('cmd_saju_purchase_admission_upgrade_charge_terms_unavailable');
