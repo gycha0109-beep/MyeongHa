@@ -78,6 +78,8 @@ describe('Cloudflare workers.dev private Admin URL',()=>{
   expect(response.headers.get('Retry-After')).toBe('60');
   expect(await response.json()).toEqual({error:'ADMIN_RATE_LIMITED'});
   expect(rateCalls).toBe(1);
+  const noCredential=await handler(new Request(ORIGIN+'/api/admin/session'));
+  expect(noCredential.status).toBe(429);
  });
  it('denies Access failures before assets or API, including the sign-in path',async()=>{
   const {handler,called}=setup(false);
