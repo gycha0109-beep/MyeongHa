@@ -121,6 +121,9 @@ export function parseSeyeonGovernedDbConfigV1(input: {
 const LEGACY_OR_DIRECT_FLAGS = [
   'isLegacyMember','isCostOwnerMember',
   'canLegacyStart','canLegacySettle','canLegacyRecord',
+  // The ordinary API account must lose ALL legacy cost entrypoints before
+  // ENFORCE can be accepted, even if the governed LOGIN itself is isolated.
+  'canOrdinaryLegacyStart','canOrdinaryLegacySettle','canOrdinaryLegacyRecord',
   'canDirectLedger','canDirectBudget','canDirectRateCard',
 ] as const;
 

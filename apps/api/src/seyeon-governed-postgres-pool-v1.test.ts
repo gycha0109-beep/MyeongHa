@@ -28,6 +28,7 @@ function safeRow() {
     hasGovernedRoleMembership:true,isLegacyMember:false,
     isCostOwnerMember:false,otherMemberships:0,
     canLegacyStart:false,canLegacySettle:false,canLegacyRecord:false,
+    canOrdinaryLegacyStart:false,canOrdinaryLegacySettle:false,canOrdinaryLegacyRecord:false,
     canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false,
   };
 }
@@ -111,11 +112,30 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       ['isLegacyMember',true],
       ['isCostOwnerMember',true],['canLegacyStart',true],
       ['canLegacySettle',true],['canLegacyRecord',true],
+      ['canOrdinaryLegacyStart',true],
+      ['canOrdinaryLegacySettle',true],
+      ['canOrdinaryLegacyRecord',true],
       ['canDirectLedger',true],['canDirectBudget',true],
       ['canDirectRateCard',true],
     ] as const) {
       expect(()=>verifySeyeonGovernedLoginPreflightV1(
         [{...safeRow(),[key]:value}],SEYEON_GOVERNED_DB_LOGIN_V1,
+      ),key).toThrow(SeyeonGovernedDbBoundaryErrorV1);
+    }
+    // W116: the dedicated LOGIN alone being safe is not sufficient:
+    // ordinary API legacy Start/Settle/Record privileges bypass Governor.
+    for(const key of [
+      'canOrdinaryLegacyStart','canOrdinaryLegacySettle',
+      'canOrdinaryLegacyRecord',
+    ] as const){
+      expect(GOVERNED_LOGIN_PREFLIGHT_SQL_V1).toContain(
+        'as "'+key+'"',
+      );
+      // A missing catalog result is UNKNOWN, never safe to admit.
+      const incomplete={...safeRow()} as Record<string,unknown>;
+      delete incomplete[key];
+      expect(()=>verifySeyeonGovernedLoginPreflightV1(
+        [incomplete],SEYEON_GOVERNED_DB_LOGIN_V1,
       ),key).toThrow(SeyeonGovernedDbBoundaryErrorV1);
     }
     expect(()=>verifySeyeonGovernedLoginPreflightV1(
@@ -150,7 +170,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     await p.close();
     expect(safe.poolEnded).toBe(true);
 
-    const bad=driver({preflight:{...safeRow(),canLegacyRecord:true}});
+    const bad=driver({preflight:{...safeRow(),canOrdinaryLegacyRecord:true}});
     const bp=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:bad.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });

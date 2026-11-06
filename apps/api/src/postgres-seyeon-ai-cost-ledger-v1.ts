@@ -50,6 +50,19 @@ select
  pg_catalog.has_function_privilege(session_user,
    'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
    'EXECUTE') as "canLegacyRecord",
+ -- The governed LOGIN being isolated is insufficient if the ordinary API
+ -- role can still bypass the Governor through pre-cutover legacy RPCs.
+ -- This deliberately blocks ENFORCE until the approved ACL cutover; OFF
+ -- continues to use its pre-cutover permission contract unchanged.
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
+   'EXECUTE') as "canOrdinaryLegacyStart",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryLegacySettle",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryLegacyRecord",
  pg_catalog.has_table_privilege(session_user,
    'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
    as "canDirectLedger",

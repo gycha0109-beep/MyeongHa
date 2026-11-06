@@ -4,7 +4,7 @@ vi.mock('pg',()=>({Pool:class{
  constructor(config){this.config=config;this.calls=[];this.releases=[];this.ended=false;state.pools.push(this);}
  on(){}async end(){this.ended=true;}
  async connect(){return{query:async(sql)=>{this.calls.push(sql);
-  if(sql.includes('session_user'))return{rows:[{sessionUser:state.wrongPrincipal?'myeongha_cf_hyperdrive_login':'myeongha_seyeon_governed_login',currentUser:'myeongha_seyeon_governed_login',canLogin:true,isSuper:false,canBypassRls:false,canInherit:false,canCreateDb:false,canCreateRole:false,hasGovernedRoleMembership:true,isLegacyMember:false,isCostOwnerMember:false,otherMemberships:0,canLegacyStart:false,canLegacySettle:false,canLegacyRecord:false,canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false}]};
+  if(sql.includes('session_user'))return{rows:[{sessionUser:state.wrongPrincipal?'myeongha_cf_hyperdrive_login':'myeongha_seyeon_governed_login',currentUser:'myeongha_seyeon_governed_login',canLogin:true,isSuper:false,canBypassRls:false,canInherit:false,canCreateDb:false,canCreateRole:false,hasGovernedRoleMembership:true,isLegacyMember:false,isCostOwnerMember:false,otherMemberships:0,canLegacyStart:false,canLegacySettle:false,canLegacyRecord:false,canOrdinaryLegacyStart:false,canOrdinaryLegacySettle:false,canOrdinaryLegacyRecord:false,canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false}]};
   if(sql==='select current_user::text as "currentUser"')return{rows:[{currentUser:'myeongha_seyeon_governed_executor'}]};
   return{rows:[]};},release:error=>this.releases.push(error)};}
 }}));
