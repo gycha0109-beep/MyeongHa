@@ -1,0 +1,569 @@
+{
+  "schema": "myeongha-production-migration-readonly-observation-v1",
+  "observationDateKst": "2026-11-07",
+  "source": {
+    "repository": "gycha0109-beep/MyeongHa",
+    "mainSha": "2f04f8f2a0d912e42bf348781e17d20ff7094675",
+    "supabaseProjectRef": "cnsfpcdiyofqvhpcegfc",
+    "postgresVersion": "17.6",
+    "readOnly": true,
+    "transactionReadOnly": "on",
+    "rawSqlIncluded": false,
+    "productionMutationPerformed": false
+  },
+  "catalog": {
+    "remoteVersionCount": 241,
+    "repositorySqlFileCount": 276,
+    "remoteFrontier": "20261105075227",
+    "repositoryFrontier": "2320",
+    "remoteOnlyCount": 41,
+    "repositoryOnlyCount": 76,
+    "sameVersionNameDiffers": [],
+    "sameNameDifferentVersion": [
+      {
+        "remoteVersion": "20261029012948",
+        "name": "owner_kcp_sandbox_remove_daily_limit_v1",
+        "repositoryVersions": [
+          "20261029012000"
+        ]
+      }
+    ],
+    "remoteOnly": [
+      {
+        "version": "20261008090417",
+        "name": "seyeon_runtime_1460_1510_acl_before_owner_recovery"
+      },
+      {
+        "version": "20261023054251",
+        "name": "cloudflare_worker_dedicated_api_login_role_20261023"
+      },
+      {
+        "version": "20261025193416",
+        "name": "seyeon_s0_http_receipt_runtime_v1"
+      },
+      {
+        "version": "20261025193454",
+        "name": "seyeon_s0_bounded_activation_20261025"
+      },
+      {
+        "version": "20261025201500",
+        "name": "seyeon_s0_resume_admission_diagnostic_20261025"
+      },
+      {
+        "version": "20261025203519",
+        "name": "seyeon_s0_resume_manual_redirect_20261025"
+      },
+      {
+        "version": "20261027004434",
+        "name": "owner_admin_credit_testing_v1_20261026"
+      },
+      {
+        "version": "20261027004544",
+        "name": "portone_chat_credit_catalog_staged_v1_20261026"
+      },
+      {
+        "version": "20261027011650",
+        "name": "chat_credit_paid_validity_and_verified_mint_v1_20261027"
+      },
+      {
+        "version": "20261027043527",
+        "name": "chat_credit_delivered_ack_private_v1_20261027"
+      },
+      {
+        "version": "20261027074247",
+        "name": "commerce_owner_sandbox_credit_checkout_v1_20261027"
+      },
+      {
+        "version": "20261027081929",
+        "name": "owner_kcp_sandbox_private_prepare_v1_20261027"
+      },
+      {
+        "version": "20261028011357",
+        "name": "owner_sandbox_signed_receipt_persistence_v1_20261028"
+      },
+      {
+        "version": "20261029012948",
+        "name": "owner_kcp_sandbox_remove_daily_limit_v1"
+      },
+      {
+        "version": "20261029070331",
+        "name": "seyeon_s0_member_withdrawal_status_20261029"
+      },
+      {
+        "version": "20261029071539",
+        "name": "admin_console_reader_audit_foundation_v1_20261029"
+      },
+      {
+        "version": "20261030014708",
+        "name": "admin_console_presentation_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030014906",
+        "name": "c09_conversation_reader_columns_acl_v1_20261030"
+      },
+      {
+        "version": "20261030014935",
+        "name": "c09_learning_source_authority_read_gated_v1_20261030"
+      },
+      {
+        "version": "20261030015201",
+        "name": "admin_console_analytics_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030015858",
+        "name": "admin_console_reading_ai_cost_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030020711",
+        "name": "admin_console_audit_retention_foundation_v1_20261030"
+      },
+      {
+        "version": "20261030021027",
+        "name": "admin_console_ai_finance_foundation_v1_20261030"
+      },
+      {
+        "version": "20261031182505",
+        "name": "s0_g0_original_member_message_source_20261101"
+      },
+      {
+        "version": "20261031182550",
+        "name": "s0_g0_original_assistant_and_recent_context_20261101"
+      },
+      {
+        "version": "20261031182926",
+        "name": "s0_g0_relationship_original_lineage_scoped_owner_grant_20261101"
+      },
+      {
+        "version": "20261031185454",
+        "name": "seyeon_owner_legacy_room_archive_preserving_history_20261101"
+      },
+      {
+        "version": "20261031192427",
+        "name": "seyeon_zero_source_first_http_receipt_issuer_20261101"
+      },
+      {
+        "version": "20261031205042",
+        "name": "seyeon_zero_source_exact_selection_census_contract_20261101"
+      },
+      {
+        "version": "20261101095105",
+        "name": "seyeon_zero_source_current_user_proof_12key_20261101"
+      },
+      {
+        "version": "20261101133954",
+        "name": "seyeon_zero_source_verified_history_pin_20261101"
+      },
+      {
+        "version": "20261101151700",
+        "name": "seyeon_recover_exact_failed_user_turn_20261102"
+      },
+      {
+        "version": "20261102060123",
+        "name": "seyeon_explicit_failed_turn_supersede_20261102"
+      },
+      {
+        "version": "20261102060126",
+        "name": "seyeon_abandoned_g0_history_exclusion_20261102"
+      },
+      {
+        "version": "20261102081315",
+        "name": "seyeon_owner_no_daily_cap_20261102"
+      },
+      {
+        "version": "20261103005333",
+        "name": "seyeon_subject_53300_connection_headroom_20261102"
+      },
+      {
+        "version": "20261103072224",
+        "name": "seyeon_unissued_zero_reply_recovery_v1_20261103"
+      },
+      {
+        "version": "20261103083731",
+        "name": "seyeon_g0_followup_original_lineage_20261103"
+      },
+      {
+        "version": "20261104043413",
+        "name": "chat_owner_visible_history_private_rls_runtime_checker_20261104"
+      },
+      {
+        "version": "20261104195925",
+        "name": "seyeon_g0_committed_followup_receipt_20261105"
+      },
+      {
+        "version": "20261105075227",
+        "name": "seyeon_g0_followup_protected_original_user_lock_20261105"
+      }
+    ],
+    "repositoryOnly": [
+      {
+        "version": "1735",
+        "name": "records_official_reading_purchase_grant_reread"
+      },
+      {
+        "version": "1740",
+        "name": "official_reader_scope_lock_private_v1"
+      },
+      {
+        "version": "1750",
+        "name": "official_reader_scope_current_bundle_private_v1"
+      },
+      {
+        "version": "1760",
+        "name": "official_reader_scope_atomic_receipt_bind_v1"
+      },
+      {
+        "version": "1770",
+        "name": "official_reader_scope_provider_effect_revoke_v1"
+      },
+      {
+        "version": "1780",
+        "name": "portone_verified_official_reader_full_cancel_v1"
+      },
+      {
+        "version": "1790",
+        "name": "official_reader_legacy_provider_effect_scope_guard_v1"
+      },
+      {
+        "version": "1800",
+        "name": "official_reader_receipt_grant_prelocked_scope_guard_v1"
+      },
+      {
+        "version": "1810",
+        "name": "official_reader_direct_bind_shared_scope_lock_v1"
+      },
+      {
+        "version": "1820",
+        "name": "official_reader_scope_read_committed_guard_v1"
+      },
+      {
+        "version": "1830",
+        "name": "official_reader_s5_precommit_held_scope_gate_v1"
+      },
+      {
+        "version": "1840",
+        "name": "official_reader_receipt_exact_revision_scope_guard_v1"
+      },
+      {
+        "version": "1850",
+        "name": "official_reader_binding_replay_current_right_and_fresh_clock_v1"
+      },
+      {
+        "version": "1860",
+        "name": "official_reader_bind_final_current_grant_guard_v1"
+      },
+      {
+        "version": "1870",
+        "name": "official_reader_unbound_zero_grant_cancel_purchase_lock_v1"
+      },
+      {
+        "version": "1880",
+        "name": "official_reader_unbound_issued_grant_full_cancel_v1"
+      },
+      {
+        "version": "1890",
+        "name": "official_reader_exact_receipt_multi_payment_cancel_v1"
+      },
+      {
+        "version": "1900",
+        "name": "official_reader_receipt_local_unbound_cancellation_v1"
+      },
+      {
+        "version": "1910",
+        "name": "official_reader_mixed_receipt_grant_full_cancellation_guard_v1"
+      },
+      {
+        "version": "1920",
+        "name": "official_reader_verified_purchase_row_before_receipt_v1"
+      },
+      {
+        "version": "1930",
+        "name": "official_reader_verified_receipt_bind_commerce_bridge_v1"
+      },
+      {
+        "version": "1940",
+        "name": "official_reader_verified_receipt_fulfillment_resolver_v1"
+      },
+      {
+        "version": "1950",
+        "name": "official_reader_protected_answer_storage_private_v1"
+      },
+      {
+        "version": "1960",
+        "name": "official_reader_s5_private_atomic_paid_answer_commit_v1"
+      },
+      {
+        "version": "1970",
+        "name": "official_reader_s6_private_current_entitlement_body_read_v1"
+      },
+      {
+        "version": "1980",
+        "name": "official_reader_s6_chat_marker_paid_answer_resolver_v1"
+      },
+      {
+        "version": "1990",
+        "name": "official_reader_s4_account_deletion_protected_child_purge_v1"
+      },
+      {
+        "version": "2000",
+        "name": "official_reader_s4_last_grant_private_body_purge_v1"
+      },
+      {
+        "version": "2010",
+        "name": "official_reader_s4_account_deletion_privacy_fence_v1"
+      },
+      {
+        "version": "2020",
+        "name": "official_reader_s4_retained_origin_grant_reference_v1"
+      },
+      {
+        "version": "20261026100200",
+        "name": "portone_chat_credit_catalog_staged_v1"
+      },
+      {
+        "version": "20261026110300",
+        "name": "owner_admin_credit_testing_v1"
+      },
+      {
+        "version": "20261027054525",
+        "name": "digital_reading_checkout_notice_evidence_v1"
+      },
+      {
+        "version": "20261027101000",
+        "name": "chat_credit_paid_validity_and_verified_mint_v1"
+      },
+      {
+        "version": "20261027125500",
+        "name": "chat_credit_delivered_ack_private_v1"
+      },
+      {
+        "version": "20261027163500",
+        "name": "commerce_owner_sandbox_credit_checkout_v1"
+      },
+      {
+        "version": "20261027185000",
+        "name": "owner_kcp_sandbox_private_prepare_v1"
+      },
+      {
+        "version": "20261028110500",
+        "name": "owner_sandbox_signed_receipt_persistence_v1"
+      },
+      {
+        "version": "20261029012000",
+        "name": "owner_kcp_sandbox_remove_daily_limit_v1"
+      },
+      {
+        "version": "20261029094500",
+        "name": "records_official_birth_revision_status_v1"
+      },
+      {
+        "version": "20261029111500",
+        "name": "saju_official_issuance_preflight_v1"
+      },
+      {
+        "version": "20261029112500",
+        "name": "saju_official_stored_lineage_v1"
+      },
+      {
+        "version": "20261029145500",
+        "name": "saju_official_attempt_reconciliation_status_v1"
+      },
+      {
+        "version": "20261029164000",
+        "name": "saju_official_stored_engine_lineage_v2"
+      },
+      {
+        "version": "20261029175000",
+        "name": "saju_official_stored_purchase_lineage_v3"
+      },
+      {
+        "version": "20261029185500",
+        "name": "official_reader_verified_purchase_access_v1"
+      },
+      {
+        "version": "2030",
+        "name": "official_reader_s4_protected_answer_no_cascade_delete_v1"
+      },
+      {
+        "version": "2040",
+        "name": "official_reader_s4_offprimary_restore_tombstone_replay_v1"
+      },
+      {
+        "version": "2050",
+        "name": "official_reader_s4_paid_answer_revocation_purge_queue_v1"
+      },
+      {
+        "version": "2060",
+        "name": "official_reader_s4_purge_worker_claim_manifest_finalize_v1"
+      },
+      {
+        "version": "2070",
+        "name": "official_reader_s4_purge_empty_scope_completion_v1"
+      },
+      {
+        "version": "2080",
+        "name": "official_reader_s4_refund_scope_restore_replay_v1"
+      },
+      {
+        "version": "2090",
+        "name": "official_reader_s4_exact_original_body_purge_completion_v1"
+      },
+      {
+        "version": "2100",
+        "name": "official_reader_s4_privacy_purge_worker_lease_renewal_v1"
+      },
+      {
+        "version": "2110",
+        "name": "official_reader_s3_s5_authoritative_source_evidence_private_v1"
+      },
+      {
+        "version": "2120",
+        "name": "official_reader_s6_revalidate_verified_source_on_private_reread_v1"
+      },
+      {
+        "version": "2130",
+        "name": "official_reader_s3_source_receipt_immutability_and_purge_v1"
+      },
+      {
+        "version": "2140",
+        "name": "official_reader_s7_private_delivery_attempt_and_client_ack_v1"
+      },
+      {
+        "version": "2150",
+        "name": "official_reader_s4_revocation_queue_real_entitlement_event_contract_v1"
+      },
+      {
+        "version": "2160",
+        "name": "official_reader_s2_verified_provider_cancellation_status_private_v1"
+      },
+      {
+        "version": "2170",
+        "name": "official_reader_s2_s5_exact_verified_receipt_bundle_pre_generation_gate_v1"
+      },
+      {
+        "version": "2180",
+        "name": "official_reader_s4_ordinary_chat_context_safe_marker_exclusion_v1"
+      },
+      {
+        "version": "2190",
+        "name": "official_reader_s4_safe_marker_memory_outbox_derivation_guards_v1"
+      },
+      {
+        "version": "2200",
+        "name": "official_reader_s4_offline_restore_ordinary_derivation_quarantine_v1"
+      },
+      {
+        "version": "2210",
+        "name": "official_reader_s4_ordinary_records_provenance_read_fence_v1"
+      },
+      {
+        "version": "2220",
+        "name": "official_reader_s4_seyeon_post_turn_outbox_restore_read_fence_v1"
+      },
+      {
+        "version": "2230",
+        "name": "official_reader_s4_restore_derived_quarantine_reason_contract_v1"
+      },
+      {
+        "version": "2240",
+        "name": "official_reader_s7_private_withdrawal_delivery_evidence_v1"
+      },
+      {
+        "version": "2250",
+        "name": "official_reader_withdrawal_original_receipt_state_private_v2"
+      },
+      {
+        "version": "2260",
+        "name": "official_reader_verified_receipt_stable_fulfillment_clock_v1"
+      },
+      {
+        "version": "2270",
+        "name": "official_reader_s4_requeued_purge_creation_clock_v1"
+      },
+      {
+        "version": "2280",
+        "name": "official_reader_s4_inflight_requeue_creation_clock_v1"
+      },
+      {
+        "version": "2290",
+        "name": "official_reader_s4_requeue_original_event_clock_v1"
+      },
+      {
+        "version": "2300",
+        "name": "official_reader_s7_post_lock_receipt_snapshot_v1"
+      },
+      {
+        "version": "2310",
+        "name": "official_reader_private_refund_dispatch_v1"
+      },
+      {
+        "version": "2320",
+        "name": "commerce_digital_reading_claim_account_delete_v1"
+      }
+    ]
+  },
+  "verifiedPairs": [
+    {
+      "remoteVersion": "20261029012948",
+      "remoteName": "owner_kcp_sandbox_remove_daily_limit_v1",
+      "repositoryVersion": "20261029012000",
+      "repositoryName": "owner_kcp_sandbox_remove_daily_limit_v1",
+      "repositoryBlobSha": "3903c37f80f860f899fb1086b4bab878e73eab1d",
+      "remoteStatementBytes": 7349,
+      "repositoryFileBytes": 7349,
+      "remoteStatementMd5": "c13c8ae6680c9c5aef35909ba81b7b1b",
+      "repositoryFileMd5": "c13c8ae6680c9c5aef35909ba81b7b1b",
+      "remoteStatementSha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "repositoryFileSha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "normalizedSha256": "0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d",
+      "exactByteEquality": true,
+      "migrationVersionIdentityEquality": false,
+      "disposition": "SQL source equivalence proven for this pair; migration ledger version identity still requires a governed forward-only disposition"
+    }
+  ],
+  "remoteOnlyBundle": {
+    "version": "20261008090417",
+    "name": "seyeon_runtime_1460_1510_acl_before_owner_recovery",
+    "statementCount": 1,
+    "statementBytes": 104021,
+    "statementMd5": "f70776d8c0f6369f6f13484ba9fa2271",
+    "statementSha256": "4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894",
+    "localMarkers1460To1510": {
+      "present": 6,
+      "emptyStatementCount": 6
+    },
+    "appliedFollowups1520To1640": 13,
+    "pinColumnsPresent": 2,
+    "pinnedFunctionPresent": true,
+    "currentInvestigationStatus": "HOLD_CHANGED_RUNTIME_SCHEMA_REASSESS",
+    "r2RpcCatalog": {
+      "expectedFunctions": 19,
+      "presentFunctions": 19,
+      "apiExecutorEffectiveExecute": 17,
+      "serviceRoleEffectiveExecute": 0,
+      "anonEffectiveExecute": 0,
+      "authenticatedEffectiveExecute": 0,
+      "apiExecutorDeniedFunctions": [
+        "assert_seyeon_chat_thread_runtime_v1",
+        "cmd_mark_seyeon_chat_context_ready_runtime_v1"
+      ]
+    },
+    "pinnedReplacement": {
+      "function": "cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)",
+      "present": true,
+      "overloads": 1,
+      "owner": "myeongha_seyeon_chat_runtime_owner",
+      "securityDefiner": true,
+      "apiExecutorExecute": true,
+      "serviceRoleExecute": false,
+      "anonExecute": false,
+      "authenticatedExecute": false
+    },
+    "note": "Historical actor/request-ID pursuit remains CLOSED_RISK_ACCEPTED; this snapshot does not reopen it. Current technical DDL/ACL/role/policy equivalence and provenance disposition remain separate."
+  },
+  "limitations": [
+    "The exact-version catalog comparison is not a semantic DDL comparison.",
+    "A matching SQL body does not prove authenticated deployment actor or approval provenance.",
+    "The remote 20261008090417 statement was not exported; only its metadata/hash and safe catalog observations are included.",
+    "Provider-managed Hosted Auth/Storage restoration, independent privacy continuity, and whole-service RPO/RTO remain unproven."
+  ]
+}
