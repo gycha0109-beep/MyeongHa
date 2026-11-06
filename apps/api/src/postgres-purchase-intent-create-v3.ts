@@ -164,14 +164,46 @@ function postgresCode(error: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function postgresMessage(error: unknown): string | null {
+  if(typeof error!=='object'||error===null)return null;
+  const value=(error as {message?:unknown}).message;
+  return typeof value==='string'?value:null;
+}
+
 function mapAuthorityError(error: unknown): never {
   const constraint = postgresConstraint(error);
+  const message=postgresMessage(error);
+  if(message!==null) {
+    if(message.includes('SAJU_DUPLICATE_PENDING_SAME_PRODUCT')
+       ||message.includes('SAJU_OVERLAPPING_PENDING_PRODUCT')
+       ||message.includes('cmd_saju_purchase_admission_replay_origin_conflict')
+       ||message.includes('cmd_saju_purchase_admission_replay_credit_conflict')) {
+      return mapped('IDEMPOTENCY_CONFLICT','A conflicting Saju purchase is already pending or was previously bound.');
+    }
+    if(message.includes('SAJU_PENDING_')||message.includes('SAJU_ORIGIN_')
+       ||message.includes('SAJU_PAID_RECORD_')) {
+      return mapped('CAPABILITY_AUTHORITY_MISMATCH','Saju Record purchase authority could not be proven.');
+    }
+  }
   const mapped = (code: ConstructorParameters<typeof PurchaseIntentCreateAuthorityPortErrorV3>[0], message: string): never => {
     throw new PurchaseIntentCreateAuthorityPortErrorV3(code, message);
   };
 
   switch (constraint) {
-    case 'cmd_purchase_intent_v3_subject_ineligible':
+    case 'cmd_saju_purchase_admission_record_unavailable':
+    case 'cmd_saju_purchase_admission_product_unavailable':
+    case 'cmd_saju_purchase_admission_capability_scope_invalid':
+      return mapped('CAPABILITY_UNAVAILABLE','Saju Record or Record-scoped Product authority is unavailable.');
+    case 'cmd_saju_purchase_admission_replay_origin_conflict':
+    case 'cmd_saju_purchase_admission_replay_credit_conflict':
+      return mapped('IDEMPOTENCY_CONFLICT','Saju Purchase Intent replay conflicts with its immutable Record or Receipt sources.');
+    case 'cmd_saju_purchase_admission_ids_required':
+    case 'cmd_saju_purchase_admission_requires_read_committed':
+    case 'cmd_saju_purchase_admission_kind_invalid':
+    case 'cmd_saju_purchase_admission_source_shape_invalid':
+    case 'cmd_saju_purchase_admission_source_kind_mismatch':
+      return mapped('INVALID_INPUT','Saju Purchase Admission input was rejected.');
+    case 'cmd_saju_purchase_intent_v3_subject_ineligible':
       return mapped('SUBJECT_INELIGIBLE', 'Purchase Intent subject is ineligible.');
     case 'cmd_purchase_intent_v3_offer_not_found':
       return mapped('OFFER_NOT_FOUND', 'Purchase Intent Offer was not found.');
