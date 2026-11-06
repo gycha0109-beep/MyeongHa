@@ -32,6 +32,30 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(migration).not.toMatch(/insert into public\.(products|product_offers)\b/iu);
   });
 
+  it('keeps Product fields and canonical entitlement keys aligned with the governed 13-product policy',()=>{
+    const fieldStart=migration.indexOf('create function public.internal_commerce_saju_product_fields_v1(');
+    const fieldEnd=migration.indexOf('$saju_overlap_fields$;',fieldStart);
+    const fieldFragment=migration.slice(fieldStart,fieldEnd);
+    const productFields=new Map(
+      [...fieldFragment.matchAll(/when '([^']+)' then array\\[([^\\]]+)\\]::text\\[\\]/gu)]
+        .map(match=>[match[1]!,[...match[2]!.matchAll(/'([^']+)'/gu)].map(x=>x[1]!)]),
+    );
+    expect(productFields.size).toBe(Object.keys(COMMERCE_SAJU_PRODUCTS_V1).length);
+    for(const [key,policy] of Object.entries(COMMERCE_SAJU_PRODUCTS_V1)) {
+      expect(productFields.get(key)).toEqual([...policy.fields]);
+    }
+    const keyStart=migration.indexOf('create function public.internal_commerce_saju_entitlement_key_v1(');
+    const keyEnd=migration.indexOf('$saju_entitlement_key$;',keyStart);
+    const keyFragment=migration.slice(keyStart,keyEnd);
+    const keys=new Map(
+      [...keyFragment.matchAll(/when '([^']+)' then '([^']+)'/gu)]
+        .map(match=>[match[1]!,match[2]!]),
+    );
+    const allFields=new Set(Object.values(COMMERCE_SAJU_PRODUCTS_V1).flatMap(x=>[...x.fields]));
+    expect(keys.size).toBe(allFields.size);
+    for(const field of allFields)expect(keys.get(field)).toBe('saju.'+field);
+  });
+
   it('keeps the database Product price mirror exactly aligned with the governed quote policy',()=>{
     const start=migration.indexOf('create function public.internal_commerce_saju_product_price_minor_v1(');
     const end=migration.indexOf('$saju_product_price$;',start);
@@ -73,6 +97,7 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(generic).toContain('context.transaction_id=pg_catalog.txid_current()');
     expect(generic).toContain('context.subject_id=p_subject_id');
     expect(generic).toContain('context.product_offer_id=p_product_offer_id');
+    expect(generic).toContain('cmd_purchase_intent_v3_saju_scope_mode_mismatch');
     expect(generic).toContain('v_existing_offer_id');
   });
 
