@@ -3,7 +3,7 @@
 -- This test verifies DB isolation, NOT resistance of an LLM to malicious text.
 BEGIN;
 
-DO $
+DO $reader_context_memory_privilege_check$
 BEGIN
   IF NOT pg_catalog.has_function_privilege(
     'myeongha_api_executor',
@@ -27,7 +27,7 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Browser and service roles must not execute the Character-scoped Memory read';
   END IF;
-END $;
+END $reader_context_memory_privilege_check$;
 
 INSERT INTO auth.users(id) VALUES
   ('a7100000-0000-4000-8000-000000000001'),

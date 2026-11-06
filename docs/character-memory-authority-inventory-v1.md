@@ -48,7 +48,11 @@ It:
 - grants EXECUTE only to \`myeongha_api_executor\`;
 - adds no table, column, write path, or schema registry.
 
-### 4.2 Shared read-only projection
+### 4.2 Subject-bound relationship projection
+
+Migration `2340_reader_context_relationship_projection_v1.sql` adds a read-only wrapper around the current `user_character_states` projection. It asserts the transaction-local Subject and runs under the existing NOLOGIN/NOBYPASSRLS relationship owner. It returns no row when no baseline exists and never calculates or creates one.
+
+### 4.3 Shared read-only projection
 
 \`packages/domain/src/character-working-memory-projection-v1.ts\` defines the provider-neutral projection contract. \`apps/api/src/character-working-memory-context-v1.ts\` reads the existing authority ports and composes one projection for a server-bound thread turn.
 
@@ -62,13 +66,13 @@ The projection separates:
 
 Messages from another Character and system messages are excluded from this initial single-Character projection. A future shared multi-Character context requires a separate explicit visibility authority.
 
-### 4.3 Schema admission remains closed by default
+### 4.4 Schema admission remains closed by default
 
 The projection accepts only an explicit server-owned projector for an exact record kind, type, and schema version. No projector is implicitly registered. Without one, the record receives \`UNSUPPORTED_SCHEMA\` and its payload is not copied into the projection.
 
 This preserves SRC-25. The existing \`conversation_recall/v1\` codec remains a contract candidate and is not automatically enabled in Production.
 
-### 4.4 Protected Saju remains separate
+### 4.5 Protected Saju remains separate
 
 The Working Memory API does not accept \`saju\`, \`protectedSaju\`, or \`officialReading\` input. Official Reading context must continue through exact Reader access, immutable artifact provenance, and the protected Character Saju path. Aggregate entitlement, general Memory, or browser-carried prose cannot widen Reader Knowledge.
 

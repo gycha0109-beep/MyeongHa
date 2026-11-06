@@ -117,10 +117,14 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 6. Do not add a new vector database, graph database, or replacement memory store. First prove whether existing PostgreSQL structures and indexes can support the required reads.
 
 **Exit criteria:**
-- every Working Memory item has an authoritative source and access decision;
-- cross-Subject, ungranted Character, revoked, expired and unauthorized Reading data are excluded before content reaches the model;
-- session-only data cannot become durable or cross-thread;
-- no arbitrary durable memory writes are possible while SRC-25/SRC-05/SRC-10 remain open.
+- every projected Life Fact/Memory summary carries its record ID and active grant ID; unsupported schemas expose no payload;
+- cross-Subject, ungranted Character, revoked Memory/grant and non-current Life Fact reads are excluded by the existing DB authorities;
+- recent dialogue is thread-bound, redacted messages are excluded, and the exact current User message is kept separate;
+- relationship projection is read through a transaction-Subject-bound, least-privilege wrapper and pinned to the exact turn revision; generic relationship-event data remains metadata-only;
+- Official Reading/Saju is excluded from general Working Memory and remains on its exact Reader-authorized protected path;
+- session-only proposals are not read as durable Memory and this read-only projection has no write/grant/mutation capability.
+
+**Known limitation:** the existing Reader read functions do not return every original source-turn/message field. This projection preserves record and grant references and does not invent missing provenance. Full source-evidence enrichment remains an explicit follow-up, not a guessed field.
 
 ### Phase 2 — Provider-neutral Token Budget Manager
 

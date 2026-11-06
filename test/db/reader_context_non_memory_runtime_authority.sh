@@ -30,3 +30,20 @@ if grep -Eq 'lowMax|mediumMax|maxEvents[[:space:]]*[:=][[:space:]]*[0-9]|maxMess
 fi
 
 echo "Reader context non-Memory runtime authority migration static checks passed."
+
+
+relationship_projection_migration="supabase/migrations/2340_reader_context_relationship_projection_v1.sql"
+grep -Fq "qry_reader_context_relationship_projection_v1" "$relationship_projection_migration"
+grep -Fq "assert_myeongha_subject_context_v1(p_subject_id)" "$relationship_projection_migration"
+grep -Fq "security definer" "$relationship_projection_migration"
+grep -Fq "alter function public.qry_reader_context_relationship_projection_v1(" "$relationship_projection_migration"
+grep -Fq "owner to myeongha_relationship_apply_owner" "$relationship_projection_migration"
+grep -Fq "grant execute on function public.qry_reader_context_relationship_projection_v1(" "$relationship_projection_migration"
+grep -Fq "revoke all on function public.qry_reader_context_relationship_projection_v1(" "$relationship_projection_migration"
+
+if grep -Eiq 'insert into public\.user_character_states|update public\.user_character_states|delete from public\.user_character_states' "$relationship_projection_migration"; then
+  echo "Reader relationship projection must not mutate relationship state." >&2
+  exit 1
+fi
+
+echo "Reader context non-Memory runtime authority migration static checks passed."
