@@ -72,33 +72,35 @@ select pg_temp.assert_fails(
   'commerce_account_links_active_external_idx'
 );
 
-insert into public.purchase_intents(
-  id, subject_id, product_offer_id, idempotency_key, request_hash,
-  offer_snapshot_jsonb, offer_snapshot_hash, status, created_at, updated_at
-) values (
-  '81300000-0000-0000-0000-000000000003', '80000000-0000-0000-0000-000000000003',
-  '81100000-0000-0000-0000-000000000001', 'guest-buy', 'hmac-sha256:k2:req-guest',
-  '{}', 'sha256:v1:snap-guest', 'created', now(), now()
+select pg_temp.assert_fails(
+  'active Guest cannot create a paid Purchase Intent',
+  $insert into public.purchase_intents(
+    id, subject_id, product_offer_id, idempotency_key, request_hash,
+    offer_snapshot_jsonb, offer_snapshot_hash, status, created_at, updated_at
+  ) values (
+    '81300000-0000-0000-0000-000000000003', '80000000-0000-0000-0000-000000000003',
+    '81100000-0000-0000-0000-000000000001', 'guest-buy', 'hmac-sha256:k2:req-guest',
+    '{}', 'sha256:v1:snap-guest', 'created', now(), now()
+  )$,
+  'ct_paid_checkout_member_required_v1'
 );
 
-do $$
+do $
 begin
-  if not exists (
-    select 1
-    from public.purchase_intents
+  if exists (
+    select 1 from public.purchase_intents
     where id = '81300000-0000-0000-0000-000000000003'
-      and subject_id = '80000000-0000-0000-0000-000000000003'
   ) then
-    raise exception 'FAIL active canonical Guest purchase owner was not accepted by shared DB invariant';
+    raise exception 'FAIL Guest paid Purchase Intent was persisted';
   end if;
-  raise notice 'PASS active canonical Guest is an eligible shared Purchase Intent owner';
+  raise notice 'PASS active Guest paid Purchase Intent is rejected';
 end;
-$$;
+$;
 
 select pg_temp.assert_fails(
   'merged Guest purchase owner is denied',
   $$insert into public.purchase_intents(id,subject_id,product_offer_id,idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,status,created_at,updated_at) values ('81300000-0000-0000-0000-000000000009','80000000-0000-0000-0000-000000000004','81100000-0000-0000-0000-000000000001','merged-guest-buy','hmac-sha256:k2:req-merged-guest','{}','sha256:v1:snap-merged-guest','created',now(),now())$$,
-  'ct_purchase_intent_active_canonical_subject'
+  'ct_paid_checkout_member_required_v1'
 );
 
 select pg_temp.assert_fails(
