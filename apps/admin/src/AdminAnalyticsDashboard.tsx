@@ -66,6 +66,7 @@ export function AdminAnalyticsDashboard({token,onSessionExpired}:{readonly token
       <p className="readiness-explainer">제품 분석 이벤트는 발생 시각부터 최대 180일 보관하며 동의 철회·사용자 삭제 시 먼저 삭제합니다. 결제 법정 증빙에는 이 기간을 적용하지 않습니다. 방문자·가입·구매 전환은 동일 기간과 고유 분석 참조를 사용합니다. 동의·삭제 연계·유효 방문 정의와 관측 완전성이 확인되지 않으면 0 대신 —를 표시합니다. 클라이언트 구매 성공은 매출 근거가 아닙니다.</p>
       {error?<StatusPanel kind="error" detail={error}/>:result===null?<StatusPanel kind="loading"/>:<>
         <p role="status">{sourceLabels[result.collectionStatus]}</p>
+        {metrics.length===0&&<p role="status">검색 조건과 일치하는 지표가 없습니다.</p>}
         <div className="beta-targets">{metrics.map(metric=><article className="beta-target" key={metric.key}>
           <span className="beta-target__title">{metric.label}</span><strong>{number(metric.value,metric.unit==='%'?'%':'')}</strong>
           <span className="beta-target__goal">분자 {number(metric.numerator)} / 분모 {number(metric.denominator)} · {metric.status==='unmeasured'?'미측정':metric.status==='empty_denominator'?'분모 없음':metric.status==='target_sample_not_met'?'목표 표본 100명 미달':'관측'}</span>
@@ -79,13 +80,13 @@ export function AdminAnalyticsDashboard({token,onSessionExpired}:{readonly token
           <tbody>{funnel.map(step=><tr key={step.eventName}><td>{step.eventName}</td><td>{number(step.uniqueVisitors)}</td><td>{number(step.previousStepVisitors)}</td><td>{number(step.dropoutRate,'%')}</td><td>{step.status==='measured'?'관측':'미측정'}</td></tr>)}</tbody></table></div>
       </section>
       <section className="surface"><div className="surface__head"><h2>기간·상품·채널별 분석</h2></div>
-        {series.length===0?<StatusPanel kind="empty" detail="승인된 분석 이벤트 원본이 없습니다. 방문 0명으로 간주하지 않습니다."/>:
+        {series.length===0?<StatusPanel kind="empty" detail={search.trim()?'검색 조건과 일치하는 분석 항목이 없습니다.':'승인된 분석 이벤트 원본이 없습니다. 방문 0명으로 간주하지 않습니다.'}/>:
           <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th scope="col">UTC 기간</th><th scope="col">상품</th><th scope="col">캠페인</th><th scope="col">채널</th><th scope="col">방문자</th><th scope="col">구매자</th><th scope="col">전환율</th></tr></thead><tbody>{series.map((row,index)=><tr key={index}><td>{row.period}</td><td>{row.productKey}</td><td>{row.campaignKey}</td><td>{row.channelKey}</td><td>{number(row.visitors)}</td><td>{number(row.buyers)}</td><td>{number(row.conversionRate,'%')}</td></tr>)}</tbody></table></div>}
       </section>
       <section className="surface"><div className="surface__head"><h2>서버 검증 영수증 금액</h2><span className="neutral-tag">방문자 추적과 별도 원본</span></div>
         <p className="readiness-explainer">{result.financialDefinition}</p>
         {result.financialStatus==='partial_verified_receipt_facts'&&<p role="alert">최대 500개 묶음만 표시했습니다. 기간을 좁혀 전체 근거를 확인해 주세요.</p>}
-        {finance.length===0?<StatusPanel kind="empty" detail="이 UTC 검증 기간에 현재 verified인 영수증이 없습니다. 이것은 방문자·환불·정산 또는 분석 원본의 부재를 뜻하지 않습니다."/>:
+        {finance.length===0?<StatusPanel kind="empty" detail={search.trim()?'검색 조건과 일치하는 결제 근거가 없습니다.':'이 UTC 검증 기간에 현재 verified인 영수증이 없습니다. 이것은 방문자·환불·정산 또는 분석 원본의 부재를 뜻하지 않습니다.'}/>:
           <div className="admin-table-scroll"><table className="admin-table"><thead><tr><th scope="col">검증 UTC 기간</th><th scope="col">상품</th><th scope="col">통화</th><th scope="col">검증 영수증</th><th scope="col">저장 소유자 수</th><th scope="col">기록 금액 · 최소통화단위</th><th scope="col">금액 근거 결측</th></tr></thead><tbody>{finance.map((row,index)=><tr key={index}><td>{row.period}</td><td>{row.productKey}</td><td>{row.currency??'—'}</td><td>{row.verifiedReceipts}</td><td>{row.receiptOwners}</td><td>{row.verifiedAmountMinor??'—'}</td><td>{row.moneyMissing}</td></tr>)}</tbody></table></div>}
       </section>
     </>}
