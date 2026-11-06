@@ -698,3 +698,11 @@
 - **연결:** 기존 검증용 PostgreSQL17 단일 스위트에 추가 `BEGIN/ROLLBACK` 검증을 연결했습니다. 현재 TypeScript의 **정확한 원본 Claim 취소/S7 SQL**을 추출하여 B2·B3 구매/Subject/Checkout 단위로 실행하고, 기존 합성 B2 PortOne cancellation을 같은 원본 Receipt에 결속·중복 replay해 (1) B2 취소 원본 HMAC·금액·상태 보존, (2) 독립 B3에 동일 취소가 전파되지 않음, (3) S5 본문이 없는 상태에서 S7 응답 준비·클라이언트 ACK 및 전달 완료를 만들어내지 않음을 검증합니다.
 - **정확한 의미:** 이는 원본 저장 취소 증거와 S7 **기록 부재**를 실DB에서 대조하는 음성/출처 검증이지, 합법적인 전달 완료 또는 실제 고객 미제공 확정이 아닙니다. Reader S5 Production 발행은 여전히 HOLD이고, 근거 없는 protected body를 생성하지 않습니다. 전체 회원 청약철회·Reader exact revoke·개인정보 finalizer 테스트는 별도 기존 케이스에서 그대로 통과해야 합니다.
 - **경계:** 모든 후보 취소 함수와 신규 Event는 격리 DB 트랜잭션 내에서만 생성/롤백합니다. 기존 고객 접수·S7·Provider 처리 코드를 바꾸지 않고 운영 DB SQL, 공개 API, Saju 발급 계약, LIVE 결제/환불·전달을 활성화하지 않습니다. 새 고정 HEAD의 CI/통합 결과 확인 전에는 PASS나 ROADMAP_COMPLETE 선언을 하지 않습니다.
+
+### 2026-11-07 — Saju Record-scoped Capability 설계 승인 및 구현 착수
+
+- **승인:** 사용자 승인으로 SRC-18의 Saju 전용 `saju_record` scope mode, 서버 생성 불투명 `entitlement_scope_id`, Receipt→Purchase Intent→immutable Origin→Record resolver 방식을 채택했습니다.
+- **문서:** `docs/architecture/COMMERCE_SAJU_RECORD_SCOPED_CAPABILITY_DELTA_V1.md`를 `APPROVED FOR IMPLEMENTATION`으로 갱신했습니다. 기존 `global/fixed` 동작은 유지하고, Saju 외 범용 동적 scope는 추가하지 않습니다.
+- **구현 순서:** (1) Record/Origin/refund ledger의 forward-only migration 및 scope identity, (2) 기존 Receipt Grant batch에 trusted resolver 연결, (3) Record scope 전용 private owned-fields reader, (4) Record 잠금 기반 Checkout Admission, (5) 계정 삭제/복원 그래프, (6) PG17 회귀·격리 테스트.
+- **안전 경계:** 승인 범위는 코드 구현입니다. 운영 DB 적용, Offer 활성화, 실제 Checkout/Provider charge/refund, 공개 API 및 LIVE 판매는 별도 release gate 전까지 계속 HOLD합니다.
+- **현재 상태:** 승인 문서 커밋 `c36f777` 반영. 실제 DB migration/runtime 변경과 PG17 검증은 아직 미완료이며, 구현 PR/CI도 아직 생성하지 않았습니다.
