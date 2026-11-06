@@ -49,7 +49,7 @@ export const POSTGRES_FOUR_CHARACTER_CHAT_GENERATED_RUNTIME_BINDING_V1 =
 export const POSTGRES_FOUR_CHARACTER_CHAT_VALIDATED_RUNTIME_BINDING_V1 =
   'public.cmd_persist_four_character_chat_validated_runtime_v1' as const;
 export const POSTGRES_FOUR_CHARACTER_CHAT_COMMIT_RUNTIME_BINDING_V1 =
-  'public.cmd_commit_four_character_chat_turn_runtime_v1' as const;
+  'public.cmd_commit_four_character_chat_turn_with_receipt_runtime_v1' as const;
 
 const REQUEST_CONTRACT_VERSION = 'four-character-chat-request-v1' as const;
 const PLANNER_VERSION = 'four-character-chat-planner-v1' as const;
@@ -118,7 +118,7 @@ select
   sequence_no as "sequenceNo",
   committed_at::text as "committedAt",
   replayed
-from public.cmd_commit_four_character_chat_turn_runtime_v1(
+from public.cmd_commit_four_character_chat_turn_with_receipt_runtime_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,
   $7::uuid,$8::text
 )
