@@ -114,17 +114,27 @@ describe('DB PR router', () => {
     expect(result.pg17Cases).toEqual([]);
   });
 
-  it('routes Saju Record Commerce migrations and its ledger candidate through PostgreSQL 17', () => {
+  it('routes Saju Record Commerce migrations through Commerce and PostgreSQL 17 suites', () => {
     for (const path of [
       'supabase/migrations/2330_saju_record_scoped_capability_authority_v1.sql',
       'supabase/migrations/2340_paid_purchase_member_auth_v1.sql',
-      'test/db/commerce_saju_record_ledger_candidate_pg17.sh',
-      'test/db/commerce_saju_record_ledger_candidate_pg17.sql',
     ]) {
       const result = route([path]);
       expect(result.suites).toEqual(['commerce-entitlement', 'commerce-payment', 'postgres17']);
       expect(result.pg17Cases).toContain('commerce-saju-record-ledger-candidate-pg17');
       expect(result.pg15Cases).toContain('commerce-payment-attempt-authority');
+    }
+  });
+
+  it('routes the Saju Record PG17 candidate files to the PG17 suite', () => {
+    for (const path of [
+      'test/db/commerce_saju_record_ledger_candidate_pg17.sh',
+      'test/db/commerce_saju_record_ledger_candidate_pg17.sql',
+    ]) {
+      const result = route([path]);
+      expect(result.suites).toEqual(['postgres17']);
+      expect(result.pg17Cases).toContain('commerce-saju-record-ledger-candidate-pg17');
+      expect(result.pg15Cases).toEqual([]);
     }
   });
 
