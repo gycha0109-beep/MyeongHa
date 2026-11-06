@@ -10,6 +10,7 @@ declare
   v_rpc record;
   v_proc pg_catalog.pg_proc%rowtype;
   v_allowed boolean;
+  v_supports_maintain boolean := current_setting('server_version_num')::integer >= 170000;
 begin
   select * into strict v_role from pg_catalog.pg_roles
     where rolname='myeongha_api_executor';
@@ -68,11 +69,11 @@ begin
   end loop;
 
   if pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+      'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+      'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+      'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_any_column_privilege('myeongha_api_executor',
       'public.seyeon_ai_call_cost_events','SELECT')
     or pg_catalog.has_any_column_privilege('myeongha_api_executor',
@@ -98,6 +99,19 @@ begin
     or pg_catalog.has_any_column_privilege('myeongha_api_executor',
       'public.seyeon_ai_governor_model_policies_v1','REFERENCES') then
     raise exception 'Common API executor obtained direct cost or policy table rights';
+  end if;
+
+  -- MAINTAIN was introduced in PostgreSQL 17. Keep the audit compatible
+  -- with the PostgreSQL 15 authority-core fixture while checking it on PG17+.
+  if v_supports_maintain then
+    if pg_catalog.has_table_privilege('myeongha_api_executor',
+        'public.seyeon_ai_call_cost_events','MAINTAIN')
+      or pg_catalog.has_table_privilege('myeongha_api_executor',
+        'public.seyeon_ai_governor_daily_budgets_v1','MAINTAIN')
+      or pg_catalog.has_table_privilege('myeongha_api_executor',
+        'public.seyeon_ai_governor_model_policies_v1','MAINTAIN') then
+      raise exception 'Common API executor obtained direct PostgreSQL 17 MAINTAIN table rights';
+    end if;
   end if;
 
   -- Critical: the same executor still owns all legacy+governed EXECUTEs.
