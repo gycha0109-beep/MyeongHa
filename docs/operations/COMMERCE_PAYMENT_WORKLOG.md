@@ -698,3 +698,14 @@
 - **연결:** 기존 검증용 PostgreSQL17 단일 스위트에 추가 `BEGIN/ROLLBACK` 검증을 연결했습니다. 현재 TypeScript의 **정확한 원본 Claim 취소/S7 SQL**을 추출하여 B2·B3 구매/Subject/Checkout 단위로 실행하고, 기존 합성 B2 PortOne cancellation을 같은 원본 Receipt에 결속·중복 replay해 (1) B2 취소 원본 HMAC·금액·상태 보존, (2) 독립 B3에 동일 취소가 전파되지 않음, (3) S5 본문이 없는 상태에서 S7 응답 준비·클라이언트 ACK 및 전달 완료를 만들어내지 않음을 검증합니다.
 - **정확한 의미:** 이는 원본 저장 취소 증거와 S7 **기록 부재**를 실DB에서 대조하는 음성/출처 검증이지, 합법적인 전달 완료 또는 실제 고객 미제공 확정이 아닙니다. Reader S5 Production 발행은 여전히 HOLD이고, 근거 없는 protected body를 생성하지 않습니다. 전체 회원 청약철회·Reader exact revoke·개인정보 finalizer 테스트는 별도 기존 케이스에서 그대로 통과해야 합니다.
 - **경계:** 모든 후보 취소 함수와 신규 Event는 격리 DB 트랜잭션 내에서만 생성/롤백합니다. 기존 고객 접수·S7·Provider 처리 코드를 바꾸지 않고 운영 DB SQL, 공개 API, Saju 발급 계약, LIVE 결제/환불·전달을 활성화하지 않습니다. 새 고정 HEAD의 CI/통합 결과 확인 전에는 PASS나 ROADMAP_COMPLETE 선언을 하지 않습니다.
+
+### 2026-11-07 — 승인된 Saju Record-scoped Capability 구현
+
+- **승인:** 사용자가 서버 생성 불투명 Record scope와 Receipt→Purchase Origin→Record 연결 방식을 승인했습니다.
+- **DB 권한:** migration `2330_saju_record_scoped_capability_authority_v1.sql`에 Saju 전용 `scope_mode='saju_record'`, 고유 `entitlement_scope_id`, 기존 Receipt Grant writer의 서버 측 scope resolver를 추가했습니다. 13개 Saju Product만 이 scope를 사용할 수 있고, 다른 Product의 기존 `global/fixed` 의미는 유지합니다.
+- **구매 연결:** 기존 Purchase Intent v3를 일반 호출로 우회할 수 없도록 transaction-local private admission context를 추가했습니다. Record 행을 먼저 잠그고 Subject·Birth revision·Offer·Capability Set을 확인한 뒤 기존 Purchase Intent v3를 호출하고 Origin을 같은 트랜잭션에서 생성합니다. 동일 멱등키 재호출은 기존 Origin의 Record/Revision까지 대조합니다.
+- **중복·환불 경계:** 같은 Record의 pending 분야 중복은 기존 Record 잠금 트리거가 보류합니다. 이미 활성 권한, 환불 증거 또는 미해결 취소가 겹치는 분야는 새 원본 구매를 보류합니다.
+- **업그레이드 제한:** 현재 Offer Charge Terms는 정적 금액이므로 Record별 가격 차액을 안전하게 고정할 수 없습니다. 따라서 이번 Admission은 `original`만 허용하고 `upgrade`는 quote-specific immutable Charge Terms가 생길 때까지 HOLD합니다. 클라이언트가 차액을 제출하는 우회는 허용하지 않습니다.
+- **개인정보 삭제:** 계정 삭제 Finalizer가 Upgrade link → Origin → Record 순서로 개인 매핑을 지운 뒤 Birth revision을 삭제합니다. Receipt·Provider Event·Grant/Event·환불 증거는 삭제하지 않습니다.
+- **검증 추가:** PG17 테스트에 두 개의 서로 다른 Saju Record가 동일 Subject에 속해도 각각 다른 opaque scope와 독립 Grant를 받는 실제 Receipt→Origin→Record→Grant 경로를 추가했습니다. 계정 삭제 테스트에도 Record/Origin 제거와 Purchase Intent 보존 검증을 추가했습니다.
+- **비운영 경계:** Product/Offer seed, 공개 Checkout route, Provider handoff, 실제 charge/refund, LIVE 판매는 변경·활성화하지 않았습니다. CI 성공 전 통과 선언은 하지 않습니다.
