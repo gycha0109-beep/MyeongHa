@@ -18,7 +18,7 @@ if (start < 0 || end <= start) throw Error('SAJU_PENDING_COLLISION_POLICY_FUNCTI
 const fragment = candidate.slice(start, end);
 const mapping = new Map(
   [...fragment.matchAll(/when '([^']+)' then array\[([^\]]+)\]::text\[\]/gu)]
-    .map(match => [
+    .map((match): [string, string[]] => [
       match[1]!,
       [...match[2]!.matchAll(/'([^']+)'/gu)].map(value => value[1]!),
     ]),
