@@ -2330,6 +2330,97 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       .toBe(digestCheck.digest);
     expect(saved.proof.historicalCandidateProof.permitsHttpReveal).toBe(false);
     expect(await readHistoricalCostFence()).toEqual(originalCostFence);
+    // W106 G4/G5: after an immutable but non-authorizing historical G1
+    // candidate, the separate NOLOGIN governed executor cannot reuse
+    // ordinary legacy cost RPCs or write cost/policy/budget tables.
+    // Its *approved* governed entrypoint itself stays bounded by server
+    // budget/policy rows; none are provisioned for this synthetic model.
+    const governedRole='myeongha_seyeon_governed_executor';
+    const {rows:[governedIsolation]}=await pool.query<{
+      safe_role:boolean;legacy_denied:boolean;
+      governed_admission_allowed:boolean;governed_settle_allowed:boolean;
+      direct_ledger_denied:boolean;direct_budget_denied:boolean;
+      direct_policy_denied:boolean
+    }>(`select
+      (select not rolcanlogin and not rolsuper and not rolbypassrls
+          and not rolinherit and not rolcreatedb and not rolcreaterole
+        from pg_catalog.pg_roles where rolname=$1) as safe_role,
+      (select bool_and(not pg_catalog.has_function_privilege(
+        $1,x.signature::regprocedure,'EXECUTE'))
+        from unnest($2::text[]) as x(signature)) as legacy_denied,
+      pg_catalog.has_function_privilege($1,
+        'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',
+        'EXECUTE') as governed_admission_allowed,
+      pg_catalog.has_function_privilege($1,
+        'public.cmd_governed_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+        'EXECUTE') as governed_settle_allowed,
+      not pg_catalog.has_table_privilege($1,
+        'public.seyeon_ai_call_cost_events','INSERT') as direct_ledger_denied,
+      not pg_catalog.has_table_privilege($1,
+        'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
+        as direct_budget_denied,
+      not pg_catalog.has_table_privilege($1,
+        'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+        as direct_policy_denied`,[governedRole,[...legacyCostRpcs]]);
+    expect(governedIsolation).toEqual({
+      safe_role:true,legacy_denied:true,governed_admission_allowed:true,
+      governed_settle_allowed:true,direct_ledger_denied:true,
+      direct_budget_denied:true,direct_policy_denied:true,
+    });
+    const verifyGovernedRealCall=async(
+      sql:string,parameters:readonly unknown[],expectedCode:string,
+      expectedConstraints?:readonly string[],
+    )=>{
+      const restricted=await pool.connect();
+      try{
+        await restricted.query('BEGIN');
+        await restricted.query('SET LOCAL ROLE myeongha_seyeon_governed_executor');
+        await restricted.query(
+          "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+        );
+        const {rows:[identity]}=await restricted.query<{role_name:string}>(
+          'select current_user as role_name',
+        );
+        expect(identity?.role_name).toBe(governedRole);
+        try{
+          await restricted.query(sql,parameters as unknown[]);
+          throw Error('Governed restricted call unexpectedly authorized');
+        }catch(error){
+          expect(error).toMatchObject({code:expectedCode});
+          if(expectedConstraints){
+            expect(expectedConstraints).toContain(
+              (error as {constraint?:string}).constraint,
+            );
+          }
+        }
+      }finally{
+        await restricted.query('ROLLBACK').catch(()=>undefined);
+        restricted.release();
+      }
+    };
+    // Actual failed SQL is required, not just has_function_privilege().
+    await verifyGovernedRealCall(`select * from
+      public.cmd_start_seyeon_ai_call_v1(
+        $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+        $6::text,$7::text,$8::text)`,[
+      f.subject,currentTurn,currentAttempt,'chat',uuid(36,218),
+      'dialogue_render','s0-unapproved-provider','s0-unapproved-model',
+    ],'42501');
+    // The governor route exists, but it cannot reserve against a missing
+    // UTC budget or nonexistent active server-owned policy.
+    await verifyGovernedRealCall(`select * from
+      public.cmd_governed_start_seyeon_ai_call_v1(
+        $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+        $6::text,$7::text,$8::text,$9::text,$10::text,
+        $11::bigint,$12::bigint,$13::bigint)`,[
+      f.subject,currentTurn,currentAttempt,'chat',uuid(37,218),
+      'dialogue_render','s0-unapproved-provider','s0-unapproved-model',
+      's0-unapproved-policy','s0-unapproved-rate',100,256,1024,
+    ],'23514',[
+      'seyeon_ai_governor_day_not_configured',
+      'seyeon_ai_governor_model_policy_mismatch',
+    ]);
+    expect(await readHistoricalCostFence()).toEqual(originalCostFence);
     const {rows:[acl]}=await pool.query(`select not has_function_privilege(
       'myeongha_api_executor',
       'seyeon_private.cmd_pin_seyeon_historical_source_candidate_s0_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text,text,text,jsonb)',
