@@ -246,10 +246,10 @@ export function createFourCharacterProductionChatExecutorV1(
     assertReservation(reservation, turn);
     try {
       const generated = await ports.provider.generate({ turn, source, reservation });
-      if (generated.characterId !== characterId ||
-          !requiredText(generated.bodyText, 8000)) {
+      if (generated.characterId !== characterId) {
         throw new FourCharacterProductionExecutionHeldV1();
       }
+      requiredText(generated.bodyText, 8000);
       requiredText(generated.providerKey, 256);
       requiredText(generated.modelKey, 256);
       if (!generated.usage ||
@@ -262,10 +262,10 @@ export function createFourCharacterProductionChatExecutorV1(
         turn, source, generated,
       });
       if (validated.approved !== true ||
-          validated.characterId !== characterId ||
-          !requiredText(validated.bodyText, 8000)) {
+          validated.characterId !== characterId) {
         throw new FourCharacterProductionExecutionHeldV1();
       }
+      requiredText(validated.bodyText, 8000);
       requiredText(validated.outputGuardVersion, 256);
       if (!Array.isArray(validated.groundingRefs) ||
           validated.groundingRefs.some(ref =>
@@ -283,8 +283,9 @@ export function createFourCharacterProductionChatExecutorV1(
         assistantMessageId: receipt.assistantMessageId,
         deliveryReceiptId: receipt.deliveryReceiptId,
       });
-    } catch (error) {
-      // Do not allow diagnostic/failure-write errors to expose model output.
+    } catch {
+      // Neither Provider error details nor generated body may cross the
+      // execution boundary. Only a fixed failure code reaches transport.
       // The durable DB implementation must make this idempotent and settle
       // reserved cost even when the Provider or Output Guard rejects.
       try {
@@ -294,7 +295,7 @@ export function createFourCharacterProductionChatExecutorV1(
       } catch {
         throw new FourCharacterProductionExecutionHeldV1();
       }
-      throw error;
+      throw new FourCharacterProductionExecutionHeldV1();
     }
   };
 }
