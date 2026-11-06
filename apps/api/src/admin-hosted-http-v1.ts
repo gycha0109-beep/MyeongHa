@@ -1,5 +1,5 @@
 import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
-import { createAdminSessionCookieV1, clearAdminSessionCookieV1, withAdminSessionCookieV1 } from './admin-cookie-session-v1.js';
+import { createAdminSessionCookieV1, clearAdminSessionCookieV1, readAdminSessionCookieV1, withAdminSessionCookieV1 } from './admin-cookie-session-v1.js';
 
 function reply(status: number, error: string) {
   return Response.json({ error }, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -57,6 +57,15 @@ export function createAdminHostedHttpV1(input: {
         const limited = reply(429, 'ADMIN_RATE_LIMITED'); limited.headers.set('Retry-After', '60'); return secure(limited);
       }
       if (request.headers.has('origin') && request.headers.get('origin') !== origin) return secure(reply(403, 'ADMIN_ORIGIN_REQUIRED'));
+      // When the browser has no Admin credential, the bootstrap check is NOT an
+      // authenticated data read. Deny it immediately after the Access gate,
+      // without opening a Hyperdrive connection or waiting for an audit insert.
+      // A valid session still undergoes the full Member/Owner + audit gates.
+      if (url.pathname === '/api/admin/session' && request.method === 'GET' &&
+          !request.headers.has('Authorization') &&
+          readAdminSessionCookieV1(request.headers.get('Cookie')) === null) {
+        return secure(reply(401, 'ADMIN_SESSION_REQUIRED'));
+      }
       if (url.pathname === '/api/admin/logout') {
         if (request.method !== 'POST' || url.search !== '' || request.headers.get('origin') !== origin) {
           return secure(reply(403, 'ADMIN_ORIGIN_REQUIRED'));
