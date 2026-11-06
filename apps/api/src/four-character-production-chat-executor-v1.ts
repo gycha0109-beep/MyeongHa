@@ -3,6 +3,10 @@
 // This code intentionally has NO public route, Provider credentials or DB
 // adapter. A Character becomes executable only after source-backed publication,
 // audited per-Character model/guard ports and transactional receipt ownership.
+import {
+  FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1,
+  FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1,
+} from './four-character-chat-length-limits-v1.js';
 import type {
   TrustedFiveCharacterChatTurnV1,
   FiveCharacterChatTurnExecutorV1,
@@ -145,7 +149,10 @@ export interface FourCharacterProductionExecutionResultV1 {
   /** No assistant text is returned before current-rights reveal and browser ACK. */
 }
 
-function requiredText(value: unknown, maxLength = 32768): string {
+function requiredText(
+  value: unknown,
+  maxLength = FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1,
+): string {
   if (typeof value !== 'string' ||
       value.trim().length === 0 ||
       value.length > maxLength) {
@@ -236,7 +243,7 @@ export function createFourCharacterProductionChatExecutorV1(
         !turn.bundleManifest.manifest.characterIds.includes(characterId)) {
       throw new FourCharacterProductionExecutionHeldV1();
     }
-    requiredText(turn.text, 8000);
+    requiredText(turn.text, FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1);
     const source = await ports.publication.readPublishedSource({
       subjectId: turn.subjectId,
       threadId: turn.threadId,
@@ -264,7 +271,7 @@ export function createFourCharacterProductionChatExecutorV1(
       if (generated.characterId !== characterId) {
         throw new FourCharacterProductionExecutionHeldV1();
       }
-      requiredText(generated.bodyText, 8000);
+      requiredText(generated.bodyText, FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1);
       requiredText(generated.providerKey, 256);
       requiredText(generated.modelKey, 256);
       if (!generated.usage ||
@@ -281,7 +288,7 @@ export function createFourCharacterProductionChatExecutorV1(
           validated.bodyText !== generated.bodyText) {
         throw new FourCharacterProductionExecutionHeldV1();
       }
-      requiredText(validated.bodyText, 8000);
+      requiredText(validated.bodyText, FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1);
       requiredText(validated.outputGuardVersion, 256);
       if (!Array.isArray(validated.groundingRefs) ||
           validated.groundingRefs.length !== 0) {

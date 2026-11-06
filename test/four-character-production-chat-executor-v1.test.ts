@@ -274,4 +274,71 @@ describe('four independent published Character AI execution', () => {
     )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
     expect(h.failAttempt).toHaveBeenCalledOnce();
   });
+
+  it('rejects user text above 8,000 UTF-16 code units before source lookup or reservation', async () => {
+    const h = harness('baekheon');
+    const text = '😀'.repeat(4001);
+    await expect(createFourCharacterProductionChatExecutorV1('baekheon', h.ports)(
+      Object.freeze({ ...turnFor('baekheon'), text }),
+    )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
+
+    expect(h.readPublishedSource).not.toHaveBeenCalled();
+    expect(h.reserveAttempt).not.toHaveBeenCalled();
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(h.failAttempt).not.toHaveBeenCalled();
+  });
+
+  it('accepts the exact message and canonical-context bounds', async () => {
+    const h = harness('yeoul');
+    const text = '😀'.repeat(4000);
+    const bodyText = '😀'.repeat(4000);
+    h.readPublishedSource.mockResolvedValueOnce({
+      ...h.source,
+      canonicalContext: 'x'.repeat(32768),
+    });
+    h.generate.mockResolvedValueOnce({ ...h.generated, bodyText });
+    h.validate.mockResolvedValueOnce({ ...h.validated, bodyText });
+
+    const result = await createFourCharacterProductionChatExecutorV1('yeoul', h.ports)(
+      Object.freeze({ ...turnFor('yeoul'), text }),
+    );
+
+    expect(result.disposition).toBe('committed_pending_delivery');
+    expect(h.reserveAttempt).toHaveBeenCalledWith(expect.objectContaining({ userText: text }));
+    expect(h.commitValidatedAndIssue).toHaveBeenCalledWith(expect.objectContaining({
+      generated: expect.objectContaining({ bodyText }),
+      validated: expect.objectContaining({ bodyText }),
+    }));
+  });
+
+  it('rejects generated text above 8,000 UTF-16 code units before Guard or receipt commit', async () => {
+    const h = harness('rahyeon');
+    const bodyText = '😀'.repeat(4001);
+    h.generate.mockResolvedValueOnce({ ...h.generated, bodyText });
+
+    await expect(createFourCharacterProductionChatExecutorV1('rahyeon', h.ports)(
+      turnFor('rahyeon'),
+    )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
+
+    expect(h.validate).not.toHaveBeenCalled();
+    expect(h.commitValidatedAndIssue).not.toHaveBeenCalled();
+    expect(h.failAttempt).toHaveBeenCalledOnce();
+  });
+
+  it('rejects canonical context above 32,768 UTF-16 code units before reservation', async () => {
+    const h = harness('taegyeom');
+    h.readPublishedSource.mockResolvedValueOnce({
+      ...h.source,
+      canonicalContext: 'x'.repeat(32769),
+    });
+
+    await expect(createFourCharacterProductionChatExecutorV1('taegyeom', h.ports)(
+      turnFor('taegyeom'),
+    )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
+
+    expect(h.reserveAttempt).not.toHaveBeenCalled();
+    expect(h.generate).not.toHaveBeenCalled();
+    expect(h.failAttempt).not.toHaveBeenCalled();
+  });
+
 });

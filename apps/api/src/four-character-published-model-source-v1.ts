@@ -3,6 +3,7 @@
 // immutable versioned artifact. No production artifact loader or canonical
 // model compiler is installed by this module; absent authority stays HELD.
 import { createHash } from 'node:crypto';
+import { FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1 } from './four-character-chat-length-limits-v1.js';
 import type {
   FourIndependentChatTargetV1,
   PublishedFourCharacterModelSourceV1,
@@ -132,7 +133,7 @@ export function createFourCharacterPublishedModelSourcePortV1(
           bibleSourceRef: required(compiled.bibleSourceRef, 512),
           runtimeSourceRef: required(compiled.runtimeSourceRef, 512),
           sourceDigest: evidence.contentHash,
-          canonicalContext: required(compiled.canonicalContext, 32768),
+          canonicalContext: required(compiled.canonicalContext, FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1),
         }) satisfies PublishedFourCharacterModelSourceV1;
       } catch {
         // Any DB/asset/compiler or integrity failure must block Model calls

@@ -5,6 +5,7 @@
 import {
   createHash,
 } from 'node:crypto';
+import { FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1 } from './four-character-chat-length-limits-v1.js';
 import {
   CHARACTER_IMMUTABLE_AUTHORING_V1,
   CHARACTER_RUNTIME_AUTHORING_V1,
@@ -249,7 +250,7 @@ function compileArtifact(
       relationshipBehavior: character.relationshipBehavior,
     },
   });
-  if (canonicalContext.length === 0 || canonicalContext.length > 32768) {
+  if (canonicalContext.length === 0 || canonicalContext.length > FOUR_CHARACTER_CHAT_MAX_CANONICAL_CONTEXT_UTF16_CODE_UNITS_V1) {
     throw new FourCharacterPublishedArtifactUnavailableV1();
   }
 

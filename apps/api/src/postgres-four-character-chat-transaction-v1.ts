@@ -5,6 +5,7 @@
 // private pending-delivery receipt; it never reveals assistant text.
 import { createHash, randomUUID } from 'node:crypto';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
+import { FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1 } from './four-character-chat-length-limits-v1.js';
 import type {
   FourCharacterAtomicReservationV1,
   FourCharacterGeneratedDraftV1,
@@ -203,7 +204,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
       const bundleId = uuid(request.bundleId);
       const clientTurnId = requiredText(request.clientTurnId, 256);
       const characterId = request.characterId;
-      const userText = requiredText(request.userText, 8000);
+      const userText = requiredText(request.userText, FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1);
       const digest = sourceDigest(request.sourceDigest);
       const turnId = randomUUID();
       const userMessageId = randomUUID();
@@ -326,7 +327,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
       const validationLogId = randomUUID();
       const outboxEventId = randomUUID();
       const deliveryReceiptId = randomUUID();
-      const bodyText = requiredText(request.generated.bodyText, 8000);
+      const bodyText = requiredText(request.generated.bodyText, FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1);
       const providerKey = requiredText(request.generated.providerKey, 256);
       const modelKey = requiredText(request.generated.modelKey, 256);
       const outputGuardVersion = requiredText(request.validated.outputGuardVersion, 256);

@@ -168,4 +168,38 @@ describe('owner-pinned five-Character execution gateway', () => {
     expect(owner.readBundleManifest).not.toHaveBeenCalled();
     expect(runtime).not.toHaveBeenCalled();
   });
+
+  it('accepts exactly 8,000 UTF-16 code units and forwards the message unchanged', async () => {
+    const owner = fixture('rahyeon');
+    const text = '😀'.repeat(4000);
+    expect(text.length).toBe(8000);
+    const runtime = vi.fn<FiveCharacterChatTurnExecutorV1<string>>(async turn => turn.text);
+
+    const result = await runPublishedFiveCharacterChatTurnV1({
+      ...owner,
+      text,
+      registeredExecutors: { rahyeon: runtime },
+    });
+
+    expect(result.execution).toBe(text);
+    expect(runtime).toHaveBeenCalledWith(expect.objectContaining({ text }));
+  });
+
+  it('rejects messages above 8,000 UTF-16 code units before authoritative reads', async () => {
+    const owner = fixture('rahyeon');
+    const text = '😀'.repeat(4001);
+    expect(text.length).toBe(8002);
+    const runtime = vi.fn<FiveCharacterChatTurnExecutorV1<string>>(async () => 'should-not-run');
+
+    await expect(runPublishedFiveCharacterChatTurnV1({
+      ...owner,
+      text,
+      registeredExecutors: { rahyeon: runtime },
+    })).rejects.toThrow('text is outside allowed bounds');
+
+    expect(owner.readRuntimeBinding).not.toHaveBeenCalled();
+    expect(owner.readBundleManifest).not.toHaveBeenCalled();
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
 });

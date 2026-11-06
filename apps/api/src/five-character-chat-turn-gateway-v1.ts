@@ -22,6 +22,7 @@ import {
   type CharacterClientCompatibilityProfileV1,
 } from '../../../packages/domain/src/character-content-compatibility.js';
 import { ApiCommandError } from './api-error.js';
+import { FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1 } from './four-character-chat-length-limits-v1.js';
 
 export interface TrustedFiveCharacterChatTurnV1 {
   readonly characterId: FiveCharacterChatTargetV1;
@@ -93,7 +94,7 @@ export async function runPublishedFiveCharacterChatTurnV1<TResult>(
   const subjectId = bounded(input.resolvedSubjectId, 'subjectId', 256);
   const threadId = bounded(input.threadId, 'threadId', 256);
   const clientTurnId = bounded(input.clientTurnId, 'clientTurnId', 256);
-  const text = bounded(input.text, 'text', 8000);
+  const text = bounded(input.text, 'text', FOUR_CHARACTER_CHAT_MAX_MESSAGE_UTF16_CODE_UNITS_V1);
 
   // Both reads must go through server-authorized, Member-owned DB read ports.
   // The client cannot name the Character, bundle, release or execution port.
