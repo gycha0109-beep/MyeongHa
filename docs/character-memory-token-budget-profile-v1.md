@@ -59,5 +59,5 @@ The profile carries the exact \`pricingVersion\` and \`policyVersion\`. The exis
 ## Verification
 
 - Generic contract tests cover exact UTF-8 bytes, adapter/model/headroom mismatch, request-format mismatch, output-cap mismatch, oversized requests, unavailable/failed/invalid counts, and budget overflow.
-- Offline OpenAI binding tests prove the exact native request is counted, the declared headroom is added, the price/model identity is preserved, and binding construction itself makes no HTTP request.
+- Offline OpenAI binding tests prove the exact native request is counted, the declared headroom is added, the price/model identity is preserved, the existing Cost Governor quote and atomic-admission input are bound to the receipt, and binding construction itself makes no HTTP request.
 - Existing PR-04D2 tests continue to cover exact count/generation body parity, fail-closed before DB admission/provider generation, and the actual provider output cap.
