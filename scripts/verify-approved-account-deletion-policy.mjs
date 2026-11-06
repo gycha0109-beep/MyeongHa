@@ -10,7 +10,7 @@ const authorityReference =
 const expectedGraphFingerprint =
   'c745bacb0e9b2d13013c1048fc4273203af68b9c4816eef7b6c9fe37e4db167b';
 
-const [policyText, dispositionText, graphText, decisions, drStatus] = await Promise.all([
+const [policyText, dispositionText, graphText, decisions, drStatus, sajuMigrationText] = await Promise.all([
   readFile('docs/operations/ACCOUNT_DELETION_FINALIZATION_POLICY_V1.json', 'utf8'),
   readFile('docs/operations/ACCOUNT_DELETION_DISPOSITION_POLICY_V1.json', 'utf8'),
   readFile('docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json', 'utf8'),
@@ -153,10 +153,10 @@ for (const table of [
     fail('account finalizer must delete personal Saju mapping: ' + table);
   }
 }
-if (!/delete\\s+from\\s+public\\.commerce_saju_purchase_admission_context_v1\\b/i.test(sajuMigrationText)) {
+if (!/delete\s+from\s+public\.commerce_saju_purchase_admission_context_v1\b/i.test(sajuMigrationText)) {
   fail('Saju admission context must be cleared at transaction end');
 }
-if (/delete\\s+from\\s+public\\.commerce_saju_verified_refund_effects_v1/i.test(sajuMigrationText)) {
+if (/delete\s+from\s+public\.commerce_saju_verified_refund_effects_v1/i.test(sajuMigrationText)) {
   fail('verified Saju refund-effect evidence must remain retained');
 }
 if (!sajuMigrationText.includes('create trigger tr_commerce_saju_refund_immutable_v1')) {
