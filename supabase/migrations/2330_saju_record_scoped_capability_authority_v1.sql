@@ -502,10 +502,17 @@ create trigger tr_commerce_saju_refund_immutable_v1
 revoke all on public.commerce_saju_records_v1,
   public.commerce_saju_purchase_origins_v1,
   public.commerce_saju_upgrade_receipt_links_v1,
-  public.commerce_saju_verified_refund_effects_v1 from public,anon,authenticated,service_role,myeongha_api_executor;
-grant select on public.commerce_saju_records_v1,
-  public.commerce_saju_purchase_origins_v1,
-  public.commerce_saju_verified_refund_effects_v1 to myeongha_api_executor;
+  public.commerce_saju_verified_refund_effects_v1
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+grant select (
+  id,subject_id,entitlement_scope_id,birth_revision_id,created_at
+) on public.commerce_saju_records_v1 to myeongha_commerce_internal_executor;
+grant select (
+  purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind,created_at
+) on public.commerce_saju_purchase_origins_v1 to myeongha_commerce_internal_executor;
+grant select (
+  provider_event_id,receipt_id,subject_id,refunded_minor,created_at
+) on public.commerce_saju_verified_refund_effects_v1 to myeongha_commerce_internal_executor;
 revoke all on function public.tr_commerce_saju_origin_revision_lock_v1(),
   public.tr_commerce_saju_verified_receipt_revision_lock_v1(),
   public.tr_commerce_saju_refund_effect_verified_v1(),
