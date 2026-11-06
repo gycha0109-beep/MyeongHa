@@ -1,5 +1,5 @@
 import {describe,expect,it,vi} from 'vitest';
-import type {PostgresSubjectPoolV1} from './postgres-subject-execution.js';
+import type {PostgresSubjectPoolV1, PostgresTransactionQueryV1} from './postgres-subject-execution.js';
 import {
   CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1,
   SAJU_CURRENT_GRANT_FIELDS_SQL_V1,
@@ -88,7 +88,7 @@ describe('Saju current field Grant evidence — staged private-only read',()=>{
       {...evidence('wealth',id(9008)),productKey:'bundle.career_economy'},
     ],[]);
     const proof=await CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1.readOwnedFields({
-      client:x.connection,subjectId,sajuRecordId,natalVersion,
+      client:x.connection as unknown as PostgresTransactionQueryV1,subjectId,sajuRecordId,natalVersion,
     });
     expect(proof.fields).toEqual(['career','wealth']);
     expect(proof.subjectId).toBe(subjectId);
