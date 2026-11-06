@@ -379,7 +379,8 @@ describe('admin dedicated readonly PostgreSQL adapter', () => {
     expect(h.sql[2]).toContain('LIMIT $1::int OFFSET $2::int');
     expect(h.sql[2]).not.toContain('read:users');
     expect(h.params[2]).toEqual([21, 0, null, null, null, 'read:users']);
-    expect(h.sql[2].indexOf('position(lower')).toBeLessThan(h.sql[2].lastIndexOf('LIMIT $1::int'));
+    const query = h.sql[2] ?? '';
+    expect(query.indexOf('position(lower')).toBeLessThan(query.lastIndexOf('LIMIT $1::int'));
   });
   it('supports search across every SQL-backed list route without bypassing fixed queries', async () => {
     const excluded = new Set(['overview','user-detail','commerce-detail','reading-detail','analytics']);
