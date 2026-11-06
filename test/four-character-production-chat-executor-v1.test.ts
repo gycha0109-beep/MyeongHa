@@ -204,7 +204,7 @@ describe('four independent published Character AI execution', () => {
     h.generate.mockRejectedValueOnce(new Error('upstream service unavailable'));
     await expect(createFourCharacterProductionChatExecutorV1('rahyeon',h.ports)(
       turnFor('rahyeon'),
-    )).rejects.toThrow('upstream service unavailable');
+    )).rejects.toThrow(FourCharacterProductionExecutionHeldV1);
     expect(h.calls).toEqual(['source','reserve','model','failed']);
     expect(h.failAttempt).toHaveBeenCalledWith({
       reservation: h.reservation,
