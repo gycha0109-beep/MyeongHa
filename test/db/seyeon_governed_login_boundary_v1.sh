@@ -8,12 +8,13 @@ set -euo pipefail
 governed_login="myeongha_seyeon_governed_login_ci"
 ordinary_login="myeongha_seyeon_ordinary_login_ci"
 error_file="$(mktemp)"
+preflight_file="$(mktemp)"
 cleanup() {
   psql -X -q -v ON_ERROR_STOP=1 <<'SQL' >/dev/null 2>&1 || true
 drop role if exists myeongha_seyeon_governed_login_ci;
 drop role if exists myeongha_seyeon_ordinary_login_ci;
 SQL
-  rm -f "$error_file"
+  rm -f "$error_file" "$preflight_file"
 }
 trap cleanup EXIT
 
@@ -40,6 +41,81 @@ grant myeongha_api_executor
   to myeongha_seyeon_ordinary_login_ci;
 SQL
 
+# W121: run the exact runtime checkout catalog query against PostgreSQL 17.
+# The ordinary API role intentionally retains pre-cutover RPC grants, so this
+# fixture must prove the query sees the bypass and keeps ENFORCE fail-closed.
+node --input-type=module - "$preflight_file" "$governed_login" <<'NODE'
+import {readFileSync,writeFileSync} from 'node:fs';
+const [output,login]=process.argv.slice(2);
+const source=readFileSync('apps/api/src/postgres-seyeon-ai-cost-ledger-v1.ts','utf8');
+const match=source.match(/export const GOVERNED_LOGIN_PREFLIGHT_SQL_V1 = `([\s\S]*?)`\.trim\(\);/);
+if(!match)throw new Error('GOVERNED_LOGIN_PREFLIGHT_SQL_V1 source not found');
+const query=match[1].trim()
+  .replaceAll('$1::name',"'myeongha_seyeon_governed_executor'::name")
+  .replaceAll('$2::name',"'myeongha_api_executor'::name");
+const fields=[
+ 'sessionUser','currentUser','canLogin','isSuper','canBypassRls','canInherit',
+ 'canCreateDb','canCreateRole','hasGovernedRoleMembership','isLegacyMember',
+ 'isCostOwnerMember','otherMemberships','canLegacyStart','canLegacySettle',
+ 'canLegacyRecord','ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
+ 'canOrdinaryLegacyStart','canOrdinaryLegacySettle','canOrdinaryLegacyRecord',
+ 'canOrdinaryGovernedStart','canOrdinaryGovernedSettle','canOrdinaryStoreReceipt',
+ 'canOrdinaryInternalStart','canOrdinaryInternalSettle',
+ 'canDirectLedger','canDirectBudget','canDirectRateCard',
+ 'canDirectLedgerColumns','canDirectBudgetColumns','canDirectRateCardColumns',
+ 'canOrdinaryDirectLedger','canOrdinaryDirectBudget','canOrdinaryDirectRateCard',
+ 'canOrdinaryDirectLedgerColumns','canOrdinaryDirectBudgetColumns',
+ 'canOrdinaryDirectRateCardColumns','executorCanLogin','executorIsSuper',
+ 'executorCanBypassRls','executorCanInherit','executorCanCreateDb',
+ 'executorCanCreateRole','executorCanReplicate','executorOtherMemberships',
+ 'executorCanUsePublicSchema','executorCanCreatePublicSchema',
+ 'executorCanResolveSubject','executorCanAssertSubject',
+ 'executorCanBeginMemberContext','executorCanBeginGuestContext',
+ 'executorCanBeginGovernedGuestContext','executorCanGovernedStart',
+ 'executorCanGovernedSettle','executorCanStoreProviderReceipt',
+ 'executorCanLegacyStart','executorCanLegacySettle','executorCanLegacyRecord',
+ 'executorCanInternalStart','executorCanInternalSettle','executorCanReadCost',
+ 'executorCanClaimProviderReceipt','executorCanAckProviderReceipt',
+ 'executorDirectLedger','executorDirectBudget','executorDirectRateCard',
+ 'executorDirectReceiptQueue','executorDirectLedgerColumns',
+ 'executorDirectBudgetColumns','executorDirectRateCardColumns',
+ 'executorDirectReceiptQueueColumns'
+];
+const json=`select pg_catalog.jsonb_build_object(${fields.map(k=>`'${k}', preflight."${k}"`).join(',')}) from (${query}) as preflight;`;
+writeFileSync(output,`set session authorization ${login};\n${json}\nreset session authorization;\n`);
+NODE
+preflight_json="$(psql -X -qAt -v ON_ERROR_STOP=1 -f "$preflight_file")"
+node --input-type=module - "$preflight_json" "$governed_login" <<'NODE'
+const [json,login]=process.argv.slice(2);const row=JSON.parse(json);
+const yes=['canLogin','hasGovernedRoleMembership','executorCanUsePublicSchema',
+ 'executorCanResolveSubject','executorCanAssertSubject','executorCanBeginMemberContext',
+ 'executorCanBeginGovernedGuestContext','executorCanGovernedStart',
+ 'executorCanGovernedSettle','executorCanStoreProviderReceipt',
+ 'canOrdinaryLegacyStart','canOrdinaryLegacySettle','canOrdinaryLegacyRecord',
+ 'canOrdinaryGovernedStart','canOrdinaryGovernedSettle'];
+const no=['isSuper','canBypassRls','canInherit','canCreateDb','canCreateRole',
+ 'isLegacyMember','isCostOwnerMember','canLegacyStart','canLegacySettle',
+ 'canLegacyRecord','ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
+ 'canOrdinaryStoreReceipt','canOrdinaryInternalStart','canOrdinaryInternalSettle',
+ 'executorCanLogin','executorIsSuper',
+ 'executorCanBypassRls','executorCanInherit','executorCanCreateDb',
+ 'executorCanCreateRole','executorCanReplicate','executorCanCreatePublicSchema',
+ 'executorCanBeginGuestContext','executorCanLegacyStart','executorCanLegacySettle',
+ 'executorCanLegacyRecord','executorCanInternalStart','executorCanInternalSettle',
+ 'executorCanReadCost','executorCanClaimProviderReceipt','executorCanAckProviderReceipt',
+ 'executorDirectLedger','executorDirectBudget','executorDirectRateCard',
+ 'executorDirectReceiptQueue','executorDirectLedgerColumns',
+ 'executorDirectBudgetColumns','executorDirectRateCardColumns',
+ 'executorDirectReceiptQueueColumns','canDirectLedger','canDirectBudget',
+ 'canDirectRateCard','canDirectLedgerColumns','canDirectBudgetColumns',
+ 'canDirectRateCardColumns','canOrdinaryDirectLedger','canOrdinaryDirectBudget',
+ 'canOrdinaryDirectRateCard','canOrdinaryDirectLedgerColumns',
+ 'canOrdinaryDirectBudgetColumns','canOrdinaryDirectRateCardColumns'];
+if(row.sessionUser!==login||row.currentUser!==login||row.otherMemberships!==0||
+   row.executorOtherMemberships!==0||yes.some(k=>row[k]!==true)||no.some(k=>row[k]!==false))
+ throw new Error('W121 runtime PostgreSQL17 preflight catalog contract mismatch');
+console.log('W121_GOVERNED_LOGIN_PREFLIGHT_SQL_PG17_PASS');
+NODE
 # Each psql process gets a fresh connection and a different session_user.
 # On older PG versions, pg_has_role supports MEMBER, not SET; the actual
 # SET ROLE success/denial tests below are the authoritative privilege proof.

@@ -12,7 +12,8 @@ begin
   select * into strict v_role from pg_catalog.pg_roles
   where rolname='myeongha_seyeon_governed_executor';
   if v_role.rolcanlogin or v_role.rolsuper or v_role.rolbypassrls
-    or v_role.rolinherit or v_role.rolcreatedb or v_role.rolcreaterole then
+    or v_role.rolinherit or v_role.rolcreatedb or v_role.rolcreaterole
+    or v_role.rolreplication then
     raise exception 'Governed executor has unsafe PostgreSQL role flags';
   end if;
   if pg_catalog.pg_has_role('myeongha_seyeon_governed_executor',
@@ -22,6 +23,13 @@ begin
     or pg_catalog.pg_has_role('myeongha_api_executor',
       'myeongha_seyeon_governed_executor','MEMBER') then
     raise exception 'Governed executor crossed forbidden role boundary';
+  end if;
+  if exists (
+    select 1 from pg_catalog.pg_auth_members m
+    join pg_catalog.pg_roles member_role on member_role.oid=m.member
+    where member_role.rolname='myeongha_seyeon_governed_executor'
+  ) then
+    raise exception 'Governed executor has an unexpected role membership';
   end if;
 
   for v_rpc in
@@ -33,6 +41,9 @@ begin
       ('public.begin_seyeon_governed_guest_subject_context_v1(text)',true),
       ('public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',true),
       ('public.cmd_governed_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',true),
+      ('public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',true),
+      ('public.cmd_claim_seyeon_provider_receipt_v1()',false),
+      ('public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)',false),
       ('public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',false),
       ('public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',false),
       ('public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',false),
@@ -51,29 +62,132 @@ begin
     end if;
   end loop;
   if not pg_catalog.has_schema_privilege(
-      'myeongha_seyeon_governed_executor','public','USAGE') then
-    raise exception 'Governed executor lacks public schema lookup';
+      'myeongha_seyeon_governed_executor','public','USAGE')
+    or pg_catalog.has_schema_privilege(
+      'myeongha_seyeon_governed_executor','public','CREATE') then
+    raise exception 'Governed executor has unsafe public schema privileges';
   end if;
-  if pg_catalog.has_table_privilege(
-       'myeongha_seyeon_governed_executor',
+  if pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_provider_receipt_queue_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
        'public.seyeon_ai_call_cost_events','SELECT')
-    or pg_catalog.has_table_privilege(
-       'myeongha_seyeon_governed_executor',
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
        'public.seyeon_ai_call_cost_events','INSERT')
-    or pg_catalog.has_table_privilege(
-       'myeongha_seyeon_governed_executor',
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
        'public.seyeon_ai_call_cost_events','UPDATE')
-    or pg_catalog.has_table_privilege(
-       'myeongha_seyeon_governed_executor',
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_call_cost_events','REFERENCES')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
        'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
-    or pg_catalog.has_table_privilege(
-       'myeongha_seyeon_governed_executor',
-       'public.seyeon_ai_governor_model_policies_v1','SELECT') then
-    raise exception 'Governed executor has unauthorized cost/policy table access';
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_daily_budgets_v1','INSERT')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_model_policies_v1','SELECT')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_model_policies_v1','INSERT')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_governor_model_policies_v1','REFERENCES')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_provider_receipt_queue_v1','SELECT')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_provider_receipt_queue_v1','INSERT')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_provider_receipt_queue_v1','UPDATE')
+    or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
+       'public.seyeon_ai_provider_receipt_queue_v1','REFERENCES') then
+    raise exception 'Governed executor has unauthorized direct cost/policy/receipt table access';
   end if;
 end $acl$;
 
--- Operator-only test policies. Production policies are neither seeded nor
+-- W121: the runtime checkout must detect ACL drift on the effective executor,
+-- not merely on the LOGIN. Every injected grant is rolled back in this fixture.
+savepoint w121_schema_create;
+grant create on schema public to myeongha_seyeon_governed_executor;
+do $w121_schema$
+begin
+  if not pg_catalog.has_schema_privilege(
+      'myeongha_seyeon_governed_executor','public','CREATE') then
+    raise exception 'W121 schema CREATE grant was not visible to governed executor';
+  end if;
+end
+$w121_schema$;
+rollback to savepoint w121_schema_create;
+release savepoint w121_schema_create;
+
+savepoint w121_receipt_table;
+grant select on public.seyeon_ai_provider_receipt_queue_v1
+  to myeongha_seyeon_governed_executor;
+do $w121_table$
+begin
+  if not pg_catalog.has_table_privilege(
+      'myeongha_seyeon_governed_executor',
+      'public.seyeon_ai_provider_receipt_queue_v1','SELECT') then
+    raise exception 'W121 receipt table grant was not visible to governed executor';
+  end if;
+end
+$w121_table$;
+rollback to savepoint w121_receipt_table;
+release savepoint w121_receipt_table;
+
+savepoint w121_receipt_column;
+grant select (call_id) on public.seyeon_ai_provider_receipt_queue_v1
+  to myeongha_seyeon_governed_executor;
+do $w121_columns$
+begin
+  if not pg_catalog.has_any_column_privilege(
+      'myeongha_seyeon_governed_executor',
+      'public.seyeon_ai_provider_receipt_queue_v1','SELECT') then
+    raise exception 'W121 column-level receipt grant was not visible';
+  end if;
+end
+$w121_columns$;
+rollback to savepoint w121_receipt_column;
+release savepoint w121_receipt_column;
+
+savepoint w121_legacy_rpc;
+grant execute on function public.cmd_start_seyeon_ai_call_v1(
+  uuid,uuid,uuid,text,uuid,text,text,text) to myeongha_seyeon_governed_executor;
+do $w121_rpc$
+begin
+  if not pg_catalog.has_function_privilege(
+      'myeongha_seyeon_governed_executor',
+      'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)','EXECUTE') then
+    raise exception 'W121 legacy RPC grant was not visible to governed executor';
+  end if;
+end
+$w121_rpc$;
+rollback to savepoint w121_legacy_rpc;
+release savepoint w121_legacy_rpc;
+
+savepoint w121_role_membership;
+grant myeongha_api_executor to myeongha_seyeon_governed_executor
+  with inherit false, set true;
+do $w121_membership$
+begin
+  if not pg_catalog.pg_has_role('myeongha_seyeon_governed_executor',
+      'myeongha_api_executor','MEMBER')
+    or not pg_catalog.pg_has_role('myeongha_seyeon_governed_executor',
+      'myeongha_api_executor','SET') then
+    raise exception 'W121 private-role membership grant was not visible';
+  end if;
+end
+$w121_membership$;
+rollback to savepoint w121_role_membership;
+release savepoint w121_role_membership;
+
+-- Operator-only test policies. Production policies are neither
 -- activated; all DML is rolled back.
 insert into public.seyeon_ai_governor_model_policies_v1(
  provider_key,model_key,policy_version,price_version,allowed_purposes,

@@ -28,7 +28,33 @@ function safeRow() {
     hasGovernedRoleMembership:true,isLegacyMember:false,
     isCostOwnerMember:false,otherMemberships:0,
     canLegacyStart:false,canLegacySettle:false,canLegacyRecord:false,
+    canOrdinaryLegacyStart:false,canOrdinaryLegacySettle:false,canOrdinaryLegacyRecord:false,
+    canOrdinaryGovernedStart:false,canOrdinaryGovernedSettle:false,
+    canOrdinaryStoreReceipt:false,
+    canOrdinaryInternalStart:false,canOrdinaryInternalSettle:false,
+    ordinaryIsGovernedRoleMember:false,ordinaryIsCostOwnerMember:false,
     canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false,
+    canOrdinaryDirectLedger:false,canOrdinaryDirectBudget:false,
+    canOrdinaryDirectRateCard:false,
+    executorCanLogin:false,executorIsSuper:false,executorCanBypassRls:false,
+    executorCanInherit:false,executorCanCreateDb:false,executorCanCreateRole:false,
+    executorCanReplicate:false,executorOtherMemberships:0,
+    executorCanUsePublicSchema:true,executorCanCreatePublicSchema:false,
+    executorCanResolveSubject:true,executorCanAssertSubject:true,
+    executorCanBeginMemberContext:true,executorCanBeginGuestContext:false,
+    executorCanBeginGovernedGuestContext:true,executorCanGovernedStart:true,
+    executorCanGovernedSettle:true,executorCanStoreProviderReceipt:true,
+    executorCanLegacyStart:false,executorCanLegacySettle:false,
+    executorCanLegacyRecord:false,executorCanInternalStart:false,
+    executorCanInternalSettle:false,executorCanReadCost:false,
+    executorCanClaimProviderReceipt:false,executorCanAckProviderReceipt:false,
+    executorDirectLedger:false,executorDirectBudget:false,
+    executorDirectRateCard:false,executorDirectReceiptQueue:false,
+    canDirectLedgerColumns:false,canDirectBudgetColumns:false,
+    canDirectRateCardColumns:false,canOrdinaryDirectLedgerColumns:false,
+    canOrdinaryDirectBudgetColumns:false,canOrdinaryDirectRateCardColumns:false,
+    executorDirectLedgerColumns:false,executorDirectBudgetColumns:false,
+    executorDirectRateCardColumns:false,executorDirectReceiptQueueColumns:false,
   };
 }
 function driver(input: {preflight?:Readonly<Record<string,unknown>>; failSql?:string}={}) {
@@ -111,11 +137,92 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       ['isLegacyMember',true],
       ['isCostOwnerMember',true],['canLegacyStart',true],
       ['canLegacySettle',true],['canLegacyRecord',true],
+      ['canOrdinaryLegacyStart',true],
+      ['canOrdinaryLegacySettle',true],
+      ['canOrdinaryLegacyRecord',true],
+      ['canOrdinaryGovernedStart',true],
+      ['canOrdinaryGovernedSettle',true],
+      ['canOrdinaryStoreReceipt',true],
+      ['canOrdinaryInternalStart',true],
+      ['canOrdinaryInternalSettle',true],
+      ['ordinaryIsGovernedRoleMember',true],
+      ['ordinaryIsCostOwnerMember',true],
       ['canDirectLedger',true],['canDirectBudget',true],
       ['canDirectRateCard',true],
+      ['canOrdinaryDirectLedger',true],
+      ['canOrdinaryDirectBudget',true],
+      ['canOrdinaryDirectRateCard',true],
+      ['executorCanLogin',true],['executorIsSuper',true],
+      ['executorCanBypassRls',true],['executorCanInherit',true],
+      ['executorCanCreateDb',true],['executorCanCreateRole',true],
+      ['executorCanReplicate',true],['executorOtherMemberships',1],
+      ['executorCanUsePublicSchema',false],
+      ['executorCanCreatePublicSchema',true],
+      ['executorCanResolveSubject',false],['executorCanAssertSubject',false],
+      ['executorCanBeginMemberContext',false],
+      ['executorCanBeginGuestContext',true],
+      ['executorCanBeginGovernedGuestContext',false],
+      ['executorCanGovernedStart',false],['executorCanGovernedSettle',false],
+      ['executorCanStoreProviderReceipt',false],
+      ['executorCanLegacyStart',true],['executorCanLegacySettle',true],
+      ['executorCanLegacyRecord',true],['executorCanInternalStart',true],
+      ['executorCanInternalSettle',true],['executorCanReadCost',true],
+      ['executorCanClaimProviderReceipt',true],
+      ['executorCanAckProviderReceipt',true],
+      ['executorDirectLedger',true],['executorDirectBudget',true],
+      ['executorDirectRateCard',true],['executorDirectReceiptQueue',true],
+      ['canDirectLedgerColumns',true],['canDirectBudgetColumns',true],
+      ['canDirectRateCardColumns',true],
+      ['canOrdinaryDirectLedgerColumns',true],
+      ['canOrdinaryDirectBudgetColumns',true],
+      ['canOrdinaryDirectRateCardColumns',true],
+      ['executorDirectLedgerColumns',true],
+      ['executorDirectBudgetColumns',true],
+      ['executorDirectRateCardColumns',true],
+      ['executorDirectReceiptQueueColumns',true],
     ] as const) {
       expect(()=>verifySeyeonGovernedLoginPreflightV1(
         [{...safeRow(),[key]:value}],SEYEON_GOVERNED_DB_LOGIN_V1,
+      ),key).toThrow(SeyeonGovernedDbBoundaryErrorV1);
+    }
+    // W116: the dedicated LOGIN alone being safe is not sufficient:
+    // ordinary API legacy Start/Settle/Record privileges bypass Governor.
+    for(const key of [
+      'canOrdinaryLegacyStart','canOrdinaryLegacySettle',
+      'canOrdinaryLegacyRecord',
+      'canOrdinaryGovernedStart','canOrdinaryGovernedSettle',
+      'canOrdinaryStoreReceipt','canOrdinaryInternalStart',
+      'canOrdinaryInternalSettle',
+      'ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
+      'canOrdinaryDirectLedger','canOrdinaryDirectBudget',
+      'canOrdinaryDirectRateCard',
+      'executorCanLogin','executorIsSuper','executorCanBypassRls',
+      'executorCanInherit','executorCanCreateDb','executorCanCreateRole',
+      'executorCanReplicate','executorOtherMemberships',
+      'executorCanUsePublicSchema','executorCanCreatePublicSchema',
+      'executorCanResolveSubject','executorCanAssertSubject',
+      'executorCanBeginMemberContext','executorCanBeginGuestContext',
+      'executorCanBeginGovernedGuestContext','executorCanGovernedStart',
+      'executorCanGovernedSettle','executorCanStoreProviderReceipt',
+      'executorCanLegacyStart','executorCanLegacySettle','executorCanLegacyRecord',
+      'executorCanInternalStart','executorCanInternalSettle','executorCanReadCost',
+      'executorCanClaimProviderReceipt','executorCanAckProviderReceipt',
+      'executorDirectLedger','executorDirectBudget','executorDirectRateCard',
+      'executorDirectReceiptQueue','canDirectLedgerColumns',
+      'canDirectBudgetColumns','canDirectRateCardColumns',
+      'canOrdinaryDirectLedgerColumns','canOrdinaryDirectBudgetColumns',
+      'canOrdinaryDirectRateCardColumns','executorDirectLedgerColumns',
+      'executorDirectBudgetColumns','executorDirectRateCardColumns',
+      'executorDirectReceiptQueueColumns',
+    ] as const){
+      expect(GOVERNED_LOGIN_PREFLIGHT_SQL_V1).toContain(
+        'as "'+key+'"',
+      );
+      // A missing catalog result is UNKNOWN, never safe to admit.
+      const incomplete={...safeRow()} as Record<string,unknown>;
+      delete incomplete[key];
+      expect(()=>verifySeyeonGovernedLoginPreflightV1(
+        [incomplete],SEYEON_GOVERNED_DB_LOGIN_V1,
       ),key).toThrow(SeyeonGovernedDbBoundaryErrorV1);
     }
     expect(()=>verifySeyeonGovernedLoginPreflightV1(
@@ -150,7 +257,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     await p.close();
     expect(safe.poolEnded).toBe(true);
 
-    const bad=driver({preflight:{...safeRow(),canLegacyRecord:true}});
+    const bad=driver({preflight:{...safeRow(),canOrdinaryDirectLedger:true}});
     const bp=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:bad.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });

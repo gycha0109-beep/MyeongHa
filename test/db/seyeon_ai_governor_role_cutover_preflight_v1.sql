@@ -24,8 +24,10 @@ begin
     raise exception 'Se-yeon cost meter authority privilege shape drifted';
   end if;
   if pg_catalog.pg_has_role('myeongha_api_executor',
-      'myeongha_seyeon_cost_meter_owner','MEMBER') then
-    raise exception 'Ordinary API executor inherited cost meter owner';
+      'myeongha_seyeon_cost_meter_owner','MEMBER')
+     or pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_governed_executor','MEMBER') then
+    raise exception 'Ordinary API executor can SET ROLE into private AI authority';
   end if;
 
   -- Positive grants are an explicitly documented pre-cutover HOLD. A
@@ -66,17 +68,35 @@ begin
   end loop;
 
   if pg_catalog.has_table_privilege('myeongha_api_executor',
+      'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_table_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_table_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_call_cost_events','SELECT')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
       'public.seyeon_ai_call_cost_events','INSERT')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
       'public.seyeon_ai_call_cost_events','UPDATE')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_call_cost_events','DELETE')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_call_cost_events','REFERENCES')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
       'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_daily_budgets_v1','INSERT')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
       'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
-    or pg_catalog.has_table_privilege('myeongha_api_executor',
-      'public.seyeon_ai_governor_model_policies_v1','SELECT') then
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_model_policies_v1','SELECT')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_model_policies_v1','INSERT')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+    or pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_governor_model_policies_v1','REFERENCES') then
     raise exception 'Common API executor obtained direct cost or policy table rights';
   end if;
 
@@ -84,6 +104,111 @@ begin
   -- It is NOT yet a least-privilege ENFORCE execution identity.
   raise notice 'D3B2B-3A verified TEMPORARY LEGACY EXPOSURE: Start/Settle/Record available under myeongha_api_executor; Production ENFORCE remains HOLD';
 end $audit$;
+
+-- W120: internal SECURITY DEFINER budget helpers must remain private too.
+begin;
+grant execute on function public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text) to myeongha_api_executor;
+grant execute on function public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb) to myeongha_api_executor;
+do $internal$
+begin
+  if not pg_catalog.has_function_privilege('myeongha_api_executor',
+      'public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text)','EXECUTE')
+     or not pg_catalog.has_function_privilege('myeongha_api_executor',
+      'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE') then
+    raise exception 'W120 private internal function grant was not visible to ordinary API role';
+  end if;
+end
+$internal$;
+rollback;
+
+-- W119: the ordinary executor itself must have no direct ledger, budget or
+-- model-rate table privileges, including read-only and maintenance rights.
+begin;
+grant select on public.seyeon_ai_call_cost_events to myeongha_api_executor;
+do $direct$
+begin
+  if not pg_catalog.has_table_privilege('myeongha_api_executor',
+      'public.seyeon_ai_call_cost_events','SELECT') then
+    raise exception 'W119 direct table grant was not visible to ordinary API role';
+  end if;
+end
+$direct$;
+rollback;
+
+-- W119: column-level grants are not reported by has_table_privilege.
+begin;
+grant select (call_id) on public.seyeon_ai_call_cost_events
+  to myeongha_api_executor;
+do $columns$
+begin
+  if not pg_catalog.has_any_column_privilege('myeongha_api_executor',
+      'public.seyeon_ai_call_cost_events','SELECT') then
+    raise exception 'W119 column-level ledger grant was not visible';
+  end if;
+end
+$columns$;
+rollback;
+
+-- W118: NOINHERIT suppresses automatic privilege inheritance, but it does
+-- NOT prevent SET ROLE. The checkout preflight must inspect MEMBER, not only
+-- effective EXECUTE privileges. Each injected membership is rolled back.
+begin;
+create role w118_membership_test_login login noinherit;
+grant myeongha_api_executor to w118_membership_test_login with inherit false, set true;
+grant myeongha_seyeon_governed_executor to myeongha_api_executor with inherit false, set true;
+do $membership$
+begin
+  if not pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_governed_executor','MEMBER')
+     or pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_governed_executor','USAGE')
+     or not pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_governed_executor','SET') then
+    raise exception 'NOINHERIT governed membership was not exposed as MEMBER-only';
+  end if;
+end
+$membership$;
+set local session authorization w118_membership_test_login;
+set local role myeongha_api_executor;
+set local role myeongha_seyeon_governed_executor;
+do $membership$
+begin
+  if session_user is distinct from 'w118_membership_test_login'
+     or current_user is distinct from 'myeongha_seyeon_governed_executor' then
+    raise exception 'NOINHERIT ordinary login could not SET ROLE governed';
+  end if;
+end
+$membership$;
+rollback;
+
+begin;
+create role w118_membership_test_login login noinherit;
+grant myeongha_api_executor to w118_membership_test_login with inherit false, set true;
+grant myeongha_seyeon_cost_meter_owner to myeongha_api_executor with inherit false, set true;
+do $membership$
+begin
+  if not pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_cost_meter_owner','MEMBER')
+     or pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_cost_meter_owner','USAGE')
+     or not pg_catalog.pg_has_role('myeongha_api_executor',
+      'myeongha_seyeon_cost_meter_owner','SET') then
+    raise exception 'NOINHERIT cost-owner membership was not exposed as MEMBER-only';
+  end if;
+end
+$membership$;
+set local session authorization w118_membership_test_login;
+set local role myeongha_api_executor;
+set local role myeongha_seyeon_cost_meter_owner;
+do $membership$
+begin
+  if session_user is distinct from 'w118_membership_test_login'
+     or current_user is distinct from 'myeongha_seyeon_cost_meter_owner' then
+    raise exception 'NOINHERIT ordinary login could not SET ROLE cost owner';
+  end if;
+end
+$membership$;
+rollback;
 
 begin;
 set local role myeongha_api_executor;
