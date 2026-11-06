@@ -66,6 +66,13 @@ describe('G5 dedicated Cloudflare Commerce Hyperdrive',()=>{
   expect(state.pools).toHaveLength(1);
   await pool.close();
  });
+ it('does not depend on a malformed optional governed-cost binding for proof settlement',async()=>{
+  const receiptBindings=bindings();
+  receiptBindings.SEYEON_GOVERNED_HYPERDRIVE={connectionString:'not-a-postgres-url'};
+  const pool=createCloudflareSeyeonG5PrivateCommercePoolV1(receiptBindings);
+  expect(state.pools).toHaveLength(1);
+  await pool.close();
+ });
  it('uses a third max-one pool and proves dedicated LOGIN plus private role on every checkout',async()=>{
   const pool=createCloudflareSeyeonG5PrivateCommercePoolV1(bindings());
   expect(state.pools).toHaveLength(1);

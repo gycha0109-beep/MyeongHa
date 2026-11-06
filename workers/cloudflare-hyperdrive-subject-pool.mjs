@@ -160,8 +160,11 @@ export function createCloudflareSeyeonG5PrivateCommercePoolV1(bindings,options){
     throw Error('SeYeon Subject Hyperdrive binding unavailable for G5 preflight');
   }
   const ordinary=requireHyperdriveConnectionStringV1(ordinaryRaw);
-  const governed=typeof governedRaw==='string'&&governedRaw.length>=20&&governedRaw.length<=4096
-    ?requireHyperdriveConnectionStringV1(governedRaw):null;
+  let governed=null;
+  if(typeof governedRaw==='string'&&governedRaw.length>=20&&governedRaw.length<=4096){
+    // Proof receipt settlement must not depend on the optional model-cost pool.
+    try{governed=requireHyperdriveConnectionStringV1(governedRaw);}catch{governed=null;}
+  }
   const raw=bindings?.SEYEON_G5_COMMERCE_HYPERDRIVE?.connectionString;
   if(typeof raw!=='string'||raw.length<20||raw.length>4096){
     throw Error('Dedicated G5 Commerce Hyperdrive binding unavailable');
