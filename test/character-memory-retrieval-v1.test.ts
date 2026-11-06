@@ -57,6 +57,7 @@ function buildProjection(input: Readonly<{
   lifeFactValidTo?: string | null;
   includeLifeFact?: boolean;
   includeMemory?: boolean;
+  includeSecondMemory?: boolean;
 }>): ReturnType<typeof buildCharacterWorkingMemoryProjectionV1> {
   return buildCharacterWorkingMemoryProjectionV1({
     scope: {
@@ -103,7 +104,26 @@ function buildProjection(input: Readonly<{
       sourceTurnId: 'turn-a',
       sourceMessageId: 'message-a',
       sourceMergeActionId: null,
-    }],
+    }, ...(input.includeSecondMemory ? [{
+      memoryItemId: 'memory-new',
+      memoryType: 'conversation_recall',
+      schemaVersion: 'v1',
+      content: {
+        summary: '최근 대화에서 오늘 계획을 이야기했습니다.',
+        relevance: 0.2,
+        salience: 0.1,
+      },
+      createdByCharacterId: 'seyeon',
+      createdAt: '2026-11-06T00:00:00.000Z',
+      grantId: 'memory-grant-new',
+      granteeCharacterId: 'seyeon',
+      grantReason: 'user_choice' as const,
+      grantedAt: '2026-11-06T00:01:00.000Z',
+      sourceKind: 'user_approved' as const,
+      sourceTurnId: 'turn-new',
+      sourceMessageId: 'message-new',
+      sourceMergeActionId: null,
+    }] : [])],
     relationship: null,
     relationshipEvents: [],
     recentMessages: [{
@@ -145,7 +165,10 @@ describe('Character Working Memory retrieval v1', () => {
 
   it('uses a bounded latest-memory fallback for a generic explicit callback', () => {
     const result = retrieveCharacterWorkingMemoryV1({
-      projection: buildProjection({ queryText: '지난번에 얘기했던 거 기억나요?' }),
+      projection: buildProjection({
+        queryText: '지난번에 얘기했던 거 기억나요?',
+        includeSecondMemory: true,
+      }),
       expectedScope: {
         subjectId: 'subject-a',
         characterId: 'seyeon',
@@ -155,8 +178,9 @@ describe('Character Working Memory retrieval v1', () => {
       limit: 5,
     });
 
-    expect(result.records.map((item) => item.record.recordId)).toEqual(['memory-a']);
+    expect(result.records.map((item) => item.record.recordId)).toEqual(['memory-new', 'memory-a']);
     expect(result.records[0]?.signals.explicitCallbackMatch).toBe(true);
+    expect(result.records[0]?.signals.callbackFallbackUsed).toBe(true);
     expect(result.trace.callbackFallbackUsed).toBe(true);
   });
 

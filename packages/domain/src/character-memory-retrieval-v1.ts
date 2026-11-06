@@ -22,6 +22,7 @@ export interface CharacterMemoryRetrievedRecordV1 {
     readonly lexicalCoverage: number;
     readonly phraseMatch: boolean;
     readonly explicitCallbackMatch: boolean;
+    readonly callbackFallbackUsed: boolean;
     readonly relevance: number;
     readonly salience: number;
     readonly effectiveAt: string;
@@ -111,6 +112,10 @@ function compareRetrieved(
   }
   if (a.phraseMatch !== b.phraseMatch) return a.phraseMatch ? -1 : 1;
   if (a.lexicalCoverage !== b.lexicalCoverage) return b.lexicalCoverage - a.lexicalCoverage;
+  if (a.callbackFallbackUsed && b.callbackFallbackUsed) {
+    const fallbackRecency = Date.parse(b.effectiveAt) - Date.parse(a.effectiveAt);
+    if (fallbackRecency !== 0) return fallbackRecency;
+  }
   if (a.salience !== b.salience) return b.salience - a.salience;
   if (a.relevance !== b.relevance) return b.relevance - a.relevance;
   const timeDelta = Date.parse(b.effectiveAt) - Date.parse(a.effectiveAt);
@@ -234,6 +239,7 @@ export function retrieveCharacterWorkingMemoryV1(
         phraseMatch,
         explicitCallbackMatch: callbackRequested &&
           (callbackFallbackUsed || lexicalCoverage >= 0.5),
+        callbackFallbackUsed,
         relevance: record.relevance,
         salience: record.salience,
         effectiveAt,
