@@ -25,7 +25,7 @@ const fields=extract(
 const ledgerFile='apps/api/src/commerce-saju-verified-ledger-source-v1.ts';
 const ledger=extract(ledgerFile,'COMMERCE_SAJU_VERIFIED_LEDGER_SQL_V1');
 const record=extract(ledgerFile,'COMMERCE_SAJU_VERIFIED_RECORD_SQL_V1');
-const recordId="'1219c200-0000-4000-8000-000000000001'::uuid";
+const recordId="'1219c200-0000-4000-8000-000000000023'::uuid";
 const subject='(select subject_id from public.commerce_saju_records_v1 where id='+recordId+')';
 const natal='(select birth_revision_id from public.commerce_saju_records_v1 where id='+recordId+')';
 function binds(sql,args) {
