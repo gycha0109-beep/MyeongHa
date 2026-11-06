@@ -188,7 +188,7 @@ if [[ "$experiment" == workerd || "$experiment" == workerd_overlap ]]; then
       and .workerdWindow.clientPendingPeak==4 and .workerdWindow.clientPendingOnlyNotWorkerAdmission==true
       and .workerdWindow.elapsedMs>=900000
       and .workerdWindow.successful>0 and .workerdWindow.unexpected==0
-      and .workerdWindow.skipped>=0 and .workerdWindow.transportFailures>=0
+      and .workerdWindow.skipped==0 and .workerdWindow.transportFailures>=0
       and .workerdWindow.unavailable>=0
       and (.workerdWindow.successful+.workerdWindow.unavailable+
         .workerdWindow.transportFailures+.workerdWindow.unexpected+.workerdWindow.skipped)==3600
