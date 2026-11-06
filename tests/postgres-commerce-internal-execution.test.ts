@@ -35,6 +35,40 @@ describe('postgres internal Commerce execution', () => {
     expect(release).toHaveBeenCalledWith(undefined);
   });
 
+  it('opens a repeatable-read read-only snapshot for private evidence reads', async () => {
+    const { pool, query, release } = makePool();
+    const result = await executePostgresCommerceInternalTransactionV1({
+      pool,
+      transactionMode: 'read_only_repeatable_read',
+      execute: async ({client}) => {
+        await client.query('select evidence');
+        return 'held';
+      },
+    });
+    expect(result).toBe('held');
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+      'SET LOCAL ROLE myeongha_commerce_internal_executor',
+      'select evidence',
+      'COMMIT',
+    ]);
+    expect(release).toHaveBeenCalledWith(undefined);
+  });
+
+  it('rolls back a read-only snapshot on a failed evidence read', async () => {
+    const {pool, query, release} = makePool();
+    await expect(executePostgresCommerceInternalTransactionV1({
+      pool, transactionMode:'read_only_repeatable_read',
+      execute: async () => { throw Error('unproven rights'); },
+    })).rejects.toThrow('unproven rights');
+    expect(query.mock.calls.map(([sql]) => sql)).toEqual([
+      'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+      'SET LOCAL ROLE myeongha_commerce_internal_executor',
+      'ROLLBACK',
+    ]);
+    expect(release).toHaveBeenCalledWith(undefined);
+  });
+
   it('rolls back provider-originated work when the slice fails', async () => {
     const { pool, query, release } = makePool();
     const failure = new Error('verification failed');
