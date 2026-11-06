@@ -2668,6 +2668,89 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       // cannot substitute B's Thread, Turn or Attempt. The restricted G3
       // adapter must expose one generic HOLD, not original DB locators.
       const foreign=await prepare(219);
+      // W108 G4/G5: two genuinely separate governed DB sessions try the
+      // SAME unapproved historical AI reservation concurrently. The
+      // original Subject A must fail its missing server-owned budget or
+      // model policy; Subject B must fail its Subject context check FIRST.
+      // Neither failure can write a ledger, consume budget, or authorize
+      // historical model execution, regardless of arrival order.
+      const governorOwner=await pool.connect();
+      const governorForeign=await pool.connect();
+      const guardedCallId=uuid(38,218);
+      try{
+        await Promise.all([
+          governorOwner.query('BEGIN'),governorForeign.query('BEGIN'),
+        ]);
+        await Promise.all([
+          governorOwner.query('SET LOCAL ROLE myeongha_seyeon_governed_executor'),
+          governorForeign.query('SET LOCAL ROLE myeongha_seyeon_governed_executor'),
+        ]);
+        await Promise.all([
+          governorOwner.query(
+            "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+          ),
+          governorForeign.query(
+            "select set_config('myeongha.subject_id',$1,true)",
+            [foreign.subject],
+          ),
+        ]);
+        const [{rows:[ownerBackend]},{rows:[foreignBackend]}]=await Promise.all([
+          governorOwner.query<{pid:number}>('select pg_backend_pid() as pid'),
+          governorForeign.query<{pid:number}>('select pg_backend_pid() as pid'),
+        ]);
+        expect(ownerBackend?.pid).toBeGreaterThan(0);
+        expect(foreignBackend?.pid).toBeGreaterThan(0);
+        expect(ownerBackend?.pid).not.toBe(foreignBackend?.pid);
+        const governedStartSql=`select * from
+          public.cmd_governed_start_seyeon_ai_call_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+            $6::text,$7::text,$8::text,$9::text,$10::text,
+            $11::bigint,$12::bigint,$13::bigint)`;
+        const originalAttemptParams=[
+          f.subject,currentTurn,currentAttempt,'chat',guardedCallId,
+          'dialogue_render','s0-unapproved-provider','s0-unapproved-model',
+          's0-unapproved-policy','s0-unapproved-rate',100,256,1024,
+        ];
+        const [ownAdmission,crossAdmission]=await Promise.allSettled([
+          governorOwner.query(governedStartSql,originalAttemptParams),
+          governorForeign.query(governedStartSql,originalAttemptParams),
+        ]);
+        expect(ownAdmission.status).toBe('rejected');
+        if(ownAdmission.status==='rejected'){
+          expect(ownAdmission.reason).toMatchObject({code:'23514'});
+          expect([
+            'seyeon_ai_governor_day_not_configured',
+            'seyeon_ai_governor_model_policy_mismatch',
+          ]).toContain(
+            (ownAdmission.reason as {constraint?:string}).constraint,
+          );
+        }
+        expect(crossAdmission.status).toBe('rejected');
+        if(crossAdmission.status==='rejected')
+          expect(crossAdmission.reason).toMatchObject({
+            code:'42501',constraint:'myeongha_subject_context_mismatch',
+          });
+      }finally{
+        await Promise.all([
+          governorOwner.query('ROLLBACK').catch(()=>undefined),
+          governorForeign.query('ROLLBACK').catch(()=>undefined),
+        ]);
+        governorOwner.release();
+        governorForeign.release();
+      }
+      const {rows:[governorAfterRace]}=await pool.query<{
+        total_cost_events:number;governed_reservations:number
+      }>(`select
+        count(*)::int as total_cost_events,
+        count(*) filter(where governor_bucket_utc_date is not null)::int
+          as governed_reservations
+        from public.seyeon_ai_call_cost_events
+        where call_id=$1::uuid`,[guardedCallId]);
+      expect(governorAfterRace).toEqual({
+        total_cost_events:0,governed_reservations:0,
+      });
+      expect(await readHistoricalCostFence()).toEqual(originalCostFence);
+      expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
       // W98 G5 Reader/Se-yeon cross-product isolation: the actual
       // production Reader ordinary-history port must remain scoped to the
       // VERIFIED member and exact Thread. Even a successful own-Thread
