@@ -23,12 +23,12 @@ vi.mock('pg',()=>({Pool:class{
 }}));
 import{createCloudflareSeyeonG5PrivateCommercePoolV1}from'../workers/cloudflare-hyperdrive-subject-pool.mjs';
 
-const host='aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres';
+const host='hyperdrive-fixture.example.test:5432/postgres';
 const scheme='postgresql:'+'/';
 const connection=(user,password)=>[scheme,'/',user,':',password,'@',host].join('');
 const subject=connection('myeongha_seyeon_subject_login','fixture-a');
 const governed=connection('myeongha_seyeon_governed_login','fixture-b');
-const commerce=connection('myeongha_seyeon_g5_commerce_login.cnsfpcdiyofqvhpcegfc','fixture-c');
+const commerce=connection('myeongha_seyeon_g5_commerce_login','fixture-c');
 const bindings=()=>({
  SEYEON_SUBJECT_HYPERDRIVE:{connectionString:subject},
  SEYEON_GOVERNED_HYPERDRIVE:{connectionString:governed},
