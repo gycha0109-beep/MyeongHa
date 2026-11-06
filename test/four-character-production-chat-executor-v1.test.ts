@@ -5,6 +5,7 @@ import {
   createFourCharacterProductionChatExecutorV1,
   type FourCharacterProductionExecutionPortsV1,
   type FourIndependentChatTargetV1,
+  type FourCharacterValidatedReplyV1,
   type PublishedFourCharacterModelSourceV1,
 } from '../apps/api/src/four-character-production-chat-executor-v1.js';
 import type {
@@ -70,7 +71,7 @@ function harness(characterId: FourIndependentChatTargetV1) {
     providerKey: 'approved-independent-provider', modelKey: 'approved-model',
     usage: { inputTokens: 10, outputTokens: 8 },
   };
-  const validated = {
+  const validated: FourCharacterValidatedReplyV1 = {
     characterId, bodyText: '검증된 응답 본문',
     approved: true as const,
     outputGuardVersion: 'approved-output-guard-v1',
