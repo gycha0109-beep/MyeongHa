@@ -26,7 +26,7 @@ export interface SajuPrivateOwnedFieldSnapshotReaderV1 {
   }): Promise<SajuVerifiedLedgerOwnedFieldsProofV1>;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 function requireId(value: string): string {
   if (typeof value !== 'string' || !UUID.test(value)) {
     throw Error('SAJU_PRIVATE_QUOTE_ID_INVALID');
