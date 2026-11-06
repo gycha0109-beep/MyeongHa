@@ -597,3 +597,22 @@ export {
   type ClaimNarrativeProfileV1,
   type ClaimNarrativeLocaleDecisionV1,
 } from './claim-narrative-locale-v1.js';
+
+export {
+  CHARACTER_WORKING_MEMORY_PROJECTION_SCHEMA_VERSION_V1,
+  CharacterWorkingMemoryProjectionErrorV1,
+  buildCharacterWorkingMemoryProjectionV1,
+  type BuildCharacterWorkingMemoryProjectionInputV1,
+  type CharacterWorkingMemoryAdmissionV1,
+  type CharacterWorkingMemoryClaimKindV1,
+  type CharacterWorkingMemoryExcludedMessageReasonV1,
+  type CharacterWorkingMemoryLifeFactSourceV1,
+  type CharacterWorkingMemoryMemorySourceV1,
+  type CharacterWorkingMemoryProjectedRecordV1,
+  type CharacterWorkingMemoryProjectionV1,
+  type CharacterWorkingMemoryRecordKindV1,
+  type CharacterWorkingMemoryRecordProjectorV1,
+  type CharacterWorkingMemoryRecentMessageSourceV1,
+  type CharacterWorkingMemoryRelationshipEventSourceV1,
+  type CharacterWorkingMemoryRelationshipSourceV1,
+} from './character-working-memory-projection-v1.js';

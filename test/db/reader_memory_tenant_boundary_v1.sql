@@ -32,7 +32,10 @@ INSERT INTO public.memory_items(
    'user_approved',null,null,null,'security-reader-a',null,clock_timestamp()),
   ('a7300000-0000-4000-8000-000000000003','a7200000-0000-4000-8000-000000000001',
    'consultation_detail','memory-v1','{"value":"REVOKED_MEMORY_CANARY"}'::jsonb,
-   'user_approved',null,null,null,'security-reader-a',clock_timestamp(),clock_timestamp());
+   'user_approved',null,null,null,'security-reader-a',clock_timestamp(),clock_timestamp()),
+  ('a7300000-0000-4000-8000-000000000004','a7200000-0000-4000-8000-000000000001',
+   'consultation_detail','memory-v1','{"value":"OWNER_A_PRIVATE_NO_GRANT"}'::jsonb,
+   'user_approved',null,null,null,'security-reader-a',null,clock_timestamp());
 
 INSERT INTO public.record_access_grants(
   id,subject_id,life_fact_id,memory_item_id,grantee_character_id,
@@ -58,8 +61,8 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'Owner A must read only their one active memory, got %', v_count;
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'Owner A must read their two active memories, got %', v_count;
   END IF;
 
   SELECT count(*) INTO v_count FROM public.qry_memory_active_grants_v1(
@@ -76,6 +79,35 @@ BEGIN
   IF v_count <> 0 THEN
     RAISE EXCEPTION 'Revoked Reader B grant was improperly returned';
   END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Reader A must receive exactly the one explicitly granted current Memory, got %', v_count;
+  END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-b'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Reader B grant was improperly included in Working Memory';
+  END IF;
+
+  BEGIN
+    PERFORM 1 FROM public.qry_reader_context_granted_memory_items_v1(
+      'a7200000-0000-4000-8000-000000000002'::uuid,
+      'security-reader-a'
+    );
+    RAISE EXCEPTION 'CROSS_SUBJECT_GRANTED_MEMORY_LEAK';
+  EXCEPTION WHEN SQLSTATE 'P0001' THEN
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
+    IF v_constraint <> 'myeongha_subject_context_mismatch' THEN
+      RAISE EXCEPTION 'Unexpected cross-subject context failure %', v_constraint;
+    END IF;
+  END;
 
   BEGIN
     PERFORM 1 FROM public.qry_memory_items_v1(
@@ -135,10 +167,17 @@ BEGIN
   IF v_count <> 0 THEN
     RAISE EXCEPTION 'Revoked Reader A grant still visible on fresh read';
   END IF;
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Reader A grant still visible in Working Memory';
+  END IF;
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
-  IF v_count <> 1 THEN
+  IF v_count <> 2 THEN
     RAISE EXCEPTION 'Revoking a grant improperly deleted the owner Memory item';
   END IF;
 END $$;
@@ -157,9 +196,18 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
-  IF v_count <> 0 THEN
-    RAISE EXCEPTION 'Revoked Memory item still visible on fresh owner read';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Only the private, non-revoked owner Memory should remain, got %', v_count;
   END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Memory still appears in Character Working Memory';
+  END IF;
+
   BEGIN
     PERFORM 1 FROM public.qry_memory_active_grants_v1(
       'a7200000-0000-4000-8000-000000000001'::uuid,
@@ -185,6 +233,15 @@ BEGIN
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'Owner B memory projection unavailable or cross-contaminated';
   END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000002'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Owner B active explicit grant must be visible only under Owner B context';
+  END IF;
 END $$;
+
 RESET ROLE;
 ROLLBACK;

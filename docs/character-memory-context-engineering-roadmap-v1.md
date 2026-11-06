@@ -101,11 +101,11 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 1 — Authority contract and data-source inventory
 
-**Status: Not started as a consolidated Context Engine implementation.**
+**Status: READ-ONLY CORE IMPLEMENTED; not connected to Production model execution.**
 
-1. Inventory existing conversation, turn, Life Fact, Memory Item, Memory Proposal, access-grant, relationship-event, Reader Knowledge and Reading records.
-2. Map each record type to its authoritative owner, Subject scope, Character visibility, disclosure gate, lifecycle, source turn and revocation behavior.
-3. Define a versioned, read-only Working Memory projection using only already-authoritative fields and existing grants.
+1. Inventory existing conversation, turn, Life Fact, Memory Item, Memory Proposal, access-grant, relationship-event, Reader Knowledge and Reading records. **Implemented in `docs/character-memory-authority-inventory-v1.md`.**
+2. Map each record type to its authoritative owner, Subject scope, Character visibility, disclosure gate, lifecycle and revocation behavior. **Implemented for the currently exposed read fields and grants.**
+3. Define a versioned, read-only Working Memory projection using only already-authoritative fields and existing grants. **Implemented as `character-working-memory-projection-v1` and the server-side read composer.**
 4. Separate the logical memory categories:
    - episodic event memory;
    - factual/user-state memory;
@@ -325,9 +325,9 @@ The Context Engine is complete only when all of the following are evidenced:
 ## 8. Immediate next work
 
 1. Keep PR #3068 Draft and preserve the current green CI evidence.
-2. Add this roadmap as the track's authoritative implementation sequence.
-3. Start Phase 1 with a read-only inventory of existing memory/context tables, grants, revocation, Reader Knowledge and current retrieval code.
-4. In parallel, inspect and reuse the existing PR-04D2 token-count adapter and Cost Governor contracts to define the provider-neutral Token Budget Manager boundary.
+2. Phase 1 read-only authority inventory and projection core are implemented; do not wire them into Production model execution until the remaining authority and cost gates are satisfied.
+3. Continue with Phase 2: inspect and reuse the existing PR-04D2 token-count adapter and Cost Governor contracts to define the provider-neutral Token Budget Manager boundary.
+4. Keep source-turn/message provenance gaps visible; do not invent missing source fields.
 5. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
 
 ## 9. Governing documents
