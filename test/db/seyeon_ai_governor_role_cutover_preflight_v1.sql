@@ -164,20 +164,20 @@ $columns$;
 rollback;
 
 -- W118: NOINHERIT suppresses automatic privilege inheritance, but it does
--- NOT prevent SET ROLE. The checkout preflight must inspect MEMBER, not only
--- effective EXECUTE privileges. Each injected membership is rolled back.
+-- NOT prevent SET ROLE. PostgreSQL 15 lacks per-membership INHERIT/SET grant
+-- options and pg_has_role(...,'SET'); use MEMBER/USAGE plus actual SET ROLE
+-- below to prove the same boundary across PostgreSQL 15 and 17.
 begin;
 create role w118_membership_test_login login noinherit;
-grant myeongha_api_executor to w118_membership_test_login with inherit false, set true;
-grant myeongha_seyeon_governed_executor to myeongha_api_executor with inherit false, set true;
+grant myeongha_api_executor to w118_membership_test_login;
+grant myeongha_seyeon_governed_executor to myeongha_api_executor;
 do $membership$
 begin
   if not pg_catalog.pg_has_role('myeongha_api_executor',
       'myeongha_seyeon_governed_executor','MEMBER')
      or pg_catalog.pg_has_role('myeongha_api_executor',
       'myeongha_seyeon_governed_executor','USAGE')
-     or not pg_catalog.pg_has_role('myeongha_api_executor',
-      'myeongha_seyeon_governed_executor','SET') then
+ then
     raise exception 'NOINHERIT governed membership was not exposed as MEMBER-only';
   end if;
 end
@@ -198,15 +198,14 @@ rollback;
 begin;
 create role w118_membership_test_login login noinherit;
 grant myeongha_api_executor to w118_membership_test_login with inherit false, set true;
-grant myeongha_seyeon_cost_meter_owner to myeongha_api_executor with inherit false, set true;
+grant myeongha_seyeon_cost_meter_owner to myeongha_api_executor;
 do $membership$
 begin
   if not pg_catalog.pg_has_role('myeongha_api_executor',
       'myeongha_seyeon_cost_meter_owner','MEMBER')
      or pg_catalog.pg_has_role('myeongha_api_executor',
       'myeongha_seyeon_cost_meter_owner','USAGE')
-     or not pg_catalog.pg_has_role('myeongha_api_executor',
-      'myeongha_seyeon_cost_meter_owner','SET') then
+ then
     raise exception 'NOINHERIT cost-owner membership was not exposed as MEMBER-only';
   end if;
 end
