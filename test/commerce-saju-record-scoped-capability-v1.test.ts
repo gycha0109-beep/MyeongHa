@@ -61,7 +61,7 @@ describe('Saju Record-scoped Capability authority',()=>{
     const end=migration.indexOf('$saju_product_price$;',start);
     const fragment=migration.slice(start,end);
     const prices=new Map(
-      [...fragment.matchAll(/when '([^']+)' then (\\d+)::bigint/gu)]
+      [...fragment.matchAll(/when '([^']+)' then (\d+)::bigint/gu)]
         .map(match=>[match[1]!,Number(match[2])]),
     );
     expect(prices.size).toBe(Object.keys(COMMERCE_SAJU_PRODUCTS_V1).length);
