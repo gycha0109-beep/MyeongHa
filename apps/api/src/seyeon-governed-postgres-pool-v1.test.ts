@@ -57,14 +57,14 @@ function safeRow() {
     executorDirectRateCardColumns:false,executorDirectReceiptQueueColumns:false,
   };
 }
-function driver(input: {preflight?:Readonly<Record<string,unknown>>; failSql?:string}={}) {
+function driver(input: {preflight?:Readonly<Record<string,unknown>>; failSql?:(sql:string)=>boolean}={}) {
   const calls: Array<{text:string;values?:readonly unknown[]}>=[];
   const released: Array<Error|undefined>=[];
   let poolEnded=false;
   const client:NodePostgresDriverClientV1={
     async query(text, values) {
       calls.push({text,...(values===undefined?{}:{values})});
-      if (input.failSql && text.includes(input.failSql))
+      if (input.failSql?.(text))
         throw new Error('database command rejected');
       if(text===GOVERNED_LOGIN_PREFLIGHT_SQL_V1)
         return {rows:[input.preflight??safeRow()]};
@@ -322,7 +322,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
   });
 
   it('rolls back exactly once when DB command fails before any paid operation',async()=>{
-    const d=driver({failSql:'assert_myeongha_subject_context_v1'});
+    const d=driver({failSql:sql=>sql==='select public.assert_myeongha_subject_context_v1($1::uuid)'});
     const p=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:d.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });
@@ -339,7 +339,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
   });
 
   it('rejects missing actual SET ROLE authority and rolls back before any caller SQL',async()=>{
-    const d=driver({failSql:'SET LOCAL ROLE'});
+    const d=driver({failSql:sql=>sql==='SET LOCAL ROLE myeongha_seyeon_governed_executor'});
     const pool=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:d.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });
