@@ -128,23 +128,25 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 2 — Provider-neutral Token Budget Manager
 
-**Status: Existing length guards are present; actual model token budget is not wired to the four-Character runtime.**
+**Status: PROVIDER-NEUTRAL PROFILE AND EXACT-REQUEST PREFLIGHT IMPLEMENTED; real model profile and four-Character Production wiring remain HOLD pending O-C1-07 and the existing Cost Governor operational gates.**
 
-1. Define a provider-neutral model profile contract. It must carry the approved model identifier, context-window capacity, maximum output tokens, input ceiling, reserved headroom, tokenizer/count adapter identity, pricing version and supported request format.
-2. Do not populate real model values until O-C1-07 is resolved.
-3. Count the exact serialized request that will be dispatched. The counted bytes/payload and dispatched bytes/payload must be identical.
-4. Reuse the existing official OpenAI Responses input-token-count adapter only for the exact supported native Responses request shape. Its current opt-in/unsupported-provider/Production-hold constraints remain in force.
-5. For another Provider, require its exact supported tokenizer/count contract. No character-count multiplier or undocumented estimate may authorize dispatch.
-6. Compute the input budget after reserving output tokens and approved headroom. Enforce the Provider's actual `max_output_tokens` independently from application text-length validation.
-7. Bind the resulting reservation to the exact model and price version through the existing Cost Governor.
-8. On unknown model, unsupported request shape, count mismatch, timeout, missing usage, exceeded budget or missing output cap: fail closed before Provider dispatch, or preserve the existing unknown-usage hold semantics after dispatch.
+1. Define a provider-neutral model profile contract. **Implemented** in \`packages/domain/src/model-token-budget-profile-v1.ts\`. It carries the server-owned provider/model identity, context/input/output ceilings, reserved headroom, serialized-byte ceiling, token-counter adapter identity/request format, and pricing version.
+2. Do not populate real model values until O-C1-07 is resolved. **Still on hold; no real model profile is registered.**
+3. Count the exact serialized request that will be dispatched. **Implemented** by \`certifyModelTokenBudgetV1\`; UTF-8 byte parity is checked and the exact immutable body is passed unchanged to the counter adapter.
+4. Reuse the existing official OpenAI Responses input-token-count adapter only for the exact supported native Responses request shape. **Implemented** as an explicit opt-in binding in \`apps/api/src/seyeon-model-token-budget-profile-v1.ts\`; its current opt-in/unsupported-provider/Production-hold constraints remain in force.
+5. For another Provider, require its exact supported tokenizer/count contract. **The generic adapter boundary is implemented; no unsupported Provider is registered and no character-count estimate is permitted.**
+6. Compute the input budget after reserving output tokens and approved headroom. **Implemented**: adapter upper bounds must include the exact profile headroom, and the actual Provider output cap must equal the profile cap.
+7. Bind the resulting reservation to the exact model and price version through the existing Cost Governor. **The profile and certification receipt carry exact policy/model/pricing identity; existing Cost Governor remains the only reservation authority.**
+8. On unknown model, unsupported request shape, count mismatch, timeout, missing usage, exceeded budget or missing output cap: fail closed before Provider dispatch, or preserve the existing unknown-usage hold semantics after dispatch. **Pre-dispatch profile/count/output-cap failures are covered by offline tests; post-dispatch unknown-usage behavior remains under the existing Cost Governor contract.**
 
 **Exit criteria:**
-- exact request-count parity is tested;
-- over-budget/count-failure paths produce zero Provider calls and zero cost reservations where dispatch has not occurred;
-- output-token cap is present in the actual Provider request;
-- reservation/dispatch/settlement/unknown-usage behavior remains atomic and auditable;
+- exact request-count parity is covered by the generic profile tests and existing PR-04D2 count/generation parity tests;
+- over-budget/count-failure paths are covered as pre-dispatch failures; existing PR-04D2 tests verify zero Provider calls and zero cost reservations when certification fails;
+- output-token cap is checked by the generic profile and remains present in the actual native Provider request;
+- reservation/dispatch/settlement/unknown-usage behavior remains governed by the existing DB Cost Governor; operational closure is still required before Production ENFORCE;
 - no paid Production evaluation or inference is activated by this phase alone.
+
+**Implementation record:** \`docs/character-memory-token-budget-profile-v1.md\`.
 
 ### Phase 3 — Permission-first Hybrid Memory Retrieval
 
@@ -330,7 +332,7 @@ The Context Engine is complete only when all of the following are evidenced:
 
 1. Keep PR #3068 Draft and preserve the current green CI evidence.
 2. Phase 1 read-only authority inventory and projection core are implemented; do not wire them into Production model execution until the remaining authority and cost gates are satisfied.
-3. Continue with Phase 2: inspect and reuse the existing PR-04D2 token-count adapter and Cost Governor contracts to define the provider-neutral Token Budget Manager boundary.
+3. Phase 2 provider-neutral profile and exact-request preflight are implemented. Keep real model profiles and four-Character Production wiring on hold until O-C1-07 and the existing PR-04B/04C/04D operational gates are resolved; do not advance to Phase 3 before Phase 2 exit criteria are met.
 4. Keep source-turn/message provenance gaps visible; do not invent missing source fields.
 5. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
 

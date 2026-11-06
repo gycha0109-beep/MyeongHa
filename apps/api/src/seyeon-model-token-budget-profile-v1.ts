@@ -1,0 +1,117 @@
+import {
+  MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
+  MODEL_TOKEN_BUDGET_PROFILE_SCHEMA_VERSION_V1,
+  validateModelTokenBudgetProfileV1,
+  type ModelTokenBudgetProfileV1,
+  type ModelTokenCountAdapterV1,
+} from '../../../packages/domain/src/model-token-budget-profile-v1.js';
+import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
+import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
+import {
+  createSeyeonOpenAiInputTokenCountAdmissionV1,
+  SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
+  type SeyeonOpenAiInputTokenCountConfigV1,
+} from './seyeon-openai-input-token-count-port-v1.js';
+import {
+  validateSeyeonCostGovernorModelPolicyV1,
+  type SeyeonCostGovernorModelPolicyV1,
+} from './seyeon-cost-governor-server-policy-v1.js';
+
+export const SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1 =
+  'openai-responses-text-json-schema-v1' as const;
+
+export interface SeyeonOpenAiModelTokenBudgetBindingV1 {
+  readonly profile: ModelTokenBudgetProfileV1;
+  readonly counter: ModelTokenCountAdapterV1<SeyeonStructuredProviderRequestV2>;
+}
+
+export function createSeyeonOpenAiModelTokenBudgetProfileV1(input: Readonly<{
+  policy: SeyeonCostGovernorModelPolicyV1;
+  reservedHeadroomTokens: number;
+}>): ModelTokenBudgetProfileV1 {
+  const policy = validateSeyeonCostGovernorModelPolicyV1(input.policy);
+  if (policy.providerKey !== 'openai-responses') {
+    throw new TypeError('Se-yeon OpenAI token budget requires the native Responses provider.');
+  }
+  if (
+    !Number.isSafeInteger(input.reservedHeadroomTokens) ||
+    input.reservedHeadroomTokens < 1 ||
+    input.reservedHeadroomTokens >= policy.maximumInputTokens
+  ) {
+    throw new TypeError('Se-yeon OpenAI token budget headroom is outside the approved input ceiling.');
+  }
+
+  return validateModelTokenBudgetProfileV1({
+    schemaVersion: MODEL_TOKEN_BUDGET_PROFILE_SCHEMA_VERSION_V1,
+    profileId: [
+      'model-token-budget',
+      policy.providerKey,
+      policy.modelKey,
+      policy.policyVersion,
+      policy.priceQuote.priceVersion,
+    ].join(':'),
+    policyVersion: policy.policyVersion,
+    providerKey: policy.providerKey,
+    modelKey: policy.modelKey,
+    pricingVersion: policy.priceQuote.priceVersion,
+    contextWindowTokens: policy.contextWindowTokens,
+    maximumInputTokens: policy.maximumInputTokens,
+    maximumOutputTokens: policy.maximumOutputTokens,
+    reservedHeadroomTokens: input.reservedHeadroomTokens,
+    maximumSerializedRequestBytes: policy.maximumSerializedRequestBytes,
+    tokenCounter: {
+      adapterId: SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
+      adapterVersion: SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
+      supportedRequestFormat: SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1,
+      inputBoundSemantics: MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
+    },
+  });
+}
+
+function adaptSeyeonOpenAiInputTokenCountAdmissionV1(
+  admission: SeyeonAiGovernorAdmissionV1,
+  reservedHeadroomTokens: number,
+): ModelTokenCountAdapterV1<SeyeonStructuredProviderRequestV2> {
+  const policy = validateSeyeonCostGovernorModelPolicyV1(admission.policy);
+  if (policy.providerKey !== 'openai-responses') {
+    throw new TypeError('Se-yeon OpenAI token counter cannot bind a different provider.');
+  }
+  return Object.freeze({
+    adapterId: SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
+    adapterVersion: SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
+    providerKey: policy.providerKey,
+    modelKey: policy.modelKey,
+    supportedRequestFormat: SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1,
+    reservedHeadroomTokens,
+    inputBoundSemantics: MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
+    countExactRequest: (input) => admission.certifiedInputTokenUpperBound(
+      input.request,
+      input.serializedRequestBodyBytes,
+      input.serializedRequestBody,
+    ),
+  });
+}
+
+/**
+ * Builds one server-owned profile and its matching opt-in official OpenAI
+ * counter from the same configuration, preventing headroom/model drift.
+ * Creating the binding performs no HTTP request; counting occurs only when
+ * certifyModelTokenBudgetV1 is explicitly called.
+ */
+export function createSeyeonOpenAiModelTokenBudgetBindingV1(
+  config: SeyeonOpenAiInputTokenCountConfigV1,
+): SeyeonOpenAiModelTokenBudgetBindingV1 {
+  const profile = createSeyeonOpenAiModelTokenBudgetProfileV1({
+    policy: config.policy,
+    reservedHeadroomTokens: config.reservedHeadroomTokens,
+  });
+  if (config.model !== profile.modelKey) {
+    throw new TypeError('Se-yeon OpenAI model configuration does not match its budget profile.');
+  }
+  const admission = createSeyeonOpenAiInputTokenCountAdmissionV1(config);
+  const counter = adaptSeyeonOpenAiInputTokenCountAdmissionV1(
+    admission,
+    config.reservedHeadroomTokens,
+  );
+  return Object.freeze({ profile, counter });
+}

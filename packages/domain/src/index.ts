@@ -616,3 +616,18 @@ export {
   type CharacterWorkingMemoryRelationshipEventSourceV1,
   type CharacterWorkingMemoryRelationshipSourceV1,
 } from './character-working-memory-projection-v1.js';
+
+
+export {
+  MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
+  MODEL_TOKEN_BUDGET_PROFILE_SCHEMA_VERSION_V1,
+  MODEL_TOKEN_BUDGET_RECEIPT_SCHEMA_VERSION_V1,
+  ModelTokenBudgetErrorV1,
+  certifyModelTokenBudgetV1,
+  validateModelTokenBudgetProfileV1,
+  type ModelTokenBudgetFailureCodeV1,
+  type ModelTokenBudgetProfileV1,
+  type ModelTokenBudgetReceiptV1,
+  type ModelTokenCountAdapterV1,
+  type ModelTokenCountExactRequestV1,
+} from './model-token-budget-profile-v1.js';
