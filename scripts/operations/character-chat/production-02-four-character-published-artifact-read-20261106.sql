@@ -27,6 +27,10 @@ $preflight$;
 -- The existing NOBYPASSRLS owner can already read the subject/thread,
 -- participants, release, and Character catalog. Grant only published bundle
 -- metadata fields, never bundle mutation or unrestricted API table SELECT.
+-- Existing chat-open owner can inspect release id/status/default, but this
+-- stricter source reader also checks the release retirement timestamp.
+grant select (retired_at) on public.content_releases
+  to myeongha_chat_thread_open_owner;
 grant select (
   content_version, content_hash, artifact_ref, artifact_schema_version,
   min_client_capability, asset_manifest_hash, cue_schema_version
