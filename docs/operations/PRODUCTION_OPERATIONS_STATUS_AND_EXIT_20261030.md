@@ -9,6 +9,19 @@
 > 최종 판정: **코드·배포·익명 운영 점검 일부 확인 / 전체 Production Operations ACCEPTANCE = 미완료**. `dr_ready=false`, `serviceResumptionAllowed=false` 상태를 변경하지 않음.
 
 ## Worklog — 운영 트랙 작업 이력
+### 2026-11-06 KST — Phase 7/11 GitHub Linux workerd Saju outage and recovery: measured PASS
+
+- The existing main-only [GitHub Linux run #42197099729](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42197099729) completed **SUCCESS** at exact `main` `af41b57575536ba39e5b4ff138dcca80252d30fc`, after [#3073](https://github.com/gycha0109-beep/MyeongHa/pull/3073) merged. Actual local Wrangler 4.152.0/workerd 1.20261019.1, four disposable signed GoTrue members, native PostgreSQL18 forced RLS and pinned Saju `9807ce89c08afc61b587560d515a475efd819032` were exercised. Sequential baseline 12/12 successes (p50/p95/p99 127.809/141.546/153.991 ms).
+- **Isolated actual fault/recovery:** stopped Saju produced calculation HTTP **503** while independent Health remained **200**; after Saju restarted, four simultaneous authenticated calculations succeeded **4/4**, with p50/p95/p99 **171.709/176.095/176.259 ms**. Anonymous denial, workerd process cleanup and Docker project cleanup were confirmed. The original [1,414-byte JSON](REAL_GOTRUE_PG18_SAJU_WORKERD_RECOVERY_LINUX_OBSERVATION_20261106.json), raw SHA-256 `25742bd0be04281f7004ccacf419ca26310f808d2fcfff6abf6331a76fd54a49`, [original artifact 13492477469](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42197099729/artifacts/13492477469), and [scope document](WORKERD_ISOLATED_PRODUCT_PATH_PHASE11_20261106.md) are preserved in this evidence PR.
+- **Non-claims:** This is a local workerd fixture with temporary GoTrue/Postgres and pinned Saju, **not** deployed Worker ingress/Hosted Hyperdrive admission, Production Saju outage recovery, production throughput/automatic scaling, Hosted restore or whole-service RPO/RTO. `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false` remain unchanged. P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN. Next work: verify outstanding approved implementation/acceptance gaps without expanding test scope unilaterally.
+
+### 2026-11-06 KST — Phase 7/11 workerd 사주 장애·복귀 준비 및 실측 대기
+
+- [PR #3072](https://github.com/gycha0109-beep/MyeongHa/pull/3072) 병합으로 [GitHub Linux #42184314101](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42184314101)에서 확인된 `workerd` + 실제 GoTrue + 임시 PostgreSQL18 강제 RLS + 고정 Saju 계산의 순차 12/12 성공과 익명 차단·정리를 원본 및 SHA-256과 함께 보존했다. 이 기록은 **로컬 workerd 계산 경로**에 한정되며 운영 Worker·Hosted 복원 증거가 아니다.
+- [PR #3073](https://github.com/gycha0109-beep/MyeongHa/pull/3073)은 같은 격리 경로에서 **사주 엔진 중지 → 계산 503·Health 200 → 엔진 재기동 → 동시 계산 4/4 성공**을 로컬 Linux로 검증한 코드를 담고 있다. 일반 CI는 성공했으나 [필수 통합 CI #42188477819](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42188477819) 및 `main` 병합, 그 이후 GitHub Linux 수동 실측은 **아직 확인되지 않았다**. 자동 병합은 설정되어 있다.
+- **다음:** #3073 통합 CI 통과 및 병합 후 기존 수동 `postgres-isolated-rls-capacity-acceptance.yml`의 `experiment=workerd`를 정확한 최신 `main`에서 실행한다. 결과 JSON·실제 SHA-256·상태 코드·runtime/Docker 정리 근거를 확인한 뒤 별도의 원본 보존 PR을 작성한다. 실패한 경우에는 원인을 수정하되 허위 `PASS`나 미관측 지연값을 추가하지 않는다.
+- **수용 경계:** 이 항목은 작업 중 워크로그이며, 전체 Production 장애 복귀, Hosted Hyperdrive, Saju 운영 CPU 한계, Production 확장 승인, Hosted RPO/RTO 및 [P0 #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)은 미수용이다. `drReady=false`, `serviceResumptionAllowed=false`.
+
 
 ### 2026-11-06 KST — Phase 11 GitHub Linux workerd 제품 경로 실측
 
