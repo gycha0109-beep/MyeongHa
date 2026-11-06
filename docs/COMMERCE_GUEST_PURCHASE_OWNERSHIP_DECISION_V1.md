@@ -1,11 +1,14 @@
 # 명하 Guest Purchase / Ownership Decision v1
 
+> **SUPERSEDED / HISTORICAL ONLY — 2026-11-07**  
+> P0-CM-04 was superseded by [P0-CM-05](COMMERCE_GUEST_ACCESS_AND_MEMBER_PURCHASE_DECISION_V1.md). This file is retained as historical decision evidence only. Its permission for Guest paid purchases and pre-registration paid-capability access is no longer current. Do not implement or infer Guest paid checkout from this document.
+
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Decision: **P0-CM-04**  
 > Repository baseline: `5f5b63241a278addb5cff5a354aae17cc335bf07`  
 > Supersedes: Commerce Architecture v1의 Member-only Purchase Intent / Guest purchase OUT OF SCOPE 규칙  
-> Status: **DECIDED / ARCHITECTURE DELTA CLOSED / IMPLEMENTATION NOT STARTED**
+> Status: **SUPERSEDED / HISTORICAL RECORD ONLY**
 
 ---
 

@@ -13,9 +13,9 @@
 > Architecture Authority: `docs/architecture/COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`  
 > Launch Rail Decision: `docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md`  
 > Web PSP Decision: `docs/COMMERCE_WEB_PSP_DECISION_V1.md`  
-> Guest Purchase Ownership Decision: `docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`  
+> Guest Access / Paid Purchase Decision: `docs/COMMERCE_GUEST_ACCESS_AND_MEMBER_PURCHASE_DECISION_V1.md` (P0-CM-05); the old P0-CM-04 Guest purchase document is historical only.  
 > Evidence Minimization Decision: `docs/COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`  
-> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / WEB PSP DECIDED / GUEST PURCHASE OWNERSHIP DECIDED / PORTONE V2 VERIFICATION+WEBHOOK FOUNDATION IMPLEMENTED / IMPLEMENTATION HOLD**  
+> Status: **DERIVED IMPLEMENTATION SPEC / ARCHITECTURE CLOSED / LAUNCH RAIL DECIDED / WEB PSP DECIDED / GUEST FREE ACCESS / MEMBER-ONLY PAID PURCHASE DECIDED / PORTONE V2 VERIFICATION+WEBHOOK FOUNDATION IMPLEMENTED / IMPLEMENTATION HOLD**  
 > Rule: 이 문서는 Architecture와 이후 explicit P0 decision을 요약해 구현 경계를 연결하는 companion이다. Domain semantics 충돌 시 Architecture가 우선하고, Architecture 작성 뒤 결정된 P0 status는 최신 `docs/P0_DECISION_REGISTER.md`와 해당 decision record가 우선한다.
 
 ---
@@ -29,7 +29,8 @@ SRC-21 Grant apply / aggregate authority      = RESOLVED BY ARCHITECTURE
 P0-CM-01 launch rail                          = DECIDED: Web + one-off only
 P0-CM-02 exact Web PSP                        = DECIDED: PortOne V2 / portone_v2
 P0-CM-03 launch paid Product / Capability     = OPEN-P0 / BLOCKED BY CURRENT SAJU AUTHORITY
-P0-CM-04 Guest purchase ownership             = DECIDED: Guest + Member / canonical subjects.id
+P0-CM-04 Guest paid purchase ownership        = SUPERSEDED
+P0-CM-05 Guest free access / paid purchase     = DECIDED: free Guest scope / active Member only
 P0-PR-01 parent retention/legal/backup        = OPEN-P0
 P0-PR-01B provider-evidence minimization      = DECIDED
 Product Capability Set foundation             = IMPLEMENTED / ADDITIVE DB AUTHORITY / NO SALEABLE CATALOG SEEDED
@@ -99,7 +100,7 @@ entitlements
 
 - Product Offer provider/platform/product mapping immutability
 - Product Capability Set / Capability Item immutable historical meaning foundation
-- Guest/Member Purchase Intent v2 ownership + immutable charge authority
+- Member-only paid Purchase Intent v2/v3 ownership + immutable charge authority
 - provider-account owner/provider consistency
 - receipt owner/provider/Offer consistency
 - provider transaction/event dedupe
@@ -115,7 +116,7 @@ qry_entitlements_v1
 internal_recompute_entitlement_projection_v1
 ```
 
-`cmd_create_purchase_intent_v1`은 historical v1 minimal Offer mapping path다. Current Guest/Member Purchase Intent v2 authority는 기존 v1의 historical semantics를 재해석하지 않고 additive command/runtime boundaries로 확장되며, saleable charge terms나 launch catalog를 스스로 활성화하지 않는다.
+`cmd_create_purchase_intent_v1`은 historical v1 minimal Offer mapping path다. Current paid Purchase Intent v2/v3 authority requires an active authenticated Member. Guest remains limited to explicitly designated free Saju experiences and cannot create paid Purchase Intent or Payment Attempt records. This does not seed or enable saleable charge terms; `P0-CM-03` remains required before launch catalog activation.
 
 `internal_recompute_entitlement_projection_v1`은 API/client command가 아니라 이미-authoritative한 `entitlement_grants`를 한 logical entitlement projection으로 재계산하는 **내부 provider-neutral DB primitive**다. `PUBLIC`, `anon`, `authenticated`, `service_role`, `myeongha_api_executor`에는 EXECUTE를 부여하지 않는다.
 
@@ -325,7 +326,7 @@ same idempotency key + same canonical request → replay
 same key + conflicting request → conflict
 ```
 
-Current v2 ownership authority additionally permits active Guest and active Member Purchase Intents through canonical server-resolved `subjects.id`, with immutable charge authority and Guest→Member continuity governed by `P0-CM-04`. This does not seed or enable saleable charge terms; `P0-CM-03` remains required before launch catalog activation.
+Current v2/v3 paid-purchase authority permits only an active authenticated Member. Guest free experiences remain outside paid Commerce Purchase Intent and Payment Attempt commands. Historical Guest-owned Commerce rows, if any, retain their original canonical `subjects.id` and are not rewritten. `P0-CM-03` remains required before launch catalog activation.
 
 Client가 보낸 가격/통화/Product key/entitlement key/scope/subject ID는 authority가 아니다.
 
@@ -744,7 +745,7 @@ test/db/entitlement_projection_recompute_concurrency.sh
 Architecture                                      = CLOSED
 Launch rail                                       = DECIDED: Web + one-off
 Web PSP                                           = DECIDED: PortOne V2 / portone_v2
-Guest purchase ownership                         = DECIDED: Guest + Member / canonical subjects.id
+Guest free access / paid purchase eligibility     = DECIDED: Guest free-only / active Member for paid
 Commerce evidence minimization                    = DECIDED: P0-PR-01B
 Product Capability Set schema                    = IMPLEMENTED / FOUNDATION / NO SALEABLE CATALOG SEEDED
 Purchase Intent v2 Guest/Member ownership        = IMPLEMENTED / MERGED-MAIN / NO SALEABLE CHARGE TERMS IMPLIED
@@ -769,4 +770,4 @@ saleable Product/Capability catalog              = HOLD / P0-CM-03 OPEN-P0
 production Commerce activation                    = NOT AUTHORIZED
 ```
 
-`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`, `COMMERCE_WEB_PSP_DECISION_V1.md`, `COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`의 authority를 함께 따른다.
+`COMMERCE_ENTITLEMENT_ARCHITECTURE_V1.md`, `COMMERCE_LAUNCH_RAIL_DECISION_V1.md`, `COMMERCE_WEB_PSP_DECISION_V1.md`, `COMMERCE_GUEST_ACCESS_AND_MEMBER_PURCHASE_DECISION_V1.md` (current; old v1 decision is superseded), `COMMERCE_EVIDENCE_DATA_MINIMIZATION_DECISION_V1.md`의 authority를 함께 따른다.

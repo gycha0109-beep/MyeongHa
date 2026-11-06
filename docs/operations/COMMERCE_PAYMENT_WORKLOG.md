@@ -716,3 +716,14 @@
 - **가격 일치:** 기존 TypeScript 상품 정책의 13개 KRW 가격을 DB 불변 함수로 미러링하고, 원본 구매 승인 시 현재 Offer Charge Terms의 금액·통화가 정확히 일치해야 합니다. 가격 정책과 Offer 금액이 다르면 결제 Intent 생성 전 HOLD합니다.
 - **일반 경로 우회 차단:** 일반 Purchase Intent v3 경로에서도 Saju Product는 Record Admission 문맥 없이는 신규 생성·재호출할 수 없고, 비Saju Product가 Saju Record scope를 사용하거나 Saju Product가 global/fixed scope를 사용하는 경우도 거부합니다.
 - **업그레이드 제한:** 정적 Offer Charge Terms로는 Record별 차액을 고정할 수 없어, 이번 버전은 원본 구매만 허용하고 업그레이드는 별도 불변 quote Charge Terms 구현 전까지 HOLD합니다.
+
+
+### 2026-11-07 — Guest 무료 이용 / Member-only 유료 구매 정책 정정 (P0-CM-05)
+
+- **오류 확인:** 기존 `P0-CM-04`가 active Guest의 Web one-off 유료 구매와 회원가입 전 유료 권한 소비를 허용하고 있었습니다. 같은 정책이 `COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `COMMERCE_PAYMENT_TRACK_ARCHITECTURE_V1.md` §2.4/§4.2, `COMMERCE_ENTITLEMENT_SPEC.md`에도 반영되어 있었습니다.
+- **정정:** 사용자의 2026-11-07 지시에 따라 `P0-CM-04`를 superseded 처리하고 `P0-CM-05`를 추가했습니다. Guest는 무료 오늘의 운세와 추후 지정할 무료 사주 상품 1종만 이용하며, 모든 유료 구매는 활성 인증 Member 로그인 후 시작합니다. Guest 유료 Purchase Intent/Payment Attempt/Provider checkout/paid Grant는 금지합니다.
+- **API 경계:** Purchase Intent 및 Payment Attempt HTTP foundation은 Guest identity를 `LOGIN_REQUIRED`로 거부하고 PostgreSQL 연결 전에 종료합니다.
+- **DB 경계:** 신규 forward-only migration `2340_paid_purchase_member_auth_v1.sql`이 Purchase Intent와 Payment Attempt insert 모두에서 활성 Member/auth binding을 확인합니다. 역사적 migration `0960`/`1070`은 수정하지 않습니다.
+- **기록 보존:** 과거 Guest-owned Commerce row가 있더라도 Receipt/Event/Grant의 원래 `subject_id`를 재작성하지 않습니다. Guest free flow와 Guest bootstrap은 유지합니다.
+- **검증 범위:** Guest paid-create 거부, Guest payment-attempt 거부, HTTP `LOGIN_REQUIRED`, historical Guest purchase history read를 회귀 검사에 포함합니다. 새 HEAD의 CI/PG17 결과 전 PASS를 선언하지 않습니다.
+- **운영 경계:** Saleable Offer/Charge Terms, public Checkout route, LIVE PortOne, Production DB 적용 및 실제 판매는 계속 HOLD.

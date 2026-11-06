@@ -20,7 +20,8 @@
 | `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
 | `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
 | `P0-CM-03` | Saju-page-wide launch scope / paid Product & Capability catalog | **OPEN-P0 (activation)** | Product Owner direction: 사주 페이지 전체 공개 및 유료 서비스 운영 준비, 단일 최초 상품 한정 출시 아님. 현재 구체화된 inactive Product = `standard.love_relationship`, 정가 KRW 8,900 결정; 다른 상품의 가격·제공 조건은 개별 결정. Reader 별도 선택; Offer/Charge Terms 및 각 상품의 판매 활성화는 미승인; 역사적 `saju.general_natal.deep.v1` 후보는 폐기 |
-| `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
+| `P0-CM-04` | Guest purchase ownership / continuity | **SUPERSEDED** | 2026-11-07 `P0-CM-05`로 대체. Guest 유료 구매 허용은 더 이상 유효하지 않으며 기존 기록의 owner/provenance 보존에만 역사적으로 적용 |
+| `P0-CM-05` | Guest free access / Member-only paid purchase | **DECIDED** | Guest는 무료 오늘의 운세와 추후 지정할 무료 사주 상품 1종만 이용. 모든 유료 구매는 활성 로그인 Member 필수. Guest 유료 Purchase Intent·Payment Attempt·결제·권한 발급 금지 |
 | `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
 | `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
 | `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; 4 structural tombstones ANONYMIZE; 9 Commerce evidence/history tables RETAIN `P5Y`; existing encrypted backup lifecycle `P30D` + restore reconciliation before serviceability |
@@ -314,7 +315,12 @@ The Product Owner now plans the **entire Saju page** as the public opening and p
 
 ```yaml
 id: P0-CM-04
-status: DECIDED
+status: SUPERSEDED
+superseded_at: 2026-11-07
+superseded_by: P0-CM-05
+supersession_scope:
+  - Guest paid-purchase eligibility and pre-registration paid-capability consumption are revoked for new purchases.
+  - Canonical subject ownership, same-subject promotion, and immutable historical provenance remain applicable to existing records only.
 decided_at: 2026-09-05
 choice: active Guest purchase is allowed and Commerce ownership remains anchored to the server-resolved canonical subjects.id
 scope:
@@ -365,6 +371,56 @@ rollback_or_change_policy: removing Guest purchase, allowing client-selected own
 record: docs/COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md
 ```
 
+### P0-CM-05
+
+```yaml
+id: P0-CM-05
+status: DECIDED
+decided_at: 2026-11-07
+supersedes: P0-CM-04 (Guest paid-purchase eligibility and pre-registration paid-capability access only)
+choice: Guest may use only explicitly designated free Saju experiences; every paid Commerce purchase requires an active authenticated Member.
+scope:
+  decides:
+    - Guest free Saju access is limited to 무료 오늘의 운세 and one additional free Saju Product that the Product Owner explicitly designates later.
+    - No other Guest-facing Saju Product is implied to be free or Guest-eligible.
+    - Guest cannot create a paid Purchase Intent, Payment Attempt, provider checkout, or paid Entitlement.
+    - Paid checkout requires subjects.kind='member', subjects.status='active', auth_user_id IS NOT NULL, and merged_into_subject_id IS NULL at the server/database authority boundary.
+    - A Guest selecting a paid Product receives LOGIN_REQUIRED and must log in or register before the paid purchase flow resumes.
+    - Free experiences are not zero-amount paid purchases and do not use paid Purchase Intent or Payment Attempt commands.
+    - Existing historical Guest-owned Commerce evidence, if any, remains immutable and is not reparented; this decision blocks new Guest paid purchases.
+    - Guest-to-new-Member promotion continues to preserve the same canonical subject_id and free-experience continuity.
+  does_not_decide:
+    - product key/name, pricing, or runtime design for the future additional free Saju Product
+    - paid Product/Offer/Charge Terms activation or saleable catalog
+    - PSP live credentials, merchant activation, public checkout route, or Production deployment
+    - free-experience retention details not already covered by existing privacy decisions
+rationale:
+  - Guest access is intended as a limited free entry experience, not an anonymous paid-commerce identity.
+  - Paid purchases require an account so purchase ownership, receipts, and ongoing Saju Record rights are attached to an authenticated Member.
+  - The free Today's Fortune entry point remains available without turning the Guest identity into a paid purchaser.
+security_invariants:
+  - Guest authentication is sufficient only for explicitly Guest-eligible free experiences.
+  - Paid Purchase Intent and Payment Attempt creation require an active authenticated Member.
+  - The server resolves canonical subjects.id; client-supplied subject identity is never accepted.
+  - Login-required rejection occurs before provider handoff or paid-right mutation.
+  - Historical Receipt/Event/Grant subject_id provenance is never rewritten because of promotion or merge.
+implementation_impact:
+  - enforce Member-only paid eligibility in Purchase Intent v2/v3, Saju Record admission, and Payment Attempt creation.
+  - return a stable LOGIN_REQUIRED response for Guest attempts to enter paid checkout.
+  - preserve Guest bootstrap and the free Today's Fortune path; do not route free experiences through paid Purchase Intent.
+  - add database-level guards so internal command paths cannot create new Guest paid checkout records.
+independent_gates_preserved:
+  - P0-CM-01 Web + one-off launch rail
+  - P0-CM-02 PortOne V2 selection; live merchant/credential/Production activation remains separately gated
+  - P0-CM-03 individual paid Product/Capability sale activation
+  - P0-PR-01 privacy, retention, and backup authority
+production_gate:
+  - this policy does not activate public checkout, saleable Offers, live PortOne, Production DB changes, or paid fulfillment.
+migration_impact:
+  - add forward-only database guards; do not rewrite historical migrations 0960 or 1070.
+rollback_or_change_policy: allowing Guest paid purchases again requires a new explicit P0 decision; free Guest scope changes also require explicit Product Owner direction.
+record: docs/COMMERCE_GUEST_ACCESS_AND_MEMBER_PURCHASE_DECISION_V1.md
+```
 ### P0-AUTH-01
 
 ```yaml
@@ -604,7 +660,7 @@ record: docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md
 
 `P0-CM-03` remains explicitly open for **individual Product sale activation**. The Product Owner's launch plan covers the entire Saju page, not only a first paid Product. The currently specified inactive Commerce v2 Product is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. Product Owner list price is now **DECIDED: KRW 8,900**. No current saleable Offer or immutable Charge Terms exists, so the decided list price is not executable charge authority. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
 
-`P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
+`P0-CM-04` is a historical decision and is superseded by `P0-CM-05` for Guest paid-purchase eligibility. Current policy permits Guest access only to 무료 오늘의 운세 and one additional free Saju Product explicitly designated later; all paid Purchase Intent and Payment Attempt creation requires an active authenticated Member. Existing historical Guest-owned Commerce provenance is not rewritten.
 
 `P0-PR-01` is now **DECIDED** by product-owner approval on 2026-09-19. The current schema baseline is DELETE for service/personalization data, ANONYMIZE for four structural tombstones, RETAIN `P5Y` for nine enumerated Commerce evidence/history tables (including `purchase_intent_reader_selections` added by migration 1130), and the existing encrypted backup lifecycle `P30D` with privacy reconciliation required before a restored environment is serviceable. RPO/RTO objective authority is separately decided by `P0-OPS-02` (`PT24H` / `PT6H`). Production non-zero bounded-window reconciliation and full-procedure RPO/RTO comparisons are runtime-proven by run `35659483080`; DR Ready remains independently gated by provider-managed full-restore equivalence. `P0-PR-01B` remains the independent Commerce evidence minimization/security boundary.
 
@@ -631,7 +687,8 @@ rollback_or_change_policy: ...
 - `P0-CM-02` PortOne V2 결정을 live merchant/PG contract/credential/Production activation 승인으로 확대 해석하는 것
 - browser redirect/callback/Payment Attempt operational state를 verified payment success authority로 사용하는 것
 - current Saju production interpretation authority가 BLOCKED인 상태에서 `P0-CM-03`을 Paid Deep/Detailed Reading production SKU로 임의 승격하는 것
-- `P0-CM-04` Guest purchase 허용을 unrelated subject/account의 purchase claim 허용으로 확대 해석하는 것
+- `P0-CM-04`의 과거 Guest 유료 구매 허용을 현재 정책으로 적용하는 것
+- `P0-CM-05`의 Guest 무료 이용 범위를 임의로 확대하거나 Guest에게 유료 Purchase Intent/Payment Attempt를 허용하는 것
 - Guest→Member continuity를 이유로 historical receipt/event/grant `subject_id`를 rewrite하는 것
 - Guest session TTL 만료를 verified paid-right 만료/취소로 재해석하는 것
 - paid one-reading ownership을 기존 `global | fixed` Capability scope에 client resource ID로 몰래 삽입하는 것
