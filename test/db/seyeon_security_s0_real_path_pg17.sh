@@ -15,6 +15,9 @@ node scripts/operations/seyeon-security-s0/install-isolated.mjs
 # G4 governed admission input hardening runs offline; HTTP and DB are mocks.
 ./node_modules/.bin/vitest run \
   test/seyeon-cost-governor-04c-adapter-v1.test.ts --maxWorkers=1
+# The OpenAI input-token counting path uses fake HTTP only, never a paid call.
+./node_modules/.bin/vitest run \
+  test/seyeon-openai-input-token-count-port-v1.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \
   test/seyeon-g3-historical-originals-review-w88.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \
