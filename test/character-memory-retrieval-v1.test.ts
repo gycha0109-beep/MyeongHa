@@ -27,7 +27,7 @@ const memoryProjector: CharacterWorkingMemoryRecordProjectorV1 = Object.freeze({
   recordType: 'conversation_recall',
   schemaVersion: 'v1',
   projectorVersion: 'test-conversation-recall-projector-v1',
-  project: ({ payload }) => {
+  project: ({ payload }: Parameters<CharacterWorkingMemoryRecordProjectorV1['project']>[0]) => {
     const value = payload as { summary?: unknown; relevance?: unknown; salience?: unknown };
     if (typeof value.summary !== 'string') throw new TypeError('summary required');
     return {
@@ -276,9 +276,9 @@ describe('Character Working Memory retrieval v1', () => {
         createdAt: '2026-10-01T00:00:00.000Z',
         grantId: 'grant-unapproved',
         granteeCharacterId: 'seyeon',
-        grantReason: 'user_choice',
+        grantReason: 'user_choice' as const,
         grantedAt: '2026-10-01T00:01:00.000Z',
-        sourceKind: 'user_approved',
+        sourceKind: 'user_approved' as const,
         sourceTurnId: null,
         sourceMessageId: null,
         sourceMergeActionId: null,
@@ -366,9 +366,9 @@ describe('Character Working Memory retrieval v1', () => {
         createdAt: '2026-10-01T00:00:00.000Z',
         grantId: 'grant-api',
         granteeCharacterId: 'seyeon',
-        grantReason: 'user_choice',
+        grantReason: 'user_choice' as const,
         grantedAt: '2026-10-01T00:01:00.000Z',
-        sourceKind: 'user_approved',
+        sourceKind: 'user_approved' as const,
         sourceTurnId: 'turn-api',
         sourceMessageId: 'message-api',
         sourceMergeActionId: null,
