@@ -15,6 +15,7 @@ const subjectId='11111111-1111-4111-8111-111111111111';
 const threadId='22222222-2222-4222-8222-222222222222';
 const releaseId='33333333-3333-4333-8333-333333333333';
 const bundleId='44444444-4444-4444-8444-444444444444';
+const sourceDigest='sha256:v1:'+'a'.repeat(64);
 
 function turnFor(characterId: FourIndependentChatTargetV1): TrustedFiveCharacterChatTurnV1 {
   const binding = Object.freeze({
@@ -55,12 +56,13 @@ function harness(characterId: FourIndependentChatTargetV1) {
     cueSchemaVersion: 'static-cue-v1',
     bibleSourceRef: 'approved://bible/'+characterId,
     runtimeSourceRef: 'approved://runtime/'+characterId,
-    sourceDigest: 'sha256:test-source-'+characterId,
+    sourceDigest,
     canonicalContext: '서버에서 승인된 개별 캐릭터의 런타임 문맥',
   };
   const reservation = {
     status: 'reserved' as const,
     subjectId, threadId, threadCharacterId: 'participant-1', characterId, releaseId, bundleId,
+    sourceDigest,
     turnId: 'turn-1', attemptId: 'attempt-1', costReservationId: 'cost-1',
   };
   const generated = {
