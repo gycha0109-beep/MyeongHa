@@ -117,6 +117,8 @@ describe('four-Character published model source compiler v1', () => {
       const h = artifactFor(characterId);
       const result = await createFourCharacterPublishedModelSourceCompilerV1()
         .compile({ characterId, evidence: h.evidence, artifactBytes: h.bytes });
+      expect(result).not.toBeNull();
+      if (result === null) throw new Error('approved source compiler fixture is required');
       expect(result.bibleSourceRef).toBe(sourceAuthority.bibleSourceRef);
       expect(result.runtimeSourceRef).toBe(sourceAuthority.runtimeSourceRef);
       const context = JSON.parse(result.canonicalContext);
@@ -140,10 +142,12 @@ describe('four-Character published model source compiler v1', () => {
 
   it('rejects immutable identity drift even when the artifact bundle hash is recomputed', async () => {
     const h = artifactFor('yeoul');
+    const original = h.contentBundle.characters[0];
+    if (original === undefined) throw new Error('Character fixture is required');
     const alteredBundle = {
       ...h.contentBundle,
       characters: [{
-        ...h.contentBundle.characters[0],
+        ...original,
         personalityTraits: ['unapproved replacement personality'],
       }],
     };
@@ -194,10 +198,12 @@ describe('four-Character published model source compiler v1', () => {
 
   it('rejects missing Production publication material instead of filling defaults', async () => {
     const h = artifactFor('taegyeom');
+    const original = h.contentBundle.characters[0];
+    if (original === undefined) throw new Error('Character fixture is required');
     const alteredBundle = {
       ...h.contentBundle,
       characters: [{
-        ...h.contentBundle.characters[0],
+        ...original,
         assetRefs: [],
       }],
     };
