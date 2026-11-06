@@ -633,6 +633,9 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
             durationSeconds:900,requestsPerSecond:4,concurrency:4,scheduled:3600,peak:4,
           });
           expect(window.elapsedMs).toBeGreaterThanOrEqual(900000);
+          // Do not accept a purported 900-wave experiment if the runner
+          // silently dropped any scheduled four-request wave.
+          expect(window.skipped).toBe(0);
           expect(successfulSamples.length).toBeGreaterThan(0);
           expect(unexpected).toBe(0);
           expect(successfulSamples.length+unavailable+transportFailures+unexpected+window.skipped).toBe(3600);
