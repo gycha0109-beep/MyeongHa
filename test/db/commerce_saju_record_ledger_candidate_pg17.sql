@@ -13,6 +13,10 @@ declare
  v_upgrade_intent uuid:='1219c200-0000-4000-8000-000000000003'::uuid;
  v_duplicate_pending_intent uuid:='1219c200-0000-4000-8000-000000000004'::uuid;
  v_guest_rejected_intent uuid:='1219c200-0000-4000-8000-000000000023'::uuid;
+ v_guest_subject uuid:='1219c200-0000-4000-8000-000000000025'::uuid;
+ v_guest_birth_profile uuid:='1219c200-0000-4000-8000-000000000026'::uuid;
+ v_guest_birth_revision uuid:='1219c200-0000-4000-8000-000000000027'::uuid;
+ v_guest_record uuid:='1219c200-0000-4000-8000-000000000028'::uuid;
  v_other_record uuid:='1219c200-0000-4000-8000-000000000005'::uuid;
  v_sandbox_intent uuid:='1219c200-0000-4000-8000-000000000006'::uuid;
  v_sandbox_receipt uuid:='1219c200-0000-4000-8000-000000000007'::uuid;
@@ -84,12 +88,50 @@ begin
  insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
  values (v_record,v_subject,v_source_revision);
 
- -- The official B2 fixture is an active Guest. Generic Commerce permits it,
- -- but Saju Record checkout must reject it before creating any Purchase Intent.
- perform pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
+ -- P0-CM-05 makes the B2/B3 paid fixture an authenticated Member.
+ -- Use a separate, real Guest Subject + Birth revision + Record to prove that
+ -- Saju checkout rejects Guest before Offer validation or Purchase Intent creation.
+ insert into public.subjects(
+   id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at
+ ) values (
+   v_guest_subject,'guest',null,'active',null,clock_timestamp(),clock_timestamp()
+ );
+ insert into public.guest_sessions(
+   id,subject_id,token_hash,expires_at,consumed_at,claimed_by_subject_id,created_at
+ ) values (
+   '1219c200-0000-4000-8000-00000000002a'::uuid,
+   v_guest_subject,'synthetic-saju-ledger-guest-token-hash',
+   clock_timestamp()+interval '1 day',null,null,clock_timestamp()
+ );
+ insert into public.birth_profiles(
+   id,subject_id,profile_kind,label,current_revision_id,archived_at,created_at,updated_at
+ ) values (
+   v_guest_birth_profile,v_guest_subject,'self','Guest Saju Record PG17',
+   null,null,clock_timestamp(),clock_timestamp()
+ );
+ insert into public.birth_profile_revisions(
+   id,birth_profile_id,subject_id,revision_no,calendar_type,birth_date,
+   birth_time,time_known,is_leap_month,sex,input_hash,created_at
+ )
+ select v_guest_birth_revision,v_guest_birth_profile,v_guest_subject,1,
+        br.calendar_type,br.birth_date,br.birth_time,br.time_known,
+        br.is_leap_month,br.sex,br.input_hash,clock_timestamp()
+ from public.birth_profile_revisions br
+ where br.id=v_source_revision;
+ get diagnostics v_rows=row_count;
+ if v_rows<>1 then
+   raise exception 'SAJU_LEDGER_PG17_GUEST_BIRTH_REVISION_NOT_ISSUED';
+ end if;
+ update public.birth_profiles
+ set current_revision_id=v_guest_birth_revision,updated_at=clock_timestamp()
+ where id=v_guest_birth_profile and subject_id=v_guest_subject;
+ insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
+ values(v_guest_record,v_guest_subject,v_guest_birth_revision);
+
+ perform pg_catalog.set_config('myeongha.subject_id',v_guest_subject::text,true);
  begin
    perform 1 from public.cmd_create_saju_purchase_intent_v1(
-     v_subject,v_guest_rejected_intent,v_record,v_source_revision,
+     v_guest_subject,v_guest_rejected_intent,v_guest_record,v_guest_birth_revision,
      '1219c200-0000-4000-8000-000000000024'::uuid,null,
      'guest-saju-record-checkout','sha256:test:guest-saju-record-checkout',
      '{}'::jsonb,'sha256:test:guest-offer','{}'::jsonb,
@@ -105,6 +147,7 @@ begin
               where purchase_intent_id=v_guest_rejected_intent) then
    raise exception 'SAJU_GUEST_CHECKOUT_LEFT_PURCHASE_STATE';
  end if;
+ perform pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
 
  update public.commerce_saju_records_v1
  set birth_revision_id=v_new_revision where id=v_record;
