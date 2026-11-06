@@ -141,6 +141,13 @@ button { cursor: pointer; }
 .admin-login .login-footnote { font-size: 11px; color: #a0a8b4; margin-top: 20px; }
 .admin-data { margin-top: 14px; }
 .admin-toolbar { display: flex; align-items: center; justify-content: space-between; margin: 22px 0; gap: 10px; flex-wrap: wrap; }
+.admin-search-form { display:flex; align-items:flex-end; gap:9px; flex-wrap:wrap; width:100%; padding:0 0 16px; margin:0 0 4px; border-bottom:1px solid #edf0f4; }
+.admin-search-field { display:grid; gap:6px; min-width:min(100%,320px); flex:1; color:#53627a; font-size:11px; }
+.admin-search-field input { width:100%; min-width:0; border:1px solid #d8deea; background:#fff; padding:10px 12px; border-radius:6px; color:#233248; }
+.admin-toolbar .admin-search-field input { width:100%; }
+.admin-search-form button { border:0; background:#283852; color:#fff; border-radius:6px; font-size:12px; padding:11px 16px; }
+.admin-search-form .admin-search-reset { background:#e9edf4; color:#4a5667; }
+.admin-search-form small { flex-basis:100%; color:#8994a5; font-size:10px; line-height:1.6; }
 .admin-toolbar form { display: flex; gap: 8px; flex-wrap: wrap; }
 .admin-toolbar form input { width: min(100%, 260px); }
 .admin-toolbar > button:last-child { margin-left: auto; background: #e9edf4; color: #4a5667; }
