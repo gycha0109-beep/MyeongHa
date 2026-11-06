@@ -58,12 +58,13 @@ export interface FourCharacterAtomicReservationV1 {
   readonly status: 'reserved' | 'replayed' | 'in_flight';
   readonly subjectId: string;
   readonly threadId: string;
+  readonly threadCharacterId: string;
   readonly characterId: FourIndependentChatTargetV1;
   readonly releaseId: string;
   readonly bundleId: string;
   readonly turnId: string;
   readonly attemptId: string;
-  /** The database Cost Governor reserves bounded inference before Provider. */
+  /** Server-issued Provider call ID; its adapter must reserve governed cost before network dispatch. */
   readonly costReservationId: string;
 }
 
@@ -92,7 +93,7 @@ export interface FourCharacterProductionExecutionPortsV1 {
     }>): Promise<PublishedFourCharacterModelSourceV1 | null>;
   }>;
   readonly transaction: Readonly<{
-    /** Atomic Member-owned user receive, idempotency and cost quota reservation. */
+    /** Atomic Member-owned user receive and idempotent attempt allocation. Returns the call ID the Provider must cost-reserve before network dispatch. */
     reserveAttempt(input: Readonly<{
       subjectId: string;
       threadId: string;
@@ -103,9 +104,7 @@ export interface FourCharacterProductionExecutionPortsV1 {
       sourceDigest: string;
       userText: string;
     }>): Promise<FourCharacterAtomicReservationV1>;
-    /** This DB transaction owns generated/validated persistence, cost
-     * settlement and secure receipt issuance. No response reveal is allowed.
-     */
+    /** This DB transaction owns generated/validated persistence and secure receipt issuance. Provider cost settlement must finish before this commit. No response reveal is allowed. */
     commitValidatedAndIssue(input: Readonly<{
       reservation: FourCharacterAtomicReservationV1;
       source: PublishedFourCharacterModelSourceV1;
@@ -186,6 +185,7 @@ function assertReservation(
       reservation.bundleId !== turn.pinnedBundleId) {
     throw new FourCharacterProductionExecutionHeldV1();
   }
+  requiredText(reservation.threadCharacterId, 256);
   requiredText(reservation.turnId, 256);
   requiredText(reservation.attemptId, 256);
   requiredText(reservation.costReservationId, 256);
@@ -267,14 +267,14 @@ export function createFourCharacterProductionChatExecutorV1(
         turn, source, generated,
       });
       if (validated.approved !== true ||
-          validated.characterId !== characterId) {
+          validated.characterId !== characterId ||
+          validated.bodyText !== generated.bodyText) {
         throw new FourCharacterProductionExecutionHeldV1();
       }
       requiredText(validated.bodyText, 8000);
       requiredText(validated.outputGuardVersion, 256);
       if (!Array.isArray(validated.groundingRefs) ||
-          validated.groundingRefs.some(ref =>
-            typeof ref !== 'string' || !ref.trim())) {
+          validated.groundingRefs.length !== 0) {
         throw new FourCharacterProductionExecutionHeldV1();
       }
       const receipt = await ports.transaction.commitValidatedAndIssue({
