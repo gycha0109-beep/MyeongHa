@@ -83,8 +83,8 @@ export class PurchaseIntentCreateAuthorityPortErrorV3 extends Error {
 export interface SajuPurchaseOriginInputV1 {
   readonly sajuRecordId: string;
   readonly birthRevisionId: string;
-  readonly purchaseKind: 'original' | 'upgrade';
-  readonly sourceReceiptIds: readonly string[];
+  readonly purchaseKind: 'original';
+  readonly sourceReceiptIds: readonly [];
 }
 
 export interface PurchaseIntentCreateAuthorityInputV3 {
@@ -167,14 +167,12 @@ function normalizeSajuPurchaseOriginV1(value: SajuPurchaseOriginInputV1): SajuPu
   const recordId=typeof value.sajuRecordId==='string'?value.sajuRecordId.toLowerCase():'';
   const birthId=typeof value.birthRevisionId==='string'?value.birthRevisionId.toLowerCase():'';
   if(!SERVER_UUID_V1.test(recordId)||!SERVER_UUID_V1.test(birthId)
-     ||(value.purchaseKind!=='original'&&value.purchaseKind!=='upgrade')
-     ||!Array.isArray(value.sourceReceiptIds)||value.sourceReceiptIds.length>13) {
+     ||value.purchaseKind!=='original'
+     ||!Array.isArray(value.sourceReceiptIds)||value.sourceReceiptIds.length!==0) {
     throw new ApiCommandError('INVALID_REQUEST','Saju purchase origin is invalid.');
   }
   const sources=value.sourceReceiptIds.map(x=>typeof x==='string'?x.toLowerCase():'');
-  if(sources.some(x=>!SERVER_UUID_V1.test(x))||new Set(sources).size!==sources.length
-     ||(value.purchaseKind==='original'&&sources.length!==0)
-     ||(value.purchaseKind==='upgrade'&&sources.length===0)) {
+  if(sources.some(x=>!SERVER_UUID_V1.test(x))||new Set(sources).size!==sources.length) {
     throw new ApiCommandError('INVALID_REQUEST','Saju upgrade Receipt sources are invalid.');
   }
   return Object.freeze({sajuRecordId:recordId,birthRevisionId:birthId,
