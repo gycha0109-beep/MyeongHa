@@ -14,7 +14,7 @@ fail(){ echo "::error title=Isolated product proof::$1" >&2; exit 1; }
 [[ "$(/usr/lib/postgresql/18/bin/pg_config --version)" == PostgreSQL\ 18.* ]] ||
   fail 'Actual local PostgreSQL18 is required.'
 for k in DATABASE_URL SUPABASE_URL SUPABASE_DB_PASSWORD SUPABASE_ACCESS_TOKEN \
-  SUPABASE_PROJECT_ID SUPABASE_SECRET_KEY SAJU_PRODUCTION_SERVICE_BEARER; do
+  SUPABASE_PROJECT_ID SUPABASE_SECRET_KEY SAJU_PRODUCTION_SERVICE_BEARER CLOUDFLARE_API_TOKEN CF_API_TOKEN; do
   [[ -z "$(printenv "$k" 2>/dev/null || true)" ]] || fail 'Production credential prohibited.'
 done
 for k in docker jq node git openssl curl; do command -v "$k" >/dev/null || fail 'Runtime missing.'; done
@@ -25,7 +25,7 @@ docker compose version >/dev/null || fail 'Docker Compose v2 missing.'
 experiment="${MH_OPS_REAL_PRODUCT_EXPERIMENT:-short}"
 export COMPOSE_PROFILES= MH_OPS_AUTH_JWT_EXP_SECONDS=300
 case "$experiment" in
-  short) ;;
+  short|workerd) ;;
   sustained|overlap) COMPOSE_PROFILES=sustained; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   saju_cpu) COMPOSE_PROFILES=sustained,cpu-pressure; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   *) fail 'Unknown isolated product experiment.' ;;
@@ -121,7 +121,7 @@ wait_saju_metrics(){
 }
 
 saju_image_id=''
-if [[ "$experiment" != short ]]; then
+if [[ "$experiment" != short && "$experiment" != workerd ]]; then
   services=(saju)
   if [[ "$experiment" == saju_cpu ]]; then services+=(saju-cpu-pressure); fi
   docker compose --project-name "$project" -f "$compose" up --detach "${services[@]}" >/dev/null ||
@@ -144,6 +144,12 @@ if [[ "$experiment" != short ]]; then
   fi
 fi
 
+if [[ "$experiment" == workerd ]]; then
+  npm install --prefix "$scratch/wrangler" --ignore-scripts --no-audit --no-fund --save-exact \
+    wrangler@4.152.0 >"$scratch/wrangler-install.log" 2>&1 || fail 'Pinned Wrangler installation failed.'
+  export MH_OPS_WORKERD_WRANGLER_ENTRY="$scratch/wrangler/node_modules/wrangler/bin/wrangler.js"
+fi
+
 cd "$GITHUB_WORKSPACE"
 export MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN="http://127.0.0.1:$MH_OPS_GOTRUE_PORT"
 export MH_OPS_REAL_SAJU_CHECKOUT="$saju"
@@ -154,7 +160,7 @@ if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.
   # The raw test output is deliberately private because it can contain
   # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
   # Report only recognized, controlled stage labels, never raw lines or paths.
-  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
+  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|workerd_runtime|workerd_requests|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
   if grep -Eq "$stage_pattern" "$scratch/vitest.log"; then
     stage="$(grep -oE "$stage_pattern" "$scratch/vitest.log" | tail -n 1)"
     echo "::error title=Isolated three-dependency failure stage::$stage" >&2
@@ -166,6 +172,21 @@ fi
 grep -F '1 passed' "$scratch/vitest.log" >/dev/null ||
   fail 'Exactly one real integrated test required.'
 [[ -s "$scratch/real-product.json" ]] || fail 'Actual private evidence not created.'
+if [[ "$experiment" == workerd ]]; then
+  jq -e --arg sha "$source_sha" '
+    .schema=="myeongha-ops-workerd-local-product-phase11-v1" and .status=="OBSERVED_ISOLATED_WORKERD_PRODUCT"
+    and .scope=="wrangler-local-loopback-go-true-pg18-and-pinned-saju" and .wranglerVersion=="4.152.0"
+    and (.workerdVersion | test("^[0-9.]+$")) and .sajuSourceSha==$sha and .memberCount==4
+    and .baseline.requested==12 and .baseline.concurrency==1 and .baseline.successful==12
+    and .baseline.unavailable==0 and .baseline.unexpected==0
+    and .baseline.p50Ms>=0 and .baseline.p95Ms>=.baseline.p50Ms and .baseline.p99Ms>=.baseline.p95Ms
+    and .actualGoTrueJwtVerified==true and .actualPostgres18Rls==true and .actualPinnedSajuProductionEngine==true
+    and .localWorkerdProductPathMeasured==true and .anonymousDenied==true and .healthUnaffected==true
+    and .runtimeCleanupVerified==true and .productionWorkerAdmissionMeasured==false and .hostedHyperdriveMeasured==false
+    and .productionCapacityProven==false and .productionScalingThresholdApproved==false
+    and .drReady==false and .serviceResumptionAllowed==false and .outputContainsIdentifiers==false
+  ' "$scratch/real-product.json" >/dev/null || fail 'Local workerd proof failed the isolated contract.'
+else
 jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
   .schema=="myeongha-ops-real-gotrue-pg18-saju-product-phase11-v1"
   and .status=="OBSERVED_ISOLATED_REAL_CHAIN"
@@ -214,6 +235,7 @@ jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
   and .drReady==false and .serviceResumptionAllowed==false
   and .outputContainsIdentifiers==false
 ' "$scratch/real-product.json" >/dev/null || fail 'Evidence failed strict isolated contract.'
+fi
 jq --arg main "$GITHUB_SHA" --arg image "$saju_image_id" '
   .githubMainSha=$main | if $image == "" then . else .cpuComparison.imageId=$image end
 ' "$scratch/real-product.json" >"$output" ||

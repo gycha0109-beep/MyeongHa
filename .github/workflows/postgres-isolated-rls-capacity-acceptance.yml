@@ -7,7 +7,7 @@ on:
       experiment:
         description: Isolated product-chain experiment
         type: choice
-        options: [short, sustained, overlap, saju_cpu]
+        options: [short, sustained, overlap, saju_cpu, workerd]
         default: short
 
 permissions:

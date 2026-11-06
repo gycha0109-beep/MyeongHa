@@ -15,6 +15,7 @@ import { handleCurrentSubjectSajuCalculationRequestV1 } from '../../apps/api/src
 import { SupabaseMemberIdentityEvidenceVerifierV1 } from '../../apps/api/src/supabase-member-identity-verifier.js';
 import { createSajuProductionCalculationHttpAdapterV1 } from '../../apps/api/src/saju-production-calculation-http-adapter.js';
 import { measureIsolatedProductWindow } from '../../scripts/operations/measure-isolated-product-window-phase11.mjs';
+import { startIsolatedWorkerdProduct } from '../../scripts/operations/start-isolated-workerd-product.mjs';
 
 const pgToolExec = promisify(execFileCallback);
 const BIN = process.env.PG_BIN_DIR;
@@ -75,6 +76,7 @@ async function startIsolatedPg18() {
       .rejects.toMatchObject({code:'42501'});
     return {
       pool:login,
+      port,
       // Real disposable GoTrue UUIDs are generated at test runtime and are never written to proofs.
       async bindRealMembers(members) {
         if (!Array.isArray(members) || members.length !== 4 ||
@@ -575,6 +577,7 @@ const overlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'overla
 const sustainedExperiment = overlapExperiment || process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'sustained';
 const cpuExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'saju_cpu';
 const constrainedSajuExperiment = sustainedExperiment || cpuExperiment;
+const workerdExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
     if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
@@ -602,6 +605,49 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT);
       }
       phase='api_setup';
+      if (workerdExperiment) {
+        phase='workerd_runtime';
+        const worker=await startIsolatedWorkerdProduct({
+          repoRoot:process.cwd(), wranglerEntry:process.env.MH_OPS_WORKERD_WRANGLER_ENTRY,
+          authOrigin:process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN, sajuOrigin:saju.origin, pgPort:database.port,
+        });
+        servers.push(worker);
+        phase='workerd_requests';
+        const tokens=members.map(member=>member.token);
+        const baseline=await measuredBatch(worker.origin,12,1,tokens);
+        expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
+        const denied=await fetch(worker.origin+'/api/me/saju/calculation',{
+          method:'POST',redirect:'error',signal:AbortSignal.timeout(3000),
+        });
+        expect(denied.status).toBe(401);
+        expect(denied.headers.get('cache-control')).toBe('no-store');
+        const health=await fetch(worker.origin+'/health',{redirect:'error',signal:AbortSignal.timeout(3000)});
+        expect(health.status).toBe(200);
+        await denied.arrayBuffer();
+        await health.arrayBuffer();
+        phase='runtime_cleanup';
+        await worker.close();
+        servers.pop();
+        await saju.close();
+        saju=undefined;
+        await database.close();
+        database=undefined;
+        phase='proof_write';
+        await writeFile(process.env.MH_OPS_REAL_PRODUCT_PROOF_PATH,JSON.stringify({
+          schema:'myeongha-ops-workerd-local-product-phase11-v1', status:'OBSERVED_ISOLATED_WORKERD_PRODUCT',
+          scope:'wrangler-local-loopback-go-true-pg18-and-pinned-saju',
+          wranglerVersion:worker.wranglerVersion, workerdVersion:worker.workerdVersion,
+          sajuSourceSha:'9807ce89c08afc61b587560d515a475efd819032',
+          memberCount:4, baseline, actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
+          actualPinnedSajuProductionEngine:true, localWorkerdProductPathMeasured:true,
+          anonymousDenied:true, healthUnaffected:true, runtimeCleanupVerified:true,
+          productionWorkerAdmissionMeasured:false, hostedHyperdriveMeasured:false,
+          productionCapacityProven:false, productionScalingThresholdApproved:false,
+          drReady:false, serviceResumptionAllowed:false, outputContainsIdentifiers:false,
+        }),{flag:'wx',mode:0o600});
+        phase='complete';
+        return;
+      }
       const state={
         dbActive:0,dbPeak:0,dbAcquisitions:0,
         dbAcquireFailures:0,apiActive:0,apiPeak:0,apiFourWayAdmissions:0,
