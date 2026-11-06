@@ -22,6 +22,8 @@ declare
  v_disjoint_product uuid:='1219c200-0000-4000-8000-000000000011'::uuid;
  v_disjoint_offer uuid:='1219c200-0000-4000-8000-000000000012'::uuid;
  v_disjoint_intent uuid:='1219c200-0000-4000-8000-000000000013'::uuid;
+ v_pending_product uuid:='11300000-0000-0000-0000-000000000001'::uuid;
+ v_pending_offer uuid:='1219c200-0000-4000-8000-000000000014'::uuid;
  v_subject uuid;
  v_source_revision uuid;
  v_receipt public.commerce_receipts%rowtype;
@@ -159,6 +161,21 @@ begin
      raise;
    end if;
  end;
+ -- The verified B2 Reader fixture has an intentionally non-Saju product key.
+ -- Use the existing disabled `standard.love_relationship` catalog Product for
+ -- all PENDING Saju collision cases instead of inventing a Reader->Saju field.
+ if (select product_key from public.products where id=v_pending_product)
+      is distinct from 'standard.love_relationship' then
+   raise exception 'SAJU_CATALOG_PENDING_TEST_PRODUCT_UNAVAILABLE';
+ end if;
+ insert into public.product_offers(
+  id,product_id,platform,provider,external_product_id,currency,
+  display_price_minor,enabled,created_at,capability_set_id
+ ) values(
+  v_pending_offer,v_pending_product,'web','portone_v2',
+  'synthetic-saju-pending-love-collision','KRW',9900,
+  false,clock_timestamp(),null
+ );
  -- New future purchase: exact Subject/Intent/Record/revision and the earlier
  -- original verified Receipt. No fabricated package-total credit is created.
  insert into public.purchase_intents(
@@ -168,14 +185,18 @@ begin
    expected_amount_minor,expected_currency,charge_terms_version,
    capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash
  )
- select v_upgrade_intent,pi.subject_id,pi.product_offer_id,
-   pi.provider_account_link_id,
+ select v_upgrade_intent,pi.subject_id,v_pending_offer,
+   null,
    'saju-ledger-pg17-upgrade','sha256:test:saju-ledger-pg17-upgrade',
-   pi.offer_snapshot_jsonb,pi.offer_snapshot_hash,
+   pg_catalog.jsonb_build_object(
+     'productOfferId',v_pending_offer::text,'productId',v_pending_product::text,
+     'platform','web','provider','portone_v2',
+     'externalProductId','synthetic-saju-pending-love-collision'),
+   'sha256:test:saju-pending-love-snapshot',
    'created',clock_timestamp()+interval '2 seconds',
    clock_timestamp()+interval '2 seconds',
-   pi.expected_amount_minor,pi.expected_currency,pi.charge_terms_version,
-   pi.capability_set_id,pi.capability_snapshot_jsonb,pi.capability_snapshot_hash
+   9900::bigint,'KRW','test-only-unapproved-charge-v1',
+   null,null,null
  from public.purchase_intents pi where pi.id=v_b2_purchase;
  insert into public.commerce_saju_purchase_origins_v1
   (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
@@ -208,7 +229,7 @@ begin
    clock_timestamp()+interval '3 seconds',
    pi.expected_amount_minor,pi.expected_currency,pi.charge_terms_version,
    pi.capability_set_id,pi.capability_snapshot_jsonb,pi.capability_snapshot_hash
- from public.purchase_intents pi where pi.id=v_b2_purchase;
+ from public.purchase_intents pi where pi.id=v_upgrade_intent;
  begin
    insert into public.commerce_saju_purchase_origins_v1
      (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
