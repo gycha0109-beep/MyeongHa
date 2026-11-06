@@ -16,6 +16,7 @@ const [policyText, dispositionText, graphText, decisions, drStatus] = await Prom
   readFile('docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json', 'utf8'),
   readFile('docs/P0_DECISION_REGISTER.md', 'utf8'),
   readFile('docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md', 'utf8'),
+  readFile('supabase/migrations/2330_saju_record_scoped_capability_authority_v1.sql', 'utf8'),
 ]);
 
 const policy = JSON.parse(policyText);
@@ -109,6 +110,57 @@ for (const entry of policy.commerceRetentionClasses) {
   if (entry.authorityReference !== authorityReference) {
     fail('Commerce class authority drifted: ' + entry.classKey);
   }
+}
+
+const expectedPostApprovalCommerceExtensions = [
+  {
+    table: 'commerce_saju_verified_refund_effects_v1',
+    classKey: 'commerce_verified_provider_evidence',
+    disposition: 'RETAIN',
+    retentionPeriod: 'P5Y',
+    authorityReference,
+    reason:
+      'Immutable verified refund-effect evidence introduced by migration 2330; it is derived from retained Receipt/Provider Event facts and follows the existing P5Y financial-evidence retention class.',
+  },
+];
+if (!sameJson(policy.postApprovalCommerceExtensions, expectedPostApprovalCommerceExtensions)) {
+  fail('post-approval Saju verified-refund retention extension drifted');
+}
+const supplementalRefundTable = expectedPostApprovalCommerceExtensions[0].table;
+if (disposition.tableDispositions.some((entry) => entry.table === supplementalRefundTable)) {
+  fail('supplemental refund evidence must remain outside the historical 59-table graph fingerprint');
+}
+const retainedCommerceTables = new Set([
+  ...policy.commerceRetentionClasses.flatMap((entry) => entry.tables),
+  ...expectedPostApprovalCommerceExtensions.map((entry) => entry.table),
+]);
+for (const personalTable of [
+  'commerce_saju_records_v1',
+  'commerce_saju_purchase_origins_v1',
+  'commerce_saju_upgrade_receipt_links_v1',
+  'commerce_saju_purchase_admission_context_v1',
+]) {
+  if (retainedCommerceTables.has(personalTable)) {
+    fail('personal or transaction-local Saju table must not be retained as financial evidence: ' + personalTable);
+  }
+}
+for (const table of [
+  'commerce_saju_records_v1',
+  'commerce_saju_purchase_origins_v1',
+  'commerce_saju_upgrade_receipt_links_v1',
+]) {
+  if (!new RegExp('delete\\s+from\\s+public\\.' + table + '\\b', 'i').test(sajuMigrationText)) {
+    fail('account finalizer must delete personal Saju mapping: ' + table);
+  }
+}
+if (!/delete\\s+from\\s+public\\.commerce_saju_purchase_admission_context_v1\\b/i.test(sajuMigrationText)) {
+  fail('Saju admission context must be cleared at transaction end');
+}
+if (/delete\\s+from\\s+public\\.commerce_saju_verified_refund_effects_v1/i.test(sajuMigrationText)) {
+  fail('verified Saju refund-effect evidence must remain retained');
+}
+if (!sajuMigrationText.includes('create trigger tr_commerce_saju_refund_immutable_v1')) {
+  fail('verified Saju refund-effect ledger immutability guard is missing');
 }
 
 if (disposition.graphRef.fingerprintSha256 !== expectedGraphFingerprint) {
@@ -211,5 +263,5 @@ for (const fragment of [
 }
 
 console.log(
-  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, 59/59 tables map to DELETE 46 / ANONYMIZE 4 / RETAIN 9, 37 mixed FK edges are explicitly planned, retained Commerce uses calendar P5Y, component policy artifacts remain non-promoting, current bounded Production reconciliation evidence is tracked separately, and DR Ready remains false.',
+  'Approved account deletion policy PASS: P0-PR-01 is DECIDED, the historical 59-table graph remains DELETE 46 / ANONYMIZE 4 / RETAIN 9, the supplemental immutable Saju verified-refund ledger inherits P5Y, personal Saju Record/Origin/upgrade mappings are deleted, transaction-local admission context is cleared, 37 mixed FK edges remain explicit, and DR Ready remains false.',
 );
