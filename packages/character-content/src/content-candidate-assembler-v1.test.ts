@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CharacterContentCandidateAssemblyError,
   assembleCharacterContentBundleCandidateV1,
+  assembleCharacterPublicationLaneCandidateV1,
   type CharacterCanonCompletionV1,
   type CharacterContentBundleCandidateInputV1,
+  type CharacterPublicationLaneCandidateInputV1,
   type CharacterPublicationMaterialInputV1,
 } from './content-candidate-assembler-v1.js';
 import {
@@ -12,6 +14,7 @@ import {
   CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS,
 } from './immutable-authoring-v1.js';
 import { CHARACTER_RUNTIME_AUTHORING_V1 } from './runtime-authoring-v1.js';
+import { validateProductionCharacterPublicationLaneBundleV1 } from './production-character-lane-v1.js';
 
 const canonCompletions: readonly CharacterCanonCompletionV1[] =
   CHARACTER_IMMUTABLE_AUTHORING_V1_CHARACTER_IDS.map((characterId) => ({
@@ -144,5 +147,88 @@ describe('Character content candidate assembler v1', () => {
       fixtureInput({ canonCompletions: duplicate }),
       'CANON_COMPLETION_ROSTER_MISMATCH',
     );
+  });
+});
+
+
+describe('independent Character publication-lane candidate assembler v1', () => {
+  const targetIds = ['baekheon', 'yeoul', 'rahyeon', 'taegyeom'] as const;
+
+  function laneInput(
+    characterId: (typeof targetIds)[number],
+    overrides: Partial<CharacterPublicationLaneCandidateInputV1> = {},
+  ): CharacterPublicationLaneCandidateInputV1 {
+    const canonCompletion = canonCompletions.find(
+      (entry) => entry.characterId === characterId,
+    );
+    const publicationMaterial = publicationMaterials.find(
+      (entry) => entry.characterId === characterId,
+    );
+    if (canonCompletion === undefined || publicationMaterial === undefined) {
+      throw new Error('lane fixtures are required');
+    }
+    return {
+      characterId,
+      metadata: {
+        ...fixtureInput().metadata,
+        bundleId: `fixture-${characterId}-lane-v1`,
+        contentVersion: `fixture-${characterId}-content-v1`,
+      },
+      canonCompletion,
+      publicationMaterial,
+      ...overrides,
+    };
+  }
+
+  it.each(targetIds)(
+    'assembles %s alone from its exact immutable/runtime source and explicit completion',
+    (characterId) => {
+      const candidate = assembleCharacterPublicationLaneCandidateV1(
+        laneInput(characterId),
+      );
+      expect(candidate.characters).toHaveLength(1);
+      expect(candidate.characters[0]?.characterId).toBe(characterId);
+      expect(candidate.bundleId).toBe(`fixture-${characterId}-lane-v1`);
+      expect(candidate.contentVersion).toBe(`fixture-${characterId}-content-v1`);
+      expect(
+        validateProductionCharacterPublicationLaneBundleV1(candidate),
+      ).toBe(candidate);
+    },
+  );
+
+  it('does not allow another Character canon to be attached to the selected lane', () => {
+    const wrongCanon = canonCompletions.find(
+      (entry) => entry.characterId === 'seyeon',
+    );
+    if (wrongCanon === undefined) throw new Error('wrong-canon fixture is required');
+    expect(() => assembleCharacterPublicationLaneCandidateV1(
+      laneInput('baekheon', { canonCompletion: wrongCanon }),
+    )).toThrow('Lane canon completion must belong to the selected Character.');
+  });
+
+  it('does not allow another Character renderer material to be attached to the selected lane', () => {
+    const wrongMaterial = publicationMaterials.find(
+      (entry) => entry.characterId === 'seyeon',
+    );
+    if (wrongMaterial === undefined) throw new Error('wrong-material fixture is required');
+    expect(() => assembleCharacterPublicationLaneCandidateV1(
+      laneInput('yeoul', { publicationMaterial: wrongMaterial }),
+    )).toThrow('Lane publication material must belong to the selected Character.');
+  });
+
+  it('keeps the one-Character candidate non-publishing and fails validation when required material is absent', () => {
+    const candidate = assembleCharacterPublicationLaneCandidateV1(
+      laneInput('rahyeon', {
+        publicationMaterial: {
+          characterId: 'rahyeon',
+          assetRefs: [],
+          emotionIds: [],
+          animationCueIds: [],
+        },
+      }),
+    );
+    expect(candidate.characters).toHaveLength(1);
+    expect(() => validateProductionCharacterPublicationLaneBundleV1(candidate))
+      .toThrow();
   });
 });
