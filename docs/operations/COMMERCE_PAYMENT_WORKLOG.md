@@ -650,3 +650,11 @@
 - **수정:** Record 출생정보 변경 차단 및 Receipt 검증 이후 revision 재확인 조건을 `environment='production'`인 실제 확인 영수증(원본 `verified_at` 존재)으로 제한했습니다. 최초 Intent→Record 연결 시점의 같은 Subject/정확한 Birth revision 검사는 유지합니다. 이미 확인된 Production 구매의 Record 고정, 업그레이드 원본/환불 금액 검증은 변경하지 않습니다.
 - **격리 증거:** 기존 실제 PostgreSQL 17 원장 테스트에 같은 Record에 결속된 `sandbox` verified Receipt를 만든 뒤 Birth revision 변경·복원을 허용하고, 이어서 본래 `production` verified Receipt를 결속하면 변경이 거부되는 경계를 추가했습니다. 모든 후보 SQL과 fixture는 격리 DB의 `BEGIN…ROLLBACK` 내부에서만 실행합니다. **신규 고정 HEAD 통합 CI 통과 전 PASS 미선언**입니다.
 - **남은 경계:** 새 사주 Product 필드에 대한 공식 Record-scoped Grant/Capability 매핑, 실제 생산자에 의한 권한 read, 결제 직전 원자적 재검증, privacy graph 및 비운영 전체 E2E는 아직 완료되지 않았습니다. 운영 migration, 소비자 API, 실제 결제·환불·LIVE는 변경하지 않습니다.
+
+### 2026-11-06 — 사주 Record별 실제 유효 Grant 증거를 내부 차액 견적에 연결 (P2/P3)
+
+- **선행 검증:** #3064의 고정 HEAD `f6071ca` 일반/전체 통합 CI 성공, main 병합 `a764c99` 확인. 샌드박스 Receipt는 Record 출생정보 유료 잠금에 사용하지 않습니다.
+- **구현:** 신규 비공개 `quoteSajuWithStoredCurrentGrantsV1`은 호출자가 임의의 `ownedFields`를 주입할 수 없도록, 앞서 구현한 한 번의 `REPEATABLE READ READ ONLY` DB 거래 안에서 `CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1`를 고정합니다. DB 조회는 현재 Saju Record/Subject/Birth revision → Purchase Intent → 실제 Production Verified Receipt → 고정된 Product Capability Set·정확한 Item → 같은 Receipt가 발행한 Active Entitlement Grant → Active 유효 권한 집계를 한 번에 대조합니다. 원본 영수증·검증된 환불 합계·미정산 취소 원장 조회는 기존 코드에서 동일 스냅샷으로 이어집니다.
+- **거부:** 현재 유효 Grant가 없으면 구매 Product만 보고 분야권한을 만들지 않습니다. 타 Subject/Record/revision, 상품에 없는 필드, 임의 권한, 동일 Grant 중복, 같은 Receipt·필드 중복, 실제 환불 또는 미정산 취소에 걸린 권한 증거를 차단합니다. 결과는 계속 `checkoutAuthorized:false`이며 권한 발급/회수/결제 없이 내부 계산에만 사용됩니다.
+- **테스트:** 정확한 Grant 1개로 직업 9,900원 인정 → 커리어·경제 추가 15,000원, 분야 권한 없는 결제의 불인정, 서로 다른 필드 Grant, 잘못된/중복된 권한/환불·취소 증거의 트랜잭션 롤백 및 실제 읽기 전용 DB 조회 계약을 검사합니다. **새 HEAD의 CI 통과 전 검증 완료를 선언하지 않습니다.**
+- **미완료:** 새 사주 상품/분야에 대한 운영 Product Capability·Grant 발행 계약/별도 Saju Record 접근 제어는 아직 배포·승인되지 않았습니다. 이 조회기는 이미 일치하는 활성 Grant가 DB에 있을 때에만 분야 소유를 입증하는 **비배포 후보**이고, 고유한 user-owned Record 권한 scope를 새로 발급하지 않습니다. 실제 Merchant/Offer·Checkout·Production DB migration·개인정보 처리·LIVE 활성화는 없습니다.
