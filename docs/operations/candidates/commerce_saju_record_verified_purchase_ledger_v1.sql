@@ -48,7 +48,7 @@ create index commerce_saju_purchase_origins_record_idx
 -- Birth revision edits; it does not authorize checkout or payment completion.
 create or replace function public.tr_commerce_saju_origin_revision_lock_v1()
 returns trigger language plpgsql security invoker
-set search_path = pg_catalog, public as $
+set search_path = pg_catalog, public as $saju_origin_lock$
 declare
   v_record_birth_revision uuid;
 begin
@@ -62,7 +62,7 @@ begin
   end if;
   return new;
 end;
-$;
+$saju_origin_lock$;
 create trigger tr_commerce_saju_origin_revision_lock_v1
  before insert on public.commerce_saju_purchase_origins_v1
  for each row execute function public.tr_commerce_saju_origin_revision_lock_v1();
@@ -73,7 +73,7 @@ create trigger tr_commerce_saju_origin_revision_lock_v1
 -- Ordinary non-Saju/Reader Receipts have no Saju origin and are untouched.
 create or replace function public.tr_commerce_saju_verified_receipt_revision_lock_v1()
 returns trigger language plpgsql security invoker
-set search_path = pg_catalog, public as $
+set search_path = pg_catalog, public as $saju_receipt_lock$
 declare
   v_origin public.commerce_saju_purchase_origins_v1%rowtype;
   v_record_birth_revision uuid;
@@ -98,7 +98,7 @@ begin
   end if;
   return new;
 end;
-$;
+$saju_receipt_lock$;
 create trigger tr_commerce_saju_verified_receipt_revision_lock_v1
  before insert or update of verification_status on public.commerce_receipts
  for each row execute function public.tr_commerce_saju_verified_receipt_revision_lock_v1();
