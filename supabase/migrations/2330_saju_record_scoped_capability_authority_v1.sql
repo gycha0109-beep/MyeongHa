@@ -510,6 +510,7 @@ declare
   v_entitlement_key text;
   v_scope_key text;
   v_scope_mode text;
+  v_product_key text;
   v_scope_key_norm text;
   v_grant_key text;
   v_next_ordering_key text;
@@ -613,6 +614,7 @@ begin
            po.product_id, pcs.product_id, pcs.definition_version, pcs.definition_hash,
            pci.entitlement_key,
            pci.scope_mode,
+           product.product_key,
            case
              when pci.scope_mode='global' then null
              when pci.scope_mode='fixed' then pci.fixed_scope_key
@@ -638,7 +640,7 @@ begin
       into v_capability_set_id, v_capability_snapshot, v_capability_snapshot_hash,
            v_offer_product_id, v_capability_product_id,
            v_capability_definition_version, v_capability_definition_hash,
-           v_entitlement_key, v_scope_mode, v_scope_key
+           v_entitlement_key, v_scope_mode, v_product_key, v_scope_key
     from public.purchase_intents pi
     join public.product_offers po on po.id = pi.product_offer_id
     join public.products product on product.id=po.product_id
@@ -661,7 +663,25 @@ begin
          'definitionVersion', v_capability_definition_version,
          'definitionHash', v_capability_definition_hash
        )
-       or (v_scope_mode='saju_record' and v_scope_key is null) then
+       or (v_scope_mode='saju_record' and v_scope_key is null)
+       or (
+         v_product_key in (
+           'standard.career','standard.wealth','standard.love_relationship',
+           'standard.business','standard.family','standard.spouse',
+           'standard.year','standard.month','standard.compatibility',
+           'standard.current_concern','bundle.career_economy',
+           'bundle.love_relationship','bundle.full_saju'
+         ) and v_scope_mode<>'saju_record'
+       )
+       or (
+         coalesce(v_product_key not in (
+           'standard.career','standard.wealth','standard.love_relationship',
+           'standard.business','standard.family','standard.spouse',
+           'standard.year','standard.month','standard.compatibility',
+           'standard.current_concern','bundle.career_economy',
+           'bundle.love_relationship','bundle.full_saju'
+         ),true) and v_scope_mode='saju_record'
+       ) then
       raise exception using errcode = 'P0001',
         constraint = 'internal_entitlement_effect_capability_authority_unavailable',
         message = 'pinned Product Capability authority is unavailable or inconsistent';
@@ -1487,5 +1507,213 @@ end;
 $account_finalizer$;
 
 revoke all on function public.internal_finalize_account_deletion_db_v1(uuid,uuid,text) from public;
+
+
+-- One atomic server-owned admission: Record lock -> validated Offer/Capability ->
+-- existing Purchase Intent v3 command -> immutable Origin -> exact upgrade links.
+-- This does not contact a provider or authorize a charge.
+create or replace function public.cmd_create_saju_purchase_intent_v1(
+  p_subject_id uuid,
+  p_purchase_intent_id uuid,
+  p_saju_record_id uuid,
+  p_birth_revision_id uuid,
+  p_product_offer_id uuid,
+  p_provider_account_link_id uuid,
+  p_idempotency_key text,
+  p_request_hash text,
+  p_offer_snapshot_jsonb jsonb,
+  p_offer_snapshot_hash text,
+  p_capability_snapshot_jsonb jsonb,
+  p_capability_snapshot_hash text,
+  p_purchase_kind text,
+  p_source_receipt_ids uuid[]
+)
+returns table (
+  purchase_intent_id uuid,
+  product_offer_id uuid,
+  provider_account_link_id uuid,
+  status text,
+  offer_snapshot_jsonb jsonb,
+  offer_snapshot_hash text,
+  expected_amount_minor bigint,
+  expected_currency text,
+  charge_terms_version text,
+  capability_set_id uuid,
+  capability_snapshot_jsonb jsonb,
+  capability_snapshot_hash text,
+  saju_record_id uuid,
+  birth_revision_id uuid,
+  replayed boolean
+)
+language plpgsql
+security definer
+set search_path=pg_catalog,public
+as $saju_admission$
+declare
+  v_record public.commerce_saju_records_v1%rowtype;
+  v_intent record;
+  v_origin public.commerce_saju_purchase_origins_v1%rowtype;
+  v_product_key text;
+  v_offer_capability_set_id uuid;
+  v_item_count integer;
+  v_saju_scope_item_count integer;
+  v_source_ids uuid[]:=coalesce(p_source_receipt_ids,array[]::uuid[]);
+  v_existing_link_count integer;
+begin
+  if p_subject_id is null or p_purchase_intent_id is null
+     or p_saju_record_id is null or p_birth_revision_id is null
+     or p_product_offer_id is null then
+    raise exception using errcode='23514',
+      constraint='cmd_saju_purchase_admission_ids_required',
+      message='Subject, Purchase Intent, Saju Record, Birth revision and Offer are required';
+  end if;
+  if pg_catalog.current_setting('transaction_isolation')<>'read committed' then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_requires_read_committed',
+      message='Saju purchase admission requires READ COMMITTED';
+  end if;
+  if p_purchase_kind not in ('original','upgrade') then
+    raise exception using errcode='23514',
+      constraint='cmd_saju_purchase_admission_kind_invalid',
+      message='Saju purchase kind must be original or upgrade';
+  end if;
+  if coalesce(array_ndims(v_source_ids),0) not in (0,1)
+     or (cardinality(v_source_ids)>0 and coalesce(array_lower(v_source_ids,1),0)<>1)
+     or array_position(v_source_ids,null) is not null
+     or (select count(distinct x)::integer from unnest(v_source_ids) x)<>cardinality(v_source_ids) then
+    raise exception using errcode='23514',
+      constraint='cmd_saju_purchase_admission_source_shape_invalid',
+      message='Upgrade source Receipts must be a unique one-dimensional UUID list';
+  end if;
+  if (p_purchase_kind='original' and cardinality(v_source_ids)<>0)
+     or (p_purchase_kind='upgrade' and cardinality(v_source_ids)=0) then
+    raise exception using errcode='23514',
+      constraint='cmd_saju_purchase_admission_source_kind_mismatch',
+      message='Original purchases have no credit sources; upgrades require exact prior Receipts';
+  end if;
+
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+
+  select r.* into v_record
+  from public.commerce_saju_records_v1 r
+  where r.id=p_saju_record_id and r.subject_id=p_subject_id
+  for update;
+  if not found or v_record.birth_revision_id is distinct from p_birth_revision_id then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_record_unavailable',
+      message='Saju Record is unavailable or its Birth revision is stale';
+  end if;
+
+  select product.product_key,offer.capability_set_id
+    into v_product_key,v_offer_capability_set_id
+  from public.product_offers offer
+  join public.products product on product.id=offer.product_id
+  where offer.id=p_product_offer_id;
+  if not found or v_product_key not in (
+    'standard.career','standard.wealth','standard.love_relationship',
+    'standard.business','standard.family','standard.spouse',
+    'standard.year','standard.month','standard.compatibility',
+    'standard.current_concern','bundle.career_economy',
+    'bundle.love_relationship','bundle.full_saju'
+  ) or v_offer_capability_set_id is null then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_product_unavailable',
+      message='Offer is not an approved Saju Product with a pinned Capability Set';
+  end if;
+  select count(*)::integer,
+         count(*) filter(where pci.scope_mode='saju_record'
+                           and pci.fixed_scope_key is null)::integer
+    into v_item_count,v_saju_scope_item_count
+  from public.product_capability_items pci
+  where pci.capability_set_id=v_offer_capability_set_id;
+  if v_item_count<=0 or v_item_count<>v_saju_scope_item_count then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_capability_scope_invalid',
+      message='Every Saju Capability Item must be scoped to the selected Saju Record';
+  end if;
+
+  select * into strict v_intent
+  from public.cmd_create_purchase_intent_v3(
+    p_subject_id,p_purchase_intent_id,p_product_offer_id,
+    p_provider_account_link_id,p_idempotency_key,p_request_hash,
+    p_offer_snapshot_jsonb,p_offer_snapshot_hash,
+    p_capability_snapshot_jsonb,p_capability_snapshot_hash
+  );
+  if v_intent.product_offer_id is distinct from p_product_offer_id
+     or v_intent.capability_set_id is distinct from v_offer_capability_set_id
+     or v_intent.status not in ('created','pending','verified','cancelled','expired','refunded') then
+    raise exception using errcode='P0001',
+      constraint='cmd_saju_purchase_admission_intent_mismatch',
+      message='Purchase Intent does not preserve the selected Saju Offer authority';
+  end if;
+
+  if v_intent.replayed then
+    select origin.* into v_origin
+    from public.commerce_saju_purchase_origins_v1 origin
+    where origin.purchase_intent_id=v_intent.purchase_intent_id
+    for update;
+    if not found
+       or v_origin.subject_id is distinct from p_subject_id
+       or v_origin.saju_record_id is distinct from p_saju_record_id
+       or v_origin.birth_revision_id is distinct from p_birth_revision_id
+       or v_origin.purchase_kind is distinct from p_purchase_kind then
+      raise exception using errcode='23505',
+        constraint='cmd_saju_purchase_admission_replay_origin_conflict',
+        message='Idempotent replay cannot retarget a Purchase Intent to another Saju Record';
+    end if;
+  else
+    if v_intent.status not in ('created','pending') then
+      raise exception using errcode='P0001',
+        constraint='cmd_saju_purchase_admission_new_intent_not_pending',
+        message='A new Saju Purchase Intent must remain unresolved before provider handoff';
+    end if;
+    insert into public.commerce_saju_purchase_origins_v1(
+      purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
+    ) values (
+      v_intent.purchase_intent_id,p_subject_id,p_saju_record_id,
+      p_birth_revision_id,p_purchase_kind
+    );
+  end if;
+
+  if v_intent.replayed then
+    select count(*)::integer into v_existing_link_count
+    from public.commerce_saju_upgrade_receipt_links_v1 link
+    where link.child_purchase_intent_id=v_intent.purchase_intent_id;
+    if v_existing_link_count<>cardinality(v_source_ids)
+       or exists (
+         select 1 from public.commerce_saju_upgrade_receipt_links_v1 link
+         where link.child_purchase_intent_id=v_intent.purchase_intent_id
+           and not (link.source_receipt_id=any(v_source_ids))
+       ) then
+      raise exception using errcode='23505',
+        constraint='cmd_saju_purchase_admission_replay_credit_conflict',
+        message='Idempotent replay cannot change its original upgrade Receipt sources';
+    end if;
+  else
+    insert into public.commerce_saju_upgrade_receipt_links_v1(
+      child_purchase_intent_id,source_receipt_id
+    )
+    select v_intent.purchase_intent_id,source_id
+    from unnest(v_source_ids) source_id;
+  end if;
+
+  return query select
+    v_intent.purchase_intent_id,v_intent.product_offer_id,
+    v_intent.provider_account_link_id,v_intent.status,
+    v_intent.offer_snapshot_jsonb,v_intent.offer_snapshot_hash,
+    v_intent.expected_amount_minor,v_intent.expected_currency,
+    v_intent.charge_terms_version,v_intent.capability_set_id,
+    v_intent.capability_snapshot_jsonb,v_intent.capability_snapshot_hash,
+    p_saju_record_id,p_birth_revision_id,v_intent.replayed;
+end;
+$saju_admission$;
+
+revoke all on function public.cmd_create_saju_purchase_intent_v1(
+  uuid,uuid,uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,text,uuid[]
+) from public,anon,authenticated,service_role;
+grant execute on function public.cmd_create_saju_purchase_intent_v1(
+  uuid,uuid,uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,text,uuid[]
+) to myeongha_api_executor;
+
 
 commit;
