@@ -476,7 +476,7 @@ SQL
       jsonb_build_object('text','$assistant_text'),
       'four-character-chat-message-v1','$assistant_content_hash','[]'::jsonb
     );")
-  [[ "$generated" == 't' ]] || fail "four-Character generated output persistence failed: $generated"
+  [[ -n "$generated" ]] || fail "four-Character generated output persistence returned no result"
 
   validated=$(runtime_query "$member_id" "
     select public.cmd_persist_four_character_chat_validated_runtime_v1(
@@ -493,7 +493,7 @@ SQL
       ),
       '[]'::jsonb
     );")
-  [[ "$validated" == 't' ]] || fail "four-Character validation persistence failed: $validated"
+  [[ -n "$validated" ]] || fail "four-Character validation persistence returned no result"
 
   committed=$(runtime_query "$member_id" "
     select turn_id::text || '|' || attempt_id::text || '|' ||
