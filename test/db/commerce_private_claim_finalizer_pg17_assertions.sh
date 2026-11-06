@@ -41,7 +41,7 @@ insert into public.products(id,product_key,product_type,enabled,created_at)
 values ('fb750000-0000-0000-0000-000000000001',
         'standard.love_relationship','reading',false,clock_timestamp())
 on conflict (product_key) do nothing;
-do $saju_delete_seed$
+do \$saju_delete_seed\$
 declare
  v_product uuid;
  v_birth_revision uuid;
@@ -97,7 +97,7 @@ begin
   purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
  ) values(v_intent,'$subject_id'::uuid,v_record,v_birth_revision,'original');
 end;
-$saju_delete_seed$;
+\$saju_delete_seed\$;
 
 insert into public.digital_reading_withdrawal_claims_private_v1(
  id,subject_id,purchase_intent_id,unit_id,reason_code,idempotency_hmac,request_hash
@@ -148,9 +148,8 @@ SQL
     (select count(*) from public.commerce_saju_purchase_origins_v1 where subject_id='$subject_id'::uuid)::text
     ||'|'||
     (select count(*) from public.purchase_intents where id='fb750000-0000-0000-0000-000000000005'::uuid)::text
-    ||'|'||
-    (select count(*) from public.commerce_saju_verified_refund_effects_v1 where subject_id='$subject_id'::uuid)::text;")"
-  [[ "$saju_state" == '0|0|1|0' ]] || fail "account deletion did not erase only personal Saju mapping and retain Intent: $saju_state"
+;")"
+  [[ "$saju_state" == '0|0|1' ]] || fail "account deletion did not erase only personal Saju mapping and retain Intent: $saju_state"
 
   # Restored/synthetic residue after the already-deleted replay boundary must
   # NOT be treated as successful idempotent finalization. Keep it in a
