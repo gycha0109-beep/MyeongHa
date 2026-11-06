@@ -2838,6 +2838,123 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       });
       expect(await readHistoricalCostFence()).toEqual(originalCostFence);
       expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
+      // W111 G4/G5: simulate loss of an in-flight governed admission
+      // while it holds NO budget reservation yet. A separate operator
+      // backend locks the real UTC budget row; a different restricted
+      // member backend must block ON THAT ROW before it is canceled.
+      // Only this synthetic disposable database gets a temporary budget.
+      const {rows:[budgetBeforeAbort]}=await pool.query<{
+        bucket_utc_date:string;occupied_micro_usd:string
+      }>(`select bucket_utc_date::text,occupied_micro_usd::text
+        from public.seyeon_ai_governor_daily_budgets_v1
+        where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date`);
+      const {rows:[createdBudget]}=await pool.query<{
+        bucket_utc_date:string
+      }>(`insert into public.seyeon_ai_governor_daily_budgets_v1(
+          bucket_utc_date,global_limit_micro_usd,subject_limit_micro_usd)
+        values ((clock_timestamp() at time zone 'UTC')::date,100000,100000)
+        on conflict (bucket_utc_date) do nothing
+        returning bucket_utc_date::text`);
+      const insertedBudget=createdBudget!==undefined;
+      const interruptedCallId=uuid(40,218);
+      let governedBlocked=false;
+      let interruptedResult:{ok:true;value:unknown}|
+        {ok:false;error:unknown}|undefined;
+      try{
+        const budgetLocker=await pool.connect();
+        const interruptedClient=await pool.connect();
+        let pendingAdmission:Promise<{ok:true;value:unknown}|
+          {ok:false;error:unknown}>|undefined;
+        let interruptedPid:number|undefined;
+        try{
+          await budgetLocker.query('BEGIN');
+          const {rows:[locker]}=await budgetLocker.query<{pid:number}>(`
+            select pg_backend_pid() as pid`);
+          await budgetLocker.query(`
+            update public.seyeon_ai_governor_daily_budgets_v1
+            set occupied_micro_usd=occupied_micro_usd
+            where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date`);
+          await interruptedClient.query('BEGIN');
+          await interruptedClient.query(
+            'SET LOCAL ROLE myeongha_seyeon_governed_executor',
+          );
+          await interruptedClient.query(
+            "select set_config('myeongha.subject_id',$1,true)",[f.subject],
+          );
+          await interruptedClient.query("SET LOCAL statement_timeout='4000ms'");
+          const {rows:[interruptedBackend]}=await interruptedClient.query<{
+            pid:number
+          }>('select pg_backend_pid() as pid');
+          interruptedPid=interruptedBackend?.pid;
+          expect(locker?.pid).toBeGreaterThan(0);
+          expect(interruptedPid).toBeGreaterThan(0);
+          expect(interruptedPid).not.toBe(locker?.pid);
+          pendingAdmission=interruptedClient.query(`
+            select * from public.cmd_governed_start_seyeon_ai_call_v1(
+              $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+              $6::text,$7::text,$8::text,$9::text,$10::text,
+              $11::bigint,$12::bigint,$13::bigint)`,[
+            f.subject,currentTurn,currentAttempt,'chat',interruptedCallId,
+            'dialogue_render','s0-unapproved-provider','s0-unapproved-model',
+            's0-unapproved-policy','s0-unapproved-rate',100,256,1024,
+          ]).then(value=>({ok:true as const,value}),
+            (error:unknown)=>({ok:false as const,error}));
+          for(let tries=0;tries<90;tries++){
+            const {rows:[waiting]}=await pool.query<{blocked:boolean}>(`
+              select $1::int=any(pg_catalog.pg_blocking_pids($2::int))
+                as blocked`,[locker!.pid,interruptedPid]);
+            if(waiting?.blocked){governedBlocked=true;break;}
+            await new Promise(resolve=>setTimeout(resolve,10));
+          }
+          expect(governedBlocked).toBe(true);
+          const {rows:[cancelled]}=await pool.query<{cancelled:boolean}>(`
+            select pg_catalog.pg_cancel_backend($1::int) as cancelled`,
+            [interruptedPid]);
+          expect(cancelled?.cancelled).toBe(true);
+          interruptedResult=await pendingAdmission;
+          expect(interruptedResult.ok).toBe(false);
+          if(interruptedResult.ok===false)
+            expect(interruptedResult.error).toMatchObject({code:'57014'});
+        }finally{
+          if(pendingAdmission && !interruptedResult && interruptedPid)
+            await pool.query(
+              'select pg_catalog.pg_cancel_backend($1::int)',
+              [interruptedPid],
+            ).catch(()=>undefined);
+          await budgetLocker.query('ROLLBACK').catch(()=>undefined);
+          budgetLocker.release();
+          if(pendingAdmission && !interruptedResult)
+            interruptedResult=await pendingAdmission;
+          await interruptedClient.query('ROLLBACK').catch(()=>undefined);
+          interruptedClient.release();
+        }
+        expect(governedBlocked).toBe(true);
+        expect(interruptedResult).toMatchObject({
+          ok:false,error:{code:'57014'},
+        });
+        const {rows:[costAfterAbort]}=await pool.query<{
+          events:number;reserved:number
+        }>(`select count(*)::int as events,
+          count(*) filter(where governor_bucket_utc_date is not null)::int
+            as reserved
+          from public.seyeon_ai_call_cost_events
+          where call_id=$1::uuid`,[interruptedCallId]);
+        expect(costAfterAbort).toEqual({events:0,reserved:0});
+        const {rows:[budgetAfterAbort]}=await pool.query<{
+          bucket_utc_date:string;occupied_micro_usd:string
+        }>(`select bucket_utc_date::text,occupied_micro_usd::text
+          from public.seyeon_ai_governor_daily_budgets_v1
+          where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date`);
+        expect(budgetAfterAbort?.occupied_micro_usd).toBe(
+          budgetBeforeAbort?.occupied_micro_usd??'0',
+        );
+      }finally{
+        if(insertedBudget)
+          await pool.query(`delete from public.seyeon_ai_governor_daily_budgets_v1
+            where bucket_utc_date=$1::date`,[createdBudget!.bucket_utc_date]);
+      }
+      expect(await readHistoricalCostFence()).toEqual(originalCostFence);
+      expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
       // W98 G5 Reader/Se-yeon cross-product isolation: the actual
       // production Reader ordinary-history port must remain scoped to the
       // VERIFIED member and exact Thread. Even a successful own-Thread
