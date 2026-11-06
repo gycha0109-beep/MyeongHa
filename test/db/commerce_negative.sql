@@ -74,18 +74,18 @@ select pg_temp.assert_fails(
 
 select pg_temp.assert_fails(
   'active Guest cannot create a paid Purchase Intent',
-  $insert into public.purchase_intents(
+  $$insert into public.purchase_intents(
     id, subject_id, product_offer_id, idempotency_key, request_hash,
     offer_snapshot_jsonb, offer_snapshot_hash, status, created_at, updated_at
   ) values (
     '81300000-0000-0000-0000-000000000003', '80000000-0000-0000-0000-000000000003',
     '81100000-0000-0000-0000-000000000001', 'guest-buy', 'hmac-sha256:k2:req-guest',
     '{}', 'sha256:v1:snap-guest', 'created', now(), now()
-  )$,
+  )$$,
   'ct_paid_checkout_member_required_v1'
 );
 
-do $
+do $$
 begin
   if exists (
     select 1 from public.purchase_intents
@@ -95,7 +95,7 @@ begin
   end if;
   raise notice 'PASS active Guest paid Purchase Intent is rejected';
 end;
-$;
+$$;
 
 select pg_temp.assert_fails(
   'merged Guest purchase owner is denied',
