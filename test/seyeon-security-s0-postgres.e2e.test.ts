@@ -2751,6 +2751,93 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       });
       expect(await readHistoricalCostFence()).toEqual(originalCostFence);
       expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
+      // W109 G4/G5: distinguish a genuinely foreign Subject denial from
+      // mere missing-budget/policy denial. Activate a fully bounded synthetic
+      // server model policy AND today's budget inside the SAME disposable
+      // transaction, then switch to the governed role and attempt A's Turn
+      // under verified B's context. Rollback always erases the policy, any
+      // revised budget, and attempted reservation (never a Provider call).
+      const configuredForeign=await pool.connect();
+      const configuredForeignCallId=uuid(39,218);
+      const configuredModel='s0-w109-synthetic-no-provider';
+      try{
+        await configuredForeign.query('BEGIN');
+        await configuredForeign.query(`
+          insert into public.seyeon_ai_governor_model_policies_v1(
+            provider_key,model_key,policy_version,price_version,
+            allowed_purposes,context_window_tokens,maximum_input_tokens,
+            maximum_output_tokens,maximum_serialized_request_bytes,
+            input_micro_usd_per_million,cached_input_micro_usd_per_million,
+            output_micro_usd_per_million,is_active
+          ) values (
+            's0-w109-offline', $1::text, 's0-w109-policy',
+            's0-w109-rate',array['dialogue_render']::text[],
+            2000,1200,800,20000,1000000,250000,4000000,true
+          )`,[configuredModel]);
+        await configuredForeign.query(`
+          insert into public.seyeon_ai_governor_daily_budgets_v1(
+            bucket_utc_date,global_limit_micro_usd,subject_limit_micro_usd
+          ) values ((clock_timestamp() at time zone 'UTC')::date,100000,100000)
+          on conflict (bucket_utc_date) do update
+          set global_limit_micro_usd=greatest(
+            public.seyeon_ai_governor_daily_budgets_v1.global_limit_micro_usd,
+            excluded.global_limit_micro_usd),
+            subject_limit_micro_usd=greatest(
+            public.seyeon_ai_governor_daily_budgets_v1.subject_limit_micro_usd,
+            excluded.subject_limit_micro_usd)`);
+        const {rows:[configured]}=await configuredForeign.query<{
+          model_approved:boolean;budget_present:boolean
+        }>(`select
+          exists(select 1 from public.seyeon_ai_governor_model_policies_v1
+            where model_key=$1::text and is_active
+              and 'dialogue_render'=any(allowed_purposes))
+            as model_approved,
+          exists(select 1 from public.seyeon_ai_governor_daily_budgets_v1
+            where bucket_utc_date=(clock_timestamp() at time zone 'UTC')::date
+              and global_limit_micro_usd>=100000
+              and subject_limit_micro_usd>=100000) as budget_present`,
+          [configuredModel]);
+        expect(configured).toEqual({model_approved:true,budget_present:true});
+        await configuredForeign.query(
+          'SET LOCAL ROLE myeongha_seyeon_governed_executor',
+        );
+        await configuredForeign.query(
+          "select set_config('myeongha.subject_id',$1,true)",
+          [foreign.subject],
+        );
+        const {rows:[acting]}=await configuredForeign.query<{
+          current_role:string
+        }>('select current_user as current_role');
+        expect(acting?.current_role).toBe('myeongha_seyeon_governed_executor');
+        await expect(configuredForeign.query(`select * from
+          public.cmd_governed_start_seyeon_ai_call_v1(
+            $1::uuid,$2::uuid,$3::uuid,$4::text,$5::uuid,
+            $6::text,$7::text,$8::text,$9::text,$10::text,
+            $11::bigint,$12::bigint,$13::bigint)`,[
+          f.subject,currentTurn,currentAttempt,'chat',
+          configuredForeignCallId,'dialogue_render',
+          's0-w109-offline',configuredModel,'s0-w109-policy','s0-w109-rate',
+          100,800,1024,
+        ])).rejects.toMatchObject({
+          code:'42501',constraint:'myeongha_subject_context_mismatch',
+        });
+      }finally{
+        await configuredForeign.query('ROLLBACK').catch(()=>undefined);
+        configuredForeign.release();
+      }
+      const {rows:[afterConfiguredForeign]}=await pool.query<{
+        remaining_model_policies:number;remaining_cost_calls:number
+      }>(`select
+        (select count(*)::int from public.seyeon_ai_governor_model_policies_v1
+          where model_key=$1::text) as remaining_model_policies,
+        (select count(*)::int from public.seyeon_ai_call_cost_events
+          where call_id=$2::uuid) as remaining_cost_calls`,
+        [configuredModel,configuredForeignCallId]);
+      expect(afterConfiguredForeign).toEqual({
+        remaining_model_policies:0,remaining_cost_calls:0,
+      });
+      expect(await readHistoricalCostFence()).toEqual(originalCostFence);
+      expect(await g3PortAudit()).toEqual(verifiedG3PortReceipt);
       // W98 G5 Reader/Se-yeon cross-product isolation: the actual
       // production Reader ordinary-history port must remain scoped to the
       // VERIFIED member and exact Thread. Even a successful own-Thread
