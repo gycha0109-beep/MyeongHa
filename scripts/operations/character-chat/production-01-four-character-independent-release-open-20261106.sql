@@ -25,6 +25,48 @@ begin
   end if;
 end $preflight$;
 
+-- The legacy insert policy remains intact for the active default release.
+-- PostgreSQL permissive INSERT policies are OR-combined; this additional
+-- owner-only slice admits a non-default release only when it is actually
+-- publishing at least one of the four approved independently routed Characters.
+-- The SECURITY DEFINER command above/below still picks exactly one release
+-- for the requested Character, and no API role receives table INSERT.
+drop policy if exists conversation_threads_chat_thread_open_independent_insert_v1
+  on public.conversation_threads;
+create policy conversation_threads_chat_thread_open_independent_insert_v1
+on public.conversation_threads
+for insert
+to myeongha_chat_thread_open_owner
+with check (
+  subject_id = public.current_myeongha_subject_id()
+  and thread_type = 'single_character'
+  and status = 'active'
+  and deleted_at is null
+  and active_content_release_id is not null
+  and active_content_bundle_id is not null
+  and exists (
+    select 1
+    from public.content_releases cr
+    join public.content_bundles cb
+      on cb.id = cr.content_bundle_id
+     and cb.retired_at is null
+    join public.character_runtime_catalog crc
+      on crc.content_bundle_id = cr.content_bundle_id
+    join public.characters c
+      on c.character_id = crc.character_id
+     and c.retired_at is null
+    where cr.id = active_content_release_id
+      and cr.content_bundle_id = active_content_bundle_id
+      and cr.status = 'active'
+      and cr.is_default = false
+      and crc.character_id in ('baekheon','yeoul','rahyeon','taegyeom')
+      and crc.enabled is true
+      and crc.availability = 'available'
+      and (crc.release_at is null or crc.release_at <= clock_timestamp())
+      and (crc.retire_at is null or crc.retire_at > clock_timestamp())
+  )
+);
+
 create or replace function public.cmd_open_member_single_character_thread_v1(
   p_subject_id uuid,
   p_character_id text,
