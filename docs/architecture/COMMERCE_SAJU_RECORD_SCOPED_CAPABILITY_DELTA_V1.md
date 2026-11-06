@@ -174,3 +174,9 @@ This does not approve product/Offer activation or live sales. The migration and 
 reviewed in the current PR and must pass CI before merge. Upgrade admission remains HOLD until
 quote-specific Charge Terms are authoritative. No Offer seed, provider charge, refund POST,
 public checkout route or LIVE activation is enabled by this architecture approval.
+
+### Implementation detail added during approved rollout
+
+- The internal field entitlement key is now canonicalized as `saju.<field>` (for example, `saju.relationship`). Every Saju Capability Item must use the exact field from the 13-Product field inventory and its matching key; arbitrary entitlement keys are rejected by both admission and the existing Receipt Grant writer.
+- The database mirrors all 13 static KRW list prices from `COMMERCE_SAJU_PRODUCTS_V1`. Original admission requires the active Offer Charge Terms amount and currency to match that exact Product price. This prevents a quote/Offer price mismatch.
+- Saju upgrades remain blocked because the current Offer Charge Terms are static per Offer and cannot safely represent a per-Record price difference. A separate immutable quote-specific Charge Terms authority is still required.
