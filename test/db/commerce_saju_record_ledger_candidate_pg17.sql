@@ -263,14 +263,14 @@ begin
    charge_terms_version,capability_set_id,capability_snapshot_jsonb,
    capability_snapshot_hash
  )
- select rows.new_intent,v_subject,rows.offer_id,null,
-   rows.idempotency,'sha256:test:saju-cross-product-'||rows.idempotency,
-   pg_catalog.jsonb_build_object('productOfferId',rows.offer_id::text,
-     'productId',rows.product_id::text,'platform','web','provider','portone_v2',
-     'externalProductId',rows.external_id),
-   'sha256:test:saju-cross-product-snapshot-'||rows.idempotency,
+ select fixture.new_intent,v_subject,fixture.offer_id,null,
+   fixture.idempotency,'sha256:test:saju-cross-product-'||fixture.idempotency,
+   pg_catalog.jsonb_build_object('productOfferId',fixture.offer_id::text,
+     'productId',fixture.product_id::text,'platform','web','provider','portone_v2',
+     'externalProductId',fixture.external_id),
+   'sha256:test:saju-cross-product-snapshot-'||fixture.idempotency,
    'created',clock_timestamp()+interval '4 seconds',
-   clock_timestamp()+interval '4 seconds',rows.price_minor,'KRW',
+   clock_timestamp()+interval '4 seconds',fixture.price_minor,'KRW',
    'test-saju-non-saleable-v1',null,null,null
  from (
    values
@@ -278,7 +278,7 @@ begin
     'saju-love-bundle-overlap','synthetic-saju-bundle-love-overlap',21900::bigint),
    (v_disjoint_intent,v_disjoint_offer,v_disjoint_product,
     'saju-career-disjoint','synthetic-saju-career-disjoint',9900::bigint)
- ) as rows(new_intent,offer_id,product_id,idempotency,external_id,price_minor);
+ ) as fixture(new_intent,offer_id,product_id,idempotency,external_id,price_minor);
  if public.internal_commerce_saju_candidate_overlap_fields_v1('standard.love_relationship')
       is distinct from array['relationship']::text[]
     or public.internal_commerce_saju_candidate_overlap_fields_v1('bundle.love_relationship')
