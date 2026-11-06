@@ -62,6 +62,31 @@ begin
  set birth_revision_id=v_new_revision where id=v_record;
  update public.commerce_saju_records_v1
  set birth_revision_id=v_source_revision where id=v_record;
+ -- Birth revision exists and belongs to the Subject, but is no longer
+ -- the Record's current version. A stale Intent association must fail closed.
+ begin
+   insert into public.commerce_saju_purchase_origins_v1
+     (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
+   values (v_b2_purchase,v_subject,v_record,v_new_revision,'original');
+   raise exception 'SAJU_LEDGER_PG17_STALE_ORIGIN_ACCEPTED';
+ exception when others then
+   get stacked diagnostics v_error=message_text;
+   if v_error is distinct from 'SAJU_ORIGIN_RECORD_REVISION_MISMATCH' then raise; end if;
+ end;
+ if exists (select 1 from public.commerce_saju_purchase_origins_v1
+            where purchase_intent_id=v_b2_purchase) then
+   raise exception 'SAJU_LEDGER_PG17_STALE_ORIGIN_PERSISTED';
+ end if;
+ -- The same guard must be installed on later Receipt verification for Intents
+ -- attached before payment. Existing unrelated Reader receipts are preserved.
+ if not exists (
+    select 1 from pg_catalog.pg_trigger
+    where tgrelid='public.commerce_receipts'::regclass
+      and tgname='tr_commerce_saju_verified_receipt_revision_lock_v1'
+      and not tgisinternal and tgenabled='O'
+ ) then
+   raise exception 'SAJU_LEDGER_PG17_RECEIPT_REVISION_GUARD_MISSING';
+ end if;
  -- A real paid Receipt pins its original Intent to the Record. Neither a
  -- failed Intent nor an unverified Payment Attempt is a permanent freeze.
  insert into public.commerce_saju_purchase_origins_v1
