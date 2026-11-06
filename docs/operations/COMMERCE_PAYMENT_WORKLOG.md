@@ -709,3 +709,10 @@
 - **개인정보 삭제:** 계정 삭제 Finalizer가 Upgrade link → Origin → Record 순서로 개인 매핑을 지운 뒤 Birth revision을 삭제합니다. Receipt·Provider Event·Grant/Event·환불 증거는 삭제하지 않습니다.
 - **검증 추가:** PG17 테스트에 두 개의 서로 다른 Saju Record가 동일 Subject에 속해도 각각 다른 opaque scope와 독립 Grant를 받는 실제 Receipt→Origin→Record→Grant 경로를 추가했습니다. 계정 삭제 테스트에도 Record/Origin 제거와 Purchase Intent 보존 검증을 추가했습니다.
 - **비운영 경계:** Product/Offer seed, 공개 Checkout route, Provider handoff, 실제 charge/refund, LIVE 판매는 변경·활성화하지 않았습니다. CI 성공 전 통과 선언은 하지 않습니다.
+
+### 2026-11-07 — Record scope의 상품·권한·가격 일치 검증 보강
+
+- **권한 키:** 10개 Saju 분야를 내부 `saju.<field>` 키로 고정했습니다. 13개 상품의 분야 목록과 각 Capability Item의 `item_key/entitlement_key` 조합이 일치하지 않으면 구매 승인과 Receipt Grant 발급을 거부합니다.
+- **가격 일치:** 기존 TypeScript 상품 정책의 13개 KRW 가격을 DB 불변 함수로 미러링하고, 원본 구매 승인 시 현재 Offer Charge Terms의 금액·통화가 정확히 일치해야 합니다. 가격 정책과 Offer 금액이 다르면 결제 Intent 생성 전 HOLD합니다.
+- **일반 경로 우회 차단:** 일반 Purchase Intent v3 경로에서도 Saju Product는 Record Admission 문맥 없이는 신규 생성·재호출할 수 없고, 비Saju Product가 Saju Record scope를 사용하거나 Saju Product가 global/fixed scope를 사용하는 경우도 거부합니다.
+- **업그레이드 제한:** 정적 Offer Charge Terms로는 Record별 차액을 고정할 수 없어, 이번 버전은 원본 구매만 허용하고 업그레이드는 별도 불변 quote Charge Terms 구현 전까지 HOLD합니다.
