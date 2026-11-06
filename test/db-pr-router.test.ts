@@ -122,7 +122,7 @@ describe('DB PR router', () => {
       'supabase/migrations/2360_paid_handoff_member_gate_v1.sql',
     ]) {
       const result = route([path]);
-      expect(result.suites).toEqual(['commerce-entitlement', 'commerce-payment', 'postgres17', 'runtime']);
+      expect(result.suites).toEqual(['commerce-entitlement', 'commerce-payment', 'postgres17']);
       expect(result.pg17Cases).toContain('commerce-saju-record-ledger-candidate-pg17');
       expect(result.pg15Cases).toContain('commerce-payment-attempt-authority');
     }
