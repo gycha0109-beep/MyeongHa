@@ -40,6 +40,15 @@ Watchtower-Track: security
 
 **스트리밍 정책:** S0는 OFF로 고정한다. 이미 전송된 바이트를 회수할 수 없으므로 최초 답변 전체의 권한 확인과 전송 순서를 검증한 뒤에만 공개한다. 이는 S0 실행 범위 결정이며, 향후 Streaming 기능을 승인하는 의미가 아니다.
 
+### S0 길이 및 자원 제한
+
+- **HTTP ingress:** `POST /api/chat/:threadId/turns`는 실제 body stream 기준 최대 16,384 bytes, body 완료 기한 3,000ms, 현재 User text 최대 8,000자다. 초과는 413, body가 기한 내 완료되지 않으면 408이다. `Content-Length`만 믿거나 `request.json()`으로 먼저 전체 버퍼링하지 않는다.
+- **연관 Reading ingress:** `POST /api/me/saju/preview-reading`도 동일 16,384-byte/3,000ms bounded reader를 사용하며 `readingText`는 최대 200자다. 이 경로는 S0 Memory 답변 입력에 포함되지 않는다.
+- **모델 요청:** 최종 직렬화 요청은 최대 524,288 bytes, 인증된 OpenAI input-token count + 1,024-token headroom은 최대 48,000 tokens, Provider-enforced output은 최대 4,096 tokens다. context window policy는 1,050,000 tokens, prompt caching은 OFF다.
+- **토큰 인증:** 정확한 최종 요청 body에서 공식 `/v1/responses/input_tokens` 응답으로 input token 상한을 인증한다. headroom 1,024를 더한 값이 48,000을 넘으면 generation을 거부한다(따라서 raw count 상한은 46,976). count 응답은 최대 8,192 bytes, timeout은 8,000ms이며 문자 수 추정/4 나누기 fallback은 없다. 이 인증은 G1 원본 Pin 이후, 실제 generation 이전에만 수행한다.
+- 위 제한은 기존 구현의 합격 기준이며 새 보안 기능을 추가하는 항목이 아니다. token count/Provider 단계 실패 후 고객 예약 환불·복구는 G4 미완료 항목으로 별도 추적한다.
+
+
 ## 3. 현재 구현 기준점 — 다시 만들지 말 것
 
 | 영역 | 이미 확보한 구현·증거 | 아직 실제 제품 완료로 볼 수 없는 부분 |
