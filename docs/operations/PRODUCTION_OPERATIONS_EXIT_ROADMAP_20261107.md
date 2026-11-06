@@ -58,6 +58,10 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 8. `myeongha_seyeon_chat_runtime_owner`의 현재 `postgres` 멤버십 2개 중 하나는 `20261104043413`에서 SET 권한을 임시 부여한 뒤 회수하며 남긴 비상속·비관리자·비SET 멤버십이다. 현재 `pg_has_role` 결과는 MEMBER=true / USAGE=false / SET=false다. 이 마이그레이션은 Production 원장에만 있고 main 파일은 없으므로 remote-only 처분표에 포함한다. 이전 1개 멤버십 postcheck는 현재 frontier 수용 조건으로 재사용하지 않는다.
 9. 적용된 `1640` 원격 SQL(10,303 bytes)과 main 파일(10,147 bytes)은 권한 소유권 전환·회수 방식이 실질적으로 다르다. 원격은 owner 역할로 전환해 legacy EXECUTE를 회수하고 `GRANTED BY postgres`로 임시 멤버십을 제거하지만 main 파일은 `current_user`에 직접 회수한다. 이미 적용된 migration file/history는 수정·재적용하지 않고 source/provenance 차이로 별도 처분한다.
 10. `20261026025332`는 원격 9개 statement를 재구성한 결과와 main 파일의 공백 제거 token stream이 일치한다. statement framing/version identity는 별도 유지한다.
+11. Production 원장에만 존재하는 S0/Se-yeon migration 12개를 현재 권한·함수·정책 효과와 함께 처분한다. 이 중 `20261025193416` 및 `20261031182926`은 본문에 Production 미배포 문구가 있고 `20261031182505`는 disposable S0 전용 문구가 있으나 Production 원장에는 적용 기록이 있다. 현재 main에 대응 SQL 파일은 12개 모두 없다. `20261025193416`의 guard는 postgres 사용자/DB, PG17, private schema 부재만 검사하고 프로젝트/환경 식별자를 검사하지 않는다. 주석을 실제 배포 방지 장치로 간주하지 않는다.
+12. `scripts/operations/production-authority-frontier-readonly.sql`을 추가하고 Production에서 read-only 실행을 확인했다. 역할/멤버십, 스키마 권한, 테이블·컬럼 ACL hash, RLS/policy hash, RPC 실행 권한 및 선택 migration metadata를 함께 기록한다.
+13. RLS 비활성 테이블과 실제 접근 경로를 분리해 판정한다. `chat_turns`·`chat_turn_attempts`는 정책 정의가 각 3개 있지만 RLS 비활성이고 API executor 직접 테이블/컬럼 권한은 없다. 현재 G0 함수는 subject/thread 조건을 명시한다. `memory_proposals`는 정책 2개가 있으나 RLS 비활성이고, API/anon/auth 직접 권한과 신규 S0 proposal-accept EXECUTE는 없으며 positive-source registry도 disabled다. 이는 현재 fail-closed 경계이지 RLS 수용 완료가 아니다. 해당 유형을 활성화하기 전에 RLS enable 또는 승인된 동등한 행 범위 통제를 증명한다.
+14. `cmd_commit_chat_turn_legacy_v1`은 service_role 전용의 별도 사용자 선택 기반 proposal 처리 경로이며 신규 positive-source registry를 참조하지 않는다. 신규 S0 proposal-accept 경로가 비활성이라고 해서 모든 legacy memory acceptance가 비활성이라고 판정하지 않는다.
 
 **금지:** blind `migration repair`, migration history rewrite, 추측에 의한 재적용, Production DDL/DML. 실제 정합화가 필요하면 근거 있는 forward-only 계획을 먼저 제시하고 사용자 승인을 받은 뒤 별도 실행한다.
 
