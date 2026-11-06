@@ -36,6 +36,7 @@ export interface CharacterMemoryRetrievalResultV1 {
   readonly trace: Readonly<{
     readonly queryTokenCount: number;
     readonly explicitCallbackRequested: boolean;
+    readonly callbackFallbackUsed: boolean;
     readonly candidateCount: number;
     readonly matchedCandidateCount: number;
     readonly unsupportedSchemaCount: number;
@@ -73,6 +74,9 @@ function tokens(value: string): readonly string[] {
   const matches = normalize(value).match(/[\p{L}\p{N}]{2,}/gu) ?? [];
   return Object.freeze([...new Set(matches)]);
 }
+
+const CALLBACK_SCAFFOLD_TOKEN_V1 =
+  /^(?:지난번|저번|그때|전에|아까|지난|대화|기억|얘기|말했|말한|했|무슨|뭐|last|time|remember|previously|earlier|what|did|we|talk|about)/i;
 
 function tokenMatches(queryToken: string, recordToken: string): boolean {
   return recordToken === queryToken ||
@@ -147,9 +151,12 @@ export function retrieveCharacterWorkingMemoryV1(
     projection.currentUserMessage.text,
     'projection.currentUserMessage.text',
   );
-  const queryTokens = tokens(queryText);
+  const queryTokens = tokens(queryText).filter(
+    (token) => !CALLBACK_SCAFFOLD_TOKEN_V1.test(token),
+  );
   const callbackRequested = input.explicitCallbackRequested ??
     detectExplicitMemoryCallbackRequestedV1(queryText);
+  const callbackFallbackUsed = callbackRequested && queryTokens.length === 0;
 
   const seenRefs = new Set<string>();
   const candidates: Array<Omit<CharacterMemoryRetrievedRecordV1, 'rank'>> = [];
@@ -208,20 +215,25 @@ export function retrieveCharacterWorkingMemoryV1(
     const lexicalCoverage = queryTokens.length === 0
       ? 0
       : matchedTokens.length / queryTokens.length;
-    if (lexicalCoverage <= 0) {
+    if (
+      lexicalCoverage <= 0 &&
+      !(callbackFallbackUsed && record.recordKind === 'memory')
+    ) {
       excluded.push(Object.freeze({
         sourceRef: record.sourceRef,
         reason: 'NO_LEXICAL_MATCH',
       }));
       continue;
     }
-    const phraseMatch = normalize(record.summary).includes(normalize(queryText));
+    const phraseMatch = queryTokens.length > 0 &&
+      normalize(record.summary).includes(normalize(queryText));
     candidates.push(Object.freeze({
       record,
       signals: Object.freeze({
         lexicalCoverage,
         phraseMatch,
-        explicitCallbackMatch: callbackRequested,
+        explicitCallbackMatch: callbackRequested &&
+          (callbackFallbackUsed || lexicalCoverage >= 0.5),
         relevance: record.relevance,
         salience: record.salience,
         effectiveAt,
@@ -244,6 +256,7 @@ export function retrieveCharacterWorkingMemoryV1(
     trace: Object.freeze({
       queryTokenCount: queryTokens.length,
       explicitCallbackRequested: callbackRequested,
+      callbackFallbackUsed,
       candidateCount: projection.projectedRecords.length,
       matchedCandidateCount: candidates.length,
       unsupportedSchemaCount: projection.admissions.filter(

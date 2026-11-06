@@ -25,8 +25,8 @@ export interface RetrieveCharacterWorkingMemoryForTurnResultV1 {
 /**
  * Server-side retrieval entrypoint for one canonical Subject, Character, and
  * server-bound thread. All authority ports must share the same Subject-bound
- * transaction client. The caller supplies the exact committed current-turn
- * text from the same pinned turn as currentUserMessageRef.
+ * transaction client. The query is taken from the exact current User message
+ * returned by the authoritative recent-message read for currentUserMessageRef.
  *
  * This performs reads and ranking only; it never writes Memory, changes grants,
  * mutates relationships, calls a Provider, or reads protected Saju content.

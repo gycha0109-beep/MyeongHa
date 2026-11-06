@@ -143,6 +143,23 @@ describe('Character Working Memory retrieval v1', () => {
     ]);
   });
 
+  it('uses a bounded latest-memory fallback for a generic explicit callback', () => {
+    const result = retrieveCharacterWorkingMemoryV1({
+      projection: buildProjection({ queryText: '지난번에 얘기했던 거 기억나요?' }),
+      expectedScope: {
+        subjectId: 'subject-a',
+        characterId: 'seyeon',
+        threadId: 'thread-a',
+      },
+      now: '2026-11-07T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result.records.map((item) => item.record.recordId)).toEqual(['memory-a']);
+    expect(result.records[0]?.signals.explicitCallbackMatch).toBe(true);
+    expect(result.trace.callbackFallbackUsed).toBe(true);
+  });
+
   it('does not retrieve memories without lexical support', () => {
     const result = retrieveCharacterWorkingMemoryV1({
       projection: buildProjection({ queryText: '고양이', includeLifeFact: false }),
@@ -156,6 +173,7 @@ describe('Character Working Memory retrieval v1', () => {
     });
 
     expect(result.records).toEqual([]);
+    expect(result.trace.callbackFallbackUsed).toBe(false);
     expect(result.trace.excluded[0]?.reason).toBe('NO_LEXICAL_MATCH');
   });
 
