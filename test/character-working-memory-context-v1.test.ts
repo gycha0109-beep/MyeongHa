@@ -12,23 +12,6 @@ import type {
 import type {
   CharacterRelationshipReadAuthorityPortV1,
 } from '../apps/api/src/character-relationship-read.js';
-import type {
-  CharacterWorkingMemoryRecordProjectorV1,
-} from '../packages/domain/src/character-working-memory-projection-v1.js';
-
-const projectors: readonly CharacterWorkingMemoryRecordProjectorV1[] = [{
-  recordKind: 'memory',
-  recordType: 'conversation_recall',
-  schemaVersion: 'v1',
-  projectorVersion: 'conversation-recall-projector-v1',
-  project: () => ({
-    summary: '이전 대화에서 퇴사를 고민했습니다.',
-    claimKind: 'character_interpretation',
-    relevance: 0.5,
-    salience: 0.5,
-  }),
-}];
-
 describe('prepareCharacterWorkingMemoryContextV1', () => {
   it('reads the same Subject/Character/thread authorities and returns a read-only projection', async () => {
     const memoryAuthorityPort: ReaderContextMemoryReadAuthorityPortV1 = {
@@ -86,7 +69,6 @@ describe('prepareCharacterWorkingMemoryContextV1', () => {
       memoryAuthorityPort,
       nonMemoryAuthorityPort,
       relationshipAuthorityPort,
-      projectors,
     });
 
     expect(memoryAuthorityPort.readGrantedMemories).toHaveBeenCalledWith({
@@ -112,12 +94,15 @@ describe('prepareCharacterWorkingMemoryContextV1', () => {
       subjectId: 'subject-a',
       characterId: 'seyeon',
     });
-    expect(result.projectedRecords).toEqual([
+    expect(result.projectedRecords).toEqual([]);
+    expect(result.admissions).toEqual([
       expect.objectContaining({
+        recordKind: 'memory',
         recordId: 'memory-a',
-        sourceRef: 'memory:memory-a:grant:grant-a',
+        outcome: 'UNSUPPORTED_SCHEMA',
       }),
     ]);
+    expect(JSON.stringify(result)).not.toContain('raw memory payload');
     expect(result.authority.readOnly).toBe(true);
     expect(result.authority.mayCreateDurableRecord).toBe(false);
   });
