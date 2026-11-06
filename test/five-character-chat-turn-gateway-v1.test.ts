@@ -50,15 +50,15 @@ function fixture(characterId: string, options?: {
 describe('owner-pinned five-Character execution gateway', () => {
   it.each(liveTargets)('executes only the installed %s runtime after authoritative reads', async characterId => {
     const owner = fixture(characterId);
-    const executor = vi.fn(async (turn) => ({
-      observedCharacterId: turn.characterId,
-      observedReleaseId: turn.pinnedReleaseId,
-      observedBundleId: turn.pinnedBundleId,
-    })) as ReturnType<typeof vi.fn<FiveCharacterChatTurnExecutorV1<{
+    const executor = vi.fn<FiveCharacterChatTurnExecutorV1<{
       observedCharacterId: string;
       observedReleaseId: string;
       observedBundleId: string;
-    }>>>;
+    }>>(async (turn) => ({
+      observedCharacterId: turn.characterId,
+      observedReleaseId: turn.pinnedReleaseId,
+      observedBundleId: turn.pinnedBundleId,
+    }));
     const result = await runPublishedFiveCharacterChatTurnV1({
       ...owner,
       registeredExecutors: { [characterId]: executor },
