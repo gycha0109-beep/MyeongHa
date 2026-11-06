@@ -34,6 +34,7 @@ const commerceEntitlementPatterns = [
 ];
 
 const postgres17Patterns = [
+  /^test\/db\/commerce_saju_record_ledger_candidate_pg17\.(?:sh|sql)$/u,
   /^test\/db\/saju_official_records_http_e2e_pg17\.sh$/u,
   /^scripts\/verify-saju-official-records-http-postgres-e2e\.mjs$/u,
   /^test\/db\/seyeon_r2_helper_service_role_least_privilege\.sh$/u,
@@ -188,6 +189,8 @@ function classifyMigration(path, selected) {
     name.includes('birth_profile_create')
     || name.includes('content_release')
     || name.includes('member_character_thread')
+    || name.includes('saju_record_scoped_capability')
+    || name.includes('paid_purchase_member_auth')
   ) {
     selected.add('postgres17');
     classified = true;

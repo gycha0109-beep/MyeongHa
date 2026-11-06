@@ -114,6 +114,20 @@ describe('DB PR router', () => {
     expect(result.pg17Cases).toEqual([]);
   });
 
+  it('routes Saju Record Commerce migrations and its ledger candidate through PostgreSQL 17', () => {
+    for (const path of [
+      'supabase/migrations/2330_saju_record_scoped_capability_authority_v1.sql',
+      'supabase/migrations/2340_paid_purchase_member_auth_v1.sql',
+      'test/db/commerce_saju_record_ledger_candidate_pg17.sh',
+      'test/db/commerce_saju_record_ledger_candidate_pg17.sql',
+    ]) {
+      const result = route([path]);
+      expect(result.suites).toEqual(['commerce-entitlement', 'commerce-payment', 'postgres17']);
+      expect(result.pg17Cases).toContain('commerce-saju-record-ledger-candidate-pg17');
+      expect(result.pg15Cases).toContain('commerce-payment-attempt-authority');
+    }
+  });
+
   it('routes Birth/runtime migrations to runtime and PostgreSQL 17 where relevant', () => {
     const result = route([
       'supabase/migrations/0860_birth_profile_create_runtime_authority.sql',
