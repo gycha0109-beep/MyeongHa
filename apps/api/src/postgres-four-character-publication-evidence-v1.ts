@@ -143,7 +143,7 @@ export function createPostgresFourCharacterPublishedArtifactEvidencePortV1(
   client: PostgresTransactionQueryV1,
 ): FourCharacterPublishedArtifactEvidencePortV1 {
   return Object.freeze({
-    async readPublishedArtifact(input) {
+    async readPublishedArtifact(input: ReadFourCharacterPublishedArtifactEvidenceInputV1) {
       assertInput(input);
       try {
         const response = await client.query<Readonly<Record<string, unknown>>>(
@@ -170,7 +170,7 @@ export function createScopedFourCharacterPublishedArtifactEvidencePortV1(input: 
 }): FourCharacterPublishedArtifactEvidencePortV1 {
   const subjectId = uuid(input.subjectId);
   return Object.freeze({
-    async readPublishedArtifact(request) {
+    async readPublishedArtifact(request: ReadFourCharacterPublishedArtifactEvidenceInputV1) {
       assertInput(request);
       if (request.subjectId.toLowerCase() !== subjectId) {
         throw new FourCharacterPublishedArtifactUnavailableV1();
