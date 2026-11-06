@@ -84,10 +84,12 @@ function harness(characterId: FourIndependentChatTargetV1) {
     calls.push('source');
     return source as PublishedFourCharacterModelSourceV1 | null;
   });
-  const reserveAttempt = vi.fn(async () => {
-    calls.push('reserve');
-    return reservation;
-  });
+  const reserveAttempt = vi.fn<FourCharacterProductionExecutionPortsV1['transaction']['reserveAttempt']>(
+    async () => {
+      calls.push('reserve');
+      return reservation;
+    },
+  );
   const generate = vi.fn(async () => {
     calls.push('model');
     return generated;
