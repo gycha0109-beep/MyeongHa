@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type { PostgresSubjectPoolV1, PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import {
   COMMERCE_SAJU_VERIFIED_LEDGER_SQL_V1,
   COMMERCE_SAJU_VERIFIED_RECORD_SQL_V1,
@@ -25,7 +25,7 @@ function fixture() {
   const connection = { query, release };
   const connect = vi.fn(async () => connection);
   const pool = {connect} as unknown as PostgresSubjectPoolV1;
-  const readOwnedFields = vi.fn(async ({client}: {client:typeof connection}) => {
+  const readOwnedFields = vi.fn(async ({client}: {client:PostgresTransactionQueryV1}) => {
     expect(client).toBe(connection);
     await client.query('select current record-scoped effective Grant evidence');
     return { authority:'record_scoped_current_effective_entitlements' as const,
