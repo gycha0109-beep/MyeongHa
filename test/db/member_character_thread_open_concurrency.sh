@@ -533,7 +533,8 @@ SQL
   [[ "$ack_replayed" == "$delivery_receipt_id|$assistant_message_id|true|true" ]] ||
     fail "four-Character delivery ACK replay was not idempotent: $ack_replayed"
   receipt_state=$("${psql_base[@]}" -c "
-    select character_id || '|' || source_digest || '|' || (acknowledged_at is not null)
+    select character_id || '|' || source_digest || '|' ||
+           case when acknowledged_at is not null then 't' else 'f' end
     from public.four_character_chat_delivery_receipts_v1
     where id='$delivery_receipt_id';")
   [[ "$receipt_state" == "baekheon|$source_digest|t" ]] ||
