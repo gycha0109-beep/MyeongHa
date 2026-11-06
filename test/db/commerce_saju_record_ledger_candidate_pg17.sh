@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# Read and mutate candidate-only tables in a disposable CI PostgreSQL 17,
+# Read the migrated Record-scoped Saju authority in a disposable CI PostgreSQL 17,
 # always inside one SQL transaction that rolls back.
 db="$(psql -X -v ON_ERROR_STOP=1 -Atqc 'select current_database()')"
 version="$(psql -X -v ON_ERROR_STOP=1 -Atqc 'show server_version_num')"
