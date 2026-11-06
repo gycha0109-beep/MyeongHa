@@ -216,8 +216,8 @@ describe('independent Character publication-lane candidate assembler v1', () => 
     )).toThrow('Lane publication material must belong to the selected Character.');
   });
 
-  it('refuses to assemble a one-Character candidate when required renderer material is absent', () => {
-    expect(() => assembleCharacterPublicationLaneCandidateV1(
+  it('keeps incomplete renderer material non-publishing and rejects it at production validation', () => {
+    const candidate = assembleCharacterPublicationLaneCandidateV1(
       laneInput('rahyeon', {
         publicationMaterial: {
           characterId: 'rahyeon',
@@ -226,6 +226,10 @@ describe('independent Character publication-lane candidate assembler v1', () => 
           animationCueIds: ['idle'],
         },
       }),
-    )).toThrow('rahyeon.assetRefs must not be empty');
+    );
+
+    expect(candidate.characters).toHaveLength(1);
+    expect(() => validateProductionCharacterPublicationLaneBundleV1(candidate))
+      .toThrow('rahyeon.assetRefs must not be empty');
   });
 });
