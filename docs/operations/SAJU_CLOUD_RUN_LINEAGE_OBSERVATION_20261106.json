@@ -1,0 +1,962 @@
+{
+  "schemaVersion": 1,
+  "capturedAtUtc": "2026-11-06T11:08:47Z",
+  "target": {
+    "projectId": "myeongha",
+    "region": "asia-southeast1",
+    "service": "saju-production",
+    "serviceUrl": "https://saju-production-anh2svf5aa-as.a.run.app",
+    "generation": 16,
+    "observedGeneration": 16,
+    "latestCreatedRevisionName": "saju-production-00013-lar",
+    "latestReadyRevisionName": "saju-production-00013-lar",
+    "activeTraffic": [
+      {
+        "revisionName": "saju-production-00013-lar",
+        "percent": 100,
+        "tag": "candidate-54667c70e461",
+        "latestRevision": false
+      }
+    ],
+    "activeTrafficPercentTotal": 100
+  },
+  "revisionInventory": [
+    {
+      "name": "saju-production-00013-lar",
+      "createdAtUtc": "2026-09-21T16:08:27.603876Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:a911e244d91fd03b72cf94553c90cf72cc2bbb51a9b82255fb45379e53c37d67",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00011-sir",
+      "createdAtUtc": "2026-09-20T09:44:20.354311Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:a2ef1b09c365372e4a9df3904b1c5d564a7d72843dd3200145bb07eb70c0c539",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00010-den",
+      "createdAtUtc": "2026-09-20T09:26:48.479989Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:e6c94522c5578bba7fe6613bb88811c1908f77bfc156ecfb73d5cb204a00ca5f",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00008-vut",
+      "createdAtUtc": "2026-09-19T15:06:19.026716Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:191f8c018d3feef757e5b88eac6c104c9195ef7e74bfe50beb85969fa3a31eda",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00006-bul",
+      "createdAtUtc": "2026-09-04T16:38:46.575059Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:e963377a62f9533c7cc54588336439f10ec42acb3e0b0754029344214debe65f",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00005-leg",
+      "createdAtUtc": "2026-09-04T16:32:34.212188Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:4318e279e1a7e47b0efb4cc49f10f843e25f9caac3399078db9cbf274e5111f1",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00004-vet",
+      "createdAtUtc": "2026-09-04T15:54:03.935508Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:0de970fd2165dfea8fd7cf342177532ffc946e893219896ab88cfdd9d4128827",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00003-jor",
+      "createdAtUtc": "2026-09-04T05:35:57.886450Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:d12ac8c5439b5436a23eb2f72ed18e0ed1232f4d11b4656fca72bfa178236e7c",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00002-xog",
+      "createdAtUtc": "2026-09-04T04:05:06.057971Z",
+      "imageRef": "asia-southeast1-docker.pkg.dev/myeongha/myeongha/saju-production@sha256:57ff92ded7586163a49bd58a32974a8b76b4602ddc29172bc384fa1ce538a111",
+      "ready": "True"
+    },
+    {
+      "name": "saju-production-00001-khn",
+      "createdAtUtc": "2026-09-04T02:01:57.175035Z",
+      "imageRef": "us-docker.pkg.dev/cloudrun/container/hello@sha256:4229c16c0c549905376c79943d0c122a728901330d10a080ec8ceb52e3f21f3e",
+      "ready": "True"
+    }
+  ],
+  "auditHistory": {
+    "freshnessDays": 30,
+    "limit": 500,
+    "readable": true,
+    "category": "readable",
+    "exitCode": 0,
+    "rawProviderDataRetained": false,
+    "selectedTrafficEvents": [
+      {
+        "timestamp": "2026-09-04T02:01:56.359132Z",
+        "methodName": "google.cloud.run.v1.Services.CreateService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T02:02:04.767626Z",
+        "methodName": "/Services.CreateService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00001-khn",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T02:02:06.122399Z",
+        "methodName": "/Services.CreateService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "latestRevision": true,
+            "percent": 100,
+            "revisionName": "saju-production-00001-khn"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00001-khn"
+      },
+      {
+        "timestamp": "2026-09-04T02:55:36.580784Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T04:05:05.291755Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T04:05:14.703877Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00002-xog",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T04:05:16.286639Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00001-khn"
+          },
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00002-xog"
+      },
+      {
+        "timestamp": "2026-09-04T05:35:57.000599Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T05:36:08.763210Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00003-jor",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T05:36:10.138976Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00001-khn"
+          },
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00003-jor"
+      },
+      {
+        "timestamp": "2026-09-04T15:54:03.177792Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T15:54:11.459335Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00004-vet",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T15:54:12.921060Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00001-khn"
+          },
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00004-vet"
+      },
+      {
+        "timestamp": "2026-09-04T16:32:33.481155Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T16:32:41.610688Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00005-leg",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T16:32:43.008720Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00001-khn"
+          },
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00005-leg",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00005-leg"
+      },
+      {
+        "timestamp": "2026-09-04T16:38:45.876421Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T16:38:53.922404Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00006-bul",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T16:38:55.343035Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00001-khn"
+          },
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00006-bul"
+      },
+      {
+        "timestamp": "2026-09-04T16:39:05.423933Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T16:39:06.374445Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00006-bul",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-04T16:39:07.717231Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00006-bul"
+      },
+      {
+        "timestamp": "2026-09-19T15:06:18.259527Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-19T15:06:29.956088Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00008-vut",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-19T15:06:31.434663Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00008-vut"
+      },
+      {
+        "timestamp": "2026-09-19T15:06:42.074214Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-19T15:06:43.018936Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00008-vut",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-19T15:06:45.625935Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00006-bul",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-19T15:06:45.760766Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00008-vut"
+      },
+      {
+        "timestamp": "2026-09-20T09:26:47.659511Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:26:59.248138Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00010-den",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:27:00.643921Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00010-den",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00010-den"
+      },
+      {
+        "timestamp": "2026-09-20T09:44:19.664934Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:44:30.021539Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00011-sir",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:44:31.475644Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00011-sir",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00011-sir"
+      },
+      {
+        "timestamp": "2026-09-20T09:44:43.017297Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:44:44.201536Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00011-sir",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:44:45.764287Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00008-vut",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-20T09:44:45.928746Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00011-sir",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00011-sir"
+      },
+      {
+        "timestamp": "2026-09-21T16:08:26.757147Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-21T16:08:37.540349Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00013-lar",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-21T16:08:39.202555Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00011-sir",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00013-lar",
+            "tag": "candidate-54667c70e461",
+            "url": "https://candidate-54667c70e461---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00013-lar"
+      },
+      {
+        "timestamp": "2026-09-21T16:08:51.979538Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-21T16:08:52.928145Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00013-lar",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-21T16:08:54.365591Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00011-sir",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-21T16:08:54.489492Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00011-sir",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00013-lar",
+            "tag": "candidate-54667c70e461",
+            "url": "https://candidate-54667c70e461---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00013-lar"
+      },
+      {
+        "timestamp": "2026-09-22T12:00:24.975392Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-22T12:00:25.955124Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00011-sir",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-22T12:00:27.391454Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00013-lar",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-22T12:00:27.502882Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00011-sir",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00013-lar",
+            "tag": "candidate-54667c70e461",
+            "url": "https://candidate-54667c70e461---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00013-lar"
+      },
+      {
+        "timestamp": "2026-09-22T12:00:40.670306Z",
+        "methodName": "google.cloud.run.v1.Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-22T12:00:45.576262Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00013-lar",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-22T12:00:48.217104Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/revisions/saju-production-00011-sir",
+        "requestTraffic": [],
+        "responseTraffic": [],
+        "responseLatestReadyRevisionName": ""
+      },
+      {
+        "timestamp": "2026-09-22T12:00:48.357786Z",
+        "methodName": "/Services.ReplaceService",
+        "resourceName": "namespaces/myeongha/services/saju-production",
+        "requestTraffic": [],
+        "responseTraffic": [
+          {
+            "revisionName": "saju-production-00002-xog",
+            "tag": "candidate-58a6752d383c",
+            "url": "https://candidate-58a6752d383c---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00003-jor",
+            "tag": "candidate-d4d775f80e95",
+            "url": "https://candidate-d4d775f80e95---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00004-vet",
+            "tag": "candidate-f5c83e927714",
+            "url": "https://candidate-f5c83e927714---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00006-bul",
+            "tag": "candidate-6c90c9a94196",
+            "url": "https://candidate-6c90c9a94196---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00008-vut",
+            "tag": "candidate-5f84d21710d2",
+            "url": "https://candidate-5f84d21710d2---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "revisionName": "saju-production-00011-sir",
+            "tag": "candidate-282caf4ca3dc",
+            "url": "https://candidate-282caf4ca3dc---saju-production-anh2svf5aa-as.a.run.app"
+          },
+          {
+            "percent": 100,
+            "revisionName": "saju-production-00013-lar",
+            "tag": "candidate-54667c70e461",
+            "url": "https://candidate-54667c70e461---saju-production-anh2svf5aa-as.a.run.app"
+          }
+        ],
+        "responseLatestReadyRevisionName": "saju-production-00013-lar"
+      }
+    ]
+  },
+  "classification": {
+    "revisionInventoryCount": 10,
+    "selectedTrafficEventCount": 54,
+    "singleActiveRevisionAt100Percent": true,
+    "rollbackTargetAuthorized": false,
+    "predecessorInferenceFromRevisionOrderingAllowed": false
+  },
+  "nonClaims": [
+    "Revision creation ordering is not evidence of prior serving traffic.",
+    "A prior rollback target is not authorized unless direct traffic-history evidence identifies it.",
+    "Audit-log read failure is not evidence that no traffic history exists.",
+    "Raw service, revision, audit-log, and provider-error payloads are intentionally excluded from the artifact.",
+    "This workflow performs no Cloud Run deployment, traffic, IAM, Secret Manager, Logging, or Monitoring mutation."
+  ]
+}

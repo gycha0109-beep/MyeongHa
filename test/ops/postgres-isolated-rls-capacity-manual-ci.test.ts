@@ -185,6 +185,7 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(runner).toContain('.workerdWindow.sajuResourceCgroupConstrained==false');
     expect(runner).toContain('else .workerdWindow==null end');
     expect(readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8')).toContain("const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap'");
+    expect(runner.split('jq -e --arg sha "$source_sha" --arg experiment "$experiment"').length - 1).toBe(2);
     expect(worker).toContain('SELECT session_user AS role');
     expect(worker).toContain('myeongha_ops_phase11_login');
     expect(worker).toContain('handleCurrentSubjectSajuCalculationRequestV1');

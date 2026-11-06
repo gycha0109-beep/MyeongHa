@@ -4,18 +4,22 @@
 > Decision date: 2026-09-04 KST  
 > MyeongHa baseline: `0fcd9f2b0dd18e6a9a97edc408b5a10204bdbbfd`  
 > Saju baseline at decision: `2f92f59c3f27c471127bfe3dad8260b192bc8c31`  
-> Decision status: **APPROVED FOR IMPLEMENTATION / PRODUCTION ACTIVATION NOT YET COMPLETE**
+> Decision status: **CLOUD RUN TARGET SELECTED / HISTORICAL DEPLOYMENT AND ROLLBACK VERIFIED / CURRENT WORKER COMPATIBILITY AND ROTATION NOT ACCEPTED**
 
 ---
 
-## 현재 적용 범위 (2026-10-28) — 기존 호스트 선택 기록과 실제 배포 구별
+## 현재 적용 범위 (2026-11-06) — Cloud Run 현행 Revision lineage와 과거 배포·복귀 증거
 
-**HISTORICAL 결정 시점 / CANDIDATE·HOLD 운영 활성화:** 아래 Cloud Run 선택은 2026-09-04 당시의 **별도 Saju Calculation Service 호스팅 선택안**입니다. 실제 배포, 비용 승인, 서비스 URL, 현재 운영 상태를 증명하지 않으며 신규 유료 리소스 생성 근거로 사용하면 안 됩니다. 사용자는 당분간 Cloudflare **무료 플랜**을 제품 운영 기준으로 사용하며 추가 유료 인프라를 승인하지 않았습니다. Cloud Run이 무료로 유지될 수 있는지/사주 서비스가 실제 호출되는지/호출 비용은 현재 근거 없이 확정하지 않습니다.
+**Cloud Run은 Saju 계산 서비스의 선택된 호스트이며, 현재 서비스의 실제 100% 트래픽 Revision까지 read-only로 확인됐다. 다만 이 증거는 새 유료 리소스, 새 배포, Secret 회전 또는 현재 MyeongHa Worker와의 양성 E2E 승인이 아니다.**
 
-MyeongHa 클라이언트·제품 API의 기본 공개 Origin은 `https://myeongha.gycha0109.workers.dev`로 변경되었습니다([Cloudflare 전환 현황](../operations/VERCEL_ORIGIN_DEPENDENCY_CLEANUP_20261026.md), [Worker 구성](../../wrangler.jsonc)). 2026-10-28 사용자 운영 지시에 따라 **Vercel은 현재 제품의 사용·신규 배포·자동 대체 경로에서 제외**됩니다. 과거 Vercel 대기 서비스 리소스·콜백이 물리적으로 남아 있더라도 사용 승인 또는 종료 완료로 해석하지 않으며, 실제 종료·이관은 운영 트랙의 별도 수락 조건을 따릅니다. **Cloudflare Worker가 Supabase Auth/Storage 또는 별도 HTTPS 사주 계산 서비스를 대체하거나, Cloud Run 사주 런타임을 자동 실행한다는 뜻이 아닙니다.** 본문 §1의 Cloud Run 선택·§7의 Vercel→Cloud Run 호출도 해당 시점 설계/가정으로 분류하며, 실제 현재 경로는 코드/시크릿 없는 운영 증거로 재검증해야 합니다.
+- 2026-09-04 결정은 Saju Calculation Service의 호스트로 Google Cloud Run `asia-southeast1`(Singapore)을 선택했다. 실제 [Production Cloud Run #35622856668](https://github.com/gycha0109-beep/Saju/actions/runs/35622856668)은 2026-09-21 exact-digest 후보를 배포하고 candidate smoke 후 100% 트래픽으로 승격했으며 post-promotion smoke를 통과했다. [Rollback drill #35724573502](https://github.com/gycha0109-beep/Saju/actions/runs/35724573502)은 2026-09-22 manifest에 고정된 이전 Revision으로 전환·인증 smoke 후 원래 Revision으로 트래픽을 복원하고 다시 smoke를 통과했다.
+- 최신 [read-only lineage #42207998063](https://github.com/gycha0109-beep/Saju/actions/runs/42207998063)은 2026-11-06 현재 `saju-production-00013-lar`가 Ready이고 **100% 트래픽**을 받는다고 확인했다. 활성 OCI digest는 `sha256:a911e244d91fd03b72cf94553c90cf72cc2bbb51a9b82255fb45379e53c37d67`, source tag는 `candidate-54667c70e461`, Cloud Audit history는 읽을 수 있었고 선택 트래픽 이벤트 54건을 확인했다. 39,017-byte 원본 JSON과 SHA-256은 MyeongHa `docs/operations/SAJU_CLOUD_RUN_LINEAGE_OBSERVATION_20261106.json`에 보존했다. 이 read-only capture는 `rollbackTargetAuthorized=false`를 유지한다.
+- 현재 Saju `main`은 배포 source commit `54667c70e46140b004d3b81c5797191538f6cbc3`보다 861 commits 앞서 있다. Dockerfile, production server entrypoint, service Bearer authorizer, calculation HTTP response schema, calculation authority/runtime 및 `/api/calculations` handler는 source 비교상 동일하다. 이후 추가된 reading/face 경로와 process 조합 차이는 남아 있으므로, 이것만으로 현재 MyeongHa Worker의 양성 E2E나 모든 서비스 호환성을 수용하지 않는다.
+- MyeongHa 제품 API는 Cloudflare Worker이며 `workers/cloudflare-saju-calculation.mjs`가 계산 전용 Saju 경로를 제공한다. 이 경로는 정확한 Saju origin/Bearer, 별도 Auth/DB/TLS/RLS 승인과 kill switch를 요구한다. 현재 Worker secret 값은 소스에서 확인할 수 없으며 읽거나 변경하지 않았다. 마지막으로 문서화된 positive Member/DB/Saju E2E는 Worker #122에 고정된 [run #40261086788](https://github.com/gycha0109-beep/MyeongHa/actions/runs/40261086788)이다. 그 이후/current Worker version은 별도 증거가 필요하다. 기존 positive E2E workflow는 명시적 confirmation과 production Member credential을 사용하고 synthetic Guest fixture를 생성하므로 사용자 승인 없이 실행하지 않는다.
+- 2026-10-28 사용자 운영 지시에 따라 추가 유료 인프라를 새로 만들거나 Cloud Run 재배포·트래픽 변경·Secret Manager 변경/회전을 수행할 권한은 과거 배포 성공으로부터 추론하지 않는다. 이번 2026-11-06 확인은 read-only이며 Production mutation은 없었다.
+- GitHub 설정 read-only 확인에서 MyeongHa와 Saju `main`은 모두 branch protection이 없다. Saju `production-saju` 환경은 `main` allowlist만 있으며 required-reviewer 보호는 확인되지 않았다. 이를 controlled promotion gate로 간주하지 않는다.
 
-[설계 충돌 원장](ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md) AR-04/05를 참조합니다. 실제 배포/결제/인프라 변경은 이 문서 정정의 범위 밖이며, 본문의 보안·검증 조건은 폐기하지 않습니다.
-
+[설계 충돌 원장](ARCHITECTURE_AUTHORITY_COLLISION_REGISTER_20261028.md) AR-04/05를 참조한다. Cloud Run 호스트 선택과 과거 배포/rollback evidence는 유지한다. 현재 credential rotation, current Worker positive E2E, release compatibility, current capacity/SLO, Hosted DB restore/RPO/RTO는 별도 수용 조건이다. Production 배포, traffic migration, IAM/Secret Manager 변경은 필요한 사용자 승인과 해당 트랙의 필수 조건을 충족하기 전에는 실행하지 않는다.
 ## 1. Decision
 
 Saju Calculation Service의 production hosting target으로 **Google Cloud Run service**를 선택한다.
