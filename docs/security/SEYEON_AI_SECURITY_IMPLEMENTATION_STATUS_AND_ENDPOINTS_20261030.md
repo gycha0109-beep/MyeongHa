@@ -527,3 +527,14 @@ Watchtower-Track: security
 - **실제 PG17 검증 추가:** 기존 disposable DB 테스트에 역할 속성·멤버십·RPC allowlist·스키마/테이블/컬럼 ACL 감사를 확장했다. 스키마 CREATE, receipt queue SELECT/컬럼 SELECT, Legacy RPC 실행, 일반 API 역할 멤버십을 각각 SAVEPOINT로 임시 부여해 탐지한 뒤 ROLLBACK한다. 별도 테스트 로그인으로 TypeScript의 실제 `GOVERNED_LOGIN_PREFLIGHT_SQL_V1` 원문을 추출해 PostgreSQL 17에서 실행하고 71개 결과 필드를 확인한다. 기존 PG17 S0 실행 경로에 관련 Vitest/Cloudflare 회귀 테스트도 연결했다.
 - **로컬 검증:** Node 24 TypeScript/JavaScript 구문 검사 PASS, 두 DB 실행 스크립트 `bash -n` PASS, `git diff --check` PASS, `W121_RUNTIME_PREFLIGHT_AND_PG17_WIRING_PASS fields=71` PASS. 현재 로컬 Worktree에는 `node_modules`가 없어 Vitest는 실행하지 못했다. **새 브랜치 exact-head PostgreSQL17 CI는 아직 실행 전이며 PASS 아님.**
 - **커밋 및 안전 범위:** `5c8ced6c4df0310c1f6bcd880318348fe5c5a50e`를 새 브랜치에 푸시했다. 운영 DB ACL/ROLE/Secret 변경, Production 연결, 유료 Provider 호출, 배포 및 병합은 수행하지 않았다. 일반 API 역할에 기존 Legacy/Governed RPC 권한이 남아 있으므로 런타임 ENFORCE는 의도적으로 차단 상태다. G4 미완료, 공식 G0–G6 0/7, `HOLD_FORWARD_STOPPED` 유지.
+
+
+#### W62 후속 — PostgreSQL 15/17 권한 검사 및 CI 호환성 수정 (2026-11-07)
+
+- **최신 main 동기화:** 기존 W121 작업 브랜치에 최신 main `9963eaaa1df66016f000e66b17f5902338e6960f`를 merge commit `ad6884fb27021eba59171e62567d9be879ba4e8c`로 반영했다. PR #3089는 현재 main 기준 ahead, behind=0이며 다른 트랙의 운영 문서 변경을 보존했다.
+- **첫 CI 실패 수정:** `seyeon-governed-postgres-pool-v1.test.ts`의 실패 주입기가 SQL 부분 문자열을 검사해 사전검사 SQL 안의 주석/문구까지 실제 실패 명령으로 오인했다. 정확한 SQL 문장 predicate로 바꾸어 Subject assertion 실패와 `SET LOCAL ROLE` 실패를 각 실행 단계에서 재현하도록 수정했다.
+- **PostgreSQL 15/17 테이블 권한 호환성:** `db-authority-core`의 실제 서버는 PostgreSQL 15.19이며, 이 버전의 `has_table_privilege`는 `MAINTAIN`을 지원하지 않는다. 런타임 사전검사는 `server_version_num >= 170000`인 경우에만 `MAINTAIN`을 평가하도록 CASE 분기했고, 두 DB 권한 감사 스크립트도 PostgreSQL 17 이상에서만 해당 권한을 검사한다. PG17 테스트에는 `MAINTAIN` 임시 GRANT 탐지와 SAVEPOINT ROLLBACK 검증을 별도로 유지했다.
+- **역할 멤버십 호환성:** PostgreSQL 15의 `pg_has_role`은 `MEMBER`와 `USAGE`를 지원하지만 `SET`은 지원하지 않으며, `GRANT ... WITH INHERIT/SET` 멤버십 옵션도 지원하지 않는다. 테스트는 `MEMBER`/`USAGE`를 검사하고 실제 `SET LOCAL ROLE` 성공·거부를 실행해 15/17 공통 경계를 검증하도록 바꿨다. W121 멤버십 주입도 교차 버전 GRANT 문법을 사용한다.
+- **사전검사 결과 직렬화:** 런타임 권한 결과 71개 필드를 71쌍의 `jsonb_build_object` 인자로 넘기던 테스트가 PostgreSQL의 함수 인자 상한 100개를 초과했다. 전체 레코드는 `to_jsonb(preflight)`로 직렬화하고, 예상 필드 목록을 별도 JSON 값으로 함께 반환해 71개 필드 누락/변형을 확인하도록 변경했다.
+- **현재 검증 증거:** 코드 HEAD `5b3eb53b0f8a6d56f662fad6b934b9f9e6449dcc`의 [CI run 42263568899](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42263568899)에서 `Work Track · security`와 PostgreSQL 15 `db-authority-core`가 SUCCESS. `W121_GOVERNED_LOGIN_PREFLIGHT_SQL_VERSIONED_PASS`, 독립 LOGIN 경계 및 기존 D4A 권한·비용 경합 테스트까지 확인했다. **동일 run의 PostgreSQL 17 검증은 기록 시점에 진행 중이므로 전체 CI GREEN이나 W121 최종 PASS로 간주하지 않는다.** 이 Worklog 변경 자체로 새 exact-head CI도 다시 실행된다.
+- **운영 경계:** Production DB ACL/ROLE/Secret 변경, 운영 연결·배포, 유료 Provider 호출, 과금·스케줄러 활성화 및 PR 병합은 수행하지 않았다. 기존 `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false`, G5 `productionMounted=false`, `scheduled=false`를 유지한다. G0–G6 전체 완료를 선언하지 않는다.
