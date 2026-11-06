@@ -21,6 +21,55 @@
     "sameVersionNameDiffers": [],
     "sameNameDifferentVersion": [
       {
+        "remoteVersion": "20261027004434",
+        "name": "owner_admin_credit_testing_v1",
+        "repositoryVersions": [
+          "20261026110300"
+        ]
+      },
+      {
+        "remoteVersion": "20261027004544",
+        "name": "portone_chat_credit_catalog_staged_v1",
+        "repositoryVersions": [
+          "20261026100200"
+        ]
+      },
+      {
+        "remoteVersion": "20261027011650",
+        "name": "chat_credit_paid_validity_and_verified_mint_v1",
+        "repositoryVersions": [
+          "20261027101000"
+        ]
+      },
+      {
+        "remoteVersion": "20261027043527",
+        "name": "chat_credit_delivered_ack_private_v1",
+        "repositoryVersions": [
+          "20261027125500"
+        ]
+      },
+      {
+        "remoteVersion": "20261027074247",
+        "name": "commerce_owner_sandbox_credit_checkout_v1",
+        "repositoryVersions": [
+          "20261027163500"
+        ]
+      },
+      {
+        "remoteVersion": "20261027081929",
+        "name": "owner_kcp_sandbox_private_prepare_v1",
+        "repositoryVersions": [
+          "20261027185000"
+        ]
+      },
+      {
+        "remoteVersion": "20261028011357",
+        "name": "owner_sandbox_signed_receipt_persistence_v1",
+        "repositoryVersions": [
+          "20261028110500"
+        ]
+      },
+      {
         "remoteVersion": "20261029012948",
         "name": "owner_kcp_sandbox_remove_daily_limit_v1",
         "repositoryVersions": [
@@ -499,25 +548,122 @@
         "version": "2320",
         "name": "commerce_digital_reading_claim_account_delete_v1"
       }
-    ]
+    ],
+    "sameNameDifferentVersionCount": 8
   },
   "verifiedPairs": [
     {
+      "remoteVersion": "20261027004434",
+      "repositoryVersion": "20261026110300",
+      "name": "owner_admin_credit_testing_v1",
+      "remoteBytes": 2947,
+      "repositoryBytes": 2947,
+      "sha256": "91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44",
+      "exactByteEquality": true,
+      "remoteSha256": "91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44",
+      "repositorySha256": "91eaf5fcbfb2835c9b99d31487494df181e88c06c4cdf6552613487b1362ff44",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    },
+    {
+      "remoteVersion": "20261027004544",
+      "repositoryVersion": "20261026100200",
+      "name": "portone_chat_credit_catalog_staged_v1",
+      "remoteBytes": 1979,
+      "repositoryBytes": 1979,
+      "sha256": "eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a",
+      "exactByteEquality": true,
+      "remoteSha256": "eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a",
+      "repositorySha256": "eb7dcffc2835c0656af0b83d25f3fa3fbdaef29532cfa3230c3cdc957447af5a",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    },
+    {
+      "remoteVersion": "20261027011650",
+      "repositoryVersion": "20261027101000",
+      "name": "chat_credit_paid_validity_and_verified_mint_v1",
+      "remoteBytes": 8360,
+      "repositoryBytes": 8360,
+      "sha256": "fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5",
+      "exactByteEquality": true,
+      "remoteSha256": "fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5",
+      "repositorySha256": "fbd450033e94dc7e454bc6b3be34b40b81abccc93b9a040c623a42bc97d9ebc5",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
+    },
+    {
+      "remoteVersion": "20261027043527",
+      "repositoryVersion": "20261027125500",
+      "name": "chat_credit_delivered_ack_private_v1",
+      "remoteBytes": 4766,
+      "repositoryBytes": 4776,
+      "sha256": "c493715f0ecdac66e18b8649dce1ab79d15b20c926811b5399d1f735fb6af235",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "c493715f0ecdac66e18b8649dce1ab79d15b20c926811b5399d1f735fb6af235",
+      "repositorySha256": "c493715f0ecdac66e18b8649dce1ab79d15b20c926811b5399d1f735fb6af235",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261027074247",
+      "repositoryVersion": "20261027163500",
+      "name": "commerce_owner_sandbox_credit_checkout_v1",
+      "remoteBytes": 4310,
+      "repositoryBytes": 4320,
+      "sha256": "3e44a8b80c97274760f64d655d3f596862041401003ecc108907e6fd04242186",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "3e44a8b80c97274760f64d655d3f596862041401003ecc108907e6fd04242186",
+      "repositorySha256": "3e44a8b80c97274760f64d655d3f596862041401003ecc108907e6fd04242186",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261027081929",
+      "repositoryVersion": "20261027185000",
+      "name": "owner_kcp_sandbox_private_prepare_v1",
+      "remoteBytes": 12355,
+      "repositoryBytes": 12365,
+      "sha256": "3673df5921fd53443623130dc37036b23da8b331ad2232d4911515a1a93b4176",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "3673df5921fd53443623130dc37036b23da8b331ad2232d4911515a1a93b4176",
+      "repositorySha256": "3673df5921fd53443623130dc37036b23da8b331ad2232d4911515a1a93b4176",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
+      "remoteVersion": "20261028011357",
+      "repositoryVersion": "20261028110500",
+      "name": "owner_sandbox_signed_receipt_persistence_v1",
+      "remoteBytes": 9260,
+      "repositoryBytes": 9270,
+      "sha256": "e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4",
+      "exactByteEquality": false,
+      "repositoryHasTrailing": "\\n\\ncommit;\\n",
+      "repositoryWithoutTrailingEqualsRemote": true,
+      "remoteSha256": "e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4",
+      "repositorySha256": "e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4",
+      "versionIdentityEquality": false,
+      "disposition": "Remote SQL equals repository file after removing trailing newline + COMMIT terminator; inspect exact statement framing before treating as migration-equivalent"
+    },
+    {
       "remoteVersion": "20261029012948",
-      "remoteName": "owner_kcp_sandbox_remove_daily_limit_v1",
       "repositoryVersion": "20261029012000",
-      "repositoryName": "owner_kcp_sandbox_remove_daily_limit_v1",
-      "repositoryBlobSha": "3903c37f80f860f899fb1086b4bab878e73eab1d",
-      "remoteStatementBytes": 7349,
-      "repositoryFileBytes": 7349,
-      "remoteStatementMd5": "c13c8ae6680c9c5aef35909ba81b7b1b",
-      "repositoryFileMd5": "c13c8ae6680c9c5aef35909ba81b7b1b",
-      "remoteStatementSha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
-      "repositoryFileSha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "name": "owner_kcp_sandbox_remove_daily_limit_v1",
+      "remoteBytes": 7349,
+      "repositoryBytes": 7349,
+      "sha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
       "normalizedSha256": "0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d",
       "exactByteEquality": true,
-      "migrationVersionIdentityEquality": false,
-      "disposition": "SQL source equivalence proven for this pair; migration ledger version identity still requires a governed forward-only disposition"
+      "remoteSha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "repositorySha256": "b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6",
+      "versionIdentityEquality": false,
+      "disposition": "SQL byte equality proven; version identity and application provenance remain separate"
     }
   ],
   "remoteOnlyBundle": {
@@ -564,6 +710,7 @@
     "The exact-version catalog comparison is not a semantic DDL comparison.",
     "A matching SQL body does not prove authenticated deployment actor or approval provenance.",
     "The remote 20261008090417 statement was not exported; only its metadata/hash and safe catalog observations are included.",
-    "Provider-managed Hosted Auth/Storage restoration, independent privacy continuity, and whole-service RPO/RTO remain unproven."
+    "Provider-managed Hosted Auth/Storage restoration, independent privacy continuity, and whole-service RPO/RTO remain unproven.",
+    "Eight same-name/different-version pairs were identified; three have exact byte equality and four are exact prefixes after removing the repository's trailing newline + COMMIT terminator; SQL framing semantics and version identity remain distinct. One pair 20261029012948 is byte-exact."
   ]
 }
