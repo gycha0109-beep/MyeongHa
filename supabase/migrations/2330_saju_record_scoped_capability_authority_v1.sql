@@ -85,7 +85,7 @@ as $saju_overlap_fields$
   end
 $saju_overlap_fields$;
 revoke all on function public.internal_commerce_saju_product_fields_v1(text)
- from public,anon,authenticated,service_role,myeongha_api_executor;
+ from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
 
 -- Canonical internal entitlement keys are derived from the governed Saju fields.
 -- This is not a public key and cannot be supplied by a client.
