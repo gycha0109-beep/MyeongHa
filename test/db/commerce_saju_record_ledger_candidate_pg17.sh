@@ -18,3 +18,9 @@ node test/db/commerce_stored_portone_hmac_lineage_pg17_generator.mjs --fixture |
   psql -X -v ON_ERROR_STOP=1 -f - >/dev/null
 
 psql -X -v ON_ERROR_STOP=1 -f test/db/commerce_saju_record_ledger_candidate_pg17.sql
+
+# Execute the exact TypeScript current-Grant and receipt/Record SQL on the same
+# disposable PG17 database. All candidate objects are again rolled back.
+# This does NOT assert that a Reader B2 fixture is an approved Saju Product.
+node test/db/commerce_saju_private_quote_sql_pg17_generator.mjs |
+  psql -X -v ON_ERROR_STOP=1 -f -
