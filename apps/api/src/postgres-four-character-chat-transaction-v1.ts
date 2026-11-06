@@ -11,7 +11,6 @@ import type {
   FourCharacterIssuedReceiptV1,
   FourCharacterProductionExecutionPortsV1,
   FourCharacterValidatedReplyV1,
-  FourIndependentChatTargetV1,
   PublishedFourCharacterModelSourceV1,
 } from './four-character-production-chat-executor-v1.js';
 import {
