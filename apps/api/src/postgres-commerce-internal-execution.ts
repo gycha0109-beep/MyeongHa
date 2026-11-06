@@ -15,12 +15,15 @@ export interface PostgresCommerceInternalExecutionScopeV1 {
 
 export interface ExecutePostgresCommerceInternalTransactionInputV1<T> {
   readonly pool: PostgresSubjectPoolV1;
+  /** An explicit immutable view for multi-query private evidence reads only. */
+  readonly transactionMode?: 'read_only_repeatable_read';
   readonly execute: (
     scope: PostgresCommerceInternalExecutionScopeV1,
   ) => Awaitable<T>;
 }
 
 const BEGIN_SQL = 'BEGIN';
+const READ_ONLY_SNAPSHOT_BEGIN_SQL = 'BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY';
 const ENTER_EXECUTION_ROLE_SQL = 'SET LOCAL ROLE myeongha_commerce_internal_executor';
 const COMMIT_SQL = 'COMMIT';
 const ROLLBACK_SQL = 'ROLLBACK';
@@ -33,7 +36,9 @@ export async function executePostgresCommerceInternalTransactionV1<T>(
   let discardConnectionError: unknown;
 
   try {
-    await connection.query(BEGIN_SQL);
+    await connection.query(input.transactionMode === 'read_only_repeatable_read'
+      ? READ_ONLY_SNAPSHOT_BEGIN_SQL
+      : BEGIN_SQL);
     transactionStarted = true;
 
     await connection.query(ENTER_EXECUTION_ROLE_SQL);
