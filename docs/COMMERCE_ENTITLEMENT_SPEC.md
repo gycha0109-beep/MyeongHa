@@ -510,22 +510,21 @@ Refund 후 이미 생성된 Reading/content artifact의 열람/삭제는 Product
 
 ## 11. Guest / Member
 
-`P0-CM-04`는 **DECIDED**다.
+`P0-CM-04`는 Guest 유료 구매를 허용했던 역사적 결정이며 2026-11-07 `P0-CM-05`로 superseded되었다.
 
 ```text
-active Guest 또는 active Member
-→ server resolves canonical subjects.id owner
-→ Purchase Intent / historical Commerce ownership
+Guest
+→ 무료 오늘의 운세 허용
+→ 추후 명시적으로 지정할 무료 사주 상품 1종 허용
+→ 유료 상품 선택 시 LOGIN_REQUIRED
 
-new Member promotion
-→ same subject continuity
-
-existing Member merge
-→ historical Commerce owner rewrite 금지
-→ current rights는 direct merged-Guest lineage로 조합
+active authenticated Member
+→ Purchase Intent
+→ Payment Attempt
+→ 기존 Commerce 검증 흐름
 ```
 
-Raw client owner/subject identity는 authority가 아니다. Guest/Member ownership authority는 saleable Product/SKU를 만들지 않으며 `P0-CM-03`은 계속 OPEN-P0다.
+모든 유료 구매는 `subjects.kind='member'`, `status='active'`, `auth_user_id IS NOT NULL`인 서버 확인 Member만 가능하다. 무료 경험은 paid Purchase Intent/Payment Attempt를 사용하지 않는다. 과거 Guest-owned Commerce row가 있더라도 canonical `subjects.id`와 역사적 Receipt/Event/Grant provenance는 변경하지 않는다. Guest 무료 이용 정책은 saleable Product/SKU나 `P0-CM-03` 판매 승인을 만들지 않는다.
 
 ---
 
@@ -659,7 +658,8 @@ SRC-18      = CLOSED by Commerce Architecture v1
 SRC-21      = CLOSED by Commerce Architecture v1
 P0-CM-01    = DECIDED: Web + one-off launch MVP
 P0-CM-02    = DECIDED: PortOne V2 / portone_v2
-P0-CM-04    = DECIDED: Guest + Member canonical subjects.id ownership
+P0-CM-04    = SUPERSEDED: Guest paid-purchase permission
+P0-CM-05    = DECIDED: Guest free-only / active Member required for paid purchase
 P0-PR-01B   = DECIDED: Commerce evidence minimization/security baseline
 ```
 
@@ -688,7 +688,7 @@ full provider lifecycle ordering/reconciliation proof
 → paid-payment completion foundation does not imply refund/reversal/dispute lifecycle completion
 ```
 
-`P0-CM-01`과 `P0-CM-02` 결정은 Web one-off + PortOne V2 선택을 고정하지만 saleable SKU, price/currency, live merchant/PG/channel/credentials 또는 Production activation을 승인하지 않는다. `P0-CM-04`는 ownership만 결정하며 saleability를 만들지 않는다. `P0-PR-01B` 결정은 retention duration을 승인하지 않는다. Effective Entitlement recompute 또는 repository-local payment/webhook foundation 역시 Production activation을 승인하지 않는다.
+`P0-CM-01`과 `P0-CM-02` 결정은 Web one-off + PortOne V2 선택을 고정하지만 saleable SKU, price/currency, live merchant/PG/channel/credentials 또는 Production activation을 승인하지 않는다. `P0-CM-04`는 superseded historical policy이고, 현재 `P0-CM-05`는 Guest 무료 이용 범위와 Member-only 유료 구매 자격만 결정하며 saleability를 만들지 않는다. `P0-PR-01B` 결정은 retention duration을 승인하지 않는다. Effective Entitlement recompute 또는 repository-local payment/webhook foundation 역시 Production activation을 승인하지 않는다.
 
 ---
 
