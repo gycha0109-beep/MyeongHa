@@ -1,13 +1,17 @@
 // Watchtower-Track: security
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+const admissionMock=vi.hoisted(()=>vi.fn(async()=>{throw Error('G4 must not run before G1 succeeds');}));
+vi.mock('../apps/api/src/seyeon-g4-first-memory-credit-admission-v1.js',()=>({
+  admitSeyeonG4FirstMemoryCreditsV1:admissionMock,
+}));
 import { createProductionSeyeonFirstMemoryNodeRuntimeV1, createProductionSeyeonFirstMemoryExecutionV1 } from '../apps/api/src/production-seyeon-first-memory-node-runtime-v1.js';
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 import { PRODUCTION_USER_DATA_RUNTIME_ENV_V1, MYEONGHA_PRODUCTION_SUPABASE_ORIGIN, PRODUCTION_POSTGRES_TLS_ACTIVATION_ENV_V1 } from '../apps/api/src/production-user-data-runtime-config.js';
 
-describe('first Memory production composition stays closed before credential resolution', () => {
-  it.each([false, true])('requires real source/cost admission after DB readiness=%s', async ready => {
+describe('first Memory production composition stays closed until G1 and G4 admission', () => {
+  it.each([false, true])('does not resolve Provider credentials when source readiness=%s', async ready => {
     let credentialReads = 0;
     let readinessReads = 0;
     const env: Record<string, string> = {
@@ -53,12 +57,16 @@ describe('first Memory production composition stays closed before credential res
         governorApproval:{} as never,
       });
       try {
+        // The fixture has no original Thread/Memory/Grant/context rows, so the
+        // complete G1 source path cannot succeed. G4 and provider configuration
+        // must remain unreachable until the exact source Pin has committed.
         await expect(approved.runtime.run({
           verifiedEvidence:{kind:'member',verifiedAuthUserId:auth},
           threadId:'33333333-3333-4333-8333-333333333333',
           clientTurnId:'44444444-4444-4444-8444-444444444444',text:'hello',
-        })).rejects.toThrow('G4 credits and delivery settlement are not mounted');
+        })).rejects.toThrow();
         expect(credentialReads).toBe(0);
+        expect(admissionMock).not.toHaveBeenCalled();
       } finally {await approved.close();}
     } finally {
       server.closeAllConnections();

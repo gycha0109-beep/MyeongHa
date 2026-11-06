@@ -2,21 +2,35 @@
 // Reuse canonical config, approved target and Hyperdrive pool authority.
 import {parseProductionUserDataRuntimeConfigV1,parseProductionPostgresRuntimeConfigV1} from '../apps/api/src/production-user-data-runtime-config.js';
 import {approvedCloudflarePostgresTargetV1} from './cloudflare-auth-db-api.mjs';
-import {createCloudflareSeyeonSubjectPoolV1,createCloudflareSeyeonGovernedPoolV1,createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1} from './cloudflare-hyperdrive-subject-pool.mjs';
+import {
+  createCloudflareSeyeonSubjectPoolV1,
+  createCloudflareSeyeonGovernedPoolV1,
+  createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1,
+  createCloudflareSeyeonG5PrivateCommercePoolV1,
+} from './cloudflare-hyperdrive-subject-pool.mjs';
 import {createProductionSeyeonFirstMemoryFetchRuntimeV1} from '../apps/api/src/production-seyeon-first-memory-fetch-runtime-v1.js';
 import {createProductionRequestIdentityVerifierV1} from '../apps/api/src/production-request-identity-verifier.js';
 import {readOwnerAdminAccessV1} from '../apps/api/src/myeongha-owner-admin-access-v1.js';
 import {handleSeyeonReceiptWithdrawalFetchV1} from '../apps/api/src/seyeon-receipt-withdrawal-fetch-v1.js';
 import {handleSeyeonPositiveReplyReceiptV1} from '../apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.js';
+import {handleSeyeonPositiveReceiptAndCreditCandidateV1} from '../apps/api/src/seyeon-g4-positive-receipt-credit-bridge-candidate-v1.js';
 const limits=Object.freeze({maxConnectionsPerRuntime:1,connectionTimeoutMs:5000,idleTimeoutMs:1000,statementTimeoutMs:5000});
 export function createCloudflareSeyeonFirstMemoryRuntimeV1(input){
  const config=parseProductionUserDataRuntimeConfigV1(input.env);
  if(!approvedCloudflarePostgresTargetV1(config,input.env)){
    throw Error('Cloudflare requires explicitly verified Hyperdrive origin');
  }
+ // Create the third, dedicated Commerce connection only when the
+ // server-owned production mount is enabled. Missing binding fails closed.
+ const privateCreditPool=input.creditBillingProductionMounted===true
+   ?createCloudflareSeyeonG5PrivateCommercePoolV1(input.env,limits)
+   :undefined;
  const pool=createCloudflareSeyeonSubjectPoolV1(input.env,limits);
  const governedCostPool=createCloudflareSeyeonGovernedPoolV1(input.env,limits);
- const runtime=createProductionSeyeonFirstMemoryFetchRuntimeV1({...input,pool,governedCostPool});
+ const runtime=createProductionSeyeonFirstMemoryFetchRuntimeV1({
+   ...input,pool,governedCostPool,
+   ...(privateCreditPool===undefined?{}:{privateCreditPool}),
+ });
  return Object.freeze({
   handleRequest:request=>runtime.handleRequest(request),
   async verifyOwnerCreditExemption(request){
@@ -31,7 +45,11 @@ export function createCloudflareSeyeonFirstMemoryRuntimeV1(input){
     }catch{return false;}
   },
   async close(){
-   try{await runtime.close();}finally{try{await pool.close();}finally{await governedCostPool.close();}}
+   try{await runtime.close();}finally{
+    try{await pool.close();}finally{
+     try{await governedCostPool.close();}finally{await privateCreditPool?.close();}
+    }
+   }
  }});
 }
 
@@ -76,13 +94,25 @@ export function createCloudflareSeyeonIssuedReplyReceiptRuntimeV1(input){
   if(!approvedCloudflarePostgresTargetV1(config,input.env)){
     throw Error('Cloudflare requires explicitly verified receipt DB origin');
   }
+  // The G4 bridge is selected only by the server-owned mount state. When
+  // enabled, the dedicated Commerce binding is mandatory and separately
+  // preflighted; receipt-only privacy behavior remains independent otherwise.
+  const creditSettlementEnabled=input.creditSettlementEnabled===true;
+  const privateCreditPool=creditSettlementEnabled
+    ?createCloudflareSeyeonG5PrivateCommercePoolV1(input.env,limits)
+    :undefined;
   const pool=createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1(input.env,limits);
   return Object.freeze({
     handleRequest(request){
-      return handleSeyeonPositiveReplyReceiptV1({
-        request,pool,requestId:crypto.randomUUID(),
-      });
+      const requestId=crypto.randomUUID();
+      return creditSettlementEnabled
+        ?handleSeyeonPositiveReceiptAndCreditCandidateV1({
+          request,pool,privateCreditPool,requestId,
+        })
+        :handleSeyeonPositiveReplyReceiptV1({request,pool,requestId});
     },
-    close(){return pool.close();},
+    async close(){
+      try{await pool.close();}finally{await privateCreditPool?.close();}
+    },
   });
 }

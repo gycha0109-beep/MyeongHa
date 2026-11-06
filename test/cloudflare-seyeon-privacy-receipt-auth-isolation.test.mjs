@@ -21,6 +21,7 @@ vi.mock('../workers/cloudflare-hyperdrive-subject-pool.mjs',()=>({
   createCloudflareSeyeonSubjectPoolV1:vi.fn(),
   createCloudflareSeyeonGovernedPoolV1:vi.fn(),
   createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1:state.subjectPool,
+  createCloudflareSeyeonG5PrivateCommercePoolV1:vi.fn(()=>({close:vi.fn(async()=>{})})),
 }));
 vi.mock('../apps/api/src/production-request-identity-verifier.js',()=>({
   createProductionRequestIdentityVerifierV1:state.verifyMember,

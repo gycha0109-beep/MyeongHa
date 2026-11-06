@@ -44,10 +44,10 @@ Watchtower-Track: security
 
 | 영역 | 이미 확보한 구현·증거 | 아직 실제 제품 완료로 볼 수 없는 부분 |
 |---|---|---|
-| G1 출처 Pin | 0건 선행 Pin, 최종 모델 입력 선택 검사, 단일 Memory + 현재 User를 결합하는 S0 Pin SQL/서버 연결 코드가 누적되어 있음 | 전체 운영 설치·권한·실제 요청에서 Provider 이전 Pin 성공 증거, S0 입력 외 출처가 유입되지 않는 최종 확인 |
+| G1 출처 Pin | 0건 선행 Pin, 최종 모델 입력 선택 검사, 단일 Memory + 현재 User를 결합하는 S0 Pin SQL/서버 연결 코드가 존재하고 실행 순서에 연결됨 | 운영 Source Registry가 비어 있고 `positiveMemoryFirstReplyApproved=false`; 운영 대상 DB에서 exact positive Pin 성공 및 Provider 0회 실패 증거 미확정 |
 | G2 Commit | S0 원본 Grant 잠금·digest 확인과 기존 `cmd_commit_seyeon_chat_turn_runtime_v2`를 사용하는 원자 Commit 경로가 존재 | 현재 운영 함수/ACL과 정확한 S0 Pin의 연결, 운영 대상 DB에서 취소 경합을 포함한 완료 증거 |
 | G3 최초 공개 | 최초 답변 발행·receipt/ACK·철회 관련 DB/서버 경로 및 실패 시 HOLD가 구현되어 있음 | 실제 배포 Worker의 HTTP 송출·receipt ACK·철회 순서가 한 번의 실제 경로에서 증명되지 않음. History/Replay는 계속 제외 |
-| G4 비용·실행 권한 | W115~W121 비용 정책 고정, Legacy RPC/직접 권한 차단, 전용 실행 역할 사전검사 구현. W121은 PR #3089로 main 병합 | 실제 운영 DB 역할/Secret/TLS 연결과 일반 고객 크레딧 예약→receipt→정산의 Runtime 장착은 미완료 |
+| G4 비용·실행 권한 | W115~W121 비용 정책 고정 및 최소 권한 검사 재사용. G1 Pin 이후 크레딧 예약, G5 전용 Hyperdrive 후보, receipt 정산 bridge를 Worker 경로에 조건부 연결 | Cloudflare G5 Commerce Hyperdrive/운영 LOGIN·Secret·Role 미구성, `creditBilling.productionMounted=false`; 일반 고객 예약·정산 실운영 증거 미확정 |
 | G5 통합 검증 | 기존 S0 PostgreSQL 격리 테스트, PG15/17 호환성 검증 및 PR #3089 exact-head 전체 Integration 성공 | S0의 최종 운영 전송 경로와 취소 경쟁을 포함한 통합 증거, 배포 대상과 일치하는 실환경 검증 |
 | G6 제한 운영 | 백업·격리 복원·forward stop 등 기존 운영 증거가 존재 | 이번 S0 범위의 제한 smoke, 안전 로그/알림, 되돌리기 절차와 최종 운영 증거 묶음 |
 
@@ -55,10 +55,10 @@ Watchtower-Track: security
 
 ### 기준 커밋과 작업 정리
 
-- 기준 main: `1609aa879aa63120072b4d21b35f4c469dc650ed`.
+- 기준 main: `cdf71d9453c96b42489a27857a6159936155065e` (PR #3094 병합, 전체 Integration run `42282815736` GREEN).
 - W121 권한 검사 및 PostgreSQL 15/17 호환성 수정은 [PR #3089](https://github.com/gycha0109-beep/MyeongHa/pull/3089)로 병합됐다. 해당 PR의 전체 Integration 성공을 기존 근거로 재사용한다.
 - 오래된 [PR #2761](https://github.com/gycha0109-beep/MyeongHa/pull/2761)은 오래된 base·155개 파일·충돌 상태의 누적 브랜치다. 이 로드맵의 작업 기준이나 재개 브랜치로 사용하지 않는다. 이미 main에 들어간 변경은 main에서 재사용한다.
-- 기존 작업 기록은 `SEYEON_AI_SECURITY_IMPLEMENTATION_STATUS_AND_ENDPOINTS_20261030.md`의 W01~W62를 보존한다.
+- 기존 작업 기록은 `SEYEON_AI_SECURITY_IMPLEMENTATION_STATUS_AND_ENDPOINTS_20261030.md`의 W01~W123을 보존한다.
 
 ## 4. 수정된 실행 순서
 
