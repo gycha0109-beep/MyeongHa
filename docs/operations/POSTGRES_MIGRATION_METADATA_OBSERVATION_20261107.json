@@ -712,5 +712,114 @@
     "The remote 20261008090417 statement was not exported; only its metadata/hash and safe catalog observations are included.",
     "Provider-managed Hosted Auth/Storage restoration, independent privacy continuity, and whole-service RPO/RTO remain unproven.",
     "Eight same-name/different-version pairs were identified; three have exact byte equality and four are exact prefixes after removing the repository's trailing newline + COMMIT terminator; SQL framing semantics and version identity remain distinct. One pair 20261029012948 is byte-exact."
-  ]
+  ],
+  "currentFrontierAssessment": {
+    "observationDateKst": "2026-11-07",
+    "source": {
+      "repository": "gycha0109-beep/MyeongHa",
+      "mainSha": "cdf71d9453c96b42489a27857a6159936155065e",
+      "supabaseProjectRef": "cnsfpcdiyofqvhpcegfc",
+      "postgresVersion": "17.6",
+      "readOnly": true,
+      "productionMutationPerformed": false
+    },
+    "historicalBundle": {
+      "version": "20261008090417",
+      "bytes": 104021,
+      "sha256": "4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894",
+      "sourceRoutines": 19,
+      "liveRoutinesPresent": 19,
+      "sourceOwnerTransfers": 18,
+      "liveOwnerTransfersMatched": 18,
+      "sourcePolicies": 19,
+      "liveSourcePoliciesMatchedByNameRelationCommandAndRole": 19,
+      "liveRelatedPolicyCount": 38,
+      "liveAdditionalPoliciesBeyondHistoricalBundle": 19,
+      "liveRoutineSearchPathMatched": "pg_catalog, public",
+      "liveSecurityDefinerCount": 17,
+      "liveInvokerCount": 2,
+      "apiExecutorEffectiveExecute": 17,
+      "anonAuthenticatedServiceRoleEffectiveExecute": 0,
+      "currentReapplyPreflight": "FAILS_BY_DESIGN: six history markers, owner roles, and Se-yeon policies already exist; current runtime also contains later Pin and RLS changes",
+      "disposition": "Do not replay the 104,021-byte historical bundle. The historical preflight and owner-membership postcheck do not describe the current frontier."
+    },
+    "roleMembership": {
+      "role": "myeongha_seyeon_chat_runtime_owner",
+      "member": "postgres",
+      "rows": [
+        {
+          "grantor": "supabase_admin",
+          "adminOption": true,
+          "inheritOption": false,
+          "setOption": false
+        },
+        {
+          "grantor": "postgres",
+          "adminOption": false,
+          "inheritOption": false,
+          "setOption": false
+        }
+      ],
+      "pgHasRole": {
+        "member": true,
+        "usage": false,
+        "set": false
+      },
+      "currentMembershipCount": 2,
+      "explanation": "The later applied remote-only migration 20261104043413 temporarily grants SET TRUE and then executes REVOKE SET OPTION FOR the role from postgres. The remaining postgres-grantor row is non-admin, non-inheriting, and non-SET; it does not grant effective role switching or privilege inheritance. The older one-row owner-membership postcheck is superseded at the current frontier."
+    },
+    "laterRemoteMigration": {
+      "version": "20261104043413",
+      "name": "chat_owner_visible_history_private_rls_runtime_checker_20261104",
+      "statementCount": 1,
+      "bytes": 15075,
+      "sha256": "689ec756ba696f9e62450a27d52370cdfb202e7f5b4fb9889665666170eb85a4",
+      "repositoryFilePresent": false,
+      "relevantRoleSequence": [
+        "GRANT myeongha_seyeon_chat_runtime_owner TO postgres WITH INHERIT FALSE, SET TRUE",
+        "REVOKE SET OPTION FOR myeongha_seyeon_chat_runtime_owner FROM postgres"
+      ],
+      "currentCatalogEffectVerified": true,
+      "classification": "Applied remote-only migration that intentionally changes the earlier owner-role membership shape; keep it in current-frontier parity scope and do not classify the remaining membership row as effective SET access."
+    },
+    "migrationSourceDrift": {
+      "version": "1640",
+      "name": "seyeon_zero_personal_source_pre_model_pin_v1",
+      "remoteBytes": 10303,
+      "remoteSha256": "ce347be8446be958c4ed6d5f2b9f527b1910032076652e3ffd021eebc9721b50",
+      "repositoryPath": "supabase/migrations/1640_seyeon_zero_personal_source_pre_model_pin_v1.sql",
+      "repositoryBytes": 10147,
+      "repositoryBlobSha": "51862c2b4adcfcf65d76ab08459b1c26a12e0fba",
+      "repositorySha256": "77fe56de1d0c51c538c0cf80189708ff385923438209e97fecc6ba460de78cd5",
+      "whitespaceStrippedEqual": false,
+      "remoteBehavior": [
+        "SET ROLE myeongha_seyeon_chat_runtime_owner",
+        "RESET ROLE",
+        "REVOKE myeongha_seyeon_chat_runtime_owner FROM postgres GRANTED BY postgres"
+      ],
+      "repositoryBehavior": [
+        "REVOKE myeongha_seyeon_chat_runtime_owner FROM current_user",
+        "direct REVOKE EXECUTE on legacy context-ready RPC"
+      ],
+      "disposition": "Applied remote SQL and current-main migration file differ materially in the ownership/ACL handoff. Do not rewrite the applied migration or replay it. Keep as an explicit source/provenance reconciliation item."
+    },
+    "migrationSourcePair": {
+      "version": "20261026025332",
+      "name": "seyeon_chat_helper_service_role_least_privilege",
+      "remoteStatementCount": 9,
+      "remoteReconstructedBytes": 6987,
+      "remoteReconstructedSha256": "0fd1fa55e2d8c6665c82b01e5a36d796f6d168365099ba08b986c360e9ca25e0",
+      "repositoryPath": "supabase/migrations/20261026025332_seyeon_chat_helper_service_role_least_privilege.sql",
+      "repositoryBytes": 6986,
+      "repositoryBlobSha": "c051a1dde2b3a260cdde5efafdcf1583c79d608d",
+      "repositorySha256": "6ca818ecebef8ca000b9c2af1247ed4a7ffcf690572f03919098b74d6cc3c7cd",
+      "whitespaceStrippedTokenStreamEqual": true,
+      "disposition": "Remote statement array reconstructed from nine stored statements and repository file differ in whitespace formatting; whitespace-stripped comparison is equal. Keep exact statement framing/version identity separate."
+    },
+    "limitations": [
+      "Policy comparison for the 19 historical policies covers policy name, relation, command and target role; it does not claim full expression-tree equivalence for all later policies.",
+      "The 19-function source-body extraction was not used as proof because the SQL regex did not isolate function bodies reliably; function body equivalence must use the existing reviewed per-function verifier or a corrected parser.",
+      "The current related-policy count of 38 includes 19 policies added by later applied migrations and must not be compared to the historical bundle's 19-policy count as if the extra policies were drift."
+    ]
+  }
 }
