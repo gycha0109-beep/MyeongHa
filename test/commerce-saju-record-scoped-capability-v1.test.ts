@@ -26,6 +26,8 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(migration).toContain('unique (entitlement_scope_id)');
     expect(migration).toContain('new.entitlement_scope_id is distinct from old.entitlement_scope_id');
     expect(migration).toContain("'saju-record:'||record.entitlement_scope_id::text");
+    expect(migration).toContain('internal_commerce_saju_entitlement_key_v1');
+    expect(migration).toContain('internal_commerce_saju_product_price_minor_v1');
     expect(migration).not.toMatch(/insert into public\.(products|product_offers)\b/iu);
   });
 
@@ -43,6 +45,7 @@ describe('Saju Record-scoped Capability authority',()=>{
       "v_scope_mode<>'saju_record'",
     ])expect(effect).toContain(part);
     expect(effect).toContain("v_scope_mode='saju_record' and v_scope_key is not null");
+    expect(effect).toContain('internal_commerce_saju_entitlement_key_v1(p_capability_item_key)');
   });
 
   it('prevents bypass through the generic Purchase Intent command',()=>{
@@ -67,6 +70,9 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(admission).toContain('for update');
     expect(admission.indexOf('for update')).toBeLessThan(admission.indexOf('cmd_create_purchase_intent_v3('));
     expect(admission).toContain('internal_commerce_saju_product_fields_v1(v_product_key)');
+    expect(admission).toContain('internal_commerce_saju_product_price_minor_v1(v_product_key)');
+    expect(admission).toContain('item.entitlement_key is distinct from');
+    expect(admission).toContain('terms.amount_minor');
     expect(admission).toContain('insert into public.commerce_saju_purchase_origins_v1');
     expect(admission).toContain('commerce_saju_purchase_admission_context_v1');
     expect(migration).toContain('cmd_purchase_intent_v3_saju_record_context_required');
@@ -93,6 +99,8 @@ describe('Saju Record-scoped Capability authority',()=>{
     expect(reader).toContain("item.scope_mode='saju_record'");
     expect(reader).toContain("'saju-record:'||record.entitlement_scope_id::text");
     expect(reader).toContain('record.birth_revision_id=origin.birth_revision_id');
+    expect(reader).toContain('item.entitlement_key as "entitlementKey"');
+    expect(reader).toContain('row.entitlementKey!==`saju.${row.field}`');
   });
 
   it('deletes only the personal Record mapping in exact account-finalizer order and retains financial evidence',()=>{
