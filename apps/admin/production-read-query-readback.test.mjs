@@ -18,10 +18,17 @@ describe('dedicated Admin Reader live data smoke',()=>{
     expect(limit).toBe(kind==='overview'?20:2);
    },
   });
+  expect(ADMIN_LIVE_READBACK_KINDS_V1).toHaveLength(20);
+  expect(ADMIN_LIVE_READBACK_KINDS_V1).toEqual(expect.arrayContaining([
+   'commerce-alerts','credit-reservations','credit-allocations','ai-errors','ai-estimates',
+   'catalog','characters','content-releases','deletion-jobs','entitlement-events','provider-events',
+  ]));
+  expect(ADMIN_LIVE_READBACK_KINDS_V1).not.toContain('analytics');
+  expect(ADMIN_LIVE_READBACK_KINDS_V1).not.toContain('user-detail');
   expect(observed.map(x=>x.kind)).toEqual(ADMIN_LIVE_READBACK_KINDS_V1);
   expect(observed.every(x=>x.subjectId===null&&x.from===null&&
    x.to===null&&x.cursor===null)).toBe(true);
-  expect(result).toEqual({readOnly:true,verified:true,queryKindsChecked:9});
+  expect(result).toEqual({readOnly:true,verified:true,queryKindsChecked:20});
   expect(JSON.stringify(result)).not.toContain('members_active');
  });
  it('never substitutes zero rows or success for a database query failure',async()=>{
@@ -29,7 +36,7 @@ describe('dedicated Admin Reader live data smoke',()=>{
   await expect(verifyAdminReadQueriesV1({
    port:{async read(){attempted++;throw Error('private-pg-details');}},
    project(){throw Error('should not project an unsuccessful query');},
-  })).rejects.toThrow('private-pg-details');
+  })).rejects.toThrow('Scoped Admin Reader query failed: overview');
   expect(attempted).toBe(1);
  });
  it('requires dedicated credentials before attempting any connection',async()=>{

@@ -9,10 +9,24 @@ import {
 } from './origin-preflight.mjs';
 
 // Existing A1–A4 read-only Admin menu routes. No customer data leaves the runner.
+// Exercise every SQL-backed list/query that does not require a specific private ID.
+// Excludes detail/attempt routes (which demand an existing owned UUID) and A5
+// analytics (a separately-gated reader authority, not this SQL adapter).
 // Each query uses the same Reader adapter and response projection as the Worker.
 export const ADMIN_LIVE_READBACK_KINDS_V1=Object.freeze([
  'overview','users','commerce','credits','entitlements','readings','ai-costs','issues','audit',
+ 'commerce-alerts','credit-reservations','credit-allocations','ai-errors','ai-estimates',
+ 'catalog','characters','content-releases','deletion-jobs','entitlement-events','provider-events',
 ]);
+
+// Only the checked-in query name is disclosed when an isolated read fails.
+// PostgreSQL errors and response rows may contain sensitive data.
+class AdminSafeReadbackQueryFailureV1 extends Error {
+ constructor(kind){
+  super('Scoped Admin Reader query failed: '+kind);
+  this.name='AdminSafeReadbackQueryFailureV1';
+ }
+}
 
 export async function verifyAdminReadQueriesV1(input){
  const {port,project}=input;
@@ -24,8 +38,12 @@ export async function verifyAdminReadQueriesV1(input){
    kind,limit,cursor:null,subjectId:null,from:null,to:null,
   });
   // Errors are fatal; never substitute empty rows for a failed read.
-  const result=await port.read(filters);
-  project(kind,result,limit);
+  try{
+   const result=await port.read(filters);
+   project(kind,result,limit);
+  }catch{
+   throw new AdminSafeReadbackQueryFailureV1(kind);
+  }
  }
  return Object.freeze({
   readOnly:true,verified:true,queryKindsChecked:ADMIN_LIVE_READBACK_KINDS_V1.length,
@@ -68,9 +86,10 @@ export async function verifyProductionAdminReadQueriesV1(env,options={}){
   return await verifyAdminReadQueriesV1({
    port:createAdminPostgresReadPortV1({pool}),project:projectAdminRowsV1,
   });
- }catch{
+ }catch(error){
   failed=true;
-  // The original error may contain DB host, SQL text or row details.
+  // A committed, constant query name is safe. Never show PostgreSQL errors.
+  if(error instanceof AdminSafeReadbackQueryFailureV1)throw error;
   throw Error('Scoped Admin Reader queries could not be verified');
  }finally{
   if(connection){try{connection.release();}catch{failed=true;}}
@@ -83,8 +102,9 @@ if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.u
  try{
   const report=await verifyProductionAdminReadQueriesV1(process.env);
   console.log(JSON.stringify(report));
- }catch{
-  console.error('Scoped Admin Reader readback failed');
+ }catch(error){
+  console.error(error instanceof AdminSafeReadbackQueryFailureV1
+   ?error.message:'Scoped Admin Reader readback failed');
   process.exitCode=2;
  }
 }
