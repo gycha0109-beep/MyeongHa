@@ -5,6 +5,7 @@ import {
   type ModelTokenBudgetProfileV1,
   type ModelTokenCountAdapterV1,
   type ModelTokenCountExactRequestV1,
+  type ModelTokenBudgetReceiptV1,
 } from '../../../packages/domain/src/model-token-budget-profile-v1.js';
 import type { SeyeonStructuredProviderRequestV2 } from './seyeon-character-runtime-v2.js';
 import type { SeyeonAiGovernorAdmissionV1 } from './postgres-seyeon-ai-cost-ledger-v1.js';
@@ -14,8 +15,10 @@ import {
   type SeyeonOpenAiInputTokenCountConfigV1,
 } from './seyeon-openai-input-token-count-port-v1.js';
 import {
+  quoteSeyeonCostGovernorMaximumV1,
   validateSeyeonCostGovernorModelPolicyV1,
   type SeyeonCostGovernorModelPolicyV1,
+  type SeyeonCostGovernorQuoteV1,
 } from './seyeon-cost-governor-server-policy-v1.js';
 
 export const SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1 =
@@ -65,6 +68,62 @@ export function createSeyeonOpenAiModelTokenBudgetProfileV1(input: Readonly<{
       adapterVersion: SEYEON_OPENAI_INPUT_TOKEN_COUNT_VERSION_V1,
       supportedRequestFormat: SEYEON_OPENAI_RESPONSES_TEXT_JSON_SCHEMA_REQUEST_FORMAT_V1,
       inputBoundSemantics: MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
+    },
+  });
+}
+
+/**
+ * Converts a certified provider-neutral budget receipt into the existing
+ * Seyeon Cost Governor quote. The caller still persists the reservation only
+ * through startGovernedSeyeonAiCallV1 in its canonical Subject transaction.
+ */
+export function quoteSeyeonCostGovernorFromModelTokenBudgetReceiptV1(input: Readonly<{
+  policy: SeyeonCostGovernorModelPolicyV1;
+  purpose: SeyeonStructuredProviderRequestV2['purpose'];
+  receipt: ModelTokenBudgetReceiptV1;
+}>): SeyeonCostGovernorQuoteV1 {
+  const policy = validateSeyeonCostGovernorModelPolicyV1(input.policy);
+  const receipt = input.receipt;
+  const expectedAvailableInputTokens = Math.min(
+    policy.maximumInputTokens,
+    policy.contextWindowTokens - policy.maximumOutputTokens,
+  );
+
+  if (
+    receipt.schemaVersion !== 'model-token-budget-receipt-v1' ||
+    typeof receipt.profileId !== 'string' ||
+    receipt.profileId.trim().length === 0 ||
+    receipt.providerKey !== policy.providerKey ||
+    receipt.modelKey !== policy.modelKey ||
+    receipt.policyVersion !== policy.policyVersion ||
+    receipt.pricingVersion !== policy.priceQuote.priceVersion ||
+    receipt.contextWindowTokens !== policy.contextWindowTokens ||
+    receipt.availableInputTokens !== expectedAvailableInputTokens ||
+    receipt.outputTokenLimit !== policy.maximumOutputTokens ||
+    !Number.isSafeInteger(receipt.reservedHeadroomTokens) ||
+    receipt.reservedHeadroomTokens < 1 ||
+    receipt.certifiedInputTokenUpperBound < receipt.reservedHeadroomTokens ||
+    !Number.isSafeInteger(receipt.remainingInputTokens) ||
+    receipt.remainingInputTokens !==
+      expectedAvailableInputTokens - receipt.certifiedInputTokenUpperBound ||
+    !Number.isSafeInteger(receipt.serializedRequestBodyBytes) ||
+    receipt.serializedRequestBodyBytes < 1 ||
+    receipt.serializedRequestBodyBytes > policy.maximumSerializedRequestBytes
+  ) {
+    throw new TypeError(
+      'Se-yeon Cost Governor receipt does not match the exact model, policy, price, or token ceilings.',
+    );
+  }
+
+  return quoteSeyeonCostGovernorMaximumV1({
+    policy,
+    request: {
+      purpose: input.purpose,
+      providerKey: receipt.providerKey,
+      modelKey: receipt.modelKey,
+      verifiedInputTokenUpperBound: receipt.certifiedInputTokenUpperBound,
+      serializedRequestBytes: receipt.serializedRequestBodyBytes,
+      enforcedOutputTokenLimit: receipt.outputTokenLimit,
     },
   });
 }
