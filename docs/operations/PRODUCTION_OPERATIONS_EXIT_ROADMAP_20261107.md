@@ -139,7 +139,7 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 3. Phase 12 수동 확장·축소 판단 기준과 근거가 승인됨. 자동 확장은 별도 목표가 아님.
 4. Phase 13 §33 14개 항목 PASS, §34 장애 행렬 및 §35 Runbook 종료 조건 충족.
 5. 최신 main SHA와 실제 배포 Worker/Saju artifact가 일치하고, 버전별 수용 증거가 유효함.
-6. `dr_ready=true`, `serviceResumptionAllowed=true`, `productionCapacityProven` 및 필요한 Phase 12 승인 상태가 실제 evidence에 의해 뒷받침됨.
+6. `dr_ready=true`, `serviceResumptionAllowed=true`. Phase 11 비운영 용량 실측과 Phase 12 수동 확장 판단 기준이 각각 증거와 승인 범위 안에서 완료됨. 실제 Production 계측·승인이 없다면 `productionCapacityProven=false`는 그대로 유지하며 격리 수치를 Production 용량으로 승격하지 않는다.
 7. 미해결 차단·승인 대기·증거 만료가 없음.
 
 위 조건을 충족하기 전에는 `ROADMAP_COMPLETE`를 선언하지 않는다. 문서 병합, CI GREEN, 백업 성공, 격리 복원 성공 또는 익명 E2E PASS 하나만으로 전체 종료를 선언하지 않는다.
