@@ -144,7 +144,7 @@ export function parseAdminReadFiltersV1(url: URL): AdminListFiltersV1 {
     throw new Error('Search is not supported by the requested authority.');
   }
   if (searchParam !== null && (searchParam.trim().length < 1 || searchParam.trim().length > 100 ||
-      /[\\u0000-\\u001f\\u007f]/u.test(searchParam))) {
+      /[\x00-\x1f\x7f]/u.test(searchParam))) {
     throw new Error('Administrator search text is invalid.');
   }
   const search = searchParam?.trim() ?? null;
