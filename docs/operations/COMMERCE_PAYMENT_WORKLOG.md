@@ -698,3 +698,11 @@
 - **연결:** 기존 검증용 PostgreSQL17 단일 스위트에 추가 `BEGIN/ROLLBACK` 검증을 연결했습니다. 현재 TypeScript의 **정확한 원본 Claim 취소/S7 SQL**을 추출하여 B2·B3 구매/Subject/Checkout 단위로 실행하고, 기존 합성 B2 PortOne cancellation을 같은 원본 Receipt에 결속·중복 replay해 (1) B2 취소 원본 HMAC·금액·상태 보존, (2) 독립 B3에 동일 취소가 전파되지 않음, (3) S5 본문이 없는 상태에서 S7 응답 준비·클라이언트 ACK 및 전달 완료를 만들어내지 않음을 검증합니다.
 - **정확한 의미:** 이는 원본 저장 취소 증거와 S7 **기록 부재**를 실DB에서 대조하는 음성/출처 검증이지, 합법적인 전달 완료 또는 실제 고객 미제공 확정이 아닙니다. Reader S5 Production 발행은 여전히 HOLD이고, 근거 없는 protected body를 생성하지 않습니다. 전체 회원 청약철회·Reader exact revoke·개인정보 finalizer 테스트는 별도 기존 케이스에서 그대로 통과해야 합니다.
 - **경계:** 모든 후보 취소 함수와 신규 Event는 격리 DB 트랜잭션 내에서만 생성/롤백합니다. 기존 고객 접수·S7·Provider 처리 코드를 바꾸지 않고 운영 DB SQL, 공개 API, Saju 발급 계약, LIVE 결제/환불·전달을 활성화하지 않습니다. 새 고정 HEAD의 CI/통합 결과 확인 전에는 PASS나 ROADMAP_COMPLETE 선언을 하지 않습니다.
+
+### 2026-11-06 — 다음 Saju Record 권한 연결 전 SRC-18 아키텍처 결정 경계 확인
+
+- **선행:** #3083 고정 HEAD `5c62bfed`의 일반 CI·Governance·Web Domain Gates·PostgreSQL 17 전체 Integration 모두 SUCCESS, `ff5ac36`로 main 병합 확인.
+- **로드맵의 다음 미완료:** Saju 13개 Product의 Record별 실제 Capability/Grant 발급 및 결제 직전 원자 Admission. 현재 quote/Grant evidence는 읽기 전용 비판매 후보이고, `checkoutAuthorized:false`를 유지합니다.
+- **기존 authority 확인:** `SRC-18`은 Capability Item scope를 `global | fixed`로만 허용하며, client/request-derived scope와 범용 dynamic resolver를 금지합니다. 사용자 소유 Resource 유료 scope에는 별도 Product/Commerce architecture delta와 server-owned resolver가 필요하다고 명시되어 있습니다. 따라서 현재 scope 제약을 우회하거나 Record UUID를 `fixed_scope_key`로 가장해 넣지 않습니다.
+- **제안:** `docs/architecture/COMMERCE_SAJU_RECORD_SCOPED_CAPABILITY_DELTA_V1.md`에 Saju 전용 `saju_record` scope mode, 서버 생성 불투명 `entitlement_scope_id`, Receipt→Purchase Origin→Record resolver, 기존 all-or-neither Entitlement Effect 재사용, 단일 Record 잠금 기반 Checkout Admission 및 개인정보 삭제 조건을 제안했습니다.
+- **결정 대기:** 이 문서는 **PROPOSAL / OWNER DECISION REQUIRED / NOT IMPLEMENTED**입니다. 승인 전에는 새 scope constraint/migration, Grant writer, 실제 Checkout Admission, Offer seed, 공개 API 및 판매를 구현·활성화하지 않습니다. 기존 비판매 quote/ledger/중복 보류 후보와 일반 Reader 계약은 그대로 유지합니다.
