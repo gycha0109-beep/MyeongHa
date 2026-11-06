@@ -48,7 +48,7 @@ create index commerce_saju_purchase_origins_record_idx
 -- Saju quote policy. It is NOT Product Capability/Entitlement authority. Only
 -- pending Origin arbitration consults these field sets. Unknown keys HOLD.
 -- Never deploy as a general-purpose authorization or public RPC.
-create function public.internal_commerce_saju_candidate_overlap_fields_v1(
+create function public.internal_commerce_saju_product_fields_v1(
   p_product_key text
 ) returns text[]
 language sql immutable strict security invoker
@@ -71,7 +71,7 @@ as $saju_overlap_fields$
     else null::text[]
   end
 $saju_overlap_fields$;
-revoke all on function public.internal_commerce_saju_candidate_overlap_fields_v1(text)
+revoke all on function public.internal_commerce_saju_product_fields_v1(text)
  from public,anon,authenticated,service_role,myeongha_api_executor;
 
 -- Keep the exact Birth revision stable while an Intent is bound to a
@@ -135,7 +135,7 @@ begin
     ) then
       raise exception 'SAJU_DUPLICATE_PENDING_SAME_PRODUCT';
     end if;
-    v_new_fields := public.internal_commerce_saju_candidate_overlap_fields_v1(
+    v_new_fields := public.internal_commerce_saju_product_fields_v1(
       v_new_product_key
     );
     if v_new_fields is null or cardinality(v_new_fields)=0 then
@@ -160,7 +160,7 @@ begin
         and prior_pi.status in ('created','pending')
         and prior_offer.product_id<>v_new_product_id
         and coalesce(
-          public.internal_commerce_saju_candidate_overlap_fields_v1(
+          public.internal_commerce_saju_product_fields_v1(
             prior_product.product_key
           ) && v_new_fields, true
         )
