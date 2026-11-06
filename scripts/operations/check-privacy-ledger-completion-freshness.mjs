@@ -6,37 +6,61 @@ const WORKFLOW = 'production-postgres-privacy-recovery-ledger.yml';
 const NOMINAL_INTERVAL_SECONDS = 3600;
 const MAX_INTERVAL_SECONDS = 2 * NOMINAL_INTERVAL_SECONDS;
 const ARTIFACT_NAME = /^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$/u;
+const CAPTURE_JOB = 'encrypted-off-db-privacy-recovery-ledger';
+const UPLOAD_STEP = 'Upload encrypted privacy recovery ledger';
+const timestamp = (value) => typeof value === 'string' ? Date.parse(value) : NaN;
 
 function fail(reason) {
   throw new Error('HOLD_PRIVACY_LEDGER_FRESHNESS: ' + reason);
 }
 
-export function assessPrivacyLedgerFreshness({ runs, artifacts, nowMs }) {
-  if (!Array.isArray(runs) || !Array.isArray(artifacts) ||
-      !Number.isFinite(nowMs) || nowMs < 0) fail('invalid metadata input');
+function latestSuccessfulRun(runs) {
   const successes = runs.filter((run) =>
     run?.status === 'completed' && run?.conclusion === 'success' &&
     run?.head_branch === 'main' &&
     ['schedule', 'workflow_dispatch'].includes(run?.event) &&
     Number.isSafeInteger(run?.id) && run.id > 0 &&
-    typeof run.updated_at === 'string' &&
-    Number.isFinite(Date.parse(run.updated_at)));
-  successes.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
-  const latest = successes[0];
-  let status = 'NO_SUCCESSFUL_CAPTURE';
+    Number.isSafeInteger(run?.run_attempt) && run.run_attempt > 0 &&
+    /^[a-f0-9]{40}$/u.test(run?.head_sha ?? '') && Number.isFinite(timestamp(run.updated_at)));
+  successes.sort((a, b) => timestamp(b.updated_at) - timestamp(a.updated_at) || b.id - a.id);
+  return successes[0];
+}
+
+function verifiedCaptureCompletion(run, jobs) {
+  const matches = jobs.filter((job) =>
+    job?.run_id === run.id && job?.run_attempt === run.run_attempt && job?.head_sha === run.head_sha &&
+    job?.name === CAPTURE_JOB && job?.status === 'completed' && job?.conclusion === 'success');
+  if (matches.length !== 1) return null;
+  const job = matches[0];
+  const uploads = (Array.isArray(job.steps) ? job.steps : []).filter((step) =>
+    step?.name === UPLOAD_STEP && step?.status === 'completed' && step?.conclusion === 'success');
+  if (uploads.length !== 1) return null;
+  const [upload] = uploads;
+  const started = timestamp(job.started_at);
+  const completed = timestamp(job.completed_at);
+  const uploadStarted = timestamp(upload.started_at);
+  const uploadCompleted = timestamp(upload.completed_at);
+  if (!(started <= uploadStarted && uploadStarted <= uploadCompleted && uploadCompleted <= completed)) return null;
+  return { completed, completedAt: job.completed_at, uploadStarted, uploadCompleted };
+}
+
+export function assessPrivacyLedgerFreshness({ runs, jobs, artifacts, nowMs }) {
+  if (!Array.isArray(runs) || !Array.isArray(jobs) || !Array.isArray(artifacts) ||
+      !Number.isFinite(nowMs) || nowMs < 0) fail('invalid metadata input');
+  const latest = latestSuccessfulRun(runs);
+  let status = latest ? 'CAPTURE_COMPLETION_METADATA_UNAVAILABLE' : 'NO_SUCCESSFUL_CAPTURE';
   let elapsedSeconds = null;
-  let latestSuccessfulRunId = null;
-  let latestSuccessfulUpdatedAt = null;
   let encryptedArtifactObserved = false;
-  if (latest) {
-    latestSuccessfulRunId = latest.id;
-    latestSuccessfulUpdatedAt = latest.updated_at;
-    elapsedSeconds = Math.floor((nowMs - Date.parse(latest.updated_at)) / 1000);
+  const completion = latest ? verifiedCaptureCompletion(latest, jobs) : null;
+  if (completion) {
+    elapsedSeconds = Math.floor((nowMs - completion.completed) / 1000);
     encryptedArtifactObserved = artifacts.some((artifact) =>
       artifact?.workflow_run?.id === latest.id &&
       typeof artifact?.name === 'string' &&
       ARTIFACT_NAME.test(artifact.name) &&
-      artifact?.expired === false);
+      artifact?.expired === false &&
+      timestamp(artifact.created_at) >= completion.uploadStarted &&
+      timestamp(artifact.created_at) <= completion.uploadCompleted);
     if (elapsedSeconds < -60) status = 'INVALID_FUTURE_COMPLETION';
     else if (!encryptedArtifactObserved) status = 'ENCRYPTED_ARTIFACT_UNAVAILABLE';
     else if (elapsedSeconds >= MAX_INTERVAL_SECONDS) status = 'CAPTURE_COMPLETION_STALE';
@@ -47,8 +71,10 @@ export function assessPrivacyLedgerFreshness({ runs, artifacts, nowMs }) {
     monitoredWorkflow: WORKFLOW,
     nominalScheduledIntervalSeconds: NOMINAL_INTERVAL_SECONDS,
     maximumObservedCompletionAgeSeconds: MAX_INTERVAL_SECONDS,
-    latestSuccessfulRunId,
-    latestSuccessfulUpdatedAt,
+    latestSuccessfulRunId: latest?.id ?? null,
+    latestSuccessfulRunAttempt: latest?.run_attempt ?? null,
+    latestSuccessfulUpdatedAt: latest?.updated_at ?? null,
+    latestSuccessfulCompletedAt: completion?.completedAt ?? null,
     elapsedSinceRunCompletionSeconds: elapsedSeconds,
     encryptedArtifactObserved,
     status,
@@ -102,22 +128,21 @@ export async function inspectPrivacyLedgerCompletion(env, nowMs = Date.now()) {
     token,
   );
   if (!Array.isArray(runsReply?.workflow_runs)) fail('successful runs response malformed');
-  const successes = runsReply.workflow_runs.filter((run) =>
-    run?.head_branch === 'main' && run?.conclusion === 'success' &&
-    ['schedule', 'workflow_dispatch'].includes(run?.event));
-  successes.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at));
-  const run = successes[0];
+  const run = latestSuccessfulRun(runsReply.workflow_runs);
+  let jobs = [];
   let artifacts = [];
   if (run) {
-    if (!Number.isSafeInteger(run.id) || run.id <= 0) fail('source run ID invalid');
-    const artifactReply = await getGithubJson(
-      prefix + '/runs/' + run.id + '/artifacts?per_page=100',
-      token,
-    );
+    const runPath = prefix + '/runs/' + run.id;
+    const [jobReply, artifactReply] = await Promise.all([
+      getGithubJson(runPath + '/attempts/' + run.run_attempt + '/jobs?per_page=100', token),
+      getGithubJson(runPath + '/artifacts?per_page=100', token),
+    ]);
+    if (!Array.isArray(jobReply?.jobs) || jobReply.total_count !== jobReply.jobs.length) fail('source attempt job list malformed');
     if (!Array.isArray(artifactReply?.artifacts)) fail('source artifact list malformed');
+    jobs = jobReply.jobs;
     artifacts = artifactReply.artifacts;
   }
-  return assessPrivacyLedgerFreshness({ runs: runsReply.workflow_runs, artifacts, nowMs });
+  return assessPrivacyLedgerFreshness({ runs: runsReply.workflow_runs, jobs, artifacts, nowMs });
 }
 
 async function main() {
@@ -127,8 +152,8 @@ async function main() {
     '',
     '- Status: ' + report.status,
     '- Latest successful run ID: ' + (report.latestSuccessfulRunId ?? 'unavailable'),
-    '- Seconds since GitHub-reported completion: ' + (report.elapsedSinceRunCompletionSeconds ?? 'unavailable'),
-    '- Exact non-expired encrypted artifact listed: ' + report.encryptedArtifactObserved,
+    '- Seconds since successful capture job completion: ' + (report.elapsedSinceRunCompletionSeconds ?? 'unavailable'),
+    '- Non-expired encrypted artifact created during the verified upload step: ' + report.encryptedArtifactObserved,
     '- Alert boundary: ' + report.maximumObservedCompletionAgeSeconds + ' seconds (twice nominal hourly cadence; NOT RPO)',
     '- Independently continuous event source: NOT PROVEN',
     '- DR/serving: BLOCKED',
