@@ -18,9 +18,12 @@ node scripts/operations/seyeon-security-s0/install-isolated.mjs
 # The OpenAI input-token counting path uses fake HTTP only, never a paid call.
 ./node_modules/.bin/vitest run \
   test/seyeon-openai-input-token-count-port-v1.test.ts --maxWorkers=1
-# G4 ENFORCE must refuse legacy bypass on the ordinary API role before role switch.
+# G4 ENFORCE must refuse legacy and governed RPC bypass from ordinary API.
 ./node_modules/.bin/vitest run \
   apps/api/src/seyeon-governed-postgres-pool-v1.test.ts --maxWorkers=1
+# The Cloudflare pool uses the exact same catalog preflight before role switch.
+./node_modules/.bin/vitest run \
+  test/cloudflare-seyeon-governed-hyperdrive.test.mjs --maxWorkers=1
 ./node_modules/.bin/vitest run \
   test/seyeon-g3-historical-originals-review-w88.test.ts --maxWorkers=1
 ./node_modules/.bin/vitest run \

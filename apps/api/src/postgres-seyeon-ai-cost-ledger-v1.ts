@@ -63,6 +63,18 @@ select
  pg_catalog.has_function_privilege($2::name,
    'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
    'EXECUTE') as "canOrdinaryLegacyRecord",
+ -- The common API executor must also lose direct execution of *governed*
+ -- cost entrypoints. The dedicated LOGIN is not an isolation boundary if
+ -- ordinary API code can invoke Start/Settle or store a Provider receipt.
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',
+   'EXECUTE') as "canOrdinaryGovernedStart",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_governed_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryGovernedSettle",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryStoreReceipt",
  pg_catalog.has_table_privilege(session_user,
    'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
    as "canDirectLedger",

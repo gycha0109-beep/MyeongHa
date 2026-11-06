@@ -124,6 +124,9 @@ const LEGACY_OR_DIRECT_FLAGS = [
   // The ordinary API account must lose ALL legacy cost entrypoints before
   // ENFORCE can be accepted, even if the governed LOGIN itself is isolated.
   'canOrdinaryLegacyStart','canOrdinaryLegacySettle','canOrdinaryLegacyRecord',
+  // No ordinary executor may independently bypass the separate Governed
+  // LOGIN by invoking governed Start/Settle or persisting Provider receipts.
+  'canOrdinaryGovernedStart','canOrdinaryGovernedSettle','canOrdinaryStoreReceipt',
   'canDirectLedger','canDirectBudget','canDirectRateCard',
 ] as const;
 
