@@ -44,14 +44,21 @@ create index commerce_saju_purchase_origins_record_idx
   on public.commerce_saju_purchase_origins_v1(subject_id, saju_record_id, birth_revision_id);
 
 -- Keep the exact Birth revision stable while an Intent is bound to a
--- Saju Record. The Record lock serializes this association against concurrent
--- Birth revision edits; it does not authorize checkout or payment completion.
+-- Saju Record. The Record row FOR UPDATE serializes both this association and
+-- same-Product unresolved-Intent admission against concurrent inserts.
+-- This is a strictly narrower early duplicate guard, NOT full overlapping
+-- field/Package checkout arbitration or permission to charge a payment.
 create or replace function public.tr_commerce_saju_origin_revision_lock_v1()
 returns trigger language plpgsql security invoker
 set search_path = pg_catalog, public as $saju_origin_lock$
 declare
   v_record_birth_revision uuid;
+  v_new_product_id uuid;
+  v_new_intent_status text;
 begin
+  -- Always acquire the same Record lock BEFORE inspecting other pending
+  -- intents. Competing inserts for this same Record must observe the first
+  -- committed origin after the lock is released (READ COMMITTED only).
   select r.birth_revision_id into v_record_birth_revision
   from public.commerce_saju_records_v1 r
   where r.id=new.saju_record_id and r.subject_id=new.subject_id
@@ -59,6 +66,41 @@ begin
   if not found
     or v_record_birth_revision is distinct from new.birth_revision_id then
     raise exception 'SAJU_ORIGIN_RECORD_REVISION_MISMATCH';
+  end if;
+
+  select pi.status, po.product_id
+    into v_new_intent_status, v_new_product_id
+  from public.purchase_intents pi
+  join public.product_offers po on po.id=pi.product_offer_id
+  where pi.id=new.purchase_intent_id
+    and pi.subject_id=new.subject_id;
+  if not found or v_new_product_id is null then
+    raise exception 'SAJU_ORIGIN_INTENT_PRODUCT_UNAVAILABLE';
+  end if;
+
+  if v_new_intent_status in ('created','pending') then
+    -- A stale repeatable-read snapshot cannot safely act as a lock-based
+    -- admission check even if it successfully acquired a Record row lock.
+    if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
+      raise exception 'SAJU_PENDING_ORIGIN_REQUIRES_READ_COMMITTED';
+    end if;
+    if exists (
+      select 1
+      from public.commerce_saju_purchase_origins_v1 prior
+      join public.purchase_intents prior_pi
+        on prior_pi.id=prior.purchase_intent_id
+       and prior_pi.subject_id=prior.subject_id
+      join public.product_offers prior_offer
+        on prior_offer.id=prior_pi.product_offer_id
+      where prior.subject_id=new.subject_id
+        and prior.saju_record_id=new.saju_record_id
+        and prior.birth_revision_id=new.birth_revision_id
+        and prior.purchase_intent_id<>new.purchase_intent_id
+        and prior_pi.status in ('created','pending')
+        and prior_offer.product_id=v_new_product_id
+    ) then
+      raise exception 'SAJU_DUPLICATE_PENDING_SAME_PRODUCT';
+    end if;
   end if;
   return new;
 end;
