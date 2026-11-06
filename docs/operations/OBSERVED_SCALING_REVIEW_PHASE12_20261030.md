@@ -29,6 +29,22 @@ Use the same analyzer with the [paired Linux CPU observation](REAL_GOTRUE_PG18_S
 
 ## Public diagnostic route review
 
+### 2026-11-07 local loopback observation — no failure boundary observed
+
+A fresh, identifier-free local report array was collected from the current `main` source `4f9b8ed8352be45a19879c59f30290988519f7d9` using the in-process Cloudflare Worker `fetch` handler behind a disposable HTTP listener bound only to `127.0.0.1`. The only route was `GET /api/health`; no credentials, DB, Saju service, Cloudflare endpoint, Production data, or paid resource was used. Each level completed 100/100 requests:
+
+| Requested concurrency | Observed peak | Successful | Non-200 / transport | Successful p95 |
+|---:|---:|---:|---:|---:|
+| 1 | 1 | 100/100 | 0 | 1.131 ms |
+| 2 | 2 | 100/100 | 0 | 1.330 ms |
+| 4 | 4 | 100/100 | 0 | 3.228 ms |
+| 8 | 8 | 100/100 | 0 | 5.127 ms |
+
+The local-only input array was preserved outside the repository as `myeongha-phase12-local-health-reports.json` (SHA-256 `074fe369bbda0115e8e5401ec52276d1a521cb4df50c6c9a90ab621ca5023cd4`). Running `derive-observed-scaling-review.mjs` on those exact bytes returned **`NO_DEGRADATION_OBSERVED`**; `firstObservedFailureConcurrency=null` and `diagnosticScalingReviewAtOrAboveConcurrency=null`. The raw local report remains local-only and is not committed.
+
+This is a small in-process Worker health-route diagnostic, not a workerd runtime, deployed Cloudflare Worker, full product chain, DB pool, Saju CPU/memory, or Production measurement. The result therefore yields **no scaling trigger** and does not change `automaticScalingEnabled=false`, `productionCapacityProven=false`, or `numericalProductionScalingThresholdApproved=false`.
+
+
 `scripts/derive-observed-scaling-review.mjs` consumes an **array of actual Phase 11 collector JSON reports** from a single controlled non-production loopback diagnostic route. It combines repeated measurements at the same concurrency level conservatively, preserving any observed non-200 or transport failures. It does **not** invent a numeric service SLO, scaling ceiling, production target or Saju/DB performance claim.
 
 ## Execute
