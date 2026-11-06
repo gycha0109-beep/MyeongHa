@@ -35,20 +35,8 @@ psql -X -v ON_ERROR_STOP=1 -f "$tmp/official.sql" > "$tmp/fixture.stdout" 2>"$tm
   exit 1
 }
 
-# Signed-in identity is modeled by an independently validated Guest fingerprint;
-# no raw Subject ID is ever accepted by the Records HTTP adapter.
-psql -X -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
-insert into public.guest_sessions(
-  id, subject_id, token_hash, expires_at, consumed_at,
-  claimed_by_subject_id, created_at
-) values (
-  '12345678-0000-4000-8000-000000000001',
-  '11390000-0000-0000-0000-000000000001',
-  'synthetic-official-http-e2e-guest-hash',
-  clock_timestamp() + interval '1 day',
-  null, null, clock_timestamp()
-);
-SQL
+# Paid Records access uses the active Member already bound to the exact
+# auth.users identity in the official Reader fixture; no Guest session is used.
 
 # Check that only an exact, current initial purchase Grant can expose the
 # stored source lineage to the internal executor. All mutations are rolled back.
