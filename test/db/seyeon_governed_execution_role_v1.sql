@@ -8,6 +8,7 @@ declare
   v_role pg_catalog.pg_roles%rowtype;
   v_rpc record;
   v_can boolean;
+  v_supports_maintain boolean := current_setting('server_version_num')::integer >= 170000;
 begin
   select * into strict v_role from pg_catalog.pg_roles
   where rolname='myeongha_seyeon_governed_executor';
@@ -68,13 +69,13 @@ begin
     raise exception 'Governed executor has unsafe public schema privileges';
   end if;
   if pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
-       'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+       'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
-       'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+       'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
-       'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+       'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
-       'public.seyeon_ai_provider_receipt_queue_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+       'public.seyeon_ai_provider_receipt_queue_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
     or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
        'public.seyeon_ai_call_cost_events','SELECT')
     or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
@@ -108,6 +109,18 @@ begin
     or pg_catalog.has_any_column_privilege('myeongha_seyeon_governed_executor',
        'public.seyeon_ai_provider_receipt_queue_v1','REFERENCES') then
     raise exception 'Governed executor has unauthorized direct cost/policy/receipt table access';
+  end if;
+  if v_supports_maintain then
+    if pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+         'public.seyeon_ai_call_cost_events','MAINTAIN')
+      or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+         'public.seyeon_ai_governor_daily_budgets_v1','MAINTAIN')
+      or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+         'public.seyeon_ai_governor_model_policies_v1','MAINTAIN')
+      or pg_catalog.has_table_privilege('myeongha_seyeon_governed_executor',
+         'public.seyeon_ai_provider_receipt_queue_v1','MAINTAIN') then
+      raise exception 'Governed executor has unauthorized PostgreSQL 17 MAINTAIN table access';
+    end if;
   end if;
 end $acl$;
 
@@ -186,6 +199,24 @@ end
 $w121_membership$;
 rollback to savepoint w121_role_membership;
 release savepoint w121_role_membership;
+
+-- PostgreSQL 17 added the MAINTAIN table privilege. Exercise that exact
+-- grant only where the server supports it; PostgreSQL 15 remains compatible.
+savepoint w121_maintain;
+do $w121_maintain$
+begin
+  if current_setting('server_version_num')::integer >= 170000 then
+    execute 'grant maintain on public.seyeon_ai_provider_receipt_queue_v1 to myeongha_seyeon_governed_executor';
+    if not pg_catalog.has_table_privilege(
+        'myeongha_seyeon_governed_executor',
+        'public.seyeon_ai_provider_receipt_queue_v1','MAINTAIN') then
+      raise exception 'W121 PostgreSQL 17 MAINTAIN grant was not visible';
+    end if;
+  end if;
+end
+$w121_maintain$;
+rollback to savepoint w121_maintain;
+release savepoint w121_maintain;
 
 -- Operator-only test policies. Production policies are neither
 -- activated; all DML is rolled back.
