@@ -374,8 +374,8 @@ SQL
     pass "independent $target published DB artifact is scoped to pinned Member room"
   done
 
-  expect_runtime_fail "foreign Member cannot read another Member pinned publication" \\
-    'b2000000-0000-0000-0000-000000000004' \\
+  expect_runtime_fail "foreign Member cannot read another Member pinned publication" \
+    'b2000000-0000-0000-0000-000000000004' \
     'Published Character source is unavailable' "
       select * from public.qry_four_character_published_artifact_v1(
         'b2000000-0000-0000-0000-000000000004',
@@ -385,8 +385,8 @@ SQL
         'c3000000-0000-0000-0000-000000000003'
       );"
 
-  expect_runtime_fail "forged publication release must fail closed" \\
-    'b2000000-0000-0000-0000-000000000003' \\
+  expect_runtime_fail "forged publication release must fail closed" \
+    'b2000000-0000-0000-0000-000000000003' \
     'Published Character source is unavailable' "
       select * from public.qry_four_character_published_artifact_v1(
         'b2000000-0000-0000-0000-000000000003',
@@ -396,8 +396,8 @@ SQL
         'c3000000-0000-0000-0000-000000000003'
       );"
 
-  expect_runtime_fail "Yunho cannot read non-default Character artifact" \\
-    'b2000000-0000-0000-0000-000000000003' \\
+  expect_runtime_fail "Yunho cannot read non-default Character artifact" \
+    'b2000000-0000-0000-0000-000000000003' \
     'Published Character source is unavailable' "
       select * from public.qry_four_character_published_artifact_v1(
         'b2000000-0000-0000-0000-000000000003',
