@@ -78,7 +78,11 @@ declare
   v_origin public.commerce_saju_purchase_origins_v1%rowtype;
   v_record_birth_revision uuid;
 begin
-  if new.verification_status not in ('verified','revoked') then
+  -- Sandbox verification is a test fact, never a settled paid purchase.
+  -- Only an exact production verified charge may enforce the paid freeze.
+  if new.verification_status not in ('verified','revoked')
+    or new.environment is distinct from 'production'
+    or new.verified_at is null then
     return new;
   end if;
   select * into v_origin
@@ -250,6 +254,8 @@ begin
       where origin.saju_record_id=old.id
         and origin.subject_id=old.subject_id
         and receipt.verification_status in ('verified','revoked')
+        and receipt.environment = 'production'
+        and receipt.verified_at is not null
     ) then
     raise exception 'SAJU_PAID_RECORD_BIRTH_REVISION_FROZEN';
   end if;
