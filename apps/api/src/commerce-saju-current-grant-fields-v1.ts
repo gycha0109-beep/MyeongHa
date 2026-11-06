@@ -45,6 +45,7 @@ select
   issuance.provider_revocation_events::text as "providerRevocationEventCount",
   product.product_key as "productKey",
   item.item_key as "field",
+  item.entitlement_key as "entitlementKey",
   coalesce(refunds.refunded_minor,0)::text as "refundedMinor",
   coalesce(cancels.unsettled_count,0)::text as "unsettledCancellationCount"
 from public.commerce_saju_purchase_origins_v1 origin
@@ -157,7 +158,7 @@ type FieldEvidenceRow = Readonly<{
   receiptGrantedEventCount: unknown;
   validReceiptGrantedEventCount: unknown;
   providerRevocationEventCount: unknown;
-  productKey: unknown; field: unknown; refundedMinor: unknown;
+  productKey: unknown; field: unknown; entitlementKey: unknown; refundedMinor: unknown;
   unsettledCancellationCount: unknown;
 }>;
 const UUID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu;
@@ -221,7 +222,8 @@ export const CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1:
             || !ALL_PRODUCTS.has(row.productKey)
             || typeof row.field!=='string') hold();
         const spec=COMMERCE_SAJU_PRODUCTS_V1[row.productKey as SajuProductKeyV1];
-        if (!(spec.fields as readonly string[]).includes(row.field)) hold();
+        if (!(spec.fields as readonly string[]).includes(row.field)
+            || row.entitlementKey!==`saju.${row.field}`) hold();
         const receiptField=receiptId+'/'+row.field;
         if (byGrant.has(grantId) || byReceiptField.has(receiptField)) hold();
         byGrant.add(grantId);
