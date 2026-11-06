@@ -5,6 +5,7 @@ const PROFILES = {
   baseline: { durationSeconds: 300, requestsPerSecond: 1, concurrency: 1 },
   concurrent: { durationSeconds: 900, requestsPerSecond: 4, concurrency: 4 },
   overlap: { durationSeconds: 900, requestsPerSecond: 4, concurrency: 4, waveSize: 4 },
+  cpu: { durationSeconds: 60, requestsPerSecond: 4, concurrency: 4, waveSize: 4 },
 };
 
 export async function measureIsolatedProductWindow(profile, request, clock = () => performance.now(), wait = sleep) {

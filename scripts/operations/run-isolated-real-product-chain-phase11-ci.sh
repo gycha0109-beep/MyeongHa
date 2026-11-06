@@ -27,6 +27,7 @@ export COMPOSE_PROFILES= MH_OPS_AUTH_JWT_EXP_SECONDS=300
 case "$experiment" in
   short) ;;
   sustained|overlap) COMPOSE_PROFILES=sustained; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
+  saju_cpu) COMPOSE_PROFILES=sustained,cpu-pressure; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   *) fail 'Unknown isolated product experiment.' ;;
 esac
 
@@ -101,23 +102,46 @@ if [[ "$ready" != true ]]; then
   fail 'Actual GoTrue host-only health did not pass.'
 fi
 
-if [[ "$experiment" != short ]]; then
-  docker compose --project-name "$project" -f "$compose" up --detach saju >/dev/null ||
-    fail 'Disposable constrained Saju container failed.'
-  calculation="$(docker compose --project-name "$project" -f "$compose" port saju 43007)"
-  metrics="$(docker compose --project-name "$project" -f "$compose" port saju 43008)"
-  [[ "$calculation" =~ ^127\.0\.0\.1:[0-9]{4,5}$ && "$metrics" =~ ^127\.0\.0\.1:[0-9]{4,5}$ ]] ||
+saju_loopback_origin(){
+  local address
+  address="$(docker compose --project-name "$project" -f "$compose" port "$1" "$2")" ||
+    fail 'Disposable Saju port lookup failed.'
+  [[ "$address" =~ ^127\.0\.0\.1:[0-9]{4,5}$ ]] ||
     fail 'Constrained Saju published outside loopback.'
-  export MH_OPS_REAL_SAJU_ORIGIN="http://$calculation"
-  export MH_OPS_REAL_SAJU_METRICS_ORIGIN="http://$metrics"
-  ready=false
-  for _ in $(seq 1 30); do
-    if curl --fail --silent --max-time 2 "$MH_OPS_REAL_SAJU_METRICS_ORIGIN/metrics" >/dev/null; then
-      ready=true; break
+  printf 'http://%s\n' "$address"
+}
+wait_saju_metrics(){
+  for _ in $(seq 1 "$2"); do
+    if curl --fail --silent --max-time 2 "$1/metrics" >/dev/null; then
+      return
     fi
     sleep 1
   done
-  [[ "$ready" == true ]] || fail 'Constrained Saju metrics did not become ready.'
+  fail 'Constrained Saju metrics did not become ready.'
+}
+
+saju_image_id=''
+if [[ "$experiment" != short ]]; then
+  services=(saju)
+  if [[ "$experiment" == saju_cpu ]]; then services+=(saju-cpu-pressure); fi
+  docker compose --project-name "$project" -f "$compose" up --detach "${services[@]}" >/dev/null ||
+    fail 'Disposable constrained Saju container failed.'
+  export MH_OPS_REAL_SAJU_ORIGIN MH_OPS_REAL_SAJU_METRICS_ORIGIN
+  MH_OPS_REAL_SAJU_ORIGIN="$(saju_loopback_origin saju 43007)"
+  MH_OPS_REAL_SAJU_METRICS_ORIGIN="$(saju_loopback_origin saju 43008)"
+  wait_saju_metrics "$MH_OPS_REAL_SAJU_METRICS_ORIGIN" 30
+  if [[ "$experiment" == saju_cpu ]]; then
+    reference_id="$(docker compose --project-name "$project" -f "$compose" ps -q saju)"
+    pressure_id="$(docker compose --project-name "$project" -f "$compose" ps -q saju-cpu-pressure)"
+    saju_image_id="$(docker inspect --format '{{.Image}}' "$reference_id")"
+    pressure_image_id="$(docker inspect --format '{{.Image}}' "$pressure_id")"
+    [[ "$saju_image_id" =~ ^sha256:[a-f0-9]{64}$ && "$pressure_image_id" == "$saju_image_id" ]] ||
+      fail 'CPU comparison Saju container images differ.'
+    export MH_OPS_PRESSURE_SAJU_ORIGIN MH_OPS_PRESSURE_SAJU_METRICS_ORIGIN
+    MH_OPS_PRESSURE_SAJU_ORIGIN="$(saju_loopback_origin saju-cpu-pressure 43007)"
+    MH_OPS_PRESSURE_SAJU_METRICS_ORIGIN="$(saju_loopback_origin saju-cpu-pressure 43008)"
+    wait_saju_metrics "$MH_OPS_PRESSURE_SAJU_METRICS_ORIGIN" 120
+  fi
 fi
 
 cd "$GITHUB_WORKSPACE"
@@ -130,7 +154,7 @@ if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.
   # The raw test output is deliberately private because it can contain
   # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
   # Report only recognized, controlled stage labels, never raw lines or paths.
-  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
+  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
   if grep -Eq "$stage_pattern" "$scratch/vitest.log"; then
     stage="$(grep -oE "$stage_pattern" "$scratch/vitest.log" | tail -n 1)"
     echo "::error title=Isolated three-dependency failure stage::$stage" >&2
@@ -161,6 +185,14 @@ jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
   and .anonymousDenied==true and .healthUnaffected==true
   and .runtimeCleanupVerified==true
   and (if $experiment == "short" then .actualSajuResourceCgroupConstrained==false and .sustained==null
+    elif $experiment == "saju_cpu" then .actualSajuResourceCgroupConstrained==true
+      and .sustained==null and .cpuComparison.recoverySucceeded==true
+      and ([.cpuComparison.reference.saju.cpuCores,.cpuComparison.pressure.saju.cpuCores]==[0.5,0.01])
+      and (all([.cpuComparison.reference,.cpuComparison.pressure][];
+        .durationSeconds==60 and .scheduled==240 and .waveSize==4 and .apiPeak==4
+        and .successful>0 and .elapsedMs>=60000
+        and .scheduled==(.successful+.unavailable+.transportFailures+.skipped)
+        and .saju.memoryPeakBytes<=268435456 and .saju.oomKills==0))
     else .actualSajuResourceCgroupConstrained==true and .sustained.recoverySucceeded==true
       and .sustained.injectedDbUnavailable==1
       and (if $experiment == "overlap" then
@@ -182,6 +214,8 @@ jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
   and .drReady==false and .serviceResumptionAllowed==false
   and .outputContainsIdentifiers==false
 ' "$scratch/real-product.json" >/dev/null || fail 'Evidence failed strict isolated contract.'
-jq --arg main "$GITHUB_SHA" '.githubMainSha=$main' "$scratch/real-product.json" >"$output" ||
+jq --arg main "$GITHUB_SHA" --arg image "$saju_image_id" '
+  .githubMainSha=$main | if $image == "" then . else .cpuComparison.imageId=$image end
+' "$scratch/real-product.json" >"$output" ||
   fail 'Sanitized proof serialization failed.'
 echo 'ISOLATED_REAL_GOTRUE_PG18_SAJU_CHAIN_PHASE11_PASS: four synthetic members on real disposable GoTrue, PG18 and pinned Saju.'
