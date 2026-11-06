@@ -118,7 +118,50 @@ async function runQuery(
           : filters.kind === 'issues'
             ? [amount + 1, filters.issueStatus ?? null, filters.from, filters.to, offset, filters.issueCategory ?? null]
             : [amount + 1, filters.subjectId, filters.from, filters.to, offset];
-  const result = await client.query<Record<string, unknown>>(query, args);
+  let queryText = query;
+  let queryArgs: readonly unknown[] = args;
+  if (filters.search !== null && filters.search !== undefined && filters.search.length > 0) {
+    if (detail || filters.kind === 'overview' || filters.search.length > 100 ||
+        /[\\x00-\\x1f\\x7f]/u.test(filters.search)) {
+      throw new Error('Invalid bounded administrator search.');
+    }
+    const pagination = /\\s+LIMIT\\s+\\$1::int\\s+OFFSET\\s+\\$(\\d+)::int\\s*$/iu.exec(query);
+    if (pagination === null || pagination.index === undefined || pagination[1] === undefined) {
+      throw new AdminReadAuthorityUnavailableV1();
+    }
+    const baseQuery = query.slice(0, pagination.index).trimEnd();
+    const searchParameter = args.length + 1;
+    // Search only the allowlisted columns returned by the fixed SQL projection.
+    // The inner query's source filters apply first; search runs before pagination.
+    // A deterministic projected timestamp/key ordering keeps pages stable.
+    queryText = `SELECT searched.* FROM (
+      SELECT base_rows.*, row_number() OVER (
+        ORDER BY COALESCE(
+          to_jsonb(base_rows)->>'occurredAt',
+          to_jsonb(base_rows)->>'createdAt',
+          to_jsonb(base_rows)->>'verifiedAt',
+          to_jsonb(base_rows)->>'detectedAt',
+          to_jsonb(base_rows)->>'requestedAt',
+          to_jsonb(base_rows)->>'startedAt',
+          to_jsonb(base_rows)->>'finishedAt',
+          to_jsonb(base_rows)->>'publishedAt',
+          to_jsonb(base_rows)->>'activatedAt',
+          to_jsonb(base_rows)->>'effectiveAt',
+          to_jsonb(base_rows)->>'updatedAt',
+          to_jsonb(base_rows)->>'lastThreadUpdatedAt',
+          to_jsonb(base_rows)->>'day',
+          to_jsonb(base_rows)->>'releaseAt'
+        ) DESC NULLS LAST,
+        to_jsonb(base_rows)::text ASC
+      ) AS "__adminSearchOrder"
+      FROM (${baseQuery}) AS base_rows
+      WHERE position(lower(${searchParameter}::text) IN lower(to_jsonb(base_rows)::text)) > 0
+    ) AS searched
+    ORDER BY searched."__adminSearchOrder"
+    LIMIT $1::int OFFSET ${pagination[1]}::int`;
+    queryArgs = [...args, filters.search];
+  }
+  const result = await client.query<Record<string, unknown>>(queryText, queryArgs);
   if (result.rows.length > amount + 1 || offset + amount > 10_050) {
     throw new AdminReadAuthorityUnavailableV1();
   }
