@@ -21,6 +21,7 @@ where access.entitlement_grant_id=g.id
 
 do $commerce_claim_e2e$
 declare
+ v_wrong_grant_rejected boolean := false;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
