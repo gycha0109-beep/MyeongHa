@@ -21,6 +21,12 @@ The [15-minute four-way observation](REAL_GOTRUE_PG18_SAJU_OVERLAP_LINUX_OBSERVA
 
 The paced and overlapping trials each offered 4 requests/s. In the overlapping trial the gateway admitted four concurrent requests in all 900 waves, and DB acquisition p95 was 83.171 ms compared with 0.066 ms in the earlier paced trial. Both trials used the two-connection fixture with an 80 ms SQL delay. This is a cross-run observation for those constraints. The short concurrency-8 ramp in the overlap run recorded 16 acquisition failures and 16 HTTP 503 responses. This supports reviewing pool headroom, bounded acquisition waits and query duration before increasing API concurrency. The successful overlap trial, without Saju throttling, leaves the combined Saju ceiling and Production scaling settings unapproved.
 
+### Paired Saju CPU comparison
+
+Use the same analyzer with the [paired Linux CPU observation](REAL_GOTRUE_PG18_SAJU_CPU_COMPARISON_LINUX_OBSERVATION_20261106.json), main `4bcad41cda3287c75cbe741f2a2331145514d0d0`, and SHA-256 `646c94a4bb4fb51113b4e8f809c161e4a42f659ab33ae7d5b43037b6283aa3cb`. It validates the shared image, both cgroup quotas, request accounting, and recovery before emitting a review signal.
+
+`reviewSajuCpuHeadroom` is true when the lower-quota trial shows more throttled periods and higher Saju adapter and product p95, with no DB acquisition failures in either comparison window. A DB acquisition failure withholds that signal for manual dependency review. In the recorded run, adapter p95 rose from 2.939 to 582.129 ms and throttled periods rose from zero to 364. The CPU comparison reports its own evidence alongside the separate DB-pool review from the sustained trial. It leaves Production CPU sizing and automatic scaling disabled.
+
 ## Public diagnostic route review
 
 `scripts/derive-observed-scaling-review.mjs` consumes an **array of actual Phase 11 collector JSON reports** from a single controlled non-production loopback diagnostic route. It combines repeated measurements at the same concurrency level conservatively, preserving any observed non-200 or transport failures. It does **not** invent a numeric service SLO, scaling ceiling, production target or Saju/DB performance claim.
