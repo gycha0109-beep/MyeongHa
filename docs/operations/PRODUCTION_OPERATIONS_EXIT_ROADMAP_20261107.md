@@ -2,7 +2,7 @@
 
 > 기준일: 2026-11-07 KST  
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`  
-> 기준 main: `1609aa879aa63120072b4d21b35f4c469dc650ed`  
+> 기준 main: `2f04f8f2a0d912e42bf348781e17d20ff7094675`  
 > 권위 문서: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §33–§38, `PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`, Phase 8 DR 문서 및 Issue [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
 
 ## 1. 개정 목적과 유지 범위
@@ -23,7 +23,7 @@
 |---|---|---|
 | Production Worker 익명 E2E | [#42271216975](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42271216975), main `1609aa8…`, Worker `295b9496-795b-44a3-b3f9-141c0b83e47d` | 화면·Health 200, 설정 기반 Readiness 200, 익명 Member/Saju/Preview 401, Cross-origin 403, unknown route 404. 실제 DB/Auth/Saju 연결 증명은 아님. |
 | Production DB 현황 | PostgreSQL 17.6, 원격 migration 원장 241개, 최신 `20261105075227` | 읽기 전용 관측. 전체 저장소 SQL/DDL/권한 동등성은 미증명. |
-| Migration 비교 | main SQL 276개, 원격 전용 40개, 저장소 전용 75개, 동일 이름 버전 불일치 1개 | 원격 전용 `20261008090417`의 19/19 함수 본문은 대응 코드와 일치하지만 wrapper·ACL·소유권 동등성은 미증명. `20261029012948`과 저장소 `20261029012000`은 최신 byte 비교에서 동일하지 않음. |
+| Migration 비교 | Production 241개 / main SQL 276개. 정확한 버전 ID 기준 원격 전용 41개·저장소 전용 76개이며, 동일 이름의 버전 불일치 쌍 1개(`20261029012948` ↔ `20261029012000`)가 포함됨. | 위 쌍은 최신 SELECT-only 비교에서 원격·저장소 SQL 전체 7,349 bytes가 MD5/SHA-256까지 일치함을 확인. 버전 ID 및 배포 provenance는 별도 미해결. 원격 `20261008090417`은 104,021 bytes, 6개 로컬 marker는 비어 있고, 후속 1520–1640 13개와 Pin 컬럼/함수가 현재 Production에 존재함. 상세는 [11/07 read-only snapshot](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json). |
 | 현재 Frontier 백업 | [#42130737153](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42130737153), frontier `20261105075227`, 241 entries | 암호화 백업·checksum 확인. |
 | 격리 PostgreSQL 복원 | [#42247589352](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42247589352), PostgreSQL 17.6, 4초 | DB 복원·선택된 역할/함수/RLS 검사는 통과. Provider 관리 데이터 27개 블록 누락, 3개 투영. 전체 Supabase 복원은 아님. |
 | 개인정보 원장 | [#42242496615](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42242496615), 현재 백업에 결합, `eventCount=0` | 비어 있는 스냅샷은 삭제·철회 재생 증거가 아님. 최신 감시 [#42262739511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42262739511)은 7,828초로 7,200초 기준 초과. |
@@ -48,11 +48,11 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 
 #### 8-A. Migration / DB 출처 정합성
 
-1. 현재 Production 원장과 정확한 main migration 파일을 다시 SELECT-only로 대조한다. 기준 관측은 원격 241개 / 저장소 276개, 원격 전용 40개 / 저장소 전용 75개 / 동일 이름 버전 불일치 1개다.
-2. 모든 불일치 버전을 다음으로 분류한 처분표를 만든다: 원격 적용 출처·실행 주체·시점, 저장소 대응 파일, 실제 statement/DDL checksum, 객체·함수·정책 영향, owner·role·membership·GRANT/REVOKE, rollback/forward-only 방향.
-3. `20261008090417`은 104,021-byte 원격 statement의 wrapper·ACL·ownership·policy와 6개 로컬 migration을 대조한다. 19/19 함수 본문 일치는 범위가 제한된 증거로만 유지한다.
-4. `20261029012948` 원격 statement와 `20261029012000` 저장소 파일의 비교 범위를 확정한다. 11/05 DR 상태 문서에는 정규화 후 hash 일치 관측이 있으나, 11/07 최신 whole-statement byte 비교에서는 원격 7,349 bytes와 저장소 7,541 bytes(끝 개행 제거 7,539 bytes)의 hash가 달랐다. 두 비교의 입력·정규화 범위를 대조해 차이를 해소하기 전에는 semantic equivalence를 확정하지 않는다.
-5. 원격 전용·저장소 전용 항목은 각각 적용됨/미적용/다른 트랙/역사적 잔존 등 근거 있는 상태로 모두 처분한다. 저장소 전용 75개를 자동으로 배포 실패로 분류하지 않는다.
+1. 현재 Production 원장과 정확한 main migration 파일을 SELECT-only로 대조했다. 2026-11-07 기준 원격 241개 / 저장소 276개이며, 정확한 버전 ID 기준 원격 전용 41개 / 저장소 전용 76개다. 동일 이름의 버전 불일치 쌍 1개는 아래 4번처럼 SQL 본문 전체가 일치하지만 version identity는 다르다.
+2. 불일치 버전은 확인 가능한 배포/자동화 출처·시점, 저장소 대응 파일, statement/DDL checksum, 객체·함수·정책 영향, owner·role·membership·GRANT/REVOKE, rollback/forward-only 방향으로 처분한다. R2-G에서 종료한 과거 개인 실행자·요청 ID·COMMIT 로그 추적은 `CLOSED_RISK_ACCEPTED`이며 다시 차단 조건으로 만들지 않는다.
+3. `20261008090417`은 104,021-byte 원격 단일 statement다. 현재 Production에는 관련 1460–1510 marker 6/6이 존재하지만 저장 statement는 모두 비어 있고, 후속 1520–1640 13개 migration·Pin 컬럼 2개·pinned 함수가 이미 존재한다. 현재 investigation은 `HOLD_CHANGED_RUNTIME_SCHEMA_REASSESS`다. 19개 R2 RPC catalog는 19/19 존재하며, `myeongha_api_executor` EXECUTE 17/19, `service_role`·`anon`·`authenticated`는 0/19다. 거부된 두 함수는 legacy assert/context-ready 경로이고, 현재 pinned context-ready replacement는 1 overload로 존재하며 API executor 실행이 허용된다. 이것은 현재 접근 경계의 증거이지, 원격 wrapper·전체 DDL·Owner·role membership·정책·grant graph의 격리 복원 parity 증명은 아니다.
+4. `20261029012948` 원격 statement와 `20261029012000` main 파일은 현재 Production에 대해 SELECT-only로 직접 비교했다. 양쪽 모두 7,349 bytes이며 exact byte equality, MD5 `c13c8ae6680c9c5aef35909ba81b7b1b`, SHA-256 `b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6`가 일치한다. 정규화 SHA-256도 `0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d`로 일치한다. 따라서 이 쌍의 SQL source equivalence는 확인됐지만 remote/local version identity와 적용 provenance는 해결되지 않았다. 원격 metadata의 `created_by`는 존재하나 인증된 실행자 증명은 아니며 idempotency key와 rollback statement는 없다.
+5. 원격 전용 41개·저장소 전용 76개는 각각 적용됨/미적용/다른 트랙/역사적 잔존 등 근거 있는 상태로 처분한다. 동일 이름 버전 쌍은 SQL 일치 사실과 version identity 불일치를 함께 기록하며, 저장소 전용 76개를 자동 배포 실패로 분류하지 않는다.
 6. 전체 schema, function, owner, role membership, grants, RLS/policy 및 provider migration ledger의 복구 동등성을 증명한다.
 
 **금지:** blind `migration repair`, migration history rewrite, 추측에 의한 재적용, Production DDL/DML. 실제 정합화가 필요하면 근거 있는 forward-only 계획을 먼저 제시하고 사용자 승인을 받은 뒤 별도 실행한다.
