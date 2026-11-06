@@ -1,4 +1,4 @@
-> **2026-10-16 실행 우선순위:** [개정 로드맵 v2](../operations/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V2_20261016.md). 이 문서는 G0~G6 판정·권한 계약의 정본이며, 로드맵은 S1 개인정보 0건 후보 방어부터 G1/G2/G3 실제 서비스 연결을 진행한다. R2-G 역사 실행자 조사는 위험 수용으로 종료했지만, 운영 배포·DR·paid/public 승인은 별개다.
+> **현재 실행 순서:** [세연 AI 보안 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md). 이 문서는 G0~G6 완료 증거·보안 권한 계약의 정본이며, 실제 작업 범위와 순서는 v3를 따른다. v3는 2026-10-25에 정한 S0(원본 `conversation_recall/v1` Memory 1건 + 현재 User 메시지 1건 + 최초 비스트리밍 답변)을 기준으로 한다. 과거 대화/Replay/Reader/다중 Memory/Life Fact/Streaming은 S0에서 계속 닫아 두며, 이를 구현하지 않는 것이 보안 합격 조건이다. G0~G6의 안전 기준을 낮추는 변경은 아니다.
 
 # 명하 세연 AI 보안 트랙 — 완료 판정·증거 계약 v1
 
@@ -9,6 +9,21 @@ Reader 구매 기반 권한: [#1827](https://github.com/gycha0109-beep/MyeongHa/
 AI 경량 보안 정책 평가: [#1816](https://github.com/gycha0109-beep/MyeongHa/issues/1816)
 플랫폼 전반 감사: [#1529](https://github.com/gycha0109-beep/MyeongHa/issues/1529)
 
+## 현재 S0 활성화 범위에 대한 판정 적용
+
+아래 범위는 이 완료 계약을 현재 제품에 적용하는 한정 Scope다. 장기적으로 가능한 모든 데이터 유형과 공개 경로를 S0 출시 전에 구현해야 한다는 뜻이 아니다.
+
+- **허용 입력:** 현재 인증 Member/Thread/Turn/Attempt, 명시 동의된 원본 `conversation_recall/v1` Memory 정확히 1건, 현재 User 메시지 정확히 1건.
+- **허용 출력:** 최초 답변 1회, 비스트리밍. 모델 입력 전 Pin, 원본 Grant/Record 재검증, Commit, HTTP 송출 및 durable receipt/ACK까지 포함한다.
+- **S0에서 금지:** 과거 User/Assistant 메시지, Relationship Event, Reader/공식 Reading, 다중 Memory/Life Fact, 새 Memory UI, History 본문 공개, Replay/재생성, 후속 Worker 공개, Streaming.
+- **금지 경로의 판정:** 위 경로는 S0에서 구현·활성화할 필요가 없다. 다만 실제 HTTP/API/Worker/DB 입구에서 계속 OFF/HOLD임을 검증해야 하며, S0 답변의 모델 Context에 해당 데이터가 섞이면 요청 전체를 HOLD한다. 일부 제거 후 계속 진행하지 않는다.
+- **G0:** 위 허용·금지 범위, 철회·재승인, 비스트리밍 전송 순서를 S0 기술 계약으로 확정한다. S0 밖의 모든 파생 데이터 정책을 한 번에 승인하지 않는다.
+- **G1/G2:** 정확한 Memory 1건과 현재 User 1건만 모델 전 불변 Pin하고, 동일 DB 트랜잭션에서 현재 원본 Grant/Record를 확인해 Commit한다.
+- **G3:** S0 최초 HTTP 공개·receipt/ACK·철회 경합을 통과시킨다. Replay/History 기능을 열거나 구현하는 대신 차단 상태를 증명한다.
+- **G4:** 일반 고객의 서버 승인 비용·크레딧 예약·receipt 기반 정산을 포함한다. Owner Admin 면제는 제한된 내부 smoke에만 사용할 수 있으며 일반 고객 과금 완료로 간주하지 않는다.
+- **G5/G6:** 이 S0 경로의 실DB·HTTP·독립 세션 경쟁 검증과 제한 운영 smoke/롤백 증거를 요구한다. 전체 DR 인증이나 미적용 Migration 일괄 적용을 새로운 S0 조건으로 추가하지 않는다.
+
+이 범위 조정은 검증을 생략하거나 보안 기준을 낮추는 것이 아니다. **출시하지 않는 기능은 계속 차단하고, 출시할 S0 경로만 완성·검증한다.**
 ## 판정 정의
 
 - **A / 구현 완료**: 실제 Production Code + PostgreSQL owner 함수 + HTTP/Replay 경로까지 보호가 연결되어, 더는 Shadow/Candidate-only가 아니다. G0/G1/G2/G3/G4 구현 필수.
