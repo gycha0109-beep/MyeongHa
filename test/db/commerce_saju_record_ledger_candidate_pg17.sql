@@ -12,6 +12,8 @@ declare
  v_record uuid:='1219c200-0000-4000-8000-000000000001'::uuid;
  v_new_revision uuid:='1219c200-0000-4000-8000-000000000002'::uuid;
  v_upgrade_intent uuid:='1219c200-0000-4000-8000-000000000003'::uuid;
+ v_sandbox_intent uuid:='1219c200-0000-4000-8000-000000000006'::uuid;
+ v_sandbox_receipt uuid:='1219c200-0000-4000-8000-000000000007'::uuid;
  v_subject uuid;
  v_source_revision uuid;
  v_receipt public.commerce_receipts%rowtype;
@@ -87,6 +89,53 @@ begin
  ) then
    raise exception 'SAJU_LEDGER_PG17_RECEIPT_REVISION_GUARD_MISSING';
  end if;
+ -- A verified SANDBOX charge is not a real paid right. It must not
+ -- permanently freeze Birth input and cannot be upgraded as production money.
+ -- Reuse only the approved synthetic B2 fixture's Offer/Subject facts.
+ insert into public.purchase_intents(
+   id,subject_id,product_offer_id,provider_account_link_id,
+   idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+   status,created_at,updated_at,
+   expected_amount_minor,expected_currency,charge_terms_version,
+   capability_set_id,capability_snapshot_jsonb,capability_snapshot_hash
+ )
+ select v_sandbox_intent,pi.subject_id,pi.product_offer_id,
+   pi.provider_account_link_id,
+   'saju-ledger-pg17-sandbox-only','sha256:test:saju-ledger-sandbox-only',
+   pi.offer_snapshot_jsonb,pi.offer_snapshot_hash,
+   'verified',clock_timestamp(),clock_timestamp(),
+   pi.expected_amount_minor,pi.expected_currency,pi.charge_terms_version,
+   pi.capability_set_id,pi.capability_snapshot_jsonb,pi.capability_snapshot_hash
+ from public.purchase_intents pi where pi.id=v_b2_purchase;
+ insert into public.commerce_receipts(
+   id,subject_id,purchase_intent_id,provider_account_link_id,
+   product_offer_id,platform,provider,external_transaction_id,
+   external_original_transaction_id,receipt_fingerprint,
+   verification_status,verified_payload_jsonb,verified_at,created_at,
+   environment,verifier_revision,verified_amount_minor,verified_currency
+ )
+ select v_sandbox_receipt,v_receipt.subject_id,v_sandbox_intent,
+   v_receipt.provider_account_link_id,v_receipt.product_offer_id,
+   v_receipt.platform,v_receipt.provider,
+   'saju-ledger-synthetic-sandbox-only',
+   v_receipt.external_original_transaction_id,
+   'sha256:test:saju-ledger-synthetic-sandbox-only',
+   'verified',v_receipt.verified_payload_jsonb,clock_timestamp(),
+   clock_timestamp(),'sandbox',v_receipt.verifier_revision,
+   v_receipt.verified_amount_minor,v_receipt.verified_currency;
+ insert into public.commerce_saju_purchase_origins_v1
+   (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
+ values (v_sandbox_intent,v_subject,v_record,v_source_revision,'original');
+ update public.commerce_saju_records_v1
+ set birth_revision_id=v_new_revision where id=v_record;
+ if (select birth_revision_id from public.commerce_saju_records_v1
+     where id=v_record) is distinct from v_new_revision then
+   raise exception 'SAJU_LEDGER_PG17_SANDBOX_FROZE_BIRTH_REVISION';
+ end if;
+ update public.commerce_saju_records_v1
+ set birth_revision_id=v_source_revision where id=v_record;
+ -- The same Record MUST freeze on a verified PRODUCTION receipt below.
+
  -- A real paid Receipt pins its original Intent to the Record. Neither a
  -- failed Intent nor an unverified Payment Attempt is a permanent freeze.
  insert into public.commerce_saju_purchase_origins_v1
