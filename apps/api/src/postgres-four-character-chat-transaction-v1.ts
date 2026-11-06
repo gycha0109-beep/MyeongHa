@@ -191,20 +191,6 @@ function assertMember(
   }
 }
 
-function assertReservationAndSource(
-  reservation: FourCharacterAtomicReservationV1,
-  source: PublishedFourCharacterModelSourceV1,
-): void {
-  if (reservation.status !== 'reserved' ||
-      reservation.characterId !== source.characterId ||
-      reservation.releaseId !== source.releaseId ||
-      reservation.bundleId !== source.bundleId ||
-      source.status !== 'published' ||
-      sourceDigest(reservation.sourceDigest) !== sourceDigest(source.sourceDigest)) {
-    throw new FourCharacterProductionExecutionHeldV1();
-  }
-}
-
 export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly<{
   runner: FourCharacterSubjectTransactionRunnerV1;
 }>): FourCharacterProductionExecutionPortsV1['transaction'] {
@@ -217,7 +203,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
       const releaseId = uuid(request.releaseId);
       const bundleId = uuid(request.bundleId);
       const clientTurnId = requiredText(request.clientTurnId, 256);
-      const characterId = request.characterId as FourIndependentChatTargetV1;
+      const characterId = request.characterId;
       const userText = requiredText(request.userText, 8000);
       const digest = sourceDigest(request.sourceDigest);
       const turnId = randomUUID();
@@ -274,6 +260,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
               characterId,
               releaseId,
               bundleId,
+              sourceDigest: digest,
               turnId: actualTurnId,
               attemptId: uuid(received.committedAttemptId ?? proposedAttemptId),
               costReservationId,
@@ -290,7 +277,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
               status: 'in_flight' as const,
               subjectId, threadId,
               threadCharacterId: actualThreadCharacterId,
-              characterId, releaseId, bundleId,
+              characterId, releaseId, bundleId, sourceDigest: digest,
               turnId: actualTurnId, attemptId, costReservationId,
             });
           }
@@ -316,7 +303,7 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
             status: 'reserved' as const,
             subjectId, threadId,
             threadCharacterId: actualThreadCharacterId,
-            characterId, releaseId, bundleId,
+            characterId, releaseId, bundleId, sourceDigest: digest,
             turnId: actualTurnId, attemptId, costReservationId,
           });
         });
@@ -344,7 +331,12 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
       const providerKey = requiredText(request.generated.providerKey, 256);
       const modelKey = requiredText(request.generated.modelKey, 256);
       const outputGuardVersion = requiredText(request.validated.outputGuardVersion, 256);
-      if (request.generated.characterId !== reservation.characterId ||
+      if (reservation.status !== 'reserved' ||
+          reservation.characterId !== request.source.characterId ||
+          reservation.releaseId !== request.source.releaseId ||
+          reservation.bundleId !== request.source.bundleId ||
+          sourceDigest(reservation.sourceDigest) !== digest ||
+          request.generated.characterId !== reservation.characterId ||
           request.validated.characterId !== reservation.characterId ||
           request.validated.approved !== true ||
           request.validated.bodyText !== bodyText ||
@@ -389,9 +381,15 @@ export function createPostgresFourCharacterChatTransactionPortV1(input: Readonly
             subjectId, threadId, turnId, attemptId, assistantMessageId,
             outboxEventId, deliveryReceiptId, digest,
           ])).rows);
+          const actualTurnId = uuid(row.turnId);
+          const actualAttemptId = uuid(row.attemptId);
           const actualReceiptId = uuid(row.deliveryReceiptId);
           const actualAssistantMessageId = uuid(row.assistantMessageId);
-          if (actualReceiptId !== deliveryReceiptId ||
+          integer(row.sequenceNo);
+          timestamp(row.committedAt);
+          if (actualTurnId !== turnId ||
+              actualAttemptId !== attemptId ||
+              actualReceiptId !== deliveryReceiptId ||
               actualAssistantMessageId !== assistantMessageId ||
               bool(row.replayed)) {
             throw new FourCharacterProductionExecutionHeldV1();
