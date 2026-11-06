@@ -1,0 +1,25 @@
+name: Admin Console Scoped Readback
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-readonly:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      MYEONGHA_ADMIN_READ_DATABASE_URL: ${{ secrets.MYEONGHA_ADMIN_READ_DATABASE_URL }}
+      MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM: ${{ secrets.MYEONGHA_ADMIN_DATABASE_SSL_ROOT_CERT_PEM }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Compile exact production Admin Reader adapters
+        run: npm run build
+      - name: Verify actual bounded menu queries with dedicated read-only database login
+        run: node apps/admin/production-read-query-readback.mjs
