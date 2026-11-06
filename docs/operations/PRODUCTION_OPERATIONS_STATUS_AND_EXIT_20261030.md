@@ -9,6 +9,11 @@
 > 최종 판정: **코드·배포·익명 운영 점검 일부 확인 / 전체 Production Operations ACCEPTANCE = 미완료**. `dr_ready=false`, `serviceResumptionAllowed=false` 상태를 변경하지 않음.
 
 ## Worklog — 운영 트랙 작업 이력
+### 2026-11-06 KST — Phase 7/11 GitHub Linux workerd Saju outage and recovery: measured PASS
+
+- The existing main-only [GitHub Linux run #42197099729](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42197099729) completed **SUCCESS** at exact `main` `af41b57575536ba39e5b4ff138dcca80252d30fc`, after [#3073](https://github.com/gycha0109-beep/MyeongHa/pull/3073) merged. Actual local Wrangler 4.152.0/workerd 1.20261019.1, four disposable signed GoTrue members, native PostgreSQL18 forced RLS and pinned Saju `9807ce89c08afc61b587560d515a475efd819032` were exercised. Sequential baseline 12/12 successes (p50/p95/p99 127.809/141.546/153.991 ms).
+- **Isolated actual fault/recovery:** stopped Saju produced calculation HTTP **503** while independent Health remained **200**; after Saju restarted, four simultaneous authenticated calculations succeeded **4/4**, with p50/p95/p99 **171.709/176.095/176.259 ms**. Anonymous denial, workerd process cleanup and Docker project cleanup were confirmed. The original [1,414-byte JSON](REAL_GOTRUE_PG18_SAJU_WORKERD_RECOVERY_LINUX_OBSERVATION_20261106.json), raw SHA-256 `25742bd0be04281f7004ccacf419ca26310f808d2fcfff6abf6331a76fd54a49`, [original artifact 13492477469](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42197099729/artifacts/13492477469), and [scope document](WORKERD_ISOLATED_PRODUCT_PATH_PHASE11_20261106.md) are preserved in this evidence PR.
+- **Non-claims:** This is a local workerd fixture with temporary GoTrue/Postgres and pinned Saju, **not** deployed Worker ingress/Hosted Hyperdrive admission, Production Saju outage recovery, production throughput/automatic scaling, Hosted restore or whole-service RPO/RTO. `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false` remain unchanged. P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) remains OPEN. Next work: verify outstanding approved implementation/acceptance gaps without expanding test scope unilaterally.
 
 ### 2026-11-06 KST — Phase 7/11 workerd 사주 장애·복귀 준비 및 실측 대기
 
