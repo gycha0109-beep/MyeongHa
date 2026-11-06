@@ -4,6 +4,12 @@
 > Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-11-01
 > Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
 
+## 2026-11-06 — privacy capture timing and alert evidence
+
+- The completion watcher reported ages of 9,569 and 8,763 seconds against its 7,200-second alert boundary. The next check passed at 6,463 seconds using workflow-run metadata. These are separate observations of the hourly capture schedule. [First stale check](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42027806260), [second stale check](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42105916304), [passing check](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42145108286).
+- The passing check's source attempt completed its capture job at `2026-11-05T23:50:24Z`. Its encrypted artifact was created at `23:50:22Z`, during the successful upload step. The watcher now measures age from the verified job completion and requires the encrypted artifact's creation time to fall inside that attempt's upload step. Replaying the passing check's timestamp with the same GitHub metadata yielded 6,465 seconds. [Source capture](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42132365347).
+- A separate scheduled encrypted PostgreSQL backup succeeded with artifact `13463805796`. Provider-equivalent Hosted Auth/Storage restoration, independent privacy continuity and measured whole-service `PT24H` RPO / `PT6H` RTO still gate DR and service resumption. [Backup run](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42130737153), [P0 #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887).
+
 ## 2026-11-05 — Production migration metadata review and one verified version pair
 
 The read-only Supabase migration catalog and `main` `d08636181b0957721b5a318898510f4045264b96` contained 241 and 276 version strings respectively. The exact-version comparison found 41 remote-only and 76 repository-only versions. The latest versions were `20261105075227` remotely and `20261029185500` in Git. Some repository-only versions may still be pending or represent a separate workstream. The [sanitized version diff](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261105.json) has SHA-256 `bcef0bfeb0356dd92b66f8304cce8bf64d5c457bc5042af96f37cd6635045535`. [P0 #1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887).

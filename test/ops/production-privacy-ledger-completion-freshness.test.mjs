@@ -7,10 +7,19 @@ import {
 } from '../../scripts/operations/check-privacy-ledger-completion-freshness.mjs';
 
 const NOW = Date.parse('2026-11-01T12:00:00Z');
+const at = (milliseconds) => new Date(milliseconds).toISOString();
 const run = (ageSeconds, overrides = {}) => ({
   id: 41287556554, status: 'completed', conclusion: 'success',
-  head_branch: 'main', event: 'schedule',
-  updated_at: new Date(NOW - ageSeconds * 1000).toISOString(),
+  head_branch: 'main', event: 'schedule', run_attempt: 1, head_sha: 'a'.repeat(40),
+  updated_at: at(NOW - ageSeconds * 1000),
+  ...overrides,
+});
+const job = (capture, completed = Date.parse(capture.updated_at), overrides = {}) => ({
+  run_id: capture.id, run_attempt: capture.run_attempt, head_sha: capture.head_sha,
+  name: 'encrypted-off-db-privacy-recovery-ledger', status: 'completed', conclusion: 'success',
+  started_at: at(completed - 30000), completed_at: at(completed),
+  steps: [{ name: 'Upload encrypted privacy recovery ledger', status: 'completed', conclusion: 'success',
+    started_at: at(completed - 2000), completed_at: at(completed - 1000) }],
   ...overrides,
 });
 const artifact = (id = 41287556554, overrides = {}) => ({
@@ -19,8 +28,10 @@ const artifact = (id = 41287556554, overrides = {}) => ({
   expired: false,
   ...overrides,
 });
-const assess = (runs, artifacts = [artifact()]) =>
-  assessPrivacyLedgerFreshness({ runs, artifacts, nowMs: NOW });
+const assess = (runs, artifacts = runs.map(capture => artifact(capture.id, {
+  created_at: at(Date.parse(capture.updated_at) - 1000),
+})), jobs = runs.map(capture => job(capture))) =>
+  assessPrivacyLedgerFreshness({ runs, jobs, artifacts, nowMs: NOW });
 
 test('recent completed encrypted capture is observed but cannot prove continuous privacy authority', () => {
   const result = assess([run(3600)]);
@@ -69,6 +80,23 @@ test('no successful capture, future completion and malformed evidence fail close
     /invalid metadata input/u);
 });
 
+test('new run metadata cannot refresh an old capture and an old attempt artifact cannot pass', () => {
+  const capture = run(20, { run_attempt: 2 });
+  const completed = NOW - 7500000;
+  const verified = job(capture, completed);
+  const sameAttempt = artifact(capture.id, { created_at: at(completed - 1000) });
+  const result = assess([capture], [sameAttempt], [verified]);
+  assert.equal(result.status, 'CAPTURE_COMPLETION_STALE');
+  assert.equal(result.elapsedSinceRunCompletionSeconds, 7500);
+  assert.equal(result.latestSuccessfulCompletedAt, at(completed));
+
+  assert.equal(assess([capture], [sameAttempt], [job(capture, completed, { run_attempt: 1 })]).status,
+    'CAPTURE_COMPLETION_METADATA_UNAVAILABLE');
+  assert.equal(assess([capture], [sameAttempt], [job(capture)]).status, 'ENCRYPTED_ARTIFACT_UNAVAILABLE');
+  assert.equal(assess([capture], [sameAttempt], [job(capture, completed, { steps: [] })]).status,
+    'CAPTURE_COMPLETION_METADATA_UNAVAILABLE');
+});
+
 test('read-only watcher refuses non-main and non-scheduled GitHub execution scopes', async () => {
   const env = {
     GITHUB_ACTIONS: 'true',
@@ -88,12 +116,14 @@ test('workflow-only GitHub API requests and artifact binding are required', asyn
   const previous = globalThis.fetch;
   const paths = [];
   try {
+    const capture = run(100);
     globalThis.fetch = async (url, options) => {
       paths.push(url.toString());
       assert.equal(url.host, 'api.github.com');
       assert.equal(options.redirect, 'error');
-      if (url.pathname.includes('/workflows/')) return Response.json({ workflow_runs: [run(100)] });
-      return Response.json({ artifacts: [artifact()] });
+      if (url.pathname.includes('/workflows/')) return Response.json({ workflow_runs: [capture] });
+      if (url.pathname.endsWith('/jobs')) return Response.json({ total_count: 1, jobs: [job(capture)] });
+      return Response.json({ artifacts: [artifact(capture.id, { created_at: at(Date.parse(capture.updated_at) - 1000) })] });
     };
     const res = await inspectPrivacyLedgerCompletion({
       GITHUB_ACTIONS: 'true',
@@ -103,9 +133,10 @@ test('workflow-only GitHub API requests and artifact binding are required', asyn
       GH_TOKEN: 'synthetic-test-token-not-authorized',
     }, NOW);
     assert.equal(res.checkPassed, true);
-    assert.equal(paths.length, 2);
+    assert.equal(paths.length, 3);
     assert.ok(paths[0].includes('/workflows/production-postgres-privacy-recovery-ledger.yml/runs'));
-    assert.ok(paths[1].includes('/runs/41287556554/artifacts'));
+    assert.ok(paths.some(path => path.includes('/runs/41287556554/attempts/1/jobs')));
+    assert.ok(paths.some(path => path.includes('/runs/41287556554/artifacts')));
   } finally {
     globalThis.fetch = previous;
   }
