@@ -118,10 +118,50 @@ export function parseSeyeonGovernedDbConfigV1(input: {
  * ANY transaction context or Subject resolver runs.
  * The new role has SET permission only from a separately provisioned login.
  */
+const GOVERNED_EXECUTOR_UNSAFE_FLAGS = [
+  'executorCanLogin','executorIsSuper','executorCanBypassRls',
+  'executorCanInherit','executorCanCreateDb','executorCanCreateRole',
+  'executorCanReplicate',
+] as const;
+const GOVERNED_EXECUTOR_REQUIRED_FUNCTION_FLAGS = [
+  'executorCanResolveSubject','executorCanAssertSubject',
+  'executorCanBeginMemberContext','executorCanBeginGovernedGuestContext',
+  'executorCanGovernedStart','executorCanGovernedSettle',
+  'executorCanStoreProviderReceipt',
+] as const;
+const GOVERNED_EXECUTOR_FORBIDDEN_FUNCTION_FLAGS = [
+  'executorCanBeginGuestContext','executorCanLegacyStart',
+  'executorCanLegacySettle','executorCanLegacyRecord',
+  'executorCanInternalStart','executorCanInternalSettle',
+  'executorCanReadCost','executorCanClaimProviderReceipt',
+  'executorCanAckProviderReceipt',
+] as const;
+const GOVERNED_EXECUTOR_DIRECT_FLAGS = [
+  'executorCanCreatePublicSchema','executorDirectLedger',
+  'executorDirectBudget','executorDirectRateCard',
+  'executorDirectReceiptQueue','executorDirectLedgerColumns',
+  'executorDirectBudgetColumns','executorDirectRateCardColumns',
+  'executorDirectReceiptQueueColumns',
+] as const;
+
 const LEGACY_OR_DIRECT_FLAGS = [
   'isLegacyMember','isCostOwnerMember',
   'canLegacyStart','canLegacySettle','canLegacyRecord',
+  // The ordinary API account must lose ALL legacy cost entrypoints before
+  // ENFORCE can be accepted, even if the governed LOGIN itself is isolated.
+  'canOrdinaryLegacyStart','canOrdinaryLegacySettle','canOrdinaryLegacyRecord',
+  // No ordinary executor may independently bypass the separate Governed
+  // LOGIN by invoking governed Start/Settle or persisting Provider receipts.
+  'canOrdinaryGovernedStart','canOrdinaryGovernedSettle','canOrdinaryStoreReceipt',
+  'canOrdinaryInternalStart','canOrdinaryInternalSettle',
+  // NOINHERIT members may still SET ROLE into these private principals.
+  'ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
   'canDirectLedger','canDirectBudget','canDirectRateCard',
+  'canDirectLedgerColumns','canDirectBudgetColumns','canDirectRateCardColumns',
+  // Check the ordinary API role itself, not only the dedicated LOGIN.
+  'canOrdinaryDirectLedger','canOrdinaryDirectBudget','canOrdinaryDirectRateCard',
+  'canOrdinaryDirectLedgerColumns','canOrdinaryDirectBudgetColumns',
+  'canOrdinaryDirectRateCardColumns',
 ] as const;
 
 export function verifySeyeonGovernedLoginPreflightV1(
@@ -146,10 +186,40 @@ export function verifySeyeonGovernedLoginPreflightV1(
   if (row.hasGovernedRoleMembership !== true) {
     return fail('GOVERNED_ROLE_UNAVAILABLE', 'Governed login cannot enter its dedicated execution role.');
   }
+  for (const key of GOVERNED_EXECUTOR_UNSAFE_FLAGS) {
+    if (row[key] !== false) {
+      return fail('GOVERNED_ROLE_UNAVAILABLE',
+        'Governed execution role has elevated PostgreSQL role attributes.');
+    }
+  }
+  if (row.executorOtherMemberships !== 0 ||
+      row.executorCanUsePublicSchema !== true) {
+    return fail('GOVERNED_ROLE_UNAVAILABLE',
+      'Governed execution role has unsafe memberships or cannot resolve approved functions.');
+  }
+  for (const key of GOVERNED_EXECUTOR_REQUIRED_FUNCTION_FLAGS) {
+    if (row[key] !== true) {
+      return fail('GOVERNED_ROLE_UNAVAILABLE',
+        'Governed execution role is missing an approved Subject or cost RPC.');
+    }
+  }
+  for (const key of GOVERNED_EXECUTOR_FORBIDDEN_FUNCTION_FLAGS) {
+    if (row[key] !== false) {
+      return fail('LEGACY_ROLE_EXPOSED',
+        'Governed execution role can reach a legacy, internal, or worker RPC.');
+    }
+  }
+  for (const key of GOVERNED_EXECUTOR_DIRECT_FLAGS) {
+    if (row[key] !== false) {
+      return fail('DIRECT_SQL_EXPOSED',
+        'Governed execution role can create schema objects or access private tables directly.');
+    }
+  }
   for (const key of LEGACY_OR_DIRECT_FLAGS) {
     if (row[key] !== false) {
       return fail(
-        key.startsWith('canDirect') ? 'DIRECT_SQL_EXPOSED' : 'LEGACY_ROLE_EXPOSED',
+        (key.startsWith('canDirect') || key.startsWith('canOrdinaryDirect'))
+          ? 'DIRECT_SQL_EXPOSED' : 'LEGACY_ROLE_EXPOSED',
         'Governed login can reach forbidden legacy or raw SQL authority.',
       );
     }

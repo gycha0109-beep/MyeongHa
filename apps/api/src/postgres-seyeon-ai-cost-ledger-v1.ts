@@ -50,15 +50,263 @@ select
  pg_catalog.has_function_privilege(session_user,
    'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
    'EXECUTE') as "canLegacyRecord",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
+ -- The governed LOGIN being isolated is insufficient if the ordinary API
+ -- role can still bypass the Governor through pre-cutover legacy RPCs.
+ -- This deliberately blocks ENFORCE until the approved ACL cutover; OFF
+ -- continues to use its pre-cutover permission contract unchanged.
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
+   'EXECUTE') as "canOrdinaryLegacyStart",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryLegacySettle",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryLegacyRecord",
+ -- The common API executor must also lose direct execution of *governed*
+ -- cost entrypoints. The dedicated LOGIN is not an isolation boundary if
+ -- ordinary API code can invoke Start/Settle or store a Provider receipt.
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)',
+   'EXECUTE') as "canOrdinaryGovernedStart",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_governed_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryGovernedSettle",
+ pg_catalog.has_function_privilege($2::name,
+   'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryStoreReceipt",
+ -- Internal budget ledger helpers are also SECURITY DEFINER entrypoints.
+ -- They must remain inaccessible to the ordinary API role.
+ pg_catalog.has_function_privilege($2::name,
+   'public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text)',
+   'EXECUTE') as "canOrdinaryInternalStart",
+ pg_catalog.has_function_privilege($2::name,
+   'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)',
+   'EXECUTE') as "canOrdinaryInternalSettle",
+ -- NOINHERIT does not remove SET ROLE. A common executor with either
+ -- privileged membership can still assume the private authority role.
+ pg_catalog.pg_has_role($2::name,$1::name,'MEMBER')
+   as "ordinaryIsGovernedRoleMember",
+ pg_catalog.pg_has_role($2::name,
+   'myeongha_seyeon_cost_meter_owner','MEMBER')
+   as "ordinaryIsCostOwnerMember",
+ (pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege(session_user, 'public.seyeon_ai_call_cost_events', 'MAINTAIN')
+     else false end)
    as "canDirectLedger",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE')
+ (pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_call_cost_events','SELECT')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_call_cost_events','INSERT')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_call_cost_events','UPDATE')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_call_cost_events','REFERENCES'))
+   as "canDirectLedgerColumns",
+ (pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege(session_user, 'public.seyeon_ai_governor_daily_budgets_v1', 'MAINTAIN')
+     else false end)
    as "canDirectBudget",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE')
-   as "canDirectRateCard"
+ (pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1','INSERT')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES'))
+   as "canDirectBudgetColumns",
+ (pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege(session_user, 'public.seyeon_ai_governor_model_policies_v1', 'MAINTAIN')
+     else false end)
+   as "canDirectRateCard",
+ (pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1','SELECT')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1','INSERT')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1','REFERENCES'))
+   as "canDirectRateCardColumns",
+ (pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($2::name, 'public.seyeon_ai_call_cost_events', 'MAINTAIN')
+     else false end)
+   as "canOrdinaryDirectLedger",
+ (pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_call_cost_events','SELECT')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_call_cost_events','INSERT')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_call_cost_events','UPDATE')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_call_cost_events','REFERENCES'))
+   as "canOrdinaryDirectLedgerColumns",
+ (pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($2::name, 'public.seyeon_ai_governor_daily_budgets_v1', 'MAINTAIN')
+     else false end)
+   as "canOrdinaryDirectBudget",
+ (pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','INSERT')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES'))
+   as "canOrdinaryDirectBudgetColumns",
+ (pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($2::name, 'public.seyeon_ai_governor_model_policies_v1', 'MAINTAIN')
+     else false end)
+   as "canOrdinaryDirectRateCard",
+ (pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1','SELECT')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1','INSERT')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1','REFERENCES'))
+   as "canOrdinaryDirectRateCardColumns",
+ -- Validate the role that will actually execute the cost RPCs, not only
+ -- the dedicated LOGIN that is allowed to SET LOCAL ROLE into it.
+ (select e.rolcanlogin from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorCanLogin",
+ (select e.rolsuper from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorIsSuper",
+ (select e.rolbypassrls from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorCanBypassRls",
+ (select e.rolinherit from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorCanInherit",
+ (select e.rolcreatedb from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorCanCreateDb",
+ (select e.rolcreaterole from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorCanCreateRole",
+ (select e.rolreplication from pg_catalog.pg_roles e where e.rolname=$1::name)
+   as "executorCanReplicate",
+ (select count(*)::int from pg_catalog.pg_auth_members m
+  join pg_catalog.pg_roles member_role on member_role.oid=m.member
+  where member_role.rolname=$1::name) as "executorOtherMemberships",
+ pg_catalog.has_schema_privilege($1::name,'public','USAGE')
+   as "executorCanUsePublicSchema",
+ pg_catalog.has_schema_privilege($1::name,'public','CREATE')
+   as "executorCanCreatePublicSchema",
+ -- Exact required execution surface for Subject binding and governed billing.
+ pg_catalog.has_function_privilege($1::name,
+   'public.current_myeongha_subject_id()','EXECUTE') as "executorCanResolveSubject",
+ pg_catalog.has_function_privilege($1::name,
+   'public.assert_myeongha_subject_context_v1(uuid)','EXECUTE') as "executorCanAssertSubject",
+ pg_catalog.has_function_privilege($1::name,
+   'public.begin_member_subject_context_v1(uuid)','EXECUTE') as "executorCanBeginMemberContext",
+ pg_catalog.has_function_privilege($1::name,
+   'public.begin_guest_subject_context_v1(text)','EXECUTE') as "executorCanBeginGuestContext",
+ pg_catalog.has_function_privilege($1::name,
+   'public.begin_seyeon_governed_guest_subject_context_v1(text)','EXECUTE')
+   as "executorCanBeginGovernedGuestContext",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_governed_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text,text,text,bigint,bigint,bigint)','EXECUTE')
+   as "executorCanGovernedStart",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_governed_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE')
+   as "executorCanGovernedSettle",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE')
+   as "executorCanStoreProviderReceipt",
+ -- Legacy/internal/worker RPCs must never be reachable through the executor.
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_start_seyeon_ai_call_v1(uuid,uuid,uuid,text,uuid,text,text,text)','EXECUTE')
+   as "executorCanLegacyStart",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_settle_seyeon_ai_call_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE')
+   as "executorCanLegacySettle",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_record_seyeon_ai_call_cost_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE')
+   as "executorCanLegacyRecord",
+ pg_catalog.has_function_privilege($1::name,
+   'public.seyeon_ai_start_internal_v1(uuid,uuid,uuid,text,uuid,text,text,text)','EXECUTE')
+   as "executorCanInternalStart",
+ pg_catalog.has_function_privilege($1::name,
+   'public.seyeon_ai_settle_internal_v1(uuid,uuid,uuid,text,jsonb)','EXECUTE')
+   as "executorCanInternalSettle",
+ pg_catalog.has_function_privilege($1::name,
+   'public.qry_seyeon_ai_turn_cost_v1(uuid,uuid)','EXECUTE')
+   as "executorCanReadCost",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_claim_seyeon_provider_receipt_v1()','EXECUTE')
+   as "executorCanClaimProviderReceipt",
+ pg_catalog.has_function_privilege($1::name,
+   'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)','EXECUTE')
+   as "executorCanAckProviderReceipt",
+ -- The executor may call owner RPCs but may not read/write their tables directly.
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_call_cost_events', 'MAINTAIN')
+     else false end) as "executorDirectLedger",
+ (pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_call_cost_events','SELECT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_call_cost_events','INSERT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_call_cost_events','UPDATE')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_call_cost_events','REFERENCES'))
+   as "executorDirectLedgerColumns",
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_governor_daily_budgets_v1', 'MAINTAIN')
+     else false end) as "executorDirectBudget",
+ (pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','INSERT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES'))
+   as "executorDirectBudgetColumns",
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_governor_model_policies_v1', 'MAINTAIN')
+     else false end) as "executorDirectRateCard",
+ (pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_model_policies_v1','SELECT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_model_policies_v1','INSERT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_model_policies_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_governor_model_policies_v1','REFERENCES'))
+   as "executorDirectRateCardColumns",
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_provider_receipt_queue_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_provider_receipt_queue_v1', 'MAINTAIN')
+     else false end)
+   as "executorDirectReceiptQueue",
+ (pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_provider_receipt_queue_v1','SELECT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_provider_receipt_queue_v1','INSERT')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_provider_receipt_queue_v1','UPDATE')
+   or pg_catalog.has_any_column_privilege($1::name,
+   'public.seyeon_ai_provider_receipt_queue_v1','REFERENCES'))
+   as "executorDirectReceiptQueueColumns"
 from pg_catalog.pg_roles r where r.rolname=session_user
 `.trim();
 
@@ -187,9 +435,23 @@ export async function startGovernedSeyeonAiCallV1(
 ): Promise<{ callId: string; ceilingMicroUsd: bigint; bucketUtcDate: string }> {
   const args = bindingParams(binding);
   const callId = uuid(call.callId, 'callId');
-  if (call.purpose !== call.quote.purpose ||
-      call.providerKey !== call.quote.providerKey ||
-      call.modelKey !== call.quote.modelKey ||
+  const quote = call.quote;
+  // Reject malformed or caller-injected model/policy metadata BEFORE any
+  // SQL reservation. The DB separately authenticates its server-owned
+  // active policy and rate, so this preflight is not admission authority.
+  const policyId = (value: unknown): boolean =>
+    typeof value === 'string' &&
+    /^[a-zA-Z0-9_.:/-]{1,128}$/u.test(value);
+  if (quote === null || typeof quote !== 'object' ||
+      typeof call.purpose !== 'string' ||
+      !/^[a-z_]{1,64}$/u.test(call.purpose) ||
+      !policyId(call.providerKey) ||
+      !policyId(call.modelKey) ||
+      !policyId(quote.policyVersion) ||
+      !policyId(quote.rateCardVersion) ||
+      call.purpose !== quote.purpose ||
+      call.providerKey !== quote.providerKey ||
+      call.modelKey !== quote.modelKey ||
       !Number.isSafeInteger(call.requestBodyBytes) ||
       call.requestBodyBytes < 1 ||
       !Number.isSafeInteger(call.quote.inputCeilingTokens) ||
@@ -403,11 +665,31 @@ export function createPersistingSeyeonAiProviderV1(input: {
   /** Explicit opt-in, server-only. Undefined retains legacy ledger behavior. */
   readonly governor?: SeyeonAiGovernorAdmissionV1;
 }): SeyeonStructuredProviderPortV2 {
-  if (input.governor !== undefined) {
-    const p = validateSeyeonCostGovernorModelPolicyV1(input.governor.policy);
-    const price = input.config.priceQuote;
-    if (input.config.model !== p.modelKey ||
-        input.config.maxOutputTokens !== p.maximumOutputTokens ||
+  // An injected or mutable server configuration must never change the
+  // approved model, rate card, output ceiling or token-certification callback
+  // after assembly but before the paid Provider dispatch. The production
+  // factory pins these independently; enforce the same invariant here.
+  const approved = input.governor === undefined ? undefined :
+    validateSeyeonCostGovernorModelPolicyV1(input.governor.policy);
+  const governor = approved === undefined ? undefined : Object.freeze({
+    policy: Object.freeze({
+      ...approved,
+      allowedPurposes: Object.freeze([...approved.allowedPurposes]),
+      priceQuote: Object.freeze({...approved.priceQuote}),
+    }),
+    certifiedInputTokenUpperBound: input.governor!.certifiedInputTokenUpperBound,
+  });
+  const config = governor === undefined ? input.config : Object.freeze({
+    ...input.config,
+    ...(input.config.priceQuote === undefined ? {} : {
+      priceQuote: Object.freeze({...input.config.priceQuote}),
+    }),
+  });
+  if (governor !== undefined) {
+    const p = governor.policy;
+    const price = config.priceQuote;
+    if (config.model !== p.modelKey ||
+        config.maxOutputTokens !== p.maximumOutputTokens ||
         price === undefined ||
         price.providerKey !== p.providerKey ||
         price.modelKey !== p.modelKey ||
@@ -418,7 +700,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
       throw new Error('Se-yeon governed provider is missing exact server price/output policy.');
     }
   }
-  const descriptor = createOpenAiSeyeonStructuredProviderV1(input.config);
+  const descriptor = createOpenAiSeyeonStructuredProviderV1(config);
   return Object.freeze({
     providerKey: descriptor.providerKey,
     modelKey: descriptor.modelKey,
@@ -427,7 +709,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
       const durableProviderReceipts = new Set<string>();
       const settledGovernedCallIds = new Set<string>();
       let providerSucceeded = false;
-      const observer = input.config.observeMetric;
+      const observer = config.observeMetric;
       const state: {
         binding: SeyeonAiCostLedgerBindingV1 | null;
         callId: string | null;
@@ -436,16 +718,26 @@ export function createPersistingSeyeonAiProviderV1(input: {
         binding: null, callId: null, admittedQuote: null,
       };
       const provider = createOpenAiSeyeonStructuredProviderV1({
-        ...input.config,
+        ...config,
         async meteredBeforeDispatch(call, serializedRequestBody) {
           // Metadata-only external hook runs separately in the raw Provider.
           // Only this server-owned metering hook accesses the full request.
-          const binding = input.getBinding();
-          if (binding === null) {
+          const originalBinding = input.getBinding();
+          if (originalBinding === null) {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             throw new Error('AI cost binding is unavailable before dispatch.');
           }
-          if (input.governor === undefined) {
+          // The producer can reuse/mutate its active Turn binding as a later
+          // step starts. Under Governor ENFORCE, pin the exact authenticated
+          // Subject/Turn/Attempt/phase BEFORE asynchronous token certification
+          // and keep this same identity for reservation, receipt and settle.
+          const binding: SeyeonAiCostLedgerBindingV1 =
+            governor === undefined ? originalBinding : (() => {
+              const [subjectId,turnId,attemptId,phase] =
+                bindingParams(originalBinding);
+              return Object.freeze({subjectId,turnId,attemptId,phase});
+            })();
+          if (governor === undefined) {
             await input.runner.run(binding.subjectId, client =>
               startSeyeonAiCallV1(client,binding,call),
             );
@@ -455,18 +747,18 @@ export function createPersistingSeyeonAiProviderV1(input: {
                   call.requestBodyBytes) {
               throw new Error('Governed token count requires the final immutable body.');
             }
-            const bound = await input.governor.certifiedInputTokenUpperBound(
+            const bound = await governor.certifiedInputTokenUpperBound(
               request, call.requestBodyBytes, serializedRequestBody,
             );
             const quote = quoteSeyeonCostGovernorMaximumV1({
-              policy: input.governor.policy,
+              policy: governor.policy,
               request: {
                 purpose: call.purpose,
                 providerKey: call.providerKey,
                 modelKey: call.modelKey,
                 verifiedInputTokenUpperBound: bound,
                 serializedRequestBytes: call.requestBodyBytes,
-                enforcedOutputTokenLimit: input.config.maxOutputTokens ?? null,
+                enforcedOutputTokenLimit: config.maxOutputTokens ?? null,
               },
             });
             try {
@@ -492,14 +784,21 @@ export function createPersistingSeyeonAiProviderV1(input: {
           state.callId = call.callId;
         },
         async meteredAfterOutcome(event) {
-          if (input.governor===undefined) return;
+          if (governor===undefined) return;
           const binding=state.binding;
           if (binding===null || state.callId!==event.callId) {
             throw new Error('Governed Provider receipt is missing reserved call context.');
           }
-          await input.runner.run(binding.subjectId, client =>
+          const stored = await input.runner.run(binding.subjectId, client =>
             storeGovernedSeyeonProviderReceiptV1(client,binding,event),
           );
+          // A new paid dispatch must receive a *newly* persisted receipt.
+          // The DB's idempotent replay is valid for reconciliation workers,
+          // never fresh evidence that authorizes this Chat Commit.
+          if (stored.replayed) {
+            console.error('MYEONGHA_SEYEON_PROVIDER_RECEIPT_REPLAYED');
+            throw new Error('Governed Provider receipt replay cannot authorize a new reply.');
+          }
           durableProviderReceipts.add(event.callId);
         },
         observeMetric(event) {
@@ -522,7 +821,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         // Chat Commit or a successful reply: the server must have stored the
         // actual outcome against its pre-dispatch reservation. Never issue a
         // second inference to repair a lost receipt.
-        if (input.governor !== undefined &&
+        if (governor !== undefined &&
             (state.callId === null ||
              !durableProviderReceipts.has(state.callId))) {
           throw new Error('Governed Provider outcome receipt was not persisted; Chat Commit denied.');
@@ -535,7 +834,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
             console.error('MYEONGHA_SEYEON_COST_BINDING_MISSING');
             continue;
           }
-          if (input.governor!==undefined &&
+          if (governor!==undefined &&
               !durableProviderReceipts.has(event.callId)) {
             // Provider completed but outcome was not committed: do not
             // fabricate evidence, settle, or retry a potentially paid call.
@@ -543,7 +842,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
             continue;
           }
           try {
-            if (input.governor === undefined) {
+            if (governor === undefined) {
               await input.runner.run(state.binding.subjectId, client =>
                 settleSeyeonAiCallV1(client,state.binding!,event),
               );
@@ -551,7 +850,11 @@ export function createPersistingSeyeonAiProviderV1(input: {
               const receipt = await input.runner.run(state.binding.subjectId, client =>
                 settleGovernedSeyeonAiCallV1(client,state.binding!,event),
               );
-              if (receipt.overCeiling) {
+              if (receipt.replayed) {
+                // A repeated settlement is acceptable for DB reconciliation,
+                // not proof that this particular paid request was settled.
+                console.error('MYEONGHA_SEYEON_COST_SETTLEMENT_REPLAYED');
+              } else if (receipt.overCeiling) {
                 // Paid inference already occurred. Hold the reply, never retry.
                 console.error('MYEONGHA_SEYEON_COST_OVER_CEILING');
               } else {
@@ -568,7 +871,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         }
         // A durable Provider outcome alone cannot authorize Chat Commit:
         // the bounded DB settlement must also acknowledge the exact call.
-        if (input.governor !== undefined && providerSucceeded &&
+        if (governor !== undefined && providerSucceeded &&
             (events.length !== 1 || state.callId === null ||
              !settledGovernedCallIds.has(state.callId))) {
           throw new Error('Governed cost settlement was not confirmed; Chat Commit denied.');
@@ -578,7 +881,7 @@ export function createPersistingSeyeonAiProviderV1(input: {
         // quote while breaking an individually approved token ceiling.
         // Account for the paid call first, then deny any unproven or
         // out-of-contract successful Provider reply without retrying.
-        if (input.governor !== undefined && providerSucceeded) {
+        if (governor !== undefined && providerSucceeded) {
           const event = events[0];
           const quote = state.admittedQuote;
           if (quote === null || event === undefined ||
