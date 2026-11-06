@@ -381,7 +381,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
       {detail === null && tab !== 'reading-generation-cost' && <form className="admin-search-form" role="search" aria-label="현재 목록 검색" onSubmit={event => {
         event.preventDefault();
         const value = draftSearch.trim();
-        if (value.length > 100 || /[\\x00-\\x1f\\x7f]/u.test(value)) {
+        if (value.length > 100 || /[\x00-\x1f\x7f]/u.test(value)) {
           setError('검색어는 제어 문자를 제외한 100자 이내로 입력해 주세요.');
           return;
         }
