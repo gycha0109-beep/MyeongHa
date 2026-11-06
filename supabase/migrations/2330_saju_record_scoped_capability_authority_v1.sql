@@ -61,7 +61,7 @@ create index commerce_saju_purchase_origins_record_idx
 -- Saju quote policy. It is NOT Product Capability/Entitlement authority. Only
 -- pending Origin arbitration consults these field sets. Unknown keys HOLD.
 -- Never deploy as a general-purpose authorization or public RPC.
-create function public.internal_commerce_saju_candidate_overlap_fields_v1(
+create function public.internal_commerce_saju_product_fields_v1(
   p_product_key text
 ) returns text[]
 language sql immutable strict security invoker
@@ -84,7 +84,7 @@ as $saju_overlap_fields$
     else null::text[]
   end
 $saju_overlap_fields$;
-revoke all on function public.internal_commerce_saju_candidate_overlap_fields_v1(text)
+revoke all on function public.internal_commerce_saju_product_fields_v1(text)
  from public,anon,authenticated,service_role,myeongha_api_executor;
 
 -- Keep the exact Birth revision stable while an Intent is bound to a
@@ -148,7 +148,7 @@ begin
     ) then
       raise exception 'SAJU_DUPLICATE_PENDING_SAME_PRODUCT';
     end if;
-    v_new_fields := public.internal_commerce_saju_candidate_overlap_fields_v1(
+    v_new_fields := public.internal_commerce_saju_product_fields_v1(
       v_new_product_key
     );
     if v_new_fields is null or cardinality(v_new_fields)=0 then
@@ -173,7 +173,7 @@ begin
         and prior_pi.status in ('created','pending')
         and prior_offer.product_id<>v_new_product_id
         and coalesce(
-          public.internal_commerce_saju_candidate_overlap_fields_v1(
+          public.internal_commerce_saju_product_fields_v1(
             prior_product.product_key
           ) && v_new_fields, true
         )
@@ -1680,7 +1680,7 @@ begin
       from public.product_offers existing_offer
       join public.products existing_product on existing_product.id=existing_offer.product_id
       where existing_offer.id=v_existing_offer_id
-        and public.internal_commerce_saju_candidate_overlap_fields_v1(
+        and public.internal_commerce_saju_product_fields_v1(
           existing_product.product_key
         ) is not null
     ) and not exists (
@@ -1801,7 +1801,7 @@ begin
       message = 'selected product offer was not found';
   end if;
 
-  if public.internal_commerce_saju_candidate_overlap_fields_v1(v_product_key) is not null
+  if public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
      and not exists (
        select 1 from public.commerce_saju_purchase_admission_context_v1 context
        where context.backend_pid=pg_catalog.pg_backend_pid()
@@ -2193,7 +2193,7 @@ begin
     into v_item_count,v_saju_scope_item_count
   from public.product_capability_items pci
   where pci.capability_set_id=v_offer_capability_set_id;
-  v_expected_fields:=public.internal_commerce_saju_candidate_overlap_fields_v1(v_product_key);
+  v_expected_fields:=public.internal_commerce_saju_product_fields_v1(v_product_key);
   if v_item_count<=0 or v_item_count<>v_saju_scope_item_count
      or v_expected_fields is null
      or cardinality(v_expected_fields)<>v_item_count
