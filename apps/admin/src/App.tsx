@@ -218,6 +218,7 @@ export function App() {
   const [sessionRestoreError, setSessionRestoreError] = useState<string | null>(null);
   const [sessionRetry, setSessionRetry] = useState(0);
   const sessionVersion = useRef(0);
+  const verifiedSession = useRef(false);
   const route = getAdminRoute(path.split('?')[0] ?? path);
 
   useEffect(() => {
@@ -230,12 +231,14 @@ export function App() {
       try {
         await verifyAdminOwnerSessionV1(ADMIN_SESSION_MARKER_V1);
         if (active && version === sessionVersion.current) {
+          verifiedSession.current = true;
           setOwnerToken(ADMIN_SESSION_MARKER_V1);
           setSessionRestoreError(null);
         }
       } catch (error) {
         if (active && version === sessionVersion.current) {
           if (shouldClearAdminSessionAfterVerificationFailureV1(error)) {
+            verifiedSession.current = false;
             setOwnerToken(null);
             setSessionRestoreError(null);
           } else {
@@ -248,8 +251,10 @@ export function App() {
       }
     };
     void check();
-    const interval = window.setInterval(() => { void check(); }, 60_000);
-    const onVisible = () => { void check(); };
+    // Once there is no verified session, do not re-check a missing/expired cookie
+    // every minute or on each focus. The Owner can explicitly log in or retry.
+    const interval = window.setInterval(() => { if (verifiedSession.current) void check(); }, 60_000);
+    const onVisible = () => { if (verifiedSession.current) void check(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('focus', onVisible);
     return () => {
@@ -261,6 +266,7 @@ export function App() {
   }, [sessionRetry]);
   const establishSession = (marker: string) => {
     sessionVersion.current++;
+    verifiedSession.current = true;
     setOwnerToken(marker);
     setLogoutError('');
     setSessionRestoreError(null);
@@ -269,6 +275,7 @@ export function App() {
     sessionVersion.current++;
     try {
       await signOutAdminSessionV1();
+      verifiedSession.current = false;
       setOwnerToken(null);
       setLogoutError('');
       setSessionRestoreError(null);
@@ -324,8 +331,9 @@ export function App() {
               {ownerToken === null && !restoringSession && sessionRestoreError === null ? <LockNotice /> : null}
               {ownerToken === null && restoringSession ? <StatusPanel kind="loading" title="관리자 세션 확인 중" />
                 : ownerToken === null && sessionRestoreError !== null
-                  ? <StatusPanel kind="error" title="관리자 세션 응답 지연" detail={sessionRestoreError}
+                  ? <><StatusPanel kind="error" title="관리자 세션 응답 지연" detail={sessionRestoreError}
                     action={<button type="button" onClick={() => { setRestoringSession(true); setSessionRetry(count => count + 1); }}>서버 연결 재시도</button>} />
+                      <AdminLogin onSession={establishSession} /></>
                   : route.section === 'overview' ? <><Overview token={ownerToken} onSessionExpired={() => { void logout(); }} />{ownerToken === null && <AdminLogin onSession={establishSession} />}</> : ownerToken === null
                 ? <><PendingSection section={route.section} /><AdminLogin onSession={establishSession} /></>
                 : <>{route.section === 'analytics'
