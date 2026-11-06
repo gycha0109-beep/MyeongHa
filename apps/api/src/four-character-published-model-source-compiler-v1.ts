@@ -27,6 +27,8 @@ import type {
   FourIndependentChatTargetV1,
 } from './four-character-production-chat-executor-v1.js';
 
+export const FOUR_CHARACTER_PUBLISHED_MODEL_ARTIFACT_SCHEMA_V1 =
+  'four-character-published-model-artifact-v1' as const;
 const CANONICAL_CONTEXT_SCHEMA_V1 = 'four-character-canonical-context-v1' as const;
 
 function record(value: unknown): Record<string, unknown> {
@@ -162,7 +164,8 @@ function compileArtifact(
     throw new FourCharacterPublishedArtifactUnavailableV1();
   }
 
-  if (artifact.schemaVersion !== evidence.artifactSchemaVersion ||
+  if (artifact.schemaVersion !== FOUR_CHARACTER_PUBLISHED_MODEL_ARTIFACT_SCHEMA_V1 ||
+      evidence.artifactSchemaVersion !== FOUR_CHARACTER_PUBLISHED_MODEL_ARTIFACT_SCHEMA_V1 ||
       artifact.characterId !== characterId ||
       artifact.contentVersion !== evidence.contentVersion) {
     throw new FourCharacterPublishedArtifactUnavailableV1();
