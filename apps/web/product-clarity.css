@@ -14,12 +14,12 @@ body.product-page :is(.saju-design-products h2,.gm-section-title,.mhx-section-ti
 body.product-page.face-reading-page { --mh-copy-muted: #b9c5c3; --mh-copy-soft: #a8b7b6; }
 body.face-reading-page :is(.face-reader-copy p,.face-hero-copy > p,.face-description) { color: var(--mh-copy-muted); }
 /* Six equally weighted navigation icons; no platform-specific glyph fonts. */
-body.product-page .mobile-bottom-nav .mobile-nav-link[href="hall.html"] { --mh-nav-icon: url("assets/myeongha-icons/home.svg"); }
-body.product-page .mobile-bottom-nav .mobile-nav-link[href="reading.html"] { --mh-nav-icon: url("assets/myeongha-icons/saju.svg"); }
-body.product-page .mobile-bottom-nav .mobile-nav-link[href="face-reading.html"] { --mh-nav-icon: url("assets/myeongha-icons/face.svg"); }
-body.product-page .mobile-bottom-nav .mobile-nav-link[href="chat-hub.html"] { --mh-nav-icon: url("assets/myeongha-icons/chat.svg"); }
-body.product-page .mobile-bottom-nav .mobile-nav-link[href="records.html"] { --mh-nav-icon: url("assets/myeongha-icons/records.svg"); }
-body.product-page .mobile-bottom-nav .mobile-nav-link[href="my.html"] { --mh-nav-icon: url("assets/myeongha-icons/my.svg"); }
+body.product-page .mobile-bottom-nav .mobile-nav-link[href="hall.html"] { --mh-nav-icon: url("assets/myeongha-icons/home.png"); }
+body.product-page .mobile-bottom-nav .mobile-nav-link[href="reading.html"] { --mh-nav-icon: url("assets/myeongha-icons/saju.png"); }
+body.product-page .mobile-bottom-nav .mobile-nav-link[href="face-reading.html"] { --mh-nav-icon: url("assets/myeongha-icons/facial.png"); }
+body.product-page .mobile-bottom-nav .mobile-nav-link[href="chat-hub.html"] { --mh-nav-icon: url("assets/myeongha-icons/talk.png"); }
+body.product-page .mobile-bottom-nav .mobile-nav-link[href="records.html"] { --mh-nav-icon: url("assets/myeongha-icons/report.png"); }
+body.product-page .mobile-bottom-nav .mobile-nav-link[href="my.html"] { --mh-nav-icon: url("assets/myeongha-icons/my.png"); }
 @media (max-width: 767px) {
   body.product-page .mobile-bottom-nav { grid-template-columns: repeat(6, minmax(0, 1fr)); border-color: rgba(129,98,68,.38); background: rgba(250,245,237,.97); }
   body.product-page .mobile-bottom-nav .mobile-nav-link { gap: 3px; font-family: var(--mh-sans); font-size: 12px; font-weight: 650; color: #514840; letter-spacing: -.015em; }

@@ -280,11 +280,11 @@ body.product-page .product-header .product-profile-mark {
   height: 28px !important; font-size: 0 !important; border: 0 !important;
   padding: 0 !important; background: transparent !important;
 }
-body.product-page .product-header .product-theme-toggle-mark { --mh-header-icon: url("assets/myeongha-icons/theme-sun.svg"); }
-html[data-theme="dark"] body.product-page .product-header .product-theme-toggle-mark { --mh-header-icon: url("assets/myeongha-icons/theme-moon.svg"); }
-body.product-page .product-header .product-icon-button { --mh-header-icon: url("assets/myeongha-icons/notification.svg"); }
-body.product-page .product-header .product-profile-mark { --mh-header-icon: url("assets/myeongha-icons/my.svg"); }
-body.product-page .product-header .ui-locale-picker { --mh-header-icon: url("assets/myeongha-icons/language.svg"); }
+body.product-page .product-header .product-theme-toggle-mark { --mh-header-icon: url("assets/myeongha-icons/light.png"); }
+html[data-theme="dark"] body.product-page .product-header .product-theme-toggle-mark { --mh-header-icon: url("assets/myeongha-icons/dark.png"); }
+body.product-page .product-header .product-icon-button { --mh-header-icon: url("assets/myeongha-icons/notification.png"); }
+body.product-page .product-header .product-profile-mark { --mh-header-icon: url("assets/myeongha-icons/my.png"); }
+body.product-page .product-header .ui-locale-picker { --mh-header-icon: url("assets/myeongha-icons/language.png"); }
 body.product-page .product-header .product-icon-button::before,
 body.product-page .product-header .product-theme-toggle-mark::before,
 body.product-page .product-header .product-profile-mark::before,

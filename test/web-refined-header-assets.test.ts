@@ -67,10 +67,10 @@ describe('shared refined header', () => {
     expect(contact).toContain("fetch('/api/contact'");
   });
 
-  it('draws all controls as equally sized vectors', async () => {
+  it('draws all controls using the original PNG icon masks', async () => {
     const css = await read('shared-product-header.css');
     expect(css.match(/--mh-header-icon: url\("assets\/myeongha-icons\//g)).toHaveLength(5);
-    expect(css).toContain('product-profile-mark { --mh-header-icon: url("assets/myeongha-icons/my.svg")');
+    expect(css).toContain('product-profile-mark { --mh-header-icon: url("assets/myeongha-icons/my.png")');
     expect(css).toContain('background: currentColor !important;');
     expect(css).not.toContain('header-bell-light.svg');
     expect(css).not.toContain('header-bell-dark.svg');
