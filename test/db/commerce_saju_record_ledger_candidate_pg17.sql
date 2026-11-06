@@ -103,6 +103,7 @@ begin
    v_guest_subject,'synthetic-saju-ledger-guest-token-hash',
    clock_timestamp()+interval '1 day',null,null,clock_timestamp()
  );
+ perform pg_catalog.set_config('myeongha.subject_id',v_guest_subject::text,true);
  insert into public.birth_profiles(
    id,subject_id,profile_kind,label,current_revision_id,archived_at,created_at,updated_at
  ) values (
@@ -128,7 +129,6 @@ begin
  insert into public.commerce_saju_records_v1(id,subject_id,birth_revision_id)
  values(v_guest_record,v_guest_subject,v_guest_birth_revision);
 
- perform pg_catalog.set_config('myeongha.subject_id',v_guest_subject::text,true);
  begin
    perform 1 from public.cmd_create_saju_purchase_intent_v1(
      v_guest_subject,v_guest_rejected_intent,v_guest_record,v_guest_birth_revision,
