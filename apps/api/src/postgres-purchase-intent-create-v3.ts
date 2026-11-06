@@ -9,6 +9,8 @@ import {
   type PurchaseIntentCapabilitySnapshotV3,
   type PurchaseIntentCreateAuthorityPortV3,
   type PurchaseIntentCreateAuthorityRowV3,
+  type PurchaseIntentCreateAuthorityInputV3,
+  type SajuPurchaseOriginInputV1,
 } from './purchase-intent-create-command-v3.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
@@ -16,6 +18,8 @@ export const POSTGRES_PURCHASE_INTENT_RUNTIME_SNAPSHOT_BINDING_V3 =
   'public.qry_purchase_intent_runtime_snapshot_v3' as const;
 export const POSTGRES_PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V3 =
   'public.cmd_create_purchase_intent_v3' as const;
+export const POSTGRES_SAJU_PURCHASE_INTENT_ADMISSION_BINDING_V1 =
+  'public.cmd_create_saju_purchase_intent_v1' as const;
 
 type SnapshotQueryRowV3 = Readonly<{
   productOfferId: unknown;
@@ -88,6 +92,28 @@ from public.cmd_create_purchase_intent_v3(
   $8::text,
   $9::jsonb,
   $10::text
+)
+`.trim();
+
+const CREATE_SAJU_SQL = `
+select
+  purchase_intent_id::text as "purchaseIntentId",
+  product_offer_id::text as "productOfferId",
+  provider_account_link_id::text as "providerAccountLinkId",
+  status,
+  offer_snapshot_jsonb as "offerSnapshotJsonb",
+  offer_snapshot_hash as "offerSnapshotHash",
+  expected_amount_minor::text as "expectedAmountMinor",
+  expected_currency as "expectedCurrency",
+  charge_terms_version as "chargeTermsVersion",
+  capability_set_id::text as "capabilitySetId",
+  capability_snapshot_jsonb as "capabilitySnapshotJsonb",
+  capability_snapshot_hash as "capabilitySnapshotHash",
+  replayed
+from public.cmd_create_saju_purchase_intent_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,
+  $7::text,$8::text,$9::jsonb,$10::text,$11::jsonb,$12::text,
+  $13::text,$14::uuid[]
 )
 `.trim();
 
@@ -279,6 +305,25 @@ implements PurchaseIntentOfferSnapshotPortV1, PurchaseIntentCapabilitySnapshotPo
       ]);
       return mapAuthorityRows(result.rows);
     } catch (error) {
+      return mapAuthorityError(error);
+    }
+  }
+
+  async createSajuPurchaseIntent(input: PurchaseIntentCreateAuthorityInputV3 & {
+    readonly sajuOrigin:SajuPurchaseOriginInputV1;
+  }): Promise<readonly PurchaseIntentCreateAuthorityRowV3[]> {
+    try {
+      const result=await this.client.query<AuthorityQueryRowV3>(CREATE_SAJU_SQL,[
+        input.subjectId,input.purchaseIntentId,
+        input.sajuOrigin.sajuRecordId,input.sajuOrigin.birthRevisionId,
+        input.productOfferId,input.providerAccountLinkId,
+        input.idempotencyKey,input.requestHash,
+        JSON.stringify(input.offerSnapshotJsonb),input.offerSnapshotHash,
+        JSON.stringify(input.capabilitySnapshotJsonb),input.capabilitySnapshotHash,
+        input.sajuOrigin.purchaseKind,[...input.sajuOrigin.sourceReceiptIds],
+      ]);
+      return mapAuthorityRows(result.rows);
+    } catch(error) {
       return mapAuthorityError(error);
     }
   }
