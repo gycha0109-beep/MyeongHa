@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -15,6 +16,7 @@ import {
 import { pickMobileFaceMediaFromLibraryV1 } from '@/platform/media/expo-face-media-picker';
 import { MobileFrontCameraV1 } from '@/platform/media/MobileFrontCameraV1';
 import { ReadingSubnav } from '@/features/reading/ReadingSubnav';
+import { subscribeMobileSubjectCredentialChangesV1 } from '@/core/session/mobile-subject-credential-changes';
 import { MobileReaderPicker } from '@/features/reading/MobileReaderPicker';
 import { FaceEditorialIntro } from '@/features/face/FaceEditorialIntro';
 import { findMobileReaderPresentationV1, type MobileReaderPresentationIdV1 } from '@/features/reading/mobile-reader-presentation';
@@ -46,7 +48,33 @@ export default function FaceScreen() {
   const [state, setState] = useState<FaceMediaStateV1>({ kind: 'idle' });
   const [frontCameraOpen, setFrontCameraOpen] = useState(false);
   const [presentationReader, setPresentationReader] = useState<MobileReaderPresentationIdV1>('seyeon');
+  const focused = useRef(false);
+  const ownerEpoch = useRef(0);
+  const cameraEpoch = useRef<number | null>(null);
   const readerPresentation = findMobileReaderPresentationV1(presentationReader);
+
+  useFocusEffect(useCallback(() => {
+    focused.current = true;
+    const clearPrivatePhoto = () => {
+      ownerEpoch.current += 1;
+      cameraEpoch.current = null;
+      setFrontCameraOpen(false);
+      setState({ kind: 'idle' });
+    };
+    // A local-only photo is still sensitive. Neither a new account nor an
+    // unfocused tab may display the old user's camera/gallery image.
+    const unsubscribe = subscribeMobileSubjectCredentialChangesV1(clearPrivatePhoto);
+    return () => {
+      unsubscribe();
+      focused.current = false;
+      clearPrivatePhoto();
+    };
+  }, []));
+  const openCamera = () => {
+    if (!focused.current) return;
+    cameraEpoch.current = ownerEpoch.current;
+    setFrontCameraOpen(true);
+  };
   // The face picker has no server read yet. Refresh only clears a transient
   // picker error; never erase the selected photo or change the reader.
   const refreshLocalMedia = async () => {
@@ -58,9 +86,12 @@ export default function FaceScreen() {
     source: 'camera' | 'library',
     operation: () => Promise<MobileFaceMediaPickerResultV1>,
   ) {
+    if (!focused.current) return;
+    const epoch = ownerEpoch.current;
     setState({ kind: 'picking', source });
     try {
       const result = await operation();
+      if (!focused.current || epoch !== ownerEpoch.current) return;
       if (result.kind === 'selected') {
         setState({ kind: 'ready', asset: result.asset });
         return;
@@ -78,6 +109,7 @@ export default function FaceScreen() {
       }
       setState({ kind: 'error', message: result.reason });
     } catch {
+      if (!focused.current || epoch !== ownerEpoch.current) return;
       setState({
         kind: 'error',
         message: '사진을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.',
@@ -164,7 +196,7 @@ export default function FaceScreen() {
           accessibilityRole="button"
           accessibilityLabel={t('전면 카메라로 정면 사진 촬영')}
           disabled={picking}
-          onPress={() => setFrontCameraOpen(true)}
+          onPress={openCamera}
           style={({ pressed }) => [styles.cameraAction, (pressed || picking) && styles.pressed]}
         >
           <MobileUiText style={styles.cameraActionText}>▣  사진 촬영</MobileUiText>
@@ -214,8 +246,13 @@ export default function FaceScreen() {
 
       {frontCameraOpen ? (
         <MobileFrontCameraV1
-          onClose={() => setFrontCameraOpen(false)}
+          onClose={() => {
+            cameraEpoch.current = null;
+            setFrontCameraOpen(false);
+          }}
           onCaptured={(photo) => {
+            if (!focused.current || cameraEpoch.current !== ownerEpoch.current) return;
+            cameraEpoch.current = null;
             setState({ kind: 'ready', asset: photo });
             setFrontCameraOpen(false);
           }}
