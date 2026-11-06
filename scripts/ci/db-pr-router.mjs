@@ -167,6 +167,15 @@ function classifyMigration(path, selected) {
   const tokens = new Set(name.split(/[^a-z0-9]+/u).filter(Boolean));
   const hasAny = (...values) => values.some((value) => tokens.has(value));
   let classified = false;
+  const paidCheckoutMemberGate = name.includes('paid_purchase_member_auth')
+    || name.includes('paid_checkout_member_command_gate')
+    || name.includes('paid_handoff_member_gate');
+
+  if (paidCheckoutMemberGate) {
+    selected.add('commerce-payment');
+    selected.add('commerce-entitlement');
+    classified = true;
+  }
 
   if (hasAny('commerce', 'payment', 'receipt', 'purchase', 'entitlement', 'product', 'capability', 'offer')) {
     selected.add('commerce-payment');
@@ -180,7 +189,7 @@ function classifyMigration(path, selected) {
     classified = true;
   }
 
-  if (hasAny('birth', 'guest', 'record', 'records', 'subject', 'profile', 'auth', 'authentication', 'rls', 'privacy', 'deletion', 'memory', 'notification')) {
+  if (!paidCheckoutMemberGate && hasAny('birth', 'guest', 'record', 'records', 'subject', 'profile', 'auth', 'authentication', 'rls', 'privacy', 'deletion', 'memory', 'notification')) {
     selected.add('runtime');
     classified = true;
   }
@@ -190,7 +199,7 @@ function classifyMigration(path, selected) {
     || name.includes('content_release')
     || name.includes('member_character_thread')
     || name.includes('saju_record_scoped_capability')
-    || name.includes('paid_purchase_member_auth')
+    || paidCheckoutMemberGate
   ) {
     selected.add('postgres17');
     classified = true;

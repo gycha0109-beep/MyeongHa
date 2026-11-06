@@ -118,6 +118,8 @@ describe('DB PR router', () => {
     for (const path of [
       'supabase/migrations/2330_saju_record_scoped_capability_authority_v1.sql',
       'supabase/migrations/2340_paid_purchase_member_auth_v1.sql',
+      'supabase/migrations/2350_paid_checkout_member_command_gate_v1.sql',
+      'supabase/migrations/2360_paid_handoff_member_gate_v1.sql',
     ]) {
       const result = route([path]);
       expect(result.suites).toEqual(['commerce-entitlement', 'commerce-payment', 'postgres17']);
