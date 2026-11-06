@@ -190,7 +190,8 @@ function mapAuthorityError(error: unknown): never {
   }
   switch (constraint) {
     case 'cmd_purchase_intent_v3_saju_record_context_required':
-      return mapped('CAPABILITY_UNAVAILABLE','Saju Purchase Intent requires a verified Record-specific admission.');
+    case 'cmd_purchase_intent_v3_saju_scope_mode_mismatch':
+      return mapped('CAPABILITY_UNAVAILABLE','Saju Purchase Intent requires the approved Record-scoped Capability mapping.');
     case 'cmd_saju_purchase_admission_record_unavailable':
     case 'cmd_saju_purchase_admission_product_unavailable':
     case 'cmd_saju_purchase_admission_capability_scope_invalid':
