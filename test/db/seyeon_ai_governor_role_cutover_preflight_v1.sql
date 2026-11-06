@@ -197,7 +197,7 @@ rollback;
 
 begin;
 create role w118_membership_test_login login noinherit;
-grant myeongha_api_executor to w118_membership_test_login with inherit false, set true;
+grant myeongha_api_executor to w118_membership_test_login;
 grant myeongha_seyeon_cost_meter_owner to myeongha_api_executor;
 do $membership$
 begin
