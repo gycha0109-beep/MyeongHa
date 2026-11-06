@@ -16,6 +16,12 @@ declare
  v_other_record uuid:='1219c200-0000-4000-8000-000000000005'::uuid;
  v_sandbox_intent uuid:='1219c200-0000-4000-8000-000000000006'::uuid;
  v_sandbox_receipt uuid:='1219c200-0000-4000-8000-000000000007'::uuid;
+ v_overlap_product uuid:='1219c200-0000-4000-8000-000000000008'::uuid;
+ v_overlap_offer uuid:='1219c200-0000-4000-8000-000000000009'::uuid;
+ v_overlap_intent uuid:='1219c200-0000-4000-8000-000000000010'::uuid;
+ v_disjoint_product uuid:='1219c200-0000-4000-8000-000000000011'::uuid;
+ v_disjoint_offer uuid:='1219c200-0000-4000-8000-000000000012'::uuid;
+ v_disjoint_intent uuid:='1219c200-0000-4000-8000-000000000013'::uuid;
  v_subject uuid;
  v_source_revision uuid;
  v_receipt public.commerce_receipts%rowtype;
@@ -234,6 +240,77 @@ begin
        and birth_revision_id=v_source_revision)<>1 then
    raise exception 'SAJU_LEDGER_PG17_INDEPENDENT_RECORD_WAS_BLOCKED';
  end if;
+ -- Same Record pending collision must also protect overlapping DIFFERENT
+ -- Products (single relationship vs the love/family/spouse bundle).
+ -- These intentionally disabled test catalog rows are created only inside
+ -- the single ROLLBACK. They are NOT new approved launch Offers.
+ insert into public.products(id,product_key,product_type,enabled,created_at)
+ values
+   (v_overlap_product,'bundle.love_relationship','bundle',false,clock_timestamp()),
+   (v_disjoint_product,'standard.career','reading',false,clock_timestamp());
+ insert into public.product_offers(
+   id,product_id,platform,provider,external_product_id,currency,
+   display_price_minor,enabled,created_at,capability_set_id
+ ) values
+   (v_overlap_offer,v_overlap_product,'web','portone_v2',
+    'synthetic-saju-bundle-love-overlap','KRW',21900,false,clock_timestamp(),null),
+   (v_disjoint_offer,v_disjoint_product,'web','portone_v2',
+    'synthetic-saju-career-disjoint','KRW',9900,false,clock_timestamp(),null);
+ insert into public.purchase_intents(
+   id,subject_id,product_offer_id,provider_account_link_id,
+   idempotency_key,request_hash,offer_snapshot_jsonb,offer_snapshot_hash,
+   status,created_at,updated_at,expected_amount_minor,expected_currency,
+   charge_terms_version,capability_set_id,capability_snapshot_jsonb,
+   capability_snapshot_hash
+ )
+ select rows.new_intent,v_subject,rows.offer_id,null,
+   rows.idempotency,'sha256:test:saju-cross-product-'||rows.idempotency,
+   pg_catalog.jsonb_build_object('productOfferId',rows.offer_id::text,
+     'productId',rows.product_id::text,'platform','web','provider','portone_v2',
+     'externalProductId',rows.external_id),
+   'sha256:test:saju-cross-product-snapshot-'||rows.idempotency,
+   'created',clock_timestamp()+interval '4 seconds',
+   clock_timestamp()+interval '4 seconds',rows.price_minor,'KRW',
+   'test-saju-non-saleable-v1',null,null,null
+ from (
+   values
+   (v_overlap_intent,v_overlap_offer,v_overlap_product,
+    'saju-love-bundle-overlap','synthetic-saju-bundle-love-overlap',21900::bigint),
+   (v_disjoint_intent,v_disjoint_offer,v_disjoint_product,
+    'saju-career-disjoint','synthetic-saju-career-disjoint',9900::bigint)
+ ) as rows(new_intent,offer_id,product_id,idempotency,external_id,price_minor);
+ if public.internal_commerce_saju_candidate_overlap_fields_v1('standard.love_relationship')
+      is distinct from array['relationship']::text[]
+    or public.internal_commerce_saju_candidate_overlap_fields_v1('bundle.love_relationship')
+      is distinct from array['relationship','family','spouse']::text[]
+    or public.internal_commerce_saju_candidate_overlap_fields_v1('bundle.full_saju')
+      is distinct from array['career','wealth','business','relationship','family','spouse']::text[]
+    or public.internal_commerce_saju_candidate_overlap_fields_v1('unknown.saleable.product')
+      is not null then
+   raise exception 'SAJU_PENDING_FIELD_INVENTORY_DRIFT';
+ end if;
+ begin
+   insert into public.commerce_saju_purchase_origins_v1
+     (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
+   values(v_overlap_intent,v_subject,v_record,v_source_revision,'original');
+   raise exception 'SAJU_PENDING_OVERLAP_WITH_LOVE_BUNDLE_WAS_ACCEPTED';
+ exception when others then
+   get stacked diagnostics v_error=message_text;
+   if v_error is distinct from 'SAJU_OVERLAPPING_PENDING_PRODUCT' then raise; end if;
+ end;
+ if exists (select 1 from public.commerce_saju_purchase_origins_v1
+            where purchase_intent_id=v_overlap_intent) then
+   raise exception 'SAJU_PENDING_OVERLAP_REJECT_LEFT_AN_ORIGIN';
+ end if;
+ -- Different fields are independent, so do not serialize all purchases on a
+ -- Record beyond the short row-lock admission window.
+ insert into public.commerce_saju_purchase_origins_v1
+  (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
+ values(v_disjoint_intent,v_subject,v_record,v_source_revision,'original');
+ if (select count(*) from public.commerce_saju_purchase_origins_v1
+     where purchase_intent_id=v_disjoint_intent and saju_record_id=v_record)<>1 then
+   raise exception 'SAJU_DISJOINT_PENDING_PRODUCT_WAS_BLOCKED';
+ end if;
  -- Original verified Provider cancel item => exact one-time refund settlement.
  select e.provider_event_id into strict v_event
  from public.internal_persist_portone_cancellation_event_v1(
@@ -270,7 +347,7 @@ begin
  then
    raise exception 'SAJU_LEDGER_PG17_PRIVATE_ACL_EXPOSED';
  end if;
- raise notice 'PASS Saju production receipt freeze, pending same-Product same-Record dedupe, other Record isolation, exact upgrade/refund linkage; no API/public access (ROLLBACK)';
+ raise notice 'PASS Saju production receipt freeze, pending same-Product and overlapping bundle dedupe, disjoint/other Record isolation, exact upgrade/refund linkage; no API/public access (ROLLBACK)';
 end;
 $saju_ledger_pg17$;
 
