@@ -82,6 +82,9 @@ export interface FourCharacterProductionExecutionPortsV1 {
   /** Must fetch only the exact active, independently published content Pin. */
   readonly publication: Readonly<{
     readPublishedSource(input: Readonly<{
+      /** Canonical Member owner and immutable existing conversation binding. */
+      subjectId: string;
+      threadId: string;
       characterId: FourIndependentChatTargetV1;
       releaseId: string;
       bundleId: string;
@@ -225,6 +228,8 @@ export function createFourCharacterProductionChatExecutorV1(
     }
     requiredText(turn.text, 8000);
     const source = await ports.publication.readPublishedSource({
+      subjectId: turn.subjectId,
+      threadId: turn.threadId,
       characterId,
       releaseId: turn.pinnedReleaseId,
       bundleId: turn.pinnedBundleId,
