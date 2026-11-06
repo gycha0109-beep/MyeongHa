@@ -44,7 +44,7 @@ verified payment evidence persistence         = IMPLEMENTED / REPOSITORY-LOCAL /
 verified Entitlement Grant/Event apply        = NOT ACTIVATED / P0-CM-03 + LIVE READINESS GATES
 ```
 
-따라서 Web-first one-off rail, PortOne V2 provider 선택, Guest/Member Commerce ownership, Product Capability foundation, provider-evidence 최소화/structural primitives, Effective Entitlement aggregate/recompute, PortOne V2 server payment verification과 webhook authentication/HTTP/runtime foundation, verified payment evidence persistence까지 repository-local 구현이 진행됐다. 그러나 이것은 saleable Product/SKU, live merchant/PG/channel/credential readiness, public Production webhook activation, verified Entitlement Grant/Event fulfillment activation, refund/reversal/dispute/reconciliation, 또는 Production Commerce readiness를 의미하지 않는다. `P0-CM-03`, `P0-PR-01`, #680 및 live activation gates는 계속 독립적으로 fail-closed다.
+따라서 Web-first one-off rail, PortOne V2 provider 선택, Guest free access / Member-only paid Commerce, Product Capability foundation, provider-evidence 최소화/structural primitives, Effective Entitlement aggregate/recompute, PortOne V2 server payment verification과 webhook authentication/HTTP/runtime foundation, verified payment evidence persistence까지 repository-local 구현이 진행됐다. 그러나 이것은 saleable Product/SKU, live merchant/PG/channel/credential readiness, public Production webhook activation, verified Entitlement Grant/Event fulfillment activation, refund/reversal/dispute/reconciliation, 또는 Production Commerce readiness를 의미하지 않는다. `P0-CM-03`, `P0-PR-01`, #680 및 live activation gates는 계속 독립적으로 fail-closed다.
 
 ---
 
@@ -54,7 +54,8 @@ verified Entitlement Grant/Event apply        = NOT ACTIVATED / P0-CM-03 + LIVE 
 MyeongHa Product
 → immutable Product Capability Set(version/hash)
 → Product Offer(provider/platform/external product + pinned Capability Set)
-→ server-resolved subjects.id-owned Purchase Intent (Guest or Member)
+→ server-resolved active authenticated Member-owned Purchase Intent (all new paid purchases)
+  (historical Guest-owned Commerce rows remain immutable; Guest free experiences stay outside paid Commerce)
 → server-side provider verification
 → minimized verified Receipt / Provider Event provenance
 → Entitlement Effect v1
@@ -643,7 +644,7 @@ Provider-specific allowlist와 canonical fingerprint input은 selected adapter i
 
 Provider transaction/event/product reference는 **non-secret이며** idempotency/reconciliation에 필요한 경우 first-class column으로 저장할 수 있다.
 
-Support는 canonical subject(Guest/Member)→Intent→Offer/Capability Set→receipt/event→grant→entitlement event→effective entitlement chain을 raw bearer 없이 재구축 가능해야 한다.
+Support는 canonical subject(Member for current paid purchases; Guest only for free experiences or immutable historical records)→Intent→Offer/Capability Set→receipt/event→grant→entitlement event→effective entitlement chain을 raw bearer 없이 재구축 가능해야 한다.
 
 PortOne V2 또는 future provider가 raw bearer-like receipt/token의 durable storage를 필수로 요구하면 current evidence-minimization authority를 우회하지 않는다. 별도 provider-specific security/retention decision 또는 decision reopen 없이 raw durable storage를 추가할 수 없다.
 
@@ -748,7 +749,7 @@ Web PSP                                           = DECIDED: PortOne V2 / porton
 Guest free access / paid purchase eligibility     = DECIDED: Guest free-only / active Member for paid
 Commerce evidence minimization                    = DECIDED: P0-PR-01B
 Product Capability Set schema                    = IMPLEMENTED / FOUNDATION / NO SALEABLE CATALOG SEEDED
-Purchase Intent v2 Guest/Member ownership        = IMPLEMENTED / MERGED-MAIN / NO SALEABLE CHARGE TERMS IMPLIED
+Purchase Intent v2/v3 Member-only paid authority = IMPLEMENTED / PR #3090 / CI PENDING / NO SALEABLE CHARGE TERMS IMPLIED
 Purchase Intent v2 Capability pin                = NOT ACTIVATED / HOLD UNTIL P0-CM-03 CATALOG AUTHORITY
 provider-neutral evidence fingerprint primitive = IMPLEMENTED / PURE HELPER / MERGED-MAIN CI GREEN
 provider-neutral evidence structural contract   = IMPLEMENTED / PURE VALIDATOR / MERGED-MAIN CI GREEN / NO AUTHENTICITY BY ITSELF
