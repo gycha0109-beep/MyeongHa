@@ -90,8 +90,11 @@ select
  pg_catalog.pg_has_role($2::name,
    'myeongha_seyeon_cost_meter_owner','MEMBER')
    as "ordinaryIsCostOwnerMember",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege(session_user, 'public.seyeon_ai_call_cost_events', 'MAINTAIN')
+     else false end)
    as "canDirectLedger",
  (pg_catalog.has_any_column_privilege(session_user,
    'public.seyeon_ai_call_cost_events','SELECT')
@@ -102,8 +105,11 @@ select
    or pg_catalog.has_any_column_privilege(session_user,
    'public.seyeon_ai_call_cost_events','REFERENCES'))
    as "canDirectLedgerColumns",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege(session_user, 'public.seyeon_ai_governor_daily_budgets_v1', 'MAINTAIN')
+     else false end)
    as "canDirectBudget",
  (pg_catalog.has_any_column_privilege(session_user,
    'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
@@ -114,8 +120,11 @@ select
    or pg_catalog.has_any_column_privilege(session_user,
    'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES'))
    as "canDirectBudgetColumns",
- pg_catalog.has_table_privilege(session_user,
-   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege(session_user,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege(session_user, 'public.seyeon_ai_governor_model_policies_v1', 'MAINTAIN')
+     else false end)
    as "canDirectRateCard",
  (pg_catalog.has_any_column_privilege(session_user,
    'public.seyeon_ai_governor_model_policies_v1','SELECT')
@@ -126,8 +135,11 @@ select
    or pg_catalog.has_any_column_privilege(session_user,
    'public.seyeon_ai_governor_model_policies_v1','REFERENCES'))
    as "canDirectRateCardColumns",
- pg_catalog.has_table_privilege($2::name,
-   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($2::name, 'public.seyeon_ai_call_cost_events', 'MAINTAIN')
+     else false end)
    as "canOrdinaryDirectLedger",
  (pg_catalog.has_any_column_privilege($2::name,
    'public.seyeon_ai_call_cost_events','SELECT')
@@ -138,8 +150,11 @@ select
    or pg_catalog.has_any_column_privilege($2::name,
    'public.seyeon_ai_call_cost_events','REFERENCES'))
    as "canOrdinaryDirectLedgerColumns",
- pg_catalog.has_table_privilege($2::name,
-   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($2::name, 'public.seyeon_ai_governor_daily_budgets_v1', 'MAINTAIN')
+     else false end)
    as "canOrdinaryDirectBudget",
  (pg_catalog.has_any_column_privilege($2::name,
    'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
@@ -150,8 +165,11 @@ select
    or pg_catalog.has_any_column_privilege($2::name,
    'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES'))
    as "canOrdinaryDirectBudgetColumns",
- pg_catalog.has_table_privilege($2::name,
-   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege($2::name,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($2::name, 'public.seyeon_ai_governor_model_policies_v1', 'MAINTAIN')
+     else false end)
    as "canOrdinaryDirectRateCard",
  (pg_catalog.has_any_column_privilege($2::name,
    'public.seyeon_ai_governor_model_policies_v1','SELECT')
@@ -232,8 +250,11 @@ select
    'public.cmd_ack_seyeon_provider_receipt_v1(uuid,uuid)','EXECUTE')
    as "executorCanAckProviderReceipt",
  -- The executor may call owner RPCs but may not read/write their tables directly.
- pg_catalog.has_table_privilege($1::name,
-   'public.seyeon_ai_call_cost_events','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') as "executorDirectLedger",
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_call_cost_events', 'MAINTAIN')
+     else false end) as "executorDirectLedger",
  (pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_call_cost_events','SELECT')
    or pg_catalog.has_any_column_privilege($1::name,
@@ -243,8 +264,11 @@ select
    or pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_call_cost_events','REFERENCES'))
    as "executorDirectLedgerColumns",
- pg_catalog.has_table_privilege($1::name,
-   'public.seyeon_ai_governor_daily_budgets_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') as "executorDirectBudget",
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_governor_daily_budgets_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_governor_daily_budgets_v1', 'MAINTAIN')
+     else false end) as "executorDirectBudget",
  (pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_governor_daily_budgets_v1','SELECT')
    or pg_catalog.has_any_column_privilege($1::name,
@@ -254,8 +278,11 @@ select
    or pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_governor_daily_budgets_v1','REFERENCES'))
    as "executorDirectBudgetColumns",
- pg_catalog.has_table_privilege($1::name,
-   'public.seyeon_ai_governor_model_policies_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') as "executorDirectRateCard",
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_governor_model_policies_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_governor_model_policies_v1', 'MAINTAIN')
+     else false end) as "executorDirectRateCard",
  (pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_governor_model_policies_v1','SELECT')
    or pg_catalog.has_any_column_privilege($1::name,
@@ -265,8 +292,11 @@ select
    or pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_governor_model_policies_v1','REFERENCES'))
    as "executorDirectRateCardColumns",
- pg_catalog.has_table_privilege($1::name,
-   'public.seyeon_ai_provider_receipt_queue_v1','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN')
+ (pg_catalog.has_table_privilege($1::name,
+   'public.seyeon_ai_provider_receipt_queue_v1', 'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')
+   or case when current_setting('server_version_num')::integer >= 170000
+     then pg_catalog.has_table_privilege($1::name, 'public.seyeon_ai_provider_receipt_queue_v1', 'MAINTAIN')
+     else false end)
    as "executorDirectReceiptQueue",
  (pg_catalog.has_any_column_privilege($1::name,
    'public.seyeon_ai_provider_receipt_queue_v1','SELECT')
