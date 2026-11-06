@@ -20,7 +20,7 @@ import {
   FourCharacterPublishedArtifactUnavailableV1,
 } from './postgres-four-character-publication-evidence-v1.js';
 import type {
-  FourCharacterPublishedSourceCompilerOutputV1,
+  FourCharacterVerifiedSourceCompilerOutputV1,
   FourCharacterPublishedSourceConstructionPortsV1,
 } from './four-character-published-model-source-v1.js';
 import type {
@@ -142,7 +142,7 @@ function compileArtifact(
     evidence: FourCharacterPublishedArtifactEvidenceV1;
     artifactBytes: Uint8Array;
   }>,
-): FourCharacterPublishedSourceCompilerOutputV1 {
+): FourCharacterVerifiedSourceCompilerOutputV1 {
   const { characterId, evidence, artifactBytes } = input;
   if (!(artifactBytes instanceof Uint8Array) ||
       artifactBytes.length === 0 || artifactBytes.length > 512_000) {
@@ -264,7 +264,7 @@ function compileArtifact(
 export function createFourCharacterPublishedModelSourceCompilerV1():
   FourCharacterPublishedSourceConstructionPortsV1['compiler'] {
   return Object.freeze({
-    async compile(input): Promise<FourCharacterPublishedSourceCompilerOutputV1> {
+    async compile(input): Promise<FourCharacterVerifiedSourceCompilerOutputV1> {
       try {
         return compileArtifact(input);
       } catch {
