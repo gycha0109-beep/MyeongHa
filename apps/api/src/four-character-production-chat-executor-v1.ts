@@ -62,6 +62,7 @@ export interface FourCharacterAtomicReservationV1 {
   readonly characterId: FourIndependentChatTargetV1;
   readonly releaseId: string;
   readonly bundleId: string;
+  readonly sourceDigest: string;
   readonly turnId: string;
   readonly attemptId: string;
   /** Server-issued Provider call ID; its adapter must reserve governed cost before network dispatch. */
@@ -153,6 +154,14 @@ function requiredText(value: unknown, maxLength = 32768): string {
   return value;
 }
 
+function requiredDigest(value: unknown): string {
+  const digest = requiredText(value, 128);
+  if (!/^sha256:v1:[0-9a-f]{64}$/u.test(digest)) {
+    throw new FourCharacterProductionExecutionHeldV1();
+  }
+  return digest;
+}
+
 function assertPublishedSource(
   source: PublishedFourCharacterModelSourceV1 | null,
   turn: TrustedFiveCharacterChatTurnV1,
@@ -169,7 +178,7 @@ function assertPublishedSource(
   }
   requiredText(source.bibleSourceRef, 512);
   requiredText(source.runtimeSourceRef, 512);
-  requiredText(source.sourceDigest, 256);
+  requiredDigest(source.sourceDigest);
   requiredText(source.canonicalContext);
 }
 
@@ -186,6 +195,7 @@ function assertReservation(
     throw new FourCharacterProductionExecutionHeldV1();
   }
   requiredText(reservation.threadCharacterId, 256);
+  requiredDigest(reservation.sourceDigest);
   requiredText(reservation.turnId, 256);
   requiredText(reservation.attemptId, 256);
   requiredText(reservation.costReservationId, 256);
