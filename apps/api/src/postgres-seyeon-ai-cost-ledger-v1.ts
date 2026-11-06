@@ -75,6 +75,13 @@ select
  pg_catalog.has_function_privilege($2::name,
    'public.cmd_store_seyeon_provider_receipt_v1(uuid,uuid,uuid,text,jsonb)',
    'EXECUTE') as "canOrdinaryStoreReceipt",
+ -- NOINHERIT does not remove SET ROLE. A common executor with either
+ -- privileged membership can still assume the private authority role.
+ pg_catalog.pg_has_role($2::name,$1::name,'MEMBER')
+   as "ordinaryIsGovernedRoleMember",
+ pg_catalog.pg_has_role($2::name,
+   'myeongha_seyeon_cost_meter_owner','MEMBER')
+   as "ordinaryIsCostOwnerMember",
  pg_catalog.has_table_privilege(session_user,
    'public.seyeon_ai_call_cost_events', 'SELECT,INSERT,UPDATE,DELETE')
    as "canDirectLedger",

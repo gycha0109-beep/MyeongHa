@@ -127,6 +127,8 @@ const LEGACY_OR_DIRECT_FLAGS = [
   // No ordinary executor may independently bypass the separate Governed
   // LOGIN by invoking governed Start/Settle or persisting Provider receipts.
   'canOrdinaryGovernedStart','canOrdinaryGovernedSettle','canOrdinaryStoreReceipt',
+  // NOINHERIT members may still SET ROLE into these private principals.
+  'ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
   'canDirectLedger','canDirectBudget','canDirectRateCard',
 ] as const;
 

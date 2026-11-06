@@ -31,6 +31,7 @@ function safeRow() {
     canOrdinaryLegacyStart:false,canOrdinaryLegacySettle:false,canOrdinaryLegacyRecord:false,
     canOrdinaryGovernedStart:false,canOrdinaryGovernedSettle:false,
     canOrdinaryStoreReceipt:false,
+    ordinaryIsGovernedRoleMember:false,ordinaryIsCostOwnerMember:false,
     canDirectLedger:false,canDirectBudget:false,canDirectRateCard:false,
   };
 }
@@ -120,6 +121,8 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       ['canOrdinaryGovernedStart',true],
       ['canOrdinaryGovernedSettle',true],
       ['canOrdinaryStoreReceipt',true],
+      ['ordinaryIsGovernedRoleMember',true],
+      ['ordinaryIsCostOwnerMember',true],
       ['canDirectLedger',true],['canDirectBudget',true],
       ['canDirectRateCard',true],
     ] as const) {
@@ -134,6 +137,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
       'canOrdinaryLegacyRecord',
       'canOrdinaryGovernedStart','canOrdinaryGovernedSettle',
       'canOrdinaryStoreReceipt',
+      'ordinaryIsGovernedRoleMember','ordinaryIsCostOwnerMember',
     ] as const){
       expect(GOVERNED_LOGIN_PREFLIGHT_SQL_V1).toContain(
         'as "'+key+'"',
@@ -177,7 +181,7 @@ describe('Se-yeon D3B2B-3B2 isolated governed credential boundary',()=>{
     await p.close();
     expect(safe.poolEnded).toBe(true);
 
-    const bad=driver({preflight:{...safeRow(),canOrdinaryGovernedStart:true}});
+    const bad=driver({preflight:{...safeRow(),ordinaryIsGovernedRoleMember:true}});
     const bp=createSeyeonGovernedPostgresPoolFromDriverV1({
       driverPool:bad.pool,expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
     });
