@@ -216,19 +216,16 @@ describe('independent Character publication-lane candidate assembler v1', () => 
     )).toThrow('Lane publication material must belong to the selected Character.');
   });
 
-  it('keeps the one-Character candidate non-publishing and fails validation when required material is absent', () => {
-    const candidate = assembleCharacterPublicationLaneCandidateV1(
+  it('refuses to assemble a one-Character candidate when required renderer material is absent', () => {
+    expect(() => assembleCharacterPublicationLaneCandidateV1(
       laneInput('rahyeon', {
         publicationMaterial: {
           characterId: 'rahyeon',
           assetRefs: [],
-          emotionIds: [],
-          animationCueIds: [],
+          emotionIds: ['neutral'],
+          animationCueIds: ['idle'],
         },
       }),
-    );
-    expect(candidate.characters).toHaveLength(1);
-    expect(() => validateProductionCharacterPublicationLaneBundleV1(candidate))
-      .toThrow();
+    )).toThrow('rahyeon.assetRefs must not be empty');
   });
 });
