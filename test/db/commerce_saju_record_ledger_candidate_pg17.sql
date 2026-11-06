@@ -425,7 +425,7 @@ begin
      'external_original_transaction_id',null,
      'receipt_fingerprint','sha256:test:saju-record-scope-receipt-a',
      'verification_status','verified',
-     'verified_at',clock_timestamp(),
+     'verified_at',transaction_timestamp(),
      'environment','production',
      'verifier_revision','test-saju-record-scope-v1',
      'verified_amount_minor',9900,
@@ -437,7 +437,7 @@ begin
    purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
  ) values(v_scope_intent,v_subject,v_scope_record,v_source_revision,'original');
 
- v_scope_now:=clock_timestamp();
+ v_scope_now:=transaction_timestamp();
  select result_grant_id into strict v_scope_grant
  from public.internal_apply_verified_receipt_capability_effects_v1(
    v_scope_receipt,
