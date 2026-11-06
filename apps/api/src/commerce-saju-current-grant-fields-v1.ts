@@ -13,14 +13,12 @@ import {
 } from './commerce-saju-single-snapshot-private-quote-v1.js';
 
 /**
- * STAGED, read-only candidate. The Saju origin tables have NOT been deployed
- * and their runtime SELECT ACL has NOT been granted. No public route invokes it.
+ * Private, read-only Record-scoped entitlement proof. No public route invokes it.
  *
- * Products define only candidate field names. A paid Product by itself NEVER
- * implies ownership: every field must be backed by a current active Grant for
- * that exact original verified Receipt, its pinned Capability Item, and this
- * Record/Birth revision. This is a quote-only proof, NOT a general access grant
- * or permission to create a user-resource-scoped Capability.
+ * Products define candidate field names only. A paid Product by itself NEVER
+ * implies ownership: each field must be backed by the exact verified Receipt,
+ * pinned Capability Item and opaque scope derived from this same Saju Record.
+ * This remains quote evidence, not a public authorization or sale activation.
  */
 export const SAJU_CURRENT_GRANT_FIELDS_SQL_V1 = `
 select
@@ -85,9 +83,10 @@ join public.entitlement_grants grant_row
 left join public.product_capability_items item
   on item.capability_set_id=capability.id
  and item.entitlement_key=grant_row.entitlement_key
- and grant_row.scope_key is not distinct from
-     (case when item.scope_mode='global' then null
-           else item.fixed_scope_key end)
+ and item.scope_mode='saju_record'
+ and item.fixed_scope_key is null
+ and grant_row.scope_key =
+     ('saju-record:'||record.entitlement_scope_id::text)
 left join public.entitlements effective
   on effective.subject_id=grant_row.subject_id
  and effective.entitlement_key=grant_row.entitlement_key
@@ -239,8 +238,8 @@ export const CURRENT_SAJU_OWNED_FIELDS_DB_READER_V1:
 
 /**
  * First quote entrypoint that does not accept externally asserted ownedFields.
- * Still strictly non-saleable: the staging tables/ACL and Saju Capability
- * rollout are HOLD, and checkoutAuthorized remains false.
+ * The database mapping is now Record-scoped, but no Product/Offer is seeded and
+ * checkoutAuthorized remains false until a separate release decision.
  */
 export async function quoteSajuWithStoredCurrentGrantsV1(input: {
   readonly pool: PostgresSubjectPoolV1;
