@@ -372,7 +372,7 @@ async function run(
     requestedDomain: 'general',
     context,
     groundingProjectionPort: input.projectionPort ?? groundingProjectionPort(bundle),
-    consultationShadowPort: input.consultationShadowPort,
+    ...(input.consultationShadowPort === undefined ? {} : { consultationShadowPort: input.consultationShadowPort }),
     ...ports,
   });
 }
