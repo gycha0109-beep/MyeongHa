@@ -153,21 +153,60 @@ export async function assertSeyeonProductionCombinedPinReadinessV1(
             'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)'
           )
         ), false)
-        and coalesce((
-          select p.prosecdef
+        -- Use the catalog for private functions: the Member role is not
+        -- granted seyeon_private schema USAGE, so name resolution cannot
+        -- be used as a reliable read-only presence check.
+        and exists (
+          select 1
+          from pg_catalog.pg_proc p
+          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'seyeon_private'
+            and p.proname = 'pin_positive_model_context_sources_v1'
+            and p.pronargs = 16
+            and p.proargtypes[0] = 'uuid'::regtype
+            and p.proargtypes[1] = 'uuid'::regtype
+            and p.proargtypes[2] = 'uuid'::regtype
+            and p.proargtypes[3] = 'uuid'::regtype
+            and p.proargtypes[4] = 'uuid'::regtype
+            and p.proargtypes[5] = 'jsonb'::regtype
+            and p.proargtypes[6] = 'text'::regtype
+            and p.proargtypes[7] = 'uuid'::regtype
+            and p.proargtypes[8] = 'uuid'::regtype
+            and p.proargtypes[9] = 'text'::regtype
+            and p.proargtypes[10] = 'text'::regtype
+            and p.proargtypes[11] = 'text'::regtype
+            and p.proargtypes[12] = 'text'::regtype
+            and p.proargtypes[13] = 'text'::regtype
+            and p.proargtypes[14] = 'text'::regtype
+            and p.proargtypes[15] = 'text'::regtype
+            and p.prosecdef
             and p.proowner = (
               select oid from pg_catalog.pg_roles
               where rolname = 'myeongha_seyeon_chat_runtime_owner'
             )
             and not has_function_privilege(current_user, p.oid, 'EXECUTE')
+        )
+        and exists (
+          select 1
           from pg_catalog.pg_proc p
-          where p.oid = to_regprocedure(
-            'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)'
-          )
-        ), false)
-        and to_regprocedure(
-          'seyeon_private.pin_model_recent_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text)'
-        ) is not null
+          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'seyeon_private'
+            and p.proname = 'pin_model_recent_sources_v1'
+            and p.pronargs = 7
+            and p.proargtypes[0] = 'uuid'::regtype
+            and p.proargtypes[1] = 'uuid'::regtype
+            and p.proargtypes[2] = 'uuid'::regtype
+            and p.proargtypes[3] = 'uuid'::regtype
+            and p.proargtypes[4] = 'uuid'::regtype
+            and p.proargtypes[5] = 'jsonb'::regtype
+            and p.proargtypes[6] = 'text'::regtype
+            and p.prosecdef
+            and p.proowner = (
+              select oid from pg_catalog.pg_roles
+              where rolname = 'myeongha_seyeon_chat_runtime_owner'
+            )
+            and not has_function_privilege(current_user, p.oid, 'EXECUTE')
+        )
         and to_regprocedure(
           'public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text)'
         ) is not null
