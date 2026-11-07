@@ -70,7 +70,7 @@ export async function inspectCurrentCancelSetExactReaderLockedCasReviewV1({
       !KEY.test(expectedProviderWebhookId)||
       expectedProviderWebhookId.trim()!==expectedProviderWebhookId||
       typeof expectedCancellationIdHmac!=='string'||
-      !MAC.test(expectedCancellationIdHmac)))
+      !MAC.test(expectedCancellationIdHmac))))
   throw Error('INVALID_CURRENT_CANCEL_SET_READER_LOCK_REVIEW_INPUT');
  const signedBoundRequested=expectedProviderWebhookId!==undefined;
  const setCheck=await (storedSetInspector??

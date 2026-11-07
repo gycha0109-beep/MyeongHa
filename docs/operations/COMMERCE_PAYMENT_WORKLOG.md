@@ -851,3 +851,11 @@
 - **확인된 기존 구성:** 읽기 전용 현재 PortOne 전체 취소 집합 GET과 기존 `inspectLockedReaderRevokeCasPreflightV1`의 원본 Event→Reader Grant→S1 잠금·변경 버전 검사 흐름이 구현돼 있었으나, 서명 알림의 **웹훅 ID와 취소 항목 HMAC**을 같은 preflight 입력으로 전달하지 않았습니다.
 - **구현:** `inspectCurrentCancelSetExactReaderLockedCasReviewV1`에 서명 검증 단계에서만 공급 가능한 `expectedProviderWebhookId + expectedCancellationIdHmac` 쌍을 선택적 내부 입력으로 추가했습니다. 둘 다 있으면 GET 이전 및 이후 동일 Provider Event 행 결속을 검증한 경우에만 기존 Reader S1 잠금·Grant 버전 검사를 실행합니다. 한쪽만 있거나 형식이 불량하면 DB 조회 전 거부하고, 묶음 증거가 누락·불일치하면 Reader 잠금 실행 전 HOLD합니다. `exactSignedCancellationBoundToEvent`는 읽기 전용 검토 결과일 뿐 권한이 아닙니다.
 - **보존:** 기존 무서명 사설 검사 호출과 격리 테스트는 유지하되 서명 증명으로 표시하지 않습니다. 실제 Entitlement Effect·Reader T2 commit·환불 API·운영 DB/라우트·판매 활성화는 변경하지 않았습니다. 공급자 semantic NEWER/STALE 및 법정 최종 환불 권한은 여전히 미증명. 최신 CI 통과 전 PASS 미선언입니다.
+
+### 2026-11-07 — 최신 PR CI 구문 오류 복구 (결제 트랙 재개 2)
+
+- **기준:** PR #3090의 `da87f39c327b`. [Commerce Work Track 실패](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42372921096/job/128404672591)에서 3개 테스트 파일이 동일 내부 취소 검토 모듈을 구문 분석하지 못했으며, [PostgreSQL17 통합 실패](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42372921096/job/128404672799)에서도 `commerce-exact-reader-withdrawal-hold-pg17` 사례가 같은 모듈 로딩 오류로 종료됐습니다. 다른 검사를 전체 성공으로 간주하지 않습니다.
+- **수정:** `scripts/operations/commerce-current-cancel-set-reader-locked-cas-review-v1.mjs`에서 서명 웹훅 ID와 개별 취소 HMAC의 쌍을 검증하는 `if` 조건문에 빠진 닫는 괄호 1개를 복원했습니다. 입력 검증 의미·기존 read-only HOLD 및 Reader 잠금/버전 사전검사는 변경하지 않았습니다.
+- **검증:** 위 실패 로그와 수정 대상 소스를 직접 대조했습니다. 이 커밋의 GitHub Actions·PostgreSQL17 재실행 결과는 아직 확인되지 않았으므로 **PASS 미선언**입니다.
+- **남은 과제:** 해당 HEAD의 Commerce, PostgreSQL17 및 전체 CI 재검증; 정확한 Provider 취소 순서/최종성 증거, 법정 환불 결정, 실제 Reader T2 원자적 회수, Reading 제공·청약철회·개인정보 삭제 통합 검증은 미완료 상태입니다.
+- **운영 경계:** 운영 DB 적용·공개 결제/환불 API·실제 PG 취소 POST·Entitlement Effect 실행·LIVE 판매는 활성화하지 않았습니다. 승인된 P1–P5 로드맵 범위 유지.
