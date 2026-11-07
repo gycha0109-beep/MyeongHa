@@ -166,12 +166,15 @@ if (onSection.includes('push:')) {
   const latestMigrationRestoreApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-40812111605-20261029.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved) {
-    throw new Error('Restore one-shot push must have exactly the seven reviewed historical/current source markers.');
+  const currentFrontierBackupApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-42309503582-20261107.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved || !currentFrontierBackupApproved) {
+    throw new Error('Restore one-shot push must have exactly the eight reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 7) {
-    throw new Error('Restore one-shot push allows exactly seven pinned marker paths.');
+  if (triggerMarkers.length !== 8) {
+    throw new Error('Restore one-shot push allows exactly eight pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -206,6 +209,12 @@ if (onSection.includes('push:')) {
     'backup_run_id=40812111605',
     'expected_artifact_id=12871016812',
     'incident_reference_utc=2026-10-29T03:35:00Z',
+    'ops(dr): one-shot restore backup 42309503582',
+    'POSTGRES-RESTORE-BACKUP-42309503582-20261107-V1',
+    'backup_run_id=42309503582',
+    'expected_artifact_id=13548176984',
+    'incident_reference_utc=2026-11-07T07:46:16Z',
+    'SCOPED_RESTORE_FRONTIER_20261105075227_ONLY',
     'now - point <= 86400',
     'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
