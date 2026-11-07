@@ -140,3 +140,13 @@ Watchtower-Track: frontend-integration
 - **다음/승인:** 신규 PR의 최신 브라우저 실제 실행을 확인하고 실패하면 이 테스트 동선의 실제 문제만 고친다. 일반 검증 통과 후 필수 통합 CI 제출·자동 병합 확인. 정식 이용약관·개인정보처리방침 게시, 운영 유료/이미지/결제 기능은 **별도 승인 전 금지**.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — PR #3141 브라우저 실패 관측 범위 보강
+
+- **확인한 사실:** `frontend-integration` PR [#3141](https://github.com/gycha0109-beep/MyeongHa/pull/3141) HEAD `cd1405d2d6975dc3b330b17be63ca90edd38444f`: [CI #42416678193](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416678193)와 [Governance #42416678030](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416678030) 성공, [Web PR #42416678175](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416678175) 실패. 실패 위치는 `verify-web-general-natal-preview-browser.mjs`의 실제 게스트 출생정보 입력·명식 계산 후 직업운 Preview 이동 검사 12초 타임아웃. 앞선 브라우저 검사들은 통과했고, 마지막 페이지가 왜 Preview로 바뀌지 않았는지는 기존 로그만으로 미확정.
+- **변경:** 기존 `scripts/verify-web-general-natal-preview-browser.mjs`의 **해당 실패 지점에만** 경로·화면 route-state·표시 여부·합성 Preview 요청 method/readingText를 기록하는 실패 진단을 추가. 사용자 인증 토큰, 요청 전문, 출생 입력 및 다른 데이터는 로그에 남기지 않음. 검사 기대치·제품 UI·권한/서버 로직은 변경하지 않음.
+- **미완료:** 새 HEAD CI의 구체적인 실패 상태 확인 후 실제 원인 수정; 이후 일반/Web/Governance 및 필수 통합 CI 확인·병합. Stage 5의 다른 점검과 Stage 2~4 출시 게이트는 변함없음.
+- **다음:** 신규 HEAD의 [PR 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3141/checks)에서 실브라우저 실패 스냅샷 확인 후, 같은 PR에서 해당 원인만 수정. 진단 추가 자체를 기능 복구나 ROADMAP_COMPLETE로 선언하지 않음.
+- **블로커·승인:** 추가 승인 없음. 실제 브라우저 검증이 미통과 상태.
+
+Watchtower-Track: frontend-integration

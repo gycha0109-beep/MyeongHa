@@ -308,9 +308,29 @@ try {
   assert(await client.evaluate('!!document.querySelector(' + JSON.stringify(previewSelector) + ')'),
     'Admitted career Preview link missing from calculated chart');
   await client.evaluate('document.querySelector(' + JSON.stringify(previewSelector) + ').click()');
-  await waitFor(client,
-    'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',
-    'supported career Preview delivery from Saju hub');
+  try {
+    await waitFor(client,
+      'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',
+      'supported career Preview delivery from Saju hub');
+  } catch (error) {
+    // Log only synthetic route/state and request shape. Never log credentials.
+    const browserState = await client.evaluate(`(() => ({
+      pathname: location.pathname,
+      state: document.body?.dataset.readingRouteState ?? null,
+      title: document.querySelector('[data-reading-state-title]')?.textContent ?? null,
+      stageVisible: document.querySelector('[data-reading-stage]')?.hidden === false,
+    }))()`).catch(() => ({ unavailable: true }));
+    const lastRequest = observedRequests.at(-1);
+    throw new Error('Career Preview browser diagnostic: ' + JSON.stringify({
+      browserState,
+      requestCount: observedRequests.length,
+      lastPreviewRequest: lastRequest ? {
+        method: lastRequest.method ?? null,
+        readingText: lastRequest.body?.readingText ?? null,
+        unexpected: lastRequest.unexpected ?? null,
+      } : null,
+    }), { cause: error });
+  }
   const journeyReading = observedRequests.at(-1);
   assert(journeyReading?.method === 'POST' &&
     journeyReading.authorization === 'Bearer ' + journeyBearer &&
