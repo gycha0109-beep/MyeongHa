@@ -172,7 +172,9 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 **Exit evidence implemented so far:** unit coverage for lexical relevance, explicit/generic callback, unsupported-schema non-exposure, temporal Life Fact validity, exact Subject/Character/thread scope and selected-record-only output; SQL coverage for v2 function ACLs, source provenance, active grants, no-grant Character isolation and cross-Subject denial.
 
-**Remaining Phase 3 exit work:** broaden multi-session recall/abstention evaluation, complete the remaining source-supported retrieval signals if their authoritative fields exist, and verify the full negative matrix for revoked/superseded/unauthorized data on the v2 path. Phase 3 is not complete, and Phase 4 must not be declared complete or started as a production context composer before these criteria are evidenced.
+**Additional exit evidence submitted for CI:** multi-session relevant/irrelevant recall and abstention tests, generic callback bounded selection, and PostgreSQL v2 revoked-grant/superseded Life Fact denial. These must pass on the latest head; submitting tests is not proof of a green run.
+
+**Remaining Phase 3 exit work:** establish the latest-head green CI and evaluate any uncovered source-supported signals or retrieval abstention cases. Causal/relationship/contradiction signals cannot be claimed until authoritative record links or approved policy values exist. Phase 3 is not complete, and Phase 4 must not be declared complete or started as a production context composer before these criteria are evidenced.
 
 ### Phase 4 — Dynamic Context Composer
 

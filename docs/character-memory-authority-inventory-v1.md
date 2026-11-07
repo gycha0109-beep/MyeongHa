@@ -40,8 +40,16 @@ It does not create a new memory database, infer facts, approve new Memory schema
 
 Migration `2330_reader_context_granted_memory_projection_v1.sql` adds the initial read-only Character-scoped Memory projection. Migration `2350_reader_context_memory_retrieval_provenance_v1.sql` adds provenance-enriched v2 projections for both Life Facts and Memory Items.
 
-The v2 functions:
-- require the transaction-local canonical Subject to match the requested Subject;
+The public v2 projections are SECURITY INVOKER functions. They compose the
+existing current-owner and exact-Character grant queries with two narrowly
+scoped SECURITY DEFINER provenance helpers. Each helper rechecks the
+transaction-local Subject, exact record ID, active grant ID, and Character
+before returning any stored source data. EXECUTE on these helpers and on the
+v2 projections is restricted to `myeongha_api_executor`; direct table SELECT
+privileges are not expanded.
+
+The v2 read path:
+- requires the transaction-local canonical Subject to match the requested Subject;
 - reuse the existing current-owner/current-record and active exact-Character grant queries;
 - preserve revocation and supersession filtering from the underlying v1 authorities;
 - return stored Life Fact source kind, source message/merge references, grant reason/time, valid-from/to, confirmation and creation timestamps;

@@ -24,7 +24,7 @@ Migration `2350_reader_context_memory_retrieval_provenance_v1.sql` adds two serv
 - `qry_reader_context_granted_life_facts_v2`: source kind, source message/merge references, grant reason/time, valid-from/to, confirmation and creation timestamps.
 - `qry_reader_context_granted_memory_items_v2`: source kind, source turn/message/merge references and grant reason/time.
 
-Both functions reuse the v1 current-owner and exact-Character grant authorities. EXECUTE is granted only to `myeongha_api_executor`; browser and generic service roles are denied. Missing source references remain NULL. No provenance is synthesized.
+Both public v2 projections use SECURITY INVOKER and reuse the existing v1 current-owner and exact-Character grant authorities. Two restricted SECURITY DEFINER provenance helpers (`qry_reader_context_life_fact_provenance_v1` and `qry_reader_context_memory_item_provenance_v1`) revalidate the pinned Subject and exact active record/grant/Character identity before returning additional stored source fields. All four functions have PUBLIC and browser/service-role EXECUTE revoked; only `myeongha_api_executor` can execute them. The API executor receives **no new direct table SELECT privileges** on Life Facts or Memory Items. Missing source references remain NULL; no provenance is synthesized.
 
 ## Retrieval behavior
 
@@ -46,6 +46,7 @@ The positive Life Fact/Memory projector registry remains server-owned and closed
 
 ## Verification scope
 
-- Unit tests: lexical recall, no-match abstention, explicit callback, generic callback fallback, latest-episode ordering, valid-time exclusion, scope mismatch, unsupported-schema non-exposure, Capability Gate denial before source reads, exact current User message binding and selected-record-only output.
-- PostgreSQL tests: v2 provenance, exact grant scope, cross-Subject denial and server-only EXECUTE privileges.
+- Unit tests: lexical recall, no-match abstention (including topical callback with no matching source), explicit callback, generic callback fallback, multiple-session recency and topical relevance, one-record budget, valid-time exclusion, scope mismatch, unsupported-schema non-exposure, Capability Gate denial before source reads, exact current User message binding and selected-record-only output.
+- PostgreSQL tests: v2 provenance, exact grant scope, cross-Subject denial, revoked-grant exclusion, superseded Life Fact exclusion and server-only EXECUTE privileges.
+- Latest-commit CI verdict is a separate required completion condition; test presence does not imply a passing run.
 - No Provider dispatch, paid inference, durable Memory write, grant mutation, relationship mutation, Production route or additional Character activation.
