@@ -577,3 +577,10 @@ Watchtower-Track: security
 - **운영 Source Registry SELECT:** 명하 Supabase 대상 PostgreSQL 17의 public.seyeon_positive_source_type_registry_v1에 (memory, conversation_recall, v1, seyeon-conversation-recall-projector-v1) 1행이 존재하지만 enabled=false, writable_enabled=false로 비활성화돼 있다. 기존 ‘Registry 비어 있음’ 주장을 수정했다. 실제 사용자 Memory나 Grant 데이터를 조회하지 않았고 positive Pin 실행 증거도 아니다.
 - **운영 함수·역할 pg_catalog SELECT:** cmd_mark_seyeon_positive_context_ready_pinned_v1(13인자), cmd_mark_seyeon_chat_context_ready_pinned_v1(4인자), cmd_commit_seyeon_chat_turn_runtime_v2(9인자)가 설치돼 있으며 myeongha_api_executor EXECUTE=true다. 기존 cmd_revoke_memory_character_grant_v1은 API EXECUTE=false, SECURITY INVOKER. myeongha_seyeon_governed_login은 존재하지만 myeongha_seyeon_g5_commerce_login은 없다. G0 철회 전용 권한 계약과 G4/G5 분리된 실제 자격증명·TLS/Secret/Hyperdrive 증명은 미완료다.
 - **안전 경계:** 운영 DB DDL/DML/GRANT/Secret, 유료 Provider, 공개 Route, 배포·과금 활성화 변경은 0. positiveMemoryFirstReplyApproved=false, creditBilling.productionMounted=false, HOLD_FORWARD_STOPPED 유지. G0~G6 최종 PASS 아님.
+
+
+### 2026-11-07 / W125 — G0 철회 권한을 모델 사용 승인과 분리 (PR #3097)
+
+- **실제 변경:** 첫 Memory Fetch 조립에서 기존 `approvedPersonalRecordModelUse`가 철회 HTTP의 `approvedWithdrawalWriteAdmission`으로 자동 전달되던 연결을 제거했다. 모델 사용을 허가해도 개인정보 철회 DB 쓰기가 자동 승인되지 않는다. 서버 전용 `approvedWithdrawalWriteAdmission`을 별도로 명시한 경우에만 기존 G0 철회 핸들러로 전달한다. 별도 Cloudflare 철회/receipt 경로의 정책·모델 비의존성을 유지한다.
+- **검증:** 모델 승인만 있는 경우 철회 DB 쓰기 승인이 전달되지 않고, 독립적인 철회 승인만 명시했을 때 전달되는 회귀 테스트를 추가했다. 현재 커밋의 정확한 CI는 실행 결과 확인 전 PASS 아님.
+- **미완료:** 실제 운영 Source Registry 활성화 및 Pin 증거, 철회 DB 권한·선형화, G5 Commerce LOGIN/Hyperdrive, 일반 고객 비용 예약·정산, G2/G3 실전송 ACK 및 G6 제한 운영. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. 운영 DB/Role/ACL/Secret/Provider/배포·트래픽 변경 없음.

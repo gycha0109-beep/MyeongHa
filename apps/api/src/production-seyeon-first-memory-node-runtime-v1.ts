@@ -35,6 +35,8 @@ export interface CreateProductionSeyeonFirstMemoryNodeRuntimeInputV1 {
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
   /** Reviewed server policy only, never headers, JSON, env flags or model text. */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
+  /** Independent G0 withdrawal write admission. Model-use consent never grants DB revoke privileges. */
+  readonly approvedWithdrawalWriteAdmission?: () => boolean | Promise<boolean>;
   readonly governorApproval?: SeyeonProductionChatGovernorApprovalV1;
   /** Server-approved certified GLM reservation policy. Never derived from client/env flag. */
   readonly glmRendererGovernor?: SeyeonAiGovernorAdmissionV1;
