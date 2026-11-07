@@ -59,6 +59,8 @@ const VERIFIED={
  kind:'exact_reader_locked_cas_consistent_but_authority_held',
  exactProviderEventInStoredSet:true,authenticatedProviderSetMatched:true,
  postGetDbSnapshotStable:true,exactReaderGrantLockedAndCasChecked:true,
+ singleExactFullCancellationObservedAtGet:true,
+ readerS1LockAndScopeRecheckObserved:true,
  grantRevocationAuthorized:false,refundExecutionAuthorized:false,
  entitlementEffectInvoked:false,writesPerformed:false,
  readerT2LockHeld:false,legalRefundAuthority:false,
@@ -177,6 +179,58 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   expect(client.calls.find(x=>x.sql===SCOPE_SQL)).toBeDefined();
   expect(client.calls.map(x=>x.sql)).not.toContain('commit');
   safe(r);
+ });
+
+ it('forwards signed webhook and its exact cancellation to locked Reader notice review',async()=>{
+  const c=db(),expectedProviderWebhookId='evt_signed-cancel-01';
+  const expectedCancellationIdHmac='hmac-sha256:k1:'+'b'.repeat(64);
+  const currentSetLockedInspector=vi.fn(async()=>({
+   ...VERIFIED,exactSignedCancellationBoundToEvent:true,
+  }));
+  const result=await call(c,{
+   expectedProviderWebhookId,expectedCancellationIdHmac,
+   sourceHmacSecret:'s'.repeat(32),currentSetLockedInspector,
+  });
+  expect(currentSetLockedInspector).toHaveBeenCalledWith(expect.objectContaining({
+   expectedProviderWebhookId,expectedCancellationIdHmac,
+   sourceHmacSecret:'s'.repeat(32),
+  }));
+  expect(result.kind).toBe('exact_reader_statutory_review_only');
+  safe(result);
+ });
+ it('rejects incomplete/malformed signed item pairs before database and GET',async()=>{
+  const mac='hmac-sha256:k1:'+'b'.repeat(64);
+  for(const pair of [
+   {expectedProviderWebhookId:'evt_signed-cancel-01'},
+   {expectedCancellationIdHmac:mac},
+   {expectedProviderWebhookId:'bad\nwebhook',expectedCancellationIdHmac:mac},
+   {expectedProviderWebhookId:'evt_signed-cancel-01',
+    expectedCancellationIdHmac:'hmac-sha256:k1:'+'B'.repeat(64)},
+  ]){
+   const c=db(),currentSetLockedInspector=vi.fn();
+   await expect(call(c,{...pair,currentSetLockedInspector}))
+    .rejects.toThrow('INVALID_EXACT_READER_WITHDRAWAL_HOLD_INPUT');
+   expect(currentSetLockedInspector).not.toHaveBeenCalled();
+   expect(c.query).not.toHaveBeenCalled();
+  }
+ });
+ it.each([
+  ['wrong signed cancellation Event',{exactSignedCancellationBoundToEvent:false}],
+  ['multiple partial cancellations',{singleExactFullCancellationObservedAtGet:false}],
+  ['missing Reader S1 shared scope lock',{readerS1LockAndScopeRecheckObserved:false}],
+ ])('HOLDs %s before reading notice',async(_reason,override)=>{
+  const c=db(),reviewer=vi.fn();
+  const result=await call(c,{
+   expectedProviderWebhookId:'evt_signed-cancel-01',
+   expectedCancellationIdHmac:'hmac-sha256:k1:'+'b'.repeat(64),
+   currentSetLockedInspector:async()=>({
+    ...VERIFIED,exactSignedCancellationBoundToEvent:true,...override,
+   }),withdrawalReviewer:reviewer,
+  });
+  expect(result.kind).toBe('current_provider_or_exact_reader_lock_not_ready');
+  expect(c.query).not.toHaveBeenCalled();
+  expect(reviewer).not.toHaveBeenCalled();
+  safe(result);
  });
  it('uses the real TypeScript evidence adapter without requiring prebuilt dist files',async()=>{
   const client=db();

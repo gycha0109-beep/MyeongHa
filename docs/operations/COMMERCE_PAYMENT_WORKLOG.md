@@ -859,3 +859,14 @@
 - **검증:** 위 실패 로그와 수정 대상 소스를 직접 대조했습니다. 이 커밋의 GitHub Actions·PostgreSQL17 재실행 결과는 아직 확인되지 않았으므로 **PASS 미선언**입니다.
 - **남은 과제:** 해당 HEAD의 Commerce, PostgreSQL17 및 전체 CI 재검증; 정확한 Provider 취소 순서/최종성 증거, 법정 환불 결정, 실제 Reader T2 원자적 회수, Reading 제공·청약철회·개인정보 삭제 통합 검증은 미완료 상태입니다.
 - **운영 경계:** 운영 DB 적용·공개 결제/환불 API·실제 PG 취소 POST·Entitlement Effect 실행·LIVE 판매는 활성화하지 않았습니다. 승인된 P1–P5 로드맵 범위 유지.
+
+### 2026-11-08 — 서명 취소 항목을 청약철회 증거 검토까지 결속
+
+- **목표·로드맵:** 승인된 개발 로드맵 §6-1~3의 기존 취소 Event → Reader S1 범위 잠금/권한 사전 검사 → 정확한 유료 구매 단위의 고지·청약철회 증거 경로에서 취소 항목 결속을 유지합니다.
+- **확인된 기준:** PR [#3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 브랜치 `feat/commerce/saju-record-scoped-capability-v1-20261107`, 변경 전 SHA `6e1da706b6cdbac478afb127e0a04d0d453060f5`. [기존 전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42377687416), Web Auth/Domain, Governance는 이 SHA에서 성공. PR은 여전히 open/unmerged입니다.
+- **변경 파일:** `scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs`, `test/commerce-exact-reader-withdrawal-evidence-hold-v1.test.mjs`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **실제 구현:** 선택적 서명 웹훅 ID+정확한 취소 항목 HMAC을 한 쌍으로 검증해 이전 GET/원장/Reader 잠금 사전검사에 그대로 넘깁니다. 누락/변조 항목은 조회 전에 거부하고, signed 검토를 요청한 경우 동일 Event 항목 결속이 증명되지 않으면 구매·고지 SQL을 실행하지 않습니다. 기존 긍정 사전검사 결과에도 단일 성공 전액 취소 및 Reader S1 공통 잠금·재확인 확인을 추가했습니다.
+- **테스트·CI:** 기존 Vitest 회귀에 signed pair 전달, 부분/오류 입력 사전 차단, 서명 Event 불일치·누적 부분취소·S1 미확인 HOLD를 추가했습니다. 신규 커밋의 실제 GitHub CI/PG17 **결과 미확인, PASS 미선언**입니다.
+- **완료·미완료:** 이번 코드·회귀·기록 단위 구현 완료. 공급자 의미적 NEWER/STALE 순서, 법적 환불 판단, Reader T2 최종 권한 회수 실행, 실제 소비자 전달 완료, 백업 복원 후 privacy replay 및 전체 E2E는 미완료입니다.
+- **브랜치·커밋·PR:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, 변경 이전 `6e1da706b6cdbac478afb127e0a04d0d453060f5`, PR #3090. 본 기록과 변경 파일을 하나의 후속 커밋으로 반영합니다.
+- **블로커·다음:** 새 HEAD의 전체 CI 결과를 확인하여 실패를 수정하고, 이후 승인된 로드맵의 미완료 결제/취소·권한 회수 연결을 진행합니다. 실제 PortOne 환불 POST·운영 DB·공개 checkout·LIVE는 실행하거나 활성화하지 않습니다. 승인 요청 없음.

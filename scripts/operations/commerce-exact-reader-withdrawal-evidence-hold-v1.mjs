@@ -93,6 +93,14 @@ limit 2
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const REV=/^(0|[1-9][0-9]*)$/u;
 const ORDER=/^[^\u0000-\u001f\u007f]{1,512}$/u;
+const WEBHOOK_ID=/^[^\u0000-\u001f\u007f]{1,512}$/u;
+const CANCELLATION_MAC=/^hmac-sha256:k1:[0-9a-f]{64}$/u;
+const validSignedPair=(webhookId,cancellationHmac)=>
+ (webhookId===undefined&&cancellationHmac===undefined)||
+ (typeof webhookId==='string'&&WEBHOOK_ID.test(webhookId)&&
+  webhookId.trim()===webhookId&&
+  typeof cancellationHmac==='string'&&
+  CANCELLATION_MAC.test(cancellationHmac));
 const REASONS=new Set([
  'change_of_mind','not_provided','delivery_failed','not_as_described',
  'defect','duplicate_charge','unprovided_separable_part','other',
@@ -248,6 +256,7 @@ async function inspectExactPaidUnit(dbClient,{
 export async function inspectExactReaderWithdrawalEvidenceHoldV1({
  dbClient,receiptId,providerEventId,entitlementGrantId,
  expectedGrantRevision,expectedLastProviderOrderingKey,
+ expectedProviderWebhookId,expectedCancellationIdHmac,
  sourceHmacSecret,apiSecret,withdrawalReason,fetchImpl,
  providerInspector,currentSetLockedInspector,withdrawalReviewer,
 }){
@@ -259,13 +268,18 @@ export async function inspectExactReaderWithdrawalEvidenceHoldV1({
       (typeof expectedLastProviderOrderingKey==='string'&&
        ORDER.test(expectedLastProviderOrderingKey)&&
        expectedLastProviderOrderingKey.trim()===expectedLastProviderOrderingKey))||
-    !REASONS.has(withdrawalReason))
+    !validSignedPair(expectedProviderWebhookId,expectedCancellationIdHmac)||
+     !REASONS.has(withdrawalReason))
   throw Error('INVALID_EXACT_READER_WITHDRAWAL_HOLD_INPUT');
 
+ // Signed-item evidence is not refund, legal, or revocation authority.
+ const signedBindingRequested=expectedProviderWebhookId!==undefined;
  const verified=await (currentSetLockedInspector??
   inspectCurrentCancelSetExactReaderLockedCasReviewV1)({
   dbClient,receiptId,providerEventId,entitlementGrantId,
   expectedGrantRevision,expectedLastProviderOrderingKey,
+  ...(signedBindingRequested?{expectedProviderWebhookId,
+    expectedCancellationIdHmac}:{}),
   sourceHmacSecret,apiSecret,fetchImpl,providerInspector,
  });
  if(!verified||typeof verified.kind!=='string'||
@@ -281,6 +295,10 @@ export async function inspectExactReaderWithdrawalEvidenceHoldV1({
     verified.exactProviderEventInStoredSet!==true||
     verified.authenticatedProviderSetMatched!==true||
     verified.postGetDbSnapshotStable!==true||
+    verified.singleExactFullCancellationObservedAtGet!==true||
+    verified.readerS1LockAndScopeRecheckObserved!==true||
+    (signedBindingRequested&&
+     verified.exactSignedCancellationBoundToEvent!==true)||
     verified.exactReaderGrantLockedAndCasChecked!==true)
   return no('current_provider_or_exact_reader_lock_not_ready');
 
