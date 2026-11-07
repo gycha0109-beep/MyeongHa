@@ -1,5 +1,15 @@
 # @myeongha/admin
 
+## Owner 사용자 관리 개선 — 2026-11-07 데이터 확인 / PR #3100
+
+- Production MyengHa DB를 **SELECT-only**로 확인했습니다. `subjects` 총 105행 중 현재 활성 `member` 3행, 활성 `guest` 95행, 삭제 완료 `member` 6행, 삭제 대기 `member` 1행입니다. 내부 Subject 수는 사람 수 또는 가입자 수가 아닙니다.
+- `guest_sessions` 98행 중 95행은 활성 Guest에 연결되고, 3행은 활성 Member로 승격된 계정의 소비·claim 기록입니다. 이 시점의 merge job/action 및 `merged_into_subject_id`는 0건입니다. 95행이 서로 다른 실사용자를 의미한다거나 한 사람의 반복 방문이라고 단정하지 않습니다.
+- `profiles`는 0행입니다. 활성 회원 3명은 인증 계정에 연결됐지만 그중 저장된 이메일이 있는 계정은 2개뿐입니다. 현재 Admin Reader에는 `auth.users`, `profiles`, `guest_sessions` 원본 테이블 직접 조회 권한이 없습니다. 관리자 UI에서 닉네임·이메일을 임의 추정하거나 클라이언트에서 관리자 신분으로 일반 사용자 API를 우회 호출하지 않습니다.
+- 첫 개편은 기존 승인된 관리자 목록 조회 API의 `subjectKind` / `subjectStatus` 필터를 재사용합니다. **활성 회원만 기본 표시**하고 게스트·탈퇴·삭제 및 전체 기록은 별도의 명시적 화면 선택으로 제공합니다. 운영 개요의 `members_active` 수치를 별도 재조회하며 세부 목록의 20행 페이지 수를 전체 회원 수로 오해하지 않습니다.
+- 목록에는 계정 종류·한국어 상태·Asia/Seoul 시간·일부 숨긴 내부 ID·상세 진입을 표시합니다. 상세 화면은 기존 검증 영수증·Reading·권한·크레딧 관측 메타데이터만 보여줍니다. 실명/이메일 검색은 별도 권한 있는 최소 필드 projection이 실제로 승인·구축될 때까지 **제공하지 않습니다**.
+- 사용자·세션 레코드 수정, 자동 병합, 게스트 삭제, DB 역할 확장, Production DDL/배포, 운영 쓰기 기능 활성화는 이 PR에서 수행하지 않습니다. 실사용자 이메일을 보고서·테스트 로그·CSV에 기록하지 않습니다.
+
+
 ## Latest verified production state — 2026-11-06 (supersedes older dated deployment notes)
 
 The Admin Console is now deployed as an isolated, **Owner-only read-only** Worker. Do not interpret older statements below saying the Worker/Hyperdrive is absent or that the private runtime is still disabled as current state; those are historical snapshots.
