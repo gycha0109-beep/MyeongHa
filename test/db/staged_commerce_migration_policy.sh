@@ -27,6 +27,23 @@ skip_staged_portone_migration_from_historical_fixture() {
       return 0
     fi
   fi
+  # 2370 replaces a private Reader refund confirmer defined by 2310.
+  # Historical PG15/PG17 fixtures deliberately exclude 2310 and MUST NOT
+  # compile its replacement. Integrated PG17 Reader cases apply both files.
+  if [[ "$name" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql' ]]; then
+    [[ "$inclusion" == 'reader-integrated' ]] && return 1
+    expected='e6988be8f0c83af3c6be124c5604809c87d23540'
+    actual="$(git hash-object "$migration")" || {
+      echo 'HOLD_READER_REFUND_MIGRATION_FINGERPRINT_UNAVAILABLE' >&2
+      exit 1
+    }
+    if [[ "$actual" != "$expected" ]]; then
+      echo 'HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT' >&2
+      exit 1
+    fi
+    echo "Skipping Reader-only refund confirmation migration from historical catalog: $name"
+    return 0
+  fi
   case "${migration##*/}" in
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;

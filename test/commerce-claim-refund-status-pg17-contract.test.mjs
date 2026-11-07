@@ -69,6 +69,16 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   expect(sql).toContain('CLAIM_E2E_WRONG_AMOUNT_FULL_CANCEL_FALSE_REFUND_CONFIRMED');
   expect(sql).toContain("v_receipt.verified_amount_minor+1");
  });
+ it('keeps the private refund confirmation SQL out of historical catalog fixtures',()=>{
+  const staged=readFileSync('test/db/staged_commerce_migration_policy.sh','utf8');
+  expect(staged).toContain("$name" + "\" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql'");
+  expect(staged).toContain("$inclusion\" == 'reader-integrated'");
+  expect(staged).toContain("expected='e6988be8f0c83af3c6be124c5604809c87d23540'");
+  expect(staged).toContain('HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT');
+  expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"');
+  expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration"');
+  expect(confirmer).toContain('commerce_reader_full_refund_dispatches_v1%rowtype');
+ });
  it('never turns a provisional provider request or effect into a confirmed customer refund',()=>{
   expect(sql).toContain("'refund_decision_recorded'");
   expect(sql).toContain("'refund_processing'");

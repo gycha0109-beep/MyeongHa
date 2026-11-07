@@ -1048,3 +1048,11 @@
 - **테스트·CI 근거:** 기존 `test/db/commerce_verified_reader_claim_cancel_effect_pg17.sql`의 일괄 ROLLBACK 안에 **Receipt revoked + 동일 취소 ID지만 원결제 금액이 일치하지 않는 합성 PG Event**를 만들고 실제 confirmer가 거부해 변경을 롤백·환불 확정 오표기를 방지하는 사례를 추가했습니다. `test/commerce-claim-refund-status-pg17-contract.test.mjs`에서 migration 결속과 격리 SQL 테스트 연결을 검사합니다. 신규 커밋의 실제 DB/TS/Vitest/CI는 실행 결과 확인 전이며 PASS를 선언하지 않습니다.
 - **완료·미완료:** 고객 환불 확정의 정확한 원결제·Provider 전액 검증 결속과 부정 격리 회귀 작성 및 문서화 반영. 공급자의 신뢰 가능한 NEWER/STALE 순서 비교, 최종 Reader/T2 원자적 회수, 실제 법적 콘텐츠 전달 증명, 실제 백업 복원 검증과 전체 E2E는 미완료.
 - **블로커·다음:** 새 CI에서 migration/PG17 실패 시 실제 에러 수정, 성공 시 기존 승인 로드맵의 남은 서비스 연결 구현. 운영 DB 배포/환불 POST/LIVE 활성화는 승인 범위 밖으로 미실행, 추가 사용자 승인 요청 없음.
+
+### 2026-11-08 — 환불 검증 SQL의 역사적 DB 검증 환경 적용 충돌 수정
+
+- **목표·근거:** 승인 로드맵 §6-3·5의 신규 환불 확정 검증을 유지하되, [커밋 b9467652의 CI #42415097353](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415097353)에서 PostgreSQL 15 공통/PG17 일부 검증이 `2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql:93`의 `relation "public.commerce_reader_full_refund_dispatches_v1" does not exist`로 실패한 문제를 해결합니다.
+- **원인:** 역사적 DB fixture는 `1740~2320` Reader 전용 migration을 승인된 지문 검사 후 생략하지만, 신규 `2370`은 생략하지 않아 2310이 생성하는 테이블 없이 환불 함수만 컴파일됐습니다. 반면 Reader 통합 PostgreSQL 17에서는 2310과 2370을 모두 적용해야 합니다.
+- **수정:** `test/db/staged_commerce_migration_policy.sh`에 정확한 2370 파일명/검토된 Git blob SHA를 적용하는 역사적 fixture 생략 분기를 추가하고, `reader-integrated` 환경에서는 기존과 같이 SQL을 적용합니다. 원본 migration과 환불 검증 조건은 변경하지 않습니다. `test/commerce-claim-refund-status-pg17-contract.test.mjs`에 분리 경로와 지문 변경 차단 계약 테스트를 추가합니다.
+- **검증·상태:** 기존 CI 실패 로그에 근거한 코드 수정입니다. 새 커밋의 GitHub CI 및 PostgreSQL 실제 실행 결과는 아직 미확인으로 PASS를 선언하지 않습니다. 기존 자동 병합 유지, LIVE/운영 DB/PortOne POST 미실행.
+- **남은 일:** 새 CI 결과 확인 및 실패 수정, Provider NEWER/STALE, 정확한 Reader/T2 회수, 소비자 공급 입증, 복원 실증과 전체 격리 E2E. 승인 요청 없음.
