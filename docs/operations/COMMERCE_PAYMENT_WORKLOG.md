@@ -990,3 +990,12 @@
 - **변경 파일:** `test/commerce-mobile-withdrawal-claim-client.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`. **내용:** `test/commerce-mobile-withdrawal-claim-client.test.ts`의 공용 mock fetch가 이전에는 인자 0개로 추론돼 새 `mockImplementation(url)`, `mock.calls[1][0/1]` 검증의 인자 형식과 맞지 않았습니다. 기존 실제 fetch 계약대로 URL/RequestInit 타입을 명시했습니다. 런타임 기능과 출시 플래그·HTTP/PG 동작은 변경하지 않습니다.
 - **테스트/완료:** 해당 신규 회귀의 타입 호환 수정과 기존 WORKLOG 기록을 함께 반영했습니다. 후속 커밋 공식 TypeScript/모바일/PG17/전체 CI는 아직 미확정이므로 통과를 가정하지 않습니다.
 - **남은 것/다음/블로커:** 전체 CI 결과 확인 및 실패 수정, 이후 법적 제공 입증·Provider 순서 판정·정확한 Reader/T2 회수·실제 복원 검증·전체 격리 E2E 잔여. 운영 DB/실제 PortOne 환불 POST/LIVE 미실행, 승인 필요 없음.
+
+### 2026-11-08 — 서명 키 누락 회귀 테스트의 기본값 충돌 수정
+
+- **작업 목표·로드맵:** 결제 트랙 승인 실행 로드맵 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6-3·5, 고객 청약철회 POST는 서버 HMAC signing key 없이 차단하고 기존 GET 상태 조회는 유효한 회원 인증·Subject 검사만으로 동작하는 계약을 CI에서 실제 검증합니다.
+- **기준 브랜치·커밋·PR:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, 작업 전 HEAD `57e3ab4f909b49765d2b56fda6931457caa6bfdb`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090) open 및 자동 병합 설정 유지.
+- **실패 근거:** [GitHub Actions run #42402843095 · Work Track · commerce job #128494278492](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402843095/job/128494278492?pr=3090)에서 테스트 9,111건 통과, 1건 실패(`test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts:219`, `expected 201 to be 503`). 실패한 테스트가 `f.run(...,true,undefined)`로 서명 키 누락을 재현하려 했지만, fixture `signingKey:string|undefined=secret`의 JS 기본인자에 의해 유효한 secret이 다시 채워졌습니다. 실제 POST 서버가 서명 없이 접수를 허용한 증거가 아닙니다. 기존 PostgreSQL17·DB core·Commerce payment/entitlement·Web·Mobile CI는 이 이전 HEAD에서 통과했으며 위 run의 전체 CI는 실패입니다.
+- **변경 파일:** `test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`. **실제 수정:** 테스트 fixture의 서명 키 인자에 `null`을 명시적 누락값으로 허용하고, 이 경우 실제 서버 입력에 `undefined`를 넘깁니다. GET/POST 회귀를 모두 `null`로 호출해 각각 200/503을 정확히 검증하며, 지나치게 짧은 secret을 입력하는 부정 테스트를 추가합니다. 정상 fixture의 기본 secret 및 생산 서버·모바일 구현은 변경하지 않습니다.
+- **완료/미완료·검증:** 실패 원인에 일대일 대응하는 테스트/WORKLOG 수정 및 원자 커밋 준비 완료. 새 HEAD의 CI 결과는 **미확인**, PASS 선언 금지. 로드맵의 Provider 최신 순서·Reader T2 원자 회수·실제 공급/삭제 복원과 전체 E2E는 미완료입니다.
+- **블로커·다음 작업:** 신규 CI를 확인해 실패하면 해당 근거로 추가 수정, 통과하면 기존 승인 로드맵의 남은 실제 연결을 구현합니다. 실제 PortOne POST 환불, 운영 DB 수정, 공개 LIVE 및 판매 활성화 미실행. 승인 필요 없음.
