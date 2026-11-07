@@ -49,6 +49,12 @@ export async function reconcileSignedCancellationPrivateV1({
   if(!signed||signed.kind!=='cancellation_lookup_candidate')
     return base('not_cancellation_event');
   if(webhookConfig?.environment!=='production')return base('production_only_hold');
+  // PortOne V2 cancellation notices carry a per-item cancellationId.
+  // Without that ID, an aggregate payment GET cannot authenticate the
+  // notification's exact cancellation or its success/amount.
+  if(typeof signed.providerCancellationId!=='string'||
+     signed.providerCancellationId.length===0)
+    return base('exact_cancellation_id_required');
 
   let original;
   try{
@@ -75,6 +81,29 @@ export async function reconcileSignedCancellationPrivateV1({
     classified.shapeConsistent!==true||
     classified.refundExecutionAuthorized!==false||
     classified.entitlementRevocationAuthorized!==false)
+    return base('inconsistent_provider_readback');
+
+  // A payment-wide CANCELLED/PARTIAL_CANCELLED status is not enough:
+  // verify the exact cancellationId from the signed notice against the
+  // authenticated GET's individual successful cancellation and bounded sum.
+  // Do not infer ordering or refund/revoke authority from this observation.
+  const paid=original.originalVerifiedPaidAmountMinor;
+  const cumulative=classified.observedCancelledTotalMinor;
+  const exact=classified.observedMatchingSucceededCancellationMinor;
+  const finalShape=classified.kind==='full_cancel_shape_observed'||
+    classified.kind==='partial_cancel_shape_observed';
+  if(classified.matchedCancellationIdObserved!==true||
+     !Number.isSafeInteger(paid)||paid<=0||
+     !Number.isSafeInteger(cumulative)||cumulative<0||cumulative>paid||
+     (finalShape&&(
+       classified.observedMatchingCancellationStatus!=='SUCCEEDED'||
+       !Number.isSafeInteger(exact)||exact<=0||exact>cumulative||
+       (signed.eventType==='Transaction.Cancelled'&&
+         classified.kind!=='full_cancel_shape_observed')||
+       (signed.eventType==='Transaction.PartialCancelled'&&exact>=paid)
+     ))||
+     (classified.kind==='cancellation_pending'&&
+       classified.observedMatchingCancellationStatus!=='REQUESTED'))
     return base('inconsistent_provider_readback');
   const mapping=Object.freeze({
     full_cancel_shape_observed:'full_cancel_review_candidate',

@@ -135,6 +135,56 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
    kind:'pending_cancel_review_candidate',entitlementEffectEligible:false,
   });
  });
+ it('missing signed cancellation ID is held before receipt lookup and provider GET',async()=>{
+  const db=fakeDb(),http=fakeFetch();
+  const r=await executor(db,http,{request:signedRequest('Transaction.Cancelled',{
+   paymentId:PAYMENT_ID,transactionId:TX,
+  })});
+  expect(r.kind).toBe('exact_cancellation_id_required');
+  expect(db.query).not.toHaveBeenCalled();
+  expect(http).not.toHaveBeenCalled();
+ });
+ it('payment-wide finality without success of the exact signed item cannot pass',async()=>{
+  const db=fakeDb(),http=fakeFetch();
+  const result=await executor(db,http,{readbackInspector:vi.fn(async()=>({
+   kind:'full_cancel_shape_observed',
+   providerReadbackFromAuthenticatedGet:true,
+   originalPaymentMatched:true,shapeConsistent:true,
+   matchedCancellationIdObserved:false,
+   observedCancelledTotalMinor:8900,
+   observedMatchingCancellationStatus:null,
+   observedMatchingSucceededCancellationMinor:null,
+   refundExecutionAuthorized:false,entitlementRevocationAuthorized:false,
+  }))});
+  expect(result.kind).toBe('inconsistent_provider_readback');
+  expect(db.query.mock.calls.some(([sql])=>sql===EVENT_AUDIT)).toBe(false);
+ });
+ it('full-cancellation notification cannot use a merely partial GET result',async()=>{
+  const http=fakeFetch({
+   ...PAID,status:'PARTIAL_CANCELLED',
+   amount:{paid:8900,cancelled:3000},
+   cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:3000}],
+  });
+  const result=await executor(fakeDb(),http);
+  expect(result.kind).toBe('inconsistent_provider_readback');
+  expect(result.grantRevocationAuthorized).toBe(false);
+ });
+ it('older partial notice with exact successful item remains review-only after later full cancellation',async()=>{
+  const http=fakeFetch({
+   ...PAID,cancellations:[
+    {id:CANCEL,status:'SUCCEEDED',totalAmount:3000},
+    {id:'later-cancel',status:'SUCCEEDED',totalAmount:5900},
+   ],
+  });
+  const result=await executor(fakeDb(),http,{
+   request:signedRequest('Transaction.PartialCancelled'),
+  });
+  expect(result).toMatchObject({
+   kind:'full_cancel_review_candidate',providerGetObserved:true,
+   fullRefundExecutionAuthorized:false,grantRevocationAuthorized:false,
+   entitlementEffectEligible:false,writesPerformed:false,
+  });
+ });
  it('invalid signature is denied before DB and network',async()=>{
   const db=fakeDb(),http=fakeFetch();
   const request=signedRequest();

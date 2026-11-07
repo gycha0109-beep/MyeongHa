@@ -778,3 +778,10 @@
 - **실패 근거:** [PR #3090 핵심 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367049323/job/128387240283)는 기존 Reader 통합 fixture의 구매 Subject를 이미 활성 인증 Member로 만들었는데, 연결 테스트가 과거 Guest 구매를 가정하고 그 Subject에 다시 Guest→Member promotion을 시도하여 `guest promotion requires an active unmerged guest subject` 오류로 중단됐습니다. 같은 HEAD에서 PostgreSQL15 개별 결제·권한·콘텐츠·런타임 DB 트랙, Governance 및 Web 검사는 통과했습니다.
 - **수정:** 비운영 Reader 구매-Chat 연결 fixture에서 역사적 Guest 구매 재현용 임의 Guest Session/Promotion을 제거하고, 원본 구매 주체가 정확한 활성 Member/Auth ID 그대로인지 검사합니다. Reader Grant·Thread/Bundle·타 구매권 독립성 검증은 유지합니다.
 - **경계:** Guest 무료 이용과 과거 Guest-owned 금융 기록 보존은 건드리지 않습니다. DB 스키마·실제 Checkout·금융 기록·Provider/환불 POST·LIVE 노출을 변경하지 않았으며, 새 CI 통과 전 PASS 미선언입니다.
+
+
+### 2026-11-07 — 취소 웹훅 원본 ID별 PortOne GET 성공 증거 대조 보강
+
+- **근거:** 공식 PortOne V2 취소 웹훅은 결제 전체 식별자 외에 개별 `cancellationId`를 제공합니다. 이전 read-only 재조합은 결제 전체의 `CANCELLED/PARTIAL_CANCELLED` 상태를 믿었으나, 서명된 **정확한 취소 ID**가 실제 GET에서 `SUCCEEDED`인지와 개별 취소 금액·누적 금액을 필수로 검사하지 않았습니다.
+- **구현:** `commerce-signed-cancellation-private-reconciliation-v1.mjs`에 서명 알림의 취소 ID 의무화, GET 결과의 동일 취소 ID/상태/정수 금액/원본 Receipt 금액 대조를 추가했습니다. 완전취소 알림을 부분취소 조회 결과로 잘못 채택하는 경우도 HOLD합니다. 후속 완전 취소 때문에 오래된 정상 부분취소 알림이 재전달되는 사례는 개별 ID 성공 금액이 일치할 때 비권한 검토 결과로만 허용합니다.
+- **검증·경계:** 내부 비운영 mock 회귀 4건 추가. Provider Event 기록기, 원본 Receipt·Grant·환불 데이터, 공개 API·웹훅 연결·실제 취소/환불 POST·운영 DB·판매 활성화는 변경하지 않습니다. 정확한 공급자 이벤트 순서 및 권한 회수 허가를 추정하지 않으며, 전체 CI 이전 PASS 미선언입니다.
