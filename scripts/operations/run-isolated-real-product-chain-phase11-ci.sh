@@ -25,7 +25,7 @@ docker compose version >/dev/null || fail 'Docker Compose v2 missing.'
 experiment="${MH_OPS_REAL_PRODUCT_EXPERIMENT:-short}"
 export COMPOSE_PROFILES= MH_OPS_AUTH_JWT_EXP_SECONDS=300
 case "$experiment" in
-  short|workerd) ;;
+  short|workerd|workerd_db_failover) ;;
   workerd_overlap) MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   sustained|overlap) COMPOSE_PROFILES=sustained; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   saju_cpu) COMPOSE_PROFILES=sustained,cpu-pressure; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
@@ -145,7 +145,7 @@ if [[ "$experiment" != short && "$experiment" != workerd && "$experiment" != wor
   fi
 fi
 
-if [[ "$experiment" == workerd || "$experiment" == workerd_overlap ]]; then
+if [[ "$experiment" == workerd || "$experiment" == workerd_overlap || "$experiment" == workerd_db_failover ]]; then
   npm install --prefix "$scratch/wrangler" --ignore-scripts --no-audit --no-fund --save-exact \
     wrangler@4.152.0 >"$scratch/wrangler-install.log" 2>&1 || fail 'Pinned Wrangler installation failed.'
   export MH_OPS_WORKERD_WRANGLER_ENTRY="$scratch/wrangler/node_modules/wrangler/bin/wrangler.js"
@@ -161,7 +161,7 @@ if ! ./node_modules/.bin/vitest run test/ops/product-saju-isolated-pg18-phase11.
   # The raw test output is deliberately private because it can contain
   # randomized GoTrue credentials/UUIDs or a PostgreSQL exception payload.
   # Report only recognized, controlled stage labels, never raw lines or paths.
-  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|workerd_runtime|workerd_requests|workerd_saju_outage|workerd_saju_recovery|workerd_sustained_overlap|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
+  stage_pattern='MYEONGHA_REAL_CHAIN_FAILURE_STAGE: (member_signup|isolated_pg18_start|subject_rls_map|real_saju_start|api_setup|workerd_runtime|workerd_requests|workerd_saju_outage|workerd_saju_recovery|workerd_db_outage|workerd_db_health|workerd_db_recovery|workerd_sustained_overlap|baseline_requests|contended_requests|anonymous_and_health|sustained_baseline|sustained_concurrent|sustained_overlap|cpu_reference|cpu_pressure|post_pressure_recovery|runtime_cleanup|proof_write|complete)'
   if grep -Eq "$stage_pattern" "$scratch/vitest.log"; then
     stage="$(grep -oE "$stage_pattern" "$scratch/vitest.log" | tail -n 1)"
     echo "::error title=Isolated three-dependency failure stage::$stage" >&2
@@ -173,7 +173,7 @@ fi
 grep -F '1 passed' "$scratch/vitest.log" >/dev/null ||
   fail 'Exactly one real integrated test required.'
 [[ -s "$scratch/real-product.json" ]] || fail 'Actual private evidence not created.'
-if [[ "$experiment" == workerd || "$experiment" == workerd_overlap ]]; then
+if [[ "$experiment" == workerd || "$experiment" == workerd_overlap || "$experiment" == workerd_db_failover ]]; then
   jq -e --arg sha "$source_sha" --arg experiment "$experiment" '
     .schema=="myeongha-ops-workerd-local-product-phase11-v1" and .status=="OBSERVED_ISOLATED_WORKERD_PRODUCT"
     and .scope=="wrangler-local-loopback-go-true-pg18-and-pinned-saju" and .wranglerVersion=="4.152.0"
@@ -196,9 +196,21 @@ if [[ "$experiment" == workerd || "$experiment" == workerd_overlap ]]; then
       and .workerdWindow.p99Ms>=.workerdWindow.p95Ms
       and .workerdWindow.sajuResourceCgroupConstrained==false
     else .workerdWindow==null end)
-    and .sajuOutage.calculationStatus==503 and .sajuOutage.healthStatus==200
-    and (.sajuOutage.recovery | .requested==4 and .concurrency==4 and .successful==4
-      and .unavailable==0 and .unexpected==0)
+    and (if $experiment == "workerd_db_failover" then
+      .sajuOutage==null and .workerdWindow==null
+      and .dbOutage.realPostgresProcessStopped==true
+      and .dbOutage.localPoolOnlyNoHostedHyperdrive==true
+      and .dbOutage.requested==4 and .dbOutage.unavailable==4
+      and .dbOutage.unexpected==0 and .dbOutage.healthStatus==200
+      and .dbOutage.recoveryAttempts>=1 and .dbOutage.recoveryAttempts<=8
+      and (.dbOutage.recovery | .requested==4 and .concurrency==4
+        and .successful==4 and .unavailable==0 and .unexpected==0)
+    else
+      .dbOutage==null and .sajuOutage.calculationStatus==503
+      and .sajuOutage.healthStatus==200
+      and (.sajuOutage.recovery | .requested==4 and .concurrency==4 and .successful==4
+        and .unavailable==0 and .unexpected==0)
+    end)
     and .actualGoTrueJwtVerified==true and .actualPostgres18Rls==true and .actualPinnedSajuProductionEngine==true
     and .localWorkerdProductPathMeasured==true and .anonymousDenied==true and .healthUnaffected==true
     and .runtimeCleanupVerified==true and .productionWorkerAdmissionMeasured==false and .hostedHyperdriveMeasured==false
