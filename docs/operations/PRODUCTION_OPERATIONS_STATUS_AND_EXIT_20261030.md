@@ -1,3 +1,12 @@
+### 2026-11-08 KST — 개인정보 원장 GREEN 기록 PR #3119의 main 병합 충돌 정리
+
+- **목표:** 기존 성공한 원장 캡처/감시기 RED→GREEN 작업 기록 [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119)을, 이후 main에 병합된 Phase 11 기록과 충돌 없이 통합한다. 누락된 기록을 삭제하거나 재실행 완료로 간주하지 않는다.
+- **변경 파일:** 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` 하나. 원장 캡처/감시기 코드와 워크플로는 수정 없음.
+- **완료:** PR #3119 본래의 RED→GREEN 실증(암호화 artifact `13582736761`, 감시 [#42393589367 Attempt 2](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42393589367) SUCCESS)을 이전 본문 그대로 보존하고, 최신 `main@7c3a0aa7218700da440900d8278d944742af9532`의 운영 워크로그를 유지한다.
+- **브랜치·커밋·PR:** `ops/privacy-ledger-freshness-recovery-20261108`, 충돌 전 HEAD `e220e0dce3bcd6c621c4c8b357a2b3f823fd27d9`, 기준 main `7c3a0aa7218700da440900d8278d944742af9532`, [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119). 본 통합은 두 부모를 가진 한 커밋으로 갱신한다.
+- **테스트/CI:** 이전 커밋의 CI/Governance/Web Gates는 SUCCESS였으나 이 새 통합 HEAD의 결과는 아직 미확인. 필수 Integration 확인 후 자동 병합. 실제 원장 재실행은 해당 Attempt 2로 이미 검증돼 불필요하게 반복하지 않음.
+- **미완료·블로커·다음:** 시간당 정기 캡처의 장기 지속성, nonzero 삭제·철회 연속성 및 Phase 8 Hosted 복구/RPO/RTO는 미완료. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 새 CI 종료·병합 확인 뒤 다음 남은 운영 차단을 처리한다. Production 변경·유료 Hosted 자원·canary 없음.
+
 ### 2026-11-08 KST — 개인정보 복구 원장 freshness RED 실측 원인 및 재캡처 GREEN 확인
 
 - **작업 목표/로드맵:** 종료 집중 로드맵 Gate 1 / Phase 8-C의 기존 `7,200초` 암호화 원장 캡처 freshness 차단을 정상 원장 캡처와 원래 검사 재실행으로 복구한다. 사용자 지정 [실패 Actions #42393589367 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42393589367) / source main `e164f7cc1e6d12d5667592ca998de3ed1240422b`를 근거로 한다.
@@ -6,6 +15,15 @@
 - **변경 파일/브랜치·커밋·PR:** 이 단위의 유일한 저장소 변경은 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` WORKLOG의 본 기록이다. 브랜치 `ops/privacy-ledger-freshness-recovery-20261108`, 최초 WORKLOG 커밋 `3d38785d86bd9d6bc5f84f4e015fa7f26316391a`, [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119). 별도 신규 WORKLOG를 만들지 않는다. `.github/workflows/production-postgres-privacy-recovery-ledger.yml`의 기존 시간당 `47 * * * *` 캡처와 `scripts/operations/check-privacy-ledger-completion-freshness.mjs`의 2시간 fail-closed 기준은 정상 동작하므로 **코드·임계치 변경 없이** 실제 캡처와 검사만 재실행했다.
 - **완료와 미완료 구분:** **현재 원장 업로드 freshness 점검만 GREEN**. 이벤트 수, 원장 독립 내구성·누락 없는 삭제/철회 연속성, 최신 backup과 같은 복구 묶음, provider Auth/Storage full restore, 전 서비스 RPO/RTO는 **미증명**. Attempt 2의 sanitized 출력도 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `approvedRpoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`. P0 #1887 OPEN 유지. 일정대로 후속 캡처가 실행되는지는 감시를 계속해야 하며 단일 복구로 scheduler 신뢰성을 완료 판정하지 않는다.
 - **블로커·다음 작업:** 이 WORKLOG 변경의 필수 GitHub PR CI/통합 검증·병합은 본 기록 작성 시점 미완료. 후속 원장 캡처 공백 재발 여부와 Phase 8 독립 개인정보 연속성·Hosted 복구 근거를 로드맵 내에서 처리한다. 실제 Production DML/DDL, 마이그레이션 수정, 신규 유료 Hosted 환경, Production privacy canary, 비밀/IAM/트래픽 변경은 이 단위에 포함하지 않았다.
+
+### 2026-11-08 KST — Phase 11 local workerd 실제 DB 장애/복구 시나리오 누락 구현 및 실행 경로 수정
+
+- **작업 목표/기준:** 종료 집중 로드맵 Gate 2 / Phase 11의 미검증 조합인 **실제 격리 PostgreSQL 18 중지 → 계산 요청 bounded-fail/Health 독립 → 같은 DB 재시작 후 인증 계산 복구**를 증명할 수 있도록 기존 Linux GoTrue + PG18 + pinned Saju + local workerd 제품 경로에 연결한다. [과거 900초/3,600건 성공 #42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347)과 이미 통과한 Saju 중단·복구는 반복하지 않는다.
+- **변경 파일:** `test/ops/product-saju-isolated-pg18-phase11.test.mjs`(실제 DB 중단/재시작·인증 오류/복구 검사), `scripts/operations/run-isolated-real-product-chain-phase11-ci.sh`(신규 실험 분기 및 기존 Saju 직접 실행 방식 유지·결과 안전 검사), `.github/workflows/postgres-isolated-rls-capacity-acceptance.yml`(main 전용 한 번의 격리 실행), `.github/ops/phase11-workerd-db-failover-20261108.once`(검토된 일회용 실행 표시), `test/ops/postgres-isolated-rls-capacity-manual-ci.test.ts`(워크플로와 Saju 호스트 선택 회귀 검사), **본 기존 운영 WORKLOG**. 앞선 개별 중복 파일 `docs/operations/WORKLOG_PHASE11_WORKERD_DB_FAILURE_RECOVERY_20261108.md`는 이 기존 문서로 통합해 제거한다.
+- **완료한 구현:** PostgreSQL 실제 프로세스를 `pg_ctl -m fast`로 종료한 뒤 4개 인증 계산이 503, Health가 200임을 요구하고, 동일한 격리 DB를 재시작한 뒤 4개 계산의 회복을 제한된 재시도 안에서 요구한다. 기존 Workerd overlap/Saju outage 경로를 유지하며 Production 및 Hosted Hyperdrive, 외부 사용자 데이터 접근은 없다. **이번 세부 수정:** 새 DB 장애 실험이 실수로 별도 제약형 Saju Docker 컨테이너를 띄우던 조건을 수정해, 반드시 기존 직접 실행 Saju 호스트를 유지하도록 고정했다(코드 커밋 `932fb13aba1e328dd698748e16f1be7a57b75e68`, 테스트 보강 `e8210943bb2a8c7ea28f1c5297afb636cf58a5a0`).
+- **브랜치·커밋·PR:** `ops/phase11-workerd-db-failover-20261108`, 구현 시작 `4818b2fe4e45d6ac222c4cf941c1c51a6513110c`, 후속 수정 `932fb13aba1e328dd698748e16f1be7a57b75e68` / `e8210943bb2a8c7ea28f1c5297afb636cf58a5a0`, [PR #3117](https://github.com/gycha0109-beep/MyeongHa/pull/3117). 본 WORKLOG 변경 및 중복 기록 정리는 동일 PR 후속 커밋으로 추적한다.
+- **검증·CI 근거:** 앞선 PR HEAD `43e1c8f198c2945308ccff3cc578693a2a0e1c7c`에 대한 [일반 CI #42392632675](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42392632675) / Governance / Web Domain Gate SUCCESS. **이 결과를 이후 수정 HEAD의 통과로 승격하지 않는다.** 기존 [필수 전체 통합 CI #42392828572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42392828572)는 당시 대기 중이었으며, 수정된 최신 HEAD는 새 CI·필수 Integration 재검증이 필요하다. PostgreSQL 18 `pg_ctl fast` 및 Cloudflare local Hyperdrive 설정은 현재 제공자 문서로 재확인했다. 실제 main-only 일회용 Linux 장애 시험의 SUCCESS·artifact는 **아직 없음**.
+- **남은 작업·블로커·다음:** 최신 HEAD 일반 CI→전역 필수 `CI Integration Verify`→보호된 main 병합→일회용 격리 DB 장애 시험의 실제 실행·개인정보 없는 evidence/cleanup 확인 순으로 진행한다. 현재 Gate 1/Phase 8의 Hosted Auth·Storage 동등 복원, 개인정보 삭제·철회 독립 연속성, 전체 서비스 RPO/RTO 및 Gate 4/Phase 13 최종 검증은 남아 있다. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN. Production DDL/DML, canary, secret/IAM, 유료 Provider 프로젝트, Production 부하는 이번 변경에 포함하지 않는다.
 
 ### 2026-11-08 KST — Phase 8-A 저장소 전용 Commerce 2건의 현행 객체·권한 영향 읽기 전용 대조
 
