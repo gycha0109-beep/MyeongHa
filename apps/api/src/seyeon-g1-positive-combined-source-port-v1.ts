@@ -17,7 +17,7 @@ const hash=(v:unknown):string=>'sha256:v1:'+createHash('sha256')
 const hold=():never=>{throw Error('G1 combined original model source Pin unavailable');};
 
 export const SEYEON_G1_COMBINED_SOURCE_PIN_V1=Object.freeze({
-  sql:'seyeon_private.pin_positive_model_context_sources_v1',
+  sql:'public.cmd_pin_seyeon_positive_model_context_sources_v1',
   productionMounted:false,permitsProvider:false,
   permitsAtomicCommit:false,permitsHttpReveal:false,
 } as const);
@@ -74,7 +74,7 @@ export async function pinSeyeonG1CombinedModelSourcesV1(
     ||hash(model)!==m.selectedModelMessageDigest)throw Error('G1 current model text mismatch');
 
   const result=await client.query<{proof:unknown}>(`
-select seyeon_private.pin_positive_model_context_sources_v1(
+select public.cmd_pin_seyeon_positive_model_context_sources_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::jsonb,$7::text,
   $8::uuid,$9::uuid,$10::text,$11::text,$12::text,$13::text,$14::text,
   $15::text,$16::text
