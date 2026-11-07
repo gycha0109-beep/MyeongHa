@@ -1,3 +1,13 @@
+### 2026-11-07 / Phase 8-A — 버전 이동 8쌍 현재 객체·접근 경계 읽기 전용 대조
+
+- **작업 목표:** 로드맵 8-A의 동일 이름/다른 버전 8쌍에 대해 이미 확보된 SQL 본문 비교에서 한 걸음 더 나아가 현재 Production 객체 이름·일부 접근 권한을 실제 카탈로그로 대조. 전수 DDL/ACL parity·배포 provenance를 주장하지 않는다.
+- **변경 파일:** `scripts/operations/production-version-shift-catalog-presence-readonly.sql`(재현 가능한 읽기 전용 SQL), `docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json`(비식별 카탈로그 결과), 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` WORKLOG. Runtime/실행 코드/Production SQL migration/Workflow 변경 0.
+- **완료:** PostgreSQL `17.6`, `transaction_read_only=on` 확인. [기존 2026-11-07 버전 이동 8쌍](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json)의 소스 SQL에서 선별한 함수 8/8, 테이블 2/2, 제약조건 3/3 이름이 현재 카탈로그에 존재. 함수의 `anon`/`authenticated`/`service_role` 실행 허용 0/8, `myeongha_api_executor` 실행 허용 5/8. 선별한 테이블 2개 모두 RLS 활성/정책 0, 조사한 역할의 직접 DML 접근은 없음.
+- **미완료·증거 한계:** SQL의 일부 이름 및 현재 effective privilege만 확인. 함수 오버로드·본문·owner/role graph·GRANT provenance·constraint 표현식·Provider migration ledger·전체 DDL/ACL·복원 동등성은 미검증. Phase 8-A 41 remote-only 및 76 repo-only 실질 출처/효과, Phase 8-B/C/D Hosted/Privacy/RPO-RTO 모두 BLOCKED.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 기준 `main@d4053b4df5d252743fc136a9ee65996f7920e0e2`; 이 3개 파일을 동일 커밋에 반영, PR·최종 HEAD/CI는 생성 후 기록한다.
+- **테스트·CI 근거:** 연결된 명하 Production PG17의 `pg_proc`, `pg_namespace`, `pg_class`, `pg_constraint`, `pg_policy`를 SELECT-only 질의해 함수 8/8·테이블 2/2·제약조건 3/3 및 역할 실행/직접 DML 결과 확보; 트랜잭션 read-only 확인. 기존 source version 8쌍은 sanitized 원장 자료에서 검증. 신규 커밋 CI 결과는 아직 미확인.
+- **블로커·다음 작업:** 읽기 전용 실측은 완료, 실제 full SQL/DDL/ACL/provenance 증명은 계속 필요. Production repair/DDL/DML, Hosted DR 자원, 개인정보 Canary, secret/Provider/traffic 변경은 범위별 사용자 승인 전 실행 금지. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
 ### 2026-11-07 KST — DR Governance 회귀 RED→GREEN 및 WORKLOG 최종 근거 갱신
 
 - **기존 미완료 작업:** Production Operations [종료 집중 로드맵](PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md) Gate 1 / Phase 8에서 진행 중이던 PostgreSQL DR 증거 정합성 및 post-merge CI 수용 확인. 이번 단위에서는 새 단계나 기능을 추가하지 않고 기존 WORKLOG PR [#3110](https://github.com/gycha0109-beep/MyeongHa/pull/3110)을 후속 실증에 맞춰 갱신함.
