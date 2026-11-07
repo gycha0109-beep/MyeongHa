@@ -61,11 +61,11 @@ function fixture(options:FixtureOptions={}){
       ...(overrides.method==='GET'?{}:{body:JSON.stringify(overrides.body??body)}),
     });
   }
-  // null is an explicit "no signing secret" test case. An omitted third
-  // argument alone uses the fixture's valid secret, as intended.
+  // null explicitly omits the optional key from the server options object.
+  // An omitted third argument retains the fixture's valid signing secret.
   const run=(req=request(),enabled=true,signingKey:string|null=secret)=>handle({request:req,
     identityEvidenceVerifier:verifier,pool:pool as unknown as PostgresSubjectPoolV1,
-    enabled,idempotencySecret:signingKey??undefined});
+    enabled,...(signingKey===null?{}:{idempotencySecret:signingKey})});
   return {pool:pool as unknown as PostgresSubjectPoolV1,verifier,queries,request,run};
 }
 describe('buyer exact paid Reader withdrawal intake',()=>{

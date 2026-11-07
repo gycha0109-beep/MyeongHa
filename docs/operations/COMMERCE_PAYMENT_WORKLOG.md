@@ -999,3 +999,12 @@
 - **변경 파일:** `test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`. **실제 수정:** 테스트 fixture의 서명 키 인자에 `null`을 명시적 누락값으로 허용하고, 이 경우 실제 서버 입력에 `undefined`를 넘깁니다. GET/POST 회귀를 모두 `null`로 호출해 각각 200/503을 정확히 검증하며, 지나치게 짧은 secret을 입력하는 부정 테스트를 추가합니다. 정상 fixture의 기본 secret 및 생산 서버·모바일 구현은 변경하지 않습니다.
 - **완료/미완료·검증:** 실패 원인에 일대일 대응하는 테스트/WORKLOG 수정 및 원자 커밋 준비 완료. 새 HEAD의 CI 결과는 **미확인**, PASS 선언 금지. 로드맵의 Provider 최신 순서·Reader T2 원자 회수·실제 공급/삭제 복원과 전체 E2E는 미완료입니다.
 - **블로커·다음 작업:** 신규 CI를 확인해 실패하면 해당 근거로 추가 수정, 통과하면 기존 승인 로드맵의 남은 실제 연결을 구현합니다. 실제 PortOne POST 환불, 운영 DB 수정, 공개 LIVE 및 판매 활성화 미실행. 승인 필요 없음.
+
+### 2026-11-08 — 서명 키 누락 검사 선택적 필드 타입 오류 수정
+
+- **목표/승인 로드맵:** `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6-3·5. 고객 청약철회 요청의 서명 키 누락(GET 허용·POST 거부) 회귀가 TypeScript 컴파일과 테스트를 모두 통과하도록 바로잡습니다.
+- **브랜치·기준 커밋·PR:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, 수정 전 `f636cdbaa57dd4dad627f8939ec76e6698cd8e1a`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090) open 및 auto-merge 설정 유지.
+- **CI 실패 증거:** 이전 [run #42402843095](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402843095/job/128494278492?pr=3090)의 1건 테스트 실패는 `f636cdba`에서 fixture 기본값 문제를 수정했습니다. 하지만 해당 수정 커밋의 새 [run #42404894438, Work Track · commerce](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42404894438/job/128500402737)에서 `test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts:66`의 **TS2379**(`exactOptionalPropertyTypes`) 오류로 'Check shared TypeScript consumers' 실패를 확인했습니다. 원인은 선택적 `idempotencySecret?:string` 속성에 `string|undefined`를 명시적으로 할당한 테스트 객체였습니다. DB core·PostgreSQL17·결제/권한·웹·모바일 개별 CI는 통과했지만 전체 CI는 실패입니다.
+- **변경 파일:** `test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`. 정상 서명 키를 입력할 때만 `idempotencySecret` 속성을 객체에 펼쳐 넣고, `null` 테스트 입력에서는 **속성 자체를 제거**합니다. 서버의 서명 검증·계정 조회·운영 설정 코드는 변경하지 않습니다.
+- **테스트 및 완료/미완료:** 로그와 정확한 컴파일 오류를 대조하고 해당 타입 원인에 국한하여 수정했습니다. GET의 키 부재·POST의 키 부재/짧은 키 거부 회귀는 유지됩니다. 새 커밋의 GitHub CI·TypeScript·Vitest 결과는 아직 미확인, PASS 선언 금지. Provider 최신 순서, Reader/T2 실제 회수, 실제 제공 입증, 복원 개인정보 삭제 및 격리 전체 E2E는 여전히 미완료입니다.
+- **블로커/다음:** 새 CI에서 TypeScript/Commerce·PostgreSQL17/CI Verify 확인 후 실패 시 수정, 통과 시 승인 로드맵의 다음 미완료 연결 구현. 실제 PG 환불 POST, 운영 DB 변경, 공개 LIVE·판매 활성화 없음. 별도 사용자 승인 필요 없음.
