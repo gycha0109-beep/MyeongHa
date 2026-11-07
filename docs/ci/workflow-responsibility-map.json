@@ -26,6 +26,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "character-runtime-taegyeom-comparison-v2.yml": {
+      "responsibility": "isolated-taegyeom-glm-natural-korean-and-persona-output-shape-comparison",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "character-runtime-taegyeom-12case-v1.yml": {
       "responsibility": "isolated-taegyeom-public-synthetic-glm-runtime-dialogue-evaluation",
       "prMode": "none",
