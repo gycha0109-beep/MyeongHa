@@ -963,3 +963,13 @@
 - **완료·미완료:** 이번 원본 취소 signed provenance의 사설 후행 재조회 안전 결속, 회귀, 기록 반영 완료. 신뢰 가능한 Provider NEWER/STALE 비교, 법적 소비자 콘텐츠 제공 입증, 실제 Reader T2 잠금·Entitlement Effect 원자 회수, 개인정보 복원 실제 삭제 실증 및 통합 E2E는 계속 미완료입니다.
 - **다음·블로커:** 신규 CI 실패 시 즉시 수정; 성공 시 승인 로드맵의 다른 미완료 서비스 연결로 진행. 운영 DB/실제 PortOne 환불 POST/공개 LIVE는 실행하지 않았습니다. 사용자 승인 요청 없음.
 
+### 2026-11-08 — 고객 청약철회 환불 후보 조회·운영자 결정의 실행계정 경계 일치
+
+- **목표/로드맵:** 승인된 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6의 3번(고객 Claim→내부 증거 검토), 2번(승인된 정확한 환불·권한 효과 연결) 및 5번(차단 사례 검증). 고객 청약철회 Claim을 조회해 수동 환불 후보를 고르는 내부 운영자 경로와 법적 환불 결정을 기록하는 기존 경로 모두 **완전 조회 권한만으로는 실행되지 않도록** 변경합니다.
+- **브랜치/PR/작업 기준:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 변경 전 커밋 `54316ff034edbfa322a3331494db54bbac7eadd9`. [해당 커밋의 전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42395412719)에서 Commerce/PG17/DB core/commerce-payment/entitlement/CI Verify 및 Web/Auth/Governance 모두 PASS. PR open, 자동 병합 on.
+- **변경 파일:** `apps/api/src/commerce-reader-withdrawal-operations-review-v1.ts`, `apps/api/src/commerce-reader-private-refund-decision-v1.ts`, `test/commerce-reader-withdrawal-operations-review-v1.test.ts`, `test/commerce-reader-private-refund-decision-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** `readPrivilegedReaderWithdrawalCaseV1`(원본 Claim→정확한 수동 Receipt 후보)과 `recordOwnerApprovedReaderFullRefundDecisionV1`(법적 결론을 영속 기록하는 기존 내부 쓰기 실행기)의 권한 SQL에 `current_user` 검증을 연결했습니다. 서비스·일반 인증·API·worker·커머스 내부 executor 등 이미 다른 Claim 운영 검토기에서 차단한 역할과 NULL/공백 이름은 **고객 원본 Claim 조회 또는 INSERT 이전**에 동일하게 거부합니다. 기존 완전 가시성·읽기 전용/쓰기 전용 트랜잭션 조건과 ROLLBACK, 기존 운영자 실행 경로 및 별도 법적 결정·원본 영수증 선택·환불 POST 분리는 보존합니다.
+- **검증·테스트:** 해당 두 테스트 파일에 각 8개 역할 거부 사례를 추가하고, 원본 청약철회 Claim/영수증 조회 또는 환불 결정 INSERT가 호출되지 않으며 ROLLBACK으로 종료되는지 검증합니다. 결제 PG 실제 POST, 공개 라우트, 스키마·Entitlement Effect·LIVE 변경은 없습니다. **새 커밋 공식 CI/PostgreSQL17/TypeScript 검증은 미확정이며 PASS 미선언**입니다.
+- **완료·미완료:** 내부 환불 검토/운영자 결정의 일반 실행계정 차단과 회귀·워크로그 반영 완료. 운영자 명단/법적 승인 증명은 이 검사만으로 해결되지 않으며 기존 별도 법적 검토가 필수입니다. Provider 순서 판정, 실제 Reader/T2 원자적 권한 회수, 고객 Reading 실제 제공 증명, 복원 DB 개인정보 삭제 실증 및 전체 E2E는 미완료입니다.
+- **다음/블로커:** 신규 CI를 확인해 실패 시 해당 오류를 수정하고, 통과하면 승인 로드맵의 취소·정확한 권한 회수 또는 실제 제공·청약철회 경로의 미완료 항목을 이어갑니다. 운영 DB·실제 PG 환불 POST·공개 LIVE 실행 없음; 승인 요청 없음.
+
