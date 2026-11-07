@@ -1,3 +1,12 @@
+### 2026-11-08 KST — 기존 Phase 8-A 버전 이동 8쌍 PR #3113 main 변경 충돌 재정렬
+
+- **작업 목표/로드맵:** Gate 1/Phase 8-A의 과거 version-shift 8쌍 현재 권한·객체 검사 PR을 최신 main에 맞춰 **충돌 없이** 병합 가능한 형태로 고친다. 이미 확인한 Production SELECT-only 관측은 중복 실행하지 않는다.
+- **변경 파일:** 원래 PR의 `scripts/operations/production-version-shift-catalog-presence-readonly.sql`, `docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json` 두 비식별 원본 파일 blob은 변형 없이 유지하고, 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`의 **중간에 추가된 모든 main 기록을 유지**하며 PR 고유 기록을 합친다.
+- **완료:** 8함수·2테이블·3제약조건 이름/선별 권한 관측 및 한계는 보존; 이 결과만으로 모든 DDL/ACL/마이그레이션 출처나 Hosted 복구 동등성이 증명되었다고 하지 않는다.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 이전 HEAD `a7525f4b60f06c6e19df4201e8474804e14ba07d`, 병합 기준 `main@7c3a0aa7218700da440900d8278d944742af9532`, [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 해결 작업은 기존 HEAD+main 두 부모 commit과 기존 Worklog를 함께 갱신한다.
+- **테스트·CI:** 지난 HEAD [CI #42395112736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42395112736) / Governance #42395112596 / Web #42395112676 SUCCESS. 새 HEAD의 CI/필수 Integration 성공은 **확인 전**이고, 신규 SQL 관측을 실행하지 않았다.
+- **미완료·블로커·다음:** 본 PR 새 CI·통합 검사·보호된 main 병합 검증; Phase 8-B Hosted Auth/Storage, 8-C 독립 개인정보 연속성, 8-D 전체 RPO/RTO, Phase 13 수용. P0 #1887 OPEN, `dr_ready=false`, `serviceResumptionAllowed=false`. 사용자 별도 승인 전 Production 변경/유료 복구 자원/실제 개인정보 카나리 없음.
+
 ### 2026-11-08 KST — Phase 8-A 버전 이동 8쌍의 기존 PR 병합 충돌 해소
 
 - **목표:** [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113)의 2026-11-07 읽기 전용 객체·접근 경계 조사(8쌍)를 최신 운영 WORKLOG와 합쳐, 기존 조사 누락 없이 보호된 main으로 병합 가능하도록 만든다.
@@ -16,6 +25,15 @@
 - **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 기준 `main@d4053b4df5d252743fc136a9ee65996f7920e0e2`; 읽기 전용 SQL·증거 JSON·기존 WORKLOG 최초 공동 커밋 `e833173a3e9501df524f7745d75caa6e28980ae3`; [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 PR의 최종 HEAD·CI 및 병합 후 증거는 확인 전 미판정.
 - **테스트·CI 근거:** 연결된 명하 Production PG17의 `pg_proc`, `pg_namespace`, `pg_class`, `pg_constraint`, `pg_policy`를 SELECT-only 질의해 함수 8/8·테이블 2/2·제약조건 3/3 및 역할 실행/직접 DML 결과 확보; 트랜잭션 read-only 확인. 기존 source version 8쌍은 sanitized 원장 자료에서 검증. 신규 커밋 CI 결과는 아직 미확인.
 - **블로커·다음 작업:** 읽기 전용 실측은 완료, 실제 full SQL/DDL/ACL/provenance 증명은 계속 필요. Production repair/DDL/DML, Hosted DR 자원, 개인정보 Canary, secret/Provider/traffic 변경은 범위별 사용자 승인 전 실행 금지. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
+### 2026-11-08 KST — Phase 11 local workerd 실제 DB 장애/복구 시나리오 누락 구현 및 실행 경로 수정
+
+- **작업 목표/기준:** 종료 집중 로드맵 Gate 2 / Phase 11의 미검증 조합인 **실제 격리 PostgreSQL 18 중지 → 계산 요청 bounded-fail/Health 독립 → 같은 DB 재시작 후 인증 계산 복구**를 증명할 수 있도록 기존 Linux GoTrue + PG18 + pinned Saju + local workerd 제품 경로에 연결한다. [과거 900초/3,600건 성공 #42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347)과 이미 통과한 Saju 중단·복구는 반복하지 않는다.
+- **변경 파일:** `test/ops/product-saju-isolated-pg18-phase11.test.mjs`(실제 DB 중단/재시작·인증 오류/복구 검사), `scripts/operations/run-isolated-real-product-chain-phase11-ci.sh`(신규 실험 분기 및 기존 Saju 직접 실행 방식 유지·결과 안전 검사), `.github/workflows/postgres-isolated-rls-capacity-acceptance.yml`(main 전용 한 번의 격리 실행), `.github/ops/phase11-workerd-db-failover-20261108.once`(검토된 일회용 실행 표시), `test/ops/postgres-isolated-rls-capacity-manual-ci.test.ts`(워크플로와 Saju 호스트 선택 회귀 검사), **본 기존 운영 WORKLOG**. 앞선 개별 중복 파일 `docs/operations/WORKLOG_PHASE11_WORKERD_DB_FAILURE_RECOVERY_20261108.md`는 이 기존 문서로 통합해 제거한다.
+- **완료한 구현:** PostgreSQL 실제 프로세스를 `pg_ctl -m fast`로 종료한 뒤 4개 인증 계산이 503, Health가 200임을 요구하고, 동일한 격리 DB를 재시작한 뒤 4개 계산의 회복을 제한된 재시도 안에서 요구한다. 기존 Workerd overlap/Saju outage 경로를 유지하며 Production 및 Hosted Hyperdrive, 외부 사용자 데이터 접근은 없다. **이번 세부 수정:** 새 DB 장애 실험이 실수로 별도 제약형 Saju Docker 컨테이너를 띄우던 조건을 수정해, 반드시 기존 직접 실행 Saju 호스트를 유지하도록 고정했다(코드 커밋 `932fb13aba1e328dd698748e16f1be7a57b75e68`, 테스트 보강 `e8210943bb2a8c7ea28f1c5297afb636cf58a5a0`).
+- **브랜치·커밋·PR:** `ops/phase11-workerd-db-failover-20261108`, 구현 시작 `4818b2fe4e45d6ac222c4cf941c1c51a6513110c`, 후속 수정 `932fb13aba1e328dd698748e16f1be7a57b75e68` / `e8210943bb2a8c7ea28f1c5297afb636cf58a5a0`, [PR #3117](https://github.com/gycha0109-beep/MyeongHa/pull/3117). 본 WORKLOG 변경 및 중복 기록 정리는 동일 PR 후속 커밋으로 추적한다.
+- **검증·CI 근거:** 앞선 PR HEAD `43e1c8f198c2945308ccff3cc578693a2a0e1c7c`에 대한 [일반 CI #42392632675](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42392632675) / Governance / Web Domain Gate SUCCESS. **이 결과를 이후 수정 HEAD의 통과로 승격하지 않는다.** 기존 [필수 전체 통합 CI #42392828572](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42392828572)는 당시 대기 중이었으며, 수정된 최신 HEAD는 새 CI·필수 Integration 재검증이 필요하다. PostgreSQL 18 `pg_ctl fast` 및 Cloudflare local Hyperdrive 설정은 현재 제공자 문서로 재확인했다. 실제 main-only 일회용 Linux 장애 시험의 SUCCESS·artifact는 **아직 없음**.
+- **남은 작업·블로커·다음:** 최신 HEAD 일반 CI→전역 필수 `CI Integration Verify`→보호된 main 병합→일회용 격리 DB 장애 시험의 실제 실행·개인정보 없는 evidence/cleanup 확인 순으로 진행한다. 현재 Gate 1/Phase 8의 Hosted Auth·Storage 동등 복원, 개인정보 삭제·철회 독립 연속성, 전체 서비스 RPO/RTO 및 Gate 4/Phase 13 최종 검증은 남아 있다. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN. Production DDL/DML, canary, secret/IAM, 유료 Provider 프로젝트, Production 부하는 이번 변경에 포함하지 않는다.
 
 ### 2026-11-08 KST — Phase 8-A 저장소 전용 Commerce 2건의 현행 객체·권한 영향 읽기 전용 대조
 
