@@ -257,6 +257,26 @@ describe('P4 exact Provider Event member of full current cancellation set',()=>{
   safe(result);
  });
 
+ it('requires the exact signed cancellation HMAC in the durable set before GET',async()=>{
+  const client=db(),fetchImpl=fetchFor();
+  const absent=await run(client,{
+    expectedCancellationIdHmac:H('unrelated-item'),fetchImpl,
+  });
+  expect(absent.kind).toBe('exact_signed_cancellation_not_in_verified_cancel_set');
+  expect(fetchImpl).not.toHaveBeenCalled();
+  expect(client.calls.filter(x=>x.sql===SQL)).toHaveLength(1);
+  safe(absent);
+ });
+ it('matches signed cancellation HMAC across both DB snapshots and full GET',async()=>{
+  const result=await run(db(),{expectedCancellationIdHmac:H(A)});
+  expect(result).toMatchObject({
+    kind:'authenticated_current_cancel_set_matches_recorded',
+    exactSignedCancellationIncluded:true,
+    postGetDbSnapshotStable:true,observedProviderSetMatched:true,
+    grantRevocationAuthorized:false,providerOrderingProven:false,
+  });
+  safe(result);
+ });
  it('requires exact persisted candidate event to be in the verified set',async()=>{
   const client=db(),fetchImpl=fetchFor();
   const r=await run(client,{

@@ -208,12 +208,14 @@ export async function auditPortOneCancellationSetForReceiptV1(
  * legal refund, atomic Reader T2, customer ACK or permission to revoke.
  */
 export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
- dbClient,receiptId,expectedProviderEventId,sourceHmacSecret,apiSecret,
- fetchImpl,providerInspector,
+ dbClient,receiptId,expectedProviderEventId,expectedCancellationIdHmac,
+ sourceHmacSecret,apiSecret,fetchImpl,providerInspector,
 }){
  if(typeof receiptId!=='string'||!UUID.test(receiptId)||
     (expectedProviderEventId!==undefined&&
-     (typeof expectedProviderEventId!=='string'||!UUID.test(expectedProviderEventId))))
+     (typeof expectedProviderEventId!=='string'||!UUID.test(expectedProviderEventId)))||
+    (expectedCancellationIdHmac!==undefined&&
+     (typeof expectedCancellationIdHmac!=='string'||!MAC.test(expectedCancellationIdHmac))))
   throw Error('INVALID_CANCELLATION_SET_RECONCILIATION_RECEIPT');
  const first=await auditPortOneCancellationSetForReceiptV1(
   dbClient,{receiptId},PRIVATE_SET_AUDIT,
@@ -223,6 +225,11 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
  if(expectedProviderEventId!==undefined&&
     before.filter(r=>r.providerEventId===expectedProviderEventId).length!==1)
   return no('exact_provider_event_not_in_verified_cancel_set');
+ // The notification's exact cancellation HMAC must be present once;
+ // a payment-wide matched total cannot stand in for the signed item.
+ if(expectedCancellationIdHmac!==undefined&&
+    before.filter(r=>r.cancellationIdHmac===expectedCancellationIdHmac).length!==1)
+  return no('exact_signed_cancellation_not_in_verified_cancel_set');
  if(before.length>64)
   return no('provider_get_set_capacity_exceeded');
  const head=before[0];
@@ -291,6 +298,10 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
     (expectedProviderEventId!==undefined&&
      second.privateRows.filter(
       r=>r.providerEventId===expectedProviderEventId,
+     ).length!==1)||
+    (expectedCancellationIdHmac!==undefined&&
+     second.privateRows.filter(
+      r=>r.cancellationIdHmac===expectedCancellationIdHmac,
      ).length!==1))
   return no('stored_cancel_set_changed_during_provider_get');
  const byId=new Map(second.privateRows.map(r=>[r.providerEventId,r]));
@@ -316,6 +327,7 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
   authenticatedProviderGetObserved:true,observedProviderSetMatched:true,
   postGetDbSnapshotStable:true,
   exactProviderEventIncluded:expectedProviderEventId!==undefined,
+  exactSignedCancellationIncluded:expectedCancellationIdHmac!==undefined,
   singleExactFullCancellationObservedAtGet:singleExactFull,
   matchedCancellationItems:before.length,
   matchedCancellationAmountMinor:first.summary.recordedItemAmountMinor,

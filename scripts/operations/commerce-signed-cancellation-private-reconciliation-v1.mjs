@@ -1,6 +1,10 @@
 // Operations-only stitched flow; requires "npm run build" before Node use.
 // Signed notification -> verified original Production Reading receipt ->
 // HTTPS GET /payments/{paymentId} -> classified review only. No mutations.
+import {createHmac} from 'node:crypto';
+import {
+  reconcileStoredPortOneCancellationSetWithGetPrivateV1,
+} from './commerce-portone-cancellation-set-ledger-audit-v1.mjs';
 import {
   resolveCancellationOriginalReceiptPrivateV1,
 } from './commerce-cancellation-payment-receipt-link-v1.mjs';
@@ -31,6 +35,7 @@ export const COMMERCE_SIGNED_CANCELLATION_PRIVATE_RECONCILIATION_V1=DISABLED;
 export async function reconcileSignedCancellationPrivateV1({
   dbClient,request,webhookConfig,apiSecret,
   fetchImpl,authenticator,readbackInspector,providerEventReadinessInspector,
+  sourceHmacSecret,cancellationSetInspector,
 }){
   let authenticate=authenticator;
   let inspect=readbackInspector;
@@ -136,7 +141,46 @@ export async function reconcileSignedCancellationPrivateV1({
   } catch {
     return base('canonical_provider_event_audit_unavailable');
   }
+  // Only an explicitly supplied private fingerprint secret enables a
+  // full-set read-only comparison. Never imply current-set completeness from
+  // one signed notification, the payment aggregate or a single Event row.
+  let cancellationSet;
+  if(finalShape&&sourceHmacSecret!==undefined){
+    if(typeof sourceHmacSecret!=='string'||
+       sourceHmacSecret.length<32||sourceHmacSecret.length>4096||
+       sourceHmacSecret.trim()!==sourceHmacSecret||
+       /[\\u0000-\\u001f\\u007f]/u.test(sourceHmacSecret))
+      return base('source_fingerprint_authority_unavailable');
+    try {
+      const cancellationIdHmac='hmac-sha256:k1:'+
+        createHmac('sha256',sourceHmacSecret)
+          .update(JSON.stringify([
+            'portone-cancellation-item-v1',
+            signed.providerPaymentId,signed.providerCancellationId,
+          ]),'utf8').digest('hex');
+      const compare=cancellationSetInspector??
+        reconcileStoredPortOneCancellationSetWithGetPrivateV1;
+      cancellationSet=await compare({
+        dbClient,receiptId:original.verifiedReceiptId,
+        expectedCancellationIdHmac:cancellationIdHmac,
+        sourceHmacSecret,apiSecret,fetchImpl,
+      });
+      if(!cancellationSet||
+         cancellationSet.kind!=='authenticated_current_cancel_set_matches_recorded'||
+         cancellationSet.observedProviderSetMatched!==true||
+         cancellationSet.postGetDbSnapshotStable!==true||
+         cancellationSet.exactSignedCancellationIncluded!==true||
+         cancellationSet.providerOrderingProven!==false||
+         cancellationSet.grantRevocationAuthorized!==false||
+         cancellationSet.providerRefundAuthorized!==false||
+         cancellationSet.writesPerformed!==false)
+        return base('canonical_cancellation_set_not_verified');
+    }catch{return base('canonical_cancellation_set_audit_unavailable');}
+  }
   return Object.freeze({...base(kind),
+    canonicalCancellationSetMatched:cancellationSet?.observedProviderSetMatched===true,
+    canonicalCancellationSetStatus:cancellationSet?.kind??'not_checked',
+    exactSignedCancellationIncluded:cancellationSet?.exactSignedCancellationIncluded===true,
     canonicalProviderEventStatus:eventReadiness.kind,
     canonicalProviderEventReady:eventReadiness.sourceEventReady,
     exactEventGrantRevocationObserved:eventReadiness.exactPurchaseGrantRevoked,

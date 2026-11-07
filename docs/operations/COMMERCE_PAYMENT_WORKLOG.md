@@ -803,3 +803,9 @@
 
 - **실패:** [PR #3090 DB authority CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42368338149/job/128391169635)는 `official_reader_first_thread_typescript_postgres.sh`의 Member 소유 Purchase/Reader 데이터는 정상 생성했지만, 그에 대응하는 TypeScript 테스트가 Guest promotion 시절의 인증 ID `c1990000-...`를 계속 사용하여 `AUTH_REQUIRED`로 실패했습니다.
 - **수정:** `test/postgres-official-reading-reader-first-thread-db.test.ts`의 verified auth fixture를 동 테스트 DB에서 실제 Member와 결속된 `11380000-...`로 변경했습니다. 실제 회원 검증은 유지하고, Reader 정책 보류·Bundle 불일치·처음 생성/재진입·Grant 회수 테스트를 완화하지 않습니다. 운영 서비스·결제·환불/고객 노출은 변경하지 않습니다. 최신 CI 통과 전 완료 미확정입니다.
+
+### 2026-11-07 — 서명 취소 알림·원본 Receipt·전체 PortOne 취소 항목 집합 비운영 대조 연결
+
+- **기존 공백:** 운영 비노출 `reconcileSignedCancellationPrivateV1`는 정확한 취소 ID의 단일 GET 및 기존 Event 조회까지만 시행했습니다. 별도로 작성된 `reconcileStoredPortOneCancellationSetWithGetPrivateV1`의 **전체 성공 취소 항목 HMAC·개별 금액·두 시점 DB 스냅샷 대조**를 서명 알림에 연결하지 않아, 한 개 웹훅이 실제 기록된 전체 취소 내역에 포함되는지 확인하는 결과를 돌려주지 않았습니다.
+- **구현:** 내부 재조합 함수가 전용 `sourceHmacSecret`를 제공받으면 서명된 `cancellationId`의 HMAC을 계산하고 기존 read-only 전체 항목 대조기를 호출합니다. 대조기는 exact cancellation HMAC의 DB 원장 존재를 GET 이전과 이후에 확인하고, 성공 시에만 원본 Receipt·전체 성공 항목·현재 GET 일치 여부를 **읽기 전용 관찰** 결과로 표시합니다. 미제공/약한 키, 원장 항목 누락·불일치·역할 문제는 안전 보류합니다. 기존 Source/Provider Event 순서를 임의로 만들어내지 않습니다.
+- **검증/경계:** 정확 항목 존재·누락과 서명 알림→전체 집합 합성 테스트를 추가했습니다. 운영 라우트, Provider 환불 POST, 계정 삭제, 실제 금액 변경·Grant 회수·LIVE 판매는 전혀 연결하지 않았습니다. CI 완료 이전에는 완료/PASS로 주장하지 않습니다.

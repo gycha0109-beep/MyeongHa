@@ -148,6 +148,47 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
   expect(db.query).not.toHaveBeenCalled();
   expect(http).not.toHaveBeenCalled();
  });
+ it('reconciles signed item against the whole canonical cancellation set without revocation',async()=>{
+  const inspector=vi.fn(async(input)=>{
+    expect(input.receiptId).toBe(ROW.verifiedReceiptId);
+    expect(input.sourceHmacSecret).toBe('test-only-secret-32-characters-or-more');
+    expect(input.expectedCancellationIdHmac).toMatch(/^hmac-sha256:k1:[0-9a-f]{64}$/u);
+    expect(input.expectedCancellationIdHmac).not.toContain(CANCEL);
+    return {
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:true,providerOrderingProven:false,
+      grantRevocationAuthorized:false,providerRefundAuthorized:false,
+      writesPerformed:false,
+    };
+  });
+  const result=await executor(fakeDb(),fakeFetch(),{
+    sourceHmacSecret:'test-only-secret-32-characters-or-more',
+    cancellationSetInspector:inspector,
+  });
+  expect(inspector).toHaveBeenCalledTimes(1);
+  expect(result).toMatchObject({
+    canonicalCancellationSetMatched:true,
+    exactSignedCancellationIncluded:true,
+    fullRefundExecutionAuthorized:false,grantRevocationAuthorized:false,
+    entitlementEffectEligible:false,writesPerformed:false,
+  });
+  expect(JSON.stringify(result)).not.toContain(CANCEL);
+ });
+ it('does not accept a full-set result missing the exact signed item',async()=>{
+  const result=await executor(fakeDb(),fakeFetch(),{
+    sourceHmacSecret:'test-only-secret-32-characters-or-more',
+    cancellationSetInspector:async()=>({
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:false,providerOrderingProven:false,
+      grantRevocationAuthorized:false,providerRefundAuthorized:false,
+      writesPerformed:false,
+    }),
+  });
+  expect(result.kind).toBe('canonical_cancellation_set_not_verified');
+  expect(result.grantRevocationAuthorized).toBe(false);
+ });
  it('payment-wide finality without success of the exact signed item cannot pass',async()=>{
   const db=fakeDb(),http=fakeFetch();
   const result=await executor(db,http,{readbackInspector:vi.fn(async()=>({
