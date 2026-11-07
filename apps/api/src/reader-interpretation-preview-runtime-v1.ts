@@ -555,7 +555,7 @@ export async function runReaderInterpretationPreviewV1(
     context: input.context,
     requestedDomain: input.requestedDomain,
     groundingProjectionPort: input.groundingProjectionPort,
-    consultationShadowPort: input.consultationShadowPort,
+    ...(input.consultationShadowPort === undefined ? {} : { consultationShadowPort: input.consultationShadowPort }),
   });
 }
 
@@ -726,6 +726,6 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     context: prepared.context,
     requestedDomain: prepared.source.sajuDomain,
     groundingProjectionPort: input.groundingProjectionPort,
-    consultationShadowPort: input.consultationShadowPort,
+    ...(input.consultationShadowPort === undefined ? {} : { consultationShadowPort: input.consultationShadowPort }),
   });
 }
