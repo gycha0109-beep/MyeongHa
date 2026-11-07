@@ -412,3 +412,11 @@ body.product-page .product-header .ui-locale-select:focus-visible { outline: 2px
 body.product-page .product-header .product-brand-seal { font-size: 13px; font-weight: 650; }
 body.product-page .product-header .product-brand-sub { font-size: 11px; color: #68554f; }
 html[data-theme="dark"] body.product-page .product-header .product-brand-sub { color: #ddcbbc; }
+
+/* Narrow mobile shell: preserve the full brand and all four utilities without
+   letting the 32px desktop-side gutter squeeze the 320px header grid. */
+@media (max-width: 350px) {
+  body.product-page .product-header .product-header-inner {
+    width: calc(100% - 24px);
+  }
+}
