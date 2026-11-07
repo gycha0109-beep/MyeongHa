@@ -127,3 +127,16 @@ Watchtower-Track: frontend-integration
 - **블로커/승인:** 번역 오류 수정에는 추가 승인 필요 없음. 미승인 법정 정책의 대외 공개는 실시하지 않음.
 
 Watchtower-Track: frontend-integration
+
+
+## 2026-11-08 — Stage 5 게스트 출생정보 → 승인된 사주 Preview 실브라우저 동선
+
+- **선행 작업 종료 증거:** [프론트 PR #3136](https://github.com/gycha0109-beep/MyeongHa/pull/3136) HEAD `1e36085589e977722c901eef7eb913ddaf003685`의 [CI #42414029872](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414029872), [Web PR #42414029843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414029843), [Governance #42414029880](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414029880), 필수 [Integration #42414505018](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414505018) **전부 SUCCESS**. 2026-11-07T21:29:32Z [main merge `f220973644d66373b86b404e133eba579a2a4621`](https://github.com/gycha0109-beep/MyeongHa/commit/f220973644d66373b86b404e133eba579a2a4621) 확인. 지난 단위의 오작동 링크·다국어 오류 수정은 **병합 완료**이며 공식 정책 대외 공개 승인과 무관.
+- **기존 ROADMAP의 정확한 다음 미완료 단위:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5의 `Real browser E2E: guest → birth → supported Saju Preview`. 기존 `scripts/run-web-birth-session-browser-smoke-v2.mjs`는 게스트 출생정보 생성만, 기존 `scripts/verify-web-general-natal-preview-browser.mjs`는 브라우저에 이미 있는 합성 토큰으로 Preview 화면 직접 방문만 검증해 **화면 간 실제 연결**은 검증하지 않았다. 이번 범위는 기존 공개 Reading 중 Preview가 허용된 `career` (직업운) 한 경로뿐이며 새 제품·권한 추가 없음.
+- **변경 파일:** `scripts/verify-web-general-natal-preview-browser.mjs` — 기존 격리 Chrome/loopback 테스트에 합성 게스트 bootstrap, Birth Profile 저장, 서버 계산, 현재 자기 명식 revision 확인 응답을 추가. 실제 `reading.html` 입력 화면에서 출생 연월일·시각을 입력해 저장하고, 서버 계산 후 표시된 카드의 `직업 · 커리어` Preview 링크를 클릭하여 `reading-detail.html`로 이동/전달되었는지 확인. 동일한 합성 주체 Bearer 재사용, `bootstrap → birth create → calculation → current profile` 순서, 정확한 `readingText=직업운`, 실제 표시 영역까지 검사. 기존 General Natal 성공/오류/연간 제공 차단 테스트와 PASS 식별자는 유지. `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md` — 본 기존 트랙 이력 업데이트. 변경 범위는 운영 코드·DB·라우팅·서비스 권한·결제 및 관상 전송에 영향 없음.
+- **코드·테스트 커밋:** `bda98e5bbeffca06a91192b3cda90ce5bc95267a`(회귀 동선 구현), `7d00dfe415299d2981cecbf01c94a26573ca867f`(브라우저 CSS 선택자 문자열 안전하게 구성), `974a14e064233ed24f15e6322298c873202fd11a`(기존 PASS 마커 보존). `Watchtower-Track: frontend-integration`, 브랜치 `test/frontend-integration/guest-birth-preview-stage5-20261108`.
+- **검증 결과/미판정:** 실제 GitHub 소스와 `scripts/ci/web-pr-checks.json`에서 변경 테스트가 기존 Saju/전체 웹 브라우저 검사 대상인 것을 확인. 사용자 PC에서 해당 스크립트의 Node 구문 검사(`node --check`) **PASS**. 브라우저 실행 성공/CI·Governance·통합 CI·배포 증거는 **새 커밋 HEAD 결과 확인 전까지 미판정**. 시험은 로컬 loopback 합성 출생정보와 가짜 응답만 사용하여 실제 서버/Production 계정·RPO·배포 수용을 주장하지 않음.
+- **남은 과제:** 이번 게스트 동선 PR의 브라우저·일반 CI·Governance·필수 통합 CI와 병합 성공 확인. Stage 5 실회원 → 보관함/공식 기록, 네트워크 장애·세션 만료·추가 접근성, 정식 법무/개인정보·환불/보관 공개 동선은 별도 미완료. Stage 2~4 공식 Reader/결제/관상 제공 게이트도 차단 유지.
+- **다음/승인:** 신규 PR의 최신 브라우저 실제 실행을 확인하고 실패하면 이 테스트 동선의 실제 문제만 고친다. 일반 검증 통과 후 필수 통합 CI 제출·자동 병합 확인. 정식 이용약관·개인정보처리방침 게시, 운영 유료/이미지/결제 기능은 **별도 승인 전 금지**.
+
+Watchtower-Track: frontend-integration
