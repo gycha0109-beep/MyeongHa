@@ -1,0 +1,65 @@
+# 명하 프론트엔드 통합 트랙 WORKLOG
+
+- Track: `frontend-integration`
+- 기준 저장소: `gycha0109-beep/MyeongHa`
+- 로드맵: `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` (Stage 1~5)
+- 디자인 기준: `docs/CORE_VISUAL_SYSTEM_V0.1.md` (Paper / Ink / Night / Brass / Seal)
+- 범위: 승인된 기존 디자인을 유지하고, Stage 5의 라이트·다크 가독성/접근성 미완료 항목을 순서대로 정리. 신규 기능·해석 권한·결제 활성화 없음.
+
+## 로드맵 상태 (2026-11-08 확인 기준)
+
+| 구간 | 확인된 상태 | 근거 / 제약 |
+| --- | --- | --- |
+| Stage 1 — 탐색·진입 | 과거 구현 기록 존재. 현재 운영 완료를 별도로 추정하지 않음 | 기존 웹 로드맵의 Stage 1 설명 |
+| Stage 2 — 공식 Reading/Reader | 차단 조건 존재 | 공식 Reading/Reader 권한 및 배포 게이트 |
+| Stage 3 — 결제 UX | 차단 조건 존재 | Commerce/운영 권한 및 실제 결제 경로 |
+| Stage 4 — 관상 사진 흐름 | 차단 조건 존재 | 승인된 intake·privacy·엔진 경계 |
+| Stage 5 — 웹 출시 점검 | 진행 중, **라이트·다크 가독성 1개 단위 수정** | 반응형·명암 대비·오류·접근성·실사용 흐름 점검 항목이 남음 |
+
+## 2026-11-08 — 공통 라이트/다크 가독성 1개 단위
+
+### 실제 변경
+
+- `apps/web/product-clarity.css` — 공통 보조 글씨 대비 강화, 본문 기본 16px, 작은 안내문 최소 14px, 상품 설명 15px, 긴 글 문단 간격 개선. 기존 명조 제목/고딕 본문 역할, 배경·캐릭터 자산, 서비스 기능은 유지.
+- `apps/web/product-clarity.css` — 사주 비선택 탭, 무료 예시 배지, 상품 버튼의 라이트/다크 대비 및 조작 가능한 크기 개선.
+- `apps/web/product-clarity.test.ts` — 실제 CSS 선언을 읽어 주요 라이트/다크 텍스트 대비 4.5:1 이상을 확인하는 회귀 테스트 추가.
+- `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md` — 본 이력 신설 (기존 트랙별 WORKLOG 없음 확인).
+
+### 커밋
+
+- CSS 수정: `b5d48b2534ab4fefcc0aa1e03e8aed6c049a5f2e`
+- 대비 테스트 추가: `4ed35206b52c854ce7f06457393ad8885e285229`
+- 첫 CI의 타입 검사 오류 수정: `22b8e5fe8dbfde90a5f4fe08015b00368dba4dd5`
+- 코드·테스트 커밋 모두 `Watchtower-Track: frontend-integration` 기록.
+
+### 검증 증거
+
+- 선언 기반 실제 색상 대비 계산 (WCAG 2.2 AA 일반 텍스트 기준 4.5:1):
+  - 라이트 보조 문구: **7.43:1**
+  - 다크 보조 문구: **7.44:1**
+  - 다크 비선택 탭: **8.52:1**
+  - 라이트 예시 배지: **8.15:1**
+  - 다크 예시 배지: **5.91:1**
+  - 다크 상품 버튼: **8.50:1**
+- GitHub 브랜치의 변경된 CSS와 테스트 파일을 다시 읽어 선언·대비 수치 일치 확인.
+- PR: [#3116](https://github.com/gycha0109-beep/MyeongHa/pull/3116), [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/3116/checks).
+- 최초 PR CI [실행 #42390556226](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556226): **FAIL**, 새 대비 테스트의 strict TypeScript 미정의 배열/매치 인덱스 오류. 원인은 본 작업 파일로 확인했고 위 `22b8e5f` 커밋에서 접근 방식을 수정함.
+- 최초 Governance [실행 #42390556039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556039): **PASS**. 웹 PR 검증 [실행 #42390556104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556104): 정적 웹 빌드 성공 후 브라우저 점검 진행 중으로 확인.
+- **수정 커밋 이후 전체 CI / 브라우저 재검증은 결과 미확인**. 수치 계산이나 예전 SHA의 성공으로 전체 페이지 WCAG 또는 수정본 CI 통과를 주장하지 않음.
+
+### 2026-11-08 이어서 — 이전 가독성 작업 CI 오류 수정 (같은 단위)
+
+- **수정 파일:** `test/web-product-clarity.test.ts` — 기존 회귀 테스트가 CSS의 옛 `13px` 최소값을 하드코딩하여 실패하므로, 이미 구현된 `14px` 최소값으로 기대치를 갱신. 제품 UI/CSS 기능 추가 없음.
+- **수정 커밋:** `303a214d94fd7ef2eaa77307f4e4a97b3822c6fa` (`Watchtower-Track: frontend-integration`).
+- **실패 원인 증거:** 이전 HEAD `d1b8b5f`의 [CI #42390762076](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390762076)은 변경된 신규 대비 테스트 2건 통과, 기존 `test/web-product-clarity.test.ts`의 `expect(css).toContain('font-size: max(13px, .8125rem);')` 1건 실패(2079 passed, 1 failed). 같은 SHA의 [Governance #42390761825](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390761825) PASS, 웹 브라우저 [#42390761874](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390761874)는 새 커밋 발생으로 취소됨.
+- **수정 확인:** 브랜치의 실제 `product-clarity.css`에 `max(14px, .875rem)`가 있고, 테스트 기대치와 일치하도록 수정. **새 커밋의 TypeScript·테스트·브라우저 CI는 통과 확인 전까지 미검증.**
+- **미완료:** PR #3116 최신 HEAD CI 성공 및 auto-merge 증거 확보, 이후 Stage 5의 실브라우저 모바일/반응형 가독성 점검.
+- **다음 작업:** 최신 PR 체크 완료/실패를 기준으로 해당 가독성 단위를 종료하거나 이 단위의 오류만 수정. 성공 후 기존 Stage 5의 실브라우저 모바일 레이아웃 확인.
+- **승인:** 사용자 추가 승인 필요 없음.
+
+### 미완료 / 다음
+
+- **미완료:** Stage 5의 실브라우저·모바일·반응형/텍스트 잘림·나머지 접근성 및 기능 흐름 점검. Stage 2~4의 별도 권한/운영 차단은 이 CSS 수정으로 해소되지 않음.
+- **다음:** 기존 Stage 5의 실브라우저 라이트·다크/모바일 대비 및 레이아웃 점검으로 이어가되, 현재 PR CI 결과부터 확인.
+- **승인 대기:** 없음. 신규 상품·기능·의미 권한 변경 없음.
+
