@@ -172,8 +172,10 @@ BEGIN
     RAISE EXCEPTION 'Reader A must receive exactly the one explicitly granted current Memory, got %', v_count;
   END IF;
 
-  SELECT count(*), max(source_kind), max(source_turn_id),
-         max(source_message_id), max(source_merge_action_id)
+  SELECT count(*), max(source_kind),
+         max(source_turn_id::text)::uuid,
+         max(source_message_id::text)::uuid,
+         max(source_merge_action_id::text)::uuid
     INTO v_count, v_source_kind, v_source_turn_id,
          v_source_message_id, v_source_merge_action_id
   FROM public.qry_reader_context_granted_memory_items_v2(
