@@ -112,7 +112,7 @@ async function callModel({ spec, repeat, model, variant }) {
   });
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
-    throw new Error('LANGUAGE_AB_HTTP_' + response.status + '_' + model.replaceAll(/[^a-z0-9]+/giu, '_'));
+    throw new Error('LANGUAGE_AB_HTTP_' + response.status + '_' + model.replaceAll(/[^a-z0-9]+/giu, '_').toUpperCase());
   }
   const payload = await response.json();
   const choice = payload?.choices?.[0];
@@ -160,8 +160,13 @@ try {
     }
   }
 } catch (e) {
-  failure = e instanceof Error && /^LANGUAGE_AB_[A-Z0-9_]+$/u.test(e.message)
-    ? e.message : 'LANGUAGE_AB_OPAQUE_FAILURE';
+  const code = e instanceof Error ? e.message : '';
+  failure = /^LANGUAGE_AB_[A-Z0-9_]+$/u.test(code)
+    ? code : e instanceof Error && e.name === 'TimeoutError'
+      ? 'LANGUAGE_AB_NETWORK_TIMEOUT'
+      : e instanceof TypeError && e.cause?.code === 'ECONNRESET'
+        ? 'LANGUAGE_AB_NETWORK_RESET'
+        : 'LANGUAGE_AB_OPAQUE_FAILURE';
 } finally {
   const report = {
     schemaVersion: 'taegyeom-language-model-ab-v1',

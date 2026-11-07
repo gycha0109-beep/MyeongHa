@@ -76,6 +76,31 @@ function section(source, start, next) {
   return nextIndex < 0 ? rest : rest.slice(0, nextIndex);
 }
 
+// Optional source-catalog witness: old five-file backups still restore; new
+// six-file backups must validate encrypted catalog SHA, schema, and provenance
+// before comparing a loopback clone. The private JSON is never uploaded.
+for (const fragment of [
+  'source_application_catalog_sha256 // empty',
+  'source-app-catalog.json',
+  'checksum_count" -eq 4',
+  'checksum_count" -eq 3',
+  'HOLD_APPLICATION_CATALOG: decrypted catalog digest mismatch.',
+  'sourceCatalogBoundToBackupSnapshot == false',
+  'RESTORE_SOURCE_APP_CATALOG_PATH',
+  'install -m 600',
+]) {
+  requireFragment(harness, fragment, harnessPath);
+}
+for (const fragment of [
+  'RESTORE_SOURCE_APP_CATALOG_PATH: ${{ runner.temp }}/source-app-catalog.json',
+  'application_catalog_source=encrypted_backup_bracketed_witness',
+  'application_catalog_source=legacy_date_only_observation',
+  '--source "$source_app_catalog"',
+]) {
+  requireFragment(workflow, fragment, workflowPath);
+}
+forbidFragment(workflow, 'path: ${{ runner.temp }}/source-app-catalog.json', workflowPath);
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 

@@ -27,6 +27,41 @@ const matched = compareApplicationCatalog(source, restored, frontier);
 assert.equal(matched.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
 assert.equal(matched.verifiedApplicationScopeEquivalence, true);
 assert.equal(matched.verifiedFullSchemaCatalogEquivalence, false);
+assert.equal(matched.sourceCatalogBoundToBackupSnapshot, false);
+assert.equal(matched.restoreMismatchRootCauseProven, false);
+assert.equal(matched.sourceCatalogProvenance, 'legacy_date_only_observation');
+assert.equal(matched.sourceCatalogProvenanceHold,
+  'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS');
+
+const bracketedSource = {
+  ...structuredClone(source),
+  sourceCatalogProvenance: 'encrypted_backup_bracketed_readonly_v1',
+  sourceCatalogBracketStartUtc: '2026-11-07T20:00:00Z',
+  sourceCatalogBracketEndUtc: '2026-11-07T20:05:00Z',
+  sourceCatalogBracketStable: true,
+  sourceCatalogBoundToBackupSnapshot: false,
+};
+const bracketed = compareApplicationCatalog(bracketedSource, restored, frontier);
+assert.equal(bracketed.sourceCatalogProvenance, 'encrypted_backup_bracketed_readonly_v1');
+assert.equal(bracketed.sourceCatalogProvenanceHold,
+  'SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT');
+assert.equal(bracketed.verifiedApplicationScopeEquivalence, true);
+assert.equal(bracketed.sourceCatalogBoundToBackupSnapshot, false);
+assert.equal(bracketed.restoreMismatchRootCauseProven, false);
+assert.equal(bracketed.verifiedFullSchemaCatalogEquivalence, false);
+assert.equal(bracketed.drReady, false);
+for (const mutation of [
+  s => { s.sourceCatalogBracketStable = false; },
+  s => { s.sourceCatalogBoundToBackupSnapshot = true; },
+  s => { s.sourceCatalogBracketEndUtc = '2026-11-07T19:59:59Z'; },
+  s => { s.sourceCatalogProvenance = 'unapproved_source'; },
+]) {
+  const corrupted = structuredClone(bracketedSource);
+  mutation(corrupted);
+  assert.throws(() => compareApplicationCatalog(corrupted, restored, frontier));
+}
+const unprovenLegacy = {...structuredClone(source), sourceCatalogBracketStable: true};
+assert.throws(() => compareApplicationCatalog(unprovenLegacy, restored, frontier));
 assert.equal(matched.drReady, false);
 assert.equal(matched.serviceResumptionAllowed, false);
 assert.equal(matched.types.schemas.matchingCount, 3);
@@ -45,6 +80,8 @@ assert.ok(rejected.types.functions.missing.length === 1);
 assert.ok(rejected.types.tables.changed.length === 1);
 assert.ok(rejected.types.schemas.changed.length === 1);
 assert.equal(rejected.drReady, false);
+assert.equal(rejected.sourceCatalogBoundToBackupSnapshot, false);
+assert.equal(rejected.restoreMismatchRootCauseProven, false);
 assert.equal(compareApplicationCatalog(source, restored, '20261105075228')
   .applicationScopeVerdict, 'HOLD_SOURCE_BACKUP_FRONTIER_MISMATCH');
 console.log('Phase 8-A application/restore parity comparison verification PASS; no live DR claim.');

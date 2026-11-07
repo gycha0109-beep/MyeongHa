@@ -249,6 +249,7 @@ jobs:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          RESTORE_SOURCE_APP_CATALOG_PATH: ${{ runner.temp }}/source-app-catalog.json
         run: bash scripts/run-postgres-isolated-restore-drill.sh
 
       - name: Compare current-frontier application schema with isolated restored catalog
@@ -264,8 +265,18 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/verify-postgres-restored-app-schema-parity.mjs
+          # A new backup carries its own read-only pre/post-dump source
+          # witness (private runner temp). Old backups keep historical,
+          # date-only comparison evidence, never same-snapshot authority.
+          source_app_catalog=docs/operations/POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json
+          if [[ -s "$RUNNER_TEMP/source-app-catalog.json" ]]; then
+            source_app_catalog="$RUNNER_TEMP/source-app-catalog.json"
+            echo 'application_catalog_source=encrypted_backup_bracketed_witness'
+          else
+            echo 'application_catalog_source=legacy_date_only_observation'
+          fi
           node scripts/operations/check-postgres-restored-app-schema-parity.mjs \
-            --source docs/operations/POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json \
+            --source "$source_app_catalog" \
             --query scripts/operations/production-app-schema-fingerprint-readonly.sql \
             --restore-evidence "$RESTORE_EVIDENCE_PATH" \
             --output "$APP_SCHEMA_PARITY_PATH"
