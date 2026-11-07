@@ -304,10 +304,10 @@ try {
   ]), 'Guest creation/calculation/authority order changed: ' + JSON.stringify(stagedPaths));
   assert(journeyRequests.slice(1).every((request) =>
     request.authorization === 'Bearer ' + journeyBearer), 'Guest identity changed during Birth/calculation');
-  const previewLink = 'a[href="reading-detail.html?topic=career"]';
-  assert(await client.evaluate('!!document.querySelector("#saju-hub ' + previewLink + '")'),
+  const previewSelector = '#saju-hub a[href="reading-detail.html?topic=career"]';
+  assert(await client.evaluate('!!document.querySelector(' + JSON.stringify(previewSelector) + ')'),
     'Admitted career Preview link missing from calculated chart');
-  await client.evaluate('document.querySelector("#saju-hub ' + previewLink + '").click()');
+  await client.evaluate('document.querySelector(' + JSON.stringify(previewSelector) + ').click()');
   await waitFor(client,
     'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',
     'supported career Preview delivery from Saju hub');
