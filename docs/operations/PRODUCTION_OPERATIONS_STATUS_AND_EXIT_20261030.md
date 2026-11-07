@@ -1,3 +1,10 @@
+### 2026-11-07 KST — restore one-shot governance CI failure repaired (implementation work unit)
+
+- The first scoped restore PR check [Governance #42365261303](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42365261303) failed at `verify:postgres-isolated-restore-drill-workflow` because the reviewed contract allowed exactly seven historical marker paths while the new pinned one-shot added an eighth. The failure is a **static verification mismatch**, not a failed restore or Production incident.
+- **Fixed:** `scripts/verify-postgres-isolated-restore-drill-workflow.mjs` now permits exactly eight reviewed markers and explicitly requires the new run ID `42309503582`, artifact `13548176984`, fixed incident reference, marker token and one-shot DR scope. All historical marker checks remain.
+- No DR completion or CI success is inferred until the updated commit's checks finish. The actual restore remains contingent on exact-title main merge.
+- No Production SQL, Hosted resource, privacy canary, secrets, traffic or external provider call was changed.
+
 ### 2026-11-07 KST — exact newest-backup one-shot isolated restore prepared (implementation work unit)
 
 - **Implemented:** updated `.github/workflows/postgres-isolated-restore-drill.yml` and added `.github/ops/postgres-restore-backup-42309503582-20261107.once`. The already existing isolated PostgreSQL 17 restore workflow is pinned to the exact Production encrypted backup [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582), artifact `13548176984`, source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`, migration frontier `20261105075227`.
