@@ -47,6 +47,16 @@
 - 최초 Governance [실행 #42390556039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556039): **PASS**. 웹 PR 검증 [실행 #42390556104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556104): 정적 웹 빌드 성공 후 브라우저 점검 진행 중으로 확인.
 - **수정 커밋 이후 전체 CI / 브라우저 재검증은 결과 미확인**. 수치 계산이나 예전 SHA의 성공으로 전체 페이지 WCAG 또는 수정본 CI 통과를 주장하지 않음.
 
+### 2026-11-08 이어서 — 이전 가독성 작업 CI 오류 수정 (같은 단위)
+
+- **수정 파일:** `test/web-product-clarity.test.ts` — 기존 회귀 테스트가 CSS의 옛 `13px` 최소값을 하드코딩하여 실패하므로, 이미 구현된 `14px` 최소값으로 기대치를 갱신. 제품 UI/CSS 기능 추가 없음.
+- **수정 커밋:** `303a214d94fd7ef2eaa77307f4e4a97b3822c6fa` (`Watchtower-Track: frontend-integration`).
+- **실패 원인 증거:** 이전 HEAD `d1b8b5f`의 [CI #42390762076](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390762076)은 변경된 신규 대비 테스트 2건 통과, 기존 `test/web-product-clarity.test.ts`의 `expect(css).toContain('font-size: max(13px, .8125rem);')` 1건 실패(2079 passed, 1 failed). 같은 SHA의 [Governance #42390761825](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390761825) PASS, 웹 브라우저 [#42390761874](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390761874)는 새 커밋 발생으로 취소됨.
+- **수정 확인:** 브랜치의 실제 `product-clarity.css`에 `max(14px, .875rem)`가 있고, 테스트 기대치와 일치하도록 수정. **새 커밋의 TypeScript·테스트·브라우저 CI는 통과 확인 전까지 미검증.**
+- **미완료:** PR #3116 최신 HEAD CI 성공 및 auto-merge 증거 확보, 이후 Stage 5의 실브라우저 모바일/반응형 가독성 점검.
+- **다음 작업:** 최신 PR 체크 완료/실패를 기준으로 해당 가독성 단위를 종료하거나 이 단위의 오류만 수정. 성공 후 기존 Stage 5의 실브라우저 모바일 레이아웃 확인.
+- **승인:** 사용자 추가 승인 필요 없음.
+
 ### 미완료 / 다음
 
 - **미완료:** Stage 5의 실브라우저·모바일·반응형/텍스트 잘림·나머지 접근성 및 기능 흐름 점검. Stage 2~4의 별도 권한/운영 차단은 이 CSS 수정으로 해소되지 않음.
