@@ -2,7 +2,7 @@
 
 > 기준일: 2026-11-07 KST  
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`  
-> 기준 main: `2f04f8f2a0d912e42bf348781e17d20ff7094675`  
+> 기준 main: 최초 `2f04f8f2a0d912e42bf348781e17d20ff7094675`; 최신 백업 source `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af` (각 증거는 자체 SHA 기준)  
 > 권위 문서: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §33–§38, `PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`, Phase 8 DR 문서 및 Issue [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
 
 ## 1. 개정 목적과 유지 범위
@@ -24,9 +24,9 @@
 | Production Worker 익명 E2E | [#42271216975](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42271216975), main `1609aa8…`, Worker `295b9496-795b-44a3-b3f9-141c0b83e47d` | 화면·Health 200, 설정 기반 Readiness 200, 익명 Member/Saju/Preview 401, Cross-origin 403, unknown route 404. 실제 DB/Auth/Saju 연결 증명은 아님. |
 | Production DB 현황 | PostgreSQL 17.6, 원격 migration 원장 241개, 최신 `20261105075227` | 읽기 전용 관측. 전체 저장소 SQL/DDL/권한 동등성은 미증명. |
 | Migration 비교 | Production 241개 / main SQL 276개. 정확한 버전 ID 기준 원격 전용 41개·저장소 전용 76개이며, 동일 이름의 버전 불일치 쌍 8개가 포함됨. 이 중 4개는 전체 byte 일치, 4개는 저장소 파일 끝의 `\n\ncommit;\n` 10 bytes를 제외한 원격 prefix 일치, 1개(`20261029012948` ↔ `20261029012000`)는 전체 byte 일치. | 위 쌍은 최신 SELECT-only 비교에서 원격·저장소 SQL 전체 7,349 bytes가 MD5/SHA-256까지 일치함을 확인. 버전 ID 및 배포 provenance는 별도 미해결. 원격 `20261008090417`은 104,021 bytes, 6개 로컬 marker는 비어 있고, 후속 1520–1640 13개와 Pin 컬럼/함수가 현재 Production에 존재함. 상세는 [11/07 read-only snapshot](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json). |
-| 현재 Frontier 백업 | [#42130737153](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42130737153), frontier `20261105075227`, 241 entries | 암호화 백업·checksum 확인. |
+| 현재 Frontier 백업 | 최신 확인 [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582), artifact `13548176984`, source `8ccf60d…`, frontier `20261105075227` | 백업 SUCCESS이지만 해당 최신 artifact의 격리 복원은 미실행/미입증. 과거 #42130737153 백업의 복원 증거를 자동 승계하지 않음. |
 | 격리 PostgreSQL 복원 | [#42247589352](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42247589352), PostgreSQL 17.6, 4초 | DB 복원·선택된 역할/함수/RLS 검사는 통과. Provider 관리 데이터 27개 블록 누락, 3개 투영. 전체 Supabase 복원은 아님. |
-| 개인정보 원장 | [#42242496615](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42242496615), 현재 백업에 결합, `eventCount=0` | 비어 있는 스냅샷은 삭제·철회 재생 증거가 아님. 최신 감시 [#42262739511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42262739511)은 7,828초로 7,200초 기준 초과. |
+| 개인정보 원장 | 최신 확인 [#42352614447](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42352614447), artifact `13566018275`, 암호화 캡처 SUCCESS. | payload 이벤트 수·누락 없는 연속성은 이번 조회에서 미인증. 최신 감시 [#42363914282](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42363914282)는 9,582초로 7,200초 기준 초과 RED. 이전 0건 스냅샷을 non-zero 증거로 사용 금지. |
 | Phase 11 제품 경로 | [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347) | 격리 GoTrue JWT + PG18 RLS + 실제 Saju + local workerd, 900초·3,600/3,600 성공, p95 174.231ms / p99 184.088ms, Saju 장애 503·Health 200·복구 4/4. Production Worker admission/Hosted Hyperdrive/Production capacity 증거는 아님. |
 | Phase 12 진단 | `OBSERVED_SCALING_REVIEW_PHASE12_20261030.md` | DB pool 2개 조건에서 concurrency 8 실패 및 Saju CPU 제한 압력 신호 확인. 진단 신호이지 Production 임계치나 자동 확장 승인 아님. |
 
@@ -64,12 +64,13 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 14. `cmd_commit_chat_turn_legacy_v1`은 service_role 전용의 별도 사용자 선택 기반 proposal 처리 경로이며 신규 positive-source registry를 참조하지 않는다. 신규 S0 proposal-accept 경로가 비활성이라고 해서 모든 legacy memory acceptance가 비활성이라고 판정하지 않는다.
 15. `docs/operations/POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json`에 원격 전용 41개 전체의 실제 원장 버전·SQL 본문 해시·statement 수·대응 저장소 버전·영향 신호를 기록했다. 분류는 Se-yeon 23 / Admin 8 / Commerce 8 / API DB Auth 1 / historical bundle 1이다. 이는 전수 목록 및 출처 추적 증거이지 41개 전체의 현재 객체/ACL/DDL 복구 동등성 증명은 아니다. 개별 대상 효과를 추가 대조한다.
 16. 현재 `conversation_recall` registry는 `enabled=false` / `writable_enabled=false`지만 AI 모델 정책 2개는 active다. 2026-11-07 UTC 예산 행은 없고 10/25–10/31 예산 7개만 존재한다. 기존 AI 비용 원장 29건은 전부 settled이며 24건은 Owner 일일 한도 면제 플래그, 1건은 usage_unknown이다. 비용 원장과 positive-memory 경계는 동일한 stop switch가 아니다. 일반 사용자 daily admission은 해당 날짜 예산 부재로 fail-closed이나 Owner 별도 예외는 남아 있으므로 글로벌 AI 비활성 완료라고 판정하지 않는다. 새 호출·설정 변경 없이 SELECT-only로 확인했다.
+17. 적용된 원격 전용 migration 41개를 대상으로 [읽기 전용 객체명 대조](POSTGRES_REMOTE_ONLY_OBJECT_PRESENCE_20261107.json)를 실행했다. SQL 선언 출현 횟수 기준 함수 82/82, 정책 82/82, 테이블 16/16이 현재 DB에 같은 이름·소속으로 존재한다. 이는 `CREATE` 텍스트의 이름 존재 확인에 불과하며, 함수 본문·소유권·권한·정책 식·실제 스키마·복구 DB의 동등성은 아직 미입증이다. 검증은 `scripts/operations/production-remote-only-object-presence-readonly.sql`로 재현 가능하다.
 
 **금지:** blind `migration repair`, migration history rewrite, 추측에 의한 재적용, Production DDL/DML. 실제 정합화가 필요하면 근거 있는 forward-only 계획을 먼저 제시하고 사용자 승인을 받은 뒤 별도 실행한다.
 
 #### 8-B. 현재 Frontier의 Provider-equivalent 복구
 
-1. 현재 Production frontier를 고정한 암호화 백업과 checksum/catalog fingerprint를 사용한다. 기존 #42130737153은 현재까지의 기준 증거이며, frontier가 바뀌면 새 백업을 확보한다.
+1. 현재 Production frontier를 고정한 암호화 백업과 checksum/catalog fingerprint를 사용한다. 최신 확인 백업은 #42309503582 / artifact `13548176984` (source `8ccf60d…`, frontier `20261105075227`)이며, **해당 artifact의 격리 복원 실증은 아직 없다**. 과거 백업 #42130737153의 복원 결과를 최신 artifact 수용으로 이전하지 않는다. frontier가 바뀌면 새 백업을 확보한다.
 2. 기존 격리 복원 #42247589352의 27개 skipped / 3개 projected Provider data block을 제거할 수 있는 Hosted-compatible 복구 경로를 확보한다. 전체 Supabase migration ledger와 Provider-managed data가 실제 복구됐는지 별도로 검사한다.
 3. Hosted Auth는 사용자·identity 연결, sessions, refresh-token 관계, JWT signing configuration, MFA/SSO 등 해당 서비스에서 사용하는 상태를 복원하고 로그인·갱신·로그아웃·삭제 계정·폐기 토큰을 검사한다.
 4. Hosted Storage는 bucket·metadata·policy와 실제 object bytes를 복원한다. synthetic object checksum, 허용된 다운로드, 비인가 접근 거부, 삭제·철회 후 접근 차단을 확인한다.
@@ -79,7 +80,7 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 #### 8-C. 독립 개인정보 연속성과 현재 Frontier Replay
 
 1. 최신 백업과 정확히 결합된 개인정보 원장을 새로 확보하고, 감시기가 7,200초 freshness 기준 안에서 성공했는지 확인한다. 기존 #42262739511 RED를 무시하거나 freshness 한도를 완화하지 않는다.
-2. 현재 #42242496615는 `eventCount=0`이므로 non-zero 삭제·철회 replay 증거로 사용할 수 없다. 과거 #40633679630도 다른 backup/ledger pair에 묶여 있으므로 현재 frontier 증거로 재사용하지 않는다.
+2. 기존 #42242496615는 `eventCount=0`이므로 non-zero replay 증거가 아니다. 최신 암호화 원장 #42352614447 / artifact `13566018275`는 캡처 성공만 확인했고 이벤트 수·독립 연속성은 미인증이다. 최신 감시 #42363914282는 9,582초로 7,200초 freshness RED다. 과거 #40633679630도 다른 backup/ledger pair에 묶여 있으므로 현재 frontier 증거로 재사용하지 않는다.
 3. Production disposable privacy canary는 사용자가 정확한 승인 문자열 `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY`를 명시한 뒤에만 실행한다. 해당 canary는 합성 전용 계정·주체를 만들고 기존 삭제 API/worker 경로를 실행한 뒤 정해진 정리 절차를 수행한다. 승인 전 dispatch 금지.
 4. 승인된 canary가 만든 non-zero Production event를 현재 backup과 같은 복구 증거 묶음에 결합하고, 격리 복원본에서 authoritative ledger를 재생한다. 2회 재생 idempotency, finalizer 완료, no-resurrection, stale JWT·Auth·Storage 접근 차단, 법적 보존 데이터 유지까지 확인한다.
 5. 위 canary는 한 captured window의 replay 증거다. `futureSafePrivacyReconciliation=true`를 위해서는 Primary PostgreSQL 손실 후에도 살아남고 사고 기준 시점까지 누락 구간 없이 삭제·철회 이벤트를 제공하는 독립적인 durable source continuity를 별도로 입증한다. GitHub Actions freshness watcher는 감시 도구이지 독립 이벤트 원장이 아니다.
