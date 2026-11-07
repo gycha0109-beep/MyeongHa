@@ -1,3 +1,10 @@
+### 2026-11-07 KST — Phase 8 captured live authority metadata baseline (read-only work unit)
+
+- **Implemented:** `docs/operations/POSTGRES_AUTHORITY_FRONTIER_METADATA_20261107.json` stores the exact current Production SELECT-only inventory result in a machine-comparable form, bound to the verified `scripts/operations/production-authority-frontier-readonly.sql` blob SHA. It contains 10 roles, 23 role-membership edges, 30 schema/role permission checks, 19 selected application-table RLS/policy/ACL fingerprints, 51 non-empty effective table privilege records, 44 selected function owner/SECURITY DEFINER/config/execution-ACL fingerprints, selected migration metadata, and aggregate Se-yeon cost/registry state.
+- **Verified:** the catalog query ran under PostgreSQL 17.6 with `transaction_read_only=on`; 241 applied migrations and latest `20261105075227` match the expected baseline. The persisted snapshot strips role session config values and contains no application row, message content, memory body, function source, secret, Auth account or Storage object byte.
+- **Boundary:** this is a reproducible **selected object authority baseline**, not full PostgreSQL schema parity, isolated provider-hosted restoration, Auth/Storage recovery, or positive RPO/RTO evidence. No claim of `dr_ready` or `serviceResumptionAllowed` is made.
+- **Next:** complete additional missing current-frontier object coverage or compare with an approved isolated restored target. Hosted-compatible DR target and independent privacy continuity remain separate unresolved gates; no Production mutation or paid target creation occurred.
+
 ### 2026-11-07 KST — PR #3095 synchronized after new character/Admin main commits (workflow work unit)
 
 - Fresh `main` advanced from `cdf71d9453c96b42489a27857a6159936155065e` to `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af` while the Phase 8 PR was open. The upstream delta contained 14 files (including character-runtime work and Admin UI/API changes) but none overlapped the six Phase 8 PR paths.
