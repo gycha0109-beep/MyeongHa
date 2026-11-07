@@ -1,3 +1,12 @@
+### 2026-11-08 KST — Phase 8-A 격리 전체 앱 구조 비교 PR #3124 회귀 테스트 RED 수정
+
+- **작업 목표:** 기존 Gate 1 / Phase 8-A #6의 단회 격리 복원 구조 비교 PR [#3124](https://github.com/gycha0109-beep/MyeongHa/pull/3124)에서 RED 발생한 테스트 기대값 불일치를 수정한다. 승인된 마커의 수·종류를 추가로 확장하지 않고 당초 9개로 고정한 상태를 유지한다.
+- **실패 근거/원인:** [CI #42402945610](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402945610), 작업 [#128494512685](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402945610/job/128494512685), 당시 HEAD `64f66f5214a260b6f6c8f1f387560f479047e482`의 `Check affected tests` FAIL. `test/ops/seyeon_current_backup_one_shot_restore_20261018.test.ts`의 7개 기존 테스트가 verifier 문자열 `triggerMarkers.length !== 8`을 기대했지만, 이미 검증기/워크플로에 승인 마커를 아홉 번째로 추가해 `triggerMarkers.length !== 9`가 됐다. 다른 실패 원인을 찾지 않았으며 실제 PostgreSQL 복원은 이 CI 단계에서 수행되지 않았다.
+- **변경 파일:** `test/ops/seyeon_current_backup_one_shot_restore_20261018.test.ts` — 7개 정적 기대값을 정확히 9개로 갱신하고, 새 단회 마커·백업 artifact ID·종료 제한·실제 격리 비교 연결을 검증하는 회귀 케이스 추가. 기존 중앙 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` — 이번 작업·증거 기록. Production 코드·SQL·워크플로 허용 조건·마커 본문은 변경하지 않음.
+- **브랜치·커밋·PR:** `ops/phase8-restored-catalog-proof-one-shot-20261108`, 수정 전 HEAD `64f66f5214a260b6f6c8f1f387560f479047e482`, 수정 기준 main `7808801e95d9f3ad8651ba8881900cdaa654944f`, [PR #3124](https://github.com/gycha0109-beep/MyeongHa/pull/3124). 본 변경은 테스트 및 WORKLOG를 함께 포함하는 신규 커밋으로 추적한다.
+- **검증·완료/미완료:** RED의 7개 실패가 동일한 outdated assertion임을 직접 로그에서 확인했고 기존 9개 허용 경로를 보존했다. 수정 HEAD의 Vitest·Governance·일반 CI·필수 Integration 및 main 병합 후 disposable 복원 실측은 **아직 확인 전**. 이전 HEAD의 Governance/Web SUCCESS는 신규 HEAD 성공 근거가 아니다.
+- **블로커·다음:** 수정된 HEAD CI가 성공하면 필수 통합 CI를 요청하고 보호된 병합 뒤 일회용 구조 비교의 실제 `app-schema-parity.json`을 확인한다. 24시간 one-shot 허가가 만료되면 그 범위를 늘려 강행하지 않는다. Hosted Auth·Storage, 독립 개인정보 연속성, 전 서비스 RPO/RTO 및 #1887은 여전히 차단. `dr_ready=false`, `serviceResumptionAllowed=false`; 추가 사용자 승인/Production 변경/유료 자원 없음.
+
 ### 2026-11-08 KST — Phase 11 실제 격리 DB 장애·복구 시험 V2 GREEN 실증
 
 - **작업 목표/로드맵:** Gate 2 / Phase 11에서 남았던 실제 PostgreSQL 중단·bounded-fail·회복 조합을 Main-only 일회용 [실행 #42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024)으로 최종 확인한다. 앞선 일반 900초·3,600/3,600 증거 [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347)를 반복하지 않는다.

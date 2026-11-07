@@ -15,7 +15,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-29T03:05:00Z');
     expect(workflow).toContain('now - point <= 86400');
     expect(workflow).toContain('SCOPED_RESTORE_PROVIDER_ROW_RETRY_ONLY');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
     const harness = readFileSync('scripts/run-postgres-isolated-restore-drill.sh', 'utf8');
     expect(harness).toContain(
       "require_report_contract '(.provider_source_counts_include_payloads == false)' 'true'",
@@ -32,7 +32,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('expected_artifact_id=12871016812');
     expect(workflow).toContain('incident_reference_utc=2026-10-29T03:35:00Z');
     expect(workflow).toContain('SCOPED_RESTORE_LATEST_MIGRATION_ONLY');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
     expect(verifier).toContain('EXPECTED_BACKUP_ARTIFACT_ID');
   });
 
@@ -45,7 +45,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-29T02:18:00Z');
     expect(workflow).toContain('now - point <= 86400');
     expect(workflow).toContain('SCOPED_RESTORE_ROW_INVENTORY_ONLY: exact governed backup 40780751650');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
     expect(verifier).toContain('POSTGRES-RESTORE-PROVIDER-ROWS-40780751650-20261029-V1');
   });
 
@@ -59,7 +59,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-28T22:37:00Z');
     expect(workflow).toContain('SCOPED_RESTORE_PROOF_ONLY: backup 40780751650; synthetic privacy, no Production writes, no Hosted restore');
     expect(workflow).toContain('now - point <= 86400');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
     expect(verifier).toContain('backup_run_id=40780751650');
     expect(verifier).toContain('POSTGRES-RESTORE-BACKUP-40780751650-20261029-V1');
   });
@@ -74,7 +74,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-10-26T00:00:00Z');
     expect(workflow).toContain('now - point <= 86400');
     expect(workflow).toContain('SCOPED_RESTORE_PROOF_ONLY: backup 40232489516; no Production SQL or privacy canary');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
   });
   it('binds one existing encrypted backup, exact reviewed main commit and 4-hour expiry', () => {
     expect(marker.trim()).toBe('POSTGRES-RESTORE-BACKUP-39067271230-20261018-V1');
@@ -85,7 +85,7 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('backup_run_id=39067271230');
     expect(workflow).toContain('incident_reference_utc=2026-10-18T08:00:00Z');
     expect(workflow).toContain('now - point <= 14400');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
   });
 
   it('pins the 2026-11-07 exact encrypted backup to isolated restore only', () => {
@@ -99,9 +99,24 @@ describe('owner-approved single-use current-frontier backup restore', () => {
     expect(workflow).toContain('incident_reference_utc=2026-11-07T07:46:16Z');
     expect(workflow).toContain('SCOPED_RESTORE_FRONTIER_20261105075227_ONLY');
     expect(workflow).toContain('now - point <= 86400');
-    expect(verifier).toContain('triggerMarkers.length !== 8');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
     expect(verifier).toContain('POSTGRES-RESTORE-BACKUP-42309503582-20261107-V1');
     expect(workflow).toContain("echo 'dr_ready=false'");
+  });
+
+  it('pins the ninth isolated application-schema comparison to the reviewed encrypted backup', () => {
+    const markerPath = '.github/ops/postgres-restore-app-parity-42309503582-20261108.once';
+    expect(readFileSync(markerPath, 'utf8').trim())
+      .toBe('POSTGRES-RESTORE-APP-PARITY-42309503582-20261108-V1');
+    expect(workflow).toContain(markerPath);
+    expect(workflow).toContain('ops(dr): compare restored app catalog backup 42309503582');
+    expect(workflow).toContain('expected_artifact_id=13548176984');
+    expect(workflow).toContain('SCOPED_APP_CATALOG_PARITY_ONLY');
+    expect(workflow).toContain('now - point <= 86400');
+    expect(workflow).toContain('node scripts/operations/check-postgres-restored-app-schema-parity.mjs');
+    expect(verifier).toContain('triggerMarkers.length !== 9');
+    expect(verifier).toContain('exactly nine pinned marker paths');
+    expect(verifier).toContain('POSTGRES-RESTORE-APP-PARITY-42309503582-20261108-V1');
   });
 
   it('retains the manual interface and isolates restoration from production SQL', () => {
