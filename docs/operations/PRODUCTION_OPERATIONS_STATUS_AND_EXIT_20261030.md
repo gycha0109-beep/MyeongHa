@@ -1,3 +1,11 @@
+### 2026-11-07 KST — Phase 8 all 41 remote-only applied migration inventory (read-only work unit)
+
+- **Implemented:** added `docs/operations/POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json`, a machine-readable per-version manifest covering all 41 applied migrations absent as exact-version SQL files in the compared main migration tree. All versions were verified against Production `supabase_migrations.schema_migrations` by SELECT-only read-back; the records include statement counts, stored-body SHA-256/byte counts, declared track labels where present, indicative DDL/ACL/function/policy text counts, source comparison linkages and explicit no-write disposition.
+- **Inventory scope:** 23 Se-yeon runtime, 8 admin-console, 8 commerce/payments, 1 API/DB auth and 1 historical Se-yeon bundle. Eight of the 41 have existing same-name/different-version SQL source comparisons; none gains version/provenance equality merely because the SQL text matches.
+- **Discrepancy retained:** two applied SQL sources contain no-Production deployment/migration comments. Those comments are not an execution guard. SQL keyword occurrences count text (including statements inside routines or preflight blocks), not proven live DDL effects. This is a provenance audit, **not** evidence of malicious execution and **not** permission for cross-track changes.
+- **No Production changes:** did not alter roles, table grants, RLS, functions, migration records, model permissions, costs, Auth or Storage.
+- **Next:** correlate the 41 live objects/privileges with the current migration tree, isolate unresolved source recovery items, and use the classifications for Phase 8 disposition; the current catalog/restore parity remains open.
+
 ### 2026-11-07 KST — Phase 8 current positive-memory and governed AI cost frontier (read-only work unit)
 
 - **Implemented:** extended `scripts/operations/production-authority-frontier-readonly.sql` to capture current positive-memory activation flags, the active model policy list, daily budget window, aggregate model cost ledger, proposal count, unrevoked memory count, and selected positive/legacy function EXECUTE boundaries. The query emits only aggregate operational metadata, never user messages or memory content.
