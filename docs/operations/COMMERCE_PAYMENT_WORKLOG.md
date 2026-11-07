@@ -952,3 +952,14 @@
 - **검증:** 기존 계약 테스트에서 SQL 계측 위치와 증거 연결을 확인하고, 4개 허용 사례·10개 비정상 수량/누락/과잉 삭제 사례를 실행형 분류기로 검증합니다. 이 수량 검사는 **대상 밖 행을 개별로 동일하다고 증명하지 못하며**, 실제 복원 DB 기반 종료 검증으로 확대 선언하지 않습니다. 신규 CI/Pg17 결과는 아직 미확정이므로 PASS 미선언.
 - **완료·미완료:** 격리 복원 환경의 청약철회 Claim 대상 외 **건수 보존 교차검사** 코드·테스트·문서 작성 완료. 실제 복원으로 양성 Claim 삭제 검증, Provider NEWER/STALE 판정, Reader/T2 원자적 회수, 법적 소비자 제공 입증 및 전체 격리 E2E 미완료.
 - **커밋·블로커·다음:** 본 변경과 WORKLOG를 하나의 PR 후속 커밋으로 반영합니다. 신규 전체 CI 확인 후 실패를 수정하고, 통과하면 승인 로드맵의 미완료 서비스 연결을 계속 진행합니다. 운영 DB·실제 PG 환불 POST·공개 LIVE/Checkout는 실행하지 않았습니다. 별도 승인 요청 없음.
+
+### 2026-11-08 — 서명 취소 증거의 재조회 통화·서명 지문·안전 권한 보류 재확인
+
+- **목표·승인 로드맵:** `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6의 취소 Event 처리(1), 정확한 Reader 권한 보호(2), 청약철회 증거 검토(3) 연결. 인증 PortOne GET과 Reader S1/CAS 사전검사의 잠금이 끝난 뒤 별도 읽기 전용 고지/청약철회 조회에서 **같은 취소 원본의 signed lineage 전체가 보존되는지** 검증합니다.
+- **기준 브랜치·PR·커밋:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 작업 전 HEAD `370e162181e8fe4b11b2d1cb6f33ec36b61d7dc5`. [직전 전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42392170460) Commerce/DB core/PostgreSQL17/Web/Governance/Verify 모두 성공, PR open·auto_merge on. 기존 로드맵과 WORKLOG를 대조하여 source-v2 기존 필드만 재사용했습니다.
+- **변경 파일:** `scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs`, `test/commerce-exact-reader-withdrawal-evidence-hold-v1.test.mjs`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 종전 signed Event 웹훅 ID·취소 HMAC·단일 전액 성공 금액 재검사에 더해, 같은 Event의 `payload_fingerprint`↔`signedPayloadHmac` 일치, `providerReadbackHmac` 형식, 소스/원 Receipt 통화, 단일 성공 취소의 원결제 전액 누적 관측값, `provider_ordering_key=null`, `orderingProven/refundExecutionAuthorized/entitlementRevocationAuthorized='false'` 여부를 **새 private REPEATABLE READ 스냅샷**에서 확인합니다. 중간 변경이 확인되면 개인 Reader 해석/고지 SQL·별도 법률 검토 전에 HOLD 후 ROLLBACK합니다. 기존 무서명 조회/접수 호환성, read-only, 권한 보류는 유지합니다. 새 원장·운영 Writer·HTTP 공개 라우트·DB 스키마는 추가하지 않았습니다.
+- **검증:** `test/commerce-exact-reader-withdrawal-evidence-hold-v1.test.mjs`의 동일 검토 경로에 통화 변경, 누적액·서명 지문 불일치, readback HMAC 누락, Provider 권한/순서 플래그 변조 등 13개 차단 회귀와 SQL 필드 계약 검증을 추가했습니다. 새 커밋 CI/PG17/TypeScript 테스트는 아직 실행 결과를 확인하지 않았으므로 PASS 미선언.
+- **완료·미완료:** 이번 원본 취소 signed provenance의 사설 후행 재조회 안전 결속, 회귀, 기록 반영 완료. 신뢰 가능한 Provider NEWER/STALE 비교, 법적 소비자 콘텐츠 제공 입증, 실제 Reader T2 잠금·Entitlement Effect 원자 회수, 개인정보 복원 실제 삭제 실증 및 통합 E2E는 계속 미완료입니다.
+- **다음·블로커:** 신규 CI 실패 시 즉시 수정; 성공 시 승인 로드맵의 다른 미완료 서비스 연결로 진행. 운영 DB/실제 PortOne 환불 POST/공개 LIVE는 실행하지 않았습니다. 사용자 승인 요청 없음.
+

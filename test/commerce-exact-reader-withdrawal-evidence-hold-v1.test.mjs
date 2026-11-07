@@ -32,6 +32,13 @@ const SCOPE={
  cancellationSourceEventType:'Transaction.Cancelled',
  cancellationIdHmac:SIGNED_CANCEL_HMAC,cancellationStatus:'SUCCEEDED',
  cancellationAmountMinor:'8900',cancellationSourcePaidMinor:'8900',
+ cancellationObservedCumulativeMinor:'8900',
+ signedEventHmac:'hmac-sha256:k1:'+'a'.repeat(64),
+ sourceSignedHmac:'hmac-sha256:k1:'+'a'.repeat(64),
+ sourceReadbackHmac:'hmac-sha256:k1:'+'c'.repeat(64),
+ providerOrderingKey:null,orderingProven:'false',
+ refundExecutionAuthorized:'false',revocationAuthorized:'false',
+ sourceCurrency:'KRW',receiptCurrency:'KRW',
  receiptPaidMinor:'8900',
  receiptId:RECEIPT,subjectId:SUBJECT,
  purchaseIntentId:INTENT,grantId:GRANT,grantRevision:'3',
@@ -170,6 +177,13 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'cancellationIdHmac'");
   expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'matchingCancellationStatus'");
   expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'exactSucceededCancellationAmountMinor'");
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'observedCumulativeCancelledAmountMinor'");
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'providerReadbackHmac'");
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'signedPayloadHmac'");
+  expect(SCOPE_SQL).toContain('event.payload_fingerprint as "signedEventHmac"');
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'currency'");
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'orderingProven'");
+  expect(SCOPE_SQL).toContain('receipt.verified_currency as "receiptCurrency"');
   expect(SCOPE_SQL).toContain('receipt.verified_amount_minor::text as "receiptPaidMinor"');
   expect(SCOPE_SQL).toContain('access.entitlement_grant_id=egrant.id');
   expect(SCOPE_SQL).not.toContain('digital_reading_checkout_notice_presentations_v1');
@@ -256,6 +270,41 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
    ['source claims different receipt amount',{cancellationSourcePaidMinor:'3000'}],
    ['changed receipt amount',{receiptPaidMinor:'9000'}],
    ['missing paid amount',{receiptPaidMinor:null}],
+  ]){
+   const c=db({scope:[{...SCOPE,...changed}]}),reviewer=vi.fn();
+   const result=await call(c,{
+    expectedProviderWebhookId:SIGNED_WEBHOOK,
+    expectedCancellationIdHmac:SIGNED_CANCEL_HMAC,
+    currentSetLockedInspector,withdrawalReviewer:reviewer,
+   });
+   expect(result.kind,label).toBe('exact_signed_cancellation_changed_before_notice_review');
+   expect(c.calls.some(v=>v.sql===SCOPE_SQL),label).toBe(true);
+   expect(c.calls.some(v=>v.sql===PRIVATE_SOURCE_SQL),label).toBe(false);
+   expect(c.calls.some(v=>v.sql===NOTICE_PROBE_SQL),label).toBe(false);
+   expect(c.calls.at(-1).sql,label).toBe('rollback');
+   expect(reviewer).not.toHaveBeenCalled();
+   safe(result);
+  }
+ });
+
+ it('HOLDs changed signed provenance, currency or authority flags in the fresh private snapshot',async()=>{
+  const currentSetLockedInspector=async()=>({
+   ...VERIFIED,exactSignedCancellationBoundToEvent:true,
+  });
+  for(const [label,changed] of [
+   ['cumulative amount changed',{cancellationObservedCumulativeMinor:'3000'}],
+   ['wrong receipt currency',{receiptCurrency:'USD'}],
+   ['source currency changed',{sourceCurrency:'USD'}],
+   ['missing receipt currency',{receiptCurrency:null}],
+   ['Event fingerprint changed',{signedEventHmac:'hmac-sha256:k1:'+'d'.repeat(64)}],
+   ['signed source fingerprint mismatch',{sourceSignedHmac:'hmac-sha256:k1:'+'d'.repeat(64)}],
+   ['missing signed Event fingerprint',{signedEventHmac:null}],
+   ['readback fingerprint missing',{sourceReadbackHmac:null}],
+   ['readback fingerprint malformed',{sourceReadbackHmac:'invalid'}],
+   ['provider ordering key set',{providerOrderingKey:'untrusted_order'}],
+   ['ordering suddenly claimed proven',{orderingProven:'true'}],
+   ['refund suddenly claimed permitted',{refundExecutionAuthorized:'true'}],
+   ['revocation suddenly claimed permitted',{revocationAuthorized:'true'}],
   ]){
    const c=db({scope:[{...SCOPE,...changed}]}),reviewer=vi.fn();
    const result=await call(c,{

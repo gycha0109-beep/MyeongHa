@@ -26,8 +26,18 @@ select
  event.verified_payload_jsonb->>'matchingCancellationStatus' as "cancellationStatus",
  event.verified_payload_jsonb->>'exactSucceededCancellationAmountMinor' as "cancellationAmountMinor",
  event.verified_payload_jsonb->>'originalReceiptPaidAmountMinor' as "cancellationSourcePaidMinor",
+ event.verified_payload_jsonb->>'observedCumulativeCancelledAmountMinor' as "cancellationObservedCumulativeMinor",
+ event.payload_fingerprint as "signedEventHmac",
+ event.verified_payload_jsonb->>'signedPayloadHmac' as "sourceSignedHmac",
+ event.verified_payload_jsonb->>'providerReadbackHmac' as "sourceReadbackHmac",
+ event.provider_ordering_key as "providerOrderingKey",
+ event.verified_payload_jsonb->>'orderingProven' as "orderingProven",
+ event.verified_payload_jsonb->>'refundExecutionAuthorized' as "refundExecutionAuthorized",
+ event.verified_payload_jsonb->>'entitlementRevocationAuthorized' as "revocationAuthorized",
+ event.verified_payload_jsonb->>'currency' as "sourceCurrency",
  receipt.id::text as "receiptId",
  receipt.verified_amount_minor::text as "receiptPaidMinor",
+ receipt.verified_currency as "receiptCurrency",
  receipt.subject_id::text as "subjectId",
  receipt.purchase_intent_id::text as "purchaseIntentId",
  egrant.id::text as "grantId",
@@ -106,6 +116,7 @@ const ORDER=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const WEBHOOK_ID=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const CANCELLATION_MAC=/^hmac-sha256:k1:[0-9a-f]{64}$/u;
 const POSITIVE_MINOR=/^[1-9][0-9]*$/u;
+const CURRENCY=/^[A-Z]{3}$/u;
 const validSignedPair=(webhookId,cancellationHmac)=>
  (webhookId===undefined&&cancellationHmac===undefined)||
  (typeof webhookId==='string'&&WEBHOOK_ID.test(webhookId)&&
@@ -185,7 +196,20 @@ async function inspectExactPaidUnit(dbClient,{
       typeof r.receiptPaidMinor!=='string'||
       !POSITIVE_MINOR.test(r.receiptPaidMinor)||
       r.cancellationAmountMinor!==r.receiptPaidMinor||
-      r.cancellationSourcePaidMinor!==r.receiptPaidMinor))
+      r.cancellationSourcePaidMinor!==r.receiptPaidMinor||
+      r.cancellationObservedCumulativeMinor!==r.receiptPaidMinor||
+      typeof r.receiptCurrency!=='string'||
+      !CURRENCY.test(r.receiptCurrency)||
+      r.sourceCurrency!==r.receiptCurrency||
+      typeof r.signedEventHmac!=='string'||
+      !CANCELLATION_MAC.test(r.signedEventHmac)||
+      r.sourceSignedHmac!==r.signedEventHmac||
+      typeof r.sourceReadbackHmac!=='string'||
+      !CANCELLATION_MAC.test(r.sourceReadbackHmac)||
+      r.providerOrderingKey!==null||
+      r.orderingProven!=='false'||
+      r.refundExecutionAuthorized!=='false'||
+      r.revocationAuthorized!=='false'))
    return no('exact_signed_cancellation_changed_before_notice_review');
 
   if(typeof r.readerContentBundleId!=='string'||
