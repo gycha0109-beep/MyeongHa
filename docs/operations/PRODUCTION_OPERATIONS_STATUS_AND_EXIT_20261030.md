@@ -853,3 +853,13 @@ Production 개인정보 canary, migration repair/DDL/DML, 비밀·트래픽 변�
 **보고서 자체의 한계:** 이 파일을 병합하는 것은 **현황과 종료 조건의 권위 있는 스냅샷 기록**이지 Phase 1–13 수용의 완료 또는 새로운 Production 배포에 대한 자동 보증이 아님. 병합 후 main SHA나 Worker 버전이 바뀌면 재확인해야 함.
 
 Watchtower-Track: ops
+
+### 2026-11-07 / Phase 8 CI RED 복구 — 과거 DR 증거와 최신 저장소 변경 이력 구분
+
+- **작업 목표:** [DR Readiness #42375717817](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717817) Attempt 1 / HEAD `61736e57979d886559451d15a853292fb3bf586e`의 오류 `repository migration advance is not covered by the dated observation` 해결. 과거 2026-10-29 복구 증거와 2026-11-07 읽기 전용 migration catalog를 혼동하지 않는다.
+- **변경 파일:** `scripts/validate-postgres-dr-current-evidence.mjs` (최신 저장소 버전 목록의 일치 조건), `scripts/verify-postgres-dr-readiness-authority.mjs` (증거 연결), `scripts/verify-postgres-dr-current-evidence.mjs` (정상/변조 회귀 검증), `docs/operations/POSTGRES_DR_REPOSITORY_VERSION_WITNESS_20261107.json` (276개 버전 ID만 고정), 기존 이 WORKLOG. 운영 migration 본문·런타임 코드·워크플로 변경 없음.
+- **완료:** 실패 job `verify-postgres-dr-readiness-authority` 로그로 원인 확정. 2026-11-07 운영 읽기 전용 관측 문서의 base main `2f04f8f2a0d912e42bf348781e17d20ff7094675`부터 실패 SHA까지 `supabase/migrations/**` 변경 0 확인. 기록된 repository SQL 파일 276개/remote 241개/remote-only 41개/repository-only 76개를 기존 증거에서 재사용한다. 새 witnessed repo-only advance는 복구/서비스 Ready 증거가 아니다.
+- **미완료:** 이 브랜치 정확한 HEAD 테스트·PR/CI 성공, 병합 후 신규 DR Readiness workflow 녹색 확인. Phase 8 Provider-managed Auth/Storage, 독립 privacy ledger/freshness/replay, full-service RPO/RTO 및 실제 DR READY 모두 여전히 미완료.
+- **브랜치·커밋·PR:** `fix/ops-dr-dated-repository-frontier-20261107` / base `8897a38f941a1948abe673a820b36a1124f9ded5`; 변경과 워크로그를 동일 커밋으로 기록. 최초 통합 변경 커밋 `dacdf44ece9131dabc8b0f14333bc53e70e212a3`, 정규식 교정 `2c21216a0635739cfbad4a8cc87d068c682dfb4f`, 0패딩 버전 인식 교정 `a2ceceffca64f50ab6995426635b60a36fee0826`. [PR #3109](https://github.com/gycha0109-beep/MyeongHa/pull/3109). 최종 HEAD·통합 CI·병합 후 DR workflow 성공은 검증 전까지 미판정.
+- **테스트·CI 근거:** 기존 실패 [Run #42375717817](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717817) Attempt 1 실패 원문 확인. repo 전진 불일치·manifest 변조·read-only 여부 위조는 모두 거부하도록 회귀 테스트 보강. 새로운 HEAD 및 post-main 성공 이전에는 완료를 주장하지 않는다.
+- **블로커와 다음 작업:** 운영 DB·마이그레이션 적용·ACL/Role·백업 실행·Hosted resource·canary·트래픽 변경 금지; 인증 또는 운영 변경 승인 필요한 Phase 8 본 작업은 별도 승인 대기. 현재 범위의 CI 코드 수정은 승인 불필요. 정확한 HEAD CI를 확인한 뒤 병합·후속 DR workflow 및 기존 경고가 해소됐는지 대조한다.
