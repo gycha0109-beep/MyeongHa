@@ -816,3 +816,10 @@
 - **CI 근거:** [PR #3090 Commerce Work Track](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42369563243/job/128394786467) 신규 signed cancellation→전체 취소 집합 테스트가 1건 실패했습니다. `resolveCancellationOriginalReceiptPrivateV1`의 기존 내부 결과에는 원본 Receipt UUID가 누락되어, 전체 집합 대조기가 정확한 Receipt를 찾을 수 없어 안전 보류했습니다.
 - **수정:** 기존 동일 SQL에서 이미 검증 중이던 `verifiedReceiptId`를 **사설 운영 Resolver 반환에만** 추가했습니다. 기존 공개/일반 read-only 판정 API는 식별자를 노출하지 않습니다. 사설 조회에서 정확한 Receipt·결제 거래번호·금액·통화 결속과 malformed ID 거부를 별도 회귀 검증합니다.
 - **보존:** 취소 전체 내역 대조는 read-only, Provider 순서와 법정 환불/권한 회수 확정은 계속 HOLD. 운영 PG/환불 POST, LIVE, 공개 라우트/DB 적용 없음. 새 HEAD CI 통과 전 성공 미확정.
+
+
+### 2026-11-07 — 기존 취소 Provider Event의 원본 Receipt 및 서명 본문 결속 검증
+
+- **미완료 경계:** 서명 웹훅·PortOne GET·전체 취소 집합이 검증되더라도, 별도 읽기 전용 `inspectExactCancellationProviderEventReadinessV1`는 **기존 이벤트 원본 Receipt ID 또는 signed raw payload HMAC** 일치 여부를 요구하지 않았습니다. 같은 외부 이벤트 ID와 거래번호만으로 기존 Event ready를 보고할 수 있었습니다.
+- **구현:** 기존 `commerce_provider_events`에서 `payload_fingerprint` 및 이미 최소화해 기록한 `verified_payload_jsonb.signedPayloadHmac`를 함께 읽고, 서명 원본 바이트로 계산한 `portone-cancel-signed-v1` HMAC과 **두 필드 모두** 일치해야 사설 Event ready로 판단합니다. 원본 Receipt ID는 `verifiedReceiptId`를 그대로 대조합니다. 테스트 입력에서 위조 영수증/서명지문, malformed HMAC를 추가해 보류 검증합니다.
+- **범위:** 기존 Event writer 및 금전/권한 변경 없음, Provider 의미적 NEWER/STALE order와 법적 환불 권한은 여전히 미증명/HOLD입니다. 내부 검토만 개선하며 공개 Route·운영 데이터·실제 환불 POST·LIVE 판매 경로는 활성화하지 않습니다. 새 CI 통과 전 PASS 미선언입니다.

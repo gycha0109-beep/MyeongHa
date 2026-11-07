@@ -175,6 +175,42 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
   });
   expect(JSON.stringify(result)).not.toContain(CANCEL);
  });
+ it('passes exact Receipt and signed-source HMAC to canonical event audit',async()=>{
+  const secret='test-only-secret-32-characters-or-more';
+  const request=signedRequest();
+  const expected='hmac-sha256:k1:'+createHmac('sha256',secret)
+    .update(JSON.stringify([
+      'portone-cancel-signed-v1','msg_1','Transaction.Cancelled',
+      Buffer.from(request.rawBody,'utf8').toString('base64'),
+    ]),'utf8').digest('hex');
+  const audit=vi.fn(async(_client,ids)=>{
+    expect(ids.expectedReceiptId).toBe(ROW.verifiedReceiptId);
+    expect(ids.expectedSignedPayloadHmac).toBe(expected);
+    return {
+      kind:'canonical_event_missing',sourceEventReady:false,
+      exactPurchaseGrantRevoked:false,grantRevocationAuthorized:false,
+      providerRefundAuthorized:false,writesPerformed:false,
+    };
+  });
+  const result=await executor(fakeDb(),fakeFetch(),{
+    request,sourceHmacSecret:secret,
+    providerEventReadinessInspector:audit,
+    cancellationSetInspector:async()=>({
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:true,providerOrderingProven:false,
+      grantRevocationAuthorized:false,providerRefundAuthorized:false,
+      writesPerformed:false,
+    }),
+  });
+  expect(audit).toHaveBeenCalledTimes(1);
+  expect(result).toMatchObject({
+    canonicalCancellationSetMatched:true,
+    canonicalProviderEventReady:false,grantRevocationAuthorized:false,
+    writesPerformed:false,
+  });
+  expect(JSON.stringify(result)).not.toContain(expected);
+ });
  it('does not accept a full-set result missing the exact signed item',async()=>{
   const result=await executor(fakeDb(),fakeFetch(),{
     sourceHmacSecret:'test-only-secret-32-characters-or-more',

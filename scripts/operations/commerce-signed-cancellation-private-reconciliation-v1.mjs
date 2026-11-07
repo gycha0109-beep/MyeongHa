@@ -118,6 +118,29 @@ export async function reconcileSignedCancellationPrivateV1({
   });
   const kind=mapping[classified.kind];
   if(!kind)return base('inconsistent_provider_readback');
+  // Only the verified raw notification bytes can be matched to an existing
+  // canonical Provider Event fingerprint. Require a private keyed source
+  // secret when this optional stronger evidence check is requested.
+  let expectedSignedPayloadHmac;
+  if(finalShape&&sourceHmacSecret!==undefined){
+    if(typeof sourceHmacSecret!=='string'||
+       sourceHmacSecret.length<32||sourceHmacSecret.length>4096||
+       sourceHmacSecret.trim()!==sourceHmacSecret||
+       /[\u0000-\u001f\u007f]/u.test(sourceHmacSecret))
+      return base('source_fingerprint_authority_unavailable');
+    try{
+      const raw=request.rawBody;
+      const bytes=typeof raw==='string'?Buffer.from(raw,'utf8'):Buffer.from(raw);
+      if(bytes.length===0||bytes.length>65536)
+        return base('authentication_rejected');
+      expectedSignedPayloadHmac='hmac-sha256:k1:'+
+        createHmac('sha256',sourceHmacSecret)
+          .update(JSON.stringify([
+            'portone-cancel-signed-v1',signed.providerWebhookId,
+            signed.eventType,bytes.toString('base64'),
+          ]),'utf8').digest('hex');
+    }catch{return base('authentication_rejected');}
+  }
   // The signed webhook and the authenticated PSP GET are not a substitute for
   // a durable, ordered, exactly-reconciled canonical Commerce Provider Event.
   // Run the existing-event audit only after both sources and the original
@@ -130,6 +153,10 @@ export async function reconcileSignedCancellationPrivateV1({
       providerWebhookId:signed.providerWebhookId,
       originalTransactionId:original.originalTransactionId,
       expectedEventType:signed.eventType,
+      expectedReceiptId:original.verifiedReceiptId,
+      ...(expectedSignedPayloadHmac===undefined?{}:{
+        expectedSignedPayloadHmac,
+      }),
     });
     if(!eventReadiness||eventReadiness.writesPerformed!==false||
        eventReadiness.grantRevocationAuthorized!==false||
@@ -146,11 +173,6 @@ export async function reconcileSignedCancellationPrivateV1({
   // one signed notification, the payment aggregate or a single Event row.
   let cancellationSet;
   if(finalShape&&sourceHmacSecret!==undefined){
-    if(typeof sourceHmacSecret!=='string'||
-       sourceHmacSecret.length<32||sourceHmacSecret.length>4096||
-       sourceHmacSecret.trim()!==sourceHmacSecret||
-       /[\u0000-\u001f\u007f]/u.test(sourceHmacSecret))
-      return base('source_fingerprint_authority_unavailable');
     try {
       const cancellationIdHmac='hmac-sha256:k1:'+
         createHmac('sha256',sourceHmacSecret)

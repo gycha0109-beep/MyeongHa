@@ -8,6 +8,7 @@ import {
 
 const EVENT='portone-event-1',TX='verified-transaction-1';
 const INPUT={providerWebhookId:EVENT,originalTransactionId:TX,expectedEventType:'Transaction.Cancelled'};
+const SOURCE_MAC='hmac-sha256:k1:'+'b'.repeat(64);
 const ROW={
  providerEventId:'00000000-0000-4000-8000-000000000001',
  eventType:'Transaction.Cancelled',eventStatus:'verified',
@@ -51,6 +52,31 @@ describe('exact verified cancellation event / Reader purchase Grant audit',()=>{
   assert.ok(SQL.includes("event.external_event_id=$1::text"));
   assert.ok(SQL.includes('effect.source_provider_event_id=event.id'));
   assert.ok(SQL.includes('grant_row.source_receipt_id=receipt.id'));
+  assert.ok(SQL.includes('event.payload_fingerprint'));
+  assert.ok(SQL.includes("event.verified_payload_jsonb->>'signedPayloadHmac'"));
+ });
+ it('binds the exact signed raw-payload HMAC and original Receipt before review',async()=>{
+  const valid={...ROW,signedEventFingerprint:SOURCE_MAC,
+    storedSignedPayloadHmac:SOURCE_MAC};
+  const input={...INPUT,expectedReceiptId:ROW.receiptId,
+    expectedSignedPayloadHmac:SOURCE_MAC};
+  assert.equal((await inspect(db([valid]),input)).sourceEventReady,true);
+  assert.equal((await inspect(db([{...valid,receiptId:
+    '00000000-0000-4000-8000-000000000099'}]),input)).kind,
+    'canonical_event_original_receipt_mismatch');
+  assert.equal((await inspect(db([{...valid,storedSignedPayloadHmac:
+    'hmac-sha256:k1:'+'c'.repeat(64)}]),input)).kind,
+    'canonical_event_signed_source_mismatch');
+  assert.equal((await inspect(db([{...valid,signedEventFingerprint:
+    'hmac-sha256:k1:'+'d'.repeat(64)}]),input)).kind,
+    'canonical_event_signed_source_mismatch');
+ });
+ it('rejects malformed source HMAC before any private DB connection',async()=>{
+  const client=db();
+  await assert.rejects(()=>inspect(client,{
+    ...INPUT,expectedSignedPayloadHmac:'raw-user-body',
+  }),/INVALID_CANCELLATION_EVENT_AUDIT_INPUT/);
+  assert.equal(client.calls.length,0);
  });
  it('observes already-revoked exact grant, without re-revoking',async()=>{
   const r=await inspect(db([{...ROW,exactEventRevocationCount:'1'}]),INPUT);

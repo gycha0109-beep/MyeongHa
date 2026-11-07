@@ -7,6 +7,8 @@ select
  event.event_type as "eventType",
  event.status as "eventStatus",
  event.resolution_source_type as "resolutionSourceType",
+ event.payload_fingerprint as "signedEventFingerprint",
+ event.verified_payload_jsonb->>'signedPayloadHmac' as "storedSignedPayloadHmac",
  event.provider_ordering_key as "providerOrderingKey",
  event.external_transaction_id as "eventTransactionId",
  event.external_original_transaction_id as "eventOriginalTransactionId",
@@ -54,6 +56,8 @@ limit 2
 const ID=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const TYPES=new Set(['Transaction.Cancelled','Transaction.PartialCancelled','Transaction.CancelPending']);
 const INTEGER=/^(0|[1-9][0-9]*)$/u;
+const MAC=/^hmac-sha256:k1:[0-9a-f]{64}$/u;
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const VALID_STATUSES=new Set(['verified','processed']);
 const no=(kind)=>Object.freeze({
  schemaVersion:'commerce-cancellation-exact-event-readiness-v1',
@@ -74,7 +78,13 @@ export const COMMERCE_CANCELLATION_EXACT_EVENT_READINESS_V1=Object.freeze({
 export async function inspectExactCancellationProviderEventReadinessV1(client,input){
  if(!input||!validId(input.providerWebhookId)||
     !validId(input.originalTransactionId)||
-    !TYPES.has(input.expectedEventType))throw Error('INVALID_CANCELLATION_EVENT_AUDIT_INPUT');
+    !TYPES.has(input.expectedEventType)||
+    (input.expectedReceiptId!==undefined&&
+      (typeof input.expectedReceiptId!=='string'||!UUID.test(input.expectedReceiptId)))||
+    (input.expectedSignedPayloadHmac!==undefined&&
+      (typeof input.expectedSignedPayloadHmac!=='string'||
+       !MAC.test(input.expectedSignedPayloadHmac))))
+  throw Error('INVALID_CANCELLATION_EVENT_AUDIT_INPUT');
  let tx=false;
  try{
   await client.query('begin isolation level repeatable read read only');tx=true;
@@ -106,6 +116,16 @@ export async function inspectExactCancellationProviderEventReadinessV1(client,in
      !/^[A-Z]{3}$/u.test(r.receiptCurrency)||
      !validId(r.receiptSubjectId))
      return no('event_receipt_identity_inconsistent');
+  // An event with the same webhook ID/transaction is not enough: verify its
+  // original Receipt and the minimized HMAC of the actual signed raw bytes.
+  // No raw provider payload is stored or returned by this private auditor.
+  if(input.expectedReceiptId!==undefined&&
+     r.receiptId!==input.expectedReceiptId)
+    return no('canonical_event_original_receipt_mismatch');
+  if(input.expectedSignedPayloadHmac!==undefined&&
+     (r.signedEventFingerprint!==input.expectedSignedPayloadHmac||
+      r.storedSignedPayloadHmac!==input.expectedSignedPayloadHmac))
+    return no('canonical_event_signed_source_mismatch');
   if(!VALID_STATUSES.has(r.eventStatus))
     return no('canonical_event_unverified');
   if(!validId(r.providerOrderingKey))
