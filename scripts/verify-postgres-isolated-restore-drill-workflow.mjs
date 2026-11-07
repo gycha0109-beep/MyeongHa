@@ -169,12 +169,15 @@ if (onSection.includes('push:')) {
   const currentFrontierBackupApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-42309503582-20261107.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved || !currentFrontierBackupApproved) {
-    throw new Error('Restore one-shot push must have exactly the eight reviewed historical/current source markers.');
+  const currentFrontierAppParityApproved = onSection.includes(
+    "'.github/ops/postgres-restore-app-parity-42309503582-20261108.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved || !currentFrontierBackupApproved || !currentFrontierAppParityApproved) {
+    throw new Error('Restore one-shot push must have exactly the nine reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 8) {
-    throw new Error('Restore one-shot push allows exactly eight pinned marker paths.');
+  if (triggerMarkers.length !== 9) {
+    throw new Error('Restore one-shot push allows exactly nine pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -215,6 +218,11 @@ if (onSection.includes('push:')) {
     'expected_artifact_id=13548176984',
     'incident_reference_utc=2026-11-07T07:46:16Z',
     'SCOPED_RESTORE_FRONTIER_20261105075227_ONLY',
+    'ops(dr): compare restored app catalog backup 42309503582',
+    'POSTGRES-RESTORE-APP-PARITY-42309503582-20261108-V1',
+    'SCOPED_APP_CATALOG_PARITY_ONLY',
+    'app-schema-parity.json',
+    'node scripts/operations/check-postgres-restored-app-schema-parity.mjs',
     'now - point <= 86400',
     'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
@@ -235,6 +243,10 @@ if (onSection.includes('push:')) {
   ]) {
     requireFragment(workflow, fragment, workflowPath);
   }
+}
+
+if ((await readFile('.github/ops/postgres-restore-app-parity-42309503582-20261108.once', 'utf8')) !== 'POSTGRES-RESTORE-APP-PARITY-42309503582-20261108-V1\n') {
+  throw new Error('Application parity one-shot must have exact reviewed marker content');
 }
 
 if (!permissionsSection.includes('actions: read') || !permissionsSection.includes('contents: read')) {
