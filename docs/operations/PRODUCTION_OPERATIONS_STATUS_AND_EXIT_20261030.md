@@ -1,3 +1,30 @@
+### 2026-11-08 KST — PR #3119 원장 기록 GREEN 확인 후 최신 운영 워크로그 충돌 재조정
+
+- **목표:** 기존 암호화 원장 RED→GREEN 성공 기록을 main과 충돌 없이 병합하고, 사용자 요청에 따라 검사 상태를 재확인한다.
+- **변경 파일:** 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` 하나. Production 원장 캡처·감시·DB 코드는 변경하지 않는다.
+- **완료:** [원장 감시 재시도 #42393589367 Attempt 2](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42393589367) SUCCESS, [#3119 통합 검증 #42396368354](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42396368354) SUCCESS를 관측했다. 현재 병합 RED는 코드 테스트 실패가 아니라 기존 WORKLOG가 이후 `main@fdefc7db38e5468794d8e85037e1691cc457c4aa`에서 수정되어 생긴 충돌이다. 과거 기록과 최신 main 기록을 모두 보존했다.
+- **브랜치·커밋·PR:** `ops/privacy-ledger-freshness-recovery-20261108`, 통합 전 `139e0c821a0d9f70871346cd8f3ef7d72c31f17c`, 기준 `main@fdefc7db38e5468794d8e85037e1691cc457c4aa`, [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119). 본 작업의 병합 커밋은 해당 PR 최신 HEAD에서 확인한다.
+- **검증/미완료:** 본 병합 커밋의 신규 CI·통합 검사와 main 병합 성공은 아직 미확정; 이전 GREEN을 신규 HEAD의 GREEN으로 승격하지 않는다. 정기 원장 연속성, nonzero 삭제/철회 및 전체 DR 수용은 여전히 미입증.
+- **블로커/다음:** 새 CI→필수 통합 검사→자동 병합 재확인. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 승인 필요한 Production 변경·유료 리소스 실행 없음.
+
+### 2026-11-08 KST — 개인정보 원장 GREEN 기록 PR #3119의 main 병합 충돌 정리
+
+- **목표:** 기존 성공한 원장 캡처/감시기 RED→GREEN 작업 기록 [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119)을, 이후 main에 병합된 Phase 11 기록과 충돌 없이 통합한다. 누락된 기록을 삭제하거나 재실행 완료로 간주하지 않는다.
+- **변경 파일:** 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` 하나. 원장 캡처/감시기 코드와 워크플로는 수정 없음.
+- **완료:** PR #3119 본래의 RED→GREEN 실증(암호화 artifact `13582736761`, 감시 [#42393589367 Attempt 2](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42393589367) SUCCESS)을 이전 본문 그대로 보존하고, 최신 `main@7c3a0aa7218700da440900d8278d944742af9532`의 운영 워크로그를 유지한다.
+- **브랜치·커밋·PR:** `ops/privacy-ledger-freshness-recovery-20261108`, 충돌 전 HEAD `e220e0dce3bcd6c621c4c8b357a2b3f823fd27d9`, 기준 main `7c3a0aa7218700da440900d8278d944742af9532`, [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119). 본 통합은 두 부모를 가진 한 커밋으로 갱신한다.
+- **테스트/CI:** 이전 커밋의 CI/Governance/Web Gates는 SUCCESS였으나 이 새 통합 HEAD의 결과는 아직 미확인. 필수 Integration 확인 후 자동 병합. 실제 원장 재실행은 해당 Attempt 2로 이미 검증돼 불필요하게 반복하지 않음.
+- **미완료·블로커·다음:** 시간당 정기 캡처의 장기 지속성, nonzero 삭제·철회 연속성 및 Phase 8 Hosted 복구/RPO/RTO는 미완료. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 새 CI 종료·병합 확인 뒤 다음 남은 운영 차단을 처리한다. Production 변경·유료 Hosted 자원·canary 없음.
+
+### 2026-11-08 KST — 개인정보 복구 원장 freshness RED 실측 원인 및 재캡처 GREEN 확인
+
+- **작업 목표/로드맵:** 종료 집중 로드맵 Gate 1 / Phase 8-C의 기존 `7,200초` 암호화 원장 캡처 freshness 차단을 정상 원장 캡처와 원래 검사 재실행으로 복구한다. 사용자 지정 [실패 Actions #42393589367 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42393589367) / source main `e164f7cc1e6d12d5667592ca998de3ed1240422b`를 근거로 한다.
+- **실패 로그/원인:** 2026-11-07 16:54:05 UTC 실패: `CAPTURE_COMPLETION_STALE`, 마지막 성공한 암호화 원장 [#42381192945 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42381192945) job 완료 `2026-11-07T14:21:37Z`, 그로부터 `9,146초`(허용 `7,200초`). `encryptedArtifactObserved=true`, `checkPassed=false`; 이는 소스 테스트 assertion이 아니라 실제 운영 캡처의 시간 초과를 fail-closed로 검출한 것이다. 조회한 최신 Actions 목록에서 그 사이에 후속 원장 캡처 실행을 발견하지 못했다. 누락된 스케줄 실행의 플랫폼 측 근본 원인은 미확인.
+- **조치/실제 재시험:** 보호된 Production 원장의 **기존 성공 암호화 캡처 job `128428963974`**를 GitHub Actions의 작업 재실행으로 요청했다. 동일 [캡처 Run #42381192945 Attempt 2](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42381192945)가 `2026-11-07T17:01:01Z` **SUCCESS**; 최신 캡처 job `128467737140`의 필수 암호화 업로드 단계 SUCCESS; 식별자/데이터 없는 암호화 산출물 `13582736761` (`myeongha-privacy-ledger-20261107T170058Z`, expired=false)을 확인했다. 이어 실패한 [freshness Watch #42393589367 Attempt 2](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42393589367)를 **실패 작업만 재실행**하여 `2026-11-07T17:01:47Z` **SUCCESS**를 확인했다. 최신 watcher job `128468017535`는 `latestSuccessfulRunAttempt=2`, `elapsedSinceRunCompletionSeconds=42`, `status=RECENT_CAPTURE_COMPLETION_OBSERVED`, `checkPassed=true`, `encryptedArtifactObserved=true`를 출력했다.
+- **변경 파일/브랜치·커밋·PR:** 이 단위의 유일한 저장소 변경은 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` WORKLOG의 본 기록이다. 브랜치 `ops/privacy-ledger-freshness-recovery-20261108`, 최초 WORKLOG 커밋 `3d38785d86bd9d6bc5f84f4e015fa7f26316391a`, [PR #3119](https://github.com/gycha0109-beep/MyeongHa/pull/3119). 별도 신규 WORKLOG를 만들지 않는다. `.github/workflows/production-postgres-privacy-recovery-ledger.yml`의 기존 시간당 `47 * * * *` 캡처와 `scripts/operations/check-privacy-ledger-completion-freshness.mjs`의 2시간 fail-closed 기준은 정상 동작하므로 **코드·임계치 변경 없이** 실제 캡처와 검사만 재실행했다.
+- **완료와 미완료 구분:** **현재 원장 업로드 freshness 점검만 GREEN**. 이벤트 수, 원장 독립 내구성·누락 없는 삭제/철회 연속성, 최신 backup과 같은 복구 묶음, provider Auth/Storage full restore, 전 서비스 RPO/RTO는 **미증명**. Attempt 2의 sanitized 출력도 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `approvedRpoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`. P0 #1887 OPEN 유지. 일정대로 후속 캡처가 실행되는지는 감시를 계속해야 하며 단일 복구로 scheduler 신뢰성을 완료 판정하지 않는다.
+- **블로커·다음 작업:** 이 WORKLOG 변경의 필수 GitHub PR CI/통합 검증·병합은 본 기록 작성 시점 미완료. 후속 원장 캡처 공백 재발 여부와 Phase 8 독립 개인정보 연속성·Hosted 복구 근거를 로드맵 내에서 처리한다. 실제 Production DML/DDL, 마이그레이션 수정, 신규 유료 Hosted 환경, Production privacy canary, 비밀/IAM/트래픽 변경은 이 단위에 포함하지 않았다.
+
 ### 2026-11-08 KST — Phase 8-A 운영 전체 애플리케이션 카탈로그 ↔ 격리 복원본 일치 비교 구현 (단위작업)
 
 - **기존 로드맵·착수 기준:** `PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md` Gate 1 / Phase 8-A #6 (전체 schema/function/owner/ACL/RLS·provider ledger 복구 동등성). 이전 PR #3114는 main `9740e36ed1c6c49a9eb771c0048b890aa70e0e03`로 병합됐고, 본 단위는 그 2건의 이름 조회를 반복하지 않는다. main 기준 `606691aeac168b4896f487569e4c5d6b65de6eeb`에서 시작함.
