@@ -214,6 +214,7 @@ export const ADMIN_USER_SCOPES_V1 = [
   { key: 'deleted', label: '삭제 완료 기록', kind: 'member', status: 'deleted' },
   { key: 'all', label: '전체 내부 기록', kind: 'all', status: 'all' },
 ] as const;
+export const DEFAULT_ADMIN_USER_SCOPE_V1 = ADMIN_USER_SCOPES_V1[0];
 
 export function formatAdminSeoulDateV1(value: unknown): string {
   if (typeof value !== 'string' || value.trim() === '') return '기록 없음';
@@ -355,8 +356,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [deletionScope, setDeletionScope] = useState<'all' | 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person'>('all');
   const [releaseStatus, setReleaseStatus] = useState<'all' | 'draft' | 'active' | 'retired'>('all');
   const [characterAvailability, setCharacterAvailability] = useState<'all' | 'available' | 'unlockable' | 'locked' | 'coming_soon'>('all');
-  const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>(section === 'users' ? 'member' : 'all');
-  const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>(section === 'users' ? 'active' : 'all');
+  const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>(section === 'users' ? DEFAULT_ADMIN_USER_SCOPE_V1.kind : 'all');
+  const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>(section === 'users' ? DEFAULT_ADMIN_USER_SCOPE_V1.status : 'all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
   const [aiFeature, setAiFeature] = useState('all');
   const [aiModel, setAiModel] = useState('');
