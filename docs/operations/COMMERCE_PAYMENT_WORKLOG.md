@@ -785,3 +785,9 @@
 - **근거:** 공식 PortOne V2 취소 웹훅은 결제 전체 식별자 외에 개별 `cancellationId`를 제공합니다. 이전 read-only 재조합은 결제 전체의 `CANCELLED/PARTIAL_CANCELLED` 상태를 믿었으나, 서명된 **정확한 취소 ID**가 실제 GET에서 `SUCCEEDED`인지와 개별 취소 금액·누적 금액을 필수로 검사하지 않았습니다.
 - **구현:** `commerce-signed-cancellation-private-reconciliation-v1.mjs`에 서명 알림의 취소 ID 의무화, GET 결과의 동일 취소 ID/상태/정수 금액/원본 Receipt 금액 대조를 추가했습니다. 완전취소 알림을 부분취소 조회 결과로 잘못 채택하는 경우도 HOLD합니다. 후속 완전 취소 때문에 오래된 정상 부분취소 알림이 재전달되는 사례는 개별 ID 성공 금액이 일치할 때 비권한 검토 결과로만 허용합니다.
 - **검증·경계:** 내부 비운영 mock 회귀 4건 추가. Provider Event 기록기, 원본 Receipt·Grant·환불 데이터, 공개 API·웹훅 연결·실제 취소/환불 POST·운영 DB·판매 활성화는 변경하지 않습니다. 정확한 공급자 이벤트 순서 및 권한 회수 허가를 추정하지 않으며, 전체 CI 이전 PASS 미선언입니다.
+
+
+### 2026-11-07 — Reader TypeScript/실DB 연결 회귀의 중복 Guest 전환 제거
+
+- **실패 근거:** [PR #3090 핵심 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367519466/job/128388734751)에서 구매-Chat 연결 fixture가 통과한 직후, 별도 TypeScript/실DB 연결 fixture가 이미 활성 Member인 유료 Reader 구매자에게 다시 `cmd_promote_guest_v1`을 호출하여 `guest promotion requires an active unmerged guest subject`로 실패했습니다.
+- **수정:** 테스트 전용 Guest 세션 생성·비회원 전환 호출을 없애고 동일 구매자의 Member 활성 상태와 기존 Auth ID를 검증한 뒤, 기존 구매 Grant 복원·Reader 첫 채팅 생성 및 별도 패키지 검사 로직을 그대로 수행하도록 갱신했습니다. 비운영 fixture 이외 운영 SQL, 승인 정책, 공개 API·LIVE·실제 환불 호출은 변경하지 않았습니다. 새 HEAD CI 통과 전 완료 미확정입니다.
