@@ -553,6 +553,14 @@ body.product-page::before {
   gap: 28px;
   flex-wrap: wrap;
 }
+.product-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.product-footer-unavailable { opacity: .76; cursor: default; }
 .product-footer-seal { color: var(--mh-seal); font-family: var(--mh-serif); }
 .mobile-bottom-nav { display: none; }
 
