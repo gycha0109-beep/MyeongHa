@@ -74,6 +74,10 @@ for (const [source, row] of MY_STATIC_UI_COPY_V1) {
 }
 for (const [source, row] of COPY) registerStaticCopy(source, { 'ja-JP': row[0], 'zh-TW': row[1] });
 for (const [source, row] of PLANNED_STATIC_UI_COPY_V1) registerStaticCopy(source, { 'en-US': row[0], 'zh-CN': row[1] });
+// Stage 5: unpublished footer policies are informational, never clickable legal terms.
+registerStaticCopy('서비스 안내 (준비 중)', { 'ja-JP': 'サービス案内（準備中）', 'zh-TW': '服務說明（準備中）', 'en-US': 'Service information (coming soon)', 'zh-CN': '服务说明（准备中）' });
+registerStaticCopy('이용약관 (공개 준비 중)', { 'ja-JP': '利用規約（公開準備中）', 'zh-TW': '服務條款（尚未公開）', 'en-US': 'Terms of Service (not yet published)', 'zh-CN': '服务条款（尚未发布）' });
+registerStaticCopy('개인정보처리방침 (공개 준비 중)', { 'ja-JP': 'プライバシーポリシー（公開準備中）', 'zh-TW': '隱私權政策（尚未公開）', 'en-US': 'Privacy Policy (not yet published)', 'zh-CN': '隐私政策（尚未发布）' });
 // Shared header native hover titles. Keep the same authored Korean source for
 // DOM first paint, theme toggles, and locale changes across all five locales.
 for (const [source, translated] of Object.entries({
