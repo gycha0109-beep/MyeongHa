@@ -4,7 +4,7 @@
 - **변경 파일:** `docs/operations/POSTGRES_REPOSITORY_ONLY_VERSION_DISPOSITION_20261107.json` (76건 근거), 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` (본 기록). 중복 생성된 `docs/operations/WORKLOG_PHASE8_REPOSITORY_ONLY_DISPOSITION_20261107.md`는 제거. Production SQL·애플리케이션·워크플로 변경 없음.
 - **완료:** 기존 읽기 전용 `POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json`의 repository-only 버전 76건과 현재 저장소의 SQL 276개를 독립 대조. 76/76 버전 일치, 중복 0, 누락 0, 파일명 불일치 0, 관측 뒤 migration 파일 변경 0. 파일명 기준 Reader 60, Saju 6, Commerce 2, 버전 이동 Commerce 8건으로 분류. 기존 8쌍 SQL byte-exact 4건·종료문 차이 4건을 이력으로만 기록하며 버전/적용 provenance는 불일치·미입증 유지.
 - **미완료:** 76건의 실제 객체·DDL·권한·배포 출처 동등성, 원격 전용 41건과 전체 migration ledger/Provider parity, Hosted Auth/Storage, 독립 Privacy 연속성 및 전체 서비스 RPO/RTO. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
-- **브랜치·커밋·PR:** `ops/phase8-repository-only-disposition-20261107` / PR [#3105](https://github.com/gycha0109-beep/MyeongHa/pull/3105), 기존 분류 브랜치 HEAD `2eb6915c89b2008602f825ac199435525c03744e`를 기준으로 기존 WORKLOG 통합 커밋. 최종 HEAD 및 병합 후 CI 결과는 별도 확인 전 미판정.
+- **브랜치·커밋·PR:** `ops/phase8-repository-only-disposition-20261107` / PR [#3105](https://github.com/gycha0109-beep/MyeongHa/pull/3105), 기존 분류 HEAD `2eb6915c89b2008602f825ac199435525c03744e`, 기존 WORKLOG 통합 커밋 `740b5a025c6204b5810322908a52bfab6c9335f9`. 최종 HEAD 및 병합 후 CI 결과는 별도 확인 전 미판정.
 - **테스트·CI 근거:** sanitized 원장·현재 SQL 파일의 exact 버전/파일명 일치 검사 PASS, 기존 PR의 일반 CI/Governance 등은 해당 커밋별 근거만 유효. 이 변경 HEAD 전체 Integration과 main 후속 검증은 통과 전 성공으로 판정하지 않는다.
 - **블로커·다음 작업:** PR #3105 정확한 HEAD 전체 CI·병합 확인 후 로드맵 8-A 실질 객체·권한·source parity 근거 조사. Production repair/DDL/DML, 신규 Hosted/Secret/traffic, 개인정보 Canary는 사용자 명시 승인 전 금지.
 
