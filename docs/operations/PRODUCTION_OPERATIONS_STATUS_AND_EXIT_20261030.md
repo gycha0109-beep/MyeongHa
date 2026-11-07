@@ -1,3 +1,13 @@
+### 2026-11-08 KST — Phase 8-A 백업 동봉 원본 지문과 과거 날짜 관측의 비교 결과 구분
+
+- **로드맵/목표:** 기존 Gate 1 / 8-A #6의 실제 격리 복원 원본-복원본 비교 정합성. PR #3139의 신형 암호화 source-app-catalog witness를 비교하더라도 예전 `SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS`로 표시되던 문제 수정. 새 해석 서비스나 재해 복구 수용 기준 추가 없음.
+- **변경 파일·구현 커밋:** `scripts/operations/check-postgres-restored-app-schema-parity.mjs`에서 동일 백업 실행의 전후 read-only witness와 구형 날짜 관측을 별개 provenance로 출력, 전후 순서·stable flag·미공유 MVCC 증거 위조는 거부. `scripts/verify-postgres-restored-app-schema-parity.mjs`에 두 출처의 정확한 표시 및 위조 거부 회귀 검사 추가. 기존 중앙 WORKLOG 본 파일 갱신. 선행 코드 커밋 `a278fd299952ab777fca5ca69f8b0096d5ccece1`, `9c884bfe88d4ffdbdfc70e54df050fdb3373546c`, `2244ef7b55f75a081d8e43ea405d8eb92ab812ea`; PR [#3139](https://github.com/gycha0109-beep/MyeongHa/pull/3139), 트랙 `ops`.
+- **CI/실측:** 이전 정확한 HEAD `62542493365849ad5d53a001043fdf4d04a89c0e`의 [CI #42415307232](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415307232), [Governance #42415307234](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415307234), [Web PR #42415307351](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415307351)은 PASS. **이번 보정 이후 HEAD의 새 CI·CI Integration은 별도 증거로 확인 전 미판정.** 기존 메인 백업 #42415093056은 새 witness가 병합되기 전 소스이므로 신형 백업 증거로 사용하지 않음.
+- **남은 것/다음:** 최종 PR HEAD CI 및 full Integration PASS 후 자동 병합, 병합된 새 소스를 사용한 정기 암호화 백업의 실제 witness 생성 및 해당 아카이브를 격리 PG17에 복원하여 비교한 판정 확인. `SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT`는 인과적 원인 규명 불가를 유지하며 다른 복원 손실/ACL 문제를 성공으로 덮지 않음.
+- **블로커/승인:** Production DDL/DML, role, provider, secret, privacy canary, 신규 Hosted/유료 DR target 변경 없음. Hosted Auth/Storage, 독립 개인정보 원장, 전체 서비스 PT24H/PT6H, Phase 13은 미완료. #1887 OPEN, `dr_ready=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE` 미충족.
+
+Watchtower-Track: ops
+
 ### 2026-11-08 KST — Phase 8-A 암호화 원본 카탈로그 witness PR #3139 최신 main 충돌 정리
 
 - **목표:** Gate 1 / Phase 8-A의 백업-원본 메타데이터 지문 봉인 구현 [PR #3139](https://github.com/gycha0109-beep/MyeongHa/pull/3139)을 최신 운영 WORKLOG와 합쳐, 이미 병합된 타 트랙 기록을 잃지 않고 통합 검사 경로를 복구한다.
