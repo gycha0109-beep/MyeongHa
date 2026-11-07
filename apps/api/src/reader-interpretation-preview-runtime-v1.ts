@@ -18,6 +18,10 @@ import {
   type CharacterSajuUtteranceV1,
 } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import {
+  runCharacterSajuConsultationShadowV1,
+  type CharacterSajuConsultationShadowPortV1,
+} from './character-saju-consultation-shadow-v1.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import {
   prepareOfficialReadingReaderAdmissionV1,
@@ -123,6 +127,8 @@ export interface RunReaderInterpretationPreviewInputV1 {
   readonly accessAuthorityPort: CharacterStandardReadingAccessAuthorityPortV1;
   readonly artifactAuthorityPort: CharacterStandardReadingArtifactAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Server-side optional comparison only; no user-visible candidate. */
+  readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
 }
 
 export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
@@ -140,6 +146,8 @@ export interface RunThreadBoundReaderInterpretationPreviewInputV1 {
   readonly memoryGrantsAuthorityPort: MemoryGrantsReadAuthorityPortV1;
   readonly nonMemoryContextAuthorityPort: ReaderContextLifeFactsReadAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Server-side optional comparison only; no user-visible candidate. */
+  readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
   /**
    * Product/Commerce server-only authority. Missing authority fails closed:
    * it cannot be substituted with a hard-coded standard Product or Reader role.
@@ -421,6 +429,8 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
   readonly context: CharacterRuntimeContextV1;
   readonly requestedDomain: SajuDomain;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Server-side optional comparison only; no user-visible candidate. */
+  readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
 }): Promise<ReaderInterpretationPreviewEnvelopeV1> {
   // Character-neutral bounded selection is resolved before the Saju call.
   // Reader grants, pinned Character content and rollout admission remain
@@ -484,6 +494,24 @@ async function renderResolvedReaderInterpretationPreviewV1(input: {
     });
   }
 
+  // After official access, grounding admission, and semantic preservation:
+  // comparison candidates are NEVER included in any Reader preview envelope.
+  if (input.consultationShadowPort !== undefined) {
+    try {
+      await runCharacterSajuConsultationShadowV1({
+        rendered,
+        grounding,
+        publishedCharacterVoice: Object.freeze({
+          speech: input.context.speech,
+          persona: input.context.persona,
+        }),
+        port: input.consultationShadowPort,
+      });
+    } catch {
+      // Shadow errors cannot replace or weaken the exact-core Reading.
+    }
+  }
+
   return withHash({
     ...common,
     mode: 'reader_interpretation' as const,
@@ -527,6 +555,7 @@ export async function runReaderInterpretationPreviewV1(
     context: input.context,
     requestedDomain: input.requestedDomain,
     groundingProjectionPort: input.groundingProjectionPort,
+    consultationShadowPort: input.consultationShadowPort,
   });
 }
 
@@ -697,5 +726,6 @@ export async function runThreadBoundReaderInterpretationPreviewV1(
     context: prepared.context,
     requestedDomain: prepared.source.sajuDomain,
     groundingProjectionPort: input.groundingProjectionPort,
+    consultationShadowPort: input.consultationShadowPort,
   });
 }
