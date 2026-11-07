@@ -9,6 +9,7 @@ select
  event.resolution_source_type as "resolutionSourceType",
  event.payload_fingerprint as "signedEventFingerprint",
  event.verified_payload_jsonb->>'signedPayloadHmac' as "storedSignedPayloadHmac",
+ event.verified_payload_jsonb->>'cancellationIdHmac' as "storedCancellationIdHmac",
  event.provider_ordering_key as "providerOrderingKey",
  event.external_transaction_id as "eventTransactionId",
  event.external_original_transaction_id as "eventOriginalTransactionId",
@@ -92,7 +93,10 @@ export async function inspectExactCancellationProviderEventReadinessV1(client,in
       (typeof input.expectedReceiptId!=='string'||!UUID.test(input.expectedReceiptId)))||
     (input.expectedSignedPayloadHmac!==undefined&&
       (typeof input.expectedSignedPayloadHmac!=='string'||
-       !MAC.test(input.expectedSignedPayloadHmac))))
+       !MAC.test(input.expectedSignedPayloadHmac)))||
+    (input.expectedCancellationIdHmac!==undefined&&
+      (typeof input.expectedCancellationIdHmac!=='string'||
+       !MAC.test(input.expectedCancellationIdHmac))))
   throw Error('INVALID_CANCELLATION_EVENT_AUDIT_INPUT');
  let tx=false;
  try{
@@ -135,6 +139,11 @@ export async function inspectExactCancellationProviderEventReadinessV1(client,in
      (r.signedEventFingerprint!==input.expectedSignedPayloadHmac||
       r.storedSignedPayloadHmac!==input.expectedSignedPayloadHmac))
     return no('canonical_event_signed_source_mismatch');
+  // Same receipt and signed envelope are insufficient if a different
+  // cancellation item was bound to this persisted event. Check exact item.
+  if(input.expectedCancellationIdHmac!==undefined&&
+     r.storedCancellationIdHmac!==input.expectedCancellationIdHmac)
+    return no('canonical_event_cancellation_item_mismatch');
   if(!VALID_STATUSES.has(r.eventStatus))
     return no('canonical_event_unverified');
   if(!validId(r.providerOrderingKey))

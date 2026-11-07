@@ -830,3 +830,10 @@
 - **발견:** `inspectExactCancellationProviderEventReadinessV1`의 기존 `purchaseGrantCount/exactEventRevocationCount`는 Receipt에 붙은 **모든 종류의 Entitlement Grant**를 집계했습니다. 해당 이벤트에 비Reader 권한이 있으면 Reader 권한 지급·회수 확인을 오판할 수 있었습니다.
 - **구현:** 두 수치 모두 기존 `standard_reading_reader_access_grants`와 **정확한 원본 Purchase Intent ID/Subject/Grant ID**를 결합한 Reader 구매권만 세도록 변경했습니다. 이미 회수된 건은 동일 Provider Event의 `entitlement_events.event_type=revoked` 및 `target_status=revoked`인 실제 효과만 인정합니다. 기존 DB 테이블·Reader 회수 Writer·원본 이벤트 중복 방지/서명·타 Reader 권한은 변경하지 않습니다.
 - **검증:** 회귀 검사에서 Reader 접근권과 구매 ID/Grant 결속, 목표 revoked 상태를 확인하도록 보강했습니다. 이 감사는 관찰만 하며 개별 Provider 최신 순서·법적 환불·Reader/T2 잠금에 대한 권한을 발행하지 않습니다. 실제 결제, PG POST, 운영 스키마/공개 API/LIVE 변경 없음. 새 HEAD의 CI 통과 전에는 완료 미확정입니다.
+
+
+### 2026-11-07 — 서명 알림의 특정 취소 건과 기존 Provider Event의 지문 결속 강화
+
+- **발견:** 기존 사설 이벤트 감사는 원본 영수증 ID와 서명 원문 지문을 검증했지만, 같은 결제에 여러 부분취소가 있는 경우 **해당 이벤트의 `verified_payload_jsonb.cancellationIdHmac`**가 서명 알림의 정확한 `cancellationId`와 일치하는지는 요구하지 않았습니다. 전체 취소 집합 감사는 항목의 존재를 별도로 확인하므로 서로 다른 이벤트로 착각할 여지가 있었습니다.
+- **구현:** `inspectExactCancellationProviderEventReadinessV1`에서 정확한 취소 항목 HMAC을 기존 이벤트의 `cancellationIdHmac`와 비교하고, 잘못된/누락된/형식 불일치 값은 읽기 전용 HOLD합니다. 내부 서명 검토기는 동일 원본 알림·키로 만든 항목 HMAC을 **기존 Provider Event 감사와 전체 취소 집합 감사 양쪽에 재사용**합니다.
+- **검증/경계:** 같은 영수증의 다른 취소 건, 누락 지문, 잘못된 입력과 연결 파라미터를 회귀 테스트에 추가했습니다. SQL 후보·Provider 환불 POST·Entitlement Effect/Reader T2·운영 DB·공개 webhook·LIVE는 변경하지 않습니다. 새 CI 통과 전 완료 미확정, 공급자 최신 순서·최종 정산은 여전히 HOLD입니다.

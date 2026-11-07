@@ -186,6 +186,11 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
   const audit=vi.fn(async(_client,ids)=>{
     expect(ids.expectedReceiptId).toBe(ROW.verifiedReceiptId);
     expect(ids.expectedSignedPayloadHmac).toBe(expected);
+    const itemMac='hmac-sha256:k1:'+createHmac('sha256',secret)
+      .update(JSON.stringify([
+        'portone-cancellation-item-v1',PAYMENT_ID,CANCEL,
+      ]),'utf8').digest('hex');
+    expect(ids.expectedCancellationIdHmac).toBe(itemMac);
     return {
       kind:'canonical_event_missing',sourceEventReady:false,
       exactPurchaseGrantRevoked:false,grantRevocationAuthorized:false,

@@ -121,7 +121,7 @@ export async function reconcileSignedCancellationPrivateV1({
   // Only the verified raw notification bytes can be matched to an existing
   // canonical Provider Event fingerprint. Require a private keyed source
   // secret when this optional stronger evidence check is requested.
-  let expectedSignedPayloadHmac;
+  let expectedSignedPayloadHmac,expectedCancellationIdHmac;
   if(finalShape&&sourceHmacSecret!==undefined){
     if(typeof sourceHmacSecret!=='string'||
        sourceHmacSecret.length<32||sourceHmacSecret.length>4096||
@@ -138,6 +138,12 @@ export async function reconcileSignedCancellationPrivateV1({
           .update(JSON.stringify([
             'portone-cancel-signed-v1',signed.providerWebhookId,
             signed.eventType,bytes.toString('base64'),
+          ]),'utf8').digest('hex');
+      expectedCancellationIdHmac='hmac-sha256:k1:'+
+        createHmac('sha256',sourceHmacSecret)
+          .update(JSON.stringify([
+            'portone-cancellation-item-v1',
+            signed.providerPaymentId,signed.providerCancellationId,
           ]),'utf8').digest('hex');
     }catch{return base('authentication_rejected');}
   }
@@ -156,6 +162,7 @@ export async function reconcileSignedCancellationPrivateV1({
       expectedReceiptId:original.verifiedReceiptId,
       ...(expectedSignedPayloadHmac===undefined?{}:{
         expectedSignedPayloadHmac,
+        expectedCancellationIdHmac,
       }),
     });
     if(!eventReadiness||eventReadiness.writesPerformed!==false||
@@ -174,17 +181,11 @@ export async function reconcileSignedCancellationPrivateV1({
   let cancellationSet;
   if(finalShape&&sourceHmacSecret!==undefined){
     try {
-      const cancellationIdHmac='hmac-sha256:k1:'+
-        createHmac('sha256',sourceHmacSecret)
-          .update(JSON.stringify([
-            'portone-cancellation-item-v1',
-            signed.providerPaymentId,signed.providerCancellationId,
-          ]),'utf8').digest('hex');
       const compare=cancellationSetInspector??
         reconcileStoredPortOneCancellationSetWithGetPrivateV1;
       cancellationSet=await compare({
         dbClient,receiptId:original.verifiedReceiptId,
-        expectedCancellationIdHmac:cancellationIdHmac,
+        expectedCancellationIdHmac,
         sourceHmacSecret,apiSecret,fetchImpl,
       });
       if(!cancellationSet||
