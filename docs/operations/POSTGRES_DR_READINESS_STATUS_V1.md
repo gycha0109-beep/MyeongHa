@@ -1,4 +1,4 @@
-## 2026-11-07 verified restore status (latest observation)
+## 2026-11-07 current isolated restore proof
 
 The newest governed encrypted Production backup [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582)
 (artifact `13548176984`, source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`)
@@ -15,6 +15,8 @@ A separate **read-only** Production migration query on 2026-11-07 returned
 The repository's latest numeric migration **file** version is `20261029185500`;
 this is intentionally distinct from the remote-applied frontier and does
 **not** imply source/ACL equivalence.
+
+## 2026-11-07 verified restore status (latest observation)
 
 ```yaml
 verified_isolated_restore_run_id: 42375717923
