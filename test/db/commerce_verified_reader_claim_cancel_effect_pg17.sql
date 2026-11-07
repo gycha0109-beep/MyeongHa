@@ -22,6 +22,11 @@ where access.entitlement_grant_id=g.id
 do $commerce_claim_e2e$
 declare
  v_wrong_grant_rejected boolean := false;
+ v_refund_decision_id uuid:='1219d000-0000-4000-8000-000000000001'::uuid;
+ v_claim_fingerprint text;
+ v_refund_reservation record;
+ v_recorded_response boolean;
+ v_refund_confirm_denied boolean:=false;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -134,6 +139,69 @@ begin
   raise exception 'CLAIM_E2E_OTHER_READER_PURCHASE_ACCEPTED';
  end if;
  v_wrong_grant_rejected:=false;
+
+
+ -- One owner-approved MANUAL decision, created only in this disposable
+ -- ROLLBACK fixture. This represents a prior legal adjudication; receiving
+ -- a Claim alone never creates legal approval or initiates a PortOne POST.
+ v_claim_fingerprint:='sha256:v1:'||pg_catalog.encode(
+   pg_catalog.sha256(pg_catalog.convert_to(v_claim::text,'UTF8')),'hex'
+ );
+ insert into public.commerce_reader_full_refund_dispatches_v1(
+   id,receipt_id,legal_decision_ref,legal_actor_ref,
+   legal_approved_at,reason,retained_until,source_claim_fingerprint
+ ) values (
+   v_refund_decision_id,v_receipt.id,
+   'sha256:v1:'||repeat('e',64),
+   'operator:1219d000-0000-4000-8000-000000000002',
+   pg_catalog.clock_timestamp()-interval '2 seconds',
+   'non_delivery',pg_catalog.clock_timestamp()+interval '6 years',
+   v_claim_fingerprint
+ );
+ select s.request_state into strict v_request_state
+ from public.qry_received_digital_reading_withdrawal_claim_v1(v_subject,v_claim) s;
+ if v_request_state<>'refund_decision_recorded'
+    or (select count(*) from public.digital_reading_withdrawal_claims_private_v1
+        where id=v_claim and state='received')<>1 then
+   raise exception 'CLAIM_E2E_MANUAL_DECISION_NOT_REFLECTED_WITH_IMMUTABLE_CLAIM';
+ end if;
+
+ -- The existing internal reservation locks the SAME original B2 Receipt,
+ -- Purchase Intent and unique original PortOne payment attempt. No network.
+ select * into strict v_refund_reservation
+ from public.internal_reserve_reader_full_refund_dispatch_v1(v_refund_decision_id);
+ if v_refund_reservation.decision<>'dispatch'
+    or v_refund_reservation.payment_id<>'synthetic-hmac-b2-payment'
+    or v_refund_reservation.transaction_id is distinct from
+       v_receipt.external_transaction_id
+    or v_refund_reservation.original_amount_minor is distinct from
+       v_receipt.verified_amount_minor
+    or v_refund_reservation.original_currency is distinct from
+       v_receipt.verified_currency
+    or v_refund_reservation.known_cancellation_id is not null then
+   raise exception 'CLAIM_E2E_OWNER_REFUND_RESERVED_WRONG_ORIGINAL_RECEIPT';
+ end if;
+ select s.request_state into strict v_request_state
+ from public.qry_received_digital_reading_withdrawal_claim_v1(v_subject,v_claim) s;
+ if v_request_state<>'refund_processing' then
+   raise exception 'CLAIM_E2E_REFUND_RESERVATION_STATUS_NOT_VISIBLE';
+ end if;
+ -- Simulate the private worker saving its REQUESTED provider response.
+ -- Do NOT contact PortOne, invent a successful cancellation or claim refund.
+ select public.internal_record_reader_full_refund_response_v1(
+   v_refund_decision_id,'synthetic-claim-b2-not-confirmed','REQUESTED'
+ ) into strict v_recorded_response;
+ select s.request_state into strict v_request_state
+ from public.qry_received_digital_reading_withdrawal_claim_v1(v_subject,v_claim) s;
+ if v_recorded_response is distinct from true
+    or v_request_state<>'refund_processing'
+    or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+        where id=v_refund_decision_id and receipt_id=v_receipt.id
+          and source_claim_fingerprint=v_claim_fingerprint
+          and status='submitted' and provider_request_status='REQUESTED')<>1
+ then
+   raise exception 'CLAIM_E2E_SUBMITTED_REQUEST_WRONGLY_CLAIMED_CONFIRMED';
+ end if;
 
  -- S1 MUST be acquired BEFORE provider Event / Grant row locks of
  -- the legacy effect writer. Pin ALL original B2/B3 Reader access scopes in
@@ -260,11 +328,38 @@ begin
   raise exception 'CLAIM_E2E_OTHER_READER_EFFECT_ALLOWED';
  end if;
 
- -- Immutable Claim and its response remain "received"; a provider Event and
- -- synthetic Entitlement Effect are not a refund legal decision or delivery.
+
+ -- Even a persisted source-v2 cancellation Event and a hypothetical exact
+ -- Grant effect DO NOT confirm the manual refund while the original Receipt
+ -- lacks the verified full cancellation + exact PortOne cancellation ID.
+ -- This must remain refund_processing in the customer's own status GET.
+ begin
+   perform public.internal_confirm_reader_full_refund_dispatch_v1(
+     v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+   );
+ exception when check_violation then
+   if sqlerrm='Refund receipt still unconfirmed by verified cancellation' then
+     v_refund_confirm_denied:=true;
+   else
+     raise;
+   end if;
+ end;
  select s.request_state into strict v_request_state
  from public.qry_received_digital_reading_withdrawal_claim_v1(v_subject,v_claim) s;
- if v_request_state<>'received'
+ if not v_refund_confirm_denied
+    or v_request_state<>'refund_processing'
+    or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+        where id=v_refund_decision_id and status='submitted'
+          and confirmed_at is null)<>1 then
+   raise exception 'CLAIM_E2E_UNVERIFIED_REFUND_CONFIRMATION_ALLOWED';
+ end if;
+
+ -- The original Claim row remains 'received' even though its external
+ -- status projection can now say refund_processing. The latter is not an
+ -- immutable Claim mutation or a verified PortOne refund.
+ select s.request_state into strict v_request_state
+ from public.qry_received_digital_reading_withdrawal_claim_v1(v_subject,v_claim) s;
+ if v_request_state<>'refund_processing'
     or (select count(*) from public.digital_reading_withdrawal_claims_private_v1 c
         where c.id=v_claim and c.subject_id=v_subject
           and c.purchase_intent_id=v_purchase and c.unit_id=v_unit
@@ -298,6 +393,13 @@ begin
  ) t;
  if v_other_claim_replay is distinct from false then
    raise exception 'CLAIM_E2E_UNRELATED_MEMBER_CLAIM_REPLAYED';
+ end if;
+ select s.request_state into strict v_request_state
+ from public.qry_received_digital_reading_withdrawal_claim_v1(
+   v_other_subject,v_other_claim
+ ) s;
+ if v_request_state<>'received' then
+   raise exception 'CLAIM_E2E_OTHER_SUBJECT_REFUND_STATUS_LEAK';
  end if;
  perform pg_catalog.set_config('myeongha.subject_id',v_subject::text,true);
 
@@ -482,6 +584,11 @@ begin
     or (select count(*) from public.commerce_provider_events
         where id=v_cancel_event and resolved_receipt_id=v_receipt.id
           and resolved_subject_id=v_subject)<>1
+    or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+        where id=v_refund_decision_id and receipt_id=v_receipt.id
+          and source_claim_fingerprint=v_claim_fingerprint
+          and status='submitted' and confirmed_at is null
+          and retained_until>pg_catalog.clock_timestamp()+interval '5 years')<>1
     or (select count(*) from public.standard_reading_reader_access_grants
         where subject_id=v_subject)<>0
     or (select count(*) from public.subjects
@@ -505,7 +612,7 @@ begin
    raise exception 'CLAIM_E2E_ACCOUNT_PRIVACY_FINALIZER_REPLAY_REGRESSED';
  end if;
 
- raise notice 'PASS verified B2 notice + Member Claim + original cancellation + exact B2 revoke + B3 pre-delete preservation + actual account deletion/replay + unrelated claim and financial receipts retained (ROLLED BACK)';
+ raise notice 'PASS verified B2 notice + Member Claim + synthetic manual refund status transitions (received -> decision -> processing; unverified confirmation denied) + original cancellation + exact B2 revoke + B3 preservation + actual account deletion/replay + unrelated claim and retained financial disposition (ROLLED BACK)';
 end;
 $commerce_claim_e2e$;
 

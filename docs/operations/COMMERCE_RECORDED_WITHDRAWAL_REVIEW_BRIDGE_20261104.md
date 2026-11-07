@@ -17,3 +17,9 @@
 - 기존 Reader S5/S7에는 서버 준비와 인증된 클라이언트 ACK가 기록되지만, **소비자에게 콘텐츠가 법적으로 제공되었음을 입증하는 완료 증거와 같지 않습니다**. 이 PR은 현재 검토기의 DELIVERED_PROVABLE을 만들지 않습니다.
 - 취소 Provider의 신뢰 가능한 NEWER/STALE 순서 및 정확한 Reader T2 동시성·권한 회수, 기록의 복원 후 privacy replay, 구매부터 삭제까지 PostgreSQL 17 종단 간 통합 검증은 후속 로드맵 과제로 남깁니다.
 - 운영 DB SQL/마이그레이션 적용, 기존 기능 릴리스 플래그 활성화, 실제 PG 환불 POST, 자동 환불 결정, LIVE/공개 라우트 변경 없음.
+## 2026-11-08 — 실제 PostgreSQL 17에서 Claim→수동 환불 진행 상태 결속
+
+- 기존 `commerce-verified-reader-claim-cancel-effect-pg17` **격리 ROLLBACK 시나리오**가 고객의 정확한 B2 원본 Claim을 받아, 별도로 입력된 **합성 운영자 승인**의 P5Y 최소 재무 기록과 결속하는 부분을 추가했습니다. 이 승인 기록은 시험용으로만 만들며 사용자 Claim 자체가 환불 승인으로 승격되지는 않습니다.
+- 실제 `qry_received_digital_reading_withdrawal_claim_v1`을 재조회해 **received → refund_decision_recorded → refund_processing** 상태를 검증합니다. 기존 `internal_reserve_reader_full_refund_dispatch_v1`과 `internal_record_reader_full_refund_response_v1`을 사용하되 **PortOne POST/GET 네트워크 요청은 하지 않습니다**.
+- 같은 시험에서 원본 Source Event 및 합성 Grant 회수만으로는 `internal_confirm_reader_full_refund_dispatch_v1`이 환불을 확정할 수 없어야 하고, 고객 상태가 **refund_confirmed로 거짓 승격되지 않아야** 합니다. 다른 회원의 Claim 상태는 received로 보존하고, 계정 삭제 후에는 개인 Claim이 삭제되지만 기존 P5Y 최소 판단 기록은 유지되는지 검사합니다.
+- 이는 **실제 PostgreSQL 17 함수의 합성 상태 전이 검증**일 뿐 소비자 제공 완료, 실제 법적 승인·PG 환불·Provider 순서·LIVE 준비 완료를 뜻하지 않습니다. 운영 DB와 기존 승인된 SQL migrations는 변경하지 않습니다.
