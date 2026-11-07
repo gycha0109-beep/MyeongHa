@@ -791,3 +791,9 @@
 
 - **실패 근거:** [PR #3090 핵심 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367519466/job/128388734751)에서 구매-Chat 연결 fixture가 통과한 직후, 별도 TypeScript/실DB 연결 fixture가 이미 활성 Member인 유료 Reader 구매자에게 다시 `cmd_promote_guest_v1`을 호출하여 `guest promotion requires an active unmerged guest subject`로 실패했습니다.
 - **수정:** 테스트 전용 Guest 세션 생성·비회원 전환 호출을 없애고 동일 구매자의 Member 활성 상태와 기존 Auth ID를 검증한 뒤, 기존 구매 Grant 복원·Reader 첫 채팅 생성 및 별도 패키지 검사 로직을 그대로 수행하도록 갱신했습니다. 비운영 fixture 이외 운영 SQL, 승인 정책, 공개 API·LIVE·실제 환불 호출은 변경하지 않았습니다. 새 HEAD CI 통과 전 완료 미확정입니다.
+
+
+### 2026-11-07 — 취소 검토 CI 테스트 입력 정합화
+
+- **실패 근거:** [PR #3090 Work Track CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42368338149/job/128391169640)에서 새 취소 검증의 두 테스트가 실패했습니다. 부분취소 성공 응답에 실제로는 `Transaction.Cancelled` 알림을 사용했고, ID 누락 테스트는 기존 signed webhook parser가 DB/GET 전에 `authentication_rejected`를 반환했습니다.
+- **수정:** 부분취소 사례는 정확히 `Transaction.PartialCancelled` 서명 알림으로 변경하고, 식별자 누락 사례는 먼저 실행되는 기존 서명/형식 검증의 거부 응답을 요구하도록 수정합니다. 취소 ID·성공 상태·정확한 금액을 필수로 대조하는 신규 검증 로직, 다른 Reader 격리 및 운영 실행 HOLD는 그대로 유지합니다. 새 HEAD 통합 CI 통과 전 PASS 미선언입니다.

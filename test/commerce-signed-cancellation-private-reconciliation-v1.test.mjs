@@ -120,7 +120,9 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
    amount:{paid:8900,cancelled:3000},
    cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:3000}],
   });
-  const r=await executor(fakeDb(),http);
+  const r=await executor(fakeDb(),http,{
+   request:signedRequest('Transaction.PartialCancelled'),
+  });
   expect(r).toMatchObject({
    kind:'partial_cancel_review_candidate',partialCancelShapeObserved:true,
    grantRevocationAuthorized:false,entitlementEffectEligible:false,
@@ -137,12 +139,12 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
    kind:'pending_cancel_review_candidate',entitlementEffectEligible:false,
   });
  });
- it('missing signed cancellation ID is held before receipt lookup and provider GET',async()=>{
+ it('missing signed cancellation ID is rejected by signed webhook parser before DB/GET',async()=>{
   const db=fakeDb(),http=fakeFetch();
   const r=await executor(db,http,{request:signedRequest('Transaction.Cancelled',{
    paymentId:PAYMENT_ID,transactionId:TX,
   })});
-  expect(r.kind).toBe('exact_cancellation_id_required');
+  expect(r.kind).toBe('authentication_rejected');
   expect(db.query).not.toHaveBeenCalled();
   expect(http).not.toHaveBeenCalled();
  });
