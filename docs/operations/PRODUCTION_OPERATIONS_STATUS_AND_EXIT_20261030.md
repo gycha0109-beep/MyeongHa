@@ -1,3 +1,11 @@
+### 2026-11-08 KST — Phase 12 실측 기반 수동 확장·축소 검토/복구 여유 기준 정리 (작업단위)
+
+- **기존 ROADMAP/작업 목표:** Gate 3 / Phase 12 #1–4의 남은 수동 검토 지표·지속 조건·조치 순서·복구 여유 기준을 이미 성공한 Phase 11 제품 경로 증거로 문서화한다. 새로운 실험·기능·로드맵 단위나 Production 임계치를 만들지 않는다.
+- **변경 파일/구현 커밋:** 기존 docs/operations/OBSERVED_SCALING_REVIEW_PHASE12_20261030.md의 수동 대응 절차 추가 및 **본 기존 운영 WORKLOG** 갱신. 구현 커밋 1f8a912741d6e370456197d555405893f673f667. DB 획득 지연·실패, Auth/Saju latency, CPU throttle·memory·OOM, 성공/503/skipped와 p50/p95/p99, 자원·복구 비용을 원인별로 분리하는 수동 검토 순서와 DB/Saju/미분류 혼합 장애/축소 보류 대응을 명시. Production 런타임·SQL·설정·비용은 변경하지 않음.
+- **근거/검증:** 기존 격리 workerd 제품 경로 [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347) 900초·3,600/3,600·p95 174.231ms·p99 184.088ms, DB fixture pool 2개 동시 4/8 실측, Saju 0.50→0.01 CPU throttle 364회·adapter p95 2.939→582.129ms, 격리 DB outage/recovery [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024) 503 4/4 및 복구 4/4 재사용. 근거 연결 및 수동 절차 필수 필드 정적 검토 PASS, git diff --check PASS. 기존 성공 실험을 반복 실행하지 않음. 새 HEAD의 GitHub CI는 결과가 나와야만 인정함.
+- **수용 경계/남은 과제:** 격리 900초/60초 실험 창을 운영 관찰 창·자동 확장 규칙으로 변경하지 않는다. 승인된 Production 관측·실패율/지연 SLO·지속 조건·정량적 회복 여유·비용 임계치가 없으므로 확장/축소 숫자 및 Phase 12 최종 수용은 **미승인/미완료**. automaticScalingEnabled=false, numericalProductionScalingThresholdApproved=false, productionCapacityProven=false. Phase 8 DR 및 Phase 13 전체 수용도 미완료. #1887 OPEN, dr_ready=false, serviceResumptionAllowed=false.
+- **다음 작업/승인:** 정확한 HEAD 필수 CI·main 병합 후 기존 로드맵에서 실제 최신 Production 계측/§33 수용 증거를 확보할 수 있는 항목만 진행한다. Production 자원·트래픽 변경이나 수치 임계치 승인은 근거를 갖춘 사용자 명시 결정이 있기 전 실행하지 않는다.
+
 ### 2026-11-08 KST — Phase 11 격리 DB 중단·복구 실제 GREEN 증거 확인 및 미완료 구분 (작업단위)
 
 - **기존 ROADMAP/선행:** 종료 집중 로드맵 Gate 2 / Phase 11 #1의 미완료 조합(실제 격리 DB 중단→요청 bounded-fail/Health 독립→재시작 후 인증 계산 복구). [PR #3123](https://github.com/gycha0109-beep/MyeongHa/pull/3123) 병합 main 3bdec3c162b132284498ebed38e15feaf32c0ff9, 동일 HEAD [필수 통합 CI #42401817297](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401817297) SUCCESS. 해당 수정은 이미 main에 있어 기능 코드·정적 테스트·일회용 marker를 반복 변경하지 않음.
