@@ -31,6 +31,8 @@ jobs:
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Build approved character authoring
         run: npm run build
+      - name: Verify fail-closed sanitized transport diagnostics
+        run: node --test scripts/operations/classify-taegyeom-language-transport-failure.cases.mjs
       - name: Run isolated two-model synthetic experiment
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
