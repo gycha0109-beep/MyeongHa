@@ -83,7 +83,10 @@ test('production workflow uses attempt-scoped selection and retains encrypted ov
   const workflow = readFileSync('.github/workflows/production-postgres-privacy-recovery-ledger.yml', 'utf8');
   assert.match(workflow, /attempts\/\$previous_attempt\/jobs\?per_page=100/u);
   assert.match(workflow, /node scripts\/operations\/select-privacy-ledger-predecessor\.mjs/u);
-  assert.match(workflow, /verify-previous-privacy-ledger-snapshot-overlap\.sh/u);
+  assert.match(workflow, /bash scripts\/operations\/export-production-postgres-privacy-recovery-ledger\.sh/u);
+  const exporter = readFileSync('scripts/operations/export-production-postgres-privacy-recovery-ledger.sh', 'utf8');
+  assert.match(exporter, /verify-previous-privacy-ledger-snapshot-overlap\.sh/u);
+  assert.match(exporter, /PREVIOUS_LEDGER_ARTIFACT_DIR/u);
   assert.match(workflow, /github-token: \$\{\{ github\.token \}\}/u);
   assert.doesNotMatch(workflow, /continue-on-error: true/u);
 });
