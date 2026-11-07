@@ -217,7 +217,7 @@ export const ADMIN_USER_SCOPES_V1 = [
 
 export function formatAdminSeoulDateV1(value: unknown): string {
   if (typeof value !== 'string' || value.trim() === '') return '기록 없음';
-  const parsed = new Date(value.trim().replace(/^(\\d{4}-\\d{2}-\\d{2}) /u, '$1T').replace(/([+-]\\d{2})$/u, '$1:00'));
+  const parsed = new Date(value.trim().replace(/^(\d{4}-\d{2}-\d{2}) /u, '$1T').replace(/([+-]\d{2})$/u, '$1:00'));
   if (!Number.isFinite(parsed.getTime())) return '날짜 확인 필요';
   return new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(parsed);
 }
@@ -393,7 +393,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     let mounted = true;
     void fetchAdminReadV1('/api/admin/overview',token).then(value=>{
       const metric=value.rows.find(row=>row.metricKey==='members_active');
-      if(mounted && typeof metric?.metricValue==='string' && /^\\d{1,12}$/u.test(metric.metricValue)) {
+      if(mounted && typeof metric?.metricValue==='string' && /^\d{1,12}$/u.test(metric.metricValue)) {
         setActiveMembers(Number(metric.metricValue));
       }
     }).catch(()=>{if(mounted)setActiveMembers(null);});
