@@ -607,9 +607,12 @@ const workerdExperiment = workerdOverlapExperiment || workerdDbFailoverExperimen
   process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
-    if(process.env.GITHUB_EVENT_NAME!=='workflow_dispatch' ||
-       process.env.GITHUB_REF!=='refs/heads/main')
-      throw Error('Actual multi-service test is manual-main-only');
+    // The sole main-push exception is the guarded, synthetic DB-outage
+    // marker. All other experiments remain manual and main-only.
+    const isManual=process.env.GITHUB_EVENT_NAME==='workflow_dispatch';
+    const isDbOneShot=process.env.GITHUB_EVENT_NAME==='push' && workerdDbFailoverExperiment;
+    if((!isManual && !isDbOneShot) || process.env.GITHUB_REF!=='refs/heads/main')
+      throw Error('Actual multi-service test requires main-only authorized invocation');
     // Phase names are a fixed allowlist: no synthetic JWT, auth UUID or SQL error
     // details may escape the private Vitest log when this actual Linux job fails.
     let phase='member_signup';
