@@ -1,3 +1,11 @@
+### 2026-11-07 KST — Phase 8 latest backup and privacy ledger monitor checkpoint (read-only work unit)
+
+- **Newer encrypted Production backup:** [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582) SUCCESS, artifact `13548176984`, source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`, migration frontier `20261105075227`. This supersedes the old backup as the newest observed capture; **its exact artifact has not been separately proved restorable**.
+- **Newer encrypted ledger:** [#42352614447](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42352614447) SUCCESS, artifact `13566018275`, latest successful completion 2026-11-07 07:46:16 UTC. Encrypted event payload/completeness was not authenticated in this checkpoint.
+- **Freshness fail:** [#42363914282](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42363914282) failed with `CAPTURE_COMPLETION_STALE`: 9,582 seconds since the last verified completion against the unchanged 7,200-second threshold. Earlier [#42331476303](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42331476303) had passed at 6,132 seconds. Thus the latest inspected status is RED.
+- **Boundaries:** newer successful capture is not independent future-safe continuity, authenticated nonzero deletion replay, Hosted recovery or whole-service RPO/RTO. No privacy canary was dispatched and no Production mutation occurred; `dr_ready=false`, `serviceResumptionAllowed=false` remain.
+- **Next:** use the latest backup/ledger artifact pairing only through the governed isolated restore flow and do not infer success before exact-artifact restore and replay results.
+
 ### 2026-11-07 KST — Phase 8 source-to-live object-presence audit (read-only work unit)
 
 - **Implemented:** added [remote-only object presence SQL](../../scripts/operations/production-remote-only-object-presence-readonly.sql) and its [sanitized result](POSTGRES_REMOTE_ONLY_OBJECT_PRESENCE_20261107.json). The SQL reads the exact 41 applied remote-only migration statements, lexically enumerates CREATE FUNCTION, CREATE POLICY and CREATE TABLE indicators, and matches names+schemas+policy relations against current Production catalog objects. It runs inside an explicit read-only transaction and rolls back.
