@@ -26,7 +26,13 @@ const SIGNED_WEBHOOK='evt_signed-cancel-01';
 const SIGNED_CANCEL_HMAC='hmac-sha256:k1:'+'b'.repeat(64);
 const SCOPE={
  providerEventId:EVENT,providerWebhookId:SIGNED_WEBHOOK,
- cancellationIdHmac:SIGNED_CANCEL_HMAC,
+ cancellationEventType:'Transaction.Cancelled',
+ cancellationVerifierRevision:'portone-cancel-readback-v2',
+ cancellationSourceSchema:'commerce-portone-cancellation-source-v2',
+ cancellationSourceEventType:'Transaction.Cancelled',
+ cancellationIdHmac:SIGNED_CANCEL_HMAC,cancellationStatus:'SUCCEEDED',
+ cancellationAmountMinor:'8900',cancellationSourcePaidMinor:'8900',
+ receiptPaidMinor:'8900',
  receiptId:RECEIPT,subjectId:SUBJECT,
  purchaseIntentId:INTENT,grantId:GRANT,grantRevision:'3',
  lastProviderOrderingKey:null,grantStatus:'active',
@@ -162,6 +168,9 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   expect(SCOPE_SQL).toContain('event.id=$1::uuid');
   expect(SCOPE_SQL).toContain('event.external_event_id as "providerWebhookId"');
   expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'cancellationIdHmac'");
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'matchingCancellationStatus'");
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'exactSucceededCancellationAmountMinor'");
+  expect(SCOPE_SQL).toContain('receipt.verified_amount_minor::text as "receiptPaidMinor"');
   expect(SCOPE_SQL).toContain('access.entitlement_grant_id=egrant.id');
   expect(SCOPE_SQL).not.toContain('digital_reading_checkout_notice_presentations_v1');
   expect(NOTICE_UNIT_SQL).toContain('presentation.unit_id::text as "unitId"');
@@ -226,6 +235,39 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
    expect(c.calls.some(q=>q.sql===PRIVATE_SOURCE_SQL),label).toBe(false);
    expect(c.calls.some(q=>q.sql===NOTICE_PROBE_SQL),label).toBe(false);
    expect(c.calls.at(-1).sql).toBe('rollback');
+   expect(reviewer).not.toHaveBeenCalled();
+   safe(result);
+  }
+ });
+
+ it('HOLDs signed item changed to pending, partial or mismatched paid amount before private notice',async()=>{
+  const currentSetLockedInspector=async()=>({
+   ...VERIFIED,exactSignedCancellationBoundToEvent:true,
+  });
+  for(const [label,changed] of [
+   ['no successful cancellation',{cancellationStatus:'REQUESTED'}],
+   ['failed cancellation',{cancellationStatus:'FAILED'}],
+   ['partial event',{cancellationEventType:'Transaction.PartialCancelled',
+    cancellationSourceEventType:'Transaction.PartialCancelled'}],
+   ['mismatched signed event type',{cancellationSourceEventType:'Transaction.PartialCancelled'}],
+   ['unverified cancel source',{cancellationVerifierRevision:'unknown'}],
+   ['unrecognized source schema',{cancellationSourceSchema:'unknown'}],
+   ['underpaid exact item',{cancellationAmountMinor:'3000'}],
+   ['source claims different receipt amount',{cancellationSourcePaidMinor:'3000'}],
+   ['changed receipt amount',{receiptPaidMinor:'9000'}],
+   ['missing paid amount',{receiptPaidMinor:null}],
+  ]){
+   const c=db({scope:[{...SCOPE,...changed}]}),reviewer=vi.fn();
+   const result=await call(c,{
+    expectedProviderWebhookId:SIGNED_WEBHOOK,
+    expectedCancellationIdHmac:SIGNED_CANCEL_HMAC,
+    currentSetLockedInspector,withdrawalReviewer:reviewer,
+   });
+   expect(result.kind,label).toBe('exact_signed_cancellation_changed_before_notice_review');
+   expect(c.calls.some(v=>v.sql===SCOPE_SQL),label).toBe(true);
+   expect(c.calls.some(v=>v.sql===PRIVATE_SOURCE_SQL),label).toBe(false);
+   expect(c.calls.some(v=>v.sql===NOTICE_PROBE_SQL),label).toBe(false);
+   expect(c.calls.at(-1).sql,label).toBe('rollback');
    expect(reviewer).not.toHaveBeenCalled();
    safe(result);
   }

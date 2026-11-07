@@ -880,3 +880,14 @@
 - **테스트:** 기존 Vitest에 다른 웹훅·다른 취소 ID HMAC·이벤트 값 누락 시 비공개 소스·고지 미조회, 트랜잭션 ROLLBACK, 결과 식별자 비노출 검증을 추가했습니다. 새 커밋의 CI·PostgreSQL17 결과는 아직 미확정, PASS 미선언입니다.
 - **완료/미완료:** 이번 사설 재조회 결속 코드·테스트·작업 기록을 함께 커밋합니다. 공급자 사건 NEWER/STALE 판정, 실제 Reader T2 원자 회수/Entitlement Effect, 법적 환불 결정, 소비자 전달 완료 증거, 복원 후 개인정보 replay, 전체 비운영 E2E는 미완료입니다.
 - **커밋/다음/블로커:** 작업 전 `5df87e208b3eeb68c22ef20d2e6cfdd24706601e`, 이번 변경은 PR #3090의 새 커밋에 포함합니다. 새 CI를 확인해 실패를 복구하거나 통과하면 다음 미완료 기능을 진행합니다. 운영 PG 취소 POST·DB 적용·LIVE 공개 실행 없음. 승인 요청 없음.
+
+### 2026-11-08 — 신규 스냅샷의 단일 전액 취소 상태·금액 재확인
+
+- **작업 목표/로드맵:** 승인된 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6-1~3. 원본 PortOne GET/Reader S1 잠금 검사 이후 별도의 청약철회 증거 조회 중 동일 서명 취소 Event의 성공 상태·정확한 전액 금액이 바뀌는 경우를 안전 보류합니다.
+- **기준 브랜치·PR·커밋:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090) (open, 자동 병합 설정), 변경 이전 HEAD `be34b51619b9d56ad9f43a5cabd66262624358de`; `main` 최신 HEAD `9740e36ed1c6c49a9eb771c0048b890aa70e0e03`. 커밋 이후 새 HEAD는 PR에서 확인합니다.
+- **변경 파일:** `scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs`, `test/commerce-exact-reader-withdrawal-evidence-hold-v1.test.mjs`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 기존 개인 청약철회 구매 범위 SELECT에서 같은 `commerce_provider_events`의 기존 최소화된 verifier revision·source schema·event type·matching status·취소 금액·원결제 금액과 Receipt 원금만 읽습니다. 서명된 개별 취소가 요청된 경우 두 번째 읽기 전용 스냅샷에서 `Transaction.Cancelled`, `SUCCEEDED`, 정확한 성공 취소액=저장 원금=Receipt 원금, 신뢰하는 source schema/revision을 모두 재확인합니다. 하나라도 누락·변경되면 비공개 Reading/고지 조회 전에 HOLD하며 무조건 ROLLBACK합니다. 무서명 기존 사설 검토 경로는 호환 유지.
+- **테스트:** 기존 Vitest에서 취소 대기·실패·부분취소·이벤트 종류 불일치·출처 스키마 변조·개별/원본 금액 변경·NULL 원금 10개 사례를 추가하여 사설/고지 SQL 차단과 ROLLBACK을 검사하도록 구성했습니다. 신규 HEAD의 공식 CI·PostgreSQL17 검증 전이므로 PASS 미선언.
+- **검증 근거:** 직전 `be34b516`의 [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42387456327)는 확인 시 Commerce Work Track, db-authority-core, runtime/content/commerce-payment/commerce-entitlement 검사가 PASS이고 PostgreSQL17 검사는 진행 중입니다. Web/Governance 검사는 통과했습니다. 해당 사실을 새 커밋 검증으로 간주하지 않습니다.
+- **완료·미완료:** 이번 읽기 전용 상태·금액 확인, 회귀 테스트 작성 및 WORKLOG 기록 완료. Provider 최신 순서 NEWER/STALE 판정, 실제 Reader T2/Entitlement Effect 원자 회수, 법적 환불 결정, 소비자 제공 입증, 복원 후 privacy replay, 전체 비운영 E2E는 미완료입니다.
+- **블로커·다음:** 새 HEAD의 공식 CI 결과 확인·오류 수정 후, 로드맵의 Provider 취소 순서·정확한 구매권 회수 연결을 이어갑니다. 운영 DB 적용, 실제 PG 취소 POST, 공개 구매·환불 API, LIVE 공개는 수행하지 않았고 사용자 승인 요청 없음.

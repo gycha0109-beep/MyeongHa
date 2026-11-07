@@ -18,8 +18,16 @@ export const COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1=`
 select
  event.id::text as "providerEventId",
  event.external_event_id as "providerWebhookId",
+ event.event_type as "cancellationEventType",
+ event.verifier_revision as "cancellationVerifierRevision",
+ event.verified_payload_jsonb->>'schemaVersion' as "cancellationSourceSchema",
+ event.verified_payload_jsonb->>'eventType' as "cancellationSourceEventType",
  event.verified_payload_jsonb->>'cancellationIdHmac' as "cancellationIdHmac",
+ event.verified_payload_jsonb->>'matchingCancellationStatus' as "cancellationStatus",
+ event.verified_payload_jsonb->>'exactSucceededCancellationAmountMinor' as "cancellationAmountMinor",
+ event.verified_payload_jsonb->>'originalReceiptPaidAmountMinor' as "cancellationSourcePaidMinor",
  receipt.id::text as "receiptId",
+ receipt.verified_amount_minor::text as "receiptPaidMinor",
  receipt.subject_id::text as "subjectId",
  receipt.purchase_intent_id::text as "purchaseIntentId",
  egrant.id::text as "grantId",
@@ -97,6 +105,7 @@ const REV=/^(0|[1-9][0-9]*)$/u;
 const ORDER=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const WEBHOOK_ID=/^[^\u0000-\u001f\u007f]{1,512}$/u;
 const CANCELLATION_MAC=/^hmac-sha256:k1:[0-9a-f]{64}$/u;
+const POSITIVE_MINOR=/^[1-9][0-9]*$/u;
 const validSignedPair=(webhookId,cancellationHmac)=>
  (webhookId===undefined&&cancellationHmac===undefined)||
  (typeof webhookId==='string'&&WEBHOOK_ID.test(webhookId)&&
@@ -161,11 +170,22 @@ async function inspectExactPaidUnit(dbClient,{
      !['active','revoked','expired'].includes(r.grantStatus))
    return no('exact_reader_purchase_or_cas_changed_after_lock');
 
-  // Re-verify the signed event/item pair in this fresh read-only snapshot.
-  // The preceding provider GET and S1/CAS inspection had released their locks.
+  // The preceding authenticated GET and Reader S1/CAS lock have ended.
+  // A second private snapshot must not reuse that full-cancel observation if
+  // this same signed Event was rewritten as partial, pending or underpaid.
+  // Only an observation is possible here, never refund/revocation authority.
   if(expectedProviderWebhookId!==undefined&&
      (r.providerWebhookId!==expectedProviderWebhookId||
-      r.cancellationIdHmac!==expectedCancellationIdHmac))
+      r.cancellationIdHmac!==expectedCancellationIdHmac||
+      r.cancellationEventType!=='Transaction.Cancelled'||
+      r.cancellationSourceEventType!==r.cancellationEventType||
+      r.cancellationVerifierRevision!=='portone-cancel-readback-v2'||
+      r.cancellationSourceSchema!=='commerce-portone-cancellation-source-v2'||
+      r.cancellationStatus!=='SUCCEEDED'||
+      typeof r.receiptPaidMinor!=='string'||
+      !POSITIVE_MINOR.test(r.receiptPaidMinor)||
+      r.cancellationAmountMinor!==r.receiptPaidMinor||
+      r.cancellationSourcePaidMinor!==r.receiptPaidMinor))
    return no('exact_signed_cancellation_changed_before_notice_review');
 
   if(typeof r.readerContentBundleId!=='string'||
