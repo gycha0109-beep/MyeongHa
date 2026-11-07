@@ -55,7 +55,7 @@ function hasDatedRepositoryVersionWitness(evidence, frontier, historicalDate) {
   if (manifest.schema !== 'myeongha-dr-dated-repository-migration-version-witness-v1'
     || observation.schema !== 'myeongha-production-migration-readonly-observation-v1'
     || manifest.observationDateKst !== observation.observationDateKst
-    || !/^\\d{4}-\\d{2}-\\d{2}$/u.test(manifest.observationDateKst)
+    || !/^\d{4}-\d{2}-\d{2}$/u.test(manifest.observationDateKst)
     || manifest.observationDateKst < historicalDate
     || manifest.sourceMainSha !== source?.mainSha
     || manifest.observedCatalogFile !==

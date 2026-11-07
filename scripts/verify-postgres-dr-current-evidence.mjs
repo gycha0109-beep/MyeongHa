@@ -105,7 +105,7 @@ const versionWitness = JSON.parse(await readFile(
   'docs/operations/POSTGRES_DR_REPOSITORY_VERSION_WITNESS_20261107.json', 'utf8',
 ));
 const migrationNames = (await (await import('node:fs/promises')).readdir('supabase/migrations'))
-  .map(name => name.match(/^(\\d+)_.*\\.sql$/u))
+  .map(name => name.match(/^(\d+)_.*\.sql$/u))
   .filter(Boolean).map(match => match[1]);
 const currentFrontier = Math.max(...migrationNames.map(Number));
 const documentedAdvance = { manifest: versionWitness,

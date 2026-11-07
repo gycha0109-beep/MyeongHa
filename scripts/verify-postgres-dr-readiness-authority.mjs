@@ -38,7 +38,7 @@ const repositoryMigrationFrontier = Math.max(...migrationNumbers);
 // A dated read-only repository inventory is distinct from historical
 // Production restore evidence. Compare every filename before trusting it.
 const repositoryVersionIds = migrationFiles
-  .map(name => name.match(/^(\\d+)_.*\\.sql$/u))
+  .map(name => name.match(/^(\d+)_.*\.sql$/u))
   .filter(Boolean).map(match => match[1]);
 const [versionWitnessText, observedCatalogText] = await Promise.all([
   readFile('docs/operations/POSTGRES_DR_REPOSITORY_VERSION_WITNESS_20261107.json', 'utf8'),
