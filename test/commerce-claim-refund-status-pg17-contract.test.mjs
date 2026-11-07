@@ -29,7 +29,7 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   const reserve=sql.indexOf('from public.internal_reserve_reader_full_refund_dispatch_v1(');
   const response=sql.indexOf('public.internal_record_reader_full_refund_response_v1(');
   const revoke=sql.indexOf('from public.internal_apply_entitlement_effect_v1(');
-  const deny=sql.indexOf('public.internal_confirm_reader_full_refund_dispatch_v1(');
+  const deny=sql.indexOf('public.internal_confirm_reader_full_refund_dispatch_v1(',revoke);
   const deletion=sql.indexOf('from public.internal_finalize_account_deletion_db_v1(');
   expect(claim).toBeGreaterThan(0);
   expect(decision).toBeGreaterThan(claim);
@@ -67,6 +67,8 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   ])expect(confirmer).toContain(check);
   expect(confirmer).toContain('grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1(');
   expect(confirmer).toContain('to myeongha_commerce_internal_executor');
+  expect((confirmer.match(/create or replace function public\.internal_confirm_reader_full_refund_dispatch_v1\(/gu)??[])).toHaveLength(1);
+  expect((confirmer.match(/\$reader_refund_confirm_exact_provider\$/gu)??[])).toHaveLength(2);
   expect(confirmer).not.toContain('supabase db push');
   const p=e2eIndex(sql,'-- Regression of the old 2310 false-positive');
   expect(p).toBeGreaterThan(0);
@@ -79,7 +81,7 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   const staged=readFileSync('test/db/staged_commerce_migration_policy.sh','utf8');
   expect(staged).toContain("$name" + "\" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql'");
   expect(staged).toContain("$inclusion\" == 'reader-integrated'");
-  expect(staged).toContain("expected='c73205cd64ec03f6793f375aafb9677ee3cd704b'");
+  expect(staged).toContain("expected='cae68e1f87d6e103f67d4951f688f0433730f137'");
   expect(staged).toContain('HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration"');
