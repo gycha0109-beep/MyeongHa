@@ -145,7 +145,125 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(workflow).toContain(".github/ops/phase11-workerd-db-failover-20261108.once");
     expect(workflow).toContain("github.event_name == 'workflow_dispatch' || (github.event_name == 'push'");
     expect(realRunner).toContain('workerd_db_failover');
-    expect(realRunner).toContain('PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V1');
+    expect(realRunner).toContain('PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V2');
+    expect(readFileSync('.github/ops/phase11-workerd-db-failover-20261108.once', 'utf8')).toBe('PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V2\\n');
+    // The original main one-shot failed before jobs started because an unquoted
+    // plain YAML if value contained ': ' inside a GitHub expression string.
+    expect(workflow).toContain("    if: >-\\n      ${{ github.repository ==");
+    expect(workflow).not.toContain("    if: ${{ github.repository ==");
+    expect(workflow).toContain("startsWith(github.event.head_commit.message, 'fix(ops): retry isolated workerd DB failover proof')");
+    expect(workflow).toContain('^fix\\(ops\\):\\ retry\\ isolated\\ workerd\\ DB\\ failover\\ proof\\ \\(\\#[0-9]+\\)
+    // DB failover must not select the separate constrained Saju container:
+    // it deliberately keeps the existing real loopback host alive.
+    expect(realRunner).toContain('"$experiment" != workerd_overlap && "$experiment" != workerd_db_failover');
+    expect(realRunner).toContain('short|workerd|workerd_db_failover) ;;');
+    expect(workflow).toContain('default: short');
+    expect(compose).toContain('profiles: [sustained]');
+    expect(compose).toContain('cpus: 0.50');
+    expect(compose).toContain('memswap_limit: 256m');
+    expect(compose).toContain('127.0.0.1::43007');
+    expect(compose).toContain('127.0.0.1::43008');
+    expect(realRunner).toContain('.sustained.recoverySucceeded==true');
+    expect(realRunner).toContain('.sustained.windows[0].apiPeak==4');
+    expect(realRunner).toContain('.sustained.windows[0].apiFourWayAdmissions>0');
+    expect(realRunner).toContain('.runtimeCleanupVerified==true');
+    expect(realRunner).toContain('.dockerCleanupVerified=true');
+  });
+
+  it('compares disposable Saju CPU quotas with the same loopback Compose isolation', () => {
+    const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
+    expect(compose).toContain('<<: *isolated-saju');
+    expect(compose).toContain('cpus: 0.01');
+    expect(compose).toContain('profiles: [cpu-pressure]');
+    expect(realRunner).toContain('saju_loopback_origin saju-cpu-pressure');
+    expect(realRunner).toContain('.cpuComparison.recoverySucceeded==true');
+    expect(realRunner).toContain('==[0.5,0.01]');
+  });
+
+  it('runs the workerd fixture locally with temporary bindings and a separate proof scope', () => {
+    const runner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const launcher = readFileSync('scripts/operations/start-isolated-workerd-product.mjs', 'utf8');
+    const worker = readFileSync('test/ops/fixtures/workerd-product-entry.mjs', 'utf8');
+    expect(runner).toContain('wrangler@4.152.0');
+    expect(runner).toContain('.localWorkerdProductPathMeasured==true');
+    expect(runner).toContain('.productionWorkerAdmissionMeasured==false');
+    expect(runner).toContain('.hostedHyperdriveMeasured==false');
+    expect(launcher).toContain("'dev', '--local'");
+    expect(launcher).not.toContain("'--remote'");
+    expect(launcher).toContain("'--ip', '127.0.0.1'");
+    expect(launcher).toContain('localConnectionString');
+    expect(runner).toContain('workerd_overlap) MH_OPS_AUTH_JWT_EXP_SECONDS=1800');
+    expect(runner).toContain('workerd_sustained_overlap');
+    expect(runner).toContain('.workerdWindow.clientPendingOnlyNotWorkerAdmission==true');
+    expect(runner).toContain('.workerdWindow.scheduled==3600');
+    expect(runner).toContain('.workerdWindow.sajuResourceCgroupConstrained==false');
+    expect(runner).toContain('else .workerdWindow==null end');
+    expect(readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8')).toContain("const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap'");
+    expect(runner.split('jq -e --arg sha "$source_sha" --arg experiment "$experiment"').length - 1).toBe(2);
+    expect(worker).toContain('SELECT session_user AS role');
+    expect(worker).toContain('myeongha_ops_phase11_login');
+    expect(worker).toContain('handleCurrentSubjectSajuCalculationRequestV1');
+  });
+
+});
+);
+    expect(realRunner).toContain('^fix\\(ops\\):\\ retry\\ isolated\\ workerd\\ DB\\ failover\\ proof\\ \\(\\#[0-9]+\\)
+    // DB failover must not select the separate constrained Saju container:
+    // it deliberately keeps the existing real loopback host alive.
+    expect(realRunner).toContain('"$experiment" != workerd_overlap && "$experiment" != workerd_db_failover');
+    expect(realRunner).toContain('short|workerd|workerd_db_failover) ;;');
+    expect(workflow).toContain('default: short');
+    expect(compose).toContain('profiles: [sustained]');
+    expect(compose).toContain('cpus: 0.50');
+    expect(compose).toContain('memswap_limit: 256m');
+    expect(compose).toContain('127.0.0.1::43007');
+    expect(compose).toContain('127.0.0.1::43008');
+    expect(realRunner).toContain('.sustained.recoverySucceeded==true');
+    expect(realRunner).toContain('.sustained.windows[0].apiPeak==4');
+    expect(realRunner).toContain('.sustained.windows[0].apiFourWayAdmissions>0');
+    expect(realRunner).toContain('.runtimeCleanupVerified==true');
+    expect(realRunner).toContain('.dockerCleanupVerified=true');
+  });
+
+  it('compares disposable Saju CPU quotas with the same loopback Compose isolation', () => {
+    const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
+    expect(compose).toContain('<<: *isolated-saju');
+    expect(compose).toContain('cpus: 0.01');
+    expect(compose).toContain('profiles: [cpu-pressure]');
+    expect(realRunner).toContain('saju_loopback_origin saju-cpu-pressure');
+    expect(realRunner).toContain('.cpuComparison.recoverySucceeded==true');
+    expect(realRunner).toContain('==[0.5,0.01]');
+  });
+
+  it('runs the workerd fixture locally with temporary bindings and a separate proof scope', () => {
+    const runner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
+    const launcher = readFileSync('scripts/operations/start-isolated-workerd-product.mjs', 'utf8');
+    const worker = readFileSync('test/ops/fixtures/workerd-product-entry.mjs', 'utf8');
+    expect(runner).toContain('wrangler@4.152.0');
+    expect(runner).toContain('.localWorkerdProductPathMeasured==true');
+    expect(runner).toContain('.productionWorkerAdmissionMeasured==false');
+    expect(runner).toContain('.hostedHyperdriveMeasured==false');
+    expect(launcher).toContain("'dev', '--local'");
+    expect(launcher).not.toContain("'--remote'");
+    expect(launcher).toContain("'--ip', '127.0.0.1'");
+    expect(launcher).toContain('localConnectionString');
+    expect(runner).toContain('workerd_overlap) MH_OPS_AUTH_JWT_EXP_SECONDS=1800');
+    expect(runner).toContain('workerd_sustained_overlap');
+    expect(runner).toContain('.workerdWindow.clientPendingOnlyNotWorkerAdmission==true');
+    expect(runner).toContain('.workerdWindow.scheduled==3600');
+    expect(runner).toContain('.workerdWindow.sajuResourceCgroupConstrained==false');
+    expect(runner).toContain('else .workerdWindow==null end');
+    expect(readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs', 'utf8')).toContain("const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap'");
+    expect(runner.split('jq -e --arg sha "$source_sha" --arg experiment "$experiment"').length - 1).toBe(2);
+    expect(worker).toContain('SELECT session_user AS role');
+    expect(worker).toContain('myeongha_ops_phase11_login');
+    expect(worker).toContain('handleCurrentSubjectSajuCalculationRequestV1');
+  });
+
+});
+);
     // DB failover must not select the separate constrained Saju container:
     // it deliberately keeps the existing real loopback host alive.
     expect(realRunner).toContain('"$experiment" != workerd_overlap && "$experiment" != workerd_db_failover');
