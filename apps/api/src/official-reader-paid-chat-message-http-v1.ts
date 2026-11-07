@@ -116,7 +116,12 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
         secret: input.deliveryTokenSecret,
       },
     });
-    if (read.delivery === undefined) {
+    if (read.delivery === undefined
+        || !Number.isFinite(Date.parse(read.committedAt))
+        || !Number.isFinite(Date.parse(read.delivery.responsePreparedAt))
+        || Date.parse(read.delivery.responsePreparedAt) < Date.parse(read.committedAt)) {
+      // Independent HTTP presentation fence. No S5->S7 temporal mismatch
+      // may be represented as a prepared paid response to the client.
       return failure(503, 'CAPABILITY_UNAVAILABLE', 'reader.paid_unavailable', input.requestId);
     }
     return Response.json({

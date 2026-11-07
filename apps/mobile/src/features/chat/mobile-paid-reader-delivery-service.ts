@@ -101,6 +101,7 @@ function parseProtectedAnswer(
       || typeof receipt.deliveryAttemptId !== 'string'
       || !UUID.test(receipt.deliveryAttemptId)
       || !validDate(receipt.responsePreparedAt)
+      || Date.parse(receipt.responsePreparedAt) < Date.parse(data.committedAt)
       || typeof receipt.acknowledgementToken !== 'string'
       || !TOKEN.test(receipt.acknowledgementToken)
       || typeof receipt.replayed !== 'boolean') return null;
@@ -221,6 +222,9 @@ export async function acknowledgeMobilePaidReaderChatDeliveryV1(input: Readonly<
         || envelope.data.schemaVersion !== DELIVERY_VERSION
         || envelope.data.deliveryAttemptId !== receipt.deliveryAttemptId
         || !validDate(envelope.data.clientAcknowledgedAt)
+        || !validDate(receipt.responsePreparedAt)
+        || Date.parse(envelope.data.clientAcknowledgedAt)
+          < Date.parse(receipt.responsePreparedAt)
         || typeof envelope.data.replayed !== 'boolean') {
       return Object.freeze({ kind: 'unavailable' as const });
     }
