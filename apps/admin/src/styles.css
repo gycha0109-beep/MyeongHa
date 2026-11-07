@@ -197,3 +197,39 @@ button { cursor: pointer; }
 
 .admin-issue-category { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .admin-issue-category input { width:min(220px,100%); }
+
+/* Member-first Owner view: do not treat ephemeral guest Subject IDs as members. */
+.admin-user-overview { display:flex; align-items:center; gap:20px; padding:18px 20px; margin:18px 0 16px; background:#f7f9fc; border:1px solid #e3eaf2; border-radius:10px; }
+.admin-user-overview p { flex:1; margin:0; color:#576780; font-size:12px; line-height:1.8; }
+.admin-user-count { min-width:185px; display:grid; gap:4px; border-right:1px solid #dbe3ed; padding-right:20px; }
+.admin-user-count span { color:#65758a; font-size:12px; font-weight:700; }
+.admin-user-count strong { color:#203a5c; font-size:26px; line-height:1.4; }
+.admin-user-count small { color:#8996a8; font-size:10px; }
+.admin-user-scopes { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }
+.admin-user-scopes button { padding:10px 13px; font-size:12px; border:1px solid #dce3ec; border-radius:7px; background:#fff; color:#53627b; cursor:pointer; }
+.admin-user-scopes button.active { background:#223952; border-color:#223952; color:#fff; font-weight:700; }
+.admin-user-scopes button:focus-visible { outline:3px solid #88a7d6; outline-offset:2px; }
+.admin-users-table td:first-child { min-width:175px; }
+.admin-users-table td:first-child strong { display:block; font-size:12px; color:#243952; }
+.admin-user-id { display:block; margin-top:5px; font-size:11px; color:#71829a; font-variant-numeric:tabular-nums; }
+.admin-user-state { display:inline-block; background:#edf2f8; padding:5px 9px; border-radius:6px; color:#506179; font-size:11px; }
+.admin-user-state--active { background:#e9f6ee; color:#267247; }
+.admin-user-state--deletion_pending { background:#fff2df; color:#9f6a1f; }
+.admin-user-state--deleted { background:#f1f2f4; color:#79828f; }
+@media (max-width:760px) {
+  .admin-user-overview { align-items:stretch; flex-direction:column; gap:12px; }
+  .admin-user-count { border-right:0; border-bottom:1px solid #dbe3ed; padding:0 0 10px; }
+  .admin-user-scopes button { flex:1 1 40%; }
+}
+
+.admin-user-detail { margin-top:18px; padding:20px; background:#f8fafc; border:1px solid #e5eaf2; border-radius:9px; }
+.admin-user-detail h3 { margin:0 0 9px; color:#293e5a; font-size:17px; }
+.admin-user-detail p { color:#65758b; font-size:12px; line-height:1.7; }
+.admin-user-detail dl { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:20px 0; }
+.admin-user-detail dl > div { background:#fff; padding:14px 16px; border:1px solid #e8edf4; border-radius:7px; min-width:0; }
+.admin-user-detail dt { font-size:11px; color:#8491a4; margin-bottom:8px; }
+.admin-user-detail dd { font-size:14px; font-weight:650; color:#293b57; margin:0; }
+.admin-user-detail details { margin-top:18px; font-size:12px; color:#55677c; }
+.admin-user-detail summary { cursor:pointer; }
+.admin-user-detail code { display:block; margin-top:8px; overflow-wrap:anywhere; }
+@media (max-width:760px) { .admin-user-detail dl { grid-template-columns:minmax(0,1fr); } }
