@@ -26,14 +26,21 @@ function runnerWithReadyRows(rows:readonly {ready:boolean}[]) {
 }
 
 describe('S0 positive combined G1 pre-Turn readiness',()=>{
-  it('reads effective executor authority, required private functions and immutable Pin column',async()=>{
+  it('reads exact private signatures through catalogs without requiring private schema USAGE',async()=>{
     const {runner,queries}=runnerWithReadyRows([{ready:true}]);
     await expect(assertSeyeonProductionCombinedPinReadinessV1(runner,subjectId))
       .resolves.toBeUndefined();
     expect(queries).toHaveLength(1);
     const sql=queries[0]!;
     expect(sql).toContain('public.cmd_pin_seyeon_positive_model_context_sources_v1');
-    expect(sql).toContain('seyeon_private.pin_positive_model_context_sources_v1');
+    expect(sql).toContain("n.nspname = 'seyeon_private'");
+    expect(sql).toContain("p.proname = 'pin_positive_model_context_sources_v1'");
+    expect(sql).toContain("p.proname = 'pin_model_recent_sources_v1'");
+    expect(sql).toContain("p.pronargs = 16");
+    expect(sql).toContain("p.pronargs = 7");
+    expect(sql).toContain("p.proargtypes[15] = 'text'::regtype");
+    expect(sql).toContain("p.proargtypes[6] = 'text'::regtype");
+    expect(sql).not.toContain("to_regprocedure(\n            'seyeon_private.");
     expect(sql).toContain('pin_model_recent_sources_v1');
     expect(sql).toContain('cmd_mark_seyeon_positive_context_ready_pinned_v1');
     expect(sql).toContain('seyeon_recent_source_pin_jsonb');
