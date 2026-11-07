@@ -56,6 +56,7 @@ import {
   createSeyeonProductionGovernanceV1,
 } from './seyeon-production-governance-v1.js';
 import { assertSeyeonPositiveProjectorsNotEnabledV1 } from './seyeon-positive-projector-admission-hold-v1.js';
+import { selectPublishedFiveCharacterChatExecutorV1 } from './five-character-chat-executor-selection-v1.js';
 import { SEYEON_CONVERSATION_RECALL_PROJECTOR_V1 } from './seyeon-conversation-recall-memory-contract-v1.js';
 import {
   createSeyeonProductionRuntimeIdPortV1,
@@ -503,6 +504,13 @@ export function createProductionSeyeonChatRuntimeV1(
         }),
       );
       assertBundleContainsSeyeon(bundleManifest);
+      // Only the published, DB-pinned Character's own installed executor
+      // can run. Se-yeon remains the sole installed executor today.
+      const selectedChatExecution = selectPublishedFiveCharacterChatExecutorV1(
+        threadBinding,
+        bundleManifest,
+        Object.freeze({ seyeon: runSeyeonProductionChatExecutionV1 }),
+      ).executor;
 
       const trustedThread = Object.freeze({
         threadId,
@@ -543,7 +551,7 @@ export function createProductionSeyeonChatRuntimeV1(
 
       const execution = await runSeyeonTurnRuntimePhaseV1(
         'chat_execution',
-        () => runSeyeonProductionChatExecutionV1({
+        () => selectedChatExecution({
           mode: 'WRITE_DARK',
           replyLocale: runInput.replyLocale ?? 'ko-KR',
           resolvedSubjectId: resolvedSubject.subjectId,

@@ -3,6 +3,70 @@
 -- This test verifies DB isolation, NOT resistance of an LLM to malicious text.
 BEGIN;
 
+DO $reader_context_memory_privilege_check$
+BEGIN
+  IF NOT pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_reader_context_granted_memory_items_v2(uuid,text)',
+    'EXECUTE'
+  ) OR NOT pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_reader_context_granted_life_facts_v2(uuid,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'API executor must have provenance-enriched Character memory reads';
+  END IF;
+  IF pg_catalog.has_function_privilege(
+    'anon',
+    'public.qry_reader_context_granted_memory_items_v2(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.qry_reader_context_granted_memory_items_v2(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'service_role',
+    'public.qry_reader_context_granted_memory_items_v2(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'anon',
+    'public.qry_reader_context_granted_life_facts_v2(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.qry_reader_context_granted_life_facts_v2(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'service_role',
+    'public.qry_reader_context_granted_life_facts_v2(uuid,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'Browser and service roles must not execute provenance-enriched reads';
+  END IF;
+  IF NOT pg_catalog.has_function_privilege(
+    'myeongha_api_executor',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'API executor must have the Character-scoped Memory read';
+  END IF;
+  IF pg_catalog.has_function_privilege(
+    'anon',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) OR pg_catalog.has_function_privilege(
+    'service_role',
+    'public.qry_reader_context_granted_memory_items_v1(uuid,text)',
+    'EXECUTE'
+  ) THEN
+    RAISE EXCEPTION 'Browser and service roles must not execute the Character-scoped Memory read';
+  END IF;
+END $reader_context_memory_privilege_check$;
+
 INSERT INTO auth.users(id) VALUES
   ('a7100000-0000-4000-8000-000000000001'),
   ('a7100000-0000-4000-8000-000000000002')
@@ -32,7 +96,20 @@ INSERT INTO public.memory_items(
    'user_approved',null,null,null,'security-reader-a',null,clock_timestamp()),
   ('a7300000-0000-4000-8000-000000000003','a7200000-0000-4000-8000-000000000001',
    'consultation_detail','memory-v1','{"value":"REVOKED_MEMORY_CANARY"}'::jsonb,
-   'user_approved',null,null,null,'security-reader-a',clock_timestamp(),clock_timestamp());
+   'user_approved',null,null,null,'security-reader-a',clock_timestamp(),clock_timestamp()),
+  ('a7300000-0000-4000-8000-000000000004','a7200000-0000-4000-8000-000000000001',
+   'consultation_detail','memory-v1','{"value":"OWNER_A_PRIVATE_NO_GRANT"}'::jsonb,
+   'user_approved',null,null,null,'security-reader-a',null,clock_timestamp());
+
+INSERT INTO public.life_facts(
+  id,subject_id,fact_type,schema_version,value_jsonb,valid_from,valid_to,
+  source_kind,source_message_id,source_merge_action_id,supersedes_fact_id,
+  confirmed_at,revoked_at,created_at
+) VALUES
+  ('a7350000-0000-4000-8000-000000000001','a7200000-0000-4000-8000-000000000001',
+   'occupation','life-fact-v1','{"value":"designer"}'::jsonb,
+   clock_timestamp() - interval '1 day',null,'user_explicit',null,null,null,
+   clock_timestamp() - interval '1 day',null,clock_timestamp());
 
 INSERT INTO public.record_access_grants(
   id,subject_id,life_fact_id,memory_item_id,grantee_character_id,
@@ -45,7 +122,9 @@ INSERT INTO public.record_access_grants(
   ('a7400000-0000-4000-8000-000000000003','a7200000-0000-4000-8000-000000000002',null,
    'a7300000-0000-4000-8000-000000000002','security-reader-a','user_choice',clock_timestamp(),null),
   ('a7400000-0000-4000-8000-000000000004','a7200000-0000-4000-8000-000000000001',null,
-   'a7300000-0000-4000-8000-000000000003','security-reader-a','user_choice',clock_timestamp(),null);
+   'a7300000-0000-4000-8000-000000000003','security-reader-a','user_choice',clock_timestamp(),null),
+  ('a7450000-0000-4000-8000-000000000001','a7200000-0000-4000-8000-000000000001',
+   'a7350000-0000-4000-8000-000000000001',null,'security-reader-a','user_choice',clock_timestamp(),null);
 
 -- Match a trusted server request transaction: role and resolved Subject pinned.
 SET LOCAL ROLE myeongha_api_executor;
@@ -54,12 +133,20 @@ DO $$
 DECLARE
   v_count bigint;
   v_constraint text;
+  v_source_kind text;
+  v_grant_reason text;
+  v_valid_from timestamptz;
+  v_confirmed_at timestamptz;
+  v_created_at timestamptz;
+  v_source_turn_id uuid;
+  v_source_message_id uuid;
+  v_source_merge_action_id uuid;
 BEGIN
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
-  IF v_count <> 1 THEN
-    RAISE EXCEPTION 'Owner A must read only their one active memory, got %', v_count;
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'Owner A must read their two active memories, got %', v_count;
   END IF;
 
   SELECT count(*) INTO v_count FROM public.qry_memory_active_grants_v1(
@@ -76,6 +163,98 @@ BEGIN
   IF v_count <> 0 THEN
     RAISE EXCEPTION 'Revoked Reader B grant was improperly returned';
   END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Reader A must receive exactly the one explicitly granted current Memory, got %', v_count;
+  END IF;
+
+  SELECT count(*), max(source_kind),
+         max(source_turn_id::text)::uuid,
+         max(source_message_id::text)::uuid,
+         max(source_merge_action_id::text)::uuid
+    INTO v_count, v_source_kind, v_source_turn_id,
+         v_source_message_id, v_source_merge_action_id
+  FROM public.qry_reader_context_granted_memory_items_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 1 OR v_source_kind <> 'user_approved'
+     OR v_source_turn_id IS NOT NULL OR v_source_message_id IS NOT NULL
+     OR v_source_merge_action_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Memory v2 must preserve stored provenance without inventing missing references';
+  END IF;
+
+  SELECT count(*), max(source_kind), max(grant_reason), max(valid_from),
+         max(confirmed_at), max(created_at)
+    INTO v_count, v_source_kind, v_grant_reason, v_valid_from,
+         v_confirmed_at, v_created_at
+  FROM public.qry_reader_context_granted_life_facts_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 1 OR v_source_kind <> 'user_explicit'
+     OR v_grant_reason <> 'user_choice'
+     OR v_valid_from IS NULL OR v_confirmed_at IS NULL OR v_created_at IS NULL THEN
+    RAISE EXCEPTION 'Life Fact v2 must preserve source, validity and grant provenance';
+  END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-b'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Reader B grant was improperly included in Working Memory';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_life_facts_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-b'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Un-granted Life Fact leaked to Reader B';
+  END IF;
+
+  BEGIN
+    PERFORM 1 FROM public.qry_reader_context_granted_memory_items_v1(
+      'a7200000-0000-4000-8000-000000000002'::uuid,
+      'security-reader-a'
+    );
+    RAISE EXCEPTION 'CROSS_SUBJECT_GRANTED_MEMORY_LEAK';
+  EXCEPTION WHEN SQLSTATE '42501' THEN
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
+    IF v_constraint <> 'myeongha_subject_context_mismatch' THEN
+      RAISE EXCEPTION 'Unexpected cross-subject context failure %', v_constraint;
+    END IF;
+  END;
+
+  BEGIN
+    PERFORM 1 FROM public.qry_reader_context_granted_life_facts_v2(
+      'a7200000-0000-4000-8000-000000000002'::uuid,
+      'security-reader-a'
+    );
+    RAISE EXCEPTION 'CROSS_SUBJECT_LIFE_FACT_V2_LEAK';
+  EXCEPTION WHEN SQLSTATE '42501' THEN
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
+    IF v_constraint <> 'myeongha_subject_context_mismatch' THEN
+      RAISE EXCEPTION 'Unexpected Life Fact v2 cross-subject failure %', v_constraint;
+    END IF;
+  END;
+
+  BEGIN
+    PERFORM 1 FROM public.qry_reader_context_granted_memory_items_v2(
+      'a7200000-0000-4000-8000-000000000002'::uuid,
+      'security-reader-a'
+    );
+    RAISE EXCEPTION 'CROSS_SUBJECT_MEMORY_V2_LEAK';
+  EXCEPTION WHEN SQLSTATE '42501' THEN
+    GET STACKED DIAGNOSTICS v_constraint = CONSTRAINT_NAME;
+    IF v_constraint <> 'myeongha_subject_context_mismatch' THEN
+      RAISE EXCEPTION 'Unexpected Memory v2 cross-subject failure %', v_constraint;
+    END IF;
+  END;
 
   BEGIN
     PERFORM 1 FROM public.qry_memory_items_v1(
@@ -116,6 +295,59 @@ BEGIN
   END;
 END $$;
 
+-- Independent Life Fact denial matrix: an ungranted successor must suppress
+-- the previously granted fact; then revoking its grant must exclude it too.
+RESET ROLE;
+INSERT INTO public.life_facts(
+  id,subject_id,fact_type,schema_version,value_jsonb,valid_from,valid_to,
+  source_kind,source_message_id,source_merge_action_id,supersedes_fact_id,
+  confirmed_at,revoked_at,created_at
+) VALUES
+  ('a7350000-0000-4000-8000-000000000002','a7200000-0000-4000-8000-000000000001',
+   'hobby','life-fact-v1','{"value":"painting"}'::jsonb,
+   null,null,'user_explicit',null,null,null,clock_timestamp(),null,clock_timestamp()),
+  ('a7350000-0000-4000-8000-000000000003','a7200000-0000-4000-8000-000000000001',
+   'hobby','life-fact-v1','{"value":"ceramics"}'::jsonb,
+   null,null,'profile_edit',null,null,'a7350000-0000-4000-8000-000000000002',
+   clock_timestamp(),null,clock_timestamp());
+INSERT INTO public.record_access_grants(
+  id,subject_id,life_fact_id,memory_item_id,grantee_character_id,
+  grant_reason,granted_at,revoked_at
+) VALUES
+  ('a7450000-0000-4000-8000-000000000002','a7200000-0000-4000-8000-000000000001',
+   'a7350000-0000-4000-8000-000000000002',null,'security-reader-a',
+   'user_choice',clock_timestamp(),null);
+SET LOCAL ROLE myeongha_api_executor;
+DO $$
+DECLARE
+  v_count bigint;
+BEGIN
+  SELECT count(*) INTO v_count
+  FROM public.qry_reader_context_granted_life_facts_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid, 'security-reader-a'
+  );
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Superseded Life Fact must not be returned despite its active grant';
+  END IF;
+END $$;
+
+RESET ROLE;
+UPDATE public.record_access_grants SET revoked_at=clock_timestamp()
+WHERE id='a7450000-0000-4000-8000-000000000001'::uuid;
+SET LOCAL ROLE myeongha_api_executor;
+DO $$
+DECLARE
+  v_count bigint;
+BEGIN
+  SELECT count(*) INTO v_count
+  FROM public.qry_reader_context_granted_life_facts_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid, 'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Life Fact with revoked grant or ungranted successor was returned';
+  END IF;
+END $$;
+
 -- Simulate an authorized revocation committed to the same transaction's DB
 -- state between reads; this proves fresh SELECT denial, not invalidation
 -- of content already materialized by a separate model request.
@@ -135,10 +367,24 @@ BEGIN
   IF v_count <> 0 THEN
     RAISE EXCEPTION 'Revoked Reader A grant still visible on fresh read';
   END IF;
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Reader A grant still visible in Working Memory';
+  END IF;
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Reader A grant still visible in Memory v2';
+  END IF;
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
-  IF v_count <> 1 THEN
+  IF v_count <> 2 THEN
     RAISE EXCEPTION 'Revoking a grant improperly deleted the owner Memory item';
   END IF;
 END $$;
@@ -157,9 +403,18 @@ BEGIN
   SELECT count(*) INTO v_count FROM public.qry_memory_items_v1(
     'a7200000-0000-4000-8000-000000000001'::uuid
   );
-  IF v_count <> 0 THEN
-    RAISE EXCEPTION 'Revoked Memory item still visible on fresh owner read';
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Only the private, non-revoked owner Memory should remain, got %', v_count;
   END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000001'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Revoked Memory still appears in Character Working Memory';
+  END IF;
+
   BEGIN
     PERFORM 1 FROM public.qry_memory_active_grants_v1(
       'a7200000-0000-4000-8000-000000000001'::uuid,
@@ -185,6 +440,15 @@ BEGIN
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'Owner B memory projection unavailable or cross-contaminated';
   END IF;
+
+  SELECT count(*) INTO v_count FROM public.qry_reader_context_granted_memory_items_v1(
+    'a7200000-0000-4000-8000-000000000002'::uuid,
+    'security-reader-a'
+  );
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Owner B active explicit grant must be visible only under Owner B context';
+  END IF;
 END $$;
+
 RESET ROLE;
 ROLLBACK;
