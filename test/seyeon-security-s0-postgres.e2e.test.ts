@@ -31,7 +31,8 @@ import {
   SeyeonG5PrivateCommerceBoundaryErrorV1,
 } from '../apps/api/src/seyeon-g5-private-commerce-postgres-pool-v1.js';
 import {handleSeyeonMemberMemoryGrantStatusRequestV1} from '../apps/api/src/seyeon-member-memory-grant-status-http-v1.js';
-import type { RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
+import { assertSeyeonProductionCombinedPinReadinessV1, type RunProductionSeyeonChatResultV1 } from '../apps/api/src/production-seyeon-chat-runtime-v1.js';
+import { createSeyeonProductionSubjectTransactionRunnerV1 } from '../apps/api/src/seyeon-production-subject-transaction-v1.js';
 import { composeSeyeonProductionContextV1, type SeyeonProductionContextSnapshotV1 } from '../apps/api/src/seyeon-production-context-v1.js';
 import { createPostgresSeyeonProductionContextReadAuthorityPortV1 } from '../apps/api/src/postgres-seyeon-production-context-read-v1.js';
 import { SEYEON_CONVERSATION_RECALL_PROJECTOR_V1 } from '../apps/api/src/seyeon-conversation-recall-memory-contract-v1.js';
@@ -313,6 +314,33 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
         'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)','EXECUTE')
         as private_denied`);
     expect(acl.private_denied).toBe(true);
+    // Recreate the effective production Member role: neither USAGE on the
+    // private schema nor direct EXECUTE on its recent-source function.
+    // All changes stay in this disposable PG17 test database and are restored.
+    await pool.query(`revoke execute on function seyeon_private.pin_model_recent_sources_v1(
+      uuid,uuid,uuid,uuid,uuid,jsonb,text) from myeongha_api_executor;
+      revoke usage on schema seyeon_private from myeongha_api_executor;`);
+    try {
+      const {rows:[privateAcl]}=await pool.query(`select
+        not has_schema_privilege('myeongha_api_executor','seyeon_private','USAGE')
+          as private_schema_denied,
+        not has_function_privilege('myeongha_api_executor',
+          'seyeon_private.pin_model_recent_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text)',
+          'EXECUTE') as private_function_denied`);
+      expect(privateAcl).toMatchObject({
+        private_schema_denied:true,private_function_denied:true,
+      });
+      const runner = createSeyeonProductionSubjectTransactionRunnerV1({
+        pool:subjectPool, verifiedEvidence:f.evidence,
+      });
+      await expect(assertSeyeonProductionCombinedPinReadinessV1(
+        runner,f.subject,
+      )).resolves.toBeUndefined();
+    } finally {
+      await pool.query(`grant usage on schema seyeon_private to myeongha_api_executor;
+        grant execute on function seyeon_private.pin_model_recent_sources_v1(
+          uuid,uuid,uuid,uuid,uuid,jsonb,text) to myeongha_api_executor;`);
+    }
   });
 
   it('denies G2 Commit for a legacy Memory-only Pin with no current User certificate', async () => {
