@@ -91,7 +91,9 @@ async function callModel({ spec, repeat, model, variant }) {
   const body = {
     model, stream: false, max_tokens: MAX_TOKENS,
     reasoning: { effort: 'low' },
-    temperature: 0.7,
+    // Luna's currently listed providers do not advertise temperature. With
+    // require_parameters=true, passing it causes OpenRouter to reject routing.
+    ...(model === 'z-ai/glm-5.3-flash' ? { temperature: 0.7 } : {}),
     messages: [
       { role: 'system', content: SYSTEMS[variant] },
       { role: 'user', content: spec.text },
@@ -173,7 +175,8 @@ try {
     mode: 'ISOLATED_SYNTHETIC_SINGLE_TURN',
     models: MODELS, variants: VARIANTS, maxCalls: MAX_CALLS,
     attemptedCalls: attempted, successfulCalls: results.length, failure,
-    temperature: 0.7, reasoningEffort: 'low',
+    sampling: { 'z-ai/glm-5.3-flash': { temperature: 0.7 }, 'openai/gpt-6-luna': { temperature: 'provider-default' } },
+    reasoningEffort: 'low',
     maxTokensPerCall: MAX_TOKENS, maxProviderReportedCostUsd: MAX_COST,
     providerReportedCostUsd: Number(cost.toFixed(8)),
     billingInvoiceReconciled: false,
