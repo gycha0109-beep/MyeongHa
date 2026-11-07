@@ -822,12 +822,13 @@
       "The current related-policy count of 38 includes 19 policies added by later applied migrations and must not be compared to the historical bundle's 19-policy count as if the extra policies were drift.",
       "Twelve current Production migration records from the S0/Se-yeon sequence have no corresponding current-main migration file. Two remote migration comments explicitly say no Production migration/deployment, and one says disposable S0 only; the remote ledger nevertheless records them as applied. This is a source/provenance and environment-guard discrepancy, not by itself proof of unauthorized execution.",
       "The current `memory_proposals` RLS policies are inert because relrowsecurity=false. The new S0 proposal acceptance function is not executable by API/service/anon/authenticated roles, has no catalog callers, and the only conversation_recall registry row is disabled. This is currently fail-closed at the application entrypoint but remains an RLS hardening gate before enabling the type.",
-      "The legacy service_role-only chat commit function remains a separate user-choice memory proposal path and does not consult the new positive-source registry; its deployment/use must be treated separately from the disabled S0 conversation_recall acceptance path."
+      "The legacy service_role-only chat commit function remains a separate user-choice memory proposal path and does not consult the new positive-source registry; its deployment/use must be treated separately from the disabled S0 conversation_recall acceptance path.",
+      "The current disabled conversation_recall registry is not a global chat or billing kill switch. Current models are active, 29 historic call events are settled, and 24 carry the owner daily-limit exemption; no fresh paid call was executed in this audit."
     ],
     "readOnlyAuditScript": {
       "path": "scripts/operations/production-authority-frontier-readonly.sql",
-      "blobSha": "4b0f463c7fd575c96f9151163c7d29afd3134f97",
-      "bytes": 13696,
+      "blobSha": "e796dadffb37996efbd3d474c46abbf47d0d8dcd",
+      "bytes": 15923,
       "verifiedAgainstProduction": true,
       "transactionReadOnly": "on",
       "executionDisposition": "SELECT-only inventory completed and transaction rolled back; output contains catalog metadata and hashes, no application rows or raw function source."
@@ -1043,6 +1044,60 @@
         "legacyCommitFunctionApiExecutorExecute": false,
         "legacyCommitFunctionNote": "Separate legacy service_role-only user-choice proposal path; it can persist memory_proposals through the existing chat commit flow and does not reference the new positive-source registry. API executor, anon and authenticated cannot execute this legacy function. Treat it as a distinct trusted-backend path rather than claiming the registry disables all memory acceptance."
       }
+    },
+    "positiveMemoryAndAiCostBoundary": {
+      "observedUtcDate": "2026-11-07",
+      "postgresqlVersion": "17.6",
+      "readOnlySnapshotScript": "scripts/operations/production-authority-frontier-readonly.sql",
+      "migrationVersionCount": 241,
+      "latestMigrationVersion": "20261105075227",
+      "positiveSourceRegistry": {
+        "recordType": "conversation_recall",
+        "enabled": false,
+        "writableEnabled": false
+      },
+      "governorModelPolicies": [
+        {
+          "provider": "openai-responses",
+          "model": "gpt-5.6-terra",
+          "policyVersion": "seyeon-s0-receipt-production-20261025",
+          "active": true
+        },
+        {
+          "provider": "openrouter-chat",
+          "model": "z-ai/glm-5.3-flash",
+          "policyVersion": "seyeon-glm53flash-context-capacity-20261031",
+          "active": true
+        }
+      ],
+      "dailyBudgets": {
+        "count": 7,
+        "firstUtcDay": "2026-10-25",
+        "lastUtcDay": "2026-10-31",
+        "rowsOnObservedDay": 0
+      },
+      "costLedger": {
+        "totalEvents": 29,
+        "settledEvents": 29,
+        "unsettledEvents": 0,
+        "ownerNoDailyLimitEvents": 24,
+        "unknownUsageEvents": 1,
+        "firstEventUtc": "2026-10-25T20:35:54.305929+00:00",
+        "latestEventUtc": "2026-11-06T06:34:54.742037+00:00",
+        "totalEffectiveMicroUsd": 294968
+      },
+      "memory": {
+        "unrevokedMemoryItems": 1,
+        "proposals": 0,
+        "pendingProposals": 0
+      },
+      "callableBoundaries": {
+        "apiExecutorPositiveCommit": true,
+        "apiExecutorNewProposalAccept": false,
+        "serviceRoleLegacyCommit": true
+      },
+      "interpretation": "The new positive-source registry is disabled and new proposal-accept entrypoint denied, but two model policies remain active, protected positive commit is API-executable, the legacy service_role commit remains callable, and 29 historical billed calls exist. Do not characterize all Se-yeon runtime, billing, or memory pathways as globally disabled. The absence of a current UTC daily budget row causes the non-owner guarded admission path to fail closed; the verified owner-admin exception is separate and still requires the other call controls. No new model dispatch was performed.",
+      "noProductionMutation": true
     }
   }
 }
