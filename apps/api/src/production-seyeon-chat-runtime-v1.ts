@@ -124,6 +124,50 @@ export async function assertSeyeonProductionPinReadinessV1(
   }
 }
 
+/**
+ * G1 positive S0 requires the one-Memory + current-User atomic Pin to be
+ * callable by the actual ordinary Subject executor BEFORE a Turn is received.
+ * Installing SQL objects alone is not enough: the source-only private wrapper
+ * currently revokes API EXECUTE, and cannot be treated as a working route.
+ * This catalog check never grants privileges or enables model use.
+ */
+export async function assertSeyeonProductionCombinedPinReadinessV1(
+  runner: SeyeonProductionSubjectTransactionRunnerV1,
+  canonicalSubjectId: string,
+): Promise<void> {
+  const result = await runner.run(canonicalSubjectId, (client) =>
+    client.query<{ ready: boolean }>(`
+      select
+        coalesce((
+          select p.prosecdef
+            and has_function_privilege(current_user, p.oid, 'EXECUTE')
+            and has_schema_privilege(current_user, p.pronamespace, 'USAGE')
+          from pg_catalog.pg_proc p
+          where p.oid = to_regprocedure(
+            'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)'
+          )
+        ), false)
+        and to_regprocedure(
+          'seyeon_private.pin_model_recent_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text)'
+        ) is not null
+        and to_regprocedure(
+          'public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text)'
+        ) is not null
+        and exists (
+          select 1
+          from pg_catalog.pg_attribute a
+          where a.attrelid = to_regclass('public.chat_turn_attempts')
+            and a.attname = 'seyeon_recent_source_pin_jsonb'
+            and a.atttypid = 'pg_catalog.jsonb'::regtype
+            and not a.attisdropped
+        ) as "ready"
+    `),
+  );
+  if (result.rows.length !== 1 || result.rows[0]?.ready !== true) {
+    throw new SeyeonProductionPinMigrationRequiredV1();
+  }
+}
+
 export const PRODUCTION_SEYEON_CHAT_RUNTIME_VERSION_V1 =
   'production-seyeon-chat-runtime-v1' as const;
 
@@ -413,6 +457,13 @@ export function createProductionSeyeonChatRuntimeV1(
       // Prior to durable receive/attempt creation: fail closed when Production
       // has not applied the 1640 immutable zero-source Pin and executor ACL.
       await assertSeyeonProductionPinReadinessV1(runner, resolvedSubject.subjectId);
+      if (input.approvedPersonalRecordModelUse !== undefined) {
+        // Positive S0 must not create a new user Turn when its 16/17 combined
+        // G1 Pin cannot execute under the real Member API transaction role.
+        await assertSeyeonProductionCombinedPinReadinessV1(
+          runner, resolvedSubject.subjectId,
+        );
+      }
       // The main Subject Runner remains responsible for Chat/Outbox writes.
       // Governed Start and Settle use a different DB LOGIN + role only.
       const costRunner = costPoolLease === null
