@@ -90,6 +90,25 @@ for (const fragment of [
   }
 }
 
+// A successfully rerun ledger workflow can retain an artifact from each
+// attempt. Only the single artifact from the latest successful attempt may
+// become the predecessor, never a guessed/latest-name selection across attempts.
+for (const fragment of [
+  'previous_run_json="$(jq -c',
+  'previous_attempt="$(jq -er',
+  'previous_attempt_started_at="$(jq -er',
+  'previous_attempt_finished_at="$(jq -er',
+  '--arg start "$previous_attempt_started_at"',
+  '--arg finish "$previous_attempt_finished_at"',
+  '--argjson run_id "$previous_run_id"',
+  '.workflow_run.id == $run_id',
+  '.created_at >= $start',
+  '.created_at <= $finish',
+  'if [[ "$(jq ' + "'length'" + ' <<<"$previous_artifacts")" != 1 ]]; then',
+]) {
+  requireFragment('workflow', fragment);
+}
+
 if (files.workflow.includes('.name == "Production PostgreSQL Logical Backup"')) {
   throw new Error(
     'Privacy recovery ledger must bind backup authority to canonical workflow path, not mutable workflow/run display name.',
