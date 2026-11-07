@@ -80,3 +80,16 @@
 - **블로커·승인:** 추가 사용자 승인 없음. CI 결과가 본 단위 종료의 선행 조건.
 - **다음 작업:** 현재 PR 검증에서 실패가 발생하면 해당 모바일 가독성 단위만 보정, 통과 시 기존 로드맵 Stage 5의 다음 미완료 검증으로 이동.
 
+
+## 2026-11-08 — 고객지원 진입 링크 복구 (Stage 5, 독립 단위)
+
+- **작업 목표:** 기존 웹 출시 점검 로드맵 Stage 5의 고객지원 탐색 경로 중 확인된 미완료 항목. 대화 화면 푸터의 `고객지원` 링크가 `href="#"`로 남아 문의 페이지로 이동하지 못하는 결함을 수정.
+- **기준/권한:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5, `docs/ROADMAP_CONTACT_INQUIRY.md`(문의 I1~I5 및 실발송 완료), `apps/web/contact.html`의 기존 문의 폼. 별도 법률·개인정보·환불 정책 초안을 공개 페이지로 승격하지 않음.
+- **변경 파일:** `apps/web/chat-hub.html` — 고객지원 링크만 `contact.html`로 수정. `test/web-product-clarity.test.ts` — 링크와 기존 문의 양식 진입 경로 회귀 검사 추가. `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md` — 이력 누적.
+- **브랜치:** `fix/frontend-integration/support-footer-navigation-stage5-20261108`; 병합 전 모바일 PR #3121의 고정 HEAD `72e721b1`에서 분기하여 코드·WORKLOG 충돌 방지.
+- **코드 커밋:** `c3e3baaaedd4ae3f39934914b5f9c86f6f856056`(링크), `ff9fbd1f630dbe88ec4a6495476acce6e7bf3834`(테스트). `Watchtower-Track: frontend-integration`.
+- **PR/CI:** 직전 [#3121](https://github.com/gycha0109-beep/MyeongHa/pull/3121) 일반 CI·웹 브라우저·Governance 성공; [통합 CI #42400926140](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42400926140)은 이 기록 시점 실행 중. 이전 PR 병합 이후 이 단위의 별도 PR 및 통합 CI를 진행해야 하므로 **신규 단위의 PR/테스트/CI 성공은 아직 주장하지 않음**.
+- **완료:** 별도 브랜치에 지원 링크 수정·회귀 검사 커밋. 기존 문의 기능·운영 설정은 수정하지 않음.
+- **미완료:** #3121 통합 CI 성공·병합, 이번 단위 PR 생성 후 새 HEAD 테스트·CI 성공·병합. Stage 5의 약관·개인정보·환불 등 공식 공개 문서는 아직 별도 권한 및 완료 조건 확인 필요.
+- **블로커/승인:** 사용자 승인 필요 없음. 현재는 이전 PR 통합 CI 및 선행 병합 대기.
+- **다음 작업:** #3121 병합 완료 확인 → 이번 브랜치의 변경을 독립 PR로 제출 → 테스트/웹 CI 및 통합 CI 검증 → 다음 로드맵 미완료 항목 검토.
