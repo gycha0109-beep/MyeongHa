@@ -41,58 +41,8 @@ function exactUtc(source, field) {
   return Date.parse(text);
 }
 
-// New repository files cannot extend an older restore's Production authority.
-// A later dated read-only catalog may only acknowledge the exact *repository*
-// version inventory. No fresh Production restore, Hosted DR or serving permission
-// is inferred from this witness.
-function hasDatedRepositoryVersionWitness(evidence, frontier, historicalDate) {
-  if (!evidence || typeof evidence !== 'object') return false;
-  const { manifest, observation, currentVersions } = evidence;
-  if (!manifest || !observation || !Array.isArray(currentVersions)
-    || !Array.isArray(manifest.versionIds)) return false;
-  const source = observation.source;
-  const catalog = observation.catalog;
-  if (manifest.schema !== 'myeongha-dr-dated-repository-migration-version-witness-v1'
-    || observation.schema !== 'myeongha-production-migration-readonly-observation-v1'
-    || manifest.observationDateKst !== observation.observationDateKst
-    || !/^\d{4}-\d{2}-\d{2}$/u.test(manifest.observationDateKst)
-    || manifest.observationDateKst < historicalDate
-    || manifest.sourceMainSha !== source?.mainSha
-    || manifest.observedCatalogFile !==
-      'docs/operations/POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json'
-    || manifest.readOnlySource !== true
-    || manifest.productionMutationPerformed !== false
-    || manifest.drReady !== false
-    || source?.readOnly !== true
-    || source?.transactionReadOnly !== 'on'
-    || source?.productionMutationPerformed !== false
-    || source?.rawSqlIncluded !== false
-    || !catalog || !Array.isArray(catalog.repositoryOnly)
-    || !Array.isArray(catalog.remoteOnly)
-    || catalog.repositoryOnlyCount !== catalog.repositoryOnly.length
-    || catalog.remoteOnlyCount !== catalog.remoteOnly.length
-    || catalog.repositorySqlFileCount !== currentVersions.length
-    || manifest.repositorySqlFileCount !== currentVersions.length
-    || currentVersions.length === 0) return false;
-
-  if (currentVersions.some(id => typeof id !== 'string' ||
-    !/^[0-9]+$/u.test(id) || Number(id) <= 0 || !Number.isSafeInteger(Number(id)))) return false;
-  const current = [...currentVersions].sort();
-  if (new Set(current).size !== current.length
-    || JSON.stringify(current) !== JSON.stringify(manifest.versionIds)
-    || String(Math.max(...current.map(Number))) !== manifest.repositoryNumericMaxVersion
-    || Math.max(...current.map(Number)) !== frontier
-    || catalog.repositoryFrontier !== current.at(-1)) return false;
-
-  const currentSet = new Set(current);
-  if (catalog.repositoryOnly.some(row => !currentSet.has(row.version))
-    || catalog.remoteOnly.some(row => currentSet.has(row.version))) return false;
-  return true;
-}
-
 export function validateDrCurrentEvidence(
   statusText, repositoryMigrationFrontier, eventName = 'local',
-  repositoryEvidence = null,
 ) {
   if (typeof statusText !== 'string') fail('readiness status must be text');
   if (!Number.isSafeInteger(repositoryMigrationFrontier) ||
@@ -138,13 +88,8 @@ export function validateDrCurrentEvidence(
   if (repositoryMigrationFrontier < repositoryObserved) {
     fail('repository is behind the recorded migration filename frontier');
   }
-  const repositoryAdvanceWitnessMatched =
-    repositoryMigrationFrontier > repositoryObserved &&
-    hasDatedRepositoryVersionWitness(
-      repositoryEvidence, repositoryMigrationFrontier, blocks[0][1],
-    );
   if (repositoryMigrationFrontier > repositoryObserved &&
-      eventName !== 'pull_request' && !repositoryAdvanceWitnessMatched) {
+      eventName !== 'pull_request') {
     fail('repository migration advance is not covered by the dated observation');
   }
   digest(latest, 'verified_isolated_restore_head_sha', 40);
@@ -166,7 +111,6 @@ export function validateDrCurrentEvidence(
     documentedRepositoryMigrationVersion: repositoryObserved,
     repositoryMigrationFrontier,
     repositoryCandidateBeyondObservation: repositoryMigrationFrontier > repositoryObserved,
-    repositoryAdvanceWitnessMatched,
     restoredBackupMatchesObservedMigrationVersion: true,
     fullSchemaCatalogEquivalenceProven: false,
     authoritativePrivacyReplayForCurrentRestoreProven: false,
