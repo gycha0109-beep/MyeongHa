@@ -39,30 +39,15 @@ purchase_state() {
       and a.purchase_intent_id='$1'::uuid;" >/dev/null
 }
 
-# The verified receipt/Reader fixture starts as a Guest. D-05-C is Member
-# only: perform the EXISTING DB-authorized same-subject Guest promotion in
-# this disposable DB. No ownership rewrite, production user or live payment.
-p <<SQL >/dev/null
-insert into auth.users(id)
-values ('c1990000-0000-0000-0000-000000000001'::uuid);
-insert into public.guest_sessions(
-  id,subject_id,token_hash,expires_at,consumed_at,
-  claimed_by_subject_id,created_at
-) values (
-  'c3990000-0000-0000-0000-000000000001'::uuid,
-  '$subject'::uuid, 'd05-fixture-promotion-token',
-  clock_timestamp()+interval '1 day',null,null,clock_timestamp()
-);
-select subject_id,subject_kind,subject_status
-from public.cmd_promote_guest_v1(
-  '$subject'::uuid,
-  'c3990000-0000-0000-0000-000000000001'::uuid,
-  'c1990000-0000-0000-0000-000000000001'::uuid
-);
-SQL
-[[ "$(p -c "select kind||'|'||status from public.subjects where id='$subject'::uuid;")" == 'member|active' ]] ||
-  fail "canonical purchased-Reading owner not promoted to active Member"
-echo 'PASS D-05-C synthetic Guest purchase retained after DB-authorized Member promotion'
+# The standard Reader purchase fixture now begins as an authenticated Member,
+# as required for every paid Purchase Intent. Preserve that canonical owner:
+# do not create a Guest session or replay a promotion against a Member.
+member_state="$(p -c "select kind||'|'||status||'|'||auth_user_id::text
+  from public.subjects where id='$subject'::uuid
+    and merged_into_subject_id is null;")"
+[[ "$member_state" == 'member|active|11380000-0000-0000-0000-000000000001' ]] ||
+  fail "purchase-backed Reader owner must remain the exact active authenticated Member"
+echo 'PASS D-05-C Reader purchase fixture is owned by the original active Member'
 
 # The preceding general Chat fixture may already have a default Release.
 # Clear its default flag only inside the same disposable PostgreSQL database.

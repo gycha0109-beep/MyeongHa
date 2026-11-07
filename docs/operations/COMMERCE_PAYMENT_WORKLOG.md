@@ -771,3 +771,10 @@
 - **실패 근거:** [PR #3090 최신 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42366472499)에서 PostgreSQL17 통합과 Governance는 통과했지만, 기존 20개 PostgreSQL15 격리 사례가 동일한 새 전체 카탈로그 SHA-256 `22f9c1cac9d642e46ae2346902a7fbe335ea3a1d33f464e44640628fa8477d08`를 반환해 이전 지문과 불일치했습니다. 2330 계정 삭제 함수의 단계별 Reader/Claim 테이블 처리 보완이 SQL 함수 정의를 변경한 결과입니다.
 - **수정:** 기존 `catalog_snapshot.sh`의 SQL 전체 정의, 제약·트리거·권한 검증은 완화하지 않고, 4개 DB 병렬 트랙/20개 독립 DB에서 일치하게 재현된 새 카탈로그 지문으로 고정값을 갱신합니다. 계정 삭제 시작 테스트의 비활성 Member 유료 Purchase Intent 차단 문구도 이미 승인된 Member-only 선행 검증 `LOGIN_REQUIRED`와 일치시킵니다. 요청 및 원장 상태의 안전 차단은 그대로 유지합니다.
 - **미완료:** 새 HEAD에 대한 전체 CI/통합 PASS 및 PR 충돌 해소·병합 검증은 별개입니다. 운영 DB, LIVE 결제/환불/제공 및 공개 판매 경로는 변경하지 않습니다.
+
+
+### 2026-11-07 — 기존 Reader 구매 테스트의 회원 전용 정책 충돌 복구
+
+- **실패 근거:** [PR #3090 핵심 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367049323/job/128387240283)는 기존 Reader 통합 fixture의 구매 Subject를 이미 활성 인증 Member로 만들었는데, 연결 테스트가 과거 Guest 구매를 가정하고 그 Subject에 다시 Guest→Member promotion을 시도하여 `guest promotion requires an active unmerged guest subject` 오류로 중단됐습니다. 같은 HEAD에서 PostgreSQL15 개별 결제·권한·콘텐츠·런타임 DB 트랙, Governance 및 Web 검사는 통과했습니다.
+- **수정:** 비운영 Reader 구매-Chat 연결 fixture에서 역사적 Guest 구매 재현용 임의 Guest Session/Promotion을 제거하고, 원본 구매 주체가 정확한 활성 Member/Auth ID 그대로인지 검사합니다. Reader Grant·Thread/Bundle·타 구매권 독립성 검증은 유지합니다.
+- **경계:** Guest 무료 이용과 과거 Guest-owned 금융 기록 보존은 건드리지 않습니다. DB 스키마·실제 Checkout·금융 기록·Provider/환불 POST·LIVE 노출을 변경하지 않았으며, 새 CI 통과 전 PASS 미선언입니다.
