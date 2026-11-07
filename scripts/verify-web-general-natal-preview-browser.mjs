@@ -17,6 +17,29 @@ const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const bearer = 'synthetic-natal-browser-bearer';
 const observedRequests = [];
 let malformed = false;
+const journeyBearer = 'synthetic-guest-birth-preview-bearer';
+const journeyRevisionId = '55555555-5555-4555-8555-555555555555';
+const journeyProfileId = '44444444-4444-4444-8444-444444444444';
+const journeyRequests = [];
+const journeyFact = (value, hanja, element, yinYang) => ({ value, hanja, element, yinYang });
+const journeyResolved = (stem, branch) => ({ status: 'resolved', value: { stem, branch } });
+const journeyPillars = {
+  year: journeyResolved(journeyFact('신', '辛', '금', '음'), journeyFact('사', '巳', '화', '음')),
+  month: journeyResolved(journeyFact('경', '庚', '금', '양'), journeyFact('인', '寅', '목', '양')),
+  day: journeyResolved(journeyFact('갑', '甲', '목', '양'), journeyFact('자', '子', '수', '양')),
+  hour: journeyResolved(journeyFact('병', '丙', '화', '양'), journeyFact('인', '寅', '목', '양')),
+};
+const journeyProfile = {
+  birthProfileId: journeyProfileId,
+  profileKind: 'self',
+  archivedAt: null,
+  currentRevision: {
+    revisionId: journeyRevisionId,
+    revisionNo: 1,
+    input: { calendarType: 'solar', birthDate: '2001-02-03', birthTime: '04:05:00',
+      timeKnown: true, isLeapMonth: false, sex: 'male' },
+  },
+};
 
 function reading() {
   return {
@@ -57,6 +80,57 @@ async function serve() {
         res.end('<!doctype html><title>Reading Browser Test</title>');
         return;
       }
+      if (url.pathname === '/api/session/bootstrap' && req.method === 'POST') {
+        journeyRequests.push({ path: url.pathname, method: req.method });
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.end(envelope({ kind: 'guest', guestSession: { bearerToken: journeyBearer } }));
+        return;
+      }
+      if (url.pathname === '/api/birth-profiles' && req.method === 'POST') {
+        let body = '';
+        for await (const chunk of req) body += chunk;
+        const request = JSON.parse(body);
+        journeyRequests.push({ path: url.pathname, method: req.method,
+          authorization: req.headers.authorization, birthDate: request.input?.birthDate });
+        if (req.headers.authorization !== 'Bearer ' + journeyBearer ||
+            request.input?.birthDate !== '2001-02-03') {
+          res.statusCode = 403;
+          res.end(JSON.stringify({ ok: false, error: { code: 'INVALID_REQUEST' } }));
+          return;
+        }
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.end(envelope({ birthProfileId: journeyProfileId, revisionId: journeyRevisionId, revisionNo: 1 }));
+        return;
+      }
+      if (url.pathname === '/api/me/saju/calculation' && req.method === 'POST') {
+        journeyRequests.push({ path: url.pathname, method: req.method,
+          authorization: req.headers.authorization });
+        if (req.headers.authorization !== 'Bearer ' + journeyBearer) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ ok: false, error: { code: 'AUTH_REQUIRED' } }));
+          return;
+        }
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.end(envelope({ calculation: {
+          birthRevisionRef: journeyRevisionId,
+          snapshot: { pillars: journeyPillars, completeness: {
+            birthTimeKnown: true, fullyResolved: true,
+          } },
+        } }));
+        return;
+      }
+      if (url.pathname === '/api/me/birth-profile' && req.method === 'GET') {
+        journeyRequests.push({ path: url.pathname, method: req.method,
+          authorization: req.headers.authorization });
+        if (req.headers.authorization !== 'Bearer ' + journeyBearer) {
+          res.statusCode = 401;
+          res.end(JSON.stringify({ ok: false, error: { code: 'AUTH_REQUIRED' } }));
+          return;
+        }
+        res.setHeader('content-type', 'application/json; charset=utf-8');
+        res.end(envelope({ birthProfile: journeyProfile }));
+        return;
+      }
       if (url.pathname === '/api/me/saju/preview-reading') {
         let body = '';
         for await (const chunk of req) body += chunk;
@@ -65,9 +139,10 @@ async function serve() {
           authorization: req.headers.authorization,
           body: JSON.parse(body),
         });
+        const readingText = JSON.parse(body).readingText;
         if (req.method !== 'POST' ||
-            req.headers.authorization !== 'Bearer ' + bearer ||
-            JSON.parse(body).readingText !== '전체 사주') {
+            !['Bearer ' + bearer, 'Bearer ' + journeyBearer].includes(req.headers.authorization) ||
+            !['전체 사주', '직업운'].includes(readingText)) {
           res.statusCode = 409;
           res.end(JSON.stringify({ ok: false, error: { code: 'SAJU_PREVIEW_READING_UNAVAILABLE' } }));
           return;
@@ -202,7 +277,49 @@ try {
   await client.send('Page.navigate', { url: origin + '/reading-detail.html?scope=year' });
   await waitFor(client, 'document.body?.dataset.readingRouteState === "blocked_by_authority"', 'unavailable annual');
   assert(observedRequests.length === previousCalls, 'Annual Reading must not call Preview endpoint');
-  console.log('MYEONGHA_GENERAL_NATAL_PREVIEW_BROWSER_PASS');
+  // Stage 5: the actual guest journey must link a new Birth Profile, calculated
+  // self chart, and an admitted Preview through visible links, not a direct URL.
+  malformed = false;
+  await client.send('Page.navigate', { url: origin + '/prime.html' });
+  await waitFor(client, 'location.pathname === "/prime.html" && document.readyState === "complete"', 'guest setup');
+  await client.evaluate('localStorage.clear(); sessionStorage.clear()');
+  await client.send('Page.navigate', { url: origin + '/reading.html' });
+  await waitFor(client, 'document.querySelector("#saju-empty")?.hidden === false', 'guest birth form');
+  await client.evaluate(`(() => {
+    document.querySelector('#saju-birth-year').value = '2001';
+    document.querySelector('#saju-birth-month').value = '02';
+    document.querySelector('#saju-birth-day').value = '03';
+    document.querySelector('#saju-birth-time').value = '04:05';
+    document.querySelector('#saju-birth-sex').value = 'male';
+    document.querySelector('#saju-birth-form').requestSubmit();
+  })()`);
+  await waitFor(client,
+    'document.querySelector("#saju-hub")?.hidden === false && document.querySelector("#saju-empty")?.hidden === true',
+    'calculated guest chart after Birth creation');
+  assert(await client.evaluate('sessionStorage.getItem("myeongha.guestBearer.v1") === ' +
+    JSON.stringify(journeyBearer)), 'Guest bootstrap bearer was not kept');
+  const stagedPaths = journeyRequests.map((request) => request.path);
+  assert(JSON.stringify(stagedPaths) === JSON.stringify([
+    '/api/session/bootstrap', '/api/birth-profiles', '/api/me/saju/calculation', '/api/me/birth-profile',
+  ]), 'Guest creation/calculation/authority order changed: ' + JSON.stringify(stagedPaths));
+  assert(journeyRequests.slice(1).every((request) =>
+    request.authorization === 'Bearer ' + journeyBearer), 'Guest identity changed during Birth/calculation');
+  const previewLink = 'a[href="reading-detail.html?topic=career"]';
+  assert(await client.evaluate('!!document.querySelector("#saju-hub ' + previewLink + '")'),
+    'Admitted career Preview link missing from calculated chart');
+  await client.evaluate('document.querySelector("#saju-hub ' + previewLink + '").click()');
+  await waitFor(client,
+    'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',
+    'supported career Preview delivery from Saju hub');
+  const journeyReading = observedRequests.at(-1);
+  assert(journeyReading?.method === 'POST' &&
+    journeyReading.authorization === 'Bearer ' + journeyBearer &&
+    journeyReading.body.readingText === '직업운',
+    'Preview must preserve the guest subject and exact admitted career route');
+  assert(await client.evaluate('document.querySelector("[data-reading-stage]")?.hidden === false'),
+    'Admitted Preview was not displayed after guest Birth');
+
+  console.log('MYEONGHA_GENERAL_NATAL_AND_GUEST_JOURNEY_PREVIEW_BROWSER_PASS');
 } catch (error) {
   console.error(error);
   if (chromeLog.trim()) console.error(chromeLog.slice(-1200));
