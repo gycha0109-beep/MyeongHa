@@ -381,10 +381,13 @@ async function run(
 
 describe('Reader Interpretation Preview Runtime v1', () => {
   it('pairs Baekheon and Seyeon against the identical authorized Saju unit for private editorial comparison', async () => {
+    const singleUnitBundle = makeBundle([
+      makeUnit('1', 'timing', '장기 흐름에서 반복되는 특징을 확인해야 합니다.'),
+    ]);
     const collector = createReaderSajuPrivatePairCollectorV1({
       readingRef: READING_ID,
       sourceResponseHash: SOURCE_HASH,
-      groundingHash: baseBundle.groundingHash,
+      groundingHash: singleUnitBundle.groundingHash,
       firstCharacterId: 'baekheon',
       secondCharacterId: 'seyeon',
     });
@@ -419,8 +422,8 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     };
     const ports = authorityPorts({ activeReaders: ['baekheon', 'seyeon'] });
     const [first, second] = await Promise.all([
-      run(readers.baekheon, { ports, consultationShadowPort: port }),
-      run(readers.seyeon, { ports, consultationShadowPort: port }),
+      run(readers.baekheon, { ports, bundle: singleUnitBundle, consultationShadowPort: port }),
+      run(readers.seyeon, { ports, bundle: singleUnitBundle, consultationShadowPort: port }),
     ]);
     expect(first.mode).toBe('reader_interpretation');
     expect(second.mode).toBe('reader_interpretation');
