@@ -251,6 +251,27 @@ jobs:
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
         run: bash scripts/run-postgres-isolated-restore-drill.sh
 
+      - name: Compare current-frontier application schema with isolated restored catalog
+        shell: bash
+        env:
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          APP_SCHEMA_PARITY_PATH: ${{ runner.temp }}/restore-evidence/app-schema-parity.json
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: restore-drill
+          PGDATABASE: postgres
+        run: |
+          set -euo pipefail
+          node scripts/verify-postgres-restored-app-schema-parity.mjs
+          node scripts/operations/check-postgres-restored-app-schema-parity.mjs \
+            --source docs/operations/POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json \
+            --query scripts/operations/production-app-schema-fingerprint-readonly.sql \
+            --restore-evidence "$RESTORE_EVIDENCE_PATH" \
+            --output "$APP_SCHEMA_PARITY_PATH"
+          jq -e '.drReady == false and .serviceResumptionAllowed == false
+            and .verifiedFullSchemaCatalogEquivalence == false
+            and .fullSupabaseMigrationLedgerRestored == false' "$APP_SCHEMA_PARITY_PATH" >/dev/null
       - name: Exercise synthetic privacy reconciliation and finalization on restored database
         shell: bash
         env:
