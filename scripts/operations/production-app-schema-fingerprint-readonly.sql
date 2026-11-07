@@ -150,6 +150,10 @@ SELECT pg_catalog.jsonb_build_object(
  'schemaVersion','ops-postgres-application-schema-fingerprint-v1',
  'postgresVersion',pg_catalog.current_setting('server_version'),
  'transactionReadOnly',pg_catalog.current_setting('transaction_read_only'),
+ 'migrationCatalog',pg_catalog.jsonb_build_object(
+   'totalVersions',(SELECT count(*) FROM supabase_migrations.schema_migrations),
+   'latestVersion',(SELECT max(version) FROM supabase_migrations.schema_migrations)
+ ),
  'schemaCount',(SELECT count(*) FROM schema_metadata),
  'tableCount',(SELECT count(*) FROM tables),
  'functionCount',(SELECT count(*) FROM functions),
