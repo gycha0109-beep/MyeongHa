@@ -29,7 +29,8 @@
 
 - CSS 수정: `b5d48b2534ab4fefcc0aa1e03e8aed6c049a5f2e`
 - 대비 테스트 추가: `4ed35206b52c854ce7f06457393ad8885e285229`
-- 두 커밋 모두 `Watchtower-Track: frontend-integration` 기록.
+- 첫 CI의 타입 검사 오류 수정: `22b8e5fe8dbfde90a5f4fe08015b00368dba4dd5`
+- 코드·테스트 커밋 모두 `Watchtower-Track: frontend-integration` 기록.
 
 ### 검증 증거
 
@@ -41,7 +42,10 @@
   - 다크 예시 배지: **5.91:1**
   - 다크 상품 버튼: **8.50:1**
 - GitHub 브랜치의 변경된 CSS와 테스트 파일을 다시 읽어 선언·대비 수치 일치 확인.
-- 자동 테스트·웹 빌드·PR CI: **아직 검증되지 않음** (PR 생성 및 워크플로 완료 후 이 칸 갱신). 수치 계산만으로 전체 페이지 WCAG 적합을 주장하지 않음.
+- PR: [#3116](https://github.com/gycha0109-beep/MyeongHa/pull/3116), [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/3116/checks).
+- 최초 PR CI [실행 #42390556226](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556226): **FAIL**, 새 대비 테스트의 strict TypeScript 미정의 배열/매치 인덱스 오류. 원인은 본 작업 파일로 확인했고 위 `22b8e5f` 커밋에서 접근 방식을 수정함.
+- 최초 Governance [실행 #42390556039](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556039): **PASS**. 웹 PR 검증 [실행 #42390556104](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390556104): 정적 웹 빌드 성공 후 브라우저 점검 진행 중으로 확인.
+- **수정 커밋 이후 전체 CI / 브라우저 재검증은 결과 미확인**. 수치 계산이나 예전 SHA의 성공으로 전체 페이지 WCAG 또는 수정본 CI 통과를 주장하지 않음.
 
 ### 미완료 / 다음
 
