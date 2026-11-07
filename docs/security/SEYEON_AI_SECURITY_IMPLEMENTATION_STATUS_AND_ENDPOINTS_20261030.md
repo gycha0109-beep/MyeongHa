@@ -598,3 +598,14 @@ Watchtower-Track: security
 - **기존 구현 재사용:** 광범위한 과거 S2용 G0 후보 문서에 현재 [S0 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md) 전용 계약 후보를 덧붙였다. 원본 `conversation_recall/v1` Memory 1건 + 현재 DB User 메시지 1건 + 최초 비스트리밍 답변 1회를 D1~D5(원본/재동의, Commit/Reveal, 제외 출처, 철회 ACK, receipt/과금 재시도)로 대조했다. 기존 S0 HTTP receipt 계약 및 기존 구현을 그대로 재사용하며 History/Replay/Reader/다중 기억/Streaming 등은 `OUT_OF_SCOPE + FAIL_CLOSED`로 유지한다.
 - **기술·운영 결정 분리:** G0 S0 계약은 제안일 뿐 사용자 기술 승인으로 처리하지 않는다. 본 문서와 PR은 운영 DB DDL/DML/GRANT/Role/Secret, Source Registry 활성화, Provider, 배포·트래픽 승인이 아니다. 2026-11-07 읽기 전용 운영 대조에서 결합 Pin 함수 2개/최근 원본 메시지 Pin 컬럼이 미설치이며 G5 Commerce LOGIN 부재와 Source Registry 비활성을 이미 확인했다. 해당 설치·권한 조치는 승인 전 진행하지 않는다.
 - **검증 경계:** 이전 PR #3097 HEAD 전체 Integration 및 병합 후 main CI 통과를 기존 증거로 재사용한다. 이 W127 변경은 문서·작업 기록만 수정하며 새 보안 기능/CI 워크플로/운영 변경은 없다. G0~G6 최종 PASS 0/7, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-07 / W128 — S0 설치 안내서와 현재 운영 기준 정합화
+
+- **목표:** 로드맵 v3 단계 0/1의 설치 준비 자료에서 과거 Node 최초 답변·빈 Source Registry·Positive 실행권한 부재라고 읽히는 낡은 서술을 제거하고 현재 운영 증거와 일치시키기.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/README.md` (S0 Cloudflare Worker 최초 비스트리밍 경로, Registry 비활성 1건, G1 결합 Pin 미설치·G4 Commerce 계정 부재, 기존 16→17 설치 순서 및 운영 승인 경계); 이 WORKLOG. 애플리케이션 코드·SQL·CI workflow 변경 0.
+- **완료:** 최신 `main`의 런타임/정책 파일·G1 설치 목록 및 읽기 전용 명하 PostgreSQL 카탈로그와 안내문 대조. 기존 S0의 `OUT_OF_SCOPE + FAIL_CLOSED`, `HOLD_FORWARD_STOPPED` 불변. 운영 DB 원본 내용/Grant/비밀번호 접근 없음.
+- **미완료:** G0 D1~D5의 사용자 기술 승인, G1 운영 결합 Pin 적용·증명, G4 Commerce LOGIN/Hyperdrive, G2/G3 Worker·receipt·철회 경합, G5/G6 실환경 증거. 최종 Gate PASS 0/7.
+- **브랜치·커밋·PR:** `docs/security/s0-operations-guide-sync-20261107`, 기준 main `dba6f436e90e9a83c27137fa218ab5115d048cf4`; README+WORKLOG 동시 커밋. PR 및 정확한 HEAD/CI 링크는 생성 후 본 항목에 후속 기록.
+- **테스트·CI 근거:** 내용 근거는 `scripts/operations/seyeon-security-s0/plan.mjs`, `cloudflare/myeongha-worker.mjs`, `apps/api/src/seyeon-security-s0-production-policy-v1.ts`, 운영 PostgreSQL read-only catalog; 선행 [PR #3102 전체 Integration](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42370395077), [병합 후 main CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42370851017) SUCCESS. 본 변경 HEAD 검증 결과는 별도 확인 전 추정 금지.
+- **블로커·다음 작업:** G0 기술 계약과 운영 DDL/ACL/Source 전환은 사용자 범위별 승인 필수. 승인 전 운영 변경 금지. PR CI 완료를 확인하고, 승인 시 로드맵 G1 실제 원본 Pin 연결부터 재개.
+
