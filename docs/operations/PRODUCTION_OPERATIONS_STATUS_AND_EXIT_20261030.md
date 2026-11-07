@@ -1,11 +1,3 @@
-### 2026-11-08 KST — Phase 8-C 기존 개인정보 원장 수정 후 실제 캡처 결과 확인 (작업단위)
-
-- **기존 ROADMAP:** Gate 1 / Phase 8-C #1–2, 암호화 원장 캡처·이전 원장 연결·연속성 및 7,200초 freshness 증거. 이전 성공 실행의 중복 artifact 선택 오류는 독립 병합된 [PR #3126](https://github.com/gycha0109-beep/MyeongHa/pull/3126), main `0b213fa890cd34ffc4c490ef029e3e5262febe4d`에서 이미 수정됐으므로 코드·테스트·마이그레이션 변경을 반복하지 않음.
-- **실제 실행:** 해당 main의 [개인정보 복구 원장 실행 #42409081297](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42409081297) workflow_dispatch SUCCESS. 암호화 증거 artifact [13588229122](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42409081297/artifacts/13588229122), `myeongha-privacy-ledger-20261107T200248Z`를 실제 다운로드하여 공개 manifest와 암호화 파일 SHA-256 `eb130f4bd2225130400d16503da93fec28bf43ef2df3ee25a4c41b9c7bf1f737` 동일함을 재계산 확인. 기준 백업 #42309503582의 완료점 `2026-11-06T23:09:47Z`, 현재 캡처 `2026-11-07T20:02:46Z`.
-- **판정/제한:** `eventCount=0`(전 유형 0)으로 non-zero 실제 개인정보 삭제·철회 재생 증명이 아님. 원장 이전 캡처 `2026-11-07T17:00:55Z` ↔ 현재 `20:02:46Z` 간격 10,911초(기본 3,600초보다 7,311초 초과), snapshotOverlapStatus=`OVERLAPPING_CAPTURED_EVENTS_PRESERVED`이지만 `continuousCaptureProven=false`, `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`. 이 간격만으로 별도 watcher의 7,200초 freshness 결과를 PASS/FAIL로 추정하지 않음. 원장 캡처 성공 ≠ 독립 durable 연속성·재해복구 수용 성공.
-- **변경 파일·검증·기록:** 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`에 본 작업단위 기록만 추가; 별도 파일·로드맵·운영 SQL·Hosted·카나리 변경 없음. artifact 암호화 SHA-256, 백업 ID, 이벤트 수, 연속성 플래그를 원본 공개 manifest와 대조 PASS. 이 기록의 정확한 HEAD CI는 PR의 새 검사 완료 전 성공으로 선언하지 않음.
-- **남은 작업/다음:** 기존 로드맵 8-C의 7,200초 freshness watcher 실증, non-zero 이벤트의 승인된 Production 합성 canary 및 Primary 손실 후 독립 durable 연속성 증명 미완료. 8-A 구조·ACL 불일치, 8-B Hosted Auth/Storage, 8-D 전체 RPO/RTO 및 Phase 12/13도 차단 상태. `#1887` OPEN, `dr_ready=false`, `serviceResumptionAllowed=false`. Production 합성 개인정보 canary는 정확한 사용자 승인 `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` 전 실행 금지.
-
 ### 2026-11-08 KST — Phase 8-A 실제 격리 복원 전체 앱 구조·권한 비교 결과 기록 (작업단위)
 
 - **기존 ROADMAP:** Gate 1 / Phase 8-A #6 전체 schema/function/owner/ACL/RLS 실증. 이미 main 병합된 [PR #3122](https://github.com/gycha0109-beep/MyeongHa/pull/3122)의 검증 코드를 재수정하지 않고 현재 백업과 2026-11-07 Production read-only 스키마 fingerprint로 실제 격리 복원을 한 번 실행함. 대상 main 7808801e95d9f3ad8651ba8881900cdaa654944f.
