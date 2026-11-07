@@ -80,3 +80,16 @@
 - **블로커·승인:** 추가 사용자 승인 없음. CI 결과가 본 단위 종료의 선행 조건.
 - **다음 작업:** 현재 PR 검증에서 실패가 발생하면 해당 모바일 가독성 단위만 보정, 통과 시 기존 로드맵 Stage 5의 다음 미완료 검증으로 이동.
 
+## 2026-11-08 — 대화 허브 고객지원 링크 복구 (Stage 5)
+
+- **작업 목표/근거:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5에서 지정한 고객지원 탐색 경로의 실제 실패 수정. `apps/web/chat-hub.html` 푸터 `고객지원`이 `#`를 가리켜 기존 접수 양식으로 들어가지 못함. 기존 `docs/ROADMAP_CONTACT_INQUIRY.md`에서 문의 접수 운영 연결 완료 기록 확인.
+- **선행 완료:** 모바일 가독성 [PR #3121](https://github.com/gycha0109-beep/MyeongHa/pull/3121) 실제 병합(`2026-11-08` KST), 일반 CI·웹 브라우저·Governance 성공, [Integration #42400926140](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42400926140) **success**. 이전 작업의 운영 배포·전체 WCAG 적합성은 이 기록으로 추정하지 않음.
+- **변경 파일:** `apps/web/chat-hub.html`(기존 고객지원 링크를 `contact.html`로 변경), `test/web-product-clarity.test.ts`(링크 및 실재하는 문의 양식의 정적 회귀 검사), `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md`(본 이력).
+- **브랜치:** `fix/frontend-integration/support-footer-stage5-current-main-20261108`. 처음 구현해 둔 `fix/frontend-integration/support-footer-navigation-stage5-20261108`가 #3121 병합 전 SHA에서 분기된 상태여서, 최신 `main`에서 동일 수정과 테스트만 재적용함. 중복 변경 없는 비교 결과(코드/테스트 2파일, 뒤처진 커밋 0개) 확인.
+- **코드·테스트 커밋:** `44802d31dc07f4652cee820604923c57ebd1ad78`, `d84d61601473651a190ccec33d85a59c12d70e92`. 앞선 분리 작업 원본 커밋 `c3e3baaaedd4ae3f39934914b5f9c86f6f856056`, `ff9fbd1f630dbe88ec4a6495476acce6e7bf3834`. 모두 동일 트랙.
+- **PR:** [#3125](https://github.com/gycha0109-beep/MyeongHa/pull/3125) (`frontend-integration`). [체크 페이지](https://github.com/gycha0109-beep/MyeongHa/pull/3125/checks).
+- **코드 검증:** 새 브랜치와 최신 `main` 비교에서 고객지원 HTML과 기존 Vitest 회귀 테스트만 변경된 것을 확인. 실제 테스트/빌드/웹 브라우저 CI·통합 CI는 **PR의 최신 SHA 검사 완료 전까지 미확인**. 성공을 추정하지 않음.
+- **완료:** 기존 문의 양식 진입 링크 수정, 회귀 검사 및 본 WORKLOG 코드와 함께 커밋, PR 생성.
+- **미완료:** PR #3125 TypeScript·테스트·웹 브라우저·Governance 및 필수 통합 CI 통과, 실제 병합 증거. Stage 5의 남은 법무/개인정보/환불 탐색과 운영 경로·실사용 E2E는 별도 차단/검증 조건 확인 필요.
+- **블로커·승인:** 추가 사용자 승인 없음. 필수 CI 완료는 PR 병합 선행 조건.
+- **다음 작업:** PR #3125의 최신 CI 결과 확인, 실패 시 이 링크 단위만 수정; 전부 Green이면 기존 방식으로 통합 검증 제출 및 병합 확인 후 Stage 5 다음 미완료 항목 파악.
