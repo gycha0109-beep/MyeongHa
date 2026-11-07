@@ -1,0 +1,1068 @@
+{
+  "schemaVersion": "ops-rls-disabled-effective-grants-report-v1",
+  "sourceQuery": "scripts/operations/production-rls-disabled-policy-role-grants-readonly.sql",
+  "sourceMetadata": "docs/operations/POSTGRES_REMOTE_ONLY_CURRENT_OBJECT_METADATA_20261108.json",
+  "productionProjectRef": "cnsfpcdiyofqvhpcegfc",
+  "evidence": {
+    "tables": [
+      {
+        "owner": "postgres",
+        "table": "ai_execution_groundings",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "ai_execution_logs",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "character_runtime_catalog",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "chat_turn_attempts",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 3,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "chat_turns",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 3,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "commerce_provider_events",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "commerce_receipts",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "content_bundles",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "content_releases",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "entitlement_events",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "entitlement_grants",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "entitlements",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "memory_proposals",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 2,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "product_offers",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "products",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "purchase_intents",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "reading_execution_attempts",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 2,
+        "rowSecurityEnabled": false
+      },
+      {
+        "owner": "postgres",
+        "table": "reading_groundings",
+        "schema": "public",
+        "tableKind": "r",
+        "tableExists": true,
+        "rolePrivileges": {
+          "anon": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "service_role": {
+            "delete": true,
+            "insert": true,
+            "select": true,
+            "update": true,
+            "trigger": true,
+            "truncate": true,
+            "references": true,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "authenticated": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          },
+          "myeongha_api_executor": {
+            "delete": false,
+            "insert": false,
+            "select": false,
+            "update": false,
+            "trigger": false,
+            "truncate": false,
+            "references": false,
+            "roleExists": true,
+            "schemaUsage": true
+          }
+        },
+        "forceRowSecurity": false,
+        "currentPolicyCount": 1,
+        "rowSecurityEnabled": false
+      }
+    ],
+    "observedAtUtc": "2026-11-07T15:39:28Z",
+    "schemaVersion": "ops-current-rls-disabled-role-grants-v1",
+    "transactionReadOnly": true,
+    "targetDistinctTableCount": 18
+  },
+  "summary": {
+    "distinctTables": 18,
+    "currentPoliciesOnTheseTables": 24,
+    "distinctRlsEnabledTables": 0,
+    "missingTables": 0,
+    "effectiveRoleCounts": {
+      "anon": {
+        "roleAvailable": 18,
+        "readGrantAndSchemaUsage": 0,
+        "anyWriteGrantAndSchemaUsage": 0
+      },
+      "authenticated": {
+        "roleAvailable": 18,
+        "readGrantAndSchemaUsage": 0,
+        "anyWriteGrantAndSchemaUsage": 0
+      },
+      "myeongha_api_executor": {
+        "roleAvailable": 18,
+        "readGrantAndSchemaUsage": 0,
+        "anyWriteGrantAndSchemaUsage": 0
+      },
+      "service_role": {
+        "roleAvailable": 18,
+        "readGrantAndSchemaUsage": 18,
+        "anyWriteGrantAndSchemaUsage": 18
+      }
+    }
+  },
+  "authority": {
+    "readOnly": true,
+    "metadataOnly": true,
+    "appRouteContainmentVerified": false,
+    "indirectFunctionAccessVerified": false,
+    "allSchemasRolesAccessVerified": false,
+    "restoredSchemaParityVerified": false,
+    "productionPermissionMutationAuthorized": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false
+  },
+  "limitations": [
+    "The 20 policy indicators in the 41-migration source cover 18 distinct current tables; these tables presently have 24 policies, including policies not represented by those 20 indicators.",
+    "has_table_privilege and has_schema_privilege describe effective grants for named roles at this snapshot; they do not prove Data API exposure or RPC/SECURITY DEFINER/cross-role access paths.",
+    "RLS policies on a table with rowSecurityEnabled=false do not enforce row visibility; table grants and alternative access paths require independent checks.",
+    "The current owner/RLS/grant state is not a historical restore or migration-ledger equivalence proof.",
+    "No production DDL/DML/grant/RLS changes, canary, user rows or secret values were read or changed."
+  ]
+}

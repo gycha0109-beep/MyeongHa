@@ -30,7 +30,7 @@ describe('product-wide identity and clarity', () => {
   it('applies legible copy rules to Home, Saju, Chat, Records, My and Face', async () => {
     const css = await read('product-clarity.css');
     for (const selector of ['.mhx-topic-copy small','.saju-design-source-note','.chat-recent-time','.records-lead','.my-account-meta','.face-reader-copy p']) expect(css).toContain(selector);
-    expect(css).toContain('font-size: max(13px, .8125rem);');
+    expect(css).toContain('font-size: max(14px, .875rem);');
     expect(css).toContain('body.product-page.face-reading-page');
   });
 });
