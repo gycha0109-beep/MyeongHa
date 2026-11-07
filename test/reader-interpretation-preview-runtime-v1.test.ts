@@ -16,6 +16,7 @@ import {
 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
 import type { CharacterSajuConsultationShadowPortV1, CharacterSajuConsultationPrivateComparisonV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
 import { createOpenAiSajuConsultationShadowPortV1, type OpenAiSajuConsultationShadowFetchV1 } from '../apps/api/src/openai-saju-consultation-shadow-port-v1.js';
+import { createReaderSajuPrivatePairCollectorV1 } from '../apps/api/src/reader-saju-private-pair-comparison-v1.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingAccessAuthorityRowV1,
@@ -379,6 +380,60 @@ async function run(
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
+  it('pairs Baekheon and Seyeon against the identical authorized Saju unit for private editorial comparison', async () => {
+    const collector = createReaderSajuPrivatePairCollectorV1({
+      readingRef: READING_ID,
+      sourceResponseHash: SOURCE_HASH,
+      groundingHash: baseBundle.groundingHash,
+      firstCharacterId: 'baekheon',
+      secondCharacterId: 'seyeon',
+    });
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'offline-paired-comparison-v1',
+      async generate(request) {
+        const data = request.input as {
+          characterId: string;
+          sourceUnit: { unitId: string; canonicalMeaning: string };
+        };
+        return {
+          schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+          characterId: data.characterId,
+          sourceUnitRefs: [data.sourceUnit.unitId],
+          text: data.characterId === 'baekheon'
+            ? '이 사주에서 먼저 짚을 공식 핵심은 ' + data.sourceUnit.canonicalMeaning
+            : '여기서 중요한 공식 풀이가 보여요. ' + data.sourceUnit.canonicalMeaning,
+        };
+      },
+      async evaluate(input) {
+        return {
+          schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1',
+          evaluatorVersion: 'offline-paired-comparison-v1',
+          candidateHash: input.candidateHash,
+          unitId: input.groundingUnit.unitId,
+          semanticPreserved: true,
+          characterFidelityPreserved: true,
+          failureClasses: [],
+        };
+      },
+      recordPrivateComparison: collector.recordPrivateComparison,
+    };
+    const ports = authorityPorts({ activeReaders: ['baekheon', 'seyeon'] });
+    const [first, second] = await Promise.all([
+      run(readers.baekheon, { ports, consultationShadowPort: port }),
+      run(readers.seyeon, { ports, consultationShadowPort: port }),
+    ]);
+    expect(first.mode).toBe('reader_interpretation');
+    expect(second.mode).toBe('reader_interpretation');
+    const review = collector.readPrivateReview();
+    expect(review.status).toBe('ready_for_private_review');
+    if (review.status !== 'ready_for_private_review') throw new Error('expected private review');
+    expect(review.first.candidateText).not.toEqual(review.second.candidateText);
+    expect(review.first.baselineText).toBe(review.second.baselineText);
+    expect(review.publicationAuthorized).toBe(false);
+    expect(first).not.toHaveProperty('candidateText');
+    expect(second).not.toHaveProperty('candidateText');
+  });
+
   it('connects the real OpenAI Responses transport through the admitted Reader shadow without changing HTTP output', async () => {
     const observed: string[] = [];
     const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
