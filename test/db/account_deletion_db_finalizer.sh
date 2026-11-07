@@ -11,6 +11,8 @@ job_id="fb800000-0000-0000-0000-000000000001"
 outbox_id="fb810000-0000-0000-0000-000000000001"
 lock_owner="account-deletion-finalizer-test"
 guest_subject_id="fb200000-0000-0000-0000-000000000002"
+other_member_subject_id="fb200000-0000-0000-0000-000000000003"
+other_member_auth_id="fb100000-0000-0000-0000-000000000003"
 guest_session_id="fb210000-0000-0000-0000-000000000002"
 merge_job_id="fb220000-0000-0000-0000-000000000002"
 merge_action_id="fb230000-0000-0000-0000-000000000002"
@@ -62,7 +64,14 @@ values ('$commerce_link_id','$subject_id','test-provider','sha256:retain','activ
 SQL
 
 if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
-  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh seed "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
+  # P0-CM-05: unrelated paid-claim provenance belongs to another active
+  # Member, not to the existing Guest involved in the merge/privacy scenario.
+  "${psql_base[@]}" <<SQL
+insert into auth.users(id) values ('$other_member_auth_id');
+insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at)
+values ('$other_member_subject_id','member','$other_member_auth_id','active',null,clock_timestamp(),clock_timestamp());
+SQL
+  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh seed "$subject_id" "$other_member_subject_id" "$job_id" "$lock_owner"
 fi
 
 if "${psql_base[@]}" -c "delete from public.birth_profile_revisions where id='$revision_id';" >/dev/null 2>&1; then fail "birth revision delete escaped immutable guard"; fi
@@ -120,7 +129,7 @@ set -e
 rollback_state="$("${psql_base[@]}" -Atc "select s.status||'|'||(select count(*) from public.readings where subject_id='$subject_id')||'|'||coalesce(dj.finalization_policy_version,'NULL') from public.subjects s join public.data_deletion_jobs dj on dj.id='$job_id' where s.id='$subject_id';")"
 [[ "$rollback_state" == "deletion_pending|1|NULL" ]] || fail "rollback mismatch: $rollback_state"
 if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
-  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-rollback "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
+  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-rollback "$subject_id" "$other_member_subject_id" "$job_id" "$lock_owner"
 fi
 pass "mid-finalization failure rolled back atomically"
 "${psql_base[@]}" -c "drop table public._finalizer_blocker;"
@@ -152,7 +161,7 @@ auth_exists="$("${psql_base[@]}" -Atc "select count(*) from auth.users where id=
 replay="$("${psql_base[@]}" -Atc "select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int) from public.internal_finalize_account_deletion_db_v1('$subject_id','$job_id','$lock_owner');")"
 [[ "$replay" == "1|1|1" ]] || fail "idempotent replay mismatch: $replay"
 if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
-  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-finalization "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
+  bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-finalization "$subject_id" "$other_member_subject_id" "$job_id" "$lock_owner"
 fi
 
 public_exec="$("${psql_base[@]}" -Atc "select case when has_function_privilege('public','public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)','EXECUTE') then '1' else '0' end;")"

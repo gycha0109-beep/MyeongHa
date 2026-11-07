@@ -575,7 +575,9 @@ begin
    purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind
  ) values(v_scope_intent_b,v_subject,v_scope_record_b,v_source_revision,'original');
 
- v_scope_now:=clock_timestamp();
+ -- Use the same transaction clock as the verified Receipt Grant writer.
+ -- A later wall-clock value would be incorrectly treated as a future grant.
+ v_scope_now:=transaction_timestamp();
  select result_grant_id into strict v_scope_grant_b
  from public.internal_apply_verified_receipt_capability_effects_v1(
    v_scope_receipt_b,
