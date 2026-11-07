@@ -12,11 +12,11 @@
 
 - scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh 에서 replay 후 복원 DB의 personal withdrawal Claim 테이블 유무를 먼저 확인합니다.
 - 해당 테이블이 실제 존재하는 스키마에서만, 각 삭제 대상 Subject의 Claim이 **계정 삭제 최종 처리 후 0건이며, 완료 단계 재실행 후에도 0건**임을 개별 확인합니다. 남아 있거나 복원된 Claim이 발견되면 전체 격리 복원 검증이 즉시 실패합니다. 검증 대상 Subject만 조회하며, 출력 증거에 해당 식별자 또는 Claim 본문을 기록하지 않습니다.
-- 테이블 자체가 존재하지 않는 과거 백업은 **schema-absent-no-private-claim-proof**로 명시합니다. 예전 백업의 성공을 새 Claim DELETE 검증 성공으로 오인하지 않습니다. 테이블이 존재하고 모두 0건이면 **exact-subject-after-finalizer-and-completion-pass**를 출력합니다.
+- 테이블 자체가 존재하지 않는 과거 백업은 **schema-absent-no-private-claim-proof**로 명시합니다. 테이블이 있더라도 각 대상의 삭제 전 Claim이 모두 0건이면 **exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness**로 표시하며 실제 삭제를 입증했다고 주장하지 않습니다. 삭제 전 Claim이 존재한 대상이 최소 하나 있고, 모든 대상의 최종 처리·완료 재실행 후 Claim이 0건인 경우에만 **exact-subject-after-finalizer-and-completion-pass**로 표시합니다. 식별자나 Claim 본문 없이 `private_withdrawal_claim_deletion_witnessed`로 관측 여부를 별도 기록합니다.
 - 기존 계정 삭제·익명화·Commerce 장기 보존 정책, PG·Reader·LIVE 및 운영 DB 마이그레이션은 변경하지 않습니다.
 
 ## 검증 범위와 한계
 
-- test/commerce-private-claim-restored-replay-guard.test.mjs: 복원 실행 스크립트의 정확한 Subject 재검사 연결, 실패 차단, 표기 구분, 기존 2320/격리 PG17 삭제 증거 재사용, Bash 구문을 확인합니다.
+- test/commerce-private-claim-restored-replay-guard.test.mjs: 복원 실행 스크립트의 정확한 Subject 재검사 연결, 실패 차단, 표기 구분, 기존 2320/격리 PG17 삭제 증거 재사용, Bash 구문을 확인합니다. `scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs`의 실제 판정 함수를 4개 정상·7개 잘못된 증거 입력으로 실행 검증합니다. 이 검사는 독립적·합성 분기 검증이지 실제 복원 PostgreSQL 실행 성공은 아닙니다.
 - 실제 복원 PostgreSQL 17 및 통합 CI 결과가 확인되기 전에는 복원 실행 PASS나 로드맵 4번 완료를 선언하지 않습니다.
 - 서버/앱 출시 플래그, 운영 데이터, 정식 판매 및 실제 환불은 전혀 건드리지 않습니다.

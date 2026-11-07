@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import { classifyRestoredPrivateClaimDeletionV1 } from
+  '../scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const restore=readFileSync(new URL(
   '../scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
@@ -20,10 +22,8 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain("to_regclass('public.digital_reading_withdrawal_claims_private_v1')");
     expect(restore).toContain("then 'absent' else 'present'");
     expect(restore).toContain("restored_claim_relation");
-    expect(restore).toContain("'schema-absent-no-private-claim-proof'");
-    expect(restore).toContain("'exact-subject-after-finalizer-and-completion-pass'");
-    expect(restore).toContain("'exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness'");
-    expect(restore).toContain('private_withdrawal_claim_deletion_witnessed');
+    expect(restore).toContain('classifyRestoredPrivateClaimDeletionV1({');
+    expect(restore).toContain('...privateClaimEvidence,');
     expect(restore.indexOf('restored_claim_relation=')).toBeGreaterThan(
       restore.indexOf(' -f "$plan"')
     );
@@ -51,8 +51,8 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain('private_claim_preexisting_subjects=0');
     expect(restore).toContain('private_claim_pre_finalizer_count=');
     expect(restore).toContain('private_claim_preexisting_subjects=$((private_claim_preexisting_subjects + 1))');
-    expect(restore).toContain('preExistingClaimSubjectCount > 0');
-    expect(restore).toContain('claimDeletionWitnessed');
+    expect(restore).toContain('preExistingClaimSubjectCount,');
+    expect(restore).toContain('accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED');
     // Only the same Subject is counted; no payload or Subject ID in the
     // restored evidence output, and no artificial claim is seeded.
     const before=restore.indexOf('private_claim_pre_finalizer_count=');
@@ -64,6 +64,39 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain("where subject_id='$subject_id'::uuid;");
     expect(restore).not.toContain('insert into public.digital_reading_withdrawal_claims_private_v1');
     expect(restore).toContain('private_claim_preexisting_subjects" -le "$private_claim_verified_subjects"');
+  });
+
+  it.each([
+    ['historical backup lacking the relation','absent',0,2,
+      'schema-absent-no-private-claim-proof',false],
+    ['table present but no Claim before deletion','present',0,2,
+      'exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness',false],
+    ['one exact Subject with an existing Claim','present',1,2,
+      'exact-subject-after-finalizer-and-completion-pass',true],
+    ['all deletion Subjects with existing Claims','present',2,2,
+      'exact-subject-after-finalizer-and-completion-pass',true],
+  ])('classifies %s without claiming unobserved deletion',
+    (_name,relation,preExistingClaimSubjectCount,accountDeletionCount,guard,witnessed)=>{
+      expect(classifyRestoredPrivateClaimDeletionV1({
+        relation,preExistingClaimSubjectCount,accountDeletionCount,
+      })).toEqual({
+        private_withdrawal_claim_replay_guard:guard,
+        private_withdrawal_claim_deletion_witnessed:witnessed,
+      });
+    },
+  );
+
+  it.each([
+    {relation:'other',preExistingClaimSubjectCount:0,accountDeletionCount:1},
+    {relation:'absent',preExistingClaimSubjectCount:1,accountDeletionCount:1},
+    {relation:'present',preExistingClaimSubjectCount:-1,accountDeletionCount:1},
+    {relation:'present',preExistingClaimSubjectCount:1.2,accountDeletionCount:2},
+    {relation:'present',preExistingClaimSubjectCount:2,accountDeletionCount:1},
+    {relation:'present',preExistingClaimSubjectCount:0,accountDeletionCount:0},
+    {relation:'present',preExistingClaimSubjectCount:0,accountDeletionCount:NaN},
+  ])('rejects invalid or overstated restored Claim proof %j',input=>{
+    expect(()=>classifyRestoredPrivateClaimDeletionV1(input))
+      .toThrow('RESTORED_PRIVATE_CLAIM_DELETION_EVIDENCE_INVALID');
   });
   it('reuses existing PG17 deletion/other-Subject/restore-residue assertions',()=>{
     expect(originalDeletionProof).toContain('after-finalization)');

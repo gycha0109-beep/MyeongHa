@@ -932,3 +932,13 @@
 - **테스트 근거:** `test/commerce-private-claim-restored-replay-guard.test.mjs`의 정적 계약에 삭제 전 조회 위치·대상 결속·수량 검증·증거 표기 분기를 추가했습니다. 기존 2320 계정 삭제 SQL이나 개인정보 보존 규칙은 수정하지 않았습니다.
 - **CI 근거:** 직전 `b36d58330027`의 [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42389940666)에서 Work Track · commerce, commerce-payment, commerce-entitlement 및 content/runtime은 PASS, PostgreSQL17·db-authority-core는 조회 시 실행 중이었습니다. 전체 성공이나 이번 커밋의 CI 성공으로 표기하지 않습니다. 신규 CI/Pg17 실증은 **미확인, PASS 미선언**입니다.
 - **완료·미완료·블로커·다음:** 이번 복원 증거 표기의 코드/계약 테스트와 WORKLOG 기록 완료. 실제 복원된 PostgreSQL에서 비어 있지 않은 Claim 삭제 입증, 취소 Provider NEWER/STALE, 정확한 Reader T2 회수, 실제 소비자 전달 입증 및 전체 E2E는 미완료입니다. 새 커밋의 CI를 확인하고 실패를 수정한 후 로드맵을 계속합니다. 운영 DB·실제 환불 POST·공개 LIVE 적용 없음, 승인 요청 없음.
+
+### 2026-11-08 — 복원 청약철회 삭제 증거 판정을 실행형 검증으로 연결
+
+- **목표/로드맵:** 승인된 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6의 4·5번. 격리 복원 privacy replay에서 사전에 삭제 대상 Claim이 없었던 경우를 DELETE 증거로 주장하지 않도록, 기존 판정 분기를 단순 문자열 검사 대신 동일한 **실행 가능 판정 함수**와 실제 Vitest 사례로 교차 검증합니다.
+- **기준 브랜치·PR·커밋:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, PR [#3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 작업 전 `cd834fe146a25623f91b840723e9951186514ecf`. PR open/auto-merge 설정 유지. 이전 `cd834fe1`의 [Commerce CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390447989/job/128456766591), Web/Governance 통과를 확인했으나 전체 CI·PostgreSQL17·db-authority-core는 당시 진행 중이었으므로 PASS 미선언.
+- **변경 파일:** `scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh`, `test/commerce-private-claim-restored-replay-guard.test.mjs`, `docs/operations/COMMERCE_PRIVATE_CLAIM_RESTORED_PRIVACY_REPLAY_20261104.md`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`, `scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs`.
+- **구현:** 격리 복원 Bash 실행기에 내장돼 있던 삭제 관측 판정·입력 오류 처리를 `commerce-private-claim-restored-evidence-classifier-v1.mjs`로 분리하고, 실제 복원 증거 생성 경로가 이 함수를 호출하게 연결했습니다. 입력은 테이블 존재 여부·삭제 전 Claim이 존재했던 삭제 대상 수·전체 삭제 대상 수뿐이며 개인 식별자/원문/실데이터를 전달하지 않습니다. 복원 검사 SQL·대상 범위·0건 강제 조건은 변경하지 않았습니다.
+- **테스트·문서:** `test/commerce-private-claim-restored-replay-guard.test.mjs`에 relation 부재, 삭제 전 0건, 삭제 전 존재 후 0건, 여러 삭제 대상, 잘못된 수량·범위 거부의 4개 정상/7개 부정 입력 실행 테스트를 추가했습니다. 기존 설명 문서의 '테이블만 존재하면 삭제 입증'이라는 구표기를 실제 코드의 3단계 결과에 맞춰 개정했습니다. 신규 커밋 공식 CI/PG17 결과는 미확정이므로 PASS로 기재하지 않습니다.
+- **완료/미완료:** 판정 로직의 실행 검증·실제 증거 경로 연결·문서 갱신은 반영했습니다. 복원된 PostgreSQL17을 통한 **비어 있지 않은 Claim의 삭제 실제 관측**, Provider 취소 최종 순서 판정, Reader/T2 원자 회수, 소비자 제공 입증, 전체 개발 E2E는 미완료입니다.
+- **블로커/다음:** 신규 CI 실패 시 오류 수정, 통과 후 승인 로드맵 미완료 연결 구현. 운영 DB 변경·PG 환불 POST·공개 LIVE 실행 없음. 별도 사용자 승인 요청 없음.

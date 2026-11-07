@@ -370,6 +370,8 @@ node - \
   "$restored_claim_relation" \
   "$private_claim_preexisting_subjects" <<'NODE'
 import { readFile, writeFile } from 'node:fs/promises';
+import { classifyRestoredPrivateClaimDeletionV1 } from
+  './scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const report = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const publicManifest = JSON.parse(await readFile(process.argv[3], 'utf8'));
@@ -380,17 +382,11 @@ const canaryRunId = Number(process.argv[7]);
 const incidentReferenceUtc = process.argv[8];
 const restoredClaimRelation = process.argv[9];
 const preExistingClaimSubjectCount = Number(process.argv[10]);
-if (restoredClaimRelation !== 'present' && restoredClaimRelation !== 'absent') {
-  throw new Error('restored withdrawal claim evidence state unavailable');
-}
-if (!Number.isSafeInteger(preExistingClaimSubjectCount) ||
-    preExistingClaimSubjectCount < 0 ||
-    (restoredClaimRelation === 'absent' && preExistingClaimSubjectCount !== 0) ||
-    preExistingClaimSubjectCount > publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED) {
-  throw new Error('restored withdrawal claim pre-finalization witness unavailable');
-}
-const claimDeletionWitnessed = restoredClaimRelation === 'present' &&
-  preExistingClaimSubjectCount > 0;
+const privateClaimEvidence = classifyRestoredPrivateClaimDeletionV1({
+  relation: restoredClaimRelation,
+  preExistingClaimSubjectCount,
+  accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED,
+});
 
 const evidence = {
   schema_version: 'myeongha-postgres-restored-db-authoritative-privacy-reconciliation-v1',
@@ -409,12 +405,7 @@ const evidence = {
   hosted_auth_provider_ack: 'production-canary-separate-plus-isolated-row-removal',
   personalization_access_resurrection_guard: 'pass',
   commerce_p5y_retention_guard: 'pass',
-  private_withdrawal_claim_replay_guard: restoredClaimRelation === 'absent'
-    ? 'schema-absent-no-private-claim-proof'
-    : claimDeletionWitnessed
-      ? 'exact-subject-after-finalizer-and-completion-pass'
-      : 'exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness',
-  private_withdrawal_claim_deletion_witnessed: claimDeletionWitnessed,
+  ...privateClaimEvidence,
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
