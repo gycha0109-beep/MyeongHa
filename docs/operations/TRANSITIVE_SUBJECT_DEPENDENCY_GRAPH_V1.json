@@ -6,7 +6,7 @@
   "executionAuthorized": false,
   "discovery": {
     "edgeCount": 149,
-    "distinctReachableTableCount": 62,
+    "distinctReachableTableCount": 63,
     "maxDepth": 4,
     "depthCounts": {
       "1": 31,
