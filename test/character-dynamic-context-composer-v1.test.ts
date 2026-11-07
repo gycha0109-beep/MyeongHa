@@ -110,7 +110,7 @@ function syntheticProfile(maximumInputTokens = 220): ModelTokenBudgetProfileV1 {
     providerKey: 'synthetic',
     modelKey: 'synthetic-only',
     pricingVersion: 'synthetic-price-v1',
-    contextWindowTokens: 500,
+    contextWindowTokens: 600,
     maximumInputTokens,
     maximumOutputTokens: 120,
     reservedHeadroomTokens: 20,

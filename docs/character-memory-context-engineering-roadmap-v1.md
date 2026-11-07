@@ -178,7 +178,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 4 — Dynamic Context Composer
 
-**Status: Existing policy defines the conceptual layers and drop order; production token-budget integration remains outstanding.**
+**Status: OFFLINE EXACT-REQUEST CONTEXT COMPOSER FOUNDATION IMPLEMENTED; Production composer wiring and complete runtime layer coverage remain outstanding.**
 
 1. Compose the Working Context from the existing Runtime Standard layers:
    - System / Safety / Product Authority;
@@ -203,6 +203,12 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 5. Never drop authority/safety, current user turn, immediate recent continuity, current relationship projection, conflict/unresolved causal events or relevant Bible core merely to fit more trivia.
 6. Produce a redacted, inspectable Context assembly trace: included source refs, excluded-item reason, token contribution, policy/version and final budget. Do not log raw private prompt/context or secrets into general observability.
 7. Ensure the exact assembled request is the same request counted by Phase 2.
+
+**Implemented offline foundation:** `packages/domain/src/character-dynamic-context-composer-v1.ts` receives permission-filtered retrieval output and an already-authorized read-only Working Context projection, plus trusted server-pinned Character and policy source segments. It preserves System/Safety, Character Core, the current User turn, the latest dialogue, approved Bible core and explicitly source-verified unresolved causal events. It drops low-priority trivia, redundant Bible examples, resolved low-salience events, older dialogue and finally lower-ranked retrieved memory, using the actual Phase 2 exact-request certification after each decision. Failure of token counting or an over-budget mandatory core fails closed. The trace has source IDs and certified token counts, never raw text. The implementation makes no network call, DB write, reservation or Provider dispatch.
+
+**Offline test coverage:** deterministic order and redacted trace, mandatory-layer survival, exact UTF-8 body accounting, selected-memory provenance, budget failure on an oversized mandatory core, scope mismatch, unknown token count and duplicate source denial.
+
+**Remaining Phase 4 work:** wire trusted source/category admission to the runtime, include the remaining source-authorized context layers, connect the exact serialized request to the actual approved Provider dispatch path after O-C1-07, and verify Production Cost Governor/Output Guard parity. This offline foundation alone does not satisfy Phase 4 exit conditions.
 
 **Exit criteria:**
 - identical inputs/policy produce deterministic assembly decisions;
@@ -332,9 +338,10 @@ The Context Engine is complete only when all of the following are evidenced:
 1. Keep PR #3068 Draft; no Production model route, paid inference, public route or additional Character activation is authorized by these read-only changes.
 2. Phase 1 authority inventory, projection and provenance-enriched read path are implemented. Preserve the existing Subject/Character grant boundaries and keep unsupported schemas closed.
 3. Phase 2 provider-neutral exact-request preflight remains implemented. Offline exit evidence is separate from Production readiness: real model profiles and four-Character Production wiring remain on hold until O-C1-07 and the existing PR-04B/04C/04D operational gates are resolved.
-4. Continue Phase 3 read-only retrieval only: close the remaining negative tests and multi-session evaluation; do not invent semantic, causal, relationship or contradiction signals where source fields are absent.
-5. Keep Character-private disclosure and Official Reading/Saju on their existing separate authority paths. Do not broaden Working Memory into either source.
-6. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
+4. Phase 3 read-only retrieval has passed the previous latest-head CI with source scope, source provenance, revocation and multi-session recall tests; unsupported semantic/causal/relationship/contradiction signals remain unimplemented until authoritative record fields are available.
+5. Phase 4 offline composer foundation now uses exact-request counting to enforce protected layers and drop order. Extend its fixture evaluation and authority integration without opening Production inference.
+6. Keep Character-private disclosure and Official Reading/Saju on their existing separate authority paths. Do not broaden Working Memory into either source.
+7. Report unresolved source-authority decisions explicitly; do not invent schemas, model IDs, token budgets, prices or publication assets.
 
 ## 9. Governing documents
 
