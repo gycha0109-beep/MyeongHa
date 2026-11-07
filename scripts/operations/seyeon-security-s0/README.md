@@ -26,6 +26,14 @@ Private accept와 revoke의 Production factory도 기존 server-owned 승인 cal
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
 
+## 2026-11-08 운영 G1 설치 승인 및 현재 보류 사유
+
+- **승인됨:** 사용자가 운영 명하 Supabase `cnsfpcdiyofqvhpcegfc`에 검증된 G1 원본 연결용 `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql` 설치 및 `myeongha_api_executor`에 정확한 public 통합 RPC `cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)`만 EXECUTE 허용하는 **좁은 운영 DB 변경**을 명시 승인했다. 이 승인은 Source Registry 활성화, G4 유료 모델/크레딧, G3 HTTP 송출·공개 활성화가 아니다.
+- **완료한 사전 확인:** 해당 프로젝트는 PostgreSQL 17 및 실제 대상 역할이 존재한다. 원본 두 SQL과 새 함수/컬럼은 아직 미설치이며 Source Registry의 활성 타입은 0개다. PR #3120 정확한 HEAD `caa4b78f8b9e311751db0659f3e0f4d3bc418dfa`의 CI #42408891382, Governance #42408891242, Web Gates #42408891276은 모두 SUCCESS다.
+- **적용 전 필수 보류:** 현재 Supabase 조직은 무료 플랜이다. 확인 가능한 기존 데이터 백업/격리 복원은 2026-10-24 시점이고 최신 운영 DB 데이터에 대한 새로운 복구 가능 백업은 확인되지 않았다. 현 연결 도구로 새로운 실DB 백업을 생성하거나 최신 시점 복원을 검증할 수 없어 **운영 DDL/ACL을 실행하지 않았다**. 보류 이유는 승인 부족이 아니라 백업 복원 근거 부재다.
+- **이어 할 기존 순서:** 최신 운영 DB 복구 가능 백업 및 격리 복원을 확보·확인 → 사전 카탈로그/원본 digest 재검사 → 승인한 SQL 16→17 적용 → public 정확한 함수에만 `GRANT EXECUTE ... TO myeongha_api_executor` → 함수 소유권/권한·원본 타입 OFF 확인 및 비공개 G1 접근 검증. 기존 `stop-positive-use.sql`은 결합 RPC의 API 실행 권한도 회수하며 철회·ACK는 유지한다.
+- **주의:** 현재 실제 `myeongha_api_executor`는 `seyeon_private` 스키마 USAGE가 이미 있다. 이전 격리 테스트에서 사용하는 '스키마 전체 USAGE 없음' 조건은 그대로 운영 실측값으로 대체하지 않는다. 기존 사용 권한을 임의로 회수하거나 private 결합 함수에 직접 실행권을 부여하지 않는다. 실제 DB 변경·기능 활성화와 혼동하지 않는다.
+
 ## 2026-11-07 S0 운영 설치 전 확인 (읽기 전용 현황, 승인 아님)
 
 - 대상 명하 운영 PostgreSQL 카탈로그 대조에서 `seyeon_private.pin_model_recent_sources_v1`와 `seyeon_private.pin_positive_model_context_sources_v1`가 **미설치**, `public.chat_turn_attempts.seyeon_recent_source_pin_jsonb`가 **없음**을 확인했다. 코드에는 이미 `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql` 순서의 격리 설치 정의가 있으므로 새 스키마를 임의 생성하거나 API/공용 역할에 실행 권한을 넓히지 않는다.
