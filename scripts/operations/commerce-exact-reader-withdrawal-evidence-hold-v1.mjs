@@ -17,6 +17,8 @@ export const COMMERCE_EXACT_READER_WITHDRAWAL_EVIDENCE_HOLD_V1=Object.freeze({
 export const COMMERCE_EXACT_READER_PURCHASED_UNIT_SQL_V1=`
 select
  event.id::text as "providerEventId",
+ event.external_event_id as "providerWebhookId",
+ event.verified_payload_jsonb->>'cancellationIdHmac' as "cancellationIdHmac",
  receipt.id::text as "receiptId",
  receipt.subject_id::text as "subjectId",
  receipt.purchase_intent_id::text as "purchaseIntentId",
@@ -121,6 +123,7 @@ const no=(kind,extra={})=>Object.freeze({
 async function inspectExactPaidUnit(dbClient,{
  providerEventId,entitlementGrantId,receiptId,expectedGrantRevision,
  expectedLastProviderOrderingKey,withdrawalReason,reviewer,
+ expectedProviderWebhookId,expectedCancellationIdHmac,
 }){
  let began=false;
  try{
@@ -157,6 +160,13 @@ async function inspectExactPaidUnit(dbClient,{
      r.lastProviderOrderingKey!==expectedLastProviderOrderingKey||
      !['active','revoked','expired'].includes(r.grantStatus))
    return no('exact_reader_purchase_or_cas_changed_after_lock');
+
+  // Re-verify the signed event/item pair in this fresh read-only snapshot.
+  // The preceding provider GET and S1/CAS inspection had released their locks.
+  if(expectedProviderWebhookId!==undefined&&
+     (r.providerWebhookId!==expectedProviderWebhookId||
+      r.cancellationIdHmac!==expectedCancellationIdHmac))
+   return no('exact_signed_cancellation_changed_before_notice_review');
 
   if(typeof r.readerContentBundleId!=='string'||
      !UUID.test(r.readerContentBundleId))
@@ -341,6 +351,8 @@ export async function inspectExactReaderWithdrawalEvidenceHoldV1({
  const inspected=await inspectExactPaidUnit(dbClient,{
   providerEventId,entitlementGrantId,receiptId,expectedGrantRevision,
   expectedLastProviderOrderingKey,withdrawalReason,reviewer,
+  ...(signedBindingRequested?{expectedProviderWebhookId,
+    expectedCancellationIdHmac}:{}),
  });
  return inspected;
 }

@@ -22,8 +22,12 @@ const UNIT='00000000-0000-4000-8000-000000000008';
 const OFFICIAL='00000000-0000-4000-8000-000000000007';
 const BUNDLE='standard-reader-bundle-v1';
 const BUNDLE_ID='00000000-0000-4000-8000-000000000055';
+const SIGNED_WEBHOOK='evt_signed-cancel-01';
+const SIGNED_CANCEL_HMAC='hmac-sha256:k1:'+'b'.repeat(64);
 const SCOPE={
- providerEventId:EVENT,receiptId:RECEIPT,subjectId:SUBJECT,
+ providerEventId:EVENT,providerWebhookId:SIGNED_WEBHOOK,
+ cancellationIdHmac:SIGNED_CANCEL_HMAC,
+ receiptId:RECEIPT,subjectId:SUBJECT,
  purchaseIntentId:INTENT,grantId:GRANT,grantRevision:'3',
  lastProviderOrderingKey:null,grantStatus:'active',
  officialReadingId:OFFICIAL,readerCharacterId:'seyeon',
@@ -156,6 +160,8 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   expect(SCOPE_SQL).toContain('egrant.id=$2::uuid');
   expect(SCOPE_SQL).toContain('receipt.id=$3::uuid');
   expect(SCOPE_SQL).toContain('event.id=$1::uuid');
+  expect(SCOPE_SQL).toContain('event.external_event_id as "providerWebhookId"');
+  expect(SCOPE_SQL).toContain("event.verified_payload_jsonb->>'cancellationIdHmac'");
   expect(SCOPE_SQL).toContain('access.entitlement_grant_id=egrant.id');
   expect(SCOPE_SQL).not.toContain('digital_reading_checkout_notice_presentations_v1');
   expect(NOTICE_UNIT_SQL).toContain('presentation.unit_id::text as "unitId"');
@@ -197,6 +203,32 @@ describe('P4 exact purchased Reader withdrawal notice and delivery HOLD',()=>{
   }));
   expect(result.kind).toBe('exact_reader_statutory_review_only');
   safe(result);
+ });
+
+ it('rechecks the signed cancellation item on the fresh Event row before private notice',async()=>{
+  const currentSetLockedInspector=async()=>({
+   ...VERIFIED,exactSignedCancellationBoundToEvent:true,
+  });
+  for(const [label,changed] of [
+   ['different webhook',{providerWebhookId:'evt_different'}],
+   ['different item',{cancellationIdHmac:'hmac-sha256:k1:'+'c'.repeat(64)}],
+   ['missing item',{cancellationIdHmac:null}],
+   ['missing webhook',{providerWebhookId:null}],
+  ]){
+   const c=db({scope:[{...SCOPE,...changed}]}),reviewer=vi.fn();
+   const result=await call(c,{
+    expectedProviderWebhookId:SIGNED_WEBHOOK,
+    expectedCancellationIdHmac:SIGNED_CANCEL_HMAC,
+    currentSetLockedInspector,withdrawalReviewer:reviewer,
+   });
+   expect(result.kind,label).toBe('exact_signed_cancellation_changed_before_notice_review');
+   expect(c.calls.some(q=>q.sql===SCOPE_SQL)).toBe(true);
+   expect(c.calls.some(q=>q.sql===PRIVATE_SOURCE_SQL),label).toBe(false);
+   expect(c.calls.some(q=>q.sql===NOTICE_PROBE_SQL),label).toBe(false);
+   expect(c.calls.at(-1).sql).toBe('rollback');
+   expect(reviewer).not.toHaveBeenCalled();
+   safe(result);
+  }
  });
  it('rejects incomplete/malformed signed item pairs before database and GET',async()=>{
   const mac='hmac-sha256:k1:'+'b'.repeat(64);

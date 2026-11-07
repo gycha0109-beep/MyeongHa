@@ -870,3 +870,13 @@
 - **완료·미완료:** 이번 코드·회귀·기록 단위 구현 완료. 공급자 의미적 NEWER/STALE 순서, 법적 환불 판단, Reader T2 최종 권한 회수 실행, 실제 소비자 전달 완료, 백업 복원 후 privacy replay 및 전체 E2E는 미완료입니다.
 - **브랜치·커밋·PR:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, 변경 이전 `6e1da706b6cdbac478afb127e0a04d0d453060f5`, PR #3090. 본 기록과 변경 파일을 하나의 후속 커밋으로 반영합니다.
 - **블로커·다음:** 새 HEAD의 전체 CI 결과를 확인하여 실패를 수정하고, 이후 승인된 로드맵의 미완료 결제/취소·권한 회수 연결을 진행합니다. 실제 PortOne 환불 POST·운영 DB·공개 checkout·LIVE는 실행하거나 활성화하지 않습니다. 승인 요청 없음.
+
+### 2026-11-08 — 서명 취소 Event를 고지 재조회 시점에 다시 결속
+
+- **작업 목표/로드맵:** 승인된 개발 로드맵 §6-1~3에 따라 인증 PortOne GET/취소 Event→Reader S1 잠금 이후 별도 청약철회 고지 재조회 트랜잭션에서도 같은 서명 취소 이벤트·항목이 유지되는지 검증합니다.
+- **기준 브랜치·PR:** `feat/commerce/saju-record-scoped-capability-v1-20261107` / [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 변경 이전 커밋 `5df87e208b3eeb68c22ef20d2e6cfdd24706601e`. 이전 커밋의 [Commerce CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42386850544/job/128445985797) 성공 및 Web/Governance 성공 확인. PostgreSQL17·DB authority는 조회 시 실행 중이었으므로 통합 성공을 추정하지 않습니다.
+- **변경 파일:** `scripts/operations/commerce-exact-reader-withdrawal-evidence-hold-v1.mjs`, `test/commerce-exact-reader-withdrawal-evidence-hold-v1.test.mjs`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 기존 구매 단위 조회 SQL에서 동일 canonical `commerce_provider_events` 행의 `external_event_id`와 `verified_payload_jsonb.cancellationIdHmac`를 읽고, 서명된 취소 쌍 요청 시 이전 검사 값과 재비교합니다. GET/S1 잠금은 이미 해제되었으므로 새 읽기 전용 스냅샷에서 값이 바뀌거나 누락되면 사설 Reader 해석과 구매 고지 조회 전에 HOLD하고 ROLLBACK합니다. 기존 DB 원장/Writer/스키마 변경 없음.
+- **테스트:** 기존 Vitest에 다른 웹훅·다른 취소 ID HMAC·이벤트 값 누락 시 비공개 소스·고지 미조회, 트랜잭션 ROLLBACK, 결과 식별자 비노출 검증을 추가했습니다. 새 커밋의 CI·PostgreSQL17 결과는 아직 미확정, PASS 미선언입니다.
+- **완료/미완료:** 이번 사설 재조회 결속 코드·테스트·작업 기록을 함께 커밋합니다. 공급자 사건 NEWER/STALE 판정, 실제 Reader T2 원자 회수/Entitlement Effect, 법적 환불 결정, 소비자 전달 완료 증거, 복원 후 개인정보 replay, 전체 비운영 E2E는 미완료입니다.
+- **커밋/다음/블로커:** 작업 전 `5df87e208b3eeb68c22ef20d2e6cfdd24706601e`, 이번 변경은 PR #3090의 새 커밋에 포함합니다. 새 CI를 확인해 실패를 복구하거나 통과하면 다음 미완료 기능을 진행합니다. 운영 PG 취소 POST·DB 적용·LIVE 공개 실행 없음. 승인 요청 없음.
