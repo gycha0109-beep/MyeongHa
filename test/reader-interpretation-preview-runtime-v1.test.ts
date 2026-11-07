@@ -15,6 +15,7 @@ import {
   type OfficialReadingCharacterGroundingProjectionPortV1,
 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
 import type { CharacterSajuConsultationShadowPortV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
+import { createOpenAiSajuConsultationShadowPortV1, type OpenAiSajuConsultationShadowFetchV1 } from '../apps/api/src/openai-saju-consultation-shadow-port-v1.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingAccessAuthorityRowV1,
@@ -378,6 +379,61 @@ async function run(
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
+  it('connects the real OpenAI Responses transport through the admitted Reader shadow without changing HTTP output', async () => {
+    const observed: string[] = [];
+    const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as {
+        model: string;
+        input: { content: { text: string }[] }[];
+      };
+      const taskInput = JSON.parse(body.input[0]!.content[0]!.text) as {
+        characterId?: string;
+        sourceUnit?: { unitId: string; canonicalMeaning: string };
+        candidateHash?: string;
+        officialUnit?: { unitId: string };
+      };
+      observed.push(body.model);
+      const result = body.model === 'offline-consultation-generator'
+        ? {
+            schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+            characterId: taskInput.characterId,
+            sourceUnitRefs: [taskInput.sourceUnit!.unitId],
+            text: '이 명식의 핵심을 먼저 설명하겠습니다.',
+          }
+        : {
+            schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1',
+            evaluatorVersion: 'myeongha-consultation-meaning-review-v1',
+            candidateHash: taskInput.candidateHash,
+            unitId: taskInput.officialUnit?.unitId,
+            semanticPreserved: true,
+            characterFidelityPreserved: true,
+            failureClasses: [],
+          };
+      return new Response(JSON.stringify({
+        status: 'completed',
+        output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(result) }] }],
+        usage: { input_tokens: 10, output_tokens: 10 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    const budget = vi.fn(async () => undefined);
+    const cost = vi.fn(async () => undefined);
+    const port = createOpenAiSajuConsultationShadowPortV1({
+      apiKey: 'offline-test-only',
+      generationModel: 'offline-consultation-generator',
+      reviewModel: 'offline-consultation-reviewer',
+      fetchImpl,
+      beforeDispatch: budget,
+      afterOutcome: cost,
+    });
+    const original = await run(readers.baekheon);
+    const shadow = await run(readers.baekheon, { consultationShadowPort: port });
+    expect(shadow).toEqual(original);
+    expect(observed).toEqual(['offline-consultation-generator', 'offline-consultation-reviewer']);
+    expect(budget).toHaveBeenCalledTimes(2);
+    expect(cost).toHaveBeenCalledTimes(2);
+    expect(shadow).not.toHaveProperty('candidate');
+  });
+
   it('feeds source-grounded consultation instructions only after admission, keeping the exact Reading unchanged', async () => {
     const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
       const data = request.input as {
