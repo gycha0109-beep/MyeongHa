@@ -1,0 +1,3428 @@
+{
+  "schemaVersion": "ops-remote-only-current-object-metadata-report-v1",
+  "sourceSql": "scripts/operations/production-remote-only-current-object-metadata-readonly.sql",
+  "productionProjectRef": "cnsfpcdiyofqvhpcegfc",
+  "compareTo": "docs/operations/POSTGRES_REMOTE_ONLY_OBJECT_PRESENCE_20261107.json",
+  "catalogueEvidence": {
+    "perVersion": [
+      {
+        "tables": [],
+        "version": "20261008090417",
+        "policies": [
+          {
+            "name": "chat_turn_attempts_seyeon_post_turn_select_v1",
+            "table": "chat_turn_attempts",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "chat_turns_seyeon_post_turn_select_v1",
+            "table": "chat_turns",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "conversation_messages_seyeon_chat_runtime_insert_v1",
+            "table": "conversation_messages",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_messages_seyeon_chat_runtime_select_v1",
+            "table": "conversation_messages",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_messages_seyeon_post_turn_select_v1",
+            "table": "conversation_messages",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_thread_characters_seyeon_chat_runtime_select_v1",
+            "table": "conversation_thread_characters",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "47042599f530676f70671e4308d3084e109881d6cbf093defc3af01e887a5da8",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_thread_characters_seyeon_post_turn_select_v1",
+            "table": "conversation_thread_characters",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "47042599f530676f70671e4308d3084e109881d6cbf093defc3af01e887a5da8",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_threads_seyeon_chat_runtime_select_v1",
+            "table": "conversation_threads",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_threads_seyeon_chat_runtime_update_v1",
+            "table": "conversation_threads",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "UPDATE",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "conversation_threads_seyeon_post_turn_select_v1",
+            "table": "conversation_threads",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_relationship_apply_owner_insert_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_relationship_apply_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "36eccbfe2e3845809a5891cfe8a7763429a99ffa27a811306822fb4cc905647c",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_relationship_apply_owner_select_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_relationship_apply_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "73b2bdcddf8b4899f6dcd45d0636d6ce97ad7ca5c2c66f8c6693353b10e99118",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_relationship_apply_owner_update_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_relationship_apply_owner"
+              ],
+              "command": "UPDATE",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "73b2bdcddf8b4899f6dcd45d0636d6ce97ad7ca5c2c66f8c6693353b10e99118",
+              "tableOwner": "postgres",
+              "withCheckSha256": "36eccbfe2e3845809a5891cfe8a7763429a99ffa27a811306822fb4cc905647c",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_seyeon_chat_runtime_insert_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "00517a8a337c310639c90e28db1dc386202a42b1f0d2148272c8f5e20b58997a",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_seyeon_post_turn_commit_select_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "eec950ffec39cb256a1dd78e1447d95ef0beee67f911695b45cbe167d2318d6a",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_seyeon_post_turn_enqueue_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "6a5f9309fc902dc346a111800c76681b87315b010faa438a828e992752537310",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_seyeon_post_turn_select_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "a9b840d4703051656a268749810939e8756eeba4c5a57df7aad023142445db85",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "outbox_events_seyeon_post_turn_update_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_post_turn_owner"
+              ],
+              "command": "UPDATE",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "eec950ffec39cb256a1dd78e1447d95ef0beee67f911695b45cbe167d2318d6a",
+              "tableOwner": "postgres",
+              "withCheckSha256": "eec950ffec39cb256a1dd78e1447d95ef0beee67f911695b45cbe167d2318d6a",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "subjects_seyeon_chat_runtime_select_v1",
+            "table": "subjects",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8cb03adb7dab1b024028781ef2a6fdac0b50114acc8d6e2cb49522c7e7c50ed8",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "assert_seyeon_chat_thread_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "1ff6e68aaa481aa1dfdf8a44157ce14c72e4ae3de95de8af3bcc2350e21fd12a",
+                "signature": "p_subject_id uuid, p_thread_id uuid",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "25b9484ed6ec6ed423d8680eac5e5419381939d04f335347f9113ca8626d3129",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_allocate_seyeon_chat_attempt_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_planner_version text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "5f490c3fbca7d1f5a749ca8629ff1c9d225304d4c7faf802ccff88f1834954eb",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_checkpoint_seyeon_post_turn_analysis_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_post_turn_owner",
+                "aclSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+                "signature": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text, p_checkpoint_jsonb jsonb",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "fda863a33442854fa807ce7ef907380f72f79e94db2c4a90025c713c4c3f99e1",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_claim_seyeon_post_turn_analysis_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_post_turn_owner",
+                "aclSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+                "signature": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text, p_lease_expires_at timestamp with time zone",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "9cd1cb8d8307b8687e8dfe38cb1e6c6b27386d51b723568c704588e9f3d42c7e",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_claim_seyeon_relationship_sync_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_relationship_apply_owner",
+                "aclSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+                "signature": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text, p_lease_expires_at timestamp with time zone",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "489fb7a554b8450de1a2c0ed990cc8fb310cd1ae35e640270207d320f88bc082",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_commit_seyeon_chat_turn_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_message_id uuid, p_outbox_event_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "9165de6fed5b1ddd48819c636a99811339b249e1738092881be32743f747a41e",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_commit_seyeon_chat_turn_runtime_v2",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_message_id uuid, p_chat_outbox_event_id uuid, p_post_turn_outbox_event_id uuid, p_post_turn_snapshot_jsonb jsonb, p_post_turn_snapshot_hash text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "49dee96f6fa46c41dfe1058f7bd223117c2c11d5a9a3d1c1222a26f0ab1492ed",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_complete_seyeon_post_turn_analysis_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_post_turn_owner",
+                "aclSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+                "signature": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "5f45b3dbc21b0bb0f4d6836176ca23e12e0a82df3e91ac36539fa6d23cb3fe1f",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_complete_seyeon_relationship_sync_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_relationship_apply_owner",
+                "aclSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+                "signature": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "f9c6a368aee96c156bebb873b44078a5b6bdd32315b44bb8f74c42db2875ae2a",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_enqueue_seyeon_relationship_sync_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_relationship_apply_owner",
+                "aclSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+                "signature": "p_subject_id uuid, p_outbox_event_id uuid, p_turn_id uuid, p_production_event_jsonb jsonb",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "a83c3c9b25c74228a7bc5348fdfb1a501b16bed3b2a9a63047561811f61cf879",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_fail_seyeon_chat_attempt_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_failure_state text, p_error_code text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "715b2ca544d393416ed77d7c8d4030b27e079e00f708cae6a7669b81296b77b7",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_mark_seyeon_chat_context_ready_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "a72e88040a48362d57151acf499bbb0aaa7f5220dc18434527ab9ebf848c2467",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_persist_seyeon_chat_generated_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_thread_character_id uuid, p_ai_execution_log_id uuid, p_provider text, p_model text, p_renderer_version text, p_body_text text, p_message_payload_jsonb jsonb, p_message_schema_version text, p_content_hash text, p_grounding_refs_jsonb jsonb",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "eda5b921309300a230dee62f2c9e9c77463b9aa23b03f9f4d202c0f04c9325c6",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_persist_seyeon_chat_validated_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_ai_execution_log_id uuid, p_provider text, p_model text, p_output_guard_version text, p_generated_content_hash text, p_validation_result_jsonb jsonb, p_grounding_refs_jsonb jsonb",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "d5a2e9a0e00f896b46335ba3592d1561c743b3778473b7181530685e3578a018",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_receive_seyeon_chat_turn_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_client_turn_id text, p_request_hash text, p_request_contract_version text, p_request_snapshot_jsonb jsonb, p_expected_content_release_id uuid, p_expected_content_bundle_id uuid, p_turn_id uuid, p_message_id uuid, p_user_body_text text, p_user_content_hash text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "75d09ad1b202d6af6673fbc7356c52c71274b1458d03eedd9ece2f5854eddc27",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_production_relationship_history_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_relationship_apply_owner",
+                "aclSha256": "fcdd412ed63bcf8c7590807503f19c129a4c9d4cd4084660084f89a6366b51e1",
+                "signature": "p_subject_id uuid, p_character_id text, p_through_revision bigint",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "c9a4101d280e3e213742cc85e898bb64d9ae59522215efb8894def82805ced61",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_production_relationship_runtime_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_relationship_apply_owner",
+                "aclSha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+                "signature": "p_subject_id uuid, p_character_id text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "1039a527496d31c711a4b986fca7183ddbd4d0b6373c5313bf587af508b93586",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_seyeon_post_turn_analysis_job_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_post_turn_owner",
+                "aclSha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+                "signature": "p_subject_id uuid, p_turn_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "0e7a56923a17f4d6f74257d1ba3f5b4b2866a701a1a69018b0696c9d94756e1a",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_seyeon_production_personal_record_context_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_character_id text",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "45271cb4a283c476f6b78b789c706f3a11377fc1926ffebb28cbf685954b3060",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 19,
+        "functionIndicators": 19
+      },
+      {
+        "tables": [],
+        "version": "20261023054251",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [
+          {
+            "name": "seyeon_positive_source_type_registry_v1",
+            "schema": "public",
+            "catalog": {
+              "kind": "r",
+              "owner": "myeongha_seyeon_chat_runtime_owner",
+              "aclSha256": "a4865fdfed8e11ec8570e6da524f5b7dfec4ddea8ffea3dfed269cf1d074ed3c",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261025193416",
+        "policies": [
+          {
+            "name": "seyeon_positive_pin_memory_subject_select_v1",
+            "table": "memory_items",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "seyeon_private_memory_insert_v1",
+            "table": "memory_items",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "seyeon_private_memory_proposal_select_v1",
+            "table": "memory_proposals",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "seyeon_private_memory_proposal_update_v1",
+            "table": "memory_proposals",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "UPDATE",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "seyeon_pending_withdrawal_blocks_source_select_v1",
+            "table": "record_access_grants",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "public"
+              ],
+              "command": "SELECT",
+              "permissive": "RESTRICTIVE",
+              "qualSha256": "f71ac9f6a50964bbe09b6ae482220a922f4e5aa1f002015c0d931e77b2ed0339",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "seyeon_positive_pin_grant_subject_select_v1",
+            "table": "record_access_grants",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "cmd_accept_seyeon_private_conversation_recall_proposal_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+                "signature": "p_subject_id uuid, p_proposal_id uuid, p_memory_item_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "b32ef934dcbf4de38d2fd594b6d8620e85fd1751093b8de63c0cf053f8ad9f77",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_commit_seyeon_positive_chat_turn_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_user_message_id uuid, p_message_id uuid, p_chat_outbox_event_id uuid, p_post_turn_outbox_event_id uuid, p_post_turn_snapshot_jsonb jsonb, p_post_turn_snapshot_hash text, p_selected_sources_digest text, p_final_model_context_digest text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "11a52268fb8351da8c7de2ee0098275b574f6728763f1491d2e5eced1299e1ce",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_issue_seyeon_positive_first_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "f098a76e7b1f5a51da3fedc5792ec597e9349abb527204d1ae0a15b44dfa1a8e",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_mark_seyeon_positive_context_ready_pinned_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_record_id uuid, p_original_grant_id uuid, p_record_type text, p_schema_version text, p_projector_version text, p_selected_sources_digest text, p_projected_memory_digest text, p_final_model_context_digest text, p_expected_record_pg_digest text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "0de9afe95f0f0d24b0a9dda5c403d4c351c5156e641d405ccc83fccb853f230d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_seyeon_positive_first_memory_locked_reveal_v3",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "d1e3a0ed7a61ad4b0b122251044c5a6834dd03fea3471e5183ea5f2f36bebe4f",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "tr_chat_turn_attempt_progression_guard",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "9684d3d620f7ec6b1737f1487598782bf78012f780ac0c64c50f76c42bf29d16",
+                "signature": "",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "3bbce10de4f38993618639996b3a1913e49e395229aa89617cfc1b93b9cf948a",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "tr_seyeon_zero_source_pin_immutable_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "9684d3d620f7ec6b1737f1487598782bf78012f780ac0c64c50f76c42bf29d16",
+                "signature": "",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "1e05192051106d3479d1e2dd9afae2d764cbfb465ca6da06ce7025f0a349170e",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_ack_seyeon_positive_reply_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_attempt_id uuid, p_proof text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "0c76460cd13238fbf706e5826a20110e340fbe6c57ea7ba0666a7fad75de06ea",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_request_seyeon_memory_revoke_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_memory_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "187031678dfc606d9036bb2b40c02c592215140803a3255a785b53c0b2f74acc",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_revoke_seyeon_memory_grant_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_memory_item_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "0c0b6b751637c0dc7f615a6129c80c8d0c5c4516dd2e1cd1d3f3461ecd7eb2ee",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "guard_positive_delivery_receipt_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "4c7da91a898a71672b47d63043d102a0f0a98debba8bee1690f56739afcaf5f9",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "guard_positive_delivery_source_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "828315a8b63540892a89663a873273613dee403ae6fe172b3bb4fe81c5f083ad",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "lock_memory_source_message_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "c03ece934444dc49fceb1caf942db04800e555914c652ad49a37b709ef2450eb",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_message_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "3da4cd2ef487b33bb6e2951e5ce2c4b8c67e97f7b705905d5f513f2dae99b9ad",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "lock_memory_subject_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "c03ece934444dc49fceb1caf942db04800e555914c652ad49a37b709ef2450eb",
+                "signature": "p_subject_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "5e60d0863fd0825d493f0f50939e6dd0213c02eba4705b848eb3a211882a6950",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "lock_original_memory_grant_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "c03ece934444dc49fceb1caf942db04800e555914c652ad49a37b709ef2450eb",
+                "signature": "p_subject_id uuid, p_memory_id uuid, p_grant_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "2f1df19dd4a2547cf1985d46811172127755165fc60227ced244f381006c6e8b",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "lock_positive_first_memory_reply_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "705e1c7e5d307b3c15c58b742211316436b562aed9eab6b95fde8c18fd37d29c",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "lock_positive_source_registry_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "1ff6e68aaa481aa1dfdf8a44157ce14c72e4ae3de95de8af3bcc2350e21fd12a",
+                "signature": "p_record_type text, p_schema_version text, p_projector_version text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "557272fab03ac46bc83ba3ab143ada5caadeb96faac64b3689f626f68f813400",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "pending_positive_delivery_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_memory_id uuid, p_grant_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "00a0b5502816cb51c83ce69a9e8b73177190b29c350cc1f89ab18d0b3132a02d",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 1,
+        "policyIndicators": 6,
+        "functionIndicators": 18
+      },
+      {
+        "tables": [],
+        "version": "20261025193454",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261025201500",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261025203519",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [
+          {
+            "name": "myeongha_owner_administrators_v1",
+            "schema": "public",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5a72e078d87a365414e261d29b656cec6b08eef6aa2572a5cc26eff809a4f9fc",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261027004434",
+        "policies": [],
+        "routines": [
+          {
+            "name": "qry_myeongha_owner_admin_access_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "ea1298b9622cf69f1a76453d2c1708bbc7e17a742664e4885dcef99216bbc009",
+                "signature": "p_subject_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "0515ae765c8c577f48b294af9f9f0574ae6640677bda67ccbc9e4dc67460743d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 1,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261027004544",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261027011650",
+        "policies": [],
+        "routines": [
+          {
+            "name": "internal_cmd_chat_credit_verified_topup_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_receipt_id uuid, p_approved_offer_id uuid, p_validity_mode text, p_validity_days integer",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "1f0d55554608a2f82bcc5e8b548c2f57171bda2a59fbd1767577978c651102e2",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "internal_cmd_chat_first_paid_reading_reward_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_receipt_id uuid, p_approved_reading_offer_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "ef539320a981ff7ddf7c51c89be1075f19a4bfb5e246551e99e1237ac0b80420",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [],
+        "version": "20261027043527",
+        "policies": [],
+        "routines": [
+          {
+            "name": "internal_cmd_chat_credit_ack_delivered_proven_v2",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_client_turn_id uuid, p_reservation_id uuid, p_committed_turn_id uuid, p_assistant_message_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "ada95cd0d60281459034469fc5f71c7beb44b96e383d52c0b0f155c2a598ca66",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261027074247",
+        "policies": [],
+        "routines": [
+          {
+            "name": "qry_commerce_owner_sandbox_credit_checkout_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_payment_attempt_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "2c7dcf4bf2f68d3a1abbcd46df711c10c3000a6d3d40a02d54b64eb43a21ad4d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261027081929",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_prepare_owner_portone_sandbox_credit_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_purchase_intent_id uuid, p_payment_attempt_id uuid, p_idempotency_key text, p_provider_request_id text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "bb9fdc4a930908f7c5bbe35968eff720d6c860dca9e927943e57fef961e3cf7d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_commerce_owner_sandbox_credit_checkout_v2",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_payment_attempt_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "6581c9d32eb577ae1402911354ed2bc387233d607baa6ddc06c703ada34ea45d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [
+          {
+            "name": "owner_sandbox_receipt_attestation_v1",
+            "schema": "commerce_private",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5a72e078d87a365414e261d29b656cec6b08eef6aa2572a5cc26eff809a4f9fc",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261028011357",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_persist_owner_kcp_signed_sandbox_receipt_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_payment_attempt_id uuid, p_attested_payload_text text, p_attestation_hex text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "14e19301cd58e65e39e2539e3500de2ff7ae244fefdfe650aae2edb489b86969",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 1,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261029012948",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_prepare_owner_portone_sandbox_credit_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_purchase_intent_id uuid, p_payment_attempt_id uuid, p_idempotency_key text, p_provider_request_id text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "bb9fdc4a930908f7c5bbe35968eff720d6c860dca9e927943e57fef961e3cf7d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261029070331",
+        "policies": [],
+        "routines": [
+          {
+            "name": "qry_seyeon_memory_grant_lifecycle_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_memory_item_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "e995d04df846a6b7ff399d4c4368695f952036d2d1d818d3fe498b704063f2de",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [
+          {
+            "name": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "6ff15b04243d2d507f417a33ebb560542d2b05dd32f0e087df84ace2af4039b8",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261029071539",
+        "policies": [
+          {
+            "name": "admin_append_audit_v1",
+            "table": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_audit_writer"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_audit_metadata_v1",
+            "table": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_ai_grounding_links_v1",
+            "table": "ai_execution_groundings",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_ai_execution_metadata_v1",
+            "table": "ai_execution_logs",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_birth_revision_identity_v1",
+            "table": "birth_profile_revisions",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_birth_profile_identity_v1",
+            "table": "birth_profiles",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_character_catalog_metadata_v1",
+            "table": "character_runtime_catalog",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_credit_lot_metadata_v1",
+            "table": "chat_credit_lots_v1",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_credit_allocations_v1",
+            "table": "chat_credit_turn_allocations_v1",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_credit_reservations_v1",
+            "table": "chat_credit_turn_reservations_v1",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_provider_event_metadata_v1",
+            "table": "commerce_provider_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_receipt_metadata_v1",
+            "table": "commerce_receipts",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_content_bundle_metadata_v1",
+            "table": "content_bundles",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_content_release_metadata_v1",
+            "table": "content_releases",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_recent_thread_update_v1",
+            "table": "conversation_threads",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_deletion_job_metadata_v1",
+            "table": "data_deletion_jobs",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_entitlement_receipt_link_v1",
+            "table": "entitlement_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_entitlement_grant_status_v1",
+            "table": "entitlement_grants",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_entitlements_metadata_v1",
+            "table": "entitlements",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_outbox_metadata_v1",
+            "table": "outbox_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_offer_metadata_v1",
+            "table": "product_offers",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_product_metadata_v1",
+            "table": "products",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_purchase_intent_status_v1",
+            "table": "purchase_intents",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_reading_attempt_metadata_v1",
+            "table": "reading_execution_attempts",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_reading_grounding_links_v1",
+            "table": "reading_groundings",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          },
+          {
+            "name": "admin_read_reading_provenance_version_v1",
+            "table": "reading_refs",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_reading_metadata_v1",
+            "table": "readings",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_ai_cost_metadata_v1",
+            "table": "seyeon_ai_call_cost_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_read_subject_metadata_v1",
+            "table": "subjects",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [],
+        "tableIndicators": 1,
+        "policyIndicators": 29,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [
+          {
+            "name": "command_receipts_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "069383e1d0e147f41614eacb4467ec51f4ece29909efa3bce5681409e72a5391",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "presentation_entries_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "a49ebba91b61e37280c194820c415ef2d3aaa8f93b9318a4f109ebf1beffeed0",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "presentation_history_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "069383e1d0e147f41614eacb4467ec51f4ece29909efa3bce5681409e72a5391",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261030014708",
+        "policies": [
+          {
+            "name": "admin_presentation_owner_audit_insert_v1",
+            "table": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_presentation_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_presentation_owner_receipt_insert_v1",
+            "table": "command_receipts_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_presentation_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_presentation_owner_receipt_read_v1",
+            "table": "command_receipts_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_presentation_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_presentation_owner_entries_v1",
+            "table": "presentation_entries_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_presentation_owner"
+              ],
+              "command": "ALL",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_presentation_owner_history_insert_v1",
+            "table": "presentation_history_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_presentation_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_presentation_owner_history_read_v1",
+            "table": "presentation_history_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_presentation_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "cmd_save_presentation_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_presentation_owner",
+                "aclSha256": "26071053d67b9b57343697f342dc807809cff1bb80eef754530abae7e0119a88",
+                "signature": "p_actor uuid, p_operation uuid, p_request uuid, p_hash text, p_entry uuid, p_expected integer, p_kind text, p_title text, p_body text, p_link text, p_status text, p_starts timestamp with time zone, p_ends timestamp with time zone, p_reason text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "c09f67ab029ac606f7afeef99847121511853aa2c4395c69792eecdbc1b214ed",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_admin_command_receipt_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_presentation_owner",
+                "aclSha256": "26071053d67b9b57343697f342dc807809cff1bb80eef754530abae7e0119a88",
+                "signature": "p_actor uuid, p_operation uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "70308645b51609059bbbd83552f411160fe6f957e893bec6885a89d41f20e01c",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_presentation_entries_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_presentation_owner",
+                "aclSha256": "26071053d67b9b57343697f342dc807809cff1bb80eef754530abae7e0119a88",
+                "signature": "p_id uuid, p_limit integer",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "465bc14e125214e5fea9484d229d9f878cf6fb55ed9ca0e63ce2446090fdfecd",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_presentation_history_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_presentation_owner",
+                "aclSha256": "26071053d67b9b57343697f342dc807809cff1bb80eef754530abae7e0119a88",
+                "signature": "p_entry uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "b3a947df898148d6b604ab9f7d6cab252022267d0a45c145fc5333fdd008408e",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_visible_presentations_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_presentation_owner",
+                "aclSha256": "d699dab68dbc4bfc63a35caad1497bb076b03e0b08874ca97d825b06ac6b1914",
+                "signature": "",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "985c106b99797547b8d422fc749b9d410100785d2c4fa5c16f9d3ac11f37b633",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 3,
+        "policyIndicators": 6,
+        "functionIndicators": 5
+      },
+      {
+        "tables": [],
+        "version": "20261030014906",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [
+          {
+            "name": "character_knowledge_topics_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5adf8fabfc30c2807b0fc4755e847ba634dd3066aa66698d3c9c411a0aaac751",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "character_learning_evidence_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5adf8fabfc30c2807b0fc4755e847ba634dd3066aa66698d3c9c411a0aaac751",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "character_learning_revocation_approvals_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5adf8fabfc30c2807b0fc4755e847ba634dd3066aa66698d3c9c411a0aaac751",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "character_learning_sharing_consents_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5adf8fabfc30c2807b0fc4755e847ba634dd3066aa66698d3c9c411a0aaac751",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "character_learning_source_approvals_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "5adf8fabfc30c2807b0fc4755e847ba634dd3066aa66698d3c9c411a0aaac751",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261030014935",
+        "policies": [
+          {
+            "name": "c09_topics_api_current_read_v1",
+            "table": "character_knowledge_topics_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "roles": [
+                "myeongha_api_executor"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "f56358a75313d3e4324969240dd8ea9d5ed658f4cc15ed9dc0f99282fd8a7b4e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "c09_learning_evidence_api_current_read_v1",
+            "table": "character_learning_evidence_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "roles": [
+                "myeongha_api_executor"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "a24826122133213d8ec6f52668e78ac68874d21b96005724d5dbda4c2c431514",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "c09_revocation_approvals_api_current_read_v1",
+            "table": "character_learning_revocation_approvals_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "roles": [
+                "myeongha_api_executor"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "90ca0755087727da4fdc891495abca0fd56e9b2307f79b0391ca9d1cebb5f0b6",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "c09_sharing_consents_api_current_read_v1",
+            "table": "character_learning_sharing_consents_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "roles": [
+                "myeongha_api_executor"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "90ca0755087727da4fdc891495abca0fd56e9b2307f79b0391ca9d1cebb5f0b6",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "c09_approved_sources_api_current_read_v1",
+            "table": "character_learning_source_approvals_v1",
+            "schema": "myeongha_internal",
+            "catalog": {
+              "roles": [
+                "myeongha_api_executor"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "12c43ce9b8b8368a53f6d3a5d61b5aec5d9600f247667d3d035fb286e9700f11",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "c09_issue_learning_evidence_shadow_v1",
+            "schema": "myeongha_internal",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_evidence_id uuid, p_subject_id uuid, p_source_ref text, p_approval_ref text, p_consent_ref text, p_expected_consent_revision bigint",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "97d322d14a9fe5d50e7a0dcd9104d712e94f20aedaa5b9664d9dbd156557b23e",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "c09_revoke_learning_evidence_shadow_v1",
+            "schema": "myeongha_internal",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_evidence_id uuid, p_revocation_ref text, p_expected_revision bigint",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "a94abe29c90f4fb6544ba6c6d021eb2c8da134e24982d7677b0ef8233d473cb7",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "c09_revoke_sharing_consent_shadow_v1",
+            "schema": "myeongha_internal",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_source_ref text, p_consent_ref text, p_expected_revision bigint",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "edb9aab57ef9df434c8ff5fba817f99f8d7569f15488869cf10f526754b31b57",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 5,
+        "policyIndicators": 5,
+        "functionIndicators": 3
+      },
+      {
+        "tables": [
+          {
+            "name": "consents_v1",
+            "schema": "myeongha_admin_analytics",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "f7050e9f674754bf9e0a4c6508a4f1391680440e5d51e8af2e83e03daa837b84",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "events_v1",
+            "schema": "myeongha_admin_analytics",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "f7050e9f674754bf9e0a4c6508a4f1391680440e5d51e8af2e83e03daa837b84",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261030015201",
+        "policies": [
+          {
+            "name": "analytics_reader_consent_v1",
+            "table": "consents_v1",
+            "schema": "myeongha_admin_analytics",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "d29ab350a55681de21c13611bf21daf62cf399b284c4bc7e38fc02c53223c356",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "analytics_writer_consent_v1",
+            "table": "consents_v1",
+            "schema": "myeongha_admin_analytics",
+            "catalog": {
+              "roles": [
+                "myeongha_analytics_writer"
+              ],
+              "command": "ALL",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "analytics_reader_event_v1",
+            "table": "events_v1",
+            "schema": "myeongha_admin_analytics",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "99b1c9d37c1a741e5bde1368ade7da4713a59418098cfa3dbc829919c0bb323b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "analytics_writer_event_v1",
+            "table": "events_v1",
+            "schema": "myeongha_admin_analytics",
+            "catalog": {
+              "roles": [
+                "myeongha_analytics_writer"
+              ],
+              "command": "ALL",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [],
+        "tableIndicators": 2,
+        "policyIndicators": 4,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [
+          {
+            "name": "reading_ai_call_cost_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "kind": "r",
+              "owner": "myeongha_reading_ai_cost_source_v1",
+              "aclSha256": "d7db36c9ce8566aefb2969adf27888699eca0233dbdc359dad0329ae6db20800",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261030015858",
+        "policies": [
+          {
+            "name": "reading_ai_cost_attempt_binding_v1",
+            "table": "reading_execution_attempts",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_reading_ai_cost_source_v1"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": false
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "cmd_record_reading_ai_call_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_reading_ai_cost_source_v1",
+                "aclSha256": "ecf7e3ed76a959cc3e7e5e9b5df5b91fdd21438b02e0e5346946a6597123c16d",
+                "signature": "p_subject uuid, p_reading uuid, p_attempt uuid, p_event jsonb",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "c3bd6b5b6a0c571f7ccbfa971fa2e8e9313982c0474df0b0ba90a09303412f31",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_reading_ai_cost_calls_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_reading_ai_cost_source_v1",
+                "aclSha256": "d23954240dab3f4cfb0130a82b5669cfeed9a0c6142789ab067a1df04d1090be",
+                "signature": "p_reading uuid, p_limit integer, p_offset integer",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "bfbcdcd911da48c7b4598ac5a6c7a339c571b8ecf79ccd4649b91c161e076640",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_reading_ai_cost_month_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_reading_ai_cost_source_v1",
+                "aclSha256": "d23954240dab3f4cfb0130a82b5669cfeed9a0c6142789ab067a1df04d1090be",
+                "signature": "p_from timestamp with time zone, p_to timestamp with time zone",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "b927b0ed8d87ff07593bc574ce132358ff117060c8ea18331aaf10b8b58c2d5f",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 1,
+        "policyIndicators": 1,
+        "functionIndicators": 3
+      },
+      {
+        "tables": [
+          {
+            "name": "admin_audit_retention_holds_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "kind": "r",
+              "owner": "postgres",
+              "aclSha256": "6ff15b04243d2d507f417a33ebb560542d2b05dd32f0e087df84ace2af4039b8",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "version": "20261030020711",
+        "policies": [
+          {
+            "name": "admin_retention_owner_audit_v1",
+            "table": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_retention_owner"
+              ],
+              "command": "INSERT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_retention_owner_delete_v1",
+            "table": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_retention_owner"
+              ],
+              "command": "DELETE",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "2a7ced04c4c8ecb92032835748b1732f7c204701e60bb6b09eac82ce597191c0",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_retention_owner_read_v1",
+            "table": "admin_audit_events_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_retention_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "admin_retention_owner_holds_v1",
+            "table": "admin_audit_retention_holds_v1",
+            "schema": "myeongha_admin_ops",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_retention_owner"
+              ],
+              "command": "ALL",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "cmd_purge_expired_admin_audit_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_retention_owner",
+                "aclSha256": "010c09244aa11259ea48f368a407b51a9aa32cf55348ce91b59f48a4ba2d5680",
+                "signature": "p_limit integer",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "ef5240850afaad96eb5f52d4e1073eab841da8fd20e906ff3dfee343a3c19639",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "set_admin_audit_expiry_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "64bc3f21bdb96f79a5054f6c0109671818b12aaad04a7e9d1161f1265ef1ea3d",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 1,
+        "policyIndicators": 4,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [],
+        "version": "20261030021027",
+        "policies": [
+          {
+            "name": "admin_finance_cost_source_v1",
+            "table": "seyeon_ai_call_cost_events",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_admin_finance_source_reader"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": true,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "qry_ai_finance_calls_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_finance_source_reader",
+                "aclSha256": "6f026f29d3752dd9245bd6276a3c3e81ebf49354f8ef48ed26ee45dfd692f8a9",
+                "signature": "p_limit integer, p_offset integer, p_from date, p_to date, p_subject uuid, p_feature text, p_model text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "80e87e3710391ecf5870c91aecedbb29b0c75bb4b46693244927b7878406dd37",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_ai_finance_prices_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_finance_source_reader",
+                "aclSha256": "6f026f29d3752dd9245bd6276a3c3e81ebf49354f8ef48ed26ee45dfd692f8a9",
+                "signature": "p_limit integer, p_offset integer, p_model text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "eb6c496eaf5b1dca09dc098d498ab0daf3eb0c7ecbda0a5405be44ca03849cfa",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_ai_finance_summary_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_finance_source_reader",
+                "aclSha256": "6f026f29d3752dd9245bd6276a3c3e81ebf49354f8ef48ed26ee45dfd692f8a9",
+                "signature": "p_limit integer, p_offset integer, p_from date, p_to date, p_subject uuid, p_feature text, p_model text, p_granularity text, p_group_by text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "fe75ce1c3347b0ab50160ef3a20f161d180c00838e6c36ce5dff0a0ae86427e1",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_ai_monthly_budget_v1",
+            "schema": "myeongha_admin_ops",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_admin_finance_source_reader",
+                "aclSha256": "6f026f29d3752dd9245bd6276a3c3e81ebf49354f8ef48ed26ee45dfd692f8a9",
+                "signature": "p_from timestamp with time zone, p_to timestamp with time zone",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "c0410bac8aaf98e1017c9e91f84ef0b7b86e7bb08ee0c4761e575484b28af819",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 1,
+        "functionIndicators": 4
+      },
+      {
+        "tables": [],
+        "version": "20261031182505",
+        "policies": [],
+        "routines": [
+          {
+            "name": "assert_current_original_member_user_message_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_user_message_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "25b1cd27f5e70301bba8198c23326a793faf14d6810799bf00df6588ad0fe1a3",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261031182550",
+        "policies": [],
+        "routines": [
+          {
+            "name": "qry_seyeon_g0_current_source_recent_messages_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_current_user_message_id uuid, p_limit integer",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "402f3e43beaaaf9caaa76a756d8208ba74b13ea3639ae3499d85d5bc20070d50",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "assert_current_original_assistant_lineage_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "20e6c9c3aa475ee02e0cafd20d31646b456022dbb0c256987a01eb0e2c703ef0",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "8db73e85c943720405291e5bad1f34abc8db238f6a1eeab6417584ebbb851f87",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [],
+        "version": "20261031182926",
+        "policies": [
+          {
+            "name": "seyeon_g0_provenance_source_select_v1",
+            "table": "relationship_event_provenance_refs",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "seyeon_g0_event_source_select_v1",
+            "table": "relationship_event_records",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "seyeon_g0_history_source_select_v1",
+            "table": "relationship_history_entries",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_seyeon_chat_runtime_owner"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "qry_seyeon_g0_current_source_relationship_history_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_character_id text, p_through_revision bigint",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "c7aff9f73a647ddd2dd7bf7dad94e9c3ba6256238f64d28e7a4731e9cd622ecc",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 3,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261031185454",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261031192427",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_issue_seyeon_zero_source_first_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "61708a1ad4eb33405ce0a028432fc2274ff9e94e3a4366a10d4856a620849bc5",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261031205042",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261101095105",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261101133954",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261101151700",
+        "policies": [],
+        "routines": [
+          {
+            "name": "qry_seyeon_recover_exact_failed_user_turn_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_user_text text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "7bcaa4dabf14dcfc3620c8f7870b41ae2e2aaaed9e1b1005489d52e9a7399dba",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261102060123",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_seyeon_supersede_stale_failed_turn_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_new_text text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "a8ffe7816b16c05376280312772e13cf1e5b0448ed281e4190eb0dc5b753d044",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261102060126",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261102081315",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_governed_settle_seyeon_ai_call_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_cost_meter_owner",
+                "aclSha256": "b806eac40b9fb9f54e924c1e625f63d5f0b7d66c1d04a935a068084957a905d4",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_phase text, p_event jsonb",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "88f62f48b906325e0b3e025ff16ca12507428c3c9d03ede89125adeaca7fa758",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_governed_start_seyeon_ai_call_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_cost_meter_owner",
+                "aclSha256": "b806eac40b9fb9f54e924c1e625f63d5f0b7d66c1d04a935a068084957a905d4",
+                "signature": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_phase text, p_call_id uuid, p_purpose text, p_provider_key text, p_model_key text, p_policy_version text, p_price_version text, p_verified_input_token_bound bigint, p_enforced_output_limit bigint, p_serialized_request_bytes bigint",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "d336f51900be4e86816cd7e864171ff0b8e69718bc2c3bfa5ab81d978d634a2b",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [],
+        "version": "20261103005333",
+        "policies": [],
+        "routines": [],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 0
+      },
+      {
+        "tables": [],
+        "version": "20261103072224",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_recover_seyeon_unissued_zero_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_user_text text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "00bf465cbda2d8777b0e6f4b03ca8f75190469e63eae4f02611fdcfa0e17c554",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      },
+      {
+        "tables": [],
+        "version": "20261103083731",
+        "policies": [],
+        "routines": [
+          {
+            "name": "assert_g0_zero_assistant_lineage_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_seyeon_chat_runtime_owner",
+                "aclSha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "acc8c889f3faed078aba06115b293f8f40438679cc94f03e1a3721a7a32fb76b",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "lock_g0_original_message_v1",
+            "schema": "seyeon_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "c03ece934444dc49fceb1caf942db04800e555914c652ad49a37b709ef2450eb",
+                "signature": "p_subject uuid, p_thread uuid, p_message uuid, p_sender text",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "dc716764ff29fc39e028c362f7bec2233c9f252d98cc4cf59e7a45b1a2a786bc",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [],
+        "version": "20261104043413",
+        "policies": [
+          {
+            "name": "chat_history_message_reader_v1",
+            "table": "conversation_messages",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_chat_history_reader_v1"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "chat_history_participant_reader_v1",
+            "table": "conversation_thread_characters",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_chat_history_reader_v1"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "94fe5148a0b4f904b36c09ad2f840e08f62cfcde12586ed2cb2335a47528a865",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "chat_history_thread_reader_v1",
+            "table": "conversation_threads",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_chat_history_reader_v1"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "9d879736682d7a63b00b745aa195076368229069ee03440cfe6ddb0f3740273e",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          },
+          {
+            "name": "chat_history_subject_reader_v1",
+            "table": "subjects",
+            "schema": "public",
+            "catalog": {
+              "roles": [
+                "myeongha_chat_history_reader_v1"
+              ],
+              "command": "SELECT",
+              "permissive": "PERMISSIVE",
+              "qualSha256": "8cb03adb7dab1b024028781ef2a6fdac0b50114acc8d6e2cb49522c7e7c50ed8",
+              "tableOwner": "postgres",
+              "withCheckSha256": "8ab60881072b62721284dd0081f2a14de0bbf755fa88c55ddd64a319bb23a734",
+              "forceRowSecurity": false,
+              "rowSecurityEnabled": true
+            }
+          }
+        ],
+        "routines": [
+          {
+            "name": "qry_chat_thread_owner_visible_history_v1",
+            "schema": "chat_private",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "myeongha_chat_history_reader_v1",
+                "aclSha256": "39b387ac02bb0498da4d8d037c6a391750a95ee93c77d3df0719e45bfed25ac0",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_after_sequence_no bigint, p_page_size integer",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "8be550a636b6c1f9b3f5c4a83009872090bf51c3beadbf14918768cc15c1e41d",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "qry_chat_thread_owner_visible_history_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_after_sequence_no bigint, p_page_size integer",
+                "anonExecute": false,
+                "securityDefiner": false,
+                "definitionSha256": "598f6b13387d2586adaa2a38b6d3055b3d7962228eb7c936235b634844aab3cc",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 4,
+        "functionIndicators": 2
+      },
+      {
+        "tables": [],
+        "version": "20261104195925",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_issue_seyeon_zero_source_followup_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "387cf5b04e6b2ac069173dabfe6ea85e5d75bb0f080700fb2f8d8c32ed23797a",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_issue_seyeon_zero_source_g0_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "82000dcc965733d7d58296c3b02d37055737e0fb0cb3794f6106b9062c072023",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          },
+          {
+            "name": "cmd_recover_seyeon_unissued_g0_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "e144475dceb0ed73965afc842c4ae29a6ab6faf7e99dcfd1fbca2fdb82b44b31",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_user_text text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "e9f358aa7e0cc2145adc50b8053add2188e9a717fc9bdfc24d157b3bcd03e82a",
+                "apiExecutorExecute": true,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 3
+      },
+      {
+        "tables": [],
+        "version": "20261105075227",
+        "policies": [],
+        "routines": [
+          {
+            "name": "cmd_issue_seyeon_zero_source_followup_reply_v1",
+            "schema": "public",
+            "overloads": [
+              {
+                "kind": "f",
+                "owner": "postgres",
+                "aclSha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+                "signature": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+                "anonExecute": false,
+                "securityDefiner": true,
+                "definitionSha256": "387cf5b04e6b2ac069173dabfe6ea85e5d75bb0f080700fb2f8d8c32ed23797a",
+                "apiExecutorExecute": false,
+                "authenticatedExecute": false
+              }
+            ]
+          }
+        ],
+        "tableIndicators": 0,
+        "policyIndicators": 0,
+        "functionIndicators": 1
+      }
+    ],
+    "observedAtUtc": "2026-11-07T15:16:53Z",
+    "schemaVersion": "ops-remote-only-current-object-metadata-v1",
+    "foundVersionCount": 41,
+    "targetVersionCount": 41,
+    "transactionReadOnly": true,
+    "liveMigrationFrontier": "20261105075227",
+    "liveMigrationLedgerCount": 241
+  },
+  "summary": {
+    "functionIndicators": 82,
+    "policyIndicators": 82,
+    "tableIndicators": 16,
+    "routineNames": 82,
+    "routineOverloads": 82,
+    "policyNames": 82,
+    "tableNames": 16,
+    "missingRoutines": 0,
+    "missingPolicies": 0,
+    "missingTables": 0,
+    "ambiguousOverloads": 0,
+    "policiesOnRlsDisabledTables": 20
+  },
+  "authorization": {
+    "transactionReadOnly": true,
+    "existingObjectMetadataOnly": true,
+    "historicalBodyEquivalenceProven": false,
+    "historicalOwnerAclEquivalenceProven": false,
+    "isolatedRestoreEquivalenceProven": false,
+    "providerHostedRestorationProven": false,
+    "serviceResumptionAllowed": false,
+    "drReady": false
+  },
+  "limitations": [
+    "Regex CREATE indicators are source-name candidates, not executed branches or a full SQL parser.",
+    "pg_get_functiondef reconstructs current definitions; its SHA-256 is not the exact original migration source checksum.",
+    "A matching name and function overload does not prove the historical signature.",
+    "Current policy expression/ACL/owner hashes do not prove isolated restore equivalence.",
+    "Policies present on RLS-disabled tables remain inert unless an independently authorized row boundary applies."
+  ]
+}
