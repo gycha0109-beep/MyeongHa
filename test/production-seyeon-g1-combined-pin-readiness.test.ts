@@ -48,7 +48,8 @@ describe('S0 positive combined G1 pre-Turn readiness',()=>{
   });
 
   it('refuses missing, multiple or malformed catalog readbacks',async()=>{
-    for(const rows of [[],[{ready:true},{ready:true}],[{ready:null}]] as any[]){
+    const malformed = [{ready:null}] as unknown as {ready:boolean}[];
+    for(const rows of [[],[{ready:true},{ready:true}],malformed]){
       const {runner}=runnerWithReadyRows(rows);
       await expect(assertSeyeonProductionCombinedPinReadinessV1(runner,subjectId))
         .rejects.toBeInstanceOf(SeyeonProductionPinMigrationRequiredV1);
