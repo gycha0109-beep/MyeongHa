@@ -1,3 +1,12 @@
+### 2026-11-08 KST — PR #3113 마이그레이션 조사 일반 CI GREEN 후 최신 main 충돌 해소 재시도
+
+- **목표:** 버전 이동 8쌍의 기존 읽기 전용 조사 증거와 운영 워크로그를 최신 main 기준으로 재조합한다.
+- **변경 파일:** `scripts/operations/production-version-shift-catalog-presence-readonly.sql`·`docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json`의 검증된 blob은 그대로 보존하고 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`의 PR 고유 기록을 main 기록에 합친다.
+- **완료:** [기존 CI #42396266740](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42396266740), Governance #42396266726, Web #42396266751은 GREEN이었다. RED 표시는 뒤이어 `main@fdefc7db38e5468794d8e85037e1691cc457c4aa`에서 같은 WORKLOG가 바뀌어 생긴 병합 충돌 및 필수 `CI Integration Verify` 미실행과 관련된다. 새 SQL 실행이나 Production 변경은 없다.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 기존 HEAD `eaf0541dd13c6fe7fe086e8ec87c9e893d0d0523`, 최신 기준 `main@fdefc7db38e5468794d8e85037e1691cc457c4aa`, [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 병합 커밋은 새로운 HEAD에서 조회한다.
+- **테스트/미완료:** 원본 객체 8함수·2테이블·3제약조건 부분적 존재 확인은 보존. 신규 HEAD의 일반 CI와 필수 통합 검증은 아직 미확정이며, 전체 DDL/ACL, Provider 복구 동등성은 증명되지 않았다.
+- **블로커/다음:** 최신 HEAD 일반 CI→필수 통합 검증→보호된 병합 확인. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 승인 필요한 운영 DB 변경·유료 복구 자원 실행 없음.
+
 ### 2026-11-08 KST — 기존 Phase 8-A 버전 이동 8쌍 PR #3113 main 변경 충돌 재정렬
 
 - **작업 목표/로드맵:** Gate 1/Phase 8-A의 과거 version-shift 8쌍 현재 권한·객체 검사 PR을 최신 main에 맞춰 **충돌 없이** 병합 가능한 형태로 고친다. 이미 확인한 Production SELECT-only 관측은 중복 실행하지 않는다.
@@ -25,6 +34,14 @@
 - **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 기준 `main@d4053b4df5d252743fc136a9ee65996f7920e0e2`; 읽기 전용 SQL·증거 JSON·기존 WORKLOG 최초 공동 커밋 `e833173a3e9501df524f7745d75caa6e28980ae3`; [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 PR의 최종 HEAD·CI 및 병합 후 증거는 확인 전 미판정.
 - **테스트·CI 근거:** 연결된 명하 Production PG17의 `pg_proc`, `pg_namespace`, `pg_class`, `pg_constraint`, `pg_policy`를 SELECT-only 질의해 함수 8/8·테이블 2/2·제약조건 3/3 및 역할 실행/직접 DML 결과 확보; 트랜잭션 read-only 확인. 기존 source version 8쌍은 sanitized 원장 자료에서 검증. 신규 커밋 CI 결과는 아직 미확인.
 - **블로커·다음 작업:** 읽기 전용 실측은 완료, 실제 full SQL/DDL/ACL/provenance 증명은 계속 필요. Production repair/DDL/DML, Hosted DR 자원, 개인정보 Canary, secret/Provider/traffic 변경은 범위별 사용자 승인 전 실행 금지. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
+### 2026-11-08 KST — Phase 8-A 운영 전체 애플리케이션 카탈로그 ↔ 격리 복원본 일치 비교 구현 (단위작업)
+
+- **기존 로드맵·착수 기준:** `PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md` Gate 1 / Phase 8-A #6 (전체 schema/function/owner/ACL/RLS·provider ledger 복구 동등성). 이전 PR #3114는 main `9740e36ed1c6c49a9eb771c0048b890aa70e0e03`로 병합됐고, 본 단위는 그 2건의 이름 조회를 반복하지 않는다. main 기준 `606691aeac168b4896f487569e4c5d6b65de6eeb`에서 시작함.
+- **실제 구현·변경 파일:** `scripts/operations/check-postgres-restored-app-schema-parity.mjs` (기존 Production 읽기 전용 fingerprint SQL의 동일 digest 알고리즘을 격리 PostgreSQL에 적용, 복원본과 차이 보고), `scripts/verify-postgres-restored-app-schema-parity.mjs` (원본/복원본 기준점 일치·DDL/RLS/ACL drift 및 frontier 불일치 검출), `.github/workflows/postgres-isolated-restore-drill.yml` (기존 복원에서 한 번 비교하고 sanitized 결과를 기존 artifact에 포함), 본 기존 ops WORKLOG. 구현 커밋 **`462da0201739933a9aa470c27379f1dad760009f`** / 브랜치 `ops/phase8-current-frontier-schema-parity-20261108`. 신규 로드맵 단계·Production 코드·migration·권한·백업 생성 없음.
+- **검증 근거:** 원래 Production baseline `POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json`의 스키마 3, `public` 테이블 94, 앱 함수 315 및 최신 원장 `20261105075227`을 참조. `node scripts/verify-postgres-restored-app-schema-parity.mjs` **PASS**, `node scripts/verify-postgres-isolated-restore-drill-workflow.mjs` **PASS**, `git diff --cached --check` **PASS**. 로컬 비교기 테스트는 fixture/기존 baseline을 사용하므로 **실제 격리 복원본과의 동등성 PASS가 아님**. 정확한 HEAD CI·새 격리 복원 결과는 아직 미확정.
+- **정직한 완료 범위:** 현재 단계에서 **복원본 측 전체 애플리케이션 구조 비교 도구와 실행 연결만 구현 완료**. SQL은 읽기 전용으로 돌며 raw DDL, 함수 본문, 고객 행, 비밀을 보고서에 출력하지 않음. 비교 성공이어도 Provider-managed migration ledger, Auth/Storage, role membership 등 소스 baseline 범위 밖 항목은 별개이며 `verifiedFullSchemaCatalogEquivalence=false`, `drReady=false`, `serviceResumptionAllowed=false` 유지.
+- **미완료·다음 작업:** 해당 코드의 필수 CI 및 병합 확인 뒤 기존 백업 #42309503582를 사용한 **단 한 번의 새 전체 애플리케이션 구조 비교 실증**을 기존 격리 복원 절차에서 수행하고 sanitized 차이 보고서를 이 WORKLOG에 기록. 그 결과에 따라 8-A의 실제 ACL/source/Provider ledger 불일치를 확정하고, 8-B Hosted Auth/Storage 전용 복구 대상·8-C 독립 개인정보 연속성·8-D 전 서비스 RPO/RTO는 계속 차단. P0 #1887 OPEN. Production migration repair/deploy, DDL/DML, 별도 Hosted target 생성, Production privacy canary, secret/traffic 변경은 명시 승인 전 시행하지 않음.
 
 ### 2026-11-08 KST — Phase 11 local workerd 실제 DB 장애/복구 시나리오 누락 구현 및 실행 경로 수정
 
