@@ -77,7 +77,7 @@ function contextAndRetrieval() {
     }, {
       messageId: 'message-recent',
       sequenceNo: 2,
-      senderType: 'assistant',
+      senderType: 'character',
       characterId: 'seyeon',
       text: '그 이야기를 계속해 봐요.',
       createdAt: '2026-11-02T00:00:00.000Z',
