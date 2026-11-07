@@ -35,6 +35,20 @@ if (migrationNumbers.length === 0) {
   throw new Error('No numbered SQL migrations found under supabase/migrations');
 }
 const repositoryMigrationFrontier = Math.max(...migrationNumbers);
+// A dated read-only repository inventory is distinct from historical
+// Production restore evidence. Compare every filename before trusting it.
+const repositoryVersionIds = migrationFiles
+  .map(name => name.match(/^(\\d+)_.*\\.sql$/u))
+  .filter(Boolean).map(match => match[1]);
+const [versionWitnessText, observedCatalogText] = await Promise.all([
+  readFile('docs/operations/POSTGRES_DR_REPOSITORY_VERSION_WITNESS_20261107.json', 'utf8'),
+  readFile('docs/operations/POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json', 'utf8'),
+]);
+const repositoryEvidence = {
+  manifest: JSON.parse(versionWitnessText),
+  observation: JSON.parse(observedCatalogText),
+  currentVersions: repositoryVersionIds,
+};
 // The September 1310 snapshot is deliberately historical and must never be
 // used as current Production authority. A dated October observation is a
 // bounded snapshot, not a live Supabase query or a serving promotion.
@@ -42,6 +56,7 @@ const currentEvidence = validateDrCurrentEvidence(
   files.readinessStatus,
   repositoryMigrationFrontier,
   process.env.GITHUB_EVENT_NAME ?? 'local',
+  repositoryEvidence,
 );
 
 function requireFragment(key, fragment) {

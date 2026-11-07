@@ -95,6 +95,41 @@ assert.throws(
   () => validateDrCurrentEvidence(status, frontier + 1, 'push'),
   /repository migration advance is not covered/u,
 );
+// A post-observation repository migration advance is only acceptable to the
+// CI authority if a newer read-only observation covers the exact filename
+// set. It never upgrades the dated restore's Hosted/DR/serving claims.
+const observedCatalog = JSON.parse(await readFile(
+  'docs/operations/POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json', 'utf8',
+));
+const versionWitness = JSON.parse(await readFile(
+  'docs/operations/POSTGRES_DR_REPOSITORY_VERSION_WITNESS_20261107.json', 'utf8',
+));
+const migrationNames = (await (await import('node:fs/promises')).readdir('supabase/migrations'))
+  .map(name => name.match(/^(\\d+)_.*\\.sql$/u))
+  .filter(Boolean).map(match => match[1]);
+const currentFrontier = Math.max(...migrationNames.map(Number));
+const documentedAdvance = { manifest: versionWitness,
+  observation: observedCatalog, currentVersions: migrationNames };
+const guardedPush = validateDrCurrentEvidence(
+  status, currentFrontier, 'push', documentedAdvance,
+);
+assert.equal(guardedPush.repositoryAdvanceWitnessMatched, true);
+assert.equal(guardedPush.repositoryCandidateBeyondObservation, true);
+assert.equal(guardedPush.drReady, false);
+assert.equal(guardedPush.serviceResumptionAllowed, false);
+for (const altered of [
+  { ...documentedAdvance, currentVersions: migrationNames.slice(1) },
+  { ...documentedAdvance, manifest: { ...versionWitness,
+      repositoryNumericMaxVersion: '99999999999999' } },
+  { ...documentedAdvance, manifest: { ...versionWitness, drReady: true } },
+  { ...documentedAdvance, observation: { ...observedCatalog,
+      source: { ...observedCatalog.source, readOnly: false } } },
+]) {
+  assert.throws(() => validateDrCurrentEvidence(
+    status, currentFrontier, 'push', altered,
+  ), /repository migration advance is not covered/u);
+}
+
 const prCandidate = validateDrCurrentEvidence(status, frontier + 1, 'pull_request');
 assert.equal(prCandidate.repositoryCandidateBeyondObservation, true);
 assert.equal(prCandidate.drReady, false);
