@@ -60,6 +60,42 @@ This confirms the isolated local workerd product path only. The artifact explici
 
 `scripts/derive-observed-scaling-review.mjs` consumes an **array of actual Phase 11 collector JSON reports** from a single controlled non-production loopback diagnostic route. It combines repeated measurements at the same concurrency level conservatively, preserving any observed non-200 or transport failures. It does **not** invent a numeric service SLO, scaling ceiling, production target or Saju/DB performance claim.
 
+
+## Phase 12 기존 실측 기반 수동 확장·축소 검토 절차 (종료 기준 #3–4)
+
+이 절차는 ROADMAP Gate 3 / Phase 12의 수동 판단·조치 요구사항을 기존 관측에 연결한다. **새 Production 수치 임계치, 자동 확장 또는 용량 승인은 아니다.** Phase 11의 격리 제품 경로와 Production Worker/Hosted Hyperdrive는 별도의 대상이므로 기록된 4/8 동시성 수치를 운영 한도로 복사하지 않는다.
+
+### 사용 가능한 실측 범위 및 판단 입력
+
+| 증거 | 확인 가능한 경계 | 운영 판단으로 승격할 수 없는 것 |
+|---|---|---|
+| 격리 900초 4-way workerd [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347) | 3,600/3,600 성공, 동시 4개 요청, p95 174.231ms·p99 184.088ms, Saju 장애/복구 및 정리 성공 | Production API 처리량·Hosted DB pool 한계·상시 최소 자원 |
+| DB pool=2 및 80ms SQL fixture의 짧은 부하 비교 | 동시 4는 성공 범위, 동시 8에서는 DB acquisition 실패·503 관측; 격리 4-way acquisition p95 83.171ms | 특정 운영 동시성에서 반드시 실패한다는 임계치 |
+| 동일 이미지의 Saju CPU 0.50 대 0.01 비교 | 낮은 quota에서 throttle 364회, Saju adapter p95 2.939→582.129ms 증가, DB acquisition 실패 0; 압력 해제 후 복구 | 운영 CPU 확장 기준, 비용 대비 적정 인스턴스 크기 |
+| 별도 127.0.0.1 Health-only 비교 | 동시 1·2·4·8 모두 100/100 성공, diagnostic-only | 사용자 제품 경로의 확장 여유 또는 축소 근거 |
+
+수동 검토에 필요한 최소 입력은 **같은 배포 버전·같은 환경·같은 시험 구간**의 요청수/성공수/503/transport/skipped, 애플리케이션 p50/p95/p99, DB 연결 점유·획득 지연·획득 실패·쿼리 시간, Saju adapter 지연·CPU throttle·메모리/OOM, Auth 지연, 오류 이후 회복 시간, 해당 자원 비용이다. 정보가 누락되면 숫자를 보충해 꾸미지 않고 판단을 보류한다.
+
+### 수동 판단 및 조치
+
+| 실제 관찰 신호 | 먼저 확인할 원인·경계 | 허용된 다음 대응 |
+|---|---|---|
+| DB 획득 실패 또는 pool 포화와 함께 503 발생 | 같은 구간의 연결 점유/획득 대기·쿼리 시간과 재시도 횟수, Saju 자원 압력 분리 | 동시성 추가 확대 중단 → 느린 쿼리/인덱스·연결 누수·pool budget 먼저 조사 → 권위가 허용한 연결 설정 검토. Production 변경에는 별도 승인 |
+| DB 획득 오류 없이 Saju CPU throttle 및 adapter p95 증가 | 같은 이미지/요청 종류와 CPU quota, OOM·메모리, Saju 외 의존성 비교 | Saju 자원 압력으로 분류하고 기존 분리·bounded-fail 경계 유지 → 수동 CPU/메모리 sizing 검토. 운영 리소스 수정은 별도 승인 |
+| DB와 Saju 지표가 동시에 나빠지거나 요청 회계가 불완전 | 원인 분리 불가·누락된 실패/성공/건너뜀 여부 | 자동 확장/축소 및 특정 의존성의 원인 단정 **보류**. 먼저 유효한 관측 자료와 장애 복구 경계 확보 |
+| 낮은 사용량 또는 Health만 정상 | 실제 인증 제품 경로의 실패율·p95/p99·DB pool 회복 여유·Saju CPU/메모리·비용과 복원 후보 | 해당 조건이 장기간 확인되더라도 즉시 축소하지 않고 최소 복구 여유·실제 제품 경로 호환성·롤백 대상을 먼저 검토; 운영 축소는 승인 전 금지 |
+
+수동 작업 순서는 **① 동일 배포 SHA와 실측 구간 고정 → ② DB/Auth/Saju 지표와 실패 분모 대조 → ③ 원인·용량·비용 및 복구 여유 판단 → ④ 변경 대상과 되돌릴 정확한 버전 확인 → ⑤ 사용자 승인 범위 내에서만 운영 변경 → ⑥ 해당 변경으로 영향을 받은 제품 경로만 재검증 → ⑦ 결과·대응 기록**이다. 장애 상태에서 이미 성공한 900초 시험을 관성적으로 재실행하지 않는다.
+
+### 관찰 구간·지속 조건·회복 여유의 결정 경계
+
+- 격리 제품 경로의 기존 **900초 / 4req/s** 관측과 별도 **60초 CPU 비교**는 실험에 묶인 실제 구간이다. 이를 Production 지속시간·알림 반복 횟수·롤링 구간으로 임의 채택하지 않는다.
+- Production 확장·축소 결정에 필요한 관찰 구간, 지속 조건, 허용 실패율, p95/p99 및 회복 여유의 **승인된 숫자는 아직 없다**. 수치를 공란/TBD로 유지하며 실제 Production 서비스 계측 및 사용자 결정 없이 시행하지 않는다.
+- 격리 DB failover [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024)의 503 4/4, Health 200, 재개 후 4/4 성공은 복구 방식의 경계에만 활용한다. 측정 p95 175.559ms를 Production RTO·확장 임계치로 바꾸지 않는다.
+- 성공적인 수동 변경에도 Production DB/Worker/Saju 상호 의존성이 악화되거나 미승인 자원 사용이 발생하면 변경을 멈추고 기존 승인된 롤백 후보·복구 절차로만 대응한다. 승인되지 않은 후보를 임의 선택하지 않는다.
+
+**Phase 12 범위 판정:** 실측 기반 원인 분리 신호와 **수동 조치 순서**는 문서화했지만, 운영 수치·관찰 구간·비용/회복 여유에 대한 승인 전에는 Phase 12 종료 조건을 충족하지 않는다. automaticScalingEnabled=false, productionCapacityProven=false, numericalProductionScalingThresholdApproved=false 유지.
+
 ## Execute
 
 Collect reports using the already implemented Phase 11 collector, save their JSON output to a local-only file as an array (measure at distinct concurrency values; e.g. 1, 2, 4, 8), then run:
