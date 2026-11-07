@@ -93,3 +93,14 @@
 - **미완료:** PR #3125 TypeScript·테스트·웹 브라우저·Governance 및 필수 통합 CI 통과, 실제 병합 증거. Stage 5의 남은 법무/개인정보/환불 탐색과 운영 경로·실사용 E2E는 별도 차단/검증 조건 확인 필요.
 - **블로커·승인:** 추가 사용자 승인 없음. 필수 CI 완료는 PR 병합 선행 조건.
 - **다음 작업:** PR #3125의 최신 CI 결과 확인, 실패 시 이 링크 단위만 수정; 전부 Green이면 기존 방식으로 통합 검증 제출 및 병합 확인 후 Stage 5 다음 미완료 항목 파악.
+
+### 2026-11-08 검증 체크포인트 — 고객지원 링크 (#3125)
+
+- **검증한 작업:** 대화 허브 `고객지원` → 실제 `contact.html` 이동, 문의 양식 존재를 보호하는 회귀 테스트. 기존 브랜치 `fix/frontend-integration/support-footer-stage5-current-main-20261108`, PR [#3125](https://github.com/gycha0109-beep/MyeongHa/pull/3125).
+- **실제 변경 파일·코드 커밋:** `apps/web/chat-hub.html` (`44802d31dc07f4652cee820604923c57ebd1ad78`), `test/web-product-clarity.test.ts` (`d84d61601473651a190ccec33d85a59c12d70e92`), 이 WORKLOG.
+- **검증 결과 (검증 대상 코드 HEAD `306650c2424dc56397c03c853a73d9bcb7bfa99f`):** [CI #42403340452](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42403340452) **PASS** (`Work Track · frontend-integration` 및 `CI Verify` success); [Web PR Domain Gates #42403340435](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42403340435) **PASS** (`Web PR Verify` success); [Governance #42403340490](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42403340490) **PASS**. 선택되지 않은 DB 검증은 skipped였으며 이를 성공 실행으로 기록하지 않음.
+- **완료:** 위 코드 HEAD의 타입/영향 테스트·웹 브라우저·Governance CI 성공 확인, 고객지원 링크 수정 및 회귀 테스트 커밋.
+- **미완료:** 이 기록 커밋으로 갱신되는 **최종 PR HEAD**의 체크 결과와 필수 `CI Integration Verify` 성공 및 병합 확인. Stage 5의 나머지 법무/개인정보/환불 공개 경로·실사용 E2E는 별도 미완료이며 본 PR 범위에서 임의 공개하지 않음.
+- **블로커/승인:** 사용자 승인 필요 없음. 기존 필수 통합 검증 절차 대기.
+- **다음 작업:** 최종 HEAD에서 선행 CI 성공 확인 → 기존 `ci-integration-ready` 절차로 통합 검증 제출 → 성공 시 자동 병합 확인; 실패 시 같은 링크 단위만 보정. 병합 성공 후 로드맵의 다음 미완료 항목 확인.
+
