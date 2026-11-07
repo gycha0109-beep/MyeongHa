@@ -63,7 +63,7 @@ describe('S0 positive combined G1 pre-Turn readiness',()=>{
     expect(source).toContain(
       'revoke all on function public.cmd_pin_seyeon_positive_model_context_sources_v1(');
     expect(source).toContain('from public,anon,authenticated,service_role,myeongha_api_executor;');
-    expect(source).not.toMatch(/grant\\s+execute\\s+on\\s+function\\s+public\\.cmd_pin_seyeon_positive_model_context_sources_v1/iu);
+    expect(source).not.toMatch(/grant\s+execute\s+on\s+function\s+public\.cmd_pin_seyeon_positive_model_context_sources_v1/iu);
     expect(adapter).toContain(
       'select public.cmd_pin_seyeon_positive_model_context_sources_v1(');
     expect(adapter).not.toContain(
