@@ -43,3 +43,11 @@
 - **검증:** 변경된 테스트 파일을 GitHub 원격 브랜치에서 재읽어 실제 호출 경로와 일치하는 정규식 확인. 새 SHA의 GitHub Actions는 재실행 중이며 **성공 확인 전까지 미완료**.
 - **남은 과제:** 최종 HEAD CI·필수 통합 CI 통과, 병합, 새 `main`의 Production 예약 원장 실행 성공 검증.
 - **다음 작업:** 최신 검증에서 같은 오류가 해소됐는지 확인 후 필수 Integration 제출; 실패하면 같은 PR의 해당 원인만 수정. 성공한 PR CI를 Production 원장 성공으로 간주하지 않음.
+
+### CI 수정본 통과 증거 (2026-11-08)
+
+- **확인한 코드·테스트 HEAD:** `39dcef861cef96eadf8d614ab72d886efa0c55c0`. 수정된 소스: `.github/workflows/production-postgres-privacy-recovery-ledger.yml`, `scripts/operations/select-privacy-ledger-predecessor.mjs`, `test/ops/production-privacy-ledger-predecessor.test.mjs` 및 본 WORKLOG. 테스트 호출 경로 수정 커밋 `7368b9538df0f24dd82f67ab601e28d653cdef68`.
+- **실제 성공 결과:** [CI #42405545477](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405545477) **SUCCESS** (`Work Track · ops` 및 `CI Verify` 성공; DB dependency는 스코프에 따라 skipped); [Web PR Domain Gates #42405545465](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405545465) **SUCCESS**; [Governance #42405545569](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405545569) **SUCCESS**. 이 세 실행은 모두 같은 HEAD의 `pull_request` 검사로 확인됨.
+- **본 기록의 범위:** 성공은 위 SHA의 코드·테스트·PR 기본 검사까지만 증명. 이 WORKLOG 기록 커밋으로 새 HEAD가 생성되므로 새 SHA의 체크와 필수 Integration 완료는 추가 확인해야 함. 실제 Production `schedule` 개인정보 원장 실행의 성공 및 보관/연속성은 별도 근거 전까지 **미완료**.
+- **다음 작업:** 새 HEAD 일반 CI 성공 확인 → 기존 `ci-integration-ready` 제출 → Integration 성공과 PR 자동 병합 확인 → 새 `main` 기준 예약 원장 워크플로 실행/보관 검증. 실패하면 이번 단위에서만 수정.
+- **블로커/승인:** 추가 사용자 승인 필요 없음. Production SQL/DDL·보관 정책·암호화 및 검증 우회 없음.
