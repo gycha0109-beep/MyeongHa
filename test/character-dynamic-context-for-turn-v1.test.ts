@@ -56,7 +56,7 @@ function input(): PrepareCharacterDynamicContextForTurnInputV1<SyntheticRequest>
       readRecentMessages: vi.fn(async () => [{
         messageId: 'user-message-a',
         sequenceNo: 1,
-        senderType: 'user',
+        senderType: 'user' as const,
         characterId: null,
         text: '지난번 퇴사 고민 기억하세요?',
         createdAt: '2026-11-07T00:00:00.000Z',

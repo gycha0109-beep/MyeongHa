@@ -33,9 +33,15 @@ The result carries the exact serialized private request body and segments for se
 
 No Provider dispatch, Cost Governor reservation, persistence, grant mutation, relationship mutation or production activation occurs here. The implementation is deliberately marked \`offline_preflight_only\`.
 
+## Server-side offline retrieval integration
+
+`prepareCharacterDynamicContextForTurnV1` is a server-only orchestration wrapper that invokes the existing Capability Gate and permission-first Subject/Character/thread retrieval before feeding selected source records and redacted context metadata into the offline composer. The exact current User message comes from the authoritative thread read, not a client-supplied query. A rejected entitlement prevents all Memory/relationship/dialogue reads and prevents the exact request builder and token counter from running.
+
+This wrapper preserves the existing same-transaction Subject-bound read-port contract and does not register a Provider, dispatch an inference request, reserve cost or activate a Character. It is an offline interface, not a public API route.
+
 ## Fixture verification
 
-Synthetic token counters and synthetic Character/Memory sources cover deterministic pressure decisions, protected-layer preservation, selected-memory record/grant provenance, one exact UTF-8 request, missing token count, over-budget mandatory layers, cross-Subject mismatch, source reference collision and trace redaction.
+Synthetic token counters and synthetic Character/Memory sources cover deterministic pressure decisions, protected-layer preservation, selected-memory record/grant provenance, one exact UTF-8 request, missing token count, over-budget mandatory layers, cross-Subject mismatch, source reference collision and trace redaction. The server orchestration fixture also verifies permission-first retrieval, exact current-turn assembly and denial before any read/count/serialization.
 
 ## Holds
 

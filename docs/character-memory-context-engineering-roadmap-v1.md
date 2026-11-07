@@ -208,6 +208,8 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 **Offline test coverage:** deterministic order and redacted trace, mandatory-layer survival, exact UTF-8 body accounting, selected-memory provenance, budget failure on an oversized mandatory core, scope mismatch, unknown token count and duplicate source denial.
 
+**Additional implemented server-side offline boundary:** `apps/api/src/character-dynamic-context-for-turn-v1.ts` composes the existing permission-first Subject/Character/thread retrieval with the exact-count context composer. A denied Capability Gate blocks all source reads and model-request serialization. Synthetic offline integration tests cover successful source-bound assembly and entitlement denial before reads/counting. No public route or Provider is enabled.
+
 **Remaining Phase 4 work:** wire trusted source/category admission to the runtime, include the remaining source-authorized context layers, connect the exact serialized request to the actual approved Provider dispatch path after O-C1-07, and verify Production Cost Governor/Output Guard parity. This offline foundation alone does not satisfy Phase 4 exit conditions.
 
 **Exit criteria:**
