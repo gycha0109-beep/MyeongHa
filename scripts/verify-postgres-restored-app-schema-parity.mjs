@@ -27,6 +27,10 @@ const matched = compareApplicationCatalog(source, restored, frontier);
 assert.equal(matched.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
 assert.equal(matched.verifiedApplicationScopeEquivalence, true);
 assert.equal(matched.verifiedFullSchemaCatalogEquivalence, false);
+assert.equal(matched.sourceCatalogBoundToBackupSnapshot, false);
+assert.equal(matched.restoreMismatchRootCauseProven, false);
+assert.equal(matched.sourceCatalogProvenanceHold,
+  'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS');
 assert.equal(matched.drReady, false);
 assert.equal(matched.serviceResumptionAllowed, false);
 assert.equal(matched.types.schemas.matchingCount, 3);
@@ -45,6 +49,8 @@ assert.ok(rejected.types.functions.missing.length === 1);
 assert.ok(rejected.types.tables.changed.length === 1);
 assert.ok(rejected.types.schemas.changed.length === 1);
 assert.equal(rejected.drReady, false);
+assert.equal(rejected.sourceCatalogBoundToBackupSnapshot, false);
+assert.equal(rejected.restoreMismatchRootCauseProven, false);
 assert.equal(compareApplicationCatalog(source, restored, '20261105075228')
   .applicationScopeVerdict, 'HOLD_SOURCE_BACKUP_FRONTIER_MISMATCH');
 console.log('Phase 8-A application/restore parity comparison verification PASS; no live DR claim.');
