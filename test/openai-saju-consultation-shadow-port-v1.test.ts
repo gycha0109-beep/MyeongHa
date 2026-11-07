@@ -3,6 +3,7 @@ import {
   createOpenAiSajuConsultationShadowPortV1,
   OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
   type OpenAiSajuConsultationShadowFetchV1,
+  type OpenAiSajuConsultationShadowOutcomeV1,
 } from '../apps/api/src/openai-saju-consultation-shadow-port-v1.js';
 import {
   CHARACTER_SAJU_SP2_CANDIDATE_SCHEMA_VERSION_V1,
@@ -60,7 +61,7 @@ function responseJson(output: unknown): Response {
 
 function fixture(fetchImpl: OpenAiSajuConsultationShadowFetchV1) {
   const beforeDispatch = vi.fn(async () => undefined);
-  const afterOutcome = vi.fn(async () => undefined);
+  const afterOutcome = vi.fn(async (_receipt: OpenAiSajuConsultationShadowOutcomeV1) => undefined);
   const port = createOpenAiSajuConsultationShadowPortV1({
     apiKey: 'offline-test-secret',
     generationModel: 'test-generation-model',
@@ -148,7 +149,7 @@ describe('OpenAI Saju consultation shadow transport (offline, never user-visible
       async () => responseJson(CANDIDATE),
     );
     const beforeDispatch = vi.fn(async () => { throw new Error('no budget'); });
-    const afterOutcome = vi.fn(async () => undefined);
+    const afterOutcome = vi.fn(async (_receipt: OpenAiSajuConsultationShadowOutcomeV1) => undefined);
     const port = createOpenAiSajuConsultationShadowPortV1({
       apiKey: 'offline-test-secret',
       generationModel: 'test-generation-model',
