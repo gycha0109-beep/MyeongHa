@@ -116,3 +116,14 @@
 - **승인 사항:** 이번 오작동 링크 제거에 별도 승인 불필요. **정식 법무·개인정보처리방침 대외 공개는 승인 전 중단**.
 
 Watchtower-Track: frontend-integration
+
+
+### 2026-11-08 / PR #3136 — Web PR Verify 다국어 화면 실패 수정
+
+- **대상 트랙과 원인:** 프론트 Stage 5 기존 미승인 정책 링크 정리 PR [#3136](https://github.com/gycha0109-beep/MyeongHa/pull/3136), 기존 코드 HEAD `4dbbfada13dd60dafbe29ad86e5835495f732b83`에서 [Web PR Domain Gates #42412817874](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42412817874) / [Web PR Verify Job #128524407858](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42412817874/job/128524407858) **FAIL**. 브라우저 `scripts/verify-web-static-ui-i18n-browser.mjs`의 일본어(`ja-JP`), 번체 중국어(`zh-TW`), 영어(`en-US`), 간체 중국어(`zh-CN`)에서 대화 허브 푸터의 신규 `서비스 안내 (준비 중)`, `이용약관 (공개 준비 중)`, `개인정보처리방침 (공개 준비 중)` 3개씩이 한국어로 남음. 빌드 및 별도 모바일 화면 렌더 검증은 통과; 이번 실패는 승인되지 않은 정적 안내 문구의 번역 누락에 한정.
+- **수정 파일·커밋:** `apps/web/ui-i18n.js` 기존 `registerStaticCopy`에 각 정책/준비 안내의 **4개 언어 전체 고정 번역**을 등록한 커밋 `5d4cbba1bf3e1162fd0704ddb7b5987c0daa1cb9`. `test/web-product-clarity.test.ts`에서 신규 3개 문구가 모두 4개 언어 등록을 유지하는지 확인하는 회귀 검사를 추가한 커밋 `419025254e561bc2a58736ae0c0111dd1a98b2de`. 본 `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md`만 기록 추가. 기존 `contact.html` 실제 지원 링크, 출시 차단된 유료/법률/개인정보 정책, 콘텐츠 의미나 외부 공개 상태는 변경하지 않음.
+- **검증 결과:** Web PR 실패 로그에서 실제 미번역 요소 12개(3개 × 4개 언어)를 확인했고, 기존 번역기가 한국어 텍스트 원문 전체가 사전에 등록돼야 변환하는 `repaintText` 경로임을 코드로 확인. 브랜치 실제 사전에 3개 한국어 원문 × 4개 지원 locale 등록 및 단위 검증을 추가함. **신규 HEAD의 Web PR Verify·일반 CI·Governance 및 필수 통합 CI는 검사 종료 전까지 미확정**; 과거 실패 또는 다른 SHA의 성공을 최종 통과로 주장하지 않음.
+- **남은 과제/다음 작업:** 같은 [PR #3136 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3136/checks)에서 수정 코드의 다국어 실브라우저 PASS, 일반 CI 및 Governance PASS를 확인한다. 통과하면 기존 `ci-integration-ready` 절차로 필수 통합 CI 수행 후 자동 병합 확인. 독립적인 약관·개인정보정책 공개 승인 및 Stage 2~4 제품/결제/관상 게이트는 그대로 미완료.
+- **블로커/승인:** 번역 오류 수정에는 추가 승인 필요 없음. 미승인 법정 정책의 대외 공개는 실시하지 않음.
+
+Watchtower-Track: frontend-integration
