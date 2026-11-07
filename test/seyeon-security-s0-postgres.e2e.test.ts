@@ -304,11 +304,10 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
     });
     const committed = await f.commit();
     expect(committed.replayed).toBe(false);
-    const response = await f.locked()({
+    await f.locked()({
       signal: new AbortController().signal,
       deliver: async text => { expect(text).toContain('합성으로 승인된 첫 개인 기억'); },
     });
-    expect(response).toBeDefined();
     const {rows:[acl]}=await pool.query(`select
       not has_function_privilege('myeongha_api_executor',
         'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)','EXECUTE')
