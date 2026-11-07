@@ -336,6 +336,12 @@ export function createProductionSeyeonChatRuntimeV1(
   // Never initialize a Production Provider/DB runtime with a positive
   // Projector while G0/G1/SRC-25 and atomic Commit are unapproved.
   assertSeyeonPositiveProjectorsNotEnabledV1();
+  // OFF must reject an injected cost Governor before a Subject pool or
+  // Provider is created, even when the Provider bundle is resolved post-Pin.
+  if (input.governorMode !== 'ENFORCE' &&
+      input.costGovernorForRole !== undefined) {
+    throw new Error('OFF refuses an active cost Governor without ENFORCE cost DB authority.');
+  }
   if (input.approvedPersonalRecordModelUse !== undefined &&
       input.governorMode !== 'ENFORCE') {
     throw new Error('Positive Memory requires the enforced server cost Governor.');
