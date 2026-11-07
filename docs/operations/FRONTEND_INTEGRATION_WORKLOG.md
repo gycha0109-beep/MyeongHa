@@ -63,3 +63,20 @@
 - **다음:** 기존 Stage 5의 실브라우저 라이트·다크/모바일 대비 및 레이아웃 점검으로 이어가되, 현재 PR CI 결과부터 확인.
 - **승인 대기:** 없음. 신규 상품·기능·의미 권한 변경 없음.
 
+## 2026-11-08 — 좁은 모바일 화면 읽기·탐색 가독성 (Stage 5)
+
+- **목표/기존 작업:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5의 반응형 화면, 라이트·다크 대비·접근성 점검 중 다음 미완료 단위. 기존 승인된 디자인 및 화면 기능 그대로 유지.
+- **선행 확인:** 직전 가독성 PR [#3116](https://github.com/gycha0109-beep/MyeongHa/pull/3116)은 2026-11-08 KST 병합 확인. 같은 HEAD `6cdd3e2e`에서 [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/3116/checks)의 Governance, CI, Web PR Domain Gates 모두 success. 필수 [Integration #42392030772](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42392030772)도 success (실제 병합 완료로 직전 단위 종료).
+- **변경 파일:**
+  - `apps/web/shared-product-header.css`: 350px 이하 공통 헤더의 좌우 폭 확보. 기존 헤더 높이/배색/메뉴 수는 변경 없음.
+  - `apps/web/product-clarity.css`: 대화 허브의 기다림 안내문을 최소 14px 가독성으로 조정.
+  - `scripts/verify-web-browser-render.mjs`: 기존 390px 모바일 렌더 검증에 320px 실제 Chrome 뷰포트 5개 메뉴 화면의 브랜드/유틸리티 겹침, 하단 6개 메뉴, 수평 오버플로, 대화 안내 문구 글씨 크기 확인 추가.
+- **브랜치:** `fix/frontend-integration/mobile-readability-stage5-20261108`
+- **코드 커밋:** `7c6ff383b39e2ddf88967320062c3210763c0d3b`, `eb1131f4e1f21178bcf1d091611f8a07a407fbea`, `784b6feef4ef97ab2cb92437d692b334f0de31c2`.
+- **PR:** [#3121](https://github.com/gycha0109-beep/MyeongHa/pull/3121) (`frontend-integration`).
+- **코드 검사:** 변경 파일과 GitHub PR diff를 확인함. 320px 검증의 성공·실패, 실제 브라우저 결과 및 CI 통과는 **PR CI 종료 전까지 미확정**. 단순 CSS 수정만으로 전체 WCAG 준수나 모든 모바일 화면 검증 완료를 주장하지 않음.
+- **완료:** 320px 헤더 여백·대화 안내문 개선 구현 및 320px 모바일 다섯 화면의 실브라우저 회귀 경로 추가, 소스 커밋.
+- **미완료:** [PR 체크](https://github.com/gycha0109-beep/MyeongHa/pull/3121/checks)의 테스트·CI·필수 Integration 통과와 병합 확인, Stage 5 다른 항목(네트워크/세션 만료/기능 E2E/법적 안내 등).
+- **블로커·승인:** 추가 사용자 승인 없음. CI 결과가 본 단위 종료의 선행 조건.
+- **다음 작업:** 현재 PR 검증에서 실패가 발생하면 해당 모바일 가독성 단위만 보정, 통과 시 기존 로드맵 Stage 5의 다음 미완료 검증으로 이동.
+
