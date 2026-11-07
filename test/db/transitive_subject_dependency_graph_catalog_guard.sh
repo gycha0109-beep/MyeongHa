@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-inventory_path="docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_V1.json"
+inventory_path="docs/operations/TRANSITIVE_SUBJECT_DEPENDENCY_GRAPH_CURRENT_MIGRATED_V1.json"
 
 expected="$(
   node --input-type=module - "$inventory_path" <<'NODE'
@@ -116,8 +116,8 @@ order by
 SQL
 )"
 
-# The inventory is pinned to the current migrated schema; new tables must be classified before updating. New signup
-# wallet edges are separately governed DELETE, never retained Commerce evidence.
+# This current-migration graph is separate from the immutable 2026-09-19 approved baseline.
+# Require exact FK parity; wallet edges remain separately governed DELETE, not financial evidence.
 wallet_edges="$(printf '%s\n' "$actual" | awk -F '|' '$3 ~ /^chat_credit_/ { print }' | sort)"
 expected_wallet_edges="$(printf '%s\n' \
   '1|subjects|chat_credit_lots_v1|chat_credit_lots_v1_subject_id_fkey|subject_id|id' \
@@ -144,7 +144,7 @@ direct_count="$(printf '%s\n' "$actual" | awk -F '|' '$1 == "1" { count += 1 } E
 max_depth="$(printf '%s\n' "$actual" | awk -F '|' 'BEGIN { max = 0 } $1 + 0 > max { max = $1 + 0 } END { print max }')"
 
 [[ "$edge_count" == "149" ]] || {
-  echo "Expected exactly 140 current reachable FK edges, found $edge_count." >&2
+  echo "Expected exactly 149 current reachable FK edges, found $edge_count." >&2
   exit 1
 }
 

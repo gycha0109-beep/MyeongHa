@@ -1161,7 +1161,11 @@ declare
   v_policy_version text;
   v_db_finalized_at timestamptz;
   v_ready boolean;
-  v_reader_protected_count bigint;
+  v_reader_protected_count bigint := 0;
+  -- The 2320 Reader claim migration is staged and absent from historical CI.
+  -- Never assume its personal-data table exists in an older migration frontier.
+  v_claim_table_present boolean := pg_catalog.to_regclass('public.digital_reading_withdrawal_claims_private_v1') is not null;
+  v_reader_bodies_table_present boolean := pg_catalog.to_regclass('public.official_reader_paid_answer_bodies') is not null;
   v_reader_external_fence_id text;
   v_now timestamptz := clock_timestamp();
 begin
@@ -1207,13 +1211,19 @@ begin
   end if;
 
   -- Restored personal claim after account deletion is a privacy replay failure.
-  if v_status='deleted' and (
-    exists(select 1 from public.digital_reading_withdrawal_claims_private_v1 c where c.subject_id=p_subject_id)
-    or exists(select 1 from public.commerce_saju_records_v1 r where r.subject_id=p_subject_id)
-    or exists(select 1 from public.commerce_saju_purchase_origins_v1 o where o.subject_id=p_subject_id)
-  ) then
-    raise exception 'Withdrawal claim resurrected after account deletion'
-      using errcode='23514';
+  -- The separately staged claim table may be absent in historical CI schemas.
+  if v_status='deleted' then
+    if v_claim_table_present then
+      if exists(select 1 from public.digital_reading_withdrawal_claims_private_v1 c where c.subject_id=p_subject_id) then
+        raise exception 'Withdrawal claim resurrected after account deletion'
+          using errcode='23514';
+      end if;
+    end if;
+    if exists(select 1 from public.commerce_saju_records_v1 r where r.subject_id=p_subject_id)
+      or exists(select 1 from public.commerce_saju_purchase_origins_v1 o where o.subject_id=p_subject_id) then
+      raise exception 'Saju Record mapping resurrected after account deletion'
+        using errcode='23514';
+    end if;
   end if;
 
   if v_status = 'deleted' then
@@ -1340,9 +1350,11 @@ begin
   -- Thread or official Reading parent. A cascading FK is NOT a substitute:
   -- keep this graph edge explicit and inside the existing claimed lease TX.
   -- This does not claim backup/KMS key purge or external Privacy Ledger ACK.
-  select pg_catalog.count(*) into v_reader_protected_count
-  from public.official_reader_paid_answer_bodies b
-  where b.subject_id=p_subject_id;
+  if v_reader_bodies_table_present then
+    select pg_catalog.count(*) into v_reader_protected_count
+    from public.official_reader_paid_answer_bodies b
+    where b.subject_id=p_subject_id;
+  end if;
 
   if v_reader_protected_count>0 then
     v_reader_external_fence_id :=
@@ -1390,16 +1402,18 @@ begin
     end if;
   end if;
 
-  delete from public.official_reader_paid_answer_bodies b
-  where b.subject_id = p_subject_id;
+  if v_reader_bodies_table_present then
+    delete from public.official_reader_paid_answer_bodies b
+    where b.subject_id = p_subject_id;
 
-  if exists (
-    select 1 from public.official_reader_paid_answer_bodies b
-    where b.subject_id = p_subject_id
-  ) then
-    raise exception using errcode = '23514',
-      constraint = 'account_deletion_finalizer_protected_reader_child_remaining',
-      message = 'Protected Reader content must be physically removed before parent deletion';
+    if exists (
+      select 1 from public.official_reader_paid_answer_bodies b
+      where b.subject_id = p_subject_id
+    ) then
+      raise exception using errcode = '23514',
+        constraint = 'account_deletion_finalizer_protected_reader_child_remaining',
+        message = 'Protected Reader content must be physically removed before parent deletion';
+    end if;
   end if;
 
   -- Delete approved DELETE-class rows in FK-safe child-before-parent order.
@@ -1407,8 +1421,10 @@ begin
   -- evidence plus personal Birth/Reading rows, so remove every Reader-access child before
   -- official Reading provenance and the underlying Reading/Birth rows.
   -- P0-PR-01 DELETE of service claim before official Reading cleanup.
-  delete from public.digital_reading_withdrawal_claims_private_v1
-    where subject_id=p_subject_id;
+  if v_claim_table_present then
+    delete from public.digital_reading_withdrawal_claims_private_v1
+      where subject_id=p_subject_id;
+  end if;
 
   delete from public.standard_reading_reader_access_grants where subject_id = p_subject_id;
   delete from public.standard_reading_reader_interpretations where subject_id = p_subject_id;
@@ -1553,12 +1569,14 @@ begin
   where id = p_deletion_job_id
     and subject_id = p_subject_id;
 
-  if exists(
-    select 1 from public.digital_reading_withdrawal_claims_private_v1 c
-    where c.subject_id=p_subject_id
-  ) then
-    raise exception 'Withdrawal claim remains after account finalization'
-      using errcode='23514';
+  if v_claim_table_present then
+    if exists(
+      select 1 from public.digital_reading_withdrawal_claims_private_v1 c
+      where c.subject_id=p_subject_id
+    ) then
+      raise exception 'Withdrawal claim remains after account finalization'
+        using errcode='23514';
+    end if;
   end if;
 
   -- Subject is the retained anonymized tombstone required by retained Commerce FKs.
