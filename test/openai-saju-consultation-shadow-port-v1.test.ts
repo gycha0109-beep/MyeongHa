@@ -149,7 +149,7 @@ describe('OpenAI Saju consultation shadow transport (offline, never user-visible
     const reserve = vi.fn(async ({ callId }: { readonly callId: string }) => ({
       reservationRef: 'budget-' + callId,
     }));
-    const settle = vi.fn(async () => undefined);
+    const settle = vi.fn(async (_receipt: unknown) => undefined);
     const budget = createReaderSajuConsultationBudgetGateV1({
       evaluationId: 'offline-approval-probe-1',
       officialReadingRef: 'official-reading-1',
