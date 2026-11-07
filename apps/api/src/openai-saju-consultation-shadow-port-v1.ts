@@ -26,6 +26,8 @@ export interface OpenAiSajuConsultationShadowDispatchV1 {
   readonly purpose: Purpose;
   readonly modelKey: string;
   readonly requestBytes: number;
+  /** Maximum total output tokens submitted to the provider. */
+  readonly maxOutputTokens: number;
 }
 
 export interface OpenAiSajuConsultationShadowOutcomeV1
@@ -188,6 +190,7 @@ export function createOpenAiSajuConsultationShadowPortV1(
     if (requestBytes > MAX_REQUEST_BYTES) throw new TypeError('Consultation request is too large.');
     const metadata = Object.freeze({
       callId, purpose: input.purpose, modelKey: input.modelKey, requestBytes,
+      maxOutputTokens: input.purpose === 'consultation_generate' ? 1600 : 900,
     });
     // A failed or missing server budget check must never dispatch model traffic.
     await config.beforeDispatch(metadata);
