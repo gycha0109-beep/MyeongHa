@@ -5,6 +5,11 @@ const sql=readFileSync('test/db/commerce_verified_reader_claim_cancel_effect_pg1
 const shell=readFileSync('test/db/commerce_verified_reader_claim_cancel_effect_pg17.sh','utf8');
 const matrix=JSON.parse(readFileSync('scripts/ci/db-suites.json','utf8'));
 const ci=readFileSync('test/db/run_ci_case.sh','utf8');
+const confirmer=readFileSync(
+ 'supabase/migrations/2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql',
+ 'utf8',
+);
+const e2eIndex=(source,needle)=>source.indexOf(needle);
 
 describe('exact paid Reader Claim -> owner decision -> refund progress real PG17 contract',()=>{
  it('runs ONLY in disposable migrated PostgreSQL17 and rolls back all hypothetical decisions',()=>{
@@ -37,6 +42,32 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   expect(sql).toContain('CLAIM_E2E_MANUAL_DECISION_NOT_REFLECTED_WITH_IMMUTABLE_CLAIM');
   expect(sql).toContain('CLAIM_E2E_REFUND_RESERVATION_STATUS_NOT_VISIBLE');
   expect(sql).toContain('CLAIM_E2E_SUBMITTED_REQUEST_WRONGLY_CLAIMED_CONFIRMED');
+ });
+ it('pins refund confirmation to the exact original full cancellation GET and Receipt',()=>{
+  expect(confirmer).toContain('create or replace function public.internal_confirm_reader_full_refund_dispatch_v1(');
+  for(const check of [
+    "pe.resolved_receipt_id=cr.id","pe.resolved_subject_id=cr.subject_id",
+    "pe.resolution_source_type='receipt'",
+    "pe.event_type='Transaction.Cancelled'",
+    "pe.environment='production'",
+    "pe.verified_payload_jsonb->>'schemaVersion'=",
+    "portone-full-cancel-verified-v1",
+    "pe.verified_payload_jsonb->>'paymentId'",
+    "pe.verified_payload_jsonb->>'verifiedAmountMinor'",
+    "pe.verified_payload_jsonb->>'verifiedCurrency'",
+    "pe.verified_payload_jsonb->>'cancellationId'",
+    "pe.verified_payload_jsonb->>'evidenceFingerprint'",
+    "pe.verified_payload_jsonb->>'verifierRevision'",
+    "attempt.provider_transaction_id=cr.external_transaction_id",
+    "v_matching_source_count<>1",
+  ])expect(confirmer).toContain(check);
+  expect(confirmer).toContain('grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1(');
+  expect(confirmer).toContain('to myeongha_commerce_internal_executor');
+  expect(confirmer).not.toContain('supabase db push');
+  const p=e2eIndex(sql,'-- Regression of the old 2310 false-positive');
+  expect(p).toBeGreaterThan(0);
+  expect(sql).toContain('CLAIM_E2E_WRONG_AMOUNT_FULL_CANCEL_FALSE_REFUND_CONFIRMED');
+  expect(sql).toContain("v_receipt.verified_amount_minor+1");
  });
  it('never turns a provisional provider request or effect into a confirmed customer refund',()=>{
   expect(sql).toContain("'refund_decision_recorded'");
