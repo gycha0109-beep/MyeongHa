@@ -2,8 +2,8 @@
 import {beforeEach,describe,expect,it,vi} from 'vitest';
 
 const fixture=vi.hoisted(()=>({
-  withdrawal:vi.fn(async()=>Response.json({ok:true})),
-  firstReply:vi.fn(async()=>Response.json({ok:false},{status:503})),
+  withdrawal:vi.fn(async(_input:unknown)=>Response.json({ok:true})),
+  firstReply:vi.fn(async(_input:unknown)=>Response.json({ok:false},{status:503})),
   close:vi.fn(async()=>{}),
   createExecution:vi.fn(),
 }));
