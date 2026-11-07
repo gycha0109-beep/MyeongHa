@@ -62,6 +62,8 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 12. `scripts/operations/production-authority-frontier-readonly.sql`을 추가하고 Production에서 read-only 실행을 확인했다. 역할/멤버십, 스키마 권한, 테이블·컬럼 ACL hash, RLS/policy hash, RPC 실행 권한 및 선택 migration metadata를 함께 기록한다.
 13. RLS 비활성 테이블과 실제 접근 경로를 분리해 판정한다. `chat_turns`·`chat_turn_attempts`는 정책 정의가 각 3개 있지만 RLS 비활성이고 API executor 직접 테이블/컬럼 권한은 없다. 현재 G0 함수는 subject/thread 조건을 명시한다. `memory_proposals`는 정책 2개가 있으나 RLS 비활성이고, API/anon/auth 직접 권한과 신규 S0 proposal-accept EXECUTE는 없으며 positive-source registry도 disabled다. 이는 현재 fail-closed 경계이지 RLS 수용 완료가 아니다. 해당 유형을 활성화하기 전에 RLS enable 또는 승인된 동등한 행 범위 통제를 증명한다.
 14. `cmd_commit_chat_turn_legacy_v1`은 service_role 전용의 별도 사용자 선택 기반 proposal 처리 경로이며 신규 positive-source registry를 참조하지 않는다. 신규 S0 proposal-accept 경로가 비활성이라고 해서 모든 legacy memory acceptance가 비활성이라고 판정하지 않는다.
+15. `docs/operations/POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json`에 원격 전용 41개 전체의 실제 원장 버전·SQL 본문 해시·statement 수·대응 저장소 버전·영향 신호를 기록했다. 분류는 Se-yeon 23 / Admin 8 / Commerce 8 / API DB Auth 1 / historical bundle 1이다. 이는 전수 목록 및 출처 추적 증거이지 41개 전체의 현재 객체/ACL/DDL 복구 동등성 증명은 아니다. 개별 대상 효과를 추가 대조한다.
+16. 현재 `conversation_recall` registry는 `enabled=false` / `writable_enabled=false`지만 AI 모델 정책 2개는 active다. 2026-11-07 UTC 예산 행은 없고 10/25–10/31 예산 7개만 존재한다. 기존 AI 비용 원장 29건은 전부 settled이며 24건은 Owner 일일 한도 면제 플래그, 1건은 usage_unknown이다. 비용 원장과 positive-memory 경계는 동일한 stop switch가 아니다. 일반 사용자 daily admission은 해당 날짜 예산 부재로 fail-closed이나 Owner 별도 예외는 남아 있으므로 글로벌 AI 비활성 완료라고 판정하지 않는다. 새 호출·설정 변경 없이 SELECT-only로 확인했다.
 
 **금지:** blind `migration repair`, migration history rewrite, 추측에 의한 재적용, Production DDL/DML. 실제 정합화가 필요하면 근거 있는 forward-only 계획을 먼저 제시하고 사용자 승인을 받은 뒤 별도 실행한다.
 
