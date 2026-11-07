@@ -58,7 +58,11 @@ describe('Cloudflare zero-personal-source first reply is server-owned and fail-c
       .rejects.toThrow('authority is not ready');
   });
   it('keeps production activation sealed until exact DB owner policy and tests',()=>{
-    expect(SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved).toBe(true);
+    // The issuer remains implemented, but S0 permits exactly one positive
+    // conversation_recall/v1 Memory and currently authorizes no public model.
+    expect(SEYEON_SECURITY_S0_PRODUCTION_V1.zeroSourceFirstReplyApproved).toBe(false);
+    expect(SEYEON_SECURITY_S0_PRODUCTION_V1.positiveMemoryFirstReplyApproved).toBe(false);
+    expect(SEYEON_SECURITY_S0_PRODUCTION_V1.creditBilling.productionMounted).toBe(false);
     const worker=read('cloudflare/myeongha-worker.mjs');
     const runtime=read('apps/api/src/production-seyeon-first-memory-node-runtime-v1.ts');
     const fetcher=read('apps/api/src/seyeon-first-positive-memory-fetch-delivery-v1.ts');

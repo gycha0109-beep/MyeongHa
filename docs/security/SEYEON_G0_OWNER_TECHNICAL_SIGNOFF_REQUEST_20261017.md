@@ -1,8 +1,14 @@
 # 세연 G0 기술 승인 요청서 — 실제 Memory 1건 사용을 시작하기 전에
 
 > Watchtower-Track: security  
-> **현재 상태: 승인 요청 준비 / G0 기술 서명 0건 / G1~G3 HOLD**  
+> **현재 상태: S0 제품 범위 결정 기록됨 / G0 기술 증거 HOLD / G1~G3 HOLD**  
 > 2026-10-17 · 운영 DB 변경·유료 모델·공개 활성화 권한을 부여하는 문서가 아님
+>
+> **2026-11-07 superseding decision:** 아래의 별도 Character/Source/DB/Security 담당자 서명표와 외부 회신 요청은 과거 운영 모델의 기록이며 더 이상 실행 지시가 아니다. 명하 프로젝트는 1인 개발이며 모든 내부 의사결정·승인은 사용자에게 있다. 외부 기관이나 별도 책임자에게 승인·확인을 요청하지 않는다.
+>
+> **사용자가 확정한 S0 제품 범위:** 원본 `conversation_recall/v1` Memory 정확히 1건 + 현재 User 메시지 1건, 최초 비스트리밍 답변 1회. 과거 대화·Replay·Reader·Relationship·다중 Memory는 S0에서 제외하고 계속 fail-closed한다.
+>
+> 이 범위 결정은 G0 전체 PASS나 운영 사용 승인이 아니다. G0의 실제 revoke/HTTP send/receipt/ACK 선형화 및 원본 권한 증거는 계속 HOLD다. 현재 `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`이며 운영 DB/Secret/Role/ACL 변경과 유료 Provider 호출은 수행하지 않는다. Section 2의 다중 담당자 서명 요청은 실행하지 말고, 남은 기술 증거를 현재 v3 로드맵 순서로 구현한다.
 
 ## 1. 이미 승인된 것과 아직 아닌 것
 

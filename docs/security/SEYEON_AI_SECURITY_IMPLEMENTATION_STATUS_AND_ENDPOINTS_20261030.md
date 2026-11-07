@@ -555,5 +555,40 @@ Watchtower-Track: security
 - **정책:** G0~G6의 증거·보안 합격 기준은 유지한다. S0에서는 History/Replay/Reader/Relationship·과거 대화 재사용/다중 Memory/Life Fact/Streaming을 구현하지 않고 계속 HOLD한다. 제외 경로가 실제 모델 Context에 섞이면 전체 요청을 HOLD한다.
 - **실행 순서:** G0 S0 계약 → G1 단일 원본 Pin → G4 Governor/일반 고객 크레딧 → G2 원자 Commit → G3 최초 HTTP/receipt/철회 → G5 정확한 S0 통합 검증 → G6 제한 운영 smoke/복구.
 - **기존 구현 재사용:** W115~W121 및 PR #3089의 전용 DB 실행 역할·PostgreSQL 15/17 권한 검증은 재작성하지 않는다. S0의 Pin/Commit/Reveal 및 기존 격리 테스트도 통과한 부분은 재사용하고, 실제로 끊긴 운영 연결만 마무리한다.
-- **PR:** [#3094](https://github.com/gycha0109-beep/MyeongHa/pull/3094), 기준 main `1609aa879aa63120072b4d21b35f4c469dc650ed`. 이 기록 직전 문서 HEAD `02b5e20a65739795b9cb3c59cae0631624bcec0e`; PR의 최종 exact-head CI/Integration은 해당 실행 결과로 판정한다.
+- **PR:** [#3094](https://github.com/gycha0109-beep/MyeongHa/pull/3094)는 main에 병합됐다. 병합 기준 SHA `cdf71d9453c96b42489a27857a6159936155065e`, 전체 Integration run [#42282815736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42282815736) GREEN.
 - **운영 경계:** 문서 변경만 수행. Production DB/ACL/Role/Secret, Provider, 공개 Route, credit billing, deployment/traffic 변경 0. `HOLD_FORWARD_STOPPED`, `creditBilling.productionMounted=false` 및 G5/G6 HOLD 유지.
+
+### 2026-11-07 / W123 — S0 G1 Pin 이후 G4 예약 및 G5 receipt 정산 연결
+
+- **실행 순서:** 양수 Memory 실행에서 G1의 원본 Memory 1건 + 현재 User 메시지 1건 Pin이 성공한 뒤에만 다음 단계로 진행하도록 연결했다. 서버가 Provider 설정·요금 정책을 검증한 다음 G4 고객 크레딧 예약을 수행하고, 그 이후에만 metered Provider를 구성·호출한다. G1 실패 시 G4 예약과 Provider credential 해석/호출은 실행되지 않는다.
+- **G4 연결:** 기존 `admitSeyeonG4FirstMemoryCreditsV1`를 새로 구현하지 않고, 실행 경로의 post-G1 admission callback에서 재사용한다. Owner Admin 면제는 DB 조회 결과로만 인정하며, 일반 Member는 별도 Commerce pool과 신규 예약 결과가 없으면 Provider에 도달하지 못한다. 기존 idempotency·fresh reservation 조건은 유지한다.
+- **G5/receipt 연결:** `SEYEON_G5_COMMERCE_HYPERDRIVE` 전용 pool factory를 추가했다. 일반 Subject 및 governed-cost 연결과 다른 전용 Commerce LOGIN/비밀번호, 동일 승인 DB origin, checkout마다 실제 `session_user`/private role/ACL 검증을 요구한다. binding에는 `SEYEON_G5_COMMERCE_HYPERDRIVE_ORIGIN_POLICY=supabase-verify-full-rls-v1` 및 전용 LOGIN principal marker도 요구한다. receipt route는 server-owned `creditBilling.productionMounted`가 true일 때만 기존 G4 receipt-credit bridge를 사용하고, 그렇지 않으면 기존 proof-only receipt 경로를 유지한다. proof receipt는 governed model-cost pool이 없어도 독립 동작하도록 G5 factory에서 해당 연결을 필수로 요구하지 않는다.
+- **제품 정책:** 기존 zero-source 첫 답변 경로를 S0 제품 범위로 간주하지 않도록 `zeroSourceFirstReplyApproved=false`로 닫았다. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `memoryCount=1`, `firstReplyOnly=true`, `streamingEnabled=false`, `history/replay/reader/multi-memory=false`를 유지한다. 이 변경으로 공개 모델 경로가 활성화되지는 않는다.
+- **Cloudflare 확인:** 현재 계정에서 확인 가능한 Hyperdrive 설정은 5개이며 전용 G5 Commerce binding은 없다. `wrangler.jsonc`에 임의 ID/placeholder를 추가하지 않았다. 따라서 운영 전환에는 전용 LOGIN/Secret/Commerce role grant 및 동일 승인 DB origin의 Hyperdrive 설정이 실제로 필요하다.
+- **길이 제한 확인:** S0 `POST /api/chat/:threadId/turns`는 실제 body stream 16,384 bytes, 3,000ms completion deadline, User text 8,000자 상한이다. 연관 `POST /api/me/saju/preview-reading`도 16,384 bytes/3,000ms, `readingText` 200자 상한을 사용한다. 초과는 413, body 미완료는 408이며, 공통 bounded reader가 실제 bytes를 세고 `Content-Length`/`request.json()` 우회를 허용하지 않는다. 모델 요청은 직렬화 524,288 bytes, 공식 `/v1/responses/input_tokens` 인증 + 1,024 headroom 포함 48,000 tokens(원시 count 최대 46,976), Provider-enforced output 4,096 tokens, context window 1,050,000, prompt caching OFF다. Token-count 응답은 8,192 bytes/8,000ms 제한이며 문자 추정 fallback은 없다. 이 인증은 G1 Pin 이후 generation 전에 수행한다.
+- **검증:** G5 Hyperdrive pool의 missing/reused/wrong-principal/physical-login/private-role 실패 테스트와 proof-only receipt의 governed pool 독립성 테스트를 추가했다. G1 실패 시 Provider credentials를 읽지 않는 Node runtime 회귀 테스트를 갱신했다. 이 W123 변경의 exact-head CI는 PR 생성 후 확인해야 하며 현재 GREEN으로 간주하지 않는다.
+- **미완료/안전 경계:** 운영 Source Registry의 `conversation_recall/v1` 활성화 승인·정확한 positive Pin 실DB 증거, G0 revoke/transport 계약, G5 운영 LOGIN·Secret·Role·TLS·Hyperdrive, G4 운영 예약·receipt 정산·실패 복구, G2/G3 실배포 HTTP ACK는 미완료. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED`, G5 `productionMounted=false`, `scheduled=false` 유지. Production DB/ACL/Role/Secret, Provider 호출, 배포/트래픽 변경은 수행하지 않았다.
+
+
+### 2026-11-07 / W124 — S0 비용 조기 차단과 운영 출처·철회 권한 실측
+
+- **코드 수정:** 비용 통제가 OFF인 경우 실행 시도가 있으면 일반 DB 연결 준비 전 거부하도록 복구했다. ENFORCE는 별도 비용 DB 자격증명을 먼저 확인하며, Provider 설정 검증은 모델 전 원본 Pin 이후에 진행한다.
+- **PR HEAD 검증:** PR #3097 commit b6da8c79d1cc38fa7b494ecb4c866cf14d3ba53c에서 CI run 42364616632, Governance run 42364616732, Web PR run 42364616633 SUCCESS. 일반 테스트 2,076건 통과. 이 문서 변경에 따른 새 HEAD CI 결과를 선행 추정하지 않는다.
+- **운영 Source Registry SELECT:** 명하 Supabase 대상 PostgreSQL 17의 public.seyeon_positive_source_type_registry_v1에 (memory, conversation_recall, v1, seyeon-conversation-recall-projector-v1) 1행이 존재하지만 enabled=false, writable_enabled=false로 비활성화돼 있다. 기존 ‘Registry 비어 있음’ 주장을 수정했다. 실제 사용자 Memory나 Grant 데이터를 조회하지 않았고 positive Pin 실행 증거도 아니다.
+- **운영 함수·역할 pg_catalog SELECT:** cmd_mark_seyeon_positive_context_ready_pinned_v1(13인자), cmd_mark_seyeon_chat_context_ready_pinned_v1(4인자), cmd_commit_seyeon_chat_turn_runtime_v2(9인자)가 설치돼 있으며 myeongha_api_executor EXECUTE=true다. 기존 cmd_revoke_memory_character_grant_v1은 API EXECUTE=false, SECURITY INVOKER. myeongha_seyeon_governed_login은 존재하지만 myeongha_seyeon_g5_commerce_login은 없다. G0 철회 전용 권한 계약과 G4/G5 분리된 실제 자격증명·TLS/Secret/Hyperdrive 증명은 미완료다.
+- **안전 경계:** 운영 DB DDL/DML/GRANT/Secret, 유료 Provider, 공개 Route, 배포·과금 활성화 변경은 0. positiveMemoryFirstReplyApproved=false, creditBilling.productionMounted=false, HOLD_FORWARD_STOPPED 유지. G0~G6 최종 PASS 아님.
+
+
+### 2026-11-07 / W125 — G0 철회 권한을 모델 사용 승인과 분리 (PR #3097)
+
+- **실제 변경:** 첫 Memory Fetch 조립에서 기존 `approvedPersonalRecordModelUse`가 철회 HTTP의 `approvedWithdrawalWriteAdmission`으로 자동 전달되던 연결을 제거했다. 모델 사용을 허가해도 개인정보 철회 DB 쓰기가 자동 승인되지 않는다. 서버 전용 `approvedWithdrawalWriteAdmission`을 별도로 명시한 경우에만 기존 G0 철회 핸들러로 전달한다. 별도 Cloudflare 철회/receipt 경로의 정책·모델 비의존성을 유지한다.
+- **검증:** 모델 승인만 있는 경우 철회 DB 쓰기 승인이 전달되지 않고, 독립적인 철회 승인만 명시했을 때 전달되는 회귀 테스트를 추가했다. 현재 커밋의 정확한 CI는 실행 결과 확인 전 PASS 아님.
+- **미완료:** 실제 운영 Source Registry 활성화 및 Pin 증거, 철회 DB 권한·선형화, G5 Commerce LOGIN/Hyperdrive, 일반 고객 비용 예약·정산, G2/G3 실전송 ACK 및 G6 제한 운영. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. 운영 DB/Role/ACL/Secret/Provider/배포·트래픽 변경 없음.
+
+
+### 2026-11-07 / W126 — 운영 역할 현황 실측 및 G3 수신 확인의 G5 장애 독립성
+
+- **현재 인프라 읽기 전용 결과:** 명하 Supabase PostgreSQL 17의 `conversation_recall/v1` Source Registry 1행은 `enabled=false,writable_enabled=false`; 기존 S0 긍정 G1은 계속 HOLD. 실제 `cmd_mark_seyeon_positive_context_ready_pinned_v1`, `cmd_commit_seyeon_positive_chat_turn_v1`, `cmd_issue_seyeon_positive_first_reply_v1`, `seyeon_private.cmd_ack_seyeon_positive_reply_v1`, `seyeon_private.cmd_request_seyeon_memory_revoke_v1`는 설치돼 있고 `myeongha_api_executor` 실행 권한이 존재함을 카탈로그에서 확인했다. `anon/authenticated/service_role`은 해당 함수 직접 EXECUTE가 없다. 이 사실만으로 실제 인증 Member 철회/송출 PASS를 선언하지 않는다.
+- **별도 비용 연결:** 운영 Supabase에 `myeongha_seyeon_g5_commerce_login`은 없으며, Cloudflare Hyperdrive 총 5개 구성 중 G5 Commerce 전용 구성도 없다. 비밀번호/사용자 원본/개인정보는 조회하지 않았다.
+- **구현 수정:** G4 정산 마운트가 참인 상태에서 G5 Commerce Pool 생성 자체가 실패하더라도, 기존 Subject DB의 정확한 256-bit receipt ACK는 진행하도록 변경했다. 수신 확인이 성공하고 정산이 불가능하면 503과 `SEYEON_CREDIT_RECEIPT_SETTLEMENT_UNAVAILABLE`을 반환해 과금 정산 성공으로 오인하지 않는다. G5의 기존 수신 건 복구 후보를 재사용한다. 증명 오류는 원래 거부를 그대로 반환한다.
+- **검증/운영:** Commerce 연결 생성 실패·무효 proof·정상 정산 분기 회귀 테스트 추가. 해당 HEAD의 CI 결과 전 PASS 미선언. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. 운영 DB/Role/ACL/Secret/Provider/배포/트래픽 변경 없음. G0~G6 완료 아님.

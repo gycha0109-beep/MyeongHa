@@ -51,6 +51,7 @@ import type {
 import {
   runSeyeonProductionChatExecutionV1,
   type RunSeyeonProductionChatExecutionResultV1,
+  type SeyeonProductionGovernanceResolverV1,
 } from './seyeon-production-chat-execution-v1.js';
 import {
   createSeyeonProductionGovernanceV1,
@@ -166,6 +167,17 @@ export interface SeyeonProductionRoleProviderConfigsV1 {
   readonly reviewer?: OpenAiSeyeonStructuredProviderConfigV1;
 }
 
+export interface SeyeonProductionProviderBundleV1 {
+  readonly provider?: SeyeonStructuredProviderPortV2;
+  readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
+  readonly roleProviderConfigs?: SeyeonProductionRoleProviderConfigsV1;
+  readonly glmRendererConfig?: SeyeonGlmRendererConfigV1;
+  readonly costGovernorForRole?: (
+    role: keyof SeyeonProductionRoleProviderConfigsV1,
+    config: OpenAiSeyeonStructuredProviderConfigV1,
+  ) => SeyeonAiGovernorAdmissionV1;
+}
+
 export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly databaseConfig: ProductionUserDataRuntimeConfigV1;
   readonly providerConfig?: OpenAiSeyeonStructuredProviderConfigV1;
@@ -190,11 +202,19 @@ export interface CreateProductionSeyeonChatRuntimeInputV1 {
   readonly createUuid?: () => string;
   /** Server-owned public Web compatibility authority. Never derived from a request. */
   readonly clientCompatibilityProfile?: CharacterClientCompatibilityProfileV1;
-  /** Explicit source-owner approval, server-only. No deployed caller sets it.
-   * The initial implementation supports one conversation_recall/v1 Memory;
-   * DB registry, G1/G2 and current-rights Reveal remain independent guards.
+  /** Server-owned S0 source-use approval. Production policy currently returns false.
+   * The contract supports one conversation_recall/v1 Memory; DB registry,
+   * G1/G2 and current-rights Reveal remain independent guards.
    */
   readonly approvedPersonalRecordModelUse?: () => boolean | Promise<boolean>;
+  /** Called after exact G1 Pin and provider-config validation, before Provider construction/dispatch. */
+  readonly beforeProviderAdmission?: (input: Readonly<{
+    verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+    threadId: string;
+    clientTurnId: string;
+  }>) => Promise<void>;
+  /** Request-scoped provider configuration; invoked after G1 and before G4 reservation. */
+  readonly resolveProviderBundleAtRequest?: () => Promise<SeyeonProductionProviderBundleV1>;
   readonly requiredPersonalRecordCount?: 0 | 1;
 }
 
@@ -210,7 +230,8 @@ function text(value: string, path: string, max: number): string {
 }
 
 function resolveProvider(
-  input: CreateProductionSeyeonChatRuntimeInputV1,
+  input: Pick<CreateProductionSeyeonChatRuntimeInputV1, 'provider'|'providerConfig'> |
+    SeyeonProductionProviderBundleV1,
 ): SeyeonStructuredProviderPortV2 {
   if (input.provider !== undefined) return input.provider;
   if (input.providerConfig === undefined) {
@@ -315,35 +336,39 @@ export function createProductionSeyeonChatRuntimeV1(
   // Never initialize a Production Provider/DB runtime with a positive
   // Projector while G0/G1/SRC-25 and atomic Commit are unapproved.
   assertSeyeonPositiveProjectorsNotEnabledV1();
+  // OFF must reject an injected cost Governor before a Subject pool or
+  // Provider is created, even when the Provider bundle is resolved post-Pin.
+  if (input.governorMode !== 'ENFORCE' &&
+      input.costGovernorForRole !== undefined) {
+    throw new Error('OFF refuses an active cost Governor without ENFORCE cost DB authority.');
+  }
   if (input.approvedPersonalRecordModelUse !== undefined &&
       input.governorMode !== 'ENFORCE') {
     throw new Error('Positive Memory requires the enforced server cost Governor.');
   }
-  if (input.governorMode === 'ENFORCE' &&
-      (input.glmRendererConfig === undefined) !== (input.glmRendererGovernor === undefined)) {
-    throw new Error('GLM ENFORCE requires both credentials and a certified Governor.');
+  if (input.approvedPersonalRecordModelUse !== undefined &&
+      input.beforeProviderAdmission === undefined) {
+    throw new Error('Positive Memory requires G4 admission after G1 and before Provider preparation.');
+  }
+  if (input.resolveProviderBundleAtRequest === undefined) {
+    if (input.governorMode === 'ENFORCE' &&
+        (input.glmRendererConfig === undefined) !== (input.glmRendererGovernor === undefined)) {
+      throw new Error('GLM ENFORCE requires both credentials and a certified Governor.');
+    }
+    if (input.costGovernorForRole !== undefined &&
+        input.provider !== undefined) {
+      throw new Error('Governed chat requires native, fully metered Provider config.');
+    }
+    if (input.costGovernorForRole !== undefined &&
+        input.provider === undefined &&
+        input.providerConfig === undefined &&
+        Object.values(input.roleProviderConfigs ?? {}).some(v => v === undefined)) {
+      throw new Error('Governed chat requires configuration for every active role.');
+    }
   }
   if (input.glmRendererGovernor !== undefined && input.governorMode !== 'ENFORCE') {
     throw new Error('GLM Governor cannot run outside ENFORCE.');
   }
-  if (input.costGovernorForRole !== undefined &&
-      input.provider !== undefined) {
-    throw new Error('Governed chat requires native, fully metered Provider config.');
-  }
-  if (input.costGovernorForRole !== undefined &&
-      input.provider === undefined &&
-      input.providerConfig === undefined &&
-      Object.values(input.roleProviderConfigs ?? {}).some(v => v === undefined)) {
-    throw new Error('Governed chat requires configuration for every active role.');
-  }
-  assertSeyeonProductionGovernorBoundaryV1({
-    mode: input.governorMode,
-    target: 'chat',
-    provider: input.provider,
-    providerConfig: input.providerConfig,
-    roleProviderConfigs: input.roleProviderConfigs,
-    governorConfigured: input.costGovernorForRole !== undefined,
-  });
   const costPoolLease = createSeyeonProductionCostPoolLeaseV1({
     mode: input.governorMode,
     ...(input.governedDbConfig === undefined ? {} : { governedDbConfig: input.governedDbConfig }),
@@ -353,16 +378,6 @@ export function createProductionSeyeonChatRuntimeV1(
     config: input.databaseConfig,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
   });
-  const provider = input.governorMode === 'ENFORCE' ? null : resolveProvider(input);
-  const roleProvider = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
-    if (input.governorMode === 'ENFORCE' || provider === null) {
-      throw new Error('ENFORCE rejects raw role Provider fallback.');
-    }
-    const roleConfig = input.roleProviderConfigs?.[role];
-    return roleConfig === undefined
-      ? provider
-      : createOpenAiSeyeonStructuredProviderV1(roleConfig);
-  };
   const idPort = createSeyeonProductionRuntimeIdPortV1(
     input.createUuid,
   );
@@ -406,16 +421,6 @@ export function createProductionSeyeonChatRuntimeV1(
             pool: costPoolLease.pool,
             verifiedEvidence: runInput.verifiedEvidence,
           });
-      if (costPoolLease !== null) {
-        // Prove independent credential + the same canonical Subject before
-        // any model provider can be invoked. Never fallback to legacy.
-        const governedSubject = await costRunner.resolveSubject();
-        if (governedSubject.subjectId.toLowerCase() !==
-            resolvedSubject.subjectId.toLowerCase() ||
-            governedSubject.subjectKind !== resolvedSubject.subjectKind) {
-          throw new Error('ENFORCE cost DB canonical Subject does not match the application Subject.');
-        }
-      }
       const ports = createSeyeonProductionTransactionalPortsV1({
         subjectId: resolvedSubject.subjectId,
         runner,
@@ -439,51 +444,116 @@ export function createProductionSeyeonChatRuntimeV1(
           return attempt;
         },
       });
-      const meterRole = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
-        if (role === 'renderer' && input.glmRendererConfig !== undefined &&
-            input.governorMode === 'ENFORCE') {
-          return createGovernedSeyeonGlmRendererV1({
-            config: input.glmRendererConfig,
-            governor: input.glmRendererGovernor!,
-            runner: costRunner,
-            getBinding: () => activeCostBinding,
+      const prepareModelExecution = async () => {
+        // This callback is reached only after the exact G1 Memory+current User
+        // Pin has committed. Validate the independent cost authority and
+        // server-owned provider configuration before reserving customer credits.
+        if (costPoolLease !== null) {
+          const governedSubject = await costRunner.resolveSubject();
+          if (governedSubject.subjectId.toLowerCase() !==
+              resolvedSubject.subjectId.toLowerCase() ||
+              governedSubject.subjectKind !== resolvedSubject.subjectKind) {
+            throw new Error('ENFORCE cost DB canonical Subject does not match the application Subject.');
+          }
+        }
+        const bundle: SeyeonProductionProviderBundleV1 =
+          input.resolveProviderBundleAtRequest === undefined
+            ? input
+            : await input.resolveProviderBundleAtRequest();
+        const provider = input.governorMode === 'ENFORCE'
+          ? null
+          : resolveProvider(bundle);
+        if (input.governorMode === 'ENFORCE' &&
+            (bundle.glmRendererConfig === undefined) !==
+              (input.glmRendererGovernor === undefined)) {
+          throw new Error('GLM ENFORCE requires both credentials and a certified Governor.');
+        }
+        if (bundle.costGovernorForRole !== undefined &&
+            bundle.provider !== undefined) {
+          throw new Error('Governed chat requires native, fully metered Provider config.');
+        }
+        if (bundle.costGovernorForRole !== undefined &&
+            bundle.provider === undefined &&
+            bundle.providerConfig === undefined &&
+            Object.values(bundle.roleProviderConfigs ?? {}).some(v => v === undefined)) {
+          throw new Error('Governed chat requires configuration for every active role.');
+        }
+        assertSeyeonProductionGovernorBoundaryV1({
+          mode: input.governorMode,
+          target: 'chat',
+          provider: bundle.provider,
+          providerConfig: bundle.providerConfig,
+          roleProviderConfigs: bundle.roleProviderConfigs,
+          governorConfigured: bundle.costGovernorForRole !== undefined,
+        });
+        await input.beforeProviderAdmission?.({
+          verifiedEvidence: runInput.verifiedEvidence,
+          threadId,
+          clientTurnId,
+        });
+        const roleProvider = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+          if (input.governorMode === 'ENFORCE' || provider === null) {
+            throw new Error('ENFORCE rejects raw role Provider fallback.');
+          }
+          const roleConfig = bundle.roleProviderConfigs?.[role];
+          return roleConfig === undefined
+            ? provider
+            : createOpenAiSeyeonStructuredProviderV1(roleConfig);
+        };
+        const meterRole = (role: keyof SeyeonProductionRoleProviderConfigsV1) => {
+          if (role === 'renderer' && bundle.glmRendererConfig !== undefined &&
+              input.governorMode === 'ENFORCE') {
+            return createGovernedSeyeonGlmRendererV1({
+              config: bundle.glmRendererConfig,
+              governor: input.glmRendererGovernor!,
+              runner: costRunner,
+              getBinding: () => activeCostBinding,
+            });
+          }
+          if (role === 'renderer' && bundle.glmRendererConfig !== undefined) {
+            let reservedBinding: SeyeonAiCostLedgerBindingV1 | null = null;
+            return createSeyeonGlmRendererV1({
+              ...bundle.glmRendererConfig,
+              async beforeDispatch(call) {
+                const binding = activeCostBinding;
+                if (binding === null) throw new Error('GLM renderer requires an active chat attempt.');
+                await costRunner.run(binding.subjectId, client =>
+                  startSeyeonAiCallV1(client, binding, call));
+                reservedBinding = binding;
+              },
+              async afterOutcome(event) {
+                if (reservedBinding === null) return;
+                await costRunner.run(reservedBinding.subjectId, client =>
+                  settleSeyeonAiCallV1(client, reservedBinding!, event));
+              },
+            });
+          }
+          const roleConfig = bundle.roleProviderConfigs?.[role];
+          const config = roleConfig ??
+            (bundle.provider === undefined ? bundle.providerConfig : undefined);
+          if (config === undefined) return roleProvider(role);
+          const governor = bundle.costGovernorForRole?.(role, config);
+          if (input.governorMode === 'ENFORCE' && governor === undefined) {
+            throw new Error('ENFORCE refuses a missing role Governor.');
+          }
+          return createPersistingSeyeonAiProviderV1({
+            config, runner: costRunner, getBinding: () => activeCostBinding,
+            ...(governor === undefined ? {} : { governor }),
           });
-        }
-        if (role === 'renderer' && input.glmRendererConfig !== undefined) {
-          let reservedBinding: SeyeonAiCostLedgerBindingV1 | null = null;
-          return createSeyeonGlmRendererV1({
-            ...input.glmRendererConfig,
-            async beforeDispatch(call) {
-              const binding = activeCostBinding;
-              if (binding === null) throw new Error('GLM renderer requires an active chat attempt.');
-              await costRunner.run(binding.subjectId, client =>
-                startSeyeonAiCallV1(client, binding, call));
-              reservedBinding = binding;
-            },
-            async afterOutcome(event) {
-              if (reservedBinding === null) return;
-              await costRunner.run(reservedBinding.subjectId, client =>
-                settleSeyeonAiCallV1(client, reservedBinding!, event));
-            },
-          });
-        }
-        const roleConfig = input.roleProviderConfigs?.[role];
-        const config = roleConfig ??
-          (input.provider === undefined ? input.providerConfig : undefined);
-        if (config === undefined) return roleProvider(role);
-        const governor = input.costGovernorForRole?.(role, config);
-        if (input.governorMode === 'ENFORCE' && governor === undefined) {
-          throw new Error('ENFORCE refuses a missing role Governor.');
-        }
-        return createPersistingSeyeonAiProviderV1({
-          config, runner: costRunner, getBinding: () => activeCostBinding,
-          ...(governor === undefined ? {} : { governor }),
+        };
+        const meteredPreflight = meterRole('preflight');
+        return Object.freeze({
+          interpreterProvider: meterRole('interpreter'),
+          rendererProvider: meterRole('renderer'),
+          semanticReviewerProvider: meterRole('reviewer'),
+          resolveGovernance: (governanceInput: Parameters<SeyeonProductionGovernanceResolverV1>[0]) =>
+            createSeyeonProductionGovernanceV1({
+              provider: meteredPreflight,
+              turnBinding: governanceInput.turnBinding,
+              productionContext: governanceInput.productionContext,
+            }),
         });
       };
-      const meteredPreflight = meterRole('preflight');
-      const meteredInterpreter = meterRole('interpreter');
-      const meteredRenderer = meterRole('renderer');
-      const meteredReviewer = meterRole('reviewer');
 
       const threadBinding = await runSeyeonTurnRuntimePhaseV1(
         'thread_binding',
@@ -555,18 +625,7 @@ export function createProductionSeyeonChatRuntimeV1(
           productionAuthorityRef:
             'server:production-seyeon-chat-runtime-v1',
           idPort,
-          resolveGovernance: ({
-            turnBinding,
-            productionContext,
-          }) =>
-            createSeyeonProductionGovernanceV1({
-              provider: meteredPreflight,
-              turnBinding,
-              productionContext,
-            }),
-          interpreterProvider: meteredInterpreter,
-          rendererProvider: meteredRenderer,
-          semanticReviewerProvider: meteredReviewer,
+          prepareModelExecution,
           persistencePort: meteredChatPersistence,
           positivePersonalSourcePort: ports.positivePersonalSource,
           combinedSourcePinPort: ports.combinedSourcePin,

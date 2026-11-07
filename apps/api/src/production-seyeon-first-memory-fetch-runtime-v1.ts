@@ -15,8 +15,8 @@ export function createProductionSeyeonFirstMemoryFetchRuntimeV1(
         request,requestId,serverTime,
         identityEvidenceVerifier:execution.identityEvidenceVerifier,
         pool:execution.pool,
-        ...(input.approvedPersonalRecordModelUse===undefined?{}:{
-          approvedWithdrawalWriteAdmission:input.approvedPersonalRecordModelUse,
+        ...(input.approvedWithdrawalWriteAdmission===undefined?{}:{
+          approvedWithdrawalWriteAdmission:input.approvedWithdrawalWriteAdmission,
         }),
       });
       if(command!==null)return command;

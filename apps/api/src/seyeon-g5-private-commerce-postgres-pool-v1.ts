@@ -183,7 +183,7 @@ export class SeyeonG5PrivateCommercePostgresPoolV1 implements PostgresSubjectPoo
   async close():Promise<void>{await this.driver.end();}
 }
 
-/** Constructed only by explicit Owner code. Never installed into a runtime route. */
+/** Constructed only from the dedicated G5 binding; production mount remains policy-gated. */
 export function createSeyeonG5PrivateCommercePoolV1(
   config:SeyeonG5PrivateCommerceConfigV1,
   options:NodePostgresSubjectPoolOptionsV1={},
