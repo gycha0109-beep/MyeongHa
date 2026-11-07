@@ -809,3 +809,10 @@
 - **기존 공백:** 운영 비노출 `reconcileSignedCancellationPrivateV1`는 정확한 취소 ID의 단일 GET 및 기존 Event 조회까지만 시행했습니다. 별도로 작성된 `reconcileStoredPortOneCancellationSetWithGetPrivateV1`의 **전체 성공 취소 항목 HMAC·개별 금액·두 시점 DB 스냅샷 대조**를 서명 알림에 연결하지 않아, 한 개 웹훅이 실제 기록된 전체 취소 내역에 포함되는지 확인하는 결과를 돌려주지 않았습니다.
 - **구현:** 내부 재조합 함수가 전용 `sourceHmacSecret`를 제공받으면 서명된 `cancellationId`의 HMAC을 계산하고 기존 read-only 전체 항목 대조기를 호출합니다. 대조기는 exact cancellation HMAC의 DB 원장 존재를 GET 이전과 이후에 확인하고, 성공 시에만 원본 Receipt·전체 성공 항목·현재 GET 일치 여부를 **읽기 전용 관찰** 결과로 표시합니다. 미제공/약한 키, 원장 항목 누락·불일치·역할 문제는 안전 보류합니다. 기존 Source/Provider Event 순서를 임의로 만들어내지 않습니다.
 - **검증/경계:** 정확 항목 존재·누락과 서명 알림→전체 집합 합성 테스트를 추가했습니다. 운영 라우트, Provider 환불 POST, 계정 삭제, 실제 금액 변경·Grant 회수·LIVE 판매는 전혀 연결하지 않았습니다. CI 완료 이전에는 완료/PASS로 주장하지 않습니다.
+
+
+### 2026-11-07 — 정확한 원본 Receipt ID의 내부 전체 취소 집합 대조 연결 복구
+
+- **CI 근거:** [PR #3090 Commerce Work Track](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42369563243/job/128394786467) 신규 signed cancellation→전체 취소 집합 테스트가 1건 실패했습니다. `resolveCancellationOriginalReceiptPrivateV1`의 기존 내부 결과에는 원본 Receipt UUID가 누락되어, 전체 집합 대조기가 정확한 Receipt를 찾을 수 없어 안전 보류했습니다.
+- **수정:** 기존 동일 SQL에서 이미 검증 중이던 `verifiedReceiptId`를 **사설 운영 Resolver 반환에만** 추가했습니다. 기존 공개/일반 read-only 판정 API는 식별자를 노출하지 않습니다. 사설 조회에서 정확한 Receipt·결제 거래번호·금액·통화 결속과 malformed ID 거부를 별도 회귀 검증합니다.
+- **보존:** 취소 전체 내역 대조는 read-only, Provider 순서와 법정 환불/권한 회수 확정은 계속 HOLD. 운영 PG/환불 POST, LIVE, 공개 라우트/DB 적용 없음. 새 HEAD CI 통과 전 성공 미확정.

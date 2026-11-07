@@ -156,7 +156,10 @@ export async function resolveCancellationOriginalReceiptPrivateV1(client,input){
   if(!Number.isSafeInteger(amount)||amount<=0)
    throw Error('INVALID_CANCELLATION_PAYMENT_RECEIPT_LINK');
 
+  // Internal-only canonical Receipt ID for the separate full cancellation-set
+  // snapshot. Never expose this ID from the public/read-only indication API.
   return Object.freeze({
+   verifiedReceiptId:row.verifiedReceiptId,
    providerPaymentId:input.providerPaymentId,
    originalTransactionId:row.verifiedTransactionId,
    originalVerifiedPaidAmountMinor:amount,
