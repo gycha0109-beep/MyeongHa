@@ -844,3 +844,10 @@
 - **확인된 공백:** 이전 전체 취소 집합 대조는 `cancellationIdHmac`가 원장 안에 존재하는지 확인했지만, 실제 서명된 `providerWebhookId`와 **동일 이벤트 행**에 결속되었는지는 증명하지 않았습니다. 서로 다른 3,000원/5,900원 부분취소 이벤트가 각각 존재하면 서명 웹훅을 다른 취소 항목에 잘못 연결할 수 있었습니다.
 - **구현:** 기존 `commerce_provider_events.external_event_id`만 사설 SELECT에 추가하고, 서명 웹훅 ID·기존 Provider Event UUID(전달된 경우)·개별 취소 HMAC 중 전달된 식별자가 **하나의 동일 원장 행에서 동시에 일치**해야 전체 취소 집합 대조를 허용합니다. 첫 DB 스냅샷과 GET 후 스냅샷 모두 확인합니다. 서명 검토기에서 웹훅 ID를 직접 전달하고 `exactSignedWebhookIncluded=true`가 없으면 안전 보류합니다.
 - **회귀/안전:** 서로 다른 취소 항목 혼동, 알 수 없는 웹훅, GET 사이 식별자 바뀜, 모의 증명 누락을 검사합니다. 기존 Provider Event·Receipt·권한 원장/DB 스키마/운영 API·환불 POST·LIVE는 변경하지 않습니다. 공급자 최신 순서·법정 환불·Reader T2 회수는 여전히 HOLD이며 새 CI 통과 전 완료 미확정입니다.
+
+
+### 2026-11-07 — 서명 취소 ID를 기존 Reader S1 잠금·구매권 버전 검사에 연결
+
+- **확인된 기존 구성:** 읽기 전용 현재 PortOne 전체 취소 집합 GET과 기존 `inspectLockedReaderRevokeCasPreflightV1`의 원본 Event→Reader Grant→S1 잠금·변경 버전 검사 흐름이 구현돼 있었으나, 서명 알림의 **웹훅 ID와 취소 항목 HMAC**을 같은 preflight 입력으로 전달하지 않았습니다.
+- **구현:** `inspectCurrentCancelSetExactReaderLockedCasReviewV1`에 서명 검증 단계에서만 공급 가능한 `expectedProviderWebhookId + expectedCancellationIdHmac` 쌍을 선택적 내부 입력으로 추가했습니다. 둘 다 있으면 GET 이전 및 이후 동일 Provider Event 행 결속을 검증한 경우에만 기존 Reader S1 잠금·Grant 버전 검사를 실행합니다. 한쪽만 있거나 형식이 불량하면 DB 조회 전 거부하고, 묶음 증거가 누락·불일치하면 Reader 잠금 실행 전 HOLD합니다. `exactSignedCancellationBoundToEvent`는 읽기 전용 검토 결과일 뿐 권한이 아닙니다.
+- **보존:** 기존 무서명 사설 검사 호출과 격리 테스트는 유지하되 서명 증명으로 표시하지 않습니다. 실제 Entitlement Effect·Reader T2 commit·환불 API·운영 DB/라우트·판매 활성화는 변경하지 않았습니다. 공급자 semantic NEWER/STALE 및 법정 최종 환불 권한은 여전히 미증명. 최신 CI 통과 전 PASS 미선언입니다.
