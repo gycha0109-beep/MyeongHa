@@ -69,7 +69,14 @@ openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 \
   -pass env:MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE
 
 tar -tzf "$work_dir/restore.tar.gz" | sed 's#^\./##' | sort > "$work_dir/listing.txt"
-printf '%s\n' data.sql manifest.json plaintext-sha256.txt roles.sql schema.sql | sort > "$work_dir/expected.txt"
+# Backward-compatible encrypted source catalog: legacy artifacts keep five files.
+public_app_catalog_sha="$(jq -r '.source_application_catalog_sha256 // empty' "$manifest")"
+if [[ -n "$public_app_catalog_sha" ]]; then
+  [[ "$public_app_catalog_sha" =~ ^[0-9a-f]{64}$ ]]
+  printf '%s\n' data.sql manifest.json plaintext-sha256.txt roles.sql schema.sql source-app-catalog.json | sort > "$work_dir/expected.txt"
+else
+  printf '%s\n' data.sql manifest.json plaintext-sha256.txt roles.sql schema.sql | sort > "$work_dir/expected.txt"
+fi
 cmp -s "$work_dir/listing.txt" "$work_dir/expected.txt"
 ! grep -Eq '(^/|(^|/)\.\.(/|$))' "$work_dir/listing.txt"
 
@@ -88,6 +95,7 @@ while read -r checksum_hash checksum_path checksum_extra; do
   checksum_name="${checksum_path##*/}"
   case "$checksum_name" in
     roles.sql|schema.sql|data.sql) ;;
+    source-app-catalog.json) [[ -n "$public_app_catalog_sha" ]] ;;
     *)
       echo "Unexpected plaintext checksum member: $checksum_name" >&2
       exit 1
@@ -102,7 +110,11 @@ while read -r checksum_hash checksum_path checksum_extra; do
   checksum_count=$((checksum_count + 1))
   printf '%s  %s\n' "$checksum_hash" "$checksum_name" >> "$normalized_plaintext_checksum"
 done < "$work_dir/plaintext-sha256.txt"
-[[ "$checksum_count" -eq 3 ]]
+if [[ -n "$public_app_catalog_sha" ]]; then
+  [[ "$checksum_count" -eq 4 ]]
+else
+  [[ "$checksum_count" -eq 3 ]]
+fi
 
 (
   cd "$work_dir"
@@ -166,6 +178,46 @@ if [[ -n "$source_history_sha" || -n "$public_history_sha" ]]; then
     echo 'HOLD_SEYEON_RESTORE: encrypted migration-history snapshot digest invalid.' >&2
     exit 1
   }
+fi
+
+
+# Source catalog is encrypted in the archive and copied only into runner temp.
+# The public evidence directory must not contain catalog object metadata.
+private_app_catalog_sha="$(jq -r '.source_application_catalog_sha256 // empty' "$work_dir/manifest.json")"
+if [[ -n "$public_app_catalog_sha" || -n "$private_app_catalog_sha" ]]; then
+  [[ "$public_app_catalog_sha" =~ ^[0-9a-f]{64}$ && "$public_app_catalog_sha" == "$private_app_catalog_sha" ]] || {
+    echo 'HOLD_APPLICATION_CATALOG: public/encrypted digest mismatch.' >&2
+    exit 1
+  }
+  [[ "$(sha256sum "$work_dir/source-app-catalog.json" | awk '{print $1}')" == "$public_app_catalog_sha" ]] || {
+    echo 'HOLD_APPLICATION_CATALOG: decrypted catalog digest mismatch.' >&2
+    exit 1
+  }
+  jq -e --arg frontier "$backup_migration_frontier" '
+    .schemaVersion == "ops-postgres-application-schema-fingerprint-v1"
+    and .transactionReadOnly == "on"
+    and .sourceCatalogProvenance == "encrypted_backup_bracketed_readonly_v1"
+    and .sourceCatalogBracketStable == true
+    and .sourceCatalogBoundToBackupSnapshot == false
+    and (.migrationCatalog.latestVersion | tostring) == $frontier
+    and (.schemas | type) == "array"
+    and (.tables | type) == "array"
+    and (.functions | type) == "array"
+  ' "$work_dir/source-app-catalog.json" >/dev/null || {
+    echo 'HOLD_APPLICATION_CATALOG: encrypted catalog contract invalid.' >&2
+    exit 1
+  }
+  if [[ -n "${RESTORE_SOURCE_APP_CATALOG_PATH:-}" ]]; then
+    [[ "$RESTORE_SOURCE_APP_CATALOG_PATH" == "$RUNNER_TEMP/"* ]] || {
+      echo 'HOLD_APPLICATION_CATALOG: output outside runner temp.' >&2
+      exit 1
+    }
+    [[ ! -e "$RESTORE_SOURCE_APP_CATALOG_PATH" ]] || {
+      echo 'HOLD_APPLICATION_CATALOG: output already exists.' >&2
+      exit 1
+    }
+    install -m 600 "$work_dir/source-app-catalog.json" "$RESTORE_SOURCE_APP_CATALOG_PATH"
+  fi
 fi
 
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
