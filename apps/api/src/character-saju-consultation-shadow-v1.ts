@@ -37,6 +37,28 @@ export interface CharacterSajuConsultationShadowPortV1 {
     publishedCharacterVoice: unknown;
   }>): Promise<CharacterSajuSp2EvaluatorVerdictV1>;
   readonly evaluatorVersion: string;
+  /**
+   * Privileged evidence sink. Only a trusted server can supply this callback.
+   * Text is sensitive official Reading content: never log it or return it
+   * from the public Reader response. The sink must enforce its own storage ACL.
+   */
+  readonly recordPrivateComparison?: (evidence: CharacterSajuConsultationPrivateComparisonV1) => Promise<void>;
+}
+
+export interface CharacterSajuConsultationPrivateComparisonV1 {
+  readonly schemaVersion: typeof CHARACTER_SAJU_CONSULTATION_SHADOW_VERSION_V1;
+  readonly readingRef: string;
+  readonly sourceResponseHash: string;
+  readonly groundingHash: string;
+  readonly characterId: string;
+  readonly sourceUnitId: string;
+  readonly sourceBlockRefs: readonly string[];
+  readonly baselineText: string;
+  readonly candidateText: string;
+  readonly candidateHash: string;
+  readonly evaluation: 'accepted' | 'rejected';
+  readonly failureCodes: readonly string[];
+  readonly evaluatorVersion: string;
 }
 
 export interface CharacterSajuConsultationShadowInputV1 {
@@ -183,6 +205,28 @@ export async function runCharacterSajuConsultationShadowV1(
       evaluatorVerdict: verdict,
       expectedEvaluatorVersion: input.port.evaluatorVersion,
     });
+    if (input.port.recordPrivateComparison !== undefined) {
+      await input.port.recordPrivateComparison(Object.freeze({
+        schemaVersion: CHARACTER_SAJU_CONSULTATION_SHADOW_VERSION_V1,
+        readingRef: input.grounding.readingRef,
+        sourceResponseHash: input.grounding.sourceResponseHash,
+        groundingHash: input.grounding.groundingHash,
+        characterId: utterance.characterId,
+        sourceUnitId: unitId,
+        sourceBlockRefs: Object.freeze([...unit.sourceBlockRefs]),
+        baselineText: first.text,
+        candidateText: candidate.text,
+        candidateHash,
+        evaluation: decision.mode === 'evaluation_accepted' ? 'accepted' : 'rejected',
+        failureCodes: Object.freeze(decision.mode === 'evaluation_accepted'
+          ? []
+          : decision.failures.flatMap((failure) => [
+              failure.code,
+              ...(failure.failureClasses ?? []),
+            ])),
+        evaluatorVersion: input.port.evaluatorVersion,
+      }));
+    }
     if (decision.mode !== 'evaluation_accepted') return fallback('evaluation_rejected');
     return Object.freeze({
       mode: 'evaluation_only' as const,
