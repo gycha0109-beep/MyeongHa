@@ -76,7 +76,6 @@ const VERDICT_SCHEMA = Object.freeze({
     characterFidelityPreserved: { type: 'boolean' },
     failureClasses: {
       type: 'array',
-      uniqueItems: true,
       items: { enum: MEANING_PRESERVATION_FAILURE_CLASSES_V1 },
     },
   },
@@ -113,7 +112,7 @@ function asTokenCount(value: unknown): number | null {
 
 function usageFrom(value: unknown): OpenAiSajuConsultationShadowOutcomeV1['usage'] {
   if (!isRecord(value)) return EMPTY_USAGE;
-  const details = isRecord(value.input_tokens_details) ? value.input_tokens_details : {};
+  const details: Record<string, unknown> = isRecord(value.input_tokens_details) ? value.input_tokens_details : {};
   return Object.freeze({
     inputTokens: asTokenCount(value.input_tokens),
     outputTokens: asTokenCount(value.output_tokens),
