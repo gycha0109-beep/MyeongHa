@@ -6,7 +6,7 @@ Watchtower-Track: security
 
 현재 `plan.mjs`의 v2는 installer의 능력과 default-closed ACL만 표현한다. 과거 v1 source snapshot의 `NOT_GRANTED`를 현재 사용자 실행 승인 부재로 해석하지 않는다. 운영 실행 권한과 실제 환경 검증은 [운영 기록](../../../docs/operations/SEYEON_AI_SECURITY_PRODUCTION_ROLLOUT_20261025.md)에 남긴다.
 
-G0의 기존 초기 범위인 **원본 Memory 1건 / `conversation_recall/v1` / first direct Node reply**를 구현한다. Source registry는 비어 있고 Positive API EXECUTE는 부여하지 않는다. 이 디렉터리는 `supabase/migrations`에 포함되지 않아 main 병합만으로 운영 DB에 적용되지 않는다.
+현재 [S0 실행 로드맵 v3](../../../docs/security/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md)의 첫 제품 범위는 **검증된 Member의 `conversation_recall/v1` 원본 Memory 1건 + 같은 Turn의 현재 User 원본 메시지 1건 + 최초 비스트리밍 Cloudflare Worker 답변 1회**다. 과거 메시지·Replay·Reader·Relationship·다중 Memory·Streaming은 제외하고 HOLD한다. 운영 Source Registry는 비어 있지 않으며 해당 타입 행 1개가 `enabled=false, writable_enabled=false`로 등록돼 있다. 기존 Positive RPC의 API 실행 권한과 원본 결합 G1 Pin의 설치·사용 승인은 다르다. 이 디렉터리는 `supabase/migrations`에 포함되지 않아 main 병합만으로 운영 DB에 적용되지 않는다.
 
 `plan.mjs`가 설치 순서의 단일 목록과 각 SQL의 LF/UTF-8 SHA-256, 중단 SQL의 digest를 출력한다. 해시는 파일 결속이며 기술 승인·서명이 아니다. 원본 초안은 #2422, 철회 명령은 기존 R17이며, 이 묶음에서 실제 SQL 계약·권한 결함을 해결한 실행본을 사용한다. 과거 Draft 전체를 재병합하지 않는다.
 
@@ -20,11 +20,18 @@ node scripts/operations/seyeon-security-s0/plan.mjs
 
 중단 산출물 `stop-positive-use.sql`은 데이터를 삭제하지 않고 Model/Writable registry 및 positive API EXECUTE만 회수한다. 기존 사용자의 동의 철회 권한은 보존한다. 운영 적용은 별도 DB/DR·Scope·예산·transport 승인 후 담당자가 검토한 목록으로 수행한다.
 
-서버 조립은 `production-seyeon-first-memory-node-runtime-v1.ts`이다. 기존 verified Member, G1/G2/G3 readiness, 원본 codec, ENFORCE Governor/별도 비용 DB, 기존 Chat 실행 및 동일 Node socket 잠금 송출을 연결한다. 서버 승인 callback과 비용 정책이 없으면 credential resolution 전에 차단한다. 기존 Vercel/Workers Fetch에 positive Node sender를 붙이지 않는다.
+`apps/api/src/production-seyeon-first-memory-node-runtime-v1.ts`는 **기존 Node 전용 실행/격리 검증용 경로**다. 현재 S0 운영 대상은 `cloudflare/myeongha-worker.mjs`의 최초 비스트리밍 HTTP 경로와 `apps/api/src/production-seyeon-chat-runtime-v1.ts` 및 G1 결합 Pin adapter다. 최초 모델 응답은 `positiveMemoryFirstReplyApproved=false`로 차단돼 있으며 `creditBilling.productionMounted=false`다. Node 송출 검증이나 Fetch Response 생성만으로 Worker 브라우저 수신·철회 경합을 PASS로 판정하거나 Node sender를 Worker에 붙이지 않는다.
 
 Private accept와 revoke의 Production factory도 기존 server-owned 승인 callback을 전달할 수 있다. 현재 배포 caller는 전달하지 않으므로 기본 DENY다. 사용자 JSON·header·env flag로 승인할 수 없다.
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
+
+## 2026-11-07 S0 운영 설치 전 확인 (읽기 전용 현황, 승인 아님)
+
+- 대상 명하 운영 PostgreSQL 카탈로그 대조에서 `seyeon_private.pin_model_recent_sources_v1`와 `seyeon_private.pin_positive_model_context_sources_v1`가 **미설치**, `public.chat_turn_attempts.seyeon_recent_source_pin_jsonb`가 **없음**을 확인했다. 코드에는 이미 `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql` 순서의 격리 설치 정의가 있으므로 새 스키마를 임의 생성하거나 API/공용 역할에 실행 권한을 넓히지 않는다.
+- 현재 Source Registry의 `memory/conversation_recall/v1` 행은 존재하지만 `enabled=false, writable_enabled=false`다. G4/G5 전용 `myeongha_seyeon_g5_commerce_login`도 운영 DB에 없다. 실제 모델 전 Pin, 전용 Commerce Hyperdrive·TLS·자격증명, 고객 크레딧 예약·receipt 정산과 Worker 송출 검증은 미완료다.
+- **실행 순서:** 기존 [G0 S0 기술 계약 후보](../../../docs/security/SEYEON_G0_REVOKE_REGRANT_REVEAL_POLICY_CANDIDATE_V1.md)의 사용자 기술 승인 → **별도의 명시적 운영 SQL/권한 적용 승인** → 대상 환경·백업·복구 확인 → 기존 16·17 설치 및 G1 실제 Pin 증명 → 로드맵 G4/G2/G3/G5/G6. G0 계약 승인만으로 DB 적용·Source Registry ON·유료 모델·배포를 승인했다고 처리하지 않는다.
+- 운영 DB DDL/DML/Role/ACL/Secret, Provider 호출, Projector 등록·활성화, 공개·유료 트래픽 변경은 **수행하지 않았다**. `HOLD_FORWARD_STOPPED`, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false` 및 최종 G0~G6 0/7 HOLD 유지. 이 README 정리는 운영 설치 스크립트를 실행하는 작업이 아니다.
 
 ## 2026-10-27 Owner Admin 응답 권한 복구 후보
 
