@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { createReaderSajuConsultationBudgetGateV1 } from '../apps/api/src/reader-saju-consultation-budget-gate-v1.js';
 import {
   createOpenAiSajuConsultationShadowPortV1,
   OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
@@ -142,6 +143,85 @@ describe('OpenAI Saju consultation shadow transport (offline, never user-visible
       expect(call[0]).not.toHaveProperty('text');
       expect(call[0]).not.toHaveProperty('apiKey');
     }
+  });
+
+  it('wires the durable private evaluation budget gate into both OpenAI generation and review dispatches', async () => {
+    const reserve = vi.fn(async ({ callId }: { readonly callId: string }) => ({
+      reservationRef: 'budget-' + callId,
+    }));
+    const settle = vi.fn(async () => undefined);
+    const budget = createReaderSajuConsultationBudgetGateV1({
+      evaluationId: 'offline-approval-probe-1',
+      officialReadingRef: 'official-reading-1',
+      sourceResponseHash: 'a'.repeat(64),
+      totalEvaluationLimitMicroUsd: 1_000_000,
+      maximumCalls: 2,
+      allowedModels: ['test-generation-model', 'test-review-model'].map((modelKey) => ({
+        priceVersion: 'offline-2026-11-v1',
+        providerKey: 'openai-responses',
+        modelKey,
+        inputMicroUsdPerMillion: 600_000,
+        cachedInputMicroUsdPerMillion: 60_000,
+        outputMicroUsdPerMillion: 3_000_000,
+      })),
+      authority: { reserve, settle },
+    });
+    const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as { model: string };
+      return responseJson(body.model === 'test-generation-model' ? CANDIDATE : {
+        schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1',
+        evaluatorVersion: OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
+        candidateHash: hashCharacterSajuSp2CandidateV1(CANDIDATE),
+        unitId: UNIT.unitId,
+        semanticPreserved: true,
+        characterFidelityPreserved: true,
+        failureClasses: [],
+      });
+    });
+    const port = createOpenAiSajuConsultationShadowPortV1({
+      apiKey: 'offline-test-secret',
+      generationModel: 'test-generation-model',
+      reviewModel: 'test-review-model',
+      fetchImpl,
+      beforeDispatch: budget.beforeDispatch,
+      afterOutcome: budget.afterOutcome,
+    });
+    await port.generate({
+      instructions: '공식 판독만 표현',
+      input: { unit: UNIT },
+      responseSchema: {
+        type: 'object', additionalProperties: false,
+        required: ['schemaVersion', 'characterId', 'sourceUnitRefs', 'text'],
+        properties: {
+          schemaVersion: { type: 'string' },
+          characterId: { type: 'string' },
+          sourceUnitRefs: { type: 'array', items: { type: 'string' } },
+          text: { type: 'string' },
+        },
+      },
+    });
+    await port.evaluate({
+      candidate: CANDIDATE,
+      candidateHash: hashCharacterSajuSp2CandidateV1(CANDIDATE),
+      groundingUnit: UNIT,
+      characterProfileRef: PROFILE,
+      publishedCharacterVoice: { speech: { honorifics: true } },
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(reserve).toHaveBeenCalledTimes(2);
+    expect(settle).toHaveBeenCalledTimes(2);
+    expect(reserve.mock.calls[0]![0]).toMatchObject({
+      officialReadingRef: 'official-reading-1',
+      purpose: 'consultation_generate',
+      totalEvaluationLimitMicroUsd: 1_000_000,
+    });
+    expect(reserve.mock.calls[1]![0]).toMatchObject({
+      purpose: 'consultation_evaluate',
+    });
+    expect(settle.mock.calls[0]![0]).toMatchObject({
+      outcome: 'response_received',
+      costStatus: 'estimated',
+    });
   });
 
   it('never dispatches if server-side budget admission rejects the call', async () => {
