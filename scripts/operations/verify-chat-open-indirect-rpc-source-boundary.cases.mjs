@@ -118,6 +118,17 @@ test('source and grant snapshot modifications do not silently verify',()=>{
     /CHAT_OPEN_RPC_SOURCE_BOUNDARY_INVALID/u);
 });
 
+test('LF and CRLF checkouts produce the same pinned source SHA and result',()=>{
+  const lf=make();
+  for(const path of CHAT_OPEN_SOURCE_FILES)
+    lf.sources[path]=lf.sources[path].replace(/\r\n/gu,'\n');
+  const crlf=make();
+  for(const path of CHAT_OPEN_SOURCE_FILES)
+    crlf.sources[path]=crlf.sources[path].replace(/\r?\n/gu,'\r\n');
+  assert.deepEqual(collectChatOpenRpcBoundary(lf),saved);
+  assert.deepEqual(collectChatOpenRpcBoundary(crlf),saved);
+});
+
 test('no raw database SQL definitions or client identifiers in public evidence',()=>{
   assert.equal('sourceText' in saved,false);
   assert.equal('functionDefinition' in saved.command,false);

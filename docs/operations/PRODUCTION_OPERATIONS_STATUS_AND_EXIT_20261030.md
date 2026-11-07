@@ -978,3 +978,13 @@ Watchtower-Track: ops
 - **블로커·승인 및 다음 작업:** 추가 개발 승인 대기 없음. 다음은 실제 회원 채팅 열기 경로의 기존 격리 테스트와 다른 SECURITY DEFINER 후보의 HTTP→SQL 주체·권한 검토를 순차 진행한다. Production DDL/DML/ACL/GRANT/RLS/Secret·트래픽·개인정보 카나리, Hosted DR 환경 신규 생성/요금·서비스 재개는 명시적 승인 전 실행하지 않는다.
 
 Watchtower-Track: ops
+
+### 2026-11-08 / Phase 8-A — 회원 채팅 함수 소스 증거의 CI 운영체제 호환성 수정
+
+- **목표와 원인:** 같은 회원 채팅 RPC 소스 경계 작업을 Linux GitHub Actions에서도 확인 가능하게 마무리한다. Windows 체크아웃의 CRLF를 원문 그대로 SHA-256 해시하여 고정하면, GitHub Actions의 LF 체크아웃에서 아무 코드 변경 없이도 스냅샷 해시가 달라질 수 있다는 사전 검증 문제를 확인했다. 이는 운영 DB 권한 문제나 실제 서비스 호출 증거가 아니다.
+- **변경 파일:** `scripts/operations/verify-chat-open-indirect-rpc-source-boundary.mjs`(코드 파일 SHA 계산 전에 CRLF→LF 정규화), `scripts/operations/verify-chat-open-indirect-rpc-source-boundary.cases.mjs`(LF·CRLF 결과 동일성 테스트 추가), `docs/operations/POSTGRES_CHAT_OPEN_RPC_SOURCE_BOUNDARY_20261108.json`(세 파일의 플랫폼 중립 SHA-256으로 변경), 본 WORKLOG. 원본 API 코드·Production DB·ACL/정책·서비스 동작은 변경하지 않는다.
+- **검증·CI:** Node 24.14.0에서 신규 소스 경계 테스트 **10/10 PASS**, 기존 간접 함수 후보 8/8 + 직접 권한 8/8 + 원격 객체 8/8을 포함하면 **34/34 PASS**. LF·CRLF 양쪽 입력으로 동일 스냅샷을 얻음을 검증했다. CI 성공 여부는 수정 신규 HEAD의 GitHub Actions 확인 전까지 미판정이다. 기존 구현 커밋 `f2f82088b712f2f96fa07e2c892c4e6078e5e50b`, 기존 WORKLOG SHA 기록 커밋 `46a7728279ba237c61edf23309e8965a858c49af`.
+- **브랜치·커밋·PR:** `gycha0109-beep/MyeongHa` · `ops/phase8-remote-only-current-object-metadata-20261108` · [PR #3115](https://github.com/gycha0109-beep/MyeongHa/pull/3115). 이번 호환성 수정 커밋 제목 `fix(ops): make chat-open source hashes stable across checkouts`; SHA는 후속 WORKLOG 기록으로 확정한다.
+- **남은 과제·다음 작업·승인:** 이 수정은 CI 환경의 일관성만 보강했고 사용자별 실제 실행·정적 외의 함수 본문 인가·격리 복원본 동등성을 검증하지 않았다. 수정 CI를 확인한 후 다음 SECURITY DEFINER RPC 경로의 소스·실행 증거를 검토한다. Production 변경·새 Hosted 복원 자원은 별도 승인 없이는 실행하지 않는다. `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+Watchtower-Track: ops

@@ -13,7 +13,8 @@ export const CHAT_OPEN_SOURCE_FILES=Object.freeze([
 const META='docs/operations/POSTGRES_CURRENT_INDIRECT_RPC_REFERENCE_CANDIDATES_20261108.json';
 const GRANTS='docs/operations/POSTGRES_CURRENT_RLS_DISABLED_ROLE_GRANTS_20261108.json';
 const OUTPUT='docs/operations/POSTGRES_CHAT_OPEN_RPC_SOURCE_BOUNDARY_20261108.json';
-const sha=s=>createHash('sha256').update(s).digest('hex');
+// Normalize checkout CRLF/LF before hashing; source text checks still inspect actual content.
+const sha=s=>createHash('sha256').update(s.replace(/\r\n/gu,'\n')).digest('hex');
 function invalid(reason){throw Error('CHAT_OPEN_RPC_SOURCE_BOUNDARY_INVALID: '+reason);}
 function exact(obj,keys){return obj!==null&&typeof obj==='object'&&!Array.isArray(obj)&&
   Object.keys(obj).length===keys.length&&keys.every(k=>Object.hasOwn(obj,k));}
