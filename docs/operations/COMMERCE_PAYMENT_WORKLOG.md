@@ -922,3 +922,13 @@
 - **검증:** `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`에 차단 대상 역할과 null·공백 역할의 no-Claim-READ, ROLLBACK 회귀를 추가했습니다. 신규 HEAD의 전체 CI/PG17 테스트는 **미확인, PASS 미선언**입니다.
 - **완료/미완료:** 이번 owner-only 운영자 접근 제약 코드·회귀·WORKLOG 반영 완료. Provider NEWER/STALE, Reader T2 원자적 회수, 독립 소비자 제공 완료, 복원 후 privacy replay 및 전체 격리 E2E는 미완료입니다.
 - **다음·블로커:** 새 CI 결과를 확인해 실패 시 수정, 통과 시 승인 로드맵 중 미완료 기능 계속 구현. 운영 DB 배포·실제 PortOne POST·고객 LIVE 판매 미실행, 사용자 승인 요청 없음.
+
+### 2026-11-08 — 복원 Claim 삭제 증거의 삭제 전 기준 유무 구분
+
+- **목표/승인 로드맵:** `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6-4·5, 격리 PostgreSQL 복원 privacy replay에서 청약철회 테이블이 존재하더라도 삭제 대상 Subject의 Claim이 원래 0건인 경우를 실제 **삭제 성공** 증거로 과장하지 않습니다. 기존 P0-PR-01 삭제 정책은 변경하지 않습니다.
+- **브랜치·커밋·PR:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, 기준 HEAD `b36d583300278ee96b7aec72a23bbc48a26bd96b`, PR [#3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090) 열림·자동 병합 설정, 변경은 이 PR의 후속 한 커밋에 포함합니다.
+- **변경 파일:** `scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh`, `test/commerce-private-claim-restored-replay-guard.test.mjs`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 기존 복원 실행 스크립트가 Claim private relation이 있는 경우, 각 **삭제 대상 Subject**의 기존 Claim 건수를 finalizer 실행 전 수량으로만 확인하고, 1건 이상 존재한 Subject가 있었는지 집계합니다. 기존 finalizer·completion replay 이후 각각 0건인 강제 조건은 그대로 유지합니다. 복원 증거는 (a) relation 부재, (b) relation 존재하지만 원래 Claim이 없어 **삭제 입증 불가**, (c) 원래 Claim이 존재했고 최종/재실행 후 0건인 **삭제 관측**을 별도로 표시하고 `private_withdrawal_claim_deletion_witnessed` 부울을 제공합니다. 원본 Subject ID·Claim 본문을 결과에 노출하지 않습니다.
+- **테스트 근거:** `test/commerce-private-claim-restored-replay-guard.test.mjs`의 정적 계약에 삭제 전 조회 위치·대상 결속·수량 검증·증거 표기 분기를 추가했습니다. 기존 2320 계정 삭제 SQL이나 개인정보 보존 규칙은 수정하지 않았습니다.
+- **CI 근거:** 직전 `b36d58330027`의 [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42389940666)에서 Work Track · commerce, commerce-payment, commerce-entitlement 및 content/runtime은 PASS, PostgreSQL17·db-authority-core는 조회 시 실행 중이었습니다. 전체 성공이나 이번 커밋의 CI 성공으로 표기하지 않습니다. 신규 CI/Pg17 실증은 **미확인, PASS 미선언**입니다.
+- **완료·미완료·블로커·다음:** 이번 복원 증거 표기의 코드/계약 테스트와 WORKLOG 기록 완료. 실제 복원된 PostgreSQL에서 비어 있지 않은 Claim 삭제 입증, 취소 Provider NEWER/STALE, 정확한 Reader T2 회수, 실제 소비자 전달 입증 및 전체 E2E는 미완료입니다. 새 커밋의 CI를 확인하고 실패를 수정한 후 로드맵을 계속합니다. 운영 DB·실제 환불 POST·공개 LIVE 적용 없음, 승인 요청 없음.

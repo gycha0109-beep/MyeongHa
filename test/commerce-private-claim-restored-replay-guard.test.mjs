@@ -22,6 +22,8 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain("restored_claim_relation");
     expect(restore).toContain("'schema-absent-no-private-claim-proof'");
     expect(restore).toContain("'exact-subject-after-finalizer-and-completion-pass'");
+    expect(restore).toContain("'exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness'");
+    expect(restore).toContain('private_withdrawal_claim_deletion_witnessed');
     expect(restore.indexOf('restored_claim_relation=')).toBeGreaterThan(
       restore.indexOf(' -f "$plan"')
     );
@@ -43,6 +45,25 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain('private_claim_verified_subjects');
     expect(restore).toContain('"$private_claim_verified_subjects" -eq "$account_deletion_count"');
     expect(restore).not.toContain('private_claim_count" == "1"');
+  });
+
+  it('separates an actually witnessed private claim DELETE from a zero-row restore',()=>{
+    expect(restore).toContain('private_claim_preexisting_subjects=0');
+    expect(restore).toContain('private_claim_pre_finalizer_count=');
+    expect(restore).toContain('private_claim_preexisting_subjects=$((private_claim_preexisting_subjects + 1))');
+    expect(restore).toContain('preExistingClaimSubjectCount > 0');
+    expect(restore).toContain('claimDeletionWitnessed');
+    // Only the same Subject is counted; no payload or Subject ID in the
+    // restored evidence output, and no artificial claim is seeded.
+    const before=restore.indexOf('private_claim_pre_finalizer_count=');
+    const finalizer=restore.indexOf('finalizer="$(');
+    const after=restore.indexOf('private_claim_count=');
+    expect(before).toBeGreaterThan(restore.indexOf('[[ "$phase" == "db_finalization_required" ]]'));
+    expect(before).toBeLessThan(finalizer);
+    expect(finalizer).toBeLessThan(after);
+    expect(restore).toContain("where subject_id='$subject_id'::uuid;");
+    expect(restore).not.toContain('insert into public.digital_reading_withdrawal_claims_private_v1');
+    expect(restore).toContain('private_claim_preexisting_subjects" -le "$private_claim_verified_subjects"');
   });
   it('reuses existing PG17 deletion/other-Subject/restore-residue assertions',()=>{
     expect(originalDeletionProof).toContain('after-finalization)');

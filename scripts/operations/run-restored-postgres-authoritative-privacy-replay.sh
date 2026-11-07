@@ -189,6 +189,7 @@ restored_claim_relation="$("${psql_base[@]}" -Atqc "
 ")"
 [[ "$restored_claim_relation" == "absent" || "$restored_claim_relation" == "present" ]]
 private_claim_verified_subjects=0
+private_claim_preexisting_subjects=0
 
 account_deletion_count=0
 while IFS=$'\t' read -r subject_id deletion_job_id outbox_event_id; do
@@ -225,6 +226,20 @@ while IFS=$'\t' read -r subject_id deletion_job_id outbox_event_id; do
     commit;
   ")"
   [[ "$phase" == "db_finalization_required" ]]
+
+  if [[ "$restored_claim_relation" == "present" ]]; then
+    # Inspect ONLY the deletion target Subject before finalization. Without a
+    # surviving pre-finalizer row, a subsequent zero count proves absence but
+    # does not prove that this replay removed a private withdrawal Claim.
+    private_claim_pre_finalizer_count="$("${psql_base[@]}" -Atqc "
+      select count(*) from public.digital_reading_withdrawal_claims_private_v1
+      where subject_id='$subject_id'::uuid;
+    ")"
+    [[ "$private_claim_pre_finalizer_count" =~ ^(0|[1-9][0-9]*)$ ]]
+    if [[ "$private_claim_pre_finalizer_count" != "0" ]]; then
+      private_claim_preexisting_subjects=$((private_claim_preexisting_subjects + 1))
+    fi
+  fi
 
   finalizer="$("${psql_base[@]}" -Atqc "
     begin;
@@ -337,8 +352,10 @@ done < <(jq -r '.events[] | select(.type == "ACCOUNT_DELETION_STARTED") | [.subj
 [[ "$account_deletion_count" -eq "$(jq -r '.eventTypeCounts.ACCOUNT_DELETION_STARTED' "$public_manifest")" ]]
 if [[ "$restored_claim_relation" == "present" ]]; then
   [[ "$private_claim_verified_subjects" -eq "$account_deletion_count" ]]
+  [[ "$private_claim_preexisting_subjects" -le "$private_claim_verified_subjects" ]]
 else
   [[ "$private_claim_verified_subjects" -eq 0 ]]
+  [[ "$private_claim_preexisting_subjects" -eq 0 ]]
 fi
 
 mkdir -p "$(dirname "$PRIVACY_RECONCILIATION_EVIDENCE_PATH")"
@@ -350,7 +367,8 @@ node - \
   "$PRIVACY_RECONCILIATION_LEDGER_RUN_ID" \
   "$PRODUCTION_PRIVACY_CANARY_RUN_ID" \
   "$PRIVACY_RECONCILIATION_INCIDENT_REFERENCE_UTC" \
-  "$restored_claim_relation" <<'NODE'
+  "$restored_claim_relation" \
+  "$private_claim_preexisting_subjects" <<'NODE'
 import { readFile, writeFile } from 'node:fs/promises';
 
 const report = JSON.parse(await readFile(process.argv[2], 'utf8'));
@@ -361,9 +379,18 @@ const ledgerRunId = Number(process.argv[6]);
 const canaryRunId = Number(process.argv[7]);
 const incidentReferenceUtc = process.argv[8];
 const restoredClaimRelation = process.argv[9];
+const preExistingClaimSubjectCount = Number(process.argv[10]);
 if (restoredClaimRelation !== 'present' && restoredClaimRelation !== 'absent') {
   throw new Error('restored withdrawal claim evidence state unavailable');
 }
+if (!Number.isSafeInteger(preExistingClaimSubjectCount) ||
+    preExistingClaimSubjectCount < 0 ||
+    (restoredClaimRelation === 'absent' && preExistingClaimSubjectCount !== 0) ||
+    preExistingClaimSubjectCount > publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED) {
+  throw new Error('restored withdrawal claim pre-finalization witness unavailable');
+}
+const claimDeletionWitnessed = restoredClaimRelation === 'present' &&
+  preExistingClaimSubjectCount > 0;
 
 const evidence = {
   schema_version: 'myeongha-postgres-restored-db-authoritative-privacy-reconciliation-v1',
@@ -382,9 +409,12 @@ const evidence = {
   hosted_auth_provider_ack: 'production-canary-separate-plus-isolated-row-removal',
   personalization_access_resurrection_guard: 'pass',
   commerce_p5y_retention_guard: 'pass',
-  private_withdrawal_claim_replay_guard: restoredClaimRelation === 'present'
-    ? 'exact-subject-after-finalizer-and-completion-pass'
-    : 'schema-absent-no-private-claim-proof',
+  private_withdrawal_claim_replay_guard: restoredClaimRelation === 'absent'
+    ? 'schema-absent-no-private-claim-proof'
+    : claimDeletionWitnessed
+      ? 'exact-subject-after-finalizer-and-completion-pass'
+      : 'exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness',
+  private_withdrawal_claim_deletion_witnessed: claimDeletionWitnessed,
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
