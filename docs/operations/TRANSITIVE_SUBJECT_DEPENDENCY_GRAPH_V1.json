@@ -5,16 +5,16 @@
   "graphAuthority": "SCHEMA_DISCOVERED_POLICY_NEUTRAL",
   "executionAuthorized": false,
   "discovery": {
-    "edgeCount": 140,
-    "distinctReachableTableCount": 59,
+    "edgeCount": 149,
+    "distinctReachableTableCount": 62,
     "maxDepth": 4,
     "depthCounts": {
-      "1": 30,
-      "2": 47,
-      "3": 59,
+      "1": 31,
+      "2": 51,
+      "3": 63,
       "4": 4
     },
-    "directDepthOneEdgeCount": 30
+    "directDepthOneEdgeCount": 31
   },
   "edges": [
     {
@@ -74,6 +74,19 @@
       "parentTable": "subjects",
       "childTable": "commerce_receipts",
       "constraintName": "commerce_receipts_subject_fk",
+      "childColumns": [
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 1,
+      "parentTable": "subjects",
+      "childTable": "commerce_saju_records_v1",
+      "constraintName": "commerce_saju_records_subject_fk",
       "childColumns": [
         "subject_id"
       ],
@@ -587,6 +600,34 @@
     {
       "minDepth": 2,
       "parentTable": "commerce_receipts",
+      "childTable": "commerce_saju_upgrade_receipt_links_v1",
+      "constraintName": "commerce_saju_upgrade_receipt_links_source_fk",
+      "childColumns": [
+        "source_receipt_id"
+      ],
+      "parentColumns": [
+        "id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_receipts",
+      "childTable": "commerce_saju_verified_refund_effects_v1",
+      "constraintName": "commerce_saju_verified_refund_effect_receipt_fk",
+      "childColumns": [
+        "receipt_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_receipts",
       "childTable": "entitlement_events",
       "constraintName": "entitlement_events_receipt_subject_fk",
       "childColumns": [
@@ -606,6 +647,21 @@
       "constraintName": "entitlement_grants_source_receipt_subject_fk",
       "childColumns": [
         "source_receipt_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "commerce_saju_records_v1",
+      "childTable": "commerce_saju_purchase_origins_v1",
+      "constraintName": "commerce_saju_purchase_origins_record_subject_fk",
+      "childColumns": [
+        "saju_record_id",
         "subject_id"
       ],
       "parentColumns": [
@@ -883,6 +939,21 @@
     {
       "minDepth": 2,
       "parentTable": "purchase_intents",
+      "childTable": "commerce_saju_purchase_origins_v1",
+      "constraintName": "commerce_saju_purchase_origins_intent_subject_fk",
+      "childColumns": [
+        "purchase_intent_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 2,
+      "parentTable": "purchase_intents",
       "childTable": "purchase_intent_reader_selections",
       "constraintName": "purchase_intent_reader_selections_intent_fk",
       "childColumns": [
@@ -1140,6 +1211,36 @@
     {
       "minDepth": 3,
       "parentTable": "birth_profile_revisions",
+      "childTable": "commerce_saju_purchase_origins_v1",
+      "constraintName": "commerce_saju_purchase_origins_birth_subject_fk",
+      "childColumns": [
+        "birth_revision_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
+      "childTable": "commerce_saju_records_v1",
+      "constraintName": "commerce_saju_records_birth_subject_fk",
+      "childColumns": [
+        "birth_revision_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "birth_profile_revisions",
       "childTable": "reading_sessions",
       "constraintName": "reading_sessions_source_birth_subject_fk",
       "childColumns": [
@@ -1204,6 +1305,23 @@
       "constraintName": "ai_execution_logs_turn_attempt_fk",
       "childColumns": [
         "turn_attempt_id",
+        "turn_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "turn_id",
+        "subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "chat_turn_attempts",
+      "childTable": "character_reading_artifacts",
+      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
+      "childColumns": [
+        "attempt_id",
         "turn_id",
         "subject_id"
       ],
@@ -1491,6 +1609,21 @@
     {
       "minDepth": 3,
       "parentTable": "commerce_provider_events",
+      "childTable": "commerce_saju_verified_refund_effects_v1",
+      "constraintName": "commerce_saju_verified_refund_effect_event_fk",
+      "childColumns": [
+        "provider_event_id",
+        "subject_id"
+      ],
+      "parentColumns": [
+        "id",
+        "resolved_subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "commerce_provider_events",
       "childTable": "entitlement_events",
       "constraintName": "entitlement_events_provider_event_subject_fk",
       "childColumns": [
@@ -1500,6 +1633,19 @@
       "parentColumns": [
         "id",
         "resolved_subject_id"
+      ],
+      "disposition": "UNDECIDED"
+    },
+    {
+      "minDepth": 3,
+      "parentTable": "commerce_saju_purchase_origins_v1",
+      "childTable": "commerce_saju_upgrade_receipt_links_v1",
+      "constraintName": "commerce_saju_upgrade_receipt_links_child_fk",
+      "childColumns": [
+        "child_purchase_intent_id"
+      ],
+      "parentColumns": [
+        "purchase_intent_id"
       ],
       "disposition": "UNDECIDED"
     },
@@ -2013,23 +2159,6 @@
       ],
       "parentColumns": [
         "id"
-      ],
-      "disposition": "UNDECIDED"
-    },
-    {
-      "minDepth": 3,
-      "parentTable": "chat_turn_attempts",
-      "childTable": "character_reading_artifacts",
-      "constraintName": "character_reading_artifacts_attempt_turn_subject_fk",
-      "childColumns": [
-        "attempt_id",
-        "turn_id",
-        "subject_id"
-      ],
-      "parentColumns": [
-        "id",
-        "turn_id",
-        "subject_id"
       ],
       "disposition": "UNDECIDED"
     },

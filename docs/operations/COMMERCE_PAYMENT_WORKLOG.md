@@ -744,3 +744,9 @@
 - **수정:** 신규 forward-only migration `2360_paid_handoff_member_gate_v1.sql`에서 handoff-context query를 Member 검증 wrapper로 교체하고, 이전 query 구현은 API executor가 직접 실행할 수 없도록 내부 전용으로 전환했습니다. HTTP 경계도 Guest를 `LOGIN_REQUIRED`로 PostgreSQL 연결 전에 거부합니다.
 - **검증:** Guest handoff-context DB query 거부, API HTTP Guest 거부, private query ACL을 회귀 검사에 추가했습니다.
 - **범위 보존:** server-side payment verification은 이미 발생한 provider 사실을 확인하는 별도 경로이므로 이 변경으로 막지 않습니다. Guest 무료 이용 흐름도 변경하지 않습니다.
+
+### 2026-11-07 — 사주 Record 신규 FK의 전체 Subject 의존성 목록 동기화
+
+- **실패 근거:** [PR #3090 DB 권한 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42364797597/job/128380535690)에서 실제 전체 마이그레이션은 성공했으나, 계정 Subject를 기준으로 추적하는 전이 FK 목록이 기존 140개인 반면 최신 DB에는 149개가 존재해 검증이 중단됐습니다.
+- **수정:** 기존 목록에 신규 Saju Record/Origin/Upgrade Link/Verified Refund Evidence 연결 9개를 실제 제약 이름·참조 컬럼·최소 깊이 그대로 추가하고, 연결 149개·직접 연결 31개를 검증하도록 갱신했습니다. 기존 Wallet 4개 예외와 최대 경로 깊이 4 조건은 유지합니다.
+- **정책:** 이 그래프는 FK 구조 목록이며 테이블의 보존·삭제 여부를 새로 승인하지 않습니다. 기존 계정 삭제·개인정보 삭제/금융 증거 보존 정책과 실행 경계를 그대로 유지하며, 새 CI 및 PG17 통과 전 완료 선언을 하지 않습니다.

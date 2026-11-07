@@ -116,7 +116,7 @@ order by
 SQL
 )"
 
-# The 140-edge inventory is a historical frozen schema snapshot. New signup
+# The inventory is pinned to the current migrated schema; new tables must be classified before updating. New signup
 # wallet edges are separately governed DELETE, never retained Commerce evidence.
 wallet_edges="$(printf '%s\n' "$actual" | awk -F '|' '$3 ~ /^chat_credit_/ { print }' | sort)"
 expected_wallet_edges="$(printf '%s\n' \
@@ -143,13 +143,13 @@ edge_count="$(printf '%s\n' "$actual" | sed '/^$/d' | wc -l | tr -d ' ')"
 direct_count="$(printf '%s\n' "$actual" | awk -F '|' '$1 == "1" { count += 1 } END { print count + 0 }')"
 max_depth="$(printf '%s\n' "$actual" | awk -F '|' 'BEGIN { max = 0 } $1 + 0 > max { max = $1 + 0 } END { print max }')"
 
-[[ "$edge_count" == "140" ]] || {
+[[ "$edge_count" == "149" ]] || {
   echo "Expected exactly 140 current reachable FK edges, found $edge_count." >&2
   exit 1
 }
 
-[[ "$direct_count" == "30" ]] || {
-  echo "Direct depth-1 edge count must stay consistent with #1063: expected=30 actual=$direct_count." >&2
+[[ "$direct_count" == "31" ]] || {
+  echo "Direct depth-1 edge count must stay consistent with the updated schema: expected=31 actual=$direct_count." >&2
   exit 1
 }
 
