@@ -34,3 +34,12 @@
 - **첫 PR HEAD** `dc8efc2d989be81e4840938db4b1c5359adf7c17`: [Governance #42405135373](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405135373) **PASS**, [Web PR #42405135422](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405135422) **PASS**, [CI #42405135391](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405135391)는 기록 당시 `Work Track · ops` 실행 중. DB dependency는 비선택에 따른 skipped 상태이며 PASS로 계산하지 않음.
 - **최종 판정 보류:** 본 WORKLOG 수정으로 PR HEAD가 갱신되므로 이전 HEAD 검사 결과를 새 SHA의 성공으로 대체하지 않음. 최종 HEAD CI와 필수 Integration, 실제 수정된 예약 원장 실행 성공은 각각 확인 필요.
 - **이후 실행:** CI 실패 원인이 이번 4파일 변경과 관련되면 같은 PR에서만 수정. 보호된 원장 생성 run을 앞서 실패했던 정확한 SHA로 반복하여 성공을 조작하지 않음.
+
+### 회귀 테스트 첫 CI 실패 및 수정 (2026-11-08)
+
+- 첫 PR HEAD `6c2dca506fe470f724850f7075abc44fdbc36ddd`에서 [CI #42405251458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405251458) **FAIL**: `Work Track · ops`의 `Check affected tests`, 새 테스트 `test/ops/production-privacy-ledger-predecessor.test.mjs` 6건 중 **5 PASS / 1 FAIL**, 전체 2,086 PASS / 1 FAIL. `CI Verify`는 해당 테스트 실패를 반영해 FAIL. 같은 SHA의 [Governance #42405251424](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405251424), [Web PR #42405251443](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405251443)는 PASS.
+- **실제 원인:** 새 회귀 테스트가 `verify-previous-privacy-ledger-snapshot-overlap.sh` 호출을 GitHub workflow YAML에서 직접 찾도록 작성됐으나 실제 호출은 workflow → `scripts/operations/export-production-postgres-privacy-recovery-ledger.sh` → `scripts/operations/verify-previous-privacy-ledger-snapshot-overlap.sh`의 간접 경로임. 기존 Production 원장 검사 자체 오류 아님.
+- **수정 파일/커밋:** `test/ops/production-privacy-ledger-predecessor.test.mjs`, `7368b9538df0f24dd82f67ab601e28d653cdef68`; workflow가 기존 exporter를 호출하는 것과 exporter가 기존 overlap guard를 호출하는 것을 모두 검사. 코드와 운영 권한/검증 범위 변경 없음.
+- **검증:** 변경된 테스트 파일을 GitHub 원격 브랜치에서 재읽어 실제 호출 경로와 일치하는 정규식 확인. 새 SHA의 GitHub Actions는 재실행 중이며 **성공 확인 전까지 미완료**.
+- **남은 과제:** 최종 HEAD CI·필수 통합 CI 통과, 병합, 새 `main`의 Production 예약 원장 실행 성공 검증.
+- **다음 작업:** 최신 검증에서 같은 오류가 해소됐는지 확인 후 필수 Integration 제출; 실패하면 같은 PR의 해당 원인만 수정. 성공한 PR CI를 Production 원장 성공으로 간주하지 않음.
