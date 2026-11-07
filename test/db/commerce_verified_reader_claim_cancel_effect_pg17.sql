@@ -28,6 +28,7 @@ declare
  v_recorded_response boolean;
  v_refund_confirm_denied boolean:=false;
  v_forged_refund_confirm_denied boolean:=false;
+ v_unrevoked_refund_confirm_denied boolean:=false;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -202,6 +203,61 @@ begin
           and status='submitted' and provider_request_status='REQUESTED')<>1
  then
    raise exception 'CLAIM_E2E_SUBMITTED_REQUEST_WRONGLY_CLAIMED_CONFIRMED';
+ end if;
+
+ -- A genuine-looking exact PortOne GET-shaped cancellation still cannot
+ -- confirm a refund BEFORE the corresponding Receipt's Reader Grant is
+ -- revoked. This is separate from the wrong-amount forged-event regression.
+ -- The nested exception subtransaction restores Receipt/Event after denial.
+ begin
+   update public.commerce_receipts
+     set verification_status='revoked'
+     where id=v_receipt.id and verification_status='verified';
+   insert into public.commerce_provider_events(
+     id,provider,external_event_id,event_type,external_transaction_id,
+     resolved_subject_id,resolution_source_type,resolved_receipt_id,
+     payload_fingerprint,provider_occurred_at,provider_ordering_key,
+     verified_payload_jsonb,status,received_at,environment,verifier_revision
+   ) values (
+     '1219d000-0000-4000-8000-000000000009'::uuid,
+     'portone_v2',
+     'myeongha:portone-v2:full-cancel:v1:synthetic-claim-b2-not-confirmed',
+     'Transaction.Cancelled',v_receipt.external_transaction_id,
+     v_subject,'receipt',v_receipt.id,
+     'hmac-sha256:k1:'||repeat('8',64),
+     pg_catalog.clock_timestamp()-interval '1 second',null,
+     pg_catalog.jsonb_build_object(
+       'schemaVersion','portone-full-cancel-verified-v1',
+       'paymentId',v_refund_reservation.payment_id,
+       'transactionId',v_receipt.external_transaction_id,
+       'cancellationId','synthetic-claim-b2-not-confirmed',
+       'environment','production',
+       'verifiedAmountMinor',v_receipt.verified_amount_minor,
+       'verifiedCurrency',v_receipt.verified_currency,
+       'evidenceFingerprint','hmac-sha256:k1:'||repeat('8',64),
+       'verifierRevision','portone-v2-payment-full-cancel-lookup-v1'
+     ),
+     'verified',pg_catalog.clock_timestamp(),'production',
+     'portone-v2-payment-full-cancel-lookup-v1'
+   );
+   perform public.internal_confirm_reader_full_refund_dispatch_v1(
+     v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+   );
+ exception when check_violation then
+   if sqlerrm='Refund receipt still unconfirmed by verified cancellation' then
+     v_unrevoked_refund_confirm_denied:=true;
+   else raise;
+   end if;
+ end;
+ if not v_unrevoked_refund_confirm_denied
+    or (select verification_status from public.commerce_receipts
+        where id=v_receipt.id)<>'verified'
+    or exists (select 1 from public.commerce_provider_events
+        where id='1219d000-0000-4000-8000-000000000009'::uuid)
+    or (select count(*) from public.entitlement_grants g
+        where g.source_receipt_id=v_receipt.id
+          and g.grant_source_type='purchase' and g.status='active')<1 then
+   raise exception 'CLAIM_E2E_UNREVOKED_ORIGINAL_GRANT_REFUND_CONFIRMED';
  end if;
 
  -- S1 MUST be acquired BEFORE provider Event / Grant row locks of

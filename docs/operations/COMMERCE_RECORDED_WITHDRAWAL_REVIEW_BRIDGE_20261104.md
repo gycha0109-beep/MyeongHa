@@ -30,3 +30,7 @@
 - 새로운 개발용 정방향 migration `2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql`은 기존 함수만 교체하여, 원본 Receipt, 유일한 결제 시도, 해당 Provider Event의 전체 취소 검증 payload를 **같은 DB 트랜잭션에서 다시 대조**합니다. 일치가 정확히 한 건일 때만 수동 결정 `confirmed` 상태를 허용합니다. 중복된 재시도는 기존 확인시각과 5년 보존 기준을 유지합니다.
 - 격리 PG17 시나리오는 **취소 ID와 회수 상태는 일치하지만 금액이 다른 가짜 Provider Event**를 잠깐 합성하고, 실제 DB 함수의 확인 거부·이전 상태 롤백·고객 상태의 `refund_processing` 유지가 성립하는지 검증합니다. 모든 작업은 기존 테스트 트랜잭션의 ROLLBACK 안에서 실행합니다.
 - **범위 제한:** 기존 법적 수동 승인과 검증된 PG GET을 대신하지 않으며, 운영 DB SQL 적용·실제 환불 POST·공개 권한/기능 활성화는 하지 않습니다. 신규 CI/PG17 실행이 완료되기 전에는 PASS를 주장하지 않습니다.
+## 2026-11-08 — 원결제 Grant가 남아 있는 환불 확정 차단
+
+- 2370 수동 최종 환불 확인은 원본 PortOne 취소 GET 증거 외에도 **같은 Receipt/Subject에서 발생한 모든 구매 Grant가 revoked**인지 재검사합니다. 다른 Receipt의 독립 구매권은 범위에서 제외합니다.
+- 격리 PostgreSQL 17 부정 시험에서 금액·통화·원거래 ID가 모두 맞는 합성 취소 증거와 revoked Receipt가 있어도 기존 구매 Grant가 활성이라면 고객 상태가 환불 확정으로 승격되지 않도록 합니다. Provider의 실제 취소 요청이나 실제 환불/법적 제공 완료를 수행하거나 증명하지는 않습니다.

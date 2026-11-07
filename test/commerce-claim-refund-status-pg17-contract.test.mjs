@@ -58,6 +58,10 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
     "pe.verified_payload_jsonb->>'cancellationId'",
     "pe.verified_payload_jsonb->>'evidenceFingerprint'",
     "pe.verified_payload_jsonb->>'verifierRevision'",
+    "grant_row.source_receipt_id=cr.id",
+    "grant_row.subject_id=cr.subject_id",
+    "grant_row.grant_source_type='purchase'",
+    "grant_row.status is distinct from 'revoked'",
     "attempt.provider_transaction_id=cr.external_transaction_id",
     "v_matching_source_count<>1",
   ])expect(confirmer).toContain(check);
@@ -67,13 +71,15 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   const p=e2eIndex(sql,'-- Regression of the old 2310 false-positive');
   expect(p).toBeGreaterThan(0);
   expect(sql).toContain('CLAIM_E2E_WRONG_AMOUNT_FULL_CANCEL_FALSE_REFUND_CONFIRMED');
+  expect(sql).toContain('CLAIM_E2E_UNREVOKED_ORIGINAL_GRANT_REFUND_CONFIRMED');
+  expect(sql).toContain('v_unrevoked_refund_confirm_denied:=true');
   expect(sql).toContain("v_receipt.verified_amount_minor+1");
  });
  it('keeps the private refund confirmation SQL out of historical catalog fixtures',()=>{
   const staged=readFileSync('test/db/staged_commerce_migration_policy.sh','utf8');
   expect(staged).toContain("$name" + "\" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql'");
   expect(staged).toContain("$inclusion\" == 'reader-integrated'");
-  expect(staged).toContain("expected='e6988be8f0c83af3c6be124c5604809c87d23540'");
+  expect(staged).toContain("expected='c73205cd64ec03f6793f375aafb9677ee3cd704b'");
   expect(staged).toContain('HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration"');

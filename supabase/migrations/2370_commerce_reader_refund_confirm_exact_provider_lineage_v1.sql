@@ -63,7 +63,73 @@ begin
     and cr.provider='portone_v2' and cr.environment='production'
     and cr.verification_status='revoked'
     and cr.verified_amount_minor>0
-    and cr.verified_currency ~ '^[A-Z]{3}$'
+    and cr.verified_currency ~ '^[A-Z]{3}
+      from public.commerce_payment_attempts attempt
+      where attempt.purchase_intent_id=cr.purchase_intent_id
+        and attempt.subject_id=cr.subject_id
+        and attempt.product_offer_id=cr.product_offer_id
+        and attempt.provider=cr.provider
+        and attempt.environment=cr.environment
+        and attempt.provider_transaction_id=cr.external_transaction_id
+        and attempt.provider_request_id=
+            pe.verified_payload_jsonb->>'paymentId'
+    )=1;
+  if v_matching_source_count<>1 then
+    raise exception 'Refund receipt still unconfirmed by verified cancellation'
+      using errcode='23514';
+  end if;
+
+  update public.commerce_reader_full_refund_dispatches_v1
+     set status='confirmed',
+         confirmed_at=coalesce(confirmed_at,pg_catalog.clock_timestamp()),
+         retained_until=greatest(
+           retained_until,pg_catalog.clock_timestamp()+interval '5 years'
+         )
+  where id=p_id;
+  return true;
+end;
+$reader_refund_confirm_exact_provider$;
+
+-- Preserve the private 2310 dispatch-only command boundary when replacing
+-- its function body. No direct customer or ordinary worker EXECUTE.
+revoke all on function public.internal_confirm_reader_full_refund_dispatch_v1(
+  uuid,text
+) from public;
+do $reader_refund_confirm_acl$
+declare v_role text;
+begin
+  for v_role in select rolname from pg_catalog.pg_roles
+    where rolname in (
+      'anon','authenticated','service_role','myeongha_api_executor',
+      'myeongha_worker_runtime','myeongha_system_executor',
+      'myeongha_seyeon_chat_runtime_owner'
+    )
+  loop
+    execute pg_catalog.format(
+      'revoke all on function public.internal_confirm_reader_full_refund_dispatch_v1(uuid,text) from %I',
+      v_role
+    );
+  end loop;
+end;
+$reader_refund_confirm_acl$;
+grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1(
+  uuid,text
+) to myeongha_commerce_internal_executor;
+
+comment on function public.internal_confirm_reader_full_refund_dispatch_v1(uuid,text)
+is 'Only a single exact original PortOne V2 GET-verified full cancellation with matched original payment attempt, Receipt, amount, currency, verifier revision, fingerprint and cancellation ID may confirm an owner-approved private Reader refund. No public caller grant or automatic refund execution.';
+
+    -- Full refund cannot be reported while any purchase right from THIS
+    -- exact original Receipt remains live or otherwise unreconciled.
+    -- Different Reader purchases from other Receipts are not considered.
+    and not exists (
+      select 1
+      from public.entitlement_grants grant_row
+      where grant_row.source_receipt_id=cr.id
+        and grant_row.subject_id=cr.subject_id
+        and grant_row.grant_source_type='purchase'
+        and grant_row.status is distinct from 'revoked'
+    )
     and (
       select count(*)
       from public.commerce_payment_attempts attempt

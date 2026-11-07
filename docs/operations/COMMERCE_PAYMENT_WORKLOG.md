@@ -1056,3 +1056,11 @@
 - **수정:** `test/db/staged_commerce_migration_policy.sh`에 정확한 2370 파일명/검토된 Git blob SHA를 적용하는 역사적 fixture 생략 분기를 추가하고, `reader-integrated` 환경에서는 기존과 같이 SQL을 적용합니다. 원본 migration과 환불 검증 조건은 변경하지 않습니다. `test/commerce-claim-refund-status-pg17-contract.test.mjs`에 분리 경로와 지문 변경 차단 계약 테스트를 추가합니다.
 - **검증·상태:** 기존 CI 실패 로그에 근거한 코드 수정입니다. 새 커밋의 GitHub CI 및 PostgreSQL 실제 실행 결과는 아직 미확인으로 PASS를 선언하지 않습니다. 기존 자동 병합 유지, LIVE/운영 DB/PortOne POST 미실행.
 - **남은 일:** 새 CI 결과 확인 및 실패 수정, Provider NEWER/STALE, 정확한 Reader/T2 회수, 소비자 공급 입증, 복원 실증과 전체 격리 E2E. 승인 요청 없음.
+
+### 2026-11-08 — 원결제 구매권이 남아 있는 경우 환불 확정 보류
+
+- **로드맵:** 승인된 §6-2·3·5. PortOne 원본 취소 증거 검증과 별개로 동일 원결제 Receipt의 구매권이 아직 활성·미회수인 상태에서 고객 환불 확정을 표시하지 않도록 보강합니다.
+- **구현:** 미배포 migration 2370의 기존 최종 확인 함수가 정확한 원본 Receipt/Subject에 속한 모든 구매 Grant가 `revoked`인지 검사합니다. 다른 Receipt/Reader의 독립 권한은 검사 범위에 넣거나 회수하지 않습니다. 신규 Entitlement Writer, 환불 POST, 법적 자동 결정은 만들지 않습니다.
+- **격리 검증:** 기존 PG17 ROLLBACK E2E에 원금·통화·취소 ID·검증 지문이 일치하는 합성 PortOne GET 형태의 취소 Event와 revoked Receipt를 넣더라도 동일 Receipt의 실제 Grant가 활성 상태이면 최종 확정을 거절하고 원상복구하는 부정 시나리오를 추가했습니다. 기존 금액 불일치 부정 회귀와 다른 회원 권리 보존도 유지합니다.
+- **CI 경계:** 2370 SQL의 변경된 Git blob SHA를 역사적 fixture 제외 정책에 다시 고정하고 계약 테스트를 갱신합니다. 신규 CI·진짜 PG17 실행 성공은 확인 전까지 미선언합니다.
+- **미완료:** provider NEWER/STALE 권한, Reader/T2 최종 동시성, 법적 제공 증명, 복원 실증, 전체 E2E. 운영 DB/실제 환불/LIVE 변경 없음, 별도 승인 없음.
