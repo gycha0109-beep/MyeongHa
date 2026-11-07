@@ -41,6 +41,11 @@ jobs:
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      - name: Install pinned Node.js for attempt-scoped evidence selection
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+
       - name: Fail closed unless recovery credentials are provisioned
         shell: bash
         run: |
@@ -217,23 +222,27 @@ jobs:
             exit 0
           fi
           [[ "$previous_run_id" =~ ^[1-9][0-9]*$ ]]
+          run_json="$RUNNER_TEMP/previous-privacy-ledger-run.json"
+          jobs_json="$RUNNER_TEMP/previous-privacy-ledger-attempt-jobs.json"
           artifacts_json="$RUNNER_TEMP/previous-privacy-ledger-artifacts.json"
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$previous_run_id" \
+            -o "$run_json"
+          previous_attempt="$(jq -er '.run_attempt | select(type == "number" and . >= 1)' "$run_json")"
+          curl -fsSL \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$previous_run_id/attempts/$previous_attempt/jobs?per_page=100" \
+            -o "$jobs_json"
           curl -fsSL \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H 'Accept: application/vnd.github+json' \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$previous_run_id/artifacts?per_page=100" \
             -o "$artifacts_json"
-          previous_artifacts="$(jq -c '[
-            .artifacts[]
-            | select(.expired == false and
-                (.name | test("^myeongha-privacy-ledger-[0-9]{8}T[0-9]{6}Z$")))
-          ]' "$artifacts_json")"
-          if [[ "$(jq 'length' <<<"$previous_artifacts")" != 1 ]]; then
-            echo '::error title=Privacy ledger predecessor missing::Prior successful ledger artifact is missing, ambiguous or expired; source continuity is unverified.'
-            exit 1
-          fi
-          echo "artifact_id=$(jq -er '.[0].id' <<<"$previous_artifacts")" >> "$GITHUB_OUTPUT"
-          echo "run_id=$previous_run_id" >> "$GITHUB_OUTPUT"
+          node scripts/operations/select-privacy-ledger-predecessor.mjs \
+            "$run_json" "$jobs_json" "$artifacts_json" >> "$GITHUB_OUTPUT"
 
       - name: Download previous encrypted privacy ledger
         if: steps.previous.outputs.artifact_id != ''
