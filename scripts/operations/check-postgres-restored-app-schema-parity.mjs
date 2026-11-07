@@ -64,7 +64,35 @@ function indexed(rows, kind, definition) {
   return map;
 }
 
+function sourceCatalogWitness(source) {
+  // A backup-run bracket is stronger evidence than a separate date-only
+  // observation, but it is NOT a shared PostgreSQL MVCC snapshot.
+  if (source.sourceCatalogProvenance === undefined) {
+    for (const key of ['sourceCatalogBracketStable', 'sourceCatalogBracketStartUtc',
+      'sourceCatalogBracketEndUtc', 'sourceCatalogBoundToBackupSnapshot']) {
+      assert.ok(!(key in source), 'Legacy observation has unexpected witness field: ' + key);
+    }
+    return {
+      provenance: 'legacy_date_only_observation',
+      hold: 'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS',
+    };
+  }
+  assert.equal(source.sourceCatalogProvenance, 'encrypted_backup_bracketed_readonly_v1');
+  assert.equal(source.sourceCatalogBracketStable, true);
+  assert.equal(source.sourceCatalogBoundToBackupSnapshot, false);
+  const utc = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/;
+  assert.match(source.sourceCatalogBracketStartUtc, utc);
+  assert.match(source.sourceCatalogBracketEndUtc, utc);
+  assert.ok(source.sourceCatalogBracketStartUtc <= source.sourceCatalogBracketEndUtc,
+    'Backup witness observation bracket must be ordered');
+  return {
+    provenance: source.sourceCatalogProvenance,
+    hold: 'SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT',
+  };
+}
+
 export function compareApplicationCatalog(source, restored, backupFrontier) {
+  const sourceWitness = sourceCatalogWitness(source);
   assert.equal(source.schemaVersion, schemaVersion);
   assert.equal(restored.schemaVersion, schemaVersion);
   assert.equal(source.transactionReadOnly, 'on');
@@ -126,8 +154,8 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     // catalog witness before making any causal restore-fidelity claim.
     sourceCatalogBoundToBackupSnapshot: false,
     restoreMismatchRootCauseProven: false,
-    sourceCatalogProvenanceHold:
-      'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS',
+    sourceCatalogProvenance: sourceWitness.provenance,
+    sourceCatalogProvenanceHold: sourceWitness.hold,
     sourcePostgresVersion: source.postgresqlVersion,
     restoredPostgresVersion: restored.postgresVersion,
     comparedScope: source.coverage,
