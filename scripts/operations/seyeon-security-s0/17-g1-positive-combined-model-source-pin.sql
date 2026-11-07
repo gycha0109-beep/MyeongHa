@@ -82,6 +82,47 @@ revoke all on function seyeon_private.pin_positive_model_context_sources_v1(
   uuid,uuid,text,text,text,text,text,text,text
 ) from public,anon,authenticated,service_role,myeongha_api_executor;
 
+-- The ordinary Member executor must NEVER get access to the private owner
+-- function. Give it a fixed public owner entrypoint, with EXECUTE revoked by
+-- default. An exact, separately approved production ACL change is required
+-- before the normal app role can invoke this function.
+-- The owner wrapper supplies no arbitrary SQL, role elevation or bypass:
+-- both immutable source Pins stay in the single private owner transaction.
+create function public.cmd_pin_seyeon_positive_model_context_sources_v1(
+  p_subject_id uuid,p_thread_id uuid,p_turn_id uuid,p_attempt_id uuid,
+  p_current_user_message_id uuid,p_recent_sources jsonb,
+  p_model_source_census_digest text,
+  p_record_id uuid,p_original_grant_id uuid,
+  p_record_type text,p_schema_version text,p_projector_version text,
+  p_selected_sources_digest text,p_projected_memory_digest text,
+  p_final_model_context_digest text,p_expected_record_pg_digest text
+) returns jsonb
+language plpgsql security definer
+set search_path=pg_catalog,public
+as $member_entry$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  return seyeon_private.pin_positive_model_context_sources_v1(
+    p_subject_id,p_thread_id,p_turn_id,p_attempt_id,
+    p_current_user_message_id,p_recent_sources,p_model_source_census_digest,
+    p_record_id,p_original_grant_id,p_record_type,p_schema_version,
+    p_projector_version,p_selected_sources_digest,p_projected_memory_digest,
+    p_final_model_context_digest,p_expected_record_pg_digest
+  );
+end
+$member_entry$;
+
+alter function public.cmd_pin_seyeon_positive_model_context_sources_v1(
+  uuid,uuid,uuid,uuid,uuid,jsonb,text,
+  uuid,uuid,text,text,text,text,text,text,text
+) owner to myeongha_seyeon_chat_runtime_owner;
+revoke all on function public.cmd_pin_seyeon_positive_model_context_sources_v1(
+  uuid,uuid,uuid,uuid,uuid,jsonb,text,
+  uuid,uuid,text,text,text,text,text,text,text
+) from public,anon,authenticated,service_role,myeongha_api_executor;
+
+-- No GRANT to API or anonymous roles in the installer. Positive Source
+-- Registry/model use, metered Provider and HTTP Reveal also remain OFF.
 revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
 commit;
