@@ -26,6 +26,13 @@ Private accept와 revoke의 Production factory도 기존 server-owned 승인 cal
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
 
+## 2026-11-08 운영 G1 승인 설치 — 최신 백업 복원 통과 후 DB 잠금 대기
+
+- **최신 복원 선행 조건 통과:** 암호화 운영 백업 [#42415093056](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415093056) SUCCESS, 산출물 `myeongha-postgres-20261107T211732Z`(artifact ID `13591083526`, 보존 기한 2026-12-07T21:20:39Z). 동일 백업의 첫 격리 복원 [#42416185560](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416185560)은 복원·구조비교·가상 개인정보 복구가 성공했지만 incident reference를 백업 종료 이전으로 입력해 증거 포장 단계에서 실패했다. 기준 시각만 수정해 **같은 백업**으로 재실행한 [#42416383688](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416383688)은 격리 복원·구조 비교·가상 개인정보 복구·증거 생성 모두 **SUCCESS**(증거 artifact `13591363096`). 앞선 실패를 복원 실패로 오기하지 않는다.
+- **운영 적용 시도 및 안전한 취소:** 운영 Supabase `cnsfpcdiyofqvhpcegfc`의 migration frontier `20261105075227`, 241개, 기존 함수·원본 타입 OFF 상태를 읽기로 재확인. 승인된 `16-g1-model-recent-source-pin.sql` 및 `17-g1-positive-combined-model-source-pin.sql`를 **단일 트랜잭션**에 넣고, 기존 관리자 `postgres`→NOLOGIN owner 역할의 멤버십이 `SET FALSE`로 설정된 상태를 보존하도록 `SET TRUE` 임시 전환·`SET FALSE` 복귀를 구성했다. 이 전환은 사전에 `BEGIN/ROLLBACK`으로 시험했고 영속 역할 변경이 없음을 확인했다. 실행은 PostgreSQL `55P03 lock_timeout`으로 실패했으며 거래 전체가 취소됐다. **16/17 함수·최근 출처 Pin 컬럼이 미설치이고 역할 SET 권한이 원래대로 false, Source Registry ON 0건**인 것을 사후 읽기 검증했다. 따라서 **운영 설치 완료나 실제 원본 Pin 성공은 아니다**.
+- **발견한 원인:** 외부 Supavisor 연결의 `idle in transaction` 상태가 `public.chat_turn_attempts`·`public.conversation_messages`에 `AccessShareLock`을 보유하여 구조 변경용 잠금과 충돌했다. 해당 세션 PID는 관측 시점 `3035490`이고 세션 식별은 일시적일 수 있다. 사용자 트래픽/다른 작업의 연결일 수 있어 강제 종료·잠금 해제·무제한 timeout 상향을 실행하지 않았다.
+- **다음 진행:** 해당 세션이 **자연 종료된 뒤** 잠금이 해제됐는지 확인 → 같은 승인·정확한 16→17 SQL, 단일 롤백 가능 트랜잭션과 한정된 lock timeout으로 재적용 → public 결합 명령만 회원 실행 계정에 실행 허용 → 공개/내부 함수 ACL 및 OFF Registry·기존 회수·ACK 보존을 검증. D1~D5 제품 승인, G4 과금, Source Registry ON, G3 공개·배포는 범위 밖이다. 트랙은 `security`로 유지하고 운영/DR 별도 트랙 작업은 만들지 않는다.
+
 ## 2026-11-08 운영 G1 설치 승인 및 현재 보류 사유
 
 - **승인됨:** 사용자가 운영 명하 Supabase `cnsfpcdiyofqvhpcegfc`에 검증된 G1 원본 연결용 `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql` 설치 및 `myeongha_api_executor`에 정확한 public 통합 RPC `cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)`만 EXECUTE 허용하는 **좁은 운영 DB 변경**을 명시 승인했다. 이 승인은 Source Registry 활성화, G4 유료 모델/크레딧, G3 HTTP 송출·공개 활성화가 아니다.
