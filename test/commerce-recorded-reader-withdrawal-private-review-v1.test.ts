@@ -284,8 +284,10 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
-  it('keeps revoked Claim when optional cancellation source SQL fails',async()=>{
-    const f=fixture({purchasedRows:[],queryFailure:'cancel'});
+  it('keeps revoked Claim with retained S7 when optional cancellation source SQL fails',async()=>{
+    // Explicitly seed historical S7: revoked purchases do not imply a
+    // surviving delivery record, and the default fixture deliberately omits it.
+    const f=fixture({purchasedRows:[],s7Rows:[S7],queryFailure:'cancel'});
     const r=await run(f);
     expect(r).toMatchObject({
       kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,

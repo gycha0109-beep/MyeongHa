@@ -901,3 +901,13 @@
 - **테스트 근거:** `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`에 정상/권한 회수된 구매의 선택적 S7·취소 조회 SQL 실패, 원본 구매/고지 쿼리 실패 시 SAVEPOINT 복구, 수동 검토·접수 보존, 잘못된 증거 거부를 확인하도록 갱신했습니다. 새 커밋의 공식 CI/PostgreSQL17 결과는 아직 확인 전으로 PASS 미선언입니다.
 - **미완료·블로커·다음:** Provider NEWER/STALE 최신성, 실제 Reader T2 원자적 회수, 소비자 법적 전달 입증, 복원 후 개인정보 replay, 전체 격리 구매→취소→삭제 E2E 미완료. [직전 커밋 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42388038283)는 작업 시작 시 완료 미확정이므로 새 커밋의 검증으로 추정하지 않습니다. CI 결과에 따라 실패 수정 후 승인 로드맵 계속 구현. 운영 DB·실제 환불 POST·LIVE는 비활성, 승인 요청 없음.
 
+### 2026-11-08 — 취소 증거 조회 장애 회귀 테스트의 전달 이력 fixture 보정
+
+- **작업 목표/로드맵:** 결제 승인 로드맵 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6의 3번·5번. 이미 접수된 청약철회 기록에 대해 과거 S7 이력과 선택 취소 증거 조회 실패가 동시에 존재하는 사례의 회귀 테스트를 실제 스냅샷 조건에 맞게 보정했습니다.
+- **현재 기준:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, PR [#3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 직전 커밋 `54767ade4adb1c05fc5b697a54f1b3f16fd7c981` (open, auto-merge on). `main`은 `9740e36ed1c6c49a9eb771c0048b890aa70e0e03` 조회 시점 기준.
+- **CI 실패 원인:** [Work Track · commerce](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42389216314/job/128453079343)에서 `keeps revoked Claim when optional cancellation source SQL fails` 1건 실패. fixture가 `purchasedRows:[]`이면 별도 `s7Rows`를 지정하지 않은 경우 과거 S7 SQL 결과도 **빈 배열**로 반환하도록 설계돼 있는데, 새 테스트는 S7 기록이 존재한다고 기대했습니다. 직전 CI는 전체 성공이 아닙니다 (Work Track 1 fail, 당시 DB-authority/PG17 진행 중).
+- **변경 파일:** `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md` (코드 수정 없음).
+- **실제 수정:** 이 테스트에서만 `s7Rows:[S7]`를 명시하여 '현재 결제 증거는 없지만 보존된 과거 S7이 존재하고, 선택적인 취소 원장 읽기가 실패하는' 사례를 재현합니다. 기존 S7가 실제로 없는 경우의 null/HOLD 판정이나 SQL의 안전 격리 코드는 변경하지 않습니다.
+- **테스트/검증:** GitHub CI 실패의 expected/received 차이와 fixture의 빈 S7 반환 조건을 원문 대조했습니다. 수정한 신규 커밋의 GitHub Vitest/PG17/전체 CI **검증 결과는 아직 미확정이므로 PASS 미선언**입니다.
+- **완료/미완료:** 테스트 fixture 모순 및 WORKLOG 정리 완료. Provider 순서·최종성 검증, 실제 Reader T2 권한 회수, 서버 독립 제공 증거, 복원 후 privacy replay 및 구매→취소→삭제 격리 E2E는 여전히 미완료입니다.
+- **블로커/다음:** 새 CI 결과가 해당 수정의 필수 검증이며, 실패하면 수정 후 승인 로드맵 작업을 이어갑니다. 실제 PG 취소/환불 POST·운영 DB·공개 LIVE 활성화 미실행, 추가 승인 요청 없음.
