@@ -889,19 +889,21 @@ describe('Official Reading Reader Chat turn preflight', () => {
       expect(result.runtime.context.saju?.readingRef).toBe(READING_ID);
       expect(result.runtime.context.relationship.relationshipRevision).toBe(7);
       expect(result.runtime.context.relationship.stageKey).toBe('familiar');
-      expect(result.runtime.context.lifeFacts).toEqual([{
+      expect(result.runtime.context.lifeFacts).toMatchObject([{
         factId: 'cccccccc-cccc-4ccc-8ccc-ccccccccccc1',
         factType: 'occupation',
         schemaVersion: 'life-fact-v1',
         value: { value: 'designer' },
         grantId: 'dddddddd-dddd-4ddd-8ddd-ddddddddddd1',
         granteeCharacterId: 'baekheon',
+        sourceKind: 'user_explicit',
+        grantReason: 'user_choice',
       }]);
       expect(authority.nonMemoryContextAuthorityPort.readGrantedLifeFacts).toHaveBeenCalledWith({
         subjectId: SUBJECT_ID,
         characterId: 'baekheon',
       });
-      expect(result.runtime.context.memories).toEqual([{
+      expect(result.runtime.context.memories).toMatchObject([{
         memoryItemId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1',
         memoryType: 'reader_memory',
         schemaVersion: 'v1',

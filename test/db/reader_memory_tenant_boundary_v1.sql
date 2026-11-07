@@ -129,7 +129,7 @@ INSERT INTO public.record_access_grants(
 -- Match a trusted server request transaction: role and resolved Subject pinned.
 SET LOCAL ROLE myeongha_api_executor;
 SELECT pg_catalog.set_config('myeongha.subject_id', 'a7200000-0000-4000-8000-000000000001', true);
-DO $
+DO $$
 DECLARE
   v_count bigint;
   v_constraint text;
