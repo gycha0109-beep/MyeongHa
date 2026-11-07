@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
+import { classifyTaegyeomLanguageTransportFailure } from './operations/classify-taegyeom-language-transport-failure.mjs';
 import { CHARACTER_RUNTIME_AUTHORING_V1 } from '../dist/packages/character-content/src/runtime-authoring-v1.js';
 
 const KEY = process.env.OPENROUTER_API_KEY?.trim();
@@ -104,17 +105,23 @@ async function callModel({ spec, repeat, model, variant }) {
   };
   const t0 = performance.now();
   attempted++;
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST', redirect: 'error',
-    headers: { authorization: 'Bearer ' + KEY, 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60000),
-  });
+  let response;
+  try {
+    response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST', redirect: 'error',
+      headers: { authorization: 'Bearer ' + KEY, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    });
+  } catch (error) {
+    throw new Error(classifyTaegyeomLanguageTransportFailure(error));
+  }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error('LANGUAGE_AB_HTTP_' + response.status + '_' + model.replaceAll(/[^a-z0-9]+/giu, '_'));
   }
-  const payload = await response.json();
+  let payload;
+  try { payload = await response.json(); } catch { throw new Error('LANGUAGE_AB_RESPONSE_JSON_INVALID_HOLD'); }
   const choice = payload?.choices?.[0];
   if (choice?.finish_reason !== 'stop' || typeof choice.message?.content !== 'string') {
     throw new Error('LANGUAGE_AB_INCOMPLETE_RESPONSE');
