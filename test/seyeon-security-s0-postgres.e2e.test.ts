@@ -1404,14 +1404,22 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
 
   it('stops model/write/Reveal admission without deleting data or removing consent withdrawal', async () => {
     const { rows: [before] } = await pool.query('select count(*)::int as n from public.memory_items');
+    const combinedSignature =
+      'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)';
+    const { rows: [admitted] } = await pool.query(
+      "select has_function_privilege('myeongha_api_executor', $1::text, 'EXECUTE') as enabled",
+      [combinedSignature],
+    );
+    expect(admitted.enabled).toBe(true);
     await pool.query(readFileSync(new URL('../scripts/operations/seyeon-security-s0/stop-positive-use.sql', import.meta.url), 'utf8'));
     const { rows: [state] } = await pool.query(`select
       not exists(select 1 from public.seyeon_positive_source_type_registry_v1 where enabled or writable_enabled) as stopped,
+      not has_function_privilege('myeongha_api_executor', $1::text, 'EXECUTE') as no_combined_pin,
       not has_function_privilege('myeongha_api_executor',
         'public.qry_seyeon_positive_first_memory_locked_reveal_v3(uuid,uuid,uuid,uuid,uuid,uuid,uuid,text)','EXECUTE') as no_reveal,
       has_function_privilege('myeongha_api_executor',
         'seyeon_private.cmd_revoke_seyeon_memory_grant_v1(uuid,uuid)','EXECUTE') as can_revoke,
-      (select count(*)::int from public.memory_items) as n`);
-    expect(state).toEqual({ stopped: true, no_reveal: true, can_revoke: true, n: before.n });
+      (select count(*)::int from public.memory_items) as n`, [combinedSignature]);
+    expect(state).toEqual({ stopped: true, no_combined_pin: true, no_reveal: true, can_revoke: true, n: before.n });
   });
 });
