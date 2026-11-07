@@ -3,7 +3,8 @@ set -euo pipefail
 umask 077
 fail(){ echo "::error title=Isolated product proof::$1" >&2; exit 1; }
 [[ "${GITHUB_ACTIONS:-}" == true && "${GITHUB_REPOSITORY:-}" == "gycha0109-beep/MyeongHa" &&
-  "${GITHUB_EVENT_NAME:-}" == workflow_dispatch && "${GITHUB_REF:-}" == refs/heads/main ]] ||
+  ( "${GITHUB_EVENT_NAME:-}" == workflow_dispatch || "${GITHUB_EVENT_NAME:-}" == push ) &&
+  "${GITHUB_REF:-}" == refs/heads/main ]] ||
   fail 'Only the manual main runner may execute the real synthetic chain.'
 [[ "${GITHUB_SHA:-}" =~ ^[a-f0-9]{40}$ && -n "${GITHUB_WORKSPACE:-}" && -n "${RUNNER_TEMP:-}" ]] ||
   fail 'Runner identity missing.'
@@ -31,6 +32,14 @@ case "$experiment" in
   saju_cpu) COMPOSE_PROFILES=sustained,cpu-pressure; MH_OPS_AUTH_JWT_EXP_SECONDS=1800 ;;
   *) fail 'Unknown isolated product experiment.' ;;
 esac
+if [[ "${GITHUB_EVENT_NAME:-}" == push ]]; then
+  [[ "$experiment" == workerd_db_failover ]] ||
+    fail 'Main push only authorizes the exact isolated DB outage experiment.'
+  [[ "$(git -C "$GITHUB_WORKSPACE" show -s --format=%s HEAD)" =~ ^test\\(ops\\):\\ prove\\ isolated\\ workerd\\ DB\\ outage\\ recovery\\ \\(\\#[0-9]+\\)$ ]] ||
+    fail 'One-shot push subject is not the reviewed DB outage proof.'
+  [[ "$(cat "$GITHUB_WORKSPACE/.github/ops/phase11-workerd-db-failover-20261108.once")" == 'PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V1' ]] ||
+    fail 'One-shot DB outage marker is absent or unreviewed.'
+fi
 
 source_sha=9807ce89c08afc61b587560d515a475efd819032
 saju="$GITHUB_WORKSPACE/_isolated_saju"
