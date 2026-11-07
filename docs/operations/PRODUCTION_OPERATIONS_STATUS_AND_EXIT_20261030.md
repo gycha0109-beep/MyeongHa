@@ -8,6 +8,16 @@
 - **테스트·CI 근거:** 연결된 명하 Production PG17의 `pg_proc`, `pg_namespace`, `pg_class`, `pg_constraint`, `pg_policy`를 SELECT-only 질의해 함수 8/8·테이블 2/2·제약조건 3/3 및 역할 실행/직접 DML 결과 확보; 트랜잭션 read-only 확인. 기존 source version 8쌍은 sanitized 원장 자료에서 검증. 신규 커밋 CI 결과는 아직 미확인.
 - **블로커·다음 작업:** 읽기 전용 실측은 완료, 실제 full SQL/DDL/ACL/provenance 증명은 계속 필요. Production repair/DDL/DML, Hosted DR 자원, 개인정보 Canary, secret/Provider/traffic 변경은 범위별 사용자 승인 전 실행 금지. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
 
+### 2026-11-07 / Phase 8-A — 저장소 전용 마이그레이션 76건 분류
+
+- **작업 목표:** 기존 Production 원장에는 없는 저장소 SQL 버전 76개를 전수 분류하되 배포 완료 여부는 추정하지 않는다. 별도 WORKLOG 대신 이 기존 ops 트랙 WORKLOG에 기록한다.
+- **변경 파일:** `docs/operations/POSTGRES_REPOSITORY_ONLY_VERSION_DISPOSITION_20261107.json` (76건 근거), 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` (본 기록). 중복 생성된 `docs/operations/WORKLOG_PHASE8_REPOSITORY_ONLY_DISPOSITION_20261107.md`는 제거. Production SQL·애플리케이션·워크플로 변경 없음.
+- **완료:** 기존 읽기 전용 `POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json`의 repository-only 버전 76건과 현재 저장소의 SQL 276개를 독립 대조. 76/76 버전 일치, 중복 0, 누락 0, 파일명 불일치 0, 관측 뒤 migration 파일 변경 0. 파일명 기준 Reader 60, Saju 6, Commerce 2, 버전 이동 Commerce 8건으로 분류. 기존 8쌍 SQL byte-exact 4건·종료문 차이 4건을 이력으로만 기록하며 버전/적용 provenance는 불일치·미입증 유지.
+- **미완료:** 76건의 실제 객체·DDL·권한·배포 출처 동등성, 원격 전용 41건과 전체 migration ledger/Provider parity, Hosted Auth/Storage, 독립 Privacy 연속성 및 전체 서비스 RPO/RTO. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
+- **브랜치·커밋·PR:** `ops/phase8-repository-only-disposition-20261107` / PR [#3105](https://github.com/gycha0109-beep/MyeongHa/pull/3105), 기존 분류 HEAD `2eb6915c89b2008602f825ac199435525c03744e`, 기존 WORKLOG 통합 커밋 `740b5a025c6204b5810322908a52bfab6c9335f9`. 최종 HEAD 및 병합 후 CI 결과는 별도 확인 전 미판정.
+- **테스트·CI 근거:** sanitized 원장·현재 SQL 파일의 exact 버전/파일명 일치 검사 PASS, 기존 PR의 일반 CI/Governance 등은 해당 커밋별 근거만 유효. 이 변경 HEAD 전체 Integration과 main 후속 검증은 통과 전 성공으로 판정하지 않는다.
+- **블로커·다음 작업:** PR #3105 정확한 HEAD 전체 CI·병합 확인 후 로드맵 8-A 실질 객체·권한·source parity 근거 조사. Production repair/DDL/DML, 신규 Hosted/Secret/traffic, 개인정보 Canary는 사용자 명시 승인 전 금지.
+
 ### 2026-11-07 KST — DR Governance 회귀 RED→GREEN 및 WORKLOG 최종 근거 갱신
 
 - **기존 미완료 작업:** Production Operations [종료 집중 로드맵](PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md) Gate 1 / Phase 8에서 진행 중이던 PostgreSQL DR 증거 정합성 및 post-merge CI 수용 확인. 이번 단위에서는 새 단계나 기능을 추가하지 않고 기존 WORKLOG PR [#3110](https://github.com/gycha0109-beep/MyeongHa/pull/3110)을 후속 실증에 맞춰 갱신함.
