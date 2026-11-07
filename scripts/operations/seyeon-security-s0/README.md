@@ -29,6 +29,8 @@ DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실
 ## 2026-11-07 S0 운영 설치 전 확인 (읽기 전용 현황, 승인 아님)
 
 - 대상 명하 운영 PostgreSQL 카탈로그 대조에서 `seyeon_private.pin_model_recent_sources_v1`와 `seyeon_private.pin_positive_model_context_sources_v1`가 **미설치**, `public.chat_turn_attempts.seyeon_recent_source_pin_jsonb`가 **없음**을 확인했다. 코드에는 이미 `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql` 순서의 격리 설치 정의가 있으므로 새 스키마를 임의 생성하거나 API/공용 역할에 실행 권한을 넓히지 않는다.
+- **2026-11-08 호출 경로 수정(소스 전용):** 기존 서버가 private 결합 함수를 일반 회원 DB 실행 계정에서 직접 호출하던 결함을 수정했다. `17-g1-positive-combined-model-source-pin.sql`에 `public.cmd_pin_seyeon_positive_model_context_sources_v1` 서버 전용 소유자 명령을 추가하고, 서버 어댑터는 이 명령만 호출한다. 내부 함수는 일반 API 계정에서 계속 실행 불가이며 **새 public 명령도 설치 직후 실행 권한을 부여하지 않는다**. 격리 설치 검사는 두 함수가 모두 기본 차단인지 확인한다. 이 호출 경로 보정은 운영 DB 설치·권한 변경·기억 사용/모델/과금/답변 공개 활성화가 아니다. 향후 정확한 계정에 필요한 함수 실행 권한을 부여하는 실제 운영 변경은 적용 범위와 안전 검증을 확인한 후 별도 처리한다.
+
 - 현재 Source Registry의 `memory/conversation_recall/v1` 행은 존재하지만 `enabled=false, writable_enabled=false`다. G4/G5 전용 `myeongha_seyeon_g5_commerce_login`도 운영 DB에 없다. 실제 모델 전 Pin, 전용 Commerce Hyperdrive·TLS·자격증명, 고객 크레딧 예약·receipt 정산과 Worker 송출 검증은 미완료다.
 - **실행 순서:** 기존 [G0 S0 기술 계약 후보](../../../docs/security/SEYEON_G0_REVOKE_REGRANT_REVEAL_POLICY_CANDIDATE_V1.md)의 사용자 기술 승인 → **별도의 명시적 운영 SQL/권한 적용 승인** → 대상 환경·백업·복구 확인 → 기존 16·17 설치 및 G1 실제 Pin 증명 → 로드맵 G4/G2/G3/G5/G6. G0 계약 승인만으로 DB 적용·Source Registry ON·유료 모델·배포를 승인했다고 처리하지 않는다.
 - 운영 DB DDL/DML/Role/ACL/Secret, Provider 호출, Projector 등록·활성화, 공개·유료 트래픽 변경은 **수행하지 않았다**. `HOLD_FORWARD_STOPPED`, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false` 및 최종 G0~G6 0/7 HOLD 유지. 이 README 정리는 운영 설치 스크립트를 실행하는 작업이 아니다.
