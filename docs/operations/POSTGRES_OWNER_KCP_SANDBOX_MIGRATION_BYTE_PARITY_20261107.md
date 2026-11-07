@@ -78,6 +78,22 @@ migration history version identity, full catalog parity, or Hosted restore
 readiness. It does not authorize removal of the suffix from source files or
 any Production SQL/migration action.
 
+## Current Production effective authority snapshot for the four version pairs
+
+Reproducible read-only probe: `scripts/operations/production-kcp-version-pair-acl-readonly.sql`.
+Exact-metadata observation and work-unit record:
+[Phase 8 KCP source/ACL Worklog](WORKLOG_PHASE8_KCP_MIGRATION_SOURCE_ACL_20261107.md).
+
+- At observed frontier `20261105075227` (241 applied ledger entries), all five named functions produced by the four repository migrations were present.
+- All five are owned by `postgres`, marked `SECURITY DEFINER`, and have a configured `search_path`. None were currently callable by `anon`, `authenticated`, `service_role`, or via an explicit direct `PUBLIC` EXECUTE grant.
+- The `myeongha_api_executor` role can currently execute exactly four of these five functions; the internal credit-delivered ACK function is not directly API-executable.
+- The related `commerce_private.owner_sandbox_receipt_attestation_v1` table is currently RLS-enabled, with SELECT denied to `anon`, `authenticated` and `myeongha_api_executor`.
+
+This narrows *current* ACL/ownership risk for those five functions. It does not
+establish historical actor attribution, byte-for-byte current function body
+parity, role membership completeness, or restored Provider migration/DDL/ACL
+equivalence. No Production schema or privileges were changed.
+
 ## Residual disposition
 
 - `SQL_BYTES_EQUAL_AT_OBSERVED_MAIN_SHA`: **proven**.
