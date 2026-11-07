@@ -53,7 +53,7 @@ Watchtower-Track: security
 
 | 영역 | 이미 확보한 구현·증거 | 아직 실제 제품 완료로 볼 수 없는 부분 |
 |---|---|---|
-| G1 출처 Pin | 0건 선행 Pin, 최종 모델 입력 선택 검사, 단일 Memory + 현재 User를 결합하는 S0 Pin SQL/서버 연결 코드가 존재하고 실행 순서에 연결됨 | 운영 Source Registry가 비어 있고 `positiveMemoryFirstReplyApproved=false`; 운영 대상 DB에서 exact positive Pin 성공 및 Provider 0회 실패 증거 미확정 |
+| G1 출처 Pin | 0건 선행 Pin, 최종 모델 입력 선택 검사, 단일 Memory + 현재 User를 결합하는 S0 Pin SQL/서버 연결 코드가 존재하고 실행 순서에 연결됨 | 운영 Source Registry에 `conversation_recall/v1` 1행이 등록돼 있으나 `enabled=false`, `writable_enabled=false`이며 `positiveMemoryFirstReplyApproved=false`; 운영 대상 DB에서 exact positive Pin 성공 및 Provider 0회 실패 증거 미확정 |
 | G2 Commit | S0 원본 Grant 잠금·digest 확인과 기존 `cmd_commit_seyeon_chat_turn_runtime_v2`를 사용하는 원자 Commit 경로가 존재 | 현재 운영 함수/ACL과 정확한 S0 Pin의 연결, 운영 대상 DB에서 취소 경합을 포함한 완료 증거 |
 | G3 최초 공개 | 최초 답변 발행·receipt/ACK·철회 관련 DB/서버 경로 및 실패 시 HOLD가 구현되어 있음 | 실제 배포 Worker의 HTTP 송출·receipt ACK·철회 순서가 한 번의 실제 경로에서 증명되지 않음. History/Replay는 계속 제외 |
 | G4 비용·실행 권한 | W115~W121 비용 정책 고정 및 최소 권한 검사 재사용. G1 Pin 이후 크레딧 예약, G5 전용 Hyperdrive 후보, receipt 정산 bridge를 Worker 경로에 조건부 연결 | Cloudflare G5 Commerce Hyperdrive/운영 LOGIN·Secret·Role 미구성, `creditBilling.productionMounted=false`; 일반 고객 예약·정산 실운영 증거 미확정 |
