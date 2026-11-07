@@ -27,3 +27,10 @@
 - **남은 과제:** PR 생성 및 영향 테스트·CI, 필요한 통합 CI, 자동 병합 후 **새 main SHA**의 원장 워크플로 실행 성공 확인. 과거 실패 run을 그 SHA 그대로 rerun해도 수정된 코드는 적용되지 않으므로 이를 완료 근거로 사용하지 않음.
 - **다음 작업:** PR CI 결과를 기준으로 실패 시 같은 단위만 수정 → 성공 시 통합 CI 통과 후 병합 → 새 main에서 예약/수동 출처 런타임 검증 후 WORKLOG 근거 갱신. GitHub 커넥터에 워크플로 수동 dispatch 기능이 없으면 다음 예약 실행의 결과를 확인해야 하며 실행되지 않은 상태를 성공으로 주장하지 않음.
 - **블로커/승인:** 승인된 GitHub Actions 읽기 권한 내 코드 수정이며 Production 직접 변경·시크릿 접근 없음. Production DB·보관 정책·검증 우회가 필요한 경우 별도 사용자 승인 없이는 수행하지 않음.
+
+### PR 및 첫 검증 체크포인트
+
+- PR: [#3127](https://github.com/gycha0109-beep/MyeongHa/pull/3127), [검사 현황](https://github.com/gycha0109-beep/MyeongHa/pull/3127/checks), 브랜치 `fix/ops/privacy-ledger-rerun-artifact-20261108`; 자동 병합 설정.
+- **첫 PR HEAD** `dc8efc2d989be81e4840938db4b1c5359adf7c17`: [Governance #42405135373](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405135373) **PASS**, [Web PR #42405135422](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405135422) **PASS**, [CI #42405135391](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42405135391)는 기록 당시 `Work Track · ops` 실행 중. DB dependency는 비선택에 따른 skipped 상태이며 PASS로 계산하지 않음.
+- **최종 판정 보류:** 본 WORKLOG 수정으로 PR HEAD가 갱신되므로 이전 HEAD 검사 결과를 새 SHA의 성공으로 대체하지 않음. 최종 HEAD CI와 필수 Integration, 실제 수정된 예약 원장 실행 성공은 각각 확인 필요.
+- **이후 실행:** CI 실패 원인이 이번 4파일 변경과 관련되면 같은 PR에서만 수정. 보호된 원장 생성 run을 앞서 실패했던 정확한 SHA로 반복하여 성공을 조작하지 않음.
