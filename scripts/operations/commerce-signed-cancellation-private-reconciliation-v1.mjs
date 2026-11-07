@@ -185,6 +185,7 @@ export async function reconcileSignedCancellationPrivateV1({
         reconcileStoredPortOneCancellationSetWithGetPrivateV1;
       cancellationSet=await compare({
         dbClient,receiptId:original.verifiedReceiptId,
+        expectedProviderWebhookId:signed.providerWebhookId,
         expectedCancellationIdHmac,
         sourceHmacSecret,apiSecret,fetchImpl,
       });
@@ -193,6 +194,7 @@ export async function reconcileSignedCancellationPrivateV1({
          cancellationSet.observedProviderSetMatched!==true||
          cancellationSet.postGetDbSnapshotStable!==true||
          cancellationSet.exactSignedCancellationIncluded!==true||
+         cancellationSet.exactSignedWebhookIncluded!==true||
          cancellationSet.providerOrderingProven!==false||
          cancellationSet.grantRevocationAuthorized!==false||
          cancellationSet.providerRefundAuthorized!==false||

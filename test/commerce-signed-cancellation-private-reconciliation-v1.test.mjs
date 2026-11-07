@@ -154,10 +154,12 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
     expect(input.sourceHmacSecret).toBe('test-only-secret-32-characters-or-more');
     expect(input.expectedCancellationIdHmac).toMatch(/^hmac-sha256:k1:[0-9a-f]{64}$/u);
     expect(input.expectedCancellationIdHmac).not.toContain(CANCEL);
+    expect(input.expectedProviderWebhookId).toBe('msg_1');
     return {
       kind:'authenticated_current_cancel_set_matches_recorded',
       observedProviderSetMatched:true,postGetDbSnapshotStable:true,
-      exactSignedCancellationIncluded:true,providerOrderingProven:false,
+      exactSignedCancellationIncluded:true,
+      exactSignedWebhookIncluded:true,providerOrderingProven:false,
       grantRevocationAuthorized:false,providerRefundAuthorized:false,
       writesPerformed:false,
     };
@@ -203,7 +205,8 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
     cancellationSetInspector:async()=>({
       kind:'authenticated_current_cancel_set_matches_recorded',
       observedProviderSetMatched:true,postGetDbSnapshotStable:true,
-      exactSignedCancellationIncluded:true,providerOrderingProven:false,
+      exactSignedCancellationIncluded:true,
+      exactSignedWebhookIncluded:true,providerOrderingProven:false,
       grantRevocationAuthorized:false,providerRefundAuthorized:false,
       writesPerformed:false,
     }),
@@ -215,6 +218,21 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
     writesPerformed:false,
   });
   expect(JSON.stringify(result)).not.toContain(expected);
+ });
+ it('does not accept a full-set result whose webhook-to-item binding was not proven',async()=>{
+  const result=await executor(fakeDb(),fakeFetch(),{
+    sourceHmacSecret:'test-only-secret-32-characters-or-more',
+    cancellationSetInspector:async()=>({
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:true,
+      exactSignedWebhookIncluded:false,
+      providerOrderingProven:false,grantRevocationAuthorized:false,
+      providerRefundAuthorized:false,writesPerformed:false,
+    }),
+  });
+  expect(result.kind).toBe('canonical_cancellation_set_not_verified');
+  expect(result.grantRevocationAuthorized).toBe(false);
  });
  it('does not accept a full-set result missing the exact signed item',async()=>{
   const result=await executor(fakeDb(),fakeFetch(),{

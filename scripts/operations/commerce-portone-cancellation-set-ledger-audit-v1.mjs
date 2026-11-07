@@ -21,6 +21,7 @@ select
  receipt.verified_currency as "receiptCurrency",
  attempt.provider_request_id as "providerPaymentId",
  event.id::text as "providerEventId",
+ event.external_event_id as "providerWebhookId",
  event.event_type as "eventType",
  event.status as "eventStatus",
  event.provider as "eventProvider",
@@ -208,12 +209,15 @@ export async function auditPortOneCancellationSetForReceiptV1(
  * legal refund, atomic Reader T2, customer ACK or permission to revoke.
  */
 export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
- dbClient,receiptId,expectedProviderEventId,expectedCancellationIdHmac,
- sourceHmacSecret,apiSecret,fetchImpl,providerInspector,
+ dbClient,receiptId,expectedProviderEventId,expectedProviderWebhookId,
+ expectedCancellationIdHmac,sourceHmacSecret,apiSecret,fetchImpl,providerInspector,
 }){
  if(typeof receiptId!=='string'||!UUID.test(receiptId)||
     (expectedProviderEventId!==undefined&&
      (typeof expectedProviderEventId!=='string'||!UUID.test(expectedProviderEventId)))||
+    (expectedProviderWebhookId!==undefined&&
+     (typeof expectedProviderWebhookId!=='string'||!ID.test(expectedProviderWebhookId)||
+      expectedProviderWebhookId.trim()!==expectedProviderWebhookId))||
     (expectedCancellationIdHmac!==undefined&&
      (typeof expectedCancellationIdHmac!=='string'||!MAC.test(expectedCancellationIdHmac))))
   throw Error('INVALID_CANCELLATION_SET_RECONCILIATION_RECEIPT');
@@ -225,11 +229,27 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
  if(expectedProviderEventId!==undefined&&
     before.filter(r=>r.providerEventId===expectedProviderEventId).length!==1)
   return no('exact_provider_event_not_in_verified_cancel_set');
+ if(expectedProviderWebhookId!==undefined&&
+    before.filter(r=>r.providerWebhookId===expectedProviderWebhookId).length!==1)
+  return no('exact_signed_webhook_not_in_verified_cancel_set');
  // The notification's exact cancellation HMAC must be present once;
  // a payment-wide matched total cannot stand in for the signed item.
  if(expectedCancellationIdHmac!==undefined&&
     before.filter(r=>r.cancellationIdHmac===expectedCancellationIdHmac).length!==1)
   return no('exact_signed_cancellation_not_in_verified_cancel_set');
+ // Distinct selectors on a single Receipt can name different partial
+ // cancellations. Every supplied selector must match the SAME event row.
+ const scoped=(row)=>
+  (expectedProviderEventId===undefined||
+   row.providerEventId===expectedProviderEventId)&&
+  (expectedProviderWebhookId===undefined||
+   row.providerWebhookId===expectedProviderWebhookId)&&
+  (expectedCancellationIdHmac===undefined||
+   row.cancellationIdHmac===expectedCancellationIdHmac);
+ const selectors=[expectedProviderEventId,expectedProviderWebhookId,
+  expectedCancellationIdHmac].filter(x=>x!==undefined).length;
+ if(selectors>=2&&before.filter(scoped).length!==1)
+  return no('exact_signed_event_and_cancel_item_mismatch');
  if(before.length>64)
   return no('provider_get_set_capacity_exceeded');
  const head=before[0];
@@ -299,10 +319,15 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
      second.privateRows.filter(
       r=>r.providerEventId===expectedProviderEventId,
      ).length!==1)||
+    (expectedProviderWebhookId!==undefined&&
+     second.privateRows.filter(
+      r=>r.providerWebhookId===expectedProviderWebhookId,
+     ).length!==1)||
     (expectedCancellationIdHmac!==undefined&&
      second.privateRows.filter(
       r=>r.cancellationIdHmac===expectedCancellationIdHmac,
-     ).length!==1))
+     ).length!==1)||
+    (selectors>=2&&second.privateRows.filter(scoped).length!==1))
   return no('stored_cancel_set_changed_during_provider_get');
  const byId=new Map(second.privateRows.map(r=>[r.providerEventId,r]));
  if(byId.size!==before.length||
@@ -327,6 +352,7 @@ export async function reconcileStoredPortOneCancellationSetWithGetPrivateV1({
   authenticatedProviderGetObserved:true,observedProviderSetMatched:true,
   postGetDbSnapshotStable:true,
   exactProviderEventIncluded:expectedProviderEventId!==undefined,
+  exactSignedWebhookIncluded:expectedProviderWebhookId!==undefined,
   exactSignedCancellationIncluded:expectedCancellationIdHmac!==undefined,
   singleExactFullCancellationObservedAtGet:singleExactFull,
   matchedCancellationItems:before.length,

@@ -837,3 +837,10 @@
 - **발견:** 기존 사설 이벤트 감사는 원본 영수증 ID와 서명 원문 지문을 검증했지만, 같은 결제에 여러 부분취소가 있는 경우 **해당 이벤트의 `verified_payload_jsonb.cancellationIdHmac`**가 서명 알림의 정확한 `cancellationId`와 일치하는지는 요구하지 않았습니다. 전체 취소 집합 감사는 항목의 존재를 별도로 확인하므로 서로 다른 이벤트로 착각할 여지가 있었습니다.
 - **구현:** `inspectExactCancellationProviderEventReadinessV1`에서 정확한 취소 항목 HMAC을 기존 이벤트의 `cancellationIdHmac`와 비교하고, 잘못된/누락된/형식 불일치 값은 읽기 전용 HOLD합니다. 내부 서명 검토기는 동일 원본 알림·키로 만든 항목 HMAC을 **기존 Provider Event 감사와 전체 취소 집합 감사 양쪽에 재사용**합니다.
 - **검증/경계:** 같은 영수증의 다른 취소 건, 누락 지문, 잘못된 입력과 연결 파라미터를 회귀 테스트에 추가했습니다. SQL 후보·Provider 환불 POST·Entitlement Effect/Reader T2·운영 DB·공개 webhook·LIVE는 변경하지 않습니다. 새 CI 통과 전 완료 미확정, 공급자 최신 순서·최종 정산은 여전히 HOLD입니다.
+
+
+### 2026-11-07 — 서명 웹훅·개별 취소 지문을 같은 Provider Event 행으로 일치시키는 대조 연결
+
+- **확인된 공백:** 이전 전체 취소 집합 대조는 `cancellationIdHmac`가 원장 안에 존재하는지 확인했지만, 실제 서명된 `providerWebhookId`와 **동일 이벤트 행**에 결속되었는지는 증명하지 않았습니다. 서로 다른 3,000원/5,900원 부분취소 이벤트가 각각 존재하면 서명 웹훅을 다른 취소 항목에 잘못 연결할 수 있었습니다.
+- **구현:** 기존 `commerce_provider_events.external_event_id`만 사설 SELECT에 추가하고, 서명 웹훅 ID·기존 Provider Event UUID(전달된 경우)·개별 취소 HMAC 중 전달된 식별자가 **하나의 동일 원장 행에서 동시에 일치**해야 전체 취소 집합 대조를 허용합니다. 첫 DB 스냅샷과 GET 후 스냅샷 모두 확인합니다. 서명 검토기에서 웹훅 ID를 직접 전달하고 `exactSignedWebhookIncluded=true`가 없으면 안전 보류합니다.
+- **회귀/안전:** 서로 다른 취소 항목 혼동, 알 수 없는 웹훅, GET 사이 식별자 바뀜, 모의 증명 누락을 검사합니다. 기존 Provider Event·Receipt·권한 원장/DB 스키마/운영 API·환불 POST·LIVE는 변경하지 않습니다. 공급자 최신 순서·법정 환불·Reader T2 회수는 여전히 HOLD이며 새 CI 통과 전 완료 미확정입니다.
