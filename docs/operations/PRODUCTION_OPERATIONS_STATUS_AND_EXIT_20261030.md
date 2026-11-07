@@ -7,6 +7,7 @@
 - **테스트/CI:** 이전 HEAD [일반 CI #42401187964](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401187964), [통합 CI #42402263808](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402263808), Governance/Web SUCCESS. **새 HEAD CI/통합 검사와 main 병합 여부는 아직 미확정**.
 - **블로커·다음:** 신규 HEAD CI/필수 Integration 확인 후 main 병합 및 Phase 8-A 같은 백업 출처에서 원본 구조·권한 지문을 확보해 구조 불일치 원인 판단. 8-B Provider Auth/Storage, 8-C 개인정보 독립 연속성, 8-D RPO/RTO, Phase 13 모두 미완료. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. Production 쓰기·유료 DR 대상·privacy canary 실행 없음.
 
+- **2026-11-08 재정렬 결과:** 최신 main bc68dbce6909fcf8ec28ecfe449297bc9979d965의 WORKLOG 전체와 이 PR 고유 작업단위 5개를 모두 보존해 충돌 해소(병합 커밋 6aa815d7f0f783430ce7d4f17fcee133e23487bc). 변경 파일은 기존 읽기 전용 SQL, 비식별 객체 조사 JSON, 기존 ops WORKLOG 3개로 한정. 기존 근거 8쌍·8함수·2관계·3제약조건의 이름/선택 권한 조건 및 SQL SELECT-only/ROLLBACK 경계를 로컬 정적 확인 PASS, git diff --check PASS. 새 HEAD의 CI/필수 Integration·병합은 미확정. 그 결과를 확인한 뒤 기존 Gate 1 Phase 8-A의 출처 결속 및 DDL/ACL 동등성 차단을 이어감; Production 변경·비밀·Hosted 자원·canary 승인 없음.\n
 ### 2026-11-08 KST — PR #3113 마이그레이션 조사 일반 CI GREEN 후 최신 main 충돌 해소 재시도
 
 - **목표:** 버전 이동 8쌍의 기존 읽기 전용 조사 증거와 운영 워크로그를 최신 main 기준으로 재조합한다.
