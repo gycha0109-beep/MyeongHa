@@ -255,7 +255,7 @@ export function createOpenAiSajuConsultationShadowPortV1(
 
   return Object.freeze({
     evaluatorVersion: OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
-    generate(requestInput) {
+    generate(requestInput: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) {
       return request({
         purpose: 'consultation_generate',
         modelKey: generationModel,
@@ -264,7 +264,7 @@ export function createOpenAiSajuConsultationShadowPortV1(
         schema: requestInput.responseSchema,
       });
     },
-    async evaluate(evalInput) {
+    async evaluate(evalInput: Parameters<CharacterSajuConsultationShadowPortV1['evaluate']>[0]) {
       const result = await request({
         purpose: 'consultation_evaluate',
         modelKey: reviewModel,
