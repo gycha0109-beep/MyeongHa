@@ -190,6 +190,18 @@ restored_claim_relation="$("${psql_base[@]}" -Atqc "
 [[ "$restored_claim_relation" == "absent" || "$restored_claim_relation" == "present" ]]
 private_claim_verified_subjects=0
 private_claim_preexisting_subjects=0
+private_claim_total_before=''
+private_claim_total_after=''
+private_claim_count_file="$tmp_dir/private-claim-target-counts"
+: > "$private_claim_count_file"
+if [[ "$restored_claim_relation" == "present" ]]; then
+  # Isolated restore only: a single aggregate count, no other Subject rows
+  # or identifiers returned. Compare it to exact target deletion counts later.
+  private_claim_total_before="$("${psql_base[@]}" -Atqc "
+    select count(*) from public.digital_reading_withdrawal_claims_private_v1;
+  ")"
+  [[ "$private_claim_total_before" =~ ^(0|[1-9][0-9]*)$ ]]
+fi
 
 account_deletion_count=0
 while IFS=$'\t' read -r subject_id deletion_job_id outbox_event_id; do
@@ -236,6 +248,8 @@ while IFS=$'\t' read -r subject_id deletion_job_id outbox_event_id; do
       where subject_id='$subject_id'::uuid;
     ")"
     [[ "$private_claim_pre_finalizer_count" =~ ^(0|[1-9][0-9]*)$ ]]
+    # Retain counts only, never Claim content/Subject IDs.
+    printf '%s\n' "$private_claim_pre_finalizer_count" >> "$private_claim_count_file"
     if [[ "$private_claim_pre_finalizer_count" != "0" ]]; then
       private_claim_preexisting_subjects=$((private_claim_preexisting_subjects + 1))
     fi
@@ -353,6 +367,10 @@ done < <(jq -r '.events[] | select(.type == "ACCOUNT_DELETION_STARTED") | [.subj
 if [[ "$restored_claim_relation" == "present" ]]; then
   [[ "$private_claim_verified_subjects" -eq "$account_deletion_count" ]]
   [[ "$private_claim_preexisting_subjects" -le "$private_claim_verified_subjects" ]]
+  private_claim_total_after="$("${psql_base[@]}" -Atqc "
+    select count(*) from public.digital_reading_withdrawal_claims_private_v1;
+  ")"
+  [[ "$private_claim_total_after" =~ ^(0|[1-9][0-9]*)$ ]]
 else
   [[ "$private_claim_verified_subjects" -eq 0 ]]
   [[ "$private_claim_preexisting_subjects" -eq 0 ]]
@@ -368,10 +386,15 @@ node - \
   "$PRODUCTION_PRIVACY_CANARY_RUN_ID" \
   "$PRIVACY_RECONCILIATION_INCIDENT_REFERENCE_UTC" \
   "$restored_claim_relation" \
-  "$private_claim_preexisting_subjects" <<'NODE'
+  "$private_claim_preexisting_subjects" \
+  "$private_claim_total_before" \
+  "$private_claim_total_after" \
+  "$private_claim_count_file" <<'NODE'
 import { readFile, writeFile } from 'node:fs/promises';
-import { classifyRestoredPrivateClaimDeletionV1 } from
-  './scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
+import {
+  classifyRestoredPrivateClaimDeletionV1,
+  verifyRestoredPrivateClaimRowConservationV1,
+} from './scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const report = JSON.parse(await readFile(process.argv[2], 'utf8'));
 const publicManifest = JSON.parse(await readFile(process.argv[3], 'utf8'));
@@ -385,6 +408,15 @@ const preExistingClaimSubjectCount = Number(process.argv[10]);
 const privateClaimEvidence = classifyRestoredPrivateClaimDeletionV1({
   relation: restoredClaimRelation,
   preExistingClaimSubjectCount,
+  accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED,
+});
+const targetBeforeCounts = (await readFile(process.argv[13], 'utf8'))
+  .split('\n').filter(Boolean);
+const privateClaimRowEvidence = verifyRestoredPrivateClaimRowConservationV1({
+  relation: restoredClaimRelation,
+  totalBefore: restoredClaimRelation === 'present' ? process.argv[11] : null,
+  totalAfter: restoredClaimRelation === 'present' ? process.argv[12] : null,
+  targetBeforeCounts,
   accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED,
 });
 
@@ -406,6 +438,7 @@ const evidence = {
   personalization_access_resurrection_guard: 'pass',
   commerce_p5y_retention_guard: 'pass',
   ...privateClaimEvidence,
+  ...privateClaimRowEvidence,
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',

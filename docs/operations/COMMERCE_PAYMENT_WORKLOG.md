@@ -942,3 +942,13 @@
 - **테스트·문서:** `test/commerce-private-claim-restored-replay-guard.test.mjs`에 relation 부재, 삭제 전 0건, 삭제 전 존재 후 0건, 여러 삭제 대상, 잘못된 수량·범위 거부의 4개 정상/7개 부정 입력 실행 테스트를 추가했습니다. 기존 설명 문서의 '테이블만 존재하면 삭제 입증'이라는 구표기를 실제 코드의 3단계 결과에 맞춰 개정했습니다. 신규 커밋 공식 CI/PG17 결과는 미확정이므로 PASS로 기재하지 않습니다.
 - **완료/미완료:** 판정 로직의 실행 검증·실제 증거 경로 연결·문서 갱신은 반영했습니다. 복원된 PostgreSQL17을 통한 **비어 있지 않은 Claim의 삭제 실제 관측**, Provider 취소 최종 순서 판정, Reader/T2 원자 회수, 소비자 제공 입증, 전체 개발 E2E는 미완료입니다.
 - **블로커/다음:** 신규 CI 실패 시 오류 수정, 통과 후 승인 로드맵 미완료 연결 구현. 운영 DB 변경·PG 환불 POST·공개 LIVE 실행 없음. 별도 사용자 승인 요청 없음.
+
+### 2026-11-08 — 복원 청약철회 기록의 대상 외 집계 보존 확인
+
+- **목표·로드맵:** 승인된 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6-4·5. 삭제 대상 Subject의 개인 Claim이 사라진다는 기존 복원 검증에 더해, 격리 복원 작업이 **대상 밖의 개인 청약철회 Claim을 함께 과잉 삭제하지 않았는지** 전체 건수의 보존식으로 교차 확인합니다.
+- **기준:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 변경 전 HEAD `b3d13db69e9ecfd2fcc7b2e797b77529caf79124`. [이전 전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42390964552)는 Commerce·PostgreSQL17·db-authority·Web/Auth/Governance 모두 성공. PR은 open, auto-merge 설정 유지.
+- **변경 파일:** `scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs`, `scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh`, `test/commerce-private-claim-restored-replay-guard.test.mjs`, `docs/operations/COMMERCE_PRIVATE_CLAIM_RESTORED_PRIVACY_REPLAY_20261104.md`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 격리 복원 PostgreSQL의 기존 private withdrawal Claim relation이 존재할 때, replay 처리 전의 **전체 행 수**, 삭제 대상 각 Subject의 finalizer 전 행 수(임시 숫자 파일, ID 없음), 완료 재실행 이후 전체 행 수를 수집합니다. 동일한 실제 증거 생성 경로가 `verifyRestoredPrivateClaimRowConservationV1`을 호출하여 전체 이전 건수에서 대상 삭제 예정 행 수 합계만큼 감소했는지 검증하고, 어긋나면 증거 작성 이전에 실패합니다. 테이블이 없는 예전 백업은 검사 미수행이라고 명시합니다. 증거에는 집계값·개인 ID·원문을 쓰지 않습니다. 임시 파일은 기존 종료 cleanup에 따라 삭제됩니다.
+- **검증:** 기존 계약 테스트에서 SQL 계측 위치와 증거 연결을 확인하고, 4개 허용 사례·10개 비정상 수량/누락/과잉 삭제 사례를 실행형 분류기로 검증합니다. 이 수량 검사는 **대상 밖 행을 개별로 동일하다고 증명하지 못하며**, 실제 복원 DB 기반 종료 검증으로 확대 선언하지 않습니다. 신규 CI/Pg17 결과는 아직 미확정이므로 PASS 미선언.
+- **완료·미완료:** 격리 복원 환경의 청약철회 Claim 대상 외 **건수 보존 교차검사** 코드·테스트·문서 작성 완료. 실제 복원으로 양성 Claim 삭제 검증, Provider NEWER/STALE 판정, Reader/T2 원자적 회수, 법적 소비자 제공 입증 및 전체 격리 E2E 미완료.
+- **커밋·블로커·다음:** 본 변경과 WORKLOG를 하나의 PR 후속 커밋으로 반영합니다. 신규 전체 CI 확인 후 실패를 수정하고, 통과하면 승인 로드맵의 미완료 서비스 연결을 계속 진행합니다. 운영 DB·실제 PG 환불 POST·공개 LIVE/Checkout는 실행하지 않았습니다. 별도 승인 요청 없음.

@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { classifyRestoredPrivateClaimDeletionV1 } from
-  '../scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
+import {
+  classifyRestoredPrivateClaimDeletionV1,
+  verifyRestoredPrivateClaimRowConservationV1,
+} from '../scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const restore=readFileSync(new URL(
   '../scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
@@ -98,6 +100,56 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(()=>classifyRestoredPrivateClaimDeletionV1(input))
       .toThrow('RESTORED_PRIVATE_CLAIM_DELETION_EVIDENCE_INVALID');
   });
+
+  it('compares the whole isolated Claim count against only exact target deletion totals',()=>{
+    expect(restore).toContain('private_claim_total_before=');
+    expect(restore).toContain('private_claim_total_after=');
+    expect(restore).toContain('private_claim_count_file="$tmp_dir/private-claim-target-counts"');
+    expect(restore).toContain('printf \'%s\\n\' "$private_claim_pre_finalizer_count"');
+    expect(restore).toContain('verifyRestoredPrivateClaimRowConservationV1({');
+    expect(restore).toContain('...privateClaimRowEvidence,');
+    const before=restore.indexOf('private_claim_total_before="$(');
+    const finalizer=restore.indexOf('finalizer="$(');
+    const after=restore.indexOf('private_claim_total_after="$(');
+    expect(before).toBeGreaterThan(restore.indexOf('restored_claim_relation='));
+    expect(before).toBeLessThan(finalizer);
+    expect(after).toBeGreaterThan(restore.indexOf('done < <(jq -r'));
+    expect(restore).not.toContain('select subject_id from public.digital_reading_withdrawal_claims_private_v1');
+  });
+  it.each([
+    ['non-target rows unchanged','present','5','3',['2','0'],2,
+      'aggregate-conservation-pass-not-row-identity-proof'],
+    ['multiple original claims on one target','present','7','3',['4','0'],2,
+      'aggregate-conservation-pass-not-row-identity-proof'],
+    ['no deletion rows, same aggregate','present','4','4',['0'],1,
+      'aggregate-conservation-pass-not-row-identity-proof'],
+    ['legacy backup with no Claim relation','absent',null,null,[],1,
+      'schema-absent-not-checked'],
+  ])('accepts %s as a bounded aggregate observation',
+    (_name,relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,guard)=>{
+      expect(verifyRestoredPrivateClaimRowConservationV1({
+        relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,
+      })).toEqual({private_withdrawal_claim_unrelated_row_count_guard:guard});
+    },
+  );
+  it.each([
+    ['unrelated Claim unexpectedly deleted','present','5','2',['2','0'],2],
+    ['target Claim unexpectedly retained','present','5','4',['2','0'],2],
+    ['target counts exceed global baseline','present','1','0',['2'],1],
+    ['missing target evidence','present','5','3',['2'],2],
+    ['fabricated extra target','present','5','3',['2','0'],1],
+    ['missing relation but positive global count','absent','1',null,[],1],
+    ['missing relation but target count','absent',null,null,['0'],1],
+    ['negative final count','present','5','-1',['2'],1],
+    ['invalid decimal','present','05','3',['2'],1],
+    ['unsafe/deformed account count','present','5','3',['2'],0],
+  ])('rejects %s before writing a restore success receipt',
+    (_name,relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount)=>{
+      expect(()=>verifyRestoredPrivateClaimRowConservationV1({
+        relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,
+      })).toThrow('RESTORED_PRIVATE_CLAIM_ROW_CONSERVATION_INVALID');
+    },
+  );
   it('reuses existing PG17 deletion/other-Subject/restore-residue assertions',()=>{
     expect(originalDeletionProof).toContain('after-finalization)');
     expect(originalDeletionProof).toContain('0|1|2');
