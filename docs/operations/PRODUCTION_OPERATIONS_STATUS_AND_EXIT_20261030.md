@@ -1,3 +1,13 @@
+### 2026-11-07 / Phase 8-A — 저장소 전용 마이그레이션 76건 분류
+
+- **작업 목표:** 기존 Production 원장에는 없는 저장소 SQL 버전 76개를 전수 분류하되 배포 완료 여부는 추정하지 않는다. 별도 WORKLOG 대신 이 기존 ops 트랙 WORKLOG에 기록한다.
+- **변경 파일:** `docs/operations/POSTGRES_REPOSITORY_ONLY_VERSION_DISPOSITION_20261107.json` (76건 근거), 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` (본 기록). 중복 생성된 `docs/operations/WORKLOG_PHASE8_REPOSITORY_ONLY_DISPOSITION_20261107.md`는 제거. Production SQL·애플리케이션·워크플로 변경 없음.
+- **완료:** 기존 읽기 전용 `POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json`의 repository-only 버전 76건과 현재 저장소의 SQL 276개를 독립 대조. 76/76 버전 일치, 중복 0, 누락 0, 파일명 불일치 0, 관측 뒤 migration 파일 변경 0. 파일명 기준 Reader 60, Saju 6, Commerce 2, 버전 이동 Commerce 8건으로 분류. 기존 8쌍 SQL byte-exact 4건·종료문 차이 4건을 이력으로만 기록하며 버전/적용 provenance는 불일치·미입증 유지.
+- **미완료:** 76건의 실제 객체·DDL·권한·배포 출처 동등성, 원격 전용 41건과 전체 migration ledger/Provider parity, Hosted Auth/Storage, 독립 Privacy 연속성 및 전체 서비스 RPO/RTO. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
+- **브랜치·커밋·PR:** `ops/phase8-repository-only-disposition-20261107` / PR [#3105](https://github.com/gycha0109-beep/MyeongHa/pull/3105), 기존 분류 브랜치 HEAD `2eb6915c89b2008602f825ac199435525c03744e`를 기준으로 기존 WORKLOG 통합 커밋. 최종 HEAD 및 병합 후 CI 결과는 별도 확인 전 미판정.
+- **테스트·CI 근거:** sanitized 원장·현재 SQL 파일의 exact 버전/파일명 일치 검사 PASS, 기존 PR의 일반 CI/Governance 등은 해당 커밋별 근거만 유효. 이 변경 HEAD 전체 Integration과 main 후속 검증은 통과 전 성공으로 판정하지 않는다.
+- **블로커·다음 작업:** PR #3105 정확한 HEAD 전체 CI·병합 확인 후 로드맵 8-A 실질 객체·권한·source parity 근거 조사. Production repair/DDL/DML, 신규 Hosted/Secret/traffic, 개인정보 Canary는 사용자 명시 승인 전 금지.
+
 ### 2026-11-07 — PostgreSQL DR Readiness RED 원인 수정 및 최신 복원 증거 갱신
 
 - **실패 실증:** [PostgreSQL DR Readiness #42375717817 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717817), main `61736e57979d886559451d15a853292fb3bf586e`에서 `repository migration advance is not covered by the dated observation` 발생. 원인은 이전 `2026-10-29` 복원 증거(`repository_latest_migration_file_version=20261029012000`)가 현재 저장소 파일 최댓값 `20261029185500`을 포괄하지 못한 것. DB 장애나 어드민 UI 테스트 실패라고 단정하지 않음.
