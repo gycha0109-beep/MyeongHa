@@ -2,6 +2,8 @@
 
 Watchtower-Track: security
 
+> **2026-11-08 트랙 복구 기준:** 이 문서의 정본 트랙은 **세연 AI 보안 `security`**입니다. 최신 확인된 보안 WORKLOG는 **W129 / PR #3106 (병합 완료)**이며, 이어지는 W130은 잘못된 운영 트랙 이탈 이후의 **재개 지점 복원 기록**입니다. `ops`의 Phase 8~13·DR, PR #3105/#3112/#3113/#3115, 운영 WORKLOG는 **AI 보안 후속 단계가 아닙니다**. 작업·자동화·이관은 이 문서 → [S0 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md) → [G0~G6 완료 계약](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md) 순으로 보안 트랙을 확인하고, 서로 다른 트랙의 마지막 답변·커밋·CI로 작업 대상을 바꾸지 않습니다.
+
 > 최초 작성: 2026-10-30 · 실행 기준 갱신: 2026-11-07
 
 - **상태:** `HOLD_FORWARD_STOPPED` / S0 제품 미완료. 소스 구현·PR CI 통과는 운영 DB 적용, 실제 HTTP 송출, 서비스 공개 또는 G0~G6 완료와 다르다.
@@ -618,3 +620,14 @@ Watchtower-Track: security
 - **브랜치·커밋·PR:** `docs/security/w128-evidence-closure-20261107` / 기준 main `61736e57979d886559451d15a853292fb3bf586e`; 초기 기록 커밋 `9b3c6a5ecf19629a54fe2716b5c7df234f028085`; [PR #3106](https://github.com/gycha0109-beep/MyeongHa/pull/3106). 최종 HEAD CI·병합 결과는 증거 확인 전 미판정.
 - **테스트·CI 근거:** 이전 W128 PR [일반 CI #42374190383](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42374190383) SUCCESS, [전체 Integration #42374245792](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42374245792) SUCCESS (PostgreSQL 17, DB authority, commerce 포함), 병합 후 [main CI #42375162788](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375162788) SUCCESS. Production [workflow #42375162390](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375162390)는 SUCCESS이나 migration/deploy 단계는 SKIPPED. 현재 증거는 문서 및 격리 검증이며 실제 S0 운영 PASS 아님.
 - **블로커·다음 작업:** G0 기술 결정과 별도 운영 DB DDL/Role/ACL/Source 변경은 사용자 승인 필요. 승인 없이 G1 SQL 설치·Source ON·Provider/과금/배포를 하지 않는다. 범위별 승인 뒤 기존 `16→17` G1 결합 Pin을 대상 DB에서 검증하고 G4→G2→G3→G5→G6 순으로 진행한다.
+
+### 2026-11-08 / W130 — 잘못된 ops/DR 이탈 차단 및 세연 AI 보안 S0 작업 재개 지점 복원
+
+- **목표/원인 판정:** 사용자가 AI 보안 후속 작업을 기대했으나 전달된 결과가 `명하 운영·복구 Phase 8~13` 및 PR #3113(`Watchtower-Track: ops`)으로 이어졌음을 확인. 이는 AI 보안의 S0 v3 로드맵과 별개의 트랙이며, **채팅/자동 이관의 정확한 오귀속 발생 지점은 이 GitHub 기록만으로 확정할 수 없다**. 서로 다른 작업의 과거 코드를 임의 되돌리거나 ops 성과를 security 완료로 치환하지 않는다.
+- **정본 보안 이력 복원:** AI 보안 WORKLOG의 마지막 정상 작업 W129는 [PR #3106](https://github.com/gycha0109-beep/MyeongHa/pull/3106). 최종 HEAD `9a2b43378686ef0bfd9240f7f3be68e6659f9f26`, 병합 SHA `8897a38f941a1948abe673a820b36a1124f9ded5`. 해당 HEAD의 [일반 CI #42375976905](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375976905), [Governance #42375976869](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375976869), [Web PR #42375976927](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375976927), [전체 Integration #42375991548](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375991548)은 모두 SUCCESS. 이 근거는 **문서/기존 검증**의 완료이지 S0 보안 Gate 최종 PASS 또는 Production 활성화를 뜻하지 않는다.
+- **다른 트랙 분리:** [운영 PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113)과 관련 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`·`docs/operations/PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md`는 `Watchtower-Track: ops` 및 DR Phase 8~13 소관이다. 해당 변경·백업·DB 객체/권한 대조·CI를 security의 다음 구현 또는 완료 증거로 계산하지 않는다. 이미 수행된 ops 코드/문서/PR은 원래 귀속을 유지하며, 승인 없는 운영 변경이나 강제 롤백을 하지 않는다.
+- **현재 제품 범위·상태:** S0 = 인증된 현재 Member/Turn + 명시적으로 허용된 원본 `conversation_recall/v1` Memory 1건 + 현재 User 원문 1건 + 최초 **비스트리밍** 답변 1회. G0~G6 최종 수용 **0/7**, `HOLD_FORWARD_STOPPED`, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`. History/Replay/Reader/Relationship/다중 Memory/Life Fact/Streaming 및 전체 ops/DR 로드맵은 S0 완료의 선행 구현 작업이 아니다.
+- **변경 파일/브랜치:** 기존 보안 WORKLOG(본 문서)에 해당 복구 경계·최종 PR/CI·재개 순서를 기록하고, 기존 `SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md`의 트랙 연속성 지침을 보강. 브랜치 `docs/security/restore-s0-track-continuity-20261108`. 애플리케이션 코드·SQL·Production 데이터/역할/시크릿·Provider·트래픽·CI workflow 변경 없음. 신규 기능이나 신규 워크로그 문서 생성 없음.
+- **남은 과제/다음 작업:** **기존 v3 실행 순서 그대로** (1) G0 S0 D1~D5 기술 계약의 미확정 사항을 실제 소스·실행 계약과 대조하고 사용자 결정이 필요한 항목을 분리 (2) 운영 변경 없이 G1의 결합 원본 Pin 기존 `16→17` 설치·권한/선행 조건을 재확인 (3) 승인된 범위에서만 G4 일반 고객 크레딧·별도 Commerce LOGIN/Hyperdrive → G2 원자 Commit → G3 첫 HTTP/receipt/철회 → G5 통합 검증 → G6 제한 운영 검증. 기존 S0 구현과 통과 증거는 재사용하며 ops 단계로 전환하지 않는다.
+- **블로커 및 승인사항:** G0 D1~D5 기술 계약 최종 승인, 운영 G1 설치·Source Registry ON/권한·Role·Secret/Hyperdrive, 유료 Provider·과금/배포·트래픽·개인정보 테스트는 각각 실제 승인 범위 전까지 실행 금지. **다른 ops 트랙의 승인·CI·병합은 security 승인으로 전용하지 않는다.** 코드/문서 검토 및 기존 테스트 재사용에는 신규 승인 없음. 이 문서-only 변경의 최종 PR/CI는 정확한 HEAD 검증 전 미판정, `ROADMAP_COMPLETE` 아님.
+
