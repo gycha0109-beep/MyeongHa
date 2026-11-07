@@ -131,7 +131,7 @@ wait_saju_metrics(){
 }
 
 saju_image_id=''
-if [[ "$experiment" != short && "$experiment" != workerd && "$experiment" != workerd_overlap ]]; then
+if [[ "$experiment" != short && "$experiment" != workerd && "$experiment" != workerd_overlap && "$experiment" != workerd_db_failover ]]; then
   services=(saju)
   if [[ "$experiment" == saju_cpu ]]; then services+=(saju-cpu-pressure); fi
   docker compose --project-name "$project" -f "$compose" up --detach "${services[@]}" >/dev/null ||
