@@ -14,7 +14,7 @@ import {
   runReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
-import type { CharacterSajuConsultationShadowPortV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
+import type { CharacterSajuConsultationShadowPortV1, CharacterSajuConsultationPrivateComparisonV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
 import { createOpenAiSajuConsultationShadowPortV1, type OpenAiSajuConsultationShadowFetchV1 } from '../apps/api/src/openai-saju-consultation-shadow-port-v1.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
@@ -417,6 +417,7 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     });
     const budget = vi.fn(async () => undefined);
     const cost = vi.fn(async () => undefined);
+    const evidence = vi.fn(async (_record: CharacterSajuConsultationPrivateComparisonV1) => undefined);
     const port = createOpenAiSajuConsultationShadowPortV1({
       apiKey: 'offline-test-only',
       generationModel: 'offline-consultation-generator',
@@ -424,6 +425,7 @@ describe('Reader Interpretation Preview Runtime v1', () => {
       fetchImpl,
       beforeDispatch: budget,
       afterOutcome: cost,
+      recordPrivateComparison: evidence,
     });
     const original = await run(readers.baekheon);
     const shadow = await run(readers.baekheon, { consultationShadowPort: port });
@@ -431,7 +433,20 @@ describe('Reader Interpretation Preview Runtime v1', () => {
     expect(observed).toEqual(['offline-consultation-generator', 'offline-consultation-reviewer']);
     expect(budget).toHaveBeenCalledTimes(2);
     expect(cost).toHaveBeenCalledTimes(2);
+    expect(evidence).toHaveBeenCalledTimes(1);
+    const comparison = evidence.mock.calls[0]![0];
+    expect(comparison).toMatchObject({
+      readingRef: READING_ID,
+      characterId: 'baekheon',
+      groundingHash: baseBundle.groundingHash,
+      evaluation: 'accepted',
+      failureCodes: [],
+      candidateText: '이 명식의 핵심을 먼저 설명하겠습니다.',
+    });
+    expect(comparison.baselineText.length).toBeGreaterThan(0);
+    expect(comparison.sourceUnitId).toMatch(/^grounding_unit_[0-9a-f]{24}$/u);
     expect(shadow).not.toHaveProperty('candidate');
+    expect(shadow).not.toHaveProperty('comparison');
   });
 
   it('feeds source-grounded consultation instructions only after admission, keeping the exact Reading unchanged', async () => {
