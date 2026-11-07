@@ -117,8 +117,10 @@ export async function handleDigitalReadingWithdrawalClaimHttpV1(input:Readonly<{
        (origin!==url.origin && !nativeBearerOnly))
       return error('ORIGIN_FORBIDDEN',403);
   }
-  if(typeof input.idempotencySecret!=='string'
-    ||Buffer.byteLength(input.idempotencySecret,'utf8')<32)
+  // Status GET is a read of an already-owned Claim, not a new filing.
+  // The signing secret is required only to HMAC an idempotent POST nonce.
+  if(method==='POST'&&(typeof input.idempotencySecret!=='string'
+    ||Buffer.byteLength(input.idempotencySecret,'utf8')<32))
     return error('SERVICE_UNAVAILABLE',503);
   let identity:Awaited<ReturnType<IdentityEvidenceVerificationPortV1['verifyRequestIdentity']>>;
   try{identity=await input.identityEvidenceVerifier.verifyRequestIdentity(input.request);}

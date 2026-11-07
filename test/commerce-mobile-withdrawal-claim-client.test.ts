@@ -145,6 +145,71 @@ describe('mobile withdrawal claim transport and Member boundary',()=>{
     expect(f.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the actual owned lifecycle status after an idempotent replay',async()=>{
+    const f=setup();
+    f.fetchImpl.mockImplementation(async url=>
+      String(url).includes('&claimId=')
+        ? OK({claimId:CLAIM,receivedAt:RECEIVED,status:'refund_confirmed'})
+        : OK({...GOOD,replayed:true}),
+    );
+    await expect(f.service.submitWithCurrentStatus(SCOPE)).resolves.toEqual({
+      submitted:{...GOOD,replayed:true},
+      currentStatus:'refund_confirmed',statusLookupUnavailable:false,
+    });
+    expect(f.fetchImpl).toHaveBeenCalledTimes(2);
+    expect(String(f.fetchImpl.mock.calls[1]?.[0])).toContain('&claimId='+CLAIM);
+    expect(f.fetchImpl.mock.calls[1]?.[1]?.credentials).toBe('omit');
+  });
+
+  it('does not issue an extra status request for a first-time Claim',async()=>{
+    const f=setup();
+    await expect(f.service.submitWithCurrentStatus(SCOPE)).resolves.toEqual({
+      submitted:GOOD,currentStatus:'received',statusLookupUnavailable:false,
+    });
+    expect(f.fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains confirmed intake when replay status GET fails',async()=>{
+    const f=setup();
+    f.fetchImpl.mockImplementation(async url=>
+      String(url).includes('&claimId=')
+        ? Response.json({ok:false,error:{code:'CLAIM_UNAVAILABLE'}},{status:503})
+        : OK({...GOOD,replayed:true}),
+    );
+    await expect(f.service.submitWithCurrentStatus(SCOPE)).resolves.toEqual({
+      submitted:{...GOOD,replayed:true},
+      currentStatus:'received',statusLookupUnavailable:true,
+    });
+    expect(f.fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects replay visibility after a member switches during status lookup',async()=>{
+    const f=setup();
+    f.fetchImpl.mockImplementation(async url=>{
+      if(String(url).includes('&claimId=')){
+        f.switchAccount('different.member.jwt');
+        return OK({claimId:CLAIM,receivedAt:RECEIVED,status:'refund_processing'});
+      }
+      return OK({...GOOD,replayed:true});
+    });
+    await expect(f.service.submitWithCurrentStatus(SCOPE))
+      .rejects.toMatchObject({code:'CLIENT_WITHDRAWAL_SESSION_CHANGED'});
+    expect(f.fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it('holds a mismatched replay status timestamp without losing its intake receipt',async()=>{
+    const f=setup();
+    f.fetchImpl.mockImplementation(async url=>
+      String(url).includes('&claimId=')
+        ? OK({claimId:CLAIM,receivedAt:'2026-11-04T03:00:00.000Z',status:'refund_processing'})
+        : OK({...GOOD,replayed:true}),
+    );
+    await expect(f.service.submitWithCurrentStatus(SCOPE)).resolves.toEqual({
+      submitted:{...GOOD,replayed:true},
+      currentStatus:'received',statusLookupUnavailable:true,
+    });
+  });
+
   it('preserves server-confirmed results for the unchanged logged-in member',async()=>{
     const f=setup();
     await expect(f.service.submit(SCOPE)).resolves.toEqual(GOOD);

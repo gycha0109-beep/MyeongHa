@@ -973,3 +973,13 @@
 - **완료·미완료:** 내부 환불 검토/운영자 결정의 일반 실행계정 차단과 회귀·워크로그 반영 완료. 운영자 명단/법적 승인 증명은 이 검사만으로 해결되지 않으며 기존 별도 법적 검토가 필수입니다. Provider 순서 판정, 실제 Reader/T2 원자적 권한 회수, 고객 Reading 실제 제공 증명, 복원 DB 개인정보 삭제 실증 및 전체 E2E는 미완료입니다.
 - **다음/블로커:** 신규 CI를 확인해 실패 시 해당 오류를 수정하고, 통과하면 승인 로드맵의 취소·정확한 권한 회수 또는 실제 제공·청약철회 경로의 미완료 항목을 이어갑니다. 운영 DB·실제 PG 환불 POST·공개 LIVE 실행 없음; 승인 요청 없음.
 
+### 2026-11-08 — 중복 청약철회 접수의 실제 진행 상태 연동
+
+- **목표/로드맵:** 승인된 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6의 3·5번. 고객의 기존 Claim 접수/상태 조회를 실제로 연계해 동일 중복방지 번호를 재전송했을 때 화면이 현재 환불 처리 상태를 과거 '접수' 상태로 오해하지 않도록 합니다. 고객이 이미 접수한 상태는 별도의 법적 환불 승인과 구분합니다.
+- **기준 브랜치·PR·CI:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 작업 전 HEAD `05405ed62393ba50b39b7f93d239a8ddd6486499`. [직전 전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401188926) PostgreSQL17/Commerce/DB core/entitlement/payment/CI Verify 및 Web/Governance/Auth 모두 PASS, PR open·자동 병합 on. 같은 브랜치의 최신 WORKLOG·로드맵·본인 인증·고객 HTTP·모바일 서비스/화면 코드 및 2320 DB `qry_received_digital_reading_withdrawal_claim_v1`의 실제 상태 계약을 대조했습니다.
+- **변경 파일:** `apps/api/src/commerce-digital-reading-withdrawal-claim-http-v1.ts`, `test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts`, `apps/mobile/src/features/my/mobile-withdrawal-claim-service.ts`, `apps/mobile/src/features/my/MobileWithdrawalClaimPanel.tsx`, `test/commerce-mobile-withdrawal-claim-client.test.ts`, `test/commerce-mobile-withdrawal-ui-release.test.ts`, `docs/operations/COMMERCE_MOBILE_WITHDRAWAL_CLIENT_20261103.md`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 서버 Claim `GET`은 기존 회원/Subject 검증과 정확한 Claim ID를 유지하되 신규 POST에만 쓰이는 idempotency HMAC secret이 없어도 조회하도록 수정합니다. 기존 `POST`의 secret 필수·불확실한 커밋 처리와 `status:'received', refundApproved:false` 접수 결과는 그대로 유지합니다. 모바일에는 `submitWithCurrentStatus`를 추가해 **replayed=true에 한해** 같은 회원 Bearer로 기존 상태 GET을 실행하고, 원 접수시각 및 Claim ID 일치를 검증합니다. 상태 조회 오류는 이미 확인된 접수번호를 유지하고 새로고침을 안내하며 재접수를 실행하지 않습니다. 계정이 바뀌면 두 요청 결과 모두 버립니다. 출시 플래그·PG 환불·DB SQL·Reader 권한은 변경하지 않습니다.
+- **테스트·검증:** `test/commerce-digital-reading-withdrawal-claim-http-v1.test.ts`에 secret 없는 GET/POST 분리 테스트 2건, `test/commerce-mobile-withdrawal-claim-client.test.ts`에 중복 건의 현재 상태/최초 접수/상태 장애/계정 변경/원 접수시각 불일치 5건, 화면의 동일 경로 정적 계약과 모바일 설명 문서 개정. 새 커밋의 CI·PG17·앱 빌드는 **실행 결과 미확정, PASS 미선언**입니다.
+- **완료/미완료:** 중복 접수→정확한 본인 상태 조회·보존 연결 및 회귀·문서 기록은 반영했습니다. 법적 고객 전달 입증, 승인된 Provider NEWER/STALE 최신성, 실제 Reader T2/Entitlement 원자 회수, 실제 복원 개인정보 삭제 및 구매→환불→삭제 전체 E2E는 미완료입니다.
+- **다음·블로커:** 신규 CI를 확인해 실패 시 수정, 성공 시 승인된 권한 회수·서비스 전달 연결의 다음 미완료 지점 진행. 실제 PortOne 환불 POST·운영 DB·상품 판매·공개 LIVE 미변경, 승인 필요 없음.
+
