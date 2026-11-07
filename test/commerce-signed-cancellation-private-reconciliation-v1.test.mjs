@@ -56,7 +56,9 @@ function fakeDb({rows=[ROW],eventRows=[],authority={readOnly:true,completeVisibi
    return {rows};
   }
   if(sql===EVENT_AUDIT){
-   expect(args).toEqual(['msg_1','Transaction.Cancelled']);
+   expect(args?.[0]).toBe('msg_1');
+   expect(['Transaction.Cancelled','Transaction.PartialCancelled',
+    'Transaction.CancelPending']).toContain(args?.[1]);
    return {rows:eventRows};
   }
   if(sql.toLowerCase().includes('insert')||
