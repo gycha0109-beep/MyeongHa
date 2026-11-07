@@ -926,3 +926,15 @@ Watchtower-Track: ops
 - **블로커·승인 사항:** 이번 SELECT-only 관측 및 소스/문서 변경에는 별도 사용자 운영 승인 필요 없음. 실제 Hosted 복원 대상 준비(아직 없음), 유료 자원 생성, Production SQL/DDL/DML/ACL/시크릿·canary/트래픽 및 삭제·철회 재현은 명시적 승인 없이는 실행하지 않음.
 
 Watchtower-Track: ops
+
+### 2026-11-08 / Phase 8-A — PR #3115 운영 트랙 CI 테스트 자동수집 충돌 해결
+
+- **작업 목표:** 기존 41개 원격 전용 객체 권한 조사 코드가 Governance 검사에는 통과했으나, PR #3115 통합 CI의 `Work Track · ops` 검사에서 실패한 문제를 실제 실패 로그 기준으로 해결한다.
+- **실패 근거:** [실패 실행 #42386368974](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42386368974), HEAD `61cdf80a9a3450945a1bf0b6c07e06c890dc9e3e`. 해당 작업은 Vitest `scripts/operations/verify-remote-only-current-object-metadata.test.mjs`를 자동 수집했으나, 파일 내부는 Node 내장 `node:test` 형식이어서 `No test suite found`가 발생했다. 다른 9,004개 테스트는 성공했어도 이 1개 파일의 실패로 통합 검사는 RED. 같은 HEAD의 Governance Verify는 PASS.
+- **변경 파일:** `scripts/operations/verify-remote-only-current-object-metadata.test.mjs` → `scripts/operations/verify-remote-only-current-object-metadata.cases.mjs`로 이름만 변경, `package.json` 전용 `node --test` 실행 경로 갱신, 기존 WORKLOG 본 항목 갱신. 테스트 내용·SQL·Production 권한·운영 DB 변경 없음.
+- **실행 확인:** 새 이름으로 `npm run verify:postgres-remote-only-current-object-metadata` 실행, 기존 증거 검증 PASS 및 Node 테스트 **8/8 PASS**. GitHub Linux CI는 이 변경의 정확한 HEAD로 새 검사 결과 확인 전까지 성공 미판정. 별도 Windows 환경의 `verify:postgres-dr-current-evidence`는 로컬 체크아웃 줄바꿈 문제로 실패했으며, 이 작업의 Linux CI 성공 근거로 사용하지 않는다.
+- **브랜치·커밋·PR:** 기존 `ops/phase8-remote-only-current-object-metadata-20261108`에 적용, [PR #3115](https://github.com/gycha0109-beep/MyeongHa/pull/3115) 재사용. 기준 커밋 `61cdf80a9a3450945a1bf0b6c07e06c890dc9e3e`; 수정 커밋 제목 `fix(ops): keep node native regression out of vitest discovery`. 푸시 후 최종 HEAD와 CI는 별도 확인.
+- **남은 과제와 다음 작업:** 수정 커밋의 Work Track·Governance 및 관련 PR 체크가 모두 PASS하는지 확인. 이후 41개 객체 지문을 격리 복원본과 비교하는 로드맵 작업이 남으며 복원 대상 확인/승인 전 실제 복원·운영 변조 금지.
+- **블로커 및 승인사항:** CI 코드·문서 변경에는 추가 승인 필요 없음. 운영 DB 쓰기, 새로운 Hosted DR 대상·유료 자원, 개인정보 카나리, 권한·RLS 변경은 별도 명시적 승인 전 중단. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+Watchtower-Track: ops

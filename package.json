@@ -32,7 +32,7 @@
     "verify:postgres-recovered-serving-admission": "node scripts/verify-postgres-recovered-serving-admission.mjs && node scripts/verify-postgres-hosted-synthetic-local-acceptance.mjs",
     "verify:postgres-dr-readiness-authority": "node scripts/verify-postgres-dr-readiness-authority.mjs",
     "verify:postgres-dr-current-evidence": "node scripts/verify-postgres-dr-current-evidence.mjs",
-    "verify:postgres-remote-only-current-object-metadata": "node scripts/operations/verify-remote-only-current-object-metadata.mjs && node --test scripts/operations/verify-remote-only-current-object-metadata.test.mjs",
+    "verify:postgres-remote-only-current-object-metadata": "node scripts/operations/verify-remote-only-current-object-metadata.mjs && node --test scripts/operations/verify-remote-only-current-object-metadata.cases.mjs",
     "verify:postgres-privacy-reconciliation-plan": "node scripts/verify-postgres-privacy-reconciliation-plan.mjs",
     "verify:production:api": "node scripts/verify-production-api.mjs",
     "verify:production:member-me": "node scripts/verify-production-member-me.mjs",
