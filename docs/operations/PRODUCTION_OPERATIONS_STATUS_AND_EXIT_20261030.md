@@ -938,3 +938,16 @@ Watchtower-Track: ops
 - **블로커 및 승인사항:** CI 코드·문서 변경에는 추가 승인 필요 없음. 운영 DB 쓰기, 새로운 Hosted DR 대상·유료 자원, 개인정보 카나리, 권한·RLS 변경은 별도 명시적 승인 전 중단. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
 
 Watchtower-Track: ops
+
+### 2026-11-08 / Phase 8-A — RLS 비활성 정책 20건의 18개 실제 테이블 직접 권한 조사
+
+- **작업 목표:** Gate 1 / Phase 8-A 승인된 13번(현재 RLS-disabled 테이블의 실제 권한 경로)과 17번(원격 전용 마이그레이션 객체 관측) 후속 작업. 기존 41개 마이그레이션의 RLS 비활성 **정책 표식 20건**이 중복 없는 **18개 테이블**에 해당함을 교차 확인하고, 현행 PostgreSQL에서 해당 테이블의 일반·서버 역할 직접 접근 여부를 SELECT-only로 기록한다. PR #3113의 버전 이동 8쌍 조사와 중복하지 않는다.
+- **변경 파일:** `scripts/operations/production-rls-disabled-policy-role-grants-readonly.sql`(현재 테이블·정책 수·RLS·4개 역할의 schema USAGE와 SELECT/INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER 확인), `docs/operations/POSTGRES_CURRENT_RLS_DISABLED_ROLE_GRANTS_20261108.json`(실제 Production 관측), `scripts/operations/verify-current-rls-disabled-grants.mjs`(기존 20건 출처/18개 테이블/권한 불일치 시 거부), `scripts/operations/verify-current-rls-disabled-grants.cases.mjs`(Node 내장 검증 8종; Vitest 자동 수집 회피), `package.json`(기존 Governance 경로에 추가), 본 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` WORKLOG.
+- **실제 완료 증거:** 2026-11-07T15:39:28Z(한국 2026-11-08 00:39:28) Production `cnsfpcdiyofqvhpcegfc` PostgreSQL에서 `BEGIN TRANSACTION READ ONLY; … ROLLBACK;`로 관측. 해당 18개 테이블은 존재 18/18, 현재 RLS enabled 0/18, 실제 현재 정책 전체 **24건**(원격 마이그레이션의 20개 표식 외에 다른 정책 4건 포함). `anon`, `authenticated`, `myeongha_api_executor` 역할에 대해 관측된 테이블의 직접 SELECT/쓰기 권한 **0/18**, `service_role` 직접 SELECT/쓰기 **18/18**. 조사한 7종 테이블 직접 권한은 앞 3개 역할 전체에서 모두 false. 현재 정책이 있어도 RLS 비활성인 경우 해당 정책은 행 접근을 제어하지 않는다.
+- **권한 경계:** 위 결과는 현재 특정 18개 테이블의 `has_schema_privilege` + `has_table_privilege` 증거만 해당한다. 실제 Data API 스키마 노출, SECURITY DEFINER 함수·RPC를 통한 간접 접근, 전체 스키마·역할, 과거 마이그레이션/격리 복원본 동등성, 개인정보 삭제 재현은 **미검증**이다. `service_role`의 별도 접근이 존재하므로 전역 노출 차단·RLS 안전 완료라고 주장하지 않는다. Production SQL/DDL/DML/ACL/RLS 변경, 데이터 행 조회, 카나리, 시크릿 조작 없음. `drReady=false`, `serviceResumptionAllowed=false`, Issue #1887 OPEN 유지.
+- **검증·CI 근거:** 새 `verify:postgres-current-rls-disabled-grants`에서 기존 출처 20건/18개 테이블과 24개 현재 정책, 직접 권한 통계를 비교하고 위조된 권한/승인/쿼리·소스 변경을 거부하는 Node **8/8 PASS**. 기존 `verify:postgres-remote-only-current-object-metadata`의 Node **8/8 PASS**도 유지. 기준 HEAD `009732f7ad7d2e26a70a11084d7c139022913418`의 PR #3115 `Work Track · ops`와 `Governance Verify` PASS 확인, `db-authority-core`는 확인 시점 진행 중. 신규 커밋의 CI는 별도 결과 확인 전까지 통과 미판정.
+- **브랜치·커밋·PR:** `gycha0109-beep/MyeongHa` · `ops/phase8-remote-only-current-object-metadata-20261108` · [PR #3115](https://github.com/gycha0109-beep/MyeongHa/pull/3115), PR #3113 별도 유지. 본 작업 공동 커밋 제목 `feat(ops): trace direct grants on RLS-disabled tables`(확정 SHA는 해당 커밋 이후 WORKLOG 후속 기록).
+- **남은 과제:** 운영 실행 경로에서 SECURITY DEFINER·RPC·서버 관리 역할 접근의 실제 사용 경계 확인, 원격 전용 이전/현재 객체와 격리 복원본의 정의·소유자·권한 동등성, Hosted Auth/Storage와 사용자 개인정보 연속성, 전 서비스 RPO/RTO 증거 확보. Phase 8과 Gate 13 완료 아님.
+- **다음 작업·블로커/승인:** 기존 코드의 API/RPC 호출 경로와 DB 함수 간접 권한만 승인된 읽기 전용 범위에서 대조한다. 독립 Hosted 복원 대상 신규 생성/비용, Production DDL/DML/GRANT/RLS/시크릿 수정 및 개인정보 카나리 실행은 사용자 명시적 승인 전 중단. 기존 승인된 로컬 코드·문서 작업은 추가 승인 대기 없음.
+
+Watchtower-Track: ops
