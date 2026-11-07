@@ -1,3 +1,10 @@
+### 2026-11-08 KST — Phase 8-A 저장소 전용 Commerce 2건의 현행 객체·권한 영향 읽기 전용 대조
+
+- **기존 로드맵/단위:** `PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md` Gate 1 / Phase 8-A (현재 Production 원장과 repository-only 76건의 개별 SQL·객체·권한 영향 처분). [PR #3105](https://github.com/gycha0109-beep/MyeongHa/pull/3105) main 병합 `2384d40ef2de3dae49fb2d7d5c4d231bb6d63b19` 이후 이미 분류된 Commerce 관련 source-only 2개를 대상으로 함; 새 단계나 기능을 추가하지 않음.
+- **변경 파일:** `scripts/operations/production-repository-only-commerce-effect-readonly.sql` (PostgreSQL 카탈로그/원장 SELECT 쿼리), `docs/operations/POSTGRES_REPOSITORY_ONLY_COMMERCE_LIVE_EFFECT_20261107.json` (개인정보·SQL 본문 없는 관측 결과), `scripts/verify-phase8-commerce-source-effects.mjs` (저장소 선언/관측 증거 검증), 본 기존 운영 WORKLOG. SQL migration/런타임/Provider/접근권한은 변경하지 않음.
+- **운영 읽기 전용 실증:** Source-only `1780_portone_verified_official_reader_full_cancel_v1.sql`, `20261027054525_digital_reading_checkout_notice_evidence_v1.sql`의 원장 exact-version 기록은 각각 없음. 현재 `public` 카탈로그의 해당 선언 함수 4, 테이블 3, 비내부 트리거 5, 합계 12개 이름은 **12/12 미발견**. 적용 원장 241개, 마지막 `20261105075227`. 확인한 것은 현행 객체 이름의 부재이며, 과거 SQL의 미실행·다른 경로의 동등 동작 부재·원본 데이터 이력·전체 DDL/ACL parity의 증명은 아님. 비존재 객체의 RLS나 실제 권한은 추정하지 않음.
+- **테스트:** `node scripts/verify-phase8-commerce-source-effects.mjs` PASS (source SQL의 12개 정확한 선언, 관측 12개, missing ledger, migration source-only 목록, DR BLOCKED, SELECT-only 문법 검증); `git diff --check` PASS. 실제 운영 카탈로그는 SELECT-only로 조회했고 Production DDL/DML/repair/canary/데이터 접근은 수행하지 않음. 정확한 HEAD의 CI는 PR 생성 및 검사 전이므로 여기서 성공으로 추정하지 않음.
+- **미완료·다음:** 이 2건을 포함한 전체 source-only 76건의 실제 DDL/owner/ACL/정책 효과, remote-only 41건의 출처, Provider Auth/Storage 복원, 독립 개인정보 원장·복구와 전 서비스 RPO/RTO 모두 미완료. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN. 본 PR의 필수 CI·자동 병합을 통과한 다음 Phase 8-A에서 아직 증명되지 않은 객체/권한 일치 범위를 기존 순서대로 조사; 별도 승인 전 변경/복구 명령 금지.
 ### 2026-11-07 / Phase 8-A — 저장소 전용 마이그레이션 76건 분류
 
 - **작업 목표:** 기존 Production 원장에는 없는 저장소 SQL 버전 76개를 전수 분류하되 배포 완료 여부는 추정하지 않는다. 별도 WORKLOG 대신 이 기존 ops 트랙 WORKLOG에 기록한다.
