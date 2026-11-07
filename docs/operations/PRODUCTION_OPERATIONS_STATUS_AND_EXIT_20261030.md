@@ -1023,3 +1023,15 @@ Watchtower-Track: ops
 - **남은 과제·다음 작업·승인:** 이 수정은 CI 환경의 일관성만 보강했고 사용자별 실제 실행·정적 외의 함수 본문 인가·격리 복원본 동등성을 검증하지 않았다. 수정 CI를 확인한 후 다음 SECURITY DEFINER RPC 경로의 소스·실행 증거를 검토한다. Production 변경·새 Hosted 복원 자원은 별도 승인 없이는 실행하지 않는다. `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
 
 Watchtower-Track: ops
+
+### 2026-11-08 / Phase 8-C — Production 개인정보 복구 원장 CI RED의 재실행 아티팩트 선택 오류
+
+- **작업 목표:** 사용자 지정 [Run #42404193088](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42404193088), attempt 1, HEAD `3bdec3c162b132284498ebed38e15feaf32c0ff9`의 구체적 실패 원인을 해결하고 기존 검증 우회 없이 재실행된 성공 원장의 증빙 파일을 정확히 선택한다. 해당 실패는 `main`의 `schedule` 작업으로 챗봇 장기기억 PR #3068와 직접 연동된 CI가 아님.
+- **실패 로그 / 재실행 대조:** `encrypted-off-db-privacy-recovery-ledger`의 `Resolve prior governed privacy ledger artifact` 단계가 `Prior successful ledger artifact is missing, ambiguous or expired; source continuity is unverified`로 종료. 직전 성공 [#42381192945](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42381192945) attempt 2에는 **동일 run ID의 유효 아티팩트 2개**가 있다: 1회차 `13577209175` 2026-11-07T14:21:35Z, 2회차 `13582736761` 2026-11-07T17:00:59Z. 최신 attempt 2 업로드 단계는 17:00:59Z–17:00:59Z SUCCESS. 단순 `artifacts.length == 1` 조건이 재실행 이력을 구분하지 못한 원인. 실패 Run은 현재 확인에서 attempt 1이며 성공 재실행 증거가 없다.
+- **브랜치 / 기준 / PR:** `ops/privacy-ledger-predecessor-attempt-selection-20261108`, 기준 main `7808801e95d9f3ad8651ba8881900cdaa654944f`; 독립적인 운영용 수정 PR을 생성한다(장기기억 Draft PR #3068이나 다른 운영 PR의 브랜치에 섞지 않음). `Watchtower-Track: ops`.
+- **변경 파일:** `.github/workflows/production-postgres-privacy-recovery-ledger.yml`: 이전 성공 실행의 최신 시도에 속한 완료 작업/업로드 단계 조회 및 일치하는 암호화 아티팩트만 선택. `scripts/operations/select-previous-privacy-ledger-artifact.mjs` (신규): exact run/attempt/SHA, main, 성공한 업로드 단계 타임스탬프와 unexpired 단일 아티팩트를 일치시키고, 실제 중복·누락·위조·오래된 시도는 차단. `scripts/operations/select-previous-privacy-ledger-artifact.cases.mjs` (신규): 관측된 2개 아티팩트 상황 및 누락/만료/시간불일치/중복/권한 경계 합성 회귀. `scripts/verify-production-postgres-privacy-recovery-ledger-workflow.mjs`, `package.json`: 기존 운영 Governance 테스트에 연결. `docs/operations/PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md`, 본 기존 중앙 WORKLOG: 범위/미완료/다음 작업.
+- **완료 / 테스트·CI 판단:** 로컬·PR의 정적 검증과 단위 테스트를 연결한 코드 변경 작업 단위. 실제 새 GitHub Actions 검증은 새로운 SHA의 워크플로 결과가 나올 때까지 성공으로 간주하지 않으며, 프로덕션 scheduled workflow의 **실제 새 실행 성공은 별도** 검증해야 한다. 아직 Production DB 접속/SQL·아티팩트 삭제/암호화 비밀/PG 접근 권한 수정 없음.
+- **미완료 / 블로커:** 최신 코드가 병합된 main에서 scheduled 또는 허가된 workflow_dispatch 재실행 성공은 미확인. Production 원장 누락 없는 독립 연속성은 원래부터 증명되지 않았으며 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `drReady=false`, `serviceResumptionAllowed=false`, [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) OPEN 유지. Production DB/Hosted/Auth/Storage/비밀/결제/카나리 등 변경은 별도 승인 전 금지.
+- **다음:** 새 PR의 TypeScript/운영 Governance/단위 테스트 CI 확인·수정. PR 병합 이후 정확한 최신 main 워크플로를 대상으로 읽기 전용 및 기존 운영 원장 수집 실행을 검증하고 실패 시 원인 추적. 원본 실패 실행만 재실행하면 옛 SHA이므로 수정 검증이 되지 않음.
+
+Watchtower-Track: ops
