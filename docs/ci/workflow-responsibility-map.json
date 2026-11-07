@@ -26,6 +26,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "character-runtime-taegyeom-12case-v1.yml": {
+      "responsibility": "isolated-taegyeom-public-synthetic-glm-runtime-dialogue-evaluation",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "ci-db-track.yml": {
       "responsibility": "db-suite-verification",
       "prMode": "routed-via-ci",

@@ -169,14 +169,16 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = '', providerEventStatus: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = '', providerEventStatus: string = 'all', search: string = ''): string {
   if (['reading-attempts','reading-ai-usage','reading-generation-cost'].includes(tab) && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
+    if (search !== '') params.set('search', search);
     return '/api/admin/readings/' + attemptReadingId + (tab === 'reading-ai-usage' ? '/ai-usage?' : tab === 'reading-generation-cost' ? '/generation-cost?' : '/attempts?') + params.toString();
   }
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
+  if (search !== '') params.set('search', search);
   if (cursor !== null) params.set('cursor', cursor);
   if (from !== null && to !== null && !['catalog','characters','content-releases'].includes(tab)) { params.set('from', from); params.set('to', to); }
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
@@ -341,6 +343,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [retryCounter, setRetryCounter] = useState(0);
+  const [search, setSearch] = useState('');
+  const [draftSearch, setDraftSearch] = useState('');
 
   useEffect(() => {
     let mounted = true;
@@ -349,7 +353,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, search);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -361,7 +365,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, retryCounter]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, search, retryCounter]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
@@ -371,9 +375,33 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     </div>
     <div className="admin-tabs" aria-label="조회 종류">
       {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['provider-events','결제사 이벤트'],['entitlements','보유 권한'],['entitlement-events','권한 지급·철회 이력'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],...(attemptReadingId ? [['reading-attempts','실행 시도'],['reading-generation-cost','Reading 생성 AI 비용']] : []),['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
-        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); setReceiptId(''); setAiFeature('all'); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
+        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setSearch(''); setDraftSearch(''); setReservationId(''); setDraftReservationId(''); setReceiptId(''); setAiFeature('all'); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {detail === null && tab !== 'reading-generation-cost' && <form className="admin-search-form" role="search" aria-label="현재 목록 검색" onSubmit={event => {
+        event.preventDefault();
+        const value = draftSearch.trim();
+        if (value.length > 100 || /[\x00-\x1f\x7f]/u.test(value)) {
+          setError('검색어는 제어 문자를 제외한 100자 이내로 입력해 주세요.');
+          return;
+        }
+        setError('');
+        setSearch(value);
+        setCursor(null);
+      }}>
+        <label className="admin-search-field">
+          <span>목록 검색</span>
+          <input aria-label="현재 목록 검색어" placeholder="ID, 상태, 이벤트, 모델, 참조값 등" value={draftSearch}
+            maxLength={100} onChange={event => setDraftSearch(event.target.value)} />
+        </label>
+        <button type="submit">검색</button>
+        {search !== '' && <button type="button" className="admin-search-reset" onClick={() => {
+          setDraftSearch('');
+          setSearch('');
+          setCursor(null);
+        }}>초기화</button>}
+        <small>현재 메뉴의 조회 가능 범위 전체에서 검색합니다. 기간·상태 필터와 함께 적용됩니다.</small>
+      </form>}
       {((section === 'commerce' && tab === 'commerce') || (section === 'readings' && tab === 'readings')) && detail === null &&
         <form className="admin-issue-category" onSubmit={e => {
           e.preventDefault();
@@ -669,6 +697,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           if (from !== null && to !== null) { query.set('from', from); query.set('to', to); }
           if (issueStatus !== 'all') query.set('status', issueStatus);
           if (issueCategory !== '') query.set('category', issueCategory);
+          if (search !== '') query.set('search', search);
           void fetchAdminIssuesCsvV1(token, query)
             .then(content => {
               const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
