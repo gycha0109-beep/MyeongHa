@@ -34,6 +34,7 @@ export interface CharacterSajuConsultationShadowPortV1 {
     candidateHash: string;
     groundingUnit: CharacterGroundingUnitViewV1;
     characterProfileRef: CharacterReadingPerspectiveRefV1;
+    publishedCharacterVoice: unknown;
   }>): Promise<CharacterSajuSp2EvaluatorVerdictV1>;
   readonly evaluatorVersion: string;
 }
@@ -68,8 +69,8 @@ const RESPONSE_SCHEMA = Object.freeze({
   properties: {
     schemaVersion: { enum: [CHARACTER_SAJU_SP2_CANDIDATE_SCHEMA_VERSION_V1] },
     characterId: { type: 'string' },
-    sourceUnitRefs: { type: 'array', minItems: 1, maxItems: 1, items: { type: 'string' } },
-    text: { type: 'string', minLength: 1, maxLength: 4000 },
+    sourceUnitRefs: { type: 'array', items: { type: 'string' } },
+    text: { type: 'string' },
   },
 } as const);
 
@@ -173,6 +174,7 @@ export async function runCharacterSajuConsultationShadowV1(
       candidateHash,
       groundingUnit: unit,
       characterProfileRef: profile,
+      publishedCharacterVoice: input.publishedCharacterVoice,
     });
     const decision = guardCharacterSajuSp2EvaluationCandidateV1({
       candidate,
