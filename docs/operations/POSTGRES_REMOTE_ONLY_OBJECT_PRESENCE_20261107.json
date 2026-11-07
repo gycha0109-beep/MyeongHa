@@ -1,0 +1,396 @@
+{
+  "schemaVersion": "ops-remote-only-object-presence-v1",
+  "dateKst": "2026-11-07",
+  "projectRef": "cnsfpcdiyofqvhpcegfc",
+  "source": "scripts/operations/production-remote-only-object-presence-readonly.sql",
+  "sourceGitBlobSha": "dbb4eca7c1ccac88826789bcf3b5fc635ad263d5",
+  "transactionReadOnly": true,
+  "comparedAppliedMigrationCount": 41,
+  "indicatorTotals": {
+    "functionIndicators": 82,
+    "liveNamedFunctions": 82,
+    "policyIndicators": 82,
+    "liveNamedPolicies": 82,
+    "tableIndicators": 16,
+    "liveNamedTables": 16
+  },
+  "missingNamedObjects": [],
+  "methodLimitations": [
+    "Regex-based name/schema indicators, not a complete parser or a proof that definitions executed.",
+    "Presence does not prove body/owner/GRANT/RLS/policy-expression, full backup parity, or runtime functionality.",
+    "Some declarations may repeat across migrations; totals are declaration indicators, not unique objects.",
+    "Current Production read-only catalog, not an isolated restored target.",
+    "This evidence does not change DR admission, privacy continuity, Hosted Auth/Storage, or RPO/RTO."
+  ],
+  "perVersion": [
+    {
+      "version": "20261008090417",
+      "functions": 19,
+      "policies": 19,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261023054251",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261025193416",
+      "functions": 18,
+      "policies": 6,
+      "tables": 1,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261025193454",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261025201500",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261025203519",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261027004434",
+      "functions": 1,
+      "policies": 0,
+      "tables": 1,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261027004544",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261027011650",
+      "functions": 2,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261027043527",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261027074247",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261027081929",
+      "functions": 2,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261028011357",
+      "functions": 1,
+      "policies": 0,
+      "tables": 1,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261029012948",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261029070331",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261029071539",
+      "functions": 0,
+      "policies": 29,
+      "tables": 1,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030014708",
+      "functions": 5,
+      "policies": 6,
+      "tables": 3,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030014906",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030014935",
+      "functions": 3,
+      "policies": 5,
+      "tables": 5,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030015201",
+      "functions": 0,
+      "policies": 4,
+      "tables": 2,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030015858",
+      "functions": 3,
+      "policies": 1,
+      "tables": 1,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030020711",
+      "functions": 2,
+      "policies": 4,
+      "tables": 1,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261030021027",
+      "functions": 4,
+      "policies": 1,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261031182505",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261031182550",
+      "functions": 2,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261031182926",
+      "functions": 1,
+      "policies": 3,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261031185454",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261031192427",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261031205042",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261101095105",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261101133954",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261101151700",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261102060123",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261102060126",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261102081315",
+      "functions": 2,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261103005333",
+      "functions": 0,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261103072224",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261103083731",
+      "functions": 2,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261104043413",
+      "functions": 2,
+      "policies": 4,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261104195925",
+      "functions": 3,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    },
+    {
+      "version": "20261105075227",
+      "functions": 1,
+      "policies": 0,
+      "tables": 0,
+      "missingFunctions": [],
+      "missingPolicies": [],
+      "missingTables": []
+    }
+  ]
+}

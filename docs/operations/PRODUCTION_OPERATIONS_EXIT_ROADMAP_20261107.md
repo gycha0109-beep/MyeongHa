@@ -2,7 +2,7 @@
 
 > 기준일: 2026-11-07 KST  
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`  
-> 기준 main: `1609aa879aa63120072b4d21b35f4c469dc650ed`  
+> 기준 main: 최초 `2f04f8f2a0d912e42bf348781e17d20ff7094675`; 최신 백업 source `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af` (각 증거는 자체 SHA 기준)  
 > 권위 문서: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §33–§38, `PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`, Phase 8 DR 문서 및 Issue [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
 
 ## 1. 개정 목적과 유지 범위
@@ -23,10 +23,10 @@
 |---|---|---|
 | Production Worker 익명 E2E | [#42271216975](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42271216975), main `1609aa8…`, Worker `295b9496-795b-44a3-b3f9-141c0b83e47d` | 화면·Health 200, 설정 기반 Readiness 200, 익명 Member/Saju/Preview 401, Cross-origin 403, unknown route 404. 실제 DB/Auth/Saju 연결 증명은 아님. |
 | Production DB 현황 | PostgreSQL 17.6, 원격 migration 원장 241개, 최신 `20261105075227` | 읽기 전용 관측. 전체 저장소 SQL/DDL/권한 동등성은 미증명. |
-| Migration 비교 | main SQL 276개, 원격 전용 40개, 저장소 전용 75개, 동일 이름 버전 불일치 1개 | 원격 전용 `20261008090417`의 19/19 함수 본문은 대응 코드와 일치하지만 wrapper·ACL·소유권 동등성은 미증명. `20261029012948`과 저장소 `20261029012000`은 최신 byte 비교에서 동일하지 않음. |
-| 현재 Frontier 백업 | [#42130737153](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42130737153), frontier `20261105075227`, 241 entries | 암호화 백업·checksum 확인. |
+| Migration 비교 | Production 241개 / main SQL 276개. 정확한 버전 ID 기준 원격 전용 41개·저장소 전용 76개이며, 동일 이름의 버전 불일치 쌍 8개가 포함됨. 이 중 4개는 전체 byte 일치, 4개는 저장소 파일 끝의 `\n\ncommit;\n` 10 bytes를 제외한 원격 prefix 일치, 1개(`20261029012948` ↔ `20261029012000`)는 전체 byte 일치. | 위 쌍은 최신 SELECT-only 비교에서 원격·저장소 SQL 전체 7,349 bytes가 MD5/SHA-256까지 일치함을 확인. 버전 ID 및 배포 provenance는 별도 미해결. 원격 `20261008090417`은 104,021 bytes, 6개 로컬 marker는 비어 있고, 후속 1520–1640 13개와 Pin 컬럼/함수가 현재 Production에 존재함. 상세는 [11/07 read-only snapshot](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json). |
+| 현재 Frontier 백업 | 최신 확인 [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582), artifact `13548176984`, source `8ccf60d…`, frontier `20261105075227` | 백업 SUCCESS이지만 해당 최신 artifact의 격리 복원은 미실행/미입증. 과거 #42130737153 백업의 복원 증거를 자동 승계하지 않음. |
 | 격리 PostgreSQL 복원 | [#42247589352](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42247589352), PostgreSQL 17.6, 4초 | DB 복원·선택된 역할/함수/RLS 검사는 통과. Provider 관리 데이터 27개 블록 누락, 3개 투영. 전체 Supabase 복원은 아님. |
-| 개인정보 원장 | [#42242496615](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42242496615), 현재 백업에 결합, `eventCount=0` | 비어 있는 스냅샷은 삭제·철회 재생 증거가 아님. 최신 감시 [#42262739511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42262739511)은 7,828초로 7,200초 기준 초과. |
+| 개인정보 원장 | 최신 확인 [#42352614447](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42352614447), artifact `13566018275`, 암호화 캡처 SUCCESS. | payload 이벤트 수·누락 없는 연속성은 이번 조회에서 미인증. 최신 감시 [#42363914282](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42363914282)는 9,582초로 7,200초 기준 초과 RED. 이전 0건 스냅샷을 non-zero 증거로 사용 금지. |
 | Phase 11 제품 경로 | [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347) | 격리 GoTrue JWT + PG18 RLS + 실제 Saju + local workerd, 900초·3,600/3,600 성공, p95 174.231ms / p99 184.088ms, Saju 장애 503·Health 200·복구 4/4. Production Worker admission/Hosted Hyperdrive/Production capacity 증거는 아님. |
 | Phase 12 진단 | `OBSERVED_SCALING_REVIEW_PHASE12_20261030.md` | DB pool 2개 조건에서 concurrency 8 실패 및 Saju CPU 제한 압력 신호 확인. 진단 신호이지 Production 임계치나 자동 확장 승인 아님. |
 
@@ -48,18 +48,29 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 
 #### 8-A. Migration / DB 출처 정합성
 
-1. 현재 Production 원장과 정확한 main migration 파일을 다시 SELECT-only로 대조한다. 기준 관측은 원격 241개 / 저장소 276개, 원격 전용 40개 / 저장소 전용 75개 / 동일 이름 버전 불일치 1개다.
-2. 모든 불일치 버전을 다음으로 분류한 처분표를 만든다: 원격 적용 출처·실행 주체·시점, 저장소 대응 파일, 실제 statement/DDL checksum, 객체·함수·정책 영향, owner·role·membership·GRANT/REVOKE, rollback/forward-only 방향.
-3. `20261008090417`은 104,021-byte 원격 statement의 wrapper·ACL·ownership·policy와 6개 로컬 migration을 대조한다. 19/19 함수 본문 일치는 범위가 제한된 증거로만 유지한다.
-4. `20261029012948` 원격 statement와 `20261029012000` 저장소 파일의 비교 범위를 확정한다. 11/05 DR 상태 문서에는 정규화 후 hash 일치 관측이 있으나, 11/07 최신 whole-statement byte 비교에서는 원격 7,349 bytes와 저장소 7,541 bytes(끝 개행 제거 7,539 bytes)의 hash가 달랐다. 두 비교의 입력·정규화 범위를 대조해 차이를 해소하기 전에는 semantic equivalence를 확정하지 않는다.
-5. 원격 전용·저장소 전용 항목은 각각 적용됨/미적용/다른 트랙/역사적 잔존 등 근거 있는 상태로 모두 처분한다. 저장소 전용 75개를 자동으로 배포 실패로 분류하지 않는다.
+1. 현재 Production 원장과 정확한 main migration 파일을 SELECT-only로 대조했다. 2026-11-07 기준 원격 241개 / 저장소 276개이며, 정확한 버전 ID 기준 원격 전용 41개 / 저장소 전용 76개다. 동일 이름의 버전 불일치 쌍 8개는 아래 4번과 같이 개별 SQL 본문/종료 구문을 대조하며 version identity는 별도로 유지한다.
+2. 불일치 버전은 확인 가능한 배포/자동화 출처·시점, 저장소 대응 파일, statement/DDL checksum, 객체·함수·정책 영향, owner·role·membership·GRANT/REVOKE, rollback/forward-only 방향으로 처분한다. R2-G에서 종료한 과거 개인 실행자·요청 ID·COMMIT 로그 추적은 `CLOSED_RISK_ACCEPTED`이며 다시 차단 조건으로 만들지 않는다.
+3. `20261008090417`은 104,021-byte 원격 단일 statement다. 현재 Production에는 관련 1460–1510 marker 6/6이 존재하지만 저장 statement는 모두 비어 있고, 후속 1520–1640 13개 migration·Pin 컬럼 2개·pinned 함수가 이미 존재한다. 현재 investigation은 `HOLD_CHANGED_RUNTIME_SCHEMA_REASSESS`다. 19개 R2 RPC catalog는 19/19 존재하며, `myeongha_api_executor` EXECUTE 17/19, `service_role`·`anon`·`authenticated`는 0/19다. 거부된 두 함수는 legacy assert/context-ready 경로이고, 현재 pinned context-ready replacement는 1 overload로 존재하며 API executor 실행이 허용된다. 이것은 현재 접근 경계의 증거이지, 원격 wrapper·전체 DDL·Owner·role membership·정책·grant graph의 격리 복원 parity 증명은 아니다.
+4. `20261029012948` 원격 statement와 `20261029012000` main 파일은 현재 Production에 대해 SELECT-only로 직접 비교했다. 양쪽 모두 7,349 bytes이며 exact byte equality, MD5 `c13c8ae6680c9c5aef35909ba81b7b1b`, SHA-256 `b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6`가 일치한다. 정규화 SHA-256도 `0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d`로 일치한다. 따라서 이 쌍의 SQL source equivalence는 확인됐지만 remote/local version identity와 적용 provenance는 해결되지 않았다. 원격 metadata의 `created_by`는 존재하나 인증된 실행자 증명은 아니며 idempotency key와 rollback statement는 없다.
+5. 원격 전용 41개·저장소 전용 76개와 동일 이름/다른 버전 8쌍을 개별 처분한다. 현재 8쌍 중 4개는 byte-exact, 4개는 저장소 끝의 `\n\ncommit;\n` 10 bytes를 제외한 원격 prefix 일치다. Prefix 일치 4쌍은 SQL statement framing 차이를 기록하고, version identity 불일치를 자동으로 정리하지 않는다. 저장소 전용 76개를 자동 배포 실패로 분류하지 않는다.
 6. 전체 schema, function, owner, role membership, grants, RLS/policy 및 provider migration ledger의 복구 동등성을 증명한다.
+7. 현재 Production 기준으로 확인한 권한·정책 상태를 복구 기준으로 사용한다. 과거 bundle은 19 routine / 18 owner transfer / 19 policy이며 현재는 routine 19/19 존재, owner transfer 18/18 일치, 정책 19/19가 이름·테이블·명령·대상 역할 기준으로 일치한다. 관련 현재 정책은 38개로 후속 정책 19개가 추가되어 있으므로 과거 19개와 단순 개수 비교하지 않는다.
+8. `myeongha_seyeon_chat_runtime_owner`의 현재 `postgres` 멤버십 2개 중 하나는 `20261104043413`에서 SET 권한을 임시 부여한 뒤 회수하며 남긴 비상속·비관리자·비SET 멤버십이다. 현재 `pg_has_role` 결과는 MEMBER=true / USAGE=false / SET=false다. 이 마이그레이션은 Production 원장에만 있고 main 파일은 없으므로 remote-only 처분표에 포함한다. 이전 1개 멤버십 postcheck는 현재 frontier 수용 조건으로 재사용하지 않는다.
+9. 적용된 `1640` 원격 SQL(10,303 bytes)과 main 파일(10,147 bytes)은 권한 소유권 전환·회수 방식이 실질적으로 다르다. 원격은 owner 역할로 전환해 legacy EXECUTE를 회수하고 `GRANTED BY postgres`로 임시 멤버십을 제거하지만 main 파일은 `current_user`에 직접 회수한다. 이미 적용된 migration file/history는 수정·재적용하지 않고 source/provenance 차이로 별도 처분한다.
+10. `20261026025332`는 원격 9개 statement를 재구성한 결과와 main 파일의 공백 제거 token stream이 일치한다. statement framing/version identity는 별도 유지한다.
+11. Production 원장에만 존재하는 S0/Se-yeon migration 12개를 현재 권한·함수·정책 효과와 함께 처분한다. 이 중 `20261025193416` 및 `20261031182926`은 본문에 Production 미배포 문구가 있고 `20261031182505`는 disposable S0 전용 문구가 있으나 Production 원장에는 적용 기록이 있다. 현재 main에 대응 SQL 파일은 12개 모두 없다. `20261025193416`의 guard는 postgres 사용자/DB, PG17, private schema 부재만 검사하고 프로젝트/환경 식별자를 검사하지 않는다. 주석을 실제 배포 방지 장치로 간주하지 않는다.
+12. `scripts/operations/production-authority-frontier-readonly.sql`을 추가하고 Production에서 read-only 실행을 확인했다. 역할/멤버십, 스키마 권한, 테이블·컬럼 ACL hash, RLS/policy hash, RPC 실행 권한 및 선택 migration metadata를 함께 기록한다.
+13. RLS 비활성 테이블과 실제 접근 경로를 분리해 판정한다. `chat_turns`·`chat_turn_attempts`는 정책 정의가 각 3개 있지만 RLS 비활성이고 API executor 직접 테이블/컬럼 권한은 없다. 현재 G0 함수는 subject/thread 조건을 명시한다. `memory_proposals`는 정책 2개가 있으나 RLS 비활성이고, API/anon/auth 직접 권한과 신규 S0 proposal-accept EXECUTE는 없으며 positive-source registry도 disabled다. 이는 현재 fail-closed 경계이지 RLS 수용 완료가 아니다. 해당 유형을 활성화하기 전에 RLS enable 또는 승인된 동등한 행 범위 통제를 증명한다.
+14. `cmd_commit_chat_turn_legacy_v1`은 service_role 전용의 별도 사용자 선택 기반 proposal 처리 경로이며 신규 positive-source registry를 참조하지 않는다. 신규 S0 proposal-accept 경로가 비활성이라고 해서 모든 legacy memory acceptance가 비활성이라고 판정하지 않는다.
+15. `docs/operations/POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json`에 원격 전용 41개 전체의 실제 원장 버전·SQL 본문 해시·statement 수·대응 저장소 버전·영향 신호를 기록했다. 분류는 Se-yeon 23 / Admin 8 / Commerce 8 / API DB Auth 1 / historical bundle 1이다. 이는 전수 목록 및 출처 추적 증거이지 41개 전체의 현재 객체/ACL/DDL 복구 동등성 증명은 아니다. 개별 대상 효과를 추가 대조한다.
+16. 현재 `conversation_recall` registry는 `enabled=false` / `writable_enabled=false`지만 AI 모델 정책 2개는 active다. 2026-11-07 UTC 예산 행은 없고 10/25–10/31 예산 7개만 존재한다. 기존 AI 비용 원장 29건은 전부 settled이며 24건은 Owner 일일 한도 면제 플래그, 1건은 usage_unknown이다. 비용 원장과 positive-memory 경계는 동일한 stop switch가 아니다. 일반 사용자 daily admission은 해당 날짜 예산 부재로 fail-closed이나 Owner 별도 예외는 남아 있으므로 글로벌 AI 비활성 완료라고 판정하지 않는다. 새 호출·설정 변경 없이 SELECT-only로 확인했다.
+17. 적용된 원격 전용 migration 41개를 대상으로 [읽기 전용 객체명 대조](POSTGRES_REMOTE_ONLY_OBJECT_PRESENCE_20261107.json)를 실행했다. SQL 선언 출현 횟수 기준 함수 82/82, 정책 82/82, 테이블 16/16이 현재 DB에 같은 이름·소속으로 존재한다. 이는 `CREATE` 텍스트의 이름 존재 확인에 불과하며, 함수 본문·소유권·권한·정책 식·실제 스키마·복구 DB의 동등성은 아직 미입증이다. 검증은 `scripts/operations/production-remote-only-object-presence-readonly.sql`로 재현 가능하다.
 
 **금지:** blind `migration repair`, migration history rewrite, 추측에 의한 재적용, Production DDL/DML. 실제 정합화가 필요하면 근거 있는 forward-only 계획을 먼저 제시하고 사용자 승인을 받은 뒤 별도 실행한다.
 
 #### 8-B. 현재 Frontier의 Provider-equivalent 복구
 
-1. 현재 Production frontier를 고정한 암호화 백업과 checksum/catalog fingerprint를 사용한다. 기존 #42130737153은 현재까지의 기준 증거이며, frontier가 바뀌면 새 백업을 확보한다.
+1. 현재 Production frontier를 고정한 암호화 백업과 checksum/catalog fingerprint를 사용한다. 최신 확인 백업은 #42309503582 / artifact `13548176984` (source `8ccf60d…`, frontier `20261105075227`)이며, **해당 artifact의 격리 복원 실증은 아직 없다**. 과거 백업 #42130737153의 복원 결과를 최신 artifact 수용으로 이전하지 않는다. frontier가 바뀌면 새 백업을 확보한다.
 2. 기존 격리 복원 #42247589352의 27개 skipped / 3개 projected Provider data block을 제거할 수 있는 Hosted-compatible 복구 경로를 확보한다. 전체 Supabase migration ledger와 Provider-managed data가 실제 복구됐는지 별도로 검사한다.
 3. Hosted Auth는 사용자·identity 연결, sessions, refresh-token 관계, JWT signing configuration, MFA/SSO 등 해당 서비스에서 사용하는 상태를 복원하고 로그인·갱신·로그아웃·삭제 계정·폐기 토큰을 검사한다.
 4. Hosted Storage는 bucket·metadata·policy와 실제 object bytes를 복원한다. synthetic object checksum, 허용된 다운로드, 비인가 접근 거부, 삭제·철회 후 접근 차단을 확인한다.
@@ -69,7 +80,7 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 #### 8-C. 독립 개인정보 연속성과 현재 Frontier Replay
 
 1. 최신 백업과 정확히 결합된 개인정보 원장을 새로 확보하고, 감시기가 7,200초 freshness 기준 안에서 성공했는지 확인한다. 기존 #42262739511 RED를 무시하거나 freshness 한도를 완화하지 않는다.
-2. 현재 #42242496615는 `eventCount=0`이므로 non-zero 삭제·철회 replay 증거로 사용할 수 없다. 과거 #40633679630도 다른 backup/ledger pair에 묶여 있으므로 현재 frontier 증거로 재사용하지 않는다.
+2. 기존 #42242496615는 `eventCount=0`이므로 non-zero replay 증거가 아니다. 최신 암호화 원장 #42352614447 / artifact `13566018275`는 캡처 성공만 확인했고 이벤트 수·독립 연속성은 미인증이다. 최신 감시 #42363914282는 9,582초로 7,200초 freshness RED다. 과거 #40633679630도 다른 backup/ledger pair에 묶여 있으므로 현재 frontier 증거로 재사용하지 않는다.
 3. Production disposable privacy canary는 사용자가 정확한 승인 문자열 `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY`를 명시한 뒤에만 실행한다. 해당 canary는 합성 전용 계정·주체를 만들고 기존 삭제 API/worker 경로를 실행한 뒤 정해진 정리 절차를 수행한다. 승인 전 dispatch 금지.
 4. 승인된 canary가 만든 non-zero Production event를 현재 backup과 같은 복구 증거 묶음에 결합하고, 격리 복원본에서 authoritative ledger를 재생한다. 2회 재생 idempotency, finalizer 완료, no-resurrection, stale JWT·Auth·Storage 접근 차단, 법적 보존 데이터 유지까지 확인한다.
 5. 위 canary는 한 captured window의 replay 증거다. `futureSafePrivacyReconciliation=true`를 위해서는 Primary PostgreSQL 손실 후에도 살아남고 사고 기준 시점까지 누락 구간 없이 삭제·철회 이벤트를 제공하는 독립적인 durable source continuity를 별도로 입증한다. GitHub Actions freshness watcher는 감시 도구이지 독립 이벤트 원장이 아니다.
