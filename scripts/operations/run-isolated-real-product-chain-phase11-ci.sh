@@ -35,7 +35,7 @@ esac
 if [[ "${GITHUB_EVENT_NAME:-}" == push ]]; then
   [[ "$experiment" == workerd_db_failover ]] ||
     fail 'Main push only authorizes the exact isolated DB outage experiment.'
-  [[ "$(git -C "$GITHUB_WORKSPACE" show -s --format=%s HEAD)" =~ ^test\\(ops\\):\\ prove\\ isolated\\ workerd\\ DB\\ outage\\ recovery\\ \\(\\#[0-9]+\\)$ ]] ||
+  [[ "$(git -C "$GITHUB_WORKSPACE" show -s --format=%s HEAD)" =~ ^test\(ops\):\ prove\ isolated\ workerd\ DB\ outage\ recovery\ \(\#[0-9]+\)$ ]] ||
     fail 'One-shot push subject is not the reviewed DB outage proof.'
   [[ "$(cat "$GITHUB_WORKSPACE/.github/ops/phase11-workerd-db-failover-20261108.once")" == 'PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V1' ]] ||
     fail 'One-shot DB outage marker is absent or unreviewed.'
