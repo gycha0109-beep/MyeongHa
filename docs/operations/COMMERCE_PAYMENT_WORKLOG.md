@@ -983,3 +983,10 @@
 - **완료/미완료:** 중복 접수→정확한 본인 상태 조회·보존 연결 및 회귀·문서 기록은 반영했습니다. 법적 고객 전달 입증, 승인된 Provider NEWER/STALE 최신성, 실제 Reader T2/Entitlement 원자 회수, 실제 복원 개인정보 삭제 및 구매→환불→삭제 전체 E2E는 미완료입니다.
 - **다음·블로커:** 신규 CI를 확인해 실패 시 수정, 성공 시 승인된 권한 회수·서비스 전달 연결의 다음 미완료 지점 진행. 실제 PortOne 환불 POST·운영 DB·상품 판매·공개 LIVE 미변경, 승인 필요 없음.
 
+### 2026-11-08 — 중복 접수 후 상태 조회의 모바일 테스트 인자 형식 보정
+
+- **목표/로드맵:** 승인된 §6-3·5의 중복 접수→상태 조회 연결 테스트가 실제 네트워크 요청의 URL·쿠키 제외 옵션까지 **TypeScript가 검사할 수 있도록** 보정합니다.
+- **기준:** `feat/commerce/saju-record-scoped-capability-v1-20261107`, PR [#3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 직전 변경 `44d6b199659b7337c87fdc93e761e378473aefb5`와 동일 모바일 상태 연계 작업. 직전 `05405ed6` [전체 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401188926)는 그린. 새 `44d6b199`의 [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402724987)는 작성 시 실행 중이며 PASS 미선언.
+- **변경 파일:** `test/commerce-mobile-withdrawal-claim-client.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`. **내용:** `test/commerce-mobile-withdrawal-claim-client.test.ts`의 공용 mock fetch가 이전에는 인자 0개로 추론돼 새 `mockImplementation(url)`, `mock.calls[1][0/1]` 검증의 인자 형식과 맞지 않았습니다. 기존 실제 fetch 계약대로 URL/RequestInit 타입을 명시했습니다. 런타임 기능과 출시 플래그·HTTP/PG 동작은 변경하지 않습니다.
+- **테스트/완료:** 해당 신규 회귀의 타입 호환 수정과 기존 WORKLOG 기록을 함께 반영했습니다. 후속 커밋 공식 TypeScript/모바일/PG17/전체 CI는 아직 미확정이므로 통과를 가정하지 않습니다.
+- **남은 것/다음/블로커:** 전체 CI 결과 확인 및 실패 수정, 이후 법적 제공 입증·Provider 순서 판정·정확한 Reader/T2 회수·실제 복원 검증·전체 격리 E2E 잔여. 운영 DB/실제 PortOne 환불 POST/LIVE 미실행, 승인 필요 없음.

@@ -102,7 +102,9 @@ describe('mobile withdrawal claim transport and Member boundary',()=>{
   function setup(enabled=true){
     let member='member.jwt.token';
     let current:MemberSessionV1|null={accessToken:member} as MemberSessionV1;
-    const fetchImpl=vi.fn(async()=>OK(GOOD));
+    // Type the mocked transport arguments so replay URL/credential
+    // assertions are checked by TypeScript, not inferred as zero arguments.
+    const fetchImpl=vi.fn(async (_url:RequestInfo|URL,_init?:RequestInit)=>OK(GOOD));
     const session={
       async read(){return current;},
       async withMemberBearer<T>(operation:(bearer:string)=>Promise<T>):Promise<T>{
