@@ -891,3 +891,13 @@
 - **검증 근거:** 직전 `be34b516`의 [CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42387456327)는 확인 시 Commerce Work Track, db-authority-core, runtime/content/commerce-payment/commerce-entitlement 검사가 PASS이고 PostgreSQL17 검사는 진행 중입니다. Web/Governance 검사는 통과했습니다. 해당 사실을 새 커밋 검증으로 간주하지 않습니다.
 - **완료·미완료:** 이번 읽기 전용 상태·금액 확인, 회귀 테스트 작성 및 WORKLOG 기록 완료. Provider 최신 순서 NEWER/STALE 판정, 실제 Reader T2/Entitlement Effect 원자 회수, 법적 환불 결정, 소비자 제공 입증, 복원 후 privacy replay, 전체 비운영 E2E는 미완료입니다.
 - **블로커·다음:** 새 HEAD의 공식 CI 결과 확인·오류 수정 후, 로드맵의 Provider 취소 순서·정확한 구매권 회수 연결을 이어갑니다. 운영 DB 적용, 실제 PG 취소 POST, 공개 구매·환불 API, LIVE 공개는 수행하지 않았고 사용자 승인 요청 없음.
+
+### 2026-11-08 — 선택 증거 SQL 장애 시 기존 청약철회 접수와 수동 검토 보존
+
+- **목표·로드맵:** 승인된 결제 개발 로드맵 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6의 3·5번. 원본 구매·고지 및 S5/S7 전달 이력·취소 원장을 조회하다 일부 SQL이 실패해도 이미 영속화된 청약철회 Claim과 독립적으로 검증된 수동 검토 결과를 잃지 않도록 구현했습니다.
+- **기준 브랜치·PR·커밋:** `feat/commerce/saju-record-scoped-capability-v1-20261107` / [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 작업 전 HEAD `ad2f0c0fa8424ca69922e0808a025cb1007f5f24`; main은 `9740e36ed1c6c49a9eb771c0048b890aa70e0e03` 확인. PR은 open/auto-merge on이며, 변경은 새 커밋으로 푸시합니다.
+- **변경 파일:** `apps/api/src/commerce-recorded-reader-withdrawal-private-review-v1.ts`, `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **실제 구현:** 기존 동일 REPEATABLE READ READ ONLY 트랜잭션 안에서 (1) 원본 구매·결제 당시 고지, (2) 보존 S5/S7, (3) 기존 취소 원장 조회를 서로 독립된 PostgreSQL SAVEPOINT로 실행합니다. 내부 검토기가 DB 쿼리 실패를 잡아 정상 부정 결과로 반환해도 DB 실패 사실을 추적해 해당 subtransaction을 rollback하고, 다음 독립 조회를 이어갈 수 있습니다. 구조가 손상된 정상 SQL 결과는 여전히 전체 검토 거부로 처리합니다. 공개 소비자 응답·법적 결정·PG 실행은 변하지 않습니다.
+- **테스트 근거:** `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`에 정상/권한 회수된 구매의 선택적 S7·취소 조회 SQL 실패, 원본 구매/고지 쿼리 실패 시 SAVEPOINT 복구, 수동 검토·접수 보존, 잘못된 증거 거부를 확인하도록 갱신했습니다. 새 커밋의 공식 CI/PostgreSQL17 결과는 아직 확인 전으로 PASS 미선언입니다.
+- **미완료·블로커·다음:** Provider NEWER/STALE 최신성, 실제 Reader T2 원자적 회수, 소비자 법적 전달 입증, 복원 후 개인정보 replay, 전체 격리 구매→취소→삭제 E2E 미완료. [직전 커밋 CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42388038283)는 작업 시작 시 완료 미확정이므로 새 커밋의 검증으로 추정하지 않습니다. CI 결과에 따라 실패 수정 후 승인 로드맵 계속 구현. 운영 DB·실제 환불 POST·LIVE는 비활성, 승인 요청 없음.
+

@@ -77,9 +77,9 @@ function fixture(options:Options={}) {
     if(options.queryFailure==='begin'&&sql.startsWith('BEGIN'))throw Error('BEGIN failed');
     if(options.queryFailure==='rollback'&&sql==='ROLLBACK')throw Error('ROLLBACK failed');
     if(sql.startsWith('BEGIN')||sql==='ROLLBACK'||
-       sql==='SAVEPOINT commerce_optional_s7_history'||
-       sql==='ROLLBACK TO SAVEPOINT commerce_optional_s7_history'||
-       sql==='RELEASE SAVEPOINT commerce_optional_s7_history')
+       /^SAVEPOINT commerce_(?:claim_preflight_evidence|optional_s7_history|optional_cancel_source)$/u.test(sql)||
+       /^ROLLBACK TO SAVEPOINT commerce_(?:claim_preflight_evidence|optional_s7_history|optional_cancel_source)$/u.test(sql)||
+       /^RELEASE SAVEPOINT commerce_(?:claim_preflight_evidence|optional_s7_history|optional_cancel_source)$/u.test(sql))
       return {rows:[] as T[]};
     if(sql.includes('pg_catalog.pg_roles'))return {rows:[{
       fullVisibility:options.visibility!==false,readOnly:options.readOnly!==false,
@@ -184,10 +184,16 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       'BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY',
       expect.stringContaining('pg_catalog.pg_roles'),
       expect.stringContaining('digital_reading_withdrawal_claims_private_v1'),
+      'SAVEPOINT commerce_claim_preflight_evidence',
       expect.stringContaining('receipt.verification_status'),
       expect.stringContaining('digital_reading_checkout_notice_acknowledgments_v1'),
+      'RELEASE SAVEPOINT commerce_claim_preflight_evidence',
+      'SAVEPOINT commerce_optional_s7_history',
       expect.stringContaining('official_reader_paid_delivery_attempts_v1'),
+      'RELEASE SAVEPOINT commerce_optional_s7_history',
+      'SAVEPOINT commerce_optional_cancel_source',
       expect.stringContaining('left join public.commerce_provider_events event'),
+      'RELEASE SAVEPOINT commerce_optional_cancel_source',
       'ROLLBACK',
     ]);
     expect(f.release).toHaveBeenCalledWith(undefined);
@@ -247,11 +253,47 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
     expect(result?.review?.automaticDenialAuthorized).toBe(false);
   });
 
-  it('does not assert a trustworthy cancellation result on snapshot DB failure',async()=>{
+  it('keeps valid manual Claim review when optional cancellation SQL fails',async()=>{
     const f=fixture({queryFailure:'cancel'});
-    await expect(run(f)).rejects.toMatchObject({
-      code:'RECORDED_READING_WITHDRAWAL_PRIVATE_REVIEW_UNAVAILABLE',
+    const r=await run(f);
+    expect(r).toMatchObject({
+      kind:'exact_unit_manual_review',recordedCustomerClaim:true,
+      storedCancellationEvidence:null,
+      retainedReaderS7Timeline:{consumerDeliveryProven:false},
+      review:{classification:'statutory_exception_review',
+        providerRefundAuthorized:false,entitlementMutationAuthorized:false},
+      providerRefundAuthorized:false,entitlementMutationAuthorized:false,
     });
+    expect(f.statements.map(s=>s.sql)).toContain(
+      'ROLLBACK TO SAVEPOINT commerce_optional_cancel_source');
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+  });
+
+  it('keeps verified Claim and stored cancellation when optional S7 SQL fails',async()=>{
+    const f=fixture({queryFailure:'s7',cancelRows:[FULL_CANCEL]});
+    const r=await run(f);
+    expect(r).toMatchObject({
+      kind:'exact_unit_manual_review',recordedCustomerClaim:true,
+      retainedReaderS7Timeline:null,
+      storedCancellationEvidence:{kind:'one_exact_full_cancel_recorded_only'},
+      review:{classification:'statutory_exception_review'},
+      consumerDeliveryProven:false,providerRefundAuthorized:false,
+    });
+    expect(f.statements.map(s=>s.sql)).toContain(
+      'ROLLBACK TO SAVEPOINT commerce_optional_s7_history');
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+  });
+
+  it('keeps revoked Claim when optional cancellation source SQL fails',async()=>{
+    const f=fixture({purchasedRows:[],queryFailure:'cancel'});
+    const r=await run(f);
+    expect(r).toMatchObject({
+      kind:'exact_unit_evidence_unavailable',recordedCustomerClaim:true,
+      retainedReaderS7Timeline:{consumerDeliveryProven:false},
+      storedCancellationEvidence:null,providerRefundAuthorized:false,
+    });
+    expect(f.statements.map(s=>s.sql)).toContain(
+      'ROLLBACK TO SAVEPOINT commerce_optional_cancel_source');
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 
@@ -450,6 +492,8 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
         review:null,providerRefundAuthorized:false,
       });
       expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+      expect(f.statements.map(s=>s.sql)).toContain(
+        'ROLLBACK TO SAVEPOINT commerce_claim_preflight_evidence');
     },
   );
 
