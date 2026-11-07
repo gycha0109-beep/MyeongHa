@@ -52,6 +52,10 @@ describe('exact verified cancellation event / Reader purchase Grant audit',()=>{
   assert.ok(SQL.includes("event.external_event_id=$1::text"));
   assert.ok(SQL.includes('effect.source_provider_event_id=event.id'));
   assert.ok(SQL.includes('grant_row.source_receipt_id=receipt.id'));
+  assert.ok(SQL.includes('join public.standard_reading_reader_access_grants reader_access'));
+  assert.ok(SQL.includes('reader_access.entitlement_grant_id=grant_row.id'));
+  assert.ok(SQL.includes('reader_access.purchase_intent_id=receipt.purchase_intent_id'));
+  assert.ok(SQL.includes("effect.target_status='revoked'"));
   assert.ok(SQL.includes('event.payload_fingerprint'));
   assert.ok(SQL.includes("event.verified_payload_jsonb->>'signedPayloadHmac'"));
  });

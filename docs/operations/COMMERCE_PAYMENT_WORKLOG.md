@@ -823,3 +823,10 @@
 - **미완료 경계:** 서명 웹훅·PortOne GET·전체 취소 집합이 검증되더라도, 별도 읽기 전용 `inspectExactCancellationProviderEventReadinessV1`는 **기존 이벤트 원본 Receipt ID 또는 signed raw payload HMAC** 일치 여부를 요구하지 않았습니다. 같은 외부 이벤트 ID와 거래번호만으로 기존 Event ready를 보고할 수 있었습니다.
 - **구현:** 기존 `commerce_provider_events`에서 `payload_fingerprint` 및 이미 최소화해 기록한 `verified_payload_jsonb.signedPayloadHmac`를 함께 읽고, 서명 원본 바이트로 계산한 `portone-cancel-signed-v1` HMAC과 **두 필드 모두** 일치해야 사설 Event ready로 판단합니다. 원본 Receipt ID는 `verifiedReceiptId`를 그대로 대조합니다. 테스트 입력에서 위조 영수증/서명지문, malformed HMAC를 추가해 보류 검증합니다.
 - **범위:** 기존 Event writer 및 금전/권한 변경 없음, Provider 의미적 NEWER/STALE order와 법적 환불 권한은 여전히 미증명/HOLD입니다. 내부 검토만 개선하며 공개 Route·운영 데이터·실제 환불 POST·LIVE 판매 경로는 활성화하지 않습니다. 새 CI 통과 전 PASS 미선언입니다.
+
+
+### 2026-11-07 — 정확한 Reader 구매권만 취소 이벤트 감사 범위로 제한
+
+- **발견:** `inspectExactCancellationProviderEventReadinessV1`의 기존 `purchaseGrantCount/exactEventRevocationCount`는 Receipt에 붙은 **모든 종류의 Entitlement Grant**를 집계했습니다. 해당 이벤트에 비Reader 권한이 있으면 Reader 권한 지급·회수 확인을 오판할 수 있었습니다.
+- **구현:** 두 수치 모두 기존 `standard_reading_reader_access_grants`와 **정확한 원본 Purchase Intent ID/Subject/Grant ID**를 결합한 Reader 구매권만 세도록 변경했습니다. 이미 회수된 건은 동일 Provider Event의 `entitlement_events.event_type=revoked` 및 `target_status=revoked`인 실제 효과만 인정합니다. 기존 DB 테이블·Reader 회수 Writer·원본 이벤트 중복 방지/서명·타 Reader 권한은 변경하지 않습니다.
+- **검증:** 회귀 검사에서 Reader 접근권과 구매 ID/Grant 결속, 목표 revoked 상태를 확인하도록 보강했습니다. 이 감사는 관찰만 하며 개별 Provider 최신 순서·법적 환불·Reader/T2 잠금에 대한 권한을 발행하지 않습니다. 실제 결제, PG POST, 운영 스키마/공개 API/LIVE 변경 없음. 새 HEAD의 CI 통과 전에는 완료 미확정입니다.

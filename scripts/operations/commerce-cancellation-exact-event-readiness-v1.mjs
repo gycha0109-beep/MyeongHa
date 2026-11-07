@@ -20,18 +20,27 @@ select
  receipt.subject_id::text as "receiptSubjectId",
  coalesce((
   select count(*) from public.entitlement_grants grant_row
+  join public.standard_reading_reader_access_grants reader_access
+    on reader_access.entitlement_grant_id=grant_row.id
+   and reader_access.subject_id=grant_row.subject_id
+   and reader_access.purchase_intent_id=receipt.purchase_intent_id
   where grant_row.source_receipt_id=receipt.id
     and grant_row.subject_id=receipt.subject_id
     and grant_row.grant_source_type='purchase'
  ),0)::text as "purchaseGrantCount",
  coalesce((
   select count(*) from public.entitlement_grants grant_row
+  join public.standard_reading_reader_access_grants reader_access
+    on reader_access.entitlement_grant_id=grant_row.id
+   and reader_access.subject_id=grant_row.subject_id
+   and reader_access.purchase_intent_id=receipt.purchase_intent_id
   join public.entitlement_events effect
     on effect.grant_id=grant_row.id
    and effect.subject_id=grant_row.subject_id
    and effect.source_type='provider_event'
    and effect.source_provider_event_id=event.id
    and effect.event_type='revoked'
+   and effect.target_status='revoked'
   where grant_row.source_receipt_id=receipt.id
     and grant_row.subject_id=receipt.subject_id
     and grant_row.grant_source_type='purchase'
