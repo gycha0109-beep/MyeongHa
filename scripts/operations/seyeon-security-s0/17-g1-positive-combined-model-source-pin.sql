@@ -6,6 +6,8 @@ begin;
 
 grant myeongha_seyeon_chat_runtime_owner to current_user;
 grant create on schema seyeon_private to myeongha_seyeon_chat_runtime_owner;
+-- Temporary CREATE is required to transfer the public wrapper to the owner.
+grant create on schema public to myeongha_seyeon_chat_runtime_owner;
 
 create function seyeon_private.pin_positive_model_context_sources_v1(
   p_subject_id uuid,p_thread_id uuid,p_turn_id uuid,p_attempt_id uuid,
@@ -124,5 +126,6 @@ revoke all on function public.cmd_pin_seyeon_positive_model_context_sources_v1(
 -- No GRANT to API or anonymous roles in the installer. Positive Source
 -- Registry/model use, metered Provider and HTTP Reveal also remain OFF.
 revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
+revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
 commit;
