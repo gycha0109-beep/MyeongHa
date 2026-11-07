@@ -1,3 +1,60 @@
+## 2026-11-07 verified restore status (latest observation)
+
+The newest governed encrypted Production backup [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582)
+(artifact `13548176984`, source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`)
+was restored on **disposable isolated PostgreSQL 17.6** by the successful
+[one-shot restore #42375717923](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717923)
+(main SHA `61736e57979d886559451d15a853292fb3bf586e`).
+The restore uploaded artifact `13575965386` with GitHub Actions ZIP
+SHA-256 `a474462113eeb780f30f7bb996d7a400ac81fa6538657199cfd891ac3ab504b9`.
+Its sanitized restore evidence confirmed source backup run `42309503582`,
+backup migration frontier `20261105075227`, 241 source catalog versions and
+catalog fingerprint `b1076fcf360f3f12c1e3fcdadb34adec87e2f8c02b7592915bb6298db2e98600`.
+A separate **read-only** Production migration query on 2026-11-07 returned
+241 applied versions and the same highest version `20261105075227`.
+The repository's latest numeric migration **file** version is `20261029185500`;
+this is intentionally distinct from the remote-applied frontier and does
+**not** imply source/ACL equivalence.
+
+```yaml
+verified_isolated_restore_run_id: 42375717923
+verified_isolated_restore_result: SUCCESS
+verified_isolated_restore_head_sha: 61736e57979d886559451d15a853292fb3bf586e
+verified_isolated_restore_backup_run_id: 42309503582
+verified_isolated_restore_backup_source_sha: 8ccf60d89eb6d3fab789fb34e0d479c51d84b9af
+verified_isolated_restore_backup_migration: 20261105075227
+verified_isolated_restore_artifact_id: 13575965386
+verified_isolated_restore_artifact_sha256: a474462113eeb780f30f7bb996d7a400ac81fa6538657199cfd891ac3ab504b9
+verified_isolated_restore_artifact_expires_at: 2026-12-07T13:11:05Z
+verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger
+verified_isolated_restore_synthetic_privacy: PASS
+verified_isolated_restore_serving_gate: BLOCKED
+observed_live_production_migration_version: 20261105075227
+repository_latest_migration_file_version: 20261029185500
+verified_restore_matches_observed_migration_version: true
+verified_full_schema_catalog_equivalence: false
+verified_provider_rows_skipped_in_loopback: 138
+verified_provider_rows_projected_in_loopback: 77
+verified_provider_rows_replayed_in_loopback: 257
+verified_provider_source_counts_include_payloads: false
+provider_managed_data_full_restore: false
+future_safe_privacy_reconciliation: false
+dr_ready: false
+```
+
+**Exact evidence limitation:** 27 provider data COPY blocks were skipped and
+3 blocks were projected (138 skipped rows / 77 projected-column rows;
+257 Provider rows replayed, with projected rows already included). The
+Source migration catalog fingerprint was verified, but the complete
+provider-managed migration ledger, hosted Auth/Storage and independent
+post-backup Production privacy deletion/revocation continuity were **not**
+restored/proven. Synthetic-only privacy replay (four synthetic events)
+passed in isolation and must not be described as Production reconciliation.
+The approved whole-service RPO/RTO and the DR serving gate remain BLOCKED:
+`dr_ready=false`, `serviceResumptionAllowed=false`.
+The [historical 2026-10-29 observation](#2026-10-29-verified-restore-status-historical-observation)
+below is preserved for provenance, **not** used as current DR readiness evidence.
+
 ## 2026-11-07 — newer backup, privacy ledger and freshness evidence (read-only metadata)
 
 - **Newer backup verified:** protected Production PostgreSQL Logical Backup [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582) completed SUCCESS; governed encrypted artifact `13548176984` (`myeongha-postgres-20261106T230639Z`) was created 2026-11-06T23:09:49Z and expires 2026-12-06T23:09:48Z. Source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`; migration frontier `20261105075227` remains unchanged. It is newer than #42130737153, but there is **no verified isolated restore for this exact new artifact** yet. The prior isolated successful restore cannot be silently transferred to this backup.
@@ -94,7 +151,7 @@ Earlier [source-row-count restore #40811556214](https://github.com/gycha0109-bee
 
 `dr_ready=false`, `future_safe_privacy_reconciliation=false`, `provider_managed_data_full_restore=false`, `sourceContinuityProven=false`, `continuousCaptureProven=false`, `serviceResumptionAllowed=false`. Production SQL writes/migration repair, Hosted Auth/Storage recovery, provider-level cutover and S8 service admission are not authorized.
 
-## 2026-10-29 verified restore status (latest observation)
+## 2026-10-29 verified restore status (historical observation)
 
 ```yaml
 verified_isolated_restore_run_id: 40817391430
