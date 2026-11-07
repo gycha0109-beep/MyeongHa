@@ -149,7 +149,7 @@ export async function reconcileSignedCancellationPrivateV1({
     if(typeof sourceHmacSecret!=='string'||
        sourceHmacSecret.length<32||sourceHmacSecret.length>4096||
        sourceHmacSecret.trim()!==sourceHmacSecret||
-       /[\\u0000-\\u001f\\u007f]/u.test(sourceHmacSecret))
+       /[\u0000-\u001f\u007f]/u.test(sourceHmacSecret))
       return base('source_fingerprint_authority_unavailable');
     try {
       const cancellationIdHmac='hmac-sha256:k1:'+
