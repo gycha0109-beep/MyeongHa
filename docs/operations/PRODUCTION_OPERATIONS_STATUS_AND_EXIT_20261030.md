@@ -1,3 +1,51 @@
+### 2026-11-08 KST — Phase 8-A 기존 버전 이동 8쌍 조사 PR #3113 최종 main 재정렬
+
+- **작업 목표/로드맵:** Gate 1 / Phase 8-A, 실제 Production에서 앞서 SELECT-only 수행한 이름·권한 부분 조사 8쌍의 기록과 재현 SQL을 최신 main에 반영한다. 이미 검증된 관측을 중복 실행하거나 전체 DDL 동등성으로 승격하지 않는다.
+- **변경 파일:** `scripts/operations/production-version-shift-catalog-presence-readonly.sql`, `docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json`는 선행 PR과 동일 blob 그대로 보존. 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`는 선행 PR 고유 4개 기록과 `main@a699f532158da7369496b20fcb57a20d56f61dc2`의 **최신 기록 전체**를 합쳐 갱신한다.
+- **완료/미완료:** 조사 8쌍의 8함수·2테이블·3제약조건 존재 및 선택 권한 경계는 근거로 남긴다. 공급자 원장, 배포 provenance, 전체 스키마/ACL/복원 정합성은 미입증. 현재 격리 복원 실측은 `HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH`.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`; 병합 전 `d709d6396998b32a467acd3be9f6f11421272392`, main 근거 `a699f532158da7369496b20fcb57a20d56f61dc2`, [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 이 기록·조사 SQL·관측 JSON은 동일 병합 커밋으로 연결한다.
+- **테스트/CI:** 이전 HEAD [일반 CI #42401187964](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401187964), [통합 CI #42402263808](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402263808), Governance/Web SUCCESS. **새 HEAD CI/통합 검사와 main 병합 여부는 아직 미확정**.
+- **블로커·다음:** 신규 HEAD CI/필수 Integration 확인 후 main 병합 및 Phase 8-A 같은 백업 출처에서 원본 구조·권한 지문을 확보해 구조 불일치 원인 판단. 8-B Provider Auth/Storage, 8-C 개인정보 독립 연속성, 8-D RPO/RTO, Phase 13 모두 미완료. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. Production 쓰기·유료 DR 대상·privacy canary 실행 없음.
+
+- **2026-11-08 재정렬 결과:** 최신 main bc68dbce6909fcf8ec28ecfe449297bc9979d965의 WORKLOG 전체와 이 PR 고유 작업단위 5개를 모두 보존해 충돌 해소(병합 커밋 6aa815d7f0f783430ce7d4f17fcee133e23487bc). 변경 파일은 기존 읽기 전용 SQL, 비식별 객체 조사 JSON, 기존 ops WORKLOG 3개로 한정. 기존 근거 8쌍·8함수·2관계·3제약조건의 이름/선택 권한 조건 및 SQL SELECT-only/ROLLBACK 경계를 로컬 정적 확인 PASS, git diff --check PASS. 새 HEAD의 CI/필수 Integration·병합은 미확정. 그 결과를 확인한 뒤 기존 Gate 1 Phase 8-A의 출처 결속 및 DDL/ACL 동등성 차단을 이어감; Production 변경·비밀·Hosted 자원·canary 승인 없음.\n
+- **2026-11-08 최신 병합:** PR #3139의 원본 앱 구조 지문 백업 구현이 main 4482936a759e91d9cdac066b52d90426ea830ce1에 병합됨. 본 PR #3113은 이전에 확인한 버전 이동 8쌍의 SELECT-only 카탈로그 조사 및 기존 WORKLOG만 보존하고, 최신 main의 독립 백업·복구 작업 기록을 덮어쓰지 않음. 실측 원본 8함수·2관계·3제약조건 이름·선택 권한 검증 PASS, 읽기 전용 SQL 경계 PASS. 이 PR의 새 HEAD CI/Integration 미확정; Production write, 신규 실험 없음.
+### 2026-11-08 KST — PR #3113 마이그레이션 조사 일반 CI GREEN 후 최신 main 충돌 해소 재시도
+
+- **목표:** 버전 이동 8쌍의 기존 읽기 전용 조사 증거와 운영 워크로그를 최신 main 기준으로 재조합한다.
+- **변경 파일:** `scripts/operations/production-version-shift-catalog-presence-readonly.sql`·`docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json`의 검증된 blob은 그대로 보존하고 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`의 PR 고유 기록을 main 기록에 합친다.
+- **완료:** [기존 CI #42396266740](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42396266740), Governance #42396266726, Web #42396266751은 GREEN이었다. RED 표시는 뒤이어 `main@fdefc7db38e5468794d8e85037e1691cc457c4aa`에서 같은 WORKLOG가 바뀌어 생긴 병합 충돌 및 필수 `CI Integration Verify` 미실행과 관련된다. 새 SQL 실행이나 Production 변경은 없다.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 기존 HEAD `eaf0541dd13c6fe7fe086e8ec87c9e893d0d0523`, 최신 기준 `main@fdefc7db38e5468794d8e85037e1691cc457c4aa`, [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 병합 커밋은 새로운 HEAD에서 조회한다.
+- **테스트/미완료:** 원본 객체 8함수·2테이블·3제약조건 부분적 존재 확인은 보존. 신규 HEAD의 일반 CI와 필수 통합 검증은 아직 미확정이며, 전체 DDL/ACL, Provider 복구 동등성은 증명되지 않았다.
+- **블로커/다음:** 최신 HEAD 일반 CI→필수 통합 검증→보호된 병합 확인. `dr_ready=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 승인 필요한 운영 DB 변경·유료 복구 자원 실행 없음.
+
+### 2026-11-08 KST — 기존 Phase 8-A 버전 이동 8쌍 PR #3113 main 변경 충돌 재정렬
+
+- **작업 목표/로드맵:** Gate 1/Phase 8-A의 과거 version-shift 8쌍 현재 권한·객체 검사 PR을 최신 main에 맞춰 **충돌 없이** 병합 가능한 형태로 고친다. 이미 확인한 Production SELECT-only 관측은 중복 실행하지 않는다.
+- **변경 파일:** 원래 PR의 `scripts/operations/production-version-shift-catalog-presence-readonly.sql`, `docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json` 두 비식별 원본 파일 blob은 변형 없이 유지하고, 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`의 **중간에 추가된 모든 main 기록을 유지**하며 PR 고유 기록을 합친다.
+- **완료:** 8함수·2테이블·3제약조건 이름/선별 권한 관측 및 한계는 보존; 이 결과만으로 모든 DDL/ACL/마이그레이션 출처나 Hosted 복구 동등성이 증명되었다고 하지 않는다.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 이전 HEAD `a7525f4b60f06c6e19df4201e8474804e14ba07d`, 병합 기준 `main@7c3a0aa7218700da440900d8278d944742af9532`, [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 해결 작업은 기존 HEAD+main 두 부모 commit과 기존 Worklog를 함께 갱신한다.
+- **테스트·CI:** 지난 HEAD [CI #42395112736](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42395112736) / Governance #42395112596 / Web #42395112676 SUCCESS. 새 HEAD의 CI/필수 Integration 성공은 **확인 전**이고, 신규 SQL 관측을 실행하지 않았다.
+- **미완료·블로커·다음:** 본 PR 새 CI·통합 검사·보호된 main 병합 검증; Phase 8-B Hosted Auth/Storage, 8-C 독립 개인정보 연속성, 8-D 전체 RPO/RTO, Phase 13 수용. P0 #1887 OPEN, `dr_ready=false`, `serviceResumptionAllowed=false`. 사용자 별도 승인 전 Production 변경/유료 복구 자원/실제 개인정보 카나리 없음.
+
+### 2026-11-08 KST — Phase 8-A 버전 이동 8쌍의 기존 PR 병합 충돌 해소
+
+- **목표:** [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113)의 2026-11-07 읽기 전용 객체·접근 경계 조사(8쌍)를 최신 운영 WORKLOG와 합쳐, 기존 조사 누락 없이 보호된 main으로 병합 가능하도록 만든다.
+- **변경 파일:** `scripts/operations/production-version-shift-catalog-presence-readonly.sql`·`docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json`(원 PR에서 검증된 파일 그대로 유지), 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`(최신 main 워크로그 보존 + PR 고유 기록 합치기). 새 DB 명령, 권한 변경, migration repair 없음.
+- **완료/미완료:** 병합 충돌 원인은 PR과 main이 같은 WORKLOG를 각각 갱신한 점으로 확인. 본 작업에서 main `606691aeac168b4896f487569e4c5d6b65de6eeb` 내용에 원 PR 고유 작업 기록을 앞에 결합하고, 원 PR의 SQL·비식별 조사 JSON은 동일 Git blob으로 보존. 개별 객체명 8함수·2테이블·3제약조건 존재의 과거 조사 기록은 유지하지만 전체 DDL/ACL 및 Hosted 복구 동등성은 미입증이다.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`; 기존 증거 HEAD `eb26447af6b3a4f5803ae836af4a5ea8c2ce4002`, 병합 기준 `main@606691aeac168b4896f487569e4c5d6b65de6eeb`, [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 병합 처리 커밋은 본 PR의 후속 HEAD로 추적한다.
+- **테스트·CI:** 기존 HEAD의 [CI #42382620976](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42382620976)·[Governance #42382620950](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42382620950)·[Web Gates #42382620918](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42382620918) PASS. **새 병합 HEAD의 CI는 아직 미확정**; 정상 통합 검사 및 자동 병합 후 실제 완료 판정.
+- **블로커·다음:** PR #3113 새 HEAD CI와 필수 통합 검증, 실제 main 병합 확인. 그 뒤 Phase 8-B/C/D의 Hosted Auth·Storage, 독립 개인정보 삭제 연속성, 전체 RPO/RTO와 Phase 13 수용이 남음. P0 #1887 OPEN, `dr_ready=false`, `serviceResumptionAllowed=false`; Production 변경/유료 Hosted 대상/Privacy Canary는 별도 조건 충족 전 실행 금지.
+
+### 2026-11-07 / Phase 8-A — 버전 이동 8쌍 현재 객체·접근 경계 읽기 전용 대조
+
+- **작업 목표:** 로드맵 8-A의 동일 이름/다른 버전 8쌍에 대해 이미 확보된 SQL 본문 비교에서 한 걸음 더 나아가 현재 Production 객체 이름·일부 접근 권한을 실제 카탈로그로 대조. 전수 DDL/ACL parity·배포 provenance를 주장하지 않는다.
+- **변경 파일:** `scripts/operations/production-version-shift-catalog-presence-readonly.sql`(재현 가능한 읽기 전용 SQL), `docs/operations/POSTGRES_VERSION_SHIFT_LIVE_OBJECT_CENSUS_20261107.json`(비식별 카탈로그 결과), 기존 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` WORKLOG. Runtime/실행 코드/Production SQL migration/Workflow 변경 0.
+- **완료:** PostgreSQL `17.6`, `transaction_read_only=on` 확인. [기존 2026-11-07 버전 이동 8쌍](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json)의 소스 SQL에서 선별한 함수 8/8, 테이블 2/2, 제약조건 3/3 이름이 현재 카탈로그에 존재. 함수의 `anon`/`authenticated`/`service_role` 실행 허용 0/8, `myeongha_api_executor` 실행 허용 5/8. 선별한 테이블 2개 모두 RLS 활성/정책 0, 조사한 역할의 직접 DML 접근은 없음.
+- **미완료·증거 한계:** SQL의 일부 이름 및 현재 effective privilege만 확인. 함수 오버로드·본문·owner/role graph·GRANT provenance·constraint 표현식·Provider migration ledger·전체 DDL/ACL·복원 동등성은 미검증. Phase 8-A 41 remote-only 및 76 repo-only 실질 출처/효과, Phase 8-B/C/D Hosted/Privacy/RPO-RTO 모두 BLOCKED.
+- **브랜치·커밋·PR:** `ops/phase8-version-shift-catalog-20261107`, 기준 `main@d4053b4df5d252743fc136a9ee65996f7920e0e2`; 읽기 전용 SQL·증거 JSON·기존 WORKLOG 최초 공동 커밋 `e833173a3e9501df524f7745d75caa6e28980ae3`; [PR #3113](https://github.com/gycha0109-beep/MyeongHa/pull/3113). 본 PR의 최종 HEAD·CI 및 병합 후 증거는 확인 전 미판정.
+- **테스트·CI 근거:** 연결된 명하 Production PG17의 `pg_proc`, `pg_namespace`, `pg_class`, `pg_constraint`, `pg_policy`를 SELECT-only 질의해 함수 8/8·테이블 2/2·제약조건 3/3 및 역할 실행/직접 DML 결과 확보; 트랜잭션 read-only 확인. 기존 source version 8쌍은 sanitized 원장 자료에서 검증. 신규 커밋 CI 결과는 아직 미확인.
+- **블로커·다음 작업:** 읽기 전용 실측은 완료, 실제 full SQL/DDL/ACL/provenance 증명은 계속 필요. Production repair/DDL/DML, Hosted DR 자원, 개인정보 Canary, secret/Provider/traffic 변경은 범위별 사용자 승인 전 실행 금지. `dr_ready=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
 ### 2026-11-08 KST — Phase 8-A 백업 동봉 원본 지문과 과거 날짜 관측의 비교 결과 구분
 
 - **로드맵/목표:** 기존 Gate 1 / 8-A #6의 실제 격리 복원 원본-복원본 비교 정합성. PR #3139의 신형 암호화 source-app-catalog witness를 비교하더라도 예전 `SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS`로 표시되던 문제 수정. 새 해석 서비스나 재해 복구 수용 기준 추가 없음.
