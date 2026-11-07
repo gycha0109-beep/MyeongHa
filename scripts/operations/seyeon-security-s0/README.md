@@ -18,7 +18,7 @@ node scripts/operations/seyeon-security-s0/plan.mjs
 
 `install-isolated.mjs`는 지정된 loopback scratch DB/CI PG17만 허용하며 remote URL 또는 production admission 옵션이 없다. CI는 기존 postgres17 suite의 `seyeon-security-s0-real-path-pg17` 사례를 실행한다. 테스트가 만든 합성 type 등록·실행 권한은 disposable DB 밖에 적용되지 않는다.
 
-중단 산출물 `stop-positive-use.sql`은 데이터를 삭제하지 않고 Model/Writable registry 및 positive API EXECUTE만 회수한다. 기존 사용자의 동의 철회 권한은 보존한다. 운영 적용은 별도 DB/DR·Scope·예산·transport 승인 후 담당자가 검토한 목록으로 수행한다.
+중단 산출물 `stop-positive-use.sql`은 데이터를 삭제하지 않고 Model/Writable registry와 positive API EXECUTE를 회수하며, 별도 허용 후 실행 가능해지는 결합 원본 Pin용 `public.cmd_pin_seyeon_positive_model_context_sources_v1` 호출 권한도 회수한다. 기존 사용자의 동의 철회와 이미 발행된 답변의 수신 확인 권한은 보존한다. 운영 적용은 별도 DB/DR·Scope·예산·transport 승인 후 담당자가 검토한 목록으로 수행한다.
 
 `apps/api/src/production-seyeon-first-memory-node-runtime-v1.ts`는 **기존 Node 전용 실행/격리 검증용 경로**다. 현재 S0 운영 대상은 `cloudflare/myeongha-worker.mjs`의 최초 비스트리밍 HTTP 경로와 `apps/api/src/production-seyeon-chat-runtime-v1.ts` 및 G1 결합 Pin adapter다. 최초 모델 응답은 `positiveMemoryFirstReplyApproved=false`로 차단돼 있으며 `creditBilling.productionMounted=false`다. Node 송출 검증이나 Fetch Response 생성만으로 Worker 브라우저 수신·철회 경합을 PASS로 판정하거나 Node sender를 Worker에 붙이지 않는다.
 
