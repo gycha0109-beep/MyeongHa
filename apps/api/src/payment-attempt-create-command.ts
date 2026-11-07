@@ -33,6 +33,7 @@ export interface PaymentAttemptCreateAuthorityRowV1 {
 }
 
 export type PaymentAttemptCreateAuthorityFailureCodeV1 =
+  | 'SUBJECT_INELIGIBLE'
   | 'INTENT_NOT_FOUND'
   | 'INTENT_TERMINAL'
   | 'IDEMPOTENCY_CONFLICT'
@@ -150,6 +151,8 @@ function requireStatus(value: unknown): PaymentAttemptStatusV1 {
 function mapAuthorityError(error: unknown): never {
   if (!(error instanceof PaymentAttemptCreateAuthorityPortErrorV1)) throw error;
   switch (error.code) {
+    case 'SUBJECT_INELIGIBLE':
+      throw new ApiCommandError('FORBIDDEN', 'Paid checkout requires an active authenticated Member.');
     case 'INTENT_NOT_FOUND':
       throw new ApiCommandError('NOT_FOUND', 'Owner-matched Purchase Intent was not found.');
     case 'INTENT_TERMINAL':

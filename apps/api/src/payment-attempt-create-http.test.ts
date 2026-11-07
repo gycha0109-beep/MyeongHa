@@ -146,6 +146,22 @@ describe('Payment Attempt authenticated HTTP runtime foundation', () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
+  it('requires Member login for paid Payment Attempt and rejects Guest before PostgreSQL', async () => {
+    const connect = vi.fn(async () => { throw new Error('must not connect'); });
+    const response = await invoke({
+      evidence: { kind: 'guest', verifiedGuestTokenHash: 'sha256:guest-session-fingerprint' },
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+    expect(response.status).toBe(403);
+    expect(payload.error).toEqual({
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'payment_attempt.login_required',
+      retryable: false,
+    });
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it('rejects caller-owned commerce authority before opening PostgreSQL', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });
     const response = await invoke({

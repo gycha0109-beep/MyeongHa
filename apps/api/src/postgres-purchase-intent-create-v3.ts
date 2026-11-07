@@ -9,6 +9,8 @@ import {
   type PurchaseIntentCapabilitySnapshotV3,
   type PurchaseIntentCreateAuthorityPortV3,
   type PurchaseIntentCreateAuthorityRowV3,
+  type PurchaseIntentCreateAuthorityInputV3,
+  type SajuPurchaseOriginInputV1,
 } from './purchase-intent-create-command-v3.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
@@ -16,6 +18,8 @@ export const POSTGRES_PURCHASE_INTENT_RUNTIME_SNAPSHOT_BINDING_V3 =
   'public.qry_purchase_intent_runtime_snapshot_v3' as const;
 export const POSTGRES_PURCHASE_INTENT_CREATE_AUTHORITY_BINDING_V3 =
   'public.cmd_create_purchase_intent_v3' as const;
+export const POSTGRES_SAJU_PURCHASE_INTENT_ADMISSION_BINDING_V1 =
+  'public.cmd_create_saju_purchase_intent_v1' as const;
 
 type SnapshotQueryRowV3 = Readonly<{
   productOfferId: unknown;
@@ -91,6 +95,28 @@ from public.cmd_create_purchase_intent_v3(
 )
 `.trim();
 
+const CREATE_SAJU_SQL = `
+select
+  purchase_intent_id::text as "purchaseIntentId",
+  product_offer_id::text as "productOfferId",
+  provider_account_link_id::text as "providerAccountLinkId",
+  status,
+  offer_snapshot_jsonb as "offerSnapshotJsonb",
+  offer_snapshot_hash as "offerSnapshotHash",
+  expected_amount_minor::text as "expectedAmountMinor",
+  expected_currency as "expectedCurrency",
+  charge_terms_version as "chargeTermsVersion",
+  capability_set_id::text as "capabilitySetId",
+  capability_snapshot_jsonb as "capabilitySnapshotJsonb",
+  capability_snapshot_hash as "capabilitySnapshotHash",
+  replayed
+from public.cmd_create_saju_purchase_intent_v1(
+  $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::uuid,
+  $7::text,$8::text,$9::jsonb,$10::text,$11::jsonb,$12::text,
+  $13::text,$14::uuid[]
+)
+`.trim();
+
 function requireString(name: string, value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw new Error(`Purchase Intent v3 PostgreSQL ${name} is invalid.`);
@@ -138,14 +164,57 @@ function postgresCode(error: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
+function postgresMessage(error: unknown): string | null {
+  if(typeof error!=='object'||error===null)return null;
+  const value=(error as {message?:unknown}).message;
+  return typeof value==='string'?value:null;
+}
+
 function mapAuthorityError(error: unknown): never {
   const constraint = postgresConstraint(error);
   const mapped = (code: ConstructorParameters<typeof PurchaseIntentCreateAuthorityPortErrorV3>[0], message: string): never => {
     throw new PurchaseIntentCreateAuthorityPortErrorV3(code, message);
   };
-
+  const message=postgresMessage(error);
+  if(message!==null) {
+    if(message.includes('SAJU_DUPLICATE_PENDING_SAME_PRODUCT')
+       ||message.includes('SAJU_OVERLAPPING_PENDING_PRODUCT')
+       ||message.includes('cmd_saju_purchase_admission_replay_origin_conflict')
+       ||message.includes('cmd_saju_purchase_admission_replay_credit_conflict')) {
+      return mapped('IDEMPOTENCY_CONFLICT','A conflicting Saju purchase is already pending or was previously bound.');
+    }
+    if(message.includes('SAJU_PENDING_')||message.includes('SAJU_ORIGIN_')
+       ||message.includes('SAJU_PAID_RECORD_')) {
+      return mapped('CAPABILITY_AUTHORITY_MISMATCH','Saju Record purchase authority could not be proven.');
+    }
+  }
   switch (constraint) {
-    case 'cmd_purchase_intent_v3_subject_ineligible':
+    case 'cmd_purchase_intent_v3_saju_record_context_required':
+    case 'cmd_purchase_intent_v3_saju_scope_mode_mismatch':
+      return mapped('CAPABILITY_UNAVAILABLE','Saju Purchase Intent requires the approved Record-scoped Capability mapping.');
+    case 'cmd_saju_purchase_admission_record_unavailable':
+    case 'cmd_saju_purchase_admission_product_unavailable':
+    case 'cmd_saju_purchase_admission_capability_scope_invalid':
+    case 'cmd_saju_purchase_admission_existing_rights_require_upgrade':
+    case 'cmd_saju_purchase_admission_refund_or_cancellation_hold':
+      return mapped('CAPABILITY_UNAVAILABLE','Saju Record or Record-scoped Product authority is unavailable.');
+    case 'cmd_saju_purchase_admission_upgrade_charge_terms_unavailable':
+    case 'cmd_saju_purchase_admission_charge_terms_mismatch':
+      return mapped('CHARGE_TERMS_UNAVAILABLE','Saju Charge Terms do not match the approved Product price authority.');
+    case 'cmd_saju_purchase_admission_replay_origin_conflict':
+    case 'cmd_saju_purchase_admission_replay_credit_conflict':
+      return mapped('IDEMPOTENCY_CONFLICT','Saju Purchase Intent replay conflicts with its immutable Record or Receipt sources.');
+    case 'ct_paid_checkout_member_required_v1':
+      return mapped('SUBJECT_INELIGIBLE','Paid Purchase Intent requires an active authenticated Member.');
+    case 'cmd_saju_purchase_admission_member_required':
+      return mapped('SUBJECT_INELIGIBLE', 'Saju purchase requires an active Member account.');
+    case 'cmd_saju_purchase_admission_ids_required':
+    case 'cmd_saju_purchase_admission_requires_read_committed':
+    case 'cmd_saju_purchase_admission_kind_invalid':
+    case 'cmd_saju_purchase_admission_source_shape_invalid':
+    case 'cmd_saju_purchase_admission_source_kind_mismatch':
+      return mapped('INVALID_INPUT','Saju Purchase Admission input was rejected.');
+    case 'cmd_saju_purchase_intent_v3_subject_ineligible':
       return mapped('SUBJECT_INELIGIBLE', 'Purchase Intent subject is ineligible.');
     case 'cmd_purchase_intent_v3_offer_not_found':
       return mapped('OFFER_NOT_FOUND', 'Purchase Intent Offer was not found.');
@@ -279,6 +348,25 @@ implements PurchaseIntentOfferSnapshotPortV1, PurchaseIntentCapabilitySnapshotPo
       ]);
       return mapAuthorityRows(result.rows);
     } catch (error) {
+      return mapAuthorityError(error);
+    }
+  }
+
+  async createSajuPurchaseIntent(input: PurchaseIntentCreateAuthorityInputV3 & {
+    readonly sajuOrigin:SajuPurchaseOriginInputV1;
+  }): Promise<readonly PurchaseIntentCreateAuthorityRowV3[]> {
+    try {
+      const result=await this.client.query<AuthorityQueryRowV3>(CREATE_SAJU_SQL,[
+        input.subjectId,input.purchaseIntentId,
+        input.sajuOrigin.sajuRecordId,input.sajuOrigin.birthRevisionId,
+        input.productOfferId,input.providerAccountLinkId,
+        input.idempotencyKey,input.requestHash,
+        JSON.stringify(input.offerSnapshotJsonb),input.offerSnapshotHash,
+        JSON.stringify(input.capabilitySnapshotJsonb),input.capabilitySnapshotHash,
+        input.sajuOrigin.purchaseKind,[...input.sajuOrigin.sourceReceiptIds],
+      ]);
+      return mapAuthorityRows(result.rows);
+    } catch(error) {
       return mapAuthorityError(error);
     }
   }

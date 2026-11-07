@@ -8,6 +8,7 @@ import {
   type PurchaseIntentCapabilitySnapshotV3,
   type PurchaseIntentCreateAuthorityPortV3,
   type PurchaseIntentCreateAuthorityRowV3,
+  type SajuPurchaseOriginInputV1,
 } from '../apps/api/src/purchase-intent-create-command-v3.js';
 import type {
   PurchaseIntentIdPortV1,
@@ -37,6 +38,9 @@ const CAPABILITY_SNAPSHOT: PurchaseIntentCapabilitySnapshotV3 = Object.freeze({
 });
 
 type AuthorityCall = Parameters<PurchaseIntentCreateAuthorityPortV3['createPurchaseIntent']>[0];
+type SajuAuthorityCall = Parameters<NonNullable<
+  PurchaseIntentCreateAuthorityPortV3['createSajuPurchaseIntent']
+>>[0];
 
 class FakeOfferPort implements PurchaseIntentOfferSnapshotPortV1 {
   readonly calls: Array<{ productOfferId: string }> = [];
@@ -74,7 +78,29 @@ class FakeIdPort implements PurchaseIntentIdPortV1 {
 
 class FakeAuthorityPort implements PurchaseIntentCreateAuthorityPortV3 {
   readonly calls: AuthorityCall[] = [];
+  readonly sajuCalls:SajuAuthorityCall[]=[];
   result: readonly PurchaseIntentCreateAuthorityRowV3[] | Error | undefined;
+
+  createSajuPurchaseIntent(input:SajuAuthorityCall):readonly PurchaseIntentCreateAuthorityRowV3[] {
+    this.sajuCalls.push(input);
+    if(this.result instanceof Error)throw this.result;
+    if(this.result!==undefined)return this.result;
+    return [{
+      purchaseIntentId:input.purchaseIntentId,
+      productOfferId:input.productOfferId,
+      providerAccountLinkId:null,
+      status:'created',
+      offerSnapshotJsonb:input.offerSnapshotJsonb,
+      offerSnapshotHash:input.offerSnapshotHash,
+      expectedAmountMinor:12900,
+      expectedCurrency:'KRW',
+      chargeTermsVersion:'charge-v3',
+      capabilitySetId:input.capabilitySnapshotJsonb.capabilitySetId,
+      capabilitySnapshotJsonb:input.capabilitySnapshotJsonb,
+      capabilitySnapshotHash:input.capabilitySnapshotHash,
+      replayed:false,
+    }];
+  }
 
   createPurchaseIntent(input: AuthorityCall): readonly PurchaseIntentCreateAuthorityRowV3[] {
     this.calls.push(input);
@@ -162,6 +188,73 @@ describe('Purchase Intent v3 capability authority boundary', () => {
     expect(Object.isFrozen(response)).toBe(true);
   });
 
+  it('uses the Record-scoped admission port only for trusted server-side Saju origin context', async () => {
+    const ports=createPorts();
+    const sajuOrigin:SajuPurchaseOriginInputV1={
+      sajuRecordId:'c1070000-0000-0000-0000-000000000011',
+      birthRevisionId:'c1070000-0000-0000-0000-000000000012',
+      purchaseKind:'original',
+      sourceReceiptIds:[],
+    };
+    const response=await createPurchaseIntentV3({
+      resolvedSubjectId:SUBJECT_ID,
+      request:{productOfferId:OFFER_ID,idempotencyKey:'saju-record-v1'},
+      sajuOrigin,
+      ...ports,
+    });
+    expect(ports.authorityPort.calls).toHaveLength(0);
+    expect(ports.authorityPort.sajuCalls).toHaveLength(1);
+    expect(ports.authorityPort.sajuCalls[0]?.sajuOrigin).toEqual(sajuOrigin);
+    expect(ports.authorityPort.sajuCalls[0]?.requestHash).toMatch(/^sha256:v1:[0-9a-f]{64}$/);
+    expect(response).toEqual({purchaseIntentId:INTENT_ID,status:'created'});
+    expect(response).not.toHaveProperty('sajuRecordId');
+    expect(response).not.toHaveProperty('scopeKey');
+  });
+
+  it('binds the idempotency hash to the exact Saju Record and Birth revision', async () => {
+    const first=createPorts();
+    const second=createPorts();
+    const common={
+      resolvedSubjectId:SUBJECT_ID,
+      request:{productOfferId:OFFER_ID,idempotencyKey:'saju-record-hash'},
+    };
+    await createPurchaseIntentV3({
+      ...common,...first,
+      sajuOrigin:{
+        sajuRecordId:'c1070000-0000-0000-0000-000000000011',
+        birthRevisionId:'c1070000-0000-0000-0000-000000000012',
+        purchaseKind:'original',sourceReceiptIds:[],
+      },
+    });
+    await createPurchaseIntentV3({
+      ...common,...second,
+      sajuOrigin:{
+        sajuRecordId:'c1070000-0000-0000-0000-000000000013',
+        birthRevisionId:'c1070000-0000-0000-0000-000000000014',
+        purchaseKind:'original',sourceReceiptIds:[],
+      },
+    });
+    expect(first.authorityPort.sajuCalls[0]?.requestHash)
+      .not.toBe(second.authorityPort.sajuCalls[0]?.requestHash);
+  });
+
+  it('rejects malformed Saju Record context before allocating a Purchase Intent id', async () => {
+    const ports=createPorts();
+    await expectApiCode(createPurchaseIntentV3({
+      resolvedSubjectId:SUBJECT_ID,
+      request:{productOfferId:OFFER_ID,idempotencyKey:'saju-invalid-origin'},
+      sajuOrigin:{
+        sajuRecordId:'client-scope-key',
+        birthRevisionId:'c1070000-0000-0000-0000-000000000012',
+        purchaseKind:'original',sourceReceiptIds:[],
+      },
+      ...ports,
+    }),'INVALID_REQUEST');
+    expect(ports.idPort.calls).toBe(0);
+    expect(ports.authorityPort.calls).toHaveLength(0);
+    expect(ports.authorityPort.sajuCalls).toHaveLength(0);
+  });
+
   it('rejects client attempts to inject capability, entitlement, monetary, owner, or status authority', async () => {
     for (const extra of [
       { capabilitySetId: CAPABILITY_SET_ID },
@@ -170,6 +263,10 @@ describe('Purchase Intent v3 capability authority boundary', () => {
       { capabilitySnapshotHash: 'client-snapshot-hash' },
       { entitlementKey: 'reading.full' },
       { scopeMode: 'global' },
+      { scopeKey: 'saju-record:client-controlled' },
+      { sajuRecordId: 'c1070000-0000-0000-0000-000000000011' },
+      { birthRevisionId: 'c1070000-0000-0000-0000-000000000012' },
+      { entitlementKey: 'saju.relationship' },
       { itemKey: 'reading-access' },
       { subjectId: SUBJECT_ID },
       { expectedAmountMinor: 1 },

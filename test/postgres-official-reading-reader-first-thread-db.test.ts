@@ -6,7 +6,7 @@ import type { ProductReaderEligibilitySourceV1 } from '../apps/api/src/product-r
 
 const enabled = process.env.MYEONGHA_D05_REAL_PG === '1';
 const SUBJECT = '11390000-0000-0000-0000-000000000001';
-const AUTH = 'c1990000-0000-4000-8000-000000000009';
+const AUTH = '11380000-0000-0000-0000-000000000001';
 const READING = '12103100-0000-4000-8000-000000000001';
 const BUNDLE_A = '11391000-0000-4000-8000-000000000001';
 const READER = 'seyeon';

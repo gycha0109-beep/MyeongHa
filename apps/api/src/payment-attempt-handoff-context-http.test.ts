@@ -139,6 +139,22 @@ describe('Payment Attempt handoff context authenticated HTTP foundation', () => 
     ).toBe(false);
   });
 
+  it('requires Member login before reading provider handoff context', async () => {
+    const connect = vi.fn(async () => { throw new Error('must not connect'); });
+    const response = await invoke({
+      evidence: { kind: 'guest', verifiedGuestTokenHash: 'sha256:guest-session-fingerprint' },
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+    expect(response.status).toBe(403);
+    expect(payload.error).toEqual({
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'payment_attempt.login_required',
+      retryable: false,
+    });
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it('returns only canonical DB-owned handoff context', async () => {
     const queriedSql: string[] = [];
     const response = await invoke({ pool: fakePool({ queriedSql }) });

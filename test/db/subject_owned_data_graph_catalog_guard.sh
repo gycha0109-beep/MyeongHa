@@ -76,7 +76,13 @@ if [[ "$reader_subject_present" != 0 ]]; then
     actual="$(printf '%s\n' "$actual" | grep -Fxv "${table}|subject_id")"
   done
 fi
-actual="$(printf '%s\n' "$actual" | sed '/^chat_credit_lots_v1|subject_id$/d')"
+# The new Saju Record is personal data deleted by the account finalizer.
+# It is outside the historical P0-PR-01 30-edge snapshot, never P5Y evidence.
+if ! printf '%s\n' "$actual" | grep -Fxq 'commerce_saju_records_v1|subject_id'; then
+  echo "Expected exact Saju Record Subject FK was not found." >&2
+  exit 1
+fi
+actual="$(printf '%s\n' "$actual" | sed '/^commerce_saju_records_v1|subject_id$/d; /^chat_credit_lots_v1|subject_id$/d')"
 if [[ "$actual" != "$expected" ]]; then
   echo "Subject-owned data graph inventory drifted." >&2
   echo "--- inventory" >&2

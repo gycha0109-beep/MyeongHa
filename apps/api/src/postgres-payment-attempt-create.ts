@@ -91,6 +91,8 @@ function mapAuthorityError(error: unknown): never {
   };
 
   switch (constraint) {
+    case 'ct_paid_checkout_member_required_v1':
+      return mapped('SUBJECT_INELIGIBLE', 'Paid checkout requires an active authenticated Member.');
     case 'cmd_payment_attempt_v1_intent_not_found':
       return mapped('INTENT_NOT_FOUND', 'Owner-matched Purchase Intent was not found.');
     case 'cmd_payment_attempt_v1_intent_terminal':

@@ -101,6 +101,22 @@ describe('Purchase Intent v3 HTTP runtime foundation', () => {
     expect(connect).not.toHaveBeenCalled();
   });
 
+  it('requires Member login for paid Purchase Intent and rejects Guest before PostgreSQL', async () => {
+    const connect = vi.fn(async () => { throw new Error('must not connect'); });
+    const response = await invoke({
+      evidence: { kind: 'guest', verifiedGuestTokenHash: 'sha256:guest-session-fingerprint' },
+      pool: { connect },
+    });
+    const payload = await response.json() as any;
+    expect(response.status).toBe(403);
+    expect(payload.error).toEqual({
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'purchase_intent.login_required',
+      retryable: false,
+    });
+    expect(connect).not.toHaveBeenCalled();
+  });
+
   it('rejects caller authority injection before opening PostgreSQL', async () => {
     const connect = vi.fn(async () => { throw new Error('must not connect'); });
     const response = await invoke({

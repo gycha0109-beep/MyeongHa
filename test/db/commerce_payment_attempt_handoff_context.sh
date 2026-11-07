@@ -40,7 +40,8 @@ on conflict do nothing;
 
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
   ('d1010000-0000-0000-0000-000000000001','member','d1000000-0000-0000-0000-000000000001','active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z'),
-  ('d1010000-0000-0000-0000-000000000002','member','d1000000-0000-0000-0000-000000000002','active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z');
+  ('d1010000-0000-0000-0000-000000000002','member','d1000000-0000-0000-0000-000000000002','active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z'),
+  ('d1010000-0000-0000-0000-000000000003','guest',null,'active',null,'2026-09-17T00:00:00Z','2026-09-17T00:00:00Z');
 
 insert into public.products(id,product_key,product_type,enabled,created_at,retired_at)
 values ('d1020000-0000-0000-0000-000000000001','payment-attempt-handoff-context-fixture','reading',true,'2026-09-17T00:00:00Z',null);
@@ -77,6 +78,8 @@ context=$(run_context 'd1010000-0000-0000-0000-000000000001' 'd1060000-0000-0000
 [[ "$context" == 'd1060000-0000-0000-0000-000000000001|portone_v2|sandbox|mha-portone-payment-id-1|12345|KRW|created' ]] || { echo "$context" >&2; fail "handoff context mismatch"; }
 pass "handoff context exposes provider_request_id as paymentId source and pinned charge authority"
 
+expect_fail "Guest cannot obtain paid provider handoff context" "paid checkout requires an active authenticated Member; login required" "begin; set local myeongha.subject_id='d1010000-0000-0000-0000-000000000003'; select * from public.qry_commerce_payment_attempt_handoff_context_v1('d1010000-0000-0000-0000-000000000003','d1060000-0000-0000-0000-000000000001'); commit;"
+
 expect_fail "handoff context requires trusted Subject context" "trusted MyeongHa subject execution context is required" "select * from public.qry_commerce_payment_attempt_handoff_context_v1('d1010000-0000-0000-0000-000000000001','d1060000-0000-0000-0000-000000000001');"
 
 expect_fail "cross-Subject attempt is non-enumerating" "payment-attempt handoff context is unavailable for the current subject" "begin; set local myeongha.subject_id='d1010000-0000-0000-0000-000000000002'; select * from public.qry_commerce_payment_attempt_handoff_context_v1('d1010000-0000-0000-0000-000000000002','d1060000-0000-0000-0000-000000000001'); commit;"
@@ -88,6 +91,7 @@ expect_fail "post-handoff attempt is no longer a pre-browser context" "payment-a
 run_attempt 'd1010000-0000-0000-0000-000000000001' 'd1060000-0000-0000-0000-000000000002' 'd1050000-0000-0000-0000-000000000001' 'handoff-attempt-2' 'mha-portone-payment-id-2' >/dev/null
 
 [[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('myeongha_api_executor','public.qry_commerce_payment_attempt_handoff_context_v1(uuid,uuid)'::regprocedure,'EXECUTE');")" == 't' ]] || fail "myeongha_api_executor lacks handoff-context query EXECUTE"
+[[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('myeongha_api_executor','public.internal_qry_payment_attempt_handoff_context_pre_member_gate_v1(uuid,uuid)'::regprocedure,'EXECUTE');")" == 'f' ]] || fail "API executor can bypass the Member-only handoff query wrapper"
 for role_name in anon authenticated service_role; do
   [[ "$("${psql_base[@]}" -Atc "select pg_catalog.has_function_privilege('${role_name}','public.qry_commerce_payment_attempt_handoff_context_v1(uuid,uuid)'::regprocedure,'EXECUTE');")" == 'f' ]] || fail "${role_name} unexpectedly executes handoff-context query"
 done

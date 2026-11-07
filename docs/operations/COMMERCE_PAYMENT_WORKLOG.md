@@ -698,3 +698,156 @@
 - **연결:** 기존 검증용 PostgreSQL17 단일 스위트에 추가 `BEGIN/ROLLBACK` 검증을 연결했습니다. 현재 TypeScript의 **정확한 원본 Claim 취소/S7 SQL**을 추출하여 B2·B3 구매/Subject/Checkout 단위로 실행하고, 기존 합성 B2 PortOne cancellation을 같은 원본 Receipt에 결속·중복 replay해 (1) B2 취소 원본 HMAC·금액·상태 보존, (2) 독립 B3에 동일 취소가 전파되지 않음, (3) S5 본문이 없는 상태에서 S7 응답 준비·클라이언트 ACK 및 전달 완료를 만들어내지 않음을 검증합니다.
 - **정확한 의미:** 이는 원본 저장 취소 증거와 S7 **기록 부재**를 실DB에서 대조하는 음성/출처 검증이지, 합법적인 전달 완료 또는 실제 고객 미제공 확정이 아닙니다. Reader S5 Production 발행은 여전히 HOLD이고, 근거 없는 protected body를 생성하지 않습니다. 전체 회원 청약철회·Reader exact revoke·개인정보 finalizer 테스트는 별도 기존 케이스에서 그대로 통과해야 합니다.
 - **경계:** 모든 후보 취소 함수와 신규 Event는 격리 DB 트랜잭션 내에서만 생성/롤백합니다. 기존 고객 접수·S7·Provider 처리 코드를 바꾸지 않고 운영 DB SQL, 공개 API, Saju 발급 계약, LIVE 결제/환불·전달을 활성화하지 않습니다. 새 고정 HEAD의 CI/통합 결과 확인 전에는 PASS나 ROADMAP_COMPLETE 선언을 하지 않습니다.
+
+### 2026-11-07 — 승인된 Saju Record-scoped Capability 구현
+
+- **승인:** 사용자가 서버 생성 불투명 Record scope와 Receipt→Purchase Origin→Record 연결 방식을 승인했습니다.
+- **DB 권한:** migration `2330_saju_record_scoped_capability_authority_v1.sql`에 Saju 전용 `scope_mode='saju_record'`, 고유 `entitlement_scope_id`, 기존 Receipt Grant writer의 서버 측 scope resolver를 추가했습니다. 13개 Saju Product만 이 scope를 사용할 수 있고, 다른 Product의 기존 `global/fixed` 의미는 유지합니다.
+- **구매 연결:** 기존 Purchase Intent v3를 일반 호출로 우회할 수 없도록 transaction-local private admission context를 추가했습니다. Record 행을 먼저 잠그고 Subject·Birth revision·Offer·Capability Set을 확인한 뒤 기존 Purchase Intent v3를 호출하고 Origin을 같은 트랜잭션에서 생성합니다. 동일 멱등키 재호출은 기존 Origin의 Record/Revision까지 대조합니다.
+- **중복·환불 경계:** 같은 Record의 pending 분야 중복은 기존 Record 잠금 트리거가 보류합니다. 이미 활성 권한, 환불 증거 또는 미해결 취소가 겹치는 분야는 새 원본 구매를 보류합니다.
+- **업그레이드 제한:** 현재 Offer Charge Terms는 정적 금액이므로 Record별 가격 차액을 안전하게 고정할 수 없습니다. 따라서 이번 Admission은 `original`만 허용하고 `upgrade`는 quote-specific immutable Charge Terms가 생길 때까지 HOLD합니다. 클라이언트가 차액을 제출하는 우회는 허용하지 않습니다.
+- **개인정보 삭제:** 계정 삭제 Finalizer가 Upgrade link → Origin → Record 순서로 개인 매핑을 지운 뒤 Birth revision을 삭제합니다. Receipt·Provider Event·Grant/Event·환불 증거는 삭제하지 않습니다.
+- **검증 추가:** PG17 테스트에 두 개의 서로 다른 Saju Record가 동일 Subject에 속해도 각각 다른 opaque scope와 독립 Grant를 받는 실제 Receipt→Origin→Record→Grant 경로를 추가했습니다. 계정 삭제 테스트에도 Record/Origin 제거와 Purchase Intent 보존 검증을 추가했습니다.
+- **비운영 경계:** Product/Offer seed, 공개 Checkout route, Provider handoff, 실제 charge/refund, LIVE 판매는 변경·활성화하지 않았습니다. CI 성공 전 통과 선언은 하지 않습니다.
+
+### 2026-11-07 — Record scope의 상품·권한·가격 일치 검증 보강
+
+- **권한 키:** 10개 Saju 분야를 내부 `saju.<field>` 키로 고정했습니다. 13개 상품의 분야 목록과 각 Capability Item의 `item_key/entitlement_key` 조합이 일치하지 않으면 구매 승인과 Receipt Grant 발급을 거부합니다.
+- **가격 일치:** 기존 TypeScript 상품 정책의 13개 KRW 가격을 DB 불변 함수로 미러링하고, 원본 구매 승인 시 현재 Offer Charge Terms의 금액·통화가 정확히 일치해야 합니다. 가격 정책과 Offer 금액이 다르면 결제 Intent 생성 전 HOLD합니다.
+- **일반 경로 우회 차단:** 일반 Purchase Intent v3 경로에서도 Saju Product는 Record Admission 문맥 없이는 신규 생성·재호출할 수 없고, 비Saju Product가 Saju Record scope를 사용하거나 Saju Product가 global/fixed scope를 사용하는 경우도 거부합니다.
+- **업그레이드 제한:** 정적 Offer Charge Terms로는 Record별 차액을 고정할 수 없어, 이번 버전은 원본 구매만 허용하고 업그레이드는 별도 불변 quote Charge Terms 구현 전까지 HOLD합니다.
+
+
+### 2026-11-07 — Guest 무료 이용 / Member-only 유료 구매 정책 정정 (P0-CM-05)
+
+- **오류 확인:** 기존 `P0-CM-04`가 active Guest의 Web one-off 유료 구매와 회원가입 전 유료 권한 소비를 허용하고 있었습니다. 같은 정책이 `COMMERCE_GUEST_PURCHASE_OWNERSHIP_DECISION_V1.md`, `COMMERCE_PAYMENT_TRACK_ARCHITECTURE_V1.md` §2.4/§4.2, `COMMERCE_ENTITLEMENT_SPEC.md`에도 반영되어 있었습니다.
+- **정정:** 사용자의 2026-11-07 지시에 따라 `P0-CM-04`를 superseded 처리하고 `P0-CM-05`를 추가했습니다. Guest는 무료 오늘의 운세와 추후 지정할 무료 사주 상품 1종만 이용하며, 모든 유료 구매는 활성 인증 Member 로그인 후 시작합니다. Guest 유료 Purchase Intent/Payment Attempt/Provider checkout/paid Grant는 금지합니다.
+- **API 경계:** Purchase Intent 및 Payment Attempt HTTP foundation은 Guest identity를 `LOGIN_REQUIRED`로 거부하고 PostgreSQL 연결 전에 종료합니다.
+- **DB 경계:** 신규 forward-only migration `2340_paid_purchase_member_auth_v1.sql`이 Purchase Intent와 Payment Attempt insert 모두에서 활성 Member/auth binding을 확인합니다. 역사적 migration `0960`/`1070`은 수정하지 않습니다.
+- **기록 보존:** 과거 Guest-owned Commerce row가 있더라도 Receipt/Event/Grant의 원래 `subject_id`를 재작성하지 않습니다. Guest free flow와 Guest bootstrap은 유지합니다.
+- **검증 범위:** Guest paid-create 거부, Guest payment-attempt 거부, HTTP `LOGIN_REQUIRED`, historical Guest purchase history read를 회귀 검사에 포함합니다. 새 HEAD의 CI/PG17 결과 전 PASS를 선언하지 않습니다.
+- **운영 경계:** Saleable Offer/Charge Terms, public Checkout route, LIVE PortOne, Production DB 적용 및 실제 판매는 계속 HOLD.
+
+
+### 2026-11-07 — Guest 유료 구매 replay 경계 추가 하드닝 (P0-CM-05)
+
+- **추가 발견:** 2340 INSERT trigger만으로는 기존 Guest-owned Purchase Intent 또는 Payment Attempt의 멱등 replay 경로를 막지 못합니다. v2/v3 Purchase Intent와 Payment Attempt command는 원래 replay 조회가 신규 insert보다 먼저 실행됩니다.
+- **수정:** 신규 forward-only migration `2350_paid_checkout_member_command_gate_v1.sql`에서 기존 구현을 내부 전용 이름으로 보존하고, 공개 command 이름은 활성 인증 Member를 replay보다 먼저 검증하는 wrapper로 교체합니다. 기존 내부 구현은 API executor를 포함한 런타임 역할에서 직접 실행할 수 없도록 권한을 회수합니다.
+- **보존:** 과거 Guest-owned Purchase Intent/Payment Attempt 행은 변경·삭제하지 않습니다. 과거 기록의 replay를 신규 유료 checkout 수단으로 사용할 수 없게만 차단합니다.
+- **회귀 검사:** Guest 신규 Purchase Intent v2/v3, 과거 Guest Purchase Intent replay, Guest 신규 Payment Attempt, 과거 Guest Payment Attempt replay를 각각 거부하고, 역사적 행이 그대로 남는지 확인하도록 DB 테스트를 추가했습니다.
+- **정책 범위:** Guest 무료 오늘의 운세 및 추후 지정할 무료 사주 상품 1종 경로는 paid Commerce command와 분리된 상태로 유지합니다. LIVE 판매 및 Production 적용 승인은 포함하지 않습니다.
+
+
+### 2026-11-07 — Provider handoff-context Guest 차단 (P0-CM-05)
+
+- **추가 발견:** Payment Attempt 생성은 Member-only였지만, 이미 생성된 Attempt의 pre-browser handoff-context read는 인증 Guest에게도 열려 있었습니다. 이 조회는 PSP `paymentId`와 고정 결제 금액을 반환하므로 Guest가 기존 Guest Attempt를 이어서 결제하는 경로가 될 수 있습니다.
+- **수정:** 신규 forward-only migration `2360_paid_handoff_member_gate_v1.sql`에서 handoff-context query를 Member 검증 wrapper로 교체하고, 이전 query 구현은 API executor가 직접 실행할 수 없도록 내부 전용으로 전환했습니다. HTTP 경계도 Guest를 `LOGIN_REQUIRED`로 PostgreSQL 연결 전에 거부합니다.
+- **검증:** Guest handoff-context DB query 거부, API HTTP Guest 거부, private query ACL을 회귀 검사에 추가했습니다.
+- **범위 보존:** server-side payment verification은 이미 발생한 provider 사실을 확인하는 별도 경로이므로 이 변경으로 막지 않습니다. Guest 무료 이용 흐름도 변경하지 않습니다.
+
+### 2026-11-07 — 사주 Record 신규 FK의 전체 Subject 의존성 목록 동기화
+
+- **실패 근거:** [PR #3090 DB 권한 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42364797597/job/128380535690)에서 실제 전체 마이그레이션은 성공했으나, 계정 Subject를 기준으로 추적하는 전이 FK 목록이 기존 140개인 반면 최신 DB에는 149개가 존재해 검증이 중단됐습니다.
+- **수정:** 기존 목록에 신규 Saju Record/Origin/Upgrade Link/Verified Refund Evidence 연결 9개를 실제 제약 이름·참조 컬럼·최소 깊이 그대로 추가하고, 연결 149개·직접 연결 31개를 검증하도록 갱신했습니다. 기존 Wallet 4개 예외와 최대 경로 깊이 4 조건은 유지합니다.
+- **정책:** 이 그래프는 FK 구조 목록이며 테이블의 보존·삭제 여부를 새로 승인하지 않습니다. 기존 계정 삭제·개인정보 삭제/금융 증거 보존 정책과 실행 경계를 그대로 유지하며, 새 CI 및 PG17 통과 전 완료 선언을 하지 않습니다.
+
+
+### 2026-11-07 — PostgreSQL17 구식 Saju 원장 중복 생성 제거
+
+- **실패 근거:** [PR #3090 PostgreSQL17](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42364797597/job/128380535790)에서 과거 비배포 원장 후보 SQL이 마이그레이션 2330이 생성한 Saju Record 테이블을 중복 생성하여 실패했습니다.
+- **수정:** 사주 Record·권한 스키마 검증은 마이그레이션 2330으로 유지하고, SQL 견적 스모크에서 구식 후보 DDL 재적용만 제거했습니다. 기존 SQL 추출·읽기 및 ROLLBACK 범위는 유지합니다.
+- **문서 교정:** Subject FK 그래프의 탐색 테이블 총수는 루트 subjects 포함 63개로 바로잡았습니다. 새 HEAD의 CI·PG17 성공 전에는 완료 선언하지 않습니다.
+
+
+### 2026-11-07 — 기존 승인 개인정보 그래프와 신규 Record FK 분리, 과거 DB 검증 호환 복구
+
+- **실패 근거:** [PR #3090 최신 Governance](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42365636485)에서 승인 당시의 고정 140 FK/59 테이블 그래프가 현재 149 FK/63 테이블 그래프와 혼합되어 실패했습니다. [DB 권한 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42365636393/job/128383142704)에서는 단계별로 설치하는 Reader/청약철회 테이블이 없는 과거 DB에서도 신규 Saju 계정 삭제 함수가 해당 테이블을 참조하여 실패했습니다.
+- **수정:** 140 FK 승인 그래프의 해시/정책 판정을 기존대로 유지하고, 신규 149 FK 그래프를 별도 현재 스키마 목록으로 관리하여 DB 검사의 정확한 목록 확인에 사용합니다. 계정 삭제 함수는 이전 단계에 아직 설치되지 않은 Reader·청약철회 테이블만 조건부 처리하며, 테이블이 존재하면 기존 실제 삭제·잔여 검사를 그대로 실행합니다.
+- **불변 경계:** 승인된 금융 증거 P5Y 보존, 사주 개인 매핑 삭제, Reader 보호 콘텐츠의 외부 삭제 증거 요구, 미승인 운영 활성화 HOLD 및 PG17 통합 검증 계약을 변경하지 않습니다. 새 HEAD의 CI 통과 전 성공 미확정입니다.
+
+
+### 2026-11-07 — 계정 삭제 경계 및 표준 DB 스키마 지문 회귀 정합화
+
+- **실패 근거:** [PR #3090 최신 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42366472499)에서 PostgreSQL17 통합과 Governance는 통과했지만, 기존 20개 PostgreSQL15 격리 사례가 동일한 새 전체 카탈로그 SHA-256 `22f9c1cac9d642e46ae2346902a7fbe335ea3a1d33f464e44640628fa8477d08`를 반환해 이전 지문과 불일치했습니다. 2330 계정 삭제 함수의 단계별 Reader/Claim 테이블 처리 보완이 SQL 함수 정의를 변경한 결과입니다.
+- **수정:** 기존 `catalog_snapshot.sh`의 SQL 전체 정의, 제약·트리거·권한 검증은 완화하지 않고, 4개 DB 병렬 트랙/20개 독립 DB에서 일치하게 재현된 새 카탈로그 지문으로 고정값을 갱신합니다. 계정 삭제 시작 테스트의 비활성 Member 유료 Purchase Intent 차단 문구도 이미 승인된 Member-only 선행 검증 `LOGIN_REQUIRED`와 일치시킵니다. 요청 및 원장 상태의 안전 차단은 그대로 유지합니다.
+- **미완료:** 새 HEAD에 대한 전체 CI/통합 PASS 및 PR 충돌 해소·병합 검증은 별개입니다. 운영 DB, LIVE 결제/환불/제공 및 공개 판매 경로는 변경하지 않습니다.
+
+
+### 2026-11-07 — 기존 Reader 구매 테스트의 회원 전용 정책 충돌 복구
+
+- **실패 근거:** [PR #3090 핵심 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367049323/job/128387240283)는 기존 Reader 통합 fixture의 구매 Subject를 이미 활성 인증 Member로 만들었는데, 연결 테스트가 과거 Guest 구매를 가정하고 그 Subject에 다시 Guest→Member promotion을 시도하여 `guest promotion requires an active unmerged guest subject` 오류로 중단됐습니다. 같은 HEAD에서 PostgreSQL15 개별 결제·권한·콘텐츠·런타임 DB 트랙, Governance 및 Web 검사는 통과했습니다.
+- **수정:** 비운영 Reader 구매-Chat 연결 fixture에서 역사적 Guest 구매 재현용 임의 Guest Session/Promotion을 제거하고, 원본 구매 주체가 정확한 활성 Member/Auth ID 그대로인지 검사합니다. Reader Grant·Thread/Bundle·타 구매권 독립성 검증은 유지합니다.
+- **경계:** Guest 무료 이용과 과거 Guest-owned 금융 기록 보존은 건드리지 않습니다. DB 스키마·실제 Checkout·금융 기록·Provider/환불 POST·LIVE 노출을 변경하지 않았으며, 새 CI 통과 전 PASS 미선언입니다.
+
+
+### 2026-11-07 — 취소 웹훅 원본 ID별 PortOne GET 성공 증거 대조 보강
+
+- **근거:** 공식 PortOne V2 취소 웹훅은 결제 전체 식별자 외에 개별 `cancellationId`를 제공합니다. 이전 read-only 재조합은 결제 전체의 `CANCELLED/PARTIAL_CANCELLED` 상태를 믿었으나, 서명된 **정확한 취소 ID**가 실제 GET에서 `SUCCEEDED`인지와 개별 취소 금액·누적 금액을 필수로 검사하지 않았습니다.
+- **구현:** `commerce-signed-cancellation-private-reconciliation-v1.mjs`에 서명 알림의 취소 ID 의무화, GET 결과의 동일 취소 ID/상태/정수 금액/원본 Receipt 금액 대조를 추가했습니다. 완전취소 알림을 부분취소 조회 결과로 잘못 채택하는 경우도 HOLD합니다. 후속 완전 취소 때문에 오래된 정상 부분취소 알림이 재전달되는 사례는 개별 ID 성공 금액이 일치할 때 비권한 검토 결과로만 허용합니다.
+- **검증·경계:** 내부 비운영 mock 회귀 4건 추가. Provider Event 기록기, 원본 Receipt·Grant·환불 데이터, 공개 API·웹훅 연결·실제 취소/환불 POST·운영 DB·판매 활성화는 변경하지 않습니다. 정확한 공급자 이벤트 순서 및 권한 회수 허가를 추정하지 않으며, 전체 CI 이전 PASS 미선언입니다.
+
+
+### 2026-11-07 — Reader TypeScript/실DB 연결 회귀의 중복 Guest 전환 제거
+
+- **실패 근거:** [PR #3090 핵심 DB CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367519466/job/128388734751)에서 구매-Chat 연결 fixture가 통과한 직후, 별도 TypeScript/실DB 연결 fixture가 이미 활성 Member인 유료 Reader 구매자에게 다시 `cmd_promote_guest_v1`을 호출하여 `guest promotion requires an active unmerged guest subject`로 실패했습니다.
+- **수정:** 테스트 전용 Guest 세션 생성·비회원 전환 호출을 없애고 동일 구매자의 Member 활성 상태와 기존 Auth ID를 검증한 뒤, 기존 구매 Grant 복원·Reader 첫 채팅 생성 및 별도 패키지 검사 로직을 그대로 수행하도록 갱신했습니다. 비운영 fixture 이외 운영 SQL, 승인 정책, 공개 API·LIVE·실제 환불 호출은 변경하지 않았습니다. 새 HEAD CI 통과 전 완료 미확정입니다.
+
+
+### 2026-11-07 — 취소 검토 CI 테스트 입력 정합화
+
+- **실패 근거:** [PR #3090 Work Track CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42368338149/job/128391169640)에서 새 취소 검증의 두 테스트가 실패했습니다. 부분취소 성공 응답에 실제로는 `Transaction.Cancelled` 알림을 사용했고, ID 누락 테스트는 기존 signed webhook parser가 DB/GET 전에 `authentication_rejected`를 반환했습니다.
+- **수정:** 부분취소 사례는 정확히 `Transaction.PartialCancelled` 서명 알림으로 변경하고, 식별자 누락 사례는 먼저 실행되는 기존 서명/형식 검증의 거부 응답을 요구하도록 수정합니다. 취소 ID·성공 상태·정확한 금액을 필수로 대조하는 신규 검증 로직, 다른 Reader 격리 및 운영 실행 HOLD는 그대로 유지합니다. 새 HEAD 통합 CI 통과 전 PASS 미선언입니다.
+
+
+### 2026-11-07 — 실DB TypeScript 인증 주체 정합화
+
+- **실패:** [PR #3090 DB authority CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42368338149/job/128391169635)는 `official_reader_first_thread_typescript_postgres.sh`의 Member 소유 Purchase/Reader 데이터는 정상 생성했지만, 그에 대응하는 TypeScript 테스트가 Guest promotion 시절의 인증 ID `c1990000-...`를 계속 사용하여 `AUTH_REQUIRED`로 실패했습니다.
+- **수정:** `test/postgres-official-reading-reader-first-thread-db.test.ts`의 verified auth fixture를 동 테스트 DB에서 실제 Member와 결속된 `11380000-...`로 변경했습니다. 실제 회원 검증은 유지하고, Reader 정책 보류·Bundle 불일치·처음 생성/재진입·Grant 회수 테스트를 완화하지 않습니다. 운영 서비스·결제·환불/고객 노출은 변경하지 않습니다. 최신 CI 통과 전 완료 미확정입니다.
+
+### 2026-11-07 — 서명 취소 알림·원본 Receipt·전체 PortOne 취소 항목 집합 비운영 대조 연결
+
+- **기존 공백:** 운영 비노출 `reconcileSignedCancellationPrivateV1`는 정확한 취소 ID의 단일 GET 및 기존 Event 조회까지만 시행했습니다. 별도로 작성된 `reconcileStoredPortOneCancellationSetWithGetPrivateV1`의 **전체 성공 취소 항목 HMAC·개별 금액·두 시점 DB 스냅샷 대조**를 서명 알림에 연결하지 않아, 한 개 웹훅이 실제 기록된 전체 취소 내역에 포함되는지 확인하는 결과를 돌려주지 않았습니다.
+- **구현:** 내부 재조합 함수가 전용 `sourceHmacSecret`를 제공받으면 서명된 `cancellationId`의 HMAC을 계산하고 기존 read-only 전체 항목 대조기를 호출합니다. 대조기는 exact cancellation HMAC의 DB 원장 존재를 GET 이전과 이후에 확인하고, 성공 시에만 원본 Receipt·전체 성공 항목·현재 GET 일치 여부를 **읽기 전용 관찰** 결과로 표시합니다. 미제공/약한 키, 원장 항목 누락·불일치·역할 문제는 안전 보류합니다. 기존 Source/Provider Event 순서를 임의로 만들어내지 않습니다.
+- **검증/경계:** 정확 항목 존재·누락과 서명 알림→전체 집합 합성 테스트를 추가했습니다. 운영 라우트, Provider 환불 POST, 계정 삭제, 실제 금액 변경·Grant 회수·LIVE 판매는 전혀 연결하지 않았습니다. CI 완료 이전에는 완료/PASS로 주장하지 않습니다.
+
+
+### 2026-11-07 — 정확한 원본 Receipt ID의 내부 전체 취소 집합 대조 연결 복구
+
+- **CI 근거:** [PR #3090 Commerce Work Track](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42369563243/job/128394786467) 신규 signed cancellation→전체 취소 집합 테스트가 1건 실패했습니다. `resolveCancellationOriginalReceiptPrivateV1`의 기존 내부 결과에는 원본 Receipt UUID가 누락되어, 전체 집합 대조기가 정확한 Receipt를 찾을 수 없어 안전 보류했습니다.
+- **수정:** 기존 동일 SQL에서 이미 검증 중이던 `verifiedReceiptId`를 **사설 운영 Resolver 반환에만** 추가했습니다. 기존 공개/일반 read-only 판정 API는 식별자를 노출하지 않습니다. 사설 조회에서 정확한 Receipt·결제 거래번호·금액·통화 결속과 malformed ID 거부를 별도 회귀 검증합니다.
+- **보존:** 취소 전체 내역 대조는 read-only, Provider 순서와 법정 환불/권한 회수 확정은 계속 HOLD. 운영 PG/환불 POST, LIVE, 공개 라우트/DB 적용 없음. 새 HEAD CI 통과 전 성공 미확정.
+
+
+### 2026-11-07 — 기존 취소 Provider Event의 원본 Receipt 및 서명 본문 결속 검증
+
+- **미완료 경계:** 서명 웹훅·PortOne GET·전체 취소 집합이 검증되더라도, 별도 읽기 전용 `inspectExactCancellationProviderEventReadinessV1`는 **기존 이벤트 원본 Receipt ID 또는 signed raw payload HMAC** 일치 여부를 요구하지 않았습니다. 같은 외부 이벤트 ID와 거래번호만으로 기존 Event ready를 보고할 수 있었습니다.
+- **구현:** 기존 `commerce_provider_events`에서 `payload_fingerprint` 및 이미 최소화해 기록한 `verified_payload_jsonb.signedPayloadHmac`를 함께 읽고, 서명 원본 바이트로 계산한 `portone-cancel-signed-v1` HMAC과 **두 필드 모두** 일치해야 사설 Event ready로 판단합니다. 원본 Receipt ID는 `verifiedReceiptId`를 그대로 대조합니다. 테스트 입력에서 위조 영수증/서명지문, malformed HMAC를 추가해 보류 검증합니다.
+- **범위:** 기존 Event writer 및 금전/권한 변경 없음, Provider 의미적 NEWER/STALE order와 법적 환불 권한은 여전히 미증명/HOLD입니다. 내부 검토만 개선하며 공개 Route·운영 데이터·실제 환불 POST·LIVE 판매 경로는 활성화하지 않습니다. 새 CI 통과 전 PASS 미선언입니다.
+
+
+### 2026-11-07 — 정확한 Reader 구매권만 취소 이벤트 감사 범위로 제한
+
+- **발견:** `inspectExactCancellationProviderEventReadinessV1`의 기존 `purchaseGrantCount/exactEventRevocationCount`는 Receipt에 붙은 **모든 종류의 Entitlement Grant**를 집계했습니다. 해당 이벤트에 비Reader 권한이 있으면 Reader 권한 지급·회수 확인을 오판할 수 있었습니다.
+- **구현:** 두 수치 모두 기존 `standard_reading_reader_access_grants`와 **정확한 원본 Purchase Intent ID/Subject/Grant ID**를 결합한 Reader 구매권만 세도록 변경했습니다. 이미 회수된 건은 동일 Provider Event의 `entitlement_events.event_type=revoked` 및 `target_status=revoked`인 실제 효과만 인정합니다. 기존 DB 테이블·Reader 회수 Writer·원본 이벤트 중복 방지/서명·타 Reader 권한은 변경하지 않습니다.
+- **검증:** 회귀 검사에서 Reader 접근권과 구매 ID/Grant 결속, 목표 revoked 상태를 확인하도록 보강했습니다. 이 감사는 관찰만 하며 개별 Provider 최신 순서·법적 환불·Reader/T2 잠금에 대한 권한을 발행하지 않습니다. 실제 결제, PG POST, 운영 스키마/공개 API/LIVE 변경 없음. 새 HEAD의 CI 통과 전에는 완료 미확정입니다.
+
+
+### 2026-11-07 — 서명 알림의 특정 취소 건과 기존 Provider Event의 지문 결속 강화
+
+- **발견:** 기존 사설 이벤트 감사는 원본 영수증 ID와 서명 원문 지문을 검증했지만, 같은 결제에 여러 부분취소가 있는 경우 **해당 이벤트의 `verified_payload_jsonb.cancellationIdHmac`**가 서명 알림의 정확한 `cancellationId`와 일치하는지는 요구하지 않았습니다. 전체 취소 집합 감사는 항목의 존재를 별도로 확인하므로 서로 다른 이벤트로 착각할 여지가 있었습니다.
+- **구현:** `inspectExactCancellationProviderEventReadinessV1`에서 정확한 취소 항목 HMAC을 기존 이벤트의 `cancellationIdHmac`와 비교하고, 잘못된/누락된/형식 불일치 값은 읽기 전용 HOLD합니다. 내부 서명 검토기는 동일 원본 알림·키로 만든 항목 HMAC을 **기존 Provider Event 감사와 전체 취소 집합 감사 양쪽에 재사용**합니다.
+- **검증/경계:** 같은 영수증의 다른 취소 건, 누락 지문, 잘못된 입력과 연결 파라미터를 회귀 테스트에 추가했습니다. SQL 후보·Provider 환불 POST·Entitlement Effect/Reader T2·운영 DB·공개 webhook·LIVE는 변경하지 않습니다. 새 CI 통과 전 완료 미확정, 공급자 최신 순서·최종 정산은 여전히 HOLD입니다.
+
+
+### 2026-11-07 — 서명 웹훅·개별 취소 지문을 같은 Provider Event 행으로 일치시키는 대조 연결
+
+- **확인된 공백:** 이전 전체 취소 집합 대조는 `cancellationIdHmac`가 원장 안에 존재하는지 확인했지만, 실제 서명된 `providerWebhookId`와 **동일 이벤트 행**에 결속되었는지는 증명하지 않았습니다. 서로 다른 3,000원/5,900원 부분취소 이벤트가 각각 존재하면 서명 웹훅을 다른 취소 항목에 잘못 연결할 수 있었습니다.
+- **구현:** 기존 `commerce_provider_events.external_event_id`만 사설 SELECT에 추가하고, 서명 웹훅 ID·기존 Provider Event UUID(전달된 경우)·개별 취소 HMAC 중 전달된 식별자가 **하나의 동일 원장 행에서 동시에 일치**해야 전체 취소 집합 대조를 허용합니다. 첫 DB 스냅샷과 GET 후 스냅샷 모두 확인합니다. 서명 검토기에서 웹훅 ID를 직접 전달하고 `exactSignedWebhookIncluded=true`가 없으면 안전 보류합니다.
+- **회귀/안전:** 서로 다른 취소 항목 혼동, 알 수 없는 웹훅, GET 사이 식별자 바뀜, 모의 증명 누락을 검사합니다. 기존 Provider Event·Receipt·권한 원장/DB 스키마/운영 API·환불 POST·LIVE는 변경하지 않습니다. 공급자 최신 순서·법정 환불·Reader T2 회수는 여전히 HOLD이며 새 CI 통과 전 완료 미확정입니다.
+
+
+### 2026-11-07 — 서명 취소 ID를 기존 Reader S1 잠금·구매권 버전 검사에 연결
+
+- **확인된 기존 구성:** 읽기 전용 현재 PortOne 전체 취소 집합 GET과 기존 `inspectLockedReaderRevokeCasPreflightV1`의 원본 Event→Reader Grant→S1 잠금·변경 버전 검사 흐름이 구현돼 있었으나, 서명 알림의 **웹훅 ID와 취소 항목 HMAC**을 같은 preflight 입력으로 전달하지 않았습니다.
+- **구현:** `inspectCurrentCancelSetExactReaderLockedCasReviewV1`에 서명 검증 단계에서만 공급 가능한 `expectedProviderWebhookId + expectedCancellationIdHmac` 쌍을 선택적 내부 입력으로 추가했습니다. 둘 다 있으면 GET 이전 및 이후 동일 Provider Event 행 결속을 검증한 경우에만 기존 Reader S1 잠금·Grant 버전 검사를 실행합니다. 한쪽만 있거나 형식이 불량하면 DB 조회 전 거부하고, 묶음 증거가 누락·불일치하면 Reader 잠금 실행 전 HOLD합니다. `exactSignedCancellationBoundToEvent`는 읽기 전용 검토 결과일 뿐 권한이 아닙니다.
+- **보존:** 기존 무서명 사설 검사 호출과 격리 테스트는 유지하되 서명 증명으로 표시하지 않습니다. 실제 Entitlement Effect·Reader T2 commit·환불 API·운영 DB/라우트·판매 활성화는 변경하지 않았습니다. 공급자 semantic NEWER/STALE 및 법정 최종 환불 권한은 여전히 미증명. 최신 CI 통과 전 PASS 미선언입니다.
