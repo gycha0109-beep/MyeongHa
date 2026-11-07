@@ -592,3 +592,9 @@ Watchtower-Track: security
 - **별도 비용 연결:** 운영 Supabase에 `myeongha_seyeon_g5_commerce_login`은 없으며, Cloudflare Hyperdrive 총 5개 구성 중 G5 Commerce 전용 구성도 없다. 비밀번호/사용자 원본/개인정보는 조회하지 않았다.
 - **구현 수정:** G4 정산 마운트가 참인 상태에서 G5 Commerce Pool 생성 자체가 실패하더라도, 기존 Subject DB의 정확한 256-bit receipt ACK는 진행하도록 변경했다. 수신 확인이 성공하고 정산이 불가능하면 503과 `SEYEON_CREDIT_RECEIPT_SETTLEMENT_UNAVAILABLE`을 반환해 과금 정산 성공으로 오인하지 않는다. G5의 기존 수신 건 복구 후보를 재사용한다. 증명 오류는 원래 거부를 그대로 반환한다.
 - **검증/운영:** Commerce 연결 생성 실패·무효 proof·정상 정산 분기 회귀 테스트 추가. 해당 HEAD의 CI 결과 전 PASS 미선언. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. 운영 DB/Role/ACL/Secret/Provider/배포/트래픽 변경 없음. G0~G6 완료 아님.
+
+### 2026-11-07 / W127 — S0 G0 기술 계약 초안의 정확한 제품 범위 정리
+
+- **기존 구현 재사용:** 광범위한 과거 S2용 G0 후보 문서에 현재 [S0 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md) 전용 계약 후보를 덧붙였다. 원본 `conversation_recall/v1` Memory 1건 + 현재 DB User 메시지 1건 + 최초 비스트리밍 답변 1회를 D1~D5(원본/재동의, Commit/Reveal, 제외 출처, 철회 ACK, receipt/과금 재시도)로 대조했다. 기존 S0 HTTP receipt 계약 및 기존 구현을 그대로 재사용하며 History/Replay/Reader/다중 기억/Streaming 등은 `OUT_OF_SCOPE + FAIL_CLOSED`로 유지한다.
+- **기술·운영 결정 분리:** G0 S0 계약은 제안일 뿐 사용자 기술 승인으로 처리하지 않는다. 본 문서와 PR은 운영 DB DDL/DML/GRANT/Role/Secret, Source Registry 활성화, Provider, 배포·트래픽 승인이 아니다. 2026-11-07 읽기 전용 운영 대조에서 결합 Pin 함수 2개/최근 원본 메시지 Pin 컬럼이 미설치이며 G5 Commerce LOGIN 부재와 Source Registry 비활성을 이미 확인했다. 해당 설치·권한 조치는 승인 전 진행하지 않는다.
+- **검증 경계:** 이전 PR #3097 HEAD 전체 Integration 및 병합 후 main CI 통과를 기존 증거로 재사용한다. 이 W127 변경은 문서·작업 기록만 수정하며 새 보안 기능/CI 워크플로/운영 변경은 없다. G0~G6 최종 PASS 0/7, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지.
