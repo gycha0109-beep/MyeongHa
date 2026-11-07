@@ -41,6 +41,7 @@ async function startIsolatedPg18() {
   const dir=await mkdtemp(join(tmpdir(),'myeongha-ops-phase11-product-'));
   const log=join(dir,'postmaster.log');
   let started=false;
+  let serverRunning=false;
   let admin;
   let login;
   try {
@@ -48,10 +49,10 @@ async function startIsolatedPg18() {
       '--auth-host=trust','--auth-local=trust','--encoding=UTF8',
       '--no-sync','--no-instructions']);
     const port=await ephemeralPort();
+    const serverOptions='-h 127.0.0.1 -p '+port+' -c listen_addresses=127.0.0.1'+
+      (process.platform==='win32'?'':' -c unix_socket_directories='+dir);
     try {
-      await pgTool('pg_ctl',['-D',dir,'-l',log,'-o',
-        '-h 127.0.0.1 -p '+port+' -c listen_addresses=127.0.0.1'+
-        (process.platform==='win32'?'':' -c unix_socket_directories='+dir),
+      await pgTool('pg_ctl',['-D',dir,'-l',log,'-o',serverOptions,
         '-w','-t','20','start']);
     } catch(e) {
       const lines=(await readFile(log,'utf8').catch(()=>'')).split(/\r?\n/u)
@@ -62,6 +63,7 @@ async function startIsolatedPg18() {
       throw e;
     }
     started=true;
+    serverRunning=true;
     const base={
       host:'127.0.0.1',port,database:'postgres',ssl:false,
       max:2,connectionTimeoutMillis:125,statement_timeout:1000,
@@ -69,6 +71,10 @@ async function startIsolatedPg18() {
     };
     admin=new Pool({...base,user:'myeongha_ops_phase11_admin'});
     login=new Pool({...base,user:'myeongha_ops_phase11_login'});
+    // Planned loopback PG shutdown closes idle sockets; assert failures via HTTP,
+    // not by crashing Node on an otherwise unhandled pg Pool error event.
+    admin.on('error',()=>undefined);
+    login.on('error',()=>undefined);
     await admin.query(FIXTURE_SQL);
     const role=await login.query('SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user');
     expect(role.rows[0]).toMatchObject({rolsuper:false,rolbypassrls:false});
@@ -77,6 +83,18 @@ async function startIsolatedPg18() {
     return {
       pool:login,
       port,
+      async stopForOutage(){
+        if (!serverRunning) throw Error('Isolated database is already stopped');
+        await pgTool('pg_ctl',['-D',dir,'-m','fast','-w','-t','20','stop']);
+        serverRunning=false;
+      },
+      async restartAfterOutage(){
+        if (serverRunning) throw Error('Isolated database is already running');
+        await pgTool('pg_ctl',['-D',dir,'-l',log,'-o',serverOptions,
+          '-w','-t','20','start']);
+        serverRunning=true;
+        await admin.query('SELECT 1');
+      },
       // Real disposable GoTrue UUIDs are generated at test runtime and are never written to proofs.
       async bindRealMembers(members) {
         if (!Array.isArray(members) || members.length !== 4 ||
@@ -121,8 +139,14 @@ $member_context$;`);
       },
       async close(){
         const pools = await Promise.allSettled([login.end(), admin.end()]);
-        await pgTool('pg_ctl',['-D',dir,'-m','immediate','-w','-t','20','stop']);
-        await rm(dir,{recursive:true,force:true});
+        try {
+          if (serverRunning) {
+            await pgTool('pg_ctl',['-D',dir,'-m','immediate','-w','-t','20','stop']);
+            serverRunning=false;
+          }
+        } finally {
+          await rm(dir,{recursive:true,force:true});
+        }
         if (pools.some(pool => pool.status === 'rejected')) throw Error('Isolated database pool cleanup failed');
       },
     };
@@ -578,7 +602,8 @@ const sustainedExperiment = overlapExperiment || process.env.MH_OPS_REAL_PRODUCT
 const cpuExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'saju_cpu';
 const constrainedSajuExperiment = sustainedExperiment || cpuExperiment;
 const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap';
-const workerdExperiment = workerdOverlapExperiment ||
+const workerdDbFailoverExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_db_failover';
+const workerdExperiment = workerdOverlapExperiment || workerdDbFailoverExperiment ||
   process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
@@ -659,23 +684,56 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         await denied.arrayBuffer();
         await health.arrayBuffer();
 
-        phase='workerd_saju_outage';
-        const sajuPort=Number(new URL(saju.origin).port);
-        await saju.close();
-        saju=undefined;
-        const calculationStatus=await requestCalculation(worker.origin,tokens[0],tokens);
-        expect(calculationStatus).toBe(503);
-        const outageHealth=await fetch(worker.origin+'/health',{
-          redirect:'error',signal:AbortSignal.timeout(3000),
-        });
-        const healthStatus=outageHealth.status;
-        await outageHealth.arrayBuffer();
-        expect(healthStatus).toBe(200);
-
-        phase='workerd_saju_recovery';
-        saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT,sajuPort);
-        const recovery=await measuredBatch(worker.origin,4,4,tokens);
-        expect(recovery).toMatchObject({requested:4,successful:4,unavailable:0,unexpected:0});
+        let sajuOutage,dbOutage;
+        if (workerdDbFailoverExperiment) {
+          // Exercise the real disposable PostgreSQL 18 process rather than
+          // injecting a fake Node gateway failure; keep GoTrue and Saju up.
+          phase='workerd_db_outage';
+          await database.stopForOutage();
+          const failed=await measuredBatch(worker.origin,4,4,tokens);
+          expect(failed).toMatchObject({requested:4,successful:0,unavailable:4,unexpected:0});
+          phase='workerd_db_health';
+          const healthDuringDbOutage=await fetch(worker.origin+'/health',{
+            redirect:'error',signal:AbortSignal.timeout(3000),
+          });
+          const healthStatus=healthDuringDbOutage.status;
+          await healthDuringDbOutage.arrayBuffer();
+          expect(healthStatus).toBe(200);
+          phase='workerd_db_recovery';
+          await database.restartAfterOutage();
+          let recovery;
+          let attempts=0;
+          // Local pool reconnection may take longer than PG startup; prove
+          // bounded restoration, not instantaneous recovery or Hosted pooling.
+          for (;attempts<8;attempts++){
+            recovery=await measuredBatch(worker.origin,4,4,tokens);
+            if(recovery.successful===4)break;
+            await new Promise(resolve=>setTimeout(resolve,250));
+          }
+          expect(recovery).toMatchObject({requested:4,successful:4,unavailable:0,unexpected:0});
+          dbOutage={requested:failed.requested,unavailable:failed.unavailable,
+            unexpected:failed.unexpected,healthStatus,recovery,
+            recoveryAttempts:attempts+1,realPostgresProcessStopped:true,
+            localPoolOnlyNoHostedHyperdrive:true};
+        } else {
+          phase='workerd_saju_outage';
+          const sajuPort=Number(new URL(saju.origin).port);
+          await saju.close();
+          saju=undefined;
+          const calculationStatus=await requestCalculation(worker.origin,tokens[0],tokens);
+          expect(calculationStatus).toBe(503);
+          const outageHealth=await fetch(worker.origin+'/health',{
+            redirect:'error',signal:AbortSignal.timeout(3000),
+          });
+          const healthStatus=outageHealth.status;
+          await outageHealth.arrayBuffer();
+          expect(healthStatus).toBe(200);
+          phase='workerd_saju_recovery';
+          saju=await launchActualSajuHost(process.env.MH_OPS_REAL_SAJU_CHECKOUT,sajuPort);
+          const recovery=await measuredBatch(worker.origin,4,4,tokens);
+          expect(recovery).toMatchObject({requested:4,successful:4,unavailable:0,unexpected:0});
+          sajuOutage={calculationStatus,healthStatus,recovery};
+        }
         phase='runtime_cleanup';
         await worker.close();
         servers.pop();
@@ -692,7 +750,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           memberCount:4, baseline, ...(workerdWindow && {workerdWindow}),
           actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
           actualPinnedSajuProductionEngine:true, localWorkerdProductPathMeasured:true,
-          sajuOutage:{calculationStatus,healthStatus,recovery},
+          ...(sajuOutage && {sajuOutage}),...(dbOutage && {dbOutage}),
           anonymousDenied:true, healthUnaffected:true, runtimeCleanupVerified:true,
           productionWorkerAdmissionMeasured:false, hostedHyperdriveMeasured:false,
           productionCapacityProven:false, productionScalingThresholdApproved:false,
