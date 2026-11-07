@@ -319,7 +319,8 @@ try {
   assert(await client.evaluate('document.querySelector("[data-reading-stage]")?.hidden === false'),
     'Admitted Preview was not displayed after guest Birth');
 
-  console.log('MYEONGHA_GENERAL_NATAL_AND_GUEST_JOURNEY_PREVIEW_BROWSER_PASS');
+  console.log('MYEONGHA_GUEST_BIRTH_TO_CAREER_PREVIEW_BROWSER_PASS');
+  console.log('MYEONGHA_GENERAL_NATAL_PREVIEW_BROWSER_PASS');
 } catch (error) {
   console.error(error);
   if (chromeLog.trim()) console.error(chromeLog.slice(-1200));
