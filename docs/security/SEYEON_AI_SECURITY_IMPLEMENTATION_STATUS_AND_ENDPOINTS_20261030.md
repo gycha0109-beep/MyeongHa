@@ -584,3 +584,11 @@ Watchtower-Track: security
 - **실제 변경:** 첫 Memory Fetch 조립에서 기존 `approvedPersonalRecordModelUse`가 철회 HTTP의 `approvedWithdrawalWriteAdmission`으로 자동 전달되던 연결을 제거했다. 모델 사용을 허가해도 개인정보 철회 DB 쓰기가 자동 승인되지 않는다. 서버 전용 `approvedWithdrawalWriteAdmission`을 별도로 명시한 경우에만 기존 G0 철회 핸들러로 전달한다. 별도 Cloudflare 철회/receipt 경로의 정책·모델 비의존성을 유지한다.
 - **검증:** 모델 승인만 있는 경우 철회 DB 쓰기 승인이 전달되지 않고, 독립적인 철회 승인만 명시했을 때 전달되는 회귀 테스트를 추가했다. 현재 커밋의 정확한 CI는 실행 결과 확인 전 PASS 아님.
 - **미완료:** 실제 운영 Source Registry 활성화 및 Pin 증거, 철회 DB 권한·선형화, G5 Commerce LOGIN/Hyperdrive, 일반 고객 비용 예약·정산, G2/G3 실전송 ACK 및 G6 제한 운영. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. 운영 DB/Role/ACL/Secret/Provider/배포·트래픽 변경 없음.
+
+
+### 2026-11-07 / W126 — 운영 역할 현황 실측 및 G3 수신 확인의 G5 장애 독립성
+
+- **현재 인프라 읽기 전용 결과:** 명하 Supabase PostgreSQL 17의 `conversation_recall/v1` Source Registry 1행은 `enabled=false,writable_enabled=false`; 기존 S0 긍정 G1은 계속 HOLD. 실제 `cmd_mark_seyeon_positive_context_ready_pinned_v1`, `cmd_commit_seyeon_positive_chat_turn_v1`, `cmd_issue_seyeon_positive_first_reply_v1`, `seyeon_private.cmd_ack_seyeon_positive_reply_v1`, `seyeon_private.cmd_request_seyeon_memory_revoke_v1`는 설치돼 있고 `myeongha_api_executor` 실행 권한이 존재함을 카탈로그에서 확인했다. `anon/authenticated/service_role`은 해당 함수 직접 EXECUTE가 없다. 이 사실만으로 실제 인증 Member 철회/송출 PASS를 선언하지 않는다.
+- **별도 비용 연결:** 운영 Supabase에 `myeongha_seyeon_g5_commerce_login`은 없으며, Cloudflare Hyperdrive 총 5개 구성 중 G5 Commerce 전용 구성도 없다. 비밀번호/사용자 원본/개인정보는 조회하지 않았다.
+- **구현 수정:** G4 정산 마운트가 참인 상태에서 G5 Commerce Pool 생성 자체가 실패하더라도, 기존 Subject DB의 정확한 256-bit receipt ACK는 진행하도록 변경했다. 수신 확인이 성공하고 정산이 불가능하면 503과 `SEYEON_CREDIT_RECEIPT_SETTLEMENT_UNAVAILABLE`을 반환해 과금 정산 성공으로 오인하지 않는다. G5의 기존 수신 건 복구 후보를 재사용한다. 증명 오류는 원래 거부를 그대로 반환한다.
+- **검증/운영:** Commerce 연결 생성 실패·무효 proof·정상 정산 분기 회귀 테스트 추가. 해당 HEAD의 CI 결과 전 PASS 미선언. `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지. 운영 DB/Role/ACL/Secret/Provider/배포/트래픽 변경 없음. G0~G6 완료 아님.

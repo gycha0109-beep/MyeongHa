@@ -94,22 +94,34 @@ export function createCloudflareSeyeonIssuedReplyReceiptRuntimeV1(input){
   if(!approvedCloudflarePostgresTargetV1(config,input.env)){
     throw Error('Cloudflare requires explicitly verified receipt DB origin');
   }
-  // The G4 bridge is selected only by the server-owned mount state. When
-  // enabled, the dedicated Commerce binding is mandatory and separately
-  // preflighted; receipt-only privacy behavior remains independent otherwise.
+  // A Commerce outage must not prevent an already-issued 256-bit receipt from
+  // being ACKed by the original Subject authority. Successful *settlement*
+  // still requires the dedicated, separately preflighted Commerce LOGIN.
   const creditSettlementEnabled=input.creditSettlementEnabled===true;
-  const privateCreditPool=creditSettlementEnabled
-    ?createCloudflareSeyeonG5PrivateCommercePoolV1(input.env,limits)
-    :undefined;
   const pool=createCloudflareSeyeonReceiptWithdrawalSubjectPoolV1(input.env,limits);
+  let privateCreditPool;
+  if(creditSettlementEnabled){
+    try{privateCreditPool=createCloudflareSeyeonG5PrivateCommercePoolV1(input.env,limits);}
+    catch{/* Keep the original receipt ACK available; do not claim credit settlement. */}
+  }
   return Object.freeze({
-    handleRequest(request){
+    async handleRequest(request){
       const requestId=crypto.randomUUID();
-      return creditSettlementEnabled
-        ?handleSeyeonPositiveReceiptAndCreditCandidateV1({
-          request,pool,privateCreditPool,requestId,
-        })
-        :handleSeyeonPositiveReplyReceiptV1({request,pool,requestId});
+      if(!creditSettlementEnabled){
+        return handleSeyeonPositiveReplyReceiptV1({request,pool,requestId});
+      }
+      if(privateCreditPool===undefined){
+        // ACK the exact original proof first. The existing G5 received-credit
+        // recovery can settle its durable reservation once Commerce returns.
+        const receipt=await handleSeyeonPositiveReplyReceiptV1({request,pool,requestId});
+        if(!receipt.ok)return receipt;
+        return Response.json({ok:false,
+          error:{code:'SEYEON_CREDIT_RECEIPT_SETTLEMENT_UNAVAILABLE',retryable:true}},
+          {status:503,headers:{'Cache-Control':'no-store'}});
+      }
+      return handleSeyeonPositiveReceiptAndCreditCandidateV1({
+        request,receiptPool:pool,privateCreditPool,requestId,
+      });
     },
     async close(){
       try{await pool.close();}finally{await privateCreditPool?.close();}
