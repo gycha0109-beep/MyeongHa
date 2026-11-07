@@ -63,6 +63,7 @@ type Options=Readonly<{
   cancelRows?:readonly unknown[];
   visibility?:boolean;
   readOnly?:boolean;
+  roleName?:string|null;
   queryFailure?:'claim'|'purchase'|'notice'|'s7'|'cancel'|'begin'|'rollback';
   releaseFailure?:boolean;
 }>;
@@ -83,6 +84,7 @@ function fixture(options:Options={}) {
       return {rows:[] as T[]};
     if(sql.includes('pg_catalog.pg_roles'))return {rows:[{
       fullVisibility:options.visibility!==false,readOnly:options.readOnly!==false,
+      currentUser:options.roleName===undefined?'postgres':options.roleName,
     } as T]};
     if(sql.includes('from public.digital_reading_withdrawal_claims_private_v1 c')){
       if(options.queryFailure==='claim')throw Error('claim SQL down');
@@ -483,6 +485,23 @@ describe('recorded customer withdrawal Claim -> exact original payment/notice pr
       code:'RECORDED_READING_WITHDRAWAL_PRIVATE_REVIEW_UNAVAILABLE',
     });
     expect(f.statements).toHaveLength(3);
+    expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
+  });
+
+
+  it.each([
+    'anon','authenticated','service_role','myeongha_api_executor',
+    'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+    null,' postgres ',
+  ])('rejects privileged-looking but non-operator current_user %s before Claim SQL',async roleName=>{
+    const f=fixture({roleName});
+    await expect(run(f)).rejects.toMatchObject({
+      code:'RECORDED_READING_WITHDRAWAL_PRIVATE_REVIEW_UNAVAILABLE',
+    });
+    expect(f.statements).toHaveLength(3);
+    expect(f.statements.map(x=>x.sql).some(
+      sql=>sql.includes('from public.digital_reading_withdrawal_claims_private_v1'),
+    )).toBe(false);
     expect(f.statements.at(-1)?.sql).toBe('ROLLBACK');
   });
 

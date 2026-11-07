@@ -911,3 +911,14 @@
 - **테스트/검증:** GitHub CI 실패의 expected/received 차이와 fixture의 빈 S7 반환 조건을 원문 대조했습니다. 수정한 신규 커밋의 GitHub Vitest/PG17/전체 CI **검증 결과는 아직 미확정이므로 PASS 미선언**입니다.
 - **완료/미완료:** 테스트 fixture 모순 및 WORKLOG 정리 완료. Provider 순서·최종성 검증, 실제 Reader T2 권한 회수, 서버 독립 제공 증거, 복원 후 privacy replay 및 구매→취소→삭제 격리 E2E는 여전히 미완료입니다.
 - **블로커/다음:** 새 CI 결과가 해당 수정의 필수 검증이며, 실패하면 수정 후 승인 로드맵 작업을 이어갑니다. 실제 PG 취소/환불 POST·운영 DB·공개 LIVE 활성화 미실행, 추가 승인 요청 없음.
+
+### 2026-11-08 — 청약철회 내부 증거 검토에서 일반 실행 계정 차단
+
+- **작업 목표·로드맵:** 결제 트랙 승인 실행 로드맵 `docs/operations/COMMERCE_PAYMENT_TRACK_STATUS_IMPLEMENTATION_ENDPOINTS_20261030.md` §6-3·5, 기존 고객 접수의 private 운영 증거 검토 권한을 코드에 정의된 `ownerOperationsOnly`에 맞게 제한합니다. 새 공개 API/운영 권한은 추가하지 않습니다.
+- **기준:** `feat/commerce/saju-record-scoped-capability-v1-20261107` / [PR #3090](https://github.com/gycha0109-beep/MyeongHa/pull/3090), 작업 전 HEAD `df27c217ded8c4ee31096285dfc05d8ec377f61f`, 당시 PR open/auto_merge on. [이전 CI #42389216314](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42389216314)의 Commerce 실패 1건은 앞선 `df27c217`에서 fixture를 보정했고 신규 CI 검증 중입니다.
+- **발견:** `apps/api/src/commerce-recorded-reader-withdrawal-private-review-v1.ts`는 `rolsuper || rolbypassrls`와 읽기 전용 트랜잭션만 검사하며 `current_user`를 제한하지 않았습니다. 일부 일반 실행 권한 역할이 RLS 우회 속성으로 운영 내부의 개인 청약철회·결제 원본 증거 조회에 접근할 수 있는 경계 불일치입니다.
+- **변경 파일:** `apps/api/src/commerce-recorded-reader-withdrawal-private-review-v1.ts`, `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`, `docs/operations/COMMERCE_PAYMENT_WORKLOG.md`.
+- **구현:** 기존 PostgreSQL 권한 검사 SELECT에 `current_user`를 포함하고, anon/authenticated/service_role/일반 API·worker·commerce internal executor 및 비정상 이름은 원본 Claim SELECT **전에** 거부합니다. 기존 내부 완전 가시성·읽기 전용 운영자 세션 경로를 유지하고 트랜잭션을 ROLLBACK합니다. 공개 경로, DB ACL, 기존 사용자의 원본 기록·환불·권한 효과는 변경하지 않습니다.
+- **검증:** `test/commerce-recorded-reader-withdrawal-private-review-v1.test.ts`에 차단 대상 역할과 null·공백 역할의 no-Claim-READ, ROLLBACK 회귀를 추가했습니다. 신규 HEAD의 전체 CI/PG17 테스트는 **미확인, PASS 미선언**입니다.
+- **완료/미완료:** 이번 owner-only 운영자 접근 제약 코드·회귀·WORKLOG 반영 완료. Provider NEWER/STALE, Reader T2 원자적 회수, 독립 소비자 제공 완료, 복원 후 privacy replay 및 전체 격리 E2E는 미완료입니다.
+- **다음·블로커:** 새 CI 결과를 확인해 실패 시 수정, 통과 시 승인 로드맵 중 미완료 기능 계속 구현. 운영 DB 배포·실제 PortOne POST·고객 LIVE 판매 미실행, 사용자 승인 요청 없음.

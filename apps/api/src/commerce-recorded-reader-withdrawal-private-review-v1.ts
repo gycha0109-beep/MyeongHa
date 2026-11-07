@@ -49,7 +49,8 @@ const REASONS = new Set([
 const ROLE_SQL = `
 select
  (rolsuper or rolbypassrls) as "fullVisibility",
- current_setting('transaction_read_only')='on' as "readOnly"
+ current_setting('transaction_read_only')='on' as "readOnly",
+ current_user as "currentUser"
 from pg_catalog.pg_roles
 where rolname=current_user
 `;
@@ -70,6 +71,12 @@ where c.id=$1::uuid
 limit 2
 `;
 const CLAIM_CONTRACT = 'digital-reading-withdrawal-claim-v1' as const;
+// Privileged operations may inspect exact Claim/Receipt data; regular
+// application, worker, and service-role sessions must not use this path.
+const UNSAFE_REVIEW_ROLES = new Set([
+  'anon','authenticated','service_role','myeongha_api_executor',
+  'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+]);
 
 type ClaimRow = Readonly<{
   claimId:unknown;
@@ -223,10 +230,15 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     await connection.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     began = true;
 
-    const roles = await connection.query<{fullVisibility:unknown;readOnly:unknown}>(ROLE_SQL);
+    const roles = await connection.query<{
+      fullVisibility:unknown;readOnly:unknown;currentUser:unknown;
+    }>(ROLE_SQL);
     if (roles.rows.length !== 1 ||
         roles.rows[0]?.fullVisibility !== true ||
-        roles.rows[0]?.readOnly !== true) return failure();
+        roles.rows[0]?.readOnly !== true ||
+        typeof roles.rows[0]?.currentUser !== 'string' ||
+        roles.rows[0].currentUser.trim() !== roles.rows[0].currentUser ||
+        UNSAFE_REVIEW_ROLES.has(roles.rows[0].currentUser)) return failure();
 
     const result = await connection.query<ClaimRow>(CLAIM_SQL,[input.claimId]);
     if (result.rows.length === 0) return null;
