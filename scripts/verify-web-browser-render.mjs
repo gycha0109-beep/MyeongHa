@@ -611,6 +611,43 @@ try {
   await verifySharedHeaderGeometry(client, origin,
     ['/hall.html','/reading.html','/chat-hub.html','/my.html'], 86);
 
+  // Stage 5 mobile readability: the narrowest supported viewport must not
+  // squeeze the brand beneath utilities or clip the six bottom-nav entries.
+  await client.send('Emulation.setDeviceMetricsOverride', { width: 320, height: 740, deviceScaleFactor: 1, mobile: true });
+  for (const pathname of ['/hall.html','/reading.html','/chat-hub.html','/records.html','/my.html']) {
+    await navigate(client, origin, pathname, '.product-header');
+    const narrow = await client.evaluate(`(() => {
+      const box = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+      const header = box('.product-header-inner');
+      const brand = box('.product-brand');
+      const utilities = box('.product-utilities');
+      const bottom = box('.mobile-bottom-nav');
+      const pendingCopy = document.querySelector('.chat-pending-copy');
+      return {
+        width: innerWidth,
+        overflow: document.documentElement.scrollWidth - innerWidth,
+        headerLeft: header?.left ?? -1,
+        headerRight: header?.right ?? -1,
+        brandRight: brand?.right ?? -1,
+        utilitiesLeft: utilities?.left ?? -1,
+        utilitiesRight: utilities?.right ?? -1,
+        bottomVisible: Boolean(bottom && bottom.height > 0),
+        bottomItems: document.querySelectorAll('.mobile-bottom-nav .mobile-nav-link').length,
+        pendingCopySize: pendingCopy ? parseFloat(getComputedStyle(pendingCopy).fontSize) : null,
+      };
+    })()`);
+    assert(narrow.width === 320 && narrow.headerLeft >= 0 && narrow.headerRight <= 321,
+      `Narrow mobile header must fit viewport on ${pathname}: ${JSON.stringify(narrow)}`);
+    assert(narrow.brandRight <= narrow.utilitiesLeft + 1 && narrow.utilitiesRight <= 321,
+      `Narrow mobile brand/utilities overlap on ${pathname}: ${JSON.stringify(narrow)}`);
+    assert(narrow.bottomVisible && narrow.bottomItems === 6 && narrow.overflow <= 2,
+      `Narrow mobile reading/navigation overflow on ${pathname}: ${JSON.stringify(narrow)}`);
+    if (pathname === '/chat-hub.html') {
+      assert(narrow.pendingCopySize !== null && narrow.pendingCopySize >= 14,
+        `Narrow mobile Chat continuation notice is too small: ${JSON.stringify(narrow)}`);
+    }
+  }
+
   await client.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   await navigate(client, origin, '/reading-detail.html?scope=year', '.reading-route-state');
   await waitForVisible(client, '.reading-route-state');
