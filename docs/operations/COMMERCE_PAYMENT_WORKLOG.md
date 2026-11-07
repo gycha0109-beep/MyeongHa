@@ -797,3 +797,9 @@
 
 - **실패 근거:** [PR #3090 Work Track CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42368338149/job/128391169640)에서 새 취소 검증의 두 테스트가 실패했습니다. 부분취소 성공 응답에 실제로는 `Transaction.Cancelled` 알림을 사용했고, ID 누락 테스트는 기존 signed webhook parser가 DB/GET 전에 `authentication_rejected`를 반환했습니다.
 - **수정:** 부분취소 사례는 정확히 `Transaction.PartialCancelled` 서명 알림으로 변경하고, 식별자 누락 사례는 먼저 실행되는 기존 서명/형식 검증의 거부 응답을 요구하도록 수정합니다. 취소 ID·성공 상태·정확한 금액을 필수로 대조하는 신규 검증 로직, 다른 Reader 격리 및 운영 실행 HOLD는 그대로 유지합니다. 새 HEAD 통합 CI 통과 전 PASS 미선언입니다.
+
+
+### 2026-11-07 — 실DB TypeScript 인증 주체 정합화
+
+- **실패:** [PR #3090 DB authority CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42368338149/job/128391169635)는 `official_reader_first_thread_typescript_postgres.sh`의 Member 소유 Purchase/Reader 데이터는 정상 생성했지만, 그에 대응하는 TypeScript 테스트가 Guest promotion 시절의 인증 ID `c1990000-...`를 계속 사용하여 `AUTH_REQUIRED`로 실패했습니다.
+- **수정:** `test/postgres-official-reading-reader-first-thread-db.test.ts`의 verified auth fixture를 동 테스트 DB에서 실제 Member와 결속된 `11380000-...`로 변경했습니다. 실제 회원 검증은 유지하고, Reader 정책 보류·Bundle 불일치·처음 생성/재진입·Grant 회수 테스트를 완화하지 않습니다. 운영 서비스·결제·환불/고객 노출은 변경하지 않습니다. 최신 CI 통과 전 완료 미확정입니다.
