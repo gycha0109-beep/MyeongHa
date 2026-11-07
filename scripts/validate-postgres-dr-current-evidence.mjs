@@ -76,7 +76,7 @@ function hasDatedRepositoryVersionWitness(evidence, frontier, historicalDate) {
     || currentVersions.length === 0) return false;
 
   if (currentVersions.some(id => typeof id !== 'string' ||
-    !/^[1-9][0-9]*$/u.test(id) || !Number.isSafeInteger(Number(id)))) return false;
+    !/^[0-9]+$/u.test(id) || Number(id) <= 0 || !Number.isSafeInteger(Number(id)))) return false;
   const current = [...currentVersions].sort();
   if (new Set(current).size !== current.length
     || JSON.stringify(current) !== JSON.stringify(manifest.versionIds)
