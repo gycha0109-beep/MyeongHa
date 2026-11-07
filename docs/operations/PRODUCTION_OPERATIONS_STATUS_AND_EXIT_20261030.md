@@ -1,3 +1,13 @@
+### 2026-11-07 KST — PostgreSQL DR Readiness 본선 GREEN 실증 및 기존 RED 종료 (후속 작업 단위)
+
+- **작업 위치·로드맵:** `ops` / [종료 집중 로드맵](PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md) Phase 8의 이미 진행 중이던 DR 증거 정합성/CI 수용 검증. 신규 기능 또는 로드맵 단계를 만들지 않음.
+- **원래 실패:** [main DR Readiness #42375717817 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717817), SHA `61736e57979d886559451d15a853292fb3bf586e`, `repository migration advance is not covered by the dated observation`으로 RED. 정확한 원인과 수동 검증은 바로 아래 기존 작업 기록에 보존.
+- **변경 파일·확정 커밋:** [PR #3108](https://github.com/gycha0109-beep/MyeongHa/pull/3108) **MERGED**, head `af0ddb374da85c13decd627c62293aabf4a93284`, squash main `79c34ecb30a0c21946db97bf373027cfa207bb33`. 변경 파일: `docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md`, `scripts/verify-postgres-dr-current-evidence.mjs`, `scripts/verify-postgres-dr-readiness-authority.mjs`, `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md` (실패 원인·근거 기록). 신규 작업은 해당 기능 코드를 다시 수정하지 않고 이 WORKLOG에 후속 본선 결과를 추가 기록함.
+- **테스트·필수 CI:** Node 24 + Git Bash LF checkout의 현재 증거 회귀 테스트 및 `GITHUB_EVENT_NAME=push` 운영 권위 검증 **PASS** (아래 구현 단위 기록 참조). [PR #3108 필수 통합 CI #42377169885](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42377169885) **SUCCESS**; `CI Integration Verify`, DB 의존성, Governance 및 일반 PR 검증 PASS.
+- **병합 후 main 재실행:** [PostgreSQL DR Readiness #42377738967 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42377738967) **SUCCESS** (main `79c34ecb30a0c21946db97bf373027cfa207bb33`). `verify-postgres-dr-readiness-authority` 작업 및 `Verify PostgreSQL DR readiness authority` 단계 SUCCESS. 실행 로그가 정확한 백업 `42309503582`→격리 복원 `42375717923`→원격 마이그레이션 `20261105075227`, 로컬 파일 최신 `20261029185500`을 대조하고 `PostgreSQL DR authority guard PASS (serving BLOCKED)`를 출력함. 종전 RED 원인 제거가 **실제 main CI에서 검증됨**.
+- **미완료:** DR readiness 자체는 `dr_ready=false`, `serviceResumptionAllowed=false`. 전체 Hosted Auth/Storage 동등 복구·미배포 migration/ACL 정합화·독립 개인정보 삭제/철회 연속성·전체 서비스 RPO/RTO는 P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)의 기존 차단 사항. 테스트 GREEN을 운영 재개 승인으로 해석하지 않음. Production DB·권한·고객 데이터·Canary·유료 Hosted 자원 미변경.
+- **다음 기존 작업:** Phase 8의 미확인 출처/복구·연속성 근거를 기존 로드맵 순서와 승인 경계에 따라 별도 단위로 보완. 이번 단위의 DR CI 재실행·대조는 완료됐으므로 추가 같은 검사 반복 금지.
+
 ### 2026-11-07 — PostgreSQL DR Readiness RED 원인 수정 및 최신 복원 증거 갱신
 
 - **실패 실증:** [PostgreSQL DR Readiness #42375717817 Attempt 1](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717817), main `61736e57979d886559451d15a853292fb3bf586e`에서 `repository migration advance is not covered by the dated observation` 발생. 원인은 이전 `2026-10-29` 복원 증거(`repository_latest_migration_file_version=20261029012000`)가 현재 저장소 파일 최댓값 `20261029185500`을 포괄하지 못한 것. DB 장애나 어드민 UI 테스트 실패라고 단정하지 않음.
