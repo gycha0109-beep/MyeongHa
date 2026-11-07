@@ -27,6 +27,15 @@ describe('product-wide identity and clarity', () => {
     expect(css).toContain('font-size: 0 !important;');
     expect(css).toContain('mobile-nav-link[href="my.html"] { --mh-nav-icon: url("assets/myeongha-icons/my.png")');
   });
+  it('routes Chat customer support to the existing governed inquiry form', async () => {
+    const hub = await read('chat-hub.html');
+    const contact = await read('contact.html');
+    expect(hub).toContain('<a href="contact.html">고객지원</a>');
+    expect(hub).not.toContain('<a href="#">고객지원</a>');
+    expect(contact).toContain('id="contact-form"');
+    expect(contact).toContain('src="/contact.js"');
+  });
+
   it('applies legible copy rules to Home, Saju, Chat, Records, My and Face', async () => {
     const css = await read('product-clarity.css');
     for (const selector of ['.mhx-topic-copy small','.saju-design-source-note','.chat-recent-time','.records-lead','.my-account-meta','.face-reader-copy p']) expect(css).toContain(selector);
