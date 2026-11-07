@@ -8,6 +8,7 @@ import {
 } from '../../../packages/domain/src/character-saju-sp2-evaluation.js';
 import type {
   CharacterSajuConsultationShadowPortV1,
+  CharacterSajuConsultationPrivateComparisonV1,
 } from './character-saju-consultation-shadow-v1.js';
 
 export const OPENAI_SAJU_CONSULTATION_SHADOW_PROVIDER_VERSION_V1 =
@@ -49,6 +50,8 @@ export interface OpenAiSajuConsultationShadowConfigV1 {
   readonly beforeDispatch: (metadata: OpenAiSajuConsultationShadowDispatchV1) => Promise<void>;
   /** Required: record costs/outcome under Reader Saju, not Seyeon chat. */
   readonly afterOutcome: (receipt: OpenAiSajuConsultationShadowOutcomeV1) => Promise<void>;
+  /** Internal evidence only. Storage and Reader ACL must be enforced by caller. */
+  readonly recordPrivateComparison?: (evidence: CharacterSajuConsultationPrivateComparisonV1) => Promise<void>;
 }
 
 const EMPTY_USAGE = Object.freeze({
@@ -255,6 +258,8 @@ export function createOpenAiSajuConsultationShadowPortV1(
 
   return Object.freeze({
     evaluatorVersion: OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
+    ...(config.recordPrivateComparison === undefined
+      ? {} : { recordPrivateComparison: config.recordPrivateComparison }),
     generate(requestInput: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) {
       return request({
         purpose: 'consultation_generate',
