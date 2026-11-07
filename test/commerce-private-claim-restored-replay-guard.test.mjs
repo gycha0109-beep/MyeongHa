@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyRestoredPrivateClaimDeletionV1,
   verifyRestoredPrivateClaimRowConservationV1,
+  verifyRestoredPrivateClaimUnrelatedFingerprintV1,
 } from '../scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const restore=readFileSync(new URL(
@@ -148,6 +149,65 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
       expect(()=>verifyRestoredPrivateClaimRowConservationV1({
         relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,
       })).toThrow('RESTORED_PRIVATE_CLAIM_ROW_CONSERVATION_INVALID');
+    },
+  );
+
+  it('fingerprints full unrelated rows before/after exact target finalization, not only counts',()=>{
+    expect(restore).toContain('private_claim_target_subjects_json="$(jq -cer');
+    expect(restore).toContain('-v claim_target_subjects_json="$private_claim_target_subjects_json"');
+    expect(restore).toContain('pg_catalog.to_jsonb(claim_row)::text');
+    expect(restore).toContain('pg_catalog.sha256(');
+    expect(restore).toContain("from pg_catalog.jsonb_array_elements_text(");
+    expect(restore).toContain("where target.subject_id::uuid=claim_row.subject_id");
+    expect(restore).toContain('order by 1;');
+    expect(restore).toContain("| sha256sum | awk '{print $1}'");
+    expect(restore).toContain('private_claim_unrelated_fingerprint_before="$(private_claim_unrelated_fingerprint)"');
+    expect(restore).toContain('private_claim_unrelated_fingerprint_after="$(private_claim_unrelated_fingerprint)"');
+    expect(restore).toContain('verifyRestoredPrivateClaimUnrelatedFingerprintV1({');
+    expect(restore).toContain('...privateClaimFingerprintEvidence,');
+    expect(restore).toContain('DENY: unrelated private withdrawal Claim rows changed');
+    expect(restore.indexOf('private_claim_unrelated_fingerprint_before="$(private_claim_unrelated_fingerprint)"'))
+      .toBeLessThan(restore.indexOf('finalizer="$('));
+    expect(restore.indexOf('private_claim_unrelated_fingerprint_after="$(private_claim_unrelated_fingerprint)"'))
+      .toBeGreaterThan(restore.indexOf('done < <(jq -r'));
+    expect(restore).not.toContain('select subject_id from public.digital_reading_withdrawal_claims_private_v1');
+  });
+
+  it.each([
+    ['unrelated Claims unchanged','present','5',['2','0'],2,'a'.repeat(64),'a'.repeat(64),
+      'sha256-full-row-multiset-consistent'],
+    ['no unrelated Claim rows','present','2',['1','1'],2,'b'.repeat(64),'b'.repeat(64),
+      'no-unrelated-claim-row-to-witness'],
+    ['old backup without the table','absent',null,[],1,null,null,
+      'schema-absent-not-checked'],
+  ])('classifies %s with a privacy-safe receipt, no digest output',
+    (_name,relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+      beforeFingerprint,afterFingerprint,guard)=>{
+      expect(verifyRestoredPrivateClaimUnrelatedFingerprintV1({
+        relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+        beforeFingerprint,afterFingerprint,
+      })).toEqual({private_withdrawal_claim_unrelated_row_fingerprint_guard:guard});
+    },
+  );
+
+  it.each([
+    ['unrelated row content changed','present','5',['2'],1,'a'.repeat(64),'b'.repeat(64)],
+    ['unrelated row ID changed','present','5',['2'],1,'a'.repeat(64),'c'.repeat(64)],
+    ['missing before fingerprint','present','5',['2'],1,null,'a'.repeat(64)],
+    ['empty final fingerprint','present','5',['2'],1,'a'.repeat(64),''],
+    ['malformed fingerprint','present','5',['2'],1,'a'.repeat(63),'a'.repeat(63)],
+    ['unrelated counts impossible','present','1',['2'],1,'a'.repeat(64),'a'.repeat(64)],
+    ['missing deletion-target count','present','5',[],1,'a'.repeat(64),'a'.repeat(64)],
+    ['old schema fabricates digests','absent',null,[],1,'a'.repeat(64),'a'.repeat(64)],
+    ['unrecognized schema','unknown',null,[],1,null,null],
+    ['unsafe count','present','5',['2'],0,'a'.repeat(64),'a'.repeat(64)],
+  ])('rejects %s before isolated restore success receipt',
+    (_name,relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+      beforeFingerprint,afterFingerprint)=>{
+      expect(()=>verifyRestoredPrivateClaimUnrelatedFingerprintV1({
+        relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+        beforeFingerprint,afterFingerprint,
+      })).toThrow('RESTORED_PRIVATE_CLAIM_UNRELATED_FINGERPRINT_INVALID');
     },
   );
   it('reuses existing PG17 deletion/other-Subject/restore-residue assertions',()=>{

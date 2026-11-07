@@ -192,8 +192,46 @@ private_claim_verified_subjects=0
 private_claim_preexisting_subjects=0
 private_claim_total_before=''
 private_claim_total_after=''
+private_claim_unrelated_fingerprint_before=''
+private_claim_unrelated_fingerprint_after=''
 private_claim_count_file="$tmp_dir/private-claim-target-counts"
 : > "$private_claim_count_file"
+
+# The source-authoritative, already verified replay manifest identifies all
+# deletion targets.  Use it ONLY as a parameter to an isolated PG read; never
+# interpolate raw target strings into SQL or print the list in public evidence.
+private_claim_target_subjects_json="$(jq -cer '
+  [.events[] | select(.type == "ACCOUNT_DELETION_STARTED") | .subjectId]
+  | if length >= 1 and all(.[];
+      type == "string" and
+      test("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+    ) then . else error("invalid private Claim target Subject selector") end
+' "$manifest")"
+
+# Streams only SHA-256 row fingerprints (not identifiers or row payloads)
+# to sha256sum. The SQL canonicalizes a WHOLE unrelated row, sorts all
+# fingerprints, and preserves duplicate multiplicity. Never persist either
+# digest or contents in the public replay receipt.
+private_claim_unrelated_fingerprint() {
+  "${psql_base[@]}" -Atq \
+    -v claim_target_subjects_json="$private_claim_target_subjects_json" <<'SQL' \
+    | sha256sum | awk '{print $1}'
+select pg_catalog.encode(
+  pg_catalog.sha256(
+    pg_catalog.convert_to(pg_catalog.to_jsonb(claim_row)::text, 'UTF8')
+  ), 'hex'
+)
+from public.digital_reading_withdrawal_claims_private_v1 claim_row
+where not exists (
+  select 1
+  from pg_catalog.jsonb_array_elements_text(
+    :'claim_target_subjects_json'::jsonb
+  ) as target(subject_id)
+  where target.subject_id::uuid=claim_row.subject_id
+)
+order by 1;
+SQL
+}
 if [[ "$restored_claim_relation" == "present" ]]; then
   # Isolated restore only: a single aggregate count, no other Subject rows
   # or identifiers returned. Compare it to exact target deletion counts later.
@@ -201,6 +239,9 @@ if [[ "$restored_claim_relation" == "present" ]]; then
     select count(*) from public.digital_reading_withdrawal_claims_private_v1;
   ")"
   [[ "$private_claim_total_before" =~ ^(0|[1-9][0-9]*)$ ]]
+  # Capture unrelated complete-row multiset BEFORE any target finalizer.
+  private_claim_unrelated_fingerprint_before="$(private_claim_unrelated_fingerprint)"
+  [[ "$private_claim_unrelated_fingerprint_before" =~ ^[0-9a-f]{64}$ ]]
 fi
 
 account_deletion_count=0
@@ -371,6 +412,12 @@ if [[ "$restored_claim_relation" == "present" ]]; then
     select count(*) from public.digital_reading_withdrawal_claims_private_v1;
   ")"
   [[ "$private_claim_total_after" =~ ^(0|[1-9][0-9]*)$ ]]
+  private_claim_unrelated_fingerprint_after="$(private_claim_unrelated_fingerprint)"
+  [[ "$private_claim_unrelated_fingerprint_after" =~ ^[0-9a-f]{64}$ ]]
+  if [[ "$private_claim_unrelated_fingerprint_before" != "$private_claim_unrelated_fingerprint_after" ]]; then
+    echo 'DENY: unrelated private withdrawal Claim rows changed during restored finalization' >&2
+    exit 1
+  fi
 else
   [[ "$private_claim_verified_subjects" -eq 0 ]]
   [[ "$private_claim_preexisting_subjects" -eq 0 ]]
@@ -389,11 +436,14 @@ node - \
   "$private_claim_preexisting_subjects" \
   "$private_claim_total_before" \
   "$private_claim_total_after" \
-  "$private_claim_count_file" <<'NODE'
+  "$private_claim_count_file" \
+  "$private_claim_unrelated_fingerprint_before" \
+  "$private_claim_unrelated_fingerprint_after" <<'NODE'
 import { readFile, writeFile } from 'node:fs/promises';
 import {
   classifyRestoredPrivateClaimDeletionV1,
   verifyRestoredPrivateClaimRowConservationV1,
+  verifyRestoredPrivateClaimUnrelatedFingerprintV1,
 } from './scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const report = JSON.parse(await readFile(process.argv[2], 'utf8'));
@@ -419,6 +469,15 @@ const privateClaimRowEvidence = verifyRestoredPrivateClaimRowConservationV1({
   targetBeforeCounts,
   accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED,
 });
+const privateClaimFingerprintEvidence =
+  verifyRestoredPrivateClaimUnrelatedFingerprintV1({
+    relation: restoredClaimRelation,
+    totalBefore: restoredClaimRelation === 'present' ? process.argv[11] : null,
+    targetBeforeCounts,
+    accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED,
+    beforeFingerprint: restoredClaimRelation === 'present' ? process.argv[14] : null,
+    afterFingerprint: restoredClaimRelation === 'present' ? process.argv[15] : null,
+  });
 
 const evidence = {
   schema_version: 'myeongha-postgres-restored-db-authoritative-privacy-reconciliation-v1',
@@ -439,6 +498,7 @@ const evidence = {
   commerce_p5y_retention_guard: 'pass',
   ...privateClaimEvidence,
   ...privateClaimRowEvidence,
+  ...privateClaimFingerprintEvidence,
   replay_event_count: report.eventCount,
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',

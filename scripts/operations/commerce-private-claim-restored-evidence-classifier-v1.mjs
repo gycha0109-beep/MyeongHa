@@ -63,3 +63,50 @@ export function verifyRestoredPrivateClaimRowConservationV1({
       'aggregate-conservation-pass-not-row-identity-proof',
   });
 }
+
+/**
+ * Compares an order-independent SHA-256 fingerprint of EVERY unrelated
+ * private Claim's canonical full-row JSON as observed inside the isolated
+ * restored PostgreSQL.  Each row is hashed in SQL, sorted by its digest, then
+ * the stream is hashed again; no raw row/identifier/digest is published.
+ * This closes the count-only gap: an unchanged count alone cannot detect a
+ * rewritten unrelated customer Claim. It remains a cryptographic witness,
+ * not independent evidence of backup provenance or a statutory disposition.
+ */
+export function verifyRestoredPrivateClaimUnrelatedFingerprintV1({
+  relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+  beforeFingerprint,afterFingerprint,
+}) {
+  const invalid=()=>{
+    throw Error('RESTORED_PRIVATE_CLAIM_UNRELATED_FINGERPRINT_INVALID');
+  };
+  const numeric=value=>{
+    if(typeof value!=='string'||!/^(0|[1-9][0-9]*)$/u.test(value))
+      invalid();
+    return BigInt(value);
+  };
+  if(!Number.isSafeInteger(accountDeletionCount)||accountDeletionCount<1||
+     !Array.isArray(targetBeforeCounts))invalid();
+  if(relation==='absent'){
+    if(totalBefore!==null||targetBeforeCounts.length!==0||
+       beforeFingerprint!==null||afterFingerprint!==null)invalid();
+    return Object.freeze({
+      private_withdrawal_claim_unrelated_row_fingerprint_guard:
+        'schema-absent-not-checked',
+    });
+  }
+  if(relation!=='present'||targetBeforeCounts.length!==accountDeletionCount||
+     typeof beforeFingerprint!=='string'||
+     typeof afterFingerprint!=='string'||
+     !/^[0-9a-f]{64}$/u.test(beforeFingerprint)||
+     !/^[0-9a-f]{64}$/u.test(afterFingerprint)||
+     beforeFingerprint!==afterFingerprint)invalid();
+  const before=numeric(totalBefore);
+  const targets=targetBeforeCounts.reduce((sum,count)=>sum+numeric(count),0n);
+  if(targets>before)invalid();
+  return Object.freeze({
+    private_withdrawal_claim_unrelated_row_fingerprint_guard:
+      before===targets ? 'no-unrelated-claim-row-to-witness'
+        :'sha256-full-row-multiset-consistent',
+  });
+}
