@@ -185,6 +185,68 @@ describe('Character Working Memory retrieval v1', () => {
     expect(result.trace.callbackFallbackUsed).toBe(true);
   });
 
+  it('abstains when a specific multi-session recall has no matching topic', () => {
+    const result = retrieveCharacterWorkingMemoryV1({
+      projection: buildProjection({
+        queryText: '지난번 쌀국수 약속 기억나요?',
+        includeLifeFact: false,
+        includeSecondMemory: true,
+      }),
+      expectedScope: {
+        subjectId: 'subject-a',
+        characterId: 'seyeon',
+        threadId: 'thread-a',
+      },
+      now: '2026-11-07T00:00:00.000Z',
+      limit: 5,
+    });
+
+    expect(result.trace.explicitCallbackRequested).toBe(true);
+    expect(result.trace.callbackFallbackUsed).toBe(false);
+    expect(result.records).toEqual([]);
+  });
+
+  it('selects the older relevant session over a newer unrelated one', () => {
+    const result = retrieveCharacterWorkingMemoryV1({
+      projection: buildProjection({
+        queryText: '퇴사 고민',
+        includeLifeFact: false,
+        includeSecondMemory: true,
+      }),
+      expectedScope: {
+        subjectId: 'subject-a',
+        characterId: 'seyeon',
+        threadId: 'thread-a',
+      },
+      now: '2026-11-07T00:00:00.000Z',
+      limit: 1,
+    });
+
+    expect(result.records.map((item) => item.record.recordId)).toEqual(['memory-a']);
+    expect(result.trace.matchedCandidateCount).toBe(1);
+  });
+
+  it('limits generic recall to the latest episode when its budget is one record', () => {
+    const result = retrieveCharacterWorkingMemoryV1({
+      projection: buildProjection({
+        queryText: '지난번에 얘기했던 거 기억나요?',
+        includeLifeFact: false,
+        includeSecondMemory: true,
+      }),
+      expectedScope: {
+        subjectId: 'subject-a',
+        characterId: 'seyeon',
+        threadId: 'thread-a',
+      },
+      now: '2026-11-07T00:00:00.000Z',
+      limit: 1,
+    });
+
+    expect(result.records.map((item) => item.record.recordId)).toEqual(['memory-new']);
+    expect(result.trace.matchedCandidateCount).toBe(2);
+    expect(result.trace.selectedSourceRefs).toHaveLength(1);
+  });
+
   it('does not retrieve memories without lexical support', () => {
     const result = retrieveCharacterWorkingMemoryV1({
       projection: buildProjection({ queryText: '고양이', includeLifeFact: false }),

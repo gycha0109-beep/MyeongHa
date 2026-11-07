@@ -293,6 +293,59 @@ BEGIN
   END;
 END $$;
 
+-- Independent Life Fact denial matrix: an ungranted successor must suppress
+-- the previously granted fact; then revoking its grant must exclude it too.
+RESET ROLE;
+INSERT INTO public.life_facts(
+  id,subject_id,fact_type,schema_version,value_jsonb,valid_from,valid_to,
+  source_kind,source_message_id,source_merge_action_id,supersedes_fact_id,
+  confirmed_at,revoked_at,created_at
+) VALUES
+  ('a7350000-0000-4000-8000-000000000002','a7200000-0000-4000-8000-000000000001',
+   'hobby','life-fact-v1','{"value":"painting"}'::jsonb,
+   null,null,'user_explicit',null,null,null,clock_timestamp(),null,clock_timestamp()),
+  ('a7350000-0000-4000-8000-000000000003','a7200000-0000-4000-8000-000000000001',
+   'hobby','life-fact-v1','{"value":"ceramics"}'::jsonb,
+   null,null,'profile_edit',null,null,'a7350000-0000-4000-8000-000000000002',
+   clock_timestamp(),null,clock_timestamp());
+INSERT INTO public.record_access_grants(
+  id,subject_id,life_fact_id,memory_item_id,grantee_character_id,
+  grant_reason,granted_at,revoked_at
+) VALUES
+  ('a7450000-0000-4000-8000-000000000002','a7200000-0000-4000-8000-000000000001',
+   'a7350000-0000-4000-8000-000000000002',null,'security-reader-a',
+   'user_choice',clock_timestamp(),null);
+SET LOCAL ROLE myeongha_api_executor;
+DO $$
+DECLARE
+  v_count bigint;
+BEGIN
+  SELECT count(*) INTO v_count
+  FROM public.qry_reader_context_granted_life_facts_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid, 'security-reader-a'
+  );
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'Superseded Life Fact must not be returned despite its active grant';
+  END IF;
+END $$;
+
+RESET ROLE;
+UPDATE public.record_access_grants SET revoked_at=clock_timestamp()
+WHERE id='a7450000-0000-4000-8000-000000000001'::uuid;
+SET LOCAL ROLE myeongha_api_executor;
+DO $$
+DECLARE
+  v_count bigint;
+BEGIN
+  SELECT count(*) INTO v_count
+  FROM public.qry_reader_context_granted_life_facts_v2(
+    'a7200000-0000-4000-8000-000000000001'::uuid, 'security-reader-a'
+  );
+  IF v_count <> 0 THEN
+    RAISE EXCEPTION 'Life Fact with revoked grant or ungranted successor was returned';
+  END IF;
+END $$;
+
 -- Simulate an authorized revocation committed to the same transaction's DB
 -- state between reads; this proves fresh SELECT denial, not invalidation
 -- of content already materialized by a separate model request.
