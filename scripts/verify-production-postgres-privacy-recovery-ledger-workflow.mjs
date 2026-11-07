@@ -15,6 +15,7 @@ const paths = {
   coverage: 'scripts/validate-postgres-privacy-recovery-ledger-coverage.mjs',
   snapshotOverlap: 'scripts/validate-postgres-privacy-ledger-snapshot-overlap.mjs',
   previousSnapshotHelper: 'scripts/operations/verify-previous-privacy-ledger-snapshot-overlap.sh',
+  predecessorSelection: 'scripts/operations/select-previous-privacy-ledger-artifact.mjs',
   decisions: 'docs/P0_DECISION_REGISTER.md',
   authority: 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_AUTHORITY_V1.md',
   historicalCandidate: 'docs/operations/POSTGRES_PRIVACY_RECOVERY_LEDGER_CANDIDATE_V1.md',
@@ -25,7 +26,7 @@ const entries = await Promise.all(
   Object.entries(paths).map(async ([key, path]) => [key, await readFile(path, 'utf8')]),
 );
 const files = Object.fromEntries(entries);
-const contract = [files.workflow, files.runner, files.strictTlsHelper, files.previousSnapshotHelper].join('\n');
+const contract = [files.workflow, files.runner, files.strictTlsHelper, files.previousSnapshotHelper, files.predecessorSelection].join('\n');
 
 function requireFragment(key, fragment) {
   if (!files[key].includes(fragment)) {
@@ -78,6 +79,8 @@ for (const fragment of [
   'retention-days: 30',
   'authoritative only for the exact governed backup cutoff through captured-at window',
   'Resolve prior governed privacy ledger artifact',
+  'select-previous-privacy-ledger-artifact.mjs',
+  'attempts/$previous_attempt/jobs?per_page=100',
   'Download previous encrypted privacy ledger',
   'verify-previous-privacy-ledger-snapshot-overlap.sh',
   'PREVIOUS_LEDGER_ARTIFACT_DIR',
@@ -90,23 +93,14 @@ for (const fragment of [
   }
 }
 
-// A successfully rerun ledger workflow can retain an artifact from each
-// attempt. Only the single artifact from the latest successful attempt may
-// become the predecessor, never a guessed/latest-name selection across attempts.
 for (const fragment of [
-  'previous_run_json="$(jq -c',
-  'previous_attempt="$(jq -er',
-  'previous_attempt_started_at="$(jq -er',
-  'previous_attempt_finished_at="$(jq -er',
-  '--arg start "$previous_attempt_started_at"',
-  '--arg finish "$previous_attempt_finished_at"',
-  '--argjson run_id "$previous_run_id"',
-  '.workflow_run.id == $run_id',
-  '.created_at >= $start',
-  '.created_at <= $finish',
-  'if [[ "$(jq ' + "'length'" + ' <<<"$previous_artifacts")" != 1 ]]; then',
+  'job?.run_attempt === run.run_attempt',
+  "step?.name === UPLOAD_STEP",
+  'timestamp(artifact.created_at) >= startedAt',
+  'timestamp(artifact.created_at) <= endedAt',
+  'if (candidates.length !== 1) fail();',
 ]) {
-  requireFragment('workflow', fragment);
+  requireFragment('predecessorSelection', fragment);
 }
 
 if (files.workflow.includes('.name == "Production PostgreSQL Logical Backup"')) {
