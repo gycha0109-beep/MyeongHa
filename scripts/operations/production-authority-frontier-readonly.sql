@@ -275,6 +275,39 @@ SELECT pg_catalog.jsonb_build_object(
   'tables',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(t) ORDER BY t.table_name),'[]'::jsonb) FROM table_inventory t),
   'effectiveTablePrivileges',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(p) ORDER BY p.role_name,p.table_name),'[]'::jsonb) FROM effective_table_privileges p WHERE cardinality(p.effective_privileges)>0),
   'functions',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(f) ORDER BY f.schema_name,f.function_name,f.identity_arguments),'[]'::jsonb) FROM function_inventory f),
+  'positiveMemoryAndAiCostBoundary',pg_catalog.jsonb_build_object(
+    'activeModelPolicies',(SELECT coalesce(pg_catalog.jsonb_agg(
+      pg_catalog.jsonb_build_object('provider',p.provider_key,'model',p.model_key,
+        'policyVersion',p.policy_version,'active',p.is_active)
+      ORDER BY p.provider_key,p.model_key),'[]'::jsonb)
+      FROM public.seyeon_ai_governor_model_policies_v1 p),
+    'dailyBudgetWindow',(SELECT pg_catalog.jsonb_build_object(
+      'rowCount',count(*),'earliest',min(b.bucket_utc_date),'latest',max(b.bucket_utc_date),
+      'currentUtcDayCount',count(*) FILTER (
+        WHERE b.bucket_utc_date=(clock_timestamp() AT TIME ZONE 'UTC')::date))
+      FROM public.seyeon_ai_governor_daily_budgets_v1 b),
+    'costLedgerSummary',(SELECT pg_catalog.jsonb_build_object(
+      'total',count(*),'settled',count(*) FILTER (WHERE e.lifecycle_state='settled'),
+      'unsettled',count(*) FILTER (WHERE e.lifecycle_state<>'settled'),
+      'ownerDailyLimitExemptCount',count(*) FILTER (WHERE e.governor_owner_no_daily_limit),
+      'unknownUsageCount',count(*) FILTER (WHERE e.cost_status='usage_unknown'),
+      'earliestEventAt',min(e.created_at),'latestEventAt',max(e.created_at),
+      'effectiveMicroUsd',sum(coalesce(e.governor_effective_micro_usd,0)))
+      FROM public.seyeon_ai_call_cost_events e),
+    'proposalCounts',(SELECT pg_catalog.jsonb_build_object(
+      'total',count(*),'pending',count(*) FILTER (WHERE p.status='pending'))
+      FROM public.memory_proposals p),
+    'unrevokedMemoryItems',(SELECT count(*) FROM public.memory_items i WHERE i.revoked_at IS NULL),
+    'positiveCommitApiExecute',pg_catalog.has_function_privilege(
+      'myeongha_api_executor',
+      'public.cmd_commit_seyeon_positive_chat_turn_v1(uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text)','EXECUTE'),
+    'proposalAcceptApiExecute',pg_catalog.has_function_privilege(
+      'myeongha_api_executor',
+      'public.cmd_accept_seyeon_private_conversation_recall_proposal_v1(uuid,uuid,uuid)','EXECUTE'),
+    'legacyCommitServiceExecute',pg_catalog.has_function_privilege(
+      'service_role',
+      'public.cmd_commit_chat_turn_legacy_v1(uuid,uuid,uuid,uuid,uuid,uuid,jsonb,jsonb,jsonb)','EXECUTE')
+  ),
   'positiveSourceRegistry',(SELECT coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(r) ORDER BY r.record_kind,r.record_type),'[]'::jsonb) FROM registry_inventory r)
 )::text;
 
