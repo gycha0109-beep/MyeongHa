@@ -12,6 +12,7 @@ import {
   type PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 import { createSeyeonPositiveS0OwnerDbPortsV1 } from '../apps/api/src/postgres-seyeon-positive-memory-source-runtime-v1.js';
+import { pinSeyeonG1CombinedModelSourcesV1 } from '../apps/api/src/seyeon-g1-positive-combined-source-port-v1.js';
 import { createSeyeonFirstPositiveMemoryLockedReadV1 } from '../apps/api/src/seyeon-first-positive-memory-node-delivery-v1.js';
 import { revokeSeyeonOriginalMemoryGrantAndAckV1 } from '../apps/api/src/seyeon-original-grant-revoke-ack-v1.js';
 import { acceptSeyeonPrivateConversationRecallProposalV1 } from '../apps/api/src/postgres-seyeon-private-memory-proposal-accept-v1.js';
@@ -84,6 +85,11 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       grant usage on schema seyeon_private to myeongha_api_executor;
       grant execute on function seyeon_private.pin_model_recent_sources_v1(
         uuid,uuid,uuid,uuid,uuid,jsonb,text) to myeongha_api_executor;
+      -- Disposable fixture ONLY: exercise the default-denied public owner
+      -- entrypoint under the exact Member executor without exposing private Pin.
+      grant execute on function public.cmd_pin_seyeon_positive_model_context_sources_v1(
+        uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)
+        to myeongha_api_executor;
       grant execute on function public.cmd_commit_seyeon_positive_chat_turn_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,uuid,uuid,jsonb,text,text,text) to myeongha_api_executor;
       grant execute on function public.qry_seyeon_positive_first_memory_locked_reveal_v3(
@@ -100,7 +106,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
   });
   afterAll(async () => { await ordinaryPool?.end();await pool?.end(); });
 
-  async function prepare(n: number, virtual?: { summary: string }, withRecentPin: boolean | 'invalid' = true) {
+  async function prepare(n: number, virtual?: { summary: string }, withRecentPin: boolean | 'invalid' | 'combined' = true) {
     const auth = uuid(10, n), subject = uuid(11, n), thread = uuid(14, n);
     const turn = uuid(16, n), attempt = uuid(17, n), user = uuid(18, n);
     const assistant = uuid(19, n), memory = uuid(24, n), grant = uuid(25, n);
@@ -162,7 +168,7 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       expect(source.grantId).toBe(grant);
     }
     const selectionDigest = hash([source]), contextDigest = hash(modelContext ?? { synthetic: turn });
-    if (withRecentPin) {
+    if (withRecentPin && withRecentPin !== 'combined') {
       const recentMessage = { messageId: user, role: 'user' as const, text: userText };
       await run(({ client }) => client.query(`
         select seyeon_private.pin_model_recent_sources_v1(
@@ -176,14 +182,31 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
           unpinnedRecentSources:[],unpinnedDerivedSources:[],
         })]));
     }
-    await run(({ client }) => createSeyeonPositiveS0OwnerDbPortsV1(client).pinBeforeModel({
+    const pinInput = {
       subjectId: subject, threadId: thread, turnId: turn, attemptId: attempt,
       originalMemoryId: memory, originalGrantId: grant, recordType: source.recordType,
       schemaVersion: source.schemaVersion, projectorVersion: source.projectorVersion,
       selectedSources: [source], selectedSourcesDigest: selectionDigest,
       projectedMemoryDigest: source.projectedMemoryDigest,
       finalModelContextDigest: contextDigest, expectedOriginalPgDigest: source.rawRecordPgDigest,
-    }));
+    };
+    if (withRecentPin === 'combined') {
+      if (modelContext === undefined) throw Error('Combined G1 requires an actual projected Memory.');
+      const recentMessage = { messageId: user, role: 'user' as const, text: userText };
+      const selection = selectSeyeonExactModelPersonalSourcesV1({
+        retrievedMemories: modelContext.retrievedMemories,
+        sourceCandidates: modelContext.personalRecordProjectionCandidates ?? [],
+        maxRetrievedMemories: 1, requiredPersonalRecordCount: 1,
+        recentMessages: [recentMessage], currentUserMessageId: user,
+      });
+      const proof = await run(({ client }) => pinSeyeonG1CombinedModelSourcesV1(client, {
+        ...pinInput, currentUserMessageId: user, recentMessages: [recentMessage], selection,
+      }));
+      expect(proof.recordId).toBe(memory);
+      expect(proof.originalGrantId).toBe(grant);
+    } else {
+      await run(({ client }) => createSeyeonPositiveS0OwnerDbPortsV1(client).pinBeforeModel(pinInput));
+    }
     let assistantText = 'DB_LOCKED_ZERO_SOURCE_SYNTHETIC_OK';
     if (modelContext !== undefined) {
       // Explicit local synthetic model: no provider, credential, or paid call.
@@ -266,6 +289,32 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       await new Promise<void>(resolve => server.close(() => resolve()));
     }
   }
+
+  it('executes the combined owner call under the real Member role, pins both sources, then commits and reveals once', async () => {
+    const f = await prepare(36, { summary: '합성으로 승인된 첫 개인 기억' }, 'combined');
+    const { rows: [stored] } = await pool.query(`select state,
+      seyeon_recent_source_pin_jsonb as recent,
+      seyeon_personal_source_pin_jsonb as personal
+      from public.chat_turn_attempts where id=$1`, [f.attempt]);
+    expect(stored.state).toBe('validated');
+    expect(stored.recent.sources).toHaveLength(1);
+    expect(stored.recent.sources[0]).toMatchObject({messageId:f.user,role:'user'});
+    expect(stored.personal.positiveProof).toMatchObject({
+      recordId:f.memory,originalGrantId:f.grant,
+    });
+    const committed = await f.commit();
+    expect(committed.replayed).toBe(false);
+    const response = await f.locked()({
+      signal: new AbortController().signal,
+      deliver: async text => { expect(text).toContain('합성으로 승인된 첫 개인 기억'); },
+    });
+    expect(response).toBeDefined();
+    const {rows:[acl]}=await pool.query(`select
+      not has_function_privilege('myeongha_api_executor',
+        'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)','EXECUTE')
+        as private_denied`);
+    expect(acl.private_denied).toBe(true);
+  });
 
   it('denies G2 Commit for a legacy Memory-only Pin with no current User certificate', async () => {
     const f=await prepare(15,undefined,false);
