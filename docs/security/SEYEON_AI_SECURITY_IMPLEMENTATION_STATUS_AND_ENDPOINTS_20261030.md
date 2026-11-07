@@ -598,3 +598,23 @@ Watchtower-Track: security
 - **기존 구현 재사용:** 광범위한 과거 S2용 G0 후보 문서에 현재 [S0 실행 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md) 전용 계약 후보를 덧붙였다. 원본 `conversation_recall/v1` Memory 1건 + 현재 DB User 메시지 1건 + 최초 비스트리밍 답변 1회를 D1~D5(원본/재동의, Commit/Reveal, 제외 출처, 철회 ACK, receipt/과금 재시도)로 대조했다. 기존 S0 HTTP receipt 계약 및 기존 구현을 그대로 재사용하며 History/Replay/Reader/다중 기억/Streaming 등은 `OUT_OF_SCOPE + FAIL_CLOSED`로 유지한다.
 - **기술·운영 결정 분리:** G0 S0 계약은 제안일 뿐 사용자 기술 승인으로 처리하지 않는다. 본 문서와 PR은 운영 DB DDL/DML/GRANT/Role/Secret, Source Registry 활성화, Provider, 배포·트래픽 승인이 아니다. 2026-11-07 읽기 전용 운영 대조에서 결합 Pin 함수 2개/최근 원본 메시지 Pin 컬럼이 미설치이며 G5 Commerce LOGIN 부재와 Source Registry 비활성을 이미 확인했다. 해당 설치·권한 조치는 승인 전 진행하지 않는다.
 - **검증 경계:** 이전 PR #3097 HEAD 전체 Integration 및 병합 후 main CI 통과를 기존 증거로 재사용한다. 이 W127 변경은 문서·작업 기록만 수정하며 새 보안 기능/CI 워크플로/운영 변경은 없다. G0~G6 최종 PASS 0/7, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false`, `HOLD_FORWARD_STOPPED` 유지.
+
+### 2026-11-07 / W128 — S0 설치 안내서와 현재 운영 기준 정합화
+
+- **목표:** 로드맵 v3 단계 0/1의 설치 준비 자료에서 과거 Node 최초 답변·빈 Source Registry·Positive 실행권한 부재라고 읽히는 낡은 서술을 제거하고 현재 운영 증거와 일치시키기.
+- **변경 파일:** `scripts/operations/seyeon-security-s0/README.md` (S0 Cloudflare Worker 최초 비스트리밍 경로, Registry 비활성 1건, G1 결합 Pin 미설치·G4 Commerce 계정 부재, 기존 16→17 설치 순서 및 운영 승인 경계); 이 WORKLOG. 애플리케이션 코드·SQL·CI workflow 변경 0.
+- **완료:** 최신 `main`의 런타임/정책 파일·G1 설치 목록 및 읽기 전용 명하 PostgreSQL 카탈로그와 안내문 대조. 기존 S0의 `OUT_OF_SCOPE + FAIL_CLOSED`, `HOLD_FORWARD_STOPPED` 불변. 운영 DB 원본 내용/Grant/비밀번호 접근 없음.
+- **미완료:** G0 D1~D5의 사용자 기술 승인, G1 운영 결합 Pin 적용·증명, G4 Commerce LOGIN/Hyperdrive, G2/G3 Worker·receipt·철회 경합, G5/G6 실환경 증거. 최종 Gate PASS 0/7.
+- **브랜치·커밋·PR:** `docs/security/s0-operations-guide-sync-20261107`, 기준 main `dba6f436e90e9a83c27137fa218ab5115d048cf4`; README+WORKLOG 최초 동시 커밋 `80e644aaf334c699015c7c1fa310976d0d1c7f40`; [PR #3104](https://github.com/gycha0109-beep/MyeongHa/pull/3104). PR 최종 HEAD `22efb8e297c3e897123766d43b9b69ecf768bbc5`는 CI/전체 Integration PASS 후 `0814d79f5c9a534e1fd731ec9dffb7efcde8da94`로 병합 완료(아래 W129 증거 참조).
+- **테스트·CI 근거:** 내용 근거는 `scripts/operations/seyeon-security-s0/plan.mjs`, `cloudflare/myeongha-worker.mjs`, `apps/api/src/seyeon-security-s0-production-policy-v1.ts`, 운영 PostgreSQL read-only catalog; 선행 [PR #3102 전체 Integration](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42370395077), [병합 후 main CI](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42370851017) SUCCESS. PR #3104 해당 HEAD [CI #42374190383](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42374190383), [전체 Integration #42374245792](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42374245792), 병합 후 [main CI #42375162788](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375162788) 모두 SUCCESS.
+- **블로커·다음 작업:** G0 기술 계약과 운영 DDL/ACL/Source 전환은 사용자 범위별 승인 필수. 승인 전 운영 변경 금지. PR CI 완료를 확인하고, 승인 시 로드맵 G1 실제 원본 Pin 연결부터 재개.
+
+### 2026-11-07 / W129 — W128 PR 병합·검증 증거 확정 및 승인 경계 재확인
+
+- **목표:** W128의 'CI 미확인'을 실제 완료 결과로 교정하고 다음 로드맵 작업의 선행조건을 정확히 구분한다. 기존 코드·SQL 또는 운영 환경을 임의 재실행하지 않는다.
+- **변경 파일:** 기존 트랙 워크로그 `docs/security/SEYEON_AI_SECURITY_IMPLEMENTATION_STATUS_AND_ENDPOINTS_20261030.md` (W128 HEAD/CI 증거 보완 및 W129 후속 기록). 신규 WORKLOG·기능·SQL·CI workflow 추가 없음.
+- **완료:** W128 [PR #3104](https://github.com/gycha0109-beep/MyeongHa/pull/3104)의 HEAD `22efb8e297c3e897123766d43b9b69ecf768bbc5`, 병합 SHA `0814d79f5c9a534e1fd731ec9dffb7efcde8da94` 및 정확한 HEAD 검증 확정. 최신 main `61736e57979d886559451d15a853292fb3bf586e`의 이후 변경은 별도 ops/DR PR #3095이며 security G0~G6 PASS 증가 근거가 아니다.
+- **미완료:** G0 D1~D5 사용자 기술 계약 확정, G1 운영 combined Pin 설치·실효 권한·원본 사용 검증, G4 고객 크레딧/Commerce 전용 LOGIN/Hyperdrive, G2/G3 송출·철회 증거, G5/G6 운영 검증. 종료 게이트 0/7 `HOLD_FORWARD_STOPPED` 유지.
+- **브랜치·커밋·PR:** `docs/security/w128-evidence-closure-20261107` / 기준 main `61736e57979d886559451d15a853292fb3bf586e`; 초기 기록 커밋 `9b3c6a5ecf19629a54fe2716b5c7df234f028085`; [PR #3106](https://github.com/gycha0109-beep/MyeongHa/pull/3106). 최종 HEAD CI·병합 결과는 증거 확인 전 미판정.
+- **테스트·CI 근거:** 이전 W128 PR [일반 CI #42374190383](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42374190383) SUCCESS, [전체 Integration #42374245792](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42374245792) SUCCESS (PostgreSQL 17, DB authority, commerce 포함), 병합 후 [main CI #42375162788](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375162788) SUCCESS. Production [workflow #42375162390](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375162390)는 SUCCESS이나 migration/deploy 단계는 SKIPPED. 현재 증거는 문서 및 격리 검증이며 실제 S0 운영 PASS 아님.
+- **블로커·다음 작업:** G0 기술 결정과 별도 운영 DB DDL/Role/ACL/Source 변경은 사용자 승인 필요. 승인 없이 G1 SQL 설치·Source ON·Provider/과금/배포를 하지 않는다. 범위별 승인 뒤 기존 `16→17` G1 결합 Pin을 대상 DB에서 검증하고 G4→G2→G3→G5→G6 순으로 진행한다.

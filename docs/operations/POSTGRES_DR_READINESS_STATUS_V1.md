@@ -1,8 +1,108 @@
+## 2026-11-07 current isolated restore proof
+
+The newest governed encrypted Production backup [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582)
+(artifact `13548176984`, source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`)
+was restored on **disposable isolated PostgreSQL 17.6** by the successful
+[one-shot restore #42375717923](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375717923)
+(main SHA `61736e57979d886559451d15a853292fb3bf586e`).
+The restore uploaded artifact `13575965386` with GitHub Actions ZIP
+SHA-256 `a474462113eeb780f30f7bb996d7a400ac81fa6538657199cfd891ac3ab504b9`.
+Its sanitized restore evidence confirmed source backup run `42309503582`,
+backup migration frontier `20261105075227`, 241 source catalog versions and
+catalog fingerprint `b1076fcf360f3f12c1e3fcdadb34adec87e2f8c02b7592915bb6298db2e98600`.
+A separate **read-only** Production migration query on 2026-11-07 returned
+241 applied versions and the same highest version `20261105075227`.
+The repository's latest numeric migration **file** version is `20261029185500`;
+this is intentionally distinct from the remote-applied frontier and does
+**not** imply source/ACL equivalence.
+
+## 2026-11-07 verified restore status (latest observation)
+
+```yaml
+verified_isolated_restore_run_id: 42375717923
+verified_isolated_restore_result: SUCCESS
+verified_isolated_restore_head_sha: 61736e57979d886559451d15a853292fb3bf586e
+verified_isolated_restore_backup_run_id: 42309503582
+verified_isolated_restore_backup_source_sha: 8ccf60d89eb6d3fab789fb34e0d479c51d84b9af
+verified_isolated_restore_backup_migration: 20261105075227
+verified_isolated_restore_artifact_id: 13575965386
+verified_isolated_restore_artifact_sha256: a474462113eeb780f30f7bb996d7a400ac81fa6538657199cfd891ac3ab504b9
+verified_isolated_restore_artifact_expires_at: 2026-12-07T13:11:05Z
+verified_isolated_restore_authoritative_privacy: not_exercised_without_production_ledger
+verified_isolated_restore_synthetic_privacy: PASS
+verified_isolated_restore_serving_gate: BLOCKED
+observed_live_production_migration_version: 20261105075227
+repository_latest_migration_file_version: 20261029185500
+verified_restore_matches_observed_migration_version: true
+verified_full_schema_catalog_equivalence: false
+verified_provider_rows_skipped_in_loopback: 138
+verified_provider_rows_projected_in_loopback: 77
+verified_provider_rows_replayed_in_loopback: 257
+verified_provider_source_counts_include_payloads: false
+provider_managed_data_full_restore: false
+future_safe_privacy_reconciliation: false
+dr_ready: false
+```
+
+**Exact evidence limitation:** 27 provider data COPY blocks were skipped and
+3 blocks were projected (138 skipped rows / 77 projected-column rows;
+257 Provider rows replayed, with projected rows already included). The
+Source migration catalog fingerprint was verified, but the complete
+provider-managed migration ledger, hosted Auth/Storage and independent
+post-backup Production privacy deletion/revocation continuity were **not**
+restored/proven. Synthetic-only privacy replay (four synthetic events)
+passed in isolation and must not be described as Production reconciliation.
+The approved whole-service RPO/RTO and the DR serving gate remain BLOCKED:
+`dr_ready=false`, `serviceResumptionAllowed=false`.
+The [historical 2026-10-29 observation](#2026-10-29-verified-restore-status-historical-observation)
+below is preserved for provenance, **not** used as current DR readiness evidence.
+
+## 2026-11-07 — newer backup, privacy ledger and freshness evidence (read-only metadata)
+
+- **Newer backup verified:** protected Production PostgreSQL Logical Backup [#42309503582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42309503582) completed SUCCESS; governed encrypted artifact `13548176984` (`myeongha-postgres-20261106T230639Z`) was created 2026-11-06T23:09:49Z and expires 2026-12-06T23:09:48Z. Source SHA `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`; migration frontier `20261105075227` remains unchanged. It is newer than #42130737153, but there is **no verified isolated restore for this exact new artifact** yet. The prior isolated successful restore cannot be silently transferred to this backup.
+- **Newer encrypted privacy ledger capture:** [#42352614447](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42352614447) SUCCESS, artifact `13566018275`, uploaded 2026-11-07T07:46:14Z, expires 2026-12-07T07:46:13Z. Its source SHA is the same `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af`; ledger job completed 2026-11-07T07:46:16Z. **Event count and complete independent continuity have not been authenticated from this encrypted payload**. A newer capture does not prove nonzero replay or source completeness.
+- **Freshness RED:** the latest inspected [watcher #42363914282](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42363914282) reported last successful snapshot age **9,582 seconds** versus the **7,200-second** maximum and concluded `CAPTURE_COMPLETION_STALE`. The preceding [watcher #42331476303](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42331476303) had passed at **6,132 seconds**. The 7,200-second gate remains unchanged; do not describe the ledger freshness monitor as GREEN.
+- **DR acceptance unchanged:** source migration ledger, Provider-managed Auth/Storage, independent privacy continuity/future-safe replay and PT24H/PT6H whole-service proof are still incomplete. `drReady=false`, `serviceResumptionAllowed=false`, Issue #1887 OPEN. Production privacy canary still requires explicit `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` approval.
+- This entry inspected existing run metadata and sanitized job logs only. No Production SQL mutation, canary, backup dispatch, Hosted resource or traffic change.
+
 # PostgreSQL DR Readiness Status v1
 
 > Issue: #389  
-> Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-11-01
+> Historical baseline date: 2026-09-27 KST; latest verified isolated restore addendum: 2026-11-07
 > Purpose: record measured recovery evidence, bounded authoritative privacy reconciliation, approved RPO/RTO comparisons, and the remaining provider-equivalence boundary.
+
+## 2026-11-07 — post-merge current-frontier recheck; migration pair resolved at SQL layer, Hosted DR remains BLOCKED
+
+- **Source baseline:** PR #3092 merged into main `2f04f8f2a0d912e42bf348781e17d20ff7094675`. All Production SQL below was executed in an explicit read-only transaction and rolled back; no DDL/DML, migration repair/deploy, role/ACL mutation or provider setting change occurred.
+- **Current migration catalog:** Supabase Production PostgreSQL 17.6 returned 241 migration versions; current main has 276 SQL migration files. Exact version-ID comparison found 41 remote-only and 76 repository-only versions. Eight same-name pairs are version-shifted. Four pairs are byte-exact; four remote statements exactly match the repository SQL after removing the repository's final 10-byte `\n\ncommit;\n` suffix. All eight retain distinct migration version IDs.
+- **Same-name migration pair audit:** the eight pairs are listed in [`POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json`](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json). Byte-exact pairs: `20261027004434` ↔ `20261026110300`, `20261027004544` ↔ `20261026100200`, `20261027011650` ↔ `20261027101000`, and `20261029012948` ↔ `20261029012000`. Four other pairs have exact prefix equality after removing only the repository's final `\n\ncommit;\n` suffix; their SQL framing and migration identity remain separate disposition items.
+- **Resolved SQL-body pair:** remote `20261029012948` and current-main `20261029012000_owner_kcp_sandbox_remove_daily_limit_v1.sql` are exactly byte-equal at 7,349 bytes (MD5 `c13c8ae6680c9c5aef35909ba81b7b1b`, SHA-256 `b544d06947b31d3d6593ef29e611ac062fe86455caf23ac2f91925b839de86e6`). Normalized SHA-256 is `0cfe257bb188bb8d40961959db6e0ca28f50236115e543eb72d0f283ea3bd53d`. This resolves the SQL-content mismatch for this pair only; the remote/local version identity and authenticated application provenance still require a governed disposition.
+- **Current historical bundle state:** remote `20261008090417` remains one 104,021-byte statement (MD5 `f70776d8c0f6369f6f13484ba9fa2271`, SHA-256 `4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894`). Its 1460–1510 markers are 6/6 present with 6/6 empty statement arrays. Unlike the older October snapshot, 1520–1640 now has 13 applied versions; two Pin columns and the pinned context-ready function are present. The current read-only lineage query therefore returns `HOLD_CHANGED_RUNTIME_SCHEMA_REASSESS`.
+- **Current R2 runtime ACL observation:** 19/19 tracked RPCs are present. `myeongha_api_executor` has effective EXECUTE on 17/19; `service_role`, `anon` and `authenticated` have 0/19. The two API-executor-denied entries are the assert helper and legacy context-ready RPC. The current pinned replacement is one overload, SECURITY DEFINER, owned by `myeongha_seyeon_chat_runtime_owner`, with `myeongha_api_executor` EXECUTE and no `service_role`/browser-role EXECUTE. This does not establish full remote bundle, owner, role-membership, DDL or policy equivalence.
+- **Latest backup and isolated restore:** encrypted Production backup [#42130737153](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42130737153), artifact `13463805796`, frontier `20261105075227` / 241 migration entries. Exact-backup isolated PostgreSQL 17.6 restore [#42247589352](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42247589352), artifact `13518507454`, SUCCESS in 4 seconds. The restore still excludes 27 Provider-managed COPY blocks and projects 3; it is not a full Supabase provider restore.
+- **Privacy freshness remains RED:** latest confirmed ledger [#42242496615](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42242496615), artifact `13516196702`, reports zero replay-supported events. Freshness watcher [#42262739511](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42262739511) failed at 7,828 seconds against the 7,200-second threshold. No new privacy canary was run; exact approval `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` remains required.
+- **DR decision unchanged:** `providerManagedDataFullRestore=false`, `hostedProviderRecoveryProven=false`, `independentPrivacyContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `wholeServiceRpoRtoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`. #1887 remains OPEN. The 11/07 sanitized migration snapshot is [`POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json`](POSTGRES_MIGRATION_METADATA_OBSERVATION_20261107.json).
+
+### 2026-11-07 — current-frontier owner, RLS and migration-source reassessment
+
+- The 104,021-byte historical `20261008090417` bundle contains 19 routines, 18 owner transfers and 19 policies. Current Production has 19/19 routine names, 18/18 owner transfers matching their target owner, and 19/19 historical policies matching by policy name, relation, command and target role. The related live policy inventory is 38 because 19 policies were added by later migrations; the count difference is expected and not a historical-bundle parity failure.
+- The 19 tracked routines have `search_path=pg_catalog, public`; 17 are SECURITY DEFINER and two are invoker functions. `myeongha_api_executor` has effective EXECUTE on 17/19; `anon`, `authenticated`, and `service_role` have 0/19. The two denied entries are the legacy assert/context-ready helpers. The current pinned replacement is separately present and API-executor executable.
+- The chat runtime owner has two `postgres` membership rows: `supabase_admin` grantor with ADMIN=true / INHERIT=false / SET=false, and `postgres` grantor with ADMIN=false / INHERIT=false / SET=false. Effective role checks are MEMBER=true, USAGE=false, SET=false. The second row is explained by applied remote-only migration `20261104043413` (`chat_owner_visible_history_private_rls_runtime_checker_20261104`), which temporarily grants SET TRUE and then revokes SET OPTION. The remote statement is 15,075 bytes, SHA-256 `689ec756ba696f9e62450a27d52370cdfb202e7f5b4fb9889665666170eb85a4`; no matching current-main migration file exists. This is a current-frontier membership shape, not effective role-switch privilege.
+- The older `20261008090417` and `20261026025332` one-row membership prechecks are not current-frontier acceptance criteria after `20261104043413`. The historical `20261008090417` preflight also requires its six markers, owner roles, and policies to be absent, whereas all are now present. Do not replay it.
+- Applied remote `1640` is 10,303 bytes / SHA-256 `ce347be8446be958c4ed6d5f2b9f527b1910032076652e3ffd021eebc9721b50`; current-main `1640_seyeon_zero_personal_source_pre_model_pin_v1.sql` is 10,147 bytes / SHA-256 `77fe56de1d0c51c538c0cf80189708ff385923438209e97fecc6ba460de78cd5`. The applied source uses `SET ROLE` / `RESET ROLE` and `REVOKE ... FROM postgres GRANTED BY postgres`; main uses `REVOKE ... FROM current_user` and direct legacy RPC revocation. Treat this as material applied-source drift. Do not rewrite the applied migration or replay it; resolve through a governed forward-only disposition if any change is needed.
+- `20261026025332` is stored as nine remote statements. Reconstructed remote text is 6,987 bytes vs the 6,986-byte main file; whitespace-stripped token streams match. This is formatting/framing variance only under that comparison, while version identity remains distinct.
+- All SQL used for this reassessment ran in explicit read-only transactions and rolled back. No Production DDL/DML, migration repair, ACL/role change, RLS policy change, or provider resource mutation occurred.
+- Remaining Phase 8 work: classify remote-only authority migrations including `20261104043413`; compare current table/schema grants and complete policy expressions; reconcile `1640` applied-source drift without rewriting history; then complete provider-managed Auth/Storage and independent privacy continuity/RPO/RTO evidence.
+
+### 2026-11-07 — remote-only S0 sequence and current data-access boundary
+
+- Twelve S0/Se-yeon migrations from `20261025193416` through `20261104043413` are applied in the Production migration ledger but have no current-main SQL files. Two migration bodies explicitly say no Production migration/deployment (`20261025193416`, `20261031182926`); one says disposable S0/staged source (`20261031182505`). The first migration's guard checks only postgres user/database, PostgreSQL 17 and absence of `seyeon_private`; it does not bind execution to a project/environment identity. This is a material remote-only source/provenance and deployment-guard discrepancy. It is not, by itself, proof of who authorized execution.
+- Current G0/recovery RPCs (`qry_seyeon_g0_current_source_recent_messages_v1`, `qry_seyeon_g0_current_source_relationship_history_v1`, `qry_seyeon_recover_exact_failed_user_turn_v1`, `cmd_seyeon_supersede_stale_failed_turn_v1`) are SECURITY DEFINER under the no-login chat runtime owner and executable by `myeongha_api_executor` only among the checked application/public roles. The inspected query paths validate subject/thread and source provenance; the supersede path only abandons an exact retryable uncommitted turn after confirming no attempt, assistant output or provider execution. `anon`, `authenticated`, and `service_role` have no EXECUTE on these RPCs.
+- The history-reader path uses an invoker public wrapper and a `chat_private` SECURITY DEFINER function owned by `myeongha_chat_history_reader_v1`, with `row_security=on`. The reader role is NOLOGIN and NOBYPASSRLS; the API executor has no direct message-table table/column SELECT and only the scoped history function is executable. Service/anonymous/authenticated roles are denied.
+- RLS is disabled on `chat_turns` and `chat_turn_attempts` despite three policy definitions each; API executor has no direct table/column access and the inspected S0 functions apply explicit subject/thread predicates. `ai_execution_groundings` and `ai_execution_logs` also have policies while RLS is disabled; API executor, anon and authenticated have no direct table/column access.
+- `memory_proposals` has two policy definitions but RLS is disabled, so those policies are not enforced. API executor/anon/authenticated have no table or column privileges; chat runtime owner has only selected column SELECT/UPDATE; the S0 proposal-accept function is not executable by API/service/anon/authenticated and has no catalog callers; the positive-source registry remains `enabled=false` / `writable_enabled=false`. This is currently fail-closed at the new S0 entrypoint, but RLS must be enabled or an explicitly accepted equivalent row-scope control proven before the type is enabled. The legacy `cmd_commit_chat_turn_legacy_v1` remains a separate service_role-only user-choice proposal path and does not consult the new registry.
+- A reusable sanitized current-frontier audit script is now in mainline review: [`production-authority-frontier-readonly.sql`](../../scripts/operations/production-authority-frontier-readonly.sql). It captures role/membership, schema/table/column ACL hashes, RLS/policy hashes, RPC execution boundaries and selected migration metadata. It was executed against Production with `transaction_read_only=on` and rolled back; it emits no application rows or raw function source.
+- No Production changes were made. The remote-only S0 sequence, disabled RLS tables and applied `1640` source divergence remain Phase 8 disposition items; no migration repair or RLS/ACL mutation is authorized by this observation.
 
 ## 2026-11-06 — privacy capture timing and alert evidence
 
@@ -53,7 +153,7 @@ Earlier [source-row-count restore #40811556214](https://github.com/gycha0109-bee
 
 `dr_ready=false`, `future_safe_privacy_reconciliation=false`, `provider_managed_data_full_restore=false`, `sourceContinuityProven=false`, `continuousCaptureProven=false`, `serviceResumptionAllowed=false`. Production SQL writes/migration repair, Hosted Auth/Storage recovery, provider-level cutover and S8 service admission are not authorized.
 
-## 2026-10-29 verified restore status (latest observation)
+## 2026-10-29 verified restore status (historical observation)
 
 ```yaml
 verified_isolated_restore_run_id: 40817391430

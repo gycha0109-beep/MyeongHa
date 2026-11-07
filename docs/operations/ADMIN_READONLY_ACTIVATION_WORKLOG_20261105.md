@@ -37,3 +37,26 @@
 - 홈 PC에서 관리자 페이지를 열면 실제 Cloudflare Access Owner 로그인 화면에 도달함. 여기서 **아직 실제 Owner 로그인 및 명하 Member 인증/조회/감사 API 호출까지 완료되지는 않음**. 사용자의 브라우저 로그인 후 개별 근거가 필요하며 비밀번호·토큰·쿠키를 작업 로그나 채팅에 보관하지 않음.
 - 비Owner의 실제 로그인 거부 기록도 여전히 미확인. 해당 증거가 없는데 접근 정책의 개별 거부 검증을 완료 처리하지 않음.
 - 범위 외: 결제·환불·크레딧·계정 변경, 고객정보 변경, 보존기간 정리, 분석 자동 수집·정리 등은 비활성/미승인 상태 유지. `ROADMAP_COMPLETE` 미도달.
+
+## 2026-11-07 22:13 KST — 회원 중심 Owner 콘솔 운영 배포 검증
+
+### 기존 로드맵의 이번 미완료 작업
+- A0–A3의 읽기 전용 관리자 화면 최신화: 이미 구현·병합된 사용자/게스트 분리 및 루트 URL 정정 내용을 **독립 관리자 Worker**에 보호된 기존 배포 절차로 반영. 새로운 로드맵, 고객 쓰기 명령, DB 역할 확대는 추가하지 않음.
+- 기존 WORKLOG 및 연속 구현 정본: 이 파일, `docs/operations/ADMIN_HOME_CONTINUATION_20261102.md`, `apps/admin/README.md`를 확인함. 해당 파일의 과거 미완료 표시 중 PR 병합/배포에 관한 사항만 아래의 새 실증으로 갱신함.
+
+### 코드·변경 파일과 커밋
+- [PR #3100](https://github.com/gycha0109-beep/MyeongHa/pull/3100) 회원 중심 목록/게스트 구분/상세: 병합 완료, squash merge `21ddb3192d8ad3f671e3cabaebec5089fc5e82c3`. 변경 파일: `apps/admin/README.md`, `apps/admin/src/AdminWorkbench.tsx`, `apps/admin/src/AdminWorkbench.test.tsx`, `apps/admin/src/styles.css`.
+- [PR #3098](https://github.com/gycha0109-beep/MyeongHa/pull/3098) 루트 북마크를 /admin/으로 이동: 병합 완료, squash merge `a8f843b901d513b592f9a8ec70697f42c0ed90fd`. 변경 파일: `apps/api/src/admin-hosted-http-v1.ts`, `apps/api/src/admin-hosted-http-v1.test.ts`.
+- 이 실행에서는 기능 코드 자체를 수정하지 않았음. PR #3100/#3098 기존 코드의 재구현·재병합을 수행하지 않음.
+
+### 테스트·CI·실운영 근거
+- #3100 일반 CI와 Web/Governance/Security 및 필수 [CI Integration #42367505896](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367505896): 성공. #3098 필수 [CI Integration #42367583696](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367583696): 성공.
+- 보호된 main의 `Admin Console Read-Only Release`를 `release_mode=readonly`로 실행: [#42375880365](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375880365), 실제 checkout 커밋 `61736e57979d886559451d15a853292fb3bf586e`. release job 및 모든 필수 실행 단계 **success**. npm 패키지 설치/타입 검사/관리자 테스트/빌드, Owner Access 및 DB 전용 연결/20종 Reader 쿼리와 롤백형 Audit 검사, Worker 배포, 후속 보안/설정 재조회, 익명 자산·API 접근 차단 검사 통과. 복구 단계는 정상적으로 skipped.
+- Cloudflare 실제 `myeongha-admin` 버전 `b82a4c8e-cae6-4a98-91f6-9449240aa77d`에 100% 트래픽. 별도 Reader/Audit Hyperdrive와 Member 인증 서비스·Assets·RateLimiter 확인. `MYEONGHA_ADMIN_PRIVATE_ENABLED=true`; `MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED=false`, `MYEONGHA_ADMIN_RETENTION_ENABLED=false`, `MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED=false`. Command/Retention 전용 바인딩 없음. 고객용 Worker/고객 데이터는 변경하지 않음.
+- 이번 CI/배포 성공은 인증된 Owner의 **브라우저**에서 새 UI 및 `GET /api/admin/users` 후 정확히 결속된 `read:users / allowed` 감사 레코드를 확인했다는 뜻이 아님. 해당 실사용 검증은 미완료로 유지.
+
+### 미완료·다음 기존 단위
+1. 사용자에게 실제 Owner 로그인 후 /admin/users에서 활성 회원만 기본 표시되고, 게스트 전환/한국 시각/상세가 정상인지 확인. 동일 시점의 Owner 읽기 감사 성공 기록은 별도 근거 필요. 이는 UI 배포 검증과 다름.
+2. 실제 비Owner의 Admin Access 앱 수준 거부 로그인 기록은 미확인. 기존 권한 정책 우회/가상 계정 생성 없이 실제 증거가 있을 때만 검증.
+3. 현재 Admin Reader에 `auth.users`/프로필 원문 조회 권한 없음; 이름/이메일 식별은 미구현. 읽기 전용 최소 노출 projection에 대한 별도 계약·검증 없이 실명을 추측하거나 역할을 확대하지 않음. A4 비용 결속 HOLD, A5 수집·보존 비활성, A6 계정/환불/크레딧 명령 비활성, A7 게시 비활성 유지.
+4. **다음 작업:** 우선 Owner 실사용 조회·감사 결속의 기존 수용 조건 확인. 추가 배포는 해당 근거에 실질 변경이 있을 경우에만 진행. `ROADMAP_COMPLETE` 선언하지 않음.
