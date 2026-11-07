@@ -1,3 +1,11 @@
+### 2026-11-07 KST — Phase 8 source-to-live object-presence audit (read-only work unit)
+
+- **Implemented:** added [remote-only object presence SQL](../../scripts/operations/production-remote-only-object-presence-readonly.sql) and its [sanitized result](POSTGRES_REMOTE_ONLY_OBJECT_PRESENCE_20261107.json). The SQL reads the exact 41 applied remote-only migration statements, lexically enumerates CREATE FUNCTION, CREATE POLICY and CREATE TABLE indicators, and matches names+schemas+policy relations against current Production catalog objects. It runs inside an explicit read-only transaction and rolls back.
+- **Live measured:** 41/41 migration versions were represented; 82/82 function declaration indicators, 82/82 policy declaration indicators, and 16/16 table declaration indicators have matching current live name/schema references. All missing-name arrays are empty. These are **declaration occurrence counts, not unique object counts**.
+- **Critical limitation:** a lexical name match is not proof that a migration's DDL was actually executed or that the live body, owner, grants, column ACL, RLS policy expression, audit source authority or restored backup counterpart is equivalent. Do not promote this to a Phase 8 DR acceptance PASS.
+- **Next:** use the already-recorded full catalog ACL/RLS fingerprints to identify substantive differences, not repeatedly rerun only name-presence checks. Provider-managed Hosted Auth/Storage and independent privacy continuity remain separate BLOCKED conditions.
+- **No Production mutation** or Production privacy canary was performed.
+
 ### 2026-11-07 KST — Phase 8 full application-schema fingerprint snapshot (read-only work unit)
 
 - **Implemented:** `scripts/operations/production-app-schema-fingerprint-readonly.sql` and `docs/operations/POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json`. This is a reproducible whole-application metadata hash baseline: all current `public` base tables and all functions in `public`, `seyeon_private`, and `chat_private`. Every table's SHA-256 includes column/default/column ACL, constraint, index, trigger, policy/RLS and table ACL structure; every function's SHA-256 covers its definition while the output carries no function body, secret, application row, user message or personal memory.
