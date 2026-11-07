@@ -146,12 +146,10 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     sourceMigrationCatalogVersionCount: source.migrationCatalog.totalVersions,
     migrationFrontierAligned,
     postgresVersionEqual: versionEqual,
-    // The 2026-11-07 reference is a calendar-day-only catalog observation,
-    // not an immutable catalog captured inside the 2026-11-06T23:09:47Z
-    // encrypted archive transaction. Same migration frontier is insufficient:
-    // later out-of-band DDL, restore projection, and replay grantor differences
-    // cannot be attributed from this report alone. Require a new source-bound
-    // catalog witness before making any causal restore-fidelity claim.
+    // A sealed before/after source witness is tied to the backup execution,
+    // unlike the legacy date-only reference. Neither shares the pg_dump MVCC
+    // snapshot, so later DDL, portable restore losses, or ACL grantor drift
+    // cannot be causally attributed from this report alone.
     sourceCatalogBoundToBackupSnapshot: false,
     restoreMismatchRootCauseProven: false,
     sourceCatalogProvenance: sourceWitness.provenance,
