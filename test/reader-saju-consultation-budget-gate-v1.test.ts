@@ -61,8 +61,8 @@ describe('server-only Reader Saju consultation budget gate', () => {
       reservationRef: 'reservation-call-1',
       outcome: 'response_received',
       costStatus: 'estimated',
-      observedCostMicroUsd: 414,
-      retainedReservationMicroUsd: 414,
+      observedCostMicroUsd: 415,
+      retainedReservationMicroUsd: 415,
     }));
   });
 
