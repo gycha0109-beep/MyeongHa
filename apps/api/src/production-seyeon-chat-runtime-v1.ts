@@ -125,11 +125,10 @@ export async function assertSeyeonProductionPinReadinessV1(
 }
 
 /**
- * G1 positive S0 requires the one-Memory + current-User atomic Pin to be
- * callable by the actual ordinary Subject executor BEFORE a Turn is received.
- * Installing SQL objects alone is not enough: the source-only private wrapper
- * currently revokes API EXECUTE, and cannot be treated as a working route.
- * This catalog check never grants privileges or enables model use.
+ * Positive S0 uses a fixed owner-owned PUBLIC RPC callable by the ordinary
+ * Member executor only after an explicit narrow ACL admission. The underlying
+ * private combined Pin must remain uncallable by that executor. Read-only
+ * readiness runs before creating a Turn; this does not enable model use.
  */
 export async function assertSeyeonProductionCombinedPinReadinessV1(
   runner: SeyeonProductionSubjectTransactionRunnerV1,
@@ -140,8 +139,27 @@ export async function assertSeyeonProductionCombinedPinReadinessV1(
       select
         coalesce((
           select p.prosecdef
+            and p.proowner = (
+              select oid from pg_catalog.pg_roles
+              where rolname = 'myeongha_seyeon_chat_runtime_owner'
+            )
             and has_function_privilege(current_user, p.oid, 'EXECUTE')
             and has_schema_privilege(current_user, p.pronamespace, 'USAGE')
+            and not has_function_privilege('anon', p.oid, 'EXECUTE')
+            and not has_function_privilege('authenticated', p.oid, 'EXECUTE')
+            and not has_function_privilege('service_role', p.oid, 'EXECUTE')
+          from pg_catalog.pg_proc p
+          where p.oid = to_regprocedure(
+            'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)'
+          )
+        ), false)
+        and coalesce((
+          select p.prosecdef
+            and p.proowner = (
+              select oid from pg_catalog.pg_roles
+              where rolname = 'myeongha_seyeon_chat_runtime_owner'
+            )
+            and not has_function_privilege(current_user, p.oid, 'EXECUTE')
           from pg_catalog.pg_proc p
           where p.oid = to_regprocedure(
             'seyeon_private.pin_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)'
