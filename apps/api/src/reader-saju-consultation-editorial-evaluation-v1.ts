@@ -129,23 +129,26 @@ export function assessReaderSajuPrivateConsultationPairV1(input: Readonly<{
   if (input.pair.status !== 'ready_for_private_review') {
     throw new TypeError('Cannot assess two Readers without identical verified official Saju source.');
   }
+  // Capture the narrowed discriminated union before entering array callbacks.
+  // TypeScript does not retain a mutable object property's narrowing in lambdas.
+  const pair = input.pair;
   if (input.reviews.length > 2 ||
       new Set(input.reviews.map((x) => x.characterId)).size !== input.reviews.length) {
     throw new TypeError('Duplicate or unexpected owner reviews.');
   }
   if (input.reviews.some((x) =>
-    x.characterId !== input.pair.first.characterId &&
-    x.characterId !== input.pair.second.characterId)) {
+    x.characterId !== pair.first.characterId &&
+    x.characterId !== pair.second.characterId)) {
     throw new TypeError('Owner review has no matching source-bound Reader.');
   }
 
   const first = assertReview(
-    input.pair.first,
-    input.reviews.find((r) => r.characterId === input.pair.first.characterId),
+    pair.first,
+    input.reviews.find((r) => r.characterId === pair.first.characterId),
   );
   const second = assertReview(
-    input.pair.second,
-    input.reviews.find((r) => r.characterId === input.pair.second.characterId),
+    pair.second,
+    input.reviews.find((r) => r.characterId === pair.second.characterId),
   );
 
   let outcome: ReaderSajuConsultationEditorialOutcomeV1 = 'awaiting_owner_review';
@@ -160,10 +163,10 @@ export function assessReaderSajuPrivateConsultationPairV1(input: Readonly<{
 
   return Object.freeze({
     schemaVersion: READER_SAJU_CONSULTATION_EDITORIAL_SCHEMA_VERSION_V1,
-    readingRef: input.pair.readingRef,
-    groundingHash: input.pair.groundingHash,
-    sourceUnitId: input.pair.sourceUnitId,
-    sourceBlockRefs: Object.freeze([...input.pair.officialSourceRefs]),
+    readingRef: pair.readingRef,
+    groundingHash: pair.groundingHash,
+    sourceUnitId: pair.sourceUnitId,
+    sourceBlockRefs: Object.freeze([...pair.officialSourceRefs]),
     coverageScope: 'single_official_unit_only' as const,
     outcome,
     first,
