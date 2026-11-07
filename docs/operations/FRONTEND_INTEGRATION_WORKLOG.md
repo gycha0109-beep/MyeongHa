@@ -104,3 +104,15 @@
 - **블로커/승인:** 사용자 승인 필요 없음. 기존 필수 통합 검증 절차 대기.
 - **다음 작업:** 최종 HEAD에서 선행 CI 성공 확인 → 기존 `ci-integration-ready` 절차로 통합 검증 제출 → 성공 시 자동 병합 확인; 실패 시 같은 링크 단위만 보정. 병합 성공 후 로드맵의 다음 미완료 항목 확인.
 
+
+## 2026-11-08 — 대화 허브 미승인 정책 안내의 오작동 링크 제거 (Stage 5)
+
+- **기존 로드맵·진행 지점:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5의 법무/개인정보/고객지원 탐색 경계. 앞선 고객지원 링크 수정 [PR #3125](https://github.com/gycha0109-beep/MyeongHa/pull/3125)는 코드 HEAD `357d9438b103bbe2b71e3d4133205e22effd4b60`, [통합 CI #42404010903](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42404010903) **SUCCESS**, 2026-11-07T19:07:43Z **병합 완료**. 본 작업은 이어지는 동일 트랙의 독립된 UI 정합성 단위.
+- **발견한 구체적 오류 및 승인 경계:** `apps/web/chat-hub.html` 푸터의 `서비스 안내`, `이용약관`, `개인정보처리방침`은 실제 발행된 안내 페이지가 아닌 `href="#"` 링크여서 클릭해도 이동하지 않음. `docs/LEGAL_001_TERMS_OF_SERVICE_DRAFT_KO.md`는 대외 게시 미승인 초안, `docs/LEGAL_002_PRIVACY_POLICY_DRAFT_KO.md`도 내부 검토·대외 게시 미승인 상태. 정책 원문 공개·유료 결제/관상 업로드 게이트 해제 및 임의 법정 문구 작성 금지.
+- **실제 변경 파일:** `apps/web/chat-hub.html`에서 위 세 항목만 `<span class="product-footer-unavailable">`의 명확한 `준비 중/공개 준비 중` 문구로 바꾸어 클릭할 수 없는 정직한 상태를 표시. 승인되어 동작하는 `<a href="contact.html">고객지원</a>`는 유지. `apps/web/product.css`에서 푸터 안내의 줄바꿈/간격과 비활성 시각 상태 부여. `test/web-product-clarity.test.ts`에 오작동 `#` 링크 금지, 미승인 3개 안내 표시, 고객지원 실제 링크 유지의 회귀 검사 추가. `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md` 본 기록.
+- **코드·테스트 커밋:** HTML `edab2f0ef0022329adcc3882a4764c1a342d75a6`, CSS `27676ad4be351cd3814fc1567f582c5cfd26c4c6`, 회귀 테스트 `aa7213f16c09b6401bd763d9c2fc89605c5e2750`. 브랜치 `fix/frontend-integration/chat-footer-unapproved-policy-stage5-20261108`, `Watchtower-Track: frontend-integration`.
+- **검증 및 현재 판정:** 원격 저장소 실제 HTML·CSS·테스트 정적 내용 재확인 후 **변경 HEAD의 CI·브라우저 검증·통합 CI가 전부 성공하기 전까지 미완료**. 준비 중 안내는 **정식 약관/개인정보처리방침의 대체물이 아니며** Stage 5 법정 고지/실제 게시 완료가 아님. Stage 2 공식 Reader, Stage 3 구매, Stage 4 관상 이미지 전달의 기존 출시 차단 유지.
+- **남은 과제·다음 작업:** 본 UI 단위의 PR CI·필수 통합 CI 성공 및 병합 확인. 실제 이용약관·개인정보 처리방침의 게시 승인/실제 운영 항목 검증, 환불·보관 고지 경로와 Stage 5 실제 브라우저 이용 흐름 E2E는 별도 미완료. 신규 정책을 임의 공개하지 않고, 다음 미완료 범위는 기존 ROADMAP과 승인 상태를 다시 대조한다.
+- **승인 사항:** 이번 오작동 링크 제거에 별도 승인 불필요. **정식 법무·개인정보처리방침 대외 공개는 승인 전 중단**.
+
+Watchtower-Track: frontend-integration
