@@ -176,3 +176,8 @@ Phase 8은 다음 네 묶음을 모두 닫아야 한다. 백업 생성이나 격
 - [Phase 11 capacity evidence](API_CONTROLLED_CAPACITY_PHASE11_20261030.md), [Phase 12 scaling review](OBSERVED_SCALING_REVIEW_PHASE12_20261030.md), [Phase 13 acceptance evidence](MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md) — 이미 확보한 실측과 잔여 검증 근거.
 
 Watchtower-Track: ops
+### 2026-11-08 / Gate 1 Phase 8-C — scheduled privacy ledger predecessor attempt repair
+
+- Exact RED [#42404193088](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42404193088) attempt 1 on `3bdec3c162b132284498ebed38e15feaf32c0ff9` was a main scheduled Production PostgreSQL Privacy Recovery Ledger run. The predecessor resolver rejected **two unexpired artifacts in the same previously successful re-run ID**, not a failed DB query or missing encryption secret.
+- Observed predecessor [#42381192945](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42381192945) attempt 2 has the valid latest upload artifact `13582736761` created at 2026-11-07T17:00:59Z and earlier attempt 1 artifact `13577209175` at 14:21:35Z. The source must match the **last successful attempt's exact upload step window**, and still fail closed if that step has missing/expired/ambiguous evidence.
+- This correction changes only selection/read-only metadata behavior. New PR exact-SHA CI and a fresh successful **main run using merged workflow code** are required before declaring scheduled RED closed. Re-running #42404193088 without a source change uses the old SHA and does not verify the fix. Independent continuity, RPO, Hosted DR and service resumption remain unproven; #1887 stays open.

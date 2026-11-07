@@ -24,6 +24,8 @@ body.product-page :is(.saju-design-product-card ul, .saju-design-product-card .s
   line-height: 1.75;
 }
 body.product-page .saju-design-product-card h3 { font-size: 1.125rem; }
+/* Mobile continuation notices remain body copy, not tiny decorative labels. */
+body.product-page .chat-pending-copy { font-size: .875rem; line-height: 1.7; }
 body.product-page .saju-design-chart-tabs button:not(.is-selected) {
   color: var(--mh-copy-muted);
   background: #fffaf5;
