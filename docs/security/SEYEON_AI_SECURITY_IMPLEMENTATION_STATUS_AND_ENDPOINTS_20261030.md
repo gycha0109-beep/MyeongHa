@@ -2,7 +2,7 @@
 
 Watchtower-Track: security
 
-> **2026-11-08 트랙 복구 기준:** 이 문서의 정본 트랙은 **세연 AI 보안 `security`**입니다. 최신 확인된 보안 WORKLOG는 **W129 / PR #3106 (병합 완료)**이며, 이어지는 W130은 잘못된 운영 트랙 이탈 이후의 **재개 지점 복원 기록**입니다. `ops`의 Phase 8~13·DR, PR #3105/#3112/#3113/#3115, 운영 WORKLOG는 **AI 보안 후속 단계가 아닙니다**. 작업·자동화·이관은 이 문서 → [S0 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md) → [G0~G6 완료 계약](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md) 순으로 보안 트랙을 확인하고, 서로 다른 트랙의 마지막 답변·커밋·CI로 작업 대상을 바꾸지 않습니다.
+> **2026-11-08 트랙 복구 기준:** 이 문서의 정본 트랙은 **세연 AI 보안 `security`**입니다. 정본 보안 이력은 **W129 / PR #3106 (병합 완료) → W130 트랙 복구 → W131 미설치 권한 선행 차단 → W132 승인 재사용·CI 검증** 순서입니다. `ops`의 Phase 8~13·DR, PR #3105/#3112/#3113/#3115, 운영 WORKLOG는 **AI 보안 후속 단계가 아닙니다**. 작업·자동화·이관은 이 문서 → [S0 로드맵 v3](SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md) → [G0~G6 완료 계약](SEYEON_AI_SECURITY_COMPLETION_GATES_V1.md) 순으로 보안 트랙을 확인하고, 서로 다른 트랙의 마지막 답변·커밋·CI로 작업 대상을 바꾸지 않습니다.
 
 > 최초 작성: 2026-10-30 · 실행 기준 갱신: 2026-11-07
 
@@ -641,3 +641,13 @@ Watchtower-Track: security
 - **남은 일·다음 작업:** G0 S0 기술 계약의 최종 확정(사용자 결정), 실제 실행 Role/Function의 안전한 **권한 호출 설계** 확정 및 G1 16→17 운영 설치·실행 입증. 이후 기존 로드맵의 G4 일반 고객 크레딧 → G2 원자 Commit → G3 최초 수신/철회 → G5 통합 → G6 제한 운영. 불필요한 보안 범위 추가나 `ops` 로드맵 전환 금지.
 - **블로커/승인:** 기술 계약과 운영 ACL·SQL 적용 승인 전에는 positive 실행을 계속 HOLD. 해당 승인 부재로 G0~G6 최종 PASS **0/7**, `ROADMAP_COMPLETE` 아님.
 
+
+### 2026-11-08 / W132 — 기존 기억 정책 승인 재사용·G1 CI 검증 및 운영 권한 변경 경계
+
+- **작업 목표:** 이전 작업 W131의 코드·PR·CI와 보안 로드맵을 다시 대조하고, 이미 승인한 개인 기억 사용 원칙을 반복 승인 요청하는 잘못된 작업 흐름을 바로잡는다. 기존 WORKLOG를 재사용하며 새 트랙/새 기능/새 운영 작업을 만들지 않는다.
+- **변경 파일:** `docs/security/SEYEON_AI_SECURITY_EXECUTION_ROADMAP_V3_20261107.md`에 2026-10-18 [기존 사용자 승인 결정](SEYEON_PRODUCT_OWNER_MEMORY_REVOKE_HISTORY_DECISION_20261018.md)의 재사용·중복 승인 요청 금지와 '기능 검증 미완료 ≠ 원칙 미승인' 경계를 명문화했다. `docs/security/SEYEON_AI_SECURITY_IMPLEMENTATION_STATUS_AND_ENDPOINTS_20261030.md`(본 WORKLOG)에 W132와 CI·다음 작업을 누적하고, 최상단 재개 지점을 최신 기록으로 수정했다. 애플리케이션/SQL/CI Workflow 변경 없음.
+- **완료·코드 대조:** [보안 PR #3120](https://github.com/gycha0109-beep/MyeongHa/pull/3120) W131 HEAD `5f03150b239dbab086525b1e73e61cb6171a1583`에서 결합 출처의 모델 호출 전 사전 차단 및 기존 Member 실행 역할을 확인했다. 실제 Subject 트랜잭션은 `SET LOCAL ROLE myeongha_api_executor`를 수행하므로 새 카탈로그 검사 `current_user`는 해당 역할을 대상으로 한다. 기존 소스 전용 `17-g1-positive-combined-model-source-pin.sql`은 이 역할의 private 결합 함수 실행 권한을 명시적으로 회수한다. **새 방어 검사의 정상 동작은 확인돼도 양수 원본 기억 응답의 실제 성공은 아직 불가능/미검증**이다.
+- **정확한 테스트·CI 근거:** W131 HEAD `5f03150...`에 연결된 [PR Checks](https://github.com/gycha0109-beep/MyeongHa/pull/3120/checks): [Web Gates #42401435211](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401435211), [Governance #42401435223](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401435223), [CI #42401435225](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42401435225) 모두 **SUCCESS** 확인. CI의 `Work Track · security` 및 `CI Verify`는 SUCCESS, 이 실행에서 PostgreSQL 17·DB Authority 등은 **SKIPPED**여서 전체 Integration/운영 DB 실증 PASS로 간주하지 않는다. 이 W132 문서 변경 후 **새 HEAD의 CI는 별도 확인 전 미판정**.
+- **브랜치·커밋·PR:** 기존 `docs/security/restore-s0-track-continuity-20261108` / 보안 [PR #3120](https://github.com/gycha0109-beep/MyeongHa/pull/3120). W131 완료 기록 커밋 `5f03150b239dbab086525b1e73e61cb6171a1583`; 이번 로드맵 승인 재사용 명시 커밋 `f6e6a085132aa8ca5343bf566ab16164971b7960`; 이 W132 기록은 이어지는 동일 PR WORKLOG 커밋에 포함한다.
+- **미완료:** 운영용 결합 Pin 함수·컬럼 설치, 안전한 실행 권한 구성, 정확한 사용자 기억/현재 메시지 결합 동작 및 모델 호출 전 저장 실증. 이후 기존 G4 고객 크레딧→G2 원자 확정→G3 첫 답변/철회→G5 통합→G6 제한 운영 순서가 남는다. 제품 정책 기승인과 무관하게 G0~G6 **운영 수용 증거 0/7**, `HOLD_FORWARD_STOPPED`, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false` 유지.
+- **블로커·다음 작업:** 사용자에게 이미 승인한 다섯 가지 기억 정책을 다시 묻지 않는다. 다음 실행 단계는 기존 16→17 결합 함수의 설치·최소 권한 계약을 확정해 운영 대상에 실제 적용·검증하는 작업이나, **운영 DB 함수·컬럼·접근권한 변경은 이 작업 단위의 권한 밖**이므로 여기서 중단한다. 변경할 정확한 대상·권한이 준비되기 전 포괄적 승인을 요구하지 않으며 운영 DB/Role/Secret/Provider/과금/배포/트래픽을 변경하지 않는다. 다음 세션은 이 W132와 로드맵을 먼저 확인하여 중복 개발·승인 요청을 피한다.
