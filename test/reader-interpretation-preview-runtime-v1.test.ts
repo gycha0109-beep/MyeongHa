@@ -14,6 +14,7 @@ import {
   runReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
+import type { CharacterSajuConsultationShadowPortV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingAccessAuthorityRowV1,
@@ -356,6 +357,7 @@ async function run(
     readonly context?: CharacterRuntimeContextWithGroundingV1;
     readonly resolvedSubjectId?: string;
     readonly projectionPort?: OfficialReadingCharacterGroundingProjectionPortV1;
+    readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
   } = {},
 ) {
   const bundle = input.bundle ?? baseBundle;
@@ -370,11 +372,86 @@ async function run(
     requestedDomain: 'general',
     context,
     groundingProjectionPort: input.projectionPort ?? groundingProjectionPort(bundle),
+    consultationShadowPort: input.consultationShadowPort,
     ...ports,
   });
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
+  it('feeds source-grounded consultation instructions only after admission, keeping the exact Reading unchanged', async () => {
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const data = request.input as {
+        characterId: string;
+        sourceUnit: { unitId: string; canonicalMeaning: string };
+      };
+      expect(request.instructions).toContain('숙련된 한국어 사주 상담자');
+      expect(request.instructions).toContain('해석 방법론 강의를 하지 마십시오');
+      expect(data.sourceUnit.canonicalMeaning.length).toBeGreaterThan(0);
+      return {
+        schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+        characterId: data.characterId,
+        sourceUnitRefs: [data.sourceUnit.unitId],
+        text: '이 명식에서 확인된 이 부분을 먼저 짚겠습니다.',
+      };
+    });
+    const evaluate = vi.fn(async (input: Parameters<CharacterSajuConsultationShadowPortV1['evaluate']>[0]) => ({
+      schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      candidateHash: input.candidateHash,
+      unitId: input.groundingUnit.unitId,
+      semanticPreserved: true,
+      characterFidelityPreserved: true,
+      failureClasses: [] as const,
+    }));
+    const shadow: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      generate,
+      evaluate,
+    };
+    const regular = await run(readers.baekheon);
+    const compared = await run(readers.baekheon, { consultationShadowPort: shadow });
+    expect(compared).toEqual(regular);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(compared).not.toHaveProperty('candidate');
+  });
+
+  it('never starts the consultation model without the authorized Reader grant', async () => {
+    const generate = vi.fn();
+    const evaluate = vi.fn();
+    const shadow = {
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      generate,
+      evaluate,
+    };
+    const ports = authorityPorts({ activeReaders: [] });
+    await expect(run(readers.baekheon, { ports, consultationShadowPort: shadow })).rejects.toMatchObject({
+      code: 'ACCESS_DENIED',
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  it('does not change the official Reader output if a model candidate is unsafe or fails', async () => {
+    const generate = vi.fn(async () => ({
+      schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+      characterId: 'baekheon',
+      sourceUnitRefs: ['injected-unit'],
+      text: '승진이 반드시 내년에 일어납니다.',
+    }));
+    const evaluate = vi.fn();
+    const shadow: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      generate,
+      evaluate,
+    };
+    const regular = await run(readers.baekheon);
+    const compared = await run(readers.baekheon, { consultationShadowPort: shadow });
+    expect(compared).toEqual(regular);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
   it('rejects standalone preview in Production before Reader access or Saju', async () => {
     const reader = readers.baekheon;
     const ports = authorityPorts({ activeReaders: [reader.characterId] });
