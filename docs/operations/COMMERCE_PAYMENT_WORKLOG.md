@@ -1122,3 +1122,11 @@
 - **구현:** 기존 DB/Entitlement Writer는 변경하지 않고 실제 DB 회수 결과의 동일 이벤트 ID 존재 여부를 모든 구매 Grant에 대해 분류합니다. 전부 동일 이벤트에서 회수되거나 재실행된 경우에만 `revoked`로 반환하고, 하나라도 다른 출처 무변경 Grant라면 `cancellation_recorded_unattributed_grants`로 구분합니다. 내부 웹훅 실행 결과 역시 `cancelled_unattributed_grants`로 별도 표시합니다. Provider 원본 취소 Receipt/Event 기록은 유지하면서 **이번 이벤트의 회수 완료를 거짓으로 주장하지 않습니다**.
 - **검증:** bound/unbound, 단일/혼합 Grant, 동일 이벤트 재실행, 타 출처 이미 비활성, 내부 웹훅 응답 테스트를 보강했습니다. 새 공식 CI 확인 전 성공은 미선언. 기존 환불 확정의 동일 이벤트·시계 결속, 독립 구매권 보호, 공개 경로 OFF, 운영 PG GET/POST/DB 미적용 유지.
 - **잔여:** Provider NEWER/STALE 전반, Reader T2 완전 연결, 실제 소비자 제공 입증, 복원 후 개인정보 삭제 검증, 전체 E2E.
+
+### 2026-11-08 — 환불 확정 시 과거 취소 효과가 최신 구매권 상태를 덮어쓰지 못하도록 차단
+
+- **선행 근거:** [CI #42481994153](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42481994153) 포함 관련 전 검사 GREEN. 승인 로드맵 §6-1·2·5, PR #3090. 기존 2370은 동일 원본 PortOne FULL 취소의 `entitlement_events` 회수 출처·시각·키를 확인했으나 그 뒤 구매권의 최종 `last_effective_at`/`last_provider_ordering_key`가 다른 사건으로 바뀐 상태인지까지 확인하지 않았습니다.
+- **구현:** 비운영 2370의 기존 내부 환불 확정 함수에서 원본 Receipt의 각 구매 Grant가 `revoked`이며, 현재 Grant의 최종 적용 시각 및 provider ordering key가 **바로 그 검증 취소 Provider Event**와 일치해야 합니다. 과거 일치하는 취소 Effect가 남아 있어도 후속 다른 Effect가 마지막 상태를 차지하면 고객 상태 `refund_confirmed`를 거부합니다. 원본 결제·금액·HMAC·이벤트 출처·원본 시각 검증, 다른 Reader 구매권 및 0-Grant 사전 취소 경계는 유지합니다.
+- **실제 격리 PG17 검증:** 정상 원본 B2 취소 Effect를 기록한 상태에서 (1) 다른 최종 적용 시각만 있는 경우와 (2) 다른 최종 ordering key만 있는 경우 각각 환불 확정을 거부하고 DB 하위 트랜잭션을 자동 롤백하는 부정 회귀를 추가했습니다. 이어 정확한 현재 Effect로 긍정·재실행·B3 보존 및 전체 테스트 롤백을 유지합니다. 기존 정적 계약/역사적 catalog 지문 가드와 WORKLOG 반영.
+- **검증/범위:** 새 CI 결과 확인 전 성공 미선언. PortOne 공식 일반 NEWER/STALE 비교기나 LIVE T2 잠금을 만들어냈다고 주장하지 않으며 운영 환불 POST/운영 DB/유료 LIVE 활성화는 수행하지 않았습니다.
+- **미완료:** Provider 최신성 판정 일반화, Reader 최종 동시성, 실물 Reading 내용 전달·법적 제공 증빙, 백업 복원 후 privacy replay, 종단 간 검증.

@@ -62,6 +62,8 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
     "grant_row.subject_id=cr.subject_id",
     "grant_row.grant_source_type='purchase'",
     "grant_row.status is distinct from 'revoked'",
+    "grant_row.last_effective_at is distinct from pe.provider_occurred_at",
+    "grant_row.last_provider_ordering_key is distinct from",
     "revoke_event.grant_id=grant_row.id",
     "revoke_event.subject_id=cr.subject_id",
     "revoke_event.source_provider_event_id=pe.id",
@@ -89,7 +91,7 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   const staged=readFileSync('test/db/staged_commerce_migration_policy.sh','utf8');
   expect(staged).toContain("$name" + "\" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql'");
   expect(staged).toContain("$inclusion\" == 'reader-integrated'");
-  expect(staged).toContain("expected='62b84e59fc070deab8bd165b9c92054be185cf90'");
+  expect(staged).toContain("expected='4abf6431c1d14212af4cb34363ea4739c21d109f'");
   expect(staged).toContain('HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration"');
@@ -119,6 +121,9 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
     "v_other_event_revoke_denied:=true",
     "CLAIM_E2E_DISPLACED_PROVIDER_EFFECT_CLOCK_FALSE_REFUND_CONFIRMED",
     "v_displaced_effect_time_denied:=true",
+    "CLAIM_E2E_HISTORICAL_REVOKE_BORROWED_AFTER_NEWER_EFFECT",
+    "v_superseded_grant_clock_denied:=true",
+    "v_superseded_grant_order_denied:=true",
     "v_request_state<>'refund_confirmed'",
     "confirmed_at=v_positive_at",
     "v_positive_effect.result_entitlement_event_id is null",

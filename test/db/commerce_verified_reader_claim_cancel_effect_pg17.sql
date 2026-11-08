@@ -36,6 +36,8 @@ declare
  v_positive_effect record;
  v_other_event_revoke_denied boolean:=false;
  v_displaced_effect_time_denied boolean:=false;
+ v_superseded_grant_clock_denied boolean:=false;
+ v_superseded_grant_order_denied boolean:=false;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -434,6 +436,52 @@ begin
                 '1219d000-0000-4000-8000-000000000008'::uuid
             and ee.event_type='revoked')<>1 then
      raise exception 'CLAIM_E2E_EXACT_FULL_CANCEL_GRANT_EVENT_MISMATCH';
+   end if;
+   -- A once-authoritative revoke Event can remain in history even if
+   -- a later material lifecycle update changes the Grant's current effect
+   -- clock/order. Do not borrow that old proof to confirm a new refund.
+   begin
+     update public.entitlement_grants
+        set last_effective_at=v_positive_event_at+interval '1 microsecond'
+      where id=v_grant.id and status='revoked';
+     perform public.internal_confirm_reader_full_refund_dispatch_v1(
+       v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+     );
+   exception when check_violation then
+     if sqlerrm='Refund receipt still unconfirmed by verified cancellation' then
+       v_superseded_grant_clock_denied:=true;
+     else raise;
+     end if;
+   end;
+   begin
+     update public.entitlement_grants
+        set last_provider_ordering_key='different-provider-effect:later'
+      where id=v_grant.id and status='revoked';
+     perform public.internal_confirm_reader_full_refund_dispatch_v1(
+       v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+     );
+   exception when check_violation then
+     if sqlerrm='Refund receipt still unconfirmed by verified cancellation' then
+       v_superseded_grant_order_denied:=true;
+     else raise;
+     end if;
+   end;
+   if not v_superseded_grant_clock_denied
+      or not v_superseded_grant_order_denied
+      or (select count(*) from public.entitlement_grants
+           where id=v_grant.id and status='revoked'
+             and last_effective_at=v_positive_event_at
+             and last_provider_ordering_key=(
+               'portone-v2-fullcancel:'||pg_catalog.to_char(
+                 v_positive_event_at at time zone 'UTC',
+                 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+               )
+             ))<>1
+      or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+           where id=v_refund_decision_id and status='submitted'
+             and confirmed_at is null)<>1
+   then
+     raise exception 'CLAIM_E2E_HISTORICAL_REVOKE_BORROWED_AFTER_NEWER_EFFECT';
    end if;
    select public.internal_confirm_reader_full_refund_dispatch_v1(
      v_refund_decision_id,'synthetic-claim-b2-not-confirmed'

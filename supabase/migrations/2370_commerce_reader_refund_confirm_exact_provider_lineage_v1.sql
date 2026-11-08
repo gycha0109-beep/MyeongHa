@@ -70,10 +70,11 @@ begin
     and cr.verification_status='revoked'
     and cr.verified_amount_minor>0
     and cr.verified_currency ~ '^[A-Z]{3}$'
-    -- The original payment's rights must be revoked by THIS very same
-    -- verified full-cancel Event, not simply inactive due to expiration,
-    -- manual editing, another provider event, or a sibling Reader purchase.
-    -- A zero-Grant original Receipt remains a legitimate pre-issuance cancel.
+    -- The original payment's rights must be CURRENTLY revoked by this
+    -- same full-cancel Event, not merely have a historical revocation that
+    -- was later superseded by a different effective effect/order. Sibling
+    -- Reader rights remain independent. A zero-Grant Receipt may cancel
+    -- before purchase rights are ever issued.
     and not exists (
       select 1
       from public.entitlement_grants grant_row
@@ -82,6 +83,9 @@ begin
         and grant_row.grant_source_type='purchase'
         and (
           grant_row.status is distinct from 'revoked'
+          or grant_row.last_effective_at is distinct from pe.provider_occurred_at
+          or grant_row.last_provider_ordering_key is distinct from
+              pe.provider_ordering_key
           or not exists (
             select 1
             from public.entitlement_events revoke_event
@@ -154,4 +158,4 @@ grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1
 ) to myeongha_commerce_internal_executor;
 
 comment on function public.internal_confirm_reader_full_refund_dispatch_v1(uuid,text)
-is 'Only a single exact original PortOne V2 GET-verified full cancellation with matched original payment attempt, Receipt, amount, currency, verifier revision, fingerprint, cancellation ID and matching original Grant-to-same-provider-event revocation effects and exact provider event/effect time and ordering key may confirm an owner-approved private Reader refund. No public caller grant or automatic refund execution.';
+is 'Only a single exact original PortOne V2 GET-verified full cancellation with matched original payment attempt, Receipt, amount, currency, verifier revision, fingerprint, cancellation ID and matching original Grant-to-same-provider-event revocation effects, live Grant last effective clock and ordering key, and exact provider event/effect time may confirm an owner-approved private Reader refund. No public caller grant or automatic refund execution.';
