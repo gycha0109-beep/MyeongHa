@@ -208,9 +208,13 @@ $pin_recent$;
 alter function seyeon_private.pin_model_recent_sources_v1(
   uuid,uuid,uuid,uuid,uuid,jsonb,text
 ) owner to myeongha_seyeon_chat_runtime_owner;
+-- Hosted PostgreSQL's installer does not inherit NOLOGIN function-owner rights.
+-- Temporarily act as the exact function owner for its explicit deny ACL.
+set local role myeongha_seyeon_chat_runtime_owner;
 revoke all on function seyeon_private.pin_model_recent_sources_v1(
   uuid,uuid,uuid,uuid,uuid,jsonb,text
 ) from public,anon,authenticated,service_role,myeongha_api_executor;
+reset role;
 revoke create on schema seyeon_private from myeongha_seyeon_chat_runtime_owner;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
 commit;

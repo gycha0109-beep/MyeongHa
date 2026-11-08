@@ -124,6 +124,107 @@ export async function assertSeyeonProductionPinReadinessV1(
   }
 }
 
+/**
+ * Positive S0 uses a fixed owner-owned PUBLIC RPC callable by the ordinary
+ * Member executor only after an explicit narrow ACL admission. The underlying
+ * private combined Pin must remain uncallable by that executor. Read-only
+ * readiness runs before creating a Turn; this does not enable model use.
+ */
+export async function assertSeyeonProductionCombinedPinReadinessV1(
+  runner: SeyeonProductionSubjectTransactionRunnerV1,
+  canonicalSubjectId: string,
+): Promise<void> {
+  const result = await runner.run(canonicalSubjectId, (client) =>
+    client.query<{ ready: boolean }>(`
+      select
+        coalesce((
+          select p.prosecdef
+            and p.proowner = (
+              select oid from pg_catalog.pg_roles
+              where rolname = 'myeongha_seyeon_chat_runtime_owner'
+            )
+            and has_function_privilege(current_user, p.oid, 'EXECUTE')
+            and has_schema_privilege(current_user, p.pronamespace, 'USAGE')
+            and not has_function_privilege('anon', p.oid, 'EXECUTE')
+            and not has_function_privilege('authenticated', p.oid, 'EXECUTE')
+            and not has_function_privilege('service_role', p.oid, 'EXECUTE')
+          from pg_catalog.pg_proc p
+          where p.oid = to_regprocedure(
+            'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)'
+          )
+        ), false)
+        -- Use the catalog for private functions: the Member role is not
+        -- granted seyeon_private schema USAGE, so name resolution cannot
+        -- be used as a reliable read-only presence check.
+        and exists (
+          select 1
+          from pg_catalog.pg_proc p
+          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'seyeon_private'
+            and p.proname = 'pin_positive_model_context_sources_v1'
+            and p.pronargs = 16
+            and p.proargtypes[0] = 'uuid'::regtype
+            and p.proargtypes[1] = 'uuid'::regtype
+            and p.proargtypes[2] = 'uuid'::regtype
+            and p.proargtypes[3] = 'uuid'::regtype
+            and p.proargtypes[4] = 'uuid'::regtype
+            and p.proargtypes[5] = 'jsonb'::regtype
+            and p.proargtypes[6] = 'text'::regtype
+            and p.proargtypes[7] = 'uuid'::regtype
+            and p.proargtypes[8] = 'uuid'::regtype
+            and p.proargtypes[9] = 'text'::regtype
+            and p.proargtypes[10] = 'text'::regtype
+            and p.proargtypes[11] = 'text'::regtype
+            and p.proargtypes[12] = 'text'::regtype
+            and p.proargtypes[13] = 'text'::regtype
+            and p.proargtypes[14] = 'text'::regtype
+            and p.proargtypes[15] = 'text'::regtype
+            and p.prosecdef
+            and p.proowner = (
+              select oid from pg_catalog.pg_roles
+              where rolname = 'myeongha_seyeon_chat_runtime_owner'
+            )
+            and not has_function_privilege(current_user, p.oid, 'EXECUTE')
+        )
+        and exists (
+          select 1
+          from pg_catalog.pg_proc p
+          join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'seyeon_private'
+            and p.proname = 'pin_model_recent_sources_v1'
+            and p.pronargs = 7
+            and p.proargtypes[0] = 'uuid'::regtype
+            and p.proargtypes[1] = 'uuid'::regtype
+            and p.proargtypes[2] = 'uuid'::regtype
+            and p.proargtypes[3] = 'uuid'::regtype
+            and p.proargtypes[4] = 'uuid'::regtype
+            and p.proargtypes[5] = 'jsonb'::regtype
+            and p.proargtypes[6] = 'text'::regtype
+            and p.prosecdef
+            and p.proowner = (
+              select oid from pg_catalog.pg_roles
+              where rolname = 'myeongha_seyeon_chat_runtime_owner'
+            )
+            and not has_function_privilege(current_user, p.oid, 'EXECUTE')
+        )
+        and to_regprocedure(
+          'public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text)'
+        ) is not null
+        and exists (
+          select 1
+          from pg_catalog.pg_attribute a
+          where a.attrelid = to_regclass('public.chat_turn_attempts')
+            and a.attname = 'seyeon_recent_source_pin_jsonb'
+            and a.atttypid = 'pg_catalog.jsonb'::regtype
+            and not a.attisdropped
+        ) as "ready"
+    `),
+  );
+  if (result.rows.length !== 1 || result.rows[0]?.ready !== true) {
+    throw new SeyeonProductionPinMigrationRequiredV1();
+  }
+}
+
 export const PRODUCTION_SEYEON_CHAT_RUNTIME_VERSION_V1 =
   'production-seyeon-chat-runtime-v1' as const;
 
@@ -413,6 +514,13 @@ export function createProductionSeyeonChatRuntimeV1(
       // Prior to durable receive/attempt creation: fail closed when Production
       // has not applied the 1640 immutable zero-source Pin and executor ACL.
       await assertSeyeonProductionPinReadinessV1(runner, resolvedSubject.subjectId);
+      if (input.approvedPersonalRecordModelUse !== undefined) {
+        // Positive S0 must not create a new user Turn when its 16/17 combined
+        // G1 Pin cannot execute under the real Member API transaction role.
+        await assertSeyeonProductionCombinedPinReadinessV1(
+          runner, resolvedSubject.subjectId,
+        );
+      }
       // The main Subject Runner remains responsible for Chat/Outbox writes.
       // Governed Start and Settle use a different DB LOGIN + role only.
       const costRunner = costPoolLease === null
