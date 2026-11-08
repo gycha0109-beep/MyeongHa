@@ -1,6 +1,6 @@
 import type {
   CharacterSajuConsultationPrivateBatchComparisonV1,
-} from './character-saju-consultation-shadow-v1';
+} from './character-saju-consultation-shadow-v1.js';
 
 export const READER_SAJU_PRIVATE_MULTI_UNIT_PAIR_SCHEMA_VERSION_V1 =
   'reader-saju-private-multi-unit-pair-v1' as const;
