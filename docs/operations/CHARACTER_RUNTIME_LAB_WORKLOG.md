@@ -42,3 +42,12 @@
 - New script `scripts/run-yeoul-language-model-ab-v1.mjs` and main-only GitHub workflow `character-runtime-yeoul-language-ab-v1.yml`; 12 character-adapted synthetic prompts, baseline core persona JSON vs natural-language advice vs four distinct fictional conversational examples, 144 possible calls, ZDR/deny/no-fallback, $0.20 provider-reported cap.
 - Node syntax, TypeScript build, responsibility map and Actions security checks passed locally. No real model calls or production character changes have been made yet.
 - Next: merge only after exact-head PR CI/integration is successful; inspect one-shot experiment and preserve all raw replies, provider-reported cost, latency, persona differences and fabrication cases. No automatic production promotion.
+
+
+## 2026-11-08 — Yeoul GLM / Luna 144-call experiment completed
+
+- PR #3148 merged as `6ae4cd50bad2932169d1157b0c2dc1b49d88a3c9`; exact-head integration run #42484236964 was successful.
+- Main-only experiment [#42484832997](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42484832997) completed **144/144**, `failure=null`, provider-reported **$0.01245689** (invoice not reconciled), elapsed **285,972ms**.
+- Original raw responses retained in [artifact #13618713017](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42484832997/artifacts/13618713017) (14-day retention). All 144 authentic replies and model/condition latency, cost and commentary archived in `docs/character-runtime-lab/yeoul-language-ab-results-v1.md`.
+- GLM mean latency across conditions: baseline 2421ms, rules 2045ms, examples 1855ms; mean length 167/156/146 chars. Luna mean latency: baseline 2288ms, rules 1650ms, examples 1657ms; mean length 110/101/108 chars. GLM uses more metaphor but contains invented memories and role confusion; Luna is generally shorter with better emotional boundary expression, though it too has self-identity meta comments/occasional role confusion.
+- Both models tested isolated one-turn only; source of truth Yeoul character authoring unchanged. This result completes the authorized experiment. No production deployment, prompt promotion, further paid calls or unapproved roadmap expansion.
