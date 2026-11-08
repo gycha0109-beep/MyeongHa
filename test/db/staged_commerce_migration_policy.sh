@@ -92,6 +92,21 @@ skip_staged_portone_migration_from_historical_fixture() {
     echo "Skipping Reader-only replay-current-state migration from historical catalog: $name"
     return 0
   fi
+  # 2410 replaces the private Reader 2390 verified cancellation writer.
+  if [[ "$name" == '2410_official_reader_unbound_cancel_replay_current_grant_guard_v1.sql' ]]; then
+    [[ "$inclusion" == 'reader-integrated' ]] && return 1
+    expected='27ade134deb15bd2f7c0aff1c13606f557950930'
+    actual="$(git hash-object "$migration")" || {
+      echo 'HOLD_UNBOUND_REPLAY_MIGRATION_FINGERPRINT_UNAVAILABLE' >&2
+      exit 1
+    }
+    if [[ "$actual" != "$expected" ]]; then
+      echo 'HOLD_UNBOUND_REPLAY_MIGRATION_FINGERPRINT_DRIFT' >&2
+      exit 1
+    fi
+    echo "Skipping Reader-only unbound replay migration from historical catalog: $name"
+    return 0
+  fi
   case "${migration##*/}" in
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;
