@@ -127,3 +127,46 @@ Watchtower-Track: frontend-integration
 - **블로커/승인:** 번역 오류 수정에는 추가 승인 필요 없음. 미승인 법정 정책의 대외 공개는 실시하지 않음.
 
 Watchtower-Track: frontend-integration
+
+
+## 2026-11-08 — Stage 5 게스트 출생정보 → 승인된 사주 Preview 실브라우저 동선
+
+- **선행 작업 종료 증거:** [프론트 PR #3136](https://github.com/gycha0109-beep/MyeongHa/pull/3136) HEAD `1e36085589e977722c901eef7eb913ddaf003685`의 [CI #42414029872](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414029872), [Web PR #42414029843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414029843), [Governance #42414029880](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414029880), 필수 [Integration #42414505018](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42414505018) **전부 SUCCESS**. 2026-11-07T21:29:32Z [main merge `f220973644d66373b86b404e133eba579a2a4621`](https://github.com/gycha0109-beep/MyeongHa/commit/f220973644d66373b86b404e133eba579a2a4621) 확인. 지난 단위의 오작동 링크·다국어 오류 수정은 **병합 완료**이며 공식 정책 대외 공개 승인과 무관.
+- **기존 ROADMAP의 정확한 다음 미완료 단위:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5의 `Real browser E2E: guest → birth → supported Saju Preview`. 기존 `scripts/run-web-birth-session-browser-smoke-v2.mjs`는 게스트 출생정보 생성만, 기존 `scripts/verify-web-general-natal-preview-browser.mjs`는 브라우저에 이미 있는 합성 토큰으로 Preview 화면 직접 방문만 검증해 **화면 간 실제 연결**은 검증하지 않았다. 이번 범위는 기존 공개 Reading 중 Preview가 허용된 `career` (직업운) 한 경로뿐이며 새 제품·권한 추가 없음.
+- **변경 파일:** `scripts/verify-web-general-natal-preview-browser.mjs` — 기존 격리 Chrome/loopback 테스트에 합성 게스트 bootstrap, Birth Profile 저장, 서버 계산, 현재 자기 명식 revision 확인 응답을 추가. 실제 `reading.html` 입력 화면에서 출생 연월일·시각을 입력해 저장하고, 서버 계산 후 표시된 카드의 `직업 · 커리어` Preview 링크를 클릭하여 `reading-detail.html`로 이동/전달되었는지 확인. 동일한 합성 주체 Bearer 재사용, `bootstrap → birth create → calculation → current profile` 순서, 정확한 `readingText=직업운`, 실제 표시 영역까지 검사. 기존 General Natal 성공/오류/연간 제공 차단 테스트와 PASS 식별자는 유지. `docs/operations/FRONTEND_INTEGRATION_WORKLOG.md` — 본 기존 트랙 이력 업데이트. 변경 범위는 운영 코드·DB·라우팅·서비스 권한·결제 및 관상 전송에 영향 없음.
+- **코드·테스트 커밋:** `bda98e5bbeffca06a91192b3cda90ce5bc95267a`(회귀 동선 구현), `7d00dfe415299d2981cecbf01c94a26573ca867f`(브라우저 CSS 선택자 문자열 안전하게 구성), `974a14e064233ed24f15e6322298c873202fd11a`(기존 PASS 마커 보존). `Watchtower-Track: frontend-integration`, 브랜치 `test/frontend-integration/guest-birth-preview-stage5-20261108`.
+- **검증 결과/미판정:** 실제 GitHub 소스와 `scripts/ci/web-pr-checks.json`에서 변경 테스트가 기존 Saju/전체 웹 브라우저 검사 대상인 것을 확인. 사용자 PC에서 해당 스크립트의 Node 구문 검사(`node --check`) **PASS**. 브라우저 실행 성공/CI·Governance·통합 CI·배포 증거는 **새 커밋 HEAD 결과 확인 전까지 미판정**. 시험은 로컬 loopback 합성 출생정보와 가짜 응답만 사용하여 실제 서버/Production 계정·RPO·배포 수용을 주장하지 않음.
+- **남은 과제:** 이번 게스트 동선 PR의 브라우저·일반 CI·Governance·필수 통합 CI와 병합 성공 확인. Stage 5 실회원 → 보관함/공식 기록, 네트워크 장애·세션 만료·추가 접근성, 정식 법무/개인정보·환불/보관 공개 동선은 별도 미완료. Stage 2~4 공식 Reader/결제/관상 제공 게이트도 차단 유지.
+- **다음/승인:** 신규 PR의 최신 브라우저 실제 실행을 확인하고 실패하면 이 테스트 동선의 실제 문제만 고친다. 일반 검증 통과 후 필수 통합 CI 제출·자동 병합 확인. 정식 이용약관·개인정보처리방침 게시, 운영 유료/이미지/결제 기능은 **별도 승인 전 금지**.
+
+Watchtower-Track: frontend-integration
+
+## 2026-11-08 — PR #3141 브라우저 실패 관측 범위 보강
+
+- **확인한 사실:** `frontend-integration` PR [#3141](https://github.com/gycha0109-beep/MyeongHa/pull/3141) HEAD `cd1405d2d6975dc3b330b17be63ca90edd38444f`: [CI #42416678193](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416678193)와 [Governance #42416678030](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416678030) 성공, [Web PR #42416678175](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416678175) 실패. 실패 위치는 `verify-web-general-natal-preview-browser.mjs`의 실제 게스트 출생정보 입력·명식 계산 후 직업운 Preview 이동 검사 12초 타임아웃. 앞선 브라우저 검사들은 통과했고, 마지막 페이지가 왜 Preview로 바뀌지 않았는지는 기존 로그만으로 미확정.
+- **변경:** 기존 `scripts/verify-web-general-natal-preview-browser.mjs`의 **해당 실패 지점에만** 경로·화면 route-state·표시 여부·합성 Preview 요청 method/readingText를 기록하는 실패 진단을 추가. 사용자 인증 토큰, 요청 전문, 출생 입력 및 다른 데이터는 로그에 남기지 않음. 검사 기대치·제품 UI·권한/서버 로직은 변경하지 않음.
+- **미완료:** 새 HEAD CI의 구체적인 실패 상태 확인 후 실제 원인 수정; 이후 일반/Web/Governance 및 필수 통합 CI 확인·병합. Stage 5의 다른 점검과 Stage 2~4 출시 게이트는 변함없음.
+- **다음:** 신규 HEAD의 [PR 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3141/checks)에서 실브라우저 실패 스냅샷 확인 후, 같은 PR에서 해당 원인만 수정. 진단 추가 자체를 기능 복구나 ROADMAP_COMPLETE로 선언하지 않음.
+- **블로커·승인:** 추가 승인 없음. 실제 브라우저 검증이 미통과 상태.
+
+Watchtower-Track: frontend-integration
+
+## 2026-11-08 — PR #3141 Web PR Verify 실사용 클릭 재현 수정
+
+- **실패 증거:** HEAD `038d9894dde594a9952b8d5113b4596e36725323`, [Web PR #42418029250 / job #128540233985](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42418029250/job/128540233985?pr=3141) **FAIL**. 진단에서 게스트 Birth 생성과 계산 후 경로가 `/reading.html`에 머물렀고, 마지막 Preview 요청은 기존 `전체 사주`였으며 `직업운` 요청은 발생하지 않았다. 즉, 기존 `element.click()` 호출만으로는 해당 E2E에서 링크 이동이 확인되지 않았으며, 원인을 실제 Preview 서버 응답으로 단정할 수 없다.
+- **수정:** `scripts/verify-web-general-natal-preview-browser.mjs`에서 JS `element.click()` 대신 실제 Chrome 마우스 이동·누름·해제를 사용해 **사용자와 같은 링크 클릭**을 확인하도록 변경했다. 클릭 전 현재 화면의 링크 연결 여부, 목적지, 표시 상태 및 다른 요소에 가려지지 않는지 확인하여 UI 결함은 그대로 FAIL 처리한다. 게스트 주체 일치·직업운 요청·Preview 응답 표시 검사와 기존 실패 시 민감정보 제외 진단은 유지한다. 제품 코드·권한·서비스 응답은 수정하지 않았다.
+- **검증/미완료:** 본 변경 HEAD의 Web PR/CI/Governance 검증 및 필수 통합 CI는 아직 결과 미확인. 실제 클릭으로도 화면 이동이 실패하면 최신 로그의 정확한 원인을 이어서 수정한다. 이번 수정만으로 기능 성공이나 출시 승인을 선언하지 않는다.
+- **다음:** [PR #3141 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3141/checks)의 변경 HEAD 결과 확인 → 실패 지점 재수정 또는 통합 검증 진행. Stage 2~4 공식 Reading·결제·관상 승인 차단과 법무·개인정보 미승인 상태 유지.
+- **승인:** 추가 사용자 승인 없음.
+
+Watchtower-Track: frontend-integration
+
+## 2026-11-08 — PR #3141 Web PR Verify 캐릭터 선택 단계 반영
+
+- **실패 근거:** 코드 HEAD `e2bcd4fd62a1389804c465217740bfe00e68580d`에서 [Web PR #42474477325 / job #128712606547](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474477325/job/128712606547?pr=3141) **FAIL**. 동일 HEAD의 일반 [CI #42474477452](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474477452)와 [Governance #42474477375](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474477375)는 **PASS**. 실브라우저는 출생정보 생성·계산 후 실제 클릭에도 `/reading.html`에 있었으며 직업운 요청이 발생하지 않았다.
+- **실제 원인:** `apps/web/reading-reader-picker.js`는 `reading-detail.html` 링크 클릭을 의도적으로 가로채 `createDelegatePicker`의 모달을 연다. 사용자가 `reader-rollout-policy.js`에 의해 Preview 장면 선택만 허용된 `seyeon`을 선택하면 그때 실제 상세 화면으로 이동한다. 기존 테스트는 이 정상 단계가 없는 것으로 가정해 12초 타임아웃이 발생했다. **제품 결함이 아니라 테스트 동선 누락**이다.
+- **수정:** `scripts/verify-web-general-natal-preview-browser.mjs`에서 실제 클릭 후 캐릭터 선택 창 열림, 선택 가능한 대상이 `seyeon` 하나뿐임을 검증하고 해당 장면을 선택해 상세 화면으로 이동한다. 이동 후 `reader=seyeon`이 **화면 연출 힌트**임을 확인하고 기존 게스트 권한·직업운 `readingText`·실제 Preview 표시 검증 유지. 실패 시 모달 열림 여부를 안전하게 기록. 실제 웹 제품·결제·유료 Reader 게이트는 변경하지 않음.
+- **검증 및 남은 작업:** 새 HEAD의 일반/Web/Governance CI·필수 통합 CI 결과는 미확정. [PR #3141 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3141/checks)에서 실브라우저 성공을 확인하고, 선행 검사 전부 성공 시 기존 통합 검증 절차를 수행해야 한다. Stage 2~4·법무 미승인 출시 차단 유지.
+- **블로커/승인:** 별도 승인 필요 없음. 새 HEAD의 실제 CI 결과 대기.
+
+Watchtower-Track: frontend-integration
