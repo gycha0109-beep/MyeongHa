@@ -60,6 +60,22 @@ skip_staged_portone_migration_from_historical_fixture() {
     echo "Skipping Reader-only cancellation status migration from historical catalog: $name"
     return 0
   fi
+  # 2390 forward-replaces the exact Reader full-cancel writer from 1890.
+  # Only fully migrated Reader-integrated PG17 may compile its replacement.
+  if [[ "$name" == '2390_official_reader_full_cancel_exact_event_replay_guard_v1.sql' ]]; then
+    [[ "$inclusion" == 'reader-integrated' ]] && return 1
+    expected='15767023608188b9269df992f1663a5189528a36'
+    actual="$(git hash-object "$migration")" || {
+      echo 'HOLD_READER_CANCEL_REPLAY_MIGRATION_FINGERPRINT_UNAVAILABLE' >&2
+      exit 1
+    }
+    if [[ "$actual" != "$expected" ]]; then
+      echo 'HOLD_READER_CANCEL_REPLAY_MIGRATION_FINGERPRINT_DRIFT' >&2
+      exit 1
+    fi
+    echo "Skipping Reader cancellation replay migration from historical catalog: $name"
+    return 0
+  fi
   case "${migration##*/}" in
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;

@@ -41,6 +41,8 @@ declare
  v_display_scope record;
  v_display_state text;
  v_display_probe_done boolean:=false;
+ v_replay_revision_conflict_denied boolean:=false;
+ v_verified_cancel_replay jsonb;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -440,6 +442,62 @@ begin
             and ee.event_type='revoked')<>1 then
      raise exception 'CLAIM_E2E_EXACT_FULL_CANCEL_GRANT_EVENT_MISMATCH';
    end if;
+   -- Real 1890/2390 full-cancellation command must safely replay a
+   -- verified exact original GET event and its already-applied 1080 effect,
+   -- without writing another Entitlement Event or touching sibling B3.
+   select public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+     v_refund_reservation.payment_id,
+     v_receipt.external_transaction_id,
+     'synthetic-claim-b2-not-confirmed',v_positive_event_at,
+     v_receipt.verified_amount_minor,v_receipt.verified_currency,
+     'production','hmac-sha256:k1:'||repeat('8',64),
+     'portone-v2-payment-full-cancel-lookup-v1'
+   ) into strict v_verified_cancel_replay;
+   if v_verified_cancel_replay->>'receiptId'<>v_receipt.id::text
+      or v_verified_cancel_replay->>'providerEventId'<>
+          '1219d000-0000-4000-8000-000000000008'
+      or v_verified_cancel_replay->'revoke'->>'grantCount'<>'1'
+      or v_verified_cancel_replay->'revoke'->'effects'->0->>'replayed'<>'true'
+      or (select count(*) from public.entitlement_events ee
+            where ee.grant_id=v_grant.id
+              and ee.source_provider_event_id=
+                '1219d000-0000-4000-8000-000000000008'::uuid)<>1
+      or (select count(*) from public.entitlement_grants g
+            where g.id=v_other.id and g.status='active'
+              and g.revision=v_original_other_revision)<>1
+   then
+     raise exception 'CLAIM_E2E_FULL_CANCEL_EXACT_REPLAY_OR_SIBLING_CHANGED';
+   end if;
+   -- The SAME original stored cancellation ID with a different verifier
+   -- revision must conflict BEFORE reusing that Event/Grant, despite the
+   -- Receipt/transaction/amount/HMAC remaining otherwise identical.
+   begin
+     perform public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+       v_refund_reservation.payment_id,
+       v_receipt.external_transaction_id,
+       'synthetic-claim-b2-not-confirmed',v_positive_event_at,
+       v_receipt.verified_amount_minor,v_receipt.verified_currency,
+       'production','hmac-sha256:k1:'||repeat('8',64),
+       'synthetic-unmatched-verifier-revision-v9'
+     );
+   exception when unique_violation then
+     if sqlerrm='PortOne full cancellation replay conflicts with persisted evidence' then
+       v_replay_revision_conflict_denied:=true;
+     else raise;
+     end if;
+   end;
+   if not v_replay_revision_conflict_denied
+      or (select count(*) from public.entitlement_events ee
+           where ee.grant_id=v_grant.id
+             and ee.source_provider_event_id=
+                '1219d000-0000-4000-8000-000000000008'::uuid)<>1
+      or (select count(*) from public.entitlement_grants g
+           where g.id=v_grant.id and g.status='revoked'
+             and g.last_effective_at=v_positive_event_at)<>1
+   then
+     raise exception 'CLAIM_E2E_REPLAY_DIFFERENT_VERIFIER_REVISION_ACCEPTED';
+   end if;
+
    -- A once-authoritative revoke Event can remain in history even if
    -- a later material lifecycle update changes the Grant's current effect
    -- clock/order. Do not borrow that old proof to confirm a new refund.

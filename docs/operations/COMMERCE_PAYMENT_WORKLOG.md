@@ -1138,3 +1138,11 @@
 - **PG17 격리 검증:** 기존 B2/B3 독립 구매권 합성 통합 시험에서 B2가 원본 전체 취소로 회수되더라도 B3가 활성일 때는 현재 구매권 표시를 우선합니다. 하위 ROLLBACK에서만 B3 비활성 상태를 가정해 진짜 B2 취소 상태 표시와 최신 B2 효과 시각이 바뀐 경우의 거부를 각각 검증하고, B3/원래 이벤트·상태를 복원합니다.
 - **운영 경계:** 신규 테이블/원장/Writer/공개 API/실제 PortOne 환불 POST/운영 DB 적용/LIVE 활성화 없음. 2380 Git SHA를 역사적 DB Fixture 정책에 고정해 기존 PostgreSQL 15/17 카탈로그를 보존하고 Reader 통합 PG17에만 적용합니다. 신규 CI 실행 성공 전까지 PASS 미선언.
 - **남은 항목:** 공식 Provider NEWER/STALE 일반 비교·Reader T2 완전한 실제 회수, 실제 고객 제공 입증, 복원 후 개인정보 replay, 전체 E2E.
+
+### 2026-11-08 — 실제 PortOne 전체 취소 재전송의 검증 원본 동일성·시각·순서 강제
+
+- **기준:** [CI #42485735481](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485735481) 전 검사 GREEN. 승인 결제 로드맵 §6-1·2·5. 최신 main과 PR의 기존 1890 Reader 전체 취소 Writer가 동일한 Git blob인 것을 확인했습니다. 기존 DB Writer는 같은 취소 ID의 Provider Event가 이미 존재할 때 Receipt/Subject/Transaction/시각/지문·상태만 재검증하고, 검증기 revision, 전체 증거 payload, 정규화 ordering key, 환경, 원본 출처를 재대조하지 않았습니다.
+- **구현:** 기존 1890 동일 함수의 정방향 후보 `2390_official_reader_full_cancel_exact_event_replay_guard_v1.sql`을 추가해 모든 재전송에서 저장된 원본 Event의 exact Receipt/Subject/Transaction, 필요 시 originalTransaction, 출처/환경, 원본 취소 시각과 UTC ordering, HMAC 지문, 검증기 revision, 완전한 정규화 PortOne GET payload 및 처리 상태를 재검증합니다. 하나라도 다르면 같은 ID를 재활용하거나 다른 구매권으로 재귀속하지 않고 즉시 기존 충돌 에러로 거부합니다. 정상 동일 재처리는 기존 공유 Reader S1 잠금과 1910/1080 단일 Effect Writer를 그대로 사용합니다. 별도 원장/권한/API/운영 POST 없음.
+- **실제 격리 PG17 검증:** 원본 B2 GET형 Provider Event→기존 1080 구매권 회수 이후 실제 1890/2390 full-cancellation DB 함수를 재실행해 같은 Event 및 Grant Effect 재실행만 발생하는지 확인합니다. 같은 Event ID에 다른 verifier revision을 제출하는 경우는 해당 함수가 오류로 거부하고 B3 독립 구매권 및 이전 B2 Effect를 변경하지 않는지 검사합니다. 전체 하위·외부 트랜잭션 ROLLBACK.
+- **CI 적용:** 독립 Vitest 정적 계약, 역사적 fixture SHA guard, WORKLOG 업데이트. 신규 CI/PG17 성공은 확인 전 미선언.
+- **남은 로드맵:** Provider 전체 NEWER/STALE 의미 비교, Reader T2 최종 동시성, 실제 고객 제공 증거 및 개인정보 복원 replay, 전체 비운영 E2E. 실제 PG 환불 POST/운영 DB/공개 LIVE 활성화 미수행.
