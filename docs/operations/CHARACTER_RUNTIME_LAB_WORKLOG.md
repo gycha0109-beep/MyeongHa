@@ -33,3 +33,13 @@
 - The script had `provider.require_parameters=true`, `temperature:0.7` for Luna. The 404 is consistent with a no-eligible-route result, but the exact provider message was deliberately not logged; the routing cause is therefore strongly suspected, not proven.
 - Fix: omit unsupported `temperature` for Luna, retain it for GLM; explicitly record the sampling mismatch in output metadata. Keep model IDs, strict JSON schema, ZDR, deny data collection, no fallback, 144-call maximum, USD 0.20 reported-cost hold, production isolation unchanged.
 - Once protected CI and integration succeed, one main-only trigger runs the corrected experiment. Report actual counts, original replies and model-specific token/cost/latency; no claims of success before artifact inspection.
+
+
+## 2026-11-08 — GLM / GPT-6 Luna 144-case experiment completed and reviewed
+
+- PR #3140 merged as `959a766d756416778b840ba231f2f4398e828d6e`, integration run #42417713223 SUCCESS.
+- Main-only experiment [#42418325224](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42418325224) SUCCESS: 144/144 requests completed, `failure=null`, provider-reported cost **$0.01097541** against $0.20 bound; 212,573 ms total duration. The reported cost is not an invoice reconciliation.
+- Result raw JSON archive: [GitHub Actions artifact #13592572074](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42418325224/artifacts/13592572074) (14-day retention). Durable complete 144-response comparative record: `docs/character-runtime-lab/taegyeom-language-ab-results-v1.md`.
+- 24 responses each for six model×prompt variants. GLM average latency baseline 1368 ms, language 1555 ms, examples 1042 ms; Luna baseline 1740 ms, language 1600 ms, examples 1552 ms. GLM has more detailed character-boundary reasoning but sometimes exhibits speaker confusion and nonexistent conversational context; Luna is usually terser and natural but sometimes over-initiates intimacy or slips into generic AI meta-language.
+- Both models invent unsupported daily experiences in some responses. Two single-turn repetitions per case do not establish multi-turn authenticity or statistically conclusive superiority. Sampling is not strictly identical: GLM temp=0.7, Luna provider default because Luna endpoints did not advertise temperature.
+- Decision: **no automatic production promotion**. The approved isolated synthetic evaluation is now complete. Quality selection and any product changes remain separate owner decisions; no new experiment has been authorized.
