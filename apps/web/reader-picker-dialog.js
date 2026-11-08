@@ -56,7 +56,9 @@ export function createDelegatePicker({
 
   const grid = document.createElement('div');
   grid.className = 'reading-reader-picker-grid';
-  grid.setAttribute('role', 'list');
+  // Preserve native button semantics for screen readers and keyboard navigation.
+  grid.setAttribute('role', 'group');
+  grid.setAttribute('aria-labelledby', heading.id);
 
   const localePainters = [];
   // Public picker visibility only. Keep canonical reader identities and old links intact.
@@ -72,7 +74,6 @@ export function createDelegatePicker({
     if (optionState.stage) button.dataset.readerRolloutState = optionState.stage;
     button.disabled = optionState.selectable === false;
     if (button.disabled) button.classList.add('is-unavailable');
-    button.setAttribute('role', 'listitem');
     // The label is localized with the name below, while availability is unchanged.
 
     const art = document.createElement('span');

@@ -342,10 +342,24 @@ try {
     enabledReaders: [...document.querySelectorAll('dialog[data-reading-reader-picker] [data-reader-key]:not(:disabled)')]
       .map((button) => button.dataset.readerKey),
     seyeonVisible: document.querySelector('dialog[data-reading-reader-picker] [data-reader-key="seyeon"]')?.hidden === false,
+    groupRole: document.querySelector('dialog[data-reading-reader-picker] .reading-reader-picker-grid')?.getAttribute('role'),
+    groupLabel: document.querySelector('dialog[data-reading-reader-picker] .reading-reader-picker-grid')?.getAttribute('aria-labelledby'),
+    selectedRole: document.querySelector('dialog[data-reading-reader-picker] [data-reader-key="seyeon"]')?.getAttribute('role'),
+    focusedReader: document.activeElement?.dataset.readerKey ?? null,
   }))()`);
   assert(JSON.stringify(pickerState.enabledReaders) === JSON.stringify(['seyeon']) && pickerState.seyeonVisible,
     'Preview picker must admit only the existing presentation Reader: ' + JSON.stringify(pickerState));
-  await client.evaluate('document.querySelector(\'dialog[data-reading-reader-picker] [data-reader-key="seyeon"]\').click()');
+  // Native button semantics must be preserved, with focus on the available Reader.
+  assert(pickerState.groupRole === 'group' && pickerState.groupLabel === 'reading-reader-picker-title' &&
+    pickerState.selectedRole === null && pickerState.focusedReader === 'seyeon',
+    'Reader picker must expose a focused native button: ' + JSON.stringify(pickerState));
+  // Use the actual Chrome keyboard to activate the available Reader.
+  await client.send('Input.dispatchKeyEvent', {
+    type: 'rawKeyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13,
+  });
+  await client.send('Input.dispatchKeyEvent', {
+    type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13,
+  });
   try {
     await waitFor(client,
       'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',

@@ -27,6 +27,9 @@ describe('MyeongHa Saju 연결자 picker', () => {
     expect(runtime).toContain('저장된 풀이를 다시 읽거나 대화를 이어가는 연결자는 서버에서 연결 가능한 상태가 확인된 뒤 별도로 표시됩니다.');
     expect(runtime).not.toContain('공개된 유료 연결자 해석');
     expect(shared).toContain("button.disabled = optionState.selectable === false;");
+    expect(shared).toContain("grid.setAttribute('role', 'group')");
+    expect(shared).toContain("grid.setAttribute('aria-labelledby', heading.id)");
+    expect(shared).not.toContain("button.setAttribute('role', 'listitem')");
     expect(shared).toContain('if (!(button instanceof HTMLButtonElement) || button.disabled) return;');
     expect(shared).toContain("typeof dialog.showModal === 'function'");
     expect(css).toContain('.reading-reader-picker-grid');

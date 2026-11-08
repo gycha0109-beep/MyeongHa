@@ -170,3 +170,15 @@ Watchtower-Track: frontend-integration
 - **블로커/승인:** 별도 승인 필요 없음. 새 HEAD의 실제 CI 결과 대기.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — Stage 5 연결자 선택 키보드 접근성 수정
+
+- **선행 완료:** [PR #3141](https://github.com/gycha0109-beep/MyeongHa/pull/3141) HEAD `427927b868b4d61ebd686f4229a19864022d8cd2`에서 일반 CI #42475953020, Web PR #42475952993, Governance #42475953008, [필수 통합 CI #42479225733](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42479225733) 성공 후 `main` merge `e5355f845e7748085f4381fb1c8cb1ac105572fc` 확인.
+- **로드맵 근거:** `docs/WEB_USER_JOURNEY_HARDENING_PLAN_2026-10-08.md` Stage 5 접근성. 회원 로그인 → 기록 → 공식 보관함 재열람은 기존 `verify-web-records-auth-browser-core.mjs`가 검사하므로 반복 구현하지 않음.
+- **확인한 실제 문제:** 공용 `reader-picker-dialog.js`가 선택 가능한 HTML 버튼에 `role=listitem`을 설정하여 스크린리더가 기본 버튼 역할을 인식하기 어려움.
+- **구현:** `apps/web/reader-picker-dialog.js`에서 선택 가능한 버튼의 기본 역할을 유지하고 제목이 연결된 선택 그룹으로 수정. `scripts/verify-web-general-natal-preview-browser.mjs`에서 실제 브라우저의 버튼 초점 및 Enter 선택→지원 사주 프리뷰 결과 표시 검사를 추가. `test/web-saju-reader-picker-v1.test.ts`에 역할 회귀 검사 추가. 법무/유료/관상 공개 및 서버 권한은 변경하지 않음.
+- **검증:** 새 PR의 일반/Web/Governance와 필수 통합 CI는 아직 확인 전. 기존 합성 게스트 테스트는 실제 Production 검증이 아님.
+- **남은 것/다음:** 같은 트랙 신규 PR CI 확인, 필수 통합 CI, 자동 병합 확인 → 로드맵 Stage 5의 미완료 네트워크/세션/접근성 점검 계속.
+- **블로커/승인:** 추가 승인 없음. Stage 2~4의 공식 해석/유료/관상 출시 차단 유지.
+
+Watchtower-Track: frontend-integration
