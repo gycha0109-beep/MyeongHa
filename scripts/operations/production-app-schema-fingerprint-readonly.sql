@@ -104,7 +104,30 @@ tables AS (
    (SELECT count(*) FROM pg_catalog.pg_policies p
     WHERE p.schemaname=t.schema_name AND p.tablename=t.table_name) AS policy_count,
    pg_catalog.encode(pg_catalog.sha256(
-     pg_catalog.convert_to(t.structural_definition::text,'UTF8')),'hex') AS structural_sha256
+     pg_catalog.convert_to(t.structural_definition::text,'UTF8')),'hex') AS structural_sha256,
+   -- Only per-component digests, never column/constraint/ACL raw material.
+   pg_catalog.jsonb_build_object(
+     'columns',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'columns')::text,'UTF8')),'hex'),
+     'constraints',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'constraints')::text,'UTF8')),'hex'),
+     'indexes',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'indexes')::text,'UTF8')),'hex'),
+     'triggers',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'triggers')::text,'UTF8')),'hex'),
+     'policies',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'policies')::text,'UTF8')),'hex'),
+     'acl',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'acl')::text,'UTF8')),'hex'),
+     'reloptions',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'reloptions')::text,'UTF8')),'hex'),
+     'persistence',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'persistence')::text,'UTF8')),'hex'),
+     'rowSecurityEnabled',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'rowSecurityEnabled')::text,'UTF8')),'hex'),
+     'rowSecurityForced',pg_catalog.encode(pg_catalog.sha256(
+       pg_catalog.convert_to((t.structural_definition->'rowSecurityForced')::text,'UTF8')),'hex')
+   ) AS structural_component_sha256
  FROM table_catalog t
 ),
 functions AS (
@@ -126,7 +149,17 @@ functions AS (
          ORDER BY a.grantee,a.grantor,a.privilege_type)
        FROM pg_catalog.aclexplode(
          coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
-     ),'<NO_ACL>'),'UTF8')),'hex') AS acl_sha256
+     ),'<NO_ACL>'),'UTF8')),'hex') AS acl_sha256,
+   -- Same ACL grant entries without GRANTED BY, not inherited effective rights.
+   pg_catalog.encode(pg_catalog.sha256(
+     pg_catalog.convert_to(coalesce((
+       SELECT pg_catalog.string_agg(
+         (CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(a.grantee) END)
+         ||':'||a.privilege_type||':'||a.is_grantable::text,E'\n'
+         ORDER BY a.grantee,a.privilege_type,a.is_grantable)
+       FROM pg_catalog.aclexplode(
+         coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+     ),'<NO_ACL>'),'UTF8')),'hex') AS acl_grant_entries_without_grantor_sha256
  FROM pg_catalog.pg_proc p
  JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
@@ -142,7 +175,14 @@ schema_metadata AS (
        ||':'||a.privilege_type||':'||a.is_grantable::text,E'\n'
        ORDER BY a.grantee,a.grantor,a.privilege_type)
      FROM pg_catalog.aclexplode(coalesce(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
-   ),'<NO_ACL>'),'UTF8')),'hex') AS acl_sha256
+   ),'<NO_ACL>'),'UTF8')),'hex') AS acl_sha256,
+   pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(coalesce((
+     SELECT pg_catalog.string_agg(
+       (CASE WHEN a.grantee=0 THEN 'PUBLIC' ELSE pg_catalog.pg_get_userbyid(a.grantee) END)
+       ||':'||a.privilege_type||':'||a.is_grantable::text,E'\n'
+       ORDER BY a.grantee,a.privilege_type,a.is_grantable)
+     FROM pg_catalog.aclexplode(coalesce(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
+   ),'<NO_ACL>'),'UTF8')),'hex') AS acl_grant_entries_without_grantor_sha256
  FROM pg_catalog.pg_namespace n
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
 )

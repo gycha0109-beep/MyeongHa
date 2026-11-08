@@ -52,6 +52,56 @@ const kinds = {
   },
 };
 
+const tableComponentNames = [
+  'columns', 'constraints', 'indexes', 'triggers', 'policies', 'acl',
+  'reloptions', 'persistence', 'rowSecurityEnabled', 'rowSecurityForced',
+];
+const digestPattern = /^[0-9a-f]{64}$/;
+
+function assertDigest(value, label) {
+  assert.match(value, digestPattern, label + ' requires SHA-256');
+}
+
+function componentDifferences(source, restored) {
+  const before = source.structural_component_sha256;
+  if (before === undefined) return null; // Existing encrypted archives predate facets.
+  const after = restored.structural_component_sha256;
+  for (const [side, value] of [['source', before], ['restored', after]]) {
+    assert.ok(value && typeof value === 'object' && !Array.isArray(value),
+      side + ' table component hashes must be a JSON object');
+    assert.deepEqual(Object.keys(value).sort(), [...tableComponentNames].sort(),
+      side + ' table component hash fields changed');
+    for (const key of tableComponentNames) assertDigest(value[key], side + ':' + key);
+  }
+  const differences = tableComponentNames.filter(key => before[key] !== after[key]);
+  assert.equal(differences.length === 0,
+    source.structural_sha256 === restored.structural_sha256,
+    'Component and aggregate structural digests contradict one another');
+  return differences;
+}
+
+function aclDifferenceScope(source, restored) {
+  const before = source.acl_grant_entries_without_grantor_sha256;
+  if (before === undefined) return null; // Older encrypted evidence remains valid.
+  const after = restored.acl_grant_entries_without_grantor_sha256;
+  assertDigest(before, 'source grant-entry digest');
+  assertDigest(after, 'restored grant-entry digest');
+  if (source.acl_sha256 === restored.acl_sha256) {
+    assert.equal(before, after, 'Same full ACL but different grant-entry digest');
+    return 'MATCH';
+  }
+  return before === after
+    ? 'GRANTOR_ATTRIBUTION_ONLY'
+    : 'GRANT_ENTRIES_DIFFER';
+}
+
+function assertUniformFacetCoverage(rows, kind, field) {
+  const present = rows.filter(row => row[field] !== undefined).length;
+  assert.ok(present === 0 || present === rows.length,
+    'Source ' + kind + ' facet digest coverage must be all or none');
+  return present === rows.length;
+}
+
 function indexed(rows, kind, definition) {
   assert.ok(Array.isArray(rows), kind + ' must be an array');
   const map = new Map();
@@ -107,6 +157,14 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
   const migrationFrontierAligned =
     String(source.migrationCatalog.latestVersion) === String(backupFrontier);
   const byType = {};
+  const componentHashEvidence = {
+    tableStructure: assertUniformFacetCoverage(source.tables, 'tables',
+      'structural_component_sha256'),
+    schemaAclGrantEntries: assertUniformFacetCoverage(source.schemas, 'schemas',
+      'acl_grant_entries_without_grantor_sha256'),
+    routineAclGrantEntries: assertUniformFacetCoverage(source.functions, 'functions',
+      'acl_grant_entries_without_grantor_sha256'),
+  };
   for (const [kind, definition] of Object.entries(kinds)) {
     const before = indexed(source[kind], kind, definition);
     const after = indexed(restored[kind], kind, definition);
@@ -119,7 +177,20 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
       }
       const differingFields = definition.fields.filter(field =>
         JSON.stringify(value[field]) !== JSON.stringify(matched[field]));
-      if (differingFields.length) changed.push({ object: identity, differingFields });
+      // Validate facet / aggregate consistency even when the aggregate matches.
+      const parts = kind === 'tables' ? componentDifferences(value, matched) : null;
+      const scope = kind === 'schemas' || kind === 'functions'
+        ? aclDifferenceScope(value, matched) : null;
+      if (differingFields.length) {
+        const detail = { object: identity, differingFields };
+        if (parts !== null && differingFields.includes('structural_sha256')) {
+          detail.structuralComponentDifferences = parts;
+        }
+        if (scope !== null && differingFields.includes('acl_sha256')) {
+          detail.aclDifferenceScope = scope;
+        }
+        changed.push(detail);
+      }
     }
     for (const identity of after.keys()) {
       if (!before.has(identity)) additional.push(identity);
@@ -157,6 +228,10 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     sourcePostgresVersion: source.postgresqlVersion,
     restoredPostgresVersion: restored.postgresVersion,
     comparedScope: source.coverage,
+    // New sealed catalogs can locate each structural/ACL facet without
+    // disclosing raw definitions, grantors, row payloads or credentials.
+    // Old sealed/legacy catalogs have no such evidence: never infer a cause.
+    componentHashEvidence,
     types: byType,
     applicationScopeVerdict: !migrationFrontierAligned
       ? 'HOLD_SOURCE_BACKUP_FRONTIER_MISMATCH'
