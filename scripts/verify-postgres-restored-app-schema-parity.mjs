@@ -18,6 +18,7 @@ assert.ok(restoredQuery.includes('structural_sha256'));
 assert.ok(restoredQuery.includes('structural_component_sha256'));
 assert.ok(restoredQuery.includes('acl_sha256'));
 assert.ok(restoredQuery.includes('acl_grant_entries_without_grantor_sha256'));
+assert.ok(restoredQuery.includes('acl_by_grantee_privilege_sha256'));
 assert.ok(!restoredQuery.includes('FROM supabase_migrations.schema_migrations'));
 
 const restored = {
@@ -35,6 +36,7 @@ assert.equal(matched.restoreMismatchRootCauseProven, false);
 assert.deepEqual(matched.componentHashEvidence, {
   tableStructure: false, schemaAclGrantEntries: false,
   routineAclGrantEntries: false,
+  tableAclByGrantee: false, schemaAclByGrantee: false, routineAclByGrantee: false,
 });
 assert.equal(matched.sourceCatalogProvenance, 'legacy_date_only_observation');
 assert.equal(matched.sourceCatalogProvenanceHold,
@@ -81,6 +83,12 @@ for (const row of facetedSource.tables) {
 for (const row of [...facetedSource.schemas, ...facetedSource.functions]) {
   row.acl_grant_entries_without_grantor_sha256 = 'a'.repeat(64);
 }
+for (const row of [...facetedSource.tables, ...facetedSource.schemas,
+  ...facetedSource.functions]) {
+  row.acl_by_grantee_privilege_sha256 = {
+    anon: 'a'.repeat(64), service_role: 'a'.repeat(64),
+  };
+}
 const facetedRestored = {
   ...structuredClone(facetedSource),
   postgresVersion: source.postgresqlVersion,
@@ -90,6 +98,7 @@ const facetedMatch = compareApplicationCatalog(facetedSource, facetedRestored, f
 assert.deepEqual(facetedMatch.componentHashEvidence, {
   tableStructure: true, schemaAclGrantEntries: true,
   routineAclGrantEntries: true,
+  tableAclByGrantee: true, schemaAclByGrantee: true, routineAclByGrantee: true,
 });
 assert.equal(facetedMatch.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
 
@@ -100,6 +109,42 @@ const olderSealedAgainstNewerRestore = compareApplicationCatalog(
 assert.equal(olderSealedAgainstNewerRestore.applicationScopeVerdict,
   'MATCH_APPLICATION_CATALOG_ONLY');
 assert.equal(olderSealedAgainstNewerRestore.componentHashEvidence.tableStructure, false);
+
+// The new ACL witness narrows which DB role's grants differ without
+// exposing permission tuples or admitting the application for DR.
+const roleRestored = structuredClone(facetedRestored);
+roleRestored.tables[1].structural_sha256 = 'b'.repeat(64);
+roleRestored.tables[1].structural_component_sha256.acl = 'b'.repeat(64);
+roleRestored.tables[1].acl_by_grantee_privilege_sha256.anon = 'b'.repeat(64);
+roleRestored.schemas[1].acl_sha256 = 'b'.repeat(64);
+roleRestored.schemas[1].acl_grant_entries_without_grantor_sha256 = 'b'.repeat(64);
+roleRestored.schemas[1].acl_by_grantee_privilege_sha256.service_role = 'b'.repeat(64);
+roleRestored.functions[1].acl_sha256 = 'b'.repeat(64);
+roleRestored.functions[1].acl_grant_entries_without_grantor_sha256 = 'b'.repeat(64);
+roleRestored.functions[1].acl_by_grantee_privilege_sha256.anon = 'b'.repeat(64);
+const roleMismatch = compareApplicationCatalog(facetedSource, roleRestored, frontier);
+assert.deepEqual(roleMismatch.types.tables.changed[0].structuralComponentDifferences,
+  ['acl']);
+assert.deepEqual(roleMismatch.types.tables.changed[0].aclAffectedGrantees, ['anon']);
+assert.deepEqual(roleMismatch.types.schemas.changed[0].aclAffectedGrantees,
+  ['service_role']);
+assert.deepEqual(roleMismatch.types.functions.changed[0].aclAffectedGrantees,
+  ['anon']);
+assert.equal(roleMismatch.restoreMismatchRootCauseProven, false);
+assert.equal(roleMismatch.drReady, false);
+const missingRoleMap = structuredClone(roleRestored);
+delete missingRoleMap.tables[0].acl_by_grantee_privilege_sha256;
+assert.throws(() => compareApplicationCatalog(facetedSource, missingRoleMap, frontier));
+const corruptRoleHash = structuredClone(roleRestored);
+corruptRoleHash.tables[0].acl_by_grantee_privilege_sha256.anon = 'bad';
+assert.throws(() => compareApplicationCatalog(facetedSource, corruptRoleHash, frontier));
+const falseRoleDrift = structuredClone(facetedRestored);
+falseRoleDrift.functions[0].acl_by_grantee_privilege_sha256.anon = 'b'.repeat(64);
+assert.throws(() => compareApplicationCatalog(facetedSource, falseRoleDrift, frontier));
+const incompleteSourceRoleMap = structuredClone(facetedSource);
+delete incompleteSourceRoleMap.functions[0].acl_by_grantee_privilege_sha256;
+assert.throws(() => compareApplicationCatalog(incompleteSourceRoleMap,
+  facetedRestored, frontier));
 
 facetedRestored.tables[0].structural_sha256 = 'b'.repeat(64);
 facetedRestored.tables[0].structural_component_sha256.columns = 'b'.repeat(64);

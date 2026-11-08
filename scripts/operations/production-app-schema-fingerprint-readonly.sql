@@ -11,6 +11,8 @@ WITH
 table_catalog AS (
  SELECT
    c.oid AS relid,
+   c.relacl AS source_acl,
+   c.relowner AS owner_oid,
    n.nspname AS schema_name,
    c.relname AS table_name,
    pg_catalog.pg_get_userbyid(c.relowner) AS owner_name,
@@ -127,7 +129,22 @@ tables AS (
        pg_catalog.convert_to((t.structural_definition->'rowSecurityEnabled')::text,'UTF8')),'hex'),
      'rowSecurityForced',pg_catalog.encode(pg_catalog.sha256(
        pg_catalog.convert_to((t.structural_definition->'rowSecurityForced')::text,'UTF8')),'hex')
-   ) AS structural_component_sha256
+   ) AS structural_component_sha256,
+   coalesce((
+     SELECT pg_catalog.jsonb_object_agg(g.grantee_name,g.privileges_sha256)
+     FROM LATERAL (
+       SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC'
+                   ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee_name,
+         pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+           pg_catalog.string_agg(
+             a.privilege_type||':'||a.is_grantable::text,E'\n'
+             ORDER BY a.privilege_type,a.is_grantable
+           ),'UTF8')),'hex') AS privileges_sha256
+       FROM pg_catalog.aclexplode(
+         coalesce(t.source_acl,pg_catalog.acldefault('r',t.owner_oid))) a
+       GROUP BY a.grantee
+     ) g
+   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256
  FROM table_catalog t
 ),
 functions AS (
@@ -159,7 +176,22 @@ functions AS (
          ORDER BY a.grantee,a.privilege_type,a.is_grantable)
        FROM pg_catalog.aclexplode(
          coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
-     ),'<NO_ACL>'),'UTF8')),'hex') AS acl_grant_entries_without_grantor_sha256
+     ),'<NO_ACL>'),'UTF8')),'hex') AS acl_grant_entries_without_grantor_sha256,
+   coalesce((
+     SELECT pg_catalog.jsonb_object_agg(g.grantee_name,g.privileges_sha256)
+     FROM LATERAL (
+       SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC'
+                   ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee_name,
+         pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+           pg_catalog.string_agg(
+             a.privilege_type||':'||a.is_grantable::text,E'\n'
+             ORDER BY a.privilege_type,a.is_grantable
+           ),'UTF8')),'hex') AS privileges_sha256
+       FROM pg_catalog.aclexplode(
+         coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+       GROUP BY a.grantee
+     ) g
+   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256
  FROM pg_catalog.pg_proc p
  JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
@@ -182,7 +214,22 @@ schema_metadata AS (
        ||':'||a.privilege_type||':'||a.is_grantable::text,E'\n'
        ORDER BY a.grantee,a.privilege_type,a.is_grantable)
      FROM pg_catalog.aclexplode(coalesce(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
-   ),'<NO_ACL>'),'UTF8')),'hex') AS acl_grant_entries_without_grantor_sha256
+   ),'<NO_ACL>'),'UTF8')),'hex') AS acl_grant_entries_without_grantor_sha256,
+   coalesce((
+     SELECT pg_catalog.jsonb_object_agg(g.grantee_name,g.privileges_sha256)
+     FROM LATERAL (
+       SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC'
+                   ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee_name,
+         pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+           pg_catalog.string_agg(
+             a.privilege_type||':'||a.is_grantable::text,E'\n'
+             ORDER BY a.privilege_type,a.is_grantable
+           ),'UTF8')),'hex') AS privileges_sha256
+       FROM pg_catalog.aclexplode(
+         coalesce(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
+       GROUP BY a.grantee
+     ) g
+   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256
  FROM pg_catalog.pg_namespace n
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
 )
