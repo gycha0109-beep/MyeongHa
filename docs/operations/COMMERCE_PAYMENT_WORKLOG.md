@@ -1178,3 +1178,9 @@
 - **검증:** 정적 계약으로 양쪽 SQL의 원본 결속·Reader S1 잠금·비공개 ACL·전송 기록 분류 한계 및 역사적 migration SHA 제외 정책을 확인하도록 추가했습니다. 격리 PG17에는 2420을 단계 마이그레이션으로 적재하며 기존 Reader claim review SQL 검사를 재수행합니다. 새 CI 결과는 성공 증거가 확보되기 전까지 미확정입니다.
 - **경계:** S5 내용 저장, HTTP response prepare, S7 Client ACK는 고객의 법적 수령 확정이 아닙니다. 이 조회로 환불을 자동 승인하거나 실제 읽음을 입증하지 않습니다. 운영 PG POST·운영 DB·유료 공개 LIVE·새 데이터 원장·권한 추가 없음.
 - **잔여:** 공식 Provider 이벤트 전반 NEWER/STALE, 최종 Reader T2 동시성, 실제 고객 제공/복원 후 privacy replay 실증, 전체 통합 완료.
+
+### 2026-11-08 — S7 source guard 첫 CI TypeScript 오류 즉시 수정
+
+- **관측:** [CI #42494024682](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42494024682)의 `Work Track · commerce`에서 TypeScript 구문 검사 RED. 처음 적용한 Recorded S7 SQL 템플릿에 패턴 교체가 인용문 내 `$'`을 치환용 특수 토큰으로 해석하여 원본 SQL 뒷부분을 중복 삽입했고, 원래 Receipt JOIN보다 뒤에 선언된 Grant 별칭을 그 JOIN 안에서 참조하는 위험도 확인했습니다.
+- **수정:** 원본 GREEN S7 SQL 파일에서 다시 구성하고 **정확한 취소 검증 조건을 모든 테이블이 연결된 후의 WHERE 절**에 배치했습니다. 기존 Receipt JOIN, 반환 열·변환 함수·S5/S7 상태 분류는 유지합니다. 검증된 2420 비공개 SQL 함수를 기준으로 원본 Provider Event·HMAC·Grant/Effect 시각·결제 시도 조건을 복사하며, 코드 생성이나 원본 대체에 특수 치환 문자열은 사용하지 않습니다. SQL 템플릿 구분자가 정확히 하나이고 중복 본문이 없는지 확인했습니다.
+- **검증:** 해당 실패 CI를 통과로 표기하지 않습니다. 새 커밋 CI와 실제 Reader 통합 PG17 결과 확인 후 상태를 갱신합니다. 운영 DB/PG/LIVE 변경 없음.
