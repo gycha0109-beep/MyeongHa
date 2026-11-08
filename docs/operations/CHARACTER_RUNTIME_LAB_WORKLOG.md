@@ -33,3 +33,12 @@
 - The script had `provider.require_parameters=true`, `temperature:0.7` for Luna. The 404 is consistent with a no-eligible-route result, but the exact provider message was deliberately not logged; the routing cause is therefore strongly suspected, not proven.
 - Fix: omit unsupported `temperature` for Luna, retain it for GLM; explicitly record the sampling mismatch in output metadata. Keep model IDs, strict JSON schema, ZDR, deny data collection, no fallback, 144-call maximum, USD 0.20 reported-cost hold, production isolation unchanged.
 - Once protected CI and integration succeed, one main-only trigger runs the corrected experiment. Report actual counts, original replies and model-specific token/cost/latency; no claims of success before artifact inspection.
+
+
+## 2026-11-08 — Yeoul matched GLM / GPT-6 Luna 144-reply synthetic experiment proposed
+
+- User selected Yeoul after reviewing 144 Taegyeom responses; retain the fixed two-model, 12-question × 2-repeat × 3-prompt-shape experimental structure and USD 0.20 provider-reported budget cap.
+- Source of truth: `CHARACTER_RUNTIME_AUTHORING_V1` with characterId `yeoul`. Approved Yeoul character is a gentle, perceptive emotional observer with nuanced feelings, open conclusions, slow deepening, and soft boundaries, not Taegyeom's strict principles.
+- New script `scripts/run-yeoul-language-model-ab-v1.mjs` and main-only GitHub workflow `character-runtime-yeoul-language-ab-v1.yml`; 12 character-adapted synthetic prompts, baseline core persona JSON vs natural-language advice vs four distinct fictional conversational examples, 144 possible calls, ZDR/deny/no-fallback, $0.20 provider-reported cap.
+- Node syntax, TypeScript build, responsibility map and Actions security checks passed locally. No real model calls or production character changes have been made yet.
+- Next: merge only after exact-head PR CI/integration is successful; inspect one-shot experiment and preserve all raw replies, provider-reported cost, latency, persona differences and fabrication cases. No automatic production promotion.

@@ -38,6 +38,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "character-runtime-yeoul-language-ab-v1.yml": {
+      "responsibility": "isolated-yeoul-glm-vs-luna-korean-language-two-repetition-ab-experiment",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "character-runtime-taegyeom-12case-v1.yml": {
       "responsibility": "isolated-taegyeom-public-synthetic-glm-runtime-dialogue-evaluation",
       "prMode": "none",
