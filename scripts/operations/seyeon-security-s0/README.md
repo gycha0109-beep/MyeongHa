@@ -26,6 +26,13 @@ Private accept와 revoke의 Production factory도 기존 server-owned 승인 cal
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
 
+## 2026-11-08 G1 운영 설치 재시도 — 잠금 해제, 함수 소유자 권한 문제 수정
+
+- 이전 W140 `idle in transaction` 충돌은 재조회 시 사라졌다. 운영 PostgreSQL `cnsfpcdiyofqvhpcegfc`의 migration `20261105075227`, 등록된 활성 모델 원본 0, 새 G1 함수/컬럼 미설치, 설치자 Owner SET 권한 원상 유지(false)를 재확인했다.
+- 기존 단일 SQL 거래로 16→17 설치를 재시도했지만 이번에는 `42501 permission denied for function pin_model_recent_sources_v1`로 취소됐다. 원인은 함수 OWNER를 NOLOGIN 역할로 이전한 뒤 관리자 `postgres`가 OWNER 권한을 상속하지 않는 운영 역할 모델에서 `REVOKE EXECUTE`를 수행하려 했기 때문이다. **운영 트랜잭션은 롤백됐고 재조회에서 새 함수/컬럼 없음, Owner SET=false, Registry OFF**를 확인했다. 이 오류는 기존 모델 원본 사용 활성화나 과금 실패가 아니다.
+- 기존 `16-g1-model-recent-source-pin.sql`, `17-g1-positive-combined-model-source-pin.sql`의 **원 함수 ACL 회수 3곳**에 한해서 해당 NOLOGIN OWNER 역할로 `SET LOCAL ROLE` → 정확한 `REVOKE ALL` → `RESET ROLE` 경계를 추가했다. API 역할/익명 역할 허용은 확대하지 않는다. 기존 PRIVATE 결합 함수의 직접 API 실행 차단·public owner wrapper만 별도 최소 EXECUTE·Registry OFF를 유지한다.
+- 이번 수정의 정확한 HEAD CI가 PostgreSQL17 격리 설치·API 보안 경로를 통과하기 전에는 실제 운영 DB에 다시 적용하지 않는다. 이전에 확인한 최신 [암호화 백업 #42415093056](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415093056) 및 [격리 복원 #42416383688](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416383688)의 성공 증거를 유지한다. 사용자 운영 G1 설치·최소 실행 권한 승인은 이미 있으므로 재승인 요청하지 않는다. Source Registry ON, G4 과금/유료 호출, G3 송출 공개는 금지 상태다.
+
 ## 2026-11-08 운영 G1 승인 설치 — 최신 백업 복원 통과 후 DB 잠금 대기
 
 - **최신 복원 선행 조건 통과:** 암호화 운영 백업 [#42415093056](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415093056) SUCCESS, 산출물 `myeongha-postgres-20261107T211732Z`(artifact ID `13591083526`, 보존 기한 2026-12-07T21:20:39Z). 동일 백업의 첫 격리 복원 [#42416185560](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416185560)은 복원·구조비교·가상 개인정보 복구가 성공했지만 incident reference를 백업 종료 이전으로 입력해 증거 포장 단계에서 실패했다. 기준 시각만 수정해 **같은 백업**으로 재실행한 [#42416383688](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416383688)은 격리 복원·구조 비교·가상 개인정보 복구·증거 생성 모두 **SUCCESS**(증거 artifact `13591363096`). 앞선 실패를 복원 실패로 오기하지 않는다.
