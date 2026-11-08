@@ -80,7 +80,7 @@ function sourceCatalogWitness(source) {
   assert.equal(source.sourceCatalogProvenance, 'encrypted_backup_bracketed_readonly_v1');
   assert.equal(source.sourceCatalogBracketStable, true);
   assert.equal(source.sourceCatalogBoundToBackupSnapshot, false);
-  const utc = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$/;
+  const utc = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
   assert.match(source.sourceCatalogBracketStartUtc, utc);
   assert.match(source.sourceCatalogBracketEndUtc, utc);
   assert.ok(source.sourceCatalogBracketStartUtc <= source.sourceCatalogBracketEndUtc,
