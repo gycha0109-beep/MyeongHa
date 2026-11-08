@@ -333,6 +333,19 @@ try {
   await client.send('Input.dispatchMouseEvent', {
     type: 'mouseReleased', x: previewLink.x, y: previewLink.y, button: 'left', clickCount: 1,
   });
+  // The public Saju link intentionally opens a presentation-only Reader picker.
+  // Complete that real user step instead of treating the modal as a navigation failure.
+  await waitFor(client,
+    'document.querySelector("dialog[data-reading-reader-picker]")?.open === true',
+    'Reader presentation picker after career Preview link');
+  const pickerState = await client.evaluate(`(() => ({
+    enabledReaders: [...document.querySelectorAll('dialog[data-reading-reader-picker] [data-reader-key]:not(:disabled)')]
+      .map((button) => button.dataset.readerKey),
+    seyeonVisible: document.querySelector('dialog[data-reading-reader-picker] [data-reader-key="seyeon"]')?.hidden === false,
+  }))()`);
+  assert(JSON.stringify(pickerState.enabledReaders) === JSON.stringify(['seyeon']) && pickerState.seyeonVisible,
+    'Preview picker must admit only the existing presentation Reader: ' + JSON.stringify(pickerState));
+  await client.evaluate('document.querySelector(\'dialog[data-reading-reader-picker] [data-reader-key="seyeon"]\').click()');
   try {
     await waitFor(client,
       'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',
@@ -344,6 +357,7 @@ try {
       state: document.body?.dataset.readingRouteState ?? null,
       title: document.querySelector('[data-reading-state-title]')?.textContent ?? null,
       stageVisible: document.querySelector('[data-reading-stage]')?.hidden === false,
+      pickerOpen: document.querySelector('dialog[data-reading-reader-picker]')?.open === true,
     }))()`).catch(() => ({ unavailable: true }));
     const lastRequest = observedRequests.at(-1);
     throw new Error('Career Preview browser diagnostic: ' + JSON.stringify({
@@ -356,6 +370,8 @@ try {
       } : null,
     }), { cause: error });
   }
+  assert(await client.evaluate('new URLSearchParams(location.search).get("reader") === "seyeon"'),
+    'Selected Reader must remain a presentation hint, not a paid access grant');
   const journeyReading = observedRequests.at(-1);
   assert(journeyReading?.method === 'POST' &&
     journeyReading.authorization === 'Bearer ' + journeyBearer &&

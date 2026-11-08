@@ -160,3 +160,13 @@ Watchtower-Track: frontend-integration
 - **승인:** 추가 사용자 승인 없음.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — PR #3141 Web PR Verify 캐릭터 선택 단계 반영
+
+- **실패 근거:** 코드 HEAD `e2bcd4fd62a1389804c465217740bfe00e68580d`에서 [Web PR #42474477325 / job #128712606547](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474477325/job/128712606547?pr=3141) **FAIL**. 동일 HEAD의 일반 [CI #42474477452](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474477452)와 [Governance #42474477375](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474477375)는 **PASS**. 실브라우저는 출생정보 생성·계산 후 실제 클릭에도 `/reading.html`에 있었으며 직업운 요청이 발생하지 않았다.
+- **실제 원인:** `apps/web/reading-reader-picker.js`는 `reading-detail.html` 링크 클릭을 의도적으로 가로채 `createDelegatePicker`의 모달을 연다. 사용자가 `reader-rollout-policy.js`에 의해 Preview 장면 선택만 허용된 `seyeon`을 선택하면 그때 실제 상세 화면으로 이동한다. 기존 테스트는 이 정상 단계가 없는 것으로 가정해 12초 타임아웃이 발생했다. **제품 결함이 아니라 테스트 동선 누락**이다.
+- **수정:** `scripts/verify-web-general-natal-preview-browser.mjs`에서 실제 클릭 후 캐릭터 선택 창 열림, 선택 가능한 대상이 `seyeon` 하나뿐임을 검증하고 해당 장면을 선택해 상세 화면으로 이동한다. 이동 후 `reader=seyeon`이 **화면 연출 힌트**임을 확인하고 기존 게스트 권한·직업운 `readingText`·실제 Preview 표시 검증 유지. 실패 시 모달 열림 여부를 안전하게 기록. 실제 웹 제품·결제·유료 Reader 게이트는 변경하지 않음.
+- **검증 및 남은 작업:** 새 HEAD의 일반/Web/Governance CI·필수 통합 CI 결과는 미확정. [PR #3141 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3141/checks)에서 실브라우저 성공을 확인하고, 선행 검사 전부 성공 시 기존 통합 검증 절차를 수행해야 한다. Stage 2~4·법무 미승인 출시 차단 유지.
+- **블로커/승인:** 별도 승인 필요 없음. 새 HEAD의 실제 CI 결과 대기.
+
+Watchtower-Track: frontend-integration
