@@ -47,6 +47,12 @@ begin
    and pe.external_transaction_id=cr.external_transaction_id
    and pe.provider_occurred_at is not null
    and pe.provider_occurred_at<=pg_catalog.clock_timestamp()
+   and pe.provider_ordering_key=(
+     'portone-v2-fullcancel:'||pg_catalog.to_char(
+       pe.provider_occurred_at at time zone 'UTC',
+       'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'
+     )
+   )
    and pe.payload_fingerprint ~ '^hmac-sha256:k1:[0-9a-f]{64}$'
    and pe.verified_payload_jsonb->>'schemaVersion'=
        'portone-full-cancel-verified-v1'
@@ -84,6 +90,12 @@ begin
               and revoke_event.source_type='provider_event'
               and revoke_event.source_provider_event_id=pe.id
               and revoke_event.event_type='revoked'
+              -- This event's actual entitlement effect clock and provider
+              -- ordering key must be the canonical GET-verified source.
+              -- A caller of legacy 1080 cannot supply a displaced clock.
+              and revoke_event.effective_at=pe.provider_occurred_at
+              and revoke_event.provider_ordering_key is not distinct from
+                  pe.provider_ordering_key
           )
         )
     )
@@ -142,4 +154,4 @@ grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1
 ) to myeongha_commerce_internal_executor;
 
 comment on function public.internal_confirm_reader_full_refund_dispatch_v1(uuid,text)
-is 'Only a single exact original PortOne V2 GET-verified full cancellation with matched original payment attempt, Receipt, amount, currency, verifier revision, fingerprint, cancellation ID and matching original Grant-to-same-provider-event revocation effects may confirm an owner-approved private Reader refund. No public caller grant or automatic refund execution.';
+is 'Only a single exact original PortOne V2 GET-verified full cancellation with matched original payment attempt, Receipt, amount, currency, verifier revision, fingerprint, cancellation ID and matching original Grant-to-same-provider-event revocation effects and exact provider event/effect time and ordering key may confirm an owner-approved private Reader refund. No public caller grant or automatic refund execution.';

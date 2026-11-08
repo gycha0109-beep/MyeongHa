@@ -35,6 +35,7 @@ declare
  v_positive_event_at timestamptz;
  v_positive_effect record;
  v_other_event_revoke_denied boolean:=false;
+ v_displaced_effect_time_denied boolean:=false;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -377,6 +378,42 @@ begin
      ),'verified',pg_catalog.clock_timestamp(),'production',
      'portone-v2-payment-full-cancel-lookup-v1'
    );
+   -- Legacy 1080 accepts a caller-provided effect clock; even if the
+   -- Event ID is the SAME, a displaced effective_at must NOT grant refund
+   -- confirmation. The inner failed confirmation rolls back this fake
+   -- Grant/Event effect, leaving the source Event for the correct attempt.
+   begin
+     perform public.internal_apply_entitlement_effect_v1(
+       'provider_event','1219d000-0000-4000-8000-000000000008'::uuid,
+       v_grant.id,null,v_original_grant_revision,
+       v_grant.last_provider_ordering_key,
+       'revoked',v_positive_event_at+interval '1 microsecond','revoked',
+       v_grant.valid_from,v_grant.valid_until,
+       'synthetic_misaligned_provider_effect_time'
+     );
+     perform public.internal_confirm_reader_full_refund_dispatch_v1(
+       v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+     );
+   exception when check_violation then
+     if sqlerrm='Refund receipt still unconfirmed by verified cancellation' then
+       v_displaced_effect_time_denied:=true;
+     else raise;
+     end if;
+   end;
+   if not v_displaced_effect_time_denied
+      or (select count(*) from public.entitlement_grants
+           where id=v_grant.id and status='active'
+             and revision=v_original_grant_revision)<>1
+      or (select count(*) from public.entitlement_events ee
+           where ee.source_provider_event_id=
+               '1219d000-0000-4000-8000-000000000008'::uuid
+             and ee.grant_id=v_grant.id)<>0
+      or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+           where id=v_refund_decision_id and status='submitted')<>1
+   then
+     raise exception 'CLAIM_E2E_DISPLACED_PROVIDER_EFFECT_CLOCK_FALSE_REFUND_CONFIRMED';
+   end if;
+
    -- The actual Writer produces the same Event's durable revoked effect.
    select * into strict v_positive_effect
    from public.internal_apply_entitlement_effect_v1(

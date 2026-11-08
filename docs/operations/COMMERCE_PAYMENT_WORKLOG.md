@@ -1101,3 +1101,10 @@
 - **구현:** 기존 인증 PortOne GET 전체 취소 검증기에서 RFC3339 시각을 기존 정규화 함수로 대조합니다. 구매 `paidAt`보다 실제 성공 취소 `cancelledAt`이 나중이어야 하며, 개별 취소 시각과 최종 결제 취소 시각이 동일해야 합니다. `statusChangedAt`이 해당 취소보다 이른 모순도 거부합니다. 모든 검증은 기존 DB Writer 실행 **이전**에 실패 안전 종료합니다. 서로 다른 UTC 오프셋 표현은 동일한 시각으로 판정합니다.
 - **검증:** 정상 합성 V2 GET을 실제 시간 필드에 맞추고, 결제보다 빠르거나 같은 취소, 개별/결제 취소 시각 불일치, 원본 또는 상태 변경 시각의 누락·파손, 역전된 상태 변경 시각은 DB 쓰기 없이 거부하는 회귀를 추가했습니다. UTC와 +09:00 동등 시각 정상 사례도 추가합니다. 새로운 CI PASS는 결과 확인 이전까지 미선언합니다.
 - **경계/잔여:** 이것은 원본 지급·취소의 **시계 정합성 사전검증**이며, 여러 웹훅 간 신뢰 가능한 Provider NEWER/STALE 순서/원자적 Reader 최종 T2 선형화 증명은 아닙니다. 상품 LIVE/운영 DB/실제 PG 환불 POST, 별도 원장·공개 API·법적 환불 자동 결정 없음. 남은 로드맵은 Provider 순서 연결, Reader 최종 회수, 실제 제공·복원·전체 격리 E2E.
+
+### 2026-11-08 — 환불 확정의 원본 취소·실제 회수 효과 시각 및 순서 결속
+
+- **근거:** [CI #42476169938](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42476169938) 전체 GREEN, 승인 로드맵 §6-1·2·5. 기존 `1080` Entitlement Writer는 검증 Provider Event를 원본 출처로 고정하지만 호출자가 별도로 전달한 `effective_at`을 해당 Event의 `provider_occurred_at`과 일치시키지는 않았습니다. 따라서 동일 Provider Event ID로 회수가 있었다는 기존 2370 검사만으로는 원본 취소 시계가 잘못 적용된 권한 변경을 걸러내지 못했습니다.
+- **구현:** 환불 상태를 최종 `confirmed`로 바꾸는 기존 2370 비공개 DB 함수에서 **정확한 전액 취소 Event의 기존 1890 시각 기반 ordering key 일치**, 해당 Event ID에서 발생한 구매권 회수 효과의 **`effective_at=provider_occurred_at`**, 회수 효과의 `provider_ordering_key`와 Provider Event의 동일성을 모두 요구합니다. 원 Receipt/Subject/취소 ID·원결제 시도/지문·전액 검증, Grant/Event 실효 증거 및 기존 ACL은 유지합니다. 정상적인 0-Grant 선취소는 기존대로 허용합니다.
+- **검증:** 기존 격리 PG17 정상 B2 환불 확정 세이브포인트 안에서 동일 Event ID이되 `effective_at`이 1마이크로초 잘못 전달된 합성 Entitlement Effect를 구형 Writer로 실제 기록한 뒤, 고객 환불 확정을 거부하고 해당 잘못된 Effect의 부작용이 하위 트랜잭션에서 완전 복구되는지 검사합니다. 이후 정확한 시각의 정상 효과·환불 확정·재실행·별도 Reader B3 보존을 실행하고 전체 외부 세이브포인트를 롤백합니다. 정적 계약과 역사적 fixture 지문도 맞춰 수정했습니다.
+- **범위:** 실제 공식 Provider NEWER/STALE 의미 비교/Reader T2 LIVE 선형화 증명이 아니며, 구매/환불 POST·운영 DB·공개 API·판매 활성화 없음. 본 커밋 CI/PG17 실행의 PASS는 실제 확인 전까지 미선언. 남은 단계: Provider 최신성·T2 원자 실행·소비자 제공·복원 실증·전체 E2E.
