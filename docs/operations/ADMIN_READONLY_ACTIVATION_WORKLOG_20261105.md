@@ -69,3 +69,14 @@
 - **변경 파일·브랜치/커밋·PR:** 이번 단위 변경은 **기존 본 WORKLOG 한 파일만**; 브랜치 `admin/owner-read-audit-evidence-20261108`. 작업 근거·초기 WORKLOG 커밋 `8321e45f7ae8e4d9ac00cdd4eb26108c30cb3ce5`, [PR #3143](https://github.com/gycha0109-beep/MyeongHa/pull/3143); 본 단위 최종 WORKLOG 갱신은 이 PR 커밋 이력에 보존한다. 기능 코드/테스트/마이그레이션/운영 Worker/DB 역할·권한/Secret/트래픽은 변경하지 않았다. CI 감시 브랜치는 `main`; 다른 트랙의 CI/PR은 이 단위에 포함하거나 수정하지 않는다.
 - **검증 범위와 미완료:** GitHub release SUCCESS + Cloudflare 최신 버전 100% + 관리자 감사 원장 SELECT-only 집계 확인. **실제 최신 Owner 브라우저 GET과 요청/감사 ID 결속은 미완료**. 브라우저 연결 도구는 세션을 열지 못했으며, Owner 신원/쿠키/토큰을 대신 사용하지 않는다. 비Owner 앱 정책 실제 거부도 여전히 미검증. A4 비용, A5 분석, A6 명령, A7 게시·보존 활성화 등은 기존 HOLD/비활성 상태 그대로이며 `ROADMAP_COMPLETE` 아님.
 - **다음 작업·블로커/승인:** Owner가 기존 접근권한으로 `https://myeongha-admin.gycha0109.workers.dev/admin/users`에 로그인하여 실제 회원 목록을 열어야 한다. **비밀번호·JWT·쿠키 공유 불필요**. 그 후 같은 시점에 `GET /api/admin/users` 성공과 `read:users / allowed` 감사가 실제로 결속되었는지만 재조회한다. Owner 브라우저에서의 인증 요청이 없어서 수용은 **차단**; 사용자 변경·운영 배포·Access 우회/완화는 승인되지 않았으며 수행하지 않는다.
+
+
+## 2026-11-08 22:30 KST — Owner 브라우저 실사용 조회·감사 확인
+
+- **Owner 실사용:** Access/Member 인증을 마친 관리자 브라우저에서 회원 목록, 회원 상세, Reading, 결제 화면 캡처 제공. 활성 회원 3명 표시, 계정 상세 정상 렌더링. 개인 식별값이나 결제 참조는 본 로그에 보존하지 않음.
+- **배포 기준:** 이전 읽기 전용 배포 [Admin Release #42375880365](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375880365)의 2026-11-07 13:13:24.506 UTC 이후. 운영 감사 원장 SELECT-only 집계. 코드·DB 권한·운영 설정 및 Worker 배포 변경 없음.
+- **회원 목록·상세:** 2026-11-08 12:00 UTC 이후 감사 read:users / allowed 4건(최신 13:30:32.847 UTC), read:user-detail / allowed 1건(13:18:02.871 UTC). 각각 요청 식별값 및 관리자 식별값 모두 저장됨. 사용자 캡처와 조회 시각·종류 부합. 브라우저 네트워크의 요청 ID를 제출받아 감사 ID와 직접 대조한 것은 아니므로 정확한 요청 ID 문자열 일치 검증은 미완료.
+- **Reading:** 선택 필터에서 ‘표시할 데이터가 없습니다’가 정상 렌더링. read:readings / allowed 1건(13:30:18.091 UTC), 요청/관리자 식별값 모두 존재. 빈 목록이 원장 전체 기록 부재를 증명하지는 않음. AI 비용 결속 HOLD는 그대로.
+- **결제:** 검증된 결제 1건(KRW 1,900원, verified)이 화면에 정상 표시. read:commerce / allowed 1건(13:30:34.447 UTC), 요청/관리자 식별값 모두 존재. 조회 실증은 결제 생성·환불·크레딧 지급 승인과 구분.
+- **수용/잔여:** Owner 브라우저 실사용 목록·상세·Reading·결제 조회 및 감사 발생은 확인. 비Owner의 해당 Cloudflare Access 앱 실제 로그인 거부는 여전히 미검증. 클라이언트 요청 ID와 감사 요청 ID의 직접 대조도 미완료. A4–A7의 기존 HOLD/비활성/미승인 상태 유지. ROADMAP_COMPLETE 미충족.
+- **다음 작업:** 실제 비Owner의 Admin Access 앱 단위 차단 기록이 확보될 경우 검증. 계정 무단 생성·Access 완화·운영 명령 활성화 금지. 필요한 경우 민감정보 없는 클라이언트 요청 ID만 감사 ID와 비교.
