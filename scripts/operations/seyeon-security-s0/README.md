@@ -26,6 +26,14 @@ Private accept와 revoke의 Production factory도 기존 server-owned 승인 cal
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
 
+## 2026-11-08 운영 G1 원본 연결 설치 성공 — Source Registry 비활성 유지
+
+- **현재 상태(아래 과거 실패·보류 기록에 우선):** 기존 사용자 승인 범위의 G1 원본 연결 SQL `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql`를 실제 명하 Supabase `cnsfpcdiyofqvhpcegfc` PostgreSQL17에 **하나의 트랜잭션**으로 적용했다. 소스 버전은 기존 security PR #3120의 `0738eea27c07e6467505c8eecdb8b91cee4d69c8`, 설치 SQL blob SHA는 `76f852d13d74bc28e452c2c4b2ea4780514af2f5` 및 `886c9b5774fbfed5bfb7997dd3b3ea3e7c672679`. 원본 파일의 `BEGIN/COMMIT`과 중복 임시 멤버십 설정만 단일 설치 트랜잭션 외피로 합쳤으며, W141에서 검증한 함수 소유자 `SET LOCAL ROLE`을 유지했다.
+- **운영 변경 범위:** 기존 `chat_turn_attempts` 최근 원본 Pin JSONB 컬럼·변경 불가 트리거·현재 회원 원본 잠금 정책/열 권한, private 최근 원본 Pin 함수 1개, private 결합 원본 Pin 함수 1개, public 합성 owner RPC 1개를 설치했다. `myeongha_api_executor`에는 오직 `public.cmd_pin_seyeon_positive_model_context_sources_v1` (정확히 16개 인자)의 `EXECUTE`만 신규 허용했다. private 함수 2개는 해당 서버 계정에서 직접 호출 불가이며 `anon`, `authenticated`, `service_role`도 public 합성 RPC를 실행할 수 없다.
+- **운영 독립 검증 결과:** 별도 읽기 전용 `pg_proc/pg_namespace/pg_roles` 카탈로그 검사에서 위 함수 3개가 전부 `myeongha_seyeon_chat_runtime_owner` 소유 `SECURITY DEFINER`임을 확인. public RPC 16인자·최근 private 7인자·결합 private 16인자 정확히 일치. 최근 출처 Pin 컬럼 1개, immutable 트리거 1개, 원본 잠금 정책 1개. `Owner`는 NOLOGIN으로 유지하고 불필요한 public/private 스키마 CREATE 및 관리자 `SET ROLE` 허용이 남지 않았다. 운영 migration frontier `20261105075227` 그대로, Source Registry 활성 원본 **0**, 원본 타입 등록행 **1**(OFF). 이 검증은 **실제 회원 승인 원본의 결합 Pin 성공/유료 AI 응답/HTTP 송출 PASS가 아니다**.
+- **원본 백업·사전 CI:** 실운영 암호화 [백업 #42415093056](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42415093056) SUCCESS, 같은 백업의 [격리 복원 #42416383688](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42416383688) SUCCESS. W141 정확한 HEAD `0738eea27c07e6467505c8eecdb8b91cee4d69c8`의 [CI #42474860198](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474860198), [Governance #42474860203](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474860203), [Web Gates #42474860167](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474860167) 전부 SUCCESS.
+- **다음 Gate:** 실사용 원본 `conversation_recall/v1` 한 건에 대한 사용자 동의·유효 Grant, 현재 User 원본 메시지의 실제 모델 입력 전 영속 Pin 경로 검증은 미완료. 이어 G4 일반 고객 크레딧 사전 예약·정산, G2 Commit, G3 실제 Cloudflare Worker 송출/receipt, G5 통합·G6 제한 운영 검증이 필요하다. `HOLD_FORWARD_STOPPED`, `positiveMemoryFirstReplyApproved=false`, `creditBilling.productionMounted=false` 유지. 이번 승인은 Registry 활성화·Provider 유료 호출·실서비스 공개로 확장되지 않는다. 사고 시 기존 `stop-positive-use.sql`의 결합 owner RPC 실행권 회수 및 기존 사용자 철회/ACK 보존 절차를 사용한다.
+
 ## 2026-11-08 G1 운영 설치 재시도 — 잠금 해제, 함수 소유자 권한 문제 수정
 
 - 이전 W140 `idle in transaction` 충돌은 재조회 시 사라졌다. 운영 PostgreSQL `cnsfpcdiyofqvhpcegfc`의 migration `20261105075227`, 등록된 활성 모델 원본 0, 새 G1 함수/컬럼 미설치, 설치자 Owner SET 권한 원상 유지(false)를 재확인했다.
