@@ -984,7 +984,17 @@ export function createPortOneV2FullCancellationVerifierV1(
           return fail('INVALID_PAYMENT',
             'PortOne V2 payment is not the exact authoritative full cancellation.');
         }
-        const verifiedAmountMinor=requireAmountMinor(payment.amount);
+        const amount=plainRecord(payment.amount,'PortOne V2 full cancellation amount');
+        const verifiedAmountMinor=requireAmountMinor(amount);
+        // Payment state and the one succeeded cancellation item cannot prove
+        // a full refund if the independently reported paid/cancelled aggregates
+        // are inconsistent. Never let such a snapshot revoke paid Reader access.
+        if(payment.version!=='V2' ||
+           amount.paid!==verifiedAmountMinor ||
+           amount.cancelled!==verifiedAmountMinor) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 cumulative full cancellation amount is inconsistent.');
+        }
         // A CANCELLED payment can result from several separate partial
         // cancellations. Such a set must never be promoted into one exact
         // full-refund authority for one exact paid Reader purchase.

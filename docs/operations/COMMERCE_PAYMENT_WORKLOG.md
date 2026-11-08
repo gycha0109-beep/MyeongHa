@@ -1079,3 +1079,10 @@
 - **구현:** 기존 B2 원본 구매·불변 Claim·수동 승인·REQUESTED·정확한 구매권 회수 뒤 같은 Receipt/원결제 시도/취소 ID·금액·통화·지문을 가진 **합성 PortOne 전체 취소**를 격리 세이브포인트에서 기록합니다. 실제 내부 확정 함수가 `refund_confirmed`를 조회시키는지, 동일 요청 재실행에서 `confirmed_at`이 유지되는지, B3 별도 구매권/원 Claim이 보존되는지 검증합니다.
 - **격리:** 성공 검증 뒤 강제 예외로 해당 세이브포인트를 롤백하고 이전 `refund_processing`·`submitted`·영수증 상태·이벤트 부재를 확인해 후속 계정 삭제 E2E에 영향을 주지 않습니다. 실제 PG17·새 CI는 확인 전까지 PASS 미선언. 실제 환불 GET/POST·운영 DB·유료 LIVE 변경 없음.
 - **미완료:** 공식 NEWER/STALE 권한, Reader T2 원자 회수, 실제 제공 입증·복원 실측·전체 독립 E2E. 사용자 승인 필요 없음.
+
+### 2026-11-08 — PortOne V2 전액 취소 실제 결제액·누적 취소액 추가 검증
+
+- **근거:** 공식 PortOne V2 `CancelledPayment`와 `PaymentAmount`의 `version`, `total`, `paid`, `cancelled` 필드 계약. 기존 단일 전액 취소 검증기는 `CANCELLED`·단일 성공 취소 금액=`amount.total`을 검사했지만 실제 결제액과 누적 취소액을 대조하지 않았습니다. 승인 로드맵 §6의 취소 원본 정합성 및 Reader 정확한 회수 보호.
+- **구현:** 기존 PortOne 원본 검증기에서 `version==='V2'`, `amount.paid===amount.total`, `amount.cancelled===amount.total`, 정확한 성공 취소 1건 `totalAmount===amount.total`을 모두 요구합니다. 불일치 또는 누락은 금전·권한 변경 전 안전 중지합니다. 원본 결제/취소 ID, 통화/환경, 서명 검증, Receipt와의 결속, 부분·요청 중 취소 보류는 유지합니다.
+- **검증:** 정상 테스트 응답을 현재 V2 필드에 맞게 보강하고 V1/미확인 버전, 누적 취소 누락·부족·초과, 실결제액 불일치·0원 사례에서 DB 쓰기 0건을 확인하는 회귀를 추가했습니다. 새 CI 통과는 아직 미확정. 실제 Provider 네트워크 요청, PG 취소 POST·운영 DB·판매 LIVE는 실행하지 않았습니다.
+- **남은 항목:** Provider 공식 NEWER/STALE 최신성 및 리더 최종 T2 권한 회수, 법적 콘텐츠 제공 증거, 백업 복원 실측, 전체 E2E.
