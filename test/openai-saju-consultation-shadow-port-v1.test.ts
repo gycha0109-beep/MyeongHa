@@ -224,6 +224,92 @@ describe('OpenAI Saju consultation shadow transport (offline, never user-visible
     });
   });
 
+  it('keeps opt-in multi-unit generation and independent review to exactly two governed provider calls', async () => {
+    const segments = [
+      { unitId: UNIT.unitId, text: UNIT.canonicalMeaning },
+      { unitId: 'grounding_unit_' + '2'.repeat(24), text: '공식 두 번째 해석입니다.' },
+      { unitId: 'grounding_unit_' + '3'.repeat(24), text: '공식 세 번째 해석입니다.' },
+    ];
+    const candidates = segments.map((part) => ({
+      schemaVersion: CHARACTER_SAJU_SP2_CANDIDATE_SCHEMA_VERSION_V1,
+      characterId: 'baekheon',
+      sourceUnitRefs: [part.unitId],
+      text: part.text,
+    }));
+    const hashes = candidates.map(hashCharacterSajuSp2CandidateV1);
+    const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as { model: string };
+      return responseJson(body.model === 'test-generation-model' ? { segments } : {
+        verdicts: candidates.map((candidate, i) => ({
+          schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1',
+          evaluatorVersion: OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
+          candidateHash: hashes[i],
+          unitId: candidate.sourceUnitRefs[0],
+          semanticPreserved: true,
+          characterFidelityPreserved: true,
+          failureClasses: [],
+        })),
+      });
+    });
+    const beforeDispatch = vi.fn(async () => undefined);
+    const afterOutcome = vi.fn(async (_receipt: OpenAiSajuConsultationShadowOutcomeV1) => undefined);
+    const port = createOpenAiSajuConsultationShadowPortV1({
+      apiKey: 'offline-test-secret',
+      generationModel: 'test-generation-model',
+      reviewModel: 'test-review-model',
+      fetchImpl,
+      beforeDispatch,
+      afterOutcome,
+      multiUnitPilot: true,
+    });
+    expect(port.multiUnitPilot).toBe(true);
+    expect(port.evaluateBatch).toBeTypeOf('function');
+    const produced = await port.generate({
+      instructions: '공식 해석 3개를 순서대로 풀어주세요.',
+      input: { officialUnits: segments },
+      responseSchema: {
+        type: 'object', additionalProperties: false, required: ['segments'],
+        properties: {
+          segments: {
+            type: 'array',
+            items: {
+              type: 'object', additionalProperties: false,
+              required: ['unitId', 'text'],
+              properties: { unitId: { type: 'string' }, text: { type: 'string' } },
+            },
+          },
+        },
+      },
+    });
+    expect(produced).toEqual({ segments });
+    const verdict = await port.evaluateBatch!({
+      candidates,
+      candidateHashes: hashes,
+      groundingUnits: candidates.map((candidate) => ({
+        ...UNIT,
+        unitId: candidate.sourceUnitRefs[0]!,
+      })),
+      characterProfileRef: PROFILE,
+      publishedCharacterVoice: { speech: { register: '백헌' } },
+    });
+    expect(verdict.verdicts).toHaveLength(3);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(beforeDispatch).toHaveBeenCalledTimes(2);
+    expect(afterOutcome).toHaveBeenCalledTimes(2);
+    const first = JSON.parse(String(fetchImpl.mock.calls[0]![1].body)) as {
+      model: string; store: boolean; text: { format: { strict: boolean; name: string } };
+    };
+    const second = JSON.parse(String(fetchImpl.mock.calls[1]![1].body)) as {
+      model: string; store: boolean; text: { format: { strict: boolean; name: string } };
+    };
+    expect(first.model).toBe('test-generation-model');
+    expect(second.model).toBe('test-review-model');
+    expect(first.store).toBe(false);
+    expect(second.store).toBe(false);
+    expect(first.text.format.strict).toBe(true);
+    expect(second.text.format.strict).toBe(true);
+  });
+
   it('never dispatches if server-side budget admission rejects the call', async () => {
     const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(
       async () => responseJson(CANDIDATE),
