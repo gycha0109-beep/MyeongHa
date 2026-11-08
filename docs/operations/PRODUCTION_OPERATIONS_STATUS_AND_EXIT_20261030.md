@@ -1,3 +1,13 @@
+### 2026-11-08 KST — Phase 8-A 복구본 구조·권한 불일치 세부 지문 진단 보강
+
+- **기존 ROADMAP / 작업목표:** Gate 1 / Phase 8-A #6. 암호화 원본 지문에 연결된 첫 격리 복원 #42474143273은 실행 SUCCESS이지만 앱 동등성 HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH(schema ACL 2, table structural hash 31, function ACL hash 180). 전체 hash만으로 원인을 알 수 없는 현상을 기존 백업 실행에서만 읽기 전용 세부 SHA-256을 봉인하는 방식으로 보강한다. 신규 기능/트랙이 아닌 기존 미해결 P0의 진단이다.
+- **구현:** production-app-schema-fingerprint-readonly.sql은 public 테이블 구조를 컬럼·제약조건·인덱스·트리거·정책·ACL·relation 옵션·persistence·RLS 활성/강제 10개 요소별 SHA-256으로 추가 구분한다. public/seyeon_private/chat_private 함수 및 schema의 ACL은 원래 전체 ACL 지문에 더해 GRANTED BY 역할만 제외한 명시적 grant entry 지문을 추가한다. 표면에는 변경 영역 이름과 SHA-256만 남기며 사용자 행·DDL 본문·함수 코드·개인정보·비밀/원본 GRANT 항목을 게시하지 않는다.
+- **실제 비교 경계:** check-postgres-restored-app-schema-parity.mjs는 새 백업에 요소별 원본 지문이 포함된 경우에만 테이블의 변경된 요소 및 ACL의 grantor attribution-only vs grant-entry difference를 분류한다. 구형 암호화 백업은 기존 집계 지문으로 정상 비교하되 세부 원인을 추정하지 않는다. 세부/전체 지문이 서로 모순되거나 새 witness가 불완전하면 실패로 닫는다. restoreMismatchRootCauseProven=false, sourceCatalogBoundToBackupSnapshot=false, drReady=false, serviceResumptionAllowed=false 유지. 전체 MVCC snapshot 공유, Role membership/Provider/Hosted 복구를 증명한 것으로 간주하지 않는다.
+- **검증·파일:** scripts/verify-postgres-restored-app-schema-parity.mjs에서 구형/신형 혼합 호환성, 10요소 세부 불일치, 함수 grantor-only, schema grant entries, 세부 지문 누락·불일치 위조 거부 검증을 추가. 로컬 Node 24.14에서 비교 verifier PASS 및 백업 workflow verifier PASS, git diff --check PASS. Windows CRLF checkout 특성으로 isolated restore workflow의 bash -n 검증은 CI Linux에서 확인해야 하며 최종 PR HEAD CI/Integration은 미확정. 변경 대상은 SQL·비교 JS·검증 JS·기존 중앙 WORKLOG 4개뿐이다.
+- **다음·블로커:** CI/필수 Integration 통과와 main 반영 후 다음 정기 암호화 백업에 세부 지문이 생성되는지 확인하고 해당 신형 백업의 격리 복원 비교로 차이 요소를 분류한다. 종전 성공 백업/복원을 불필요하게 반복하지 않는다. 현재 2/31/180의 과거 차이에 세부 원인을 소급 추정하지 않는다. Production DDL/DML·migration repair, Hosted 유료 대상, privacy canary, IAM/secret/traffic 변경 없음. #1887 OPEN, DR 종료 조건 미충족.
+
+Watchtower-Track: ops
+
 ### 2026-11-08 KST — Phase 8-A 첫 동일 백업 원본 지문 기반 격리 복원 실측 결과
 
 - **기존 로드맵 / 범위:** Gate 1 / Phase 8-A #6. 날짜 검증 오류를 교정한 PR #3142가 main에 병합된 후, 성공한 암호화 백업 #42417503612를 새로 만들지 않고 동일 아카이브로 격리 복원 #42474143273을 재실행. 실행 main SHA a211b2c451879610c245259249a74c21d87ad02a; 백업 source SHA 4482936a759e91d9cdac066b52d90426ea830ce1; migration frontier 20261105075227.

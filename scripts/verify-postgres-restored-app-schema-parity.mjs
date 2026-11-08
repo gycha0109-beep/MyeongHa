@@ -15,7 +15,10 @@ assert.ok(restoredQuery.includes("'totalVersions',null"));
 assert.ok(!restoredQuery.includes('FROM supabase_migrations.schema_migrations'));
 assert.ok(restoredQuery.includes('full_definition_sha256'));
 assert.ok(restoredQuery.includes('structural_sha256'));
+assert.ok(restoredQuery.includes('structural_component_sha256'));
 assert.ok(restoredQuery.includes('acl_sha256'));
+assert.ok(restoredQuery.includes('acl_grant_entries_without_grantor_sha256'));
+assert.ok(!restoredQuery.includes('FROM supabase_migrations.schema_migrations'));
 
 const restored = {
   ...structuredClone(source),
@@ -29,6 +32,10 @@ assert.equal(matched.verifiedApplicationScopeEquivalence, true);
 assert.equal(matched.verifiedFullSchemaCatalogEquivalence, false);
 assert.equal(matched.sourceCatalogBoundToBackupSnapshot, false);
 assert.equal(matched.restoreMismatchRootCauseProven, false);
+assert.deepEqual(matched.componentHashEvidence, {
+  tableStructure: false, schemaAclGrantEntries: false,
+  routineAclGrantEntries: false,
+});
 assert.equal(matched.sourceCatalogProvenance, 'legacy_date_only_observation');
 assert.equal(matched.sourceCatalogProvenanceHold,
   'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS');
@@ -60,6 +67,67 @@ for (const mutation of [
   mutation(corrupted);
   assert.throws(() => compareApplicationCatalog(corrupted, restored, frontier));
 }
+// New encrypted backups carry facet hashes. Old backups continue to compare
+// with aggregate-only hashes; the verifier never invents a facet-level cause.
+const facetedSource = structuredClone(bracketedSource);
+const componentNames = [
+  'columns', 'constraints', 'indexes', 'triggers', 'policies', 'acl',
+  'reloptions', 'persistence', 'rowSecurityEnabled', 'rowSecurityForced',
+];
+for (const row of facetedSource.tables) {
+  row.structural_component_sha256 =
+    Object.fromEntries(componentNames.map(key => [key, 'a'.repeat(64)]));
+}
+for (const row of [...facetedSource.schemas, ...facetedSource.functions]) {
+  row.acl_grant_entries_without_grantor_sha256 = 'a'.repeat(64);
+}
+const facetedRestored = {
+  ...structuredClone(facetedSource),
+  postgresVersion: source.postgresqlVersion,
+  migrationCatalog: { totalVersions: null, latestVersion: null },
+};
+const facetedMatch = compareApplicationCatalog(facetedSource, facetedRestored, frontier);
+assert.deepEqual(facetedMatch.componentHashEvidence, {
+  tableStructure: true, schemaAclGrantEntries: true,
+  routineAclGrantEntries: true,
+});
+assert.equal(facetedMatch.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
+
+// Old sealed catalogs have no facet hashes while the newer restored SQL does;
+// do not misclassify all objects merely because newer read-only output grew.
+const olderSealedAgainstNewerRestore = compareApplicationCatalog(
+  bracketedSource, facetedRestored, frontier);
+assert.equal(olderSealedAgainstNewerRestore.applicationScopeVerdict,
+  'MATCH_APPLICATION_CATALOG_ONLY');
+assert.equal(olderSealedAgainstNewerRestore.componentHashEvidence.tableStructure, false);
+
+facetedRestored.tables[0].structural_sha256 = 'b'.repeat(64);
+facetedRestored.tables[0].structural_component_sha256.columns = 'b'.repeat(64);
+facetedRestored.schemas[0].acl_sha256 = 'b'.repeat(64);
+facetedRestored.schemas[0].acl_grant_entries_without_grantor_sha256 = 'b'.repeat(64);
+facetedRestored.functions[0].acl_sha256 = 'b'.repeat(64);
+const facetMismatch = compareApplicationCatalog(facetedSource, facetedRestored, frontier);
+assert.equal(facetMismatch.applicationScopeVerdict, 'HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH');
+assert.deepEqual(facetMismatch.types.tables.changed[0].structuralComponentDifferences,
+  ['columns']);
+assert.equal(facetMismatch.types.schemas.changed[0].aclDifferenceScope,
+  'GRANT_ENTRIES_DIFFER');
+assert.equal(facetMismatch.types.functions.changed[0].aclDifferenceScope,
+  'GRANTOR_ATTRIBUTION_ONLY');
+assert.equal(facetMismatch.restoreMismatchRootCauseProven, false);
+assert.equal(facetMismatch.drReady, false);
+
+const tampered = structuredClone(facetedRestored);
+delete tampered.tables[0].structural_component_sha256;
+assert.throws(() => compareApplicationCatalog(facetedSource, tampered, frontier));
+const inconsistent = structuredClone(facetedRestored);
+inconsistent.tables[0].structural_sha256 =
+  facetedSource.tables[0].structural_sha256;
+assert.throws(() => compareApplicationCatalog(facetedSource, inconsistent, frontier));
+const incomplete = structuredClone(facetedSource);
+delete incomplete.tables[0].structural_component_sha256;
+assert.throws(() => compareApplicationCatalog(incomplete, facetedRestored, frontier));
+
 const unprovenLegacy = {...structuredClone(source), sourceCatalogBracketStable: true};
 assert.throws(() => compareApplicationCatalog(unprovenLegacy, restored, frontier));
 assert.equal(matched.drReady, false);
