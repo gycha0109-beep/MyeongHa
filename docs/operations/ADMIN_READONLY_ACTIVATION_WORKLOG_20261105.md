@@ -80,3 +80,14 @@
 - **결제:** 검증된 결제 1건(KRW 1,900원, verified)이 화면에 정상 표시. read:commerce / allowed 1건(13:30:34.447 UTC), 요청/관리자 식별값 모두 존재. 조회 실증은 결제 생성·환불·크레딧 지급 승인과 구분.
 - **수용/잔여:** Owner 브라우저 실사용 목록·상세·Reading·결제 조회 및 감사 발생은 확인. 비Owner의 해당 Cloudflare Access 앱 실제 로그인 거부는 여전히 미검증. 클라이언트 요청 ID와 감사 요청 ID의 직접 대조도 미완료. A4–A7의 기존 HOLD/비활성/미승인 상태 유지. ROADMAP_COMPLETE 미충족.
 - **다음 작업:** 실제 비Owner의 Admin Access 앱 단위 차단 기록이 확보될 경우 검증. 계정 무단 생성·Access 완화·운영 명령 활성화 금지. 필요한 경우 민감정보 없는 클라이언트 요청 ID만 감사 ID와 비교.
+
+
+## 2026-11-08 KST — 비Owner 추가 실증 생략 결정 및 A4 실제 비용 결속 재개
+
+- **Owner 수용 결정:** Owner가 비Owner의 Access 앱 수준 실제 로그인 거부 재현을 더 이상 요구하지 않고 다음 로드맵 단계로 진행하도록 지시했다. 이는 **실제 비Owner 거부 로그 통과가 아니며**, 기존 단일 Owner 이메일 allow 정책·Access/JWT/Member 권한 검사를 완화하거나 대체하지 않는다. 기존 비Owner 실제 거부 기록은 여전히 '미실증(Owner 요청으로 추가 재현 생략)'으로 관리한다. 개인정보, 쿠키, JWT를 수집하지 않는다.
+- **A0–A3 결과:** Owner의 회원 목록/상세, Reading 및 검증 결제 조회와 운영 감사 INSERT 성공은 앞 절 및 [PR #3150](https://github.com/gycha0109-beep/MyeongHa/pull/3150)에 기록됐고 통합 CI [#42487641148](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42487641148) SUCCESS, 2026-11-08 14:16:23 UTC main 병합 확인. 브라우저 네트워크의 원본 request_id와 감사 request_id의 직접 문자열 동등 비교는 아직 진행하지 않았고, 생략 수용 대상은 비Owner 재현에 한정한다.
+- **A4 현재 코드:** MyeongHa `reading-ai-saju-provider-bridge-v1.ts`는 Saju 실측 공급사 호출 증거를 입력받지만 `SajuReadingProviderBindingAuthorityV1.resolve()`의 **실제 소유권 증명 매핑**이 없으면 Writer 접근 전 실패하도록 구현. 전용 Writer/RPC 및 제한된 비용 원장 DB 설치는 기존 [A4 Production 설치 기록](ADMIN_READING_AI_COST_PRODUCTION_INSTALL_20261030.md)에 따라 완료했으나 운영 수집은 미활성. Saju-native requestId/Reading ID를 명하 Subject/Reading/execution attempt와 같다고 간주하지 않는다.
+- **운영 DB SELECT-only 현실 확인:** 2026-11-08 운영 `public.reading_execution_attempts` 0행(비NULL `external_request_ref` 0행), `public.reading_refs`의 비NULL `external_reading_ref` 0행, `myeongha_admin_ops.reading_ai_call_cost_events_v1` 0행. **이 숫자는 AI 원가 0원·Saju 호출 0건 또는 수집 완전성을 뜻하지 않는다.** `external_request_ref` 컬럼이 존재한다는 사실만으로 공급사 `requestId`와의 동일성/유일성이 입증되지 않는다.
+- **Saju 소스 선행 PR:** [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739)의 server-only onProviderCall 소스 관측(토큰/모델/호출 결과) 및 합성 단위 테스트는 현재 기록된 PR HEAD 검증 3개 성공. 이 PR은 초안 상태를 해제하고 자동 병합을 요청했으며, **병합 완료 여부는 별도 확인 필요**. 선택적 콜백 추가는 운영 공급사 호출/비용 적재 활성화가 아니다.
+- **다음 원래 A4 수용 조건:** 승인된 실제 Saju 서버 호출 `requestId`와 명하 DB의 기존 Reading/실행 시도 간 **동일 요청을 입증하는 Authority 결속**을 구현·검증할 때까지 HOLD. 이후 전용 Writer의 안전한 인증/연결, 실제 호출 누락/실패 포함 관측 커버리지 및 공급사 청구/환율의 독립 근거가 확보돼야 실비/완전성·KRW 월 예산을 주장할 수 있다. 새로운 Source ID 매핑/Production DB 권한/운영 연결을 검증 없이 생성하거나 활성화하지 않는다.
+- **나머지 로드맵:** A5 분석 수집·보존 비활성, A6 고객 변경 명령 비활성, A7 게시 기능 비활성. `ROADMAP_COMPLETE` 미충족. 본 변경은 문서만 수정하며 고객 데이터, 공개 Worker, Admin 운영 플래그, DB 역할·권한은 변경하지 않는다.
