@@ -27,6 +27,7 @@
 - `test/openai-saju-consultation-shadow-port-v1.test.ts`: 가짜 OpenAI 응답으로 실제 API 요청 형식·별도 리뷰·토큰 계량·서버 예산 어댑터 연결.
 - `test/reader-saju-consultation-budget-gate-v1.test.ts`: 비용 예약, 모델 미승인, 한도 초과, 외부 승인 실패, 카운터 미확인 시 과금 보수적 보류.
 - `test/reader-saju-consultation-editorial-evaluation-v1.test.ts`: 사용자가 실제 평가하지 않은 문장을 자동 합격 처리하지 않고, 불명확한/불리한 판정, 잘못된 캐릭터, 이전 후보의 평가를 거부. 해당 품질 판정은 전체 상품 품질과 고객 공개 권한이 아님.
+- `test/saju-character-grounding-cross-service.e2e.test.ts`: 인증된 실제 Saju 호스트의 공식 Grounding 반환값을 새 상담형 후보·검토 경로로 넘기는 E2E 추가. 기존 Reader 결과 불변·Grant 회수 시 모델 미호출을 확인. **사주 입력은 합성 테스트 Reading이고 AI 응답은 가짜**, 실명식/실모델 품질 증거가 아님.
 - `test/reader-saju-private-pair-comparison-v1.test.ts`: 출처 불일치·캐릭터 중복·권한 없는 비교 차단.
 
 ## **아직 하지 않은 일**
