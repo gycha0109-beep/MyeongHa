@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import type {
+  CharacterSajuConsultationShadowPortV1,
+  CharacterSajuConsultationPrivateComparisonV1,
+} from '../apps/api/src/character-saju-consultation-shadow-v1.js';
 import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import type { CharacterRuntimeContextV1 } from '../packages/domain/src/index.js';
 import {
@@ -245,6 +249,7 @@ function liveProjectionPort(): OfficialReadingCharacterGroundingProjectionPortV1
 async function runPreview(
   groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1,
   active = true,
+  consultationShadowPort?: CharacterSajuConsultationShadowPortV1,
 ) {
   return runReaderInterpretationPreviewV1({
     legacyOfflineFixtureOnly: true,
@@ -255,6 +260,7 @@ async function runPreview(
     requestedDomain: 'general',
     context: readerContext(),
     groundingProjectionPort,
+    ...(consultationShadowPort === undefined ? {} : { consultationShadowPort }),
     ...authorityPorts(active),
   });
 }
@@ -280,6 +286,76 @@ describeE2e('Reader Preview ↔ Saju Character grounding cross-service E2E v1', 
           segment.kind === 'semantic_realization' && segment.text === TIMING_TEXT,
       ),
     ).toBe(true);
+  });
+
+
+  it('feeds the authenticated Saju projection into a protected consultation candidate and review, with no customer reveal', async () => {
+    // The Saju service is real; the synthetic delivered Reading fixture and
+    // offline model response do NOT constitute a real-person chart evaluation.
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const input = request.input as {
+        characterId: string;
+        domain: string;
+        groundingHash: string;
+        sourceUnit: {
+          unitId: string;
+          canonicalMeaning: string;
+          sourceBlockRefs: readonly string[];
+        };
+      };
+      expect(input.characterId).toBe(READER_ID);
+      expect(input.domain).toBe('general');
+      expect(input.groundingHash).toMatch(/^[0-9a-f]{64}$/u);
+      expect(input.sourceUnit.canonicalMeaning).toContain(TIMING_TEXT);
+      expect(input.sourceUnit.sourceBlockRefs.length).toBeGreaterThan(0);
+      expect(request.instructions).toContain('숙련된 한국어 사주 상담자');
+      return {
+        schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+        characterId: input.characterId,
+        sourceUnitRefs: [input.sourceUnit.unitId],
+        text: input.sourceUnit.canonicalMeaning,
+      };
+    });
+    const evaluate = vi.fn(async (input: Parameters<CharacterSajuConsultationShadowPortV1['evaluate']>[0]) => {
+      expect(input.groundingUnit.canonicalMeaning).toContain(TIMING_TEXT);
+      expect(input.candidate.sourceUnitRefs).toEqual([input.groundingUnit.unitId]);
+      return {
+        schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+        evaluatorVersion: 'cross-service-offline-review-v1',
+        candidateHash: input.candidateHash,
+        unitId: input.groundingUnit.unitId,
+        semanticPreserved: true,
+        characterFidelityPreserved: true,
+        failureClasses: [] as const,
+      };
+    });
+    const record = vi.fn(async (_evidence: CharacterSajuConsultationPrivateComparisonV1) => undefined);
+    const shadow: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'cross-service-offline-review-v1',
+      generate,
+      evaluate,
+      recordPrivateComparison: record,
+    };
+    const regular = await runPreview(liveProjectionPort());
+    const compared = await runPreview(liveProjectionPort(), true, shadow);
+    expect(compared).toEqual(regular);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(record).toHaveBeenCalledTimes(1);
+    const evidence = record.mock.calls[0]![0];
+    expect(evidence).toMatchObject({
+      readingRef: READING_ID,
+      sourceResponseHash: compared.sourceResponseHash,
+      groundingHash: compared.groundingHash,
+      characterId: READER_ID,
+      evaluation: 'accepted',
+      candidateText: TIMING_TEXT,
+    });
+    expect(evidence.sourceBlockRefs.length).toBeGreaterThan(0);
+    expect(evidence.baselineText).toBe(TIMING_TEXT);
+    expect(compared).not.toHaveProperty('candidateText');
+    expect(compared).not.toHaveProperty('evaluation');
+    expect(compared).not.toHaveProperty('sourceUnitId');
   });
 
   it('is rejected by the real Saju host when the service bearer is wrong', async () => {
@@ -311,9 +387,16 @@ describeE2e('Reader Preview ↔ Saju Character grounding cross-service E2E v1', 
       live.projectGrounding.bind(live),
     ) as OfficialReadingCharacterGroundingProjectionPortV1['projectGrounding'];
 
+    const generate = vi.fn();
+    const shadow: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'cross-service-offline-review-v1',
+      generate,
+      evaluate: vi.fn(),
+    };
     await expect(
-      runPreview({ projectGrounding }, false),
+      runPreview({ projectGrounding }, false, shadow),
     ).rejects.toMatchObject({ code: 'ACCESS_DENIED' });
     expect(projectGrounding).not.toHaveBeenCalled();
+    expect(generate).not.toHaveBeenCalled();
   });
 });
