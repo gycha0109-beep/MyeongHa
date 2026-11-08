@@ -21,6 +21,15 @@
 5. `apps/api/src/reader-saju-private-pair-comparison-v1.ts`: 같은 공식 판독 단위와 같은 원문을 백헌·세연이 어떻게 풀었는지 **서버 내부에서만** 나란히 검토하는 메모리 기반 수집 기능. 비공개 원문·결과는 브라우저/운영 로그에 출력하지 않음.
 6. `apps/api/src/reader-interpretation-preview-runtime-v1.ts`: 기존 공식 풀이가 통과한 다음 shadow 평가를 선택 호출. 원래 반환 구조·기존 고객 해석 유지.
 
+## 이번 확장: 3~4개 공식 판독을 한 번에 설명하는 비공개 시험
+
+- `apps/api/src/character-saju-consultation-multi-unit-shadow-v1.ts`: Reader가 실제로 선택한 **공식 의미 단위 3~4개**만 순서대로 제공하여 1번의 상담문 생성 + 1번의 독립 의미 검토를 수행. 각 unit ID, 원문, 필요한 동반 판정, 공개 금지 고지를 보존한다. 하나라도 누락/추가/서로 다른 ID·Hash/의미 변경이 발견되면 전체 후보 보류.
+- `apps/api/src/character-saju-consultation-shadow-v1.ts`: 기존 단일 의미 단위 경로를 기본값으로 유지. 서버 소유 `multiUnitPilot: true`인 평가에서만 새 경로 사용. 판단을 통과해도 고객에게 노출하는 권한이 없다.
+- `apps/api/src/openai-saju-consultation-shadow-port-v1.ts`: 기존 OpenAI Responses API 생성 모델 호출과 **독립 검토 모델 호출을 각 1회만 사용**. 배치 출력도 엄격한 JSON 형식과 기존 비용 선예약/정산 연결을 유지.
+- `apps/api/src/reader-saju-private-multi-unit-pair-v1.ts`: 백헌·세연의 표현 순서가 달라도 **같은 공식 원문/단위 집합**인지 확인한 경우에만 비공개 비교. 하나라도 다른 원문/출처면 비교 중단.
+- 신규 자동 검증: `test/reader-saju-private-multi-unit-pair-v1.test.ts`; 기존 `test/reader-interpretation-preview-runtime-v1.test.ts` 및 `test/openai-saju-consultation-shadow-port-v1.test.ts`에 배치 생성·독립 검토·거부 경로 추가.
+- **범위 주의**: 공식 Grounding에 3개 이상의 적격 의미 단위가 없으면 LLM을 호출하지 않는다. 모든 자료는 기존 권한을 통과한 판독과 회귀 테스트 입력이다. 실고객 명식 품질·AI 공급자 승인·운영 유료 호출 실측 근거는 여전히 없다.
+
 ## 검증 파일
 
 - `test/reader-interpretation-preview-runtime-v1.test.ts`: 접근 불가면 모델 미호출, 공식 결과 동일, 두 Reader 같은 Unit 비교, 내부 evidence만 별도 수집.
@@ -34,7 +43,7 @@
 
 - 실제 제공자 API 키를 사용한 과금 모델 네트워크 호출 **0회**. 위 모델 테스트는 모두 가짜 응답.
 - 서버 실행 환경에서 **실제 승인된** 모델 단가·예산/정산 DB 권한 객체·공식 Reading 실행 ID 연결 미완료. `beforeDispatch` 구현만으로 예산 집행 승인을 가장하지 말 것.
-- 현재 비교와 상담 품질 평가는 공식 판정 **첫 단위 1개**. 실사주 전체 상담문·분야별 실제 품질 비교·상용화 검증 미완료.
+- 현재 기본 비교/상담 품질 평가는 공식 판정 **첫 단위 1개**. 선택형 3~4개 단위 시험 경로를 추가했지만 실사주 전체 상담문·분야별 실제 품질 비교·상용화 검증은 미완료.
 - Saju Career의 일부 심화 방법론/해석 소스 권위가 아직 미충족이므로, 없는 Career 결론·시기·상품 가치를 만들어내지 않음.
 - 기존 로드맵 `P0-AI-01`(모델/실패 정책) 및 공급자 승인, 최종 Reader Chat 근거 DB 계약, 구매/Reader 권한 등 출시 전제는 그대로 유지.
 
