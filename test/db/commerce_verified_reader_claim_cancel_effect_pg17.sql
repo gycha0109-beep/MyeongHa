@@ -29,6 +29,9 @@ declare
  v_refund_confirm_denied boolean:=false;
  v_forged_refund_confirm_denied boolean:=false;
  v_unrevoked_refund_confirm_denied boolean:=false;
+ v_positive_confirmed boolean:=false;
+ v_positive_done boolean:=false;
+ v_positive_at timestamptz;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -468,6 +471,96 @@ begin
    raise exception 'CLAIM_E2E_WRONG_AMOUNT_FULL_CANCEL_FALSE_REFUND_CONFIRMED';
  end if;
 
+
+ -- The existing actual B2 Entitlement writer revoked the exact purchase
+ -- before this scenario. Verify a GET-shaped full provider cancellation may
+ -- NOW confirm its refund, replay is stable, and B3 remains active. The
+ -- savepoint is explicitly rolled back to retain the outer deletion fixture.
+ begin
+   update public.commerce_receipts set verification_status='revoked'
+     where id=v_receipt.id and verification_status='verified';
+   insert into public.commerce_provider_events(
+     id,provider,external_event_id,event_type,external_transaction_id,
+     resolved_subject_id,resolution_source_type,resolved_receipt_id,
+     payload_fingerprint,provider_occurred_at,provider_ordering_key,
+     verified_payload_jsonb,status,received_at,environment,verifier_revision
+   ) values (
+     '1219d000-0000-4000-8000-000000000008'::uuid,'portone_v2',
+     'myeongha:portone-v2:full-cancel:v1:synthetic-claim-b2-not-confirmed',
+     'Transaction.Cancelled',v_receipt.external_transaction_id,
+     v_subject,'receipt',v_receipt.id,
+     'hmac-sha256:k1:'||repeat('8',64),
+     pg_catalog.clock_timestamp()-interval '1 second',null,
+     pg_catalog.jsonb_build_object(
+       'schemaVersion','portone-full-cancel-verified-v1',
+       'paymentId',v_refund_reservation.payment_id,
+       'transactionId',v_receipt.external_transaction_id,
+       'cancellationId','synthetic-claim-b2-not-confirmed',
+       'environment','production',
+       'verifiedAmountMinor',v_receipt.verified_amount_minor,
+       'verifiedCurrency',v_receipt.verified_currency,
+       'evidenceFingerprint','hmac-sha256:k1:'||repeat('8',64),
+       'verifierRevision','portone-v2-payment-full-cancel-lookup-v1'
+     ),'verified',pg_catalog.clock_timestamp(),'production',
+     'portone-v2-payment-full-cancel-lookup-v1'
+   );
+   select public.internal_confirm_reader_full_refund_dispatch_v1(
+     v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+   ) into strict v_positive_confirmed;
+   select confirmed_at into strict v_positive_at
+     from public.commerce_reader_full_refund_dispatches_v1
+     where id=v_refund_decision_id and receipt_id=v_receipt.id;
+   if public.internal_confirm_reader_full_refund_dispatch_v1(
+     v_refund_decision_id,'synthetic-claim-b2-not-confirmed'
+   ) is distinct from true then
+     raise exception 'CLAIM_E2E_POSITIVE_REFUND_REPLAY_DENIED';
+   end if;
+   select s.request_state into strict v_request_state
+     from public.qry_received_digital_reading_withdrawal_claim_v1(
+       v_subject,v_claim
+     ) s;
+   if v_positive_confirmed is distinct from true
+      or v_positive_at is null
+      or v_request_state<>'refund_confirmed'
+      or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+          where id=v_refund_decision_id and status='confirmed'
+            and confirmed_at=v_positive_at)<>1
+      or (select count(*) from public.entitlement_grants
+          where id=v_grant.id and source_receipt_id=v_receipt.id
+            and status='revoked')<>1
+      or (select count(*) from public.entitlement_grants
+          where id=v_other.id and source_receipt_id=v_other_receipt.id
+            and status='active' and revision=v_original_other_revision)<>1
+      or (select verification_status from public.commerce_receipts
+          where id=v_other_receipt.id)<>'verified'
+      or (select count(*) from public.digital_reading_withdrawal_claims_private_v1
+          where id=v_claim and subject_id=v_subject and state='received')<>1
+   then
+     raise exception 'CLAIM_E2E_POSITIVE_REFUND_OR_INDEPENDENT_READER_FAILED';
+   end if;
+   raise exception 'CLAIM_E2E_POSITIVE_REFUND_FORCE_ROLLBACK';
+ exception when raise_exception then
+   if sqlerrm='CLAIM_E2E_POSITIVE_REFUND_FORCE_ROLLBACK' then
+     v_positive_done:=true;
+   else raise;
+   end if;
+ end;
+ select s.request_state into strict v_request_state
+   from public.qry_received_digital_reading_withdrawal_claim_v1(
+     v_subject,v_claim
+   ) s;
+ if not v_positive_done or v_request_state<>'refund_processing'
+    or (select verification_status from public.commerce_receipts
+         where id=v_receipt.id)<>'verified'
+    or (select count(*) from public.commerce_reader_full_refund_dispatches_v1
+         where id=v_refund_decision_id and status='submitted'
+           and confirmed_at is null)<>1
+    or exists (select 1 from public.commerce_provider_events
+         where id='1219d000-0000-4000-8000-000000000008'::uuid)
+ then
+   raise exception 'CLAIM_E2E_POSITIVE_REFUND_SAVEPOINT_LEAK';
+ end if;
+
  -- The original Claim row remains 'received' even though its external
  -- status projection can now say refund_processing. The latter is not an
  -- immutable Claim mutation or a verified PortOne refund.
@@ -726,7 +819,7 @@ begin
    raise exception 'CLAIM_E2E_ACCOUNT_PRIVACY_FINALIZER_REPLAY_REGRESSED';
  end if;
 
- raise notice 'PASS verified B2 notice + Member Claim + synthetic manual refund status transitions (received -> decision -> processing; unverified confirmation denied) + original cancellation + exact B2 revoke + B3 preservation + actual account deletion/replay + unrelated claim and retained financial disposition (ROLLED BACK)';
+ raise notice 'PASS verified B2 notice + Member Claim + synthetic manual refund status transitions (received -> decision -> processing; synthetic exact full GET positive confirmed + idempotent replay ROLLED BACK; unverified confirmation denied) + original cancellation + exact B2 revoke + B3 preservation + actual account deletion/replay + unrelated claim and retained financial disposition (ROLLED BACK)';
 end;
 $commerce_claim_e2e$;
 

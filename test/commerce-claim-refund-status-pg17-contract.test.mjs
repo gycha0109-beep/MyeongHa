@@ -94,7 +94,23 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   expect(sql).toContain('Refund receipt still unconfirmed by verified cancellation');
   expect(sql).toContain('CLAIM_E2E_UNVERIFIED_REFUND_CONFIRMATION_ALLOWED');
   expect(sql).not.toContain("set status='confirmed'");
-  expect(sql).not.toContain("v_request_state<>'refund_confirmed'");
+  expect(sql).toContain("v_request_state<>'refund_confirmed'");
+ });
+ it('proves exact synthetic refund success and idempotent replay before rollback/deletion',()=>{
+  const positive=sql.indexOf('CLAIM_E2E_POSITIVE_REFUND_REPLAY_DENIED');
+  const revoke=sql.indexOf('from public.internal_apply_entitlement_effect_v1(');
+  const deletion=sql.indexOf('from public.internal_finalize_account_deletion_db_v1(');
+  expect(positive).toBeGreaterThan(revoke);
+  expect(deletion).toBeGreaterThan(positive);
+  for(const assertion of [
+    "CLAIM_E2E_POSITIVE_REFUND_OR_INDEPENDENT_READER_FAILED",
+    "CLAIM_E2E_POSITIVE_REFUND_FORCE_ROLLBACK",
+    "CLAIM_E2E_POSITIVE_REFUND_SAVEPOINT_LEAK",
+    "v_request_state<>'refund_confirmed'",
+    "confirmed_at=v_positive_at",
+    "id=v_other.id and source_receipt_id=v_other_receipt.id",
+    "id=v_claim and subject_id=v_subject and state='received'",
+  ])expect(sql).toContain(assertion);
  });
  it('keeps unrelated Subject Claim at received and preserves only P5Y decision after deletion',()=>{
   expect(sql).toContain('CLAIM_E2E_OTHER_SUBJECT_REFUND_STATUS_LEAK');
