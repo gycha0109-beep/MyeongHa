@@ -170,3 +170,13 @@ Watchtower-Track: frontend-integration
 - **블로커/승인:** 별도 승인 필요 없음. 새 HEAD의 실제 CI 결과 대기.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — 사용자 요청 범위 정정: 폰트·컬러만 변경
+
+- **범위 정정:** 앞서 접근성 코드·테스트 변경을 담은 [PR #3147](https://github.com/gycha0109-beep/MyeongHa/pull/3147)은 사용자 요청 범위를 벗어났으므로 **미병합 종료**. 본 변경은 해당 코드를 포함하지 않음.
+- **기준:** 기존 제품 구조·서체 `Noto Serif KR`(제목) / `Pretendard`(본문)를 유지하면서, 요청된 사주 기본정보·사주 상품 카드·캐릭터 선택·마이페이지·기록·리딩의 서체 용도와 색상 대비만 조정. 라이트 `#F6F0E9 / #FFFBF6 / #2C2530 / #71354F / #946A35`, 다크 `#0B151A / #152129 / #F7EFE5 / #E8A9BE / #D7B478`.
+- **변경:** `apps/web/product-clarity.css`의 해당 화면 범위 글꼴·글자색·카드 배경색·테마 색상만 조정. 컴포넌트 구조, 크기, 배치, 버튼 동작, 네비게이션, 접근성 역할 및 서버·계약은 변경하지 않음.
+- **검증/다음:** 신규 PR의 일반 CI·Web PR·Governance 및 필수 Integration 결과 확인 후 병합. 실제 화면 및 Production 수용은 CI만으로 확정하지 않음.
+- **블로커/승인:** 별도 사용자 승인 없음. 미승인 Reader·결제·관상·법무 공개 금지 유지.
+
+Watchtower-Track: frontend-integration

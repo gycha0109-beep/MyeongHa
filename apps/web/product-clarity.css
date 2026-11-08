@@ -73,3 +73,85 @@ body.product-page .mobile-bottom-nav .mobile-nav-link[href="my.html"] { --mh-nav
   html[data-theme="dark"] body.product-page .mobile-bottom-nav .mobile-nav-link[aria-current="page"] { color: #f4e7d4; background: #2c3c47; border-color: #c49a5c; }
   body.product-page :is(input,select,textarea) { font-size: max(16px, 1rem); }
 }
+
+
+/* Scoped visual-only typography/palette pass. Existing structure and behaviour stay intact. */
+body.product-page:is(.saju-hub-page, .records-page, .reading-page, [data-page="my"]) {
+  --mh-paper-base: #F6F0E9;
+  --mh-paper-raised: #FFFBF6;
+  --mh-ink-strong: #2C2530;
+  --mh-ink: #403641;
+  --mh-ink-muted: #655866;
+  --mh-brass-strong: #946A35;
+  --mh-seal: #71354F;
+  --mh-copy-muted: #655866;
+  color: var(--mh-ink-strong);
+  font-family: var(--mh-sans);
+}
+body.saju-hub-page :is(.saju-design-hero h2, .saju-design-card h3, .saju-design-products h2, .saju-design-example h2, .saju-design-product-card h3),
+body.records-page :is(.records-title, .records-panel-head h2, .records-reading-title),
+body[data-page="my"] :is(.my-title, .my-section-heading h2, .my-memory-copy h2),
+body.reading-page :is(.reading-block h2, .reading-sheet h2) {
+  font-family: var(--mh-serif);
+  color: #71354F;
+}
+body.saju-hub-page :is(.saju-design-card, .saju-design-product-card, .saju-design-elements-panel),
+body.records-page :is(.records-panel, .records-reading-card),
+body[data-page="my"] :is(.my-account-card, .my-choice-card) {
+  background-color: #FFFBF6;
+  color: #2C2530;
+}
+body.saju-hub-page :is(.saju-design-hero p, .saju-design-product-card ul, .saju-design-product-scope, .saju-design-birth-fields),
+body.records-page :is(.records-reading-summary, .records-status, .records-reading-date),
+body[data-page="my"] :is(.my-lead, .my-account-meta, .my-detail-hint),
+body.reading-page :is(.reading-block p, .reading-character-block p) {
+  font-family: var(--mh-sans);
+  color: #403641;
+}
+body.product-page .reading-reader-picker {
+  font-family: var(--mh-sans);
+  color: #F7EFE5;
+}
+body.product-page .reading-reader-picker-intro h2,
+body.product-page .reading-reader-option-heading strong {
+  font-family: var(--mh-serif);
+}
+html[data-theme="light"] body.product-page .reading-reader-picker {
+  background: #FFFBF6;
+  color: #2C2530;
+}
+html[data-theme="light"] body.product-page .reading-reader-picker-intro h2,
+html[data-theme="light"] body.product-page .reading-reader-option-heading strong {
+  color: #71354F;
+}
+html[data-theme="dark"] body.product-page:is(.saju-hub-page, .records-page, .reading-page, [data-page="my"]) {
+  --mh-paper-base: #0B151A;
+  --mh-paper-raised: #152129;
+  --mh-ink-strong: #F7EFE5;
+  --mh-ink: #E6D9D2;
+  --mh-ink-muted: #D5C5BD;
+  --mh-brass-strong: #D7B478;
+  --mh-seal: #E8A9BE;
+  --mh-copy-muted: #D5C5BD;
+  color: var(--mh-ink-strong);
+}
+html[data-theme="dark"] body.saju-hub-page :is(.saju-design-hero h2, .saju-design-card h3, .saju-design-products h2, .saju-design-example h2, .saju-design-product-card h3),
+html[data-theme="dark"] body.records-page :is(.records-title, .records-panel-head h2, .records-reading-title),
+html[data-theme="dark"] body[data-page="my"] :is(.my-title, .my-section-heading h2, .my-memory-copy h2),
+html[data-theme="dark"] body.reading-page :is(.reading-block h2, .reading-sheet h2) { color: #E8A9BE; }
+html[data-theme="dark"] body.saju-hub-page :is(.saju-design-card, .saju-design-product-card, .saju-design-elements-panel),
+html[data-theme="dark"] body.records-page :is(.records-panel, .records-reading-card),
+html[data-theme="dark"] body[data-page="my"] :is(.my-account-card, .my-choice-card) {
+  background-color: #152129;
+  color: #F7EFE5;
+}
+html[data-theme="dark"] body.saju-hub-page :is(.saju-design-hero p, .saju-design-product-card ul, .saju-design-product-scope, .saju-design-birth-fields),
+html[data-theme="dark"] body.records-page :is(.records-reading-summary, .records-status, .records-reading-date),
+html[data-theme="dark"] body[data-page="my"] :is(.my-lead, .my-account-meta, .my-detail-hint),
+html[data-theme="dark"] body.reading-page :is(.reading-block p, .reading-character-block p) { color: #F7EFE5; }
+html[data-theme="dark"] body.product-page .reading-reader-picker {
+  background: #152129;
+  color: #F7EFE5;
+}
+html[data-theme="dark"] body.product-page .reading-reader-picker-intro h2,
+html[data-theme="dark"] body.product-page .reading-reader-option-heading strong { color: #E8A9BE; }
