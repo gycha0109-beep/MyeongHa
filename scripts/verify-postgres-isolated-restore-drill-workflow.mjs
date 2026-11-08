@@ -339,6 +339,17 @@ for (const fragment of [
   'REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated',
   'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC',
   'REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated',
+  'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role',
+  'REVOKE EXECUTE ON FUNCTIONS FROM service_role',
+  'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role',
+  'REVOKE ALL PRIVILEGES ON TABLES FROM service_role',
+  "IF current_user = 'supabase_admin' THEN",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM postgres'",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM postgres'",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM postgres'",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM postgres'",
+  'HOLD_SEYEON_RESTORE: isolated provider/application grantees missing',
+  'HOLD_SEYEON_RESTORE: isolated creator retains unexpected noncreator service_role/postgres defaults',
   'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges',
   'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE',
   'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
@@ -357,6 +368,23 @@ for (const forbidden of [
 if (!(harness.indexOf('prepare-postgres-isolated-restore-function-defaults.sql')
   < harness.indexOf('--file "$work_dir/schema.sql"'))) {
   throw new Error('Creator default ACL must be guarded before schema replay.');
+}
+if (!creatorDefaultAcl.includes(
+  "a.grantee = 'service_role'::regrole::oid") ||
+  !creatorDefaultAcl.includes(
+    "current_user = 'supabase_admin' AND") ||
+  !creatorDefaultAcl.includes(
+    "a.grantee = 'postgres'::regrole::oid")) {
+  throw new Error('Isolated creator default ACL role guard is missing.');
+}
+// The test role postgres is also the creator. Never remove its own default
+// grants (which can restore implicit PUBLIC EXECUTE); only the isolated
+// supabase_admin creator may revoke future defaults TO postgres.
+if (creatorDefaultAcl.includes(
+  'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role, postgres') ||
+  creatorDefaultAcl.includes(
+    'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role, postgres')) {
+  throw new Error('Creator own-default privileges must never be revoked unconditionally.');
 }
 for (const fragment of [
   "has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE')",
