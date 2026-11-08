@@ -1,3 +1,12 @@
+### 2026-11-08 KST — Phase 8-A 첫 동일 백업 원본 지문 기반 격리 복원 실측 결과
+
+- **기존 로드맵 / 범위:** Gate 1 / Phase 8-A #6. 날짜 검증 오류를 교정한 PR #3142가 main에 병합된 후, 성공한 암호화 백업 #42417503612를 새로 만들지 않고 동일 아카이브로 격리 복원 #42474143273을 재실행. 실행 main SHA a211b2c451879610c245259249a74c21d87ad02a; 백업 source SHA 4482936a759e91d9cdac066b52d90426ea830ce1; migration frontier 20261105075227.
+- **실측:** https://github.com/gycha0109-beep/MyeongHa/actions/runs/42474143273 — 격리 PostgreSQL 복원, 원본 앱 구조 지문 비교, 합성 개인정보 복구, 차단된 재개 게이트 및 비식별 증거 업로드가 모두 실행 성공. evidence artifact 13614578247, app-schema-parity.json SHA-256 f0b9bf20da7e8674f53d8daa697b93db87a5a39507ec7001c5e80756c3a49481. 요약: POSTGRES_APP_SCHEMA_RESTORE_PARITY_20261108.json.
+- **실제 동등성은 HOLD:** HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH. 원본/복원본 schema 3/3, table 94/94, function 318/318으로 누락·추가 객체는 0. 다만 schema ACL 2개(public, seyeon_private), table structural hash 31개, function ACL hash 180개가 다름. 원본 지문은 백업과 같은 실행의 전후 SELECT-only 관측이나 pg_dump와 동일 MVCC snapshot을 공유하지 않음. hash만으로 정책/권한 재구성과 DDL 차이의 인과 원인은 증명하지 못함.
+- **DR 미수용:** Provider COPY block 27개 skipped/3개 projected, 관련 58행 skipped·23행 projected로 full Provider 복구가 아님. 합성 개인정보 이벤트 4건만 실습했고 실제 Production 권위 원장 non-zero replay와 future-safe continuity는 미증명. Hosted Auth/Storage, 전체 권한/DDL/role membership parity, 전체 서비스 RPO PT24H/RTO PT6H, Phase 13 최종 서비스 수용도 미완료. drReady=false, serviceResumptionAllowed=false, P0 #1887 OPEN.
+- **이번 변경 / 다음:** 이번 실측에서 파생한 비식별 집계 증거 JSON 및 기존 중앙 WORKLOG 기록만 추가. 다음 Phase 8-A는 table structural hash와 schema/function ACL 차이 원인을 읽기 전용 근거로 개별 분류. Production SQL/DDL/DML, IAM/Secret, Provider 설정·트래픽, 신규 Hosted/유료 자원, 개인정보 canary 실행 없음.
+
+Watchtower-Track: ops
 ### 2026-11-08 KST — Phase 8-A 첫 암호화 원본 지문 백업 성공·격리 복원 UTC 검사 RED 수정 (작업단위)
 
 - **실제 ROADMAP 작업:** Gate 1 / Phase 8-A #6, 같은 백업 실행의 원본 앱 구조·권한 지문으로 격리 복원본을 비교하는 첫 실제 실행. [PR #3139](https://github.com/gycha0109-beep/MyeongHa/pull/3139)가 병합된 정확한 main `4482936a759e91d9cdac066b52d90426ea830ce1`을 사용했으며 새로운 로드맵 단위를 만들거나 이미 성공한 과거 복원 시험을 반복하지 않음.
