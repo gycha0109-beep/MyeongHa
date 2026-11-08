@@ -1,3 +1,13 @@
+### 2026-11-08 KST — PR #3156 PG17 Integration RED, 격리 생성자 자신의 기본 권한 보호 수정
+
+- **CI 실패 근거:** PR #3156 HEAD 6ebc897eba99508d84bcac171945d1e739521886, 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42491775990 job 128766051799 (full / DB dependency · postgres17 / postgres17) FAILED. DB CI는 member-character-thread-open 1건에서 FAIL isolated restore creator default still exposed browser function EXECUTE로 실패. 다른 테스트의 의도된 permission denied 로그를 본 장애로 오인하지 않음.
+- **영향 범위/가능한 원인:** 실제 isolated restore 실행 시 creator는 supabase_admin, 하지만 PG17 CI의 일회용 myeongha_ci_case_*에서는 creator가 postgres. 이번 PR의 전역 ALTER DEFAULT PRIVILEGES ... FROM service_role, postgres는 CI creator의 자기 자신을 회수 대상으로 포함해 기본 PUBLIC EXECUTE 보호를 깨뜨릴 가능성이 있음. 이 인과는 수정 후 exact-head CI PASS 전까지 확정하지 않음. 기존 백업·Production DB 자체의 문제로 판단하지 않음.
+- **수정:** service_role의 미래 기본 FUNCTION EXECUTE / TABLE privilege는 격리 creator 누구에게서든 회수. postgres의 미래 기본 ACL은 현 사용자 supabase_admin인 실제 격리 복원일 때만 추가 회수하고, CI creator postgres의 자신의 기본 권한은 건드리지 않도록 분리. 롤 존재/PG17/격리 DB preflight, PUBLIC/anon/authenticated 보호, 비생성자 역할 사후 점검, 최종 실객체 ACL·owner/RLS·DR fail-closed는 모두 유지. 소스 아카이브의 명시적 GRANT는 변경하지 않음.
+- **재발 방지:** test/db/seyeon_relationship_isolated_restore_proof.sh에서 service_role 함수 및 테이블의 비생성자 기본 권한을 일부러 심고, 수정된 스크립트가 직접 ACL에서 이를 제거하면서 anon/authenticated 실행·DML 거부도 보존하는지 PG17 disposable fixture 확인. scripts/verify-postgres-isolated-restore-drill-workflow.mjs는 무조건 postgres 자기 권한 회수를 금지하고 supabase_admin일 때만 회수하는 조건을 고정. 로컬 Node24 restore mechanics PASS, restore workflow boundary verifier PASS(Windows checkout workflow YAML LF 정규화 후), Git Bash syntax PASS; 갱신된 PR HEAD CI·Integration 결과는 아직 미확정.
+- **다음:** PR #3156 동일 브랜치에 수정 push, 필수 CI/Integration 재실행. GREEN 확인 전 자동 병합·실제 isolated DR 개선 효과 미주장. CI/병합 성공 후 정확한 기존 백업 #42488222531로 격리 복원하고 direct privilege delta 195건이 줄었는지 비교. Production DDL/DML/권한·Secret·Hosted·유료자원·privacy canary 변경 없음. P0 #1887 OPEN, dr_ready=false, serviceResumptionAllowed=false, ROADMAP_COMPLETE 미충족.
+
+Watchtower-Track: ops
+
 ### 2026-11-08 KST — Phase 8-A 격리 복원 관리자 기본 ACL 편차 수선안 (실측 대기)
 
 - **ROADMAP / 기준:** Gate 1 / Phase 8-A #6. PR #3155 일반 CI·통합 CI 모두 GREEN, main 병합 5f63d2912895504a087ef317eb9cf043e78586d5. 성공한 동일 암호화 백업 #42488222531과 독립 격리 복원 #42489176631의 SHA-256 기반 비식별 증거 docs/operations/POSTGRES_APP_ACL_GRANTEE_PARITY_20261108.json: schema ACL 2, table ACL 31, function ACL 181, 객체 누락 0. 그중 195개는 직접 grantee privilege 변동(service_role/postgres), 19개는 grantee privileges 같으나 aggregate ACL digest 다름. 원인 및 MVCC snapshot 동등성은 아직 증명되지 않음.

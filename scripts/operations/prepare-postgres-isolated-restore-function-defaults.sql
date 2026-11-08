@@ -59,9 +59,12 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 -- does not explicitly cancel. Remove only the *future* creator defaults
 -- before replay. Explicit GRANTs from the source archive remain untouched.
 -- This does NOT prove current source ACL equivalence, nor permit DR serving.
-ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role, postgres;
+-- A creator must keep its own default ACL. In the disposable PG17 CI case,
+-- current_user is postgres; removing postgres' own default function EXECUTE
+-- can make built-in PUBLIC EXECUTE reappear. Only remove *other* grantees.
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  REVOKE EXECUTE ON FUNCTIONS FROM service_role, postgres;
+  REVOKE EXECUTE ON FUNCTIONS FROM service_role;
 
 -- Production postgres has no default PUBLIC/anon/authenticated table grants
 -- for app relationship tables. The isolated supabase_admin image grants
@@ -72,9 +75,23 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated;
-ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role, postgres;
+ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
-  REVOKE ALL PRIVILEGES ON TABLES FROM service_role, postgres;
+  REVOKE ALL PRIVILEGES ON TABLES FROM service_role;
+
+-- The restore workflow creates objects as supabase_admin, not postgres.
+-- In that separate authorized isolated role, postgres is a noncreator
+-- grantee and can safely be removed from future defaults as well.
+DO $seyeon_isolated_noncreator_postgres_defaults$
+BEGIN
+  IF current_user = 'supabase_admin' THEN
+    EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM postgres';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM postgres';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM postgres';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM postgres';
+  END IF;
+END
+$seyeon_isolated_noncreator_postgres_defaults$;
 
 DO $seyeon_isolated_acl_assert$
 BEGIN
@@ -125,9 +142,13 @@ BEGIN
     WHERE r.rolname = current_user
       AND d.defaclobjtype IN ('f', 'r')
       AND d.defaclnamespace IN (0, 'public'::regnamespace::oid)
-      AND a.grantee IN ('service_role'::regrole::oid, 'postgres'::regrole::oid)
+      AND (
+        a.grantee = 'service_role'::regrole::oid
+        OR (current_user = 'supabase_admin' AND
+            a.grantee = 'postgres'::regrole::oid)
+      )
   ) THEN
-    RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: isolated creator retains unexpected service_role/postgres defaults';
+    RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: isolated creator retains unexpected noncreator service_role/postgres defaults';
   END IF;
 
   IF NOT EXISTS (
