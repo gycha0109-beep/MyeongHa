@@ -180,3 +180,13 @@ Watchtower-Track: frontend-integration
 - **검증/종료:** 새 HEAD의 일반 CI·Web PR·Governance 및 필수 Integration CI가 실제 성공한 뒤 자동 병합돼야 **이번 폰트·컬러 단위 완료**. 기존 Stage 2~4 권한/운영 출시 차단, Stage 5의 다른 미완료 항목은 이 단위와 별개이며 확대 구현하지 않음.
 
 Watchtower-Track: frontend-integration
+
+
+### 2026-11-08 — PR #3152 웹 브라우저 다크 색상 회귀 검사 수정
+
+- **실패 증거:** PR #3152 HEAD `5c4a770c94a962163d5831cfb113661a6f17953c`의 [Web PR #42485900345 / Web PR Verify job #128747575064](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485900345/job/128747575064?pr=3152) FAIL. 정적 웹 빌드 및 정적 UI 번역 검증은 성공, `scripts/verify-web-browser-render.mjs`에서 `/hall.html` 다크 테마의 실제 `--mh-paper-base: #0b151a`를 종전 고정 기대값 `#0b1419`와 비교하여 실패함. 같은 파일의 `--mh-ink-strong` 기대값도 종전 `#f0e7d9`로 남아 새 선언 `#f7efe5`와 불일치. 해당 HEAD [일반 CI #42485900304](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485900304), [Governance #42485900303](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485900303)는 모두 SUCCESS.
+- **수정 범위:** 이미 승인 범위에서 변경한 `apps/web/product-theme.css`의 다크 배경·본문 색상을 되돌리지 않고 `scripts/verify-web-browser-render.mjs`의 다크 배경/본문 기대색 **두 곳만** 현재 CSS 변수값과 일치하도록 갱신. 기존 브라우저 검사의 테마 영속성·가시성·넘침/반응형/화면 검증 범위는 유지. 제품 기능·서버·레이아웃·추가 디자인 변경 없음.
+- **검증/다음:** 새 HEAD에 대한 CI·브라우저·Governance 결과는 아직 미확정. 선행 3개 성공 시 기존 필수 통합 CI를 요청하고 성공·병합 사실을 확인해야 폰트·컬러 단위를 완료 판정할 수 있음.
+- **승인:** 없음. Stage 2~4 미승인 제품 출시 게이트와 무관.
+
+Watchtower-Track: frontend-integration

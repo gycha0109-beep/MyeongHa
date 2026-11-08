@@ -301,8 +301,8 @@ async function verifyDarkPage(client, origin, pathname, selector, { toggle = tru
   assert(state.colorScheme === 'dark', `Dark color-scheme missing on ${cleanPath}: ${state.colorScheme}`);
   assert(state.storedTheme === 'dark', `Dark theme preference missing on ${cleanPath}`);
   assert(state.styles.includes('/product-theme.css'), `Dark theme stylesheet missing on ${cleanPath}`);
-  assert(state.paperBase === '#0b1419', `Dark paper token not active on ${cleanPath}: ${state.paperBase}`);
-  assert(state.inkStrong === '#f0e7d9', `Dark ink token not active on ${cleanPath}: ${state.inkStrong}`);
+  assert(state.paperBase === '#0b151a', `Dark paper token not active on ${cleanPath}: ${state.paperBase}`);
+  assert(state.inkStrong === '#f7efe5', `Dark ink token not active on ${cleanPath}: ${state.inkStrong}`);
   assert(state.targetVisible, `Dark theme target is not visible on ${cleanPath}: ${selector}`);
   if (toggle) assert(state.toggleVisible, `Theme toggle is not visible on ${cleanPath}`);
   assert(state.overflow <= 2, `Horizontal overflow on ${cleanPath}: ${state.overflow}px`);
