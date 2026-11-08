@@ -79,10 +79,14 @@ alter function seyeon_private.pin_positive_model_context_sources_v1(
   uuid,uuid,text,text,text,text,text,text,text
 ) owner to myeongha_seyeon_chat_runtime_owner;
 
+-- Hosted PostgreSQL's installer does not inherit NOLOGIN function-owner rights.
+-- Temporarily act as the exact function owner for its explicit deny ACL.
+set local role myeongha_seyeon_chat_runtime_owner;
 revoke all on function seyeon_private.pin_positive_model_context_sources_v1(
   uuid,uuid,uuid,uuid,uuid,jsonb,text,
   uuid,uuid,text,text,text,text,text,text,text
 ) from public,anon,authenticated,service_role,myeongha_api_executor;
+reset role;
 
 -- The ordinary Member executor must NEVER get access to the private owner
 -- function. Give it a fixed public owner entrypoint, with EXECUTE revoked by
@@ -118,10 +122,14 @@ alter function public.cmd_pin_seyeon_positive_model_context_sources_v1(
   uuid,uuid,uuid,uuid,uuid,jsonb,text,
   uuid,uuid,text,text,text,text,text,text,text
 ) owner to myeongha_seyeon_chat_runtime_owner;
+-- Hosted PostgreSQL's installer does not inherit NOLOGIN function-owner rights.
+-- Temporarily act as the exact function owner for its explicit deny ACL.
+set local role myeongha_seyeon_chat_runtime_owner;
 revoke all on function public.cmd_pin_seyeon_positive_model_context_sources_v1(
   uuid,uuid,uuid,uuid,uuid,jsonb,text,
   uuid,uuid,text,text,text,text,text,text,text
 ) from public,anon,authenticated,service_role,myeongha_api_executor;
+reset role;
 
 -- No GRANT to API or anonymous roles in the installer. Positive Source
 -- Registry/model use, metered Provider and HTTP Reveal also remain OFF.
