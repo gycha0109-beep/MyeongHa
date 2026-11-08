@@ -307,7 +307,32 @@ try {
   const previewSelector = '#saju-hub a[href="reading-detail.html?topic=career"]';
   assert(await client.evaluate('!!document.querySelector(' + JSON.stringify(previewSelector) + ')'),
     'Admitted career Preview link missing from calculated chart');
-  await client.evaluate('document.querySelector(' + JSON.stringify(previewSelector) + ').click()');
+  // Exercise the visible link with a real Chrome pointer gesture. A JS-only
+  // element.click() is not equivalent to the user's browser interaction.
+  const previewLink = await client.evaluate(`(() => {
+    const link = document.querySelector(${JSON.stringify(previewSelector)});
+    link.scrollIntoView({ block: 'center' });
+    const rect = link.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return { x, y, connected: link.isConnected, href: link.getAttribute('href'),
+      visible: rect.width > 0 && rect.height > 0 && getComputedStyle(link).visibility !== 'hidden',
+      reachable: hit === link || link.contains(hit),
+    };
+  })()`);
+  assert(previewLink.connected && previewLink.href === 'reading-detail.html?topic=career' &&
+    previewLink.visible && previewLink.reachable,
+    'Career Preview is not reachable by a browser pointer: ' + JSON.stringify(previewLink));
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseMoved', x: previewLink.x, y: previewLink.y,
+  });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mousePressed', x: previewLink.x, y: previewLink.y, button: 'left', clickCount: 1,
+  });
+  await client.send('Input.dispatchMouseEvent', {
+    type: 'mouseReleased', x: previewLink.x, y: previewLink.y, button: 'left', clickCount: 1,
+  });
   try {
     await waitFor(client,
       'location.pathname === "/reading-detail.html" && document.body?.dataset.readingRouteState === "preview"',

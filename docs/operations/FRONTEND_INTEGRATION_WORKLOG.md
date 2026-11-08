@@ -150,3 +150,13 @@ Watchtower-Track: frontend-integration
 - **블로커·승인:** 추가 승인 없음. 실제 브라우저 검증이 미통과 상태.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — PR #3141 Web PR Verify 실사용 클릭 재현 수정
+
+- **실패 증거:** HEAD `038d9894dde594a9952b8d5113b4596e36725323`, [Web PR #42418029250 / job #128540233985](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42418029250/job/128540233985?pr=3141) **FAIL**. 진단에서 게스트 Birth 생성과 계산 후 경로가 `/reading.html`에 머물렀고, 마지막 Preview 요청은 기존 `전체 사주`였으며 `직업운` 요청은 발생하지 않았다. 즉, 기존 `element.click()` 호출만으로는 해당 E2E에서 링크 이동이 확인되지 않았으며, 원인을 실제 Preview 서버 응답으로 단정할 수 없다.
+- **수정:** `scripts/verify-web-general-natal-preview-browser.mjs`에서 JS `element.click()` 대신 실제 Chrome 마우스 이동·누름·해제를 사용해 **사용자와 같은 링크 클릭**을 확인하도록 변경했다. 클릭 전 현재 화면의 링크 연결 여부, 목적지, 표시 상태 및 다른 요소에 가려지지 않는지 확인하여 UI 결함은 그대로 FAIL 처리한다. 게스트 주체 일치·직업운 요청·Preview 응답 표시 검사와 기존 실패 시 민감정보 제외 진단은 유지한다. 제품 코드·권한·서비스 응답은 수정하지 않았다.
+- **검증/미완료:** 본 변경 HEAD의 Web PR/CI/Governance 검증 및 필수 통합 CI는 아직 결과 미확인. 실제 클릭으로도 화면 이동이 실패하면 최신 로그의 정확한 원인을 이어서 수정한다. 이번 수정만으로 기능 성공이나 출시 승인을 선언하지 않는다.
+- **다음:** [PR #3141 검사](https://github.com/gycha0109-beep/MyeongHa/pull/3141/checks)의 변경 HEAD 결과 확인 → 실패 지점 재수정 또는 통합 검증 진행. Stage 2~4 공식 Reading·결제·관상 승인 차단과 법무·개인정보 미승인 상태 유지.
+- **승인:** 추가 사용자 승인 없음.
+
+Watchtower-Track: frontend-integration
