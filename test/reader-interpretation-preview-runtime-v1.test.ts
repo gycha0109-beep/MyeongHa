@@ -14,7 +14,7 @@ import {
   runReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
-import type { CharacterSajuConsultationShadowPortV1, CharacterSajuConsultationPrivateComparisonV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
+import type { CharacterSajuConsultationShadowPortV1, CharacterSajuConsultationPrivateComparisonV1, CharacterSajuConsultationPrivateBatchComparisonV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
 import { createOpenAiSajuConsultationShadowPortV1, type OpenAiSajuConsultationShadowFetchV1 } from '../apps/api/src/openai-saju-consultation-shadow-port-v1.js';
 import { createReaderSajuPrivatePairCollectorV1 } from '../apps/api/src/reader-saju-private-pair-comparison-v1.js';
 import type {
@@ -380,6 +380,130 @@ async function run(
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
+
+  const multiUnitBundle = makeBundle([
+    makeUnit('1', 'timing', '오래 지속되는 흐름의 유리한 점이 인정됩니다.'),
+    makeUnit('2', 'strength', '생활에서 발휘할 수 있는 강점을 확인합니다.'),
+    { ...makeUnit('3', 'responsibility', '책임을 다루는 조건이 함께 중요합니다.'), narrativeRole: 'supporting' as const },
+    { ...makeUnit('4', 'tension', '선택의 부담이 동시에 존재할 수 있습니다.'), narrativeRole: 'tension' as const },
+  ]);
+
+  it('can generate and review 3-4 source-owned consultation units with one call per model, never exposing the candidate', async () => {
+    const evidence = vi.fn(async (_record: CharacterSajuConsultationPrivateBatchComparisonV1) => undefined);
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const data = request.input as {
+        characterId: string;
+        officialUnits: readonly { unitId: string; canonicalMeaning: string }[];
+      };
+      expect(data.officialUnits.length).toBeGreaterThanOrEqual(3);
+      expect(data.officialUnits.length).toBeLessThanOrEqual(4);
+      expect(new Set(data.officialUnits.map((x) => x.unitId)).size).toBe(data.officialUnits.length);
+      return {
+        segments: data.officialUnits.map((unit) => ({
+          unitId: unit.unitId,
+          text: unit.canonicalMeaning,
+        })),
+      };
+    });
+    const evaluate = vi.fn();
+    const evaluateBatch = vi.fn(async (
+      batch: Parameters<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>[0],
+    ) => ({
+      verdicts: batch.candidates.map((candidate, i) => ({
+        schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+        evaluatorVersion: 'offline-multi-unit-review-v1',
+        candidateHash: batch.candidateHashes[i]!,
+        unitId: candidate.sourceUnitRefs[0]!,
+        semanticPreserved: true,
+        characterFidelityPreserved: true,
+        failureClasses: [] as const,
+      })),
+    }));
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      multiUnitPilot: true,
+      evaluatorVersion: 'offline-multi-unit-review-v1',
+      generate,
+      evaluate,
+      evaluateBatch,
+      recordPrivateBatchComparison: evidence,
+    };
+    const original = await run(readers.baekheon, { bundle: multiUnitBundle });
+    const checked = await run(readers.baekheon, {
+      bundle: multiUnitBundle,
+      consultationShadowPort: port,
+    });
+    expect(checked).toEqual(original);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(evaluateBatch).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+    expect(evidence).toHaveBeenCalledOnce();
+    const received = evidence.mock.calls[0]![0];
+    expect(received.units.length).toBeGreaterThanOrEqual(3);
+    expect(received.units.every((u) => u.evaluation === 'accepted')).toBe(true);
+    expect(received.revealState).toBe('forbidden');
+    expect(checked).not.toHaveProperty('candidateText');
+  });
+
+  it('rejects the entire multi-unit pilot if even one official unit is not semantically preserved', async () => {
+    const evidence = vi.fn(async (_record: CharacterSajuConsultationPrivateBatchComparisonV1) => undefined);
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const data = request.input as { officialUnits: readonly {unitId:string;canonicalMeaning:string}[] };
+      return {
+        segments: data.officialUnits.map((unit) => ({
+          unitId: unit.unitId,
+          text: unit.canonicalMeaning,
+        })),
+      };
+    });
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      multiUnitPilot: true,
+      evaluatorVersion: 'offline-multi-unit-review-v1',
+      generate,
+      evaluate: vi.fn(),
+      async evaluateBatch(batch) {
+        return {
+          verdicts: batch.candidates.map((candidate, i) => ({
+            schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+            evaluatorVersion: 'offline-multi-unit-review-v1',
+            candidateHash: batch.candidateHashes[i]!,
+            unitId: candidate.sourceUnitRefs[0]!,
+            semanticPreserved: i !== 1,
+            characterFidelityPreserved: true,
+            failureClasses: i === 1 ? ['ADDED_CLAIM' as const] : [],
+          })),
+        };
+      },
+      recordPrivateBatchComparison: evidence,
+    };
+    const original = await run(readers.baekheon, { bundle: multiUnitBundle });
+    const checked = await run(readers.baekheon, {
+      bundle: multiUnitBundle, consultationShadowPort: port,
+    });
+    expect(checked).toEqual(original);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(evidence).toHaveBeenCalledOnce();
+    const review = evidence.mock.calls[0]![0];
+    expect(review.units.some((unit) =>
+      unit.evaluation === 'rejected' && unit.failureCodes.includes('ADDED_CLAIM'),
+    )).toBe(true);
+  });
+
+  it('blocks malformed multi-unit sequence before independent model evaluation', async () => {
+    const evaluateBatch = vi.fn();
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      multiUnitPilot: true,
+      evaluatorVersion: 'offline-multi-unit-review-v1',
+      generate: vi.fn(async () => ({ segments: [{unitId: 'forged',text:'잘못된 예언입니다.'}] })),
+      evaluate: vi.fn(),
+      evaluateBatch,
+    };
+    const original = await run(readers.baekheon, { bundle: multiUnitBundle });
+    const checked = await run(readers.baekheon, { bundle: multiUnitBundle, consultationShadowPort: port });
+    expect(checked).toEqual(original);
+    expect(evaluateBatch).not.toHaveBeenCalled();
+  });
+
+
   it('pairs Baekheon and Seyeon against the identical authorized Saju unit for private editorial comparison', async () => {
     const singleUnitBundle = makeBundle([
       makeUnit('1', 'timing', '장기 흐름에서 반복되는 특징을 확인해야 합니다.'),
