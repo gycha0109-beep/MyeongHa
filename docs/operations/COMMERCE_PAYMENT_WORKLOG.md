@@ -1146,3 +1146,11 @@
 - **실제 격리 PG17 검증:** 원본 B2 GET형 Provider Event→기존 1080 구매권 회수 이후 실제 1890/2390 full-cancellation DB 함수를 재실행해 같은 Event 및 Grant Effect 재실행만 발생하는지 확인합니다. 같은 Event ID에 다른 verifier revision을 제출하는 경우는 해당 함수가 오류로 거부하고 B3 독립 구매권 및 이전 B2 Effect를 변경하지 않는지 검사합니다. 전체 하위·외부 트랜잭션 ROLLBACK.
 - **CI 적용:** 독립 Vitest 정적 계약, 역사적 fixture SHA guard, WORKLOG 업데이트. 신규 CI/PG17 성공은 확인 전 미선언.
 - **남은 로드맵:** Provider 전체 NEWER/STALE 의미 비교, Reader T2 최종 동시성, 실제 고객 제공 증거 및 개인정보 복원 replay, 전체 비운영 E2E. 실제 PG 환불 POST/운영 DB/공개 LIVE 활성화 미수행.
+
+### 2026-11-08 — PortOne GET 취소 시간의 마이크로초 비교 오판정 수정
+
+- **선행:** [CI #42488062249](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42488062249) 및 관련 검사 전체 GREEN. 승인 로드맵 §6-1·2·5. 최신 PortOne V2 공개 REST/SDK 문서의 결제·취소 시간 필드를 대조했습니다.
+- **발견:** 기존 원본 GET 검증기의 UTC 정규화는 RFC3339 소수초의 가변 자릿수를 보존했지만 `paidAt>=succeededCancelledAt`, `statusChangedAt<cancelledAt`을 문자열로 비교했습니다. `.9991Z`는 문자순으로 `.999101Z`보다 크므로 실제로 더 이전인 결제를 뒤늦은 것으로 거부하거나, 반대로 결제 이후보다 이른 취소를 정상처럼 허용하는 오류가 발생할 수 있었습니다. JS Date 밀리초 반올림 비교는 정확성을 잃습니다.
+- **실제 구현:** 원본 인증 PortOne GET 검증기에서 이미 달력·UTC·오프셋 검증된 정규화 시각을 **초 단위 이후 소수 부분의 길이를 맞춘 정밀 비교**로 대체합니다. 결제 < 단일 성공 취소, 개별/결제 취소 시각의 정확한 일치, 최종 상태 변경 시각 >= 취소 시각을 전부 동일하게 비교합니다. 외부 Provider 순서 정보를 새로 주장하거나 원본 이벤트/DB 구조·Writer·정산 기능을 바꾸지 않습니다.
+- **회귀:** 동일 밀리초 안에서 정상 `.999100Z` → `.999101Z` +09:00 오프셋 검증 및 취소 DB 바인딩 정상 사례, 실제 결제 시각 역전·상태 변경 시각 역전·소수부 동일 시간(자릿수 차이)을 **DB 쓰기 없이 거부**하는 사례를 추가했습니다. 새 CI 통과 전까지 검증 결과는 미확정입니다.
+- **잔여:** 현재 GET 내부 시계 정합성 검사만 완료. 서로 다른 Provider 사건의 공식 NEWER/STALE 순서·Reader T2 완전 선형화, 실제 고객 제공/복원/privacy replay 및 전체 E2E는 미완료. 운영 환불 POST/운영 DB/LIVE 미수행.

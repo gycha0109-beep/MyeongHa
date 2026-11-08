@@ -637,6 +637,32 @@ function canonicalFraction(fraction: string): string {
   return trimmed.length < 3 ? trimmed.padEnd(3, '0') : trimmed;
 }
 
+/**
+ * Both instants are already strictly validated UTC RFC3339 timestamps from
+ * requirePaidAt. Comparing the whole strings is NOT chronological when one
+ * fractional second is a prefix of the other: the final 'Z' sorts after a
+ * decimal digit. Compare whole seconds, then zero-pad fractional digits to
+ * equal precision. Never round to JavaScript milliseconds.
+ */
+function compareCanonicalPortOneInstants(
+  left: string,
+  right: string,
+): -1 | 0 | 1 {
+  const leftSecond = left.slice(0, 19);
+  const rightSecond = right.slice(0, 19);
+  if (leftSecond !== rightSecond) {
+    return leftSecond < rightSecond ? -1 : 1;
+  }
+  const leftFraction = left.slice(20, -1);
+  const rightFraction = right.slice(20, -1);
+  const precision = Math.max(leftFraction.length, rightFraction.length);
+  const normalizedLeft = leftFraction.padEnd(precision, '0');
+  const normalizedRight = rightFraction.padEnd(precision, '0');
+  return normalizedLeft === normalizedRight
+    ? 0
+    : normalizedLeft < normalizedRight ? -1 : 1;
+}
+
 function requirePaidAt(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > 128) {
     return fail('INVALID_PAYMENT', 'PortOne V2 payment paidAt is invalid.');
@@ -1026,9 +1052,9 @@ export function createPortOneV2FullCancellationVerifierV1(
         const cancelledAt=requirePaidAt(payment.cancelledAt);
         const succeededCancelledAt=requirePaidAt(cancellation.cancelledAt);
         const statusChangedAt=requirePaidAt(payment.statusChangedAt);
-        if (paidAt>=succeededCancelledAt ||
-            succeededCancelledAt!==cancelledAt ||
-            statusChangedAt<cancelledAt) {
+        if (compareCanonicalPortOneInstants(paidAt,succeededCancelledAt)>=0 ||
+            compareCanonicalPortOneInstants(succeededCancelledAt,cancelledAt)!==0 ||
+            compareCanonicalPortOneInstants(statusChangedAt,cancelledAt)<0) {
           return fail('INVALID_PAYMENT',
             'PortOne V2 original payment and successful cancellation chronology is inconsistent.');
         }
