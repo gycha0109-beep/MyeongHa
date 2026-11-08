@@ -130,6 +130,31 @@ assert.deepEqual(roleMismatch.types.schemas.changed[0].aclAffectedGrantees,
   ['service_role']);
 assert.deepEqual(roleMismatch.types.functions.changed[0].aclAffectedGrantees,
   ['anon']);
+for (const kind of ['schemas', 'tables', 'functions']) {
+  assert.equal(roleMismatch.types[kind].changed[0].aclGranteePrivilegeVerdict,
+    'DIFFERENT_DIRECT_GRANTEE_PRIVILEGES');
+}
+// An aggregate hash can differ when role OIDs and grant-entry aggregation
+// order differ across clusters even with identical direct grant entries.
+const sameRoleGrants = structuredClone(facetedRestored);
+sameRoleGrants.schemas[0].acl_sha256 = 'b'.repeat(64);
+sameRoleGrants.schemas[0].acl_grant_entries_without_grantor_sha256 = 'b'.repeat(64);
+sameRoleGrants.tables[0].structural_sha256 = 'b'.repeat(64);
+sameRoleGrants.tables[0].structural_component_sha256.acl = 'b'.repeat(64);
+sameRoleGrants.functions[0].acl_sha256 = 'b'.repeat(64);
+sameRoleGrants.functions[0].acl_grant_entries_without_grantor_sha256 =
+  'b'.repeat(64);
+const orderAmbiguity = compareApplicationCatalog(facetedSource, sameRoleGrants, frontier);
+for (const kind of ['schemas', 'tables', 'functions']) {
+  assert.deepEqual(orderAmbiguity.types[kind].changed[0].aclAffectedGrantees, []);
+  assert.equal(orderAmbiguity.types[kind].changed[0].aclGranteePrivilegeVerdict,
+    'MATCH_DIRECT_GRANTEE_PRIVILEGES_ACL_HASH_DIFFERS');
+}
+assert.equal(orderAmbiguity.applicationScopeVerdict,
+  'HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH');
+assert.equal(orderAmbiguity.restoreMismatchRootCauseProven, false);
+assert.equal(orderAmbiguity.drReady, false);
+
 assert.equal(roleMismatch.restoreMismatchRootCauseProven, false);
 assert.equal(roleMismatch.drReady, false);
 const missingRoleMap = structuredClone(roleRestored);

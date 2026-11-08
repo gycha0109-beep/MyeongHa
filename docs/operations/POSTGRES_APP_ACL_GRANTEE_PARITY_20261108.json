@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "ops-postgres-source-bound-acl-grantee-parity-evidence-v1",
+  "backupRunId": 42488222531,
+  "backupRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42488222531",
+  "backupSourceSha": "33fd5173d51f27a800e0f16dade7e814519e6377",
+  "backupFrontier": "20261105075227",
+  "restoreRunId": 42489176631,
+  "restoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42489176631",
+  "restoreExecutionSha": "42846267330c2f8bad421a1b40f57c2f461a1a8d",
+  "restoreArtifactId": 13620528350,
+  "restoreArtifactEvidenceSha256": {
+    "app-schema-parity.json": "3b9f8e20d5f5a376df6cc59fd785f535a22bdb0c10310155f7055688b05655a2",
+    "restore-evidence.json": "118a21eaa155298619bc470071156752dabb5908ffd53239fa36995024aa9b98",
+    "privacy-reconciliation-evidence.json": "813df15a812730fe8fa8265339f6b164f0657f8e874816468177cdfda01ead96",
+    "recovered-serving-admission.json": "77130277f2d23483e16672b3eb463e65f7de232a4d2a49713c8aed91cb7d5104"
+  },
+  "isolatedRestoreConclusion": "success",
+  "s0OptionalRehearsalExecuted": false,
+  "provenance": "encrypted_backup_bracketed_readonly_v1",
+  "sourceCatalogHold": "SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT",
+  "sharedPgDumpMvccSnapshot": false,
+  "restoreMismatchRootCauseProven": false,
+  "componentHashEvidence": {
+    "tableStructure": true,
+    "schemaAclGrantEntries": true,
+    "routineAclGrantEntries": true,
+    "tableAclByGrantee": true,
+    "schemaAclByGrantee": true,
+    "routineAclByGrantee": true
+  },
+  "migrationFrontierAligned": true,
+  "postgresVersionEqual": true,
+  "catalogComparisonVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+  "catalogComparison": {
+    "schemas": {
+      "baselineCount": 3,
+      "restoredCount": 3,
+      "changedCount": 2,
+      "matchingCount": 1,
+      "missingCount": 0,
+      "additionalCount": 0,
+      "differentDirectGranteePrivileges": 0,
+      "matchingDirectGranteePrivilegesDespiteAclHashChange": 2,
+      "affectedRoleCounts": {},
+      "roleCombinationCounts": {
+        "none": 2
+      }
+    },
+    "tables": {
+      "baselineCount": 94,
+      "restoredCount": 94,
+      "changedCount": 31,
+      "matchingCount": 63,
+      "missingCount": 0,
+      "additionalCount": 0,
+      "differentDirectGranteePrivileges": 23,
+      "matchingDirectGranteePrivilegesDespiteAclHashChange": 8,
+      "affectedRoleCounts": {
+        "postgres": 7,
+        "service_role": 20
+      },
+      "roleCombinationCounts": {
+        "none": 8,
+        "postgres": 3,
+        "postgres,service_role": 4,
+        "service_role": 16
+      }
+    },
+    "functions": {
+      "baselineCount": 322,
+      "restoredCount": 322,
+      "changedCount": 181,
+      "matchingCount": 141,
+      "missingCount": 0,
+      "additionalCount": 0,
+      "differentDirectGranteePrivileges": 172,
+      "matchingDirectGranteePrivilegesDespiteAclHashChange": 9,
+      "affectedRoleCounts": {
+        "postgres": 82,
+        "service_role": 166
+      },
+      "roleCombinationCounts": {
+        "none": 9,
+        "postgres": 6,
+        "postgres,service_role": 76,
+        "service_role": 90
+      }
+    }
+  },
+  "aggregateCounts": {
+    "changed": 214,
+    "differentDirectGranteePrivileges": 195,
+    "matchingDirectGranteePrivilegesDespiteAclHashChange": 19
+  },
+  "authorization": {
+    "verifiedApplicationScopeEquivalence": false,
+    "verifiedFullSchemaCatalogEquivalence": false,
+    "providerManagedDataFullRestore": false,
+    "providerCopyBlocksSkipped": 27,
+    "providerCopyBlocksProjected": 3,
+    "authoritativePrivacyReconciliation": false,
+    "futureSafePrivacyReconciliation": false,
+    "servingGate": "BLOCKED",
+    "drReady": false,
+    "serviceResumptionAllowed": false
+  },
+  "interpretationLimitations": [
+    "Direct grantee privilege-entry hashes are scoped to acl-exploded grants; this does not prove inherited or effective permissions.",
+    "Matching per-grantee privilege hashes with different aggregate ACL digests cannot prove grantor drift: the legacy digest orders by DB-local role OIDs.",
+    "Differing source/restored grants do not distinguish original Production ACL from portable replay behavior, restored target defaults, or snapshot timing.",
+    "No shared MVCC pg_dump snapshot. Provider-owned roles, Hosted Auth/Storage, authoritative privacy continuity and whole-service RPO/RTO are not accepted.",
+    "Previous S0 optional rehearsal runs failed an installation-fixture collision, not this DB-only restoration; optional S0 was disabled for this scoped run."
+  ]
+}
