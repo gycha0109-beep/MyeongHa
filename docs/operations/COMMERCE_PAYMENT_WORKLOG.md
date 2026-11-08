@@ -1108,3 +1108,9 @@
 - **구현:** 환불 상태를 최종 `confirmed`로 바꾸는 기존 2370 비공개 DB 함수에서 **정확한 전액 취소 Event의 기존 1890 시각 기반 ordering key 일치**, 해당 Event ID에서 발생한 구매권 회수 효과의 **`effective_at=provider_occurred_at`**, 회수 효과의 `provider_ordering_key`와 Provider Event의 동일성을 모두 요구합니다. 원 Receipt/Subject/취소 ID·원결제 시도/지문·전액 검증, Grant/Event 실효 증거 및 기존 ACL은 유지합니다. 정상적인 0-Grant 선취소는 기존대로 허용합니다.
 - **검증:** 기존 격리 PG17 정상 B2 환불 확정 세이브포인트 안에서 동일 Event ID이되 `effective_at`이 1마이크로초 잘못 전달된 합성 Entitlement Effect를 구형 Writer로 실제 기록한 뒤, 고객 환불 확정을 거부하고 해당 잘못된 Effect의 부작용이 하위 트랜잭션에서 완전 복구되는지 검사합니다. 이후 정확한 시각의 정상 효과·환불 확정·재실행·별도 Reader B3 보존을 실행하고 전체 외부 세이브포인트를 롤백합니다. 정적 계약과 역사적 fixture 지문도 맞춰 수정했습니다.
 - **범위:** 실제 공식 Provider NEWER/STALE 의미 비교/Reader T2 LIVE 선형화 증명이 아니며, 구매/환불 POST·운영 DB·공개 API·판매 활성화 없음. 본 커밋 CI/PG17 실행의 PASS는 실제 확인 전까지 미선언. 남은 단계: Provider 최신성·T2 원자 실행·소비자 제공·복원 실증·전체 E2E.
+
+### 2026-11-08 — PortOne GET 검증기 보안 경계 CI 문구 충돌 수정
+
+- **근거:** [CI #42479409068](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42479409068) `Work Track · commerce`에서 보안 경계 테스트 `tests/portone-v2-payment-verification-adapter-authority.test.ts`의 특정 금지 용어 정규식과 새 주석에 쓰인 `Entitlement` 용어가 충돌해 Vitest 1건 실패했습니다. 기존 검증기 실행 오류나 DB/PortOne 호출 오류는 아닙니다.
+- **수정:** 원본 PortOne GET 검증기 파일의 보안 경계 주석을 테스트 계약상 허용되는 Reader 취소 처리 용어로 교체합니다. 모든 취소 시각 검증 로직과 DB/Provider 연결은 변경하지 않습니다. 수정된 코드에 대하여 기존 테스트가 금지하는 `webhook|entitlement|supabase|grant` 용어가 존재하지 않음을 확인했습니다.
+- **검증:** 신규 CI 및 PostgreSQL17 결과는 실행 완료 전까지 미확정. 운영 환불 POST·운영 DB·공개 LIVE 변경 없음. 승인 필요 없음.

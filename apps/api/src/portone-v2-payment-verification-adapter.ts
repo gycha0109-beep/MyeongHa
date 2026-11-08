@@ -1021,7 +1021,7 @@ export function createPortOneV2FullCancellationVerifierV1(
         // This paid-only Reader purchase must have a coherent provider
         // lifecycle clock. An out-of-order or unrelated cancellation item
         // must not become the effective_at used by the existing locked S2
-        // Entitlement writer's STALE protection.
+        // existing private Reader cancellation writer's older-source check.
         const paidAt=requirePaidAt(payment.paidAt);
         const cancelledAt=requirePaidAt(payment.cancelledAt);
         const succeededCancelledAt=requirePaidAt(cancellation.cancelledAt);
