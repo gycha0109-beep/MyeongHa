@@ -108,11 +108,86 @@ try{
   }finally{await isolatedSchemaAdmin.end();}
   const local=new Client({...db,user:'postgres',database:target});
   await local.connect();
+  // The encrypted Production backup already contains earlier S0 objects;
+  // the full source bundle is intentionally not idempotent. Never drop or
+  // overwrite those objects just to force a fresh-install rehearsal.
+  let rehearsalInstallMode='fresh-baseline';
+  let restoredIncrementalSourceFiles=[];
   try{
     const {rows:[preflight]}=await local.query(`select
       to_regnamespace('seyeon_private') is null as absent,
-      not exists(select 1 from auth.users where id::text like 'a8100000-0000-4000-8000-%') as fixtures_absent`);
-    if(preflight.absent!==true||preflight.fixtures_absent!==true)throw Error('S0 installation/fixture collision; no overwrite.');
+      not exists(select 1 from auth.users where id::text like 'a8100000-0000-4000-8000-%') as fixtures_absent,
+      to_regprocedure('seyeon_private.lock_memory_subject_v1(uuid)') is not null
+        and to_regprocedure('public.cmd_mark_seyeon_positive_context_ready_pinned_v1(uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text)') is not null
+        and to_regprocedure('seyeon_private.assert_current_original_member_user_message_v1(uuid,uuid,uuid)') is not null
+        as upstream_installed,
+      to_regprocedure('seyeon_private.lock_accepted_original_memory_for_grant_v1(uuid,uuid)') is null
+        and to_regprocedure('public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)') is null
+        and to_regprocedure('seyeon_private.pin_model_recent_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text)') is null
+        and to_regprocedure('public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)') is null
+        as supplementary_absent,
+      (select count(*)=1 and bool_and(not enabled and not writable_enabled)
+         from public.seyeon_positive_source_type_registry_v1
+         where record_kind='memory' and record_type='conversation_recall'
+           and schema_version='v1' and projector_version='seyeon-conversation-recall-projector-v1')
+         as single_closed_registry,
+      (select count(*)=1 from public.seyeon_positive_source_type_registry_v1) as registry_count_exact`);
+    if(preflight.fixtures_absent!==true)throw Error('S0 synthetic fixture collision; no overwrite.');
+    if(preflight.absent!==true){
+      // Only the exact already-reviewed missing S0 sources are allowed into
+      // this disposable CLONE. The original restored database stays untouched.
+      if(preflight.upstream_installed!==true||preflight.supplementary_absent!==true||
+         preflight.single_closed_registry!==true||preflight.registry_count_exact!==true){
+        throw Error('S0 restored baseline diverged; refuse duplicate source install.');
+      }
+      const sources=['09-owned-original-memory-grant.sql',
+        '16-g1-model-recent-source-pin.sql','17-g1-positive-combined-model-source-pin.sql'];
+      const owner='myeongha_seyeon_chat_runtime_owner';
+      const grant='grant '+owner+' to current_user;';
+      const revoke='revoke '+owner+' from current_user;';
+      const sections=[];
+      for(const name of sources){
+        const sql=(await readFile(new URL('./seyeon-security-s0/'+name,import.meta.url),'utf8')).replace(/\r\n/gu,'\n');
+        if((sql.match(/^begin;$/gmu)??[]).length!==1||
+           (sql.match(/^commit;$/gmu)??[]).length!==1||
+           sql.split(grant).length!==2||sql.split(revoke).length!==2){
+          throw Error('S0 supplemental SQL envelope changed: '+name);
+        }
+        sections.push(sql.replace(/^begin;\n/mu,'').replace(/\ncommit;\s*$/u,'')
+          .replace(grant,'-- Owner membership is held by the atomic clone installer')
+          .replace(revoke,'-- Owner membership restored by the atomic clone installer'));
+      }
+      await local.query('begin');
+      try{
+        await local.query(`set local lock_timeout='5s'; set local statement_timeout='60s'`);
+        await local.query(`grant myeongha_seyeon_chat_runtime_owner
+          to current_user with admin false, inherit false, set true`);
+        for(const sql of sections)await local.query(sql);
+        await local.query(`grant myeongha_seyeon_chat_runtime_owner
+          to current_user with admin false, inherit false, set false`);
+        const {rows:[installed]}=await local.query(`select
+          to_regprocedure('public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)') is not null
+            and to_regprocedure('seyeon_private.lock_accepted_original_memory_for_grant_v1(uuid,uuid)') is not null
+            and to_regprocedure('seyeon_private.pin_model_recent_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text)') is not null
+            and to_regprocedure('public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)') is not null
+            as complete,
+          not has_function_privilege('myeongha_api_executor',
+            'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)','EXECUTE')
+            and not has_function_privilege('anon',
+            'public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)','EXECUTE')
+            as default_closed,
+          not pg_has_role('postgres','myeongha_seyeon_chat_runtime_owner','SET') as owner_set_restored,
+          (select count(*)=1 and bool_and(not enabled and not writable_enabled)
+           from public.seyeon_positive_source_type_registry_v1) as source_still_off`);
+        if(installed.complete!==true||installed.default_closed!==true||
+          installed.owner_set_restored!==true||installed.source_still_off!==true){
+          throw Error('S0 incremental disposable clone postflight failed');
+        }
+        await local.query('commit');
+      }catch(error){await local.query('rollback').catch(()=>undefined);throw error;}
+      rehearsalInstallMode='restored-baseline-supplement';
+      restoredIncrementalSourceFiles=sources;
+    }
   }finally{await local.end();}
   // Fixture administration is separate from restricted SQL installation and
   // actual ordinary API execution. No superuser connection handles an API TX.
@@ -128,8 +203,10 @@ try{
     PGPASSWORD:'restore-drill',PGDATABASE:target,PGSSLMODE:'disable',DB_SUITE:'postgres17',
     SEYEON_SECURITY_S0_REAL_PG:'1',SEYEON_S0_TEST_ADMIN_USER:'supabase_admin',
     SEYEON_S0_TEST_ORDINARY_USER:fixtureRole};
-  execFileSync(process.execPath,['scripts/operations/seyeon-security-s0/install-isolated.mjs'],
-    {env,stdio:'inherit',timeout:60_000});
+  if(rehearsalInstallMode==='fresh-baseline'){
+    execFileSync(process.execPath,['scripts/operations/seyeon-security-s0/install-isolated.mjs'],
+      {env,stdio:'inherit',timeout:60_000});
+  }
   const output=join(process.env.RUNNER_TEMP,'seyeon-security-s0-rehearsal','vitest.json');
   await mkdir(dirname(output),{recursive:true});
   execFileSync(process.execPath,['node_modules/vitest/vitest.mjs','run',
@@ -145,6 +222,8 @@ try{
     backupMigrationFrontier:restore.backup_migration_frontier,
     target:'loopback-disposable-clone-of-restored-postgres',productionMutation:false,
     nativeProviderCalls:0,installedDefaultClosed:true,
+    rehearsalInstallMode,restoredIncrementalSourceFiles,
+    originalRestoredDatabaseUnmodified:true,
     installationPrincipal:'postgres-nosuperuser',fixtureAdmin:'supabase_admin-loopback-only',
     apiExecutionPrincipal:fixtureRole,
     testsPassed:result.numPassedTests,testsFailed:0,
