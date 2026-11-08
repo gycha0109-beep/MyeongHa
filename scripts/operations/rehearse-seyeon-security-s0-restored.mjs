@@ -125,19 +125,23 @@ try{
         and to_regprocedure('public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)') is null
         and to_regprocedure('seyeon_private.pin_model_recent_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text)') is null
         and to_regprocedure('public.cmd_pin_seyeon_positive_model_context_sources_v1(uuid,uuid,uuid,uuid,uuid,jsonb,text,uuid,uuid,text,text,text,text,text,text,text)') is null
-        as supplementary_absent,
-      (select count(*)=1 and bool_and(not enabled and not writable_enabled)
+        as supplementary_absent`);
+    if(preflight.fixtures_absent!==true)throw Error('S0 synthetic fixture collision; no overwrite.');
+    if(preflight.absent!==true){
+      // An empty S0 baseline may have no Source Registry relation at all.
+      // Check its rows only on the preinstalled-schema branch.
+      const {rows:[registry]}=await local.query(`select
+        (select count(*)=1 and bool_and(not enabled and not writable_enabled)
          from public.seyeon_positive_source_type_registry_v1
          where record_kind='memory' and record_type='conversation_recall'
            and schema_version='v1' and projector_version='seyeon-conversation-recall-projector-v1')
          as single_closed_registry,
-      (select count(*)=1 from public.seyeon_positive_source_type_registry_v1) as registry_count_exact`);
-    if(preflight.fixtures_absent!==true)throw Error('S0 synthetic fixture collision; no overwrite.');
-    if(preflight.absent!==true){
+        (select count(*)=1 from public.seyeon_positive_source_type_registry_v1)
+         as registry_count_exact`);
       // Only the exact already-reviewed missing S0 sources are allowed into
       // this disposable CLONE. The original restored database stays untouched.
       if(preflight.upstream_installed!==true||preflight.supplementary_absent!==true||
-         preflight.single_closed_registry!==true||preflight.registry_count_exact!==true){
+         registry.single_closed_registry!==true||registry.registry_count_exact!==true){
         throw Error('S0 restored baseline diverged; refuse duplicate source install.');
       }
       const sources=['09-owned-original-memory-grant.sql',
