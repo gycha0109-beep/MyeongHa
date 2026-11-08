@@ -170,3 +170,23 @@ Watchtower-Track: frontend-integration
 - **블로커/승인:** 별도 승인 필요 없음. 새 HEAD의 실제 CI 결과 대기.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — 기존 승인 폰트·컬러 마무리 단위
+
+- **근거:** `docs/CORE_VISUAL_SYSTEM_V0.1.md`의 Paper/Ink/Night/Brass/Seal 및 기존 프론트 워크로그. 이전 [가독성 PR #3116](https://github.com/gycha0109-beep/MyeongHa/pull/3116)과 [모바일 PR #3121](https://github.com/gycha0109-beep/MyeongHa/pull/3121)은 필수 CI·통합 CI 성공 후 이미 병합. 본 작업은 기능 추가가 아닌 기존 시각 디자인의 마지막 서체·배색 정합화 단위.
+- **승인된 방향:** 제목 Noto Serif KR, 본문 Pretendard; 기존 기본 16px·작은 글씨 14px·상품 설명 15px은 변경하지 않음. 사용자 승인된 비교 시안 수준의 따뜻한 Paper 배경, 먹색 글자, 작은 자주색 제목과 Brass 포인트를 라이트/다크 양쪽에 반영하되 전체 화면·세계관/캐릭터 배경은 유지.
+- **스타일만 변경:** `apps/web/product.css` 및 `apps/web/product-theme.css`의 핵심 Paper/Ink/Brass 대비 토큰과 제한적 제목 강조색을 정리, `apps/web/product-clarity.css`에서 사주·기록·마이의 일부 주요 제목만 명조 역할을 고정하고 기록 요약·마이 설명·읽기 본문을 기존 고딕 역할로 통일. Seal/캐릭터 독립 테마 유지.
+- **변경하지 않은 것:** DOM·컴포넌트, 레이아웃·크기·간격, 버튼/키보드 동작, 접근성 동작 로직, 테스트·권한·서버·Reading·결제·관상·법무 공개. 요청 범위를 벗어난 [PR #3147](https://github.com/gycha0109-beep/MyeongHa/pull/3147) 및 근거 없이 넓게 덮어쓴 [PR #3149](https://github.com/gycha0109-beep/MyeongHa/pull/3149)은 모두 미병합 종료.
+- **검증/종료:** 새 HEAD의 일반 CI·Web PR·Governance 및 필수 Integration CI가 실제 성공한 뒤 자동 병합돼야 **이번 폰트·컬러 단위 완료**. 기존 Stage 2~4 권한/운영 출시 차단, Stage 5의 다른 미완료 항목은 이 단위와 별개이며 확대 구현하지 않음.
+
+Watchtower-Track: frontend-integration
+
+
+### 2026-11-08 — PR #3152 웹 브라우저 다크 색상 회귀 검사 수정
+
+- **실패 증거:** PR #3152 HEAD `5c4a770c94a962163d5831cfb113661a6f17953c`의 [Web PR #42485900345 / Web PR Verify job #128747575064](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485900345/job/128747575064?pr=3152) FAIL. 정적 웹 빌드 및 정적 UI 번역 검증은 성공, `scripts/verify-web-browser-render.mjs`에서 `/hall.html` 다크 테마의 실제 `--mh-paper-base: #0b151a`를 종전 고정 기대값 `#0b1419`와 비교하여 실패함. 같은 파일의 `--mh-ink-strong` 기대값도 종전 `#f0e7d9`로 남아 새 선언 `#f7efe5`와 불일치. 해당 HEAD [일반 CI #42485900304](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485900304), [Governance #42485900303](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42485900303)는 모두 SUCCESS.
+- **수정 범위:** 이미 승인 범위에서 변경한 `apps/web/product-theme.css`의 다크 배경·본문 색상을 되돌리지 않고 `scripts/verify-web-browser-render.mjs`의 다크 배경/본문 기대색 **두 곳만** 현재 CSS 변수값과 일치하도록 갱신. 기존 브라우저 검사의 테마 영속성·가시성·넘침/반응형/화면 검증 범위는 유지. 제품 기능·서버·레이아웃·추가 디자인 변경 없음.
+- **검증/다음:** 새 HEAD에 대한 CI·브라우저·Governance 결과는 아직 미확정. 선행 3개 성공 시 기존 필수 통합 CI를 요청하고 성공·병합 사실을 확인해야 폰트·컬러 단위를 완료 판정할 수 있음.
+- **승인:** 없음. Stage 2~4 미승인 제품 출시 게이트와 무관.
+
+Watchtower-Track: frontend-integration

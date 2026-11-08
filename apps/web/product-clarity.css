@@ -73,3 +73,12 @@ body.product-page .mobile-bottom-nav .mobile-nav-link[href="my.html"] { --mh-nav
   html[data-theme="dark"] body.product-page .mobile-bottom-nav .mobile-nav-link[aria-current="page"] { color: #f4e7d4; background: #2c3c47; border-color: #c49a5c; }
   body.product-page :is(input,select,textarea) { font-size: max(16px, 1rem); }
 }
+
+/* Prior approved typography: restrained serif headings, sans-serif reading copy. */
+body.product-page :is(.saju-design-hero h2, .saju-design-products h2, .records-title, .my-title) {
+  font-family: var(--mh-serif);
+  color: var(--mh-title-accent);
+}
+body.product-page :is(.records-reading-summary, .my-lead, .reading-block p, .reading-character-block p) {
+  font-family: var(--mh-sans);
+}
