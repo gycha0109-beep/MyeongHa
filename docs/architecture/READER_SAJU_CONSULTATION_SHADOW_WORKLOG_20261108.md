@@ -58,3 +58,13 @@
 [OpenAI Responses API 참조](https://developers.openai.com/api/reference/resources/responses/methods/create) 및 [Structured Outputs 가이드](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)의 `text.format` 엄격 JSON 스키마 구조 기준. 스키마 준수는 명리 의미 보존을 자동 보장하지 않으므로 기존 Semantic Guard 및 별도 검토를 필수로 한다.
 
 **종료 판정:** 완료 아님. PR 필수 CI 통과 및 실비용·공식 명리 근거·실제 상담 품질 증거가 필요함.
+
+
+## 2026-11-08 — 다중 판독 사람 평가 경계 보강
+
+- \`apps/api/src/reader-saju-multi-unit-editorial-evaluation-v1.ts\`: 기존 공식 판독 3~4개 및 두 Reader의 비공개 비교 기록을 받아, **판독별 5항목 사람 평가**, Reader별 상담 연결성 평가, 두 Reader의 실제 화법 차이 평가를 분리한다.
+- 모든 판독은 공식 source unit ID·후보 hash에 매칭되어야 한다. 누락 리뷰는 \`awaiting_owner_review\`, 의미 보존 실패는 \`failed_semantic_gate\`, 사람 평가 실패는 \`failed_editorial_review\`; 두 Reader의 결과 문구가 판독별로 전부 동일할 때는 개성 평가를 자동 실패시킨다.
+- 사람 평가가 모두 통과해도 오직 \`offline_editorial_pass_only\`이며, \`realModelQualityProven=false\`, \`fullProductQualityProven=false\`, \`publicRevealAuthorized=false\`가 불변이다. 민감한 공식 원문·후보 문구·사람 메모는 요약 출력으로 전파하지 않는다.
+- \`test/reader-saju-multi-unit-editorial-evaluation-v1.test.ts\`: 누락 판단/모두 통과/의미 실패/동일 화법/후보 해시 불일치·중복/상담 연결성 실패를 합성 테스트 자료로 검증한다.
+- **남은 필수 증거**: 실제 Saju가 생성한 공식 명식·해석과 실모델 상담 결과, 사람의 구체성·문맥·불리한 판정·불확실성·개성 평가, 승인된 AI 비용 집행·정산, 해당 커밋 CI 및 최종 공개 정책. 합성 데이터의 녹색 테스트를 실제 명리·상담 품질 평가로 간주하지 않는다.
+- 보류 유지: P0-AI-01 모델/실패 정책·요금·비용 저장소 권한 미승인 시 네트워크 과금 호출 0회, 고객 공개 0회.
