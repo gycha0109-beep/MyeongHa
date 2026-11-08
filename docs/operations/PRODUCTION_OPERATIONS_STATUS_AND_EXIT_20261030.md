@@ -1,3 +1,13 @@
+### 2026-11-08 KST — Phase 8-A 격리 복원 관리자 기본 ACL 편차 수선안 (실측 대기)
+
+- **ROADMAP / 기준:** Gate 1 / Phase 8-A #6. PR #3155 일반 CI·통합 CI 모두 GREEN, main 병합 5f63d2912895504a087ef317eb9cf043e78586d5. 성공한 동일 암호화 백업 #42488222531과 독립 격리 복원 #42489176631의 SHA-256 기반 비식별 증거 docs/operations/POSTGRES_APP_ACL_GRANTEE_PARITY_20261108.json: schema ACL 2, table ACL 31, function ACL 181, 객체 누락 0. 그중 195개는 직접 grantee privilege 변동(service_role/postgres), 19개는 grantee privileges 같으나 aggregate ACL digest 다름. 원인 및 MVCC snapshot 동등성은 아직 증명되지 않음.
+- **차이 발생 원인 후보:** Production 원본 schema.sql은 postgres --role로 pg_dump하고, isolated 복원은 supabase_admin으로 생성·재생한다. 기존 creator default SQL은 PUBLIC/anon/authenticated creator default grants를 사전 제거하지만 service_role 및 postgres 기본 ACL은 명시적으로 정렬하지 않았음. 차이 195개가 실제로 이 경로에서 발생했는지는 추정이며 기존 source 지문으로 인과 귀속 불가능.
+- **격리 복원 코드 수정:** 기존 pre-DDL replay 기본 ACL 준비 SQL에서 disposable creator의 service_role/postgres **미래 객체 기본 권한**만 전역·public schema 각각 REVOKE한다. 대상 역할 존재·PostgreSQL17·격리 관리자/DB preflight와, default ACL에 두 역할이 남지 않았는지 fail-closed postcheck 추가. 이미 생성된 객체의 GRANT/REVOKE, 소스 schema.sql의 명시적 권한, Production 권한/설정은 변경하지 않는다. 기존 최종 실객체 ACL/owner/RLS 검증과 drReady=false, serviceResumptionAllowed=false 유지. scripts/verify-postgres-isolated-restore-drill-workflow.mjs에 새 보호 조건을 고정.
+- **검증/다음:** PR HEAD CI·필수 Integration 전에는 효과 미인증. CI 후 동일 성공 백업 #42488222531을 재사용해 S0 선택 리허설 없이 격리 복원 한 번 실행하고, 기존 #42489176631의 schema 2/table 31/function 181 / 역할 차이 195 건과 비교. 불일치 감소 여부를 결과로 판단하고 원인을 확인하지 못하면 기본 권한 수선이 성공했다고 선언하지 않는다. 동일 아카이브의 역할/사용자 데이터, 복구 비밀을 공개하거나 Production SQL/DDL/DML, IAM/Provider/Hosted 설정, 유료 리소스, privacy canary 실행하지 않는다.
+- **진행·수용:** 현재 우선순위는 Phase 8-A 권한/DDL parity 증명. Hosted Auth/Storage·provider ledger·실 개인정보 연속성·PT24H/PT6H·최종 Production 수용은 별도 미완료. P0 #1887 OPEN, dr_ready=false, serviceResumptionAllowed=false 유지. ROADMAP_COMPLETE 미충족.
+
+Watchtower-Track: ops
+
 ### 2026-11-08 KST — Phase 8-A 원본·복원본 ACL 역할별 차이 실측, 집계 해석 모호성 분리
 
 - **ROADMAP / 현재 증거:** Gate 1 / Phase 8-A #6, 출처가 결속된 신규 암호화 백업 [#42488222531](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42488222531), source SHA 33fd5173d51f27a800e0f16dade7e814519e6377, migration frontier 20261105075227. 동일 아카이브를 쓴 isolated PG17 복원 [#42489176631](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42489176631), 실행 SHA 42846267330c2f8bad421a1b40f57c2f461a1a8d **SUCCESS**. S0 선택 리허설은 이 작업 범위에서 false; 이전 #42488281162/#42486369447은 선택 S0 설치·fixture 충돌로 실패했으며 동일 신형 백업 전체 복원 RED로 오인하지 않는다.
