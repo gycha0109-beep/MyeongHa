@@ -1,3 +1,4 @@
+import { runCharacterSajuConsultationMultiUnitShadowV1 } from './character-saju-consultation-multi-unit-shadow-v1.js';
 import {
   CHARACTER_SAJU_SP2_CANDIDATE_SCHEMA_VERSION_V1,
   guardCharacterSajuSp2EvaluationCandidateV1,
@@ -37,6 +38,20 @@ export interface CharacterSajuConsultationShadowPortV1 {
     publishedCharacterVoice: unknown;
   }>): Promise<CharacterSajuSp2EvaluatorVerdictV1>;
   readonly evaluatorVersion: string;
+  /** Explicit server-owned activation for the 3-4-unit offline pilot. Default OFF. */
+  readonly multiUnitPilot?: true;
+  /** Independent batch semantic review on the same source-bound unit hashes. */
+  readonly evaluateBatch?: (input: Readonly<{
+    candidates: readonly CharacterSajuSp2CandidateV1[];
+    candidateHashes: readonly string[];
+    groundingUnits: readonly CharacterGroundingUnitViewV1[];
+    characterProfileRef: CharacterReadingPerspectiveRefV1;
+    publishedCharacterVoice: unknown;
+  }>) => Promise<Readonly<{ verdicts: readonly CharacterSajuSp2EvaluatorVerdictV1[] }>>;
+  /** Privileged evidence; may contain sensitive Reading text. Never log/reveal. */
+  readonly recordPrivateBatchComparison?: (
+    evidence: CharacterSajuConsultationPrivateBatchComparisonV1,
+  ) => Promise<void>;
   /**
    * Privileged evidence sink. Only a trusted server can supply this callback.
    * Text is sensitive official Reading content: never log it or return it
@@ -61,6 +76,26 @@ export interface CharacterSajuConsultationPrivateComparisonV1 {
   readonly evaluatorVersion: string;
 }
 
+export interface CharacterSajuConsultationPrivateBatchComparisonV1 {
+  readonly schemaVersion: 'myeongha-character-saju-consultation-multi-unit-shadow-v1';
+  readonly readingRef: string;
+  readonly sourceResponseHash: string;
+  readonly groundingHash: string;
+  readonly characterId: string;
+  readonly sourceUnitIds: readonly string[];
+  readonly units: readonly Readonly<{
+    sourceUnitId: string;
+    sourceBlockRefs: readonly string[];
+    baselineText: string;
+    candidateText: string;
+    candidateHash: string;
+    evaluation: 'accepted' | 'rejected';
+    failureCodes: readonly string[];
+  }>[];
+  readonly evaluatorVersion: string;
+  readonly revealState: 'forbidden';
+}
+
 export interface CharacterSajuConsultationShadowInputV1 {
   /** Only a source-admitted, previously guarded exact-core renderer result. */
   readonly rendered: CharacterSajuBoundedRenderDecisionV1;
@@ -71,6 +106,12 @@ export interface CharacterSajuConsultationShadowInputV1 {
 }
 
 export type CharacterSajuConsultationShadowResultV1 =
+  | Readonly<{
+      mode: 'evaluation_only_batch';
+      sourceUnitIds: readonly string[];
+      candidateHashes: readonly string[];
+      revealState: 'forbidden';
+    }>
   | Readonly<{
       mode: 'evaluation_only';
       sourceUnitId: string;
@@ -137,6 +178,11 @@ function isCandidateForSource(value: unknown, characterId: string, unitId: strin
 export async function runCharacterSajuConsultationShadowV1(
   input: CharacterSajuConsultationShadowInputV1,
 ): Promise<CharacterSajuConsultationShadowResultV1> {
+  if (input.port.multiUnitPilot === true) {
+    // Activation is server-only; an incomplete/unavailable batch reviewer
+    // fails closed instead of silently downgrading to another model contract.
+    return runCharacterSajuConsultationMultiUnitShadowV1(input);
+  }
   if (input.rendered.mode !== 'bounded_exact_core') return fallback('protected_or_missing_source');
   const { planDecision, utterance } = input.rendered;
   if (planDecision.mode !== 'character_plan' ||
