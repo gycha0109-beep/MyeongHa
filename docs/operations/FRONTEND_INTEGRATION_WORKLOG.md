@@ -170,3 +170,13 @@ Watchtower-Track: frontend-integration
 - **블로커/승인:** 별도 승인 필요 없음. 새 HEAD의 실제 CI 결과 대기.
 
 Watchtower-Track: frontend-integration
+
+## 2026-11-08 — 기존 승인 폰트·컬러 마무리 단위
+
+- **근거:** `docs/CORE_VISUAL_SYSTEM_V0.1.md`의 Paper/Ink/Night/Brass/Seal 및 기존 프론트 워크로그. 이전 [가독성 PR #3116](https://github.com/gycha0109-beep/MyeongHa/pull/3116)과 [모바일 PR #3121](https://github.com/gycha0109-beep/MyeongHa/pull/3121)은 필수 CI·통합 CI 성공 후 이미 병합. 본 작업은 기능 추가가 아닌 기존 시각 디자인의 마지막 서체·배색 정합화 단위.
+- **승인된 방향:** 제목 Noto Serif KR, 본문 Pretendard; 기존 기본 16px·작은 글씨 14px·상품 설명 15px은 변경하지 않음. 사용자 승인된 비교 시안 수준의 따뜻한 Paper 배경, 먹색 글자, 작은 자주색 제목과 Brass 포인트를 라이트/다크 양쪽에 반영하되 전체 화면·세계관/캐릭터 배경은 유지.
+- **스타일만 변경:** `apps/web/product.css` 및 `apps/web/product-theme.css`의 핵심 Paper/Ink/Brass 대비 토큰과 제한적 제목 강조색을 정리, `apps/web/product-clarity.css`에서 사주·기록·마이의 일부 주요 제목만 명조 역할을 고정하고 기록 요약·마이 설명·읽기 본문을 기존 고딕 역할로 통일. Seal/캐릭터 독립 테마 유지.
+- **변경하지 않은 것:** DOM·컴포넌트, 레이아웃·크기·간격, 버튼/키보드 동작, 접근성 동작 로직, 테스트·권한·서버·Reading·결제·관상·법무 공개. 요청 범위를 벗어난 [PR #3147](https://github.com/gycha0109-beep/MyeongHa/pull/3147) 및 근거 없이 넓게 덮어쓴 [PR #3149](https://github.com/gycha0109-beep/MyeongHa/pull/3149)은 모두 미병합 종료.
+- **검증/종료:** 새 HEAD의 일반 CI·Web PR·Governance 및 필수 Integration CI가 실제 성공한 뒤 자동 병합돼야 **이번 폰트·컬러 단위 완료**. 기존 Stage 2~4 권한/운영 출시 차단, Stage 5의 다른 미완료 항목은 이 단위와 별개이며 확대 구현하지 않음.
+
+Watchtower-Track: frontend-integration
