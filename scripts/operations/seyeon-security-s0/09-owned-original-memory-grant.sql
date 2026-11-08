@@ -156,8 +156,13 @@ $grant$;
 alter function public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)
   owner to myeongha_seyeon_chat_runtime_owner;
 revoke create on schema public from myeongha_seyeon_chat_runtime_owner;
+-- The function is now NOLOGIN-owned. The restricted installer cannot
+-- revoke its ACL without acting as its exact owner; keep that role elevation
+-- transactional and return to the installer immediately afterward.
+set local role myeongha_seyeon_chat_runtime_owner;
 revoke all on function public.cmd_grant_seyeon_owned_conversation_recall_v1(uuid,uuid,uuid)
   from public,anon,authenticated,service_role,myeongha_api_executor;
+reset role;
 revoke myeongha_seyeon_chat_runtime_owner from current_user;
 
 -- No API EXECUTE, no source activation, no HTTP route, no initial Grant.

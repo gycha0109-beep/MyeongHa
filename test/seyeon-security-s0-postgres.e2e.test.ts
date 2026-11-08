@@ -77,8 +77,13 @@ describe.skipIf(!enabled)('S0 actual original Pin → v2 Commit → locked first
       password:process.env.PGPASSWORD,ssl:false,max:4,statement_timeout:5000});}
     subjectPool = (ordinaryPool??pool) as unknown as PostgresSubjectPoolV1;
     // These are isolated test admissions, NEVER deployment instructions.
+    // The disposable restored-backup clone has this source type already
+    // registered but OFF; only this synthetic fixture may turn it ON.
+    // Preserve all other rows and never apply fixture admission to Production.
     await pool.query(`insert into public.seyeon_positive_source_type_registry_v1
-      values('memory','conversation_recall','v1','seyeon-conversation-recall-projector-v1',true,true);
+      values('memory','conversation_recall','v1','seyeon-conversation-recall-projector-v1',true,true)
+      on conflict (record_kind,record_type,schema_version,projector_version)
+      do update set enabled=excluded.enabled, writable_enabled=excluded.writable_enabled;
       grant execute on function public.cmd_mark_seyeon_positive_context_ready_pinned_v1(
         uuid,uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,text,text) to myeongha_api_executor;
       -- The following narrow Grant exists ONLY inside this disposable S0
