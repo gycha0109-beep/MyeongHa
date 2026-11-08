@@ -1114,3 +1114,11 @@
 - **근거:** [CI #42479409068](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42479409068) `Work Track · commerce`에서 보안 경계 테스트 `tests/portone-v2-payment-verification-adapter-authority.test.ts`의 특정 금지 용어 정규식과 새 주석에 쓰인 `Entitlement` 용어가 충돌해 Vitest 1건 실패했습니다. 기존 검증기 실행 오류나 DB/PortOne 호출 오류는 아닙니다.
 - **수정:** 원본 PortOne GET 검증기 파일의 보안 경계 주석을 테스트 계약상 허용되는 Reader 취소 처리 용어로 교체합니다. 모든 취소 시각 검증 로직과 DB/Provider 연결은 변경하지 않습니다. 수정된 코드에 대하여 기존 테스트가 금지하는 `webhook|entitlement|supabase|grant` 용어가 존재하지 않음을 확인했습니다.
 - **검증:** 신규 CI 및 PostgreSQL17 결과는 실행 완료 전까지 미확정. 운영 환불 POST·운영 DB·공개 LIVE 변경 없음. 승인 필요 없음.
+
+### 2026-11-08 — 취소 원본이 기록된 것과 동일 출처의 구매권 회수를 결과에서 분리
+
+- **기준:** [CI #42479786473](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42479786473) Commerce·PG17·웹·모바일·정책 모두 GREEN. 승인 로드맵 §6-1·2·5.
+- **발견:** 기존 1900/1910은 정확한 PortOne 취소 이벤트를 기록하되, 해당 Receipt의 Reader 구매권이 **다른 Provider Event로 이미 revoked**되어 있으면 1080이 반환한 무변경·신규 회수 Event 없음 결과도 허용합니다. 기존 API는 이 사례에도 `kind=revoked`를 돌려주어 '이번 이벤트로 실제 회수했다'는 근거와 이미 비활성인 권리를 구별하지 못했습니다.
+- **구현:** 기존 DB/Entitlement Writer는 변경하지 않고 실제 DB 회수 결과의 동일 이벤트 ID 존재 여부를 모든 구매 Grant에 대해 분류합니다. 전부 동일 이벤트에서 회수되거나 재실행된 경우에만 `revoked`로 반환하고, 하나라도 다른 출처 무변경 Grant라면 `cancellation_recorded_unattributed_grants`로 구분합니다. 내부 웹훅 실행 결과 역시 `cancelled_unattributed_grants`로 별도 표시합니다. Provider 원본 취소 Receipt/Event 기록은 유지하면서 **이번 이벤트의 회수 완료를 거짓으로 주장하지 않습니다**.
+- **검증:** bound/unbound, 단일/혼합 Grant, 동일 이벤트 재실행, 타 출처 이미 비활성, 내부 웹훅 응답 테스트를 보강했습니다. 새 공식 CI 확인 전 성공은 미선언. 기존 환불 확정의 동일 이벤트·시계 결속, 독립 구매권 보호, 공개 경로 OFF, 운영 PG GET/POST/DB 미적용 유지.
+- **잔여:** Provider NEWER/STALE 전반, Reader T2 완전 연결, 실제 소비자 제공 입증, 복원 후 개인정보 삭제 검증, 전체 E2E.

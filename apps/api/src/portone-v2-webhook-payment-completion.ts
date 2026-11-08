@@ -90,7 +90,7 @@ export type PortOneV2WebhookPaymentCompletionExecutionV1 =
       eventType: string;
     }>
   | Readonly<{
-      kind: 'cancelled';
+      kind: 'cancelled' | 'cancelled_unattributed_grants';
       providerWebhookId: string;
       receiptId: string;
       providerEventId: string;
@@ -524,7 +524,9 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
       });
     }
     return Object.freeze({
-      kind: 'cancelled',
+      kind: applied.kind === 'cancellation_recorded_unattributed_grants'
+        ? 'cancelled_unattributed_grants' as const
+        : 'cancelled' as const,
       providerWebhookId: decision.providerWebhookId,
       receiptId: applied.receiptId,
       providerEventId: applied.providerEventId,

@@ -17,7 +17,9 @@ export type AppliedPortOneV2ReaderFullCancellationV1 =
   grantCount: 0 }>
   | Readonly<{ kind: 'revoked'; receiptId: string;
   readonly providerEventId: string;
-  grantCount: number }>;
+  grantCount: number }>
+  | Readonly<{ kind: 'cancellation_recorded_unattributed_grants';
+    receiptId: string; readonly providerEventId: string; grantCount: number }>;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 
 
@@ -27,16 +29,18 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
  * commit as a successful Reader revoke. Replayed effects identify the exact
  * existing Entitlement Event; an already-revoked Grant may instead legitimately
  * produce the 1080 no-material-change result with no new Event or Outbox.
+ * That no-op requires a separate outcome, not an attributed Reader revoke.
  */
-function hasAuthoritativeGrantEffects(
+function inspectAuthoritativeGrantEffects(
   effects: readonly unknown[],
   contractVersion: unknown,
-): boolean {
+): Readonly<{ allAttributedToExactEvent: boolean }> | null {
   const grantIds = new Set<string>();
   const entitlementEventIds = new Set<string>();
+  let allAttributedToExactEvent = true;
   for (const effect of effects) {
     if (typeof effect !== 'object' || effect === null || Array.isArray(effect)) {
-      return false;
+      return null;
     }
     const entry = effect as Record<string, unknown>;
     let grantId: unknown;
@@ -46,16 +50,16 @@ function hasAuthoritativeGrantEffects(
       if (entry.contractVersion !== 'official-reader-s2-provider-revoke-v1' ||
           !Number.isSafeInteger(entry.scopeCount) ||
           (entry.scopeCount as number) < 1 ||
-          typeof entry.replayed !== 'boolean') return false;
+          typeof entry.replayed !== 'boolean') return null;
       grantId = entry.grantId;
       eventId = entry.entitlementEventId;
     } else if (contractVersion === 'official-reader-s2-unbound-grant-cancellation-v1') {
       // 1900 directly serializes the original 1080 effect row to JSON.
-      if (typeof entry.result_replayed !== 'boolean') return false;
+      if (typeof entry.result_replayed !== 'boolean') return null;
       grantId = entry.result_grant_id;
       eventId = entry.result_entitlement_event_id;
     } else {
-      return false;
+      return null;
     }
     // Existing Commerce 1080 can return a legitimate no-material-change
     // outcome when this Grant was ALREADY revoked by a different verified
@@ -63,7 +67,7 @@ function hasAuthoritativeGrantEffects(
     // and no Outbox event. The original Receipt is still revoked by 1900.
     // A replay of THIS event, by contrast, has its original Event ID.
     if (typeof grantId !== 'string' || !UUID.test(grantId) ||
-        grantIds.has(grantId.toLowerCase())) return false;
+        grantIds.has(grantId.toLowerCase())) return null;
     if (eventId === null) {
       const noOp = contractVersion === 'official-reader-s2-revoke-dispatch-v1'
         ? entry.replayed === false && entry.projectionChanged === false &&
@@ -71,15 +75,16 @@ function hasAuthoritativeGrantEffects(
         : entry.result_replayed === false &&
           entry.result_projection_changed === false &&
           entry.result_outbox_event_id === null;
-      if (!noOp) return false;
+      if (!noOp) return null;
+      allAttributedToExactEvent = false;
     } else {
       if (typeof eventId !== 'string' || !UUID.test(eventId) ||
-          entitlementEventIds.has(eventId.toLowerCase())) return false;
+          entitlementEventIds.has(eventId.toLowerCase())) return null;
       entitlementEventIds.add(eventId.toLowerCase());
     }
     grantIds.add(grantId.toLowerCase());
   }
-  return true;
+  return Object.freeze({ allAttributedToExactEvent });
 }
 
 /**
@@ -149,9 +154,12 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
       // because some JSON reported a positive grantCount. The 1900/1910
       // writers have distinct lock/lineage contracts; reject a malformed
       // result INSIDE the transaction so Receipt/Event/Grant all roll back.
+      const lineage = Array.isArray(effect.effects)
+        ? inspectAuthoritativeGrantEffects(effect.effects, effect.contractVersion)
+        : null;
       if (!Array.isArray(effect.effects)
           || effect.effects.length !== grantCount
-          || !hasAuthoritativeGrantEffects(effect.effects, effect.contractVersion)
+          || lineage === null
           || !Number.isSafeInteger(effect.scopeCount)
           || (effect.scopeCount as number) < 0) {
         throw new Error('Verified Reader cancellation result was not authoritative.');
@@ -170,8 +178,12 @@ export async function applyVerifiedPortOneV2ReaderFullCancellationV1(input: {
       } else {
         throw new Error('Verified Reader cancellation result was not authoritative.');
       }
+      // An inactive Grant without an Event from this exact cancellation
+      // cannot be reported as a successful Reader right revocation by it.
       return Object.freeze({
-        kind: 'revoked' as const,
+        kind: lineage.allAttributedToExactEvent
+          ? 'revoked' as const
+          : 'cancellation_recorded_unattributed_grants' as const,
         receiptId: result.receiptId,
         providerEventId: result.providerEventId,
         grantCount,

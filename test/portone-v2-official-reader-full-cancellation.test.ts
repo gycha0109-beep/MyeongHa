@@ -80,7 +80,10 @@ function verifier(overrides:Record<string,unknown>={}) {
   };
 }
 
-function fakePool(sql: string[], values: unknown[][]) {
+function fakePool(
+  sql: string[], values: unknown[][],
+  grantEffect: 'same_event'|'unattributed'='same_event',
+) {
   return {
     async connect() {
       return {
@@ -97,7 +100,10 @@ function fakePool(sql: string[], values: unknown[][]) {
                 effects:[{
                   contractVersion:'official-reader-s2-provider-revoke-v1',
                   scopeCount:1,grantId:GRANT,
-                  entitlementEventId:ENTITLEMENT_EVENT,replayed:false,
+                  entitlementEventId:grantEffect==='same_event'?ENTITLEMENT_EVENT:null,
+                  ...(grantEffect==='unattributed'
+                    ? {projectionChanged:false,outboxEventId:null}
+                    : {}),replayed:false,
                 }],
               },
             }}]};
@@ -147,6 +153,20 @@ describe('PortOne authenticated full cancellation -> scoped Reader revoke',()=>{
     ]);
     expect(values[0]?.slice(0,3)).toEqual([PAYMENT,TX,CANCEL]);
     expect(values[0]?.[6]).toBe('production');
+  });
+
+  it('separates provider full cancellation from a Reader Grant already inactive by another source',async()=>{
+    const sql:string[]=[];
+    const result=await executePortOneV2WebhookPaymentCompletionV1({
+      pool:fakePool(sql,[],'unattributed'),
+      ...signedEvent('Transaction.Cancelled',fullCancelData),
+      verificationAdapter:{verify:vi.fn(async()=>{throw Error('not paid')})},
+      fullCancellationVerifier:verifier().verifier,
+    });
+    expect(result).toMatchObject({
+      kind:'cancelled_unattributed_grants',providerEventId:EVENT,grantCount:1,
+    });
+    expect(sql.at(-1)).toBe('COMMIT');
   });
 
   it('normalizes equivalent RFC3339 provider clocks without inventing a new event order',async()=>{
