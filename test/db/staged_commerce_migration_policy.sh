@@ -32,7 +32,7 @@ skip_staged_portone_migration_from_historical_fixture() {
   # compile its replacement. Integrated PG17 Reader cases apply both files.
   if [[ "$name" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql' ]]; then
     [[ "$inclusion" == 'reader-integrated' ]] && return 1
-    expected='cae68e1f87d6e103f67d4951f688f0433730f137'
+    expected='0a8945f44454af70c78a7f3dae4435f9506c260a'
     actual="$(git hash-object "$migration")" || {
       echo 'HOLD_READER_REFUND_MIGRATION_FINGERPRINT_UNAVAILABLE' >&2
       exit 1

@@ -1086,3 +1086,11 @@
 - **구현:** 기존 PortOne 원본 검증기에서 `version==='V2'`, `amount.paid===amount.total`, `amount.cancelled===amount.total`, 정확한 성공 취소 1건 `totalAmount===amount.total`을 모두 요구합니다. 불일치 또는 누락은 금전·권한 변경 전 안전 중지합니다. 원본 결제/취소 ID, 통화/환경, 서명 검증, Receipt와의 결속, 부분·요청 중 취소 보류는 유지합니다.
 - **검증:** 정상 테스트 응답을 현재 V2 필드에 맞게 보강하고 V1/미확인 버전, 누적 취소 누락·부족·초과, 실결제액 불일치·0원 사례에서 DB 쓰기 0건을 확인하는 회귀를 추가했습니다. 새 CI 통과는 아직 미확정. 실제 Provider 네트워크 요청, PG 취소 POST·운영 DB·판매 LIVE는 실행하지 않았습니다.
 - **남은 항목:** Provider 공식 NEWER/STALE 최신성 및 리더 최종 T2 권한 회수, 법적 콘텐츠 제공 증거, 백업 복원 실측, 전체 E2E.
+
+### 2026-11-08 — 동일 원본 PortOne 취소 이벤트에 의한 실제 구매권 회수까지 환불 확정 결속
+
+- **기준:** [CI #42473680953](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42473680953) 및 웹·모바일·정책 검사 GREEN, PR #3090 `0f4c598c`. 승인 결제 로드맵 §6의 취소 원본/정확한 권한 회수/고객 환불 상태 연결.
+- **발견:** 2370 수동 환불 확정 함수는 원본 PortOne GET 형식 전액 취소 Event의 금액·거래·지문을 검증하고 동일 Receipt의 모든 구매 Grant가 `revoked`인지 확인했으나, 해당 Grant의 실제 회수 `entitlement_events`가 **바로 그 취소 Event**에서 발생했는지는 확인하지 않았습니다. 다른 Source로 이미 회수된 Grant와 별개 전액 취소 Event를 조합해 고객 상태를 거짓으로 `refund_confirmed` 승격할 수 있었습니다.
+- **구현:** 비운영 2370 마이그레이션의 기존 비공개 최종 확인 경계에서 정확한 Receipt/Subject의 각 구매 Grant가 `revoked`이며, 바로 일치하는 GET 검증 Provider Event의 ID를 출처로 기록한 **실제 `entitlement_events` 회수 효과**가 존재해야만 확인합니다. 동의 없는 재회수/별도 Entitlement Writer는 만들지 않았습니다. 0 Grant 선취소는 기존 허용하고, 다른 Receipt/Reader 구매권은 영향받지 않습니다. 기존 비공개 ACL 및 HMAC·원결제 시도 검증 유지.
+- **격리 PG17:** 정상 경로는 원본 B2 활성 Grant에서 동일 Provider Event를 통해 실제 Effect Writer를 실행해 회수, 확인 함수 성공·재실행·B3 보존까지 증명한 뒤 SQL 하위 세이브포인트를 되돌립니다. 별개 검증 전액 취소 Event를 붙이되 **기존 다른 Event**가 B2를 회수한 경우는 `refund_processing`에 보류하는 독립 부정 시험을 추가했습니다. 모든 합성 사건/DB 변경은 전체 `ROLLBACK`; 실제 PortOne GET/POST, 운영 DB, LIVE 변경 없음.
+- **검증 상태:** SQL/정적 계약 테스트/역사적 fixture SHA 가드와 WORKLOG 갱신. **새 CI 및 실제 PG17 검증 완료 전 SUCCESS 미선언**. NEWER/STALE Provider 의미 순서, 최종 Reader T2 운영 권한, 법적 소비자 제공 입증, 복원 후 실증, 전체 E2E는 별개 미완료로 유지.

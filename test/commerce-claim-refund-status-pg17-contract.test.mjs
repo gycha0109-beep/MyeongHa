@@ -62,6 +62,11 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
     "grant_row.subject_id=cr.subject_id",
     "grant_row.grant_source_type='purchase'",
     "grant_row.status is distinct from 'revoked'",
+    "revoke_event.grant_id=grant_row.id",
+    "revoke_event.subject_id=cr.subject_id",
+    "revoke_event.source_provider_event_id=pe.id",
+    "revoke_event.source_type='provider_event'",
+    "revoke_event.event_type='revoked'",
     "attempt.provider_transaction_id=cr.external_transaction_id",
     "v_matching_source_count<>1",
   ])expect(confirmer).toContain(check);
@@ -81,7 +86,7 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
   const staged=readFileSync('test/db/staged_commerce_migration_policy.sh','utf8');
   expect(staged).toContain("$name" + "\" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql'");
   expect(staged).toContain("$inclusion\" == 'reader-integrated'");
-  expect(staged).toContain("expected='cae68e1f87d6e103f67d4951f688f0433730f137'");
+  expect(staged).toContain("expected='0a8945f44454af70c78a7f3dae4435f9506c260a'");
   expect(staged).toContain('HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"');
   expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration"');
@@ -106,8 +111,12 @@ describe('exact paid Reader Claim -> owner decision -> refund progress real PG17
     "CLAIM_E2E_POSITIVE_REFUND_OR_INDEPENDENT_READER_FAILED",
     "CLAIM_E2E_POSITIVE_REFUND_FORCE_ROLLBACK",
     "CLAIM_E2E_POSITIVE_REFUND_SAVEPOINT_LEAK",
+    "CLAIM_E2E_EXACT_FULL_CANCEL_GRANT_EVENT_MISMATCH",
+    "CLAIM_E2E_OTHER_PROVIDER_EVENT_REVOKE_FALSE_REFUND_CONFIRMED",
+    "v_other_event_revoke_denied:=true",
     "v_request_state<>'refund_confirmed'",
     "confirmed_at=v_positive_at",
+    "v_positive_effect.result_entitlement_event_id is null",
     "id=v_other.id and source_receipt_id=v_other_receipt.id",
     "id=v_claim and subject_id=v_subject and state='received'",
   ])expect(sql).toContain(assertion);

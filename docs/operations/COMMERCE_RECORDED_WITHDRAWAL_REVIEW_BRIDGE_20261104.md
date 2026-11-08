@@ -34,3 +34,8 @@
 
 - 2370 수동 최종 환불 확인은 원본 PortOne 취소 GET 증거 외에도 **같은 Receipt/Subject에서 발생한 모든 구매 Grant가 revoked**인지 재검사합니다. 다른 Receipt의 독립 구매권은 범위에서 제외합니다.
 - 격리 PostgreSQL 17 부정 시험에서 금액·통화·원거래 ID가 모두 맞는 합성 취소 증거와 revoked Receipt가 있어도 기존 구매 Grant가 활성이라면 고객 상태가 환불 확정으로 승격되지 않도록 합니다. Provider의 실제 취소 요청이나 실제 환불/법적 제공 완료를 수행하거나 증명하지는 않습니다.
+
+## 2026-11-08 — 동일 PortOne 취소 원본에 귀속한 구매권 회수 확인
+
+- 고객 환불 상태 `refund_confirmed`의 비공개 함수는 이제 정확한 GET 검증 원본 취소 Event와 **그 Event가 실제로 회수한** 동일 Receipt의 구매 Grant/Event 증거를 함께 요구합니다. 단지 `status=revoked`이거나 다른 Provider Event가 먼저 회수했다는 이유만으로 환불 확정하지 않습니다.
+- 격리 PostgreSQL 정상 성공·재실행과 다른 Event 회수 혼입 부정 시험을 각각 원상복구하며, 타 Reader 권리와 원 Claim을 보존합니다. 실제 PortOne 환불/운영 출시는 수행하거나 승인하지 않습니다.
