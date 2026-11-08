@@ -1018,7 +1018,20 @@ export function createPortOneV2FullCancellationVerifierV1(
             'PortOne V2 exact single full cancellation amount is unavailable.');
         }
 
+        // This paid-only Reader purchase must have a coherent provider
+        // lifecycle clock. An out-of-order or unrelated cancellation item
+        // must not become the effective_at used by the existing locked S2
+        // Entitlement writer's STALE protection.
+        const paidAt=requirePaidAt(payment.paidAt);
         const cancelledAt=requirePaidAt(payment.cancelledAt);
+        const succeededCancelledAt=requirePaidAt(cancellation.cancelledAt);
+        const statusChangedAt=requirePaidAt(payment.statusChangedAt);
+        if (paidAt>=succeededCancelledAt ||
+            succeededCancelledAt!==cancelledAt ||
+            statusChangedAt<cancelledAt) {
+          return fail('INVALID_PAYMENT',
+            'PortOne V2 original payment and successful cancellation chronology is inconsistent.');
+        }
         const verifiedCurrency=requireCurrency(payment.currency);
         const canonical=JSON.stringify({
           schemaVersion:'myeongha.portone-v2.full-cancel-evidence.v1',

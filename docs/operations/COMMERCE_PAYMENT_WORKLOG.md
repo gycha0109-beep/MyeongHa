@@ -1094,3 +1094,10 @@
 - **구현:** 비운영 2370 마이그레이션의 기존 비공개 최종 확인 경계에서 정확한 Receipt/Subject의 각 구매 Grant가 `revoked`이며, 바로 일치하는 GET 검증 Provider Event의 ID를 출처로 기록한 **실제 `entitlement_events` 회수 효과**가 존재해야만 확인합니다. 동의 없는 재회수/별도 Entitlement Writer는 만들지 않았습니다. 0 Grant 선취소는 기존 허용하고, 다른 Receipt/Reader 구매권은 영향받지 않습니다. 기존 비공개 ACL 및 HMAC·원결제 시도 검증 유지.
 - **격리 PG17:** 정상 경로는 원본 B2 활성 Grant에서 동일 Provider Event를 통해 실제 Effect Writer를 실행해 회수, 확인 함수 성공·재실행·B3 보존까지 증명한 뒤 SQL 하위 세이브포인트를 되돌립니다. 별개 검증 전액 취소 Event를 붙이되 **기존 다른 Event**가 B2를 회수한 경우는 `refund_processing`에 보류하는 독립 부정 시험을 추가했습니다. 모든 합성 사건/DB 변경은 전체 `ROLLBACK`; 실제 PortOne GET/POST, 운영 DB, LIVE 변경 없음.
 - **검증 상태:** SQL/정적 계약 테스트/역사적 fixture SHA 가드와 WORKLOG 갱신. **새 CI 및 실제 PG17 검증 완료 전 SUCCESS 미선언**. NEWER/STALE Provider 의미 순서, 최종 Reader T2 운영 권한, 법적 소비자 제공 입증, 복원 후 실증, 전체 E2E는 별개 미완료로 유지.
+
+### 2026-11-08 — 결제·단일 취소·결제 상태 변경의 실제 PortOne 시각 정합성 검증
+
+- **기준:** [CI #42476169938](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42476169938) 전체 GREEN, PR #3090, 승인 로드맵 §6-1·2. PortOne V2 공개 SDK의 `CancelledPayment.paidAt`(유료 원본에는 있어야 함), `cancelledAt`, `statusChangedAt` 및 `SucceededPaymentCancellation.cancelledAt` 구조를 확인했습니다. 기존 Reader 원본 취소 검증기는 단일 성공 ID·금액·상태를 대조하지만 **그 취소 항목 시각이 결제의 최신 취소 시각과 같은지, 원결제 시각 이후인지** 확인하지 않았습니다.
+- **구현:** 기존 인증 PortOne GET 전체 취소 검증기에서 RFC3339 시각을 기존 정규화 함수로 대조합니다. 구매 `paidAt`보다 실제 성공 취소 `cancelledAt`이 나중이어야 하며, 개별 취소 시각과 최종 결제 취소 시각이 동일해야 합니다. `statusChangedAt`이 해당 취소보다 이른 모순도 거부합니다. 모든 검증은 기존 DB Writer 실행 **이전**에 실패 안전 종료합니다. 서로 다른 UTC 오프셋 표현은 동일한 시각으로 판정합니다.
+- **검증:** 정상 합성 V2 GET을 실제 시간 필드에 맞추고, 결제보다 빠르거나 같은 취소, 개별/결제 취소 시각 불일치, 원본 또는 상태 변경 시각의 누락·파손, 역전된 상태 변경 시각은 DB 쓰기 없이 거부하는 회귀를 추가했습니다. UTC와 +09:00 동등 시각 정상 사례도 추가합니다. 새로운 CI PASS는 결과 확인 이전까지 미선언합니다.
+- **경계/잔여:** 이것은 원본 지급·취소의 **시계 정합성 사전검증**이며, 여러 웹훅 간 신뢰 가능한 Provider NEWER/STALE 순서/원자적 Reader 최종 T2 선형화 증명은 아닙니다. 상품 LIVE/운영 DB/실제 PG 환불 POST, 별도 원장·공개 API·법적 환불 자동 결정 없음. 남은 로드맵은 Provider 순서 연결, Reader 최종 회수, 실제 제공·복원·전체 격리 E2E.

@@ -54,8 +54,13 @@ function portonePayment(overrides:Record<string,unknown>={}): Record<string,unkn
     version:'V2',
     amount:{total:4900,paid:4900,cancelled:4900},
     currency:'KRW',
+    paidAt:'2026-10-18T10:00:00Z',
     cancelledAt:'2026-10-18T11:00:00Z',
-    cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:4900}],
+    statusChangedAt:'2026-10-18T11:00:00Z',
+    cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:'2026-10-18T11:00:00Z',
+    }],
     ...overrides,
   };
 }
@@ -144,11 +149,55 @@ describe('PortOne authenticated full cancellation -> scoped Reader revoke',()=>{
     expect(values[0]?.[6]).toBe('production');
   });
 
+  it('normalizes equivalent RFC3339 provider clocks without inventing a new event order',async()=>{
+    const sql:string[]=[];
+    const {verifier:confirmed}=verifier({
+      paidAt:'2026-10-18T19:00:00+09:00',
+      cancelledAt:'2026-10-18T20:00:00.000+09:00',
+      statusChangedAt:'2026-10-18T11:00:00Z',
+      cancellations:[{
+        id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+        cancelledAt:'2026-10-18T11:00:00Z',
+      }],
+    });
+    await expect(executePortOneV2WebhookPaymentCompletionV1({
+      pool:fakePool(sql,[]),
+      ...signedEvent('Transaction.Cancelled',fullCancelData),
+      verificationAdapter:{verify:vi.fn(async()=>{throw Error('not paid')})},
+      fullCancellationVerifier:confirmed,
+    })).resolves.toMatchObject({kind:'cancelled'});
+    expect(sql.at(-1)).toBe('COMMIT');
+  });
+
   it.each([
     {status:'PARTIAL_CANCELLED'},
     {status:'CANCEL_PENDING'},
     {version:'V1'},
     {version:null},
+    // Never equate an arrival order or a generic CANCELLED flag with
+    // source ordering: require the exact succeeded cancellation's clock,
+    // and ensure it occurred after the verified paid lifecycle event.
+    {paidAt:undefined},
+    {paidAt:'2026-10-18T11:00:00Z'},
+    {paidAt:'2026-10-18T12:00:00Z'},
+    {paidAt:'2026-13-18T10:00:00Z'},
+    {cancelledAt:'2026-10-18T10:59:00Z'},
+    {cancelledAt:'2026-10-18T12:00:00Z'},
+    {cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:'2026-10-18T11:01:00Z',
+    }]},
+    {cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:undefined,
+    }]},
+    {cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:'2026-10-18T10:00:00Z',
+    }]},
+    {statusChangedAt:'2026-10-18T10:59:59Z'},
+    {statusChangedAt:undefined},
+    {statusChangedAt:'not-a-date'},
     {amount:{total:4900,paid:4900,cancelled:0}},
     {amount:{total:4900,paid:4900,cancelled:1900}},
     {amount:{total:4900,paid:4900,cancelled:4901}},
