@@ -38,6 +38,9 @@ declare
  v_displaced_effect_time_denied boolean:=false;
  v_superseded_grant_clock_denied boolean:=false;
  v_superseded_grant_order_denied boolean:=false;
+ v_display_scope record;
+ v_display_state text;
+ v_display_probe_done boolean:=false;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
  v_unit uuid:='12192400-0000-4000-8000-000000000002'::uuid;
@@ -482,6 +485,66 @@ begin
              and confirmed_at is null)<>1
    then
      raise exception 'CLAIM_E2E_HISTORICAL_REVOKE_BORROWED_AFTER_NEWER_EFFECT';
+   end if;
+   -- Existing B3 is a separate verified paid right on the SAME S1 Reader
+   -- scope. Until B3 stops being active, the private display MUST prefer
+   -- current verified purchase over historical B2 cancellation.
+   select a.official_reading_id,a.reader_character_id
+     into strict v_display_scope
+   from public.standard_reading_reader_access_grants a
+   where a.entitlement_grant_id=v_grant.id
+     and a.subject_id=v_subject and a.purchase_intent_id=v_purchase;
+   select q.state into strict v_display_state
+   from public.internal_qry_official_reader_verified_cancellation_status_v1(
+     v_subject,v_display_scope.official_reading_id,
+     v_display_scope.reader_character_id
+   ) q;
+   if v_display_state<>'current_verified_purchase' then
+     raise exception 'CLAIM_E2E_READER_SIBLING_PURCHASE_CANCEL_DISPLAY_OVERRIDDEN';
+   end if;
+   -- Probe only inside nested ROLLBACK: B3 must remain active afterward.
+   begin
+     update public.entitlement_grants
+       set status='revoked'
+       where id=v_other.id and source_receipt_id=v_other_receipt.id
+         and status='active';
+     select q.state into strict v_display_state
+     from public.internal_qry_official_reader_verified_cancellation_status_v1(
+       v_subject,v_display_scope.official_reading_id,
+       v_display_scope.reader_character_id
+     ) q;
+     if v_display_state<>'verified_full_cancellation' then
+       raise exception 'CLAIM_E2E_EXACT_FULL_CANCEL_STATUS_NOT_OBSERVED';
+     end if;
+     -- A historical B2 effect persists but its current clock has moved.
+     -- The display must NOT report a verified cancellation in that case.
+     update public.entitlement_grants
+       set last_effective_at=v_positive_event_at+interval '1 microsecond'
+       where id=v_grant.id and status='revoked';
+     select q.state into strict v_display_state
+     from public.internal_qry_official_reader_verified_cancellation_status_v1(
+       v_subject,v_display_scope.official_reading_id,
+       v_display_scope.reader_character_id
+     ) q;
+     if v_display_state<>'not_confirmed' then
+       raise exception 'CLAIM_E2E_STALE_HISTORICAL_CANCEL_DISPLAY_ALLOWED';
+     end if;
+     raise exception 'CLAIM_E2E_PRIVATE_CANCEL_STATUS_PROBE_ROLLBACK';
+   exception when raise_exception then
+     if sqlerrm='CLAIM_E2E_PRIVATE_CANCEL_STATUS_PROBE_ROLLBACK' then
+       v_display_probe_done:=true;
+     else raise;
+     end if;
+   end;
+   if not v_display_probe_done
+      or (select count(*) from public.entitlement_grants
+           where id=v_other.id and status='active'
+             and revision=v_original_other_revision)<>1
+      or (select count(*) from public.entitlement_grants
+           where id=v_grant.id and status='revoked'
+             and last_effective_at=v_positive_event_at)<>1
+   then
+     raise exception 'CLAIM_E2E_PRIVATE_CANCEL_STATUS_PROBE_LEAK';
    end if;
    select public.internal_confirm_reader_full_refund_dispatch_v1(
      v_refund_decision_id,'synthetic-claim-b2-not-confirmed'

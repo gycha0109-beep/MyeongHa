@@ -44,6 +44,22 @@ skip_staged_portone_migration_from_historical_fixture() {
     echo "Skipping Reader-only refund confirmation migration from historical catalog: $name"
     return 0
   fi
+  # 2380 forward-replaces the private Reader display helper from 2160.
+  # Historical fixtures skip 2160; only reader-integrated PG17 loads both.
+  if [[ "$name" == '2380_official_reader_current_exact_cancellation_status_provenance_v1.sql' ]]; then
+    [[ "$inclusion" == 'reader-integrated' ]] && return 1
+    expected='f7dbad4218a9443894f53af4777bd46eb823f99c'
+    actual="$(git hash-object "$migration")" || {
+      echo 'HOLD_READER_STATUS_MIGRATION_FINGERPRINT_UNAVAILABLE' >&2
+      exit 1
+    }
+    if [[ "$actual" != "$expected" ]]; then
+      echo 'HOLD_READER_STATUS_MIGRATION_FINGERPRINT_DRIFT' >&2
+      exit 1
+    fi
+    echo "Skipping Reader-only cancellation status migration from historical catalog: $name"
+    return 0
+  fi
   case "${migration##*/}" in
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;

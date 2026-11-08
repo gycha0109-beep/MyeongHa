@@ -1130,3 +1130,11 @@
 - **실제 격리 PG17 검증:** 정상 원본 B2 취소 Effect를 기록한 상태에서 (1) 다른 최종 적용 시각만 있는 경우와 (2) 다른 최종 ordering key만 있는 경우 각각 환불 확정을 거부하고 DB 하위 트랜잭션을 자동 롤백하는 부정 회귀를 추가했습니다. 이어 정확한 현재 Effect로 긍정·재실행·B3 보존 및 전체 테스트 롤백을 유지합니다. 기존 정적 계약/역사적 catalog 지문 가드와 WORKLOG 반영.
 - **검증/범위:** 새 CI 결과 확인 전 성공 미선언. PortOne 공식 일반 NEWER/STALE 비교기나 LIVE T2 잠금을 만들어냈다고 주장하지 않으며 운영 환불 POST/운영 DB/유료 LIVE 활성화는 수행하지 않았습니다.
 - **미완료:** Provider 최신성 판정 일반화, Reader 최종 동시성, 실물 Reading 내용 전달·법적 제공 증빙, 백업 복원 후 privacy replay, 종단 간 검증.
+
+### 2026-11-08 — 현재 Reader 취소 표시를 원본 검증 취소·최신 구매권 효과에 정확히 결속
+
+- **기준:** [CI #42483694042](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42483694042) 전 검사 GREEN. 승인 결제 로드맵 §6-1·2·5. 기존 비공개 취소 상태 조회(2160)는 S1 범위·활성 형제 구매권을 확인하지만, `verified_full_cancellation`에서 과거 회수 Event가 현재 Grant의 마지막 효과인지, 원본 GET 전액 취소 ID/금액/지문/실제 결제 시도와 일치하는지는 모두 재검증하지 않았습니다.
+- **구현:** 정방향 비운영 migration `2380_official_reader_current_exact_cancellation_status_provenance_v1.sql`로 기존 비공개 S1 조회 함수만 교체합니다. 활성 별도 Reader 구매권이 있으면 기존 `current_verified_purchase` 우선 규칙 유지. 없을 때는 원본 PortOne full-cancel 검증 원장, 원본 Receipt와 정확히 한 결제 시도, 전액·통화·취소 ID·검증 지문·버전, 실제 해당 취소의 `entitlement_events` 및 **현재 Grant의 마지막 적용 시각과 순서**가 모두 일치해야만 `verified_full_cancellation`을 반환합니다. 오래된 Event로 만들어진 취소 표시나 불충분한 원본 증거는 `not_confirmed`으로 유지합니다.
+- **PG17 격리 검증:** 기존 B2/B3 독립 구매권 합성 통합 시험에서 B2가 원본 전체 취소로 회수되더라도 B3가 활성일 때는 현재 구매권 표시를 우선합니다. 하위 ROLLBACK에서만 B3 비활성 상태를 가정해 진짜 B2 취소 상태 표시와 최신 B2 효과 시각이 바뀐 경우의 거부를 각각 검증하고, B3/원래 이벤트·상태를 복원합니다.
+- **운영 경계:** 신규 테이블/원장/Writer/공개 API/실제 PortOne 환불 POST/운영 DB 적용/LIVE 활성화 없음. 2380 Git SHA를 역사적 DB Fixture 정책에 고정해 기존 PostgreSQL 15/17 카탈로그를 보존하고 Reader 통합 PG17에만 적용합니다. 신규 CI 실행 성공 전까지 PASS 미선언.
+- **남은 항목:** 공식 Provider NEWER/STALE 일반 비교·Reader T2 완전한 실제 회수, 실제 고객 제공 입증, 복원 후 개인정보 replay, 전체 E2E.
