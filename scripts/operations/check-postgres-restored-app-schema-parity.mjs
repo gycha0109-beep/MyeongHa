@@ -235,8 +235,15 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
         }
         if (roles !== null && (kind === 'tables' ? parts?.includes('acl') :
           differingFields.includes('acl_sha256'))) {
-          // Role identifiers only, never source grant tuples or raw DDL.
+          // Scope direct per-grantee grant entries, not inherited effective access.
+          // The legacy aggregate ACL digest sorts entries by role OIDs, which
+          // may differ across isolated clusters. A digest mismatch with no
+          // grantee delta is NOT proof of a changed permission or grantor.
+          // Role identifiers only; never raw source grants or SQL bodies.
           detail.aclAffectedGrantees = roles;
+          detail.aclGranteePrivilegeVerdict = roles.length
+            ? 'DIFFERENT_DIRECT_GRANTEE_PRIVILEGES'
+            : 'MATCH_DIRECT_GRANTEE_PRIVILEGES_ACL_HASH_DIFFERS';
         }
         changed.push(detail);
       }
