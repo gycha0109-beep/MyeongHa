@@ -1170,3 +1170,11 @@
 - **구현:** 정방향 `2410_official_reader_unbound_cancel_replay_current_grant_guard_v1.sql`로 동일 원본 전체 취소 Writer를 교체합니다. 기존 구매/Receipt/Grant 잠금, 원본 PortOne GET·HMAC/결제 시도, S1 및 1080 효과를 유지합니다. 과거 정확한 Event가 재실행될 때는 그 취소로 인한 **현재 상태, 마지막 적용 시각, Provider 정렬 키, 실제 Event의 출처**가 모두 여전히 맞아야 하며 다르면 40001로 전체 취소 트랜잭션을 거부합니다. 새 원장·권한·실제 환불·공개 라우트 없음.
 - **격리 PG17:** 기존 B2 Reader 구매 fixture가 **결제된 Grant를 발급하고 아직 Reader Access를 연결하지 않은 시점**에 원본 취소→정상 재실행→더 늦은 재활성화 또는 다른 정렬 키 뒤 오래된 원본 재실행을 시험합니다. 충돌은 정확한 오류를 요구하고 B2 기존 Effect 하나만 존재해야 하며, 모든 시험 변경은 하위 savepoint 복원으로 되돌려 정상 B2/B3 연결 시나리오를 그대로 실행합니다. 별도 계약 테스트와 역사적 SHA 고정 추가.
 - **판정:** 신규 CI/PG17 완료 전 성공 미선언. 일반 Provider NEWER/STALE 전체 의미 비교, Reader 최종 T2 실측, 법적 고객 제공 완료 증빙, 복원 Privacy 실증, 전체 로드맵 검증은 미완료. 운영 DB·환불 POST·유료 LIVE 변경 없음.
+
+### 2026-11-08 — 취소된 원본 구매권의 S7·청약철회 전달 증거 출처 일치 보강
+
+- **선행:** [CI #42492471967](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42492471967) 및 관련 전체 GREEN. 승인 로드맵 §6-1·2·3·5. 기존 2240 S7 private withdrawal evidence는 revoked Receipt를 읽을 때 과거 verified `Transaction.Cancelled` Event/Effect 존재만 요구했습니다. 별도 owner-only `commerce-recorded-reader-s7-evidence-v1.ts`는 Receipt `verified|revoked`를 구분하지 않아, 단순 과거 취소 이벤트만으로 취소된 구매권의 S5/S7 전송 기록을 검토 후보로 채택할 수 있었습니다.
+- **실제 구현:** 정방향 `2420_official_reader_s7_withdrawal_exact_full_cancel_provenance_v1.sql`로 기존 비공개 S1-locked 2240 조회를 교체했습니다. 정상 verified Receipt는 유지하고, revoked Receipt는 동일 원본 구매권의 **현재 revoked 상태 + 마지막 효과의 시각/순서 + 정확한 원본 취소 Entitlement Event + GET-검증된 PortOne V2 단일 전액 취소 원본 + 원본 영수증 금액/통화/HMAC/verifier revision/취소 ID + 일치하는 정확히 한 결제 시도**를 요구합니다. 동일 조건을 별도 owner-only 기록 조회 SQL에도 적용해 우회 경로를 닫습니다. 형제 Receipt를 가져오거나 과거 Event를 현재 권리 회수의 증거로 오인하지 않습니다.
+- **검증:** 정적 계약으로 양쪽 SQL의 원본 결속·Reader S1 잠금·비공개 ACL·전송 기록 분류 한계 및 역사적 migration SHA 제외 정책을 확인하도록 추가했습니다. 격리 PG17에는 2420을 단계 마이그레이션으로 적재하며 기존 Reader claim review SQL 검사를 재수행합니다. 새 CI 결과는 성공 증거가 확보되기 전까지 미확정입니다.
+- **경계:** S5 내용 저장, HTTP response prepare, S7 Client ACK는 고객의 법적 수령 확정이 아닙니다. 이 조회로 환불을 자동 승인하거나 실제 읽음을 입증하지 않습니다. 운영 PG POST·운영 DB·유료 공개 LIVE·새 데이터 원장·권한 추가 없음.
+- **잔여:** 공식 Provider 이벤트 전반 NEWER/STALE, 최종 Reader T2 동시성, 실제 고객 제공/복원 후 privacy replay 실증, 전체 통합 완료.
