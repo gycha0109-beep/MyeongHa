@@ -95,6 +95,35 @@ function aclDifferenceScope(source, restored) {
     : 'GRANT_ENTRIES_DIFFER';
 }
 
+function aclByGranteeDifferences(source, restored) {
+  const before = source.acl_by_grantee_privilege_sha256;
+  if (before === undefined) return null; // Older sealed archives.
+  const after = restored.acl_by_grantee_privilege_sha256;
+  for (const [side, map] of [['source', before], ['restored', after]]) {
+    assert.ok(map && typeof map === 'object' && !Array.isArray(map),
+      side + ' grantee privilege digests must be a JSON object');
+    for (const [role, digest] of Object.entries(map)) {
+      assert.ok(role.length > 0 && role.length <= 160 &&
+        !/[\r\n\t]/u.test(role), side + ' malformed grantee role');
+      assertDigest(digest, side + ':' + role);
+    }
+  }
+  const affected = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter(role => before[role] !== after[role]).sort();
+  if (source.acl_sha256 !== undefined && restored.acl_sha256 !== undefined &&
+      source.acl_sha256 === restored.acl_sha256) {
+    assert.equal(affected.length, 0,
+      'Unchanged full ACL digest contradicts grantee privilege digests');
+  }
+  if (source.acl_grant_entries_without_grantor_sha256 !== undefined &&
+      source.acl_grant_entries_without_grantor_sha256 ===
+        restored.acl_grant_entries_without_grantor_sha256) {
+    assert.equal(affected.length, 0,
+      'Unchanged grant entries contradict grantee privilege digests');
+  }
+  return affected;
+}
+
 function assertUniformFacetCoverage(rows, kind, field) {
   const present = rows.filter(row => row[field] !== undefined).length;
   assert.ok(present === 0 || present === rows.length,
@@ -164,6 +193,12 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
       'acl_grant_entries_without_grantor_sha256'),
     routineAclGrantEntries: assertUniformFacetCoverage(source.functions, 'functions',
       'acl_grant_entries_without_grantor_sha256'),
+    tableAclByGrantee: assertUniformFacetCoverage(source.tables, 'tables',
+      'acl_by_grantee_privilege_sha256'),
+    schemaAclByGrantee: assertUniformFacetCoverage(source.schemas, 'schemas',
+      'acl_by_grantee_privilege_sha256'),
+    routineAclByGrantee: assertUniformFacetCoverage(source.functions, 'functions',
+      'acl_by_grantee_privilege_sha256'),
   };
   for (const [kind, definition] of Object.entries(kinds)) {
     const before = indexed(source[kind], kind, definition);
@@ -181,6 +216,15 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
       const parts = kind === 'tables' ? componentDifferences(value, matched) : null;
       const scope = kind === 'schemas' || kind === 'functions'
         ? aclDifferenceScope(value, matched) : null;
+      const roles = aclByGranteeDifferences(value, matched);
+      if (roles?.length && kind === 'tables') {
+        assert.ok(parts?.includes('acl') && differingFields.includes('structural_sha256'),
+          'Changed table grantee privileges lack a table ACL digest difference');
+      }
+      if (roles?.length && kind !== 'tables') {
+        assert.ok(differingFields.includes('acl_sha256'),
+          'Changed grantee privileges lack a schema/function ACL difference');
+      }
       if (differingFields.length) {
         const detail = { object: identity, differingFields };
         if (parts !== null && differingFields.includes('structural_sha256')) {
@@ -188,6 +232,11 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
         }
         if (scope !== null && differingFields.includes('acl_sha256')) {
           detail.aclDifferenceScope = scope;
+        }
+        if (roles !== null && (kind === 'tables' ? parts?.includes('acl') :
+          differingFields.includes('acl_sha256'))) {
+          // Role identifiers only, never source grant tuples or raw DDL.
+          detail.aclAffectedGrantees = roles;
         }
         changed.push(detail);
       }

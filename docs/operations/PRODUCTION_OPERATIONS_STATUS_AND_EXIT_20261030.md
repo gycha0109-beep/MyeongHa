@@ -1,3 +1,13 @@
+### 2026-11-08 KST — Phase 8-A 신형 백업 원본 지문 격리 복원 성공, 불일치 ACL 영향 범위 실측 및 역할별 진단 구현
+
+- **기존 ROADMAP / 출처:** Gate 1 / Phase 8-A #6, 최초 세부 지문을 포함한 성공한 암호화 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42481834384 (source c4a6f842156a1fb426a307e3901de42eb4eaea88)과 정확히 연결된 격리 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42483472256 SUCCESS (동일 main SHA), 비식별 artifact 13618159526. app-schema-parity.json SHA-256 13966cdb658e3d8886b8c61eb12860f6b6f38f88df941832091036d031aa162e. 실제 집계 파일 docs/operations/POSTGRES_APP_SCHEMA_RESTORE_ACL_FACETS_20261108.json에 artifact 전 파일 SHA·복구 경계·분류를 기록; 고객 행·SQL 본문·비밀 없음.
+- **실측 세부 구분:** 원본/복원본 schema 3/3, table 94/94, function 322/322이고 missing/additional 모두 0. DB 구조 동등성은 여전히 HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH. schema ACL 2개(public/seyeon_private), public table 31개는 10요소 세부 비교상 ACL 요소만 다르고 컬럼·정책·인덱스 등 다른 9요소는 이 지문상 동일. Function ACL은 181개가 다르며 이전 복원 180개에서 1개 추가된 객체 cmd_pin_seyeon_positive_model_context_sources_v1의 권한도 차이로 확인 (기준 함수 객체 전체는 318→322로 증가). Schema/Function 차이는 grantor 귀속만의 차이가 아닌 실제 privilege-grant entry 차이로 분류. 차이가 있는 개별 역할은 아직 source의 세부 원본 지문이 없어서 불명이며 복구 실패 근본 원인·정확한 PostgreSQL DDL이 증명된 것은 아님.
+- **비수용:** 동일 백업 실행 안에서 원본 관측 전후는 안정적으로 결속됐지만 pg_dump와 동일한 MVCC snapshot은 아님. Provider COPY 27블록 제외/3블록 열 투영, 60행 제외/24행 투영, 대상의 supabase_realtime_admin 역할 부재, Hosted Auth/Storage 완전 복구 미증명, 합성 개인정보 4건일 뿐 독립 Production 원장 replay·연속성 불충족, 전체 서비스 PT24H/PT6H 미수용. dr_ready=false, serviceResumptionAllowed=false, #1887 OPEN.
+- **새 구현:** scripts/operations/production-app-schema-fingerprint-readonly.sql에서 table/schema/function ACL의 역할별 권한 항목 SHA-256을 추가 (raw grants/code/rows 미출력); scripts/operations/check-postgres-restored-app-schema-parity.mjs는 새 암호화 백업에 원본 역할별 digest가 있을 때만 차이가 난 역할명 목록을 반환. 구형 백업은 미확정으로 두고 그대로 지원. 동일한 aggregate ACL의 위조된 역할별 차이, 누락·잘못된 지문, 균일하지 않은 source 범위는 거부. 기존 restoreMismatchRootCauseProven=false 및 서비스 재개 차단 유지. 검증 스크립트에 정상 역할 변화·원본 없는 구형 백업·위조·누락·비활성 DR 게이트 검사 추가.
+- **완료 조건/다음:** 기존 성공 백업/복원을 반복하지 않는다. PR HEAD 필수 CI/Integration 및 병합 확인 후 다음 정기 백업에서 새 지문 생성, 같은 백업의 격리 복원 결과로 차이가 난 역할(권한 원장) 범위를 분류한다. SQL 실행 구문은 승인된 다음 백업에서 실제 검증되며 현재 Production SQL/DDL/DML·migration repair, provider/role/secret/traffic 수정, Hosted 유료 프로젝트, privacy canary 없음. 역할별 digest는 장래 동등성 증명을 위한 조사 정보이지 권한 변경 승인·복구 통과 조건을 새로 만든 것이 아님.
+
+Watchtower-Track: ops
+
 ### 2026-11-08 KST — Phase 8-A 복구본 구조·권한 불일치 세부 지문 진단 보강
 
 - **기존 ROADMAP / 작업목표:** Gate 1 / Phase 8-A #6. 암호화 원본 지문에 연결된 첫 격리 복원 #42474143273은 실행 SUCCESS이지만 앱 동등성 HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH(schema ACL 2, table structural hash 31, function ACL hash 180). 전체 hash만으로 원인을 알 수 없는 현상을 기존 백업 실행에서만 읽기 전용 세부 SHA-256을 봉인하는 방식으로 보강한다. 신규 기능/트랙이 아닌 기존 미해결 P0의 진단이다.
