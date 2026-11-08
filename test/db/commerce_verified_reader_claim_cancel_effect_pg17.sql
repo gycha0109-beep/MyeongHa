@@ -42,6 +42,8 @@ declare
  v_display_state text;
  v_display_probe_done boolean:=false;
  v_replay_revision_conflict_denied boolean:=false;
+ v_replayed_reactivated_denied boolean:=false;
+ v_replayed_reordered_denied boolean:=false;
  v_verified_cancel_replay jsonb;
  v_purchase uuid:='12192300-0000-0000-0000-000000000002'::uuid;
  v_other_purchase uuid:='12192300-0000-0000-0000-000000000003'::uuid;
@@ -496,6 +498,68 @@ begin
              and g.last_effective_at=v_positive_event_at)<>1
    then
      raise exception 'CLAIM_E2E_REPLAY_DIFFERENT_VERIFIER_REVISION_ACCEPTED';
+   end if;
+
+   -- The historical 1080 replay returns its prior Effect without a
+   -- Grant revision/CAS update. The S2 scoped caller MUST NOT report that
+   -- historical revoke as current once a subsequent effect reactivated the
+   -- Grant, even if the PortOne GET cancellation is otherwise unchanged.
+   begin
+     update public.entitlement_grants
+        set status='active',revision=revision+1,
+            last_effective_at=v_positive_event_at+interval '1 microsecond',
+            last_provider_ordering_key='synthetic-later-restoration'
+      where id=v_grant.id and status='revoked';
+     perform public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+       v_refund_reservation.payment_id,
+       v_receipt.external_transaction_id,
+       'synthetic-claim-b2-not-confirmed',v_positive_event_at,
+       v_receipt.verified_amount_minor,v_receipt.verified_currency,
+       'production','hmac-sha256:k1:'||repeat('8',64),
+       'portone-v2-payment-full-cancel-lookup-v1'
+     );
+   exception when serialization_failure then
+     get stacked diagnostics v_constraint=constraint_name;
+     if v_constraint='official_reader_s2_replayed_effect_no_longer_current' then
+       v_replayed_reactivated_denied:=true;
+     else raise;
+     end if;
+   end;
+   -- A second historical replay cannot borrow the old cancellation if
+   -- a later provider source changed only the live Grant ordering key.
+   begin
+     update public.entitlement_grants
+        set last_provider_ordering_key='synthetic-later-revoke'
+      where id=v_grant.id and status='revoked';
+     perform public.cmd_apply_verified_portone_reader_full_cancellation_v1(
+       v_refund_reservation.payment_id,
+       v_receipt.external_transaction_id,
+       'synthetic-claim-b2-not-confirmed',v_positive_event_at,
+       v_receipt.verified_amount_minor,v_receipt.verified_currency,
+       'production','hmac-sha256:k1:'||repeat('8',64),
+       'portone-v2-payment-full-cancel-lookup-v1'
+     );
+   exception when serialization_failure then
+     get stacked diagnostics v_constraint=constraint_name;
+     if v_constraint='official_reader_s2_replayed_effect_no_longer_current' then
+       v_replayed_reordered_denied:=true;
+     else raise;
+     end if;
+   end;
+   if not v_replayed_reactivated_denied or not v_replayed_reordered_denied
+      or (select count(*) from public.entitlement_grants
+           where id=v_grant.id and status='revoked'
+             and revision=v_positive_effect.result_grant_revision
+             and last_effective_at=v_positive_event_at)<>1
+      or (select count(*) from public.entitlement_events
+           where grant_id=v_grant.id
+             and source_provider_event_id=
+                 '1219d000-0000-4000-8000-000000000008'::uuid)<>1
+      or (select count(*) from public.entitlement_grants
+           where id=v_other.id and status='active'
+             and revision=v_original_other_revision)<>1
+   then
+     raise exception 'CLAIM_E2E_SUPERSEDED_REVOKE_REPLAY_OR_SIBLING_LEAK';
    end if;
 
    -- A once-authoritative revoke Event can remain in history even if

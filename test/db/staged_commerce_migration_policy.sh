@@ -76,6 +76,22 @@ skip_staged_portone_migration_from_historical_fixture() {
     echo "Skipping Reader cancellation replay migration from historical catalog: $name"
     return 0
   fi
+  # 2400 forward-replaces the private 1770 S2 scoped revoke worker.
+  # Historical PG15/PG17 fixtures do not install the original Reader 1770.
+  if [[ "$name" == '2400_official_reader_replayed_revoke_current_grant_guard_v1.sql' ]]; then
+    [[ "$inclusion" == 'reader-integrated' ]] && return 1
+    expected='ac0d025948aa6cc30403fa637c2415da98c22526'
+    actual="$(git hash-object "$migration")" || {
+      echo 'HOLD_READER_REPLAY_CURRENT_MIGRATION_FINGERPRINT_UNAVAILABLE' >&2
+      exit 1
+    }
+    if [[ "$actual" != "$expected" ]]; then
+      echo 'HOLD_READER_REPLAY_CURRENT_MIGRATION_FINGERPRINT_DRIFT' >&2
+      exit 1
+    fi
+    echo "Skipping Reader-only replay-current-state migration from historical catalog: $name"
+    return 0
+  fi
   case "${migration##*/}" in
     20261026100200_portone_chat_credit_catalog_staged_v1.sql)
       expected='a55bd7aa06d6625523090e997f6f76f5539abee1' ;;

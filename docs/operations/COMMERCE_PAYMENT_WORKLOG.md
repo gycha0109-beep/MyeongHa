@@ -1154,3 +1154,12 @@
 - **실제 구현:** 원본 인증 PortOne GET 검증기에서 이미 달력·UTC·오프셋 검증된 정규화 시각을 **초 단위 이후 소수 부분의 길이를 맞춘 정밀 비교**로 대체합니다. 결제 < 단일 성공 취소, 개별/결제 취소 시각의 정확한 일치, 최종 상태 변경 시각 >= 취소 시각을 전부 동일하게 비교합니다. 외부 Provider 순서 정보를 새로 주장하거나 원본 이벤트/DB 구조·Writer·정산 기능을 바꾸지 않습니다.
 - **회귀:** 동일 밀리초 안에서 정상 `.999100Z` → `.999101Z` +09:00 오프셋 검증 및 취소 DB 바인딩 정상 사례, 실제 결제 시각 역전·상태 변경 시각 역전·소수부 동일 시간(자릿수 차이)을 **DB 쓰기 없이 거부**하는 사례를 추가했습니다. 새 CI 통과 전까지 검증 결과는 미확정입니다.
 - **잔여:** 현재 GET 내부 시계 정합성 검사만 완료. 서로 다른 Provider 사건의 공식 NEWER/STALE 순서·Reader T2 완전 선형화, 실제 고객 제공/복원/privacy replay 및 전체 E2E는 미완료. 운영 환불 POST/운영 DB/LIVE 미수행.
+
+### 2026-11-08 — 과거 회수 이벤트 재실행 시 현재 구매권 상태·순서 불일치 거부
+
+- **선행:** [CI #42489437460](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42489437460) 포함 기존 PR 검사 전부 GREEN, 최신 1770/1910/2390 및 1080 Entitlement Writer 확인. 로드맵 §6-1·2·5.
+- **발견:** 1910 Reader S2 구매권 취소 처리에서 같은 Provider Event에 이미 Event가 존재하는 경우 오래된 시각 차단을 생략합니다. 1080의 기존 `result_replayed=true`는 **역사적으로 일치하는 Event**를 재사용할 뿐, 이후 Grant가 다른 사건으로 다시 활성화됐거나 마지막 Provider 순서가 변경됐어도 현재 Grant를 재회수하지 않고 반환합니다. 그 상태에서 취소 Receipt를 완료로 표시하는 경로는 현재 구매권의 실제 회수 사실과 다를 수 있습니다.
+- **구현:** 1770 비공개 Reader S2 scoped writer를 정방향 `2400_official_reader_replayed_revoke_current_grant_guard_v1.sql`로 대체합니다. 기존 S1 advisory 잠금 → 1080 Provider Event/Grant 행 잠금 → 기존 Effect Writer를 유지하고, 실제 Effect **재실행 시** 1080이 잠근 현재 Grant의 정확한 상태·마지막 적용 시각·Provider 순서와 원본 Entitlement Event의 출처·시각·순서가 모두 동일한지 검증합니다. 불일치는 40001로 전체 DB 취소 트랜잭션을 거부합니다. 정상 동일 재전송이나 기존 별도 출처 no-op 처리, 다른 Reader 권한은 유지합니다.
+- **격리 PG17:** 실제 B2 전액 취소→1080 Grant 회수→정상 2390 재실행 이후, 하위 트랜잭션에서 (1) B2 Grant 후속 활성화 (2) 후속 Provider ordering key 변경을 각각 합성하고 동일 취소 재실행을 거부합니다. 실패한 하위 트랜잭션이 롤백되는지, B2 원본 Effect가 하나뿐인지, 독립 B3 구매권이 유지되는지 검사합니다. 원래 외부 시험 전체도 ROLLBACK. 별도 Vitest 계약과 역사적 migration SHA 가드, WORKLOG 갱신.
+- **경계:** 일반 PortOne NEWER/STALE 비교나 실제 운영 T2 동시성 전체를 입증하는 작업은 아니며, 보존된 역사적 Event가 현재 회수 효과인 양 통과하지 못하도록 하는 제한된 안전 조치입니다. 직접 포트원 환불 POST, 운영 SQL 적용, 공개 API/LIVE 활성화 없음. 신규 CI는 완료 근거가 확보되기 전까지 미확정.
+- **잔여:** 취소 Provider 전체 최신성, Reader T2 실제 연결, 고객 제공 입증, privacy 복원 실증, 전체 통합 검증.
