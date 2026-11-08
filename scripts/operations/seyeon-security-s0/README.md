@@ -26,6 +26,13 @@ Private accept와 revoke의 Production factory도 기존 server-owned 승인 cal
 
 DB 최초 설치·타입 계약·운영 역할 부여·동일 백업 복원·실제 외부 transport V/R/S/ACK 및 유료/공개 승인은 이 브랜치가 대신하지 않는다. History/Replay/Reader/Worker/다중 Memory·Life Fact의 미확정 파생 공개는 계속 차단한다.
 
+## 2026-11-08 — 백업 복원형 S0 격리 리허설 RED 복구 (운영 무변경)
+
+- [실패 실행 #42488281162](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42488281162)의 원인은 운영 백업에 이미 존재하는 `seyeon_private` 스키마를 `rehearse-seyeon-security-s0-restored.mjs`가 무조건 **새로 설치할 빈 스키마**로 가정했기 때문이다. 복원·스키마 비교는 성공했고, 시험 리허설만 `S0 installation/fixture collision; no overwrite.`로 중단했다.
+- **수정된 격리 전용 실행:** 기존 임시 복제본의 선행 함수·정확한 비활성 출처 타입과 신규 확장 함수의 미설치 여부를 별도로 확인한다. 이미 설치된 S0 객체는 덮거나 삭제하지 않고, 운영 백업 생성 시점에 아직 없던 **09 소유 Memory Grant·16 현재 User 원본 Pin·17 양수 결합 Pin** 세 SQL만 원자적으로 *복제본에만* 보충한다. 정확한 사전 조건과 기존 권한 차이가 나면 중단한다. 원본 복원 DB·실 운영 Supabase에는 작성하지 않는다.
+- 새로 만드는 함수의 소유권 이전 이후 ACL을 회수할 때는 해당 NOLOGIN owner로 잠시 역할을 전환하고 즉시 원복한다. 실제 사용자 기록은 투입하지 않으며, 테스트의 `conversation_recall/v1` 출처 허용은 **일회용 복제본에서만** 기존 OFF 행을 갱신한다. 빈 스키마에서 전체를 설치하는 기존 CI 경로도 유지한다.
+- 결과 증거에는 복제본 설치 모드·보충한 SQL 목록·정확한 테스트 건수·Provider 호출 0회·운영 무변경을 별도 명시한다. 신규 SQL·운영 Source Registry·실제 회원 권한·유료 호출·답변 공개를 활성화하는 변경은 없다. **새 코드의 격리 리허설 PASS 전에는 운영 백업 기반 S0 검증을 성공으로 표기하지 않는다.**
+
 ## 2026-11-08 운영 G1 원본 연결 설치 성공 — Source Registry 비활성 유지
 
 - **현재 상태(아래 과거 실패·보류 기록에 우선):** 기존 사용자 승인 범위의 G1 원본 연결 SQL `16-g1-model-recent-source-pin.sql` → `17-g1-positive-combined-model-source-pin.sql`를 실제 명하 Supabase `cnsfpcdiyofqvhpcegfc` PostgreSQL17에 **하나의 트랜잭션**으로 적용했다. 소스 버전은 기존 security PR #3120의 `0738eea27c07e6467505c8eecdb8b91cee4d69c8`, 설치 SQL blob SHA는 `76f852d13d74bc28e452c2c4b2ea4780514af2f5` 및 `886c9b5774fbfed5bfb7997dd3b3ea3e7c672679`. 원본 파일의 `BEGIN/COMMIT`과 중복 임시 멤버십 설정만 단일 설치 트랜잭션 외피로 합쳤으며, W141에서 검증한 함수 소유자 `SET LOCAL ROLE`을 유지했다.
