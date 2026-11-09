@@ -86,9 +86,11 @@ const started = performance.now();
 const results = [];
 let cost = 0;
 let attempted = 0;
+let apiRequestAttempts = 0;
+let invalidResponseRetries = 0;
 let failure = null;
 
-async function callModel({ spec, repeat, model, variant }) {
+async function callModelAttempt({ spec, repeat, model, variant }) {
   const body = {
     model, stream: false, max_tokens: MAX_TOKENS,
     reasoning: { effort: 'low' },
@@ -105,11 +107,11 @@ async function callModel({ spec, repeat, model, variant }) {
     provider: { require_parameters: true, allow_fallbacks: false, zdr: true, data_collection: 'deny' },
   };
   const t0 = performance.now();
-  attempted++;
   let response;
   // A 429 does not confirm billable generation. Retry the same case in place
   // with bounded waits, retaining the original spend and call ceilings.
   for (let retry = 0; retry <= 6; retry++) {
+    apiRequestAttempts++;
     response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST', redirect: 'error',
       headers: { authorization: 'Bearer ' + KEY, 'content-type': 'application/json', accept: 'application/json' },
@@ -162,6 +164,24 @@ async function callModel({ spec, repeat, model, variant }) {
     costUsd: Number(cost.toFixed(8)) }));
 }
 
+async function callModel({ spec, repeat, model, variant }) {
+  attempted++;
+  for (let retry = 0; retry <= 2; retry++) {
+    try {
+      await callModelAttempt({ spec, repeat, model, variant });
+      return;
+    } catch (error) {
+      const code = error instanceof Error ? error.message : '';
+      if (!['LANGUAGE_AB_INVALID_JSON', 'LANGUAGE_AB_INVALID_REPLY'].includes(code)
+        || retry === 2 || cost >= MAX_COST) throw error;
+      invalidResponseRetries++;
+      console.log(JSON.stringify({ event: 'INVALID_FORMAT_RETRY', id: spec.id,
+        model, variant, repeat, retry: retry + 1, reason: code,
+        costUsd: Number(cost.toFixed(8)) }));
+    }
+  }
+}
+
 try {
   for (let repeat = 1; repeat <= 2; repeat++) {
     for (const [idx, spec] of CASES.entries()) {
@@ -190,6 +210,7 @@ try {
     mode: 'ISOLATED_SYNTHETIC_SINGLE_TURN',
     models: MODELS, variants: VARIANTS, maxCalls: MAX_CALLS,
     attemptedCalls: attempted, successfulCalls: results.length, failure,
+    actualApiRequestAttempts: apiRequestAttempts, invalidResponseRetries,
     sampling: { temperature: 0.7, appliedToEveryModel: true },
     verifiedOpenRouterListPriceUsdPerMillionTokens: {
       'z-ai/glm-5.3-flash': { input: 0.0335, output: 0.083 },
