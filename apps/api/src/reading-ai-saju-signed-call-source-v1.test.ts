@@ -12,11 +12,12 @@ const REQUEST = { sajuRequestId: 'host_private', callId: CALL, modelKey: 'gpt-5.
 const DOMAIN = 'myeongha/a4/saju-provider-call-proof/v1\0';
 
 const OBS = Object.freeze({
-  callId: CALL, requestId: REQUEST.sajuRequestId, providerKey: 'openai',
-  modelKey: REQUEST.modelKey, source: 'provider_response_usage', outcome: 'response_received',
+  callId: CALL, requestId: REQUEST.sajuRequestId, providerKey: 'openai' as const,
+  modelKey: REQUEST.modelKey, source: 'provider_response_usage' as const, outcome: 'response_received' as const,
   observedAt: AT,
   usage: { inputTokens: 120, outputTokens: 35, cachedInputTokens: 20, reasoningTokens: 10 },
 });
+const PROOF_REQUEST = { ...REQUEST, observation: OBS };
 function canonicalize(v: unknown): unknown {
   if (Array.isArray(v)) return v.map(canonicalize);
   if (v === null || typeof v !== 'object') return v;
@@ -50,7 +51,7 @@ describe('A4 private Saju source-issued provider proof', () => {
       expect(callId).toBe(CALL);
       return proof;
     });
-    expect(await source.verifyProviderCall(REQUEST)).toEqual({
+    expect(await source.verifyProviderCall(PROOF_REQUEST)).toEqual({
       ...REQUEST, externalRequestRef: 'saju_source_' + SOURCE, executionAttemptId: ID,
     });
   });
@@ -62,34 +63,36 @@ describe('A4 private Saju source-issued provider proof', () => {
         ...valid.payload.link, executionAttemptId:'123e4567-e89b-42d3-a456-426614174999',
       }},
     };
-    expect(await authority(async()=>tampered).verifyProviderCall(REQUEST)).toBeNull();
-    expect(await authority(async()=>signed({issuer:'someone.else'})).verifyProviderCall(REQUEST))
+    expect(await authority(async()=>tampered).verifyProviderCall(PROOF_REQUEST)).toBeNull();
+    expect(await authority(async()=>signed({issuer:'someone.else'})).verifyProviderCall(PROOF_REQUEST))
       .toBeNull();
-    expect(await authority(async()=>signed({audience:'other.reader'})).verifyProviderCall(REQUEST))
+    expect(await authority(async()=>signed({audience:'other.reader'})).verifyProviderCall(PROOF_REQUEST))
       .toBeNull();
     const wrongKey = createSajuSignedProviderCallSourceAuthorityV1({
       trustedIssuer:'saju.private', expectedAudience:'myeongha.admin', trustedKeyId:'a4.key.1',
       keyBytes: new Uint8Array(32), nowMs:()=>NOW + 2000, loadSignedCallById:async()=>valid,
     });
-    expect(await wrongKey.verifyProviderCall(REQUEST)).toBeNull();
-    expect(await authority(async()=>valid).verifyProviderCall({...REQUEST,modelKey:'other'}))
+    expect(await wrongKey.verifyProviderCall(PROOF_REQUEST)).toBeNull();
+    expect(await authority(async()=>valid).verifyProviderCall({...PROOF_REQUEST,modelKey:'other'}))
       .toBeNull();
-    expect(await authority(async()=>valid).verifyProviderCall({...REQUEST,callId:ID}))
+    expect(await authority(async()=>valid).verifyProviderCall({...PROOF_REQUEST,observation:{...OBS,usage:{...OBS.usage,inputTokens:9999}}})).toBeNull();
+    expect(await authority(async()=>valid).verifyProviderCall({...PROOF_REQUEST,observation:{...OBS,outcome:'http_failure'}})).toBeNull();
+    expect(await authority(async()=>valid).verifyProviderCall({...PROOF_REQUEST,callId:ID}))
       .toBeNull();
   });
 
   it('rejects malformed, missing and future-dated proofs without a false cost attribution', async () => {
-    expect(await authority(async()=>null).verifyProviderCall(REQUEST)).toBeNull();
+    expect(await authority(async()=>null).verifyProviderCall(PROOF_REQUEST)).toBeNull();
     expect(await authority(async()=>{throw Error('source receipt store unavailable')})
-      .verifyProviderCall(REQUEST)).toBeNull();
+      .verifyProviderCall(PROOF_REQUEST)).toBeNull();
     expect(await authority(async()=>signed({issuedAtMs:NOW+90_000}))
-      .verifyProviderCall(REQUEST)).toBeNull();
+      .verifyProviderCall(PROOF_REQUEST)).toBeNull();
     expect(await authority(async()=>signed({extra:'unexpected'}))
-      .verifyProviderCall(REQUEST)).toBeNull();
+      .verifyProviderCall(PROOF_REQUEST)).toBeNull();
     expect(await authority(async()=>signed({link:{
       ...signed().payload.link,
       observation: {...OBS, usage:{inputTokens:null,outputTokens:null,cachedInputTokens:null,reasoningTokens:null}},
-    }})).verifyProviderCall(REQUEST)).toBeNull();
+    }})).verifyProviderCall(PROOF_REQUEST)).toBeNull();
   });
 
   it('refuses production trust without a real server-owned source read port and 32-byte key', () => {

@@ -95,7 +95,11 @@ function readProof(
     || observation.callId !== expected.callId
     || observation.requestId !== expected.sajuRequestId
     || observation.modelKey !== expected.modelKey
-    || observation.observedAt !== expected.observedAt) return null;
+    || observation.observedAt !== expected.observedAt
+    // The binding alone is insufficient: a signed callId must not authorize
+    // replacement token counters, outcome or missing-usage flags.
+    || JSON.stringify(canonicalize(observation)) !==
+       JSON.stringify(canonicalize(expected.observation))) return null;
   const computed = createHmac('sha256', trust.keyBytes)
     .update(DOMAIN).update(JSON.stringify(canonicalize(payload))).digest();
   const received = Buffer.from(proof.signatureHex, 'hex');
