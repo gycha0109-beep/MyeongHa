@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { APPROVED_SAJU_CATALOG_V1, getApprovedSajuOfferV1 } from
+  '../packages/contracts/src/approved-saju-catalog.js';
 
 const webRoot = resolve(process.cwd(), 'apps/web');
 
@@ -67,11 +69,10 @@ describe('Web Golden Master', () => {
   });
 
   it('pins the Saju free-preview reference layout and retained calculation identifiers', async () => {
-    const [html, page, design, catalog] = await Promise.all([
+    const [html, page, design] = await Promise.all([
       readWebFile('reading.html'),
       readWebFile('src/reading/ReadingPage.tsx'),
       readWebFile('saju-preview-landing.css'),
-      readWebFile('src/reading/approved-saju-catalog.ts'),
     ]);
     const saju = `${html}\n${page}`;
 
@@ -87,15 +88,18 @@ describe('Web Golden Master', () => {
       '사주 해석 상품',
       '보고서 구성 미리보기',
     ]);
-    expectInOrder(catalog, [
-      "id: 'career'", "id: 'business'", "id: 'wealth'", "id: 'relationship'",
-      "id: 'year'", "id: 'month'", "id: 'first-counterpart'",
-      "id: 'additional-counterpart'", "id: 'relationship-plus-first'",
-      "id: 'career-economy'", "id: 'basic'", "id: 'basic-year'",
-      "id: 'basic-month'", "id: 'basic-year-month'",
+    expect(APPROVED_SAJU_CATALOG_V1.map((offer) => offer.id)).toEqual([
+      'career', 'business', 'wealth', 'relationship',
+      'year', 'month', 'first-counterpart',
+      'additional-counterpart', 'relationship-plus-first',
+      'career-economy', 'basic', 'basic-year', 'basic-month', 'basic-year-month',
     ]);
-    expect(catalog).toContain("{ id: 'career', title: '직업·커리어운', priceKrw: 9900, type: 'single' }");
-    expect(catalog).toContain("{ id: 'basic-year-month', title: '전체 사주 + 올해 + 이번 달', priceKrw: 39700");
+    expect(getApprovedSajuOfferV1('career')).toMatchObject({
+      title: '직업·커리어운', priceKrw: 9900, type: 'single',
+    });
+    expect(getApprovedSajuOfferV1('basic-year-month')).toMatchObject({
+      title: '전체 사주 + 올해 + 이번 달', priceKrw: 39700,
+    });
 
     const runtimeIds = [
       'saju-status', 'saju-empty', 'saju-birth-form',
