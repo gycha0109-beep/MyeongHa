@@ -62,6 +62,7 @@ export interface SajuProductionReadingRequestV1 {
   readonly reading: Readonly<{
     text: string;
     targetPersonRef?: string;
+    periodReferenceDateTime?: string;
   }>;
 }
 
@@ -170,6 +171,7 @@ export function buildSajuProductionReadingRequestV1(input: {
   readonly birthRevision: SajuBirthRevisionBindingV1;
   readonly readingText: string;
   readonly targetPersonRef?: string;
+  readonly periodReferenceDateTime?: string;
 }): SajuProductionReadingRequestV1 {
   const calculationRequest = buildSajuProductionCalculationRequestV1(input.birthRevision);
   const text = requireNonBlank('readingText', input.readingText, 200);
@@ -177,12 +179,24 @@ export function buildSajuProductionReadingRequestV1(input: {
     input.targetPersonRef === undefined
       ? undefined
       : requireNonBlank('targetPersonRef', input.targetPersonRef, 200);
+  const { periodReferenceDateTime } = input;
+  if (periodReferenceDateTime !== undefined
+    && (typeof periodReferenceDateTime !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(periodReferenceDateTime)
+      || !Number.isFinite(Date.parse(periodReferenceDateTime))
+      || new Date(periodReferenceDateTime).toISOString() !== periodReferenceDateTime)) {
+    throw new SajuProductionReadingHttpAdapterErrorV1(
+      'INVALID_READING_REQUEST',
+      'periodReferenceDateTime must be a canonical UTC timestamp.',
+    );
+  }
 
   return Object.freeze({
     birth: calculationRequest.birth,
     reading: Object.freeze({
       text,
       ...(targetPersonRef === undefined ? {} : { targetPersonRef }),
+      ...(periodReferenceDateTime === undefined ? {} : { periodReferenceDateTime }),
     }),
   });
 }
@@ -342,9 +356,13 @@ function assertLifecycleAttestation(
   response: SajuProductionCalculationHttpResponseV1,
   expectedLifecycle: string | undefined,
 ): void {
-  if (expectedLifecycle === undefined) return;
   const lifecycle = response.headers.get(SAJU_READING_LIFECYCLE_HEADER_V1);
-  if (lifecycle !== expectedLifecycle) {
+  // The bounded older Production host omits this header. A response labeled
+  // Preview (or any unknown lifecycle) cannot enter the Production adapter.
+  const matches = expectedLifecycle === undefined
+    ? lifecycle === null || lifecycle === 'production'
+    : lifecycle === expectedLifecycle;
+  if (!matches) {
     cancelUnusedResponseBody(response);
     throw new SajuProductionReadingHttpAdapterErrorV1(
       'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED',
