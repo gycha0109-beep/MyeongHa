@@ -57,6 +57,10 @@ body.saju-hub-page .saju-design-chart-content [hidden] { display: none !importan
 .saju-design-product-card header { display:flex; align-items:center; gap:10px; padding-bottom:11px; border-bottom:1px solid #efe1db; }
 .saju-design-topic-symbol { flex:0 0 auto; display:grid; place-items:center; width:41px; height:41px; border-radius:50%; color:#ad6474; background:linear-gradient(145deg,#f9efee,#eecdd0); font:26px/1 var(--mh-serif,serif); }
 .saju-design-product-card h3 { margin:0; font:700 19px/1.4 var(--mh-serif,serif); color:#65313b; }
+.saju-design-product-group { margin-top:24px; }
+.saju-design-product-group > h3 { margin:0 0 12px; color:#65313b; font:700 18px/1.4 var(--mh-serif,serif); }
+.saju-design-product-card .saju-design-product-price { margin:12px 0 4px; color:#65313b; font-size:18px; font-weight:750; }
+.saju-design-product-card .saju-design-product-scope { flex:initial; }
 .saju-design-product-card ul { margin:12px 0 15px; padding-left:16px; flex:1; color:#403841; font-size:15px; line-height:1.75; }
 .saju-design-product-card li::marker { color:#ad6778; }
 

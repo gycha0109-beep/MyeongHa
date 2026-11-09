@@ -1,28 +1,25 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
+import { APPROVED_SAJU_CATALOG_GROUPS_V1, APPROVED_SAJU_CATALOG_V1 } from './approved-saju-catalog.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
-// The eleven public Saju topics share one product layer. Route availability is
-// independent from Product identity and never grants sale or Reader access.
-const sajuProductTopics = [
-  { symbol: '✎', title: '직업 · 커리어', href: 'reading-detail.html?topic=career', outline: ['일의 성향과 적성', '커리어 방향', '직업별 궁합', '성장의 흐름', '현실적 조언'] },
-  { symbol: '◇', title: '재물', href: 'reading-detail.html?topic=money', outline: ['재물 운의 흐름', '수입과 지출 성향', '재물 운이 강한 시기', '투자 · 사업 성향', '재물 관리 조언'] },
-  { symbol: '✿', title: '연애 · 관계', href: 'reading-detail.html?topic=love', outline: ['연애 성향과 인연 흐름', '잘 맞는 상대 유형', '관계에서 주의할 점', '결혼 운의 흐름', '행복한 관계를 위한 조언'] },
-  { symbol: '商', title: '사업', href: 'reading-detail.html?topic=business' },
-  { symbol: '家', title: '가족', href: 'reading-detail.html?topic=family' },
-  { symbol: '生', title: '삶의 단계', href: 'reading-detail.html?topic=life-stage' },
-  { symbol: '歲', title: '올해', href: 'reading-detail.html?scope=year' },
-  { symbol: '月', title: '이번 달', href: 'reading-detail.html?scope=month' },
-  { symbol: '伴', title: '배우자', href: 'reading-detail.html?topic=spouse' },
-  { symbol: '合', title: '궁합', href: 'reading-detail.html?topic=compatibility' },
-  { symbol: '問', title: '지금 고민으로 보기', href: 'reading-detail.html?topic=question-specific' },
-] as const;
+const hrefByOfferId: Readonly<Record<string, string>> = Object.freeze({
+  career: 'reading-detail.html?topic=career',
+  business: 'reading-detail.html?topic=business',
+  wealth: 'reading-detail.html?topic=money',
+  relationship: 'reading-detail.html?topic=love',
+  year: 'reading-detail.html?scope=year',
+  month: 'reading-detail.html?scope=month',
+});
+const symbolByOfferId: Readonly<Record<string, string>> = Object.freeze({
+  career: '✎', business: '商', wealth: '◇', relationship: '✿', year: '歲', month: '月',
+});
 
 export function ReadingPage() {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
   // Preserve historic detail URLs in the route layer, but do not surface the
   // retired general-natal product through the present Home/Saju catalogs.
-  const resumedVisibleTopic = resumedPreview && sajuProductTopics.some((topic) => topic.href === resumedPreview)
+  const resumedVisibleTopic = resumedPreview && Object.values(hrefByOfferId).includes(resumedPreview)
     ? resumedPreview : null;
   const [chartTab, setChartTab] = useState<'pillars' | 'elements'>('pillars');
   const [selectedElement, setSelectedElement] = useState<string | null>(null);
@@ -170,24 +167,28 @@ export function ReadingPage() {
 
         <section className="saju-design-products" aria-labelledby="saju-design-products-title">
           <h2 id="saju-design-products-title">사주 해석 상품</h2>
-          <p>관심 있는 사주 해석 주제를 같은 상품 영역에서 확인합니다. 현재 허용된 프리뷰만 바로 열 수 있으며, 공식 보고서 발행·결제는 실제 상품 이용 권한이 연결된 뒤 제공됩니다. 상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.</p>
-          <div className="saju-design-product-grid">
-            {sajuProductTopics.map((topic) => {
-              const availability = resolveReadingAvailabilityV1(topic.href);
-              return (
-                <article className="saju-design-product-card" key={topic.href}>
-                  <header><span className="saju-design-topic-symbol" aria-hidden="true">{topic.symbol}</span><h3>{topic.title}</h3></header>
-                  {'outline' in topic
-                    ? <ul>{topic.outline.map((item) => <li key={item}>{item}</li>)}</ul>
-                    : <p className="saju-design-product-scope">이 주제의 공식 해석은 정식 읽기 연결 후 제공됩니다.</p>}
-                  <span className={`reading-topic-availability is-${availability.kind}`}>{availability.label}</span>
-                  {availability.kind === 'preview'
-                    ? <a href={topic.href}>프리뷰 읽기</a>
-                    : <span className="saju-design-product-disabled" aria-disabled="true">정식 읽기 준비 중</span>}
-                </article>
-              );
-            })}
-          </div>
+          <p>2026년 11월 6일 확정된 단품·관계 비교·패키지 구성과 가격입니다. 아래 상태는 현재 화면에서 확인 가능한 풀이 경로를 뜻하며, 준비 중 항목은 개인 풀이가 완성된 것처럼 표시하지 않습니다.</p>
+          {APPROVED_SAJU_CATALOG_GROUPS_V1.map((group) => (
+            <section className="saju-design-product-group" key={group.id} aria-labelledby={`approved-saju-group-${group.id}`}>
+              <h3 id={`approved-saju-group-${group.id}`}>{group.title}</h3>
+              <div className="saju-design-product-grid">
+                {APPROVED_SAJU_CATALOG_V1.filter((offer) => offer.type === group.id).map((offer) => {
+                  const href = hrefByOfferId[offer.id];
+                  const availability = href ? resolveReadingAvailabilityV1(href) : null;
+                  return (
+                    <article className="saju-design-product-card" key={offer.id}>
+                      <header><span className="saju-design-topic-symbol" aria-hidden="true">{symbolByOfferId[offer.id] ?? (offer.type === 'comparison' ? '合' : '命')}</span><h3>{offer.title}</h3></header>
+                      <p className="saju-design-product-price">{offer.priceKrw.toLocaleString('ko-KR')}원</p>
+                      {offer.includes && <p className="saju-design-product-scope">구성: {offer.includes.join(' + ')}</p>}
+                      {availability?.kind === 'preview'
+                        ? <><span className={`reading-topic-availability is-${availability.kind}`}>개인 명식 프리뷰</span><a href={href}>명식 확인하기</a></>
+                        : <><span className="reading-topic-availability is-unavailable">정식 풀이 연결 준비 중</span><p className="saju-design-product-scope">공식 풀이와 구매한 상품의 전달 경로를 연결 중입니다.</p></>}
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
         </section>
 
         <section className="saju-design-example" aria-labelledby="saju-design-example-title">
