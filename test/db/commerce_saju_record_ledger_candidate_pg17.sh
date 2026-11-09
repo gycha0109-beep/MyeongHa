@@ -18,6 +18,7 @@ node test/db/commerce_stored_portone_hmac_lineage_pg17_generator.mjs --fixture |
   psql -X -v ON_ERROR_STOP=1 -f - >/dev/null
 
 psql -X -v ON_ERROR_STOP=1 -f test/db/commerce_saju_record_ledger_candidate_pg17.sql
+psql -X -v ON_ERROR_STOP=1 -f test/db/commerce_approved_saju_purchase_scope_pg17.sql
 
 # Execute the exact TypeScript current-Grant and receipt/Record SQL on the same
 # disposable PG17 database. Synthetic purchase and Grant rows are rolled back.
