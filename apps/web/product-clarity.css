@@ -1,7 +1,7 @@
 /* Shared product readability: loaded after route styles and before header authority. */
-:root { --mh-copy-muted: #544b50; --mh-copy-soft: #62565a; }
-html[data-theme="dark"] { --mh-copy-muted: #d1c4b9; --mh-copy-soft: #c5b5aa; }
-body.product-page { font-family: var(--mh-sans); font-size: 1rem; line-height: 1.7; text-rendering: optimizeLegibility; }
+:root { --mh-copy-muted: #4a3b45; --mh-copy-soft: #62535c; --mh-copy-body: #2c2530; }
+html[data-theme="dark"] { --mh-copy-muted: #d8cac3; --mh-copy-soft: #bfb0aa; --mh-copy-body: #f7efe5; }
+body.product-page { font-family: var(--mh-sans); font-size: 1rem; font-weight: 500; line-height: 1.7; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 body.product-page :is(button,input,select,textarea) { font-family: var(--mh-sans); }
 body.product-page :is(a,button,input,select,textarea):focus-visible { outline: 2px solid var(--mh-brass-strong); outline-offset: 3px; }
 /* Only actual copy is enlarged; decorative symbols and fixed-size art are untouched. */
@@ -81,4 +81,24 @@ body.product-page :is(.saju-design-hero h2, .saju-design-products h2, .records-t
 }
 body.product-page :is(.records-reading-summary, .my-lead, .reading-block p, .reading-character-block p) {
   font-family: var(--mh-sans);
+}
+
+/* Product reading hierarchy; page-specific styles retain approved art and geometry. */
+body.product-page :is(.records-reading-summary, .reading-block p, .reading-character-block p, .official-report-primary, .official-report-supporting) {
+  font-family: var(--mh-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.8;
+}
+body.product-page :is(.gm-section-title,.mhx-section-title,.records-panel-head h2,.my-section-heading h2) {
+  font-size: clamp(25px, 2.25vw, 32px);
+  font-weight: 700;
+  letter-spacing: -.035em;
+}
+body.product-page :is(.saju-design-chart-tabs button,.saju-design-product-card a,.my-primary-action,.chat-person-action) {
+  font-family: var(--mh-sans);
+  font-weight: 700;
+}
+html[data-theme="dark"] body.product-page :is(.records-reading-summary,.reading-block p,.reading-character-block p) {
+  color: var(--mh-copy-body);
 }
