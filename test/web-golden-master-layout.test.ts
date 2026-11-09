@@ -67,10 +67,11 @@ describe('Web Golden Master', () => {
   });
 
   it('pins the Saju free-preview reference layout and retained calculation identifiers', async () => {
-    const [html, page, design] = await Promise.all([
+    const [html, page, design, catalog] = await Promise.all([
       readWebFile('reading.html'),
       readWebFile('src/reading/ReadingPage.tsx'),
       readWebFile('saju-preview-landing.css'),
+      readWebFile('src/reading/approved-saju-catalog.ts'),
     ]);
     const saju = `${html}\n${page}`;
 
@@ -86,10 +87,15 @@ describe('Web Golden Master', () => {
       '사주 해석 상품',
       '보고서 구성 미리보기',
     ]);
-    expectInOrder(page.slice(page.indexOf('const sajuProductTopics')), [
-      '직업 · 커리어', '재물', '연애 · 관계',
-      '사업', '가족', '삶의 단계', '올해', '이번 달', '배우자', '궁합', '지금 고민으로 보기',
+    expectInOrder(catalog, [
+      "id: 'career'", "id: 'business'", "id: 'wealth'", "id: 'relationship'",
+      "id: 'year'", "id: 'month'", "id: 'first-counterpart'",
+      "id: 'additional-counterpart'", "id: 'relationship-plus-first'",
+      "id: 'career-economy'", "id: 'basic'", "id: 'basic-year'",
+      "id: 'basic-month'", "id: 'basic-year-month'",
     ]);
+    expect(catalog).toContain("{ id: 'career', title: '직업·커리어운', priceKrw: 9900, type: 'single' }");
+    expect(catalog).toContain("{ id: 'basic-year-month', title: '전체 사주 + 올해 + 이번 달', priceKrw: 39700");
 
     const runtimeIds = [
       'saju-status', 'saju-empty', 'saju-birth-form',
@@ -105,8 +111,6 @@ describe('Web Golden Master', () => {
     ] as const;
     for (const id of runtimeIds) expect(saju).toContain(`id="${id}"`);
     expect(page).not.toContain('전체 사주');
-    const catalog = page.match(/const sajuProductTopics = \[([\s\S]*?)\] as const;/u)?.[1] ?? '';
-    expect(catalog.match(/symbol:/gu)).toHaveLength(11);
     expect(page).toContain("resumedVisibleTopic ?? '#saju-design-products-title'");
     expect(design).toContain('.saju-design-product-card:nth-last-child(3):nth-child(4n+1)');
     expect(design).toContain('.gm-saju-main:has(#saju-empty:not([hidden]))');
