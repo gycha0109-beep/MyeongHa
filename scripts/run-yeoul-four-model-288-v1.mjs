@@ -92,9 +92,8 @@ async function callModel({ spec, repeat, model, variant }) {
   const body = {
     model, stream: false, max_tokens: MAX_TOKENS,
     reasoning: { effort: 'low' },
-    // Only GLM has a fixed sampling temperature in the original experiment.
-    // Preserve its baseline and let the other three use provider defaults.
-    ...(model === 'z-ai/glm-5.3-flash' ? { temperature: 0.7 } : {}),
+    // Every selected model advertises temperature support: keep identical sampling.
+    temperature: 0.7,
     messages: [
       { role: 'system', content: SYSTEMS[variant] },
       { role: 'user', content: spec.text },
@@ -177,7 +176,7 @@ try {
     mode: 'ISOLATED_SYNTHETIC_SINGLE_TURN',
     models: MODELS, variants: VARIANTS, maxCalls: MAX_CALLS,
     attemptedCalls: attempted, successfulCalls: results.length, failure,
-    sampling: { 'z-ai/glm-5.3-flash': { temperature: 0.7 }, 'deepseek/deepseek-v4.1-flash-1017': { temperature: 'provider-default' }, 'minimax/minimax-m3.1-flash': { temperature: 'provider-default' }, 'qwen/qwen3.8-27b': { temperature: 'provider-default' } },
+    sampling: { temperature: 0.7, appliedToEveryModel: true },
     verifiedOpenRouterListPriceUsdPerMillionTokens: {
       'z-ai/glm-5.3-flash': { input: 0.0335, output: 0.083 },
       'deepseek/deepseek-v4.1-flash-1017': { input: 0.006, output: 0.5 },
