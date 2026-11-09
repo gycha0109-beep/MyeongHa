@@ -45,3 +45,11 @@
 - 운영 DB SELECT-only 확인: `public.reading_execution_attempts.relrowsecurity=false`, `relforcerowsecurity=false`, 기존 A4 Writer 존재, A4 binding reader 부재, `external_request_ref` 비NULL 0행. 앞선 `reading-ai-cost-binding-reader-offline-v1.sql`은 RLS=true를 요구하므로 운영에 적용하지 않음.
 - 실제 운영 상태에 맞춘 **별도** `apps/admin/database/reading-ai-cost-binding-reader-rls-off-v1.sql` 후보를 작성. 기존 테이블 RLS 모드를 변경하지 않고, 독립 비상속·비밀번호 없는 계정에 5개 열 SELECT만 부여하며 정책은 생성하지 않음. 기존 A4 Reader/Writer의 권한은 변경하지 않음. 비밀키·연결 바인딩·실수집은 아직 없음.
 - 임시 Docker PostgreSQL 17.11에서 RLS-off 테이블, 기존 Writer 역할을 구성해 신규 후보 설치/읽기 성공을 확인하고 컨테이너 삭제. **운영 DB 설치는 CI 및 별도 적용 검증 전까지 미실행**. 실제 Saju 호출에서 DB 시도로 이어지는 Source Authority 증명과 공급사 비용 대조는 여전히 미완료.
+
+## 2026-11-09 — A4 전용 Reader 설치 재검증: Supabase 관리형 자동 역할 멤버십
+
+- [PR #3172](https://github.com/gycha0109-beep/MyeongHa/pull/3172)는 필수 Integration CI SUCCESS 후 병합됨. Owner 승인에 따라 Production에 SQL을 적용했으나 postflight가 두 차례 트랜잭션 롤백됨. 역할·정책 미생성을 Production SELECT-only로 재확인했으며 고객 데이터·기존 RLS·비용 수집 변경 없음.
+- 근거: PostgreSQL 관리형 `postgres`가 새 역할을 생성하면 `supabase_admin`이 grantor인 `postgres`의 **ADMIN-only** membership이 자동 부여됨. `inherit_option=false`, `set_option=false`, `admin_option=true`. 기존 A4 `myeongha_reading_ai_cost_source_v1` 및 `myeongha_reading_ai_cost_writer_v1`에도 동일한 membership. 설치자 자신을 grantor로 지정한 REVOKE로는 이를 제거할 수 없음.
+- 변경: 전용 Reader의 멤버십 검사에서 **오직** `role=new Reader, member=postgres, grantor=supabase_admin, inherit=false, set=false, admin=true` 조합만 허용. 그 외 멤버십·SET/INHERIT 활성은 거부. 테이블 전체 SELECT/쓰기·스키마 CREATE·5개 외 컬럼 접근 거부 및 RLS 기존 상태 유지.
+- 검증: 임시 Docker PostgreSQL 17.11을 `supabase_admin` 슈퍼유저 + 비슈퍼 `postgres` DB 소유자/CREATEROLE로 구성. 동일 관리형 자동 grant가 생성되는 환경에서 후보 SQL의 pre/postflight 및 COMMIT 성공. `postgres`의 전용 Reader SET ROLE은 PostgreSQL이 거부함. 이 검증은 Production 설치·인증 자격 증명·Saju 실호출 연계를 의미하지 않음.
+- **운영 적용 대기:** 수정 PR 일반/통합 CI 통과 및 병합 확인 뒤에만 재설치. 실제 Saju provider call과 DB attempt 결속, 별도 안전한 접속 비밀 및 사용량 커버리지 검증 전 비용 수집은 비활성/HOLD.

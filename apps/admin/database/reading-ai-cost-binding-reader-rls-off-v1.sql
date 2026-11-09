@@ -43,6 +43,10 @@ CREATE ROLE myeongha_reading_ai_cost_binding_reader_v1
   LOGIN PASSWORD NULL NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
   NOREPLICATION NOBYPASSRLS;
 
+-- Supabase creates an unavoidable admin-only membership for the managed
+-- postgres installer, granted by supabase_admin. This MUST confer neither
+-- SET ROLE nor inherited access; the postflight permits only that exact link.
+
 GRANT USAGE ON SCHEMA public TO myeongha_reading_ai_cost_binding_reader_v1;
 -- Only columns needed for exact, globally unique terminal-attempt lookup.
 GRANT SELECT (id,reading_id,subject_id,external_request_ref,state)
@@ -60,9 +64,20 @@ BEGIN
         AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication
         AND NOT rolbypassrls) <> 1
     OR EXISTS (
+      -- A real managed Supabase installer receives one ADMIN-only membership
+      -- from supabase_admin. No SET/INHERIT grant, or any other link, is allowed.
       SELECT 1 FROM pg_auth_members m
-      JOIN pg_roles r ON r.oid=m.roleid OR r.oid=m.member
-      WHERE r.rolname='myeongha_reading_ai_cost_binding_reader_v1'
+      WHERE (m.roleid=(SELECT oid FROM pg_roles
+                     WHERE rolname='myeongha_reading_ai_cost_binding_reader_v1')
+             OR m.member=(SELECT oid FROM pg_roles
+                     WHERE rolname='myeongha_reading_ai_cost_binding_reader_v1'))
+        AND NOT (
+          m.roleid=(SELECT oid FROM pg_roles
+                    WHERE rolname='myeongha_reading_ai_cost_binding_reader_v1')
+          AND m.member=(SELECT oid FROM pg_roles WHERE rolname='postgres')
+          AND m.grantor=(SELECT oid FROM pg_roles WHERE rolname='supabase_admin')
+          AND NOT m.inherit_option AND NOT m.set_option AND m.admin_option
+        )
     )
     OR has_table_privilege('myeongha_reading_ai_cost_binding_reader_v1',
       'public.reading_execution_attempts','INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')
