@@ -10,6 +10,17 @@ describe('shared CI verification plan', () => {
     expect(plan).toMatchObject({ chat: true, full: false, browser: true, contracts: false, dependencies: false, db: false, db_suites: [] });
     expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-static-ui-i18n-browser.mjs', 'scripts/run-web-chat-auth-browser-smoke.mjs', 'scripts/run-web-conversation-browser-smoke.mjs']);
   });
+  it('keeps Web-only changes off shared, API-client, and Admin checks', () => {
+    expect(resolveVerificationPlan(['apps/web/src/reading/ReadingPage.tsx'])).toMatchObject({
+      web: true, mobile: false, unit_full: false, api: false, admin: false, db: false, db_suites: [],
+    });
+    expect(resolveVerificationPlan(['packages/api-client/src/saju.ts'])).toMatchObject({
+      unit_full: true, api: true, admin: true,
+    });
+    expect(resolveVerificationPlan(['apps/admin/src/main.tsx'])).toMatchObject({
+      unit_full: false, api: false, admin: true,
+    });
+  });
   it('keeps multiple selected surfaces and runs their union without duplicates', () => {
     const plan = resolveVerificationPlan(['apps/web/reading-reader-picker.js', 'apps/web/records-page.js']);
     expect(selectWebChecks(plan)).toEqual(['scripts/verify-web-static-ui-i18n-browser.mjs', 'scripts/verify-web-saju-auth-browser.mjs', 'scripts/verify-golden-master-header-browser.mjs', 'scripts/verify-web-general-natal-preview-browser.mjs', 'scripts/verify-web-records-auth-browser.mjs']);
