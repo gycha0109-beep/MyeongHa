@@ -124,6 +124,36 @@ function aclByGranteeDifferences(source, restored) {
   return affected;
 }
 
+function canonicalGrantorDifferences(source, restored, directRoles) {
+  const before = source.acl_by_grantee_grantor_privilege_sha256;
+  if (before === undefined) return null; // Previous sealed archives stay comparable.
+  const after = restored.acl_by_grantee_grantor_privilege_sha256;
+  for (const [side, map] of [['source', before], ['restored', after]]) {
+    assert.ok(map && typeof map === 'object' && !Array.isArray(map),
+      side + ' canonical grantor map must be an object');
+    for (const [grantee, digest] of Object.entries(map)) {
+      assert.ok(grantee.length > 0 && grantee.length <= 160 &&
+        !/[\r\n\t]/u.test(grantee), side + ' malformed grantee name');
+      assertDigest(digest, side + ':grantor:' + grantee);
+    }
+  }
+  const affected = [...new Set([...Object.keys(before), ...Object.keys(after)])]
+    .filter(grantee => before[grantee] !== after[grantee]).sort();
+  // A canonical grantor-aware entry includes the grantee's permission entry.
+  if (directRoles !== null) {
+    for (const grantee of directRoles) {
+      assert.ok(affected.includes(grantee),
+        'Changed direct privileges cannot have an unchanged grantor-aware digest');
+    }
+  }
+  if (source.acl_sha256 !== undefined && restored.acl_sha256 !== undefined &&
+      source.acl_sha256 === restored.acl_sha256) {
+    assert.equal(affected.length, 0,
+      'Unchanged full ACL contradicts canonical grantor-aware digests');
+  }
+  return affected;
+}
+
 function assertUniformFacetCoverage(rows, kind, field) {
   const present = rows.filter(row => row[field] !== undefined).length;
   assert.ok(present === 0 || present === rows.length,
@@ -199,6 +229,12 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
       'acl_by_grantee_privilege_sha256'),
     routineAclByGrantee: assertUniformFacetCoverage(source.functions, 'functions',
       'acl_by_grantee_privilege_sha256'),
+    tableAclGrantorByGrantee: assertUniformFacetCoverage(source.tables, 'tables',
+      'acl_by_grantee_grantor_privilege_sha256'),
+    schemaAclGrantorByGrantee: assertUniformFacetCoverage(source.schemas, 'schemas',
+      'acl_by_grantee_grantor_privilege_sha256'),
+    routineAclGrantorByGrantee: assertUniformFacetCoverage(source.functions, 'functions',
+      'acl_by_grantee_grantor_privilege_sha256'),
   };
   for (const [kind, definition] of Object.entries(kinds)) {
     const before = indexed(source[kind], kind, definition);
@@ -217,6 +253,15 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
       const scope = kind === 'schemas' || kind === 'functions'
         ? aclDifferenceScope(value, matched) : null;
       const roles = aclByGranteeDifferences(value, matched);
+      const grantorGrantees = canonicalGrantorDifferences(value, matched, roles);
+      if (grantorGrantees?.length && kind === 'tables') {
+        assert.ok(parts?.includes('acl') && differingFields.includes('structural_sha256'),
+          'Canonical table grantor difference lacks aggregate ACL difference');
+      }
+      if (grantorGrantees?.length && kind !== 'tables') {
+        assert.ok(differingFields.includes('acl_sha256'),
+          'Canonical function/schema grantor difference lacks aggregate ACL difference');
+      }
       if (roles?.length && kind === 'tables') {
         assert.ok(parts?.includes('acl') && differingFields.includes('structural_sha256'),
           'Changed table grantee privileges lack a table ACL digest difference');
@@ -244,6 +289,15 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
           detail.aclGranteePrivilegeVerdict = roles.length
             ? 'DIFFERENT_DIRECT_GRANTEE_PRIVILEGES'
             : 'MATCH_DIRECT_GRANTEE_PRIVILEGES_ACL_HASH_DIFFERS';
+        }
+        if (grantorGrantees !== null && (kind === 'tables' ?
+          parts?.includes('acl') : differingFields.includes('acl_sha256'))) {
+          detail.aclCanonicalGrantorChangedGrantees = grantorGrantees;
+          // Even with canonical agreement, never infer an authenticated
+          // Provider/Hosted restore, effective inherited rights or DR ready.
+          detail.aclCanonicalGrantorVerdict = grantorGrantees.length
+            ? 'DIFFERENT_CANONICAL_GRANTOR_ENTRIES'
+            : 'MATCH_CANONICAL_GRANTOR_ENTRIES_LEGACY_ACL_HASH_DIFFERS';
         }
         changed.push(detail);
       }

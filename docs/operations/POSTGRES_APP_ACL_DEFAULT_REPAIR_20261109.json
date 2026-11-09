@@ -1,0 +1,93 @@
+{
+  "schemaVersion": "ops-source-bound-acl-creator-default-restore-comparison-v1",
+  "baselineRestoreRunId": 42489176631,
+  "baselineEvidenceFile": "docs/operations/POSTGRES_APP_ACL_GRANTEE_PARITY_20261108.json",
+  "afterRestoreRunId": 42562661906,
+  "afterRestoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42562661906",
+  "afterRestoreArtifactId": 13650101355,
+  "afterRestoreExecutionSha": "d89ae03f879681c3f218f20ba8019542c51c9239",
+  "backupRunId": 42488222531,
+  "backupSourceSha": "33fd5173d51f27a800e0f16dade7e814519e6377",
+  "backupMigrationFrontier": "20261105075227",
+  "afterArtifactSha256": {
+    "app-schema-parity.json": "9114afcffb94675b62fcc2fb70f6145b566ba501f1c231fce6a34829d39e72fe",
+    "restore-evidence.json": "411c029cc8dc0f83affa7e2704fd4dff61884ab166fd399812698209acbb4d7b",
+    "privacy-reconciliation-evidence.json": "813df15a812730fe8fa8265339f6b164f0657f8e874816468177cdfda01ead96",
+    "recovered-serving-admission.json": "df1047b575f7025ee670ce387fd43fa755aa641b669ce51c055c51be3f3e1ac8"
+  },
+  "workflowConclusion": "success",
+  "componentHashEvidence": {
+    "tableStructure": true,
+    "schemaAclGrantEntries": true,
+    "routineAclGrantEntries": true,
+    "tableAclByGrantee": true,
+    "schemaAclByGrantee": true,
+    "routineAclByGrantee": true
+  },
+  "scopeObjectCounts": {
+    "schemas": {
+      "sourceCount": 3,
+      "restoredCount": 3,
+      "mismatchBefore": 2,
+      "mismatchAfter": 2,
+      "directPrivilegeMismatchBefore": 0,
+      "directPrivilegeMismatchAfter": 0,
+      "legacyAclHashOnlyMismatchBefore": 2,
+      "legacyAclHashOnlyMismatchAfter": 2,
+      "missingCount": 0,
+      "additionalCount": 0
+    },
+    "tables": {
+      "sourceCount": 94,
+      "restoredCount": 94,
+      "mismatchBefore": 31,
+      "mismatchAfter": 8,
+      "directPrivilegeMismatchBefore": 23,
+      "directPrivilegeMismatchAfter": 0,
+      "legacyAclHashOnlyMismatchBefore": 8,
+      "legacyAclHashOnlyMismatchAfter": 8,
+      "missingCount": 0,
+      "additionalCount": 0
+    },
+    "functions": {
+      "sourceCount": 322,
+      "restoredCount": 322,
+      "mismatchBefore": 181,
+      "mismatchAfter": 19,
+      "directPrivilegeMismatchBefore": 172,
+      "directPrivilegeMismatchAfter": 0,
+      "legacyAclHashOnlyMismatchBefore": 9,
+      "legacyAclHashOnlyMismatchAfter": 19,
+      "missingCount": 0,
+      "additionalCount": 0
+    }
+  },
+  "aggregates": {
+    "directPrivilegeMismatchBefore": 195,
+    "directPrivilegeMismatchAfter": 0,
+    "totalLegacyAclHashMismatchBefore": 214,
+    "totalLegacyAclHashMismatchAfter": 29,
+    "granteePrivilegeMatchButLegacyAclHashMismatchBefore": 19,
+    "granteePrivilegeMatchButLegacyAclHashMismatchAfter": 29
+  },
+  "sourceCatalogProvenance": "encrypted_backup_bracketed_readonly_v1",
+  "sourceCatalogHold": "SOURCE_BACKUP_EXECUTION_BRACKETED_NO_SHARED_MVCC_SNAPSHOT",
+  "sourceBoundToPgDumpMvccSnapshot": false,
+  "restoreMismatchRootCauseProven": false,
+  "migrationFrontierAligned": true,
+  "providerManagedDataFullRestore": false,
+  "providerCopyBlocksSkipped": 27,
+  "providerCopyBlocksProjected": 3,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "servingGate": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "interpretationLimits": [
+    "Direct grantee privilege-entry mismatch is zero, but inherited/effective access and all ACL provenance are not proven.",
+    "Residual aggregate ACL hashes can differ because of role OID ordering or grantor provenance; neither is established by these old sealed digests.",
+    "The restore code and main repository revision changed; do not claim exclusive causal proof from the pair of runs.",
+    "Source catalog observations bracket the encrypted backup but do not share its PostgreSQL MVCC snapshot.",
+    "No provider-owned full restore, Hosted Auth/Storage, independent Production privacy replay or whole-service RPO/RTO evidence."
+  ]
+}

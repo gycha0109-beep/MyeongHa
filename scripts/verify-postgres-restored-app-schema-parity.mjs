@@ -19,6 +19,7 @@ assert.ok(restoredQuery.includes('structural_component_sha256'));
 assert.ok(restoredQuery.includes('acl_sha256'));
 assert.ok(restoredQuery.includes('acl_grant_entries_without_grantor_sha256'));
 assert.ok(restoredQuery.includes('acl_by_grantee_privilege_sha256'));
+assert.ok(restoredQuery.includes('acl_by_grantee_grantor_privilege_sha256'));
 assert.ok(!restoredQuery.includes('FROM supabase_migrations.schema_migrations'));
 
 const restored = {
@@ -37,6 +38,8 @@ assert.deepEqual(matched.componentHashEvidence, {
   tableStructure: false, schemaAclGrantEntries: false,
   routineAclGrantEntries: false,
   tableAclByGrantee: false, schemaAclByGrantee: false, routineAclByGrantee: false,
+  tableAclGrantorByGrantee: false, schemaAclGrantorByGrantee: false,
+  routineAclGrantorByGrantee: false,
 });
 assert.equal(matched.sourceCatalogProvenance, 'legacy_date_only_observation');
 assert.equal(matched.sourceCatalogProvenanceHold,
@@ -88,6 +91,9 @@ for (const row of [...facetedSource.tables, ...facetedSource.schemas,
   row.acl_by_grantee_privilege_sha256 = {
     anon: 'a'.repeat(64), service_role: 'a'.repeat(64),
   };
+  row.acl_by_grantee_grantor_privilege_sha256 = {
+    anon: 'a'.repeat(64), service_role: 'a'.repeat(64),
+  };
 }
 const facetedRestored = {
   ...structuredClone(facetedSource),
@@ -99,6 +105,8 @@ assert.deepEqual(facetedMatch.componentHashEvidence, {
   tableStructure: true, schemaAclGrantEntries: true,
   routineAclGrantEntries: true,
   tableAclByGrantee: true, schemaAclByGrantee: true, routineAclByGrantee: true,
+  tableAclGrantorByGrantee: true, schemaAclGrantorByGrantee: true,
+  routineAclGrantorByGrantee: true,
 });
 assert.equal(facetedMatch.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
 
@@ -116,12 +124,15 @@ const roleRestored = structuredClone(facetedRestored);
 roleRestored.tables[1].structural_sha256 = 'b'.repeat(64);
 roleRestored.tables[1].structural_component_sha256.acl = 'b'.repeat(64);
 roleRestored.tables[1].acl_by_grantee_privilege_sha256.anon = 'b'.repeat(64);
+roleRestored.tables[1].acl_by_grantee_grantor_privilege_sha256.anon = 'b'.repeat(64);
 roleRestored.schemas[1].acl_sha256 = 'b'.repeat(64);
 roleRestored.schemas[1].acl_grant_entries_without_grantor_sha256 = 'b'.repeat(64);
 roleRestored.schemas[1].acl_by_grantee_privilege_sha256.service_role = 'b'.repeat(64);
+roleRestored.schemas[1].acl_by_grantee_grantor_privilege_sha256.service_role = 'b'.repeat(64);
 roleRestored.functions[1].acl_sha256 = 'b'.repeat(64);
 roleRestored.functions[1].acl_grant_entries_without_grantor_sha256 = 'b'.repeat(64);
 roleRestored.functions[1].acl_by_grantee_privilege_sha256.anon = 'b'.repeat(64);
+roleRestored.functions[1].acl_by_grantee_grantor_privilege_sha256.anon = 'b'.repeat(64);
 const roleMismatch = compareApplicationCatalog(facetedSource, roleRestored, frontier);
 assert.deepEqual(roleMismatch.types.tables.changed[0].structuralComponentDifferences,
   ['acl']);
@@ -149,12 +160,51 @@ for (const kind of ['schemas', 'tables', 'functions']) {
   assert.deepEqual(orderAmbiguity.types[kind].changed[0].aclAffectedGrantees, []);
   assert.equal(orderAmbiguity.types[kind].changed[0].aclGranteePrivilegeVerdict,
     'MATCH_DIRECT_GRANTEE_PRIVILEGES_ACL_HASH_DIFFERS');
+  assert.deepEqual(orderAmbiguity.types[kind].changed[0]
+    .aclCanonicalGrantorChangedGrantees, []);
+  assert.equal(orderAmbiguity.types[kind].changed[0].aclCanonicalGrantorVerdict,
+    'MATCH_CANONICAL_GRANTOR_ENTRIES_LEGACY_ACL_HASH_DIFFERS');
 }
 assert.equal(orderAmbiguity.applicationScopeVerdict,
   'HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH');
 assert.equal(orderAmbiguity.restoreMismatchRootCauseProven, false);
 assert.equal(orderAmbiguity.drReady, false);
 
+// Same direct privileges but different canonical grantor attribution: this
+// evidence is not an OID-ordering-only match and must remain fail-closed.
+const alteredGrantor = structuredClone(sameRoleGrants);
+alteredGrantor.schemas[0].acl_by_grantee_grantor_privilege_sha256.anon =
+  'b'.repeat(64);
+alteredGrantor.tables[0].acl_by_grantee_grantor_privilege_sha256.anon =
+  'b'.repeat(64);
+alteredGrantor.functions[0].acl_by_grantee_grantor_privilege_sha256.anon =
+  'b'.repeat(64);
+const changedGrantor = compareApplicationCatalog(facetedSource, alteredGrantor, frontier);
+for (const kind of ['schemas', 'tables', 'functions']) {
+  assert.equal(changedGrantor.types[kind].changed[0].aclCanonicalGrantorVerdict,
+    'DIFFERENT_CANONICAL_GRANTOR_ENTRIES');
+  assert.deepEqual(changedGrantor.types[kind].changed[0]
+    .aclCanonicalGrantorChangedGrantees, ['anon']);
+}
+assert.equal(changedGrantor.drReady, false);
+const malformedGrantor = structuredClone(alteredGrantor);
+malformedGrantor.functions[0].acl_by_grantee_grantor_privilege_sha256.anon =
+  'invalid';
+assert.throws(() => compareApplicationCatalog(facetedSource, malformedGrantor, frontier));
+const incompleteGrantor = structuredClone(facetedSource);
+delete incompleteGrantor.tables[0].acl_by_grantee_grantor_privilege_sha256;
+assert.throws(() => compareApplicationCatalog(incompleteGrantor, alteredGrantor, frontier));
+const forgedGrantor = structuredClone(facetedRestored);
+forgedGrantor.functions[0].acl_by_grantee_grantor_privilege_sha256.anon =
+  'b'.repeat(64);
+assert.throws(() => compareApplicationCatalog(facetedSource, forgedGrantor, frontier));
+
+assert.equal(roleMismatch.restoreMismatchRootCauseProven, false);
+
+for (const kind of ['schemas', 'tables', 'functions']) {
+  assert.equal(roleMismatch.types[kind].changed[0].aclCanonicalGrantorVerdict,
+    'DIFFERENT_CANONICAL_GRANTOR_ENTRIES');
+}
 assert.equal(roleMismatch.restoreMismatchRootCauseProven, false);
 assert.equal(roleMismatch.drReady, false);
 const missingRoleMap = structuredClone(roleRestored);
