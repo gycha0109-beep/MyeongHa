@@ -190,3 +190,13 @@ Watchtower-Track: frontend-integration
 - **승인:** 없음. Stage 2~4 미승인 제품 출시 게이트와 무관.
 
 Watchtower-Track: frontend-integration
+
+
+## 2026-11-09 — 웹·앱 시각 전달력 강화 (사용자 승인)
+
+- **사용자 요청 및 승인 범위:** 실제 웹 화면 5장의 흐린 본문·저대비·명조체 과용 지적 후, 타이포그래피·배경 대비·정보 위계를 한층 과감하게 개편하도록 직접 승인. 현재 `main` 기준으로 공통 색상·일러스트·캐릭터 개별 분위기를 유지하고 홈·사주·대화·리딩·마이의 명확한 시각 계층만 개선.
+- **웹 적용:** `apps/web/product.css`에 Noto Serif KR / Pretendard Variable 명시적 웹폰트 스타일시트 로드 및 기존 시스템 대체 글꼴 유지, `product-clarity.css`에서 본문 먹색·다크모드 대비·제목/리딩 굵기 조정. `home-moonlight.css`의 메인 타이틀 확대 및 밝은 테마 첫 진입 카드만 Night 포인트로 강조. `saju-preview-landing.css`, `my.css`, `chat-hub.css`, `conversation-v2.css`, `face-reading.css`, `reading-detail-shell.css`에서 일반 설명·사주 명식·버튼·대화·날짜·공식 결과의 글자 크기·계층·배경 대비 조정. 기존 이미지 원본과 페이지 이동/권한 로직은 수정하지 않음.
+- **모바일 앱 적용:** `mobile-colors.ts`·`mobile-theme.tsx`의 라이트/다크 밝기 기준을 웹과 정렬하고, `MobileScreen.tsx`, 대화 목록/대화 본문, 사주/리딩/기록 화면의 글자·행간·명도 강화. 설치된 Expo SDK 57/React Native 구성의 기존 `StyleSheet` 방식만 사용. 웹 CSS 변경이 네이티브 앱을 수정하지 않으므로 앱 파일은 별도 반영.
+- **보존 범위:** 결제·관상 업로드·법무 게시·사주 해석 권한·데이터 처리, 문자열/번역, 인증, 이벤트 동작, 캐릭터 원화, 글로벌 메뉴 구조 변경 없음. `Watchtower-Track: frontend-integration`.
+- **검증/주의:** 외부 웹폰트 로딩은 네트워크 차단 시 대체 글꼴로 표시되며, 이 변경에서 네이티브 폰트 바이너리나 Expo 폰트 패키지 배포는 하지 않음. 명암 대비 표본값 및 정적 CSS/TSX 상태는 확인하되 실제 브라우저·네이티브 렌더링, 일반 CI, 웹 도메인, Governance, 통합 검증은 해당 PR의 최종 HEAD 결과 확인 전까지 성공으로 주장하지 않음.
+- **후속:** PR checks 실패 시 기존 승인 범위에서 정확한 원인만 수정하고, 선행 CI 전체 성공 후 기존 통합 절차로 병합 진행. 별도 승인되지 않은 제품 출시 게이트는 유지.
