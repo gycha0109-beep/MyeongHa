@@ -30,6 +30,10 @@ const restored = {
 const frontier = source.migrationCatalog.latestVersion;
 const matched = compareApplicationCatalog(source, restored, frontier);
 assert.equal(matched.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
+assert.deepEqual(matched.observedCanonicalAclCatalog, {
+  witnessComplete: false, observedApplicationCatalogParity: false,
+  legacyHashOnlyByKind: null, unresolvedByKind: null,
+});
 assert.equal(matched.verifiedApplicationScopeEquivalence, true);
 assert.equal(matched.verifiedFullSchemaCatalogEquivalence, false);
 assert.equal(matched.sourceCatalogBoundToBackupSnapshot, false);
@@ -109,6 +113,11 @@ assert.deepEqual(facetedMatch.componentHashEvidence, {
   routineAclGrantorByGrantee: true,
 });
 assert.equal(facetedMatch.applicationScopeVerdict, 'MATCH_APPLICATION_CATALOG_ONLY');
+assert.deepEqual(facetedMatch.observedCanonicalAclCatalog, {
+  witnessComplete: true, observedApplicationCatalogParity: true,
+  legacyHashOnlyByKind: { schemas: 0, tables: 0, functions: 0 },
+  unresolvedByKind: { schemas: 0, tables: 0, functions: 0 },
+});
 
 // Old sealed catalogs have no facet hashes while the newer restored SQL does;
 // do not misclassify all objects merely because newer read-only output grew.
@@ -117,6 +126,8 @@ const olderSealedAgainstNewerRestore = compareApplicationCatalog(
 assert.equal(olderSealedAgainstNewerRestore.applicationScopeVerdict,
   'MATCH_APPLICATION_CATALOG_ONLY');
 assert.equal(olderSealedAgainstNewerRestore.componentHashEvidence.tableStructure, false);
+assert.equal(olderSealedAgainstNewerRestore
+  .observedCanonicalAclCatalog.observedApplicationCatalogParity, false);
 
 // The new ACL witness narrows which DB role's grants differ without
 // exposing permission tuples or admitting the application for DR.
@@ -167,6 +178,11 @@ for (const kind of ['schemas', 'tables', 'functions']) {
 }
 assert.equal(orderAmbiguity.applicationScopeVerdict,
   'HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH');
+assert.deepEqual(orderAmbiguity.observedCanonicalAclCatalog, {
+  witnessComplete: true, observedApplicationCatalogParity: true,
+  legacyHashOnlyByKind: { schemas: 1, tables: 1, functions: 1 },
+  unresolvedByKind: { schemas: 0, tables: 0, functions: 0 },
+});
 assert.equal(orderAmbiguity.restoreMismatchRootCauseProven, false);
 assert.equal(orderAmbiguity.drReady, false);
 
@@ -187,6 +203,11 @@ for (const kind of ['schemas', 'tables', 'functions']) {
     .aclCanonicalGrantorChangedGrantees, ['anon']);
 }
 assert.equal(changedGrantor.drReady, false);
+assert.deepEqual(changedGrantor.observedCanonicalAclCatalog, {
+  witnessComplete: true, observedApplicationCatalogParity: false,
+  legacyHashOnlyByKind: { schemas: 0, tables: 0, functions: 0 },
+  unresolvedByKind: { schemas: 1, tables: 1, functions: 1 },
+});
 const malformedGrantor = structuredClone(alteredGrantor);
 malformedGrantor.functions[0].acl_by_grantee_grantor_privilege_sha256.anon =
   'invalid';
@@ -207,6 +228,8 @@ for (const kind of ['schemas', 'tables', 'functions']) {
 }
 assert.equal(roleMismatch.restoreMismatchRootCauseProven, false);
 assert.equal(roleMismatch.drReady, false);
+assert.equal(roleMismatch.observedCanonicalAclCatalog
+  .observedApplicationCatalogParity, false);
 const missingRoleMap = structuredClone(roleRestored);
 delete missingRoleMap.tables[0].acl_by_grantee_privilege_sha256;
 assert.throws(() => compareApplicationCatalog(facetedSource, missingRoleMap, frontier));
@@ -236,6 +259,10 @@ assert.equal(facetMismatch.types.functions.changed[0].aclDifferenceScope,
   'GRANTOR_ATTRIBUTION_ONLY');
 assert.equal(facetMismatch.restoreMismatchRootCauseProven, false);
 assert.equal(facetMismatch.drReady, false);
+assert.equal(facetMismatch.observedCanonicalAclCatalog
+  .observedApplicationCatalogParity, false);
+assert.deepEqual(facetMismatch.observedCanonicalAclCatalog.unresolvedByKind,
+  { schemas: 0, tables: 1, functions: 0 });
 
 const tampered = structuredClone(facetedRestored);
 delete tampered.tables[0].structural_component_sha256;
