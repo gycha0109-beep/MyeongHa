@@ -94,6 +94,36 @@ This draft is a single-pass paraphrase of the returned Preview meanings. It adds
 
 ## Existing implementation handoff
 
+## Four approved single-product Reader Preview drafts
+
+On 2026-11-09, the current Saju Preview-only HTTP route returned a separate delivered Preview for each supported single intent using the same synthetic input (`1992-07-14 15:20`, solar, sex unspecified). Each response was HTTP 200 with lifecycle `preview`, response version `myeonghwa-product-reading-response-v2`, and chart pillars 壬申 / 丁未 / 辛卯 / 丙申; calculation state was `partially_ambiguous`. The following are single-pass Reader paraphrases of those returned meanings, not Production readings:
+
+**직업·커리어운 — approved KRW 9,900**
+
+> 일에서는 찾아낸 것을 실제로 고쳐 결과로 보여주는 쪽에 힘이 실릴 수 있습니다. 익숙하지 않은 정보를 파고들고, 남들이 지나친 연결점을 찾아내는 과정이 일의 동력이 되기 쉽습니다. 거기서 멈추기보다 기존 방식의 문제를 발견해 더 나은 형태로 바꾸고, 생각을 결과물로 보여줄 수 있을 때 강점이 살아날 수 있어요.
+>
+> 역할과 기준이 분명한 환경도 중요합니다. 무엇을 지키고 어디까지 책임지는지 알 수 있으면 맡은 일을 안정적으로 끌고 가기 쉽습니다. 빠른 판단이나 책임이 필요한 상황을 정면으로 다루는 힘도 보이지만, 압박만 크고 결정권이 없는 자리는 소모적일 수 있습니다. 함께 일할 때는 기여와 역할 경계를 구체적으로 나누는 편이 안정적입니다.
+
+**사업운 — approved KRW 9,900**
+
+> 사업에서는 오래 검토만 하기보다 작은 형태로 먼저 실행하고, 실제 반응을 확인하면서 판단을 다듬는 방식이 맞을 수 있습니다. 내가 결정할 수 있는 영역이 있을 때 움직이기 편하고, 책임은 지는데 결정권은 거의 없는 구조에서는 답답함이 커질 수 있어요.
+>
+> 중요한 결정을 앞두고 정보를 모아 불확실성을 줄이는 과정도 필요합니다. 다만 완전히 확실해질 때까지 기다리면 결정 시기를 놓칠 수 있으니, 무엇을 확인하면 작게 시작할지 기준을 정해두는 편이 좋겠습니다. 시간과 돈을 어디에 먼저 써야 실제 반응을 볼 수 있는지 따져보고, 역할·기한·책임을 분명히 하는 운영 기준도 중요합니다. 이 풀이는 사업 성패나 투자 판단을 예언하거나 권하지 않습니다.
+
+**재물운 — approved KRW 9,900**
+
+> 돈의 흐름은 능력이나 생각을 실제 결과물로 바꾸는 과정에서 이해하기 쉬울 수 있습니다. 무엇을 만들었고 누가 왜 필요로 하는지가 보이면 금전적인 판단도 구체적으로 잡히기 쉽습니다. 돈은 단순히 모아두는 숫자라기보다 내가 선택할 수 있는 범위와 시간을 넓혀주는 자원으로 느낄 수 있어요.
+>
+> 배움이나 도구, 자료에 쓰는 돈도 앞으로의 선택지를 넓혀준다는 점에서 납득하기 쉬울 수 있습니다. 다만 준비에만 머물면 비용은 늘고 실제로 써보지 못할 수 있으니, 지출할 때 언제 어떻게 써볼지도 함께 정해두는 편이 좋습니다. 내가 원하는 선택과 예산, 배움과 당장 결과를 내야 하는 비용이 부딪힐 때는 선택권·성장·유지비를 나누어 보면 도움이 됩니다. 현재 재산, 수입 규모, 투자 수익이나 금전 시기는 이 응답에서 확정하지 않습니다.
+
+**나의 인연·관계운 — approved KRW 9,900**
+
+> 관계에서는 가까워져도 각자의 선택권이 남아 있는 편이 편할 수 있습니다. 필요할 때 나란히 움직이되 모든 것을 함께해야 하지는 않는 관계가 자연스럽고, 간섭받는 느낌이 커지면 가까운 사이에서도 거리를 두고 싶어질 수 있어요.
+>
+> 대화로 상대의 생각과 맥락을 이해하고 신뢰를 확인할 시간이 있어야 편할 수 있습니다. 생각과 감정을 말이나 행동으로 표현하고 반응을 주고받을 통로가 중요합니다. 가까울수록 약속과 책임, 실제로 서로 나누는 시간과 노력이 신뢰의 기준이 되기 쉽습니다. 내가 원하는 방식과 함께 써야 하는 시간·돈·에너지가 부딪힐 때, 또는 빨리 해결하고 싶은 마음과 먼저 충분히 이해하고 싶은 마음이 엇갈릴 때는 각자 결정할 일과 함께 정할 일, 이해할 시간과 결정할 시간을 구분해 볼 수 있겠습니다. 이 응답은 관계 변화의 시기나 상대방의 성격·결과를 말하지 않습니다.
+
+These four Preview responses did not return a validated link from each sentence to its specific pillar or other chart evidence, nor explain `partially_ambiguous`. Therefore these drafts demonstrate a real calculation and a Reader delivery treatment, but they do not pass the required Saju grounding-quality gate or constitute finished customer products. The complete user-facing sample is kept in the Outputs folder as `four-single-saju-reader-preview-samples-20261109.md`.
+
 The intended existing flow is:
 
 ```text
