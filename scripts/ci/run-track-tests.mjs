@@ -14,8 +14,13 @@ if (plan.full) {
   // Select those that explicitly mention a changed path (or its filename).
   // Shared/CI changes still run the full suite through the plan above.
   const staticTests = [];
-  const changedNames = changed.map((path) => path.replaceAll('\\', '/'));
-  const changedBasenames = changedNames.map((path) => path.split('/').at(-1)).filter(Boolean);
+  const changedReferences = new Set();
+  for (const rawPath of changed) {
+    const path = rawPath.replaceAll('\\', '/');
+    changedReferences.add(path);
+    // Web/API/Admin tests often read files relative to their workspace root.
+    changedReferences.add(path.replace(/^apps\/[^/]+\//u, ''));
+  }
   function visit(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (['node_modules', 'dist', '.expo'].includes(entry.name)) continue;
@@ -24,7 +29,7 @@ if (plan.full) {
       else if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path)) {
         const source = readFileSync(path, 'utf8');
         if (/(?:readFile|readdir|execFile|execSync|spawnSync|node:fs|node:child_process)/u.test(source)
-          && changedNames.some((changedPath, index) => source.includes(changedPath) || source.includes(changedBasenames[index]))) {
+          && [...changedReferences].some((changedPath) => source.includes(changedPath))) {
           staticTests.push(path);
         }
       }
