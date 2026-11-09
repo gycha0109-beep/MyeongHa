@@ -53,3 +53,12 @@
 - 변경: 전용 Reader의 멤버십 검사에서 **오직** `role=new Reader, member=postgres, grantor=supabase_admin, inherit=false, set=false, admin=true` 조합만 허용. 그 외 멤버십·SET/INHERIT 활성은 거부. 테이블 전체 SELECT/쓰기·스키마 CREATE·5개 외 컬럼 접근 거부 및 RLS 기존 상태 유지.
 - 검증: 임시 Docker PostgreSQL 17.11을 `supabase_admin` 슈퍼유저 + 비슈퍼 `postgres` DB 소유자/CREATEROLE로 구성. 동일 관리형 자동 grant가 생성되는 환경에서 후보 SQL의 pre/postflight 및 COMMIT 성공. `postgres`의 전용 Reader SET ROLE은 PostgreSQL이 거부함. 이 검증은 Production 설치·인증 자격 증명·Saju 실호출 연계를 의미하지 않음.
 - **운영 적용 대기:** 수정 PR 일반/통합 CI 통과 및 병합 확인 뒤에만 재설치. 실제 Saju provider call과 DB attempt 결속, 별도 안전한 접속 비밀 및 사용량 커버리지 검증 전 비용 수집은 비활성/HOLD.
+
+## 2026-11-09 — A4 비용 결속 Reader 운영 설치 완료 (Owner 승인)
+
+- Owner 승인: A4 운영 DB 전용 읽기 계정 설치 및 사주 호출·Reading 실행 결속 구현. 비용 수집은 필수 CI/실제 출처 검증 후 활성화. 고객·결제·크레딧 변경 금지.
+- 병합/필수 Integration SUCCESS: [PR #3176](https://github.com/gycha0109-beep/MyeongHa/pull/3176), merge `273764b70714492c9fa5ab5fdb1800c4645711ff`, [Integration #42576488537](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42576488537).
+- 운영 Supabase project `cnsfpcdiyofqvhpcegfc`에 `admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109` SQL migration **성공**. 적용된 정본: `apps/admin/database/reading-ai-cost-binding-reader-rls-off-v1.sql` (해시 Git Blob `c1869f9101f5557939051e046ece6fadb5554264`).
+- 읽기 역할 `myeongha_reading_ai_cost_binding_reader_v1` 생성 확인: LOGIN, NOINHERIT, NOSUPERUSER, NOBYPASSRLS. 필요한 `id/reading_id/subject_id/external_request_ref/state` 5개 열 SELECT만 허용. `started_at` SELECT, INSERT/UPDATE, 스키마 CREATE 모두 거부. `postgres`의 SET ROLE/권한 상속 불허, `supabase_admin` 부여의 ADMIN-only·SET=false·INHERIT=false 멤버십 1건 확인.
+- 운영 원본 `public.reading_execution_attempts` RLS=false 유지, 새 Reader policy=0, `anon/authenticated` 직접 테이블 권한=0. 실제 비밀번호는 설정하지 않았고, 별도 서비스 접속/바인딩도 하지 않았음.
+- **미완료/HOLD:** 인증된 Production Saju 출처에서 실발급 provider-call requestId/callId와 preallocated DB attempt/ref를 결속하고, source 증거를 보존·서명/검증하며 실제 비용 Writer까지 연결해야 함. 비용 수집 OFF, 전체 비용/KRW/청구 일치 주장 금지. Reader 역할 설치만으로 비용 원장이 활성화되거나 사용량이 채워지지 않음.
