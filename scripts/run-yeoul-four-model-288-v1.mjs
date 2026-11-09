@@ -106,12 +106,26 @@ async function callModel({ spec, repeat, model, variant }) {
   };
   const t0 = performance.now();
   attempted++;
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST', redirect: 'error',
-    headers: { authorization: 'Bearer ' + KEY, 'content-type': 'application/json', accept: 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(60000),
-  });
+  let response;
+  // A 429 does not confirm billable generation. Retry the same case in place
+  // with bounded waits, retaining the original spend and call ceilings.
+  for (let retry = 0; retry <= 6; retry++) {
+    response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST', redirect: 'error',
+      headers: { authorization: 'Bearer ' + KEY, 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (response.ok || response.status !== 429 || retry === 6) break;
+    const retryAfter = Number(response.headers.get('retry-after'));
+    const waitMs = Math.min(60000, Math.max(
+      [5000, 10000, 20000, 30000, 45000, 60000][retry],
+      Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : 0,
+    ));
+    await response.body?.cancel().catch(() => undefined);
+    console.log(JSON.stringify({ event: 'RATE_LIMIT_RETRY', id: spec.id, model, variant, repeat, retry: retry + 1, waitMs }));
+    await new Promise(resolve => setTimeout(resolve, waitMs));
+  }
   if (!response.ok) {
     await response.body?.cancel().catch(() => undefined);
     throw new Error('LANGUAGE_AB_HTTP_' + response.status + '_' + model.replaceAll(/[^a-z0-9]+/giu, '_').toUpperCase());
