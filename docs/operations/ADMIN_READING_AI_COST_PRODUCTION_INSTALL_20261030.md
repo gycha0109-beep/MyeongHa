@@ -38,3 +38,10 @@
 - 최소권한: `id`, `reading_id`, `subject_id`, `external_request_ref`, `state` 열에 대한 SELECT와 명시적 조회 정책만 허용. 전역 동일 요청 참조 카운트를 위해 제한 없는 SELECT 가시성을 요구. 수정을 위한 권한·테이블 전체 SELECT·스키마 CREATE·멤버십·BYPASSRLS 없음. `LOGIN`이지만 비밀번호는 **NULL**이며 별도 Owner 승인 없이는 운영 연결 불가. 실제 보안 자격증명, Cloudflare 바인딩, 사용자/결제 원장은 건드리지 않음.
 - **독립 검증:** Docker `postgres:17.11`의 새 임시 DB에 최소 Reading 시도 테이블과 RLS, 기존 비용 Writer 역할만 생성한 다음 후보 SQL을 실행해 BEGIN→preflight→ROLE→GRANT→POLICY→postflight→COMMIT 성공. 임의 데이터로 동일 external ref 2행과 유일 ref 1행이 조회되고, 허용하지 않은 `started_at` 읽기 및 UPDATE가 각각 PostgreSQL 권한 거부되는 것 확인. 역할에 비밀번호·멤버십이 없는 것 확인. 임시 Docker DB는 작업 종료 즉시 중지·삭제. 실제 운영 데이터·테이블에 합성 기록 삽입하지 않음.
 - **운영 수용 HOLD:** 본 테스트는 Production 적용·실제 Saju 요청 매핑·실제 연결 성공의 근거가 아니다. 실제 Production Reader 역할/비밀번호/전송 경로/Source 권위의 요청→시도 매핑과 사용량 보존/실패 재처리/청구 대조는 별도 승인·검증 전까지 미활성. `ROADMAP_COMPLETE` 미충족.
+
+## 2026-11-09 — Owner 승인 후 Production RLS 상태 사전 점검 및 별도 설치 후보
+
+- Owner가 A4 전용 읽기 계정 설치, 실제 호출-Reading 실행 결속 구현, 필수 CI/검증 통과 후 비용 수집 활성화를 승인함. 기존 회원·결제·크레딧 데이터 변경은 금지.
+- 운영 DB SELECT-only 확인: `public.reading_execution_attempts.relrowsecurity=false`, `relforcerowsecurity=false`, 기존 A4 Writer 존재, A4 binding reader 부재, `external_request_ref` 비NULL 0행. 앞선 `reading-ai-cost-binding-reader-offline-v1.sql`은 RLS=true를 요구하므로 운영에 적용하지 않음.
+- 실제 운영 상태에 맞춘 **별도** `apps/admin/database/reading-ai-cost-binding-reader-rls-off-v1.sql` 후보를 작성. 기존 테이블 RLS 모드를 변경하지 않고, 독립 비상속·비밀번호 없는 계정에 5개 열 SELECT만 부여하며 정책은 생성하지 않음. 기존 A4 Reader/Writer의 권한은 변경하지 않음. 비밀키·연결 바인딩·실수집은 아직 없음.
+- 임시 Docker PostgreSQL 17.11에서 RLS-off 테이블, 기존 Writer 역할을 구성해 신규 후보 설치/읽기 성공을 확인하고 컨테이너 삭제. **운영 DB 설치는 CI 및 별도 적용 검증 전까지 미실행**. 실제 Saju 호출에서 DB 시도로 이어지는 Source Authority 증명과 공급사 비용 대조는 여전히 미완료.
