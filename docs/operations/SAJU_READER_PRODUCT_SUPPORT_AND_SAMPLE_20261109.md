@@ -94,9 +94,9 @@ This draft is a single-pass paraphrase of the returned Preview meanings. It adds
 
 ## Existing implementation handoff
 
-## Four approved single-product Reader Preview drafts
+## Four single-product Preview samples — paid-quality gate failed
 
-On 2026-11-09, the current Saju Preview-only HTTP route returned a separate delivered Preview for each supported single intent using the same synthetic input (`1992-07-14 15:20`, solar, sex unspecified). Each response was HTTP 200 with lifecycle `preview`, response version `myeonghwa-product-reading-response-v2`, and chart pillars 壬申 / 丁未 / 辛卯 / 丙申; calculation state was `partially_ambiguous`. The following are single-pass Reader paraphrases of those returned meanings, not Production readings:
+On 2026-11-09, the current Saju Preview-only HTTP route returned a separate delivered Preview for each supported single intent using the same synthetic input (`1992-07-14 15:20`, solar, sex unspecified). Each response was HTTP 200 with lifecycle `preview`, response version `myeonghwa-product-reading-response-v2`, and chart pillars 壬申 / 丁未 / 辛卯 / 丙申; calculation state was `partially_ambiguous`. The following single-pass paraphrases are internal evaluation material, not satisfactory paid Reader readings:
 
 **직업·커리어운 — approved KRW 9,900**
 
@@ -122,7 +122,7 @@ On 2026-11-09, the current Saju Preview-only HTTP route returned a separate deli
 >
 > 대화로 상대의 생각과 맥락을 이해하고 신뢰를 확인할 시간이 있어야 편할 수 있습니다. 생각과 감정을 말이나 행동으로 표현하고 반응을 주고받을 통로가 중요합니다. 가까울수록 약속과 책임, 실제로 서로 나누는 시간과 노력이 신뢰의 기준이 되기 쉽습니다. 내가 원하는 방식과 함께 써야 하는 시간·돈·에너지가 부딪힐 때, 또는 빨리 해결하고 싶은 마음과 먼저 충분히 이해하고 싶은 마음이 엇갈릴 때는 각자 결정할 일과 함께 정할 일, 이해할 시간과 결정할 시간을 구분해 볼 수 있겠습니다. 이 응답은 관계 변화의 시기나 상대방의 성격·결과를 말하지 않습니다.
 
-These four Preview responses did not return a validated link from each sentence to its specific pillar or other chart evidence, nor explain `partially_ambiguous`. Therefore these drafts demonstrate a real calculation and a Reader delivery treatment, but they do not pass the required Saju grounding-quality gate or constitute finished customer products. The complete user-facing sample is kept in the Outputs folder as `four-single-saju-reader-preview-samples-20261109.md`.
+**Paid product quality: FAIL for all four at KRW 9,900.** These Preview responses did not return a validated link from each sentence to its specific pillar or other chart evidence, nor explain `partially_ambiguous`. The text is short, generic advice; it does not show the chart-specific judgment, conditions, natal strengths and limits, auspicious/inauspicious reasoning, concrete life manifestations, or supported timing flow that would justify the approved price. Avoiding unsupported predictions is necessary, but does not make this a valuable paid reading. These samples prove the route can return a real calculation Preview; they do not establish a complete Reader experience or a finished product. The customer-facing evaluation copy is explicitly marked FAIL in `four-single-saju-reader-preview-samples-20261109.md` in the Outputs folder.
 
 The intended existing flow is:
 
