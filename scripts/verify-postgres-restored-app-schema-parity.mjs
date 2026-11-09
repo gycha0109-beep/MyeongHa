@@ -44,6 +44,7 @@ assert.deepEqual(matched.observedApplicationDirectRoleGraph, {
   sourceWitnessAvailable: false,
   observedMembershipOptionsParity: false,
   observedGrantorAttributionParity: false,
+  observedPortableGrantorRewriteCompatibility: null,
   scope: 'myeongha_to_myeongha_direct_membership_only_v1',
   providerBoundaryMembershipsIncluded: false, details: null,
 });
@@ -85,12 +86,15 @@ const sameGraph = observeApplicationDirectRoleGraph(sourceGraph, roleGraphSame);
 assert.equal(sameGraph.sourceWitnessAvailable, true);
 assert.equal(sameGraph.observedMembershipOptionsParity, true);
 assert.equal(sameGraph.observedGrantorAttributionParity, true);
+assert.equal(sameGraph.observedPortableGrantorRewriteCompatibility, null);
 assert.deepEqual(sameGraph.details, {
   sourceRoleCount: 2, restoredRoleCount: 2,
   sourceDirectMembershipCount: 1, restoredDirectMembershipCount: 1,
   missingRoleCount: 0, addedRoleCount: 0, roleAttributesDifferentCount: 0,
   missingMembershipEntryCount: 0, addedMembershipEntryCount: 0,
   grantorAttributionDifferenceGroupCount: 0,
+  portablePostgresGrantorRewriteCompatibleGroupCount: 0,
+  unexplainedGrantorAttributionDifferenceGroupCount: 0,
 });
 const providerGrantorChanged = structuredClone(sourceGraph);
 providerGrantorChanged.applicationRoleGraph.directMemberships[0].grantor_name =
@@ -100,6 +104,39 @@ const grantorChanged = observeApplicationDirectRoleGraph(
 assert.equal(grantorChanged.observedMembershipOptionsParity, true);
 assert.equal(grantorChanged.observedGrantorAttributionParity, false);
 assert.equal(grantorChanged.details.grantorAttributionDifferenceGroupCount, 1);
+assert.equal(grantorChanged.observedPortableGrantorRewriteCompatibility, true);
+assert.equal(grantorChanged.details.portablePostgresGrantorRewriteCompatibleGroupCount, 1);
+assert.equal(grantorChanged.details.unexplainedGrantorAttributionDifferenceGroupCount, 0);
+const unrelatedGrantor = structuredClone(providerGrantorChanged);
+unrelatedGrantor.applicationRoleGraph.directMemberships[0].grantor_name = 'unknown_grantor';
+const unrelatedResult = observeApplicationDirectRoleGraph(sourceGraph, unrelatedGrantor);
+assert.equal(unrelatedResult.observedMembershipOptionsParity, true);
+assert.equal(unrelatedResult.observedGrantorAttributionParity, false);
+assert.equal(unrelatedResult.observedPortableGrantorRewriteCompatibility, false);
+assert.equal(unrelatedResult.details.portablePostgresGrantorRewriteCompatibleGroupCount, 0);
+assert.equal(unrelatedResult.details.unexplainedGrantorAttributionDifferenceGroupCount, 1);
+const otherSourceGrantor = structuredClone(sourceGraph);
+otherSourceGrantor.applicationRoleGraph.directMemberships[0].grantor_name =
+  'other_provider';
+assert.equal(observeApplicationDirectRoleGraph(otherSourceGrantor,
+  providerGrantorChanged).observedPortableGrantorRewriteCompatibility, false);
+const twoEdgeSource = structuredClone(sourceGraph);
+twoEdgeSource.applicationRoleGraph.directMemberships.push({
+  granted_role: 'myeongha_role_b', member_role: 'myeongha_role_a',
+  grantor_name: 'other_provider', admin_option: false,
+  inherit_option: true, set_option: false,
+});
+const twoEdgeRestored = structuredClone(twoEdgeSource);
+twoEdgeRestored.applicationRoleGraph.directMemberships[0].grantor_name =
+  'supabase_admin';
+twoEdgeRestored.applicationRoleGraph.directMemberships[1].grantor_name =
+  'supabase_admin';
+const mixedProvenance = observeApplicationDirectRoleGraph(twoEdgeSource,
+  twoEdgeRestored);
+assert.equal(mixedProvenance.details.grantorAttributionDifferenceGroupCount, 2);
+assert.equal(mixedProvenance.details.portablePostgresGrantorRewriteCompatibleGroupCount, 1);
+assert.equal(mixedProvenance.details.unexplainedGrantorAttributionDifferenceGroupCount, 1);
+assert.equal(mixedProvenance.observedPortableGrantorRewriteCompatibility, false);
 const optionsChanged = structuredClone(sourceGraph);
 optionsChanged.applicationRoleGraph.directMemberships[0].set_option = true;
 const optionsResult = observeApplicationDirectRoleGraph(sourceGraph, optionsChanged);
@@ -173,6 +210,18 @@ assert.equal(scopedDrift.observedApplicationDirectRoleGraph.observedMembershipOp
   false);
 assert.equal(scopedDrift.roleMembershipParityProven, false);
 assert.equal(scopedDrift.serviceResumptionAllowed, false);
+const rewrittenScopedRestored = {
+  ...structuredClone(restored), ...providerGrantorChanged,
+};
+const rewrittenScope = compareApplicationCatalog(scopedSource,
+  rewrittenScopedRestored, frontier);
+assert.equal(rewrittenScope.observedApplicationDirectRoleGraph
+  .observedPortableGrantorRewriteCompatibility, true);
+assert.equal(rewrittenScope.observedApplicationDirectRoleGraph
+  .observedGrantorAttributionParity, false);
+assert.equal(rewrittenScope.roleMembershipParityProven, false);
+assert.equal(rewrittenScope.drReady, false);
+assert.equal(rewrittenScope.serviceResumptionAllowed, false);
 
 
 for (const mutation of [
