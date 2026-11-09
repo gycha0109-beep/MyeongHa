@@ -62,3 +62,10 @@
 - 읽기 역할 `myeongha_reading_ai_cost_binding_reader_v1` 생성 확인: LOGIN, NOINHERIT, NOSUPERUSER, NOBYPASSRLS. 필요한 `id/reading_id/subject_id/external_request_ref/state` 5개 열 SELECT만 허용. `started_at` SELECT, INSERT/UPDATE, 스키마 CREATE 모두 거부. `postgres`의 SET ROLE/권한 상속 불허, `supabase_admin` 부여의 ADMIN-only·SET=false·INHERIT=false 멤버십 1건 확인.
 - 운영 원본 `public.reading_execution_attempts` RLS=false 유지, 새 Reader policy=0, `anon/authenticated` 직접 테이블 권한=0. 실제 비밀번호는 설정하지 않았고, 별도 서비스 접속/바인딩도 하지 않았음.
 - **미완료/HOLD:** 인증된 Production Saju 출처에서 실발급 provider-call requestId/callId와 preallocated DB attempt/ref를 결속하고, source 증거를 보존·서명/검증하며 실제 비용 Writer까지 연결해야 함. 비용 수집 OFF, 전체 비용/KRW/청구 일치 주장 금지. Reader 역할 설치만으로 비용 원장이 활성화되거나 사용량이 채워지지 않음.
+
+## 2026-11-09 — A4 실제 Saju Provider-call 출처 서명 검증 후보 (운영 미연결)
+
+- `apps/api/src/reading-ai-saju-signed-call-source-v1.ts`: 실제 Saju 서버가 발급한 `saju-provider-call-source-proof-v1` HMAC 증명을 수신하여, 신뢰된 발급자/대상/키 ID/호출 ID/시각/모델/정확한 토큰/시도 UUID/`externalRequestRef`가 서명과 일치하는 경우에만 MyeongHa 비용 귀속 엔진의 `SajuProviderCallSourceAuthorityV1` 포트에 검증 결과 제공.
+- 원본 호출 증명은 **출처 서버가 자체 불변 저장소에 보관하고** 비용 관리 서버가 서버 전용 조회 포트로 읽어야 함. 사용자·브라우저 자료를 출처 증명으로 승인하지 않음. 조회 실패·서명 불일치·미확인 연결 시 `null` 반환.
+- 실제 과금 기록은 여전히 독립 DB 실행 시도 검증 `reading-ai-saju-attempt-db-verifier-v1.ts`의 일치 결과가 추가로 필요함. 현재 소스 증명 영속 저장소·연결 자격증명·운영 발급 경로·Writer 호출은 미구현. 비용 수집 OFF.
+- 독립 테스트 4건과 대상 소스 strict TypeScript 검사 통과. 새로운 운영 DB/비밀번호/API/프로필/크레딧 변경 없음. `ROADMAP_COMPLETE` 미충족.
