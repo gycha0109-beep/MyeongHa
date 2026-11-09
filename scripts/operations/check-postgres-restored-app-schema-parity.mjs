@@ -319,6 +319,44 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     !t.missing.length && !t.additional.length && !t.changed.length);
   const verifiedApplicationScopeEquivalence =
     migrationFrontierAligned && versionEqual && scopeMatched;
+
+  // Never erase original legacy hash differences. When a source catalog
+  // sealed during this backup execution has ALL canonical facets, we can
+  // *separately* report observed equality of app DDL + direct ACL entries
+  // and grantor attribution, without claiming the pg_dump MVCC snapshot,
+  // inherited effective permissions, provider ledger, or recovered serving.
+  const canonicalAclCoverageComplete =
+    sourceWitness.provenance === 'encrypted_backup_bracketed_readonly_v1' &&
+    Object.values(componentHashEvidence).every(Boolean);
+  const canonicalAclLegacyHashOnlyByKind = {};
+  const canonicalAclUnresolvedByKind = {};
+  for (const [kind, evidence] of Object.entries(byType)) {
+    const isSafeLegacyHashDifference = row =>
+      row.aclGranteePrivilegeVerdict ===
+        'MATCH_DIRECT_GRANTEE_PRIVILEGES_ACL_HASH_DIFFERS' &&
+      row.aclCanonicalGrantorVerdict ===
+        'MATCH_CANONICAL_GRANTOR_ENTRIES_LEGACY_ACL_HASH_DIFFERS' &&
+      Array.isArray(row.aclAffectedGrantees) &&
+      row.aclAffectedGrantees.length === 0 &&
+      Array.isArray(row.aclCanonicalGrantorChangedGrantees) &&
+      row.aclCanonicalGrantorChangedGrantees.length === 0 &&
+      (kind === 'tables'
+        ? row.differingFields.length === 1 &&
+          row.differingFields[0] === 'structural_sha256' &&
+          row.structuralComponentDifferences?.length === 1 &&
+          row.structuralComponentDifferences[0] === 'acl'
+        : row.differingFields.length === 1 &&
+          row.differingFields[0] === 'acl_sha256');
+    const ignorable = canonicalAclCoverageComplete
+      ? evidence.changed.filter(isSafeLegacyHashDifference).length
+      : 0;
+    canonicalAclLegacyHashOnlyByKind[kind] = ignorable;
+    canonicalAclUnresolvedByKind[kind] = evidence.changed.length - ignorable +
+      evidence.missing.length + evidence.additional.length;
+  }
+  const observedCanonicalApplicationCatalogParity =
+    canonicalAclCoverageComplete && migrationFrontierAligned && versionEqual &&
+    Object.values(canonicalAclUnresolvedByKind).every(count => count === 0);
   return {
     schemaVersion: 'ops-postgres-restored-app-catalog-comparison-v1',
     sourceObservationDateKst: source.observedKstDate,
@@ -342,6 +380,17 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     // disclosing raw definitions, grantors, row payloads or credentials.
     // Old sealed/legacy catalogs have no such evidence: never infer a cause.
     componentHashEvidence,
+    // A diagnostic observation, NOT a migration/DR/provider acceptance gate.
+    // The original applicationScopeVerdict below remains fail-closed on any
+    // legacy hash mismatch; this evidence does not waive it.
+    observedCanonicalAclCatalog: {
+      witnessComplete: canonicalAclCoverageComplete,
+      observedApplicationCatalogParity: observedCanonicalApplicationCatalogParity,
+      legacyHashOnlyByKind: canonicalAclCoverageComplete
+        ? canonicalAclLegacyHashOnlyByKind : null,
+      unresolvedByKind: canonicalAclCoverageComplete
+        ? canonicalAclUnresolvedByKind : null,
+    },
     types: byType,
     applicationScopeVerdict: !migrationFrontierAligned
       ? 'HOLD_SOURCE_BACKUP_FRONTIER_MISMATCH'
