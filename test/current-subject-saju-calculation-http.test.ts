@@ -12,6 +12,7 @@ import type {
 } from '../apps/api/src/postgres-subject-execution.js';
 import type { SajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
 import { readBoundSajuComparisonBirthsV1 } from '../apps/api/src/saju-bound-comparison-births-v1.js';
+import { executeSajuComparisonPreviewV1 } from '../apps/api/src/saju-comparison-preview-execution-v1.js';
 
 const SUBJECT_ID = '11111111-1111-4111-8111-111111111111';
 const AUTH_USER_ID = '22222222-2222-4222-8222-222222222222';
@@ -170,6 +171,70 @@ describe('owner-bound comparison revisions', () => {
     await expect(readBoundSajuComparisonBirthsV1({
       ...pinned, targetPersonId: differentId, pool: createPool(),
     })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  const env = {
+    MYEONGHA_SAJU_SERVICE_ORIGIN: 'https://saju.example.test',
+    MYEONGHA_SAJU_SERVICE_BEARER: 'synthetic-service-credential',
+  };
+  const pillar = { status: 'resolved', value: '甲子' };
+  function response(overrides: Record<string, unknown> = {}) {
+    return Response.json({
+      lifecycle: 'internal_preview_only', coverage: 'calculation_facts_only',
+      generatedInterpretationClaims: false, mayPublish: false, mayPersist: false, maySell: false,
+      subjects: [
+        { role: 'self', pillars: { year: pillar, month: pillar, day: pillar, hour: pillar } },
+        { role: 'partner', pillars: { year: pillar, month: pillar, day: pillar, hour: { status: 'unavailable' } } },
+      ],
+      ...overrides,
+    }, { headers: { 'x-myeonghwa-reading-lifecycle': 'preview' } });
+  }
+
+  it('dispatches the owner-bound inputs only after exact-use authorization and rechecks it on return', async () => {
+    const events: string[] = [];
+    const fetchImpl = vi.fn(async (url: string, init: RequestInit) => {
+      expect(events.slice(-2)).toEqual(['COMMIT', 'RELEASE']);
+      expect(url).toBe('https://saju.example.test/api/preview/compatibility-charts');
+      expect(init.redirect).toBe('manual');
+      const body = JSON.parse(String(init.body));
+      expect(Object.keys(body)).toEqual(['birth', 'partnerBirth']);
+      expect(body.partnerBirth).toEqual({ calendarType: 'solar', date: '2000-03-19', time: null });
+      expect(JSON.stringify(body)).not.toContain(TARGET_ID);
+      return response();
+    });
+    const admit = vi.fn(async () => true);
+    const result = await executeSajuComparisonPreviewV1({
+      ...pinned, env, pool: createPool({ events }), fetchImpl, useAuthority: { admit },
+    });
+    expect(result).toMatchObject({ lifecycle: 'internal_preview_only', maySell: false });
+    expect(admit).toHaveBeenCalledTimes(2);
+    expect(admit).toHaveBeenNthCalledWith(1, {
+      purpose: 'saju_comparison_preview', subjectId: SUBJECT_ID, targetPersonId: TARGET_ID,
+      sourceBirthRevisionId: REVISION_ID, targetBirthRevisionId: TARGET_REVISION_ID,
+    });
+    expect(events.filter(event => event === 'BEGIN')).toHaveLength(2);
+  });
+
+  it('blocks missing authorization before dispatch and suppresses results if authorization is withdrawn', async () => {
+    const fetchImpl = vi.fn(async () => response());
+    const request = { ...pinned, env, pool: createPool(), fetchImpl };
+    await expect(executeSajuComparisonPreviewV1(request)).rejects.toMatchObject({ code: 'CAPABILITY_UNAVAILABLE' });
+    await expect(executeSajuComparisonPreviewV1({
+      ...request, useAuthority: { admit: async () => false },
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const admit = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    await expect(executeSajuComparisonPreviewV1({
+      ...request, useAuthority: { admit },
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a source response that claims to provide an interpretation', async () => {
+    await expect(executeSajuComparisonPreviewV1({
+      ...pinned, env, pool: createPool(), useAuthority: { admit: async () => true },
+      fetchImpl: async () => response({ generatedInterpretationClaims: true }),
+    })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
   });
 });
 
