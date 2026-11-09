@@ -1,3 +1,14 @@
+### 2026-11-09 KST — Phase 8-A 동일 백업 creator ACL 수정 실증: 직접 grantee 불일치 195→0, 잔여 legacy hash 29 HOLD
+
+- **ROADMAP / 실행:** Gate 1 / Phase 8-A #6. PR #3156 main 병합 c29bc25cbb3054aa55109450e7ae9c8b58b55df8, Integration #42494231293 SUCCESS. 기존 암호화 백업 #42488222531 (source 33fd5173d51f27a800e0f16dade7e814519e6377)을 재사용하여 main d89ae03f879681c3f218f20ba8019542c51c9239 격리 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42562661906 SUCCESS. 선택 S0 리허설 false, Production DB 변경 없음.
+- **실측:** 수정 전 #42489176631 대비 source/restore schema 3/3, table 94/94, function 322/322, 누락·추가 0. 직접 grantee privilege-entry 불일치 195→0 (schema 0→0, table 23→0, function 172→0). Full/structural ACL legacy 지문 불일치 214→29 (schema 2→2, table 31→8, function 181→19). 남은 29개는 모두 역할별 직접 권한 SHA 일치. 수정 효과와 부합하지만 실행 main revision도 달라졌으므로 독점적 인과 귀속 보류.
+- **증거:** restore artifact 13650101355, app-schema-parity.json SHA256 9114afcffb94675b62fcc2fb70f6145b566ba501f1c231fce6a34829d39e72fe, 집계 파일 docs/operations/POSTGRES_APP_ACL_DEFAULT_REPAIR_20261109.json SHA256 9c9e476a0fdeb13d50d1fcf5c3206b55d038430205f6e0e5657856a6c48c7d27. 실측 verdict HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH / service BLOCKED. 백업 원본 SELECT-only bracket는 공유 MVCC snapshot이 아님.
+- **남은 29개 한계:** 소스 전체 ACL 지문은 cluster-local role OID 기반 정렬. 역할별 직접 권한이 같더라도 grantor provenance와 DB-local OID ordering 차이를 구별할 수 없음. 상속/effective access 동등성은 미증명. 과거 아카이브에 없는 근거를 추정하지 않음.
+- **READ-ONLY 진단:** production-app-schema-fingerprint-readonly.sql에 table/function/schema의 grantee별 grantor-name·privilege·grantable 항목을 ROLE 이름 기준 정렬한 SHA-256 digest 추가. 원문 SQL/GRANT·개인정보·행 비공개. 기존 sealed archive·legacy hash 보존. check-postgres-restored-app-schema-parity.mjs에서는 신형 source digest가 있을 때만 실제 canonical grantor-entry 차이와 legacy 정렬 차이 가능성을 구분. 비정상/위조 digest는 fail-closed, 최종 복구 승인 차단 유지. 구형 sealed 호환/일치/변경/변조·DR 차단 Node24 검증 및 backup workflow verifier PASS. 단순 분류이며 DR 수용이나 인과 입증 아님.
+- **다음/제약:** PR HEAD 필수 CI·Integration GREEN 및 main 병합 후 다음 정기 백업과 동일 아카이브 격리 복원에서 canonical grantor 진단 실증. 기존 백업을 반복하지 않음. Provider COPY 제외/투영, Hosted Auth/Storage, migration ledger/role membership, 독립 실제 privacy replay/future-safe, RPO PT24H/RTO PT6H 및 Phase 12/13 미완료. #1887 OPEN, drReady=false, serviceResumptionAllowed=false, ROADMAP_COMPLETE 미충족. Production DDL/DML, IAM/secret/Hosted 유료 대상, canary 변경 없음.
+
+Watchtower-Track: ops
+
 ### 2026-11-08 KST — PR #3156 PG17 Integration RED, 격리 생성자 자신의 기본 권한 보호 수정
 
 - **CI 실패 근거:** PR #3156 HEAD 6ebc897eba99508d84bcac171945d1e739521886, 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42491775990 job 128766051799 (full / DB dependency · postgres17 / postgres17) FAILED. DB CI는 member-character-thread-open 1건에서 FAIL isolated restore creator default still exposed browser function EXECUTE로 실패. 다른 테스트의 의도된 permission denied 로그를 본 장애로 오인하지 않음.

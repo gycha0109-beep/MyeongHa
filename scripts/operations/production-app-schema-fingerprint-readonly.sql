@@ -144,7 +144,26 @@ tables AS (
          coalesce(t.source_acl,pg_catalog.acldefault('r',t.owner_oid))) a
        GROUP BY a.grantee
      ) g
-   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256
+   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256,
+    -- Canonical grantor-aware digest, ordered by role name (not DB-local OID).
+    -- Kept alongside the legacy hash; no raw GRANT tuple leaves the encrypted archive.
+    coalesce((
+      SELECT pg_catalog.jsonb_object_agg(g.grantee_name,g.grantor_privileges_sha256)
+      FROM LATERAL (
+        SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC'
+                    ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee_name,
+          pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+            pg_catalog.string_agg(
+              pg_catalog.pg_get_userbyid(a.grantor)||':'||
+              a.privilege_type||':'||a.is_grantable::text,E'\n'
+              ORDER BY pg_catalog.pg_get_userbyid(a.grantor),
+                       a.privilege_type,a.is_grantable
+            ),'UTF8')),'hex') AS grantor_privileges_sha256
+        FROM pg_catalog.aclexplode(
+          coalesce(t.source_acl,pg_catalog.acldefault('r',t.owner_oid))) a
+        GROUP BY a.grantee
+      ) g
+    ),'{}'::jsonb) AS acl_by_grantee_grantor_privilege_sha256
  FROM table_catalog t
 ),
 functions AS (
@@ -191,7 +210,26 @@ functions AS (
          coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
        GROUP BY a.grantee
      ) g
-   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256
+   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256,
+    -- Canonical grantor-aware digest, ordered by role name (not DB-local OID).
+    -- Kept alongside the legacy hash; no raw GRANT tuple leaves the encrypted archive.
+    coalesce((
+      SELECT pg_catalog.jsonb_object_agg(g.grantee_name,g.grantor_privileges_sha256)
+      FROM LATERAL (
+        SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC'
+                    ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee_name,
+          pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+            pg_catalog.string_agg(
+              pg_catalog.pg_get_userbyid(a.grantor)||':'||
+              a.privilege_type||':'||a.is_grantable::text,E'\n'
+              ORDER BY pg_catalog.pg_get_userbyid(a.grantor),
+                       a.privilege_type,a.is_grantable
+            ),'UTF8')),'hex') AS grantor_privileges_sha256
+        FROM pg_catalog.aclexplode(
+          coalesce(p.proacl,pg_catalog.acldefault('f',p.proowner))) a
+        GROUP BY a.grantee
+      ) g
+    ),'{}'::jsonb) AS acl_by_grantee_grantor_privilege_sha256
  FROM pg_catalog.pg_proc p
  JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
@@ -229,7 +267,26 @@ schema_metadata AS (
          coalesce(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
        GROUP BY a.grantee
      ) g
-   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256
+   ),'{}'::jsonb) AS acl_by_grantee_privilege_sha256,
+    -- Canonical grantor-aware digest, ordered by role name (not DB-local OID).
+    -- Kept alongside the legacy hash; no raw GRANT tuple leaves the encrypted archive.
+    coalesce((
+      SELECT pg_catalog.jsonb_object_agg(g.grantee_name,g.grantor_privileges_sha256)
+      FROM LATERAL (
+        SELECT CASE WHEN a.grantee=0 THEN 'PUBLIC'
+                    ELSE pg_catalog.pg_get_userbyid(a.grantee) END AS grantee_name,
+          pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+            pg_catalog.string_agg(
+              pg_catalog.pg_get_userbyid(a.grantor)||':'||
+              a.privilege_type||':'||a.is_grantable::text,E'\n'
+              ORDER BY pg_catalog.pg_get_userbyid(a.grantor),
+                       a.privilege_type,a.is_grantable
+            ),'UTF8')),'hex') AS grantor_privileges_sha256
+        FROM pg_catalog.aclexplode(
+          coalesce(n.nspacl,pg_catalog.acldefault('n',n.nspowner))) a
+        GROUP BY a.grantee
+      ) g
+    ),'{}'::jsonb) AS acl_by_grantee_grantor_privilege_sha256
  FROM pg_catalog.pg_namespace n
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
 )
