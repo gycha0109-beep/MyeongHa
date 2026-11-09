@@ -12,6 +12,8 @@ export const RECORDED_READER_S7_CLAIM_EVIDENCE_V1=Object.freeze({
  * The original verified Receipt, paid purchase Grant and S5 body must be
  * joined again by the DB. No client-supplied body or Grant is trusted.
  * Retained S7 journal data is independently transport-only evidence.
+ * A revoked receipt contributes only when its exact original full cancellation
+ * remains the current source of revocation for the purchase grant.
  */
 export const RECORDED_READER_S7_EXACT_PURCHASE_SQL_V1=`
 select
@@ -73,9 +75,6 @@ left join public.official_reader_paid_delivery_attempts_v1 d
 where pi.id=$1::uuid and pi.subject_id=$2::uuid
  and presentation.unit_id=$3::uuid
  and pi.status='verified' and pi.expected_amount_minor>0
- -- The retained S7 journal is historical; a revoked Receipt may contribute
- -- evidence only if the exact original verified full-cancel remains the
- -- CURRENT revoked state of this purchase Grant. Mere past events deny.
  and (
    receipt.verification_status='verified'
    or (
@@ -101,9 +100,6 @@ where pi.id=$1::uuid and pi.subject_id=$2::uuid
            and cancelled.event_type='Transaction.Cancelled'
            and cancelled.provider_occurred_at is not null
            and cancelled.provider_occurred_at<=pg_catalog.clock_timestamp()
-           -- The original verified FULL cancellation must be the CURRENT
-           -- source of this Grant's revoked status, not merely one historic
-           -- provider event for this Receipt.
            and grant_row.last_effective_at=revoked.effective_at
            and grant_row.last_provider_ordering_key is not distinct from
                revoked.provider_ordering_key
