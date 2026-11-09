@@ -389,10 +389,10 @@ html[data-theme="dark"] .my-settings-section::before { opacity: .07; }
   html[data-theme="dark"] .my-memory-section::before { background: linear-gradient(90deg, rgba(20, 28, 33, .96), rgba(20, 28, 33, .75) 63%, transparent); }
   .my-memory-copy { padding: 23px; }
   .my-memory-copy h2 { font-size: 23px; }
-  .my-memory-copy p { max-width: 320px; font-size: 13px; }
-  .my-primary-action { font-size: 13px; padding: 9px 18px; }
+  .my-memory-copy p { max-width: 320px; font-size: 15px; }
+  .my-primary-action { font-size: 15px; padding: 10px 18px; min-height: 50px; }
   .my-section-card { padding: 18px; }
-  .my-section-heading h2 { font-size: 21px; }
+  .my-section-heading h2 { font-size: 25px; }
   .my-section-heading p { font-size: 14px; }
   .my-settings-grid { grid-template-columns: 1fr; }
   .my-choice-card { min-height: 69px; }
@@ -403,7 +403,7 @@ html[data-theme="dark"] .my-settings-section::before { opacity: .07; }
   .my-hero { min-height: 153px; }
   .my-hero-inner { padding-top: 27px; }
   .my-kicker { font-size: 10px; }
-  .my-title { font-size: 35px; margin: 4px 0 5px; }
+  .my-title { font-size: 39px; margin: 4px 0 5px; }
   .my-lead { font-size: 15px; }
   .my-memory-section { min-height: 190px; }
   .my-memory-copy { padding: 20px; }
