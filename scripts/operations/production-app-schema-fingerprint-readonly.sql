@@ -289,6 +289,33 @@ schema_metadata AS (
     ),'{}'::jsonb) AS acl_by_grantee_grantor_privilege_sha256
  FROM pg_catalog.pg_namespace n
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
+),
+-- Read-only direct application role graph. Provider-owned cross-boundary
+-- memberships are explicitly OUTSIDE scope and cannot be inferred from it.
+-- Preserve grantor provenance as metadata, not as an ACL repair directive.
+application_roles AS (
+ SELECT r.rolname::text AS role_name,
+   r.rolsuper AS superuser,
+   r.rolinherit AS inherit,
+   r.rolcreaterole AS create_role,
+   r.rolcreatedb AS create_database,
+   r.rolcanlogin AS can_login,
+   r.rolreplication AS replication,
+   r.rolbypassrls AS bypass_rls,
+   r.rolconnlimit AS connection_limit
+ FROM pg_catalog.pg_roles r
+ WHERE r.rolname::text ~ '^myeongha_[a-z0-9_]+$'
+),
+application_memberships AS (
+ SELECT granted.rolname::text AS granted_role,
+   member.rolname::text AS member_role,
+   pg_catalog.pg_get_userbyid(edge.grantor) AS grantor_name,
+   edge.admin_option, edge.inherit_option, edge.set_option
+ FROM pg_catalog.pg_auth_members edge
+ JOIN pg_catalog.pg_roles granted ON granted.oid=edge.roleid
+ JOIN pg_catalog.pg_roles member ON member.oid=edge.member
+ WHERE granted.rolname::text ~ '^myeongha_[a-z0-9_]+$'
+   AND member.rolname::text ~ '^myeongha_[a-z0-9_]+$'
 )
 SELECT pg_catalog.jsonb_build_object(
  'schemaVersion','ops-postgres-application-schema-fingerprint-v1',
@@ -297,6 +324,15 @@ SELECT pg_catalog.jsonb_build_object(
  'migrationCatalog',pg_catalog.jsonb_build_object(
    'totalVersions',(SELECT count(*) FROM supabase_migrations.schema_migrations),
    'latestVersion',(SELECT max(version) FROM supabase_migrations.schema_migrations)
+ ),
+ 'applicationRoleGraph',pg_catalog.jsonb_build_object(
+   'scope','myeongha_to_myeongha_direct_membership_only_v1',
+   'providerBoundaryMembershipsIncluded',false,
+   'roles',(SELECT coalesce(pg_catalog.jsonb_agg(to_jsonb(r)
+     ORDER BY r.role_name),'[]'::jsonb) FROM application_roles r),
+   'directMemberships',(SELECT coalesce(pg_catalog.jsonb_agg(to_jsonb(m)
+     ORDER BY m.granted_role,m.member_role,m.grantor_name),'[]'::jsonb)
+     FROM application_memberships m)
  ),
  'schemaCount',(SELECT count(*) FROM schema_metadata),
  'tableCount',(SELECT count(*) FROM tables),
