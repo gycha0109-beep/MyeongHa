@@ -1,6 +1,6 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
-import { APPROVED_SAJU_CATALOG_GROUPS_V1, APPROVED_SAJU_CATALOG_V1 } from './approved-saju-catalog.js';
+import { APPROVED_SAJU_CATALOG_GROUPS_V1, APPROVED_SAJU_CATALOG_V1, getApprovedSajuOfferV1 } from './approved-saju-catalog.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
 const hrefByOfferId: Readonly<Record<string, string>> = Object.freeze({
@@ -179,7 +179,7 @@ export function ReadingPage() {
                     <article className="saju-design-product-card" key={offer.id}>
                       <header><span className="saju-design-topic-symbol" aria-hidden="true">{symbolByOfferId[offer.id] ?? (offer.type === 'comparison' ? '合' : '命')}</span><h3>{offer.title}</h3></header>
                       <p className="saju-design-product-price">{offer.priceKrw.toLocaleString('ko-KR')}원</p>
-                      {offer.includes && <p className="saju-design-product-scope">구성: {offer.includes.join(' + ')}</p>}
+                      {offer.includes && <p className="saju-design-product-scope">구성: {offer.includes.map((id) => getApprovedSajuOfferV1(id)?.title).join(' + ')}</p>}
                       {availability?.kind === 'preview'
                         ? <><span className={`reading-topic-availability is-${availability.kind}`}>개인 명식 프리뷰</span><a href={href}>명식 확인하기</a></>
                         : <><span className="reading-topic-availability is-unavailable">정식 풀이 연결 준비 중</span><p className="saju-design-product-scope">공식 풀이와 구매한 상품의 전달 경로를 연결 중입니다.</p></>}

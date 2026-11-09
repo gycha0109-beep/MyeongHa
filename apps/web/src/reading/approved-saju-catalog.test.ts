@@ -13,8 +13,8 @@ describe('approved Saju catalog', () => {
 
   it('keeps package contents tied to the approved component readings', () => {
     expect(APPROVED_SAJU_CATALOG_V1.find(({ id }) => id === 'career-economy')?.includes)
-      .toEqual(['직업·커리어운', '사업운', '재물운']);
+      .toEqual(['career', 'business', 'wealth']);
     expect(APPROVED_SAJU_CATALOG_V1.find(({ id }) => id === 'basic')?.includes)
-      .toEqual(['직업·커리어운', '사업운', '재물운', '나의 인연·관계운']);
+      .toEqual(['career', 'business', 'wealth', 'relationship']);
   });
 });

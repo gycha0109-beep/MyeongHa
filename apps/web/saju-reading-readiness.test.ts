@@ -5,7 +5,7 @@ import { RECORDS_HUB_STATIC_UI_COPY_V1 } from './ui-records-hub-copy.js';
 const html = [
   readFileSync(new URL('./reading.html', import.meta.url), 'utf8'),
   readFileSync(new URL('./src/reading/ReadingPage.tsx', import.meta.url), 'utf8'),
-  readFileSync(new URL('./src/reading/approved-saju-catalog.ts', import.meta.url), 'utf8'),
+  readFileSync(new URL('../../packages/contracts/src/approved-saju-catalog.ts', import.meta.url), 'utf8'),
 ].join('\n');
 
 describe('Saju hub target product discovery', () => {
