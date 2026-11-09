@@ -103,6 +103,36 @@ for (const fragment of requiredWorkflowFragments) {
   }
 }
 
+// The source PostgreSQL 17 role graph is captured by read-only SQL, but the
+// governed backup reprojects its JSON before encrypting it. Dropping the new
+// field in that allowlist silently defeats the direct-membership comparison.
+const roleGraphScopeFragment =
+  'and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"';
+if (runner.split(roleGraphScopeFragment).length !== 3) {
+  throw new Error('Both pre-dump and post-dump source catalog checks must require applicationRoleGraph.');
+}
+for (const fragment of [
+  'and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false',
+  'and (.applicationRoleGraph.roles | type) == "array"',
+  'and (.applicationRoleGraph.roles | length) > 0',
+  'and (.applicationRoleGraph.directMemberships | type) == "array"',
+  'schemas, tables, functions, applicationRoleGraph,',
+  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed application role graph.',
+]) {
+  if (!runner.includes(fragment)) {
+    throw new Error('Encrypted application role graph preservation failed: ' + fragment);
+  }
+}
+const projectedRoleGraph = runner.indexOf('schemas, tables, functions, applicationRoleGraph,');
+const checkedRoleGraph = runner.indexOf(
+  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed application role graph.');
+const catalogChecksum = runner.indexOf(
+  'source_catalog_sha256="$(sha256sum "$backup_dir/source-app-catalog.json"');
+if (!(projectedRoleGraph >= 0 && checkedRoleGraph > projectedRoleGraph &&
+  catalogChecksum > checkedRoleGraph)) {
+  throw new Error('Role graph must be sealed and checked before computing encrypted backup digest.');
+}
+
 const forbiddenWorkflowFragments = [
   'SUPABASE_ACCESS_TOKEN',
   'api.supabase.com',

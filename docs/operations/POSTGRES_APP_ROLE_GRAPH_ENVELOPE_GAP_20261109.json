@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "ops-sealed-application-role-graph-envelope-gap-v1",
+  "backupRunId": 42581252206,
+  "backupRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42581252206",
+  "encryptedBackupArtifactId": 13657162890,
+  "backupSourceSha": "bc14b552ced4d6e9082df7505ac02c13835584a8",
+  "backupMigrationFrontier": "20261109071019",
+  "restoreRunId": 42581809351,
+  "restoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42581809351",
+  "restoreEvidenceArtifactId": 13657845823,
+  "restoreConclusion": "success",
+  "evidenceFileSha256": {
+    "app-schema-parity.json": "6eba190f5f3e4579faa512b04421513bdefc382fb1398d852461f459058d65d6",
+    "restore-evidence.json": "2ff37948db3567e23b99e59f51a126174cb811dfa45097a82d2779ac5b82659e",
+    "privacy-reconciliation-evidence.json": "e3786402e04fa12c90e5e45bff220646e25e744941b298a819f9244c297e0b75",
+    "recovered-serving-admission.json": "45c6dc7375d35f8235c1ff6810b458d2d9c9f3d5bd13ee3be5201d21c886a484"
+  },
+  "applicationScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+  "observedCanonicalAclCatalog": {
+    "witnessComplete": true,
+    "observedApplicationCatalogParity": true,
+    "legacyHashOnlyByKind": {
+      "schemas": 2,
+      "tables": 8,
+      "functions": 19
+    },
+    "unresolvedByKind": {
+      "schemas": 0,
+      "tables": 0,
+      "functions": 0
+    }
+  },
+  "catalogObjects": {
+    "schemas": {
+      "sourceObjects": 3,
+      "restoredObjects": 3,
+      "legacyHashMismatch": 2,
+      "missing": 0,
+      "additional": 0
+    },
+    "tables": {
+      "sourceObjects": 94,
+      "restoredObjects": 94,
+      "legacyHashMismatch": 8,
+      "missing": 0,
+      "additional": 0
+    },
+    "functions": {
+      "sourceObjects": 322,
+      "restoredObjects": 322,
+      "legacyHashMismatch": 19,
+      "missing": 0,
+      "additional": 0
+    }
+  },
+  "sourceRoleGraphWitnessAvailable": false,
+  "roleMembershipParityProven": false,
+  "roleGraphGap": "Export JSON projection omitted applicationRoleGraph though read-only source SQL emits it.",
+  "sourceSnapshotBoundToPgDump": false,
+  "restoreMismatchRootCauseProven": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "servingGate": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "readOnlySourceQueryExecuted": true,
+  "productionMutationsPerformed": false,
+  "notes": [
+    "Role membership equality was not observed: no source witness in encrypted application catalog.",
+    "The export script selected schemas/tables/functions but dropped applicationRoleGraph from its encrypted JSON projection.",
+    "Successful PG17 restore and unchanged canonical ACL observations do not prove role membership or Hosted service parity.",
+    "The fixed exporter requires a nonempty sealed application role inventory and fail-closes on missing graph; requires new exact-backup restore after merge."
+  ]
+}

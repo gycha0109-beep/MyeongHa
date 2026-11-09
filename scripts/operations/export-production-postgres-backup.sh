@@ -139,7 +139,12 @@ source_catalog_canonical="$(jq -ecS --arg frontier "$migration_frontier" '
     and (.functions | type) == "array"
     and (.schemas | length) == .schemaCount
     and (.tables | length) == .tableCount
-    and (.functions | length) == .functionCount)
+    and (.functions | length) == .functionCount
+    and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"
+    and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false
+    and (.applicationRoleGraph.roles | type) == "array"
+    and (.applicationRoleGraph.roles | length) > 0
+    and (.applicationRoleGraph.directMemberships | type) == "array")
 ' <<<"$source_catalog_before")" || {
   echo 'HOLD_APPLICATION_CATALOG: invalid source before dump.' >&2
   exit 1
@@ -178,7 +183,12 @@ source_catalog_after_canonical="$(jq -ecS --arg frontier "$migration_frontier" '
     and (.functions | type) == "array"
     and (.schemas | length) == .schemaCount
     and (.tables | length) == .tableCount
-    and (.functions | length) == .functionCount)
+    and (.functions | length) == .functionCount
+    and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"
+    and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false
+    and (.applicationRoleGraph.roles | type) == "array"
+    and (.applicationRoleGraph.roles | length) > 0
+    and (.applicationRoleGraph.directMemberships | type) == "array")
 ' <<<"$source_catalog_after")" || {
   echo 'HOLD_APPLICATION_CATALOG: invalid source after dump.' >&2
   exit 1
@@ -196,7 +206,7 @@ jq -S --arg project_ref "$SUPABASE_PROJECT_ID" \
   --arg kst "$(TZ=Asia/Seoul date +%F)" '{
     schemaVersion, transactionReadOnly,
     postgresqlVersion: .postgresVersion, migrationCatalog,
-    schemas, tables, functions,
+    schemas, tables, functions, applicationRoleGraph,
     observedKstDate: $kst, projectRef: $project_ref,
     sourceCatalogProvenance: "encrypted_backup_bracketed_readonly_v1",
     sourceCatalogBracketStartUtc: $before,
@@ -205,6 +215,18 @@ jq -S --arg project_ref "$SUPABASE_PROJECT_ID" \
     sourceCatalogBoundToBackupSnapshot: false,
     coverage: "public tables and public/seyeon_private/chat_private routines; structural, owner, RLS and ACL digests; excludes user rows and Hosted Auth/Storage"
   }' <<<"$source_catalog_canonical" > "$backup_dir/source-app-catalog.json"
+# Do not successfully seal a new-format source catalog if the reviewed
+# read-only application role-graph witness is silently dropped in projection.
+jq -e '
+  .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"
+  and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false
+  and (.applicationRoleGraph.roles | type) == "array"
+  and (.applicationRoleGraph.roles | length) > 0
+  and (.applicationRoleGraph.directMemberships | type) == "array"
+' "$backup_dir/source-app-catalog.json" >/dev/null || {
+  echo 'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed application role graph.' >&2
+  exit 1
+}
 source_catalog_sha256="$(sha256sum "$backup_dir/source-app-catalog.json" | awk '{print $1}')"
 
 grep -Fq 'member_auth_rate_limit_buckets' "$backup_dir/schema.sql"
