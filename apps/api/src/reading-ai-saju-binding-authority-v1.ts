@@ -72,7 +72,11 @@ export function createVerifiedSajuReadingProviderBindingAuthorityV1(
       if (!validUuid(request.callId)
         || !request.sajuRequestId || request.sajuRequestId.length > 256
         || !request.modelKey || request.modelKey.length > 128
-        || !Number.isFinite(Date.parse(request.observedAt))) return null;
+        || !Number.isFinite(Date.parse(request.observedAt))
+        || request.observation?.callId !== request.callId
+        || request.observation?.requestId !== request.sajuRequestId
+        || request.observation?.modelKey !== request.modelKey
+        || request.observation?.observedAt !== request.observedAt) return null;
       const source = await input.source.verifyProviderCall(request);
       if (source === null || !exactInput(request, source)) return null;
       const attempt = await input.db.verifyDbAttempt({
