@@ -124,6 +124,10 @@ On 2026-11-09, the current Saju Preview-only HTTP route returned a separate deli
 
 **Paid product quality: FAIL for all four at KRW 9,900.** These Preview responses did not return a validated link from each sentence to its specific pillar or other chart evidence, nor explain `partially_ambiguous`. The text is short, generic advice; it does not show the chart-specific judgment, conditions, natal strengths and limits, auspicious/inauspicious reasoning, concrete life manifestations, or supported timing flow that would justify the approved price. Avoiding unsupported predictions is necessary, but does not make this a valuable paid reading. These samples prove the route can return a real calculation Preview; they do not establish a complete Reader experience or a finished product. The customer-facing evaluation copy is explicitly marked FAIL in `four-single-saju-reader-preview-samples-20261109.md` in the Outputs folder.
 
+### Required Reader composition from the supplied format reference
+
+The user-provided PDF gives the reading form to follow: begin with the core judgment; show the actual natal placements and their roles; explain strengths, limits, and tensions; connect those effects to concrete scenes in the purchased field; connect Daeun/Sewoon changes and real timing only when supported; close by integrating the person's story in the Reader's own conversational voice. This is a scene-by-scene 상담, not a report outline or a stack of short advice cards. The current four drafts do not meet that form because the Preview response omits claim-to-chart evidence links and supported timing. Do not present the six beats as filled when the engine has not supplied the facts.
+
 The intended existing flow is:
 
 ```text
