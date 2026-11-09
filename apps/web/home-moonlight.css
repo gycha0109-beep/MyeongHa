@@ -562,7 +562,7 @@ body.gm-page[data-page="home"] .mhx-characters-intro h2 {
   color: #fff0f6;
 }
 body.gm-page[data-page="home"] .mhx-characters-intro p {
-  color: #c8b9c5;
+  color: #dfd2dd;
 }
 body.gm-page[data-page="home"] .mhx-small-label { color: #d88baa; }
 /* Dark theme: override the original late dark palette without rebuilding the hero. */
@@ -596,6 +596,19 @@ html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic {
   background: rgba(255,250,246,.94);
   border-color: rgba(164,113,137,.22);
 }
+/* One prominent Night card gives the landing actions a deliberate focal point. */
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic:first-child {
+  background: linear-gradient(150deg, #172838 0%, #24364a 100%);
+  border-color: #9b784e;
+  box-shadow: 0 14px 30px rgba(25, 39, 52, .18);
+}
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic:first-child .mhx-topic-copy strong { color: #fff5e7; }
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic:first-child .mhx-topic-copy small { color: #e4d7ca; }
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic:first-child .mhx-topic-copy .mhx-topic-status { color: #e7bf8b; }
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic:first-child .mhx-topic-icon {
+  color: #d7b478; background: rgba(255,248,231,.08); border-color: rgba(215,180,120,.6);
+}
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic:first-child .mhx-topic-arrow { color: #fff2d9; border-color: rgba(215,180,120,.55); }
 html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic-copy strong { color: #332231; }
 html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic-copy small { color: #4a3b45; }
 html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic-copy .mhx-topic-status { color: #994d70; }
@@ -604,12 +617,12 @@ html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-topic-arrow {
   border-color: rgba(151,92,119,.24);
 }
 html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-hero-actions p { color: #766773; }
-html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-hero-actions p small { color: #877582; }
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-hero-actions p small { color: #51434b; }
 html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-characters {
   background-color: rgba(255,250,245,.94);
 }
 html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-characters-intro h2 { color: #2b1d31; }
-html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-characters-intro p { color: #746671; }
+html:not([data-theme="dark"]) body.gm-page[data-page="home"] .mhx-characters-intro p { color: #443841; }
 @media (max-width: 1100px) {
   body.gm-page[data-page="home"] .mhx-hero {
     min-height: 590px;
