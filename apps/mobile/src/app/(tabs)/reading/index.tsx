@@ -175,8 +175,8 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 12,
   },
-  cardTitle: { color: mobileColors.ink, fontSize: 20, fontWeight: '800' },
-  muted: { color: mobileColors.muted, fontSize: 15, lineHeight: 22 },
+  cardTitle: { color: mobileColors.ink, fontSize: 23, fontWeight: '800' },
+  muted: { color: mobileColors.muted, fontSize: 16, lineHeight: 25, fontWeight: '500' },
   error: { color: mobileColors.seal, fontSize: 14, lineHeight: 20 },
   primaryButton: {
     minHeight: 48,
