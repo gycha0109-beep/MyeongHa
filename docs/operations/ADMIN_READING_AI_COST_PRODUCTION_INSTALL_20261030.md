@@ -30,3 +30,11 @@
 - 전용 읽기 역할 `myeongha_reading_ai_cost_binding_reader_v1`은 **운영에 존재한다고 주장하지 않으며 생성·설치하지 않았습니다.** 향후 승인된 DB 권한 설계는 전송 참조와 시도 식별자에 대한 최소 SELECT, 중복 참조 판별에 필요한 **전역 RLS 가시성**, 기존 비용 Writer와의 권한 분리를 충족해야 합니다. 그런 역할이 없는 운영 환경에서 어댑터는 호출되지 않습니다.
 - 실행 시작 시점에는 `external_request_ref`가 저장돼 있지 않으므로 이 어댑터는 **종료 이후 사후 대조 전용**입니다. 실제 실패/미완료 호출을 모두 다루는 발급 쪽 영수증 및 보류 이벤트 추적·재처리 구현은 여전히 선행 조건이며, 현재 비용 원장의 0건은 0원 또는 완전한 관측 증거가 아닙니다.
 - 별도 서버 권한·접속 비밀·HTTP 라우트·배포 바인딩·DB 스키마/권한/실데이터 변경 없음. 자체 단위 테스트 4건 및 변경 파일 strict TypeScript 검사 통과. `ROADMAP_COMPLETE` 선언 불가.
+
+## 2026-11-09 — A4 결속 전용 DB 읽기 역할 오프라인 설치 후보 (운영 미적용)
+
+- 설치 후보: `apps/admin/database/reading-ai-cost-binding-reader-offline-v1.sql`. 기존 `reading-ai-saju-attempt-db-verifier-v1.ts`가 요구하는 **별도 읽기 전용 역할**을 위한 버전 고정 PostgreSQL SQL. 현재 운영 DB에는 해당 역할이 없음을 SELECT-only 확인했고, 본 후보를 운영에서 실행하지 않았다.
+- 사전 조건: 관리형 `postgres` 설치자, RLS 활성화된 기존 `public.reading_execution_attempts`, 설치된 A4 Cost Writer 역할, 미설치 역할/정책, 전역 유일성 판별을 흐리게 하는 제한적 RLS 정책 없음. 위반 시 설치 거부; 재실행도 거부.
+- 최소권한: `id`, `reading_id`, `subject_id`, `external_request_ref`, `state` 열에 대한 SELECT와 명시적 조회 정책만 허용. 전역 동일 요청 참조 카운트를 위해 제한 없는 SELECT 가시성을 요구. 수정을 위한 권한·테이블 전체 SELECT·스키마 CREATE·멤버십·BYPASSRLS 없음. `LOGIN`이지만 비밀번호는 **NULL**이며 별도 Owner 승인 없이는 운영 연결 불가. 실제 보안 자격증명, Cloudflare 바인딩, 사용자/결제 원장은 건드리지 않음.
+- **독립 검증:** Docker `postgres:17.11`의 새 임시 DB에 최소 Reading 시도 테이블과 RLS, 기존 비용 Writer 역할만 생성한 다음 후보 SQL을 실행해 BEGIN→preflight→ROLE→GRANT→POLICY→postflight→COMMIT 성공. 임의 데이터로 동일 external ref 2행과 유일 ref 1행이 조회되고, 허용하지 않은 `started_at` 읽기 및 UPDATE가 각각 PostgreSQL 권한 거부되는 것 확인. 역할에 비밀번호·멤버십이 없는 것 확인. 임시 Docker DB는 작업 종료 즉시 중지·삭제. 실제 운영 데이터·테이블에 합성 기록 삽입하지 않음.
+- **운영 수용 HOLD:** 본 테스트는 Production 적용·실제 Saju 요청 매핑·실제 연결 성공의 근거가 아니다. 실제 Production Reader 역할/비밀번호/전송 경로/Source 권위의 요청→시도 매핑과 사용량 보존/실패 재처리/청구 대조는 별도 승인·검증 전까지 미활성. `ROADMAP_COMPLETE` 미충족.
