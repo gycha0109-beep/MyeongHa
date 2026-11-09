@@ -1,4 +1,5 @@
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type { DbReadingAttemptBindingAuthorityV1 } from './reading-ai-saju-binding-authority-v1.js';
 
 /**
  * A4 OFFLINE candidate for the DB half of Saju provider-call attribution.
@@ -57,7 +58,7 @@ function requestAllowed(value: string, id: string): boolean {
  */
 export function createPostgresSajuReadingAttemptVerifierV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
-}>) {
+}>): DbReadingAttemptBindingAuthorityV1 {
   return Object.freeze({
     async verifyDbAttempt(request: Readonly<{
       externalRequestRef: string;
