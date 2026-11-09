@@ -200,6 +200,115 @@ function sourceCatalogWitness(source) {
   };
 }
 
+// Direct internal application role graph only. Provider-managed role edges,
+// inherited effective access, and portable replay provenance are NOT covered.
+const roleGraphScope = 'myeongha_to_myeongha_direct_membership_only_v1';
+const applicationRolePattern = /^myeongha_[a-z0-9_]+$/u;
+const roleAttributeFields = [
+  'superuser', 'inherit', 'create_role', 'create_database', 'can_login',
+  'replication', 'bypass_rls', 'connection_limit',
+];
+const membershipOptionFields = ['admin_option', 'inherit_option', 'set_option'];
+
+function validateRoleGraph(graph, side) {
+  assert.ok(graph && typeof graph === 'object' && !Array.isArray(graph),
+    side + ' role graph must be an object');
+  assert.equal(graph.scope, roleGraphScope);
+  assert.equal(graph.providerBoundaryMembershipsIncluded, false,
+    'Full provider role membership cannot be assumed');
+  assert.ok(Array.isArray(graph.roles) && graph.roles.length > 0);
+  assert.ok(Array.isArray(graph.directMemberships));
+  const roles = new Map();
+  for (const item of graph.roles) {
+    assert.ok(applicationRolePattern.test(item.role_name), 'Invalid application role');
+    for (const field of roleAttributeFields) {
+      if (field === 'connection_limit') {
+        assert.ok(Number.isInteger(item[field]), 'Role connection limit must be integer');
+      } else {
+        assert.equal(typeof item[field], 'boolean', 'Invalid application role flag: ' + field);
+      }
+    }
+    assert.ok(!roles.has(item.role_name), 'Duplicate application role');
+    roles.set(item.role_name, item);
+  }
+  const seen = new Set();
+  const membershipCore = new Map();
+  for (const item of graph.directMemberships) {
+    assert.ok(roles.has(item.granted_role) && roles.has(item.member_role),
+      'Direct role edge is outside explicit application role inventory');
+    assert.ok(typeof item.grantor_name === 'string' &&
+      item.grantor_name.length > 0 && item.grantor_name.length <= 160 &&
+      !/[\r\n\t]/u.test(item.grantor_name), 'Invalid membership grantor');
+    for (const field of membershipOptionFields) {
+      assert.equal(typeof item[field], 'boolean', 'Invalid membership option: ' + field);
+    }
+    const exact = JSON.stringify([item.granted_role, item.member_role,
+      item.grantor_name]);
+    assert.ok(!seen.has(exact), 'Duplicate grantor-specific membership row');
+    seen.add(exact);
+    const key = JSON.stringify([item.granted_role, item.member_role,
+      ...membershipOptionFields.map(field => item[field])]);
+    const grantors = membershipCore.get(key) ?? [];
+    grantors.push(item.grantor_name);
+    membershipCore.set(key, grantors);
+  }
+  for (const grantors of membershipCore.values()) grantors.sort();
+  return { graph, roles, membershipCore };
+}
+
+export function observeApplicationDirectRoleGraph(source, restored) {
+  if (source.applicationRoleGraph === undefined) {
+    return { sourceWitnessAvailable: false, observedMembershipOptionsParity: false,
+      observedGrantorAttributionParity: false, scope: roleGraphScope,
+      providerBoundaryMembershipsIncluded: false, details: null };
+  }
+  const before = validateRoleGraph(source.applicationRoleGraph, 'source');
+  const after = validateRoleGraph(restored.applicationRoleGraph, 'restored');
+  const missingRoleCount = [...before.roles.keys()].filter(x => !after.roles.has(x)).length;
+  const addedRoleCount = [...after.roles.keys()].filter(x => !before.roles.has(x)).length;
+  const roleAttributesDifferentCount = [...before.roles].filter(([name, role]) =>
+    after.roles.has(name) && roleAttributeFields.some(field =>
+      role[field] !== after.roles.get(name)[field])).length;
+  let missingMembershipEntryCount = 0;
+  let addedMembershipEntryCount = 0;
+  let grantorAttributionDifferenceGroupCount = 0;
+  for (const [key, grantors] of before.membershipCore) {
+    const next = after.membershipCore.get(key) ?? [];
+    if (grantors.length > next.length) {
+      missingMembershipEntryCount += grantors.length - next.length;
+    }
+    if (grantors.length < next.length) {
+      addedMembershipEntryCount += next.length - grantors.length;
+    }
+    if (grantors.length === next.length && JSON.stringify(grantors) !==
+      JSON.stringify(next)) grantorAttributionDifferenceGroupCount++;
+  }
+  for (const [key, grantors] of after.membershipCore) {
+    if (!before.membershipCore.has(key)) addedMembershipEntryCount += grantors.length;
+  }
+  const observedMembershipOptionsParity =
+    missingRoleCount === 0 && addedRoleCount === 0 &&
+    roleAttributesDifferentCount === 0 && missingMembershipEntryCount === 0 &&
+    addedMembershipEntryCount === 0;
+  return {
+    sourceWitnessAvailable: true,
+    scope: roleGraphScope,
+    providerBoundaryMembershipsIncluded: false,
+    observedMembershipOptionsParity,
+    observedGrantorAttributionParity: observedMembershipOptionsParity &&
+      grantorAttributionDifferenceGroupCount === 0,
+    details: {
+      sourceRoleCount: before.roles.size,
+      restoredRoleCount: after.roles.size,
+      sourceDirectMembershipCount: before.graph.directMemberships.length,
+      restoredDirectMembershipCount: after.graph.directMemberships.length,
+      missingRoleCount, addedRoleCount, roleAttributesDifferentCount,
+      missingMembershipEntryCount, addedMembershipEntryCount,
+      grantorAttributionDifferenceGroupCount,
+    },
+  };
+}
+
 export function compareApplicationCatalog(source, restored, backupFrontier) {
   const sourceWitness = sourceCatalogWitness(source);
   assert.equal(source.schemaVersion, schemaVersion);
@@ -216,6 +325,12 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
   const migrationFrontierAligned =
     String(source.migrationCatalog.latestVersion) === String(backupFrontier);
   const byType = {};
+  if (source.applicationRoleGraph !== undefined) {
+    assert.equal(sourceWitness.provenance, 'encrypted_backup_bracketed_readonly_v1',
+      'Application role graph requires a sealed backup-run source witness');
+  }
+  const observedApplicationDirectRoleGraph =
+    observeApplicationDirectRoleGraph(source, restored);
   const componentHashEvidence = {
     tableStructure: assertUniformFacetCoverage(source.tables, 'tables',
       'structural_component_sha256'),
@@ -380,6 +495,9 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     // disclosing raw definitions, grantors, row payloads or credentials.
     // Old sealed/legacy catalogs have no such evidence: never infer a cause.
     componentHashEvidence,
+    // Read-only, sealed application-owned role edges only. Provider/Hosted
+    // membership and inherited effective access remain unverified.
+    observedApplicationDirectRoleGraph,
     // A diagnostic observation, NOT a migration/DR/provider acceptance gate.
     // The original applicationScopeVerdict below remains fail-closed on any
     // legacy hash mismatch; this evidence does not waive it.

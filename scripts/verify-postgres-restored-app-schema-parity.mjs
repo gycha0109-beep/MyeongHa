@@ -2,7 +2,8 @@
 // Watchtower-Track: ops
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { buildRestoredReadOnlyQuery, compareApplicationCatalog } from
+import { buildRestoredReadOnlyQuery, compareApplicationCatalog,
+  observeApplicationDirectRoleGraph } from
   './operations/check-postgres-restored-app-schema-parity.mjs';
 
 const source = JSON.parse(await readFile(
@@ -20,6 +21,10 @@ assert.ok(restoredQuery.includes('acl_sha256'));
 assert.ok(restoredQuery.includes('acl_grant_entries_without_grantor_sha256'));
 assert.ok(restoredQuery.includes('acl_by_grantee_privilege_sha256'));
 assert.ok(restoredQuery.includes('acl_by_grantee_grantor_privilege_sha256'));
+assert.ok(restoredQuery.includes('applicationRoleGraph'));
+assert.ok(restoredQuery.includes('pg_catalog.pg_auth_members'));
+assert.ok(restoredQuery.includes('m.admin_option, m.inherit_option, m.set_option')
+  || restoredQuery.includes('edge.admin_option, edge.inherit_option, edge.set_option'));
 assert.ok(!restoredQuery.includes('FROM supabase_migrations.schema_migrations'));
 
 const restored = {
@@ -35,6 +40,13 @@ assert.deepEqual(matched.observedCanonicalAclCatalog, {
   legacyHashOnlyByKind: null, unresolvedByKind: null,
 });
 assert.equal(matched.verifiedApplicationScopeEquivalence, true);
+assert.deepEqual(matched.observedApplicationDirectRoleGraph, {
+  sourceWitnessAvailable: false,
+  observedMembershipOptionsParity: false,
+  observedGrantorAttributionParity: false,
+  scope: 'myeongha_to_myeongha_direct_membership_only_v1',
+  providerBoundaryMembershipsIncluded: false, details: null,
+});
 assert.equal(matched.verifiedFullSchemaCatalogEquivalence, false);
 assert.equal(matched.sourceCatalogBoundToBackupSnapshot, false);
 assert.equal(matched.restoreMismatchRootCauseProven, false);
@@ -49,6 +61,84 @@ assert.equal(matched.sourceCatalogProvenance, 'legacy_date_only_observation');
 assert.equal(matched.sourceCatalogProvenanceHold,
   'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS');
 
+// Phase 8-A: direct MyeongHa-owned role graph is read-only metadata and
+// NEVER proves provider-granted memberships or inherited/effective privileges.
+const role = (name, flags = {}) => ({
+  role_name: name, superuser: false, inherit: false, create_role: false,
+  create_database: false, can_login: false, replication: false,
+  bypass_rls: false, connection_limit: -1, ...flags,
+});
+const sourceGraph = {
+  applicationRoleGraph: {
+    scope: 'myeongha_to_myeongha_direct_membership_only_v1',
+    providerBoundaryMembershipsIncluded: false,
+    roles: [role('myeongha_role_a'), role('myeongha_role_b')],
+    directMemberships: [{
+      granted_role: 'myeongha_role_a', member_role: 'myeongha_role_b',
+      grantor_name: 'postgres', admin_option: false,
+      inherit_option: false, set_option: false,
+    }],
+  },
+};
+const roleGraphSame = structuredClone(sourceGraph);
+const sameGraph = observeApplicationDirectRoleGraph(sourceGraph, roleGraphSame);
+assert.equal(sameGraph.sourceWitnessAvailable, true);
+assert.equal(sameGraph.observedMembershipOptionsParity, true);
+assert.equal(sameGraph.observedGrantorAttributionParity, true);
+assert.deepEqual(sameGraph.details, {
+  sourceRoleCount: 2, restoredRoleCount: 2,
+  sourceDirectMembershipCount: 1, restoredDirectMembershipCount: 1,
+  missingRoleCount: 0, addedRoleCount: 0, roleAttributesDifferentCount: 0,
+  missingMembershipEntryCount: 0, addedMembershipEntryCount: 0,
+  grantorAttributionDifferenceGroupCount: 0,
+});
+const providerGrantorChanged = structuredClone(sourceGraph);
+providerGrantorChanged.applicationRoleGraph.directMemberships[0].grantor_name =
+  'supabase_admin';
+const grantorChanged = observeApplicationDirectRoleGraph(
+  sourceGraph, providerGrantorChanged);
+assert.equal(grantorChanged.observedMembershipOptionsParity, true);
+assert.equal(grantorChanged.observedGrantorAttributionParity, false);
+assert.equal(grantorChanged.details.grantorAttributionDifferenceGroupCount, 1);
+const optionsChanged = structuredClone(sourceGraph);
+optionsChanged.applicationRoleGraph.directMemberships[0].set_option = true;
+const optionsResult = observeApplicationDirectRoleGraph(sourceGraph, optionsChanged);
+assert.equal(optionsResult.observedMembershipOptionsParity, false);
+assert.equal(optionsResult.details.missingMembershipEntryCount, 1);
+assert.equal(optionsResult.details.addedMembershipEntryCount, 1);
+const roleFlagsChanged = structuredClone(sourceGraph);
+roleFlagsChanged.applicationRoleGraph.roles[0].bypass_rls = true;
+assert.equal(observeApplicationDirectRoleGraph(sourceGraph, roleFlagsChanged)
+  .details.roleAttributesDifferentCount, 1);
+const roleMissing = structuredClone(sourceGraph);
+roleMissing.applicationRoleGraph.roles[1].role_name = 'myeongha_role_c';
+roleMissing.applicationRoleGraph.directMemberships[0].member_role = 'myeongha_role_c';
+assert.equal(observeApplicationDirectRoleGraph(sourceGraph, roleMissing)
+  .details.missingRoleCount, 1);
+const edgeMissing = structuredClone(sourceGraph);
+edgeMissing.applicationRoleGraph.directMemberships = [];
+assert.equal(observeApplicationDirectRoleGraph(sourceGraph, edgeMissing)
+  .details.missingMembershipEntryCount, 1);
+const edgeExtra = structuredClone(sourceGraph);
+edgeExtra.applicationRoleGraph.directMemberships.push({
+  granted_role: 'myeongha_role_b', member_role: 'myeongha_role_a',
+  grantor_name: 'postgres', admin_option: false,
+  inherit_option: false, set_option: true,
+});
+assert.equal(observeApplicationDirectRoleGraph(sourceGraph, edgeExtra)
+  .details.addedMembershipEntryCount, 1);
+for (const corrupt of [
+  g => { g.providerBoundaryMembershipsIncluded = true; },
+  g => { g.roles[0].role_name = 'postgres'; },
+  g => { g.roles[0].can_login = 'false'; },
+  g => { g.directMemberships[0].grantor_name = ''; },
+  g => { g.directMemberships[0].set_option = null; },
+  g => { g.directMemberships.push(structuredClone(g.directMemberships[0])); },
+]) {
+  const invalid = structuredClone(sourceGraph);
+  corrupt(invalid.applicationRoleGraph);
+  assert.throws(() => observeApplicationDirectRoleGraph(invalid, roleGraphSame));
+}
 const bracketedSource = {
   ...structuredClone(source),
   sourceCatalogProvenance: 'encrypted_backup_bracketed_readonly_v1',
@@ -66,6 +156,25 @@ assert.equal(bracketed.sourceCatalogBoundToBackupSnapshot, false);
 assert.equal(bracketed.restoreMismatchRootCauseProven, false);
 assert.equal(bracketed.verifiedFullSchemaCatalogEquivalence, false);
 assert.equal(bracketed.drReady, false);
+const scopedSource = { ...structuredClone(bracketedSource), ...sourceGraph };
+const scopedRestored = { ...structuredClone(restored), ...roleGraphSame };
+const scopedResult = compareApplicationCatalog(scopedSource, scopedRestored, frontier);
+assert.equal(scopedResult.observedApplicationDirectRoleGraph.sourceWitnessAvailable, true);
+assert.equal(scopedResult.observedApplicationDirectRoleGraph.observedMembershipOptionsParity, true);
+assert.equal(scopedResult.roleMembershipParityProven, false);
+assert.throws(() => compareApplicationCatalog(
+  { ...structuredClone(source), ...sourceGraph }, scopedRestored, frontier));
+assert.throws(() => compareApplicationCatalog(scopedSource,
+  { ...structuredClone(restored) }, frontier));
+assert.equal(scopedResult.drReady, false);
+const scopedDrift = compareApplicationCatalog(scopedSource,
+  { ...structuredClone(restored), ...optionsChanged }, frontier);
+assert.equal(scopedDrift.observedApplicationDirectRoleGraph.observedMembershipOptionsParity,
+  false);
+assert.equal(scopedDrift.roleMembershipParityProven, false);
+assert.equal(scopedDrift.serviceResumptionAllowed, false);
+
+
 for (const mutation of [
   s => { s.sourceCatalogBracketStable = false; },
   s => { s.sourceCatalogBoundToBackupSnapshot = true; },
