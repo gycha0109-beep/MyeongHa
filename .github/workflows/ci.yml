@@ -78,6 +78,9 @@ jobs:
               echo "track=main-regression"
               echo "web=true"
               echo "mobile=true"
+              echo "unit_full=true"
+              echo "api=true"
+              echo "admin=true"
               echo "db=true"
               if [[ -n "$CANDIDATE_HEAD" ]]; then
                 echo 'db_suites=["runtime","content","commerce-payment","commerce-entitlement","postgres17"]'
