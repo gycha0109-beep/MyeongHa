@@ -67,8 +67,23 @@ BEGIN
     OR has_table_privilege('myeongha_reading_ai_cost_binding_reader_v1',
       'public.reading_execution_attempts','INSERT,UPDATE,DELETE,TRUNCATE,TRIGGER')
     OR has_schema_privilege('myeongha_reading_ai_cost_binding_reader_v1','public','CREATE')
-    OR has_table_privilege('myeongha_reading_ai_cost_binding_reader_v1',
-      'public.reading_execution_attempts','SELECT')
+    -- has_table_privilege('SELECT') also returns true for column-only grants.
+    -- Inspect the relation ACL itself so five-column SELECT is not mistaken
+    -- for an unrestricted table SELECT grant.
+    OR EXISTS (
+      SELECT 1
+      FROM pg_class c
+      CROSS JOIN LATERAL aclexplode(
+        coalesce(c.relacl, acldefault('r', c.relowner))
+      ) acl
+      WHERE c.oid = 'public.reading_execution_attempts'::regclass
+        AND acl.privilege_type = 'SELECT'
+        AND acl.grantee IN (
+          0,
+          (SELECT oid FROM pg_roles
+           WHERE rolname = 'myeongha_reading_ai_cost_binding_reader_v1')
+        )
+    )
     OR has_column_privilege('myeongha_reading_ai_cost_binding_reader_v1',
       'public.reading_execution_attempts','started_at','SELECT')
     OR (SELECT count(*) FROM (
