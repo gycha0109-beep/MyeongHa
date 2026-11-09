@@ -91,3 +91,11 @@
 - **Saju 소스 선행 PR:** [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739)의 server-only onProviderCall 소스 관측(토큰/모델/호출 결과) 및 합성 단위 테스트는 현재 기록된 PR HEAD 검증 3개 성공. 이 PR은 초안 상태를 해제하고 자동 병합을 요청했으며, **병합 완료 여부는 별도 확인 필요**. 선택적 콜백 추가는 운영 공급사 호출/비용 적재 활성화가 아니다.
 - **다음 원래 A4 수용 조건:** 승인된 실제 Saju 서버 호출 `requestId`와 명하 DB의 기존 Reading/실행 시도 간 **동일 요청을 입증하는 Authority 결속**을 구현·검증할 때까지 HOLD. 이후 전용 Writer의 안전한 인증/연결, 실제 호출 누락/실패 포함 관측 커버리지 및 공급사 청구/환율의 독립 근거가 확보돼야 실비/완전성·KRW 월 예산을 주장할 수 있다. 새로운 Source ID 매핑/Production DB 권한/운영 연결을 검증 없이 생성하거나 활성화하지 않는다.
 - **나머지 로드맵:** A5 분석 수집·보존 비활성, A6 고객 변경 명령 비활성, A7 게시 기능 비활성. `ROADMAP_COMPLETE` 미충족. 본 변경은 문서만 수정하며 고객 데이터, 공개 Worker, Admin 운영 플래그, DB 역할·권한은 변경하지 않는다.
+
+## 2026-11-09 KST — A4 공급사 호출과 DB Reading 시도 검증 결속 계약 구현
+
+- **선행 PR 완료:** [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739) 실제 OpenAI Responses 호출의 비공개 usage observer가 2026-11-09 01:21:51 UTC 병합됨. 필수 [통합 CI #42543739334](https://github.com/gycha0109-beep/Saju/actions/runs/42543739334) SUCCESS. 이 호출 관측은 기본 opt-in 상태이고 공급사 비용 적재·운영 활성화와는 별개임.
+- **A4 구현 단위:** `apps/api/src/reading-ai-saju-binding-authority-v1.ts`를 추가하여 기존 `SajuReadingProviderBindingAuthorityV1`의 실제 연결용 검증 어댑터를 구현. 두 **서로 독립된 신뢰 서버 포트**를 요구함: (1) Saju에서 실제 호출 ID/모델/시각과 사전 할당된 정확한 DB 실행시도·전송 참조의 결속을 증명하는 Source Authority, (2) 같은 전송 참조와 실행 시도에 정확히 하나의 정본 Reading/Subject가 해당함을 확인하는 DB Authority. 두 검증 근거가 모두 일치해야 기존 비용 Writer가 사용할 Subject/Reading/시도 UUID를 반환함.
+- **실제 경계:** Saju 내부 `requestId`가 DB의 `external_request_ref`와 같다고 가정하지 않음. 이 두 독립 포트의 Production 구현·Saju 발급 경로에서의 권위 있는 사전 매핑과 전용 Writer 인증은 **미연결/HOLD**. 이 모듈은 단독으로 DB 질의·HTTP·공급사 호출·쓰기·비밀키·운영 배포/활성화를 수행하지 않음. `null`은 비용 0원이나 호출 부재가 아니라 미검증임.
+- **검증:** 신규 `reading-ai-saju-binding-authority-v1.test.ts` 4건 + 기존 bridge 테스트 4건, 총 8건 로컬 성공. 신규 두 파일의 TypeScript 6 별도 strict/noEmit 검사 통과. 전체 저장소 로컬 타입 검사는 오래된 다른 worktree의 `node_modules` 임시 연결로 모바일 API 클라이언트 경로가 섞여 실패하여 **전체 통과라고 표현하지 않음**. 최종 PR CI에서 깨끗한 lockfile 설치 검증 필요.
+- **다음 수용 조건:** Production Saju issuer가 `requestId`·실제 호출 ID·할당된 실행 시도를 한 계약에서 검증할 수 있게 연결하고, DB Owner의 정확히 하나의 시도 조회/권한 증명을 구현해야 Source/DB 검증 포트를 설치 가능. 실제 사용량 커버리지/청구서·환율/추정 비용 분리 및 보류된 A5–A7은 별도 로드맵 조건 그대로 유지. `ROADMAP_COMPLETE` 미충족.
