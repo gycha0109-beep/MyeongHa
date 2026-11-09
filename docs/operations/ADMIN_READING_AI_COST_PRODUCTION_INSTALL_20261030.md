@@ -24,6 +24,13 @@
 
 `SajuReadingProviderBindingAuthorityV1.resolve()`에 필요한 실제 요청 → DB Reading/실행 시도 매핑 정본은 여전히 없습니다. 이 설치로 Production Interpretation HOLD를 해제하거나 식별자 동등성을 가정하지 않습니다. 안전한 전용 Writer 자격증명과 권위 있는 호출 전달 결속이 남았습니다.
 
+## 2026-11-09 — A4 DB 실행 참조 검증 어댑터 (오프라인 후속 구현)
+
+- `apps/api/src/reading-ai-saju-attempt-db-verifier-v1.ts`는 Source Authority가 독립적으로 증명한 정확한 `executionAttemptId` + `externalRequestRef`를 받아, PostgreSQL의 **종료 상태** 실행 시도와 일치하고 해당 참조가 **DB 전체에서 1건뿐일 때에만** 정본 Subject/Reading/시도 UUID를 돌려주는 별도 읽기 전용 어댑터입니다. 실측 사용량이나 Saju 내부 요청 ID를 DB 참조와 같다고 가정하지 않습니다.
+- 전용 읽기 역할 `myeongha_reading_ai_cost_binding_reader_v1`은 **운영에 존재한다고 주장하지 않으며 생성·설치하지 않았습니다.** 향후 승인된 DB 권한 설계는 전송 참조와 시도 식별자에 대한 최소 SELECT, 중복 참조 판별에 필요한 **전역 RLS 가시성**, 기존 비용 Writer와의 권한 분리를 충족해야 합니다. 그런 역할이 없는 운영 환경에서 어댑터는 호출되지 않습니다.
+- 실행 시작 시점에는 `external_request_ref`가 저장돼 있지 않으므로 이 어댑터는 **종료 이후 사후 대조 전용**입니다. 실제 실패/미완료 호출을 모두 다루는 발급 쪽 영수증 및 보류 이벤트 추적·재처리 구현은 여전히 선행 조건이며, 현재 비용 원장의 0건은 0원 또는 완전한 관측 증거가 아닙니다.
+- 별도 서버 권한·접속 비밀·HTTP 라우트·배포 바인딩·DB 스키마/권한/실데이터 변경 없음. 자체 단위 테스트 4건 및 변경 파일 strict TypeScript 검사 통과. `ROADMAP_COMPLETE` 선언 불가.
+
 ## 2026-11-09 — A4 결속 전용 DB 읽기 역할 오프라인 설치 후보 (운영 미적용)
 
 - 설치 후보: `apps/admin/database/reading-ai-cost-binding-reader-offline-v1.sql`. 기존 `reading-ai-saju-attempt-db-verifier-v1.ts`가 요구하는 **별도 읽기 전용 역할**을 위한 버전 고정 PostgreSQL SQL. 현재 운영 DB에는 해당 역할이 없음을 SELECT-only 확인했고, 본 후보를 운영에서 실행하지 않았다.
