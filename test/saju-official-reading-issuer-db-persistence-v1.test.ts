@@ -57,9 +57,10 @@ const executedRequest = {
 
 function ports() {
   const sourceVerifier = {
-    verifyProductionIssue: vi.fn(async (_input: Parameters<SajuOfficialSourceVerificationPortV1['verifyProductionIssue']>[0]) => ({
+    verifyProductionIssue: vi.fn(async (proofInput: Parameters<SajuOfficialSourceVerificationPortV1['verifyProductionIssue']>[0]) => ({
       state: 'production_source_verified' as const,
       nativeReadingId,
+      sourceRequestHash: hashSajuHeldSourceProofRequestV1(proofInput.executedRequest),
       sourceResponseHash: sourceHash,
       sourceBirthRevisionId,
       sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
@@ -779,6 +780,29 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
       expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
     }
+  });
+
+  it('rejects an otherwise valid issuer result for a different purchased month', async () => {
+    const p = ports();
+    const novemberRequest = {
+      ...executedRequest,
+      reading: { text: '이번 달', periodReferenceDateTime: '2026-11-30T14:59:59.999Z' },
+    };
+    const verified = await p.sourceVerifier.verifyProductionIssue({
+      sourceResponse: native, executedRequest: novemberRequest, subjectId,
+      dbReadingId: readingId, readingSessionId, sourceBirthRevisionId,
+    });
+    p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce(verified);
+    const result = await persistIssuedSajuOfficialReadingV1({
+      ...input(p),
+      executedRequest: {
+        ...novemberRequest,
+        reading: { ...novemberRequest.reading, periodReferenceDateTime: '2026-11-30T15:00:00.000Z' },
+      },
+    });
+    expect(result).toMatchObject({ state: 'held', reason: 'production_source_unverified' });
+    expect(p.mappingVerifier.verifyIssuedReadingMapping).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
   });
 
   it('rejects non-ID payload changes or DB mapping with a different subject, hash or session', async () => {
