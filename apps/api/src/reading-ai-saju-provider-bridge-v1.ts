@@ -43,6 +43,8 @@ export interface SajuReadingProviderBindingAuthorityV1 {
     callId: string;
     modelKey: string;
     observedAt: string;
+    /** Exact internal provider observation must match the signed source receipt. */
+    observation: SajuNarrativeProviderObservationV1;
   }>): Promise<Binding | null>;
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -131,6 +133,7 @@ export function createSajuNarrativeReadingCostBridgeV1(input:{
       const binding=await input.bindingAuthority.resolve({
         sajuRequestId:event.requestId,callId:event.callId,
         modelKey:event.modelKey,observedAt:event.observedAt,
+        observation:event,
       });
       // Absence of DB Owner's authenticated correspondence is a HOLD, not
       // license to attach a Saju-native ID to a convenient Reading row.

@@ -6,6 +6,13 @@ const request = {
   callId: '123e4567-e89b-42d3-a456-426614174003',
   modelKey: 'fixture-model',
   observedAt: '2026-11-09T00:00:00.000Z',
+  observation: {
+    callId: '123e4567-e89b-42d3-a456-426614174003',
+    requestId: 'saju-private-request-1', modelKey: 'fixture-model',
+    observedAt: '2026-11-09T00:00:00.000Z', providerKey: 'openai' as const,
+    source: 'provider_response_usage' as const, outcome: 'response_received' as const,
+    usage: {inputTokens:10,outputTokens:5,cachedInputTokens:0,reasoningTokens:0},
+  },
 };
 const sourceProof = {
   ...request,
