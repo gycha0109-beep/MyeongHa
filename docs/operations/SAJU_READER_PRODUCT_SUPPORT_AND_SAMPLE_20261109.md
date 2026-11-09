@@ -2,33 +2,53 @@
 
 ## Decision basis
 
-This snapshot follows current `main` (`c29bc25`, 2026-11-09) and the current Saju `main` (`4feb7531`). It does not revive the historical `saju.general_natal.deep.v1` candidate or create, price, or activate a product.
+This snapshot follows current `main` (`c29bc25`, 2026-11-09), current Saju `main` (`4feb7531`), and the user's supplied final-approved catalog dated 2026-11-06. That approval is the current catalog baseline for this work. It supersedes the older one-product/price description in `STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md` and `P0_DECISION_REGISTER.md` (`P0-CM-03`); those older records must be reconciled before any executable Offer or Charge Terms are made. This does not revive the historical standalone `saju.general_natal.deep.v1` product.
 
-The only currently specified paid Saju Product is `standard.love_relationship`: relationship / natal / general, with a required Reader selection and the Reader kept separate from the official Reading identity. Its list price is KRW 8,900, but the Product is disabled, no executable Offer or Charge Terms exist, and Saju Production interpretation and paid fulfillment remain blocked. The source is `STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md` and `P0_DECISION_REGISTER.md` (`P0-CM-03`).
+The approved catalog has six single products, one relationship-comparison product, and five packages:
 
-`commerce-saju-upgrade-pricing-v1.ts` contains a non-saleable quote calculator with 13 product keys and candidate prices. That file explicitly grants no checkout or purchase authority. Its `standard.love_relationship` value of KRW 9,900 conflicts with the approved KRW 8,900 product decision; neither that value nor the other quote values are executable price authority. No price or package changes are made here.
+| Approved product | Composition / scope | Approved price |
+|---|---|---:|
+| 직업·커리어운 | Career / natal | KRW 9,900 |
+| 사업운 | Business / natal | KRW 9,900 |
+| 재물운 | Wealth / natal | KRW 9,900 |
+| 나의 인연·관계운 | Relationship / natal / general | KRW 9,900 |
+| 올해의 사주 | Current-year reading | KRW 7,900 |
+| 이번 달의 사주 | Current-month reading | KRW 4,900 |
+| 첫 번째 상대방과 관계 비교 | Two-person relationship comparison | KRW 12,900 |
+| 두 번째 이후 상대방 1명당 | Additional person for relationship comparison | KRW 9,900 |
+| 나의 인연·관계운 + 첫 관계 비교 | Relationship / natal / general + first comparison | KRW 19,900 |
+| 커리어·경제 패키지 | Career + business + wealth | KRW 24,900 |
+| 전체 사주 기본 | Career + business + wealth + relationship | KRW 29,900 |
+| 전체 사주 기본 + 올해 | Basic package + current-year reading | KRW 35,800 |
+| 전체 사주 기본 + 이번 달 | Basic package + current-month reading | KRW 33,800 |
+| 전체 사주 기본 + 올해 + 이번 달 | Basic package + current-year + current-month readings | KRW 39,700 |
 
-## Existing SKU fields versus Saju Reading support
+“전체 사주 기본” is an approved package of four named readings, not a separate standalone full-saju SKU. Relationship comparison and additional-person pricing are approved catalog items, but the engine must support the corresponding two-person source handling before those items can be fulfilled.
 
-“Preview supported” means the current Preview host can return a real engine-calculated Preview for the intent. It does not mean Production authority, paid Product support, Reader delivery, or a public sale is available.
+`commerce-saju-upgrade-pricing-v1.ts` is explicitly a non-saleable quote calculator, not the approved catalog or purchase authority. Its 13 keys do not match the approved list one-to-one: it includes `standard.family`, `standard.spouse`, `standard.compatibility`, `standard.current_concern`, and `bundle.love_relationship`, which are not in the supplied approval; its `bundle.full_saju` composition is career + wealth + business + relationship + family + spouse, unlike the approved four-field “전체 사주 기본”; and its `standard.love_relationship` KRW 9,900 value happens to match the approved single-product price but does not authorize sale. The older written KRW 8,900 decision is stale against the 2026-11-06 approval. No executable offer, live checkout, or payment authority is inferred from the screenshot or quote module.
 
-| Existing quote key / field | Engine intent correspondence | Current engine evidence | Product / paid state |
+## Approved catalog versus Saju Reading support
+
+“Preview supported” means the current Preview host can return an engine-calculated Preview for that intent. It does not establish production-authorized interpretation, exact catalog fulfillment, Reader delivery, or public sale. Package scope is supported only when each component is supported; adjacent previews must not be merged into an invented interpretation.
+
+| Approved product / package | Engine intent correspondence | Current engine evidence | Reading support today |
 |---|---|---|---|
-| `standard.career` / `career` | career / natal | Preview supported | No current paid Product authority; Production blocked |
-| `standard.wealth` / `wealth` | wealth / natal | Preview supported | No current paid Product authority; Production blocked |
-| `standard.business` / `business` | business / natal | Preview supported | No current paid Product authority; Production blocked |
-| `standard.love_relationship` / `relationship` | relationship / natal / general | Preview supported; exact intent matches the current Product spec | Product defined, but disabled; sale and Production Reading blocked |
-| `standard.family` / `family` | family / natal | Preview unsupported | Product/paid support not established |
-| `standard.spouse` / `spouse` | relationship / natal / spouse | Partial Preview only: bounded spouse-palace position statement; not an Official Reading interpretation | Not equivalent to a spouse-character or spouse-fortune reading; Production blocked |
-| `standard.year` / `year` | No approved one-to-one period intent from this field alone | Annual Preview unsupported | Product semantics and paid support not established |
-| `standard.month` / `month` | No approved one-to-one period intent from this field alone | Monthly Preview unsupported | Product semantics and paid support not established |
-| `standard.compatibility` / `compatibility` | compatibility / natal would require two-person source handling | Preview unsupported; current calculation-only service decision does not authorize a second-Birth reading route | Product/paid support not established |
-| `standard.current_concern` / `current_concern` | question-specific / natal would require a validated question contract | Preview unsupported | Product/paid support not established |
-| `bundle.career_economy` / career + wealth + business | Three separate natal intents | Each component has Preview output | Bundle is quote-only; no package sale or combined Reading authority |
-| `bundle.love_relationship` / relationship + family + spouse | relationship general + family + spouse | Relationship Preview supported; family unsupported; spouse position-only partial | Bundle is quote-only; no package sale or combined Reading authority |
-| `bundle.full_saju` / six fields | Mixed natal intents | Mixed: career, wealth, business and relationship Preview; family unsupported; spouse position-only partial | Quote-only code entry; not a current approved Product and not part of this release mapping |
+| 직업·커리어운 | career / natal | Preview supported | Partial: calculation Preview exists; Production interpretation and paid delivery blocked |
+| 사업운 | business / natal | Preview supported | Partial: calculation Preview exists; Production interpretation and paid delivery blocked |
+| 재물운 | wealth / natal | Preview supported | Partial: calculation Preview exists; Production interpretation and paid delivery blocked |
+| 나의 인연·관계운 | relationship / natal / general | Preview supported; exact intent matches the older relationship Product spec | Partial: calculation Preview exists; Production interpretation and paid delivery blocked |
+| 올해의 사주 | Current-year reading | Annual Preview unsupported | Insufficient; no current engine interpretation support established |
+| 이번 달의 사주 | Current-month reading | Monthly Preview unsupported | Insufficient; no current engine interpretation support established |
+| 첫 번째 상대방과 관계 비교 | Two-person compatibility / relationship comparison | Preview unsupported; no authorized second-birth reading route | Insufficient |
+| 두 번째 이후 상대방 1명당 | Additional two-person comparison | Preview unsupported; no authorized second-birth reading route | Insufficient |
+| 나의 인연·관계운 + 첫 관계 비교 | Relationship general + two-person comparison | One-person relationship Preview only; comparison unsupported | Partial; package as a whole unsupported |
+| 커리어·경제 패키지 | Career + business + wealth | All three have Preview output | Partial; no production package reading authority |
+| 전체 사주 기본 | Career + business + wealth + relationship | All four have Preview output | Partial; no production package reading authority |
+| 전체 사주 기본 + 올해 | Basic four + annual | Basic components Preview; annual unsupported | Partial; package incomplete |
+| 전체 사주 기본 + 이번 달 | Basic four + monthly | Basic components Preview; monthly unsupported | Partial; package incomplete |
+| 전체 사주 기본 + 올해 + 이번 달 | Basic four + annual + monthly | Basic components Preview; annual/monthly unsupported | Partial; package incomplete |
 
-The Saju production interpretation audit on current Saju `main` still reports no real production-authorized interpretation registry. Thus every row above is **not supported for Production paid delivery today**, even where Preview works. Do not fill unsupported scopes by combining adjacent domains, by reading a bundle label as semantic authority, or by asking the Reader model to invent the missing result.
+The Saju production interpretation audit on current Saju `main` still reports no real production-authorized interpretation registry. Thus **none of these catalog entries is ready for Production paid delivery today**, even where Preview works. Do not fill unsupported scopes with generic advice, by combining adjacent domains as if they were one official interpretation, or by asking the Reader model to invent the missing result.
 
 ## One calculated Preview used for quality review
 
