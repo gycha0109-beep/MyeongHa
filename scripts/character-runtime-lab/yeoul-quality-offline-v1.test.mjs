@@ -66,21 +66,27 @@ test('unrated question discrimination is not fabricated', () => {
 });
 
 test('only explicitly approved, relationship-matched examples are retrieved', () => {
-  const base = { candidateId: '1', candidateReply: '괜찮으세요?', sourcePrompt: '식사는 하셨어요?', situation: { userMove: '식사하셨어요?' }, preconditions: { relationshipStage: 'no_history', historyAvailable: false, approvedFacts: [] } };
+  const reviewEvidence = { reviewedBy: 'character_owner', sourceRefs: ['docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md', 'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'] };
+  const base = { candidateId: '1', candidateReply: '괜찮으세요?', sourcePrompt: '식사는 하셨어요?', situation: { userMove: '식사하셨어요?' }, reviewEvidence, preconditions: { relationshipStage: 'no_history', historyAvailable: false, approvedFacts: [] } };
   assert.equal(retrieveReviewedExamples({ examples: [{ ...base, reviewStatus: 'pending_canon_and_language_review' }], userMove: '식사했어요?', relationshipStage: 'no_history', historyAvailable: false }).length, 0);
   assert.equal(retrieveReviewedExamples({ examples: [{ ...base, reviewStatus: 'approved' }], userMove: '식사했어요?', relationshipStage: 'partner', historyAvailable: true }).length, 0);
   assert.equal(retrieveReviewedExamples({ examples: [{ ...base, reviewStatus: 'approved' }], userMove: '식사했어요?', relationshipStage: 'no_history', historyAvailable: false }).length, 1);
+  assert.equal(retrieveReviewedExamples({ examples: [{ ...base, reviewStatus: 'approved', reviewEvidence: null }], userMove: '식사했어요?', relationshipStage: 'no_history', historyAvailable: false }).length, 0);
+  assert.equal(retrieveReviewedExamples({ examples: [{ ...base, reviewStatus: 'approved' }], userMove: '자동차 보험료', relationshipStage: 'no_history', historyAvailable: false }).length, 0);
   const needingMemory = { ...base, reviewStatus: 'approved', preconditions: { relationshipStage: 'partner', historyAvailable: true, approvedFacts: ['ledger:known-event'] } };
   assert.equal(retrieveReviewedExamples({ examples: [needingMemory], userMove: '식사했어요?', relationshipStage: 'partner', historyAvailable: true }).length, 0);
 });
 
 test('research prompts cannot insert unreviewed example or replace model selection', () => {
-  assert.throws(() => buildResearchPromptPlan({ variant: 'hybrid', pinnedCoreAnchor: '고정 인격', languageRules: '자연스러운 존댓말', reviewedExamples: [{ reviewStatus: 'pending' }] }), /UNREVIEWED/);
+  assert.throws(() => buildResearchPromptPlan({ variant: 'hybrid', pinnedCoreAnchor: '고정 인격', languageRules: '자연스러운 존댓말', reviewedExamples: [{ reviewStatus: 'pending' }] }), /UNREVIEWED_OR_CONTEXT/);
   const plan = buildResearchPromptPlan({ variant: 'hybrid', pinnedCoreAnchor: '고정 인격', languageRules: '자연스러운 존댓말' });
   assert.equal(plan.modelSelection, 'unchanged_no_routing');
   assert.equal(plan.status, 'offline_candidate_only');
   assert.equal(plan.providerRules.allowFallbacks, false);
   assert.ok(!plan.system.includes('사용자:'));
+  const reviewEvidence = { reviewedBy: 'character_owner', sourceRefs: ['docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md', 'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'] };
+  const e = { candidateId: '1', reviewStatus: 'approved', reviewEvidence, sourcePrompt: '식사했어요?', candidateReply: '네.', preconditions: { relationshipStage: 'no_history', historyAvailable: false, approvedFacts: [] } };
+  assert.throws(() => buildResearchPromptPlan({ variant: 'hybrid', pinnedCoreAnchor: '고정 인격', languageRules: '존댓말', relationshipState: 'partner', historyAvailable: true, reviewedExamples: [e] }), /CONTEXT_MISMATCHED/);
 });
 
 test('offline CLI preserves source bytes, writes outputs, and rejects holdout inputs', async () => {
@@ -92,6 +98,10 @@ test('offline CLI preserves source bytes, writes outputs, and rejects holdout in
   const result = await runOffline({ inputPath: input, outputDir: output });
   assert.equal(result.summary.count, 288);
   assert.match(await readFile(join(output, 'summary.json'), 'utf8'), /sourceSha256/);
+  const preflight = JSON.parse(await readFile(join(output, 'optimization-preflight.json'), 'utf8'));
+  const feedback = JSON.parse(await readFile(join(output, 'feedback-revision-proposals.json'), 'utf8'));
+  assert.equal(preflight.externalCalls, 0);
+  assert.equal(feedback.qualityGainEstablished, false);
   assert.equal(JSON.parse(await readFile(input, 'utf8')).responses.length, 288);
   const holdout = join(dir, 'holdout-cases.json');
   await writeFile(holdout, JSON.stringify(data));
