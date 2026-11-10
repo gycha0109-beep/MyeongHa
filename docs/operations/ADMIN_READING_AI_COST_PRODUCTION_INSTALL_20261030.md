@@ -77,3 +77,11 @@
 - 조회 결과는 크기·필드 allowlist·정확한 호출 ID를 확인한다. 행 부재·중복·변조·원문 추가·DB 장애는 출처 증명을 생성하지 않으며, 반환한 자료도 기존 `createSajuSignedProviderCallSourceAuthorityV1`의 **독립 HMAC·토큰·호출 식별자 검증**이 필수다. 브라우저·관리자 UI·공개 API를 통해 증명을 등록/조회하지 않는다.
 - `apps/api/src/reading-ai-saju-source-receipt-db-reader-v1.test.ts`: 정상 서명 검증기 결합, 잘못된 DB role 차단, 부적절한 UUID 거부, 누락/중복/변조/초과 길이 거부, DB 예외/롤백 처리 5개 신규 테스트. 기존 서명 검증 4개·DB Attempt 검증 4개와 총 13건 통과, 변경 파일 TypeScript 6 strict 검사 통과. 저장소 루트에는 ESLint 설정이 없어 별도 단독 ESLint 실행은 적용되지 않았으며 PR CI에서 프로젝트 지정 검사 확인이 필요.
 - 이 파일은 출처 **조회 포트**만 구현한다. 운영 Saju 출처 DB 역할·연결 비밀번호·TLS 연결·서버 전용 인증 바인딩은 여전히 미연결. Saju 실제 발급 authority, 실행 시도 UUID·source ref 최종화, Source 영수증 사후 검증/중복 재처리, 공급사 전체 비용 정확성, 비용 Writer 연결/실수집은 HOLD. 기존 운영 DB 설치·로그인·서비스·고객/결제/크레딧 변경 없음. `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-10 — A4 출처 서명·정본 Reading 실행·비용 Writer 3중 검증 조합 (오프라인)
+
+- Saju Source 전용 DB Reader, MyeongHa 정본 Reading attempt 전용 Reader, MyeongHa AI Cost 전용 Writer를 **서로 다른 서버 비공개 PostgreSQL 연결**로 묶는 `apps/api/src/reading-ai-saju-proven-cost-composition-v1.ts`를 추가. 세 개가 같은 연결 풀인 구성은 생성 단계에서 거절. 각 계정은 기존 어댑터에서 정확한 DB `current_user`를 별도 확인한다.
+- 호출마다 기존 검증 순서: (1) 출처 소유 영구 영수증 조회 + HMAC 서명·요청 식별자·실제 사용량 정확히 확인 → (2) 종료된 DB 실행 시도의 `executionAttemptId`와 `externalRequestRef`가 전체 DB에서 유일한지 확인 → (3) 전용 Writer RPC 기록. 호출자나 Preview Reader ID를 명하 UUID로 단순 대입하지 않는다. 검증 실패·불명확·누락·계정 오류면 원장 기록하지 않는다.
+- `apps/api/src/reading-ai-saju-proven-cost-composition-v1.test.ts`: 정상 순서·정확한 원장 투영·영수증 누락/변조·사용량 변경·정본 실행 누락/중복/불일치·전용 계정 오류·스토리지 장애·공유 풀 거부 7개 신규 테스트. 관련 기존 테스트 합계 16건과 파일 지정 TypeScript strict 검사 통과.
+- 비용 Writer는 기존 RPC 경계 외에 직접 DB INSERT·UPDATE를 실행하지 않는다. 이 신규 조합은 **서버 내부 미설치 함수**이며 공개 라우트/회원/Reading/결제/크레딧 처리·운영 DB·역할·비밀키·Cloudflare 설정을 변경하지 않았다.
+- Saju Source PostgreSQL Writer/Reader 설치, 실서비스에서 서버 간 인증된 DB attempt 발급·종료 ref 결속, 실제 OpenAI callback 설치와 비용 영수증 전달, 사주 전체 누락 호출 대조 및 공급사 청구·환율 근거는 여전히 HOLD. 서명과 정본 DB 일치만으로 완전한 비용 집계를 주장할 수 없으며 `ROADMAP_COMPLETE` 미충족.
