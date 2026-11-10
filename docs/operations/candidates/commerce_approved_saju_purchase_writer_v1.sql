@@ -266,6 +266,22 @@ begin
           select 1 from public.commerce_saju_verified_refund_effects_v1 settled
           where settled.provider_event_id = event.id and settled.receipt_id = receipt.id
         )
+        -- The approved full-cancel command records all Grant effects and
+        -- completes the event in the same transaction as receipt revocation.
+        and (
+          receipt.verification_status='revoked' and event.status='processed'
+          and event.event_type='Transaction.Cancelled' and event.provider='portone_v2'
+          and event.environment='production' and event.resolved_subject_id=receipt.subject_id
+          and event.external_transaction_id=receipt.external_transaction_id
+          and event.verified_payload_jsonb->>'schemaVersion'='portone-full-cancel-verified-v1'
+          and event.verified_payload_jsonb->>'verifiedAmountMinor'=receipt.verified_amount_minor::text
+          and event.verified_payload_jsonb->>'verifiedCurrency'=receipt.verified_currency
+          and not exists (
+            select 1 from public.entitlement_grants active
+            where active.source_receipt_id=receipt.id and active.subject_id=receipt.subject_id
+              and active.grant_source_type='purchase' and active.status<>'revoked'
+          )
+        ) is not true
     ) then
       raise exception using errcode = 'P0001', constraint = 'approved_saju_cancellation_pending',
         message = 'Approved Saju purchase has an unsettled related cancellation';

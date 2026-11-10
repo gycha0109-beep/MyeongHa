@@ -6,6 +6,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_reading_access_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuance_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_checkout_selection_v1.sql
 
 insert into public.saju_domain_runtime(saju_domain,availability,capability_version,updated_at)
 select domain,'available','isolated-approved-v1',now()
@@ -686,6 +687,11 @@ begin
            or not exists(select 1 from public.qry_approved_saju_component_record_v1(actor,additional_reading,null,true)) then
           raise exception 'Refund effect did not revoke just the exact comparison purchase';
         end if;
+        payload := commerce_saju_private.resolve_approved_purchase_admission_v1(actor,record_id,self_revision,
+          offer_id,capability_id,offer_key,'after-settled-refund',target_id);
+        perform 1 from pg_temp.approved_fixture_purchase(actor,gen_random_uuid(),record_id,self_revision,
+          offer_id,'after-settled-refund',offer_snapshot,capability_snapshot,payload)
+          as x(purchase_intent_id uuid,replayed boolean,admission_hash text);
       end if;
     end if;
   end loop;
@@ -694,5 +700,89 @@ begin
   end if;
 end
 $fixture$;
+
+do $checkout_selection$
+declare
+  actor uuid := gen_random_uuid();
+  actor_auth uuid := gen_random_uuid();
+  profile uuid := gen_random_uuid();
+  first_revision uuid := gen_random_uuid();
+  next_revision uuid := gen_random_uuid();
+  pinned_record uuid;
+  purchase uuid := gen_random_uuid();
+  entry record;
+  selection record;
+  offer record;
+  selected_admission jsonb;
+  expected_constraint text;
+begin
+  insert into auth.users(id) values(actor_auth);
+  insert into public.subjects(id,kind,auth_user_id,status,created_at,updated_at)
+  values(actor,'member',actor_auth,'active',now(),now());
+  perform set_config('myeongha.subject_id',actor::text,true);
+  insert into public.birth_profiles(id,subject_id,profile_kind,created_at,updated_at)
+  values(profile,actor,'self',now(),now());
+  insert into public.birth_profile_revisions(
+    id,birth_profile_id,subject_id,revision_no,calendar_type,birth_date,time_known,input_hash,created_at
+  ) values(first_revision,profile,actor,1,'solar','1992-01-15',false,'fixture-checkout-self',now()),
+    (next_revision,profile,actor,2,'solar','1992-01-16',false,'fixture-checkout-new-self',now());
+  update public.birth_profiles set current_revision_id=first_revision where id=profile;
+
+  for entry in
+    select release.*, approved.counterpart_order
+    from commerce_saju_private.approved_fulfillment_release_v1 release
+    cross join lateral commerce_saju_private.approved_offer_v1(release.approved_offer_id) approved
+  loop
+    select * into strict selection from commerce_saju_private.select_approved_saju_checkout_v1(
+      actor,entry.approved_offer_id,'checkout-' || entry.approved_offer_id,
+      case when entry.counterpart_order is null then null else gen_random_uuid() end
+    );
+    pinned_record := coalesce(pinned_record,selection.saju_record_id);
+    if selection.product_offer_id<>entry.product_offer_id or selection.birth_revision_id<>first_revision
+      or selection.saju_record_id<>pinned_record then raise exception 'Catalog selection did not bind the same self Record'; end if;
+  end loop;
+  if (select count(*) from public.commerce_saju_records_v1 where subject_id=actor)<>1 then
+    raise exception 'Catalog selection created duplicate Records';
+  end if;
+
+  select release.*, physical.product_id, physical.external_product_id,
+    capability.definition_version, capability.definition_hash
+    into strict offer
+  from commerce_saju_private.approved_fulfillment_release_v1 release
+  join public.product_offers physical on physical.id=release.product_offer_id
+  join public.product_capability_sets capability on capability.id=release.capability_set_id
+  where release.approved_offer_id='career';
+  selected_admission := commerce_saju_private.resolve_approved_purchase_admission_v1(
+    actor,pinned_record,first_revision,offer.product_offer_id,offer.capability_set_id,'career','checkout-career',null
+  );
+  perform 1 from pg_temp.approved_fixture_purchase(actor,purchase,pinned_record,first_revision,offer.product_offer_id,
+    'checkout-career',jsonb_build_object('productOfferId',offer.product_offer_id,'productId',offer.product_id,
+      'platform','web','provider','portone_v2','externalProductId',offer.external_product_id),
+    jsonb_build_object('capabilitySetId',offer.capability_set_id,'definitionVersion',offer.definition_version,
+      'definitionHash',offer.definition_hash),selected_admission)
+    as x(purchase_intent_id uuid,replayed boolean,admission_hash text);
+
+  update public.birth_profiles set current_revision_id=next_revision where id=profile;
+  select * into strict selection from commerce_saju_private.select_approved_saju_checkout_v1(
+    actor,'career','checkout-career',null
+  );
+  if selection.saju_record_id<>pinned_record or selection.birth_revision_id<>first_revision then
+    raise exception 'Checkout replay changed the purchase Birth revision';
+  end if;
+  begin
+    perform 1 from commerce_saju_private.select_approved_saju_checkout_v1(actor,'month','checkout-career',null);
+    raise exception 'Checkout replay allowed a different catalog item';
+  exception when unique_violation then
+    get stacked diagnostics expected_constraint=constraint_name;
+    if expected_constraint<>'approved_saju_replay_conflict' then raise; end if;
+  end;
+  select * into strict selection from commerce_saju_private.select_approved_saju_checkout_v1(
+    actor,'month','checkout-new-month',null
+  );
+  if selection.saju_record_id=pinned_record or selection.birth_revision_id<>next_revision then
+    raise exception 'New checkout did not select the edited self revision';
+  end if;
+end
+$checkout_selection$;
 rollback;
 select 'PASS_APPROVED_SAJU_PURCHASE_SCOPE_PG17';

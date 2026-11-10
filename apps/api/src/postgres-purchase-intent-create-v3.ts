@@ -1,4 +1,5 @@
 import { canonicalJson } from '../../../packages/domain/src/index.js';
+import { ApiCommandError } from './api-error.js';
 import type {
   ApprovedSajuPurchaseAdmissionV1,
   ApprovedSajuPurchaseAuthorityPortV1,
@@ -463,4 +464,25 @@ export function createPostgresApprovedSajuPurchaseAuthorityV1(
     },
   };
   return Object.freeze(authority);
+}
+
+export async function selectPostgresApprovedSajuCheckoutV1(
+  client: PostgresTransactionQueryV1,
+  input: { subjectId: string; approvedOfferId: string; idempotencyKey: string; targetPersonId?: string },
+): Promise<{ productOfferId: string; sajuRecordId: string; birthRevisionId: string } | null> {
+  try {
+    const { rows } = await client.query<{ productOfferId: string; sajuRecordId: string; birthRevisionId: string }>(
+      `select product_offer_id::text as "productOfferId", saju_record_id::text as "sajuRecordId",
+        birth_revision_id::text as "birthRevisionId"
+       from commerce_saju_private.select_approved_saju_checkout_v1($1::uuid,$2::text,$3::text,$4::uuid)`,
+      [input.subjectId, input.approvedOfferId, input.idempotencyKey, input.targetPersonId ?? null],
+    );
+    if (rows.length > 1) throw new Error('Approved Saju checkout returned ambiguous authority.');
+    return rows[0] ?? null;
+  } catch (error) {
+    if (postgresConstraint(error) === 'approved_saju_replay_conflict') {
+      throw new ApiCommandError('IDEMPOTENCY_CONFLICT', 'Approved Saju checkout selection conflicts.');
+    }
+    throw error;
+  }
 }

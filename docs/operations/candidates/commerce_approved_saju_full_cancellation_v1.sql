@@ -115,6 +115,8 @@ begin
   end if;
   update public.commerce_receipts set verification_status='revoked'
     where id=v_receipt.id and verification_status='verified';
+  update public.commerce_provider_events set status='processed'
+    where id=v_event.id and status='verified';
   return jsonb_build_object(
     'disposition',case when v_count=0 then 'cancelled_before_grant'
       when v_all_attributed then 'revoked' else 'cancellation_recorded_unattributed_grants' end,
