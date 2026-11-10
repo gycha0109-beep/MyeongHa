@@ -57,6 +57,14 @@ export type SajuHeldTemporalEvidenceV1 = Readonly<{
   interpretationStatus: 'insufficient_authorized_semantics';
   segments: readonly Readonly<Record<string, unknown>>[];
   dayunOverlap: Readonly<Record<string, unknown>>;
+  researchSignals?: readonly Readonly<{
+    claimId: string;
+    segmentId: string;
+    kind: 'primary' | 'tension';
+    headline: string;
+    statement: string;
+    epistemicType: 'future_tendency';
+  }>[];
 }>;
 
 export interface SajuHeldSourceProofVerifierTrustV1 {
@@ -148,6 +156,7 @@ function validTemporalEvidence(
 ): evidence is SajuHeldTemporalEvidenceV1 {
   if (!record(evidence) || !record(request) || !record(request.reading)) return false;
   const { evidenceHash, ...content } = evidence;
+  const segments = evidence.segments;
   const scope = request.reading.text === '올해' ? 'annual'
     : request.reading.text === '이번 달' ? 'monthly' : undefined;
   if (typeof evidence.referenceDateTime !== 'string'
@@ -162,8 +171,17 @@ function validTemporalEvidence(
     && (scope === 'annual' ? evidence.targetMonth === undefined : evidence.targetMonth === Number(period.month))
     && evidence.snapshotId === material.snapshotId && evidence.responseBodyHash === payload.responseBodyHash
     && typeof evidence.calculationHash === 'string' && HASH.test(evidence.calculationHash)
-    && Array.isArray(evidence.segments) && evidence.segments.length > 0 && evidence.segments.every(record)
+    && Array.isArray(segments) && segments.length > 0 && segments.every(record)
     && record(evidence.dayunOverlap)
+    && (evidence.researchSignals === undefined || (Array.isArray(evidence.researchSignals)
+      && evidence.researchSignals.length <= 10 && evidence.researchSignals.every(signal =>
+        record(signal) && typeof signal.claimId === 'string' && signal.claimId.length > 0
+        && (signal.kind === 'primary' || signal.kind === 'tension')
+        && signal.epistemicType === 'future_tendency'
+        && typeof signal.headline === 'string' && signal.headline.length > 0
+        && typeof signal.statement === 'string' && signal.statement.length > 0
+        && segments.some(segment => segment.id === signal.segmentId)
+      )))
     && typeof evidenceHash === 'string' && evidenceHash === payload.temporalEvidenceHash
     && evidenceHash === digest(content);
 }

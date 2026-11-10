@@ -126,12 +126,17 @@ describe('2B-3C-3 MyeongHa source proof verification, Preview HOLD only', () => 
   it('binds the optional evidence to the signed response and the purchased Seoul period', async () => {
     const referenceDateTime = '2026-11-30T15:00:00.000Z';
     const request = { ...expectedRequest, reading: { text: '이번 달', periodReferenceDateTime: referenceDateTime } };
-    const temporal = { scope: 'monthly', referenceDateTime, targetYear: 2026, targetMonth: 12 };
+    const signal = { claimId: 'fixture-claim-1', segmentId: 'after_jeol', kind: 'primary',
+      headline: '검토용 기간 풀이', statement: '검토용 근거입니다.', epistemicType: 'future_tendency' };
+    const temporal = { scope: 'monthly', referenceDateTime, targetYear: 2026, targetMonth: 12, researchSignals: [signal] };
     const input = { ...context(), expectedRequestBody: request, expectTemporalEvidence: true as const };
     const valid = envelope(request, nonce, temporal);
     const altered = structuredClone(valid);
     mutate(altered, ['temporalEvidence', 'segments', '0', 'id'], 'before_jeol');
-    for (const proof of [envelope(request), altered, envelope(request, nonce, { ...temporal, targetMonth: 11 })]) {
+    for (const proof of [
+      envelope(request), altered, envelope(request, nonce, { ...temporal, targetMonth: 11 }),
+      envelope(request, nonce, { ...temporal, researchSignals: [{ ...signal, segmentId: 'outside_period' }] }),
+    ]) {
       const authority = trust();
       expect(await verifySajuHeldSourceProofV1(proof, authority, input)).toMatchObject({ state: 'blocked' });
       expect(authority.claimNonceOnce).not.toHaveBeenCalled();
