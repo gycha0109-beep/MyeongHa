@@ -1,3 +1,13 @@
+### 2026-11-10 KST — Gate 1 / Phase 8-A: 실제 필터링된 roles.sql 대조, GRANT 1문장 미해석으로 HOLD 유지
+
+- **기준 결속:** PR #3193 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42765406281 SUCCESS, 병합 main `5144bc873983b06c44f5ef813fd17df2a3c2d13d`. 기존 암호화 원본 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638 (artifact 13734401337; source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`; frontier `20261109071019`) 재사용. 격리 PostgreSQL 17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42767722985 SUCCESS, artifact 13740043509, incident reference `2026-11-10T03:56:30Z`; Production 재백업·SQL·권한 설정·IAM·Hosted 변경 없음.
+- **실측:** 봉인 source 앱↔비앱 직접 membership 48개. 격리 러너의 **실제 필터된 `roles.sql`** 에서 GRANT로 시작하는 문장 8개 중 정상 문법 인식 7개, **미해석 1개**. 인식한 문장에 원본 역할 쌍 존재 0 / 부재 48, 전부 현재 reserved-recipient 필터 후보 48 / 기타 0. 미해석 GRANT 1문장의 수신자·대상 역할을 판별하지 못했으므로 **48개 연결이 백업 SQL에서 전부 확실히 제거됐다는 근거는 아직 부족**. 진단 verdict=`HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED`이며 이 HOLD를 우회하지 않음.
+- **기존 비교 병존:** isolated source→restored catalog 앱 내부 역할 43/43, 직접 멤버십 7/7, 예상 grantor portable rewrite 7/7, 외부 역할 연결 48/0 유지. 앱 스키마 legacy ACL hash 29 objects 차이, Provider COPY 29 skipped/3 projected, migration ledger 및 Hosted Auth/Storage 미복구. `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN, `NOT_ACCEPTED`, ROADMAP_COMPLETE 금지.
+- **비식별 증거:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`의 `actualFilteredRolesSqlObservation`에 기존 원본 복원 관측은 유지하면서 백업/실행/아티팩트 결속과 hash를 추가. `role-dump-coverage.json` SHA256 `d6474c2240c381fd0da8e95b8ee38a4a323d3828542666dddbd4438239c0db19`, `app-schema-parity.json` `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `8caf28f1bcdf194820fce9d053a73a71675cb180f2f3c5aea2062da64240292d`. 공개 자료에 raw role names, GRANT tuples, 개인정보, 토큰 없음.
+- **다음 Gate 1 작업:** 보안 경계를 유지한 채 기존 PostgreSQL 17 roles-only GRANT 구문의 미해석 1건을 정확히 분류하도록 파서를 보강한 뒤 동일 암호화 백업의 격리 복원 1회로 coverage 판정을 재확인. 원본과 같은 DB 스냅샷·grantor/options/Provider 소유·실효권한 동등성은 별도 미증명으로 둔다. 임의 권한 생성/복구·Migration repair·유료 Hosted·Privacy canary는 하지 않는다.
+
+Watchtower-Track: ops
+
 ### 2026-11-10 KST — Gate 1 / Phase 8-A: 암호화 원본과 실제 필터링된 roles.sql 직접 연결 포함 여부 비교 추가
 
 - **전체 목표·기준:** 기존 운영 종료 집중 로드맵 Gate 1 / Phase 8-A #6의 권한 복구 동등성 검증을 계속한다. PR #3191 필수 Integration #42761495378 성공 후 main `c6c3374fe4cb541892146a5dc9e8a4975adcf67b` 병합. 기존 암호화 백업 #42752268638, 같은 source의 격리 복원 #42759540674에서 앱↔외부 역할 직접 membership 48건 중 48건 누락, 모두 기존 strict roles-only reserved-recipient 필터 후보였음. 이 수치는 **실제 roles.sql 행별 부재를 인증하지 않으므로** 추가 진단이 필요하다.
