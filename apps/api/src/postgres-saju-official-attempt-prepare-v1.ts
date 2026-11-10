@@ -4,6 +4,10 @@ import {
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type { SajuOfficialAttemptPreparePortV1 } from './saju-production-reading-execution.js';
+import {
+  admitApprovedSajuIssueAttemptV1,
+  type ApprovedSajuIssueAttemptBindingV1,
+} from './postgres-approved-saju-issue-scope-v1.js';
 
 /**
  * Internal official Reading attempt allocator. It reuses the existing governed
@@ -60,6 +64,7 @@ export function createPostgresSajuOfficialAttemptPreparePortV1(input: Readonly<{
   transportKey: string;
   sajuEngineKey: string;
   requestedEngineVersion: string | null;
+  approvedPurchase?: ApprovedSajuIssueAttemptBindingV1;
 }>): SajuOfficialAttemptPreparePortV1 {
   const validConfiguration = validServerKey(input.transportKey)
     && validServerKey(input.sajuEngineKey)
@@ -75,6 +80,11 @@ export function createPostgresSajuOfficialAttemptPreparePortV1(input: Readonly<{
           verifiedEvidence: input.verifiedEvidence,
           execute: async ({ client, resolvedSubject }) => {
             if (resolvedSubject.subjectId !== request.subjectId) return false;
+            const approved = input.approvedPurchase;
+            // Take the exact Grant lock before the transport command locks Reading.
+            // Finalize uses the same order when it rechecks the active purchase.
+            if (approved !== undefined
+              && !await admitApprovedSajuIssueAttemptV1(client, approved, request, 'before_allocation')) return false;
             const attempt = await client.query<PrepareRow>(PREPARE_SQL, [
               request.subjectId,
               request.readingId,
@@ -98,11 +108,17 @@ export function createPostgresSajuOfficialAttemptPreparePortV1(input: Readonly<{
             // ones. Never send a second Saju network request for the same ID.
             if (row.replayed) return false;
 
-            const result = await client.query<{ admitted: unknown }>(CURRENT_PURCHASE_SQL, [
-              request.subjectId, request.readingId, request.readingSessionId,
-              request.executionAttemptId, request.sourceBirthRevisionId,
-            ]);
-            if (result.rows.length !== 1 || result.rows[0]?.admitted !== true) {
+            let admitted: boolean;
+            if (approved !== undefined) {
+              admitted = await admitApprovedSajuIssueAttemptV1(client, approved, request);
+            } else {
+              const result = await client.query<{ admitted: unknown }>(CURRENT_PURCHASE_SQL, [
+                request.subjectId, request.readingId, request.readingSessionId,
+                request.executionAttemptId, request.sourceBirthRevisionId,
+              ]);
+              admitted = result.rows.length === 1 && result.rows[0]?.admitted === true;
+            }
+            if (!admitted) {
               // A mere false result must NOT commit an unentitled running attempt.
               throw deniedAfterAllocation;
             }

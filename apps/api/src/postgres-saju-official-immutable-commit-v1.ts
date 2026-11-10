@@ -1,6 +1,7 @@
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import type { SajuOfficialImmutableCommitPortV1 } from './saju-official-reading-issuer-db-persistence-v1.js';
+import type { ApprovedSajuIssueAttemptBindingV1 } from './postgres-approved-saju-issue-scope-v1.js';
 
 /**
  * Existing DB Owner atomic finalize command; NOT a new writer, grant or
@@ -45,6 +46,10 @@ from public.qry_saju_official_stored_lineage_v3(
 )
 `.trim();
 
+const VERIFY_APPROVED_STORED_LINEAGE_SQL = VERIFY_STORED_LINEAGE_SQL.replace(
+  'public.qry_saju_official_stored_lineage_v3', 'commerce_saju_private.approved_stored_lineage_v1',
+);
+
 type StoredLineageRow = Readonly<{
   nativeReadingId: unknown;
   externalRequestRef: unknown;
@@ -77,9 +82,13 @@ function strictString(value: unknown, label: string): string {
 
 export function createPostgresSajuOfficialImmutableCommitPortV1(
   client: PostgresTransactionQueryV1,
+  approvedPurchase?: ApprovedSajuIssueAttemptBindingV1,
 ): SajuOfficialImmutableCommitPortV1 {
   return Object.freeze({
     async finalizeSuccess(input: Parameters<SajuOfficialImmutableCommitPortV1['finalizeSuccess']>[0]) {
+      if (approvedPurchase !== undefined && input.sourceRequestHash !== approvedPurchase.sourceRequestHash) {
+        throw new Error('Approved Saju issuer did not verify the purchased source request.');
+      }
       // Caller has already verified issuer provenance, exact ID mapping,
       // immutable birth revision and current Commerce/Privacy authority.
       // Do not run an open-ended UPDATE or forge a DB success state.
@@ -109,9 +118,18 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
         throw new Error('Saju official immutable DB commit returned an invalid replay state.');
       }
 
-      const verified = await client.query<StoredLineageRow>(VERIFY_STORED_LINEAGE_SQL, [
-        input.subjectId, input.readingId, input.executionAttemptId,
-      ]);
+      if (approvedPurchase !== undefined) {
+        await client.query(
+          'select commerce_saju_private.bind_approved_component_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::text,$6::text)',
+          [input.subjectId, approvedPurchase.purchaseIntentId, approvedPurchase.component,
+            input.readingId, approvedPurchase.sourceRequestHash, input.storedResponseHash],
+        );
+      }
+      const verified = await client.query<StoredLineageRow>(
+        approvedPurchase === undefined ? VERIFY_STORED_LINEAGE_SQL : VERIFY_APPROVED_STORED_LINEAGE_SQL, [
+          input.subjectId, input.readingId, input.executionAttemptId,
+        ],
+      );
       const lineage = verified.rows[0];
       if (verified.rows.length !== 1 || !lineage
         || lineage.nativeReadingId !== input.nativeReadingId

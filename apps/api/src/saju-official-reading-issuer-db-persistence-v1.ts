@@ -100,6 +100,7 @@ export interface SajuOfficialImmutableCommitPortV1 {
     readonly engineVersion: string;
     readonly externalRequestRef: string;
     readonly nativeReadingId: string;
+    readonly sourceRequestHash?: string;
     readonly sourceResponseHash: string;
     readonly sourceBirthInputHash: string;
     readonly readingContractVersion: typeof RESPONSE_VERSION;
@@ -262,6 +263,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     engineVersion: source.engineVersion,
     externalRequestRef: source.externalRequestRef,
     nativeReadingId: source.nativeReadingId,
+    sourceRequestHash: source.sourceRequestHash,
     sourceResponseHash: originalHash,
     sourceBirthInputHash: source.sourceBirthInputHash,
     readingContractVersion: RESPONSE_VERSION,

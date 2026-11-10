@@ -1,4 +1,5 @@
 import type { BirthProfileReadResponseV1 } from './birth-profile-read.js';
+import type { SajuBirthRevisionBindingV1 } from '../../../packages/domain/src/index.js';
 
 // Reject malformed prepared identities before any paid Saju network execution.
 // The canonical owner, attempt and session are still rechecked by the governed DB transaction.
@@ -94,26 +95,39 @@ export interface SajuOfficialIssuedDbTransactionPortV1 {
  * On completion the existing DB finalize command stores the immutable record,
  * source native ID, response hash and outbox entry as a single DB transaction.
  */
-export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<AdmittedResponse>(
-  input: Readonly<{
-    profile: BirthProfileReadResponseV1;
-    readingText: string;
-    targetPersonRef?: string;
-    /** Immutable period reference resolved from the purchase, when applicable. */
-    periodReferenceDateTime?: string;
-    adapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
-    subjectId: string;
-    readingId: string;
-    readingSessionId: string;
-    executionAttemptId: string;
-    outboxEventId: string;
-    /** Pinned by the authoritative DB Reading Session, not by the browser. */
-    sourceBirthRevisionId: string;
-    sourceVerifier?: SajuOfficialSourceVerificationPortV1;
-    mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
-    /** Required single-use DB attempt allocation before any Saju source call. */
-    attemptPrepare?: SajuOfficialAttemptPreparePortV1;
-    dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
+export interface SajuOfficialReadingExecutionInputV1<AdmittedResponse> {
+  readingText: string;
+  targetPersonRef?: string;
+  /** Immutable period reference resolved from the purchase, when applicable. */
+  periodReferenceDateTime?: string;
+  adapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
+  subjectId: string;
+  readingId: string;
+  readingSessionId: string;
+  executionAttemptId: string;
+  outboxEventId: string;
+  /** Pinned by the authoritative DB Reading Session, not by the browser. */
+  sourceBirthRevisionId: string;
+  sourceVerifier?: SajuOfficialSourceVerificationPortV1;
+  mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
+  /** Required single-use DB attempt allocation before any Saju source call. */
+  attemptPrepare?: SajuOfficialAttemptPreparePortV1;
+  dbTransaction?: SajuOfficialIssuedDbTransactionPortV1;
+}
+
+export function executeAndPersistCurrentBirthSajuOfficialReadingV1<AdmittedResponse>(
+  input: Readonly<SajuOfficialReadingExecutionInputV1<AdmittedResponse> & { profile: BirthProfileReadResponseV1 }>,
+): Promise<SajuOfficialIssuanceResultV1> {
+  return executeAndPersistPinnedBirthSajuOfficialReadingV1({
+    ...input,
+    resolveBirth: () => bindCurrentBirthProfileRevisionForSajuV1(input.profile),
+  });
+}
+
+/** Internal execution shared by current-profile and paid pinned-revision callers. */
+export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<AdmittedResponse>(
+  input: Readonly<SajuOfficialReadingExecutionInputV1<AdmittedResponse> & {
+    resolveBirth: () => SajuBirthRevisionBindingV1;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
   const unavailable = Object.freeze({
@@ -148,7 +162,7 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     return unavailable;
   }
 
-  const birth = bindCurrentBirthProfileRevisionForSajuV1(input.profile);
+  const birth = input.resolveBirth();
   if (birth.birthRevisionRef !== input.sourceBirthRevisionId) {
     return Object.freeze({
       ...unavailable,

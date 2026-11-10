@@ -15,6 +15,7 @@ import {
 import {
   SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1,
 } from './saju-official-reading-issuer-db-persistence-v1.js';
+import type { ApprovedSajuIssueAttemptBindingV1 } from './postgres-approved-saju-issue-scope-v1.js';
 
 /**
  * Concrete server-only composition for a Postgres subject transaction.
@@ -27,6 +28,7 @@ import {
 export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+  approvedPurchase?: ApprovedSajuIssueAttemptBindingV1;
 }>): SajuOfficialIssuedDbTransactionPortV1 {
   return Object.freeze({
     async run(request: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) {
@@ -44,8 +46,8 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
             });
           }
           return request.commit({
-            currentAuthority: createPostgresSajuOfficialCurrentAuthorityPortV1(client),
-            commitPort: createPostgresSajuOfficialImmutableCommitPortV1(client),
+            currentAuthority: createPostgresSajuOfficialCurrentAuthorityPortV1(client, input.approvedPurchase),
+            commitPort: createPostgresSajuOfficialImmutableCommitPortV1(client, input.approvedPurchase),
           });
         },
       });
