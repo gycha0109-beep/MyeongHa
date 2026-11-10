@@ -82,3 +82,10 @@ node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input /private
 - `responses[*].providerReportedCostUsd` 합계 `0.04232348479999998` (수치 오차를 무시하면 `0.0423234848`).
 - 합계 차이 `(실험 총액 - 개별 응답 합계) = 약 0.0000449852 USD`. **원인은 미확인**이며 재청구, 누락, 재시도 등 특정 원인을 임의로 단정하지 않는다.
 - 초기 파서는 이 둘이 일치하지 않으면 거부했으나 정제본 실제 내용과 충돌한다. 수정한 파서는 메타데이터 비용, 개별 합계, 차이, 미정 원인 상태를 별도로 유지한다. `costReconciled = false`는 보존하며 원본 JSON에 쓰지 않는다.
+
+### 교사 모델 출력의 오프라인 접수 계약
+
+- 교사 API를 **호출하지 않고**, 출력이 나중에 제출될 경우 `stageTeacherSuggestion({teacherInput, teacherOutput})`가 입력 출처·기존 12개 개발 질문·여울 Runtime에 정의된 행동 ID·허용 사실·공유 기억 사용·관계 진전 여부를 확인한다.
+- 출처 불명, 허가되지 않은 사실 ID, 존재하지 않는 여울 행동, 관계 증거 없는 공동 기억·연애 상태 승격, 홀드아웃 입력을 거부한다.
+- 형식 검사를 통과해도 문장 내부의 숨은 사실/말투 오류를 자동으로 증명할 수 없으므로 결과는 `pending_character_owner_review`에 머무르며 Production으로 자동 승격하지 않는다.
+- 신규 테스트 추가 후 로컬 Node 13개 PASS. 이번 단계에 새로운 유료 교사·DeepSeek 호출은 없다.
