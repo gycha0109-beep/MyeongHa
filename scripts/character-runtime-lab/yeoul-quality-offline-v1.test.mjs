@@ -47,6 +47,17 @@ test('288 independent matrix combinations and original user ratings are validate
   assert.ok(result.teacherInputs.every(x => x.review_status.startsWith('pending')));
 });
 
+test('source-level and per-row reported costs remain separate when they disagree', () => {
+  const data = fixture();
+  data.sourceExperiment.providerReportedCostUsd = 0.04236847;
+  const result = validateEvaluationExport(data);
+  assert.equal(result.providerReportedCostUsd, 0.04236847);
+  assert.equal(result.responseRowsReportedCostUsd, 0);
+  assert.equal(result.costGapRunMinusRowsUsd, 0.04236847);
+  assert.equal(result.costReconciled, false);
+  assert.equal(result.costGapCause, 'unverified_do_not_infer');
+});
+
 test('duplicate source key and incomplete matrix are rejected', () => {
   const data = fixture();
   data.responses[1] = structuredClone(data.responses[0]);
