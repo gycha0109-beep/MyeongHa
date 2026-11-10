@@ -1,8 +1,6 @@
 -- Private scope persistence for the November 6 Saju catalog. Apply only to an
 -- isolated review database. The existing atomic purchase command must call this
 -- before commit; this candidate creates no Offer, intent, payment or grant.
-create schema commerce_saju_private;
-revoke all on schema commerce_saju_private from public, anon, authenticated, service_role;
 
 create function commerce_saju_private.approved_offer_v1(p_offer_id text)
 returns table(amount_minor bigint, fields text[], counterpart_order text)
@@ -28,33 +26,6 @@ as $function$
   ) approved(offer_id, amount_minor, fields, counterpart_order)
   where approved.offer_id = p_offer_id
 $function$;
-
-create table commerce_saju_private.approved_purchase_scope_v1 (
-  purchase_intent_id uuid primary key references public.commerce_saju_purchase_origins_v1(purchase_intent_id)
-    on delete cascade,
-  admission_hash text not null check (admission_hash ~ '^sha256:v1:[a-f0-9]{64}$'),
-  admission jsonb not null check (jsonb_typeof(admission) = 'object'),
-  -- A grant is always checked together with its component entitlement key.
-  component_scope_keys jsonb not null check (jsonb_typeof(component_scope_keys) = 'object' and component_scope_keys <> '{}'::jsonb)
-);
-alter table commerce_saju_private.approved_purchase_scope_v1 enable row level security;
-revoke all on commerce_saju_private.approved_purchase_scope_v1 from public, anon, authenticated, service_role;
-
--- The existing account-deletion finalizer removes the parent Origin. CASCADE
--- removes these private pins with it. No new FK blocks target profile deletion.
--- Prevent mutation even by an eventual insert-capable runtime role.
-create function commerce_saju_private.reject_scope_update_v1()
-returns trigger
-language plpgsql security invoker
-set search_path = pg_catalog
-as $function$
-begin
-  raise exception using errcode = '23514', message = 'Approved Saju purchase scope is immutable';
-end
-$function$;
-create trigger approved_purchase_scope_immutable_v1
-before update on commerce_saju_private.approved_purchase_scope_v1
-for each row execute function commerce_saju_private.reject_scope_update_v1();
 
 -- Caller must be inside the scoped purchase transaction. An eventual writer
 -- must establish live release / target-use authority and reserve the comparison
@@ -131,6 +102,7 @@ begin
     '{"approvedAdmissionHash":"%s","birthRevisionId":"%s","productOfferId":"%s","purchaseKind":"original","sajuRecordId":"%s","sourceReceiptIds":[]}',
     p_admission_hash, v_origin.birth_revision_id, v_intent.product_offer_id, v_record.id);
   if v_origin.purchase_kind <> 'original' or v_intent.status not in ('created','pending')
+     or v_origin.approved_admission_hash is distinct from p_admission_hash
      or v_intent.request_hash is distinct from 'sha256:v1:' ||
        encode(sha256(convert_to(v_request_text, 'UTF8')), 'hex')
      or v_origin.birth_revision_id is distinct from v_record.birth_revision_id

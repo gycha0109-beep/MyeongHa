@@ -205,8 +205,8 @@ begin
     end if;
   else
     insert into public.commerce_saju_purchase_origins_v1
-      (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
-    values (v_intent.purchase_intent_id,p_subject_id,p_record_id,p_birth_revision_id,'original');
+      (purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind,approved_admission_hash)
+    values (v_intent.purchase_intent_id,p_subject_id,p_record_id,p_birth_revision_id,'original',p_admission_hash);
     v_keys := commerce_saju_private.bind_approved_purchase_scope_v1(
       p_subject_id,v_intent.purchase_intent_id,p_admission_text,p_admission_hash);
 

@@ -49,6 +49,8 @@ export interface PortOneV2WebhookPaymentCompletionConfigV1 {
   readonly now?: () => Date;
   /** Explicit, internal S2 Reader purchase fulfillment; default disabled. */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  /** Owner-only verified Saju Grant issuance. Defaults to disabled. */
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: boolean;
 }
 
 type PortOneV2WebhookPaymentCompletionConfigSnapshotV1 = Readonly<{
@@ -541,6 +543,9 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
     verificationAdapter: input.verificationAdapter,
     ...(input.config.privateReaderReceiptFulfillmentEnabled === true
       ? { privateReaderReceiptFulfillmentEnabled: true }
+      : {}),
+    ...(input.config.privateApprovedSajuReceiptFulfillmentEnabled === true
+      ? { privateApprovedSajuReceiptFulfillmentEnabled: true }
       : {}),
   });
 

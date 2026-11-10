@@ -2,6 +2,7 @@
 begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_purchase_scope_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_purchase_writer_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_receipt_fulfillment_v1.sql
 
 create function pg_temp.approved_fixture_purchase(
   actor uuid, intent_id uuid, record_id uuid, birth_revision uuid, offer_id uuid,
@@ -20,6 +21,48 @@ begin
     offer_snapshot,'fixture-offer',capability_snapshot,'fixture-capability',payload::text,admission_hash
   );
   return (result.purchase_intent_id,result.replayed,result.approved_admission_hash);
+end
+$function$;
+
+create function pg_temp.approved_fixture_receipt(
+  actor uuid, intent_id uuid, receipt_id uuid, amount_delta bigint default 0
+) returns void language plpgsql as $function$
+begin
+  insert into public.commerce_receipts(
+    id,subject_id,purchase_intent_id,product_offer_id,platform,provider,external_transaction_id,
+    receipt_fingerprint,verification_status,verified_payload_jsonb,verified_at,created_at,
+    environment,verifier_revision,verified_amount_minor,verified_currency
+  ) select receipt_id,actor,intent_id,intent.product_offer_id,'web','portone_v2',receipt_id::text,
+    'isolated-' || receipt_id::text,'verified','{}',now(),now(),'production','isolated',
+    intent.expected_amount_minor + amount_delta,intent.expected_currency
+  from public.purchase_intents intent where intent.id=intent_id and intent.subject_id=actor;
+  update public.purchase_intents set status='verified' where id=intent_id and subject_id=actor;
+end
+$function$;
+
+create function pg_temp.approved_fixture_grants(
+  intent_id uuid, receipt_id uuid, fields text[]
+) returns void language plpgsql as $function$
+declare
+  total integer;
+  matching integer;
+  outcome text;
+begin
+  select applied.grant_count,applied.outcome into strict total,outcome
+  from public.internal_fulfill_verified_approved_saju_receipt_v1(receipt_id) applied;
+  select count(*) into matching
+  from commerce_saju_private.approved_purchase_scope_v1 scope
+  cross join jsonb_each_text(scope.component_scope_keys) item(field, scope_key)
+  join public.entitlement_grants grant_row
+    on grant_row.entitlement_key=public.internal_commerce_saju_entitlement_key_v1(item.field)
+    and grant_row.scope_key=item.scope_key and grant_row.source_receipt_id=receipt_id
+  where scope.purchase_intent_id=intent_id;
+  if outcome<>'granted' or total <> cardinality(fields) or total <> matching then
+    raise exception 'Verified receipt grants did not match all pinned component scopes';
+  end if;
+  select applied.grant_count,applied.outcome into strict total,outcome
+  from public.internal_fulfill_verified_approved_saju_receipt_v1(receipt_id) applied;
+  if outcome<>'replayed' or total <> cardinality(fields) then raise exception 'Verified receipt grant replay was not exact'; end if;
 end
 $function$;
 
@@ -59,12 +102,14 @@ declare
   sql_constraint text;
   first_intent uuid;
   first_record uuid;
-  first_offer uuid;
   first_receipt uuid := gen_random_uuid();
   extra_target uuid := gen_random_uuid();
   extra_profile uuid := gen_random_uuid();
   extra_revision uuid := gen_random_uuid();
   target_for_offer uuid;
+  receipt_for_offer uuid;
+  cancellation_event uuid;
+  first_grant public.entitlement_grants%rowtype;
 begin
   insert into auth.users(id) values (auth_id);
   insert into public.subjects(id,kind,auth_user_id,status,created_at,updated_at)
@@ -145,8 +190,9 @@ begin
       cutoff,amount,'KRW','fixture',capability_id,jsonb_build_object('capabilitySetId',capability_id,
         'definitionVersion',offer_key,'definitionHash','fixture-' || offer_key),'fixture-capability'
     );
-    insert into public.commerce_saju_purchase_origins_v1(purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind)
-      values (intent_id,actor,record_id,self_revision,'original');
+    insert into public.commerce_saju_purchase_origins_v1(
+      purchase_intent_id,subject_id,saju_record_id,birth_revision_id,purchase_kind,approved_admission_hash
+    ) values (intent_id,actor,record_id,self_revision,'original',admission_hash);
 
     if offer_key = 'relationship-plus-first' then
       update public.birth_profiles set current_revision_id = wrong_revision where id = target_profile;
@@ -219,7 +265,9 @@ begin
      or has_schema_privilege('authenticated','commerce_saju_private','USAGE')
      or has_schema_privilege('service_role','commerce_saju_private','USAGE')
      or has_function_privilege('myeongha_api_executor',
-       'commerce_saju_private.bind_approved_purchase_scope_v1(uuid,uuid,text,text)','EXECUTE') then
+       'commerce_saju_private.bind_approved_purchase_scope_v1(uuid,uuid,text,text)','EXECUTE')
+     or has_function_privilege('myeongha_commerce_internal_executor',
+       'public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)','EXECUTE') then
     raise exception 'Private binding exposed before activation';
   end if;
   perform set_config('myeongha.account_deletion_finalizer_subject_id',actor::text,true);
@@ -329,23 +377,21 @@ begin
       if exists (select 1 from public.purchase_intents where id = intent_id) then
         raise exception 'Rejected comparison order left a Purchase Intent';
       end if;
-      -- Isolated proof fixture only. Actual receipt-to-Grant wiring is a
-      -- separate boundary. A merely pending first comparison did not qualify.
-      insert into public.commerce_receipts(id,subject_id,purchase_intent_id,product_offer_id,platform,provider,
-        external_transaction_id,receipt_fingerprint,verification_status,verified_payload_jsonb,verified_at,created_at,
-        environment,verifier_revision,verified_amount_minor,verified_currency)
-      values(first_receipt,actor,first_intent,first_offer,'web','portone_v2','atomic-first-fixture',
-        'atomic-first-fingerprint','verified','{}',now(),now(),'production','isolated',12900,'KRW');
-      update public.purchase_intents set status = 'verified' where id = first_intent;
-      insert into public.entitlement_grants(id,subject_id,entitlement_key,scope_key,grant_key,grant_source_type,
-        status,valid_from,created_at,updated_at,source_receipt_id)
-      select gen_random_uuid(),actor,'saju.compatibility',scope.component_scope_keys->>'compatibility',
-        'isolated-first-grant','purchase','active',now(),now(),now(),first_receipt
-      from commerce_saju_private.approved_purchase_scope_v1 scope where scope.purchase_intent_id = first_intent;
+      -- A synthetic verified Receipt goes through the actual grant batch.
+      perform pg_temp.approved_fixture_receipt(actor,first_intent,first_receipt);
+      begin
+        update commerce_saju_private.comparison_use_approval_v1 set revoked_at=now() where approval_ref='isolated-proof';
+        perform pg_temp.approved_fixture_grants(first_intent,first_receipt,array['compatibility']);
+        raise exception 'Revoked target use was allowed to mint a comparison grant';
+      exception when sqlstate 'P0001' then
+        get stacked diagnostics sql_constraint = constraint_name;
+        if sql_constraint <> 'approved_saju_receipt_target_use_unavailable' then raise; end if;
+      end;
+      perform pg_temp.approved_fixture_grants(first_intent,first_receipt,array['compatibility']);
       begin
         insert into public.commerce_provider_events(id,provider,external_event_id,event_type,external_transaction_id,
           resolved_subject_id,resolution_source_type,resolved_receipt_id,payload_fingerprint,status,received_at,environment)
-        values(gen_random_uuid(),'portone_v2','atomic-first-unsettled','Transaction.Cancelled','atomic-first-fixture',
+        values(gen_random_uuid(),'portone_v2','atomic-first-unsettled','Transaction.Cancelled',first_receipt::text,
           actor,'receipt',first_receipt,'atomic-first-unsettled-fingerprint','received',now(),'production');
         perform 1 from pg_temp.approved_fixture_purchase(actor,intent_id,record_id,self_revision,offer_id,
           'atomic-' || offer_key,offer_snapshot,capability_snapshot,payload)
@@ -359,7 +405,6 @@ begin
     if offer_key = 'first-counterpart' then
       first_intent := intent_id;
       first_record := record_id;
-      first_offer := offer_id;
       update commerce_saju_private.comparison_use_approval_v1 set revoked_at = now() where approval_ref = 'isolated-proof';
       begin
         perform 1 from pg_temp.approved_fixture_purchase(actor,intent_id,record_id,self_revision,offer_id,
@@ -398,6 +443,50 @@ begin
       as x(purchase_intent_id uuid,replayed boolean,admission_hash text);
     if result.purchase_intent_id <> intent_id or not result.replayed then
       raise exception 'Approved Saju command did not replay one exact intent';
+    end if;
+    if offer_key <> 'first-counterpart' then
+      receipt_for_offer := gen_random_uuid();
+      if offer_key = 'basic-month' then
+        begin
+          perform pg_temp.approved_fixture_receipt(actor,intent_id,receipt_for_offer,1);
+          perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
+          raise exception 'Incorrect verified receipt amount was allowed to mint grants';
+        exception when check_violation then
+          get stacked diagnostics sql_constraint = constraint_name;
+          if sql_constraint <> 'ct_commerce_receipt_charge_terms_mismatch' then raise; end if;
+        end;
+      end if;
+      perform pg_temp.approved_fixture_receipt(actor,intent_id,receipt_for_offer);
+      if offer_key = 'basic-month' then
+        begin
+          delete from commerce_saju_private.approved_purchase_scope_v1 where purchase_intent_id=intent_id;
+          perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
+          raise exception 'Approved receipt without its scope fell back to an entitlement';
+        exception when sqlstate 'P0001' then
+          get stacked diagnostics sql_constraint = constraint_name;
+          if sql_constraint <> 'approved_saju_receipt_scope_missing' then raise; end if;
+        end;
+      end if;
+      perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
+      if offer_key = 'additional-counterpart' then
+        select * into strict first_grant from public.entitlement_grants where source_receipt_id=first_receipt;
+        cancellation_event := gen_random_uuid();
+        insert into public.commerce_provider_events(id,provider,external_event_id,event_type,external_transaction_id,
+          resolved_subject_id,resolution_source_type,resolved_receipt_id,payload_fingerprint,status,received_at,
+          environment,provider_ordering_key)
+        values(cancellation_event,'portone_v2','atomic-first-cancelled','Transaction.Cancelled',first_receipt::text,
+          actor,'receipt',first_receipt,'atomic-first-cancelled-fingerprint','verified',now(),'production','isolated-cancel');
+        perform 1 from public.internal_apply_entitlement_effect_v1(
+          'provider_event',cancellation_event,first_grant.id,null,first_grant.revision,
+          first_grant.last_provider_ordering_key,'revoked',now()+interval '1 second','revoked',
+          first_grant.valid_from,first_grant.valid_until,'isolated-saju-refund'
+        );
+        if (select status from public.entitlement_grants where id=first_grant.id)<>'revoked'
+           or not exists(select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer
+             and status='active' and scope_key is distinct from first_grant.scope_key) then
+          raise exception 'Refund effect did not revoke just the exact comparison purchase';
+        end if;
+      end if;
     end if;
   end loop;
   if exists (select 1 from public.commerce_saju_purchase_admission_context_v1) then

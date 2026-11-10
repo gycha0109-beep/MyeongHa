@@ -1,5 +1,9 @@
 import { fulfillVerifiedReaderReceiptV1 } from './commerce-verified-reader-fulfillment.js';
 import {
+  fulfillVerifiedApprovedSajuReceiptV1,
+  type ApprovedSajuReceiptFulfillmentV1,
+} from './commerce-verified-approved-saju-fulfillment.js';
+import {
   continuationFromVerifiedReaderBindV1,
   type CommerceReaderReceiptContinuationV1,
 } from './commerce-reader-product-continuity-v1.js';
@@ -33,6 +37,7 @@ export interface SubjectOwnedCommercePaymentCompletionV1 {
   readonly receiptId: string;
   readonly providerEventId: string;
   readonly replayed: boolean;
+  readonly sajuFulfillment?: ApprovedSajuReceiptFulfillmentV1;
   readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
   /**
    * Safe product navigation ONLY, not live entitlement or an interpretation.
@@ -56,6 +61,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
   /** Explicit internal S2 only; public subject completion remains inactive. */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: boolean;
 }): Promise<SubjectOwnedCommercePaymentCompletionV1> {
   const verificationContext = await executePostgresSubjectTransactionV1({
     pool: input.pool,
@@ -87,7 +93,12 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
       }),
   });
 
+  const sajuFulfillment = input.privateApprovedSajuReceiptFulfillmentEnabled === true
+    && evidence.environment === 'production' && evidence.provider === 'portone_v2' && evidence.platform === 'web'
+    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: input.pool, receiptId: persisted.receiptId })
+    : undefined;
   const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
+    && (sajuFulfillment === undefined || sajuFulfillment === 'not_approved_saju')
     ? await fulfillVerifiedReaderReceiptV1({
         pool: input.pool,
         receiptId: persisted.receiptId,
@@ -99,6 +110,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
     receiptId: persisted.receiptId,
     providerEventId: persisted.providerEventId,
     replayed: persisted.replayed,
+    ...(sajuFulfillment === undefined ? {} : { sajuFulfillment }),
     ...(input.privateReaderReceiptFulfillmentEnabled === true
       ? { readerFulfillment: readerFulfillment?.kind ?? 'not_reader' as const }
       : {}),
