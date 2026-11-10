@@ -177,5 +177,51 @@
       "Zero grantor-change groups among missing keys is not a positive statement about grantor parity.",
       "No Production grants or role membership were repaired, no permission scope or DR acceptance gate was promoted."
     ]
+  },
+  "actualFilteredRolesSqlObservation": {
+    "implementedInPr": 3193,
+    "mergeCommitSha": "5144bc873983b06c44f5ef813fd17df2a3c2d13d",
+    "requiredIntegrationRunId": 42765406281,
+    "requiredIntegrationConclusion": "success",
+    "isolatedRestoreRunId": 42767722985,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42767722985",
+    "conclusion": "success",
+    "artifactId": 13740043509,
+    "sourceBackupRunId": 42752268638,
+    "sourceBackupSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "executionMainSha": "5144bc873983b06c44f5ef813fd17df2a3c2d13d",
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "artifactFileSha256": {
+      "app-schema-parity.json": "96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595",
+      "restore-evidence.json": "8caf28f1bcdf194820fce9d053a73a71675cb180f2f3c5aea2062da64240292d",
+      "role-dump-coverage.json": "d6474c2240c381fd0da8e95b8ee38a4a323d3828542666dddbd4438239c0db19"
+    },
+    "roleDumpCoverage": {
+      "sourceWitnessAvailable": true,
+      "sourceDirectMembershipCount": 48,
+      "filteredRolesSqlGrantStatementCount": 8,
+      "filteredRolesSqlUnparsedGrantStatementCount": 1,
+      "sourceRowsWithPairInFilteredSqlCount": 0,
+      "sourceRowsWithoutPairInFilteredSqlCount": 48,
+      "missingPairReservedRecipientCandidateCount": 48,
+      "missingPairOtherRecipientCount": 0,
+      "verdict": "HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED",
+      "filteredRolesSqlOnly": true,
+      "sameMvccSnapshotProven": false,
+      "perGrantorAndOptionsRestoreParityProven": false,
+      "providerOwnershipProven": false,
+      "inheritedEffectiveAccessProven": false,
+      "fullProviderCompatibleRestoreProven": false,
+      "drReady": false,
+      "serviceResumptionAllowed": false
+    },
+    "followUpRisk": [
+      "One GRANT statement in the filtered roles.sql is not recognized by the narrow parser. The public counts cannot exclude it from being relevant until this grammar is resolved.",
+      "Zero source edge pairs in the recognized filtered roles.sql is only a partial presence observation, not proof that all 48 were removed from the full dump.",
+      "The Source role catalog was read-only bracketed around the backup execution, not within the identical MVCC snapshot.",
+      "No Production role grants or provider role set have been changed. Existing DR HOLD and P0 #1887 remain."
+    ]
   }
 }
