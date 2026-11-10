@@ -85,3 +85,9 @@
 - `apps/api/src/reading-ai-saju-proven-cost-composition-v1.test.ts`: 정상 순서·정확한 원장 투영·영수증 누락/변조·사용량 변경·정본 실행 누락/중복/불일치·전용 계정 오류·스토리지 장애·공유 풀 거부 7개 신규 테스트. 관련 기존 테스트 합계 16건과 파일 지정 TypeScript strict 검사 통과.
 - 비용 Writer는 기존 RPC 경계 외에 직접 DB INSERT·UPDATE를 실행하지 않는다. 이 신규 조합은 **서버 내부 미설치 함수**이며 공개 라우트/회원/Reading/결제/크레딧 처리·운영 DB·역할·비밀키·Cloudflare 설정을 변경하지 않았다.
 - Saju Source PostgreSQL Writer/Reader 설치, 실서비스에서 서버 간 인증된 DB attempt 발급·종료 ref 결속, 실제 OpenAI callback 설치와 비용 영수증 전달, 사주 전체 누락 호출 대조 및 공급사 청구·환율 근거는 여전히 HOLD. 서명과 정본 DB 일치만으로 완전한 비용 집계를 주장할 수 없으며 `ROADMAP_COMPLETE` 미충족.
+
+## 2026-11-10 — A4 서버 간 준비 실행 시도 서명 계약 (오프라인)
+
+- `apps/api/src/saju-a4-prepared-attempt-handoff-v1.ts`는 기존 운영 DB에서 **실행 시도가 1회 준비·승인된 다음에만** 서버가 사용해야 하는 별도 HMAC SHA-256 handoff 증거 생성 함수다. 기존 Reading/Subject·출생·프롬프트·모델 결과를 전송하지 않고, 준비된 `executionAttemptId`, 실제 전송할 JSON의 정확한 SHA-256, 일회성 nonce, 발급/만료 시각, issuer/audience/keyId만 서명한다. 유효 기간은 최대 120초다. 암호키 원문은 증명에 포함되지 않는다.
+- 이 함수는 **자체로 실행 허가를 부여하지 않는다.** Saju의 기존 서비스 Bearer 인증, 별도 Production Interpretation Authority, Saju 측 실물 DB 실행 시도/nonce의 영속적 일회성 승인·소모, 실제 HTTP requestBody 검증이 별도로 필수다. 기존 서명 영수증 키와 임의로 같은 키를 공유하지 않으며 운영 Secret 구성은 미완료다.
+- `apps/api/src/saju-a4-prepared-attempt-handoff-v1.test.ts` 신규 4건 PASS. Saju 측 verifier와 실 TypeScript 소스를 직접 상호 호출하여 정상 HMAC 수락/요청 본문 변조 거부 교차 확인. 신규 public API/HTTP 헤더/라우트/서비스 Secret/DB 접근·운영 비용 수집은 미설치. 승인·사용·발급 경로를 소비하기 전까지 **OFF/HOLD**, `ROADMAP_COMPLETE` 미충족.
