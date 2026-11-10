@@ -181,7 +181,9 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // current Birth and issuer provenance before any report can be stored.
   let response: AdmittedResponse;
   try {
-    response = await input.adapter.requestReading(executedRequest);
+    response = await input.adapter.requestReading(executedRequest, {
+      executionAttemptId: input.executionAttemptId,
+    });
   } catch (error) {
     // A transport error cannot prove whether the Saju issuer already generated
     // a result. Do not finalize a failed attempt as retryable/final, reissue the
