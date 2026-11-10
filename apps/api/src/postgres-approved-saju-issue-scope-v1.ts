@@ -48,6 +48,7 @@ export async function readApprovedSajuIssueScopeV1(
   return Object.freeze({
     birthRevision,
     readingText,
+    request,
     periodReferenceDateTime: period,
     binding: Object.freeze({ purchaseIntentId: input.purchaseIntentId, component: input.component, sourceRequestHash }),
   });

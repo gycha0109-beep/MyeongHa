@@ -12,6 +12,9 @@ const NONCE = /^[a-zA-Z0-9_-]{22,128}$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const MAX_TTL_MS = 120_000;
 const CLOCK_SKEW_MS = 15_000;
+const SEOUL_PERIOD = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric',
+});
 const ENVELOPE_KEYS = [
   'schemaVersion','lifecycle','state','response','proof',
   'productionInterpretationAuthority','releaseAuthorization',
@@ -23,6 +26,8 @@ const PAYLOAD_KEYS = [
   'requestBodyHash','responseBodyHash','material','productionInterpretationAuthority',
   'releaseAuthorization','canExecute','canPublish','canSell',
 ];
+const TEMPORAL_ENVELOPE_KEYS = [...ENVELOPE_KEYS, 'temporalEvidence'];
+const TEMPORAL_PAYLOAD_KEYS = [...PAYLOAD_KEYS, 'temporalEvidenceHash'];
 const MATERIAL_KEYS = [
   'snapshotId','interpretationRunId','registrySnapshotId','executionId','preparationId',
   'selectionId','profileRef','evidenceBundleHash','readingId','responseId','responseBodyHash',
@@ -35,7 +40,24 @@ export interface SajuHeldSourceProofVerifierContextV1 {
   /** Must be the exact normalized request Saju executed; never trust a caller's digest. */
   readonly expectedRequestBody: unknown;
   readonly nowMs: number;
+  readonly expectTemporalEvidence?: true;
 }
+
+export type SajuHeldTemporalEvidenceV1 = Readonly<{
+  version: 'myeonghwa-temporal-reader-evidence-v1';
+  scope: 'annual' | 'monthly';
+  referenceDateTime: string;
+  timeZone: 'Asia/Seoul';
+  targetYear: number;
+  targetMonth?: number;
+  snapshotId: string;
+  calculationHash: string;
+  responseBodyHash: string;
+  evidenceHash: string;
+  interpretationStatus: 'insufficient_authorized_semantics';
+  segments: readonly Readonly<Record<string, unknown>>[];
+  dayunOverlap: Readonly<Record<string, unknown>>;
+}>;
 
 export interface SajuHeldSourceProofVerifierTrustV1 {
   readonly trustedIssuer: string;
@@ -67,6 +89,7 @@ export type SajuHeldSourceProofVerificationV1 = Readonly<{
     evidenceBundleHash: string;
     requestBodyHash: string;
     responseBodyHash: string;
+    temporalEvidence?: SajuHeldTemporalEvidenceV1;
   }>;
 }>;
 
@@ -120,6 +143,31 @@ function validMaterial(value: unknown): value is Record<string, unknown> {
       .every((item) => typeof item === 'string' && HASH.test(item));
 }
 
+function validTemporalEvidence(
+  evidence: unknown, payload: Record<string, unknown>, material: Record<string, unknown>, request: unknown,
+): evidence is SajuHeldTemporalEvidenceV1 {
+  if (!record(evidence) || !record(request) || !record(request.reading)) return false;
+  const { evidenceHash, ...content } = evidence;
+  const scope = request.reading.text === '올해' ? 'annual'
+    : request.reading.text === '이번 달' ? 'monthly' : undefined;
+  if (typeof evidence.referenceDateTime !== 'string'
+    || evidence.referenceDateTime !== request.reading.periodReferenceDateTime) return false;
+  const reference = new Date(evidence.referenceDateTime);
+  if (!Number.isFinite(reference.getTime()) || reference.toISOString() !== evidence.referenceDateTime) return false;
+  const period = Object.fromEntries(SEOUL_PERIOD.formatToParts(reference).map(({ type, value }) => [type, value]));
+  return scope !== undefined && evidence.scope === scope
+    && evidence.version === 'myeonghwa-temporal-reader-evidence-v1'
+    && evidence.interpretationStatus === 'insufficient_authorized_semantics'
+    && evidence.timeZone === 'Asia/Seoul' && evidence.targetYear === Number(period.year)
+    && (scope === 'annual' ? evidence.targetMonth === undefined : evidence.targetMonth === Number(period.month))
+    && evidence.snapshotId === material.snapshotId && evidence.responseBodyHash === payload.responseBodyHash
+    && typeof evidence.calculationHash === 'string' && HASH.test(evidence.calculationHash)
+    && Array.isArray(evidence.segments) && evidence.segments.length > 0 && evidence.segments.every(record)
+    && record(evidence.dayunOverlap)
+    && typeof evidenceHash === 'string' && evidenceHash === payload.temporalEvidenceHash
+    && evidenceHash === digest(content);
+}
+
 /**
  * Server-side Preview-only transport verification. This does NOT verify
  * Subject/Birth Revision ownership, Saju semantic truth, release or Commerce.
@@ -130,7 +178,8 @@ export async function verifySajuHeldSourceProofV1(
   context: SajuHeldSourceProofVerifierContextV1,
 ): Promise<SajuHeldSourceProofVerificationV1> {
   try {
-    if (!record(envelope) || !exact(envelope, ENVELOPE_KEYS)
+    const expectTemporal = context.expectTemporalEvidence === true;
+    if (!record(envelope) || !exact(envelope, expectTemporal ? TEMPORAL_ENVELOPE_KEYS : ENVELOPE_KEYS)
       || envelope.schemaVersion !== SAJU_HELD_SOURCE_PROOF_HTTP_VERSION_V1
       || envelope.lifecycle !== 'preview' || envelope.state !== 'held'
       || envelope.productionInterpretationAuthority !== 'NOT_EVALUATED'
@@ -138,7 +187,7 @@ export async function verifySajuHeldSourceProofV1(
       || envelope.canExecute !== false || envelope.canPublish !== false
       || envelope.canSell !== false
       || !record(envelope.proof) || !exact(envelope.proof, PROOF_KEYS)
-      || !record(envelope.proof.payload) || !exact(envelope.proof.payload, PAYLOAD_KEYS)
+      || !record(envelope.proof.payload) || !exact(envelope.proof.payload, expectTemporal ? TEMPORAL_PAYLOAD_KEYS : PAYLOAD_KEYS)
       || !record(envelope.response)
       || typeof trust.trustedIssuer !== 'string' || !ID.test(trust.trustedIssuer)
       || typeof trust.expectedAudience !== 'string' || !ID.test(trust.expectedAudience)
@@ -182,6 +231,13 @@ export async function verifySajuHeldSourceProofV1(
       .update(digest(payload)).digest();
     const received = Buffer.from(proof.signatureHex, 'hex');
     if (signed.length !== received.length || !timingSafeEqual(signed, received)) return blocked();
+    let temporalEvidence: SajuHeldTemporalEvidenceV1 | undefined;
+    if (expectTemporal) {
+      if (!validTemporalEvidence(envelope.temporalEvidence, payload, payload.material, context.expectedRequestBody)) {
+        return blocked();
+      }
+      temporalEvidence = structuredClone(envelope.temporalEvidence);
+    }
     // Exact parity with the Saju Source Owner verifier:
     // a domain-separated tuple binds issuer, audience, signing key ID and
     // nonce without ambiguous ':' boundaries or cross-key-rotation collisions.
@@ -209,6 +265,7 @@ export async function verifySajuHeldSourceProofV1(
         evidenceBundleHash: material.evidenceBundleHash as string,
         requestBodyHash: payload.requestBodyHash as string,
         responseBodyHash: payload.responseBodyHash as string,
+        ...(temporalEvidence === undefined ? {} : { temporalEvidence }),
       }),
     });
   } catch {

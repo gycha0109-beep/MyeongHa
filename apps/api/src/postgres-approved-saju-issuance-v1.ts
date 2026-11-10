@@ -1,8 +1,14 @@
+import { randomBytes } from 'node:crypto';
 import type { SajuReadingComponentV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { readApprovedSajuIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
 import { createPostgresSajuOfficialAttemptPreparePortV1 } from './postgres-saju-official-attempt-prepare-v1.js';
 import { createPostgresSajuOfficialIssuedDbTransactionPortV1 } from './postgres-saju-official-issued-db-transaction-v1.js';
 import { executePostgresSubjectTransactionV1 } from './postgres-subject-execution.js';
+import type { SajuHeldSourceProofIssuePortV1 } from './saju-held-source-proof-revision-binding-v1.js';
+import {
+  verifySajuHeldSourceProofV1,
+  type SajuHeldSourceProofVerifierTrustV1,
+} from './saju-held-source-proof-verifier-v1.js';
 import {
   SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1,
   type SajuOfficialIssuanceResultV1,
@@ -19,6 +25,39 @@ function held(reason: 'production_source_unverified' | 'current_authority_unavai
     contractVersion: SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1,
     state: 'held', reason, canDisclose: false, canSell: false,
   });
+}
+
+/** Reviews the exact purchased period privately without creating an official Reading or Reader message. */
+export async function inspectApprovedSajuTemporalEvidenceV1(input: Readonly<
+  Pick<PrepareOptions, 'pool' | 'verifiedEvidence'> & {
+    subjectId: string;
+    purchaseIntentId: string;
+    component: 'year' | 'month';
+    issuePort: SajuHeldSourceProofIssuePortV1;
+    verifierTrust: SajuHeldSourceProofVerifierTrustV1;
+  }
+>) {
+  const readScope = () => executePostgresSubjectTransactionV1({
+    pool: input.pool,
+    verifiedEvidence: input.verifiedEvidence,
+    execute: ({ client, resolvedSubject }) => resolvedSubject.subjectKind === 'member'
+      && resolvedSubject.subjectId === input.subjectId ? readApprovedSajuIssueScopeV1(client, input) : null,
+  });
+
+  const before = await readScope();
+  if (before === null) return null;
+  const nonce = randomBytes(32).toString('base64url');
+  const envelope = await input.issuePort.issuePreviewProof({
+    nonce, request: structuredClone(before.request), includeTemporalEvidence: true,
+  });
+  const proof = await verifySajuHeldSourceProofV1(envelope, input.verifierTrust, {
+    expectedNonce: nonce, expectedRequestBody: before.request, expectTemporalEvidence: true, nowMs: Date.now(),
+  });
+  if (proof.state !== 'held' || proof.verifiedSource?.temporalEvidence === undefined) return null;
+
+  const after = await readScope();
+  return after !== null && after.birthRevision.birthRevisionRef === before.birthRevision.birthRevisionRef
+    && after.binding.sourceRequestHash === proof.verifiedSource.requestBodyHash ? proof : null;
 }
 
 /** Private issuance candidate. The paid component determines the exact Birth
