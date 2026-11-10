@@ -103,34 +103,42 @@ for (const fragment of requiredWorkflowFragments) {
   }
 }
 
-// The source PostgreSQL 17 role graph is captured by read-only SQL, but the
-// governed backup reprojects its JSON before encrypting it. Dropping the new
-// field in that allowlist silently defeats the direct-membership comparison.
+// Both the internal role graph and external direct-boundary inventory must
+// survive the encrypted source projection. Raw role edges never enter the
+// public workflow artifact; neither inventory proves provider ownership.
 const roleGraphScopeFragment =
   'and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"';
-if (runner.split(roleGraphScopeFragment).length !== 3) {
-  throw new Error('Both pre-dump and post-dump source catalog checks must require applicationRoleGraph.');
+const boundaryScopeFragment =
+  '    and .applicationExternalRoleBoundary.scope == "myeongha_to_non_myeongha_direct_membership_only_v1"';
+for (const fragment of [roleGraphScopeFragment, boundaryScopeFragment]) {
+  if (runner.split(fragment).length !== 3) {
+    throw new Error('Pre/post source catalog checks missing sealed role boundary: ' + fragment);
+  }
 }
 for (const fragment of [
   'and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false',
   'and (.applicationRoleGraph.roles | type) == "array"',
   'and (.applicationRoleGraph.roles | length) > 0',
   'and (.applicationRoleGraph.directMemberships | type) == "array"',
-  'schemas, tables, functions, applicationRoleGraph,',
-  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed application role graph.',
+  'and .applicationExternalRoleBoundary.providerOwnedOnlyProven == false',
+  'and .applicationExternalRoleBoundary.inheritedEffectiveAccessIncluded == false',
+  'and (.applicationExternalRoleBoundary.directMemberships | type) == "array"',
+  'schemas, tables, functions, applicationRoleGraph, applicationExternalRoleBoundary,',
+  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed internal or external application role membership witness.',
 ]) {
   if (!runner.includes(fragment)) {
-    throw new Error('Encrypted application role graph preservation failed: ' + fragment);
+    throw new Error('Encrypted application role boundary preservation failed: ' + fragment);
   }
 }
-const projectedRoleGraph = runner.indexOf('schemas, tables, functions, applicationRoleGraph,');
+const projectedRoleGraph = runner.indexOf(
+  'schemas, tables, functions, applicationRoleGraph, applicationExternalRoleBoundary,');
 const checkedRoleGraph = runner.indexOf(
-  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed application role graph.');
+  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed internal or external application role membership witness.');
 const catalogChecksum = runner.indexOf(
   'source_catalog_sha256="$(sha256sum "$backup_dir/source-app-catalog.json"');
 if (!(projectedRoleGraph >= 0 && checkedRoleGraph > projectedRoleGraph &&
   catalogChecksum > checkedRoleGraph)) {
-  throw new Error('Role graph must be sealed and checked before computing encrypted backup digest.');
+  throw new Error('Role boundaries must be checked before computing encrypted backup digest.');
 }
 
 const forbiddenWorkflowFragments = [

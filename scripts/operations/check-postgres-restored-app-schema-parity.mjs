@@ -335,6 +335,111 @@ export function observeApplicationDirectRoleGraph(source, restored) {
   };
 }
 
+// This catalog-only inventory includes a direct edge if exactly one endpoint
+// is a MyeongHa application role. "External" is NOT an authenticated claim
+// that the other endpoint is provider-owned. Inherited and effective rights
+// are deliberately outside this diagnostic and remain unproven.
+const externalBoundaryScope =
+  'myeongha_to_non_myeongha_direct_membership_only_v1';
+
+function validateApplicationExternalRoleBoundary(graph, side) {
+  assert.ok(graph && typeof graph === 'object' && !Array.isArray(graph),
+    side + ' external boundary must be an object');
+  assert.equal(graph.scope, externalBoundaryScope);
+  assert.equal(graph.providerOwnedOnlyProven, false);
+  assert.equal(graph.inheritedEffectiveAccessIncluded, false);
+  assert.ok(Array.isArray(graph.directMemberships),
+    side + ' external membership inventory must be an array');
+  const core = new Map();
+  const seen = new Set();
+  const externalRoles = new Set();
+  for (const item of graph.directMemberships) {
+    for (const roleName of [item.granted_role, item.member_role,
+      item.grantor_name]) {
+      assert.ok(typeof roleName === 'string' &&
+        roleName.length > 0 && roleName.length <= 160 &&
+        !/[\r\n\t]/u.test(roleName),
+      'Invalid external role membership name');
+    }
+    const grantedIsApplication = applicationRolePattern.test(item.granted_role);
+    const memberIsApplication = applicationRolePattern.test(item.member_role);
+    assert.notEqual(grantedIsApplication, memberIsApplication,
+      'External role edge must cross exactly one application role boundary');
+    externalRoles.add(grantedIsApplication ? item.member_role : item.granted_role);
+    for (const field of membershipOptionFields) {
+      assert.equal(typeof item[field], 'boolean',
+        'Invalid external role membership option: ' + field);
+    }
+    const exact = JSON.stringify([item.granted_role, item.member_role,
+      item.grantor_name]);
+    assert.ok(!seen.has(exact), 'Duplicate external grantor membership');
+    seen.add(exact);
+    const key = JSON.stringify([item.granted_role, item.member_role,
+      ...membershipOptionFields.map(field => item[field])]);
+    const grantors = core.get(key) ?? [];
+    grantors.push(item.grantor_name);
+    core.set(key, grantors);
+  }
+  for (const grantors of core.values()) grantors.sort();
+  return { graph, core, externalRoles };
+}
+
+export function observeApplicationExternalRoleBoundary(source, restored) {
+  if (source.applicationExternalRoleBoundary === undefined) {
+    return {
+      sourceWitnessAvailable: false,
+      scope: externalBoundaryScope,
+      providerOwnedOnlyProven: false,
+      inheritedEffectiveAccessIncluded: false,
+      observedDirectMembershipOptionParity: false,
+      observedGrantorAttributionParity: false,
+      details: null,
+    };
+  }
+  const before = validateApplicationExternalRoleBoundary(
+    source.applicationExternalRoleBoundary, 'source');
+  const after = validateApplicationExternalRoleBoundary(
+    restored.applicationExternalRoleBoundary, 'restored');
+  let missingMembershipOptionEntryCount = 0;
+  let addedMembershipOptionEntryCount = 0;
+  let grantorAttributionDifferenceGroupCount = 0;
+  for (const [key, grantors] of before.core) {
+    const next = after.core.get(key) ?? [];
+    missingMembershipOptionEntryCount += Math.max(0, grantors.length - next.length);
+    addedMembershipOptionEntryCount += Math.max(0, next.length - grantors.length);
+    if (grantors.length === next.length &&
+      JSON.stringify(grantors) !== JSON.stringify(next)) {
+      grantorAttributionDifferenceGroupCount++;
+    }
+  }
+  for (const [key, grantors] of after.core) {
+    if (!before.core.has(key)) {
+      addedMembershipOptionEntryCount += grantors.length;
+    }
+  }
+  const observedDirectMembershipOptionParity =
+    missingMembershipOptionEntryCount === 0 &&
+    addedMembershipOptionEntryCount === 0;
+  return {
+    sourceWitnessAvailable: true,
+    scope: externalBoundaryScope,
+    providerOwnedOnlyProven: false,
+    inheritedEffectiveAccessIncluded: false,
+    observedDirectMembershipOptionParity,
+    observedGrantorAttributionParity: observedDirectMembershipOptionParity &&
+      grantorAttributionDifferenceGroupCount === 0,
+    details: {
+      sourceDirectMembershipCount: before.graph.directMemberships.length,
+      restoredDirectMembershipCount: after.graph.directMemberships.length,
+      sourceReferencedExternalRoleCount: before.externalRoles.size,
+      restoredReferencedExternalRoleCount: after.externalRoles.size,
+      missingMembershipOptionEntryCount,
+      addedMembershipOptionEntryCount,
+      grantorAttributionDifferenceGroupCount,
+    },
+  };
+}
+
 export function compareApplicationCatalog(source, restored, backupFrontier) {
   const sourceWitness = sourceCatalogWitness(source);
   assert.equal(source.schemaVersion, schemaVersion);
@@ -357,6 +462,12 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
   }
   const observedApplicationDirectRoleGraph =
     observeApplicationDirectRoleGraph(source, restored);
+  if (source.applicationExternalRoleBoundary !== undefined) {
+    assert.equal(sourceWitness.provenance, 'encrypted_backup_bracketed_readonly_v1',
+      'External role boundary requires a sealed backup-run source witness');
+  }
+  const observedApplicationExternalRoleBoundary =
+    observeApplicationExternalRoleBoundary(source, restored);
   const componentHashEvidence = {
     tableStructure: assertUniformFacetCoverage(source.tables, 'tables',
       'structural_component_sha256'),
@@ -524,6 +635,9 @@ export function compareApplicationCatalog(source, restored, backupFrontier) {
     // Read-only, sealed application-owned role edges only. Provider/Hosted
     // membership and inherited effective access remain unverified.
     observedApplicationDirectRoleGraph,
+    // External-role boundary means any non-MyeongHa endpoint, not verified
+    // provider ownership. Count-only output; raw role edges stay encrypted.
+    observedApplicationExternalRoleBoundary,
     // A diagnostic observation, NOT a migration/DR/provider acceptance gate.
     // The original applicationScopeVerdict below remains fail-closed on any
     // legacy hash mismatch; this evidence does not waive it.
