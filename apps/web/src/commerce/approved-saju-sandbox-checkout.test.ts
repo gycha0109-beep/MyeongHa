@@ -29,7 +29,7 @@ function fixture(offer: ApprovedSajuOfferV1, overrides: object = {}) {
         expect(JSON.parse(request.body)).toEqual({ paymentAttemptId, approvedOfferId: offer.id });
         return success({
           paymentAttemptId, provider: 'portone_v2', environment: 'sandbox', providerRequestId: paymentId,
-          amountMinor: offer.priceKrw, currency: 'KRW', status: 'created', ...overrides,
+          amountMinor: offer.priceKrw, currency: 'KRW', status: 'handed_off', ...overrides,
         });
       }),
     },
@@ -86,6 +86,7 @@ it.each([{ approvedOfferId: 'wealth' }, { amountMinor: 1 }, { status: 'verified'
 
 it.each([
   { amountMinor: 1 }, { currency: 'USD' }, { environment: 'production' }, { providerRequestId: 'x'.repeat(41) },
+  { status: 'created' },
 ])(
   'keeps the SDK and verification closed for an ineligible handoff %j',
   async (override) => {

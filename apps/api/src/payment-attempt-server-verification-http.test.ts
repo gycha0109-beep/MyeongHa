@@ -76,6 +76,7 @@ function fakePool(input: {
   contextConstraint?: string;
   persistConstraint?: string;
   replayed?: boolean;
+  environment?: 'sandbox' | 'production';
 } = {}): PostgresSubjectPoolV1 {
   return {
     async connect(): Promise<PostgresSubjectConnectionV1> {
@@ -115,7 +116,7 @@ function fakePool(input: {
                 purchaseIntentId: PURCHASE_INTENT_ID,
                 provider: 'portone_v2',
                 platform: 'web',
-                environment: 'sandbox',
+                environment: input.environment ?? 'sandbox',
                 providerRequestId: PROVIDER_REQUEST_ID,
                 expectedProviderTransactionId: null,
                 expectedExternalProductId: PRODUCT_ID,
@@ -139,6 +140,10 @@ function fakePool(input: {
               } as Row],
             };
           }
+          if (text.includes('internal_fulfill_verified_approved_saju_receipt_v1')) {
+            expect(values).toEqual([RECEIPT_ID]);
+            return { rows: [{ outcome: 'granted', grant_count: 1 } as Row] };
+          }
 
           throw new Error(`Unexpected SQL in payment verification HTTP test: ${text}`);
         },
@@ -153,6 +158,7 @@ function invoke(input: {
   evidence?: VerifiedSubjectIdentityEvidenceV1 | null;
   pool?: PostgresSubjectPoolV1;
   verificationAdapter?: CommercePaymentVerificationAdapterV1;
+  privateApprovedSajuReceiptFulfillmentEnabled?: true;
   onVerifiedReceiptCommitted?: (input: {
     readonly request: Request; readonly receiptId: string;
   }) => Promise<void>;
@@ -168,12 +174,30 @@ function invoke(input: {
     ),
     pool: input.pool ?? fakePool(),
     verificationAdapter: input.verificationAdapter ?? adapter(),
+    ...(input.privateApprovedSajuReceiptFulfillmentEnabled === true
+      ? { privateApprovedSajuReceiptFulfillmentEnabled: true } : {}),
     ...(input.onVerifiedReceiptCommitted===undefined ? {} :
       { onVerifiedReceiptCommitted: input.onVerifiedReceiptCommitted }),
   });
 }
 
 describe('Payment Attempt server verification HTTP foundation', () => {
+  it.each([
+    ['production', true, true], ['production', false, false], ['sandbox', true, false],
+  ] as const)('dispatches an approved Saju receipt only for opted-in production verification (%s, %s)', async (environment, enabled, expected) => {
+    const queriedSql: string[] = [];
+    const response = await invoke({
+      pool: fakePool({ queriedSql, environment }),
+      ...(enabled ? { privateApprovedSajuReceiptFulfillmentEnabled: true } : {}),
+      verificationAdapter: { verify: async () => ({ providerRequestId: PROVIDER_REQUEST_ID, evidence: { ...EVIDENCE, environment } }) },
+    });
+    expect(response.status).toBe(200);
+    const persist = queriedSql.findIndex(sql => sql.includes('cmd_persist_verified_payment_evidence_v1'));
+    const fulfill = queriedSql.findIndex(sql => sql.includes('internal_fulfill_verified_approved_saju_receipt_v1'));
+    expect(persist).toBeGreaterThan(-1);
+    if (expected) expect(fulfill).toBeGreaterThan(persist);
+    else expect(fulfill).toBe(-1);
+  });
   it('rejects unsupported methods without touching identity or Commerce authority', async () => {
     const verifyRequestIdentity = vi.fn(async () => {
       throw new Error('must not verify');

@@ -106,13 +106,22 @@ begin
     join commerce_saju_private.approved_purchase_scope_v1 scope on scope.purchase_intent_id=attempt.purchase_intent_id
     where attempt.id=p_attempt_id and attempt.subject_id=p_subject_id and attempt.environment='sandbox'
       and scope.admission->>'approvedOfferId'=p_approved_offer_id
-      and attempt.provider='portone_v2' and attempt.status='created';
+    and attempt.provider='portone_v2' and attempt.status in ('created','handed_off')
+    for update of attempt;
   if v_intent_id is null then
     raise exception using errcode='P0001',constraint='approved_saju_payment_unavailable',
       message='Approved Saju payment attempt is unavailable';
   end if;
   perform commerce_saju_private.assert_approved_saju_payment_ready_v1(p_subject_id,v_intent_id);
-  return query select * from public.qry_commerce_payment_attempt_handoff_context_v1(p_subject_id,p_attempt_id);
+  -- Verification accepts only a persisted handoff. Transition before exposing
+  -- the payment identity. Exact retries retain the same attempt and payment ID.
+  return query
+  select committed.payment_attempt_id,committed.provider,committed.environment,committed.provider_request_id,
+    intent.expected_amount_minor,intent.expected_currency,committed.status
+  from public.cmd_transition_payment_attempt_v1(p_subject_id,p_attempt_id,'handed_off',null,null) committed
+  join public.purchase_intents intent on intent.id=committed.purchase_intent_id
+    and intent.subject_id=p_subject_id and intent.id=v_intent_id
+  where committed.provider='portone_v2' and committed.environment='sandbox' and committed.status='handed_off';
 end
 $function$;
 revoke all on function commerce_saju_private.assert_approved_saju_payment_ready_v1(uuid,uuid),

@@ -38,6 +38,7 @@ export interface HandlePaymentAttemptServerVerificationRequestInputV1 {
   }) => Promise<void>;
   /** Server-injected private S2, never sourced from the request payload. */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: true;
 }
 
 type PaymentAttemptServerVerificationResponseV1 = Readonly<
@@ -271,6 +272,8 @@ export async function handlePaymentAttemptServerVerificationRequestV1(
       // the current production payment verification route remains unmounted.
       privateReaderReceiptFulfillmentEnabled:
         input.privateReaderReceiptFulfillmentEnabled === true,
+      ...(input.privateApprovedSajuReceiptFulfillmentEnabled === true
+        ? { privateApprovedSajuReceiptFulfillmentEnabled: true } : {}),
     });
     // A committed payment must not become an error if optional telemetry is
     // unconfigured, consent is unavailable, or collection is offline. Even a

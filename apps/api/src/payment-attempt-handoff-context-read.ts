@@ -5,7 +5,7 @@ export const PAYMENT_ATTEMPT_HANDOFF_CONTEXT_QUERY_V1 =
   'public.qry_commerce_payment_attempt_handoff_context_v1' as const;
 
 export type PaymentAttemptHandoffEnvironmentV1 = 'sandbox' | 'production';
-export type PaymentAttemptHandoffStatusV1 = 'created';
+export type PaymentAttemptHandoffStatusV1 = 'created' | 'handed_off';
 
 export interface PaymentAttemptHandoffContextV1 {
   readonly paymentAttemptId: string;
@@ -90,11 +90,11 @@ function requireCurrency(value: unknown): string {
   return currency;
 }
 
-function requireStatus(value: unknown): PaymentAttemptHandoffStatusV1 {
-  if (value !== 'created') {
+function requireStatus(value: unknown, expected: PaymentAttemptHandoffStatusV1): PaymentAttemptHandoffStatusV1 {
+  if (value !== expected) {
     throw new Error('Payment Attempt handoff authority returned an ineligible status.');
   }
-  return value;
+  return expected;
 }
 
 function postgresConstraint(error: unknown): string | undefined {
@@ -122,6 +122,7 @@ function mapAuthorityError(error: unknown): never {
 function projectContext(
   requestedPaymentAttemptId: string,
   rows: readonly HandoffContextRowV1[],
+  expectedStatus: PaymentAttemptHandoffStatusV1,
 ): PaymentAttemptHandoffContextV1 {
   const row = rows[0];
   if (rows.length !== 1 || row === undefined) {
@@ -140,13 +141,13 @@ function projectContext(
     providerRequestId: requireStoredString('provider request identity', row.providerRequestId),
     amountMinor: requireAmountMinor(row.expectedAmountMinor),
     currency: requireCurrency(row.expectedCurrency),
-    status: requireStatus(row.status),
+    status: requireStatus(row.status, expectedStatus),
   });
 }
 
 /**
  * Reads one owned pre-browser Payment Attempt handoff context under an already bound
- * transaction-local canonical Subject. It performs no PSP I/O and mutates no state.
+ * transaction-local canonical Subject. Approved Saju commits the sandbox handoff before returning.
  */
 export async function loadPaymentAttemptHandoffContextV1(input: {
   readonly scope: PostgresSubjectExecutionScopeV1;
@@ -162,7 +163,7 @@ export async function loadPaymentAttemptHandoffContextV1(input: {
         ? [input.scope.resolvedSubject.subjectId, paymentAttemptId]
         : [input.scope.resolvedSubject.subjectId, paymentAttemptId, input.approvedOfferId],
     );
-    return projectContext(paymentAttemptId, result.rows);
+    return projectContext(paymentAttemptId, result.rows, input.approvedOfferId === undefined ? 'created' : 'handed_off');
   } catch (error) {
     return mapAuthorityError(error);
   }

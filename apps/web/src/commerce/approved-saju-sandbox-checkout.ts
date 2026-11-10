@@ -62,7 +62,7 @@ export async function prepareApprovedSajuSandboxCheckoutV1(input: {
   const attempt = await postCheckout(input.attempts, {
     purchaseIntentId: order.purchaseIntentId, idempotencyKey: input.idempotencyKey,
   });
-  if (attempt.status !== 'created' || typeof attempt.paymentAttemptId !== 'string'
+  if ((attempt.status !== 'created' && attempt.status !== 'handed_off') || typeof attempt.paymentAttemptId !== 'string'
     || !UUID.test(attempt.paymentAttemptId)) {
     throw new Error('Approved Saju payment attempt is unavailable.');
   }

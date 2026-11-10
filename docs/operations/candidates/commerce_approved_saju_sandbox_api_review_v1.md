@@ -5,6 +5,7 @@
 - `commerce_approved_saju_sandbox_api_v1.sql`은 공개 스키마에 함수 다섯 개를 정의하고 모든 일반 실행 권한을 회수합니다. 각 함수는 기존 비공개 판정에 위임합니다. 주문 생성은 선택된 상품, 구매자의 명식 및 원본 재시도 범위를 다시 확인합니다.
 - `commerce_approved_saju_sandbox_api_grant_v1.sql`은 위 함수 다섯 개와 보관함 조회 두 개에 한해 `myeongha_api_executor`에 실행 권한을 부여합니다. 이 역할에는 비공개 스키마나 테이블 접근을 부여할 필요가 없습니다.
 - `commerce_approved_saju_sandbox_api_revoke_v1.sql`은 동일한 일곱 실행 권한을 회수합니다. 주문, 영수증, 보관함과 명식 데이터에는 변경이 없습니다.
+- `commerce_approved_saju_legacy_archive_fence_v1.sql`은 승인 사주 풀이가 기존 보관함 조회에서 열리는 것을 차단합니다. 승인 사주 풀이를 최초 저장하기 전에 적용하고, 기능을 끄거나 권한을 회수한 뒤에도 유지합니다.
 
 ## 승인 이후 적용 순서
 

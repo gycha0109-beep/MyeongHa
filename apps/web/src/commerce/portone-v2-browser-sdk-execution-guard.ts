@@ -65,18 +65,16 @@ export function guardPortOneV2BrowserSdkExecutionV1(input: {
   readonly providerSelector: PortOneV2ProviderSelectorV1;
   readonly activation: PortOneV2DeferredActivationFieldsV1;
   readonly preparedRequest: PortOneV2BrowserPaymentRequestV1;
+  readonly requireCommittedHandoff?: true;
 }): PortOneV2BrowserSdkExecutionAdmissionV1 {
-  if (input.context.environment !== 'sandbox' || input.context.status !== 'created') {
+  if (input.context.environment !== 'sandbox'
+    || input.context.status !== (input.requireCommittedHandoff === true ? 'handed_off' : 'created')) {
     throw new PortOneV2BrowserSdkExecutionGuardErrorV1('INELIGIBLE_CONTEXT');
   }
 
   let canonicalRequest: PortOneV2BrowserPaymentRequestV1;
   try {
-    canonicalRequest = preparePortOneV2BrowserCheckoutV1({
-      context: input.context,
-      providerSelector: input.providerSelector,
-      activation: input.activation,
-    });
+    canonicalRequest = preparePortOneV2BrowserCheckoutV1(input);
   } catch {
     throw new PortOneV2BrowserSdkExecutionGuardErrorV1('INELIGIBLE_CONTEXT');
   }
@@ -109,16 +107,14 @@ export async function preparePortOneV2BrowserSdkExecutionAdmissionFromPaymentAtt
     fetchPort: input.fetchPort,
     ...(input.approvedOfferId === undefined ? {} : { approvedOfferId: input.approvedOfferId }),
   });
-  const preparedRequest = preparePortOneV2BrowserCheckoutV1({
-    context,
-    providerSelector: input.providerSelector,
-    activation: input.activation,
-  });
+  const preparation = {
+    context, providerSelector: input.providerSelector, activation: input.activation,
+    ...(input.approvedOfferId === undefined ? {} : { requireCommittedHandoff: true as const }),
+  };
+  const preparedRequest = preparePortOneV2BrowserCheckoutV1(preparation);
 
   return guardPortOneV2BrowserSdkExecutionV1({
-    context,
-    providerSelector: input.providerSelector,
-    activation: input.activation,
+    ...preparation,
     preparedRequest,
   });
 }

@@ -7,7 +7,7 @@ export interface PaymentAttemptBrowserHandoffContextV1 {
   readonly providerRequestId: string;
   readonly amountMinor: number;
   readonly currency: string;
-  readonly status: 'created';
+  readonly status: 'created' | 'handed_off';
 }
 
 export interface PortOneV2ProviderSelectorV1 {
@@ -70,6 +70,7 @@ function requireCurrency(value: unknown): string {
 export function projectPortOneV2BrowserPaymentCoreV1(input: {
   readonly context: PaymentAttemptBrowserHandoffContextV1;
   readonly providerSelector: PortOneV2ProviderSelectorV1;
+  readonly requireCommittedHandoff?: true;
 }): PortOneV2BrowserPaymentCoreV1 {
   const provider = requireNonEmptyString('provider', input.context.provider);
   if (!input.providerSelector.accepts(provider)) {
@@ -80,7 +81,7 @@ export function projectPortOneV2BrowserPaymentCoreV1(input: {
     throw new Error('PortOne V2 browser handoff LIVE environment remains held.');
   }
 
-  if (input.context.status !== 'created') {
+  if (input.context.status !== (input.requireCommittedHandoff === true ? 'handed_off' : 'created')) {
     throw new Error('PortOne V2 browser handoff status is ineligible.');
   }
 

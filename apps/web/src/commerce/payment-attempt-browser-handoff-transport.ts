@@ -125,16 +125,17 @@ function requireCurrency(value: unknown): string {
   return currency;
 }
 
-function requireStatus(value: unknown): 'created' {
-  if (value !== 'created') {
+function requireStatus(value: unknown, expected: PaymentAttemptBrowserHandoffContextV1['status']) {
+  if (value !== expected) {
     return invalidResponse('Payment Attempt browser handoff response status is invalid.');
   }
-  return value;
+  return expected;
 }
 
 function parseSuccessEnvelope(
   value: unknown,
   expectedPaymentAttemptId: string,
+  expectedStatus: PaymentAttemptBrowserHandoffContextV1['status'],
 ): PaymentAttemptBrowserHandoffContextV1 {
   if (!isRecord(value) || !hasExactKeys(value, ['ok', 'data', 'meta']) || value.ok !== true) {
     return invalidResponse('Payment Attempt browser handoff success envelope is invalid.');
@@ -179,7 +180,7 @@ function parseSuccessEnvelope(
     providerRequestId: requireCanonicalString('providerRequestId', value.data.providerRequestId),
     amountMinor: requireAmountMinor(value.data.amountMinor),
     currency: requireCurrency(value.data.currency),
-    status: requireStatus(value.data.status),
+    status: requireStatus(value.data.status, expectedStatus),
   });
 }
 
@@ -288,7 +289,7 @@ export async function fetchPaymentAttemptBrowserHandoffContextV1(input: {
     return invalidResponse('Payment Attempt browser handoff response JSON is malformed.');
   }
 
-  return parseSuccessEnvelope(decoded, paymentAttemptId);
+  return parseSuccessEnvelope(decoded, paymentAttemptId, input.approvedOfferId === undefined ? 'created' : 'handed_off');
 }
 
 /**

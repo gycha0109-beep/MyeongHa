@@ -72,7 +72,7 @@ function fakePool(input: {
               providerRequestId: PROVIDER_REQUEST_ID,
               expectedAmountMinor: '12900',
               expectedCurrency: 'KRW',
-              status: 'created',
+              status: text.includes('read_approved_saju_sandbox_handoff_v1') ? 'handed_off' : 'created',
             } as Row] };
           }
           throw new Error(`Unexpected SQL in Payment Attempt handoff HTTP test: ${text}`);

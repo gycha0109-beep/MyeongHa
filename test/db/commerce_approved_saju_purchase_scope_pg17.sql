@@ -4,6 +4,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_purchase_writer_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_receipt_fulfillment_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_reading_access_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_legacy_archive_fence_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuance_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_checkout_selection_v1.sql
@@ -40,16 +41,19 @@ begin
 end
 $function$;
 
-create function pg_temp.approved_fixture_reading(actor uuid,intent_id uuid,field text)
+create function pg_temp.approved_fixture_reading(
+  actor uuid,intent_id uuid,field text,snapshot_reading_id uuid default null,
+  snapshot_body jsonb default null,snapshot_hash text default null
+)
 returns uuid language plpgsql as $function$
 #variable_conflict use_variable
 declare
   authorized record;
-  reading_id uuid := gen_random_uuid();
+  reading_id uuid := coalesce(snapshot_reading_id,gen_random_uuid());
   session_id uuid := gen_random_uuid();
   attempt_id uuid := gen_random_uuid();
   source_hash text := repeat('a',64);
-  response_hash text := 'sha256:v1:' || repeat('b',64);
+  response_hash text := coalesce(snapshot_hash,'sha256:v1:' || repeat('b',64));
   reader_bundle uuid;
   runtime_version text;
   domain text := case when field in ('year','month') then 'general' else field end;
@@ -119,8 +123,8 @@ begin
     (select input_hash from public.birth_profile_revisions where id=authorized.source_birth_revision_id),
     (select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id),
     'myeonghwa-product-reading-response-v2','delivered',null,null,null,
-    jsonb_build_object('responseVersion','myeonghwa-product-reading-response-v2','state','delivered',
-      'reading',jsonb_build_object('readingId',reading_id)),response_hash);
+    coalesce(snapshot_body,jsonb_build_object('responseVersion','myeonghwa-product-reading-response-v2','state','delivered',
+      'reading',jsonb_build_object('readingId',reading_id))),response_hash);
   set constraints ct_reading_session_authority,ct_reading_request_authority,ct_reading_finalize_from_reading,
     ct_reading_finalize_from_ref,ct_reading_finalize_from_execution immediate;
   set constraints ct_reading_session_authority,ct_reading_request_authority,ct_reading_finalize_from_reading,
@@ -146,6 +150,8 @@ begin
     where metadata.response_hash=response_hash and metadata.response_snapshot_jsonb is null
   ) or exists (
     select 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,'other-reader',true)
+  ) or exists (
+    select 1 from public.qry_official_reading_record_runtime_v1(actor,reading_id)
   ) then raise exception 'Archive and Reader did not resolve one exact authorized source'; end if;
   begin
     perform set_config('myeongha.subject_id',gen_random_uuid()::text,true);
@@ -733,6 +739,7 @@ begin
            or not exists(select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer
              and status='active' and scope_key is distinct from first_grant.scope_key)
            or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,first_reading,null,true))
+           or exists(select 1 from public.qry_official_reading_record_runtime_v1(actor,first_reading))
            or not exists(select 1 from public.qry_approved_saju_component_record_v1(actor,additional_reading,null,true)) then
           raise exception 'Refund effect did not revoke just the exact comparison purchase';
         end if;
@@ -876,8 +883,17 @@ begin
   end if;
   select * into strict handoff from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career');
   if handoff.expected_amount_minor<>9900 or handoff.expected_currency<>'KRW'
-    or handoff.environment<>'sandbox' or handoff.provider_request_id<>'checkout-sandbox-request' then
+    or handoff.environment<>'sandbox' or handoff.provider_request_id<>'checkout-sandbox-request'
+    or handoff.status<>'handed_off' then
     raise exception 'Sandbox handoff changed the approved payment identity or amount';
+  end if;
+  if not exists (select 1 from public.qry_commerce_payment_verification_context_v1(actor,attempt_id)
+    where expected_amount_minor=9900 and provider_request_id='checkout-sandbox-request') then
+    raise exception 'Committed sandbox handoff was unavailable to server verification';
+  end if;
+  if not exists (select 1 from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career')
+    where status='handed_off' and provider_request_id='checkout-sandbox-request') then
+    raise exception 'Sandbox handoff replay changed its committed identity';
   end if;
   begin
     perform 1 from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'wealth');
