@@ -91,3 +91,43 @@ test('teacher output remains a proposal; no invented facts, memory, or relations
   assert.throws(() => stageTeacherSuggestion({ teacherInput: input, teacherOutput: {...output, action: 'invent_new_canon'} }), /teacher_action/);
   assert.throws(() => stageTeacherSuggestion({ teacherInput: {...input, scenario: {...input.scenario, split: 'sealed_holdout_results'} }, teacherOutput: output }), /teacher_training_split/);
 });
+
+test('planned 10-scenario, four-candidate, two-repeat holdout produces all 80 matched reviews', () => {
+  const ids = Array.from({length: 10}, (_, i) => 'H' + String(i + 1).padStart(2, '0'));
+  const variants = ['baseline', 'language_rules', 'conversation_examples', 'hybrid'];
+  const rows = variants.flatMap(candidateId => ids.flatMap(scenarioId => [1, 2].map(repeat =>
+    review(candidateId, scenarioId, {repeat, reviewRef: `${candidateId}-${scenarioId}-${repeat}`}))));
+  const candidateFailure = rows.find(x => x.candidateId === 'hybrid' && x.scenarioId === 'H03' && x.repeat === 2);
+  candidateFailure.hardFailures.fabricated_shared_memory = true;
+  const candidateNaturalness = rows.find(x => x.candidateId === 'hybrid' && x.scenarioId === 'H02' && x.repeat === 1);
+  candidateNaturalness.quality.korean_naturalness = 'fail';
+  const result = summarizeReviewedComparisons(rows, {
+    datasetRole: 'sealed_holdout_results', expectedScenarioIds: ids, expectedRepeatCount: 2,
+    expectedCandidateIds: variants,
+  });
+  assert.equal(rows.length, 80);
+  assert.equal(result.expectedCasesPerCandidate, 20);
+  assert.equal(result.candidates.length, 4);
+  assert.ok(result.candidates.every(c => c.cases === 20 && c.repeatsPerScenario === 2));
+  assert.equal(result.candidates.find(c => c.id === 'hybrid').hardGatePassed, false);
+  const paired = result.pairedAgainstBaseline.find(c => c.candidateId === 'hybrid');
+  assert.equal(paired.matchedCases, 20);
+  assert.equal(paired.hardGateRegressions, 1);
+  assert.equal(paired.quality.korean_naturalness.baselineOnlyPass, 1);
+  assert.equal(result.qualityGainEstablished, false);
+  assert.equal(result.automaticWinner, null);
+});
+
+test('holdout comparison rejects missing or duplicate repeats and cherry-picked candidate sets', () => {
+  const opts = {datasetRole: 'sealed_holdout_results', expectedScenarioIds:['H01'],
+    expectedRepeatCount: 2, expectedCandidateIds: ['baseline', 'hybrid']};
+  const valid = [review('baseline', 'H01', { repeat: 1 }), review('baseline', 'H01', { repeat: 2 }),
+    review('hybrid', 'H01', { repeat: 1 }), review('hybrid', 'H01', { repeat: 2 })];
+  assert.equal(summarizeReviewedComparisons(valid, opts).expectedCasesPerCandidate, 2);
+  assert.throws(() => summarizeReviewedComparisons(valid.slice(0, 3), opts), /incomplete_case_matrix/);
+  assert.throws(() => summarizeReviewedComparisons([...valid, valid[0]], opts), /duplicate_case/);
+  assert.throws(() => summarizeReviewedComparisons(valid.filter(r => r.candidateId === 'baseline'), opts), /missing_candidate/);
+  assert.throws(() => summarizeReviewedComparisons([{...valid[0], repeat: 3}, ...valid.slice(1)], opts), /repeat_scope/);
+  assert.throws(() => summarizeReviewedComparisons([{...valid[0], repeat: undefined}, ...valid.slice(1)], opts), /repeat_required/);
+  assert.throws(() => summarizeReviewedComparisons([...valid, review('unplanned', 'H01', { repeat: 1 })], opts), /unexpected_candidate/);
+});

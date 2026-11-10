@@ -156,28 +156,47 @@ export function stageTeacherSuggestion({ teacherInput, teacherOutput }) {
 }
 
 /** Evaluate *future* independently reviewed responses; never train on the sealed holdout. */
-export function summarizeReviewedComparisons(rows, { datasetRole, expectedScenarioIds = [] } = {}) {
+export function summarizeReviewedComparisons(rows, {
+  datasetRole,
+  expectedScenarioIds = [],
+  expectedRepeatCount = 1,
+  expectedCandidateIds = null,
+  expectedHoldoutSha256 = null,
+} = {}) {
   if (!['development_review_results', 'sealed_holdout_results'].includes(datasetRole)) invalid('evaluation_split');
   if (!Array.isArray(rows) || !rows.length || !Array.isArray(expectedScenarioIds) || !expectedScenarioIds.length) invalid('comparison_input');
   if (new Set(expectedScenarioIds).size !== expectedScenarioIds.length || expectedScenarioIds.some(x => !nonempty(x))) invalid('scenario_ids');
+  if (!Number.isInteger(expectedRepeatCount) || expectedRepeatCount < 1 || expectedRepeatCount > 20) invalid('repeat_count');
+  if (expectedCandidateIds !== null && (!Array.isArray(expectedCandidateIds) || !expectedCandidateIds.length ||
+    new Set(expectedCandidateIds).size !== expectedCandidateIds.length || expectedCandidateIds.some(x => !nonempty(x)))) invalid('candidate_ids');
+  if (expectedHoldoutSha256 !== null && (datasetRole !== 'sealed_holdout_results' ||
+    typeof expectedHoldoutSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(expectedHoldoutSha256))) invalid('holdout_hash_scope');
   if (datasetRole === 'sealed_holdout_results' && expectedScenarioIds.some(id => !/^H(0[1-9]|10)$/.test(id))) invalid('holdout_scenario_scope');
   if (datasetRole === 'development_review_results' && expectedScenarioIds.some(id => /^H(0[1-9]|10)$/.test(id))) invalid('holdout_leak_into_development');
   const groups = new Map();
   for (const row of rows) {
     if (!isObject(row) || !nonempty(row.candidateId) || !expectedScenarioIds.includes(row.scenarioId) || row.datasetRole !== datasetRole) invalid('comparison_row_identity');
+    if (expectedCandidateIds !== null && !expectedCandidateIds.includes(row.candidateId)) invalid('unexpected_candidate');
+    if (expectedHoldoutSha256 !== null && row.holdoutSha256 !== expectedHoldoutSha256) invalid('holdout_manifest_mismatch');
+    const repeat = row.repeat === undefined || row.repeat === null
+      ? (expectedRepeatCount === 1 ? 1 : invalid('repeat_required')) : row.repeat;
+    if (!Number.isInteger(repeat) || repeat < 1 || repeat > expectedRepeatCount) invalid('repeat_scope');
     if (!['human_review', 'direct_user_review'].includes(row.evaluationSource) || !nonempty(row.reviewRef)) invalid('unverified_review_source');
     if (!isObject(row.quality) || REVIEW_DIMENSIONS.some(k => !['pass', 'fail', 'not_evaluated'].includes(row.quality[k]))) invalid('quality_axes');
     if (!isObject(row.hardFailures) || HARD_FAILURES.some(k => typeof row.hardFailures[k] !== 'boolean')) invalid('hard_gate_unrated');
     if (!asNumber(row.elapsedMs) || !asNumber(row.providerReportedCostUsd)) invalid('metrics');
     const group = groups.get(row.candidateId) ?? new Map();
-    if (group.has(row.scenarioId)) invalid('duplicate_case');
-    group.set(row.scenarioId, row);
+    const caseKey = `${row.scenarioId}/${repeat}`;
+    if (group.has(caseKey)) invalid('duplicate_case');
+    group.set(caseKey, row);
     groups.set(row.candidateId, group);
   }
+  if (expectedCandidateIds !== null && expectedCandidateIds.some(id => !groups.has(id))) invalid('missing_candidate');
+  const caseKeys = expectedScenarioIds.flatMap(id => Array.from({ length: expectedRepeatCount }, (_, i) => `${id}/${i + 1}`));
   const candidates = [];
   for (const [id, group] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    if (group.size !== expectedScenarioIds.length) invalid('incomplete_case_matrix_' + id);
-    const records = expectedScenarioIds.map(s => group.get(s));
+    if (group.size !== caseKeys.length || caseKeys.some(key => !group.has(key))) invalid('incomplete_case_matrix_' + id);
+    const records = caseKeys.map(key => group.get(key));
     const hardFailures = Object.fromEntries(HARD_FAILURES.map(k => [k, records.filter(r => r.hardFailures[k]).length]));
     const dimensions = Object.fromEntries(REVIEW_DIMENSIONS.map(k => [k, {
       pass: records.filter(r => r.quality[k] === 'pass').length,
@@ -186,32 +205,61 @@ export function summarizeReviewedComparisons(rows, { datasetRole, expectedScenar
     }]));
     const times = records.map(r => r.elapsedMs).sort((a, b) => a - b);
     candidates.push({
-      id, cases: records.length, dimensions, hardFailures,
+      id, cases: records.length, scenarioCount: expectedScenarioIds.length, repeatsPerScenario: expectedRepeatCount,
+      dimensions, hardFailures,
       hardGatePassed: Object.values(hardFailures).every(n => n === 0),
       providerReportedCostUsd: records.reduce((sum, r) => sum + r.providerReportedCostUsd, 0),
       meanElapsedMs: records.reduce((sum, r) => sum + r.elapsedMs, 0) / records.length,
       observedP95ElapsedMs: times[Math.ceil(times.length * 0.95) - 1],
     });
   }
+  // Scenario-and-repeat matching is essential: unpaired candidate totals obscure sampling variance.
+  const baseline = groups.get('baseline');
+  const pairedAgainstBaseline = baseline ? candidates.filter(c => c.id !== 'baseline').map(candidate => {
+    const other = groups.get(candidate.id);
+    const quality = Object.fromEntries(REVIEW_DIMENSIONS.map(dim => {
+      const counts = { candidateOnlyPass: 0, baselineOnlyPass: 0, bothPass: 0, bothFail: 0, unreviewed: 0 };
+      for (const key of caseKeys) {
+        const a = baseline.get(key).quality[dim];
+        const b = other.get(key).quality[dim];
+        if (a === 'not_evaluated' || b === 'not_evaluated') counts.unreviewed++;
+        else if (a === 'pass' && b === 'pass') counts.bothPass++;
+        else if (a === 'pass') counts.baselineOnlyPass++;
+        else if (b === 'pass') counts.candidateOnlyPass++;
+        else counts.bothFail++;
+      }
+      return [dim, counts];
+    }));
+    const hardGateRegressions = caseKeys.filter(key =>
+      !HARD_FAILURES.some(k => baseline.get(key).hardFailures[k]) &&
+      HARD_FAILURES.some(k => other.get(key).hardFailures[k])).length;
+    return { candidateId: candidate.id, matchedCases: caseKeys.length, quality, hardGateRegressions,
+      label: 'observed_human_review_pairs_not_causal_proof' };
+  }) : [];
   return {
     schemaVersion: 'yeoul-reviewed-comparison-v1', datasetRole,
     candidateOptimizationAllowed: datasetRole === 'development_review_results',
     qualityGainEstablished: false, automaticWinner: null,
     reason: 'HUMAN_RUBRIC_AND_INDEPENDENT_COMPARISON_REQUIRED',
+    expectedCasesPerCandidate: caseKeys.length, pairedAgainstBaseline,
     candidates,
   };
 }
 
-export function makeApprovalEstimate({ newScenarios, candidateVariants, repeatCount, baselineCostUsd = 0.00691712, baselineCallCount = 72 }) {
+export function makeApprovalEstimate({ newScenarios, candidateVariants, repeatCount, turnsPerScenario = null, baselineCostUsd = 0.00691712, baselineCallCount = 72 }) {
   if (![newScenarios, candidateVariants, repeatCount, baselineCallCount].every(n => Number.isInteger(n) && n > 0) || !asNumber(baselineCostUsd)) invalid('benchmark_parameters');
-  const proposedCalls = newScenarios * candidateVariants * repeatCount;
+  if (turnsPerScenario !== null && (!Array.isArray(turnsPerScenario) || turnsPerScenario.length !== newScenarios ||
+      turnsPerScenario.some(n => !Number.isInteger(n) || n < 1 || n > 20))) invalid('turn_counts');
+  const scenarioRuns = newScenarios * candidateVariants * repeatCount;
+  const proposedCalls = (turnsPerScenario === null ? newScenarios : turnsPerScenario.reduce((a, b) => a + b, 0)) * candidateVariants * repeatCount;
   return {
     role: 'planning_only_no_authorization',
     model: 'deepseek/deepseek-v4.1-flash-1017',
-    proposedCalls,
+    scenarioRuns, proposedCalls,
+    callsAssumption: 'one_model_reply_generated_per_user_turn_no_retries',
     observedHistoricalCostPerCallUsd: baselineCostUsd / baselineCallCount,
     indicativeCostAtHistoricalRateUsd: (baselineCostUsd / baselineCallCount) * proposedCalls,
     reliableCostCeilingUsd: null,
-    warnings: ['Different prompt lengths and provider charges may change cost.', 'Teacher and grader calls are excluded.', 'No API calls or spending are authorized by this estimate.'],
+    warnings: ['Multi-turn scenarios require one model call per generated turn; scenario runs are not model calls.', 'Different prompt lengths and provider charges may change cost.', 'Teacher, grader, retry, and repair calls are excluded.', 'No API calls or spending are authorized by this estimate.'],
   };
 }
