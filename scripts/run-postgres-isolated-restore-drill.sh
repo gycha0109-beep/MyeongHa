@@ -218,6 +218,14 @@ if [[ -n "$public_app_catalog_sha" || -n "$private_app_catalog_sha" ]]; then
     }
     install -m 600 "$work_dir/source-app-catalog.json" "$RESTORE_SOURCE_APP_CATALOG_PATH"
   fi
+  # Compare sealed source direct memberships to the actual filtered roles.sql
+  # while both files are private inside this one-shot isolated runner.
+  # Export only aggregate counts; never any role names or raw GRANT tuples.
+  node scripts/operations/observe-postgres-sealed-role-dump-coverage.mjs \
+    --source "$work_dir/source-app-catalog.json" \
+    --roles "$work_dir/roles.sql" \
+    --dump-runner scripts/operations/run-production-postgres-strict-dump.sh \
+    --output "$(dirname "$RESTORE_EVIDENCE_PATH")/role-dump-coverage.json"
 fi
 
 restore_started_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
