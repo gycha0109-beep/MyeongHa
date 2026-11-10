@@ -101,3 +101,11 @@
 - `saju-production-reading-http-adapter.ts`: 요청 JSON(출생·사주 풀이)에는 메타데이터를 추가하지 않고 기존 Bearer 인증 요청에만 `x-myeongha-reading-execution-attempt-id`를 조건부 부여한다. 허용 가능한 UUID 형식만 허용하고 Preview 경로에서 해당 헤더는 거부하며, 일반 요청은 종전 동작 그대로다.
 - 신규 테스트 4건 및 기존 공식 발급·HTTP 테스트 포함 총 55건, 엄격 TypeScript 검사·Prettier 통과. 이 헤더는 **식별 좌표일 뿐 Saju Source Authority 자체가 아니다**. Saju 서버가 Bearer 확인 + 준비된 DB 실행 시도에 대한 독립 일회성 검증을 수행하지 않으면 Source 증거 발급·비용 기록을 허용해서는 안 된다.
 - Saju의 해당 헤더 수신/Source 서명 범위 설치, 인증된 Saju 외부 참조의 응답 전달 및 공식 실행 종료시 저장, 운영 전용 DB/Secret 연결, 실호출 커버리지·청구 검증은 HOLD. 이번 변경은 Production HTTP 서버·DB·비밀·실제 비용 수집을 활성화하지 않음. `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-10 — Saju 발급 외부 요청 참조의 HTTPS 수신·정본 Source 대조 (오프라인)
+
+- 앞선 명하 [PR #3194](https://github.com/gycha0109-beep/MyeongHa/pull/3194)의 Prepared Attempt UUID 운송 계약을 계승하여, 실제 Saju 서버 [PR #2772](https://github.com/gycha0109-beep/Saju/pull/2772)가 명시적 Source admission 후 반환하도록 설계한 `x-myeongha-saju-external-request-ref` 헤더를 수신하는 전용 `requestReadingWithSourceRef()`를 추가한다.
+- 이 서버 전용 메서드는 정확한 UUID 헤더·기존 HTTPS Bearer·ProductReadingResponse admission·Saju 발급 `saju_source_UUID` 형식 헤더를 동시에 요구한다. 헤더 부재/변형/Preview 경로는 출력 수락을 거부한다. source ref는 JSON Birth/풀이 응답에 삽입하지 않고 병렬 요청 각각의 비동기 결과에만 결속해 요청 간 혼합을 방지한다.
+- `executeAndPersistCurrentBirthSajuOfficialReadingV1`에서 실제 HTTP 어댑터가 전용 수신 기능을 제공하면 그 결과의 정확한 외부 참조를 공식 발급 후단에 전달한다. `persistIssuedSajuOfficialReadingV1`는 원문을 읽기/DB 최종화하기 전에 **독립 Production Source verifier가 검증한 ref와 수신한 ref가 정확히 일치하는지** 확인한다. 불일치·형식 오류는 `production_source_unverified`로 보류하고 Mapping·Write를 금지한다.
+- 신규 응답 운송 테스트 5건, Source/DB 최종화 거부 테스트 4건, 기존 공식 발급·HTTP 테스트 55건을 포함해 관련 **64건 PASS**, 엄격 TypeScript 검사 PASS. 기존 Mock 포트는 기존 독립 Production Source + DB Authority 조건을 그대로 요구하며, HTTP 전용 sourceRef 없음을 근거로 검증을 우회하지 못한다.
+- **여전히 HOLD:** 운영 출처 영수증 스키마·전용 Secret/TLS/서비스 로그인, 실제 Production Interpretation Authority 사전 승인, 최종화 권한 및 Source 서명 검증, 실제 OpenAI 호출 커버리지·공급사 청구 대조가 필요하다. 단순 수신 헤더는 비용 증명/발급 권한이 아니며 실제 운영 배포·유료 API 호출·비용 수집은 실행하지 않았다. `ROADMAP_COMPLETE` 아님.
