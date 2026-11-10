@@ -69,3 +69,11 @@
 - 원본 호출 증명은 **출처 서버가 자체 불변 저장소에 보관하고** 비용 관리 서버가 서버 전용 조회 포트로 읽어야 함. 사용자·브라우저 자료를 출처 증명으로 승인하지 않음. 조회 실패·서명 불일치·미확인 연결 시 `null` 반환.
 - 실제 과금 기록은 여전히 독립 DB 실행 시도 검증 `reading-ai-saju-attempt-db-verifier-v1.ts`의 일치 결과가 추가로 필요함. 현재 소스 증명 영속 저장소·연결 자격증명·운영 발급 경로·Writer 호출은 미구현. 비용 수집 OFF.
 - 독립 테스트 4건과 대상 소스 strict TypeScript 검사 통과. 새로운 운영 DB/비밀번호/API/프로필/크레딧 변경 없음. `ROADMAP_COMPLETE` 미충족.
+
+## 2026-11-10 — Saju Source 영수증 전용 DB Reader 로더 (오프라인, 운영 미연결)
+
+- Saju [PR #2767](https://github.com/gycha0109-beep/Saju/pull/2767)은 필수 [통합 검증 #42740408956](https://github.com/gycha0109-beep/Saju/actions/runs/42740408956) 성공 후 병합됨. 후속 Saju 출처 소유 PostgreSQL 불변 영수증/전용 Reader 역할은 [PR #2768](https://github.com/gycha0109-beep/Saju/pull/2768)에 구현 후보로 제출되어 있으며, 본 단락 작성 당시 필수 CI·운영 설치 완료가 확인되지 않음.
+- `apps/api/src/reading-ai-saju-source-receipt-db-reader-v1.ts`는 **별도 Saju 출처 DB** 전용 Reader 역할 `saju_a4_provider_receipt_reader_v1`만 허용하고, 호출 UUID에 대한 `BEGIN READ ONLY` + 변수 결속 `SELECT proof::text`만 수행한다. MyeongHa 기존 관리자 Reader, A4 실행 대조 Reader, Cost Writer/일반 API executor의 권한은 사용하지 않는다.
+- 조회 결과는 크기·필드 allowlist·정확한 호출 ID를 확인한다. 행 부재·중복·변조·원문 추가·DB 장애는 출처 증명을 생성하지 않으며, 반환한 자료도 기존 `createSajuSignedProviderCallSourceAuthorityV1`의 **독립 HMAC·토큰·호출 식별자 검증**이 필수다. 브라우저·관리자 UI·공개 API를 통해 증명을 등록/조회하지 않는다.
+- `apps/api/src/reading-ai-saju-source-receipt-db-reader-v1.test.ts`: 정상 서명 검증기 결합, 잘못된 DB role 차단, 부적절한 UUID 거부, 누락/중복/변조/초과 길이 거부, DB 예외/롤백 처리 5개 신규 테스트. 기존 서명 검증 4개·DB Attempt 검증 4개와 총 13건 통과, 변경 파일 TypeScript 6 strict 검사 통과. 저장소 루트에는 ESLint 설정이 없어 별도 단독 ESLint 실행은 적용되지 않았으며 PR CI에서 프로젝트 지정 검사 확인이 필요.
+- 이 파일은 출처 **조회 포트**만 구현한다. 운영 Saju 출처 DB 역할·연결 비밀번호·TLS 연결·서버 전용 인증 바인딩은 여전히 미연결. Saju 실제 발급 authority, 실행 시도 UUID·source ref 최종화, Source 영수증 사후 검증/중복 재처리, 공급사 전체 비용 정확성, 비용 Writer 연결/실수집은 HOLD. 기존 운영 DB 설치·로그인·서비스·고객/결제/크레딧 변경 없음. `ROADMAP_COMPLETE` 아님.
