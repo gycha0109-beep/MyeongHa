@@ -485,7 +485,7 @@ export async function createPurchaseIntentV3(
         capability: capabilitySnapshot,
         idempotencyKey: request.idempotencyKey,
         ...(approved.targetPersonId === undefined ? {} : { targetPersonId: approved.targetPersonId }),
-      }, approved.authority);
+      }, approved.authority).catch(mapAuthorityError);
   const purchaseIntentId = requireServerString(
     'generated purchase intent id',
     await input.idPort.nextPurchaseIntentId(),

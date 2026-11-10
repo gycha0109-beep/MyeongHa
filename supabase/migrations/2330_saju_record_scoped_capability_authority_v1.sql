@@ -186,6 +186,21 @@ begin
     if pg_catalog.current_setting('transaction_isolation') <> 'read committed' then
       raise exception 'SAJU_PENDING_ORIGIN_REQUIRES_READ_COMMITTED';
     end if;
+    -- The approved-catalog writer checks overlap by the persisted component
+    -- scope under this same Record lock. Only its exact private context can
+    -- bypass the legacy product-wide collision check.
+    if exists (
+      select 1 from public.commerce_saju_purchase_admission_context_v1 context
+      join public.purchase_intents intent on intent.id=new.purchase_intent_id
+        and intent.product_offer_id=context.product_offer_id
+      where context.backend_pid=pg_catalog.pg_backend_pid()
+        and context.transaction_id=pg_catalog.txid_current()
+        and context.subject_id=new.subject_id and context.saju_record_id=new.saju_record_id
+        and context.birth_revision_id=new.birth_revision_id
+        and context.approved_purchase_intent_id=new.purchase_intent_id
+    ) then
+      return new;
+    end if;
     if exists (
       select 1
       from public.commerce_saju_purchase_origins_v1 prior
@@ -1614,6 +1629,7 @@ create table public.commerce_saju_purchase_admission_context_v1 (
   saju_record_id uuid not null,
   birth_revision_id uuid not null,
   product_offer_id uuid not null,
+  approved_purchase_intent_id uuid,
   created_at timestamptz not null default transaction_timestamp(),
   constraint commerce_saju_purchase_admission_context_v1_pk
     primary key(backend_pid,transaction_id)
@@ -1667,6 +1683,7 @@ declare
   v_existing_capability_set_id uuid;
   v_existing_capability_snapshot jsonb;
   v_existing_capability_snapshot_hash text;
+  v_existing_approved_context boolean;
 
   v_subject_kind text;
   v_subject_status text;
@@ -1682,6 +1699,7 @@ declare
   v_product_enabled boolean;
   v_product_retired_at timestamptz;
   v_offer_capability_set_id uuid;
+  v_approved_context boolean;
   v_expected_offer_snapshot jsonb;
 
   v_capability_product_id uuid;
@@ -1771,7 +1789,14 @@ begin
     and pi.idempotency_key = p_idempotency_key;
 
   if found then
-    if exists (
+    select exists (
+      select 1 from public.commerce_saju_purchase_admission_context_v1 context
+      where context.backend_pid=pg_catalog.pg_backend_pid()
+        and context.transaction_id=pg_catalog.txid_current()
+        and context.subject_id=p_subject_id and context.product_offer_id=v_existing_offer_id
+        and context.approved_purchase_intent_id=p_purchase_intent_id
+    ) into v_existing_approved_context;
+    if (exists (
       select 1
       from public.product_offers existing_offer
       join public.products existing_product on existing_product.id=existing_offer.product_id
@@ -1779,7 +1804,10 @@ begin
         and public.internal_commerce_saju_product_fields_v1(
           existing_product.product_key
         ) is not null
-    ) and not exists (
+    ) or exists (
+      select 1 from public.product_capability_items item
+      where item.capability_set_id=v_existing_capability_set_id and item.scope_mode='saju_record'
+    )) and not exists (
       select 1 from public.commerce_saju_purchase_admission_context_v1 context
       where context.backend_pid=pg_catalog.pg_backend_pid()
         and context.transaction_id=pg_catalog.txid_current()
@@ -1797,7 +1825,8 @@ begin
       where existing_offer.id=v_existing_offer_id
         and (
           (
-            public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is not null
+            (v_existing_approved_context
+              or public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is not null)
             and exists (
               select 1 from public.product_capability_items item
               where item.capability_set_id=v_existing_capability_set_id
@@ -1805,7 +1834,8 @@ begin
             )
           )
           or (
-            public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is null
+            not v_existing_approved_context
+            and public.internal_commerce_saju_product_fields_v1(existing_product.product_key) is null
             and exists (
               select 1 from public.product_capability_items item
               where item.capability_set_id=v_existing_capability_set_id
@@ -1926,7 +1956,18 @@ begin
       message = 'selected product offer was not found';
   end if;
 
-  if public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+  select exists (
+    select 1 from public.commerce_saju_purchase_admission_context_v1 context
+    where context.backend_pid=pg_catalog.pg_backend_pid()
+      and context.transaction_id=pg_catalog.txid_current()
+      and context.subject_id=p_subject_id and context.product_offer_id=p_product_offer_id
+      and context.approved_purchase_intent_id=p_purchase_intent_id
+  ) into v_approved_context;
+  if (public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+      or exists (
+        select 1 from public.product_capability_items item
+        where item.capability_set_id=v_offer_capability_set_id and item.scope_mode='saju_record'
+      ))
      and not exists (
        select 1 from public.commerce_saju_purchase_admission_context_v1 context
        where context.backend_pid=pg_catalog.pg_backend_pid()
@@ -1996,14 +2037,14 @@ begin
   end if;
 
   if (
-    public.internal_commerce_saju_product_fields_v1(v_product_key) is not null
+    (v_approved_context or public.internal_commerce_saju_product_fields_v1(v_product_key) is not null)
     and exists (
       select 1 from public.product_capability_items item
       where item.capability_set_id=v_offer_capability_set_id
         and item.scope_mode<>'saju_record'
     )
   ) or (
-    public.internal_commerce_saju_product_fields_v1(v_product_key) is null
+    not v_approved_context and public.internal_commerce_saju_product_fields_v1(v_product_key) is null
     and exists (
       select 1 from public.product_capability_items item
       where item.capability_set_id=v_offer_capability_set_id
