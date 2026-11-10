@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile, realpath, stat, readdir } from 'node:fs/pro
 import { resolve, join, basename, dirname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { proposeFeedbackRevisions, createOptimizationPreflight, makeApprovalEstimate } from './yeoul-offline-optimizer-v1.mjs';
+import { buildExampleReviewQueue } from './yeoul-example-review-queue-v1.mjs';
 
 export const MODELS = Object.freeze([
   'z-ai/glm-5.3-flash',
@@ -229,6 +230,7 @@ export async function runOffline({ inputPath, outputDir }) {
   const feedback = proposeFeedbackRevisions(result.records);
   const preflight = createOptimizationPreflight({ proposalPack: feedback, selectedRuleIds: feedback.proposals.map(p => p.ruleId) });
   const costEstimate = makeApprovalEstimate({ newScenarios: 10, candidateVariants: 4, repeatCount: 2 });
+  const reviewQueue = buildExampleReviewQueue(result.examples);
   await mkdir(out, { recursive: true, mode: 0o700 });
   // Private evaluation replies and human notes must not resolve through a symlink into the repo.
   const [realOut, realCheckout, realRepoRoot] = await Promise.all([
@@ -246,10 +248,11 @@ export async function runOffline({ inputPath, outputDir }) {
   await writeFile(join(out, 'example-candidates.jsonl'), jsonl(result.examples), privateFileOptions);
   await writeFile(join(out, 'pairwise-candidates.jsonl'), jsonl(result.pairs), privateFileOptions);
   await writeFile(join(out, 'teacher-inputs.jsonl'), jsonl(result.teacherInputs), privateFileOptions);
+  await writeFile(join(out, 'example-review-queue.json'), JSON.stringify(reviewQueue, null, 2) + '\n', privateFileOptions);
   await writeFile(join(out, 'feedback-revision-proposals.json'), JSON.stringify(feedback, null, 2) + '\n', privateFileOptions);
   await writeFile(join(out, 'optimization-preflight.json'), JSON.stringify(preflight, null, 2) + '\n', privateFileOptions);
   await writeFile(join(out, 'approval-estimate.json'), JSON.stringify(costEstimate, null, 2) + '\n', privateFileOptions);
-  return { feedbackRuleCandidates: feedback.proposals.length, summary: result.summary, sourceSha256: originSha256, outputDir: out, exampleCandidates: result.examples.length, teacherInputs: result.teacherInputs.length, pairwiseCandidates: result.pairs.length };
+  return { feedbackRuleCandidates: feedback.proposals.length, summary: result.summary, sourceSha256: originSha256, outputDir: out, exampleCandidates: result.examples.length, queuedForHumanReview: reviewQueue.queuedCount, teacherInputs: result.teacherInputs.length, pairwiseCandidates: result.pairs.length };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
