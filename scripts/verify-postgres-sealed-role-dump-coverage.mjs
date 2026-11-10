@@ -78,6 +78,43 @@ assert.throws(() => observeSealedRoleDumpCoverage(source(rows),
 assert.throws(() => observeSealedRoleDumpCoverage({
   ...source(rows), sourceCatalogBoundToBackupSnapshot: true,
 }, '',runner), /true !== false/);
+const multilineSource = source([
+  e('myeongha_alpha', 'postgres'), e('myeongha_beta', 'postgres'),
+  e('myeongha_alpha', 'service_role'),
+]);
+const multilineSql = [
+  '-- GRANT "decoy" TO "postgres";',
+  'GRANT',
+  ' "myeongha_alpha",',
+  ' "myeongha_beta"',
+  ' TO',
+  ' "postgres", "service_role"',
+  ' WITH INHERIT TRUE, SET FALSE GRANTED BY "postgres";',
+].join('\n') + '\n';
+const multiline = observeSealedRoleDumpCoverage(
+  multilineSource, multilineSql, runner);
+assert.equal(multiline.filteredRolesSqlGrantStatementCount, 1);
+assert.equal(multiline.filteredRolesSqlUnparsedGrantStatementCount, 0);
+assert.equal(multiline.sourceRowsWithPairInFilteredSqlCount, 3);
+assert.equal(multiline.sourceRowsWithoutPairInFilteredSqlCount, 0);
+assert.equal(multiline.verdict, 'OBSERVED_PAIR_PRESENCE_ONLY_NOT_ROLE_PARITY');
+assert.equal(multiline.drReady, false);
+const semicolonInQuotedMember = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'external;role')]),
+  'GRANT "myeongha_alpha" TO "external;role";\n', runner);
+assert.equal(semicolonInQuotedMember.sourceRowsWithPairInFilteredSqlCount, 1);
+assert.equal(semicolonInQuotedMember.filteredRolesSqlUnparsedGrantStatementCount, 0);
+const unterminated = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'postgres')]),
+  'GRANT "myeongha_alpha" TO "postgres"\n', runner);
+assert.equal(unterminated.filteredRolesSqlUnparsedGrantStatementCount, 1);
+assert.equal(unterminated.verdict,
+  'HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED');
+const invalidTail = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'postgres')]),
+  'GRANT "myeongha_alpha" TO "postgres" UNKNOWN OPTION;\n', runner);
+assert.equal(invalidTail.filteredRolesSqlUnparsedGrantStatementCount, 1);
+assert.equal(invalidTail.sourceRowsWithPairInFilteredSqlCount, 0);
 const harness = await readFile('scripts/run-postgres-isolated-restore-drill.sh','utf8');
 for (const fragment of [
   '--source "$work_dir/source-app-catalog.json"',

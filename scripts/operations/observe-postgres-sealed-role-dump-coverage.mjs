@@ -20,23 +20,88 @@ function reservedRecipientMatcher(dumpRunner) {
   return /^(?:anon|authenticated|authenticator|cli_login_.*|dashboard_user|pgbouncer|postgres|service_role|supabase_.*|pgsodium_keyholder|pgsodium_keyiduser|pgsodium_keymaker|pgtle_admin)$/u;
 }
 
+// Collect SQL statements instead of individual lines. Role dumps may contain
+// line continuations, multiple grant recipients, or semicolons inside quoted
+// identifiers/settings. Unrecognized statements stay HOLD, never silently pass.
+function sqlStatements(sql) {
+  const statements = [];
+  let segment = '';
+  let quotedIdentifier = false;
+  let singleQuoted = false;
+  let lineComment = false;
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i];
+    const next = sql[i + 1];
+    if (lineComment) {
+      if (c === '\n') { lineComment = false; segment += '\n'; }
+      continue;
+    }
+    if (!quotedIdentifier && !singleQuoted && c === '-' && next === '-') {
+      lineComment = true; i++; continue;
+    }
+    if (quotedIdentifier && c === '"' && next === '"') {
+      segment += '""'; i++; continue;
+    }
+    if (singleQuoted && c === "'" && next === "'") {
+      segment += "''"; i++; continue;
+    }
+    if (!singleQuoted && c === '"') quotedIdentifier = !quotedIdentifier;
+    else if (!quotedIdentifier && c === "'") singleQuoted = !singleQuoted;
+    if (!quotedIdentifier && !singleQuoted && c === ';') {
+      if (segment.trim()) statements.push({ sql: segment.trim(), complete: true });
+      segment = ''; continue;
+    }
+    segment += c;
+  }
+  if (segment.trim()) statements.push({ sql: segment.trim(), complete: false });
+  return statements;
+}
+
+function parseQuotedRoleList(value) {
+  const quotedRole = '"(?:[^"]|"")*"';
+  if (!new RegExp('^' + quotedRole + '(?:\\s*,\\s*' + quotedRole + ')*$', 'u')
+    .test(value)) return null;
+  return [...value.matchAll(/"((?:[^"]|"")*)"/gu)]
+    .map(match => match[1].replaceAll('""', '"'));
+}
+
+function parseGrantPairStatement(statement) {
+  // Only role-membership grants with fully quoted identifiers are supported;
+  // object/privilege GRANT, unquoted identifiers, and unknown tails stay HOLD.
+  const list = '"(?:[^"]|"")*"(?:\\s*,\\s*"(?:[^"]|"")*")*';
+  const match = statement.match(new RegExp(
+    '^GRANT\\s+(' + list + ')\\s+TO\\s+(' + list + ')(?:\\s+([\\s\\S]*))?$',
+    'iu'));
+  if (!match) return null;
+  const granted = parseQuotedRoleList(match[1]);
+  const members = parseQuotedRoleList(match[2]);
+  if (!granted || !members) return null;
+  const suffix = (match[3] ?? '').trim();
+  if (suffix) {
+    const roleOptions = '(?:ADMIN|INHERIT|SET)\\s+(?:TRUE|FALSE)';
+    const withOptions = '(?:WITH\\s+(?:' + roleOptions +
+      ')(?:\\s*,\\s*' + roleOptions + ')*)';
+    const adminOption = 'WITH\\s+ADMIN\\s+OPTION';
+    const grantor = 'GRANTED\\s+BY\\s+"(?:[^"]|"")*"';
+    const supportedTail = new RegExp('^(?:(?:' + withOptions + '|' +
+      adminOption + ')(?:\\s+' + grantor + ')?|' + grantor + ')$', 'iu');
+    if (!supportedTail.test(suffix)) return null;
+  }
+  return granted.flatMap(grant => members.map(member =>
+    JSON.stringify([grant, member])));
+}
+
 function rolePairsInFilteredSql(sql) {
   const pairs = new Set();
   let observedGrantStatementCount = 0;
   let unparsedGrantStatementCount = 0;
-  for (const line of sql.split(/\r?\n/u)) {
-    if (!/^\s*GRANT\s/u.test(line)) continue;
+  for (const candidate of sqlStatements(sql)) {
+    if (!/^GRANT\s/iu.test(candidate.sql)) continue;
     observedGrantStatementCount++;
-    // --quote-all-identifiers is mandatory in the governed roles-only dump.
-    // Pair presence only: this is NOT grantor/option/effective privilege parity.
-    const parsed = line.match(/^\s*GRANT\s+"((?:[^"]|"")*)"\s+TO\s+"((?:[^"]|"")*)"(?:\s+[^;]*)?;\s*$/u);
-    if (!parsed) {
-      unparsedGrantStatementCount++;
-      continue;
-    }
-    const granted = parsed[1].replaceAll('""', '"');
-    const member = parsed[2].replaceAll('""', '"');
-    pairs.add(JSON.stringify([granted, member]));
+    if (!candidate.complete) { unparsedGrantStatementCount++; continue; }
+    const parsed = parseGrantPairStatement(candidate.sql);
+    if (!parsed) { unparsedGrantStatementCount++; continue; }
+    for (const pair of parsed) pairs.add(pair);
   }
   return { pairs, observedGrantStatementCount, unparsedGrantStatementCount };
 }
