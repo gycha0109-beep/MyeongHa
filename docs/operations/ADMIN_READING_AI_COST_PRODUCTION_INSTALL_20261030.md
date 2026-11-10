@@ -93,3 +93,11 @@
 - 영수증 부재/비정형은 명시적인 `held`와 `recordedCost:false`만 반환; 서명 위조·원본 사용량 변조·정본 DB 결속 불일치·권한/DB 장애는 비용 기록 없이 실패. 가격을 사용자 호출에서 임의로 전달하는 인수를 두지 않고, 단가 근거가 없으면 기존 원장 `price_unknown` 상태로 남긴다. 공급사 청구 정산은 항상 `invoiceReconciled:false`.
 - 신규 테스트 7건 + 기존 3중 검증 테스트 7건 총 14건, TypeScript strict 및 Prettier 통과. 외부 OpenAI 요청·실제 운영 DB 접속·새 DB 권한·비밀번호·결제/크레딧/고객 변경 없음.
 - **HOLD:** 실행 종료에 사용되는 실제 Saju 외부 ref 전달, 서버 간 Prepared Attempt Admission/Production Interpretation Authority, 출처 소유 영구 DB 운영 설치와 전용 비밀·TLS 바인딩, 실제 서비스 수집·공급사 청구 대조·누락 호출 완전성 확인은 미완료다. 이 단건 재처리 함수는 scheduler/HTTP/운영 Runtime에 설치하지 않았으며 코드를 병합해도 비용 수집 OFF다. `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-10 — 명하 사전 할당 Reading 실행 ID → Saju 전용 서버 요청 헤더 (오프라인)
+
+- 사후 재처리 [PR #3192](https://github.com/gycha0109-beep/MyeongHa/pull/3192)는 정확한 HEAD `f1ee5d2c7bf7dc6f885f392ce70e0e93e4607259`에 대한 [Integration #42765388396](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42765388396) SUCCESS 후 병합됐다.
+- `saju-production-reading-execution.ts`: 기존 실제 준비/동일 구매 확인용 `attemptPrepare.prepareBeforeSourceCall()`이 반환한 **true 이후에만** 동일 `executionAttemptId`를 `adapter.requestReading()`의 서버 전용 실행 인자로 전달한다. Preparing 이전에는 모델 호출·헤더 전송을 하지 않는다.
+- `saju-production-reading-http-adapter.ts`: 요청 JSON(출생·사주 풀이)에는 메타데이터를 추가하지 않고 기존 Bearer 인증 요청에만 `x-myeongha-reading-execution-attempt-id`를 조건부 부여한다. 허용 가능한 UUID 형식만 허용하고 Preview 경로에서 해당 헤더는 거부하며, 일반 요청은 종전 동작 그대로다.
+- 신규 테스트 4건 및 기존 공식 발급·HTTP 테스트 포함 총 55건, 엄격 TypeScript 검사·Prettier 통과. 이 헤더는 **식별 좌표일 뿐 Saju Source Authority 자체가 아니다**. Saju 서버가 Bearer 확인 + 준비된 DB 실행 시도에 대한 독립 일회성 검증을 수행하지 않으면 Source 증거 발급·비용 기록을 허용해서는 안 된다.
+- Saju의 해당 헤더 수신/Source 서명 범위 설치, 인증된 Saju 외부 참조의 응답 전달 및 공식 실행 종료시 저장, 운영 전용 DB/Secret 연결, 실호출 커버리지·청구 검증은 HOLD. 이번 변경은 Production HTTP 서버·DB·비밀·실제 비용 수집을 활성화하지 않음. `ROADMAP_COMPLETE` 아님.

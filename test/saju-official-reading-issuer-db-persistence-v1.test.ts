@@ -438,7 +438,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(requestReading).toHaveBeenCalledWith({
       birth: { calendarType: 'solar', date: '2001-07-14', time: '15:20', sex: 'female' },
       reading: { text: '전체 사주' },
-    });
+    }, { executionAttemptId });
     expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
   });
 
