@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve, join, basename, sep } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { resolve, join, basename, dirname, sep } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { proposeFeedbackRevisions, createOptimizationPreflight, makeApprovalEstimate } from './yeoul-offline-optimizer-v1.mjs';
 
 export const MODELS = Object.freeze([
   'z-ai/glm-5.3-flash',
@@ -149,28 +150,54 @@ export function transformForOffline(data) {
   return { summary, records, examples, pairs, teacherInputs };
 }
 
-export function retrieveReviewedExamples({ examples, userMove, relationshipStage, historyAvailable, approvedFacts = [], limit = 3 }) {
-  if (!Array.isArray(examples) || !nonempty(userMove) || !nonempty(relationshipStage)) throw new Error('INVALID_RETRIEVAL_CONTEXT');
+const BIGRAM = (text) => {
+  const normalized = text.toLowerCase().replace(/[^가-힣a-z0-9]+/g, ' ');
+  const result = new Set();
+  for (const token of normalized.split(/\s+/).filter(x => x.length >= 2)) {
+    for (let i = 0; i < token.length - 1; i++) result.add(token.slice(i, i + 2));
+  }
+  return result;
+};
+const allowedExampleContext = (example, context) => {
+  const p = example.preconditions;
+  if (!p || p.relationshipStage !== context.relationshipStage || p.historyAvailable !== context.historyAvailable) return false;
+  if (!Array.isArray(p.approvedFacts) || p.approvedFacts.some(f => typeof f !== 'string' || !context.approvedFacts.includes(f))) return false;
+  const review = example.reviewEvidence;
+  return example.reviewStatus === 'approved' && review?.reviewedBy === 'character_owner' &&
+    nonempty(example.candidateId) && Array.isArray(example.situation?.tags ?? []) &&
+    Array.isArray(review?.sourceRefs) &&
+    review.sourceRefs.includes('docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md') &&
+    review.sourceRefs.includes('docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md') &&
+    nonempty(example.candidateReply) && nonempty(example.sourcePrompt);
+};
+
+export function retrieveReviewedExamples({ examples, userMove, relationshipStage, historyAvailable, approvedFacts = [], situationTags = [], limit = 3 }) {
+  if (!Array.isArray(examples) || !nonempty(userMove) || !nonempty(relationshipStage) || typeof historyAvailable !== 'boolean') throw new Error('INVALID_RETRIEVAL_CONTEXT');
+  if (!Array.isArray(approvedFacts) || approvedFacts.some(f => !nonempty(f)) || !Array.isArray(situationTags) || situationTags.some(t => !nonempty(t))) throw new Error('INVALID_RETRIEVAL_PROVENANCE');
   if (!Number.isInteger(limit) || limit < 1 || limit > 3) throw new Error('INVALID_EXAMPLE_LIMIT');
-  const allowedFacts = new Set(approvedFacts);
-  const words = new Set((userMove.match(/[가-힣a-zA-Z0-9]{2,}/g) ?? []).map(s => s.toLowerCase()));
-  return examples.filter(e => e.reviewStatus === 'approved' && e.preconditions?.relationshipStage === relationshipStage &&
-    e.preconditions?.historyAvailable === historyAvailable &&
-    (e.preconditions?.approvedFacts ?? []).every(f => allowedFacts.has(f)) && nonempty(e.candidateReply))
-    .map(e => ({ e, score: (e.situation?.userMove?.match(/[가-힣a-zA-Z0-9]{2,}/g) ?? []).reduce((n, word) => n + Number(words.has(word.toLowerCase())), 0) }))
+  const current = { relationshipStage, historyAvailable, approvedFacts };
+  const grams = BIGRAM(userMove);
+  const tags = new Set(situationTags);
+  return examples.filter(e => allowedExampleContext(e, current)).map(e => {
+    const matches = [...BIGRAM(e.situation?.userMove ?? e.sourcePrompt)].filter(x => grams.has(x)).length;
+    const topic = (e.situation?.tags ?? []).filter(t => tags.has(t)).length;
+    return { e, score: topic * 20 + matches };
+  }).filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score || a.e.candidateId.localeCompare(b.e.candidateId))
     .slice(0, limit).map(x => x.e);
 }
 
-export function buildResearchPromptPlan({ variant, pinnedCoreAnchor, languageRules, relationshipState = 'no_history', reviewedExamples = [] }) {
+export function buildResearchPromptPlan({ variant, pinnedCoreAnchor, languageRules, relationshipState = 'no_history', historyAvailable = false, approvedFacts = [], reviewedExamples = [] }) {
   if (!['baseline', 'language_rules', 'conversation_examples', 'hybrid'].includes(variant) || !nonempty(pinnedCoreAnchor)) throw new Error('UNPINNED_CORE_ANCHOR');
-  if (reviewedExamples.some(e => e.reviewStatus !== 'approved')) throw new Error('UNREVIEWED_EXAMPLE_BLOCKED');
+  if (!nonempty(relationshipState) || typeof historyAvailable !== 'boolean' || !Array.isArray(approvedFacts)) throw new Error('INVALID_PROMPT_CONTEXT');
+  if (!Array.isArray(reviewedExamples)) throw new Error('INVALID_PROMPT_EXAMPLES');
+  if (reviewedExamples.some(e => !allowedExampleContext(e, { relationshipStage: relationshipState, historyAvailable, approvedFacts }))) throw new Error('UNREVIEWED_OR_CONTEXT_MISMATCHED_EXAMPLE_BLOCKED');
   const useLanguage = variant === 'language_rules' || variant === 'hybrid';
   const useExamples = variant === 'conversation_examples' || variant === 'hybrid';
   if (useLanguage && !nonempty(languageRules)) throw new Error('MISSING_LANGUAGE_RULES');
   const content = [pinnedCoreAnchor];
   if (useLanguage) content.push(languageRules);
-  content.push('관계 상태: ' + relationshipState + '. 이 정보만으로 과거 사건이나 기억을 추정하지 마세요.');
+  content.push('관계 단계: ' + relationshipState + '. 확인된 기억 사용 여부: ' + historyAvailable + '. 승인된 정보 범위 밖 과거 사건이나 관계는 만들지 마세요.');
   if (useExamples && reviewedExamples.length) {
     content.push('다음은 검토된 가상 예시입니다. 실제 공유 기억이 아니며 대사를 복사하거나 과거 사실로 취급하지 마세요.');
     for (const e of reviewedExamples.slice(0, 3)) content.push('사용자: ' + e.sourcePrompt + '\n여울: ' + e.candidateReply);
@@ -187,11 +214,15 @@ export async function runOffline({ inputPath, outputDir }) {
   const out = resolve(outputDir);
   if (input === out || out.startsWith(input + sep)) throw new Error('OUTPUT_PATH_INVALID');
   const checkout = resolve(process.cwd());
-  if (out === checkout || out.startsWith(checkout + sep)) throw new Error('PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY');
+  const actualRepoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+  if ([checkout, actualRepoRoot].some(dir => out === dir || out.startsWith(dir + sep))) throw new Error('PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY');
   if (/holdout/i.test(basename(input))) throw new Error('HOLDOUT_NOT_TRAINING_DATA');
   const bytes = await readFile(input);
   const data = JSON.parse(bytes.toString('utf8'));
   const result = transformForOffline(data);
+  const feedback = proposeFeedbackRevisions(result.records);
+  const preflight = createOptimizationPreflight({ proposalPack: feedback, selectedRuleIds: feedback.proposals.map(p => p.ruleId) });
+  const costEstimate = makeApprovalEstimate({ newScenarios: 10, candidateVariants: 4, repeatCount: 2 });
   await mkdir(out, { recursive: true });
   const originSha256 = createHash('sha256').update(bytes).digest('hex');
   await writeFile(join(out, 'summary.json'), JSON.stringify({ ...result.summary, sourceSha256: originSha256, inputFile: basename(input), datasetRole: 'legacy_development_only', operationalImpact: 'none' }, null, 2) + '\n');
@@ -199,7 +230,10 @@ export async function runOffline({ inputPath, outputDir }) {
   await writeFile(join(out, 'example-candidates.jsonl'), jsonl(result.examples));
   await writeFile(join(out, 'pairwise-candidates.jsonl'), jsonl(result.pairs));
   await writeFile(join(out, 'teacher-inputs.jsonl'), jsonl(result.teacherInputs));
-  return { summary: result.summary, sourceSha256: originSha256, outputDir: out, exampleCandidates: result.examples.length, teacherInputs: result.teacherInputs.length, pairwiseCandidates: result.pairs.length };
+  await writeFile(join(out, 'feedback-revision-proposals.json'), JSON.stringify(feedback, null, 2) + '\n');
+  await writeFile(join(out, 'optimization-preflight.json'), JSON.stringify(preflight, null, 2) + '\n');
+  await writeFile(join(out, 'approval-estimate.json'), JSON.stringify(costEstimate, null, 2) + '\n');
+  return { feedbackRuleCandidates: feedback.proposals.length, summary: result.summary, sourceSha256: originSha256, outputDir: out, exampleCandidates: result.examples.length, teacherInputs: result.teacherInputs.length, pairwiseCandidates: result.pairs.length };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
