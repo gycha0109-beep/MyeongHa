@@ -42,3 +42,32 @@ node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input /private
 4. 프론티어 교사 실행, 최적화 실행, 288건 원본에 대한 실제 파일 변환기 재실행(현재 샌드박스 원본 바이트 마운트 불가), 대사 승인, DeepSeek 재실험, 신규 평가셋 실측, 운영 승격은 아직 미완료다.
 
 GEPA/DSPy는 자체 reflective LM과 평가용 LM 호출을 반복하는 구조이므로 허가 없는 자동 실행 대상이 아니다. 공식 자료: https://github.com/gepa-ai/gepa , https://dspy.ai/api/optimizers/GEPA/overview/ . 추가 상시 서버나 GPU 학습을 요구하지 않는다.
+
+## 2026-11-10 후속 오프라인 구현 — 진단 반영 및 자동 검증 준비
+
+- `yeoul-offline-optimizer-v1.mjs`가 기존 **사용자 원라벨/부가 플래그**와 **미확인 자유 의견 추출**을 별도로 계수한다. Canon/Runtime을 대체하지 않는 정해진 행동 개선 문구 후보를 만들지만, 모든 문구는 `pending_character_owner_review`이며 모델 품질을 입증하지 않는다.
+- 기존 변환기를 실행하면 비공개 출력 폴더에 `feedback-revision-proposals.json`, `optimization-preflight.json`, `approval-estimate.json`도 생성한다. 첫 파일은 행동 규칙 제안, 둘째는 4개 기존 프롬프트 형태의 비실행 계획, 셋째는 신규 평가의 호출 수 및 역사적 호출당 비용을 이용한 참고치다. **교사 모델 호출·실험 승인·프롬프트 배포는 모두 0건이다.**
+- `retrieveReviewedExamples`는 캐릭터 소스 두 개의 리뷰 근거, 관계 단계, 허용 기억 여부, 승인된 사건 목록을 검증한다. 문맥이 완전히 다른 예시는 억지로 채우지 않는다. `buildResearchPromptPlan`에도 동일한 이중 검증을 둬 직접 예시를 끼워 넣는 우회를 차단한다.
+- 비공개 변환기 출력 경로는 현재 실행 위치뿐 아니라 코드가 설치된 실제 Git 저장소 루트도 검사한다. 위반 시 입력·출력을 처리하지 않는다.
+- `summarizeReviewedComparisons()`는 향후 **실제 인간이 별도 검토한 신규 응답 결과**만 접수해 품질 다섯 축, 사실/사생활/관계의 필수 실패 세 축, 지연·비용을 나란히 보여준다. 홀드아웃을 개선 규칙의 재료로 사용하지 않고, 자동 최종 우승자를 고르지 않는다.
+- 로컬 Node 실행 결과: 수정 전 6개 테스트 + 후속 5개 테스트 = **11개 PASS**. 실제 288 원본 JSON의 파일 바이트 경로는 이 세션에서 도구가 제공하지 않아 실제 CLI 입력 실행은 별도 대기한다. 기존 수동 평가는 이미 검증된 원본을 변경하지 않는다.
+
+### 라이브러리 호환성 확인과 현재 선택
+
+- [DSPy 공식](https://dspy.ai/)에서 3.4.1 공개 안내 및 `dspy.GEPA` 방식 확인. [GEPA 공식 저장소](https://github.com/gepa-ai/gepa)의 `optimize_anything`는 실제 평가 함수와 생성 모델을 연결하는 별도 실험 도구다. GEPA를 단순 로컬 점수표로 위장하지 않는다.
+- [Promptfoo 공식](https://www.promptfoo.dev/docs/usage/node-package/)은 Node.js 22.22.0+를 요구하고 24 LTS를 권장한다. 저장소는 Node 24를 요구하므로 런타임 방향은 맞지만, [평가 실행](https://www.promptfoo.dev/docs/configuration/guide/)에 provider를 연결하면 비용이 발생할 수 있다.
+- 따라서 현재 구현은 **의존성 추가 없는 Node 오프라인 평가/피드백 준비**를 선택한다. GEPA/Promptfoo 설치나 유료 자동 탐색·프론티어 교사 생성은 승인 이후 별도 진입한다. 역사적 288개 사용자 라벨의 차이는 새 프롬프트의 인과적 개선 근거가 아니다.
+
+### 승인 전 실험 계획 참고치
+
+- 예를 들어 여울 DeepSeek 단일 모델 × 비공개 홀드아웃 신규 상황 10개 × 프롬프트 후보 4개 × 반복 2회면 **80개 신규 응답**이 필요하다. 기존 DeepSeek 72개 공급자 보고 비용 합계 `$0.00691712`를 단순 환산한 값은 매우 거친 참고치일 뿐 **비용 한도/승인 금액이 아니다**.
+- 실제 유료 호출 전에는 사용자가 별도로 상한 금액·모델·교사/채점 호출 포함 여부·중단 조건을 승인해야 한다. 이번 실행에서 유료 호출은 없음.
+
+### 비공개 결과 실행 예
+
+```sh
+node --test scripts/character-runtime-lab/yeoul-quality-offline-v1.test.mjs scripts/character-runtime-lab/yeoul-offline-optimizer-v1.test.mjs
+node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input /private/yeoul-evaluations-all-288-clean.json --out /private/yeoul-quality-output
+```
+
+리뷰된 신규 대사의 결과가 별도로 생성되기 전에는 `summarizeReviewedComparisons`가 검증용 프레임일 뿐 성공 결과가 아니다. `sealed_holdout_results`는 후보 수정에 재사용하지 않는다.
