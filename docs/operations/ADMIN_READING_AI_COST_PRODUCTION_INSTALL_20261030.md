@@ -85,3 +85,11 @@
 - `apps/api/src/reading-ai-saju-proven-cost-composition-v1.test.ts`: 정상 순서·정확한 원장 투영·영수증 누락/변조·사용량 변경·정본 실행 누락/중복/불일치·전용 계정 오류·스토리지 장애·공유 풀 거부 7개 신규 테스트. 관련 기존 테스트 합계 16건과 파일 지정 TypeScript strict 검사 통과.
 - 비용 Writer는 기존 RPC 경계 외에 직접 DB INSERT·UPDATE를 실행하지 않는다. 이 신규 조합은 **서버 내부 미설치 함수**이며 공개 라우트/회원/Reading/결제/크레딧 처리·운영 DB·역할·비밀키·Cloudflare 설정을 변경하지 않았다.
 - Saju Source PostgreSQL Writer/Reader 설치, 실서비스에서 서버 간 인증된 DB attempt 발급·종료 ref 결속, 실제 OpenAI callback 설치와 비용 영수증 전달, 사주 전체 누락 호출 대조 및 공급사 청구·환율 근거는 여전히 HOLD. 서명과 정본 DB 일치만으로 완전한 비용 집계를 주장할 수 없으며 `ROADMAP_COMPLETE` 미충족.
+
+## 2026-11-10 — A4 실행 종료 후 영수증 단건 재처리 연결 (오프라인)
+
+- Saju Source [PR #2769](https://github.com/gycha0109-beep/Saju/pull/2769), [PR #2770](https://github.com/gycha0109-beep/Saju/pull/2770)은 해당 커밋의 필수 Integration SUCCESS 후 병합됨. #2770의 실제 OpenAI 콜백·서명 영수증·관측 누락 영구 기록은 **서버 내부 설치 후보**일 뿐 운영 발급/서비스 설치 완료가 아님.
+- `apps/api/src/reading-ai-saju-postterminal-replay-v1.ts`: Saju Source 전용 DB Reader에서 **서버 선택 callId** 1건의 보존된 증거를 재조회하고, 바로 그 증거의 호출 관측값만 추출한다. 이어서 기존 `createSajuA4VerifiedCostCompositionV1`가 별도 Source Reader에서 HMAC 재검증 → 종료된 MyeongHa DB Reading 실행 시도·source ref 유일 결속 → 전용 Cost Writer RPC 기록을 차례로 확인한다. 재전달된 callId로 임의 사용량을 생성하지 않으며, 원장 RPC 멱등 `replayed` 결과를 보존한다.
+- 영수증 부재/비정형은 명시적인 `held`와 `recordedCost:false`만 반환; 서명 위조·원본 사용량 변조·정본 DB 결속 불일치·권한/DB 장애는 비용 기록 없이 실패. 가격을 사용자 호출에서 임의로 전달하는 인수를 두지 않고, 단가 근거가 없으면 기존 원장 `price_unknown` 상태로 남긴다. 공급사 청구 정산은 항상 `invoiceReconciled:false`.
+- 신규 테스트 7건 + 기존 3중 검증 테스트 7건 총 14건, TypeScript strict 및 Prettier 통과. 외부 OpenAI 요청·실제 운영 DB 접속·새 DB 권한·비밀번호·결제/크레딧/고객 변경 없음.
+- **HOLD:** 실행 종료에 사용되는 실제 Saju 외부 ref 전달, 서버 간 Prepared Attempt Admission/Production Interpretation Authority, 출처 소유 영구 DB 운영 설치와 전용 비밀·TLS 바인딩, 실제 서비스 수집·공급사 청구 대조·누락 호출 완전성 확인은 미완료다. 이 단건 재처리 함수는 scheduler/HTTP/운영 Runtime에 설치하지 않았으며 코드를 병합해도 비용 수집 OFF다. `ROADMAP_COMPLETE` 아님.
