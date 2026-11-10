@@ -259,7 +259,8 @@ function validateRoleGraph(graph, side) {
 export function observeApplicationDirectRoleGraph(source, restored) {
   if (source.applicationRoleGraph === undefined) {
     return { sourceWitnessAvailable: false, observedMembershipOptionsParity: false,
-      observedGrantorAttributionParity: false, scope: roleGraphScope,
+      observedGrantorAttributionParity: false,
+      observedPortableGrantorRewriteCompatibility: null, scope: roleGraphScope,
       providerBoundaryMembershipsIncluded: false, details: null };
   }
   const before = validateRoleGraph(source.applicationRoleGraph, 'source');
@@ -272,6 +273,8 @@ export function observeApplicationDirectRoleGraph(source, restored) {
   let missingMembershipEntryCount = 0;
   let addedMembershipEntryCount = 0;
   let grantorAttributionDifferenceGroupCount = 0;
+  let portablePostgresGrantorRewriteCompatibleGroupCount = 0;
+  let unexplainedGrantorAttributionDifferenceGroupCount = 0;
   for (const [key, grantors] of before.membershipCore) {
     const next = after.membershipCore.get(key) ?? [];
     if (grantors.length > next.length) {
@@ -281,7 +284,21 @@ export function observeApplicationDirectRoleGraph(source, restored) {
       addedMembershipEntryCount += next.length - grantors.length;
     }
     if (grantors.length === next.length && JSON.stringify(grantors) !==
-      JSON.stringify(next)) grantorAttributionDifferenceGroupCount++;
+      JSON.stringify(next)) {
+      grantorAttributionDifferenceGroupCount++;
+      // Portable roles.sql replay removes only an exact GRANTED BY postgres
+      // on a MyeongHa-to-MyeongHa membership, then re-grants the unchanged
+      // options as isolated supabase_admin. Compare EACH membership key.
+      // This is diagnostic compatibility, never identical grantor provenance.
+      const expectedPortableGrantors = grantors.map(grantor =>
+        grantor === 'postgres' ? 'supabase_admin' : grantor).sort();
+      if (grantors.includes('postgres') &&
+        JSON.stringify(expectedPortableGrantors) === JSON.stringify(next)) {
+        portablePostgresGrantorRewriteCompatibleGroupCount++;
+      } else {
+        unexplainedGrantorAttributionDifferenceGroupCount++;
+      }
+    }
   }
   for (const [key, grantors] of after.membershipCore) {
     if (!before.membershipCore.has(key)) addedMembershipEntryCount += grantors.length;
@@ -297,6 +314,13 @@ export function observeApplicationDirectRoleGraph(source, restored) {
     observedMembershipOptionsParity,
     observedGrantorAttributionParity: observedMembershipOptionsParity &&
       grantorAttributionDifferenceGroupCount === 0,
+    // Null means no drift to classify. True means every changed membership
+    // group matches the reviewed portable postgres -> supabase_admin rewrite,
+    // NOT that Production grantor attribution was restored.
+    observedPortableGrantorRewriteCompatibility:
+      grantorAttributionDifferenceGroupCount === 0 ? null :
+        (observedMembershipOptionsParity &&
+        unexplainedGrantorAttributionDifferenceGroupCount === 0),
     details: {
       sourceRoleCount: before.roles.size,
       restoredRoleCount: after.roles.size,
@@ -305,6 +329,8 @@ export function observeApplicationDirectRoleGraph(source, restored) {
       missingRoleCount, addedRoleCount, roleAttributesDifferentCount,
       missingMembershipEntryCount, addedMembershipEntryCount,
       grantorAttributionDifferenceGroupCount,
+      portablePostgresGrantorRewriteCompatibleGroupCount,
+      unexplainedGrantorAttributionDifferenceGroupCount,
     },
   };
 }
