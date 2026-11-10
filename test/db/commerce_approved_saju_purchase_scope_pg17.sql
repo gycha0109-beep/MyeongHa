@@ -666,6 +666,10 @@ begin
         end;
       end if;
       perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
+      if (select count(*) from public.qry_approved_saju_purchase_readings_v1(actor,intent_id)
+          where reading_id is null and reader_character_id is null and completed_at is null)<>cardinality(fields) then
+        raise exception 'Paid order archive did not list its pending components';
+      end if;
       if offer_key in ('career','business','wealth','relationship','year','month') then
         perform pg_temp.approved_fixture_reading(actor,intent_id,offer_key);
       end if;
@@ -681,12 +685,30 @@ begin
         end;
         perform pg_temp.approved_fixture_reading(actor,intent_id,'month');
         perform pg_temp.approved_fixture_reading(actor,intent_id,'relationship');
+        if (select array_agg(component order by component) from public.qry_approved_saju_purchase_readings_v1(actor,intent_id)
+            where reading_id is not null and reader_character_id is not null and completed_at is not null)
+            is distinct from array['month','relationship']::text[] then
+          raise exception 'Package archive did not bind its completed components';
+        end if;
+        begin
+          declare other_subject uuid := gen_random_uuid();
+          begin
+            perform set_config('myeongha.subject_id',other_subject::text,true);
+            if exists(select 1 from public.qry_approved_saju_purchase_readings_v1(other_subject,intent_id)) then
+              raise exception 'Package archive was visible to a different subject';
+            end if;
+            raise sqlstate 'ZX001' using message='Restore fixture subject';
+          end;
+        exception when sqlstate 'ZX001' then null;
+        end;
         cancelled_at := clock_timestamp();
         cancel_result := pg_temp.approved_fixture_full_cancellation(receipt_for_offer,cancelled_at);
         if cancel_result->>'disposition'<>'revoked'
           or (cancel_result->>'grantCount')::integer<>cardinality(fields)
           or exists (
             select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer and status<>'revoked'
+          ) or exists (
+            select 1 from public.qry_approved_saju_purchase_readings_v1(actor,intent_id)
           ) then raise exception 'Verified package cancellation did not revoke every purchased component'; end if;
       end if;
       if offer_key = 'additional-counterpart' then

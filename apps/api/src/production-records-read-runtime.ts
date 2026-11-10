@@ -32,6 +32,8 @@ export interface CreateProductionRecordsReadRuntimeInputV1 {
   readonly pool?: PostgresSubjectPoolV1;
   /** Server-side test/runtime injection only. Never derived from the client request. */
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  /** Server-owned opt-in for an isolated approved Saju archive runtime. */
+  readonly approvedSajuArchiveEnabled?: true;
 }
 
 type RecordsReadHandlerV1 = (input: {
@@ -133,6 +135,7 @@ export function createProductionReadingHistoryReadRuntimeV1(
           serverTime: requestInput.serverTime,
           identityEvidenceVerifier,
           pool: poolLease.pool,
+          ...(input.approvedSajuArchiveEnabled === true ? { approvedSajuArchiveEnabled: true } : {}),
         });
       }
       if (requestInput.request.method === 'POST') {

@@ -1,4 +1,7 @@
 import {
+  SAJU_READING_COMPONENTS_V1, type SajuReadingComponentV1,
+} from '../../contracts/src/approved-saju-catalog.js';
+import {
   projectProductReadingResponseV2,
   type ProductReadingDisplayResultV2,
 } from './product-reading-display.js';
@@ -79,6 +82,11 @@ export interface OfficialReadingRecordV1 {
   readonly completedAt: string;
   readonly display: Extract<ProductReadingDisplayResultV2, { kind: 'delivered' }>;
 }
+
+export type ApprovedSajuPurchaseReadingV1 = Readonly<{ component: SajuReadingComponentV1 }> & (
+  | Readonly<{ state: 'pending' }>
+  | Readonly<{ state: 'ready'; readingId: string; readerCharacterId: string; completedAt: string }>
+);
 
 function malformed(message: string): never {
   throw new MyeongHaApiClientErrorV1(
@@ -462,4 +470,37 @@ export async function readOfficialReadingRecordV1(
     bearer,
   });
   return parseOfficialReadingRecordV1(data, readingId);
+}
+
+export async function readApprovedSajuPurchaseReadingsV1(
+  client: MyeongHaApiClientV1,
+  bearer: string,
+  purchaseIntentIdInput: unknown,
+): Promise<readonly ApprovedSajuPurchaseReadingV1[]> {
+  if (typeof purchaseIntentIdInput !== 'string' || !UUID_V1.test(purchaseIntentIdInput)) {
+    return clientInput('Purchase Intent id must be a canonical UUID.');
+  }
+  const purchaseIntentId = purchaseIntentIdInput.toLowerCase();
+  const data = await client.requestData({
+    method: 'GET',
+    path: `/api/readings?${new URLSearchParams({ purchaseIntentId })}`,
+    bearer,
+  });
+  if (!isRecord(data) || data.purchaseIntentId !== purchaseIntentId) return malformed('Saju archive order does not match.');
+  const readings = parseUniqueItems<ApprovedSajuPurchaseReadingV1>(data.readings, 'Saju order readings', (value) => {
+    if (!isRecord(value) || typeof value.component !== 'string'
+      || !Object.hasOwn(SAJU_READING_COMPONENTS_V1, value.component)) return malformed('Saju component is invalid.');
+    const component = value.component as SajuReadingComponentV1;
+    if (value.state === 'pending' && Object.keys(value).length === 2) {
+      return Object.freeze({ component, state: 'pending' });
+    }
+    if (value.state !== 'ready' || Object.keys(value).length !== 5 || typeof value.readingId !== 'string'
+      || !UUID_V1.test(value.readingId)) return malformed('Saju archive Reading is invalid.');
+    return Object.freeze({
+      component, state: 'ready', readingId: value.readingId,
+      readerCharacterId: requireString('Saju archive Reader', value.readerCharacterId),
+      completedAt: requireTimestamp('Saju archive completedAt', value.completedAt),
+    });
+  }, (item) => item.component);
+  return readings.length > 0 ? readings : malformed('Saju archive has no purchased components.');
 }

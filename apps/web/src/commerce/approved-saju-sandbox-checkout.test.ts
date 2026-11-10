@@ -1,11 +1,14 @@
 import { expect, it, vi } from 'vitest';
 import { APPROVED_SAJU_CATALOG_V1, type ApprovedSajuOfferV1 } from '../../../../packages/contracts/src/approved-saju-catalog.js';
-import { requestApprovedSajuSandboxPaymentV1 } from './approved-saju-sandbox-checkout.js';
+import { prepareApprovedSajuSandboxCheckoutV1, requestApprovedSajuSandboxPaymentV1 } from './approved-saju-sandbox-checkout.js';
 import type { PaymentAttemptHandoffFetchRequestV1 } from './payment-attempt-browser-handoff-transport.js';
 import type { PaymentAttemptServerVerificationFetchRequestV1 } from './payment-attempt-browser-server-verification-transport.js';
 
 const paymentAttemptId = '11111111-1111-4111-8111-111111111111';
 const receiptId = '22222222-2222-4222-8222-222222222222';
+const purchaseIntentId = '33333333-3333-4333-8333-333333333333';
+const targetPersonId = '44444444-4444-4444-8444-444444444444';
+const idempotencyKey = 'approved-order-sandbox-1';
 const paymentId = 'sandbox-server-payment';
 
 function success(data: object) {
@@ -42,13 +45,44 @@ function fixture(offer: ApprovedSajuOfferV1, overrides: object = {}) {
 
 it.each(APPROVED_SAJU_CATALOG_V1)('uses the server-owned payment for $id and returns only its verified receipt', async (offer) => {
   const input = fixture(offer);
-  await expect(requestApprovedSajuSandboxPaymentV1(input)).resolves.toEqual({ paymentAttemptId, receiptId, replayed: false });
+  const target = offer.counterpartOrder === undefined ? {} : { targetPersonId };
+  const orders = { fetch: vi.fn(async (request: PaymentAttemptHandoffFetchRequestV1) => {
+    expect(JSON.parse(request.body)).toEqual({ approvedOfferId: offer.id, idempotencyKey, ...target });
+    return success({ approvedOfferId: offer.id, purchaseIntentId, status: 'created', amountMinor: offer.priceKrw, currency: 'KRW' });
+  }) };
+  const attempts = { fetch: vi.fn(async (request: PaymentAttemptHandoffFetchRequestV1) => {
+    expect(JSON.parse(request.body)).toEqual({ purchaseIntentId, idempotencyKey });
+    return success({ paymentAttemptId, status: 'created' });
+  }) };
+  const selection = { approvedOfferId: offer.id, idempotencyKey, ...target, orders, attempts };
+  const binding = await prepareApprovedSajuSandboxCheckoutV1(selection);
+  expect(binding).toEqual({ approvedOfferId: offer.id, purchaseIntentId, paymentAttemptId });
+  await expect(prepareApprovedSajuSandboxCheckoutV1(selection)).resolves.toEqual(binding);
+  expect(orders.fetch).toHaveBeenCalledTimes(2);
+  expect(attempts.fetch).toHaveBeenCalledTimes(2);
+  await expect(requestApprovedSajuSandboxPaymentV1({ ...input, ...binding })).resolves.toEqual({
+    paymentAttemptId, receiptId, replayed: false,
+  });
   expect(input.sdk.requestPayment).toHaveBeenCalledExactlyOnceWith({
     storeId: 'sandbox-store', channelKey: 'sandbox-channel', paymentId, orderName: offer.title,
     totalAmount: offer.priceKrw, currency: 'CURRENCY_KRW', payMethod: 'CARD',
   });
   expect(input.verification.fetch).toHaveBeenCalledOnce();
 });
+
+it.each([{ approvedOfferId: 'wealth' }, { amountMinor: 1 }, { status: 'verified' }])(
+  'does not create an attempt if the server order does not match the requested purchase %j',
+  async (override) => {
+    const attempts = { fetch: vi.fn() };
+    const orders = { fetch: vi.fn(async () => success({
+      approvedOfferId: 'career', purchaseIntentId, status: 'created', amountMinor: 9900, currency: 'KRW', ...override,
+    })) };
+    await expect(prepareApprovedSajuSandboxCheckoutV1({
+      approvedOfferId: 'career', idempotencyKey, orders, attempts,
+    })).rejects.toThrow();
+    expect(attempts.fetch).not.toHaveBeenCalled();
+  },
+);
 
 it.each([
   { amountMinor: 1 }, { currency: 'USD' }, { environment: 'production' }, { providerRequestId: 'x'.repeat(41) },

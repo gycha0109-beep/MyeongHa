@@ -1,7 +1,9 @@
 import { ApiCommandError } from './api-error.js';
 import type { createAdminAnalyticsVerifiedReadingAdapterV1 } from './admin-analytics-verified-reading-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
-import { createPostgresApprovedSajuReadingAccessV1 } from './postgres-approved-saju-reading-access-v1.js';
+import {
+  createPostgresApprovedSajuReadingAccessV1, readPostgresApprovedSajuPurchaseReadingsV1,
+} from './postgres-approved-saju-reading-access-v1.js';
 import {
   getOfficialReadingRecord,
   OfficialReadingRecordReadAuthorityPortErrorV1,
@@ -172,13 +174,14 @@ export function createPostgresOfficialReadingRecordAuthorityPortV1(
     },
   };
 }
-function requestedReadingId(request: Request): string | null {
+function requestedArchiveId(request: Request, allowPurchase: boolean) {
   const url = new URL(request.url);
   if (url.pathname !== READINGS_ROUTE) return null;
-  if ([...url.searchParams.keys()].some((key) => key !== 'readingId')) return null;
-  if (url.searchParams.getAll('readingId').length !== 1) return null;
-  const value = url.searchParams.get('readingId');
-  return value !== null && UUID_V1.test(value.trim()) ? value.trim() : null;
+  const [entry, duplicate] = [...url.searchParams];
+  if (entry === undefined || duplicate !== undefined) return null;
+  const [key, value] = entry;
+  if ((key !== 'readingId' && !(allowPurchase && key === 'purchaseIntentId')) || !UUID_V1.test(value.trim())) return null;
+  return { key, id: value.trim() };
 }
 
 function jsonError(input: {
@@ -226,8 +229,8 @@ export async function handleOfficialReadingRecordRequestV1(input: {
    * completion event. This does not claim complete runtime coverage. */
   readonly verifiedReadingAnalytics?: Pick<ReturnType<typeof createAdminAnalyticsVerifiedReadingAdapterV1>, 'record'>;
 }): Promise<Response> {
-  const readingId = requestedReadingId(input.request);
-  if (readingId === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } });
+  const selector = requestedArchiveId(input.request, input.approvedSajuArchiveEnabled === true);
+  if (selector === null) return new Response(null, { status: 404, headers: { 'Cache-Control': NO_STORE_CACHE_CONTROL } });
   if (input.request.method !== GET_METHOD) {
     return new Response(null, { status: 405, headers: { Allow: GET_METHOD, 'Cache-Control': NO_STORE_CACHE_CONTROL } });
   }
@@ -240,6 +243,18 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   }
 
   try {
+    if (selector.key === 'purchaseIntentId') {
+      const purchaseIntentId = selector.id.toLowerCase();
+      const readings = await executePostgresSubjectTransactionV1({
+        pool: input.pool,
+        verifiedEvidence,
+        execute: ({ resolvedSubject, client }) => resolvedSubject.subjectKind === 'member'
+          ? readPostgresApprovedSajuPurchaseReadingsV1(client, resolvedSubject.subjectId, purchaseIntentId) : [],
+      });
+      if (readings.length === 0) throw new ApiCommandError('NOT_FOUND', 'Approved Saju purchase is unavailable.');
+      return successResponse({ purchaseIntentId, readings }, requestId, serverTime);
+    }
+    const readingId = selector.id;
     const data = await executePostgresSubjectTransactionV1({
       pool: input.pool,
       verifiedEvidence,

@@ -1,3 +1,7 @@
+import {
+  SAJU_READING_COMPONENTS_V1, type SajuReadingComponentV1,
+} from '../../../packages/contracts/src/approved-saju-catalog.js';
+import type { ApprovedSajuPurchaseReadingV1 } from '../../../packages/api-client/src/records.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingArtifactAuthorityPortV1,
@@ -17,6 +21,39 @@ select reading_id::text as "readingId",reading_session_id::text as "readingSessi
   issued_revision_no as "issuedRevisionNo",current_revision_no as "currentRevisionNo"
 from public.qry_approved_saju_component_record_v1($1::uuid,$2::uuid,$3::text,$4::boolean)
 `.trim();
+
+/** Server-only archive manifest, read inside the existing canonical subject transaction. */
+export async function readPostgresApprovedSajuPurchaseReadingsV1(
+  client: PostgresTransactionQueryV1,
+  subjectId: string,
+  purchaseIntentId: string,
+): Promise<readonly ApprovedSajuPurchaseReadingV1[]> {
+  const { rows } = await client.query<{
+    component: string;
+    readingId: string | null;
+    readerCharacterId: string | null;
+    completedAt: string | null;
+  }>(`
+    select component,reading_id::text as "readingId",reader_character_id as "readerCharacterId",
+      completed_at::text as "completedAt"
+    from public.qry_approved_saju_purchase_readings_v1($1::uuid,$2::uuid)
+  `.trim(), [subjectId, purchaseIntentId]);
+  const components = new Set<string>();
+  return rows.map(({ component, readingId, readerCharacterId, completedAt }) => {
+    if (!Object.hasOwn(SAJU_READING_COMPONENTS_V1, component) || components.has(component)) {
+      throw new Error('Approved Saju archive manifest returned an invalid component.');
+    }
+    components.add(component);
+    const key = component as SajuReadingComponentV1;
+    if (readingId === null && readerCharacterId === null && completedAt === null) {
+      return { component: key, state: 'pending' };
+    }
+    if (!readingId || !readerCharacterId || !completedAt || !Number.isFinite(Date.parse(completedAt))) {
+      throw new Error('Approved Saju archive manifest returned an incomplete Reading.');
+    }
+    return { component: key, state: 'ready', readingId, readerCharacterId, completedAt: new Date(completedAt).toISOString() };
+  });
+}
 
 interface ApprovedReadingRow {
   readonly readingId: string;
