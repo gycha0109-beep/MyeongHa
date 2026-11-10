@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve, join, basename } from 'node:path';
+import { resolve, join, basename, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const MODELS = Object.freeze([
@@ -185,7 +185,9 @@ export async function runOffline({ inputPath, outputDir }) {
   if (!nonempty(inputPath) || !nonempty(outputDir)) throw new Error('INPUT_AND_OUTPUT_REQUIRED');
   const input = resolve(inputPath);
   const out = resolve(outputDir);
-  if (input === out || out.startsWith(input + '/')) throw new Error('OUTPUT_PATH_INVALID');
+  if (input === out || out.startsWith(input + sep)) throw new Error('OUTPUT_PATH_INVALID');
+  const checkout = resolve(process.cwd());
+  if (out === checkout || out.startsWith(checkout + sep)) throw new Error('PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY');
   if (/holdout/i.test(basename(input))) throw new Error('HOLDOUT_NOT_TRAINING_DATA');
   const bytes = await readFile(input);
   const data = JSON.parse(bytes.toString('utf8'));
