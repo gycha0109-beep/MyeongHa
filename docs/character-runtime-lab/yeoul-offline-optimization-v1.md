@@ -16,7 +16,7 @@ node --test scripts/character-runtime-lab/yeoul-quality-offline-v1.test.mjs
 node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input /private/yeoul-evaluations-all-288-clean.json --out /private/yeoul-quality-output
 ```
 
-입출력은 사용자가 선택한 비공개 경로로 지정한다. 출력: `summary.json`(입력 SHA-256), `records.jsonl`(모든 원본 행·평가·메모·상세플래그를 원형 보존한 구조화 자료), `example-candidates.jsonl`(검토 전 우수 사례 후보), `pairwise-candidates.jsonl`(동일 질문/조건의 관찰적 선호 쌍), `teacher-inputs.jsonl`(교사 호출 전 검증 대기 자료). 온라인 호출, 가중치 학습, 운영 수정은 일어나지 않는다.
+입출력은 사용자가 선택한 비공개 경로로 지정한다. **현재 작업 디렉터리(저장소) 내부로 결과를 쓰는 것은 거부한다.** 출력: `summary.json`(입력 SHA-256), `records.jsonl`(모든 원본 행·평가·메모·상세플래그를 원형 보존한 구조화 자료), `example-candidates.jsonl`(검토 전 우수 사례 후보), `pairwise-candidates.jsonl`(동일 질문/조건의 관찰적 선호 쌍), `teacher-inputs.jsonl`(교사 호출 전 검증 대기 자료). 온라인 호출, 가중치 학습, 운영 수정은 일어나지 않는다.
 
 ## 라벨과 승인 경계
 
