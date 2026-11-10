@@ -236,6 +236,41 @@ describe('owner-bound comparison revisions', () => {
       fetchImpl: async () => response({ generatedInterpretationClaims: true }),
     })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
   });
+
+  it('binds opt-in structural evidence to the source chart and refuses missing or altered evidence', async () => {
+    const match = {
+      kind: 'branch_clash', component: 'branch',
+      subject: { factPath: 'subject.pillars.year.value.branch', value: '子' },
+      target: { factPath: 'target.pillars.day.value.branch', value: '午' },
+      sourceIds: ['source-clash-table'], definitionContentHash: 'a'.repeat(64),
+      pairwiseMeaningAuthorized: false,
+    };
+    const own = { year: pillar, month: pillar, day: pillar, hour: pillar };
+    const partner = { ...own, day: { status: 'resolved', value: '庚午' }, hour: { status: 'unavailable' } };
+    const subjects = [{ role: 'self', pillars: own }, { role: 'partner', pillars: partner }];
+    const evidence = { version: 'myeonghwa-cross-chart-structural-evidence-v1', matches: [match] };
+    const fetchImpl = vi.fn(async (_url: string) => response({ subjects, evidence }));
+    const admit = vi.fn(async () => true);
+    const input = { ...pinned, env, pool: createPool(), useAuthority: { admit }, includeStructuralEvidence: true as const };
+    const result = await executeSajuComparisonPreviewV1({ ...input, fetchImpl });
+    expect(fetchImpl).toHaveBeenCalledWith('https://saju.example.test/api/preview/compatibility-evidence', expect.anything());
+    expect(admit).toHaveBeenCalledTimes(2);
+    expect(result.structuralEvidence).toEqual({
+      version: evidence.version, pairwiseT10Admitted: false, matches: [{
+        ...match, subject: { slot: 'year', value: '子' }, target: { slot: 'day', value: '午' },
+      }],
+    });
+    for (const badEvidence of [
+      undefined,
+      { ...evidence, matches: [match, match] },
+      { ...evidence, matches: [{ ...match, target: { ...match.target, value: '子' } }] },
+      { ...evidence, matches: [{ ...match, pairwiseMeaningAuthorized: true }] },
+    ]) {
+      await expect(executeSajuComparisonPreviewV1({
+        ...input, fetchImpl: async () => response({ subjects, evidence: badEvidence }),
+      })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
+    }
+  });
 });
 
 function verifier(

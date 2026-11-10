@@ -10,6 +10,8 @@ import {
 } from './upstream-json-response-resource.js';
 
 const PATH = '/api/preview/compatibility-charts';
+const EVIDENCE_PATH = '/api/preview/compatibility-evidence';
+const EVIDENCE_VERSION = 'myeonghwa-cross-chart-structural-evidence-v1';
 const SLOTS = ['year', 'month', 'day', 'hour'] as const;
 const PILLAR = /^[甲乙丙丁戊己庚辛壬癸][子丑寅卯辰巳午未申酉戌亥]$/u;
 type Pillar = { status: 'unavailable' } | { status: 'resolved'; value: string };
@@ -49,10 +51,50 @@ function readChart(value: unknown, role: 'self' | 'partner', timeKnown: boolean)
   return { role, pillars: Object.fromEntries(entries) };
 }
 
+function readStructuralEvidence(value: unknown, charts: readonly ReturnType<typeof readChart>[]) {
+  if (!record(value) || value.version !== EVIDENCE_VERSION
+    || !Array.isArray(value.matches) || value.matches.length > 48) throw unavailable();
+  const observed = new Set<string>();
+  const matches = value.matches.map((match: unknown) => {
+    if (!record(match)
+      || (match.kind !== 'stem_five_combination' && match.kind !== 'branch_six_combination'
+        && match.kind !== 'branch_clash')
+      || match.component !== (match.kind === 'stem_five_combination' ? 'stem' : 'branch')
+      || typeof match.definitionContentHash !== 'string' || !/^[a-f0-9]{64}$/u.test(match.definitionContentHash)
+      || match.pairwiseMeaningAuthorized !== false
+      || !Array.isArray(match.sourceIds) || match.sourceIds.length < 1 || match.sourceIds.length > 4
+      || !match.sourceIds.every(id => typeof id === 'string' && /^[A-Za-z0-9._:-]{1,128}$/u.test(id))) throw unavailable();
+    const { component } = match;
+    const readOperand = (role: 'subject' | 'target', chart: ReturnType<typeof readChart> | undefined) => {
+      const operand = match[role];
+      if (!record(operand) || typeof operand.value !== 'string') throw unavailable();
+      const slot = SLOTS.find(item => operand.factPath === `${role}.pillars.${item}.value.${component}`);
+      const pillar = slot === undefined ? undefined : chart?.pillars[slot];
+      if (slot === undefined || pillar?.status !== 'resolved'
+        || operand.value !== pillar.value[component === 'stem' ? 0 : 1]) throw unavailable();
+      return { slot, value: operand.value };
+    };
+    const subject = readOperand('subject', charts[0]);
+    const target = readOperand('target', charts[1]);
+    const identity = `${match.kind}:${subject.slot}:${target.slot}`;
+    if (observed.has(identity)) throw unavailable();
+    observed.add(identity);
+    return {
+      kind: match.kind, component, subject, target,
+      sourceIds: [...match.sourceIds] as string[],
+      definitionContentHash: match.definitionContentHash,
+      pairwiseMeaningAuthorized: false as const,
+    };
+  });
+  return { version: EVIDENCE_VERSION, matches, pairwiseT10Admitted: false as const };
+}
+
 /** Internal transport for an explicitly authorized two-chart Preview use. */
 export async function executeSajuComparisonPreviewV1(input: BirthPairInput & Readonly<{
   env: ProductionSajuRuntimeEnvV1;
   useAuthority?: SajuComparisonUseAuthorityV1;
+  /** Configured by the internal caller, outside the browser request. */
+  includeStructuralEvidence?: true;
   fetchImpl?: (url: string, init: RequestInit) => Promise<Response>;
 }>) {
   const useAuthority = input.useAuthority;
@@ -79,7 +121,7 @@ export async function executeSajuComparisonPreviewV1(input: BirthPairInput & Rea
   try {
     const signal = AbortSignal.timeout(15_000);
     const response = await awaitBoundedUpstreamJsonResponseHeadersV1(
-      (input.fetchImpl ?? fetch)(config.serviceOrigin + PATH, {
+      (input.fetchImpl ?? fetch)(config.serviceOrigin + (input.includeStructuralEvidence === true ? EVIDENCE_PATH : PATH), {
         method: 'POST',
         redirect: 'manual',
         headers: {
@@ -111,6 +153,8 @@ export async function executeSajuComparisonPreviewV1(input: BirthPairInput & Rea
     readChart(result.subjects[0], 'self', pair.previewRequest.birth.time !== null),
     readChart(result.subjects[1], 'partner', pair.previewRequest.partnerBirth.time !== null),
   ] as const;
+  const structuralEvidence = input.includeStructuralEvidence === true
+    ? readStructuralEvidence(result.evidence, charts) : undefined;
 
   const current = await readBoundSajuComparisonBirthsV1(input);
   if (current.subjectId !== pair.subjectId) {
@@ -121,6 +165,7 @@ export async function executeSajuComparisonPreviewV1(input: BirthPairInput & Rea
     lifecycle: 'internal_preview_only' as const,
     coverage: 'calculation_facts_only' as const,
     charts,
+    ...(structuralEvidence === undefined ? {} : { structuralEvidence }),
     mayPublish: false as const,
     mayPersist: false as const,
     maySell: false as const,
