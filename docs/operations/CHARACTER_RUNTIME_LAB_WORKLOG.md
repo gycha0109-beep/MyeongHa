@@ -73,3 +73,10 @@
 - Added offline-only benchmark SHA-256 manifest, exact 10 scenario IDs, per-scenario turn counts, 104-call historical estimate, mandatory user budget/abort review and unrated review template. It cannot execute network/model APIs or publish scenario text. Holdout rubric identifiers aligned; future review rows may require a matching holdout SHA.
 - Local Node tests: 19 PASS (tool environment Node 22; repository CI Node 24). No paid model calls, user data, Canon/relationship/memory or production modifications. Real 288 evaluations remain unchanged; physical original-file CLI invocation still blocked by authorized byte mounting.
 - Next: confirm exact new PR CI, then separately request approval for any real student 104-call benchmark plus explicitly scoped teacher/grader/retry budget. Indicative historical price is not a spending cap or proven quality gain.
+
+## 2026-11-10 — PR #3187 Work Track CI red: fix holdout test source path
+- Observed exact PR head 28c2dfa7dfad62af61270088caa09c3e23cac24e, run https://github.com/gycha0109-beep/MyeongHa/actions/runs/42760697567 and failing job https://github.com/gycha0109-beep/MyeongHa/actions/runs/42760697567/job/129645504737. Failure was the changed-test step, not TypeScript build, API client, model provider, or historical evaluation.
+- Root cause: new benchmark test used ../docs/yeoul-holdout-scenarios-v1.json relative to scripts/character-runtime-lab, so CI searched nonexistent scripts/docs. Actual tracked JSON path is docs/character-runtime-lab/yeoul-holdout-scenarios-v1.json.
+- Fix only the new test's source path to ../../docs/character-runtime-lab/yeoul-holdout-scenarios-v1.json (relative to test module); no code policy, production, Canon, relationship, memory, model or cost changes.
+- Reproduced the ENOENT before fix using exact repo-like directory layout; after fix the four affected tests passed, and all 19 Yeoul Node tests passed locally on Node v22. CI uses Node v24, so final exact-head CI remains the authoritative gate.
+- Next: wait for checks of fix HEAD and auto-merge when permitted. No paid calls.

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { prepareBenchmarkPreflight, createBlankHumanReviewRows } from './yeoul-benchmark-preflight-v1.mjs';
 import { summarizeReviewedComparisons } from './yeoul-offline-optimizer-v1.mjs';
-const originalBytes = readFileSync(fileURLToPath(new URL('../docs/yeoul-holdout-scenarios-v1.json', import.meta.url)));
+const originalBytes = readFileSync(fileURLToPath(new URL('../../docs/character-runtime-lab/yeoul-holdout-scenarios-v1.json', import.meta.url)));
 const original = JSON.parse(originalBytes.toString('utf8'));
 const altered = edit => { const clone = structuredClone(original); edit(clone); return JSON.stringify(clone); };
 
