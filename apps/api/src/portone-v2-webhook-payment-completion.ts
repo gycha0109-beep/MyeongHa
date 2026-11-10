@@ -51,6 +51,8 @@ export interface PortOneV2WebhookPaymentCompletionConfigV1 {
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
   /** Owner-only verified Saju Grant issuance. Defaults to disabled. */
   readonly privateApprovedSajuReceiptFulfillmentEnabled?: boolean;
+  /** Independent from new sales so refund processing can remain available. */
+  readonly privateApprovedSajuFullCancellationEnabled?: boolean;
 }
 
 type PortOneV2WebhookPaymentCompletionConfigSnapshotV1 = Readonly<{
@@ -517,6 +519,8 @@ export async function executePortOneV2WebhookPaymentCompletionV1(input: {
     const applied = await applyVerifiedPortOneV2ReaderFullCancellationV1({
       pool: input.pool,
       evidence,
+      ...(input.config.privateApprovedSajuFullCancellationEnabled === true
+        ? { privateApprovedSajuFullCancellationEnabled: true } : {}),
     });
     if (applied.kind === 'unrelated_commerce') {
       return Object.freeze({

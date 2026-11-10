@@ -5,6 +5,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_receipt_fulfillment_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_reading_access_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuance_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
 
 insert into public.saju_domain_runtime(saju_domain,availability,capability_version,updated_at)
 select domain,'available','isolated-approved-v1',now()
@@ -165,8 +166,25 @@ begin
     'isolated-' || receipt_id::text,'verified','{}',now(),now(),'production','isolated',
     intent.expected_amount_minor + amount_delta,intent.expected_currency
   from public.purchase_intents intent where intent.id=intent_id and intent.subject_id=actor;
+  insert into public.commerce_payment_attempts(
+    id,purchase_intent_id,subject_id,product_offer_id,attempt_no,provider,environment,idempotency_key,
+    provider_request_id,provider_transaction_id,status,created_at,updated_at
+  ) select gen_random_uuid(),intent_id,actor,intent.product_offer_id,
+    (select count(*)::integer+1 from public.commerce_payment_attempts attempt where attempt.purchase_intent_id=intent_id),
+    'portone_v2','production',receipt_id::text,'payment-' || receipt_id::text,receipt_id::text,
+    'response_received',now(),now()
+  from public.purchase_intents intent where intent.id=intent_id and intent.subject_id=actor;
   update public.purchase_intents set status='verified' where id=intent_id and subject_id=actor;
 end
+$function$;
+
+create function pg_temp.approved_fixture_full_cancellation(receipt_id uuid,cancelled_at timestamptz,payment_id text default null)
+returns jsonb language sql as $function$
+  select public.internal_apply_approved_saju_full_cancellation_v1(
+    coalesce(payment_id,'payment-' || receipt.id::text),receipt.external_transaction_id,'cancel-' || receipt.id::text,
+    cancelled_at,receipt.verified_amount_minor,receipt.verified_currency,receipt.environment,
+    'hmac-sha256:k1:' || repeat('a',64),'isolated-cancel')
+  from public.commerce_receipts receipt where receipt.id=receipt_id
 $function$;
 
 create function pg_temp.approved_fixture_grants(
@@ -237,11 +255,12 @@ declare
   extra_revision uuid := gen_random_uuid();
   target_for_offer uuid;
   receipt_for_offer uuid;
-  cancellation_event uuid;
   first_grant public.entitlement_grants%rowtype;
   first_reading uuid;
   additional_reading uuid;
   edited_self uuid := gen_random_uuid();
+  cancelled_at timestamptz;
+  cancel_result jsonb;
 begin
   insert into auth.users(id) values (auth_id);
   insert into public.subjects(id,kind,auth_user_id,status,created_at,updated_at)
@@ -601,6 +620,17 @@ begin
       perform pg_temp.approved_fixture_receipt(actor,intent_id,receipt_for_offer);
       if offer_key = 'basic-month' then
         begin
+          cancelled_at := clock_timestamp();
+          cancel_result := pg_temp.approved_fixture_full_cancellation(receipt_for_offer,cancelled_at);
+          if cancel_result->>'disposition'<>'cancelled_before_grant'
+            or (select verification_status from public.commerce_receipts where id=receipt_for_offer)<>'revoked'
+            or exists (select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer) then
+            raise exception 'Verified full cancellation before issuance did not revoke only the receipt';
+          end if;
+          raise sqlstate 'ZX002' using message='Roll back isolated pre-issuance cancellation';
+        exception when sqlstate 'ZX002' then null;
+        end;
+        begin
           delete from commerce_saju_private.approved_purchase_scope_v1 where purchase_intent_id=intent_id;
           perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
           raise exception 'Approved receipt without its scope fell back to an entitlement';
@@ -625,21 +655,30 @@ begin
         end;
         perform pg_temp.approved_fixture_reading(actor,intent_id,'month');
         perform pg_temp.approved_fixture_reading(actor,intent_id,'relationship');
+        cancelled_at := clock_timestamp();
+        cancel_result := pg_temp.approved_fixture_full_cancellation(receipt_for_offer,cancelled_at);
+        if cancel_result->>'disposition'<>'revoked'
+          or (cancel_result->>'grantCount')::integer<>cardinality(fields)
+          or exists (
+            select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer and status<>'revoked'
+          ) then raise exception 'Verified package cancellation did not revoke every purchased component'; end if;
       end if;
       if offer_key = 'additional-counterpart' then
         additional_reading := pg_temp.approved_fixture_reading(actor,intent_id,'compatibility');
         select * into strict first_grant from public.entitlement_grants where source_receipt_id=first_receipt;
-        cancellation_event := gen_random_uuid();
-        insert into public.commerce_provider_events(id,provider,external_event_id,event_type,external_transaction_id,
-          resolved_subject_id,resolution_source_type,resolved_receipt_id,payload_fingerprint,status,received_at,
-          environment,provider_ordering_key)
-        values(cancellation_event,'portone_v2','atomic-first-cancelled','Transaction.Cancelled',first_receipt::text,
-          actor,'receipt',first_receipt,'atomic-first-cancelled-fingerprint','verified',now(),'production','isolated-cancel');
-        perform 1 from public.internal_apply_entitlement_effect_v1(
-          'provider_event',cancellation_event,first_grant.id,null,first_grant.revision,
-          first_grant.last_provider_ordering_key,'revoked',now()+interval '1 second','revoked',
-          first_grant.valid_from,first_grant.valid_until,'isolated-saju-refund'
-        );
+        cancelled_at := clock_timestamp();
+        begin
+          perform pg_temp.approved_fixture_full_cancellation(first_receipt,cancelled_at,'payment-' || receipt_for_offer::text);
+          raise exception 'Different charge authorized an approved Saju full cancellation';
+        exception when check_violation then
+          if sqlerrm <> 'Approved Saju cancellation does not match the original charge' then raise; end if;
+        end;
+        cancel_result := pg_temp.approved_fixture_full_cancellation(first_receipt,cancelled_at);
+        if cancel_result->>'disposition'<>'revoked' or cancel_result->>'grantCount'<>'1'
+          or pg_temp.approved_fixture_full_cancellation(first_receipt,cancelled_at) is distinct from cancel_result
+          or (select verification_status from public.commerce_receipts where id=first_receipt)<>'revoked' then
+          raise exception 'Verified full cancellation did not revoke and replay the exact receipt';
+        end if;
         if (select status from public.entitlement_grants where id=first_grant.id)<>'revoked'
            or not exists(select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer
              and status='active' and scope_key is distinct from first_grant.scope_key)
