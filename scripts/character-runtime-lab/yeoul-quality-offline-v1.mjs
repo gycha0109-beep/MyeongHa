@@ -149,7 +149,7 @@ export function transformForOffline(data) {
     expected_character_action: null, candidate_reply: r.source.reply,
     diagnostic_labels: r.diagnostic.evidence,
     original_user_evaluation: structuredClone(r.source.evaluation),
-    teacher_output_schema: { action: 'string', corrections: 'string[]', violations: 'string[]', suggested_reply: 'string', source_refs: 'string[]' },
+    teacher_output_schema: { action: 'YeoulRuntimeActionKey', corrections: 'string[]', violations: 'string[]', suggested_reply: 'string', source_refs: 'approved_source_path[]', facts_claimed: 'approved_fact_id[]', uses_shared_history: 'boolean', implies_romantic_relationship: 'boolean' },
     review_status: 'pending_teacher_and_human_review',
     provenance: { experimentRunId: data.experimentRunId, sourceKey: r.diagnostic.originalKey },
   }));
