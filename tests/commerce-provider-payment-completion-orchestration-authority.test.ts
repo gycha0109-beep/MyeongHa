@@ -11,7 +11,7 @@ const orchestration = readFileSync(
     'commerce-provider-payment-completion-orchestration.ts',
   ),
   'utf8',
-);
+).replace(/\r\n/gu, '\n');
 
 describe('authenticated provider payment completion orchestration authority', () => {
   it('accepts only provider-owned lookup identity from the authenticated ingress boundary', () => {

@@ -1,6 +1,7 @@
 import { ApiCommandError } from './api-error.js';
 import type { createAdminAnalyticsVerifiedReadingAdapterV1 } from './admin-analytics-verified-reading-v1.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from './postgres-approved-saju-reading-access-v1.js';
 import {
   getOfficialReadingRecord,
   OfficialReadingRecordReadAuthorityPortErrorV1,
@@ -160,8 +161,16 @@ class TransactionOfficialReadingRecordPortV1 implements OfficialReadingRecordRea
 /** Reuses the current Records authority, including its Birth revision check. */
 export function createPostgresOfficialReadingRecordAuthorityPortV1(
   client: PostgresTransactionQueryV1,
+  approvedReadingId?: string,
 ): OfficialReadingRecordReadAuthorityPortV1 {
-  return new TransactionOfficialReadingRecordPortV1(client);
+  const legacy = new TransactionOfficialReadingRecordPortV1(client);
+  if (approvedReadingId === undefined) return legacy;
+  const { recordPort } = createPostgresApprovedSajuReadingAccessV1(client, approvedReadingId);
+  return {
+    async readRecord(input) {
+      return await recordPort.readRecord(input) ?? legacy.readRecord(input);
+    },
+  };
 }
 function requestedReadingId(request: Request): string | null {
   const url = new URL(request.url);
@@ -210,6 +219,8 @@ export async function handleOfficialReadingRecordRequestV1(input: {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  /** Disabled until the approved component archive SQL and grant are installed. */
+  readonly approvedSajuArchiveEnabled?: boolean;
   /** Opt-in after an authorized Official archive read. Reads the persisted
    * succeeded Reading again and requires consent before backfilling its
    * completion event. This does not claim complete runtime coverage. */
@@ -236,7 +247,9 @@ export async function handleOfficialReadingRecordRequestV1(input: {
         getOfficialReadingRecord({
           resolvedSubjectId: resolvedSubject.subjectId,
           readingId,
-          authorityPort: new TransactionOfficialReadingRecordPortV1(client),
+          authorityPort: createPostgresOfficialReadingRecordAuthorityPortV1(
+            client, input.approvedSajuArchiveEnabled === true ? readingId : undefined,
+          ),
         }),
     });
     // The DB transaction has committed and the owner-scoped archive was

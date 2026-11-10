@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
+import { prepareApprovedSajuReaderThreadRuntimeV1 } from '../apps/api/src/character-standard-reading-chat-turn-context.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from '../apps/api/src/postgres-approved-saju-reading-access-v1.js';
+import { getOfficialReadingRecord } from '../apps/api/src/official-reading-record-read.js';
+import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
 import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
 import {
   prepareCharacterStandardChatGroundingV2,
@@ -511,6 +515,49 @@ function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
 }
 
 describe('thread-bound Official Reading Reader runtime', () => {
+  it('rechecks the purchased component for Reader body access and preserves the Records source hash', async () => {
+    const authority = authorities();
+    const [access] = await authority.accessAuthorityPort.readAccessibleReadings({
+      subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', effectiveAt: '2026-09-21T00:01:00.000Z',
+    });
+    const [artifact] = await authority.artifactAuthorityPort.readArtifactSource({
+      subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', readingId: READING_ID,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+    });
+    const reads: unknown[] = [];
+    let archiveGrantCurrent = true;
+    const client: PostgresTransactionQueryV1 = {
+      async query<Row>(text: string, values?: readonly unknown[]) {
+        expect(text).toContain('qry_approved_saju_component_record_v1');
+        reads.push(values);
+        if (values?.[3] === true && !archiveGrantCurrent) return { rows: [] };
+        return { rows: [{
+          ...access, ...artifact, component: 'career', issuedRevisionNo: 1, currentRevisionNo: 1,
+          responseSnapshotJsonb: values?.[3] === true ? artifact?.responseSnapshotJsonb : null,
+        } as Row] };
+      },
+    };
+    const { recordPort } = createPostgresApprovedSajuReadingAccessV1(client, READING_ID);
+    const record = await getOfficialReadingRecord({
+      resolvedSubjectId: SUBJECT_ID, readingId: READING_ID, authorityPort: recordPort,
+    });
+    const request = {
+      resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID, readingId: READING_ID, client,
+      effectiveAt: '2026-09-21T00:01:00.000Z',
+      threadBindingAuthorityPort: authority.threadBindingAuthorityPort,
+      contextInput: contextInput(),
+    };
+    const result = await prepareApprovedSajuReaderThreadRuntimeV1(request);
+    expect(result.source.responseSnapshotJsonb).toEqual(record.reading);
+    expect(result.source.responseHash).toBe('sha256:v1:' + hashSajuHeldSourceProofRequestV1(record.reading));
+    expect(reads).toEqual([
+      [SUBJECT_ID, READING_ID, null, true],
+      [SUBJECT_ID, READING_ID, 'baekheon', false],
+      [SUBJECT_ID, READING_ID, 'baekheon', true],
+    ]);
+    archiveGrantCurrent = false;
+    await expect(prepareApprovedSajuReaderThreadRuntimeV1(request)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
   it('derives Reader identity from the owned thread and assembles the exact Official Reading context', async () => {
     const authority = authorities();
     const previousNodeEnv = process.env.NODE_ENV;

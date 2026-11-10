@@ -223,8 +223,7 @@ export async function executeAuthenticatedCommerceProviderPaymentCompletionV1(in
   // fulfillment fails, the provider can retry the same canonical Receipt;
   // replay is idempotent and does not manufacture a second Purchase/Grant.
   const sajuFulfillment = input.privateApprovedSajuReceiptFulfillmentEnabled === true
-    && evidence.environment === 'production' && evidence.provider === 'portone_v2' && evidence.platform === 'web'
-    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: input.pool, receiptId: persisted.receiptId })
+    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: input.pool, receiptId: persisted.receiptId, evidence })
     : undefined;
   const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
     && (sajuFulfillment === undefined || sajuFulfillment === 'not_approved_saju')

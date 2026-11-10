@@ -3,6 +3,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_purchase_scope_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_purchase_writer_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_receipt_fulfillment_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_reading_access_v1.sql
 
 create function pg_temp.approved_fixture_purchase(
   actor uuid, intent_id uuid, record_id uuid, birth_revision uuid, offer_id uuid,
@@ -21,6 +22,80 @@ begin
     offer_snapshot,'fixture-offer',capability_snapshot,'fixture-capability',payload::text,admission_hash
   );
   return (result.purchase_intent_id,result.replayed,result.approved_admission_hash);
+end
+$function$;
+
+create function pg_temp.approved_fixture_reading(actor uuid,intent_id uuid,field text)
+returns uuid language plpgsql as $function$
+#variable_conflict use_variable
+declare
+  authorized record;
+  reading_id uuid := gen_random_uuid();
+  session_id uuid := gen_random_uuid();
+  attempt_id uuid := gen_random_uuid();
+  source_hash text := repeat('a',64);
+  response_hash text := 'sha256:v1:' || repeat('b',64);
+  reader_bundle uuid;
+  domain text := case when field in ('year','month') then 'general' else field end;
+  purchase_snapshot jsonb;
+begin
+  select * into strict authorized
+    from commerce_saju_private.approved_component_entitlement_v1(actor,intent_id,field);
+  select content_bundle_id into strict reader_bundle from public.character_runtime_catalog
+    where character_id='test-standard-reader';
+  purchase_snapshot := jsonb_build_object(
+    'purchaseIntentId',intent_id,'component',field,'admissionHash',authorized.admission_hash,
+    'periodReferenceDateTime',authorized.period_reference,'targetBirthRevisionId',authorized.target_birth_revision_id,
+    'releaseRef',authorized.release_ref,'sourceRequestHash',source_hash);
+  insert into public.reading_sessions(id,subject_id,saju_domain,domain_capability_version,source_birth_revision_id,
+    target_birth_revision_id,state,created_at,updated_at)
+  values (session_id,actor,domain,'isolated-approved-v1',authorized.source_birth_revision_id,
+    authorized.target_birth_revision_id,'active',now(),now());
+  insert into public.readings(id,reading_session_id,subject_id,saju_domain,attempt_no,
+    requested_character_id,requested_character_content_bundle_id,execution_status,request_idempotency_key,
+    request_hash,request_contract_version,request_snapshot_jsonb,created_at)
+  values(reading_id,session_id,actor,domain,1,'test-standard-reader',reader_bundle,'running',reading_id::text,
+    'isolated-request','approved-saju-reading-component-v1',jsonb_build_object('approvedPurchase',purchase_snapshot),now());
+  insert into public.reading_execution_attempts(id,reading_id,subject_id,execution_attempt_no,state,transport_key,
+    saju_engine_key,resolved_engine_version,external_request_ref,started_at,finished_at)
+  values(attempt_id,reading_id,actor,1,'succeeded','isolated-fixture','saju','isolated-approved-v1','isolated-ref',now(),now());
+  insert into public.reading_refs(reading_id,subject_id,execution_attempt_id,saju_engine_key,external_reading_ref,
+    source_birth_input_hash,target_birth_input_hash,saju_engine_version,reading_contract_version,product_response_state,
+    response_snapshot_jsonb,response_hash,created_at)
+  values(reading_id,actor,attempt_id,'saju','isolated-native','fixture-self',
+    (select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id),
+    'isolated-approved-v1',
+    'myeonghwa-product-reading-response-v2','delivered',
+    jsonb_build_object('responseVersion','myeonghwa-product-reading-response-v2','state','delivered',
+      'reading',jsonb_build_object('readingId',reading_id)),response_hash,now());
+  update public.readings set execution_status='succeeded',completed_at=now(),committed_execution_attempt_id=attempt_id
+    where id=reading_id;
+  begin
+    perform commerce_saju_private.bind_approved_component_reading_v1(actor,intent_id,field,reading_id,
+      repeat('c',64),response_hash);
+    raise exception 'Different source request was bound to the paid component';
+  exception when sqlstate 'P0001' then
+    if sqlerrm <> 'Approved Saju Reading does not match the exact issued scope' then raise; end if;
+  end;
+  perform commerce_saju_private.bind_approved_component_reading_v1(actor,intent_id,field,reading_id,source_hash,response_hash);
+  perform commerce_saju_private.bind_approved_component_reading_v1(actor,intent_id,field,reading_id,source_hash,response_hash);
+  if not exists (
+    select 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,null,true) record
+    where record.response_hash=response_hash and record.response_snapshot_jsonb->'reading'->>'readingId'=reading_id::text
+  ) or not exists (
+    select 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,'test-standard-reader',false) metadata
+    where metadata.response_hash=response_hash and metadata.response_snapshot_jsonb is null
+  ) or exists (
+    select 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,'other-reader',true)
+  ) then raise exception 'Archive and Reader did not resolve one exact authorized source'; end if;
+  begin
+    perform set_config('myeongha.subject_id',gen_random_uuid()::text,true);
+    perform 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,null,true);
+    raise exception 'Cross-subject archive was not rejected';
+  exception when insufficient_privilege then
+    if sqlerrm <> 'subject execution context mismatch' then raise; end if;
+  end;
+  return reading_id;
 end
 $function$;
 
@@ -110,6 +185,8 @@ declare
   receipt_for_offer uuid;
   cancellation_event uuid;
   first_grant public.entitlement_grants%rowtype;
+  first_reading uuid;
+  additional_reading uuid;
 begin
   insert into auth.users(id) values (auth_id);
   insert into public.subjects(id,kind,auth_user_id,status,created_at,updated_at)
@@ -388,6 +465,16 @@ begin
         if sql_constraint <> 'approved_saju_receipt_target_use_unavailable' then raise; end if;
       end;
       perform pg_temp.approved_fixture_grants(first_intent,first_receipt,array['compatibility']);
+      first_reading := pg_temp.approved_fixture_reading(actor,first_intent,'compatibility');
+      begin
+        update commerce_saju_private.comparison_use_approval_v1 set revoked_at=now() where approval_ref='isolated-proof';
+        if exists(select 1 from public.qry_approved_saju_component_record_v1(actor,first_reading,null,true)) then
+          raise exception 'Archived comparison reopened after target use was revoked';
+        end if;
+        raise exception using errcode='P0002',message='restore synthetic approval';
+      exception when no_data_found then
+        if sqlerrm <> 'restore synthetic approval' then raise; end if;
+      end;
       begin
         insert into public.commerce_provider_events(id,provider,external_event_id,event_type,external_transaction_id,
           resolved_subject_id,resolution_source_type,resolved_receipt_id,payload_fingerprint,status,received_at,environment)
@@ -468,7 +555,12 @@ begin
         end;
       end if;
       perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
+      if offer_key='basic-month' then
+        perform pg_temp.approved_fixture_reading(actor,intent_id,'month');
+        perform pg_temp.approved_fixture_reading(actor,intent_id,'relationship');
+      end if;
       if offer_key = 'additional-counterpart' then
+        additional_reading := pg_temp.approved_fixture_reading(actor,intent_id,'compatibility');
         select * into strict first_grant from public.entitlement_grants where source_receipt_id=first_receipt;
         cancellation_event := gen_random_uuid();
         insert into public.commerce_provider_events(id,provider,external_event_id,event_type,external_transaction_id,
@@ -483,7 +575,9 @@ begin
         );
         if (select status from public.entitlement_grants where id=first_grant.id)<>'revoked'
            or not exists(select 1 from public.entitlement_grants where source_receipt_id=receipt_for_offer
-             and status='active' and scope_key is distinct from first_grant.scope_key) then
+             and status='active' and scope_key is distinct from first_grant.scope_key)
+           or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,first_reading,null,true))
+           or not exists(select 1 from public.qry_approved_saju_component_record_v1(actor,additional_reading,null,true)) then
           raise exception 'Refund effect did not revoke just the exact comparison purchase';
         end if;
       end if;

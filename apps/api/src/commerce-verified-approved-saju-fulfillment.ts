@@ -1,5 +1,6 @@
 import { executePostgresCommerceInternalTransactionV1 } from './postgres-commerce-internal-execution.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
+import type { VerifiedCommerceEvidenceV2 } from './verified-commerce-evidence.js';
 
 export type ApprovedSajuReceiptFulfillmentV1 = 'granted' | 'replayed' | 'not_approved_saju';
 
@@ -7,7 +8,10 @@ export type ApprovedSajuReceiptFulfillmentV1 = 'granted' | 'replayed' | 'not_app
 export async function fulfillVerifiedApprovedSajuReceiptV1(input: {
   readonly pool: PostgresSubjectPoolV1;
   readonly receiptId: string;
-}): Promise<ApprovedSajuReceiptFulfillmentV1> {
+  readonly evidence: VerifiedCommerceEvidenceV2;
+}): Promise<ApprovedSajuReceiptFulfillmentV1 | undefined> {
+  if (input.evidence.environment !== 'production' || input.evidence.provider !== 'portone_v2'
+    || input.evidence.platform !== 'web') return undefined;
   return executePostgresCommerceInternalTransactionV1({
     pool: input.pool,
     execute: async ({ client }) => {
