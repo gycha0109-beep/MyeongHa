@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { MODELS, VARIANTS, transformForOffline } from './yeoul-quality-offline-v1.mjs';
-import { proposeFeedbackRevisions, createOptimizationPreflight, summarizeReviewedComparisons, makeApprovalEstimate, REVIEW_DIMENSIONS, HARD_FAILURES } from './yeoul-offline-optimizer-v1.mjs';
+import { proposeFeedbackRevisions, createOptimizationPreflight, summarizeReviewedComparisons, makeApprovalEstimate, stageTeacherSuggestion, REVIEW_DIMENSIONS, HARD_FAILURES } from './yeoul-offline-optimizer-v1.mjs';
 function fixture() {
   const responses = [];
   for (let question = 1; question <= 12; question++) for (const model of MODELS) for (const variant of VARIANTS) for (const repeat of [1, 2]) {
@@ -73,4 +73,21 @@ test('planning estimate is an observation-based reference, not a spending author
   assert.equal(estimate.proposedCalls,80);
   assert.equal(estimate.reliableCostCeilingUsd,null);
   assert.equal(estimate.role,'planning_only_no_authorization');
+});
+
+test('teacher output remains a proposal; no invented facts, memory, or relationship escalation', () => {
+  const input = transformForOffline(fixture()).teacherInputs[0];
+  const output = {
+    action: 'state_boundary', suggested_reply: '그건 좀 싫어요. 말은 할 수 있잖아요.',
+    corrections: ['단호하고 짧은 경계 표현'], violations: [],
+    source_refs: ['docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'],
+    facts_claimed: [], uses_shared_history: false, implies_romantic_relationship: false,
+  };
+  const candidate = stageTeacherSuggestion({ teacherInput: input, teacherOutput: output });
+  assert.equal(candidate.status, 'pending_character_owner_review');
+  assert.equal(candidate.productionEligible, false);
+  assert.throws(() => stageTeacherSuggestion({ teacherInput: input, teacherOutput: {...output, uses_shared_history: true} }), /teacher_unverified_history/);
+  assert.throws(() => stageTeacherSuggestion({ teacherInput: input, teacherOutput: {...output, facts_claimed: ['memory:forged']} }), /teacher_unapproved_fact/);
+  assert.throws(() => stageTeacherSuggestion({ teacherInput: input, teacherOutput: {...output, action: 'invent_new_canon'} }), /teacher_action/);
+  assert.throws(() => stageTeacherSuggestion({ teacherInput: {...input, scenario: {...input.scenario, split: 'sealed_holdout_results'} }, teacherOutput: output }), /teacher_training_split/);
 });
