@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, symlink, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   MODELS, VARIANTS, diagnose, validateEvaluationExport, transformForOffline,
   retrieveReviewedExamples, buildResearchPromptPlan, runOffline,
@@ -118,4 +119,24 @@ test('offline CLI preserves source bytes, writes outputs, and rejects holdout in
   await writeFile(holdout, JSON.stringify(data));
   await assert.rejects(() => runOffline({ inputPath: holdout, outputDir: output }), /HOLDOUT_NOT_TRAINING_DATA/);
   await assert.rejects(() => runOffline({ inputPath: input, outputDir: process.cwd() }), /PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY/);
+});
+
+
+test('private results use restrictive permissions, do not overwrite, and block symlink escapes', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'yeoul-private-output-'));
+  const input = join(dir, 'evaluations.json');
+  await writeFile(input, JSON.stringify(fixture()));
+  const output = join(dir, 'private-results');
+  await runOffline({ inputPath: input, outputDir: output });
+  if (process.platform !== 'win32') {
+    assert.equal((await stat(output)).mode & 0o077, 0);
+    assert.equal((await stat(join(output, 'records.jsonl'))).mode & 0o077, 0);
+  }
+  await assert.rejects(() => runOffline({ inputPath: input, outputDir: output }), /PRIVATE_OUTPUT_MUST_START_EMPTY/);
+  if (process.platform !== 'win32') {
+    const repoDocs = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'docs', 'character-runtime-lab');
+    const alias = join(dir, 'hidden-repo-target');
+    await symlink(repoDocs, alias, 'dir');
+    await assert.rejects(() => runOffline({ inputPath: input, outputDir: alias }), /PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY/);
+  }
 });

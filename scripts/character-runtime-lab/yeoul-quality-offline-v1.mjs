@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, realpath, stat, readdir } from 'node:fs/promises';
 import { resolve, join, basename, dirname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { proposeFeedbackRevisions, createOptimizationPreflight, makeApprovalEstimate } from './yeoul-offline-optimizer-v1.mjs';
@@ -229,16 +229,26 @@ export async function runOffline({ inputPath, outputDir }) {
   const feedback = proposeFeedbackRevisions(result.records);
   const preflight = createOptimizationPreflight({ proposalPack: feedback, selectedRuleIds: feedback.proposals.map(p => p.ruleId) });
   const costEstimate = makeApprovalEstimate({ newScenarios: 10, candidateVariants: 4, repeatCount: 2 });
-  await mkdir(out, { recursive: true });
+  await mkdir(out, { recursive: true, mode: 0o700 });
+  // Private evaluation replies and human notes must not resolve through a symlink into the repo.
+  const [realOut, realCheckout, realRepoRoot] = await Promise.all([
+    realpath(out), realpath(checkout), realpath(actualRepoRoot),
+  ]);
+  if ([realCheckout, realRepoRoot].some(dir => realOut === dir || realOut.startsWith(dir + sep))) {
+    throw new Error('PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY');
+  }
+  if ((await stat(out)).mode & 0o077) throw new Error('PRIVATE_OUTPUT_DIRECTORY_PERMISSIONS');
+  if ((await readdir(out)).length) throw new Error('PRIVATE_OUTPUT_MUST_START_EMPTY');
+  const privateFileOptions = { flag: 'wx', mode: 0o600 };
   const originSha256 = createHash('sha256').update(bytes).digest('hex');
-  await writeFile(join(out, 'summary.json'), JSON.stringify({ ...result.summary, sourceSha256: originSha256, inputFile: basename(input), datasetRole: 'legacy_development_only', operationalImpact: 'none' }, null, 2) + '\n');
-  await writeFile(join(out, 'records.jsonl'), jsonl(result.records));
-  await writeFile(join(out, 'example-candidates.jsonl'), jsonl(result.examples));
-  await writeFile(join(out, 'pairwise-candidates.jsonl'), jsonl(result.pairs));
-  await writeFile(join(out, 'teacher-inputs.jsonl'), jsonl(result.teacherInputs));
-  await writeFile(join(out, 'feedback-revision-proposals.json'), JSON.stringify(feedback, null, 2) + '\n');
-  await writeFile(join(out, 'optimization-preflight.json'), JSON.stringify(preflight, null, 2) + '\n');
-  await writeFile(join(out, 'approval-estimate.json'), JSON.stringify(costEstimate, null, 2) + '\n');
+  await writeFile(join(out, 'summary.json'), JSON.stringify({ ...result.summary, sourceSha256: originSha256, inputFile: basename(input), datasetRole: 'legacy_development_only', operationalImpact: 'none' }, null, 2) + '\n', privateFileOptions);
+  await writeFile(join(out, 'records.jsonl'), jsonl(result.records), privateFileOptions);
+  await writeFile(join(out, 'example-candidates.jsonl'), jsonl(result.examples), privateFileOptions);
+  await writeFile(join(out, 'pairwise-candidates.jsonl'), jsonl(result.pairs), privateFileOptions);
+  await writeFile(join(out, 'teacher-inputs.jsonl'), jsonl(result.teacherInputs), privateFileOptions);
+  await writeFile(join(out, 'feedback-revision-proposals.json'), JSON.stringify(feedback, null, 2) + '\n', privateFileOptions);
+  await writeFile(join(out, 'optimization-preflight.json'), JSON.stringify(preflight, null, 2) + '\n', privateFileOptions);
+  await writeFile(join(out, 'approval-estimate.json'), JSON.stringify(costEstimate, null, 2) + '\n', privateFileOptions);
   return { feedbackRuleCandidates: feedback.proposals.length, summary: result.summary, sourceSha256: originSha256, outputDir: out, exampleCandidates: result.examples.length, teacherInputs: result.teacherInputs.length, pairwiseCandidates: result.pairs.length };
 }
 
