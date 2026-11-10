@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "ops-application-external-role-direct-membership-restore-observation-v1",
+  "roadmapGate": "Gate 1 / Phase 8-A / external direct role membership source-vs-restore",
+  "comparisonCode": {
+    "prNumber": 3186,
+    "mergeCommitSha": "e648758acab6eb30bc83a1fd04a6906fee307456",
+    "requiredIntegrationRunId": 42747768365,
+    "requiredIntegrationConclusion": "success",
+    "executedMainSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63"
+  },
+  "sourceBackup": {
+    "runId": 42752268638,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638",
+    "conclusion": "success",
+    "artifactId": 13734401337,
+    "sourceSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "migrationFrontier": "20261109071019",
+    "migrationCatalogVersionCount": 242,
+    "manifestCreatedAtUtc": "2026-11-10T03:56:30Z",
+    "sourceEncryptedSha256": "5396ceec4eca37f23c519c7e006fe0d8af27ad7f53ae7f54938fd9fc14f3a2d1",
+    "sourceApplicationCatalogSha256": "daabeba5eab153eb0c46c9ac96d7dbfb3ae5c29346ee910660099bfd141d9c12"
+  },
+  "isolatedRestore": {
+    "runId": 42757061875,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42757061875",
+    "conclusion": "success",
+    "artifactId": 13736645297,
+    "sourceBackupRunId": 42752268638,
+    "sourceSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "target": "isolated Supabase PostgreSQL 17"
+  },
+  "artifactFileSha256": {
+    "app-schema-parity.json": "c9c00b13ad28da178ab78ac9dc6ded7d22eb90b3fb9d903ede249fc7d216bd09",
+    "restore-evidence.json": "aa87a3f93a263649208ba1e0e720929734eedaefb3941114e73dc5187b459be2",
+    "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+    "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595"
+  },
+  "externalBoundary": {
+    "scope": "myeongha_to_non_myeongha_direct_membership_only_v1",
+    "sourceWitnessAvailable": true,
+    "providerOwnedOnlyProven": false,
+    "inheritedEffectiveAccessIncluded": false,
+    "observedDirectMembershipOptionParity": false,
+    "observedGrantorAttributionParity": false,
+    "sourceDirectMembershipCount": 48,
+    "restoredDirectMembershipCount": 0,
+    "sourceReferencedExternalRoleCount": 1,
+    "restoredReferencedExternalRoleCount": 0,
+    "missingMembershipOptionEntryCount": 48,
+    "addedMembershipOptionEntryCount": 0,
+    "grantorAttributionDifferenceGroupCount": 0
+  },
+  "internalGraph": {
+    "sourceRoleCount": 43,
+    "restoredRoleCount": 43,
+    "sourceDirectMembershipCount": 7,
+    "restoredDirectMembershipCount": 7,
+    "observedMembershipOptionsParity": true,
+    "grantorAttributionDifferenceGroupCount": 7,
+    "portablePostgresGrantorRewriteCompatibleGroupCount": 7,
+    "unexplainedGrantorAttributionDifferenceGroupCount": 0,
+    "observedGrantorAttributionParity": false,
+    "roleMembershipParityProven": false
+  },
+  "applicationCatalog": {
+    "schemas": {
+      "source": 3,
+      "restored": 3,
+      "legacyHashOnlyDifference": 2
+    },
+    "tables": {
+      "source": 94,
+      "restored": 94,
+      "legacyHashOnlyDifference": 8
+    },
+    "functions": {
+      "source": 322,
+      "restored": 322,
+      "legacyHashOnlyDifference": 19
+    },
+    "canonicalAclApplicationCatalogParity": true,
+    "applicationScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+    "sourceCatalogBoundToBackupSnapshot": false
+  },
+  "policyInvestigation": {
+    "strictRolesDumpCommentsGrantsToReservedRoleRecipients": true,
+    "disposableRestoreDoesNotFabricateProviderRoles": true,
+    "sourceExternalRoleIdentityPublished": false,
+    "sourceToRuleEdgeByEdgeCausationProven": false,
+    "remediationApproved": false
+  },
+  "recoveryBlockers": {
+    "providerManagedCopyBlocksSkipped": 29,
+    "providerManagedCopyBlocksProjected": 3,
+    "fullMigrationLedgerRestored": false,
+    "hostedAuthStorageEquivalent": false,
+    "authoritativePrivacyContinuityProven": false,
+    "syntheticPrivacyReplayEventCount": 4,
+    "futureSafePrivacyReconciliation": false,
+    "wholeServiceRpoRtoProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "p0Issue": 1887,
+    "phase8Accepted": false
+  },
+  "interpretationLimits": [
+    "Observed 48 direct source memberships involving an application role and one non-application role; the isolated target has zero. The non-application role is not classified as provider-owned by this diagnostic.",
+    "Existing strict role-dump code suppresses grants addressed to certain reserved roles; this is a potential explanation, NOT verified per-edge root cause of the 48 missing memberships.",
+    "No grantor-attribution difference groups are reported among unmatched external membership keys; zero is not evidence of grantor equality.",
+    "The source catalog was captured in read-only transactions around backup execution, not in the identical pg_dump MVCC snapshot.",
+    "Existing app-internal rewrite 7/7 is not a substitute for 48 missing cross-boundary links, inherited/effective access, provider-managed restore or Hosted Auth/Storage.",
+    "No Production DDL/DML/GRANT, live role repair, Hosted project, paid resource, privacy canary, or serving admission has been performed."
+  ]
+}
