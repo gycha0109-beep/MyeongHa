@@ -122,6 +122,39 @@ export function createOptimizationPreflight({ proposalPack, pinnedAnchorRef = nu
   };
 }
 
+export const ALLOWED_YEOUL_ACTIONS = Object.freeze([
+  'react_quickly', 'care_before_label', 'observe_reaction', 'downplay_meaning',
+  'brief_deny', 'deflect_lightly', 'counterquestion', 'state_boundary',
+  'acknowledge_feeling', 'ask_directly', 'speak_before_caught',
+]);
+
+/** A teacher can propose wording, not publish Canon, memory, or a verified response. */
+export function stageTeacherSuggestion({ teacherInput, teacherOutput }) {
+  if (!isObject(teacherInput) || !isObject(teacherInput.source_authority) || !isObject(teacherInput.scenario)) invalid('teacher_input');
+  if (teacherInput.scenario.split !== 'legacy_development_only' || !/^Y(0[1-9]|1[0-2])$/.test(teacherInput.scenario.legacyQuestionId)) invalid('teacher_training_split');
+  if (teacherInput.source_authority.bible !== BIBLE || teacherInput.source_authority.runtime !== RUNTIME || teacherInput.source_authority.publicationAuthority !== 'not_inferred_from_draft') invalid('teacher_source');
+  if (!isObject(teacherInput.provenance) || teacherInput.provenance.experimentRunId !== 42572722295 || !nonempty(teacherInput.provenance.sourceKey)) invalid('teacher_provenance');
+  if (typeof teacherInput.history_available !== 'boolean' || !Array.isArray(teacherInput.approved_facts)) invalid('teacher_history_context');
+  if (!isObject(teacherOutput) || !ALLOWED_YEOUL_ACTIONS.includes(teacherOutput.action)) invalid('teacher_action');
+  if (!nonempty(teacherOutput.suggested_reply) || teacherOutput.suggested_reply.length > 600 || !Array.isArray(teacherOutput.corrections) || !Array.isArray(teacherOutput.violations)) invalid('teacher_output_schema');
+  if (teacherOutput.corrections.some(x => !nonempty(x)) || teacherOutput.violations.some(x => !nonempty(x))) invalid('teacher_array_content');
+  if (!Array.isArray(teacherOutput.source_refs) || !teacherOutput.source_refs.length || teacherOutput.source_refs.some(x => ![BIBLE, RUNTIME].includes(x))) invalid('teacher_source_refs');
+  if (!Array.isArray(teacherOutput.facts_claimed) || teacherOutput.facts_claimed.some(x => !nonempty(x) || !teacherInput.approved_facts.includes(x))) invalid('teacher_unapproved_fact');
+  if (typeof teacherOutput.uses_shared_history !== 'boolean' || typeof teacherOutput.implies_romantic_relationship !== 'boolean') invalid('teacher_relation_fields');
+  if (!teacherInput.history_available && teacherOutput.uses_shared_history) invalid('teacher_unverified_history');
+  if (teacherInput.relationship_state === 'no_history' && teacherOutput.implies_romantic_relationship) invalid('teacher_unverified_relationship');
+  // Structured flags cannot prove natural-language integrity; mandatory review is never bypassed.
+  return {
+    schemaVersion: 'yeoul-teacher-suggestion-candidate-v1',
+    status: 'pending_character_owner_review', productionEligible: false,
+    dataSplit: 'legacy_development_only', sourceRefs: [...teacherOutput.source_refs],
+    proposedAction: teacherOutput.action, proposedReply: teacherOutput.suggested_reply,
+    proposedCorrections: [...teacherOutput.corrections], reportedViolations: [...teacherOutput.violations],
+    provenance: { ...teacherInput.provenance },
+    warning: 'TEACHER_IS_NOT_FACT_OR_CANON_AUTHORITY',
+  };
+}
+
 /** Evaluate *future* independently reviewed responses; never train on the sealed holdout. */
 export function summarizeReviewedComparisons(rows, { datasetRole, expectedScenarioIds = [] } = {}) {
   if (!['development_review_results', 'sealed_holdout_results'].includes(datasetRole)) invalid('evaluation_split');
