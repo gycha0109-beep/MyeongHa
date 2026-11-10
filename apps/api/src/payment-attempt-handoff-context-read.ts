@@ -46,7 +46,7 @@ from public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)
 `.trim();
 const READ_APPROVED_SAJU_CONTEXT_SQL = READ_CONTEXT_SQL.replace(
   'public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)',
-  'commerce_saju_private.read_approved_saju_sandbox_handoff_v1($1::uuid, $2::uuid, $3::text)',
+  'public.read_approved_saju_sandbox_handoff_v1($1::uuid, $2::uuid, $3::text)',
 );
 
 function requirePaymentAttemptId(value: unknown): string {

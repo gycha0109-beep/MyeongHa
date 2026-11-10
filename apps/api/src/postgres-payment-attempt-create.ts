@@ -44,7 +44,7 @@ from public.cmd_create_payment_attempt_v1(
 )
 `.trim();
 const APPROVED_SAJU_CREATE_SQL = CREATE_SQL.replace(
-  'public.cmd_create_payment_attempt_v1', 'commerce_saju_private.create_approved_saju_sandbox_attempt_v1',
+  'public.cmd_create_payment_attempt_v1', 'public.create_approved_saju_sandbox_attempt_v1',
 );
 
 function requireString(name: string, value: unknown): string {

@@ -126,14 +126,14 @@ from public.cmd_create_saju_purchase_intent_v1(
 `.trim();
 
 const RESOLVE_APPROVED_SAJU_SQL = `
-select commerce_saju_private.resolve_approved_purchase_admission_v1(
+select public.resolve_approved_purchase_admission_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,$8::uuid
 ) as admission
 `.trim();
 
 const CREATE_APPROVED_SAJU_SQL = `
 select ${SAJU_AUTHORITY_COLUMNS}, approved_admission_hash as "approvedSajuAdmissionHash"
-from commerce_saju_private.create_approved_purchase_intent_v1(
+from public.create_approved_purchase_intent_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text,$7::text,
   $8::jsonb,$9::text,$10::jsonb,$11::text,$12::text,$13::text
 )
@@ -474,7 +474,7 @@ export async function selectPostgresApprovedSajuCheckoutV1(
     const { rows } = await client.query<{ productOfferId: string; sajuRecordId: string; birthRevisionId: string }>(
       `select product_offer_id::text as "productOfferId", saju_record_id::text as "sajuRecordId",
         birth_revision_id::text as "birthRevisionId"
-       from commerce_saju_private.select_approved_saju_checkout_v1($1::uuid,$2::text,$3::text,$4::uuid)`,
+       from public.select_approved_saju_checkout_v1($1::uuid,$2::text,$3::text,$4::uuid)`,
       [input.subjectId, input.approvedOfferId, input.idempotencyKey, input.targetPersonId ?? null],
     );
     if (rows.length > 1) throw new Error('Approved Saju checkout returned ambiguous authority.');

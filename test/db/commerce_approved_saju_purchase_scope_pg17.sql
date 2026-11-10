@@ -8,6 +8,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_checkout_selection_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_payment_handoff_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_sandbox_api_v1.sql
 
 insert into public.saju_domain_runtime(saju_domain,availability,capability_version,updated_at)
 select domain,'available','isolated-approved-v1',now()
@@ -114,7 +115,8 @@ begin
     raise exception 'Approved source attempt did not enforce the exact paid request';
   end if;
   perform 1 from public.cmd_finalize_reading_transport_success_v1(actor,reading_id,attempt_id,gen_random_uuid(),
-    'isolated-ref','isolated-approved-v1','isolated-native','fixture-self',
+    'isolated-ref','isolated-approved-v1','isolated-native',
+    (select input_hash from public.birth_profile_revisions where id=authorized.source_birth_revision_id),
     (select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id),
     'myeonghwa-product-reading-response-v2','delivered',null,null,null,
     jsonb_build_object('responseVersion','myeonghwa-product-reading-response-v2','state','delivered',
@@ -748,6 +750,47 @@ begin
 end
 $fixture$;
 
+do $disabled$
+begin
+  if has_function_privilege('myeongha_api_executor',
+    'public.select_approved_saju_checkout_v1(uuid,text,text,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_purchase_readings_v1(uuid,uuid)','EXECUTE') then
+    raise exception 'Sandbox API was granted before the opt-in';
+  end if;
+end
+$disabled$;
+\ir ../../docs/operations/candidates/commerce_approved_saju_sandbox_api_grant_v1.sql
+do $granted_acl$
+declare
+  entry oid;
+  intended_count integer := 0;
+begin
+  for entry in select proc.oid from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace ns on ns.oid=proc.pronamespace
+    where ns.nspname='public' and proc.proname in (
+      'select_approved_saju_checkout_v1','resolve_approved_purchase_admission_v1',
+      'create_approved_purchase_intent_v1','create_approved_saju_sandbox_attempt_v1',
+      'read_approved_saju_sandbox_handoff_v1','qry_approved_saju_component_record_v1',
+      'qry_approved_saju_purchase_readings_v1'
+    )
+  loop
+    intended_count := intended_count+1;
+    if not has_function_privilege('myeongha_api_executor',entry,'EXECUTE')
+      or has_function_privilege('anon',entry,'EXECUTE')
+      or has_function_privilege('authenticated',entry,'EXECUTE')
+      or has_function_privilege('service_role',entry,'EXECUTE') then
+      raise exception 'Sandbox API opt-in exposed a function to the wrong role';
+    end if;
+  end loop;
+  if intended_count<>7 or has_schema_privilege('myeongha_api_executor','commerce_saju_private','USAGE')
+    or has_function_privilege('myeongha_commerce_internal_executor',
+      'public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)','EXECUTE') then
+    raise exception 'Sandbox API opt-in changed the private or fulfillment perimeter';
+  end if;
+end
+$granted_acl$;
+
 do $checkout_selection$
 declare
   actor uuid := gen_random_uuid();
@@ -763,6 +806,10 @@ declare
   selection record;
   offer record;
   selected_admission jsonb;
+  admission_hash text;
+  request_hash text;
+  sandbox_receipt uuid := gen_random_uuid();
+  archived_reading uuid;
   expected_constraint text;
 begin
   insert into auth.users(id) values(actor_auth);
@@ -801,42 +848,52 @@ begin
   join public.product_offers physical on physical.id=release.product_offer_id
   join public.product_capability_sets capability on capability.id=release.capability_set_id
   where release.approved_offer_id='career';
-  selected_admission := commerce_saju_private.resolve_approved_purchase_admission_v1(
+  set local role myeongha_api_executor;
+  perform 1 from public.begin_member_subject_context_v1(actor_auth);
+  select * into strict selection from public.select_approved_saju_checkout_v1(actor,'career','checkout-career',null);
+  if selection.saju_record_id<>pinned_record or selection.birth_revision_id<>first_revision then
+    raise exception 'API executor selected the wrong checkout scope';
+  end if;
+  selected_admission := public.resolve_approved_purchase_admission_v1(
     actor,pinned_record,first_revision,offer.product_offer_id,offer.capability_set_id,'career','checkout-career',null
   );
-  perform 1 from pg_temp.approved_fixture_purchase(actor,purchase,pinned_record,first_revision,offer.product_offer_id,
-    'checkout-career',jsonb_build_object('productOfferId',offer.product_offer_id,'productId',offer.product_id,
-      'platform','web','provider','portone_v2','externalProductId',offer.external_product_id),
+  admission_hash := 'sha256:v1:' || encode(sha256(convert_to(selected_admission::text,'UTF8')),'hex');
+  request_hash := 'sha256:v1:' || encode(sha256(convert_to(format(
+    '{"approvedAdmissionHash":"%s","birthRevisionId":"%s","productOfferId":"%s","purchaseKind":"original","sajuRecordId":"%s","sourceReceiptIds":[]}',
+    admission_hash,first_revision,offer.product_offer_id,pinned_record),'UTF8')),'hex');
+  perform 1 from public.create_approved_purchase_intent_v1(actor,purchase,pinned_record,first_revision,
+    offer.product_offer_id,'checkout-career',request_hash,
+    jsonb_build_object('productOfferId',offer.product_offer_id,'productId',offer.product_id,
+      'platform','web','provider','portone_v2','externalProductId',offer.external_product_id),'fixture-offer',
     jsonb_build_object('capabilitySetId',offer.capability_set_id,'definitionVersion',offer.definition_version,
-      'definitionHash',offer.definition_hash),selected_admission)
-    as x(purchase_intent_id uuid,replayed boolean,admission_hash text);
+      'definitionHash',offer.definition_hash),'fixture-capability',selected_admission::text,admission_hash);
 
-  select * into strict handoff from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+  select * into strict handoff from public.create_approved_saju_sandbox_attempt_v1(
     actor,attempt_id,purchase,'sandbox','checkout-attempt','checkout-sandbox-request'
   );
   if handoff.payment_attempt_id<>attempt_id or handoff.status<>'created' or handoff.replayed then
     raise exception 'Approved order failed to create its sandbox attempt';
   end if;
-  select * into strict handoff from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career');
+  select * into strict handoff from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career');
   if handoff.expected_amount_minor<>9900 or handoff.expected_currency<>'KRW'
     or handoff.environment<>'sandbox' or handoff.provider_request_id<>'checkout-sandbox-request' then
     raise exception 'Sandbox handoff changed the approved payment identity or amount';
   end if;
   begin
-    perform 1 from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'wealth');
+    perform 1 from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'wealth');
     raise exception 'Sandbox handoff accepted a different same-price offer';
   exception when sqlstate 'P0001' then
     get stacked diagnostics expected_constraint=constraint_name;
     if expected_constraint<>'approved_saju_payment_unavailable' then raise; end if;
   end;
-  select * into strict handoff from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+  select * into strict handoff from public.create_approved_saju_sandbox_attempt_v1(
     actor,gen_random_uuid(),purchase,'sandbox','checkout-attempt','checkout-sandbox-request'
   );
   if handoff.payment_attempt_id<>attempt_id or not handoff.replayed then
     raise exception 'Sandbox attempt replay created a different attempt';
   end if;
   begin
-    perform 1 from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+    perform 1 from public.create_approved_saju_sandbox_attempt_v1(
       actor,gen_random_uuid(),purchase,'sandbox','checkout-other-attempt','checkout-other-request'
     );
     raise exception 'Sandbox checkout allowed two active attempts';
@@ -845,7 +902,7 @@ begin
     if expected_constraint<>'cmd_payment_attempt_v1_idempotency_conflict' then raise; end if;
   end;
   begin
-    perform 1 from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+    perform 1 from public.create_approved_saju_sandbox_attempt_v1(
       actor,gen_random_uuid(),purchase,'production','checkout-production','checkout-production-request'
     );
     raise exception 'Sandbox checkout allowed a production attempt';
@@ -853,6 +910,16 @@ begin
     get stacked diagnostics expected_constraint=constraint_name;
     if expected_constraint<>'approved_saju_payment_unavailable' then raise; end if;
   end;
+  if exists(select 1 from public.qry_approved_saju_purchase_readings_v1(actor,purchase)) then
+    raise exception 'Sandbox checkout opened the paid archive';
+  end if;
+  begin
+    perform 1 from public.read_approved_saju_sandbox_handoff_v1(gen_random_uuid(),attempt_id,'career');
+    raise exception 'Runtime handoff accepted a subject outside its bound context';
+  exception when insufficient_privilege then
+    if sqlerrm <> 'subject execution context mismatch' then raise; end if;
+  end;
+  reset role;
   begin
     update commerce_saju_private.approved_fulfillment_release_v1 set revoked_at=clock_timestamp()
       where approved_offer_id='career';
@@ -883,7 +950,42 @@ begin
   if selection.saju_record_id=pinned_record or selection.birth_revision_id<>next_revision then
     raise exception 'New checkout did not select the edited self revision';
   end if;
+
+  -- A separate synthetic verified production receipt proves archive ACLs
+  -- without allowing a sandbox charge to mint product entitlements.
+  perform pg_temp.approved_fixture_receipt(actor,purchase,sandbox_receipt);
+  perform pg_temp.approved_fixture_grants(purchase,sandbox_receipt,array['career']);
+  archived_reading := pg_temp.approved_fixture_reading(actor,purchase,'career');
+  set local role myeongha_api_executor;
+  if not exists (select 1 from public.qry_approved_saju_purchase_readings_v1(actor,purchase)
+      where reading_id=archived_reading and component='career')
+    or not exists (select 1 from public.qry_approved_saju_component_record_v1(actor,archived_reading,null,true)
+      where response_snapshot_jsonb is not null) then
+    raise exception 'Runtime could not reopen the exact archive Reading';
+  end if;
+  reset role;
 end
 $checkout_selection$;
+
+\ir ../../docs/operations/candidates/commerce_approved_saju_sandbox_api_revoke_v1.sql
+do $revoked$
+begin
+  if has_schema_privilege('myeongha_api_executor','commerce_saju_private','USAGE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean)','EXECUTE') then
+    raise exception 'Sandbox API rollback left runtime privileges';
+  end if;
+  set local role myeongha_api_executor;
+  begin
+    perform 1 from public.select_approved_saju_checkout_v1(gen_random_uuid(),'career','rolled-back',null);
+    raise exception 'Sandbox API could still execute after the rollback';
+  exception when insufficient_privilege then
+    if sqlerrm <> 'permission denied for function select_approved_saju_checkout_v1' then raise; end if;
+  end;
+  reset role;
+end
+$revoked$;
 rollback;
 select 'PASS_APPROVED_SAJU_PURCHASE_SCOPE_PG17';
