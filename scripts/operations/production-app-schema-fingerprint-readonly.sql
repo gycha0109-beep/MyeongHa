@@ -291,8 +291,10 @@ schema_metadata AS (
  WHERE n.nspname IN ('public','seyeon_private','chat_private')
 ),
 -- Read-only direct application role graph. Provider-owned cross-boundary
--- memberships are explicitly OUTSIDE scope and cannot be inferred from it.
--- Preserve grantor provenance as metadata, not as an ACL repair directive.
+-- memberships are explicitly OUTSIDE the internal graph scope.
+-- A separate direct MyeongHa/non-MyeongHa boundary inventory observes only
+-- catalog edges, not provider ownership or inherited/effective privileges.
+-- Preserve grantor provenance only in the encrypted source catalog.
 application_roles AS (
  SELECT r.rolname::text AS role_name,
    r.rolsuper AS superuser,
@@ -316,6 +318,17 @@ application_memberships AS (
  JOIN pg_catalog.pg_roles member ON member.oid=edge.member
  WHERE granted.rolname::text ~ '^myeongha_[a-z0-9_]+$'
    AND member.rolname::text ~ '^myeongha_[a-z0-9_]+$'
+),
+application_external_memberships AS (
+ SELECT granted.rolname::text AS granted_role,
+   member.rolname::text AS member_role,
+   pg_catalog.pg_get_userbyid(edge.grantor) AS grantor_name,
+   edge.admin_option, edge.inherit_option, edge.set_option
+ FROM pg_catalog.pg_auth_members edge
+ JOIN pg_catalog.pg_roles granted ON granted.oid=edge.roleid
+ JOIN pg_catalog.pg_roles member ON member.oid=edge.member
+ WHERE (granted.rolname::text ~ '^myeongha_[a-z0-9_]+$')
+   <> (member.rolname::text ~ '^myeongha_[a-z0-9_]+$')
 )
 SELECT pg_catalog.jsonb_build_object(
  'schemaVersion','ops-postgres-application-schema-fingerprint-v1',
@@ -333,6 +346,14 @@ SELECT pg_catalog.jsonb_build_object(
    'directMemberships',(SELECT coalesce(pg_catalog.jsonb_agg(to_jsonb(m)
      ORDER BY m.granted_role,m.member_role,m.grantor_name),'[]'::jsonb)
      FROM application_memberships m)
+ ),
+ 'applicationExternalRoleBoundary',pg_catalog.jsonb_build_object(
+   'scope','myeongha_to_non_myeongha_direct_membership_only_v1',
+   'providerOwnedOnlyProven',false,
+   'inheritedEffectiveAccessIncluded',false,
+   'directMemberships',(SELECT coalesce(pg_catalog.jsonb_agg(to_jsonb(m)
+     ORDER BY m.granted_role,m.member_role,m.grantor_name),'[]'::jsonb)
+     FROM application_external_memberships m)
  ),
  'schemaCount',(SELECT count(*) FROM schema_metadata),
  'tableCount',(SELECT count(*) FROM tables),

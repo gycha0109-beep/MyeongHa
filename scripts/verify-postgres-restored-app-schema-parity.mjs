@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { buildRestoredReadOnlyQuery, compareApplicationCatalog,
-  observeApplicationDirectRoleGraph } from
+  observeApplicationDirectRoleGraph, observeApplicationExternalRoleBoundary } from
   './operations/check-postgres-restored-app-schema-parity.mjs';
 
 const source = JSON.parse(await readFile(
@@ -22,6 +22,10 @@ assert.ok(restoredQuery.includes('acl_grant_entries_without_grantor_sha256'));
 assert.ok(restoredQuery.includes('acl_by_grantee_privilege_sha256'));
 assert.ok(restoredQuery.includes('acl_by_grantee_grantor_privilege_sha256'));
 assert.ok(restoredQuery.includes('applicationRoleGraph'));
+assert.ok(restoredQuery.includes('applicationExternalRoleBoundary'));
+assert.ok(restoredQuery.includes('application_external_memberships'));
+assert.ok(restoredQuery.includes('inheritedEffectiveAccessIncluded'));
+assert.ok(restoredQuery.includes('BEGIN TRANSACTION READ ONLY;'));
 assert.ok(restoredQuery.includes('pg_catalog.pg_auth_members'));
 assert.ok(restoredQuery.includes('m.admin_option, m.inherit_option, m.set_option')
   || restoredQuery.includes('edge.admin_option, edge.inherit_option, edge.set_option'));
@@ -48,6 +52,15 @@ assert.deepEqual(matched.observedApplicationDirectRoleGraph, {
   scope: 'myeongha_to_myeongha_direct_membership_only_v1',
   providerBoundaryMembershipsIncluded: false, details: null,
 });
+assert.deepEqual(matched.observedApplicationExternalRoleBoundary, {
+  sourceWitnessAvailable: false,
+  scope: 'myeongha_to_non_myeongha_direct_membership_only_v1',
+  providerOwnedOnlyProven: false,
+  inheritedEffectiveAccessIncluded: false,
+  observedDirectMembershipOptionParity: false,
+  observedGrantorAttributionParity: false,
+  details: null,
+});
 assert.equal(matched.verifiedFullSchemaCatalogEquivalence, false);
 assert.equal(matched.sourceCatalogBoundToBackupSnapshot, false);
 assert.equal(matched.restoreMismatchRootCauseProven, false);
@@ -61,6 +74,91 @@ assert.deepEqual(matched.componentHashEvidence, {
 assert.equal(matched.sourceCatalogProvenance, 'legacy_date_only_observation');
 assert.equal(matched.sourceCatalogProvenanceHold,
   'SOURCE_OBSERVATION_DATE_ONLY_NO_BACKUP_SNAPSHOT_WITNESS');
+
+// Phase 8-A: each direct cross-boundary membership is scoped to exactly
+// one application endpoint. Source raw names stay inside encrypted catalogs;
+// public comparison outputs counts only, never an inherited/provider PASS.
+const boundaryFixture = directMemberships => ({
+  applicationExternalRoleBoundary: {
+    scope: 'myeongha_to_non_myeongha_direct_membership_only_v1',
+    providerOwnedOnlyProven: false,
+    inheritedEffectiveAccessIncluded: false,
+    directMemberships,
+  },
+});
+const edgeToExternal = {
+  granted_role: 'myeongha_reader', member_role: 'supabase_auth_admin',
+  grantor_name: 'postgres', admin_option: false,
+  inherit_option: true, set_option: false,
+};
+const edgeFromExternal = {
+  granted_role: 'external_audit', member_role: 'myeongha_writer',
+  grantor_name: 'postgres', admin_option: false,
+  inherit_option: false, set_option: false,
+};
+const sourceBoundary = boundaryFixture([edgeToExternal, edgeFromExternal]);
+const boundarySame = observeApplicationExternalRoleBoundary(
+  sourceBoundary, structuredClone(sourceBoundary));
+assert.deepEqual(boundarySame.details, {
+  sourceDirectMembershipCount: 2, restoredDirectMembershipCount: 2,
+  sourceReferencedExternalRoleCount: 2, restoredReferencedExternalRoleCount: 2,
+  missingMembershipOptionEntryCount: 0, addedMembershipOptionEntryCount: 0,
+  grantorAttributionDifferenceGroupCount: 0,
+});
+assert.equal(boundarySame.observedDirectMembershipOptionParity, true);
+assert.equal(boundarySame.observedGrantorAttributionParity, true);
+assert.equal(boundarySame.providerOwnedOnlyProven, false);
+assert.equal(boundarySame.inheritedEffectiveAccessIncluded, false);
+assert.ok(!JSON.stringify(boundarySame).includes('external_audit'));
+assert.ok(!JSON.stringify(boundarySame).includes('supabase_auth_admin'));
+
+const boundaryMissing = observeApplicationExternalRoleBoundary(
+  sourceBoundary, boundaryFixture([]));
+assert.equal(boundaryMissing.observedDirectMembershipOptionParity, false);
+assert.equal(boundaryMissing.observedGrantorAttributionParity, false);
+assert.equal(boundaryMissing.details.missingMembershipOptionEntryCount, 2);
+assert.equal(boundaryMissing.details.addedMembershipOptionEntryCount, 0);
+
+const changedBoundaryGrantor = boundaryFixture([
+  { ...edgeToExternal, grantor_name: 'supabase_admin' }, edgeFromExternal,
+]);
+const boundaryGrantorDrift = observeApplicationExternalRoleBoundary(
+  sourceBoundary, changedBoundaryGrantor);
+assert.equal(boundaryGrantorDrift.observedDirectMembershipOptionParity, true);
+assert.equal(boundaryGrantorDrift.observedGrantorAttributionParity, false);
+assert.equal(boundaryGrantorDrift.details.grantorAttributionDifferenceGroupCount, 1);
+
+const changedBoundaryOption = boundaryFixture([
+  { ...edgeToExternal, inherit_option: false }, edgeFromExternal,
+]);
+const boundaryOptionDrift = observeApplicationExternalRoleBoundary(
+  sourceBoundary, changedBoundaryOption);
+assert.equal(boundaryOptionDrift.observedDirectMembershipOptionParity, false);
+assert.equal(boundaryOptionDrift.details.missingMembershipOptionEntryCount, 1);
+assert.equal(boundaryOptionDrift.details.addedMembershipOptionEntryCount, 1);
+
+assert.throws(() => observeApplicationExternalRoleBoundary(
+  sourceBoundary, boundaryFixture([{ ...edgeToExternal,
+    member_role: 'myeongha_another' }])), /exactly one application/);
+assert.throws(() => observeApplicationExternalRoleBoundary(
+  sourceBoundary, boundaryFixture([{ ...edgeToExternal,
+    granted_role: 'other_external' }])), /exactly one application/);
+assert.throws(() => observeApplicationExternalRoleBoundary(
+  sourceBoundary, boundaryFixture([edgeToExternal, edgeToExternal])),
+/Duplicate external grantor/);
+assert.throws(() => observeApplicationExternalRoleBoundary(
+  sourceBoundary, { applicationExternalRoleBoundary: {
+    ...sourceBoundary.applicationExternalRoleBoundary, providerOwnedOnlyProven: true,
+  } }), /true !== false/);
+assert.throws(() => observeApplicationExternalRoleBoundary(
+  sourceBoundary, {}), /external boundary must be an object/);
+const boundaryAbsent = observeApplicationExternalRoleBoundary({}, sourceBoundary);
+assert.equal(boundaryAbsent.sourceWitnessAvailable, false);
+assert.equal(boundaryAbsent.observedDirectMembershipOptionParity, false);
+assert.equal(boundaryAbsent.details, null);
+assert.throws(() => compareApplicationCatalog({
+  ...source, ...sourceBoundary,
+}, restored, frontier), /sealed backup-run source witness/);
 
 // Phase 8-A: direct MyeongHa-owned role graph is read-only metadata and
 // NEVER proves provider-granted memberships or inherited/effective privileges.
@@ -199,6 +297,27 @@ const scopedResult = compareApplicationCatalog(scopedSource, scopedRestored, fro
 assert.equal(scopedResult.observedApplicationDirectRoleGraph.sourceWitnessAvailable, true);
 assert.equal(scopedResult.observedApplicationDirectRoleGraph.observedMembershipOptionsParity, true);
 assert.equal(scopedResult.roleMembershipParityProven, false);
+const sealedBoundarySource = {
+  ...structuredClone(scopedSource), ...sourceBoundary,
+};
+const sealedBoundaryRestored = {
+  ...structuredClone(scopedRestored), ...boundaryFixture([]),
+};
+const scopedBoundaryObservation = compareApplicationCatalog(
+  sealedBoundarySource, sealedBoundaryRestored, frontier);
+assert.equal(scopedBoundaryObservation.observedApplicationExternalRoleBoundary
+  .sourceWitnessAvailable, true);
+assert.equal(scopedBoundaryObservation.observedApplicationExternalRoleBoundary
+  .details.missingMembershipOptionEntryCount, 2);
+assert.equal(scopedBoundaryObservation.observedApplicationExternalRoleBoundary
+  .observedDirectMembershipOptionParity, false);
+assert.equal(scopedBoundaryObservation.roleMembershipParityProven, false);
+assert.equal(scopedBoundaryObservation.drReady, false);
+assert.ok(!JSON.stringify(scopedBoundaryObservation).includes('external_audit'));
+assert.ok(!JSON.stringify(scopedBoundaryObservation).includes('supabase_auth_admin'));
+assert.throws(() => compareApplicationCatalog(
+  sealedBoundarySource, scopedRestored, frontier),
+/external boundary must be an object/);
 assert.throws(() => compareApplicationCatalog(
   { ...structuredClone(source), ...sourceGraph }, scopedRestored, frontier));
 assert.throws(() => compareApplicationCatalog(scopedSource,

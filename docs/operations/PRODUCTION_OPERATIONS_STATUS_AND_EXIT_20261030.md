@@ -1,3 +1,13 @@
+### 2026-11-10 KST — Gate 1 / Phase 8-A: 앱↔외부 역할 직접 멤버십 비식별 복구 관측 경계 구현
+
+- **근거/우선순위:** 기존 승인된 종료 집중 로드맵 Gate 1 / Phase 8-A #6의 미입증 교차 역할 권한 범위를 좁힌다. 앞선 PR #3183 / merge main `60e63a7d9409b50b4968a77e7134ebfffee644c7`는 앱 내부 직접 멤버십 7/7 및 grantor 이식 규칙 7/7을 실측했으나, 앱 역할↔비앱 역할 경계는 의도적으로 제외했다. Provider-owned로 역할 소유를 분류하거나 상속/실효 권한 전체를 증명하지 않는다.
+- **읽기 전용 구현:** `production-app-schema-fingerprint-readonly.sql`의 기존 READ ONLY 관측에 앱 역할과 비앱 역할이 양쪽 끝점에 하나씩 있는 `pg_auth_members` 직접 연결만 별도 `applicationExternalRoleBoundary` 목록으로 수집. 원본 직접 권한의 양쪽 역할·grantor·ADMIN/INHERIT/SET 옵션은 기존 봉인된 백업의 암호화된 source catalog에만 저장한다. `export-production-postgres-backup.sh`에서 before/after source bracket와 암호화 JSON projection에 해당 필드가 누락되면 백업을 실패시키고, 외부 소유권/상속/효과 권한 입증 플래그는 false를 강제한다.
+- **대조·비식별 안전:** `check-postgres-restored-app-schema-parity.mjs`는 원본/격리 복원본 직접 연결을 역할 쌍·옵션·grantor별로 비교해 연결 누락·추가/옵션 차이 및 grantor 그룹 차이 **건수**만 산출한다. 역할 이름·원문 GRANT/권한 관계·개인정보를 공개 evidence에 쓰지 않는다. 기존 암호화 백업처럼 source에 새 필드가 없으면 `sourceWitnessAvailable=false`로 남기며, 새 source 필드가 있는데 복원본 관측이 없다면 실패한다. `roleMembershipParityProven=false`, `drReady=false`, `serviceResumptionAllowed=false`, legacy ACL 29개 HOLD 유지. 외부 역할은 꼭 Provider 소유가 아닐 수 있으므로 Provider 복구 완료로 판정하지 않는다.
+- **검증:** Node24 parity verifier(기존 앱 내부 7건 규칙 포함, 외부 연결 동등·삭제·옵션 변경·grantor 변경·위조·누락·비식별 출력) PASS, Production 백업 workflow 계약 검증 PASS, `git diff --check` PASS. 현재는 **구현과 합성 검증만** 완료; 새 컬렉터를 실제 Production read-only 환경에서 실행했다는 결과, 외부 멤버십 수치, Provider 이식 동등성, 전체 migration ledger/Hosted/Auth/Storage/Privacy/RPO/RTO 증거는 아직 없다.
+- **다음:** 해당 코드 PR 정확한 HEAD CI/필수 통합 통과·main 병합 후에만 현재 source frontier를 읽기 전용 암호화 백업으로 한 번 새로 봉인하고, 동일 백업의 PostgreSQL 17 격리 복원에서 앱↔외부 직접 멤버십 누락/차이를 비식별 건수로 실측한다. 기존 백업 #42584865734에는 새 필드가 없으므로 같은 archive 재실행으로 이 관측을 생성할 수 없다. Production DDL/DML/GRANT, IAM·비밀·Hosted 유료 리소스 및 개인정보 canary 변경 없음. P0 #1887 OPEN / NOT_ACCEPTED / ROADMAP_COMPLETE 미충족.
+
+Watchtower-Track: ops
+
 ### 2026-11-10 KST — Gate 1 / Phase 8-A: sealed 백업 격리 PG17 복원에서 grantor 7건 개별 portable rewrite 규칙 부합 실측
 
 - **결속:** PR #3182 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42734339010 SUCCESS, merge main `0714b06bd04a79a5f27819137475a6f8207d4f9e`. 기존 암호화 Production 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42584865734 SUCCESS (artifact 13658419071, source `07ae476f7913930c8880e70b5766d23c30a53f8a`, migration frontier `20261109071019`)만 재사용. 신규 격리 PostgreSQL 17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42740306678 SUCCESS, artifact 13729550427, 동일 백업 ID 42584865734, incident reference `2026-11-09T08:21:20Z`. Production DB/권한/데이터를 수정하지 않았고 신규 Production 백업·Hosted 비용·privacy canary는 실행하지 않음.
