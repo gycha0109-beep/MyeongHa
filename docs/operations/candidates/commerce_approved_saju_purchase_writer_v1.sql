@@ -115,6 +115,40 @@ revoke all on function commerce_saju_private.resolve_approved_purchase_admission
   uuid,uuid,uuid,uuid,uuid,text,text,uuid
 ) from public, anon, authenticated, service_role, myeongha_api_executor;
 
+create function commerce_saju_private.current_approved_saju_comparison_order_v1(
+  p_subject_id uuid,p_record_id uuid,p_birth_revision_id uuid,p_target_id text,p_as_of timestamptz
+)
+returns text
+language sql stable security invoker
+set search_path=pg_catalog
+as $function$
+  select case
+    when bool_or(scope.admission->'counterpart'->>'targetPersonId'=p_target_id) then null
+    when bool_or(scope.admission->'counterpart'->>'targetPersonId'<>p_target_id) then 'additional'
+    else 'first'
+  end
+  from public.commerce_saju_purchase_origins_v1 prior
+  join commerce_saju_private.approved_purchase_scope_v1 scope using (purchase_intent_id)
+  join public.purchase_intents intent on intent.id = prior.purchase_intent_id
+    and intent.subject_id = prior.subject_id and intent.status = 'verified'
+  join public.commerce_receipts receipt on receipt.purchase_intent_id = prior.purchase_intent_id
+    and receipt.subject_id = prior.subject_id and receipt.verification_status = 'verified'
+    and receipt.environment = 'production' and receipt.provider = 'portone_v2' and receipt.platform = 'web'
+    and receipt.product_offer_id = intent.product_offer_id
+    and receipt.verified_amount_minor = intent.expected_amount_minor
+    and receipt.verified_currency = intent.expected_currency
+  join public.entitlement_grants grant_row on grant_row.source_receipt_id = receipt.id
+    and grant_row.subject_id = receipt.subject_id and grant_row.entitlement_key = 'saju.compatibility'
+    and grant_row.scope_key = scope.component_scope_keys->>'compatibility'
+    and grant_row.grant_source_type = 'purchase' and grant_row.status = 'active' and grant_row.valid_from <= p_as_of
+    and (grant_row.valid_until is null or grant_row.valid_until > p_as_of)
+  where prior.subject_id = p_subject_id and prior.saju_record_id = p_record_id
+    and prior.birth_revision_id = p_birth_revision_id
+    and prior.subject_id=public.current_myeongha_subject_id()
+$function$;
+revoke all on function commerce_saju_private.current_approved_saju_comparison_order_v1(uuid,uuid,uuid,text,timestamptz)
+  from public,anon,authenticated,service_role,myeongha_api_executor;
+
 create function commerce_saju_private.create_approved_purchase_intent_v1(
   p_subject_id uuid, p_intent_id uuid, p_record_id uuid, p_birth_revision_id uuid,
   p_offer_id uuid, p_idempotency_key text, p_request_hash text,
@@ -137,8 +171,6 @@ declare
   v_intent record;
   v_keys jsonb;
   v_target jsonb;
-  v_has_paid_comparison boolean;
-  v_target_already_paid boolean;
   v_as_of timestamptz;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
@@ -287,31 +319,11 @@ begin
         message = 'Approved Saju purchase has an unsettled related cancellation';
     end if;
 
-    if v_target is not null then
-      select coalesce(bool_or(scope.admission->'counterpart'->>'targetPersonId' <> v_target->>'targetPersonId'),false),
-             coalesce(bool_or(scope.admission->'counterpart'->>'targetPersonId' = v_target->>'targetPersonId'),false)
-        into v_has_paid_comparison,v_target_already_paid
-        from public.commerce_saju_purchase_origins_v1 prior
-        join commerce_saju_private.approved_purchase_scope_v1 scope using (purchase_intent_id)
-        join public.purchase_intents intent on intent.id = prior.purchase_intent_id
-          and intent.subject_id = prior.subject_id and intent.status = 'verified'
-        join public.commerce_receipts receipt on receipt.purchase_intent_id = prior.purchase_intent_id
-          and receipt.subject_id = prior.subject_id and receipt.verification_status = 'verified'
-          and receipt.environment = 'production' and receipt.provider = 'portone_v2' and receipt.platform = 'web'
-          and receipt.product_offer_id = intent.product_offer_id
-          and receipt.verified_amount_minor = intent.expected_amount_minor
-          and receipt.verified_currency = intent.expected_currency
-        join public.entitlement_grants grant_row on grant_row.source_receipt_id = receipt.id
-          and grant_row.subject_id = receipt.subject_id and grant_row.entitlement_key = 'saju.compatibility'
-          and grant_row.scope_key = scope.component_scope_keys->>'compatibility'
-          and grant_row.grant_source_type = 'purchase' and grant_row.status = 'active' and grant_row.valid_from <= v_as_of
-          and (grant_row.valid_until is null or grant_row.valid_until > v_as_of)
-        where prior.subject_id = p_subject_id and prior.saju_record_id = p_record_id
-          and prior.birth_revision_id = p_birth_revision_id;
-      if v_target_already_paid or (v_target->>'order' = 'additional') is distinct from v_has_paid_comparison then
-        raise exception using errcode = 'P0001', constraint = 'approved_saju_counterpart_order_unavailable',
-          message = 'Approved Saju comparison order is unavailable';
-      end if;
+    if v_target is not null and commerce_saju_private.current_approved_saju_comparison_order_v1(
+      p_subject_id,p_record_id,p_birth_revision_id,v_target->>'targetPersonId',v_as_of
+    ) is distinct from v_target->>'order' then
+      raise exception using errcode = 'P0001', constraint = 'approved_saju_counterpart_order_unavailable',
+        message = 'Approved Saju comparison order is unavailable';
     end if;
   end if;
   delete from public.commerce_saju_purchase_admission_context_v1

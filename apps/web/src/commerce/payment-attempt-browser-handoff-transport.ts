@@ -229,12 +229,16 @@ function normalizeHttpFailure(status: number): never {
 export async function fetchPaymentAttemptBrowserHandoffContextV1(input: {
   readonly paymentAttemptId: unknown;
   readonly fetchPort: PaymentAttemptHandoffFetchPortV1;
+  readonly approvedOfferId?: string;
 }): Promise<PaymentAttemptBrowserHandoffContextV1> {
   const paymentAttemptId = requirePaymentAttemptId(input.paymentAttemptId);
   const request: PaymentAttemptHandoffFetchRequestV1 = Object.freeze({
     method: 'POST',
     headers: Object.freeze({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ paymentAttemptId }),
+    body: JSON.stringify({
+      paymentAttemptId,
+      ...(input.approvedOfferId === undefined ? {} : { approvedOfferId: input.approvedOfferId }),
+    }),
   });
 
   let response: PaymentAttemptHandoffFetchResponseV1;

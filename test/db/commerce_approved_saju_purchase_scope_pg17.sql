@@ -7,6 +7,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuance_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_checkout_selection_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_payment_handoff_v1.sql
 
 insert into public.saju_domain_runtime(saju_domain,availability,capability_version,updated_at)
 select domain,'available','isolated-approved-v1',now()
@@ -419,7 +420,11 @@ begin
      or has_function_privilege('myeongha_api_executor',
        'commerce_saju_private.bind_approved_purchase_scope_v1(uuid,uuid,text,text)','EXECUTE')
      or has_function_privilege('myeongha_commerce_internal_executor',
-       'public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)','EXECUTE') then
+       'public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)','EXECUTE')
+     or has_function_privilege('myeongha_api_executor',
+       'commerce_saju_private.create_approved_saju_sandbox_attempt_v1(uuid,uuid,uuid,text,text,text)','EXECUTE')
+     or has_function_privilege('myeongha_api_executor',
+       'commerce_saju_private.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)','EXECUTE') then
     raise exception 'Private binding exposed before activation';
   end if;
   perform set_config('myeongha.account_deletion_finalizer_subject_id',actor::text,true);
@@ -586,6 +591,26 @@ begin
       select 1 from commerce_saju_private.approved_purchase_scope_v1 scope
       where scope.purchase_intent_id = intent_id and scope.admission_hash = result.admission_hash
     ) then raise exception 'Approved Saju writer did not commit matching scope'; end if;
+    select * into strict result from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+      actor,gen_random_uuid(),intent_id,'sandbox','attempt-' || offer_key,'sandbox-' || offer_key
+    );
+    perform 1 from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(
+      actor,result.payment_attempt_id,offer_key
+    ) handoff where handoff.expected_amount_minor=amount and handoff.expected_currency='KRW';
+    if not found then raise exception 'Sandbox handoff did not match catalog price for %',offer_key; end if;
+    if offer_key='first-counterpart' then
+      begin
+        update commerce_saju_private.comparison_use_approval_v1 set revoked_at=now()
+          where approval_ref='isolated-proof';
+        perform 1 from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(
+          actor,result.payment_attempt_id,offer_key
+        );
+        raise exception 'Sandbox handoff ignored revoked target use';
+      exception when sqlstate 'P0001' then
+        get stacked diagnostics sql_constraint=constraint_name;
+        if sql_constraint<>'approved_saju_payment_unavailable' then raise; end if;
+      end;
+    end if;
     if offer_key in ('basic-month','first-counterpart') then
       begin
         perform 1 from pg_temp.approved_fixture_purchase(actor,gen_random_uuid(),record_id,self_revision,offer_id,
@@ -710,6 +735,8 @@ declare
   next_revision uuid := gen_random_uuid();
   pinned_record uuid;
   purchase uuid := gen_random_uuid();
+  attempt_id uuid := gen_random_uuid();
+  handoff record;
   entry record;
   selection record;
   offer record;
@@ -761,6 +788,58 @@ begin
     jsonb_build_object('capabilitySetId',offer.capability_set_id,'definitionVersion',offer.definition_version,
       'definitionHash',offer.definition_hash),selected_admission)
     as x(purchase_intent_id uuid,replayed boolean,admission_hash text);
+
+  select * into strict handoff from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+    actor,attempt_id,purchase,'sandbox','checkout-attempt','checkout-sandbox-request'
+  );
+  if handoff.payment_attempt_id<>attempt_id or handoff.status<>'created' or handoff.replayed then
+    raise exception 'Approved order failed to create its sandbox attempt';
+  end if;
+  select * into strict handoff from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career');
+  if handoff.expected_amount_minor<>9900 or handoff.expected_currency<>'KRW'
+    or handoff.environment<>'sandbox' or handoff.provider_request_id<>'checkout-sandbox-request' then
+    raise exception 'Sandbox handoff changed the approved payment identity or amount';
+  end if;
+  begin
+    perform 1 from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'wealth');
+    raise exception 'Sandbox handoff accepted a different same-price offer';
+  exception when sqlstate 'P0001' then
+    get stacked diagnostics expected_constraint=constraint_name;
+    if expected_constraint<>'approved_saju_payment_unavailable' then raise; end if;
+  end;
+  select * into strict handoff from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+    actor,gen_random_uuid(),purchase,'sandbox','checkout-attempt','checkout-sandbox-request'
+  );
+  if handoff.payment_attempt_id<>attempt_id or not handoff.replayed then
+    raise exception 'Sandbox attempt replay created a different attempt';
+  end if;
+  begin
+    perform 1 from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+      actor,gen_random_uuid(),purchase,'sandbox','checkout-other-attempt','checkout-other-request'
+    );
+    raise exception 'Sandbox checkout allowed two active attempts';
+  exception when unique_violation then
+    get stacked diagnostics expected_constraint=constraint_name;
+    if expected_constraint<>'cmd_payment_attempt_v1_idempotency_conflict' then raise; end if;
+  end;
+  begin
+    perform 1 from commerce_saju_private.create_approved_saju_sandbox_attempt_v1(
+      actor,gen_random_uuid(),purchase,'production','checkout-production','checkout-production-request'
+    );
+    raise exception 'Sandbox checkout allowed a production attempt';
+  exception when sqlstate 'P0001' then
+    get stacked diagnostics expected_constraint=constraint_name;
+    if expected_constraint<>'approved_saju_payment_unavailable' then raise; end if;
+  end;
+  begin
+    update commerce_saju_private.approved_fulfillment_release_v1 set revoked_at=clock_timestamp()
+      where approved_offer_id='career';
+    perform 1 from commerce_saju_private.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career');
+    raise exception 'Revoked approved release still returned a sandbox handoff';
+  exception when sqlstate 'P0001' then
+    get stacked diagnostics expected_constraint=constraint_name;
+    if expected_constraint<>'approved_saju_payment_unavailable' then raise; end if;
+  end;
 
   update public.birth_profiles set current_revision_id=next_revision where id=profile;
   select * into strict selection from commerce_saju_private.select_approved_saju_checkout_v1(

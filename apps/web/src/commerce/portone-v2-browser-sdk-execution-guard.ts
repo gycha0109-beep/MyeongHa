@@ -102,10 +102,12 @@ export async function preparePortOneV2BrowserSdkExecutionAdmissionFromPaymentAtt
   readonly fetchPort: PaymentAttemptHandoffFetchPortV1;
   readonly providerSelector: PortOneV2ProviderSelectorV1;
   readonly activation: PortOneV2DeferredActivationFieldsV1;
+  readonly approvedOfferId?: string;
 }): Promise<PortOneV2BrowserSdkExecutionAdmissionV1> {
   const context = await fetchPaymentAttemptBrowserHandoffContextV1({
     paymentAttemptId: input.paymentAttemptId,
     fetchPort: input.fetchPort,
+    ...(input.approvedOfferId === undefined ? {} : { approvedOfferId: input.approvedOfferId }),
   });
   const preparedRequest = preparePortOneV2BrowserCheckoutV1({
     context,

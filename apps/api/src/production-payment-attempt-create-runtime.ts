@@ -5,6 +5,7 @@ import {
   type PaymentAttemptEnvironmentV1,
 } from './payment-attempt-create-command.js';
 import { handlePaymentAttemptCreateRequestV1 } from './payment-attempt-create-http.js';
+import { derivePortOneKcpV2SandboxPaymentIdV1 } from './portone-kcp-v2-sandbox-payment-id-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import { createProductionPostgresSubjectPoolLeaseV1 } from './production-postgres-subject-pool-lease.js';
 import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
@@ -31,6 +32,7 @@ export interface CreateProductionPaymentAttemptCreateRuntimeInputV1 {
   readonly paymentEnvironment: PaymentAttemptEnvironmentV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  readonly approvedSajuSandbox?: true;
 }
 
 /**
@@ -42,6 +44,9 @@ export function createProductionPaymentAttemptCreateRuntimeV1(
 ): ProductionPaymentAttemptCreateRuntimeV1 {
   const config = parseProductionUserDataRuntimeConfigV1(input.env);
   const environment = requirePaymentAttemptEnvironmentV1(input.paymentEnvironment);
+  if (input.approvedSajuSandbox === true && environment !== 'sandbox') {
+    throw new Error('Approved Saju sandbox checkout requires the sandbox environment.');
+  }
   const poolLease = createProductionPostgresSubjectPoolLeaseV1({
     config,
     ...(input.pool === undefined ? {} : { pool: input.pool }),
@@ -52,7 +57,9 @@ export function createProductionPaymentAttemptCreateRuntimeV1(
   });
   const identityPort = Object.freeze({
     nextPaymentAttemptId: randomUUID,
-    providerRequestIdFor: derivePaymentAttemptProviderRequestIdV1,
+    providerRequestIdFor: input.approvedSajuSandbox === true
+      ? derivePortOneKcpV2SandboxPaymentIdV1
+      : derivePaymentAttemptProviderRequestIdV1,
   });
 
   return Object.freeze({
@@ -65,6 +72,7 @@ export function createProductionPaymentAttemptCreateRuntimeV1(
         identityEvidenceVerifier,
         pool: poolLease.pool,
         identityPort,
+        ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
       });
     },
     close() {

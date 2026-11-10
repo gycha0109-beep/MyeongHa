@@ -44,6 +44,10 @@ select
   status
 from public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)
 `.trim();
+const READ_APPROVED_SAJU_CONTEXT_SQL = READ_CONTEXT_SQL.replace(
+  'public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)',
+  'commerce_saju_private.read_approved_saju_sandbox_handoff_v1($1::uuid, $2::uuid, $3::text)',
+);
 
 function requirePaymentAttemptId(value: unknown): string {
   if (typeof value !== 'string' || !UUID.test(value.trim())) {
@@ -103,6 +107,7 @@ function mapAuthorityError(error: unknown): never {
   switch (postgresConstraint(error)) {
     case 'qry_commerce_payment_attempt_handoff_context_unavailable':
     case 'qry_commerce_payment_attempt_handoff_context_state_ineligible':
+    case 'approved_saju_payment_unavailable':
       throw new ApiCommandError(
         'NOT_FOUND',
         'Payment Attempt handoff context is unavailable for the current subject.',
@@ -146,13 +151,16 @@ function projectContext(
 export async function loadPaymentAttemptHandoffContextV1(input: {
   readonly scope: PostgresSubjectExecutionScopeV1;
   readonly paymentAttemptId: unknown;
+  readonly approvedOfferId?: string;
 }): Promise<PaymentAttemptHandoffContextV1> {
   const paymentAttemptId = requirePaymentAttemptId(input.paymentAttemptId);
 
   try {
     const result = await input.scope.client.query<HandoffContextRowV1>(
-      READ_CONTEXT_SQL,
-      [input.scope.resolvedSubject.subjectId, paymentAttemptId],
+      input.approvedOfferId === undefined ? READ_CONTEXT_SQL : READ_APPROVED_SAJU_CONTEXT_SQL,
+      input.approvedOfferId === undefined
+        ? [input.scope.resolvedSubject.subjectId, paymentAttemptId]
+        : [input.scope.resolvedSubject.subjectId, paymentAttemptId, input.approvedOfferId],
     );
     return projectContext(paymentAttemptId, result.rows);
   } catch (error) {

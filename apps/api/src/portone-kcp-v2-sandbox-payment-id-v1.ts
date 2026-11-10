@@ -17,6 +17,14 @@ export const PORTONE_KCP_V2_PAYMENT_ID_V1=Object.freeze({
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 const IDEMPOTENCY=/^[A-Za-z0-9_-]{8,128}$/u;
 
+export function isPortOneKcpV2SandboxPaymentIdInputV1(input: Readonly<{
+  purchaseIntentId: string;
+  idempotencyKey: string;
+}>): boolean {
+  return !!input && typeof input.purchaseIntentId === 'string' && UUID.test(input.purchaseIntentId)
+    && typeof input.idempotencyKey === 'string' && IDEMPOTENCY.test(input.idempotencyKey);
+}
+
 /**
  * Derive an opaque, replay-stable 128-bit payment identity for NEW KCP V2
  * sandbox Purchase Intents. Historical derivation is not rewritten, and
@@ -26,10 +34,7 @@ export function derivePortOneKcpV2SandboxPaymentIdV1(input:Readonly<{
   purchaseIntentId:string;
   idempotencyKey:string;
 }>):string{
-  if(!input||typeof input.purchaseIntentId!=='string'||
-     !UUID.test(input.purchaseIntentId)||
-     typeof input.idempotencyKey!=='string'||
-     !IDEMPOTENCY.test(input.idempotencyKey)){
+  if(!isPortOneKcpV2SandboxPaymentIdInputV1(input)){
     throw new Error('Invalid KCP V2 server-owned Payment Attempt derivation input.');
   }
   const digest=createHash('sha256')
