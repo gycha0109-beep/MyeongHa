@@ -26,10 +26,12 @@ import type {
   ReaderContextLifeFactsReadAuthorityPortV1,
 } from './reader-context-non-memory-read.js';
 import {
+  runApprovedSajuReaderInterpretationPreviewV1,
   runThreadBoundReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
   type ReaderInterpretationPreviewEnvelopeV1,
 } from './reader-interpretation-preview-runtime-v1.js';
+import type { PostgresSubjectExecutionScopeV1 } from './postgres-subject-execution.js';
 
 export const READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1 =
   '/api/me/readings/reader-interpretation/preview' as const;
@@ -244,11 +246,17 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
   readonly productReaderEligibilityAuthorityPort?: ProductReaderEligibilityAuthorityPortV1;
   readonly currentVerifiedPurchaseAuthorityPort?: import('./official-reader-private-exact-verified-purchase-guard-v1.js').OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
   readonly admitServerReader?: (serverReaderCharacterId: string) => void;
+  readonly approvedSajuScope?: PostgresSubjectExecutionScopeV1;
 }): Promise<ReaderInterpretationPreviewHttpResponseV1> {
   const subjectId = requireSubject(input.resolvedSubjectId);
   const effectiveAt = requireEffectiveAt(input.effectiveAt);
   const request = parseReaderInterpretationPreviewHttpRequestV1(input.body);
 
+  if (input.approvedSajuScope !== undefined
+    && (input.approvedSajuScope.resolvedSubject.subjectKind !== 'member'
+      || input.approvedSajuScope.resolvedSubject.subjectId !== subjectId)) {
+    throw new ReaderInterpretationPreviewHttpErrorV1('AUTH_REQUIRED', 'Verified member scope is required.');
+  }
   const resolvedContext = await input.contextAuthorityPort.resolveContext({
     subjectId,
     threadId: request.threadId,
@@ -258,16 +266,13 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     resolvedContext,
   );
 
-  const envelope = await runThreadBoundReaderInterpretationPreviewV1({
-    resolvedSubjectId: subjectId,
+  const common = {
     threadId: request.threadId,
     officialReadingId: request.officialReadingId,
     effectiveAt,
     contentReleaseRuntime: input.contentReleaseRuntime,
     contextInput,
     threadBindingAuthorityPort: input.threadBindingAuthorityPort,
-    accessAuthorityPort: input.accessAuthorityPort,
-    artifactAuthorityPort: input.artifactAuthorityPort,
     relationshipAuthorityPort: input.relationshipAuthorityPort,
     memoryItemsAuthorityPort: input.memoryItemsAuthorityPort,
     memoryGrantsAuthorityPort: input.memoryGrantsAuthorityPort,
@@ -276,9 +281,17 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
     ...(input.productReaderEligibilityAuthorityPort
       ? { productReaderEligibilityAuthorityPort: input.productReaderEligibilityAuthorityPort }
       : {}),
-    ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
     ...(input.admitServerReader ? { admitServerReader: input.admitServerReader } : {}),
-  });
+  };
+  const envelope = input.approvedSajuScope === undefined
+    ? await runThreadBoundReaderInterpretationPreviewV1({
+      ...common,
+      resolvedSubjectId: subjectId,
+      accessAuthorityPort: input.accessAuthorityPort,
+      artifactAuthorityPort: input.artifactAuthorityPort,
+      ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
+    })
+    : await runApprovedSajuReaderInterpretationPreviewV1({ ...common, scope: input.approvedSajuScope });
 
   return projectReaderInterpretationPreviewHttpResponseV1(envelope);
 }

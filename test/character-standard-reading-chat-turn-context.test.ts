@@ -8,6 +8,7 @@ import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subjec
 import { prepareCharacterStandardReadingChatTurnPreflightV2 } from '../apps/api/src/character-standard-reading-chat-turn-preflight-v2.js';
 import {
   prepareCharacterStandardChatGroundingV2,
+  prepareApprovedSajuReaderFollowupSourceV1,
   assertServerPreparedStandardChatGroundingV2,
 } from '../apps/api/src/character-standard-reading-chat-grounding-v2.js';
 import { selectCharacterStandardFollowupEvidenceV1 } from '../apps/api/src/character-standard-reading-chat-followup-evidence-v1.js';
@@ -578,6 +579,43 @@ describe('thread-bound Official Reading Reader runtime', () => {
       }
       expect(projectGrounding).toHaveBeenCalledTimes(scenario === 'insufficient_source' ? 0 : 1);
       expect(generate).toHaveBeenCalledTimes(scenario === 'wrong_source' || scenario === 'insufficient_source' ? 0 : 1);
+
+      grantCurrent = true;
+      const followupProjection = vi.fn(async () => {
+        if (scenario === 'refund_during_consultation') grantCurrent = false;
+        return previewGrounding(scenario === 'wrong_source' ? 'a'.repeat(64) : responseHash.slice('sha256:v1:'.length));
+      });
+      const followup = prepareApprovedSajuReaderFollowupSourceV1({
+        ...authority, scope: { client, resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' } },
+        readingId: READING_ID, effectiveAt, receivePlan: existingThreadReceivePlan(),
+        contextInput: serverContextInput(), groundingProjectionPort: { projectGrounding: followupProjection },
+      });
+      if (scenario === 'same_source') {
+        await expect(followup).resolves.toMatchObject({
+          preflight: { scope: { officialArtifactResponseHash: responseHash } },
+          grounded: {
+            scope: { officialArtifactResponseHash: responseHash, readingId: READING_ID },
+            grounding: { sourceResponseHash: responseHash.slice('sha256:v1:'.length) },
+          },
+        });
+        const initialScene = await runReaderInterpretationPreviewHttpV1({
+          ...authority, resolvedSubjectId: SUBJECT_ID, effectiveAt,
+          approvedSajuScope: { client, resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' } },
+          body: { threadId: THREAD_ID, officialReadingId: READING_ID },
+          contentReleaseRuntime: compatibleReceiveRuntime(),
+          contextAuthorityPort: { resolveContext: () => serverContextInput() },
+          groundingProjectionPort: { projectGrounding: followupProjection },
+        });
+        expect(initialScene).toMatchObject({
+          mode: 'reader_interpretation', readerCharacterId: 'baekheon', officialReadingId: READING_ID,
+        });
+        expect(initialScene).not.toHaveProperty('sourceResponseHash');
+      } else {
+        await expect(followup).rejects.toMatchObject({
+          code: scenario === 'insufficient_source' ? 'GROUNDING_UNAVAILABLE' : 'SOURCE_MISMATCH',
+        });
+      }
+      expect(followupProjection).toHaveBeenCalledTimes(scenario === 'insufficient_source' ? 0 : scenario === 'same_source' ? 2 : 1);
     },
   );
 

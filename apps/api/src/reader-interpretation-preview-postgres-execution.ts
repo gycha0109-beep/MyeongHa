@@ -42,6 +42,8 @@ export interface ExecuteReaderInterpretationPreviewPostgresInputV1 {
     client: PostgresTransactionQueryV1,
   ) => ReaderInterpretationPreviewContextAuthorityPortV1;
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
+  /** Select the approved purchase source only for the internal, allowlisted Reader runtime. */
+  readonly privateApprovedSajuReaderEnabled?: true;
   /** Explicit Product/Commerce authority from the SAME canonical Subject transaction.
    * Absent until Commerce approves an actual production Product policy adapter.
    * Missing adapter fails closed before Official artifact/Saju calls.
@@ -68,7 +70,8 @@ export function executeReaderInterpretationPreviewPostgresV1(
   return executePostgresSubjectTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
-    execute: ({ resolvedSubject, client }) => {
+    execute: (scope) => {
+      const { resolvedSubject, client } = scope;
       // The activation hash is derived only from the canonical subjects.id resolved
       // inside the transaction. Disabled/out-of-cohort requests stop here before
       // thread, Reading, content, relationship, Memory, or Saju authorities exist.
@@ -99,6 +102,7 @@ export function executeReaderInterpretationPreviewPostgresV1(
         nonMemoryContextAuthorityPort:
           createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
         groundingProjectionPort: input.groundingProjectionPort,
+        ...(input.privateApprovedSajuReaderEnabled === true ? { approvedSajuScope: scope } : {}),
         ...(input.createProductReaderEligibilityAuthorityPort
           ? { productReaderEligibilityAuthorityPort:
               input.createProductReaderEligibilityAuthorityPort(client) }
