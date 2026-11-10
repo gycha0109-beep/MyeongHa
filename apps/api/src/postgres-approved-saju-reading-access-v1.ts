@@ -3,6 +3,7 @@ import type {
   CharacterStandardReadingArtifactAuthorityPortV1,
 } from './character-standard-reading-knowledge.js';
 import type { OfficialReadingRecordReadAuthorityPortV1 } from './official-reading-record-read.js';
+import type { OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
 const READ_SQL = `
@@ -46,6 +47,7 @@ export function createPostgresApprovedSajuReadingAccessV1(
   recordPort: OfficialReadingRecordReadAuthorityPortV1;
   accessPort: CharacterStandardReadingAccessAuthorityPortV1;
   artifactPort: CharacterStandardReadingArtifactAuthorityPortV1;
+  purchasePort: OfficialReaderPrivateCurrentPurchaseAuthorityPortV1;
 }> {
   async function read(subjectId: string, reader: string | null, includePayload: boolean) {
     const { rows } = await client.query<ApprovedReadingRow>(READ_SQL, [subjectId, readingId, reader, includePayload]);
@@ -59,6 +61,15 @@ export function createPostgresApprovedSajuReadingAccessV1(
   }
 
   return {
+    purchasePort: {
+      async assertCurrentVerifiedPurchase(input) {
+        const row = input.readingId === readingId
+          ? await read(input.subjectId, input.readerCharacterId, false) : undefined;
+        if (row === undefined || row.readerContentBundleId !== input.readerContentBundleId) {
+          throw new Error('Approved Saju Reading purchase is unavailable for this Reader.');
+        }
+      },
+    },
     recordPort: {
       async readRecord(input) {
         if (input.readingId !== readingId) return null;

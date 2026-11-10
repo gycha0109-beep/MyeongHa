@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { hashSajuHeldSourceProofRequestV1 } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import { prepareApprovedSajuReaderThreadRuntimeV1 } from '../apps/api/src/character-standard-reading-chat-turn-context.js';
+import { runApprovedSajuReaderInterpretationPreviewV1 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
 import { createPostgresApprovedSajuReadingAccessV1 } from '../apps/api/src/postgres-approved-saju-reading-access-v1.js';
 import { getOfficialReadingRecord } from '../apps/api/src/official-reading-record-read.js';
 import type { PostgresTransactionQueryV1 } from '../apps/api/src/postgres-subject-execution.js';
@@ -457,7 +458,7 @@ function existingThreadReceivePlan(
   });
 }
 
-function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
+function previewGrounding(sourceResponseHash = 'a'.repeat(64)): CharacterSajuGroundingBundleViewV1 {
   const withoutHash = {
     schemaVersion: SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
     groundingProjectionVersion: SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
@@ -466,7 +467,7 @@ function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
     productResponseVersion: 'myeonghwa-product-reading-response-v2',
     engineVersion: 'saju-engine-v1',
     readingDomain: 'career' as const,
-    sourceResponseHash: 'a'.repeat(64),
+    sourceResponseHash,
     units: [
       {
         unitId: `grounding_unit_${'1'.repeat(24)}`,
@@ -515,6 +516,71 @@ function previewGrounding(): CharacterSajuGroundingBundleViewV1 {
 }
 
 describe('thread-bound Official Reading Reader runtime', () => {
+  it.each(['same_source', 'wrong_source', 'insufficient_source', 'refund_during_consultation'] as const)(
+    'checks paid Reader source and active grant for %s', async (scenario) => {
+      const authority = authorities();
+      const effectiveAt = '2026-09-21T00:01:00.000Z';
+      const [access] = await authority.accessAuthorityPort.readAccessibleReadings({
+        subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', effectiveAt,
+      });
+      const [artifact] = await authority.artifactAuthorityPort.readArtifactSource({
+        subjectId: SUBJECT_ID, readerCharacterId: 'baekheon', readingId: READING_ID, effectiveAt,
+      });
+      const productResponseState = scenario === 'insufficient_source' ? 'delivered_with_fallback' : 'delivered';
+      const snapshot = {
+        ...(artifact?.responseSnapshotJsonb as Record<string, unknown>),
+        state: productResponseState,
+        messageCode: scenario === 'insufficient_source' ? 'READING_DELIVERED_WITH_GROUNDED_FALLBACK' : 'READING_DELIVERED',
+      };
+      const responseHash = 'sha256:v1:' + hashSajuHeldSourceProofRequestV1(snapshot);
+      const { readApprovedRule } = authority.productReaderEligibilityAuthorityPort;
+      readApprovedRule.mockResolvedValue({
+        status: 'approved',
+        rule: { ...((await readApprovedRule()).rule), productSpecVersion: 'approved-saju-2026-11-06' },
+      });
+      let grantCurrent = true;
+      const client: PostgresTransactionQueryV1 = {
+        async query<Row>(sql: string, params?: readonly unknown[]) {
+          expect(sql).toContain('qry_approved_saju_component_record_v1');
+          expect(params?.slice(0, 3)).toEqual([SUBJECT_ID, READING_ID, 'baekheon']);
+          return { rows: grantCurrent ? [{
+            ...access, ...artifact, component: 'career', responseHash, productResponseState,
+            responseSnapshotJsonb: params?.[3] === true ? snapshot : null,
+          } as Row] : [] };
+        },
+      };
+      const generate = vi.fn(async () => {
+        if (scenario === 'refund_during_consultation') grantCurrent = false;
+        return { segments: [] }; // The malformed comparison can never replace the exact-core Reading.
+      });
+      const projectGrounding = vi.fn(async () => previewGrounding(
+        scenario === 'wrong_source' ? 'a'.repeat(64) : responseHash.slice('sha256:v1:'.length),
+      ));
+      const running = runApprovedSajuReaderInterpretationPreviewV1({
+        ...authority, scope: { client, resolvedSubject: { subjectId: SUBJECT_ID, subjectKind: 'member' } },
+        threadId: THREAD_ID, officialReadingId: READING_ID, effectiveAt,
+        contentReleaseRuntime: compatibleReceiveRuntime(), contextInput: serverContextInput(),
+        groundingProjectionPort: { projectGrounding },
+        consultationShadowPort: {
+          generate, evaluate: async () => { throw new Error('Malformed candidate cannot reach review'); },
+          multiUnitPilot: true, evaluateBatch: async () => ({ verdicts: [] }), evaluatorVersion: 'fixture-evaluator',
+        },
+      });
+      if (scenario === 'same_source') {
+        await expect(running).resolves.toMatchObject({
+          mode: 'reader_interpretation', officialArtifactResponseHash: responseHash,
+          sourceResponseHash: responseHash.slice('sha256:v1:'.length),
+        });
+      } else {
+        await expect(running).rejects.toMatchObject({
+          code: scenario === 'refund_during_consultation' ? 'ACCESS_DENIED' : 'SOURCE_MISMATCH',
+        });
+      }
+      expect(projectGrounding).toHaveBeenCalledTimes(scenario === 'insufficient_source' ? 0 : 1);
+      expect(generate).toHaveBeenCalledTimes(scenario === 'wrong_source' || scenario === 'insufficient_source' ? 0 : 1);
+    },
+  );
+
   it('rechecks the purchased component for Reader body access and preserves the Records source hash', async () => {
     const authority = authorities();
     const [access] = await authority.accessAuthorityPort.readAccessibleReadings({
