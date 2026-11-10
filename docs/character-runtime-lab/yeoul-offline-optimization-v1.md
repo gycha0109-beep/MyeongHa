@@ -71,3 +71,14 @@ node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input /private
 ```
 
 리뷰된 신규 대사의 결과가 별도로 생성되기 전에는 `summarizeReviewedComparisons`가 검증용 프레임일 뿐 성공 결과가 아니다. `sealed_holdout_results`는 후보 수정에 재사용하지 않는다.
+
+
+### 실제 정제 JSON 비용 차이 확인과 파서 수정
+
+2026-11-10 이 세션에서 개인 파일 보관함의 `yeoul-evaluations-all-288-clean.json` 전체 7,596줄을 다시 파싱하여 다음을 확인했다.
+
+- `responses.length = 288`; `(model, variant, id, repeat)`의 고유 조합 `288`; 메모 `117`; 긍정+주의사항 `11`; 질문 변별력 전건 미평가.
+- 실험 메타데이터 `sourceExperiment.providerReportedCostUsd = 0.04236847`.
+- `responses[*].providerReportedCostUsd` 합계 `0.04232348479999998` (수치 오차를 무시하면 `0.0423234848`).
+- 합계 차이 `(실험 총액 - 개별 응답 합계) = 약 0.0000449852 USD`. **원인은 미확인**이며 재청구, 누락, 재시도 등 특정 원인을 임의로 단정하지 않는다.
+- 초기 파서는 이 둘이 일치하지 않으면 거부했으나 정제본 실제 내용과 충돌한다. 수정한 파서는 메타데이터 비용, 개별 합계, 차이, 미정 원인 상태를 별도로 유지한다. `costReconciled = false`는 보존하며 원본 JSON에 쓰지 않는다.
