@@ -96,4 +96,5 @@ test('offline CLI preserves source bytes, writes outputs, and rejects holdout in
   const holdout = join(dir, 'holdout-cases.json');
   await writeFile(holdout, JSON.stringify(data));
   await assert.rejects(() => runOffline({ inputPath: holdout, outputDir: output }), /HOLDOUT_NOT_TRAINING_DATA/);
+  await assert.rejects(() => runOffline({ inputPath: input, outputDir: process.cwd() }), /PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY/);
 });
