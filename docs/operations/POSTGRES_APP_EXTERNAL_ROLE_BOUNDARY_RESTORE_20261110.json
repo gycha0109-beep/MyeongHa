@@ -111,5 +111,71 @@
     "The source catalog was captured in read-only transactions around backup execution, not in the identical pg_dump MVCC snapshot.",
     "Existing app-internal rewrite 7/7 is not a substitute for 48 missing cross-boundary links, inherited/effective access, provider-managed restore or Hosted Auth/Storage.",
     "No Production DDL/DML/GRANT, live role repair, Hosted project, paid resource, privacy canary, or serving admission has been performed."
-  ]
+  ],
+  "followUpRestore": {
+    "comparatorPullRequest": 3189,
+    "comparatorMergeCommitSha": "4ebd0ca78f089bdb9a743c6663dbae45564b7fa6",
+    "requiredIntegrationRunId": 42758285919,
+    "requiredIntegrationConclusion": "success",
+    "runId": 42759540674,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42759540674",
+    "conclusion": "success",
+    "artifactId": 13736534480,
+    "sourceBackupRunId": 42752268638,
+    "sourceBackupSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "isolatedExecutionMainSha": "4ebd0ca78f089bdb9a743c6663dbae45564b7fa6",
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "artifactFileSha256": {
+      "app-schema-parity.json": "96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3",
+      "restore-evidence.json": "9877035244757beaabf3c8c9479daceaa36ab5b084015a0753431682119647cf",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595"
+    },
+    "externalBoundaryDiagnostic": {
+      "sourceWitnessAvailable": true,
+      "sourceDirectMembershipCount": 48,
+      "restoredDirectMembershipCount": 0,
+      "missingMembershipOptionEntryCount": 48,
+      "addedMembershipOptionEntryCount": 0,
+      "missingReservedRecipientPolicyCandidateCount": 48,
+      "missingOtherRecipientCount": 0,
+      "observedDirectMembershipOptionParity": false,
+      "observedGrantorAttributionParity": false,
+      "sourceReferencedExternalRoleCount": 1,
+      "restoredReferencedExternalRoleCount": 0,
+      "providerOwnedOnlyProven": false,
+      "inheritedEffectiveAccessIncluded": false,
+      "policyCandidateRule": "reviewed_strict_pg_dumpall_roles_only_reserved_recipient_filter",
+      "exactSourceGrantToRolesSqlFilterCausalMatchProven": false,
+      "providerOrInheritedPrivilegeRestorationProven": false
+    },
+    "internalGraphDiagnostic": {
+      "sourceRoleCount": 43,
+      "restoredRoleCount": 43,
+      "sourceDirectMembershipCount": 7,
+      "restoredDirectMembershipCount": 7,
+      "observedMembershipOptionsParity": true,
+      "grantorAttributionDifferenceGroupCount": 7,
+      "portablePostgresGrantorRewriteCompatibleGroupCount": 7,
+      "unexplainedGrantorAttributionDifferenceGroupCount": 0,
+      "roleMembershipParityProven": false
+    },
+    "sourceCatalogBoundToBackupSnapshot": false,
+    "observedCanonicalAclApplicationCatalogParity": true,
+    "legacyAclHashOnlyDifferenceCount": 29,
+    "applicationScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+    "providerManagedCopyBlocksSkipped": 29,
+    "providerManagedCopyBlocksProjected": 3,
+    "fullMigrationLedgerRestored": false,
+    "authoritativePrivacyReconciliation": false,
+    "futureSafePrivacyReconciliation": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "interpretationLimits": [
+      "48 of 48 omitted source-to-isolated direct role membership rows have recipients classified by the currently reviewed strict roles-only dump reserved-recipient pattern; there were zero other-recipient omitted rows.",
+      "Policy-candidate match is not proof of per-edge omission by the actual roles.sql stream or provider-owned role provenance.",
+      "Zero grantor-change groups among missing keys is not a positive statement about grantor parity.",
+      "No Production grants or role membership were repaired, no permission scope or DR acceptance gate was promoted."
+    ]
+  }
 }
