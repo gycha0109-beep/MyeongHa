@@ -270,6 +270,53 @@ describe('owner-bound comparison revisions', () => {
         ...input, fetchImpl: async () => response({ subjects, evidence: badEvidence }),
       })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
     }
+
+    const dayMatch = { ...match, subject: { ...match.subject, factPath: 'subject.pillars.day.value.branch' } };
+    const candidate = {
+      scope: 'traditional_marital_palace_comparison' as const,
+      review: 'unreviewed', pairwiseT10Admitted: false, state: 'candidate_factor',
+      sourceInterpretation: 'challenging_factor', kind: 'branch_clash',
+      source: {
+        id: 'SRC-NAM-KIM-2018-MARITAL-PALACE-PAIR', doi: '10.22143/HSS21.9.2.9',
+        authorCopySha256: 'adda4474baf27754ca25efed615bdffdc96f55726e0495d42b0e894395c475c0',
+        locators: ['p. 108'],
+      },
+    };
+    const explicitScope = { ...input, candidateScope: candidate.scope };
+    const valid = await executeSajuComparisonPreviewV1({
+      ...explicitScope,
+      fetchImpl: async (_url, init) => {
+        expect(JSON.parse(String(init.body)).candidateScope).toBe(candidate.scope);
+        return response({ subjects, evidence: { ...evidence, matches: [dayMatch], maritalDayBranchCandidate: candidate } });
+      },
+    });
+    expect(valid).toMatchObject({ maySell: false, maritalDayBranchCandidate: {
+      state: 'candidate_factor', sourceInterpretation: 'challenging_factor', pairwiseT10Admitted: false,
+      match: { subject: { slot: 'day', value: '子' }, target: { slot: 'day', value: '午' } },
+    } });
+    expect(admit).toHaveBeenLastCalledWith(expect.objectContaining({ purpose: 'saju_marital_comparison_review' }));
+    const blockedFetch = vi.fn(async () => response());
+    await expect(executeSajuComparisonPreviewV1({
+      ...explicitScope, fetchImpl: blockedFetch,
+      useAuthority: { admit: async ({ purpose }) => purpose === 'saju_comparison_preview' },
+    })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(blockedFetch).not.toHaveBeenCalled();
+    for (const altered of [
+      { ...candidate, sourceInterpretation: 'supportive_factor' },
+      { ...candidate, pairwiseT10Admitted: true },
+      { ...candidate, source: { ...candidate.source, authorCopySha256: 'f'.repeat(64) } },
+    ]) {
+      await expect(executeSajuComparisonPreviewV1({
+        ...explicitScope, fetchImpl: async () => response({
+          subjects, evidence: { ...evidence, matches: [dayMatch], maritalDayBranchCandidate: altered },
+        }),
+      })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
+    }
+    await expect(executeSajuComparisonPreviewV1({
+      ...explicitScope, fetchImpl: async () => response({
+        subjects, evidence: { ...evidence, maritalDayBranchCandidate: candidate },
+      }),
+    })).rejects.toMatchObject({ code: 'SAJU_TEMPORARILY_UNAVAILABLE' });
   });
 });
 
