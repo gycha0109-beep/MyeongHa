@@ -49,3 +49,9 @@
 - 신규 GEPA API가 있는 공식 소스 커밋 `ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309`을 GH Actions 격리 Python 환경에 고정 설치하고, 사람 평가나 유료 LLM 대신 합성 평가·가짜 반사 전략으로 `optimize_anything` 실행을 확인하는 경로를 추가했다.
 - `OPENAI_API_KEY`/`OPENROUTER_API_KEY` 등 키를 비우고, Python 실행 중 socket 연결을 예외로 차단하며, 봉인 홀드아웃을 GEPA에 넘기지 않는다. 저장소 외부 출력 디렉터리만 허용한다.
 - 주의: 이번 코드는 GH Actions 완료 후에만 실제 GEPA 새 API 호환성이 확인된다. OS 차원의 전체 격리·실 비용 게이트·문장 의미 품질 실험은 아직 미완료다.
+
+## 2026-11-11 — first pinned GEPA CI failure and corrections
+
+- Newly pinned source revision installed successfully. Its first smoke test was stopped locally by the expected max_evals<=10 guard because the test incorrectly requested 16. Test now uses 10, preserving the fail-closed contract.
+- Governance workflow-map rejected the new pull-request workflow because it had not been registered in docs/ci/workflow-responsibility-map.json; added an explicit character-runtime-lab mapping.
+- No external AI model or user messages were sent; real GEPA execution confirmation remains pending the next CI.

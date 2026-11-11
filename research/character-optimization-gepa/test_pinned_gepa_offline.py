@@ -87,7 +87,7 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             kwargs = build_offline_gepa_kwargs(
                 fixture(), seed_text=SEED, evaluator=judge, reflection_lm=forbid_reflection_lm,
                 output_dir=output_dir, repository_root=repo_dir, config_factory=factory,
-                max_evals=16,
+                max_evals=10,
             )
             self.assertIsNone(kwargs["test_set"])
             self.assertEqual(len(kwargs["dataset"]), 1)
@@ -102,7 +102,7 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             self.assertIn("character_expression", result.best_candidate)
             self.assertIn("concise answers", result.best_candidate["character_expression"])
             self.assertGreater(result.best_score, 0.2)
-            self.assertLessEqual(result.total_evals, 16)
+            self.assertLessEqual(result.total_evals, 10)
             self.assertEqual(fixture()["test_set"], None)
             self.assertTrue(pathlib.Path(output_dir).is_dir())
 
