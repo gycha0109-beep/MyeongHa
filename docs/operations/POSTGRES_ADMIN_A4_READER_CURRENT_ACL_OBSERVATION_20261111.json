@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "ops-remote-only-a4-reading-cost-reader-current-access-observation-v1",
+  "scope": "Gate 1 / Phase 8-A / newly observed remote-only migration effect",
+  "observedAtUtc": "2026-11-11T02:53:10Z",
+  "source": {
+    "origin": "Production read-only PostgreSQL 17 catalog / migration ledger",
+    "repository": "gycha0109-beep/MyeongHa",
+    "repositoryMainSha": "28e71e125ab3be814db5b002502467224da6f746",
+    "readOnlySqlPath": "scripts/operations/production-admin-a4-reading-cost-reader-acl-readonly.sql",
+    "verifiedSourceStatementVersion": "20261109071019",
+    "migrationName": "admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109",
+    "statementCount": 1,
+    "statementBytes": 5512,
+    "statementSha256": "974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8",
+    "exactVersionSqlFileInMain": false,
+    "createdByMetadataAuthenticatesExecutor": false,
+    "rollbackProven": false
+  },
+  "observedCurrentCatalog": {
+    "roleExists": true,
+    "tableExists": true,
+    "roleFlagsMatchRestrictedLoginNoInheritNoBypassRls": true,
+    "roleCredentialOrSessionSecurityProven": false,
+    "relatedRoleMembershipCount": 1,
+    "expectedSupabaseAdminGrantedMembershipCount": 1,
+    "publicSchemaUsage": true,
+    "explicitWholeTableSelectAclCount": 0,
+    "expectedFiveColumnSelectPrivilegeCount": 5,
+    "unapprovedSelectableColumnCount": 0,
+    "missingExpectedSelectableColumnCount": 0,
+    "expectedColumnNames": [
+      "id",
+      "reading_id",
+      "subject_id",
+      "external_request_ref",
+      "state"
+    ],
+    "rlsDisabled": true,
+    "policyDefinitionsPresent": 2,
+    "restrictivePolicies": 0,
+    "hasTableMutationPrivilege": false
+  },
+  "boundaries": {
+    "liveApplicationDataRead": false,
+    "roleSecretsRead": false,
+    "productionWrite": false,
+    "migrationStatementPublished": false,
+    "tableRlsAcceptanceProven": false,
+    "roleEffectivePrivilegeParityAcrossRestore": false,
+    "sameMvccSnapshotProven": false,
+    "providerHostedRecoveryProven": false,
+    "migrationVersionIdentityResolved": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "p0Issue": 1887
+  },
+  "disposition": "CURRENT_PRODUCTION_CATALOG_EFFECT_OBSERVED__RESTORE_AND_SOURCE_PARITY_HOLD",
+  "nextRequiredProof": "Review source repository alignment, exact restore role + column ACL + policies + inherited privileges in authorized compatible isolated Hosted target, without altering Production or rewriting applied migrations."
+}
