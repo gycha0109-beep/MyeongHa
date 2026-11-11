@@ -255,5 +255,40 @@
     "drReady": false,
     "serviceResumptionAllowed": false,
     "interpretation": "The refined multiline and multi-recipient parser still leaves one GRANT statement unreadable. It must be classified without leaking role names or raw GRANT, and cannot justify a parity PASS."
+  },
+  "classifiedUnparsedGrantRestore": {
+    "workflowRunId": 42938743906,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42938743906",
+    "conclusion": "success",
+    "artifactId": 13819433379,
+    "sourceBackupRunId": 42752268638,
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "executionMainSha": "5ae1d39397ee576e2a78deccc896ec87a29958e6",
+    "classificationImplementationPr": 3199,
+    "artifactFileSha256": {
+      "app-schema-parity.json": "96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595",
+      "restore-evidence.json": "c86248eae4c3d7cc9b414b2a99f2e1385d5f201b9813a8a6fe9029aeee8d4595",
+      "role-dump-coverage.json": "787be7d1df98fe39a8043d86360df060bee5b5b3ce078a53ea21d5de78190f0a"
+    },
+    "sourceDirectMembershipCount": 48,
+    "restoredDirectMembershipCount": 0,
+    "filteredRolesSqlGrantStatementCount": 8,
+    "filteredRolesSqlUnparsedGrantStatementCount": 1,
+    "filteredRolesSqlUnparsedGrantShapeCounts": {
+      "object_privilege_grant": 1
+    },
+    "sourceRowsWithPairInFilteredSqlCount": 0,
+    "sourceRowsWithoutPairInFilteredSqlCount": 48,
+    "missingPairReservedRecipientCandidateCount": 48,
+    "missingPairOtherRecipientCount": 0,
+    "verdict": "HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED",
+    "classificationCausallyDisjointFromRoleMembershipProven": false,
+    "providerCompatibleRestorationProven": false,
+    "roleMembershipParityProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "interpretation": "The one unparsed GRANT was heuristically categorized as object_privilege_grant; object grant grammar is not yet formally excluded from role membership matching. Next code change uses a narrowly anchored object privilege grammar, not a blanket ON token search. No role grant or provider parity is restored."
   }
 }
