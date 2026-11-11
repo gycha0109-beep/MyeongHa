@@ -200,6 +200,12 @@
       "mainMode": "manual",
       "workTrackAttribution": "workflow-dispatch"
     },
+    "postgres-provider-sealed-copy-preflight.yml": {
+      "responsibility": "postgres-provider-sealed-backup-copy-preflight",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
+    },
     "production-authenticated-json-resource-evidence.yml": {
       "responsibility": "production-security-evidence",
       "prMode": "none",
