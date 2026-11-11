@@ -223,5 +223,37 @@
       "The Source role catalog was read-only bracketed around the backup execution, not within the identical MVCC snapshot.",
       "No Production role grants or provider role set have been changed. Existing DR HOLD and P0 #1887 remain."
     ]
+  },
+  "refinedParserRestore": {
+    "runId": 42935870383,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42935870383",
+    "conclusion": "success",
+    "artifactId": 13816869352,
+    "sourceBackupRunId": 42752268638,
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "executionMainSha": "f91a9f1773bad0c7d6424cb27248e6ae1b1233b7",
+    "comparisonParserPr": 3196,
+    "artifactFileSha256": {
+      "app-schema-parity.json": "96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595",
+      "restore-evidence.json": "6295892fe53ea296f2758aa937a4744afd3ff81ca006e03ee5d492a23e4326b4",
+      "role-dump-coverage.json": "d6474c2240c381fd0da8e95b8ee38a4a323d3828542666dddbd4438239c0db19"
+    },
+    "sourceDirectMembershipCount": 48,
+    "restoredDirectMembershipCount": 0,
+    "sourceRowsWithPairInFilteredSqlCount": 0,
+    "sourceRowsWithoutPairInFilteredSqlCount": 48,
+    "filteredRolesSqlGrantStatementCount": 8,
+    "filteredRolesSqlUnparsedGrantStatementCount": 1,
+    "missingPairReservedRecipientCandidateCount": 48,
+    "missingPairOtherRecipientCount": 0,
+    "verdict": "HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED",
+    "sourceCatalogBoundToBackupSnapshot": false,
+    "unknownStatementRolePairAbsenceProven": false,
+    "fullProviderCompatibleRestoreProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "interpretation": "The refined multiline and multi-recipient parser still leaves one GRANT statement unreadable. It must be classified without leaking role names or raw GRANT, and cannot justify a parity PASS."
   }
 }
