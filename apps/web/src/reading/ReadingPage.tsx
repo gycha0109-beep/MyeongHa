@@ -1,5 +1,6 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
+import { ApprovedSajuCheckoutPanel, type ApprovedSajuCheckoutPanelPorts } from '../commerce/ApprovedSajuCheckoutPanel.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
 // The eleven public Saju topics share one product layer. Route availability is
@@ -18,7 +19,7 @@ const sajuProductTopics = [
   { symbol: '問', title: '지금 고민으로 보기', href: 'reading-detail.html?topic=question-specific' },
 ] as const;
 
-export function ReadingPage() {
+export function ReadingPage({ approvedCheckout }: { approvedCheckout?: ApprovedSajuCheckoutPanelPorts } = {}) {
   const resumedPreview = typeof window === 'undefined' ? null : resumePreviewHrefV1(window.location.search);
   // Preserve historic detail URLs in the route layer, but do not surface the
   // retired general-natal product through the present Home/Saju catalogs.
@@ -40,6 +41,7 @@ export function ReadingPage() {
   return (
     <div className="gm-shell">
       <h1 className="gm-page-title saju-design-sr-title">사주</h1>
+      {approvedCheckout === undefined ? null : <ApprovedSajuCheckoutPanel ports={approvedCheckout} />}
       <div className="saju-status" id="saju-status" role="status">내 사주를 확인하는 중입니다…</div>
       <button id="saju-calculation-retry" className="saju-calculation-retry" type="button" hidden>
         저장된 출생정보로 계산 다시 시도

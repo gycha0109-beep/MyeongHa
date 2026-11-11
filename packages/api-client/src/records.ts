@@ -85,7 +85,11 @@ export interface OfficialReadingRecordV1 {
 
 export type ApprovedSajuPurchaseReadingV1 = Readonly<{ component: SajuReadingComponentV1 }> & (
   | Readonly<{ state: 'pending' }>
-  | Readonly<{ state: 'ready'; readingId: string; readerCharacterId: string; completedAt: string }>
+  | Readonly<{
+    state: 'ready'; readingId: string; readingSessionId: string;
+    sajuDomain: typeof SAJU_READING_COMPONENTS_V1[SajuReadingComponentV1]['domain'];
+    readerCharacterId: string; completedAt: string;
+  }>
 );
 
 function malformed(message: string): never {
@@ -494,10 +498,14 @@ export async function readApprovedSajuPurchaseReadingsV1(
     if (value.state === 'pending' && Object.keys(value).length === 2) {
       return Object.freeze({ component, state: 'pending' });
     }
-    if (value.state !== 'ready' || Object.keys(value).length !== 5 || typeof value.readingId !== 'string'
-      || !UUID_V1.test(value.readingId)) return malformed('Saju archive Reading is invalid.');
+    const sajuDomain = SAJU_READING_COMPONENTS_V1[component].domain;
+    if (value.state !== 'ready' || Object.keys(value).length !== 7 || typeof value.readingId !== 'string'
+      || !UUID_V1.test(value.readingId) || typeof value.readingSessionId !== 'string'
+      || !UUID_V1.test(value.readingSessionId) || value.sajuDomain !== sajuDomain) {
+      return malformed('Saju archive Reading is invalid.');
+    }
     return Object.freeze({
-      component, state: 'ready', readingId: value.readingId,
+      component, state: 'ready', readingId: value.readingId, readingSessionId: value.readingSessionId, sajuDomain,
       readerCharacterId: requireString('Saju archive Reader', value.readerCharacterId),
       completedAt: requireTimestamp('Saju archive completedAt', value.completedAt),
     });

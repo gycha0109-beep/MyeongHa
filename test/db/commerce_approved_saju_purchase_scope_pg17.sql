@@ -672,7 +672,8 @@ begin
       end if;
       perform pg_temp.approved_fixture_grants(intent_id,receipt_for_offer,fields);
       if (select count(*) from public.qry_approved_saju_purchase_readings_v1(actor,intent_id)
-          where reading_id is null and reader_character_id is null and completed_at is null)<>cardinality(fields) then
+          where reading_id is null and reading_session_id is null and saju_domain is null
+            and reader_character_id is null and completed_at is null)<>cardinality(fields) then
         raise exception 'Paid order archive did not list its pending components';
       end if;
       if offer_key in ('career','business','wealth','relationship','year','month') then
@@ -682,7 +683,7 @@ begin
         perform pg_temp.approved_fixture_reading(actor,intent_id,'compatibility');
         perform pg_temp.approved_fixture_reading(actor,intent_id,'relationship');
         if (select count(*) from public.qry_approved_saju_purchase_readings_v1(actor,intent_id)
-          where reading_id is not null)<>2 then
+          where reading_id is not null and reading_session_id is not null and saju_domain=component)<>2 then
           raise exception 'Combined order did not reopen the pair and self components independently';
         end if;
       end if;

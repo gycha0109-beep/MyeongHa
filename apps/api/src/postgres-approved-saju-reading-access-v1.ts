@@ -31,27 +31,35 @@ export async function readPostgresApprovedSajuPurchaseReadingsV1(
   const { rows } = await client.query<{
     component: string;
     readingId: string | null;
+    readingSessionId: string | null;
+    sajuDomain: string | null;
     readerCharacterId: string | null;
     completedAt: string | null;
   }>(`
-    select component,reading_id::text as "readingId",reader_character_id as "readerCharacterId",
+    select component,reading_id::text as "readingId",reading_session_id::text as "readingSessionId",
+      saju_domain as "sajuDomain",reader_character_id as "readerCharacterId",
       completed_at::text as "completedAt"
     from public.qry_approved_saju_purchase_readings_v1($1::uuid,$2::uuid)
   `.trim(), [subjectId, purchaseIntentId]);
   const components = new Set<string>();
-  return rows.map(({ component, readingId, readerCharacterId, completedAt }) => {
+  return rows.map(({ component, readingId, readingSessionId, sajuDomain, readerCharacterId, completedAt }) => {
     if (!Object.hasOwn(SAJU_READING_COMPONENTS_V1, component) || components.has(component)) {
       throw new Error('Approved Saju archive manifest returned an invalid component.');
     }
     components.add(component);
     const key = component as SajuReadingComponentV1;
-    if (readingId === null && readerCharacterId === null && completedAt === null) {
+    if (readingId === null && readingSessionId === null && sajuDomain === null && readerCharacterId === null && completedAt === null) {
       return { component: key, state: 'pending' };
     }
-    if (!readingId || !readerCharacterId || !completedAt || !Number.isFinite(Date.parse(completedAt))) {
+    const domain = SAJU_READING_COMPONENTS_V1[key].domain;
+    if (!readingId || !readingSessionId || sajuDomain !== domain || !readerCharacterId
+      || !completedAt || !Number.isFinite(Date.parse(completedAt))) {
       throw new Error('Approved Saju archive manifest returned an incomplete Reading.');
     }
-    return { component: key, state: 'ready', readingId, readerCharacterId, completedAt: new Date(completedAt).toISOString() };
+    return {
+      component: key, state: 'ready', readingId, readingSessionId, sajuDomain: domain,
+      readerCharacterId, completedAt: new Date(completedAt).toISOString(),
+    };
   });
 }
 

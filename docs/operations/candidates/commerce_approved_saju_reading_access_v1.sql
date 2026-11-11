@@ -204,14 +204,17 @@ revoke all on function public.qry_approved_saju_component_record_v1(uuid,uuid,te
 -- Exact purchased-order manifest for the archive. A component with no
 -- committed Reading is still visible as pending while its paid grant is active.
 create function public.qry_approved_saju_purchase_readings_v1(p_subject_id uuid,p_purchase_intent_id uuid)
-returns table (component text,reading_id uuid,reader_character_id text,completed_at timestamptz)
+returns table (
+  component text,reading_id uuid,reading_session_id uuid,saju_domain text,reader_character_id text,completed_at timestamptz
+)
 language plpgsql stable security definer
 set search_path=pg_catalog
 as $function$
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject_id);
   return query
-  select item.component,record_row.reading_id,record_row.reader_character_id,record_row.completed_at
+  select item.component,record_row.reading_id,record_row.reading_session_id,record_row.saju_domain,
+    record_row.reader_character_id,record_row.completed_at
   from public.commerce_saju_purchase_origins_v1 origin
   join commerce_saju_private.approved_purchase_scope_v1 scope
     on scope.purchase_intent_id=origin.purchase_intent_id and scope.admission_hash=origin.approved_admission_hash

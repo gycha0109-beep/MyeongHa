@@ -139,15 +139,17 @@ describe('Official Reading record HTTP adapter', () => {
     expect((await invoke({ request: purchaseRequest, approvedSajuArchiveEnabled: true, authenticated: false })).status).toBe(401);
     expect((await invoke({ request: purchaseRequest, approvedSajuArchiveEnabled: true })).status).toBe(404);
     const pool = fakePool({ archiveRows: [
-      { component: 'career', readingId: READING_ID, readerCharacterId: 'seyeon', completedAt: ROW.completedAt },
-      { component: 'wealth', readingId: null, readerCharacterId: null, completedAt: null },
+      { component: 'career', readingId: READING_ID, readingSessionId: SESSION_ID, sajuDomain: 'career',
+        readerCharacterId: 'seyeon', completedAt: ROW.completedAt },
+      { component: 'wealth', readingId: null, readingSessionId: null, sajuDomain: null, readerCharacterId: null, completedAt: null },
     ] });
     const client = new MyeongHaApiClientV1({
       origin: 'https://myeongha.internal',
       fetchImpl: (url, init) => invoke({ request: new Request(url, init), pool, approvedSajuArchiveEnabled: true }),
     });
     await expect(readApprovedSajuPurchaseReadingsV1(client, 'member-secret', PURCHASE_ID)).resolves.toEqual([
-      { component: 'career', state: 'ready', readingId: READING_ID, readerCharacterId: 'seyeon', completedAt: ROW.completedAt },
+      { component: 'career', state: 'ready', readingId: READING_ID, readingSessionId: SESSION_ID, sajuDomain: 'career',
+        readerCharacterId: 'seyeon', completedAt: ROW.completedAt },
       { component: 'wealth', state: 'pending' },
     ]);
   });
