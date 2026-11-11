@@ -43,7 +43,7 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
-            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate
+            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway
       - name: Prove optimizer cannot access sealed files or network at OS boundary
         shell: bash
         run: |
@@ -80,3 +80,40 @@ jobs:
             --env PYTHONPATH=/opt/myeongha \
             myeongha-gepa-pinned-offline:verify \
             python -m unittest -v test_pinned_gepa_offline
+
+      - name: Verify shared budget gateway for Node and isolated Python
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
+          export GATE_DIR="$RUNNER_TEMP/myeongha-synthetic-gateway"
+          mkdir -p "$GATE_DIR"
+          chmod 700 "$GATE_DIR"
+          "$RUNNER_TEMP/gepa-venv/bin/python" research/character-optimization-gepa/local_socket_gateway_daemon.py \
+            --socket "$GATE_DIR/gateway.sock" --ledger "$RUNNER_TEMP/myeongha-gate-ledger.sqlite" &
+          gate_pid=$!
+          trap 'kill "$gate_pid" 2>/dev/null || true' EXIT
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if test -S "$GATE_DIR/gateway.sock"; then break; fi
+            sleep 0.2
+          done
+          test -S "$GATE_DIR/gateway.sock"
+          node scripts/character-optimization/local-socket-gateway-probe.mjs "$GATE_DIR/gateway.sock"
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
+            --mount "type=bind,src=$GATE_DIR,dst=/private/gate,readonly" \
+            --env PYTHONPATH=/opt/myeongha \
+            python:3.14-slim python /opt/myeongha/local_socket_client_probe.py \
+            --socket /private/gate/gateway.sock --request-id docker-synthetic-2
+          "$RUNNER_TEMP/gepa-venv/bin/python" - <<'PY'
+          import os
+          from budget_ledger import BudgetLedger
+          ledger=BudgetLedger(os.path.join(os.environ['RUNNER_TEMP'],'myeongha-gate-ledger.sqlite'),
+              run_id='synthetic-gateway-integration',max_spend_micro_usd=90,max_attempts=3,
+              role_caps={'student':3,'reflection':0,'judge':0,'holdout':0})
+          status=ledger.status()
+          assert status['attempts']==2 and status['reserved_micro_usd']==80 and status['held']==0, status
+          assert status['real_api_requests_sent_by_this_module']==0
+          print('Shared Node/Python synthetic gateway and single budget ledger verified; external calls 0.')
+          PY

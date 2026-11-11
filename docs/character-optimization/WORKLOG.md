@@ -73,3 +73,9 @@
 - Added a build-time-only container image installing official GEPA source SHA ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309. No model credentials are provided.
 - The new CI step runs the *real* pinned GEPA fake-reflector optimizer **inside** an unprivileged Docker container with `--network none`, read-only code mount and private temporary outputs. This closes the gap between separately proving Docker isolation and separately running real GEPA.
 - Image base python:3.14-slim is currently tag-based, not a digest lock; pin its digest once a validated image digest is collected. A passing isolated smoke still cannot authorize live provider calls or prove user dialogue quality.
+
+## 2026-11-11 — Single local socket gateway shared by Node and no-network optimizer client
+
+- Added an explicitly synthetic-only Unix-domain socket service hosted outside the optimizer container, backed by the existing transactional SQLite ledger. It rejects malformed/oversized requests, unknown models, missing usage, duplicate attempts and over-budget admissions without exposing user text or any provider network client.
+- New CI probes use a Node process and a Python client inside a `--network none` Docker container connecting to the same host service. A post-run ledger check verifies two distinct reservations and no external calls.
+- This is **not** the live OpenRouter transport: owner approval verification, model token ceiling/price controls, real provider response accounting and dedicated production gateway deployment remain pending. No paid calls authorized.
