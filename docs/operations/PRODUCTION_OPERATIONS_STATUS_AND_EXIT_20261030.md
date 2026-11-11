@@ -1,3 +1,14 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 개선된 GRANT 분석기의 동일 백업 격리 실측 및 미해석 1문장 원인 유형 진단
+
+- **실행 결속:** 이전 PR #3195·#3196·#3198 모두 필수 Integration SUCCESS 후 병합 완료. 기존 암호화 백업 #42752268638 (source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, frontier `20261109071019`) 재사용, 신규 Production 백업 없음. 개선된 multiline/multi-recipient 분석기 포함 main `f91a9f1773bad0c7d6424cb27248e6ae1b1233b7`에서 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42935870383 SUCCESS, artifact 13816869352; 중간에 병합된 Admin 코드 변경은 운영 복원 SQL을 수정하지 않음.
+- **실측 결론:** 암호화 source의 앱↔비앱 직접 멤버십 원본 48건 / 격리 복원 0건. 실제 filtered `roles.sql` GRANT 문장 8개, 정상 인식 7개, **미해석 1개 유지**. 정상 인식된 구문에 source 역할 쌍 0/48, 부재 후보 48/48은 reserved-recipient 수신자 필터 해당, 기타 0. 미해석 문장이 source edge와 관련됐는지 증명되지 않아 `HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED` 유지. 복원 SUCCESS를 Provider full parity 또는 Phase 8 수용으로 승격 금지.
+- **근거 해시:** `app-schema-parity.json` SHA256 `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `6295892fe53ea296f2758aa937a4744afd3ff81ca006e03ee5d492a23e4326b4`, `role-dump-coverage.json` `d6474c2240c381fd0da8e95b8ee38a4a323d3828542666dddbd4438239c0db19`; 이전 원본 복원 분석은 보존하고 `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`에 본 실행을 `refinedParserRestore`로 별도 결속.
+- **추가 미완료 진단 구현:** `scripts/operations/observe-postgres-sealed-role-dump-coverage.mjs`가 미해석 GRANT를 원문·역할명 없이 **미종결/일반 객체 권한/TO 누락/역할 식별자 형식/옵션 형식**의 고정된 범주별 건수로만 공개하도록 보강. 범주 구분은 실제 누락 48건의 권한 복구나 원본과 동일 MVCC 스냅샷·grantor/options·Provider 소유·상속/실효 권한 증명이 아니다. 합성 검증 PASS, 기존 schema parity 검증 PASS. PR/격리 실측 전까지 이 신규 원인 유형 분류를 실제 결과로 주장하지 않는다.
+- **계속 차단:** ACL legacy hash 29 objects, Provider COPY 29 skipped/3 projected, full Provider migration ledger, Hosted Auth/Storage, 개인정보 독립 source continuity와 future safe replay, 전체 서비스 RPO PT24H/RTO PT6H 미입증. P0 #1887 OPEN, `drReady=false`, `serviceResumptionAllowed=false`, `NOT_ACCEPTED`. Production SQL/GRANT/DDL/DML·IAM·비밀·운영 설정·유료 Hosted·승인 전 canary 변경 없음.
+- **다음:** 현재 승인 범위의 코드 PR 필수 CI/Integration 통과 및 병합 후 기존 source #42752268638로 필요 시 격리 복원 1회 실행하여 남은 GRANT 1개 구문의 비식별 범주를 확인, 이후 실제 수용 근거로 엄격 분리한다. 완료 조건 미충족, ROADMAP_COMPLETE 금지.
+
+Watchtower-Track: ops
+
 ### 2026-11-11 KST — Gate 1 / Phase 8-C: 최신 정기 백업 성공·개인정보 원장 freshness GREEN, 독립 연속성 미입증
 
 - **현재 기준:** main `97a0e88f36b68838a9d608e3a209d5099e3db7b1`에서 정기 암호화 Production PostgreSQL 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42922087061 SUCCESS (`2026-11-10T23:17:17Z` 시작 / `23:20:57Z` 완료, artifact 13811234154, migration frontier `20261109071019`). 이 백업은 기존 11/10 원본 #42752268638과 다른 실행이며 아직 PostgreSQL 격리·Hosted 전체 복구 또는 최신 원장 일대일 결속이 입증되지 않았다.

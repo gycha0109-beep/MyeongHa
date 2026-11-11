@@ -91,19 +91,39 @@ function parseGrantPairStatement(statement) {
     JSON.stringify([grant, member])));
 }
 
+// Only a fixed category is exported; neither SQL fragments nor role names
+// are permitted in this diagnostic. Unknown SQL always retains the HOLD.
+function classifyUnparsedGrantShape(sql, complete) {
+  if (!complete) return 'unterminated_statement';
+  if (/\bON\b/iu.test(sql)) return 'object_privilege_grant';
+  if (!/\bTO\b/iu.test(sql)) return 'missing_to_clause';
+  if (!/^GRANT\s+"/iu.test(sql)) return 'unquoted_or_unexpected_granted_roles';
+  if (!/\bTO\s+"/iu.test(sql)) return 'unquoted_or_unexpected_recipient_roles';
+  return 'unsupported_role_options_or_other_syntax';
+}
+
 function rolePairsInFilteredSql(sql) {
   const pairs = new Set();
   let observedGrantStatementCount = 0;
   let unparsedGrantStatementCount = 0;
+  const unparsedGrantShapeCounts = {};
   for (const candidate of sqlStatements(sql)) {
     if (!/^GRANT\s/iu.test(candidate.sql)) continue;
     observedGrantStatementCount++;
-    if (!candidate.complete) { unparsedGrantStatementCount++; continue; }
-    const parsed = parseGrantPairStatement(candidate.sql);
-    if (!parsed) { unparsedGrantStatementCount++; continue; }
+    const parsed = candidate.complete
+      ? parseGrantPairStatement(candidate.sql) : null;
+    if (!parsed) {
+      unparsedGrantStatementCount++;
+      const category = classifyUnparsedGrantShape(
+        candidate.sql, candidate.complete);
+      unparsedGrantShapeCounts[category] =
+        (unparsedGrantShapeCounts[category] ?? 0) + 1;
+      continue;
+    }
     for (const pair of parsed) pairs.add(pair);
   }
-  return { pairs, observedGrantStatementCount, unparsedGrantStatementCount };
+  return { pairs, observedGrantStatementCount, unparsedGrantStatementCount,
+    unparsedGrantShapeCounts };
 }
 
 export function observeSealedRoleDumpCoverage(source, filteredRolesSql, dumpRunner) {
@@ -130,6 +150,7 @@ export function observeSealedRoleDumpCoverage(source, filteredRolesSql, dumpRunn
     sourceDirectMembershipCount: null,
     filteredRolesSqlGrantStatementCount: extracted.observedGrantStatementCount,
     filteredRolesSqlUnparsedGrantStatementCount: extracted.unparsedGrantStatementCount,
+    filteredRolesSqlUnparsedGrantShapeCounts: extracted.unparsedGrantShapeCounts,
     sourceRowsWithPairInFilteredSqlCount: null,
     sourceRowsWithoutPairInFilteredSqlCount: null,
     missingPairReservedRecipientCandidateCount: null,

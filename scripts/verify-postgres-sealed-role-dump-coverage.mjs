@@ -66,6 +66,8 @@ const unknownGrammar = observeSealedRoleDumpCoverage(
   source([e('myeongha_alpha','postgres')]),
   'GRANT role_without_quotes TO another;\n', runner);
 assert.equal(unknownGrammar.filteredRolesSqlUnparsedGrantStatementCount, 1);
+assert.deepEqual(unknownGrammar.filteredRolesSqlUnparsedGrantShapeCounts,
+  { unquoted_or_unexpected_granted_roles: 1 });
 assert.equal(unknownGrammar.verdict,
   'HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED');
 assert.throws(() => observeSealedRoleDumpCoverage(source([
@@ -108,13 +110,34 @@ const unterminated = observeSealedRoleDumpCoverage(
   source([e('myeongha_alpha', 'postgres')]),
   'GRANT "myeongha_alpha" TO "postgres"\n', runner);
 assert.equal(unterminated.filteredRolesSqlUnparsedGrantStatementCount, 1);
+assert.deepEqual(unterminated.filteredRolesSqlUnparsedGrantShapeCounts,
+  { unterminated_statement: 1 });
 assert.equal(unterminated.verdict,
   'HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED');
 const invalidTail = observeSealedRoleDumpCoverage(
   source([e('myeongha_alpha', 'postgres')]),
   'GRANT "myeongha_alpha" TO "postgres" UNKNOWN OPTION;\n', runner);
 assert.equal(invalidTail.filteredRolesSqlUnparsedGrantStatementCount, 1);
+assert.deepEqual(invalidTail.filteredRolesSqlUnparsedGrantShapeCounts,
+  { unsupported_role_options_or_other_syntax: 1 });
 assert.equal(invalidTail.sourceRowsWithPairInFilteredSqlCount, 0);
+const objectPrivilege = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'postgres')]),
+  'GRANT SELECT ON TABLE "public"."example" TO "postgres";\n', runner);
+assert.deepEqual(objectPrivilege.filteredRolesSqlUnparsedGrantShapeCounts,
+  { object_privilege_grant: 1 });
+assert.equal(objectPrivilege.drReady, false);
+assert.equal(objectPrivilege.serviceResumptionAllowed, false);
+for (const report of [unknownGrammar, unterminated, invalidTail, objectPrivilege]) {
+  assert.equal(Object.values(report.filteredRolesSqlUnparsedGrantShapeCounts)
+    .reduce((a, b) => a + b, 0),
+  report.filteredRolesSqlUnparsedGrantStatementCount);
+  const json = JSON.stringify(report);
+  for (const forbidden of ['myeongha_alpha', 'role_without_quotes',
+    'unknown_option', 'public', 'postgres']) {
+    assert.equal(json.toLowerCase().includes(forbidden), false);
+  }
+}
 const harness = await readFile('scripts/run-postgres-isolated-restore-drill.sh','utf8');
 for (const fragment of [
   '--source "$work_dir/source-app-catalog.json"',
