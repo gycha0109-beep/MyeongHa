@@ -290,5 +290,42 @@
     "drReady": false,
     "serviceResumptionAllowed": false,
     "interpretation": "The one unparsed GRANT was heuristically categorized as object_privilege_grant; object grant grammar is not yet formally excluded from role membership matching. Next code change uses a narrowly anchored object privilege grammar, not a blanket ON token search. No role grant or provider parity is restored."
+  },
+  "strictObjectGrantSeparationRestore": {
+    "workflowRunId": 42942053576,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42942053576",
+    "conclusion": "success",
+    "artifactId": 13821281666,
+    "sourceBackupRunId": 42752268638,
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "executionMainSha": "231c657dba354ea1800ee5c7a73c4953a2069e4b",
+    "objectGrantSeparationPr": 3200,
+    "artifactFileSha256": {
+      "app-schema-parity.json": "96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595",
+      "restore-evidence.json": "af9c236614a8d4effa0f7941209bf48699a4396264818d1f91509b203d5d01ed",
+      "role-dump-coverage.json": "3a62e58a650f156d76da0aacbc4d3dca93d7cf6bd8115a4636dfb6e16f6dfc41"
+    },
+    "sourceDirectMembershipCount": 48,
+    "restoredDirectMembershipCount": 0,
+    "filteredRolesSqlGrantStatementCount": 8,
+    "filteredRolesSqlRecognizedObjectPrivilegeGrantCount": 0,
+    "filteredRolesSqlUnparsedGrantStatementCount": 1,
+    "filteredRolesSqlUnparsedGrantShapeCounts": {
+      "unquoted_or_unexpected_granted_roles": 1
+    },
+    "sourceRowsWithPairInFilteredSqlCount": 0,
+    "sourceRowsWithoutPairInFilteredSqlCount": 48,
+    "missingPairReservedRecipientCandidateCount": 48,
+    "missingPairOtherRecipientCount": 0,
+    "verdict": "HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED",
+    "actualUnquotedOnBeforeToLexicalStructureMeasured": false,
+    "sameMvccSnapshotProven": false,
+    "fullProviderCompatibleRestoreProven": false,
+    "roleMembershipParityProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "interpretation": "The strict known object-privilege prefix did not recognize the one remaining GRANT. It is categorized as unquoted or unexpected granted-role syntax. Quoted identifier-safe ON-before-TO lexical separation is implemented but requires a new isolated measurement. The 48 missing links remain unproven restored."
   }
 }
