@@ -20,8 +20,38 @@
       "mainMode": "manual",
       "workTrackAttribution": "none"
     },
+    "admin-console-private-build.yml": {
+      "responsibility": "Manual isolated Admin build and disabled deployment configuration verification; no deployment or secret access",
+      "prMode": "manual-only",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "admin-console"
+    },
+    "admin-console-readonly-release.yml": {
+      "responsibility": "Owner-approved isolated Admin read-only release and disabled rollback using protected production environment",
+      "prMode": "manual-only",
+      "mainMode": "manual-only",
+      "workTrackAttribution": "admin-console"
+    },
+    "admin-console-scoped-readback.yml": {
+      "responsibility": "On-demand isolated Admin least-privilege read-only production data query verification without worker deployment",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "admin-console"
+    },
     "character-c1-three-five-approved-main-once-20261028.yml": {
       "responsibility": "character-memory-owner-approved-public-three-character-five-turn-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "character-gepa-offline-pinned.yml": {
+      "responsibility": "character-runtime-lab-pinned-gepa-synthetic-offline-smoke",
+      "prMode": "direct-pull-request",
+      "mainMode": "manual",
+      "workTrackAttribution": "commit-metadata"
+    },
+    "character-runtime-taegyeom-12case-v1.yml": {
+      "responsibility": "isolated-taegyeom-public-synthetic-glm-runtime-dialogue-evaluation",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -46,12 +76,6 @@
     },
     "character-runtime-yeoul-language-ab-v1.yml": {
       "responsibility": "isolated-yeoul-glm-vs-luna-korean-language-two-repetition-ab-experiment",
-      "prMode": "none",
-      "mainMode": "one-shot-trigger",
-      "workTrackAttribution": "commit-metadata"
-    },
-    "character-runtime-taegyeom-12case-v1.yml": {
-      "responsibility": "isolated-taegyeom-public-synthetic-glm-runtime-dialogue-evaluation",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -92,17 +116,17 @@
       "mainMode": "triggered-operations",
       "workTrackAttribution": "pr-metadata"
     },
-    "cloudflare-seyeon-room-shell-live.yml": {
-      "responsibility": "cloudflare-seyeon-owner-metadata-room-live-e2e",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "workflow-dispatch"
-    },
     "cloudflare-saju-admission-canary.yml": {
       "responsibility": "production-saju-smoke",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
+    },
+    "cloudflare-seyeon-room-shell-live.yml": {
+      "responsibility": "cloudflare-seyeon-owner-metadata-room-live-e2e",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
     },
     "db-commerce-entitlement-suite.yml": {
       "responsibility": "commerce-entitlement-verification",
@@ -158,12 +182,6 @@
       "mainMode": "regression",
       "workTrackAttribution": "none"
     },
-    "postgres-isolated-rls-capacity-acceptance.yml": {
-      "responsibility": "postgres-isolated-rls-capacity-evidence",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "workflow-dispatch"
-    },
     "postgres-hosted-synthetic-local-acceptance.yml": {
       "responsibility": "postgres-hosted-synthetic-local-recovery",
       "prMode": "none",
@@ -175,6 +193,12 @@
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
+    },
+    "postgres-isolated-rls-capacity-acceptance.yml": {
+      "responsibility": "postgres-isolated-rls-capacity-evidence",
+      "prMode": "none",
+      "mainMode": "manual",
+      "workTrackAttribution": "workflow-dispatch"
     },
     "production-authenticated-json-resource-evidence.yml": {
       "responsibility": "production-security-evidence",
@@ -278,17 +302,17 @@
       "mainMode": "scheduled-manual",
       "workTrackAttribution": "scheduled-operations"
     },
-    "production-privacy-ledger-freshness-watch.yml": {
-      "responsibility": "postgres-privacy-recovery-freshness-watch",
-      "prMode": "none",
-      "mainMode": "scheduled-manual",
-      "workTrackAttribution": "scheduled-operations"
-    },
     "production-privacy-canary-orphan-cleanup-one-shot.yml": {
       "responsibility": "privacy-recovery-operations",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "dispatch-input"
+    },
+    "production-privacy-ledger-freshness-watch.yml": {
+      "responsibility": "postgres-privacy-recovery-freshness-watch",
+      "prMode": "none",
+      "mainMode": "scheduled-manual",
+      "workTrackAttribution": "scheduled-operations"
     },
     "production-privacy-recovery-canary.yml": {
       "responsibility": "privacy-recovery-operations",
@@ -356,14 +380,14 @@
       "mainMode": "manual-only",
       "workTrackAttribution": "dispatch-input"
     },
-    "saju-isolated-rate-ladder-phase11.yml": {
-      "responsibility": "saju-real-engine-constrained-rate-ladder-evidence",
+    "saju-isolated-cgroup-capacity-acceptance.yml": {
+      "responsibility": "saju-real-engine-kernel-cpu-memory-constrained-evidence",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "workflow-dispatch"
     },
-    "saju-isolated-cgroup-capacity-acceptance.yml": {
-      "responsibility": "saju-real-engine-kernel-cpu-memory-constrained-evidence",
+    "saju-isolated-rate-ladder-phase11.yml": {
+      "responsibility": "saju-real-engine-constrained-rate-ladder-evidence",
       "prMode": "none",
       "mainMode": "manual",
       "workTrackAttribution": "workflow-dispatch"
@@ -452,14 +476,14 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
-    "seyeon-c09-minimax-remaining-four-main-once-20261027.yml": {
-      "responsibility": "character-memory-owner-approved-original-minimax-q2-q5_q7_q10-continuation-once",
+    "seyeon-c09-minimax-m2-her-five-main-once-20261027.yml": {
+      "responsibility": "character-memory-owner-approved-minimax-m2-her-five-synthetic-dialogues-one-shot",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
-    "seyeon-c09-minimax-m2-her-five-main-once-20261027.yml": {
-      "responsibility": "character-memory-owner-approved-minimax-m2-her-five-synthetic-dialogues-one-shot",
+    "seyeon-c09-minimax-remaining-four-main-once-20261027.yml": {
+      "responsibility": "character-memory-owner-approved-original-minimax-q2-q5_q7_q10-continuation-once",
       "prMode": "none",
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
@@ -655,24 +679,6 @@
       "prMode": "required-router",
       "mainMode": "none",
       "workTrackAttribution": "pr-metadata"
-    },
-    "admin-console-private-build.yml": {
-      "responsibility": "Manual isolated Admin build and disabled deployment configuration verification; no deployment or secret access",
-      "prMode": "manual-only",
-      "mainMode": "manual-only",
-      "workTrackAttribution": "admin-console"
-    },
-    "admin-console-readonly-release.yml": {
-      "responsibility": "Owner-approved isolated Admin read-only release and disabled rollback using protected production environment",
-      "prMode": "manual-only",
-      "mainMode": "manual-only",
-      "workTrackAttribution": "admin-console"
-    },
-    "admin-console-scoped-readback.yml": {
-      "responsibility": "On-demand isolated Admin least-privilege read-only production data query verification without worker deployment",
-      "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "admin-console"
     }
   }
 }
