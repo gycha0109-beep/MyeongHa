@@ -1,3 +1,10 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-B: CLI 3.1.0 Provider 전체 구조 확인 및 암호화 백업 적재 구문 사전검증
+
+- **실측 결과:** 기존 백업 #42752268638에서 누락됐던 Provider 테이블 29/29개(Auth 22, Storage 7), 제외됐던 18/18 컬럼 모두 무료 Supabase CLI 3.1.0/PostgreSQL17 격리 스키마에 존재. 실행 #42983135911 SUCCESS, artifact 13838168533, SHA-256 `37f75702037caf3d224d74541fd201aef4eed7b50d0545cb51a7353bc9a532ba`; 2.122.0 대비 Storage lifecycle 테이블 2개가 추가 확인됨. 실제 Provider 원본 행 삽입은 0건.
+- **다음 구현:** 동일 암호화 백업의 실제 Provider COPY 헤더·행 개수와 새 로컬 스키마의 필수값/컬럼 메타데이터를 대조하는 별도 무료 격리 사전검증 경로 추가. 비공개 RUNNER_TEMP에서만 복호화하며 CI artifact에는 컬럼 및 개수 기반 비식별 검사 결과만 남김. 실제 데이터 복원·Auth 세션 검증·Hosted 동등성 증거는 아직 없음.
+- **안전 차단:** Production DDL/SQL/권한/Secret 변경 없음. Provider ledger·개인정보 독립 연속성·전체 RPO/RTO 미증명, Issue #1887 OPEN. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` 유지.
+
+Watchtower-Track: ops
 ### 2026-11-11 KST — Gate 1 / Phase 8-B: 무료 격리 Provider 스키마 실측
 
 - **실제 검사:** PR #3213의 필수 통합 검사 #42977371860 성공, main 병합 30e6c9c03835c5fd9b215125e9b42315fc2cc0ed. 무료 GitHub Actions 격리 Supabase CLI 2.122.0/PostgreSQL17 읽기 전용 스키마 검사 #42979219119 성공, artifact 13836926312, 파일 SHA-256 4f0553fd002221423acb56e41100cb4b5a0be4d487accac458eec4b884657bbc.

@@ -1,0 +1,75 @@
+name: PostgreSQL Provider Sealed COPY Preflight
+run-name: "[WT:ops] Provider Sealed COPY Header Preflight"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-operations-provider-sealed-copy-preflight
+  cancel-in-progress: false
+
+jobs:
+  source-provider-copy-preflight:
+    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: production
+    env:
+      EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
+      MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
+    steps:
+      - name: Checkout exact protected main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Resolve governed backup and reject unrelated artifacts
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: '42752268638'
+          EXPECTED_BACKUP_ARTIFACT_ID: '13734401337'
+          INCIDENT_REFERENCE_UTC: '2026-11-10T03:56:30Z'
+        shell: bash
+        run: bash scripts/operations/resolve-postgres-restore-source.sh
+      - name: Download exact governed encrypted backup
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '42752268638'
+          artifact-ids: ${{ steps.source.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/backup-artifact
+      - name: Install PostgreSQL client for local read-only catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq >/dev/null
+      - name: Compare sealed backup COPY headers with disposable Supabase CLI 3.1.0 schema
+        shell: bash
+        env:
+          MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
+          BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
+          EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          SUPABASE_ACCESS_TOKEN: ''
+          SUPABASE_DB_PASSWORD: ''
+          SUPABASE_PROJECT_ID: ''
+          DATABASE_URL: ''
+        run: bash scripts/operations/run-postgres-provider-sealed-copy-preflight-ci.sh
+      - name: Upload only identifier-free compatibility summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-sealed-copy-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-sealed-copy-preflight.json
+          if-no-files-found: ignore
+          retention-days: 14
