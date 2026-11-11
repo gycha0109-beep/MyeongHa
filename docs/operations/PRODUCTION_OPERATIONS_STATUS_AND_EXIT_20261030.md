@@ -1,3 +1,13 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-C: 최신 정기 백업 성공·개인정보 원장 freshness GREEN, 독립 연속성 미입증
+
+- **현재 기준:** main `97a0e88f36b68838a9d608e3a209d5099e3db7b1`에서 정기 암호화 Production PostgreSQL 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42922087061 SUCCESS (`2026-11-10T23:17:17Z` 시작 / `23:20:57Z` 완료, artifact 13811234154, migration frontier `20261109071019`). 이 백업은 기존 11/10 원본 #42752268638과 다른 실행이며 아직 PostgreSQL 격리·Hosted 전체 복구 또는 최신 원장 일대일 결속이 입증되지 않았다.
+- **원장·감시:** 최근 암호화 개인정보 원장 캡처 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42915280991 SUCCESS (artifact 13809665641; `2026-11-10T22:31:37Z` 완료), **이 원장이 참조한 백업은 최신 #42922087061이 아닌 기존 #42752268638**. 후속 신선도 감시 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42923909478 SUCCESS, `RECENT_CAPTURE_COMPLETION_OBSERVED`, 최근 원장 완료 후 3,534초 경과로 허용 7,200초 이내. 하지만 원장 캡처 작업 자체가 이전 암호화 캡처와 **18,845초 간격**(정상 예정 3,600초 간격의 두 배 7,200초 초과분 15,245초)을 경고했다. 이는 개인정보 이벤트 누락을 입증하는 것도 아니며, 누락이 없음을 입증하는 것도 아니다.
+- **명시적 미수용:** 현재 일치하는 최신 백업+독립 개인정보 원장 조합은 미입증, encrypted 원장의 eventCount도 미확인. Watcher 자체가 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `approvedRpoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`로 보고한다. 무중단 외부 durable 개인정보 이벤트 원장, approved canary nonzero replay, Hosted Auth·Storage 및 PT24H/PT6H end-to-end 복구 증거는 없다. P0 #1887 OPEN / `NOT_ACCEPTED`.
+- **근거 기록:** 각 실행 ID·artifact ID·source SHA·보존 원장 연결·캡처 간격·watcher 실측·수용 차단을 비식별 `docs/operations/POSTGRES_BACKUP_PRIVACY_FRESHNESS_20261111.json`에 별도 고정. 공개 파일에 사용자 행, 삭제 이벤트 payload, 토큰 또는 개인정보를 기록하지 않음. 새로운 백업·canary·Provider/Hosted 자원 생성 및 Production SQL/권한·환경 변경은 하지 않았다.
+- **다음 로드맵:** Phase 8-A 최신 필터 GRANT 분석기 PR #3196 병합은 확인됐으나 같은 backup #42752268638로 새 comparator를 실행한 격리 복원 결과는 아직 없음. 재실행 시 미해석 GRANT 1개 해소 여부와 원본 직접 멤버십 48건의 actual filtered SQL 포함/부재 건수 검증; Phase 8-C의 최신 원장/백업 정확한 결속과 snapshot 구간 연속성·nonzero event 입증은 별도 필요. Privacy canary 승인 문자열 없이 실행 금지, Phase 8 완료 및 ROADMAP_COMPLETE 불가.
+
+Watchtower-Track: ops
+
 ### 2026-11-10 KST — Gate 1 / Phase 8-A: 실제 필터링된 roles.sql 대조, GRANT 1문장 미해석으로 HOLD 유지
 
 - **기준 결속:** PR #3193 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42765406281 SUCCESS, 병합 main `5144bc873983b06c44f5ef813fd17df2a3c2d13d`. 기존 암호화 원본 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638 (artifact 13734401337; source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`; frontier `20261109071019`) 재사용. 격리 PostgreSQL 17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42767722985 SUCCESS, artifact 13740043509, incident reference `2026-11-10T03:56:30Z`; Production 재백업·SQL·권한 설정·IAM·Hosted 변경 없음.
