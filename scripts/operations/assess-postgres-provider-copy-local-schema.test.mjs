@@ -7,6 +7,7 @@ const source = JSON.parse(await readFile(
   new URL('../../docs/operations/POSTGRES_PROVIDER_COPY_SOURCE_GAP_20261111.json', import.meta.url), 'utf8'));
 const fakeLocal = () => ({
   schemaVersion: 'ops-disposable-provider-catalog-v1',
+  cliVersion: '2.122.0',
   postgresMajor: 17,
   relationRowsRead: false,
   tables: [
@@ -35,6 +36,20 @@ test('missing relation and source column are retained as explicit gaps', () => {
   assert.equal(result.previouslySkippedRelationsStillAbsentInLocal, 1);
   assert.equal(result.previouslyProjectedSourceColumnsMissingInLocal.length, 1);
   assert.equal(result.verdict, 'LOCAL_PROVIDER_SCHEMA_STILL_INCOMPATIBLE__REQUIRES_VERSION_OR_MIGRATION_REVIEW');
+});
+test('latest pinned CLI candidate remains schema-only and cannot grant DR admission', () => {
+  const local = fakeLocal();
+  local.cliVersion = '3.1.0';
+  const result = assessProviderCopyLocalSchema(source, local);
+  assert.equal(result.target, 'fresh-disposable-supabase-cli-3.1.0-postgres17');
+  assert.equal(result.recoveredProductionProviderRows, 0);
+  assert.equal(result.drReady, false);
+  assert.equal(result.serviceResumptionAllowed, false);
+});
+test('unsupported CLI version fails closed', () => {
+  const local = fakeLocal();
+  local.cliVersion = 'latest';
+  assert.throws(() => assessProviderCopyLocalSchema(source, local));
 });
 test('rejects a modified backup-count witness', () => {
   const forged = structuredClone(source);

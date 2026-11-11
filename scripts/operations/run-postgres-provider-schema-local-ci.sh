@@ -12,6 +12,11 @@ fail() { echo "HOLD_LOCAL_PROVIDER_SCHEMA_INVENTORY: $1" >&2; exit 1; }
 [[ -z "${SUPABASE_ACCESS_TOKEN:-}" && -z "${SUPABASE_DB_PASSWORD:-}" && -z "${SUPABASE_PROJECT_ID:-}" && -z "${DATABASE_URL:-}" ]] || fail 'Hosted credentials forbidden'
 for cmd in docker node jq; do command -v "$cmd" >/dev/null || fail 'Dependency missing'; done
 docker info >/dev/null 2>&1 || fail 'Docker unavailable'
+cli_version="${MH_OPS_PROVIDER_CLI_VERSION:-2.122.0}"
+case "$cli_version" in
+  2.122.0|3.1.0) ;;
+  *) fail 'Unsupported Provider inventory CLI version' ;;
+esac
 root="$MH_DR_CI_REPO_ROOT"
 stack_dir="$(mktemp -d "$RUNNER_TEMP/myeongha-provider-schema.XXXXXX")"
 network="myeongha-provider-schema-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
@@ -21,7 +26,7 @@ network_created=false
 cleanup() {
   status=$?
   if [[ -f "$stack_dir/supabase/config.toml" ]]; then
-    (cd "$stack_dir" && npx --yes supabase@2.122.0 stop --no-backup >/dev/null 2>&1) || true
+    (cd "$stack_dir" && npx --yes "supabase@$cli_version" stop --no-backup >/dev/null 2>&1) || true
   fi
   if [[ "$network_created" == true ]]; then
     docker network rm "$network" >/dev/null 2>&1 || true
@@ -37,14 +42,14 @@ docker network create \
 network_created=true
 (
   cd "$stack_dir"
-  npx --yes supabase@2.122.0 init >"$stack_dir/cli-init.private.log" 2>&1 ||
+  npx --yes "supabase@$cli_version" init >"$stack_dir/cli-init.private.log" 2>&1 ||
     fail 'Disposable local init failed'
-  timeout 1200 npx --yes supabase@2.122.0 start \
+  timeout 1200 npx --yes "supabase@$cli_version" start \
     --network-id "$network" \
     -x imgproxy,realtime,edge-runtime,vector,studio,postgres-meta,mailpit,logflare \
     >"$stack_dir/cli-start.private.log" 2>&1 ||
     fail 'Disposable local stack start failed'
-  npx --yes supabase@2.122.0 status -o env \
+  npx --yes "supabase@$cli_version" status -o env \
     >"$stack_dir/cli-status.private.env" 2>"$stack_dir/cli-status.private.log" ||
     fail 'Disposable stack status unavailable'
   set -a
@@ -62,6 +67,9 @@ network_created=true
     fail 'Local read-only schema query failed'
 )
 [[ -s "$local_catalog" ]] || fail 'Local catalog missing'
+jq --arg version "$cli_version" '.cliVersion = $version' "$local_catalog" >"$stack_dir/local-versioned.private.json" ||
+  fail 'Cannot label disposable local CLI version'
+mv "$stack_dir/local-versioned.private.json" "$local_catalog"
 MH_OPS_DISPOSABLE_PG17_ONLY=true \
   node "$root/scripts/operations/assess-postgres-provider-copy-local-schema.mjs" \
     --source "$root/docs/operations/POSTGRES_PROVIDER_COPY_SOURCE_GAP_20261111.json" \
