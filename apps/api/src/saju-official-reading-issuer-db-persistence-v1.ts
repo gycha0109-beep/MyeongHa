@@ -64,6 +64,7 @@ export interface SajuOfficialSourceVerificationPortV1 {
     readonly dbReadingId: string;
     readonly readingSessionId: string;
     readonly sourceBirthRevisionId: string;
+    readonly executionAttemptId: string;
   }>): Promise<VerifiedSajuProductionIssueV1 | null>;
 }
 
@@ -184,8 +185,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     input.sourceBirthRevisionId].every(uuid)) {
     return held('production_source_unverified');
   }
-  // No Production issuer exists in the current Saju runtime. In particular,
-  // a Preview source proof, even when HMAC-verified, cannot enter this path.
+  // A Preview source proof cannot authorize an official Reading.
   if (!input.sourceVerifier || !input.mappingVerifier
     || !input.currentAuthority || !input.commitPort) {
     return held('production_source_unverified');
@@ -219,6 +219,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     sourceResponse: native, executedRequest: input.executedRequest, subjectId: input.subjectId,
     dbReadingId: input.readingId, readingSessionId: input.readingSessionId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
+    executionAttemptId: input.executionAttemptId,
   });
   if (source?.state !== 'production_source_verified'
     || source.nativeReadingId !== native.reading.readingId

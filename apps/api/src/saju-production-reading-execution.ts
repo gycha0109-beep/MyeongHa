@@ -8,6 +8,8 @@ const OFFICIAL_ISSUE_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab]
 import { bindCurrentBirthProfileRevisionForSajuV1 } from './saju-production-calculation-execution.js';
 import {
   buildSajuProductionReadingRequestV1,
+  SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1,
+  SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1,
   SajuProductionReadingHttpAdapterErrorV1,
   type SajuProductionReadingHttpAdapterV1,
 } from './saju-production-reading-http-adapter.js';
@@ -112,6 +114,8 @@ export interface SajuOfficialReadingExecutionInputV1<AdmittedResponse> {
   outboxEventId: string;
   /** Pinned by the authoritative DB Reading Session, not by the browser. */
   sourceBirthRevisionId: string;
+  sourceBirthInputHash?: string;
+  releaseRef?: string;
   sourceVerifier?: SajuOfficialSourceVerificationPortV1;
   mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
   /** Required single-use DB attempt allocation before any Saju source call. */
@@ -191,6 +195,15 @@ export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<Admitted
     executionAttemptId: input.executionAttemptId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
   };
+  const { sourceBirthInputHash, releaseRef } = input;
+  const preparedContext = typeof sourceBirthInputHash === 'string'
+    && SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1.test(sourceBirthInputHash)
+    && typeof releaseRef === 'string' && SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1.test(releaseRef)
+    ? { ...exactAttempt, sourceBirthInputHash, releaseRef }
+    : undefined;
+  if (input.adapter.requestPreparedReading !== undefined && preparedContext === undefined) {
+    return unavailable;
+  }
 
   // The DB allocator rejects exact replays and in-flight attempts. A read-only
   // preflight is never sufficient to claim single-use network execution.
@@ -205,7 +218,9 @@ export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<Admitted
   // current Birth and issuer provenance before any report can be stored.
   let response: AdmittedResponse;
   try {
-    response = await input.adapter.requestReading(executedRequest);
+    response = input.adapter.requestPreparedReading !== undefined && preparedContext !== undefined
+      ? await input.adapter.requestPreparedReading(executedRequest, preparedContext)
+      : await input.adapter.requestReading(executedRequest);
   } catch (error) {
     // A transport error cannot prove whether the Saju issuer already generated
     // a result. Do not finalize a failed attempt as retryable/final, reissue the

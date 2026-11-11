@@ -16,6 +16,8 @@ export interface ApprovedSajuIssueAttemptBindingV1 {
 
 interface ScopeRow {
   readonly birthRevisionId: string;
+  readonly sourceBirthInputHash: string;
+  readonly releaseRef: string;
   readonly periodReferenceDateTime: string | null;
   readonly birth: Omit<SajuBirthRevisionBindingV1, 'birthRevisionRef'>;
 }
@@ -47,6 +49,8 @@ export async function readApprovedSajuIssueScopeV1(
   const sourceRequestHash = hashSajuHeldSourceProofRequestV1(request);
   return Object.freeze({
     birthRevision,
+    sourceBirthInputHash: scope.sourceBirthInputHash,
+    releaseRef: scope.releaseRef,
     readingText,
     request,
     periodReferenceDateTime: period,

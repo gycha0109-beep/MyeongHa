@@ -11,6 +11,7 @@ as $function$
     'admissionHash',entitled.admission_hash,'releaseRef',entitled.release_ref,
     'periodReferenceDateTime',entitled.period_reference,
     'birthRevisionId',birth.id,
+    'sourceBirthInputHash',birth.input_hash,
     'birth',jsonb_build_object('calendarType',birth.calendar_type,'birthDate',to_char(birth.birth_date,'YYYY-MM-DD'),
       'birthTime',to_char(birth.birth_time,'HH24:MI'),'timeKnown',birth.time_known,
       'isLeapMonth',coalesce(birth.is_leap_month,false),'sex',birth.sex)

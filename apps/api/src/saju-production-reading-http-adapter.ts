@@ -70,7 +70,21 @@ export interface SajuProductionReadingHttpAdapterV1<AdmittedResponse = unknown> 
   requestReading(
     request: SajuProductionReadingRequestV1,
   ): Promise<AdmittedResponse>;
+  requestPreparedReading?(
+    request: SajuProductionReadingRequestV1,
+    context: SajuPreparedProductionReadingContextV1,
+  ): Promise<AdmittedResponse>;
 }
+
+export interface SajuPreparedProductionReadingContextV1 {
+  readonly executionAttemptId: string;
+  readonly sourceBirthRevisionId: string;
+  readonly sourceBirthInputHash: string;
+  readonly releaseRef: string;
+}
+
+export const SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1 = /^sha256:v1:[a-f0-9]{64}$/u;
+export const SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1 = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/u;
 
 interface SajuProductionReadingHttpDeadlineLeaseV1 {
   readonly response: SajuProductionCalculationHttpResponseV1;

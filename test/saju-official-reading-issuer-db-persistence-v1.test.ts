@@ -838,7 +838,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       const p = ports();
       const original = await p.sourceVerifier.verifyProductionIssue({
         sourceResponse: native, executedRequest, subjectId, dbReadingId: readingId,
-        readingSessionId, sourceBirthRevisionId,
+        readingSessionId, sourceBirthRevisionId, executionAttemptId,
       });
       p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({ ...original, ...wrong });
       const result = await persistIssuedSajuOfficialReadingV1(input(p));
@@ -857,7 +857,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       const p = ports();
       const verified = await p.sourceVerifier.verifyProductionIssue({
         sourceResponse: native, executedRequest, subjectId, dbReadingId: readingId,
-        readingSessionId, sourceBirthRevisionId,
+        readingSessionId, sourceBirthRevisionId, executionAttemptId,
       });
       p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({
         ...verified, sourceBirthInputHash: badHash,
@@ -881,7 +881,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     };
     const verified = await p.sourceVerifier.verifyProductionIssue({
       sourceResponse: native, executedRequest: novemberRequest, subjectId,
-      dbReadingId: readingId, readingSessionId, sourceBirthRevisionId,
+      dbReadingId: readingId, readingSessionId, sourceBirthRevisionId, executionAttemptId,
     });
     p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce(verified);
     const result = await persistIssuedSajuOfficialReadingV1({

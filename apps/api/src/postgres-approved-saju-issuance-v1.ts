@@ -106,6 +106,8 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     requireCompleteResponse: true,
     resolveBirth: () => scope.birthRevision,
     sourceBirthRevisionId: scope.birthRevision.birthRevisionRef,
+    sourceBirthInputHash: scope.sourceBirthInputHash,
+    releaseRef: scope.releaseRef,
     readingText: scope.readingText,
     ...(scope.periodReferenceDateTime === undefined ? {} : { periodReferenceDateTime: scope.periodReferenceDateTime }),
     attemptPrepare: createPostgresSajuOfficialAttemptPreparePortV1({ ...input, approvedPurchase }),
