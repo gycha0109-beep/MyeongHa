@@ -125,3 +125,12 @@
 - `apps/api/src/saju-a4-prepared-proof-private-http-v1.ts`: **기존 API/관리자/Preview와 분리된 미설치 Server Factory**, 전용 Bearer 검증 후에만 UUID로 영구 저장된 증명을 사설 조회. GET 외 메서드, Cookie/Origin, 쿼리·임의 경로, 만료·식별 불일치 증명 거부. 전용 HTTPS/mTLS termination은 서비스 운영 시 필수이며 해당 네트워크/서버는 설치하지 않았다.
 - 신규 HTTP 7건·DB 6건·정본발급 조합 4건 + 기존 HMAC 발급 5건 = **22건 PASS**, 엄격 TypeScript/Prettier PASS. Saju HTTPS 로더의 독립 테스트 7건도 PASS. 원본 출생자료·프롬프트·AI 원문·Secret은 저장하지 않는다.
 - **HOLD**: 증명에는 회원/Reading UUID가 포함되므로 운영 보존 기간·파기/개인정보 정책 정합성 확인 전 전용 영구 테이블을 설치하지 않는다. 실제 운영 TLS·비밀 인증·계정·Producer/Consumer 동시 Runtime 주입, Production Interpretation Authority, 운영 실제 호출/청구 완전성은 미확정이며 수집 OFF. `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-11 — A4 Reading 실행 시도별 다중 서명 영수증 사후 비용 재처리 (오프라인)
+
+- Saju [PR #2776](https://github.com/gycha0109-beep/Saju/pull/2776)는 정확한 HEAD `de7ee62f02b63239c924a349ae6e80967dae18f6` 필수 Integration [#42951234862](https://github.com/gycha0109-beep/Saju/actions/runs/42951234862) **2차 SUCCESS** 후 병합 커밋 `28db4d7a474e588abde210df1f3d6429d81a4b6c`로 완료됐다. 실제 Production 설치·비용 수집 OFF는 유지했다.
+- `apps/api/src/reading-ai-saju-attempt-batch-replay-v1.ts`: 서버 내부에서 이미 할당된 정본 Reading `executionAttemptId`로 Saju Source 전용 DB Reader의 불변 서명 영수증을 **읽기 전용**으로 최대 500건 조회. Source Reader의 정확한 DB 현재 역할, 호출 UUID 오름차순·중복 금지, 영수증 JSON 크기/요청 시도 ID 결속을 확인한다. 잘못된 목록/501건 이상/DB 장애는 불확실 상태를 0건으로 바꾸지 않고 즉시 실패한다.
+- 조회된 각 호출은 기존 `createSajuA4PostTerminalCostReplayV1.replayOne()`에서 **원본 영수증 재조회 → 독립 HMAC/공급사 관측 검증 → 정본 종료된 Reading 실행 시도/외부 ref 대조 → 기존 비용 Writer RPC의 멱등 보존**을 거친다. 이전에 성공한 일부 기록은 재시도할 때 Writer의 `replayed`로 확인하며, 이후 호출 실패 시 성공으로 조작하지 않는다. 로컬 영수증이 0건이면 명시적 `held_no_local_receipts`다.
+- 결과의 `completeCostCoverage:false`, `invoiceReconciled:false`는 상수다. **Saju 로컬에 저장된 영수증 목록은 공급사 실제 전체 HTTP 호출 수와 동일하다는 보장이 없으며**, 가격 단가가 확인되지 않은 호출을 추정 비용 0으로 취급하지 않는다. 운영 스케줄러·HTTP 엔드포인트·과금·크레딧·고객 정보/권한은 변경하지 않았다.
+- 신규 8건 + 기존 단건 사후 재처리 7건 **15건 PASS**, 엄격 TypeScript 및 Prettier PASS. 폐기형 PostgreSQL 17.11에 Saju 서명 영수증 오프라인 스키마를 설치해 **기존 전용 Reader 역할로 실제 bounded 목록 SELECT 권한**을 확인하고 DB를 종료했다. 운영 Saju Source DB 계정/비밀번호/TLS는 설치하지 않았다.
+- **HOLD:** 로컬 콜백 누락/커버리지와 공급사 실제 호출 전수 대조, Saju/명하 전용 서비스 DB/Secret/TLS, Production Interpretation Authority, 실제 비용 단가·청구 검증 및 개인정보 보존/삭제 정책이 미완료다. 실서비스 비용 수집은 계속 OFF이고 `ROADMAP_COMPLETE` 아님.
