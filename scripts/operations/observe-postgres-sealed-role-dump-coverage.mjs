@@ -105,8 +105,51 @@ const knownObjectPrivilegeGrant = new RegExp(
   '^GRANT\\s+' + objectPrivilege + '(?:\\s*,\\s*' +
   objectPrivilege + ')*\\s+ON\\s+' + objectClasses + '\\b', 'iu');
 
-// Only a fixed category is exported; neither SQL fragments nor role names
-// are permitted in this diagnostic. Unknown SQL always retains the HOLD.
+// PostgreSQL role-membership GRANT has no unquoted ON clause. Find ON before
+// TO only outside quoted identifiers and string literals; in particular the
+// role name "ON" is not an object privilege. This proves a statement is not
+// a role-membership GRANT; it does NOT validate its object privilege semantics.
+function hasObjectGrantClauseOrder(statement) {
+  const tokens = [];
+  let quotedIdentifier = false;
+  let quotedString = false;
+  for (let i = 0; i < statement.length;) {
+    const c = statement[i];
+    const next = statement[i + 1];
+    if (quotedIdentifier) {
+      if (c === '"' && next === '"') { i += 2; continue; }
+      if (c === '"') quotedIdentifier = false;
+      i++; continue;
+    }
+    if (quotedString) {
+      if (c === "'" && next === "'") { i += 2; continue; }
+      if (c === "'") quotedString = false;
+      i++; continue;
+    }
+    if (c === '"') { quotedIdentifier = true; i++; continue; }
+    if (c === "'") { quotedString = true; i++; continue; }
+    if (/[a-z_]/iu.test(c)) {
+      const start = i;
+      i++;
+      while (i < statement.length && /[a-z0-9_]/iu.test(statement[i])) i++;
+      tokens.push({word: statement.slice(start, i).toUpperCase(), start, end: i});
+      continue;
+    }
+    i++;
+  }
+  if (quotedIdentifier || quotedString || tokens[0]?.word !== 'GRANT')
+    return false;
+  const onIndex = tokens.findIndex(token => token.word === 'ON');
+  const toIndex = tokens.findIndex(token => token.word === 'TO');
+  if (onIndex < 1 || toIndex <= onIndex) return false;
+  const grant = tokens[0], on = tokens[onIndex], to = tokens[toIndex];
+  return Boolean(statement.slice(grant.end, on.start).trim() &&
+    statement.slice(on.end, to.start).trim() &&
+    statement.slice(to.end).trim());
+}
+
+// Only fixed categories are exported; never SQL fragments or role names.
+// Unknown grammar stays HOLD.
 function classifyUnparsedGrantShape(sql, complete) {
   if (!complete) return 'unterminated_statement';
   if (knownObjectPrivilegeGrant.test(sql)) return 'object_privilege_grant';
@@ -120,6 +163,7 @@ function rolePairsInFilteredSql(sql) {
   const pairs = new Set();
   let observedGrantStatementCount = 0;
   let recognizedObjectPrivilegeGrantCount = 0;
+  let objectGrantClauseOrderOnlyCount = 0;
   let unparsedGrantStatementCount = 0;
   const unparsedGrantShapeCounts = {};
   for (const candidate of sqlStatements(sql)) {
@@ -127,6 +171,12 @@ function rolePairsInFilteredSql(sql) {
     observedGrantStatementCount++;
     if (candidate.complete && knownObjectPrivilegeGrant.test(candidate.sql)) {
       recognizedObjectPrivilegeGrantCount++;
+      continue;
+    }
+    if (candidate.complete && hasObjectGrantClauseOrder(candidate.sql)) {
+      // This cannot be a role-membership GRANT. Object privilege
+      // validity, grantor and target permissions remain unproven.
+      objectGrantClauseOrderOnlyCount++;
       continue;
     }
     const parsed = candidate.complete
@@ -142,8 +192,8 @@ function rolePairsInFilteredSql(sql) {
     for (const pair of parsed) pairs.add(pair);
   }
   return { pairs, observedGrantStatementCount,
-    recognizedObjectPrivilegeGrantCount, unparsedGrantStatementCount,
-    unparsedGrantShapeCounts };
+    recognizedObjectPrivilegeGrantCount, objectGrantClauseOrderOnlyCount,
+    unparsedGrantStatementCount, unparsedGrantShapeCounts };
 }
 
 export function observeSealedRoleDumpCoverage(source, filteredRolesSql, dumpRunner) {
@@ -171,6 +221,8 @@ export function observeSealedRoleDumpCoverage(source, filteredRolesSql, dumpRunn
     filteredRolesSqlGrantStatementCount: extracted.observedGrantStatementCount,
     filteredRolesSqlRecognizedObjectPrivilegeGrantCount:
       extracted.recognizedObjectPrivilegeGrantCount,
+    filteredRolesSqlObjectGrantClauseOrderOnlyCount:
+      extracted.objectGrantClauseOrderOnlyCount,
     filteredRolesSqlUnparsedGrantStatementCount: extracted.unparsedGrantStatementCount,
     filteredRolesSqlUnparsedGrantShapeCounts: extracted.unparsedGrantShapeCounts,
     sourceRowsWithPairInFilteredSqlCount: null,

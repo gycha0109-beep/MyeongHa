@@ -134,13 +134,33 @@ const onAsRoleName = observeSealedRoleDumpCoverage(
   source([e('myeongha_alpha', 'ON')]),
   'GRANT "myeongha_alpha" TO "ON";\n', runner);
 assert.equal(onAsRoleName.filteredRolesSqlRecognizedObjectPrivilegeGrantCount, 0);
+assert.equal(onAsRoleName.filteredRolesSqlObjectGrantClauseOrderOnlyCount, 0);
 assert.equal(onAsRoleName.sourceRowsWithPairInFilteredSqlCount, 1);
 const malformedObject = observeSealedRoleDumpCoverage(
   source([e('myeongha_alpha', 'postgres')]),
   'GRANT ALL ON UNDOCUMENTED_OBJECT "x" TO "postgres";\n', runner);
 assert.equal(malformedObject.filteredRolesSqlRecognizedObjectPrivilegeGrantCount, 0);
-assert.equal(malformedObject.filteredRolesSqlUnparsedGrantStatementCount, 1);
-for (const report of [unknownGrammar, unterminated, invalidTail, malformedObject]) {
+assert.equal(malformedObject.filteredRolesSqlObjectGrantClauseOrderOnlyCount, 1);
+assert.equal(malformedObject.filteredRolesSqlUnparsedGrantStatementCount, 0);
+assert.equal(malformedObject.verdict,
+  'HOLD_SOURCE_EXTERNAL_ROLE_GRANT_PAIRS_MISSING_FROM_FILTERED_DUMP');
+const quotedOnRoleName = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'ON')]),
+  'GRANT "myeongha_alpha" TO "ON";\n', runner);
+assert.equal(quotedOnRoleName.filteredRolesSqlObjectGrantClauseOrderOnlyCount, 0);
+assert.equal(quotedOnRoleName.sourceRowsWithPairInFilteredSqlCount, 1);
+const unquotedRole = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'postgres')]),
+  'GRANT unquoted_role TO postgres;\n', runner);
+assert.equal(unquotedRole.filteredRolesSqlObjectGrantClauseOrderOnlyCount, 0);
+assert.equal(unquotedRole.filteredRolesSqlUnparsedGrantStatementCount, 1);
+const missingObjectRecipient = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'postgres')]),
+  'GRANT CUSTOM_PRIV ON UNKNOWN_CLASS "example";\n', runner);
+assert.equal(missingObjectRecipient.filteredRolesSqlObjectGrantClauseOrderOnlyCount, 0);
+assert.equal(missingObjectRecipient.filteredRolesSqlUnparsedGrantStatementCount, 1);
+for (const report of [unknownGrammar, unterminated, invalidTail,
+  unquotedRole, missingObjectRecipient]) {
   assert.equal(Object.values(report.filteredRolesSqlUnparsedGrantShapeCounts)
     .reduce((a, b) => a + b, 0),
   report.filteredRolesSqlUnparsedGrantStatementCount);
