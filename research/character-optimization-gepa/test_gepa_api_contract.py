@@ -27,8 +27,18 @@ class ContractTests(unittest.TestCase):
             self.assertEqual(kw['config'].engine_config['reflection']['reflection_lm'],offline_reflection)
             self.assertEqual(len(kw['dataset']),1);self.assertEqual(len(kw['valset']),1)
             self.assertIsNone(kw['test_set'])
-            self.assertEqual(kw['_contract_status'],'offline_preflight_pass')
+            self.assertEqual(set(kw), {'seed_candidate','dataset','valset','test_set','evaluator','objective','background','config'})
             self.assertEqual(kw['evaluator'](kw['seed_candidate'],kw['dataset'][0])[0],0.5)
+    def test_symlink_output_denied(self):
+        with tempfile.TemporaryDirectory() as out,tempfile.TemporaryDirectory() as repo:
+            link=pathlib.Path(out).parent / ('gepa-output-test-symlink-' + pathlib.Path(out).name)
+            link.symlink_to(out, target_is_directory=True)
+            try:
+                with self.assertRaises(PreflightDenied):
+                    build_offline_gepa_kwargs(self.setup_envelope(),seed_text=SEED,evaluator=dummy_evaluator,
+                      reflection_lm=offline_reflection,output_dir=str(link),repository_root=repo,config_factory=FakeGepaConfig)
+            finally:
+                link.unlink()
     def test_no_default_reflection_model(self):
         with tempfile.TemporaryDirectory() as out,tempfile.TemporaryDirectory() as repo:
             with self.assertRaises(PreflightDenied):build_offline_gepa_kwargs(self.setup_envelope(),seed_text=SEED,evaluator=dummy_evaluator,

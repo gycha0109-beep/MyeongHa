@@ -16,7 +16,7 @@ def build_offline_gepa_kwargs(envelope, *, seed_text, evaluator, reflection_lm,
     `reflection_lm` is required to prevent GEPA's implicit paid-provider default.
     Returning call arguments (not invoking GEPA) is safe for no-network preflight.
     """
-    report=preflight(envelope)
+    preflight(envelope)
     if not isinstance(seed_text,str) or len(seed_text)<1 or len(seed_text)>1600:
         raise PreflightDenied('seed_text')
     if hashlib.sha256(seed_text.encode('utf-8')).hexdigest()!=envelope['candidateSha256']:
@@ -28,8 +28,11 @@ def build_offline_gepa_kwargs(envelope, *, seed_text, evaluator, reflection_lm,
     if not isinstance(max_evals,int) or isinstance(max_evals,bool) or max_evals<1 or max_evals>10:
         raise PreflightDenied('max_evals_offline_only')
     root=pathlib.Path(repository_root).resolve(strict=True)
-    out=pathlib.Path(output_dir).resolve(strict=True)
-    if out == root or out.is_relative_to(root) or not out.is_dir() or out.is_symlink():
+    requested_out=pathlib.Path(output_dir)
+    if requested_out.is_symlink():
+        raise PreflightDenied('private_output_required')
+    out=requested_out.resolve(strict=True)
+    if out == root or out.is_relative_to(root) or not out.is_dir():
         raise PreflightDenied('private_output_required')
     if stat.S_IMODE(out.stat().st_mode)&0o077:
         raise PreflightDenied('private_output_permissions')
@@ -63,5 +66,4 @@ def build_offline_gepa_kwargs(envelope, *, seed_text, evaluator, reflection_lm,
         'evaluator':bounded_eval,
         'objective':'Improve synthetic character expression without changing identity or authority.',
         'background':'Only synthetic public metadata. No private conversation, canon mutation, or paid providers.',
-        'config':cfg,
-        '_contract_status':report['status']}
+        'config':cfg}

@@ -36,3 +36,9 @@
 
 - Source inspection: PyPI gepa==0.1.4 (legacy GEPAConfig) does not expose the OptimizeAnythingConfig/test_set shape in the v0.3 architecture. Upstream main revision ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309 has the new config source but no install/runtime verification in MyeongHa yet.
 - No unverified dependency pin or paid optimizer invocation. See GEPA_SOURCE_COMPATIBILITY.md. Exact commit install, private offline evaluation and gateway checks remain future work.
+
+## 2026-11-11 — Correct GEPA argument contract and private output symlink check
+
+- Remove synthetic-only `_contract_status` from the kwargs destined for `optimize_anything(**kwargs)`; this was an invalid keyword in the pinned upstream new API. The preflight remains a separate call.
+- Reject symlinked private output directories before `Path.resolve()` so the check is not bypassed by path normalization. Add independent synthetic tests.
+- Local checks: Node 17/17 and Python 17/17 pass. Installed GEPA runtime remains unverified, remote model calls 0.
