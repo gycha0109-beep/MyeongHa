@@ -25,6 +25,10 @@ from public.cmd_finalize_reading_transport_success_v1(
   $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb, $16::text
 )
 `.trim();
+const FINALIZE_APPROVED_SQL = FINALIZE_SQL.replace(
+  /public\.cmd_finalize_reading_transport_success_v1\([\s\S]+\)$/u,
+  'public.cmd_finalize_approved_saju_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::text,$8::text,$9::text,$10::text,$11::text,$12::jsonb,$13::text)',
+);
 
 // Read back the exact immutable source lineage after finalization in the SAME
 // transaction, including replays. The legacy command only compares responseHash
@@ -47,7 +51,7 @@ from public.qry_saju_official_stored_lineage_v3(
 `.trim();
 
 const VERIFY_APPROVED_STORED_LINEAGE_SQL = VERIFY_STORED_LINEAGE_SQL.replace(
-  'public.qry_saju_official_stored_lineage_v3', 'commerce_saju_private.approved_stored_lineage_v1',
+  'public.qry_saju_official_stored_lineage_v3', 'public.qry_approved_saju_stored_lineage_v1',
 );
 
 type StoredLineageRow = Readonly<{
@@ -92,7 +96,8 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
       // Caller has already verified issuer provenance, exact ID mapping,
       // immutable birth revision and current Commerce/Privacy authority.
       // Do not run an open-ended UPDATE or forge a DB success state.
-      const result = await client.query<Row>(FINALIZE_SQL, [
+      const result = await client.query<Row>(approvedPurchase === undefined ? FINALIZE_SQL : FINALIZE_APPROVED_SQL,
+        approvedPurchase === undefined ? [
         input.subjectId,
         input.readingId,
         input.executionAttemptId,
@@ -109,6 +114,11 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
         null,
         JSON.stringify(input.storedSnapshot),
         input.storedResponseHash,
+      ] : [
+        input.subjectId, approvedPurchase.purchaseIntentId, approvedPurchase.component, input.readingId,
+        input.executionAttemptId, input.outboxEventId, approvedPurchase.sourceRequestHash, input.externalRequestRef,
+        input.engineVersion, input.nativeReadingId, input.sourceBirthInputHash,
+        JSON.stringify(input.storedSnapshot), input.storedResponseHash,
       ]);
       if (result.rows.length !== 1 || !result.rows[0]) {
         throw new Error('Saju official immutable DB commit did not return exactly one receipt.');
@@ -118,13 +128,6 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
         throw new Error('Saju official immutable DB commit returned an invalid replay state.');
       }
 
-      if (approvedPurchase !== undefined) {
-        await client.query(
-          'select commerce_saju_private.bind_approved_component_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::text,$6::text)',
-          [input.subjectId, approvedPurchase.purchaseIntentId, approvedPurchase.component,
-            input.readingId, approvedPurchase.sourceRequestHash, input.storedResponseHash],
-        );
-      }
       const verified = await client.query<StoredLineageRow>(
         approvedPurchase === undefined ? VERIFY_STORED_LINEAGE_SQL : VERIFY_APPROVED_STORED_LINEAGE_SQL, [
           input.subjectId, input.readingId, input.executionAttemptId,

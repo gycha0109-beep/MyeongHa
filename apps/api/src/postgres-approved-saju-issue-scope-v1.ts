@@ -26,7 +26,7 @@ export async function readApprovedSajuIssueScopeV1(
 ) {
   if (input.component === 'compatibility') return null;
   const result = await client.query<{ scope: ScopeRow | null }>(
-    'select commerce_saju_private.approved_issue_scope_v1($1::uuid,$2::uuid,$3::text) as scope',
+    'select public.qry_approved_saju_issue_scope_v1($1::uuid,$2::uuid,$3::text) as scope',
     [input.subjectId, input.purchaseIntentId, input.component],
   );
   if (result.rows.length !== 1 || result.rows[0] === undefined) {
@@ -58,12 +58,11 @@ export async function admitApprovedSajuIssueAttemptV1(
   client: PostgresTransactionQueryV1,
   binding: ApprovedSajuIssueAttemptBindingV1,
   request: Parameters<SajuOfficialIssuancePreflightPortV1['admitBeforeSourceCall']>[0],
-  stage: 'before_allocation' | 'running' = 'running',
 ): Promise<boolean> {
   const result = await client.query<{ admitted: unknown }>(
-    'select commerce_saju_private.admit_approved_issue_attempt_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text) as admitted',
+    'select public.admit_approved_saju_issue_attempt_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text) as admitted',
     [request.subjectId, binding.purchaseIntentId, binding.component, request.readingId,
-      request.readingSessionId, stage === 'before_allocation' ? null : request.executionAttemptId,
+      request.readingSessionId, request.executionAttemptId,
       request.sourceBirthRevisionId, binding.sourceRequestHash],
   );
   if (result.rows.length !== 1 || typeof result.rows[0]?.admitted !== 'boolean') {

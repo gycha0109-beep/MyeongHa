@@ -161,6 +161,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   readonly sourceResponse: unknown;
   /** Exact request sent to the authenticated Saju host, for issuer digest verification. */
   readonly executedRequest: SajuProductionReadingRequestV1;
+  readonly requireCompleteResponse?: true;
   readonly sourceVerifier?: SajuOfficialSourceVerificationPortV1;
   readonly mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
   readonly currentAuthority?: SajuOfficialCurrentAuthorityPortV1;
@@ -187,6 +188,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   if (!obj(native) || !obj(native.reading)
     || native.responseVersion !== RESPONSE_VERSION
     || !STATES.has(String(native.state))
+    || (input.requireCompleteResponse === true && native.state !== 'delivered')
     || !id(native.responseId)
     || !id(native.reading.readingId)) {
     return held('production_source_unverified');

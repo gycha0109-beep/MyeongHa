@@ -3,7 +3,7 @@ import type { SajuReadingComponentV1 } from '../../../packages/contracts/src/app
 import { readApprovedSajuIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
 import { createPostgresSajuOfficialAttemptPreparePortV1 } from './postgres-saju-official-attempt-prepare-v1.js';
 import { createPostgresSajuOfficialIssuedDbTransactionPortV1 } from './postgres-saju-official-issued-db-transaction-v1.js';
-import { executePostgresSubjectTransactionV1 } from './postgres-subject-execution.js';
+import { executePostgresApprovedSajuIssuerTransactionV1 } from './postgres-subject-execution.js';
 import type { SajuHeldSourceProofIssuePortV1 } from './saju-held-source-proof-revision-binding-v1.js';
 import {
   verifySajuHeldSourceProofV1,
@@ -37,7 +37,8 @@ export async function inspectApprovedSajuTemporalEvidenceV1(input: Readonly<
     verifierTrust: SajuHeldSourceProofVerifierTrustV1;
   }
 >) {
-  const readScope = () => executePostgresSubjectTransactionV1({
+  if (input.verifiedEvidence.kind !== 'member') return null;
+  const readScope = () => executePostgresApprovedSajuIssuerTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
     execute: ({ client, resolvedSubject }) => resolvedSubject.subjectKind === 'member'
@@ -75,7 +76,8 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     || typeof input.mappingVerifier?.verifyIssuedReadingMapping !== 'function') {
     return held('production_source_unverified');
   }
-  const prepared = await executePostgresSubjectTransactionV1({
+  if (input.verifiedEvidence.kind !== 'member') return held('current_authority_unavailable');
+  const prepared = await executePostgresApprovedSajuIssuerTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
     execute: async ({ client, resolvedSubject }) => {
@@ -84,7 +86,7 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
       if (scope === null) return null;
       const result = await client.query<{ readingId: string; readingSessionId: string }>(
         `select reading_id::text as "readingId",session_id::text as "readingSessionId"
-         from commerce_saju_private.prepare_approved_component_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::text,$7::text)`,
+         from public.prepare_approved_component_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::text,$7::text)`,
         [input.subjectId, input.purchaseIntentId, input.component, input.readingId, input.readingSessionId,
           input.readerCharacterId, scope.binding.sourceRequestHash],
       );
@@ -102,6 +104,7 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     ...input,
     readingId,
     readingSessionId,
+    requireCompleteResponse: true,
     resolveBirth: () => scope.birthRevision,
     sourceBirthRevisionId: scope.birthRevision.birthRevisionRef,
     readingText: scope.readingText,

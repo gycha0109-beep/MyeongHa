@@ -100,6 +100,7 @@ export interface SajuOfficialReadingExecutionInputV1<AdmittedResponse> {
   targetPersonRef?: string;
   /** Immutable period reference resolved from the purchase, when applicable. */
   periodReferenceDateTime?: string;
+  requireCompleteResponse?: true;
   adapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
   subjectId: string;
   readingId: string;
@@ -223,6 +224,7 @@ export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<Admitted
         sourceBirthRevisionId: input.sourceBirthRevisionId,
         sourceResponse: response,
         executedRequest,
+        ...(input.requireCompleteResponse === true ? { requireCompleteResponse: true } : {}),
         sourceVerifier,
         mappingVerifier,
         currentAuthority,

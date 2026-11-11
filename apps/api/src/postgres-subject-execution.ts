@@ -151,6 +151,23 @@ class TransactionSubjectIdentityResolutionPortV1
 export async function executePostgresSubjectTransactionV1<T>(
   input: ExecutePostgresSubjectTransactionInputV1<T>,
 ): Promise<T> {
+  return executeSubjectTransaction(input, ENTER_EXECUTION_ROLE_SQL);
+}
+
+/** Requires the isolated issuance login's separate role membership. */
+export async function executePostgresApprovedSajuIssuerTransactionV1<T>(
+  input: ExecutePostgresSubjectTransactionInputV1<T>,
+): Promise<T> {
+  if (input.verifiedEvidence.kind !== 'member') {
+    throw new Error('Approved Saju issuance requires a verified member.');
+  }
+  return executeSubjectTransaction(input, 'SET LOCAL ROLE myeongha_approved_saju_issuer_executor');
+}
+
+async function executeSubjectTransaction<T>(
+  input: ExecutePostgresSubjectTransactionInputV1<T>,
+  executionRoleSql: string,
+): Promise<T> {
   const connection = await input.pool.connect();
   let transactionStarted = false;
   let discardConnectionError: unknown;
@@ -159,7 +176,7 @@ export async function executePostgresSubjectTransactionV1<T>(
     await connection.query(BEGIN_SQL);
     transactionStarted = true;
 
-    await connection.query(ENTER_EXECUTION_ROLE_SQL);
+    await connection.query(executionRoleSql);
 
     const resolvedSubject = await resolveSubjectIdentity({
       verifiedEvidence: input.verifiedEvidence,

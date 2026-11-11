@@ -6,6 +6,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_reading_access_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_legacy_archive_fence_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuance_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_issuer_facades_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_checkout_selection_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_payment_handoff_v1.sql
@@ -825,7 +826,12 @@ declare
   admission_hash text;
   request_hash text;
   sandbox_receipt uuid := gen_random_uuid();
-  archived_reading uuid;
+  archived_reading uuid := gen_random_uuid();
+  issued_session uuid := gen_random_uuid();
+  issued_attempt uuid := gen_random_uuid();
+  issue_hash text := repeat('a',64);
+  issued_hash text := 'sha256:v1:' || repeat('b',64);
+  issued_snapshot jsonb;
   expected_constraint text;
 begin
   insert into auth.users(id) values(actor_auth);
@@ -983,7 +989,54 @@ begin
   -- without allowing a sandbox charge to mint product entitlements.
   perform pg_temp.approved_fixture_receipt(actor,purchase,sandbox_receipt);
   perform pg_temp.approved_fixture_grants(purchase,sandbox_receipt,array['career']);
-  archived_reading := pg_temp.approved_fixture_reading(actor,purchase,'career');
+  if has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_issue_scope_v1(uuid,uuid,text)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_issuer_executor',
+      'public.cmd_prepare_reading_transport_attempt_v1(uuid,uuid,uuid,text,text,text)','EXECUTE')
+    or has_schema_privilege('myeongha_approved_saju_issuer_executor','commerce_saju_private','USAGE') then
+    raise exception 'Approved issuance candidate exposed broader functions';
+  end if;
+  set local role myeongha_approved_saju_issuer_executor;
+  perform 1 from public.begin_member_subject_context_v1(actor_auth);
+  if public.qry_approved_saju_issue_scope_v1(actor,purchase,'career')->>'birthRevisionId'
+      is distinct from first_revision::text
+    or public.qry_approved_saju_issue_scope_v1(gen_random_uuid(),purchase,'career') is not null then
+    raise exception 'Dedicated issuer could not resolve the exact paid Birth';
+  end if;
+  perform 1 from public.prepare_approved_component_reading_v1(actor,purchase,'career',archived_reading,
+    issued_session,'test-standard-reader',issue_hash);
+  if not exists (select 1 from public.cmd_prepare_approved_saju_attempt_v1(actor,purchase,'career',
+      archived_reading,issued_session,issued_attempt,first_revision,issue_hash,'isolated-fixture','saju',null)
+    where execution_attempt_id=issued_attempt and attempt_state='running' and not replayed) then
+    raise exception 'Dedicated issuer could not prepare the exact source attempt';
+  end if;
+  if exists (select 1 from public.cmd_prepare_approved_saju_attempt_v1(actor,purchase,'career',
+    archived_reading,issued_session,gen_random_uuid(),first_revision,issue_hash,'isolated-fixture','saju',null)) then
+    raise exception 'Dedicated issuer prepared a duplicate source attempt';
+  end if;
+  issued_snapshot := jsonb_build_object('responseVersion','myeonghwa-product-reading-response-v2',
+    'state','delivered','reading',jsonb_build_object('readingId',archived_reading));
+  begin
+    perform 1 from public.cmd_finalize_approved_saju_reading_v1(actor,purchase,'career',archived_reading,issued_attempt,
+      gen_random_uuid(),repeat('c',64),'isolated-ref','isolated-approved-v1','isolated-native',
+      'fixture-checkout-self',issued_snapshot,issued_hash);
+    raise exception 'Dedicated issuer accepted a different source request';
+  exception when sqlstate 'P0001' then
+    get stacked diagnostics expected_constraint=constraint_name;
+    if expected_constraint<>'approved_saju_issuer_current_scope_unavailable' then raise; end if;
+  end;
+  perform 1 from public.cmd_finalize_approved_saju_reading_v1(actor,purchase,'career',archived_reading,issued_attempt,
+    gen_random_uuid(),issue_hash,'isolated-ref','isolated-approved-v1','isolated-native',
+    'fixture-checkout-self',issued_snapshot,issued_hash);
+  if not exists (select 1 from public.qry_approved_saju_stored_lineage_v1(actor,archived_reading,issued_attempt)
+    where stored_response_hash=issued_hash and stored_snapshot=issued_snapshot) then
+    raise exception 'Dedicated issuer could not verify committed lineage';
+  end if;
+  reset role;
+  set constraints ct_reading_session_authority,ct_reading_request_authority,ct_reading_finalize_from_reading,
+    ct_reading_finalize_from_ref,ct_reading_finalize_from_execution immediate;
+  set constraints ct_reading_session_authority,ct_reading_request_authority,ct_reading_finalize_from_reading,
+    ct_reading_finalize_from_ref,ct_reading_finalize_from_execution deferred;
   set local role myeongha_api_executor;
   if not exists (select 1 from public.qry_approved_saju_purchase_readings_v1(actor,purchase)
       where reading_id=archived_reading and component='career')

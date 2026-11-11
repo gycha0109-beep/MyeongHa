@@ -1,6 +1,7 @@
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import {
   executePostgresSubjectTransactionV1,
+  executePostgresApprovedSajuIssuerTransactionV1,
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type {
@@ -32,7 +33,9 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
 }>): SajuOfficialIssuedDbTransactionPortV1 {
   return Object.freeze({
     async run(request: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) {
-      return executePostgresSubjectTransactionV1({
+      const transact = input.approvedPurchase === undefined
+        ? executePostgresSubjectTransactionV1 : executePostgresApprovedSajuIssuerTransactionV1;
+      return transact({
         pool: input.pool,
         verifiedEvidence: input.verifiedEvidence,
         execute: ({ resolvedSubject, client }) => {

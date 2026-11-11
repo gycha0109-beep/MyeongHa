@@ -1,13 +1,11 @@
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import {
   executePostgresSubjectTransactionV1,
+  executePostgresApprovedSajuIssuerTransactionV1,
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import type { SajuOfficialAttemptPreparePortV1 } from './saju-production-reading-execution.js';
-import {
-  admitApprovedSajuIssueAttemptV1,
-  type ApprovedSajuIssueAttemptBindingV1,
-} from './postgres-approved-saju-issue-scope-v1.js';
+import type { ApprovedSajuIssueAttemptBindingV1 } from './postgres-approved-saju-issue-scope-v1.js';
 
 /**
  * Internal official Reading attempt allocator. It reuses the existing governed
@@ -27,6 +25,10 @@ from public.cmd_prepare_reading_transport_attempt_v1(
   $1::uuid, $2::uuid, $3::uuid, $4::text, $5::text, $6::text
 )
 `.trim();
+const PREPARE_APPROVED_SQL = PREPARE_SQL.replace(
+  /public\.cmd_prepare_reading_transport_attempt_v1\([\s\S]+\)$/u,
+  'public.cmd_prepare_approved_saju_attempt_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text,$9::text,$10::text,$11::text)',
+);
 
 const CURRENT_PURCHASE_SQL = `
 select public.qry_saju_official_issuance_preflight_v1(
@@ -75,24 +77,24 @@ export function createPostgresSajuOfficialAttemptPreparePortV1(input: Readonly<{
     async prepareBeforeSourceCall(request: PrepareInput) {
       if (!validConfiguration || !validIdentity(request)) return false;
       try {
-        return await executePostgresSubjectTransactionV1({
+        const approved = input.approvedPurchase;
+        const transact = approved === undefined
+          ? executePostgresSubjectTransactionV1 : executePostgresApprovedSajuIssuerTransactionV1;
+        return await transact({
           pool: input.pool,
           verifiedEvidence: input.verifiedEvidence,
           execute: async ({ client, resolvedSubject }) => {
             if (resolvedSubject.subjectId !== request.subjectId) return false;
-            const approved = input.approvedPurchase;
-            // Take the exact Grant lock before the transport command locks Reading.
-            // Finalize uses the same order when it rechecks the active purchase.
-            if (approved !== undefined
-              && !await admitApprovedSajuIssueAttemptV1(client, approved, request, 'before_allocation')) return false;
-            const attempt = await client.query<PrepareRow>(PREPARE_SQL, [
-              request.subjectId,
-              request.readingId,
-              request.executionAttemptId,
-              input.transportKey,
-              input.sajuEngineKey,
-              input.requestedEngineVersion,
-            ]);
+            const attempt = await client.query<PrepareRow>(approved === undefined ? PREPARE_SQL : PREPARE_APPROVED_SQL,
+              approved === undefined ? [
+                request.subjectId, request.readingId, request.executionAttemptId,
+                input.transportKey, input.sajuEngineKey, input.requestedEngineVersion,
+              ] : [
+                request.subjectId, approved.purchaseIntentId, approved.component, request.readingId,
+                request.readingSessionId, request.executionAttemptId, request.sourceBirthRevisionId,
+                approved.sourceRequestHash, input.transportKey, input.sajuEngineKey, input.requestedEngineVersion,
+              ]);
+            if (approved !== undefined && attempt.rows.length === 0) return false;
             if (attempt.rows.length !== 1 || !attempt.rows[0]) {
               throw new Error('Official Reading prepare returned an invalid receipt.');
             }
@@ -108,25 +110,19 @@ export function createPostgresSajuOfficialAttemptPreparePortV1(input: Readonly<{
             // ones. Never send a second Saju network request for the same ID.
             if (row.replayed) return false;
 
-            let admitted: boolean;
-            if (approved !== undefined) {
-              admitted = await admitApprovedSajuIssueAttemptV1(client, approved, request);
-            } else {
+            if (approved === undefined) {
               const result = await client.query<{ admitted: unknown }>(CURRENT_PURCHASE_SQL, [
                 request.subjectId, request.readingId, request.readingSessionId,
                 request.executionAttemptId, request.sourceBirthRevisionId,
               ]);
-              admitted = result.rows.length === 1 && result.rows[0]?.admitted === true;
-            }
-            if (!admitted) {
-              // A mere false result must NOT commit an unentitled running attempt.
-              throw deniedAfterAllocation;
+              if (result.rows.length !== 1 || result.rows[0]?.admitted !== true) throw deniedAfterAllocation;
             }
             return true;
           },
         });
       } catch (error) {
-        if (error === deniedAfterAllocation) return false;
+        if (error === deniedAfterAllocation || (error instanceof Error
+          && (error as { constraint?: string }).constraint === 'approved_saju_issuer_current_scope_unavailable')) return false;
         throw error;
       }
     },

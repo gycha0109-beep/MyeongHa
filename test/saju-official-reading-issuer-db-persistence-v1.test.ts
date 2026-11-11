@@ -129,10 +129,11 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
       rows = [{ subjectId: this.resolvedSubjectId, subjectKind: 'member' }];
     } else if (sql.includes('public.qry_saju_official_issuance_preflight_v1(')) {
       rows = [{ admitted: this.currentIssueAdmitted }];
-    } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')) {
+    } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')
+      || sql.includes('from public.cmd_finalize_approved_saju_reading_v1(')) {
       rows = [{ readingId, executionAttemptId, responseHash: storedHash, replayed: false }];
     } else if (sql.includes('from public.qry_saju_official_stored_lineage_v3(')
-      || sql.includes('from commerce_saju_private.approved_stored_lineage_v1(')) {
+      || sql.includes('from public.qry_approved_saju_stored_lineage_v1(')) {
       rows = [{
         nativeReadingId: this.storedNativeId,
         externalRequestRef: 'internal-only-ref',
@@ -151,6 +152,17 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
 }
 
 describe('Saju issued official Reading -> DB immutable commit boundary', () => {
+  it('holds a fallback response for an approved paid component before source or mapping verification', async () => {
+    const p = ports();
+    const result = await persistIssuedSajuOfficialReadingV1({
+      ...input(p, { ...native, state: 'delivered_with_fallback' }),
+      requireCompleteResponse: true,
+    });
+    expect(result).toMatchObject({ state: 'held', reason: 'production_source_unverified' });
+    expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
   it('dispatches the paid monthly request from DB scope and binds it before final transaction commit', async () => {
     const period = '2026-10-31T15:00:00.000Z';
     const purchaseIntentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -160,7 +172,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     class ApprovedConnection extends FakeIssuedDbConnection {
       override async query<Row>(sql: string, params: readonly unknown[] = []): Promise<PostgresQueryResultV1<Row>> {
         let rows: unknown[];
-        if (sql.includes('approved_issue_scope_v1(')) {
+        if (sql.includes('qry_approved_saju_issue_scope_v1(')) {
           expect(params).toEqual([subjectId, purchaseIntentId, 'month']);
           rows = [{ scope: { birthRevisionId: sourceBirthRevisionId, periodReferenceDateTime: period,
             birth: { calendarType: 'solar', birthDate: '2001-07-14', birthTime: '15:20',
@@ -168,20 +180,23 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
         } else if (sql.includes('prepare_approved_component_reading_v1(')) {
           expect(params.at(-1)).toBe(requestHash);
           rows = [{ readingId, readingSessionId }];
-        } else if (sql.includes('admit_approved_issue_attempt_v1(')) {
+        } else if (sql.includes('admit_approved_saju_issue_attempt_v1(')) {
           expect(params.at(-1)).toBe(requestHash);
-          events.push(params[5] === null ? 'lock-grant' : 'check-attempt');
+          events.push('check-attempt');
           rows = [{ admitted: true }];
-        } else if (sql.includes('cmd_prepare_reading_transport_attempt_v1(')) {
-          events.push('allocate');
+        } else if (sql.includes('cmd_prepare_approved_saju_attempt_v1(')) {
+          expect(params.slice(0,8)).toEqual([subjectId, purchaseIntentId, 'month', readingId,
+            readingSessionId, executionAttemptId, sourceBirthRevisionId, requestHash]);
+          events.push('prepare-approved');
           rows = [{ executionAttemptId, executionAttemptNo: 1, attemptState: 'running', replayed: false }];
-        } else if (sql.includes('bind_approved_component_reading_v1(')) {
-          expect(params).toEqual([subjectId, purchaseIntentId, 'month', readingId, requestHash, storedHash]);
-          events.push('bind');
-          rows = [];
         } else {
-          if (sql.includes('cmd_finalize_reading_transport_success_v1(')) events.push('finalize');
-          if (sql.includes('approved_stored_lineage_v1(')) events.push('read-back');
+          if (sql.includes('cmd_finalize_approved_saju_reading_v1(')) {
+            expect(params.slice(0,7)).toEqual([subjectId, purchaseIntentId, 'month', readingId,
+              executionAttemptId, outboxEventId, requestHash]);
+            expect(params.at(-1)).toBe(storedHash);
+            events.push('finalize-and-bind');
+          }
+          if (sql.includes('qry_approved_saju_stored_lineage_v1(')) events.push('read-back');
           return super.query<Row>(sql, params);
         }
         return { rows: rows as Row[] };
@@ -203,8 +218,10 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     });
     expect(result).toMatchObject({ state: 'committed', readingId });
     expect(requestReading).toHaveBeenCalledWith(request);
-    expect(events).toEqual(['lock-grant', 'allocate', 'check-attempt', 'source', 'check-attempt',
-      'finalize', 'bind', 'read-back']);
+    expect(events).toEqual(['prepare-approved', 'source', 'check-attempt', 'finalize-and-bind', 'read-back']);
+    expect(connection.calls.filter(sql => sql.startsWith('SET LOCAL ROLE'))).toEqual(
+      Array(3).fill('SET LOCAL ROLE myeongha_approved_saju_issuer_executor'),
+    );
     expect(connection.calls.at(-1)).toBe('COMMIT');
   });
 
