@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "ops-postgres-provider-copy-source-gap-v1",
+  "sourceBackupRunId": 42752268638,
+  "sourceRestoreRunId": 42967203704,
+  "sourceRestoreArtifactId": 13830933913,
+  "sourceRestoreMainSha": "3fbd8f8017f367258ca74ea2c2a0bc5e35a61f02",
+  "sourceRestoreEvidenceSha256": "248d81d918f2015b90bb6704cd303ff565b3641c5163b0478010a6919761dcf4",
+  "sourceMigrationFrontier": "20261109071019",
+  "sourceProviderSkippedBlocks": 29,
+  "sourceProviderSkippedRows": 66,
+  "sourceProviderProjectedBlocks": 3,
+  "sourceProviderProjectedRows": 27,
+  "skippedTables": [
+    {
+      "schema": "auth",
+      "table": "custom_oauth_providers",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 1
+    },
+    {
+      "schema": "auth",
+      "table": "flow_state",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 21
+    },
+    {
+      "schema": "auth",
+      "table": "identities",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 4
+    },
+    {
+      "schema": "auth",
+      "table": "oauth_clients",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "sessions",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 16
+    },
+    {
+      "schema": "auth",
+      "table": "mfa_amr_claims",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 16
+    },
+    {
+      "schema": "auth",
+      "table": "mfa_factors",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "mfa_challenges",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "mfa_recovery_code_sets",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "mfa_recovery_codes",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "oauth_authorizations",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "oauth_client_states",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 8
+    },
+    {
+      "schema": "auth",
+      "table": "oauth_consents",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "one_time_tokens",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "sso_providers",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "saml_providers",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "saml_relay_states",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "scim_tokens",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "scim_users",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "sso_domains",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "webauthn_challenges",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "webauthn_credentials",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "buckets",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "bucket_lifecycle_states",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "buckets_analytics",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "lifecycle_abandoned_artifacts",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "s3_multipart_uploads",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "storage",
+      "table": "s3_multipart_uploads_parts",
+      "reason": "target_relation_missing",
+      "sourceRowCount": 0
+    }
+  ],
+  "projectedTables": [
+    {
+      "schema": "auth",
+      "table": "audit_log_entries",
+      "reason": "source_columns_projected_to_target",
+      "previouslyDroppedSourceColumns": [
+        "ip_address"
+      ],
+      "sourceRowCount": 0
+    },
+    {
+      "schema": "auth",
+      "table": "users",
+      "reason": "source_columns_projected_to_target",
+      "previouslyDroppedSourceColumns": [
+        "email_confirmed_at",
+        "email_change_token_new",
+        "phone",
+        "phone_confirmed_at",
+        "phone_change",
+        "phone_change_token",
+        "phone_change_sent_at",
+        "email_change_token_current",
+        "email_change_confirm_status",
+        "banned_until",
+        "reauthentication_token",
+        "reauthentication_sent_at",
+        "is_sso_user",
+        "deleted_at",
+        "is_anonymous"
+      ],
+      "sourceRowCount": 4
+    },
+    {
+      "schema": "auth",
+      "table": "refresh_tokens",
+      "reason": "source_columns_projected_to_target",
+      "previouslyDroppedSourceColumns": [
+        "parent",
+        "session_id"
+      ],
+      "sourceRowCount": 23
+    }
+  ],
+  "sourceRowsAreBackupTimeAggregates": true,
+  "containsRowPayloads": false,
+  "containsIdentifiers": false,
+  "sourceProviderFullRestoreProven": false,
+  "hostedAuthStorageProven": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false
+}
