@@ -243,6 +243,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client jq
 
+      - name: Validate synthetic external role replay boundaries
+        run: node scripts/verify-isolated-postgres-external-role-replay.mjs
+
       - name: Restore encrypted backup into isolated PostgreSQL
         shell: bash
         env:

@@ -1,3 +1,13 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 무료 Docker Supabase PostgreSQL17 역할 연결 복구 구현·합성 실증
+
+- **실제 원인:** 기존 `scripts/operations/run-production-postgres-strict-dump.sh`의 예약된 수신 역할 GRANT 필터 때문에 봉인 백업의 `roles.sql`에 앱 역할→`postgres` 직접 연결이 포함되지 않음. 최신 격리 복원 #42945204368에서 원본 48/복원 0으로 확정. 운영 DB `pg_auth_members` SELECT-only 메타 집계 재확인: 앱 역할 43개→`postgres` 수신 직접 GRANT 48개, grantor 분류 `supabase_admin`·`postgres`만 존재, admin true 43/inherit true 3/set true 2. 실제 원본 행·역할명은 비공개.
+- **이번 Docker 구현:** 봉인된 암호화 백업 안 `source-app-catalog.json`의 원본 직접 권한 연결만 허용 목록(앱 역할→`postgres`, grantor 2종, 3개 옵션 boolean) 검증 후 개인 `RUNNER_TEMP` 안에 SQL을 생성하고, `scripts/run-postgres-isolated-restore-drill.sh`에서 기존 격리 PostgreSQL17 `supabase_admin`으로만 트랜잭션 복원하도록 연결. 다른 Provider 역할을 만들거나 운영 SQL/권한을 변경하지 않으며, SQL·이름·개인정보는 GitHub 로그/아티팩트 업로드 금지. 실패 시 전체 복원 단계 HOLD, 원본 filtered dump는 그대로 보존. 결과는 기존 정확한 source↔target 카탈로그 비교에서 별도 평가.
+- **실제 무료 Docker 실증:** Windows Docker Desktop Engine 29.8.2, 자체 네트워크 없음/포트 공개 없음/영속 볼륨 없는 임시 `public.ecr.aws/supabase/postgres@sha256:6942962433a569e87f228b4d4ab7e11db5deca64e43babb3a038443ad6c4f1bb` (PG17.6.1.167)에서 **합성 역할 43개·연결 48개** 복원 옵션/부여자 48/48 일치, 누락 역할 시 트랜잭션 전체 롤백, 두 번째 실행 시 중복·변형 없음. 검사기 `scripts/verify-isolated-postgres-external-role-replay.mjs --docker` 실제 PASS. 일반 PostgreSQL 17 이미지는 Supabase 전용 bootstrap admin grantor와 달라 실패했으므로 실환경에 가까운 Supabase Docker 이미지만 사용. 기밀 데이터 원본은 투입하지 않음.
+- **증거 및 한계:** `docs/operations/POSTGRES_DOCKER_EXTERNAL_ROLE_REPLAY_PROOF_20261111.json`은 합성 원본/대상 결과만 비식별 보존. 원본 봉인 백업 #42752268638의 48건을 수정된 복원 경로에서 **아직 실제 재생·검증하지 않았으므로** 원본 복구 성공으로 보고하지 않음. source catalog는 dump 이전/이후 안정 관측이지만 같은 MVCC snapshot 증거 아님. Provider 객체/ACL legacy 29, Provider COPY skipped 29/projected 3, 전체 migration ledger, 실제 Hosted Auth/Storage, 개인정보 독립 연속성, full-service RPO PT24H/RTO PT6H 미증명. P0 #1887 OPEN, `drReady=false`, `serviceResumptionAllowed=false`, `NOT_ACCEPTED`.
+- **다음:** PR 필수 Integration PASS 및 `main` 병합 뒤 기존 encrypted backup #42752268638을 한 번만 Docker 기반 격리 PG17에 재복원해 원본 48건 grantor/options parity 실측, 안전한 비식별 JSON만 기록. 유료 Hosted 환경 생성·운영 SQL/DDL/DML/GRANT·개인정보 canary 실행 없음.
+
+Watchtower-Track: ops
+
 ### 2026-11-11 KST — Gate 1 / Phase 8-A: 새 운영 전용 Admin A4 migration 현재 ACL 효과 SELECT-only 실측
 
 - **근거:** PR #3205 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42947155405 SUCCESS, main `28e71e125ab3be814db5b002502467224da6f746` 병합. 운영 PostgreSQL 17 `supabase_migrations.schema_migrations` 현재 적용 242개 / main SQL 276개, 공통 200, 원격 전용 42(기존 41+1), 저장소 전용 76. 새 원격 전용 버전 `20261109071019` Admin A4 reading AI cost binding reader에 대한 원격 저장 SQL 1개, 5,512 bytes, SHA256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8` (원문은 공개하지 않음).
