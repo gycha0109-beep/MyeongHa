@@ -1,6 +1,7 @@
 """Single-host, transaction-based offline API budget governor. No network clients here."""
-import os
 import sqlite3
+import time
+from contextlib import contextmanager
 from pathlib import Path
 
 ROLES = {'student', 'reflection', 'judge', 'holdout'}
@@ -41,11 +42,26 @@ class BudgetLedger:
             if con.execute('SELECT * FROM config WHERE run_id=?', (run_id,)).fetchone() != config:
                 raise BudgetDenied('config_changed_after_start')
 
+    @contextmanager
     def _connect(self):
-        con = sqlite3.connect(str(self.path), isolation_level=None, timeout=4)
-        con.execute('PRAGMA journal_mode=WAL')
-        con.execute('PRAGMA busy_timeout=4000')
-        return con
+        con = sqlite3.connect(str(self.path), isolation_level=None, timeout=10)
+        try:
+            con.execute('PRAGMA busy_timeout=10000')
+            # Concurrent first-open can race journal initialization. Only request WAL
+            # when needed, with a bounded lock retry; never fake successful access.
+            for attempt in range(8):
+                try:
+                    mode = con.execute('PRAGMA journal_mode').fetchone()[0]
+                    if mode != 'wal':
+                        con.execute('PRAGMA journal_mode=WAL')
+                    break
+                except sqlite3.OperationalError as exc:
+                    if 'locked' not in str(exc).lower() or attempt == 7:
+                        raise
+                    time.sleep(0.03 * (attempt + 1))
+            yield con
+        finally:
+            con.close()
 
     def reserve(self, request_id, role, worst_case_micro_usd):
         """Fail closed. A reservation must be persisted before the caller sends a request."""

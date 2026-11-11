@@ -8,7 +8,7 @@ A single offline optimization runner supports character-specific and shared expr
 
 ## Implementation steps / evidence
 
-- [x] A (foundation, partial): standalone, zero-dependency shared profile and multi-character run contracts; immutable hashes, distinct model/routing, approved mutable slot only; 9 character IDs; 13 synthetic Node tests. Not yet connected to historical Yeoul 288 transformed evaluation records; do not claim full A completion.
+- [x] A (foundation, partial): standalone shared profile and multi-character run contracts; immutable hashes, distinct model/routing, allowed mutable slot only; 9 character IDs; Yeoul historical diagnostic bridge built and privately smoke-checked against reconstructed 288 ratings (72 DeepSeek; 36 positive). 17 synthetic Node tests. Original uploaded JSON raw bytes not authenticated; 24 review and 104-turn artifacts are not yet integrated, so full A remains incomplete.
 - [ ] A completion: adapt Yeoul's private 288/24/104 outputs without changing totals; second-character synthetic profile through a stable versioned bridge.
 - [x] B (foundation, partial): development/validation/holdout/long-horizon family collision checks; hard-gate metadata feedback; per-character no-regression; no text in cross-process metadata. Structural checks do not prove semantic equivalence or natural-language safety.
 - [ ] B completion: existing Context Composer/Output Guard authority integration, dedicated R16 rubrics, scenario-family semantic review and private data access policy.
