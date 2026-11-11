@@ -67,3 +67,9 @@
 - Added a synthetic-only gateway admission path for student/reflection/judge/holdout that uses the real shared SQLite reservation ledger; rejects duplicate IDs, unapproved simulated models, supplier mismatch, uncertain cost and over-budget charges without HTTP calls. The module has deliberately **no real provider transport**, so this is not a live security gateway.
 - The pinned GEPA workflow now runs two distinct Docker containers with `--network none`, read-only research-source mount and unprivileged user. The optimizer receives no sealed mount; the separate final evaluator gets only a generated synthetic holdout fixture. Both are forbidden from network egress and source writes at OS level.
 - This proves the isolated synthetic harness, **not** that a future paid GEPA optimization + forwarding gateway is isolated; real approved network gateway, private datasets, token/price authorization and sealed final evaluation remain unimplemented.
+
+## 2026-11-11 — Pinned GEPA in OS-denied-network runtime (new CI gate)
+
+- Added a build-time-only container image installing official GEPA source SHA ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309. No model credentials are provided.
+- The new CI step runs the *real* pinned GEPA fake-reflector optimizer **inside** an unprivileged Docker container with `--network none`, read-only code mount and private temporary outputs. This closes the gap between separately proving Docker isolation and separately running real GEPA.
+- Image base python:3.14-slim is currently tag-based, not a digest lock; pin its digest once a validated image digest is collected. A passing isolated smoke still cannot authorize live provider calls or prove user dialogue quality.

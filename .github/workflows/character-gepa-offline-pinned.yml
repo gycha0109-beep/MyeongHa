@@ -67,3 +67,16 @@ jobs:
             --mount "type=bind,src=$RUNNER_TEMP/sealed-gepa-synthetic,dst=/private/sealed,readonly" \
             python:3.14-slim python /opt/myeongha/isolated_runtime_probe.py \
             --mode holdout --host-sealed-path "$RUNNER_TEMP/sealed-gepa-synthetic/synthetic.json"
+
+      - name: Run actual pinned GEPA inside denied-network container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build --pull --file research/character-optimization-gepa/Dockerfile.pinned-offline \
+            --tag myeongha-gepa-pinned-offline:verify research/character-optimization-gepa
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user 65534:65534 --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
+            --env PYTHONPATH=/opt/myeongha \
+            myeongha-gepa-pinned-offline:verify \
+            python -m unittest -v test_pinned_gepa_offline
