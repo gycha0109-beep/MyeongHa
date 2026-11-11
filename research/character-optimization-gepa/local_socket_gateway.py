@@ -22,7 +22,12 @@ class SocketGatewayError(ValueError):
     pass
 
 
-def handle_request(gate: OfflineEgressGate, request: object) -> dict:
+def handle_request(gate: OfflineEgressGate, request: object, governed_gate=None) -> dict:
+    # No client may supply an approval claim to this synthetic-only route.
+    if isinstance(request, dict) and set(request) == {'kind', 'request', 'fixture'}:
+        if request['kind'] != 'governed_dry_run' or governed_gate is None:
+            raise SocketGatewayError('governed_dry_run_only')
+        return governed_gate.simulate(request['request'], request['fixture'])
     if not isinstance(request, dict) or set(request) != REQUEST_KEYS:
         raise SocketGatewayError('request_shape')
     fixture = request['fixture']
@@ -44,7 +49,7 @@ class _Handler(socketserver.StreamRequestHandler):
             return
         try:
             req = json.loads(raw.decode('utf-8'))
-            outcome = handle_request(self.server.gate, req)
+            outcome = handle_request(self.server.gate, req, self.server.governed_gate)
             self._respond({'ok': True, 'result': outcome})
         except (UnicodeError, json.JSONDecodeError, ValueError, TypeError) as exc:
             # Internal path/token errors must not be copied to the caller or CI logs.
@@ -58,7 +63,7 @@ class LocalSocketGateway(socketserver.ThreadingMixIn, socketserver.UnixStreamSer
     daemon_threads = True
     allow_reuse_address = False
 
-    def __init__(self, path: str | Path, gate: OfflineEgressGate):
+    def __init__(self, path: str | Path, gate: OfflineEgressGate, governed_gate=None):
         target = Path(path)
         if target.is_symlink() or target.exists() or not target.parent.is_dir():
             raise SocketGatewayError('socket_path_not_private_or_available')
@@ -66,6 +71,7 @@ class LocalSocketGateway(socketserver.ThreadingMixIn, socketserver.UnixStreamSer
             raise SocketGatewayError('socket_parent_not_private')
         super().__init__(str(target), _Handler)
         self.gate = gate
+        self.governed_gate = governed_gate
         os.chmod(target, 0o600)
 
     def server_close(self):

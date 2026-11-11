@@ -79,3 +79,9 @@
 - Added an explicitly synthetic-only Unix-domain socket service hosted outside the optimizer container, backed by the existing transactional SQLite ledger. It rejects malformed/oversized requests, unknown models, missing usage, duplicate attempts and over-budget admissions without exposing user text or any provider network client.
 - New CI probes use a Node process and a Python client inside a `--network none` Docker container connecting to the same host service. A post-run ledger check verifies two distinct reservations and no external calls.
 - This is **not** the live OpenRouter transport: owner approval verification, model token ceiling/price controls, real provider response accounting and dedicated production gateway deployment remain pending. No paid calls authorized.
+
+## 2026-11-11 — 모의 토큰·요금·공급자·재시도 통제
+
+- 기존 SQLite 장부와 Unix 소켓 서버를 재사용해 별도 통제형 합성 요청 경로를 구현했다. 요청의 역할·대상·모델·설정 해시·공급자 정책·요금표 버전, 입력/출력/추론 토큰을 검증하며, 과금 불명·초과·응답 모델/공급자 불일치는 예약을 보류한다.
+- 동시 예약/재시도 횟수 제한과 실행 정책 해시를 SQLite 트랜잭션에 고정한다. 클라이언트의 approvalRef는 입력 스키마에서 거부하고, 모든 통제형 응답에 approval_state=synthetic_only, external_calls=0을 남긴다.
+- 확인 범위: 관련 가짜 요청 테스트만. 실제 사용자 승인 확인 시스템, 유료 공급자 송신, 검증된 공식 가격표, 비용 전체 강제 게이트, 실제 비공개 연구 입력 격리는 앞으로의 필수 과제다.
