@@ -42,3 +42,10 @@
 - Remove synthetic-only `_contract_status` from the kwargs destined for `optimize_anything(**kwargs)`; this was an invalid keyword in the pinned upstream new API. The preflight remains a separate call.
 - Reject symlinked private output directories before `Path.resolve()` so the check is not bypassed by path normalization. Add independent synthetic tests.
 - Local checks: Node 17/17 and Python 17/17 pass. Installed GEPA runtime remains unverified, remote model calls 0.
+
+## 2026-11-11 — 로드맵 본문 복구 및 GEPA 실제 무네트워크 실행 CI 추가
+
+- 이전 커밋의 ROADMAP.md 본문에 일시적 파일 읽기 오류 문구가 저장된 결함 확인; 승인된 v0.3 설계의 필수 구현 단계와 현재 작업 상태를 복원했다.
+- 신규 GEPA API가 있는 공식 소스 커밋 `ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309`을 GH Actions 격리 Python 환경에 고정 설치하고, 사람 평가나 유료 LLM 대신 합성 평가·가짜 반사 전략으로 `optimize_anything` 실행을 확인하는 경로를 추가했다.
+- `OPENAI_API_KEY`/`OPENROUTER_API_KEY` 등 키를 비우고, Python 실행 중 socket 연결을 예외로 차단하며, 봉인 홀드아웃을 GEPA에 넘기지 않는다. 저장소 외부 출력 디렉터리만 허용한다.
+- 주의: 이번 코드는 GH Actions 완료 후에만 실제 GEPA 새 API 호환성이 확인된다. OS 차원의 전체 격리·실 비용 게이트·문장 의미 품질 실험은 아직 미완료다.

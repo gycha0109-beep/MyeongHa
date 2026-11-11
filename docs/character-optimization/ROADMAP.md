@@ -1,5 +1,27 @@
-The requested file reference is not currently visible. Use files.search or files.list to rediscover the file, then retry with a returned ref_id or file_id.
+# 명하 캐릭터 공통 GEPA 최적화 — 구현 로드맵
 
-### Confirmed GEPA library-version blocker
+> 기준: `MyeongHa_Character_GEPA_Optimization_Architecture_v0.3` · 연구용 · 사용자 승인 없는 유료 API 호출 금지
+> 구현 트랙: `character-runtime-lab` / PR #3208. 코드 검증과 실제 응답 품질 증명을 반드시 구분한다.
 
-Public gepa==0.1.4 exposes legacy API; the new OptimizeAnythingConfig exists in the newer upstream source but runtime/dependency lock and fake-evaluator behavior have not been verified. See GEPA_SOURCE_COMPATIBILITY.md. C remains partial; no user-paid calls.
+| 순서 | 필수 결과 | 현재 사실 확인 | 완료를 증명할 조건 |
+|---|---|---|---|
+| 1. 공통 규격 | 캐릭터별 프로필과 공통 실행 입력 | **부분 구현**: 9개 저작 캐릭터, 단일/다중 캐릭터 계약, 표현 슬롯 제한 | 기존 여울 평가 288건·24개 검토 후보·104턴 계획의 의미를 유지하고, 다른 캐릭터 프로필 및 모델을 별도로 수용 |
+| 2. 평가·권한 | 한국어/페르소나/관계/기억/주도성 평가와 실패 차단 | **부분 구현**: 기본 결함·평가셋 분할·비열화 검사, 비공개 집계만 추출 | 캐릭터별 R16 루브릭, 미검토 예시 및 허위 기억, 교차 캐릭터 오염, 평가셋 유사 자료 혼입을 독립 검증 |
+| 3. GEPA 오프라인 연결 | 실제 패키지 호환·안전한 가상 개선 실행 | **부분 구현**: API 계약 조립, 테스트용 SQLite 예약 장부, 잠긴 소스 버전 기반 오프라인 CI 실험 추가 | 정확한 GEPA 소스 버전 설치 및 실제 가상 평가 통과, 모든 원격 호출 강제 차단, 비용 장부/파일 격리·비공개 출력 검증 |
+| 4. 여울 파일럿 준비 | DeepSeek 실패 피드백과 독립 질문군 | **부분 구현**: 기존 사용자 288건 집계/DeepSeek 72건 읽기 전용 연결 | 새로운 개발/검증 질문 가족, 미승인 30개 검토표 확정, 모델·요금표·호출/비용 상한 및 평가 기준 승인 묶음 |
+| 5. 유료 GEPA 파일럿 | 여울 개선 후보의 실측 비교 | **미착수, 별도 비용 승인 필요** | 승인된 비용 안에서 실제 DeepSeek와 반사 모델 비교, 봉인 평가·사람 블라인드 비교, 안전·비용 회귀 |
+| 6. 다른 캐릭터 확대 | 공통/고유 규칙별 독립 최적화 | **미착수** | 각 캐릭터의 근거·실패 유형 확보, 공통 규칙 적용 시 각자 퇴행 없음 증명 |
+| 7. 운영 반영 | 검증된 콘텐츠의 승인된 배포 | **미착수** | 사용자 운영 승인, 콘텐츠 버전 고정, 기존 대화 무단 교체 금지, 되돌리기 검증 |
+
+## 고정 경계
+
+- GEPA는 Canon/세계관/기억/관계/사주/콘텐츠 권한을 변경하지 않는다. 허용된 표현 슬롯 하나만 제안한다.
+- 기존 12개 여울 질문과 288개 평가는 개발 근거이며 독립 품질 검증에 재사용하지 않는다.
+- H01~H10은 평가군의 독립성에 공개 노출 이력이 있는 합성 자료다. 최적화기 파일 마운트·읽기 권한 차단은 별도 구현·검증 전까지 **미충족**이다.
+- 사용자 승인 없는 외부 모델 호출은 0회로 유지한다. GEPA 가상 실행이나 자동 CI 성공은 품질 개선 또는 운영 승인 근거가 아니다.
+- 필수 구현/검증/문서화가 완료되지 않았으므로 **ROADMAP_COMPLETE 미선언**.
+
+## 현 호환성 문제
+
+- 공개 `gepa==0.1.4` 릴리스는 구 API에 해당하며, 신규 `OptimizeAnythingConfig`가 포함된 공식 소스 커밋 `ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309`을 대상으로 별도 **가상/무네트워크 실제 실행**을 검증한다.
+- 새 GH Actions 검증은 해당 소스 SHA를 사용하며 실제 유료 모델을 사용하지 않는다. 실행 결과를 확인하기 전까지 설치/실행 성공을 추정하지 않는다.

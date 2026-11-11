@@ -1,0 +1,46 @@
+name: Character GEPA Pinned Offline Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'research/character-optimization-gepa/**'
+      - 'docs/character-optimization/**'
+      - '.github/workflows/character-gepa-offline-pinned.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: character-gepa-offline-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pinned-source-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      OPENAI_API_KEY: ''
+      OPENROUTER_API_KEY: ''
+      ANTHROPIC_API_KEY: ''
+      WANDB_DISABLED: 'true'
+      MLFLOW_TRACKING_URI: ''
+      PYTHONNOUSERSITE: '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Create isolated GEPA venv and install pinned source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/gepa-venv"
+          "$RUNNER_TEMP/gepa-venv/bin/python" -m pip install --disable-pip-version-check --no-deps \
+            'gepa @ git+https://github.com/gepa-ai/gepa.git@ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309'
+      - name: Verify genuine GEPA with only fake evaluation and no network
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
+          "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
+            test_offline test_gepa_api_contract test_pinned_gepa_offline
