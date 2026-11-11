@@ -55,3 +55,9 @@
 - Newly pinned source revision installed successfully. Its first smoke test was stopped locally by the expected max_evals<=10 guard because the test incorrectly requested 16. Test now uses 10, preserving the fail-closed contract.
 - Governance workflow-map rejected the new pull-request workflow because it had not been registered in docs/ci/workflow-responsibility-map.json; added an explicit character-runtime-lab mapping.
 - No external AI model or user messages were sent; real GEPA execution confirmation remains pending the next CI.
+
+## 2026-11-11 — Pinned GEPA offline smoke ran; research bridge data isolation hardening
+
+- Genuine GEPA pinned source commit ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309 installed in GH Actions. In-process fake reflection and synthetic evaluation improved fabricated score from 0.2 to 0.8; 18 Python tests PASS. Evidence: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42963466961 . This is **not a real quality gain** and external model calls remain 0.
+- Enforce manifest hash, original candidate hash, immutable context hash, unique scenario families, separate dev/validation sets, cohort-appropriate character IDs, and shared-cohort per-character split coverage at the GEPA boundary. Add synthetic negative tests.
+- Installed GEPA was derived from a pinned source commit whose project metadata still reports version 0.1.4; do not confuse it with published PyPI v0.1.4. Full OS file/network isolation and provider spend gateway remain unfinished.

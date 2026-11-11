@@ -25,4 +25,29 @@ test('candidate allows only selected expression text',()=>{assert.equal(validate
 test('feedback is metadata-only, hard failures override score',()=>{const scores=Object.fromEntries(DIMENSIONS.map(d=>[d,1]));const r=sanitizeGepaFeedback({characterId:'yeoul',scores,hardFailures:['fabricated_memory']});assert.equal(r.score,0);assert.equal(r.side_info.raw_dialogue_excluded,true);assert.equal(JSON.stringify(r).includes('user_message'),false);});
 test('shared regression never hidden by positive mean',()=>{const x=assessSharedCandidate([{characterId:'yeoul',baseline:0.5,candidate:0.9,hardGatePass:true,humanReviewVerified:true},{characterId:'seyeon',baseline:0.8,candidate:0.7,hardGatePass:true,humanReviewVerified:true}]);assert.equal(x.eligible,false);assert.deepEqual(x.regressions,['seyeon']);});
 test('shared approval not inferred from missing human review',()=>assert.equal(assessSharedCandidate([{characterId:'yeoul',baseline:0.5,candidate:0.9,hardGatePass:true,humanReviewVerified:true},{characterId:'seyeon',baseline:0.5,candidate:0.9,hardGatePass:true,humanReviewVerified:false}]).eligible,false));
-test('GEPA bridge strips dialogue and never forwards sealed holdout',()=>{const manifest=run('character',[profile('yeoul')]);const candidate=validateCandidate({character_expression:'잘 들어 보세요.'},{slot:'character_expression',pinnedContextSha256:h});const corpus=[row('x','f','development')];const envelope=buildGepaResearchPayload({manifest,candidate,corpus});assert.equal(envelope.externalCallsAuthorized,false);assert.equal(envelope.test_set,null);assert.ok(!JSON.stringify(envelope).includes('잘 들어'));assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[row('z','z','sealed_holdout')]}),/optimizer_inputs/);});
+test('GEPA bridge strips dialogue and never forwards sealed holdout',()=>{const manifest=run('character',[profile('yeoul')]);const candidate=validateCandidate({character_expression:'잘 들어 보세요.'},{slot:'character_expression',pinnedContextSha256:h});const corpus=[row('x','f','development','x'),row('y','fv','optimizer_validation','y')];const envelope=buildGepaResearchPayload({manifest,candidate,corpus});assert.equal(envelope.externalCallsAuthorized,false);assert.equal(envelope.test_set,null);assert.ok(!JSON.stringify(envelope).includes('잘 들어'));assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[row('z','z','sealed_holdout')]}),/optimizer_inputs/);});
+test('GEPA bridge requires signed-equivalent manifest and untouched expression candidate',()=>{
+ const manifest=run('character',[profile('yeoul')]);
+ const candidate=validateCandidate({character_expression:'말을 구체적으로 이어가세요.'},{slot:'character_expression',pinnedContextSha256:h});
+ const corpus=[row('d','d','development','d'),row('v','v','optimizer_validation','v')];
+ assert.ok(buildGepaResearchPayload({manifest,candidate,corpus}).dataset.length===2);
+ assert.throws(()=>buildGepaResearchPayload({manifest:{...manifest,optimizerVersion:'tampered'},candidate,corpus}),/manifest_integrity/);
+ assert.throws(()=>buildGepaResearchPayload({manifest,candidate:{...candidate,text:'modified'},corpus}),/candidate_integrity/);
+ assert.throws(()=>buildGepaResearchPayload({manifest,candidate:{...candidate,pinnedContextSha256:digest('other')},corpus}),/candidate_integrity/);
+});
+test('GEPA bridge refuses missing validation, cross character, and mixed family',()=>{
+ const manifest=run('character',[profile('yeoul')]);
+ const candidate=validateCandidate({character_expression:'설명은 짧게 하세요.'},{slot:'character_expression',pinnedContextSha256:h});
+ const d=row('d','f1','development','a');
+ assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[d]}),/separate_dev_and_validation_required/);
+ assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[d,{...row('v','f2','optimizer_validation','b'),characterId:'seyeon'}]}),/cross_character_input/);
+ assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[d,row('v','f1','optimizer_validation','b')]}),/family_crosses_split/);
+});
+test('shared GEPA bridge requires development and validation evidence for every character',()=>{
+ const manifest=run('shared',[profile('yeoul','shared_expression'),profile('seyeon','shared_expression','different/model')]);
+ const candidate=validateCandidate({shared_expression:'답변을 자연스럽게 해주세요.'},{slot:'shared_expression',pinnedContextSha256:h});
+ const yeoul=[row('yd','yf1','development','ya'),row('yv','yf2','optimizer_validation','yb')];
+ const seyeon=[{...row('sd','sf1','development','sa'),characterId:'seyeon'}, {...row('sv','sf2','optimizer_validation','sb'),characterId:'seyeon'}];
+ assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[...yeoul,seyeon[0]]}),/missing_character_coverage/);
+ assert.equal(buildGepaResearchPayload({manifest,candidate,corpus:[...yeoul,...seyeon]}).dataset.length,4);
+});
