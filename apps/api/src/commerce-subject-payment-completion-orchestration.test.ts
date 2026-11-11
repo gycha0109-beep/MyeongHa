@@ -86,7 +86,8 @@ function fakePool(input: {
             };
           }
 
-          if (text.includes('qry_commerce_payment_verification_context_v1')) {
+          if (text.includes('qry_commerce_payment_verification_context_v1')
+            || text.includes('qry_approved_saju_sandbox_verification_context_v1')) {
             expect(values).toEqual([SUBJECT_ID, PAYMENT_ATTEMPT_ID]);
             if (input.contextConstraint !== undefined) {
               throw Object.assign(new Error('private verification-context detail'), {
@@ -162,6 +163,24 @@ function invoke(input: {
 }
 
 describe('subject-owned Commerce payment completion orchestration', () => {
+  it('reads only an approved sandbox attempt and writes its receipt through the separate pool', async () => {
+    const subjectQueries: string[] = [];
+    const commerceQueries: string[] = [];
+    const result = await executeSubjectOwnedCommercePaymentCompletionV1({
+      pool: fakePool({ queriedSql: subjectQueries }),
+      commercePool: fakePool({ queriedSql: commerceQueries }),
+      approvedSajuSandbox: true,
+      verifiedEvidence: { kind: 'member', verifiedAuthUserId: AUTH_USER_ID },
+      paymentAttemptId: PAYMENT_ATTEMPT_ID,
+      verificationAdapter: adapter(),
+    });
+    expect(result).toMatchObject({ receiptId: RECEIPT_ID });
+    expect(subjectQueries.some(sql => sql.includes('qry_approved_saju_sandbox_verification_context_v1'))).toBe(true);
+    expect(subjectQueries).not.toContain('SET LOCAL ROLE myeongha_commerce_internal_executor');
+    expect(commerceQueries.some(sql => sql.includes('cmd_persist_verified_payment_evidence_v1'))).toBe(true);
+    expect(commerceQueries).not.toContain('SET LOCAL ROLE myeongha_api_executor');
+  });
+
   it('fulfills the persisted Saju Receipt once through Commerce and skips the separate Reader purchase path', async () => {
     const queriedSql: string[] = [];
     const result = await invoke({

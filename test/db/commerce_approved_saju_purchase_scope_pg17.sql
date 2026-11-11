@@ -786,7 +786,8 @@ begin
     where ns.nspname='public' and proc.proname in (
       'select_approved_saju_checkout_v1','resolve_approved_purchase_admission_v1',
       'create_approved_purchase_intent_v1','create_approved_saju_sandbox_attempt_v1',
-      'read_approved_saju_sandbox_handoff_v1','qry_approved_saju_component_record_v1',
+      'read_approved_saju_sandbox_handoff_v1','qry_approved_saju_sandbox_verification_context_v1',
+      'qry_approved_saju_component_record_v1',
       'qry_approved_saju_purchase_readings_v1','qry_approved_saju_reading_history_v1'
     )
   loop
@@ -798,7 +799,7 @@ begin
       raise exception 'Sandbox API opt-in exposed a function to the wrong role';
     end if;
   end loop;
-  if intended_count<>8 or has_schema_privilege('myeongha_api_executor','commerce_saju_private','USAGE')
+  if intended_count<>9 or has_schema_privilege('myeongha_api_executor','commerce_saju_private','USAGE')
     or has_function_privilege('myeongha_commerce_internal_executor',
       'public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)','EXECUTE') then
     raise exception 'Sandbox API opt-in changed the private or fulfillment perimeter';
@@ -896,7 +897,7 @@ begin
     or handoff.status<>'handed_off' then
     raise exception 'Sandbox handoff changed the approved payment identity or amount';
   end if;
-  if not exists (select 1 from public.qry_commerce_payment_verification_context_v1(actor,attempt_id)
+  if not exists (select 1 from public.qry_approved_saju_sandbox_verification_context_v1(actor,attempt_id)
     where expected_amount_minor=9900 and provider_request_id='checkout-sandbox-request'
       and expected_external_product_id=handoff.external_product_id) then
     raise exception 'Committed sandbox handoff was unavailable to server verification';
@@ -1014,6 +1015,8 @@ begin
       'public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)','EXECUTE')
     or has_function_privilege('myeongha_api_executor',
       'public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_sandbox_verification_context_v1(uuid,uuid)','EXECUTE')
     or has_function_privilege('myeongha_api_executor',
       'public.qry_approved_saju_reading_history_v1(uuid,timestamptz,timestamptz,uuid,integer)','EXECUTE') then
     raise exception 'Sandbox API rollback left runtime privileges';

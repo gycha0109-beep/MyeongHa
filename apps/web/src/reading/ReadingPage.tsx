@@ -1,6 +1,7 @@
 import { resumePreviewHrefV1 } from '../../reading-preview-continuation.js';
 import { useEffect, useState } from 'react';
-import { ApprovedSajuCheckoutPanel, type ApprovedSajuCheckoutPanelPorts } from '../commerce/ApprovedSajuCheckoutPanel.js';
+import { ApprovedSajuCheckoutPanel } from '../commerce/ApprovedSajuCheckoutPanel.js';
+import type { ApprovedSajuCheckoutPanelPorts } from '../commerce/approved-saju-sandbox-checkout.js';
 import { resolveReadingAvailabilityV1 } from './reading-availability.js';
 
 // The eleven public Saju topics share one product layer. Route availability is

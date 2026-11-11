@@ -56,6 +56,8 @@ export interface SubjectOwnedCommercePaymentCompletionV1 {
  */
 export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   readonly pool: PostgresSubjectPoolV1;
+  readonly commercePool?: PostgresSubjectPoolV1;
+  readonly approvedSajuSandbox?: true;
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly paymentAttemptId: unknown;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
@@ -63,6 +65,10 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
   readonly privateApprovedSajuReceiptFulfillmentEnabled?: boolean;
 }): Promise<SubjectOwnedCommercePaymentCompletionV1> {
+  if (input.approvedSajuSandbox === true && (input.commercePool === undefined || input.commercePool === input.pool)) {
+    throw new Error('Approved Saju sandbox verification requires separate receipt persistence authority.');
+  }
+  const commercePool = input.commercePool ?? input.pool;
   const verificationContext = await executePostgresSubjectTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
@@ -70,6 +76,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
       loadCommercePaymentVerificationContextV1({
         scope,
         paymentAttemptId: input.paymentAttemptId,
+        ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
       }),
   });
 
@@ -84,7 +91,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   });
 
   const persisted = await executePostgresCommerceInternalTransactionV1({
-    pool: input.pool,
+    pool: commercePool,
     execute: async (scope) =>
       persistVerifiedPaymentEvidenceV1({
         scope,
@@ -94,12 +101,12 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   });
 
   const sajuFulfillment = input.privateApprovedSajuReceiptFulfillmentEnabled === true
-    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: input.pool, receiptId: persisted.receiptId, evidence })
+    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: commercePool, receiptId: persisted.receiptId, evidence })
     : undefined;
   const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
     && (sajuFulfillment === undefined || sajuFulfillment === 'not_approved_saju')
     ? await fulfillVerifiedReaderReceiptV1({
-        pool: input.pool,
+        pool: commercePool,
         receiptId: persisted.receiptId,
       })
     : undefined;

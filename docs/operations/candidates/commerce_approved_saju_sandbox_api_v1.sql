@@ -61,6 +61,27 @@ as $function$
   select * from commerce_saju_private.create_approved_saju_sandbox_attempt_v1($1,$2,$3,$4,$5,$6)
 $function$;
 
+create function public.qry_approved_saju_sandbox_verification_context_v1(p_subject_id uuid,p_attempt_id uuid)
+returns table(payment_attempt_id uuid,purchase_intent_id uuid,provider text,platform text,
+  environment text,provider_request_id text,expected_provider_transaction_id text,
+  expected_external_product_id text,expected_amount_minor bigint,expected_currency text)
+language plpgsql stable security definer set search_path=pg_catalog
+as $function$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject_id);
+  if not exists (
+    select 1 from public.commerce_payment_attempts a
+    join commerce_saju_private.approved_purchase_scope_v1 s on s.purchase_intent_id=a.purchase_intent_id
+    where a.id=p_attempt_id and a.subject_id=p_subject_id and a.environment='sandbox'
+      and a.provider='portone_v2'
+  ) then
+    raise exception using errcode='P0001',constraint='qry_commerce_payment_verification_context_unavailable',
+      message='Approved Saju sandbox verification context is unavailable';
+  end if;
+  return query select * from public.qry_commerce_payment_verification_context_v1(p_subject_id,p_attempt_id);
+end
+$function$;
+
 create function public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)
 returns table(payment_attempt_id uuid,provider text,environment text,provider_request_id text,
   expected_amount_minor bigint,expected_currency text,status text,external_product_id text)
@@ -74,5 +95,6 @@ revoke all on function
   public.resolve_approved_purchase_admission_v1(uuid,uuid,uuid,uuid,uuid,text,text,uuid),
   public.create_approved_purchase_intent_v1(uuid,uuid,uuid,uuid,uuid,text,text,jsonb,text,jsonb,text,text,text),
   public.create_approved_saju_sandbox_attempt_v1(uuid,uuid,uuid,text,text,text),
-  public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)
+  public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text),
+  public.qry_approved_saju_sandbox_verification_context_v1(uuid,uuid)
   from public,anon,authenticated,service_role,myeongha_api_executor;

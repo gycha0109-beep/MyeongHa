@@ -4,17 +4,13 @@ import {
 } from '../../../../packages/contracts/src/approved-saju-catalog.js';
 import type { ApprovedSajuPurchaseReadingV1 } from '../../../../packages/api-client/src/records.js';
 import { buildPersistedReadingHandoffUrlV1 } from '../../reading-history-handoff.js';
-import { prepareApprovedSajuSandboxCheckoutV1, requestApprovedSajuSandboxPaymentV1 } from './approved-saju-sandbox-checkout.js';
+import {
+  prepareApprovedSajuSandboxCheckoutV1, requestApprovedSajuSandboxPaymentV1,
+  type ApprovedSajuCheckoutPanelPorts,
+} from './approved-saju-sandbox-checkout.js';
 import {
   fetchPaymentAttemptServerVerificationV1, PaymentAttemptBrowserServerVerificationTransportErrorV1,
 } from './payment-attempt-browser-server-verification-transport.js';
-
-export type ApprovedSajuCheckoutPanelPorts = Pick<Parameters<typeof prepareApprovedSajuSandboxCheckoutV1>[0],
-  'orders' | 'attempts'> & Pick<Parameters<typeof requestApprovedSajuSandboxPaymentV1>[0],
-  'handoff' | 'verification' | 'sdk' | 'channel'> & Readonly<{
-    targets: readonly Readonly<{ id: string; label: string }>[];
-    readArchive(purchaseIntentId: string): Promise<readonly ApprovedSajuPurchaseReadingV1[]>;
-  }>;
 
 type Binding = Awaited<ReturnType<typeof prepareApprovedSajuSandboxCheckoutV1>>;
 const GROUPS = [
@@ -40,6 +36,10 @@ export function ApprovedSajuCheckoutPanel({ ports }: { ports: ApprovedSajuChecko
   const needsTarget = offer?.counterpartOrder !== undefined;
 
   async function loadArchive(purchaseIntentId: string) {
+    if (ports.readArchive === undefined) {
+      setMessage('테스트 결제를 확인했습니다.');
+      return;
+    }
     try {
       setArchive(await ports.readArchive(purchaseIntentId));
       setMessage('보관함의 풀이 상태를 확인했습니다.');
@@ -133,9 +133,11 @@ export function ApprovedSajuCheckoutPanel({ ports }: { ports: ApprovedSajuChecko
             </select>
           </div>
         )}
-        <button className="saju-primary-button" type="submit" disabled={busy || !offer || (needsTarget && !targetId)}>
-          {busy ? '확인 중…' : verified ? '보관함 상태 다시 확인' : verifyOnly ? '결제 확인 다시 시도' : '결제창 열기'}
-        </button>
+        {(!verified || ports.readArchive !== undefined) && (
+          <button className="saju-primary-button" type="submit" disabled={busy || !offer || (needsTarget && !targetId)}>
+            {busy ? '확인 중…' : verified ? '보관함 상태 다시 확인' : verifyOnly ? '결제 확인 다시 시도' : '결제창 열기'}
+          </button>
+        )}
         {verified && <button type="button" disabled={busy} onClick={chooseAnotherOffer}>다른 상품 선택</button>}
       </form>
       <p role="status">{message}</p>

@@ -29,6 +29,8 @@ export interface HandlePaymentAttemptServerVerificationRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  readonly commercePool?: PostgresSubjectPoolV1;
+  readonly approvedSajuSandbox?: true;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
   /** Server-only optional observer, called after the receipt transaction commits.
    * It must independently validate Member consent and the verified receipt.
@@ -265,6 +267,8 @@ export async function handlePaymentAttemptServerVerificationRequestV1(
   try {
     const result = await executeSubjectOwnedCommercePaymentCompletionV1({
       pool: input.pool,
+      ...(input.commercePool === undefined ? {} : { commercePool: input.commercePool }),
+      ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
       verifiedEvidence,
       paymentAttemptId: requestBody.paymentAttemptId,
       verificationAdapter: input.verificationAdapter,
