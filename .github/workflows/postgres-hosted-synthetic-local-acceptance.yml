@@ -45,7 +45,7 @@ jobs:
         run: bash scripts/operations/run-postgres-provider-schema-local-ci.sh
       - name: Upload identifier-free local acceptance evidence
         if: ${{ always() && !inputs.provider_schema_inventory }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0 # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hosted-synthetic-local-acceptance-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-dr-synthetic-evidence.json
@@ -53,7 +53,7 @@ jobs:
           retention-days: 14
       - name: Upload identifier-free Provider local schema inventory
         if: ${{ always() && inputs.provider_schema_inventory }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0 # v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: postgres-provider-local-schema-inventory-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-provider-schema-inventory.json
