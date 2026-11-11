@@ -134,6 +134,111 @@ grant execute on function
   public.qry_approved_saju_stored_lineage_v1(uuid,uuid,uuid)
   to myeongha_approved_saju_issuer_executor;
 
+-- Preserve the Saju signature in the same transaction as its Reading. The
+-- archived signature is evidence of issuance. Paid answer authority is separate.
+create table commerce_saju_private.approved_source_issue_proofs_v1 (
+  reading_id uuid primary key references commerce_saju_private.approved_component_reading_v1(reading_id)
+    on delete cascade,
+  execution_attempt_id uuid not null unique,
+  subject_id uuid not null,
+  proof_envelope jsonb not null,
+  accepted_at timestamptz not null,
+  foreign key(execution_attempt_id,reading_id,subject_id)
+    references public.reading_execution_attempts(id,reading_id,subject_id) on delete cascade
+);
+revoke all on table commerce_saju_private.approved_source_issue_proofs_v1
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
+    myeongha_approved_saju_issuer_executor;
+
+create function public.cmd_bind_approved_saju_source_issue_proof_v1(
+  p_subject uuid,p_purchase uuid,p_component text,p_reading uuid,p_attempt uuid,p_proof jsonb
+)
+returns boolean
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare
+  v_payload jsonb := p_proof->'payload';
+  v_scope jsonb;
+  v_lineage record;
+  v_attempt_request_hash text;
+  v_now timestamptz := clock_timestamp();
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
+  if jsonb_typeof(p_proof) is distinct from 'object' or jsonb_typeof(v_payload) is distinct from 'object'
+    or p_proof-array['payload','signature']<>'{}'::jsonb
+    or coalesce(p_proof->>'signature','') !~ '^[a-zA-Z0-9_-]{86}$'
+    or octet_length(p_proof::text)>4096
+    or v_payload->>'version' is distinct from 'myeonghwa-production-reading-issue-proof-v1'
+    or v_payload->>'executionAttemptId' is distinct from p_attempt::text
+    or coalesce(v_payload->>'authorityHash','') !~ '^[0-9a-f]{64}$'
+    or coalesce(v_payload->>'responseBodyHash','') !~ '^[0-9a-f]{64}$' then return false; end if;
+
+  select binding.source_request_hash into v_attempt_request_hash
+  from commerce_saju_private.approved_component_reading_v1 binding
+  where binding.purchase_intent_id=p_purchase and binding.component=p_component
+    and binding.subject_id=p_subject and binding.reading_id=p_reading;
+  if not found or v_payload->>'requestBodyHash' is distinct from v_attempt_request_hash then return false; end if;
+  v_scope := commerce_saju_private.approved_issue_scope_v1(p_subject,p_purchase,p_component);
+  if v_scope is null or v_payload->>'releaseRef' is distinct from v_scope->>'releaseRef' then return false; end if;
+  select * into v_lineage from commerce_saju_private.approved_stored_lineage_v1(p_subject,p_reading,p_attempt);
+  if not found or v_payload->>'externalRequestRef' is distinct from v_lineage.external_request_ref
+    or v_payload->>'engineVersion' is distinct from v_lineage.saju_engine_version
+    or v_payload->>'nativeReadingId' is distinct from v_lineage.native_reading_id then return false; end if;
+
+  -- An existing immutable receipt can be read back on an exact replay.
+  if exists (select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof where proof.reading_id=p_reading) then
+    return exists (select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
+      where proof.reading_id=p_reading and proof.execution_attempt_id=p_attempt
+        and proof.subject_id=p_subject and proof.proof_envelope=p_proof);
+  end if;
+  if jsonb_typeof(v_payload->'issuedAtMs') is distinct from 'number'
+    or coalesce(v_payload->>'issuedAtMs','') !~ '^[0-9]{13}$' then return false; end if;
+  if to_timestamp((v_payload->>'issuedAtMs')::bigint/1000.0)
+    not between v_now-interval '125 seconds' and v_now+interval '5 seconds' then return false; end if;
+  insert into commerce_saju_private.approved_source_issue_proofs_v1(
+    reading_id,execution_attempt_id,subject_id,proof_envelope,accepted_at
+  ) values(p_reading,p_attempt,p_subject,p_proof,v_now)
+  on conflict (reading_id) do nothing;
+  return exists (select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
+    where proof.reading_id=p_reading and proof.execution_attempt_id=p_attempt
+      and proof.subject_id=p_subject and proof.proof_envelope=p_proof);
+end
+$function$;
+
+revoke all on function public.cmd_bind_approved_saju_source_issue_proof_v1(uuid,uuid,text,uuid,uuid,jsonb)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+grant execute on function public.cmd_bind_approved_saju_source_issue_proof_v1(uuid,uuid,text,uuid,uuid,jsonb)
+  to myeongha_approved_saju_issuer_executor;
+
+create function public.qry_approved_saju_source_issue_proof_v1(p_subject uuid,p_reading uuid)
+returns jsonb
+language sql stable security definer set search_path=pg_catalog
+as $function$
+  select jsonb_build_object(
+    'proof',proof.proof_envelope,'acceptedAt',proof.accepted_at,
+    'executionAttemptId',proof.execution_attempt_id,'sourceRequestHash',binding.source_request_hash,
+    'storedResponseHash',binding.stored_response_hash,'releaseRef',entitled.release_ref,
+    'nativeReadingId',lineage.native_reading_id,'externalRequestRef',lineage.external_request_ref,
+    'engineVersion',lineage.saju_engine_version
+  )
+  from commerce_saju_private.approved_source_issue_proofs_v1 proof
+  join commerce_saju_private.approved_component_reading_v1 binding
+    on binding.reading_id=proof.reading_id and binding.subject_id=proof.subject_id
+  cross join lateral commerce_saju_private.approved_component_entitlement_v1(
+    binding.subject_id,binding.purchase_intent_id,binding.component
+  ) entitled
+  cross join lateral commerce_saju_private.approved_stored_lineage_v1(
+    proof.subject_id,proof.reading_id,proof.execution_attempt_id
+  ) lineage
+  where proof.reading_id=p_reading and proof.subject_id=p_subject
+    and proof.subject_id=public.current_myeongha_subject_id()
+$function$;
+
+revoke all on function public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+grant execute on function public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)
+  to myeongha_approved_saju_issuer_executor;
+
 -- Only the dedicated issuer may claim these exact jobs. A fresh lease ID
 -- prevents an expired worker from completing a claim that was taken over.
 create function public.cmd_claim_approved_saju_issue_job_v1(p_lease uuid,p_releases jsonb)

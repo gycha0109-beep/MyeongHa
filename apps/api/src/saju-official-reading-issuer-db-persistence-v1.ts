@@ -33,6 +33,11 @@ function uuid(value: unknown): value is string {
 }
 
 /** Returned ONLY from a real Saju Production issuer signature/semantic verifier. */
+export interface SajuProductionIssueProofEnvelopeV1 {
+  readonly payload: Readonly<Record<string, unknown>>;
+  readonly signature: string;
+}
+
 export interface VerifiedSajuProductionIssueV1 {
   readonly state: 'production_source_verified';
   readonly nativeReadingId: string;
@@ -43,6 +48,7 @@ export interface VerifiedSajuProductionIssueV1 {
   readonly sourceBirthInputHash: string;
   readonly engineVersion: string;
   readonly externalRequestRef: string;
+  readonly issueProof?: SajuProductionIssueProofEnvelopeV1;
 }
 
 /** DB Owner must separately attest that the ONLY transformation is Reading ID. */
@@ -115,6 +121,7 @@ export interface SajuOfficialImmutableCommitPortV1 {
     readonly externalRequestRef: string;
     readonly nativeReadingId: string;
     readonly sourceRequestHash?: string;
+    readonly issueProof?: SajuProductionIssueProofEnvelopeV1;
     readonly sourceResponseHash: string;
     readonly sourceBirthInputHash: string;
     readonly readingContractVersion: typeof RESPONSE_VERSION;
@@ -285,6 +292,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     externalRequestRef: source.externalRequestRef,
     nativeReadingId: source.nativeReadingId,
     sourceRequestHash: source.sourceRequestHash,
+    ...(source.issueProof === undefined ? {} : { issueProof: source.issueProof }),
     sourceResponseHash: originalHash,
     sourceBirthInputHash: source.sourceBirthInputHash,
     readingContractVersion: RESPONSE_VERSION,

@@ -93,6 +93,12 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
       if (approvedPurchase !== undefined && input.sourceRequestHash !== approvedPurchase.sourceRequestHash) {
         throw new Error('Approved Saju issuer did not verify the purchased source request.');
       }
+      if (input.issueProof !== undefined && (
+        input.issueProof.payload.executionAttemptId !== input.executionAttemptId ||
+        input.issueProof.payload.responseBodyHash !== input.sourceResponseHash
+      )) {
+        throw new Error('Saju issue proof does not match the verified Reading response.');
+      }
       // Caller has already verified issuer provenance, exact ID mapping,
       // immutable birth revision and current Commerce/Privacy authority.
       // Do not run an open-ended UPDATE or forge a DB success state.
@@ -160,6 +166,16 @@ export function createPostgresSajuOfficialImmutableCommitPortV1(
       if (hashSajuHeldSourceProofRequestV1(originalNativeSnapshot)
         !== input.sourceResponseHash) {
         throw new Error('Saju native source hash differs from the stored immutable mapped response.');
+      }
+      if (approvedPurchase !== undefined && input.issueProof !== undefined) {
+        const proof = await client.query<{ bound: boolean }>(
+          'select public.cmd_bind_approved_saju_source_issue_proof_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::jsonb) as bound',
+          [input.subjectId, approvedPurchase.purchaseIntentId, approvedPurchase.component, input.readingId,
+            input.executionAttemptId, JSON.stringify(input.issueProof)],
+        );
+        if (proof.rows.length !== 1 || proof.rows[0]?.bound !== true) {
+          throw new Error('Approved Saju Reading proof did not bind to the stored issuance.');
+        }
       }
       return Object.freeze({
         readingId: strictString(row.readingId, 'Reading ID'),

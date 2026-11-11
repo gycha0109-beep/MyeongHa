@@ -1,6 +1,9 @@
 import { verify, type KeyObject } from 'node:crypto';
 import { hashSajuHeldSourceProofRequestV1 as hashJson } from './saju-held-source-proof-verifier-v1.js';
-import type { SajuOfficialSourceVerificationPortV1 } from './saju-official-reading-issuer-db-persistence-v1.js';
+import type {
+  SajuOfficialSourceVerificationPortV1,
+  SajuProductionIssueProofEnvelopeV1,
+} from './saju-official-reading-issuer-db-persistence-v1.js';
 import {
   createSajuProductionReadingHttpAdapterV1,
   SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1,
@@ -30,6 +33,9 @@ export interface SajuProductionIssueSourceConfigV1
   readonly verificationKey: KeyObject;
 }
 
+export type SajuProductionIssueProofTrustV1 = Pick<SajuProductionIssueSourceConfigV1,
+  'authorityHash' | 'issuer' | 'audience' | 'keyId' | 'verificationKey'>;
+
 function record(input: unknown): input is Record<string, unknown> {
   return input !== null && typeof input === 'object' && !Array.isArray(input);
 }
@@ -41,6 +47,68 @@ function parseProof(header: string | null): unknown {
   } catch {
     return null;
   }
+}
+
+function authenticateIssueProof(
+  proof: unknown,
+  trust: SajuProductionIssueProofTrustV1,
+  acceptedAtMs: number,
+  maxAgeMs: number,
+): SajuProductionIssueProofEnvelopeV1 | null {
+  if (!record(proof) || Object.keys(proof).length !== 2) return null;
+  const { payload, signature } = proof;
+  if (!record(payload) || Object.keys(payload).length !== 13 ||
+      typeof signature !== 'string' || !/^[a-zA-Z0-9_-]{86}$/u.test(signature)) return null;
+  if (
+    payload.version !== VERSION || payload.issuer !== trust.issuer || payload.audience !== trust.audience ||
+    payload.keyId !== trust.keyId || payload.authorityHash !== trust.authorityHash || !HASH.test(trust.authorityHash) ||
+    trust.verificationKey.type !== 'public' || trust.verificationKey.asymmetricKeyType !== 'ed25519' ||
+    typeof payload.issuedAtMs !== 'number' || !Number.isSafeInteger(payload.issuedAtMs) ||
+    !Number.isSafeInteger(acceptedAtMs) || payload.issuedAtMs < acceptedAtMs - maxAgeMs ||
+    payload.issuedAtMs > acceptedAtMs + MAX_FUTURE_SKEW_MS ||
+    !verify(null, Buffer.from(SIGNATURE_DOMAIN + hashJson(payload)), trust.verificationKey, Buffer.from(signature, 'base64url'))
+  ) return null;
+  return Object.freeze({ payload: Object.freeze({ ...payload }), signature });
+}
+
+/** Verify a receipt accepted at issuance, then reconstruct the native source from the exact archive. */
+export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
+  receipt: unknown;
+  trusts: readonly SajuProductionIssueProofTrustV1[];
+  readingId: string;
+  storedResponse: unknown;
+  storedResponseHash: string;
+}>): Readonly<{ sourceProofFingerprint: string; nativeSourceResponseHash: string }> | null {
+  const { receipt, storedResponse, storedResponseHash } = input;
+  if (!record(receipt) || !record(storedResponse) || !record(storedResponse.reading) ||
+    storedResponse.state !== 'delivered' || storedResponse.reading.readingId !== input.readingId ||
+    receipt.storedResponseHash !== storedResponseHash || typeof receipt.acceptedAt !== 'string' ||
+    typeof receipt.nativeReadingId !== 'string' || typeof receipt.executionAttemptId !== 'string' ||
+    !UUID.test(receipt.executionAttemptId) || typeof receipt.sourceRequestHash !== 'string' ||
+    !HASH.test(receipt.sourceRequestHash) || typeof receipt.releaseRef !== 'string' ||
+    !SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1.test(receipt.releaseRef) ||
+    typeof receipt.engineVersion !== 'string' || typeof receipt.externalRequestRef !== 'string' ||
+    'sha256:v1:' + hashJson(storedResponse) !== storedResponseHash) return null;
+  if (!record(receipt.proof) || !record(receipt.proof.payload)) return null;
+  const { issuer, keyId, authorityHash } = receipt.proof.payload;
+  const trust = input.trusts.find(entry =>
+    entry.issuer === issuer && entry.keyId === keyId && entry.authorityHash === authorityHash,
+  );
+  if (trust === undefined) return null;
+  // The DB write follows live signature verification in the same issuance transaction.
+  const proof = authenticateIssueProof(receipt.proof, trust, Date.parse(receipt.acceptedAt), MAX_PROOF_AGE_MS + 5_000);
+  if (proof === null) return null;
+  const { payload } = proof;
+  const native = { ...storedResponse, reading: { ...storedResponse.reading, readingId: receipt.nativeReadingId } };
+  const nativeHash = hashJson(native);
+  if (payload.nativeReadingId !== receipt.nativeReadingId || payload.engineVersion !== receipt.engineVersion ||
+    payload.executionAttemptId !== receipt.executionAttemptId || payload.externalRequestRef !== receipt.externalRequestRef ||
+    payload.releaseRef !== receipt.releaseRef || payload.requestBodyHash !== receipt.sourceRequestHash ||
+    payload.responseBodyHash !== nativeHash) return null;
+  return Object.freeze({
+    sourceProofFingerprint: 'sha256:v1:' + hashJson(proof),
+    nativeSourceResponseHash: 'sha256:v1:' + nativeHash,
+  });
 }
 
 /** The private key belongs to Saju. This factory verifies the raw admitted response before issuance. */
@@ -118,26 +186,20 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
         }
         const entry = proofs.get(sourceResponse);
         proofs.delete(sourceResponse);
-        if (!entry || !record(entry.proof)) return null;
-        const { context, externalRequestRef, proof: { payload, signature } } = entry;
-        if (!record(payload) || typeof signature !== 'string' || !/^[a-zA-Z0-9_-]{86}$/u.test(signature)) {
-          return null;
-        }
-        const now = Date.now();
+        if (!entry) return null;
+        const { context, externalRequestRef } = entry;
+        const issueProof = authenticateIssueProof(entry.proof, config, Date.now(), MAX_PROOF_AGE_MS);
+        if (issueProof === null) return null;
+        const { payload } = issueProof;
         const requestHash = hashJson(executedRequest);
         const responseHash = hashJson(sourceResponse);
         if (
-          payload.version !== VERSION || payload.issuer !== issuer || payload.audience !== audience ||
-          payload.keyId !== keyId || payload.authorityHash !== authorityHash ||
           executionAttemptId !== context.executionAttemptId || payload.executionAttemptId !== executionAttemptId ||
           payload.externalRequestRef !== externalRequestRef ||
           sourceBirthRevisionId !== context.sourceBirthRevisionId || payload.releaseRef !== context.releaseRef ||
           payload.requestBodyHash !== requestHash || payload.responseBodyHash !== responseHash ||
           typeof payload.nativeReadingId !== 'string' || payload.nativeReadingId !== sourceResponse.reading.readingId ||
-          typeof payload.engineVersion !== 'string' || !TOKEN.test(payload.engineVersion) ||
-          typeof payload.issuedAtMs !== 'number' || !Number.isSafeInteger(payload.issuedAtMs) ||
-          payload.issuedAtMs < now - MAX_PROOF_AGE_MS || payload.issuedAtMs > now + MAX_FUTURE_SKEW_MS ||
-          !verify(null, Buffer.from(SIGNATURE_DOMAIN + hashJson(payload)), verificationKey, Buffer.from(signature, 'base64url'))
+          typeof payload.engineVersion !== 'string' || !TOKEN.test(payload.engineVersion)
         ) return null;
         return {
           state: 'production_source_verified',
@@ -148,6 +210,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           sourceBirthInputHash: context.sourceBirthInputHash,
           engineVersion: payload.engineVersion,
           externalRequestRef,
+          issueProof,
         };
       },
     },
