@@ -126,3 +126,23 @@ node --test scripts/character-runtime-lab/yeoul-quality-offline-v1.test.mjs scri
 - `yeoul-example-review-queue-v1.mjs`: 12개 기존 개발 질문마다 최대 2개씩, 우선 DeepSeek에서 후보를 고르되 사용 가능한 경우 다른 모델도 포함하여 사람 검토용 24개 후보를 **비공개 파일** `example-review-queue.json`으로 생성한다. 표본 추출 순위는 품질 우열이 아니며 모두 `pending_canon_and_language_review`, 승인 0건이다.
 - 검토 공백: **Y07에는 DeepSeek의 주의사항 없는 긍정 대사 후보가 0개**이므로 다른 모델의 후보를 넣더라도 DeepSeek의 Y07 개선을 증명할 수 없다.
 - 전체 83개 원본 긍정 후보는 그대로 별도 보존. 사용자 검토 없이 프롬프트 예시 승격/운영 적용하지 않는다. 관련 27개 로컬 테스트 PASS(Node 22); 저장소 CI는 Node 24. 외부 유료 호출 0건.
+
+### 2026-11-11 — 비공개 검토표 입력 및 원본 대조 (승인 자동화 아님)
+
+- `scripts/character-runtime-lab/yeoul-review-packet-import-v1.mjs`는 **사용자가 직접 판정해 다시 제공한** 6개 규칙·24개 대사 검토표를 오프라인으로 읽고, 원본 288건 사용자 평가 JSON·`example-review-queue.json`·`feedback-revision-proposals.json`과 대조한다. 기존 사용자 평점과 288회 실험은 변경하거나 다시 실행하지 않는다.
+- 항목별 선택 없음/승인 요청/수정 요청/제외를 분리하고 다중 선택·근거 없는 수정/제외·위조된 출처 키·질문/답변 변경·중복·누락·원본 등급 변경·거짓 완료 표시를 거부한다. 검토표의 직접 수정 의견은 원평가에 덮어쓰지 않는다.
+- **체크된 `연구용 ... 승인`은 승인된 프롬프트 자료가 아니라 `approve_requested`로만 저장한다.** `ownerApprovalVerified=false`, `approvedRulesForPrompt=[]`, `approvedExamplesForPrompt=[]`로 고정한다. 별도 실제 사용자/캐릭터 책임자 확인 및 승인 근거 없이는 후보 조립기, 교사 모델, 운영 서비스로 결과를 승격하지 않는다.
+- 출력은 리포지토리 밖에 있는 사전 생성된 비공개 폴더의 **신규 파일**에만 쓰며 파일은 `0600`으로 생성한다. 로그는 검토 건수·상태만 출력한다. 파일에 포함된 개인 대화/대사 원문은 GitHub 커밋에 포함하지 않는다.
+- 오프라인 사용 예시 (모든 경로는 비공개 로컬 파일이어야 한다):
+
+```sh
+node scripts/character-runtime-lab/yeoul-review-packet-import-v1.mjs \
+  --packet /private/Yeoul_Offline_Review_Packet_2026-11-10.md \
+  --queue /private/yeoul-quality-output/example-review-queue.json \
+  --proposals /private/yeoul-quality-output/feedback-revision-proposals.json \
+  --evaluations /private/yeoul-evaluations-all-288-clean.json \
+  --out /private/yeoul-quality-output/yeoul-review-intake.json
+```
+
+- 기존 제공된 검토표를 288건의 비공개 복원 자료와 대조했을 때 **30개 전부 미체크, 승인 0개**, 대사 원본 키 24개 전부 일치했다. 여기서 사용한 원본은 개인 보관함 텍스트 복원본이며 원본 업로드 파일의 바이트 동일성은 확인하지 못했다. 새로운 실험이나 사용자 대사 채점은 하지 않았다.
+- 별도 합성자료 테스트 7건 로컬 통과. 유료 호출·운영 반영·Canon/관계·기억 변경 없음. 다음 단계는 사용자의 실제 검토 기록 및 원본 인격 기준 승인 범위 확인이며, 이후 별도 유료 실험 승인과 독립 홀드아웃 성능 검증이 필요하다.
