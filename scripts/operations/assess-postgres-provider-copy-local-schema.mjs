@@ -38,6 +38,8 @@ export function assessProviderCopyLocalSchema(source, local) {
   assert.equal(source.containsRowPayloads, false);
   assert.equal(source.sourceProviderFullRestoreProven, false);
   assert.equal(local?.schemaVersion, 'ops-disposable-provider-catalog-v1');
+  assert.ok(['2.122.0', '3.1.0'].includes(local.cliVersion),
+    'Only pinned local Supabase CLI baselines are accepted');
   assert.equal(local.postgresMajor, 17);
   assert.equal(local.relationRowsRead, false);
   assert.ok(Array.isArray(local.tables));
@@ -96,7 +98,8 @@ export function assessProviderCopyLocalSchema(source, local) {
     (a, x) => a + x.previouslyDroppedSourceColumns.length, 0);
   const report = {
     schemaVersion: 'ops-postgres-provider-local-schema-compatibility-v1',
-    target: 'fresh-disposable-supabase-cli-2.122.0-postgres17',
+    target: 'fresh-disposable-supabase-cli-' + local.cliVersion + '-postgres17',
+    cliVersion: local.cliVersion,
     sourceBackupRunId: source.sourceBackupRunId,
     sourceRestoreRunId: source.sourceRestoreRunId,
     sourceRestoreArtifactId: source.sourceRestoreArtifactId,

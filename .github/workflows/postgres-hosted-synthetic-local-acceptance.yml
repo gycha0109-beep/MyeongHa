@@ -9,6 +9,14 @@ on:
         required: false
         default: false
         type: boolean
+      provider_schema_cli_version:
+        description: Pinned local-only Supabase CLI version for Provider schema inventory
+        required: false
+        default: '2.122.0'
+        type: choice
+        options:
+          - '2.122.0'
+          - '3.1.0'
 
 permissions:
   contents: read
@@ -42,6 +50,7 @@ jobs:
         shell: bash
         env:
           MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
+          MH_OPS_PROVIDER_CLI_VERSION: ${{ inputs.provider_schema_cli_version }}
         run: bash scripts/operations/run-postgres-provider-schema-local-ci.sh
       - name: Upload identifier-free local acceptance evidence
         if: ${{ always() && !inputs.provider_schema_inventory }}

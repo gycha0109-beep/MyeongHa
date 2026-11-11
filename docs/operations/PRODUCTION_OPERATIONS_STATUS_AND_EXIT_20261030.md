@@ -1,3 +1,10 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-B: 무료 격리 Provider 스키마 실측
+
+- **실제 검사:** PR #3213의 필수 통합 검사 #42977371860 성공, main 병합 30e6c9c03835c5fd9b215125e9b42315fc2cc0ed. 무료 GitHub Actions 격리 Supabase CLI 2.122.0/PostgreSQL17 읽기 전용 스키마 검사 #42979219119 성공, artifact 13836926312, 파일 SHA-256 4f0553fd002221423acb56e41100cb4b5a0be4d487accac458eec4b884657bbc.
+- **비식별 실측:** 백업 #42752268638의 복원 증거 #42967203704에 있던 누락 Provider COPY 29블록/66행 중 Auth 테이블 22/22개, Storage 테이블 5/7개를 로컬에서 확인. 없는 테이블은 storage.bucket_lifecycle_states와 storage.lifecycle_abandoned_artifacts이며 해당 원본 행은 0개. 과거 제외 컬럼은 18/18개가 로컬에 존재. 실제 Provider 원본 행은 복원하지 않았고 로그에 개인정보·토큰·실제 데이터 저장 없음.
+- **한계와 다음:** 구조 존재만 입증. CLI v3.1.0 안정판의 새 격리 스키마를 별도 비교하고, 그 결과를 토대로 Provider 호환 복원 가능성을 판단. 현재 Hosted Auth/Storage, 독립 개인정보 연속성, RPO/RTO 및 서비스 재개는 미증명. Production SQL/권한/유료 프로젝트 변경 없음. P0 #1887 OPEN / NOT_ACCEPTED / drReady=false / serviceResumptionAllowed=false.
+
+Watchtower-Track: ops
 ### 2026-11-11 KST — Gate 1 / Phase 8-A: sealed-backup external-role recovery proven (48/48), broader DR blocked
 
 - **실행:** 실패 #42965479758의 비공개 임시 경로 불일치를 PR #3211로 수정·병합(main 3fbd8f8017f367258ca74ea2c2a0bc5e35a61f02). 필수 CI SUCCESS 후 기존 암호화 Production 백업 #42752268638 (artifact 13734401337, source 4de4e050e1e9393850a34eb68f8fa60973dc9f63, migration 20261109071019, 242개)을 새 코드로 격리 Supabase PostgreSQL 17에 복원: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42967203704 SUCCESS, 비식별 artifact 13830933913. 신규 Production 백업·SQL·권한·canary 변경 없음.
