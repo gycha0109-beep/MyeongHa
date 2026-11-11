@@ -32,7 +32,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify character-specific R16 source contracts (metadata only)
-        run: node --test scripts/character-optimization/r16-probe-contract-v1.test.mjs
+        run: node --test scripts/character-optimization/r16-probe-contract-v1.test.mjs scripts/character-optimization/yeoul-new-scenario-families-v1.test.mjs
       - name: Create isolated GEPA venv and install pinned source revision
         shell: bash
         run: |
@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
-            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run
+            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope
       - name: Prove optimizer cannot access sealed files or network at OS boundary
         shell: bash
         run: |
