@@ -1,3 +1,12 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-A: sealed-backup external-role recovery proven (48/48), broader DR blocked
+
+- **실행:** 실패 #42965479758의 비공개 임시 경로 불일치를 PR #3211로 수정·병합(main 3fbd8f8017f367258ca74ea2c2a0bc5e35a61f02). 필수 CI SUCCESS 후 기존 암호화 Production 백업 #42752268638 (artifact 13734401337, source 4de4e050e1e9393850a34eb68f8fa60973dc9f63, migration 20261109071019, 242개)을 새 코드로 격리 Supabase PostgreSQL 17에 복원: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42967203704 SUCCESS, 비식별 artifact 13830933913. 신규 Production 백업·SQL·권한·canary 변경 없음.
+- **원본 대비 복원 실측:** 봉인 source 앱→외부 postgres 직접 membership 원본 48/복원 48, 옵션 기준 누락 0·추가 0, 원본 grantor 차이 0. ADMIN=true 43, INHERIT=true 3, SET=true 2. 역할 복구 SQL은 비공개 임시 경로에서만 실행하고 공개 artifact로 내보내지 않음. 기존 필터링 roles.sql 자체의 누락 48개는 유지: 원래 dump 누락과 별도 재생 후 target 성공을 혼동 금지. 원본 source catalog는 백업 전후 bracket witness이며 same-MVCC snapshot 보증이 아님.
+- **잔여 HOLD:** 앱 내부 7개 직접 membership은 원본/복원 수와 옵션이 일치하지만 portable grantor 재작성 7건으로 exact grantor parity는 false. 현재 3 schema/94 table/322 function 중 legacy ACL hash-only 차이 2/8/19개 때문에 applicationScopeVerdict=HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH. Provider COPY 29블록/66행 skipped, 3블록/27행 projected(284행 replayed 중 일부), full Supabase migration ledger·실제 Hosted Auth/Storage 및 객체 바이트·독립 개인정보 연속성·서비스 전체 RPO/RTO 미증명. gate=BLOCKED / NOT_ACCEPTED / drReady=false / serviceResumptionAllowed=false, Issue #1887 OPEN 유지. 증거 파일별 SHA-256과 정확한 값은 외부 역할 복원 관측 JSON에 비식별 기록.
+- **다음:** 기존 무료 Supabase CLI/Docker 검증기와 PostgreSQL 복원 대상의 Provider 스키마 차이를 확인하고 29개 Provider COPY 누락 원인을 분류한 뒤 호환되는 격리 복원 경로를 구현한다. Hosted 동등성은 별도 검증까지 미승인.
+
+Watchtower-Track: ops
+
 ### 2026-11-11 KST — Gate 1 / Phase 8-A: 무료 Docker Supabase PostgreSQL17 역할 연결 복구 구현·합성 실증
 
 - **실제 원인:** 기존 `scripts/operations/run-production-postgres-strict-dump.sh`의 예약된 수신 역할 GRANT 필터 때문에 봉인 백업의 `roles.sql`에 앱 역할→`postgres` 직접 연결이 포함되지 않음. 최신 격리 복원 #42945204368에서 원본 48/복원 0으로 확정. 운영 DB `pg_auth_members` SELECT-only 메타 집계 재확인: 앱 역할 43개→`postgres` 수신 직접 GRANT 48개, grantor 분류 `supabase_admin`·`postgres`만 존재, admin true 43/inherit true 3/set true 2. 실제 원본 행·역할명은 비공개.

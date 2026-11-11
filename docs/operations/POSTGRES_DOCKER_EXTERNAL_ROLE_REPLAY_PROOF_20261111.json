@@ -49,8 +49,8 @@
     "isolatedPostgresOnly": true
   },
   "status": {
-    "actualEncryptedBackupSourceReplayMeasured": false,
-    "targetOriginalMembershipParityProven": false,
+    "actualEncryptedBackupSourceReplayMeasured": true,
+    "targetOriginalMembershipParityProven": true,
     "sourceCatalogSameMvccSnapshotProven": false,
     "providerCatalogRestoreEquivalent": false,
     "providerCopySkippedBlocksLastObserved": 29,
@@ -61,7 +61,82 @@
     "wholeServiceRpoRtoProven": false,
     "drReady": false,
     "serviceResumptionAllowed": false,
-    "p0Issue": 1887
+    "p0Issue": 1887,
+    "targetOriginalMembershipParityScope": "external direct memberships only: exact 48/48, option and grantor parity; internal app graph legacy grantor rewrite and full catalog still hold"
   },
-  "next": "After PR required Integration PASS and merge, restore existing encrypted backup #42752268638 once into isolated GitHub Docker Supabase PG17 service, examine sanitized role pre/post source parity and the new replay report. Never dispatch Production SQL/backup/privacy canary or enable service admission."
+  "next": "Gate 1 Phase 8-B: classify missing 29 Provider COPY blocks and prepare schema-compatible disposable Supabase Auth/Storage restore; preserve Hosted and production admission HOLD.",
+  "actualEncryptedBackupRestore": {
+    "state": "ISOLATED_SOURCE_EXTERNAL_ROLE_DIRECT_MEMBERSHIP_PARITY_PASS__FULL_DR_HOLD",
+    "workflowRunId": 42967203704,
+    "workflowUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42967203704",
+    "artifactId": 13830933913,
+    "executedMainSha": "3fbd8f8017f367258ca74ea2c2a0bc5e35a61f02",
+    "fixPrNumber": 3211,
+    "fixMergeSha": "3fbd8f8017f367258ca74ea2c2a0bc5e35a61f02",
+    "sourceBackupRunId": 42752268638,
+    "sourceBackupArtifactId": 13734401337,
+    "sourceBackupSha": "4de4e050e1e9393850a34eb68f8fa60973dc9f63",
+    "sourceBackupEncryptedSha256": "5396ceec4eca37f23c519c7e006fe0d8af27ad7f53ae7f54938fd9fc14f3a2d1",
+    "sourceCatalogNotSameMvccSnapshot": true,
+    "postgresVersion": "17.6",
+    "restoreCompletedAtUtc": "2026-11-11T05:40:30Z",
+    "backupMigrationFrontier": "20261109071019",
+    "backupMigrationCatalogVersionCount": 242,
+    "privateSqlNotExported": true,
+    "originalFilteredDumpStillMissingSourceEdges": true,
+    "directRoleMembership": {
+      "scope": "myeongha_to_non_myeongha_direct_membership_only_v1",
+      "source": 48,
+      "restored": 48,
+      "missing": 0,
+      "added": 0,
+      "sourceExternalRoleCount": 1,
+      "restoredExternalRoleCount": 1,
+      "optionParity": true,
+      "grantorParity": true,
+      "grantorDifferenceGroups": 0,
+      "adminTrue": 43,
+      "inheritTrue": 3,
+      "setTrue": 2
+    },
+    "internalApplicationRoleGraph": {
+      "sourceEdges": 7,
+      "restoredEdges": 7,
+      "portableGrantorRewriteCompatibleGroups": 7,
+      "exactGrantorAttributionParity": false
+    },
+    "applicationCatalog": {
+      "scopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+      "fullScopeParityProven": false,
+      "canonicalAclParity": true,
+      "legacyAclHashOnlyDifferenceCounts": {
+        "schemas": 2,
+        "tables": 8,
+        "functions": 19
+      }
+    },
+    "providerData": {
+      "skippedCopyBlocks": 29,
+      "skippedSourceRows": 66,
+      "projectedCopyBlocks": 3,
+      "projectedSourceRows": 27,
+      "replayedSourceRows": 284,
+      "fullProviderMigrationLedgerRestored": false
+    },
+    "artifactSha256": {
+      "app-schema-parity.json": "1e0a1013a800967b22fbb80a1e8e6e6c94c29bf00af8735330892438a51726fc",
+      "isolated-external-role-replay.json": "d5d8b2145b3637a74b23d2eb6680bcc4736e6493fe524e82f035df37b8edc40c",
+      "role-dump-coverage.json": "d836a23ca3809e87ec8d74e6ae82e5bde202c971ddcc4dd685975581b23f07b2",
+      "restore-evidence.json": "248d81d918f2015b90bb6704cd303ff565b3641c5163b0478010a6919761dcf4",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595"
+    },
+    "fullHostedAuthStorageRecoveryProven": false,
+    "independentIncidentTimePrivacyContinuityProven": false,
+    "wholeServiceRpoRtoProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "productionAcceptance": "NOT_ACCEPTED",
+    "evidenceCaveat": "The overall workflow succeeded and direct external 48/48 boundary parity passed; legacy application ACL hashes still differ, and provider/Hosted recovery is not proven."
+  }
 }
