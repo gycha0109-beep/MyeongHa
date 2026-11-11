@@ -61,3 +61,9 @@
 - Genuine GEPA pinned source commit ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309 installed in GH Actions. In-process fake reflection and synthetic evaluation improved fabricated score from 0.2 to 0.8; 18 Python tests PASS. Evidence: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42963466961 . This is **not a real quality gain** and external model calls remain 0.
 - Enforce manifest hash, original candidate hash, immutable context hash, unique scenario families, separate dev/validation sets, cohort-appropriate character IDs, and shared-cohort per-character split coverage at the GEPA boundary. Add synthetic negative tests.
 - Installed GEPA was derived from a pinned source commit whose project metadata still reports version 0.1.4; do not confuse it with published PyPI v0.1.4. Full OS file/network isolation and provider spend gateway remain unfinished.
+
+## 2026-11-11 — OS-isolated synthetic optimizer/holdout and single-ledger dry-run gate
+
+- Added a synthetic-only gateway admission path for student/reflection/judge/holdout that uses the real shared SQLite reservation ledger; rejects duplicate IDs, unapproved simulated models, supplier mismatch, uncertain cost and over-budget charges without HTTP calls. The module has deliberately **no real provider transport**, so this is not a live security gateway.
+- The pinned GEPA workflow now runs two distinct Docker containers with `--network none`, read-only research-source mount and unprivileged user. The optimizer receives no sealed mount; the separate final evaluator gets only a generated synthetic holdout fixture. Both are forbidden from network egress and source writes at OS level.
+- This proves the isolated synthetic harness, **not** that a future paid GEPA optimization + forwarding gateway is isolated; real approved network gateway, private datasets, token/price authorization and sealed final evaluation remain unimplemented.
