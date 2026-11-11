@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'research/character-optimization-gepa/**'
+      - 'scripts/character-optimization/**'
       - 'docs/character-optimization/**'
       - '.github/workflows/character-gepa-offline-pinned.yml'
   workflow_dispatch:
@@ -30,6 +31,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Verify character-specific R16 source contracts (metadata only)
+        run: node --test scripts/character-optimization/r16-probe-contract-v1.test.mjs
       - name: Create isolated GEPA venv and install pinned source revision
         shell: bash
         run: |
