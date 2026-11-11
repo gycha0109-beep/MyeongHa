@@ -102,3 +102,10 @@
 - Intake emits decision requests only, with ownerApprovalVerified=false, no approved prompt examples/rules, no production eligibility, no paid readiness; original evaluation preserved. A future owner confirmation is required separately; checkboxes/markdown are not authenticated authority.
 - Local Node tests: 7 new parser cases PASS plus a private actual-packet smoke (288 original labels; 30 pending); no API calls. Source raw bytes still not fully proved against original uploaded binary; the text reconstruction remains the evidence limit.
 - No Canon, relationship, memory, DB, prompt routing, or production state changes. Next: exact new-head CI and user review/approval of actual 30 items before any offline prompt candidate can be promoted; any new DeepSeek benchmark still requires separately approved spending and caps.
+
+## 2026-11-11 — Yeoul offline per-turn evaluation ledger and evidence gate
+- Previous PR #3187 head 0305380cb94395a0781d6abaebfcaf2ca4b756f6 had CI/Governance/Web/character-runtime-lab success, auto-merge enabled but PR unmerged. The user-provided review packet has zero checked boxes and therefore no author-approved rules/examples.
+- Implemented stand-alone offline structural holdout ledger with 104 unique turn keys from 80 scenario trajectories; explicit previous-turn binding prohibits mixing a different candidate/scenario/repeat in two-turn cases. Plan contains no holdout question text, reply, or source user evaluation.
+- Added future private-turn-evidence validator rejecting missing/duplicate/cross-candidate/fallback/wrong prompt hash/changed dataset, while explicitly returning qualityReviewed=false, qualityGainEstablished=false, productionEligible=false. It does not authenticate provider receipts or replayed conversation messages.
+- 6 new Node offline tests PASS; no new paid API, no owner-review approval, no change to runtime, Canon, relationship, memory, DB or production.
+- Next: confirm exact new-head CI; actual optimization and 104-call evaluation require explicit owner review of candidate content plus separate user budget/call-limit approval. No ROADMAP_COMPLETE.
