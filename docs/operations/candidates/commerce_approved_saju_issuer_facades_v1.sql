@@ -133,3 +133,115 @@ grant execute on function
   public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text),
   public.qry_approved_saju_stored_lineage_v1(uuid,uuid,uuid)
   to myeongha_approved_saju_issuer_executor;
+
+-- Only the dedicated issuer may claim these exact jobs. A fresh lease ID
+-- prevents an expired worker from completing a claim that was taken over.
+create function public.cmd_claim_approved_saju_issue_job_v1(p_lease uuid,p_releases jsonb)
+returns table(job_id uuid,subject_id uuid,auth_user_id uuid,purchase_intent_id uuid,
+  component text,release_ref text,already_issued boolean)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare
+  candidate record;
+  v_now timestamptz := clock_timestamp();
+begin
+  if p_lease is null or jsonb_typeof(p_releases) is distinct from 'object' then return; end if;
+  select event.id,owner.id as owner_id,owner.auth_user_id as owner_auth_id,
+    origin.purchase_intent_id as purchase_id,event.dedupe_key as field,
+    event.payload_jsonb->>'releaseRef' as release,
+    binding.reading_id is not null as issued
+  into candidate
+  from public.outbox_events event
+  join public.commerce_saju_purchase_origins_v1 origin on origin.purchase_intent_id=case
+    when event.aggregate_type='purchase_intent'
+      and event.aggregate_id ~ '^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$'
+    then event.aggregate_id::uuid end
+  join public.subjects owner on owner.id=origin.subject_id and owner.kind='member'
+    and owner.status='active' and owner.merged_into_subject_id is null and owner.auth_user_id is not null
+  join public.purchase_intents intent on intent.id=origin.purchase_intent_id
+    and intent.subject_id=origin.subject_id and intent.status='verified'
+  join commerce_saju_private.approved_purchase_scope_v1 scope
+    on scope.purchase_intent_id=origin.purchase_intent_id and scope.admission_hash=origin.approved_admission_hash
+  join commerce_saju_private.approved_fulfillment_release_v1 live_release
+    on live_release.product_offer_id=intent.product_offer_id and live_release.revoked_at is null
+    and live_release.approved_offer_id=scope.admission->>'approvedOfferId'
+    and live_release.capability_set_id=intent.capability_set_id
+    and live_release.components @> (scope.admission->'components')
+    and live_release.components <@ (scope.admission->'components')
+    and live_release.components @> jsonb_build_array(jsonb_build_object(
+      'component',event.dedupe_key,'authority','official_fulfillment',
+      'releaseRef',event.payload_jsonb->>'releaseRef'))
+  left join commerce_saju_private.approved_component_reading_v1 binding
+    on binding.purchase_intent_id=origin.purchase_intent_id and binding.component=event.dedupe_key
+  where event.event_type='approved_saju.reading_requested'
+    and event.event_schema_version='approved-saju-reading-request-v1'
+    and event.dedupe_key=event.payload_jsonb->>'component'
+    and event.payload_jsonb->>'releaseRef'=p_releases->>event.dedupe_key
+    and (event.status='pending' and event.available_at<=v_now
+      or event.status='processing' and event.lease_expires_at<=v_now)
+    and exists (
+      select 1 from public.commerce_receipts receipt
+      join public.entitlement_grants g on g.subject_id=owner.id and g.source_receipt_id=receipt.id
+        and g.entitlement_key=public.internal_commerce_saju_entitlement_key_v1(event.dedupe_key)
+        and g.scope_key=scope.component_scope_keys->>event.dedupe_key
+      where receipt.purchase_intent_id=intent.id and receipt.subject_id=owner.id
+        and receipt.product_offer_id=intent.product_offer_id and receipt.verification_status='verified'
+        and receipt.environment='production' and receipt.provider='portone_v2' and receipt.platform='web'
+        and receipt.verified_at is not null and receipt.verified_amount_minor=intent.expected_amount_minor
+        and receipt.verified_currency=intent.expected_currency
+        and g.grant_source_type='purchase' and g.status='active' and g.valid_from<=v_now
+        and (g.valid_until is null or g.valid_until>v_now)
+        and not exists (
+          select 1 from public.commerce_provider_events cancellation
+          where cancellation.resolved_receipt_id=receipt.id and cancellation.resolved_subject_id=owner.id
+            and cancellation.provider=receipt.provider and cancellation.environment=receipt.environment
+            and cancellation.event_type in ('Transaction.Cancelled','Transaction.PartialCancelled')
+            and cancellation.status in ('received','verified','processed','unresolved')
+        )
+    )
+    and not exists (
+      select 1 from public.readings reading
+      join public.reading_execution_attempts attempt on attempt.reading_id=reading.id
+        and attempt.subject_id=owner.id and attempt.execution_attempt_no=reading.next_execution_attempt_no-1
+      where reading.subject_id=owner.id and reading.request_idempotency_key=
+        'approved-saju:' || intent.id::text || ':' || event.dedupe_key
+        and attempt.state in ('running','failed_final')
+    )
+  order by event.available_at,event.id
+  limit 1
+  for update of event skip locked;
+  if not found then return; end if;
+
+  perform public.cmd_claim_outbox_event_v1(candidate.id,p_lease::text,v_now+interval '2 minutes');
+  return query select candidate.id,candidate.owner_id,candidate.owner_auth_id,candidate.purchase_id,
+    candidate.field,candidate.release,candidate.issued;
+end
+$function$;
+
+create function public.cmd_complete_approved_saju_issue_job_v1(p_job uuid,p_lease uuid)
+returns boolean
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+begin
+  if p_job is null or p_lease is null or not exists (
+    select 1 from public.outbox_events event
+    join commerce_saju_private.approved_component_reading_v1 binding
+      on binding.purchase_intent_id::text=event.aggregate_id and binding.component=event.dedupe_key
+    where event.id=p_job and event.aggregate_type='purchase_intent'
+      and event.event_type='approved_saju.reading_requested'
+      and event.event_schema_version='approved-saju-reading-request-v1'
+      and event.lock_owner=p_lease::text and event.status='processing'
+      and event.lease_expires_at>clock_timestamp()
+    for update of event
+  ) then return false; end if;
+  perform public.cmd_complete_outbox_event_v1(p_job,p_lease::text);
+  return true;
+end
+$function$;
+
+revoke all on function public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb),
+  public.cmd_complete_approved_saju_issue_job_v1(uuid,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+grant execute on function public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb),
+  public.cmd_complete_approved_saju_issue_job_v1(uuid,uuid)
+  to myeongha_approved_saju_issuer_executor;

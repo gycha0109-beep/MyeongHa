@@ -218,6 +218,14 @@ begin
   select applied.grant_count,applied.outcome into strict total,outcome
   from public.internal_fulfill_verified_approved_saju_receipt_v1(receipt_id) applied;
   if outcome<>'replayed' or total <> cardinality(fields) then raise exception 'Verified receipt grant replay was not exact'; end if;
+  if (select array_agg(event.dedupe_key order by event.dedupe_key)
+    from public.outbox_events event where event.aggregate_type='purchase_intent'
+      and event.aggregate_id=intent_id::text and event.event_type='approved_saju.reading_requested'
+      and event.event_schema_version='approved-saju-reading-request-v1'
+      and event.status='pending' and event.payload_jsonb->>'component'=event.dedupe_key)
+    is distinct from (select array_agg(field order by field) from unnest(fields) field) then
+    raise exception 'Verified receipt did not enqueue each approved Reading exactly once';
+  end if;
 end
 $function$;
 

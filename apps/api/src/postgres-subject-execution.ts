@@ -161,14 +161,39 @@ export async function executePostgresApprovedSajuIssuerTransactionV1<T>(
   if (input.verifiedEvidence.kind !== 'member') {
     throw new Error('Approved Saju issuance requires a verified member.');
   }
-  return executeSubjectTransaction(input, 'SET LOCAL ROLE myeongha_approved_saju_issuer_executor');
+  return executeSubjectTransaction(input, ENTER_APPROVED_SAJU_ISSUER_ROLE_SQL);
+}
+
+const ENTER_APPROVED_SAJU_ISSUER_ROLE_SQL = 'SET LOCAL ROLE myeongha_approved_saju_issuer_executor';
+
+/** Internal outbox access for the separately provisioned issuer login. */
+export function executePostgresApprovedSajuIssuerJobTransactionV1<T>(input: {
+  readonly pool: PostgresSubjectPoolV1;
+  readonly execute: (client: PostgresTransactionQueryV1) => Awaitable<T>;
+}): Promise<T> {
+  return executeRoleTransaction(input.pool, ENTER_APPROVED_SAJU_ISSUER_ROLE_SQL, input.execute);
 }
 
 async function executeSubjectTransaction<T>(
   input: ExecutePostgresSubjectTransactionInputV1<T>,
   executionRoleSql: string,
 ): Promise<T> {
-  const connection = await input.pool.connect();
+  return executeRoleTransaction(input.pool, executionRoleSql, async (client) => {
+    const resolvedSubject = await resolveSubjectIdentity({
+      verifiedEvidence: input.verifiedEvidence,
+      resolutionPort: new TransactionSubjectIdentityResolutionPortV1(client),
+    });
+    await client.query(ASSERT_SUBJECT_CONTEXT_SQL, [resolvedSubject.subjectId]);
+    return input.execute(Object.freeze({ resolvedSubject, client }));
+  });
+}
+
+async function executeRoleTransaction<T>(
+  pool: PostgresSubjectPoolV1,
+  executionRoleSql: string,
+  execute: (client: PostgresTransactionQueryV1) => Awaitable<T>,
+): Promise<T> {
+  const connection = await pool.connect();
   let transactionStarted = false;
   let discardConnectionError: unknown;
 
@@ -178,19 +203,7 @@ async function executeSubjectTransaction<T>(
 
     await connection.query(executionRoleSql);
 
-    const resolvedSubject = await resolveSubjectIdentity({
-      verifiedEvidence: input.verifiedEvidence,
-      resolutionPort: new TransactionSubjectIdentityResolutionPortV1(connection),
-    });
-
-    await connection.query(ASSERT_SUBJECT_CONTEXT_SQL, [resolvedSubject.subjectId]);
-
-    const result = await input.execute(
-      Object.freeze({
-        resolvedSubject,
-        client: connection,
-      }),
-    );
+    const result = await execute(connection);
 
     await connection.query(COMMIT_SQL);
     transactionStarted = false;

@@ -93,6 +93,18 @@ begin
   if grant_count<>v_count then
     raise exception using errcode='P0001', message='Approved Saju receipt grant batch is incomplete';
   end if;
+  -- The same transaction publishes one durable job per purchased component.
+  -- The outbox contains no Birth input or member authentication identifiers.
+  insert into public.outbox_events(
+    id,aggregate_type,aggregate_id,event_type,event_schema_version,dedupe_key,
+    payload_jsonb,status,available_at,created_at
+  )
+  select gen_random_uuid(),'purchase_intent',v_receipt.purchase_intent_id::text,
+    'approved_saju.reading_requested','approved-saju-reading-request-v1',part.value->>'component',
+    jsonb_build_object('component',part.value->>'component','releaseRef',part.value->>'releaseRef'),
+    'pending',clock_timestamp(),clock_timestamp()
+  from jsonb_array_elements(v_scope.admission->'components') part
+  on conflict (aggregate_type,aggregate_id,event_type,dedupe_key) do nothing;
   outcome := case when v_replay_count=grant_count then 'replayed' else 'granted' end;
   return next;
 end

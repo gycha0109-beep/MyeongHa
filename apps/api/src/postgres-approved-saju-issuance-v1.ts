@@ -70,6 +70,7 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     purchaseIntentId: string;
     component: SajuReadingComponentV1;
     readerCharacterId: string;
+    expectedReleaseRef?: string;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
   if (input.component === 'compatibility' || typeof input.sourceVerifier?.verifyProductionIssue !== 'function') {
@@ -82,7 +83,8 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     execute: async ({ client, resolvedSubject }) => {
       if (resolvedSubject.subjectId !== input.subjectId || resolvedSubject.subjectKind !== 'member') return null;
       const scope = await readApprovedSajuIssueScopeV1(client, input);
-      if (scope === null) return null;
+      if (scope === null || (input.expectedReleaseRef !== undefined
+        && input.expectedReleaseRef !== scope.releaseRef)) return null;
       const result = await client.query<{ readingId: string; readingSessionId: string }>(
         `select reading_id::text as "readingId",session_id::text as "readingSessionId"
          from public.prepare_approved_component_reading_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::text,$7::text)`,
