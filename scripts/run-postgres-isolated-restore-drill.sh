@@ -337,6 +337,38 @@ if [[ ${#provider_managed_roles_absent[@]} -gt 0 ]]; then
   printf 'Provider-managed roles absent from isolated target and not fabricated: %s\n' "${provider_managed_roles_absent[*]}"
 fi
 
+# Phase 8-A: the sealed source witness contains 48 direct memberships
+# deliberately filtered from roles.sql when the recipient is postgres.
+# Rehearse those *existing* edges only inside this disposable PG17 service;
+# do not create missing provider roles or publish SQL/role names. The full
+# source catalog is sealed but NOT a same-MVCC witness. This does not alter
+# the original filtered dump or grant Hosted/provider recovery acceptance.
+if [[ -s "$work_dir/source-app-catalog.json" ]] &&
+  jq -e '(.applicationExternalRoleBoundary.directMemberships // []) |
+    length > 0' "$work_dir/source-app-catalog.json" >/dev/null; then
+  replay_sql="$work_dir/isolated-external-role-replay.sql"
+  replay_report="$(dirname "$RESTORE_EVIDENCE_PATH")/isolated-external-role-replay.json"
+  MH_OPS_DISPOSABLE_PG17_ONLY=true \
+    node scripts/operations/prepare-isolated-postgres-external-role-replay.mjs \
+      --source "$work_dir/source-app-catalog.json" \
+      --output "$replay_sql" \
+      --report "$replay_report"
+  if ! psql "$RESTORE_ADMIN_DATABASE_URL" --set ON_ERROR_STOP=1 --quiet \
+      --file "$replay_sql" >"$work_dir/external-role-replay.stdout" \
+      2>"$work_dir/external-role-replay.stderr"; then
+    echo 'HOLD_DISPOSABLE_EXTERNAL_ROLE_REPLAY_FAILED; private SQL not disclosed.' >&2
+    exit 1
+  fi
+  # Execution proof is separate from post-replay catalog and grantor parity.
+  # The subsequent application-schema parity reader supplies that comparison.
+  replay_report_next="$work_dir/external-role-replay.report.json"
+  jq '.actualTargetReplayExecuted=true |
+      .verdict="ISOLATED_PG17_ROLE_REPLAY_EXECUTED__PARITY_NOT_YET_CHECKED"' \
+    "$replay_report" >"$replay_report_next"
+  mv "$replay_report_next" "$replay_report"
+  echo 'PASS_DISPOSABLE_EXTERNAL_ROLE_REPLAY: sealed source memberships replayed in isolated PostgreSQL 17 only'
+fi
+
 # The dump was authored under Production postgres defaults (no browser
 # function EXECUTE). The isolated Supabase image restores the DDL as
 # supabase_admin, whose global/public defaults can otherwise introduce an

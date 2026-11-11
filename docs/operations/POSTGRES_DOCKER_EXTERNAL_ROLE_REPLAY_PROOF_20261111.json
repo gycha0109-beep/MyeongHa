@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "ops-disposable-supabase-pg17-external-role-replay-observation-v1",
+  "scope": "Gate 1 Phase 8-A: reconstruct source-like app-to-postgres direct role memberships in isolated Docker",
+  "source": "synthetic-only role identities and grantor/options distribution based on read-only live aggregate; no actual source role names or backup rows copied into Docker proof",
+  "readOnlyProductionAggregate": {
+    "observedSourceDirectMembershipCount": 48,
+    "observedDistinctGrantedApplicationRoles": 43,
+    "recipientPostgresCount": 48,
+    "allowedGrantorCount": 48,
+    "unsupportedGrantorCount": 0,
+    "adminTrueCount": 43,
+    "inheritTrueCount": 3,
+    "setTrueCount": 2
+  },
+  "docker": {
+    "runtime": "Docker Desktop",
+    "engineVersion": "29.8.2",
+    "containerImage": "public.ecr.aws/supabase/postgres@sha256:6942962433a569e87f228b4d4ab7e11db5deca64e43babb3a038443ad6c4f1bb",
+    "postgresVersionFamily": "17.6.1.167",
+    "network": "none",
+    "publishedPorts": 0,
+    "persistentVolumes": 0,
+    "containerRemoved": true,
+    "syntheticOnly": true
+  },
+  "actualSyntheticTest": {
+    "outcome": "PASS",
+    "sourceLikeRoleEdges": 48,
+    "targetGrantorAndOptionsEdges": 48,
+    "distinctApplicationRoles": 43,
+    "grantorManagedAdminCount": 43,
+    "grantorPostgresCount": 5,
+    "adminOptionTrue": 43,
+    "inheritOptionTrue": 3,
+    "setOptionTrue": 2,
+    "missingTargetRoleAtomicRollback": "PASS",
+    "repeatReplayIdempotent": "PASS",
+    "externalNetworkCalls": 0,
+    "productionSqlMutations": 0
+  },
+  "implementation": {
+    "generator": "scripts/operations/prepare-isolated-postgres-external-role-replay.mjs",
+    "verifier": "scripts/verify-isolated-postgres-external-role-replay.mjs",
+    "integration": "scripts/run-postgres-isolated-restore-drill.sh",
+    "noSourceRoleNamesInArtifacts": true,
+    "noRawSqlArtifact": true,
+    "sourceRequiresSealedEncryptedWitness": true,
+    "unsupportedProviderRolesCannotBeFabricated": true,
+    "isolatedPostgresOnly": true
+  },
+  "status": {
+    "actualEncryptedBackupSourceReplayMeasured": false,
+    "targetOriginalMembershipParityProven": false,
+    "sourceCatalogSameMvccSnapshotProven": false,
+    "providerCatalogRestoreEquivalent": false,
+    "providerCopySkippedBlocksLastObserved": 29,
+    "providerCopyProjectedBlocksLastObserved": 3,
+    "fullProviderMigrationLedgerProven": false,
+    "hostedAuthStorageRecovered": false,
+    "independentPrivacyContinuityProven": false,
+    "wholeServiceRpoRtoProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "p0Issue": 1887
+  },
+  "next": "After PR required Integration PASS and merge, restore existing encrypted backup #42752268638 once into isolated GitHub Docker Supabase PG17 service, examine sanitized role pre/post source parity and the new replay report. Never dispatch Production SQL/backup/privacy canary or enable service admission."
+}
