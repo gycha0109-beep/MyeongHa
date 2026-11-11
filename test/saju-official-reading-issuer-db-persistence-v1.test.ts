@@ -163,6 +163,21 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
   });
 
+  it('does not commit an otherwise approved response if its wording changes during mapping verification', async () => {
+    const p = ports();
+    const response = structuredClone(native);
+    const map = p.mappingVerifier.verifyIssuedReadingMapping.getMockImplementation();
+    p.mappingVerifier.verifyIssuedReadingMapping.mockImplementationOnce(async request => {
+      response.reading.sections[0]!.blocks[0]!.text = '검증 이후 바뀐 풀이';
+      return map!(request);
+    });
+    await expect(persistIssuedSajuOfficialReadingV1(input(p, response))).resolves.toMatchObject({
+      state: 'held', reason: 'db_mapping_unverified',
+    });
+    expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
   it('dispatches the paid monthly request from DB scope and binds it before final transaction commit', async () => {
     const period = '2026-10-31T15:00:00.000Z';
     const purchaseIntentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -218,7 +233,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     });
     expect(result).toMatchObject({ state: 'committed', readingId });
     expect(requestReading).toHaveBeenCalledWith(request);
-    expect(events).toEqual(['prepare-approved', 'source', 'check-attempt', 'finalize-and-bind', 'read-back']);
+    expect(events).toEqual(['prepare-approved', 'source', 'check-attempt', 'check-attempt', 'finalize-and-bind', 'read-back']);
     expect(connection.calls.filter(sql => sql.startsWith('SET LOCAL ROLE'))).toEqual(
       Array(3).fill('SET LOCAL ROLE myeongha_approved_saju_issuer_executor'),
     );

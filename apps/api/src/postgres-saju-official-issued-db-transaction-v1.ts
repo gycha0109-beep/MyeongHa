@@ -14,9 +14,14 @@ import {
   createPostgresSajuOfficialCurrentAuthorityPortV1,
 } from './postgres-saju-official-current-authority-v1.js';
 import {
+  projectSajuOfficialStoredSnapshotV1,
   SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1,
+  type SajuOfficialDbMappingVerificationPortV1,
 } from './saju-official-reading-issuer-db-persistence-v1.js';
-import type { ApprovedSajuIssueAttemptBindingV1 } from './postgres-approved-saju-issue-scope-v1.js';
+import {
+  admitApprovedSajuIssueAttemptV1, type ApprovedSajuIssueAttemptBindingV1,
+} from './postgres-approved-saju-issue-scope-v1.js';
+import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
 /**
  * Concrete server-only composition for a Postgres subject transaction.
@@ -31,9 +36,11 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   approvedPurchase?: ApprovedSajuIssueAttemptBindingV1;
 }>): SajuOfficialIssuedDbTransactionPortV1 {
+  const { approvedPurchase } = input;
   return Object.freeze({
+    ...(approvedPurchase === undefined ? {} : { mappingVerification: 'transaction' as const }),
     async run(request: Parameters<SajuOfficialIssuedDbTransactionPortV1['run']>[0]) {
-      const transact = input.approvedPurchase === undefined
+      const transact = approvedPurchase === undefined
         ? executePostgresSubjectTransactionV1 : executePostgresApprovedSajuIssuerTransactionV1;
       return transact({
         pool: input.pool,
@@ -48,9 +55,31 @@ export function createPostgresSajuOfficialIssuedDbTransactionPortV1(input: Reado
               canSell: false as const,
             });
           }
+          const { executionAttemptId } = request;
+          const mappingVerifier: SajuOfficialDbMappingVerificationPortV1 | undefined =
+            approvedPurchase === undefined || executionAttemptId === undefined ? undefined : {
+              async verifyIssuedReadingMapping(mapping) {
+                const { source, originalResponse, subjectId, dbReadingId, readingSessionId, sourceBirthRevisionId } = mapping;
+                if (subjectId !== resolvedSubject.subjectId
+                  || source.sourceBirthRevisionId !== sourceBirthRevisionId
+                  || source.sourceRequestHash !== approvedPurchase.sourceRequestHash
+                  || source.sourceResponseHash !== hashSajuHeldSourceProofRequestV1(originalResponse)) return null;
+                const stored = projectSajuOfficialStoredSnapshotV1(originalResponse, dbReadingId);
+                if (stored === null || !await admitApprovedSajuIssueAttemptV1(client, approvedPurchase, {
+                  subjectId, readingId: dbReadingId, readingSessionId, executionAttemptId, sourceBirthRevisionId,
+                })) return null;
+                return Object.freeze({
+                  state: 'approved_mapping' as const,
+                  subjectId, dbReadingId, readingSessionId, sourceBirthRevisionId,
+                  nativeReadingId: source.nativeReadingId, originalResponseHash: source.sourceResponseHash,
+                  storedResponseHash: hashSajuHeldSourceProofRequestV1(stored),
+                });
+              },
+            };
           return request.commit({
-            currentAuthority: createPostgresSajuOfficialCurrentAuthorityPortV1(client, input.approvedPurchase),
-            commitPort: createPostgresSajuOfficialImmutableCommitPortV1(client, input.approvedPurchase),
+            currentAuthority: createPostgresSajuOfficialCurrentAuthorityPortV1(client, approvedPurchase),
+            commitPort: createPostgresSajuOfficialImmutableCommitPortV1(client, approvedPurchase),
+            ...(mappingVerifier === undefined ? {} : { mappingVerifier }),
           });
         },
       });

@@ -13,9 +13,17 @@ $function$;
 
 create function public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text)
 returns table(reading_id uuid,session_id uuid)
-language sql volatile security definer set search_path=pg_catalog
+language plpgsql volatile security definer set search_path=pg_catalog
 as $function$
-  select * from commerce_saju_private.prepare_approved_component_reading_v1($1,$2,$3,$4,$5,$6,$7)
+begin
+  return query select * from commerce_saju_private.prepare_approved_component_reading_v1($1,$2,$3,$4,$5,$6,$7);
+  -- The existing invoker constraint triggers read protected tables.
+  -- Run them while the controlled wrapper owns the write, before COMMIT.
+  set constraints public.ct_reading_session_authority,public.ct_reading_request_authority,
+    public.ct_reading_finalize_from_reading immediate;
+  set constraints public.ct_reading_session_authority,public.ct_reading_request_authority,
+    public.ct_reading_finalize_from_reading deferred;
+end
 $function$;
 
 create function public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text)
@@ -48,6 +56,8 @@ begin
     raise exception using errcode='P0001',constraint='approved_saju_issuer_current_scope_unavailable',
       message='Approved Saju issuance authority changed';
   end if;
+  set constraints public.ct_reading_finalize_from_reading immediate;
+  set constraints public.ct_reading_finalize_from_reading deferred;
   return query select prepared.execution_attempt_id,prepared.execution_attempt_no,
     prepared.attempt_state,prepared.replayed;
 end
@@ -86,6 +96,10 @@ begin
   perform commerce_saju_private.bind_approved_component_reading_v1(
     p_subject,p_purchase,p_component,p_reading,p_request_hash,p_stored_hash
   );
+  set constraints public.ct_reading_finalize_from_reading,public.ct_reading_finalize_from_ref,
+    public.ct_reading_finalize_from_execution immediate;
+  set constraints public.ct_reading_finalize_from_reading,public.ct_reading_finalize_from_ref,
+    public.ct_reading_finalize_from_execution deferred;
   return query select committed.reading_id,committed.execution_attempt_id,committed.response_hash,committed.replayed;
 end
 $function$;
@@ -110,6 +124,7 @@ revoke all on function
 
 grant execute on function
   public.begin_member_subject_context_v1(uuid),
+  public.current_myeongha_subject_id(),
   public.assert_myeongha_subject_context_v1(uuid),
   public.qry_approved_saju_issue_scope_v1(uuid,uuid,text),
   public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text),

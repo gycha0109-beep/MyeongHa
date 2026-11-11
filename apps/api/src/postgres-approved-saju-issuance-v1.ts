@@ -66,14 +66,13 @@ export async function inspectApprovedSajuTemporalEvidenceV1(input: Readonly<
 export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
   input: Readonly<PrepareOptions & Pick<SajuOfficialReadingExecutionInputV1<AdmittedResponse>,
     'subjectId' | 'readingId' | 'readingSessionId' | 'executionAttemptId' | 'outboxEventId'
-      | 'adapter' | 'sourceVerifier' | 'mappingVerifier'> & {
+      | 'adapter' | 'sourceVerifier'> & {
     purchaseIntentId: string;
     component: SajuReadingComponentV1;
     readerCharacterId: string;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
-  if (input.component === 'compatibility' || typeof input.sourceVerifier?.verifyProductionIssue !== 'function'
-    || typeof input.mappingVerifier?.verifyIssuedReadingMapping !== 'function') {
+  if (input.component === 'compatibility' || typeof input.sourceVerifier?.verifyProductionIssue !== 'function') {
     return held('production_source_unverified');
   }
   if (input.verifiedEvidence.kind !== 'member') return held('current_authority_unavailable');

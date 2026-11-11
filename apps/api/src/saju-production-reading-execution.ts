@@ -75,11 +75,14 @@ export interface SajuOfficialIssuancePreflightPortV1 {
  * share the same governed connection. An upstream success alone is not a grant.
  */
 export interface SajuOfficialIssuedDbTransactionPortV1 {
+  readonly mappingVerification?: 'transaction';
   run(input: Readonly<{
     readonly subjectId: string;
+    readonly executionAttemptId?: string;
     readonly commit: (ports: Readonly<{
       currentAuthority: SajuOfficialCurrentAuthorityPortV1;
       commitPort: SajuOfficialImmutableCommitPortV1;
+      mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
     }>) => Promise<SajuOfficialIssuanceResultV1>;
   }>): Promise<SajuOfficialIssuanceResultV1>;
 }
@@ -142,7 +145,8 @@ export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<Admitted
   // Never charge an upstream call without a wired Production issuer + DB scope.
   const { sourceVerifier, mappingVerifier, attemptPrepare, dbTransaction } = input;
   if (typeof sourceVerifier?.verifyProductionIssue !== 'function'
-    || typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function'
+    || (dbTransaction?.mappingVerification !== 'transaction'
+      && typeof mappingVerifier?.verifyIssuedReadingMapping !== 'function')
     || typeof attemptPrepare?.prepareBeforeSourceCall !== 'function'
     || typeof dbTransaction?.run !== 'function'
     || typeof input.adapter?.requestReading !== 'function') {
@@ -214,8 +218,10 @@ export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<Admitted
   }
   return dbTransaction.run({
     subjectId: input.subjectId,
-    commit: ({ currentAuthority, commitPort }) =>
-      persistIssuedSajuOfficialReadingV1({
+    ...(dbTransaction.mappingVerification === 'transaction' ? { executionAttemptId: input.executionAttemptId } : {}),
+    commit: ({ currentAuthority, commitPort, mappingVerifier: transactionMappingVerifier }) => {
+      const mapping = dbTransaction.mappingVerification === 'transaction' ? transactionMappingVerifier : mappingVerifier;
+      return persistIssuedSajuOfficialReadingV1({
         subjectId: input.subjectId,
         readingId: input.readingId,
         readingSessionId: input.readingSessionId,
@@ -226,9 +232,10 @@ export async function executeAndPersistPinnedBirthSajuOfficialReadingV1<Admitted
         executedRequest,
         ...(input.requireCompleteResponse === true ? { requireCompleteResponse: true } : {}),
         sourceVerifier,
-        mappingVerifier,
+        ...(mapping === undefined ? {} : { mappingVerifier: mapping }),
         currentAuthority,
         commitPort,
-      }),
+      });
+    },
   });
 }

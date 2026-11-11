@@ -998,6 +998,7 @@ begin
   end if;
   set local role myeongha_approved_saju_issuer_executor;
   perform 1 from public.begin_member_subject_context_v1(actor_auth);
+  perform public.assert_myeongha_subject_context_v1(actor);
   if public.qry_approved_saju_issue_scope_v1(actor,purchase,'career')->>'birthRevisionId'
       is distinct from first_revision::text
     or public.qry_approved_saju_issue_scope_v1(gen_random_uuid(),purchase,'career') is not null then

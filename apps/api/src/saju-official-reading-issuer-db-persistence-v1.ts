@@ -78,6 +78,18 @@ export interface SajuOfficialDbMappingVerificationPortV1 {
   }>): Promise<ApprovedSajuReadingIdMappingV1 | null>;
 }
 
+/** The stored artifact preserves the native payload with the authorized DB ID. */
+export function projectSajuOfficialStoredSnapshotV1(
+  response: unknown,
+  readingId: string,
+): Readonly<Record<string, unknown>> | null {
+  if (!uuid(readingId) || !obj(response) || !obj(response.reading) || !id(response.reading.readingId)) return null;
+  return Object.freeze({
+    ...response,
+    reading: Object.freeze({ ...response.reading, readingId }),
+  });
+}
+
 /** Run this immediately before finalization in the SAME governed DB transaction. */
 export interface SajuOfficialCurrentAuthorityPortV1 {
   admitCurrentIssue(input: Readonly<{
@@ -202,12 +214,12 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   }
 
   const executedRequestHash = hashSajuHeldSourceProofRequestV1(input.executedRequest);
+  const originalHash = hashSajuHeldSourceProofRequestV1(native);
   const source = await input.sourceVerifier.verifyProductionIssue({
     sourceResponse: native, executedRequest: input.executedRequest, subjectId: input.subjectId,
     dbReadingId: input.readingId, readingSessionId: input.readingSessionId,
     sourceBirthRevisionId: input.sourceBirthRevisionId,
   });
-  const originalHash = hashSajuHeldSourceProofRequestV1(native);
   if (source?.state !== 'production_source_verified'
     || source.nativeReadingId !== native.reading.readingId
     || source.sourceRequestHash !== executedRequestHash
@@ -230,10 +242,10 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
 
   // Only the DB UUID is remapped, never interpreted/rewritten text, scope,
   // disclosures, ambiguity, birth data, or issuer response metadata.
-  const storedSnapshot = Object.freeze({
-    ...native,
-    reading: Object.freeze({ ...native.reading, readingId: input.readingId }),
-  });
+  const storedSnapshot = projectSajuOfficialStoredSnapshotV1(native, input.readingId);
+  if (storedSnapshot === null || hashSajuHeldSourceProofRequestV1(native) !== originalHash) {
+    return held('db_mapping_unverified');
+  }
   const storedHash = hashSajuHeldSourceProofRequestV1(storedSnapshot);
   if (mapped?.state !== 'approved_mapping'
     || mapped.subjectId !== input.subjectId
