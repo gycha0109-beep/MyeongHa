@@ -19,7 +19,9 @@ export function validateDatasetSplitMetadata(records) {
     if (ids.has(rec.recordId)) fail('dataset.recordId', 'duplicate record');
     ids.add(rec.recordId);
     for (const [map, field] of [[families,'familyId'],[paraphrases,'paraphraseFamilyId'],[turns,'turnGroupId'],[fingerprints,'promptFingerprint']]) {
-      const scopedKey = `${rec.characterId}|${rec[field]}`;
+      // Repeated prompts across different characters can contaminate a shared optimizer.
+      // Protect prompt fingerprints globally while allowing separate character-specific family labels.
+      const scopedKey = field === 'promptFingerprint' ? rec[field] : `${rec.characterId}|${rec[field]}`;
       const prior = map.get(scopedKey);
       if (prior !== undefined && prior !== rec.role) fail(`dataset.${field}`, 'same family/turn/prompt split across roles');
       map.set(scopedKey, rec.role);

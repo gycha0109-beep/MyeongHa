@@ -5,3 +5,4 @@ export * from './evidence-and-split-validator.mjs';
 export * from './prompt-slot-compiler.mjs';
 export * from './metrics-and-gates.mjs';
 export * from './regression-matrix.mjs';
+export * from './legacy-feedback-adapter.mjs';

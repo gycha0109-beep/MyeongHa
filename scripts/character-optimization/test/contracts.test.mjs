@@ -5,7 +5,7 @@ import {
   validateOptimizationProfile, validateOptimizationRunManifest,
   validateDatasetSplitMetadata, buildOptimizerDatasetView,
   compileOfflineCandidate, validateEvaluationEvidence, assessCandidateForOwnerReview,
-  evaluateSharedCandidateRegression,
+  evaluateSharedCandidateRegression, normalizeLegacyDiagnosticMetadata,
 } from '../src/index.mjs';
 const H = c => c.repeat(64);
 const tokens = Object.fromEntries(['student','reflection','judge','holdout'].map(role=>[role,{input:0,output:0}]));
@@ -173,4 +173,26 @@ test('shared rule cannot pass with insufficient families or unreviewed character
   const x=evaluateSharedCandidateRegression(rows,{minimumScore:3,maximumDrop:0,minimumFamilies:8});
   assert.equal(x.allCharactersPass,false);
   assert.deepEqual(x.decisions[1].reasons,['insufficient_independent_families','not_human_reviewed']);
+});
+
+test('shared prompt fingerprint cannot cross train/holdout boundary between characters',()=>{
+  const a=record('d1','development','F01');
+  const b=record('v1','optimizer_validation','F02',{characterId:'seyeon',promptFingerprint:a.promptFingerprint});
+  assert.throws(()=>validateDatasetSplitMetadata([a,b]),/promptFingerprint/);
+});
+test('legacy human diagnostics are converted without notes or raw user text',()=>{
+  const input=[{originalKey:'Y07|baseline|1|deepseek/deepseek-v4.1-flash-1017',originalRating:'fiction',classification:'negative_user_rating',evidence:[{tag:'unverified_fact_or_memory',origin:'user_rating',evidence:'fiction'},{tag:'unverified_fact_or_memory',origin:'note_heuristic_unconfirmed',evidence:'PRIVATE_USER_NOTE_DO_NOT_EXPORT'}],sourceAuthority:['docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md'],reviewStatus:'unreviewed'}];
+  const result=normalizeLegacyDiagnosticMetadata('yeoul',input);
+  assert.equal(result.count,1);assert.equal(result.ratingCounts.fiction,1);
+  assert.equal(result.records[0].hardViolationVerified,false);
+  assert.equal(result.records[0].exampleApproved,false);
+  assert.equal(result.records[0].signals[1].confirmedByOwner,false);
+  assert.equal(JSON.stringify(result).includes('PRIVATE_USER_NOTE_DO_NOT_EXPORT'),false);
+  assert.equal(JSON.stringify(result).includes(input[0].originalKey),false);
+});
+test('legacy diagnostics reject cross-character source and invented owner approval',()=>{
+  const d={originalKey:'record1',originalRating:'good',classification:'clean_positive_candidate',evidence:[],sourceAuthority:['docs/character/SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md'],reviewStatus:'unreviewed'};
+  assert.throws(()=>normalizeLegacyDiagnosticMetadata('yeoul',[d]),/unexpected character source/);
+  d.sourceAuthority=['docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md'];d.reviewStatus='approved';
+  assert.throws(()=>normalizeLegacyDiagnosticMetadata('yeoul',[d]),/review status cannot be promoted/);
 });
