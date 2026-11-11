@@ -17,6 +17,7 @@ export const SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1 =
 
 const HASH = /^[a-f0-9]{64}$/u;
 const VERSIONED_BIRTH_HASH = /^sha256:v1:[a-f0-9]{64}$/u;
+const EXACT_SOURCE_REF = /^saju_source_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu;
 const RESPONSE_VERSION = 'myeonghwa-product-reading-response-v2';
 const STATES = new Set(['delivered', 'delivered_with_fallback']);
@@ -175,6 +176,8 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   /** Exact request sent to the authenticated Saju host, for issuer digest verification. */
   readonly executedRequest: SajuProductionReadingRequestV1;
   readonly requireCompleteResponse?: true;
+  /** Authenticated transport header coordinate; must equal independently verified Source provenance. */
+  readonly authenticatedTransportSourceRef?: string;
   readonly sourceVerifier?: SajuOfficialSourceVerificationPortV1;
   readonly mappingVerifier?: SajuOfficialDbMappingVerificationPortV1;
   readonly currentAuthority?: SajuOfficialCurrentAuthorityPortV1;
@@ -230,7 +233,10 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     || typeof source.sourceBirthInputHash !== 'string'
     || !VERSIONED_BIRTH_HASH.test(source.sourceBirthInputHash)
     || !id(source.engineVersion)
-    || !id(source.externalRequestRef)) {
+    || !id(source.externalRequestRef)
+    || (input.authenticatedTransportSourceRef !== undefined &&
+      (!EXACT_SOURCE_REF.test(input.authenticatedTransportSourceRef) ||
+        source.externalRequestRef !== input.authenticatedTransportSourceRef))) {
     return held('production_source_unverified');
   }
 

@@ -11,7 +11,6 @@ import {
   type SajuProductionReadingHttpAdapterV1,
 } from './saju-production-reading-http-adapter.js';
 
-const ATTEMPT_HEADER = 'x-myeongha-reading-attempt';
 const RELEASE_HEADER = 'x-myeongha-reading-release';
 const PROOF_HEADER = 'x-myeonghwa-production-issue-proof';
 const VERSION = 'myeonghwa-production-reading-issue-proof-v1';
@@ -65,6 +64,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
   const proofs = new WeakMap<object, {
     context: SajuPreparedProductionReadingContextV1;
     proof: unknown;
+    externalRequestRef: string;
   }>();
 
   return {
@@ -94,7 +94,6 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
               ...init,
               headers: {
                 ...init.headers,
-                [ATTEMPT_HEADER]: binding.executionAttemptId,
                 [RELEASE_HEADER]: binding.releaseRef,
               },
             });
@@ -102,9 +101,14 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
             return response;
           },
         });
-        const response = await transport.requestReading(request);
-        if (record(response)) proofs.set(response, { context: binding, proof: parseProof(header) });
-        return response;
+        if (transport.requestReadingWithSourceRef === undefined) {
+          throw new Error('Saju prepared transport did not provide the A4 source ref boundary.');
+        }
+        const attested = await transport.requestReadingWithSourceRef(request, binding);
+        if (record(attested.response)) proofs.set(attested.response, {
+          context: binding, proof: parseProof(header), externalRequestRef: attested.externalRequestRef,
+        });
+        return attested;
       },
     },
     sourceVerifier: {
@@ -115,7 +119,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
         const entry = proofs.get(sourceResponse);
         proofs.delete(sourceResponse);
         if (!entry || !record(entry.proof)) return null;
-        const { context, proof: { payload, signature } } = entry;
+        const { context, externalRequestRef, proof: { payload, signature } } = entry;
         if (!record(payload) || typeof signature !== 'string' || !/^[a-zA-Z0-9_-]{86}$/u.test(signature)) {
           return null;
         }
@@ -126,6 +130,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           payload.version !== VERSION || payload.issuer !== issuer || payload.audience !== audience ||
           payload.keyId !== keyId || payload.authorityHash !== authorityHash ||
           executionAttemptId !== context.executionAttemptId || payload.executionAttemptId !== executionAttemptId ||
+          payload.externalRequestRef !== externalRequestRef ||
           sourceBirthRevisionId !== context.sourceBirthRevisionId || payload.releaseRef !== context.releaseRef ||
           payload.requestBodyHash !== requestHash || payload.responseBodyHash !== responseHash ||
           typeof payload.nativeReadingId !== 'string' || payload.nativeReadingId !== sourceResponse.reading.readingId ||
@@ -142,7 +147,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           sourceBirthRevisionId,
           sourceBirthInputHash: context.sourceBirthInputHash,
           engineVersion: payload.engineVersion,
-          externalRequestRef: executionAttemptId,
+          externalRequestRef,
         };
       },
     },

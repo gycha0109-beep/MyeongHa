@@ -232,7 +232,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       adapter: { requestReading },
     });
     expect(result).toMatchObject({ state: 'committed', readingId });
-    expect(requestReading).toHaveBeenCalledWith(request);
+    expect(requestReading).toHaveBeenCalledWith(request, { executionAttemptId });
     expect(events).toEqual(['prepare-approved', 'source', 'check-attempt', 'check-attempt', 'finalize-and-bind', 'read-back']);
     expect(connection.calls.filter(sql => sql.startsWith('SET LOCAL ROLE'))).toEqual(
       Array(3).fill('SET LOCAL ROLE myeongha_approved_saju_issuer_executor'),
@@ -530,7 +530,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(requestReading).toHaveBeenCalledWith({
       birth: { calendarType: 'solar', date: '2001-07-14', time: '15:20', sex: 'female' },
       reading: { text: '전체 사주' },
-    });
+    }, { executionAttemptId });
     expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
   });
 

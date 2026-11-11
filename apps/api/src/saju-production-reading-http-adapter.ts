@@ -11,6 +11,13 @@ import {
 } from './upstream-json-response-resource.js';
 
 export const SAJU_PRODUCTION_READING_HTTP_PATH_V1 = '/api/readings' as const;
+export const SAJU_A4_PREPARED_ATTEMPT_HEADER_V1 = 'x-myeongha-reading-execution-attempt-id' as const;
+export const SAJU_A4_SOURCE_REF_RESPONSE_HEADER_V1 = 'x-myeongha-saju-external-request-ref' as const;
+const SAJU_A4_SOURCE_REF_V1 = /^saju_source_[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
+const SAJU_A4_UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+export interface SajuA4PreparedAttemptTransportV1 {
+  readonly executionAttemptId: string;
+}
 export const SAJU_PREVIEW_READING_HTTP_PATH_V1 = '/api/preview/readings' as const;
 export const SAJU_READING_LIFECYCLE_HEADER_V1 = 'x-myeonghwa-reading-lifecycle' as const;
 export const SAJU_PREVIEW_READING_LIFECYCLE_V1 = 'preview' as const;
@@ -34,7 +41,8 @@ export type SajuProductionReadingHttpAdapterFailureCodeV1 =
   | 'RESPONSE_TOO_LARGE'
   | 'RESPONSE_ADMISSION_ATTESTATION_REJECTED'
   | 'RESPONSE_LIFECYCLE_ATTESTATION_REJECTED'
-  | 'RESPONSE_ADMISSION_REJECTED';
+  | 'RESPONSE_ADMISSION_REJECTED'
+  | 'SOURCE_REF_ATTESTATION_REJECTED';
 
 export class SajuProductionReadingHttpAdapterErrorV1 extends Error {
   constructor(
@@ -69,11 +77,17 @@ export interface SajuProductionReadingRequestV1 {
 export interface SajuProductionReadingHttpAdapterV1<AdmittedResponse = unknown> {
   requestReading(
     request: SajuProductionReadingRequestV1,
+    preparedAttempt?: SajuA4PreparedAttemptTransportV1,
   ): Promise<AdmittedResponse>;
   requestPreparedReading?(
     request: SajuProductionReadingRequestV1,
     context: SajuPreparedProductionReadingContextV1,
-  ): Promise<AdmittedResponse>;
+  ): Promise<Readonly<{ response: AdmittedResponse; externalRequestRef: string }>>;
+  /** Private server transport: ref is untrusted until independently signed by Source. */
+  requestReadingWithSourceRef?(
+    request: SajuProductionReadingRequestV1,
+    preparedAttempt: SajuA4PreparedAttemptTransportV1,
+  ): Promise<Readonly<{ response: AdmittedResponse; externalRequestRef: string }>>;
 }
 
 export interface SajuPreparedProductionReadingContextV1 {
@@ -237,6 +251,7 @@ async function fetchWithTimeout(input: {
   readonly request: SajuProductionReadingRequestV1;
   readonly bearerToken: string;
   readonly timeoutMs: number;
+  readonly preparedAttemptId?: string;
 }): Promise<SajuProductionReadingHttpDeadlineLeaseV1> {
   const controller = new AbortController();
   let timedOut = false;
@@ -266,6 +281,9 @@ async function fetchWithTimeout(input: {
           accept: 'application/json',
           authorization: `Bearer ${input.bearerToken}`,
           'content-type': 'application/json',
+          ...(input.preparedAttemptId === undefined
+            ? {}
+            : { [SAJU_A4_PREPARED_ATTEMPT_HEADER_V1]: input.preparedAttemptId }),
         }),
         body: JSON.stringify(input.request),
         redirect: 'manual',
@@ -469,49 +487,96 @@ function createSajuReadingHttpAdapterV1<AdmittedResponse>(
     );
   }
 
+  async function executeRequest(
+    request: SajuProductionReadingRequestV1,
+    preparedAttempt: SajuA4PreparedAttemptTransportV1 | undefined,
+    requireSourceRef: boolean,
+  ): Promise<Readonly<{ response: AdmittedResponse; externalRequestRef: string | null }>> {
+    if ((requireSourceRef && preparedAttempt === undefined) ||
+      (preparedAttempt !== undefined &&
+        (endpointPath !== SAJU_PRODUCTION_READING_HTTP_PATH_V1 ||
+          typeof preparedAttempt.executionAttemptId !== 'string' ||
+          !SAJU_A4_UUID_V1.test(preparedAttempt.executionAttemptId)))) {
+      throw new SajuProductionReadingHttpAdapterErrorV1(
+        'INVALID_READING_REQUEST',
+        'Authenticated Saju A4 transport requires an exact prepared DB attempt.',
+      );
+    }
+    const lease = await fetchWithTimeout({
+      fetchImpl,
+      url,
+      request,
+      bearerToken,
+      timeoutMs,
+      ...(preparedAttempt === undefined
+        ? {}
+        : { preparedAttemptId: preparedAttempt.executionAttemptId }),
+    });
+    try {
+      const { response } = lease;
+      assertSuccessfulStatus(response);
+      assertJsonContentType(response);
+      assertSourceAdmissionAttestation(response);
+      assertLifecycleAttestation(response, expectedLifecycle);
+      const externalRequestRef = requireSourceRef
+        ? response.headers.get(SAJU_A4_SOURCE_REF_RESPONSE_HEADER_V1)
+        : null;
+      if (requireSourceRef && (externalRequestRef === null ||
+          !SAJU_A4_SOURCE_REF_V1.test(externalRequestRef))) {
+        cancelUnusedResponseBody(response);
+        throw new SajuProductionReadingHttpAdapterErrorV1(
+          'SOURCE_REF_ATTESTATION_REJECTED',
+          'Saju production reading did not attest its exact source request ref.',
+          response.status,
+        );
+      }
+      const payload = await parseJsonResponse(
+        response, lease.deadline, lease.signal, lease.didTimeout,
+      );
+      assertAttestedEnvelopeVersion(payload);
+      if (config.admissionPort === undefined) {
+        return { response: payload as AdmittedResponse, externalRequestRef };
+      }
+      try {
+        return {
+          response: config.admissionPort.admit(payload),
+          externalRequestRef,
+        };
+      } catch {
+        throw new SajuProductionReadingHttpAdapterErrorV1(
+          'RESPONSE_ADMISSION_REJECTED',
+          'Saju ProductReadingResponse failed the configured defense-in-depth admission boundary.',
+          response.status,
+        );
+      }
+    } finally {
+      lease.release();
+    }
+  }
+
   return Object.freeze({
     async requestReading(
       request: SajuProductionReadingRequestV1,
+      preparedAttempt?: SajuA4PreparedAttemptTransportV1,
     ): Promise<AdmittedResponse> {
-      const lease = await fetchWithTimeout({
-        fetchImpl,
-        url,
-        request,
-        bearerToken,
-        timeoutMs,
-      });
-
-      try {
-        const { response } = lease;
-        assertSuccessfulStatus(response);
-        assertJsonContentType(response);
-        assertSourceAdmissionAttestation(response);
-        assertLifecycleAttestation(response, expectedLifecycle);
-        const payload = await parseJsonResponse(
-          response,
-          lease.deadline,
-          lease.signal,
-          lease.didTimeout,
-        );
-        assertAttestedEnvelopeVersion(payload);
-
-        if (config.admissionPort === undefined) {
-          return payload as AdmittedResponse;
-        }
-
-        try {
-          return config.admissionPort.admit(payload);
-        } catch {
-          throw new SajuProductionReadingHttpAdapterErrorV1(
-            'RESPONSE_ADMISSION_REJECTED',
-            'Saju ProductReadingResponse failed the configured defense-in-depth admission boundary.',
-            response.status,
-          );
-        }
-      } finally {
-        lease.release();
-      }
+      return (await executeRequest(request, preparedAttempt, false)).response;
     },
+    ...(endpointPath !== SAJU_PRODUCTION_READING_HTTP_PATH_V1
+      ? {}
+      : {
+          async requestReadingWithSourceRef(
+            request: SajuProductionReadingRequestV1,
+            preparedAttempt: SajuA4PreparedAttemptTransportV1,
+          ): Promise<Readonly<{ response: AdmittedResponse; externalRequestRef: string }>> {
+            const result = await executeRequest(request, preparedAttempt, true);
+            if (result.externalRequestRef === null)
+              throw new Error('Exact Saju source ref response invariant failed');
+            return Object.freeze({
+              response: result.response,
+              externalRequestRef: result.externalRequestRef,
+            });
+          },
+        }),
   });
 }
 
