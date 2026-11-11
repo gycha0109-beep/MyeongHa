@@ -29,7 +29,8 @@ function fixture(offer: ApprovedSajuOfferV1, overrides: object = {}) {
         expect(JSON.parse(request.body)).toEqual({ paymentAttemptId, approvedOfferId: offer.id });
         return success({
           paymentAttemptId, provider: 'portone_v2', environment: 'sandbox', providerRequestId: paymentId,
-          amountMinor: offer.priceKrw, currency: 'KRW', status: 'handed_off', ...overrides,
+          amountMinor: offer.priceKrw, currency: 'KRW', status: 'handed_off',
+          externalProductId: 'server-product-' + offer.id, ...overrides,
         });
       }),
     },
@@ -66,6 +67,7 @@ it.each(APPROVED_SAJU_CATALOG_V1)('uses the server-owned payment for $id and ret
   expect(input.sdk.requestPayment).toHaveBeenCalledExactlyOnceWith({
     storeId: 'sandbox-store', channelKey: 'sandbox-channel', paymentId, orderName: offer.title,
     totalAmount: offer.priceKrw, currency: 'CURRENCY_KRW', payMethod: 'CARD',
+    products: [{ id: 'server-product-' + offer.id, name: offer.title, amount: offer.priceKrw, quantity: 1 }],
   });
   expect(input.verification.fetch).toHaveBeenCalledOnce();
 });
@@ -86,7 +88,7 @@ it.each([{ approvedOfferId: 'wealth' }, { amountMinor: 1 }, { status: 'verified'
 
 it.each([
   { amountMinor: 1 }, { currency: 'USD' }, { environment: 'production' }, { providerRequestId: 'x'.repeat(41) },
-  { status: 'created' },
+  { status: 'created' }, { externalProductId: undefined }, { externalProductId: '  ' },
 ])(
   'keeps the SDK and verification closed for an ineligible handoff %j',
   async (override) => {

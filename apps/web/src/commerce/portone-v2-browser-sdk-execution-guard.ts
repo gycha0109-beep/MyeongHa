@@ -40,6 +40,7 @@ export interface PortOneV2BrowserSdkExecutionAdmissionV1 {
   readonly environment: 'sandbox';
   readonly paymentAttemptId: string;
   readonly request: PortOneV2BrowserPaymentRequestV1;
+  readonly externalProductId?: string;
 }
 
 function sameRequest(
@@ -87,6 +88,7 @@ export function guardPortOneV2BrowserSdkExecutionV1(input: {
     environment: 'sandbox',
     paymentAttemptId: input.context.paymentAttemptId,
     request: canonicalRequest,
+    ...(input.context.externalProductId === undefined ? {} : { externalProductId: input.context.externalProductId }),
   });
 }
 

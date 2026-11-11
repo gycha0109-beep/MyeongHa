@@ -97,14 +97,19 @@ export async function requestApprovedSajuSandboxPaymentV1(input: {
       payMethod: 'CARD',
     },
   });
-  if (admission.request.currency !== 'KRW' || admission.request.totalAmount !== offer.priceKrw
+  if (admission.externalProductId === undefined || admission.request.currency !== 'KRW'
+    || admission.request.totalAmount !== offer.priceKrw
     || !/^[A-Za-z0-9_-]{6,40}$/u.test(admission.request.paymentId)) {
     throw new Error('Sandbox checkout request does not match the approved Saju order.');
   }
 
   // A closed or failed SDK window can race the provider callback. Verify the original attempt either way.
   try {
-    await input.sdk.requestPayment({ ...admission.request, currency: 'CURRENCY_KRW' });
+    await input.sdk.requestPayment({
+      ...admission.request,
+      currency: 'CURRENCY_KRW',
+      products: [{ id: admission.externalProductId, name: offer.title, amount: offer.priceKrw, quantity: 1 }],
+    });
   } catch { /* A client error does not settle the server-side payment. */ }
   return fetchPaymentAttemptServerVerificationV1({
     paymentAttemptId: admission.paymentAttemptId,

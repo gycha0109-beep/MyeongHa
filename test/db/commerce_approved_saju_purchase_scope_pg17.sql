@@ -890,15 +890,18 @@ begin
   select * into strict handoff from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career');
   if handoff.expected_amount_minor<>9900 or handoff.expected_currency<>'KRW'
     or handoff.environment<>'sandbox' or handoff.provider_request_id<>'checkout-sandbox-request'
+    or handoff.external_product_id is distinct from offer.external_product_id
     or handoff.status<>'handed_off' then
     raise exception 'Sandbox handoff changed the approved payment identity or amount';
   end if;
   if not exists (select 1 from public.qry_commerce_payment_verification_context_v1(actor,attempt_id)
-    where expected_amount_minor=9900 and provider_request_id='checkout-sandbox-request') then
+    where expected_amount_minor=9900 and provider_request_id='checkout-sandbox-request'
+      and expected_external_product_id=handoff.external_product_id) then
     raise exception 'Committed sandbox handoff was unavailable to server verification';
   end if;
   if not exists (select 1 from public.read_approved_saju_sandbox_handoff_v1(actor,attempt_id,'career')
-    where status='handed_off' and provider_request_id='checkout-sandbox-request') then
+    where status='handed_off' and provider_request_id='checkout-sandbox-request'
+      and external_product_id=offer.external_product_id) then
     raise exception 'Sandbox handoff replay changed its committed identity';
   end if;
   begin

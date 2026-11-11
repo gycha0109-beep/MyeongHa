@@ -72,6 +72,8 @@ function fakePool(input: {
               providerRequestId: PROVIDER_REQUEST_ID,
               expectedAmountMinor: '12900',
               expectedCurrency: 'KRW',
+              ...(text.includes('read_approved_saju_sandbox_handoff_v1')
+                ? { externalProductId: 'fixture-first-counterpart' } : {}),
               status: text.includes('read_approved_saju_sandbox_handoff_v1') ? 'handed_off' : 'created',
             } as Row] };
           }
@@ -110,6 +112,7 @@ describe('Payment Attempt handoff context authenticated HTTP foundation', () => 
     const queriedSql: string[] = [];
     const response = await invoke({ request: post(body), approvedSajuSandbox: true, pool: fakePool({ queriedSql }) });
     expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ data: { externalProductId: 'fixture-first-counterpart' } });
     expect(queriedSql.some((sql) => sql.includes('read_approved_saju_sandbox_handoff_v1'))).toBe(true);
     expect(queriedSql.some((sql) => sql.includes('qry_commerce_payment_attempt_handoff_context_v1'))).toBe(false);
   });

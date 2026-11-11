@@ -94,7 +94,7 @@ create function commerce_saju_private.read_approved_saju_sandbox_handoff_v1(
   p_subject_id uuid,p_attempt_id uuid,p_approved_offer_id text
 )
 returns table(payment_attempt_id uuid,provider text,environment text,provider_request_id text,
-  expected_amount_minor bigint,expected_currency text,status text)
+  expected_amount_minor bigint,expected_currency text,status text,external_product_id text)
 language plpgsql security invoker
 set search_path=pg_catalog
 as $function$
@@ -117,7 +117,8 @@ begin
   -- the payment identity. Exact retries retain the same attempt and payment ID.
   return query
   select committed.payment_attempt_id,committed.provider,committed.environment,committed.provider_request_id,
-    intent.expected_amount_minor,intent.expected_currency,committed.status
+    intent.expected_amount_minor,intent.expected_currency,committed.status,
+    intent.offer_snapshot_jsonb->>'externalProductId'
   from public.cmd_transition_payment_attempt_v1(p_subject_id,p_attempt_id,'handed_off',null,null) committed
   join public.purchase_intents intent on intent.id=committed.purchase_intent_id
     and intent.subject_id=p_subject_id and intent.id=v_intent_id

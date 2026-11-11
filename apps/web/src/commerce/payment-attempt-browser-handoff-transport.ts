@@ -148,6 +148,7 @@ function parseSuccessEnvelope(
     'amountMinor',
     'currency',
     'status',
+    ...(expectedStatus === 'handed_off' ? ['externalProductId'] : []),
   ])) {
     return invalidResponse('Payment Attempt browser handoff success data is invalid.');
   }
@@ -173,6 +174,12 @@ function parseSuccessEnvelope(
     return invalidResponse('Payment Attempt browser handoff response serverTime is invalid.');
   }
 
+  const externalProductId = expectedStatus === 'handed_off'
+    ? requireCanonicalString('externalProductId', value.data.externalProductId)
+    : undefined;
+  if (externalProductId !== undefined && externalProductId.length > 512) {
+    return invalidResponse('Payment Attempt browser handoff response externalProductId is invalid.');
+  }
   return Object.freeze({
     paymentAttemptId: expectedPaymentAttemptId,
     provider: requireCanonicalString('provider', value.data.provider),
@@ -181,6 +188,7 @@ function parseSuccessEnvelope(
     amountMinor: requireAmountMinor(value.data.amountMinor),
     currency: requireCurrency(value.data.currency),
     status: requireStatus(value.data.status, expectedStatus),
+    ...(externalProductId === undefined ? {} : { externalProductId }),
   });
 }
 

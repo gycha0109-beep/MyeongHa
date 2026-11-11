@@ -16,6 +16,7 @@ export interface PaymentAttemptHandoffContextV1 {
   readonly amountMinor: number;
   readonly currency: string;
   readonly status: PaymentAttemptHandoffStatusV1;
+  readonly externalProductId?: string;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -31,6 +32,7 @@ type HandoffContextRowV1 = Readonly<{
   expectedAmountMinor?: unknown;
   expectedCurrency?: unknown;
   status?: unknown;
+  externalProductId?: unknown;
 }>;
 
 const READ_CONTEXT_SQL = `
@@ -45,6 +47,8 @@ select
 from public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)
 `.trim();
 const READ_APPROVED_SAJU_CONTEXT_SQL = READ_CONTEXT_SQL.replace(
+  '  status\n', '  status,\n  external_product_id as "externalProductId"\n',
+).replace(
   'public.qry_commerce_payment_attempt_handoff_context_v1($1::uuid, $2::uuid)',
   'public.read_approved_saju_sandbox_handoff_v1($1::uuid, $2::uuid, $3::text)',
 );
@@ -134,6 +138,12 @@ function projectContext(
     throw new Error('Payment Attempt handoff authority returned a different payment-attempt identity.');
   }
 
+  const externalProductId = expectedStatus === 'handed_off'
+    ? requireStoredString('external product identity', row.externalProductId)
+    : undefined;
+  if (externalProductId !== undefined && externalProductId.length > 512) {
+    throw new Error('Payment Attempt handoff authority returned an invalid external product identity.');
+  }
   return Object.freeze({
     paymentAttemptId: requestedPaymentAttemptId,
     provider: requireStoredString('provider', row.provider),
@@ -142,6 +152,7 @@ function projectContext(
     amountMinor: requireAmountMinor(row.expectedAmountMinor),
     currency: requireCurrency(row.expectedCurrency),
     status: requireStatus(row.status, expectedStatus),
+    ...(externalProductId === undefined ? {} : { externalProductId }),
   });
 }
 

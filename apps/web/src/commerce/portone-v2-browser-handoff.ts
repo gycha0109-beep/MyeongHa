@@ -8,6 +8,7 @@ export interface PaymentAttemptBrowserHandoffContextV1 {
   readonly amountMinor: number;
   readonly currency: string;
   readonly status: 'created' | 'handed_off';
+  readonly externalProductId?: string;
 }
 
 export interface PortOneV2ProviderSelectorV1 {

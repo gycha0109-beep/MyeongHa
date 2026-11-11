@@ -63,7 +63,7 @@ $function$;
 
 create function public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)
 returns table(payment_attempt_id uuid,provider text,environment text,provider_request_id text,
-  expected_amount_minor bigint,expected_currency text,status text)
+  expected_amount_minor bigint,expected_currency text,status text,external_product_id text)
 language sql volatile security definer set search_path=pg_catalog
 as $function$
   select * from commerce_saju_private.read_approved_saju_sandbox_handoff_v1($1,$2,$3)
