@@ -110,13 +110,17 @@ class GovernedDryRunTests(unittest.TestCase):
             with self.assertRaises(BudgetDenied):
                 g.simulate(req(g.policy), receipt(g.policy), now=100)
             r2 = req(g.policy, rid='id-2', attempt=2)
-            self.assertEqual(g.simulate(r2, receipt(g.policy), now=100)['state'],
-                             'settled')
+            with self.assertRaisesRegex(BudgetDenied, 'unreconciled_charge_halts_run'):
+                g.simulate(r2, receipt(g.policy), now=100)
             with self.assertRaises(PolicyDenied):
                 g.simulate(req(g.policy, rid='id-3', attempt=3),
                            receipt(g.policy), now=100)
-            self.assertEqual(g.ledger.status()['attempts'], 2)
+            self.assertEqual(g.ledger.status()['attempts'], 1)
             self.assertEqual(g.ledger.status()['held'], 1)
+            reopened = self.setup_gate(d)
+            with self.assertRaisesRegex(BudgetDenied, 'unreconciled_charge_halts_run'):
+                reopened.simulate(req(g.policy, rid='after-restart', operation='new-turn'),
+                                  receipt(g.policy), now=100)
 
     def test_run_config_change_rejected_after_restart(self):
         with tempfile.TemporaryDirectory() as d:

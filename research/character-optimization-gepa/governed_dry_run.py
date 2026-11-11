@@ -177,6 +177,10 @@ class GovernedBudgetLedger(BudgetLedger):
             if con.execute('SELECT 1 FROM attempts WHERE request_id=?',
                            (request['request_id'],)).fetchone():
                 raise BudgetDenied('duplicate_request_not_replayed')
+            # Fail closed for *all* roles once any previous charge is uncertain.
+            if con.execute("SELECT 1 FROM attempts WHERE run_id=? AND state='held' LIMIT 1",
+                           (self.run_id,)).fetchone():
+                raise BudgetDenied('unreconciled_charge_halts_run')
             previous = con.execute(
                 'SELECT COUNT(*),MAX(attempt_number) FROM controlled_attempts '
                 'WHERE run_id=? AND operation_id=?',

@@ -42,6 +42,18 @@ class OfflineTests(unittest.TestCase):
             b=BudgetLedger(path,**CONFIG)
             self.assertEqual(b.status()['held'],1)
             with self.assertRaises(BudgetDenied):b.reserve('req-2','student',20)
+    def test_unreconciled_charge_stops_new_requests_even_when_budget_remains(self):
+        with tempfile.TemporaryDirectory() as d:
+            path=pathlib.Path(d)/'ledger.sqlite'
+            caps=dict(CONFIG,max_spend_micro_usd=300)
+            a=BudgetLedger(path,**caps)
+            a.reserve('unknown-1','student',30)
+            a.hold('unknown-1')
+            b=BudgetLedger(path,**caps)
+            with self.assertRaisesRegex(BudgetDenied,'unreconciled_charge_halts_run'):
+                b.reserve('new-request','student',20)
+            self.assertEqual(b.status()['attempts'],1)
+
     def test_parallel_reservations_do_not_oversubscribe(self):
         with tempfile.TemporaryDirectory() as d:
             path=pathlib.Path(d)/'ledger.sqlite'

@@ -76,6 +76,10 @@ class BudgetLedger:
                     con.execute('COMMIT')
                     return {'request_id':request_id,'state':previous[2],'reused':True,'send_permitted':False}
                 raise BudgetDenied('request_id_reuse_conflict')
+            # Any unknown charge is a run-level stop, not merely reserved money.
+            if con.execute("SELECT 1 FROM attempts WHERE run_id=? AND state='held' LIMIT 1",
+                           (self.run_id,)).fetchone():
+                raise BudgetDenied('unreconciled_charge_halts_run')
             spent = con.execute('SELECT COALESCE(SUM(reserved),0),COUNT(*) FROM attempts WHERE run_id=?',(self.run_id,)).fetchone()
             role_count = con.execute('SELECT COUNT(*) FROM attempts WHERE run_id=? AND role=?',(self.run_id,role)).fetchone()[0]
             total, attempts = spent
