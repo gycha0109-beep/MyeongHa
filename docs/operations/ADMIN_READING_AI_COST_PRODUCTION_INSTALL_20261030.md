@@ -109,3 +109,11 @@
 - `executeAndPersistCurrentBirthSajuOfficialReadingV1`에서 실제 HTTP 어댑터가 전용 수신 기능을 제공하면 그 결과의 정확한 외부 참조를 공식 발급 후단에 전달한다. `persistIssuedSajuOfficialReadingV1`는 원문을 읽기/DB 최종화하기 전에 **독립 Production Source verifier가 검증한 ref와 수신한 ref가 정확히 일치하는지** 확인한다. 불일치·형식 오류는 `production_source_unverified`로 보류하고 Mapping·Write를 금지한다.
 - 신규 응답 운송 테스트 5건, Source/DB 최종화 거부 테스트 4건, 기존 공식 발급·HTTP 테스트 55건을 포함해 관련 **64건 PASS**, 엄격 TypeScript 검사 PASS. 기존 Mock 포트는 기존 독립 Production Source + DB Authority 조건을 그대로 요구하며, HTTP 전용 sourceRef 없음을 근거로 검증을 우회하지 못한다.
 - **여전히 HOLD:** 운영 출처 영수증 스키마·전용 Secret/TLS/서비스 로그인, 실제 Production Interpretation Authority 사전 승인, 최종화 권한 및 Source 서명 검증, 실제 OpenAI 호출 커버리지·공급사 청구 대조가 필요하다. 단순 수신 헤더는 비용 증명/발급 권한이 아니며 실제 운영 배포·유료 API 호출·비용 수집은 실행하지 않았다. `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-11 — A4 명하 정본 DB 실행 준비 이후 서명 발급 후보 (오프라인)
+
+- Saju [PR #2773](https://github.com/gycha0109-beep/Saju/pull/2773)의 원본 영수증·콜백 기록 교차 대조는 필수 Integration [#42938778847](https://github.com/gycha0109-beep/Saju/actions/runs/42938778847) SUCCESS 후 병합됐다. 이 검증은 관측된 호출의 저장 무결성만 확인하며 공급사 전체 비용 완전성 근거는 아니다.
+- `apps/api/src/saju-a4-signed-prepared-attempt-issuer-v1.ts`: 이미 존재하는 `SajuOfficialAttemptPreparePortV1.prepareBeforeSourceCall`의 **정확한 사전 할당·현재 구매 검증 성공 이후에만** Saju 서버 전용 HMAC 증명 후보를 발급한다. 동일 실행 시도 replay/권한 거부·형식 오류는 null 반환, DB 오류는 즉시 상향 전달한다. 증명에 `executionAttemptId`, 정본 `readingId`, `subjectId`, 발급자·대상·키 ID·발급/만료 시각만 넣고 프롬프트/출생정보/고객 원문은 포함하지 않는다. 보통 만료 90초(최대 120초).
+- Saju [PR #2774](https://github.com/gycha0109-beep/Saju/pull/2774)의 오프라인 HMAC/전용 Source DB Claim verifier와 버전 `myeongha-a4-prepared-attempt-proof-v1`, 도메인 `myeongha/a4/prepared-attempt-proof/v1`를 동결해 동일한 canonical sorted JSON으로 서명한다. Saju 측은 별도의 source DB PK로 한 시도 한 번만 사용할 수 있도록 한다.
+- 신규 5건 + 기존 공식 발급·DB 시도 관련 테스트 34건 **총 39건 PASS**, 파일별 엄격 TypeScript/Prettier PASS. 발급자 자체는 **서버 내부 미설치 함수**이며, 이번 변경에서 DB 권한/비밀키/HTTP 헤더 전송/운영 Worker/유료 호출은 변경하지 않았다.
+- **HOLD:** 실제 Production Interpretation Authority·정본 DB Prepare 호출자의 승인, 인증된 명하→Saju 서버 간 증명 조회/전달, 실서비스 전용 키·TLS·Source Claim DB 운영 설치·사용량/청구 완전성 대조가 필요하다. 이 증명은 Production Interpretation Authority나 사용자 Reading 공개 승인 자체가 아니며 비용 수집 OFF, `ROADMAP_COMPLETE` 아님.
