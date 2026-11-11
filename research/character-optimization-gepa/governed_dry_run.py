@@ -10,6 +10,8 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass
+from collections.abc import Mapping
+from types import MappingProxyType
 from budget_ledger import BudgetLedger, BudgetDenied, ROLES
 
 
@@ -29,9 +31,18 @@ def _text(value, label):
     return value
 
 
+def _json_snapshot(value):
+    """Preserve the original JSON hash form for immutable policy mappings."""
+    if isinstance(value, Mapping):
+        return {key: _json_snapshot(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_snapshot(item) for item in value]
+    return value
+
+
 def digest(value):
     return 'sha256:' + hashlib.sha256(json.dumps(
-        value, sort_keys=True, separators=(',', ':'), ensure_ascii=False
+        _json_snapshot(value), sort_keys=True, separators=(',', ':'), ensure_ascii=False
     ).encode('utf-8')).hexdigest()
 
 
@@ -82,6 +93,15 @@ class DryRunPolicy:
             raise PolicyDenied('limits_shape')
         for k, v in self.limits.items():
             _integer(v, k, zero=k == 'reasoning_tokens')
+        # frozen=True does not freeze nested dicts/lists. Detach all caller-owned
+        # collections and expose only read-only snapshots before any reservation.
+        # The only nested collection is routing['only']; preserve its JSON form
+        # in digest() while freezing it as a tuple in memory.
+        object.__setattr__(self, 'pricing', MappingProxyType(dict(self.pricing)))
+        object.__setattr__(self, 'routing', MappingProxyType({
+            **self.routing, 'only': tuple(self.routing['only'])
+        }))
+        object.__setattr__(self, 'limits', MappingProxyType(dict(self.limits)))
 
     @property
     def policy_hash(self):
