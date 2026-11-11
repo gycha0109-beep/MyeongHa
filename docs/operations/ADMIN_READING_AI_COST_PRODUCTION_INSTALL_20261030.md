@@ -134,3 +134,12 @@
 - 결과의 `completeCostCoverage:false`, `invoiceReconciled:false`는 상수다. **Saju 로컬에 저장된 영수증 목록은 공급사 실제 전체 HTTP 호출 수와 동일하다는 보장이 없으며**, 가격 단가가 확인되지 않은 호출을 추정 비용 0으로 취급하지 않는다. 운영 스케줄러·HTTP 엔드포인트·과금·크레딧·고객 정보/권한은 변경하지 않았다.
 - 신규 8건 + 기존 단건 사후 재처리 7건 **15건 PASS**, 엄격 TypeScript 및 Prettier PASS. 폐기형 PostgreSQL 17.11에 Saju 서명 영수증 오프라인 스키마를 설치해 **기존 전용 Reader 역할로 실제 bounded 목록 SELECT 권한**을 확인하고 DB를 종료했다. 운영 Saju Source DB 계정/비밀번호/TLS는 설치하지 않았다.
 - **HOLD:** 로컬 콜백 누락/커버리지와 공급사 실제 호출 전수 대조, Saju/명하 전용 서비스 DB/Secret/TLS, Production Interpretation Authority, 실제 비용 단가·청구 검증 및 개인정보 보존/삭제 정책이 미완료다. 실서비스 비용 수집은 계속 OFF이고 `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-11 — 관리자 A4 호출 출처 검증·운영 준비 상태 갱신
+
+- Saju PR #2777: 로컬 공급사 콜백 보고서와 실제 저장된 HMAC 영수증을 대조하고 불일치 시 공식 Reading 성공 응답을 차단한다. 필수 통합 검사 https://github.com/gycha0109-beep/Saju/actions/runs/42969724190 성공 후 병합 2095a77c8be599166ac6c378e02dfb892f2ce45e.
+- Saju PR #2778: 공식 Production Host에서 임의 공급사 전송 함수 및 정본 OpenAI Responses 외의 주소 사용을 차단한다. 필수 통합 검사 https://github.com/gycha0109-beep/Saju/actions/runs/42974983168 성공 후 병합 7d962c5015b7721f04b2603fe13041255e520fc9.
+- Saju PR #2779: 공급사 호출 및 명하 Reading 일회성 실행 승인 소비 이전에 Source 영수증 전용 DB 계정·테이블·최소 권한을 읽기 전용으로 확인하는 변경. 로컬 관련 테스트 22건, 타입·코드·서식 검사 통과. 운영에 미설치이며 GitHub 검사 중으로 병합 완료로 기록하지 않는다.
+- 명하의 기존 Source 영수증 다건 재처리 PR #3210은 이미 병합돼 있으므로 반복 구현하지 않는다. 현 비용 귀속은 영수증의 일부 집합이 검증되었다는 의미일 뿐 공급사 전체 청구 가능 호출의 전수 검증이 아니다.
+- 11월 11일 명하 운영 DB 읽기 전용 확인 결과, 기존 AI 비용 원장 및 비용 Writer RPC와 정본 실행 시도 전용 Reader는 존재했다. 명하 사전 승인 증명 전용 스키마와 Reader/Writer 역할은 운영 설치가 확인되지 않았다. Saju 별도 Production Source DB의 설치 여부는 이 점검으로 판단할 수 없다.
+- 실제 서비스 자격증명·TLS 연결, Production Interpretation Authority, 개인정보 연계 UUID의 보존·삭제 기준, 공급사 실제 호출 누락과 청구서·환율 대조는 미검증이다. 기존 Customer/Payment/Credit는 변경하지 않으며 completeCostCoverage=false, invoiceReconciled=false 및 실제 비용 수집 OFF를 유지한다.
