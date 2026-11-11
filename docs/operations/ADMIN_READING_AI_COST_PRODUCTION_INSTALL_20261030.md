@@ -117,3 +117,11 @@
 - Saju [PR #2774](https://github.com/gycha0109-beep/Saju/pull/2774)의 오프라인 HMAC/전용 Source DB Claim verifier와 버전 `myeongha-a4-prepared-attempt-proof-v1`, 도메인 `myeongha/a4/prepared-attempt-proof/v1`를 동결해 동일한 canonical sorted JSON으로 서명한다. Saju 측은 별도의 source DB PK로 한 시도 한 번만 사용할 수 있도록 한다.
 - 신규 5건 + 기존 공식 발급·DB 시도 관련 테스트 34건 **총 39건 PASS**, 파일별 엄격 TypeScript/Prettier PASS. 발급자 자체는 **서버 내부 미설치 함수**이며, 이번 변경에서 DB 권한/비밀키/HTTP 헤더 전송/운영 Worker/유료 호출은 변경하지 않았다.
 - **HOLD:** 실제 Production Interpretation Authority·정본 DB Prepare 호출자의 승인, 인증된 명하→Saju 서버 간 증명 조회/전달, 실서비스 전용 키·TLS·Source Claim DB 운영 설치·사용량/청구 완전성 대조가 필요하다. 이 증명은 Production Interpretation Authority나 사용자 Reading 공개 승인 자체가 아니며 비용 수집 OFF, `ROADMAP_COMPLETE` 아님.
+
+## 2026-11-11 — DB 승인 서명 증명 보존·Saju 사설 HTTPS 조회 경계 (오프라인)
+
+- `apps/api/src/saju-a4-prepared-proof-handoff-v1.ts`: 기존 DB 공식 Reading 준비 포트 대신 장착할 수 있는 **서버 내부 조합**. 정본 DB 신규 실행·현재 구매 검증 후 HMAC 서명 발급이 완료되고, 전용 PostgreSQL Writer의 보존/재조회/COMMIT까지 확인됐을 때만 `true`를 반환해 Saju 호출을 허용한다. 재시도/거절/보존 실패는 금지하거나 오류 상향 전파. 공개 ProductReadingResponse·비용 원장/결제/크레딧 동작을 변경하지 않는다.
+- `apps/api/src/saju-a4-prepared-proof-postgres-v1.ts` 및 `docs/operations/ADMIN_A4_PREPARED_PROOF_PRIVATE_STORE_OFFLINE_V1.sql`: DB 출처 증명 전용 Writer/Reader 역할과 불변 증명 테이블 **운영 미설치 후보**. UUID당 최초 저장, 재조회로 동일 서명 검증, 다르면 거부, Writer와 Reader 역할 분리, RLS·UPDATE/DELETE 트리거·PUBLIC 권한 거부·비밀번호 미설치. 별도 전용 Reader는 읽기 전용 트랜잭션만 사용. SQL은 폐기형 PostgreSQL 17.11에 설치 확인 후 즉시 제거했다.
+- `apps/api/src/saju-a4-prepared-proof-private-http-v1.ts`: **기존 API/관리자/Preview와 분리된 미설치 Server Factory**, 전용 Bearer 검증 후에만 UUID로 영구 저장된 증명을 사설 조회. GET 외 메서드, Cookie/Origin, 쿼리·임의 경로, 만료·식별 불일치 증명 거부. 전용 HTTPS/mTLS termination은 서비스 운영 시 필수이며 해당 네트워크/서버는 설치하지 않았다.
+- 신규 HTTP 7건·DB 6건·정본발급 조합 4건 + 기존 HMAC 발급 5건 = **22건 PASS**, 엄격 TypeScript/Prettier PASS. Saju HTTPS 로더의 독립 테스트 7건도 PASS. 원본 출생자료·프롬프트·AI 원문·Secret은 저장하지 않는다.
+- **HOLD**: 증명에는 회원/Reading UUID가 포함되므로 운영 보존 기간·파기/개인정보 정책 정합성 확인 전 전용 영구 테이블을 설치하지 않는다. 실제 운영 TLS·비밀 인증·계정·Producer/Consumer 동시 Runtime 주입, Production Interpretation Authority, 운영 실제 호출/청구 완전성은 미확정이며 수집 OFF. `ROADMAP_COMPLETE` 아님.
