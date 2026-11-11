@@ -32,7 +32,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify character-specific R16 source contracts (metadata only)
-        run: node --test scripts/character-optimization/r16-probe-contract-v1.test.mjs scripts/character-optimization/yeoul-new-scenario-families-v1.test.mjs
+        run: node --test scripts/character-optimization/*.test.mjs
       - name: Create isolated GEPA venv and install pinned source revision
         shell: bash
         run: |
