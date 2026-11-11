@@ -327,5 +327,61 @@
     "drReady": false,
     "serviceResumptionAllowed": false,
     "interpretation": "The strict known object-privilege prefix did not recognize the one remaining GRANT. It is categorized as unquoted or unexpected granted-role syntax. Quoted identifier-safe ON-before-TO lexical separation is implemented but requires a new isolated measurement. The 48 missing links remain unproven restored."
+  },
+  "quoteSafeClauseOrderRestore": {
+    "workflowRunId": 42945204368,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42945204368",
+    "conclusion": "success",
+    "artifactId": 13822446594,
+    "sourceBackupRunId": 42752268638,
+    "incidentReferenceUtc": "2026-11-10T03:56:30Z",
+    "executionMainSha": "a53678d3962ea93ba1ded8e8d17747d322641043",
+    "quoteSafeClauseOrderImplementationPr": 3202,
+    "requiredIntegrationRunId": 42943059052,
+    "artifactFileSha256": {
+      "app-schema-parity.json": "96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3",
+      "privacy-reconciliation-evidence.json": "a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e",
+      "recovered-serving-admission.json": "cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595",
+      "restore-evidence.json": "f1af2fe44302c0a4b8dfd0a4885f12a32127a58aeedaf141d54979e9a4ee8ee7",
+      "role-dump-coverage.json": "d836a23ca3809e87ec8d74e6ae82e5bde202c971ddcc4dd685975581b23f07b2"
+    },
+    "directRoleBoundary": {
+      "sourceWitnessAvailable": true,
+      "sourceDirectMembershipCount": 48,
+      "restoredDirectMembershipCount": 0,
+      "sourceReferencedExternalRoleCount": 1,
+      "restoredReferencedExternalRoleCount": 0,
+      "missingMembershipOptionEntryCount": 48,
+      "addedMembershipOptionEntryCount": 0,
+      "missingReservedRecipientPolicyCandidateCount": 48,
+      "missingOtherRecipientCount": 0
+    },
+    "filteredRoleDumpObservation": {
+      "filteredRolesSqlGrantStatementCount": 8,
+      "filteredRolesSqlRecognizedObjectPrivilegeGrantCount": 0,
+      "filteredRolesSqlObjectGrantClauseOrderOnlyCount": 1,
+      "filteredRolesSqlUnparsedGrantStatementCount": 0,
+      "filteredRolesSqlUnparsedGrantShapeCounts": {},
+      "sourceRowsWithPairInFilteredSqlCount": 0,
+      "sourceRowsWithoutPairInFilteredSqlCount": 48,
+      "missingPairReservedRecipientCandidateCount": 48,
+      "missingPairOtherRecipientCount": 0,
+      "verdict": "HOLD_SOURCE_EXTERNAL_ROLE_GRANT_PAIRS_MISSING_FROM_FILTERED_DUMP"
+    },
+    "sourceCatalogBoundToBackupSnapshot": false,
+    "objectGrantSemanticsProven": false,
+    "completeRoleGrantorAndOptionRestorationProven": false,
+    "providerOwnershipProven": false,
+    "inheritedEffectivePrivilegeProven": false,
+    "fullProviderCompatibleRestoreProven": false,
+    "providerManagedCopyBlocksSkipped": 29,
+    "providerManagedCopyBlocksProjected": 3,
+    "fullMigrationLedgerRestored": false,
+    "authoritativePrivacyContinuityProven": false,
+    "hostedAuthStorageRestorationProven": false,
+    "wholeServiceRpoRtoProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "interpretation": "A quote-safe unquoted ON-before-TO structure excludes one SQL statement from direct role membership matching. The filtered roles.sql contains no pair corresponding to any of 48 bracketed-source direct application/external membership rows. The output does not establish exact shared MVCC snapshots, complete provider grants, actual role privileges, or an acceptable DR recovery."
   }
 }
