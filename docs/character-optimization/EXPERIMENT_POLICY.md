@@ -24,3 +24,7 @@ node scripts/character-optimization/validate-offline-manifest.mjs /private/run.j
 - 최적화용 CLI는 development/optimizer_validation 메타데이터만 받는다. `sealed_holdout`/`long_horizon`이 있으면 거절한다.
 - 결과는 집계 수·해시·상태만 표준 출력한다. 실제 대사 생성·GEPA 탐색·API 요청·자동 배포는 수행하지 않는다.
 - 실제 파일 시스템 격리, 동의 검증, GEPA 버전 잠금, 충돌 안전 비용 장부는 아직 구현하지 않았다.
+
+## 신규 합성 개발 자료 초안
+
+`scripts/character-optimization/fixtures/yeoul-synthetic-development-v1.json`은 공개 가능 합성 **초안**이며, 개발 8개·검증 4개만 포함한다. 사용자가 검수해 중복·캐릭터 적합성을 확인하기 전에는 자동 최적화에서 사용하지 않는다. 최종 홀드아웃은 여기에 포함되지 않는다.

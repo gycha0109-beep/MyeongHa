@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "yeoul-synthetic-development-draft-v1",
+  "characterId": "yeoul",
+  "researchOnly": true,
+  "examplesApproved": false,
+  "semanticIndependenceHumanReviewed": false,
+  "source": "fresh_synthetic_draft_not_from_existing_288_or_sealed_holdout",
+  "scenarios": [
+    {"id":"YD01","role":"development","familyId":"word_explanation","relationshipStage":"first_contact","historyAvailable":false,"turns":["제가 쓴 '간결하게'라는 말이 너무 딱딱한가요? 좀 자연스럽게 바꿔보면 어떨까요?"],"evaluationFocus":["korean_naturalness","response_relevance"]},
+    {"id":"YD02","role":"development","familyId":"banter_and_mistake","relationshipStage":"acquaintance","historyAvailable":false,"turns":["농담을 던졌는데 너무 썰렁했죠? 본인도 웃기다고 생각해요?"],"evaluationFocus":["persona_fidelity","agency"]},
+    {"id":"YD03","role":"development","familyId":"interrogation_fatigue","relationshipStage":"acquaintance","historyAvailable":false,"turns":["질문으로만 답하니까 제가 인터뷰하는 기분이에요. 질문 말고 자기 생각도 말해주세요."],"evaluationFocus":["anti_repetition","agency"]},
+    {"id":"YD04","role":"development","familyId":"finish_listening","relationshipStage":"acquaintance","historyAvailable":false,"turns":["말을 하다가 자꾸 끊기는 느낌이 들어요. 제가 얘기를 마칠 때까지 조금만 들어주세요."],"evaluationFocus":["response_relevance","relationship_continuity"]},
+    {"id":"YD05","role":"development","familyId":"spoiler_constraint","relationshipStage":"first_contact","historyAvailable":false,"turns":["영화 분위기만 이야기하고 싶은데, 결말이나 중요한 반전은 절대 말하지 마세요."],"evaluationFocus":["response_relevance","agency"]},
+    {"id":"YD06","role":"development","familyId":"rewriting_voice","relationshipStage":"acquaintance","historyAvailable":false,"turns":["문장을 예쁘게 다듬고 싶지만 제 말투를 없애지는 말아주세요. 조금만 고쳐줄래요?"],"evaluationFocus":["korean_naturalness","response_relevance"]},
+    {"id":"YD07","role":"development","familyId":"routine_priority","relationshipStage":"acquaintance","historyAvailable":false,"turns":["이번 주 해야 할 일이 세 개 남았어요. 다 중요하다고 생각하니까 무엇부터 해야 할지 모르겠네요."],"evaluationFocus":["agency","response_relevance"]},
+    {"id":"YD08","role":"development","familyId":"corrected_misreading","relationshipStage":"first_contact","historyAvailable":false,"turns":["그 말은 제가 한 뜻이 아니었는데요. 제가 좀 애매하게 썼나 봐요. 어떻게 들렸어요?"],"evaluationFocus":["korean_naturalness","response_relevance"]},
+    {"id":"YV01","role":"optimizer_validation","familyId":"repeat_prompt_acknowledgement","relationshipStage":"acquaintance","historyAvailable":false,"turns":["방금 얘기한 걸 또 처음부터 물으시면 제가 조금 지쳐요. 같은 질문은 되도록 피해주세요."],"evaluationFocus":["anti_repetition","response_relevance"]},
+    {"id":"YV02","role":"optimizer_validation","familyId":"no_mindreading","relationshipStage":"first_contact","historyAvailable":false,"turns":["제가 문장을 빨리 쓰다 보니 중간에 끊겼어요. 무슨 마음인지 지레짐작은 하지 말아주세요."],"evaluationFocus":["response_relevance","memory_quality"]},
+    {"id":"YV03","role":"optimizer_validation","familyId":"short_reply_request","relationshipStage":"acquaintance","historyAvailable":false,"turns":["답변이 길면 집중이 안 돼서요. 이번에는 두 문장 정도로만 답해주실래요?"],"evaluationFocus":["korean_naturalness","response_relevance"]},
+    {"id":"YV04","role":"optimizer_validation","familyId":"light_response_request","relationshipStage":"acquaintance","historyAvailable":false,"turns":["제가 말실수한 것 같긴 한데, 너무 심각하게 다루지는 말아주세요. 그냥 가볍게 넘어가고 싶어요."],"evaluationFocus":["persona_fidelity","response_relevance"]}
+  ]
+}
