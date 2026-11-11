@@ -43,6 +43,14 @@ test('R16 rejects tampered, swapped, unapproved and sealed optimizer inputs',()=
     split:'development',familyId:'f',profileSourceSha256:x.sourceSha256}),/cross_character/);
 });
 
+test('R16 numbered character-specific probes are retained without creating new examples',()=>{
+  const numbered=text.replace('- 여울의 원칙을 지키는가','1. 여울의 원칙을 지키는가')
+    .replace('- 관계 권한을 존중하는가','2. 관계 권한을 존중하는가');
+  const x=extractR16Metadata({...options,runtimeText:numbered,
+    sourceSha256:digest(numbered)});
+  assert.equal(x.probeCount,4);
+});
+
 test('existing character Runtime R16 source is parsed without inventing missing rubrics',()=>{
   const sources=[
     ['yeoul','YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'],

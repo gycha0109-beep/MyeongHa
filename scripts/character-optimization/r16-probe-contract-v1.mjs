@@ -29,7 +29,7 @@ export function extractR16Metadata({characterId,sourceRef,sourceSha256,runtimeTe
     seen.add(index);
     const part = section.slice(match.index+match[0].length,
       i+1<sections.length ? sections[i+1].index : undefined);
-    const descriptions = [...part.matchAll(/^- (.+)$/gm)].map(m=>m[1].trim());
+    const descriptions = [...part.matchAll(/^(?:- |[1-9]\d*\. )(.+)$/gm)].map(m=>m[1].trim());
     if (descriptions.length === 0) failure('empty_probe_class');
     for (const [ordinal,description] of descriptions.entries()) {
       if (!description || description.length > 1500) failure('invalid_probe_description');
