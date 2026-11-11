@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "ops-provider-sealed-copy-preflight-observation-v1",
+  "runId": 42987584238,
+  "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42987584238",
+  "headSha": "26fdf7dd19a07d0e2a17f15492b8b7288d5edab4",
+  "artifactId": 13839928483,
+  "artifactSha256": "49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989",
+  "backupRunId": 42752268638,
+  "sourceProviderCopyBlocks": 33,
+  "sourceProviderCopyRows": 93,
+  "exactPreviouslyMissingRelations": 29,
+  "exactPreviouslyProjectedRelations": 3,
+  "incompatibleBlocks": 0,
+  "actualProviderRowsReplayed": 0,
+  "sourceRowPayloadsExported": false,
+  "fullHostedRestore": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "verdict": "COPY_HEADER_COLUMN_CANDIDATE_ONLY__DATA_AND_CONSTRAINT_REPLAY_UNPROVEN",
+  "next": "Atomic 93-row copy to disposable CLI3 PG17 with constraints active, before/after per-relation aggregate checks. Never Production."
+}
