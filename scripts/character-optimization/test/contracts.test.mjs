@@ -65,6 +65,13 @@ test('draft profile never permits invented approval, private fields or mutable c
   delete p.approvalRef;p.reviewRequired=false;assert.throws(()=>validateOptimizationProfile(p),/owner review mandatory/);
   p.reviewRequired=true;p.mutableSlots=['canon'];assert.throws(()=>validateOptimizationProfile(p),/slot/);
 });
+test('character source references cannot point to another character Bible or Runtime',()=>{
+  const p=profile();p.target.canonRef='docs/character/SEYEON_CHARACTER_BIBLE_DRAFT_V0_2.md';
+  assert.throws(()=>validateOptimizationProfile(p),/cross-character source reference/);
+  p.target.canonRef='docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md';
+  p.target.runtimeRef='docs/character/SEYEON_CHARACTER_RUNTIME_DRAFT_V0_1.md';
+  assert.throws(()=>validateOptimizationProfile(p),/cross-character source reference/);
+});
 test('model, routing, content source and evaluation hashes are required',()=>{
   const p=profile();p.target.student.routingPolicySha256='';assert.throws(()=>validateOptimizationProfile(p),/sha256/);
   p.target.student.routingPolicySha256=H('c');p.target.evalSuite.validationRef=p.target.evalSuite.developmentRef;
@@ -110,6 +117,9 @@ test('dataset forbids raw content fields, mixed-turn splitting and historical ho
   assert.throws(()=>validateDatasetSplitMetadata([d,record('r2','sealed_holdout','F02',{turnGroupId:'turn_F01'})]),/turnGroupId/);
   assert.throws(()=>validateDatasetSplitMetadata([record('r3','optimizer_validation','F03',{sourceKind:'user_reviewed_development'})]),/historical ratings/);
 });
+test('dataset cannot include unregistered character records',()=>{
+  assert.throws(()=>validateDatasetSplitMetadata([record('d1','development','F01',{characterId:'unknown-character'})]),/unknown character/);
+});
 test('dataset reports semantic-independence limitations without claiming perfect de-duplication',()=>{
   const result=validateDatasetSplitMetadata([record('r1','development','F01')]);
   assert.equal(result.semanticSimilarityVerified,false);
@@ -120,6 +130,11 @@ test('candidate compiler refuses to produce production output or change protecte
   const artifact=compileOfflineCandidate(p,r,{slot:'character_expression',text:'질문보다 행동으로 반응하세요.',baselineImmutableSha256:sha256('CANON PROTECTED')},'CANON PROTECTED');
   assert.equal(artifact.status,'pending_owner_review');assert.equal(artifact.promotionAllowed,false);assert.equal(artifact.productionOutputCreated,false);
   assert.throws(()=>compileOfflineCandidate(p,r,{slot:'character_expression',text:'Test',baselineImmutableSha256:H('0')},'CANON PROTECTED'),/protected baseline changed/);
+});
+test('run cannot compile candidate with swapped/stale profile version',()=>{
+  const p=profile();const r=validateOptimizationRunManifest(run({track:'character',characterId:'yeoul'}),[p]);
+  const changed=structuredClone(p);changed.target.contentBundleSha256=H('f');
+  assert.throws(()=>compileOfflineCandidate(changed,r,{slot:'character_expression',text:'짧게 말하세요.',baselineImmutableSha256:sha256('FIXED')},'FIXED'),/pinned to exact character profile/);
 });
 test('candidate compiler rejects slot escalation and flags semantic authority bypass',()=>{
   const p=profile();const r=validateOptimizationRunManifest(run({track:'character',characterId:'yeoul'}),[p]);

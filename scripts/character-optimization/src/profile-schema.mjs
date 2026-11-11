@@ -14,7 +14,8 @@ export function validateOptimizationProfile(value) {
   if (!CHARACTER_IDS.includes(target.characterId)) fail('target.characterId', 'unknown character');
   reference(target.canonRef, 'target.canonRef');
   reference(target.runtimeRef, 'target.runtimeRef');
-  if (!target.canonRef.startsWith('docs/character/') || !target.runtimeRef.startsWith('docs/character/')) fail('target.source', 'character source required');
+  const prefix = `docs/character/${target.characterId.toUpperCase()}_CHARACTER_`;
+  if (!target.canonRef.startsWith(`${prefix}BIBLE_`) || !target.runtimeRef.startsWith(`${prefix}RUNTIME_`)) fail('target.source', 'cross-character source reference');
   hash(target.contentBundleSha256, 'target.contentBundleSha256');
   id(target.authorityVersion, 'target.authorityVersion');
   if (!['DRAFT', 'APPROVED', 'OTHER_VERIFIED'].includes(target.authorityState)) fail('target.authorityState', 'unknown authority state');

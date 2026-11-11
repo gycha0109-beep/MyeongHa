@@ -65,5 +65,5 @@ export function validateOptimizationRunManifest(run, profiles) {
     if (target.track !== 'character' || ps.size !== 1 || !ps.has(target.characterId)) fail('run.target.characterId', 'one matching character required');
     if (!ps.get(target.characterId).mutableSlots.includes('character_expression')) fail('run.target.characterId', 'character slot not enabled');
   }
-  return Object.freeze({runId:run.runId, track:target.track, characterIds:Object.freeze(common?target.cohort.map(c=>c.characterId):[target.characterId]), manifestSha256:objectSha256(run), externalCallsEnabled:false, productionChangesEnabled:false});
+  return Object.freeze({runId:run.runId, track:target.track, characterIds:Object.freeze(common?target.cohort.map(c=>c.characterId):[target.characterId]), profileFingerprints:Object.freeze(Object.fromEntries([...ps].map(([id,p]) => [id,validateOptimizationProfile(p).fingerprint]))), manifestSha256:objectSha256(run), externalCallsEnabled:false, productionChangesEnabled:false});
 }

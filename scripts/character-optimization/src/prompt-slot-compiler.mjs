@@ -12,7 +12,7 @@ const DANGEROUS_PATTERNS = [
 /** A review-only artifact. Never directly compiles into a production prompt. */
 export function compileOfflineCandidate(profile, runSummary, candidate, immutableSourceBytes) {
   const p = validateOptimizationProfile(profile);
-  if (!runSummary || !Array.isArray(runSummary.characterIds) || !runSummary.characterIds.includes(p.characterId) || runSummary.externalCallsEnabled !== false) fail('runSummary', 'offline matching run required');
+  if (!runSummary || !Array.isArray(runSummary.characterIds) || !runSummary.characterIds.includes(p.characterId) || runSummary.externalCallsEnabled !== false || runSummary.profileFingerprints?.[p.characterId] !== p.fingerprint) fail('runSummary', 'offline run pinned to exact character profile required');
   if (typeof immutableSourceBytes !== 'string' || immutableSourceBytes.length === 0) fail('immutableSourceBytes', 'nonempty protected source required');
   keys(candidate, ALLOWLIST, ALLOWLIST, 'candidate');
   if (!MUTABLE_SLOTS.includes(candidate.slot) || !profile.mutableSlots.includes(candidate.slot)) fail('candidate.slot', 'slot not approved for profile');

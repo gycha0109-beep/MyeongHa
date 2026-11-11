@@ -1,4 +1,4 @@
-import { fail, keys, hash, id, objectSha256 } from './contracts.mjs';
+import { CHARACTER_IDS, fail, keys, hash, id, objectSha256 } from './contracts.mjs';
 
 export const DATASET_ROLES = Object.freeze(['development', 'optimizer_validation', 'sealed_holdout', 'long_horizon']);
 const FIELDS = ['recordId', 'characterId', 'familyId', 'paraphraseFamilyId', 'turnGroupId', 'promptFingerprint', 'role', 'sourceKind'];
@@ -11,6 +11,7 @@ export function validateDatasetSplitMetadata(records) {
   for (const rec of records) {
     keys(rec, FIELDS, FIELDS, 'dataset.record');
     for (const field of ['recordId','characterId','familyId','paraphraseFamilyId','turnGroupId']) id(rec[field], `dataset.${field}`);
+    if (!CHARACTER_IDS.includes(rec.characterId)) fail('dataset.characterId', 'unknown character');
     hash(rec.promptFingerprint, 'dataset.promptFingerprint');
     if (!DATASET_ROLES.includes(rec.role)) fail('dataset.role', 'unrecognized split');
     if (!['synthetic', 'user_reviewed_development'].includes(rec.sourceKind)) fail('dataset.sourceKind', 'unreviewed or unknown source');
