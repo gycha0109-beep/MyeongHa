@@ -122,6 +122,52 @@ class GovernedDryRunTests(unittest.TestCase):
                 reopened.simulate(req(g.policy, rid='after-restart', operation='new-turn'),
                                   receipt(g.policy), now=100)
 
+    def test_host_owned_policy_is_detached_and_deeply_read_only(self):
+        source = policy()
+        mutable_pricing = dict(source.pricing)
+        mutable_routing = dict(source.routing)
+        mutable_routing['only'] = list(source.routing['only'])
+        mutable_limits = dict(source.limits)
+        p = policy(pricing=mutable_pricing, routing=mutable_routing,
+                   limits=mutable_limits)
+        hashes = p.policy_hash, p.pricing_hash, p.routing_hash
+        original_quote = p.quote(500, 100, 20)
+
+        # Mutating the objects handed to the constructor must not change the
+        # policy used for preflight, pricing, or a persisted ledger reservation.
+        mutable_pricing['input_rate'] = 999999999
+        mutable_routing['only'].append('unapproved-provider')
+        mutable_routing['zdr'] = False
+        mutable_limits['input_tokens'] = 1
+        mutable_limits['max_parallel'] = 999
+        self.assertEqual((p.policy_hash, p.pricing_hash, p.routing_hash), hashes)
+        self.assertEqual(p.routing['only'], ('fake-provider',))
+        self.assertEqual(p.limits['max_parallel'], 2)
+        self.assertEqual(p.quote(500, 100, 20), original_quote)
+        self.assertEqual(p.preflight(req(p), now=100), 770)
+        with self.assertRaises(TypeError):
+            p.pricing['input_rate'] = 1
+        with self.assertRaises(TypeError):
+            p.routing['only'][0] = 'unapproved-provider'
+        with self.assertRaises(TypeError):
+            p.routing['zdr'] = False
+        with self.assertRaises(TypeError):
+            p.limits['input_tokens'] = 99999
+        with self.assertRaises(AttributeError):
+            p.routing['only'].append('unapproved-provider')
+
+        # Immutable in-memory representation must keep prior on-disk hash
+        # semantics (lists in JSON, not tuple stringification).
+        rebuilt = policy(pricing=dict(p.pricing),
+                         routing={**p.routing, 'only': list(p.routing['only'])},
+                         limits=dict(p.limits))
+        self.assertEqual(rebuilt.policy_hash, hashes[0])
+        with tempfile.TemporaryDirectory() as directory:
+            g = self.setup_gate(directory, p)
+            result = g.simulate(req(p), receipt(p), now=100)
+            self.assertEqual(result['reserved_micro_usd'], 770)
+            self.assertEqual(g.ledger.status()['attempts'], 1)
+
     def test_run_config_change_rejected_after_restart(self):
         with tempfile.TemporaryDirectory() as d:
             g = self.setup_gate(d)

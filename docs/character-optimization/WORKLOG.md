@@ -111,3 +111,9 @@
 - 전체 통합 검사 [42973301443](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42973301443)에서 `npm test`의 Vitest 4.1.11이 `scripts/character-optimization/*.test.mjs` 네 파일을 수집했지만, 파일이 `node:test` 기반이어서 `No test suite found`로 실패한 것이 원인임을 로그로 확인했다. Vitest의 다른 9,082개 테스트는 통과했다.
 - `vitest.config.ts`에서 해당 경로만 Vitest 수집에서 제외하고, 루트 `npm test`에 Node 자체 테스트 실행을 별도 연결한다. GEPA 격리 워크플로도 같은 네 파일을 Node로 실행하도록 맞춘다. 테스트를 무시하거나 삭제하는 조치가 아니라 실행기를 구분한 것이다.
 - 기존 GitHub 보호 규칙이나 운영 환경·캐릭터 모델·GEPA 유료 호출은 변경하지 않았다. 후속 전체 통합 CI의 실제 재검증 결과로만 성공을 판정한다.
+
+## 2026-11-11 — 정책 생성 후 요금표·라우팅·한도 변조 차단
+
+- PR #3208 병합 뒤 후속 오프라인 작업. `DryRunPolicy`는 dataclass 필드 재할당만 막아 내부 dict/list가 mutable이었으므로, 정책 생성 시 원본 참조를 복사하고 `MappingProxyType` 및 불변 공급자 튜플로 고정한다.
+- 기존 정책 해시의 JSON 직렬화 결과는 그대로 유지한다. 입력 원본 수정, 생성된 객체 내부 수정, 가격 인용, SQLite 사전예약의 음성 회귀 테스트를 추가한다.
+- 실제 모델 가격표·사용자 예산 승인 권한·유료 제공자 송신·운영 변경은 범위 외이며 계속 차단한다.
