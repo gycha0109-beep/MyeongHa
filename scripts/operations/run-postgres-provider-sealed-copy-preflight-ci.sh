@@ -109,13 +109,97 @@ jq -e '
   and .storageObjectBytesRecovered == false
   and .drReady == false and .serviceResumptionAllowed == false and .gate == "BLOCKED"
 ' "$report" >/dev/null || fail 'Non-acceptance evidence invalid'
+if [[ "$MH_OPS_PROVIDER_DATA_REPLAY" == 'true' ]]; then
+  jq -e '
+    .allProviderCopyBlocksExact == true
+    and .actualSourceCopyBlocks == 33
+    and .actualSourceCopyRows == 93
+    and .historicalSkippedRelationsNowExact == 29
+    and .historicalProjectedRelationsNowExact == 3
+    and .drReady == false
+    and .serviceResumptionAllowed == false
+  ' "$report" >/dev/null || fail 'Exact COPY-source admission failed'
+  MH_OPS_PROVIDER_DATA_REPLAY=true \
+    node "$MH_DR_CI_REPO_ROOT/scripts/operations/replay-sealed-provider-data-isolated.mjs" \
+    --mode prepare \
+    --source "$private/data.sql" \
+    --catalog "$private/target-catalog.private.json" \
+    --preflight "$report" \
+    --gaps "$MH_DR_CI_REPO_ROOT/docs/operations/POSTGRES_PROVIDER_COPY_SOURCE_GAP_20261111.json" \
+    --sql "$private/provider-only.private.sql" \
+    --counts "$private/source-provider-counts.private.json" \
+    --count-sql "$private/target-counts.private.sql" ||
+    fail 'Exact Provider replay preparation failed'
+  # Stop local API/Auth/Storage containers before injecting real backup rows.
+  mapfile -t db_names < <(docker ps --filter "network=$network" \
+    --format '{{.Names}}' | grep -E '^supabase_db_' || true)
+  [[ "${#db_names[@]}" -eq 1 ]] || fail 'Exactly one isolated Postgres container required'
+  mapfile -t services < <(docker ps --filter "network=$network" \
+    --format '{{.Names}}' | grep -v -F -x "${db_names[0]}" || true)
+  for service in "${services[@]}"; do
+    [[ "$service" == supabase_* ]] || fail 'Unexpected container in isolation network'
+    docker stop "$service" >"$private/stop-services.private.log" 2>&1 ||
+      fail 'Could not stop private Supabase service'
+  done
+  set -a
+  source "$private/status.private.env"
+  set +a
+  [[ "$DB_URL" == postgresql://postgres:*@127.0.0.1:54322/postgres ]] ||
+    fail 'Local PostgreSQL connection boundary changed'
+  psql "$DB_URL" -X -qAt --set ON_ERROR_STOP=1 \
+    --file "$private/target-counts.private.sql" \
+    >"$private/before-counts.private.json" 2>"$private/before-errors.private.log" ||
+    fail 'Before-replay Provider counters unavailable'
+  # PostgreSQL enforces constraints; transaction is all or nothing.
+  # All SQL, COPY data and error output are private and deleted on exit.
+  psql "$DB_URL" -X -q --single-transaction --set ON_ERROR_STOP=1 \
+    --file "$private/provider-only.private.sql" \
+    >"$private/replay-output.private.log" 2>"$private/replay-errors.private.log" ||
+    fail 'Isolated PostgreSQL rejected Provider COPY or constraints'
+  psql "$DB_URL" -X -qAt --set ON_ERROR_STOP=1 \
+    --file "$private/target-counts.private.sql" \
+    >"$private/after-counts.private.json" 2>"$private/after-errors.private.log" ||
+    fail 'After-replay Provider counters unavailable'
+  MH_OPS_PROVIDER_DATA_REPLAY=true \
+    node "$MH_DR_CI_REPO_ROOT/scripts/operations/replay-sealed-provider-data-isolated.mjs" \
+    --mode verify \
+    --counts "$private/source-provider-counts.private.json" \
+    --before "$private/before-counts.private.json" \
+    --after "$private/after-counts.private.json" \
+    --output "$RUNNER_TEMP/myeongha-provider-isolated-row-replay.json" ||
+    fail 'Isolated target row counts differ from source'
+  jq -e '
+    .copiedSourceRows == 93
+    and .isolatedTargetRowDelta == 93
+    and .rowsCountVerified == true
+    and .constraintsEnforcedOnCopy == true
+    and .providerManagedFullRestoreProven == false
+    and .drReady == false and .serviceResumptionAllowed == false
+  ' "$RUNNER_TEMP/myeongha-provider-isolated-row-replay.json" >/dev/null ||
+    fail 'Non-acceptance evidence violated'
+  {
+    echo '### Ops: Actual Provider source COPY rows in disposable DB'
+    echo '- Source Provider rows: 93; isolated PostgreSQL delta: 93'
+    echo '- Provider/PostgreSQL constraints enforced; SQL replay atomic'
+    echo '- Local API/Auth/Storage endpoints stopped before data injection'
+    echo '- Hosted-equivalent recovery, privacy continuity and serving: BLOCKED'
+  } >>"$GITHUB_STEP_SUMMARY"
+fi
 {
   echo '### Ops: governed source Provider COPY preflight (no data replay)'
   echo
   echo "- Previously missing source relations COPY-exact: $(jq -r '.historicalSkippedRelationsNowExact' "$report")/29"
   echo "- Previously projected source relations COPY-exact: $(jq -r '.historicalProjectedRelationsNowExact' "$report")/3"
   echo "- Remaining nonexact source relations: $(jq -r '.remainingIncompatibleRelations|length' "$report")"
-  echo '- Actual rows inserted: 0; Production data and services untouched'
-  echo '- DR ready/serving: BLOCKED'
+  if [[ "$MH_OPS_PROVIDER_DATA_REPLAY" == 'true' ]]; then
+    echo '- Provider row replay mode: 93 rows, local disposable DB only'
+  else
+    echo '- Provider row replay mode: disabled (zero rows inserted)'
+  fi
+  echo '- Production data and services untouched; DR ready/serving BLOCKED'
 } >>"$GITHUB_STEP_SUMMARY"
-echo 'SEALED_PROVIDER_COPY_HEADER_PREFLIGHT_COMPLETE; zero source rows inserted; DR blocked'
+if [[ "$MH_OPS_PROVIDER_DATA_REPLAY" == 'true' ]]; then
+  echo 'SEALED_PROVIDER_ISOLATED_ROW_REPLAY_COMPLETE, DR blocked'
+else
+  echo 'SEALED_PROVIDER_COPY_HEADER_PREFLIGHT_COMPLETE; zero source rows inserted; DR blocked'
+fi

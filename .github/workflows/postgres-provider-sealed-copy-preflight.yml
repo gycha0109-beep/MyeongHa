@@ -3,6 +3,12 @@ run-name: "[WT:ops] Provider Sealed COPY Header Preflight"
 
 on:
   workflow_dispatch:
+    inputs:
+      provider_data_replay:
+        description: Replay exact sealed Provider COPY data into fresh isolated local database and verify counts (never Production)
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -60,6 +66,7 @@ jobs:
           MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          MH_OPS_PROVIDER_DATA_REPLAY: ${{ inputs.provider_data_replay }}
           SUPABASE_ACCESS_TOKEN: ''
           SUPABASE_DB_PASSWORD: ''
           SUPABASE_PROJECT_ID: ''
@@ -71,5 +78,13 @@ jobs:
         with:
           name: provider-sealed-copy-preflight-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-provider-sealed-copy-preflight.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload only aggregate isolated Provider row delta summary
+        if: ${{ always() && inputs.provider_data_replay }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-sealed-isolated-row-replay-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-isolated-row-replay.json
           if-no-files-found: ignore
           retention-days: 14

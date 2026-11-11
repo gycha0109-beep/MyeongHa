@@ -1,3 +1,11 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-B: 실제 봉인 백업의 Provider 전용 행 복원 경로 구현
+
+- **사전검증 증거:** 봉인 Production 백업 #42752268638 / source artifact 13734401337에 대해 CLI 3.1.0 무료 격리 스키마에서 실제 Provider COPY 33개·93행을 확인. #42987584238 SUCCESS, artifact 13839928483, SHA-256 `49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989`. 과거 누락 관계 29/29, 부분 복원 관계 3/3 모두 COPY 헤더·컬럼 수준 exact. 이는 **행 삽입 성공 증거가 아님**.
+- **이번 변경:** 같은 신뢰 경계의 수동 GitHub 실행 옵션으로 Provider 전용 원본 COPY를 비공개 임시 파일로 추출한다. 가동된 로컬 Auth/Storage 및 기타 서비스 컨테이너를 중단하고, localhost 일회성 PostgreSQL에 제약조건 유지 상태로 1개 트랜잭션에서 삽입한 뒤 테이블별 행 수 전후 차이를 대조한다. 오류 SQL·COPY 내용은 업로드하지 않고 비식별 집계만 CI 증거로 남긴다. 원본 애플리케이션 테이블, Production SQL/권한, 호스팅 프로젝트는 변경하지 않는다.
+- **검증 상태:** 합성 코드 테스트 3건 통과 및 GitHub CI 권한·책임 검사 통과. 실제 봉인 백업의 93행 적재 여부는 본 커밋 병합 후 정확한 main에서 별도 실행·증거 확인 전까지 **미검증**. 사전검증과 적재 검증의 판정을 혼동하지 않는다.
+- **미해결:** 전체 Supabase migration ledger, Auth 세션·refresh token, Storage object bytes, 동일 원본 snapshot 검증, 개인정보 독립 연속성, RPO/RTO 미증명. Issue #1887 OPEN, NOT_ACCEPTED, `drReady=false`, `serviceResumptionAllowed=false` 유지.
+
+Watchtower-Track: ops
 ### 2026-11-11 KST — Gate 1 / Phase 8-B: CLI 3.1.0 Provider 전체 구조 확인 및 암호화 백업 적재 구문 사전검증
 
 - **실측 결과:** 기존 백업 #42752268638에서 누락됐던 Provider 테이블 29/29개(Auth 22, Storage 7), 제외됐던 18/18 컬럼 모두 무료 Supabase CLI 3.1.0/PostgreSQL17 격리 스키마에 존재. 실행 #42983135911 SUCCESS, artifact 13838168533, SHA-256 `37f75702037caf3d224d74541fd201aef4eed7b50d0545cb51a7353bc9a532ba`; 2.122.0 대비 Storage lifecycle 테이블 2개가 추가 확인됨. 실제 Provider 원본 행 삽입은 0건.
