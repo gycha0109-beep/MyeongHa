@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { findReadingPublicTrustLanguageViolationV1 } from '../../../packages/character-content/src/index.js';
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
   classifyExactOfficialReadingSummaryReferenceV1,
@@ -23,7 +25,13 @@ import type {
 import {
   prepareCharacterStandardReaderBoundedCandidateV1,
   guardCharacterStandardReaderFinalOutputV1,
+  getGuardedStandardReaderCandidateProfileV1,
+  recheckCharacterStandardReaderFinalHoldV1,
+  type CharacterStandardReaderBoundedCandidateV1,
+  type CharacterStandardReaderOutputHoldV1,
 } from './character-standard-reading-chat-bounded-candidate-v1.js';
+import { reviewCharacterSajuConsultationBatchV1 } from './character-saju-consultation-multi-unit-shadow-v1.js';
+import type { CharacterSajuConsultationShadowPortV1 } from './character-saju-consultation-shadow-v1.js';
 import {
   assertServerGuardedReaderInterpretationSceneV2,
 } from './reader-interpretation-preview-runtime-v2.js';
@@ -206,6 +214,106 @@ export interface PrepareReaderConversationResponseCandidateInputV1 {
     guardedScene?: ReaderInterpretationPreviewEnvelopeV1;
     rendererDraft?: unknown;
   }>;
+}
+
+const preparedFollowupReviews = new WeakMap<CharacterStandardReaderOutputHoldV1, Readonly<{
+  preflight: CharacterStandardReadingChatTurnPreflightV2;
+  grounded: CharacterStandardChatGroundingV2;
+  candidate: Extract<CharacterStandardReaderBoundedCandidateV1, { mode: 'semantic_guarded_candidate' }>;
+}>>();
+
+export type ReaderFollowupCurrentAuthorityV1 = Omit<
+  Parameters<typeof recheckCharacterStandardReaderFinalHoldV1>[0], 'preflight' | 'outputHold'
+> & Readonly<{
+  anchorAuthorityPort: ValidatedStandardFollowupAnchorAuthorityPortV1;
+  recentMessageAuthorityPort: Pick<ReaderContextNonMemoryReadAuthorityPortV1, 'readRecentMessages'>;
+}>;
+
+/** A one-use reference for the private delivery pipeline. It contains no answer text. */
+export interface ReviewedPrivateReaderFollowupV1 {
+  readonly state: 'reviewed_private';
+  readonly privateBodyHash: string;
+  readonly sourceIdentityHash: string;
+  readonly officialArtifactResponseHash: string;
+  readonly evaluatorVersion: string;
+  readonly candidateHashes: readonly string[];
+}
+
+const reviewedFollowupBodies = new WeakMap<ReviewedPrivateReaderFollowupV1, string>();
+
+/** Only the server-owned protected commit may consume the reviewed text. */
+export function consumeReviewedPrivateReaderFollowupBodyV1(
+  candidate: ReviewedPrivateReaderFollowupV1,
+): string | null {
+  const body = reviewedFollowupBodies.get(candidate);
+  reviewedFollowupBodies.delete(candidate);
+  return body ?? null;
+}
+
+/** Runs the provider between two fresh owner/anchor checks, outside their DB transactions. */
+export async function reviewPreparedReaderConversationFollowupV1(input: Readonly<{
+  outputHold: CharacterStandardReaderOutputHoldV1;
+  port: CharacterSajuConsultationShadowPortV1;
+  withCurrentAuthority: <T>(check: (authority: ReaderFollowupCurrentAuthorityV1) => Promise<T>) => Promise<T>;
+}>): Promise<ReviewedPrivateReaderFollowupV1 | null> {
+  const plan = preparedFollowupReviews.get(input.outputHold);
+  if (!plan || input.port.evaluateBatch === undefined) return null;
+  preparedFollowupReviews.delete(input.outputHold);
+  const { preflight, grounded, candidate } = plan;
+  const hold = input.outputHold;
+  const { grounding, context } = grounded;
+  const question = preflight.receivePlan.normalizedRequest.text;
+  if (typeof question !== 'string') return null;
+  const units = new Map(grounding.units.map(unit => [unit.unitId, unit]));
+  const semantic = candidate.utterance.segments.filter(segment => segment.kind === 'semantic_realization');
+  const source = [];
+  for (const segment of semantic) {
+    const unitId = segment.sourceUnitRefs[0];
+    const unit = unitId === undefined ? undefined : units.get(unitId);
+    if (segment.sourceUnitRefs.length !== 1 || unit === undefined || unit.ambiguityRef !== undefined) return null;
+    source.push({ unitId: unit.unitId, unit, purpose: segment.purpose, baselineText: segment.text });
+  }
+  if (source.length !== hold.sourceUnitRefs.length ||
+      source.some(({ unitId }, index) => unitId !== hold.sourceUnitRefs[index])) return null;
+  const check = () => input.withCurrentAuthority(async authority => {
+    await recheckCharacterStandardReaderFinalHoldV1({ ...authority, preflight, outputHold: hold });
+    const latest = await prepareReaderLatestAnchorContinuityV1({ ...authority, preflight, grounded });
+    return latest.mode !== 'hold'
+      && latest.questionScope.scopeHash === hold.scopeHash
+      && latest.questionScope.evidence.assistantMessageId === hold.assistantAnchorMessageId
+      && latest.questionScope.evidence.selectionHash === hold.selectionHash;
+  });
+  try {
+    if (!await check()) return null;
+    const result = await reviewCharacterSajuConsultationBatchV1({
+      source, grounding, question, port: input.port,
+      profile: getGuardedStandardReaderCandidateProfileV1(candidate),
+      publishedCharacterVoice: Object.freeze({ speech: context.speech, persona: context.persona }),
+    });
+    if (result.mode !== 'reviewed_batch' || result.segments.some(({ text }) =>
+      !text.trim() || findReadingPublicTrustLanguageViolationV1(text) !== null || /[\p{Cc}\p{Cf}]/u.test(text),
+    )) return null;
+
+    const reviewed = new Map(result.segments.map(segment => [segment.unitId, segment.text]));
+    const body = candidate.utterance.segments.flatMap(segment => {
+      if (segment.kind === 'protected_disclosure') return [segment.text];
+      if (segment.kind !== 'semantic_realization') return [];
+      return [reviewed.get(segment.sourceUnitRefs[0]!)!];
+    }).join('\n\n');
+    if (!body.trim() || !await check()) return null;
+    const review: ReviewedPrivateReaderFollowupV1 = Object.freeze({
+      state: 'reviewed_private',
+      privateBodyHash: 'sha256:v1:' + createHash('sha256').update(body, 'utf8').digest('hex'),
+      sourceIdentityHash: hold.sourceIdentityHash,
+      officialArtifactResponseHash: hold.officialArtifactResponseHash,
+      evaluatorVersion: result.evaluatorVersion,
+      candidateHashes: Object.freeze(result.segments.map(segment => segment.candidateHash)),
+    });
+    reviewedFollowupBodies.set(review, body);
+    return review;
+  } catch {
+    return null;
+  }
 }
 
 function hold(
@@ -405,6 +513,7 @@ export async function prepareReaderConversationResponseCandidateV1(
       grounded, questionScope: question, candidate,
       rendererDraft: input.official.rendererDraft,
     });
+    preparedFollowupReviews.set(outputHold, { preflight, grounded, candidate });
     return Object.freeze({
       mode: 'official_followup_output_hold' as const, intent,
       selectedSourceUnitRefs: Object.freeze([...candidate.sourceUnitRefs]),

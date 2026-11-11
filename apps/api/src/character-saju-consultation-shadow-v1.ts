@@ -47,6 +47,7 @@ export interface CharacterSajuConsultationShadowPortV1 {
     groundingUnits: readonly CharacterGroundingUnitViewV1[];
     characterProfileRef: CharacterReadingPerspectiveRefV1;
     publishedCharacterVoice: unknown;
+    question?: string;
   }>) => Promise<Readonly<{ verdicts: readonly CharacterSajuSp2EvaluatorVerdictV1[] }>>;
   /** Privileged evidence; may contain sensitive Reading text. Never log/reveal. */
   readonly recordPrivateBatchComparison?: (

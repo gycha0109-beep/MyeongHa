@@ -27,7 +27,13 @@ import {
   classifyCharacterStandardFollowupQuestionScopeV1,
   assertServerPreparedStandardFollowupQuestionScopeV1,
 } from '../apps/api/src/character-standard-reading-chat-question-scope-v1.js';
-import { prepareReaderConversationResponseCandidateV1 } from '../apps/api/src/reader-conversation-source-routing-v1.js';
+import {
+  prepareReaderConversationResponseCandidateV1,
+  reviewPreparedReaderConversationFollowupV1,
+  consumeReviewedPrivateReaderFollowupBodyV1,
+} from '../apps/api/src/reader-conversation-source-routing-v1.js';
+import type { CharacterSajuConsultationShadowPortV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
+import { CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1 } from '../packages/domain/src/character-saju-sp2-evaluation.js';
 import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import { assertServerGuardedReaderInterpretationSceneV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import {
@@ -1976,7 +1982,8 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     };
   }
 
-  it('RR-08 connects latest real Reader Assistant and Guarded Official anchor into existing RR-06 Output HOLD', async () => {
+  it.each(['reviewed', 'wrong_source', 'changed_anchor', 'refund_before', 'refund_during', 'semantic_rejected'] as const)(
+    'RR-08 privately reviews one generated follow-up and keeps its exact authority (%s)', async scenario => {
     const base = previewGrounding();
     const {groundingHash: _old, ...material} = base;
     const bounded = {...material, units: [material.units[0]!]};
@@ -2037,6 +2044,73 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       subjectId: SUBJECT_ID, threadId: THREAD_ID, limit: 32,
     });
     expect(JSON.stringify(result)).not.toContain('PRIVATE_GUARDED_OFFICIAL_TEXT');
+
+    const generated = '직업에서는 방향을 급히 정하기보다 흐름을 길게 살펴보시는 쪽입니다.';
+    const evaluatorVersion = 'followup-test-evaluator-v1';
+    const generate = vi.fn<CharacterSajuConsultationShadowPortV1['generate']>(async ({ input }) => {
+      const prompt = input as { question: string; officialUnits: readonly { unitId: string }[] };
+      expect(prompt.question).toBe(question);
+      expect(prompt.officialUnits.map(unit => unit.unitId)).toEqual([f.ids[0]]);
+      return { segments: [{ unitId: scenario === 'wrong_source' ? 'unrelated' : f.ids[0], text: generated }] };
+    });
+    const evaluateBatch = vi.fn<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>(
+      async ({ candidateHashes, groundingUnits, question: reviewedQuestion }) => {
+        expect(reviewedQuestion).toBe(question);
+        if (scenario === 'changed_anchor') {
+          rows.unshift({
+            messageId: 'different-newer-assistant', sequenceNo: 19, senderType: 'character',
+            characterId: 'baekheon', text: 'newer reply', createdAt: '2026-10-22T05:00:01.000Z',
+          });
+        }
+        return { verdicts: [{
+          schemaVersion: CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1,
+          evaluatorVersion, candidateHash: candidateHashes[0]!, unitId: groundingUnits[0]!.unitId,
+          semanticPreserved: scenario !== 'semantic_rejected', characterFidelityPreserved: true,
+          failureClasses: scenario === 'semantic_rejected' ? ['ADDED_CLAIM'] : [],
+        }] };
+      },
+    );
+    const port = { generate, evaluateBatch, evaluatorVersion, evaluate: async () => { throw new Error('batch only'); } };
+    let checks = 0;
+    const review = (outputHold = result.outputHold) => reviewPreparedReaderConversationFollowupV1({
+      outputHold, port,
+      withCurrentAuthority: check => {
+        checks += 1;
+        return check({
+          ...f.authority,
+          ...(scenario === 'refund_before' || (scenario === 'refund_during' && checks > 1)
+            ? { currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: async () => { throw new Error('refunded'); } } }
+            : {}),
+          anchorAuthorityPort: f.input.anchorAuthorityPort,
+          recentMessageAuthorityPort: { readRecentMessages },
+        });
+      },
+    });
+    await expect(review({ ...result.outputHold })).resolves.toBeNull();
+    expect(generate).not.toHaveBeenCalled();
+    const candidate = await review();
+    if (scenario === 'reviewed') {
+      expect(candidate).toMatchObject({
+        state: 'reviewed_private', evaluatorVersion,
+        officialArtifactResponseHash: result.outputHold.officialArtifactResponseHash,
+        sourceIdentityHash: result.outputHold.sourceIdentityHash,
+        candidateHashes: [expect.stringMatching(/^[a-f0-9]{64}$/u)],
+        privateBodyHash: expect.stringMatching(/^sha256:v1:[a-f0-9]{64}$/u),
+      });
+      expect(candidate).not.toBeNull();
+      expect(JSON.stringify(candidate)).not.toContain(generated);
+      expect(consumeReviewedPrivateReaderFollowupBodyV1({ ...candidate! })).toBeNull();
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(candidate!)).toBe(generated);
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(candidate!)).toBeNull();
+      expect(checks).toBe(2);
+    } else {
+      expect(candidate).toBeNull();
+    }
+    const expectedCalls = scenario === 'refund_before' ? 0 : 1;
+    expect(generate).toHaveBeenCalledTimes(expectedCalls);
+    expect(evaluateBatch).toHaveBeenCalledTimes(scenario === 'wrong_source' ? 0 : expectedCalls);
+    await expect(review()).resolves.toBeNull();
+    expect(generate).toHaveBeenCalledTimes(expectedCalls);
   });
 
   it('RR-08 refuses to bypass missing actual Reader transcript authority despite valid server-minted sources', async () => {

@@ -7,6 +7,7 @@ import {
   guardCharacterSajuSemanticPreservationV2,
   renderCharacterSajuBoundedExactCoreV2,
   resolveCharacterSajuCommonPerspectiveV1,
+  type CharacterReadingPerspectiveRefV1,
   type CharacterSajuUtteranceV1,
 } from '../../../packages/domain/src/index.js';
 import {
@@ -53,7 +54,7 @@ export type CharacterStandardReaderBoundedCandidateV1 =
         'selection_mismatch' | 'renderer_unavailable' | 'semantic_guard_failed';
     }>;
 
-const mintedSemanticCandidates = new WeakSet<object>();
+const mintedSemanticCandidates = new WeakMap<object, CharacterReadingPerspectiveRefV1>();
 
 export function assertServerGuardedStandardReaderBoundedCandidateV1(
   value: unknown,
@@ -64,6 +65,14 @@ export function assertServerGuardedStandardReaderBoundedCandidateV1(
       !mintedSemanticCandidates.has(value)) {
     throw new Error('Official Reader bounded semantic candidate is unavailable.');
   }
+}
+
+export function getGuardedStandardReaderCandidateProfileV1(
+  candidate: CharacterStandardReaderBoundedCandidateV1,
+): CharacterReadingPerspectiveRefV1 {
+  const profile = mintedSemanticCandidates.get(candidate);
+  if (profile === undefined) throw new Error('Official Reader bounded semantic candidate is unavailable.');
+  return profile;
 }
 
 function hold(
@@ -176,7 +185,7 @@ export function prepareCharacterStandardReaderBoundedCandidateV1(input: Readonly
     requiredDisclosureRefs: closure.requiredDisclosureRefs,
     utterance: guard.utterance,
   });
-  mintedSemanticCandidates.add(result);
+  mintedSemanticCandidates.set(result, rendered.planDecision.plan.perspectiveProfileRef);
   return result;
 }
 
