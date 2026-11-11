@@ -41,6 +41,7 @@ export interface HandleReadingHistoryRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  readonly approvedSajuArchiveEnabled?: true;
 }
 
 type ReadingHistoryQueryRowV1 = Readonly<{
@@ -52,6 +53,7 @@ type ReadingHistoryQueryRowV1 = Readonly<{
   readerCharacterIds: unknown;
   createdAt: unknown;
   completedAt: unknown;
+  approvedComponent?: unknown;
 }>;
 
 type ParsedReadingHistoryPageRequestV1 = Readonly<{
@@ -77,6 +79,12 @@ select
   completed_at as "completedAt"
 from public.qry_reading_history_v3($1::uuid, $2::timestamptz, $3::timestamptz, $4::uuid, $5::integer)
 `.trim();
+const READ_APPROVED_SAJU_HISTORY_SQL = READ_READING_HISTORY_SQL
+  .replace('created_at as "createdAt"', `to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as "createdAt"`)
+  .replace('completed_at as "completedAt"', `to_char(completed_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') as "completedAt",
+  approved_component as "approvedComponent"`)
+  .replace('public.qry_reading_history_v3', 'public.qry_approved_saju_reading_history_v1');
+const MICROSECOND_TIMESTAMP = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3})\d{3}Z$/u;
 
 function requireNonEmptyString(name: string, value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -110,6 +118,7 @@ function requireStoredStringArray(name: string, value: unknown): readonly string
 function requireTimestamp(name: string, value: unknown): string {
   if (value instanceof Date && Number.isFinite(value.getTime())) return value.toISOString();
   if (typeof value === 'string' && Number.isFinite(Date.parse(value))) {
+    if (MICROSECOND_TIMESTAMP.test(value)) return value;
     return new Date(value).toISOString();
   }
   throw new Error(`Reading History authority ${name} is invalid.`);
@@ -136,6 +145,7 @@ function mapReadingHistoryRow(row: ReadingHistoryQueryRowV1): ReadingHistoryAuth
     readerCharacterIds: requireStoredStringArray('Reader Character identities', row.readerCharacterIds),
     createdAt: requireTimestamp('created timestamp', row.createdAt),
     completedAt: requireTimestamp('completed timestamp', row.completedAt),
+    ...(row.approvedComponent == null ? {} : { approvedComponent: row.approvedComponent }),
   });
 }
 
@@ -147,13 +157,15 @@ class TransactionReadingHistoryReadPortV1 implements ReadingHistoryReadAuthority
     private readonly client: PostgresTransactionQueryV1,
     private readonly cursor: ReadingHistoryCursorPositionV1 | null,
     private readonly pageSize: number,
+    private readonly approvedSajuArchiveEnabled: boolean,
   ) {}
 
   async readHistory(input: {
     readonly subjectId: string;
   }): Promise<readonly ReadingHistoryAuthorityRowV1[]> {
     try {
-      const result = await this.client.query<ReadingHistoryQueryRowV1>(READ_READING_HISTORY_SQL, [
+      const sql = this.approvedSajuArchiveEnabled ? READ_APPROVED_SAJU_HISTORY_SQL : READ_READING_HISTORY_SQL;
+      const result = await this.client.query<ReadingHistoryQueryRowV1>(sql, [
         input.subjectId,
         this.cursor?.completedAt ?? null,
         this.cursor?.createdAt ?? null,
@@ -206,10 +218,21 @@ function decodeReadingHistoryCursor(
   });
   requireExactCursorPositionKeysV1(position, ['completedAt', 'createdAt', 'id']);
   return Object.freeze({
-    completedAt: requireCursorTimestampV1('completedAt', position.completedAt),
-    createdAt: requireCursorTimestampV1('createdAt', position.createdAt),
+    completedAt: requireReadingHistoryCursorTimestamp('completedAt', position.completedAt),
+    createdAt: requireReadingHistoryCursorTimestamp('createdAt', position.createdAt),
     id: requireCursorUuidV1('id', position.id),
   });
+}
+
+function requireReadingHistoryCursorTimestamp(name: string, value: unknown): string {
+  if (typeof value === 'string') {
+    const milliseconds = MICROSECOND_TIMESTAMP.exec(value)?.[1];
+    if (milliseconds !== undefined) {
+      requireCursorTimestampV1(name, milliseconds + 'Z');
+      return value;
+    }
+  }
+  return requireCursorTimestampV1(name, value);
 }
 
 function nextReadingHistoryCursor(
@@ -359,6 +382,7 @@ export async function handleReadingHistoryRequestV1(
           client,
           cursor,
           pageRequest.pageSize,
+          input.approvedSajuArchiveEnabled === true && resolvedSubject.subjectKind === 'member',
         );
         const page = await getReadingHistory({
           resolvedSubjectId: subjectId,

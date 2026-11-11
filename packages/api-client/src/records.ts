@@ -41,6 +41,7 @@ export interface ReadingHistoryItemV1 {
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly sajuDomain: string;
+  readonly approvedComponent?: SajuReadingComponentV1;
   readonly readingContractVersion: string;
   readonly productResponseState: string;
   readonly readerCharacterIds: readonly string[];
@@ -228,10 +229,18 @@ function parseReaderCharacterIds(value: unknown): readonly string[] {
 
 function parseReading(value: unknown): ReadingHistoryItemV1 {
   if (!isRecord(value)) return malformed('Reading history item is invalid.');
+  const sajuDomain = requireString('Reading sajuDomain', value.sajuDomain);
+  const component = value.approvedComponent as SajuReadingComponentV1 | undefined;
+  if (component !== undefined && (typeof component !== 'string'
+    || !Object.hasOwn(SAJU_READING_COMPONENTS_V1, component)
+    || SAJU_READING_COMPONENTS_V1[component].domain !== sajuDomain)) {
+    return malformed('Reading approved component is invalid.');
+  }
   return Object.freeze({
     readingId: requireString('Reading identity', value.readingId),
     readingSessionId: requireString('Reading Session identity', value.readingSessionId),
-    sajuDomain: requireString('Reading sajuDomain', value.sajuDomain),
+    sajuDomain,
+    ...(component === undefined ? {} : { approvedComponent: component }),
     readingContractVersion: requireString(
       'Reading contract version',
       value.readingContractVersion,

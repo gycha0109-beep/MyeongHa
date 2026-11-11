@@ -6,5 +6,6 @@ grant execute on function
   public.create_approved_saju_sandbox_attempt_v1(uuid,uuid,uuid,text,text,text),
   public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text),
   public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean),
-  public.qry_approved_saju_purchase_readings_v1(uuid,uuid)
+  public.qry_approved_saju_purchase_readings_v1(uuid,uuid),
+  public.qry_approved_saju_reading_history_v1(uuid,timestamptz,timestamptz,uuid,integer)
   to myeongha_api_executor;

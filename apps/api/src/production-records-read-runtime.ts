@@ -126,9 +126,8 @@ export function createProductionReadingHistoryReadRuntimeV1(
     async handleRequest(requestInput: ProductionRecordsReadRequestV1) {
       if (requestInput.request.method === 'GET') {
         const url = new URL(requestInput.request.url);
-        const handler = url.search === ''
-          ? handleReadingHistoryRequestV1
-          : handleOfficialReadingRecordRequestV1;
+        const detail = url.searchParams.has('readingId') || url.searchParams.has('purchaseIntentId');
+        const handler = detail ? handleOfficialReadingRecordRequestV1 : handleReadingHistoryRequestV1;
         return handler({
           request: requestInput.request,
           requestId: requestInput.requestId,

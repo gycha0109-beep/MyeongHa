@@ -768,7 +768,9 @@ begin
   if has_function_privilege('myeongha_api_executor',
     'public.select_approved_saju_checkout_v1(uuid,text,text,uuid)','EXECUTE')
     or has_function_privilege('myeongha_api_executor',
-      'public.qry_approved_saju_purchase_readings_v1(uuid,uuid)','EXECUTE') then
+      'public.qry_approved_saju_purchase_readings_v1(uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_reading_history_v1(uuid,timestamptz,timestamptz,uuid,integer)','EXECUTE') then
     raise exception 'Sandbox API was granted before the opt-in';
   end if;
 end
@@ -785,7 +787,7 @@ begin
       'select_approved_saju_checkout_v1','resolve_approved_purchase_admission_v1',
       'create_approved_purchase_intent_v1','create_approved_saju_sandbox_attempt_v1',
       'read_approved_saju_sandbox_handoff_v1','qry_approved_saju_component_record_v1',
-      'qry_approved_saju_purchase_readings_v1'
+      'qry_approved_saju_purchase_readings_v1','qry_approved_saju_reading_history_v1'
     )
   loop
     intended_count := intended_count+1;
@@ -796,7 +798,7 @@ begin
       raise exception 'Sandbox API opt-in exposed a function to the wrong role';
     end if;
   end loop;
-  if intended_count<>7 or has_schema_privilege('myeongha_api_executor','commerce_saju_private','USAGE')
+  if intended_count<>8 or has_schema_privilege('myeongha_api_executor','commerce_saju_private','USAGE')
     or has_function_privilege('myeongha_commerce_internal_executor',
       'public.internal_fulfill_verified_approved_saju_receipt_v1(uuid)','EXECUTE') then
     raise exception 'Sandbox API opt-in changed the private or fulfillment perimeter';
@@ -985,8 +987,20 @@ begin
   if not exists (select 1 from public.qry_approved_saju_purchase_readings_v1(actor,purchase)
       where reading_id=archived_reading and component='career')
     or not exists (select 1 from public.qry_approved_saju_component_record_v1(actor,archived_reading,null,true)
-      where response_snapshot_jsonb is not null) then
+      where response_snapshot_jsonb is not null)
+    or not exists (select 1 from public.qry_approved_saju_reading_history_v1(actor,null,null,null,20)
+      where reading_id=archived_reading and approved_component='career'
+        and reader_character_ids=array['test-standard-reader'])
+    or exists (select 1 from public.qry_reading_history_v3(actor,null,null,null,20)
+      where reading_id=archived_reading) then
     raise exception 'Runtime could not reopen the exact archive Reading';
+  end if;
+  reset role;
+  perform pg_temp.approved_fixture_full_cancellation(sandbox_receipt,clock_timestamp());
+  set local role myeongha_api_executor;
+  if exists(select 1 from public.qry_approved_saju_reading_history_v1(actor,null,null,null,20)
+    where reading_id=archived_reading) then
+    raise exception 'Cancelled approved Reading remained visible in the archive history';
   end if;
   reset role;
 end
@@ -999,7 +1013,9 @@ begin
     or has_function_privilege('myeongha_api_executor',
       'public.read_approved_saju_sandbox_handoff_v1(uuid,uuid,text)','EXECUTE')
     or has_function_privilege('myeongha_api_executor',
-      'public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean)','EXECUTE') then
+      'public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_reading_history_v1(uuid,timestamptz,timestamptz,uuid,integer)','EXECUTE') then
     raise exception 'Sandbox API rollback left runtime privileges';
   end if;
   set local role myeongha_api_executor;
