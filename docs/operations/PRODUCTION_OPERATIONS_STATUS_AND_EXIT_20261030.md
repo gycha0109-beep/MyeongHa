@@ -1,3 +1,14 @@
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 미해석 GRANT 1문장 객체 권한 후보 실측·역할 권한과 보수적 분리
+
+- **실측 결속:** PR #3199 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42937180237 SUCCESS / main 병합 `5ae1d39397ee576e2a78deccc896ec87a29958e6`. 기존 암호화 백업 #42752268638, source SHA `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, migration frontier `20261109071019`를 재사용한 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42938743906 SUCCESS, artifact 13819433379; 새 Production 백업/권한 변경 없이 실행.
+- **실제 대조:** source 앱↔비앱 직접 멤버십 48건, target 0. filtered roles.sql GRANT 8문장 중 정상 인식한 7개에서 source 권한 쌍 0건, 관측 누락 48/48건 중 reserved recipient 패턴 후보 48건/기타 0. 미해석 1문장의 비식별 유형은 `object_privilege_grant: 1`. 기존 분류기는 단순 `ON` 토큰을 기준으로 삼았으므로 이 유형만으로 확정적 객체 GRANT 판정·전체 역할 부재를 증명하지 않음. verdict=`HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED`.
+- **증거:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`의 `classifiedUnparsedGrantRestore`에 실행·아티팩트·SHA·보류 범위를 추가. `role-dump-coverage.json` SHA256 `787be7d1df98fe39a8043d86360df060bee5b5b3ce078a53ea21d5de78190f0a`, `app-schema-parity.json` `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `c86248eae4c3d7cc9b414b2a99f2e1385d5f201b9813a8a6fe9029aeee8d4595`. 원본 role 이름·권한 GRANT tuple·개인정보는 공개하지 않음.
+- **이번 구현:** 기존 `observe-postgres-sealed-role-dump-coverage.mjs`에서 `ON`의 무차별 탐색 대신 고정된 PostgreSQL 객체 GRANT의 privilege list + ON + object class 문법을 엄격히 식별하며, 인식된 객체 GRANT는 직접 역할 membership 미해석 건수와 별도로 비식별 집계한다. 실제 SQL이 이 문법에 부합하지 않으면 계속 미해석 HOLD. 합성 단일/다중 role GRANT, 객체 GRANT, 역할명 `ON` 경계, 미지원 문법에 대한 Node24 verifier PASS.
+- **남은 수용 차단:** 정확한 filtered SQL 객체 grant 해석은 본 코드 병합 후 재격리 관측 필요. 이를 해소해도 source와 pg_dump 같은 MVCC snapshot이 아니고, provider-compatible cross-boundary role/restored privilege 동등성이 미입증. 기존 legacy ACL 해시 29 objects, Provider COPY 29 skipped/3 projected, migration ledger, Hosted Auth/Storage, 독립 privacy continuity, full RPO/RTO 모두 HOLD. P0 #1887 OPEN, `drReady=false`, `serviceResumptionAllowed=false`, `NOT_ACCEPTED`. Production GRANT/DDL/DML·IAM·비밀·Hosted·canary 변경 없음.
+- **다음:** PR 승인된 CI/Integration 성공 후 자동 병합되면 동일 backup #42752268638의 격리 PG17 복원 1회로 객체 GRANT 인식·역할 쌍 누락 건수를 실측한다. Provider 범위·서비스 재개 승인으로 승격 금지. ROADMAP_COMPLETE 선언 불가.
+
+Watchtower-Track: ops
+
 ### 2026-11-11 KST — Gate 1 / Phase 8-A: 개선된 GRANT 분석기의 동일 백업 격리 실측 및 미해석 1문장 원인 유형 진단
 
 - **실행 결속:** 이전 PR #3195·#3196·#3198 모두 필수 Integration SUCCESS 후 병합 완료. 기존 암호화 백업 #42752268638 (source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, frontier `20261109071019`) 재사용, 신규 Production 백업 없음. 개선된 multiline/multi-recipient 분석기 포함 main `f91a9f1773bad0c7d6424cb27248e6ae1b1233b7`에서 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42935870383 SUCCESS, artifact 13816869352; 중간에 병합된 Admin 코드 변경은 운영 복원 SQL을 수정하지 않음.

@@ -91,11 +91,25 @@ function parseGrantPairStatement(statement) {
     JSON.stringify([grant, member])));
 }
 
+// Only known PostgreSQL object-privilege grammar is excluded from direct
+// role-membership matching. Anchor the unquoted privilege list and object
+// class: a quoted role named "ON" must never become a false object-grant PASS.
+const objectPrivilege = '(?:ALL(?:\\s+PRIVILEGES)?|SELECT|INSERT|UPDATE|' +
+  'DELETE|TRUNCATE|REFERENCES|TRIGGER|MAINTAIN|USAGE|CREATE|CONNECT|' +
+  'TEMP(?:ORARY)?|EXECUTE)';
+const objectClasses = '(?:TABLE|SEQUENCE|SCHEMA|DATABASE|FUNCTION|' +
+  'PROCEDURE|ROUTINE|LANGUAGE|TYPE|DOMAIN|TABLESPACE|PARAMETER|' +
+  'FOREIGN\\s+(?:DATA\\s+WRAPPER|SERVER)|LARGE\\s+OBJECT|' +
+  'ALL\\s+(?:TABLES|SEQUENCES|FUNCTIONS|PROCEDURES|ROUTINES)\\s+IN\\s+SCHEMA)';
+const knownObjectPrivilegeGrant = new RegExp(
+  '^GRANT\\s+' + objectPrivilege + '(?:\\s*,\\s*' +
+  objectPrivilege + ')*\\s+ON\\s+' + objectClasses + '\\b', 'iu');
+
 // Only a fixed category is exported; neither SQL fragments nor role names
 // are permitted in this diagnostic. Unknown SQL always retains the HOLD.
 function classifyUnparsedGrantShape(sql, complete) {
   if (!complete) return 'unterminated_statement';
-  if (/\bON\b/iu.test(sql)) return 'object_privilege_grant';
+  if (knownObjectPrivilegeGrant.test(sql)) return 'object_privilege_grant';
   if (!/\bTO\b/iu.test(sql)) return 'missing_to_clause';
   if (!/^GRANT\s+"/iu.test(sql)) return 'unquoted_or_unexpected_granted_roles';
   if (!/\bTO\s+"/iu.test(sql)) return 'unquoted_or_unexpected_recipient_roles';
@@ -105,11 +119,16 @@ function classifyUnparsedGrantShape(sql, complete) {
 function rolePairsInFilteredSql(sql) {
   const pairs = new Set();
   let observedGrantStatementCount = 0;
+  let recognizedObjectPrivilegeGrantCount = 0;
   let unparsedGrantStatementCount = 0;
   const unparsedGrantShapeCounts = {};
   for (const candidate of sqlStatements(sql)) {
     if (!/^GRANT\s/iu.test(candidate.sql)) continue;
     observedGrantStatementCount++;
+    if (candidate.complete && knownObjectPrivilegeGrant.test(candidate.sql)) {
+      recognizedObjectPrivilegeGrantCount++;
+      continue;
+    }
     const parsed = candidate.complete
       ? parseGrantPairStatement(candidate.sql) : null;
     if (!parsed) {
@@ -122,7 +141,8 @@ function rolePairsInFilteredSql(sql) {
     }
     for (const pair of parsed) pairs.add(pair);
   }
-  return { pairs, observedGrantStatementCount, unparsedGrantStatementCount,
+  return { pairs, observedGrantStatementCount,
+    recognizedObjectPrivilegeGrantCount, unparsedGrantStatementCount,
     unparsedGrantShapeCounts };
 }
 
@@ -149,6 +169,8 @@ export function observeSealedRoleDumpCoverage(source, filteredRolesSql, dumpRunn
     fullProviderCompatibleRestoreProven: false,
     sourceDirectMembershipCount: null,
     filteredRolesSqlGrantStatementCount: extracted.observedGrantStatementCount,
+    filteredRolesSqlRecognizedObjectPrivilegeGrantCount:
+      extracted.recognizedObjectPrivilegeGrantCount,
     filteredRolesSqlUnparsedGrantStatementCount: extracted.unparsedGrantStatementCount,
     filteredRolesSqlUnparsedGrantShapeCounts: extracted.unparsedGrantShapeCounts,
     sourceRowsWithPairInFilteredSqlCount: null,

@@ -124,11 +124,23 @@ assert.equal(invalidTail.sourceRowsWithPairInFilteredSqlCount, 0);
 const objectPrivilege = observeSealedRoleDumpCoverage(
   source([e('myeongha_alpha', 'postgres')]),
   'GRANT SELECT ON TABLE "public"."example" TO "postgres";\n', runner);
-assert.deepEqual(objectPrivilege.filteredRolesSqlUnparsedGrantShapeCounts,
-  { object_privilege_grant: 1 });
+assert.deepEqual(objectPrivilege.filteredRolesSqlUnparsedGrantShapeCounts, {});
+assert.equal(objectPrivilege.filteredRolesSqlRecognizedObjectPrivilegeGrantCount, 1);
+assert.equal(objectPrivilege.filteredRolesSqlUnparsedGrantStatementCount, 0);
+assert.equal(objectPrivilege.sourceRowsWithoutPairInFilteredSqlCount, 1);
 assert.equal(objectPrivilege.drReady, false);
 assert.equal(objectPrivilege.serviceResumptionAllowed, false);
-for (const report of [unknownGrammar, unterminated, invalidTail, objectPrivilege]) {
+const onAsRoleName = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'ON')]),
+  'GRANT "myeongha_alpha" TO "ON";\n', runner);
+assert.equal(onAsRoleName.filteredRolesSqlRecognizedObjectPrivilegeGrantCount, 0);
+assert.equal(onAsRoleName.sourceRowsWithPairInFilteredSqlCount, 1);
+const malformedObject = observeSealedRoleDumpCoverage(
+  source([e('myeongha_alpha', 'postgres')]),
+  'GRANT ALL ON UNDOCUMENTED_OBJECT "x" TO "postgres";\n', runner);
+assert.equal(malformedObject.filteredRolesSqlRecognizedObjectPrivilegeGrantCount, 0);
+assert.equal(malformedObject.filteredRolesSqlUnparsedGrantStatementCount, 1);
+for (const report of [unknownGrammar, unterminated, invalidTail, malformedObject]) {
   assert.equal(Object.values(report.filteredRolesSqlUnparsedGrantShapeCounts)
     .reduce((a, b) => a + b, 0),
   report.filteredRolesSqlUnparsedGrantStatementCount);
