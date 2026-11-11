@@ -5,6 +5,10 @@ import {
 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { executeApprovedSajuOfficialReadingV1 } from './postgres-approved-saju-issuance-v1.js';
 import {
+  OFFICIAL_READER_RUNTIME_IDS_V1,
+  type OfficialReaderRuntimeIdV1,
+} from './reader-production-rollout-policy-v1.js';
+import {
   executePostgresApprovedSajuIssuerJobTransactionV1,
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
@@ -15,7 +19,7 @@ import {
 } from './saju-production-reading-issue-source-v1.js';
 
 type SelfComponent = Exclude<SajuReadingComponentV1, 'compatibility'>;
-type ComponentRelease = Readonly<{ releaseRef: string; readerCharacterId: string }>;
+type ComponentRelease = Readonly<{ releaseRef: string; readerCharacterId: OfficialReaderRuntimeIdV1 }>;
 type WorkerResult = Readonly<{ state: 'idle' | 'issued' | 'held' | 'lease_expired' }>;
 
 interface Job {
@@ -30,6 +34,7 @@ interface Job {
 
 const UUID = /^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$/u;
 const SERVER_KEY = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/u;
+const officialReaderIds = new Set<string>(OFFICIAL_READER_RUNTIME_IDS_V1);
 
 /** Server-only worker. The payment transaction queues work and the issuer owns completion. */
 export function createApprovedSajuIssuanceWorkerV1(input: Readonly<{
@@ -45,7 +50,7 @@ export function createApprovedSajuIssuanceWorkerV1(input: Readonly<{
       component === 'compatibility' || !Object.hasOwn(SAJU_READING_COMPONENTS_V1, component) ||
       !release || typeof release.releaseRef !== 'string' ||
       !SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1.test(release.releaseRef) ||
-      typeof release.readerCharacterId !== 'string' || !SERVER_KEY.test(release.readerCharacterId)
+      !officialReaderIds.has(release.readerCharacterId)
     ) throw new Error('Invalid approved Saju issuance release.');
     releases.set(component, { ...release });
   }
