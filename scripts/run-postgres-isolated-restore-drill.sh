@@ -346,11 +346,11 @@ fi
 if [[ -s "$work_dir/source-app-catalog.json" ]] &&
   jq -e '(.applicationExternalRoleBoundary.directMemberships // []) |
     length > 0' "$work_dir/source-app-catalog.json" >/dev/null; then
-  replay_sql="$work_dir/isolated-external-role-replay.sql"
+  replay_sql="$RUNNER_TEMP/isolated-external-role-replay.sql"
   replay_report="$(dirname "$RESTORE_EVIDENCE_PATH")/isolated-external-role-replay.json"
   MH_OPS_DISPOSABLE_PG17_ONLY=true \
     node scripts/operations/prepare-isolated-postgres-external-role-replay.mjs \
-      --source "$work_dir/source-app-catalog.json" \
+      --source "$RESTORE_SOURCE_APP_CATALOG_PATH" \
       --output "$replay_sql" \
       --report "$replay_report"
   if ! psql "$RESTORE_ADMIN_DATABASE_URL" --set ON_ERROR_STOP=1 --quiet \
