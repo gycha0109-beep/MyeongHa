@@ -49,6 +49,9 @@ jq -e --arg sha "$catalog_sha" --argjson count "$count" \
     and .hostedProviderRecoveryProven == false
     and .migrationCount == $count
     and .migrationCatalogSha256 == $sha
+    and (.sourceStatementBodiesMissingCount | type) == "number"
+    and .sourceStatementBodiesMissingCount >= 0
+    and .historicalExecutorAuthenticated == false
     and .drReady == false and .serviceResumptionAllowed == false' \
   "$private/validation.json" >/dev/null || fail
 # Only the encrypted archive is moved outside the immediately deleted private dir.
@@ -67,12 +70,17 @@ jq -n --arg ref "$SUPABASE_PROJECT_ID" --arg source "$GITHUB_SHA" \
   --arg archive_sha "$archive_sha" --arg catalog_sha "$catalog_sha" \
   --argjson count "$count" --argjson frontier "$frontier" \
   --arg source_packet_sha "$(jq -er '.sourcePacketSha256' "$private/validation.json")" \
+  --argjson statement_missing "$(jq -er '.sourceStatementBodiesMissingCount' "$private/validation.json")" \
+  --argjson created_by_rows "$(jq -er '.createdByFieldPopulatedRows' "$private/validation.json")" \
   '{
     schemaVersion:"ops-provider-migration-sealed-source-artifact-v1",
     projectRef:$ref,sourceWorkflowCommitSha:$source,
     migrationCount:$count,migrationFrontier:$frontier,
     migrationCatalogSha256:$catalog_sha,
     sourcePacketSha256:$source_packet_sha,
+    sourceStatementBodiesMissingCount:$statement_missing,
+    createdByFieldPopulatedRows:$created_by_rows,
+    historicalExecutorAuthenticated:false,
     encryptedArchiveSha256:$archive_sha,
     containsPlaintextMigrationStatements:false,
     sourceStoredInEncryptedArtifactOnly:true,
