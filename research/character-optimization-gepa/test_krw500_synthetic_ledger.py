@@ -8,7 +8,8 @@ import unittest
 
 from budget_ledger import BudgetDenied
 from governed_dry_run import DryRunPolicy, GovernedBudgetLedger, GovernedDryRunGate
-from krw500_synthetic_ledger import YeoulKrw500SyntheticLedger, CAP_KRW
+from krw500_synthetic_ledger import (YeoulKrw500SyntheticLedger,
+                                     YeoulKrw500SingleFlightLedger, CAP_KRW)
 
 ROLES = {'student':10,'reflection':10,'judge':10,'holdout':10}
 
@@ -223,6 +224,91 @@ class YeoulKrw500SyntheticLedgerTests(unittest.TestCase):
         self.assertEqual(second.krw_status()['all_roles_and_runs_attempts'],2)
         self.assertEqual(second.krw_status()['pilot_unreconciled_charges'],0)
         self.assertTrue(second.krw_status()['pilot_ledger_global_hold_clear'])
+
+
+    def strict_ledger(self, run_id='run-a'):
+        return YeoulKrw500SingleFlightLedger(
+            self.path, run_id=run_id,
+            max_spend_micro_usd=10000000, max_attempts=30,
+            role_caps=ROLES, upper_fx_milli_krw_per_usd=1400000,
+            fixed_fees_krw=0,
+        )
+
+    def test_single_flight_blocks_other_runs_until_confirmed_settlement(self):
+        first = self.strict_ledger('run-a')
+        a = policy('run-a')
+        first.reserve_controlled(a, request(a, 'pending-a', 'student'), 100000)
+        second = self.strict_ledger('run-b')
+        b = policy('run-b')
+        with self.assertRaisesRegex(BudgetDenied,
+                                    'pilot_inflight_requires_reconciliation'):
+            second.reserve_controlled(b, request(b, 'unsafe-b', 'judge'), 100000)
+        before = second.krw_status()
+        self.assertEqual(before['pilot_pending_charge_reservations'], 1)
+        self.assertEqual(before['all_roles_and_runs_attempts'], 1)
+        self.assertFalse(before['pilot_ledger_global_hold_clear'])
+        self.assertTrue(before['strict_single_flight'])
+        first.settle('pending-a', 99999)
+        second.reserve_controlled(b, request(b, 'after-settlement', 'judge'), 100000)
+        self.assertEqual(second.krw_status()['pilot_pending_charge_reservations'], 1)
+        self.assertEqual(second.krw_status()['all_roles_and_runs_attempts'], 2)
+
+    def test_single_flight_restart_preserves_unknown_egress_stop(self):
+        first = self.strict_ledger('run-a')
+        a = policy('run-a')
+        first.reserve_controlled(a, request(a, 'crashed'), 100)
+        del first
+        restarted = self.strict_ledger('run-c')
+        c = policy('run-c')
+        with self.assertRaisesRegex(BudgetDenied,
+                                    'pilot_inflight_requires_reconciliation'):
+            restarted.reserve_controlled(c, request(c, 'after-crash'), 100)
+        self.assertEqual(restarted.krw_status()['reserved_requests_krw'], 1)
+        first = self.strict_ledger('run-a')
+        first.hold('crashed')
+        with self.assertRaisesRegex(BudgetDenied,
+                                    'pilot_unreconciled_charge_halts_all_runs'):
+            restarted.reserve_controlled(c, request(c, 'after-held'), 100)
+        self.assertEqual(restarted.krw_status()['pilot_unreconciled_charges'], 1)
+
+    def test_single_flight_dispatch_mode_cannot_be_downgraded(self):
+        self.strict_ledger()
+        with self.assertRaisesRegex(BudgetDenied,
+                                    'pilot_dispatch_mode_changed_after_start'):
+            self.ledger('run-b')
+        with self.assertRaisesRegex(BudgetDenied,
+                                    'single_flight_mode_is_fixed'):
+            YeoulKrw500SingleFlightLedger(
+                self.path, run_id='run-b',
+                max_spend_micro_usd=10000000, max_attempts=30,
+                role_caps=ROLES, upper_fx_milli_krw_per_usd=1400000,
+                fixed_fees_krw=0, single_flight=False,
+            )
+
+    def test_single_flight_mode_cannot_upgrade_parallel_ledger_in_place(self):
+        old = self.ledger()
+        p = policy('yeoul-synthetic-run')
+        old.reserve_controlled(p, request(p, 'legacy-parallel'), 10)
+        with self.assertRaisesRegex(BudgetDenied,
+                                    'pilot_dispatch_mode_changed_after_start'):
+            self.strict_ledger('run-b')
+
+    def test_single_flight_parallel_workers_reserve_exactly_one(self):
+        p = policy('run-race')
+        led = self.strict_ledger('run-race')
+        def reserve(i):
+            try:
+                led.reserve_controlled(
+                    p, request(p, f'race-{i}', 'reflection'), 100)
+                return True
+            except BudgetDenied:
+                return False
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(reserve, range(12)))
+        self.assertEqual(sum(results), 1)
+        self.assertEqual(led.krw_status()['all_roles_and_runs_attempts'], 1)
+        self.assertEqual(led.krw_status()['pilot_pending_charge_reservations'], 1)
+        self.assertEqual(led.krw_status()['remaining_unverified_krw'], 499)
 
 
 if __name__ == '__main__':
