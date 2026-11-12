@@ -68,17 +68,28 @@ class YeoulKrw500SyntheticLedger(GovernedBudgetLedger):
         if scope != (PILOT_ID, CAP_KRW, self.fx_upper, self.fixed_fees_krw):
             raise BudgetDenied('pilot_krw_scope_changed_after_start')
 
-        # Stop if another ledger writer bypassed this KRW guard on this run.
+        # This is one pilot-wide file, NOT an independent 500-KRW allowance
+        # for every run. A dollar-only reservation under *any* run here is
+        # untracked by KRW and makes the entire synthetic pilot unsafe.
         total = con.execute(
-            'SELECT COUNT(*) FROM attempts WHERE run_id=?',
-            (self.run_id,)
+            'SELECT COUNT(*) FROM attempts'
         ).fetchone()[0]
         guarded = con.execute(
-            'SELECT COUNT(*) FROM pilot_krw_attempts WHERE run_id=?',
-            (self.run_id,)
+            'SELECT COUNT(*) FROM pilot_krw_attempts WHERE pilot_id=?',
+            (PILOT_ID,)
         ).fetchone()[0]
         if total != guarded:
             raise BudgetDenied('unguarded_usd_reservations_present')
+
+        # Parent checks held charges for this run; stop the complete pilot
+        # if a different run left any unknown charge. Never release its quote.
+        if con.execute(
+            'SELECT 1 FROM attempts a JOIN pilot_krw_attempts p '
+            'ON p.request_id=a.request_id '
+            'WHERE p.pilot_id=? AND a.state=\'held\' LIMIT 1',
+            (PILOT_ID,)
+        ).fetchone():
+            raise BudgetDenied('pilot_unreconciled_charge_halts_all_runs')
 
         next_krw = (
             worst * self.fx_upper + MICRO_USD_TO_MILLI_KRW_DENOMINATOR - 1
@@ -114,6 +125,15 @@ class YeoulKrw500SyntheticLedger(GovernedBudgetLedger):
                 (PILOT_ID,)
             ).fetchone()
             remaining = CAP_KRW - self.fixed_fees_krw - charged
+            all_usd_attempts = con.execute(
+                'SELECT COUNT(*) FROM attempts'
+            ).fetchone()[0]
+            pilot_held = con.execute(
+                'SELECT COUNT(*) FROM attempts a JOIN pilot_krw_attempts p '
+                'ON p.request_id=a.request_id '
+                'WHERE p.pilot_id=? AND a.state=\'held\'',
+                (PILOT_ID,)
+            ).fetchone()[0]
             return {
                 'pilot_id': PILOT_ID,
                 'owner_declared_total_cap_krw': CAP_KRW,
@@ -121,6 +141,11 @@ class YeoulKrw500SyntheticLedger(GovernedBudgetLedger):
                 'fixed_fees_ceiling_krw': self.fixed_fees_krw,
                 'remaining_unverified_krw': remaining,
                 'all_roles_and_runs_attempts': attempts,
+                'pilot_unreconciled_charges': pilot_held,
+                'unguarded_usd_attempts_detected': all_usd_attempts != attempts,
+                'pilot_ledger_global_hold_clear': (
+                    pilot_held == 0 and all_usd_attempts == attempts
+                ),
                 'provider_fx_and_fee_authenticated': False,
                 'owner_authority_authenticated': False,
                 'new_credit_purchase_allowed': False,
