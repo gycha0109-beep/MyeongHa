@@ -1,4 +1,11 @@
 import { createHash } from 'node:crypto';
+import {
+  canonicalJson,
+  guardCharacterRendererOutput,
+  type CharacterReadingPerspectiveRefV1,
+  type CharacterSajuUtteranceSegmentV1,
+} from '../../../packages/domain/src/index.js';
+import { prepareCharacterStandardReaderSceneSourceHandoffV1 } from './character-standard-reading-chat-scene-handoff-v1.js';
 import { findReadingPublicTrustLanguageViolationV1 } from '../../../packages/character-content/src/index.js';
 import {
   classifyCharacterStandardFollowupLexicalIntentV1,
@@ -34,6 +41,7 @@ import { reviewCharacterSajuConsultationBatchV1 } from './character-saju-consult
 import type { CharacterSajuConsultationShadowPortV1 } from './character-saju-consultation-shadow-v1.js';
 import {
   assertServerGuardedReaderInterpretationSceneV2,
+  getGuardedReaderSceneProfileV2,
 } from './reader-interpretation-preview-runtime-v2.js';
 import type {
   ReaderInterpretationPreviewEnvelopeV1,
@@ -263,20 +271,8 @@ export async function reviewPreparedReaderConversationFollowupV1(input: Readonly
   preparedFollowupReviews.delete(input.outputHold);
   const { preflight, grounded, candidate } = plan;
   const hold = input.outputHold;
-  const { grounding, context } = grounded;
   const question = preflight.receivePlan.normalizedRequest.text;
   if (typeof question !== 'string') return null;
-  const units = new Map(grounding.units.map(unit => [unit.unitId, unit]));
-  const semantic = candidate.utterance.segments.filter(segment => segment.kind === 'semantic_realization');
-  const source = [];
-  for (const segment of semantic) {
-    const unitId = segment.sourceUnitRefs[0];
-    const unit = unitId === undefined ? undefined : units.get(unitId);
-    if (segment.sourceUnitRefs.length !== 1 || unit === undefined || unit.ambiguityRef !== undefined) return null;
-    source.push({ unitId: unit.unitId, unit, purpose: segment.purpose, baselineText: segment.text });
-  }
-  if (source.length !== hold.sourceUnitRefs.length ||
-      source.some(({ unitId }, index) => unitId !== hold.sourceUnitRefs[index])) return null;
   const check = () => input.withCurrentAuthority(async authority => {
     await recheckCharacterStandardReaderFinalHoldV1({ ...authority, preflight, outputHold: hold });
     const latest = await prepareReaderLatestAnchorContinuityV1({ ...authority, preflight, grounded });
@@ -285,11 +281,44 @@ export async function reviewPreparedReaderConversationFollowupV1(input: Readonly
       && latest.questionScope.evidence.assistantMessageId === hold.assistantAnchorMessageId
       && latest.questionScope.evidence.selectionHash === hold.selectionHash;
   });
+  return reviewPrivateReaderSegmentsV1({
+    grounded, question, port: input.port, check,
+    segments: candidate.utterance.segments,
+    sourceUnitRefs: hold.sourceUnitRefs, sourceIdentityHash: hold.sourceIdentityHash,
+    profile: getGuardedStandardReaderCandidateProfileV1(candidate),
+  });
+}
+
+async function reviewPrivateReaderSegmentsV1(input: Readonly<{
+  grounded: CharacterStandardChatGroundingV2;
+  question: string;
+  port: CharacterSajuConsultationShadowPortV1;
+  check: () => Promise<boolean>;
+  segments: readonly CharacterSajuUtteranceSegmentV1[];
+  sourceUnitRefs: readonly string[];
+  sourceIdentityHash: string;
+  profile: CharacterReadingPerspectiveRefV1;
+}>): Promise<ReviewedPrivateReaderFollowupV1 | null> {
+  const { grounded, question, check, segments } = input;
+  const { grounding, context } = grounded;
+  const units = new Map(grounding.units.map(unit => [unit.unitId, unit]));
+  const source = [];
+  for (const segment of segments) {
+    if (segment.kind === 'protected_disclosure' &&
+        findReadingPublicTrustLanguageViolationV1(segment.text) !== null) return null;
+    if (segment.kind !== 'semantic_realization') continue;
+    const unitId = segment.sourceUnitRefs[0];
+    const unit = unitId === undefined ? undefined : units.get(unitId);
+    if (segment.sourceUnitRefs.length !== 1 || unit === undefined || unit.ambiguityRef !== undefined) return null;
+    source.push({ unitId: unit.unitId, unit, purpose: segment.purpose, baselineText: segment.text });
+  }
+  if (source.length !== input.sourceUnitRefs.length ||
+      source.some(({ unitId }, index) => unitId !== input.sourceUnitRefs[index])) return null;
   try {
     if (!await check()) return null;
     const result = await reviewCharacterSajuConsultationBatchV1({
       source, grounding, question, port: input.port,
-      profile: getGuardedStandardReaderCandidateProfileV1(candidate),
+      profile: input.profile,
       publishedCharacterVoice: Object.freeze({ speech: context.speech, persona: context.persona }),
     });
     if (result.mode !== 'reviewed_batch' || result.segments.some(({ text }) =>
@@ -297,7 +326,7 @@ export async function reviewPreparedReaderConversationFollowupV1(input: Readonly
     )) return null;
 
     const reviewed = new Map(result.segments.map(segment => [segment.unitId, segment.text]));
-    const body = candidate.utterance.segments.flatMap(segment => {
+    const body = segments.flatMap(segment => {
       if (segment.kind === 'protected_disclosure') return [segment.text];
       if (segment.kind !== 'semantic_realization') return [];
       return [reviewed.get(segment.sourceUnitRefs[0]!)!];
@@ -306,13 +335,109 @@ export async function reviewPreparedReaderConversationFollowupV1(input: Readonly
     const review: ReviewedPrivateReaderFollowupV1 = Object.freeze({
       state: 'reviewed_private',
       privateBodyHash: 'sha256:v1:' + createHash('sha256').update(body, 'utf8').digest('hex'),
-      sourceIdentityHash: hold.sourceIdentityHash,
-      officialArtifactResponseHash: hold.officialArtifactResponseHash,
+      sourceIdentityHash: input.sourceIdentityHash,
+      officialArtifactResponseHash: grounded.scope.officialArtifactResponseHash,
       evaluatorVersion: result.evaluatorVersion,
       candidateHashes: Object.freeze(result.segments.map(segment => segment.candidateHash)),
     });
     reviewedFollowupBodies.set(review, body);
     return review;
+  } catch {
+    return null;
+  }
+}
+
+/** A purchased question uses the selected scene for entry and the acknowledged answer after it. */
+export async function reviewPreparedPurchasedReaderQuestionV1(input: Readonly<{
+  preflight: CharacterStandardReadingChatTurnPreflightV2;
+  grounded: CharacterStandardChatGroundingV2;
+  guardedScene: ReaderInterpretationPreviewEnvelopeV1;
+  firstSceneQuestion?: Readonly<{ interpretationHash: string; segmentIndex: number }>;
+  anchorAuthorityPort: ValidatedStandardFollowupAnchorAuthorityPortV1;
+  port: CharacterSajuConsultationShadowPortV1;
+  recheckCurrent: () => Promise<void>;
+}>): Promise<Readonly<{
+  reviewed: ReviewedPrivateReaderFollowupV1;
+  sourceUnitRefs: readonly string[];
+  focusedUnitRef: string;
+  previousSafeMessageId: string | null;
+}> | null> {
+  const { grounded, guardedScene, firstSceneQuestion } = input;
+  const question = input.preflight.receivePlan.normalizedRequest.text;
+  if (typeof question !== 'string' || input.port.evaluateBatch === undefined) return null;
+  const intent = classifyReaderConversationIntentV1(question, grounded.scope.sajuDomain);
+  const assessment = inspectCharacterStandardFollowupSignalsV1(question, grounded.scope.sajuDomain);
+  if (intent.primaryIntent !== 'official_followup' || intent.securitySignals.length !== 0 ||
+      assessment.securitySignals.length !== 0) return null;
+
+  try {
+    assertServerGuardedReaderInterpretationSceneV2(guardedScene);
+    if (guardedScene.officialReadingId !== grounded.scope.readingId ||
+        guardedScene.readerCharacterId !== grounded.scope.readerCharacterId ||
+        guardedScene.readerContentBundleId !== grounded.scope.readerContentBundleId ||
+        guardedScene.officialArtifactResponseHash !== grounded.scope.officialArtifactResponseHash ||
+        guardedScene.requestedDomain !== grounded.scope.sajuDomain ||
+        guardedScene.sourceResponseHash !== grounded.grounding.sourceResponseHash ||
+        guardedScene.groundingHash !== grounded.grounding.groundingHash) return null;
+
+    const select = async () => {
+      if (firstSceneQuestion !== undefined) {
+        const scene = await prepareCharacterStandardReaderSceneSourceHandoffV1({
+          ...input, expectedSceneInterpretationHash: firstSceneQuestion.interpretationHash,
+          selectedSceneSegmentIndex: firstSceneQuestion.segmentIndex,
+        });
+        return scene.mode === 'hold' ? null : {
+          ...scene, focusedUnitRef: scene.rootUnitId, previousSafeMessageId: null,
+        };
+      }
+      const current = await prepareReaderLatestAnchorContinuityV1({
+        ...input, useApprovedSajuAnchorContinuity: true,
+      });
+      if (current.mode === 'hold') return null;
+      const evidence = current.questionScope.evidence;
+      return { ...evidence, previousSafeMessageId: evidence.assistantMessageId };
+    };
+    const handoff = await select();
+    if (handoff === null || handoff.requiredAmbiguityRefs.length !== 0) return null;
+    const selected = new Set(handoff.selectedUnitIds);
+    const semantic = guardedScene.utterance.segments.filter((segment): segment is Extract<
+      CharacterSajuUtteranceSegmentV1, { kind: 'semantic_realization' }
+    > =>
+      segment.kind === 'semantic_realization' && segment.sourceUnitRefs.length === 1 &&
+      selected.has(segment.sourceUnitRefs[0]!),
+    );
+    const sourceUnitRefs = Object.freeze(semantic.flatMap(segment => segment.sourceUnitRefs));
+    if (sourceUnitRefs.length !== selected.size || new Set(sourceUnitRefs).size !== selected.size) return null;
+
+    const disclosures = new Map(grounded.grounding.disclosures.map(disclosure => [disclosure.disclosureRef, disclosure]));
+    const segments: CharacterSajuUtteranceSegmentV1[] = [...semantic];
+    for (const disclosureRef of handoff.requiredDisclosureRefs) {
+      const disclosure = disclosures.get(disclosureRef);
+      if (!disclosure) return null;
+      segments.push({ kind: 'protected_disclosure', disclosureRef, text: disclosure.text });
+    }
+    guardCharacterRendererOutput({
+      rawOutput: { schemaVersion: 'v1', emotion: 'neutral', memoryProposals: [],
+        relationshipEventProposals: [], suggestedActions: [] },
+      context: grounded.context, allowedSuggestedActionKeys: [],
+    });
+    const check = async () => {
+      await input.recheckCurrent();
+      const current = await select();
+      return current !== null && current.selectionHash === handoff.selectionHash &&
+        current.previousSafeMessageId === handoff.previousSafeMessageId;
+    };
+    const sourceIdentityHash = 'sha256:v1:' + createHash('sha256').update(canonicalJson({
+      selectionHash: handoff.selectionHash, question,
+    })).digest('hex');
+    const reviewed = await reviewPrivateReaderSegmentsV1({
+      grounded, question, port: input.port, check, segments, sourceUnitRefs, sourceIdentityHash,
+      profile: getGuardedReaderSceneProfileV2(guardedScene),
+    });
+    return reviewed === null ? null : Object.freeze({
+      reviewed, sourceUnitRefs, focusedUnitRef: handoff.focusedUnitRef,
+      previousSafeMessageId: handoff.previousSafeMessageId,
+    });
   } catch {
     return null;
   }

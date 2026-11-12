@@ -277,6 +277,8 @@ export function guardCharacterSajuSemanticPreservationV1(input: {
   readonly grounding: unknown;
   readonly perspective: CharacterPerspectiveProfileV1;
   readonly requestedDomain: SajuDomain;
+  /** The signed source may supply exact qualifier sentences already in canonicalMeaning. */
+  readonly allowQualifiersInExactCore?: true;
 }): CharacterSajuSemanticGuardDecisionV1 {
   const rendererDecision = renderCharacterSajuBoundedExactCoreV1({
     context: input.context,
@@ -312,7 +314,9 @@ export function guardCharacterSajuSemanticPreservationV1(input: {
   ];
 
   for (const unit of selected) {
-    if ((unit.qualifiers?.length ?? 0) > 0) {
+    const qualifiesInExactCore = input.allowQualifiersInExactCore === true &&
+      (unit.qualifiers ?? []).every(qualifier => unit.canonicalMeaning.split('\n').includes(qualifier));
+    if ((unit.qualifiers?.length ?? 0) > 0 && !qualifiesInExactCore) {
       failures.push(failure('DROPPED_QUALIFIER', 'Exact-core renderer has no approved visible qualifier realization; fail closed until source-approved realization support exists.', { unitRef: unit.unitId }));
     }
     if (unit.ambiguityRef !== undefined) {
@@ -365,4 +369,6 @@ export function guardCharacterSajuSemanticPreservationV2(input: {
   readonly grounding: unknown;
   readonly perspective: CharacterPerspectiveProfileV1;
   readonly requestedDomain: SajuDomain;
+  /** The signed source may supply exact qualifier sentences already in canonicalMeaning. */
+  readonly allowQualifiersInExactCore?: true;
 }): CharacterSajuSemanticGuardDecisionV1 { return guardCharacterSajuSemanticPreservationV1(input); }

@@ -30,11 +30,12 @@ import {
 import {
   prepareReaderConversationResponseCandidateV1,
   reviewPreparedReaderConversationFollowupV1,
+  reviewPreparedPurchasedReaderQuestionV1,
   consumeReviewedPrivateReaderFollowupBodyV1,
 } from '../apps/api/src/reader-conversation-source-routing-v1.js';
 import type { CharacterSajuConsultationShadowPortV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
 import { CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1 } from '../packages/domain/src/character-saju-sp2-evaluation.js';
-import { runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
+import { renderGroundedStandardReaderSceneV2, runThreadBoundReaderInterpretationPreviewV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import { assertServerGuardedReaderInterpretationSceneV2 } from '../apps/api/src/reader-interpretation-preview-runtime-v2.js';
 import {
   prepareCharacterStandardReaderSceneSourceHandoffV1,
@@ -616,6 +617,8 @@ describe('thread-bound Official Reading Reader runtime', () => {
           mode: 'reader_interpretation', readerCharacterId: 'baekheon', officialReadingId: READING_ID,
         });
         expect(initialScene).not.toHaveProperty('sourceResponseHash');
+        const { grounded } = await followup;
+        expect(initialScene.interpretationHash).toBe(renderGroundedStandardReaderSceneV2(grounded).interpretationHash);
       } else {
         await expect(followup).rejects.toMatchObject({
           code: scenario === 'insufficient_source' ? 'GROUNDING_UNAVAILABLE' : 'SOURCE_MISMATCH',
@@ -1405,7 +1408,7 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     expect(projectGrounding).not.toHaveBeenCalled();
   });
 
-  async function prepareSceneHandoffFixture() {
+  async function prepareSceneHandoffFixture(bundle = previewGrounding()) {
     const authority = authorities();
     const base = nonspecialistReleaseRuntime();
     const entry = base.resolvePinned(RELEASE_ID);
@@ -1439,7 +1442,6 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
         },
       })),
     } as unknown as ContentReleaseRuntime;
-    const bundle = previewGrounding();
     const guardedScene = await runThreadBoundReaderInterpretationPreviewV2({
       resolvedSubjectId: SUBJECT_ID, threadId: THREAD_ID,
       officialReadingId: READING_ID,
@@ -1497,6 +1499,91 @@ describe('A3-gamma server-only Thread-bound official standard V2 Preview (public
     expect(() => assertServerPreparedStandardReaderSceneSourceHandoffV1({ ...result }))
       .toThrow(/unavailable/u);
   });
+
+  it.each(['accepted', 'qualified', 'acknowledged', 'prior_moved', 'stale_scene', 'refund_during', 'new_answer', 'changed_judgment'] as const)(
+    'answers the first question from one purchased Scene focus (%s)', async scenario => {
+      const { groundingHash: _, ...base } = previewGrounding();
+      const qualifier = '같은 직업 환경에서 흐름이 반복될 때 적용됩니다.';
+      const disclosure = { disclosureRef: 'grounding_disclosure_' + '1'.repeat(24),
+        type: 'scope_limitation' as const, sourceDisclosureIndex: 0, text: '이 풀이는 직업을 살피는 데 적용됩니다.' };
+      const material = scenario !== 'qualified' ? base : {
+        ...base, disclosures: [disclosure], units: [{
+          ...base.units[0]!, qualifiers: [qualifier], requiredDisclosureRefs: [disclosure.disclosureRef],
+          canonicalMeaning: base.units[0]!.canonicalMeaning + '\n' + qualifier,
+        }, ...base.units.slice(1)],
+      };
+      const f = await prepareSceneHandoffFixture({
+        ...material, groundingHash: hashCharacterSajuGroundingBundleMaterialV1(material),
+      });
+      const guardedScene = scenario === 'qualified' ? renderGroundedStandardReaderSceneV2(f.grounded) : f.guardedScene;
+      if (guardedScene.mode !== 'reader_interpretation') throw Error('Fixture needs a guarded Scene.');
+      const firstQuestion = {
+        ...f.input, guardedScene, expectedSceneInterpretationHash: guardedScene.interpretationHash,
+        selectedSceneSegmentIndex: guardedScene.utterance.segments.findIndex(segment => segment.kind === 'semantic_realization'),
+      };
+      const admitted = await prepareCharacterStandardReaderSceneSourceHandoffV1(firstQuestion);
+      if (admitted.mode === 'hold') throw Error('Fixture needs an admitted Scene focus.');
+      const previousSafeMessageId = '12345678-1234-4234-8234-123456789012';
+      const prior = scenario === 'acknowledged' || scenario === 'prior_moved';
+      if (prior) f.readLatestValidatedAnchor.mockResolvedValue({
+        status: 'committed_semantic_guard_pass', subjectId: SUBJECT_ID, threadId: THREAD_ID,
+        readerCharacterId: 'baekheon', readingRef: READING_ID,
+        officialArtifactResponseHash: f.grounded.scope.officialArtifactResponseHash,
+        groundingHash: f.grounded.grounding.groundingHash,
+        assistantMessageId: previousSafeMessageId, sourceUnitRefs: [admitted.rootUnitId],
+        focusedUnitRef: admitted.rootUnitId,
+      });
+      const evaluatorVersion = 'first-scene-test-v1';
+      const leading = '직업에서는 긴 흐름에서 반복되는 선택을 살펴보시는 편입니다.';
+      const text = scenario === 'qualified' ? leading + ' ' + qualifier : leading;
+      const generate = vi.fn<CharacterSajuConsultationShadowPortV1['generate']>(async ({ input }) => {
+        const prompt = input as { question: string; officialUnits: readonly { unitId: string }[] };
+        expect(prompt.question).toBe('방금 본 직업 해석을 조금 더 설명해 주세요.');
+        expect(prompt.officialUnits.map(unit => unit.unitId)).toEqual([admitted.rootUnitId]);
+        if (scenario === 'qualified') expect(prompt.officialUnits[0]).toMatchObject({ qualifiers: [qualifier] });
+        return { segments: [{ unitId: admitted.rootUnitId, text }] };
+      });
+      const evaluateBatch = vi.fn<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>(
+        async ({ candidateHashes, groundingUnits }) => {
+          if (scenario === 'new_answer' || scenario === 'prior_moved') {
+            f.readLatestValidatedAnchor.mockRejectedValue(new Error('An answer was committed.'));
+          }
+          return { verdicts: [{
+            schemaVersion: CHARACTER_SAJU_SP2_EVALUATOR_VERDICT_SCHEMA_VERSION_V1,
+            evaluatorVersion, candidateHash: candidateHashes[0]!, unitId: groundingUnits[0]!.unitId,
+            semanticPreserved: scenario !== 'changed_judgment', characterFidelityPreserved: true,
+            failureClasses: scenario === 'changed_judgment' ? ['ADDED_CLAIM'] : [],
+          }] };
+        },
+      );
+      let checks = 0;
+      const result = await reviewPreparedPurchasedReaderQuestionV1({
+        ...firstQuestion,
+        ...(prior ? {} : { firstSceneQuestion: {
+          interpretationHash: scenario === 'stale_scene' ? 'sha256:v1:' + '0'.repeat(64) : guardedScene.interpretationHash,
+          segmentIndex: firstQuestion.selectedSceneSegmentIndex,
+        } }),
+        port: { generate, evaluateBatch, evaluatorVersion, evaluate: async () => { throw Error('Batch only'); } },
+        recheckCurrent: async () => {
+          if (++checks === 2 && scenario === 'refund_during') throw Error('Purchase revoked.');
+        },
+      });
+      expect(generate).toHaveBeenCalledTimes(scenario === 'stale_scene' ? 0 : 1);
+      if (scenario !== 'accepted' && scenario !== 'qualified' && scenario !== 'acknowledged') {
+        expect(result).toBeNull();
+        return;
+      }
+      expect(result?.sourceUnitRefs).toEqual([admitted.rootUnitId]);
+      expect(result?.focusedUnitRef).toBe(admitted.rootUnitId);
+      expect(result?.previousSafeMessageId).toBe(prior ? previousSafeMessageId : null);
+      expect(checks).toBe(2);
+      expect(JSON.stringify(result)).not.toContain(text);
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(result!.reviewed)).toBe(
+        scenario === 'qualified' ? [text, disclosure.text].join('\n\n') : text,
+      );
+      expect(consumeReviewedPrivateReaderFollowupBodyV1(result!.reviewed)).toBeNull();
+    },
+  );
 
   it('RR-01 does not trust a browser Scene clone, stale hash, or forged A3 Grounding', async () => {
     const f = await prepareSceneHandoffFixture();
