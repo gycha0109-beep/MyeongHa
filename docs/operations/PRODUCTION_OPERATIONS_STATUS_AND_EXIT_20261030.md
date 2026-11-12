@@ -1,3 +1,22 @@
+### 2026-11-12 KST — Gate 1 / Phase 8-C: 최신 백업과 0건 개인정보 원장의 정확한 관측 결속
+
+- **새 봉인 원본:** Scheduled Production PostgreSQL 백업 [#43128832121](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43128832121) / artifact 13904856784 성공. 공개 manifest `2026-11-12T00:42:44Z`, source `d046d06c9e90c047d17978b4dbf4deeed45b8490`, migration frontier `20261109071019` / 242개로 확인. source catalog bracket stable이나 **same-MVCC snapshot 아님**. 앞서 93/93행을 적재한 백업 #42752268638과 동일 frontier이지만 별도 백업이므로 실제 데이터 동일성이나 최신 Provider 복원을 추정 금지.
+- **원장 출처 결속:** 개인정보 암호화 캡처 [#43131250378](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43131250378) / artifact 13905665420 성공. 공개 manifest에서 source backup #43128832121와 source SHA 일치, backup 완료 `00:42:44Z` / captured `00:59:27Z` / coverage through `00:59:27Z` 확인. **eventCount=0**, `AUTHORITATIVE_CAPTURED_WINDOW_V1`, `futureSafePrivacyReconciliation=false`. 실 사용자 이벤트 내용·암호화 payload는 조회하거나 복호화하지 않음. 별도 비식별 근거 `POSTGRES_CURRENT_BACKUP_PRIVACY_LEDGER_PAIR_20261112.json`.
+- **감시 RED 보존:** 이전 freshness watch [#43114630966](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43114630966)는 이전 성공 캡처 #43073831947 이후 **17,082초** 경과로 `CAPTURE_COMPLETION_STALE` RED(7,200초 한계). 이후 원장 캡처가 성공해도 새 watcher 성공·지속적인 외부 이벤트 연속성을 인증한 것은 아님. freshness 경계 완화 금지.
+- **다음 및 차단:** 실제 non-zero 개인정보 replay와 사고까지의 독립 durable source continuity는 미증명. 정확한 문자열 `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` 승인 없이 Production Privacy Canary 실행 금지. 새 Hosted DR/유료 리소스/Production SQL·권한 변경도 별도 명시 승인 필요. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / P0 #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-B: 기존 봉인 백업 Provider 93/93행 실제 격리 복원 성공
+
+- **병합·실행:** 실제 데이터 복원 구현 [PR #3221](https://github.com/gycha0109-beep/MyeongHa/pull/3221), 첫 일회성 호출 [PR #3224](https://github.com/gycha0109-beep/MyeongHa/pull/3224)의 실행 #43132816493은 Git 이전 커밋을 포함하지 않은 checkout으로 **백업 다운로드 전에 실패**. 부모 이력 `fetch-depth: 2`와 새 1회 표식으로 수정한 [PR #3226](https://github.com/gycha0109-beep/MyeongHa/pull/3226)이 필수 통합 검사 #43134615884 성공 후 `main 553c0c90aae09c303c060be4203fd19acddd15ed`에 병합. **동일 `main`의 격리 재실행 #43136341133 SUCCESS**. 이전 RED를 실제 복원 성공으로 승격하지 않음.
+- **원본·대상:** 기존 암호화 Production 백업 #42752268638 / artifact 13734401337 / source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`; 새 Production 백업이나 변경 없음. 무료 GitHub Actions 내부 일회성 Supabase CLI 3.1.0 / PostgreSQL17, 로컬 API/Auth/Storage 서비스 중지 후 비공개 SQL로 PostgreSQL 단일 트랜잭션 적재. Source COPY 33개 블록 총 **93행 / 격리 대상 전후 실제 증가 93행**; 테이블별 행 수 일치, 데이터 적재 중 제약조건 활성. 과거 누락 29/29 관계와 투영 3/3 관계의 COPY 컬럼 수준 정확 일치. CI 로그에 `SEALED_PROVIDER_REPLAY_VERIFIED isolated_rows=93 DR_BLOCKED` 기록.
+- **확인된 비식별 증거:** run [#43136341133](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43136341133), 적재 집계 artifact **13907413085** 내부 `myeongha-provider-isolated-row-replay.json` SHA-256 `0b086178e9a6d3e2ebff2e4d1b5089844934471a605667a08fa119785041e9f1`; COPY header artifact **13907378335**, 내부 `myeongha-provider-sealed-copy-preflight.json` SHA-256 `49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989`. 파일 본문 직접 확인. SQL·원본 사용자 행·토큰·객체 바이트는 증거에 포함하지 않음. 별도 `POSTGRES_PROVIDER_SEALED_ISOLATED_ROW_RESTORE_20261112.json`에 권한 경계와 증명 범위를 고정.
+- **정확한 한계:** 93/93은 **2026-11-10 기준 해당 백업**의 Provider COPY 데이터가 격리 DB에 적재된 증거이지, 현재 frontier의 Hosted Auth/Storage 전체 복구·세션 갱신/폐기·객체 실제 바이트·Provider 전체 migration ledger·전체 앱 스키마/ACL·동일 MVCC snapshot·독립 개인정보 이벤트 연속성·서비스 RPO PT24H / RTO PT6H의 증거가 아님. 기존 운영 DB·권한·실서비스·Secret·유료 DR 환경 미변경. Gate 1 / Phase 8 **BLOCKED**, P0 #1887 OPEN, `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`.
+- **다음:** 승인된 Phase 8-B Provider migration ledger와 Hosted Auth/Storage 복구 정합성의 잔여 차이부터 분류하고, 기존 무료 격리·비식별 증거를 재사용한다. 신규 유료 Hosted DR, 운영 SQL/권한, Production Privacy Canary는 별도 명시 승인 전 실행 금지.
+
+Watchtower-Track: ops
+
 ### 2026-11-11 KST — Gate 1 / Phase 8-B: 실제 봉인 백업의 Provider 전용 행 복원 경로 구현
 
 - **사전검증 증거:** 봉인 Production 백업 #42752268638 / source artifact 13734401337에 대해 CLI 3.1.0 무료 격리 스키마에서 실제 Provider COPY 33개·93행을 확인. #42987584238 SUCCESS, artifact 13839928483, SHA-256 `49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989`. 과거 누락 관계 29/29, 부분 복원 관계 3/3 모두 COPY 헤더·컬럼 수준 exact. 이는 **행 삽입 성공 증거가 아님**.
