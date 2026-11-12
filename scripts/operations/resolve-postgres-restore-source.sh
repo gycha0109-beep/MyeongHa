@@ -87,6 +87,21 @@ if [[ -n "${EXPECTED_BACKUP_ARTIFACT_ID:-}" ]]; then
 fi
 [[ "$artifact_name" =~ ^myeongha-postgres-[0-9]{8}T[0-9]{6}Z$ ]]
 
+# The escrow is an optional, exact-run companion of the logical backup.
+# Never source a Provider migration ledger from an unrelated run or a
+# scheduled job; this operation cannot repair Production or target history.
+if [[ "${VERIFY_PROVIDER_MIGRATION_SOURCE:-false}" == 'true' ]]; then
+  [[ "${GITHUB_EVENT_NAME:-}" == 'workflow_dispatch' &&
+     "$run_event" == 'workflow_dispatch' ]] || exit 1
+  expected_provider_artifact="${artifact_name/myeongha-postgres-/myeongha-provider-migration-ledger-}"
+  provider_artifacts="$(jq -c --arg name "$expected_provider_artifact" \
+    '[.artifacts[] | select(.name == $name and .expired == false)]' "$artifact_json")"
+  [[ "$(jq 'length' <<<"$provider_artifacts")" == '1' ]] || exit 1
+  provider_artifact_id="$(jq -er '.[0].id' <<<"$provider_artifacts")"
+  [[ "$provider_artifact_id" =~ ^[0-9]+$ ]] || exit 1
+  echo "provider_source_artifact_id=$provider_artifact_id" >> "$GITHUB_OUTPUT"
+fi
+
 echo "source_sha=$source_sha" >> "$GITHUB_OUTPUT"
 echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
 echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
