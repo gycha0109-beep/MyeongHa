@@ -18,8 +18,8 @@
       "repositoryPath": "supabase/migrations/1400_relationship_apply_context_v1.sql",
       "repositoryBlobSha": "a5616e211d4d324905a846aa273955b3903fa265",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1410",
@@ -29,8 +29,8 @@
       "repositoryPath": "supabase/migrations/1410_relationship_event_apply_command_v1.sql",
       "repositoryBlobSha": "2650e849e0ded188642ccdcd81022b35cb7e2b6e",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1420",
@@ -40,8 +40,8 @@
       "repositoryPath": "supabase/migrations/1420_relationship_reliability_context_v1.sql",
       "repositoryBlobSha": "c273a827f3e144f790557dae8d1d31c0846ac202",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1430",
@@ -51,8 +51,8 @@
       "repositoryPath": "supabase/migrations/1430_relationship_adjustment_commands_v1.sql",
       "repositoryBlobSha": "c244966b545081f1ddd6b1ef1619f75ac1645d1d",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1440",
@@ -62,8 +62,8 @@
       "repositoryPath": "supabase/migrations/1440_relationship_projection_rebuild_v1.sql",
       "repositoryBlobSha": "78d128294f7a04099be514e933e072241cda3fa6",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1450",
@@ -73,8 +73,8 @@
       "repositoryPath": "supabase/migrations/1450_relationship_snapshot_runtime_v1.sql",
       "repositoryBlobSha": "2b9fba98ad6d4e72c8bfe37e6b234216de52de2b",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1460",
@@ -84,8 +84,8 @@
       "repositoryPath": "supabase/migrations/1460_seyeon_production_relationship_runtime_read_v1.sql",
       "repositoryBlobSha": "5f01689c7835e5f576e8b41b0adece5f95a9f747",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1470",
@@ -95,8 +95,8 @@
       "repositoryPath": "supabase/migrations/1470_seyeon_relationship_sync_outbox_v1.sql",
       "repositoryBlobSha": "c20d98c18c516c055de97947258118842434d3c9",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1480",
@@ -106,8 +106,8 @@
       "repositoryPath": "supabase/migrations/1480_seyeon_production_context_runtime_v1.sql",
       "repositoryBlobSha": "1822ffa9027c38747fd5bd8098c1ea8e5fbeeeaa",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1490",
@@ -117,8 +117,8 @@
       "repositoryPath": "supabase/migrations/1490_seyeon_production_chat_execution_runtime_v1.sql",
       "repositoryBlobSha": "129592edfce0294550c272a53059ce8a18a288e6",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1500",
@@ -128,8 +128,8 @@
       "repositoryPath": "supabase/migrations/1500_seyeon_post_turn_analysis_runtime_v1.sql",
       "repositoryBlobSha": "38a5dd1d4575b62ec7a676382d54e7ce3ce0dc09",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     },
     {
       "version": "1510",
@@ -139,8 +139,8 @@
       "repositoryPath": "supabase/migrations/1510_seyeon_production_runtime_composition_v1.sql",
       "repositoryBlobSha": "ed4f0b50be666ff9cd0c525e749879c605edf27f",
       "repositoryFileHasNonCommentSql": true,
-      "exactAppliedSqlEquivalentToRepository": false,
-      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF"
+      "sourceBodyRecoveryAuthority": "SOURCE_LEDGER_STATEMENTS_NULL__REPOSITORY_MATCH_IS_NOT_APPLIED_SQL_PROOF",
+      "appliedSqlEquivalenceProven": false
     }
   ],
   "limitations": {
