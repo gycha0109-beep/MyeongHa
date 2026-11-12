@@ -1,3 +1,12 @@
+### 2026-11-12 KST — Gate 1 / Phase 8-B: Auth 연결 실측 PASS 및 Provider migration 원장 비교 구현
+
+- **병합 및 실측:** PR #3234 필수 통합 검사 [#43141494629](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43141494629) 성공, `main e6e7f5ca5eba7c465f956b5a18acb614d3ce2db9` 병합. 일회성 보호 main [#43142832141](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43142832141) 성공. 최신 Supabase CLI 3.1.0 / PG17 무료 격리 대상에서 봉인 source 백업 #42752268638의 실제 Auth 관계 검사: 사용자 4/4, 식별 4/4, 세션 16/16, 갱신 토큰 23/23, MFA-AMR 16/16; 고아 참조 4종 각각 0, Provider FK 33개 중 NOT VALID 0, 내부 비활성 FK 트리거 0. 집계 결과 artifact #13910092446 내부 파일 SHA-256 `36c5effc28909f9b90964e11d5dee8e84aa91c3beb8640624a39f8509487bc98`. 별도 `POSTGRES_PROVIDER_AUTH_REFERENCE_INTEGRITY_20261112.json`에 범위 고정.
+- **원장 비교 후속 구현:** 봉인 백업 공개 manifest를 정확한 encrypted SHA와 source SHA에 결속해 원본 `supabase_migrations.schema_migrations` 242개, frontier `20261109071019`, 전체 statement-hash catalog `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`로 고정. 격리 로컬의 numeric/all version 수, frontier, 해당 방식으로 계산한 catalog SHA-256을 READ ONLY 트랜잭션으로 확인하고 비식별 metadata만 집계한다. 인과적으로 원본과 동일한 Provider migration ledger가 재생됐다는 증명은 **실제 결과 대조 전까지 없음**. 원장 mismatch 자체를 CI 실패나 자동 migration repair로 처리하지 않고 `HOLD`로 보존하며, source fingerprint가 우연히 일치하더라도 Hosted/DR 승격 금지.
+- **안전:** 사주/상업/다른 트랙 코드, Production SQL·migration deploy/repair/GRANT, 개인정보 canary, 실제 Hosted Auth/Storage 및 유료 자원 변경 없음. 기존 한 번 사용한 marker 대신 새 보호 main 1회 실행을 사용한다. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN 유지.
+- **남은 것:** 원장 실측 결과, 실제 Hosted Auth 로그인·refresh·폐기, Storage 바이트, 현재 backup frontier 서비스 정합성, 독립 개인정보 연속성, 전체 RPO/RTO. 이들이 확보되기 전까지 Gate 1 종료 불가.
+
+Watchtower-Track: ops
+
 ### 2026-11-12 KST — Gate 1 / Phase 8-B: 봉인 Provider Auth 연결관계 격리 정합성 검증 구현
 
 - **구현:** 기존 봉인 백업 #42752268638의 Provider 33블록/93행 실제 격리 복원 #43136341133 성공 증거를 재사용한다. 이번 작업은 동일 출처의 격리 로컬 PostgreSQL17에서 `auth.users`·`auth.identities`·`auth.sessions`·`auth.refresh_tokens`·`auth.mfa_amr_claims`의 원본 행 수(4/4/16/23/16)를 대조하고 참조 누락 4종, Provider FK `NOT VALID` 및 내부 트리거 비활성 건수를 **읽기 전용 집계**로 관측하는 후속 실증이다.
