@@ -203,8 +203,8 @@
     "postgres-provider-sealed-copy-preflight.yml": {
       "responsibility": "postgres-provider-sealed-backup-copy-preflight",
       "prMode": "none",
-      "mainMode": "manual",
-      "workTrackAttribution": "workflow-dispatch"
+      "mainMode": "manual-and-one-shot-trigger",
+      "workTrackAttribution": "workflow-dispatch-or-commit-metadata"
     },
     "production-authenticated-json-resource-evidence.yml": {
       "responsibility": "production-security-evidence",
