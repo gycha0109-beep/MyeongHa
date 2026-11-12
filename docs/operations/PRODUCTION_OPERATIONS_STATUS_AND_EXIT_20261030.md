@@ -1,3 +1,11 @@
+### 2026-11-12 KST — Gate 1 / Phase 8-B: 격리 Provider 원장 조회 RED — 부재 선검사 적용
+
+- **확인된 RED:** PR #3236 필수 통합 검사 [#43148300651](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43148300651) 성공, `main d88b5342d24a78cd2518dbf880c4c4b84346b898` 병합. 일회성 격리 [#43150641399](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43150641399)에서 백업 출처·원본 Provider COPY·93/93행 적재·Auth 연결 무결성 및 이전 증거 업로드 성공. **새 마이그레이션 원장 SQL 조회 단계만 실패**했으며, 공개 CI 로그는 `Disposable Provider migration ledger read-only query unavailable`까지이므로 테이블 부재/컬럼 불일치/쿼리 오류 중 정확한 원인은 판정하지 않음. 해당 시도에서 원장 지문 일치를 추정하거나 Provider 복구를 완료 선언하지 않음.
+- **개정 구현:** Supabase CLI 3.1.0 신규 일회성 격리 DB에서 `supabase_migrations.schema_migrations` 테이블과 `version/name/statements` 3개 필수 컬럼의 존재를 먼저 READ ONLY `pg_catalog`에서 확인. 테이블/컬럼이 없으면 **원장 건수 0이라고 조작하지 않고 null(관측불가)**로 비식별 결과를 기록하고 `HOLD`를 표시. 모두 있을 때에만 기존 SELECT-only 버전수·frontier·statement SHA 비교를 수행. 실제 source 백업 #42752268638의 공개 manifest와 ciphertext checksum은 그대로 고정. 타겟 원장에 CREATE/INSERT/`migration repair`/복제/재적용을 하지 않음. **이번 수정의 실제 결과는 신규 CI 실행 전까지 미확인**.
+- **안전:** 사용 완료한 main one-shot marker는 재사용하지 않음. 개인 식별자·raw migration statements·토큰·SQL 에러 내용을 결과 artifact에 올리지 않음. Production SQL/Role, Hosted Auth/Storage, 유료 자원, Privacy Canary 변경 없음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
 ### 2026-11-12 KST — Gate 1 / Phase 8-B: Auth 연결 실측 PASS 및 Provider migration 원장 비교 구현
 
 - **병합 및 실측:** PR #3234 필수 통합 검사 [#43141494629](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43141494629) 성공, `main e6e7f5ca5eba7c465f956b5a18acb614d3ce2db9` 병합. 일회성 보호 main [#43142832141](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43142832141) 성공. 최신 Supabase CLI 3.1.0 / PG17 무료 격리 대상에서 봉인 source 백업 #42752268638의 실제 Auth 관계 검사: 사용자 4/4, 식별 4/4, 세션 16/16, 갱신 토큰 23/23, MFA-AMR 16/16; 고아 참조 4종 각각 0, Provider FK 33개 중 NOT VALID 0, 내부 비활성 FK 트리거 0. 집계 결과 artifact #13910092446 내부 파일 SHA-256 `36c5effc28909f9b90964e11d5dee8e84aa91c3beb8640624a39f8509487bc98`. 별도 `POSTGRES_PROVIDER_AUTH_REFERENCE_INTEGRITY_20261112.json`에 범위 고정.
