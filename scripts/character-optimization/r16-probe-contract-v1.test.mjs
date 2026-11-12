@@ -48,7 +48,7 @@ test('R16 ticket rejects private text, path and unbounded family identifiers',()
   const input={registry,probeId:registry.probes[0].probeId,
     split:'optimizer_validation',profileSourceSha256:registry.sourceSha256};
   assert.equal(buildR16Ticket({...input,familyId:'yeoul.R16:val_01'}).familyId,'yeoul.R16:val_01');
-  for(const familyId of ['개인 대화 원문','user\\nprivate','../sealed','a|user_message','-bad','a'.repeat(121)]){
+  for(const familyId of ['개인 대화 원문','user\\nprivate','../sealed','a|user_message','-bad','valid\n','a'.repeat(121)]){
     assert.throws(()=>buildR16Ticket({...input,familyId}),/split_or_family/);
   }
   assert.throws(()=>extractR16Metadata({...options,
