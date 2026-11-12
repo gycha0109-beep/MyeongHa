@@ -43,6 +43,20 @@ test('R16 rejects tampered, swapped, unapproved and sealed optimizer inputs',()=
     split:'development',familyId:'f',profileSourceSha256:x.sourceSha256}),/cross_character/);
 });
 
+test('R16 ticket rejects private text, path and unbounded family identifiers',()=>{
+  const registry=extractR16Metadata(options);
+  const input={registry,probeId:registry.probes[0].probeId,
+    split:'optimizer_validation',profileSourceSha256:registry.sourceSha256};
+  assert.equal(buildR16Ticket({...input,familyId:'yeoul.R16:val_01'}).familyId,'yeoul.R16:val_01');
+  for(const familyId of ['개인 대화 원문','user\\nprivate','../sealed','a|user_message','-bad','a'.repeat(121)]){
+    assert.throws(()=>buildR16Ticket({...input,familyId}),/split_or_family/);
+  }
+  assert.throws(()=>extractR16Metadata({...options,
+    sourceRef:'docs/character/../private/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md'}),/source_binding/);
+  assert.throws(()=>extractR16Metadata({...options,
+    sourceRef:'docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md\\nprivate'}),/source_binding/);
+});
+
 test('R16 numbered character-specific probes are retained without creating new examples',()=>{
   const numbered=text.replace('- 여울의 원칙을 지키는가','1. 여울의 원칙을 지키는가')
     .replace('- 관계 권한을 존중하는가','2. 관계 권한을 존중하는가');
