@@ -10,6 +10,7 @@ import {
   type SajuCanonicalReaderSourceV1,
 } from './saju-canonical-reader-source-v1.js';
 import type { SajuDomain } from '../../../packages/contracts/src/index.js';
+import type { SajuCanonicalReaderPeriodV1 } from './saju-canonical-reader-temporal-v1.js';
 import {
   createSajuProductionReadingHttpAdapterV1,
   SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1,
@@ -89,10 +90,11 @@ function bindCanonicalSource(
   source: unknown,
   nativeResponse: Record<string, unknown>,
   engineVersion: string,
+  expectedPeriod?: SajuCanonicalReaderPeriodV1,
 ): SajuCanonicalReaderSourceV1 | null {
   if (payload.readerSourceHash === undefined || source === undefined ||
     hashJson(source) !== payload.readerSourceHash) return null;
-  return admitSajuCanonicalReaderSourceV1(source, nativeResponse, engineVersion);
+  return admitSajuCanonicalReaderSourceV1(source, nativeResponse, engineVersion, expectedPeriod);
 }
 
 /** Verify a receipt accepted at issuance, then reconstruct the native source from the exact archive. */
@@ -135,7 +137,10 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
     payload.executionAttemptId !== receipt.executionAttemptId || payload.externalRequestRef !== receipt.externalRequestRef ||
     payload.releaseRef !== receipt.releaseRef || payload.requestBodyHash !== receipt.sourceRequestHash ||
     payload.responseBodyHash !== nativeHash) return null;
-  const canonicalSource = bindCanonicalSource(payload, readerSource, native, receipt.engineVersion);
+  const period = receipt.component === 'year' || receipt.component === 'month'
+    ? { scope: receipt.component === 'year' ? 'annual' as const : 'monthly' as const, referenceDateTime: receipt.periodReferenceDateTime }
+    : undefined;
+  const canonicalSource = bindCanonicalSource(payload, readerSource, native, receipt.engineVersion, period);
   if ((readerSource !== undefined || payload.readerSourceHash !== undefined) && canonicalSource === null) return null;
   return Object.freeze({
     sourceProofFingerprint: 'sha256:v1:' + hashJson(receipt.proof),
@@ -246,7 +251,11 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           typeof payload.nativeReadingId !== 'string' || payload.nativeReadingId !== sourceResponse.reading.readingId ||
           typeof payload.engineVersion !== 'string' || !TOKEN.test(payload.engineVersion)
         ) return null;
-        const canonicalSource = bindCanonicalSource(payload, entry.readerSource, sourceResponse, payload.engineVersion);
+        const { text, periodReferenceDateTime } = executedRequest.reading;
+        const period = text === '올해' || text === '이번 달'
+          ? { scope: text === '올해' ? 'annual' as const : 'monthly' as const, referenceDateTime: periodReferenceDateTime }
+          : undefined;
+        const canonicalSource = bindCanonicalSource(payload, entry.readerSource, sourceResponse, payload.engineVersion, period);
         if ((config.requireCanonicalReaderSource === true || entry.readerSource !== undefined ||
           payload.readerSourceHash !== undefined) && canonicalSource === null) return null;
         if (canonicalSource !== null) {

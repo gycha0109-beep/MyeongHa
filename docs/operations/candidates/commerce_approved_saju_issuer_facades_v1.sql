@@ -191,6 +191,18 @@ begin
   if not found or v_payload->>'requestBodyHash' is distinct from v_attempt_request_hash then return false; end if;
   v_scope := commerce_saju_private.approved_issue_scope_v1(p_subject,p_purchase,p_component);
   if v_scope is null or v_payload->>'releaseRef' is distinct from v_scope->>'releaseRef' then return false; end if;
+  if (p_proof ? 'readerSource') then
+    if p_component in ('year','month') then
+      if p_proof#>>'{readerSource,temporal,calendar,referenceDateTime}'
+          is distinct from v_scope->>'periodReferenceDateTime'
+        or p_proof#>>'{readerSource,temporal,calendar,scope}'
+          is distinct from (case p_component when 'year' then 'annual' else 'monthly' end)
+        or p_proof#>>'{readerSource,temporal,calendar,responseBodyHash}' is distinct from v_payload->>'responseBodyHash'
+      then return false; end if;
+    elsif p_proof#>'{readerSource,temporal}' is not null then
+      return false;
+    end if;
+  end if;
   select * into v_lineage from commerce_saju_private.approved_stored_lineage_v1(p_subject,p_reading,p_attempt);
   if not found or v_payload->>'externalRequestRef' is distinct from v_lineage.external_request_ref
     or v_payload->>'engineVersion' is distinct from v_lineage.saju_engine_version
@@ -229,6 +241,7 @@ as $function$
     'proof',proof.proof_envelope,'acceptedAt',proof.accepted_at,
     'executionAttemptId',proof.execution_attempt_id,'sourceRequestHash',binding.source_request_hash,
     'originatingGrantId',binding.entitlement_grant_id,
+    'component',binding.component,'periodReferenceDateTime',entitled.period_reference,
     'storedResponseHash',binding.stored_response_hash,'releaseRef',entitled.release_ref,
     'nativeReadingId',lineage.native_reading_id,'externalRequestRef',lineage.external_request_ref,
     'engineVersion',lineage.saju_engine_version
