@@ -14,6 +14,7 @@ import unittest
 from unittest.mock import patch
 
 from gepa_api_contract import build_offline_gepa_kwargs
+from gepa_result_proposal import freeze_offline_gepa_result
 from runner import probe_installed_gepa
 
 SEED = "Respond clearly in natural Korean."
@@ -127,6 +128,14 @@ class PinnedGepaOfflineTest(unittest.TestCase):
         self.assertIn("shared_expression", result.best_candidate)
         self.assertIn("concise answers", result.best_candidate["shared_expression"])
         self.assertGreater(result.best_score, 0.35)
+        frozen = freeze_offline_gepa_result(
+            result, plan, immutable_sources_sha256=SHA, max_evals=10)
+        self.assertEqual(frozen["proposal"]["slot"], "shared_expression")
+        self.assertEqual(
+            frozen["proposal"]["text"], result.best_candidate["shared_expression"])
+        self.assertEqual(frozen["researchEvidence"]["sourceAuthenticated"], False)
+        self.assertEqual(frozen["researchEvidence"]["ownerReviewGranted"], False)
+        self.assertEqual(frozen["externalCalls"], 0)
         self.assertLessEqual(result.total_evals, 10)
         # This is only a synthetic shared run. Neither run nor result may
         # authorize character-level quality claims, owner review or release.
@@ -180,6 +189,13 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             self.assertIn("character_expression", result.best_candidate)
             self.assertIn("concise answers", result.best_candidate["character_expression"])
             self.assertGreater(result.best_score, 0.2)
+            frozen = freeze_offline_gepa_result(
+                result, fixture(), immutable_sources_sha256=SHA, max_evals=10)
+            self.assertEqual(frozen["proposal"]["slot"], "character_expression")
+            self.assertEqual(frozen["proposal"]["text"],
+                             result.best_candidate["character_expression"])
+            self.assertFalse(frozen["researchEvidence"]["heldoutPassed"])
+            self.assertFalse(frozen["productionEligible"])
             self.assertLessEqual(result.total_evals, 10)
             self.assertEqual(fixture()["test_set"], None)
             self.assertTrue(pathlib.Path(output_dir).is_dir())

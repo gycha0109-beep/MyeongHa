@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
-            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner test_krw500_synthetic_ledger test_krw500_socket_gateway
+            test_offline test_gepa_api_contract test_gepa_result_proposal test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner test_krw500_synthetic_ledger test_krw500_socket_gateway
       - name: Prove optimizer cannot access sealed files or network at OS boundary
         shell: bash
         run: |
