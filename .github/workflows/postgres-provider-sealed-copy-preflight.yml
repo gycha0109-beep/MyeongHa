@@ -27,7 +27,8 @@ concurrency:
 
 jobs:
   source-provider-copy-preflight:
-    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot sealed Provider replay backup 42752268638'))) }}
+    if: >-
+      ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot sealed Provider replay backup 42752268638'))) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     environment: production
