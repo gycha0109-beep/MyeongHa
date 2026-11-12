@@ -177,6 +177,39 @@ if [[ "$MH_OPS_PROVIDER_DATA_REPLAY" == 'true' ]]; then
     and .drReady == false and .serviceResumptionAllowed == false
   ' "$RUNNER_TEMP/myeongha-provider-isolated-row-replay.json" >/dev/null ||
     fail 'Non-acceptance evidence violated'
+  # Inspect only aggregate relational integrity after the 93-row transaction.
+  # Auth services remain stopped; no source subject/token or table payload is emitted.
+  psql "$DB_URL" -X -qAt --set ON_ERROR_STOP=1 \
+    --file "$MH_DR_CI_REPO_ROOT/scripts/operations/local-provider-auth-reference-integrity-readonly.sql" \
+    >"$private/auth-reference-snapshot.private.json" \
+    2>"$private/auth-reference-errors.private.log" ||
+    fail 'Isolated Auth relationship snapshot unavailable'
+  MH_OPS_PROVIDER_DATA_REPLAY=true \
+    node "$MH_DR_CI_REPO_ROOT/scripts/operations/assess-provider-auth-reference-integrity.mjs" \
+    --snapshot "$private/auth-reference-snapshot.private.json" \
+    --replay "$RUNNER_TEMP/myeongha-provider-isolated-row-replay.json" \
+    --output "$RUNNER_TEMP/myeongha-provider-auth-reference-integrity.json" ||
+    fail 'Auth references or local constraint validity failed'
+  jq -e '
+    .sourceBackupRunId == 42752268638
+    and .rowCountsMatchSealedBackup == true
+    and .orphanCount == 0
+    and .allProviderForeignKeysValidated == true
+    and .localAuthReferenceIntegrityObserved == true
+    and .actualProductionAccountLoginVerified == false
+    and .authRefreshRevocationSemanticsVerified == false
+    and .hostedProviderRecoveryEquivalent == false
+    and .providerMigrationLedgerEquivalent == false
+    and .drReady == false and .serviceResumptionAllowed == false
+    and .gate == "BLOCKED"
+  ' "$RUNNER_TEMP/myeongha-provider-auth-reference-integrity.json" >/dev/null ||
+    fail 'Auth reference report attempted authority escalation'
+  {
+    echo '### Ops: isolated Auth relationship checks (no Hosted admission)'
+    echo '- Source-exact recovered Auth tables: users, identities, sessions, refresh tokens, MFA claims'
+    echo '- Parent-reference orphan counts and Provider FK validity: $(jq -r ".verdict" "$RUNNER_TEMP/myeongha-provider-auth-reference-integrity.json")'
+    echo '- Auth login, token rotation and Hosted recovery: NOT PROVEN'
+  } >>"$GITHUB_STEP_SUMMARY"
   {
     echo '### Ops: Actual Provider source COPY rows in disposable DB'
     echo '- Source Provider rows: 93; isolated PostgreSQL delta: 93'
