@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
-            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope
+            test_offline test_gepa_api_contract test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner
       - name: Prove optimizer cannot access sealed files or network at OS boundary
         shell: bash
         run: |
@@ -70,6 +70,75 @@ jobs:
             --mount "type=bind,src=$RUNNER_TEMP/sealed-gepa-synthetic,dst=/private/sealed,readonly" \
             python:3.14-slim python /opt/myeongha/isolated_runtime_probe.py \
             --mode holdout --host-sealed-path "$RUNNER_TEMP/sealed-gepa-synthetic/synthetic.json"
+
+      - name: Verify one-shot sealed synthetic evaluator across OS boundaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          export EVAL_ROOT="$RUNNER_TEMP/myeongha-gepa-final-synthetic"
+          mkdir -p "$EVAL_ROOT"/{sealed,frozen,state}
+          chmod 700 "$EVAL_ROOT" "$EVAL_ROOT"/sealed "$EVAL_ROOT"/frozen "$EVAL_ROOT"/state
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ['EVAL_ROOT'])
+          dimensions = ['korean_naturalness', 'response_relevance', 'agency', 'persona_fidelity',
+                        'relationship_fit', 'continuity', 'repetition', 'efficiency']
+          def family(name, baseline, candidate):
+              return {'familyId': name, 'baselineScores': {d: baseline for d in dimensions},
+                      'candidateScores': {d: candidate for d in dimensions},
+                      'hardFailures': [], 'uncertainty': False}
+          sealed = {
+              'schemaVersion': 'myeongha-synthetic-sealed-evaluation-v1',
+              'datasetRole': 'sealed_holdout', 'sourceType': 'synthetic_fixture',
+              'families': [family('synthetic-sealed-a', 0.5, 0.7),
+                           family('synthetic-sealed-b', 0.5, 0.4)],
+          }
+          frozen = {
+              'schemaVersion': 'myeongha-frozen-candidate-test-v1',
+              'characterId': 'yeoul', 'runManifestSha256': 'a' * 64,
+              'candidateSha256': 'b' * 64,
+              'optimizationFamilyIds': ['synthetic-dev-a', 'synthetic-val-b'],
+              'frozenBeforeSealedEvaluation': True,
+              'externalCallsAuthorized': False, 'productionEligible': False,
+          }
+          for path, data in [(root / 'sealed' / 'synthetic.json', sealed),
+                             (root / 'frozen' / 'candidate.json', frozen)]:
+              path.write_text(json.dumps(data, sort_keys=True), encoding='utf-8')
+              path.chmod(0o600)
+          PY
+          run_final() {
+            docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+              --user "$(id -u):$(id -g)" --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+              --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
+              --mount "type=bind,src=$EVAL_ROOT/sealed,dst=/private/sealed,readonly" \
+              --mount "type=bind,src=$EVAL_ROOT/frozen,dst=/private/frozen,readonly" \
+              --mount "type=bind,src=$EVAL_ROOT/state,dst=/private/state" \
+              python:3.14-slim python /opt/myeongha/sealed_holdout_runner.py \
+              --sealed /private/sealed/synthetic.json \
+              --frozen /private/frozen/candidate.json \
+              --ledger /private/state/single-use.sqlite
+          }
+          run_final > "$RUNNER_TEMP/gepa-final-synthetic-report.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          data = json.loads((Path(os.environ['RUNNER_TEMP']) / 'gepa-final-synthetic-report.json').read_text())
+          assert data['familyCount'] == 2
+          assert data['regressionFamilies'] == 1
+          assert data['candidateRegistryStage'] == 'proposed'
+          assert data['externalCalls'] == 0
+          assert data['independentPrivateHoldoutValidated'] is False
+          assert data['productionEligible'] is False
+          PY
+          if run_final > "$RUNNER_TEMP/gepa-final-replay-stdout.txt" 2>&1; then
+            echo "Sealed synthetic holdout was incorrectly reused" >&2
+            exit 1
+          fi
+          grep -q 'SEALED_HOLDOUT_EVALUATION_REFUSED' "$RUNNER_TEMP/gepa-final-replay-stdout.txt"
+          echo "Synthetic sealed evaluator: OS network denied, state persisted, replay refused."
 
       - name: Run actual pinned GEPA inside denied-network container
         shell: bash
