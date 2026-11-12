@@ -19,6 +19,12 @@
 - `.github/workflows/production-postgres-backup.yml` — 기존 워크플로를 재사용. `workflow_dispatch`의 `capture_provider_ledger=true` 선택 시에만 별도 원본 봉인 수집 수행. **기본값 false**이며 정기 `schedule` 및 기존 `push` 백업에서는 원장 SQL 본문 수집을 실행하지 않음. 기존 봉인 백업의 archive 멤버·파일 형식·수동/정기 경로는 유지.
 - 기존 운영 Governance 검증과 Node 합성 테스트에 관련 안전 경계 및 null 진단 추가. 별도 신규 워크플로는 만들지 않음.
 
+## 2026-11-12 보호된 실제 수집·격리 복구 결과
+
+- 보호된 `main` 수동 백업 [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) SUCCESS. 공개 원장 아티팩트 #13923871638에 암호화 파일·체크섬·비식별 manifest만 포함됐고 실제 SHA-256 검증이 일치했다. 원장 **242개**, frontier `20261109071019`, 원장 SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`, SQL 본문 누락 12개, created_by 메타데이터 46개로 확인. 같은 실행의 별도 SQL 백업은 #13923088346. [실측 증거](POSTGRES_PROVIDER_LEDGER_SEALED_CAPTURE_REAL_RUN_20261112.json).
+- 같은 실행 백업의 독립 격리 복원 [#43176401912](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43176401912)은 SUCCESS. 다만 전체 애플리케이션 스키마 동등성 `false`, 복구된 migration history `false`, 외부 역할 권한 증거 `HOLD`, serving admission `BLOCKED`. [실측 증거](POSTGRES_CURRENT_FRONTIER_ISOLATED_RESTORE_20261112.json).
+- **후속 구현 중:** 기존 격리 복구 워크플로에 선택적 `verify_provider_migration_source`를 추가해 동일 백업 실행의 암호화 원장만 내려받고 임시 공간에서 복호화·원문 지문 확인 후 비식별 HOLD 보고를 남기는 경로를 준비했다. 이 경로의 실제 실행 성공은 병합 이후 별도로 확인해야 하며, Provider 원장 복구나 SQL 적용으로 간주하지 않는다.
+
 ## 실측 및 복구 한계
 
 1. 이 파일들은 선택적 원본 수집 경로를 준비한 것이다. **새 암호화 migration ledger 아티팩트가 실제로 생성됐는지는 보호된 main 수동 실행 결과로 별도 확인**해야 한다. PR 검사 성공을 실제 Production 원본 수집 성공으로 간주하지 않는다.
