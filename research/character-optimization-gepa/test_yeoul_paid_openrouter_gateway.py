@@ -6,6 +6,8 @@ from unittest import TestCase, mock
 from tempfile import TemporaryDirectory
 
 from approval_scope import ApprovalHold
+from yeoul_openrouter_credit_preflight import CreditPreflightHold
+from test_yeoul_openrouter_credit_preflight import snapshots
 from governed_dry_run import DryRunPolicy, PolicyDenied
 from budget_ledger import BudgetDenied
 from krw500_synthetic_ledger import YeoulKrw500SingleFlightLedger
@@ -141,6 +143,8 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
     def test_mocked_post_failure_holds_entire_pilot_without_retry(self):
         with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
                          return_value=None),
+              mock.patch('yeoul_paid_openrouter_gateway._read_existing_credit_for_dispatch',
+                         return_value={'sufficient_prepaid_credit_observed': True}),
               mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-fixture'}),
               mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
                          side_effect=YeoulPaidDispatchHold('socket_dropped')) as post):
@@ -161,6 +165,8 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
         # KRW 500 pilot ledger after a network failure.
         with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
                          return_value=None),
+              mock.patch('yeoul_paid_openrouter_gateway._read_existing_credit_for_dispatch',
+                         return_value={'sufficient_prepaid_credit_observed': True}),
               mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-fixture'}),
               mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
                          side_effect=AssertionError('must not send')) as post):
@@ -175,6 +181,8 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
     def test_verified_mock_receipt_still_holds_until_payer_reconciliation(self):
         with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
                          return_value=None),
+              mock.patch('yeoul_paid_openrouter_gateway._read_existing_credit_for_dispatch',
+                         return_value={'sufficient_prepaid_credit_observed': True}),
               mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-fixture'}),
               mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
                          return_value={'id': 'gen-test-123', 'model': MODEL}) as post,
@@ -189,6 +197,109 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
         self.assertEqual(self.ledger.krw_status()['pilot_unreconciled_charges'], 1)
         self.assertEqual(self.ledger.krw_status()['remaining_unverified_krw'], 499)
 
+
+
+    def test_management_key_required_before_ledger_and_http(self):
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-inference'},
+                              clear=True),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         side_effect=AssertionError('no provider call')) as network):
+            with self.assertRaisesRegex(YeoulPaidDispatchHold,
+                                        'management_key_unavailable'):
+                self.gateway.dispatch(
+                    policy_request=live_request(self.pol, 'without-management'),
+                    body=body(),
+                )
+            network.assert_not_called()
+        self.assertEqual(self.ledger.krw_status()['all_roles_and_runs_attempts'], 0)
+
+    def test_same_management_key_cannot_be_spend_and_control_key(self):
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-both',
+                                              'OPENROUTER_MANAGEMENT_KEY': 'sk-or-both'},
+                              clear=True),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         side_effect=AssertionError('no provider call')) as network):
+            with self.assertRaisesRegex(YeoulPaidDispatchHold,
+                                        'same_key_cannot_be_inference_and_management'):
+                self.gateway.dispatch(
+                    policy_request=live_request(self.pol, 'same-key'), body=body(),
+                )
+            network.assert_not_called()
+        self.assertEqual(self.ledger.krw_status()['all_roles_and_runs_attempts'], 0)
+
+    def test_host_reads_same_account_credit_before_reserving_or_posting(self):
+        snapshots_value = snapshots()
+        queried = []
+
+        def pretend_get(*, method, path, api_key, body=None):
+            queried.append((method, path, api_key))
+            self.assertEqual(method, 'GET')
+            self.assertIsNone(body)
+            if path == '/api/v1/key' and api_key == 'sk-or-inference':
+                return snapshots_value['inference_key_snapshot']
+            if path == '/api/v1/key' and api_key == 'sk-or-manager':
+                return snapshots_value['management_key_snapshot']
+            if path == '/api/v1/credits' and api_key == 'sk-or-manager':
+                return snapshots_value['credits_snapshot']
+            raise AssertionError('unexpected outbound request')
+
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-inference',
+                                             'OPENROUTER_MANAGEMENT_KEY': 'sk-or-manager'},
+                              clear=True),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         side_effect=pretend_get)):
+            # Break only AFTER the authenticated GETs; a mock transport
+            # failure must stay HELD and block every later paid call.
+            with self.assertRaises(AssertionError):
+                # Add a deliberately failing metadata step by making GET-only
+                # fake reject the subsequent POST.
+                self.gateway.dispatch(
+                    policy_request=live_request(self.pol, 'credit-verified'),
+                    body=body(),
+                )
+        self.assertEqual(queried, [
+            ('GET', '/api/v1/key', 'sk-or-inference'),
+            ('GET', '/api/v1/key', 'sk-or-manager'),
+            ('GET', '/api/v1/credits', 'sk-or-manager'),
+            ('POST', '/api/v1/chat/completions', 'sk-or-inference'),
+        ])
+        self.assertEqual(self.ledger.krw_status()['pilot_unreconciled_charges'], 1)
+
+    def test_insufficient_credit_denies_before_reservation_or_post(self):
+        source = snapshots()
+        source['credits_snapshot']['data']['total_usage'] = 0.4
+        seen = []
+
+        def pretend_get(*, method, path, api_key, body=None):
+            seen.append((method, path))
+            if path == '/api/v1/key' and api_key == 'sk-or-inference':
+                return source['inference_key_snapshot']
+            if path == '/api/v1/key' and api_key == 'sk-or-manager':
+                return source['management_key_snapshot']
+            if path == '/api/v1/credits' and api_key == 'sk-or-manager':
+                return source['credits_snapshot']
+            raise AssertionError('paid request not allowed')
+
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-inference',
+                                             'OPENROUTER_MANAGEMENT_KEY': 'sk-or-manager'},
+                              clear=True),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         side_effect=pretend_get)):
+            with self.assertRaisesRegex(CreditPreflightHold,
+                                        'existing_prepaid_credit_insufficient'):
+                self.gateway.dispatch(
+                    policy_request=live_request(self.pol, 'no-credit'), body=body(),
+                )
+        self.assertNotIn(('POST', '/api/v1/chat/completions'), seen)
+        self.assertEqual(self.ledger.krw_status()['all_roles_and_runs_attempts'], 0)
 
     def test_non_strict_ledger_and_mismatched_provider_rejected(self):
         with self.assertRaisesRegex(YeoulPaidDispatchHold, 'strict_krw500_ledger_required'):
