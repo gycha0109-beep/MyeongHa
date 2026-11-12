@@ -241,7 +241,9 @@ describe("A4 bounded source-owned attempt receipt replay (OFFLINE)", () => {
       invoiceReconciled: false,
     });
     expect([...x.stored].sort()).toEqual([...CALLS]);
-    expect(x.trace.filter((s) => s === "connect:writer")).toHaveLength(3);
+    // Initial batch preflight, then each call is separately rechecked before
+    // its own write (and has its own final Writer transaction).
+    expect(x.trace.filter((s) => s === "connect:writer")).toHaveLength(5);
     expect(x.trace).toContain("writer:WITH objects AS (");
     expect(x.trace[0]).toBe("connect:source");
     expect(x.trace.some((s) => s === "source:BEGIN READ ONLY")).toBe(true);
