@@ -1,3 +1,9 @@
+## 2026-11-12 Gate 1 Phase 8-A/8-B: actual paired Provider source decryption proof
+
+- [PR #3251](https://github.com/gycha0109-beep/MyeongHa/pull/3251) merged. Protected main isolated restore [#43179685582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582) SUCCESS using same-run backup and encrypted Provider history from source backup [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843). **Actual decryption and SHA/full original statement-history fingerprint verification pass** for 242 versions and frontier `20261109071019`; historical SQL bodies are missing for 12 entries.
+- Isolated application comparison: 3/3 schemas, 94/94 tables and 322/322 routines present, with 2 schema + 8 table + 19 routine legacy ACL-digest differences, although observed direct recipient privileges and canonical grantor entries match for those objects. Application internal role graph: 43/43 roles and 7/7 edges (portable grantor rewrites); app↔external boundary edges: observed 48/48 on isolated target but original filtered `roles.sql` excludes all 48. **This does not prove Provider role ownership, inherited access, full schema/permission or Hosted service parity.** A shared source/dump MVCC snapshot is unproven. Detailed [paired decryption evidence](POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json).
+- This closes only the optional **source-ledger decryption/integrity subtask**, not Phase 8-A/8-B/Gate 1. No target migration ledger replay, no repair, no Hosted Auth/Storage restoration, no Production writes, no privacy canary. P0 #1887 remains open, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. Approved remaining Gate 1 tasks remain exactly as enumerated below; no scope additions.
+
 # Production Operations — 종료 집중 로드맵
 
 ## 2026-11-12 current-frontier Provider source capture + isolated restore evidence
