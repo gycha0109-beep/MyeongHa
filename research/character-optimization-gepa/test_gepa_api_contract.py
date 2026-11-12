@@ -17,7 +17,6 @@ class ContractTests(unittest.TestCase):
         import copy
         p=copy.deepcopy(PAYLOAD)
         p['candidateSha256']=hashlib.sha256(SEED.encode('utf-8')).hexdigest()
-        p['dataset'].append({'id':'synthetic-2','characterId':'yeoul','familyId':'f2','split':'optimizer_validation','contentSha256':H})
         return p
     def test_prepares_explicit_new_api_kwargs_without_running(self):
         with tempfile.TemporaryDirectory() as out,tempfile.TemporaryDirectory() as repo:

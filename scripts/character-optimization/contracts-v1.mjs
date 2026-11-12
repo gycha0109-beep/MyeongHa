@@ -10,6 +10,7 @@ export const CORPUS_SPLITS = Object.freeze(['development', 'optimizer_validation
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const nonempty = v => typeof v === 'string' && v.trim().length > 0;
 const sha = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
+const safeCorpusKey = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(v);
 const fail = code => { throw new Error(`CHARACTER_OPTIMIZATION_INVALID:${code}`); };
 export const digest = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 
@@ -65,7 +66,7 @@ export function validateCorpusSplits(rows, { exposeToOptimizer = false } = {}) {
   const ids = new Set(), families = new Map(), normalized = [];
   for (const row of rows) {
     if (!isObj(row) || !CHARACTER_IDS.includes(row.characterId)
-        || !nonempty(row.id) || !nonempty(row.familyId) || !CORPUS_SPLITS.includes(row.split)
+        || !safeCorpusKey(row.id) || !safeCorpusKey(row.familyId) || !CORPUS_SPLITS.includes(row.split)
         || !sha(row.contentSha256) || !['synthetic','approved_development'].includes(row.sourceType)) fail('corpus_row');
     const id = `${row.characterId}|${row.id}`;
     if (ids.has(id)) fail('duplicate_corpus_item');

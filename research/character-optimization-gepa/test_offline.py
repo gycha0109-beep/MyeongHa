@@ -11,13 +11,51 @@ CONFIG={'run_id':'synthetic-run','max_spend_micro_usd':100,'max_attempts':3,
         'role_caps':{'student':2,'reflection':1,'judge':0,'holdout':0}}
 PAYLOAD={'schemaVersion':'character-gepa-offline-bridge-v1','optimizer':'gepa','runManifestSha256':H,
  'candidateSha256':H,'mutableSlot':'character_expression','dataset':[
-   {'id':'synthetic-1','characterId':'yeoul','familyId':'f1','split':'development','contentSha256':H}],
+   {'id':'synthetic-1','characterId':'yeoul','familyId':'f1','split':'development','contentSha256':H},
+   {'id':'synthetic-2','characterId':'yeoul','familyId':'f2','split':'optimizer_validation','contentSha256':'b'*64}],
  'test_set':None,'externalCallsAuthorized':False,'productionEligible':False,
  'requiresPrivateRuntime':False,'qualityGainEstablished':False}
 
 class OfflineTests(unittest.TestCase):
     def test_plan(self):
         self.assertEqual(preflight(PAYLOAD)['external_calls'],0)
+    def test_python_checks_families_duplicates_and_cross_split_content(self):
+        import copy
+        cases=[
+            ({'familyId':'f1'},'family_crosses_split'),
+            ({'contentSha256':H},'identical_content_crosses_split'),
+            ({'id':'synthetic-1','split':'development','contentSha256':H},'duplicate_corpus_id'),
+            ({'characterId':'seyeon'},'missing_character_split'),
+            ({'id':'PRIVATE Korean conversation 안녕하세요'},'dataset_row'),
+        ]
+        for changes,reason in cases:
+            bad=copy.deepcopy(PAYLOAD)
+            bad['dataset'][1].update(changes)
+            with self.assertRaisesRegex(PreflightDenied,reason):preflight(bad)
+
+    def test_python_requires_validation_and_metadata_only_keys(self):
+        import copy
+        bad=copy.deepcopy(PAYLOAD)
+        bad['dataset'].pop()
+        with self.assertRaisesRegex(PreflightDenied,'dataset_shape'):preflight(bad)
+        bad=copy.deepcopy(PAYLOAD)
+        bad['dataset'][1]['familyId']='../private/holdout'
+        with self.assertRaisesRegex(PreflightDenied,'dataset_row'):preflight(bad)
+        bad=copy.deepcopy(PAYLOAD)
+        bad['dataset'][1]['split']='development'
+        with self.assertRaisesRegex(PreflightDenied,'missing_character_split'):preflight(bad)
+
+    def test_python_shared_profiles_require_each_character_two_splits(self):
+        import copy
+        data=copy.deepcopy(PAYLOAD)
+        data['dataset'].extend([
+            {'id':'s-dev','characterId':'seyeon','familyId':'s-dev','split':'development','contentSha256':'c'*64},
+            {'id':'s-val','characterId':'seyeon','familyId':'s-val','split':'optimizer_validation','contentSha256':'d'*64},
+        ])
+        self.assertEqual(preflight(data)['cases'],4)
+        data['dataset'].pop()
+        with self.assertRaisesRegex(PreflightDenied,'missing_character_split'):preflight(data)
+
     def test_sealed_rejected(self):
         bad=json.loads(json.dumps(PAYLOAD));bad['dataset'][0]['split']='sealed_holdout'
         with self.assertRaises(PreflightDenied):preflight(bad)
