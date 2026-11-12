@@ -10,7 +10,7 @@ class FakeGepaConfig:
     def __init__(self,**kwargs):self.__dict__.update(kwargs)
 
 def offline_reflection(*args,**kwargs):return 'synthetic-only-no-network'
-def dummy_evaluator(candidate,example):return 0.5,{'failure_codes':[],'character_id':'yeoul','raw_dialogue_excluded':True}
+def dummy_evaluator(candidate,example):return 0.5,{'failure_codes':[],'character_id':'yeoul','raw_dialogue_excluded':True,'uncertain':False}
 
 class ContractTests(unittest.TestCase):
     def setup_envelope(self):
@@ -96,7 +96,7 @@ class ContractTests(unittest.TestCase):
 
     def test_feedback_cannot_smuggle_unlisted_text_or_other_character(self):
         result = {'failure_codes': [], 'character_id': 'yeoul',
-                  'raw_dialogue_excluded': True}
+                  'raw_dialogue_excluded': True, 'uncertain': False}
         def judge(candidate, example):
             return (0.5, result.copy())
         with tempfile.TemporaryDirectory() as out, tempfile.TemporaryDirectory() as repo:
@@ -109,19 +109,22 @@ class ContractTests(unittest.TestCase):
                 {'failure_codes': ['private_user_message']},
                 {'failure_codes': ['fabricated_memory', 'fabricated_memory']},
                 {'raw_dialogue_excluded': 1},
+                {'uncertain': 1},
+                {'uncertain': 'false'},
             ):
                 with self.subTest(change=change):
                     result.update({'failure_codes': [], 'character_id': 'yeoul',
-                                   'raw_dialogue_excluded': True})
+                                   'raw_dialogue_excluded': True, 'uncertain': False})
                     result.update(change)
                     with self.assertRaisesRegex(PreflightDenied, 'unsafe_feedback'):
                         kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
             result.update({'failure_codes': ['fabricated_memory'],
                            'character_id': 'yeoul',
-                           'raw_dialogue_excluded': True})
+                           'raw_dialogue_excluded': True, 'uncertain': False})
             score, safe_feedback = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
             self.assertEqual(score, 0.0)
             self.assertEqual(safe_feedback['failure_codes'], ['fabricated_memory'])
+            self.assertIs(safe_feedback['uncertain'], False)
             def raise_private_error(candidate, example):
                 raise RuntimeError('PRIVATE_USER_DIALOGUE_MUST_NOT_LEAK')
             other = build_offline_gepa_kwargs(self.setup_envelope(), seed_text=SEED,
@@ -134,7 +137,7 @@ class ContractTests(unittest.TestCase):
 
     def test_hard_failures_veto_max_score_per_character_and_keep_safe_codes(self):
         result = {'failure_codes': [], 'character_id': 'yeoul',
-                  'raw_dialogue_excluded': True}
+                  'raw_dialogue_excluded': True, 'uncertain': False}
 
         def judge(candidate, example):
             return (1.0, {**result})
@@ -166,6 +169,35 @@ class ContractTests(unittest.TestCase):
             result['failure_codes'] = []
             score, _ = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
             self.assertEqual(score, 1.0)
+
+    def test_uncertain_evaluation_blocks_high_score_without_claimed_hard_failure(self):
+        state = {'failure_codes': [], 'character_id': 'yeoul',
+                 'raw_dialogue_excluded': True, 'uncertain': False}
+
+        def judge(candidate, example):
+            return (1.0, state.copy())
+
+        with tempfile.TemporaryDirectory() as out, tempfile.TemporaryDirectory() as repo:
+            kw = build_offline_gepa_kwargs(self.setup_envelope(), seed_text=SEED,
+                evaluator=judge, reflection_lm=offline_reflection,
+                output_dir=out, repository_root=repo, config_factory=FakeGepaConfig)
+            state['uncertain'] = True
+            score, feedback = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
+            self.assertEqual(score, 0.0)
+            self.assertIs(feedback['uncertain'], True)
+            self.assertEqual(feedback['failure_codes'], [])
+            state['uncertain'] = False
+            score, feedback = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
+            self.assertEqual(score, 1.0)
+            self.assertIs(feedback['uncertain'], False)
+            for invalid in (None, 0, 1, 'false'):
+                state['uncertain'] = invalid
+                with self.subTest(value=invalid), self.assertRaisesRegex(
+                        PreflightDenied, 'unsafe_feedback'):
+                    kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
+            del state['uncertain']
+            with self.assertRaisesRegex(PreflightDenied, 'feedback_fields'):
+                kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
 
     def test_sealed_set_not_exposed(self):
         p=self.setup_envelope();p['dataset'][1]['split']='sealed_holdout'
