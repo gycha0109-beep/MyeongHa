@@ -1,3 +1,8 @@
+## 2026-11-12 원본 복호화·무결성 재검증 실측
+
+- 통합 CI 후 PR #3251 병합. 보호된 main 수동 격리 복구 [#43179685582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582) SUCCESS로 **같은 백업 실행에서 생성된 원장 artifact를 실제 복호화**했다. 암호문·원본 packet SHA-256, 242개 원장 버전/최종 버전/statement fingerprint, 12개 NULL statement 및 기존 verification.json과 전부 일치했다. 실측 [POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json](POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json) 참고.
+- **해소된 것:** 복구 시 원본 봉인 원장을 실제로 안전하게 꺼내 원문 이력 무결성을 검증할 수 있다는 점. **미해결:** 원본 12개 SQL NULL, 대상 Provider migration history 부재, 소유권·역할·ACL·Hosted Auth/Storage 전체 복구 동등성, 독립 개인정보 연속성 및 RPO/RTO. 이력 복호화만으로 운영 재개를 허용하지 않는다.
+
 # Production Operations — Provider 마이그레이션 원본 봉인 수집 경로 (2026-11-12)
 
 > 트랙: `ops` · Gate 1 / Phase 8-A·8-B · P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
