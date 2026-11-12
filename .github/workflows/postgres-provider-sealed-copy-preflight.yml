@@ -8,7 +8,7 @@ on:
     branches:
       - main
     paths:
-      - '.github/ops/postgres-provider-ledger-backup-42752268638-20261112.once'
+      - '.github/ops/postgres-provider-ledger-presence-backup-42752268638-20261112-retry2.once'
   workflow_dispatch:
     inputs:
       provider_data_replay:
@@ -51,9 +51,9 @@ jobs:
           [[ -z "$(git status --porcelain)" ]]
           subject="$(git show -s --format=%s HEAD)"
           [[ "$subject" =~ ^ops\(dr\):\ one-shot\ sealed\ Provider\ replay\ backup\ 42752268638(\ \(\#[0-9]+\))?$ ]]
-          [[ "$(cat '.github/ops/postgres-provider-ledger-backup-42752268638-20261112.once')" == 'OPS-SEALED-PROVIDER-LEDGER-BACKUP-42752268638-20261112-V1' ]]
+          [[ "$(cat '.github/ops/postgres-provider-ledger-presence-backup-42752268638-20261112-retry2.once')" == 'OPS-SEALED-PROVIDER-LEDGER-PRESENCE-BACKUP-42752268638-20261112-RETRY2-V1' ]]
           [[ -n "$(git rev-parse "$GITHUB_SHA^" 2>/dev/null)" ]]
-          [[ "$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -Fxc '.github/ops/postgres-provider-ledger-backup-42752268638-20261112.once' || true)" == '1' ]]
+          [[ "$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -Fxc '.github/ops/postgres-provider-ledger-presence-backup-42752268638-20261112-retry2.once' || true)" == '1' ]]
           echo 'EXACT_SEALED_PROVIDER_REPLAY_MARKER_VALIDATED: local-only, governed source backup'
       - name: Install Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

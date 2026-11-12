@@ -32,6 +32,7 @@ SELECT jsonb_build_object(
   'schemaVersion','ops-disposable-supabase-migration-catalog-v1',
   'target','disposable-supabase-cli-3.1.0-postgresql17',
   'migrationTablePresent',true,
+  'requiredColumnsPresent',true,
   'allVersionCount',(SELECT count(*) FROM supabase_migrations.schema_migrations),
   'numericVersionCount',f.numeric_version_count,
   'migrationFrontier',f.frontier,

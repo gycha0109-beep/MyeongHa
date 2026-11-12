@@ -204,13 +204,47 @@ if [[ "$MH_OPS_PROVIDER_DATA_REPLAY" == 'true' ]]; then
     and .gate == "BLOCKED"
   ' "$RUNNER_TEMP/myeongha-provider-auth-reference-integrity.json" >/dev/null ||
     fail 'Auth reference report attempted authority escalation'
-  # Read-only Provider migration ledger fingerprint. Source manifest was already
-  # bound to the governed ciphertext; never alter migration history to match it.
+  # Detect absent or incomplete CLI migration ledger before accessing its
+  # columns. This is normal for fresh local CLI stacks without app migrations.
+  # Absence is a HOLD witness, never a reason to initialize/repair the ledger.
   psql "$DB_URL" -X -qAt --set ON_ERROR_STOP=1 \
-    --file "$MH_DR_CI_REPO_ROOT/scripts/operations/local-provider-migration-catalog-fingerprint-readonly.sql" \
-    >"$private/migration-ledger-snapshot.private.json" \
-    2>"$private/migration-ledger-errors.private.log" ||
-    fail 'Disposable Provider migration ledger read-only query unavailable'
+    --file "$MH_DR_CI_REPO_ROOT/scripts/operations/local-provider-migration-ledger-capability-readonly.sql" \
+    >"$private/migration-ledger-capability.private.json" \
+    2>"$private/migration-ledger-capability-errors.private.log" ||
+    fail 'Disposable Provider ledger metadata probe unavailable'
+  jq -e '
+    .schemaVersion == "ops-disposable-provider-ledger-capability-v1"
+    and .target == "disposable-supabase-cli-3.1.0-postgresql17"
+    and (.migrationTablePresent | type == "boolean")
+    and (.requiredColumnsPresent | type == "boolean")
+    and .migrationStatementOrUserPayloadOutput == false
+  ' "$private/migration-ledger-capability.private.json" >/dev/null ||
+    fail 'Disposable Provider ledger capability metadata malformed'
+  if jq -e '.migrationTablePresent == true and .requiredColumnsPresent == true' \
+    "$private/migration-ledger-capability.private.json" >/dev/null; then
+    # Read-only exact fingerprint only when the existing schema supports it.
+    psql "$DB_URL" -X -qAt --set ON_ERROR_STOP=1 \
+      --file "$MH_DR_CI_REPO_ROOT/scripts/operations/local-provider-migration-catalog-fingerprint-readonly.sql" \
+      >"$private/migration-ledger-snapshot.private.json" \
+      2>"$private/migration-ledger-errors.private.log" ||
+      fail 'Existing migration table fingerprint query unavailable'
+  else
+    # No schema or row changes. Report null (unknown) counts, not invented zeros.
+    jq -nc --slurpfile probe "$private/migration-ledger-capability.private.json" '
+      $probe[0] as $p | {
+        schemaVersion:"ops-disposable-supabase-migration-catalog-v1",
+        target:"disposable-supabase-cli-3.1.0-postgresql17",
+        migrationTablePresent:$p.migrationTablePresent,
+        requiredColumnsPresent:$p.requiredColumnsPresent,
+        allVersionCount:null,
+        numericVersionCount:null,
+        migrationFrontier:null,
+        catalogSha256:null,
+        migrationStatementOrUserPayloadOutput:false
+      }
+    ' >"$private/migration-ledger-snapshot.private.json" ||
+      fail 'Cannot emit safe absent-ledger metadata'
+  fi
   MH_OPS_PROVIDER_DATA_REPLAY=true \
     node "$MH_DR_CI_REPO_ROOT/scripts/operations/assess-disposable-provider-migration-ledger.mjs" \
     --manifest "$manifest" \
