@@ -6,6 +6,7 @@
 ## 확정된 실제 사실
 
 - PR #3239 병합 후 격리 실측 [#43158737963](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963): 원본 migration 242개 / frontier `20261109071019` / 봉인 원장 fingerprint `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`; 무료 Supabase CLI 3.1.0/PG17 격리 대상 `supabase_migrations.schema_migrations` 테이블 **부재**. 대상 count/frontier/digest는 모두 **null (관측 불가)**.
+- **NULL 본문 12개의 정확한 버전:** `1400`–`1510` (10단위 연속). 원격 메타데이터의 이름과 같은 12개 SQL 파일이 현재 저장소에 존재하고, 각 파일에 주석 외 SQL이 포함되어 있음을 확인했다. 그러나 **저장소 SQL 파일이 실제 Production에서 실행된 SQL과 같다는 증거는 없다**. 자세한 비식별 목록은 [POSTGRES_PROVIDER_LEDGER_NULL_STATEMENT_DISPOSITION_20261112.json](POSTGRES_PROVIDER_LEDGER_NULL_STATEMENT_DISPOSITION_20261112.json) 참조.
 - 2026-11-12 Supabase Production에서 현행 `production-migration-catalog-fingerprint-readonly.sql`과 동등한 집계 SQL을 **직접 SELECT-only 실행**: 버전 242개, frontier `20261109071019`, 위 원본 catalog fingerprint **완전 일치**. 이 시점의 원격 history metadata만 입증하며 사용한 기존 봉인 파일의 실제 동일 MVCC 백업 시점 증명은 아니다.
 - 같은 Production의 `pg_catalog`/집계만 읽어 현행 원장 필드 **6개** (`version`, `statements`, `name`, `created_by`, `idempotency_key`, `rollback`)를 확인. 242개 행 모두 숫자 버전, `statements IS NULL` **12개**, `created_by IS NOT NULL` **46개**, idempotency/rollback populated **0개**. `created_by` 필드 존재는 인증된 배포 실행자 증거가 아니다. 12개는 원본 SQL 문장이 보존되지 않은 이력으로 별도 정합화가 필요하다.
 - 현재 봉인 백업은 Provider migration ledger **원본 행을 제외**하고 hash/count/frontier만 저장한다. 해당 백업으로는 누락된 이력 row들을 복원할 수 없다. 기존 Provider COPY 93/93행 및 Auth 참조 검증은 독립된 성공이며 반복하지 않는다.
