@@ -78,6 +78,9 @@ function fixture(
     attemptRows?: readonly unknown[];
     failSource?: boolean;
     failAttempt?: boolean;
+    readinessOverrides?: Partial<
+      Record<"source" | "attempt" | "writer", Record<string, unknown>>
+    >;
   } = {},
 ) {
   const trace: string[] = [];
@@ -99,7 +102,57 @@ function fixture(
           statements[kind]?.push({ sql, values });
           trace.push(kind + ":" + sql.split("\n")[0]);
           let rows: unknown[] = [];
-          if (sql.includes("current_user::text")) {
+          if (sql.startsWith("WITH objects AS")) {
+            const grants =
+              kind === "source"
+                ? {
+                    objectsExist: true,
+                    callIdRead: true,
+                    proofRead: true,
+                    canInsert: false,
+                    canUpdate: false,
+                    canDelete: false,
+                    canTruncate: false,
+                    canReadCoverage: false,
+                  }
+                : kind === "attempt"
+                  ? {
+                      objectsExist: true,
+                      idRead: true,
+                      readingRead: true,
+                      subjectRead: true,
+                      refRead: true,
+                      stateRead: true,
+                      canInsert: false,
+                      canUpdate: false,
+                      canDelete: false,
+                      canTruncate: false,
+                    }
+                  : {
+                      objectsExist: true,
+                      canExecute: true,
+                      canReadLedger: false,
+                      canInsert: false,
+                      canUpdate: false,
+                      canDelete: false,
+                      canTruncate: false,
+                    };
+            rows = [
+              {
+                currentUser:
+                  kind === "source"
+                    ? (options.sourceRole ??
+                      "saju_a4_provider_receipt_reader_v1")
+                    : kind === "attempt"
+                      ? (options.attemptRole ??
+                        "myeongha_reading_ai_cost_binding_reader_v1")
+                      : (options.writerRole ??
+                        "myeongha_reading_ai_cost_writer_v1"),
+                ...grants,
+                ...options.readinessOverrides?.[kind],
+              },
+            ];
+          } else if (sql.includes("current_user::text")) {
             rows = [
               {
                 currentUser:
@@ -133,7 +186,7 @@ function fixture(
             rows = [...(options.attemptRows ?? [BOUND_ATTEMPT])];
           } else if (
             kind === "writer" &&
-            sql.includes("cmd_record_reading_ai_call_v1")
+            sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1(")
           ) {
             rows = [{ callId: CALL, replayed: false }];
           }
@@ -178,6 +231,9 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
     expect(x.trace.filter((t) => t.startsWith("connect:"))).toEqual([
       "connect:source",
       "connect:attempt",
+      "connect:source",
+      "connect:attempt",
+      "connect:writer",
       "connect:writer",
     ]);
     expect(x.statements.source?.map((q) => q.sql)).toEqual([
@@ -187,21 +243,30 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
         "FROM saju_source_ops.a4_provider_call_signed_receipts_v1",
       ),
       "COMMIT",
+      "BEGIN READ ONLY",
+      expect.stringContaining("WITH objects AS"),
+      "COMMIT",
     ]);
     expect(x.statements.attempt?.map((q) => q.sql)).toEqual([
       "BEGIN READ ONLY",
       'SELECT current_user::text AS "currentUser"',
       expect.stringContaining("FROM public.reading_execution_attempts a"),
       "COMMIT",
+      "BEGIN READ ONLY",
+      expect.stringContaining("WITH objects AS"),
+      "COMMIT",
     ]);
     expect(x.statements.writer?.map((q) => q.sql)).toEqual([
+      "BEGIN READ ONLY",
+      expect.stringContaining("WITH objects AS"),
+      "COMMIT",
       "BEGIN",
       'SELECT current_user::text AS "currentUser"',
-      expect.stringContaining("cmd_record_reading_ai_call_v1"),
+      expect.stringContaining("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
       "COMMIT",
     ]);
     const writerInput = x.statements.writer?.find((q) =>
-      q.sql.includes("cmd_record_reading_ai_call_v1"),
+      q.sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
     );
     expect(writerInput?.values.slice(0, 3)).toEqual([
       SUBJECT,
@@ -282,7 +347,7 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
       },
       {
         writerRole: "myeongha_admin_reader",
-        expected: ["source", "attempt", "writer"],
+        expected: ["source", "attempt", "source", "attempt", "writer"],
       },
     ];
     for (const c of cases) {
@@ -293,7 +358,7 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
       );
       expect(
         x.statements.writer?.some((q) =>
-          q.sql.includes("cmd_record_reading_ai_call_v1"),
+          q.sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
         ),
       ).toBe(false);
     }
@@ -314,6 +379,31 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
     ).rejects.toThrow("Unbound Saju narrative provider observation");
     expect(invalid.trace).toHaveLength(0);
   });
+
+  it.each([
+    ["source", { callIdRead: false }, "Source receipt read revoked"],
+    ["source", { canInsert: true }, "Source Reader gained INSERT"],
+    ["source", { canReadCoverage: true }, "Source Reader gained coverage SELECT"],
+    ["attempt", { subjectRead: false }, "canonical Subject read revoked"],
+    ["attempt", { canUpdate: true }, "canonical Reader gained UPDATE"],
+    ["writer", { canExecute: false }, "Cost RPC EXECUTE revoked"],
+    ["writer", { canReadLedger: true }, "Cost Writer gained table SELECT"],
+    ["writer", { currentUser: "postgres" }, "Cost Writer identity changed"],
+  ] as const)(
+    "blocks verified provider call on %s readiness drift: %s (%s)",
+    async (kind, grants, reason) => {
+      expect(reason.length).toBeGreaterThan(0);
+      const x = fixture({ readinessOverrides: { [kind]: grants } });
+      await expect(x.composition.record(REQUEST)).rejects.toThrow(
+        "Dedicated A4 cost attribution principal is not ready",
+      );
+      expect(
+        x.statements.writer?.some((row) =>
+          row.sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
+        ),
+      ).toBe(false);
+    },
+  );
 
   it("does not permit a shared DB pool to impersonate three separate principals", () => {
     const x = fixture();

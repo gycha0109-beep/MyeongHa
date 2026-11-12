@@ -3,6 +3,7 @@ import type { SeyeonAiPriceV1 } from "./seyeon-ai-usage-cost-v1.js";
 import { createSajuSignedProviderCallSourceAuthorityV1 } from "./reading-ai-saju-signed-call-source-v1.js";
 import { createPostgresSajuSourceReceiptLoaderV1 } from "./reading-ai-saju-source-receipt-db-reader-v1.js";
 import { createPostgresSajuReadingAttemptVerifierV1 } from "./reading-ai-saju-attempt-db-verifier-v1.js";
+import { createSajuA4PrincipalReadinessV1 } from "./reading-ai-saju-principal-readiness-v1.js";
 import { createVerifiedSajuReadingProviderBindingAuthorityV1 } from "./reading-ai-saju-binding-authority-v1.js";
 import {
   createSajuNarrativeReadingCostBridgeV1,
@@ -19,6 +20,9 @@ import {
  * credential, authorization grant, production deployment or cost-collection
  * activation. Only a governed, independently admitted server runtime may
  * install and call it after validating all three principals and source keys.
+ * Every verified Source/DB binding must also pass independent grant and role
+ * checks immediately before the Writer RPC. This cannot establish invoice
+ * completeness or guarantee future DB availability.
  */
 export interface SajuA4VerifiedCostCompositionConfigV1 {
   readonly sourceReceiptPool: PostgresSubjectPoolV1;
@@ -74,9 +78,19 @@ export function createSajuA4VerifiedCostCompositionV1(
     source,
     db,
   });
+  const readiness = createSajuA4PrincipalReadinessV1(input);
   const bridge = createSajuNarrativeReadingCostBridgeV1({
     pool: input.ledgerWriterPool,
-    bindingAuthority,
+    bindingAuthority: Object.freeze({
+      async resolve(request: Parameters<typeof bindingAuthority.resolve>[0]) {
+        // Validate the signed Source and canonical terminated Reading attempt
+        // before checking three least-privilege DB principals. Never call the
+        // ledger Writer when the privilege check fails.
+        const binding = await bindingAuthority.resolve(request);
+        if (binding !== null) await readiness.check();
+        return binding;
+      },
+    }),
   });
   return Object.freeze({ record: bridge.record });
 }
