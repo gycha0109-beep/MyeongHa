@@ -43,6 +43,8 @@ export function assessSealedProviderMigrationSource(packet,{expectedCount,expect
   assert.equal(packet.migrationFrontier,expectedFrontier);
   assert.equal(packet.catalogSha256,expectedCatalogSha256);
   const seen=new Set();
+  let statementBodiesMissingCount=0;
+  let createdByFieldPopulatedRows=0;
   let lastVersion=null;
   const hashed=[];
   let frontier=null;
@@ -61,6 +63,8 @@ export function assessSealedProviderMigrationSource(packet,{expectedCount,expect
     valueString(entry.idempotencyKey,'migrationIdempotency');
     nullableStringArray(entry.statements,'migrationStatements');
     nullableStringArray(entry.rollbackStatements,'rollbackStatements');
+    if(entry.statements===null || entry.statements.length===0) statementBodiesMissingCount++;
+    if(entry.createdBy!==null) createdByFieldPopulatedRows++;
     const statementHashes=entry.statements?.map(s=>s===null?null:sha256(s))??[];
     hashed.push([entry.version,entry.name,statementHashes]);
     const version=BigInt(entry.version);
@@ -76,6 +80,10 @@ export function assessSealedProviderMigrationSource(packet,{expectedCount,expect
     migrationFrontier:expectedFrontier,
     migrationCatalogSha256:computedCatalogSha256,
     sourceLedgerHistoryCaptured:true,
+    sourceStatementBodiesMissingCount:statementBodiesMissingCount,
+    sourceStatementBodiesComplete:statementBodiesMissingCount===0,
+    createdByFieldPopulatedRows,
+    historicalExecutorAuthenticated:false,
     sourceLedgerRowsRestored:false,
     providerMigrationLedgerRestored:false,
     hostedProviderRecoveryProven:false,
