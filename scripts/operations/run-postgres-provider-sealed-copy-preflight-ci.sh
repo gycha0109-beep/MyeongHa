@@ -204,6 +204,41 @@ if [[ "$MH_OPS_PROVIDER_DATA_REPLAY" == 'true' ]]; then
     and .gate == "BLOCKED"
   ' "$RUNNER_TEMP/myeongha-provider-auth-reference-integrity.json" >/dev/null ||
     fail 'Auth reference report attempted authority escalation'
+  # Read-only Provider migration ledger fingerprint. Source manifest was already
+  # bound to the governed ciphertext; never alter migration history to match it.
+  psql "$DB_URL" -X -qAt --set ON_ERROR_STOP=1 \
+    --file "$MH_DR_CI_REPO_ROOT/scripts/operations/local-provider-migration-catalog-fingerprint-readonly.sql" \
+    >"$private/migration-ledger-snapshot.private.json" \
+    2>"$private/migration-ledger-errors.private.log" ||
+    fail 'Disposable Provider migration ledger read-only query unavailable'
+  MH_OPS_PROVIDER_DATA_REPLAY=true \
+    node "$MH_DR_CI_REPO_ROOT/scripts/operations/assess-disposable-provider-migration-ledger.mjs" \
+    --manifest "$manifest" \
+    --target "$private/migration-ledger-snapshot.private.json" \
+    --replay "$RUNNER_TEMP/myeongha-provider-isolated-row-replay.json" \
+    --auth "$RUNNER_TEMP/myeongha-provider-auth-reference-integrity.json" \
+    --output "$RUNNER_TEMP/myeongha-provider-migration-ledger-parity.json" ||
+    fail 'Provider ledger metadata malformed'
+  jq -e '
+    .sourceBackupRunId == 42752268638
+    and .sourceBackupMigrationCount == 242
+    and .recoveredProviderCopyRows == 93
+    and .localAuthReferenceIntegrityObserved == true
+    and .migrationStatementPayloadPublished == false
+    and .productionMigrationRepairPerformed == false
+    and .providerMigrationLedgerRestored == false
+    and .hostedProviderRecoveryProven == false
+    and .drReady == false and .serviceResumptionAllowed == false
+    and .gate == "BLOCKED"
+  ' "$RUNNER_TEMP/myeongha-provider-migration-ledger-parity.json" >/dev/null ||
+    fail 'Provider migration ledger report violated protected admission'
+  {
+    echo '### Ops: Provider migration catalog divergence (metadata only)'
+    echo "- Source migration count: $(jq -r '.sourceBackupMigrationCount' "$RUNNER_TEMP/myeongha-provider-migration-ledger-parity.json")"
+    echo "- Disposable local migration count: $(jq -r '.localMigrationNumericCount' "$RUNNER_TEMP/myeongha-provider-migration-ledger-parity.json")"
+    echo "- Exact version/frontier/statement fingerprint match: $(jq -r '.allMetadataFingerprintsMatch' "$RUNNER_TEMP/myeongha-provider-migration-ledger-parity.json")"
+    echo '- Local ledger is never rewritten; Provider/Hosted recovery remains BLOCKED'
+  } >>"$GITHUB_STEP_SUMMARY"
   {
     echo '### Ops: isolated Auth relationship checks (no Hosted admission)'
     echo '- Source-exact recovered Auth tables: users, identities, sessions, refresh tokens, MFA claims'
