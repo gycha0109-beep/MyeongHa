@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "ops-provider-auth-reference-integrity-observation-v1",
+  "roadmapGate": "Gate 1 / Phase 8-B",
+  "execution": {
+    "workflowRunId": 43142832141,
+    "workflowUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43142832141",
+    "conclusion": "success",
+    "mainSha": "e6e7f5ca5eba7c465f956b5a18acb614d3ce2db9",
+    "mergePr": 3234,
+    "sourceBackupRunId": 42752268638,
+    "sourceBackupArtifactId": 13734401337,
+    "target": "disposable-supabase-cli-3.1.0-postgresql17"
+  },
+  "nonidentifyingProof": {
+    "artifactId": 13910092446,
+    "artifactFileName": "myeongha-provider-auth-reference-integrity.json",
+    "sha256": "36c5effc28909f9b90964e11d5dee8e84aa91c3beb8640624a39f8509487bc98",
+    "containsIdentifiers": false,
+    "containsTokenValues": false,
+    "containsPersonalData": false
+  },
+  "observed": {
+    "userRows": 4,
+    "identityRows": 4,
+    "sessionRows": 16,
+    "refreshTokenRows": 23,
+    "mfaAmrClaimRows": 16,
+    "identityUserOrphans": 0,
+    "sessionUserOrphans": 0,
+    "refreshSessionOrphans": 0,
+    "mfaSessionOrphans": 0,
+    "providerForeignKeys": 33,
+    "unvalidatedProviderForeignKeys": 0,
+    "disabledInternalProviderTriggers": 0,
+    "sourceRowsMatch": true,
+    "localAuthReferenceIntegrityObserved": true,
+    "verdict": "LOCAL_AUTH_REFERENCE_INTEGRITY_ONLY__HOSTED_DR_HOLD"
+  },
+  "notProven": {
+    "hostedUserLogin": false,
+    "hostedSessionRefreshAndRevocation": false,
+    "hostedJwtSigningConfiguration": false,
+    "hostedStorageObjectBytes": false,
+    "providerMigrationLedgerEquivalent": false,
+    "currentFrontierRestore": false,
+    "sourceSameMvccSnapshot": false,
+    "independentPrivacyContinuity": false,
+    "wholeServiceRpoRto": false
+  },
+  "admission": {
+    "gate": "BLOCKED",
+    "decision": "NOT_ACCEPTED",
+    "p0Issue": 1887,
+    "drReady": false,
+    "serviceResumptionAllowed": false
+  }
+}
