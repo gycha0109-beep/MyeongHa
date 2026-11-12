@@ -90,7 +90,7 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             improved = {"yeoul": 0.8, "seyeon": 0.75}[character]
             return (improved if concise else baseline,
                     {"failure_codes": [], "character_id": character,
-                     "raw_dialogue_excluded": True})
+                     "raw_dialogue_excluded": True, "uncertain": False})
 
         def forbid_remote(*args, **kwargs):
             raise AssertionError("GEPA shared test attempted an external model call")
@@ -145,7 +145,7 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             calls.append(example["id"])
             score = 0.8 if "concise answers" in candidate["character_expression"] else 0.2
             return score, {"failure_codes": [] if score > 0.5 else ["synthetic_verbosity"],
-                           "character_id": example["characterId"], "raw_dialogue_excluded": True}
+                           "character_id": example["characterId"], "raw_dialogue_excluded": True, "uncertain": False}
 
         def forbid_reflection_lm(*_, **__):
             raise AssertionError("unexpected fallback to model-based reflection")
