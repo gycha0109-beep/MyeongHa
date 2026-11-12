@@ -53,6 +53,84 @@ class NoNetworkReflector:
 
 
 class PinnedGepaOfflineTest(unittest.TestCase):
+    def test_real_pinned_gepa_runs_shared_slot_for_two_characters(self):
+        """One offline GEPA run must evaluate both characters, not just a mean-only mock."""
+        probe = probe_installed_gepa()
+        self.assertTrue(probe["api_compatible"], probe)
+        module = importlib.import_module("gepa.optimize_anything")
+        reflector_module = importlib.import_module(
+            "gepa.proposer.reflective_mutation.reflection_lm")
+        strategy = NoNetworkReflector(reflector_module.ReflectionProposal)
+        shared_seed = "Respond clearly in natural Korean."
+        samples = [
+            {"id": "shared-yeoul-dev", "characterId": "yeoul",
+             "familyId": "shared-yeoul-family-dev", "split": "development",
+             "contentSha256": "a" * 64},
+            {"id": "shared-seyeon-dev", "characterId": "seyeon",
+             "familyId": "shared-seyeon-family-dev", "split": "development",
+             "contentSha256": "b" * 64},
+            {"id": "shared-yeoul-val", "characterId": "yeoul",
+             "familyId": "shared-yeoul-family-val", "split": "optimizer_validation",
+             "contentSha256": "c" * 64},
+            {"id": "shared-seyeon-val", "characterId": "seyeon",
+             "familyId": "shared-seyeon-family-val", "split": "optimizer_validation",
+             "contentSha256": "d" * 64},
+        ]
+        plan = {**fixture(), "mutableSlot": "shared_expression",
+                "candidateSha256": hashlib.sha256(shared_seed.encode()).hexdigest(),
+                "dataset": samples}
+        seen = set()
+
+        def judge(candidate, example):
+            # Synthetic per-character baselines differ; neither is a real quality score.
+            character = example["characterId"]
+            seen.add((character, example["split"]))
+            concise = "concise answers" in candidate["shared_expression"]
+            baseline = {"yeoul": 0.2, "seyeon": 0.35}[character]
+            improved = {"yeoul": 0.8, "seyeon": 0.75}[character]
+            return (improved if concise else baseline,
+                    {"failure_codes": [], "character_id": character,
+                     "raw_dialogue_excluded": True})
+
+        def forbid_remote(*args, **kwargs):
+            raise AssertionError("GEPA shared test attempted an external model call")
+
+        def config_factory(**kwargs):
+            kwargs["max_token_cost"] = None
+            kwargs["engine_config"]["reflection"]["reflection_strategy"] = strategy
+            kwargs["engine_config"].update({
+                "merge": None, "refiner": None,
+                "tracking": {"use_wandb": False, "use_mlflow": False},
+            })
+            return module.OptimizeAnythingConfig(**kwargs)
+
+        with tempfile.TemporaryDirectory(prefix="myeongha-shared-gepa-out-") as out, \
+                tempfile.TemporaryDirectory(prefix="myeongha-shared-gepa-repo-") as repo:
+            kwargs = build_offline_gepa_kwargs(
+                plan, seed_text=shared_seed, evaluator=judge,
+                reflection_lm=forbid_remote, output_dir=out,
+                repository_root=repo, config_factory=config_factory,
+                max_evals=10)
+            self.assertEqual(kwargs["test_set"], None)
+            self.assertEqual({e["characterId"] for e in kwargs["dataset"]},
+                             {"yeoul", "seyeon"})
+            self.assertEqual({e["characterId"] for e in kwargs["valset"]},
+                             {"yeoul", "seyeon"})
+            self.assertEqual(set(kwargs["seed_candidate"]), {"shared_expression"})
+            with patch.object(socket.socket, "connect", side_effect=forbid_remote), \
+                    patch.object(socket.socket, "connect_ex", side_effect=forbid_remote), \
+                    patch("socket.create_connection", side_effect=forbid_remote):
+                result = module.optimize_anything(**kwargs)
+
+        self.assertGreater(strategy.calls, 0)
+        self.assertEqual({character for character, _ in seen}, {"yeoul", "seyeon"})
+        self.assertIn("shared_expression", result.best_candidate)
+        self.assertIn("concise answers", result.best_candidate["shared_expression"])
+        self.assertGreater(result.best_score, 0.35)
+        self.assertLessEqual(result.total_evals, 10)
+        # This is only a synthetic shared run. Neither run nor result may
+        # authorize character-level quality claims, owner review or release.
+
     def test_real_api_signature_and_in_process_proposal(self):
         probe = probe_installed_gepa()
         self.assertTrue(probe["api_compatible"], probe)
