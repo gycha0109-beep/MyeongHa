@@ -9,7 +9,10 @@
     "encryptedArchiveSha256": "5396ceec4eca37f23c519c7e006fe0d8af27ad7f53ae7f54938fd9fc14f3a2d1",
     "migrationCount": 242,
     "migrationFrontier": "20261109071019",
-    "migrationCatalogSha256": "91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47"
+    "migrationCatalogSha256": "91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47",
+    "migrationCatalogCapturedAsMetadataOnly": true,
+    "completeMigrationLedgerExcludedFromEncryptedSqlDump": true,
+    "archiveCoverageAuthority": "docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md (2026-11-01 catalog capture)"
   },
   "implementation": {
     "pr": 3239,
@@ -65,7 +68,9 @@
     "productionMutationPerformed": false,
     "migrationRepairPerformed": false,
     "paidHostedTargetCreated": false,
-    "privacyCanaryExecuted": false
+    "privacyCanaryExecuted": false,
+    "sourceStatementsAndAppliedLedgerRowsRecoveredFromBackup": false,
+    "localCliInitializationRootCauseEstablished": false
   },
   "acceptance": {
     "decision": "NOT_ACCEPTED",
@@ -75,5 +80,5 @@
     "p0State": "OPEN",
     "roadmapComplete": false
   },
-  "next": "Read-only inspect sealed archive ledger table/data coverage and reconcile Hosted source ownership/version and target initialization semantics; do not create/insert/repair history or repeat successful Provider replay solely for this evidence."
+  "next": "The sealed archive excludes the Provider migration history rows; identify an authorized independent ledger source and establish ownership/version/statement and schema/ACL equality with read-only evidence before any isolated recovery attempt. Do not fabricate or repair history."
 }
