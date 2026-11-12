@@ -1,3 +1,12 @@
+### 2026-11-12 KST — Gate 1 / Phase 8-A·8-B: 현재 frontier 원장 암호화 수집 및 격리 복원 실측
+
+- **보호된 백업:** PR #3241/#3245 통합 CI 통과·병합 후 수동 read-only source 봉인 [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) SUCCESS. Provider 원장 암호화 아티팩트 #13923871638, 동일 실행 백업 #13923088346; 실제 ciphertext SHA-256 `4a9c94ed42896d623a1cb519376601d7bf02851fc0eb9258c63cb8a44aff1054`와 manifest/checksum 일치. 242개·frontier 20261109071019·catalog hash `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`·SQL NULL 12개·created_by populated 46개. [봉인 증거](POSTGRES_PROVIDER_LEDGER_SEALED_CAPTURE_REAL_RUN_20261112.json).
+- **같은 실행 백업 격리 복원:** [#43176401912](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43176401912) SUCCESS / artifact #13924790522, frontier 20261109071019. 애플리케이션 전체 스키마 동등성 `false`, supabase migration ledger 복원 `false`, 외부 역할 GRANT 누락 증거 `HOLD`, serving gate `BLOCKED`. [격리 실측](POSTGRES_CURRENT_FRONTIER_ISOLATED_RESTORE_20261112.json).
+- **별도 후속 구현:** 기존 복구 워크플로에 *같은 실행의* 암호화 원장을 선택적으로 다운로드하여 임시 복호화·전체 SQL 지문 대조 후 비식별 증거만 업로드하는 경로 추가. 초기 구현이며 보호된 실제 실행 결과 확인 전까지 복호화 검증 성공은 주장하지 않음. 대상 DB 이력 INSERT/CREATE, Production SQL/권한 변경, privacy canary, 신규 유료 Hosted 없음.
+- **수용 경계:** Provider 원장 원본 봉인 성공 != 격리 원장 복원/Hosted Auth·Storage 서비스 복원. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
 ### 2026-11-12 KST — Gate 1 / Phase 8-A·8-B: Provider 마이그레이션 원장 부재 실측 SUCCESS 및 차단 보존
 
 - **GitHub 검증:** PR [#3239](https://github.com/gycha0109-beep/MyeongHa/pull/3239) MERGED, merge SHA 515ee5badae659c3c5bc64045499dbdf1d7ea28f. 필수 통합 [#43157525886](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43157525886) SUCCESS, 병합 후 해당 SHA 실제 격리 [#43158737963](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963) SUCCESS, 일반 main CI [#43158738087](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158738087) SUCCESS. 2026-11-12 14시 KST 조회 최신 main은 다른 트랙 추가 변경을 포함한 510be175c07e3ca849d1d3a087cc7e21c05fd5e2. 이 SHA 자체의 Provider 새 검증으로 과거 성공 결과를 승격하지 않는다.
