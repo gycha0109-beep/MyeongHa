@@ -120,7 +120,7 @@ class ContractTests(unittest.TestCase):
                            'character_id': 'yeoul',
                            'raw_dialogue_excluded': True})
             score, safe_feedback = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
-            self.assertEqual(score, 0.5)
+            self.assertEqual(score, 0.0)
             self.assertEqual(safe_feedback['failure_codes'], ['fabricated_memory'])
             def raise_private_error(candidate, example):
                 raise RuntimeError('PRIVATE_USER_DIALOGUE_MUST_NOT_LEAK')
@@ -131,6 +131,41 @@ class ContractTests(unittest.TestCase):
                 other['evaluator'](other['seed_candidate'], other['dataset'][0])
             self.assertEqual(str(caught.exception), 'evaluator_failed')
             self.assertTrue(caught.exception.__suppress_context__)
+
+    def test_hard_failures_veto_max_score_per_character_and_keep_safe_codes(self):
+        result = {'failure_codes': [], 'character_id': 'yeoul',
+                  'raw_dialogue_excluded': True}
+
+        def judge(candidate, example):
+            return (1.0, {**result})
+
+        with tempfile.TemporaryDirectory() as out, tempfile.TemporaryDirectory() as repo:
+            kw = build_offline_gepa_kwargs(
+                self.setup_envelope(), seed_text=SEED,
+                evaluator=judge, reflection_lm=offline_reflection,
+                output_dir=out, repository_root=repo, config_factory=FakeGepaConfig)
+            hard_cases = (
+                'fabricated_memory', 'cross_character_or_user_leak',
+                'canon_or_authority_violation', 'unsupported_relationship',
+                'provider_or_cost_violation',
+            )
+            for code in hard_cases:
+                with self.subTest(code=code):
+                    result['failure_codes'] = [code]
+                    score, feedback = kw['evaluator'](
+                        kw['seed_candidate'], kw['dataset'][0])
+                    self.assertEqual(score, 0.0)
+                    self.assertEqual(feedback['failure_codes'], [code])
+                    self.assertEqual(feedback['character_id'], 'yeoul')
+            result['failure_codes'] = ['synthetic_verbosity']
+            score, _ = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
+            self.assertEqual(score, 1.0)
+            result['failure_codes'] = ['synthetic_verbosity', 'fabricated_memory']
+            score, _ = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
+            self.assertEqual(score, 0.0)
+            result['failure_codes'] = []
+            score, _ = kw['evaluator'](kw['seed_candidate'], kw['dataset'][0])
+            self.assertEqual(score, 1.0)
 
     def test_sealed_set_not_exposed(self):
         p=self.setup_envelope();p['dataset'][1]['split']='sealed_holdout'
