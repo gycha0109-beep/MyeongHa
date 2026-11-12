@@ -410,6 +410,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08-admin-spend-readiness-v1.yml": {
+      "responsibility": "character-memory-evaluation-admin-readonly-spend-preflight",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c08-key2-first-six-real-v1.yml": {
       "responsibility": "character-memory-bounded-real-model-evaluation",
       "prMode": "none",
