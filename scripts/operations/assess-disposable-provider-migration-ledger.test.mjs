@@ -14,7 +14,8 @@ const source=()=>({
 const target=()=>({
   schemaVersion:'ops-disposable-supabase-migration-catalog-v1',
   target:'disposable-supabase-cli-3.1.0-postgresql17',
-  migrationTablePresent:true,allVersionCount:0,numericVersionCount:0,
+  migrationTablePresent:true,requiredColumnsPresent:true,
+  allVersionCount:0,numericVersionCount:0,
   migrationFrontier:null,
   catalogSha256:'4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945',
   migrationStatementOrUserPayloadOutput:false,
@@ -63,4 +64,32 @@ test('leaked columns and identifier fields are rejected',()=>{
 test('row-replay or Auth proof readiness promotion is rejected',()=>{
   assert.throws(()=>run(source(),target(),{...replay,drReady:true}));
   assert.throws(()=>run(source(),target(),replay,{...auth,localAuthReferenceIntegrityObserved:false}));
+});
+
+test('missing disposable CLI migration table is evidence, not a repaired zero-row ledger',()=>{
+  const t={...target(),migrationTablePresent:false,requiredColumnsPresent:false,
+    allVersionCount:null,numericVersionCount:null,migrationFrontier:null,
+    catalogSha256:null};
+  const out=run(source(),t);
+  assert.equal(out.localMigrationTablePresent,false);
+  assert.equal(out.localMigrationNumericCount,null);
+  assert.equal(out.allMetadataFingerprintsMatch,false);
+  assert.equal(out.verdict,'HOLD_DISPOSABLE_PROVIDER_MIGRATION_LEDGER_TABLE_ABSENT');
+  assert.equal(out.drReady,false);
+});
+test('migration table with missing required columns remains a HOLD',()=>{
+  const t={...target(),migrationTablePresent:true,requiredColumnsPresent:false,
+    allVersionCount:null,numericVersionCount:null,migrationFrontier:null,
+    catalogSha256:null};
+  const out=run(source(),t);
+  assert.equal(out.localMigrationRequiredColumnsPresent,false);
+  assert.equal(out.verdict,'HOLD_DISPOSABLE_PROVIDER_MIGRATION_LEDGER_COLUMNS_INCOMPLETE');
+  assert.equal(out.providerMigrationLedgerRestored,false);
+});
+test('missing local migration table cannot fabricate zero-valued fingerprint',()=>{
+  const t={...target(),migrationTablePresent:false,requiredColumnsPresent:false};
+  assert.throws(()=>run(source(),t));
+});
+test('migration table presence requires existing column evidence',()=>{
+  assert.throws(()=>run(source(),{...target(),requiredColumnsPresent:null}));
 });

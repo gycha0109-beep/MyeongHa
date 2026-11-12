@@ -23,20 +23,29 @@ export function assessDisposableProviderLedger({sourceManifest,targetSnapshot,re
   assert.equal(s.migration_catalog_version_count,242);
   assert.equal(s.migration_frontier,20261109071019);
   assert.match(s.migration_catalog_sha256,SHA256);
-  keys(t,['schemaVersion','target','migrationTablePresent','allVersionCount',
+  keys(t,['schemaVersion','target','migrationTablePresent','requiredColumnsPresent','allVersionCount',
     'numericVersionCount','migrationFrontier','catalogSha256',
     'migrationStatementOrUserPayloadOutput'],'targetSnapshot');
   assert.equal(t.schemaVersion,'ops-disposable-supabase-migration-catalog-v1');
   assert.equal(t.target,'disposable-supabase-cli-3.1.0-postgresql17');
-  assert.equal(t.migrationTablePresent,true);
+  assert.equal(typeof t.migrationTablePresent,'boolean');
+  assert.equal(typeof t.requiredColumnsPresent,'boolean');
   assert.equal(t.migrationStatementOrUserPayloadOutput,false);
-  for(const n of [t.allVersionCount,t.numericVersionCount]){
-    assert.ok(Number.isSafeInteger(n)&&n>=0,'Invalid local migration count');
+  if (!t.migrationTablePresent || !t.requiredColumnsPresent) {
+    // A fresh CLI instance may not have created the migration ledger.
+    // Record absence as HOLD; never initialize or fabricate its history.
+    if (!t.migrationTablePresent) assert.equal(t.requiredColumnsPresent,false);
+    for(const n of [t.allVersionCount,t.numericVersionCount,
+      t.migrationFrontier,t.catalogSha256]) assert.equal(n,null);
+  } else {
+    for(const n of [t.allVersionCount,t.numericVersionCount]){
+      assert.ok(Number.isSafeInteger(n)&&n>=0,'Invalid local migration count');
+    }
+    assert.ok(t.numericVersionCount<=t.allVersionCount);
+    assert.ok(t.migrationFrontier===null ||
+      (Number.isSafeInteger(t.migrationFrontier)&&t.migrationFrontier>=0));
+    assert.match(t.catalogSha256,SHA256);
   }
-  assert.ok(t.numericVersionCount<=t.allVersionCount);
-  assert.ok(t.migrationFrontier===null ||
-    (Number.isSafeInteger(t.migrationFrontier)&&t.migrationFrontier>=0));
-  assert.match(t.catalogSha256,SHA256);
   assert.equal(replay?.schemaVersion,'ops-provider-sealed-copy-isolated-row-restore-v1');
   assert.equal(replay.sourceBackupRunId,SOURCE_BACKUP_RUN_ID);
   assert.equal(replay.copiedSourceRows,93);
@@ -51,9 +60,10 @@ export function assessDisposableProviderLedger({sourceManifest,targetSnapshot,re
   assert.equal(authProof.drReady,false);
   assert.equal(authProof.serviceResumptionAllowed,false);
 
-  const versionCountMatch=t.numericVersionCount===s.migration_catalog_version_count;
-  const frontierMatch=t.migrationFrontier===s.migration_frontier;
-  const hashMatch=t.catalogSha256===s.migration_catalog_sha256;
+  const comparable=t.migrationTablePresent&&t.requiredColumnsPresent;
+  const versionCountMatch=comparable&&t.numericVersionCount===s.migration_catalog_version_count;
+  const frontierMatch=comparable&&t.migrationFrontier===s.migration_frontier;
+  const hashMatch=comparable&&t.catalogSha256===s.migration_catalog_sha256;
   const fullCatalogFingerprintMatch=versionCountMatch&&frontierMatch&&hashMatch&&
     t.allVersionCount===t.numericVersionCount;
   return {
@@ -63,6 +73,8 @@ export function assessDisposableProviderLedger({sourceManifest,targetSnapshot,re
     sourceBackupMigrationFrontier:s.migration_frontier,
     sourceBackupMigrationCatalogSha256:s.migration_catalog_sha256,
     target:'disposable-supabase-cli-3.1.0-postgresql17',
+    localMigrationTablePresent:t.migrationTablePresent,
+    localMigrationRequiredColumnsPresent:t.requiredColumnsPresent,
     localMigrationTotalCount:t.allVersionCount,
     localMigrationNumericCount:t.numericVersionCount,
     localMigrationFrontier:t.migrationFrontier,
@@ -82,9 +94,13 @@ export function assessDisposableProviderLedger({sourceManifest,targetSnapshot,re
     wholeServiceRpoRtoProven:false,
     drReady:false,serviceResumptionAllowed:false,
     gate:'BLOCKED',
-    verdict:fullCatalogFingerprintMatch
-      ? 'LOCAL_LEDGER_FINGERPRINT_MATCH_ONLY__HOSTED_DR_HOLD'
-      : 'HOLD_ISOLATED_PROVIDER_MIGRATION_LEDGER_DIFFERENCE',
+    verdict:!t.migrationTablePresent
+      ? 'HOLD_DISPOSABLE_PROVIDER_MIGRATION_LEDGER_TABLE_ABSENT'
+      : !t.requiredColumnsPresent
+        ? 'HOLD_DISPOSABLE_PROVIDER_MIGRATION_LEDGER_COLUMNS_INCOMPLETE'
+        : fullCatalogFingerprintMatch
+          ? 'LOCAL_LEDGER_FINGERPRINT_MATCH_ONLY__HOSTED_DR_HOLD'
+          : 'HOLD_ISOLATED_PROVIDER_MIGRATION_LEDGER_DIFFERENCE',
   };
 }
 async function main(){
