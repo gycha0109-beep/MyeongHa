@@ -4,7 +4,7 @@
 -- Watchtower-Track: ops
 BEGIN TRANSACTION READ ONLY;
 WITH complete_rows AS MATERIALIZED (
-  SELECT version, name, statements, created_by, idempotency_key, rollback
+  SELECT version, name, statements, created_by, idempotency_key, "rollback"
   FROM supabase_migrations.schema_migrations
 ),
 numeric_rows AS MATERIALIZED (
@@ -54,7 +54,7 @@ SELECT jsonb_build_object(
       'statements', statements,
       'createdBy', created_by,
       'idempotencyKey', idempotency_key,
-      'rollbackStatements', rollback
+      'rollbackStatements', "rollback"
     ) ORDER BY version)
     FROM complete_rows
   ), '[]'::jsonb)
