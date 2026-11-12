@@ -10,6 +10,10 @@ import {
 import { assertReaderRuntimeInternalPreviewCandidateV1 } from './reader-production-rollout-policy-v1.js';
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import { createPostgresCharacterRelationshipReadAuthorityPortV1 } from './postgres-character-relationship-read.js';
+import {
+  readPostgresApprovedSajuCanonicalReaderV1,
+  type ApprovedSajuCanonicalReaderAuthorityV1,
+} from './postgres-approved-saju-reading-access-v1.js';
 import { createPostgresCharacterStandardReadingKnowledgePortsV1 } from './postgres-character-standard-reading-knowledge.js';
 import { createPostgresChatThreadRuntimeBindingAuthorityPortV1 } from './postgres-chat-thread-runtime-binding.js';
 import {
@@ -44,6 +48,7 @@ export interface ExecuteReaderInterpretationPreviewPostgresInputV1 {
   readonly groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
   /** Select the approved purchase source only for the internal, allowlisted Reader runtime. */
   readonly privateApprovedSajuReaderEnabled?: true;
+  readonly approvedSajuCanonicalReaderAuthority?: ApprovedSajuCanonicalReaderAuthorityV1;
   /** Explicit Product/Commerce authority from the SAME canonical Subject transaction.
    * Absent until Commerce approves an actual production Product policy adapter.
    * Missing adapter fails closed before Official artifact/Saju calls.
@@ -80,6 +85,21 @@ export function executeReaderInterpretationPreviewPostgresV1(
         resolvedSubjectId: resolvedSubject.subjectId,
       });
 
+      let groundingProjectionPort = input.groundingProjectionPort;
+      if (input.privateApprovedSajuReaderEnabled === true) {
+        const authority = input.approvedSajuCanonicalReaderAuthority;
+        if (authority === undefined || authority.pool === input.pool || authority.trusts.length === 0) {
+          throw new Error('Approved Saju Reader requires a separate signed source connection.');
+        }
+        groundingProjectionPort = {
+          async projectGrounding(artifact) {
+            const { grounding } = await readPostgresApprovedSajuCanonicalReaderV1({
+              authority, verifiedEvidence: input.verifiedEvidence, subjectId: resolvedSubject.subjectId, artifact,
+            });
+            return grounding;
+          },
+        };
+      }
       const knowledgePorts =
         createPostgresCharacterStandardReadingKnowledgePortsV1(client);
 
@@ -101,7 +121,7 @@ export function executeReaderInterpretationPreviewPostgresV1(
           createPostgresReaderContextMemoryGrantsAuthorityPortV1(client),
         nonMemoryContextAuthorityPort:
           createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
-        groundingProjectionPort: input.groundingProjectionPort,
+        groundingProjectionPort,
         ...(input.privateApprovedSajuReaderEnabled === true ? { approvedSajuScope: scope } : {}),
         ...(input.createProductReaderEligibilityAuthorityPort
           ? { productReaderEligibilityAuthorityPort:

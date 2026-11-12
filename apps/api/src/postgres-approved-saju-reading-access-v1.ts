@@ -8,7 +8,70 @@ import type {
 } from './character-standard-reading-knowledge.js';
 import type { OfficialReadingRecordReadAuthorityPortV1 } from './official-reading-record-read.js';
 import type { OfficialReaderPrivateCurrentPurchaseAuthorityPortV1 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
-import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
+import {
+  executePostgresApprovedSajuIssuerTransactionV1,
+  type PostgresSubjectPoolV1,
+  type PostgresTransactionQueryV1,
+} from './postgres-subject-execution.js';
+import type { OfficialReadingCharacterGroundingProjectionInputV1 } from './reader-interpretation-preview-runtime-v1.js';
+import { projectSajuCanonicalReaderGroundingV1 } from './saju-canonical-reader-source-v1.js';
+import {
+  verifyArchivedSajuProductionIssueProofV1,
+  type SajuProductionIssueProofTrustV1,
+} from './saju-production-reading-issue-source-v1.js';
+import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
+
+export interface ApprovedSajuCanonicalReaderAuthorityV1 {
+  readonly pool: PostgresSubjectPoolV1;
+  readonly trusts: readonly SajuProductionIssueProofTrustV1[];
+}
+
+/** Resolve the same private source for the purchased Reader scene and its follow-up. */
+export async function readPostgresApprovedSajuCanonicalReaderV1(input: Readonly<{
+  authority: ApprovedSajuCanonicalReaderAuthorityV1;
+  verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
+  subjectId: string;
+  artifact: OfficialReadingCharacterGroundingProjectionInputV1;
+}>) {
+  const { artifact, authority, subjectId, verifiedEvidence } = input;
+  if (verifiedEvidence.kind !== 'member' || authority.trusts.length === 0) {
+    throw new Error('Signed canonical Reader source requires a verified member.');
+  }
+  const receipt = await executePostgresApprovedSajuIssuerTransactionV1({
+    pool: authority.pool, verifiedEvidence,
+    execute: async ({ client, resolvedSubject }) => {
+      if (resolvedSubject.subjectId !== subjectId) return null;
+      const { rows } = await client.query<{ receipt: { originatingGrantId?: unknown } | null }>(
+        'select public.qry_approved_saju_source_issue_proof_v1($1::uuid,$2::uuid) as receipt',
+        [resolvedSubject.subjectId, artifact.readingId],
+      );
+      return rows.length === 1 ? rows[0]?.receipt ?? null : null;
+    },
+  });
+  const verified = verifyArchivedSajuProductionIssueProofV1({
+    receipt, trusts: authority.trusts, readingId: artifact.readingId,
+    storedResponse: artifact.responseSnapshotJsonb, storedResponseHash: artifact.officialArtifactResponseHash,
+  });
+  const grant = receipt?.originatingGrantId;
+  if (verified?.readerSource === undefined || typeof grant !== 'string' ||
+    !/^[a-f0-9]{8}-[0-9a-f]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu.test(grant)) {
+    throw new Error('Signed canonical Reader source is unavailable.');
+  }
+  const grounding = projectSajuCanonicalReaderGroundingV1(verified.readerSource, {
+    readingId: artifact.readingId, storedResponseHash: artifact.officialArtifactResponseHash, sajuDomain: artifact.sajuDomain,
+  });
+  if (grounding.engineVersion !== artifact.sajuEngineVersion ||
+    grounding.productResponseVersion !== artifact.readingContractVersion ||
+    artifact.productResponseState !== 'delivered') throw new Error('Canonical Reader source does not match the archive.');
+  return Object.freeze({
+    grounding, originatingGrantId: grant,
+    issueIdentity: Object.freeze({
+      sourceProofFingerprint: verified.sourceProofFingerprint,
+      nativeSourceResponseHash: verified.nativeSourceResponseHash,
+      executionAttemptId: verified.executionAttemptId,
+    }),
+  });
+}
 
 const READ_SQL = `
 select reading_id::text as "readingId",reading_session_id::text as "readingSessionId",
