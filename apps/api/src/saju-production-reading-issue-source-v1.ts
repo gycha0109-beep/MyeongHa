@@ -78,7 +78,11 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
   readingId: string;
   storedResponse: unknown;
   storedResponseHash: string;
-}>): Readonly<{ sourceProofFingerprint: string; nativeSourceResponseHash: string }> | null {
+}>): Readonly<{
+  sourceProofFingerprint: string;
+  nativeSourceResponseHash: string;
+  executionAttemptId: string;
+}> | null {
   const { receipt, storedResponse, storedResponseHash } = input;
   if (!record(receipt) || !record(storedResponse) || !record(storedResponse.reading) ||
     storedResponse.state !== 'delivered' || storedResponse.reading.readingId !== input.readingId ||
@@ -108,6 +112,7 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
   return Object.freeze({
     sourceProofFingerprint: 'sha256:v1:' + hashJson(proof),
     nativeSourceResponseHash: 'sha256:v1:' + nativeHash,
+    executionAttemptId: receipt.executionAttemptId,
   });
 }
 

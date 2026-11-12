@@ -1,11 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { commitApprovedSajuReaderFollowupPostgresV1 } from '../apps/api/src/approved-saju-reader-followup-postgres-v1.js';
 import {
   classifyReaderConversationIntentV1,
   prepareReaderConversationResponseCandidateV1,
 } from '../apps/api/src/reader-conversation-source-routing-v1.js';
 
 describe('Reader conversation and consensual memory source split — RR-05/06/08, PUBLIC OFF', () => {
+  it('rejects an unminted paid follow-up before opening the protected database connection', async () => {
+    let connects = 0;
+    const result = await commitApprovedSajuReaderFollowupPostgresV1({
+      protectedPool: { connect() { connects += 1; throw new Error('Unexpected connection'); } },
+      verifiedEvidence: { kind: 'member', verifiedAuthUserId: '00000000-0000-4000-8000-000000000001' },
+      prepared: Object.freeze({ reviewed: {}, productionSource: {} }) as never,
+      turnId: '00000000-0000-4000-8000-000000000002',
+      attemptId: '00000000-0000-4000-8000-000000000003',
+      bodyId: '00000000-0000-4000-8000-000000000004',
+      safeMessageId: '00000000-0000-4000-8000-000000000005',
+      key: { keyRef: 'synthetic-key', keyBytes: new Uint8Array(32) },
+    });
+    expect(result).toBeNull();
+    expect(connects).toBe(0);
+  });
+
   it.each([
     ['방금 본 재물 해석을 짧게 요약해 주세요.', 'wealth', 'official_summary'],
     ['구매한 사주를 간단히 요약해 줘.', 'wealth', 'official_summary'],

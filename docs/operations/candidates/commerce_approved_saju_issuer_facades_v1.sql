@@ -217,6 +217,7 @@ as $function$
   select jsonb_build_object(
     'proof',proof.proof_envelope,'acceptedAt',proof.accepted_at,
     'executionAttemptId',proof.execution_attempt_id,'sourceRequestHash',binding.source_request_hash,
+    'originatingGrantId',binding.entitlement_grant_id,
     'storedResponseHash',binding.stored_response_hash,'releaseRef',entitled.release_ref,
     'nativeReadingId',lineage.native_reading_id,'externalRequestRef',lineage.external_request_ref,
     'engineVersion',lineage.saju_engine_version

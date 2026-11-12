@@ -166,6 +166,16 @@ export async function executePostgresApprovedSajuIssuerTransactionV1<T>(
 
 const ENTER_APPROVED_SAJU_ISSUER_ROLE_SQL = 'SET LOCAL ROLE myeongha_approved_saju_issuer_executor';
 
+/** Private paid answer candidate. Its login and endpoint are separately provisioned. */
+export function executePostgresApprovedSajuPaidAnswerTransactionV1<T>(
+  input: ExecutePostgresSubjectTransactionInputV1<T>,
+): Promise<T> {
+  if (input.verifiedEvidence.kind !== 'member') {
+    throw new Error('Approved Saju paid answers require a verified member.');
+  }
+  return executeSubjectTransaction(input, 'SET LOCAL ROLE myeongha_approved_saju_paid_answer_executor');
+}
+
 /** Internal outbox access for the separately provisioned issuer login. */
 export function executePostgresApprovedSajuIssuerJobTransactionV1<T>(input: {
   readonly pool: PostgresSubjectPoolV1;
