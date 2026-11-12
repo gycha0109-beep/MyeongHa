@@ -6,6 +6,8 @@ from unittest import TestCase, mock
 from tempfile import TemporaryDirectory
 
 from approval_scope import ApprovalHold
+from governed_dry_run import DryRunPolicy
+from budget_ledger import BudgetDenied
 from krw500_synthetic_ledger import YeoulKrw500SingleFlightLedger
 from test_krw500_synthetic_ledger import policy, request
 from yeoul_paid_openrouter_gateway import (
@@ -39,6 +41,25 @@ def receipt():
                  'num_media_prompt': 0, 'num_media_completion': 0,
                  'num_input_audio_prompt': 0, 'total_cost': 0.0001},
     }
+
+
+def live_policy(run_id):
+    p = policy(run_id)
+    return DryRunPolicy(
+        run_id=run_id, target_id='yeoul', model_id=MODEL,
+        settings_hash=p.settings_hash, provider='deepseek',
+        pricing=dict(p.pricing),
+        routing={'only': ['deepseek'], 'allow_fallbacks': False,
+                 'require_parameters': True, 'zdr': True,
+                 'data_collection': 'deny'},
+        limits=dict(p.limits), allowed_roles=p.allowed_roles,
+    )
+
+
+def live_request(p, name):
+    value = request(p, name)
+    value['max_output_tokens'] = 48
+    return value
 
 
 class _FakeResponse:
@@ -78,9 +99,9 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
             role_caps=ROLES, upper_fx_milli_krw_per_usd=1400000,
             fixed_fees_krw=0,
         )
-        self.pol = policy('run-private-gateway')
+        self.pol = live_policy('run-private-gateway')
         self.gateway = YeoulPaidOpenRouterGateway(
-            self.ledger, self.pol, approved_provider='fake-provider',
+            self.ledger, self.pol, approved_provider='deepseek',
             provider_name='DeepSeek',
         )
 
@@ -90,7 +111,7 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
             with self.assertRaisesRegex(ApprovalHold,
                                         'owner_approval_authority_not_configured'):
                 self.gateway.dispatch(
-                    policy_request=request(self.pol, 'blocked'),
+                    policy_request=live_request(self.pol, 'blocked'),
                     body=body(),
                 )
             sender.assert_not_called()
@@ -101,11 +122,73 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
             for name in ('one', 'two', 'three'):
                 with self.assertRaises(ApprovalHold):
                     self.gateway.dispatch(
-                        policy_request={**request(self.pol, name),
+                        policy_request={**live_request(self.pol, name),
                                         'approvalRef': 'owner-says-yes'},
                         body=body(),
                     )
         self.assertEqual(self.ledger.krw_status()['reserved_requests_krw'], 0)
+
+    def test_missing_key_never_creates_pending_reservation(self):
+        with mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                        return_value=None), mock.patch.dict('os.environ', {},
+                        clear=True):
+            with self.assertRaisesRegex(YeoulPaidDispatchHold,
+                                        'inference_key_unavailable'):
+                self.gateway.dispatch(
+                    policy_request=live_request(self.pol, 'no-key'), body=body())
+        self.assertEqual(self.ledger.krw_status()['all_roles_and_runs_attempts'], 0)
+
+    def test_mocked_post_failure_holds_entire_pilot_without_retry(self):
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-fixture'}),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         side_effect=YeoulPaidDispatchHold('socket_dropped')) as post):
+            with self.assertRaisesRegex(YeoulPaidDispatchHold, 'socket_dropped'):
+                self.gateway.dispatch(
+                    policy_request=live_request(self.pol, 'failed-post'), body=body())
+            post.assert_called_once()
+        self.assertEqual(self.ledger.krw_status()['pilot_unreconciled_charges'], 1)
+        self.assertEqual(self.ledger.krw_status()['all_roles_and_runs_attempts'], 1)
+        again = YeoulKrw500SingleFlightLedger(
+            self.ledger.path, run_id='run-another-role',
+            max_spend_micro_usd=200000, max_attempts=8,
+            role_caps=ROLES, upper_fx_milli_krw_per_usd=1400000,
+            fixed_fees_krw=0,
+        )
+        p2 = live_policy('run-another-role')
+        # A different role/run cannot authorize another POST with the same
+        # KRW 500 pilot ledger after a network failure.
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-fixture'}),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         side_effect=AssertionError('must not send')) as post):
+            with self.assertRaisesRegex(BudgetDenied,
+                                        'pilot_unreconciled_charge_halts_all_runs'):
+                YeoulPaidOpenRouterGateway(
+                    again, p2, approved_provider='deepseek',
+                    provider_name='DeepSeek',
+                ).dispatch(policy_request=live_request(p2, 'second-run'), body=body())
+            post.assert_not_called()
+
+    def test_verified_mock_receipt_still_holds_until_payer_reconciliation(self):
+        with (mock.patch('yeoul_paid_openrouter_gateway._verify_trusted_live_scope',
+                         return_value=None),
+              mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-fixture'}),
+              mock.patch('yeoul_paid_openrouter_gateway._fixed_host_json',
+                         return_value={'id': 'gen-test-123', 'model': MODEL}) as post,
+              mock.patch('yeoul_paid_openrouter_gateway._generation_metadata',
+                         return_value=receipt()) as metadata):
+            result = self.gateway.dispatch(
+                policy_request=live_request(self.pol, 'unsettled'), body=body())
+            post.assert_called_once()
+            metadata.assert_called_once_with('gen-test-123', api_key='sk-or-fixture')
+        self.assertEqual(result['status'], 'held')
+        self.assertTrue(result['billable_dispatch_unreconciled'])
+        self.assertEqual(self.ledger.krw_status()['pilot_unreconciled_charges'], 1)
+        self.assertEqual(self.ledger.krw_status()['remaining_unverified_krw'], 498)
+
 
     def test_non_strict_ledger_and_mismatched_provider_rejected(self):
         with self.assertRaisesRegex(YeoulPaidDispatchHold, 'strict_krw500_ledger_required'):
