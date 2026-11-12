@@ -285,3 +285,66 @@ for (const fragment of requiredRunbookFragments) {
 }
 
 console.log('MyeongHa production PostgreSQL backup workflow explicit Session Pooler-only contract verification passed.');
+ 
+// An opt-in Provider migration-history escrow is strictly separate from the
+// portable backup format and never activates on a scheduled or push run.
+const [providerSourceSql, providerEscrow, providerVerifier] = await Promise.all([
+  readFile('scripts/operations/production-provider-migration-ledger-sealed-source-readonly.sql','utf8'),
+  readFile('scripts/operations/capture-provider-migration-ledger-source-encrypted.sh','utf8'),
+  readFile('scripts/operations/assess-production-provider-migration-ledger-source.mjs','utf8'),
+]);
+for (const [body, fragments] of [
+  [workflow,[
+    'capture_provider_ledger:', 'default: false', 'type: boolean',
+    "github.event_name == 'workflow_dispatch' && inputs.capture_provider_ledger",
+    'MH_OPS_CAPTURE_PROVIDER_LEDGER:',
+    'provider_ledger_archive', 'provider_ledger_checksum',
+    'provider_ledger_public_manifest', 'if-no-files-found: error',
+  ]],
+  [runner,[
+    'if [[ "${MH_OPS_CAPTURE_PROVIDER_LEDGER:-false}" == \'true\' ]]; then',
+    'capture-provider-migration-ledger-source-encrypted.sh',
+    'source_catalog_after="$(capture_application_catalog)"',
+  ]],
+  [providerSourceSql,[
+    'BEGIN TRANSACTION READ ONLY;', 'supabase_migrations.schema_migrations',
+    "'createdBy', created_by", "'idempotencyKey', idempotency_key",
+    "'rollbackStatements', \"rollback\"", 'pg_catalog.sha256',
+  ]],
+  [providerEscrow,[
+    'GITHUB_EVENT_NAME:-}" == \'workflow_dispatch\'',
+    'PGSSLMODE:-}" == \'verify-full\'',
+    'default_transaction_read_only=on',
+    'production-provider-migration-ledger-sealed-source-readonly.sql',
+    'assess-production-provider-migration-ledger-source.mjs',
+    '>"$source_file"',
+    'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
+    'rm -rf "$private"',
+    'containsPlaintextMigrationStatements:false',
+    'providerMigrationLedgerRestored:false',
+    'serviceResumptionAllowed:false',
+  ]],
+  [providerVerifier,[
+    'assessSealedProviderMigrationSource',
+    'Exact original statement fingerprint mismatch',
+    'providerMigrationLedgerRestored:false',
+    'hostedProviderRecoveryProven:false',
+    "console.error('HOLD_PROVIDER_LEDGER_SOURCE_INVALID')",
+  ]],
+]) {
+  for(const fragment of fragments) {
+    if(!body.includes(fragment)) throw Error('Opt-in Provider ledger source escrow contract changed');
+  }
+}
+if (!providerSourceSql.trim().endsWith('ROLLBACK;') ||
+    /\b(INSERT|UPDATE|DELETE|ALTER|CREATE|DROP|TRUNCATE|GRANT|REVOKE)\s+/iu.test(
+      providerSourceSql.replace(/^--.*$/gmu,''))) {
+  throw Error('Protected Provider ledger source query must remain strictly read-only');
+}
+const providerRunnerPos=runner.indexOf('capture-provider-migration-ledger-source-encrypted.sh');
+const stableFingerprintPos=runner.indexOf('migration_catalog_after="$(capture_migration_catalog_fingerprint)"');
+const sourceAppAfterPos=runner.indexOf('source_catalog_after="$(capture_application_catalog)"');
+if (!(stableFingerprintPos>=0 && providerRunnerPos>stableFingerprintPos &&
+      sourceAppAfterPos>providerRunnerPos)) {
+  throw Error('Provider source packet must be captured inside the existing read-only source bracket');
+}

@@ -1,5 +1,12 @@
 # Production Operations — 종료 집중 로드맵
 
+## 2026-11-12 evidence addendum — Gate 1 migration ledger source HOLD (no roadmap scope change)
+
+- PR [#3239](https://github.com/gycha0109-beep/MyeongHa/pull/3239) merged; exact-main isolated [#43158737963](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963) completed successfully. The observed local Provider migration history table is **absent** in disposable CLI 3.1.0/PostgreSQL17; source 242 entries/frontier 20261109071019 **cannot be compared to target null metadata**. Evidence: [POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json](POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json).
+- The existing sealed backup deliberately **excludes full migration history rows**, retaining count/frontier/fingerprint only (see [Backup Runbook](POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md)). This does not supply reconstructable Provider migration records. Phase 8-A/8-B therefore requires a separately authorized source and read-only identity/SQL/object/permissions equivalence before any supported isolated recovery route.
+- Existing 93/93 Provider row and Auth FK proofs are **reused**, not repeated. Hosted Auth/Storage, current-frontier service restore, privacy continuity and service RPO/RTO remain unproven; P0 #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. Phase 8 and full roadmap remain incomplete.
+
+
 > 기준일: 2026-11-07 KST  
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`  
 > 기준 main: 최초 `2f04f8f2a0d912e42bf348781e17d20ff7094675`; 최신 백업 source `8ccf60d89eb6d3fab789fb34e0d479c51d84b9af` (각 증거는 자체 SHA 기준)  
