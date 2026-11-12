@@ -192,6 +192,8 @@ export async function commitApprovedSajuReaderFollowupPostgresV1(input: Readonly
           archiveResponseHash: outputHold.officialArtifactResponseHash,
           nativeSourceResponseHash: identity.sourceResponseHash, sourceAttemptId: prepared.productionSource.executionAttemptId,
           semanticGuardVersion: prepared.reviewed.evaluatorVersion, outputGuardVersion: outputHold.guardVersion,
+          groundingHash: outputHold.groundingHash, sourceUnitRefs: outputHold.sourceUnitRefs,
+          focusedUnitRef: outputHold.focusedUnitRef,
           encryptionKeyRef: cipher.keyRef,
         };
         const { rows } = await client.query<{ result: {

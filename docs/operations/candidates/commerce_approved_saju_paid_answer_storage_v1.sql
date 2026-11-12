@@ -11,14 +11,21 @@ alter table commerce_saju_private.approved_component_reading_v1
 alter table public.official_reader_paid_answer_bodies
   add column approved_purchase_intent_id uuid,
   add column approved_component text,
+  add column approved_grounding_hash text,
+  add column approved_source_unit_refs text[],
+  add column approved_focused_unit_ref text,
   add column legacy_reading_id uuid generated always as
     (case when approved_purchase_intent_id is null then official_reading_id end) stored,
   add column legacy_product_id uuid generated always as
     (case when approved_purchase_intent_id is null then product_id end) stored,
   add constraint approved_saju_paid_answer_route_shape check (
     (approved_purchase_intent_id is null and approved_component is null
+      and approved_grounding_hash is null and approved_source_unit_refs is null and approved_focused_unit_ref is null
       and product_spec_version<>'approved-saju-2026-11-06')
     or (approved_purchase_intent_id is not null and approved_component is not null
+      and approved_grounding_hash is not null and approved_grounding_hash ~ '^[a-f0-9]{64}$'
+      and approved_source_unit_refs is not null and cardinality(approved_source_unit_refs) between 1 and 12
+      and approved_focused_unit_ref is not null and approved_focused_unit_ref=any(approved_source_unit_refs)
       and product_spec_version='approved-saju-2026-11-06')
   ),
   drop constraint official_reader_paid_answer_official_fk,
@@ -303,6 +310,10 @@ declare
   v_attempt uuid := (p_request->>'attemptId')::uuid;
   v_body uuid := (p_request->>'bodyId')::uuid;
   v_message uuid := (p_request->>'safeMessageId')::uuid;
+  v_grounding_hash text := p_request->>'groundingHash';
+  v_focused_unit text := p_request->>'focusedUnitRef';
+  v_source_units text[];
+  v_signed_units jsonb;
   v_sequence bigint;
   v_participant uuid;
   v_now timestamptz;
@@ -313,8 +324,11 @@ begin
     or p_request-array['subjectId','readingId','readerCharacterId','readerContentBundleId','contentReleaseId',
       'contentRevision','threadId','turnId','clientTurnId','requestHash','attemptId','bodyId','safeMessageId','originatingGrantId','productId',
       'archiveResponseHash','nativeSourceResponseHash','sourceAttemptId','semanticGuardVersion','outputGuardVersion',
-      'encryptionKeyRef']<>'{}'::jsonb
+      'encryptionKeyRef','groundingHash','sourceUnitRefs','focusedUnitRef']<>'{}'::jsonb
     or v_body is null or v_message is null
+    or not coalesce(v_grounding_hash ~ '^[a-f0-9]{64}$',false)
+    or not coalesce(v_focused_unit ~ '^grounding_unit_[a-f0-9]{24}$',false)
+    or jsonb_typeof(p_request->'sourceUnitRefs') is distinct from 'array'
     or coalesce(length(btrim(p_request->>'clientTurnId')),0) not between 1 and 256
     or not coalesce(p_request->>'requestHash' ~ '^sha256:v1:[a-f0-9]{64}$',false)
     or octet_length(p_iv) is distinct from 12 or octet_length(p_tag) is distinct from 16
@@ -324,6 +338,18 @@ begin
     or p_request->>'outputGuardVersion' is distinct from 'myeongha-character-output-guard-v1'
   then raise exception using errcode='23514',message='Invalid approved Saju protected answer'; end if;
 
+  if jsonb_array_length(p_request->'sourceUnitRefs') not between 1 and 12
+    or exists (
+      select 1 from jsonb_array_elements(p_request->'sourceUnitRefs') ref
+      where jsonb_typeof(ref)<>'string' or (ref#>>'{}') !~ '^grounding_unit_[a-f0-9]{24}$'
+    )
+  then raise exception using errcode='23514',message='Invalid approved Saju source units'; end if;
+  select array_agg(ref order by ord) into v_source_units
+  from jsonb_array_elements_text(p_request->'sourceUnitRefs') with ordinality source(ref,ord);
+  if not (v_focused_unit=any(v_source_units)) or
+    (select count(distinct ref) from unnest(v_source_units) ref)<>cardinality(v_source_units)
+  then raise exception using errcode='23514',message='Invalid approved Saju source focus'; end if;
+
   select * into scope from commerce_saju_private.lock_approved_paid_answer_scope_v1(v_subject,v_reading,v_reader,v_bundle);
   if not found or scope.stored_response_hash is distinct from p_request->>'archiveResponseHash'
     or scope.native_source_response_hash is distinct from p_request->>'nativeSourceResponseHash'
@@ -331,6 +357,26 @@ begin
     or scope.entitlement_grant_id::text is distinct from p_request->>'originatingGrantId'
     or scope.product_id::text is distinct from p_request->>'productId'
   then raise exception using errcode='P0001',message='Approved Saju paid answer scope is unavailable'; end if;
+
+  select proof.proof_envelope#>'{readerSource,grounding,units}' into v_signed_units
+  from commerce_saju_private.approved_source_issue_proofs_v1 proof
+  where proof.subject_id=v_subject and proof.reading_id=v_reading
+    and proof.execution_attempt_id=scope.source_attempt_id;
+  if jsonb_typeof(v_signed_units) is distinct from 'array'
+  then raise exception using errcode='P0001',message='Approved Saju signed source units are unavailable'; end if;
+  if exists (
+    select 1 from unnest(v_source_units) ref
+    where not exists (
+      select 1 from jsonb_array_elements(v_signed_units) unit
+      where unit->>'unitId'=regexp_replace(ref,'^grounding_unit_','grounding_unit_v2_')
+    )
+  ) or exists (
+    select 1 from jsonb_array_elements(v_signed_units) unit
+    cross join lateral jsonb_array_elements_text(unit->'requiredCompanionUnitRefs') companion
+    where regexp_replace(unit->>'unitId','^grounding_unit_v2_','grounding_unit_')=any(v_source_units)
+      and not (regexp_replace(companion,'^grounding_unit_v2_','grounding_unit_')=any(v_source_units))
+  )
+  then raise exception using errcode='P0001',message='Approved Saju source focus does not match the signed Reading'; end if;
 
   select thread.next_sequence_no into v_sequence from public.conversation_threads thread
   where thread.id=v_thread and thread.subject_id=v_subject
@@ -354,6 +400,9 @@ begin
       or existing.originating_entitlement_grant_id is distinct from scope.entitlement_grant_id
       or existing.approved_purchase_intent_id is distinct from scope.purchase_intent_id
       or existing.approved_component is distinct from scope.component
+      or existing.approved_grounding_hash is distinct from v_grounding_hash
+      or existing.approved_source_unit_refs is distinct from v_source_units
+      or existing.approved_focused_unit_ref is distinct from v_focused_unit
       or existing.product_id is distinct from scope.product_id
       or existing.official_artifact_response_hash is distinct from scope.stored_response_hash
       or existing.source_attestation_ref is distinct from ('approved-saju-issue:' || scope.source_attempt_id::text)
@@ -394,11 +443,13 @@ begin
     id,subject_id,thread_id,turn_id,attempt_id,safe_message_id,thread_character_id,
     official_reading_id,reader_character_id,reader_content_bundle_id,content_release_id,
     originating_entitlement_grant_id,product_id,product_spec_version,approved_purchase_intent_id,approved_component,
+    approved_grounding_hash,approved_source_unit_refs,approved_focused_unit_ref,
     official_artifact_response_hash,source_attestation_ref,source_response_hash,semantic_guard_version,output_guard_version,
     encryption_scheme_version,encryption_key_ref,encryption_iv,encryption_auth_tag,encrypted_body,committed_at
   ) values(v_body,v_subject,v_thread,v_turn,v_attempt,v_message,v_participant,
     v_reading,v_reader,v_bundle,v_release,scope.entitlement_grant_id,scope.product_id,'approved-saju-2026-11-06',
-    scope.purchase_intent_id,scope.component,scope.stored_response_hash,'approved-saju-issue:' || scope.source_attempt_id::text,
+    scope.purchase_intent_id,scope.component,v_grounding_hash,v_source_units,v_focused_unit,
+    scope.stored_response_hash,'approved-saju-issue:' || scope.source_attempt_id::text,
     scope.native_source_response_hash,p_request->>'semanticGuardVersion',p_request->>'outputGuardVersion',
     'aes-256-gcm-v1',p_request->>'encryptionKeyRef',p_iv,p_tag,p_ciphertext,v_now);
   update public.chat_turn_attempts
