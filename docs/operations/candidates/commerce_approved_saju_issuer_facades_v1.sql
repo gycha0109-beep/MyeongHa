@@ -165,13 +165,24 @@ declare
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   if jsonb_typeof(p_proof) is distinct from 'object' or jsonb_typeof(v_payload) is distinct from 'object'
-    or p_proof-array['payload','signature']<>'{}'::jsonb
+    or p_proof-array['payload','signature','readerSource']<>'{}'::jsonb
     or coalesce(p_proof->>'signature','') !~ '^[a-zA-Z0-9_-]{86}$'
-    or octet_length(p_proof::text)>4096
+    or octet_length((p_proof-'readerSource')::text)>4096
     or v_payload->>'version' is distinct from 'myeonghwa-production-reading-issue-proof-v1'
     or v_payload->>'executionAttemptId' is distinct from p_attempt::text
     or coalesce(v_payload->>'authorityHash','') !~ '^[0-9a-f]{64}$'
-    or coalesce(v_payload->>'responseBodyHash','') !~ '^[0-9a-f]{64}$' then return false; end if;
+    or coalesce(v_payload->>'responseBodyHash','') !~ '^[0-9a-f]{64}$'
+    or (p_proof ? 'readerSource') is distinct from (v_payload ? 'readerSourceHash')
+    or ((p_proof ? 'readerSource') and (
+      jsonb_typeof(p_proof->'readerSource') is distinct from 'object'
+      or octet_length((p_proof->'readerSource')::text)>163840
+      or coalesce(v_payload->>'readerSourceHash','') !~ '^[0-9a-f]{64}$'
+      or p_proof#>>'{readerSource,grounding,readingRef}' is distinct from v_payload->>'nativeReadingId'
+      or p_proof#>>'{readerSource,grounding,engineVersion}' is distinct from v_payload->>'engineVersion'
+      or coalesce(p_proof#>>'{readerSource,grounding,sourceSemanticHash}','') !~ '^[0-9a-f]{64}$'
+      or p_proof#>>'{readerSource,grounding,sourceSemanticHash}'
+        is distinct from p_proof#>>'{readerSource,semanticSource,semanticHash}'
+    )) then return false; end if;
 
   select binding.source_request_hash into v_attempt_request_hash
   from commerce_saju_private.approved_component_reading_v1 binding

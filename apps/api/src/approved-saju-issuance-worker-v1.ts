@@ -62,7 +62,7 @@ export function createApprovedSajuIssuanceWorkerV1(input: Readonly<{
     [...releases].map(([component, release]) => [component, release.releaseRef]),
   ));
   const { pool, engineKey, engineVersion } = input;
-  const source = createSajuProductionReadingIssueSourceV1(input.source);
+  const source = createSajuProductionReadingIssueSourceV1({ ...input.source, requireCanonicalReaderSource: true });
 
   return Object.freeze({
     async runNext(): Promise<WorkerResult> {

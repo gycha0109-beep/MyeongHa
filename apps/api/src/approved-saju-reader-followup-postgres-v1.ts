@@ -31,16 +31,20 @@ import {
   reviewPreparedReaderConversationFollowupV1,
   type ReviewedPrivateReaderFollowupV1,
 } from './reader-conversation-source-routing-v1.js';
-import type { OfficialReadingCharacterGroundingProjectionPortV1 } from './reader-interpretation-preview-runtime-v1.js';
+import { projectSajuCanonicalReaderGroundingV1 } from './saju-canonical-reader-source-v1.js';
 import {
   verifyArchivedSajuProductionIssueProofV1,
   type SajuProductionIssueProofTrustV1,
 } from './saju-production-reading-issue-source-v1.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 
+type VerifiedReaderIssueIdentityV1 = Omit<
+  NonNullable<ReturnType<typeof verifyArchivedSajuProductionIssueProofV1>>, 'readerSource'
+>;
+
 type PreparedApprovedSajuReaderFollowupV1 = Readonly<{
   reviewed: ReviewedPrivateReaderFollowupV1;
-  productionSource: NonNullable<ReturnType<typeof verifyArchivedSajuProductionIssueProofV1>>;
+  productionSource: VerifiedReaderIssueIdentityV1;
 }>;
 
 const preparedPrivateCommits = new WeakMap<PreparedApprovedSajuReaderFollowupV1, Readonly<{
@@ -64,7 +68,6 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
   createProductReaderEligibilityAuthorityPort: (
     client: PostgresTransactionQueryV1,
   ) => ProductReaderEligibilityAuthorityPortV1;
-  groundingProjectionPort: OfficialReadingCharacterGroundingProjectionPortV1;
   consultationPort: CharacterSajuConsultationShadowPortV1;
 }>): Promise<PreparedApprovedSajuReaderFollowupV1 | null> {
   if (input.verifiedEvidence.kind !== 'member' || input.consultationPort.evaluateBatch === undefined
@@ -76,6 +79,10 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
       const { client } = scope;
       const threadBindingAuthorityPort = createPostgresChatThreadRuntimeBindingAuthorityPortV1(client);
       const nonMemoryContextAuthorityPort = createPostgresReaderContextNonMemoryReadAuthorityPortV1(client);
+      const source: {
+        verified?: VerifiedReaderIssueIdentityV1;
+        originatingGrantId?: string;
+      } = {};
       const { preflight, grounded } = await prepareApprovedSajuReaderFollowupSourceV1({
         scope, readingId, receivePlan: input.receivePlan,
         effectiveAt: new Date().toISOString(), contextInput: input.contextInput,
@@ -84,7 +91,40 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
         memoryItemsAuthorityPort: createPostgresReaderContextMemoryItemsAuthorityPortV1(client),
         memoryGrantsAuthorityPort: createPostgresReaderContextMemoryGrantsAuthorityPortV1(client),
         productReaderEligibilityAuthorityPort: input.createProductReaderEligibilityAuthorityPort(client),
-        groundingProjectionPort: input.groundingProjectionPort,
+        groundingProjectionPort: {
+          async projectGrounding(artifact) {
+            const receipt = await executePostgresApprovedSajuIssuerTransactionV1({
+              pool: input.issuanceProofPool, verifiedEvidence,
+              execute: async ({ client: issuer, resolvedSubject }) => {
+                if (resolvedSubject.subjectId !== scope.resolvedSubject.subjectId) return null;
+                const { rows } = await issuer.query<{ receipt: unknown }>(
+                  'select public.qry_approved_saju_source_issue_proof_v1($1::uuid,$2::uuid) as receipt',
+                  [resolvedSubject.subjectId, artifact.readingId],
+                );
+                return rows.length === 1 ? rows[0]?.receipt : null;
+              },
+            });
+            const verified = verifyArchivedSajuProductionIssueProofV1({
+              receipt, trusts: input.productionIssueProofTrusts, readingId: artifact.readingId,
+              storedResponse: artifact.responseSnapshotJsonb, storedResponseHash: artifact.officialArtifactResponseHash,
+            });
+            const grant = (receipt as { originatingGrantId?: unknown } | null)?.originatingGrantId;
+            if (verified?.readerSource === undefined || typeof grant !== 'string' ||
+              !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu.test(grant)) {
+              throw new Error('Signed canonical Reader source is unavailable.');
+            }
+            source.verified = Object.freeze({
+              sourceProofFingerprint: verified.sourceProofFingerprint,
+              nativeSourceResponseHash: verified.nativeSourceResponseHash,
+              executionAttemptId: verified.executionAttemptId,
+            });
+            source.originatingGrantId = grant;
+            return projectSajuCanonicalReaderGroundingV1(verified.readerSource, {
+              readingId: artifact.readingId, storedResponseHash: artifact.officialArtifactResponseHash,
+              sajuDomain: artifact.sajuDomain,
+            });
+          },
+        },
       });
       const candidate = await prepareReaderConversationResponseCandidateV1({
         userText: input.receivePlan.normalizedRequest.text,
@@ -99,38 +139,13 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
           },
         },
       });
-      if (candidate.mode !== 'official_followup_output_hold') return null;
-      const outputHold = candidate.outputHold;
-      const { artifactPort } = createPostgresApprovedSajuReadingAccessV1(client, readingId);
-      const sources = await artifactPort.readArtifactSource({
-        subjectId: outputHold.subjectId, readingId, readerCharacterId: outputHold.readerCharacterId,
-        effectiveAt: outputHold.effectiveAt,
-      });
-      if (sources.length !== 1 || sources[0]?.responseHash !== outputHold.officialArtifactResponseHash) return null;
-      return { outputHold, storedResponse: sources[0].responseSnapshotJsonb };
+      if (candidate.mode !== 'official_followup_output_hold' ||
+        source.verified === undefined || source.originatingGrantId === undefined) return null;
+      return { outputHold: candidate.outputHold, productionSource: source.verified, originatingGrantId: source.originatingGrantId };
     },
   });
   if (prepared === null) return null;
-  const { outputHold, storedResponse } = prepared;
-  const receipt = await executePostgresApprovedSajuIssuerTransactionV1({
-    pool: input.issuanceProofPool, verifiedEvidence,
-    execute: async ({ client, resolvedSubject }) => {
-      if (resolvedSubject.subjectId !== outputHold.subjectId) return null;
-      const { rows } = await client.query<{ receipt: unknown }>(
-        'select public.qry_approved_saju_source_issue_proof_v1($1::uuid,$2::uuid) as receipt',
-        [outputHold.subjectId, readingId],
-      );
-      return rows.length === 1 ? rows[0]?.receipt : null;
-    },
-  });
-  const productionSource = verifyArchivedSajuProductionIssueProofV1({
-    receipt, trusts: input.productionIssueProofTrusts, readingId, storedResponse,
-    storedResponseHash: outputHold.officialArtifactResponseHash,
-  });
-  if (productionSource === null) return null;
-  const originatingGrantId = (receipt as { originatingGrantId?: unknown }).originatingGrantId;
-  if (typeof originatingGrantId !== 'string' ||
-    !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/iu.test(originatingGrantId)) return null;
+  const { outputHold, productionSource, originatingGrantId } = prepared;
   const reviewed = await reviewPreparedReaderConversationFollowupV1({
     outputHold,
     port: input.consultationPort,

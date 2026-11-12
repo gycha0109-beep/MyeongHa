@@ -5,6 +5,12 @@ import type {
   SajuProductionIssueProofEnvelopeV1,
 } from './saju-official-reading-issuer-db-persistence-v1.js';
 import {
+  admitSajuCanonicalReaderSourceV1,
+  projectSajuCanonicalReaderGroundingV1,
+  type SajuCanonicalReaderSourceV1,
+} from './saju-canonical-reader-source-v1.js';
+import type { SajuDomain } from '../../../packages/contracts/src/index.js';
+import {
   createSajuProductionReadingHttpAdapterV1,
   SAJU_PRODUCTION_ISSUE_BIRTH_HASH_V1,
   SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1,
@@ -16,6 +22,8 @@ import {
 
 const RELEASE_HEADER = 'x-myeongha-reading-release';
 const PROOF_HEADER = 'x-myeonghwa-production-issue-proof';
+const READER_SOURCE_HEADER = 'x-myeongha-reader-source';
+const READER_SOURCE_VERSION = 'canonical-v1';
 const VERSION = 'myeonghwa-production-reading-issue-proof-v1';
 const SIGNATURE_DOMAIN = 'myeongha/saju/production-reading-issue/v1\0';
 const UUID = /^[a-f0-9]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -31,6 +39,7 @@ export interface SajuProductionIssueSourceConfigV1
   readonly audience: string;
   readonly keyId: string;
   readonly verificationKey: KeyObject;
+  readonly requireCanonicalReaderSource?: boolean;
 }
 
 export type SajuProductionIssueProofTrustV1 = Pick<SajuProductionIssueSourceConfigV1,
@@ -57,7 +66,11 @@ function authenticateIssueProof(
 ): SajuProductionIssueProofEnvelopeV1 | null {
   if (!record(proof) || Object.keys(proof).length !== 2) return null;
   const { payload, signature } = proof;
-  if (!record(payload) || Object.keys(payload).length !== 13 ||
+  if (!record(payload) ||
+      (payload.readerSourceHash === undefined
+        ? Object.keys(payload).length !== 13
+        : Object.keys(payload).length !== 14 ||
+          typeof payload.readerSourceHash !== 'string' || !HASH.test(payload.readerSourceHash)) ||
       typeof signature !== 'string' || !/^[a-zA-Z0-9_-]{86}$/u.test(signature)) return null;
   if (
     payload.version !== VERSION || payload.issuer !== trust.issuer || payload.audience !== trust.audience ||
@@ -71,6 +84,17 @@ function authenticateIssueProof(
   return Object.freeze({ payload: Object.freeze({ ...payload }), signature });
 }
 
+function bindCanonicalSource(
+  payload: Readonly<Record<string, unknown>>,
+  source: unknown,
+  nativeResponse: Record<string, unknown>,
+  engineVersion: string,
+): SajuCanonicalReaderSourceV1 | null {
+  if (payload.readerSourceHash === undefined || source === undefined ||
+    hashJson(source) !== payload.readerSourceHash) return null;
+  return admitSajuCanonicalReaderSourceV1(source, nativeResponse, engineVersion);
+}
+
 /** Verify a receipt accepted at issuance, then reconstruct the native source from the exact archive. */
 export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
   receipt: unknown;
@@ -82,6 +106,7 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
   sourceProofFingerprint: string;
   nativeSourceResponseHash: string;
   executionAttemptId: string;
+  readerSource?: SajuCanonicalReaderSourceV1;
 }> | null {
   const { receipt, storedResponse, storedResponseHash } = input;
   if (!record(receipt) || !record(storedResponse) || !record(storedResponse.reading) ||
@@ -100,7 +125,8 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
   );
   if (trust === undefined) return null;
   // The DB write follows live signature verification in the same issuance transaction.
-  const proof = authenticateIssueProof(receipt.proof, trust, Date.parse(receipt.acceptedAt), MAX_PROOF_AGE_MS + 5_000);
+  const { readerSource, ...signedEnvelope } = receipt.proof;
+  const proof = authenticateIssueProof(signedEnvelope, trust, Date.parse(receipt.acceptedAt), MAX_PROOF_AGE_MS + 5_000);
   if (proof === null) return null;
   const { payload } = proof;
   const native = { ...storedResponse, reading: { ...storedResponse.reading, readingId: receipt.nativeReadingId } };
@@ -109,10 +135,13 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
     payload.executionAttemptId !== receipt.executionAttemptId || payload.externalRequestRef !== receipt.externalRequestRef ||
     payload.releaseRef !== receipt.releaseRef || payload.requestBodyHash !== receipt.sourceRequestHash ||
     payload.responseBodyHash !== nativeHash) return null;
+  const canonicalSource = bindCanonicalSource(payload, readerSource, native, receipt.engineVersion);
+  if ((readerSource !== undefined || payload.readerSourceHash !== undefined) && canonicalSource === null) return null;
   return Object.freeze({
-    sourceProofFingerprint: 'sha256:v1:' + hashJson(proof),
+    sourceProofFingerprint: 'sha256:v1:' + hashJson(receipt.proof),
     nativeSourceResponseHash: 'sha256:v1:' + nativeHash,
     executionAttemptId: receipt.executionAttemptId,
+    ...(canonicalSource === null ? {} : { readerSource: canonicalSource }),
   });
 }
 
@@ -137,6 +166,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
   const proofs = new WeakMap<object, {
     context: SajuPreparedProductionReadingContextV1;
     proof: unknown;
+    readerSource: unknown;
     externalRequestRef: string;
   }>();
 
@@ -160,6 +190,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
         }
         const binding = { ...context };
         let header: string | null = null;
+        let readerSource: unknown;
         const transport = createSajuProductionReadingHttpAdapterV1({
           ...config,
           fetchImpl: async (url, init) => {
@@ -168,10 +199,19 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
               headers: {
                 ...init.headers,
                 [RELEASE_HEADER]: binding.releaseRef,
+                ...(config.requireCanonicalReaderSource === true ? { [READER_SOURCE_HEADER]: READER_SOURCE_VERSION } : {}),
               },
             });
             header = response.headers.get(PROOF_HEADER);
             return response;
+          },
+          admissionPort: {
+            admit(payload) {
+              if (!record(payload)) throw new Error('Invalid Saju issuance response.');
+              const { readerSource: privateSource, ...readingResponse } = payload;
+              readerSource = privateSource;
+              return readingResponse;
+            },
           },
         });
         if (transport.requestReadingWithSourceRef === undefined) {
@@ -179,13 +219,13 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
         }
         const attested = await transport.requestReadingWithSourceRef(request, binding);
         if (record(attested.response)) proofs.set(attested.response, {
-          context: binding, proof: parseProof(header), externalRequestRef: attested.externalRequestRef,
+          context: binding, proof: parseProof(header), readerSource, externalRequestRef: attested.externalRequestRef,
         });
         return attested;
       },
     },
     sourceVerifier: {
-      async verifyProductionIssue({ sourceResponse, executedRequest, executionAttemptId, sourceBirthRevisionId }) {
+      async verifyProductionIssue({ sourceResponse, executedRequest, executionAttemptId, sourceBirthRevisionId, dbReadingId }) {
         if (!record(sourceResponse) || sourceResponse.state !== 'delivered' || !record(sourceResponse.reading)) {
           return null;
         }
@@ -206,6 +246,20 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           typeof payload.nativeReadingId !== 'string' || payload.nativeReadingId !== sourceResponse.reading.readingId ||
           typeof payload.engineVersion !== 'string' || !TOKEN.test(payload.engineVersion)
         ) return null;
+        const canonicalSource = bindCanonicalSource(payload, entry.readerSource, sourceResponse, payload.engineVersion);
+        if ((config.requireCanonicalReaderSource === true || entry.readerSource !== undefined ||
+          payload.readerSourceHash !== undefined) && canonicalSource === null) return null;
+        if (canonicalSource !== null) {
+          try {
+            projectSajuCanonicalReaderGroundingV1(canonicalSource, {
+              readingId: dbReadingId,
+              storedResponseHash: 'sha256:v1:' + hashJson({
+                ...sourceResponse, reading: { ...sourceResponse.reading, readingId: dbReadingId },
+              }),
+              sajuDomain: canonicalSource.grounding.readingDomain as SajuDomain,
+            });
+          } catch { return null; }
+        }
         return {
           state: 'production_source_verified',
           nativeReadingId: payload.nativeReadingId,
@@ -215,7 +269,7 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           sourceBirthInputHash: context.sourceBirthInputHash,
           engineVersion: payload.engineVersion,
           externalRequestRef,
-          issueProof,
+          issueProof: canonicalSource === null ? issueProof : Object.freeze({ ...issueProof, readerSource: canonicalSource }),
         };
       },
     },

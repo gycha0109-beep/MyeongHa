@@ -70,6 +70,8 @@ begin
     and proof.proof_envelope->'payload'->>'engineVersion'=lineage.saju_engine_version
     and proof.proof_envelope->'payload'->>'releaseRef'=entitled.release_ref
     and proof.proof_envelope->'payload'->>'responseBodyHash' ~ '^[a-f0-9]{64}$'
+    and proof.proof_envelope->'payload'->>'readerSourceHash' ~ '^[a-f0-9]{64}$'
+    and jsonb_typeof(proof.proof_envelope->'readerSource')='object'
     and commerce_saju_private.approved_issue_scope_v1(
       p_subject,v_binding.purchase_intent_id,v_binding.component
     ) is not null

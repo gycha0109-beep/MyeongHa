@@ -1,6 +1,7 @@
 import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
 import type { SajuProductionReadingRequestV1 } from './saju-production-reading-http-adapter.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
+import type { SajuCanonicalReaderSourceV1 } from './saju-canonical-reader-source-v1.js';
 
 /**
  * Saju Production source -> DB-owned immutable Official Reading handoff.
@@ -36,6 +37,7 @@ function uuid(value: unknown): value is string {
 export interface SajuProductionIssueProofEnvelopeV1 {
   readonly payload: Readonly<Record<string, unknown>>;
   readonly signature: string;
+  readonly readerSource?: SajuCanonicalReaderSourceV1;
 }
 
 export interface VerifiedSajuProductionIssueV1 {
