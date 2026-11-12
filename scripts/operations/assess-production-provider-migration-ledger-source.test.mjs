@@ -59,3 +59,19 @@ test('raw history and source statement hash mismatch must never be called restor
   const q=source();q.entries[0].statements=null;
   assert.throws(()=>check(q));
 });
+
+test('missing historical SQL body is preserved as an unresolved source gap',()=>{
+  const p=source();
+  p.entries[0].statements=null;
+  p.entries[0].createdBy='operator-metadata-not-authenticated';
+  p.catalogSha256=sha('[["1", "one", []]]');
+  const result=assessSealedProviderMigrationSource(p,{
+    ...expected,expectedCatalogSha256:p.catalogSha256,
+  });
+  assert.equal(result.sourceLedgerHistoryCaptured,true);
+  assert.equal(result.sourceStatementBodiesMissingCount,1);
+  assert.equal(result.sourceStatementBodiesComplete,false);
+  assert.equal(result.createdByFieldPopulatedRows,1);
+  assert.equal(result.historicalExecutorAuthenticated,false);
+  assert.equal(result.providerMigrationLedgerRestored,false);
+});
