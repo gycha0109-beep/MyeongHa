@@ -15,6 +15,7 @@ from budget_ledger import BudgetDenied
 from governed_dry_run import DryRunPolicy, PolicyDenied
 from krw500_synthetic_ledger import YeoulKrw500SingleFlightLedger
 from approval_scope import require_authenticated_paid_approval
+from yeoul_openrouter_credit_preflight import inspect_existing_prepaid_credit
 
 MODEL = 'deepseek/deepseek-v4.1-flash-1017'
 HOST = 'https://openrouter.ai'
@@ -79,12 +80,12 @@ class _NoRedirect(http.HTTPRedirectHandler):
 
 def _fixed_host_json(*, method, path, api_key, body=None):
     """Single fixed-origin sender. No generic URL, redirects or automatic retry."""
-    if method not in ('GET', 'POST') or path not in (
-        '/api/v1/chat/completions', '/api/v1/generation',
-    ):
+    if (method, path) not in {
+        ('POST', '/api/v1/chat/completions'),
+        ('GET', '/api/v1/key'),
+        ('GET', '/api/v1/credits'),
+    }:
         _deny('unapproved_http_operation')
-    if ((method == 'POST') != (path == '/api/v1/chat/completions')):
-        _deny('unapproved_http_method')
     if not isinstance(api_key, str) or not api_key.startswith('sk-or-') or len(api_key) > 512:
         _deny('inference_key_unavailable')
     if method == 'POST' and (not isinstance(body, bytes) or not 1 <= len(body) <= MAX_BYTES):
@@ -109,6 +110,36 @@ def _fixed_host_json(*, method, path, api_key, body=None):
             return parsed
     except (error.HTTPError, error.URLError, ValueError, UnicodeError, OSError):
         _deny('provider_network_or_receipt_unverifiable')
+
+
+def _read_existing_credit_for_dispatch(*, inference_key, management_key,
+                                       worst_micro_usd):
+    """Always obtain fresh provider read-only evidence in the trusted host.
+
+    Management keys must never be used to send completions. No inbound
+    snapshot or caller-provided balance can satisfy this check.
+    """
+    if (not isinstance(management_key, str)
+            or not management_key.startswith('sk-or-')
+            or len(management_key) > 512):
+        _deny('management_key_unavailable')
+    if management_key == inference_key:
+        _deny('same_key_cannot_be_inference_and_management')
+    inference_snapshot = _fixed_host_json(
+        method='GET', path='/api/v1/key', api_key=inference_key,
+    )
+    management_snapshot = _fixed_host_json(
+        method='GET', path='/api/v1/key', api_key=management_key,
+    )
+    credits_snapshot = _fixed_host_json(
+        method='GET', path='/api/v1/credits', api_key=management_key,
+    )
+    return inspect_existing_prepaid_credit(
+        inference_key_snapshot=inference_snapshot,
+        management_key_snapshot=management_snapshot,
+        credits_snapshot=credits_snapshot,
+        worst_case_micro_usd=worst_micro_usd,
+    )
 
 
 def _generation_metadata(generation_id, *, api_key):
@@ -224,6 +255,14 @@ class YeoulPaidOpenRouterGateway:
         if (not isinstance(key, str) or not key.startswith('sk-or-')
                 or len(key) > 512):
             _deny('inference_key_unavailable')
+        # The account probe is READ-ONLY and happens before a costly
+        # reservation. Matching accounts and sufficient observed balances
+        # are necessary but NOT sufficient to grant paid execution.
+        _read_existing_credit_for_dispatch(
+            inference_key=key,
+            management_key=os.environ.get('OPENROUTER_MANAGEMENT_KEY'),
+            worst_micro_usd=expected,
+        )
         # Every provider call is admitted by the same strict KRW+USD SQLite
         # transaction. Never retry a POST after a network/receipt error.
         self.ledger.reserve_controlled(self.policy, policy_request, expected)
