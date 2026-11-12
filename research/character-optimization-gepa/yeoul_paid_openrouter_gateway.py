@@ -176,6 +176,20 @@ def _check_generation(completion, metadata, *, request_id, expected_provider,
     return {'metadata_consistent': True, 'settlement_authorized': False}
 
 
+def _verify_trusted_live_scope(policy, request, serialized_body):
+    """Mandatory authority/tariff/token checks; not caller injectable.
+
+    The current project has no authenticated issuer nor attested provider
+    token counter. Until those exist all real execution is HOLD; simulated
+    unit tests patch this boundary while also patching every HTTP function.
+    """
+    require_authenticated_paid_approval(claim_ref=None)
+    if policy.model_id != MODEL or policy.pricing['source'].startswith('synthetic-fixture:'):
+        _deny('authenticated_live_tariff_missing')
+    # Character count cannot guarantee tokenizer-dependent prompt token cost.
+    _deny('trusted_input_token_ceiling_unavailable')
+
+
 class YeoulPaidOpenRouterGateway:
     """The only public gateway dispatch path: verify, reserve, send, then HOLD.
 
@@ -195,35 +209,36 @@ class YeoulPaidOpenRouterGateway:
         self.provider, self.provider_name = approved_provider, provider_name
 
     def dispatch(self, *, policy_request, body):
-        # This function intentionally cannot pass with the current authority
-        # source. Never infer a grant from the user's 500-KRW ceiling alone.
-        require_authenticated_paid_approval(claim_ref=None)
-        if self.policy.model_id != MODEL or self.policy.pricing['source'].startswith('synthetic-fixture:'):
-            _deny('authenticated_live_tariff_missing')
+        # Validation is before reservation. A client cannot pass an approval
+        # record, source URL, HTTP handler, token count, or alternate route.
         expected = self.policy.preflight(policy_request)
-        payload = _check_body(body, expected_provider=self.provider,
-                              max_output_tokens=policy_request['max_output_tokens'])
-        # Current tokenizer is not attested; a character count is not a
-        # certified input-token bound and must never be treated as one.
-        _deny('trusted_input_token_ceiling_unavailable')
-        # Future network step (unreachable until the authority + tokenizer
-        # verifier are implemented) must reserve before sending, never retry,
-        # and HOLD all unknown charges. No raw completion is logged.
+        payload = _check_body(
+            body, expected_provider=self.provider,
+            max_output_tokens=policy_request['max_output_tokens'],
+        )
+        _verify_trusted_live_scope(self.policy, policy_request, payload)
+
+        # Every provider call is admitted by the same strict KRW+USD SQLite
+        # transaction. Never retry a POST after a network/receipt error.
         self.ledger.reserve_controlled(self.policy, policy_request, expected)
         key = os.environ.get('OPENROUTER_API_KEY')
         try:
-            completion = _fixed_host_json(method='POST', path='/api/v1/chat/completions',
-                                          api_key=key, body=payload)
+            completion = _fixed_host_json(
+                method='POST', path='/api/v1/chat/completions',
+                api_key=key, body=payload,
+            )
             metadata = _generation_metadata(completion.get('id'), api_key=key)
             _check_generation(
                 completion, metadata, request_id=policy_request['request_id'],
-                expected_provider=self.provider, expected_provider_name=self.provider_name,
+                expected_provider=self.provider,
+                expected_provider_name=self.provider_name,
                 reserved_micro_usd=expected,
                 max_input_tokens=policy_request['max_input_tokens'],
                 max_output_tokens=policy_request['max_output_tokens'],
                 max_reasoning_tokens=policy_request['max_reasoning_tokens'],
             )
-            # Even a matching metadata response does not verify all KRW charges.
+            # Only independent payer reconciliation may turn HELD into a
+            # settled charge. Generation metadata is not financial proof.
             self.ledger.hold(policy_request['request_id'])
             return {'status': 'held', 'billable_dispatch_unreconciled': True,
                     'external_call_result_confirmed': True}
