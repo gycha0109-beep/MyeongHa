@@ -419,7 +419,8 @@ $function$;
 revoke all on function public.cmd_commit_approved_saju_paid_answer_v1(jsonb,bytea,bytea,bytea)
   from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
     myeongha_approved_saju_issuer_executor;
-grant execute on function public.begin_member_subject_context_v1(uuid),public.assert_myeongha_subject_context_v1(uuid),
+grant execute on function public.begin_member_subject_context_v1(uuid),public.current_myeongha_subject_id(),
+  public.assert_myeongha_subject_context_v1(uuid),
   public.cmd_commit_approved_saju_paid_answer_v1(jsonb,bytea,bytea,bytea)
   to myeongha_approved_saju_paid_answer_executor;
 

@@ -5,6 +5,7 @@ import {
   type OfficialReaderProtectedBodyKeyV1,
 } from './official-reader-protected-body-crypto-v1.js';
 import {
+  executePostgresApprovedSajuPaidAnswerTransactionV1,
   executePostgresSubjectTransactionV1,
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
@@ -23,11 +24,13 @@ import {
 } from './official-reader-private-exact-verified-purchase-guard-v1.js';
 
 import {
+  selectPrivateApprovedSajuCiphertextQueryV1,
   selectPrivateOfficialReaderCiphertextQueryV1,
   type OfficialReaderPrivateCiphertextSelectorV1,
 } from './official-reader-private-paid-answer-query-v1.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+const CATALOG_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu;
 type CiphertextRow = Readonly<{
   bodyId: unknown;
   threadId: unknown;
@@ -80,8 +83,8 @@ export class PrivateOfficialReaderPaidAnswerReadErrorV1 extends Error {
 function unavailable(): never {
   throw new PrivateOfficialReaderPaidAnswerReadErrorV1();
 }
-function asUuid(value: unknown): string {
-  if (typeof value !== 'string' || !UUID.test(value)) return unavailable();
+function asUuid(value: unknown, shape: RegExp = UUID): string {
+  if (typeof value !== 'string' || !shape.test(value)) return unavailable();
   return value.toLowerCase();
 }
 function asString(value: unknown): string {
@@ -95,7 +98,7 @@ function asBytes(value: unknown): Uint8Array {
 
 /**
  * Server-only S6 Reader ciphertext retrieval + private decryption while the
- * same S1 current-entitlement advisory lock still belongs to this transaction.
+ * current-entitlement locks still belong to this transaction.
  * The database independently rejects revoked, expired, wrong-Reader and
  * ambiguous-bundle access; it does NOT expose or reactivate a prior Grant.
  *
@@ -140,14 +143,32 @@ export async function readPrivateOfficialReaderPaidChatMessageV1(input:
   );
 }
 
+/** Private approved-Saju re-read. The existing delivery journal is standard-reading scoped. */
+export async function readPrivateApprovedSajuPaidChatMessageV1(input:
+  Omit<ReaderPaidPrivateReadInputV1, 'deliveryReservation'> & Readonly<{
+    threadId: string;
+    safeMessageId: string;
+  }>,
+): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
+  return readPrivateOfficialReaderPaidAnswerCoreV1({
+    pool: input.pool, verifiedEvidence: input.verifiedEvidence,
+    keyResolver: input.keyResolver, privacyLedgerPort: input.privacyLedgerPort,
+  }, {
+    kind: 'chat_marker', threadId: asUuid(input.threadId), safeMessageId: asUuid(input.safeMessageId),
+  }, 'approved_saju');
+}
+
 async function readPrivateOfficialReaderPaidAnswerCoreV1(
   input: ReaderPaidPrivateReadInputV1,
   selector: OfficialReaderPrivateCiphertextSelectorV1,
+  purchaseKind: 'standard' | 'approved_saju' = 'standard',
 ): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
   try {
+    const executeSubject = purchaseKind === 'approved_saju'
+      ? executePostgresApprovedSajuPaidAnswerTransactionV1 : executePostgresSubjectTransactionV1;
     // Read Subject authority in a separate short transaction. Do not hold a
-    // PostgreSQL Reader scope lock while consulting the independent ledger.
-    const subjectId = await executePostgresSubjectTransactionV1({
+    // PostgreSQL purchase locks while consulting the independent ledger.
+    const subjectId = await executeSubject({
       pool: input.pool,
       verifiedEvidence: input.verifiedEvidence,
       execute: async ({ resolvedSubject }) => asUuid(resolvedSubject.subjectId),
@@ -166,7 +187,7 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
       port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
     })) return unavailable();
 
-    const answer = await executePostgresSubjectTransactionV1({
+    const answer = await executeSubject({
       pool: input.pool,
       verifiedEvidence: input.verifiedEvidence,
       execute: async (scope) => {
@@ -177,9 +198,9 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         })) return unavailable();
         // Each S6 selector calls its own private DB function. A Thread ID
         // must never be interpreted as a paid body ID if a SQL layout drifts.
-        const lookup = selectPrivateOfficialReaderCiphertextQueryV1(
-          subjectId, selector,
-        );
+        const lookup = purchaseKind === 'approved_saju' && selector.kind === 'chat_marker'
+          ? selectPrivateApprovedSajuCiphertextQueryV1(subjectId, selector)
+          : selectPrivateOfficialReaderCiphertextQueryV1(subjectId, selector);
         const result = await scope.client.query<CiphertextRow>(
           lookup.sql, lookup.values,
         );
@@ -201,23 +222,23 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
           safeMessageId: asUuid(row.safeMessageId),
           officialReadingId: asUuid(row.officialReadingId),
           readerCharacterId: asString(row.readerCharacterId),
-          readerContentBundleId: asUuid(row.readerContentBundleId),
-          contentReleaseId: asUuid(row.contentReleaseId),
+          readerContentBundleId: asUuid(row.readerContentBundleId, CATALOG_UUID),
+          contentReleaseId: asUuid(row.contentReleaseId, CATALOG_UUID),
           originatingEntitlementGrantId: asUuid(row.originatingGrantId),
-          productId: asUuid(row.productId),
+          productId: asUuid(row.productId, CATALOG_UUID),
           sourceResponseHash: asString(row.sourceResponseHash),
         };
-        // Independently require the exact S2 production verified Receipt,
-        // pinned Reader and Bundle before resolving the DEK. The private
-        // S6 SQL already checks current entitlements/Source proof, but one
-        // consistent S1-locked cross-surface purchase guard ensures refunded
-        // lineage cannot leak via the direct-body or Chat marker selector.
-        await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
-          scope,
-          readingId: identity.officialReadingId,
-          readerCharacterId: identity.readerCharacterId,
-          readerContentBundleId: identity.readerContentBundleId,
-        });
+        // Standard Reading keeps its independent S2 purchase check. The
+        // approved selector already holds the exact Receipt and Grant locks
+        // and matches the signed archive for this marker.
+        if (purchaseKind === 'standard') {
+          await assertOfficialReaderPrivateCurrentVerifiedPurchaseScopeV1({
+            scope,
+            readingId: identity.officialReadingId,
+            readerCharacterId: identity.readerCharacterId,
+            readerContentBundleId: identity.readerContentBundleId,
+          });
+        }
 
         const keyRef = asString(row.encryptionKeyRef);
         if (row.encryptionSchemeVersion !== OFFICIAL_READER_PROTECTED_CIPHER_VERSION_V1
@@ -231,7 +252,7 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         }
 
         // This synchronous work completes before transaction COMMIT, while
-        // the SQL helper still holds its S1 advisory transaction lock.
+        // the SQL helper still holds its current-purchase transaction locks.
         const body = decryptOfficialReaderProtectedBodyV1({
           identity,
           encrypted: {
@@ -246,7 +267,7 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         const committedAt = asString(row.committedAt);
         if (!Number.isFinite(Date.parse(committedAt))) return unavailable();
         // Final off-primary restore/deletion fence before decrypted text can
-        // leave the T2 S1-scoped Reader transaction. Never trust a DB backup's
+        // leave the T2 purchase-scoped transaction. Never trust a DB backup's
         // self-declared "restored" flag.
         if (!currentOfficialReaderPrivacyReadLeaseV1({
           port: input.privacyLedgerPort, lease, subjectId, selector: selectorKey,
@@ -288,7 +309,7 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
         });
       },
     });
-    // The S1 transaction and its S7 prepare receipt have now COMMITTED.
+    // The current-purchase transaction has now committed.
     // A separate Privacy deletion/restore epoch may have changed during
     // COMMIT or connection release. Check the same off-primary lease again
     // immediately before returning plaintext to the caller. Do not claim

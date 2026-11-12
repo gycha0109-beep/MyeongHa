@@ -33,6 +33,8 @@ const BY_CHAT_MARKER = `${CIPHERTEXT_PROJECTION}
 from public.internal_qry_official_reader_paid_chat_marker_ciphertext_v1(
   $1::uuid, $2::uuid, $3::uuid
 )`;
+const BY_APPROVED_SAJU_CHAT_MARKER = `${CIPHERTEXT_PROJECTION}
+from public.qry_approved_saju_paid_answer_ciphertext_v1($1::uuid, $2::uuid, $3::uuid)`;
 
 export type OfficialReaderPrivateCiphertextSelectorV1 =
   | Readonly<{ kind: 'body'; bodyId: string }>
@@ -41,6 +43,15 @@ export type OfficialReaderPrivateCiphertextSelectorV1 =
 export interface OfficialReaderPrivateCiphertextQueryV1 {
   readonly sql: string;
   readonly values: readonly string[];
+}
+
+export function selectPrivateApprovedSajuCiphertextQueryV1(
+  subjectId: string,
+  selector: Extract<OfficialReaderPrivateCiphertextSelectorV1, { kind: 'chat_marker' }>,
+): OfficialReaderPrivateCiphertextQueryV1 {
+  if (selector.kind !== 'chat_marker') throw new Error('Invalid approved Saju selector.');
+  const { values } = selectPrivateOfficialReaderCiphertextQueryV1(subjectId, selector);
+  return Object.freeze({ sql: BY_APPROVED_SAJU_CHAT_MARKER, values });
 }
 
 /** Bind only exact selector UUIDs; do not interpolate external values into SQL. */
