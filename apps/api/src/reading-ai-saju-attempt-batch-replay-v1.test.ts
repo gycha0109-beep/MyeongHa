@@ -71,6 +71,9 @@ function fixture(
     failSecondWrite?: boolean;
     missingIndividual?: string;
     stored?: Set<string>;
+    readinessOverrides?: Partial<
+      Record<"source" | "attempt" | "writer", Record<string, unknown>>
+    >;
   } = {},
 ) {
   const stored = opts.stored ?? new Set<string>();
@@ -94,7 +97,55 @@ function fixture(
           async query<Row>(sql: string, args: readonly unknown[] = []) {
             trace.push(type + ":" + sql.split("\n")[0]);
             let response: unknown[] = [];
-            if (sql.includes("current_user::text")) {
+            if (sql.startsWith("WITH objects AS")) {
+              const privileges =
+                type === "source"
+                  ? {
+                      objectsExist: true,
+                      callIdRead: true,
+                      proofRead: true,
+                      canInsert: false,
+                      canUpdate: false,
+                      canDelete: false,
+                      canTruncate: false,
+                      canReadCoverage: false,
+                    }
+                  : type === "attempt"
+                    ? {
+                        objectsExist: true,
+                        idRead: true,
+                        readingRead: true,
+                        subjectRead: true,
+                        refRead: true,
+                        stateRead: true,
+                        canInsert: false,
+                        canUpdate: false,
+                        canDelete: false,
+                        canTruncate: false,
+                      }
+                    : {
+                        objectsExist: true,
+                        canExecute: true,
+                        canReadLedger: false,
+                        canInsert: false,
+                        canUpdate: false,
+                        canDelete: false,
+                        canTruncate: false,
+                      };
+              response = [
+                {
+                  currentUser:
+                    type === "source"
+                      ? (opts.sourceRole ??
+                        "saju_a4_provider_receipt_reader_v1")
+                      : type === "attempt"
+                        ? "myeongha_reading_ai_cost_binding_reader_v1"
+                        : "myeongha_reading_ai_cost_writer_v1",
+                  ...privileges,
+                  ...opts.readinessOverrides?.[type],
+                },
+              ];
+            } else if (sql.includes("current_user::text")) {
               response = [
                 {
                   currentUser:
@@ -190,7 +241,8 @@ describe("A4 bounded source-owned attempt receipt replay (OFFLINE)", () => {
       invoiceReconciled: false,
     });
     expect([...x.stored].sort()).toEqual([...CALLS]);
-    expect(x.trace.filter((s) => s === "connect:writer")).toHaveLength(2);
+    expect(x.trace.filter((s) => s === "connect:writer")).toHaveLength(3);
+    expect(x.trace).toContain("writer:WITH objects AS (");
     expect(x.trace[0]).toBe("connect:source");
     expect(x.trace.some((s) => s === "source:BEGIN READ ONLY")).toBe(true);
   });
@@ -260,6 +312,48 @@ describe("A4 bounded source-owned attempt receipt replay (OFFLINE)", () => {
       await expect(x.service.replayAttempt(ATTEMPT)).rejects.toThrow();
       expect(x.stored.size).toBe(0);
     }
+  });
+
+  it.each([
+    ["source", { callIdRead: false }, "missing signed receipt read"],
+    ["source", { canInsert: true }, "Source Reader acquiring INSERT"],
+    ["source", { canReadCoverage: true }, "Source Reader acquiring coverage data"],
+    ["source", { objectsExist: false }, "missing Source table"],
+    ["attempt", { subjectRead: false }, "missing canonical Subject column"],
+    ["attempt", { canUpdate: true }, "canonical Reader acquiring UPDATE"],
+    ["writer", { canExecute: false }, "missing cost RPC permission"],
+    ["writer", { canReadLedger: true }, "cost Writer acquiring ledger SELECT"],
+    ["writer", { currentUser: "postgres" }, "incorrect cost Writer principal"],
+  ] as const)(
+    "rejects %s grant/readiness mismatch: %s (%s)",
+    async (role, mismatch, reason) => {
+      expect(reason.length).toBeGreaterThan(0);
+      const x = fixture({ readinessOverrides: { [role]: mismatch } });
+      await expect(x.service.replayAttempt(ATTEMPT)).rejects.toThrow(
+        "Dedicated A4 cost attribution principal is not ready",
+      );
+      expect(x.stored.size).toBe(0);
+      expect(
+        x.trace.some((entry) =>
+          entry.startsWith("writer:SELECT current_user::text"),
+        ),
+      ).toBe(false);
+    },
+  );
+
+  it("does not require a cost Writer for empty or invalid Source receipt censuses", async () => {
+    const empty = fixture({ calls: [] });
+    expect(await empty.service.replayAttempt(ATTEMPT)).toMatchObject({
+      state: "held_no_local_receipts",
+      completeCostCoverage: false,
+    });
+    expect(empty.trace).not.toContain("connect:writer");
+
+    const invalid = fixture({
+      listed: [{ callId: CALLS[0], proofJson: "invalid-json" }],
+    });
+    await expect(invalid.service.replayAttempt(ATTEMPT)).rejects.toThrow();
+    expect(invalid.trace).not.toContain("connect:writer");
   });
 
   it("preserves already committed immutable entries when a subsequent Writer fails", async () => {
