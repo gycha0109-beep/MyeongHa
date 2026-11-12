@@ -218,10 +218,15 @@ class YeoulPaidOpenRouterGateway:
         )
         _verify_trusted_live_scope(self.policy, policy_request, payload)
 
+        # Missing credentials must not consume the persistent pilot budget.
+        # Access the key only after trusted scope validation.
+        key = os.environ.get('OPENROUTER_API_KEY')
+        if (not isinstance(key, str) or not key.startswith('sk-or-')
+                or len(key) > 512):
+            _deny('inference_key_unavailable')
         # Every provider call is admitted by the same strict KRW+USD SQLite
         # transaction. Never retry a POST after a network/receipt error.
         self.ledger.reserve_controlled(self.policy, policy_request, expected)
-        key = os.environ.get('OPENROUTER_API_KEY')
         try:
             completion = _fixed_host_json(
                 method='POST', path='/api/v1/chat/completions',
