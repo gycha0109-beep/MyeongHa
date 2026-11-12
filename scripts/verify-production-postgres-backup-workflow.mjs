@@ -317,7 +317,7 @@ for (const [body, fragments] of [
     'default_transaction_read_only=on',
     'production-provider-migration-ledger-sealed-source-readonly.sql',
     'assess-production-provider-migration-ledger-source.mjs',
-    '> "$source_file"',
+    '>"$source_file"',
     'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
     'rm -rf "$private"',
     'containsPlaintextMigrationStatements:false',
