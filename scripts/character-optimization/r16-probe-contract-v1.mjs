@@ -4,8 +4,8 @@ const TYPES = Object.freeze(['persona','relationship','memory','long_horizon','o
 const failure = reason => { throw new Error(`CHARACTER_R16_INVALID:${reason}`); };
 const isSha = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 const nonempty = v => typeof v === 'string' && v.trim().length > 0;
-const safeFamilyId = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(v);
-const safeRuntimeRef = v => typeof v === 'string' && /^docs\/character\/[A-Z0-9_]+\.md$/.test(v);
+const safeFamilyId = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}(?![\s\S])/.test(v);
+const safeRuntimeRef = v => typeof v === 'string' && /^docs\/character\/[A-Z0-9_]+\.md(?![\s\S])/.test(v);
 
 /** Caller loads a pinned Runtime source; DRAFT cannot become approved by parsing it. */
 export function extractR16Metadata({characterId,sourceRef,sourceSha256,runtimeText,sourceAuthorityState}) {
