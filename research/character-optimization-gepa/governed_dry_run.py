@@ -179,6 +179,14 @@ class GovernedBudgetLedger(BudgetLedger):
             con.execute('CREATE TABLE IF NOT EXISTS pinned_run_policy ('
                         'run_id TEXT PRIMARY KEY,policy_hash TEXT NOT NULL)')
 
+    def _additional_budget_preflight(self, con, request, worst):
+        """Extensibility hook within the same BEGIN IMMEDIATE transaction."""
+        return None
+
+    def _additional_budget_record(self, con, request, worst, reservation):
+        """Synthetic add-on budget accounting. The default changes nothing."""
+        return None
+
     def reserve_controlled(self, policy, request, worst):
         if policy.run_id != self.run_id:
             raise BudgetDenied('run_identity')
@@ -234,12 +242,14 @@ class GovernedBudgetLedger(BudgetLedger):
                     or role_count >= role_caps[request['role']]
                     or active >= policy.limits['max_parallel']):
                 raise BudgetDenied('budget_attempt_or_parallel_cap')
+            additional_reservation = self._additional_budget_preflight(con, request, worst)
             con.execute('INSERT INTO attempts VALUES(?,?,?,?,?,?)',
                         (request['request_id'], self.run_id,
                          request['role'], worst, None, 'reserved'))
             con.execute('INSERT INTO controlled_attempts VALUES (?,?,?,?,?)',
                         (request['request_id'], self.run_id, request['operation_id'],
                          request['attempt_number'], policy.policy_hash))
+            self._additional_budget_record(con, request, worst, additional_reservation)
             con.execute('COMMIT')
             return {'send_permitted': True, 'state': 'reserved'}
 
