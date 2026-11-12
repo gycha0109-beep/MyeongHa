@@ -105,6 +105,15 @@ test('sealed holdout, private user text, unapproved scores and invented characte
   }
 });
 
+test('family evaluation metadata rejects final newline, raw text and paths',()=>{
+  const {manifest,candidate}=setup(), data=examples(['yeoul']);
+  for(const familyId of ['valid\n','사적인 대화 원문','../private','family|leak','a'.repeat(101)]){
+    assert.throws(()=>inspectCandidateReviewReadiness({manifest,candidate,
+      familyEvaluations:[{...data[0],familyId},data[1]]}),
+    /private_unverified_or_out_of_scope_evidence/);
+  }
+});
+
 test('run and candidate hashes, context and allowed expression slot must match',()=>{
   const {manifest,candidate}=setup(), data=examples(['yeoul']);
   assert.throws(()=>inspectCandidateReviewReadiness({manifest:{...manifest,optimizerVersion:'changed'},

@@ -62,7 +62,7 @@ export function inspectCandidateReviewReadiness({manifest, candidate, familyEval
   for (const row of familyEvaluations) {
     if (!exact(row, ROW_KEYS) || !expected.includes(row.characterId)
         || !SPLITS.includes(row.split)
-        || typeof row.familyId !== 'string' || !/^[a-zA-Z0-9_.:-]{1,100}$/u.test(row.familyId)
+        || typeof row.familyId !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}(?![\s\S])/u.test(row.familyId)
         || row.reviewStatus !== 'unreviewed' || typeof row.uncertainty !== 'boolean'
         || !Array.isArray(row.hardFailures)
         || row.hardFailures.some(x => !HARD_GATES.includes(x))
