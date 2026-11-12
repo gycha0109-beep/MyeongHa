@@ -141,7 +141,21 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
   it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
     const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
     const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');
-    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap]');
+    expect(workflow).toContain('options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap, workerd_db_failover]');
+    expect(workflow).toContain(".github/ops/phase11-workerd-db-failover-20261108.once");
+    expect(workflow).toContain("github.event_name == 'workflow_dispatch' || (github.event_name == 'push'");
+    expect(realRunner).toContain('workerd_db_failover');
+    expect(realRunner).toContain('PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V2');
+    expect(readFileSync('.github/ops/phase11-workerd-db-failover-20261108.once', 'utf8').trim()).toBe('PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V2');
+    // YAML plain scalars cannot contain the colon-space in the commit-title expression.
+    expect(workflow).toContain('    if: >-');
+    expect(workflow).not.toContain('    if: ${{ github.repository');
+    expect(workflow).toContain("startsWith(github.event.head_commit.message, 'fix(ops): retry isolated workerd DB failover proof')");
+    expect(realRunner).toContain('One-shot push subject is not the reviewed DB outage proof.');
+    // DB failover must not select the separate constrained Saju container:
+    // it deliberately keeps the existing real loopback host alive.
+    expect(realRunner).toContain('"$experiment" != workerd_overlap && "$experiment" != workerd_db_failover');
+    expect(realRunner).toContain('short|workerd|workerd_db_failover) ;;');
     expect(workflow).toContain('default: short');
     expect(compose).toContain('profiles: [sustained]');
     expect(compose).toContain('cpus: 0.50');

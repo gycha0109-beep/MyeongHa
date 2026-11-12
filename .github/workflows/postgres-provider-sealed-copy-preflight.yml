@@ -1,0 +1,129 @@
+name: PostgreSQL Provider Sealed COPY Preflight
+run-name: "[WT:ops] Provider Sealed COPY Header Preflight"
+
+on:
+  # A single protected-main merge containing this exact one-shot marker triggers
+  # the already approved isolated Provider replay; no Hosted writes are allowed.
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/ops/postgres-provider-ledger-presence-backup-42752268638-20261112-retry2.once'
+  workflow_dispatch:
+    inputs:
+      provider_data_replay:
+        description: Replay exact sealed Provider COPY data into fresh isolated local database and verify counts (never Production)
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: production-operations-provider-sealed-copy-preflight
+  cancel-in-progress: false
+
+jobs:
+  source-provider-copy-preflight:
+    if: >-
+      ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot sealed Provider replay backup 42752268638'))) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    environment: production
+    env:
+      EXPECTED_PROJECT_REF: cnsfpcdiyofqvhpcegfc
+      MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.MYEONGHA_BACKUP_ENCRYPTION_PASSPHRASE }}
+    steps:
+      - name: Checkout exact protected main source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 2 # one parent needed for exact merged-marker diff inspection
+      - name: Gate exact protected-main one-shot Provider replay marker
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ -z "$(git status --porcelain)" ]]
+          subject="$(git show -s --format=%s HEAD)"
+          [[ "$subject" =~ ^ops\(dr\):\ one-shot\ sealed\ Provider\ replay\ backup\ 42752268638(\ \(\#[0-9]+\))?$ ]]
+          [[ "$(cat '.github/ops/postgres-provider-ledger-presence-backup-42752268638-20261112-retry2.once')" == 'OPS-SEALED-PROVIDER-LEDGER-PRESENCE-BACKUP-42752268638-20261112-RETRY2-V1' ]]
+          [[ -n "$(git rev-parse "$GITHUB_SHA^" 2>/dev/null)" ]]
+          [[ "$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -Fxc '.github/ops/postgres-provider-ledger-presence-backup-42752268638-20261112-retry2.once' || true)" == '1' ]]
+          echo 'EXACT_SEALED_PROVIDER_REPLAY_MARKER_VALIDATED: local-only, governed source backup'
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+      - name: Resolve governed backup and reject unrelated artifacts
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BACKUP_RUN_ID: '42752268638'
+          EXPECTED_BACKUP_ARTIFACT_ID: '13734401337'
+          INCIDENT_REFERENCE_UTC: '2026-11-10T03:56:30Z'
+        shell: bash
+        run: bash scripts/operations/resolve-postgres-restore-source.sh
+      - name: Download exact governed encrypted backup
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: '42752268638'
+          artifact-ids: ${{ steps.source.outputs.artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/backup-artifact
+      - name: Install PostgreSQL client for local read-only catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client jq >/dev/null
+      - name: Compare sealed backup COPY headers with disposable Supabase CLI 3.1.0 schema
+        shell: bash
+        env:
+          MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
+          BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
+          EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+          MH_OPS_PROVIDER_DATA_REPLAY: ${{ github.event_name == 'push' && 'true' || inputs.provider_data_replay }}
+          SUPABASE_ACCESS_TOKEN: ''
+          SUPABASE_DB_PASSWORD: ''
+          SUPABASE_PROJECT_ID: ''
+          DATABASE_URL: ''
+        run: bash scripts/operations/run-postgres-provider-sealed-copy-preflight-ci.sh
+      - name: Upload only identifier-free compatibility summary
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-sealed-copy-preflight-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-sealed-copy-preflight.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload only aggregate isolated Provider row delta summary
+        if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-sealed-isolated-row-replay-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-isolated-row-replay.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload aggregate Auth reference integrity verdict only
+        if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-sealed-auth-reference-integrity-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-auth-reference-integrity.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload metadata-only isolated Provider migration ledger parity
+        if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-sealed-migration-ledger-parity-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-migration-ledger-parity.json
+          if-no-files-found: ignore
+          retention-days: 14

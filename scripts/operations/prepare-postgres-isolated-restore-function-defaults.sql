@@ -36,6 +36,13 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: isolated browser roles missing';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'service_role'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles r WHERE r.rolname = 'postgres'
+  ) THEN
+    RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: isolated provider/application grantees missing';
+  END IF;
 END
 $seyeon_isolated_acl_preflight$;
 
@@ -44,6 +51,20 @@ $seyeon_isolated_acl_preflight$;
 ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated;
+
+-- Phase 8-A #6: first isolate a possible creator-default ACL drift.
+-- The source dump was authored under postgres, but the disposable target
+-- creates imported DDL under supabase_admin. The target creator can have
+-- default service_role/postgres grants that the source schema-only dump
+-- does not explicitly cancel. Remove only the *future* creator defaults
+-- before replay. Explicit GRANTs from the source archive remain untouched.
+-- This does NOT prove current source ACL equivalence, nor permit DR serving.
+-- A creator must keep its own default ACL. In the disposable PG17 CI case,
+-- current_user is postgres; removing postgres' own default function EXECUTE
+-- can make built-in PUBLIC EXECUTE reappear. Only remove *other* grantees.
+ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE EXECUTE ON FUNCTIONS FROM service_role;
 
 -- Production postgres has no default PUBLIC/anon/authenticated table grants
 -- for app relationship tables. The isolated supabase_admin image grants
@@ -54,6 +75,23 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public
 ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated;
+ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE ALL PRIVILEGES ON TABLES FROM service_role;
+
+-- The restore workflow creates objects as supabase_admin, not postgres.
+-- In that separate authorized isolated role, postgres is a noncreator
+-- grantee and can safely be removed from future defaults as well.
+DO $seyeon_isolated_noncreator_postgres_defaults$
+BEGIN
+  IF current_user = 'supabase_admin' THEN
+    EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM postgres';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM postgres';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM postgres';
+    EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM postgres';
+  END IF;
+END
+$seyeon_isolated_noncreator_postgres_defaults$;
 
 DO $seyeon_isolated_acl_assert$
 BEGIN
@@ -91,6 +129,26 @@ BEGIN
       )
   ) THEN
     RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges';
+  END IF;
+
+  -- No silent grants from the isolated creator to provider service_role or
+  -- the source principal postgres. Raw restored object grants are still
+  -- checked downstream and are never replaced or inferred from this step.
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_default_acl d
+    JOIN pg_catalog.pg_roles r ON r.oid = d.defaclrole
+    JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) a ON true
+    WHERE r.rolname = current_user
+      AND d.defaclobjtype IN ('f', 'r')
+      AND d.defaclnamespace IN (0, 'public'::regnamespace::oid)
+      AND (
+        a.grantee = 'service_role'::regrole::oid
+        OR (current_user = 'supabase_admin' AND
+            a.grantee = 'postgres'::regrole::oid)
+      )
+  ) THEN
+    RAISE EXCEPTION 'HOLD_SEYEON_RESTORE: isolated creator retains unexpected noncreator service_role/postgres defaults';
   END IF;
 
   IF NOT EXISTS (

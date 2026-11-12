@@ -1,0 +1,85 @@
+{
+  "schemaVersion": "ops-source-backup-canonical-grantor-acl-parity-observation-v1",
+  "backupRunId": 42572773074,
+  "backupRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42572773074",
+  "backupSourceSha": "bba6f03a1eaf2ddb799a885c7f9c96a00b28f925",
+  "backupMigrationFrontier": "20261105075227",
+  "restoreRunId": 42573344623,
+  "restoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42573344623",
+  "restoreHeadSha": "bba6f03a1eaf2ddb799a885c7f9c96a00b28f925",
+  "restoreArtifactId": 13654227002,
+  "evidenceFileSha256": {
+    "app-schema-parity.json": "a4a05250a4b2cc90135160b56fe509de3ce5822075964e4e7cdf3853b2636f1d",
+    "restore-evidence.json": "01fa234fd2a70e47de6661238614edc60b7a0d673105430f0ff9847cd67d307b",
+    "privacy-reconciliation-evidence.json": "faa0f89d56f9dab1e69e2555fd9deb7758e1c3968ed06474ebbdf7501e467d65",
+    "recovered-serving-admission.json": "08779f69831d5a0ee64ae31849a305df18cff16228772bc9bf258ad1bbbeac48"
+  },
+  "restoreExecutionSuccess": true,
+  "legacyApplicationScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+  "componentHashEvidence": {
+    "tableStructure": true,
+    "schemaAclGrantEntries": true,
+    "routineAclGrantEntries": true,
+    "tableAclByGrantee": true,
+    "schemaAclByGrantee": true,
+    "routineAclByGrantee": true,
+    "tableAclGrantorByGrantee": true,
+    "schemaAclGrantorByGrantee": true,
+    "routineAclGrantorByGrantee": true
+  },
+  "catalogObjectCounts": {
+    "schemas": {
+      "sourceObjectCount": 3,
+      "restoredObjectCount": 3,
+      "identicalLegacyHashCount": 1,
+      "legacyAclHashOnlyMismatchCount": 2,
+      "directGranteePrivilegeMismatchCount": 0,
+      "canonicalGrantorPrivilegeMismatchCount": 0,
+      "missingCount": 0,
+      "additionalCount": 0
+    },
+    "tables": {
+      "sourceObjectCount": 94,
+      "restoredObjectCount": 94,
+      "identicalLegacyHashCount": 86,
+      "legacyAclHashOnlyMismatchCount": 8,
+      "directGranteePrivilegeMismatchCount": 0,
+      "canonicalGrantorPrivilegeMismatchCount": 0,
+      "missingCount": 0,
+      "additionalCount": 0
+    },
+    "functions": {
+      "sourceObjectCount": 322,
+      "restoredObjectCount": 322,
+      "identicalLegacyHashCount": 303,
+      "legacyAclHashOnlyMismatchCount": 19,
+      "directGranteePrivilegeMismatchCount": 0,
+      "canonicalGrantorPrivilegeMismatchCount": 0,
+      "missingCount": 0,
+      "additionalCount": 0
+    }
+  },
+  "legacyAclHashOnlyMismatchCount": 29,
+  "directGranteePrivilegeMismatchCount": 0,
+  "canonicalGrantorPrivilegeMismatchCount": 0,
+  "observedCanonicalAclApplicationCatalogParity": true,
+  "observedScopeOnly": true,
+  "sourceCatalogProvenance": "encrypted_backup_bracketed_readonly_v1",
+  "samePgDumpMvccSnapshot": false,
+  "restoreMismatchRootCauseProven": false,
+  "providerManagedFullRestore": false,
+  "providerCopyBlocksSkipped": 29,
+  "providerCopyBlocksProjected": 3,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "servingGate": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "interpretationLimits": [
+    "Every residual legacy ACL hash mismatch has equal canonical grantor-name/privilege/grantee-entry SHA-256 digests. No actual direct ACL drift is observed in this application catalog scope.",
+    "The original source and restored PostgreSQL role OIDs can differ. This observed canonical agreement cannot prove that role OID ordering is the exclusive root cause of all legacy hash differences.",
+    "Captured source witness bracket is not the same MVCC snapshot as the SQL dump.",
+    "No inherited/effective role membership graph or complete provider-owned/Hosted Auth/Storage/independent privacy continuum was verified.",
+    "The historic HOLD verdict must remain fail-closed; the separately recorded canonical observation does not imply DR or service restart acceptance."
+  ]
+}

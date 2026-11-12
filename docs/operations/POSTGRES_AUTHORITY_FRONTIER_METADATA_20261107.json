@@ -1,0 +1,2344 @@
+{
+  "schemaVersion": "ops-production-authority-metadata-v1",
+  "capturedOnKst": "2026-11-07",
+  "sourceAuditSqlPath": "scripts/operations/production-authority-frontier-readonly.sql",
+  "sourceAuditSqlBlobSha": "e796dadffb37996efbd3d474c46abbf47d0d8dcd",
+  "authorityScope": "SELECT-only PostgreSQL metadata for 19 selected application tables and 44 selected routines, plus chosen roles/schema ACLs, selected migration ledger hashes, registry flags and aggregate cost state. This is NOT all-schema SQL equivalence or hosted Auth/Storage recovery proof.",
+  "excluded": [
+    "user data rows",
+    "function source code",
+    "function arguments values",
+    "raw memories",
+    "JWT/key material",
+    "auth identities and sessions",
+    "storage object bytes",
+    "unselected tables and routines"
+  ],
+  "transactionReadOnly": "on",
+  "postgresqlVersion": "17.6",
+  "migrationCatalog": {
+    "latestVersion": "20261105075227",
+    "totalVersions": 241,
+    "selectedMigrations": [
+      {
+        "name": "seyeon_production_relationship_runtime_read_v1",
+        "version": "1460",
+        "statement_count": 0,
+        "reconstructed_bytes": null,
+        "reconstructed_sha256": null
+      },
+      {
+        "name": "seyeon_relationship_sync_outbox_v1",
+        "version": "1470",
+        "statement_count": 0,
+        "reconstructed_bytes": null,
+        "reconstructed_sha256": null
+      },
+      {
+        "name": "seyeon_production_context_runtime_v1",
+        "version": "1480",
+        "statement_count": 0,
+        "reconstructed_bytes": null,
+        "reconstructed_sha256": null
+      },
+      {
+        "name": "seyeon_production_chat_execution_runtime_v1",
+        "version": "1490",
+        "statement_count": 0,
+        "reconstructed_bytes": null,
+        "reconstructed_sha256": null
+      },
+      {
+        "name": "seyeon_post_turn_analysis_runtime_v1",
+        "version": "1500",
+        "statement_count": 0,
+        "reconstructed_bytes": null,
+        "reconstructed_sha256": null
+      },
+      {
+        "name": "seyeon_production_runtime_composition_v1",
+        "version": "1510",
+        "statement_count": 0,
+        "reconstructed_bytes": null,
+        "reconstructed_sha256": null
+      },
+      {
+        "name": "account_deletion_finalizer_relationship_runtime_sync",
+        "version": "1520",
+        "statement_count": 1,
+        "reconstructed_bytes": 14413,
+        "reconstructed_sha256": "56d37448d1ec43df24d60c07d9f08065a3301f6129a2dd174430fcfe099aeaec"
+      },
+      {
+        "name": "character_reading_artifact_durable_commit_v1",
+        "version": "1530",
+        "statement_count": 1,
+        "reconstructed_bytes": 17399,
+        "reconstructed_sha256": "b8c8726e15757559c0fee89e7a077f5d577fc246388b28fc835760a2b83eacef"
+      },
+      {
+        "name": "saju_source_proof_nonce_claim_authority_v1",
+        "version": "1540",
+        "statement_count": 1,
+        "reconstructed_bytes": 4753,
+        "reconstructed_sha256": "62649ab1f61e0b4433500509006781941c8041a785138c19abea2f776d382e81"
+      },
+      {
+        "name": "seyeon_ai_cost_ledger_v1",
+        "version": "1550",
+        "statement_count": 1,
+        "reconstructed_bytes": 12746,
+        "reconstructed_sha256": "b3ee764747d9d3c9740d1a0e1cfbfc0252b4eb588d6cb0b5823d0c49ebc25198"
+      },
+      {
+        "name": "seyeon_ai_call_lifecycle_v1",
+        "version": "1560",
+        "statement_count": 1,
+        "reconstructed_bytes": 10519,
+        "reconstructed_sha256": "75fe20fe1b3b87bfd77ddac57353bc2f67b74d694b92206c1452767ac66f500c"
+      },
+      {
+        "name": "seyeon_ai_cost_model_observability_v1",
+        "version": "1570",
+        "statement_count": 1,
+        "reconstructed_bytes": 3833,
+        "reconstructed_sha256": "4925a6006390d1bdecc33213018e579b175777c92666586e8153ed40644e03d6"
+      },
+      {
+        "name": "seyeon_ai_governor_atomic_admission_v1",
+        "version": "1580",
+        "statement_count": 1,
+        "reconstructed_bytes": 12181,
+        "reconstructed_sha256": "95ac530f7550b39c8314f2638d86a91b78a9d7f95248ef2eaad49e600a8870d9"
+      },
+      {
+        "name": "seyeon_ai_governor_atomic_settlement_v1",
+        "version": "1590",
+        "statement_count": 1,
+        "reconstructed_bytes": 12880,
+        "reconstructed_sha256": "4f76148e0aeff1637d811479651c04e2dd61010c991bef80d3673af3690185e0"
+      },
+      {
+        "name": "seyeon_ai_governor_rate_card_integrity_v1",
+        "version": "1600",
+        "statement_count": 1,
+        "reconstructed_bytes": 10110,
+        "reconstructed_sha256": "811794c64a307822589c096f4ce8bb0ac93bb5343fb188c3bfe6bf6ebb55fdcb"
+      },
+      {
+        "name": "seyeon_ai_governor_legacy_settlement_guard_v1",
+        "version": "1610",
+        "statement_count": 1,
+        "reconstructed_bytes": 17008,
+        "reconstructed_sha256": "273b19f1186d1556b8f5bf70ea7c4c62ebf4ddca1dccf07cd06d2496654d3b35"
+      },
+      {
+        "name": "seyeon_ai_governor_internal_start_v1",
+        "version": "1620",
+        "statement_count": 1,
+        "reconstructed_bytes": 10428,
+        "reconstructed_sha256": "d9cecc9352236e555073c21f29b9987a7acfbea8e2ea4b6c9b9ca89b059a3d91"
+      },
+      {
+        "name": "seyeon_governed_execution_role_v1",
+        "version": "1630",
+        "statement_count": 1,
+        "reconstructed_bytes": 2730,
+        "reconstructed_sha256": "bc2b2c6a9344d54ebcf2a4b6017444ce0f1fc441b89ae6931ce2739dbd3dd24c"
+      },
+      {
+        "name": "seyeon_zero_personal_source_pre_model_pin_v1",
+        "version": "1640",
+        "statement_count": 1,
+        "reconstructed_bytes": 10303,
+        "reconstructed_sha256": "ce347be8446be958c4ed6d5f2b9f527b1910032076652e3ffd021eebc9721b50"
+      },
+      {
+        "name": "seyeon_runtime_1460_1510_acl_before_owner_recovery",
+        "version": "20261008090417",
+        "statement_count": 1,
+        "reconstructed_bytes": 104021,
+        "reconstructed_sha256": "4f38e4483061a84899f0fcaa4a8d6cfa9e09ce1553b1d31089d4de9154c4d894"
+      },
+      {
+        "name": "seyeon_s0_http_receipt_runtime_v1",
+        "version": "20261025193416",
+        "statement_count": 1,
+        "reconstructed_bytes": 82624,
+        "reconstructed_sha256": "20f335556c0c861275100e76d4e3380296d0e8c4f211f89f29d09643279bcc98"
+      },
+      {
+        "name": "seyeon_chat_helper_service_role_least_privilege",
+        "version": "20261026025332",
+        "statement_count": 9,
+        "reconstructed_bytes": 6987,
+        "reconstructed_sha256": "0fd1fa55e2d8c6665c82b01e5a36d796f6d168365099ba08b986c360e9ca25e0"
+      },
+      {
+        "name": "s0_g0_original_member_message_source_20261101",
+        "version": "20261031182505",
+        "statement_count": 1,
+        "reconstructed_bytes": 3086,
+        "reconstructed_sha256": "0a82f51c60188afb32f9ea22252ef544206d4329169ecbb085f84c74fcb45cd0"
+      },
+      {
+        "name": "s0_g0_original_assistant_and_recent_context_20261101",
+        "version": "20261031182550",
+        "statement_count": 1,
+        "reconstructed_bytes": 12361,
+        "reconstructed_sha256": "1753bf4c284f587342404fed5aeef9d59baf081c4bcf2f5aec3107d2376a56b2"
+      },
+      {
+        "name": "s0_g0_relationship_original_lineage_scoped_owner_grant_20261101",
+        "version": "20261031182926",
+        "statement_count": 1,
+        "reconstructed_bytes": 10531,
+        "reconstructed_sha256": "6e46e6fba6c328120393b4592153d25f51d46aa464bea00aec43d398e5d813d4"
+      },
+      {
+        "name": "seyeon_zero_source_exact_selection_census_contract_20261101",
+        "version": "20261031205042",
+        "statement_count": 1,
+        "reconstructed_bytes": 6089,
+        "reconstructed_sha256": "acfc6b0071b9420df19a99b74fca40a42a1fc1c3f872d4c8c1326d827b19ef7f"
+      },
+      {
+        "name": "seyeon_zero_source_current_user_proof_12key_20261101",
+        "version": "20261101095105",
+        "statement_count": 1,
+        "reconstructed_bytes": 9033,
+        "reconstructed_sha256": "643bf0d2f9532b64686709b411e18ad9ead27c0a31d4a8eb28e3d3c0328b9fb3"
+      },
+      {
+        "name": "seyeon_zero_source_verified_history_pin_20261101",
+        "version": "20261101133954",
+        "statement_count": 1,
+        "reconstructed_bytes": 13933,
+        "reconstructed_sha256": "324dae7506d260110e7144708bd3b34dfa09c1295445aa36159a0efbc40f057c"
+      },
+      {
+        "name": "seyeon_recover_exact_failed_user_turn_20261102",
+        "version": "20261101151700",
+        "statement_count": 1,
+        "reconstructed_bytes": 4572,
+        "reconstructed_sha256": "c757c6696c19657643fb2c8f8ec7903a07d53d399b3b9e41ee1603daf7dcf3b0"
+      },
+      {
+        "name": "seyeon_explicit_failed_turn_supersede_20261102",
+        "version": "20261102060123",
+        "statement_count": 1,
+        "reconstructed_bytes": 5896,
+        "reconstructed_sha256": "fe20ee9e01500c1ea266ea3b0f497d43dde2d16b8e02023389a12b0096a28810"
+      },
+      {
+        "name": "seyeon_abandoned_g0_history_exclusion_20261102",
+        "version": "20261102060126",
+        "statement_count": 1,
+        "reconstructed_bytes": 5923,
+        "reconstructed_sha256": "6be817f46fed3c796a1ba99a0af68136d171f13de9fff0dfe7eb2ccbd5fab757"
+      },
+      {
+        "name": "seyeon_g0_followup_original_lineage_20261103",
+        "version": "20261103083731",
+        "statement_count": 1,
+        "reconstructed_bytes": 14694,
+        "reconstructed_sha256": "5ef8cdd2b83c648c6cb7cb4ba7f3bfa6b93cae54bc8ee42d2e972bcbad672108"
+      },
+      {
+        "name": "chat_owner_visible_history_private_rls_runtime_checker_20261104",
+        "version": "20261104043413",
+        "statement_count": 1,
+        "reconstructed_bytes": 15075,
+        "reconstructed_sha256": "689ec756ba696f9e62450a27d52370cdfb202e7f5b4fb9889665666170eb85a4"
+      }
+    ]
+  },
+  "roles": [
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "anon",
+      "rolinherit": true,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "authenticated",
+      "rolinherit": true,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_api_executor",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_chat_history_reader_v1",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_relationship_apply_owner",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_seyeon_governed_executor",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "rolinherit": false,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": false,
+      "rolcreaterole": false,
+      "rolreplication": false
+    },
+    {
+      "present": true,
+      "rolsuper": false,
+      "role_name": "service_role",
+      "rolinherit": true,
+      "rolcanlogin": false,
+      "rolcreatedb": false,
+      "rolbypassrls": true,
+      "rolcreaterole": false,
+      "rolreplication": false
+    }
+  ],
+  "memberships": [
+    {
+      "role_name": "anon",
+      "set_option": true,
+      "member_name": "authenticator",
+      "admin_option": false,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "anon",
+      "set_option": true,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": true
+    },
+    {
+      "role_name": "anon",
+      "set_option": true,
+      "member_name": "supabase_realtime_admin",
+      "admin_option": false,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "authenticated",
+      "set_option": true,
+      "member_name": "authenticator",
+      "admin_option": false,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "authenticated",
+      "set_option": true,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": true
+    },
+    {
+      "role_name": "authenticated",
+      "set_option": true,
+      "member_name": "supabase_realtime_admin",
+      "admin_option": false,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_api_executor",
+      "set_option": true,
+      "member_name": "myeongha_cf_api_login",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_api_executor",
+      "set_option": true,
+      "member_name": "myeongha_cf_hyperdrive_login",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_api_executor",
+      "set_option": true,
+      "member_name": "myeongha_runtime",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_api_executor",
+      "set_option": true,
+      "member_name": "myeongha_seyeon_subject_login",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_api_executor",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_chat_history_reader_v1",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_chat_history_reader_v1",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_seyeon_governed_executor",
+      "set_option": true,
+      "member_name": "myeongha_seyeon_governed_login",
+      "admin_option": false,
+      "grantor_name": "postgres",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_seyeon_governed_executor",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "set_option": false,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "service_role",
+      "set_option": true,
+      "member_name": "authenticator",
+      "admin_option": false,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    },
+    {
+      "role_name": "service_role",
+      "set_option": true,
+      "member_name": "postgres",
+      "admin_option": true,
+      "grantor_name": "supabase_admin",
+      "inherit_option": true
+    },
+    {
+      "role_name": "service_role",
+      "set_option": true,
+      "member_name": "supabase_realtime_admin",
+      "admin_option": false,
+      "grantor_name": "supabase_admin",
+      "inherit_option": false
+    }
+  ],
+  "schemaPrivileges": [
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "anon",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "anon",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "anon",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "authenticated",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "authenticated",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "authenticated",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_api_executor",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_api_executor",
+      "schema_name": "public"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_api_executor",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": true,
+      "create": true,
+      "role_name": "myeongha_chat_history_reader_v1",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_chat_history_reader_v1",
+      "schema_name": "public"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_chat_history_reader_v1",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_relationship_apply_owner",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_relationship_apply_owner",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_relationship_apply_owner",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "schema_name": "public"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_governed_executor",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_seyeon_governed_executor",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_governed_executor",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "schema_name": "seyeon_private"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "service_role",
+      "schema_name": "chat_private"
+    },
+    {
+      "usage": true,
+      "create": false,
+      "role_name": "service_role",
+      "schema_name": "public"
+    },
+    {
+      "usage": false,
+      "create": false,
+      "role_name": "service_role",
+      "schema_name": "seyeon_private"
+    }
+  ],
+  "tables": [
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "ai_execution_groundings",
+      "policy_count": 1,
+      "policy_sha256": "d4313a66d6ea139ee828de6a9622efac67c16b93cd77e2c5304cdaf84a81f2bc",
+      "table_acl_edges": 17,
+      "column_acl_edges": 3,
+      "table_acl_sha256": "ad5375d37c6c52a45b72c35c570be2e466222f5ba30e49d2f3698a7e068fb75a",
+      "column_acl_sha256": "b4c5632465911e3201f08fec9b285e2b05a459baae48c5228870afe5d2c9f4e4",
+      "force_row_security": false,
+      "row_security_enabled": false
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "ai_execution_logs",
+      "policy_count": 1,
+      "policy_sha256": "49a128c47ee32cf043ca77ce2f64cd5105620b3af2dde62a68881e0ad6df263e",
+      "table_acl_edges": 18,
+      "column_acl_edges": 11,
+      "table_acl_sha256": "3aa124442ba708b214a41795d6a0bbc673c59605d9e59ae9b763fb376838ab1c",
+      "column_acl_sha256": "0d5e9a4097cf579d9c9c6483c4ac8ff6543207ce07c70ce35bc8b8acbc87361f",
+      "force_row_security": false,
+      "row_security_enabled": false
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "chat_turn_attempts",
+      "policy_count": 3,
+      "policy_sha256": "f95ea12bcacea856505a56b7de6a5e2dbae846d21f31672d37aee30cc6b2c452",
+      "table_acl_edges": 23,
+      "column_acl_edges": 6,
+      "table_acl_sha256": "a27708a4949dff0b0ef493375e4a27f8624a15b98063caf13dd075d450b6f335",
+      "column_acl_sha256": "ac2f61b5aad3b58e57f70f853fd9fbbb8973e0c0a5cd7bb315d910f6600eb41b",
+      "force_row_security": false,
+      "row_security_enabled": false
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "chat_turns",
+      "policy_count": 3,
+      "policy_sha256": "12a0c73cf0727b8da091222efa61a1dee73f56c599d1657d9300722776bd2c09",
+      "table_acl_edges": 23,
+      "column_acl_edges": 6,
+      "table_acl_sha256": "a27708a4949dff0b0ef493375e4a27f8624a15b98063caf13dd075d450b6f335",
+      "column_acl_sha256": "c0b85d83a0b529445a4876e273790905df44f35f9b775351052b4758de208e45",
+      "force_row_security": false,
+      "row_security_enabled": false
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "conversation_messages",
+      "policy_count": 6,
+      "policy_sha256": "281898afc75e42083b6f2e02337440ffcada768d70201f36ead3e01bbd534585",
+      "table_acl_edges": 20,
+      "column_acl_edges": 22,
+      "table_acl_sha256": "2aa8e7a157c0a9df74a9fa9671538df9578b1638a4ded3c3cddd8882f88e938d",
+      "column_acl_sha256": "541c73ea7a2491bd219c2eddcca2a0ed4bffec3e6ba0855d90b4dd6c9e0d4aa0",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "conversation_thread_characters",
+      "policy_count": 7,
+      "policy_sha256": "b71bc365e5e66e2ff8a7b3a13b4059b32b6df6bc481301aad6fd769332a099dc",
+      "table_acl_edges": 19,
+      "column_acl_edges": 22,
+      "table_acl_sha256": "acc5053020f8e15e0047375d45235f105e674214b7a666c775ef8705a37ab0bb",
+      "column_acl_sha256": "234ff51ebc6a08ab041644dc1d8977cfa21405e1decd0f77fe1482f9b015008b",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "conversation_threads",
+      "policy_count": 9,
+      "policy_sha256": "695853cf2d630529924a02c31189f81be13c877ffa8539845e43a68aeb8ada54",
+      "table_acl_edges": 22,
+      "column_acl_edges": 25,
+      "table_acl_sha256": "8b8320118107a5d589f1c0ddea4cab46eaa2ddf736613a4b6e93bbb3901c0d2d",
+      "column_acl_sha256": "f6c3541e3d8abeab40033269c8805d57156e2b70316a5b0c30ff557d0fda52bd",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "memory_items",
+      "policy_count": 3,
+      "policy_sha256": "63d8bf981ba45d8fcf8552f1ed08723b955efee96fb55238917b393214236bc8",
+      "table_acl_edges": 16,
+      "column_acl_edges": 26,
+      "table_acl_sha256": "fbb99f0fbaa8b0b8f2a53918f48ce0c41eea1785bb41e13c472207ff3194ca53",
+      "column_acl_sha256": "13a781e19efa11f3c7154b2cc7d74085ad1a649df28aec5aa2061de7f70120ee",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "memory_proposals",
+      "policy_count": 2,
+      "policy_sha256": "c492c2aaf7cc2fbcd2c9cb7c56085303db972306829aaefd64fed7ad205d4052",
+      "table_acl_edges": 16,
+      "column_acl_edges": 14,
+      "table_acl_sha256": "fbb99f0fbaa8b0b8f2a53918f48ce0c41eea1785bb41e13c472207ff3194ca53",
+      "column_acl_sha256": "2ecfcbf23e6932b288aa775a6424e021a9c44696ac1a5a8ad2b6e638b3f1e486",
+      "force_row_security": false,
+      "row_security_enabled": false
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "outbox_events",
+      "policy_count": 10,
+      "policy_sha256": "1239cfbaf47517725fa301cbe5b95315a7665b73ac75009c432e5329714279dd",
+      "table_acl_edges": 23,
+      "column_acl_edges": 19,
+      "table_acl_sha256": "4b7350d6b7a629a221713ce8b9e317ddbd1db46ebf9dfd34c8def426921d8034",
+      "column_acl_sha256": "4234d18e2b0f3632a346f39e0054b50f69d3de8e4c56ddaef1f7ed7ab2dbb0e0",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "record_access_grants",
+      "policy_count": 3,
+      "policy_sha256": "7886a7b55856357262410d0a77fe293e3af9b26e750588337b1969442544568c",
+      "table_acl_edges": 16,
+      "column_acl_edges": 16,
+      "table_acl_sha256": "fbb99f0fbaa8b0b8f2a53918f48ce0c41eea1785bb41e13c472207ff3194ca53",
+      "column_acl_sha256": "d1d312bd42f9ff4d6a93db0047031e3f5fbb18214510636135c794b1e190ded3",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "relationship_event_provenance_refs",
+      "policy_count": 3,
+      "policy_sha256": "61215efe120e8e0c4fba3f8c80f359a3cb4871230c6fecbdfb77b3f4015aaf4d",
+      "table_acl_edges": 19,
+      "column_acl_edges": 0,
+      "table_acl_sha256": "c49b813f3e6af89372ab2d2ee01f825e405568e2167f1860fd8383765d9abf2f",
+      "column_acl_sha256": "97406f20af80d668922e7e3dee634c3c23ed42da8d7b64d367ee4b9061ac799f",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "relationship_event_records",
+      "policy_count": 3,
+      "policy_sha256": "a21db0510f6c148bbb29b9d0b58cb2bf646f2a6007df285003245efeec7ecf19",
+      "table_acl_edges": 19,
+      "column_acl_edges": 0,
+      "table_acl_sha256": "c49b813f3e6af89372ab2d2ee01f825e405568e2167f1860fd8383765d9abf2f",
+      "column_acl_sha256": "97406f20af80d668922e7e3dee634c3c23ed42da8d7b64d367ee4b9061ac799f",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "relationship_history_entries",
+      "policy_count": 3,
+      "policy_sha256": "d483455ddd5883b78c24ba1ad3ebff0637c3e8e97103b216834e0b67b5f46982",
+      "table_acl_edges": 19,
+      "column_acl_edges": 0,
+      "table_acl_sha256": "c49b813f3e6af89372ab2d2ee01f825e405568e2167f1860fd8383765d9abf2f",
+      "column_acl_sha256": "97406f20af80d668922e7e3dee634c3c23ed42da8d7b64d367ee4b9061ac799f",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "seyeon_ai_call_cost_events",
+      "policy_count": 6,
+      "policy_sha256": "7b80b0b64abff344cd2697e7021ba5c9af55e14a6f444458bf1d3f82e257c67f",
+      "table_acl_edges": 20,
+      "column_acl_edges": 25,
+      "table_acl_sha256": "84c042223407487a5e938dd4f0a7dccbc4235213e6e2c64935cc00242d26db57",
+      "column_acl_sha256": "483d75bf454c806a86b7dac412595c1aba0f8e7dcb2f96898a55dbcb65cf9b57",
+      "force_row_security": true,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "seyeon_ai_governor_daily_budgets_v1",
+      "policy_count": 2,
+      "policy_sha256": "155d17c47de25bbc405875c80ebc8764bb7856d58d611933e6d4867cb2153b2f",
+      "table_acl_edges": 16,
+      "column_acl_edges": 0,
+      "table_acl_sha256": "bb45e495d33132ddae3f866bac47077026af5714ec3b0c125e370d638e079107",
+      "column_acl_sha256": "97406f20af80d668922e7e3dee634c3c23ed42da8d7b64d367ee4b9061ac799f",
+      "force_row_security": true,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "seyeon_ai_governor_model_policies_v1",
+      "policy_count": 1,
+      "policy_sha256": "29f8c79518027a08da83de771bb87ba9bec4c083973ca87f77c24c3daa04bb64",
+      "table_acl_edges": 16,
+      "column_acl_edges": 0,
+      "table_acl_sha256": "bb45e495d33132ddae3f866bac47077026af5714ec3b0c125e370d638e079107",
+      "column_acl_sha256": "97406f20af80d668922e7e3dee634c3c23ed42da8d7b64d367ee4b9061ac799f",
+      "force_row_security": true,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "seyeon_positive_source_type_registry_v1",
+      "policy_count": 0,
+      "policy_sha256": "6dc64228b0edb27905edab91f9f3e24ab336a5a7cfb30ad50f69a3ae2a03a5fd",
+      "table_acl_edges": 8,
+      "column_acl_edges": 0,
+      "table_acl_sha256": "a4865fdfed8e11ec8570e6da524f5b7dfec4ddea8ffea3dfed269cf1d074ed3c",
+      "column_acl_sha256": "97406f20af80d668922e7e3dee634c3c23ed42da8d7b64d367ee4b9061ac799f",
+      "force_row_security": false,
+      "row_security_enabled": true
+    },
+    {
+      "present": true,
+      "owner_name": "postgres",
+      "table_name": "subjects",
+      "policy_count": 20,
+      "policy_sha256": "0f5e3146fd901eb862e92adfa0ade04d19d7bb0e699c22ce6bab4c175c9e7c6d",
+      "table_acl_edges": 16,
+      "column_acl_edges": 60,
+      "table_acl_sha256": "fbb99f0fbaa8b0b8f2a53918f48ce0c41eea1785bb41e13c472207ff3194ca53",
+      "column_acl_sha256": "b9b7a5e37ea1987f8f28720f07bffed9140c85b1207548f93d4a6f3198257653",
+      "force_row_security": false,
+      "row_security_enabled": true
+    }
+  ],
+  "effectiveTablePrivileges": [
+    {
+      "role_name": "myeongha_api_executor",
+      "table_name": "conversation_threads",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "chat_turn_attempts",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "chat_turns",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "conversation_messages",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "conversation_thread_characters",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "conversation_threads",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "outbox_events",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "relationship_event_provenance_refs",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "relationship_event_records",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT"
+      ]
+    },
+    {
+      "role_name": "myeongha_relationship_apply_owner",
+      "table_name": "relationship_history_entries",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "ai_execution_groundings",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "ai_execution_logs",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "chat_turn_attempts",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "chat_turns",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "conversation_messages",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "conversation_thread_characters",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "conversation_threads",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "outbox_events",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "relationship_event_provenance_refs",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "relationship_event_records",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "relationship_history_entries",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_chat_runtime_owner",
+      "table_name": "seyeon_positive_source_type_registry_v1",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "chat_turn_attempts",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "chat_turns",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "seyeon_ai_call_cost_events",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "seyeon_ai_governor_daily_budgets_v1",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_cost_meter_owner",
+      "table_name": "seyeon_ai_governor_model_policies_v1",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "table_name": "chat_turn_attempts",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "table_name": "chat_turns",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "table_name": "conversation_messages",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "table_name": "conversation_thread_characters",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "table_name": "conversation_threads",
+      "effective_privileges": [
+        "SELECT"
+      ]
+    },
+    {
+      "role_name": "myeongha_seyeon_post_turn_owner",
+      "table_name": "outbox_events",
+      "effective_privileges": [
+        "SELECT",
+        "UPDATE"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "ai_execution_groundings",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "ai_execution_logs",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "chat_turn_attempts",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "chat_turns",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "conversation_messages",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "conversation_thread_characters",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "conversation_threads",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "memory_items",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "memory_proposals",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "outbox_events",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "record_access_grants",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "relationship_event_provenance_refs",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "relationship_event_records",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "relationship_history_entries",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "seyeon_ai_call_cost_events",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "seyeon_ai_governor_daily_budgets_v1",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "seyeon_ai_governor_model_policies_v1",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    },
+    {
+      "role_name": "service_role",
+      "table_name": "subjects",
+      "effective_privileges": [
+        "SELECT",
+        "INSERT",
+        "UPDATE",
+        "DELETE",
+        "TRUNCATE",
+        "REFERENCES",
+        "TRIGGER"
+      ]
+    }
+  ],
+  "functions": [
+    {
+      "acl_sha256": "39b387ac02bb0498da4d8d037c6a391750a95ee93c77d3df0719e45bfed25ac0",
+      "owner_name": "myeongha_chat_history_reader_v1",
+      "volatility": "v",
+      "schema_name": "chat_private",
+      "anon_execute": false,
+      "function_name": "qry_chat_thread_owner_visible_history_v1",
+      "function_config": [
+        "search_path=\"\"",
+        "row_security=on"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_after_sequence_no bigint, p_page_size integer",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": true
+    },
+    {
+      "acl_sha256": "4b39a68ee0f13b63887b7091c553990033738126b2b63b1ff2887eaf74700ee5",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "s",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "assert_seyeon_chat_thread_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": false,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_accept_seyeon_private_conversation_recall_proposal_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_proposal_id uuid, p_memory_item_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_allocate_seyeon_chat_attempt_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_planner_version text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+      "owner_name": "myeongha_seyeon_post_turn_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_checkpoint_seyeon_post_turn_analysis_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text, p_checkpoint_jsonb jsonb",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+      "owner_name": "myeongha_seyeon_post_turn_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_claim_seyeon_post_turn_analysis_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text, p_lease_expires_at timestamp with time zone",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+      "owner_name": "myeongha_relationship_apply_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_claim_seyeon_relationship_sync_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text, p_lease_expires_at timestamp with time zone",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "f98650ae8ce07b7a1a3eec06ac14679f9f90c81f34a885e3560f7537c38a1bbf",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_commit_chat_turn_legacy_v1",
+      "function_config": [
+        "search_path=public, pg_temp"
+      ],
+      "security_definer": false,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_message_id uuid, p_outbox_event_id uuid, p_relationship_effect_jsonb jsonb, p_world_event_jsonb jsonb, p_memory_accept_jsonb jsonb",
+      "api_executor_execute": false,
+      "service_role_execute": true,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_commit_seyeon_chat_turn_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_message_id uuid, p_outbox_event_id uuid",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_commit_seyeon_chat_turn_runtime_v2",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_message_id uuid, p_chat_outbox_event_id uuid, p_post_turn_outbox_event_id uuid, p_post_turn_snapshot_jsonb jsonb, p_post_turn_snapshot_hash text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+      "owner_name": "myeongha_seyeon_post_turn_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_complete_seyeon_post_turn_analysis_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+      "owner_name": "myeongha_relationship_apply_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_complete_seyeon_relationship_sync_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_outbox_event_id uuid, p_lock_owner text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+      "owner_name": "myeongha_relationship_apply_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_enqueue_seyeon_relationship_sync_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_outbox_event_id uuid, p_turn_id uuid, p_production_event_jsonb jsonb",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_fail_seyeon_chat_attempt_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_failure_state text, p_error_code text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_mark_seyeon_chat_context_ready_pinned_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_source_proof_jsonb jsonb",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_mark_seyeon_chat_context_ready_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_mark_seyeon_positive_context_ready_pinned_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_record_id uuid, p_original_grant_id uuid, p_record_type text, p_schema_version text, p_projector_version text, p_selected_sources_digest text, p_projected_memory_digest text, p_final_model_context_digest text, p_expected_record_pg_digest text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_persist_seyeon_chat_generated_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_thread_character_id uuid, p_ai_execution_log_id uuid, p_provider text, p_model text, p_renderer_version text, p_body_text text, p_message_payload_jsonb jsonb, p_message_schema_version text, p_content_hash text, p_grounding_refs_jsonb jsonb",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_persist_seyeon_chat_validated_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_attempt_id uuid, p_ai_execution_log_id uuid, p_provider text, p_model text, p_output_guard_version text, p_generated_content_hash text, p_validation_result_jsonb jsonb, p_grounding_refs_jsonb jsonb",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_receive_seyeon_chat_turn_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_client_turn_id text, p_request_hash text, p_request_contract_version text, p_request_snapshot_jsonb jsonb, p_expected_content_release_id uuid, p_expected_content_bundle_id uuid, p_turn_id uuid, p_message_id uuid, p_user_body_text text, p_user_content_hash text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "cmd_seyeon_supersede_stale_failed_turn_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_new_text text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_chat_thread_owner_visible_history_v1",
+      "function_config": [
+        "search_path=\"\""
+      ],
+      "security_definer": false,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_after_sequence_no bigint, p_page_size integer",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "fcdd412ed63bcf8c7590807503f19c129a4c9d4cd4084660084f89a6366b51e1",
+      "owner_name": "myeongha_relationship_apply_owner",
+      "volatility": "s",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_production_relationship_history_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_character_id text, p_through_revision bigint",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "6d65c6dbdd9904664ba313d8777f79280a1748de63cfeba73726ec9580a95e6f",
+      "owner_name": "myeongha_relationship_apply_owner",
+      "volatility": "s",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_production_relationship_runtime_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_character_id text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_seyeon_g0_current_source_recent_messages_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_current_user_message_id uuid, p_limit integer",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_seyeon_g0_current_source_relationship_history_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_character_id text, p_through_revision bigint",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "5cf99e179cb2a3ffd73d33ac6fb654b8a45863750690aeca3b554d6d4f7ad93e",
+      "owner_name": "myeongha_seyeon_post_turn_owner",
+      "volatility": "s",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_seyeon_post_turn_analysis_job_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926",
+      "owner_name": "postgres",
+      "volatility": "s",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_seyeon_production_personal_record_context_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": false,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_character_id text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "c6219e43a5ba316273abf062124a425673547c08d61016c0ef133e88efbaa03d",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "public",
+      "anon_execute": false,
+      "function_name": "qry_seyeon_recover_exact_failed_user_turn_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_user_text text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "7306c389efc4a76887d306e0c29b51aff4e146127ff847734290fa5e5e5b7568",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "assert_current_original_assistant_lineage_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": true
+    },
+    {
+      "acl_sha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "assert_current_original_member_user_message_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_user_message_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "cdcfbc02576d08a8439bcfc47daf7326bfcd95edb793fe5d26fac60c10b543fd",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "assert_g0_zero_assistant_lineage_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_assistant_message_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "cmd_ack_seyeon_positive_reply_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_attempt_id uuid, p_proof text",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "cmd_request_seyeon_memory_revoke_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_memory_id uuid",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "87c96523cf69d4787b74054ee4e58f5ced9893a08af0bc16f2d9681c2e6a5926",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "cmd_revoke_seyeon_memory_grant_v1",
+      "function_config": [
+        "search_path=pg_catalog, public, pg_temp",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_memory_item_id uuid",
+      "api_executor_execute": true,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "guard_positive_delivery_receipt_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": false,
+      "chat_owner_execute": false,
+      "identity_arguments": "",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "guard_positive_delivery_source_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "0cc602538b89896ab95ed88970af7297a8c91f22ecd0e25f48ff267a57743d5f",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "lock_g0_original_message_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject uuid, p_thread uuid, p_message uuid, p_sender text",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "0cc602538b89896ab95ed88970af7297a8c91f22ecd0e25f48ff267a57743d5f",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "lock_memory_source_message_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_turn_id uuid, p_message_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "0cc602538b89896ab95ed88970af7297a8c91f22ecd0e25f48ff267a57743d5f",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "lock_memory_subject_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "0cc602538b89896ab95ed88970af7297a8c91f22ecd0e25f48ff267a57743d5f",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "lock_original_memory_grant_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_subject_id uuid, p_memory_id uuid, p_grant_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+      "owner_name": "postgres",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "lock_positive_first_memory_reply_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_thread_id uuid, p_turn_id uuid, p_attempt_id uuid, p_expected_user_message_id uuid, p_expected_assistant_message_id uuid, p_expected_post_turn_outbox_event_id uuid, p_expected_client_turn_id text, p_delivery_receipt_hash bytea",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "4b39a68ee0f13b63887b7091c553990033738126b2b63b1ff2887eaf74700ee5",
+      "owner_name": "myeongha_seyeon_chat_runtime_owner",
+      "volatility": "v",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "lock_positive_source_registry_v1",
+      "function_config": [
+        "search_path=pg_catalog, public"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": true,
+      "identity_arguments": "p_record_type text, p_schema_version text, p_projector_version text",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    },
+    {
+      "acl_sha256": "fd09fe04476fa2c33960047c1d5819ba9b9b0801cdd17319e24e9ac93e244bc2",
+      "owner_name": "postgres",
+      "volatility": "s",
+      "schema_name": "seyeon_private",
+      "anon_execute": false,
+      "function_name": "pending_positive_delivery_v1",
+      "function_config": [
+        "search_path=pg_catalog, public",
+        "row_security=off"
+      ],
+      "security_definer": true,
+      "chat_owner_execute": false,
+      "identity_arguments": "p_subject_id uuid, p_memory_id uuid, p_grant_id uuid",
+      "api_executor_execute": false,
+      "service_role_execute": false,
+      "authenticated_execute": false,
+      "history_reader_execute": false
+    }
+  ],
+  "positiveSourceRegistry": [
+    {
+      "enabled": false,
+      "record_kind": "memory",
+      "record_type": "conversation_recall",
+      "schema_version": "v1",
+      "writable_enabled": false,
+      "projector_version": "seyeon-conversation-recall-projector-v1"
+    }
+  ],
+  "positiveMemoryAndAiCostBoundary": {
+    "proposalCounts": {
+      "total": 0,
+      "pending": 0
+    },
+    "costLedgerSummary": {
+      "total": 29,
+      "settled": 29,
+      "unsettled": 0,
+      "latestEventAt": "2026-11-06T06:34:54.742037+00:00",
+      "earliestEventAt": "2026-10-25T20:35:54.305929+00:00",
+      "effectiveMicroUsd": 294968,
+      "unknownUsageCount": 1,
+      "ownerDailyLimitExemptCount": 24
+    },
+    "dailyBudgetWindow": {
+      "latest": "2026-10-31",
+      "earliest": "2026-10-25",
+      "rowCount": 7,
+      "currentUtcDayCount": 0
+    },
+    "activeModelPolicies": [
+      {
+        "model": "gpt-5.6-terra",
+        "active": true,
+        "provider": "openai-responses",
+        "policyVersion": "seyeon-s0-receipt-production-20261025"
+      },
+      {
+        "model": "z-ai/glm-5.3-flash",
+        "active": true,
+        "provider": "openrouter-chat",
+        "policyVersion": "seyeon-glm53flash-context-capacity-20261031"
+      }
+    ],
+    "unrevokedMemoryItems": 1,
+    "positiveCommitApiExecute": true,
+    "proposalAcceptApiExecute": false,
+    "legacyCommitServiceExecute": true
+  },
+  "noProductionMutation": true
+}

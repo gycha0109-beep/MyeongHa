@@ -1,20 +1,25 @@
+/* Display/body web fonts: keep local Korean system fallbacks if CDN is unavailable. */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@600;700;800&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css");
+
 :root {
   color-scheme: light;
-  --mh-paper-base: #f2e9df;
-  --mh-paper-raised: #f7f0e7;
-  --mh-paper-muted: #ede1d4;
-  --mh-ink-strong: #242529;
-  --mh-ink: #3c3836;
-  --mh-ink-muted: #665951;
-  --mh-ink-faint: #83766e;
+  --mh-paper-base: #f6f0e9;
+  --mh-paper-raised: #fffbf6;
+  --mh-paper-muted: #efe3d9;
+  --mh-ink-strong: #2c2530;
+  --mh-ink: #403641;
+  --mh-ink-muted: #655866;
+  --mh-ink-faint: #786b72;
   --mh-night-900: #1d2129;
   --mh-night-800: #252d3a;
   --mh-night-700: #313a49;
-  --mh-brass-strong: #a98250;
+  --mh-brass-strong: #946a35;
   --mh-brass: #b99a70;
   --mh-brass-faint: #d6c1a4;
   --mh-seal: #823332;
   --mh-seal-soft: #a65a50;
+  --mh-title-accent: #71354f;
   --mh-line: rgba(120, 91, 57, .22);
   --mh-line-strong: rgba(130, 92, 51, .42);
   --mh-shadow: 0 14px 42px rgba(77, 53, 31, .09);
@@ -23,7 +28,7 @@
   --mh-radius-lg: 16px;
   --mh-max: 1320px;
   --mh-serif: "Noto Serif KR", "Nanum Myeongjo", "Batang", serif;
-  --mh-sans: "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", system-ui, sans-serif;
+  --mh-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -33,6 +38,7 @@ body.product-page {
   margin: 0;
   color: var(--mh-ink-strong);
   font-family: var(--mh-sans);
+  font-weight: 500;
   background:
     radial-gradient(circle at 82% 5%, rgba(71, 80, 92, .055), transparent 22rem),
     radial-gradient(circle at 8% 88%, rgba(169, 130, 80, .06), transparent 26rem),
@@ -553,6 +559,14 @@ body.product-page::before {
   gap: 28px;
   flex-wrap: wrap;
 }
+.product-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+}
+.product-footer-unavailable { opacity: .76; cursor: default; }
 .product-footer-seal { color: var(--mh-seal); font-family: var(--mh-serif); }
 .mobile-bottom-nav { display: none; }
 

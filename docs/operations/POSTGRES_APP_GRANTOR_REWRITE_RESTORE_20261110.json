@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "ops-application-direct-membership-portable-grantor-rewrite-observation-v1",
+  "scope": "Gate 1 / Phase 8-A / app-to-app direct role grantor portability",
+  "backup": {
+    "workflowRunId": 42584865734,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42584865734",
+    "encryptedArtifactId": 13658419071,
+    "sourceSha": "07ae476f7913930c8880e70b5766d23c30a53f8a",
+    "migrationFrontier": "20261109071019"
+  },
+  "previousRestoreRunId": 42587519188,
+  "comparisonCode": {
+    "pullRequest": 3182,
+    "mergedMainSha": "0714b06bd04a79a5f27819137475a6f8207d4f9e",
+    "integrationRunId": 42734339010,
+    "requiredIntegrationConclusion": "success"
+  },
+  "restore": {
+    "workflowRunId": 42740306678,
+    "runUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/42740306678",
+    "artifactId": 13729550427,
+    "conclusion": "success",
+    "sourceBackupRunId": 42584865734,
+    "isolatedTarget": "Supabase PostgreSQL 17",
+    "incidentReferenceUtc": "2026-11-09T08:21:20Z"
+  },
+  "artifactFileSha256": {
+    "app-schema-parity.json": "ee79a1733be85db6395765de03ede9b516e43eef18b45f4f04fbb7c66a57b204",
+    "restore-evidence.json": "a07acc2ff481db9c66cf268e0f7c8b9bfa7f1968618e6da86b245447401fc339",
+    "privacy-reconciliation-evidence.json": "e3ca0050996fb819c11b26f3323d1cfa940e63be67c4549612cb650a45a637fe",
+    "recovered-serving-admission.json": "4ec989e6a996172bcc824170677b9fc7203fc1a5c5ee6cd72bc4f81395da1067"
+  },
+  "applicationDirectRoleGraph": {
+    "sourceWitnessAvailable": true,
+    "scope": "myeongha_to_myeongha_direct_membership_only_v1",
+    "providerBoundaryMembershipsIncluded": false,
+    "observedMembershipOptionsParity": true,
+    "observedGrantorAttributionParity": false,
+    "observedPortableGrantorRewriteCompatibility": true,
+    "counts": {
+      "sourceRoleCount": 43,
+      "restoredRoleCount": 43,
+      "sourceDirectMembershipCount": 7,
+      "restoredDirectMembershipCount": 7,
+      "missingRoleCount": 0,
+      "addedRoleCount": 0,
+      "roleAttributesDifferentCount": 0,
+      "missingMembershipEntryCount": 0,
+      "addedMembershipEntryCount": 0,
+      "grantorAttributionDifferenceGroupCount": 7,
+      "portablePostgresGrantorRewriteCompatibleGroupCount": 7,
+      "unexplainedGrantorAttributionDifferenceGroupCount": 0,
+      "portableRoleGrantorNormalizationCount": 7
+    }
+  },
+  "sourceCatalogProvenance": "encrypted_backup_bracketed_readonly_v1",
+  "sourceCatalogBoundToBackupSnapshot": false,
+  "observedCanonicalAclApplicationCatalogParity": true,
+  "migrationFrontierAligned": true,
+  "applicationScopeVerdict": "HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH",
+  "verifiedFullSchemaCatalogEquivalence": false,
+  "roleMembershipParityProven": false,
+  "fullProviderManagedRestore": false,
+  "providerManagedCopyBlocksSkipped": 29,
+  "providerManagedCopyBlocksProjected": 3,
+  "fullMigrationLedgerRestored": false,
+  "authoritativePrivacyReconciliation": false,
+  "futureSafePrivacyReconciliation": false,
+  "syntheticPrivacyReplayEventCount": 4,
+  "servingGate": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "interpretationLimits": [
+    "All seven observed application-to-application grantor difference groups matched the narrowly defined expected postgres-to-supabase_admin portable replay substitution; no unexplained group was observed.",
+    "The observed portable rewrite pattern is not proof of identical original grantor provenance, unchanged effective or inherited privileges, or causal identity across a shared MVCC source/backup snapshot.",
+    "Provider cross-boundary role grants, complete migration ledger, provider COPY, Hosted Auth and Storage, independent nonzero privacy ledger continuity, and end-to-end RPO/RTO remain outside this evidence.",
+    "The legacy 29-object raw ACL fingerprint HOLD remains; no Production roles, grants, data, IAM, secrets, or Hosted settings were changed."
+  ]
+}

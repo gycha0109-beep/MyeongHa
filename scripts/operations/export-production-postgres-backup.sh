@@ -117,6 +117,43 @@ migration_catalog_canonical="$(jq -ec --argjson frontier "$migration_frontier" '
 migration_catalog_version_count="$(jq -er '.version_count' <<<"$migration_catalog_canonical")"
 migration_catalog_sha256="$(jq -er '.catalog_sha256' <<<"$migration_catalog_canonical")"
 
+
+# Capture all application schema/owner/RLS/ACL digests on either side of
+# the protected dump. These are independent read-only transactions, NOT
+# the same exported PostgreSQL snapshot as roles/schema/data pg_dump.
+capture_application_catalog() {
+  PGOPTIONS='-c default_transaction_read_only=on -c statement_timeout=90000' \
+    psql -X -qAt --set ON_ERROR_STOP=1 \
+    --file scripts/operations/production-app-schema-fingerprint-readonly.sql
+}
+source_catalog_before_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+source_catalog_before="$(capture_application_catalog)"
+source_catalog_canonical="$(jq -ecS --arg frontier "$migration_frontier" '
+  select(.schemaVersion == "ops-postgres-application-schema-fingerprint-v1"
+    and .transactionReadOnly == "on"
+    and (.postgresVersion | startswith("17."))
+    and (.migrationCatalog.latestVersion | tostring) == $frontier
+    and (.migrationCatalog.totalVersions | type) == "number"
+    and .migrationCatalog.totalVersions > 0
+    and (.schemas | type) == "array" and (.tables | type) == "array"
+    and (.functions | type) == "array"
+    and (.schemas | length) == .schemaCount
+    and (.tables | length) == .tableCount
+    and (.functions | length) == .functionCount
+    and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"
+    and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false
+    and (.applicationRoleGraph.roles | type) == "array"
+    and (.applicationRoleGraph.roles | length) > 0
+    and (.applicationRoleGraph.directMemberships | type) == "array"
+    and .applicationExternalRoleBoundary.scope == "myeongha_to_non_myeongha_direct_membership_only_v1"
+    and .applicationExternalRoleBoundary.providerOwnedOnlyProven == false
+    and .applicationExternalRoleBoundary.inheritedEffectiveAccessIncluded == false
+    and (.applicationExternalRoleBoundary.directMemberships | type) == "array")
+' <<<"$source_catalog_before")" || {
+  echo 'HOLD_APPLICATION_CATALOG: invalid source before dump.' >&2
+  exit 1
+}
+
 bash scripts/operations/run-production-postgres-strict-dump.sh roles "$backup_dir/roles.sql"
 bash scripts/operations/run-production-postgres-strict-dump.sh schema "$backup_dir/schema.sql"
 bash scripts/operations/run-production-postgres-strict-dump.sh data "$backup_dir/data.sql"
@@ -136,6 +173,74 @@ if [[ "$(jq -c . <<<"$migration_catalog_after")" != "$migration_catalog_canonica
   exit 1
 fi
 
+
+source_catalog_after="$(capture_application_catalog)"
+source_catalog_after_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+source_catalog_after_canonical="$(jq -ecS --arg frontier "$migration_frontier" '
+  select(.schemaVersion == "ops-postgres-application-schema-fingerprint-v1"
+    and .transactionReadOnly == "on"
+    and (.postgresVersion | startswith("17."))
+    and (.migrationCatalog.latestVersion | tostring) == $frontier
+    and (.migrationCatalog.totalVersions | type) == "number"
+    and .migrationCatalog.totalVersions > 0
+    and (.schemas | type) == "array" and (.tables | type) == "array"
+    and (.functions | type) == "array"
+    and (.schemas | length) == .schemaCount
+    and (.tables | length) == .tableCount
+    and (.functions | length) == .functionCount
+    and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"
+    and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false
+    and (.applicationRoleGraph.roles | type) == "array"
+    and (.applicationRoleGraph.roles | length) > 0
+    and (.applicationRoleGraph.directMemberships | type) == "array"
+    and .applicationExternalRoleBoundary.scope == "myeongha_to_non_myeongha_direct_membership_only_v1"
+    and .applicationExternalRoleBoundary.providerOwnedOnlyProven == false
+    and .applicationExternalRoleBoundary.inheritedEffectiveAccessIncluded == false
+    and (.applicationExternalRoleBoundary.directMemberships | type) == "array")
+' <<<"$source_catalog_after")" || {
+  echo 'HOLD_APPLICATION_CATALOG: invalid source after dump.' >&2
+  exit 1
+}
+[[ "$source_catalog_after_canonical" == "$source_catalog_canonical" ]] || {
+  echo 'HOLD_APPLICATION_CATALOG: source catalog changed across dump.' >&2
+  exit 1
+}
+
+# Full catalog metadata is encrypted with the backup, not uploaded as a
+# plaintext artifact. Only its digest appears in the public manifest.
+jq -S --arg project_ref "$SUPABASE_PROJECT_ID" \
+  --arg before "$source_catalog_before_at" \
+  --arg after "$source_catalog_after_at" \
+  --arg kst "$(TZ=Asia/Seoul date +%F)" '{
+    schemaVersion, transactionReadOnly,
+    postgresqlVersion: .postgresVersion, migrationCatalog,
+    schemas, tables, functions, applicationRoleGraph, applicationExternalRoleBoundary,
+    observedKstDate: $kst, projectRef: $project_ref,
+    sourceCatalogProvenance: "encrypted_backup_bracketed_readonly_v1",
+    sourceCatalogBracketStartUtc: $before,
+    sourceCatalogBracketEndUtc: $after,
+    sourceCatalogBracketStable: true,
+    sourceCatalogBoundToBackupSnapshot: false,
+    coverage: "public tables and public/seyeon_private/chat_private routines; structural, owner, RLS and ACL digests; application-internal roles plus direct app/external role edges only; no provider ownership classification, inherited effective rights, user rows or Hosted Auth/Storage"
+  }' <<<"$source_catalog_canonical" > "$backup_dir/source-app-catalog.json"
+# Do not successfully seal a new-format source catalog if the reviewed
+# read-only application role-graph witness is silently dropped in projection.
+jq -e '
+  .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"
+  and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false
+  and (.applicationRoleGraph.roles | type) == "array"
+  and (.applicationRoleGraph.roles | length) > 0
+  and (.applicationRoleGraph.directMemberships | type) == "array"
+  and .applicationExternalRoleBoundary.scope == "myeongha_to_non_myeongha_direct_membership_only_v1"
+  and .applicationExternalRoleBoundary.providerOwnedOnlyProven == false
+  and .applicationExternalRoleBoundary.inheritedEffectiveAccessIncluded == false
+  and (.applicationExternalRoleBoundary.directMemberships | type) == "array"
+' "$backup_dir/source-app-catalog.json" >/dev/null || {
+  echo 'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed internal or external application role membership witness.' >&2
+  exit 1
+}
+source_catalog_sha256="$(sha256sum "$backup_dir/source-app-catalog.json" | awk '{print $1}')"
+
 grep -Fq 'member_auth_rate_limit_buckets' "$backup_dir/schema.sql"
 if grep -Eq 'COPY[[:space:]]+public[.]member_auth_rate_limit_buckets|INSERT[[:space:]]+INTO[[:space:]]+public[.]member_auth_rate_limit_buckets' "$backup_dir/data.sql"; then
   echo 'Ephemeral Member Auth rate-limit counter data leaked into the governed backup.' >&2
@@ -144,7 +249,7 @@ fi
 
 (
   cd "$backup_dir"
-  sha256sum roles.sql schema.sql data.sql > plaintext-sha256.txt
+  sha256sum roles.sql schema.sql data.sql source-app-catalog.json > plaintext-sha256.txt
 )
 
 completed_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
@@ -157,6 +262,7 @@ jq -n \
   --arg completed_at "$completed_at" \
   --arg seyeon_early_history_sha256 "$seyeon_early_history_sha256" \
   --arg migration_catalog_sha256 "$migration_catalog_sha256" \
+  --arg source_catalog_sha256 "$source_catalog_sha256" \
   --argjson migration_catalog_version_count "$migration_catalog_version_count" \
   --argjson seyeon_early_history "$seyeon_early_history_canonical" \
   --argjson migration_frontier "$migration_frontier" \
@@ -170,6 +276,9 @@ jq -n \
     migration_frontier: $migration_frontier,
     migration_catalog_version_count: $migration_catalog_version_count,
     migration_catalog_sha256: $migration_catalog_sha256,
+    source_application_catalog_sha256: $source_catalog_sha256,
+    source_application_catalog_bracket_stable: true,
+    source_application_catalog_shared_pg_snapshot: false,
     seyeon_early_relationship_migration_history: $seyeon_early_history,
     seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256,
     ephemeral_data_exclusions: [
@@ -180,7 +289,7 @@ jq -n \
 plaintext_archive="$RUNNER_TEMP/myeongha-postgres-${backup_stamp}.tar.gz"
 encrypted_archive="${plaintext_archive}.enc"
 tar -C "$backup_dir" -czf "$plaintext_archive" \
-  roles.sql schema.sql data.sql plaintext-sha256.txt manifest.json
+  roles.sql schema.sql data.sql source-app-catalog.json plaintext-sha256.txt manifest.json
 
 openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000 \
   -in "$plaintext_archive" \
@@ -202,6 +311,7 @@ jq -n \
   --arg archive_name "$(basename "$encrypted_archive")" \
   --arg seyeon_early_history_sha256 "$seyeon_early_history_sha256" \
   --arg migration_catalog_sha256 "$migration_catalog_sha256" \
+  --arg source_catalog_sha256 "$source_catalog_sha256" \
   --argjson migration_catalog_version_count "$migration_catalog_version_count" \
   --argjson migration_frontier "$migration_frontier" \
   '{
@@ -214,6 +324,9 @@ jq -n \
     migration_frontier: $migration_frontier,
     migration_catalog_version_count: $migration_catalog_version_count,
     migration_catalog_sha256: $migration_catalog_sha256,
+    source_application_catalog_sha256: $source_catalog_sha256,
+    source_application_catalog_bracket_stable: true,
+    source_application_catalog_shared_pg_snapshot: false,
     seyeon_early_relationship_migration_history_sha256: $seyeon_early_history_sha256,
     ephemeral_data_exclusions: [
       "public.member_auth_rate_limit_buckets"

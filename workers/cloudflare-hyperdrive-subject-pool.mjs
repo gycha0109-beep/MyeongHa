@@ -8,7 +8,14 @@ import {
   createNodePostgresSubjectPoolV1,
 } from '../apps/api/src/node-postgres-subject-pool.ts';
 import {createSeyeonGovernedPostgresPoolFromDriverV1,SEYEON_GOVERNED_DB_LOGIN_V1} from '../apps/api/src/seyeon-governed-postgres-pool-v1.ts';
-import { MYEONGHA_API_EXECUTION_ROLE } from '../apps/api/src/production-user-data-runtime-config.ts';
+import {
+  SeyeonG5PrivateCommercePostgresPoolV1,
+  SEYEON_G5_PRIVATE_COMMERCE_DB_V1,
+} from '../apps/api/src/seyeon-g5-private-commerce-postgres-pool-v1.ts';
+import {
+  MYEONGHA_API_EXECUTION_ROLE,
+  MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF,
+} from '../apps/api/src/production-user-data-runtime-config.ts';
 
 export const CLOUDFLARE_HYPERDRIVE_MODE_V1 = 'approved-supabase-hyperdrive-v1';
 
@@ -137,4 +144,59 @@ export function createCloudflareSeyeonGovernedPoolV1(bindings,options){
     driverPool:createHyperdriveDriverPoolV1(target.governed,options),
     expectedPrincipal:SEYEON_GOVERNED_DB_LOGIN_V1,
   });
+}
+
+/**
+ * Dedicated G5 Commerce Hyperdrive. It is intentionally absent from Wrangler
+ * until the separate LOGIN/secret and role grants have been provisioned.
+ * A reused Subject or governed-cost binding is rejected before pool creation.
+ */
+export function createCloudflareSeyeonG5PrivateCommercePoolV1(bindings,options){
+  // Receipt settlement depends on the ordinary Subject authority and the
+  // separate Commerce LOGIN, never on the optional governed model-cost pool.
+  const ordinaryRaw=bindings?.SEYEON_SUBJECT_HYPERDRIVE?.connectionString;
+  const governedRaw=bindings?.SEYEON_GOVERNED_HYPERDRIVE?.connectionString;
+  if(typeof ordinaryRaw!=='string'||ordinaryRaw.length<20||ordinaryRaw.length>4096){
+    throw Error('SeYeon Subject Hyperdrive binding unavailable for G5 preflight');
+  }
+  const ordinary=requireHyperdriveConnectionStringV1(ordinaryRaw);
+  let governed=null;
+  if(typeof governedRaw==='string'&&governedRaw.length>=20&&governedRaw.length<=4096){
+    // Proof receipt settlement must not depend on the optional model-cost pool.
+    try{governed=requireHyperdriveConnectionStringV1(governedRaw);}catch{governed=null;}
+  }
+  const raw=bindings?.SEYEON_G5_COMMERCE_HYPERDRIVE?.connectionString;
+  if(typeof raw!=='string'||raw.length<20||raw.length>4096){
+    throw Error('Dedicated G5 Commerce Hyperdrive binding unavailable');
+  }
+  if(bindings?.SEYEON_G5_COMMERCE_HYPERDRIVE_ORIGIN_POLICY!=='supabase-verify-full-rls-v1'||
+     bindings?.SEYEON_G5_COMMERCE_HYPERDRIVE_PRINCIPAL!==
+       SEYEON_G5_PRIVATE_COMMERCE_DB_V1.login){
+    throw Error('G5 Commerce Hyperdrive origin policy or dedicated principal marker missing');
+  }
+  const connectionString=requireHyperdriveConnectionStringV1(raw);
+  if(connectionString===ordinary||connectionString===governed){
+    throw Error('G5 Commerce must use a dedicated Hyperdrive binding');
+  }
+  const username=decodeURIComponent(new URL(connectionString).username);
+  const qualified=SEYEON_G5_PRIVATE_COMMERCE_DB_V1.login+'.'+
+    MYEONGHA_PRODUCTION_SUPABASE_PROJECT_REF;
+  if(username!==SEYEON_G5_PRIVATE_COMMERCE_DB_V1.login&&username!==qualified){
+    throw Error('G5 Commerce Hyperdrive login principal mismatch');
+  }
+  const commerceUrl=new URL(connectionString);
+  const approvedOrigins=[new URL(ordinary),...(governed===null?[]:[new URL(governed)])];
+  const sameApprovedOrigin=approvedOrigins.every(origin=>
+    commerceUrl.protocol===origin.protocol&&
+    commerceUrl.hostname.toLowerCase()===origin.hostname.toLowerCase()&&
+    commerceUrl.port===origin.port&&
+    commerceUrl.pathname===origin.pathname);
+  if(!sameApprovedOrigin||
+     commerceUrl.password===new URL(ordinary).password||
+     (governed!==null&&commerceUrl.password===new URL(governed).password)){
+    throw Error('G5 Commerce must use a distinct secret on the existing approved database origin');
+  }
+  return new SeyeonG5PrivateCommercePostgresPoolV1(
+    createHyperdriveDriverPoolV1(connectionString,options),
+  );
 }

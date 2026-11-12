@@ -76,6 +76,31 @@ function section(source, start, next) {
   return nextIndex < 0 ? rest : rest.slice(0, nextIndex);
 }
 
+// Optional source-catalog witness: old five-file backups still restore; new
+// six-file backups must validate encrypted catalog SHA, schema, and provenance
+// before comparing a loopback clone. The private JSON is never uploaded.
+for (const fragment of [
+  'source_application_catalog_sha256 // empty',
+  'source-app-catalog.json',
+  'checksum_count" -eq 4',
+  'checksum_count" -eq 3',
+  'HOLD_APPLICATION_CATALOG: decrypted catalog digest mismatch.',
+  'sourceCatalogBoundToBackupSnapshot == false',
+  'RESTORE_SOURCE_APP_CATALOG_PATH',
+  'install -m 600',
+]) {
+  requireFragment(harness, fragment, harnessPath);
+}
+for (const fragment of [
+  'RESTORE_SOURCE_APP_CATALOG_PATH: ${{ runner.temp }}/source-app-catalog.json',
+  'application_catalog_source=encrypted_backup_bracketed_witness',
+  'application_catalog_source=legacy_date_only_observation',
+  '--source "$source_app_catalog"',
+]) {
+  requireFragment(workflow, fragment, workflowPath);
+}
+forbidFragment(workflow, 'path: ${{ runner.temp }}/source-app-catalog.json', workflowPath);
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 
@@ -166,12 +191,15 @@ if (onSection.includes('push:')) {
   const latestMigrationRestoreApproved = onSection.includes(
     "'.github/ops/postgres-restore-backup-40812111605-20261029.once'",
   );
-  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved) {
-    throw new Error('Restore one-shot push must have exactly the seven reviewed historical/current source markers.');
+  const currentFrontierBackupApproved = onSection.includes(
+    "'.github/ops/postgres-restore-backup-42309503582-20261107.once'",
+  );
+  if (legacy1310 || !seyeonIncident || !latestOwnerApproved || !currentBackupApproved || !freshBackupApproved || !providerRowsApproved || !providerRowsRetryApproved || !latestMigrationRestoreApproved || !currentFrontierBackupApproved) {
+    throw new Error('Restore one-shot push must have exactly the eight reviewed historical/current source markers.');
   }
   const triggerMarkers = onSection.split('\n').filter((line) => line.includes('.github/ops/') && line.includes('.once\''));
-  if (triggerMarkers.length !== 7) {
-    throw new Error('Restore one-shot push allows exactly seven pinned marker paths.');
+  if (triggerMarkers.length !== 8) {
+    throw new Error('Restore one-shot push allows exactly eight pinned marker paths.');
   }
   for (const fragment of ['branches:', '- main']) {
     requireFragment(onSection, fragment, workflowPath);
@@ -206,6 +234,12 @@ if (onSection.includes('push:')) {
     'backup_run_id=40812111605',
     'expected_artifact_id=12871016812',
     'incident_reference_utc=2026-10-29T03:35:00Z',
+    'ops(dr): one-shot restore backup 42309503582',
+    'POSTGRES-RESTORE-BACKUP-42309503582-20261107-V1',
+    'backup_run_id=42309503582',
+    'expected_artifact_id=13548176984',
+    'incident_reference_utc=2026-11-07T07:46:16Z',
+    'SCOPED_RESTORE_FRONTIER_20261105075227_ONLY',
     'now - point <= 86400',
     'synthetic privacy, no Production writes, no Hosted restore',
     'POSTGRES-RESTORE-BACKUP-40232489516-20261026-V1',
@@ -305,6 +339,17 @@ for (const fragment of [
   'REVOKE EXECUTE ON FUNCTIONS FROM anon, authenticated',
   'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM PUBLIC',
   'REVOKE ALL PRIVILEGES ON TABLES FROM anon, authenticated',
+  'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role',
+  'REVOKE EXECUTE ON FUNCTIONS FROM service_role',
+  'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role',
+  'REVOKE ALL PRIVILEGES ON TABLES FROM service_role',
+  "IF current_user = 'supabase_admin' THEN",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM postgres'",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM postgres'",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM postgres'",
+  "EXECUTE 'ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL PRIVILEGES ON TABLES FROM postgres'",
+  'HOLD_SEYEON_RESTORE: isolated provider/application grantees missing',
+  'HOLD_SEYEON_RESTORE: isolated creator retains unexpected noncreator service_role/postgres defaults',
   'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default table privileges',
   'HOLD_SEYEON_RESTORE: creator retains PUBLIC/anon/authenticated default function EXECUTE',
   'PASS_SEYEON_ISOLATED_CREATOR_FUNCTION_DEFAULT_ACL',
@@ -323,6 +368,23 @@ for (const forbidden of [
 if (!(harness.indexOf('prepare-postgres-isolated-restore-function-defaults.sql')
   < harness.indexOf('--file "$work_dir/schema.sql"'))) {
   throw new Error('Creator default ACL must be guarded before schema replay.');
+}
+if (!creatorDefaultAcl.includes(
+  "a.grantee = 'service_role'::regrole::oid") ||
+  !creatorDefaultAcl.includes(
+    "current_user = 'supabase_admin' AND") ||
+  !creatorDefaultAcl.includes(
+    "a.grantee = 'postgres'::regrole::oid")) {
+  throw new Error('Isolated creator default ACL role guard is missing.');
+}
+// The test role postgres is also the creator. Never remove its own default
+// grants (which can restore implicit PUBLIC EXECUTE); only the isolated
+// supabase_admin creator may revoke future defaults TO postgres.
+if (creatorDefaultAcl.includes(
+  'ALTER DEFAULT PRIVILEGES REVOKE EXECUTE ON FUNCTIONS FROM service_role, postgres') ||
+  creatorDefaultAcl.includes(
+    'ALTER DEFAULT PRIVILEGES REVOKE ALL PRIVILEGES ON TABLES FROM service_role, postgres')) {
+  throw new Error('Creator own-default privileges must never be revoked unconditionally.');
 }
 for (const fragment of [
   "has_table_privilege('anon',c.oid,'SELECT,INSERT,UPDATE,DELETE')",

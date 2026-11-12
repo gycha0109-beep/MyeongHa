@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   eyebrow: { color: mobileColors.gold, fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   title: { color: mobileColors.ink, fontSize: 27, fontWeight: '800' },
-  meta: { color: mobileColors.muted, fontSize: 13, lineHeight: 19 },
+  meta: { color: mobileColors.muted, fontSize: 14, lineHeight: 22 },
   authority: { color: mobileColors.navy, fontSize: 12, lineHeight: 18, fontWeight: '700' },
   muted: { color: mobileColors.muted, fontSize: 14, lineHeight: 21 },
   error: { color: mobileColors.seal, fontSize: 14, lineHeight: 20 },
@@ -286,7 +286,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   readerCardTitle: { color: mobileColors.navy, fontSize: 15, fontWeight: '800' },
-  readerCardText: { color: mobileColors.muted, fontSize: 13, lineHeight: 19 },
+  readerCardText: { color: mobileColors.muted, fontSize: 15, lineHeight: 23 },
   noticeCard: {
     borderWidth: 1,
     borderColor: mobileColors.gold,
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   noticeTitle: { color: mobileColors.navy, fontSize: 14, fontWeight: '800' },
-  noticeText: { color: mobileColors.muted, fontSize: 13, lineHeight: 19 },
+  noticeText: { color: mobileColors.muted, fontSize: 15, lineHeight: 23 },
   readingCard: {
     borderWidth: 1,
     borderColor: mobileColors.border,
@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   },
   stepIndex: { color: mobileColors.gold, fontSize: 11, fontWeight: '900', letterSpacing: 0.8 },
   stepTitle: { color: mobileColors.ink, fontSize: 19, fontWeight: '800' },
-  primaryText: { color: mobileColors.navy, fontSize: 16, lineHeight: 24, fontWeight: '700' },
+  primaryText: { color: mobileColors.navy, fontSize: 17, lineHeight: 27, fontWeight: '700' },
   supportBlock: {
     borderTopWidth: 1,
     borderTopColor: mobileColors.border,
@@ -315,6 +315,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   supportTitle: { color: mobileColors.ink, fontSize: 13, fontWeight: '800' },
-  supportText: { color: mobileColors.muted, fontSize: 13, lineHeight: 20 },
+  supportText: { color: mobileColors.muted, fontSize: 15, lineHeight: 24 },
 });
 const staticStyles = styles;

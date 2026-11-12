@@ -3,6 +3,20 @@ run-name: "[WT:ops] Hosted Auth/Storage Synthetic Local Acceptance"
 
 on:
   workflow_dispatch:
+    inputs:
+      provider_schema_inventory:
+        description: Inventory local Auth/Storage table and column compatibility without replaying Production data
+        required: false
+        default: false
+        type: boolean
+      provider_schema_cli_version:
+        description: Pinned local-only Supabase CLI version for Provider schema inventory
+        required: false
+        default: '2.122.0'
+        type: choice
+        options:
+          - '2.122.0'
+          - '3.1.0'
 
 permissions:
   contents: read
@@ -26,15 +40,31 @@ jobs:
       - name: Install application dependencies (no lifecycle scripts)
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run disposable loopback Auth/Storage acceptance
+        if: ${{ !inputs.provider_schema_inventory }}
         shell: bash
         env:
           MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
         run: bash scripts/operations/run-postgres-hosted-synthetic-local-ci.sh
+      - name: Inventory local Provider schema against sealed-backup source table metadata
+        if: ${{ inputs.provider_schema_inventory }}
+        shell: bash
+        env:
+          MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
+          MH_OPS_PROVIDER_CLI_VERSION: ${{ inputs.provider_schema_cli_version }}
+        run: bash scripts/operations/run-postgres-provider-schema-local-ci.sh
       - name: Upload identifier-free local acceptance evidence
-        if: ${{ always() }}
+        if: ${{ always() && !inputs.provider_schema_inventory }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: hosted-synthetic-local-acceptance-${{ github.run_id }}
           path: ${{ runner.temp }}/myeongha-dr-synthetic-evidence.json
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Upload identifier-free Provider local schema inventory
+        if: ${{ always() && inputs.provider_schema_inventory }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: postgres-provider-local-schema-inventory-${{ github.run_id }}
+          path: ${{ runner.temp }}/myeongha-provider-schema-inventory.json
           if-no-files-found: ignore
           retention-days: 14

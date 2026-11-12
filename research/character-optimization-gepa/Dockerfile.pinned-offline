@@ -1,0 +1,12 @@
+# Only the image build may contact public package/source registries.
+# Runtime execution must use --network none, readonly source, no secrets.
+# Pinned Docker Official Python multi-platform index (verified linux/amd64 Python 3.14.10 slim-trixie).
+FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
+ARG GEPA_SOURCE_SHA=ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309
+RUN set -eu; \
+    apt-get update; \
+    apt-get install --no-install-recommends -y git ca-certificates; \
+    python -m pip install --disable-pip-version-check --no-cache-dir --no-deps \
+      "gepa @ git+https://github.com/gepa-ai/gepa.git@${GEPA_SOURCE_SHA}"; \
+    apt-get purge --auto-remove -y git; \
+    rm -rf /var/lib/apt/lists/*

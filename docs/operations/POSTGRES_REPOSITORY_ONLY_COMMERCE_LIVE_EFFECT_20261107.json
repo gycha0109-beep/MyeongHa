@@ -1,0 +1,107 @@
+{
+  "schemaVersion": "myeongha-ops-phase8-repository-only-commerce-live-effect-v1",
+  "observedKstDate": "2026-11-07",
+  "readOnlySource": "Supabase PostgreSQL 17.6 catalog SELECT",
+  "mainSourceSha": "2384d40ef2de3dae49fb2d7d5c4d231bb6d63b19",
+  "migrationSqlFiles": [
+    "supabase/migrations/1780_portone_verified_official_reader_full_cancel_v1.sql",
+    "supabase/migrations/20261027054525_digital_reading_checkout_notice_evidence_v1.sql"
+  ],
+  "queryPath": "scripts/operations/production-repository-only-commerce-effect-readonly.sql",
+  "productionMigrationFrontier": "20261105075227",
+  "productionAppliedMigrationCount": 241,
+  "observedObjects": [
+    {
+      "sourceVersion": "1780",
+      "kind": "function",
+      "name": "cmd_apply_verified_portone_reader_full_cancellation_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "function",
+      "name": "ct_validate_digital_checkout_notice_acknowledgment_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "function",
+      "name": "ct_validate_digital_checkout_notice_presentation_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "function",
+      "name": "tr_digital_checkout_notice_immutable_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "table",
+      "name": "digital_reading_checkout_notice_acknowledgments_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "table",
+      "name": "digital_reading_checkout_notice_presentations_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "table",
+      "name": "digital_reading_checkout_notice_revisions_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "trigger",
+      "name": "ct_digital_checkout_notice_acknowledgment_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "trigger",
+      "name": "ct_digital_checkout_notice_presentation_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "trigger",
+      "name": "tr_digital_checkout_notice_ack_immutable_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "trigger",
+      "name": "tr_digital_checkout_notice_presentation_immutable_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    },
+    {
+      "sourceVersion": "20261027054525",
+      "kind": "trigger",
+      "name": "tr_digital_checkout_notice_revision_immutable_v1",
+      "exactSourceVersionInLedger": false,
+      "currentNamedObjectMatches": 0
+    }
+  ],
+  "limitations": [
+    "Current object-name absence does not establish historical non-execution or absence of equivalent effects under alternate object identities.",
+    "Missing migration versions do not authorize deployment or migration-history repair.",
+    "No raw Production SQL body, customer row, secret, Production DDL/DML or grant change was accessed/performed.",
+    "Full DDL/ACL/provider-restore parity remains unproven, including the other repository-only migrations."
+  ],
+  "drReady": false,
+  "serviceResumptionAllowed": false
+}

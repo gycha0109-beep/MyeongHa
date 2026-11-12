@@ -1,6 +1,6 @@
 // Watchtower-Track: security
-// G4 candidate: private Member credit admission before any positive model call.
-// No production route, credit settlement or paid activation.
+// G4 private Member admission after the exact G1 Pin and before the first Provider call.
+// Worker selection is server-flagged; the production mount remains false.
 import {executePostgresSubjectTransactionV1,type PostgresSubjectPoolV1} from './postgres-subject-execution.js';
 import type {VerifiedSubjectIdentityEvidenceV1} from './subject-identity-resolver.js';
 import {createPostgresChatCreditCandidatePortsV1} from './postgres-chat-credit-candidate-v1.js';

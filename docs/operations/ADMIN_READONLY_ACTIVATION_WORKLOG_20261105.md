@@ -37,3 +37,65 @@
 - 홈 PC에서 관리자 페이지를 열면 실제 Cloudflare Access Owner 로그인 화면에 도달함. 여기서 **아직 실제 Owner 로그인 및 명하 Member 인증/조회/감사 API 호출까지 완료되지는 않음**. 사용자의 브라우저 로그인 후 개별 근거가 필요하며 비밀번호·토큰·쿠키를 작업 로그나 채팅에 보관하지 않음.
 - 비Owner의 실제 로그인 거부 기록도 여전히 미확인. 해당 증거가 없는데 접근 정책의 개별 거부 검증을 완료 처리하지 않음.
 - 범위 외: 결제·환불·크레딧·계정 변경, 고객정보 변경, 보존기간 정리, 분석 자동 수집·정리 등은 비활성/미승인 상태 유지. `ROADMAP_COMPLETE` 미도달.
+
+## 2026-11-07 22:13 KST — 회원 중심 Owner 콘솔 운영 배포 검증
+
+### 기존 로드맵의 이번 미완료 작업
+- A0–A3의 읽기 전용 관리자 화면 최신화: 이미 구현·병합된 사용자/게스트 분리 및 루트 URL 정정 내용을 **독립 관리자 Worker**에 보호된 기존 배포 절차로 반영. 새로운 로드맵, 고객 쓰기 명령, DB 역할 확대는 추가하지 않음.
+- 기존 WORKLOG 및 연속 구현 정본: 이 파일, `docs/operations/ADMIN_HOME_CONTINUATION_20261102.md`, `apps/admin/README.md`를 확인함. 해당 파일의 과거 미완료 표시 중 PR 병합/배포에 관한 사항만 아래의 새 실증으로 갱신함.
+
+### 코드·변경 파일과 커밋
+- [PR #3100](https://github.com/gycha0109-beep/MyeongHa/pull/3100) 회원 중심 목록/게스트 구분/상세: 병합 완료, squash merge `21ddb3192d8ad3f671e3cabaebec5089fc5e82c3`. 변경 파일: `apps/admin/README.md`, `apps/admin/src/AdminWorkbench.tsx`, `apps/admin/src/AdminWorkbench.test.tsx`, `apps/admin/src/styles.css`.
+- [PR #3098](https://github.com/gycha0109-beep/MyeongHa/pull/3098) 루트 북마크를 /admin/으로 이동: 병합 완료, squash merge `a8f843b901d513b592f9a8ec70697f42c0ed90fd`. 변경 파일: `apps/api/src/admin-hosted-http-v1.ts`, `apps/api/src/admin-hosted-http-v1.test.ts`.
+- 이 실행에서는 기능 코드 자체를 수정하지 않았음. PR #3100/#3098 기존 코드의 재구현·재병합을 수행하지 않음.
+
+### 테스트·CI·실운영 근거
+- #3100 일반 CI와 Web/Governance/Security 및 필수 [CI Integration #42367505896](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367505896): 성공. #3098 필수 [CI Integration #42367583696](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42367583696): 성공.
+- 보호된 main의 `Admin Console Read-Only Release`를 `release_mode=readonly`로 실행: [#42375880365](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375880365), 실제 checkout 커밋 `61736e57979d886559451d15a853292fb3bf586e`. release job 및 모든 필수 실행 단계 **success**. npm 패키지 설치/타입 검사/관리자 테스트/빌드, Owner Access 및 DB 전용 연결/20종 Reader 쿼리와 롤백형 Audit 검사, Worker 배포, 후속 보안/설정 재조회, 익명 자산·API 접근 차단 검사 통과. 복구 단계는 정상적으로 skipped.
+- Cloudflare 실제 `myeongha-admin` 버전 `b82a4c8e-cae6-4a98-91f6-9449240aa77d`에 100% 트래픽. 별도 Reader/Audit Hyperdrive와 Member 인증 서비스·Assets·RateLimiter 확인. `MYEONGHA_ADMIN_PRIVATE_ENABLED=true`; `MYEONGHA_ADMIN_CREDIT_COMMANDS_ENABLED=false`, `MYEONGHA_ADMIN_RETENTION_ENABLED=false`, `MYEONGHA_ADMIN_ANALYTICS_RETENTION_ENABLED=false`. Command/Retention 전용 바인딩 없음. 고객용 Worker/고객 데이터는 변경하지 않음.
+- 이번 CI/배포 성공은 인증된 Owner의 **브라우저**에서 새 UI 및 `GET /api/admin/users` 후 정확히 결속된 `read:users / allowed` 감사 레코드를 확인했다는 뜻이 아님. 해당 실사용 검증은 미완료로 유지.
+
+### 미완료·다음 기존 단위
+1. 사용자에게 실제 Owner 로그인 후 /admin/users에서 활성 회원만 기본 표시되고, 게스트 전환/한국 시각/상세가 정상인지 확인. 동일 시점의 Owner 읽기 감사 성공 기록은 별도 근거 필요. 이는 UI 배포 검증과 다름.
+2. 실제 비Owner의 Admin Access 앱 수준 거부 로그인 기록은 미확인. 기존 권한 정책 우회/가상 계정 생성 없이 실제 증거가 있을 때만 검증.
+3. 현재 Admin Reader에 `auth.users`/프로필 원문 조회 권한 없음; 이름/이메일 식별은 미구현. 읽기 전용 최소 노출 projection에 대한 별도 계약·검증 없이 실명을 추측하거나 역할을 확대하지 않음. A4 비용 결속 HOLD, A5 수집·보존 비활성, A6 계정/환불/크레딧 명령 비활성, A7 게시 비활성 유지.
+4. **다음 작업:** 우선 Owner 실사용 조회·감사 결속의 기존 수용 조건 확인. 추가 배포는 해당 근거에 실질 변경이 있을 경우에만 진행. `ROADMAP_COMPLETE` 선언하지 않음.
+
+## 2026-11-08 — 관리자 Owner 실사용 읽기·감사 결속 실증 점검 (기존 A0–A3 단위)
+
+- **로드맵·작업 목표:** 관리자 A0–A7 정본 중 기존 A0–A3의 미완료 수용 조건인 **최신 배포에서 Owner가 직접 `GET /api/admin/users`를 호출하고 같은 요청의 `read:users / allowed` 감사를 입증**하는 단위. 별도 로드맵·운영 기능을 만들지 않는다. 기준 `main@91739f98f8c124d472e34ab814edb8de057b40d0`, 전용 WORKLOG는 이 파일, 연속 상태는 `docs/operations/ADMIN_HOME_CONTINUATION_20261102.md`.
+- **코드·PR·CI 대조:** 기존 회원 중심 화면 [PR #3100](https://github.com/gycha0109-beep/MyeongHa/pull/3100), 루트 관리자 경로 [PR #3098](https://github.com/gycha0109-beep/MyeongHa/pull/3098), 배포 기록 [PR #3107](https://github.com/gycha0109-beep/MyeongHa/pull/3107) 모두 병합. 보호된 `main@61736e57979d886559451d15a853292fb3bf586e`에서 실행된 [Admin Read-Only Release #42375880365](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375880365)는 2026-11-07 13:13:29 UTC SUCCESS. Cloudflare **읽기 전용** 버전 조회 결과 최신 독립 `myeongha-admin` 배포 `b82a4c8e-cae6-4a98-91f6-9449240aa77d`가 2026-11-07 13:13:24 UTC부터 100% traffic. 고객 Worker 및 관리자 활성 플래그는 이 작업에서 변경하지 않았다.
+- **읽기 전용 실측 결과:** Production 전용 `myeongha_admin_ops.admin_audit_events_v1`에서 2026-11-06 10:00 UTC 이후 선택된 감사 action의 **집계**만 SELECT-only 확인(개인 ID, request_id, 세션, 이메일, JWT 미출력). `read:users / allowed`는 총 5건, 마지막 2026-11-07 10:09:57.593 UTC. `session:verify / allowed`는 57건, 마지막 10:44:02.219 UTC. **최신 배포 시각 13:13:24.506 UTC 이후의 `read:users / allowed`는 0건**. 앞선 읽기 성공은 새 배포 실사용 완료 증거로 승격하지 않는다.
+- **변경 파일·브랜치/커밋·PR:** 이번 단위 변경은 **기존 본 WORKLOG 한 파일만**; 브랜치 `admin/owner-read-audit-evidence-20261108`. 작업 근거·초기 WORKLOG 커밋 `8321e45f7ae8e4d9ac00cdd4eb26108c30cb3ce5`, [PR #3143](https://github.com/gycha0109-beep/MyeongHa/pull/3143); 본 단위 최종 WORKLOG 갱신은 이 PR 커밋 이력에 보존한다. 기능 코드/테스트/마이그레이션/운영 Worker/DB 역할·권한/Secret/트래픽은 변경하지 않았다. CI 감시 브랜치는 `main`; 다른 트랙의 CI/PR은 이 단위에 포함하거나 수정하지 않는다.
+- **검증 범위와 미완료:** GitHub release SUCCESS + Cloudflare 최신 버전 100% + 관리자 감사 원장 SELECT-only 집계 확인. **실제 최신 Owner 브라우저 GET과 요청/감사 ID 결속은 미완료**. 브라우저 연결 도구는 세션을 열지 못했으며, Owner 신원/쿠키/토큰을 대신 사용하지 않는다. 비Owner 앱 정책 실제 거부도 여전히 미검증. A4 비용, A5 분석, A6 명령, A7 게시·보존 활성화 등은 기존 HOLD/비활성 상태 그대로이며 `ROADMAP_COMPLETE` 아님.
+- **다음 작업·블로커/승인:** Owner가 기존 접근권한으로 `https://myeongha-admin.gycha0109.workers.dev/admin/users`에 로그인하여 실제 회원 목록을 열어야 한다. **비밀번호·JWT·쿠키 공유 불필요**. 그 후 같은 시점에 `GET /api/admin/users` 성공과 `read:users / allowed` 감사가 실제로 결속되었는지만 재조회한다. Owner 브라우저에서의 인증 요청이 없어서 수용은 **차단**; 사용자 변경·운영 배포·Access 우회/완화는 승인되지 않았으며 수행하지 않는다.
+
+
+## 2026-11-08 22:30 KST — Owner 브라우저 실사용 조회·감사 확인
+
+- **Owner 실사용:** Access/Member 인증을 마친 관리자 브라우저에서 회원 목록, 회원 상세, Reading, 결제 화면 캡처 제공. 활성 회원 3명 표시, 계정 상세 정상 렌더링. 개인 식별값이나 결제 참조는 본 로그에 보존하지 않음.
+- **배포 기준:** 이전 읽기 전용 배포 [Admin Release #42375880365](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42375880365)의 2026-11-07 13:13:24.506 UTC 이후. 운영 감사 원장 SELECT-only 집계. 코드·DB 권한·운영 설정 및 Worker 배포 변경 없음.
+- **회원 목록·상세:** 2026-11-08 12:00 UTC 이후 감사 read:users / allowed 4건(최신 13:30:32.847 UTC), read:user-detail / allowed 1건(13:18:02.871 UTC). 각각 요청 식별값 및 관리자 식별값 모두 저장됨. 사용자 캡처와 조회 시각·종류 부합. 브라우저 네트워크의 요청 ID를 제출받아 감사 ID와 직접 대조한 것은 아니므로 정확한 요청 ID 문자열 일치 검증은 미완료.
+- **Reading:** 선택 필터에서 ‘표시할 데이터가 없습니다’가 정상 렌더링. read:readings / allowed 1건(13:30:18.091 UTC), 요청/관리자 식별값 모두 존재. 빈 목록이 원장 전체 기록 부재를 증명하지는 않음. AI 비용 결속 HOLD는 그대로.
+- **결제:** 검증된 결제 1건(KRW 1,900원, verified)이 화면에 정상 표시. read:commerce / allowed 1건(13:30:34.447 UTC), 요청/관리자 식별값 모두 존재. 조회 실증은 결제 생성·환불·크레딧 지급 승인과 구분.
+- **수용/잔여:** Owner 브라우저 실사용 목록·상세·Reading·결제 조회 및 감사 발생은 확인. 비Owner의 해당 Cloudflare Access 앱 실제 로그인 거부는 여전히 미검증. 클라이언트 요청 ID와 감사 요청 ID의 직접 대조도 미완료. A4–A7의 기존 HOLD/비활성/미승인 상태 유지. ROADMAP_COMPLETE 미충족.
+- **다음 작업:** 실제 비Owner의 Admin Access 앱 단위 차단 기록이 확보될 경우 검증. 계정 무단 생성·Access 완화·운영 명령 활성화 금지. 필요한 경우 민감정보 없는 클라이언트 요청 ID만 감사 ID와 비교.
+
+
+## 2026-11-08 KST — 비Owner 추가 실증 생략 결정 및 A4 실제 비용 결속 재개
+
+- **Owner 수용 결정:** Owner가 비Owner의 Access 앱 수준 실제 로그인 거부 재현을 더 이상 요구하지 않고 다음 로드맵 단계로 진행하도록 지시했다. 이는 **실제 비Owner 거부 로그 통과가 아니며**, 기존 단일 Owner 이메일 allow 정책·Access/JWT/Member 권한 검사를 완화하거나 대체하지 않는다. 기존 비Owner 실제 거부 기록은 여전히 '미실증(Owner 요청으로 추가 재현 생략)'으로 관리한다. 개인정보, 쿠키, JWT를 수집하지 않는다.
+- **A0–A3 결과:** Owner의 회원 목록/상세, Reading 및 검증 결제 조회와 운영 감사 INSERT 성공은 앞 절 및 [PR #3150](https://github.com/gycha0109-beep/MyeongHa/pull/3150)에 기록됐고 통합 CI [#42487641148](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42487641148) SUCCESS, 2026-11-08 14:16:23 UTC main 병합 확인. 브라우저 네트워크의 원본 request_id와 감사 request_id의 직접 문자열 동등 비교는 아직 진행하지 않았고, 생략 수용 대상은 비Owner 재현에 한정한다.
+- **A4 현재 코드:** MyeongHa `reading-ai-saju-provider-bridge-v1.ts`는 Saju 실측 공급사 호출 증거를 입력받지만 `SajuReadingProviderBindingAuthorityV1.resolve()`의 **실제 소유권 증명 매핑**이 없으면 Writer 접근 전 실패하도록 구현. 전용 Writer/RPC 및 제한된 비용 원장 DB 설치는 기존 [A4 Production 설치 기록](ADMIN_READING_AI_COST_PRODUCTION_INSTALL_20261030.md)에 따라 완료했으나 운영 수집은 미활성. Saju-native requestId/Reading ID를 명하 Subject/Reading/execution attempt와 같다고 간주하지 않는다.
+- **운영 DB SELECT-only 현실 확인:** 2026-11-08 운영 `public.reading_execution_attempts` 0행(비NULL `external_request_ref` 0행), `public.reading_refs`의 비NULL `external_reading_ref` 0행, `myeongha_admin_ops.reading_ai_call_cost_events_v1` 0행. **이 숫자는 AI 원가 0원·Saju 호출 0건 또는 수집 완전성을 뜻하지 않는다.** `external_request_ref` 컬럼이 존재한다는 사실만으로 공급사 `requestId`와의 동일성/유일성이 입증되지 않는다.
+- **Saju 소스 선행 PR:** [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739)의 server-only onProviderCall 소스 관측(토큰/모델/호출 결과) 및 합성 단위 테스트는 현재 기록된 PR HEAD 검증 3개 성공. 이 PR은 초안 상태를 해제하고 자동 병합을 요청했으며, **병합 완료 여부는 별도 확인 필요**. 선택적 콜백 추가는 운영 공급사 호출/비용 적재 활성화가 아니다.
+- **다음 원래 A4 수용 조건:** 승인된 실제 Saju 서버 호출 `requestId`와 명하 DB의 기존 Reading/실행 시도 간 **동일 요청을 입증하는 Authority 결속**을 구현·검증할 때까지 HOLD. 이후 전용 Writer의 안전한 인증/연결, 실제 호출 누락/실패 포함 관측 커버리지 및 공급사 청구/환율의 독립 근거가 확보돼야 실비/완전성·KRW 월 예산을 주장할 수 있다. 새로운 Source ID 매핑/Production DB 권한/운영 연결을 검증 없이 생성하거나 활성화하지 않는다.
+- **나머지 로드맵:** A5 분석 수집·보존 비활성, A6 고객 변경 명령 비활성, A7 게시 기능 비활성. `ROADMAP_COMPLETE` 미충족. 본 변경은 문서만 수정하며 고객 데이터, 공개 Worker, Admin 운영 플래그, DB 역할·권한은 변경하지 않는다.
+
+## 2026-11-09 KST — A4 공급사 호출과 DB Reading 시도 검증 결속 계약 구현
+
+- **선행 PR 완료:** [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739) 실제 OpenAI Responses 호출의 비공개 usage observer가 2026-11-09 01:21:51 UTC 병합됨. 필수 [통합 CI #42543739334](https://github.com/gycha0109-beep/Saju/actions/runs/42543739334) SUCCESS. 이 호출 관측은 기본 opt-in 상태이고 공급사 비용 적재·운영 활성화와는 별개임.
+- **A4 구현 단위:** `apps/api/src/reading-ai-saju-binding-authority-v1.ts`를 추가하여 기존 `SajuReadingProviderBindingAuthorityV1`의 실제 연결용 검증 어댑터를 구현. 두 **서로 독립된 신뢰 서버 포트**를 요구함: (1) Saju에서 실제 호출 ID/모델/시각과 사전 할당된 정확한 DB 실행시도·전송 참조의 결속을 증명하는 Source Authority, (2) 같은 전송 참조와 실행 시도에 정확히 하나의 정본 Reading/Subject가 해당함을 확인하는 DB Authority. 두 검증 근거가 모두 일치해야 기존 비용 Writer가 사용할 Subject/Reading/시도 UUID를 반환함.
+- **실제 경계:** Saju 내부 `requestId`가 DB의 `external_request_ref`와 같다고 가정하지 않음. 이 두 독립 포트의 Production 구현·Saju 발급 경로에서의 권위 있는 사전 매핑과 전용 Writer 인증은 **미연결/HOLD**. 이 모듈은 단독으로 DB 질의·HTTP·공급사 호출·쓰기·비밀키·운영 배포/활성화를 수행하지 않음. `null`은 비용 0원이나 호출 부재가 아니라 미검증임.
+- **검증:** 신규 `reading-ai-saju-binding-authority-v1.test.ts` 4건 + 기존 bridge 테스트 4건, 총 8건 로컬 성공. 신규 두 파일의 TypeScript 6 별도 strict/noEmit 검사 통과. 전체 저장소 로컬 타입 검사는 오래된 다른 worktree의 `node_modules` 임시 연결로 모바일 API 클라이언트 경로가 섞여 실패하여 **전체 통과라고 표현하지 않음**. 최종 PR CI에서 깨끗한 lockfile 설치 검증 필요.
+- **다음 수용 조건:** Production Saju issuer가 `requestId`·실제 호출 ID·할당된 실행 시도를 한 계약에서 검증할 수 있게 연결하고, DB Owner의 정확히 하나의 시도 조회/권한 증명을 구현해야 Source/DB 검증 포트를 설치 가능. 실제 사용량 커버리지/청구서·환율/추정 비용 분리 및 보류된 A5–A7은 별도 로드맵 조건 그대로 유지. `ROADMAP_COMPLETE` 미충족.

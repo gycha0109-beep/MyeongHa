@@ -61,6 +61,16 @@ const requiredWorkflowFragments = [
   "PGOPTIONS='-c default_transaction_read_only=on'",
   'capture_seyeon_early_history',
   'production-migration-catalog-fingerprint-readonly.sql',
+  'production-app-schema-fingerprint-readonly.sql',
+  'capture_application_catalog',
+  'source_catalog_before="$(capture_application_catalog)"',
+  'source_catalog_after="$(capture_application_catalog)"',
+  'HOLD_APPLICATION_CATALOG: source catalog changed across dump.',
+  'source_catalog_sha256="$(sha256sum "$backup_dir/source-app-catalog.json"',
+  'source_application_catalog_sha256: $source_catalog_sha256',
+  'source_application_catalog_bracket_stable: true',
+  'source_application_catalog_shared_pg_snapshot: false',
+  'roles.sql schema.sql data.sql source-app-catalog.json plaintext-sha256.txt manifest.json',
   'migration_catalog_before="$(capture_migration_catalog_fingerprint)"',
   'migration_catalog_after="$(capture_migration_catalog_fingerprint)"',
   'HOLD_MIGRATION_CATALOG: production history changed during governed dump.',
@@ -78,7 +88,7 @@ const requiredWorkflowFragments = [
   '--env PGPASSWORD',
   '--entrypoint bash',
   'cd "$backup_dir"',
-  'sha256sum roles.sql schema.sql data.sql > plaintext-sha256.txt',
+  'sha256sum roles.sql schema.sql data.sql source-app-catalog.json > plaintext-sha256.txt',
   'openssl enc -aes-256-cbc -salt -pbkdf2 -iter 200000',
   'rm -f "$plaintext_archive"',
   'uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7',
@@ -91,6 +101,44 @@ for (const fragment of requiredWorkflowFragments) {
   if (!contract.includes(fragment)) {
     throw new Error(`Missing production backup workflow contract fragment: ${fragment}`);
   }
+}
+
+// Both the internal role graph and external direct-boundary inventory must
+// survive the encrypted source projection. Raw role edges never enter the
+// public workflow artifact; neither inventory proves provider ownership.
+const roleGraphScopeFragment =
+  'and .applicationRoleGraph.scope == "myeongha_to_myeongha_direct_membership_only_v1"';
+const boundaryScopeFragment =
+  '    and .applicationExternalRoleBoundary.scope == "myeongha_to_non_myeongha_direct_membership_only_v1"';
+for (const fragment of [roleGraphScopeFragment, boundaryScopeFragment]) {
+  if (runner.split(fragment).length !== 3) {
+    throw new Error('Pre/post source catalog checks missing sealed role boundary: ' + fragment);
+  }
+}
+for (const fragment of [
+  'and .applicationRoleGraph.providerBoundaryMembershipsIncluded == false',
+  'and (.applicationRoleGraph.roles | type) == "array"',
+  'and (.applicationRoleGraph.roles | length) > 0',
+  'and (.applicationRoleGraph.directMemberships | type) == "array"',
+  'and .applicationExternalRoleBoundary.providerOwnedOnlyProven == false',
+  'and .applicationExternalRoleBoundary.inheritedEffectiveAccessIncluded == false',
+  'and (.applicationExternalRoleBoundary.directMemberships | type) == "array"',
+  'schemas, tables, functions, applicationRoleGraph, applicationExternalRoleBoundary,',
+  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed internal or external application role membership witness.',
+]) {
+  if (!runner.includes(fragment)) {
+    throw new Error('Encrypted application role boundary preservation failed: ' + fragment);
+  }
+}
+const projectedRoleGraph = runner.indexOf(
+  'schemas, tables, functions, applicationRoleGraph, applicationExternalRoleBoundary,');
+const checkedRoleGraph = runner.indexOf(
+  'HOLD_APPLICATION_ROLE_GRAPH: encrypted source catalog missing sealed internal or external application role membership witness.');
+const catalogChecksum = runner.indexOf(
+  'source_catalog_sha256="$(sha256sum "$backup_dir/source-app-catalog.json"');
+if (!(projectedRoleGraph >= 0 && checkedRoleGraph > projectedRoleGraph &&
+  catalogChecksum > checkedRoleGraph)) {
+  throw new Error('Role boundaries must be checked before computing encrypted backup digest.');
 }
 
 const forbiddenWorkflowFragments = [
@@ -118,6 +166,7 @@ const forbiddenWorkflowFragments = [
   'path: roles.sql',
   'path: schema.sql',
   'path: data.sql',
+  'path: source-app-catalog.json',
 ];
 
 for (const fragment of forbiddenWorkflowFragments) {

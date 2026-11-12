@@ -57,6 +57,19 @@ function harness(options: {
 }
 
 describe('admin owner-only reads', () => {
+  it('accepts bounded search only on safe list routes', () => {
+    const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
+    expect(read('/api/admin/audit?search=read%3Ausers').search).toBe('read:users');
+    expect(read('/api/admin/users?search=%20member%20').search).toBe('member');
+    for (const path of [
+      '/api/admin/overview?search=member',
+      '/api/admin/users?search=',
+      '/api/admin/users?search=' + 'x'.repeat(101),
+      '/api/admin/users?search=%00',
+      '/api/admin/users?search=member&search=guest',
+      '/api/admin/users/123e4567-e89b-42d3-a456-426614174002?search=member',
+    ]) expect(() => read(path)).toThrow();
+  });
   it('allows exact provider-event receipt and state filters only on the evidence route', () => {
     const read = (path: string) => parseAdminReadFiltersV1(new URL('https://admin.invalid' + path));
     expect(read('/api/admin/provider-events?receiptId=' + subject + '&providerEventStatus=unresolved')).toMatchObject({ receiptId: subject, providerEventStatus: 'unresolved' });

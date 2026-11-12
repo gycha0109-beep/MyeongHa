@@ -15,6 +15,7 @@ on:
       - '.github/ops/postgres-restore-provider-rows-40780751650-20261029.once'
       - '.github/ops/postgres-restore-provider-rows-retry-40780751650-20261029.once'
       - '.github/ops/postgres-restore-backup-40812111605-20261029.once'
+      - '.github/ops/postgres-restore-backup-42309503582-20261107.once'
   workflow_dispatch:
     inputs:
       backup_run_id:
@@ -56,7 +57,7 @@ concurrency:
 jobs:
   restore-drill:
     name: isolated-supabase-postgres-17-restore
-    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40232489516') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory retry 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40812111605'))) }}"
+    if: "${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 38088591661') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 39067271230') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40232489516') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot provider row inventory retry 40780751650') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 40812111605') || startsWith(github.event.head_commit.message, 'ops(dr): one-shot restore backup 42309503582'))) }}"
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     environment: production
@@ -99,7 +100,19 @@ jobs:
           [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
           [[ -z "$(git status --porcelain)" ]]
           subject="$(git show -s --format=%s HEAD)"
-          if [[ "$subject" =~ ^ops\(dr\):\ one-shot\ restore\ backup\ 40812111605(\ \(\#[0-9]+\))?$ ]]; then
+          if [[ "$subject" =~ ^ops\(dr\):\ one-shot\ restore\ backup\ 42309503582(\ \(\#[0-9]+\))?$ ]]; then
+            # One-time isolated PG17 restore from the exact current-frontier encrypted
+            # Production backup. Synthetic privacy only; no Production writes,
+            # provider-managed full restore or Hosted Auth/Storage claim.
+            [[ "$(cat .github/ops/postgres-restore-backup-42309503582-20261107.once)" == 'POSTGRES-RESTORE-BACKUP-42309503582-20261107-V1' ]]
+            point="$(date -u -d '2026-11-07T07:46:16Z' +%s)"
+            now="$(date -u +%s)"
+            (( now >= point && now - point <= 86400 ))
+            echo 'backup_run_id=42309503582' >> "$GITHUB_OUTPUT"
+            echo 'expected_artifact_id=13548176984' >> "$GITHUB_OUTPUT"
+            echo 'incident_reference_utc=2026-11-07T07:46:16Z' >> "$GITHUB_OUTPUT"
+            echo 'SCOPED_RESTORE_FRONTIER_20261105075227_ONLY: backup 42309503582; artifact 13548176984; synthetic privacy only, no Production write, no Hosted provider restore, dr_ready=false'
+          elif [[ "$subject" =~ ^ops\(dr\):\ one-shot\ restore\ backup\ 40812111605(\ \(\#[0-9]+\))?$ ]]; then
             # One-shot migration-matched 20261029012948 encrypted backup; synthetic-only privacy.
             [[ "$(cat .github/ops/postgres-restore-backup-40812111605-20261029.once)" == 'POSTGRES-RESTORE-BACKUP-40812111605-20261029-V1' ]]
             point="$(date -u -d '2026-10-29T03:35:00Z' +%s)"
@@ -230,14 +243,49 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y postgresql-client jq
 
+      - name: Validate synthetic external role replay boundaries
+        run: node scripts/verify-isolated-postgres-external-role-replay.mjs
+
       - name: Restore encrypted backup into isolated PostgreSQL
         shell: bash
         env:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
           RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          RESTORE_SOURCE_APP_CATALOG_PATH: ${{ runner.temp }}/source-app-catalog.json
         run: bash scripts/run-postgres-isolated-restore-drill.sh
 
+      - name: Compare current-frontier application schema with isolated restored catalog
+        shell: bash
+        env:
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          APP_SCHEMA_PARITY_PATH: ${{ runner.temp }}/restore-evidence/app-schema-parity.json
+          PGHOST: 127.0.0.1
+          PGPORT: 5432
+          PGUSER: postgres
+          PGPASSWORD: restore-drill
+          PGDATABASE: postgres
+        run: |
+          set -euo pipefail
+          node scripts/verify-postgres-restored-app-schema-parity.mjs
+          # A new backup carries its own read-only pre/post-dump source
+          # witness (private runner temp). Old backups keep historical,
+          # date-only comparison evidence, never same-snapshot authority.
+          source_app_catalog=docs/operations/POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json
+          if [[ -s "$RUNNER_TEMP/source-app-catalog.json" ]]; then
+            source_app_catalog="$RUNNER_TEMP/source-app-catalog.json"
+            echo 'application_catalog_source=encrypted_backup_bracketed_witness'
+          else
+            echo 'application_catalog_source=legacy_date_only_observation'
+          fi
+          node scripts/operations/check-postgres-restored-app-schema-parity.mjs \
+            --source "$source_app_catalog" \
+            --query scripts/operations/production-app-schema-fingerprint-readonly.sql \
+            --restore-evidence "$RESTORE_EVIDENCE_PATH" \
+            --output "$APP_SCHEMA_PARITY_PATH"
+          jq -e '.drReady == false and .serviceResumptionAllowed == false
+            and .verifiedFullSchemaCatalogEquivalence == false
+            and .fullSupabaseMigrationLedgerRestored == false' "$APP_SCHEMA_PARITY_PATH" >/dev/null
       - name: Exercise synthetic privacy reconciliation and finalization on restored database
         shell: bash
         env:

@@ -2,12 +2,16 @@ name: Isolated PostgreSQL 18 RLS and Capacity Proof
 run-name: "[WT:ops] Phase 7/11 isolated PostgreSQL 18 proof"
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/ops/phase11-workerd-db-failover-20261108.once'
   workflow_dispatch:
     inputs:
       experiment:
         description: Isolated product-chain experiment
         type: choice
-        options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap]
+        options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap, workerd_db_failover]
         default: short
 
 permissions:
@@ -19,12 +23,23 @@ concurrency:
 
 jobs:
   isolated-postgres-proof:
-    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'fix(ops): retry isolated workerd DB failover proof'))) }}
     runs-on: ubuntu-26.04
     timeout-minutes: 35
     steps:
       - name: Checkout exact main source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Validate one-shot isolated DB-outage admission
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ "$(git show -s --format=%s HEAD)" =~ ^fix\(ops\):\ retry\ isolated\ workerd\ DB\ failover\ proof\ \(\#[0-9]+\)$ ]]
+          [[ "$(cat .github/ops/phase11-workerd-db-failover-20261108.once)" == 'PHASE11-ISOLATED-WORKERD-DB-FAILOVER-20261108-V2' ]]
+          echo 'isolated_workerd_db_failover=one_shot_main_only'
       - name: Install pinned Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -32,13 +47,14 @@ jobs:
       - name: Install application dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
       - name: Run actual temporary PostgreSQL 18 RLS and pool-pressure proof
+        if: ${{ github.event_name == 'workflow_dispatch' }}
         shell: bash
         env:
           PG_BIN_DIR: /usr/lib/postgresql/18/bin
           MH_OPS_REPO_ROOT: ${{ github.workspace }}
         run: bash scripts/operations/run-isolated-postgres-phase7-phase11-ci.sh
       - name: Upload sanitized actual PostgreSQL 18 proof
-        if: ${{ always() }}
+        if: ${{ always() && github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: isolated-pg18-phase7-phase11-${{ github.run_id }}
@@ -65,7 +81,7 @@ jobs:
         env:
           PG_BIN_DIR: /usr/lib/postgresql/18/bin
           MH_OPS_REPO_ROOT: ${{ github.workspace }}
-          MH_OPS_REAL_PRODUCT_EXPERIMENT: ${{ inputs.experiment }}
+          MH_OPS_REAL_PRODUCT_EXPERIMENT: ${{ github.event_name == 'push' && 'workerd_db_failover' || inputs.experiment }}
         run: bash scripts/operations/run-isolated-real-product-chain-phase11-ci.sh
       - name: Upload actual isolated three-dependency product observation
         if: ${{ always() }}

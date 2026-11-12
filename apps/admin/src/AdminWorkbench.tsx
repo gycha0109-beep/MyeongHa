@@ -169,14 +169,16 @@ function isSubjectId(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(value);
 }
 
-export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = '', providerEventStatus: string = 'all'): string {
+export function buildListPath(section: ListSection, subject: string, cursor: string | null, tab: ReadTab, from: string | null = null, to: string | null = null, issueStatus: string = 'all', subjectKind: string = 'all', subjectStatus: string = 'all', readingStatus: string = 'all', issueCategory: string = '', creditSource: string = 'all', reservationState: string = 'all', reservationId: string = '', attemptReadingId: string = '', aiStage: string = 'all', aiErrorCode: string = '', deletionStatus: string = 'all', deletionScope: string = 'all', releaseStatus: string = 'all', characterAvailability: string = 'all', receiptStatus: string = 'all', auditOutcome: string = 'all', allocationMismatchOnly: boolean = false, receiptId: string = '', aiFeature: string = 'all', aiModel: string = '', providerEventStatus: string = 'all', search: string = ''): string {
   if (['reading-attempts','reading-ai-usage','reading-generation-cost'].includes(tab) && isSubjectId(attemptReadingId)) {
     const params = new URLSearchParams({ limit: '20' });
     if (cursor !== null) params.set('cursor', cursor);
+    if (search !== '') params.set('search', search);
     return '/api/admin/readings/' + attemptReadingId + (tab === 'reading-ai-usage' ? '/ai-usage?' : tab === 'reading-generation-cost' ? '/generation-cost?' : '/attempts?') + params.toString();
   }
   const params = new URLSearchParams({ limit: '20' });
   if (subject.length > 0) params.set('subjectId', subject);
+  if (search !== '') params.set('search', search);
   if (cursor !== null) params.set('cursor', cursor);
   if (from !== null && to !== null && !['catalog','characters','content-releases'].includes(tab)) { params.set('from', from); params.set('to', to); }
   if (tab === 'issues' && issueStatus !== 'all') params.set('status', issueStatus);
@@ -203,12 +205,85 @@ export function buildListPath(section: ListSection, subject: string, cursor: str
   return '/api/admin/' + tab + '?' + params.toString();
 }
 
+
+export const ADMIN_USER_SCOPES_V1 = [
+  { key: 'active', label: '활성 회원', kind: 'member', status: 'active' },
+  { key: 'members', label: '전체 회원 기록', kind: 'member', status: 'all' },
+  { key: 'guests', label: '게스트 이용 기록', kind: 'guest', status: 'all' },
+  { key: 'pending', label: '탈퇴 처리 대기', kind: 'member', status: 'deletion_pending' },
+  { key: 'deleted', label: '삭제 완료 기록', kind: 'member', status: 'deleted' },
+  { key: 'all', label: '전체 내부 기록', kind: 'all', status: 'all' },
+] as const;
+export const DEFAULT_ADMIN_USER_SCOPE_V1 = ADMIN_USER_SCOPES_V1[0];
+
+export function formatAdminSeoulDateV1(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') return '기록 없음';
+  const parsed = new Date(value.trim().replace(/^(\d{4}-\d{2}-\d{2}) /u, '$1T').replace(/([+-]\d{2})$/u, '$1:00'));
+  if (!Number.isFinite(parsed.getTime())) return '날짜 확인 필요';
+  return new Intl.DateTimeFormat('ko-KR', {timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(parsed);
+}
+
+function AdminUsersTableV1({ result, onDetail }: {
+  readonly result: AdminReadResponse; readonly onDetail: (id: string) => void;
+}) {
+  if (result.rows.length === 0) return <StatusPanel kind="empty" detail="선택한 사용자 범위에 기록이 없습니다. 다른 범위나 검색 조건을 확인해 주세요." />;
+  const statusLabels: Readonly<Record<string,string>> = {
+    active:'활성',merged:'회원에 연결됨',deletion_pending:'탈퇴 처리 대기',deleted:'삭제 완료'
+  };
+  return <div className="admin-table-scroll"><table className="admin-table admin-users-table">
+    <thead><tr><th scope="col">계정 기록</th><th scope="col">상태</th><th scope="col">생성 시각 (한국)</th><th scope="col">최근 대화 기록 (한국)</th><th scope="col">상세</th></tr></thead>
+    <tbody>{result.rows.map((row,index)=>{
+      const id=typeof row.subjectId==='string' && isSubjectId(row.subjectId) ? row.subjectId : null;
+      const status=typeof row.status==='string' ? row.status : '';
+      return <tr key={id??index}>
+        <td><strong>{row.kind==='member'?'가입 회원':'게스트 이용 기록'}</strong>
+          <small className="admin-user-id" title={id??''}>{id?'내부 ID '+id.slice(0,8)+'…':'내부 식별정보 없음'}</small></td>
+        <td><span className={'admin-user-state admin-user-state--'+status}>{statusLabels[status]??'상태 확인 필요'}</span></td>
+        <td>{formatAdminSeoulDateV1(row.createdAt)}</td>
+        <td>{formatAdminSeoulDateV1(row.lastThreadUpdatedAt)}</td>
+        <td>{id?<button type="button" className="table-link" onClick={()=>onDetail(id)}>이용 내역 확인</button>:'—'}</td>
+      </tr>;
+    })}</tbody>
+  </table></div>;
+}
+
+
+function AdminUserDetailV1({ result }: { readonly result: AdminReadResponse }) {
+  const row = result.rows[0];
+  if (!row) return <StatusPanel kind="empty" detail="해당 사용자 기록을 조회할 수 없습니다." />;
+  const id = typeof row.subjectId === 'string' && isSubjectId(row.subjectId) ? row.subjectId : null;
+  const isMember = row.kind === 'member';
+  const memberState: Readonly<Record<string,string>> = {
+    active:'활성',merged:'회원에 연결됨',deletion_pending:'탈퇴 처리 대기',deleted:'삭제 완료',
+  };
+  const count = (value: unknown) => typeof value === 'string' && /^\d+$/u.test(value)
+    ? Number(value).toLocaleString('ko-KR') : '측정 불가';
+  return <section className="admin-user-detail" aria-label="사용자 메타데이터 상세">
+    <h3>{isMember ? '가입 회원 이용 내역' : '게스트 이용 기록'}</h3>
+    <p>이 화면은 개인정보 원문을 표시하지 않습니다. 실제 저장된 사용자·결제·사주 운영 메타데이터만 조회합니다.</p>
+    <dl>
+      <div><dt>계정 종류</dt><dd>{isMember ? '가입 회원' : '게스트'}</dd></div>
+      <div><dt>현재 상태</dt><dd>{memberState[String(row.status)] ?? '상태 확인 필요'}</dd></div>
+      <div><dt>생성 시각 (한국)</dt><dd>{formatAdminSeoulDateV1(row.createdAt)}</dd></div>
+      <div><dt>최근 대화 기록 (한국)</dt><dd>{formatAdminSeoulDateV1(row.lastThreadUpdatedAt)}</dd></div>
+      <div><dt>사주 분석 기록</dt><dd>{count(row.readingsCount)}건</dd></div>
+      <div><dt>서버 검증 영수증</dt><dd>{count(row.verifiedPurchasesCount)}건</dd></div>
+      <div><dt>활성 이용 권한</dt><dd>{count(row.activeEntitlementsCount)}건</dd></div>
+      <div><dt>가용 크레딧</dt><dd>{count(row.availableCredits)}</dd></div>
+    </dl>
+    <details><summary>내부 사용자 식별번호 확인</summary><code>{id ?? '조회 불가'}</code></details>
+    <p>표시 이름 및 이메일은 이 조회 결과에 포함되지 않습니다. 이 값이 없다는 이유로 서로 다른 계정을 같은 사람으로 판단하지 않습니다.</p>
+  </section>;
+}
+
 function DataTable({ result, section, onDetail, onAllocation }: {
   readonly result: AdminReadResponse;
   readonly section: ListSection;
   readonly onDetail: (id: string) => void;
   readonly onAllocation: (id: string) => void;
 }) {
+  if (section === 'users' && result.kind === 'users') return <AdminUsersTableV1 result={result} onDetail={onDetail} />;
+  if (section === 'users' && result.kind === 'user-detail') return <AdminUserDetailV1 result={result} />;
   if (result.rows.length === 0) {
     return <StatusPanel kind="empty" detail="해당 범위에서 실제 조회된 데이터가 없습니다." />;
   }
@@ -311,8 +386,8 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [deletionScope, setDeletionScope] = useState<'all' | 'account' | 'conversation' | 'memory' | 'life_fact' | 'target_person'>('all');
   const [releaseStatus, setReleaseStatus] = useState<'all' | 'draft' | 'active' | 'retired'>('all');
   const [characterAvailability, setCharacterAvailability] = useState<'all' | 'available' | 'unlockable' | 'locked' | 'coming_soon'>('all');
-  const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>('all');
-  const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>('all');
+  const [subjectKind, setSubjectKind] = useState<'all' | 'guest' | 'member'>(section === 'users' ? DEFAULT_ADMIN_USER_SCOPE_V1.kind : 'all');
+  const [subjectStatus, setSubjectStatus] = useState<'all' | 'active' | 'merged' | 'deletion_pending' | 'deleted'>(section === 'users' ? DEFAULT_ADMIN_USER_SCOPE_V1.status : 'all');
   const [readingStatus, setReadingStatus] = useState<'all' | 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled'>('all');
   const [aiFeature, setAiFeature] = useState('all');
   const [aiModel, setAiModel] = useState('');
@@ -341,6 +416,20 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [retryCounter, setRetryCounter] = useState(0);
+  const [search, setSearch] = useState('');
+  const [draftSearch, setDraftSearch] = useState('');
+  const [activeMembers, setActiveMembers] = useState<number | null>(null);
+  useEffect(() => {
+    if (section !== 'users') return;
+    let mounted = true;
+    void fetchAdminReadV1('/api/admin/overview',token).then(value=>{
+      const metric=value.rows.find(row=>row.metricKey==='members_active');
+      if(mounted && typeof metric?.metricValue==='string' && /^\d{1,12}$/u.test(metric.metricValue)) {
+        setActiveMembers(Number(metric.metricValue));
+      }
+    }).catch(()=>{if(mounted)setActiveMembers(null);});
+    return ()=>{mounted=false;};
+  },[section,token]);
 
   useEffect(() => {
     let mounted = true;
@@ -349,7 +438,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     setResult(null);
     const url = detail !== null
       ? (section === 'commerce' ? '/api/admin/commerce/' : section === 'readings' ? '/api/admin/readings/' : '/api/admin/users/') + detail
-      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus);
+      : buildListPath(section, subject, cursor, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, search);
     void fetchAdminReadV1(url, token)
       .then(value => { if (mounted) setResult(value); })
       .catch(e => {
@@ -361,19 +450,55 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
     return () => {
       mounted = false;
     };
-  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, retryCounter]);
+  }, [section, token, cursor, subject, detail, tab, from, to, issueStatus, subjectKind, subjectStatus, readingStatus, issueCategory, creditSource, reservationState, reservationId, attemptReadingId, aiStage, aiErrorCode, deletionStatus, deletionScope, releaseStatus, characterAvailability, receiptStatus, auditOutcome, allocationMismatchOnly, receiptId, aiFeature, aiModel, providerEventStatus, search, retryCounter]);
 
   return <section className="surface admin-data">
     <div className="surface__head">
       <div><span className="section-kicker">VERIFIED READ ONLY</span>
-        <h2>{detail !== null ? section === 'users' ? '사용자 상세' : section === 'readings' ? 'Reading 실행 상세' : '결제 검증 상세' : '관리자 실데이터 조회'}</h2></div>
+        <h2>{detail !== null ? section === 'users' ? '사용자 상세' : section === 'readings' ? 'Reading 실행 상세' : '결제 검증 상세' : section === 'users' ? '사용자 관리' : '관리자 실데이터 조회'}</h2></div>
       <span className="neutral-tag">서버 검증 필수</span>
     </div>
+    {section==='users' && detail===null && <section className="admin-user-overview" aria-label="사용자 관리 안내">
+      <div className="admin-user-count"><span>현재 활성 회원</span><strong>{activeMembers===null?'조회 불가':activeMembers.toLocaleString('ko-KR')+'명'}</strong><small>게스트·삭제 기록 제외 · 운영 DB 집계</small></div>
+      <p>가입 회원과 게스트 이용 기록은 서로 다릅니다. 가입 회원만 기본 표시합니다. 이름·이메일은 현재 보호된 관리자 조회 계약에 포함되지 않아 표시하지 않습니다.</p>
+    </section>}
+    {section==='users' && detail===null && <div className="admin-user-scopes" role="group" aria-label="사용자 기록 범위">
+      {ADMIN_USER_SCOPES_V1.map(scope=><button key={scope.key} type="button"
+        className={subjectKind===scope.kind && subjectStatus===scope.status?'active':''}
+        aria-pressed={subjectKind===scope.kind && subjectStatus===scope.status}
+        onClick={()=>{setSubjectKind(scope.kind);setSubjectStatus(scope.status);setCursor(null);}}>
+        {scope.label}
+      </button>)}
+    </div>}
     <div className="admin-tabs" aria-label="조회 종류">
       {(section === 'commerce' ? [['commerce','결제 내역'],['commerce-alerts','검증·지급 점검'],['provider-events','결제사 이벤트'],['entitlements','보유 권한'],['entitlement-events','권한 지급·철회 이력'],['credits','크레딧 지급'],['credit-reservations','크레딧 사용·정산'],['credit-allocations','차감·복원 재원']] : section === 'readings' ? [['readings','Reading'],...(attemptReadingId ? [['reading-attempts','실행 시도'],['reading-generation-cost','Reading 생성 AI 비용']] : []),['ai-costs','AI 호출'],['ai-errors','AI 실패·차단'],['ai-estimates','AI 추정 원가']] : section === 'issues' ? [['issues','운영 이슈'],['audit','관리자 접근 기록'],['deletion-jobs','삭제 작업'],['catalog','상품 카탈로그'],['characters','캐릭터'],['content-releases','콘텐츠 릴리스']] : [])
-        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setReservationId(''); setDraftReservationId(''); setReceiptId(''); setAiFeature('all'); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
+        .map(([name,label]) => <button key={name} type="button" className={tab===name ? 'active' : ''} onClick={() => { setTab(name as ReadTab); setCursor(null); setDetail(null); setSearch(''); setDraftSearch(''); setReservationId(''); setDraftReservationId(''); setReceiptId(''); setAiFeature('all'); if (name !== 'reading-attempts') setAttemptReadingId(''); }}>{label}</button>)}
     </div>
     <div className="admin-toolbar">
+      {detail === null && tab !== 'reading-generation-cost' && <form className="admin-search-form" role="search" aria-label="현재 목록 검색" onSubmit={event => {
+        event.preventDefault();
+        const value = draftSearch.trim();
+        if (value.length > 100 || /[\x00-\x1f\x7f]/u.test(value)) {
+          setError('검색어는 제어 문자를 제외한 100자 이내로 입력해 주세요.');
+          return;
+        }
+        setError('');
+        setSearch(value);
+        setCursor(null);
+      }}>
+        <label className="admin-search-field">
+          <span>목록 검색</span>
+          <input aria-label="현재 목록 검색어" placeholder="ID, 상태, 이벤트, 모델, 참조값 등" value={draftSearch}
+            maxLength={100} onChange={event => setDraftSearch(event.target.value)} />
+        </label>
+        <button type="submit">검색</button>
+        {search !== '' && <button type="button" className="admin-search-reset" onClick={() => {
+          setDraftSearch('');
+          setSearch('');
+          setCursor(null);
+        }}>초기화</button>}
+        <small>현재 메뉴의 조회 가능 범위 전체에서 검색합니다. 기간·상태 필터와 함께 적용됩니다.</small>
+      </form>}
       {((section === 'commerce' && tab === 'commerce') || (section === 'readings' && tab === 'readings')) && detail === null &&
         <form className="admin-issue-category" onSubmit={e => {
           e.preventDefault();
@@ -510,17 +635,17 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           </select>
         </label>}
       {section === 'users' && detail === null && <div className="admin-user-filters">
-        <label>계정 종류
+        <label>계정 구분
           <select value={subjectKind} onChange={e => {
             setSubjectKind(e.target.value as 'all' | 'guest' | 'member');
             setCursor(null);
           }}>
             <option value="all">전체</option>
-            <option value="member">회원</option>
-            <option value="guest">게스트</option>
+            <option value="member">가입 회원 기록</option>
+            <option value="guest">게스트 이용 기록</option>
           </select>
         </label>
-        <label>수명주기
+        <label>계정 상태
           <select value={subjectStatus} onChange={e => {
             setSubjectStatus(e.target.value as typeof subjectStatus);
             setCursor(null);
@@ -528,7 +653,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
             <option value="all">전체</option>
             <option value="active">활성</option>
             <option value="merged">병합됨</option>
-            <option value="deletion_pending">삭제 대기</option>
+            <option value="deletion_pending">탈퇴 처리 대기</option>
             <option value="deleted">삭제 완료</option>
           </select>
         </label>
@@ -669,6 +794,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           if (from !== null && to !== null) { query.set('from', from); query.set('to', to); }
           if (issueStatus !== 'all') query.set('status', issueStatus);
           if (issueCategory !== '') query.set('category', issueCategory);
+          if (search !== '') query.set('search', search);
           void fetchAdminIssuesCsvV1(token, query)
             .then(content => {
               const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
