@@ -9,11 +9,13 @@ import stat
 from runner import preflight, PreflightDenied, CHARACTER_IDS
 
 # Offline GEPA feedback must not smuggle arbitrary evaluator strings to reflection/logs.
-KNOWN_FAILURE_CODES = frozenset({
+HARD_FAILURE_CODES = frozenset({
     'fabricated_memory', 'cross_character_or_user_leak',
     'canon_or_authority_violation', 'unsupported_relationship',
-    'provider_or_cost_violation', 'synthetic_verbosity',
+    'provider_or_cost_violation',
 })
+# The offline fixture's descriptive code is not a hard-safety violation.
+KNOWN_FAILURE_CODES = HARD_FAILURE_CODES | frozenset({'synthetic_verbosity'})
 EXPRESSION_OVERRIDE = re.compile(
     r'(?:ignore|override|disregard|bypass)\s+(?:all\s+)?'
     r'(?:previous|system|developer|authority|canon|rules|instructions)'
@@ -92,7 +94,10 @@ def build_offline_gepa_kwargs(envelope, *, seed_text, evaluator, reflection_lm,
                        for code in failure_codes)
                 or len(set(failure_codes)) != len(failure_codes)):
             raise PreflightDenied('unsafe_feedback')
-        return float(score), {
+        # Match the Node hard-gate contract: no claimed quality gain may
+        # compensate for unsafe memory, authority, relationship or cost behavior.
+        hard_blocked = not HARD_FAILURE_CODES.isdisjoint(failure_codes)
+        return (0.0 if hard_blocked else float(score)), {
             'failure_codes': list(failure_codes),
             'character_id': example['characterId'],
             'raw_dialogue_excluded': True,
