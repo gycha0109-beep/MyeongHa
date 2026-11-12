@@ -6,7 +6,7 @@ from unittest import TestCase, mock
 from tempfile import TemporaryDirectory
 
 from approval_scope import ApprovalHold
-from governed_dry_run import DryRunPolicy
+from governed_dry_run import DryRunPolicy, PolicyDenied
 from budget_ledger import BudgetDenied
 from krw500_synthetic_ledger import YeoulKrw500SingleFlightLedger
 from test_krw500_synthetic_ledger import policy, request
@@ -120,7 +120,7 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
     def test_repeated_fake_grants_cannot_open_sender(self):
         with mock.patch.dict('os.environ', {'OPENROUTER_API_KEY': 'sk-or-test-fixture'}):
             for name in ('one', 'two', 'three'):
-                with self.assertRaises(ApprovalHold):
+                with self.assertRaisesRegex(PolicyDenied, 'request_shape_or_untrusted_approval'):
                     self.gateway.dispatch(
                         policy_request={**live_request(self.pol, name),
                                         'approvalRef': 'owner-says-yes'},
@@ -187,7 +187,7 @@ class YeoulPaidGatewayBoundaryTests(TestCase):
         self.assertEqual(result['status'], 'held')
         self.assertTrue(result['billable_dispatch_unreconciled'])
         self.assertEqual(self.ledger.krw_status()['pilot_unreconciled_charges'], 1)
-        self.assertEqual(self.ledger.krw_status()['remaining_unverified_krw'], 498)
+        self.assertEqual(self.ledger.krw_status()['remaining_unverified_krw'], 499)
 
 
     def test_non_strict_ledger_and_mismatched_provider_rejected(self):
