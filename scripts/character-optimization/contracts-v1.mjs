@@ -10,7 +10,7 @@ export const CORPUS_SPLITS = Object.freeze(['development', 'optimizer_validation
 const isObj = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const nonempty = v => typeof v === 'string' && v.trim().length > 0;
 const sha = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
-const safeCorpusKey = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(v);
+const safeCorpusKey = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}(?![\s\S])/.test(v);
 const fail = code => { throw new Error(`CHARACTER_OPTIMIZATION_INVALID:${code}`); };
 export const digest = value => createHash('sha256').update(typeof value === 'string' ? value : JSON.stringify(value)).digest('hex');
 
