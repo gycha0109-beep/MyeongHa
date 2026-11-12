@@ -143,3 +143,11 @@
 - 명하의 기존 Source 영수증 다건 재처리 PR #3210은 이미 병합돼 있으므로 반복 구현하지 않는다. 현 비용 귀속은 영수증의 일부 집합이 검증되었다는 의미일 뿐 공급사 전체 청구 가능 호출의 전수 검증이 아니다.
 - 11월 11일 명하 운영 DB 읽기 전용 확인 결과, 기존 AI 비용 원장 및 비용 Writer RPC와 정본 실행 시도 전용 Reader는 존재했다. 명하 사전 승인 증명 전용 스키마와 Reader/Writer 역할은 운영 설치가 확인되지 않았다. Saju 별도 Production Source DB의 설치 여부는 이 점검으로 판단할 수 없다.
 - 실제 서비스 자격증명·TLS 연결, Production Interpretation Authority, 개인정보 연계 UUID의 보존·삭제 기준, 공급사 실제 호출 누락과 청구서·환율 대조는 미검증이다. 기존 Customer/Payment/Credit는 변경하지 않으며 completeCostCoverage=false, invoiceReconciled=false 및 실제 비용 수집 OFF를 유지한다.
+
+## 2026-11-12 — A4 세 독립 계정 사전 점검과 다건 비용 재처리 연결 (오프라인)
+
+- 명하 [PR #3222](https://github.com/gycha0109-beep/MyeongHa/pull/3222): HEAD `17ef0a768d6137915e31be3f056bcf5913c3f98d` 필수 [통합 검증 #42990676628](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42990676628) SUCCESS 후 병합 커밋 `d046d06c9e90c047d17978b4dbf4deeed45b8490`. Source 영수증 Reader, 정본 DB 실행 시도 Reader, 독립 Cost Writer의 계정·테이블·최소 권한을 읽기 전용으로 점검하는 미설치 함수가 병합됨.
+- 기존 `apps/api/src/reading-ai-saju-attempt-batch-replay-v1.ts`에서 유효한 Source 영수증 목록이 1건 이상일 때, **첫 비용 Writer RPC 이전에** 위 독립 계정 점검을 실행한다. DB 계정 불일치·권한 부족·과잉 권한·테이블 누락·연결 장애는 비용 기록 전에 차단한다.
+- 영수증 0건인 경우 기존 `held_no_local_receipts`를 그대로 반환하고 이를 0원/전체 비용으로 확정하지 않는다. 목록이 불량하거나 501건 이상이면 검증 전에 실패한다. 이미 보존된 호출에 대한 재처리는 기존 멱등 원장을 그대로 사용한다.
+- 이 연결은 서버 내부 **오프라인 미설치 코드**다. 실제 자격증명·운영 DB·Saju API·비용 수집 활성화·고객·결제·크레딧·관리자 공개 라우트는 변경하지 않는다. `completeCostCoverage:false`, `invoiceReconciled:false` 유지. 수집 완전성·청구서·환율 검증은 별개 HOLD.
+- CI 검증과 병합은 이 단락 작성 시점에는 아직 미확인으로 취급하며, 승인된 실서비스 적용 또는 개인정보 증명 보존/삭제 정책 확정으로 간주하지 않는다.

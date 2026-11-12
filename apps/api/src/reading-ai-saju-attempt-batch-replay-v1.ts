@@ -1,6 +1,7 @@
 import type { PostgresSubjectPoolV1 } from "./postgres-subject-execution.js";
 import { SAJU_A4_SOURCE_RECEIPT_READER_ROLE_V1 } from "./reading-ai-saju-source-receipt-db-reader-v1.js";
 import { createSajuA4PostTerminalCostReplayV1 } from "./reading-ai-saju-postterminal-replay-v1.js";
+import { createSajuA4PrincipalReadinessV1 } from "./reading-ai-saju-principal-readiness-v1.js";
 import type { SajuA4VerifiedCostCompositionConfigV1 } from "./reading-ai-saju-proven-cost-composition-v1.js";
 
 const UUID =
@@ -137,6 +138,9 @@ export type SajuA4AttemptBatchReplayResultV1 =
  * operation fail closed; earlier successful entries remain idempotently
  * replayable on retry. A local census can never establish total provider usage.
  *
+ * Before the first cost Writer RPC, the three independent Source/canonical/
+ * ledger principals must pass read-only privilege checks. This preflight
+ * cannot guarantee a subsequent write or establish full provider coverage.
  * No scheduler, HTTP route, authorized issuer, production installation,
  * price guessing or billing reconciliation is performed.
  */
@@ -156,6 +160,7 @@ export function createSajuA4AttemptBatchReplayV1(
     throw new TypeError("Independent A4 source receipt Reader required");
   }
   const replay = createSajuA4PostTerminalCostReplayV1(input);
+  const readiness = createSajuA4PrincipalReadinessV1(input);
   return Object.freeze({
     async replayAttempt(executionAttemptId: string) {
       if (
@@ -181,6 +186,10 @@ export function createSajuA4AttemptBatchReplayV1(
           invoiceReconciled: false as const,
         });
       }
+      // Only a nonempty, valid local census can proceed to cost attribution.
+      // Validate the three independent database accounts before the first
+      // ledger write; a point-in-time check never proves invoice completeness.
+      await readiness.check();
       let recordedCalls = 0;
       let replayedCalls = 0;
       for (const callId of callIds) {
