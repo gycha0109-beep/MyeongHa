@@ -166,5 +166,64 @@ class YeoulKrw500SyntheticLedgerTests(unittest.TestCase):
         self.assertEqual(status['external_calls'],0)
 
 
+    def test_held_charge_in_one_run_halts_all_other_runs(self):
+        first=self.ledger('run-a',fees=10)
+        p1=policy('run-a')
+        first.reserve_controlled(p1,request(p1,'held-run-a'),1)
+        first.hold('held-run-a')
+        second=self.ledger('run-b',fees=10)
+        p2=policy('run-b')
+        with self.assertRaisesRegex(BudgetDenied,'pilot_unreconciled_charge_halts_all_runs'):
+            second.reserve_controlled(p2,request(p2,'later-in-other-run','judge'),1)
+        status=second.krw_status()
+        self.assertEqual(status['pilot_unreconciled_charges'],1)
+        self.assertFalse(status['pilot_ledger_global_hold_clear'])
+        self.assertEqual(status['all_roles_and_runs_attempts'],1)
+
+    def test_usd_only_reservation_in_different_run_also_halts_pilot(self):
+        unprotected=GovernedBudgetLedger(
+            self.path,run_id='other-run',
+            max_spend_micro_usd=10000000,max_attempts=30,role_caps=ROLES,
+        )
+        pu=policy('other-run')
+        unprotected.reserve_controlled(pu,request(pu,'usd-only-other'),1)
+        guarded=self.ledger('pilot-run')
+        pg=policy('pilot-run')
+        with self.assertRaisesRegex(BudgetDenied,'unguarded_usd_reservations_present'):
+            guarded.reserve_controlled(pg,request(pg,'would-spend'),1)
+        self.assertTrue(guarded.krw_status()['unguarded_usd_attempts_detected'])
+        self.assertFalse(guarded.krw_status()['pilot_ledger_global_hold_clear'])
+
+    def test_late_unguarded_writer_after_protected_run_stops_all_followups(self):
+        guarded=self.ledger('run-a')
+        pa=policy('run-a')
+        guarded.reserve_controlled(pa,request(pa,'protected'),1)
+        legacy=GovernedBudgetLedger(
+            self.path,run_id='run-b',
+            max_spend_micro_usd=10000000,max_attempts=30,role_caps=ROLES,
+        )
+        pb=policy('run-b')
+        legacy.reserve_controlled(pb,request(pb,'late-unguarded'),1)
+        another=self.ledger('run-c')
+        pc=policy('run-c')
+        with self.assertRaisesRegex(BudgetDenied,'unguarded_usd_reservations_present'):
+            another.reserve_controlled(pc,request(pc,'cannot-reserve'),1)
+        status=another.krw_status()
+        self.assertEqual(status['all_roles_and_runs_attempts'],1)
+        self.assertTrue(status['unguarded_usd_attempts_detected'])
+
+    def test_settled_other_run_does_not_trigger_unknown_charge_hold(self):
+        first=self.ledger('run-a')
+        pa=policy('run-a')
+        first.reserve_controlled(pa,request(pa,'fully-settled'),1)
+        first.settle('fully-settled',0)
+        second=self.ledger('run-b')
+        pb=policy('run-b')
+        second.reserve_controlled(pb,request(pb,'later-clean'),1)
+        self.assertEqual(second.krw_status()['all_roles_and_runs_attempts'],2)
+        self.assertEqual(second.krw_status()['pilot_unreconciled_charges'],0)
+        self.assertTrue(second.krw_status()['pilot_ledger_global_hold_clear'])
+
+
 if __name__ == '__main__':
     unittest.main()
