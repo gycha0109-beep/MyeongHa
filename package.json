@@ -27,7 +27,7 @@
     "verify:production-smoke-fresh-session-authority": "node scripts/verify-production-smoke-fresh-session-authority.mjs",
     "verify:production-platform-integrity-read-audit": "node scripts/verify-production-platform-integrity-read-audit.mjs",
     "verify:production-data-api-containment": "node scripts/verify-production-data-api-containment.mjs",
-    "verify:production-postgres-backup-workflow": "node scripts/verify-production-postgres-backup-workflow.mjs",
+    "verify:production-postgres-backup-workflow": "node scripts/verify-production-postgres-backup-workflow.mjs && vitest run scripts/operations/assess-production-provider-migration-ledger-source.test.mjs",
     "verify:postgres-isolated-restore-drill-workflow": "node scripts/verify-postgres-isolated-restore-drill-workflow.mjs",
     "verify:postgres-recovered-serving-admission": "node scripts/verify-postgres-recovered-serving-admission.mjs && node scripts/verify-postgres-hosted-synthetic-local-acceptance.mjs",
     "verify:postgres-dr-readiness-authority": "node scripts/verify-postgres-dr-readiness-authority.mjs",

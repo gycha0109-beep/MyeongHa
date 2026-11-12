@@ -174,6 +174,15 @@ if [[ "$(jq -c . <<<"$migration_catalog_after")" != "$migration_catalog_canonica
 fi
 
 
+# Optional source escrow is a separate encrypted artifact. The portable backup
+# archive and its existing restore consumers remain byte-format compatible.
+# Scheduled and push backups never capture the raw migration ledger.
+if [[ "${MH_OPS_CAPTURE_PROVIDER_LEDGER:-false}" == 'true' ]]; then
+  bash scripts/operations/capture-provider-migration-ledger-source-encrypted.sh \
+    "$migration_catalog_version_count" "$migration_frontier" \
+    "$migration_catalog_sha256" "$backup_stamp"
+fi
+
 source_catalog_after="$(capture_application_catalog)"
 source_catalog_after_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
 source_catalog_after_canonical="$(jq -ecS --arg frontier "$migration_frontier" '
