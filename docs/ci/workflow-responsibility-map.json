@@ -476,6 +476,12 @@
       "mainMode": "one-shot-trigger",
       "workTrackAttribution": "commit-metadata"
     },
+    "seyeon-c08y-owner-paid-six-v1.yml": {
+      "responsibility": "character-memory-owner-approved-six-real-synthetic-gold-evaluation-once",
+      "prMode": "none",
+      "mainMode": "one-shot-trigger",
+      "workTrackAttribution": "commit-metadata"
+    },
     "seyeon-c09-gpt6-luna-five-main-once-20261026.yml": {
       "responsibility": "character-memory-owner-approved-single-model-gpt6-luna-five-public-dialogues-once",
       "prMode": "none",
