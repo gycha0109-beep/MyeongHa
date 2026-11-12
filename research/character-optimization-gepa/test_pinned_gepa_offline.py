@@ -29,7 +29,7 @@ def fixture():
         "mutableSlot": "character_expression",
         "dataset": [
             {"id": "public-syn-dev", "characterId": "yeoul", "familyId": "public-dev", "split": "development", "contentSha256": SHA},
-            {"id": "public-syn-val", "characterId": "yeoul", "familyId": "public-val", "split": "optimizer_validation", "contentSha256": SHA},
+            {"id": "public-syn-val", "characterId": "yeoul", "familyId": "public-val", "split": "optimizer_validation", "contentSha256": "b" * 64},
         ],
         "test_set": None,
         "externalCallsAuthorized": False,

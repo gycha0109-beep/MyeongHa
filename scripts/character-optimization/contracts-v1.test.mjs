@@ -51,3 +51,12 @@ test('shared GEPA bridge requires development and validation evidence for every 
  assert.throws(()=>buildGepaResearchPayload({manifest,candidate,corpus:[...yeoul,seyeon[0]]}),/missing_character_coverage/);
  assert.equal(buildGepaResearchPayload({manifest,candidate,corpus:[...yeoul,...seyeon]}).dataset.length,4);
 });
+
+test('corpus metadata IDs reject raw prompts and unsafe path characters',()=>{
+ const good=[row('dev-1','family.v1','development','a'),row('val-1','family:v2','optimizer_validation','b')];
+ assert.equal(validateCorpusSplits(good,{exposeToOptimizer:true}).families,2);
+ for(const key of ['개인 대화 내용','family\\nmessage','../holdout','a|secret','a'.repeat(121)]){
+   assert.throws(()=>validateCorpusSplits([{...good[0],id:key},good[1]]),/corpus_row/);
+   assert.throws(()=>validateCorpusSplits([{...good[0],familyId:key},good[1]]),/corpus_row/);
+ }
+});
