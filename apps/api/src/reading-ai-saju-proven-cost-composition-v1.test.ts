@@ -78,7 +78,9 @@ function fixture(
     attemptRows?: readonly unknown[];
     failSource?: boolean;
     failAttempt?: boolean;
-    readinessOverrides?: Partial<Record<"source" | "attempt" | "writer", Record<string, unknown>>>;
+    readinessOverrides?: Partial<
+      Record<"source" | "attempt" | "writer", Record<string, unknown>>
+    >;
   } = {},
 ) {
   const trace: string[] = [];
