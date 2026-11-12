@@ -4,11 +4,13 @@ const TYPES = Object.freeze(['persona','relationship','memory','long_horizon','o
 const failure = reason => { throw new Error(`CHARACTER_R16_INVALID:${reason}`); };
 const isSha = v => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 const nonempty = v => typeof v === 'string' && v.trim().length > 0;
+const safeFamilyId = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}(?![\s\S])/.test(v);
+const safeRuntimeRef = v => typeof v === 'string' && /^docs\/character\/[A-Z0-9_]+\.md(?![\s\S])/.test(v);
 
 /** Caller loads a pinned Runtime source; DRAFT cannot become approved by parsing it. */
 export function extractR16Metadata({characterId,sourceRef,sourceSha256,runtimeText,sourceAuthorityState}) {
   if (!CHARACTER_IDS.includes(characterId) || !nonempty(sourceRef)
-      || !sourceRef.startsWith('docs/character/')
+      || !safeRuntimeRef(sourceRef)
       || !sourceRef.split('/').at(-1).startsWith(`${characterId.toUpperCase()}_CHARACTER_RUNTIME_`)
       || !['DRAFT','APPROVED','OTHER_VERIFIED'].includes(sourceAuthorityState)
       || !isSha(sourceSha256) || typeof runtimeText !== 'string' || digest(runtimeText) !== sourceSha256)
@@ -57,7 +59,7 @@ export function buildR16Ticket({registry,probeId,split,familyId,profileSourceSha
       || !Array.isArray(registry.probes) || !isSha(profileSourceSha256)
       || registry.sourceSha256!==profileSourceSha256) failure('runtime_source_mismatch');
   if (!['development','optimizer_validation'].includes(split)
-      || !nonempty(familyId)) failure('split_or_family');
+      || !safeFamilyId(familyId)) failure('split_or_family');
   const probe=registry.probes.find(x=>x.probeId===probeId);
   if (!probe || probe.characterId!==registry.characterId
       || probe.sourceSha256!==registry.sourceSha256 || probe.humanReviewVerified!==false)
