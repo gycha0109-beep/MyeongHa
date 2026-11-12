@@ -55,7 +55,7 @@ test('shared GEPA bridge requires development and validation evidence for every 
 test('corpus metadata IDs reject raw prompts and unsafe path characters',()=>{
  const good=[row('dev-1','family.v1','development','a'),row('val-1','family:v2','optimizer_validation','b')];
  assert.equal(validateCorpusSplits(good,{exposeToOptimizer:true}).families,2);
- for(const key of ['개인 대화 내용','family\\nmessage','../holdout','a|secret','a'.repeat(121)]){
+ for(const key of ['개인 대화 내용','family\\nmessage','../holdout','a|secret','valid\n','a'.repeat(121)]){
    assert.throws(()=>validateCorpusSplits([{...good[0],id:key},good[1]]),/corpus_row/);
    assert.throws(()=>validateCorpusSplits([{...good[0],familyId:key},good[1]]),/corpus_row/);
  }
