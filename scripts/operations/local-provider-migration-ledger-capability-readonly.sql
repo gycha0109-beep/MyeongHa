@@ -6,9 +6,9 @@ WITH target AS (
   SELECT pg_catalog.to_regclass('supabase_migrations.schema_migrations') AS oid
 ), attributes AS (
   SELECT
-    pg_catalog.coalesce(pg_catalog.bool_or(a.attname='version'),false) AS has_version,
-    pg_catalog.coalesce(pg_catalog.bool_or(a.attname='name'),false) AS has_name,
-    pg_catalog.coalesce(pg_catalog.bool_or(a.attname='statements'),false) AS has_statements
+    coalesce(pg_catalog.bool_or(a.attname='version'),false) AS has_version,
+    coalesce(pg_catalog.bool_or(a.attname='name'),false) AS has_name,
+    coalesce(pg_catalog.bool_or(a.attname='statements'),false) AS has_statements
   FROM target t
   LEFT JOIN pg_catalog.pg_attribute a
     ON a.attrelid=t.oid AND a.attnum>0 AND NOT a.attisdropped
