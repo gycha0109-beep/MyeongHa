@@ -14,6 +14,7 @@ alter table public.official_reader_paid_answer_bodies
   add column approved_grounding_hash text,
   add column approved_source_unit_refs text[],
   add column approved_focused_unit_ref text,
+  add column approved_prior_safe_message_id uuid,
   add column legacy_reading_id uuid generated always as
     (case when approved_purchase_intent_id is null then official_reading_id end) stored,
   add column legacy_product_id uuid generated always as
@@ -21,6 +22,7 @@ alter table public.official_reader_paid_answer_bodies
   add constraint approved_saju_paid_answer_route_shape check (
     (approved_purchase_intent_id is null and approved_component is null
       and approved_grounding_hash is null and approved_source_unit_refs is null and approved_focused_unit_ref is null
+      and approved_prior_safe_message_id is null
       and product_spec_version<>'approved-saju-2026-11-06')
     or (approved_purchase_intent_id is not null and approved_component is not null
       and approved_grounding_hash is not null and approved_grounding_hash ~ '^[a-f0-9]{64}$'
@@ -312,6 +314,8 @@ declare
   v_message uuid := (p_request->>'safeMessageId')::uuid;
   v_grounding_hash text := p_request->>'groundingHash';
   v_focused_unit text := p_request->>'focusedUnitRef';
+  v_prior_message uuid := (p_request->>'previousSafeMessageId')::uuid;
+  v_current_message uuid;
   v_source_units text[];
   v_signed_units jsonb;
   v_sequence bigint;
@@ -324,7 +328,8 @@ begin
     or p_request-array['subjectId','readingId','readerCharacterId','readerContentBundleId','contentReleaseId',
       'contentRevision','threadId','turnId','clientTurnId','requestHash','attemptId','bodyId','safeMessageId','originatingGrantId','productId',
       'archiveResponseHash','nativeSourceResponseHash','sourceAttemptId','semanticGuardVersion','outputGuardVersion',
-      'encryptionKeyRef','groundingHash','sourceUnitRefs','focusedUnitRef']<>'{}'::jsonb
+      'encryptionKeyRef','groundingHash','sourceUnitRefs','focusedUnitRef','previousSafeMessageId']<>'{}'::jsonb
+    or not (p_request ? 'previousSafeMessageId')
     or v_body is null or v_message is null
     or not coalesce(v_grounding_hash ~ '^[a-f0-9]{64}$',false)
     or not coalesce(v_focused_unit ~ '^grounding_unit_[a-f0-9]{24}$',false)
@@ -403,6 +408,7 @@ begin
       or existing.approved_grounding_hash is distinct from v_grounding_hash
       or existing.approved_source_unit_refs is distinct from v_source_units
       or existing.approved_focused_unit_ref is distinct from v_focused_unit
+      or existing.approved_prior_safe_message_id is distinct from v_prior_message
       or existing.product_id is distinct from scope.product_id
       or existing.official_artifact_response_hash is distinct from scope.stored_response_hash
       or existing.source_attestation_ref is distinct from ('approved-saju-issue:' || scope.source_attempt_id::text)
@@ -422,6 +428,11 @@ begin
     then raise exception using errcode='23505',message='Approved Saju protected answer replay has a different scope'; end if;
     return jsonb_build_object('bodyId',v_body,'safeMessageId',v_message,'committedAt',existing.committed_at,'replayed',true);
   end if;
+
+  select prior.assistant_message_id into v_current_message
+  from public.qry_approved_saju_reader_followup_anchor_v1(v_subject,v_thread,v_reader,v_reading) prior;
+  if v_current_message is distinct from v_prior_message
+  then raise exception using errcode='P0001',message='Approved Saju previous answer changed'; end if;
 
   perform 1 from public.chat_turns turn
   where turn.id=v_turn and turn.thread_id=v_thread and turn.subject_id=v_subject
@@ -443,12 +454,12 @@ begin
     id,subject_id,thread_id,turn_id,attempt_id,safe_message_id,thread_character_id,
     official_reading_id,reader_character_id,reader_content_bundle_id,content_release_id,
     originating_entitlement_grant_id,product_id,product_spec_version,approved_purchase_intent_id,approved_component,
-    approved_grounding_hash,approved_source_unit_refs,approved_focused_unit_ref,
+    approved_grounding_hash,approved_source_unit_refs,approved_focused_unit_ref,approved_prior_safe_message_id,
     official_artifact_response_hash,source_attestation_ref,source_response_hash,semantic_guard_version,output_guard_version,
     encryption_scheme_version,encryption_key_ref,encryption_iv,encryption_auth_tag,encrypted_body,committed_at
   ) values(v_body,v_subject,v_thread,v_turn,v_attempt,v_message,v_participant,
     v_reading,v_reader,v_bundle,v_release,scope.entitlement_grant_id,scope.product_id,'approved-saju-2026-11-06',
-    scope.purchase_intent_id,scope.component,v_grounding_hash,v_source_units,v_focused_unit,
+    scope.purchase_intent_id,scope.component,v_grounding_hash,v_source_units,v_focused_unit,v_prior_message,
     scope.stored_response_hash,'approved-saju-issue:' || scope.source_attempt_id::text,
     scope.native_source_response_hash,p_request->>'semanticGuardVersion',p_request->>'outputGuardVersion',
     'aes-256-gcm-v1',p_request->>'encryptionKeyRef',p_iv,p_tag,p_ciphertext,v_now);
@@ -533,4 +544,143 @@ revoke all on function public.qry_approved_saju_paid_answer_ciphertext_v1(uuid,u
   from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
     myeongha_approved_saju_issuer_executor;
 grant execute on function public.qry_approved_saju_paid_answer_ciphertext_v1(uuid,uuid,uuid)
+  to myeongha_approved_saju_paid_answer_executor;
+
+-- Use the existing S7 journal and token contract for the approved-purchase
+-- ciphertext. Only the protected runtime may prepare or acknowledge delivery.
+create function public.cmd_prepare_approved_saju_paid_delivery_v1(
+  p_subject uuid,p_body uuid,p_thread uuid,p_message uuid,p_request uuid,p_token_hash text
+)
+returns table(delivery_attempt_id uuid,response_prepared_at timestamptz,already_prepared boolean)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare
+  v_delivery public.official_reader_paid_delivery_attempts_v1%rowtype;
+  v_now timestamptz;
+begin
+  if p_request is null or not coalesce(p_token_hash ~ '^sha256:v1:[a-f0-9]{64}$',false)
+    or not exists (
+      select 1 from public.qry_approved_saju_paid_answer_ciphertext_v1(p_subject,p_thread,p_message) answer
+      where answer.body_id=p_body
+    )
+  then raise exception using errcode='P0001',message='Approved Saju delivery is unavailable'; end if;
+
+  v_now := clock_timestamp();
+  insert into public.official_reader_paid_delivery_attempts_v1(
+    subject_id,body_id,thread_id,safe_message_id,delivery_request_id,
+    acknowledgement_token_hash,response_prepared_at,acknowledgement_deadline,retention_until
+  ) values (
+    p_subject,p_body,p_thread,p_message,p_request,p_token_hash,
+    v_now,v_now+interval '24 hours',v_now+interval '90 days'
+  ) on conflict on constraint official_reader_s7_once_per_client_request do nothing
+  returning * into v_delivery;
+  if found then return query select v_delivery.id,v_delivery.response_prepared_at,false; return; end if;
+
+  select d.* into v_delivery from public.official_reader_paid_delivery_attempts_v1 d
+  where d.subject_id=p_subject and d.body_id=p_body and d.delivery_request_id=p_request
+    and d.thread_id=p_thread and d.safe_message_id=p_message
+  for update;
+  if not found or v_delivery.acknowledgement_token_hash is distinct from p_token_hash
+    or v_delivery.acknowledgement_deadline<=v_now
+  then raise exception using errcode='P0001',message='Approved Saju delivery replay is unavailable'; end if;
+  return query select v_delivery.id,v_delivery.response_prepared_at,true;
+end
+$function$;
+
+create function public.cmd_ack_approved_saju_paid_delivery_v1(
+  p_subject uuid,p_thread uuid,p_message uuid,p_delivery uuid,p_request uuid,p_token_hash text
+)
+returns table(client_acknowledged_at timestamptz,replayed boolean)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+begin
+  if not exists (
+    select 1 from public.qry_approved_saju_paid_answer_ciphertext_v1(p_subject,p_thread,p_message) answer
+    join public.official_reader_paid_delivery_attempts_v1 delivery on delivery.body_id=answer.body_id
+      and delivery.id=p_delivery and delivery.subject_id=p_subject
+      and delivery.thread_id=p_thread and delivery.safe_message_id=p_message
+  ) then raise exception using errcode='P0001',message='Approved Saju delivery is unavailable'; end if;
+  return query select ack.client_acknowledged_at,ack.replayed
+  from public.internal_ack_official_reader_paid_delivery_v1(
+    p_subject,p_thread,p_message,p_delivery,p_request,p_token_hash
+  ) ack;
+end
+$function$;
+
+revoke all on function public.cmd_prepare_approved_saju_paid_delivery_v1(uuid,uuid,uuid,uuid,uuid,text),
+  public.cmd_ack_approved_saju_paid_delivery_v1(uuid,uuid,uuid,uuid,uuid,text)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
+    myeongha_approved_saju_issuer_executor;
+grant execute on function public.cmd_prepare_approved_saju_paid_delivery_v1(uuid,uuid,uuid,uuid,uuid,text),
+  public.cmd_ack_approved_saju_paid_delivery_v1(uuid,uuid,uuid,uuid,uuid,text)
+  to myeongha_approved_saju_paid_answer_executor;
+
+-- Admit only the latest acknowledged answer for this exact purchase. A
+-- superseded or still pending delivery must not be read as a new conversation.
+create function public.qry_approved_saju_reader_followup_anchor_v1(
+  p_subject uuid,p_thread uuid,p_reader text,p_reading uuid
+)
+returns table(
+  status text,subject_id uuid,thread_id uuid,reader_character_id text,reading_ref uuid,
+  official_artifact_response_hash text,grounding_hash text,assistant_message_id uuid,
+  source_unit_refs text[],focused_unit_ref text
+)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare
+  v_bundle uuid;
+  v_latest record;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
+  select thread.active_content_bundle_id into v_bundle
+  from public.conversation_threads thread
+  join public.conversation_thread_characters reader on reader.thread_id=thread.id
+    and reader.character_id=p_reader and reader.content_bundle_id=thread.active_content_bundle_id
+    and reader.role='primary' and reader.left_at is null
+  where thread.id=p_thread and thread.subject_id=p_subject and thread.status='active'
+    and thread.thread_type='single_character';
+  if not found or not exists (
+    select 1 from commerce_saju_private.lock_approved_paid_answer_scope_v1(p_subject,p_reading,p_reader,v_bundle)
+  ) then raise exception using errcode='P0001',message='Approved Saju consultation scope is unavailable'; end if;
+
+  select body.id,body.safe_message_id,body.official_artifact_response_hash,
+    body.approved_grounding_hash,body.approved_source_unit_refs,body.approved_focused_unit_ref,
+    marker.sequence_no
+  into v_latest
+  from public.official_reader_paid_answer_bodies body
+  join public.conversation_messages marker on marker.id=body.safe_message_id
+    and marker.thread_id=p_thread and marker.subject_id=p_subject
+  where body.subject_id=p_subject and body.thread_id=p_thread and body.official_reading_id=p_reading
+    and body.reader_character_id=p_reader and body.approved_purchase_intent_id is not null
+  order by marker.sequence_no desc limit 1;
+
+  if not found then return; end if;
+  if not exists (
+    select 1 from public.qry_approved_saju_paid_answer_ciphertext_v1(
+      p_subject,p_thread,v_latest.safe_message_id
+    ) answer
+    join public.official_reader_paid_delivery_attempts_v1 delivery on delivery.body_id=answer.body_id
+      and delivery.subject_id=p_subject and delivery.thread_id=p_thread
+      and delivery.safe_message_id=v_latest.safe_message_id and delivery.client_acknowledged_at is not null
+    where answer.body_id=v_latest.id
+  ) or exists (
+    select 1 from public.conversation_messages message
+    where message.subject_id=p_subject and message.thread_id=p_thread
+      and message.sequence_no>v_latest.sequence_no
+      and (message.sender_type='character' or exists (
+        select 1 from public.official_reader_paid_answer_bodies later
+        where later.safe_message_id=message.id and later.thread_id=p_thread and later.subject_id=p_subject
+      ))
+  ) then raise exception using errcode='P0001',message='Approved Saju previous answer is unavailable'; end if;
+
+  return query select 'committed_semantic_guard_pass'::text,p_subject,p_thread,p_reader,p_reading,
+    v_latest.official_artifact_response_hash,v_latest.approved_grounding_hash,v_latest.safe_message_id,
+    v_latest.approved_source_unit_refs,v_latest.approved_focused_unit_ref;
+end
+$function$;
+
+revoke all on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
+    myeongha_approved_saju_issuer_executor;
+grant execute on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid)
   to myeongha_approved_saju_paid_answer_executor;

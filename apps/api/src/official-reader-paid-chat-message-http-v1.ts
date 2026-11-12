@@ -1,5 +1,6 @@
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
 import {
+  readPrivateApprovedSajuPaidChatMessageV1,
   readPrivateOfficialReaderPaidChatMessageV1,
   type PrivateOfficialReaderPaidAnswerKeyResolverV1,
 } from './official-reader-private-paid-answer-reread-v1.js';
@@ -56,6 +57,7 @@ export interface HandleOfficialReaderPaidChatMessageHttpInputV1 {
    * grants have all been accepted. No caller-controlled request flag.
    */
   readonly paidReadReleaseEnabled?: boolean;
+  readonly purchaseKind?: 'standard' | 'approved_saju';
   readonly identityEvidenceVerifier?: IdentityEvidenceVerificationPortV1;
   readonly pool?: PostgresSubjectPoolV1;
   readonly keyResolver?: PrivateOfficialReaderPaidAnswerKeyResolverV1;
@@ -104,7 +106,9 @@ export async function handleOfficialReaderPaidChatMessageHttpV1(
     if (evidence.kind !== 'member') {
       return failure(403, 'ACCESS_DENIED', 'reader.paid_unavailable', input.requestId);
     }
-    const read = await readPrivateOfficialReaderPaidChatMessageV1({
+    const readPaidMessage = input.purchaseKind === 'approved_saju'
+      ? readPrivateApprovedSajuPaidChatMessageV1 : readPrivateOfficialReaderPaidChatMessageV1;
+    const read = await readPaidMessage({
       pool: input.pool,
       verifiedEvidence: evidence,
       threadId: parsed.threadId,

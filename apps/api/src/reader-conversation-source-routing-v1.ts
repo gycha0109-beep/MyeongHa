@@ -211,6 +211,7 @@ export interface PrepareReaderConversationResponseCandidateInputV1 {
     anchorAuthorityPort?: ValidatedStandardFollowupAnchorAuthorityPortV1;
     /** DB-origin actual Reader message order; needed for pronoun follow-ups. */
     recentMessageAuthorityPort?: Pick<ReaderContextNonMemoryReadAuthorityPortV1, 'readRecentMessages'>;
+    useApprovedSajuAnchorContinuity?: true;
     guardedScene?: ReaderInterpretationPreviewEnvelopeV1;
     rendererDraft?: unknown;
   }>;
@@ -226,7 +227,8 @@ export type ReaderFollowupCurrentAuthorityV1 = Omit<
   Parameters<typeof recheckCharacterStandardReaderFinalHoldV1>[0], 'preflight' | 'outputHold'
 > & Readonly<{
   anchorAuthorityPort: ValidatedStandardFollowupAnchorAuthorityPortV1;
-  recentMessageAuthorityPort: Pick<ReaderContextNonMemoryReadAuthorityPortV1, 'readRecentMessages'>;
+  recentMessageAuthorityPort?: Pick<ReaderContextNonMemoryReadAuthorityPortV1, 'readRecentMessages'>;
+  useApprovedSajuAnchorContinuity?: true;
 }>;
 
 /** A one-use reference for the private delivery pipeline. It contains no answer text. */
@@ -481,7 +483,7 @@ export async function prepareReaderConversationResponseCandidateV1(
   }
 
   if (!input.official.anchorAuthorityPort ||
-      !input.official.recentMessageAuthorityPort) {
+      (!input.official.recentMessageAuthorityPort && input.official.useApprovedSajuAnchorContinuity !== true)) {
     // A DB-validated Saju Anchor alone does not prove it is the Reader's
     // most recent actual answer. No fallback to the old shortcut is allowed.
     return hold(intent, 'official_latest_anchor_not_admitted');
@@ -491,7 +493,9 @@ export async function prepareReaderConversationResponseCandidateV1(
       preflight,
       grounded,
       anchorAuthorityPort: input.official.anchorAuthorityPort,
-      recentMessageAuthorityPort: input.official.recentMessageAuthorityPort,
+      ...(input.official.recentMessageAuthorityPort === undefined ? {} :
+        { recentMessageAuthorityPort: input.official.recentMessageAuthorityPort }),
+      ...(input.official.useApprovedSajuAnchorContinuity === true ? { useApprovedSajuAnchorContinuity: true } : {}),
     });
     if (continuity.mode === 'hold') {
       return hold(intent, 'official_latest_anchor_not_admitted');

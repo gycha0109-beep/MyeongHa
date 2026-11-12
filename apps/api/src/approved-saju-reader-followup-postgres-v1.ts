@@ -44,8 +44,7 @@ type PreparedApprovedSajuReaderFollowupV1 = Readonly<{
 }>;
 
 const preparedPrivateCommits = new WeakMap<PreparedApprovedSajuReaderFollowupV1, Readonly<{
-  ordinaryPool: PostgresSubjectPoolV1;
-  issuerPool: PostgresSubjectPoolV1;
+  protectedPool: PostgresSubjectPoolV1;
   outputHold: CharacterStandardReaderOutputHoldV1;
   originatingGrantId: string;
   clientTurnId: string;
@@ -56,6 +55,7 @@ const preparedPrivateCommits = new WeakMap<PreparedApprovedSajuReaderFollowupV1,
 export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
   issuanceProofPool: PostgresSubjectPoolV1;
+  protectedPool: PostgresSubjectPoolV1;
   productionIssueProofTrusts: readonly SajuProductionIssueProofTrustV1[];
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readingId: string;
@@ -67,8 +67,21 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
   consultationPort: CharacterSajuConsultationShadowPortV1;
 }>): Promise<PreparedApprovedSajuReaderFollowupV1 | null> {
   if (input.verifiedEvidence.kind !== 'member' || input.consultationPort.evaluateBatch === undefined
-      || input.issuanceProofPool === input.pool || input.productionIssueProofTrusts.length === 0) return null;
-  const { pool, verifiedEvidence, readingId } = input;
+      || input.issuanceProofPool === input.pool || input.protectedPool === input.pool
+      || input.protectedPool === input.issuanceProofPool || input.productionIssueProofTrusts.length === 0) return null;
+  const { pool, protectedPool, verifiedEvidence, readingId } = input;
+  const anchorAuthorityPort = {
+    readLatestValidatedAnchor: (coordinates: Parameters<
+      ReturnType<typeof createPostgresStandardFollowupAnchorAuthorityPortV1>['readLatestValidatedAnchor']
+    >[0]) => executePostgresApprovedSajuPaidAnswerTransactionV1({
+      pool: protectedPool, verifiedEvidence,
+      execute: ({ client, resolvedSubject }) => {
+        if (resolvedSubject.subjectId !== coordinates.subjectId) throw new Error('Reader subject changed.');
+        return createPostgresStandardFollowupAnchorAuthorityPortV1(client, 'approved_saju')
+          .readLatestValidatedAnchor(coordinates);
+      },
+    }),
+  };
   const prepared = await executePostgresSubjectTransactionV1({
     pool, verifiedEvidence,
     execute: async (scope) => {
@@ -99,8 +112,8 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
         admittedDomain: grounded.scope.sajuDomain,
         official: {
           preflight, grounded,
-          anchorAuthorityPort: createPostgresStandardFollowupAnchorAuthorityPortV1(client),
-          recentMessageAuthorityPort: nonMemoryContextAuthorityPort,
+          anchorAuthorityPort,
+          useApprovedSajuAnchorContinuity: true,
           rendererDraft: {
             schemaVersion: 'v1', emotion: 'neutral',
             memoryProposals: [], relationshipEventProposals: [], suggestedActions: [],
@@ -130,8 +143,8 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
           accessAuthorityPort: accessPort, artifactAuthorityPort: artifactPort,
           currentVerifiedPurchaseAuthorityPort: purchasePort,
           productReaderEligibilityAuthorityPort: input.createProductReaderEligibilityAuthorityPort(client),
-          anchorAuthorityPort: createPostgresStandardFollowupAnchorAuthorityPortV1(client),
-          recentMessageAuthorityPort: createPostgresReaderContextNonMemoryReadAuthorityPortV1(client),
+          anchorAuthorityPort,
+          useApprovedSajuAnchorContinuity: true,
         });
       },
     }),
@@ -139,7 +152,7 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
   if (reviewed === null) return null;
   const result = Object.freeze({ reviewed, productionSource });
   preparedPrivateCommits.set(result, {
-    ordinaryPool: pool, issuerPool: input.issuanceProofPool, outputHold, originatingGrantId,
+    protectedPool, outputHold, originatingGrantId,
     clientTurnId: input.receivePlan.normalizedRequest.clientTurnId, requestHash: input.receivePlan.requestHash,
   });
   return result;
@@ -157,8 +170,8 @@ export async function commitApprovedSajuReaderFollowupPostgresV1(input: Readonly
   key: OfficialReaderProtectedBodyKeyV1;
 }>): Promise<Readonly<{ bodyId: string; safeMessageId: string; committedAt: string; replayed: boolean }> | null> {
   const staged = preparedPrivateCommits.get(input.prepared);
-  if (staged === undefined || input.protectedPool === staged.ordinaryPool ||
-    input.protectedPool === staged.issuerPool || input.verifiedEvidence.kind !== 'member') return null;
+  if (staged === undefined || input.protectedPool !== staged.protectedPool ||
+    input.verifiedEvidence.kind !== 'member') return null;
   preparedPrivateCommits.delete(input.prepared);
   const { outputHold, originatingGrantId, clientTurnId, requestHash } = staged;
   const { prepared, turnId, attemptId, bodyId, safeMessageId } = input;
@@ -194,6 +207,7 @@ export async function commitApprovedSajuReaderFollowupPostgresV1(input: Readonly
           semanticGuardVersion: prepared.reviewed.evaluatorVersion, outputGuardVersion: outputHold.guardVersion,
           groundingHash: outputHold.groundingHash, sourceUnitRefs: outputHold.sourceUnitRefs,
           focusedUnitRef: outputHold.focusedUnitRef,
+          previousSafeMessageId: outputHold.assistantAnchorMessageId,
           encryptionKeyRef: cipher.keyRef,
         };
         const { rows } = await client.query<{ result: {

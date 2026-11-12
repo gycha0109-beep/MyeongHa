@@ -1,5 +1,6 @@
 import { createHash, createHmac } from 'node:crypto';
 import {
+  executePostgresApprovedSajuPaidAnswerTransactionV1,
   executePostgresSubjectTransactionV1,
   type PostgresSubjectExecutionScopeV1,
   type PostgresSubjectPoolV1,
@@ -45,6 +46,13 @@ from public.internal_ack_official_reader_paid_delivery_v1(
   $1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid,$6::text
 )
 `;
+
+const APPROVED_PREPARE_SQL = PREPARE_SQL.replace(
+  'internal_prepare_official_reader_paid_delivery_v1', 'cmd_prepare_approved_saju_paid_delivery_v1',
+);
+const APPROVED_ACK_SQL = ACK_SQL.replace(
+  'internal_ack_official_reader_paid_delivery_v1', 'cmd_ack_approved_saju_paid_delivery_v1',
+);
 
 export interface OfficialReaderPrivateDeliveryReservationV1 {
   readonly deliveryRequestId: string;
@@ -131,6 +139,7 @@ export async function prepareOfficialReaderPrivateDeliveryV1(input: Readonly<{
   safeMessageId: string;
   bodyId: string;
   reservation: OfficialReaderPrivateDeliveryReservationV1;
+  purchaseKind?: 'standard' | 'approved_saju';
 }>): Promise<OfficialReaderPrivateDeliveryPreparedV1> {
   try {
     const subjectId=uuid(input.subjectId);
@@ -151,7 +160,7 @@ export async function prepareOfficialReaderPrivateDeliveryV1(input: Readonly<{
       deliveryAttemptId: unknown;
       responsePreparedAt: unknown;
       replayed: unknown;
-    }>(PREPARE_SQL,[
+    }>(input.purchaseKind === 'approved_saju' ? APPROVED_PREPARE_SQL : PREPARE_SQL,[
       subjectId,bodyId,threadId,safeMessageId,
       deliveryRequestId,digestToken(acknowledgementToken),
     ]);
@@ -185,6 +194,7 @@ export async function acknowledgeOfficialReaderPrivateDeliveryV1(input: Readonly
   deliveryRequestId: string;
   deliveryAttemptId: string;
   acknowledgementToken: string;
+  purchaseKind?: 'standard' | 'approved_saju';
 }>): Promise<OfficialReaderPrivateDeliveryAcknowledgedV1> {
   try {
     const threadId=uuid(input.threadId);
@@ -194,7 +204,9 @@ export async function acknowledgeOfficialReaderPrivateDeliveryV1(input: Readonly
     if (typeof input.acknowledgementToken !== 'string'
         || !TOKEN.test(input.acknowledgementToken)) return unavailable();
     const tokenHash=digestToken(input.acknowledgementToken);
-    return await executePostgresSubjectTransactionV1({
+    const executeSubject = input.purchaseKind === 'approved_saju'
+      ? executePostgresApprovedSajuPaidAnswerTransactionV1 : executePostgresSubjectTransactionV1;
+    return await executeSubject({
       pool:input.pool,
       verifiedEvidence:input.verifiedEvidence,
       execute:async(scope)=>{
@@ -203,7 +215,7 @@ export async function acknowledgeOfficialReaderPrivateDeliveryV1(input: Readonly
         const result=await scope.client.query<{
           clientAcknowledgedAt:unknown;
           replayed:unknown;
-        }>(ACK_SQL,[
+        }>(input.purchaseKind === 'approved_saju' ? APPROVED_ACK_SQL : ACK_SQL,[
           subjectId,threadId,safeMessageId,deliveryAttemptId,
           deliveryRequestId,tokenHash,
         ]);
