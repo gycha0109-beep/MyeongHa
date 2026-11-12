@@ -104,7 +104,7 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             })
             return module.OptimizeAnythingConfig(**kwargs)
 
-        with tempfile.TemporaryDirectory(prefix="myeongha-shared-gepa-out-") as out, \\
+        with tempfile.TemporaryDirectory(prefix="myeongha-shared-gepa-out-") as out, \
                 tempfile.TemporaryDirectory(prefix="myeongha-shared-gepa-repo-") as repo:
             kwargs = build_offline_gepa_kwargs(
                 plan, seed_text=shared_seed, evaluator=judge,
@@ -117,8 +117,8 @@ class PinnedGepaOfflineTest(unittest.TestCase):
             self.assertEqual({e["characterId"] for e in kwargs["valset"]},
                              {"yeoul", "seyeon"})
             self.assertEqual(set(kwargs["seed_candidate"]), {"shared_expression"})
-            with patch.object(socket.socket, "connect", side_effect=forbid_remote), \\
-                    patch.object(socket.socket, "connect_ex", side_effect=forbid_remote), \\
+            with patch.object(socket.socket, "connect", side_effect=forbid_remote), \
+                    patch.object(socket.socket, "connect_ex", side_effect=forbid_remote), \
                     patch("socket.create_connection", side_effect=forbid_remote):
                 result = module.optimize_anything(**kwargs)
 
