@@ -2,6 +2,13 @@ name: PostgreSQL Provider Sealed COPY Preflight
 run-name: "[WT:ops] Provider Sealed COPY Header Preflight"
 
 on:
+  # A single protected-main merge containing this exact one-shot marker triggers
+  # the already approved isolated Provider replay; no Hosted writes are allowed.
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/ops/postgres-provider-sealed-replay-backup-42752268638-20261112.once'
   workflow_dispatch:
     inputs:
       provider_data_replay:
@@ -20,7 +27,8 @@ concurrency:
 
 jobs:
   source-provider-copy-preflight:
-    if: ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ github.repository == 'gycha0109-beep/MyeongHa' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'ops(dr): one-shot sealed Provider replay backup 42752268638'))) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     environment: production
@@ -32,6 +40,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - name: Gate exact protected-main one-shot Provider replay marker
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+          [[ -z "$(git status --porcelain)" ]]
+          subject="$(git show -s --format=%s HEAD)"
+          [[ "$subject" =~ ^ops\(dr\):\ one-shot\ sealed\ Provider\ replay\ backup\ 42752268638(\ \(\#[0-9]+\))?$ ]]
+          [[ "$(cat '.github/ops/postgres-provider-sealed-replay-backup-42752268638-20261112.once')" == 'OPS-SEALED-PROVIDER-REPLAY-BACKUP-42752268638-20261112-V1' ]]
+          [[ "$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -Fxc '.github/ops/postgres-provider-sealed-replay-backup-42752268638-20261112.once' || true)" == '1' ]]
+          echo 'EXACT_SEALED_PROVIDER_REPLAY_MARKER_VALIDATED: local-only, governed source backup'
       - name: Install Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -66,7 +87,7 @@ jobs:
           MH_DR_CI_REPO_ROOT: ${{ github.workspace }}
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
-          MH_OPS_PROVIDER_DATA_REPLAY: ${{ inputs.provider_data_replay }}
+          MH_OPS_PROVIDER_DATA_REPLAY: ${{ github.event_name == 'push' && 'true' || inputs.provider_data_replay }}
           SUPABASE_ACCESS_TOKEN: ''
           SUPABASE_DB_PASSWORD: ''
           SUPABASE_PROJECT_ID: ''
@@ -81,7 +102,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
       - name: Upload only aggregate isolated Provider row delta summary
-        if: ${{ always() && inputs.provider_data_replay }}
+        if: ${{ always() && (github.event_name == 'push' || inputs.provider_data_replay) }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: provider-sealed-isolated-row-replay-${{ github.run_id }}
