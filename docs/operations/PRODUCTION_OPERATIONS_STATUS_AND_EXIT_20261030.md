@@ -1,3 +1,12 @@
+### 2026-11-12 KST — Gate 1 / Phase 8-C: 최신 백업과 0건 개인정보 원장의 정확한 관측 결속
+
+- **새 봉인 원본:** Scheduled Production PostgreSQL 백업 [#43128832121](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43128832121) / artifact 13904856784 성공. 공개 manifest `2026-11-12T00:42:44Z`, source `d046d06c9e90c047d17978b4dbf4deeed45b8490`, migration frontier `20261109071019` / 242개로 확인. source catalog bracket stable이나 **same-MVCC snapshot 아님**. 앞서 93/93행을 적재한 백업 #42752268638과 동일 frontier이지만 별도 백업이므로 실제 데이터 동일성이나 최신 Provider 복원을 추정 금지.
+- **원장 출처 결속:** 개인정보 암호화 캡처 [#43131250378](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43131250378) / artifact 13905665420 성공. 공개 manifest에서 source backup #43128832121와 source SHA 일치, backup 완료 `00:42:44Z` / captured `00:59:27Z` / coverage through `00:59:27Z` 확인. **eventCount=0**, `AUTHORITATIVE_CAPTURED_WINDOW_V1`, `futureSafePrivacyReconciliation=false`. 실 사용자 이벤트 내용·암호화 payload는 조회하거나 복호화하지 않음. 별도 비식별 근거 `POSTGRES_CURRENT_BACKUP_PRIVACY_LEDGER_PAIR_20261112.json`.
+- **감시 RED 보존:** 이전 freshness watch [#43114630966](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43114630966)는 이전 성공 캡처 #43073831947 이후 **17,082초** 경과로 `CAPTURE_COMPLETION_STALE` RED(7,200초 한계). 이후 원장 캡처가 성공해도 새 watcher 성공·지속적인 외부 이벤트 연속성을 인증한 것은 아님. freshness 경계 완화 금지.
+- **다음 및 차단:** 실제 non-zero 개인정보 replay와 사고까지의 독립 durable source continuity는 미증명. 정확한 문자열 `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` 승인 없이 Production Privacy Canary 실행 금지. 새 Hosted DR/유료 리소스/Production SQL·권한 변경도 별도 명시 승인 필요. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / P0 #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
 ### 2026-11-12 KST — Gate 1 / Phase 8-B: 기존 봉인 백업 Provider 93/93행 실제 격리 복원 성공
 
 - **병합·실행:** 실제 데이터 복원 구현 [PR #3221](https://github.com/gycha0109-beep/MyeongHa/pull/3221), 첫 일회성 호출 [PR #3224](https://github.com/gycha0109-beep/MyeongHa/pull/3224)의 실행 #43132816493은 Git 이전 커밋을 포함하지 않은 checkout으로 **백업 다운로드 전에 실패**. 부모 이력 `fetch-depth: 2`와 새 1회 표식으로 수정한 [PR #3226](https://github.com/gycha0109-beep/MyeongHa/pull/3226)이 필수 통합 검사 #43134615884 성공 후 `main 553c0c90aae09c303c060be4203fd19acddd15ed`에 병합. **동일 `main`의 격리 재실행 #43136341133 SUCCESS**. 이전 RED를 실제 복원 성공으로 승격하지 않음.
