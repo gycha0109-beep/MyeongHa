@@ -69,6 +69,7 @@ function fixture(
     sourceError?: boolean;
     writerError?: boolean;
     replayed?: boolean;
+    readinessOverrides?: Partial<Record<"source" | "attempt" | "writer", Record<string, unknown>>>;
   } = {},
 ) {
   const trace: string[] = [];
@@ -85,7 +86,57 @@ function fixture(
           async query<Row>(sql: string, values: readonly unknown[] = []) {
             trace.push(type + ":" + sql.split("\n")[0]);
             let rows: unknown[] = [];
-            if (sql.includes("current_user::text"))
+            if (sql.startsWith("WITH objects AS")) {
+              const grants =
+                type === "source"
+                  ? {
+                      objectsExist: true,
+                      callIdRead: true,
+                      proofRead: true,
+                      canInsert: false,
+                      canUpdate: false,
+                      canDelete: false,
+                      canTruncate: false,
+                      canReadCoverage: false,
+                    }
+                  : type === "attempt"
+                    ? {
+                        objectsExist: true,
+                        idRead: true,
+                        readingRead: true,
+                        subjectRead: true,
+                        refRead: true,
+                        stateRead: true,
+                        canInsert: false,
+                        canUpdate: false,
+                        canDelete: false,
+                        canTruncate: false,
+                      }
+                    : {
+                        objectsExist: true,
+                        canExecute: true,
+                        canReadLedger: false,
+                        canInsert: false,
+                        canUpdate: false,
+                        canDelete: false,
+                        canTruncate: false,
+                      };
+              rows = [
+                {
+                  currentUser:
+                    type === "source"
+                      ? (opts.sourceRole ??
+                        "saju_a4_provider_receipt_reader_v1")
+                      : type === "attempt"
+                        ? (opts.attemptRole ??
+                          "myeongha_reading_ai_cost_binding_reader_v1")
+                        : (opts.writerRole ??
+                          "myeongha_reading_ai_cost_writer_v1"),
+                  ...grants,
+                  ...opts.readinessOverrides?.[type],
+                },
+              ];
+            } else if (sql.includes("current_user::text"))
               rows = [
                 {
                   currentUser:
@@ -167,6 +218,9 @@ describe("A4 post-terminal signed source receipt cost replay (HOLD)", () => {
       "connect:source",
       "connect:source",
       "connect:attempt",
+      "connect:source",
+      "connect:attempt",
+      "connect:writer",
       "connect:writer",
     ]);
     expect(x.submitted).toHaveLength(1);
@@ -293,6 +347,17 @@ describe("A4 post-terminal signed source receipt cost replay (HOLD)", () => {
       await expect(x.replay.replayOne(CALL)).rejects.toThrow();
       expect(x.submitted).toHaveLength(0);
     }
+  });
+
+  it("blocks valid signed call when cost Writer loses EXECUTE privilege", async () => {
+    const x = fixture({
+      readinessOverrides: { writer: { canExecute: false } },
+    });
+    await expect(x.replay.replayOne(CALL)).rejects.toThrow(
+      "Dedicated A4 cost attribution principal is not ready",
+    );
+    expect(x.submitted).toHaveLength(0);
+    expect(x.trace).not.toContain("writer:BEGIN");
   });
 
   it("does not consult databases for an invalid or browser-chosen call ID", async () => {
