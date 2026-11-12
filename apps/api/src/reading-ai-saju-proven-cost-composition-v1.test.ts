@@ -186,7 +186,7 @@ function fixture(
             rows = [...(options.attemptRows ?? [BOUND_ATTEMPT])];
           } else if (
             kind === "writer" &&
-            sql.includes("cmd_record_reading_ai_call_v1")
+            sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1(")
           ) {
             rows = [{ callId: CALL, replayed: false }];
           }
@@ -262,11 +262,11 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
       "COMMIT",
       "BEGIN",
       'SELECT current_user::text AS "currentUser"',
-      expect.stringContaining("cmd_record_reading_ai_call_v1"),
+      expect.stringContaining("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
       "COMMIT",
     ]);
     const writerInput = x.statements.writer?.find((q) =>
-      q.sql.includes("cmd_record_reading_ai_call_v1"),
+      q.sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
     );
     expect(writerInput?.values.slice(0, 3)).toEqual([
       SUBJECT,
@@ -347,7 +347,7 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
       },
       {
         writerRole: "myeongha_admin_reader",
-        expected: ["source", "attempt", "writer"],
+        expected: ["source", "attempt", "source", "attempt", "writer"],
       },
     ];
     for (const c of cases) {
@@ -358,7 +358,7 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
       );
       expect(
         x.statements.writer?.some((q) =>
-          q.sql.includes("cmd_record_reading_ai_call_v1"),
+          q.sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
         ),
       ).toBe(false);
     }
@@ -399,7 +399,7 @@ describe("A4 signed Saju source => canonical DB attempt => dedicated cost ledger
       );
       expect(
         x.statements.writer?.some((row) =>
-          row.sql.includes("cmd_record_reading_ai_call_v1"),
+          row.sql.includes("FROM myeongha_admin_ops.cmd_record_reading_ai_call_v1("),
         ),
       ).toBe(false);
     },
