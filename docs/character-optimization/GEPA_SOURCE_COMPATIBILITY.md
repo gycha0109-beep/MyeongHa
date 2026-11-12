@@ -10,3 +10,10 @@
 - https://github.com/gepa-ai/gepa/blob/v0.1.4/src/gepa/optimize_anything.py
 - https://github.com/gepa-ai/gepa/blob/ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309/src/gepa/optimize_anything.py
 - https://gepa-ai.github.io/gepa/api/optimize_anything/OptimizeAnythingConfig/
+
+## 2026-11-12 — 합성 GEPA Python 기반 이미지 고정
+
+- Docker Official Image `python:3.14-slim`의 멀티플랫폼 이미지 인덱스를 `sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f`로 조회·확인하였다. GitHub Actions의 `linux/amd64` 자식 이미지는 `sha256:ac25e5afbfdb4a94ff99cc24b0345719210133144481480bcba6085efa36a341`, Python 버전 표기는 `3.14.10-slim-trixie`이다.
+- 기존 격리 컨테이너 및 GEPA 검증 Dockerfile에 같은 고정 이미지 참조를 적용한다. 태그가 변경돼도 합성 검증의 Python 기반 이미지가 조용히 교체되지 않도록 한다.
+- **이 변경은 Python 기반 이미지 하나만 고정**한다. 빌드 중 apt 패키지 및 pip 의존성 전체의 재현 가능한 잠금, 실제 공급자 요금·승인·유료 송신, 대화 품질 개선까지 증명하지 않는다.
+- Docker 공식 빌드 기준: https://docs.docker.com/build/building/best-practices/ · 이미지 출처: https://hub.docker.com/_/python

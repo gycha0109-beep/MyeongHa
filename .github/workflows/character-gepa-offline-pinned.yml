@@ -58,7 +58,7 @@ jobs:
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --user 65534:65534 --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=32m \
             --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
-            python:3.14-slim python /opt/myeongha/isolated_runtime_probe.py \
+            python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f python /opt/myeongha/isolated_runtime_probe.py \
             --mode optimizer --host-sealed-path "$RUNNER_TEMP/sealed-gepa-synthetic/synthetic.json"
       - name: Prove final evaluation has isolated private input but no network
         shell: bash
@@ -68,7 +68,7 @@ jobs:
             --user 65534:65534 --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=32m \
             --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
             --mount "type=bind,src=$RUNNER_TEMP/sealed-gepa-synthetic,dst=/private/sealed,readonly" \
-            python:3.14-slim python /opt/myeongha/isolated_runtime_probe.py \
+            python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f python /opt/myeongha/isolated_runtime_probe.py \
             --mode holdout --host-sealed-path "$RUNNER_TEMP/sealed-gepa-synthetic/synthetic.json"
 
       - name: Verify one-shot sealed synthetic evaluator across OS boundaries
@@ -115,7 +115,7 @@ jobs:
               --mount "type=bind,src=$EVAL_ROOT/sealed,dst=/private/sealed,readonly" \
               --mount "type=bind,src=$EVAL_ROOT/frozen,dst=/private/frozen,readonly" \
               --mount "type=bind,src=$EVAL_ROOT/state,dst=/private/state" \
-              python:3.14-slim python /opt/myeongha/sealed_holdout_runner.py \
+              python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f python /opt/myeongha/sealed_holdout_runner.py \
               --sealed /private/sealed/synthetic.json \
               --frozen /private/frozen/candidate.json \
               --ledger /private/state/single-use.sqlite
@@ -176,7 +176,7 @@ jobs:
             --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
             --mount "type=bind,src=$GATE_DIR,dst=/private/gate,readonly" \
             --env PYTHONPATH=/opt/myeongha \
-            python:3.14-slim python /opt/myeongha/local_socket_client_probe.py \
+            python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f python /opt/myeongha/local_socket_client_probe.py \
             --socket /private/gate/gateway.sock --request-id docker-synthetic-2
           "$RUNNER_TEMP/gepa-venv/bin/python" - <<'PY'
           import os
