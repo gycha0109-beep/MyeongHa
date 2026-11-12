@@ -1,3 +1,11 @@
+### 2026-11-12 KST — Gate 1 / Phase 8-B: 봉인 Provider Auth 연결관계 격리 정합성 검증 구현
+
+- **구현:** 기존 봉인 백업 #42752268638의 Provider 33블록/93행 실제 격리 복원 #43136341133 성공 증거를 재사용한다. 이번 작업은 동일 출처의 격리 로컬 PostgreSQL17에서 `auth.users`·`auth.identities`·`auth.sessions`·`auth.refresh_tokens`·`auth.mfa_amr_claims`의 원본 행 수(4/4/16/23/16)를 대조하고 참조 누락 4종, Provider FK `NOT VALID` 및 내부 트리거 비활성 건수를 **읽기 전용 집계**로 관측하는 후속 실증이다.
+- **안전 경계:** `scripts/operations/local-provider-auth-reference-integrity-readonly.sql`, `assess-provider-auth-reference-integrity.mjs` 및 전용 합성 테스트를 추가했다. 기존 무료 격리 데이터 복원 후 원본 사용자의 ID·토큰·이메일·객체 바이트는 조회/업로드하지 않고 집계 및 차단 여부만 결과 파일로 남긴다. 이전에 사용된 일회성 marker는 재사용하지 않고 새 1회 파일을 요구한다. 부정합 시 fail-closed. 로컬 코드 테스트 6건 통과; 실제 DB 실행 결과는 병합 후 CI artifact 확인 전까지 **미검증**.
+- **미완료:** 이 테스트는 FK/기초 참조 무결성만 다루며 로그인·refresh·MFA·삭제된 계정의 세션 폐기, Hosted JWT signing, 실제 Storage object bytes, Supabase provider migration ledger, source same-MVCC, 독립 개인정보 연속성 및 전체 RPO/RTO를 입증하지 못한다. Production DB/토큰·권한·Secret/유료 Hosted 대상 변경 없음. Gate=BLOCKED, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
 ### 2026-11-12 KST — Gate 1 / Phase 8-C: 최신 백업과 0건 개인정보 원장의 정확한 관측 결속
 
 - **새 봉인 원본:** Scheduled Production PostgreSQL 백업 [#43128832121](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43128832121) / artifact 13904856784 성공. 공개 manifest `2026-11-12T00:42:44Z`, source `d046d06c9e90c047d17978b4dbf4deeed45b8490`, migration frontier `20261109071019` / 242개로 확인. source catalog bracket stable이나 **same-MVCC snapshot 아님**. 앞서 93/93행을 적재한 백업 #42752268638과 동일 frontier이지만 별도 백업이므로 실제 데이터 동일성이나 최신 Provider 복원을 추정 금지.
