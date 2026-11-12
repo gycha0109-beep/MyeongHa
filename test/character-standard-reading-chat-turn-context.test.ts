@@ -1982,7 +1982,7 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     };
   }
 
-  it.each(['reviewed', 'wrong_source', 'changed_anchor', 'refund_before', 'refund_during', 'semantic_rejected'] as const)(
+  it.each(['reviewed', 'approved_paid', 'approved_moved', 'wrong_source', 'changed_anchor', 'refund_before', 'refund_during', 'semantic_rejected'] as const)(
     'RR-08 privately reviews one generated follow-up and keeps its exact authority (%s)', async scenario => {
     const base = previewGrounding();
     const {groundingHash: _old, ...material} = base;
@@ -2011,13 +2011,17 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
       },
     ];
     const readRecentMessages = vi.fn(async () => rows);
+    const approved = scenario === 'approved_paid' || scenario === 'approved_moved';
+    const continuity = approved
+      ? { useApprovedSajuAnchorContinuity: true as const }
+      : { recentMessageAuthorityPort: { readRecentMessages } };
     const result = await prepareReaderConversationResponseCandidateV1({
       userText: question, admittedDomain: 'career',
       official: {
         preflight: f.input.preflight,
         grounded: f.input.grounded,
         anchorAuthorityPort: f.input.anchorAuthorityPort,
-        recentMessageAuthorityPort: { readRecentMessages },
+        ...continuity,
         rendererDraft: cosmetics(),
       },
     });
@@ -2038,9 +2042,9 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     expect(result.selectedSourceUnitRefs).toEqual([f.ids[0]]);
     expect(result.publicDisclosureAuthorized).toBe(false);
     expect(result.addedModelCalls).toBe(0);
-    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(1);
-    expect(readRecentMessages).toHaveBeenCalledTimes(2);
-    expect(readRecentMessages).toHaveBeenCalledWith({
+    expect(f.readLatestValidatedAnchor).toHaveBeenCalledTimes(approved ? 3 : 1);
+    expect(readRecentMessages).toHaveBeenCalledTimes(approved ? 0 : 2);
+    if (!approved) expect(readRecentMessages).toHaveBeenCalledWith({
       subjectId: SUBJECT_ID, threadId: THREAD_ID, limit: 32,
     });
     expect(JSON.stringify(result)).not.toContain('PRIVATE_GUARDED_OFFICIAL_TEXT');
@@ -2056,6 +2060,9 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
     const evaluateBatch = vi.fn<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>(
       async ({ candidateHashes, groundingUnits, question: reviewedQuestion }) => {
         expect(reviewedQuestion).toBe(question);
+        if (scenario === 'approved_moved') {
+          f.readLatestValidatedAnchor.mockRejectedValue(new Error('Previous paid answer changed'));
+        }
         if (scenario === 'changed_anchor') {
           rows.unshift({
             messageId: 'different-newer-assistant', sequenceNo: 19, senderType: 'character',
@@ -2082,14 +2089,14 @@ describe('A3-eta server-anchored follow-up evidence selection (public OFF)', () 
             ? { currentVerifiedPurchaseAuthorityPort: { assertCurrentVerifiedPurchase: async () => { throw new Error('refunded'); } } }
             : {}),
           anchorAuthorityPort: f.input.anchorAuthorityPort,
-          recentMessageAuthorityPort: { readRecentMessages },
+          ...continuity,
         });
       },
     });
     await expect(review({ ...result.outputHold })).resolves.toBeNull();
     expect(generate).not.toHaveBeenCalled();
     const candidate = await review();
-    if (scenario === 'reviewed') {
+    if (scenario === 'reviewed' || scenario === 'approved_paid') {
       expect(candidate).toMatchObject({
         state: 'reviewed_private', evaluatorVersion,
         officialArtifactResponseHash: result.outputHold.officialArtifactResponseHash,

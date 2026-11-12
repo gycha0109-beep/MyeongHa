@@ -143,17 +143,14 @@ export async function readPrivateOfficialReaderPaidChatMessageV1(input:
   );
 }
 
-/** Private approved-Saju re-read. The existing delivery journal is standard-reading scoped. */
+/** Private approved-Saju re-read through the separately scoped protected runtime. */
 export async function readPrivateApprovedSajuPaidChatMessageV1(input:
-  Omit<ReaderPaidPrivateReadInputV1, 'deliveryReservation'> & Readonly<{
+  ReaderPaidPrivateReadInputV1 & Readonly<{
     threadId: string;
     safeMessageId: string;
   }>,
 ): Promise<PrivateOfficialReaderPaidAnswerReadV1> {
-  return readPrivateOfficialReaderPaidAnswerCoreV1({
-    pool: input.pool, verifiedEvidence: input.verifiedEvidence,
-    keyResolver: input.keyResolver, privacyLedgerPort: input.privacyLedgerPort,
-  }, {
+  return readPrivateOfficialReaderPaidAnswerCoreV1(input, {
     kind: 'chat_marker', threadId: asUuid(input.threadId), safeMessageId: asUuid(input.safeMessageId),
   }, 'approved_saju');
 }
@@ -285,6 +282,7 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
               safeMessageId:identity.safeMessageId,
               bodyId,
               reservation:input.deliveryReservation,
+              purchaseKind,
             });
         // S7 cannot precede its immutable S5 answer. Fail inside the same
         // DB transaction so a contradictory prepared receipt is rolled back
