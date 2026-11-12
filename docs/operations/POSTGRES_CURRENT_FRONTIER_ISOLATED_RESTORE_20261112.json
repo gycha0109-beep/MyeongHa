@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "ops-current-frontier-isolated-restore-observation-v1",
+  "observedDate": "2026-11-12",
+  "sourceBackupRunId": 43174606843,
+  "sourceCommitSha": "05ee24d45ff4c99a7615449a51384222f7ca4247",
+  "sourceBackupArtifactId": 13923088346,
+  "restoreRunId": 43176401912,
+  "restoreRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43176401912",
+  "restoreWorkflow": ".github/workflows/postgres-isolated-restore-drill.yml",
+  "restoreWorkflowConclusion": "success",
+  "restoreArtifactId": 13924790522,
+  "restoreEvidenceZipDigestSha256": "7043636ffa8863a11582ba3d74be16c6680c69921b9021d0314e557e76fd6ae3",
+  "migrationFrontier": 20261109071019,
+  "restoreTarget": "isolated GitHub Actions Supabase PostgreSQL17",
+  "applicationSchemaFullyEquivalent": false,
+  "sourceCatalogBoundToBackupSnapshot": false,
+  "supabaseMigrationLedgerRestored": false,
+  "sourceExternalRoleGrantParityProven": false,
+  "externalRoleVerdict": "HOLD_SOURCE_EXTERNAL_ROLE_GRANT_PAIRS_MISSING_FROM_FILTERED_DUMP",
+  "providerManagedDataFullRestore": false,
+  "authoritativePrivacyContinuityProven": false,
+  "recoveredServingAdmission": "BLOCKED",
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "notes": [
+    "Workflow success shows isolated procedure execution, not full service recovery parity.",
+    "App schema comparison and filtered role dump evidence explicitly preserve unresolved differences.",
+    "Paired encrypted Provider migration source from the same source run was not yet decrypted by this baseline restore; new optional path is implemented separately.",
+    "No Production SQL writes, privacy canary, paid hosted DR provisioning, or original SQL payload publication was performed."
+  ]
+}
