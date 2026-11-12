@@ -1,3 +1,4 @@
+import { SAJU_READING_COMPONENTS_V1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { ApiCommandError } from './api-error.js';
 import { admitSajuAbuseHttpRequestV1, type SajuAbuseAdmissionGateV1 } from './saju-abuse-admission-http.js';
 import {
@@ -32,10 +33,10 @@ export const CURRENT_SUBJECT_SAJU_PREVIEW_READING_HTTP_BINDINGS_V1 = Object.free
 
 export const CURRENT_SUBJECT_SAJU_PREVIEW_READING_TEXTS_V1 = Object.freeze([
   '전체 사주',
-  '직업운',
-  '재물운',
-  '연애운',
-  '사업운',
+  SAJU_READING_COMPONENTS_V1.career.text,
+  SAJU_READING_COMPONENTS_V1.wealth.text,
+  SAJU_READING_COMPONENTS_V1.relationship.text,
+  SAJU_READING_COMPONENTS_V1.business.text,
 ] as const);
 
 const supportedReadingTexts = new Set<string>(
