@@ -1,7 +1,12 @@
 import type { ChatReceivePlan } from './chat-receive.js';
 import { prepareApprovedSajuReaderFollowupSourceV1 } from './character-standard-reading-chat-grounding-v2.js';
 import type { CharacterStandardReadingChatTurnServerContextInputV1 } from './character-standard-reading-chat-turn-preflight.js';
-import type { CharacterStandardReaderOutputHoldV1 } from './character-standard-reading-chat-bounded-candidate-v1.js';
+import {
+  recheckCurrentReaderQuestionAdmissionV1,
+  type CharacterStandardReaderOutputHoldV1,
+} from './character-standard-reading-chat-bounded-candidate-v1.js';
+import { CHARACTER_OUTPUT_GUARD_VERSION_V1 } from '../../../packages/domain/src/index.js';
+import { renderGroundedStandardReaderSceneV2 } from './reader-interpretation-preview-runtime-v2.js';
 import type { CharacterSajuConsultationShadowPortV1 } from './character-saju-consultation-shadow-v1.js';
 import {
   encryptOfficialReaderProtectedBodyV1,
@@ -29,8 +34,8 @@ import {
 import type { ProductReaderEligibilityAuthorityPortV1 } from './product-reader-eligibility-policy-v1.js';
 import {
   consumeReviewedPrivateReaderFollowupBodyV1,
-  prepareReaderConversationResponseCandidateV1,
-  reviewPreparedReaderConversationFollowupV1,
+  reviewPreparedPurchasedReaderQuestionV1,
+  type ReaderFollowupCurrentAuthorityV1,
   type ReviewedPrivateReaderFollowupV1,
 } from './reader-conversation-source-routing-v1.js';
 import type { SajuProductionIssueProofTrustV1 } from './saju-production-reading-issue-source-v1.js';
@@ -43,9 +48,15 @@ type PreparedApprovedSajuReaderFollowupV1 = Readonly<{
   productionSource: CanonicalReaderProjectionV1['issueIdentity'];
 }>;
 
+type ProtectedReaderCommitSource = Pick<CharacterStandardReaderOutputHoldV1,
+  'subjectId' | 'threadId' | 'readingRef' | 'readerCharacterId' | 'readerContentBundleId' |
+  'contentReleaseId' | 'productId' | 'contentRevision' | 'officialArtifactResponseHash' |
+  'guardVersion' | 'groundingHash' | 'sourceUnitRefs' | 'focusedUnitRef'
+> & Readonly<{ assistantAnchorMessageId: string | null }>;
+
 const preparedPrivateCommits = new WeakMap<PreparedApprovedSajuReaderFollowupV1, Readonly<{
   protectedPool: PostgresSubjectPoolV1;
-  outputHold: CharacterStandardReaderOutputHoldV1;
+  outputHold: ProtectedReaderCommitSource;
   originatingGrantId: string;
   clientTurnId: string;
   requestHash: string;
@@ -65,11 +76,14 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
     client: PostgresTransactionQueryV1,
   ) => ProductReaderEligibilityAuthorityPortV1;
   consultationPort: CharacterSajuConsultationShadowPortV1;
+  /** The browser may nominate a displayed scene index and hash, never a unit or source. */
+  firstSceneQuestion?: Readonly<{ interpretationHash: string; segmentIndex: number }>;
 }>): Promise<PreparedApprovedSajuReaderFollowupV1 | null> {
   if (input.verifiedEvidence.kind !== 'member' || input.consultationPort.evaluateBatch === undefined
       || input.issuanceProofPool === input.pool || input.protectedPool === input.pool
       || input.protectedPool === input.issuanceProofPool || input.productionIssueProofTrusts.length === 0) return null;
   const { pool, protectedPool, verifiedEvidence, readingId } = input;
+  const firstSceneQuestion = input.firstSceneQuestion === undefined ? undefined : { ...input.firstSceneQuestion };
   const anchorAuthorityPort = {
     readLatestValidatedAnchor: (coordinates: Parameters<
       ReturnType<typeof createPostgresStandardFollowupAnchorAuthorityPortV1>['readLatestValidatedAnchor']
@@ -107,36 +121,18 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
           },
         },
       });
-      const candidate = await prepareReaderConversationResponseCandidateV1({
-        userText: input.receivePlan.normalizedRequest.text,
-        admittedDomain: grounded.scope.sajuDomain,
-        official: {
-          preflight, grounded,
-          anchorAuthorityPort,
-          useApprovedSajuAnchorContinuity: true,
-          rendererDraft: {
-            schemaVersion: 'v1', emotion: 'neutral',
-            memoryProposals: [], relationshipEventProposals: [], suggestedActions: [],
-          },
-        },
-      });
-      if (candidate.mode !== 'official_followup_output_hold' || source.value === undefined) return null;
-      return {
-        outputHold: candidate.outputHold,
-        productionSource: source.value.issueIdentity,
-        originatingGrantId: source.value.originatingGrantId,
-      };
+      if (source.value === undefined) return null;
+      const { issueIdentity: productionSource, originatingGrantId } = source.value;
+      return { preflight, grounded, productionSource, originatingGrantId };
     },
   });
   if (prepared === null) return null;
-  const { outputHold, productionSource, originatingGrantId } = prepared;
-  const reviewed = await reviewPreparedReaderConversationFollowupV1({
-    outputHold,
-    port: input.consultationPort,
-    withCurrentAuthority: (check) => executePostgresSubjectTransactionV1({
+  const { preflight, productionSource, originatingGrantId } = prepared;
+  const withCurrentAuthority = <T>(check: (authority: ReaderFollowupCurrentAuthorityV1) => Promise<T>) =>
+    executePostgresSubjectTransactionV1({
       pool, verifiedEvidence,
       execute: ({ client, resolvedSubject }) => {
-        if (resolvedSubject.subjectId !== outputHold.subjectId) throw new Error('Reader subject changed.');
+        if (resolvedSubject.subjectId !== preflight.scope.subjectId) throw new Error('Reader subject changed.');
         const { accessPort, artifactPort, purchasePort } = createPostgresApprovedSajuReadingAccessV1(client, readingId);
         return check({
           threadBindingAuthorityPort: createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
@@ -147,9 +143,25 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
           useApprovedSajuAnchorContinuity: true,
         });
       },
+    });
+
+  const question = await reviewPreparedPurchasedReaderQuestionV1({
+    preflight, grounded: prepared.grounded, guardedScene: renderGroundedStandardReaderSceneV2(prepared.grounded),
+    ...(firstSceneQuestion === undefined ? {} : { firstSceneQuestion }),
+    anchorAuthorityPort, port: input.consultationPort,
+    recheckCurrent: () => withCurrentAuthority(async authority => {
+      await recheckCurrentReaderQuestionAdmissionV1({ ...authority, preflight });
     }),
   });
-  if (reviewed === null) return null;
+  if (question === null) return null;
+  const { readingId: readingRef, ...scope } = preflight.scope;
+  const outputHold: ProtectedReaderCommitSource = {
+    ...scope, readingRef, guardVersion: CHARACTER_OUTPUT_GUARD_VERSION_V1,
+    assistantAnchorMessageId: question.previousSafeMessageId,
+    groundingHash: prepared.grounded.grounding.groundingHash, sourceUnitRefs: question.sourceUnitRefs,
+    focusedUnitRef: question.focusedUnitRef,
+  };
+  const { reviewed } = question;
   const result = Object.freeze({ reviewed, productionSource });
   preparedPrivateCommits.set(result, {
     protectedPool, outputHold, originatingGrantId,

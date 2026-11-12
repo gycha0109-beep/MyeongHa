@@ -17,6 +17,7 @@ import {
 const HASH = /^[0-9a-f]{64}$/u;
 const UNIT = /^grounding_unit_v2_[0-9a-f]{24}$/u;
 const CANONICAL_UNIT = /^canonical_reading_unit_[0-9a-f]{24}$/u;
+const CLAIM_CLASSIFICATION = /^(?:polarity:(?:supportive|challenging|neutral|mixed)|emphasis:(?:minor|moderate|major))$/u;
 
 export const SAJU_CANONICAL_READER_SOURCE_MAX_BYTES = 128 * 1024;
 
@@ -113,7 +114,12 @@ export function projectSajuCanonicalReaderGroundingV1(
       domain: unit.domain, axis: unit.axis, narrativeRole: unit.narrativeRole,
       semanticKey: unit.semanticKey, canonicalMeaning: unit.canonicalMeaning,
       sourceBlockRefs: unit.sourceCanonicalUnitRefs,
-      qualifiers: unit.qualifiers, prohibitedExtensions: unit.prohibitedExtensions,
+      // V2 puts claim classification tags in this field alongside actual
+      // qualifiers. The signed receipt retains those tags for provenance.
+      qualifiers: Array.isArray(unit.qualifiers)
+        ? unit.qualifiers.filter(qualifier => typeof qualifier !== 'string' || !CLAIM_CLASSIFICATION.test(qualifier))
+        : unit.qualifiers,
+      prohibitedExtensions: unit.prohibitedExtensions,
       requiredCompanionUnitRefs: (unit.requiredCompanionUnitRefs as string[]).map(unitIdV1),
       requiredDisclosureRefs: temporal === undefined || !Array.isArray(unit.requiredDisclosureRefs)
         ? unit.requiredDisclosureRefs

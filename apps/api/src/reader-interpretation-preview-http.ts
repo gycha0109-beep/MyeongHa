@@ -26,12 +26,13 @@ import type {
   ReaderContextLifeFactsReadAuthorityPortV1,
 } from './reader-context-non-memory-read.js';
 import {
-  runApprovedSajuReaderInterpretationPreviewV1,
   runThreadBoundReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
   type ReaderInterpretationPreviewEnvelopeV1,
 } from './reader-interpretation-preview-runtime-v1.js';
 import type { PostgresSubjectExecutionScopeV1 } from './postgres-subject-execution.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from './postgres-approved-saju-reading-access-v1.js';
+import { runThreadBoundReaderInterpretationPreviewV2 } from './reader-interpretation-preview-runtime-v2.js';
 
 export const READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1 =
   '/api/me/readings/reader-interpretation/preview' as const;
@@ -283,15 +284,25 @@ export async function runReaderInterpretationPreviewHttpV1(input: {
       : {}),
     ...(input.admitServerReader ? { admitServerReader: input.admitServerReader } : {}),
   };
-  const envelope = input.approvedSajuScope === undefined
-    ? await runThreadBoundReaderInterpretationPreviewV1({
-      ...common,
-      resolvedSubjectId: subjectId,
-      accessAuthorityPort: input.accessAuthorityPort,
-      artifactAuthorityPort: input.artifactAuthorityPort,
-      ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
-    })
-    : await runApprovedSajuReaderInterpretationPreviewV1({ ...common, scope: input.approvedSajuScope });
+  if (input.approvedSajuScope !== undefined) {
+    const { accessPort, artifactPort, purchasePort } = createPostgresApprovedSajuReadingAccessV1(
+      input.approvedSajuScope.client, request.officialReadingId,
+    );
+    const scene = await runThreadBoundReaderInterpretationPreviewV2({
+      ...common, resolvedSubjectId: subjectId, accessAuthorityPort: accessPort,
+      artifactAuthorityPort: artifactPort, currentVerifiedPurchaseAuthorityPort: purchasePort,
+      requireExactSourceHash: true,
+    });
+    return projectReaderInterpretationPreviewHttpResponseV1(scene);
+  }
+
+  const envelope = await runThreadBoundReaderInterpretationPreviewV1({
+    ...common,
+    resolvedSubjectId: subjectId,
+    accessAuthorityPort: input.accessAuthorityPort,
+    artifactAuthorityPort: input.artifactAuthorityPort,
+    ...(input.currentVerifiedPurchaseAuthorityPort ? { currentVerifiedPurchaseAuthorityPort: input.currentVerifiedPurchaseAuthorityPort } : {}),
+  });
 
   return projectReaderInterpretationPreviewHttpResponseV1(envelope);
 }
