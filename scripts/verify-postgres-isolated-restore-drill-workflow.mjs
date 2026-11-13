@@ -121,6 +121,28 @@ for (const fragment of [
   'observedGrantorAttributionParity, true',
 ]) requireFragment(roleProof, fragment, roleProofPath);
 
+const migrationLineagePath = 'scripts/operations/assess-sealed-provider-migration-file-lineage.mjs';
+const migrationLineage = await readFile(migrationLineagePath, 'utf8');
+for (const fragment of [
+  'sourcePacketSha256',
+  'compareMigrationCatalogs',
+  'baselineRemoteOnlyStillAbsentCount',
+  'newRemoteOnlySinceBaselineIds',
+  'sourceLedgerHistoryRowsRestored: false',
+  'migrationHistoryRepaired: false',
+  'hostedProviderRestoreProven: false',
+  'drReady: false',
+  'serviceResumptionAllowed: false',
+]) requireFragment(migrationLineage, fragment, migrationLineagePath);
+const sealedRunner = await readFile(providerSourceRunnerPath, 'utf8');
+for (const fragment of [
+  'MIGRATION_LINEAGE_EVIDENCE_PATH',
+  '--source "$private/source-provider-migration-ledger.json"',
+  'assess-sealed-provider-migration-file-lineage.mjs',
+  'originalSqlBodiesPublished == false',
+  'migrationHistoryRepaired == false',
+]) requireFragment(sealedRunner, fragment, providerSourceRunnerPath);
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 
@@ -134,6 +156,7 @@ for (const fragment of [
   'artifact-ids: ${{ steps.source.outputs.provider_source_artifact_id }}',
   'Verify paired Provider source decryptability without target history replay',
   'run: bash scripts/operations/verify-paired-provider-migration-source-recovery.sh',
+  'MIGRATION_LINEAGE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-migration-file-lineage.json',
   'privacy_ledger_run_id:',
   'production_privacy_canary_run_id:',
   'watchtower_track:',

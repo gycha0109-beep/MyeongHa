@@ -280,6 +280,7 @@ jobs:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
           PROVIDER_LEDGER_ARTIFACT_DIR: ${{ runner.temp }}/provider-ledger-artifact
           PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-source-recovery.json
+          MIGRATION_LINEAGE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-migration-file-lineage.json
           BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: bash scripts/operations/verify-paired-provider-migration-source-recovery.sh
