@@ -407,3 +407,40 @@ revoke all on function public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb),
 grant execute on function public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb),
   public.cmd_complete_approved_saju_issue_job_v1(uuid,uuid)
   to myeongha_approved_saju_issuer_executor;
+
+-- Exact paid component observation. A local attempt does not establish the
+-- upstream outcome or authorize another dispatch.
+create function public.qry_approved_saju_issue_job_status_v1(p_subject uuid,p_purchase uuid,p_component text)
+returns table(queue_state text,attempt_state text,attempt_no integer,signed_commit boolean)
+language plpgsql stable security definer set search_path=pg_catalog
+as $function$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
+  return query
+  select event.status,attempt.state,attempt.execution_attempt_no,
+    coalesce(proof.execution_attempt_id=attempt.id and reading.committed_execution_attempt_id=attempt.id
+      and attempt.state='succeeded' and reading.execution_status='succeeded',false)
+  from commerce_saju_private.approved_component_entitlement_v1(p_subject,p_purchase,p_component) entitled
+  join public.outbox_events event on event.aggregate_type='purchase_intent'
+    and event.aggregate_id=p_purchase::text and event.dedupe_key=p_component
+    and event.event_type='approved_saju.reading_requested'
+    and event.event_schema_version='approved-saju-reading-request-v1'
+    and event.payload_jsonb->>'component'=p_component and event.payload_jsonb->>'releaseRef'=entitled.release_ref
+  left join public.readings reading on reading.subject_id=p_subject
+    and reading.request_idempotency_key='approved-saju:' || p_purchase::text || ':' || p_component
+    and reading.request_contract_version='approved-saju-reading-component-v1'
+    and reading.request_snapshot_jsonb#>>'{approvedPurchase,admissionHash}'=entitled.admission_hash
+  left join public.reading_execution_attempts attempt on attempt.reading_id=reading.id
+    and attempt.subject_id=reading.subject_id and attempt.execution_attempt_no=reading.next_execution_attempt_no-1
+  left join commerce_saju_private.approved_component_reading_v1 binding on binding.reading_id=reading.id
+    and binding.subject_id=p_subject and binding.purchase_intent_id=p_purchase and binding.component=p_component
+    and binding.entitlement_grant_id=entitled.entitlement_grant_id
+  left join commerce_saju_private.approved_source_issue_proofs_v1 proof on proof.reading_id=binding.reading_id
+    and proof.subject_id=binding.subject_id and proof.execution_attempt_id=attempt.id;
+end
+$function$;
+
+revoke all on function public.qry_approved_saju_issue_job_status_v1(uuid,uuid,text)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
+grant execute on function public.qry_approved_saju_issue_job_status_v1(uuid,uuid,text)
+  to myeongha_approved_saju_issuer_executor;

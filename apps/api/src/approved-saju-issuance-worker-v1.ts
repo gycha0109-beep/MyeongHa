@@ -4,12 +4,14 @@ import {
   type SajuReadingComponentV1,
 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { executeApprovedSajuOfficialReadingV1 } from './postgres-approved-saju-issuance-v1.js';
+import type { SajuOfficialIssuanceResultV1 } from './saju-official-reading-issuer-db-persistence-v1.js';
 import {
   OFFICIAL_READER_RUNTIME_IDS_V1,
   type OfficialReaderRuntimeIdV1,
 } from './reader-production-rollout-policy-v1.js';
 import {
   executePostgresApprovedSajuIssuerJobTransactionV1,
+  executePostgresApprovedSajuIssuerTransactionV1,
   type PostgresSubjectPoolV1,
 } from './postgres-subject-execution.js';
 import { SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1 } from './saju-production-reading-http-adapter.js';
@@ -20,7 +22,13 @@ import {
 
 type SelfComponent = Exclude<SajuReadingComponentV1, 'compatibility'>;
 type ComponentRelease = Readonly<{ releaseRef: string; readerCharacterId: OfficialReaderRuntimeIdV1 }>;
-type WorkerResult = Readonly<{ state: 'idle' | 'issued' | 'held' | 'lease_expired' }>;
+type WorkerResult = Readonly<{ state: 'idle' | 'issued' | 'lease_expired' }> | Readonly<{
+  state: 'held';
+  jobId: string;
+  component: SelfComponent;
+  reason: Extract<SajuOfficialIssuanceResultV1, { state: 'held' }>['reason'];
+  localAttempt: 'not_allocated' | 'requires_source_reconciliation' | 'signed_commit' | 'unavailable';
+}>;
 
 interface Job {
   readonly job_id: string;
@@ -103,7 +111,24 @@ export function createApprovedSajuIssuanceWorkerV1(input: Readonly<{
           sajuEngineKey: engineKey,
           requestedEngineVersion: engineVersion,
         });
-        if (result.state !== 'committed') return { state: 'held' };
+        if (result.state !== 'committed') {
+          const localAttempt = await executePostgresApprovedSajuIssuerTransactionV1({
+            pool,
+            verifiedEvidence: { kind: 'member', verifiedAuthUserId: job.auth_user_id },
+            execute: async ({ client, resolvedSubject }) => {
+              if (resolvedSubject.subjectId !== job.subject_id) return 'unavailable';
+              const { rows } = await client.query<{ attempt_no: number | null; signed_commit: boolean }>(
+                'select attempt_no,signed_commit from public.qry_approved_saju_issue_job_status_v1($1::uuid,$2::uuid,$3::text)',
+                [job.subject_id, job.purchase_intent_id, job.component],
+              );
+              const row = rows[0];
+              if (rows.length !== 1 || row === undefined) return 'unavailable';
+              if (row.signed_commit) return 'signed_commit';
+              return row.attempt_no === null ? 'not_allocated' : 'requires_source_reconciliation';
+            },
+          });
+          return { state: 'held', jobId: job.job_id, component: job.component, reason: result.reason, localAttempt };
+        }
       }
       const completed = await executePostgresApprovedSajuIssuerJobTransactionV1({
         pool,
