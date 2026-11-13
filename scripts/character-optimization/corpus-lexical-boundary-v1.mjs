@@ -5,7 +5,7 @@
 import { CHARACTER_IDS } from './contracts-v1.mjs';
 
 const fail = code => { throw new Error('CHARACTER_LEXICAL_SPLIT_INVALID:' + code); };
-const key = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/u.test(v);
+const key = v => typeof v === 'string' && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}(?![\s\S])/u.test(v);
 const normalize = v => v.normalize('NFKC').toLocaleLowerCase('ko-KR')
   .replace(/[\p{Separator}\p{Punctuation}\p{Symbol}]/gu, '').trim();
 const grams = v => new Set(Array.from({ length: Math.max(0, v.length - 1) },
