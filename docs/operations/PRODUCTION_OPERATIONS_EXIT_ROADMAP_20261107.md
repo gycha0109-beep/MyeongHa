@@ -1,3 +1,9 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 21개 단일 SQL 바이트 불일치의 지문 기반 처분 진전
+
+- 보호된 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611)의 비식별 SQL 지문 및 그 실행에서 체크아웃한 exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`의 저장소 파일을 독립적으로 대조했다. **단일 statement bytes 불일치 21개 중 9개는 원본 statement SHA-256과 저장소 파일 앞부분 SHA-256이 정확히 동일**하고, 저장소 쪽에 2바이트 `;` + LF가 추가된 사실을 확인. 나머지 **12개는 제한된 형식 변환 검사에서 원인을 확인하지 못했다**.
+- [21개 버전별 분류 및 검사 한계](./POSTGRES_COMMON_VERSION_MIGRATION_SINGLE_STATEMENT_FINGERPRINT_TRIAGE_20261113.json)를 증거로 보존한다. 9개를 기존 byte-exact 13개에 합산하지 않으며, 원본 파일 동등성·SQL 의미·역사적 실행 인과·현재 객체/권한 동등성으로 승격하지 않는다. 154개 다중 statement 구성 보류 및 12개 원문 NULL은 별도로 유지한다.
+- **남은 Phase 8-A:** 단일 미확정 12개와 다중 SQL 154개의 source framing/실제 SQL 영향 처분, 현재 schema·owner·role·GRANT·RLS 및 Provider ledger target 복구 검증. 기존 원격 전용 41개/신규 A4 조사 재활용. P0 #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`; Production 변경·migration repair 없음.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 공통 SQL 원문 200개 실제 비교 성공 (후속 처분 미완료)
 
 - [실제 격리 복구 #43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS, exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`, source run `43174606843`, artifact `14012916977` (ZIP SHA-256 `1aa91ac0b1273263b1452f4c6a26da724c8dea99003260fe4381d2ea9860f078`).
