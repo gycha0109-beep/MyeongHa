@@ -1319,3 +1319,13 @@ Separately [Web Auth Browser Regression #42552762320](https://github.com/gycha01
 **Authority:** Owner explicitly requests merging PR #3068, not enabling live inference, publication, automatic long-term Memory or paid evaluation. Verify the new commit and merge with repository-required checks only.
 
 **Verification:** Local targeted read-only diagnostic tests 28/28 PASS; CI responsibility map governance PASS (112 workflows, four required checks); root/API Client/Web/Mobile/Admin typecheck PASS; git diff --check clean. New exact-HEAD PR checks and merge outcome remain to be verified.
+
+## 2026-11-13 — Integration CI: commerce payment fixture vs shared-memory account-finalization guard
+
+**Observed failure:** Staged integration #43406315892, exact head 923c2660, failed only the `commerce-payment-adversarial-e2e` isolated PG15 case. Its old fixture directly set a synthetic Subject from active to deleted. Migration 2370 correctly rejects that operation unless it occurs under the authorized account-deletion finalizer; the failure did not establish a Commerce runtime regression.
+
+**Fix:** Preserve the finalizer/erasure security trigger unchanged. In the disposable payment fixture, assert that forged direct deletion fails with the exact check-violation message, then mark the Subject deletion_pending and prove its wallet remains unmodified, cannot be read by the runtime, and cannot mutate another Subject's wallet. The separate DB finalizer suite retains the authorized physical-erasure proof. No Production data, schema, grant or policy changed.
+
+**Verification:** Local PostgreSQL 15 disposable container using Linux-LF Git archive plus the two modified fixture files: `bash test/db/run_ci_case.sh commerce-payment-adversarial-e2e` EXIT 0; full payment adversarial scenario and catalog snapshot PASS. Hosted exact new-head CI is still required. Container is local only.
+
+**Next:** Commit to existing PR #3068, wait for new-head required checks, and request exact-head premerge integration once. Auto-merge must remain subject to the existing branch rules.
