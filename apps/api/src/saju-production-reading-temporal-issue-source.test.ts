@@ -86,22 +86,36 @@ function fixture() {
     authorityHash: '1'.repeat(64), issuer: 'isolated-saju', audience: 'isolated-myeongha',
     keyId: 'isolated-key', verificationKey: publicKey,
   };
-  async function exchange(source = readerSource) {
+  function signProofWithoutReaderSource() {
     const payload = {
       version: 'myeonghwa-production-reading-issue-proof-v1',
       authorityHash: trust.authorityHash, issuer: trust.issuer, audience: trust.audience, keyId: trust.keyId,
       executionAttemptId, externalRequestRef, releaseRef,
-      requestBodyHash: hash(request), responseBodyHash: hash(response), readerSourceHash: hash(source),
+      requestBodyHash: hash(request), responseBodyHash: hash(response),
+      nativeReadingId, engineVersion, issuedAtMs: Date.now(),
+    };
+    const signature = sign(null, Buffer.from('myeongha/saju/production-reading-issue/v1\0' + hash(payload)),
+      privateKey).toString('base64url');
+    return { payload, signature };
+  }
+  async function exchange(source: unknown = readerSource, requireCanonicalReaderSource = true) {
+    const payload = {
+      version: 'myeonghwa-production-reading-issue-proof-v1',
+      authorityHash: trust.authorityHash, issuer: trust.issuer, audience: trust.audience, keyId: trust.keyId,
+      executionAttemptId, externalRequestRef, releaseRef,
+      requestBodyHash: hash(request), responseBodyHash: hash(response),
+      ...(source === null ? {} : { readerSourceHash: hash(source) }),
       nativeReadingId, engineVersion, issuedAtMs: Date.now(),
     };
     const signature = sign(null, Buffer.from('myeongha/saju/production-reading-issue/v1\0' + hash(payload)),
       privateKey).toString('base64url');
     const { adapter, sourceVerifier } = createSajuProductionReadingIssueSourceV1({
       ...trust, baseUrl: 'https://isolated.example.test', bearerToken: 'isolated-synthetic-bearer',
-      requireCanonicalReaderSource: true,
+      requireCanonicalReaderSource,
       async fetchImpl(_url, init) {
-        expect(init.headers['x-myeongha-reader-source']).toBe('canonical-v1');
-        return Response.json({ ...response, readerSource: source }, { headers: {
+        expect(init.headers['x-myeongha-reader-source']).toBe(
+          requireCanonicalReaderSource ? 'canonical-v1' : undefined);
+        return Response.json(source === null ? response : { ...response, readerSource: source }, { headers: {
           'x-myeonghwa-product-reading-response-admitted': stable.responseVersion,
           'x-myeongha-saju-external-request-ref': externalRequestRef,
           'x-myeonghwa-production-issue-proof': Buffer.from(JSON.stringify({ payload, signature })).toString('base64url'),
@@ -117,7 +131,7 @@ function fixture() {
       dbReadingId: readingId, readingSessionId: randomUUID(), sourceBirthRevisionId, executionAttemptId,
     });
   }
-  return { referenceDateTime, readerSource, exchange, archive: {
+  return { referenceDateTime, readerSource, exchange, signProofWithoutReaderSource, archive: {
     trusts: [trust], readingId, storedResponse, storedResponseHash,
   }, receipt: {
     acceptedAt: new Date().toISOString(), component: 'month', periodReferenceDateTime: referenceDateTime,
@@ -142,6 +156,30 @@ describe('signed canonical temporal issue', () => {
     expect(grounding.units[1]?.requiredDisclosureRefs).toEqual([grounding.disclosures[1]?.disclosureRef]);
     expect(verifyArchivedSajuProductionIssueProofV1({
       ...input.archive, receipt: { ...receipt, periodReferenceDateTime: '2026-12-01T00:00:00.000Z' },
+    })).toBeNull();
+  });
+
+  it('rejects a valid source-less signed monthly proof at both issue and archived reread', async () => {
+    const input = fixture();
+    // Even an accidentally disabled global flag must not bypass the period gate.
+    expect(await input.exchange(null, false)).toBeNull();
+    const signedWithoutSource = input.signProofWithoutReaderSource();
+    const stored = verifyArchivedSajuProductionIssueProofV1({
+      ...input.archive,
+      receipt: { ...input.receipt, proof: signedWithoutSource },
+    });
+    expect(stored).toBeNull();
+  });
+
+  it('rejects a correctly signed monthly source when the archived purchase claims an annual scope', async () => {
+    const input = fixture();
+    const issued = await input.exchange();
+    expect(issued).not.toBeNull();
+    expect(verifyArchivedSajuProductionIssueProofV1({
+      ...input.archive,
+      receipt: {
+        ...input.receipt, component: 'year', proof: issued!.issueProof,
+      },
     })).toBeNull();
   });
 
