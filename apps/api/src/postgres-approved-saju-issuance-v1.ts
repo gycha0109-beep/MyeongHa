@@ -50,8 +50,18 @@ export async function inspectApprovedSajuPairSourceV1<T>(input: Readonly<
   if (after === null || after.admissionHash !== before.admissionHash || after.releaseRef !== before.releaseRef ||
       after.birthRevisionId !== before.birthRevisionId || after.targetBirthRevisionId !== before.targetBirthRevisionId ||
       after.sourceBirthInputHash !== before.sourceBirthInputHash || after.targetBirthInputHash !== before.targetBirthInputHash ||
-      after.sourceRequestHash !== before.sourceRequestHash) return null;
-  return Object.freeze({ state: 'held', canSell: false, sourceRequestHash: before.sourceRequestHash, evidence });
+      after.sourceRequestHash !== before.sourceRequestHash ||
+      after.paidComparison.offerId !== before.paidComparison.offerId ||
+      after.paidComparison.counterpartOrder !== before.paidComparison.counterpartOrder ||
+      after.paidComparison.targetPersonId !== before.paidComparison.targetPersonId ||
+      after.paidComparison.useApprovalRef !== before.paidComparison.useApprovalRef ||
+      after.paidComparison.releaseRef !== before.paidComparison.releaseRef ||
+      after.paidComparison.requiredComponents.join(',') !==
+        before.paidComparison.requiredComponents.join(',')) return null;
+  return Object.freeze({
+    state: 'held', canSell: false, sourceRequestHash: before.sourceRequestHash,
+    paidComparison: before.paidComparison, evidence,
+  });
 }
 
 /** Reviews the exact purchased period privately without creating an official Reading or Reader message. */
