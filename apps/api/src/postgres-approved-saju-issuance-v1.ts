@@ -45,6 +45,7 @@ export async function inspectApprovedSajuPairSourceV1<T>(input: Readonly<
   const before = await readScope();
   if (before === null) return null;
   const evidence = await input.inspectSource(before.request);
+  if (evidence === null) return null;
   const after = await readScope();
   if (after === null || after.admissionHash !== before.admissionHash || after.releaseRef !== before.releaseRef ||
       after.birthRevisionId !== before.birthRevisionId || after.targetBirthRevisionId !== before.targetBirthRevisionId ||
