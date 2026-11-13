@@ -95,6 +95,26 @@ async function startIsolatedPg18() {
         serverRunning=true;
         await admin.query('SELECT 1');
       },
+      async holdSyntheticBirthTableLock(){
+        if (!serverRunning) throw Error('Isolated PostgreSQL is not running');
+        const client=await admin.connect();
+        try {
+          await client.query('BEGIN');
+          await client.query('SET LOCAL statement_timeout = 0');
+          await client.query('LOCK TABLE public.ops_phase11_birth IN ACCESS EXCLUSIVE MODE');
+        } catch (error) {
+          await client.query('ROLLBACK').catch(()=>undefined);
+          client.release();
+          throw error;
+        }
+        let released=false;
+        return async ()=>{
+          if(released) throw Error('Synthetic table lock already released');
+          released=true;
+          try { await client.query('ROLLBACK'); }
+          finally { client.release(); }
+        };
+      },
       // Real disposable GoTrue UUIDs are generated at test runtime and are never written to proofs.
       async bindRealMembers(members) {
         if (!Array.isArray(members) || members.length !== 4 ||
@@ -603,8 +623,9 @@ const cpuExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'saju_cpu';
 const constrainedSajuExperiment = sustainedExperiment || cpuExperiment;
 const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap';
 const workerdDbFailoverExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_db_failover';
+const workerdDbPressureExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_db_pressure';
 const workerdExperiment = workerdOverlapExperiment || workerdDbFailoverExperiment ||
-  process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
+  workerdDbPressureExperiment || process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
     // The sole main-push exception is the guarded, synthetic DB-outage
@@ -687,7 +708,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         await denied.arrayBuffer();
         await health.arrayBuffer();
 
-        let sajuOutage,dbOutage;
+        let sajuOutage,dbOutage,dbPressure;
         if (workerdDbFailoverExperiment) {
           // Exercise the real disposable PostgreSQL 18 process rather than
           // injecting a fake Node gateway failure; keep GoTrue and Saju up.
@@ -718,6 +739,45 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
             unexpected:failed.unexpected,healthStatus,recovery,
             recoveryAttempts:attempts+1,realPostgresProcessStopped:true,
             localPoolOnlyNoHostedHyperdrive:true};
+        } else if (workerdDbPressureExperiment) {
+          // The real disposable PG18 table is locked by a separate superuser
+          // session. No proxy/mocked database error and no remote database.
+          phase='workerd_db_pressure';
+          const unlock=await database.holdSyntheticBirthTableLock();
+          let failed,healthStatus;
+          try {
+            failed=await measuredBatch(worker.origin,4,4,tokens);
+            expect(failed).toMatchObject({
+              requested:4,successful:0,unavailable:4,unexpected:0,
+            });
+            phase='workerd_db_pressure_health';
+            const independentHealth=await fetch(worker.origin+'/health',{
+              redirect:'error',signal:AbortSignal.timeout(3000),
+            });
+            healthStatus=independentHealth.status;
+            await independentHealth.arrayBuffer();
+            expect(healthStatus).toBe(200);
+          } finally { await unlock(); }
+          phase='workerd_db_pressure_recovery';
+          let recovery,attempts=0;
+          for (;attempts<8;attempts++){
+            recovery=await measuredBatch(worker.origin,4,4,tokens);
+            if(recovery.successful===4)break;
+            await new Promise(resolve=>setTimeout(resolve,250));
+          }
+          expect(recovery).toMatchObject({
+            requested:4,successful:4,unavailable:0,unexpected:0,
+          });
+          dbPressure={
+            kind:'disposable-table-lock-query-stall',
+            requested:failed.requested,unavailable:failed.unavailable,
+            unexpected:failed.unexpected,healthStatus,recovery,
+            recoveryAttempts:attempts+1,
+            actualDatabaseLockInjected:true,
+            databaseLockReleasedBeforeRecovery:true,
+            exactPoolAcquisitionTimeoutCauseProven:false,
+            hostedHyperdriveMeasured:false,
+          };
         } else {
           phase='workerd_saju_outage';
           const sajuPort=Number(new URL(saju.origin).port);
@@ -754,6 +814,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
           actualPinnedSajuProductionEngine:true, localWorkerdProductPathMeasured:true,
           ...(sajuOutage && {sajuOutage}),...(dbOutage && {dbOutage}),
+          ...(dbPressure && {dbPressure}),
           anonymousDenied:true, healthUnaffected:true, runtimeCleanupVerified:true,
           productionWorkerAdmissionMeasured:false, hostedHyperdriveMeasured:false,
           productionCapacityProven:false, productionScalingThresholdApproved:false,
