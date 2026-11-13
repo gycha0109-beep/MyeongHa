@@ -15,6 +15,11 @@ test('new draft development and validation families are separate and unpublished
   assert.equal(plan.optimizerInputReady,false);
   assert.equal(plan.modelCallsAuthorized,false);
   assert.equal(plan.oldY01toY12Compared,false);
+  assert.equal(plan.syntheticCrossSplitLexicalScreen.lexicalScreenPassed,true);
+  assert.equal(plan.syntheticCrossSplitLexicalScreen.crossSplitFamilyPairsChecked,16);
+  assert.equal(plan.syntheticCrossSplitLexicalScreen.possibleOverlapCount,0);
+  assert.equal(plan.syntheticCrossSplitLexicalScreen.semanticIndependenceVerified,false);
+  assert.equal(plan.syntheticCrossSplitLexicalScreen.optimizerAdmissionAuthorized,false);
   assert.equal(plan.metadata.every(x=>x.characterId==='yeoul'),true);
   assert.equal(JSON.stringify(plan).includes('답장을 안 했대요'),false);
   assert.deepEqual(plan,makeNewYeoulScenarioPlan());
