@@ -184,7 +184,13 @@ export function createPostgresApprovedSajuReadingAccessV1(
         const row = await read(input.subjectId, null, true);
         if (row === undefined) return null;
         const { issuedRevisionNo, currentRevisionNo } = row;
+        const component = row.component as SajuReadingComponentV1;
+        if (!Object.hasOwn(SAJU_READING_COMPONENTS_V1, component)
+          || SAJU_READING_COMPONENTS_V1[component].domain !== row.sajuDomain) {
+          throw new Error('Approved Saju Reading component does not match its domain.');
+        }
         return {
+          approvedComponent: component,
           readingId: row.readingId, readingSessionId: row.readingSessionId, sajuDomain: row.sajuDomain,
           readingContractVersion: row.readingContractVersion, productResponseState: row.productResponseState,
           responseSnapshotJsonb: row.responseSnapshotJsonb, responseHash: row.responseHash,

@@ -5,6 +5,11 @@ const ARCHIVE_OPENABLE_PRODUCT_RESPONSE_STATES_V1 = new Set([
   'delivered',
   'delivered_with_fallback',
 ]);
+const APPROVED_COMPONENT_DOMAIN = new Map([
+  ['career', 'career'], ['business', 'business'], ['wealth', 'wealth'],
+  ['relationship', 'relationship'], ['year', 'general'], ['month', 'general'],
+  ['compatibility', 'compatibility'],
+]);
 
 export class OfficialReadingRecordContractErrorV1 extends TypeError {
   constructor(message) {
@@ -117,11 +122,17 @@ export function parseOfficialReadingRecordPayloadV1(payload) {
     readingContractVersion,
     productResponseState,
   });
+  const sajuDomain = requireSajuDomain(payload.sajuDomain, 'sajuDomain');
+  const { approvedComponent } = payload;
+  if (approvedComponent !== undefined && APPROVED_COMPONENT_DOMAIN.get(approvedComponent) !== sajuDomain) {
+    fail('approvedComponent does not match sajuDomain');
+  }
 
   return Object.freeze({
     readingId,
     readingSessionId: requireUuid(payload.readingSessionId, 'readingSessionId'),
-    sajuDomain: requireSajuDomain(payload.sajuDomain, 'sajuDomain'),
+    sajuDomain,
+    ...(approvedComponent === undefined ? {} : { approvedComponent }),
     readingContractVersion,
     productResponseState,
     readerCharacterIds: requireReaderCharacterIds(payload.readerCharacterIds),
