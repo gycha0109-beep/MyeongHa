@@ -1,3 +1,32 @@
+### 2026-11-13 KST — 원격 전용 결제 SQL 후보의 실제 DB 객체/권한 확인 (읽기 전용)
+
+- 원격 이력 `20261028011357`(원본 SQL 9,260 bytes)과 저장소 `20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql`(9,270문자)의 논리 이름은 유사하지만, **파일·적용 이력이 바이트·구문·실행 인과까지 동일하다는 증거는 없다**.
+- 저장소 SQL에 기술된 `commerce_private.owner_sandbox_receipt_attestation_v1` 테이블과 `public.cmd_persist_owner_kcp_signed_sandbox_receipt_v1` 함수는 **현재 실제 운영 DB에 존재**한다. 함수는 네 인자 `(uuid,uuid,text,text)`, `SECURITY DEFINER`, owner `postgres`이고, `myeongha_api_executor` 실행 **true**, `anon` 및 `authenticated` 실행 **false**를 read-only pg_catalog에서 확인했다.
+- **처분 경계:** 객체 존재 및 표면 권한 일치만으로 양쪽 원본 SQL과 함수 본문·실제 데이터·RLS/의존성까지 동등하다고 판정하지 않는다. Production migration `repair`나 재실행은 금지. 사용자 승인 전 가능한 객체/본문 지문 및 격리 검증을 우선한다.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — 현재 Production frontier 이후 백업/원장 수집 수동 실행 등록
+
+- 현재 실제 최종 migration `20261113062455`에 맞춘 백업을 확보하기 위해 기존 보호된 `production-postgres-backup.yml`을 [run #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)로 `main` `6eab97337811128282f5f5ec6320e4608d5f9c09`에서 `capture_provider_ledger=true`로 **수동 dispatch**했다. 활성 중복 실행이 없음을 먼저 확인했다.
+- 기존 Workflow가 Production을 읽고 암호화 백업/Provider 원장 아티팩트를 생성하는 **기존 기능만 사용**. 이 기록 시점에는 **실행 결과·실제 백업 시각·manifest 무결성·최종 migration 포함 여부 미확정**. CI/백업 성공이나 DR 완료를 추정하지 않는다. Production migration repair/DDL/DML/개인정보 canary·유료 Hosted 변경 없음.
+- 이후 단계: 완료 결과, 정확한 artifact·manifest·원장 쌍 및 `20261113062455` 대응 여부를 확인한 뒤 현재 스키마 격리 복구를 **필수 개인정보/권한 차단을 유지한 상태로** 실행; 그때도 전체 서비스 복구 증거와 구분한다.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — 총괄 우선순위 반영 및 현재 Production DB 직접 읽기 전용 재실측
+
+- **목적/결정:** 기존 Phase 8/11/12/13의 안전·수용 조건은 유지하면서, 차단 해소 실행 순서를 **현재 운영 DB 이력/DDL·실제 배포 호환성 → 최소 정합화 격리 검증 → 필요 시 승인된 운영 적용 → 최신 백업/Hosted/Privacy/서비스 재개**로 재정렬했다. 이전 187개 byte-exact 미입증 SQL 전수 처분을 독립적인 선행조건으로 만들지 않는다. 기존 증거 재사용. 운영 변경·유료 호스팅·개인정보 canary 없음.
+- **실제 Supabase 연결 및 권한:** 명하 프로젝트 `cnsfpcdiyofqvhpcegfc`, PostgreSQL **17.6**에 **SELECT 기반 읽기 전용 조회** 수행. 2026-11-13 기준 repo `main=6eab97337811128282f5f5ec6320e4608d5f9c09`의 Git tree 전체 `supabase/migrations/*.sql`과 원격 `supabase_migrations.schema_migrations`의 version/name을 실제로 분류. 원격 **245개**, 저장소 **282개**, 공통 **200개**, 원격 전용 **45개**, 저장소 전용 **82개**; 원격 최종 `20261113062455` (`admin_a4_proof_retention_safety_window_29_days_20261113`). 원격 전용 45개는 과거 42개 원장 증거와 시점 차이가 있으므로 동일한 모집단으로 오인하지 않는다.
+- **#1887의 기존 핵심 불일치 실재:** 원격 `20261008090417`(`seyeon_runtime_1460_1510_acl_before_owner_recovery`, 1 statement, 104,021 bytes), `20261028011357`(`owner_sandbox_signed_receipt_persistence_v1_20261028`, 1 statement, 9,260 bytes)는 실제 원격 이력에 존재한다. 저장소 `20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql`은 존재하지만 그 version은 운영 이력에 **없다**. 저장소 텍스트 9,270문자. 내용/실행/현재 DDL의 완전 동등성은 **미입증**; 이름 유사성·길이만으로 repair나 DDL 재적용 불가. 원본 SQL 텍스트·사용자/행 데이터·실행자 정보를 출력하지 않았다.
+- **#2200 관련 최신 실제 함수·권한:** remote migration `1640` 기록 **존재**. `public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)`는 실제 pg_proc에 **존재**, `SECURITY DEFINER`, owner `myeongha_seyeon_chat_runtime_owner`, `myeongha_api_executor` EXECUTE **true**, `anon`/ `authenticated` **false**. `public.cmd_mark_seyeon_chat_context_ready_runtime_v1(uuid,uuid,uuid)`는 존재하지만 API EXECUTE **false**. 과거 '1640 함수 미적용' **하위 원인은 현재 사실과 맞지 않는다**. 단, 현재 실제 배포 SHA·채팅 송수신·원래 P0001 retry/idempotency는 **미검증**이므로 #2200 전체 **OPEN** 유지. 초기 임시 조회에서 `pg_get_function_identity_arguments`의 **인자명까지 포함한 문자열을 인자 타입만의 텍스트와 비교**하여 존재=false가 나왔으나, 올바른 pg_proc 직접 조회와 `to_regprocedure`에서 존재=true로 교정 확인했다. 오판 결과를 정본으로 사용하지 않는다.
+- **현재 개인정보/복구 차이:** Production 이력 `2380` 없음. `public.subject_shared_memory_items_v1`, `public.subject_shared_memory_delete_events_v1`, `public.internal_replay_shared_memory_note_deletion_v1(uuid,uuid,timestamptz)`도 현재 없음. 옛 백업에서 해당 기능의 합성 복구가 실패한 [#43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784)와 부합하지만, 실제 적용 필요 범위는 현재 배포/호출 의존성으로 판단해야 한다. 이전 한정된 source-only 실증을 현재 전체 DR 승인으로 승격하지 않음.
+- **가장 최근 확인한 백업:** Github Actions `production-postgres-backup.yml`의 최신 성공 [#43330215791](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43330215791) 시작 `2026-11-12T23:36:01Z`. 원격 최종 마이그레이션 버전 `20261113062455`의 시각보다 빠르다. **현재 전체 스키마가 포함된 백업/독립 복원 증거로 수용할 수 없음**; 이후 생성된 실제 backup artifact·복호화 지문·원장 및 현재 스키마 기준 복원 확인 필요. 기존 `43174606843`은 과거 차이 비교 출처로만 재사용.
+- **별도 차단:** #1887 OPEN / #2200 OPEN / #2025 OPEN 확인. 상업 호스팅 #2025는 병렬 비교 대상으로만 관리하고 우선 DB 정합화를 지연시키지 않는다. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+- **구현/남은 것/다음:** 기존 승인 로드맵 맨 위에 실행 우선순위·5단계 실제 출구 조건·승인 경계를 갱신하고 이 워크로그에 정본 읽기 전용 관측을 기록. **다음**은 현재 배포 버전/원격 전용 실제 기능의 출처를 연결하고 특히 `20261008090417`, `20261028011357` ↔ `20261028110500`의 실제 DB 객체/권한 효과를 비교해 **운영 DB 최소 정합화 SQL과 롤백/격리검증 계획**을 만드는 것. 사용자가 그 구체적 계획을 승인하기 전에는 Production `db push`, `migration repair`, DDL/DML, 데이터 이동, Hosted 생성, 요금제/DNS 변경을 실행하지 않음.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Phase 8-A: 개인정보 신형 마이그레이션이 없는 원본 백업 차단·SQL 출처만 제한 실증하는 경로 추가
 
 - [기존 격리 복구 실행 #43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784) **FAILURE**. `main` `e1ed546bef1b368f74b27515379bfb98ba1f9a88`, 원본 run `43174606843`. 로그상 원장 복호화/버전·바이트/코드 토큰 분류 단계는 통과했으나 **결과 JSON 업로드 전** 합성 개인정보 재생 preflight에서 `governed shared-memory deletion replay migration` 부재로 차단됐다. 저장소의 뒤늦은 개인정보 migration `2380`이 없는 **옛 백업에서 예상되는 필수 차단**이다. 따라서 12개 실제 코드 차이 수량을 추측·확정하지 않는다.
