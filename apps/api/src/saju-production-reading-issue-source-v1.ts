@@ -141,7 +141,11 @@ export function verifyArchivedSajuProductionIssueProofV1(input: Readonly<{
     ? { scope: receipt.component === 'year' ? 'annual' as const : 'monthly' as const, referenceDateTime: receipt.periodReferenceDateTime }
     : undefined;
   const canonicalSource = bindCanonicalSource(payload, readerSource, native, receipt.engineVersion, period);
-  if ((readerSource !== undefined || payload.readerSourceHash !== undefined) && canonicalSource === null) return null;
+  // A paid annual/monthly Reading must remain replayable with its originally
+  // signed, complete two-window canonical Reader source. Older source-less
+  // proofs cannot be silently upgraded into a new paid interpretation.
+  if ((period !== undefined || readerSource !== undefined || payload.readerSourceHash !== undefined) &&
+      canonicalSource === null) return null;
   return Object.freeze({
     sourceProofFingerprint: 'sha256:v1:' + hashJson(receipt.proof),
     nativeSourceResponseHash: 'sha256:v1:' + nativeHash,
@@ -256,8 +260,11 @@ export function createSajuProductionReadingIssueSourceV1(config: SajuProductionI
           ? { scope: text === '올해' ? 'annual' as const : 'monthly' as const, referenceDateTime: periodReferenceDateTime }
           : undefined;
         const canonicalSource = bindCanonicalSource(payload, entry.readerSource, sourceResponse, payload.engineVersion, period);
-        if ((config.requireCanonicalReaderSource === true || entry.readerSource !== undefined ||
-          payload.readerSourceHash !== undefined) && canonicalSource === null) return null;
+        // The purchased year/month itself requires a signed canonical Reader
+        // source, even if a caller accidentally disables the global option.
+        if ((period !== undefined || config.requireCanonicalReaderSource === true ||
+          entry.readerSource !== undefined || payload.readerSourceHash !== undefined) &&
+          canonicalSource === null) return null;
         if (canonicalSource !== null) {
           try {
             projectSajuCanonicalReaderGroundingV1(canonicalSource, {
