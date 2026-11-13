@@ -12,6 +12,59 @@ function record(value: unknown): value is Readonly<Record<string, unknown>> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+const SERVICE_RULES = new Set([
+  'T10-SERVICE-DAY-UNKNOWN',
+  'T10-SERVICE-DAY-SIX-COMBINATION',
+  'T10-SERVICE-DAY-CLASH',
+  'T10-SERVICE-DAY-NO-SIX-OR-CLASH',
+  'T10-SERVICE-MIXED-POSITIONS',
+  'T10-SERVICE-BOUNDED-SCOPE',
+]);
+
+/** Only accept the signed, non-public MyeongHa interpretation vocabulary
+ * with both original chart identities and exact structural fact references. */
+function validHeldInternalPairInterpretation(evidence: Readonly<Record<string, unknown>>): boolean {
+  const meaning = evidence.internalServiceInterpretation;
+  const review = evidence.readingReview;
+  if (!record(meaning) || !record(review) || !Array.isArray(review.charts) ||
+      !Array.isArray(meaning.charts) || meaning.charts.length !== 2 ||
+      !Array.isArray(meaning.sentences) || meaning.sentences.length < 2 ||
+      meaning.sentences.length > 6 || !Array.isArray(evidence.matches) ||
+      meaning.version !== 'saju-t10-internal-service-interpretation-v1' ||
+      meaning.lifecycle !== 'internal_policy_trial' ||
+      meaning.policyId !== 'myeongha-t10-internal-relational-explanation-v1' ||
+      meaning.policyVersion !== '2026-11-13' ||
+      meaning.adoption !== 'project_owner_service_lexicon' ||
+      meaning.academicThirdPartyApprovalRequired !== false ||
+      meaning.ruleCoverage !== 'day_branch_structures_only' ||
+      meaning.readyForOfficialIssue !== false ||
+      meaning.mayPublish !== false || meaning.maySell !== false ||
+      JSON.stringify(meaning.charts) !== JSON.stringify(review.charts)) return false;
+
+  const knownPaths = new Set<string>();
+  for (const item of evidence.matches) {
+    if (!record(item) || !record(item.subject) || !record(item.target) ||
+        typeof item.subject.factPath !== 'string' ||
+        typeof item.target.factPath !== 'string') return false;
+    knownPaths.add(item.subject.factPath);
+    knownPaths.add(item.target.factPath);
+  }
+  const usedRules = new Set<string>();
+  for (const item of meaning.sentences) {
+    if (!record(item) || typeof item.ruleId !== 'string' ||
+        !SERVICE_RULES.has(item.ruleId) || usedRules.has(item.ruleId) ||
+        typeof item.paragraph !== 'string' || item.paragraph.trim().length === 0 ||
+        item.paragraph.length > 1500 ||
+        item.interpretationOwner !== 'myeongha_internal_service' ||
+        item.individualOutcomeClaimed !== false ||
+        !Array.isArray(item.observedFactPaths) ||
+        item.observedFactPaths.some(path => typeof path !== 'string' || !knownPaths.has(path))) return false;
+    usedRules.add(item.ruleId);
+  }
+  return usedRules.has('T10-SERVICE-BOUNDED-SCOPE') &&
+    [...usedRules].some(rule => rule.startsWith('T10-SERVICE-DAY-'));
+}
+
 function discard(response: Response): null {
   void response.body?.cancel().catch(() => undefined);
   return null;
@@ -76,7 +129,8 @@ export function createSajuHeldPairReviewPortV1(input: Readonly<{
         !record(result.evidence) || !record(result.evidence.readingReview) ||
         result.evidence.readingReview.state !== 'held' ||
         result.evidence.readingReview.actualCompatibilityReadingReady !== false ||
-        result.evidence.readingReview.mayGrantOfficialAuthority !== false) return null;
+        result.evidence.readingReview.mayGrantOfficialAuthority !== false ||
+        !validHeldInternalPairInterpretation(result.evidence)) return null;
       return result;
     },
   });
