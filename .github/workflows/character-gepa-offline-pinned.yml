@@ -153,6 +153,23 @@ jobs:
             myeongha-gepa-pinned-offline:verify \
             sh -c 'python /opt/myeongha/verify_gepa_environment.py && python -m unittest -v test_gepa_source_identity test_pinned_gepa_offline'
 
+      - name: Prove real pinned GEPA result reaches Node review as unapproved candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          PROOF_DIR="$RUNNER_TEMP/character-gepa-crosslang-synthetic"
+          mkdir -p "$PROOF_DIR"
+          chmod 700 "$PROOF_DIR"
+          node scripts/character-optimization/gepa-crosslang-handoff-v1.mjs prepare "$PROOF_DIR"
+          docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
+            --mount "type=bind,src=$PROOF_DIR,dst=/private/gepa-proof" \
+            --env PYTHONPATH=/opt/myeongha \
+            myeongha-gepa-pinned-offline:verify \
+            python /opt/myeongha/gepa_crosslang_synthetic_handoff.py /private/gepa-proof
+          node scripts/character-optimization/gepa-crosslang-handoff-v1.mjs verify "$PROOF_DIR"
+
       - name: Verify shared budget gateway for Node and isolated Python
         shell: bash
         run: |

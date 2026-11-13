@@ -1,3 +1,10 @@
+## 2026-11-13 실제 보호된 main 격리 재현 결과
+
+- PR [#3255](https://github.com/gycha0109-beep/MyeongHa/pull/3255) 병합 및 필수 통합 검사 성공. 실제 수동 격리 복구 [#43343813577](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43343813577) **SUCCESS**. 원본은 기존 보호된 수동 백업 #43174606843에서 확보한 원장·PostgreSQL 백업 한 쌍. 비식별 검증 증거 아티팩트 #14000940857, ZIP SHA-256 `009f41101fd0fa388266141ffb181c587a6c3e1e93a6232bc5e985e20f5f8654`.
+- 같은 실행의 실제 평가 `isolated-provider-role-replay-provenance.json`: 원본 직접 역할 연결 **48개**, 격리 재현 **48개**, 대상 관측 **48개**; 역할별 권한 옵션·부여자 정보 일치. `directRoleMembershipTargetRehearsalProven=true`. 그와 별개로 원본 `roles.sql`에서 제외된 외부 역할 연결은 48개 그대로이며, 이 파일만으로 Provider 역할을 복구했다고 판단하지 않는다.
+- 암호화 원장은 실제 복호화·원문 지문 검증에 재성공했고 242개 version, frontier `20261109071019`, 원문 SQL 누락 12개가 유지됐다. 원장 이력은 격리 대상에 기록하거나 적용하지 않았다.
+- 전체 앱 스키마 동등성, 원본 카탈로그와 백업의 단일 MVCC snapshot, Provider 소유권·상속 접근권한, Hosted Auth/Storage와 개인 정보 연속성, 전 서비스 RPO/RTO는 미입증. `fullProviderCompatibleRestoreProven=false`, `drReady=false`, `serviceResumptionAllowed=false` 유지. 재현 세부는 [실측 근거](POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json)에 보존한다.
+
 # Production Operations — 격리 역할·권한 복원 출처 검증 (2026-11-13)
 
 > 트랙: `ops` · Gate 1 / Phase 8-A·8-B · P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
