@@ -63,7 +63,7 @@ describe('purchase-locked pair source review for 3 approved offers', () => {
     'first-counterpart', 'additional-counterpart', 'relationship-plus-first',
   ] as const)('keeps the exact %s offer and target during a protected review', async offer => {
     const a = pool(scope(offer));
-    const source = vi.fn(async () => ({
+    const source = vi.fn(async (_request: unknown) => ({
       lifecycle: 'internal_preview_only', maySell: false, mayPersist: false,
     }));
     const result = await inspectApprovedSajuPairSourceV1({
