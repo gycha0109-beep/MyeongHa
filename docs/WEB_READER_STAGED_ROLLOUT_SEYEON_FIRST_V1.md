@@ -1,5 +1,8 @@
 # MyeongHa Reader 단계적 개방: 공통 런타임 · 세연 우선
 
+> **2026-11-13 후속 제품 결정:** [현행 최초 출시 범위](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md)는 웹에서 세연·라현·백헌·여울·윤호·태겸 6명 **동시 채팅 공개**와 구매 풀이 열람·기본 질문을 요구한다. 아래 '세연 우선'은 기존 **프리뷰** 단계의 이력이며, 현재 최초 상용 공개 범위를 1명으로 축소하는 근거가 아니다. 채팅 권한과 유료 Reader 권한은 여전히 독립적으로 검증한다.
+
+
 Status: **Seyeon Preview presentation candidate only. Paid Reader interpretation is NOT publicly activated.**
 
 ## 사용자 결정
