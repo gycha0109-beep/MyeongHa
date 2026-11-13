@@ -96,6 +96,31 @@ jq -e '.originalSqlBodiesPublished == false
   and .hostedProviderRestoreProven == false
   and .drReady == false and .serviceResumptionAllowed == false' \
   "$MIGRATION_LINEAGE_EVIDENCE_PATH" >/dev/null || fail
+# Reconcile identical migration VERSIONs against exact main SQL bytes.
+# Source packet and repo file bodies never leave this disposable runner.
+[[ -n "${MIGRATION_BODY_PARITY_EVIDENCE_PATH:-}" &&
+   "$MIGRATION_BODY_PARITY_EVIDENCE_PATH" == "$RUNNER_TEMP/"* ]] || fail
+node scripts/operations/assess-sealed-common-migration-body-parity.mjs \
+  --source "$private/source-provider-migration-ledger.json" \
+  --paired-proof "$PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH" \
+  --lineage "$MIGRATION_LINEAGE_EVIDENCE_PATH" \
+  --output "$MIGRATION_BODY_PARITY_EVIDENCE_PATH" || fail
+jq -e '.schemaVersion == "ops-sealed-common-migration-body-parity-v1"
+  and .commonVersionCount > 0
+  and (.byteExactSingleStatementCount + .notByteExactOrUnprovenCount ==
+       .commonVersionCount)
+  and .sourceSqlStatementsPublished == false
+  and .sourceOperatorMetadataPublished == false
+  and .multipleStatementReconstructionPromotedToExact == false
+  and .migrationHistoryReplayed == false
+  and .migrationHistoryRepaired == false
+  and .executionCausalityProven == false
+  and .restoredProviderMigrationLedgerProven == false
+  and .fullHostedProviderRecoveryProven == false
+  and .drReady == false and .serviceResumptionAllowed == false' \
+  "$MIGRATION_BODY_PARITY_EVIDENCE_PATH" >/dev/null || fail
+echo 'SAME_VERSION_SOURCE_SQL_BYTE_COMPARISON_OBSERVED DR_HOLD'
+
 echo 'EXACT_MAIN_MIGRATION_FILE_LINEAGE_OBSERVED DR_HOLD'
 
 echo 'PAIRED_SOURCE_RECOVERABILITY_PASS TARGET_PROVIDER_LEDGER_HOLD'
