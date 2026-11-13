@@ -39,14 +39,14 @@ jobs:
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/gepa-venv"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m pip install --disable-pip-version-check --no-deps \
-            'gepa @ git+https://github.com/gepa-ai/gepa.git@ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309'
+            -r "$GITHUB_WORKSPACE/research/character-optimization-gepa/requirements.lock"
       - name: Verify genuine GEPA with only fake evaluation and no network
         shell: bash
         run: |
           set -euo pipefail
           export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
-            test_offline test_gepa_api_contract test_gepa_result_proposal test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner test_krw500_synthetic_ledger test_krw500_socket_gateway
+            test_offline test_gepa_api_contract test_gepa_result_proposal test_gepa_source_identity test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner test_krw500_synthetic_ledger test_krw500_socket_gateway
       - name: Prove optimizer cannot access sealed files or network at OS boundary
         shell: bash
         run: |
@@ -151,7 +151,7 @@ jobs:
             --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
             --env PYTHONPATH=/opt/myeongha \
             myeongha-gepa-pinned-offline:verify \
-            python -m unittest -v test_pinned_gepa_offline
+            sh -c 'python /opt/myeongha/verify_gepa_environment.py && python -m unittest -v test_gepa_source_identity test_pinned_gepa_offline'
 
       - name: Verify shared budget gateway for Node and isolated Python
         shell: bash
