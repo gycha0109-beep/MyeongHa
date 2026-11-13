@@ -43,12 +43,16 @@ function evidence() {
         policyVersion: '2026-11-13',
         adoption: 'project_owner_service_lexicon',
         academicThirdPartyApprovalRequired: false,
-        ruleCoverage: 'day_branch_structures_only',
+        ruleCoverage: 'resolved_day_stem_branch_and_other_positions',
         charts: both,
         sentences: [
           { ruleId: 'T10-SERVICE-DAY-SIX-COMBINATION',
             paragraph: '두 명식에서 일지 간 육합 구조를 관찰했습니다.',
             observedFactPaths: [subjectPath, targetPath],
+            interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false },
+          { ruleId: 'T10-SERVICE-DAY-STEM-NO-FIVE-COMBINATION',
+            paragraph: '일간 사이에 오합이 관찰되지 않아도 이것은 관계의 실패를 뜻하지 않습니다.',
+            observedFactPaths: [],
             interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false },
           { ruleId: 'T10-SERVICE-BOUNDED-SCOPE',
             paragraph: '개인 관계의 결과나 성공 여부는 단정하지 않습니다.',
@@ -111,6 +115,22 @@ describe('signed held T10 pair interpretation acceptance', () => {
       'subject.pillars.hour.value.branch',
     ];
     expect(await port(fabricated).inspectSource(body)).toBeNull();
+  });
+
+  it('rejects a signed but incomplete day-stem axis or two mutually exclusive day rules', async () => {
+    const missingStem = evidence();
+    missingStem.evidence.internalServiceInterpretation.sentences =
+      missingStem.evidence.internalServiceInterpretation.sentences.filter(x =>
+        x.ruleId !== 'T10-SERVICE-DAY-STEM-NO-FIVE-COMBINATION');
+    expect(await port(missingStem).inspectSource(body)).toBeNull();
+    const duplicateDay = evidence();
+    duplicateDay.evidence.internalServiceInterpretation.sentences.splice(1, 0, {
+      ruleId: 'T10-SERVICE-DAY-CLASH',
+      paragraph: '같은 일지에서 별도 충이 발생한 것으로 잘못 기록한 문장.',
+      observedFactPaths: [],
+      interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false,
+    });
+    expect(await port(duplicateDay).inspectSource(body)).toBeNull();
   });
 
   it('rejects signed meaning that tries to become official or claim an outcome', async () => {
