@@ -43,3 +43,12 @@
 - `apps/api/src/saju-held-pair-review-v1.ts`는 검토 응답의 **두 사람 계산 해시, Saju 관측 사실 경로, 내부 규칙/문장, 관계 결과 비단정 및 연구용 미판매 상태**를 확인하며, 서명 응답이더라도 실제 명식 원본에서 벗어난 설명이나 `readyForOfficialIssue=true` 반환을 거부한다.
 - 연관 테스트 `apps/api/src/saju-held-pair-review-v1.test.ts`는 정상 서명 연구 검토·인물 해시 바꾸기·허구 근거 경로·공식 발급 승격 시도 거부를 검사한다.
 - **남은 필수 단계:** 첫 상대/추가 상대/본인 T8+첫 상대 구성 각각의 구매·동의·출생 revision/상대 권리, **서명된 Official T10 Reading** 발급, Reader 보관함/재열람, 환불/철회·실결제·운영 복구 E2E. 현재 연구 검토 통과는 발급/판매 허가가 아니다.
+
+## 2026-11-13 — 관계 비교 3상품의 결제 당시 선택·동의·두 명식 묶음 검증
+
+- **기존 공식 발급 블로커 유지:** 현재 Saju 생산 발급 및 MyeongHa 발급 작업자는 단일 본인 명식 처리만 구현되어 있고, 관계 비교 `compatibility` 발급을 의도적으로 차단한다. 내부 서명 검토 결과를 운영 Grant로 승격하지 않는다.
+- **이번 실구현:** `docs/operations/candidates/commerce_approved_saju_issuer_facades_v1.sql`의 `qry_approved_saju_pair_issue_scope_v1`은 기존 구매·현재 동의 잠금 검증을 통과한 다음, *동일한 승인 구매 기록*에서 정확한 상품 `first-counterpart` / `additional-counterpart` / `relationship-plus-first`, 첫/추가 상대 구분, 상대 ID, 사용 동의 승인번호를 읽어 반환하도록 확장했다. 외부 요청의 상품명을 신뢰하지 않는다.
+- `apps/api/src/postgres-approved-saju-issue-scope-v1.ts`는 DB가 읽은 선택이 승인된 3개 상품의 구성/순서와 일치하는지, 두 출생 revision이 다른지, 상대 식별값/동의 번호가 유효한지 검사한다. 결합 구매만 `['relationship','compatibility']`, 다른 두 상품은 `['compatibility']`로 별도 유지한다. 산출된 `paidComparison.authorizedForIssue=false`는 그대로다.
+- `apps/api/src/postgres-approved-saju-issuance-v1.ts`의 비공개 두 명식 소스 검토에서는 **해석 요청 전·후** DB 조회에서 상품·상대·승인번호·구성·해석 요청 해시·명식 revision·Release가 그대로인지 다시 검증한다. 구매 취소·동의 철회·상대 변경 시 신규 확인에서 null/HOLD를 유지한다.
+- **검증:** `apps/api/src/postgres-approved-saju-pair-issuance-scope-v1.test.ts`와 `apps/api/src/postgres-approved-saju-pair-offer-handoff-v1.test.ts`에서 세 상품·양 명식·동의 및 구매 변경 거부를 검사한다. 이 작업의 SQL은 배포된 마이그레이션이 아니라 후보 문서이므로 운영 DB 적용이나 실제 결제 테스트 완료로 간주하지 않는다.
+- **다음 필수:** 공식 T10 이중 명식 서명 Source 계약, 관계 구성별 DB 발급 작업, 실제 동의/철회/구매 영수증·중복발급·환불/Reader E2E. 기존 명하 운영 판매 HOLD.
