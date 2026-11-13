@@ -1,5 +1,8 @@
 # Character Gate B Production Publication Blocker Evidence
 
+> **2026-11-13 최초 출시 범위 정정:** [현행 6명 동시 공개 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md)에 따라 기존 정확히 9명의 **집합 배포 완성**은 최초 웹 공개에 불필요한 범위라면 후속 확장으로 구분한다. 그러나 이 문서의 9명 배포 기술 계약·과거 차단 근거는 역사로 보존한다. 6명 각각 정식 승인된 원본·자산·콘텐츠 배포·실제 채팅 실행이 필요하며, 현재 윤호는 [#3068](https://github.com/gycha0109-beep/MyeongHa/pull/3068)의 실행 대상에서 제외돼 있어 추가 구현·검증이 필수다. 임시 배포·권한 우회 또는 미승인 자산으로 여섯 명을 채울 수 없다.
+
+
 Status: **BLOCKED — exact-nine canon completion + concrete visual/cue/provenance payload; `SRC-27` mutation authority implemented**  
 Authority parent `main`: `d80ede71f7cc5e297702a86c8c6ab585e63f9476`  
 Scope: Character Runtime / Gate B Production publication / Member Chat positive E2E
