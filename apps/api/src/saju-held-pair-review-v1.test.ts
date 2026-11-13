@@ -159,6 +159,21 @@ describe('signed held T10 pair interpretation acceptance', () => {
     expect(await port(duplicateDay).inspectSource(body)).toBeNull();
   });
 
+  it('rejects missing or internally inconsistent two-chart material', async () => {
+    const missing = evidence();
+    delete (missing.evidence as Record<string, unknown>).sourceReadingMaterial;
+    expect(await port(missing).inspectSource(body)).toBeNull();
+    const changedSentence = evidence();
+    changedSentence.evidence.sourceReadingMaterial.units[0]!.paragraph = '달라진 문장';
+    expect(await port(changedSentence).inspectSource(body)).toBeNull();
+    const changedChart = evidence();
+    changedChart.evidence.sourceReadingMaterial.charts[1]!.calculationHash = ownHash;
+    expect(await port(changedChart).inspectSource(body)).toBeNull();
+    const attemptedIssue = evidence();
+    attemptedIssue.evidence.sourceReadingMaterial.officialIssueAuthorized = true;
+    expect(await port(attemptedIssue).inspectSource(body)).toBeNull();
+  });
+
   it('rejects signed meaning that tries to become official or claim an outcome', async () => {
     const issued = evidence();
     issued.evidence.internalServiceInterpretation.readyForOfficialIssue = true;
