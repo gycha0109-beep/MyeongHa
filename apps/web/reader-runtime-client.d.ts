@@ -44,6 +44,10 @@ export interface ReaderRuntimeClientV1 {
   readonly enabled: boolean;
   readonly endpoint: string;
   readReaderScene(input: ReaderRuntimeReadInputV1): Promise<ReaderSceneV1>;
+  readPurchasedReaderScene(input: ReaderRuntimeReadInputV1): Promise<Readonly<{
+    scene: ReaderSceneV1;
+    latestPaidReply: Readonly<{ safeMessageId: string; canContinue: boolean }> | null;
+  }>>;
   askPurchasedReading(input: Readonly<{
     threadId: string;
     officialReadingId: string;

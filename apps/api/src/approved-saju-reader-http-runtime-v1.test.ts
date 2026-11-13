@@ -3,9 +3,14 @@ import { createApprovedSajuReaderHttpRuntimeV1 } from './approved-saju-reader-ht
 import { APPROVED_SAJU_READER_QUESTION_PATH_V1 } from './approved-saju-reader-question-http-v1.js';
 import { READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1 } from './reader-interpretation-preview-http.js';
 import { executeReaderInterpretationPreviewPostgresV1 } from './reader-interpretation-preview-postgres-execution.js';
+import { executePostgresApprovedSajuPaidAnswerTransactionV1 } from './postgres-subject-execution.js';
 
 vi.mock('./reader-interpretation-preview-postgres-execution.js', () => ({
   executeReaderInterpretationPreviewPostgresV1: vi.fn(),
+}));
+vi.mock('./postgres-subject-execution.js', async importOriginal => ({
+  ...await importOriginal<typeof import('./postgres-subject-execution.js')>(),
+  executePostgresApprovedSajuPaidAnswerTransactionV1: vi.fn(),
 }));
 
 const origin = 'http://127.0.0.1:4173';
@@ -27,7 +32,8 @@ function fixture() {
       releaseRuntime: {}, identityEvidenceVerifier: { verifyRequestIdentity },
     },
     scene: { activationEnv: {}, createContextAuthorityPort: vi.fn() },
-    delivery: { keyResolver: vi.fn(), privacyLedgerPort: {}, deliveryTokenSecret: new Uint8Array(32) },
+    delivery: { keys: { issueUniqueKey: vi.fn(), resolveCachedKey: vi.fn() }, privacyLedgerPort: {},
+      deliveryTokenSecret: new Uint8Array(32) },
   } as unknown as Parameters<typeof createApprovedSajuReaderHttpRuntimeV1>[0];
   const server = createApprovedSajuReaderHttpRuntimeV1(input);
   return {
@@ -49,9 +55,15 @@ describe('isolated approved Saju Reader HTTP runtime', () => {
 
   it('uses the same signed source and policy for the authenticated Scene and the question flow', async () => {
     const { input, request } = fixture();
-    const scene = { mode: 'reader_interpretation' };
+    const scene = { mode: 'reader_interpretation', readerCharacterId: 'seyeon' };
     const execute = vi.mocked(executeReaderInterpretationPreviewPostgresV1);
     execute.mockResolvedValueOnce(scene as Awaited<ReturnType<typeof executeReaderInterpretationPreviewPostgresV1>>);
+    const query = vi.fn(async () => ({ rows: [{ safeMessageId: id, canContinue: true, sourceUnitRefs: ['internal'] }] }));
+    vi.mocked(executePostgresApprovedSajuPaidAnswerTransactionV1).mockImplementationOnce(
+      async ({ execute: read }) => read({
+        resolvedSubject: { subjectId: id, subjectKind: 'member' }, client: { query },
+      } as Parameters<typeof read>[0]),
+    );
     const body = { officialReadingId: id, threadId: id };
     const response = await request(READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1, {
       method: 'POST', body: JSON.stringify(body),
@@ -64,8 +76,11 @@ describe('isolated approved Saju Reader HTTP runtime', () => {
         pool: input.question.issuanceProofPool, trusts: input.question.productionIssueProofTrusts,
       },
     }));
+    expect(query).toHaveBeenCalledWith(expect.stringContaining('qry_approved_saju_reader_latest_marker_v1'),
+      [id, id, 'seyeon', id]);
     expect(await response?.json()).toEqual({ ok: true, data: scene,
-      meta: { apiContractVersion: 'v0.9', requestId: id, serverTime: time } });
+      meta: { apiContractVersion: 'v0.9', requestId: id, serverTime: time,
+        latestPaidReply: { safeMessageId: id, canContinue: true } } });
     expect(response?.headers.get('Cache-Control')).toContain('no-store');
   });
 

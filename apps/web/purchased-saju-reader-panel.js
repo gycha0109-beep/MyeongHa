@@ -29,7 +29,9 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
       const { threadId } = await openClient.openForServerCharacter({ readerCharacterId });
       if (signal.aborted || !(await resolveBearer())) return;
       const officialReadingId = record.readingId;
-      const scene = await readerClient.readReaderScene({ threadId, officialReadingId, signal });
+      const { scene, latestPaidReply } = await readerClient.readPurchasedReaderScene({
+        threadId, officialReadingId, signal,
+      });
       if (signal.aborted || !(await resolveBearer())) return;
       if (scene.mode !== 'reader_interpretation' || scene.readerCharacterId !== readerCharacterId ||
           scene.domain !== record.sajuDomain) throw new Error('Purchased Reader scene is unavailable.');
@@ -50,7 +52,7 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
       let focus;
       let priorAcknowledged = false;
       let pending = null;
-      let waitingForAnswer = false;
+      let waitingForAnswer = latestPaidReply !== null;
       const sceneButtons = [];
       for (const [segmentIndex, segment] of scene.utterance.segments.entries()) {
         const paragraph = document.createElement('p');
@@ -61,6 +63,7 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
         const button = document.createElement('button');
         button.type = 'button';
         button.textContent = '이 부분 묻기';
+        button.disabled = latestPaidReply !== null;
         button.setAttribute('aria-pressed', 'false');
         sceneButtons.push(button);
         button.addEventListener('click', () => {
@@ -77,6 +80,29 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
       status.textContent = '설명을 듣고 싶은 부분을 고르세요.';
       launch.hidden = true;
 
+      function openAnswer(safeMessageId, canContinue) {
+        clearProtectedReaderChatRevealV1();
+        answer.replaceChildren();
+        status.textContent = '연결자의 답변을 열고 있습니다.';
+        appendProtectedReaderChatRevealV1(answer, {
+          threadId, safeMessageId, officialReadingId, readerCharacterId, openImmediately: true,
+          onAcknowledged() {
+            if (signal.aborted) return;
+            priorAcknowledged = canContinue;
+            waitingForAnswer = false;
+            question.readOnly = !canContinue;
+            send.disabled = !canContinue;
+            for (const button of sceneButtons) button.disabled = true;
+            status.textContent = canContinue ? '같은 풀이에 대해 이어서 질문할 수 있습니다.'
+              : '이전 답변을 읽을 수 있습니다. 이 답변에서 상담을 이어갈 수 없습니다.';
+          },
+        });
+      }
+
+      if (latestPaidReply !== null) {
+        question.readOnly = true;
+        openAnswer(latestPaidReply.safeMessageId, latestPaidReply.canContinue);
+      }
       form.addEventListener('submit', async event => {
         event.preventDefault();
         const text = question.value.trim();
@@ -93,21 +119,7 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
           const marker = await readerClient.askPurchasedReading(pending);
           if (signal.aborted || !(await resolveBearer())) return;
           pending = null;
-          clearProtectedReaderChatRevealV1();
-          answer.replaceChildren();
-          status.textContent = '연결자의 답변을 열고 있습니다.';
-          appendProtectedReaderChatRevealV1(answer, {
-            ...marker, officialReadingId, readerCharacterId, openImmediately: true,
-            onAcknowledged() {
-              if (signal.aborted) return;
-              priorAcknowledged = true;
-              waitingForAnswer = false;
-              question.readOnly = false;
-              send.disabled = false;
-              for (const button of sceneButtons) button.disabled = true;
-              status.textContent = '같은 풀이에 대해 이어서 질문할 수 있습니다.';
-            },
-          });
+          openAnswer(marker.safeMessageId, true);
         } catch (error) {
           if (signal.aborted) return;
           if (error?.retryable === false) pending = null;
