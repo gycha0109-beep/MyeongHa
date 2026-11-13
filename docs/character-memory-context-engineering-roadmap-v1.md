@@ -1,7 +1,7 @@
 # MyeongHa Persistent Memory & Context Engineering Roadmap v1
 
 > Watchtower-Track: character-memory
-> Status: APPROVED ROADMAP / IMPLEMENTATION NOT COMPLETE
+> Status (2026-11-13): APPROVED OFFLINE SCOPE VERIFIED AND MERGED / END-TO-END RELEASE DEPENDENCIES HELD / OVERALL ROADMAP_IN_PROGRESS
 > Date: 2026-11-07
 > Parent runtime track: PR #3068
 > Baseline commit: `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`
@@ -25,7 +25,7 @@ This roadmap extends the existing Character Runtime and Memory authority. It doe
 
 ### 2.1 PR #3068 baseline
 
-PR #3068 remains **Open / Draft / not merged**. The original baseline commit is `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`. Current implementation changes are carried on `feat/character-memory/five-character-chat-runtime-bridge-20261106`; the live head and check results are tracked on PR #3068 rather than duplicated as static counts here.
+PR [#3068](https://github.com/gycha0109-beep/MyeongHa/pull/3068) was **merged** into `main` on 2026-11-13 11:14:14 UTC. Final PR head: `859f1c9050c8660e010899bdaf8c7f8c9dd4c08c`; squash merge: `764fa668192b7a280720b58b7b051feaa82ee9df`; [exact-head integration run #43413337871](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43413337871) completed SUCCESS. The original runtime baseline commit was `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`. This is a code/CI merge result, not Production activation or proof of deployed migrations.
 
 The original baseline contains:
 - independent Character room selection and server-side turn gateway foundations;
@@ -36,7 +36,7 @@ The original baseline contains:
 - existing message and generated-reply guard: 8,000 UTF-16 code units;
 - existing canonical-context guard: 32,768 UTF-16 code units.
 
-The PR remains Draft because the four additional Characters are not yet production-ready live AI chat targets. Recent Memory retrieval work remains read-only and does not activate those Characters or connect a Production model route.
+The former Draft status is historical, not the current PR state. The merged work remains read-only/offline for Character memory retrieval; additional Characters and a Production Provider route were not enabled. Later dated Draft/CI-pending statements in this document are preserved as historical work notes and are superseded by the verified merge above.
 
 ### 2.2 What the current length limits do not mean
 
@@ -89,7 +89,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 0 — Preserve and close the current chat-runtime baseline
 
-**Status: Implemented at PR #3068 head; PR remains Draft and unmerged.**
+**Status: Runtime baseline implemented, verified and merged by PR #3068; additional live Character activation remains a separate release gate.**
 
 - Preserve the six visible discovery cards and current Yunho exclusion.
 - Preserve independent room/thread ownership, immutable source pinning, turn persistence, receipt and ACK authority.
@@ -101,7 +101,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 1 — Authority contract and data-source inventory
 
-**Status: READ-ONLY CORE IMPLEMENTED; not connected to Production model execution.**
+**Status: APPROVED READ-ONLY SCOPE IMPLEMENTED / MERGED; live Production integration is separately held.**
 
 1. Inventory existing conversation, turn, Life Fact, Memory Item, Memory Proposal, access-grant, relationship-event, Reader Knowledge and Reading records. **Implemented in `docs/character-memory-authority-inventory-v1.md`.**
 2. Map each record type to its authoritative owner, Subject scope, Character visibility, disclosure gate, lifecycle and revocation behavior. **Implemented for the currently exposed read fields and grants.**
@@ -128,7 +128,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 2 — Provider-neutral Token Budget Manager
 
-**Status: PROVIDER-NEUTRAL PROFILE AND EXACT-REQUEST PREFLIGHT IMPLEMENTED; real model profile and four-Character Production wiring remain HOLD pending O-C1-07 and the existing Cost Governor operational gates.**
+**Status: PROVIDER-NEUTRAL OFFLINE PREFLIGHT IMPLEMENTED / MERGED; real Provider profile, pricing and Production wiring remain separate O-C1-07/Cost Governor gates.**
 
 1. Define a provider-neutral model profile contract. **Implemented** in \`packages/domain/src/model-token-budget-profile-v1.ts\`. It carries the server-owned provider/model identity, context/input/output ceilings, reserved headroom, serialized-byte ceiling, token-counter adapter identity/request format, and pricing version.
 2. Do not populate real model values until O-C1-07 is resolved. **Still on hold; no real model profile is registered.**
@@ -150,7 +150,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 3 — Permission-first Hybrid Memory Retrieval
 
-**Status: INITIAL READ-ONLY RETRIEVAL CORE IMPLEMENTED; PHASE 3 NOT COMPLETE.**
+**Status: APPROVED LEXICAL+METADATA READ-ONLY RETRIEVAL SCOPE IMPLEMENTED / MERGED; full semantic/causal ranking is source-authority HOLD, not an open-ended offline test task.**
 
 **Source timestamp defense-in-depth (offline, 2026-11-08):** Phase 3 read-only retrieval now rejects undecodable grant/creation/confirmation/validity timestamps, inverted Life Fact validity intervals and an authoritative current User message later than the pinned server as-of; still excludes valid but future grants and not-yet-valid/expired facts. This does not create any new grant, supersession authority or Production model route.
 
@@ -174,9 +174,9 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 **Exit evidence implemented so far:** unit coverage for lexical relevance, explicit/generic callback, unsupported-schema non-exposure, temporal Life Fact validity, exact Subject/Character/thread scope and selected-record-only output; SQL coverage for v2 function ACLs, source provenance, active grants, no-grant Character isolation and cross-Subject denial.
 
-**Additional exit evidence submitted for CI:** multi-session relevant/irrelevant recall and abstention tests, generic callback bounded selection, and PostgreSQL v2 revoked-grant/superseded Life Fact denial. These must pass on the latest head; submitting tests is not proof of a green run.
+**Additional exit evidence:** multi-session relevant/irrelevant recall and abstention, generic bounded callback, and PostgreSQL revoked-grant/superseded Life Fact denial were part of the implemented test coverage. The final merged PR passed its exact-head integration; green CI establishes these offline/source-bound checks only, not semantic model accuracy or Production source availability.
 
-**Remaining Phase 3 exit work:** establish the latest-head green CI and evaluate any uncovered source-supported signals or retrieval abstention cases. Causal/relationship/contradiction signals cannot be claimed until authoritative record links or approved policy values exist. Phase 3 is not complete, and Phase 4 must not be declared complete or started as a production context composer before these criteria are evidenced.
+**Phase 3 scope disposition (2026-11-13):** the source-supported read-only lexical/metadata retrieval and its merged offline tests have reached their approved implementation boundary. Causal/relationship/contradiction ranking remains unimplemented because the owning source contracts do not supply the required evidence/links. Do not re-open this scope for speculative synthetic cases; activate those features only after their independent source authority is available. Production retrieval remains gated.
 
 
 **Canonical dialogue chronology gate (offline, 2026-11-08):** The existing Working Memory projection now rejects a prior canonical message dated after the current User message or any backward timestamp across sequence-ordered messages. Equal creation timestamps remain valid; canonical sequence is still authoritative. This read-only fail-closed gate also checks messages excluded from model-facing context, so their inconsistent source evidence is not silently ignored. This narrows Phase 3 temporal safety, not source-policy approval, causal-memory support or Production activation.
@@ -191,7 +191,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 4 — Dynamic Context Composer
 
-**Status: OFFLINE EXACT-REQUEST CONTEXT COMPOSER FOUNDATION IMPLEMENTED; Production composer wiring and complete runtime layer coverage remain outstanding.**
+**Status: SOURCE-SUPPORTED OFFLINE EXACT-REQUEST COMPOSER IMPLEMENTED / MERGED; Production request wiring and externally authorized layers remain separate holds.**
 
 1. Compose the Working Context from the existing Runtime Standard layers:
    - System / Safety / Product Authority;
@@ -260,7 +260,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 5 — Memory Consolidation and Lifecycle
 
-**Status: Existing proposal/approval architecture is defined; full durable consolidation is gated by source authority.**
+**Status: APPROVED HOLD — automatic conversation-to-durable-memory extraction/writes are explicitly OFF under the 2026-11-11 owner decision. Existing proposal/approval contracts remain; SRC-25/SRC-05/SRC-10 are separate source-authority dependencies. This is not unfinished approved manual-memory work.**
 
 1. Extract bounded candidates from committed conversation turns: events, user facts, preferences, commitments and unresolved topics.
 2. Keep Fact Memory and Insight Memory distinct. Insight must cite the facts/events it derives from and cannot become an independent user fact.
@@ -281,7 +281,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 6 — Evidence-preserving Context Compaction
 
-**Status: Offline canonical-turn extractive foundation implemented; shared semantic compaction and Production capability not implemented.**
+**Status: SOURCE-VERIFIED OFFLINE EXTRACTIVE COMPACTION IMPLEMENTED / MERGED; persistent/semantic compaction remains deliberately held behind retention, source and deployment authority.**
 
 **Additional offline reuse guard (2026-11-08):** Any previous extractive episode must be rebuilt from the current fully authorized canonical turns before reuse, and all original source IDs, verbatim excerpts and timeline fields must still match. Revocation/deletion or scope drift blocks the episode. No Production cache, database invalidation job or retention policy is introduced; Phase 6 durable deletion/compaction remains incomplete.
 
@@ -304,7 +304,7 @@ SRC-22 governs executable relationship-event scoring/stage/anti-farming semantic
 
 ### Phase 7 — Memory Quality, Context and Cost Evaluation
 
-**Status: DETERMINISTIC OFFLINE INTEGRATED SOURCE-FIDELITY/QUALITY/ACCOUNTING SUITE IMPLEMENTED AND CI VERIFIED; Phase 7 NOT COMPLETE — real model response semantics, actual Provider token/cost/latency measurements, and paid evaluation approvals remain outstanding.**
+**Status: APPROVED DETERMINISTIC OFFLINE EVALUATION SCOPE IMPLEMENTED / MERGED; actual Provider response/usage/latency measurements remain external evidence gates. Owner consent for a bounded paid pilot is already recorded, but billing/identity/hard-limit/cross-run reservation controls still prohibit paid dispatch. Model comparison/optimization belongs to the GEPA track; do not duplicate it here.**
 
 **Verified exact-head offline integration (2026-11-09):** Draft PR #3068 commit `6c4c3c18856b027e71290731421f8f0dc4ea077c` passed [CI #42554861447](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42554861447), [Governance #42554861300](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42554861300), [Web PR Domain Gates #42554861317](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42554861317), and [Web Auth Browser Regression #42554861299](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42554861299). Its Character Memory Work Track completed shared TypeScript, affected tests, client checks and build, including the unmocked two-session Memory-callback, canonical-expression, 40-turn episode and held-unknown-cost integration fixture. This establishes only deterministic, source-owned **offline** evidence and does not prove semantic recall or a live Provider response.
 
@@ -388,7 +388,7 @@ Run offline fixtures and database tests first. Paid model evaluation remains loc
 
 ### Phase 8 — Provider, Cache and Production Rollout
 
-**Status: Blocked by O-C1-07, independent Character source publication, real Guard/ACK adapters and remaining source gates.**
+**Status: END-TO-END RELEASE INTEGRATION HELD by O-C1-07/provider evidence, independent Character publication, Guard/ACK runtime integration and Production security/DR acceptance. These are not unimplemented items in the completed read-only/offline scope.**
 
 1. After O-C1-07 is resolved, bind approved model profiles and independent Provider adapters to each eligible Character. No implicit Se-yeon fallback.
 2. Wire the model-specific Token Budget Manager, exact input counter, output cap and Cost Governor into every production inference entrypoint.
@@ -421,7 +421,25 @@ The order is dependency-aware, not a requirement to wait idly between independen
 
 ## 7. Definition of done
 
-The Context Engine is complete only when all of the following are evidenced:
+### 7.1 Closeout classification — implementation vs deliberate hold vs external dependency (2026-11-13)
+
+**Verified repository fact:** [PR #3068](https://github.com/gycha0109-beep/MyeongHa/pull/3068) merged after [exact-head integration #43413337871](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43413337871) passed. A merged, green offline implementation must not be described as an open Draft or made to re-enter indefinite synthetic-test development. The full live product/Production exit conditions below are *retained*, not waived.
+
+| Classification | Phase/work | Closeout and remaining gate |
+|---|---|---|
+| **IMPLEMENTED / VERIFIED / MERGED** | Phase 0 runtime baseline; Phase 1 source inventory and read-only authority projection; Phase 2 provider-neutral exact-request budget/counter contract; Phase 3 source-supported lexical+metadata retrieval; Phase 4 offline source-admitted context assembly; Phase 6 source-verified extractive episode reuse; Phase 7 deterministic offline multi-session/source/cost safety evaluation | This is the **approved source-supported offline implementation scope**. Evidence is the merged PR and its exact-head required checks/integration. Do not re-open as generic additional fixture work. These rows do **not** assert that every original phase's Production/semantic exit criterion is met. |
+| **IMPLEMENTED / VERIFIED / MERGED; DEPLOYMENT HOLD** | Member-authored shared My Page memory CRUD, owner/RLS limits, account/individual-note deletion and bounded encrypted-backup replay mechanics | The [owner decision](CHARACTER_SHARED_MEMORY_OWNER_DECISION_V1.md) is already made. Local/disposable evidence does not establish actual Production migrations, continuous independent privacy ledger or Hosted Auth/Storage/backup recovery. Keep `MYEONGHA_SHARED_MEMORY_ENABLED=0` pending operational acceptance. |
+| **APPROVED HOLD — DO NOT BUILD UNDER PRESENT POLICY** | Phase 5 automatic conversation extraction, auto-approved durable Life Fact/Memory writes and pending-proposal persistence; related Phase 6 durable/semantic summarization | Owner reaffirmed **manual shared notes only; automatic collection/writes OFF** on 2026-11-11. SRC-25 positive schemas, SRC-05 proposal retention and SRC-10 grant/regrant must be resolved by their authoritative source tracks before any authorized expansion. Approval is **not missing** for current manual scope; do not ask the owner to select a memory policy again. |
+| **CROSS-TRACK DEPENDENCY / OUTSIDE OFFLINE SCOPE** | Provider/model/fallback and price (O-C1-07); GEPA model comparison/optimization; independently published four-Character canon/asset sources (SRC-15/16); Phase 8 Provider/Cost Governor/Output Guard/receipt/ACK; production security and DR (#1843/#1887) | Track/authority owners provide approved source artifacts and live acceptance evidence. Memory integration then consumes the resulting contracts and verifies its own read/write/disclosure boundaries. No generic approval question, fictitious asset, new paid test or Production toggle is authorized. |
+| **EXTERNAL EVIDENCE HOLD, NOT AN OWNER CHOICE** | Phase 7 real-model measurement and the previously approved narrowly capped C08 paid evaluation | Owner's pilot consent is documented. Historic eleven-call billing/receipt reconciliation, exact evaluation-key/project attribution, hard spend enforcement and durable cross-run reservation remain unverified. `paidDispatchEnabled=false`; do not re-request consent or use another project's credentials/GEPA process as substitute. |
+
+**Disposition:** `OFFLINE_SCOPE_COMPLETE / ROADMAP_IN_PROGRESS`. The approved offline subset is completed by documented evidence; the **original end-to-end Context Engine / Production release roadmap remains incomplete**. Neither status is `ROADMAP_COMPLETE` for the parent roadmap. No Production readiness, deployed migration, model semantic accuracy, real cost or all-Character publication is inferred.
+
+**No-work stopping rule:** After exact-head proof, when every remaining item is (a) explicitly owner-held, (b) external source/GEPA/Character content/operations dependency, or (c) real Provider/Production evidence unavailable in this track, **do not invent further synthetic tests or re-ask already decided policy questions**. Record the exact unresolved dependency and stop this work unit. Resume only upon new authoritative source/evidence or a distinct owner scope change. Successful CI on a new docs PR changes documentation, not these authority gates.
+
+### 7.2 Original full-service completion criteria (unchanged requirements)
+
+The **full live Context Engine and Character Chat release**, not the offline implementation subset, is complete only when all of the following are evidenced:
 
 1. Model-specific input/output limits are enforced against the exact dispatched request, not estimated from character count.
 2. Context is assembled dynamically from authorized, relevant, source-traceable information.
@@ -434,7 +452,7 @@ The Context Engine is complete only when all of the following are evidenced:
 
 ### Owner-approved shared My Page memory — manual lane (2026-11-09)
 
-**Status: Draft manual-memory implementation and captured-window synthetic restore/extractor CI GREEN at exact HEAD `73c1a710` (checked 2026-11-10); Production deployment, independently complete off-DB capture, and real backup recovery remain separate HOLD gates.** The owner chose one shared My Page memory space instead of requiring users to classify memories by current vs next conversation. Active Members may manually add/edit/delete their own notes; all Characters of the same Subject may consult relevant notes without per-Character grant copies. Conversation-to-memory extraction remains OFF. This manual lane is distinct from automatic Memory Proposals, Life Facts, protected Saju and Character-private disclosure.
+**Status: Merged manual shared-memory CRUD and captured-window synthetic restore/extractor implementation (historical proof at `73c1a710`; final PR #3068 integrated GREEN); Production migration, independently complete off-DB capture, and real backup recovery remain separate HOLD gates.** The owner chose one shared My Page memory space instead of requiring users to classify memories by current vs next conversation. Active Members may manually add/edit/delete their own notes; all Characters of the same Subject may consult relevant notes without per-Character grant copies. Conversation-to-memory extraction remains OFF. This manual lane is distinct from automatic Memory Proposals, Life Facts, protected Saju and Character-private disclosure.
 
 - My Page has a member-authenticated CRUD editor, no localStorage of personal text, bounded notes, and five-locale labels.
 - A separate owner-RLS PostgreSQL table and member-only HTTP API implement the manual lane; deletion removes the owner note row. The Vercel endpoint is disabled by default until explicit deployment admission.
@@ -451,13 +469,13 @@ The Context Engine is complete only when all of the following are evidenced:
 
 ## 8. Immediate next work
 
-1. Keep PR #3068 Draft; no Production model route, paid inference, public route or additional Character activation is authorized by these read-only changes.
-2. Phase 1 authority inventory, projection and provenance-enriched read path are implemented. Preserve the existing Subject/Character grant boundaries and keep unsupported schemas closed.
-3. Phase 2 provider-neutral exact-request preflight remains implemented. Offline exit evidence is separate from Production readiness: real model profiles and four-Character Production wiring remain on hold until O-C1-07 and the existing PR-04B/04C/04D operational gates are resolved.
-4. Phase 3 read-only retrieval, source provenance, revocation, multi-session callback and synthetic exact-request delivery have passed the latest verified offline CI. Unsupported semantic/causal/relationship/contradiction ranking still requires source-owned record fields or an approved contract; never infer them from prose.
-5. Phase 4 offline composer, permission-first server bridge, pinned published-core adapter, source admission and protected layers have passed current offline test/build gates. These do not authorize a Production Provider/request route, independent unpublished Character content or missing runtime source bindings; retain their existing approval gates.
-6. Keep Character-private disclosure and Official Reading/Saju on their existing separate authority paths. Do not broaden Working Memory into either source.
-7. Phase 7's four existing offline axes now have a GREEN integrated test suite; do not create more speculative fixtures as a substitute for missing authority. Next implementation is gated by SRC-25/SRC-05/SRC-10 (durable Memory authority), SRC-15/SRC-16 (independent Character publication), O-C1-07 (Provider/model/fallback) and approved real-model/cost/Guard/receipt/ACK evidence. Report these blockers without inventing schemas, model IDs, token budgets, prices or publication assets.
+**As of 2026-11-13:** PR #3068 is merged, not Draft. See the authoritative three-way closeout table in §7.1; do not replay historical "Draft/CI pending" checklist items or start new read-only fixture work to compensate for external blockers.
+
+1. **Within the approved offline scope:** no unfinished generic implementation or synthetic evaluation work remains identified. Existing source-bound retrieval, composer, manual-note mechanics, compaction and offline evaluation are implemented/verified/merged. The absence of unsupported causal/source evidence is a *hold*, not permission to invent a new input registry.
+2. **Approved hold (no request to the owner):** retain manual shared notes, automatic Memory collection/writes OFF, unsupported source schemas closed, individual Character/private/Official Saju source fences intact. Source-owner resolutions for SRC-25/SRC-05/SRC-10 and SRC-22 can enable future separate implementation when actual evidence is supplied.
+3. **External integration dependency:** GEPA owns model comparison and optimization; Character content publication owns canonical bundles, SRC-15/16 and visual/cue provenance; the Provider/Cost Governor/Guard/ACK and Security/Operations tracks own their respective live controls. Do not attempt to close their gates here through more offline tests or repeat questions settled in `docs/CHARACTER_SHARED_MEMORY_OWNER_DECISION_V1.md`.
+4. **Production/paid gate:** manual shared-memory endpoint remains disabled; no migration or public route release until independently verifiable production/backup/privacy/security evidence exists. Owner pilot consent does not override missing invoice/key/hard-limit/global-reservation controls; paid calls remain disabled.
+5. **Resume rule:** name the concrete new artifact or evidence, the source-owning track, and the precise outstanding integration test when a dependency changes. If no new authoritative evidence exists, report `OFFLINE_SCOPE_COMPLETE / ROADMAP_IN_PROGRESS` and stop; do not manufacture extra tasks or label already completed work as unfinished.
 
 ## 9. Governing documents
 
