@@ -16,6 +16,8 @@ test('separates SQL whitespace/comments from changed executable tokens', () => {
   assert.equal(inspect('SELECT 1', 'SELECT 1;'), 'CODE_TOKEN_BYTES_DIFFER');
   assert.equal(inspect('SELECT a + + b', 'SELECT a ++ b'),
     'CODE_TOKEN_BYTES_DIFFER');
+  assert.equal(inspect('SELECT 1.2;', 'SELECT 1 . 2;'),
+    'CODE_TOKEN_BYTES_DIFFER');
 });
 
 test('keeps SQL text inside quotes and function bodies opaque', () => {
