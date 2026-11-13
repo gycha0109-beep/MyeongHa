@@ -1,3 +1,13 @@
+### 2026-11-13 KST — Phase 8-A: 보호 환경의 실제 SQL 코드 차이 분류 도구 (실증 전)
+
+- 이전 보호 복구 #43406911458의 원문 242/저장소 276/공통 200 실증과 21개 바이트 차이 위치(9개 repo 종결자 추가, 2개 source suffix, 10개 내부 상이) 및 12개 저장소 선언 조사 결과를 재사용한다.
+- 기존 원본 원장 복호화·버전/해시 대조를 통과한 **보호된 임시 runner 안에서만** 단일 statement 바이트가 다른 경우 원본·저장소 SQL의 코드 토큰을 비교하도록 실제 구현했다. 주석과 공백을 보수적으로 건너뛰고, SQL 문자열·quoted identifier·dollar-quoted body를 그대로 취급한다. 인용 형식이 불명확하면 안전하게 분류 보류. **SQL 원문, 바뀐 명령, 토큰/리터럴·작성자·시크릿은 결과에 포함되지 않는다.**
+- 제한적 결과는 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA` / `CODE_TOKEN_BYTES_DIFFER` / `LEXICAL_SCAN_INDETERMINATE` 셋 중 하나만 출력. 이 분류는 SQL parser나 역사적 실행 증거가 아니고 현재 함수/역할/권한·RLS 동등성을 보증하지 않는다. 기존 byte-exact 13개/미입증 187개와 Provider ledger/Hosted/privacy DR HOLD 판정 유지.
+- Node 24 기준 새·기존 합성 검사 총 7건 통과. **아직 12개 원본의 코드 토큰 비교를 실제 실행하지 않았다**. 병합 후 암호화 backup run #43174606843을 기존 보호 격리 워크플로로 재사용하여 실행 증거를 별도로 남긴다.
+- 상태: Production 변경·migration replay/repair·privacy canary 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Phase 8-A: 공통 SQL 21개 실제 원문 바이트 차이 위치 실증 완료
 
 - **실제 실행 성공:** [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458), checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`, source run `43174606843`, artifact ID `14026803978` (ZIP SHA-256 `b9f779ae4360cf8b13ee85e79c43b0c3c1a4b6da98ad57205b1b47bc0ef2fe0c`). 원본 `paired-provider-common-migration-body-parity.json` SHA-256 `a30da4e0554a77f6bffb87f1aeeebc0da4eb2adccef9f87128c75b1325cfa0a5` 실측. 이전 구현 PR #3281까지 병합 완료.
