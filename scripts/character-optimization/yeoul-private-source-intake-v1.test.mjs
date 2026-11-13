@@ -125,3 +125,46 @@ test('private path requirement forbids source symlinks and repository output', a
     await assert.rejects(runPrivateYeoulIntake({ input, output: badTarget }), /private_paths_required/);
   } finally { rmSync(folder, { recursive: true, force: true }); }
 });
+
+test('archived unreviewed automatic discrimination is excluded only with explicit original-source option', () => {
+  const archived = source();
+  archived.surveyState = {groups:Object.fromEntries(
+    Array.from({length:9},(_,i)=>['synthetic-group-'+i,
+      {discrimination:'UNREVIEWED_SYNTHETIC_AUTO_'+SENTINEL}]))};
+  for (const row of archived.responses.slice(0,36))
+    row.questionDiscrimination = 'UNREVIEWED_SYNTHETIC_AUTO_'+SENTINEL;
+  const before = structuredClone(archived);
+  assert.throws(()=>inspectPrivateYeoulEvaluation(archived), /private_row_contract/);
+  const report=inspectPrivateYeoulEvaluation(archived,{knownOriginalAutoFields:true});
+  assert.equal(report.legacy.originalRowsChecked,288);
+  assert.equal(report.legacy.deepseekRowsChecked,72);
+  assert.equal(report.excludedUnreviewedRowFields,36);
+  assert.equal(report.excludedUnreviewedGroupFields,9);
+  assert.equal(report.knownOriginalUnreviewedFieldsExcludedInMemory,true);
+  assert.equal(report.originalUserRatingsOrNotesModified,false);
+  assert.equal(report.externalCalls,0);
+  assert.equal(report.readyForPaidExperiment,false);
+  assert.equal(JSON.stringify(report).includes(SENTINEL),false);
+  assert.deepEqual(archived,before);
+});
+
+test('archived auto-field admission is fail-closed on changed counts, fields, or fake claims', () => {
+  const archived = source();
+  archived.surveyState = {groups:Object.fromEntries(
+    Array.from({length:9},(_,i)=>['synthetic-group-'+i,{discrimination:'unreviewed-auto'}]))};
+  for(const row of archived.responses.slice(0,36))row.questionDiscrimination='unreviewed-auto';
+  for (const mutate of [
+    x=>{x.responses[0].questionDiscrimination=null;},
+    x=>{x.surveyState.groups['synthetic-group-0'].discrimination='';},
+    x=>{x.responses[0].questionDiscrimination={claimedOwnerApproved:true};},
+    x=>{x.experimentRunId=42;},
+  ]) {
+    const attempt=structuredClone(archived); mutate(attempt);
+    assert.throws(()=>inspectPrivateYeoulEvaluation(attempt,{knownOriginalAutoFields:true}),
+      /YEOUL_PRIVATE_INTAKE_INVALID/);
+  }
+  const absent=source();absent.surveyState=archived.surveyState;
+  assert.throws(()=>validatePrivateYeoul288(absent), /unreviewed_group_discrimination/);
+  assert.throws(()=>inspectPrivateYeoulEvaluation(archived,
+    {knownOriginalAutoFields:'true'}), /explicit_source_mode_required/);
+});
