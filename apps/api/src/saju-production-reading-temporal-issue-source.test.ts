@@ -71,7 +71,11 @@ function fixture() {
           { id: 'after_jeol', startsAt: referenceDateTime, endsAt: '2026-11-30T15:00:00.000Z',
             pillar: { stem: '기', branch: '해' }, stemTenGod: '편인', natalBranchRelations: {} },
         ],
-        dayunOverlap: { status: 'unavailable' },
+        dayunOverlap: { status: 'unavailable' } as
+          { status: 'unavailable'; reasonCode?: string } |
+          { status: 'resolved'; contextId: string; segments: Array<{
+            index: number; startsAt: string; endsAt: string; pillar: { stem: string; branch: string };
+          }> },
       },
       unitWindows: units.map((unit, index) => ({
         unitId: unit.unitId, segmentIds: [index === 0 ? 'before_jeol' : 'after_jeol'],
@@ -154,5 +158,49 @@ describe('signed canonical temporal issue', () => {
     swapped.temporal.unitWindows[0]!.unitId = input.readerSource.temporal.unitWindows[0]!.unitId;
     swapped.temporal.unitWindows[1]!.unitId = input.readerSource.temporal.unitWindows[1]!.unitId;
     expect(await input.exchange(swapped)).toBeNull();
+  });
+
+  it('projects each signed daeyun interval only into its corresponding Reader windows', async () => {
+    const input = fixture();
+    const source = structuredClone(input.readerSource);
+    const segments = source.temporal.calendar.segments.map(({ startsAt, endsAt, pillar }, index) => ({
+      index, startsAt, endsAt, pillar,
+    }));
+    const marked = {
+      ...source,
+      temporal: { ...source.temporal, calendar: {
+        ...source.temporal.calendar, dayunDisclosureVersion: 'calculated_overlap_v1',
+        dayunOverlap: { status: 'resolved' as const, contextId: 'dayun_temporal_' + 'a'.repeat(24), segments },
+      } },
+    };
+    const issued = await input.exchange(marked);
+    expect(issued?.issueProof?.readerSource).toEqual(marked);
+    const project = (issue: NonNullable<typeof issued>) => {
+      const result = verifyArchivedSajuProductionIssueProofV1({
+        ...input.archive, receipt: { ...input.receipt, proof: issue.issueProof },
+      });
+      return projectSajuCanonicalReaderGroundingV1(result!.readerSource!, {
+        readingId: input.archive.readingId, storedResponseHash: input.archive.storedResponseHash, sajuDomain: 'general',
+      });
+    };
+    const grounded = project(issued!);
+    expect(grounded.disclosures).toHaveLength(4);
+    for (const index of [0, 1]) {
+      expect(grounded.disclosures[index + 2]?.text).toContain('이 기간에 겹치는 대운은');
+      expect(grounded.units[index]?.requiredDisclosureRefs).toEqual([
+        grounded.disclosures[index]?.disclosureRef, grounded.disclosures[index + 2]?.disclosureRef,
+      ]);
+    }
+    const unavailable = { ...marked, temporal: { ...marked.temporal, calendar: {
+      ...marked.temporal.calendar, dayunOverlap: {
+        status: 'unavailable' as const, reasonCode: 'birth_clock_time_unavailable',
+      },
+    } } };
+    const withGap = project((await input.exchange(unavailable))!);
+    expect(withGap.disclosures[2]?.text).toContain('대운을 계산할 근거가 부족');
+    expect(withGap.units.every(unit => unit.requiredDisclosureRefs.includes(withGap.disclosures[2]!.disclosureRef)))
+      .toBe(true);
+    segments[0]!.startsAt = '2026-10-30T15:00:00.000Z';
+    expect(await input.exchange(marked)).toBeNull();
   });
 });
