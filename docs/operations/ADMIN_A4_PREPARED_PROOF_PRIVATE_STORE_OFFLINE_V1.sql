@@ -78,10 +78,10 @@ GRANT USAGE ON SCHEMA myeongha_a4_source_ops
   TO myeongha_a4_prepared_proof_writer_v1, myeongha_a4_prepared_proof_reader_v1;
 REVOKE ALL ON myeongha_a4_source_ops.prepared_attempt_proofs_v1 FROM PUBLIC;
 GRANT INSERT (execution_attempt_id, proof),
-  SELECT (execution_attempt_id, proof)
+  SELECT (execution_attempt_id, proof, stored_at)
   ON myeongha_a4_source_ops.prepared_attempt_proofs_v1
   TO myeongha_a4_prepared_proof_writer_v1;
-GRANT SELECT (execution_attempt_id, proof)
+GRANT SELECT (execution_attempt_id, proof, stored_at)
   ON myeongha_a4_source_ops.prepared_attempt_proofs_v1
   TO myeongha_a4_prepared_proof_reader_v1;
 
