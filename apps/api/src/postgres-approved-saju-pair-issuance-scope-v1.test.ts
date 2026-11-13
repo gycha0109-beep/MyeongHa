@@ -45,7 +45,7 @@ function db(scope: unknown): PostgresTransactionQueryV1 {
     async query<Row>(sql: string, values?: readonly unknown[]) {
       expect(sql).toContain('qry_approved_saju_pair_issue_scope_v1');
       expect(values).toEqual([SUBJECT, PURCHASE]);
-      return { rows: [{ scope }] as Row[] };
+      return { rows: [{ scope }] as unknown as Row[] };
     },
   };
 }
