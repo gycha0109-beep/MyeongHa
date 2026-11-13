@@ -110,6 +110,17 @@ for (const fragment of [
   '"$run_event" == \'workflow_dispatch\'',
 ]) requireFragment(sourceResolver, fragment, sourceResolverPath);
 
+const roleProofPath = 'scripts/operations/assess-isolated-provider-role-replay-proof.mjs';
+const roleProof = await readFile(roleProofPath, 'utf8');
+for (const fragment of [
+  'providerMigrationLedgerRestored: false',
+  'fullProviderCompatibleRestoreProven: false',
+  'hostedAuthStorageEquivalent: false',
+  'sourcePairsExcludedFromPortableRolesDump',
+  'observedDirectMembershipOptionParity, true',
+  'observedGrantorAttributionParity, true',
+]) requireFragment(roleProof, fragment, roleProofPath);
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 
@@ -142,6 +153,12 @@ for (const fragment of [
   'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
   'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
+  'Attribute isolated Provider role replay to sealed source and observed target',
+  'inputs.verify_provider_migration_source',
+  'node scripts/operations/assess-isolated-provider-role-replay-proof.mjs',
+  'isolated-provider-role-replay-provenance.json',
+  '.directRoleMembershipTargetRehearsalProven == true',
+  '.fullProviderCompatibleRestoreProven == false',
   'Record fail-closed recovered service admission',
   'node scripts/build-postgres-recovered-serving-admission.mjs',
   'recovered-serving-admission.json',
