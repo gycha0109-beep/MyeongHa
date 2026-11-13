@@ -1,3 +1,13 @@
+### 2026-11-13 KST — Phase 8-A: 공통 마이그레이션 본문 원장 실제 전수 비교
+
+- **완료 근거:** protected main 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS / source backup `43174606843` / exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`. 결과 artifact `14012916977` (ZIP SHA-256 `1aa91ac0b1273263b1452f4c6a26da724c8dea99003260fe4381d2ea9860f078`); 본문 원본 결과 JSON SHA-256 `42be852ab426edc70e89cc0b018e88594bfa341b29f323ebb4816a7a1c05b005`.
+- **실측 분류:** source 242 / repo 276 / common 200 / remote-only 42 / repo-only 76. byte-exact single **13**, single source/repo bytes differ **21**, multi framing unproven **148**, multi reconstructed match yet source original unproven **6**, source SQL absent **12**. **187개 미입증이 곧 SQL 의미 불일치 187개를 뜻하지는 않는다.**
+- **증거:** [187개 비일치·보류 버전과 해시를 포함한 비식별 증거](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json). 과거 구현 당시 '실측 대기' 단락은 역사적 상태다. 원본 SQL·실행자·시크릿 미출력.
+- **남은 일:** 21개 single bytes differ, 154개 multi-framing의 실제 근거별 처분, 12개 NULL 원문의 위험 보류; 전체 Provider schema/role/ownership/RLS·Hosted Auth/Storage·privacy·RPO/RTO 실증. 원격 전용 기존 41개와 A4 ACL 관측은 재사용하며 재조사 반복 없음. Production SQL/migration/replay/privacy canary/Hosted 생성 없음.
+- 상태 `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / #1887 OPEN / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Gate 1 / Phase 8-A: 공통 버전 원장 SQL 본문 raw-byte 대조 구현 (실측 대기)
 
 - **선행 완료:** PR [#3267](https://github.com/gycha0109-beep/MyeongHa/pull/3267) 필수 통합 CI [#43354735084](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43354735084) SUCCESS·merge `a9b920e697746542b441f7ba143d431bfa6e978c`. 원격 버전 242/저장소 파일 276/공통 200/원격-only 42/저장소-only 76 및 신규 A4 현재 권한 효과 처분 기존 근거 재사용.
