@@ -34,7 +34,13 @@ export async function inspectApprovedSajuPairSourceV1<T>(input: Readonly<
     purchaseIntentId: string;
     inspectSource: (request: NonNullable<Awaited<ReturnType<typeof readApprovedSajuPairIssueScopeV1>>>['request']) => Promise<T>;
   }
->): Promise<Readonly<{ state: 'held'; canSell: false; sourceRequestHash: string; evidence: T }> | null> {
+>): Promise<Readonly<{
+  state: 'held';
+  canSell: false;
+  sourceRequestHash: string;
+  paidComparison: NonNullable<Awaited<ReturnType<typeof readApprovedSajuPairIssueScopeV1>>>['paidComparison'];
+  evidence: T;
+}> | null> {
   if (input.verifiedEvidence.kind !== 'member') return null;
   const readScope = () => executePostgresApprovedSajuIssuerTransactionV1({
     pool: input.pool,
