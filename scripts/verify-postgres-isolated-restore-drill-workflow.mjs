@@ -170,6 +170,50 @@ for (const fragment of [
   "migrationHistoryRepaired == false",
 ]) requireFragment(sealedRunner, fragment, providerSourceRunnerPath);
 
+// The old same-run sealed backup predates governed shared-memory migration
+// 2380. A Phase 8-A diagnostic may omit the later privacy mechanics test, but
+// only for the exact source, never as a full-service/DR success.
+for (const fragment of [
+  'migration_source_only_diagnostic:',
+  'SCOPED_SOURCE_DIAGNOSTIC: ${{ inputs.migration_source_only_diagnostic }}',
+  'SCOPED_SOURCE_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
+  'SCOPED_INCIDENT_REFERENCE: ${{ inputs.incident_reference_utc }}',
+  'SCOPED_PROVIDER_VERIFY: ${{ inputs.verify_provider_migration_source }}',
+  'SCOPED_PRIVACY_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}',
+  'SCOPED_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}',
+  'SCOPED_SEYEON_S0: ${{ inputs.seyeon_security_s0_rehearsal }}',
+  'if [[ "$SCOPED_SOURCE_DIAGNOSTIC" == \'true\' ]]; then',
+  '[[ "$SCOPED_SOURCE_BACKUP_RUN_ID" == \'43174606843\' ]]',
+  '[[ "$SCOPED_INCIDENT_REFERENCE" == \'2026-11-12T07:25:00Z\' ]]',
+  '[[ -z "$SCOPED_PRIVACY_LEDGER_RUN_ID" &&',
+  '-z "$SCOPED_PRIVACY_CANARY_RUN_ID" ]]',
+  '[[ "$SCOPED_PROVIDER_VERIFY" == \'true\' ]]',
+  '[[ "$SCOPED_SEYEON_S0" == \'false\' ]]',
+  'SOURCE_DIAGNOSTIC_OBSERVED_PRIVACY_NOT_EXERCISED_DR_HOLD',
+  'migration-source-only-diagnostic-boundary.json',
+  'syntheticPrivacyReconciliationExercised: false',
+  'authoritativePrivacyReconciliationExercised: false',
+  'serviceResumptionAllowed: false',
+  'drReady: false',
+]) requireFragment(workflow, fragment, workflowPath);
+const privacyExercise = section(workflow,
+  '      - name: Exercise synthetic privacy reconciliation and finalization on restored database',
+  '      - name: Replay authoritative Production privacy ledger on restored database');
+requireFragment(privacyExercise,
+  "if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic) }}",
+  workflowPath);
+const diagnosticProof = section(workflow,
+  '      - name: Record scoped sealed migration source diagnostic boundary',
+  '      - name: Build self-contained restore evidence envelope');
+requireFragment(diagnosticProof,
+  "if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic }}",
+  workflowPath);
+requireFragment(diagnosticProof, 'and .exactRepositoryCommitSha == env.GITHUB_SHA', workflowPath);
+requireFragment(diagnosticProof, 'and .notByteExactOrUnprovenCount == 187', workflowPath);
+requireFragment(diagnosticProof, 'and .drReady == false', workflowPath);
+requireFragment(diagnosticProof, 'syntheticPrivacyReconciliationExercised: false', workflowPath);
+// No change to normal full-drill synthetic privacy requirement or final DR HOLD.
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 

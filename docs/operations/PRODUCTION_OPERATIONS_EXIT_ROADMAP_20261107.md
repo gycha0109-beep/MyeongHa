@@ -1,3 +1,10 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 옛 백업에서 최신 개인정보 마이그레이션 차단 확인 및 출처 전용 검증 분리 (실증 대기)
+
+- [격리 복구 #43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784)는 **FAILURE**다. 봉인 원장 복호화·버전 SQL 내용 비교는 로그상 완료했으나 결과 아티팩트가 없으므로 **새 12개 코드 토큰 분류는 실증 완료가 아니다**. 이후 개인정보 합성 재생 단계에서 `FAIL restored DB is missing governed shared-memory deletion replay migration`으로 중단됐다. 옛 백업 `43174606843`에는 뒤에 추가된 shared-memory 삭제 재생 테이블·함수(저장소 migration `2380`)가 없다. 이는 **정상적인 fail-closed 차단**이며 운영 복구 성공으로 승격하지 않는다.
+- 최신 정상 전체 DR 절차의 개인정보 preflight나 필수 검증을 제거하지 않고, **Phase 8-A 전용 `migration_source_only_diagnostic`** 수동 모드를 추가했다. 오직 보호된 `main`, 원본 run `43174606843`, incident `2026-11-12T07:25:00Z`, `verify_provider_migration_source=true`, 개인정보 원장/canary 입력 없음, S0=false에서만 허용한다. PostgreSQL 격리 복원·암호화 출처 복호화·원본 SHA·버전 SQL 비교·스키마/역할 관측은 계속 실행하되 **새 schema 부재로 수행 불가능한 합성 개인정보 재생은 이 진단 모드에서만 미실행**한다.
+- 출처 전용 실행은 별도 **비식별 제한 증거 `migration-source-only-diagnostic-boundary.json`**을 반드시 남겨 원장/checkout/backup 출처와 `syntheticPrivacyReconciliationExercised=false`, `authoritativePrivacyReconciliationExercised=false`, `serviceResumptionAllowed=false`, `drReady=false`를 함께 입증하도록 했다. 전체 복구 실행은 기존 synthetic privacy 검사를 그대로 통과해야 한다.
+- **다음:** PR 병합 이후 *동일 원본 백업*으로 제한된 진단을 1회 실행해 이전 미처분 12개 단일 SQL의 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA` / `CODE_TOKEN_BYTES_DIFFER` / `LEXICAL_SCAN_INDETERMINATE` 실제 분류와 결과 SHA·아티팩트 ID를 보존한다. 이 결과도 SQL 의미·권한·RLS 동등성이나 DR Ready 입증은 아니다. 기존 다중 SQL 154개·원문 NULL 12개 및 Provider/Hosted/독립 개인정보/RPO/RTO 미입증 유지. P0 #1887 OPEN / `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 12개 SQL 실제 코드 차이 검증 경로 구현 (보호 실증 대기)
 
 - 이전 보호된 복구 [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458)의 정확한 결과와 [21개 바이트 차이 실측](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json) 및 [12개 저장소 SQL 대상 객체 조사](POSTGRES_COMMON_VERSION_MIGRATION_12_REPO_OBJECT_EFFECT_SCOPE_20261113.json)를 재활용한다. 바이트가 다른 단일 SQL 21개 중 9개는 저장소 끝 `;`+LF 추가, 2개는 원본 끝 76바이트 추가, 10개는 내부 상이 구간이다. 실제 SQL 의미/권한 영향은 여전히 미입증.

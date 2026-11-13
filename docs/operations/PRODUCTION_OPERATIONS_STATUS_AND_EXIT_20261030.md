@@ -1,3 +1,12 @@
+### 2026-11-13 KST — Phase 8-A: 개인정보 신형 마이그레이션이 없는 원본 백업 차단·SQL 출처만 제한 실증하는 경로 추가
+
+- [기존 격리 복구 실행 #43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784) **FAILURE**. `main` `e1ed546bef1b368f74b27515379bfb98ba1f9a88`, 원본 run `43174606843`. 로그상 원장 복호화/버전·바이트/코드 토큰 분류 단계는 통과했으나 **결과 JSON 업로드 전** 합성 개인정보 재생 preflight에서 `governed shared-memory deletion replay migration` 부재로 차단됐다. 저장소의 뒤늦은 개인정보 migration `2380`이 없는 **옛 백업에서 예상되는 필수 차단**이다. 따라서 12개 실제 코드 차이 수량을 추측·확정하지 않는다.
+- 복구 작업의 본래 개인정보 fail-closed 검사는 그대로 보존하면서 **`migration_source_only_diagnostic=true`**인 경우만 위 신형 개인정보 합성 검사를 미실행하도록 구현했다. 이 경로는 `backup_run_id=43174606843`, `incident_reference_utc=2026-11-12T07:25:00Z`, `main`, paired source verification 필수, privacy ledger/canary 없음, S0=false로 **정확히 제한**한다. 재사용 원본은 기존 암호화 백업/원장 한 쌍만이다.
+- 격리 DB 복원·원장 복호화·원본 무결성·같은 버전 SQL 분류·스키마 비교·48개 역할 연결 provenance·복구 evidence envelope·서비스 재개 차단은 그대로 수행. 별도 진단용 비식별 JSON에 개인정보 재생 **미실행** 및 `drReady=false`를 명시한다. 정상 전체 DR workflow는 기존 개인정보 검사를 계속 실행·요구한다.
+- **현재 상태:** 구현 제출/합성 검사 전 또는 완료 시점과 실제 실행을 구분한다. 새로운 실제 SQL 코드 토큰 분류 결과가 나오기 전에는 12개 결과 미확정. Production SQL/DDL·migration repair·Hosted 자원·개인정보 canary 변경 없음. #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Phase 8-A: 보호 환경의 실제 SQL 코드 차이 분류 도구 (실증 전)
 
 - 이전 보호 복구 #43406911458의 원문 242/저장소 276/공통 200 실증과 21개 바이트 차이 위치(9개 repo 종결자 추가, 2개 source suffix, 10개 내부 상이) 및 12개 저장소 선언 조사 결과를 재사용한다.
