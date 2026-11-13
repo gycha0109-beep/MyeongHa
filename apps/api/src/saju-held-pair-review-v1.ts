@@ -74,6 +74,58 @@ function validHeldInternalPairInterpretation(evidence: Readonly<Record<string, u
     dayStem.filter(rule => usedRules.has(rule)).length === 1;
 }
 
+/** The future Official issuer must consume material with two separately
+ * bound charts. Neither a signed Preview response nor this material issues a grant. */
+function validT10PairSourceReadingMaterial(evidence: Readonly<Record<string, unknown>>): boolean {
+  const material = evidence.sourceReadingMaterial;
+  const meaning = evidence.internalServiceInterpretation;
+  if (!record(material) || !record(meaning) ||
+      material.version !== 'saju-t10-pair-reading-material-v1' ||
+      material.policyId !== 'myeongha-t10-internal-relational-explanation-v1' ||
+      material.policyVersion !== '2026-11-13' ||
+      material.readingDomain !== 'compatibility' ||
+      material.interpretationOwner !== 'myeongha_internal_service' ||
+      material.sourceScope !== 'two_canonical_natal_charts' ||
+      material.status !== 'source_owned_candidate_unissued' ||
+      material.officialIssueAuthorized !== false || material.mayPublish !== false ||
+      material.maySell !== false || !Array.isArray(material.charts) ||
+      material.charts.length !== 2 || !Array.isArray(material.units) ||
+      !Array.isArray(meaning.charts) || !Array.isArray(meaning.sentences) ||
+      material.units.length !== meaning.sentences.length ||
+      typeof material.materialHash !== 'string' || !HASH.test(material.materialHash)) return false;
+
+  for (let i = 0; i < 2; i++) {
+    const chart = material.charts[i];
+    const expected = meaning.charts[i];
+    if (!record(chart) || !record(expected) ||
+        chart.role !== expected.role || chart.calculationHash !== expected.calculationHash ||
+        typeof chart.snapshotId !== 'string' || chart.snapshotId.length === 0 ||
+        typeof chart.calculationHash !== 'string' || !HASH.test(chart.calculationHash)) return false;
+  }
+  if ((material.charts[0] as Record<string, unknown>).role ===
+      (material.charts[1] as Record<string, unknown>).role) return false;
+
+  for (let i = 0; i < material.units.length; i++) {
+    const unit = material.units[i];
+    const sentence = meaning.sentences[i];
+    if (!record(unit) || !record(sentence) ||
+        unit.ruleId !== sentence.ruleId || unit.paragraph !== sentence.paragraph ||
+        typeof unit.unitId !== 'string' || !/^t10_unit_[a-f0-9]{24}$/u.test(unit.unitId) ||
+        !Array.isArray(unit.observedFactPaths) || !Array.isArray(sentence.observedFactPaths) ||
+        !Array.isArray(unit.calculationSourceIds) || !Array.isArray(unit.sourceDefinitionHashes) ||
+        JSON.stringify(unit.observedFactPaths) !== JSON.stringify(sentence.observedFactPaths) ||
+        unit.observedFactPaths.some(path => typeof path !== 'string') ||
+        unit.calculationSourceIds.some(id => typeof id !== 'string' || id.length === 0) ||
+        unit.sourceDefinitionHashes.some(id => typeof id !== 'string' || !HASH.test(id)) ||
+        (unit.observedFactPaths.length > 0 &&
+          (unit.calculationSourceIds.length === 0 || unit.sourceDefinitionHashes.length === 0))) return false;
+    const { unitId, ...source } = unit;
+    if (unitId !== 't10_unit_' + hashJson(source).slice(0, 24)) return false;
+  }
+  const { materialHash, status, officialIssueAuthorized, mayPublish, maySell, ...unsigned } = material;
+  return materialHash === hashJson(unsigned);
+}
+
 function discard(response: Response): null {
   void response.body?.cancel().catch(() => undefined);
   return null;
@@ -139,7 +191,8 @@ export function createSajuHeldPairReviewPortV1(input: Readonly<{
         result.evidence.readingReview.state !== 'held' ||
         result.evidence.readingReview.actualCompatibilityReadingReady !== false ||
         result.evidence.readingReview.mayGrantOfficialAuthority !== false ||
-        !validHeldInternalPairInterpretation(result.evidence)) return null;
+        !validHeldInternalPairInterpretation(result.evidence) ||
+        !validT10PairSourceReadingMaterial(result.evidence)) return null;
       return result;
     },
   });
