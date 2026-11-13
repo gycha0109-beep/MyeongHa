@@ -52,7 +52,9 @@ export type CharacterContentCandidateAssemblyErrorCode =
   | 'SOURCE_ROSTER_MISMATCH'
   | 'SOURCE_DISPLAY_NAME_MISMATCH'
   | 'CANON_COMPLETION_ROSTER_MISMATCH'
-  | 'PUBLICATION_MATERIAL_ROSTER_MISMATCH';
+  | 'PUBLICATION_MATERIAL_ROSTER_MISMATCH'
+  | 'CANON_COMPLETION_CHARACTER_MISMATCH'
+  | 'PUBLICATION_MATERIAL_CHARACTER_MISMATCH';
 
 export class CharacterContentCandidateAssemblyError extends Error {
   constructor(
@@ -157,6 +159,100 @@ function assertSourceAlignment(): void {
       );
     }
   }
+}
+
+
+export interface CharacterPublicationLaneCandidateInputV1 {
+  readonly characterId: CharacterContentCandidateV1CharacterId;
+  readonly metadata: CharacterContentBundleCandidateMetadataV1;
+  /** Explicit source-backed completion for this Character only. */
+  readonly canonCompletion: CharacterCanonCompletionV1;
+  /** Explicit approved renderer material for this Character only. */
+  readonly publicationMaterial: CharacterPublicationMaterialInputV1;
+}
+
+/**
+ * Assemble exactly one independent Character publication-lane candidate.
+ *
+ * This is a non-publishing authoring operation. It joins the existing immutable
+ * and runtime sources with the caller's explicit canon/material handoff; it
+ * never fills missing canon, invents renderer IDs/assets, or mutates releases.
+ * Production publication remains a separate validator and authority step.
+ */
+export function assembleCharacterPublicationLaneCandidateV1(
+  input: CharacterPublicationLaneCandidateInputV1,
+): CharacterContentBundle {
+  assertSourceAlignment();
+  if (input.canonCompletion.characterId !== input.characterId) {
+    throw new CharacterContentCandidateAssemblyError(
+      'CANON_COMPLETION_CHARACTER_MISMATCH',
+      'Lane canon completion must belong to the selected Character.',
+    );
+  }
+  if (input.publicationMaterial.characterId !== input.characterId) {
+    throw new CharacterContentCandidateAssemblyError(
+      'PUBLICATION_MATERIAL_CHARACTER_MISMATCH',
+      'Lane publication material must belong to the selected Character.',
+    );
+  }
+
+  const immutable = CHARACTER_IMMUTABLE_AUTHORING_V1.find(
+    (entry) => entry.characterId === input.characterId,
+  );
+  const runtime = CHARACTER_RUNTIME_AUTHORING_V1.find(
+    (entry) => entry.characterId === input.characterId,
+  );
+  if (immutable === undefined || runtime === undefined) {
+    throw new CharacterContentCandidateAssemblyError(
+      'SOURCE_ROSTER_MISMATCH',
+      'Independent lane source authoring is unavailable for the selected Character.',
+    );
+  }
+
+  const character = {
+    characterId: input.characterId,
+    contentVersion: input.metadata.contentVersion,
+    displayName: immutable.displayName,
+    gender: immutable.gender,
+    deityProxyLabel: immutable.deityProxyLabel,
+    shortDescriptor: immutable.shortDescriptor,
+    personalityTraits: immutable.personalityTraits,
+    flaws: immutable.flaws,
+    values: immutable.values,
+    speech: runtime.speech,
+    capabilities: runtime.capabilities,
+    assetRefs: input.publicationMaterial.assetRefs,
+    emotionIds: input.publicationMaterial.emotionIds,
+    animationCueIds: input.publicationMaterial.animationCueIds,
+    canon: {
+      worldRole: immutable.worldRole,
+      origin: immutable.origin,
+      apparentAgeBand: immutable.apparentAgeBand,
+      deityBond: {
+        deityId: immutable.deityId,
+        representationRole: immutable.deityBond.representationRole,
+        oath: immutable.deityBond.oath,
+        acceptedDoctrine: immutable.deityBond.acceptedDoctrine,
+        resistedDoctrine: immutable.deityBond.resistedDoctrine,
+      },
+      worldview: input.canonCompletion.worldview,
+      psychology: input.canonCompletion.psychology,
+    },
+    visual: immutable.visual,
+    persona: runtime.persona,
+    behavior: runtime.behavior,
+    sajuProfile: runtime.sajuProfile,
+    relationshipBehavior: runtime.relationshipBehavior,
+  } satisfies CharacterContentDefinition;
+
+  return validateCharacterContentBundle({
+    bundleId: input.metadata.bundleId,
+    contentVersion: input.metadata.contentVersion,
+    assetManifestHash: input.metadata.assetManifestHash,
+    cueSchemaVersion: input.metadata.cueSchemaVersion,
+    minClientCapability: input.metadata.minClientCapability,
+    characters: [character],
+  } satisfies CharacterContentBundle);
 }
 
 /**

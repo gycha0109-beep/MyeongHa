@@ -5,6 +5,15 @@ export interface ReaderGrantedLifeFactAuthorityRowV1 {
   readonly value: unknown;
   readonly grantId: string;
   readonly granteeCharacterId: string;
+  readonly grantReason: 'user_choice' | 'merge_import';
+  readonly grantedAt: string;
+  readonly sourceKind: 'user_explicit' | 'profile_edit' | 'merge_import';
+  readonly sourceMessageId: string | null;
+  readonly sourceMergeActionId: string | null;
+  readonly validFrom: string | null;
+  readonly validTo: string | null;
+  readonly confirmedAt: string;
+  readonly createdAt: string;
 }
 
 export interface ReaderRelationshipEventAuthorityRowV1 {

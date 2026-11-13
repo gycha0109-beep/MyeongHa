@@ -13,6 +13,8 @@ import {SEYEON_C08T_FIRST_PAID_PILOT_POLICY_V1 as P}
 
 const BASE='https://api.openai.com/v1';
 const PROJECT=/^proj_[A-Za-z0-9_-]{6,128}$/u;
+const PROJECT_KEY=/^key_[A-Za-z0-9_-]{3,128}$/u;
+const EVAL_PROJECT_NAME='MyeongHa-Evaluation';
 const MAX_BODY_BYTES=256*1024;
 const MAX_PAGES=8;
 const safeInt=x=>Number.isSafeInteger(x)&&x>=0;
@@ -21,6 +23,7 @@ const hold=(reason)=>Object.freeze({
  status:'HOLD',reason,projectActiveVerified:false,projectHardLimitVerified:false,
  monthSpendReadbackComplete:false,monthSpendMicroUsd:null,
  remainingUnderProjectLimitMicroUsd:null,
+ projectKeyMetadataVerified:false,
  projectCredentialBindingVerified:false,invoiceReconciled:false,
  crossRunPaidReservationVerified:false,paidDispatchEnabled:false,
 });
@@ -54,12 +57,15 @@ async function getJson(fetchImpl,url,key){
 }
 
 export async function inspectSeyeonC08AdminSpendReadinessV1({
- adminKey,projectId,fetchImpl=fetch,now=new Date(),
+ adminKey,projectId,evaluationKeyId=null,fetchImpl=fetch,now=new Date(),
 }={}){
  if(!PROJECT.test(String(projectId??''))||
     typeof adminKey!=='string'||adminKey.length<24||
     !adminKey.startsWith('sk-')||adminKey!==adminKey.trim())
   return hold('ADMIN_CREDENTIAL_OR_PROJECT_MISSING');
+ if(evaluationKeyId!==null&&evaluationKeyId!==''&&
+    (typeof evaluationKeyId!=='string'||!PROJECT_KEY.test(evaluationKeyId)))
+  return hold('EVALUATION_KEY_ID_INVALID');
  if(!(now instanceof Date)||!Number.isFinite(now.getTime()))
   return hold('CLOCK_UNAVAILABLE');
  if(typeof fetchImpl!=='function')return hold('TRANSPORT_UNAVAILABLE');
@@ -72,8 +78,41 @@ export async function inspectSeyeonC08AdminSpendReadinessV1({
    encodeURIComponent(projectId),adminKey);
  }catch{return hold('PROJECT_READBACK_FAILED');}
  if(project.object!=='organization.project'||project.id!==projectId||
+    project.name!==EVAL_PROJECT_NAME||
     project.status!=='active'||project.archived_at!=null)
   return hold('PROJECT_NOT_ACTIVE_OR_MISMATCHED');
+ // Optional Admin metadata probe: an active key ID belongs to the project,
+ // but there is NO cryptographic link to the evaluation secret on this host.
+ // Keep projectCredentialBindingVerified=false even after a successful GET.
+ let projectKeyMetadataVerified=false;
+ if(evaluationKeyId){
+  let keyMetadata;
+  try{
+   keyMetadata=await getJson(fetchImpl,BASE+'/organization/projects/'+
+    encodeURIComponent(projectId)+'/api_keys/'+
+    encodeURIComponent(evaluationKeyId),adminKey);
+  }catch{return hold('PROJECT_KEY_READBACK_FAILED');}
+  // A project-owned key may be expired even when its owner's access is active.
+  // Mirror the existing C08-AB Admin evidence admission's key-expiry rule.
+  const nowSeconds=Math.floor(now.getTime()/1000);
+  const ownerKind=keyMetadata.owner?.type;
+  const ownerId=ownerKind==='user'?keyMetadata.owner?.user?.id:
+   ownerKind==='service_account'?keyMetadata.owner?.service_account?.id:null;
+  if(keyMetadata.object!=='organization.project.api_key'||
+     keyMetadata.id!==evaluationKeyId||
+     keyMetadata.owner_project_access!=='active'||
+     !Number.isSafeInteger(keyMetadata.created_at)||
+     keyMetadata.created_at<1||keyMetadata.created_at>nowSeconds||
+     (keyMetadata.expires_at!==undefined&&keyMetadata.expires_at!==null&&
+      (!Number.isSafeInteger(keyMetadata.expires_at)||
+       keyMetadata.expires_at<=nowSeconds||
+       keyMetadata.expires_at<=keyMetadata.created_at))||
+     !['user','service_account'].includes(ownerKind)||
+     typeof ownerId!=='string'||ownerId.length===0||
+     ownerId.length>160||!ownerId.startsWith(ownerKind==='user'?'user_':'svc_acct_'))
+   return hold('PROJECT_KEY_INACTIVE_OR_MISMATCHED');
+  projectKeyMetadataVerified=true;
+ }
  let cap;
  try{
   cap=await getJson(fetchImpl,BASE+'/organization/projects/'+
@@ -146,6 +185,7 @@ export async function inspectSeyeonC08AdminSpendReadinessV1({
   monthSpendReadbackComplete:true,
   monthSpendMicroUsd:spent,
   remainingUnderProjectLimitMicroUsd:Math.max(0,remaining),
+  projectKeyMetadataVerified,
   projectCredentialBindingVerified:false,invoiceReconciled:false,
   crossRunPaidReservationVerified:false,paidDispatchEnabled:false,
  });
@@ -155,6 +195,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  const result=await inspectSeyeonC08AdminSpendReadinessV1({
   adminKey:process.env.OPENAI_ADMIN_KEY,
   projectId:process.env.OPENAI_EVAL_PROJECT_ID,
+  evaluationKeyId:process.env.OPENAI_EVAL_API_KEY_ID??null,
  }).catch(()=>hold('UNEXPECTED_READBACK_FAILURE'));
  console.info('C08_ADMIN_READONLY_SPEND '+JSON.stringify(result));
  if(result.status!=='ADMIN_READBACK_ONLY')process.exitCode=1;

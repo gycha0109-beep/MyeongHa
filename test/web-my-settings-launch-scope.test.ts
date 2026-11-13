@@ -10,7 +10,7 @@ describe('My settings and approved dashboard layout', () => {
     for (const item of [
       '마이페이지',
       '계정 정보',
-      '캐릭터 메모리',
+      '공통 메모리',
       '구매 내역',
       '내 이용권',
       '설정 및 지원',
@@ -64,7 +64,15 @@ describe('My settings and approved dashboard layout', () => {
       loadWeb('src/my/MyPage.tsx'),
       loadWeb('my.css'),
     ]);
-    expect(page).toContain('캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다.');
+    expect(page).toContain('캐릭터 대화에서 공통 메모리를 실제로 불러오는 기능은 운영 검증 후 연결됩니다.');
+    // The memory editor must remount when the signed-in Member or eligibility changes.
+    expect(page).toContain('<SharedMemoryPanel');
+    expect(page).toContain("key={payload?.subjectKind === 'member' && payload.subjectStatus === 'active'");
+    expect(page).toContain("? 'member:' + (session?.user?.id ?? 'unverified')");
+    expect(page).toContain(": 'ineligible'}");
+    expect(page).toContain("canManage={payload?.subjectKind === 'member' && payload.subjectStatus === 'active'}");
+    expect(page).toContain('t={uiLabel}');
+    expect(page).toContain("import { SharedMemoryPanel } from './SharedMemoryPanel.js';");
     expect(page).toContain('구매 내역 조회가 연결되지 않았습니다.');
     expect(page).toContain('이용권 조회가 연결되지 않았습니다.');
     expect(page).toContain('href="contact.html"');

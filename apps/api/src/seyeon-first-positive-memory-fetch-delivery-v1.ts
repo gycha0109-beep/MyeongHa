@@ -6,7 +6,7 @@ import { preflightSeyeonChatTurnSendRequestV1 } from './chat-turn-send-http.js';
 import { createSeyeonCloudflareStaticPreflightDenialV1 } from './seyeon-cloudflare-offline-reveal-fence-v1.js';
 import {assertSeyeonZeroSourceHttpReceiptReadyV1, SEYEON_G0_RECEIPT_ISSUER_V1} from './seyeon-zero-source-http-receipt-ready-v1.js';
 import { executePostgresSubjectTransactionV1, type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
-import type { ProductionSeyeonChatRuntimeV1 } from './production-seyeon-chat-runtime-v1.js';
+import type { ProductionSeyeonChatRuntimeV1, RunProductionSeyeonChatResultV1 } from './production-seyeon-chat-runtime-v1.js';
 import { recoverSeyeonUnissuedZeroReplyV1 } from './seyeon-unissued-zero-reply-recovery-v1.js';
 
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -75,6 +75,29 @@ export function isSeyeonFirstReceiptEligibleReceiveV1(received: Readonly<{
 }>): boolean {
   return (received.turnState==='received' && received.replayed===false) ||
     (received.turnState==='failed_retryable' && received.replayed===true);
+}
+
+/** Positive first HTTP receipt must refer to the SAME durable G2 outbox.
+ * Node G3 already enforces this. A forged/stale worker outcome is not evidence
+ * for issuing protected assistant bytes, even when the Commit locators match.
+ */
+export function assertSeyeonFirstPositiveReceiptOutboxBoundV1(
+  execution: RunProductionSeyeonChatResultV1['execution'],
+): void {
+  if (execution.disposition !== 'executed') {
+    throw new Error('First positive response requires a newly executed turn.');
+  }
+  const committedOutbox = execution.committedTurn.postTurnOutboxEventId;
+  const analysis = execution.postTurnAnalysis;
+  if (typeof committedOutbox !== 'string' || !UUID.test(committedOutbox) ||
+      committedOutbox === '00000000-0000-0000-0000-000000000000' ||
+      (analysis.status === 'processed'
+        ? analysis.result.outboxEventId !== committedOutbox
+        : analysis.status === 'deferred'
+          ? analysis.outboxEventId !== committedOutbox
+          : true)) {
+    throw new Error('First positive response has mismatched durable outbox provenance.');
+  }
 }
 
 export function holdSeyeonReceiptHttpV1(requestId: string): Response {
@@ -238,6 +261,7 @@ export async function handleSeyeonFirstPositiveMemoryFetchV1(input: Readonly<{
     // idempotent replay of the User row, NOT a replay of any Assistant text.
     // An already committed/delivered reply remains non-revealable here.
     const eligibleReceive=isSeyeonFirstReceiptEligibleReceiveV1(e.receivedTurn);
+    if (!zeroSource) assertSeyeonFirstPositiveReceiptOutboxBoundV1(e);
     if(e.disposition!=='executed'||e.receivedTurn.userText!==preflight.text||
        !eligibleReceive||
        e.receivedTurn.committedTurn!==null||e.attempt.replayed||

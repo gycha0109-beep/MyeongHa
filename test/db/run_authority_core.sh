@@ -222,6 +222,9 @@ bash test/db/account_deletion_finalizer_catalog_guard.sh
 bash test/db/seyeon_ai_cost_cleanup_authority.sh
 
 run_isolated_case myeongha_privacy_reconciliation_replay_test bash test/db/privacy_reconciliation_replay.sh
+# Actual read-only Production ledger SELECT -> bounded manifest -> restored note replay.
+# Uses two disposable loopback DBs; never connects to Production or writes evidence identifiers.
+run_isolated_case myeongha_shared_note_capture_replay_test bash test/db/shared_memory_capture_to_restore_authority.sh
 
 bash test/db/guest_promotion_concurrency.sh
 psql -v ON_ERROR_STOP=1 -f test/db/guest_promotion_auth_fk_authority.sql
