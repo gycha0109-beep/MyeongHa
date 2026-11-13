@@ -92,7 +92,7 @@ describe('signed held T10 pair interpretation acceptance', () => {
     const original = evidence();
     const result = await port(original).inspectSource(body);
     expect(result).toEqual(original);
-    expect(result?.evidence.internalServiceInterpretation.charts).toEqual(both);
+    expect(result).toMatchObject({ evidence: { internalServiceInterpretation: { charts: both } } });
     expect(result?.maySell).toBe(false);
   });
 
