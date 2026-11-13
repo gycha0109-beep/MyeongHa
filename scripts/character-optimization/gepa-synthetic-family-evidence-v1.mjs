@@ -16,7 +16,7 @@ const REPORT = [
   'sourceType','scalarRepeatedAcrossDimensions','independentEvaluation',
   'familyScores','externalCalls','productionEligible',
 ];
-const FAMILY = ['characterId','split','familyId','baselineScore','candidateScore',
+const FAMILY = ['characterId','split','familyId','baselineScores','candidateScores',
   'failureCodes','uncertain'];
 
 export function inspectFrozenSyntheticFamilyEvidence({manifest,envelope,packet,evidence}) {
@@ -26,12 +26,12 @@ export function inspectFrozenSyntheticFamilyEvidence({manifest,envelope,packet,e
       || envelope.candidateSha256 !== packet.sourceSeedSha256
       || !Array.isArray(envelope.dataset)
       || !exact(evidence,REPORT)
-      || evidence.schemaVersion !== 'character-gepa-synthetic-family-evidence-v1'
+      || evidence.schemaVersion !== 'character-gepa-synthetic-family-evidence-v2'
       || evidence.runManifestSha256 !== manifest.manifestSha256
       || evidence.sourceSeedSha256 !== packet.sourceSeedSha256
       || evidence.candidateTextSha256 !== intake.candidate.textSha256
       || evidence.sourceType !== 'actual_bounded_gepa_evaluator_synthetic_only'
-      || evidence.scalarRepeatedAcrossDimensions !== true
+      || evidence.scalarRepeatedAcrossDimensions !== false
       || evidence.independentEvaluation !== false
       || evidence.externalCalls !== 0 || evidence.productionEligible !== false
       || !Array.isArray(evidence.familyScores)
@@ -54,17 +54,19 @@ export function inspectFrozenSyntheticFamilyEvidence({manifest,envelope,packet,e
     if (!exact(row,FAMILY) || !intake.characterIds.includes(row.characterId)
         || !['development','optimizer_validation'].includes(row.split)
         || typeof row.familyId !== 'string'
-        || !score(row.baselineScore) || !score(row.candidateScore)
+        || !exact(row.baselineScores,DIMENSIONS)
+        || !exact(row.candidateScores,DIMENSIONS)
+        || DIMENSIONS.some(axis => !score(row.baselineScores[axis])
+          || !score(row.candidateScores[axis]))
         || !Array.isArray(row.failureCodes) || row.failureCodes.length !== 0
         || row.uncertain !== false) fail('unsafe_family_score');
     const id = [row.characterId,row.split,row.familyId].join('|');
     if(seen.has(id) || !expected.has(id)) fail('foreign_or_duplicate_family');
     seen.add(id);
-    const dimensions = value => Object.fromEntries(DIMENSIONS.map(dim=>[dim,value]));
     familyEvaluations.push({
       characterId:row.characterId, split:row.split, familyId:row.familyId,
-      baselineScores:dimensions(row.baselineScore),
-      candidateScores:dimensions(row.candidateScore),
+      baselineScores:{...row.baselineScores},
+      candidateScores:{...row.candidateScores},
       hardFailures:[],uncertainty:false,reviewStatus:'unreviewed',
     });
   }
@@ -73,14 +75,14 @@ export function inspectFrozenSyntheticFamilyEvidence({manifest,envelope,packet,e
     manifest,candidate:intake.candidate,familyEvaluations,
   });
   return Object.freeze({
-    schemaVersion:'character-gepa-synthetic-family-review-v1',
+    schemaVersion:'character-gepa-synthetic-family-review-v2',
     manifestSha256:manifest.manifestSha256,
     candidateSha256:intake.candidate.textSha256,
     byCharacter:review.byCharacter,
     scenarioFamiliesChecked:review.scenarioFamiliesChecked,
     hasSyntheticRegressions:review.unverifiedEvidenceWouldFailStrictNoRegression,
     sourceAuthenticated:false,independentHumanQualityProven:false,
-    independentEvaluation:false,scalarRepeatedAcrossDimensions:true,
+    independentEvaluation:false,scalarRepeatedAcrossDimensions:false,
     candidateRegistryStage:'proposed',
     ownerReviewGranted:false,heldoutPassed:false,releaseApproved:false,
     productionEligible:false,externalCalls:0,

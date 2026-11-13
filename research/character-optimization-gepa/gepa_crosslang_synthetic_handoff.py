@@ -21,6 +21,32 @@ from test_pinned_gepa_offline import NoNetworkReflector
 
 SEED = "Respond clearly in natural Korean."
 CHARACTERS = {"yeoul", "seyeon"}
+DIMENSIONS = (
+    "korean_naturalness", "response_relevance", "agency",
+    "persona_fidelity", "relationship_fit", "continuity",
+    "repetition", "efficiency",
+)
+# Static diagnostic vectors—not authentic scores, annotations or models.
+SYNTHETIC_SCORES = {
+    "yeoul": {
+        "baseline": (.2, .4, .5, .3, .4, .5, .3, .4),
+        "candidate": (.65, .69, .75, .65, .68, .76, .64, .80),
+    },
+    "seyeon": {
+        "baseline": (.62,) * len(DIMENSIONS),
+        # The mean rises while persona_fidelity drops: a strict veto case.
+        "candidate": (.72, .72, .72, .40, .72, .72, .72, .72),
+    },
+}
+
+
+def synthetic_dimension_scores(candidate, character):
+    if character not in CHARACTERS:
+        raise ValueError("foreign character in synthetic evaluation")
+    selected = "concise answers" in candidate["shared_expression"]
+    vector = SYNTHETIC_SCORES[character]["candidate" if selected else "baseline"]
+    return dict(zip(DIMENSIONS, vector))
+
 
 
 def offline_only(*args, **kwargs):
@@ -45,8 +71,8 @@ def run(proof_dir: Path):
         raise ValueError("synthetic run manifest mismatch")
     if manifest.get("externalCallsAuthorized") is not False:
         raise ValueError("external calls remain blocked")
-    # The check is performed in the very process that executes official GEPA,
-    # not a separate demonstration container or only a Python unit test.
+    # Prove this same pinned GEPA process lacks its host's sealed fixture
+    # before loading and running the real optimizer.
     verify_optimizer_sealed_boundary(os.environ.get("GEPA_HOST_SEALED_FILE"))
     probe = probe_installed_gepa()
     if not probe["api_compatible"]:
@@ -59,15 +85,11 @@ def run(proof_dir: Path):
     out.mkdir(mode=0o700, exist_ok=False)
 
     def judge(candidate, example):
-        # No text lookup, LM evaluation or user data. This is not a quality score.
+        # Static independent-axis *synthetic* values—not Korean language
+        # observations. GEPA receives their mean, but Node checks every axis.
         character = example["characterId"]
-        if character not in CHARACTERS:
-            raise ValueError("foreign character in synthetic evaluation")
-        improved = "concise answers" in candidate["shared_expression"]
-        baseline = {"yeoul": 0.2, "seyeon": 0.4}[character]
-        # A higher shared average masks a SeYeon regression. The Node
-        # verification must flag it using this very same selected candidate.
-        return ({"yeoul": 0.95, "seyeon": 0.3}[character] if improved else baseline), {
+        dimensions = synthetic_dimension_scores(candidate, character)
+        return sum(dimensions.values()) / len(DIMENSIONS), {
             "failure_codes": [],
             "character_id": character,
             "raw_dialogue_excluded": True,
@@ -131,27 +153,40 @@ def run(proof_dir: Path):
                     or base_feedback["failure_codes"]
                     or new_feedback["failure_codes"]):
                 raise AssertionError("synthetic candidate violated eval guard")
+            baseline_dimensions = synthetic_dimension_scores(
+                kwargs["seed_candidate"], example["characterId"])
+            candidate_dimensions = synthetic_dimension_scores(
+                candidate, example["characterId"])
+            if (abs(base_score - sum(baseline_dimensions.values()) / len(DIMENSIONS)) > 1e-10
+                    or abs(candidate_score - sum(candidate_dimensions.values()) / len(DIMENSIONS)) > 1e-10):
+                raise AssertionError("actual bounded GEPA score disagreed with synthetic dimensions")
             family_scores.append({
                 "characterId": example["characterId"],
                 "split": example["split"],
                 "familyId": example["familyId"],
-                "baselineScore": base_score,
-                "candidateScore": candidate_score,
+                "baselineScores": baseline_dimensions,
+                "candidateScores": candidate_dimensions,
                 "failureCodes": [],
                 "uncertain": False,
             })
-    if not (all(x["candidateScore"] > x["baselineScore"]
+    if not (all(
+                all(x["candidateScores"][dim] > x["baselineScores"][dim]
+                    for dim in DIMENSIONS)
                 for x in family_scores if x["characterId"] == "yeoul")
-            and all(x["candidateScore"] < x["baselineScore"]
-                    for x in family_scores if x["characterId"] == "seyeon")):
-        raise AssertionError("synthetic regression fixture was not exercised")
+            and all(
+                x["candidateScores"]["persona_fidelity"] <
+                x["baselineScores"]["persona_fidelity"]
+                and sum(x["candidateScores"].values()) >
+                    sum(x["baselineScores"].values())
+                for x in family_scores if x["characterId"] == "seyeon")):
+        raise AssertionError("synthetic hidden-axis regression fixture was not exercised")
     report = {
-        "schemaVersion": "character-gepa-synthetic-family-evidence-v1",
+        "schemaVersion": "character-gepa-synthetic-family-evidence-v2",
         "runManifestSha256": manifest["manifestSha256"],
         "sourceSeedSha256": envelope["candidateSha256"],
         "candidateTextSha256": packet["proposal"]["textSha256"],
         "sourceType": "actual_bounded_gepa_evaluator_synthetic_only",
-        "scalarRepeatedAcrossDimensions": True,
+        "scalarRepeatedAcrossDimensions": False,
         "independentEvaluation": False,
         "familyScores": family_scores,
         "externalCalls": 0,
