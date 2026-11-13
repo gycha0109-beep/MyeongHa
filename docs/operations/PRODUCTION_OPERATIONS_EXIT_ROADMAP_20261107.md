@@ -1,3 +1,10 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 정확한 본원 원장 242개와 main 버전 정합성 실측
+
+- PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259)의 필수 통합 CI SUCCESS 후 main 병합. 실제 보호 main [#43350336600](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350336600) SUCCESS (백업 source [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843)). 동일 원장 복호화·SHA/catalog 지문을 다시 확인한 뒤 exact checked-out `main` SHA `9a5f903d8c3498a18363286000525f8114671b9e`의 파일 버전과 대조: Production 원장 **242**, 저장소 파일 **276**, 공통 200, 원격 전용 **42**, 저장소 전용 **76**.
+- 기존 2026-11-07 처분표의 원격 전용 **41개 모두 보존**; 이후 새 원격 전용 버전은 `20261109071019` **1개**. 정확한 버전 일치 상태의 이름 불일치 0개, 동일 이름·다른 버전 쌍 `20261029012948` ↔ `20261029012000`은 계속 별도로 표시. SQL body NULL 12개, 원격 원장의 원문 적용 SQL 동등성 및 대상 migration ledger 복구 미증명.
+- 원본 [41개 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)의 역사적 항목은 그대로 두고 새 `currentFrontierReconciliation`에 실측 범위를 추가했다. [전체 실제 증거](POSTGRES_SEALED_PROVIDER_MIGRATION_FILE_LINEAGE_PROOF_20261113.json)에는 42개 원격 전용·76개 저장소 전용 버전 ID가 포함되어 있으며, SQL 본문·작성자·개인정보는 없다.
+- Phase 8-A 다음 미완료 항목은 신규 원격 전용 `20261109071019`의 *적용 SQL·현재 객체/권한 효과*를 원본과 독립적으로 검증하는 것(실행자 인증 및 기존 누락 12개 SQL 본문은 검증 불가능 상태로 별도 HOLD). **원본 기록 자동 수정, SQL 재실행, Hosted DR 수용 승격 금지.** `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
 ## 2026-11-13 Gate 1 / Phase 8-A·8-B — direct role replay observed in isolation
 
 - PR [#3255](https://github.com/gycha0109-beep/MyeongHa/pull/3255) merged. Protected main [#43343813577](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43343813577) actual disposable PG17 restore and sealed-source verification SUCCESS. The guarded independent proof confirms source cross-boundary role edges **48**, executed isolated replay **48**, observed target edges **48**, and directly observed grant options/grantor attribution match. The source filtered roles.sql still excludes all 48; this is a staged disposable replay, **not** a portable Provider/Hosted restore guarantee. [Exact evidence](POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json).
