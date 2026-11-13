@@ -71,6 +71,17 @@ function codeTokens(bytes) {
       i = end;
       continue;
     }
+    // PostgreSQL decimal/exponent literals are one lexical unit.
+    // Do not equate "1.2" to "1 . 2" by splitting both at the dot.
+    if (/[0-9]/u.test(ch) ||
+      (ch === '.' && /[0-9]/u.test(sql[i + 1] ?? ''))) {
+      const number = /^(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?/u.exec(
+        sql.slice(i));
+      if (!number) return null;
+      tokens.push(number[0]);
+      i += number[0].length;
+      continue;
+    }
     if (wordChar(ch)) {
       let end = i + 1;
       while (end < sql.length && wordChar(sql[end])) end++;
