@@ -171,7 +171,7 @@ function mapTargetPersonRow(
   });
 }
 
-class TransactionTargetPersonReadPortV1 implements TargetPersonReadAuthorityPortV1 {
+export class TransactionTargetPersonReadPortV1 implements TargetPersonReadAuthorityPortV1 {
   constructor(private readonly client: PostgresTransactionQueryV1) {}
 
   async listCurrent(
