@@ -94,21 +94,29 @@ jobs:
     steps:
       - name: Require operations Watchtower attribution
         shell: bash
+        env:
+          SCOPED_SOURCE_DIAGNOSTIC: ${{ inputs.migration_source_only_diagnostic }}
+          SCOPED_SOURCE_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          SCOPED_INCIDENT_REFERENCE: ${{ inputs.incident_reference_utc }}
+          SCOPED_PROVIDER_VERIFY: ${{ inputs.verify_provider_migration_source }}
+          SCOPED_PRIVACY_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}
+          SCOPED_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}
+          SCOPED_SEYEON_S0: ${{ inputs.seyeon_security_s0_rehearsal }}
         run: |
           set -euo pipefail
           [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
-          if [[ "${{ inputs.migration_source_only_diagnostic && 'true' || 'false' }}" == 'true' ]]; then
+          if [[ "$SCOPED_SOURCE_DIAGNOSTIC" == 'true' ]]; then
             # Explicit Phase 8-A only: the 2026-11-12 source backup pre-dates
             # later shared-memory privacy migration 2380. Never bypass a full
             # recovery/privacy admission; allow only this bounded source probe.
             [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' &&
                "$GITHUB_REF" == 'refs/heads/main' ]]
-            [[ "${{ inputs.verify_provider_migration_source && 'true' || 'false' }}" == 'true' ]]
-            [[ "${{ inputs.backup_run_id }}" == '43174606843' ]]
-            [[ "${{ inputs.incident_reference_utc }}" == '2026-11-12T07:25:00Z' ]]
-            [[ -z "${{ inputs.privacy_ledger_run_id }}" &&
-               -z "${{ inputs.production_privacy_canary_run_id }}" ]]
-            [[ "${{ inputs.seyeon_security_s0_rehearsal && 'true' || 'false' }}" == 'false' ]]
+            [[ "$SCOPED_PROVIDER_VERIFY" == 'true' ]]
+            [[ "$SCOPED_SOURCE_BACKUP_RUN_ID" == '43174606843' ]]
+            [[ "$SCOPED_INCIDENT_REFERENCE" == '2026-11-12T07:25:00Z' ]]
+            [[ -z "$SCOPED_PRIVACY_LEDGER_RUN_ID" &&
+               -z "$SCOPED_PRIVACY_CANARY_RUN_ID" ]]
+            [[ "$SCOPED_SEYEON_S0" == 'false' ]]
             echo 'MIGRATION_SOURCE_DIAGNOSTIC_ONLY_PRIVACY_NOT_EXERCISED_DR_HOLD'
           fi
 
