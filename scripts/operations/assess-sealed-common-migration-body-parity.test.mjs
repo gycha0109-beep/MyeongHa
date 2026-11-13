@@ -42,10 +42,10 @@ function fixture() {
     sourcePacketSha256:pairedProof.sourcePacketSha256,
     sourceMigrationCatalogSha256:pairedProof.migrationCatalogSha256,
     sourceMigrationFrontier:pairedProof.migrationFrontier,
-    sourceVersionCount:6,currentRepositoryFileCount:6,
+    sourceVersionCount:6,currentRepositoryFileCount:8,
     commonVersionCount:5,
     remoteOnlyVersionIds:['150'],
-    repositoryOnlyVersionIds:['160'],
+    repositoryOnlyVersionIds:['160','2050','20261001000000'],
     originalSqlBodiesPublished:false,
     sourceLedgerHistoryRowsRestored:false,
     migrationHistoryRepaired:false,
@@ -58,6 +58,8 @@ function fixture() {
     {path:'supabase/migrations/130_multiple.sql',bytes:buf('select 1;\n\nselect 2;')},
     {path:'supabase/migrations/140_other_name.sql',bytes:buf('select 140;')},
     {path:'supabase/migrations/160_repo_only.sql',bytes:null},
+    {path:'supabase/migrations/2050_historical_repo_only.sql',bytes:null},
+    {path:'supabase/migrations/20261001000000_later_repo_only.sql',bytes:null},
   ];
   return {sourcePacket,sourceBytes,pairedProof,lineage,
     repositoryEntries,repositoryCommitSha};
@@ -67,6 +69,7 @@ test('separates byte-exact history from ambiguous and missing source bodies',()=
   const report = assessSealedCommonMigrationBodyParity(fixture());
   assert.equal(report.sourceVersionCount,6);
   assert.equal(report.commonVersionCount,5);
+  assert.equal(report.repositoryOnlyVersionCount,3);
   assert.equal(report.byteExactSingleStatementCount,1);
   assert.equal(report.notByteExactOrUnprovenCount,4);
   assert.equal(report.classifications.SOURCE_STATEMENTS_ABSENT,1);
