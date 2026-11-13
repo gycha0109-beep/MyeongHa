@@ -6,6 +6,7 @@ import type { SajuBirthRevisionBindingV1 } from '../../../packages/domain/src/in
 import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 import type { SajuOfficialIssuancePreflightPortV1 } from './saju-production-reading-execution.js';
 import { buildSajuProductionReadingRequestV1 } from './saju-production-reading-http-adapter.js';
+import { buildSajuProductionCalculationRequestV1 } from './saju-production-calculation-http-adapter.js';
 import { hashSajuHeldSourceProofRequestV1 } from './saju-held-source-proof-verifier-v1.js';
 
 export interface ApprovedSajuIssueAttemptBindingV1 {
@@ -20,6 +21,46 @@ interface ScopeRow {
   readonly releaseRef: string;
   readonly periodReferenceDateTime: string | null;
   readonly birth: Omit<SajuBirthRevisionBindingV1, 'birthRevisionRef'>;
+}
+
+interface PairScopeRow extends ScopeRow {
+  readonly admissionHash: string;
+  readonly targetBirthRevisionId: string;
+  readonly targetBirthInputHash: string;
+  readonly targetBirth: ScopeRow['birth'];
+}
+
+/** Issuer-only input, scoped to the current paid comparison and target use. */
+export async function readApprovedSajuPairIssueScopeV1(
+  client: PostgresTransactionQueryV1,
+  input: { readonly subjectId: string; readonly purchaseIntentId: string },
+) {
+  const { rows } = await client.query<{ scope: PairScopeRow | null }>(
+    'select public.qry_approved_saju_pair_issue_scope_v1($1::uuid,$2::uuid) as scope',
+    [input.subjectId, input.purchaseIntentId],
+  );
+  if (rows.length !== 1 || rows[0] === undefined) {
+    throw new Error('Approved Saju comparison scope returned invalid authority.');
+  }
+  const { scope } = rows[0];
+  if (scope === null) return null;
+  if (scope.periodReferenceDateTime !== null || scope.birthRevisionId === scope.targetBirthRevisionId ||
+      !scope.admissionHash || !scope.releaseRef || !scope.sourceBirthInputHash || !scope.targetBirthInputHash) {
+    throw new Error('Approved Saju comparison scope does not match the pinned pair.');
+  }
+  const { birth } = buildSajuProductionCalculationRequestV1({
+    ...scope.birth, birthRevisionRef: scope.birthRevisionId,
+  });
+  const { birth: partnerBirth } = buildSajuProductionCalculationRequestV1({
+    ...scope.targetBirth, birthRevisionRef: scope.targetBirthRevisionId,
+  });
+  const request = Object.freeze({ birth, partnerBirth });
+  return Object.freeze({
+    birthRevisionId: scope.birthRevisionId, targetBirthRevisionId: scope.targetBirthRevisionId,
+    sourceBirthInputHash: scope.sourceBirthInputHash, targetBirthInputHash: scope.targetBirthInputHash,
+    admissionHash: scope.admissionHash, releaseRef: scope.releaseRef,
+    request, sourceRequestHash: hashSajuHeldSourceProofRequestV1(request),
+  });
 }
 
 export async function readApprovedSajuIssueScopeV1(

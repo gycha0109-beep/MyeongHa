@@ -63,6 +63,11 @@ begin
   issue_scope := commerce_saju_private.approved_issue_scope_v1(actor,intent_id,field);
   if field='compatibility' then
     if issue_scope->>'targetBirthRevisionId' is distinct from authorized.target_birth_revision_id::text
+      or issue_scope->>'targetBirthInputHash' is distinct from (
+        select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id
+      )
+      or public.qry_approved_saju_pair_issue_scope_v1(actor,intent_id) is distinct from issue_scope
+      or public.qry_approved_saju_issue_scope_v1(actor,intent_id,field) is not null
       or issue_scope->'targetBirth'->>'birthDate' is distinct from (
         select birth_date::text from public.birth_profile_revisions where id=authorized.target_birth_revision_id
       ) or exists (
@@ -105,6 +110,9 @@ begin
       update commerce_saju_private.comparison_use_approval_v1 approval set revoked_at=clock_timestamp()
         where approval.subject_id=actor and approval.birth_revision_id=authorized.source_birth_revision_id
           and approval.target_birth_revision_id=authorized.target_birth_revision_id;
+      if public.qry_approved_saju_pair_issue_scope_v1(actor,intent_id) is not null then
+        raise exception 'Pair review returned a target after consent withdrawal';
+      end if;
       if commerce_saju_private.admit_approved_issue_attempt_v1(actor,intent_id,field,reading_id,
         session_id,attempt_id,authorized.source_birth_revision_id,source_hash,authorized.target_birth_revision_id) then
         raise exception 'Pair issuer admitted a running attempt after consent withdrawal';
@@ -999,6 +1007,12 @@ begin
   perform pg_temp.approved_fixture_grants(purchase,sandbox_receipt,array['career']);
   if has_function_privilege('myeongha_api_executor',
       'public.qry_approved_saju_issue_scope_v1(uuid,uuid,text)','EXECUTE')
+    or has_function_privilege('myeongha_api_executor',
+      'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_commerce_internal_executor',
+      'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+      'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
     or has_function_privilege('myeongha_approved_saju_issuer_executor',
       'public.cmd_prepare_reading_transport_attempt_v1(uuid,uuid,uuid,text,text,text)','EXECUTE')
     or has_schema_privilege('myeongha_approved_saju_issuer_executor','commerce_saju_private','USAGE') then

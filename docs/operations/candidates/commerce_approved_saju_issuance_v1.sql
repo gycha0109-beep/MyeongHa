@@ -17,6 +17,7 @@ as $function$
       'isLeapMonth',coalesce(birth.is_leap_month,false),'sex',birth.sex)
   ) || case when target_birth.id is null then '{}'::jsonb else jsonb_build_object(
     'targetBirthRevisionId',target_birth.id,
+    'targetBirthInputHash',target_birth.input_hash,
     'targetBirth',jsonb_build_object('calendarType',target_birth.calendar_type,
       'birthDate',to_char(target_birth.birth_date,'YYYY-MM-DD'),
       'birthTime',to_char(target_birth.birth_time,'HH24:MI'),'timeKnown',target_birth.time_known,
