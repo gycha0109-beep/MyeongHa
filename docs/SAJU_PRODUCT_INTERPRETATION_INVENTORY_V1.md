@@ -73,6 +73,14 @@ The Saju drift after the `#723` readiness audit consists of non-promotional Rela
 
 ---
 
+## 2026-11-13 — 현행 상용 해석 적격성 정정 (과거 표·PIN 보존)
+
+> 이 문서의 2026-09 원국·T9·T10 및 `Domain ReviewAttestation`·`Reviewer trust grant` 상태는 **당시 고정한 감사 증거**다. 최신 상용 해석 판단은 [내부 서비스 채택·발급 인계](SAJU_INTERNAL_COMMERCIAL_INTERPRETATION_HANDOFF_20261113.md) 및 Saju [7단계 로드맵](https://github.com/gycha0109-beep/Saju/blob/feat/saju-pin-reading-period-20261109/docs/ROADMAP.md)과 [T10 5단계 로드맵](https://github.com/gycha0109-beep/Saju/blob/feat/saju-cross-chart-structural-evidence-20261109/docs/research/compatibility-t10-product-ready-research-roadmap-20261111.md)을 따른다.
+
+- 전문가·학술기관·추가 문헌의 독립 승인이 없다는 사실은 **상용 해석 전역 HOLD의 근거가 아니다**. 명하가 채택한 규칙에 대해 계산→명식/기간/상대→Claim·Rule→고객 문장의 실제 실행·재현·모순 방지 검사로 해석 적격성을 판단한다.
+- `source`, `authority`, `proof`, `grounding`, `signature`에 해당하는 원국/기간/해석 버전, 서명·구매·Consent·Offer·Grant·Reader·환불·개인정보·복구는 **필수 무결성 장치로 유지한다**.
+- 새 Saju PR #2762/#2763은 내부 해석 후보의 실제 구현/검증 작업이고 MyeongHa #3174는 별도 보호 발급·운영 계약이다. 각 CI Green은 전체 판매 승인이 아니다. 문서의 과거 `NO_BUILD` 행을 현재의 모든 명하 내부 의미 규칙 미승인으로 일반화하지 않는다.
+
 ## 1. Verdict
 
 The repository now contains both concrete General Natal T8 research candidates and an explicit source-condition-preserving lower-tier research producer introduced by Saju PR `#339`. This is a real authority-graph improvement over the previous inventory baseline, but it does **not** authorize General Natal production semantics or Commerce.
