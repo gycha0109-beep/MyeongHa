@@ -1,3 +1,9 @@
+## 실제 원장·저장소 본문 비교 결과 — 2026-11-13
+
+- [복구 실행 #43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS, 정확한 main `ccf52e1132f9afb6b956ebb399dc380154719d74`, 재사용 백업 `43174606843`.
+- 공통 200개 중 단일 raw-byte exact 13개, 단일 bytes differ 21개, multi source framing 미입증 148개, multi reconstructed-match source-framing 미입증 6개, 원문 없음 12개. [전체 분류·지문·아티팩트 무결성](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json).
+- 기존 '실측 미실시' 문장은 구현 시점의 이력이다. 불일치·다중 구문을 함부로 동등화하지 않고 Phase 8-A 후속 처분을 계속한다. `drReady=false`, #1887 OPEN.
+
 # Production Operations — 공통 버전 마이그레이션 SQL 본문 일치 검증
 
 > 적용 트랙: `ops` / Gate 1·Phase 8-A / P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887)
