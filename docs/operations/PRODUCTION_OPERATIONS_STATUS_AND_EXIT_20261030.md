@@ -1,3 +1,11 @@
+### 2026-11-13 KST — Phase 8-A: 단일 원문 SQL 바이트 차이 위치 실측 기능 추가 (실제 실증 대기)
+
+- 기존 보호 격리 복구 #43372543611에서 200개 원장 본문 전수 비교·21개 단일 SQL 불일치를 실측했고, PR #3279에서 9개 exact-prefix hash 일치 및 12개 미확정 근거를 별도로 보존했다. 9개도 전체 저장소 파일 byte-exact으로 승격하지 않는다.
+- 이번 구현은 기존 암호화된 원장과 정확한 `main` SQL을 보호된 임시 runner 안에서 대조하여 **일치하는 시작/끝 구간의 바이트 수·양쪽 차이 바이트 수·차이 위치·`0x3b0a` 종결자 추가 여부**만 기존 비식별 결과에 부착한다. SQL 실행자·원문·차이 텍스트·변경 토큰을 외부 출력하지 않는다. Synthetic fixture로 원문 비노출·기존 byte-exact 집계 보존을 검사한다.
+- **아직 실제 12개 차이 위치를 실증하지 않았다.** 병합 후 같은 source backup #43174606843으로 정확한 main에서 수동 격리 실행한 뒤 결과를 해시·아티팩트 ID·main SHA와 묶어 증거화할 것. 대상 원장 복원·Hosted Auth/Storage·개인정보 연속성·RPO/RTO는 별개 미완료. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / #1887 OPEN.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Gate 1 / Phase 8-A: 단일 statement 21개 불일치 지문 추가 대조
 
 - **실제 조사:** 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) 산출물의 원본 SQL SHA-256/길이와 같은 실행의 exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`의 저장소 SQL 원문 파일 지문 비교. **9개(`0130`, `0160`, `0195`, `0221`, `0271`, `0800`, `0961`, `0981`, `1380`)는 source SQL statement가 repo 파일에서 마지막 semicolon+LF 2바이트를 제외한 내용과 SHA-256까지 정확히 일치**. 나머지 12개(`1580`, `1590`, `1600`, `1610`, `1620`, `1630`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`)는 bounded format fingerprint 검사로 미확정.

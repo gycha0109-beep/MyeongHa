@@ -86,6 +86,35 @@ test('separates byte-exact history from ambiguous and missing source bodies',()=
   assert.ok(!text.includes('createdBy'));
 });
 
+test('keeps single-statement byte-difference locations non-sensitive and unproven',()=>{
+  const report=assessSealedCommonMigrationBodyParity(fixture());
+  const changed=report.nonExactOrUnprovenVersions.find(x=>x.version==='110');
+  assert.deepEqual(changed.rawByteDifference,{
+    commonPrefixBytes:9,commonSuffixBytes:1,
+    sourceDifferentBytes:1,repositoryDifferentBytes:1,
+    differenceLocation:'INTERNAL_CHANGED_REGION',
+    repositoryTwoByteTerminatorSuffix:false,
+    sqlSemanticEquivalenceProven:false,
+    historicalExecutionCausalityProven:false,
+  });
+  const extended=fixture();
+  extended.sourcePacket.entries[1].statements=['select 111'];
+  extended.sourceBytes=buf(JSON.stringify(extended.sourcePacket)+'\n');
+  extended.pairedProof.sourcePacketSha256=hash(extended.sourceBytes);
+  extended.lineage.sourcePacketSha256=extended.pairedProof.sourcePacketSha256;
+  extended.repositoryEntries[1].bytes=buf('select 111;\n');
+  const extendedReport=assessSealedCommonMigrationBodyParity(extended);
+  const shape=extendedReport.nonExactOrUnprovenVersions.find(x=>x.version==='110')
+    .rawByteDifference;
+  assert.equal(shape.differenceLocation,'REPOSITORY_EXTRA_SUFFIX');
+  assert.equal(shape.repositoryTwoByteTerminatorSuffix,true);
+  assert.equal(shape.sourceDifferentBytes,0);
+  assert.equal(shape.repositoryDifferentBytes,2);
+  assert.equal(extendedReport.byteExactSingleStatementCount,1);
+  assert.equal(extendedReport.notByteExactOrUnprovenCount,4);
+  assert.ok(!JSON.stringify(extendedReport).includes('select 111'));
+});
+
 test('rejects packet drift, lineage mismatch and false DR promotion',()=>{
   const drift=fixture();
   drift.sourceBytes=buf('fake');

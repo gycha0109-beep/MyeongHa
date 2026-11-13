@@ -1,3 +1,9 @@
+## 12개 미해결 단일 원문 SQL 차이 위치 보강 — 실제 측정 전
+
+- 2026-11-13 실제 전수 비교에서 21개 단일 statement 바이트 불일치. [비식별 후속 지문 대조](POSTGRES_COMMON_VERSION_MIGRATION_SINGLE_STATEMENT_FINGERPRINT_TRIAGE_20261113.json)에 따르면 9개는 원본 statement와 저장소 파일 앞부분의 SHA-256이 정확히 일치하지만, 12개는 한정된 형식 변환만으로 설명되지 않았다.
+- 봉인 원본은 외부에 꺼내지 않고 **기존 격리 복구의 복호화 시점**에만 바이트 공통 접두/접미 길이와 각 진영의 다른 구간 길이 및 차이 위치 유형을 산출하도록 구현했다. 결과 객체 `rawByteDifference`에는 원문·실행자·변경된 조각이나 해당 조각의 해시를 포함하지 않는다. `repositoryTwoByteTerminatorSuffix`는 2바이트 `0x3b0a`의 단순 관찰이며 SQL 의미 동등성의 증거가 아니다.
+- 기존 byte-exact/비일치/NULL/다중 SQL 판정은 유지한다. 이 기능은 실제 보호 runner 실행이 끝나기 전에는 **실증 완료**로 간주하지 않는다. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false` 유지.
+
 ## 실제 원장·저장소 본문 비교 결과 — 2026-11-13
 
 - [복구 실행 #43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS, 정확한 main `ccf52e1132f9afb6b956ebb399dc380154719d74`, 재사용 백업 `43174606843`.

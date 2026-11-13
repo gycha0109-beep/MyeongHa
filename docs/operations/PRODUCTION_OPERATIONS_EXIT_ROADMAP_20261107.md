@@ -1,3 +1,9 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 미해결 단일 SQL 12개의 봉인 공간 차이 위치 실측 도구 (실증 대기)
+
+- [PR #3279](https://github.com/gycha0109-beep/MyeongHa/pull/3279)까지 기존 21개 단일 SQL 불일치 중 9개의 *원본 statement = 저장소 파일 prefix* SHA 일치(저장소 뒤에 `0x3b0a`)만 확인했고, **12개는 실제 내용 차이의 범위를 확인하지 못했다**. 스키마 94개·함수 322개·기존 48개 역할 연결의 격리 관측은 버전별 SQL 실행 인과 증거가 아니다.
+- 이를 위한 승인 범위 내 추가 구현: 기존 `verify_provider_migration_source=true` 격리 복호화와 exact checked-out main SQL을 사용해, 단일 원본 불일치의 **공통 시작·끝 바이트 길이, 양측 상이 구간 길이, 변경 위치 분류, 저장소 2바이트 종결자 추가 여부**만 산출한다. 원본 SQL 구문/부분 문자열·작성자·자격증명은 저장하거나 공개하지 않는다. 기존 raw-byte exact 판단과 200개 분류 수량은 변경하지 않는다.
+- **실제 실행 전에는 12개 결과·의미적 동등성·현재 객체/권한 효과를 추정하지 않는다.** PR 병합 후 기존 백업 `43174606843`을 재사용해 보호된 main 격리 복구로 실증하고, 관련 JSON을 바이트 무결성·실행 SHA와 묶어 보존한다. Production 변경·원문 재실행·migration repair·privacy canary·유료 Hosted 대상 생성 없음. P0 #1887 OPEN, `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` 유지.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 21개 단일 SQL 바이트 불일치의 지문 기반 처분 진전
 
 - 보호된 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611)의 비식별 SQL 지문 및 그 실행에서 체크아웃한 exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`의 저장소 파일을 독립적으로 대조했다. **단일 statement bytes 불일치 21개 중 9개는 원본 statement SHA-256과 저장소 파일 앞부분 SHA-256이 정확히 동일**하고, 저장소 쪽에 2바이트 `;` + LF가 추가된 사실을 확인. 나머지 **12개는 제한된 형식 변환 검사에서 원인을 확인하지 못했다**.
