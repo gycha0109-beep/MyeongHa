@@ -127,10 +127,17 @@ export function assessSealedCommonMigrationBodyParity({
     repositoryByVersion.set(file.version, { ...file, bytes: entry.bytes });
   }
   at('VERSION_SETS');
+  // Match the numeric version order used by the sealed lineage authority.
+  // A lexical sort interleaves short versions (e.g. 2050) with timestamps.
+  const compareVersion = (a, b) => {
+    const left = BigInt(a);
+    const right = BigInt(b);
+    return left < right ? -1 : left > right ? 1 : a.localeCompare(b);
+  };
   const remoteOnly = [...sourceByVersion.keys()].filter(
-    v => !repositoryByVersion.has(v)).sort();
+    v => !repositoryByVersion.has(v)).sort(compareVersion);
   const repositoryOnly = [...repositoryByVersion.keys()].filter(
-    v => !sourceByVersion.has(v)).sort();
+    v => !sourceByVersion.has(v)).sort(compareVersion);
   assert.deepEqual(remoteOnly, lineage.remoteOnlyVersionIds);
   assert.deepEqual(repositoryOnly, lineage.repositoryOnlyVersionIds);
   assert.equal(sourceByVersion.size - remoteOnly.length,
