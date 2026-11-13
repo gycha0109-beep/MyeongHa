@@ -19,7 +19,8 @@ const INSERT = [
 const SELECT = [
   'SELECT proof::text AS "proofJson"',
   "FROM myeongha_a4_source_ops.prepared_attempt_proofs_v1",
-  "WHERE execution_attempt_id = $1::uuid LIMIT 2",
+  "WHERE execution_attempt_id = $1::uuid",
+  "AND stored_at > clock_timestamp() - INTERVAL '30 days' LIMIT 2",
 ].join("\n");
 
 function record(raw: unknown): Record<string, unknown> | null {

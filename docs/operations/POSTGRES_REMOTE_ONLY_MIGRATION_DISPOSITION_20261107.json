@@ -25,7 +25,8 @@
     "Domain assignment is a name-based inventory grouping, not a transfer of implementation ownership.",
     "Eight same-name/different-version pairs have separate verified SQL source comparisons. This file does not imply version/provenance equivalence.",
     "Do not rewrite applied history, replay source, or activate Production resources to resolve metadata.",
-    "2026-11-13 reconciliation is attached without changing this 2026-11-07 source snapshot or its 41 historical entries; the new 20261109071019 version lacks an exact main migration filename. Source name/DDL effects and executor authority remain unproven, and no migration repair is authorized."
+    "2026-11-13 reconciliation is attached without changing this 2026-11-07 source snapshot or its 41 historical entries; the new 20261109071019 version lacks an exact main migration filename. Source name/DDL effects and executor authority remain unproven, and no migration repair is authorized.",
+    "2026-11-13 exact-version 20261109071019: independently SELECT-only examined the stored 5,512-byte migration SQL and contemporaneous role/table/column catalog. Current expected role and direct column ACLs match the declared SQL, but this does not authenticate the historical executor or prove causal execution, whole schema parity or Hosted restoration. No source migration SQL copied to repository."
   ],
   "entries": [
     {
@@ -1142,6 +1143,35 @@
     "hostedProviderRecoveryProven": false,
     "drReady": false,
     "serviceResumptionAllowed": false,
-    "verdict": "CURRENT_FRONTIER_EXACT_VERSION_GAPS__EFFECT_DISPOSITION_PENDING"
+    "verdict": "CURRENT_FRONTIER_EXACT_VERSION_GAPS__EFFECT_DISPOSITION_PENDING",
+    "newRemoteOnlyMigrationEffects": [
+      {
+        "version": "20261109071019",
+        "name": "admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109",
+        "statementCount": 1,
+        "statementBytes": 5512,
+        "statementSha256": "974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8",
+        "createdByFieldPopulated": true,
+        "historicalExecutorAuthenticated": false,
+        "repositoryExactVersionFilePresent": false,
+        "declaredOperations": [
+          "CREATE_ROLE",
+          "GRANT_SCHEMA_USAGE",
+          "GRANT_FIVE_COLUMN_SELECT"
+        ],
+        "affectedObject": "public.reading_execution_attempts",
+        "role": "myeongha_reading_ai_cost_binding_reader_v1",
+        "currentRoleAndDirectColumnGrantMatchesDeclaredIntent": true,
+        "currentTableRlsEnabled": false,
+        "currentTableRlsPolicyDefinitions": 2,
+        "currentWholeTableSelect": false,
+        "currentNonReadDmlGranted": false,
+        "currentUnintendedReadableColumns": 0,
+        "sourceSqlHistoricalExecutionProven": false,
+        "hostedServiceParityProven": false,
+        "dispositionEvidence": "docs/operations/POSTGRES_A4_READER_REMOTE_ONLY_MIGRATION_EFFECT_20261113.json",
+        "disposition": "CURRENT_A4_READER_OBJECT_AND_COLUMN_ACL_MATCH__HISTORICAL_AND_HOSTED_PARITY_HOLD"
+      }
+    ]
   }
 }

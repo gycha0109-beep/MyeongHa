@@ -103,6 +103,7 @@ describe("A4 immutable post-prepare proof persistence and private reader", () =>
       expect.stringContaining("SELECT proof::text"),
       "COMMIT",
     ]);
+    expect(x.logs.reader.some((sql) => sql.includes("stored_at > clock_timestamp() - INTERVAL"))).toBe(true);
     expect(x.logs.reader).toEqual([
       "BEGIN READ ONLY",
       'SELECT current_user::text AS "currentUser"',

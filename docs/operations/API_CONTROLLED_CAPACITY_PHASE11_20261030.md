@@ -1,5 +1,12 @@
 # Phase 11 — Controlled non-production loopback capacity probe
 
+## 2026-11-13 증거 정렬 — 기존 workerd DB 장애·회복 실증 재사용
+
+- 기존 보호된 `main`의 [실제 Linux 실행 #42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024)은 **SUCCESS**였으며, source `3bdec3c162b132284498ebed38e15feaf32c0ff9` 및 [증거 아티팩트 #13586047057](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024/artifacts/13586047057)에서 확인한 ZIP SHA-256은 `1f0047d4cb5276e726733966869618f99902d0e8f39c46d34bfda0ca609ac145`다.
+- 실제 `workerd` + GoTrue + PostgreSQL18 강제 RLS + 고정 Saju 제품 경로의 기준 요청 **12/12 성공**. 격리 DB 프로세스 실제 중지 후 **4/4 bounded unavailable**, 독립 Health **200**, 재기동 후 동시 4개 요청 **4/4 성공**, 추가 시도 1번. 익명 거부·런타임·Docker 정리 성공.
+- 이는 **Phase 11의 DB unavailable 시 bounded-fail/독립 Health/회복 항목에 재사용 가능한 실측**이다. 추가 동일 실험은 시행하지 않는다. `workerd` 제품 경로에서의 **slow DB·pool acquisition timeout**은 여전히 별도 미입증이며, 실제 Hosted Hyperdrive·현재 배포 Worker/Production 용량은 별도다. [비식별 원본 근거 정렬](PHASE11_DISPOSABLE_WORKERD_DB_OUTAGE_EVIDENCE_20261113.json).
+- `productionWorkerAdmissionMeasured=false`, `hostedHyperdriveMeasured=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false` 유지한다.
+
 ## Actual local Workers runtime observation
 
 On 2026-11-05 KST, the actual `workerd` process ran the main Worker entrypoint from `9ea61382aad65231d8fbda095a7f5b1da9f515b9` under the repository's pinned Wrangler 4.152.0 (`workerd` 1.20261019.1, Windows Node 24.20.0). The 127.0.0.1 listener used a temporary Wrangler configuration with the source compatibility date and flags, a local-only name, and no bindings or credentials. [Original 1,149-byte observation](LOCAL_WORKERD_HEALTH_OBSERVATION_20261105.json), SHA-256 `6e23bc849965c3906b28ff7868e86a881556eccc2912f7266f8aa777f129076a`.
