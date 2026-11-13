@@ -1,14 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import type { ContentReleaseRuntime } from '../../../packages/world-content/src/index.js';
+import type { CharacterClientCompatibilityProfileV1 } from '../../../packages/domain/src/index.js';
 import {
   commitApprovedSajuReaderFollowupPostgresV1,
   prepareApprovedSajuReaderFollowupPostgresV1,
 } from './approved-saju-reader-followup-postgres-v1.js';
-import { prepareChatReceiveCommand } from './chat-receive.js';
+import { preparePinnedPurchasedReaderReceivePlanV1 } from './chat-receive.js';
 import { getChatThreadRuntimeBinding } from './chat-thread-runtime-binding-read.js';
 import type { IdentityEvidenceVerificationPortV1 } from './current-subject-profile-http.js';
+import { getContentBundleManifest } from './content-bundle-manifest-read.js';
 import type { OfficialReaderProtectedBodyKeyV1 } from './official-reader-protected-body-crypto-v1.js';
 import { createPostgresChatThreadRuntimeBindingAuthorityPortV1 } from './postgres-chat-thread-runtime-binding.js';
+import { createPostgresContentBundleManifestReadAuthorityPortV1 } from './postgres-content-bundle-manifest-read-v1.js';
 import {
   executePostgresApprovedSajuPaidAnswerTransactionV1,
   executePostgresSubjectTransactionV1,
@@ -53,7 +56,7 @@ type Dependencies = Omit<Parameters<typeof prepareApprovedSajuReaderFollowupPost
   'verifiedEvidence' | 'readingId' | 'receivePlan' | 'firstSceneQuestion'> & Readonly<{
     identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
     releaseRuntime: ContentReleaseRuntime;
-    clientCapability: string;
+    clientProfile: CharacterClientCompatibilityProfileV1;
     issueUniqueKey: () => Promise<OfficialReaderProtectedBodyKeyV1>;
   }>;
 
@@ -97,22 +100,28 @@ export async function handleApprovedSajuReaderQuestionHttpV1(input: Readonly<{
     if (runtime.pool === runtime.protectedPool || runtime.pool === runtime.issuanceProofPool ||
         runtime.protectedPool === runtime.issuanceProofPool || runtime.productionIssueProofTrusts.length === 0 ||
         runtime.consultationPort.evaluateBatch === undefined) return unavailable(503, 'CAPABILITY_UNAVAILABLE');
-    const thread = await executePostgresSubjectTransactionV1({
+    const receivePlan = await executePostgresSubjectTransactionV1({
       pool: runtime.pool, verifiedEvidence,
-      execute: ({ client, resolvedSubject }) => getChatThreadRuntimeBinding({
-        resolvedSubjectId: resolvedSubject.subjectId, threadId,
-        authorityPort: createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
-      }),
+      execute: async ({ client, resolvedSubject }) => {
+        const thread = await getChatThreadRuntimeBinding({
+          resolvedSubjectId: resolvedSubject.subjectId, threadId,
+          authorityPort: createPostgresChatThreadRuntimeBindingAuthorityPortV1(client),
+        });
+        const bundleManifest = await getContentBundleManifest({
+          contentBundleId: thread.activeContentBundleId,
+          authorityPort: createPostgresContentBundleManifestReadAuthorityPortV1(client),
+        });
+        const plan = preparePinnedPurchasedReaderReceivePlanV1({
+          text, clientTurnId, bundleManifest, clientProfile: runtime.clientProfile,
+          releaseRuntime: runtime.releaseRuntime,
+          trustedThread: { threadId, pinnedReleaseId: thread.activeContentReleaseId,
+            participantCharacterIds: thread.participantCharacterIds },
+        });
+        return { plan, reader: thread.participantCharacterIds[0]! };
+      },
     });
-    const reader = thread.participantCharacterIds[0];
-    if (!reader || thread.participantCharacterIds.length !== 1) return unavailable(404, 'NOT_FOUND');
-    const receivePlan = prepareChatReceiveCommand({
-      request: { threadId, clientTurnId, text, clientCapability: runtime.clientCapability },
-      releaseRuntime: runtime.releaseRuntime,
-      trustedThread: { threadId, pinnedReleaseId: thread.activeContentReleaseId, participantCharacterIds: [reader] },
-    });
-    const { releaseId, bundleId } = receivePlan.resolvedContent;
-    if (bundleId !== thread.activeContentBundleId) return unavailable(404, 'NOT_FOUND');
+    const { plan, reader } = receivePlan;
+    const { releaseId, bundleId } = plan.resolvedContent;
 
     const turnId = randomUUID(), attemptId = randomUUID();
     const reservation = await executePostgresApprovedSajuPaidAnswerTransactionV1({
@@ -122,7 +131,7 @@ export async function handleApprovedSajuReaderQuestionHttpV1(input: Readonly<{
           'select turn_id::text as "turnId",attempt_id::text as "attemptId",safe_message_id::text as "safeMessageId",state ' +
           'from public.cmd_reserve_approved_saju_reader_question_v1($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13)',
           [resolvedSubject.subjectId, readingId, threadId, reader, releaseId, bundleId, clientTurnId,
-            receivePlan.requestHash, receivePlan.normalizedRequest.text, JSON.stringify(firstSceneQuestion ?? null),
+            plan.requestHash, plan.normalizedRequest.text, JSON.stringify(firstSceneQuestion ?? null),
             turnId, randomUUID(), attemptId],
         );
         if (rows.length !== 1) throw new Error('Protected Reader reservation is unavailable.');
@@ -140,7 +149,7 @@ export async function handleApprovedSajuReaderQuestionHttpV1(input: Readonly<{
     let committed = false;
     try {
       const prepared = await prepareApprovedSajuReaderFollowupPostgresV1({
-        ...runtime, verifiedEvidence, readingId, receivePlan,
+        ...runtime, verifiedEvidence, readingId, receivePlan: plan,
         ...(firstSceneQuestion === undefined ? {} : { firstSceneQuestion }),
       });
       if (prepared === null) return unavailable(409, 'QUESTION_UNAVAILABLE');
