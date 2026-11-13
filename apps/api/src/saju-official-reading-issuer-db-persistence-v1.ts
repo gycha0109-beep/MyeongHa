@@ -36,6 +36,8 @@ function uuid(value: unknown): value is string {
 export interface VerifiedSajuProductionIssueV1 {
   readonly state: 'production_source_verified';
   readonly nativeReadingId: string;
+  /** Digest of the exact normalized request attested by the Production issuer. */
+  readonly sourceRequestHash: string;
   readonly sourceResponseHash: string;
   readonly sourceBirthRevisionId: string;
   readonly sourceBirthInputHash: string;
@@ -199,6 +201,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
     return held('production_source_unverified');
   }
 
+  const executedRequestHash = hashSajuHeldSourceProofRequestV1(input.executedRequest);
   const source = await input.sourceVerifier.verifyProductionIssue({
     sourceResponse: native, executedRequest: input.executedRequest, subjectId: input.subjectId,
     dbReadingId: input.readingId, readingSessionId: input.readingSessionId,
@@ -207,6 +210,7 @@ export async function persistIssuedSajuOfficialReadingV1(input: Readonly<{
   const originalHash = hashSajuHeldSourceProofRequestV1(native);
   if (source?.state !== 'production_source_verified'
     || source.nativeReadingId !== native.reading.readingId
+    || source.sourceRequestHash !== executedRequestHash
     || source.sourceResponseHash !== originalHash
     || !HASH.test(source.sourceResponseHash)
     || source.sourceBirthRevisionId !== input.sourceBirthRevisionId

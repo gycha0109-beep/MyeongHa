@@ -99,6 +99,8 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
     profile: BirthProfileReadResponseV1;
     readingText: string;
     targetPersonRef?: string;
+    /** Immutable period reference resolved from the purchase, when applicable. */
+    periodReferenceDateTime?: string;
     adapter: SajuProductionReadingHttpAdapterV1<AdmittedResponse>;
     subjectId: string;
     readingId: string;
@@ -159,6 +161,9 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   const executedRequest = buildSajuProductionReadingRequestV1({
     birthRevision: birth,
     readingText: input.readingText,
+    ...(input.periodReferenceDateTime === undefined
+      ? {}
+      : { periodReferenceDateTime: input.periodReferenceDateTime }),
   });
   const exactAttempt = {
     subjectId: input.subjectId,
