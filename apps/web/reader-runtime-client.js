@@ -217,6 +217,14 @@ export function createReaderRuntimeClientV1(options = {}) {
       return Object.freeze({ threadId, safeMessageId: data.safeMessageId });
     },
     async readReaderScene(input) {
+      return (await readScene(input, false)).scene;
+    },
+    readPurchasedReaderScene(input) {
+      return readScene(input, true);
+    },
+  });
+
+  async function readScene(input, purchased) {
       if (!enabled) {
         throw new ReaderRuntimeClientErrorV1(
           'READER_FEATURE_UNAVAILABLE',
@@ -243,7 +251,7 @@ export function createReaderRuntimeClientV1(options = {}) {
       }
       if (
         !bearer ||
-        (bearer.kind !== 'member' && bearer.kind !== 'guest') ||
+        (bearer.kind !== 'member' && (purchased || bearer.kind !== 'guest')) ||
         typeof bearer.token !== 'string' ||
         bearer.token.trim().length === 0
       ) {
@@ -316,7 +324,15 @@ export function createReaderRuntimeClientV1(options = {}) {
             'Reader Scene response officialReadingId does not match the requested Reading.',
           );
         }
-        return scene;
+        if (!purchased) return { scene };
+        const reply = payload.meta.latestPaidReply;
+        if (reply !== null && (!reply || typeof reply.safeMessageId !== 'string' ||
+            !UUID_V1.test(reply.safeMessageId) || typeof reply.canContinue !== 'boolean' ||
+            Object.keys(reply).length !== 2)) {
+          throw new ReaderSceneContractErrorV1('Latest purchased Reader marker is invalid.');
+        }
+        return { scene, latestPaidReply: reply === null ? null
+          : Object.freeze({ safeMessageId: reply.safeMessageId, canContinue: reply.canContinue }) };
       } catch (error) {
         if (error instanceof ReaderSceneContractErrorV1) {
           throw new ReaderRuntimeClientErrorV1(
@@ -328,6 +344,5 @@ export function createReaderRuntimeClientV1(options = {}) {
         }
         throw error;
       }
-    },
-  });
+  }
 }

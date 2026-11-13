@@ -54,7 +54,7 @@ type Dependencies = Omit<Parameters<typeof prepareApprovedSajuReaderFollowupPost
     identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
     releaseRuntime: ContentReleaseRuntime;
     clientCapability: string;
-    resolveKey: () => Promise<OfficialReaderProtectedBodyKeyV1 | null>;
+    issueUniqueKey: () => Promise<OfficialReaderProtectedBodyKeyV1>;
   }>;
 
 function unavailable(status: number, code: string) {
@@ -139,13 +139,12 @@ export async function handleApprovedSajuReaderQuestionHttpV1(input: Readonly<{
 
     let committed = false;
     try {
-      const key = await runtime.resolveKey();
-      if (!key) return unavailable(503, 'CAPABILITY_UNAVAILABLE');
       const prepared = await prepareApprovedSajuReaderFollowupPostgresV1({
         ...runtime, verifiedEvidence, readingId, receivePlan,
         ...(firstSceneQuestion === undefined ? {} : { firstSceneQuestion }),
       });
       if (prepared === null) return unavailable(409, 'QUESTION_UNAVAILABLE');
+      const key = await runtime.issueUniqueKey();
       const result = await commitApprovedSajuReaderFollowupPostgresV1({
         protectedPool: runtime.protectedPool, verifiedEvidence, prepared, key,
         turnId, attemptId, bodyId: randomUUID(), safeMessageId: randomUUID(),

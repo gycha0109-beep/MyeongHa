@@ -621,21 +621,21 @@ grant execute on function public.cmd_prepare_approved_saju_paid_delivery_v1(uuid
   public.cmd_ack_approved_saju_paid_delivery_v1(uuid,uuid,uuid,uuid,uuid,text)
   to myeongha_approved_saju_paid_answer_executor;
 
--- Admit only the latest acknowledged answer for this exact purchase. A
--- superseded or still pending delivery must not be read as a new conversation.
-create function public.qry_approved_saju_reader_followup_anchor_v1(
+-- Locate the latest exact-purchase marker, including an answer whose
+-- delivery was interrupted. Only an acknowledged, current marker is an anchor.
+create function commerce_saju_private.read_approved_reader_latest_answer_v1(
   p_subject uuid,p_thread uuid,p_reader text,p_reading uuid
 )
 returns table(
-  status text,subject_id uuid,thread_id uuid,reader_character_id text,reading_ref uuid,
-  official_artifact_response_hash text,grounding_hash text,assistant_message_id uuid,
-  source_unit_refs text[],focused_unit_ref text
+  assistant_message_id uuid,official_artifact_response_hash text,grounding_hash text,
+  source_unit_refs text[],focused_unit_ref text,acknowledged boolean,can_continue boolean
 )
 language plpgsql volatile security definer set search_path=pg_catalog
 as $function$
 declare
   v_bundle uuid;
   v_latest record;
+  v_body uuid;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   select thread.active_content_bundle_id into v_bundle
@@ -661,34 +661,76 @@ begin
   order by marker.sequence_no desc limit 1;
 
   if not found then return; end if;
-  if not exists (
-    select 1 from public.qry_approved_saju_paid_answer_ciphertext_v1(
-      p_subject,p_thread,v_latest.safe_message_id
-    ) answer
-    join public.official_reader_paid_delivery_attempts_v1 delivery on delivery.body_id=answer.body_id
-      and delivery.subject_id=p_subject and delivery.thread_id=p_thread
-      and delivery.safe_message_id=v_latest.safe_message_id and delivery.client_acknowledged_at is not null
-    where answer.body_id=v_latest.id
-  ) or exists (
-    select 1 from public.conversation_messages message
-    where message.subject_id=p_subject and message.thread_id=p_thread
-      and message.sequence_no>v_latest.sequence_no
-      and (message.sender_type='character' or exists (
-        select 1 from public.official_reader_paid_answer_bodies later
-        where later.safe_message_id=message.id and later.thread_id=p_thread and later.subject_id=p_subject
-      ))
-  ) then raise exception using errcode='P0001',message='Approved Saju previous answer is unavailable'; end if;
+  select answer.body_id into v_body
+  from public.qry_approved_saju_paid_answer_ciphertext_v1(p_subject,p_thread,v_latest.safe_message_id) answer
+  where answer.body_id=v_latest.id;
+  if not found then
+    raise exception using errcode='P0001',message='Approved Saju previous answer is unavailable';
+  end if;
 
-  return query select 'committed_semantic_guard_pass'::text,p_subject,p_thread,p_reader,p_reading,
-    v_latest.official_artifact_response_hash,v_latest.approved_grounding_hash,v_latest.safe_message_id,
-    v_latest.approved_source_unit_refs,v_latest.approved_focused_unit_ref;
+  return query select v_latest.safe_message_id,v_latest.official_artifact_response_hash,
+    v_latest.approved_grounding_hash,v_latest.approved_source_unit_refs,v_latest.approved_focused_unit_ref,
+    exists (
+      select 1 from public.official_reader_paid_delivery_attempts_v1 delivery
+      where delivery.body_id=v_body and delivery.subject_id=p_subject and delivery.thread_id=p_thread
+        and delivery.safe_message_id=v_latest.safe_message_id and delivery.client_acknowledged_at is not null
+    ), not exists (
+      select 1 from public.conversation_messages message
+      where message.subject_id=p_subject and message.thread_id=p_thread
+        and message.sequence_no>v_latest.sequence_no
+        and (message.sender_type='character' or exists (
+          select 1 from public.official_reader_paid_answer_bodies later
+          where later.safe_message_id=message.id and later.thread_id=p_thread and later.subject_id=p_subject
+        ))
+    );
 end
 $function$;
 
-revoke all on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid)
+revoke all on function commerce_saju_private.read_approved_reader_latest_answer_v1(uuid,uuid,text,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
+    myeongha_approved_saju_issuer_executor,myeongha_approved_saju_paid_answer_executor;
+
+create function public.qry_approved_saju_reader_latest_marker_v1(
+  p_subject uuid,p_thread uuid,p_reader text,p_reading uuid
+)
+returns table(safe_message_id uuid,can_continue boolean)
+language sql volatile security definer set search_path=pg_catalog
+as $function$
+  select answer.assistant_message_id,answer.can_continue
+  from commerce_saju_private.read_approved_reader_latest_answer_v1(p_subject,p_thread,p_reader,p_reading) answer
+$function$;
+
+create function public.qry_approved_saju_reader_followup_anchor_v1(
+  p_subject uuid,p_thread uuid,p_reader text,p_reading uuid
+)
+returns table(
+  status text,subject_id uuid,thread_id uuid,reader_character_id text,reading_ref uuid,
+  official_artifact_response_hash text,grounding_hash text,assistant_message_id uuid,
+  source_unit_refs text[],focused_unit_ref text
+)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare
+  v_latest record;
+begin
+  select * into v_latest
+  from commerce_saju_private.read_approved_reader_latest_answer_v1(p_subject,p_thread,p_reader,p_reading);
+  if not found then return; end if;
+  if not v_latest.acknowledged or not v_latest.can_continue then
+    raise exception using errcode='P0001',message='Approved Saju previous answer is unavailable';
+  end if;
+  return query select 'committed_semantic_guard_pass'::text,p_subject,p_thread,p_reader,p_reading,
+    v_latest.official_artifact_response_hash,v_latest.grounding_hash,v_latest.assistant_message_id,
+    v_latest.source_unit_refs,v_latest.focused_unit_ref;
+end
+$function$;
+
+revoke all on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid),
+  public.qry_approved_saju_reader_latest_marker_v1(uuid,uuid,text,uuid)
   from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
     myeongha_approved_saju_issuer_executor;
-grant execute on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid)
+grant execute on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid),
+  public.qry_approved_saju_reader_latest_marker_v1(uuid,uuid,text,uuid)
   to myeongha_approved_saju_paid_answer_executor;
 
 -- Reserve one protected question before generation using the existing Chat

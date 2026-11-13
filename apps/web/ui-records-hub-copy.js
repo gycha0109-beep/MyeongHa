@@ -174,6 +174,7 @@ export const RECORDS_HUB_STATIC_UI_COPY_V1 = new Map([
   ['연결자가 구매한 풀이를 확인하고 있습니다.', {'ja-JP':'案内人が購入した鑑定を確認しています。', 'zh-TW':'引導者正在查看您購買的解讀。', 'en-US':'Your Reader is reviewing your purchased reading.', 'zh-CN':'引导者正在查看您购买的解读。'}],
   ['연결자의 답변을 열고 있습니다.', {'ja-JP':'案内人の回答を開いています。', 'zh-TW':'正在開啟引導者的回答。', 'en-US':'Opening your Reader’s reply.', 'zh-CN':'正在打开引导者的回答。'}],
   ['같은 풀이에 대해 이어서 질문할 수 있습니다.', {'ja-JP':'同じ鑑定について続けて質問できます。', 'zh-TW':'您可以繼續詢問同一份解讀。', 'en-US':'You can ask a follow-up about the same reading.', 'zh-CN':'您可以继续询问同一份解读。'}],
+  ['이전 답변을 읽을 수 있습니다. 이 답변에서 상담을 이어갈 수 없습니다.', {'ja-JP':'以前の回答を読めます。この回答から相談を続けることはできません。', 'zh-TW':'您可以閱讀先前的回答。這則回答無法接續諮詢。', 'en-US':'You can read the previous reply. This reply cannot start a follow-up.', 'zh-CN':'您可以阅读之前的回答。这则回答无法接续咨询。'}],
   ['질문 결과를 확인하지 못했습니다. 같은 질문을 다시 확인해 주세요.', {'ja-JP':'回答を確認できませんでした。同じ質問でもう一度お試しください。', 'zh-TW':'未能確認回答。請重試同一個問題。', 'en-US':'We could not confirm the reply. Try the same question again.', 'zh-CN':'未能确认回答。请重试同一个问题。'}],
   ['현재 이 질문에 답할 수 없습니다. 선택한 부분을 확인해 주세요.', {'ja-JP':'現在この質問には回答できません。選んだ部分を確認してください。', 'zh-TW':'目前無法回答這個問題。請確認所選段落。', 'en-US':'This question cannot be answered right now. Check the selected part.', 'zh-CN':'目前无法回答这个问题。请确认所选段落。'}],
   ['이 풀이의 상담을 지금 열 수 없습니다.', {'ja-JP':'現在この鑑定の相談を開けません。', 'zh-TW':'目前無法開啟這份解讀的諮詢。', 'en-US':'Consultation is unavailable for this reading right now.', 'zh-CN':'目前无法打开这份解读的咨询。'}],
