@@ -1,3 +1,10 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 공통 SQL 원문 200개 실제 비교 성공 (후속 처분 미완료)
+
+- [실제 격리 복구 #43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS, exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`, source run `43174606843`, artifact `14012916977` (ZIP SHA-256 `1aa91ac0b1273263b1452f4c6a26da724c8dea99003260fe4381d2ea9860f078`).
+- 원장 242개 / 저장소 276개 / 공통 200개 / 원격 전용 42개 / 저장소 전용 76개. **단일 원문 바이트 일치 13개, 단일 바이트 불일치 21개, 다중 SQL framing 보류 148개, 다중 SQL 재구성 일치·원문 증명 보류 6개, 원문 누락 12개.** 총 187개 byte-exact 미입증. 전체 분류와 각 지문은 [실제 비식별 증거](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json) 참조.
+- 다음은 21개 단일 불일치와 154개 다중 statement의 실제 근거별 처분 및 원문 없는 12개 위험 보류. 자동 정규화로 동등 판정하거나 SQL을 재실행·repair하지 않는다. 이전 source-only 41개 처분과 신규 A4 권한 실측 재활용.
+- 아직 Provider ledger 대상 복원·전체 스키마/권한·Hosted Auth/Storage·개인정보·전체 RPO/RTO는 미입증. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / #1887 OPEN / `ROADMAP_COMPLETE=false`. 아래 '실측 대기'는 이 실행 이전의 역사 기록.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 공통 원장 버전 200개 SQL raw-byte 대조 경로 구현 (실측 대기)
 
 - PR #3267 필수 통합 CI [#43354735084](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43354735084) SUCCESS·보호된 main 병합, 신규 원격 전용 A4 버전 `20261109071019`의 현재 전용 역할·5개 열 SELECT 권한 실측 기록 완료. 기존 원격 버전 242/저장소 276/공통 200, 원격 전용 42·저장소 전용 76의 당시 비교는 별도 실증으로 보존한다.
