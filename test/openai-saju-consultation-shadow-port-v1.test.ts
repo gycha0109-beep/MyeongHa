@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createReaderSajuConsultationBudgetGateV1 } from '../apps/api/src/reader-saju-consultation-budget-gate-v1.js';
+import { createApprovedSajuReaderOpenAiConsultationV1 } from '../apps/api/src/approved-saju-reader-openai-consultation-v1.js';
 import {
   createOpenAiSajuConsultationShadowPortV1,
   OPENAI_SAJU_CONSULTATION_SHADOW_EVALUATOR_VERSION_V1,
@@ -75,6 +76,42 @@ function fixture(fetchImpl: OpenAiSajuConsultationShadowFetchV1) {
 }
 
 describe('OpenAI Saju consultation shadow transport (offline, never user-visible)', () => {
+  it('binds purchased generation and review to one signed attempt and stops before an unreserved request', async () => {
+    const order: string[] = [];
+    const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
+      const { model } = JSON.parse(String(init.body)) as { model: string };
+      order.push('fetch:' + model);
+      return responseJson(model === 'generator' ? { segments: [] } : { verdicts: [] });
+    });
+    const reserve = vi.fn(async ({ callId, purpose }: { callId: string; purpose: string }) => {
+      order.push('reserve:' + purpose);
+      return { reservationRef: callId };
+    });
+    const settle = vi.fn(async () => { order.push('settle'); });
+    const scope = { evaluationId: 'answer-attempt-1', officialReadingRef: 'reading-1',
+      sourceResponseHash: 'sha256:v1:' + 'a'.repeat(64) };
+    const provider = { apiKey: 'isolated-key', generationModel: 'generator', reviewModel: 'reviewer', fetchImpl };
+    const allowedModels = ['generator', 'reviewer'].map(modelKey => ({
+      providerKey: 'openai-responses' as const, modelKey, priceVersion: 'isolated',
+      inputMicroUsdPerMillion: 1_000, cachedInputMicroUsdPerMillion: 1_000, outputMicroUsdPerMillion: 2_000,
+    }));
+    const budget = { allowedModels, totalEvaluationLimitMicroUsd: 100,
+      authority: { reserve, settle } };
+    const port = createApprovedSajuReaderOpenAiConsultationV1({ provider, budget })(scope);
+    const generation = { instructions: '공식 판정만 사용', input: { unit: UNIT }, responseSchema: {} };
+    await port.generate(generation);
+    await port.evaluateBatch!({ candidates: [CANDIDATE], candidateHashes: [hashCharacterSajuSp2CandidateV1(CANDIDATE)],
+      groundingUnits: [UNIT], characterProfileRef: PROFILE, publishedCharacterVoice: {} });
+    expect(order).toEqual(['reserve:consultation_generate', 'fetch:generator', 'settle',
+      'reserve:consultation_evaluate', 'fetch:reviewer', 'settle']);
+    for (const [call] of reserve.mock.calls) expect(call).toMatchObject({ ...scope, maximumCalls: 2 });
+    await expect(port.generate(generation)).rejects.toThrow('budget exceeded');
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(() => createApprovedSajuReaderOpenAiConsultationV1({
+      provider, budget: { ...budget, allowedModels: allowedModels.slice(0, 1) },
+    })).toThrow('approved rate card');
+  });
+
   it('makes separate structured generation/review calls with budget and outcome receipts', async () => {
     const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
       const body = JSON.parse(String(init.body)) as { model: string };
