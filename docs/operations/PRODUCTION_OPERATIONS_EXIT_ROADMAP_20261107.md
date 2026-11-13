@@ -1,3 +1,10 @@
+## 2026-11-13 현재 운영 백업의 개인정보 복구 선행 마이그레이션 — 격리 적용 경로 구현
+
+- 보호된 [백업 #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)는 실측한 현재 원격 이력 **245건 / frontier `20261113062455`**를 암호화 원장과 함께 보존한다. 현재 Production에는 수동 공유 메모리 `2360`, 계정 삭제시 메모리 소거 `2370`, 삭제 이벤트 재생 `2380`의 테이블·함수/원장이 존재하지 않는다. 그러므로 백업 무결성만으로 최신 승인된 **개인정보 복구 기능까지 검증됐다고 선언할 수 없다**.
+- 기존 격리 복구의 원본 스키마 비교를 **먼저 수행한 후**, 오직 복구 실행의 `restore_clone_shared_memory_rehearsal=true`에서만 위 세 기존 SQL 파일을 일회용 loopback PG17에 `--single-transaction`으로 순차 적용하고, 함수·RLS·브라우저·API 역할 분리 및 삭제 이벤트 트리거를 검사하게 했다. 실행은 **정확한 backup run `43424903445` / source SHA `6eab97337811128282f5f5ec6320e4608d5f9c09` / reference `2026-11-13T12:29:12Z` / 보호된 `main` / Provider 봉인 원장 동시 검증 필수 / Production canary·실제 개인정보 원장 없음**에만 허용한다.
+- 이 뒤의 기존 **합성 개인정보 삭제·복구 재검증은 생략하지 않으며**, clone에만 변경을 적용했다는 JSON을 별도 보존한다. 실측 통과 여부는 병합 후 실제 보호 워크플로 결과로만 판정한다. **통과하더라도 Production에 세 SQL이 적용됐다는 뜻이 아니며, 원본 현재 스키마 복구 동등성·Hosted Auth/Storage·실제 삭제 원장 재생·RPO/RTO·서비스 재개 판정은 모두 HOLD**. 정상 모드의 개인정보 검사/차단은 그대로 유지한다.
+- **다음:** 보호된 PR CI·병합 → 정확한 최신 백업 복구 + 클론 한정 3개 SQL 적용·권한·합성 프라이버시 실증 → 그 결과로만 **Production 적용 필요 여부, 원격 이력 45건 보존 전략, 단일 변경 계획·롤백**을 확정한다. Production 변경은 구체적 사용자 승인 후에만. #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+
 ## 2026-11-13 최신 스키마 백업 출처·암호화 무결성 PASS, 복구 검증은 별도 HOLD
 
 - **현재 적용 이력 포함 백업:** [#43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445) SUCCESS, Git checkout `6eab97337811128282f5f5ec6320e4608d5f9c09`. 백업 artifact `14037181099` (GitHub ZIP SHA256 `27f2d0536ec2f3e7a92823b1cb7a0a451c41cd3b6fc6521aa404da5630ffe60b`), 암호화 Provider 원장 `14037056434` (ZIP SHA256 `217b7dae06d5f5d6a0365b1df64e0fc90e039420b835596d5a5105e913b613b3`), 만료 `2026-12-13`. 각 암호문 SHA256을 공개 manifest의 `encrypted_sha256` / `encryptedArchiveSha256`과 실제 파일 해시로 독립 일치 확인. 양쪽 manifest에 현재 원격 frontier `20261113062455`, 적용 원장 **245개**, catalog SHA256 `405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 동일. Backed-up schema catalog bracket 안정 표시는 **같은 pg_dump snapshot 보장이나 독립 복원 결과는 아님**. 암호화 원장에는 SQL 본문 12개 누락·역사적 실행자 미인증 경계가 남아 있음.
