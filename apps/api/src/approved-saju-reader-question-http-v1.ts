@@ -53,7 +53,7 @@ function parseQuestion(value: unknown): QuestionInput | null {
 }
 
 type Dependencies = Omit<Parameters<typeof prepareApprovedSajuReaderFollowupPostgresV1>[0],
-  'verifiedEvidence' | 'readingId' | 'receivePlan' | 'firstSceneQuestion'> & Readonly<{
+  'verifiedEvidence' | 'readingId' | 'receivePlan' | 'firstSceneQuestion' | 'evaluationId'> & Readonly<{
     identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
     releaseRuntime: ContentReleaseRuntime;
     clientProfile: CharacterClientCompatibilityProfileV1;
@@ -99,7 +99,7 @@ export async function handleApprovedSajuReaderQuestionHttpV1(input: Readonly<{
     if (verifiedEvidence?.kind !== 'member') return unavailable(401, 'AUTH_REQUIRED');
     if (runtime.pool === runtime.protectedPool || runtime.pool === runtime.issuanceProofPool ||
         runtime.protectedPool === runtime.issuanceProofPool || runtime.productionIssueProofTrusts.length === 0 ||
-        runtime.consultationPort.evaluateBatch === undefined) return unavailable(503, 'CAPABILITY_UNAVAILABLE');
+        typeof runtime.createConsultationPort !== 'function') return unavailable(503, 'CAPABILITY_UNAVAILABLE');
     const receivePlan = await executePostgresSubjectTransactionV1({
       pool: runtime.pool, verifiedEvidence,
       execute: async ({ client, resolvedSubject }) => {
@@ -149,7 +149,7 @@ export async function handleApprovedSajuReaderQuestionHttpV1(input: Readonly<{
     let committed = false;
     try {
       const prepared = await prepareApprovedSajuReaderFollowupPostgresV1({
-        ...runtime, verifiedEvidence, readingId, receivePlan: plan,
+        ...runtime, verifiedEvidence, readingId, receivePlan: plan, evaluationId: attemptId,
         ...(firstSceneQuestion === undefined ? {} : { firstSceneQuestion }),
       });
       if (prepared === null) return unavailable(409, 'QUESTION_UNAVAILABLE');

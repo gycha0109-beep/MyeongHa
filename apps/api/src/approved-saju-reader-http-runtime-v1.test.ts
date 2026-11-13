@@ -27,7 +27,7 @@ function fixture() {
     origin,
     question: {
       pool: { connect }, protectedPool: { connect }, issuanceProofPool: { connect },
-      productionIssueProofTrusts: [{}], consultationPort: { evaluateBatch: vi.fn() },
+      productionIssueProofTrusts: [{}], createConsultationPort: vi.fn(),
       createProductReaderEligibilityAuthorityPort: vi.fn(),
       releaseRuntime: {}, identityEvidenceVerifier: { verifyRequestIdentity },
     },
