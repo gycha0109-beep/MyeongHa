@@ -26,6 +26,10 @@ jq -e '.restore_target == "github-actions-loopback-supabase-postgres"
   "select current_user = 'supabase_admin' and rolsuper
    from pg_catalog.pg_roles where rolname = current_user")" == t ]] || fail
 [[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
+  select pg_get_userbyid(proowner)
+  from pg_catalog.pg_proc
+  where oid=to_regprocedure('public.internal_finalize_account_deletion_db_v1(uuid,uuid,text)')")" == postgres ]] || fail
+[[ "$(psql -X -qAt -v ON_ERROR_STOP=1 -c "
   select (to_regclass('public.subject_shared_memory_items_v1') is null)::int
     || '|' || (to_regclass('public.subject_shared_memory_delete_events_v1') is null)::int
     || '|' || (to_regprocedure('public.internal_replay_shared_memory_note_deletion_v1(uuid,uuid,timestamptz)') is null)::int")" == "1|1|1" ]] || fail
@@ -39,7 +43,10 @@ f3=supabase/migrations/2380_subject_shared_memory_note_deletion_recovery_v1.sql
    "$(git hash-object -- "$f3")" == 3cafb2d702bb17b6677ae550bd8b540d3e884158 ]] || fail
 
 # Atomic transaction. Apply ONLY to the disposable GitHub loopback target.
+# The existing Production finalizer is postgres-owned. Mimic that same
+# function/table owner in the clone without connecting to Production.
 psql -X -q -v ON_ERROR_STOP=1 --single-transaction \
+  --command 'SET ROLE postgres' \
   --file "$f1" --file "$f2" --file "$f3" >/dev/null || fail
 
 # Metadata and privilege check; never read recovered user rows or secrets.
