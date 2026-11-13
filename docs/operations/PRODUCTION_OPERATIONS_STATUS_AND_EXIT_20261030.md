@@ -1,3 +1,12 @@
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 봉인 원장 242개 vs 정확한 main 파일 버전 전수 실측
+
+- **병합·실증:** PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259) 필수 통합 CI [#43347035879](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43347035879) SUCCESS / merge `78f53d3fe6a2749795b4219254b3494f94c763ce`. 최신 보호 main 격리 복구 [#43350336600](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350336600) SUCCESS / workflow commit `9a5f903d8c3498a18363286000525f8114671b9e`. 원본 source backup #43174606843, artifact #14003143450 / ZIP SHA-256 `b481bedef267b2edba757ad826d66f316e74c2580cd76da5b790aa3ef7f6e667`.
+- **원본·현재 저장소 버전 실측:** 원본 242개 / 저장소 migration 파일 276개 / 공통 버전 200개 / Production에만 있는 버전 **42개** / 저장소에만 있는 버전 **76개**. 기존 11/07 원격 전용 41개 모두 여전히 원격 전용이고, 새로운 원격 전용 `20261109071019` 1개를 확인. 12개 null statement, 원본 전체 catalog SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47` 유지. 타 버전에서 동일 이름인 migration `20261029012948`↔`20261029012000` 1쌍은 identity 불일치로 보존.
+- **처분 근거:** 구 41개 버전 및 당시 SQL/영향 기록은 역사적 관측으로 유지하고 [기존 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)에 현재 frontier 대조 항목만 추가. 새 [전체 실측 파일](POSTGRES_SEALED_PROVIDER_MIGRATION_FILE_LINEAGE_PROOF_20261113.json)에서 누락 ID 확인 가능. 신규 `20261109071019`의 실제 적용 SQL·현재 객체 영향 및 provenance는 아직 미처분.
+- **차단:** source 원장 봉인·복호화와 이름/버전 비교는 실제 Supabase migration ledger 대상 복원 또는 현재 DDL·ACL parity의 대체물이 아니다. 추가 Production 쓰기 없음, Hosted DR/개인정보 canary/유료 생성 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Gate 1 / Phase 8-A·8-B: disposable Provider role replay 실측 SUCCESS
 
 - **선행 코드 병합:** PR #3252·#3255 필수 통합 CI 성공 및 보호된 `main` 병합. 역할 증거 검증 구현을 기존 수동 격리 복구에 결합했고, 개인 정보나 원문 SQL을 아티팩트에 공개하지 않음.
