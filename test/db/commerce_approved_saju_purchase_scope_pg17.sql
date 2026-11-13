@@ -71,15 +71,15 @@ begin
       or issue_scope->'targetBirth'->>'birthDate' is distinct from (
         select birth_date::text from public.birth_profile_revisions where id=authorized.target_birth_revision_id
       ) or exists (
-      select 1 from commerce_saju_private.prepare_approved_component_reading_v1(actor,intent_id,field,reading_id,
+      select 1 from public.prepare_approved_component_reading_v1(actor,intent_id,field,reading_id,
         session_id,'test-standard-reader',source_hash)
     ) or exists (
-      select 1 from commerce_saju_private.prepare_approved_component_reading_v1(actor,intent_id,field,reading_id,
+      select 1 from public.prepare_approved_component_reading_v1(actor,intent_id,field,reading_id,
         session_id,'test-standard-reader',source_hash,authorized.source_birth_revision_id)
     ) then raise exception 'Pair issuer did not enforce the exact two Birth revisions'; end if;
   end if;
   select * into strict prepared
-  from commerce_saju_private.prepare_approved_component_reading_v1(actor,intent_id,field,reading_id,
+  from public.prepare_approved_component_reading_v1(actor,intent_id,field,reading_id,
     session_id,'test-standard-reader',source_hash,authorized.target_birth_revision_id);
   if prepared.reading_id<>reading_id or prepared.session_id<>session_id
     or issue_scope->>'birthRevisionId' is distinct from authorized.source_birth_revision_id::text
@@ -87,21 +87,29 @@ begin
     or not commerce_saju_private.admit_approved_issue_attempt_v1(actor,intent_id,field,reading_id,
       session_id,null,authorized.source_birth_revision_id,source_hash,authorized.target_birth_revision_id)
     or exists (
-      select 1 from commerce_saju_private.prepare_approved_component_reading_v1(actor,intent_id,field,gen_random_uuid(),
+      select 1 from public.prepare_approved_component_reading_v1(actor,intent_id,field,gen_random_uuid(),
         gen_random_uuid(),'test-standard-reader',repeat('c',64),authorized.target_birth_revision_id)
     ) then raise exception 'Approved logical Reading did not enforce the exact paid request'; end if;
   select * into strict prepared
-  from commerce_saju_private.prepare_approved_component_reading_v1(actor,intent_id,field,gen_random_uuid(),
+  from public.prepare_approved_component_reading_v1(actor,intent_id,field,gen_random_uuid(),
     gen_random_uuid(),'test-standard-reader',source_hash,authorized.target_birth_revision_id);
   if prepared.reading_id<>reading_id or prepared.session_id<>session_id then
     raise exception 'Approved logical Reading replay allocated a new identity';
   end if;
-  perform 1 from public.cmd_prepare_reading_transport_attempt_v1(actor,reading_id,attempt_id,'isolated-fixture','saju',null);
-  if not commerce_saju_private.admit_approved_issue_attempt_v1(actor,intent_id,field,reading_id,
+  if field='compatibility' and exists (
+    select 1 from public.cmd_prepare_approved_saju_attempt_v1(actor,intent_id,field,reading_id,
+      session_id,attempt_id,authorized.source_birth_revision_id,source_hash,'isolated-fixture','saju',null,
+      authorized.source_birth_revision_id)
+  ) then raise exception 'Pair issuer prepared an attempt with a substituted target'; end if;
+  select * into strict prepared from public.cmd_prepare_approved_saju_attempt_v1(actor,intent_id,field,reading_id,
+    session_id,attempt_id,authorized.source_birth_revision_id,source_hash,'isolated-fixture','saju',null,
+    authorized.target_birth_revision_id);
+  if prepared.execution_attempt_id<>attempt_id or prepared.attempt_state<>'running' or prepared.replayed
+    or not public.admit_approved_saju_issue_attempt_v1(actor,intent_id,field,reading_id,
       session_id,attempt_id,authorized.source_birth_revision_id,source_hash,authorized.target_birth_revision_id)
     or commerce_saju_private.admit_approved_issue_attempt_v1(actor,intent_id,field,reading_id,
       session_id,null,authorized.source_birth_revision_id,source_hash,authorized.target_birth_revision_id)
-    or commerce_saju_private.admit_approved_issue_attempt_v1(actor,intent_id,field,reading_id,
+    or public.admit_approved_saju_issue_attempt_v1(actor,intent_id,field,reading_id,
       session_id,attempt_id,authorized.source_birth_revision_id,repeat('c',64),authorized.target_birth_revision_id) then
     raise exception 'Approved source attempt did not enforce the exact paid request';
   end if;
@@ -113,12 +121,21 @@ begin
       if public.qry_approved_saju_pair_issue_scope_v1(actor,intent_id) is not null then
         raise exception 'Pair review returned a target after consent withdrawal';
       end if;
-      if commerce_saju_private.admit_approved_issue_attempt_v1(actor,intent_id,field,reading_id,
+      if public.admit_approved_saju_issue_attempt_v1(actor,intent_id,field,reading_id,
         session_id,attempt_id,authorized.source_birth_revision_id,source_hash,authorized.target_birth_revision_id) then
         raise exception 'Pair issuer admitted a running attempt after consent withdrawal';
       end if;
       raise sqlstate 'ZX001' using message='Restore synthetic pair consent';
     exception when sqlstate 'ZX001' then null;
+    end;
+    begin
+      perform 1 from public.cmd_finalize_approved_saju_reading_v1(actor,intent_id,field,reading_id,attempt_id,
+        gen_random_uuid(),source_hash,'isolated-ref','isolated-approved-v1','isolated-native',
+        'fixture-birth-hash',jsonb_build_object('state','delivered','responseVersion','myeonghwa-product-reading-response-v2',
+          'reading',jsonb_build_object('readingId',reading_id)),response_hash);
+      raise exception 'Single-Birth finalizer accepted a pair Reading';
+    exception when sqlstate 'P0001' then
+      if sqlerrm <> 'Approved Saju issuance authority changed' then raise; end if;
     end;
   end if;
   perform 1 from public.cmd_finalize_reading_transport_success_v1(actor,reading_id,attempt_id,gen_random_uuid(),

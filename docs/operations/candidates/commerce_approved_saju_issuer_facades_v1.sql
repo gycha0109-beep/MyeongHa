@@ -29,12 +29,14 @@ begin
 end
 $function$;
 
-create function public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text)
+-- Paired requests supply the immutable target revision. The private command
+-- checks the exact paid pair and locks its current consent before any write.
+create function public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text,uuid default null)
 returns table(reading_id uuid,session_id uuid)
 language plpgsql volatile security definer set search_path=pg_catalog
 as $function$
 begin
-  return query select * from commerce_saju_private.prepare_approved_component_reading_v1($1,$2,$3,$4,$5,$6,$7);
+  return query select * from commerce_saju_private.prepare_approved_component_reading_v1($1,$2,$3,$4,$5,$6,$7,$8);
   -- The existing invoker constraint triggers read protected tables.
   -- Run them while the controlled wrapper owns the write, before COMMIT.
   set constraints public.ct_reading_session_authority,public.ct_reading_request_authority,
@@ -44,17 +46,18 @@ begin
 end
 $function$;
 
-create function public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text)
+create function public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,uuid default null)
 returns boolean
 language sql volatile security definer set search_path=pg_catalog
 as $function$
   select case when $6 is null then false
-    else commerce_saju_private.admit_approved_issue_attempt_v1($1,$2,$3,$4,$5,$6,$7,$8) end
+    else commerce_saju_private.admit_approved_issue_attempt_v1($1,$2,$3,$4,$5,$6,$7,$8,$9) end
 $function$;
 
 create function public.cmd_prepare_approved_saju_attempt_v1(
   p_subject uuid,p_purchase uuid,p_component text,p_reading uuid,p_session uuid,
-  p_attempt uuid,p_birth uuid,p_request_hash text,p_transport text,p_engine text,p_engine_version text
+  p_attempt uuid,p_birth uuid,p_request_hash text,p_transport text,p_engine text,p_engine_version text,
+  p_target_birth uuid default null
 )
 returns table(execution_attempt_id uuid,execution_attempt_no integer,attempt_state text,replayed boolean)
 language plpgsql volatile security definer set search_path=pg_catalog
@@ -62,14 +65,14 @@ as $function$
 declare prepared record;
 begin
   if not commerce_saju_private.admit_approved_issue_attempt_v1(
-    p_subject,p_purchase,p_component,p_reading,p_session,null,p_birth,p_request_hash
+    p_subject,p_purchase,p_component,p_reading,p_session,null,p_birth,p_request_hash,p_target_birth
   ) then return; end if;
   select * into strict prepared from public.cmd_prepare_reading_transport_attempt_v1(
     p_subject,p_reading,p_attempt,p_transport,p_engine,p_engine_version
   );
   if prepared.replayed then return; end if;
   if not commerce_saju_private.admit_approved_issue_attempt_v1(
-    p_subject,p_purchase,p_component,p_reading,p_session,p_attempt,p_birth,p_request_hash
+    p_subject,p_purchase,p_component,p_reading,p_session,p_attempt,p_birth,p_request_hash,p_target_birth
   ) then
     raise exception using errcode='P0001',constraint='approved_saju_issuer_current_scope_unavailable',
       message='Approved Saju issuance authority changed';
@@ -134,14 +137,17 @@ $function$;
 revoke all on function
   public.qry_approved_saju_issue_scope_v1(uuid,uuid,text),
   public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
-  public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text),
-  public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text),
-  public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text),
+  public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text,uuid),
+  public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,uuid),
+  public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text,uuid),
   public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text),
   public.qry_approved_saju_stored_lineage_v1(uuid,uuid,uuid)
   from public,anon,authenticated,service_role,myeongha_api_executor;
 
-revoke all on function public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)
+revoke all on function public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
+  public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text,uuid),
+  public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,uuid),
+  public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text,uuid)
   from myeongha_commerce_internal_executor;
 
 grant execute on function
@@ -150,9 +156,9 @@ grant execute on function
   public.assert_myeongha_subject_context_v1(uuid),
   public.qry_approved_saju_issue_scope_v1(uuid,uuid,text),
   public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
-  public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text),
-  public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text),
-  public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text),
+  public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text,uuid),
+  public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,uuid),
+  public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text,uuid),
   public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text),
   public.qry_approved_saju_stored_lineage_v1(uuid,uuid,uuid)
   to myeongha_approved_saju_issuer_executor;
@@ -187,7 +193,9 @@ declare
   v_now timestamptz := clock_timestamp();
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
-  if jsonb_typeof(p_proof) is distinct from 'object' or jsonb_typeof(v_payload) is distinct from 'object'
+  -- The current signed source contract binds one Birth only.
+  if p_component is null or p_component='compatibility'
+    or jsonb_typeof(p_proof) is distinct from 'object' or jsonb_typeof(v_payload) is distinct from 'object'
     or p_proof-array['payload','signature','readerSource']<>'{}'::jsonb
     or coalesce(p_proof->>'signature','') !~ '^[a-zA-Z0-9_-]{86}$'
     or octet_length((p_proof-'readerSource')::text)>4096
@@ -328,6 +336,7 @@ begin
     on binding.purchase_intent_id=origin.purchase_intent_id and binding.component=event.dedupe_key
   where event.event_type='approved_saju.reading_requested'
     and event.event_schema_version='approved-saju-reading-request-v1'
+    and event.dedupe_key in ('career','business','wealth','relationship','year','month')
     and event.dedupe_key=event.payload_jsonb->>'component'
     and event.payload_jsonb->>'releaseRef'=p_releases->>event.dedupe_key
     and (event.status='pending' and event.available_at<=v_now
