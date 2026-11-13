@@ -8,7 +8,8 @@ import {
   verifyArchivedSajuProductionIssueProofV1,
 } from './saju-production-reading-issue-source-v1.js';
 
-function fixture() {
+function fixture(component: 'month' | 'year' = 'month') {
+  const isYear = component === 'year';
   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
   const readingId = randomUUID();
   const nativeReadingId = 'isolated-temporal-reading';
@@ -17,12 +18,13 @@ function fixture() {
   const sourceBirthInputHash = 'sha256:v1:' + 'b'.repeat(64);
   const externalRequestRef = 'saju_source_' + randomUUID();
   const referenceDateTime = '2026-11-07T09:52:00.000Z';
-  const releaseRef = 'isolated-month-v1';
+  const releaseRef = 'isolated-' + component + '-v1';
+  const boundaryAt = isYear ? '2026-02-04T02:00:00.000Z' : referenceDateTime;
   const engineVersion = 'isolated-engine';
   const snapshotId = 'isolated-calculation';
   const request = {
     birth: { calendarType: 'solar', date: '1992-07-14', time: '15:20', sex: 'female' },
-    reading: { text: '이번 달', periodReferenceDateTime: referenceDateTime },
+    reading: { text: isYear ? '올해' : '이번 달', periodReferenceDateTime: referenceDateTime },
   } as const;
   const stableReading = { readingId: nativeReadingId };
   const stable = {
@@ -55,17 +57,26 @@ function fixture() {
       semanticHash, snapshotId, officialReportHash: 'e'.repeat(64),
       units: units.map((unit, index) => ({
         unitId: unit.sourceCanonicalUnitRefs[0], sourceRefs: [],
-        factRefs: [`temporal.segmentsById.${index === 0 ? 'before_jeol' : 'after_jeol'}.monthlyStemTenGod`],
+        factRefs: [isYear
+          ? index === 0 ? 'temporal.segmentsById.before_ipchun.annualStemTenGod' : 'temporal.annualStemTenGod'
+          : `temporal.segmentsById.${index === 0 ? 'before_jeol' : 'after_jeol'}.monthlyStemTenGod`],
       })),
     },
     temporal: {
       calendar: {
-        version: 'myeonghwa-temporal-reader-evidence-v1', scope: 'monthly',
+        version: 'myeonghwa-temporal-reader-evidence-v1', scope: isYear ? 'annual' : 'monthly',
         intervalConvention: 'half_open_start_inclusive_end_exclusive',
-        referenceDateTime, timeZone: 'Asia/Seoul', targetYear: 2026, targetMonth: 11, snapshotId,
+        referenceDateTime, timeZone: 'Asia/Seoul', targetYear: 2026,
+        ...(isYear ? {} : { targetMonth: 11 }), snapshotId,
         responseBodyHash: hash(response), calculationHash: 'f'.repeat(64),
-        boundary: { at: referenceDateTime }, referenceSegmentId: 'after_jeol',
-        segments: [
+        boundary: { at: boundaryAt },
+        referenceSegmentId: isYear ? 'after_ipchun' : 'after_jeol',
+        segments: isYear ? [
+          { id: 'before_ipchun', startsAt: '2025-12-31T15:00:00.000Z', endsAt: boundaryAt,
+            pillar: { stem: '을', branch: '사' }, stemTenGod: '정인', natalBranchRelations: {} },
+          { id: 'after_ipchun', startsAt: boundaryAt, endsAt: '2026-12-31T15:00:00.000Z',
+            pillar: { stem: '병', branch: '오' }, stemTenGod: '편인', natalBranchRelations: {} },
+        ] : [
           { id: 'before_jeol', startsAt: '2026-10-31T15:00:00.000Z', endsAt: referenceDateTime,
             pillar: { stem: '무', branch: '술' }, stemTenGod: '정인', natalBranchRelations: {} },
           { id: 'after_jeol', startsAt: referenceDateTime, endsAt: '2026-11-30T15:00:00.000Z',
@@ -78,7 +89,9 @@ function fixture() {
           }> },
       },
       unitWindows: units.map((unit, index) => ({
-        unitId: unit.unitId, segmentIds: [index === 0 ? 'before_jeol' : 'after_jeol'],
+        unitId: unit.unitId, segmentIds: [isYear
+          ? index === 0 ? 'before_ipchun' : 'after_ipchun'
+          : index === 0 ? 'before_jeol' : 'after_jeol'],
       })),
     },
   };
@@ -134,7 +147,7 @@ function fixture() {
   return { referenceDateTime, readerSource, exchange, signProofWithoutReaderSource, archive: {
     trusts: [trust], readingId, storedResponse, storedResponseHash,
   }, receipt: {
-    acceptedAt: new Date().toISOString(), component: 'month', periodReferenceDateTime: referenceDateTime,
+    acceptedAt: new Date().toISOString(), component, periodReferenceDateTime: referenceDateTime,
     nativeReadingId, executionAttemptId, sourceRequestHash: hash(request), releaseRef,
     externalRequestRef, engineVersion, storedResponseHash,
   } };
@@ -157,6 +170,30 @@ describe('signed canonical temporal issue', () => {
     expect(verifyArchivedSajuProductionIssueProofV1({
       ...input.archive, receipt: { ...receipt, periodReferenceDateTime: '2026-12-01T00:00:00.000Z' },
     })).toBeNull();
+  });
+
+  it('preserves a signed full-year Reading across both Ipchun windows and Reader reopening', async () => {
+    const input = fixture('year');
+    const issued = await input.exchange();
+    expect(issued?.issueProof?.readerSource).toEqual(input.readerSource);
+    const reopened = verifyArchivedSajuProductionIssueProofV1({
+      ...input.archive, receipt: { ...input.receipt, proof: issued!.issueProof },
+    });
+    expect(reopened?.readerSource?.temporal?.calendar.scope).toBe('annual');
+    const grounded = projectSajuCanonicalReaderGroundingV1(reopened!.readerSource!, {
+      readingId: input.archive.readingId,
+      storedResponseHash: input.archive.storedResponseHash,
+      sajuDomain: 'general',
+    });
+    expect(grounded.disclosures).toHaveLength(2);
+    expect(grounded.disclosures[0]?.text).toContain('을사');
+    expect(grounded.disclosures[1]?.text).toContain('병오');
+    expect(grounded.units[0]?.requiredDisclosureRefs).toEqual([
+      grounded.disclosures[0]?.disclosureRef,
+    ]);
+    expect(grounded.units[1]?.requiredDisclosureRefs).toEqual([
+      grounded.disclosures[1]?.disclosureRef,
+    ]);
   });
 
   it('rejects a valid source-less signed monthly proof at both issue and archived reread', async () => {
