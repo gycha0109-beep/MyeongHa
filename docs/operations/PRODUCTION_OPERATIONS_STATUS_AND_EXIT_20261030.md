@@ -1,3 +1,11 @@
+### 2026-11-13 KST — 원격 전용 결제 SQL 후보의 실제 DB 객체/권한 확인 (읽기 전용)
+
+- 원격 이력 `20261028011357`(원본 SQL 9,260 bytes)과 저장소 `20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql`(9,270문자)의 논리 이름은 유사하지만, **파일·적용 이력이 바이트·구문·실행 인과까지 동일하다는 증거는 없다**.
+- 저장소 SQL에 기술된 `commerce_private.owner_sandbox_receipt_attestation_v1` 테이블과 `public.cmd_persist_owner_kcp_signed_sandbox_receipt_v1` 함수는 **현재 실제 운영 DB에 존재**한다. 함수는 네 인자 `(uuid,uuid,text,text)`, `SECURITY DEFINER`, owner `postgres`이고, `myeongha_api_executor` 실행 **true**, `anon` 및 `authenticated` 실행 **false**를 read-only pg_catalog에서 확인했다.
+- **처분 경계:** 객체 존재 및 표면 권한 일치만으로 양쪽 원본 SQL과 함수 본문·실제 데이터·RLS/의존성까지 동등하다고 판정하지 않는다. Production migration `repair`나 재실행은 금지. 사용자 승인 전 가능한 객체/본문 지문 및 격리 검증을 우선한다.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — 현재 Production frontier 이후 백업/원장 수집 수동 실행 등록
 
 - 현재 실제 최종 migration `20261113062455`에 맞춘 백업을 확보하기 위해 기존 보호된 `production-postgres-backup.yml`을 [run #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)로 `main` `6eab97337811128282f5f5ec6320e4608d5f9c09`에서 `capture_provider_ledger=true`로 **수동 dispatch**했다. 활성 중복 실행이 없음을 먼저 확인했다.
