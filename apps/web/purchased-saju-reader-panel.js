@@ -1,6 +1,7 @@
 import { createChatOpenClientV1 } from './chat-open-client.js';
 import { createReaderRuntimeClientV1 } from './reader-runtime-client.js';
 import { appendProtectedReaderChatRevealV1, clearProtectedReaderChatRevealV1 } from './paid-reader-chat-reveal.js';
+import { getUiLocale, translateStaticUi } from './ui-i18n.js';
 
 /** Mount only after the existing Records API has admitted an approved purchase. */
 export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
@@ -38,7 +39,7 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
       const question = document.createElement('input');
       question.required = true;
       question.maxLength = 240;
-      question.value = '그 부분을 더 설명해 주세요.';
+      question.value = translateStaticUi('그 부분을 더 설명해 주세요.', getUiLocale());
       label.append('질문 ', question);
       const send = document.createElement('button');
       send.type = 'submit';
@@ -53,6 +54,7 @@ export function mountPurchasedSajuReaderPanelV1(panel, record, resolveBearer) {
       const sceneButtons = [];
       for (const [segmentIndex, segment] of scene.utterance.segments.entries()) {
         const paragraph = document.createElement('p');
+        paragraph.dataset.officialReading = '';
         paragraph.textContent = segment.text;
         section.append(paragraph);
         if (segment.kind !== 'semantic_realization') continue;
