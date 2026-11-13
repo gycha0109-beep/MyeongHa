@@ -1,3 +1,11 @@
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 단일 statement 21개 불일치 지문 추가 대조
+
+- **실제 조사:** 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) 산출물의 원본 SQL SHA-256/길이와 같은 실행의 exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`의 저장소 SQL 원문 파일 지문 비교. **9개(`0130`, `0160`, `0195`, `0221`, `0271`, `0800`, `0961`, `0981`, `1380`)는 source SQL statement가 repo 파일에서 마지막 semicolon+LF 2바이트를 제외한 내용과 SHA-256까지 정확히 일치**. 나머지 12개(`1580`, `1590`, `1600`, `1610`, `1620`, `1630`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`)는 bounded format fingerprint 검사로 미확정.
+- **독립 증거:** [21개 비식별 버전별 해시 조사 결과](POSTGRES_COMMON_VERSION_MIGRATION_SINGLE_STATEMENT_FINGERPRINT_TRIAGE_20261113.json) 및 앞선 [200개 본문 전수 실증](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json). 추가 9개는 파일 바이트 완전 일치가 아니므로 13개 byte-exact 집계 변경 없음. 실제 SQL 의미/현재 객체·권한 동등성은 계속 미입증. 원본 12개 NULL 및 다중 SQL 154개 framing 보류도 유지한다.
+- **다음:** 기존 DB 객체/권한 비교 증거를 연결하여 9개 framing 대응의 영향 범위를 정확히 처분하고, 남은 12개 단일 mismatch 및 154개 multi-statement 정합성 조사. 원본 SQL 복구·재실행, 운영 migration repair, Hosted 생성, canary 실행 없음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Phase 8-A: 공통 마이그레이션 본문 원장 실제 전수 비교
 
 - **완료 근거:** protected main 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS / source backup `43174606843` / exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`. 결과 artifact `14012916977` (ZIP SHA-256 `1aa91ac0b1273263b1452f4c6a26da724c8dea99003260fe4381d2ea9860f078`); 본문 원본 결과 JSON SHA-256 `42be852ab426edc70e89cc0b018e88594bfa341b29f323ebb4816a7a1c05b005`.
