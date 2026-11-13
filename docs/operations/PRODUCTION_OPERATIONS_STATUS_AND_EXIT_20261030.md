@@ -1,3 +1,13 @@
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 봉인 원장·main 파일 242/276 실측, 신규 원격 전용 1개 처분
+
+- **코드·CI:** PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259) 자동 병합·통합 CI 성공. 보호된 `main`에서 [#43350367171](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350367171) SUCCESS, 원본 백업 #43174606843, 실제 SHA 검증·격리 복호화 후 **원본 242개 / 정확한 main SQL 파일 276개** 비교. 실제 실행 코드 SHA `9a5f903d8c3498a18363286000525f8114671b9e`, 증거 artifact #14002903484, ZIP SHA-256 `9432441c41030f0702c93d570b3514e3c43798ac2bfdeb49c16cad61c3329e9f`.
+- **정확 버전 결과:** 공통 200개 / 원격 전용 42개 / 저장소 전용 76개 / 동일 버전-이름 불일치 0개. 과거 원격 전용 41개는 모두 그대로 있고 추가 1개 `20261109071019`. 12개 NULL SQL 본문은 계속 미해결. 고유 이름으로 자동 매칭된 다른 버전 쌍 1개 `20261029012948`↔`20261029012000`은 과거 수동 조사한 8개 쌍을 대체하지 않는다.
+- **추가 Production SELECT-only 확인:** 현재 원격 원장도 242개/frontier `20261109071019` 유지. 추가 버전명 `admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109`, stored statement 1개/5,512바이트/SHA-256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8`, created_by 메타데이터 있음(실행자 인증 아님), rollback/idempotency 없음. SQL 원문·작성자 원문 열람·공개 없음. Admin 영역 수정 없이 source-only HOLD.
+- **기록:** 기존 [41개 역사적 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)는 그대로 보존. [42개 증분 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_DELTA_20261113.json)로 현재 차이를 확정하고 [대조 작업 문서](POSTGRES_SEALED_PROVIDER_MIGRATION_MAIN_LINEAGE_20261113.md) 갱신. SQL 효과, Hosted Provider, 대상 원장 재생, 전체 schema/권한·개인정보 연속성·RPO/RTO는 미입증.
+- **판정:** `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN. Production 마이그레이션/DDL/DML/Secret 변경, 유료 Hosted 생성 및 개인정보 canary 없음.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Gate 1 / Phase 8-A·8-B: disposable Provider role replay 실측 SUCCESS
 
 - **선행 코드 병합:** PR #3252·#3255 필수 통합 CI 성공 및 보호된 `main` 병합. 역할 증거 검증 구현을 기존 수동 격리 복구에 결합했고, 개인 정보나 원문 SQL을 아티팩트에 공개하지 않음.
