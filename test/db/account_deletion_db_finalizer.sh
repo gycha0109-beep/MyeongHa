@@ -21,6 +21,7 @@ reading_session_id="fb500000-0000-0000-0000-000000000001"
 reading_id="fb510000-0000-0000-0000-000000000001"
 execution_id="fb520000-0000-0000-0000-000000000001"
 commerce_link_id="fb600000-0000-0000-0000-000000000001"
+shared_memory_id="fb700000-0000-4000-8000-000000000001"
 
 "${psql_base[@]}" <<SQL
 insert into auth.users(id) values ('$auth_id');
@@ -59,6 +60,8 @@ update public.readings set committed_execution_attempt_id='$execution_id' where 
 update public.reading_sessions set current_reading_id='$reading_id' where id='$reading_session_id';
 insert into public.commerce_account_links(id,subject_id,provider,external_account_fingerprint,status,verified_at,revoked_at,created_at)
 values ('$commerce_link_id','$subject_id','test-provider','sha256:retain','active',clock_timestamp(),null,clock_timestamp());
+insert into public.subject_shared_memory_items_v1(id,subject_id,body_text)
+values ('$shared_memory_id','$subject_id','ACCOUNT_ERASURE_PRIVATE_FIXTURE');
 SQL
 
 if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
@@ -123,6 +126,8 @@ if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
   bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-rollback "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
 fi
 pass "mid-finalization failure rolled back atomically"
+rolled_back_memory="$("${psql_base[@]}" -Atc "select count(*) from public.subject_shared_memory_items_v1 where id='$shared_memory_id' and subject_id='$subject_id' and body_text='ACCOUNT_ERASURE_PRIVATE_FIXTURE';")"
+[[ "$rolled_back_memory" == "1" ]] || fail "failed finalizer erased shared memory despite transaction rollback"
 "${psql_base[@]}" -c "drop table public._finalizer_blocker;"
 
 result="$("${psql_base[@]}" -Atc "select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int) from public.internal_finalize_account_deletion_db_v1('$subject_id','$job_id','$lock_owner');")"
@@ -130,6 +135,8 @@ result="$("${psql_base[@]}" -Atc "select (finalized::int)||'|'||(replayed::int)|
 
 deleted="$("${psql_base[@]}" -Atc "select (select count(*) from public.profiles where subject_id='$subject_id')||'|'||(select count(*) from public.birth_profile_revisions where subject_id='$subject_id')||'|'||(select count(*) from public.readings where subject_id='$subject_id')||'|'||(select count(*) from public.reading_execution_attempts where subject_id='$subject_id')||'|'||(select count(*) from public.guest_sessions where claimed_by_subject_id='$subject_id');")"
 [[ "$deleted" == "0|0|0|0|0" ]] || fail "DELETE representatives remain: $deleted"
+shared_memory_remaining="$("${psql_base[@]}" -Atc "select count(*) from public.subject_shared_memory_items_v1 where id='$shared_memory_id' or subject_id='$subject_id';")"
+[[ "$shared_memory_remaining" == "0" ]] || fail "shared memory remained after account finalizer"
 
 retain="$("${psql_base[@]}" -Atc "select count(*)||'|'||status||'|'||case when revoked_at is null then 'NO' else 'YES' end from public.commerce_account_links where id='$commerce_link_id' group by status,revoked_at;")"
 [[ "$retain" == "1|revoked|YES" ]] || fail "Commerce RETAIN/revocation mismatch: $retain"
@@ -151,6 +158,8 @@ auth_exists="$("${psql_base[@]}" -Atc "select count(*) from auth.users where id=
 
 replay="$("${psql_base[@]}" -Atc "select (finalized::int)||'|'||(replayed::int)||'|'||(auth_mapping_present::int) from public.internal_finalize_account_deletion_db_v1('$subject_id','$job_id','$lock_owner');")"
 [[ "$replay" == "1|1|1" ]] || fail "idempotent replay mismatch: $replay"
+replay_memory="$("${psql_base[@]}" -Atc "select count(*) from public.subject_shared_memory_items_v1 where subject_id='$subject_id';")"
+[[ "$replay_memory" == "0" ]] || fail "shared memory reappeared after finalizer replay"
 if [[ "${COMMERCE_PRIVATE_CLAIM_FINALIZER_PG17_PROOF:-0}" == '1' ]]; then
   bash test/db/commerce_private_claim_finalizer_pg17_assertions.sh after-finalization "$subject_id" "$guest_subject_id" "$job_id" "$lock_owner"
 fi

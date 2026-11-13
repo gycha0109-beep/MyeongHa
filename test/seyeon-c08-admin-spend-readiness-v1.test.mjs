@@ -6,7 +6,8 @@ const projectId='proj_testing_123456';
 const adminKey='sk-admin-synthetic-not-a-real-secret-1234567890';
 const now=new Date('2026-11-11T09:00:00Z');
 const project=()=>({
- object:'organization.project',id:projectId,status:'active',archived_at:null,
+ object:'organization.project',id:projectId,name:'MyeongHa-Evaluation',
+ status:'active',archived_at:null,
 });
 const cap=(status='enforcing',cents=100)=>({
  object:'project.spend_limit',currency:'USD',interval:'month',
@@ -65,6 +66,8 @@ describe('C08 actual Admin GET hard-limit and current-cost readiness (never paid
    {...project(),archived_at:1793491200},
    {...project(),id:'proj_foreign_999999'},
    {...project(),object:'not_a_project'},
+   {...project(),name:'Another-Evaluation'},
+   {...project(),name:null},
   ]){
    const f=fake(cap(),page(),bad);
    const outcome=await run(f);
@@ -131,5 +134,110 @@ describe('C08 actual Admin GET hard-limit and current-cost readiness (never paid
    'MONTH_COST_SHAPE_MISMATCH');
   expect((await run(fake(),{now:new Date('invalid')})).reason).toBe(
    'CLOCK_UNAVAILABLE');
+ });
+});
+
+describe('C08 optional project-key metadata readback remains non-authorizing',()=>{
+ const keyId='key_eval_readonly_123456';
+ const record=()=>({
+  object:'organization.project.api_key',id:keyId,
+  owner_project_access:'active',created_at:1793300000,
+  redacted_value:'sk-private...masked',
+  owner:{type:'service_account',service_account:{id:'svc_acct_private_123'}},
+ });
+ const withKey=(keyResponse=record())=>{
+  const calls=[];
+  const fetchImpl=async(url,opts)=>{
+   calls.push({url,method:opts.method,redirect:opts.redirect});
+   if(calls.length===1)return reply(project());
+   if(calls.length===2)return reply(keyResponse);
+   if(calls.length===3)return reply(cap());
+   if(calls.length===4)return reply(page(0.1));
+   throw Error('unexpected extra GET');
+  };
+  return {fetchImpl,calls};
+ };
+ it('reads project-owned active key metadata only and does not claim secret binding',async()=>{
+  const f=withKey();
+  const result=await run(f,{evaluationKeyId:keyId});
+  expect(result).toMatchObject({
+   status:'ADMIN_READBACK_ONLY',projectKeyMetadataVerified:true,
+   projectCredentialBindingVerified:false,invoiceReconciled:false,
+   paidDispatchEnabled:false,monthSpendMicroUsd:100000,
+  });
+  expect(f.calls).toHaveLength(4);
+  expect(f.calls.every(c=>c.method==='GET'&&c.redirect==='error')).toBe(true);
+  expect(f.calls[1].url).toBe(
+   'https://api.openai.com/v1/organization/projects/'+projectId+
+   '/api_keys/'+keyId);
+  expect(JSON.stringify(result)).not.toContain(keyId);
+  expect(JSON.stringify(result)).not.toContain('private');
+ });
+ it('rejects inactive, foreign, malformed or missing key metadata before cost reads',async()=>{
+  for(const bad of [
+   {...record(),id:'key_other_987654'},
+   {...record(),owner_project_access:'inactive'},
+   {...record(),owner_project_access:null},
+   {...record(),created_at:'1793300000'},
+   {...record(),created_at:1794387601},
+   {...record(),expires_at:1794387599},
+   {...record(),expires_at:1794387600},
+   {...record(),expires_at:'1794389999'},
+   {...record(),expires_at:1793299999},
+   {...record(),owner:{type:'user',user:{id:'svc_acct_invalid'}}},
+   {...record(),owner:{type:'service_account',service_account:{id:'user_invalid'}}},
+   {...record(),owner:{type:'unknown'}},
+   {...record(),object:'organization.project'},
+  ]){
+   const f=withKey(bad);
+   const result=await run(f,{evaluationKeyId:keyId});
+   expect(result).toMatchObject({status:'HOLD',
+    reason:'PROJECT_KEY_INACTIVE_OR_MISMATCHED',
+    paidDispatchEnabled:false,projectKeyMetadataVerified:false});
+   expect(f.calls).toHaveLength(2);
+  }
+ });
+ it('accepts genuinely unexpired project keys but never grants billable dispatch',async()=>{
+  const f=withKey({...record(),expires_at:1794387601});
+  const x=await run(f,{evaluationKeyId:keyId});
+  expect(x).toMatchObject({
+   status:'ADMIN_READBACK_ONLY',projectKeyMetadataVerified:true,
+   projectCredentialBindingVerified:false,paidDispatchEnabled:false,
+  });
+  expect(f.calls).toHaveLength(4);
+  const noExpiry=withKey({...record(),expires_at:null});
+  const y=await run(noExpiry,{evaluationKeyId:keyId});
+  expect(y.projectKeyMetadataVerified).toBe(true);
+  expect(y.paidDispatchEnabled).toBe(false);
+ });
+ it('rejects malformed key ID without any remote read',async()=>{
+  const f=withKey();
+  for(const bad of ['key_../other','sk-live-secret','key_x?owner=1','key_한글',17]){
+   const result=await run(f,{evaluationKeyId:bad});
+   expect(result).toMatchObject({
+    status:'HOLD',reason:'EVALUATION_KEY_ID_INVALID',
+    paidDispatchEnabled:false});
+  }
+  expect(f.calls).toHaveLength(0);
+ });
+ it('holds an Admin key metadata HTTP error without reading costs',async()=>{
+  const calls=[];
+  const f={fetchImpl:async(url,opts)=>{
+   calls.push({url,method:opts.method});
+   return calls.length===1?reply(project()):new Response(null,{status:403});
+  }};
+  const result=await run(f,{evaluationKeyId:keyId});
+  expect(result.reason).toBe('PROJECT_KEY_READBACK_FAILED');
+  expect(result.paidDispatchEnabled).toBe(false);
+  expect(calls).toHaveLength(2);
+ });
+ it('does not require key metadata to preserve independent existing spending diagnosis',async()=>{
+  const f=fake(cap(),page(0.1));
+  const result=await run(f);
+  expect(result).toMatchObject({
+   status:'ADMIN_READBACK_ONLY',projectKeyMetadataVerified:false,
+   projectCredentialBindingVerified:false,paidDispatchEnabled:false,
+  });
+  expect(f.calls).toHaveLength(3);
  });
 });

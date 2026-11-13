@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { WithdrawalRequestPanel } from '../commerce/WithdrawalRequestPanel.js';
+import { SharedMemoryPanel } from './SharedMemoryPanel.js';
 import { createMyRuntimeClient, MyRuntimeError } from '../../my-runtime-client.js';
 import { PRODUCT_AUTH_STORAGE_V1, readMemberSession, signOutMember } from '../../product-auth.js';
 import { shouldReloadMyForMemberSessionStorageChange } from '../../product-auth-surface.js';
@@ -152,9 +153,16 @@ function Detail({ panel, account, birth }: { panel: Exclude<MyPanel, null>; acco
       ) : null}
       {panel === 'memory' ? (
         <>
-          <h3><MyText source="캐릭터 메모리 관리" /></h3>
-          <p><MyText source="캐릭터가 기억할 정보를 확인하고 직접 추가하거나 관리하는 공간입니다." /></p>
-          <p className="my-detail-hint"><MyText source="캐릭터별 메모리 조회·저장 기능은 아직 연결되지 않았습니다. 확인되지 않은 기억을 임의로 표시하거나 저장하지 않습니다." /></p>
+          <h3><MyText source="공통 메모리" /></h3>
+          {/* Reset note/draft state when Member identity or access changes. */}
+          <SharedMemoryPanel
+            key={payload?.subjectKind === 'member' && payload.subjectStatus === 'active'
+              ? 'member:' + (session?.user?.id ?? 'unverified')
+              : 'ineligible'}
+            canManage={payload?.subjectKind === 'member' && payload.subjectStatus === 'active'}
+            t={uiLabel}
+          />
+          <p className="my-detail-hint"><MyText source="캐릭터 대화에서 공통 메모리를 실제로 불러오는 기능은 운영 검증 후 연결됩니다." /></p>
         </>
       ) : null}
       {panel === 'orders' ? (
@@ -317,8 +325,8 @@ function MyPageBody() {
 
         <section className="my-memory-section" aria-labelledby="my-memory-title">
           <div className="my-memory-copy">
-            <h2 id="my-memory-title"><MyText source="캐릭터 메모리" /></h2>
-            <p><MyText source="대화 중 기억한 내용과 내가 직접 추가한 내용을" /><br className="my-desktop-break" /> <MyText source="확인하고 관리합니다." /></p>
+            <h2 id="my-memory-title"><MyText source="공통 메모리" /></h2>
+            <p><MyText source="모든 캐릭터가 참고할 정보를 직접 등록하고" /><br className="my-desktop-break" /> <MyText source="수정하거나 삭제합니다. 자동 저장은 하지 않습니다." /></p>
             <button type="button" className="my-primary-action" onClick={() => toggle('memory')} aria-expanded={activePanel === 'memory'}><MyText source="메모리 관리하기" /> <MyGlyph name="chevron" /></button>
           </div>
         </section>

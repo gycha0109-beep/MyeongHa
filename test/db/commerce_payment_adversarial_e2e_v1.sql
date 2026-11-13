@@ -106,17 +106,41 @@ update public.chat_credit_lots_v1
 set issued_at=now()-interval '31 days',expires_at=now()-interval '1 day'
 where subject_id='cda20000-0000-4000-8000-000000000003';
 
-update public.subjects set status='deleted',updated_at=now()
-where id='cda20000-0000-4000-8000-000000000002';
-do $erasure$
+-- The finalizer is the sole authority permitted to transition a Subject to deleted.
+-- This payment fixture must not bypass account deletion or test the wallet trigger
+-- through an unauthorized state update. Full authorized erasure is covered by the
+-- separate account-deletion DB finalizer case.
+do $direct_delete_denied$
+declare v_message text;
 begin
- if exists(select 1 from public.chat_credit_lots_v1
-           where subject_id='cda20000-0000-4000-8000-000000000002')
- then raise exception 'ATTACK_DELETED_WALLET_SURVIVES'; end if;
+  begin
+    update public.subjects set status='deleted',updated_at=now()
+    where id='cda20000-0000-4000-8000-000000000002';
+    raise exception 'ATTACK_DIRECT_ACCOUNT_DELETE_SUCCEEDED';
+  exception when check_violation then
+    get stacked diagnostics v_message = message_text;
+    if v_message <> 'shared-memory erasure requires the exact account finalization state' then
+      raise exception 'ATTACK_DIRECT_ACCOUNT_DELETE_WRONG_DENIAL: %', v_message;
+    end if;
+  end;
+end $direct_delete_denied$;
+
+update public.subjects set status='deletion_pending',updated_at=now()
+where id='cda20000-0000-4000-8000-000000000002';
+
+do $deletion_pending$
+begin
+ if (select status from public.subjects
+     where id='cda20000-0000-4000-8000-000000000002') <> 'deletion_pending'
+ then raise exception 'ATTACK_UNAUTHORIZED_SUBJECT_DELETION'; end if;
+ if (select count(*) from public.chat_credit_lots_v1
+     where subject_id='cda20000-0000-4000-8000-000000000002'
+       and credits_remaining=50) <> 1
+ then raise exception 'ATTACK_UNAUTHORIZED_WALLET_MUTATION'; end if;
  if (select count(*) from public.chat_credit_lots_v1
      where subject_id='cda20000-0000-4000-8000-000000000001'
-       and credits_remaining=50)<>1
- then raise exception 'ATTACK_ERASURE_TENANT_CROSSOVER'; end if;
-end $erasure$;
+       and credits_remaining=50) <> 1
+ then raise exception 'ATTACK_DELETION_TENANT_CROSSOVER'; end if;
+end $deletion_pending$;
 commit;
-\echo PASS_PAYMENT_E2E_SYNTHETIC_CUSTOMERS_SIGNUP_REPLAY_FRAUD_EXPIRY_ERASURE
+\echo PASS_PAYMENT_E2E_SYNTHETIC_CUSTOMERS_SIGNUP_REPLAY_FRAUD_EXPIRY_PENDING_AUTHORITY

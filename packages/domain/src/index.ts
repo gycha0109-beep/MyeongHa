@@ -597,3 +597,48 @@ export {
   type ClaimNarrativeProfileV1,
   type ClaimNarrativeLocaleDecisionV1,
 } from './claim-narrative-locale-v1.js';
+
+export {
+  CHARACTER_WORKING_MEMORY_PROJECTION_SCHEMA_VERSION_V1,
+  CharacterWorkingMemoryProjectionErrorV1,
+  buildCharacterWorkingMemoryProjectionV1,
+  type BuildCharacterWorkingMemoryProjectionInputV1,
+  type CharacterWorkingMemoryAdmissionV1,
+  type CharacterWorkingMemoryClaimKindV1,
+  type CharacterWorkingMemoryExcludedMessageReasonV1,
+  type CharacterWorkingMemoryLifeFactSourceV1,
+  type CharacterWorkingMemoryMemorySourceV1,
+  type CharacterWorkingMemoryProjectedRecordV1,
+  type CharacterWorkingMemoryProjectionV1,
+  type CharacterWorkingMemoryRecordKindV1,
+  type CharacterWorkingMemoryRecordProjectorV1,
+  type CharacterWorkingMemoryRecentMessageSourceV1,
+  type CharacterWorkingMemoryRelationshipEventSourceV1,
+  type CharacterWorkingMemoryRelationshipSourceV1,
+} from './character-working-memory-projection-v1.js';
+
+
+export {
+  MODEL_TOKEN_BUDGET_INPUT_BOUND_SEMANTICS_V1,
+  MODEL_TOKEN_BUDGET_PROFILE_SCHEMA_VERSION_V1,
+  MODEL_TOKEN_BUDGET_RECEIPT_SCHEMA_VERSION_V1,
+  ModelTokenBudgetErrorV1,
+  certifyModelTokenBudgetV1,
+  validateModelTokenBudgetProfileV1,
+  type ModelTokenBudgetFailureCodeV1,
+  type ModelTokenBudgetProfileV1,
+  type ModelTokenBudgetReceiptV1,
+  type ModelTokenCountAdapterV1,
+  type ModelTokenCountExactRequestV1,
+} from './model-token-budget-profile-v1.js';
+
+
+export {
+  CHARACTER_MEMORY_RETRIEVAL_POLICY_VERSION_V1,
+  detectExplicitMemoryCallbackRequestedV1,
+  retrieveCharacterWorkingMemoryV1,
+  type CharacterMemoryRetrievalExclusionV1,
+  type CharacterMemoryRetrievalResultV1,
+  type CharacterMemoryRetrievedRecordV1,
+  type RetrieveCharacterWorkingMemoryInputV1,
+} from './character-memory-retrieval-v1.js';
