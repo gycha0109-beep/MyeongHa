@@ -1,5 +1,6 @@
 import {
   SAJU_READING_COMPONENTS_V1,
+  getApprovedSajuOfferV1,
   type SajuReadingComponentV1,
 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import type { SajuBirthRevisionBindingV1 } from '../../../packages/domain/src/index.js';
@@ -25,6 +26,11 @@ interface ScopeRow {
 
 interface PairScopeRow extends ScopeRow {
   readonly admissionHash: string;
+  /** Exact immutable purchase choice returned by the consent-locked SQL facade. */
+  readonly approvedOfferId: string;
+  readonly counterpartOrder: 'first' | 'additional';
+  readonly targetPersonId: string;
+  readonly useApprovalRef: string;
   readonly targetBirthRevisionId: string;
   readonly targetBirthInputHash: string;
   readonly targetBirth: ScopeRow['birth'];
@@ -44,8 +50,16 @@ export async function readApprovedSajuPairIssueScopeV1(
   }
   const { scope } = rows[0];
   if (scope === null) return null;
+  const offer = getApprovedSajuOfferV1(scope.approvedOfferId);
   if (scope.periodReferenceDateTime !== null || scope.birthRevisionId === scope.targetBirthRevisionId ||
-      !scope.admissionHash || !scope.releaseRef || !scope.sourceBirthInputHash || !scope.targetBirthInputHash) {
+      !scope.admissionHash || !scope.releaseRef || !scope.sourceBirthInputHash || !scope.targetBirthInputHash ||
+      offer === undefined || offer.type !== 'comparison' || !offer.components.includes('compatibility') ||
+      offer.counterpartOrder !== scope.counterpartOrder ||
+      !['first-counterpart', 'additional-counterpart', 'relationship-plus-first'].includes(offer.id) ||
+      typeof scope.targetPersonId !== 'string' ||
+      !/^[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/iu.test(scope.targetPersonId) ||
+      typeof scope.useApprovalRef !== 'string' || scope.useApprovalRef.trim().length === 0 ||
+      scope.useApprovalRef.length > 200) {
     throw new Error('Approved Saju comparison scope does not match the pinned pair.');
   }
   const { birth } = buildSajuProductionCalculationRequestV1({
@@ -59,6 +73,16 @@ export async function readApprovedSajuPairIssueScopeV1(
     birthRevisionId: scope.birthRevisionId, targetBirthRevisionId: scope.targetBirthRevisionId,
     sourceBirthInputHash: scope.sourceBirthInputHash, targetBirthInputHash: scope.targetBirthInputHash,
     admissionHash: scope.admissionHash, releaseRef: scope.releaseRef,
+    /** This is not a grant or official issue authorization. */
+    paidComparison: Object.freeze({
+      offerId: offer.id,
+      counterpartOrder: scope.counterpartOrder,
+      targetPersonId: scope.targetPersonId,
+      useApprovalRef: scope.useApprovalRef,
+      requiredComponents: Object.freeze([...offer.components]),
+      releaseRef: scope.releaseRef,
+      authorizedForIssue: false as const,
+    }),
     request, sourceRequestHash: hashSajuHeldSourceProofRequestV1(request),
   });
 }
