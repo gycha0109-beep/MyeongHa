@@ -18,14 +18,43 @@ create function public.qry_approved_saju_pair_issue_scope_v1(p_subject uuid,p_pu
 returns jsonb
 language plpgsql volatile security definer set search_path=pg_catalog
 as $function$
-declare v_scope jsonb;
+declare v_scope jsonb; v_admission jsonb; v_order text; v_offer text;
 begin
   perform public.assert_myeongha_subject_context_v1(p_subject);
   v_scope := commerce_saju_private.approved_issue_scope_v1(p_subject,p_purchase,'compatibility');
   if v_scope is null or not commerce_saju_private.lock_approved_pair_issue_consent_v1(
     p_subject,p_purchase,(v_scope->>'targetBirthRevisionId')::uuid
   ) then return null; end if;
-  return v_scope;
+
+  -- Only the immutable purchased Offer can label a paid pair. The consent
+  -- approval and original admission hash must match the very same purchase.
+  select scope.admission into v_admission
+  from public.commerce_saju_purchase_origins_v1 origin
+  join commerce_saju_private.approved_purchase_scope_v1 scope
+    on scope.purchase_intent_id=origin.purchase_intent_id
+    and scope.admission_hash=origin.approved_admission_hash
+  where origin.subject_id=p_subject and origin.purchase_intent_id=p_purchase
+    and scope.admission_hash=v_scope->>'admissionHash';
+  if v_admission is null or jsonb_typeof(v_admission) is distinct from 'object'
+    or jsonb_typeof(v_admission->'counterpart') is distinct from 'object'
+    or v_admission->'counterpart'->>'targetBirthRevisionId'
+      is distinct from v_scope->>'targetBirthRevisionId'
+    or coalesce(v_admission->'counterpart'->>'useApprovalRef','')=''
+  then return null; end if;
+
+  v_offer := v_admission->>'approvedOfferId';
+  v_order := v_admission->'counterpart'->>'order';
+  if not (
+    (v_offer='first-counterpart' and v_order='first')
+    or (v_offer='additional-counterpart' and v_order='additional')
+    or (v_offer='relationship-plus-first' and v_order='first')
+  ) then return null; end if;
+
+  return v_scope || jsonb_build_object(
+    'approvedOfferId',v_offer,'counterpartOrder',v_order,
+    'targetPersonId',v_admission->'counterpart'->>'targetPersonId',
+    'useApprovalRef',v_admission->'counterpart'->>'useApprovalRef'
+  );
 end
 $function$;
 
