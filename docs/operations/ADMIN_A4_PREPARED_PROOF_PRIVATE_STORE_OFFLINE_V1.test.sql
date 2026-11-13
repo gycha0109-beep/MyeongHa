@@ -87,6 +87,8 @@ INSERT INTO myeongha_a4_source_ops.prepared_attempt_proofs_v1(execution_attempt_
 VALUES ('123e4567-e89b-42d3-a456-426614174012',
  jsonb_build_object('payload',jsonb_build_object(
  'version','myeongha-a4-prepared-attempt-proof-v1',
+ 'issuer','myeongha-production','audience','saju-production-a4',
+ 'keyId','mh-a4-prepared-v1','readingId','123e4567-e89b-42d3-a456-426614174011',
  'executionAttemptId','123e4567-e89b-42d3-a456-426614174012',
  'subjectId','123e4567-e89b-42d3-a456-426614174010',
  'issuedAtMs',1794500000000::bigint,'expiresAtMs',1794500090000::bigint),
@@ -94,6 +96,8 @@ VALUES ('123e4567-e89b-42d3-a456-426614174012',
 ('123e4567-e89b-42d3-a456-426614174013',
  jsonb_build_object('payload',jsonb_build_object(
  'version','myeongha-a4-prepared-attempt-proof-v1',
+ 'issuer','myeongha-production','audience','saju-production-a4',
+ 'keyId','mh-a4-prepared-v1','readingId','123e4567-e89b-42d3-a456-426614174011',
  'executionAttemptId','123e4567-e89b-42d3-a456-426614174013',
  'subjectId','123e4567-e89b-42d3-a456-426614174010',
  'issuedAtMs',1794500000000::bigint,'expiresAtMs',1794500090000::bigint),
