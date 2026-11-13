@@ -3,6 +3,7 @@
  *  Never send source turns to GEPA through the metadata bridge.
  */
 import {digest, validateCorpusSplits} from './contracts-v1.mjs';
+import {screenSyntheticCrossSplitLexicalOverlap} from './corpus-lexical-boundary-v1.mjs';
 
 export const YEOUL_NEW_FAMILY_DRAFTS = Object.freeze([
   {
@@ -102,12 +103,21 @@ export function makeNewYeoulScenarioPlan({knownExactTurnHashes=[]}={}) {
   validateCorpusSplits(rows.map(({id,familyId,split,characterId,sourceType,contentSha256})=>({
     id,familyId,split,characterId,sourceType,contentSha256
   })));
+  const lexicalScreen = screenSyntheticCrossSplitLexicalOverlap(
+    YEOUL_NEW_FAMILY_DRAFTS.map(({familyId,split,turns})=>({
+      familyId,split,turns,characterId:'yeoul',sourceType:'synthetic',
+    }))
+  );
+  // Lexical overlap is not a quality judgment. Refuse to preregister a draft
+  // with an obvious development/validation near-duplicate.
+  if(!lexicalScreen.lexicalScreenPassed)fail('cross_split_possible_lexical_overlap');
   return Object.freeze({
     schemaVersion:SCENARIO_PLAN_VERSION,
     characterId:'yeoul',status:'candidate_semantic_overlap_review_required',
     sources:['docs/character/YEOUL_CHARACTER_RUNTIME_DRAFT_V0_1.md',
              'docs/character/CHARACTER_RUNTIME_STANDARD_V1.md'],
     oldY01toY12Compared:false, publiclyExposedH01toH10NotReusedAsHoldout:true,
+    syntheticCrossSplitLexicalScreen:lexicalScreen,
     independentQualityEvidence:false, humanReviewApproved:false,
     optimizerInputReady:false, modelCallsAuthorized:false,
     metadata:Object.freeze(rows.map(row=>Object.freeze(row))),

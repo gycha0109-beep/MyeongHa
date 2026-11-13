@@ -24,7 +24,8 @@
     "SQL keyword counts are textual signals only; they are not evidence of a current object's presence, grant effectiveness, executed SQL branch, or migration authorization.",
     "Domain assignment is a name-based inventory grouping, not a transfer of implementation ownership.",
     "Eight same-name/different-version pairs have separate verified SQL source comparisons. This file does not imply version/provenance equivalence.",
-    "Do not rewrite applied history, replay source, or activate Production resources to resolve metadata."
+    "Do not rewrite applied history, replay source, or activate Production resources to resolve metadata.",
+    "2026-11-13 reconciliation is attached without changing this 2026-11-07 source snapshot or its 41 historical entries; the new 20261109071019 version lacks an exact main migration filename. Source name/DDL effects and executor authority remain unproven, and no migration repair is authorized."
   ],
   "entries": [
     {
@@ -1113,5 +1114,34 @@
     "Correlate live schema/RPC/owner/ACL/RLS effects for each nonpaired remote-only item and prove current-frontier restore equivalence.",
     "Resolve provenance or record explicit risk disposition for missing exact-version sources; do not require unprovable historical actor identity already closed accepted.",
     "Preserve independent commerce, admin, and Se-yeon track ownership; this manifest is an operations inventory."
-  ]
+  ],
+  "currentFrontierReconciliation": {
+    "observationDateKst": "2026-11-13",
+    "schemaVersion": "ops-remote-only-ledger-current-frontier-reconciliation-v1",
+    "sealedSourceBackupRunId": 43174606843,
+    "isolatedReconciliationRunId": 43350336600,
+    "isolatedReconciliationEvidenceArtifactId": 14003143450,
+    "sourceMigrationFrontier": "20261109071019",
+    "sourceMigrationVersionCount": 242,
+    "repositoryCommitSha": "9a5f903d8c3498a18363286000525f8114671b9e",
+    "repositoryMigrationFileCount": 276,
+    "versionIntersectionCount": 200,
+    "sourceOnlyVersionCount": 42,
+    "repositoryOnlyVersionCount": 76,
+    "previouslyDocumentedSourceOnlyVersionCount": 41,
+    "previouslyDocumentedSourceOnlyVersionIdentitiesPreserved": 41,
+    "previouslyDocumentedSourceOnlyVersionsNowInRepo": 0,
+    "newlyObservedSourceOnlyVersions": [
+      "20261109071019"
+    ],
+    "missingSourceSqlBodyCount": 12,
+    "fullEvidenceFile": "docs/operations/POSTGRES_SEALED_PROVIDER_MIGRATION_FILE_LINEAGE_PROOF_20261113.json",
+    "existingHistoricalEntriesAmended": false,
+    "newSourceOnlyMigrationAppliedSqlAndCurrentDdlEquivalenceProven": false,
+    "providerMigrationLedgerRestored": false,
+    "hostedProviderRecoveryProven": false,
+    "drReady": false,
+    "serviceResumptionAllowed": false,
+    "verdict": "CURRENT_FRONTIER_EXACT_VERSION_GAPS__EFFECT_DISPOSITION_PENDING"
+  }
 }
