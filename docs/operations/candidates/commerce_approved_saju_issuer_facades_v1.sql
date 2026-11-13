@@ -8,7 +8,25 @@ create function public.qry_approved_saju_issue_scope_v1(uuid,uuid,text)
 returns jsonb
 language sql stable security definer set search_path=pg_catalog
 as $function$
-  select commerce_saju_private.approved_issue_scope_v1($1,$2,$3)
+  select case when $3 in ('career','business','wealth','relationship','year','month')
+    then commerce_saju_private.approved_issue_scope_v1($1,$2,$3) end
+$function$;
+
+-- Resolve both immutable births only for a current, authorized comparison.
+-- The caller repeats the check after its isolated source request.
+create function public.qry_approved_saju_pair_issue_scope_v1(p_subject uuid,p_purchase uuid)
+returns jsonb
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare v_scope jsonb;
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
+  v_scope := commerce_saju_private.approved_issue_scope_v1(p_subject,p_purchase,'compatibility');
+  if v_scope is null or not commerce_saju_private.lock_approved_pair_issue_consent_v1(
+    p_subject,p_purchase,(v_scope->>'targetBirthRevisionId')::uuid
+  ) then return null; end if;
+  return v_scope;
+end
 $function$;
 
 create function public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text)
@@ -115,6 +133,7 @@ $function$;
 
 revoke all on function
   public.qry_approved_saju_issue_scope_v1(uuid,uuid,text),
+  public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
   public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text),
   public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text),
   public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text),
@@ -122,11 +141,15 @@ revoke all on function
   public.qry_approved_saju_stored_lineage_v1(uuid,uuid,uuid)
   from public,anon,authenticated,service_role,myeongha_api_executor;
 
+revoke all on function public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)
+  from myeongha_commerce_internal_executor;
+
 grant execute on function
   public.begin_member_subject_context_v1(uuid),
   public.current_myeongha_subject_id(),
   public.assert_myeongha_subject_context_v1(uuid),
   public.qry_approved_saju_issue_scope_v1(uuid,uuid,text),
+  public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
   public.prepare_approved_component_reading_v1(uuid,uuid,text,uuid,uuid,text,text),
   public.admit_approved_saju_issue_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text),
   public.cmd_prepare_approved_saju_attempt_v1(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,text,text),

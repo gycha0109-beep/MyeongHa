@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { SajuReadingComponentV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
-import { readApprovedSajuIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
+import { readApprovedSajuIssueScopeV1, readApprovedSajuPairIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
 import { createPostgresSajuOfficialAttemptPreparePortV1 } from './postgres-saju-official-attempt-prepare-v1.js';
 import { createPostgresSajuOfficialIssuedDbTransactionPortV1 } from './postgres-saju-official-issued-db-transaction-v1.js';
 import { executePostgresApprovedSajuIssuerTransactionV1 } from './postgres-subject-execution.js';
@@ -25,6 +25,32 @@ function held(reason: 'production_source_unverified' | 'current_authority_unavai
     contractVersion: SAJU_OFFICIAL_DB_ISSUANCE_HANDOFF_VERSION_V1,
     state: 'held', reason, canDisclose: false, canSell: false,
   });
+}
+
+/** Runs an explicitly supplied internal source review for the exact paid pair. */
+export async function inspectApprovedSajuPairSourceV1<T>(input: Readonly<
+  Pick<PrepareOptions, 'pool' | 'verifiedEvidence'> & {
+    subjectId: string;
+    purchaseIntentId: string;
+    inspectSource: (request: NonNullable<Awaited<ReturnType<typeof readApprovedSajuPairIssueScopeV1>>>['request']) => Promise<T>;
+  }
+>): Promise<Readonly<{ state: 'held'; canSell: false; sourceRequestHash: string; evidence: T }> | null> {
+  if (input.verifiedEvidence.kind !== 'member') return null;
+  const readScope = () => executePostgresApprovedSajuIssuerTransactionV1({
+    pool: input.pool,
+    verifiedEvidence: input.verifiedEvidence,
+    execute: ({ client, resolvedSubject }) => resolvedSubject.subjectKind === 'member'
+      && resolvedSubject.subjectId === input.subjectId ? readApprovedSajuPairIssueScopeV1(client, input) : null,
+  });
+  const before = await readScope();
+  if (before === null) return null;
+  const evidence = await input.inspectSource(before.request);
+  const after = await readScope();
+  if (after === null || after.admissionHash !== before.admissionHash || after.releaseRef !== before.releaseRef ||
+      after.birthRevisionId !== before.birthRevisionId || after.targetBirthRevisionId !== before.targetBirthRevisionId ||
+      after.sourceBirthInputHash !== before.sourceBirthInputHash || after.targetBirthInputHash !== before.targetBirthInputHash ||
+      after.sourceRequestHash !== before.sourceRequestHash) return null;
+  return Object.freeze({ state: 'held', canSell: false, sourceRequestHash: before.sourceRequestHash, evidence });
 }
 
 /** Reviews the exact purchased period privately without creating an official Reading or Reader message. */
