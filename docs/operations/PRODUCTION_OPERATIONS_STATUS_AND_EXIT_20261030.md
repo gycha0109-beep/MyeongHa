@@ -1,3 +1,12 @@
+### 2026-11-13 KST — Gate 1 / Phase 8-A·8-B: disposable Provider role replay 실측 SUCCESS
+
+- **선행 코드 병합:** PR #3252·#3255 필수 통합 CI 성공 및 보호된 `main` 병합. 역할 증거 검증 구현을 기존 수동 격리 복구에 결합했고, 개인 정보나 원문 SQL을 아티팩트에 공개하지 않음.
+- **실제 실행:** [#43343813577](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43343813577) SUCCESS, source backup #43174606843, 백업·원장 동일 실행 출처. 증거 artifact #14000940857, ZIP SHA-256 `009f41101fd0fa388266141ffb181c587a6c3e1e93a6232bc5e985e20f5f8654`. 원본 앱→외부 역할 멤버십 48개 / 격리 GRANT 재현 48개 / 대상 관측 48개, 권한 옵션 및 grantor 일치. `directRoleMembershipTargetRehearsalProven=true`.
+- **남은 정합성 차단:** filtered `roles.sql`의 경계 멤버십 48개 제외는 변함없다. Source 원장 242개 복호화 검증 성공이나 NULL statement 12개, target 원장 미복원. 원본 catalog가 dump와 단일 MVCC 스냅샷인지는 미증명. Provider 소유권·상속 유효 접근권한, Hosted Auth/Storage·독립 개인정보 연속성·전체 RPO/RTO 미증명. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 상세 [POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json](POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json).
+- **Production 영향:** 읽기/수동 격리 검증만 수행. Production SQL·권한·Secret 변경, 유료 Hosted provisioning, 개인정보 canary 없음.
+
+Watchtower-Track: ops
+
 ### 2026-11-12 KST — Gate 1 / Phase 8-A·8-B: 원장 복호화 실증 성공, 복원 정합성 HOLD
 
 - **실제 보호 main 격리 실행:** 원본 source capture [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) 및 원장 복호화 포함 격리 복구 [#43179685582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582) 모두 SUCCESS. PR #3251 병합 `073c26063eccc5b5adbe146d8c09f1c0e8f29b72`. 동일 백업 실행의 원장 ciphertext SHA `4a9c94ed42896d623a1cb519376601d7bf02851fc0eb9258c63cb8a44aff1054`, 원본 packet SHA `e5a2285acc6f44c29f981d3f9c1d2567d5794b845ec3217ee2869243482af686`, 242개 version / frontier `20261109071019` / catalog SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`를 **실제 복호화 후 재검증**. 원장 SQL 누락 12개·created_by 존재 46개 유지. 원본 SQL·작성자·개인정보를 공개 artifact에 포함하지 않음.
