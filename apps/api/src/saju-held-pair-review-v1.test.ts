@@ -16,7 +16,7 @@ const targetPath = 'target.pillars.day.value.branch';
 const body = {
   birth: { calendarType: 'solar', date: '1990-05-15', time: '14:30', sex: 'unspecified' },
   partnerBirth: { calendarType: 'solar', date: '1996-01-09', time: '09:30', sex: 'unspecified' },
-};
+} as const;
 
 function evidence() {
   return {
