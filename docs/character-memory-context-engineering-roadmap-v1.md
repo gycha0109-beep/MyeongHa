@@ -1,5 +1,8 @@
 # MyeongHa Persistent Memory & Context Engineering Roadmap v1
 
+> **2026-11-13 제품 범위 반영:** [현행 6명 동시 웹 출시 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md)은 기존 5명 실행 기반선 및 윤호 제외 **현재 구현 상태**를 바꾸지 않는다. 최초 출시 전 윤호 포함 여섯 명 각각의 승인된 채팅 실행·보호·배포를 검증해야 한다. 이 로드맵의 고급 자동 기억·GEPA 등은 필수 6명 채팅 기능을 안전하게 제공하는 데 직접 필요한 부분만 선행시키며, 사용자 승인으로 OFF인 자동 기억 기능을 임의 활성화하지 않는다. 기존 Memory 로드맵의 독립 최종 목표는 삭제하지 않는다.
+
+
 > Watchtower-Track: character-memory
 > Status (2026-11-13): APPROVED OFFLINE SCOPE VERIFIED AND MERGED / END-TO-END RELEASE DEPENDENCIES HELD / OVERALL ROADMAP_IN_PROGRESS
 > Date: 2026-11-07
