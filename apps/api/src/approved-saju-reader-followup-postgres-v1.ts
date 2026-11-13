@@ -43,6 +43,12 @@ import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resol
 
 type CanonicalReaderProjectionV1 = Awaited<ReturnType<typeof readPostgresApprovedSajuCanonicalReaderV1>>;
 
+export type ApprovedSajuReaderConsultationFactoryV1 = (scope: Readonly<{
+  evaluationId: string;
+  officialReadingRef: string;
+  sourceResponseHash: string;
+}>) => CharacterSajuConsultationShadowPortV1;
+
 type PreparedApprovedSajuReaderFollowupV1 = Readonly<{
   reviewed: ReviewedPrivateReaderFollowupV1;
   productionSource: CanonicalReaderProjectionV1['issueIdentity'];
@@ -75,11 +81,12 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
   createProductReaderEligibilityAuthorityPort: (
     client: PostgresTransactionQueryV1,
   ) => ProductReaderEligibilityAuthorityPortV1;
-  consultationPort: CharacterSajuConsultationShadowPortV1;
+  evaluationId: string;
+  createConsultationPort: ApprovedSajuReaderConsultationFactoryV1;
   /** The browser may nominate a displayed scene index and hash, never a unit or source. */
   firstSceneQuestion?: Readonly<{ interpretationHash: string; segmentIndex: number }>;
 }>): Promise<PreparedApprovedSajuReaderFollowupV1 | null> {
-  if (input.verifiedEvidence.kind !== 'member' || input.consultationPort.evaluateBatch === undefined
+  if (input.verifiedEvidence.kind !== 'member'
       || input.issuanceProofPool === input.pool || input.protectedPool === input.pool
       || input.protectedPool === input.issuanceProofPool || input.productionIssueProofTrusts.length === 0) return null;
   const { pool, protectedPool, verifiedEvidence, readingId } = input;
@@ -148,7 +155,10 @@ export async function prepareApprovedSajuReaderFollowupPostgresV1(input: Readonl
   const question = await reviewPreparedPurchasedReaderQuestionV1({
     preflight, grounded: prepared.grounded, guardedScene: renderGroundedStandardReaderSceneV2(prepared.grounded),
     ...(firstSceneQuestion === undefined ? {} : { firstSceneQuestion }),
-    anchorAuthorityPort, port: input.consultationPort,
+    anchorAuthorityPort, port: input.createConsultationPort({
+      evaluationId: input.evaluationId, officialReadingRef: preflight.scope.readingId,
+      sourceResponseHash: productionSource.nativeSourceResponseHash,
+    }),
     recheckCurrent: () => withCurrentAuthority(async authority => {
       await recheckCurrentReaderQuestionAdmissionV1({ ...authority, preflight });
     }),

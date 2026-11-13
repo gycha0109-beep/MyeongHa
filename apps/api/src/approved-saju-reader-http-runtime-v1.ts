@@ -46,7 +46,7 @@ export function createApprovedSajuReaderHttpRuntimeV1(input: Readonly<{
       (origin.protocol !== 'https:' && (origin.protocol !== 'http:' || origin.hostname !== '127.0.0.1')) ||
       new Set([pool, protectedPool, issuanceProofPool]).size !== 3 ||
       productionIssueProofTrusts.length === 0 ||
-      question.consultationPort.evaluateBatch === undefined ||
+      typeof question.createConsultationPort !== 'function' ||
       typeof keys?.issueUniqueKey !== 'function' || typeof keys.resolveCachedKey !== 'function' ||
       delivery.deliveryTokenSecret.byteLength !== 32) {
     throw new Error('Approved Saju Reader HTTP authority is incomplete.');
