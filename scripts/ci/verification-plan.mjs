@@ -16,6 +16,8 @@ export function resolveVerificationPlan(inputPaths, event = {}) {
     web: work.web,
     mobile: work.mobile,
     unit_full: work.full,
+    api: work.full || paths.some(path => path.startsWith('packages/api-client/')),
+    admin: work.full || paths.some(path => path.startsWith('apps/admin/')),
     browser: ['chat', 'saju', 'records', 'profile', 'full'].some(key => web[key]),
     contracts: paths.some(path => /^(?:\.github\/workflows\/|\.github\/dependabot\.yml$|\.github\/[^/]+\.trigger$|scripts\/|docs\/|supabase\/migrations\/|test\/db\/|package(?:-lock)?\.json$)/u.test(path)),
     dependencies: paths.some(path => /^(?:\.github\/workflows\/|\.github\/dependabot\.yml$|package(?:-lock)?\.json$|(?:apps|packages)\/[^/]+\/package\.json$)/u.test(path)),

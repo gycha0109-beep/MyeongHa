@@ -11,16 +11,28 @@ if (plan.full) {
   run(['run']);
 } else {
   // Static source/SQL/fixture assertions do not appear in Vite's import graph.
-  // Keep every file-reading test as a common contract gate until it has an
-  // explicit dependency inventory. Imported consumers are selected by Vitest.
+  // Select those that explicitly mention a changed path (or its filename).
+  // Shared/CI changes still run the full suite through the plan above.
   const staticTests = [];
+  const changedReferences = new Set();
+  for (const rawPath of changed) {
+    const path = rawPath.replaceAll('\\', '/');
+    changedReferences.add(path);
+    // Web/API/Admin tests often read files relative to their workspace root.
+    changedReferences.add(path.replace(/^apps\/[^/]+\//u, ''));
+  }
   function visit(directory) {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (['node_modules', 'dist', '.expo'].includes(entry.name)) continue;
       const path = `${directory}/${entry.name}`;
       if (entry.isDirectory()) visit(path);
-      else if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path)
-        && /(?:readFile|readdir|execFile|execSync|spawnSync|node:fs|node:child_process)/u.test(readFileSync(path, 'utf8'))) staticTests.push(path);
+      else if (/\.(?:test|spec)\.[cm]?[jt]sx?$/u.test(path)) {
+        const source = readFileSync(path, 'utf8');
+        if (/(?:readFile|readdir|execFile|execSync|spawnSync|node:fs|node:child_process)/u.test(source)
+          && [...changedReferences].some((changedPath) => source.includes(changedPath))) {
+          staticTests.push(path);
+        }
+      }
     }
   }
   for (const directory of ['test', 'tests', 'apps', 'packages']) visit(directory);
