@@ -9,6 +9,11 @@ type Segment = Readonly<{
   pillar: Readonly<{ stem: string; branch: string }>;
   stemTenGod: string;
 }>;
+type DayunSegment = Readonly<Pick<Segment, 'startsAt' | 'endsAt' | 'pillar'> & { index: number }>;
+type DayunOverlap = Readonly<
+  { status: 'resolved'; contextId: string; segments: readonly DayunSegment[] } |
+  { status: 'unavailable'; reasonCode: string }
+>;
 
 export interface SajuCanonicalReaderPeriodV1 {
   readonly scope: Scope;
@@ -19,6 +24,8 @@ export interface SajuCanonicalReaderTemporalV1 {
   readonly calendar: Readonly<{
     scope: Scope;
     segments: readonly Segment[];
+    dayunDisclosureVersion?: 'calculated_overlap_v1';
+    dayunOverlap?: DayunOverlap;
   }>;
   readonly unitWindows: readonly Readonly<{ unitId: string; segmentIds: readonly string[] }>[];
 }
@@ -43,11 +50,34 @@ function timestamp(value: unknown): value is string {
     new Date(value).toISOString() === value;
 }
 
+function validPillar(value: unknown): value is Segment['pillar'] {
+  return record(value) && typeof value.stem === 'string' && STEMS.has(value.stem) &&
+    typeof value.branch === 'string' && BRANCHES.has(value.branch);
+}
+
 function validSegment(value: unknown, id: string): value is Segment {
   return record(value) && value.id === id && timestamp(value.startsAt) && timestamp(value.endsAt) &&
-    value.startsAt < value.endsAt && record(value.pillar) && typeof value.pillar.stem === 'string' &&
-    STEMS.has(value.pillar.stem) && typeof value.pillar.branch === 'string' && BRANCHES.has(value.pillar.branch) &&
+    value.startsAt < value.endsAt && validPillar(value.pillar) &&
     typeof value.stemTenGod === 'string' && TEN_GODS.has(value.stemTenGod) && record(value.natalBranchRelations);
+}
+
+function validDayun(value: Data, startsAt: string, endsAt: string): value is DayunOverlap {
+  if (value.status === 'unavailable') return typeof value.reasonCode === 'string' &&
+    /^[a-z_]{1,64}$/u.test(value.reasonCode) && value.segments === undefined;
+  if (value.status !== 'resolved' || typeof value.contextId !== 'string' ||
+    !/^dayun_temporal_[a-f0-9]{24}$/u.test(value.contextId) || !Array.isArray(value.segments) ||
+    value.segments.length < 1 || value.segments.length > 2) return false;
+
+  let previous: DayunSegment | undefined;
+  for (const segment of value.segments) {
+    if (!record(segment) || typeof segment.index !== 'number' || !Number.isSafeInteger(segment.index) ||
+      segment.index < 0 || !timestamp(segment.startsAt) || !timestamp(segment.endsAt) ||
+      segment.startsAt < startsAt || segment.endsAt > endsAt || segment.startsAt >= segment.endsAt ||
+      !validPillar(segment.pillar) || (previous !== undefined &&
+        (segment.startsAt !== previous.endsAt || segment.index !== previous.index + 1))) return false;
+    previous = { index: segment.index, startsAt: segment.startsAt, endsAt: segment.endsAt, pillar: segment.pillar };
+  }
+  return true;
 }
 
 function civilStart(year: number, month: number): string {
@@ -97,7 +127,9 @@ export function admitSajuCanonicalReaderTemporalV1(
     after.endsAt !== (scope === 'monthly' ? civilStart(year, month + 1) : civilStart(year + 1, 1)) ||
     before.endsAt !== calendar.boundary.at || after.startsAt !== before.endsAt ||
     referenceDateTime < before.startsAt || referenceDateTime >= after.endsAt ||
-    calendar.referenceSegmentId !== (referenceDateTime < after.startsAt ? beforeId : afterId)) return false;
+    calendar.referenceSegmentId !== (referenceDateTime < after.startsAt ? beforeId : afterId) ||
+    (calendar.dayunDisclosureVersion !== undefined && (calendar.dayunDisclosureVersion !== 'calculated_overlap_v1' ||
+      !validDayun(calendar.dayunOverlap, before.startsAt, after.endsAt)))) return false;
 
   const byUnit = new Map(groundingUnits.map(unit => [unit.unitId, unit]));
   const seen = new Set<string>();
@@ -124,7 +156,8 @@ export function admitSajuCanonicalReaderTemporalV1(
 
 /** Protected calculation disclosures reused by scene rendering and reviewed chat. */
 export function projectSajuTemporalDisclosuresV1(temporal: SajuCanonicalReaderTemporalV1, firstIndex: number) {
-  const disclosures = temporal.calendar.segments.map((segment, index) => {
+  const { segments, dayunDisclosureVersion, dayunOverlap } = temporal.calendar;
+  const disclosures = segments.map((segment, index) => {
     const { pillar, stemTenGod, startsAt, endsAt } = segment;
     const disclosureRef = 'grounding_disclosure_' + hashJson({
       purpose: 'approved-saju-temporal-window-v1', segment,
@@ -135,11 +168,32 @@ export function projectSajuTemporalDisclosuresV1(temporal: SajuCanonicalReaderTe
       sourceDisclosureIndex: firstIndex + index,
     };
   });
+  // The signed version pins projection behavior so an existing archived Reading
+  // keeps its original grounding hash and follow-up references.
+  const dayunDisclosures = dayunDisclosureVersion !== 'calculated_overlap_v1' || dayunOverlap === undefined ? [] :
+    (dayunOverlap.status === 'resolved' ? dayunOverlap.segments : [dayunOverlap]).map((entry, index) => ({
+      disclosureRef: 'grounding_disclosure_' + hashJson({
+        purpose: 'approved-saju-temporal-dayun-v1', scope: temporal.calendar.scope, entry,
+      }).slice(0, 24),
+      type: 'scope_limitation' as const,
+      text: 'pillar' in entry
+        ? `이 기간에 겹치는 대운은 ${entry.pillar.stem}${entry.pillar.branch}입니다. 한국시간 ${KOREAN_CLOCK.format(new Date(entry.startsAt))}부터 ${KOREAN_CLOCK.format(new Date(entry.endsAt))} 직전까지의 범위입니다.`
+        : '이 명식은 요청하신 기간에 적용되는 대운을 계산할 근거가 부족합니다.',
+      sourceDisclosureIndex: firstIndex + disclosures.length + index,
+    }));
   const bySegment = new Map(disclosures.map(item => [item.id, item.disclosureRef]));
   return {
-    disclosures: disclosures.map(({ id: _id, ...disclosure }) => disclosure),
+    disclosures: [...disclosures.map(({ id: _id, ...disclosure }) => disclosure), ...dayunDisclosures],
     refsByUnit: new Map(temporal.unitWindows.map(({ unitId, segmentIds }) => [
-      unitId, segmentIds.map(id => bySegment.get(id)!),
+      unitId, [
+        ...segmentIds.map(id => bySegment.get(id)!),
+        ...dayunDisclosures.filter((_item, index) => {
+          if (dayunOverlap?.status !== 'resolved') return true;
+          const overlap = dayunOverlap.segments[index]!;
+          return segments.some(segment => segmentIds.includes(segment.id) &&
+            overlap.startsAt < segment.endsAt && segment.startsAt < overlap.endsAt);
+        }).map(item => item.disclosureRef),
+      ],
     ])),
   };
 }
