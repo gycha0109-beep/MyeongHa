@@ -84,8 +84,8 @@ test('foreign candidate, private text, changed family or forged approval is deni
     {...a,manifest:{...a.manifest,evaluatorVersion:'real-model'}},
     {...a,envelope:{...a.envelope,test_set:['private']}},
     {...a,envelope:{...a.envelope,dataset:a.envelope.dataset.slice(1)}},
-    {...a,envelope:{...a.envelope,dataset:a.envelope.dataset.map((v,i)=>i? v:{...v,familyId:'synthetic-holdout-leak'}}},
-    {...a,envelope:{...a.envelope,dataset:a.envelope.dataset.map((v,i)=>i? v:{...v,privateText:'secret-user-message'}}},
+    {...a,envelope:{...a.envelope,dataset:a.envelope.dataset.map((v,i)=>i? v:{...v,familyId:'synthetic-holdout-leak'})}},
+    {...a,envelope:{...a.envelope,dataset:a.envelope.dataset.map((v,i)=>i? v:{...v,privateText:'secret-user-message'})}},
   ])assert.throws(()=>make(modified));
 });
 
