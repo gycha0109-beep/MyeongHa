@@ -1,3 +1,12 @@
+### 2026-11-13 KST — 최신 DB 백업의 공유 메모리 삭제 복구 마이그레이션, 운영 변경 없는 격리 리허설 구현
+
+- **현 상태:** 원격 `245`/frontier `20261113062455`를 포함한 최신 암호화 백업·원장 #43424903445 보관 성공. 반면 현재 Production의 수동 공유 메모리 `2360`/계정 삭제 연동 `2370`/삭제 이벤트 재생 `2380` 미적용. 이전 백업 복구 #43418694784는 2380 부재 때문에 정상 fail-closed 종료. 같은 실패를 생산 복구 성공으로 꾸미지 않는다.
+- **이번 구현:** 기존 PG17 임시 복구 워크플로에 정확한 최신 backup/incident/source SHA만 받는 `restore_clone_shared_memory_rehearsal` 입력 추가. 원본 복제본을 **먼저** 기존 스키마·역할·원장 기준으로 읽기 전용 비교한 뒤, 검토된 `2360→2370→2380` SQL의 Git 객체 해시를 확인하고 **일회용 복원 DB 한 곳에만 원자적 트랜잭션으로 적용**한다. 메타데이터와 권한 검사 후 원래 합성 개인정보 소거·재생 테스트를 계속한다. 개인정보 테스트를 생략하거나 Production SQL/이력 변경·Hosted 자원·개인정보 canary를 호출하지 않는다.
+- **안전 경계:** 새 JSON에는 `cloneStillMatchesOriginalProductionSchema=false`, `productionDatabaseChanged=false`, `drReady=false`, `serviceResumptionAllowed=false`를 강제한다. 이는 **미적용 기능의 격리 가능성 테스트**이지 운영 DB 정합화·서비스 재개 수용이 아니다. 합성 결과도 실제 실행 전에는 성공·실패를 추정하지 않음. 신규 CI·실제 격리 실증이 다음 필수 작업이며, 사용자 승인 필요한 Production write 전까지 격리 증거를 먼저 확보한다.
+- **로드맵 목표 유지:** 과거 동일 SQL 미세 차이 무한 재분석보다 현재 DB에 필요한 변경만 선별. 기존 RPO/RTO·Hosted Auth/Storage·개인정보 원장·원격 전용 이력 보호 조건 모두 유지. #1887 OPEN, `NOT_ACCEPTED`, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — 최신 운영 DB 암호화 백업·원장 성공과 기존 KCP 동일성 증거 재확인
 
 - **현재 운영 백업·원장:** [수동 보호 실행 #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445) SUCCESS, 기준 main `6eab97337811128282f5f5ec6320e4608d5f9c09`. 백업 ZIP artifact ID `14037181099` digest `27f2d0536ec2f3e7a92823b1cb7a0a451c41cd3b6fc6521aa404da5630ffe60b`; 원장 ZIP artifact `14037056434` digest `217b7dae06d5f5d6a0365b1df64e0fc90e039420b835596d5a5105e913b613b3`, 두 artifact 만료 2026-12-13. 각 공개 manifest의 암호문 SHA256과 내려받은 암호문의 지문 **모두 일치**, 원문 SQL·개인정보·시크릿 조회·복호화 없음. 원장/백업 manifest의 `migrationFrontier/migration_frontier=20261113062455`, `migrationCount/migration_catalog_version_count=245`, `migrationCatalogSha256=405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 세 항목 **일치**. 백업 출처와 암호문 무결성만 관측; 독립 복원·개인정보·Provider 관리형 Auth/Storage·전체 RPO/RTO는 HOLD. 원장 역사적 실행자 미입증, SQL 본문 12개 누락.
