@@ -1,3 +1,12 @@
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 공통 버전 원장 SQL 본문 raw-byte 대조 구현 (실측 대기)
+
+- **선행 완료:** PR [#3267](https://github.com/gycha0109-beep/MyeongHa/pull/3267) 필수 통합 CI [#43354735084](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43354735084) SUCCESS·merge `a9b920e697746542b441f7ba143d431bfa6e978c`. 원격 버전 242/저장소 파일 276/공통 200/원격-only 42/저장소-only 76 및 신규 A4 현재 권한 효과 처분 기존 근거 재사용.
+- **이번 구현:** 수동 보호 격리 복구 `verify_provider_migration_source=true`에서 복호화·SHA 검증된 원본 원장과 정확한 main SQL 파일을 **동일 버전 기준 raw bytes**로 대조하는 `scripts/operations/assess-sealed-common-migration-body-parity.mjs` 추가. 단일 statement만 완전 byte equality 인정, 원문 누락·다중 statement framing·이름 상이·본문 불일치는 구분하고 버전/해시/길이만 산출. 비공개 SQL·작업자·개인정보 미출력. 합성 테스트 3개 및 Bash/Node 문법 검증 PASS.
+- **실측 경계:** 코드는 기존 격리 워크플로에 연결했으나, 새 PR의 통합 CI·병합 전에는 실제 200개 SQL 본문 일치 개수는 미확정이다. 이전 버전 ID 대조 SUCCESS가 원문 SQL byte parity를 입증한 것으로 취급하지 않는다. 관련 [설계와 수용 범위](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_20261113.md).
+- **운영 게이트:** Production SQL/DDL, migration repair·replay, 시크릿/Hosted 유료 생성 및 synthetic privacy canary 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Gate 1 / Phase 8-A: 신규 A4 원격 전용 SQL·현재 역할/권한 대조
 
 - **상태:** [PR #3261](https://github.com/gycha0109-beep/MyeongHa/pull/3261) 필수 통합 검사 [#43351167715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43351167715) SUCCESS, 병합 `e3c5185ed3df1b7bf883c3babc2ec4d2f3b5c09b`. 현재 source ledger 242개 / frontier `20261109071019` / 저장소 파일 276개 / 원격-only 42개·repo-only 76개.

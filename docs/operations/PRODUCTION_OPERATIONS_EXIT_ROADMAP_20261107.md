@@ -1,3 +1,10 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 공통 원장 버전 200개 SQL raw-byte 대조 경로 구현 (실측 대기)
+
+- PR #3267 필수 통합 CI [#43354735084](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43354735084) SUCCESS·보호된 main 병합, 신규 원격 전용 A4 버전 `20261109071019`의 현재 전용 역할·5개 열 SELECT 권한 실측 기록 완료. 기존 원격 버전 242/저장소 276/공통 200, 원격 전용 42·저장소 전용 76의 당시 비교는 별도 실증으로 보존한다.
+- **다음 승인 범위 내 구현:** 기존 원장 봉인·복호화·정확한 main 버전 대조를 재활용해 공통 200개 버전의 SQL *저장 원문*과 저장소 파일 bytes를 대조하는 격리 검증 도구를 추가했다. 단일 statement만 raw-byte equality로 인정한다. NULL, 부분 NULL, 다중 statement의 재구성, 동일 버전에서 이름 상이, raw bytes 불일치를 구분하며 원문 SQL·작성자·개인정보를 아티팩트에 출력하지 않는다.
+- 이 기능은 기존 수동 격리 복구의 `verify_provider_migration_source=true`인 경우에만 추가된다. `sourcePacketSha256`, 원장 frontier와 repository HEAD가 맞지 않으면 거부한다. 합성 테스트 3개·Node/Bash 문법 확인 완료. **보호된 main에 병합한 뒤 실측하기 전에는 본문 일치 건수를 새로 확정하거나 DR 게이트를 승격하지 않는다.** 세부 설계 [공통 버전 SQL 본문 비교](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_20261113.md).
+- 이 작업은 roadmap 8-A의 적용된 SQL 출처 정합성 근거만 보강한다. Source SQL 일부 일치가 역사적 실행 인과관계, 전체 객체 DDL/ACL parity, 실제 Provider ledger 복원, Hosted Auth/Storage 및 개인정보 연속성이나 RPO/RTO 달성을 보장하지 않는다. 원본 이력 덮어쓰기·재적용 없음. `NOT_ACCEPTED`·`drReady=false`·`serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 신규 원격 전용 A4 20261109071019의 현재 객체·권한 효과 점검
 
 - PR [#3261](https://github.com/gycha0109-beep/MyeongHa/pull/3261) 필수 통합 CI [#43351167715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43351167715) SUCCESS 및 병합. 정확한 원장·main 버전 차이는 **242 / 276 / 공통 200 / 원격 전용 42 / 저장소 전용 76**이며, 신규 원격 전용은 `20261109071019` 단 1개.
