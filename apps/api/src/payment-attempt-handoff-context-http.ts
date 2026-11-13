@@ -127,7 +127,7 @@ async function readBodyAfterSubjectResolution(request: Request): Promise<{ payme
 }
 
 /**
- * Authenticated but intentionally unmounted handoff-context boundary.
+ * Member-authenticated but intentionally unmounted handoff-context boundary.
  *
  * Ordering is deliberate: verify request identity, resolve/bind the canonical Subject,
  * then parse the caller body, then execute the owner-scoped handoff read.
@@ -145,6 +145,15 @@ export async function handlePaymentAttemptHandoffContextRequestV1(
       status: 401,
       code: 'AUTH_REQUIRED',
       messageKey: 'auth.required',
+      retryable: false,
+      requestId,
+    });
+  }
+  if (verifiedEvidence.kind !== 'member') {
+    return jsonError({
+      status: 403,
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'payment_attempt.login_required',
       retryable: false,
       requestId,
     });

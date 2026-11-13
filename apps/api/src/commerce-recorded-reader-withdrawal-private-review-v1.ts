@@ -1,9 +1,11 @@
 import type {
   PostgresSubjectConnectionV1,
   PostgresSubjectPoolV1,
+  PostgresTransactionQueryV1,
 } from './postgres-subject-execution.js';
 import {
   prepareDigitalReadingWithdrawalReviewV1,
+  type DigitalReadingWithdrawalPreflightV1,
 } from './commerce-digital-reading-withdrawal-review-preflight-v1.js';
 import type {
   DigitalReadingWithdrawalReviewV1,
@@ -47,7 +49,8 @@ const REASONS = new Set([
 const ROLE_SQL = `
 select
  (rolsuper or rolbypassrls) as "fullVisibility",
- current_setting('transaction_read_only')='on' as "readOnly"
+ current_setting('transaction_read_only')='on' as "readOnly",
+ current_user as "currentUser"
 from pg_catalog.pg_roles
 where rolname=current_user
 `;
@@ -68,6 +71,12 @@ where c.id=$1::uuid
 limit 2
 `;
 const CLAIM_CONTRACT = 'digital-reading-withdrawal-claim-v1' as const;
+// Privileged operations may inspect exact Claim/Receipt data; regular
+// application, worker, and service-role sessions must not use this path.
+const UNSAFE_REVIEW_ROLES = new Set([
+  'anon','authenticated','service_role','myeongha_api_executor',
+  'myeongha_worker_runtime','myeongha_commerce_internal_executor',
+]);
 
 type ClaimRow = Readonly<{
   claimId:unknown;
@@ -144,6 +153,58 @@ function view(
   });
 }
 
+// SQL faults in optional evidence must not erase an immutable received Claim.
+// A query failure can be caught by the preflight while PostgreSQL still marks
+// the transaction aborted; each optional source therefore has its own SAVEPOINT.
+// Malformed successful evidence is NOT downgraded to missing evidence.
+type ClaimReviewSavepoint =
+  | 'commerce_claim_preflight_evidence'
+  | 'commerce_optional_s7_history'
+  | 'commerce_optional_cancel_source';
+
+const UNAVAILABLE_PURCHASE_EVIDENCE = Object.freeze({
+  kind: 'not_admitted',
+  requestRecorded: false,
+  providerRefundAuthorized: false,
+  entitlementMutationAuthorized: false,
+} as const);
+
+async function readClaimEvidenceWithSavepoint<T>(
+  connection: PostgresSubjectConnectionV1,
+  savepoint: ClaimReviewSavepoint,
+  unavailable: T,
+  read: (client: PostgresTransactionQueryV1) => Promise<T>,
+): Promise<T> {
+  await connection.query(`SAVEPOINT ${savepoint}`);
+  let databaseQueryFailed = false;
+  const scoped: PostgresTransactionQueryV1 = {
+    async query<Row = Record<string, unknown>>(
+      sql: string, values?: readonly unknown[],
+    ) {
+      try { return await connection.query<Row>(sql, values); }
+      catch {
+        databaseQueryFailed = true;
+        throw Error('PRIVATE_CLAIM_EVIDENCE_QUERY_UNAVAILABLE');
+      }
+    },
+  };
+  try {
+    const value = await read(scoped);
+    if (databaseQueryFailed) {
+      await connection.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+      await connection.query(`RELEASE SAVEPOINT ${savepoint}`);
+      return unavailable;
+    }
+    await connection.query(`RELEASE SAVEPOINT ${savepoint}`);
+    return value;
+  } catch (error) {
+    await connection.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+    await connection.query(`RELEASE SAVEPOINT ${savepoint}`);
+    if (databaseQueryFailed) return unavailable;
+    throw error;
+  }
+}
+
 /**
  * One read-only REPEATABLE READ transaction, including the Claim and all
  * original-purchase/notice reads. The Subject and claimed unit are sourced
@@ -169,10 +230,15 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
     await connection.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     began = true;
 
-    const roles = await connection.query<{fullVisibility:unknown;readOnly:unknown}>(ROLE_SQL);
+    const roles = await connection.query<{
+      fullVisibility:unknown;readOnly:unknown;currentUser:unknown;
+    }>(ROLE_SQL);
     if (roles.rows.length !== 1 ||
         roles.rows[0]?.fullVisibility !== true ||
-        roles.rows[0]?.readOnly !== true) return failure();
+        roles.rows[0]?.readOnly !== true ||
+        typeof roles.rows[0]?.currentUser !== 'string' ||
+        roles.rows[0].currentUser.trim() !== roles.rows[0].currentUser ||
+        UNSAFE_REVIEW_ROLES.has(roles.rows[0].currentUser)) return failure();
 
     const result = await connection.query<ClaimRow>(CLAIM_SQL,[input.claimId]);
     if (result.rows.length === 0) return null;
@@ -193,77 +259,43 @@ export async function reviewRecordedReadingWithdrawalPrivateV1(input: Readonly<{
         'general_unlinked_manual_review',null);
     }
 
-    const preflight = await prepareDigitalReadingWithdrawalReviewV1({
-      resolvedSubjectId: claim.subjectId,
-      request: {
-        purchaseIntentId: claim.purchaseIntentId,
-        unitId: claim.unitId,
-        reason: claim.reasonCode,
-      },
-      evidencePort: createPostgresDigitalReadingWithdrawalEvidencePrivateV1(connection),
-    });
-
-    // A revoked/missing Receipt, missing original notice, DB failure or an
-    // ambiguous unit must NEVER be converted into positive refund/denial proof.
-    if (preflight.kind !== 'manual_review_candidate') {
-      // A currently revoked purchase may still have historical S5/S7
-      // transport receipts. Read ONLY the exact original Claim lineage:
-      // the S7 resolver independently requires the original Receipt, Unit,
-      // Reader Grant and body even when the Receipt is now revoked.
-      // No retained S7 row is NOT evidence that nothing was supplied;
-      // S4 privacy cleanup or retention expiry may have removed the row.
-      // Failure of this optional historical lookup cannot erase a recorded
-      // customer Claim or fabricate a delivered outcome.
-      let historicalS7:RecordedReaderS7ClaimTimelineV1|null=null;
-      // A failed PostgreSQL read aborts the transaction until rolled back.
-      // Isolate optional S7 history with a SAVEPOINT so cancellation evidence
-      // can still be reviewed in the SAME immutable Claim snapshot.
-      await connection.query('SAVEPOINT commerce_optional_s7_history');
-      try {
-        historicalS7=await readRecordedReaderS7ClaimTimelineV1(
-          connection,{
-            subjectId:claim.subjectId as string,
-            purchaseIntentId:claim.purchaseIntentId,
-            unitId:claim.unitId as string,
-          },
-        );
-        await connection.query('RELEASE SAVEPOINT commerce_optional_s7_history');
-      } catch {
-        await connection.query('ROLLBACK TO SAVEPOINT commerce_optional_s7_history');
-        await connection.query('RELEASE SAVEPOINT commerce_optional_s7_history');
-        historicalS7=null;
-      }
-      const sourceOnly=await readRecordedReaderCancellationForClaimV1(
-        connection,{
-          subjectId:claim.subjectId as string,
-          purchaseIntentId:claim.purchaseIntentId,
-          unitId:claim.unitId as string,
+    const claimScope = {
+      subjectId: claim.subjectId as string,
+      purchaseIntentId: claim.purchaseIntentId,
+      unitId: claim.unitId as string,
+    };
+    const preflight = await readClaimEvidenceWithSavepoint<
+      DigitalReadingWithdrawalPreflightV1
+    >(connection,'commerce_claim_preflight_evidence',
+      UNAVAILABLE_PURCHASE_EVIDENCE,
+      client=>prepareDigitalReadingWithdrawalReviewV1({
+        resolvedSubjectId: claim.subjectId as string,
+        request: {
+          purchaseIntentId: claim.purchaseIntentId,
+          unitId: claim.unitId,
+          reason: claim.reasonCode,
         },
-      );
-      return view(claim.claimId,receivedAt,
-        'exact_unit_evidence_unavailable',null,historicalS7,sourceOnly);
-    }
+        evidencePort: createPostgresDigitalReadingWithdrawalEvidencePrivateV1(client),
+      }),
+    );
 
-    // Correlate the original paid S5 body and currently retained S7 attempts
-    // only after the exact Claim->paid Receipt/checkout evidence is established.
-    // The DB derives the Grant/body from the immutable Claim's Subject/Unit.
-    const retainedReaderS7Timeline = await readRecordedReaderS7ClaimTimelineV1(
-      connection,{
-        subjectId:claim.subjectId as string,
-        purchaseIntentId:claim.purchaseIntentId,
-        unitId:claim.unitId as string,
-      },
-    );
-    // This is only the canonical STORED cancellation source in the same
-    // read-only Claim snapshot, never a latest Provider GET/finality finding.
-    // Do not derive another Reader/Receipt from client input.
-    const storedCancellationEvidence=await readRecordedReaderCancellationForClaimV1(
-      connection,{
-        subjectId:claim.subjectId as string,
-        purchaseIntentId:claim.purchaseIntentId,
-        unitId:claim.unitId as string,
-      },
-    );
+    // Optional historical S5/S7 and source cancellation records can be
+    // unavailable without invalidating a separately recorded customer Claim.
+    // They never prove delivery, refund finality, or entitlement authority.
+    const retainedReaderS7Timeline = await readClaimEvidenceWithSavepoint<
+      RecordedReaderS7ClaimTimelineV1|null
+    >(connection,'commerce_optional_s7_history',null,
+      client=>readRecordedReaderS7ClaimTimelineV1(client,claimScope));
+    const storedCancellationEvidence = await readClaimEvidenceWithSavepoint<
+      RecordedReaderCancelClaimEvidenceV1|null
+    >(connection,'commerce_optional_cancel_source',null,
+      client=>readRecordedReaderCancellationForClaimV1(client,claimScope));
+
+    if (preflight.kind !== 'manual_review_candidate') {
+      return view(claim.claimId,receivedAt,
+        'exact_unit_evidence_unavailable',null,
+        retainedReaderS7Timeline,storedCancellationEvidence);
+    }
     return view(claim.claimId,receivedAt,
       'exact_unit_manual_review',preflight.review,
       retainedReaderS7Timeline,storedCancellationEvidence);

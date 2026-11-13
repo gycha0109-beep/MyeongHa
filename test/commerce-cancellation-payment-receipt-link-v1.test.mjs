@@ -3,6 +3,7 @@ import {describe,it,expect,vi} from 'vitest';
 import {
  COMMERCE_CANCELLATION_PAYMENT_RECEIPT_LINK_SQL_V1,
  inspectCancellationPaymentReceiptLinkReadOnlyV1,
+ resolveCancellationOriginalReceiptPrivateV1,
 } from '../scripts/operations/commerce-cancellation-payment-receipt-link-v1.mjs';
 
 const PAYMENT='server-payment-1',TX='provider-transaction-1';
@@ -64,6 +65,26 @@ describe('signed cancellation paymentId to exact local verified Reading Receipt'
   expect(r).not.toHaveProperty('readerCharacterId');
   expect(r).not.toHaveProperty('verifiedReceiptId');
   expect(Object.isFrozen(r)).toBe(true);
+  expect(c.query.mock.calls.at(-1)[0]).toBe('rollback');
+ });
+ it('private owned Receipt resolver exposes exact original ID only to operations',async()=>{
+  const c=db();
+  const r=await resolveCancellationOriginalReceiptPrivateV1(c,input);
+  expect(r).toEqual({
+    verifiedReceiptId:ROW.verifiedReceiptId,
+    providerPaymentId:PAYMENT,
+    originalTransactionId:TX,
+    originalVerifiedPaidAmountMinor:8900,
+    originalCurrency:'KRW',
+    environment:'production',
+  });
+  expect(Object.isFrozen(r)).toBe(true);
+  expect(c.query.mock.calls.at(-1)[0]).toBe('rollback');
+ });
+ it('private resolver cannot invent a Receipt ID or accept ambiguous purchases',async()=>{
+  const c=db({rows:[{...ROW,verifiedReceiptId:'not-an-id'}]});
+  await expect(resolveCancellationOriginalReceiptPrivateV1(c,input))
+    .rejects.toThrow('INVALID_CANCELLATION_PAYMENT_RECEIPT_LINK');
   expect(c.query.mock.calls.at(-1)[0]).toBe('rollback');
  });
  it('no verified receipt is NOT proof of a refund or even of a charge',async()=>{

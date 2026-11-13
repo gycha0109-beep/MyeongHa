@@ -265,6 +265,13 @@ async function readPrivateOfficialReaderPaidAnswerCoreV1(
               bodyId,
               reservation:input.deliveryReservation,
             });
+        // S7 cannot precede its immutable S5 answer. Fail inside the same
+        // DB transaction so a contradictory prepared receipt is rolled back
+        // with the protected read; it must not escape to HTTP as a delivery.
+        if(delivery !== undefined && (
+          !Number.isFinite(Date.parse(delivery.responsePreparedAt))
+          || Date.parse(delivery.responsePreparedAt) < Date.parse(committedAt)
+        )) return unavailable();
         // The independent outside-backup erasure ledger can change while
         // waiting for SQL; deny plaintext and ROLLBACK prepared receipts if
         // the subject was tombstoned during that interval.

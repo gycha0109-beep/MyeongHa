@@ -1,0 +1,142 @@
+import {readFileSync} from 'node:fs';
+import {describe,it,expect} from 'vitest';
+
+const sql=readFileSync('test/db/commerce_verified_reader_claim_cancel_effect_pg17.sql','utf8');
+const shell=readFileSync('test/db/commerce_verified_reader_claim_cancel_effect_pg17.sh','utf8');
+const matrix=JSON.parse(readFileSync('scripts/ci/db-suites.json','utf8'));
+const ci=readFileSync('test/db/run_ci_case.sh','utf8');
+const confirmer=readFileSync(
+ 'supabase/migrations/2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql',
+ 'utf8',
+);
+const e2eIndex=(source,needle)=>source.indexOf(needle);
+
+describe('exact paid Reader Claim -> owner decision -> refund progress real PG17 contract',()=>{
+ it('runs ONLY in disposable migrated PostgreSQL17 and rolls back all hypothetical decisions',()=>{
+  expect(matrix.postgres17.postgres).toBe(17);
+  expect(shell).toContain("DB_SUITE:-");
+  expect(shell).toContain('postgres17');
+  expect(shell).toContain('myeongha_ci_case_[0-9]+');
+  expect(ci).toContain('commerce-verified-reader-claim-cancel-effect-pg17');
+  expect(sql).toContain('begin;');
+  expect(sql.trimEnd().endsWith('rollback;')).toBe(true);
+  expect(sql).not.toMatch(/\\bcommit\\s*;/iu);
+  expect(sql).not.toContain('https://api.portone.io');
+ });
+ it('connects immutable original Claim to separately approved one-Receipt refund lifecycle',()=>{
+  const claim=sql.indexOf('from public.cmd_receive_digital_reading_withdrawal_claim_v1(');
+  const decision=sql.indexOf('insert into public.commerce_reader_full_refund_dispatches_v1(');
+  const reserve=sql.indexOf('from public.internal_reserve_reader_full_refund_dispatch_v1(');
+  const response=sql.indexOf('public.internal_record_reader_full_refund_response_v1(');
+  const revoke=sql.indexOf('from public.internal_apply_entitlement_effect_v1(');
+  const deny=sql.indexOf('public.internal_confirm_reader_full_refund_dispatch_v1(',revoke);
+  const deletion=sql.indexOf('from public.internal_finalize_account_deletion_db_v1(');
+  expect(claim).toBeGreaterThan(0);
+  expect(decision).toBeGreaterThan(claim);
+  expect(reserve).toBeGreaterThan(decision);
+  expect(response).toBeGreaterThan(reserve);
+  expect(revoke).toBeGreaterThan(response);
+  expect(deny).toBeGreaterThan(revoke);
+  expect(deletion).toBeGreaterThan(deny);
+  expect(sql).toContain('source_claim_fingerprint=v_claim_fingerprint');
+  expect(sql).toContain('CLAIM_E2E_MANUAL_DECISION_NOT_REFLECTED_WITH_IMMUTABLE_CLAIM');
+  expect(sql).toContain('CLAIM_E2E_REFUND_RESERVATION_STATUS_NOT_VISIBLE');
+  expect(sql).toContain('CLAIM_E2E_SUBMITTED_REQUEST_WRONGLY_CLAIMED_CONFIRMED');
+ });
+ it('pins refund confirmation to the exact original full cancellation GET and Receipt',()=>{
+  expect(confirmer).toContain('create or replace function public.internal_confirm_reader_full_refund_dispatch_v1(');
+  for(const check of [
+    "pe.resolved_receipt_id=cr.id","pe.resolved_subject_id=cr.subject_id",
+    "pe.resolution_source_type='receipt'",
+    "pe.event_type='Transaction.Cancelled'",
+    "pe.environment='production'",
+    "pe.verified_payload_jsonb->>'schemaVersion'=",
+    "portone-full-cancel-verified-v1",
+    "pe.verified_payload_jsonb->>'paymentId'",
+    "pe.verified_payload_jsonb->>'verifiedAmountMinor'",
+    "pe.verified_payload_jsonb->>'verifiedCurrency'",
+    "pe.verified_payload_jsonb->>'cancellationId'",
+    "pe.verified_payload_jsonb->>'evidenceFingerprint'",
+    "pe.verified_payload_jsonb->>'verifierRevision'",
+    "grant_row.source_receipt_id=cr.id",
+    "grant_row.subject_id=cr.subject_id",
+    "grant_row.grant_source_type='purchase'",
+    "grant_row.status is distinct from 'revoked'",
+    "grant_row.last_effective_at is distinct from pe.provider_occurred_at",
+    "grant_row.last_provider_ordering_key is distinct from",
+    "revoke_event.grant_id=grant_row.id",
+    "revoke_event.subject_id=cr.subject_id",
+    "revoke_event.source_provider_event_id=pe.id",
+    "revoke_event.source_type='provider_event'",
+    "revoke_event.event_type='revoked'",
+    "revoke_event.effective_at=pe.provider_occurred_at",
+    "revoke_event.provider_ordering_key is not distinct from",
+    "pe.provider_ordering_key=(",
+    "attempt.provider_transaction_id=cr.external_transaction_id",
+    "v_matching_source_count<>1",
+  ])expect(confirmer).toContain(check);
+  expect(confirmer).toContain('grant execute on function public.internal_confirm_reader_full_refund_dispatch_v1(');
+  expect(confirmer).toContain('to myeongha_commerce_internal_executor');
+  expect((confirmer.match(/create or replace function public\.internal_confirm_reader_full_refund_dispatch_v1\(/gu)??[])).toHaveLength(1);
+  expect((confirmer.match(/\$reader_refund_confirm_exact_provider\$/gu)??[])).toHaveLength(2);
+  expect(confirmer).not.toContain('supabase db push');
+  const p=e2eIndex(sql,'-- Regression of the old 2310 false-positive');
+  expect(p).toBeGreaterThan(0);
+  expect(sql).toContain('CLAIM_E2E_WRONG_AMOUNT_FULL_CANCEL_FALSE_REFUND_CONFIRMED');
+  expect(sql).toContain('CLAIM_E2E_UNREVOKED_ORIGINAL_GRANT_REFUND_CONFIRMED');
+  expect(sql).toContain('v_unrevoked_refund_confirm_denied:=true');
+  expect(sql).toContain("v_receipt.verified_amount_minor+1");
+ });
+ it('keeps the private refund confirmation SQL out of historical catalog fixtures',()=>{
+  const staged=readFileSync('test/db/staged_commerce_migration_policy.sh','utf8');
+  expect(staged).toContain("$name" + "\" == '2370_commerce_reader_refund_confirm_exact_provider_lineage_v1.sql'");
+  expect(staged).toContain("$inclusion\" == 'reader-integrated'");
+  expect(staged).toContain("expected='4abf6431c1d14212af4cb34363ea4739c21d109f'");
+  expect(staged).toContain('HOLD_READER_REFUND_MIGRATION_FINGERPRINT_DRIFT');
+  expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration" "$reader_scope"');
+  expect(ci).toContain('skip_staged_portone_migration_from_historical_fixture "$migration"');
+  expect(confirmer).toContain('commerce_reader_full_refund_dispatches_v1%rowtype');
+ });
+ it('never turns a provisional provider request or effect into a confirmed customer refund',()=>{
+  expect(sql).toContain("'refund_decision_recorded'");
+  expect(sql).toContain("'refund_processing'");
+  expect(sql).toContain("'REQUESTED'");
+  expect(sql).toContain('Refund receipt still unconfirmed by verified cancellation');
+  expect(sql).toContain('CLAIM_E2E_UNVERIFIED_REFUND_CONFIRMATION_ALLOWED');
+  expect(sql).not.toContain("set status='confirmed'");
+  expect(sql).toContain("v_request_state<>'refund_confirmed'");
+ });
+ it('proves exact synthetic refund success and idempotent replay before rollback/deletion',()=>{
+  const positive=sql.indexOf('CLAIM_E2E_POSITIVE_REFUND_REPLAY_DENIED');
+  const revoke=sql.indexOf('from public.internal_apply_entitlement_effect_v1(');
+  const deletion=sql.indexOf('from public.internal_finalize_account_deletion_db_v1(');
+  expect(positive).toBeGreaterThan(revoke);
+  expect(deletion).toBeGreaterThan(positive);
+  for(const assertion of [
+    "CLAIM_E2E_POSITIVE_REFUND_OR_INDEPENDENT_READER_FAILED",
+    "CLAIM_E2E_POSITIVE_REFUND_FORCE_ROLLBACK",
+    "CLAIM_E2E_POSITIVE_REFUND_SAVEPOINT_LEAK",
+    "CLAIM_E2E_EXACT_FULL_CANCEL_GRANT_EVENT_MISMATCH",
+    "CLAIM_E2E_OTHER_PROVIDER_EVENT_REVOKE_FALSE_REFUND_CONFIRMED",
+    "v_other_event_revoke_denied:=true",
+    "CLAIM_E2E_DISPLACED_PROVIDER_EFFECT_CLOCK_FALSE_REFUND_CONFIRMED",
+    "v_displaced_effect_time_denied:=true",
+    "CLAIM_E2E_HISTORICAL_REVOKE_BORROWED_AFTER_NEWER_EFFECT",
+    "v_superseded_grant_clock_denied:=true",
+    "v_superseded_grant_order_denied:=true",
+    "v_request_state<>'refund_confirmed'",
+    "confirmed_at=v_positive_at",
+    "v_positive_effect.result_entitlement_event_id is null",
+    "id=v_other.id and source_receipt_id=v_other_receipt.id",
+    "id=v_claim and subject_id=v_subject and state='received'",
+  ])expect(sql).toContain(assertion);
+ });
+ it('keeps unrelated Subject Claim at received and preserves only P5Y decision after deletion',()=>{
+  expect(sql).toContain('CLAIM_E2E_OTHER_SUBJECT_REFUND_STATUS_LEAK');
+  expect(sql).toContain('where id=v_refund_decision_id and receipt_id=v_receipt.id');
+  expect(sql).toContain('retained_until>pg_catalog.clock_timestamp()');
+  expect(sql).toContain('where subject_id=v_subject)<>0');
+  expect(sql).toContain('v_deleted_replay.replayed is distinct from true');
+  expect(sql).toContain('CLAIM_E2E_ACCOUNT_PRIVACY_FINALIZER_RETENTION_OR_ISOLATION_FAILED');
+ });
+});

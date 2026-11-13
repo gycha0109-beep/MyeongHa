@@ -18,9 +18,18 @@ export const MOBILE_WITHDRAWAL_CLAIM_RELEASE_V1 = Object.freeze({
   accountSwitchClearsResult: true,
 });
 
+export interface MobileWithdrawalClaimSubmissionWithStatusV1 {
+  readonly submitted: SubmittedDigitalReadingWithdrawalClaimV1;
+  readonly currentStatus: DigitalReadingWithdrawalClaimStatusResponseV1['status'];
+  /** The immutable Claim was received, but its later state could not be read. */
+  readonly statusLookupUnavailable: boolean;
+}
+
 export interface MobileWithdrawalClaimServiceV1 {
   submit(request: SubmitDigitalReadingWithdrawalRequestV1):
     Promise<SubmittedDigitalReadingWithdrawalClaimV1>;
+  submitWithCurrentStatus(request: SubmitDigitalReadingWithdrawalRequestV1):
+    Promise<MobileWithdrawalClaimSubmissionWithStatusV1>;
   readStatus(claimId: string): Promise<DigitalReadingWithdrawalClaimStatusResponseV1>;
 }
 
@@ -55,6 +64,39 @@ export function createMobileWithdrawalClaimServiceV1(input: Readonly<{
   return Object.freeze({
     submit: (request: SubmitDigitalReadingWithdrawalRequestV1) => memberRequest((bearer) =>
       submitDigitalReadingWithdrawalClaimV1(input.client, bearer, request)),
+    submitWithCurrentStatus: (request: SubmitDigitalReadingWithdrawalRequestV1) =>
+      memberRequest(async (bearer): Promise<MobileWithdrawalClaimSubmissionWithStatusV1> => {
+        const submitted = await submitDigitalReadingWithdrawalClaimV1(
+          input.client, bearer, request,
+        );
+        if (!submitted.replayed) return Object.freeze({
+          submitted, currentStatus: 'received' as const,
+          statusLookupUnavailable: false,
+        });
+        // An idempotent retry returns the ORIGINAL intake receipt. It is not
+        // a new "received" lifecycle event; read the latest scoped DB state.
+        // The same Member bearer covers both calls, and memberRequest checks
+        // that the credentials are still current before exposing either.
+        try {
+          const existing = await readDigitalReadingWithdrawalClaimStatusV1(
+            input.client, bearer, submitted.claimId,
+          );
+          if (existing.receivedAt !== submitted.receivedAt) {
+            throw Error('WITHDRAWAL_REPLAY_RECEIPT_MISMATCH');
+          }
+          return Object.freeze({
+            submitted, currentStatus: existing.status,
+            statusLookupUnavailable: false,
+          });
+        } catch {
+          // The POST was confirmed. A failed optional status GET cannot
+          // erase the customer's claim ID or trigger a second intake.
+          return Object.freeze({
+            submitted, currentStatus: 'received' as const,
+            statusLookupUnavailable: true,
+          });
+        }
+      }),
     readStatus: (claimId: string) => memberRequest((bearer) =>
       readDigitalReadingWithdrawalClaimStatusV1(input.client, bearer, claimId)),
   });

@@ -51,10 +51,16 @@ function portonePayment(overrides:Record<string,unknown>={}): Record<string,unkn
     id:PAYMENT,
     transactionId:TX,
     channel:{type:'LIVE'},
-    amount:{total:4900},
+    version:'V2',
+    amount:{total:4900,paid:4900,cancelled:4900},
     currency:'KRW',
+    paidAt:'2026-10-18T10:00:00Z',
     cancelledAt:'2026-10-18T11:00:00Z',
-    cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:4900}],
+    statusChangedAt:'2026-10-18T11:00:00Z',
+    cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:'2026-10-18T11:00:00Z',
+    }],
     ...overrides,
   };
 }
@@ -74,7 +80,10 @@ function verifier(overrides:Record<string,unknown>={}) {
   };
 }
 
-function fakePool(sql: string[], values: unknown[][]) {
+function fakePool(
+  sql: string[], values: unknown[][],
+  grantEffect: 'same_event'|'unattributed'='same_event',
+) {
   return {
     async connect() {
       return {
@@ -91,7 +100,10 @@ function fakePool(sql: string[], values: unknown[][]) {
                 effects:[{
                   contractVersion:'official-reader-s2-provider-revoke-v1',
                   scopeCount:1,grantId:GRANT,
-                  entitlementEventId:ENTITLEMENT_EVENT,replayed:false,
+                  entitlementEventId:grantEffect==='same_event'?ENTITLEMENT_EVENT:null,
+                  ...(grantEffect==='unattributed'
+                    ? {projectionChanged:false,outboxEventId:null}
+                    : {}),replayed:false,
                 }],
               },
             }}]};
@@ -143,9 +155,127 @@ describe('PortOne authenticated full cancellation -> scoped Reader revoke',()=>{
     expect(values[0]?.[6]).toBe('production');
   });
 
+  it('separates provider full cancellation from a Reader Grant already inactive by another source',async()=>{
+    const sql:string[]=[];
+    const result=await executePortOneV2WebhookPaymentCompletionV1({
+      pool:fakePool(sql,[],'unattributed'),
+      ...signedEvent('Transaction.Cancelled',fullCancelData),
+      verificationAdapter:{verify:vi.fn(async()=>{throw Error('not paid')})},
+      fullCancellationVerifier:verifier().verifier,
+    });
+    expect(result).toMatchObject({
+      kind:'cancelled_unattributed_grants',providerEventId:EVENT,grantCount:1,
+    });
+    expect(sql.at(-1)).toBe('COMMIT');
+  });
+
+  it('normalizes equivalent RFC3339 provider clocks without inventing a new event order',async()=>{
+    const sql:string[]=[];
+    const {verifier:confirmed}=verifier({
+      paidAt:'2026-10-18T19:00:00+09:00',
+      cancelledAt:'2026-10-18T20:00:00.000+09:00',
+      statusChangedAt:'2026-10-18T11:00:00Z',
+      cancellations:[{
+        id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+        cancelledAt:'2026-10-18T11:00:00Z',
+      }],
+    });
+    await expect(executePortOneV2WebhookPaymentCompletionV1({
+      pool:fakePool(sql,[]),
+      ...signedEvent('Transaction.Cancelled',fullCancelData),
+      verificationAdapter:{verify:vi.fn(async()=>{throw Error('not paid')})},
+      fullCancellationVerifier:confirmed,
+    })).resolves.toMatchObject({kind:'cancelled'});
+    expect(sql.at(-1)).toBe('COMMIT');
+  });
+
+  it('uses true submillisecond chronology rather than lexicographic Z ordering',async()=>{
+    const sql:string[]=[]; const bindings:unknown[][]=[];
+    const {verifier:confirmed}=verifier({
+      // The first fraction is a strict decimal prefix of the second.
+      // Plain string comparison would wrongly say .9991Z > .999101Z.
+      paidAt:'2026-10-18T10:59:59.999100Z',
+      cancelledAt:'2026-10-18T10:59:59.999101Z',
+      statusChangedAt:'2026-10-18T10:59:59.999102Z',
+      cancellations:[{
+        id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+        cancelledAt:'2026-10-18T19:59:59.999101+09:00',
+      }],
+    });
+    await expect(executePortOneV2WebhookPaymentCompletionV1({
+      pool:fakePool(sql,bindings),
+      ...signedEvent('Transaction.Cancelled',fullCancelData),
+      verificationAdapter:{verify:vi.fn(async()=>{throw Error('not paid')})},
+      fullCancellationVerifier:confirmed,
+    })).resolves.toMatchObject({kind:'cancelled'});
+    expect(sql.at(-1)).toBe('COMMIT');
+    expect(bindings[0]?.[3]).toBe('2026-10-18T10:59:59.999101Z');
+  });
+
   it.each([
     {status:'PARTIAL_CANCELLED'},
     {status:'CANCEL_PENDING'},
+    {version:'V1'},
+    {version:null},
+    // Never equate an arrival order or a generic CANCELLED flag with
+    // source ordering: require the exact succeeded cancellation's clock,
+    // and ensure it occurred after the verified paid lifecycle event.
+    {paidAt:undefined},
+    {paidAt:'2026-10-18T11:00:00Z'},
+    {paidAt:'2026-10-18T12:00:00Z'},
+    // These time instants are all within one millisecond. A direct string
+    // comparison of prefix fractions would incorrectly admit newer paidAt.
+    {
+      paidAt:'2026-10-18T10:59:59.999101Z',
+      cancelledAt:'2026-10-18T10:59:59.999100Z',
+      statusChangedAt:'2026-10-18T10:59:59.999100Z',
+      cancellations:[{
+        id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+        cancelledAt:'2026-10-18T10:59:59.999100Z',
+      }],
+    },
+    {
+      paidAt:'2026-10-18T10:59:59.999099Z',
+      cancelledAt:'2026-10-18T10:59:59.999101Z',
+      statusChangedAt:'2026-10-18T10:59:59.999100Z',
+      cancellations:[{
+        id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+        cancelledAt:'2026-10-18T10:59:59.999101Z',
+      }],
+    },
+    {
+      paidAt:'2026-10-18T10:59:59.9991000Z',
+      cancelledAt:'2026-10-18T10:59:59.9991Z',
+      statusChangedAt:'2026-10-18T10:59:59.9991Z',
+      cancellations:[{
+        id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+        cancelledAt:'2026-10-18T10:59:59.999100Z',
+      }],
+    },
+    {paidAt:'2026-13-18T10:00:00Z'},
+    {cancelledAt:'2026-10-18T10:59:00Z'},
+    {cancelledAt:'2026-10-18T12:00:00Z'},
+    {cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:'2026-10-18T11:01:00Z',
+    }]},
+    {cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:undefined,
+    }]},
+    {cancellations:[{
+      id:CANCEL,status:'SUCCEEDED',totalAmount:4900,
+      cancelledAt:'2026-10-18T10:00:00Z',
+    }]},
+    {statusChangedAt:'2026-10-18T10:59:59Z'},
+    {statusChangedAt:undefined},
+    {statusChangedAt:'not-a-date'},
+    {amount:{total:4900,paid:4900,cancelled:0}},
+    {amount:{total:4900,paid:4900,cancelled:1900}},
+    {amount:{total:4900,paid:4900,cancelled:4901}},
+    {amount:{total:4900,paid:4900}},
+    {amount:{total:4900,paid:1900,cancelled:4900}},
+    {amount:{total:4900,paid:0,cancelled:4900}},
     {id:'other-order'},
     {transactionId:'other-transaction'},
     {cancellations:[{id:'different-cancellation',status:'SUCCEEDED',totalAmount:4900}]},

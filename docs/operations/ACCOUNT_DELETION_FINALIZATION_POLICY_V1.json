@@ -69,5 +69,15 @@
   "authoritativePostBackupSource": false,
   "authoritativePrivacyReconciliation": false,
   "futureSafePrivacyReconciliation": false,
-  "drReady": false
+  "drReady": false,
+  "postApprovalCommerceExtensions": [
+    {
+      "table": "commerce_saju_verified_refund_effects_v1",
+      "classKey": "commerce_verified_provider_evidence",
+      "disposition": "RETAIN",
+      "retentionPeriod": "P5Y",
+      "authorityReference": "https://github.com/gycha0109-beep/MyeongHa/issues/964#issuecomment-5737913582",
+      "reason": "Immutable verified refund-effect evidence introduced by migration 2330; it is derived from retained Receipt/Provider Event facts and follows the existing P5Y financial-evidence retention class."
+    }
+  ]
 }

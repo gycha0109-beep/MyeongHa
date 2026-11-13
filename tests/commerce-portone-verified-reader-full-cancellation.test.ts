@@ -179,7 +179,38 @@ describe('verified PortOne Reader full cancellation DB result normalization', ()
       }));
       await expect(applyVerifiedPortOneV2ReaderFullCancellationV1({pool:db.pool,evidence}))
         .resolves.toEqual({
-          kind:'revoked',receiptId:RECEIPT,providerEventId:EVENT,grantCount:1,
+          kind:effect.entitlementEventId === null ||
+            effect.result_entitlement_event_id === null
+              ? 'cancellation_recorded_unattributed_grants' : 'revoked',
+          receiptId:RECEIPT,providerEventId:EVENT,grantCount:1,
+        });
+      expect(db.statements().at(-1)).toBe('COMMIT');
+    });
+
+  it.each([
+    {contractVersion:'official-reader-s2-revoke-dispatch-v1',bound:true},
+    {contractVersion:'official-reader-s2-unbound-grant-cancellation-v1',bound:false},
+  ])('does not claim full attribution for mixed exact and prior-inactive Grants: $contractVersion',
+    async ({contractVersion,bound}) => {
+      const same=bound
+        ? {contractVersion:'official-reader-s2-provider-revoke-v1',
+          scopeCount:1,grantId:GRANT,entitlementEventId:ENTITLEMENT_EVENT,replayed:false}
+        : {result_grant_id:GRANT,result_entitlement_event_id:ENTITLEMENT_EVENT,result_replayed:false};
+      const prior=bound
+        ? {contractVersion:'official-reader-s2-provider-revoke-v1',
+          scopeCount:1,grantId:OTHER_GRANT,entitlementEventId:null,
+          projectionChanged:false,outboxEventId:null,replayed:false}
+        : {result_grant_id:OTHER_GRANT,result_entitlement_event_id:null,
+          result_projection_changed:false,result_outbox_event_id:null,result_replayed:false};
+      const db=mockCommercePool(result({
+        contractVersion,grantCount:2,scopeCount:bound?1:0,
+        effects:[same,prior],
+        ...(bound?{providerEventId:EVENT}:{disposition:'cancelled_before_binding'}),
+      }));
+      await expect(applyVerifiedPortOneV2ReaderFullCancellationV1({pool:db.pool,evidence}))
+        .resolves.toEqual({
+          kind:'cancellation_recorded_unattributed_grants',
+          receiptId:RECEIPT,providerEventId:EVENT,grantCount:2,
         });
       expect(db.statements().at(-1)).toBe('COMMIT');
     });

@@ -143,6 +143,15 @@ export async function handlePaymentAttemptCreateRequestV1(
       requestId,
     });
   }
+  if (verifiedEvidence.kind !== 'member') {
+    return jsonError({
+      status: 403,
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'payment_attempt.login_required',
+      retryable: false,
+      requestId,
+    });
+  }
 
   let rawBody: unknown;
   try {

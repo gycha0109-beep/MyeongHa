@@ -56,7 +56,9 @@ function fakeDb({rows=[ROW],eventRows=[],authority={readOnly:true,completeVisibi
    return {rows};
   }
   if(sql===EVENT_AUDIT){
-   expect(args).toEqual(['msg_1','Transaction.Cancelled']);
+   expect(args?.[0]).toBe('msg_1');
+   expect(['Transaction.Cancelled','Transaction.PartialCancelled',
+    'Transaction.CancelPending']).toContain(args?.[1]);
    return {rows:eventRows};
   }
   if(sql.toLowerCase().includes('insert')||
@@ -118,7 +120,9 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
    amount:{paid:8900,cancelled:3000},
    cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:3000}],
   });
-  const r=await executor(fakeDb(),http);
+  const r=await executor(fakeDb(),http,{
+   request:signedRequest('Transaction.PartialCancelled'),
+  });
   expect(r).toMatchObject({
    kind:'partial_cancel_review_candidate',partialCancelShapeObserved:true,
    grantRevocationAuthorized:false,entitlementEffectEligible:false,
@@ -133,6 +137,156 @@ describe('signed cancellation -> original verified Reading -> GET -> review-only
   const r=await executor(fakeDb(),http);
   expect(r).toMatchObject({
    kind:'pending_cancel_review_candidate',entitlementEffectEligible:false,
+  });
+ });
+ it('missing signed cancellation ID is rejected by signed webhook parser before DB/GET',async()=>{
+  const db=fakeDb(),http=fakeFetch();
+  const r=await executor(db,http,{request:signedRequest('Transaction.Cancelled',{
+   paymentId:PAYMENT_ID,transactionId:TX,
+  })});
+  expect(r.kind).toBe('authentication_rejected');
+  expect(db.query).not.toHaveBeenCalled();
+  expect(http).not.toHaveBeenCalled();
+ });
+ it('reconciles signed item against the whole canonical cancellation set without revocation',async()=>{
+  const inspector=vi.fn(async(input)=>{
+    expect(input.receiptId).toBe(ROW.verifiedReceiptId);
+    expect(input.sourceHmacSecret).toBe('test-only-secret-32-characters-or-more');
+    expect(input.expectedCancellationIdHmac).toMatch(/^hmac-sha256:k1:[0-9a-f]{64}$/u);
+    expect(input.expectedCancellationIdHmac).not.toContain(CANCEL);
+    expect(input.expectedProviderWebhookId).toBe('msg_1');
+    return {
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:true,
+      exactSignedWebhookIncluded:true,providerOrderingProven:false,
+      grantRevocationAuthorized:false,providerRefundAuthorized:false,
+      writesPerformed:false,
+    };
+  });
+  const result=await executor(fakeDb(),fakeFetch(),{
+    sourceHmacSecret:'test-only-secret-32-characters-or-more',
+    cancellationSetInspector:inspector,
+  });
+  expect(inspector).toHaveBeenCalledTimes(1);
+  expect(result).toMatchObject({
+    canonicalCancellationSetMatched:true,
+    exactSignedCancellationIncluded:true,
+    fullRefundExecutionAuthorized:false,grantRevocationAuthorized:false,
+    entitlementEffectEligible:false,writesPerformed:false,
+  });
+  expect(JSON.stringify(result)).not.toContain(CANCEL);
+ });
+ it('passes exact Receipt and signed-source HMAC to canonical event audit',async()=>{
+  const secret='test-only-secret-32-characters-or-more';
+  const request=signedRequest();
+  const expected='hmac-sha256:k1:'+createHmac('sha256',secret)
+    .update(JSON.stringify([
+      'portone-cancel-signed-v1','msg_1','Transaction.Cancelled',
+      Buffer.from(request.rawBody,'utf8').toString('base64'),
+    ]),'utf8').digest('hex');
+  const audit=vi.fn(async(_client,ids)=>{
+    expect(ids.expectedReceiptId).toBe(ROW.verifiedReceiptId);
+    expect(ids.expectedSignedPayloadHmac).toBe(expected);
+    const itemMac='hmac-sha256:k1:'+createHmac('sha256',secret)
+      .update(JSON.stringify([
+        'portone-cancellation-item-v1',PAYMENT_ID,CANCEL,
+      ]),'utf8').digest('hex');
+    expect(ids.expectedCancellationIdHmac).toBe(itemMac);
+    return {
+      kind:'canonical_event_missing',sourceEventReady:false,
+      exactPurchaseGrantRevoked:false,grantRevocationAuthorized:false,
+      providerRefundAuthorized:false,writesPerformed:false,
+    };
+  });
+  const result=await executor(fakeDb(),fakeFetch(),{
+    request,sourceHmacSecret:secret,
+    providerEventReadinessInspector:audit,
+    cancellationSetInspector:async()=>({
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:true,
+      exactSignedWebhookIncluded:true,providerOrderingProven:false,
+      grantRevocationAuthorized:false,providerRefundAuthorized:false,
+      writesPerformed:false,
+    }),
+  });
+  expect(audit).toHaveBeenCalledTimes(1);
+  expect(result).toMatchObject({
+    canonicalCancellationSetMatched:true,
+    canonicalProviderEventReady:false,grantRevocationAuthorized:false,
+    writesPerformed:false,
+  });
+  expect(JSON.stringify(result)).not.toContain(expected);
+ });
+ it('does not accept a full-set result whose webhook-to-item binding was not proven',async()=>{
+  const result=await executor(fakeDb(),fakeFetch(),{
+    sourceHmacSecret:'test-only-secret-32-characters-or-more',
+    cancellationSetInspector:async()=>({
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:true,
+      exactSignedWebhookIncluded:false,
+      providerOrderingProven:false,grantRevocationAuthorized:false,
+      providerRefundAuthorized:false,writesPerformed:false,
+    }),
+  });
+  expect(result.kind).toBe('canonical_cancellation_set_not_verified');
+  expect(result.grantRevocationAuthorized).toBe(false);
+ });
+ it('does not accept a full-set result missing the exact signed item',async()=>{
+  const result=await executor(fakeDb(),fakeFetch(),{
+    sourceHmacSecret:'test-only-secret-32-characters-or-more',
+    cancellationSetInspector:async()=>({
+      kind:'authenticated_current_cancel_set_matches_recorded',
+      observedProviderSetMatched:true,postGetDbSnapshotStable:true,
+      exactSignedCancellationIncluded:false,providerOrderingProven:false,
+      grantRevocationAuthorized:false,providerRefundAuthorized:false,
+      writesPerformed:false,
+    }),
+  });
+  expect(result.kind).toBe('canonical_cancellation_set_not_verified');
+  expect(result.grantRevocationAuthorized).toBe(false);
+ });
+ it('payment-wide finality without success of the exact signed item cannot pass',async()=>{
+  const db=fakeDb(),http=fakeFetch();
+  const result=await executor(db,http,{readbackInspector:vi.fn(async()=>({
+   kind:'full_cancel_shape_observed',
+   providerReadbackFromAuthenticatedGet:true,
+   originalPaymentMatched:true,shapeConsistent:true,
+   matchedCancellationIdObserved:false,
+   observedCancelledTotalMinor:8900,
+   observedMatchingCancellationStatus:null,
+   observedMatchingSucceededCancellationMinor:null,
+   refundExecutionAuthorized:false,entitlementRevocationAuthorized:false,
+  }))});
+  expect(result.kind).toBe('inconsistent_provider_readback');
+  expect(db.query.mock.calls.some(([sql])=>sql===EVENT_AUDIT)).toBe(false);
+ });
+ it('full-cancellation notification cannot use a merely partial GET result',async()=>{
+  const http=fakeFetch({
+   ...PAID,status:'PARTIAL_CANCELLED',
+   amount:{paid:8900,cancelled:3000},
+   cancellations:[{id:CANCEL,status:'SUCCEEDED',totalAmount:3000}],
+  });
+  const result=await executor(fakeDb(),http);
+  expect(result.kind).toBe('inconsistent_provider_readback');
+  expect(result.grantRevocationAuthorized).toBe(false);
+ });
+ it('older partial notice with exact successful item remains review-only after later full cancellation',async()=>{
+  const http=fakeFetch({
+   ...PAID,cancellations:[
+    {id:CANCEL,status:'SUCCEEDED',totalAmount:3000},
+    {id:'later-cancel',status:'SUCCEEDED',totalAmount:5900},
+   ],
+  });
+  const result=await executor(fakeDb(),http,{
+   request:signedRequest('Transaction.PartialCancelled'),
+  });
+  expect(result).toMatchObject({
+   kind:'full_cancel_review_candidate',providerGetObserved:true,
+   fullRefundExecutionAuthorized:false,grantRevocationAuthorized:false,
+   entitlementEffectEligible:false,writesPerformed:false,
   });
  });
  it('invalid signature is denied before DB and network',async()=>{

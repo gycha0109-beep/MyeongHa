@@ -135,6 +135,15 @@ export async function handlePurchaseIntentCreateRequestV3(
       requestId,
     });
   }
+  if (verifiedEvidence.kind !== 'member') {
+    return jsonError({
+      status: 403,
+      code: 'LOGIN_REQUIRED',
+      messageKey: 'purchase_intent.login_required',
+      retryable: false,
+      requestId,
+    });
+  }
 
   let rawBody: unknown;
   try {

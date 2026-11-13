@@ -18,6 +18,7 @@ const H=id=>'hmac-sha256:k1:'+createHmac('sha256',SECRET)
  .update(JSON.stringify(['portone-cancellation-item-v1',P,id]),'utf8')
  .digest('hex');
 const FIRST={
+ providerWebhookId:'signed-first-event',
  receiptId:R,receiptSubjectId:S,receiptTransactionId:T,
  receiptProvider:'portone_v2',receiptEnvironment:'production',
  receiptStatus:'verified',receiptPaidMinor:'8900',receiptCurrency:'KRW',
@@ -39,7 +40,8 @@ const FIRST={
  revocationAuthorized:'false',
 };
 const SECOND={
- ...FIRST,providerEventId:'00000000-0000-4000-8000-000000000092',
+ ...FIRST,providerWebhookId:'signed-second-event',
+ providerEventId:'00000000-0000-4000-8000-000000000092',
  eventType:'Transaction.Cancelled',sourceEventType:'Transaction.Cancelled',
  signedEventHmac:MAC('d'),sourceSignedHmac:MAC('d'),
  sourceReadbackHmac:MAC('e'),cancellationIdHmac:H(B),
@@ -257,6 +259,69 @@ describe('P4 exact Provider Event member of full current cancellation set',()=>{
   safe(result);
  });
 
+ it('requires the exact signed cancellation HMAC in the durable set before GET',async()=>{
+  const client=db(),fetchImpl=fetchFor();
+  const absent=await run(client,{
+    expectedCancellationIdHmac:H('unrelated-item'),fetchImpl,
+  });
+  expect(absent.kind).toBe('exact_signed_cancellation_not_in_verified_cancel_set');
+  expect(fetchImpl).not.toHaveBeenCalled();
+  expect(client.calls.filter(x=>x.sql===SQL)).toHaveLength(1);
+  safe(absent);
+ });
+ it('matches signed cancellation HMAC across both DB snapshots and full GET',async()=>{
+  const result=await run(db(),{expectedCancellationIdHmac:H(A)});
+  expect(result).toMatchObject({
+    kind:'authenticated_current_cancel_set_matches_recorded',
+    exactSignedCancellationIncluded:true,
+    postGetDbSnapshotStable:true,observedProviderSetMatched:true,
+    grantRevocationAuthorized:false,providerOrderingProven:false,
+  });
+  safe(result);
+ });
+ it('rejects independently-present event and item selectors from different cancellations',async()=>{
+  const client=db(),fetchImpl=fetchFor();
+  const r=await run(client,{fetchImpl,
+    expectedProviderEventId:FIRST.providerEventId,
+    expectedProviderWebhookId:FIRST.providerWebhookId,
+    expectedCancellationIdHmac:H(B),
+  });
+  expect(r.kind).toBe('exact_signed_event_and_cancel_item_mismatch');
+  expect(fetchImpl).not.toHaveBeenCalled();
+  expect(client.calls.filter(x=>x.sql===SQL)).toHaveLength(1);
+  safe(r);
+ });
+ it('binds the signed webhook and exact cancellation item to the SAME event before and after GET',async()=>{
+  const r=await run(db(),{
+   expectedProviderWebhookId:FIRST.providerWebhookId,
+   expectedCancellationIdHmac:H(A),
+  });
+  expect(r).toMatchObject({
+   kind:'authenticated_current_cancel_set_matches_recorded',
+   exactSignedWebhookIncluded:true,exactSignedCancellationIncluded:true,
+   postGetDbSnapshotStable:true,grantRevocationAuthorized:false,
+  });
+  safe(r);
+ });
+ it('rejects an unknown signed webhook event before GET',async()=>{
+  const fetchImpl=fetchFor();
+  const r=await run(db(),{fetchImpl,expectedProviderWebhookId:'unknown-webhook'});
+  expect(r.kind).toBe('exact_signed_webhook_not_in_verified_cancel_set');
+  expect(fetchImpl).not.toHaveBeenCalled();
+  safe(r);
+ });
+ it('detects switched webhook-to-item mapping after GET even if aggregate totals match',async()=>{
+  const rowsAfter=[
+   {...FIRST,providerWebhookId:SECOND.providerWebhookId},
+   {...SECOND,providerWebhookId:FIRST.providerWebhookId},
+  ];
+  const r=await run(db({rowsAfter}),{
+   expectedProviderWebhookId:FIRST.providerWebhookId,
+   expectedCancellationIdHmac:H(A),
+  });
+  expect(r.kind).toBe('stored_cancel_set_changed_during_provider_get');
+  safe(r);
+ });
  it('requires exact persisted candidate event to be in the verified set',async()=>{
   const client=db(),fetchImpl=fetchFor();
   const r=await run(client,{
@@ -298,6 +363,8 @@ describe('P4 exact Provider Event member of full current cancellation set',()=>{
  it('rejects invalid external event identity before beginning DB read',async()=>{
   const client=db();
   await expect(run(client,{expectedProviderEventId:'not-uuid'})).rejects.toThrow('INVALID');
+  await expect(run(client,{expectedProviderWebhookId:'bad\nwebhook'}))
+   .rejects.toThrow('INVALID');
   expect(client.query).not.toHaveBeenCalled();
  });
 });

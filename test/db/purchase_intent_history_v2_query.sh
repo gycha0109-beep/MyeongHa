@@ -42,9 +42,11 @@ insert into public.product_offers(
   'web','testpay','history-safe-web','KRW',4900,true,'2026-09-01T00:00:00Z',null,'2026-09-01T00:00:00Z'
 );
 
--- Seed while Guest owners are still canonical/active. Two Guest rows are then
--- merged into different existing Members to prove read-time lineage continuity
--- without rewriting historical purchase_intents.subject_id.
+-- These are historical Guest-owned Commerce rows from before P0-CM-05. Disable
+-- only the new-current-write Member guard for this privileged history fixture;
+-- production/runtime inserts remain guarded. Two Guest rows are then merged into
+-- different existing Members without rewriting purchase_intents.subject_id.
+alter table public.purchase_intents disable trigger tr_purchase_intent_member_required_v1;
 insert into public.purchase_intents(
   id,subject_id,product_offer_id,provider_account_link_id,idempotency_key,request_hash,
   offer_snapshot_jsonb,offer_snapshot_hash,status,expected_amount_minor,expected_currency,
@@ -55,6 +57,7 @@ insert into public.purchase_intents(
   ('b6500000-0000-4000-8000-000000000010','b6200000-0000-4000-8000-000000000010','b6400000-0000-4000-8000-000000000001',null,'member-self','sha256:member-self','{"secretSentinel":"INTERNAL_MEMBER_SNAPSHOT"}'::jsonb,'sha256:snapshot:member-self','created',15900,'KRW','charge-v2','2026-09-01T03:00:00Z','2026-09-01T03:00:00Z'),
   ('b6500000-0000-4000-8000-000000000020','b6200000-0000-4000-8000-000000000002','b6400000-0000-4000-8000-000000000001',null,'merged-guest-member-one','sha256:merged-guest-member-one','{"secretSentinel":"INTERNAL_MERGED_GUEST_SNAPSHOT"}'::jsonb,'sha256:snapshot:merged-one','failed',12900,'KRW','charge-v1','2026-09-01T02:00:00Z','2026-09-01T02:10:00Z'),
   ('b6500000-0000-4000-8000-000000000030','b6200000-0000-4000-8000-000000000003','b6400000-0000-4000-8000-000000000001',null,'merged-guest-member-two','sha256:merged-guest-member-two','{"secretSentinel":"FOREIGN_PROVIDER_DATA"}'::jsonb,'sha256:snapshot:merged-two','cancelled',9900,'KRW','charge-v0','2026-09-01T01:00:00Z','2026-09-01T01:10:00Z');
+alter table public.purchase_intents enable trigger tr_purchase_intent_member_required_v1;
 
 update public.subjects
 set status='merged', merged_into_subject_id='b6200000-0000-4000-8000-000000000010', updated_at='2026-09-01T06:00:00Z'

@@ -1,6 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import {
+  classifyRestoredPrivateClaimDeletionV1,
+  verifyRestoredPrivateClaimRowConservationV1,
+  verifyRestoredPrivateClaimUnrelatedFingerprintV1,
+} from '../scripts/operations/commerce-private-claim-restored-evidence-classifier-v1.mjs';
 
 const restore=readFileSync(new URL(
   '../scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
@@ -20,8 +25,8 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain("to_regclass('public.digital_reading_withdrawal_claims_private_v1')");
     expect(restore).toContain("then 'absent' else 'present'");
     expect(restore).toContain("restored_claim_relation");
-    expect(restore).toContain("'schema-absent-no-private-claim-proof'");
-    expect(restore).toContain("'exact-subject-after-finalizer-and-completion-pass'");
+    expect(restore).toContain('classifyRestoredPrivateClaimDeletionV1({');
+    expect(restore).toContain('...privateClaimEvidence,');
     expect(restore.indexOf('restored_claim_relation=')).toBeGreaterThan(
       restore.indexOf(' -f "$plan"')
     );
@@ -44,6 +49,167 @@ describe('Commerce claim account deletion after isolated Postgres restore',()=>{
     expect(restore).toContain('"$private_claim_verified_subjects" -eq "$account_deletion_count"');
     expect(restore).not.toContain('private_claim_count" == "1"');
   });
+
+  it('separates an actually witnessed private claim DELETE from a zero-row restore',()=>{
+    expect(restore).toContain('private_claim_preexisting_subjects=0');
+    expect(restore).toContain('private_claim_pre_finalizer_count=');
+    expect(restore).toContain('private_claim_preexisting_subjects=$((private_claim_preexisting_subjects + 1))');
+    expect(restore).toContain('preExistingClaimSubjectCount,');
+    expect(restore).toContain('accountDeletionCount: publicManifest.eventTypeCounts.ACCOUNT_DELETION_STARTED');
+    // Only the same Subject is counted; no payload or Subject ID in the
+    // restored evidence output, and no artificial claim is seeded.
+    const before=restore.indexOf('private_claim_pre_finalizer_count=');
+    const finalizer=restore.indexOf('finalizer="$(');
+    const after=restore.indexOf('private_claim_count=');
+    expect(before).toBeGreaterThan(restore.indexOf('[[ "$phase" == "db_finalization_required" ]]'));
+    expect(before).toBeLessThan(finalizer);
+    expect(finalizer).toBeLessThan(after);
+    expect(restore).toContain("where subject_id='$subject_id'::uuid;");
+    expect(restore).not.toContain('insert into public.digital_reading_withdrawal_claims_private_v1');
+    expect(restore).toContain('private_claim_preexisting_subjects" -le "$private_claim_verified_subjects"');
+  });
+
+  it.each([
+    ['historical backup lacking the relation','absent',0,2,
+      'schema-absent-no-private-claim-proof',false],
+    ['table present but no Claim before deletion','present',0,2,
+      'exact-subject-zero-after-replay-no-pre-finalizer-deletion-witness',false],
+    ['one exact Subject with an existing Claim','present',1,2,
+      'exact-subject-after-finalizer-and-completion-pass',true],
+    ['all deletion Subjects with existing Claims','present',2,2,
+      'exact-subject-after-finalizer-and-completion-pass',true],
+  ])('classifies %s without claiming unobserved deletion',
+    (_name,relation,preExistingClaimSubjectCount,accountDeletionCount,guard,witnessed)=>{
+      expect(classifyRestoredPrivateClaimDeletionV1({
+        relation,preExistingClaimSubjectCount,accountDeletionCount,
+      })).toEqual({
+        private_withdrawal_claim_replay_guard:guard,
+        private_withdrawal_claim_deletion_witnessed:witnessed,
+      });
+    },
+  );
+
+  it.each([
+    {relation:'other',preExistingClaimSubjectCount:0,accountDeletionCount:1},
+    {relation:'absent',preExistingClaimSubjectCount:1,accountDeletionCount:1},
+    {relation:'present',preExistingClaimSubjectCount:-1,accountDeletionCount:1},
+    {relation:'present',preExistingClaimSubjectCount:1.2,accountDeletionCount:2},
+    {relation:'present',preExistingClaimSubjectCount:2,accountDeletionCount:1},
+    {relation:'present',preExistingClaimSubjectCount:0,accountDeletionCount:0},
+    {relation:'present',preExistingClaimSubjectCount:0,accountDeletionCount:NaN},
+  ])('rejects invalid or overstated restored Claim proof %j',input=>{
+    expect(()=>classifyRestoredPrivateClaimDeletionV1(input))
+      .toThrow('RESTORED_PRIVATE_CLAIM_DELETION_EVIDENCE_INVALID');
+  });
+
+  it('compares the whole isolated Claim count against only exact target deletion totals',()=>{
+    expect(restore).toContain('private_claim_total_before=');
+    expect(restore).toContain('private_claim_total_after=');
+    expect(restore).toContain('private_claim_count_file="$tmp_dir/private-claim-target-counts"');
+    expect(restore).toContain('printf \'%s\\n\' "$private_claim_pre_finalizer_count"');
+    expect(restore).toContain('verifyRestoredPrivateClaimRowConservationV1({');
+    expect(restore).toContain('...privateClaimRowEvidence,');
+    const before=restore.indexOf('private_claim_total_before="$(');
+    const finalizer=restore.indexOf('finalizer="$(');
+    const after=restore.indexOf('private_claim_total_after="$(');
+    expect(before).toBeGreaterThan(restore.indexOf('restored_claim_relation='));
+    expect(before).toBeLessThan(finalizer);
+    expect(after).toBeGreaterThan(restore.indexOf('done < <(jq -r'));
+    expect(restore).not.toContain('select subject_id from public.digital_reading_withdrawal_claims_private_v1');
+  });
+  it.each([
+    ['non-target rows unchanged','present','5','3',['2','0'],2,
+      'aggregate-conservation-pass-not-row-identity-proof'],
+    ['multiple original claims on one target','present','7','3',['4','0'],2,
+      'aggregate-conservation-pass-not-row-identity-proof'],
+    ['no deletion rows, same aggregate','present','4','4',['0'],1,
+      'aggregate-conservation-pass-not-row-identity-proof'],
+    ['legacy backup with no Claim relation','absent',null,null,[],1,
+      'schema-absent-not-checked'],
+  ])('accepts %s as a bounded aggregate observation',
+    (_name,relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,guard)=>{
+      expect(verifyRestoredPrivateClaimRowConservationV1({
+        relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,
+      })).toEqual({private_withdrawal_claim_unrelated_row_count_guard:guard});
+    },
+  );
+  it.each([
+    ['unrelated Claim unexpectedly deleted','present','5','2',['2','0'],2],
+    ['target Claim unexpectedly retained','present','5','4',['2','0'],2],
+    ['target counts exceed global baseline','present','1','0',['2'],1],
+    ['missing target evidence','present','5','3',['2'],2],
+    ['fabricated extra target','present','5','3',['2','0'],1],
+    ['missing relation but positive global count','absent','1',null,[],1],
+    ['missing relation but target count','absent',null,null,['0'],1],
+    ['negative final count','present','5','-1',['2'],1],
+    ['invalid decimal','present','05','3',['2'],1],
+    ['unsafe/deformed account count','present','5','3',['2'],0],
+  ])('rejects %s before writing a restore success receipt',
+    (_name,relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount)=>{
+      expect(()=>verifyRestoredPrivateClaimRowConservationV1({
+        relation,totalBefore,totalAfter,targetBeforeCounts,accountDeletionCount,
+      })).toThrow('RESTORED_PRIVATE_CLAIM_ROW_CONSERVATION_INVALID');
+    },
+  );
+
+  it('fingerprints full unrelated rows before/after exact target finalization, not only counts',()=>{
+    expect(restore).toContain('private_claim_target_subjects_json="$(jq -cer');
+    expect(restore).toContain('-v claim_target_subjects_json="$private_claim_target_subjects_json"');
+    expect(restore).toContain('pg_catalog.to_jsonb(claim_row)::text');
+    expect(restore).toContain('pg_catalog.sha256(');
+    expect(restore).toContain("from pg_catalog.jsonb_array_elements_text(");
+    expect(restore).toContain("where target.subject_id::uuid=claim_row.subject_id");
+    expect(restore).toContain('order by 1;');
+    expect(restore).toContain("| sha256sum | awk '{print $1}'");
+    expect(restore).toContain('private_claim_unrelated_fingerprint_before="$(private_claim_unrelated_fingerprint)"');
+    expect(restore).toContain('private_claim_unrelated_fingerprint_after="$(private_claim_unrelated_fingerprint)"');
+    expect(restore).toContain('verifyRestoredPrivateClaimUnrelatedFingerprintV1({');
+    expect(restore).toContain('...privateClaimFingerprintEvidence,');
+    expect(restore).toContain('DENY: unrelated private withdrawal Claim rows changed');
+    expect(restore.indexOf('private_claim_unrelated_fingerprint_before="$(private_claim_unrelated_fingerprint)"'))
+      .toBeLessThan(restore.indexOf('finalizer="$('));
+    expect(restore.indexOf('private_claim_unrelated_fingerprint_after="$(private_claim_unrelated_fingerprint)"'))
+      .toBeGreaterThan(restore.indexOf('done < <(jq -r'));
+    expect(restore).not.toContain('select subject_id from public.digital_reading_withdrawal_claims_private_v1');
+  });
+
+  it.each([
+    ['unrelated Claims unchanged','present','5',['2','0'],2,'a'.repeat(64),'a'.repeat(64),
+      'sha256-full-row-multiset-consistent'],
+    ['no unrelated Claim rows','present','2',['1','1'],2,'b'.repeat(64),'b'.repeat(64),
+      'no-unrelated-claim-row-to-witness'],
+    ['old backup without the table','absent',null,[],1,null,null,
+      'schema-absent-not-checked'],
+  ])('classifies %s with a privacy-safe receipt, no digest output',
+    (_name,relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+      beforeFingerprint,afterFingerprint,guard)=>{
+      expect(verifyRestoredPrivateClaimUnrelatedFingerprintV1({
+        relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+        beforeFingerprint,afterFingerprint,
+      })).toEqual({private_withdrawal_claim_unrelated_row_fingerprint_guard:guard});
+    },
+  );
+
+  it.each([
+    ['unrelated row content changed','present','5',['2'],1,'a'.repeat(64),'b'.repeat(64)],
+    ['unrelated row ID changed','present','5',['2'],1,'a'.repeat(64),'c'.repeat(64)],
+    ['missing before fingerprint','present','5',['2'],1,null,'a'.repeat(64)],
+    ['empty final fingerprint','present','5',['2'],1,'a'.repeat(64),''],
+    ['malformed fingerprint','present','5',['2'],1,'a'.repeat(63),'a'.repeat(63)],
+    ['unrelated counts impossible','present','1',['2'],1,'a'.repeat(64),'a'.repeat(64)],
+    ['missing deletion-target count','present','5',[],1,'a'.repeat(64),'a'.repeat(64)],
+    ['old schema fabricates digests','absent',null,[],1,'a'.repeat(64),'a'.repeat(64)],
+    ['unrecognized schema','unknown',null,[],1,null,null],
+    ['unsafe count','present','5',['2'],0,'a'.repeat(64),'a'.repeat(64)],
+  ])('rejects %s before isolated restore success receipt',
+    (_name,relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+      beforeFingerprint,afterFingerprint)=>{
+      expect(()=>verifyRestoredPrivateClaimUnrelatedFingerprintV1({
+        relation,totalBefore,targetBeforeCounts,accountDeletionCount,
+        beforeFingerprint,afterFingerprint,
+      })).toThrow('RESTORED_PRIVATE_CLAIM_UNRELATED_FINGERPRINT_INVALID');
+    },
+  );
   it('reuses existing PG17 deletion/other-Subject/restore-residue assertions',()=>{
     expect(originalDeletionProof).toContain('after-finalization)');
     expect(originalDeletionProof).toContain('0|1|2');

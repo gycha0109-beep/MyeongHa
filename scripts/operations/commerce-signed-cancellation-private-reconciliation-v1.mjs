@@ -1,6 +1,10 @@
 // Operations-only stitched flow; requires "npm run build" before Node use.
 // Signed notification -> verified original Production Reading receipt ->
 // HTTPS GET /payments/{paymentId} -> classified review only. No mutations.
+import {createHmac} from 'node:crypto';
+import {
+  reconcileStoredPortOneCancellationSetWithGetPrivateV1,
+} from './commerce-portone-cancellation-set-ledger-audit-v1.mjs';
 import {
   resolveCancellationOriginalReceiptPrivateV1,
 } from './commerce-cancellation-payment-receipt-link-v1.mjs';
@@ -31,6 +35,7 @@ export const COMMERCE_SIGNED_CANCELLATION_PRIVATE_RECONCILIATION_V1=DISABLED;
 export async function reconcileSignedCancellationPrivateV1({
   dbClient,request,webhookConfig,apiSecret,
   fetchImpl,authenticator,readbackInspector,providerEventReadinessInspector,
+  sourceHmacSecret,cancellationSetInspector,
 }){
   let authenticate=authenticator;
   let inspect=readbackInspector;
@@ -49,6 +54,12 @@ export async function reconcileSignedCancellationPrivateV1({
   if(!signed||signed.kind!=='cancellation_lookup_candidate')
     return base('not_cancellation_event');
   if(webhookConfig?.environment!=='production')return base('production_only_hold');
+  // PortOne V2 cancellation notices carry a per-item cancellationId.
+  // Without that ID, an aggregate payment GET cannot authenticate the
+  // notification's exact cancellation or its success/amount.
+  if(typeof signed.providerCancellationId!=='string'||
+     signed.providerCancellationId.length===0)
+    return base('exact_cancellation_id_required');
 
   let original;
   try{
@@ -76,6 +87,29 @@ export async function reconcileSignedCancellationPrivateV1({
     classified.refundExecutionAuthorized!==false||
     classified.entitlementRevocationAuthorized!==false)
     return base('inconsistent_provider_readback');
+
+  // A payment-wide CANCELLED/PARTIAL_CANCELLED status is not enough:
+  // verify the exact cancellationId from the signed notice against the
+  // authenticated GET's individual successful cancellation and bounded sum.
+  // Do not infer ordering or refund/revoke authority from this observation.
+  const paid=original.originalVerifiedPaidAmountMinor;
+  const cumulative=classified.observedCancelledTotalMinor;
+  const exact=classified.observedMatchingSucceededCancellationMinor;
+  const finalShape=classified.kind==='full_cancel_shape_observed'||
+    classified.kind==='partial_cancel_shape_observed';
+  if(classified.matchedCancellationIdObserved!==true||
+     !Number.isSafeInteger(paid)||paid<=0||
+     !Number.isSafeInteger(cumulative)||cumulative<0||cumulative>paid||
+     (finalShape&&(
+       classified.observedMatchingCancellationStatus!=='SUCCEEDED'||
+       !Number.isSafeInteger(exact)||exact<=0||exact>cumulative||
+       (signed.eventType==='Transaction.Cancelled'&&
+         classified.kind!=='full_cancel_shape_observed')||
+       (signed.eventType==='Transaction.PartialCancelled'&&exact>=paid)
+     ))||
+     (classified.kind==='cancellation_pending'&&
+       classified.observedMatchingCancellationStatus!=='REQUESTED'))
+    return base('inconsistent_provider_readback');
   const mapping=Object.freeze({
     full_cancel_shape_observed:'full_cancel_review_candidate',
     partial_cancel_shape_observed:'partial_cancel_review_candidate',
@@ -84,6 +118,35 @@ export async function reconcileSignedCancellationPrivateV1({
   });
   const kind=mapping[classified.kind];
   if(!kind)return base('inconsistent_provider_readback');
+  // Only the verified raw notification bytes can be matched to an existing
+  // canonical Provider Event fingerprint. Require a private keyed source
+  // secret when this optional stronger evidence check is requested.
+  let expectedSignedPayloadHmac,expectedCancellationIdHmac;
+  if(finalShape&&sourceHmacSecret!==undefined){
+    if(typeof sourceHmacSecret!=='string'||
+       sourceHmacSecret.length<32||sourceHmacSecret.length>4096||
+       sourceHmacSecret.trim()!==sourceHmacSecret||
+       /[\u0000-\u001f\u007f]/u.test(sourceHmacSecret))
+      return base('source_fingerprint_authority_unavailable');
+    try{
+      const raw=request.rawBody;
+      const bytes=typeof raw==='string'?Buffer.from(raw,'utf8'):Buffer.from(raw);
+      if(bytes.length===0||bytes.length>65536)
+        return base('authentication_rejected');
+      expectedSignedPayloadHmac='hmac-sha256:k1:'+
+        createHmac('sha256',sourceHmacSecret)
+          .update(JSON.stringify([
+            'portone-cancel-signed-v1',signed.providerWebhookId,
+            signed.eventType,bytes.toString('base64'),
+          ]),'utf8').digest('hex');
+      expectedCancellationIdHmac='hmac-sha256:k1:'+
+        createHmac('sha256',sourceHmacSecret)
+          .update(JSON.stringify([
+            'portone-cancellation-item-v1',
+            signed.providerPaymentId,signed.providerCancellationId,
+          ]),'utf8').digest('hex');
+    }catch{return base('authentication_rejected');}
+  }
   // The signed webhook and the authenticated PSP GET are not a substitute for
   // a durable, ordered, exactly-reconciled canonical Commerce Provider Event.
   // Run the existing-event audit only after both sources and the original
@@ -96,6 +159,11 @@ export async function reconcileSignedCancellationPrivateV1({
       providerWebhookId:signed.providerWebhookId,
       originalTransactionId:original.originalTransactionId,
       expectedEventType:signed.eventType,
+      expectedReceiptId:original.verifiedReceiptId,
+      ...(expectedSignedPayloadHmac===undefined?{}:{
+        expectedSignedPayloadHmac,
+        expectedCancellationIdHmac,
+      }),
     });
     if(!eventReadiness||eventReadiness.writesPerformed!==false||
        eventReadiness.grantRevocationAuthorized!==false||
@@ -107,7 +175,37 @@ export async function reconcileSignedCancellationPrivateV1({
   } catch {
     return base('canonical_provider_event_audit_unavailable');
   }
+  // Only an explicitly supplied private fingerprint secret enables a
+  // full-set read-only comparison. Never imply current-set completeness from
+  // one signed notification, the payment aggregate or a single Event row.
+  let cancellationSet;
+  if(finalShape&&sourceHmacSecret!==undefined){
+    try {
+      const compare=cancellationSetInspector??
+        reconcileStoredPortOneCancellationSetWithGetPrivateV1;
+      cancellationSet=await compare({
+        dbClient,receiptId:original.verifiedReceiptId,
+        expectedProviderWebhookId:signed.providerWebhookId,
+        expectedCancellationIdHmac,
+        sourceHmacSecret,apiSecret,fetchImpl,
+      });
+      if(!cancellationSet||
+         cancellationSet.kind!=='authenticated_current_cancel_set_matches_recorded'||
+         cancellationSet.observedProviderSetMatched!==true||
+         cancellationSet.postGetDbSnapshotStable!==true||
+         cancellationSet.exactSignedCancellationIncluded!==true||
+         cancellationSet.exactSignedWebhookIncluded!==true||
+         cancellationSet.providerOrderingProven!==false||
+         cancellationSet.grantRevocationAuthorized!==false||
+         cancellationSet.providerRefundAuthorized!==false||
+         cancellationSet.writesPerformed!==false)
+        return base('canonical_cancellation_set_not_verified');
+    }catch{return base('canonical_cancellation_set_audit_unavailable');}
+  }
   return Object.freeze({...base(kind),
+    canonicalCancellationSetMatched:cancellationSet?.observedProviderSetMatched===true,
+    canonicalCancellationSetStatus:cancellationSet?.kind??'not_checked',
+    exactSignedCancellationIncluded:cancellationSet?.exactSignedCancellationIncluded===true,
     canonicalProviderEventStatus:eventReadiness.kind,
     canonicalProviderEventReady:eventReadiness.sourceEventReady,
     exactEventGrantRevocationObserved:eventReadiness.exactPurchaseGrantRevoked,
