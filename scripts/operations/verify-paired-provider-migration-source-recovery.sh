@@ -74,4 +74,28 @@ jq -e '.encryptedSourceDecryptionVerified == true
   and .hostedProviderRecoveryProven == false
   and .drReady == false and .serviceResumptionAllowed == false' \
   "$PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH" >/dev/null || fail
+# Compare only version/name metadata against the exact checked-out main.
+# Original statement-bearing packet stays inside private temp; public output
+# contains version IDs and counts, never historical SQL or operator identities.
+[[ -n "${MIGRATION_LINEAGE_EVIDENCE_PATH:-}" &&
+   "$MIGRATION_LINEAGE_EVIDENCE_PATH" == "$RUNNER_TEMP/"* ]] || fail
+node scripts/operations/assess-sealed-provider-migration-file-lineage.mjs \
+  --source "$private/source-provider-migration-ledger.json" \
+  --paired-proof "$PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH" \
+  --output "$MIGRATION_LINEAGE_EVIDENCE_PATH" || fail
+jq -e '.schemaVersion == "ops-sealed-provider-migration-file-lineage-v1"
+  and .sourceVersionCount > 0
+  and .commonVersionCount + .remoteOnlyVersionCount == .sourceVersionCount
+  and (.newRemoteOnlySinceBaselineIds | type) == "array"' \
+  "$MIGRATION_LINEAGE_EVIDENCE_PATH" >/dev/null || fail
+jq -e '.originalSqlBodiesPublished == false
+  and .operatorProvenancePublished == false
+  and .sourceLedgerHistoryRowsRestored == false
+  and .migrationHistoryRepaired == false
+  and .appliedSqlAndCurrentDdlEquivalenceProven == false
+  and .hostedProviderRestoreProven == false
+  and .drReady == false and .serviceResumptionAllowed == false' \
+  "$MIGRATION_LINEAGE_EVIDENCE_PATH" >/dev/null || fail
+echo 'EXACT_MAIN_MIGRATION_FILE_LINEAGE_OBSERVED DR_HOLD'
+
 echo 'PAIRED_SOURCE_RECOVERABILITY_PASS TARGET_PROVIDER_LEDGER_HOLD'
