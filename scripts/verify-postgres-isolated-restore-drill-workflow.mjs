@@ -15,6 +15,8 @@ const relationshipProofPath = 'scripts/operations/seyeon-relationship-isolated-r
 const creatorDefaultAclPath = 'scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql';
 const portableReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
 const privacySyntheticPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
+const cloneRehearsalPath =
+  'scripts/operations/rehearse-current-backup-shared-memory-privacy-chain.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
 for (const script of [
@@ -26,6 +28,7 @@ for (const script of [
   evidenceRunnerPath,
   harnessPath,
   privacySyntheticPath,
+  cloneRehearsalPath,
 ]) {
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
@@ -40,6 +43,7 @@ const [
   harness,
   portableReplay,
   privacySynthetic,
+  cloneRehearsal,
   runbook,
   relationshipProof,
   creatorDefaultAcl,
@@ -53,6 +57,7 @@ const [
   readFile(harnessPath, 'utf8'),
   readFile(portableReplayPath, 'utf8'),
   readFile(privacySyntheticPath, 'utf8'),
+  readFile(cloneRehearsalPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
   readFile(relationshipProofPath, 'utf8'),
   readFile(creatorDefaultAclPath, 'utf8'),
@@ -213,6 +218,73 @@ requireFragment(diagnosticProof, 'and .notByteExactOrUnprovenCount == 187', work
 requireFragment(diagnosticProof, 'and .drReady == false', workflowPath);
 requireFragment(diagnosticProof, 'syntheticPrivacyReconciliationExercised: false', workflowPath);
 // No change to normal full-drill synthetic privacy requirement or final DR HOLD.
+
+// Exact current backup clone-only test never bypasses the full privacy gate.
+// The restored original catalog must be assessed BEFORE adding new objects.
+for (const fragment of [
+  'restore_clone_shared_memory_rehearsal:',
+  'SCOPED_CLONE_REHEARSAL: ${{ inputs.restore_clone_shared_memory_rehearsal }}',
+  'if [[ "$SCOPED_CLONE_REHEARSAL" == \'true\' ]]; then',
+  '[[ "$SCOPED_SOURCE_BACKUP_RUN_ID" == \'43424903445\' ]]',
+  '[[ "$SCOPED_INCIDENT_REFERENCE" == \'2026-11-13T12:29:12Z\' ]]',
+  '[[ "$SCOPED_SOURCE_DIAGNOSTIC" == \'false\' &&',
+  '"$SCOPED_PROVIDER_VERIFY" == \'true\' ]]',
+  'SCOPED_DISPOSABLE_PRIVACY_FORWARD_REHEARSAL__PRODUCTION_UNCHANGED__DR_HOLD',
+  'Rehearse missing shared-memory privacy chain only on isolated current-backup clone',
+  'run: bash scripts/operations/rehearse-current-backup-shared-memory-privacy-chain.sh',
+  'disposable-shared-memory-privacy-rehearsal.json',
+  'shared_memory_privacy_chain=forward_applied_on_disposable_clone_only',
+  'clone_post_rehearsal_production_schema_equivalence=false',
+]) requireFragment(workflow, fragment, workflowPath);
+const cloneStep = section(workflow,
+  '      - name: Rehearse missing shared-memory privacy chain only on isolated current-backup clone',
+  '      - name: Exercise synthetic privacy reconciliation and finalization on restored database');
+requireFragment(cloneStep,
+  "if: ${{ github.event_name == 'workflow_dispatch' && inputs.restore_clone_shared_memory_rehearsal }}",
+  workflowPath);
+for (const fragment of [
+  'BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
+  'EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}',
+  'PGHOST: 127.0.0.1',
+  'PGUSER: supabase_admin',
+]) requireFragment(cloneStep, fragment, workflowPath);
+const rolePosition = workflow.indexOf(
+  '      - name: Attribute isolated Provider role replay to sealed source and observed target');
+const clonePosition = workflow.indexOf(
+  '      - name: Rehearse missing shared-memory privacy chain only on isolated current-backup clone');
+const comparePosition = workflow.indexOf(
+  '      - name: Compare current-frontier application schema with isolated restored catalog');
+const privacyPosition = workflow.indexOf(
+  '      - name: Exercise synthetic privacy reconciliation and finalization on restored database');
+if (!(0 <= comparePosition && comparePosition < rolePosition &&
+  rolePosition < clonePosition && clonePosition < privacyPosition)) {
+  throw new Error('Clone-only SQL must execute after original source-catalog parity and before synthetic privacy');
+}
+for (const fragment of [
+  '43424903445',
+  '6eab97337811128282f5f5ec6320e4608d5f9c09',
+  '2026-11-13T12:29:12Z',
+  'github-actions-loopback-supabase-postgres',
+  'supabase/migrations/2360_subject_shared_memory_owner_managed_v1.sql',
+  'supabase/migrations/2370_subject_shared_memory_account_finalization_erasure_v1.sql',
+  'supabase/migrations/2380_subject_shared_memory_note_deletion_recovery_v1.sql',
+  '--single-transaction',
+  "SET ROLE postgres",
+  "pg_get_userbyid(proowner)",
+  'git hash-object',
+  'REHEARSAL_EVIDENCE_PATH',
+  'cloneStillMatchesOriginalProductionSchema: false',
+  'productionDatabaseChanged: false',
+  'serviceResumptionAllowed: false',
+  'drReady: false',
+]) requireFragment(cloneRehearsal, fragment, cloneRehearsalPath);
+for (const forbidden of [
+  'supabase db push',
+  'supabase migration repair',
+  'supabase db reset',
+  'curl ',
+  'gh api',
+]) forbidFragment(cloneRehearsal, forbidden, cloneRehearsalPath);
 
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
