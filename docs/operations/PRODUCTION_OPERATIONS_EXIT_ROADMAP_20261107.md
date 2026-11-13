@@ -1,3 +1,10 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 단일 SQL 21개 실제 차이 위치 실증 (12개 내용/영향 처분 HOLD)
+
+- 보호된 `main` 격리 복구 [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458) **SUCCESS** (원본 백업 #43174606843 재사용, checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`, artifact `14026803978`, ZIP SHA-256 `b9f779ae4360cf8b13ee85e79c43b0c3c1a4b6da98ad57205b1b47bc0ef2fe0c`, 원본 parity JSON SHA-256 `a30da4e0554a77f6bffb87f1aeeebc0da4eb2adccef9f87128c75b1325cfa0a5`).
+- 실제 원장/저장소/공통 분류 **242/276/200**, source-only **42**, repo-only **76**. 기존 완전 일치 **13**, 전체 byte-exact 미입증 **187** 유지. 단일 statement bytes 불일치 21개를 봉인된 격리 runner에서 실제 바이트로 조사하여 **저장소 `;`+LF 2바이트 추가 9개**, **원본 source 끝부분 추가 2개(`1600`, `1630`)**, **원본·저장소 내부 상이 구간 10개(`1580`, `1590`, `1610`, `1620`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`)**를 관측했다.
+- **실제 비식별 21개 전수 측정값:** [POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json). 원문 SQL/변경 구간/작성자·개인정보는 공개하지 않았고, 바이트 길이·위치·해시 및 실행 출처만 보존했다. 파일 일부가 다르다는 사실은 SQL 의미 차이, 역사적 실행 인과나 복원된 객체/권한 영향까지 입증하지 않는다.
+- **다음 Phase 8-A 실제 미완료:** 12개 SQL의 끝부분/내부 차이가 실행 명령·권한·RLS에 미치는 영향을 안전한 원본 증거와 현재 객체 실측으로 처분한다. 다중 statement 154개 framing 보류, 원문 NULL 12개, Provider migration ledger 대상 복원 및 전체 DDL/owner/role/GRANT/RLS 동등성은 별도 HOLD. 기존 41개 source-only 처분·A4 실측을 반복하지 않는다. Production 변경·migration repair/replay·Hosted 생성·privacy canary 없음. #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 미해결 단일 SQL 12개의 봉인 공간 차이 위치 실측 도구 (실증 대기)
 
 - [PR #3279](https://github.com/gycha0109-beep/MyeongHa/pull/3279)까지 기존 21개 단일 SQL 불일치 중 9개의 *원본 statement = 저장소 파일 prefix* SHA 일치(저장소 뒤에 `0x3b0a`)만 확인했고, **12개는 실제 내용 차이의 범위를 확인하지 못했다**. 스키마 94개·함수 322개·기존 48개 역할 연결의 격리 관측은 버전별 SQL 실행 인과 증거가 아니다.

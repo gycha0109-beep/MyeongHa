@@ -1,3 +1,13 @@
+### 2026-11-13 KST — Phase 8-A: 공통 SQL 21개 실제 원문 바이트 차이 위치 실증 완료
+
+- **실제 실행 성공:** [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458), checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`, source run `43174606843`, artifact ID `14026803978` (ZIP SHA-256 `b9f779ae4360cf8b13ee85e79c43b0c3c1a4b6da98ad57205b1b47bc0ef2fe0c`). 원본 `paired-provider-common-migration-body-parity.json` SHA-256 `a30da4e0554a77f6bffb87f1aeeebc0da4eb2adccef9f87128c75b1325cfa0a5` 실측. 이전 구현 PR #3281까지 병합 완료.
+- **실측 분류 불변:** 원본 242개 / 저장소 파일 276개 / 공통 200개 / remote-only 42개 / repository-only 76개. 단일 byte-exact 13 / 단일 bytes differ 21 / 다중 framing unproven 148 / 다중 reconstructed match unproven 6 / 원문 부재 12 = 공통 200개. 21개 전부 raw byte difference 위치 결과 존재.
+- **새 관측:** repo 끝의 `;`+LF 종결자 2바이트만 추가 **9개**; source 끝에 저장소보다 바이트가 추가된 **2개**(`1600`, `1630`, 각 source extra 76바이트); 내부 다른 구간 **10개**(`1580`, `1590`, `1610`, `1620`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`). 특히 `1650`·`1670`·`1680`·`1690`은 각 구간 수천 바이트 달라 단순 `;`+LF 차이라고 판정하지 않는다.
+- **영구 증거:** [21개 비식별 바이트 비교 결과](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json)에는 21개 원본/파일 해시와 바이트 공통 접두·접미 길이, 다른 길이, 분류, 원장/checkout/아티팩트 SHA 및 DR HOLD만 보존. SQL 원문, 변경 조각·실행자 메타데이터 비출력. 기존 문서의 '실증 대기'는 과거 구현 상태로 구분.
+- **남은 일:** 12개 SQL의 실제 명령/권한 영향과 현재 DB 일치 범위를 근거별 처분, 다중 statement 154개 프레이밍/원본 SQL NULL 12개는 계속 HOLD, Provider 원장 대상·전체 역할/ACL/Hosted Auth/Storage·독립 개인정보·전체 RPO/RTO 수용 불가. Production SQL/DDL·재적용·repair·canary·유료 Hosted 작업 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Phase 8-A: 단일 원문 SQL 바이트 차이 위치 실측 기능 추가 (실제 실증 대기)
 
 - 기존 보호 격리 복구 #43372543611에서 200개 원장 본문 전수 비교·21개 단일 SQL 불일치를 실측했고, PR #3279에서 9개 exact-prefix hash 일치 및 12개 미확정 근거를 별도로 보존했다. 9개도 전체 저장소 파일 byte-exact으로 승격하지 않는다.

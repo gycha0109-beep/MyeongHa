@@ -1,3 +1,9 @@
+## 기존 암호화 원장의 실제 차이 위치 관측 — 2026-11-13
+
+- 보호된 main [격리 복구 #43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458) SUCCESS. source run #43174606843, exact checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`.
+- 단일 SQL 불일치 21개 전체에 대해 원본 SQL을 보호된 격리 runner에서 바이트 비교했다. **repo 종결자 `0x3b0a` 추가 9**, **source suffix 76바이트 추가 2**, **서로 다른 내부 구간 10**. [21개 분류·길이·해시·출처 비식별 증거](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json).
+- 원본 242/저장소 276/공통 200 및 분류 13 exact·21 bytes differ·154 multi-statement framing unproven·12 NULL은 변경되지 않았다. 현재 SQL 의미/DDL·owner·권한·RLS 복구 동일성이나 역사적 실행 인과관계는 **미입증**. 따라서 Phase 8-A와 DR 서비스 재개 HOLD 유지. 이전 '실증 대기'는 시점별 역사 기록이다.
+
 ## 12개 미해결 단일 원문 SQL 차이 위치 보강 — 실제 측정 전
 
 - 2026-11-13 실제 전수 비교에서 21개 단일 statement 바이트 불일치. [비식별 후속 지문 대조](POSTGRES_COMMON_VERSION_MIGRATION_SINGLE_STATEMENT_FINGERPRINT_TRIAGE_20261113.json)에 따르면 9개는 원본 statement와 저장소 파일 앞부분의 SHA-256이 정확히 일치하지만, 12개는 한정된 형식 변환만으로 설명되지 않았다.
