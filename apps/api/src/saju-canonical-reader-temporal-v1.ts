@@ -2,12 +2,15 @@ import { hashSajuHeldSourceProofRequestV1 as hashJson } from './saju-held-source
 
 type Data = Readonly<Record<string, unknown>>;
 type Scope = 'annual' | 'monthly';
+type Pillar = Readonly<{ stem: string; branch: string }>;
+type AnnualContext = Readonly<{ sajuYear: number; pillar: Pillar; stemTenGod: string }>;
 type Segment = Readonly<{
   id: string;
   startsAt: string;
   endsAt: string;
-  pillar: Readonly<{ stem: string; branch: string }>;
+  pillar: Pillar;
   stemTenGod: string;
+  annualContext?: AnnualContext;
 }>;
 type DayunSegment = Readonly<Pick<Segment, 'startsAt' | 'endsAt' | 'pillar'> & { index: number }>;
 type DayunOverlap = Readonly<
@@ -36,8 +39,8 @@ const KOREAN_CLOCK = new Intl.DateTimeFormat('ko-KR', {
   timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric',
   hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23',
 });
-const STEMS = new Set('갑 을 병 정 무 기 경 신 임 계'.split(' '));
-const BRANCHES = new Set('자 축 인 묘 진 사 오 미 신 유 술 해'.split(' '));
+const STEMS = '갑 을 병 정 무 기 경 신 임 계'.split(' ');
+const BRANCHES = '자 축 인 묘 진 사 오 미 신 유 술 해'.split(' ');
 const TEN_GODS = new Set('비견 겁재 식신 상관 편재 정재 편관 정관 편인 정인'.split(' '));
 const SEGMENTS = { annual: ['before_ipchun', 'after_ipchun'], monthly: ['before_jeol', 'after_jeol'] } as const;
 
@@ -51,14 +54,20 @@ function timestamp(value: unknown): value is string {
 }
 
 function validPillar(value: unknown): value is Segment['pillar'] {
-  return record(value) && typeof value.stem === 'string' && STEMS.has(value.stem) &&
-    typeof value.branch === 'string' && BRANCHES.has(value.branch);
+  return record(value) && typeof value.stem === 'string' && STEMS.includes(value.stem) &&
+    typeof value.branch === 'string' && BRANCHES.includes(value.branch);
 }
 
 function validSegment(value: unknown, id: string): value is Segment {
   return record(value) && value.id === id && timestamp(value.startsAt) && timestamp(value.endsAt) &&
     value.startsAt < value.endsAt && validPillar(value.pillar) &&
     typeof value.stemTenGod === 'string' && TEN_GODS.has(value.stemTenGod) && record(value.natalBranchRelations);
+}
+
+function validAnnualContext(value: unknown, sajuYear: number): value is AnnualContext {
+  return record(value) && value.sajuYear === sajuYear && validPillar(value.pillar) &&
+    value.pillar.stem === STEMS[(sajuYear - 4) % 10] && value.pillar.branch === BRANCHES[(sajuYear - 4) % 12] &&
+    typeof value.stemTenGod === 'string' && TEN_GODS.has(value.stemTenGod);
 }
 
 function validDayun(value: Data, startsAt: string, endsAt: string): value is DayunOverlap {
@@ -130,6 +139,13 @@ export function admitSajuCanonicalReaderTemporalV1(
     calendar.referenceSegmentId !== (referenceDateTime < after.startsAt ? beforeId : afterId) ||
     (calendar.dayunDisclosureVersion !== undefined && (calendar.dayunDisclosureVersion !== 'calculated_overlap_v1' ||
       !validDayun(calendar.dayunOverlap, before.startsAt, after.endsAt)))) return false;
+  const beforeAnnual = before.annualContext;
+  const afterAnnual = after.annualContext;
+  if (beforeAnnual !== undefined || afterAnnual !== undefined) {
+    if (scope !== 'monthly' || !validAnnualContext(beforeAnnual, month <= 2 ? year - 1 : year) ||
+      !validAnnualContext(afterAnnual, month === 1 ? year - 1 : year) ||
+      (beforeAnnual.sajuYear === afterAnnual.sajuYear && beforeAnnual.stemTenGod !== afterAnnual.stemTenGod)) return false;
+  }
 
   const byUnit = new Map(groundingUnits.map(unit => [unit.unitId, unit]));
   const seen = new Set<string>();
@@ -158,13 +174,14 @@ export function admitSajuCanonicalReaderTemporalV1(
 export function projectSajuTemporalDisclosuresV1(temporal: SajuCanonicalReaderTemporalV1, firstIndex: number) {
   const { segments, dayunDisclosureVersion, dayunOverlap } = temporal.calendar;
   const disclosures = segments.map((segment, index) => {
-    const { pillar, stemTenGod, startsAt, endsAt } = segment;
+    const { pillar, stemTenGod, startsAt, endsAt, annualContext } = segment;
     const disclosureRef = 'grounding_disclosure_' + hashJson({
       purpose: 'approved-saju-temporal-window-v1', segment,
     }).slice(0, 24);
     return {
       id: segment.id, disclosureRef, type: 'scope_limitation' as const,
-      text: `이 판정은 한국시간 ${KOREAN_CLOCK.format(new Date(startsAt))}부터 ${KOREAN_CLOCK.format(new Date(endsAt))} 직전까지 적용됩니다. 이 구간의 기둥은 ${pillar.stem}${pillar.branch}, 천간 십신은 ${stemTenGod}입니다.`,
+      text: `이 판정은 한국시간 ${KOREAN_CLOCK.format(new Date(startsAt))}부터 ${KOREAN_CLOCK.format(new Date(endsAt))} 직전까지 적용됩니다. 이 구간의 기둥은 ${pillar.stem}${pillar.branch}, 천간 십신은 ${stemTenGod}입니다.`
+        + (annualContext === undefined ? '' : ` 같은 구간의 세운은 ${annualContext.pillar.stem}${annualContext.pillar.branch}년이며, 천간 십신은 ${annualContext.stemTenGod}입니다.`),
       sourceDisclosureIndex: firstIndex + index,
     };
   });

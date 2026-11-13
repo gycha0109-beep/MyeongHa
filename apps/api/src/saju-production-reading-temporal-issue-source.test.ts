@@ -160,6 +160,25 @@ describe('signed canonical temporal issue', () => {
     expect(await input.exchange(swapped)).toBeNull();
   });
 
+  it('uses the signed annual context of each monthly window and rejects a substituted year', async () => {
+    const input = fixture();
+    const original = input.readerSource.temporal.calendar;
+    const annualContext = { sajuYear: 2026, pillar: { stem: '병', branch: '오' }, stemTenGod: '식신' };
+    const source = { ...input.readerSource, temporal: { ...input.readerSource.temporal, calendar: {
+      ...original, segments: original.segments.map(segment => ({ ...segment, annualContext })),
+    } } };
+    const issued = await input.exchange(source);
+    const archived = verifyArchivedSajuProductionIssueProofV1({
+      ...input.archive, receipt: { ...input.receipt, proof: issued?.issueProof },
+    });
+    const grounded = projectSajuCanonicalReaderGroundingV1(archived!.readerSource!, {
+      readingId: input.archive.readingId, storedResponseHash: input.archive.storedResponseHash, sajuDomain: 'general',
+    });
+    expect(grounded.disclosures.every(disclosure => disclosure.text.includes('세운은 병오년'))).toBe(true);
+    annualContext.sajuYear = 2025;
+    expect(await input.exchange(source)).toBeNull();
+  });
+
   it('projects each signed daeyun interval only into its corresponding Reader windows', async () => {
     const input = fixture();
     const source = structuredClone(input.readerSource);
