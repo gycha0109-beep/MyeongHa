@@ -315,6 +315,31 @@ jobs:
           jq -e '.drReady == false and .serviceResumptionAllowed == false
             and .verifiedFullSchemaCatalogEquivalence == false
             and .fullSupabaseMigrationLedgerRestored == false' "$APP_SCHEMA_PARITY_PATH" >/dev/null
+      - name: Attribute isolated Provider role replay to sealed source and observed target
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_provider_migration_source }}
+        shell: bash
+        env:
+          REPLAY_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/isolated-external-role-replay.json
+          CATALOG_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/app-schema-parity.json
+          FILTERED_ROLES_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/role-dump-coverage.json
+          PAIRED_LEDGER_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-source-recovery.json
+          PROVIDER_ROLE_PROOF_PATH: ${{ runner.temp }}/restore-evidence/isolated-provider-role-replay-provenance.json
+        run: |
+          set -euo pipefail
+          node scripts/operations/assess-isolated-provider-role-replay-proof.mjs \
+            --replay "$REPLAY_EVIDENCE_PATH" \
+            --catalog "$CATALOG_EVIDENCE_PATH" \
+            --filtered "$FILTERED_ROLES_EVIDENCE_PATH" \
+            --paired-source "$PAIRED_LEDGER_EVIDENCE_PATH" \
+            --output "$PROVIDER_ROLE_PROOF_PATH"
+          jq -e '.directRoleMembershipTargetRehearsalProven == true
+            and .providerMigrationLedgerRestored == false
+            and .fullProviderCompatibleRestoreProven == false
+            and .hostedAuthStorageEquivalent == false
+            and .drReady == false
+            and .serviceResumptionAllowed == false' \
+            "$PROVIDER_ROLE_PROOF_PATH" >/dev/null
+
       - name: Exercise synthetic privacy reconciliation and finalization on restored database
         shell: bash
         env:
