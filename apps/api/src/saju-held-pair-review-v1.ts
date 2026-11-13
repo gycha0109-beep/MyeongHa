@@ -17,6 +17,10 @@ const SERVICE_RULES = new Set([
   'T10-SERVICE-DAY-SIX-COMBINATION',
   'T10-SERVICE-DAY-CLASH',
   'T10-SERVICE-DAY-NO-SIX-OR-CLASH',
+  'T10-SERVICE-DAY-STEM-UNKNOWN',
+  'T10-SERVICE-DAY-STEM-FIVE-COMBINATION',
+  'T10-SERVICE-DAY-STEM-NO-FIVE-COMBINATION',
+  'T10-SERVICE-OTHER-STRUCTURES',
   'T10-SERVICE-MIXED-POSITIONS',
   'T10-SERVICE-BOUNDED-SCOPE',
 ]);
@@ -36,7 +40,7 @@ function validHeldInternalPairInterpretation(evidence: Readonly<Record<string, u
       meaning.policyVersion !== '2026-11-13' ||
       meaning.adoption !== 'project_owner_service_lexicon' ||
       meaning.academicThirdPartyApprovalRequired !== false ||
-      meaning.ruleCoverage !== 'day_branch_structures_only' ||
+      meaning.ruleCoverage !== 'resolved_day_stem_branch_and_other_positions' ||
       meaning.readyForOfficialIssue !== false ||
       meaning.mayPublish !== false || meaning.maySell !== false ||
       JSON.stringify(meaning.charts) !== JSON.stringify(review.charts)) return false;
@@ -61,8 +65,13 @@ function validHeldInternalPairInterpretation(evidence: Readonly<Record<string, u
         item.observedFactPaths.some(path => typeof path !== 'string' || !knownPaths.has(path))) return false;
     usedRules.add(item.ruleId);
   }
+  const dayBranch = ['T10-SERVICE-DAY-UNKNOWN','T10-SERVICE-DAY-SIX-COMBINATION',
+    'T10-SERVICE-DAY-CLASH','T10-SERVICE-DAY-NO-SIX-OR-CLASH'];
+  const dayStem = ['T10-SERVICE-DAY-STEM-UNKNOWN',
+    'T10-SERVICE-DAY-STEM-FIVE-COMBINATION','T10-SERVICE-DAY-STEM-NO-FIVE-COMBINATION'];
   return usedRules.has('T10-SERVICE-BOUNDED-SCOPE') &&
-    [...usedRules].some(rule => rule.startsWith('T10-SERVICE-DAY-'));
+    dayBranch.filter(rule => usedRules.has(rule)).length === 1 &&
+    dayStem.filter(rule => usedRules.has(rule)).length === 1;
 }
 
 function discard(response: Response): null {
