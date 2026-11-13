@@ -1,3 +1,9 @@
+## 12개 단일 SQL 본문 차이의 보수적 코드 토큰 비교 — 구현, 실제 검증 대기
+
+- 기존 SHA 검증 봉인 원장과 정확한 체크아웃 main 파일을 **같은 보호 runner 안에서만** 읽고, 바이트가 다른 단일 SQL에 `sqlCodeLexicalObservation`을 부착한다. 주석과 SQL 코드 토큰 간 공백은 비교에서 무시하지만 인용 문자열·식별자·달러 인용 본문은 재구성하거나 정규화하지 않는다.
+- 분류는 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA`, `CODE_TOKEN_BYTES_DIFFER`, `LEXICAL_SCAN_INDETERMINATE`. 알 수 없는 문법은 안전하게 마지막 분류로 보류. 토큰·SQL 본문·리터럴·변경 조각·실행자·인증정보는 **절대 출력하지 않는다**.
+- 이는 완전한 PostgreSQL 파서 검증이 아니며 실행 효과·의미 동등성·권한·RLS·역사적 적용의 증거가 아니다. 13 byte-exact, 187 비일치/보류 및 `drReady=false`는 그대로 유지한다. 합성 7건 통과. **운영 백업 실제 실증은 이 문서 작성 시점에 아직 없다**.
+
 ## 기존 암호화 원장의 실제 차이 위치 관측 — 2026-11-13
 
 - 보호된 main [격리 복구 #43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458) SUCCESS. source run #43174606843, exact checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`.

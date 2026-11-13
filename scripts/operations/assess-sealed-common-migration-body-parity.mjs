@@ -8,6 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { assessProtectedSqlLexicalChange } from './assess-protected-sql-lexical-change.mjs';
 
 const sha256 = value => createHash('sha256').update(value).digest('hex');
 const sha40 = /^[a-f0-9]{40}$/u;
@@ -102,8 +103,10 @@ function classForSource(statements, repoBytes) {
     sourceStatementBytes: sourceBytes.length,
     repositoryFileSha256: sha256(repoBytes),
     repositoryFileBytes: repoBytes.length,
-    ...(byteExact ? {} : { rawByteDifference:
-      describeByteDifference(sourceBytes, repoBytes) }),
+    ...(byteExact ? {} : {
+      rawByteDifference: describeByteDifference(sourceBytes, repoBytes),
+      sqlCodeLexicalObservation: assessProtectedSqlLexicalChange(sourceBytes, repoBytes),
+    }),
   };
 }
 
