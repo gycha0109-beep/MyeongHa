@@ -103,8 +103,13 @@ export function assessSealedCommonMigrationBodyParity({
   const repositoryByVersion = new Map();
   for (const entry of repositoryEntries) {
     const file = asMigrationFile(entry.path);
-    assert.ok(Buffer.isBuffer(entry.bytes));
-    assert.ok(entry.bytes.length > 0 && entry.bytes.length <= maxSqlBytes);
+    if (sourceByVersion.has(file.version)) {
+      assert.ok(Buffer.isBuffer(entry.bytes));
+      assert.ok(entry.bytes.length > 0 && entry.bytes.length <= maxSqlBytes);
+    } else {
+      assert.equal(entry.bytes, null,
+        'Repo-only migration SQL is outside the source comparison');
+    }
     assert.ok(!repositoryByVersion.has(file.version),
       'Duplicate main migration version');
     repositoryByVersion.set(file.version, { ...file, bytes: entry.bytes });
@@ -208,10 +213,9 @@ async function main() {
   const entries = paths.map(path => {
     const file = asMigrationFile(path);
     return { path, bytes: sourceIds.has(file.version)
-      ? git('show', sha+':'+path) : Buffer.from([0x20]) };
+      ? git('show', sha+':'+path) : null };
   });
-  // Source-only versions are not read; for repo-only versions, a nonempty
-  // sentinel suffices because their contents are outside this comparison.
+  // Do not read repository-only SQL bodies or remote-only missing files.
   const result = assessSealedCommonMigrationBodyParity({
     sourcePacket,sourceBytes,pairedProof,lineage,
     repositoryEntries:entries,repositoryCommitSha:sha,
