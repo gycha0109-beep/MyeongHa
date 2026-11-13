@@ -14,6 +14,13 @@ const sha40 = /^[a-f0-9]{40}$/u;
 const sha64 = /^[a-f0-9]{64}$/u;
 const filePattern = /^supabase\/migrations\/([0-9]+)_([^/\r\n]+)\.sql$/u;
 const maxSqlBytes = 16 * 1024 * 1024;
+// Fixed stage labels only: never print assertion values or source SQL.
+let failureStage = 'START';
+let failureVersion = '';
+function at(stage, version = '') {
+  failureStage = stage;
+  failureVersion = /^[0-9]+$/u.test(version) ? version : '';
+}
 
 function asMigrationFile(path) {
   assert.equal(typeof path, 'string');
@@ -58,6 +65,7 @@ export function assessSealedCommonMigrationBodyParity({
   sourcePacket, sourceBytes, pairedProof, lineage, repositoryEntries,
   repositoryCommitSha,
 }) {
+  at('SOURCE_ADMISSION');
   assert.match(repositoryCommitSha, sha40);
   assert.ok(Buffer.isBuffer(sourceBytes) && sourceBytes.length > 0 &&
     sourceBytes.length <= 64 * 1024 * 1024);
@@ -66,6 +74,7 @@ export function assessSealedCommonMigrationBodyParity({
   assert.equal(sourcePacket.allVersionCount, sourcePacket.entries.length);
   assert.equal(sourcePacket.numericVersionCount, sourcePacket.entries.length);
   assert.match(sourcePacket.catalogSha256, sha64);
+  at('PAIRED_PROOF_ADMISSION');
   assert.equal(pairedProof?.schemaVersion,
     'ops-paired-provider-ledger-source-recovery-v1');
   assert.equal(pairedProof.encryptedSourceDecryptionVerified, true);
@@ -79,6 +88,7 @@ export function assessSealedCommonMigrationBodyParity({
   assert.equal(pairedProof.serviceResumptionAllowed, false);
   assert.match(pairedProof.backupSourceSha, sha40);
 
+  at('LINEAGE_ADMISSION');
   assert.equal(lineage?.schemaVersion, 'ops-sealed-provider-migration-file-lineage-v1');
   assert.equal(lineage.currentRepositoryCommitSha, repositoryCommitSha);
   assert.equal(lineage.sourceBackupRunId, pairedProof.backupRunId);
@@ -92,6 +102,7 @@ export function assessSealedCommonMigrationBodyParity({
   assert.equal(lineage.drReady, false);
   assert.equal(lineage.serviceResumptionAllowed, false);
 
+  at('SOURCE_VERSION_INDEX');
   const sourceByVersion = new Map();
   for (const entry of sourcePacket.entries) {
     assert.match(entry.version, /^[0-9]+$/u);
@@ -100,6 +111,7 @@ export function assessSealedCommonMigrationBodyParity({
   }
   assert.ok(Array.isArray(repositoryEntries) &&
     repositoryEntries.length === lineage.currentRepositoryFileCount);
+  at('REPOSITORY_VERSION_INDEX');
   const repositoryByVersion = new Map();
   for (const entry of repositoryEntries) {
     const file = asMigrationFile(entry.path);
@@ -114,6 +126,7 @@ export function assessSealedCommonMigrationBodyParity({
       'Duplicate main migration version');
     repositoryByVersion.set(file.version, { ...file, bytes: entry.bytes });
   }
+  at('VERSION_SETS');
   const remoteOnly = [...sourceByVersion.keys()].filter(
     v => !repositoryByVersion.has(v)).sort();
   const repositoryOnly = [...repositoryByVersion.keys()].filter(
@@ -122,8 +135,10 @@ export function assessSealedCommonMigrationBodyParity({
   assert.deepEqual(repositoryOnly, lineage.repositoryOnlyVersionIds);
   assert.equal(sourceByVersion.size - remoteOnly.length,
     lineage.commonVersionCount);
+  at('CLASSIFICATION');
   const classified = [];
   for (const [version, source] of sourceByVersion) {
+    at('CLASSIFICATION', version);
     const repo = repositoryByVersion.get(version);
     if (!repo) continue;
     if (source.name !== repo.name) {
@@ -133,7 +148,9 @@ export function assessSealedCommonMigrationBodyParity({
     const found = classForSource(source.statements, repo.bytes);
     classified.push({ version, ...found });
   }
+  at('CLASSIFICATION_TOTALS');
   assert.equal(classified.length, lineage.commonVersionCount);
+  at('REPORT_AGGREGATION');
   const classes = [...new Set(classified.map(x => x.classification))];
   const counts = Object.fromEntries(classes.map(k => [
     k, classified.filter(x => x.classification === k).length,
@@ -180,6 +197,7 @@ export function assessSealedCommonMigrationBodyParity({
 }
 
 async function main() {
+  at('RUNTIME_GUARD');
   assert.equal(process.env.GITHUB_ACTIONS, 'true');
   assert.equal(process.env.GITHUB_EVENT_NAME, 'workflow_dispatch');
   assert.equal(process.env.GITHUB_REF, 'refs/heads/main');
@@ -200,26 +218,32 @@ async function main() {
     assert.ok(result.startsWith(root+sep));
     return result;
   };
+  at('INPUT_READ');
   const sourceBytes = await readFile(arg('--source'));
   const sourcePacket = JSON.parse(sourceBytes.toString('utf8'));
   const [pairedProof, lineage] = await Promise.all([
     readFile(arg('--paired-proof'), 'utf8').then(JSON.parse),
     readFile(arg('--lineage'), 'utf8').then(JSON.parse),
   ]);
+  at('REPOSITORY_TREE');
   const paths = git('ls-tree', '-r', '--name-only', sha, '--',
     'supabase/migrations').toString('utf8')
     .trim().split(/\r?\n/u).filter(path => path.endsWith('.sql'));
   const sourceIds = new Set(sourcePacket.entries.map(x => x.version));
+  at('REPOSITORY_SQL_READ');
   const entries = paths.map(path => {
     const file = asMigrationFile(path);
+    at('REPOSITORY_SQL_READ', file.version);
     return { path, bytes: sourceIds.has(file.version)
       ? git('show', sha+':'+path) : null };
   });
   // Do not read repository-only SQL bodies or remote-only missing files.
+  at('ASSESSMENT');
   const result = assessSealedCommonMigrationBodyParity({
     sourcePacket,sourceBytes,pairedProof,lineage,
     repositoryEntries:entries,repositoryCommitSha:sha,
   });
+  at('OUTPUT_WRITE');
   await writeFile(arg('--output'), JSON.stringify(result,null,2)+'\n',
     {flag:'wx',mode:0o600});
   process.stdout.write('COMMON_VERSION_SQL_BYTE_PARITY_OBSERVED DR_HOLD\n');
@@ -228,7 +252,7 @@ async function main() {
 if (process.argv[1] &&
   import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   main().catch(() => {
-    process.stderr.write('HOLD_COMMON_VERSION_SQL_BYTE_PARITY\n');
+    process.stderr.write(`HOLD_COMMON_VERSION_SQL_BYTE_PARITY stage=${failureStage} version=${failureVersion || 'none'}\n`);
     process.exitCode=1;
   });
 }
