@@ -2,6 +2,7 @@ import type { ReaderSceneV1 } from './reader-scene-contract.js';
 
 export const READER_RUNTIME_ENDPOINT_V1:
   '/api/me/readings/reader-interpretation/preview';
+export const APPROVED_SAJU_READER_QUESTION_ENDPOINT_V1: '/api/me/readings/reader-questions';
 
 export type ReaderRuntimeClientErrorCodeV1 =
   | 'READER_REQUEST_INVALID'
@@ -43,6 +44,14 @@ export interface ReaderRuntimeClientV1 {
   readonly enabled: boolean;
   readonly endpoint: string;
   readReaderScene(input: ReaderRuntimeReadInputV1): Promise<ReaderSceneV1>;
+  askPurchasedReading(input: Readonly<{
+    threadId: string;
+    officialReadingId: string;
+    clientTurnId: string;
+    text: string;
+    firstSceneQuestion?: Readonly<{ interpretationHash: string; segmentIndex: number }>;
+    signal?: AbortSignal;
+  }>): Promise<Readonly<{ threadId: string; safeMessageId: string }>>;
 }
 
 export function createReaderRuntimeClientV1(

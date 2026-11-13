@@ -441,6 +441,12 @@ begin
     and turn.resolved_content_release_id=v_release and turn.resolved_content_bundle_id=v_bundle
   for update;
   if not found then raise exception using errcode='P0001',message='Approved Saju Reader turn is unavailable'; end if;
+  if exists (
+    select 1 from public.chat_turns turn
+    where turn.id=v_turn and turn.request_contract_version='approved-saju-reader-question-v1'
+      and (turn.request_snapshot_jsonb->>'readingId' is distinct from v_reading::text
+        or ((turn.request_snapshot_jsonb->'scene') = 'null'::jsonb) is distinct from (v_prior_message is not null))
+  ) then raise exception using errcode='P0001',message='Approved Saju question scope changed'; end if;
   perform 1 from public.chat_turn_attempts attempt
   where attempt.id=v_attempt and attempt.turn_id=v_turn and attempt.subject_id=v_subject and attempt.state='running'
   for update;
@@ -683,4 +689,120 @@ revoke all on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,u
   from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
     myeongha_approved_saju_issuer_executor;
 grant execute on function public.qry_approved_saju_reader_followup_anchor_v1(uuid,uuid,text,uuid)
+  to myeongha_approved_saju_paid_answer_executor;
+
+-- Reserve one protected question before generation using the existing Chat
+-- receive and attempt commands. Only a committed safe marker is replayed.
+create function public.cmd_reserve_approved_saju_reader_question_v1(
+  p_subject uuid,p_reading uuid,p_thread uuid,p_reader text,p_release uuid,p_bundle uuid,
+  p_client_turn text,p_hash text,p_text text,p_scene jsonb,p_turn uuid,p_user_message uuid,p_attempt uuid
+)
+returns table(turn_id uuid,attempt_id uuid,safe_message_id uuid,state text)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+declare
+  v_received record;
+  v_turn public.chat_turns%rowtype;
+  v_attempt public.chat_turn_attempts%rowtype;
+  v_existing_message uuid;
+  v_snapshot jsonb := jsonb_build_object('readingId',p_reading,'scene',p_scene);
+begin
+  if p_reading is null or p_turn is null or p_user_message is null or p_attempt is null
+    or coalesce(length(btrim(p_client_turn)),0) not between 1 and 256
+    or coalesce(length(btrim(p_text)),0) not between 1 and 240
+    or not coalesce(p_hash ~ '^sha256:v1:[0-9a-f]{64}$',false)
+    or p_scene is null
+    or (p_scene <> 'null'::jsonb and (
+      jsonb_typeof(p_scene) is distinct from 'object'
+      or p_scene-array['interpretationHash','segmentIndex'] <> '{}'::jsonb
+      or not coalesce(p_scene->>'interpretationHash' ~ '^sha256:v1:[0-9a-f]{64}$',false)
+      or jsonb_typeof(p_scene->'segmentIndex') is distinct from 'number'
+      or not coalesce(p_scene->>'segmentIndex' ~ '^(?:[0-9]|[1-5][0-9]|6[0-3])$',false)
+    ))
+    or not exists (
+      select 1 from commerce_saju_private.lock_approved_paid_answer_scope_v1(p_subject,p_reading,p_reader,p_bundle)
+    )
+    or not exists (
+      select 1 from public.conversation_thread_characters reader
+      where reader.thread_id=p_thread and reader.character_id=p_reader
+        and reader.content_bundle_id=p_bundle and reader.role='primary' and reader.left_at is null
+    )
+  then raise exception using errcode='P0001',message='Approved Saju question is unavailable'; end if;
+
+  select * into v_received from public.cmd_receive_chat_turn_v1(
+    p_subject,p_thread,p_client_turn,p_hash,'approved-saju-reader-question-v1',v_snapshot,
+    p_release,p_bundle,p_turn,p_user_message,p_text,null,
+    'sha256:v1:' || encode(sha256(convert_to(p_text,'UTF8')),'hex')
+  );
+
+  if v_received.replayed then
+    select stored.* into v_turn from public.chat_turns stored
+    where stored.id=v_received.turn_id and stored.thread_id=p_thread and stored.subject_id=p_subject;
+    if not found or v_turn.request_contract_version is distinct from 'approved-saju-reader-question-v1'
+      or v_turn.request_snapshot_jsonb is distinct from v_snapshot
+    then raise exception using errcode='23505',message='Approved Saju question identity changed'; end if;
+    if v_turn.state in ('committed','delivered') then
+      select answer.safe_message_id into v_existing_message from public.official_reader_paid_answer_bodies answer
+      where answer.turn_id=v_turn.id and answer.attempt_id=v_turn.committed_attempt_id
+        and answer.thread_id=p_thread and answer.subject_id=p_subject and answer.official_reading_id=p_reading
+        and answer.reader_character_id=p_reader and answer.content_release_id=p_release
+        and answer.reader_content_bundle_id=p_bundle and answer.approved_purchase_intent_id is not null;
+      if not found then raise exception using errcode='P0001',message='Approved Saju answer is unavailable'; end if;
+      return query select v_turn.id,null::uuid,v_existing_message,'committed'::text;
+      return;
+    end if;
+    if v_turn.state in ('failed_final','abandoned') then
+      return query select v_turn.id,null::uuid,null::uuid,'failed'::text;
+      return;
+    end if;
+    select running.* into v_attempt from public.chat_turn_attempts running
+    where running.turn_id=v_turn.id and running.subject_id=p_subject and running.state='running';
+    if not found then raise exception using errcode='P0001',message='Approved Saju question attempt is unavailable'; end if;
+    if v_attempt.started_at < clock_timestamp()-interval '5 minutes' then
+      perform public.cmd_mark_chat_turn_failed_v1(
+        p_subject,v_turn.id,v_attempt.id,'failed_final','APPROVED_READER_QUESTION_EXPIRED'
+      );
+      return query select v_turn.id,null::uuid,null::uuid,'failed'::text;
+    else
+      return query select v_turn.id,null::uuid,null::uuid,'in_progress'::text;
+    end if;
+    return;
+  end if;
+
+  perform public.cmd_allocate_chat_turn_attempt_v1(
+    p_subject,v_received.turn_id,p_attempt,'approved-saju-reader-question-v1'
+  );
+  perform public.cmd_mark_chat_turn_context_ready_v1(p_subject,v_received.turn_id,p_attempt);
+  return query select v_received.turn_id,p_attempt,null::uuid,'reserved'::text;
+end
+$function$;
+
+create function public.cmd_fail_approved_saju_reader_question_v1(
+  p_subject uuid,p_turn uuid,p_attempt uuid
+)
+returns void
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
+  if exists (
+    select 1 from public.chat_turns turn
+    join public.chat_turn_attempts attempt on attempt.turn_id=turn.id and attempt.subject_id=p_subject
+      and attempt.id=p_attempt and attempt.state='running'
+    where turn.id=p_turn and turn.subject_id=p_subject and turn.state='context_ready'
+      and turn.request_contract_version='approved-saju-reader-question-v1'
+  ) then
+    perform public.cmd_mark_chat_turn_failed_v1(
+      p_subject,p_turn,p_attempt,'failed_final','APPROVED_READER_QUESTION_UNAVAILABLE'
+    );
+  end if;
+end
+$function$;
+
+revoke all on function public.cmd_reserve_approved_saju_reader_question_v1(uuid,uuid,uuid,text,uuid,uuid,text,text,text,jsonb,uuid,uuid,uuid),
+  public.cmd_fail_approved_saju_reader_question_v1(uuid,uuid,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor,
+    myeongha_approved_saju_issuer_executor;
+grant execute on function public.cmd_reserve_approved_saju_reader_question_v1(uuid,uuid,uuid,text,uuid,uuid,text,text,text,jsonb,uuid,uuid,uuid),
+  public.cmd_fail_approved_saju_reader_question_v1(uuid,uuid,uuid)
   to myeongha_approved_saju_paid_answer_executor;
