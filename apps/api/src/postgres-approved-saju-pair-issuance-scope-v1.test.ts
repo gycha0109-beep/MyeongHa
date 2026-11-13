@@ -76,17 +76,17 @@ describe('paid T10 pair source scope preserves approved offer plus exact consent
 
   it.each(OFFERS)('rejects missing, wrong-order and arbitrary consent in %s', async offerId => {
     const row = fixture(offerId);
-    expect(await readApprovedSajuPairIssueScopeV1(db({
+    await expect(readApprovedSajuPairIssueScopeV1(db({
       ...row, counterpartOrder: offerId === 'additional-counterpart' ? 'first' : 'additional',
     }), { subjectId: SUBJECT, purchaseIntentId: PURCHASE })).rejects.toThrow(
       'Approved Saju comparison scope',
     );
-    expect(await readApprovedSajuPairIssueScopeV1(db({
+    await expect(readApprovedSajuPairIssueScopeV1(db({
       ...row, useApprovalRef: '',
     }), { subjectId: SUBJECT, purchaseIntentId: PURCHASE })).rejects.toThrow(
       'Approved Saju comparison scope',
     );
-    expect(await readApprovedSajuPairIssueScopeV1(db({
+    await expect(readApprovedSajuPairIssueScopeV1(db({
       ...row, targetPersonId: OWN_REVISION.replace(/3/g, 'x'),
     }), { subjectId: SUBJECT, purchaseIntentId: PURCHASE })).rejects.toThrow(
       'Approved Saju comparison scope',
