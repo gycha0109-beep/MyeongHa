@@ -269,6 +269,8 @@ for (const fragment of [
   'supabase/migrations/2370_subject_shared_memory_account_finalization_erasure_v1.sql',
   'supabase/migrations/2380_subject_shared_memory_note_deletion_recovery_v1.sql',
   '--single-transaction',
+  "SET ROLE postgres",
+  "pg_get_userbyid(proowner)",
   'git hash-object',
   'REHEARSAL_EVIDENCE_PATH',
   'cloneStillMatchesOriginalProductionSchema: false',
