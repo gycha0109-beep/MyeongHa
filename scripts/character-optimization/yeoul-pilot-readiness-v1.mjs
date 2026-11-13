@@ -1,5 +1,6 @@
 /** Offline Yeoul GEPA preregistration. No provider transport, private text export, or approval authority. */
 import { YEOUL_NEW_FAMILY_DRAFTS, makeNewYeoulScenarioPlan } from './yeoul-new-scenario-families-v1.mjs';
+import { inspectYeoulPilotPreregistrationDraft } from './yeoul-pilot-preregistration-v1.mjs';
 
 const MODEL = 'deepseek/deepseek-v4.1-flash-1017';
 const ROLES = Object.freeze(['student', 'reflection', 'judge', 'holdout']);
@@ -97,8 +98,10 @@ export function quoteYeoulPilotEnvelope({ priceEvidence, roles, proposedUsdCapMi
 }
 
 /** Do not conflate publicly exposed H01-H10 with a new confidential sealed holdout. */
-export function makeYeoulPilotReadiness({ privateScreen = null, costQuote = null, reviewIntake = null } = {}) {
+export function makeYeoulPilotReadiness({ privateScreen = null, costQuote = null, reviewIntake = null,
+  criteriaDraft = null } = {}) {
   const plan = makeNewYeoulScenarioPlan();
+  const criteria = criteriaDraft === null ? null : inspectYeoulPilotPreregistrationDraft(criteriaDraft);
   if (privateScreen !== null && (privateScreen.schemaVersion !== 'yeoul-private-overlap-screen-v1'
       || privateScreen.candidateFamiliesScreened !== 8 || privateScreen.legacyFamiliesScreened !== 12
       || privateScreen.optimizerAdmissionAuthorized !== false)) fail('untrusted_overlap_claim');
@@ -112,6 +115,8 @@ export function makeYeoulPilotReadiness({ privateScreen = null, costQuote = null
     'legacy_source_bytes_authentication', 'independent_human_semantic_review',
     'owner_review_of_30_rule_example_candidates',
     'new_confidential_final_holdout',
+    ...(!criteria ? ['pilot_success_stop_nonregression_rules_draft'] : []),
+    'owner_review_and_immutable_preregistration_before_trial',
     ...(!costQuote ? ['role_model_provider_price_snapshot_and_attempt_caps'] : []),
     'live_model_endpoint_and_provider_support_verification',
     'independently_authenticated_provider_tariffs',
@@ -125,6 +130,9 @@ export function makeYeoulPilotReadiness({ privateScreen = null, costQuote = null
     reviewerAuthorityVerified: false, reviewIntakeReceived: reviewIntake !== null,
     lexicalScreenReceived: privateScreen !== null, semanticIndependenceVerified: false,
     costQuoteReceived: costQuote !== null,
+    criteriaDraftReceived: criteria !== null,
+    criteriaDraftSha256: criteria?.criteriaDraftSha256 ?? null,
+    criteriaOwnerApproved: false, criteriaImmutablyPreregistered: false,
     publicPreviouslyExposedBenchmark: { scenarioRuns: 80, studentCalls: 104, confidentialHoldout: false },
     independentFinalEvaluationReady: false, optimizerDatasetReady: false,
     modelIdCandidate: MODEL, roleModelApprovalsVerified: false,
