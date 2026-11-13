@@ -1,3 +1,12 @@
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 신규 A4 원격 전용 SQL·현재 역할/권한 대조
+
+- **상태:** [PR #3261](https://github.com/gycha0109-beep/MyeongHa/pull/3261) 필수 통합 검사 [#43351167715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43351167715) SUCCESS, 병합 `e3c5185ed3df1b7bf883c3babc2ec4d2f3b5c09b`. 현재 source ledger 242개 / frontier `20261109071019` / 저장소 파일 276개 / 원격-only 42개·repo-only 76개.
+- **원본 적용 기록 SELECT-only:** source-only `20261109071019`, 이름 `admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109`, SQL 1 statement 5,512 bytes, SHA256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8`; `created_by` metadata 있음, rollback/idempotency 없음. 원본 SQL을 공개하거나 실행하지 않음.
+- **현재 객체·직접 ACL 실측:** `myeongha_reading_ai_cost_binding_reader_v1`은 LOGIN 가능하지만 password NULL, NOINHERIT/비관리자 권한 제한. `public.reading_execution_attempts` 13개 열 중 정확히 `external_request_ref,id,reading_id,state,subject_id` 5개만 SELECT 가능; table-wide SELECT 및 INSERT/UPDATE/DELETE 없음. `public` USAGE=true, 관리자 role membership 1개(ADMIN=true, INHERIT=false, SET=false), 테이블 RLS OFF·정책 정의 2개. 해당 SQL이 선언한 현재 role/schema/column-ACL 목표 상태에 부합함. [읽기전용 SQL](../../scripts/operations/production-admin-a4-reader-current-readonly.sql) 및 [비식별 증거](POSTGRES_A4_READER_REMOTE_ONLY_MIGRATION_EFFECT_20261113.json) 저장.
+- **차단 유지:** 2026-11-07 기존 원격-only 41개 기록 불변; 새 1개에는 현재 object/ACL 효과 관측만 덧붙임. SQL 실행 원인·과거 실행자 인증, snapshot 동일성, Provider history target/Hosted 복원, 실제 Worker credential·binding, 독립 개인정보·RPO/RTO 미입증. Production DB 변경·권한 부여·마이그레이션 재적용·유료 DR·privacy canary 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — Gate 1 / Phase 8-A: 봉인 원장 242개 vs 정확한 main 파일 버전 전수 실측
 
 - **병합·실증:** PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259) 필수 통합 CI [#43347035879](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43347035879) SUCCESS / merge `78f53d3fe6a2749795b4219254b3494f94c763ce`. 최신 보호 main 격리 복구 [#43350336600](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350336600) SUCCESS / workflow commit `9a5f903d8c3498a18363286000525f8114671b9e`. 원본 source backup #43174606843, artifact #14003143450 / ZIP SHA-256 `b481bedef267b2edba757ad826d66f316e74c2580cd76da5b790aa3ef7f6e667`.

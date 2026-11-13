@@ -1,3 +1,11 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 신규 원격 전용 A4 20261109071019의 현재 객체·권한 효과 점검
+
+- PR [#3261](https://github.com/gycha0109-beep/MyeongHa/pull/3261) 필수 통합 CI [#43351167715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43351167715) SUCCESS 및 병합. 정확한 원장·main 버전 차이는 **242 / 276 / 공통 200 / 원격 전용 42 / 저장소 전용 76**이며, 신규 원격 전용은 `20261109071019` 단 1개.
+- **실제 Production SELECT-only 점검**: source 원장 이름 `admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109`; 원문 statement **1개·5,512바이트·SHA-256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8`**. SQL은 dedicated 비밀번호 없는 LOGIN 역할 생성, `public` USAGE, `public.reading_execution_attempts`의 5개 열 SELECT만 부여하며 새 RLS 정책·Worker credential을 설치하지 않는다.
+- 같은 날 현재 DB에서 dedicated 역할 존재·LOGIN=true·password NULL·NOINHERIT/NOBYPASSRLS 등 제한, 관리자 멤버십 1개(`supabase_admin` grantor → `postgres` 수신, ADMIN=true/INHERIT=false/SET=false), 테이블 13개 열 중 `external_request_ref,id,reading_id,state,subject_id` 다섯 열만 SELECT 가능, 추가 열·테이블 전체 SELECT·INSERT/UPDATE/DELETE 불가, `public` USAGE=true 확인. 테이블 RLS OFF이고 정책 정의 2개가 존재한다(비활성). 현재 역할·직접 ACL은 source SQL의 선언된 목표와 부합한다.
+- [재실행 가능한 읽기 전용 관측 SQL](../../scripts/operations/production-admin-a4-reader-current-readonly.sql)과 [비식별 실측 증거](POSTGRES_A4_READER_REMOTE_ONLY_MIGRATION_EFFECT_20261113.json)를 보존했다. 기존 [41개 역사적 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)의 내용은 변경하지 않고, 최신 reconciliation 항목에 신규 1개 적용 목적과 현 상태만 기록했다.
+- **수용 경계:** 원장 `created_by` 값의 존재는 과거 실행자 인증 증명이 아니며, 현재 객체/ACL 일치는 과거 SQL 인과관계·정확한 snapshot·전체 Provider 원장 대상 복원·실제 Hosted 재해복구·Worker binding·독립 개인정보·전체 RPO/RTO를 입증하지 않는다. 기존 12개 NULL 원문 SQL도 미해결. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 정확한 본원 원장 242개와 main 버전 정합성 실측
 
 - PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259)의 필수 통합 CI SUCCESS 후 main 병합. 실제 보호 main [#43350336600](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350336600) SUCCESS (백업 source [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843)). 동일 원장 복호화·SHA/catalog 지문을 다시 확인한 뒤 exact checked-out `main` SHA `9a5f903d8c3498a18363286000525f8114671b9e`의 파일 버전과 대조: Production 원장 **242**, 저장소 파일 **276**, 공통 200, 원격 전용 **42**, 저장소 전용 **76**.
