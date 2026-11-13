@@ -36,3 +36,10 @@
 - `apps/api/src/saju-production-reading-temporal-issue-source.test.ts`에서 월운/연운의 실제 두 구간 서명→보관→Reader 설명 유지, 소스 없는 유효 서명 거부, 연운·월운 구매 범위 바꾸기 거부를 검증한다.
 - **업스트림 Saju** `src/host/production-reading-issue-proof.ts`도 연·월운 원본이 없으면 서명 자체를 발급하지 않도록 맞췄다([Saju #2762](https://github.com/gycha0109-beep/Saju/pull/2762)).
 - **미완료:** 명하 내부 채택 T9 본문을 실제 Official 해석으로 확정·승격하는 검증, 구매/동의/서명·운영 DB·실결제·환불·복구 E2E; T10 세 관계 비교 상품의 두 명식 보호 발급과 상대 동의·Reader 결속. 기존 임시 실행 데이터를 운영 승인으로 취급하지 않는다.
+
+## 2026-11-13 관계 비교 연구 인계 추가 구현
+
+- Saju #2763의 사내 채택 T10 일지 합·충/양면성 설명을 **서명된 비공개 두 명식 검토 응답**으로 이관한다. 기존 자체 계산/출처 감사 및 명하 구매/동의/발급 주체를 바꾸지 않는다.
+- `apps/api/src/saju-held-pair-review-v1.ts`는 검토 응답의 **두 사람 계산 해시, Saju 관측 사실 경로, 내부 규칙/문장, 관계 결과 비단정 및 연구용 미판매 상태**를 확인하며, 서명 응답이더라도 실제 명식 원본에서 벗어난 설명이나 `readyForOfficialIssue=true` 반환을 거부한다.
+- 연관 테스트 `apps/api/src/saju-held-pair-review-v1.test.ts`는 정상 서명 연구 검토·인물 해시 바꾸기·허구 근거 경로·공식 발급 승격 시도 거부를 검사한다.
+- **남은 필수 단계:** 첫 상대/추가 상대/본인 T8+첫 상대 구성 각각의 구매·동의·출생 revision/상대 권리, **서명된 Official T10 Reading** 발급, Reader 보관함/재열람, 환불/철회·실결제·운영 복구 E2E. 현재 연구 검토 통과는 발급/판매 허가가 아니다.
