@@ -103,3 +103,10 @@ node scripts/character-optimization/yeoul-private-source-intake-v1.mjs \
 - 이 자료는 여울의 규칙 6건·좋은 대사 24건을 확인하는 **별도 연구 PR #3187의 검토 절차와 구분**한다. 특히 Y07 실패 대사 6건을 좋은 대사 후보나 사람 승인으로 자동 변경하지 않는다.
 - 로컬 원본을 실제 사용할 수 있는 환경에서만 `node scripts/character-optimization/yeoul-y07-private-human-review-v1.mjs --private-original /private/yeoul-evaluations-all-288.json --private-output /private/yeoul-y07-review.md` 실행 가능. 현재 집 PC의 실제 288건 존재 여부가 확인되지 않아 이번 검증의 실측 원문 검토 완료는 주장하지 않는다.
 - 사람 직접 판정·30건 검토·신규 봉인 홀드아웃·실제 유료 DeepSeek 최적화와 운영 승격은 계속 HOLD.
+
+## 2026-11-13 — Y07 사람 검토 결과의 비공개 접수·보류 경계
+
+- 원본이 있는 PC에서 Y07 검토표의 6개 항목에 **한 건당 판정 1개 이하**를 체크하고, 체크한 경우 관찰 근거를 **1줄 텍스트**로 직접 작성한다. 미작성·판단 보류는 계속 미완료로 집계한다. 응답/질문/기존 평점/사용자 의견은 수정하면 안 된다.
+- 결과 접수기: `scripts/character-optimization/yeoul-y07-review-intake-v1.mjs`. 사용자가 수정한 Markdown 검토표와 원본 288행에서 재생성한 검토표를 전체 행 단위로 비교하고, 오직 판정과 직접 작성할 1줄 근거/수정 방향·종합 메모·완료 체크만 변경 허용한다. 근거 없이 판정하거나, 모순된 체크, 원본 변경, 미완료인데 완료 체크한 경우 실패한다.
+- 로컬 실행: `node scripts/character-optimization/yeoul-y07-review-intake-v1.mjs --private-original /private/yeoul-evaluations-all-288.json --reviewed-sheet /private/yeoul-y07-review.md --private-result /private/yeoul-y07-review-summary.json`. 세 경로 모두 저장소 밖에 두고, 기존 결과 덮어쓰기를 금지한다.
+- 결과에 질문/응답/사용자 의견/직접 작성한 근거는 **포함하지 않고**, 6건 중 접수된 판정 수와 분류·미결 건수만 남긴다. 체크·완료 선언은 신원 확인이나 승인 기록이 아니다. 여울의 별도 30건 검토 및 독립 평가/실제 GEPA 품질 개선·500원 총상한의 유료 실행 승인·운영 승격은 변함없이 HOLD.
