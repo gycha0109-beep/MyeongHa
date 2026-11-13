@@ -194,6 +194,79 @@ jobs:
             python /opt/myeongha/gepa_crosslang_synthetic_handoff.py /private/gepa-proof
           node scripts/character-optimization/gepa-crosslang-handoff-v1.mjs verify "$PROOF_DIR"
 
+      - name: Evaluate actual GEPA-selected candidate in a separate one-shot synthetic final container
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINAL_ROOT="$RUNNER_TEMP/myeongha-gepa-selected-final-synthetic"
+          mkdir -p "$FINAL_ROOT"/{sealed,frozen,state}
+          chmod 700 "$FINAL_ROOT" "$FINAL_ROOT"/{sealed,frozen,state}
+          node scripts/character-optimization/gepa-linked-synthetic-final-v1.mjs \
+            "$RUNNER_TEMP/character-gepa-crosslang-synthetic" "$FINAL_ROOT/frozen"
+          export FINAL_ROOT
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ['FINAL_ROOT'])
+          dims = ('korean_naturalness', 'response_relevance', 'agency',
+                  'persona_fidelity', 'relationship_fit', 'continuity',
+                  'repetition', 'efficiency')
+          def family(fid, baseline, candidate):
+              return {'familyId': fid,
+                      'baselineScores': dict(zip(dims, baseline)),
+                      'candidateScores': dict(zip(dims, candidate)),
+                      'hardFailures': [], 'uncertainty': False}
+          sealed = {
+              'schemaVersion': 'myeongha-synthetic-sealed-evaluation-v1',
+              'datasetRole': 'sealed_holdout', 'sourceType': 'synthetic_fixture',
+              'families': [
+                  family('synthetic-selected-final-a', [0.5] * 8, [0.7] * 8),
+                  family('synthetic-selected-final-b', [0.5] * 8,
+                         [0.6, 0.6, 0.6, 0.3, 0.6, 0.6, 0.6, 0.6]),
+              ],
+          }
+          path = root / 'sealed' / 'synthetic.json'
+          path.write_text(json.dumps(sealed, sort_keys=True), encoding='utf-8')
+          path.chmod(0o600)
+          PY
+          selected_final() {
+            docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+              --user "$(id -u):$(id -g)" --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=32m \
+              --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
+              --mount "type=bind,src=$FINAL_ROOT/sealed,dst=/private/sealed,readonly" \
+              --mount "type=bind,src=$FINAL_ROOT/frozen,dst=/private/frozen,readonly" \
+              --mount "type=bind,src=$FINAL_ROOT/state,dst=/private/state" \
+              python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f \
+              python /opt/myeongha/sealed_holdout_runner.py \
+              --sealed /private/sealed/synthetic.json \
+              --frozen /private/frozen/candidate.json \
+              --ledger /private/state/one-shot-selected.sqlite
+          }
+          selected_final > "$RUNNER_TEMP/gepa-selected-final-report.json"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          root = Path(os.environ['FINAL_ROOT'])
+          report = json.loads((Path(os.environ['RUNNER_TEMP']) /
+                               'gepa-selected-final-report.json').read_text(encoding='utf-8'))
+          selected = json.loads((root / 'frozen' / 'candidate.json').read_text(encoding='utf-8'))
+          assert report['candidateSha256'] == selected['candidateSha256']
+          assert report['runManifestSha256'] == selected['runManifestSha256']
+          assert report['familyCount'] == 2 and report['regressionFamilies'] == 1
+          assert report['externalCalls'] == 0 and report['candidateRegistryStage'] == 'proposed'
+          assert report['independentPrivateHoldoutValidated'] is False
+          assert report['qualityGainEstablished'] is False
+          assert report['productionEligible'] is False
+          PY
+          if selected_final > "$RUNNER_TEMP/gepa-selected-final-replay-denied.log" 2>&1; then
+            echo 'Selected GEPA candidate synthetic final was incorrectly replayed' >&2
+            exit 1
+          fi
+          grep -q 'SEALED_HOLDOUT_EVALUATION_REFUSED' "$RUNNER_TEMP/gepa-selected-final-replay-denied.log"
+          echo 'Actual selected GEPA SHA reaches isolated one-shot synthetic final; no model calls, no quality claim.'
+
       - name: Verify shared budget gateway for Node and isolated Python
         shell: bash
         run: |
