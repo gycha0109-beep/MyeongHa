@@ -14,6 +14,9 @@ import {
   runReaderInterpretationPreviewV1,
   type OfficialReadingCharacterGroundingProjectionPortV1,
 } from '../apps/api/src/reader-interpretation-preview-runtime-v1.js';
+import type { CharacterSajuConsultationShadowPortV1, CharacterSajuConsultationPrivateComparisonV1, CharacterSajuConsultationPrivateBatchComparisonV1 } from '../apps/api/src/character-saju-consultation-shadow-v1.js';
+import { createOpenAiSajuConsultationShadowPortV1, type OpenAiSajuConsultationShadowFetchV1 } from '../apps/api/src/openai-saju-consultation-shadow-port-v1.js';
+import { createReaderSajuPrivatePairCollectorV1 } from '../apps/api/src/reader-saju-private-pair-comparison-v1.js';
 import type {
   CharacterStandardReadingAccessAuthorityPortV1,
   CharacterStandardReadingAccessAuthorityRowV1,
@@ -356,6 +359,7 @@ async function run(
     readonly context?: CharacterRuntimeContextWithGroundingV1;
     readonly resolvedSubjectId?: string;
     readonly projectionPort?: OfficialReadingCharacterGroundingProjectionPortV1;
+    readonly consultationShadowPort?: CharacterSajuConsultationShadowPortV1;
   } = {},
 ) {
   const bundle = input.bundle ?? baseBundle;
@@ -370,11 +374,337 @@ async function run(
     requestedDomain: 'general',
     context,
     groundingProjectionPort: input.projectionPort ?? groundingProjectionPort(bundle),
+    ...(input.consultationShadowPort === undefined ? {} : { consultationShadowPort: input.consultationShadowPort }),
     ...ports,
   });
 }
 
 describe('Reader Interpretation Preview Runtime v1', () => {
+
+  const multiUnitBundle = makeBundle([
+    makeUnit('1', 'timing', '오래 지속되는 흐름의 유리한 점이 인정됩니다.'),
+    makeUnit('2', 'strength', '생활에서 발휘할 수 있는 강점을 확인합니다.'),
+    { ...makeUnit('3', 'responsibility', '책임을 다루는 조건이 함께 중요합니다.'), narrativeRole: 'supporting' as const },
+    { ...makeUnit('4', 'tension', '선택의 부담이 동시에 존재할 수 있습니다.'), narrativeRole: 'tension' as const },
+  ]);
+
+  it('can generate and review 3-4 source-owned consultation units with one call per model, never exposing the candidate', async () => {
+    const evidence = vi.fn(async (_record: CharacterSajuConsultationPrivateBatchComparisonV1) => undefined);
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const data = request.input as {
+        characterId: string;
+        officialUnits: readonly { unitId: string; canonicalMeaning: string }[];
+      };
+      expect(data.officialUnits.length).toBeGreaterThanOrEqual(3);
+      expect(data.officialUnits.length).toBeLessThanOrEqual(4);
+      expect(new Set(data.officialUnits.map((x) => x.unitId)).size).toBe(data.officialUnits.length);
+      return {
+        segments: data.officialUnits.map((unit) => ({
+          unitId: unit.unitId,
+          text: unit.canonicalMeaning,
+        })),
+      };
+    });
+    const evaluate = vi.fn();
+    const evaluateBatch = vi.fn(async (
+      batch: Parameters<NonNullable<CharacterSajuConsultationShadowPortV1['evaluateBatch']>>[0],
+    ) => ({
+      verdicts: batch.candidates.map((candidate, i) => ({
+        schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+        evaluatorVersion: 'offline-multi-unit-review-v1',
+        candidateHash: batch.candidateHashes[i]!,
+        unitId: candidate.sourceUnitRefs[0]!,
+        semanticPreserved: true,
+        characterFidelityPreserved: true,
+        failureClasses: [] as const,
+      })),
+    }));
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      multiUnitPilot: true,
+      evaluatorVersion: 'offline-multi-unit-review-v1',
+      generate,
+      evaluate,
+      evaluateBatch,
+      recordPrivateBatchComparison: evidence,
+    };
+    const original = await run(readers.baekheon, { bundle: multiUnitBundle });
+    const checked = await run(readers.baekheon, {
+      bundle: multiUnitBundle,
+      consultationShadowPort: port,
+    });
+    expect(checked).toEqual(original);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(evaluateBatch).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+    expect(evidence).toHaveBeenCalledOnce();
+    const received = evidence.mock.calls[0]![0];
+    expect(received.units.length).toBeGreaterThanOrEqual(3);
+    expect(received.units.every((u) => u.evaluation === 'accepted')).toBe(true);
+    expect(received.revealState).toBe('forbidden');
+    expect(checked).not.toHaveProperty('candidateText');
+  });
+
+  it('rejects the entire multi-unit pilot if even one official unit is not semantically preserved', async () => {
+    const evidence = vi.fn(async (_record: CharacterSajuConsultationPrivateBatchComparisonV1) => undefined);
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const data = request.input as { officialUnits: readonly {unitId:string;canonicalMeaning:string}[] };
+      return {
+        segments: data.officialUnits.map((unit) => ({
+          unitId: unit.unitId,
+          text: unit.canonicalMeaning,
+        })),
+      };
+    });
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      multiUnitPilot: true,
+      evaluatorVersion: 'offline-multi-unit-review-v1',
+      generate,
+      evaluate: vi.fn(),
+      async evaluateBatch(batch) {
+        return {
+          verdicts: batch.candidates.map((candidate, i) => ({
+            schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+            evaluatorVersion: 'offline-multi-unit-review-v1',
+            candidateHash: batch.candidateHashes[i]!,
+            unitId: candidate.sourceUnitRefs[0]!,
+            semanticPreserved: i !== 1,
+            characterFidelityPreserved: true,
+            failureClasses: i === 1 ? ['ADDED_CLAIM' as const] : [],
+          })),
+        };
+      },
+      recordPrivateBatchComparison: evidence,
+    };
+    const original = await run(readers.baekheon, { bundle: multiUnitBundle });
+    const checked = await run(readers.baekheon, {
+      bundle: multiUnitBundle, consultationShadowPort: port,
+    });
+    expect(checked).toEqual(original);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(evidence).toHaveBeenCalledOnce();
+    const review = evidence.mock.calls[0]![0];
+    expect(review.units.some((unit) =>
+      unit.evaluation === 'rejected' && unit.failureCodes.includes('ADDED_CLAIM'),
+    )).toBe(true);
+  });
+
+  it('blocks malformed multi-unit sequence before independent model evaluation', async () => {
+    const evaluateBatch = vi.fn();
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      multiUnitPilot: true,
+      evaluatorVersion: 'offline-multi-unit-review-v1',
+      generate: vi.fn(async () => ({ segments: [{unitId: 'forged',text:'잘못된 예언입니다.'}] })),
+      evaluate: vi.fn(),
+      evaluateBatch,
+    };
+    const original = await run(readers.baekheon, { bundle: multiUnitBundle });
+    const checked = await run(readers.baekheon, { bundle: multiUnitBundle, consultationShadowPort: port });
+    expect(checked).toEqual(original);
+    expect(evaluateBatch).not.toHaveBeenCalled();
+  });
+
+
+  it('pairs Baekheon and Seyeon against the identical authorized Saju unit for private editorial comparison', async () => {
+    const singleUnitBundle = makeBundle([
+      makeUnit('1', 'timing', '장기 흐름에서 반복되는 특징을 확인해야 합니다.'),
+    ]);
+    const collector = createReaderSajuPrivatePairCollectorV1({
+      readingRef: READING_ID,
+      sourceResponseHash: SOURCE_HASH,
+      groundingHash: singleUnitBundle.groundingHash,
+      firstCharacterId: 'baekheon',
+      secondCharacterId: 'seyeon',
+    });
+    const port: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'offline-paired-comparison-v1',
+      async generate(request) {
+        const data = request.input as {
+          characterId: string;
+          sourceUnit: { unitId: string; canonicalMeaning: string };
+        };
+        return {
+          schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+          characterId: data.characterId,
+          sourceUnitRefs: [data.sourceUnit.unitId],
+          text: data.characterId === 'baekheon'
+            ? '이 사주에서 먼저 짚을 공식 핵심은 ' + data.sourceUnit.canonicalMeaning
+            : '여기서 중요한 공식 풀이가 보여요. ' + data.sourceUnit.canonicalMeaning,
+        };
+      },
+      async evaluate(input) {
+        return {
+          schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1',
+          evaluatorVersion: 'offline-paired-comparison-v1',
+          candidateHash: input.candidateHash,
+          unitId: input.groundingUnit.unitId,
+          semanticPreserved: true,
+          characterFidelityPreserved: true,
+          failureClasses: [],
+        };
+      },
+      recordPrivateComparison: collector.recordPrivateComparison,
+    };
+    const ports = authorityPorts({ activeReaders: ['baekheon', 'seyeon'] });
+    const [first, second] = await Promise.all([
+      run(readers.baekheon, { ports, bundle: singleUnitBundle, consultationShadowPort: port }),
+      run(readers.seyeon, { ports, bundle: singleUnitBundle, consultationShadowPort: port }),
+    ]);
+    expect(first.mode).toBe('reader_interpretation');
+    expect(second.mode).toBe('reader_interpretation');
+    const review = collector.readPrivateReview();
+    expect(review.status).toBe('ready_for_private_review');
+    if (review.status !== 'ready_for_private_review') throw new Error('expected private review');
+    expect(review.first.candidateText).not.toEqual(review.second.candidateText);
+    expect(review.first.baselineText).toBe(review.second.baselineText);
+    expect(review.publicationAuthorized).toBe(false);
+    expect(first).not.toHaveProperty('candidateText');
+    expect(second).not.toHaveProperty('candidateText');
+  });
+
+  it('connects the real OpenAI Responses transport through the admitted Reader shadow without changing HTTP output', async () => {
+    const observed: string[] = [];
+    const fetchImpl = vi.fn<OpenAiSajuConsultationShadowFetchV1>(async (_url, init) => {
+      const body = JSON.parse(String(init.body)) as {
+        model: string;
+        input: { content: { text: string }[] }[];
+      };
+      const taskInput = JSON.parse(body.input[0]!.content[0]!.text) as {
+        characterId?: string;
+        sourceUnit?: { unitId: string; canonicalMeaning: string };
+        candidateHash?: string;
+        officialUnit?: { unitId: string };
+      };
+      observed.push(body.model);
+      const result = body.model === 'offline-consultation-generator'
+        ? {
+            schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+            characterId: taskInput.characterId,
+            sourceUnitRefs: [taskInput.sourceUnit!.unitId],
+            text: '이 명식의 핵심을 먼저 설명하겠습니다.',
+          }
+        : {
+            schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1',
+            evaluatorVersion: 'myeongha-consultation-meaning-review-v1',
+            candidateHash: taskInput.candidateHash,
+            unitId: taskInput.officialUnit?.unitId,
+            semanticPreserved: true,
+            characterFidelityPreserved: true,
+            failureClasses: [],
+          };
+      return new Response(JSON.stringify({
+        status: 'completed',
+        output: [{ type: 'message', content: [{ type: 'output_text', text: JSON.stringify(result) }] }],
+        usage: { input_tokens: 10, output_tokens: 10 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    });
+    const budget = vi.fn(async () => undefined);
+    const cost = vi.fn(async () => undefined);
+    const evidence = vi.fn(async (_record: CharacterSajuConsultationPrivateComparisonV1) => undefined);
+    const port = createOpenAiSajuConsultationShadowPortV1({
+      apiKey: 'offline-test-only',
+      generationModel: 'offline-consultation-generator',
+      reviewModel: 'offline-consultation-reviewer',
+      fetchImpl,
+      beforeDispatch: budget,
+      afterOutcome: cost,
+      recordPrivateComparison: evidence,
+    });
+    const original = await run(readers.baekheon);
+    const shadow = await run(readers.baekheon, { consultationShadowPort: port });
+    expect(shadow).toEqual(original);
+    expect(observed).toEqual(['offline-consultation-generator', 'offline-consultation-reviewer']);
+    expect(budget).toHaveBeenCalledTimes(2);
+    expect(cost).toHaveBeenCalledTimes(2);
+    expect(evidence).toHaveBeenCalledTimes(1);
+    const comparison = evidence.mock.calls[0]![0];
+    expect(comparison).toMatchObject({
+      readingRef: READING_ID,
+      characterId: 'baekheon',
+      groundingHash: baseBundle.groundingHash,
+      evaluation: 'accepted',
+      failureCodes: [],
+      candidateText: '이 명식의 핵심을 먼저 설명하겠습니다.',
+    });
+    expect(comparison.baselineText.length).toBeGreaterThan(0);
+    expect(comparison.sourceUnitId).toMatch(/^grounding_unit_[0-9a-f]{24}$/u);
+    expect(shadow).not.toHaveProperty('candidate');
+    expect(shadow).not.toHaveProperty('comparison');
+  });
+
+  it('feeds source-grounded consultation instructions only after admission, keeping the exact Reading unchanged', async () => {
+    const generate = vi.fn(async (request: Parameters<CharacterSajuConsultationShadowPortV1['generate']>[0]) => {
+      const data = request.input as {
+        characterId: string;
+        sourceUnit: { unitId: string; canonicalMeaning: string };
+      };
+      expect(request.instructions).toContain('숙련된 한국어 사주 상담자');
+      expect(request.instructions).toContain('해석 방법론 강의를 하지 마십시오');
+      expect(data.sourceUnit.canonicalMeaning.length).toBeGreaterThan(0);
+      return {
+        schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+        characterId: data.characterId,
+        sourceUnitRefs: [data.sourceUnit.unitId],
+        text: '이 명식에서 확인된 이 부분을 먼저 짚겠습니다.',
+      };
+    });
+    const evaluate = vi.fn(async (input: Parameters<CharacterSajuConsultationShadowPortV1['evaluate']>[0]) => ({
+      schemaVersion: 'myeongha-character-saju-sp2-evaluator-verdict-v1' as const,
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      candidateHash: input.candidateHash,
+      unitId: input.groundingUnit.unitId,
+      semanticPreserved: true,
+      characterFidelityPreserved: true,
+      failureClasses: [] as const,
+    }));
+    const shadow: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      generate,
+      evaluate,
+    };
+    const regular = await run(readers.baekheon);
+    const compared = await run(readers.baekheon, { consultationShadowPort: shadow });
+    expect(compared).toEqual(regular);
+    expect(generate).toHaveBeenCalledTimes(1);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(compared).not.toHaveProperty('candidate');
+  });
+
+  it('never starts the consultation model without the authorized Reader grant', async () => {
+    const generate = vi.fn();
+    const evaluate = vi.fn();
+    const shadow = {
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      generate,
+      evaluate,
+    };
+    const ports = authorityPorts({ activeReaders: [] });
+    await expect(run(readers.baekheon, { ports, consultationShadowPort: shadow })).rejects.toMatchObject({
+      code: 'ACCESS_DENIED',
+    });
+    expect(generate).not.toHaveBeenCalled();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  it('does not change the official Reader output if a model candidate is unsafe or fails', async () => {
+    const generate = vi.fn(async () => ({
+      schemaVersion: 'myeongha-character-saju-sp2-candidate-v1',
+      characterId: 'baekheon',
+      sourceUnitRefs: ['injected-unit'],
+      text: '승진이 반드시 내년에 일어납니다.',
+    }));
+    const evaluate = vi.fn();
+    const shadow: CharacterSajuConsultationShadowPortV1 = {
+      evaluatorVersion: 'shadow-test-evaluator-v1',
+      generate,
+      evaluate,
+    };
+    const regular = await run(readers.baekheon);
+    const compared = await run(readers.baekheon, { consultationShadowPort: shadow });
+    expect(compared).toEqual(regular);
+    expect(generate).toHaveBeenCalledOnce();
+    expect(evaluate).not.toHaveBeenCalled();
+  });
+
   it('rejects standalone preview in Production before Reader access or Saju', async () => {
     const reader = readers.baekheon;
     const ports = authorityPorts({ activeReaders: [reader.characterId] });

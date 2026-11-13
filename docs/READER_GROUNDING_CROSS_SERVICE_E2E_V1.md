@@ -44,6 +44,16 @@ The E2E requires:
 - admitted Reader perspective
 - bounded semantic realization in the final Reader Preview envelope
 
+## Consultation shadow — source-bound offline evaluation extension (2026-11-08)
+
+The cross-service suite now also exercises the **same authenticated Saju projection** as input to the new Character consultation shadow path:
+
+- An already-admitted, official-identity Saju-grounding unit becomes the ONLY allowed prompt source.
+- A fake, non-network AI candidate echoes the admitted official meaning; a fake independent evaluator produces a source/candidate-hash-matched verdict.
+- The internal private comparison callback records provenance + candidate, while the resulting Reader Preview envelope must stay identical to the no-shadow output.
+- Revoked Reader grants block BOTH the Saju projection and the consultation AI candidate.
+- The Saju host is a real locally launched server; however the delivered Reading input is a **synthetic regression fixture** and the AI response is a stub. This proves service contract wiring, NOT genuine personal Saju reading quality, production domain authority, approved model performance, or paid-model admission.
+
 ## Negative evidence
 
 The E2E also proves:
