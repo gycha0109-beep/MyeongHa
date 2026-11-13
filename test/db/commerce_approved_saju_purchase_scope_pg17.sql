@@ -56,17 +56,32 @@ declare
   source_hash text := repeat('a',64);
   response_hash text := coalesce(snapshot_hash,'sha256:v1:' || repeat('b',64));
   issue_scope jsonb;
+  pair_issue_scope jsonb;
+  paid_pair_admission jsonb;
   prepared record;
 begin
   select * into strict authorized
     from commerce_saju_private.approved_component_entitlement_v1(actor,intent_id,field);
   issue_scope := commerce_saju_private.approved_issue_scope_v1(actor,intent_id,field);
   if field='compatibility' then
+    pair_issue_scope := public.qry_approved_saju_pair_issue_scope_v1(actor,intent_id);
+    select scope.admission into paid_pair_admission
+      from commerce_saju_private.approved_purchase_scope_v1 scope
+      where scope.purchase_intent_id=intent_id;
     if issue_scope->>'targetBirthRevisionId' is distinct from authorized.target_birth_revision_id::text
       or issue_scope->>'targetBirthInputHash' is distinct from (
         select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id
       )
-      or public.qry_approved_saju_pair_issue_scope_v1(actor,intent_id) is distinct from issue_scope
+      or pair_issue_scope is null
+      or pair_issue_scope - array['approvedOfferId','counterpartOrder','targetPersonId','useApprovalRef']
+        is distinct from issue_scope
+      or pair_issue_scope->>'approvedOfferId' is distinct from paid_pair_admission->>'approvedOfferId'
+      or pair_issue_scope->>'counterpartOrder'
+        is distinct from paid_pair_admission->'counterpart'->>'order'
+      or pair_issue_scope->>'targetPersonId'
+        is distinct from paid_pair_admission->'counterpart'->>'targetPersonId'
+      or pair_issue_scope->>'useApprovalRef'
+        is distinct from paid_pair_admission->'counterpart'->>'useApprovalRef'
       or public.qry_approved_saju_issue_scope_v1(actor,intent_id,field) is not null
       or issue_scope->'targetBirth'->>'birthDate' is distinct from (
         select birth_date::text from public.birth_profile_revisions where id=authorized.target_birth_revision_id
