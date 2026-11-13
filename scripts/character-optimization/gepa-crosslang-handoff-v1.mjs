@@ -133,8 +133,10 @@ if (mode === 'prepare') {
   const byId=Object.fromEntries(review.byCharacter.map(x=>[x.characterId,x]));
   assert.equal(byId.yeoul.regressionFamilies,0);
   assert.equal(byId.seyeon.regressionFamilies,2);
+  assert.equal(byId.seyeon.regressionByDimension.persona_fidelity,2);
+  assert.equal(byId.seyeon.regressionByDimension.agency,0);
   assert.deepEqual(Object.keys(byId).sort(),[...IDS].sort());
-  assert.equal(review.scalarRepeatedAcrossDimensions,true);
+  assert.equal(review.scalarRepeatedAcrossDimensions,false);
   assert.equal(review.independentEvaluation,false);
   assert.equal(review.independentHumanQualityProven,false);
   assert.equal(review.candidateRegistryStage,'proposed');
