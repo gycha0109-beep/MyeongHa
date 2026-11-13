@@ -84,10 +84,12 @@ def build_offline_gepa_kwargs(envelope, *, seed_text, evaluator, reflection_lm,
         if not isinstance(score, (int, float)) or isinstance(score, bool) or not 0 <= score <= 1:
             raise PreflightDenied('score_range')
         if not isinstance(feedback, dict) or set(feedback) != {
-                'failure_codes', 'character_id', 'raw_dialogue_excluded'}:
+                'failure_codes', 'character_id', 'raw_dialogue_excluded',
+                'uncertain'}:
             raise PreflightDenied('feedback_fields')
         failure_codes = feedback['failure_codes']
         if (feedback['raw_dialogue_excluded'] is not True
+                or type(feedback['uncertain']) is not bool
                 or feedback['character_id'] != example['characterId']
                 or not isinstance(failure_codes, list)
                 or any(type(code) is not str or code not in KNOWN_FAILURE_CODES
@@ -96,11 +98,13 @@ def build_offline_gepa_kwargs(envelope, *, seed_text, evaluator, reflection_lm,
             raise PreflightDenied('unsafe_feedback')
         # Match the Node hard-gate contract: no claimed quality gain may
         # compensate for unsafe memory, authority, relationship or cost behavior.
-        hard_blocked = not HARD_FAILURE_CODES.isdisjoint(failure_codes)
+        hard_blocked = (feedback['uncertain']
+                        or not HARD_FAILURE_CODES.isdisjoint(failure_codes))
         return (0.0 if hard_blocked else float(score)), {
             'failure_codes': list(failure_codes),
             'character_id': example['characterId'],
             'raw_dialogue_excluded': True,
+            'uncertain': feedback['uncertain'],
         }
     data=[dict(x) for x in envelope['dataset'] if x['split']=='development']
     validation=[dict(x) for x in envelope['dataset'] if x['split']=='optimizer_validation']
