@@ -1,3 +1,11 @@
+### 2026-11-13 KST — 현재 Production frontier 이후 백업/원장 수집 수동 실행 등록
+
+- 현재 실제 최종 migration `20261113062455`에 맞춘 백업을 확보하기 위해 기존 보호된 `production-postgres-backup.yml`을 [run #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)로 `main` `6eab97337811128282f5f5ec6320e4608d5f9c09`에서 `capture_provider_ledger=true`로 **수동 dispatch**했다. 활성 중복 실행이 없음을 먼저 확인했다.
+- 기존 Workflow가 Production을 읽고 암호화 백업/Provider 원장 아티팩트를 생성하는 **기존 기능만 사용**. 이 기록 시점에는 **실행 결과·실제 백업 시각·manifest 무결성·최종 migration 포함 여부 미확정**. CI/백업 성공이나 DR 완료를 추정하지 않는다. Production migration repair/DDL/DML/개인정보 canary·유료 Hosted 변경 없음.
+- 이후 단계: 완료 결과, 정확한 artifact·manifest·원장 쌍 및 `20261113062455` 대응 여부를 확인한 뒤 현재 스키마 격리 복구를 **필수 개인정보/권한 차단을 유지한 상태로** 실행; 그때도 전체 서비스 복구 증거와 구분한다.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — 총괄 우선순위 반영 및 현재 Production DB 직접 읽기 전용 재실측
 
 - **목적/결정:** 기존 Phase 8/11/12/13의 안전·수용 조건은 유지하면서, 차단 해소 실행 순서를 **현재 운영 DB 이력/DDL·실제 배포 호환성 → 최소 정합화 격리 검증 → 필요 시 승인된 운영 적용 → 최신 백업/Hosted/Privacy/서비스 재개**로 재정렬했다. 이전 187개 byte-exact 미입증 SQL 전수 처분을 독립적인 선행조건으로 만들지 않는다. 기존 증거 재사용. 운영 변경·유료 호스팅·개인정보 canary 없음.
