@@ -1,3 +1,10 @@
+## 2026-11-13 Gate 1 / Phase 8-A — 12개 SQL 실제 코드 차이 검증 경로 구현 (보호 실증 대기)
+
+- 이전 보호된 복구 [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458)의 정확한 결과와 [21개 바이트 차이 실측](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json) 및 [12개 저장소 SQL 대상 객체 조사](POSTGRES_COMMON_VERSION_MIGRATION_12_REPO_OBJECT_EFFECT_SCOPE_20261113.json)를 재활용한다. 바이트가 다른 단일 SQL 21개 중 9개는 저장소 끝 `;`+LF 추가, 2개는 원본 끝 76바이트 추가, 10개는 내부 상이 구간이다. 실제 SQL 의미/권한 영향은 여전히 미입증.
+- 승인된 기존 격리 원장 복호화 단계에서만 **원본 SQL과 정확한 checkout SQL의 실행 코드 토큰을 보수적으로 대조**하도록 구현했다. 주석·토큰 사이 공백만 무시하며 문자열·인용 식별자·달러 인용 함수 본문은 원문 바이트 그대로 보존한다. 불확실한 인용/이스케이프/주석은 `LEXICAL_SCAN_INDETERMINATE`로 보류한다. 출력은 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA`, `CODE_TOKEN_BYTES_DIFFER`, `LEXICAL_SCAN_INDETERMINATE`의 **비식별 분류만** 추가하고 SQL 토큰·내용·실행자·민감값은 저장하지 않는다.
+- **중요 수용 경계:** 코드 토큰 일치 후보도 SQL 의미·역사적 실행·현재 DDL/권한/RLS 동등성 **증명이 아니다**. 단일 byte-exact 13·나머지 187 및 전체 DR HOLD를 유지하고, 154개 다중 statement framing과 원문 누락 12개는 새 분류 대상에 포함하지 않는다. 합성 단위 검사 7건 통과. **새 보호 실행 결과 전에는 12개의 새 분류 개수를 추정하지 않는다.**
+- **다음:** PR 병합 이후 보호된 main에서 **기존 백업 #43174606843만** 사용해 `verify_provider_migration_source=true` 격리 복구를 1회 실행하고 분류·실제 SHA·아티팩트·실행 번호를 증거로 보존한다. 원본 코드 토큰이 실제로 다르면 기존 객체·권한·역할·RLS 관측과 연결해 버전별 미입증 범위를 처분한다. Production DDL/DML·재적용·repair·유료 Hosted 생성·privacy canary 금지. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, #1887 OPEN.
+
 ## 2026-11-13 Gate 1 / Phase 8-A — 단일 SQL 21개 실제 차이 위치 실증 (12개 내용/영향 처분 HOLD)
 
 - 보호된 `main` 격리 복구 [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458) **SUCCESS** (원본 백업 #43174606843 재사용, checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`, artifact `14026803978`, ZIP SHA-256 `b9f779ae4360cf8b13ee85e79c43b0c3c1a4b6da98ad57205b1b47bc0ef2fe0c`, 원본 parity JSON SHA-256 `a30da4e0554a77f6bffb87f1aeeebc0da4eb2adccef9f87128c75b1325cfa0a5`).
