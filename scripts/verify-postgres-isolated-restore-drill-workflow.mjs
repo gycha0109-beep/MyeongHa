@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/postgres-isolated-restore-drill.yml';
 const sourceResolverPath = 'scripts/operations/resolve-postgres-restore-source.sh';
+const providerSourceRunnerPath = 'scripts/operations/verify-paired-provider-migration-source-recovery.sh';
 const privacyRunnerPath = 'scripts/operations/run-restored-postgres-privacy-drill.sh';
 const authoritativePrivacySourcePath =
   'scripts/operations/resolve-postgres-authoritative-privacy-replay-source.sh';
@@ -18,6 +19,7 @@ const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
 for (const script of [
   sourceResolverPath,
+  providerSourceRunnerPath,
   privacyRunnerPath,
   authoritativePrivacySourcePath,
   authoritativePrivacyRunnerPath,
@@ -101,6 +103,24 @@ for (const fragment of [
 }
 forbidFragment(workflow, 'path: ${{ runner.temp }}/source-app-catalog.json', workflowPath);
 
+for (const fragment of [
+  'VERIFY_PROVIDER_MIGRATION_SOURCE',
+  'expected_provider_artifact=',
+  'provider_source_artifact_id=',
+  '"$run_event" == \'workflow_dispatch\'',
+]) requireFragment(sourceResolver, fragment, sourceResolverPath);
+
+const roleProofPath = 'scripts/operations/assess-isolated-provider-role-replay-proof.mjs';
+const roleProof = await readFile(roleProofPath, 'utf8');
+for (const fragment of [
+  'providerMigrationLedgerRestored: false',
+  'fullProviderCompatibleRestoreProven: false',
+  'hostedAuthStorageEquivalent: false',
+  'sourcePairsExcludedFromPortableRolesDump',
+  'observedDirectMembershipOptionParity, true',
+  'observedGrantorAttributionParity, true',
+]) requireFragment(roleProof, fragment, roleProofPath);
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 
@@ -109,6 +129,11 @@ for (const fragment of [
   'workflow_dispatch:',
   'backup_run_id:',
   'incident_reference_utc:',
+  'verify_provider_migration_source:',
+  'Download paired encrypted Provider migration source',
+  'artifact-ids: ${{ steps.source.outputs.provider_source_artifact_id }}',
+  'Verify paired Provider source decryptability without target history replay',
+  'run: bash scripts/operations/verify-paired-provider-migration-source-recovery.sh',
   'privacy_ledger_run_id:',
   'production_privacy_canary_run_id:',
   'watchtower_track:',
@@ -128,6 +153,12 @@ for (const fragment of [
   'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
   'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
+  'Attribute isolated Provider role replay to sealed source and observed target',
+  'inputs.verify_provider_migration_source',
+  'node scripts/operations/assess-isolated-provider-role-replay-proof.mjs',
+  'isolated-provider-role-replay-provenance.json',
+  '.directRoleMembershipTargetRehearsalProven == true',
+  '.fullProviderCompatibleRestoreProven == false',
   'Record fail-closed recovered service admission',
   'node scripts/build-postgres-recovered-serving-admission.mjs',
   'recovered-serving-admission.json',

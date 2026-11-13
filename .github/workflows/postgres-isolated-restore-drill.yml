@@ -46,6 +46,12 @@ on:
         default: false
         type: boolean
 
+      verify_provider_migration_source:
+        description: Verify exact same-run encrypted Provider migration history in isolated runner only
+        required: false
+        default: false
+        type: boolean
+
 permissions:
   actions: read
   contents: read
@@ -192,6 +198,7 @@ jobs:
           BACKUP_RUN_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.backup_run_id || steps.one_shot.outputs.backup_run_id }}
           EXPECTED_BACKUP_ARTIFACT_ID: ${{ github.event_name == 'push' && steps.one_shot.outputs.expected_artifact_id || '' }}
           INCIDENT_REFERENCE_UTC: ${{ github.event_name == 'workflow_dispatch' && inputs.incident_reference_utc || steps.one_shot.outputs.incident_reference_utc }}
+          VERIFY_PROVIDER_MIGRATION_SOURCE: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_provider_migration_source && 'true' || 'false' }}
         run: bash scripts/operations/resolve-postgres-restore-source.sh
       - name: Download exact governed backup artifact
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
@@ -202,6 +209,17 @@ jobs:
           artifact-ids: ${{ steps.source.outputs.artifact_id }}
           merge-multiple: true
           path: ${{ runner.temp }}/backup-artifact
+
+      - name: Download paired encrypted Provider migration source
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_provider_migration_source }}
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.backup_run_id }}
+          artifact-ids: ${{ steps.source.outputs.provider_source_artifact_id }}
+          merge-multiple: true
+          path: ${{ runner.temp }}/provider-ledger-artifact
 
       - name: Resolve authoritative Production privacy replay provenance
         id: privacy-source
@@ -255,6 +273,17 @@ jobs:
           RESTORE_SOURCE_APP_CATALOG_PATH: ${{ runner.temp }}/source-app-catalog.json
         run: bash scripts/run-postgres-isolated-restore-drill.sh
 
+      - name: Verify paired Provider source decryptability without target history replay
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_provider_migration_source }}
+        shell: bash
+        env:
+          BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
+          PROVIDER_LEDGER_ARTIFACT_DIR: ${{ runner.temp }}/provider-ledger-artifact
+          PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-source-recovery.json
+          BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
+          EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
+        run: bash scripts/operations/verify-paired-provider-migration-source-recovery.sh
+
       - name: Compare current-frontier application schema with isolated restored catalog
         shell: bash
         env:
@@ -286,6 +315,31 @@ jobs:
           jq -e '.drReady == false and .serviceResumptionAllowed == false
             and .verifiedFullSchemaCatalogEquivalence == false
             and .fullSupabaseMigrationLedgerRestored == false' "$APP_SCHEMA_PARITY_PATH" >/dev/null
+      - name: Attribute isolated Provider role replay to sealed source and observed target
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.verify_provider_migration_source }}
+        shell: bash
+        env:
+          REPLAY_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/isolated-external-role-replay.json
+          CATALOG_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/app-schema-parity.json
+          FILTERED_ROLES_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/role-dump-coverage.json
+          PAIRED_LEDGER_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-source-recovery.json
+          PROVIDER_ROLE_PROOF_PATH: ${{ runner.temp }}/restore-evidence/isolated-provider-role-replay-provenance.json
+        run: |
+          set -euo pipefail
+          node scripts/operations/assess-isolated-provider-role-replay-proof.mjs \
+            --replay "$REPLAY_EVIDENCE_PATH" \
+            --catalog "$CATALOG_EVIDENCE_PATH" \
+            --filtered "$FILTERED_ROLES_EVIDENCE_PATH" \
+            --paired-source "$PAIRED_LEDGER_EVIDENCE_PATH" \
+            --output "$PROVIDER_ROLE_PROOF_PATH"
+          jq -e '.directRoleMembershipTargetRehearsalProven == true
+            and .providerMigrationLedgerRestored == false
+            and .fullProviderCompatibleRestoreProven == false
+            and .hostedAuthStorageEquivalent == false
+            and .drReady == false
+            and .serviceResumptionAllowed == false' \
+            "$PROVIDER_ROLE_PROOF_PATH" >/dev/null
+
       - name: Exercise synthetic privacy reconciliation and finalization on restored database
         shell: bash
         env:

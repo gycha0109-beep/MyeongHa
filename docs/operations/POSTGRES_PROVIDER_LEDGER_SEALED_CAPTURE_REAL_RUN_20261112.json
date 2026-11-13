@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "ops-provider-migration-sealed-source-capture-observation-v1",
+  "observedDate": "2026-11-12",
+  "sourceRunId": 43174606843,
+  "sourceRunUrl": "https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843",
+  "workflow": ".github/workflows/production-postgres-backup.yml",
+  "event": "workflow_dispatch",
+  "sourceCommit": "05ee24d45ff4c99a7615449a51384222f7ca4247",
+  "workflowStatus": "completed",
+  "workflowConclusion": "success",
+  "sourceProjectRef": "cnsfpcdiyofqvhpcegfc",
+  "sealedSourceArtifact": {
+    "id": 13923871638,
+    "name": "myeongha-provider-migration-ledger-20261112T072149Z",
+    "zipDigestSha256": "63c128a645ae83120bffddfd1425449c2a0f71e4ec9b66d4ccf1e1c6635b3c74",
+    "encryptedArchiveSha256": "4a9c94ed42896d623a1cb519376601d7bf02851fc0eb9258c63cb8a44aff1054",
+    "encryptedArchiveBytes": 320624,
+    "sourcePacketSha256": "e5a2285acc6f44c29f981d3f9c1d2567d5794b845ec3217ee2869243482af686",
+    "ciphertextChecksumVerified": true,
+    "checksumFileVerified": true,
+    "containsOnlyArchiveChecksumAndPublicManifest": true,
+    "expiresAt": "2026-12-12T07:24:43Z"
+  },
+  "sameRunPortableBackupArtifact": {
+    "id": 13923088346,
+    "name": "myeongha-postgres-20261112T072149Z",
+    "zipDigestSha256": "760e9db959684a0c5124522bb6460710e950fb45e746b72aac998c1ad2ca1015"
+  },
+  "migrationCount": 242,
+  "migrationFrontier": 20261109071019,
+  "migrationCatalogSha256": "91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47",
+  "sourceStatementBodiesMissingCount": 12,
+  "createdByFieldPopulatedRows": 46,
+  "historicalExecutorAuthenticated": false,
+  "sourceLedgerHistoryCaptured": true,
+  "sourcePayloadDecryptionRevalidatedInIsolatedRestore": false,
+  "targetMigrationLedgerRestored": false,
+  "hostedProviderRecoveryProven": false,
+  "drReady": false,
+  "serviceResumptionAllowed": false,
+  "verdict": "SEALED_SOURCE_CAPTURE_VERIFIED__RESTORE_PARITY_HOLD",
+  "evidenceLimitations": [
+    "Source public manifest and ciphertext SHA-256 were checked; encrypted original SQL payload was not decrypted during this independent artifact inspection.",
+    "Source 12 rows with null SQL statements cannot prove historical executed SQL text.",
+    "No target migration ledger, restored Provider service, Hosted Auth/Storage, or full RPO/RTO is established."
+  ]
+}

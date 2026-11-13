@@ -1,4 +1,23 @@
+## 2026-11-12 Gate 1 Phase 8-A/8-B: actual paired Provider source decryption proof
+
+- [PR #3251](https://github.com/gycha0109-beep/MyeongHa/pull/3251) merged. Protected main isolated restore [#43179685582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582) SUCCESS using same-run backup and encrypted Provider history from source backup [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843). **Actual decryption and SHA/full original statement-history fingerprint verification pass** for 242 versions and frontier `20261109071019`; historical SQL bodies are missing for 12 entries.
+- Isolated application comparison: 3/3 schemas, 94/94 tables and 322/322 routines present, with 2 schema + 8 table + 19 routine legacy ACL-digest differences, although observed direct recipient privileges and canonical grantor entries match for those objects. Application internal role graph: 43/43 roles and 7/7 edges (portable grantor rewrites); app↔external boundary edges: observed 48/48 on isolated target but original filtered `roles.sql` excludes all 48. **This does not prove Provider role ownership, inherited access, full schema/permission or Hosted service parity.** A shared source/dump MVCC snapshot is unproven. Detailed [paired decryption evidence](POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json).
+- This closes only the optional **source-ledger decryption/integrity subtask**, not Phase 8-A/8-B/Gate 1. No target migration ledger replay, no repair, no Hosted Auth/Storage restoration, no Production writes, no privacy canary. P0 #1887 remains open, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. Approved remaining Gate 1 tasks remain exactly as enumerated below; no scope additions.
+
 # Production Operations — 종료 집중 로드맵
+
+## 2026-11-12 current-frontier Provider source capture + isolated restore evidence
+
+- Production SELECT-only encrypted Provider source run [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) SUCCESS: 242 original history rows, catalog SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`, 12 NULL statement bodies. Archive ciphertext integrity matches public manifest and checksum; see [sealed-source evidence](POSTGRES_PROVIDER_LEDGER_SEALED_CAPTURE_REAL_RUN_20261112.json).
+- Matching backup isolated restore [#43176401912](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43176401912) SUCCESS; entire schema/role/Provider migration equivalence **not** passed, service gate BLOCKED. See [current-frontier isolated evidence](POSTGRES_CURRENT_FRONTIER_ISOLATED_RESTORE_20261112.json).
+- Phase 8-A/8-B next boundary: verify that exact same-run encrypted original history can be independently decrypted and re-fingerprinted **in disposable isolation only**. No target migration-history write, schema repair, or historical SQL replay is permitted. That verification alone will not close Phase 8 or alter Gate 1/P0 conditions. Whole roadmap scope unchanged.
+
+## 2026-11-12 evidence addendum — Gate 1 migration ledger source HOLD (no roadmap scope change)
+
+- PR [#3239](https://github.com/gycha0109-beep/MyeongHa/pull/3239) merged; exact-main isolated [#43158737963](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963) completed successfully. The observed local Provider migration history table is **absent** in disposable CLI 3.1.0/PostgreSQL17; source 242 entries/frontier 20261109071019 **cannot be compared to target null metadata**. Evidence: [POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json](POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json).
+- The existing sealed backup deliberately **excludes full migration history rows**, retaining count/frontier/fingerprint only (see [Backup Runbook](POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md)). This does not supply reconstructable Provider migration records. Phase 8-A/8-B therefore requires a separately authorized source and read-only identity/SQL/object/permissions equivalence before any supported isolated recovery route.
+- Existing 93/93 Provider row and Auth FK proofs are **reused**, not repeated. Hosted Auth/Storage, current-frontier service restore, privacy continuity and service RPO/RTO remain unproven; P0 #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. Phase 8 and full roadmap remain incomplete.
+
 
 > 기준일: 2026-11-07 KST  
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`  
