@@ -60,8 +60,10 @@ def run(proof_dir: Path):
         if character not in CHARACTERS:
             raise ValueError("foreign character in synthetic evaluation")
         improved = "concise answers" in candidate["shared_expression"]
-        baseline = {"yeoul": 0.2, "seyeon": 0.3}[character]
-        return ({"yeoul": 0.8, "seyeon": 0.75}[character] if improved else baseline), {
+        baseline = {"yeoul": 0.2, "seyeon": 0.4}[character]
+        # A higher shared average masks a SeYeon regression. The Node
+        # verification must flag it using this very same selected candidate.
+        return ({"yeoul": 0.95, "seyeon": 0.3}[character] if improved else baseline), {
             "failure_codes": [],
             "character_id": character,
             "raw_dialogue_excluded": True,
@@ -98,14 +100,62 @@ def run(proof_dir: Path):
     if packet["externalCalls"] != 0 or packet["productionEligible"] is not False:
         raise AssertionError("GEPA frozen packet violated research-only gate")
 
-    target = root / "frozen-result.json"
-    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
-    if hasattr(os, "O_NOFOLLOW"):
-        flags |= os.O_NOFOLLOW
-    fd = os.open(target, flags, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as sink:
-        json.dump(packet, sink, ensure_ascii=False, sort_keys=True)
-    print("Pinned GEPA two-character synthetic result frozen; no external calls.")
+    def restricted_write(name, value):
+        flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        fd = os.open(root / name, flags, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as sink:
+            json.dump(value, sink, ensure_ascii=False, sort_keys=True)
+
+    # Unlike the old independent 0.5/0.5 fixture, this evidence is derived
+    # from the real returned GEPA candidate and the actual bounded evaluator.
+    # The same synthetic evaluator/data were used by GEPA: NOT independent.
+    candidate = result.best_candidate
+    if "concise answers" not in candidate["shared_expression"]:
+        raise AssertionError("synthetic GEPA did not select its improved-average candidate")
+    family_scores = []
+    with patch.object(socket.socket, "connect", side_effect=offline_only), \
+            patch.object(socket.socket, "connect_ex", side_effect=offline_only), \
+            patch("socket.create_connection", side_effect=offline_only):
+        for example in envelope["dataset"]:
+            base_score, base_feedback = kwargs["evaluator"](
+                kwargs["seed_candidate"], example)
+            candidate_score, new_feedback = kwargs["evaluator"](
+                candidate, example)
+            if (base_feedback["uncertain"] or new_feedback["uncertain"]
+                    or base_feedback["failure_codes"]
+                    or new_feedback["failure_codes"]):
+                raise AssertionError("synthetic candidate violated eval guard")
+            family_scores.append({
+                "characterId": example["characterId"],
+                "split": example["split"],
+                "familyId": example["familyId"],
+                "baselineScore": base_score,
+                "candidateScore": candidate_score,
+                "failureCodes": [],
+                "uncertain": False,
+            })
+    if not (all(x["candidateScore"] > x["baselineScore"]
+                for x in family_scores if x["characterId"] == "yeoul")
+            and all(x["candidateScore"] < x["baselineScore"]
+                    for x in family_scores if x["characterId"] == "seyeon")):
+        raise AssertionError("synthetic regression fixture was not exercised")
+    report = {
+        "schemaVersion": "character-gepa-synthetic-family-evidence-v1",
+        "runManifestSha256": manifest["manifestSha256"],
+        "sourceSeedSha256": envelope["candidateSha256"],
+        "candidateTextSha256": packet["proposal"]["textSha256"],
+        "sourceType": "actual_bounded_gepa_evaluator_synthetic_only",
+        "scalarRepeatedAcrossDimensions": True,
+        "independentEvaluation": False,
+        "familyScores": family_scores,
+        "externalCalls": 0,
+        "productionEligible": False,
+    }
+    restricted_write("frozen-result.json", packet)
+    restricted_write("synthetic-family-scores.json", report)
+    print("Pinned GEPA result and actual synthetic family comparisons frozen; external calls 0.")
 
 
 if __name__ == "__main__":

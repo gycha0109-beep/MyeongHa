@@ -9,8 +9,8 @@ import { isAbsolute } from 'node:path';
 import {
   createOptimizationRun, digest, validateCandidate,
 } from './contracts-v1.mjs';
-import { buildGepaResearchPayload, DIMENSIONS } from './evaluation-v1.mjs';
-import { inspectCandidateReviewReadiness } from './candidate-evidence-review-v1.mjs';
+import { buildGepaResearchPayload } from './evaluation-v1.mjs';
+import { inspectFrozenSyntheticFamilyEvidence } from './gepa-synthetic-family-evidence-v1.mjs';
 import { intakeFrozenGepaResult } from './gepa-result-intake-v1.mjs';
 
 const [mode, dir] = process.argv.slice(2);
@@ -120,25 +120,28 @@ if (mode === 'prepare') {
   assert.equal(frozen.includes('PRIVATE_USER'), false);
   assert.equal(frozen.includes('reflection_dataset'), false);
 
-  // Separate family aggregates remain explicitly synthetic and unreviewed.
-  const synthetic = IDS.flatMap(characterId =>
-    ['development', 'optimizer_validation'].map(split => {
-      const prefix = characterId + '-synthetic-' + (split === 'development' ? 'dev' : 'val');
-      const scores = Object.fromEntries(DIMENSIONS.map(key => [key, 0.5]));
-      return {
-        characterId, split, familyId: prefix + '-family',
-        baselineScores: scores, candidateScores: { ...scores },
-        hardFailures: [], uncertainty: false, reviewStatus: 'unreviewed',
-      };
-    }));
-  const review = inspectCandidateReviewReadiness({
-    manifest, candidate: intake.candidate, familyEvaluations: synthetic,
+  // These are actual results for the selected GEPA candidate, obtained by
+  // rerunning the very same bounded synthetic evaluator on each family.
+  // They are NOT a real independent validation or human rubric scores.
+  const review = inspectFrozenSyntheticFamilyEvidence({
+    manifest,envelope,packet,
+    evidence:readJson('synthetic-family-scores.json'),
   });
-  assert.equal(review.scenarioFamiliesChecked, 4);
-  assert.deepEqual(review.characterIds, IDS);
-  assert.equal(review.candidateRegistryStage, 'proposed');
-  assert.equal(review.offlineValidated, false);
-  assert.equal(review.releaseApproved, false);
-  assert.equal(review.productionEligible, false);
+  assert.equal(review.scenarioFamiliesChecked,4);
+  assert.equal(review.candidateSha256,intake.candidate.textSha256);
+  assert.equal(review.hasSyntheticRegressions,true);
+  const byId=Object.fromEntries(review.byCharacter.map(x=>[x.characterId,x]));
+  assert.equal(byId.yeoul.regressionFamilies,0);
+  assert.equal(byId.seyeon.regressionFamilies,2);
+  assert.deepEqual(Object.keys(byId).sort(),[...IDS].sort());
+  assert.equal(review.scalarRepeatedAcrossDimensions,true);
+  assert.equal(review.independentEvaluation,false);
+  assert.equal(review.independentHumanQualityProven,false);
+  assert.equal(review.candidateRegistryStage,'proposed');
+  assert.equal(review.ownerReviewGranted,false);
+  assert.equal(review.heldoutPassed,false);
+  assert.equal(review.releaseApproved,false);
+  assert.equal(review.productionEligible,false);
+  assert.equal(review.externalCalls,0);
   console.log('Real pinned GEPA -> Python frozen packet -> Node review: synthetic HOLD, zero provider calls.');
 }
