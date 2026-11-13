@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<title>여울 Y07 · 기존 DeepSeek 6건 검토</title>
+<style>
+:root{font-family:"Malgun Gothic",system-ui,sans-serif;--fg:#152333;--muted:#50617a;--border:#cad4df}
+*{box-sizing:border-box}
+body{margin:0;background:#f5f7fa;color:var(--fg);line-height:1.58}
+main{max-width:1040px;margin:0 auto;padding:24px 20px 60px}
+h1{font-size:25px;margin:0 0 8px}h2{font-size:18px;margin:0}h3{font-size:14px;margin:16px 0 4px}
+.notice,.tools,.case{background:white;border:1px solid var(--border);border-radius:14px;padding:18px;margin:16px 0}
+.notice{background:#fffaf0;border-color:#dfca92}
+.muted,.status{color:var(--muted);font-size:13px}
+.case header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:space-between}
+.chip{display:inline-block;border-radius:30px;background:#edf1f6;padding:3px 10px;font-size:12px}
+summary{cursor:pointer;font-weight:600;margin:14px 0}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f4f8;border-radius:8px;padding:14px;font:inherit;font-size:14px}
+label{display:block;margin-top:14px;font-weight:600}
+select,textarea{font:inherit;display:block;width:100%;padding:11px;border:1px solid #aebdcc;border-radius:9px;margin-top:6px;background:white;color:var(--fg)}
+textarea{min-height:88px;resize:vertical}
+button{background:#29466e;border:0;border-radius:9px;color:white;padding:11px 16px;font:inherit;cursor:pointer}
+button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:3px solid #329ac5}
+.tools{position:sticky;top:0;z-index:1;box-shadow:0 2px 8px #15304b16}
+.actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.status[data-complete="true"]{color:#16613e;font-weight:650}
+@media(max-width:600px){h1{font-size:21px}.tools{position:static}}
+</style>
+</head>
+<body>
+<main>
+<h1>여울 DeepSeek Y07 · 기존 응답 6건</h1>
+<div class="notice">
+<strong>로컬 비공개 검토 — 외부 업로드 금지</strong>
+<p>이 자료는 기존 288건 평가 중 Y07의 비양호 응답 6건에 대한 사람 검토용입니다. 옛 사용자 평점은 확정된 인격·Canon·기억 위반이 아닙니다. 이 검토는 30건의 좋은 대사·행동 규칙 검토와 별개입니다.</p>
+<p class="muted">기본 상태는 전부 미검토입니다. 판정과 근거를 작성해 로컬 초안을 저장할 수 있으나, 체크 또는 저장만으로 사용자 승인·독립 최종평가·실제 GEPA 개선·운영 승격이 되지 않습니다.</p>
+</div>
+<div class="tools">
+  <div class="actions">
+    <button id="export" type="button">현재 입력을 로컬 JSON 초안으로 저장</button>
+    <label>저장했던 초안 불러오기 <input type="file" id="restore" accept=".json,application/json"></label>
+  </div>
+  <p id="progress" aria-live="polite">0 / 6건</p>
+  <p class="muted">브라우저 새로고침 시 저장하지 않은 입력은 사라집니다. 저장한 JSON에는 작성한 판정·근거가 포함되므로 비공개로 보관하세요.</p>
+</div>
+<!-- PRIVATE_Y07_CASES -->
+<p class="muted">사람이 검토한 자료는 사전 검토 초안일 뿐이며, 별도 승인·새 최종평가·지출 승인을 대체하지 않습니다.</p>
+</main>
+<script>
+(() => {
+  'use strict';
+  const keys=['baseline:1','baseline:2','language_rules:1','language_rules:2','conversation_examples:1','conversation_examples:2'];
+  const validDecisions=new Set(['pending','persona','korean_naturalness','excessive_softness','excessive_aggression',
+    'unverified_fact_or_memory_suspected','no_issue_on_review','hold']);
+  const input=(key,field)=>document.querySelector('[data-field="'+field+'"][data-key="'+key+'"]');
+  const all=()=>keys.map(key=>({
+    key,decision:input(key,'decision').value,
+    evidence:input(key,'evidence').value.trim(),
+    direction:input(key,'direction').value.trim()
+  }));
+  const valid=row=>row && typeof row==='object' && keys.includes(row.key) && validDecisions.has(row.decision)
+    && typeof row.evidence==='string' && row.evidence.length<=1500
+    && typeof row.direction==='string' && row.direction.length<=1500;
+  function refresh(){
+    let completed=0;
+    for(const row of all()){
+      const done=row.decision!=='pending' && (row.decision==='hold' || row.evidence.length>0);
+      const label=document.querySelector('[data-status="'+row.key+'"]');
+      label.dataset.complete=String(done);
+      label.textContent=done
+        ? (row.decision==='hold'?'판단 보류로 기록':'검토 판정 입력됨')
+        : (row.decision==='pending'?'미검토':'관찰 근거가 필요합니다');
+      if(done)completed++;
+    }
+    document.querySelector('#progress').textContent=completed+' / 6건 판정 입력 · 남은 '+(6-completed)+'건';
+    return completed;
+  }
+  function save(){
+    const rows=all();
+    if(rows.some(row=>!valid(row))){alert('검토 입력에 오류가 있습니다.');return;}
+    const completed=refresh();
+    const packet={
+      schemaVersion:'yeoul-y07-private-human-review-draft-v1',
+      sourceExperimentRunId:42572722295,
+      datasetRole:'historical_development_only',
+      characterId:'yeoul',
+      modelId:'deepseek/deepseek-v4.1-flash-1017',
+      questionId:'Y07',
+      decisions:rows,
+      enteredCount:completed,
+      allEntriesEntered:completed===6,
+      reviewerAuthorityVerified:false,
+      ownerApproved:false,
+      canonViolationConfirmed:false,
+      independentQualityGainEstablished:false,
+      externalCalls:0,
+      productionEligible:false
+    };
+    const blob=new Blob([JSON.stringify(packet,null,2)+'\n'],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;
+    link.download='yeoul-y07-private-review-draft.json';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  async function restore(e){
+    const file=e.target.files&&e.target.files[0];
+    if(!file)return;
+    try {
+      if(file.size>30000)throw Error('oversized');
+      const obj=JSON.parse(await file.text());
+      if(obj.schemaVersion!=='yeoul-y07-private-human-review-draft-v1'
+        ||obj.sourceExperimentRunId!==42572722295
+        ||obj.characterId!=='yeoul'
+        ||obj.questionId!=='Y07'
+        ||obj.modelId!=='deepseek/deepseek-v4.1-flash-1017'
+        ||!Array.isArray(obj.decisions)||obj.decisions.length!==6)throw Error('shape');
+      const seen=new Set();
+      for(const row of obj.decisions) {
+        if(!valid(row)||seen.has(row.key))throw Error('entry');
+        seen.add(row.key);
+      }
+      if(seen.size!==6)throw Error('missing');
+      for(const row of obj.decisions) {
+        input(row.key,'decision').value=row.decision;
+        input(row.key,'evidence').value=row.evidence;
+        input(row.key,'direction').value=row.direction;
+      }
+      refresh();
+    }catch{alert('이 검토 화면에서 저장된 Y07 형식이 아닙니다.');}
+    finally{e.target.value='';}
+  }
+  document.querySelector('#export').addEventListener('click',save);
+  document.querySelector('#restore').addEventListener('change',restore);
+  for(const element of document.querySelectorAll('select,textarea')){
+    element.addEventListener('input',refresh);
+    element.addEventListener('change',refresh);
+  }
+  refresh();
+})();
+</script>
+</body>
+</html>
