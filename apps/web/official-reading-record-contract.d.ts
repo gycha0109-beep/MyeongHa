@@ -1,6 +1,7 @@
 import type { SajuDomainV1 } from './saju-domain-contract.js';
 
 export interface OfficialReadingRecordBrowserPayloadV1 {
+  readonly approvedComponent?: 'career' | 'business' | 'wealth' | 'relationship' | 'year' | 'month' | 'compatibility';
   readonly readingId: string;
   readonly readingSessionId: string;
   readonly sajuDomain: SajuDomainV1;
