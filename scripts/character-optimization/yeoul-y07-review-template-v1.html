@@ -66,7 +66,7 @@ button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-vis
   function refresh(){
     let completed=0;
     for(const row of all()){
-      const done=row.decision!=='pending' && (row.decision==='hold' || row.evidence.length>0);
+      const done=row.decision!=='pending' && row.evidence.length>0;
       const label=document.querySelector('[data-status="'+row.key+'"]');
       label.dataset.complete=String(done);
       label.textContent=done

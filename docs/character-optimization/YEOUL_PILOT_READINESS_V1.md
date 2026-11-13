@@ -124,3 +124,15 @@ node scripts/character-optimization/yeoul-y07-private-browser-review-v1.mjs --pr
 
 - 생성된 HTML을 로컬 브라우저에서 열어 사람 검토를 입력하고 로컬 JSON 초안으로 저장한다. **JSON의 모든 판정·근거도 아직 신원 확인된 사람 승인이나 최종 실측 개선 증거가 아니다.** 기존 여울 30건 규칙/좋은 대사 검토와 별개로 보존한다.
 - 현재 실제 비공개 원본 보관 PC에 접근할 수 없으므로 UI 코드만 합성 자료로 검증했다. 실제 사람 검토·독립 비공개 홀드아웃·유료 DeepSeek 모델 송신 및 운영 적용은 계속 HOLD다.
+
+## 2026-11-13 — 브라우저 Y07 사람 검토 초안의 오프라인 원본 잠금 수집
+
+- 파일: `scripts/character-optimization/yeoul-y07-browser-draft-intake-v1.mjs`. 브라우저에서 저장한 `yeoul-y07-private-review-draft.json`의 정확한 6개 키·허용된 판정·작성 근거·완료 수를 검사한다. 검토자의 선택/근거는 **원본 288건에서 새로 생성한 불변 Markdown 검토표의 편집 허용 칸**에만 메모리로 매핑하고, 이미 병합된 `inspectPrivateY07ReviewSubmission`에 다시 검증받는다.
+- 검토자 입력의 모든 승인·원본 위반·품질 개선 관련 권한 표시는 엄격히 `false`만 허용한다. 사람 검토가 작성됐더라도 승인으로 취급하지 않고, 판단 보류는 계속 미판정으로 계산한다. 기록되지 않은 근거·개수 위조·순서 변경·파일 덮어쓰기·저장소 내 출력·원문 반출을 거부한다.
+- 실제 원본이 있는 로컬 PC에서만 다음을 실행한다. 입력과 결과의 경로는 모두 Git 저장소 밖이어야 하며, 출력 경로에는 기존 파일이 없어야 한다.
+
+```sh
+node scripts/character-optimization/yeoul-y07-browser-draft-intake-v1.mjs --private-original /private/yeoul-evaluations-all-288.json --browser-draft /private/yeoul-y07-private-review-draft.json --private-result /private/yeoul-y07-review-metadata.json
+```
+
+- 출력은 6건의 판정 범주별 수·미결정 수·검토 진행 현황을 담은 **메타데이터 전용 로컬 JSON**이다. 원본 질문/응답·기존 평가 메모·사람 자유 의견은 넣지 않는다. 실제 검토자 신원 인증이나 자료 진위는 확인하지 못하므로 명시적 owner 승인·새 비공개 홀드아웃·실제 품질 개선·유료 송신 허가로 승격되지 않는다.
