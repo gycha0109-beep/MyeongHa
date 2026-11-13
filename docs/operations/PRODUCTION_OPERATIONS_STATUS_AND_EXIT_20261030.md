@@ -1598,3 +1598,14 @@ Watchtower-Track: ops
 - **다음 작업·블로커/승인:** 다음 실제 예약 실행과 별도 freshness 감시 결과를 있는 그대로 확인하여 중앙 WORKLOG에 새 증거를 기록한다. Production SQL/DDL/DML·카나리·시크릿·유료 Hosted 복구·트래픽 변경은 이 실증에서 실행·승인하지 않았으며 필요 시 사용자 별도 승인. 이번 실행 자체는 기존 허용된 read-only 추출/암호화 아티팩트 업로드만 수행. **이번 문서 기록만 신규 커밋**하며, 해당 PR의 검증 결과는 새 HEAD CI 확인 전까지 별도 미판정.
 
 Watchtower-Track: ops
+
+### 2026-11-08 / Phase 8-C — 병합된 원장에 대한 독립 신선도 감시 실제 검증
+
+- **기존 작업·ROADMAP:** `docs/operations/PRODUCTION_OPERATIONS_EXIT_ROADMAP_20261107.md` Gate 1 / Phase 8-C 및 바로 앞 WORKLOG의 미완료 후속 검증인 **기존 개인정보 원장의 별도 신선도 감시 결과 확인**. 신규 기능·로드맵·임계치 추가 없음.
+- **운영 실제 실행/코드 출처:** [Privacy Recovery Ledger Freshness Watch #42411739521](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42411739521) (`workflow_dispatch`, `main` 정확한 SHA `224e9d13a8c927fb054ac4e4a9083b4272ea244f`, attempt 1) **SUCCESS**. `Privacy recovery ledger freshness` 작업 성공, 기존 `scripts/operations/check-privacy-ledger-completion-freshness.mjs` 실행. 이전 [원장 재수집 #42409081297](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42409081297)도 `main` 수정본을 사용한 **SUCCESS**이며 암호화 artifact `13588229122`을 보관함.
+- **실제 감시 로그:** `status=RECENT_CAPTURE_COMPLETION_OBSERVED`, `checkPassed=true`, `latestSuccessfulRunId=42409081297`, `latestSuccessfulRunAttempt=1`, `latestSuccessfulCompletedAt=2026-11-07T20:02:51Z`, `elapsedSinceRunCompletionSeconds=1936`, `encryptedArtifactObserved=true`. 기존 `nominalScheduledIntervalSeconds=3600` / `maximumObservedCompletionAgeSeconds=7200` 조건에 따른 **해당 시점의 신선도 정상 관측**이다. 이전 원장 본체의 측정된 수집 간격 10,911초 경고를 무효화하지 않는다.
+- **변경 파일·기존 커밋·테스트/CI:** 본 기록만 기존 중앙 `docs/operations/PRODUCTION_OPERATIONS_STATUS_AND_EXIT_20261030.md`에 추가한다. 신규 운영 코드·테스트·배포·설정 수정 없음. 선행 코드 [PR #3126](https://github.com/gycha0109-beep/MyeongHa/pull/3126) 병합 `0b213fa890cd34ffc4c490ef029e3e5262febe4d`, 기록 [PR #3132](https://github.com/gycha0109-beep/MyeongHa/pull/3132) 병합 `1ad709423df8afcddb67c1a9ca736aed9bfd2191`, [Integration #42409706792](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42409706792) **SUCCESS**. 본 문서 커밋의 정확한 SHA는 PR에서 확인하고, 본 변경 자체의 CI는 검증 완료 전까지 PASS로 기재하지 않는다.
+- **검증 한계·미완료:** 신선도 감시 성공은 **2026-11-07T20:35:08Z경**의 한 차례 metadata-only 관측에 한정된다. `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `approvedRpoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`를 감시가 직접 보고함. 새 `main`의 **예약 schedule 실제 성공**, 지연 없는 지속 수집·누락 없는 개인정보 원장, 최신 복구 frontier와 Provider-compatible Hosted Auth/Storage 복구, #1887 해결, Phase 8 및 전체 운영 수용은 **미완료**.
+- **다음 작업/블로커·승인:** 해당 문서의 PR 코드·Governance·통합 CI가 통과하면 자동 병합하여 증거를 보존. 다음 **자연 발생 예약 수집·감시** 결과가 있을 때만 새 증거로 검증하며, 현재 시점의 수동 성공으로 schedule 정상화를 주장하지 않는다. Production SQL/DDL/DML·권한·시크릿·개인정보 카나리·유료 Hosted 프로젝트·운영 설정 변경을 수행하지 않았고, 해당 작업은 별도 사용자 승인 전 중단. `NOT_ACCEPTED` 유지.
+
+Watchtower-Track: ops
