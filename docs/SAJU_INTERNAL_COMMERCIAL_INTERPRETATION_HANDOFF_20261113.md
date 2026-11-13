@@ -52,3 +52,9 @@
 - `apps/api/src/postgres-approved-saju-issuance-v1.ts`의 비공개 두 명식 소스 검토에서는 **해석 요청 전·후** DB 조회에서 상품·상대·승인번호·구성·해석 요청 해시·명식 revision·Release가 그대로인지 다시 검증한다. 구매 취소·동의 철회·상대 변경 시 신규 확인에서 null/HOLD를 유지한다.
 - **검증:** `apps/api/src/postgres-approved-saju-pair-issuance-scope-v1.test.ts`와 `apps/api/src/postgres-approved-saju-pair-offer-handoff-v1.test.ts`에서 세 상품·양 명식·동의 및 구매 변경 거부를 검사한다. 이 작업의 SQL은 배포된 마이그레이션이 아니라 후보 문서이므로 운영 DB 적용이나 실제 결제 테스트 완료로 간주하지 않는다.
 - **다음 필수:** 공식 T10 이중 명식 서명 Source 계약, 관계 구성별 DB 발급 작업, 실제 동의/철회/구매 영수증·중복발급·환불/Reader E2E. 기존 명하 운영 판매 HOLD.
+
+## 2026-11-13 — 관계 비교 두 명식 원본 Reading 자료 검증
+
+- Saju #2763에서 두 명식의 일간·일지 및 타주 합충을 독립 원본 경로와 연결해 조건부 **고객 한국어 풀이**를 보강하고, `saju-t10-pair-reading-material-v1`에 두 원국 식별값·각 문장/규칙/근거의 해시·전체 자료 해시를 결합했다.
+- `apps/api/src/saju-held-pair-review-v1.ts`에서 이 자료를 기존 Bearer/Ed25519 서명 검증에 이어 확인한다. 잘못된 명식 대응, 문장·해시 변경, 원본 미첨부, 연구용 결과의 자의적 발급 승격을 거부한다.
+- **현재의 한계:** 계약은 **비공개 서명 검토/정식 발급 준비 자료**이지 Saju Production Pair Issue Proof나 고객 저장/Reader 결과가 아니다. 최초·추가·결합 구매의 정식 전용 Issuer/서명/DB 연결은 구현하지 않았으며 실제 구매·동의/환불·복구 무결성 미충족 상태에서 판매를 열지 않는다.
