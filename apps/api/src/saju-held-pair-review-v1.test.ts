@@ -154,6 +154,7 @@ describe('signed held T10 pair interpretation acceptance', () => {
       ruleId: 'T10-SERVICE-DAY-CLASH',
       paragraph: '같은 일지에서 별도 충이 발생한 것으로 잘못 기록한 문장.',
       observedFactPaths: [],
+      calculationSourceIds: [], sourceDefinitionHashes: [],
       interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false,
     });
     expect(await port(duplicateDay).inspectSource(body)).toBeNull();
