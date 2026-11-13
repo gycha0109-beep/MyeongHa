@@ -101,6 +101,7 @@ test('keeps single-statement byte-difference locations non-sensitive and unprove
   extended.sourcePacket.entries[1].statements=['select 111'];
   extended.sourceBytes=buf(JSON.stringify(extended.sourcePacket)+'\n');
   extended.pairedProof.sourcePacketSha256=hash(extended.sourceBytes);
+  extended.lineage.sourcePacketSha256=extended.pairedProof.sourcePacketSha256;
   extended.repositoryEntries[1].bytes=buf('select 111;\n');
   const extendedReport=assessSealedCommonMigrationBodyParity(extended);
   const shape=extendedReport.nonExactOrUnprovenVersions.find(x=>x.version==='110')
