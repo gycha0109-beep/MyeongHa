@@ -115,8 +115,8 @@ def run(proof_dir: Path):
     if "concise answers" not in candidate["shared_expression"]:
         raise AssertionError("synthetic GEPA did not select its improved-average candidate")
     family_scores = []
-    with patch.object(socket.socket, "connect", side_effect=offline_only), \\
-            patch.object(socket.socket, "connect_ex", side_effect=offline_only), \\
+    with patch.object(socket.socket, "connect", side_effect=offline_only), \
+            patch.object(socket.socket, "connect_ex", side_effect=offline_only), \
             patch("socket.create_connection", side_effect=offline_only):
         for example in envelope["dataset"]:
             base_score, base_feedback = kwargs["evaluator"](
