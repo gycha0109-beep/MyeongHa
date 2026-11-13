@@ -51,6 +51,11 @@ on:
         required: false
         default: false
         type: boolean
+      migration_source_only_diagnostic:
+        description: Exact 43174606843 sealed SQL source-only diagnostic; never DR privacy acceptance
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -92,6 +97,20 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$MYEONGHA_WATCHTOWER_TRACK" == 'ops' ]]
+          if [[ "${{ inputs.migration_source_only_diagnostic && 'true' || 'false' }}" == 'true' ]]; then
+            # Explicit Phase 8-A only: the 2026-11-12 source backup pre-dates
+            # later shared-memory privacy migration 2380. Never bypass a full
+            # recovery/privacy admission; allow only this bounded source probe.
+            [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' &&
+               "$GITHUB_REF" == 'refs/heads/main' ]]
+            [[ "${{ inputs.verify_provider_migration_source && 'true' || 'false' }}" == 'true' ]]
+            [[ "${{ inputs.backup_run_id }}" == '43174606843' ]]
+            [[ "${{ inputs.incident_reference_utc }}" == '2026-11-12T07:25:00Z' ]]
+            [[ -z "${{ inputs.privacy_ledger_run_id }}" &&
+               -z "${{ inputs.production_privacy_canary_run_id }}" ]]
+            [[ "${{ inputs.seyeon_security_s0_rehearsal && 'true' || 'false' }}" == 'false' ]]
+            echo 'MIGRATION_SOURCE_DIAGNOSTIC_ONLY_PRIVACY_NOT_EXERCISED_DR_HOLD'
+          fi
 
       - name: Checkout exact repository state
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -343,6 +362,7 @@ jobs:
             "$PROVIDER_ROLE_PROOF_PATH" >/dev/null
 
       - name: Exercise synthetic privacy reconciliation and finalization on restored database
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic) }}
         shell: bash
         env:
           BACKUP_ARTIFACT_DIR: ${{ runner.temp }}/backup-artifact
@@ -372,6 +392,55 @@ jobs:
           PGDATABASE: postgres
         run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh
 
+      - name: Record scoped sealed migration source diagnostic boundary
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic }}
+        shell: bash
+        env:
+          RESTORE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/restore-evidence.json
+          PROVIDER_LEDGER_PROOF_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-source-recovery.json
+          COMMON_SQL_PROOF_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-common-migration-body-parity.json
+          PROVIDER_ROLE_PROOF_PATH: ${{ runner.temp }}/restore-evidence/isolated-provider-role-replay-provenance.json
+          DIAGNOSTIC_BOUNDARY_PATH: ${{ runner.temp }}/restore-evidence/migration-source-only-diagnostic-boundary.json
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          jq -e '.dr_ready == false
+            and .restore_target == "github-actions-loopback-supabase-postgres"' "$RESTORE_EVIDENCE_PATH" >/dev/null
+          jq -e '.backupRunId == 43174606843
+            and .encryptedSourceDecryptionVerified == true
+            and .providerMigrationLedgerRestored == false
+            and .drReady == false' "$PROVIDER_LEDGER_PROOF_PATH" >/dev/null
+          jq -e '.sourceBackupRunId == 43174606843
+            and .exactRepositoryCommitSha == env.GITHUB_SHA
+            and .sourceVersionCount == 242
+            and .commonVersionCount == 200
+            and .notByteExactOrUnprovenCount == 187
+            and .serviceResumptionAllowed == false
+            and .drReady == false' "$COMMON_SQL_PROOF_PATH" >/dev/null
+          jq -e '.directRoleMembershipTargetRehearsalProven == true
+            and .fullProviderCompatibleRestoreProven == false
+            and .serviceResumptionAllowed == false' "$PROVIDER_ROLE_PROOF_PATH" >/dev/null
+          [[ ! -e "$RUNNER_TEMP/restore-evidence/privacy-reconciliation-evidence.json" &&
+             ! -e "$RUNNER_TEMP/restore-evidence/authoritative-privacy-reconciliation-evidence.json" ]]
+          jq -n --arg sha "$GITHUB_SHA" --argjson run "$GITHUB_RUN_ID" '{
+            schemaVersion: "ops-sealed-source-only-diagnostic-boundary-v1",
+            runId: $run,
+            exactRepositoryCommitSha: $sha,
+            sourceBackupRunId: 43174606843,
+            originalSourceEvidenceVerified: true,
+            isolatedPostgresRestoreObserved: true,
+            sourceSqlLexicalClassificationMeasured: true,
+            syntheticPrivacyReconciliationExercised: false,
+            authoritativePrivacyReconciliationExercised: false,
+            fullProviderRestoreProven: false,
+            incidentTimePrivacyContinuityProven: false,
+            wholeServiceRpoRtoProven: false,
+            serviceResumptionAllowed: false,
+            drReady: false,
+            verdict: "PHASE8A_SOURCE_DIAGNOSTIC_ONLY__PRIVACY_NOT_EXERCISED__DR_HOLD"
+          }' > "$DIAGNOSTIC_BOUNDARY_PATH"
+          chmod 600 "$DIAGNOSTIC_BOUNDARY_PATH"
+          echo 'SOURCE_DIAGNOSTIC_OBSERVED_PRIVACY_NOT_EXERCISED_DR_HOLD'
       - name: Build self-contained restore evidence envelope
         shell: bash
         env:
@@ -452,6 +521,7 @@ jobs:
           compression-level: 0
 
       - name: Record restore drill boundary
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic) }}
         shell: bash
         run: |
           set -euo pipefail
@@ -466,4 +536,17 @@ jobs:
           else
             echo 'authoritative_privacy_reconciliation=not_exercised_without_production_ledger'
           fi
+          echo 'dr_ready=false'
+
+      - name: Record source-only diagnostic boundary in logs
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'restore_target=github-actions-loopback-supabase-postgres'
+          echo 'source_migration_diagnostic=observed'
+          echo 'synthetic_privacy_reconciliation=not_exercised_older_schema'
+          echo 'authoritative_privacy_reconciliation=not_exercised'
+          echo 'hosted_provider_recovery=not_proven'
+          echo 'service_resumption_allowed=false'
           echo 'dr_ready=false'
