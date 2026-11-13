@@ -29,6 +29,49 @@ function asMigrationFile(path) {
   return { path, version: match[1], name: match[2] };
 }
 
+// Compare raw bytes only inside the same disposable runner as the sealed source.
+// Do not emit SQL fragments, changed-text hashes, or semantic-equivalence claims.
+function describeByteDifference(source, repository) {
+  assert.ok(Buffer.isBuffer(source) && Buffer.isBuffer(repository));
+  const shared = Math.min(source.length, repository.length);
+  let prefix = 0;
+  while (prefix < shared && source[prefix] === repository[prefix]) prefix++;
+  let suffix = 0;
+  while (suffix < shared - prefix &&
+    source[source.length - suffix - 1] ===
+    repository[repository.length - suffix - 1]) suffix++;
+  const sourceDifferentBytes = source.length - prefix - suffix;
+  const repositoryDifferentBytes = repository.length - prefix - suffix;
+  let differenceLocation = 'NO_SHARED_EDGE_BYTES';
+  if (prefix === shared) {
+    differenceLocation = source.length < repository.length
+      ? 'REPOSITORY_EXTRA_SUFFIX' : 'SOURCE_EXTRA_SUFFIX';
+  } else if (suffix === shared) {
+    differenceLocation = source.length < repository.length
+      ? 'REPOSITORY_EXTRA_PREFIX' : 'SOURCE_EXTRA_PREFIX';
+  } else if (prefix > 0 && suffix > 0) {
+    differenceLocation = 'INTERNAL_CHANGED_REGION';
+  } else if (prefix > 0) {
+    differenceLocation = 'CHANGED_THROUGH_END';
+  } else if (suffix > 0) {
+    differenceLocation = 'CHANGED_FROM_BEGINNING';
+  }
+  const repositoryTwoByteTerminatorSuffix = differenceLocation ===
+    'REPOSITORY_EXTRA_SUFFIX' && repositoryDifferentBytes === 2 &&
+    repository[repository.length - 2] === 0x3b &&
+    repository[repository.length - 1] === 0x0a;
+  return {
+    commonPrefixBytes: prefix,
+    commonSuffixBytes: suffix,
+    sourceDifferentBytes,
+    repositoryDifferentBytes,
+    differenceLocation,
+    repositoryTwoByteTerminatorSuffix,
+    sqlSemanticEquivalenceProven: false,
+    historicalExecutionCausalityProven: false,
+  };
+}
+
 function classForSource(statements, repoBytes) {
   if (statements === null || statements.length === 0) {
     return { classification: 'SOURCE_STATEMENTS_ABSENT' };
@@ -50,14 +93,17 @@ function classForSource(statements, repoBytes) {
   }
   const sourceBytes = Buffer.from(statements[0], 'utf8');
   assert.ok(sourceBytes.length <= maxSqlBytes);
+  const byteExact = sourceBytes.equals(repoBytes);
   return {
-    classification: sourceBytes.equals(repoBytes)
+    classification: byteExact
       ? 'SINGLE_STATEMENT_BYTE_EXACT'
       : 'SINGLE_STATEMENT_BYTES_DIFFER',
     sourceStatementSha256: sha256(sourceBytes),
     sourceStatementBytes: sourceBytes.length,
     repositoryFileSha256: sha256(repoBytes),
     repositoryFileBytes: repoBytes.length,
+    ...(byteExact ? {} : { rawByteDifference:
+      describeByteDifference(sourceBytes, repoBytes) }),
   };
 }
 
