@@ -125,6 +125,8 @@ CREATE TRIGGER a4_proof_subject_deletion_revocation_v1
   EXECUTE FUNCTION myeongha_a4_source_ops.revoke_proofs_on_subject_deletion_v1();
 
 -- The only runtime retention capability is bounded EXECUTE; no direct DELETE.
+-- Purge one day ahead of the 30x24-hour hard upper bound to leave operational buffer
+-- for the one-minute scheduler; outages/backlogs still require monitoring.
 CREATE ROLE myeongha_a4_prepared_proof_maintenance_v1
   LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION
   NOBYPASSRLS PASSWORD NULL;
@@ -142,7 +144,7 @@ BEGIN
   WITH due AS (
     SELECT execution_attempt_id
     FROM myeongha_a4_source_ops.prepared_attempt_proofs_v1
-    WHERE stored_at <= clock_timestamp() - INTERVAL '30 days'
+    WHERE stored_at <= clock_timestamp() - INTERVAL '29 days'
     ORDER BY stored_at, execution_attempt_id
     LIMIT p_limit FOR UPDATE SKIP LOCKED
   )
