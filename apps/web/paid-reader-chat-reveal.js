@@ -85,6 +85,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
   const body = document.createElement('div');
   body.className = 'conversation-paid-reader-revealed-body';
   body.hidden = true;
+  body.dataset.officialReading = '';
   body.dataset.readerPaidAriaSource = '현재 구매권으로 확인된 사주 해설';
   body.setAttribute('aria-label', paidReaderUi('현재 구매권으로 확인된 사주 해설'));
 
