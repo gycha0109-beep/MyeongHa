@@ -13,6 +13,7 @@ import socket
 import sys
 from unittest.mock import patch
 
+from optimizer_sealed_boundary_v1 import verify_optimizer_sealed_boundary
 from gepa_api_contract import build_offline_gepa_kwargs
 from gepa_result_proposal import freeze_offline_gepa_result
 from runner import preflight, probe_installed_gepa
@@ -44,6 +45,9 @@ def run(proof_dir: Path):
         raise ValueError("synthetic run manifest mismatch")
     if manifest.get("externalCallsAuthorized") is not False:
         raise ValueError("external calls remain blocked")
+    # The check is performed in the very process that executes official GEPA,
+    # not a separate demonstration container or only a Python unit test.
+    verify_optimizer_sealed_boundary(os.environ.get("GEPA_HOST_SEALED_FILE"))
     probe = probe_installed_gepa()
     if not probe["api_compatible"]:
         raise RuntimeError("pinned GEPA API not compatible")
