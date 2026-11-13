@@ -84,3 +84,16 @@
 - 사용자님이 A4 사전 승인 증명의 **최대 30×24시간 보존**과 계정 삭제 시 즉시 폐기, 전용 저장소/인증의 단계적 운영 적용을 승인했다. 상세 정책: [A4 증명 보존·삭제 결정](ADMIN_A4_PREPARED_PROOF_RETENTION_DECISION_20261113.md).
 - 저장소 후보는 내용을 변경할 수 없는 구조를 유지하면서, 삭제 요청 시 즉시 폐기와 30일 만료 배치 삭제만 별도 허용하도록 개정한다. 만료 정리 실행 일정·운영 TLS/비밀키·실제 Saju 연결은 **별도 운영 증거 미확인**이므로 상시 비용 수집 OFF를 유지한다.
 - 앞선 미승인 정책 표기는 이 날짜의 결정으로 대체된다. CI와 운영 설치, 실제 호출·공급사 청구/환율 대조가 끝났다는 뜻은 아니다.
+
+
+## 2026-11-13 운영 DB 증명 저장소 및 29일 선제 폐기 실측
+
+**증거 범위:** 명하 Supabase 프로젝트 `cnsfpcdiyofqvhpcegfc`의 PostgreSQL 17.6에 직접 질의. 해당 DB로 스키마 설치·선제 폐기 함수 패치를 수행했으며, 설치 SQL과 최종 패치 SQL은 병합된 GitHub `main` 내용과 동일하다. 2026-11-12의 '미설치' 표는 과거 스냅샷이며, 아래 실측으로 갱신된다.
+
+- 명하 [#3272](https://github.com/gycha0109-beep/MyeongHa/pull/3272): 정확한 HEAD `e6c1869fdc345b5bca2db7fcdbb72596f78d59b9`의 필수 [통합 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43364671474) 성공·병합을 확인하고 `ADMIN_A4_PREPARED_PROOF_PRIVATE_STORE_OFFLINE_V1.sql`을 운영 DB에 설치했다.
+- 운영 스키마 `myeongha_a4_source_ops`, 불변 증명 테이블 `prepared_attempt_proofs_v1`, Reader/Writer/정리 역할 및 계정 삭제 즉시 증명 폐기 트리거의 실제 존재 확인. 테이블 RLS 활성화, 전용 정책 3개. `anon`, `authenticated`, `service_role`, `myeongha_runtime`의 스키마 사용·읽기·쓰기 권한 없음. Reader/Writer의 직접 UPDATE/DELETE 거부; 정리 역할은 전용 함수 실행만 허용된다.
+- 보관 정책은 **최대 30×24시간**이며, 1분 간격 자동 정리의 지연 여유를 위해 29일 기준을 적용했다. 명하 [#3275](https://github.com/gycha0109-beep/MyeongHa/pull/3275)의 정확한 HEAD `3389ab99163abde5e964fc37939abe558b3554a8`에 대한 [통합 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43371510789) 성공·병합 후, `ADMIN_A4_PREPARED_PROOF_RETENTION_SAFETY_WINDOW_PRODUCTION_PATCH_20261113.sql`을 운영 DB에 적용했다. 적용된 실제 함수 본문에서 29일 조건 존재·기존 30일 조건 부재·최대 1,000건 처리·행 잠금/중복 작업 건너뛰기 확인.
+- 자동 정리 `myeongha_a4_prepared_proofs_purge_v1`: **활성**, 1분마다 실행, DB 실행 역할 `postgres`. 2026-11-13 **06:23–06:25 UTC의 연속 3회 실행 성공**을 `cron.job_run_details`에서 확인했다. 정리 실행 역할 자체가 전용 maintenance 역할인 것은 아니므로, 전용 역할의 최소 권한과 정기 작업 실행 주체를 혼동하지 않는다.
+- 실측 당시 준비 증명 **0건**. 따라서 실제 29일 도달 행의 운영 삭제·대량 적체 처리 성능은 실증되지 않았고, 코드와 격리형 검증 및 스케줄 실행 성공까지만 인정한다. 정리 중단이 1일 이상 지속되거나 1회 1,000건 적체가 누적되면 최대 30일을 초과할 가능성이 있으므로 무조건적인 보존 상한 준수 보장은 하지 않는다.
+- 연결된 Supabase 프로젝트 목록과 접근 가능한 Neon 프로젝트 목록에 Saju 전용 Source PostgreSQL 운영 인스턴스는 확인되지 않았다. **그 인스턴스가 세상에 존재하지 않는다는 판정은 아니다.** Saju Source 원본 DB·계정/TLS·개인 서비스 Bearer/HMAC 비밀·Production Interpretation Authority와 실사용 인스턴스 결속은 **미검증**이다.
+- 실서비스에서 발급/호출 또는 비용 원장 실수집은 활성화하지 않았다. `completeCostCoverage=false`, `invoiceReconciled=false`, 상시 비용 수집 OFF. Saju Source 운영 설치·네트워크/TLS 및 서비스 비밀 공급·인스턴스 결속과 실제 소규모 호출 비용 상한 확인·공급사 청구 대조가 다음 수용 조건이다. **운영 A4 전체 수용은 HOLD / `ROADMAP_COMPLETE` 아님.**
