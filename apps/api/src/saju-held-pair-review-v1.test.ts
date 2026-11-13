@@ -19,7 +19,7 @@ const body = {
 } as const;
 
 function evidence() {
-  return {
+  const sample = {
     lifecycle: 'internal_preview_only',
     coverage: 'calculation_facts_only',
     generatedInterpretationClaims: false,
@@ -49,20 +49,46 @@ function evidence() {
           { ruleId: 'T10-SERVICE-DAY-SIX-COMBINATION',
             paragraph: '두 명식에서 일지 간 육합 구조를 관찰했습니다.',
             observedFactPaths: [subjectPath, targetPath],
+            calculationSourceIds: ['SRC-T0-YISI-ZHAN-10'], sourceDefinitionHashes: ['c'.repeat(64)],
             interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false },
           { ruleId: 'T10-SERVICE-DAY-STEM-NO-FIVE-COMBINATION',
             paragraph: '일간 사이에 오합이 관찰되지 않아도 이것은 관계의 실패를 뜻하지 않습니다.',
             observedFactPaths: [],
+            calculationSourceIds: [], sourceDefinitionHashes: [],
             interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false },
           { ruleId: 'T10-SERVICE-BOUNDED-SCOPE',
             paragraph: '개인 관계의 결과나 성공 여부는 단정하지 않습니다.',
             observedFactPaths: [],
+            calculationSourceIds: [], sourceDefinitionHashes: [],
             interpretationOwner: 'myeongha_internal_service', individualOutcomeClaimed: false },
         ],
         readyForOfficialIssue: false, mayPublish: false, maySell: false,
       },
     },
   };
+  const meaning = sample.evidence.internalServiceInterpretation;
+  const units = meaning.sentences.map(entry => {
+    const value = {
+      ruleId: entry.ruleId, paragraph: entry.paragraph,
+      observedFactPaths: entry.observedFactPaths,
+      calculationSourceIds: entry.calculationSourceIds,
+      sourceDefinitionHashes: entry.sourceDefinitionHashes,
+    };
+    return { unitId: 't10_unit_' + hash(value).slice(0, 24), ...value };
+  });
+  const unsigned = {
+    version: 'saju-t10-pair-reading-material-v1',
+    policyId: 'myeongha-t10-internal-relational-explanation-v1',
+    policyVersion: '2026-11-13', readingDomain: 'compatibility',
+    interpretationOwner: 'myeongha_internal_service',
+    sourceScope: 'two_canonical_natal_charts',
+    charts: both.map(chart => ({ ...chart, snapshotId: 'snapshot-' + chart.role })),
+    units,
+  };
+  return { ...sample, evidence: { ...sample.evidence, sourceReadingMaterial: {
+    ...unsigned, materialHash: hash(unsigned), status: 'source_owned_candidate_unissued',
+    officialIssueAuthorized: false, mayPublish: false, maySell: false,
+  } } };
 }
 
 function port(candidate: unknown) {
