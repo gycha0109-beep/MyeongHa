@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           export PYTHONPATH="$GITHUB_WORKSPACE/research/character-optimization-gepa"
           "$RUNNER_TEMP/gepa-venv/bin/python" -m unittest -v \
-            test_offline test_gepa_api_contract test_gepa_result_proposal test_gepa_source_identity test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner test_krw500_synthetic_ledger test_krw500_socket_gateway
+            test_offline test_gepa_api_contract test_gepa_result_proposal test_gepa_source_identity test_optimizer_sealed_boundary_v1 test_pinned_gepa_offline test_offline_egress_gate test_local_socket_gateway test_governed_dry_run test_approval_scope test_sealed_holdout_runner test_krw500_synthetic_ledger test_krw500_socket_gateway
       - name: Prove optimizer cannot access sealed files or network at OS boundary
         shell: bash
         run: |
@@ -158,14 +158,38 @@ jobs:
         run: |
           set -euo pipefail
           PROOF_DIR="$RUNNER_TEMP/character-gepa-crosslang-synthetic"
-          mkdir -p "$PROOF_DIR"
-          chmod 700 "$PROOF_DIR"
+          SEALED_HOST_DIR="$RUNNER_TEMP/character-gepa-unmounted-private"
+          mkdir -p "$PROOF_DIR" "$SEALED_HOST_DIR"
+          chmod 700 "$PROOF_DIR" "$SEALED_HOST_DIR"
+          # A host-only marker MUST exist before the real optimizer starts.
+          # It is synthetic, not H01-H10 or any confidential private source.
+          printf '%s\n' 'sealed synthetic fixture never mounted into optimizer' > "$SEALED_HOST_DIR/synthetic-secret.json"
+          chmod 600 "$SEALED_HOST_DIR/synthetic-secret.json"
+          test -s "$SEALED_HOST_DIR/synthetic-secret.json"
           node scripts/character-optimization/gepa-crosslang-handoff-v1.mjs prepare "$PROOF_DIR"
+          # Deliberately misconfigured optimizer: make the host-only sealed
+          # directory visible and verify the actual GEPA entrypoint refuses it.
+          if docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
+            --user "$(id -u):$(id -g)" --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=64m \
+            --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
+            --mount "type=bind,src=$PROOF_DIR,dst=/private/gepa-proof" \
+            --mount "type=bind,src=$SEALED_HOST_DIR,dst=/private/sealed,readonly" \
+            --env PYTHONPATH=/opt/myeongha \
+            --env "GEPA_HOST_SEALED_FILE=$SEALED_HOST_DIR/synthetic-secret.json" \
+            myeongha-gepa-pinned-offline:verify \
+            python /opt/myeongha/gepa_crosslang_synthetic_handoff.py /private/gepa-proof \
+            > "$RUNNER_TEMP/gepa-sealed-mount-denial.log" 2>&1; then
+            echo "GEPA incorrectly accepted a mounted sealed fixture" >&2
+            exit 1
+          fi
+          grep -q 'optimizer_can_locate_sealed_source' "$RUNNER_TEMP/gepa-sealed-mount-denial.log"
+          # Real optimizer invocation: only source code + synthetic proof mounts.
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --user "$(id -u):$(id -g)" --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=64m \
             --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
             --mount "type=bind,src=$PROOF_DIR,dst=/private/gepa-proof" \
             --env PYTHONPATH=/opt/myeongha \
+            --env "GEPA_HOST_SEALED_FILE=$SEALED_HOST_DIR/synthetic-secret.json" \
             myeongha-gepa-pinned-offline:verify \
             python /opt/myeongha/gepa_crosslang_synthetic_handoff.py /private/gepa-proof
           node scripts/character-optimization/gepa-crosslang-handoff-v1.mjs verify "$PROOF_DIR"
