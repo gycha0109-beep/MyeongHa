@@ -17,8 +17,13 @@ import {
   executeAndPersistPinnedBirthSajuOfficialReadingV1,
   type SajuOfficialReadingExecutionInputV1,
 } from './saju-production-reading-execution.js';
+import { createMyeongHaA4PreparedProofHandoffV1, type MyeongHaA4PreparedProofStorePortV1 } from './saju-a4-prepared-proof-handoff-v1.js';
+import { createMyeongHaA4SignedPreparedAttemptIssuerV1 } from './saju-a4-signed-prepared-attempt-issuer-v1.js';
 
 type PrepareOptions = Omit<Parameters<typeof createPostgresSajuOfficialAttemptPreparePortV1>[0], 'approvedPurchase'>;
+export type ApprovedSajuA4HandoffV1 = Omit<
+  Parameters<typeof createMyeongHaA4SignedPreparedAttemptIssuerV1>[0], 'preparePort'
+> & { readonly store: MyeongHaA4PreparedProofStorePortV1 };
 
 function held(reason: 'production_source_unverified' | 'current_authority_unavailable'): SajuOfficialIssuanceResultV1 {
   return Object.freeze({
@@ -97,6 +102,7 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     component: SajuReadingComponentV1;
     readerCharacterId: string;
     expectedReleaseRef?: string;
+    preparedProof?: ApprovedSajuA4HandoffV1;
   }>,
 ): Promise<SajuOfficialIssuanceResultV1> {
   if (input.component === 'compatibility' || typeof input.sourceVerifier?.verifyProductionIssue !== 'function') {
@@ -127,6 +133,12 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
 
   const { scope, readingId, readingSessionId } = prepared;
   const approvedPurchase = scope.binding;
+  const preparePort = createPostgresSajuOfficialAttemptPreparePortV1({ ...input, approvedPurchase });
+  const proof = input.preparedProof;
+  const attemptPrepare = proof === undefined ? preparePort : createMyeongHaA4PreparedProofHandoffV1({
+    issuer: createMyeongHaA4SignedPreparedAttemptIssuerV1({ ...proof, preparePort }),
+    store: proof.store,
+  });
   return executeAndPersistPinnedBirthSajuOfficialReadingV1({
     ...input,
     readingId,
@@ -138,7 +150,7 @@ export async function executeApprovedSajuOfficialReadingV1<AdmittedResponse>(
     releaseRef: scope.releaseRef,
     readingText: scope.readingText,
     ...(scope.periodReferenceDateTime === undefined ? {} : { periodReferenceDateTime: scope.periodReferenceDateTime }),
-    attemptPrepare: createPostgresSajuOfficialAttemptPreparePortV1({ ...input, approvedPurchase }),
+    attemptPrepare,
     dbTransaction: createPostgresSajuOfficialIssuedDbTransactionPortV1({ ...input, approvedPurchase }),
   });
 }

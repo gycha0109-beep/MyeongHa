@@ -3,7 +3,7 @@ import {
   SAJU_READING_COMPONENTS_V1,
   type SajuReadingComponentV1,
 } from '../../../packages/contracts/src/approved-saju-catalog.js';
-import { executeApprovedSajuOfficialReadingV1 } from './postgres-approved-saju-issuance-v1.js';
+import { executeApprovedSajuOfficialReadingV1, type ApprovedSajuA4HandoffV1 } from './postgres-approved-saju-issuance-v1.js';
 import {
   OFFICIAL_READER_RUNTIME_IDS_V1,
   type OfficialReaderRuntimeIdV1,
@@ -43,6 +43,7 @@ export function createApprovedSajuIssuanceWorkerV1(input: Readonly<{
   releases: Partial<Readonly<Record<SelfComponent, ComponentRelease>>>;
   engineKey: string;
   engineVersion: string;
+  preparedProof?: ApprovedSajuA4HandoffV1;
 }>) {
   const releases = new Map<string, ComponentRelease>();
   for (const [component, release] of Object.entries(input.releases)) {
@@ -102,6 +103,7 @@ export function createApprovedSajuIssuanceWorkerV1(input: Readonly<{
           transportKey: 'saju-production-issue-proof-v1',
           sajuEngineKey: engineKey,
           requestedEngineVersion: engineVersion,
+          ...(input.preparedProof === undefined ? {} : { preparedProof: input.preparedProof }),
         });
         if (result.state !== 'committed') return { state: 'held' };
       }
