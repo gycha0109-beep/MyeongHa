@@ -69,3 +69,12 @@
 4. 모든 기존 A4 수용 조건의 **코드/오프라인 검증/운영 설치**가 실증되기 전에는 `ROADMAP_COMPLETE`을 선언하지 않는다.
 
 이 문서는 승인된 로드맵의 설치·권한 상태를 증거로 분류한 기록이며 추가 기능·스키마·예산 정책을 제안하지 않는다.
+
+## 2026-11-13 후속 검증 — Source 호출 전 기록과 미결 조회 병합 (GitHub 전용)
+
+- **증거 시점/방법:** 명하 `main` `575e554fbecfb5ea6975f64e8729dca360646dc8`, Saju `main` `34ab034955b0d918af76f827ea15c28cb6e6fca0`의 GitHub PR·workflow 상태만 확인했다. 2026-11-12의 운영 DB SELECT 실측은 재수행하지 않았으며, 현재 운영 DB의 설치·접속·실제 호출 상태를 새로 확인했다고 주장하지 않는다.
+- Saju [#2739](https://github.com/gycha0109-beep/Saju/pull/2739)와 명하 [#3228](https://github.com/gycha0109-beep/MyeongHa/pull/3228)은 모두 **병합**됐다. #3228의 정확한 HEAD `197e3e2443cc72f9d51b12cb8d1ac165dd08fa1f`에 대한 [필수 통합 검사](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43139967971)는 성공했다. 과거 문서의 두 PR에 대한 '열림/검증 대기' 표기는 당시 상태이며 현재 진행 차단 조건이 아니다.
+- Saju의 출처 측 후속 구현은 모두 **필수 통합 검증 성공 후 병합**됐다: [#2781](https://github.com/gycha0109-beep/Saju/pull/2781) [통합 #43161252438](https://github.com/gycha0109-beep/Saju/actions/runs/43161252438) — 요청 전 영속 의도 Writer; [#2782](https://github.com/gycha0109-beep/Saju/pull/2782) [통합 #43167124651](https://github.com/gycha0109-beep/Saju/actions/runs/43167124651) — 정본 실행 시도/호출 ID·서명 영수증 결속; [#2783](https://github.com/gycha0109-beep/Saju/pull/2783) [통합 #43173668433](https://github.com/gycha0109-beep/Saju/actions/runs/43173668433) — 일회성 승인 소비 전 영수증·의도 저장소 권한 검사; [#2784](https://github.com/gycha0109-beep/Saju/pull/2784) [통합 #43179672493](https://github.com/gycha0109-beep/Saju/actions/runs/43179672493) — 500건 상한의 미결 의도/영수증 없는 항목 조회.
+- **현재 오프라인 구현:** 요청 전 Source 의도 보존, 반환/실패 후 서명 영수증 대조, 사전 최소 권한 검사 및 영수증 누락 기록의 읽기 전용 조회. '기록된 요청 전 의도'는 HTTP 실제 송신·공급사 도달·청구 발생을 증명하지 않으며, 누락 영수증을 자동 재전송하지 않는다. 오프라인 소스의 병합은 실제 서비스 결속/실수집 수용 완료가 아니다.
+- **여전히 미충족/Owner 판단 필요:** 명하 사전 승인 증명의 개인정보 보존·삭제/철회 정책, 운영 Source·명하 증명 전용 DB 설치 및 인증/TLS/서비스 계정, Saju Production Interpretation Authority와 실제 AI 요청 실행 인스턴스 결속, 명하 비용 Writer까지의 인증된 최종 Source 참조와 공급사 독립 청구/환율 대조. 해당 정본 운영 근거 없이 운영 설치·유료 호출·비용 수집/재호출을 시행하지 않는다.
+- **판정:** 오프라인 A4 Source 기록·미결 조회 구현 PR은 병합 검증 완료. **운영 A4 수용은 HOLD.** `completeCostCoverage=false`, `invoiceReconciled=false`, 비용 수집 OFF, `ROADMAP_COMPLETE` 아님. 추가 기능/정책을 신규 승인된 작업으로 만들지 않는다.
