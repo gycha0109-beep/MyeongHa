@@ -81,7 +81,8 @@ BEGIN
 END $$;
 RESET ROLE;
 
--- A previously stored expired proof is removed in a bounded purge.
+-- A proof older than the 29-day safety cutoff is removed in a bounded purge.
+-- A proof 28 days 23 hours old remains below the early cleanup threshold.
 -- The proof's original timestamp is supplied in the synthetic fixture only.
 INSERT INTO myeongha_a4_source_ops.prepared_attempt_proofs_v1(execution_attempt_id,proof,stored_at)
 VALUES ('123e4567-e89b-42d3-a456-426614174012',
@@ -92,7 +93,7 @@ VALUES ('123e4567-e89b-42d3-a456-426614174012',
  'executionAttemptId','123e4567-e89b-42d3-a456-426614174012',
  'subjectId','123e4567-e89b-42d3-a456-426614174010',
  'issuedAtMs',1794500000000::bigint,'expiresAtMs',1794500090000::bigint),
- 'signatureHex',repeat('c',64)),clock_timestamp() - INTERVAL '31 days'),
+ 'signatureHex',repeat('c',64)),clock_timestamp() - INTERVAL '29 days 1 hour'),
 ('123e4567-e89b-42d3-a456-426614174013',
  jsonb_build_object('payload',jsonb_build_object(
  'version','myeongha-a4-prepared-attempt-proof-v1',
@@ -101,7 +102,7 @@ VALUES ('123e4567-e89b-42d3-a456-426614174012',
  'executionAttemptId','123e4567-e89b-42d3-a456-426614174013',
  'subjectId','123e4567-e89b-42d3-a456-426614174010',
  'issuedAtMs',1794500000000::bigint,'expiresAtMs',1794500090000::bigint),
- 'signatureHex',repeat('d',64)),clock_timestamp() - INTERVAL '1 day');
+ 'signatureHex',repeat('d',64)),clock_timestamp() - INTERVAL '28 days 23 hours');
 
 SET ROLE myeongha_a4_prepared_proof_maintenance_v1;
 DO $$
