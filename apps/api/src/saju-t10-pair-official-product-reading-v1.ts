@@ -55,7 +55,8 @@ export function projectSignedSajuT10PairProductReadingV1(input: PairIssueInput) 
           ...('time' in birth && typeof birth.time === 'string' ? { time: birth.time } : {}),
           timeKnown: 'time' in birth && typeof birth.time === 'string',
         },
-        calculationState: 'resolved' as const,
+        calculationState: slots.some(([slot]) => self.pillars[slot].status === 'unavailable')
+          ? 'partially_ambiguous' as const : 'resolved' as const,
       },
       calculationSummary: { pillars: selfFacts },
       sections: [
@@ -80,7 +81,9 @@ export function projectSignedSajuT10PairProductReadingV1(input: PairIssueInput) 
   const displayed = projectProductReadingResponseV2(response);
   if (displayed.kind !== 'delivered' || displayed.readingId !== input.readingId ||
       displayed.steps.length !== 2 ||
-      displayed.steps[1]?.supporting.length !== source.units.length - 1) {
+      displayed.steps[1]?.primary !== source.units[0]?.paragraph ||
+      displayed.steps[1]?.supporting.length !== source.units.length - 1 ||
+      displayed.steps[1]?.supporting.some((text, i) => text !== source.units[i + 1]?.paragraph)) {
     throw new Error('Verified official T10 projection lost signed Korean reading units.');
   }
   return Object.freeze({
