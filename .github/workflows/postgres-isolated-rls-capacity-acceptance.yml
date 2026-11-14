@@ -11,7 +11,7 @@ on:
       experiment:
         description: Isolated product-chain experiment
         type: choice
-        options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap, workerd_db_failover]
+        options: [short, sustained, overlap, saju_cpu, workerd, workerd_overlap, workerd_db_failover, workerd_db_slow_pool]
         default: short
 
 permissions:

@@ -1,3 +1,11 @@
+### 2026-11-14: isolated Phase 11 slow DB and pool acquisition timeout harness (execution pending)
+
+- Reuse prior actual workerd DB process outage/health/recovery evidence [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024); implement only the missing slow database/pool acquisition timeout scenario.
+- The main-only manual workerd_db_slow_pool mode retains real disposable GoTrue JWT, PG18 RLS, pinned Saju and local workerd. It holds a synthetic read table lock, requires bounded 503/positive acquisition timeout/Health 200 and 4/4 post-unlock success, with identifier-free counters in the evidence.
+- Node/Bash syntax and existing contract tests PASS. The Linux experiment itself is NOT_OBSERVED. Production SQL, actual user data, remote traffic and paid resources unchanged. DR, Hosted and Production capacity remain HOLD.
+
+Watchtower-Track: ops
+
 ### 2026-11-14 — 봉인 Provider migration 원장 격리 복원 245/245 실제 성공
 
 - CI [#43573202014](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43573202014) **SUCCESS** 및 PR #3302 병합 SHA `fa0c36e7a47e371a6096d31724765a0a42fc7814` 확인 후, 기존 같은 실행 암호화 백업/원장 #43424903445로 [격리 복구 #43575005715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43575005715) **SUCCESS**. 증거 artifact `14105687545`, 만료 2026-12-14 UTC.

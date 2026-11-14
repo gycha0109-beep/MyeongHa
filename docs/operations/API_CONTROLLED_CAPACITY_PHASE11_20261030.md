@@ -1,3 +1,15 @@
+## 2026-11-14 isolated workerd slow DB / pool acquisition timeout experiment - implementation, not evidence
+
+Reuse real workerd DB outage [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024) and the 15-minute overlap [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347). Execute only the missing slow DB/pool scenario as a manual main-only dispatch after merge:
+
+    gh workflow run postgres-isolated-rls-capacity-acceptance.yml -R gycha0109-beep/MyeongHa --ref main -f experiment=workerd_db_slow_pool
+
+The manual workflow uses local workerd with a disposable GoTrue, PG18 RLS and fixed real Saju engine. Only this mode enables a maximum two-connection/125ms-acquisition-timeout local pool and a temporary ACCESS EXCLUSIVE lock on a synthetic table. It must observe four simultaneous bounded 503 responses, a positive local pool acquisition timeout count, independent Health 200 and full 4/4 recovery after unlocking. Existing workerd, workerd_overlap and workerd_db_failover modes are unchanged.
+
+Actual Linux proof is NOT_OBSERVED before a successful run and inspection of its original artifact. This cannot establish Production capacity or Hosted Hyperdrive performance. Keep productionWorkerAdmissionMeasured=false, hostedHyperdriveMeasured=false, productionCapacityProven=false, productionScalingThresholdApproved=false, drReady=false, serviceResumptionAllowed=false, ROADMAP_COMPLETE=false. No Production change or external paid resource is authorized.
+
+Watchtower-Track: ops
+
 # Phase 11 — Controlled non-production loopback capacity probe
 
 ## 2026-11-13 증거 정렬 — 기존 workerd DB 장애·회복 실증 재사용
