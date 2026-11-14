@@ -307,6 +307,40 @@ function DataTable({ result, section, onDetail, onAllocation }: {
   </div>;
 }
 
+/** The audit must contain exactly one successful read with the server-issued request ID. */
+export function matchesAdminReadAuditV1(requestId: string, kind: string, audit: AdminReadResponse): boolean {
+  if (!/^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(requestId) ||
+      !/^[a-z][a-z0-9-]{0,63}$/u.test(kind) || kind === 'audit' || audit.kind !== 'audit') return false;
+  const rows = audit.rows.filter(row => row.requestId === requestId);
+  return rows.length === 1 && rows[0]?.action === 'read:' + kind && rows[0]?.outcome === 'allowed';
+}
+
+function AdminReadAuditCorrelationV1({ result, token, onSessionExpired }: {
+  readonly result: AdminReadResponse;
+  readonly token: string;
+  readonly onSessionExpired: () => void;
+}) {
+  const [check, setCheck] = useState<'idle' | 'checking' | 'matched' | 'missing' | 'unavailable'>('idle');
+  if (!result.requestId || result.kind === 'audit') return null;
+  const requestId = result.requestId;
+  return <div className="readiness-explainer" role="group" aria-label="관리자 조회 감사 대조">
+    <span>조회 요청 ID: <code>{requestId}</code></span>{' '}
+    <button type="button" disabled={check === 'checking'} onClick={() => {
+      setCheck('checking');
+      void fetchAdminReadV1('/api/admin/audit?limit=20&search=' + requestId, token)
+        .then(audit => setCheck(matchesAdminReadAuditV1(requestId, result.kind, audit) ? 'matched' : 'missing'))
+        .catch(error => {
+          if (error instanceof AdminAccessDeniedErrorV1) { onSessionExpired(); return; }
+          setCheck('unavailable');
+        });
+    }}>동일 요청 감사 확인</button>
+    {check === 'checking' && <span role="status"> 감사 기록 대조 중</span>}
+    {check === 'matched' && <span role="status"> 조회 ID·감사 ID 일치 확인</span>}
+    {check === 'missing' && <span role="status"> 일치하는 성공 감사 기록 없음 — 수용 보류</span>}
+    {check === 'unavailable' && <span role="status"> 감사 조회 실패 — 수용 보류</span>}
+  </div>;
+}
+
 export function AdminLogin({ onSession }: {
   readonly onSession: (token: string) => void;
 }) {
@@ -851,6 +885,7 @@ export function AdminWorkbench({ section, token, onSessionExpired, onNavigate }:
           setCursor(null);
           setDetail(null);
         }} />
+        <AdminReadAuditCorrelationV1 key={result.requestId ?? 'unavailable'} result={result} token={token} onSessionExpired={onSessionExpired} />
         {(cursor !== null || result.nextCursor !== null) && <div className="admin-pagination" aria-label="조회 페이지 이동">
           {cursor !== null && <button type="button" onClick={() => {
             const prior = Number(cursor) - 20;

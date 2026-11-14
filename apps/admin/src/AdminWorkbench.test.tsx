@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildListPath, ADMIN_USER_SCOPES_V1, DEFAULT_ADMIN_USER_SCOPE_V1, formatAdminSeoulDateV1 } from './AdminWorkbench.js';
+import { buildListPath, ADMIN_USER_SCOPES_V1, DEFAULT_ADMIN_USER_SCOPE_V1, formatAdminSeoulDateV1, matchesAdminReadAuditV1 } from './AdminWorkbench.js';
 
 describe('member-first administrator user views', () => {
   it('starts with registered active members, not every guest record', () => {
@@ -71,4 +71,23 @@ describe('administrator investigation navigation', () => {
       .toBe('/api/admin/readings/'+reading+'/ai-usage');
   });
 
+});
+
+describe('administrator exact Owner read and audit correlation', () => {
+  const requestId = '123e4567-e89b-42d3-a456-426614174001';
+  const row = { requestId, action: 'read:users', outcome: 'allowed', actorRef: 'owner' };
+  const page = (rows: readonly Record<string, string>[]) => ({ kind: 'audit', rows, nextCursor: null });
+  it('accepts only one audited allowed read with the exact same ID and read action', () => {
+    expect(matchesAdminReadAuditV1(requestId, 'users', page([row]))).toBe(true);
+    expect(matchesAdminReadAuditV1(requestId, 'users', page([{ ...row, requestId: '123e4567-e89b-42d3-a456-426614174002' }]))).toBe(false);
+    expect(matchesAdminReadAuditV1(requestId, 'users', page([{ ...row, action: 'read:commerce' }]))).toBe(false);
+    expect(matchesAdminReadAuditV1(requestId, 'users', page([{ ...row, outcome: 'failed' }]))).toBe(false);
+    expect(matchesAdminReadAuditV1(requestId, 'users', page([row, row]))).toBe(false);
+  });
+  it('never treats an untrusted ID, audit listing or missing row as confirmation', () => {
+    expect(matchesAdminReadAuditV1('unsafe', 'users', page([row]))).toBe(false);
+    expect(matchesAdminReadAuditV1(requestId, 'audit', page([row]))).toBe(false);
+    expect(matchesAdminReadAuditV1(requestId, 'users', { ...page([row]), kind: 'users' })).toBe(false);
+    expect(matchesAdminReadAuditV1(requestId, 'users', page([]))).toBe(false);
+  });
 });
