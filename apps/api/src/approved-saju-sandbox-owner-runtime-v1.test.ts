@@ -8,7 +8,10 @@ const mock = vi.hoisted(() => {
   const archiveClose = vi.fn(async () => undefined);
   return {
     checkout: vi.fn(() => ({ handleRequest: vi.fn() })),
-    host: vi.fn(() => ({ start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) })),
+    host: vi.fn((_input: { ownerReads: {
+      targets: (request: Request) => Promise<Response>;
+      readings: (request: Request) => Promise<Response>;
+    } }) => ({ start: vi.fn(async () => undefined), close: vi.fn(async () => undefined) })),
     target: vi.fn(() => ({ handleRequest: targetRead, close: targetClose })),
     archive: vi.fn(() => ({ handleRequest: archiveRead, close: archiveClose })),
     targetRead, archiveRead, targetClose, archiveClose,
@@ -69,8 +72,9 @@ describe('owner Saju checkout, target and paid archive runtime composition', () 
       origin: input.origin,
       staticRoot: input.staticRoot,
     }));
-    const readPorts = mock.host.mock.calls.at(-1)?.[0].ownerReads;
-    expect(typeof readPorts?.readings).toBe('function');
+    const readPorts = mock.host.mock.lastCall?.[0]?.ownerReads;
+    if (!readPorts) throw Error('Isolated Owner archive was not attached.');
+    expect(typeof readPorts.readings).toBe('function');
     expect(typeof readPorts?.targets).toBe('function');
     await readPorts.targets(new Request(input.origin + '/api/target-persons'));
     await readPorts.readings(new Request(input.origin + '/api/readings'));
