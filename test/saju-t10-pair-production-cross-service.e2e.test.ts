@@ -142,7 +142,7 @@ suite('real pinned Saju T10 Production issuer to MyeongHa Reading contract', () 
       scope.sourceBirthInputHash, scope.targetBirthInputHash,
     ]);
     expect(body.chartDisplays.map(chart => chart.role)).toEqual(['self', 'partner']);
-    expect(body.chartDisplays.every(chart => chart.pillars.day.status === 'resolved')).toBe(true);
+    expect(body.chartDisplays.every(chart => chart.pillars.day?.status === 'resolved')).toBe(true);
     expect(body.units.length).toBeGreaterThanOrEqual(3);
     expect(body.units.some(unit => unit.ruleId === 'T10-SERVICE-BOUNDED-SCOPE')).toBe(true);
     const display = projectProductReadingResponseV2(projected?.response);
@@ -212,7 +212,7 @@ suite('real pinned Saju T10 Production issuer to MyeongHa Reading contract', () 
     expect(opened?.state).toBe('signed_pair_archive_reopened');
     expect(opened?.sourceUnits).toEqual((signed.body as {units: unknown[]}).units);
     expect(opened?.display.kind).toBe('delivered');
-    expect((opened?.display as {steps?: {primary: string}[]})?.steps?.[1]?.primary)
+    expect(opened?.display.steps[1]?.primary)
       .toBe((signed.body as {units: {paragraph: string}[]}).units[0]?.paragraph);
 
     db.scope.mockResolvedValue(null);
