@@ -1,5 +1,7 @@
 # Reader Runtime V2 — TRACK CLOSED 실행 정본 (RR-01~RR-15)
 
+> **2026-11-14 추가 승인:** 기존 DeepSeek 기반 GEPA 연구 유지. 운영 모델은 기존 구현·품질·속도·비용 비교 후 선정하며, 장애 시 검증된 동일 공급자 예비 모델만 허용하고 실패하면 중단한다. GEPA 유료 송신은 기존 HOLD 유지. 만 19세 이상 성인 전용, 몰입형 로맨스·플러팅 허용, 노골적인 성적 묘사는 제외. 최초 6명 Reader 전원×7개 해석 구성요소 = 42개 지원 목표를 확정하되, 개별 콘텐츠·권한·모델/Guard·발급·취소·질문 검증 전 공개 OFF. [결정 원장](../P0_DECISION_REGISTER.md)
+
 
 - 상태: **CONTINUE / PUBLIC OFF**. 독립 Reader 공식 사주 후속 Chat은 운영 공개 불가.
 - 트랙: `reader-runtime` — 공식 Reading × 구매 검증 Grant × 고정 Thread × Reader × 원본 Saju Grounding 기반 Chat.
@@ -34,7 +36,7 @@
 | RR-10 | Reader/DB | 중복 클릭/Retry/동시성/Timeout/Idempotency/Revocation race 복구 | RR-09 |
 | RR-11 | Backend | 독립 Reader Chat HTTP read/send/receive 안전 실행, 인증, rate-limit, 구형 클라이언트 호환. V1 불변 | RR-09,10 |
 | RR-12 | Web/Product | 공식 Reading Scene → 동일 Reader Thread → 대화 및 Records 재조회. Preview CTA는 증명 전 활성화 금지 | RR-01,11 |
-| RR-13 | QA/Commerce/Saju | **최초 공개:** 실제 지원하는 Reader×구매 Reading/7개 해석 구성요소의 지원·미지원 행렬, cross-subject/Reader/Reading/Refund 및 실제 DB·Saju E2E. **후속:** 9×9 전체 가능한 조합·추가 Reader 결제 | RR-09~12, 상품 |
+| RR-13 | QA/Commerce/Saju | **최초 공개:** 6명 Reader×7개 해석 구성요소 42개 전체의 구현·검증 행렬, cross-subject/Reader/Reading/Refund 및 실제 DB·Saju E2E. **후속:** 9×9 전체 가능한 조합·추가 Reader 결제 | RR-09~12, 상품 |
 | RR-14 | Ops/Release | 기능 OFF → 내부 제한 → 점진 배포; 측정, guard fallback, 비활성화, rollback, exact-SHA 확인 | RR-13, 출시 정책 |
 | RR-15 | Reader+총괄 | 전체 이력/테스트/운영 Runbook/소유권 인계, 미해결 P0=0, TRACK CLOSED 검증 | RR-14 |
 
@@ -42,9 +44,9 @@
 
 ## 2. 프로젝트 차단 선행 조건
 
-- `P0-AI-01`: 생성형 공급자/모델/실패 정책 OPEN. 정책 없는 유료 AI 호출 또는 SP-2 상용화 금지.
+- `P0-AI-01`: 공급자·모델 선정 기준 및 동일 공급자 예비 모델 정책 승인. 정확한 운영 모델·비용·품질·출력 검증 전 유료 AI 호출 또는 SP-2 상용화 금지.
 - `P0-CM-03`: 상품/Charge Terms 활성화 OPEN. 실제 신규 유료 구매 E2E 검증 대기.
-- `P0-AGE-01`: 연령/캐릭터 콘텐츠 정책 OPEN. 공개 안전 검수에 의존.
+- `P0-AGE-01`: 만 19세 이상 성인·몰입형 로맨스 허용·노골적 성적 묘사 제외 승인. 연령 확인·콘텐츠 정책 검증 전 공개 HOLD.
 - `SRC-15`: MVP evaluator 계약 해결이나 실제 자산 호환성 검사 필요.
 - `SRC-16`: MVP 회원 기본 Release 결정 완료; Guest/실험 Cohort 롤아웃을 임의 확대하지 않는다.
 - DB Owner의 전용 근거 provenance Writer/Query 구현 및 권한 검증이 최종 Critical Path.
