@@ -47,8 +47,8 @@ export function assertReplaySource({sourceBytes,paired}) {
 export function buildDisposableLedgerReplaySql(packet) {
   assert.ok(packet?.schemaVersion==='ops-provider-migration-sealed-source-v1' &&
     Array.isArray(packet.entries)&&packet.entries.length>0);
-  const sourceBase64=Buffer.from(JSON.stringify(packet),'utf8').toString('base64');
-  assert.match(sourceBase64,/^[A-Za-z0-9+/=]+$/u);
+  // Historical SQL never appears in a SQL statement. COPY STDIN transports
+  // the original private, single-line JSON packet as data, not query text.
   return [
     'BEGIN;',
     "SET LOCAL statement_timeout='90s';",
@@ -67,8 +67,8 @@ export function buildDisposableLedgerReplaySql(packet) {
     " RAISE EXCEPTION 'DISPOSABLE_LEDGER_NOT_EMPTY'; END IF;",
     'END $guard$;',
     'CREATE TEMP TABLE ops_private_source_packet(packet jsonb) ON COMMIT DROP;',
-    "INSERT INTO ops_private_source_packet(packet) VALUES (convert_from(decode('"+
-      sourceBase64+"','base64'),'UTF8')::jsonb);",
+    "COPY ops_private_source_packet(packet) FROM STDIN WITH (FORMAT csv, DELIMITER E'\\x01', QUOTE E'\\x02', ESCAPE E'\\x02');",
+    '/*__SOURCE_PACKET_COPY_DATA__*/',
     'INSERT INTO supabase_migrations.schema_migrations',
     '(version,name,statements,created_by,idempotency_key,"rollback")',
     'SELECT r.version,r.name,r.statements,r."createdBy",r."idempotencyKey",r."rollbackStatements"',
@@ -159,7 +159,12 @@ async function main(){
   ]);
   const packet=assertReplaySource({sourceBytes,paired});
   const run=spawnSync('psql',['-X','-qAt','-v','ON_ERROR_STOP=1','-f','-'],{
-    input:buildDisposableLedgerReplaySql(packet),
+    // The JSON packet is copied as PostgreSQL COPY data. Neither the SQL
+    // query string nor any printed error contains original statement bodies.
+    input:buildDisposableLedgerReplaySql(packet).replace(
+      '/*__SOURCE_PACKET_COPY_DATA__*/',
+      sourceBytes.toString('utf8').trimEnd()+'\\n\\\\.\\n'
+    ),
     encoding:'utf8',timeout:110000,maxBuffer:1024*1024,
     env:process.env,windowsHide:true,
   });
