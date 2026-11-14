@@ -698,3 +698,10 @@
 - **연결:** 기존 검증용 PostgreSQL17 단일 스위트에 추가 `BEGIN/ROLLBACK` 검증을 연결했습니다. 현재 TypeScript의 **정확한 원본 Claim 취소/S7 SQL**을 추출하여 B2·B3 구매/Subject/Checkout 단위로 실행하고, 기존 합성 B2 PortOne cancellation을 같은 원본 Receipt에 결속·중복 replay해 (1) B2 취소 원본 HMAC·금액·상태 보존, (2) 독립 B3에 동일 취소가 전파되지 않음, (3) S5 본문이 없는 상태에서 S7 응답 준비·클라이언트 ACK 및 전달 완료를 만들어내지 않음을 검증합니다.
 - **정확한 의미:** 이는 원본 저장 취소 증거와 S7 **기록 부재**를 실DB에서 대조하는 음성/출처 검증이지, 합법적인 전달 완료 또는 실제 고객 미제공 확정이 아닙니다. Reader S5 Production 발행은 여전히 HOLD이고, 근거 없는 protected body를 생성하지 않습니다. 전체 회원 청약철회·Reader exact revoke·개인정보 finalizer 테스트는 별도 기존 케이스에서 그대로 통과해야 합니다.
 - **경계:** 모든 후보 취소 함수와 신규 Event는 격리 DB 트랜잭션 내에서만 생성/롤백합니다. 기존 고객 접수·S7·Provider 처리 코드를 바꾸지 않고 운영 DB SQL, 공개 API, Saju 발급 계약, LIVE 결제/환불·전달을 활성화하지 않습니다. 새 고정 HEAD의 CI/통합 결과 확인 전에는 PASS나 ROADMAP_COMPLETE 선언을 하지 않습니다.
+
+## 2026-11-14 — PortOne 환불 복구 조회 본문 제한
+
+- 환불 요청의 응답이 유실된 경우 PortOne 결제 조회로 복구한다. 성공·취소의 기존 대조는 유지하면서, 본문을 받는 도중 65,536바이트를 초과하거나 기한이 지나면 읽기를 정리한다.
+- 제한 초과 후 취소 식별자 기록·권한 회수·환불 재전송이 발생하지 않는 것을 검증했다. 결제 완료·취소·환불 대상 테스트 40건과 TypeScript 빌드 통과.
+
+Watchtower-Track: commerce

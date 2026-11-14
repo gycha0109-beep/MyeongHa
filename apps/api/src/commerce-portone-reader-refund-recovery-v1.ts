@@ -1,6 +1,16 @@
 import type {
-  PortOneV2PaymentHttpFetchV1,
+  PortOneV2PaymentHttpRequestInitV1,
 } from './portone-v2-payment-verification-adapter.js';
+import {
+  awaitBoundedUpstreamJsonResponseHeadersV1,
+  readBoundedUpstreamJsonTextV1,
+} from './upstream-json-response-resource.js';
+
+const MAXIMUM_READBACK_BYTES = 65_536;
+export type PortOneRefundReadbackFetchV1 = (
+  url: string,
+  init: PortOneV2PaymentHttpRequestInitV1,
+) => Promise<Response>;
 
 /**
  * Recover an uncertain full cancellation after the POST response was lost.
@@ -16,7 +26,7 @@ export async function recoverExactPortOneFullCancellationIdV1(input: Readonly<{
   originalCurrency:string;
   apiSecret:string;
   timeoutMs:number;
-  fetchImpl?:PortOneV2PaymentHttpFetchV1;
+  fetchImpl?:PortOneRefundReadbackFetchV1;
 }>):Promise<string|null>{
   const controller=new AbortController();
   let timer: ReturnType<typeof setTimeout>|undefined;
@@ -30,14 +40,9 @@ export async function recoverExactPortOneFullCancellationIdV1(input: Readonly<{
     ||!Number.isSafeInteger(input.timeoutMs)||input.timeoutMs<1
     ||input.timeoutMs>30_000) return null;
   try{
-    const deadline=new Promise<never>((_,reject)=>{
-      timer=setTimeout(()=>{
-        controller.abort();
-        reject(Error('REFUND_RECONCILIATION_TIMEOUT'));
-      },input.timeoutMs);
-    });
+    timer=setTimeout(()=>controller.abort(),input.timeoutMs);
     const fetchImpl=input.fetchImpl??(async(url,init)=>fetch(url,init));
-    const response=await Promise.race([
+    const response=await awaitBoundedUpstreamJsonResponseHeadersV1(
       fetchImpl('https://api.portone.io/payments/'+encodeURIComponent(input.paymentId),{
         method:'GET',redirect:'manual',signal:controller.signal,
         headers:Object.freeze({
@@ -45,15 +50,20 @@ export async function recoverExactPortOneFullCancellationIdV1(input: Readonly<{
           accept:'application/json',
         }),
       }),
-      deadline,
-    ]);
-    if(response.status!==200
-      ||!/^application\/json(?:\s*;|$)/iu.test(response.headers.get('content-type')??''))return null;
+      controller.signal,
+    );
     const contentLength=response.headers.get('content-length');
-    if(contentLength!==null
-      &&(!/^\d+$/u.test(contentLength)||Number(contentLength)>65_536)) return null;
-    const raw=await Promise.race([response.text(),deadline]);
-    if(Buffer.byteLength(raw,'utf8')>65_536)return null;
+    if(response.status!==200
+      ||!/^application\/json(?:\s*;|$)/iu.test(response.headers.get('content-type')??'')
+      ||(contentLength!==null
+        &&(!/^\d+$/u.test(contentLength)||Number(contentLength)>MAXIMUM_READBACK_BYTES))){
+      void response.body?.cancel().catch(()=>undefined);
+      return null;
+    }
+    const raw=await readBoundedUpstreamJsonTextV1(response,{
+      maximumBodyBytes:MAXIMUM_READBACK_BYTES,
+      signal:controller.signal,
+    });
     const value:unknown=JSON.parse(raw);
     if(!value||typeof value!=='object'||Array.isArray(value))return null;
     const payment=value as Record<string,unknown>;
