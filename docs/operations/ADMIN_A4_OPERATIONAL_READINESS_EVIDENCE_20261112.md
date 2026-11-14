@@ -97,3 +97,17 @@
 - 실측 당시 준비 증명 **0건**. 따라서 실제 29일 도달 행의 운영 삭제·대량 적체 처리 성능은 실증되지 않았고, 코드와 격리형 검증 및 스케줄 실행 성공까지만 인정한다. 정리 중단이 1일 이상 지속되거나 1회 1,000건 적체가 누적되면 최대 30일을 초과할 가능성이 있으므로 무조건적인 보존 상한 준수 보장은 하지 않는다.
 - 연결된 Supabase 프로젝트 목록과 접근 가능한 Neon 프로젝트 목록에 Saju 전용 Source PostgreSQL 운영 인스턴스는 확인되지 않았다. **그 인스턴스가 세상에 존재하지 않는다는 판정은 아니다.** Saju Source 원본 DB·계정/TLS·개인 서비스 Bearer/HMAC 비밀·Production Interpretation Authority와 실사용 인스턴스 결속은 **미검증**이다.
 - 실서비스에서 발급/호출 또는 비용 원장 실수집은 활성화하지 않았다. `completeCostCoverage=false`, `invoiceReconciled=false`, 상시 비용 수집 OFF. Saju Source 운영 설치·네트워크/TLS 및 서비스 비밀 공급·인스턴스 결속과 실제 소규모 호출 비용 상한 확인·공급사 청구 대조가 다음 수용 조건이다. **운영 A4 전체 수용은 HOLD / `ROADMAP_COMPLETE` 아님.**
+
+
+## 2026-11-14 A4 Docker Source / 명하 운영 DB / Cloudflare 연결 경계 재실측
+
+> 기존 2026-11-12~13 점검 이후 Saju Docker 구축·로컬 연결 작업이 병합된 상태를 반영한다. 이번 작업의 운영 점검은 **읽기 전용**이며 실제 Reading 생성, 공급사 요청, DB 증명 INSERT/DELETE, 서비스 배포는 수행하지 않았다.
+
+- **Saju 코드/검사:** Docker 설치·TLS·전용 3계정·Node 연결·로컬 Reader/Writer 권한 검증·공식 Host의 비실행 연결 경계가 [Saju #2785](https://github.com/gycha0109-beep/Saju/pull/2785)~[#2792](https://github.com/gycha0109-beep/Saju/pull/2792)에 걸쳐 구현됐다. 마지막 #2792는 정확한 HEAD `9122a8f71611734b6b53ee101a583aae85ea7389`의 [필수 Integration](https://github.com/gycha0109-beep/Saju/actions/runs/43569555599) 성공 후 `2bb797f0ca05775ccaaa36814c041ae4262ac872`로 병합됐다. 기존 11월 12일 문서의 '별도 Source DB 미검증'은 당시 시점의 표기이며, **집 PC 로컬** Docker Source DB와 Node 접속에 한해 후속 실증됐다.
+- **집 PC 로컬 Source:** 기존 `saju-a4-source-pg17` 컨테이너가 `healthy`였으며 루프백 `127.0.0.1:55432`의 로컬 접속만 검증됐다. 이는 외부 Saju 운영 인스턴스의 사설 통신 경로·서버 신원·공인 TLS나 Production 해석 권한의 증거가 아니다. 운영 공개 포트·새 터널·새 인프라를 생성하지 않았다.
+- **명하 운영 Supabase (`cnsfpcdiyofqvhpcegfc`):** 연결된 명하 계정에서 실제 PostgreSQL 17.6.1을 읽기 전용 조회했다. `myeongha_a4_source_ops.prepared_attempt_proofs_v1` 존재, RLS 활성, 정책 3개, `myeongha_a4_prepared_proof_reader_v1` 및 `myeongha_a4_prepared_proof_writer_v1` 역할 존재를 확인했다. 조회 시 증명 행은 **0건**이었다. 서비스가 실제 증명을 발급·보존·전달했다는 의미가 아니다.
+- **명하 증명 정리:** `myeongha_a4_prepared_proofs_purge_v1` 스케줄이 매분 활성 상태였고, 최근 확인된 2026-11-14 **07:35~07:37 UTC** 실행 3회는 모두 `succeeded`였다. 증명 행 0건이므로 실제 29일 경과 행 삭제 성공이나 30일 상한 준수의 지속적인 실증으로 확대하지 않는다.
+- **Cloudflare 실제 배포 설정:** 연결된 Cloudflare 계정의 기존 `myeongha` 및 `myeongha-admin` Worker 설정에서 결속 이름·유형만 읽었다(비밀값 미조회). 두 Worker에서 **A4 전용 증명 서비스·Source 연결을 식별하는 바인딩이 확인되지 않았다**. 이것만으로 외부에 별도 A4 서비스가 없다고 단정할 수는 없지만, 해당 Worker에 A4 운영 경로가 설치됐다고 주장할 증거도 없다. 기존 일반 Saju 서비스 Bearer/Hyperdrive를 A4 전용 신원으로 대체하지 않는다.
+- **다음 운영 수용 경계 / HOLD:** 사전 승인 증명의 인증된 비공개 HTTPS 발급·조회 및 서비스 신원, 로컬 Docker Source와 **실제** Saju 실행 인스턴스의 사설 네트워크·TLS/키 공급, 정식 Production Interpretation Authority, Saju Source 불변 영수증·의도·Claim의 승인된 별도 보존/삭제 정책, 모델·비용 상한이 구체화된 제한적 실제 공급사 호출, 독립 청구 원본/가격/환율 대조와 명하 전용 Cost Writer 결속이 충족되지 않았다. 임의 외부 포트 개방·로컬 자체 서명 인증서의 운영 승격·합성 증명 삽입·운영 비용 적재를 금지한다.
+
+**판정:** A4 로컬 인프라/권한/연결 코드까지는 병합·실증, **서비스 간 실제 운영 결속은 HOLD**. `completeCostCoverage=false`, `invoiceReconciled=false`, 비용 수집 OFF, `ROADMAP_COMPLETE` 미충족.
