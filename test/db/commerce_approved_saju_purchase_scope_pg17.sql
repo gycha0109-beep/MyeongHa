@@ -291,9 +291,9 @@ begin
         v_pair_snapshot,response_hash,
         jsonb_set(v_pair_envelope,'{signature}',to_jsonb(repeat('B',86))));
       raise exception 'Pair issuer accepted another signed Source for the same Reading';
-    exception when unique_violation then
+    exception when sqlstate 'P0001' then
       get stacked diagnostics v_pair_constraint = constraint_name;
-      if v_pair_constraint <> 'approved_saju_pair_immutable_proof_replay' then raise; end if;
+      if v_pair_constraint <> 'approved_saju_pair_current_authority_unavailable' then raise; end if;
     end;
     if public.qry_approved_saju_source_issue_proof_v1(actor,reading_id)->'proof'
       is distinct from v_pair_envelope
