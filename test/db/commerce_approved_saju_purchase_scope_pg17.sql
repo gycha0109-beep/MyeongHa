@@ -63,6 +63,8 @@ declare
   v_pair_payload jsonb;
   v_pair_snapshot jsonb;
   v_pair_receipt jsonb;
+  v_pair_envelope jsonb;
+  v_pair_constraint text;
   prepared record;
 begin
   select * into strict authorized
@@ -219,6 +221,31 @@ begin
             jsonb_build_object('type','paragraph','text','두 명식의 접점을 설명합니다.'),
             jsonb_build_object('type','paragraph','text','두 명식의 조율 지점을 설명합니다.'),
             jsonb_build_object('type','paragraph','text','미지원 결과는 단정하지 않습니다.'))))));
+    v_pair_envelope := jsonb_build_object(
+      'payload',v_pair_payload,'sourceBody',v_pair_body,'signature',repeat('A',86));
+
+    -- A valid-shaped Source must not let altered Korean copy commit a Reading.
+    -- PL/pgSQL exception blocks rollback their own DB writes in PG17.
+    begin
+      perform 1 from public.cmd_finalize_approved_saju_pair_reading_v1(
+        actor,intent_id,reading_id,attempt_id,gen_random_uuid(),source_hash,
+        'isolated-ref','isolated-approved-v1',
+        (select input_hash from public.birth_profile_revisions
+          where id=authorized.source_birth_revision_id),
+        (select input_hash from public.birth_profile_revisions
+          where id=authorized.target_birth_revision_id),
+        jsonb_set(v_pair_snapshot,'{reading,sections,1,blocks,0,text}',to_jsonb('바뀐 문단'::text)),
+        response_hash,v_pair_envelope);
+      raise exception 'Changed pair Korean text was committed before Source verification';
+    exception when sqlstate 'P0001' then
+      get stacked diagnostics v_pair_constraint = constraint_name;
+      if v_pair_constraint <> 'approved_saju_pair_text_modified' then raise; end if;
+    end;
+    if exists (
+      select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
+      where proof.reading_id=reading_id
+    ) then raise exception 'Rejected Korean text left a persisted signed pair proof'; end if;
+
     perform 1 from public.cmd_finalize_approved_saju_pair_reading_v1(
       actor,intent_id,reading_id,attempt_id,gen_random_uuid(),source_hash,
       'isolated-ref','isolated-approved-v1',
@@ -226,14 +253,55 @@ begin
         where id=authorized.source_birth_revision_id),
       (select input_hash from public.birth_profile_revisions
         where id=authorized.target_birth_revision_id),
-      v_pair_snapshot,response_hash,
-      jsonb_build_object('payload',v_pair_payload,'sourceBody',v_pair_body,'signature',repeat('A',86)));
+      v_pair_snapshot,response_hash,v_pair_envelope);
     v_pair_receipt := public.qry_approved_saju_source_issue_proof_v1(actor,reading_id);
     if v_pair_receipt#>>'{proof,payload,readingId}' is distinct from reading_id::text
       or v_pair_receipt#>>'{proof,payload,targetBirthRevisionId}'
         is distinct from authorized.target_birth_revision_id::text
-      or v_pair_receipt->>'storedResponseHash' is distinct from response_hash then
-      raise exception 'Pair source proof and two Revision identities were not archived';
+      or v_pair_receipt#>>'{proof,payload,offerId}'
+        is distinct from pair_issue_scope->>'approvedOfferId'
+      or v_pair_receipt#>>'{proof,payload,useApprovalRef}'
+        is distinct from pair_issue_scope->>'useApprovalRef'
+      or v_pair_receipt->'proof' is distinct from v_pair_envelope
+      or v_pair_receipt->>'storedResponseHash' is distinct from response_hash
+      or v_pair_receipt->>'sourceRequestHash' is distinct from source_hash
+      or v_pair_receipt->>'releaseRef' is distinct from pair_issue_scope->>'releaseRef'
+      or v_pair_receipt->>'executionAttemptId' is distinct from attempt_id::text
+      or v_pair_receipt->>'originatingGrantId' is distinct from authorized.entitlement_grant_id::text
+      or nullif(v_pair_receipt->>'acceptedAt','') is null
+      or not exists (
+        select 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,'test-standard-reader',true) r
+        where r.component='compatibility' and r.response_hash=response_hash
+          and r.response_snapshot_jsonb#>'{reading,sections,1,blocks}'
+            is not distinct from v_pair_snapshot#>'{reading,sections,1,blocks}'
+      ) then
+      raise exception 'Pair Reading/Reader archive lost its exact signed two-person material';
+    end if;
+
+    -- Same Reading/attempt cannot substitute another signed source. A failed
+    -- replay must not alter the previously archived proof or delivered response.
+    begin
+      perform 1 from public.cmd_finalize_approved_saju_pair_reading_v1(
+        actor,intent_id,reading_id,attempt_id,gen_random_uuid(),source_hash,
+        'isolated-ref','isolated-approved-v1',
+        (select input_hash from public.birth_profile_revisions
+          where id=authorized.source_birth_revision_id),
+        (select input_hash from public.birth_profile_revisions
+          where id=authorized.target_birth_revision_id),
+        v_pair_snapshot,response_hash,
+        jsonb_set(v_pair_envelope,'{signature}',to_jsonb(repeat('B',86))));
+      raise exception 'Pair issuer accepted another signed Source for the same Reading';
+    exception when unique_violation then
+      get stacked diagnostics v_pair_constraint = constraint_name;
+      if v_pair_constraint <> 'approved_saju_pair_immutable_proof_replay' then raise; end if;
+    end;
+    if public.qry_approved_saju_source_issue_proof_v1(actor,reading_id)->'proof'
+      is distinct from v_pair_envelope
+      or not exists (
+        select 1 from public.qry_approved_saju_component_record_v1(actor,reading_id,'test-standard-reader',true) r
+        where r.response_hash=response_hash and r.response_snapshot_jsonb=v_pair_snapshot
+      ) then
+      raise exception 'Rejected pair proof replay mutated the archived customer Reading';
     end if;
   else
     perform 1 from public.cmd_finalize_reading_transport_success_v1(actor,reading_id,attempt_id,gen_random_uuid(),
