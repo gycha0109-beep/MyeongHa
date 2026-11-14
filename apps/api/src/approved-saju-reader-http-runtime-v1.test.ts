@@ -1,3 +1,4 @@
+import { generateKeyPairSync } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { createApprovedSajuReaderHttpRuntimeV1 } from './approved-saju-reader-http-runtime-v1.js';
 import { APPROVED_SAJU_READER_QUESTION_PATH_V1 } from './approved-saju-reader-question-http-v1.js';
@@ -51,6 +52,29 @@ describe('isolated approved Saju Reader HTTP runtime', () => {
     expect(() => createApprovedSajuReaderHttpRuntimeV1({
       ...input, question: { ...input.question, protectedPool: input.question.pool },
     })).toThrow('authority is incomplete');
+  });
+
+  it('does not route T10 purchased archive reads through the issuance DB pool', async () => {
+    const { input } = fixture();
+    const trusts = [{
+      issuer:'saju',audience:'myeongha',keyId:'test-key',engineVersion:'test',
+      verificationKey:generateKeyPairSync('ed25519').publicKey,
+    }];
+    expect(() => createApprovedSajuReaderHttpRuntimeV1({
+      ...input, pairReader:{pool:input.question.issuanceProofPool,trusts},
+    })).toThrow('independently provisioned read-only DB pool');
+    expect(() => createApprovedSajuReaderHttpRuntimeV1({
+      ...input, pairReader:{pool:input.question.protectedPool,trusts},
+    })).toThrow('independently provisioned read-only DB pool');
+    const privateReadOnlyPool={connect:vi.fn()};
+    const server=createApprovedSajuReaderHttpRuntimeV1({
+      ...input,pairReader:{pool:privateReadOnlyPool,trusts},
+    });
+    const response=await server.handleRequest({
+      request:new Request(origin+'/api/approved-saju/pair/reader'),requestId:id,serverTime:time,
+    });
+    expect(response?.status).toBe(405);
+    expect(privateReadOnlyPool.connect).not.toHaveBeenCalled();
   });
 
   it('uses the same signed source and policy for the authenticated Scene and the question flow', async () => {
