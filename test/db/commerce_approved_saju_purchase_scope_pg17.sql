@@ -1333,5 +1333,57 @@ begin
   reset role;
 end
 $revoked$;
+
+-- T10-only permission HOLD drill. Preserve every signed source and keep the
+-- existing single-Birth issuer callable: no DROP, deletion or broad revoke.
+create temp table pg_temp.saju_pair_hold_snapshot on commit drop as
+  select count(*)::bigint as proof_count,
+    md5(coalesce(string_agg(
+      reading_id::text || ':' || proof_envelope::text,'|' order by reading_id
+    ),'empty')) as proof_fingerprint
+  from commerce_saju_private.approved_source_issue_proofs_v1;
+do $pair_hold_before$
+begin
+  if (select proof_count from pg_temp.saju_pair_hold_snapshot)<1
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.cmd_finalize_approved_saju_pair_reading_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,text,jsonb)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.qry_approved_saju_pair_recovery_record_v1(uuid,uuid)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text)','EXECUTE')
+  then raise exception 'T10 hold rehearsal did not start with signed proofs and separate active grants'; end if;
+end
+$pair_hold_before$;
+\ir ../../docs/operations/candidates/commerce_approved_saju_pair_issuer_hold_v1.sql
+do $pair_hold_after$
+declare
+  current_count bigint;
+  current_fingerprint text;
+begin
+  if has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.cmd_finalize_approved_saju_pair_reading_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,text,jsonb)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.qry_approved_saju_pair_recovery_record_v1(uuid,uuid)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_issuer_executor',
+       'public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)','EXECUTE')
+  then raise exception 'T10 HOLD leaked issuer authority or disabled unrelated Saju/Reader access'; end if;
+  select count(*)::bigint,
+    md5(coalesce(string_agg(
+      reading_id::text || ':' || proof_envelope::text,'|' order by reading_id
+    ),'empty'))
+    into current_count,current_fingerprint
+  from commerce_saju_private.approved_source_issue_proofs_v1;
+  if (current_count,current_fingerprint) is distinct from (
+    select proof_count,proof_fingerprint from pg_temp.saju_pair_hold_snapshot
+  ) then raise exception 'T10 HOLD modified a previously issued signed archive'; end if;
+end
+$pair_hold_after$;
+
 rollback;
 select 'PASS_APPROVED_SAJU_PURCHASE_SCOPE_PG17';
