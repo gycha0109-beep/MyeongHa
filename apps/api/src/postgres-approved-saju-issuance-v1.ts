@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import type { createSajuT10ProductionPairIssueSourceV1 } from './saju-t10-production-pair-issue-source-v1.js';
 import type { SajuReadingComponentV1 } from '../../../packages/contracts/src/approved-saju-catalog.js';
 import { readApprovedSajuIssueScopeV1, readApprovedSajuPairIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
 import { createPostgresSajuOfficialAttemptPreparePortV1 } from './postgres-saju-official-attempt-prepare-v1.js';
@@ -67,6 +68,68 @@ export async function inspectApprovedSajuPairSourceV1<T>(input: Readonly<
   return Object.freeze({
     state: 'held', canSell: false, sourceRequestHash: before.sourceRequestHash,
     paidComparison: before.paidComparison, evidence,
+  });
+}
+
+/**
+ * Runs only after the dedicated DB authority has allocated a running pair
+ * attempt. It re-locks the paid comparison and consent on both sides of the
+ * signed source call. No Reading/Grant is committed by this boundary.
+ */
+export async function verifyApprovedSajuPreparedPairIssueV1(input: Readonly<
+  Pick<PrepareOptions, 'pool' | 'verifiedEvidence'> & {
+    subjectId: string;
+    purchaseIntentId: string;
+    readingId: string;
+    readingSessionId: string;
+    executionAttemptId: string;
+    expectedReleaseRef: string;
+    source: ReturnType<typeof createSajuT10ProductionPairIssueSourceV1>;
+  }
+>) {
+  if (input.verifiedEvidence.kind !== 'member') return null;
+  const readAndAdmit = () => executePostgresApprovedSajuIssuerTransactionV1({
+    pool: input.pool,
+    verifiedEvidence: input.verifiedEvidence,
+    execute: async ({ client, resolvedSubject }) => {
+      if (resolvedSubject.subjectKind !== 'member' ||
+          resolvedSubject.subjectId !== input.subjectId) return null;
+      const scope = await readApprovedSajuPairIssueScopeV1(client, input);
+      if (scope === null || scope.releaseRef !== input.expectedReleaseRef) return null;
+      const { rows } = await client.query<{ admitted: unknown }>(
+        'select public.admit_approved_saju_issue_attempt_v1($1::uuid,$2::uuid,$3::text,$4::uuid,$5::uuid,$6::uuid,$7::uuid,$8::text,$9::uuid) as admitted',
+        [input.subjectId, input.purchaseIntentId, 'compatibility',
+          input.readingId, input.readingSessionId, input.executionAttemptId,
+          scope.birthRevisionId, scope.sourceRequestHash, scope.targetBirthRevisionId],
+      );
+      return rows.length === 1 && rows[0]?.admitted === true ? scope : null;
+    },
+  });
+  const before = await readAndAdmit();
+  if (before === null) return null;
+  const signed = await input.source.issuePreparedPair({
+    scope: before, purchaseIntentId: input.purchaseIntentId,
+    executionAttemptId: input.executionAttemptId, readingId: input.readingId,
+  });
+  if (signed === null) return null;
+  const after = await readAndAdmit();
+  if (after === null || after.admissionHash !== before.admissionHash ||
+      after.releaseRef !== before.releaseRef ||
+      after.birthRevisionId !== before.birthRevisionId ||
+      after.targetBirthRevisionId !== before.targetBirthRevisionId ||
+      after.sourceBirthInputHash !== before.sourceBirthInputHash ||
+      after.targetBirthInputHash !== before.targetBirthInputHash ||
+      after.sourceRequestHash !== before.sourceRequestHash ||
+      after.paidComparison.offerId !== before.paidComparison.offerId ||
+      after.paidComparison.counterpartOrder !== before.paidComparison.counterpartOrder ||
+      after.paidComparison.targetPersonId !== before.paidComparison.targetPersonId ||
+      after.paidComparison.useApprovalRef !== before.paidComparison.useApprovalRef ||
+      after.paidComparison.requiredComponents.join(',') !==
+        before.paidComparison.requiredComponents.join(',')) return null;
+  return Object.freeze({
+    state: 'source_verified_not_committed' as const,
+    readingId: input.readingId, executionAttemptId: input.executionAttemptId,
+    source: signed,
   });
 }
 
