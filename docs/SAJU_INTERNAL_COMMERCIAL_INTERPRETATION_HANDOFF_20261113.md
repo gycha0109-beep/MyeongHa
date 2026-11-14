@@ -110,3 +110,11 @@
 - 발급용 `qry_approved_saju_pair_issue_scope_v1` 권한을 철회해도 별도 Reader 역할에는 현재 결제·상대 동의·Grant 및 기존 보관 서명 조회만 허용한다. 원본 증거 재생성·새 Source 호출·Outbox ACK·발급 최종 확정 권한은 없다.
 - PostgreSQL 17에서 HOLD 이후 실제 구매자 인증으로 살아 있는 비교 Reading과 서명 원본을 열람하고, 발급 역할 철회·개별 Reader 역할 제한을 검증한다. TypeScript HTTP는 발급/답변 Pool 재사용을 거부한다.
 - 운영 로그인 별도 프로비저닝/실서비스 설치·결제·배포는 진행하지 않았다. `ROADMAP_IN_PROGRESS`, 판매 HOLD.
+
+## 2026-11-14 — 유료 T10 Reader에서 발급 잠금 조회 제거
+
+- **확인한 경계:** 직전 작업의 전용 Reader 역할은 만들었지만 `qry_approved_saju_pair_issue_scope_v1`을 그대로 호출하여 발급 시도의 상대 동의 행 잠금에 의존했다. 기존 발급 중단 시 고객 보관본 재열람과 역할 분리를 완성하기 위해 조회 전용 함수가 필요했다.
+- **추가 구현:** `commerce_approved_saju_pair_issuer_v1.sql`에 `qry_approved_saju_pair_reader_scope_v1`을 분리했다. 현재 유료 Grant·발급 Release, 불변 구매 Offer/상대 명식 Revision, 유효하고 철회되지 않은 상대 동의를 **행 잠금 없이 조회**한다. 응답 범위는 발급용과 동일하며 신규 발급·권한 부여 기능이 없다.
+- **권한/Reader:** 읽기 전용 DB 역할은 이제 발급용 Scope를 사용할 수 없고 조회 전용 Scope·보관 Reading·원본 증거만 읽는다. `readPostgresApprovedSajuT10PairReaderV1`도 정확한 조회 함수를 호출한다. 세 상품의 같은 구매 원본과 취소·철회 이후의 무권한 상태를 검증한다.
+- **증거:** 격리 PostgreSQL 17은 발급 중단을 적용한 후 해당 Reader 역할에서 유효한 구매의 서명 원본/Reading 재열람을 검사하고, 이후 상대 동의 철회 시 조회를 거부하는 별도 롤백 시험을 실행한다. 기존 실제 Saju Ed25519 E2E의 조회 모의 계약도 새 함수로 맞췄다.
+- **범위:** 운영 DB·별도 로그인/Pool 구성·실결제·판매 활성화는 수행하지 않았다. `ROADMAP_IN_PROGRESS`, 판매 HOLD.
