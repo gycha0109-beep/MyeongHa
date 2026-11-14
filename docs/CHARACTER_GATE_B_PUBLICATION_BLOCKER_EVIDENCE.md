@@ -1,5 +1,8 @@
 # Character Gate B Production Publication Blocker Evidence
 
+> **2026-11-14 현재 실행 기준:** [6명 정식 게시와 9명 후속 분류](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)을 따른다. 9명 집합 패킷의 기존 BLOCKED 증거는 보존하되 첫 웹 출시는 여섯 명이다. 실제 6명 Canon·콘텐츠 자산·서명/권한·독립 실행이 증명되지 않으면 9명 조건을 단순 끄거나 더미로 대체할 수 없다.
+
+
 Status: **BLOCKED — exact-nine canon completion + concrete visual/cue/provenance payload; `SRC-27` mutation authority implemented**  
 Authority parent `main`: `d80ede71f7cc5e297702a86c8c6ab585e63f9476`  
 Scope: Character Runtime / Gate B Production publication / Member Chat positive E2E

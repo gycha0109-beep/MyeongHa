@@ -1,5 +1,8 @@
 # 명하 Character / World Content Specification v0.5 — Source Aligned
 
+> **2026-11-14 현재 실행 기준:** [2026-11-14 현재 출시 범위](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)는 여섯 명 동시 웹 채팅과 후속 3명 공개를 구분한다. 기존 9명 저작/세계관/ID/이전 대화의 권한은 보존한다. 실제 정식 여섯 명 게시·배포 경로가 구현·검증되기 전에는 현재 게시 게이트를 임의 해제하지 않는다.
+
+
 > Product: **명하 (Myeongha)**  
 > Pack Version: **v0.5**  
 > Date: **2026-09-07**  

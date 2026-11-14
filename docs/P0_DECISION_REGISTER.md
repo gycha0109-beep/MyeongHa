@@ -1,5 +1,7 @@
 # 명하 Production P0 Decision Register — Full Audit v0.9
 
+> **2026-11-14 현재 실행 기준:** [현행 제품 소유자 범위 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md) · [통합 실행 게이트](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)가 첫 출시 범위에 대한 후속 승인이다. **14개 구매 Offer(묶음 5개 포함) / 7개 해석 구성 / 6명 동시 채팅 및 공식 Reader / 500명 품질 개선 / 웹 일괄 공개**가 현재 목표다. 기존 1/11/12상품 관련 결정 기록은 당시 상태로 보존하고, 실결제·운영 DB·법적 고지 등 필수 조건은 완료로 승격하지 않는다.
+
 > Product: **명하 (Myeongha)**  
 > Pack Version: **v0.11**  
 > Date: **2026-09-19**  
@@ -17,17 +19,48 @@
 | ID | Decision | Status | Current Options / Required Resolution |
 |---|---|---|---|
 | `P0-SA-01` | Saju transport | **DECIDED** | authenticated internal HTTP service; calculation-only V1; no `/api/readings` activation |
-| `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off only for launch MVP; no subscription/bundle/native-store billing |
+| `P0-CM-01` | Commerce launch rail | **DECIDED** | Web + one-off PortOne V2 payments; 2026-11-14 approved bundles are one-off package Offers (5), not recurring bundle billing; no subscription/native-store billing |
 | `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
-| `P0-CM-03` | Saju-page-wide launch scope / paid Product & Capability catalog | **OPEN-P0 (activation)** | Product Owner direction: 사주 페이지 전체 공개 및 유료 서비스 운영 준비, 단일 최초 상품 한정 출시 아님. 현재 구체화된 inactive Product = `standard.love_relationship`, 정가 KRW 8,900 결정; 다른 상품의 가격·제공 조건은 개별 결정. Reader 별도 선택; Offer/Charge Terms 및 각 상품의 판매 활성화는 미승인; 역사적 `saju.general_natal.deep.v1` 후보는 폐기 |
+| `P0-CM-03` | Saju-page-wide launch scope / paid Product & Capability catalog | **OPEN-P0 (activation)** | 2026-11-06 approved 14 Offer IDs/prices and 7 shared components supersede the historical single `standard.love_relationship` candidate for launch scope; P0-CM-03 remains OPEN-P0 only for actual sale/Charge Terms/fulfillment/Production activation. The 5 package Offers are included; Reader eligibility remains separately gated. Historical `standard.love_relationship` KRW 8,900 and retired deep candidate remain historical, not the 14-Offer pricing baseline |
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
-| `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
-| `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
+| `P0-AI-01` | AI provider/model/fallback | **DECIDED (selection policy); implementation/model pin HOLD** | Preserve existing DeepSeek-based GEPA track; compare actual implemented candidates on quality, latency and cost before selecting production provider/model. Only a verified same-provider standby model may be retried; if unavailable or validation fails, fail closed. No unapproved cross-provider fallback or external paid GEPA calls. |
+| `P0-AGE-01` | Minimum age / character content policy | **DECIDED (product policy); enforcement HOLD** | 만 19세 이상 성인 전용. 성인 대상 몰입형 로맨스·플러팅 허용, 노골적인 성적 묘사는 제외. 연령 확인·콘텐츠 분류·캐릭터별 실제 적용/검증 전 공개 금지. |
 | `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; 4 structural tombstones ANONYMIZE; 9 Commerce evidence/history tables RETAIN `P5Y`; existing encrypted backup lifecycle `P30D` + restore reconciliation before serviceability |
 | `P0-PR-02` | Official Reader paid interpretation privacy | **DECIDED — PRODUCT POLICY ONLY** | [기본 브랜치 제품 개인정보 정책 정본](OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md); 24h 본 DB 삭제 목표/90d 일반 로그 상한, 정확한 유료 권한, 원문 격리. 법무·기술·저장·운영 승인은 별도 HOLD |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
 | `P0-PR-01B` | Commerce provider-evidence data minimization | **DECIDED** | no raw secret/bearer/receipt/PCI storage; versioned keyed fingerprints + allowlisted bounded verified payload; parent `P0-PR-01` now supplies the separate `P5Y` retention baseline |
 | `P0-AUTH-01` | API→PostgreSQL execution identity / RLS enforcement model | **DECIDED** | non-BYPASSRLS API execution role + transaction-scoped trusted canonical `subject_id` context |
+
+
+> **2026-11-14 후속 제품 소유자 결정 적용 (현행 범위, 역사 보존):** 2026-09-05 P0-CM-01의 웹·1회성 결제 및 구독·네이티브 스토어 결제 제외는 유지한다. 당시 *bundle billing 제외*는 현재 승인된 **1회성 묶음 Offer 5개**를 제외하는 정책으로 더 이상 적용하지 않는다. 묶음은 구독·정기결제가 아닌 단일 구매이고 구성요소별 발급/권한·환불 검증이 필수다. P0-CM-03의 예전 8,900원 연애 상품과 미정 가격 문구는 당시 후보 기록이며 현행 14개 상품 가격의 근거가 아니다. **상품 구성·정가 승인과 실제 Offer/Charge Terms 발행·실판매 허가는 별개**이므로 P0-CM-03의 운영 활성화는 OPEN-P0/HOLD를 유지한다. [최신 범위 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md) · [승인 카탈로그 코드(PR #3174)](https://github.com/gycha0109-beep/MyeongHa/blob/feat/saju-approved-checkout-admission-20261109/packages/contracts/src/approved-saju-catalog.ts).
+
+### 2026-11-14 제품 소유자 AI·연령·Reader 범위 추가 결정
+
+- **AI 공급자/모델:** 현재 **DeepSeek 기반 GEPA 연구**를 진행 중인 기존 구현을 출발점으로 유지한다. OpenAI/Gemini/Claude 등 다른 공급자를 임의로 기본값으로 지정하거나 기존 GEPA를 대체하지 않는다. 운영 공급자·정확한 모델 ID는 **기존 구현의 실제 품질·응답 속도·비용 비교 후 선정**하며, 아직 선정/승인/운영 배포되었다고 기록하지 않는다. 장애 시에는 사전 검증된 **동일 공급자의 예비 모델만** 재시도하고, 없거나 검증 실패 시 중단한다. Saju 원본·권한·근거/출력 Guard는 우회하지 않는다. 기존 GEPA 연구의 별도 500원 상한·유료 송신 HOLD는 유지한다.
+- **연령/콘텐츠:** **만 19세 이상** 성인 전용. 성인 몰입형 로맨스와 플러팅을 허용하되 **노골적인 성적 묘사는 제외**한다. 연령 확인 방식, 캐릭터별 정책 태그, 실제 필터·검증은 구현/출시 게이트이며 결정만으로 기능을 공개하지 않는다.
+- **Reader 범위:** 최초 공개 여섯 명(세연·라현·백헌·여울·윤호·태겸) **전원이 7개 해석 구성요소 모두 지원**하도록 제품 범위를 승인한다(6×7=42 조합). 구매 Offer 14개와 묶음상품은 이 7개 구성요소의 권한 있는 조합으로 처리한다. 42개 지원은 **목표**이지 현재 구현·콘텐츠·모델·Grant·T9/T10/발급·환불 검증 통과를 의미하지 않는다. 각 조합이 실제로 안전하게 구현·검증되기 전에는 차단하고, 임의의 다른 Reader/모델로 대체하지 않는다.
+- **남은 승인/증거:** 운영 모델의 정확한 선택 및 가격·품질 증거, 동일 공급자 예비 모델의 실증, 연령·표현 정책 적용, 42조합과 14개 Offer의 실제 종단 검증. 새 공급자·모델을 사용한다는 결정은 아직 없음.
+
+### 현재 승인된 14개 Offer 및 정가 (판매 비활성)
+
+| Offer ID | 상품 | 정가 | 구분 |
+| --- | --- | ---: | --- |
+| `career` | 직업·커리어운 | KRW 9,900 | 단일 |
+| `business` | 사업운 | KRW 9,900 | 단일 |
+| `wealth` | 재물운 | KRW 9,900 | 단일 |
+| `relationship` | 나의 인연·관계운 | KRW 9,900 | 단일 |
+| `year` | 올해의 사주 | KRW 7,900 | 단일 |
+| `month` | 이번 달의 사주 | KRW 4,900 | 단일 |
+| `first-counterpart` | 첫 번째 상대방과 관계 비교 | KRW 12,900 | 관계 비교/결합 |
+| `additional-counterpart` | 두 번째 이후 상대방 1명당 | KRW 9,900 | 관계 비교/결합 |
+| `relationship-plus-first` | 나의 인연·관계운 + 첫 관계 비교 | KRW 19,900 | 관계 비교/결합 |
+| `career-economy` | 커리어·경제 패키지 | KRW 24,900 | 1회성 묶음 |
+| `basic` | 전체 사주 기본 | KRW 29,900 | 1회성 묶음 |
+| `basic-year` | 전체 사주 + 올해 | KRW 35,800 | 1회성 묶음 |
+| `basic-month` | 전체 사주 + 이번 달 | KRW 33,800 | 1회성 묶음 |
+| `basic-year-month` | 전체 사주 + 올해 + 이번 달 | KRW 39,700 | 1회성 묶음 |
+
+> 이 가격표는 초안 PR #3174의 승인 카탈로그 코드에 있는 가격을 반영한 **제품 결정 기록**이다. 운영 Charge Terms, PG 계약, 과금·환불 실증, Official 서명 발급, 6명 Reader 지원 행렬을 완료했다고 뜻하지 않는다.
 
 ## 3. 상태 규칙
 
@@ -143,7 +176,7 @@ scope:
     - launch payment surface is Web
     - launch billing shape is one-off purchase
     - subscription billing is not launch MVP
-    - bundle billing is not launch MVP
+    - recurring bundle billing is not launch MVP; 2026-11-14 approved one-off package Offers are in launch scope
     - Apple IAP and Google Play Billing are deferred until a real native paid surface exists and current store policy is revalidated
   does_not_decide:
     - exact Web PSP/vendor
@@ -156,7 +189,7 @@ scope:
 rationale:
   - primary product/use-case authority assigns long detailed Saju reports and payment to Web while Mobile centers on Character Hall/chat/relationship/push flows.
   - current apps/mobile is only a placeholder and explicitly defers Expo/React Native bootstrap.
-  - no current product authority authorizes subscription or bundle billing for MVP.
+  - historical 2026-09-05 rationale: no bundle catalog had then been approved; 2026-11-14 approved one-off package Offers supersede this historical limitation.
   - selecting a native store rail before a real native paid product surface would introduce provider-specific lifecycle complexity without satisfying a current launch requirement.
   - provider-neutral Commerce Architecture v1 already preserves Web/iOS/Android future compatibility without requiring an Apple/Google adapter now.
 implementation_gates_preserved:
@@ -175,7 +208,7 @@ migration_impact:
   - provider-neutral additive Commerce schema remains governed by COMMERCE_ENTITLEMENT_ARCHITECTURE_V1
 reopen_triggers:
   - native iOS/Android paid digital surface becomes MVP scope
-  - subscription or bundle billing becomes MVP scope
+  - subscription or recurring bundle billing with distinct lifecycle semantics becomes MVP scope
   - approved launch distribution plan is incompatible with Web-first payment
   - material current store/provider policy requires a different compliant launch rail
 record: docs/COMMERCE_LAUNCH_RAIL_DECISION_V1.md
@@ -244,9 +277,9 @@ id: P0-CM-03
 status: OPEN-P0
 candidate_updated_at: 2026-09-19
 scope_direction_approved_at: 2026-10-16
-scope_direction: saju_page_full_public_opening_and_paid_services_preparation
+scope_direction: approved_14_offers_full_web_launch_including_5_one_off_packages
 scope_boundary: all_saju_page_sections_in_launch_plan_not_automatic_sale_activation
-pricing_boundary: existing_8900_krw_applies_only_to_standard_love_relationship
+pricing_boundary: approved_14_offer_prices_20261106_supersede_historical_8900_candidate
 current_candidate:
   product_key: standard.love_relationship
   consumer_name: 연애·관계
@@ -278,6 +311,13 @@ stale_candidate:
   historical_price: KRW_9900
   disposition: forward_retired
   historical_migration_rewritten: false
+approved_launch_catalog:
+  source: packages/contracts/src/approved-saju-catalog.ts
+  source_pr: 3174
+  offer_count: 14
+  shared_saju_component_count: 7
+  one_off_package_offer_count: 5
+  prices: approved_product_owner_not_executable_charge_terms
 catalog_activation:
   product_enabled: false
   saleable_offer_exists: false
@@ -308,7 +348,7 @@ record: docs/STANDARD_LOVE_RELATIONSHIP_PRODUCT_V1.md
 tracking: issue #1068
 ```
 
-The Product Owner now plans the **entire Saju page** as the public opening and paid-service preparation scope, rather than limiting launch planning to one 'first paid Product'. The existing `standard.love_relationship` record remains the currently specified inactive Commerce Product, with its KRW 8,900 list price decided; no price is implied for other Saju-page products. This record still deliberately leaves **sale activation, executable Charge Terms, Offer creation, and Product Reading runtime blocked**. Migration `1120_paid_general_natal_product_candidate.sql` remains immutable history; the supersession is forward-only in migration `1130_standard_love_relationship_reader_authority.sql`.
+**2026-11-14 CURRENT SCOPE:** The Product Owner has approved all 14 catalog Offers, including five one-off package Offers and their listed prices, for the first simultaneous Web launch. The previously described single-product approach is historical. The existing `standard.love_relationship` record remains the currently specified inactive Commerce Product, with its KRW 8,900 list price decided; the current 14-Offer price list above supersedes that historical pricing gap. This record still deliberately leaves **sale activation, executable Charge Terms, Offer creation, and Product Reading runtime blocked**. Migration `1120_paid_general_natal_product_candidate.sql` remains immutable history; the supersession is forward-only in migration `1130_standard_love_relationship_reader_authority.sql`.
 
 ### P0-CM-04
 
@@ -602,7 +642,7 @@ record: docs/operations/POSTGRES_DR_READINESS_STATUS_V1.md
 
 `P0-CM-02` exact Web PSP is now **DECIDED: PortOne V2**. This closes provider selection only; live merchant/PG/channel/credential readiness and Production activation remain independent gates.
 
-`P0-CM-03` remains explicitly open for **individual Product sale activation**. The Product Owner's launch plan covers the entire Saju page, not only a first paid Product. The currently specified inactive Commerce v2 Product is `standard.love_relationship`, with Reader identity selected separately and stored as sparse Purchase Intent provenance. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. Product Owner list price is now **DECIDED: KRW 8,900**. No current saleable Offer or immutable Charge Terms exists, so the decided list price is not executable charge authority. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
+`P0-CM-03` remains explicitly open for **individual Product sale activation**. The Product Owner's launch plan covers the entire Saju page, not only a first paid Product. The historical inactive Commerce v2 Product was `standard.love_relationship`; the current launch catalog is the 14 approved Offers in PR #3174, with exact Reader rights still separately verified. The former `saju.general_natal.deep.v1` / KRW 9,900 candidate is historical and forward-retired. The former **KRW 8,900** list price refers only to the historical inactive `standard.love_relationship` Product; current first-Web-launch Offer IDs and approved list prices are the **14-item catalog** recorded in the 2026-11-14 supersession table above. Approved list prices are not executable Charge Terms or evidence of a live saleable Offer; current operational activation remains HOLD. Current Saju relationship Product Reading authority remains blocked, so Product activation must stay fail-closed.
 
 `P0-CM-04` closes the product/ownership question of whether Guest may purchase. Its historical `does_not_decide` list records the boundary at the time that decision was made; the later `P0-CM-02` record now supplies the PSP decision without rewriting `P0-CM-04` history.
 

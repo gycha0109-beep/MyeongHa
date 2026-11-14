@@ -1,5 +1,7 @@
 # 명하 Commerce Launch Rail Decision v1
 
+> **2026-11-14 현재 실행 기준:** [현행 통합 제품 범위](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)는 웹 PortOne V2와 승인된 **14개 Offer 모두** 최초 출시를 목표로 한다. 아래 초기 PSP/단일 SKU 결정 전 상태는 역사 기록이며 현재 상품 활성화·PG 계약·실결제/환불 완료 증거가 아니다. 기존 결제 검증과 유료 Grant 보호는 유지한다.
+
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Repository baseline: `871289f16da2b0a41784dfffc50950ce14f40bb3`  
@@ -7,6 +9,16 @@
 > Status: **P0-CM-01 DECIDED / PROVIDER + LAUNCH SKU STILL OPEN / IMPLEMENTATION HOLD**
 
 ---
+
+## 2026-11-14 현행 최초 웹 출시 범위 적용 (후속 승인)
+
+> 이 문서는 **2026-09-05 당시의 결제 수단 결정 기록**이다. 현재 최초 웹 출시 범위는 [제품 소유자 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md)과 [통합 실행 게이트](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md), [최신 결정 원장](P0_DECISION_REGISTER.md)을 우선 적용한다. 아래 당시 정책 및 상태 기록을 삭제하거나 그 당시 의미를 소급 변경하지 않는다.
+
+- **유지:** Web 우선 + 일회성 구매. 구독 및 네이티브 앱스토어 결제는 첫 웹 출시에서 제외.
+- **대체:** 당시 §1·§3·§9의 `NO BUNDLE BILLING`은 승인된 묶음 카탈로그가 없던 시점의 역사적 제한이다. **2026-11-06 승인된 14개 Offer의 일회성 묶음 5개는 현재 출시 범위에 포함**된다. 묶음은 정기결제/구독 상품이 아니며 구성별 발급·권한·환불 검증이 필요하다.
+- **현재 PSP:** `P0-CM-02`는 **PortOne V2 결정**. 아래 `OPEN` 표기는 당시 기록이며 가맹점/정산/실거래 활성화는 별도 미완료.
+- **현재 상품:** `P0-CM-03`의 옛 단일 후보 및 8,900원 정가는 당시 기록이다. 현재 상품 ID와 정가는 [#3174 승인 카탈로그](https://github.com/gycha0109-beep/MyeongHa/pull/3174)의 **14개 Offer**가 우선하지만 실행 가능한 Charge Terms·실판매·정식 발급·Reader 권한 승인은 **여전히 HOLD**.
+- **연계 출시:** 6명 실채팅과 6명 공식 Reader, Saju 500명 7단계 품질, 운영·법적·보안 요구는 전역 게이트다. 이 후속 범위 결정만으로 운영 판매를 시작하지 않는다.
 
 ## 상태 권위 보정 (2026-10-28)
 

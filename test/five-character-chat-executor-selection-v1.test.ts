@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   FIVE_CHARACTER_CHAT_TARGETS_V1,
+  SIX_CHARACTER_WEB_LAUNCH_CHAT_TARGETS_V1,
+  selectPublishedSixCharacterWebLaunchChatExecutorV1,
   CharacterChatExecutorUnavailableV1,
   selectPublishedFiveCharacterChatExecutorV1,
 } from '../apps/api/src/five-character-chat-executor-selection-v1.js';
@@ -60,5 +62,30 @@ describe('Five-character Member live-chat production executor selection',()=>{
       {...binding('yeoul'),activeContentBundleId:'different'},
       manifest('yeoul'),{yeoul:()=>true},
     )).toThrow(CharacterChatExecutorUnavailableV1);
+  });
+});
+
+describe('six-character first-web-launch admission remains fail-closed', () => {
+  it('includes Yunho without changing the installed five-character runtime', () => {
+    expect(SIX_CHARACTER_WEB_LAUNCH_CHAT_TARGETS_V1).toEqual([...ids, 'yunho']);
+  });
+  it('selects Yunho only with matching server-pinned manifest and his own executor', () => {
+    const yunhoExecutor = () => 'yunho';
+    expect(selectPublishedSixCharacterWebLaunchChatExecutorV1(
+      binding('yunho'), manifest('yunho'), { yunho: yunhoExecutor },
+    )).toEqual({ characterId: 'yunho', executor: yunhoExecutor });
+    expect(() => selectPublishedSixCharacterWebLaunchChatExecutorV1(
+      binding('yunho'), manifest('yunho'), { seyeon: () => true },
+    )).toThrow(CharacterChatExecutorUnavailableV1);
+    expect(() => selectPublishedSixCharacterWebLaunchChatExecutorV1(
+      binding('yunho'), manifest('seyeon'), { yunho: yunhoExecutor },
+    )).toThrow(CharacterChatExecutorUnavailableV1);
+  });
+  it('rejects the three post-launch characters', () => {
+    for (const id of ['seorin', 'mira', 'doyun']) {
+      expect(() => selectPublishedSixCharacterWebLaunchChatExecutorV1(
+        binding(id), manifest(id), { [id]: () => true } as never,
+      )).toThrow(CharacterChatExecutorUnavailableV1);
+    }
   });
 });

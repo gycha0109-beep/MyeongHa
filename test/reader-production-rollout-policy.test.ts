@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import {
   OFFICIAL_READER_RUNTIME_IDS_V1,
+  FIRST_WEB_LAUNCH_READER_TARGET_IDS_V1,
   READER_RUNTIME_INTERNAL_PREVIEW_CANDIDATES_V1,
   READER_RUNTIME_PUBLIC_ACTIVATED_V1,
   ReaderRuntimeRolloutWithheldErrorV1,
@@ -25,6 +26,7 @@ describe('server-side first tranche for the shared Character Reader runtime', ()
     expect([...OFFICIAL_READER_RUNTIME_IDS_V1]).toEqual(
       MOBILE_READER_PRESENTATIONS_V1.map(x => x.key),
     );
+    expect(FIRST_WEB_LAUNCH_READER_TARGET_IDS_V1).toEqual(['seyeon', 'rahyeon', 'baekheon', 'yeoul', 'yunho', 'taegyeom']);
     expect(READER_RUNTIME_INTERNAL_PREVIEW_CANDIDATES_V1).toEqual(['seyeon']);
     expect(READER_RUNTIME_PUBLIC_ACTIVATED_V1).toBe(false);
   });
