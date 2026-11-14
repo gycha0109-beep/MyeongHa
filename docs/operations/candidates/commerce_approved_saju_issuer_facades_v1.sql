@@ -365,7 +365,7 @@ begin
     on binding.purchase_intent_id=origin.purchase_intent_id and binding.component=event.dedupe_key
   where event.event_type='approved_saju.reading_requested'
     and event.event_schema_version='approved-saju-reading-request-v1'
-    and event.dedupe_key in ('career','business','wealth','relationship','year','month')
+    and event.dedupe_key in ('career','business','wealth','relationship','year','month','compatibility')
     and event.dedupe_key=event.payload_jsonb->>'component'
     and event.payload_jsonb->>'releaseRef'=p_releases->>event.dedupe_key
     and (event.status='pending' and event.available_at<=v_now
