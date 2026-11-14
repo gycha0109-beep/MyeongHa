@@ -1,3 +1,9 @@
+### 2026-11-14 추가 격리 근거 — 느린 DB / 획득 대기 초과
+
+[보호 workerd + GoTrue + PG18 + Saju 실증 #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780), exact `main=5ad56e5775644e656db6b1029612c3911c5032a8`, 실제 JSON SHA-256 `2c5768e300090d6d9bfa230793e4df26a4b3b42cf4a761ed5af7c931678e2c14`에서 **synthetic table lock 동안 4/4 HTTP 503, local acquire timeout 2, peak slots 2/2, Health 200, 해제 후 4/4 복구**를 확인했다. 정상 기준선 12/12 HTTP 200; Saju 실제 엔진과 GoTrue JWT 경로·PostgreSQL 18 RLS는 유지했다.
+
+**수동 판단 근거 보강:** DB 연결 획득 실패와 서비스 503이 함께 관측될 때 먼저 해당 요청 구간의 DB 잠금·쿼리 지연·슬롯 점유·재시도 및 Auth/Saju 별도 지표를 확인하고 동시성 추가 확대를 보류한다. 장애 후 락 해제 시 회복 가능성만 격리 환경에서 실증했다. 본 실험의 `2 slots/125ms`는 일회용 **fixture의 로컬 제한**이며 Hosted Hyperdrive 획득 대기/Production 수용량을 측정한 값이 아니다. 따라서 기존 표의 Production 수치·지속 조건·수동 확장/축소 승인 상태는 변경하지 않으며 `automaticScalingEnabled=false`, `productionCapacityProven=false`, `numericalProductionScalingThresholdApproved=false` 유지.
+
 # Phase 12 — Observed concurrency scaling-review trigger
 
 Authority: `docs/architecture/PRODUCTION_OPERATIONS_ARCHITECTURE_V1.md` §30 and §38 Phase 12.

@@ -1,3 +1,11 @@
+### 2026-11-14 — 느린 DB·연결 획득 대기 초과 실제 보호 격리 시험 성공
+
+- [PR #3310](https://github.com/gycha0109-beep/MyeongHa/pull/3310) 병합 및 최종 [CI #43594107224](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43594107224) SUCCESS 후, 정본 `main=5ad56e5775644e656db6b1029612c3911c5032a8`에서 [실증 #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780) SUCCESS. 첫 실패 #43592572032는 실패 이력으로 보존.
+- 확인한 artifact `14115168226`, JSON SHA-256 `2c5768e300090d6d9bfa230793e4df26a4b3b42cf4a761ed5af7c931678e2c14`: 기준선 계산 12/12, 실제 합성 DB 잠금 중 503 4/4, 연결 획득 실패·대기 초과 각 2건, 최대 동시 슬롯 2/2, Health 200, 잠금 해제 후 복구 4/4, 익명 차단 및 격리 정리 PASS. 기본 RLS/합성 압력 artifact `14115073288` PASS.
+- 이번 누락 조합은 **격리 환경에서 수용**, 이전 완료한 DB 프로세스 중단/15분 실험 반복 없음. Production Worker/Hosted Hyperdrive 성능, Production 확장 임계치, Hosted DR·Auth·Storage·개인정보 연속성은 미입증. `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false` 유지. 실제 운영 DB나 사용자 데이터 변경 없음.
+
+Watchtower-Track: ops
+
 ### 2026-11-14 — 느린 DB 실측 첫 실패와 격리 Worker DB 연결 경계 수정
 
 - [격리 실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032): PG18 RLS·합성 연결 압력 PASS, 실제 GoTrue+PG18+Saju Workerd 제품 경로 `workerd_requests` FAIL. 비식별 증거 `14113415610`=`BLOCKED_INCOMPLETE`, 성공/4개 요청 복구/연결 대기 초과 미입증.

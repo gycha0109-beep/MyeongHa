@@ -1,3 +1,12 @@
+## 2026-11-14 workerd slow-DB / local acquisition timeout — actual Linux PASS
+
+- Corrected request-local PostgreSQL client code from [PR #3310](https://github.com/gycha0109-beep/MyeongHa/pull/3310); exact main `5ad56e5775644e656db6b1029612c3911c5032a8`; [isolated run #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780) SUCCESS. Evidence artifact `14115168226`, JSON SHA-256 `2c5768e300090d6d9bfa230793e4df26a4b3b42cf4a761ed5af7c931678e2c14` (expires 2026-11-28 UTC).
+- Real disposable GoTrue JWT/PG18 RLS/Saju/workerd: 12/12 baseline 200; under a real synthetic PostgreSQL table lock 4/4 bounded 503; local fixture two-slot gate at 125ms observed 16 acquisition attempts, two acquisition failures/timeouts and peak two; health 200; release lock then recovery 4/4 HTTP 200 (p95 279.819ms). Anonymous denied, no identifiers in artifact and disposable runtime/Docker cleanup PASS.
+- Separate PG18 RLS/pool proof artifact `14115073288` also PASS. Historical first attempt [#43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032) remains FAILED, not rewritten. Existing DB outage and 900-second overlap runs are reused.
+- Acceptance: missing Phase 11 **isolated** slow DB/acquisition condition now OBSERVED and PASS. It is not Hosted Hyperdrive acquisition data, Cloudflare Production admission, Production capacity, production scaling policy or service DR. All related HOLD flags remain unchanged.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 workerd 느린 DB 첫 보호 실행 결과 — BLOCKED, 요청별 연결 수정
 
 [실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032): 기본 PG18 RLS·합성 압력 PASS, 실제 workerd 제품 경로 `workerd_requests` 실패. 실증 상태는 `BLOCKED_INCOMPLETE`이며 계획된 4개 동시 요청의 제한 실패·획득 대기 초과·복구 4/4 수용을 완료하지 못했다.
