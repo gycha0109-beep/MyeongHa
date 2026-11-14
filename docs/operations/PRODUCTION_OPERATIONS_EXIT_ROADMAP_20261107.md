@@ -1,3 +1,33 @@
+## 2026-11-14 현재 배포 의존성·최소 Production 정합화 변경안 — 읽기 전용 검증, 적용 보류
+
+> **아직 사용자 승인 요청 전의 단일 조건부 변경 후보**이며, 이 기록은 Production SQL 실행이나 migration history 수정 권한을 발급하지 않는다. 2026-11-14 보호 격리 복구 [#43553728311](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43553728311)의 실제 결과를 사용한다.
+
+1. **정확한 대상·기준:** Supabase `cnsfpcdiyofqvhpcegfc`, PostgreSQL 17.6, `public`과 기존 `supabase_migrations` 이력. 11/14 실제 원격 관측은 245개/frontier `20261113062455`; 공유 메모리 2360/2370/2380의 이력·테이블·삭제 재생 함수가 모두 없음. 원격 전용 `20261008090417`·`20261028011357`는 **유지**, 저장소 alias `20261028110500`은 **임의 기록 금지**. 45/82 차이는 무차별 배포 대상이 아님.
+2. **현재 배포 의존성:** GitHub `main` 확인 `f4027f9cdb2a08d132a2425116d561b00bcb7509`에서 `apps/api/src/character-shared-memory-http-v1.ts`는 `/api/me/shared-memory` 명세를 제공하지만 `workers/cloudflare-api-router.mjs`의 Cloudflare allowlist에 해당 경로는 없음. 확인한 현재 주 채팅 실행 코드에도 공유 메모리 독자 조회의 직접 연결은 확인되지 않음. Cloudflare Worker `myeongha`의 실제 100% 배포 버전 `1d995e41-8c91-40c4-97dc-ebe958d678af`는 2026-11-14 03:58 UTC 기록이고, **Cloudflare Workers Builds의 해당 버전 빌드 `df4efe5b-505b-478a-9100-304e612e30da`가 `main` commit `f4027f9cdb2a08d132a2425116d561b00bcb7509`의 `npm run build:web` 및 `node scripts/cloudflare-main-web-cd.mjs` 성공을 독립 표기**해 배포 SHA까지 확인됨. 이 기능의 *출시 필요성*과 이미 서비스 중인 채팅 장애를 혼동하지 않는다. 캐릭터·프론트 기능 연결은 타 트랙 책임이며 여기서 중복 구현하지 않는다.
+3. **기존 코드·권한 선행조건:** `subjects`, `data_deletion_jobs`, `current_myeongha_subject_id()`, `internal_finalize_account_deletion_db_v1(uuid,uuid,text)` 존재; finalizer 소유자는 `postgres`, `myeongha_api_executor`는 non-superuser/non-BYPASSRLS. 기존 세연 pinned RPC는 현재 존재하며 API role만 실행 가능. #2200의 남은 P0001/실송수신 실패는 별도 진단이며 1640을 재적용하지 않는다.
+4. **이미 구현·재사용하는 읽기 전용 중단 게이트:** `scripts/operations/production-shared-memory-forward-preflight-readonly.sql`을 실제 Production에 SELECT로 1회 실행해 `baselineMatchesExpected=true` 실측. 이 검사는 사용자 데이터/원문 SQL을 읽지 않고 245/frontier, 기존 원격 이력 2개 보존, 공유 객체 부재, 필요 함수/역할을 확인한다. 그 결과는 **이전 시점의 기준선 일치**이지 변경 승인·전체 SQL 실행 가능성이나 최신 배포 동등성 증명이 아니다. 적용 직전 다시 실행하고 한 항목이라도 달라지면 중단한다.
+5. **최소 SQL 세트(다른 이력 제외):** 기존 변경 없는 `2360_subject_shared_memory_owner_managed_v1.sql` (Git blob `ddf51632a08735042adb0cff1bdbbf1b64e7c65a`) → `2370_subject_shared_memory_account_finalization_erasure_v1.sql` (`90848c31cd5dfc0de1ffb0b30cb46c95ef5c0710`) → `2380_subject_shared_memory_note_deletion_recovery_v1.sql` (`3cafb2d702bb17b6677ae550bd8b540d3e884158`). 2380 단독 설치·SQL 재생성·원격 전용 SQL 수정 없음.
+6. **객체·권한 변화:** 사용자 직접 작성 메모리 테이블(Owner RLS forced, API 역할 제한), 계정 최종 삭제의 물리 소거 트리거, 메모리 삭제 이벤트 테이블·삭제 트리거, 특권 복구 전용 함수. 브라우저 `anon/authenticated`의 직접 SELECT 및 내부 복구 함수 EXECUTE는 불허. 최종 삭제 시점의 기존 finalizer 상태 조건 불일치가 발견되면 실패 폐쇄하므로 기존 계정 삭제 경로와 충돌 가능성을 수용 검증해야 한다.
+7. **실행 순서·원자성:** 먼저 **적용 시점과 일치하는 새 암호화 Production 백업 + 같은 실행의 Provider 원장**을 확보·지문 검증한다. 오직 사용자가 정확한 대상/세 SQL/이력 등록을 승인한 후 보호된 production 전용 접속에서 해시·현재 권한·기존 객체 부재를 재검증하고 `postgres` owner 컨텍스트로 세 SQL을 **하나의 트랜잭션**에 순차 적용한다. 일반 `supabase db push --include-all` 또는 원격 전체 마이그레이션 repair는 사용하지 않는다.
+8. **이력 등록 방식과 중복 방지:** SQL 적용 후 객체/함수/권한 결과가 맞는 경우에만 **새로 실행한 정확한 2360/2370/2380 세 버전**을 최신 지원 CLI의 대상 지정 이력 절차로 기록하고 readback한다. 이는 별도 명시 승인 범위이며 현재 유효한 원격 45개를 없애거나 옛 `20261028110500`을 가짜 적용 처리하는 작업이 아니다. SQL은 재실행 가능한 idempotent DDL이 아니므로, 스키마는 존재하고 이력 등록만 누락된 경우 전체 SQL을 재실행하지 않고 HOLD·분리 정합화한다.
+9. **기존 데이터 영향:** 기존 공유 메모리 테이블은 현재 없어 사용자 메모리 기존 행 이관은 없음. `subjects` 및 삭제 작업 테이블의 기존 행을 일괄 수정하지 않으며 기존 채팅·Reader·Commerce 데이터를 변경하지 않음. 단, 새 트리거는 **향후** 계정 삭제 완료 전환의 정합성을 강제하므로 삭제 시나리오 실패는 기능 활성화 차단으로 판정한다.
+10. **실패·되돌리기:** 3 SQL 중 실패하면 그 단일 트랜잭션을 전부 롤백하고 이력 등록 없이 중단. 커밋 후 이력/권한 검증 실패면 기능 노출을 중단하고 기존 Worker 버전을 유지·복구하되, 이미 저장될 수 있는 메모리·삭제 이벤트의 손실 위험 때문에 테이블 DROP/DB 과거 백업 덮어쓰기를 자동 rollback으로 사용하지 않는다. 별도 정방향 복구안과 명시 승인을 받는다.
+11. **이후 읽기 전용 수용:** 세 적용 버전·정확한 Git source SHA/DB 실행 출처, 테이블·정책·소유자·GRANT/RLS·트리거·복구 함수, 원격 2개 역사 이력 보존 및 배포 SHA 호환성을 확인. 격리 PG17의 실제 동일 SQL 3종 적용/권한/합성 개인정보 비재노출·재생 2회 PASS는 이미 `#43553728311`에서 확보. 새 버전 기준 전체 백업/복구, 실제 독립 개인정보 원장, Hosted Auth/Storage, RPO 24h/RTO 6h, #2200 실제 채팅 수용은 **별도 HOLD**.
+12. **승인·운영 판정:** 현재 Cloudflare 경로 및 실제 배포 SHA를 확정하고 해당 기능을 Production에 열기로 결정할 때, 위 정확한 SQL 3종 + 적용 방식 + 세 신규 이력 ID 기록을 대상으로 사용자에게 **단일 명시 승인**을 요청한다. 승인 전 Production SQL·실데이터 삭제·Provider 비용 발생 작업 없음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false` 유지.
+
+Watchtower-Track: ops
+
+## 2026-11-14 실제 현재 백업 격리 개인정보 마이그레이션 실증 — 제한 PASS, 전체 DR HOLD
+
+- **보호 실행:** [PostgreSQL Isolated Restore Drill #43553728311](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43553728311) **SUCCESS**, 정확한 `main` SHA `986cc1cc2e2b095350158990cb7660ed2de0692d`. 비식별 증거 artifact `14097053341` (`postgres-isolated-restore-drill-43553728311`, 만료 2026-12-14 UTC).
+- **소스 검증:** 백업·암호화 Provider 원장 **동일 실행 #43424903445**, 백업 소스 `6eab97337811128282f5f5ec6320e4608d5f9c09`, 프로젝트 `cnsfpcdiyofqvhpcegfc`, 원격 이력 **245개**, frontier `20261113062455`, catalog SHA256 `405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 일치. 암호화 원장 복호화·원본 무결성 **PASS**, 원본 SQL 본문 12개 미보유/전체 Provider migration ledger 대상 복구 **HOLD**.
+- **일회용 DB의 실제 결과:** 백업 원본에 대한 이전 스키마/역할/ACL 관측을 먼저 수행한 다음, **PG17 loopback 복원 클론에만** 고정 SQL `2360→2370→2380`을 **단일 트랜잭션**으로 적용. `disposable-shared-memory-privacy-rehearsal.json`: 세 버전 적용 및 메타데이터/권한 검사 PASS, `productionDatabaseChanged=false`, `cloneStillMatchesOriginalProductionSchema=false`, `drReady=false`. 기존 합성 개인정보 삭제·복구 검사 **PASS** (5개 합성 이벤트, 동일 원장 두 번째 재생 멱등 PASS, 공유 메모리 재노출 차단·계정 삭제·Commerce 보존 가드 PASS). **실제 Production 데이터 삭제/Privacy Canary는 실행하지 않음.**
+- **복원 범위의 한계:** 원본/복원 public 스키마 catalog 비교는 범위 한정 관측이며 공유 MVCC snapshot 동등성은 미증명. Provider-managed 141 COPY block 중 112 replay, 3 column projection, 29 skip; **full Provider restore=false**. Hosted `auth.identities`/`auth.sessions`/Storage, 로그인·갱신·객체 바이트 및 전체 RPO 24h/RTO 6h 실측 **미완료**. `recovered-serving-admission.json`은 `gate=BLOCKED`, `serviceResumptionAllowed=false`, `drReady=false`.
+- **직접 운영 재확인:** 2026-11-14 읽기 전용 Supabase에서 migration **245개/frontier `20261113062455` 유지**, 세 공유 메모리 객체/삭제 재생 함수 **부재**. 이번 실증은 **세 SQL의 현재 백업 기준 격리 정방향 적용 가능성만** 입증한다. 운영 이력 45/82·원격 전용 두 버전·실배포 의존성을 구분한 최소 변경안을 마련하고, 운영 DB SQL 적용 전 대상/순서/보존/롤백/재검증 근거와 사용자 명시 승인을 받는다.
+- **판정:** #1887 OPEN / `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false`. 합성 복구 결과를 실제 Production 개인정보 원장 연속성이나 서비스 재개로 승격하지 않는다.
+
+Watchtower-Track: ops
+
 ## 2026-11-13 현재 운영 백업의 개인정보 복구 선행 마이그레이션 — 격리 적용 경로 구현
 
 - 보호된 [백업 #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)는 실측한 현재 원격 이력 **245건 / frontier `20261113062455`**를 암호화 원장과 함께 보존한다. 현재 Production에는 수동 공유 메모리 `2360`, 계정 삭제시 메모리 소거 `2370`, 삭제 이벤트 재생 `2380`의 테이블·함수/원장이 존재하지 않는다. 그러므로 백업 무결성만으로 최신 승인된 **개인정보 복구 기능까지 검증됐다고 선언할 수 없다**.
