@@ -163,7 +163,7 @@ async function main(){
     // query string nor any printed error contains original statement bodies.
     input:buildDisposableLedgerReplaySql(packet).replace(
       '/*__SOURCE_PACKET_COPY_DATA__*/',
-      sourceBytes.toString('utf8').trimEnd()+'\\n\\\\.\\n'
+      sourceBytes.toString('utf8').trimEnd()+'\n\\.\n'
     ),
     encoding:'utf8',timeout:110000,maxBuffer:1024*1024,
     env:process.env,windowsHide:true,
