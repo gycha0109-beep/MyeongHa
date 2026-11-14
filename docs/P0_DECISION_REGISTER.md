@@ -1,5 +1,7 @@
 # 명하 Production P0 Decision Register — Full Audit v0.9
 
+> **2026-11-14 현재 실행 기준:** [현행 제품 소유자 범위 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md) · [통합 실행 게이트](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)가 첫 출시 범위에 대한 후속 승인이다. **14개 구매 Offer / 7개 해석 구성 / 6명 동시 채팅 / 500명 품질 개선 / 웹 기본 Reader 일괄 공개**가 현재 목표다. 기존 1/11/12상품 관련 결정 기록은 당시 상태로 보존하고, 실결제·운영 DB·법적 고지 등 필수 조건은 완료로 승격하지 않는다.
+
 > Product: **명하 (Myeongha)**  
 > Pack Version: **v0.11**  
 > Date: **2026-09-19**  
