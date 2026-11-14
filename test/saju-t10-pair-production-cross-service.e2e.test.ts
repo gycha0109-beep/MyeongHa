@@ -17,7 +17,7 @@ const subjectId = '11223344-5566-4788-899a-aabbccddeeff';
 // Only DB access is simulated; the Saju issuer, Ed25519 signature and
 // MyeongHa verification/projection are the actual implementation.
 vi.mock('../apps/api/src/postgres-subject-execution.js', () => ({
-  executePostgresApprovedSajuIssuerTransactionV1: async (
+  executePostgresApprovedSajuPairReaderTransactionV1: async (
     input: {execute: (context: unknown) => Promise<unknown>},
   ) => input.execute({
     client: {query: db.query},resolvedSubject: {subjectKind: 'member',subjectId},
