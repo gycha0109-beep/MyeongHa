@@ -3,41 +3,42 @@ import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-verification-execution.js';
 import { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
 import { createApprovedSajuSandboxLoopbackHostV1 } from './approved-saju-sandbox-loopback-host-v1.js';
-import { createProductionTargetPersonReadRuntimeV1 } from './production-target-person-read-runtime.js';
-import { createProductionReadingHistoryReadRuntimeV1 } from './production-records-read-runtime.js';
-import { createProductionRequestIdentityVerifierV1 } from './production-request-identity-verifier.js';
+import { handleTargetPersonReadRequestV1 } from './target-person-read-http.js';
+import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
+import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import {
-  parseProductionUserDataRuntimeConfigV1,
-  type ProductionUserDataRuntimeEnvV1,
-} from './production-user-data-runtime-config.js';
-import type { SupabaseMemberVerifierFetchV1 } from './supabase-member-identity-verifier.js';
+  SupabaseMemberIdentityEvidenceVerifierV1,
+  type SupabaseMemberVerifierFetchV1,
+} from './supabase-member-identity-verifier.js';
+import { MYEONGHA_PRODUCTION_SUPABASE_ORIGIN } from './production-user-data-runtime-config.js';
 
 /**
- * Assemble the ALREADY APPROVED sandbox APIs on one isolated localhost origin:
- * owner checkout, consented counterpart reads, purchased signed Reading archive.
- *
- * This is an injection-only runtime. No environment-variable lookup, public
- * Cloudflare route, live payment activation, issuer worker or database migration.
- * The caller MUST supply two distinct, separately authorized PostgreSQL pools
- * and the existing server-side PortOne TEST verifier.
+ * The owner-only, local TEST runtime mounts existing authorized HTTP handlers.
+ * Production database credentials, Cloudflare routes, official issuer workers,
+ * public sale enablement and migrations are never created here.
  */
 export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
   origin: string;
   staticRoot: string;
-  env: ProductionUserDataRuntimeEnvV1;
+  supabaseOrigin: string;
+  supabaseApiKey: string;
   channel: Readonly<{ environment: 'sandbox'; storeId: string; channelKey: string }>;
   memberPool: PostgresSubjectPoolV1;
   commercePool: PostgresSubjectPoolV1;
   verificationAdapter: CommercePaymentVerificationAdapterV1;
   memberFetchImpl?: SupabaseMemberVerifierFetchV1;
+  sdkFetch?: typeof fetch;
 }>) {
   if (input.memberPool === input.commercePool) {
     throw new Error('Saju sandbox owner runtime requires separate member and commerce DB roles.');
   }
-  const config = parseProductionUserDataRuntimeConfigV1(input.env);
-  const memberAuth = createProductionRequestIdentityVerifierV1({
-    config,
-    ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
+  if (input.supabaseOrigin !== MYEONGHA_PRODUCTION_SUPABASE_ORIGIN) {
+    throw new Error('Saju sandbox Owner login must use the existing governed Supabase Auth project.');
+  }
+  const memberAuth = new SupabaseMemberIdentityEvidenceVerifierV1({
+    supabaseOrigin: input.supabaseOrigin,
+    supabaseApiKey: input.supabaseApiKey,
+    ...(input.memberFetchImpl === undefined ? {} : { fetchImpl: input.memberFetchImpl }),
   });
   const checkout = createApprovedSajuSandboxHttpRuntimeV1({
     origin: input.origin, channel: input.channel,
@@ -45,32 +46,32 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
     identityEvidenceVerifier: memberAuth,
     verificationAdapter: input.verificationAdapter,
   });
-  const readerOptions = {
-    env: input.env, pool: input.memberPool,
-    ...(input.memberFetchImpl === undefined ? {} : { memberFetchImpl: input.memberFetchImpl }),
-  };
-  const targets = createProductionTargetPersonReadRuntimeV1(readerOptions);
-  const archive = createProductionReadingHistoryReadRuntimeV1({
-    ...readerOptions, approvedSajuArchiveEnabled: true,
+  const shared = (request: Request) => ({
+    request, requestId: randomUUID(), serverTime: new Date().toISOString(),
+    identityEvidenceVerifier: memberAuth, pool: input.memberPool,
   });
   const host = createApprovedSajuSandboxLoopbackHostV1({
     origin: input.origin,
     staticRoot: input.staticRoot,
     runtime: checkout,
+    ...(input.sdkFetch === undefined ? {} : { sdkFetch: input.sdkFetch }),
     ownerReads: {
-      targets: request => targets.handleRequest({
-        request, requestId: randomUUID(), serverTime: new Date().toISOString(),
-      }),
-      readings: request => archive.handleRequest({
-        request, requestId: randomUUID(), serverTime: new Date().toISOString(),
-      }),
+      targets: request => handleTargetPersonReadRequestV1(shared(request)),
+      readings: request => {
+        const url = new URL(request.url);
+        if (url.searchParams.has('purchaseIntentId') || url.searchParams.has('readingId')) {
+          return handleOfficialReadingRecordRequestV1({
+            ...shared(request), approvedSajuArchiveEnabled: true,
+          });
+        }
+        return handleReadingHistoryRequestV1({
+          ...shared(request), approvedSajuArchiveEnabled: true,
+        });
+      },
     },
   });
   return Object.freeze({
     start: () => host.start(),
-    async close() {
-      await host.close();
-      await Promise.all([targets.close(), archive.close()]);
-    },
+    close: () => host.close(),
   });
 }
