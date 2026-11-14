@@ -17,6 +17,7 @@ const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const bearer = 'synthetic-natal-browser-bearer';
 const observedRequests = [];
 let malformed = false;
+let previewUnavailable = false;
 const journeyBearer = 'synthetic-guest-birth-preview-bearer';
 const journeyRevisionId = '55555555-5555-4555-8555-555555555555';
 const journeyProfileId = '44444444-4444-4444-8444-444444444444';
@@ -149,6 +150,13 @@ async function serve() {
         }
         res.setHeader('content-type', 'application/json; charset=utf-8');
         res.setHeader('cache-control', 'no-store');
+        if (previewUnavailable) {
+          res.statusCode = 503;
+          res.end(JSON.stringify({ ok: false, error: {
+            code: 'SAJU_PREVIEW_TEMPORARILY_UNAVAILABLE', retryable: true,
+          } }));
+          return;
+        }
         res.end(envelope({ lifecycle: 'preview', reading: reading() }));
         return;
       }
@@ -266,6 +274,16 @@ try {
     'Preview guidance and scope limitation must both survive delivery: ' + JSON.stringify(visible));
   assert(observedRequests.length === 1, 'Expected one General Natal request');
   assert(observedRequests[0].body.readingText === '전체 사주', 'Request was not General Natal');
+
+  previewUnavailable = true;
+  await client.send('Page.navigate', { url: origin + '/reading-detail.html?topic=temperament&scope=original' });
+  await waitFor(client, 'document.body?.dataset.readingRouteState === "preview_unavailable"', 'temporary Saju outage');
+  assert(await client.evaluate('document.querySelector("[data-reading-route-action]")?.href === location.href'),
+    'Retry should keep the exact Preview product');
+  previewUnavailable = false;
+  await client.evaluate('document.querySelector("[data-reading-route-action]")?.click()');
+  await waitFor(client, 'document.body?.dataset.readingRouteState === "preview"', 'same product retry');
+  assert(observedRequests.at(-1).body.readingText === '전체 사주', 'Retry requested a different product');
 
   malformed = true;
   await client.send('Page.navigate', { url: origin + '/reading-detail.html?topic=temperament&scope=original' });

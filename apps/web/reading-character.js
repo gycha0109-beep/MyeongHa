@@ -363,7 +363,7 @@ document.addEventListener('myeongha:localechange', () => {
   if (root.dataset.readingRouteState === 'preview_loading') renderPreviewLoading();
 });
 
-function renderPreviewFailure(title, copy, state = 'preview_unavailable') {
+function renderPreviewFailure(title, copy, state = 'preview_unavailable', retryable = false) {
   root.dataset.readingRouteState = state;
   if (stage) stage.hidden = true;
   if (routeState) routeState.hidden = false;
@@ -373,6 +373,9 @@ function renderPreviewFailure(title, copy, state = 'preview_unavailable') {
   if (state === 'preview_requires_profile' && routeAction) {
     routeAction.setAttribute('href', previewSetupHrefV1(params));
     routeAction.textContent = '출생정보 입력 후 이 사주 읽기 보기 →';
+  } else if (retryable && routeAction) {
+    routeAction.href = window.location.href;
+    routeAction.textContent = translateStaticUi('다시 시도', getUiLocale());
   }
 }
 
@@ -438,7 +441,7 @@ function stepsFromIssuedProductResponse(response, { isStoredRecord = false } = {
 
     return [{
       title,
-      primary: interpretation[0],
+      primary: interpretation[0] ?? '',
       supporting: interpretation.slice(1),
       structure,
     }];
@@ -1108,6 +1111,7 @@ async function loadPreviewReading() {
       return;
     }
     if (response.status === 409 || publicErrorCode(payload) === 'SAJU_PREVIEW_READING_UNAVAILABLE') {
+      root.dataset.readingRouteState = 'blocked_by_authority';
       renderAuthorityBlockedRoute();
       return;
     }
@@ -1115,6 +1119,8 @@ async function loadPreviewReading() {
       renderPreviewFailure(
         '사주 프리뷰를 잠시 불러올 수 없습니다.',
         '검증된 Preview Reading 연결이 일시적으로 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.',
+        'preview_unavailable',
+        payload?.error?.retryable === true || response.status >= 500,
       );
       return;
     }
@@ -1132,6 +1138,8 @@ async function loadPreviewReading() {
     renderPreviewFailure(
       '사주 프리뷰를 잠시 불러올 수 없습니다.',
       '네트워크 연결 또는 Preview Reading 서비스 상태를 확인한 뒤 다시 시도해 주세요.',
+      'preview_unavailable',
+      true,
     );
   }
 }
