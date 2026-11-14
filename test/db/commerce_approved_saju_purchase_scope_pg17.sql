@@ -7,6 +7,7 @@ begin;
 \ir ../../docs/operations/candidates/commerce_approved_saju_legacy_archive_fence_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuance_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_issuer_facades_v1.sql
+\ir ../../docs/operations/candidates/commerce_approved_saju_pair_issuer_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_full_cancellation_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_checkout_selection_v1.sql
 \ir ../../docs/operations/candidates/commerce_approved_saju_payment_handoff_v1.sql
@@ -151,6 +152,18 @@ begin
       raise exception 'Single-Birth finalizer accepted a pair Reading';
     exception when sqlstate 'P0001' then
       if sqlerrm <> 'Approved Saju issuance authority changed' then raise; end if;
+    end;
+    begin
+      perform 1 from public.cmd_finalize_approved_saju_pair_reading_v1(actor,intent_id,reading_id,attempt_id,
+        gen_random_uuid(),source_hash,'isolated-ref','isolated-approved-v1',
+        (select input_hash from public.birth_profile_revisions where id=authorized.source_birth_revision_id),
+        (select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id),
+        jsonb_build_object('state','delivered','responseVersion','myeonghwa-product-reading-response-v2',
+          'reading',jsonb_build_object('readingId',reading_id)),
+        response_hash,'{}'::jsonb);
+      raise exception 'Dedicated T10 finalizer accepted missing Ed25519 Source proof';
+    exception when sqlstate 'P0001' then
+      if sqlerrm <> 'Approved Saju pair source did not match the verified issued Reading' then raise; end if;
     end;
   end if;
   perform 1 from public.cmd_finalize_reading_transport_success_v1(actor,reading_id,attempt_id,gen_random_uuid(),
