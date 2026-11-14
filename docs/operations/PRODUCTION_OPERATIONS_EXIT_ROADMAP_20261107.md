@@ -1,3 +1,14 @@
+## 2026-11-14 실제 Provider migration 원장 245행 격리 재구성 실증 — 로컬 복원 PASS, Hosted DR HOLD
+
+- **정본 실행:** [보호 격리 복구 #43575005715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43575005715) **SUCCESS**, workflow SHA `fa0c36e7a47e371a6096d31724765a0a42fc7814`, 동일 실행 백업·봉인 Provider 원장 [#43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445). 비식별 증거 artifact `14105687545` (`postgres-isolated-restore-drill-43575005715`, 2026-12-14 08:17 UTC 만료).
+- **원장 실증:** `disposable-provider-migration-ledger-restore.json`의 `originalMigrationCount=245`, `restoredHistoryRowCount=245`, `originalFrontier=20261113062455`, catalog SHA256 `405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba`, `restoredAllSixHistoryFieldsExact=true`, `restoredSourceHistoryWithoutExecutingMigrationSql=true`. 일회용 **loopback PostgreSQL 17.6**에서 6개 이력 필드 모두 봉인 원본과 일치. 원장 기록 복원만 수행했으며 원장 내 과거 SQL 본문은 실행하지 않음.
+- **개인정보:** 기존 백업 복원 후 동일 일회용 DB에만 `2360→2370→2380`을 단일 트랜잭션으로 적용하고 권한·RLS·함수 검사 PASS. `privacy-reconciliation-evidence.json`에서 합성 5개 삭제·철회·계정 삭제 이벤트 PASS, 재생 멱등성·공유 메모리 비재노출·Commerce 보존 가드 PASS. `recovered-serving-admission.json`: `gate=BLOCKED`, `serviceResumptionAllowed=false`, `drReady=false`.
+- **비노출·운영 영향:** 수정 후 workflow는 PostgreSQL 서비스에 `--log-driver none` 적용, 원문 JSON 대신 봉인 패킷의 base64 ASCII를 일회용 DB COPY로 전달. 실제 성공한 실행의 로그를 기준으로 이전 JSON/원문 출력 오류, 구문 오류, 보호 SQL 본문 재출력 **관련 패턴 미발견**. `productionDatabaseChanged=false`. 당일 다시 실시한 Production Supabase **읽기 전용** 조회에서도 245개/frontier `20261113062455`, 원격 역사 버전 2개 보존, 공유 메모리 2360/2370/2380 **미적용**·객체 **부재**.
+- **결과 구분:** *일회용 DB의 이력 행 완전 재구성*과 *Provider-managed migration ledger의 Hosted 서비스 복구*는 다른 수용 조건. `fullProviderMigrationLedgerRestored=false`, `providerManagedDataFullRestore=false`; 원장 SQL 본문 12개 미보유·역사적 실행자 미인증도 유지. 동일 복구의 Provider 데이터는 29 block skip, 3 projection을 포함하여 완전 복구가 아니며 Hosted Auth/Storage 로그인·세션/객체 바이트, 실제 Production 개인정보 원장 연속성, RPO 24시간·RTO 6시간 모두 미증명.
+- **다음:** 기존 Phase 8-B의 독립 Hosted Provider-equivalent 복구·Phase 8-C의 개인정보 연속성을 증명한다. 신규 유료 Hosted 환경, Production DB SQL `2360→2370→2380` 적용 및 이력 등록, Privacy Canary는 사용자 명시 승인 이전 실행 금지. 기존 원격 전용 45개와 이력 차이 45/82 무차별 repair 금지. #1887 OPEN / `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 — 실제 Provider 원장 복원 첫 실행 실패·출력 보호 보강
 
 - **실행:** 보호 격리 복구 [#43571674258](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43571674258), 정확한 짝지어진 백업 #43424903445, `restore_disposable_provider_ledger=true`. 복구·동일 실행 암호화 Provider 원장 복호화·원본 SQL 지문·버전 출처 검증은 PASS, **일회용 원장 행 삽입 단계에서 FAIL**. SQL 원문이 포함된 JSON을 PostgreSQL `COPY`의 직접 입력으로 전송하다가 JSON 오류가 발생한 것이 원인; 245행 복원은 **미증명**. 이 실패가 Production DB를 변경하지 않았음(재조회 245개/frontier `20261113062455`, 공유 메모리 3개 미적용).
