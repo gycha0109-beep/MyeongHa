@@ -6,6 +6,12 @@ import type { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-san
 import { OWNER_PORTONE_SDK_PATH, serveOwnerPortOneSdkV1 } from '../../../cloudflare/owner-portone-sdk-proxy.mjs';
 
 const ROUTES = new Set(Object.values(APPROVED_SAJU_SANDBOX_ROUTES_V1));
+const AUTH_ROUTES = Object.freeze({
+  '/api/auth/sign-in': 'sign-in',
+  '/api/auth/refresh': 'refresh',
+  '/api/auth/sign-out': 'sign-out',
+} as const);
+type LocalAuthAction = typeof AUTH_ROUTES[keyof typeof AUTH_ROUTES];
 const ARCHIVE_PATH = '/api/readings';
 const TARGETS_PATH = '/api/target-persons';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
@@ -36,6 +42,7 @@ const TYPES: Readonly<Record<string, string>> = Object.freeze({
 
 type Runtime = Pick<ReturnType<typeof createApprovedSajuSandboxHttpRuntimeV1>, 'handleRequest'>;
 type OwnerReadHandler = (request: Request) => Promise<Response>;
+type LocalAuthHandler = (request: Request, action: LocalAuthAction) => Promise<Response>;
 function closedHeaders() {
   return { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' };
@@ -53,6 +60,8 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   runtime: Runtime;
   /** Trusted fixed-CDN test injection; never selected by a client URL. */
   sdkFetch?: typeof fetch;
+  /** Only existing-member sign-in/refresh/sign-out. Never sign-up or social callbacks. */
+  memberAuth?: LocalAuthHandler;
   /** Existing RLS/entitlement-verifying GET runtimes. No write routes. */
   ownerReads?: Readonly<{ targets: OwnerReadHandler; readings: OwnerReadHandler }>;
 }>) {
@@ -68,6 +77,7 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
     throw new Error('Saju sandbox host port is outside the approved local range.');
   }
   const staticRoot = resolve(input.staticRoot);
+  const authAttempts: number[] = [];
   const server = createServer({ maxHeaderSize: 8192, requestTimeout: 12_000 }, async (req, res) => {
     const reply = (status: number, body?: Uint8Array, mime?: string) => {
       res.writeHead(status, { ...closedHeaders(), ...(mime ? { 'Content-Type': mime } : {}) });
@@ -105,6 +115,56 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
         let offset = 0;
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
         reply(200, bytes, 'application/javascript; charset=utf-8');
+      } catch { reply(503); }
+      return;
+    }
+
+    if (Object.hasOwn(AUTH_ROUTES, requestUrl.pathname)) {
+      if (input.memberAuth === undefined) { req.resume(); reply(404); return; }
+      if (req.method !== 'POST' || requestUrl.search !== ''
+        || req.headers.origin !== input.origin
+        || req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
+        req.resume(); reply(403); return;
+      }
+      const action = AUTH_ROUTES[requestUrl.pathname as keyof typeof AUTH_ROUTES];
+      // Only password sign-in is rate-limited; refresh/sign-out must remain usable.
+      if (action === 'sign-in') {
+        const now = Date.now();
+        while (authAttempts.length && authAttempts[0]! < now - 15 * 60_000) authAttempts.shift();
+        if (authAttempts.length >= 8) { req.resume(); reply(429); return; }
+        authAttempts.push(now);
+      }
+      try {
+        const chunks: Buffer[] = [];
+        let length = 0;
+        for await (const chunk of req) {
+          const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+          length += bytes.length;
+          if (length > 8192) { reply(413); return; }
+          chunks.push(bytes);
+        }
+        const headers = new Headers();
+        for (const [key, value] of Object.entries(req.headers)) {
+          if (typeof value === 'string') headers.set(key, value);
+        }
+        const result = await input.memberAuth(new Request(requestUrl.href, {
+          method: 'POST', headers, body: Buffer.concat(chunks),
+        }), action);
+        if (!(result instanceof Response) || result.status >= 300 && result.status < 400
+          || result.headers.has('location')) { reply(503); return; }
+        const body = new Uint8Array(await result.arrayBuffer());
+        if (body.byteLength > MAX_RESPONSE_BYTES || !result.headers.get('content-type')?.startsWith('application/json')) {
+          reply(503); return;
+        }
+        const cookie = result.headers.get('set-cookie');
+        if (cookie !== null && !/^myeongha_member_refresh_v1=[^;]*; Path=\/api\/auth; HttpOnly; Secure; SameSite=Strict(?:; Max-Age=0)?$/u.test(cookie)) {
+          reply(503); return;
+        }
+        res.writeHead(result.status, { ...closedHeaders(),
+          'Content-Type': 'application/json; charset=utf-8',
+          ...(cookie === null ? {} : { 'Set-Cookie': cookie }),
+        });
+        res.end(body);
       } catch { reply(503); }
       return;
     }
