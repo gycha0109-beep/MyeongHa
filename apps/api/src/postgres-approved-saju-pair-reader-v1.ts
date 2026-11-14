@@ -1,7 +1,7 @@
 import { executePostgresApprovedSajuPairReaderTransactionV1,
   type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
-import { readApprovedSajuPairIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
+import { readApprovedSajuPairReaderScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
 import { projectSignedSajuT10PairProductReadingV1 } from './saju-t10-pair-official-product-reading-v1.js';
 import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
 import { hashSajuHeldSourceProofRequestV1 as hashJson } from './saju-held-source-proof-verifier-v1.js';
@@ -44,7 +44,7 @@ export async function readPostgresApprovedSajuT10PairReaderV1(input: Readonly<{
       if (resolvedSubject.subjectKind !== 'member' ||
           (input.subjectId !== undefined && resolvedSubject.subjectId !== input.subjectId)) return null;
       const subjectId=resolvedSubject.subjectId;
-      const scope=await readApprovedSajuPairIssueScopeV1(client,{
+      const scope=await readApprovedSajuPairReaderScopeV1(client,{
         subjectId,purchaseIntentId:input.purchaseIntentId,
       });
       if (scope === null) return null;
