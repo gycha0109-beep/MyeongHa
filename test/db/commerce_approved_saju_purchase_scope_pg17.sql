@@ -466,6 +466,8 @@ declare
   first_grant public.entitlement_grants%rowtype;
   first_reading uuid;
   additional_reading uuid;
+  bundle_pair_reading uuid;
+  bundle_self_reading uuid;
   edited_self uuid := gen_random_uuid();
   cancelled_at timestamptz;
   cancel_result jsonb;
@@ -881,11 +883,24 @@ begin
         perform pg_temp.approved_fixture_reading(actor,intent_id,offer_key);
       end if;
       if offer_key='relationship-plus-first' then
-        perform pg_temp.approved_fixture_reading(actor,intent_id,'compatibility');
-        perform pg_temp.approved_fixture_reading(actor,intent_id,'relationship');
+        bundle_pair_reading := pg_temp.approved_fixture_reading(actor,intent_id,'compatibility');
+        bundle_self_reading := pg_temp.approved_fixture_reading(actor,intent_id,'relationship');
         if (select count(*) from public.qry_approved_saju_purchase_readings_v1(actor,intent_id)
-          where reading_id is not null and reading_session_id is not null and saju_domain=component)<>2 then
-          raise exception 'Combined order did not reopen the pair and self components independently';
+          where reading_id is not null and reading_session_id is not null and saju_domain=component)<>2
+          or bundle_pair_reading=bundle_self_reading
+          or public.qry_approved_saju_source_issue_proof_v1(actor,bundle_pair_reading) is null
+          or public.qry_approved_saju_source_issue_proof_v1(actor,bundle_self_reading) is not null then
+          raise exception 'Combined order did not preserve independent pair and self Reading proofs';
+        end if;
+        cancelled_at := clock_timestamp();
+        cancel_result := pg_temp.approved_fixture_full_cancellation(receipt_for_offer,cancelled_at);
+        if cancel_result->>'disposition'<>'revoked'
+          or (cancel_result->>'grantCount')::integer<>cardinality(fields)
+          or exists(select 1 from public.qry_approved_saju_purchase_readings_v1(actor,intent_id))
+          or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,bundle_pair_reading,null,true))
+          or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,bundle_self_reading,null,true))
+          or public.qry_approved_saju_source_issue_proof_v1(actor,bundle_pair_reading) is not null then
+          raise exception 'Cancelled combined T8/T10 purchase retained its Reader or pair proof access';
         end if;
       end if;
       if offer_key='basic-month' then
@@ -947,8 +962,14 @@ begin
              and status='active' and scope_key is distinct from first_grant.scope_key)
            or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,first_reading,null,true))
            or exists(select 1 from public.qry_official_reading_record_runtime_v1(actor,first_reading))
-           or not exists(select 1 from public.qry_approved_saju_component_record_v1(actor,additional_reading,null,true)) then
-          raise exception 'Refund effect did not revoke just the exact comparison purchase';
+           or not exists(select 1 from public.qry_approved_saju_component_record_v1(actor,additional_reading,null,true))
+           or public.qry_approved_saju_source_issue_proof_v1(actor,first_reading) is not null
+           or public.qry_approved_saju_source_issue_proof_v1(actor,additional_reading) is null
+           or not exists(
+             select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
+             where proof.reading_id=first_reading and proof.subject_id=actor
+           ) then
+          raise exception 'Refund incorrectly exposed or deleted a historical pair receipt';
         end if;
         payload := commerce_saju_private.resolve_approved_purchase_admission_v1(actor,record_id,self_revision,
           offer_id,capability_id,offer_key,'after-settled-refund',target_id);
