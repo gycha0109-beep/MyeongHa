@@ -1,3 +1,11 @@
+### 2026-11-14 — 느린 DB 실측 첫 실패와 격리 Worker DB 연결 경계 수정
+
+- [격리 실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032): PG18 RLS·합성 연결 압력 PASS, 실제 GoTrue+PG18+Saju Workerd 제품 경로 `workerd_requests` FAIL. 비식별 증거 `14113415610`=`BLOCKED_INCOMPLETE`, 성공/4개 요청 복구/연결 대기 초과 미입증.
+- 워커 fixture가 전역 `pg.Pool`로 연결을 요청 간 재사용한 설계 문제 발견(Cloudflare 공식 권장 방식과 불일치). 개별 요청마다 `pg.Client`를 새로 열고, 교차 요청에는 숫자 상태로만 2개 슬롯/125ms 대기 제한을 두도록 수정. 수용 검사에 요청별 연결·최대 2개 사용량을 추가하고 실패 관측도 숫자 집계만 허용. **실패 원문이 보존되지 않아 예외 종류 자체는 미확정**.
+- 기존 DB 중단·15분 시험은 재실행하지 않음. 새 브랜치의 정적 검사와 일반/통합 CI 후 정확한 최신 `main`에서 한정 재실증하고 원본 artifact를 검사. Production DB/Worker·Hosted 설정·사용자 데이터·비용 변경 없음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false` 유지.
+
+Watchtower-Track: ops
+
 ### 2026-11-14: isolated Phase 11 slow DB and pool acquisition timeout harness (execution pending)
 
 - Reuse prior actual workerd DB process outage/health/recovery evidence [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024); implement only the missing slow database/pool acquisition timeout scenario.

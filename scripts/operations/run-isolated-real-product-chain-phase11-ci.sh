@@ -219,6 +219,8 @@ if [[ "$experiment" == workerd || "$experiment" == workerd_overlap || "$experime
       and .dbSlowPool.realPostgresTableLock==true
       and .dbSlowPool.disposablePoolMax==2
       and .dbSlowPool.localAcquireTimeoutMillis==125
+      and .dbSlowPool.requestLocalDbConnections==true
+      and .dbSlowPool.observedLocalPeak>=1 and .dbSlowPool.observedLocalPeak<=2
       and .dbSlowPool.acquisitionAttempts>=4
       and .dbSlowPool.acquisitionFailures>=1
       and .dbSlowPool.acquisitionTimeouts>=1

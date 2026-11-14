@@ -138,6 +138,24 @@ describe('isolated PG18 actual authority and capacity workflow', () => {
     expect(product).toContain('flag:\'wx\'');
   });
 
+  it('uses request-local workerd PostgreSQL connections while preserving a bounded acquisition gate', () => {
+    const fixture=readFileSync('test/ops/fixtures/workerd-product-entry.mjs','utf8');
+    const product=readFileSync('test/ops/product-saju-isolated-pg18-phase11.test.mjs','utf8');
+    const realRunner=readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh','utf8');
+    expect(fixture).not.toContain('new Pool(');
+    expect(fixture).toContain('client=new Client(');
+    expect(fixture).toContain('async function acquireBoundedLease()');
+    expect(fixture).toContain('const BOUNDED_MAX=2;');
+    expect(fixture).toContain('const BOUNDED_ACQUIRE_MS=125;');
+    expect(fixture).toContain('ISOLATED_LOCAL_DB_LEASE_TIMEOUT');
+    expect(fixture).toContain('requestLocalClient:true');
+    expect(fixture).toContain('ctx.waitUntil(currentClient.end()');
+    expect(product).toContain('requestLocalDbConnections:true');
+    expect(product).toContain('metrics.peak).toBeLessThanOrEqual(2)');
+    expect(realRunner).toContain('.dbSlowPool.requestLocalDbConnections==true');
+    expect(realRunner).toContain('.dbSlowPool.observedLocalPeak>=1 and .dbSlowPool.observedLocalPeak<=2');
+  });
+
   it('keeps sustained load opt-in and verifies Saju limits and teardown', () => {
     const realRunner = readFileSync('scripts/operations/run-isolated-real-product-chain-phase11-ci.sh', 'utf8');
     const compose = readFileSync('scripts/operations/real-gotrue-product-phase11.compose.yml', 'utf8');

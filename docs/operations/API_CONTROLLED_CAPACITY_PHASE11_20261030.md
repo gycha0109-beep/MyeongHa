@@ -1,3 +1,11 @@
+## 2026-11-14 workerd 느린 DB 첫 보호 실행 결과 — BLOCKED, 요청별 연결 수정
+
+[실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032): 기본 PG18 RLS·합성 압력 PASS, 실제 workerd 제품 경로 `workerd_requests` 실패. 실증 상태는 `BLOCKED_INCOMPLETE`이며 계획된 4개 동시 요청의 제한 실패·획득 대기 초과·복구 4/4 수용을 완료하지 못했다.
+
+Cloudflare Workers는 서로 다른 요청 사이에 DB socket/`pg.Pool`을 공유할 수 없으므로 테스트 fixture의 전역 Pool을 폐기한다. 새 실험은 각 요청에서 새 DB Client를 사용하고 전역에는 비식별 숫자형 2-slot 획득 제한/125ms 대기 초과만 저장한다. 이는 **local fixture의 슬롯 대기**이지 Hosted Hyperdrive 및 Production Pool 측정이 아니다. 기존 503·Health 200·4/4 복구 조건을 유지하고 실제 최고 동시 슬롯 2 이하를 확인한다. 정확한 최신 `main` 병합 후 동일 수동 실험을 재시도하며 새 성공 artifact 확인 전에는 실증 `NOT_OBSERVED`로 유지한다.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 isolated workerd slow DB / pool acquisition timeout experiment - implementation, not evidence
 
 Reuse real workerd DB outage [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024) and the 15-minute overlap [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347). Execute only the missing slow DB/pool scenario as a manual main-only dispatch after merge:

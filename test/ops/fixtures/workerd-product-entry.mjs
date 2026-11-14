@@ -1,9 +1,33 @@
-import { Client, Pool } from 'pg';
+import { Client } from 'pg';
 
-let isolatedBoundedPool;
+// The fixture bounds concurrent *request-local* Postgres connections without
+// ever storing a connection or a cross-request Promise in module scope.
+// Workers/Hyperdrive do not permit reusing a pg.Pool across requests.
+const BOUNDED_MAX=2;
+const BOUNDED_ACQUIRE_MS=125;
+let boundedActive=0;
+let boundedPeak=0;
 let boundedAcquireAttempts=0;
 let boundedAcquireFailures=0;
 let boundedAcquireTimeouts=0;
+let boundedConnectionFailures=0;
+
+async function acquireBoundedLease() {
+  boundedAcquireAttempts++;
+  const deadline=performance.now()+BOUNDED_ACQUIRE_MS;
+  while(boundedActive>=BOUNDED_MAX) {
+    if(performance.now()>=deadline) {
+      boundedAcquireFailures++;
+      boundedAcquireTimeouts++;
+      throw Error('ISOLATED_LOCAL_DB_LEASE_TIMEOUT');
+    }
+    // A timer created and resolved within the same request; no cross-request
+    // promise or reusable TCP socket is retained in global scope.
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  boundedActive++;
+  boundedPeak=Math.max(boundedPeak,boundedActive);
+}
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../../../apps/api/src/current-subject-saju-calculation-http.ts';
 import { SupabaseMemberIdentityEvidenceVerifierV1 } from '../../../apps/api/src/supabase-member-identity-verifier.ts';
 import { createSajuProductionCalculationHttpAdapterV1 } from '../../../apps/api/src/saju-production-calculation-http-adapter.ts';
@@ -34,10 +58,10 @@ export default {
     const boundedMode=env.MH_OPS_WORKERD_DB_POOL_MODE==='bounded';
     if (path==='/__ops/db-pool' && boundedMode && request.method==='GET') {
       return Response.json({
-        max:2,connectionTimeoutMillis:125,
+        max:BOUNDED_MAX,connectionTimeoutMillis:BOUNDED_ACQUIRE_MS,
         acquireAttempts:boundedAcquireAttempts,acquireFailures:boundedAcquireFailures,
-        acquireTimeouts:boundedAcquireTimeouts,
-        waiting:isolatedBoundedPool?.waitingCount??0,
+        acquireTimeouts:boundedAcquireTimeouts,connectionFailures:boundedConnectionFailures,
+        active:boundedActive,peak:boundedPeak,requestLocalClient:true,
       },{headers:{'cache-control':'no-store'}});
     }
     if (path === '/health' && request.method === 'GET') {
@@ -59,28 +83,33 @@ export default {
       baseUrl: sajuOrigin, bearerToken: 'synthetic-saju-only-bearer', timeoutMs: 3000,
     });
     let client;
+    let boundedLeaseHeld=false;
     const pool = {
       async connect() {
         if (boundedMode) {
-          if (!isolatedBoundedPool) {
-            isolatedBoundedPool=new Pool({...dbConfig,max:2,connectionTimeoutMillis:125,
-              query_timeout:1100,statement_timeout:1000,idleTimeoutMillis:1000,
-              allowExitOnIdle:true});
-            isolatedBoundedPool.on('error',()=>undefined);
-          }
-          boundedAcquireAttempts++;
-          client=await isolatedBoundedPool.connect().catch(error=>{
-            boundedAcquireFailures++;
-            if (/timeout/i.test(String(error.message))) boundedAcquireTimeouts++;
-            throw error;
-          });
-        } else {
-          client=new Client(dbConfig);
-          await client.connect();
+          await acquireBoundedLease();
+          boundedLeaseHeld=true;
         }
-        const principal=await client.query('SELECT session_user AS role');
-        if(principal.rows[0]?.role!=='myeongha_ops_phase11_login') throw Error('Unexpected fixture login');
-        return {query:(sql,values)=>client.query(sql,values?[...values]:[]),release(){}};
+        // A fresh TCP client belongs only to the current Worker invocation.
+        client=new Client(boundedMode
+          ? {...dbConfig,query_timeout:1100,statement_timeout:1000}
+          : dbConfig);
+        try {
+          await client.connect();
+          const principal=await client.query('SELECT session_user AS role');
+          if(principal.rows[0]?.role!=='myeongha_ops_phase11_login')
+            throw Error('Unexpected fixture login');
+          return {query:(sql,values)=>client.query(sql,values?[...values]:[]),release(){}};
+        } catch(error) {
+          if(boundedMode) boundedConnectionFailures++;
+          await client.end().catch(()=>undefined);
+          client=undefined;
+          if(boundedLeaseHeld) {
+            boundedActive--;
+            boundedLeaseHeld=false;
+          }
+          throw error;
+        }
       },
     };
     try {
@@ -93,8 +122,16 @@ export default {
       return new Response(result.body, { status: result.status, headers });
     } finally {
       if(client) {
-        if(boundedMode) client.release();
-        else ctx.waitUntil(client.end().catch(()=>{}));
+        const currentClient=client;
+        ctx.waitUntil(currentClient.end().catch(()=>undefined).finally(()=>{
+          if(boundedLeaseHeld) {
+            boundedActive--;
+            boundedLeaseHeld=false;
+          }
+        }));
+      } else if(boundedLeaseHeld) {
+        boundedActive--;
+        boundedLeaseHeld=false;
       }
     }
   },

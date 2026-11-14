@@ -1,3 +1,12 @@
+## 2026-11-14 Phase 11 workerd 느린 DB 격리 실증 — 첫 실행 실패, 요청별 연결로 수정
+
+- **첫 실증:** [보호 실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032), 병합된 `main=fdd8b65514f7fed601e252c975611d471ded35ed`, `experiment=workerd_db_slow_pool`. PostgreSQL 18 RLS·합성 압력 단계 PASS(별도 증거 `14113300753`), GoTrue·PG18·Saju의 workerd 제품 측정은 `workerd_requests`에서 FAIL, 비식별 증거 `14113415610`의 `status=BLOCKED_INCOMPLETE`. 4/4 제한 실패·연결 대기 초과·정상 복구 증거는 **아직 없음**.
+- **원인 조사와 최소 수정:** 신규 fixture가 module scope에 `pg.Pool`을 보존해 요청 간 PostgreSQL 연결을 재사용하도록 작성되어 있었음. 이는 Cloudflare [연결 수명주기](https://developers.cloudflare.com/hyperdrive/concepts/connection-lifecycle/)의 요청별 새 Client 규칙과 충돌한다. 기존 실패 시 보호 로그가 단계만 출력하므로 실제 예외 종류를 단정하지 않음. 해당 **테스트 fixture 전용** 전역 DB 연결을 제거하고 각 요청에 별도 `pg.Client`를 생성하며, 재사용 가능한 객체는 숫자형 동시 연결 사용량/최고치·대기 초과 계수로 한정. 2개 연결 한도, 125ms 로컬 획득 대기 제한, DB 원격 테이블 잠금, 장애 중 HTTP 503, Health 200, 해제 후 정상 계산 4/4의 수용 조건은 유지하고 요청별 연결·실측 최대 연결 수 `<=2`를 필수 추가.
+- **정확한 범위:** 이 획득 제한은 **격리 Worker fixture의 요청 간 슬롯 확보**이며 Production Cloudflare Hyperdrive나 Node `pg.Pool`의 실운영 획득 시간·처리량 증명이 아님. 실제 개인정보·키·식별자·SQL 원문을 출력하지 않고 실패 시 제한된 요청 개수와 실패 유형만 진단한다. 실제 요청 장애의 원인이 전역 Pool이었는지는 새 격리 결과를 통해 검증.
+- **판정·다음:** 변경 코드/안전성 검사 → 운영 PR 통합 CI → 정확한 병합 `main`에서 같은 **수동 격리 실험**을 1회 재실행. 실제 Linux 증거가 성공하기 전 `NOT_OBSERVED`, `productionWorkerAdmissionMeasured=false`, `hostedHyperdriveMeasured=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false` 유지. Production SQL/트래픽/설정 변경 없음.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 Gate 2 / Phase 11: isolated workerd slow-DB and bounded pool proof (implementation; execution pending)
 
 - Preserve prior actual workerd outage/health/recovery PASS [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024) and 3,600/3,600 overlap PASS [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347); do not rerun those scenarios.
