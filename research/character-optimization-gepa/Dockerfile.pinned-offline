@@ -1,17 +1,26 @@
-# Only the image build may contact public package/source registries.
-# Runtime execution must use --network none, readonly source, no secrets.
-# Pinned Docker Official Python multi-platform index (verified linux/amd64 Python 3.14.10 slim-trixie).
-FROM python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
+# The build alone may access the fixed Debian archive / pinned Python & VCS sources.
+# Runtime remains a fresh pinned Python base with only GEPA/Python packages copied.
+ARG PYTHON_BASE=python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
+FROM ${PYTHON_BASE} AS gepa-build
+COPY apt-snapshot.sources /etc/apt/sources.list.d/debian.sources
 COPY requirements.lock /tmp/myeongha-gepa-requirements.lock
 COPY build-requirements-hashed.lock /tmp/myeongha-gepa-build-requirements.lock
 RUN set -eu; \
     apt-get update; \
-    apt-get install --no-install-recommends -y git ca-certificates; \
+    apt-get install --no-install-recommends -y \
+      git=1:2.47.3-0+deb13u1 ca-certificates=20250419+deb13u1; \
+    test "$(dpkg-query -W -f='${Version}' git)" = '1:2.47.3-0+deb13u1'; \
     python -m pip --isolated install --disable-pip-version-check --no-cache-dir \
       --no-deps --only-binary=:all: --require-hashes \
       -r /tmp/myeongha-gepa-build-requirements.lock; \
     python -m pip --isolated install --disable-pip-version-check --no-cache-dir \
       --no-deps --no-build-isolation --check-build-dependencies \
-      -r /tmp/myeongha-gepa-requirements.lock; \
-    apt-get purge --auto-remove -y git; \
-    rm -rf /var/lib/apt/lists/* /tmp/myeongha-gepa-requirements.lock /tmp/myeongha-gepa-build-requirements.lock
+      -r /tmp/myeongha-gepa-requirements.lock
+
+# No apt package installation, git binary, snapshot configuration or build cache
+# enters the offline/runtime stage. Both stages share the same pinned base digest.
+FROM ${PYTHON_BASE} AS gepa-offline-runtime
+COPY --from=gepa-build /usr/local/lib/python3.14/site-packages/ /usr/local/lib/python3.14/site-packages/
+RUN set -eu; \
+    ! command -v git >/dev/null 2>&1; \
+    python -c "from importlib import metadata; assert metadata.version('gepa') == '0.1.4'"

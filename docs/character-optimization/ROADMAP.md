@@ -259,3 +259,8 @@
 
 - 공식 GEPA 소스 commit 및 Python 이미지 고정에 더해 실제 설치 시 사용되는 5개 Python 빌드 wheel의 버전·SHA-256을 별도 잠금 파일로 확정했다. Docker·GitHub CI에서 동일한 해시 검증 설치와 빌드 격리 중지를 사용한다.
 - 네트워크 차단 Docker 실빌드 및 Python 8건 가상 GEPA 검증을 확인했다. **apt/system 패키지·빌드 산출물까지 포함한 전체 전이 의존성 완전 잠금은 아직 미완료**이며, 실제 품질 개선·사람 검토·유료 실행/운영 전환을 인정하지 않는다. 상세: `GEPA_SOURCE_INSTALL_IDENTITY_V1.md`.
+
+## 2026-11-14 — GEPA APT 스냅샷 고정 및 빌드 전용 패키지의 실행 이미지 배제
+
+- 3단계 오프라인 GEPA 설치 재현성의 남은 위험 중 빌드 시 임의 최신 APT 인덱스 사용 문제를 고정 시점 Debian 스냅샷으로 제한하고, Git/CA 패키지 버전을 명시했다. 빌드와 런타임을 다단계 Docker로 분리해 Git·APT 변경을 최종 네트워크 차단 연구 이미지에 포함하지 않는다.
+- 집 PC에서 새 이미지 실제 빌드 및 공식 GEPA 합성 8건 통과. 새 CI에서 시스템 Git 파일 제외와 고정된 Python/GEPA 출처를 검증한다. 개별 Debian 전이 .deb 해시·다중 플랫폼 재현성 등 **완전한 시스템 의존성 고정은 여전히 미증명**이다. 사람 평가/개인 홀드아웃/유료 실행/운영 승격도 계속 HOLD. 상세: GEPA_SOURCE_INSTALL_IDENTITY_V1.md.
