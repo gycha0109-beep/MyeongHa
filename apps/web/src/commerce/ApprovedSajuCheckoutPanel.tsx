@@ -35,8 +35,11 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   const [message, setMessage] = useState('');
   const inFlight = useRef(false);
   const retryKey = useRef<string | null>(null);
+  const appliedSelection = useRef<number | null>(null);
   useEffect(() => {
-    if (!selection || inFlight.current || !getApprovedSajuOfferV1(selection.offerId)) return;
+    if (!selection || inFlight.current || appliedSelection.current === selection.sequence
+      || !getApprovedSajuOfferV1(selection.offerId)) return;
+    appliedSelection.current = selection.sequence;
     setOfferId(selection.offerId);
     setTargetId('');
     setBinding(null);
@@ -45,7 +48,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     setArchive([]);
     setMessage('');
     retryKey.current = null;
-  }, [selection?.sequence]);
+  }, [selection?.sequence, busy]);
   const offer = getApprovedSajuOfferV1(offerId);
   const needsTarget = offer?.counterpartOrder !== undefined;
 
