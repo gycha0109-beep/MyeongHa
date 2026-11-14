@@ -163,3 +163,45 @@ revoke all on function public.cmd_finalize_approved_saju_pair_reading_v1(
 grant execute on function public.cmd_finalize_approved_saju_pair_reading_v1(
   uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,text,jsonb
 ) to myeongha_approved_saju_issuer_executor;
+
+-- Read-only recovery pointer for a previously committed pair. The caller must
+-- still verify the historical Ed25519 proof and the exact archived Reading.
+-- This function never dispatches Source, mints a Grant, or changes a job.
+create function public.qry_approved_saju_pair_recovery_record_v1(
+  p_subject uuid,p_purchase uuid
+)
+returns table(reading_id uuid,reader_character_id text)
+language plpgsql volatile security definer set search_path=pg_catalog
+as $function$
+begin
+  perform public.assert_myeongha_subject_context_v1(p_subject);
+  if public.qry_approved_saju_pair_issue_scope_v1(p_subject,p_purchase) is null
+  then return; end if;
+
+  return query
+  select record_row.reading_id,record_row.reader_character_id
+  from commerce_saju_private.approved_component_reading_v1 binding
+  cross join lateral public.qry_approved_saju_component_record_v1(
+    p_subject,binding.reading_id,null,false
+  ) record_row
+  join public.readings reading on reading.id=binding.reading_id
+    and reading.subject_id=binding.subject_id
+    and reading.committed_execution_attempt_id is not null
+    and reading.execution_status='succeeded'
+  join commerce_saju_private.approved_source_issue_proofs_v1 proof
+    on proof.reading_id=binding.reading_id
+    and proof.subject_id=binding.subject_id
+    and proof.execution_attempt_id=reading.committed_execution_attempt_id
+  where binding.subject_id=p_subject and binding.purchase_intent_id=p_purchase
+    and binding.component='compatibility'
+    and record_row.component='compatibility'
+    and record_row.saju_domain='compatibility'
+    and record_row.reader_character_id is not null;
+end
+$function$;
+
+revoke all on function public.qry_approved_saju_pair_recovery_record_v1(uuid,uuid)
+  from public,anon,authenticated,service_role,myeongha_api_executor,
+    myeongha_commerce_internal_executor;
+grant execute on function public.qry_approved_saju_pair_recovery_record_v1(uuid,uuid)
+  to myeongha_approved_saju_issuer_executor;
