@@ -166,6 +166,18 @@ export async function executePostgresApprovedSajuIssuerTransactionV1<T>(
 
 const ENTER_APPROVED_SAJU_ISSUER_ROLE_SQL = 'SET LOCAL ROLE myeongha_approved_saju_issuer_executor';
 
+/** Separate read-only login/role for already purchased T10 Reader archives.
+ * Issuance HOLD must never disable an authorized customer's historical Reading.
+ */
+export function executePostgresApprovedSajuPairReaderTransactionV1<T>(
+  input: ExecutePostgresSubjectTransactionInputV1<T>,
+): Promise<T> {
+  if (input.verifiedEvidence.kind !== 'member') {
+    throw new Error('Approved Saju pair Reader requires a verified member.');
+  }
+  return executeSubjectTransaction(input, 'SET LOCAL ROLE myeongha_approved_saju_pair_reader_executor');
+}
+
 /** Private paid answer candidate. Its login and endpoint are separately provisioned. */
 export function executePostgresApprovedSajuPaidAnswerTransactionV1<T>(
   input: ExecutePostgresSubjectTransactionInputV1<T>,
