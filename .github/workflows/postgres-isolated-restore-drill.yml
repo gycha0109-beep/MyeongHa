@@ -61,6 +61,11 @@ on:
         required: false
         default: false
         type: boolean
+      restore_disposable_provider_ledger:
+        description: Only paired backup 43424903445; copy exact sealed history to disposable PostgreSQL; no historical SQL execution
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -102,6 +107,7 @@ jobs:
         env:
           SCOPED_SOURCE_DIAGNOSTIC: ${{ inputs.migration_source_only_diagnostic }}
           SCOPED_CLONE_REHEARSAL: ${{ inputs.restore_clone_shared_memory_rehearsal }}
+          SCOPED_PROVIDER_REPLAY: ${{ inputs.restore_disposable_provider_ledger }}
           SCOPED_SOURCE_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
           SCOPED_INCIDENT_REFERENCE: ${{ inputs.incident_reference_utc }}
           SCOPED_PROVIDER_VERIFY: ${{ inputs.verify_provider_migration_source }}
@@ -136,6 +142,19 @@ jobs:
                -z "$SCOPED_PRIVACY_CANARY_RUN_ID" ]]
             [[ "$SCOPED_SEYEON_S0" == 'false' ]]
             echo 'SCOPED_DISPOSABLE_PRIVACY_FORWARD_REHEARSAL__PRODUCTION_UNCHANGED__DR_HOLD'
+          fi
+          if [[ "$SCOPED_PROVIDER_REPLAY" == 'true' ]]; then
+            [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' &&
+               "$GITHUB_REF" == 'refs/heads/main' &&
+               "$SCOPED_CLONE_REHEARSAL" == 'true' &&
+               "$SCOPED_PROVIDER_VERIFY" == 'true' &&
+               "$SCOPED_SOURCE_DIAGNOSTIC" == 'false' &&
+               "$SCOPED_SEYEON_S0" == 'false' ]]
+            [[ "$SCOPED_SOURCE_BACKUP_RUN_ID" == '43424903445' &&
+               "$SCOPED_INCIDENT_REFERENCE" == '2026-11-13T12:29:12Z' ]]
+            [[ -z "$SCOPED_PRIVACY_LEDGER_RUN_ID" &&
+               -z "$SCOPED_PRIVACY_CANARY_RUN_ID" ]]
+            echo 'PAIRED_PROVIDER_HISTORY_DISPOSABLE_REPLAY_ONLY__PRODUCTION_UNCHANGED__DR_HOLD'
           fi
 
       - name: Checkout exact repository state
@@ -327,6 +346,13 @@ jobs:
           PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-source-recovery.json
           MIGRATION_LINEAGE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-migration-file-lineage.json
           MIGRATION_BODY_PARITY_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-common-migration-body-parity.json
+          MH_OPS_DISPOSABLE_LEDGER_REPLAY: ${{ inputs.restore_disposable_provider_ledger && 'true' || 'false' }}
+          DISPOSABLE_PROVIDER_LEDGER_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/disposable-provider-migration-ledger-restore.json
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGPASSWORD: restore-drill
+          PGDATABASE: postgres
           BACKUP_RUN_ID: ${{ inputs.backup_run_id }}
           EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: bash scripts/operations/verify-paired-provider-migration-source-recovery.sh
