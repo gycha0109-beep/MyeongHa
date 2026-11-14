@@ -25,6 +25,7 @@ vi.mock('../apps/api/src/postgres-subject-execution.js', () => ({
 }));
 vi.mock('../apps/api/src/postgres-approved-saju-issue-scope-v1.js', () => ({
   readApprovedSajuPairIssueScopeV1: db.scope,
+  readApprovedSajuPairReaderScopeV1: db.scope,
 }));
 
 const enabled = process.env.MYEONGHA_RUN_SAJU_T10_PAIR_CROSS_SERVICE_E2E === '1';
