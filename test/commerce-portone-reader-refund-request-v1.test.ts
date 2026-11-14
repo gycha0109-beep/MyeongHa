@@ -177,14 +177,10 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
     const f=fixture();
     f.fetchImpl.mockRejectedValue(Error('response lost after provider acceptance'));
     expect((await f.run()).kind).toBe('reconciliation_required');
-    const lookupFetchImpl=vi.fn(async()=>({
-      status:200,
-      headers:{get:(key:string)=>key==='content-type'?'application/json':null},
-      text:async()=>JSON.stringify({
+    const lookupFetchImpl=vi.fn(async()=>Response.json({
         id:proof.paymentId,transactionId:proof.transactionId,
         status:'CANCELLED',currency:'KRW',amount:{total:8900},
         cancellations:[{id:cancellation,status:'SUCCEEDED',totalAmount:8900}],
-      }),
     }));
     const result=await executePrivatelyAuthorizedReaderFullRefundV1({
       pool:f.pool,authorizationId:auth,apiSecret:'private-service-api-secret-12345',
@@ -200,21 +196,36 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
     expect(f.recordCount).toBe(1);
     expect(f.confirmCount).toBe(1);
   });
+  it('stops an oversized cancellation readback without persisting or repeating a refund',async()=>{
+    const f=fixture();
+    f.fetchImpl.mockRejectedValue(Error('POST response lost'));
+    expect((await f.run()).kind).toBe('reconciliation_required');
+    const cancel=vi.fn();
+    const response=new Response(new ReadableStream({
+      start(controller){ controller.enqueue(new Uint8Array(65_537)); },
+      cancel,
+    }),{headers:{'content-type':'application/json'}});
+    const result=await executePrivatelyAuthorizedReaderFullRefundV1({
+      pool:f.pool,authorizationId:auth,apiSecret:'private-service-api-secret-12345',
+      fetchImpl:f.fetchImpl,lookupFetchImpl:async()=>response,verifier:f.verifier,
+    });
+    expect(result.kind).toBe('reconciliation_required');
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(f.fetchImpl).toHaveBeenCalledTimes(1);
+    expect(f.recordCount).toBe(0);
+    expect(f.confirmCount).toBe(0);
+  });
   it('rejects ambiguous cancellation recovery rather than revoking the grant',async()=>{
     const f=fixture();
     f.fetchImpl.mockRejectedValue(Error('POST lost'));
     await f.run();
-    const lookupFetchImpl=vi.fn(async()=>({
-      status:200,
-      headers:{get:(key:string)=>key==='content-type'?'application/json':null},
-      text:async()=>JSON.stringify({
+    const lookupFetchImpl=vi.fn(async()=>Response.json({
         id:proof.paymentId,transactionId:proof.transactionId,
         status:'CANCELLED',currency:'KRW',amount:{total:8900},
         cancellations:[
           {id:cancellation,status:'SUCCEEDED',totalAmount:3900},
           {id:'other-cancel',status:'SUCCEEDED',totalAmount:5000},
         ],
-      }),
     }));
     const result=await executePrivatelyAuthorizedReaderFullRefundV1({
       pool:f.pool,authorizationId:auth,apiSecret:'private-service-api-secret-12345',
@@ -244,14 +255,10 @@ describe('exact manually authorized PortOne V2 Reader full refund dispatch',()=>
     const f=fixture();
     f.fetchImpl.mockRejectedValue(Error('POST response lost'));
     expect((await f.run()).kind).toBe('reconciliation_required');
-    const lookupFetchImpl=vi.fn(async()=>({
-      status:200,
-      headers:{get:(key:string)=>key==='content-type'?'application/json':null},
-      text:async()=>JSON.stringify({
+    const lookupFetchImpl=vi.fn(async()=>Response.json({
         id:proof.paymentId,transactionId:proof.transactionId,
         status:'CANCELLED',currency:'KRW',amount:{total:8900},
         cancellations,
-      }),
     }));
     const result=await executePrivatelyAuthorizedReaderFullRefundV1({
       pool:f.pool,authorizationId:auth,

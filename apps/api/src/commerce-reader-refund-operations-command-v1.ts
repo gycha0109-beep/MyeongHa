@@ -1,6 +1,7 @@
 import type {PostgresSubjectPoolV1} from './postgres-subject-execution.js';
-import type {PortOneV2FullCancellationVerifierV1,PortOneV2PaymentHttpFetchV1}
+import type {PortOneV2FullCancellationVerifierV1}
   from './portone-v2-payment-verification-adapter.js';
+import type {PortOneRefundReadbackFetchV1} from './commerce-portone-reader-refund-recovery-v1.js';
 import {
   recordOwnerApprovedReaderFullRefundDecisionV1,
   type OwnerReaderRefundReasonV1,
@@ -44,7 +45,7 @@ export async function executeOwnerApprovedReaderRefundCommandV1(input:Readonly<{
   apiSecret:string;
   verifier:PortOneV2FullCancellationVerifierV1;
   postFetchImpl?:ReaderPrivateRefundFetchV1;
-  lookupFetchImpl?:PortOneV2PaymentHttpFetchV1;
+  lookupFetchImpl?:PortOneRefundReadbackFetchV1;
   timeoutMs?:number;
 }>):Promise<CommerceOwnerRefundCommandResultV1>{
   const decision=await recordOwnerApprovedReaderFullRefundDecisionV1({
