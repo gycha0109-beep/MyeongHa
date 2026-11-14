@@ -1,0 +1,16 @@
+# Frozen Debian 13 (trixie) APT index from the image's upstream source timestamp.
+# Snapshot index packages are authenticated by the Debian archive keyring.
+# This does not lock all OS/library bytes across architectures in this repository.
+Types: deb
+URIs: https://snapshot.debian.org/archive/debian/20261104T212339Z/
+Suites: trixie trixie-updates
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp
+Check-Valid-Until: no
+
+Types: deb
+URIs: https://snapshot.debian.org/archive/debian-security/20261104T212339Z/
+Suites: trixie-security
+Components: main
+Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp
+Check-Valid-Until: no

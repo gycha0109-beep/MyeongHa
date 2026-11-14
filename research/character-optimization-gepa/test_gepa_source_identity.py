@@ -1,6 +1,7 @@
 """Synthetic, no-network guards for pinned Python/GEPA and hash-locked build tools."""
 import json
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from verify_gepa_environment import (
@@ -95,6 +96,35 @@ class SourceIdentityTests(unittest.TestCase):
             with self.subTest(receipt=direct_url), self.assertRaises(
                     EnvironmentMismatch):
                 self.check(distribution=dist)
+
+    def test_debian_snapshot_and_runtime_stage_are_fixed_by_source(self):
+        root = Path(__file__).parent
+        sources = (root / "apt-snapshot.sources").read_text(encoding="utf-8")
+        active = [line.strip() for line in sources.splitlines()
+                  if line.strip() and not line.lstrip().startswith("#")]
+        self.assertEqual(active, [
+            "Types: deb",
+            "URIs: https://snapshot.debian.org/archive/debian/20261104T212339Z/",
+            "Suites: trixie trixie-updates",
+            "Components: main",
+            "Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp",
+            "Check-Valid-Until: no",
+            "Types: deb",
+            "URIs: https://snapshot.debian.org/archive/debian-security/20261104T212339Z/",
+            "Suites: trixie-security",
+            "Components: main",
+            "Signed-By: /usr/share/keyrings/debian-archive-keyring.pgp",
+            "Check-Valid-Until: no",
+        ])
+        dockerfile = (root / "Dockerfile.pinned-offline").read_text(encoding="utf-8")
+        self.assertIn("COPY apt-snapshot.sources /etc/apt/sources.list.d/debian.sources", dockerfile)
+        self.assertIn("git=1:2.47.3-0+deb13u1 ca-certificates=20250419+deb13u1", dockerfile)
+        self.assertIn("AS gepa-build", dockerfile)
+        self.assertIn("AS gepa-offline-runtime", dockerfile)
+        runtime = dockerfile.split("AS gepa-offline-runtime", 1)[1]
+        self.assertNotIn("apt-get", runtime)
+        self.assertIn("! command -v git", runtime)
+        self.assertIn("COPY --from=gepa-build", runtime)
 
 
 if __name__ == "__main__":

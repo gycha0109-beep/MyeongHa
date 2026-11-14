@@ -30,3 +30,12 @@
 - 런타임 검증은 잠금 파일의 정확한 5개 해시·버전 목록, 설치된 배포 패키지의 버전과 기존 GEPA Git 출처/소스 커밋을 대조한다. **이 검증만으로 실제 빌드 당시 설치 옵션을 증명할 수 없으므로** 결과에는 `buildIsolationRuntimeAttested=false`를 유지한다.
 - Windows 집 PC Docker 실빌드 성공, `--network none`/읽기전용 소스/제한된 tmpfs에서 신원 검증과 실제 공식 GEPA 합성 실행 포함 Python 8건 성공. 유료 모델 요청·기존 사용자 원본·대화 데이터 사용은 0건.
 - **미충족:** apt 패키지 버전·다운로드 아티팩트의 전체 해시 잠금, 공식 Git 소스에서 생성되는 wheel 결과 바이트의 독립 고정, OS 전이 패키지 증빙 및 실제 사람 평가/품질·운영 승인. 따라서 `transitiveDependenciesFullyLocked=false`는 계속 유지한다.
+
+## 2026-11-14 — Debian APT 시점 고정 및 GEPA 빌드/실행 환경 분리
+
+- 고정 Python 3.14.10 이미지의 원본 Debian APT 주석에 명시된 **2026-11-04T21:23:39Z** 시점을 `apt-snapshot.sources`에 고정하고, 공식 Debian 스냅샷의 서명된 trixie/trixie-updates/trixie-security 패키지 목록을 사용한다.
+- 빌드 단계에서 `git=1:2.47.3-0+deb13u1`, `ca-certificates=20250419+deb13u1`을 명시한다. 기존 해시 고정 Python 빌드 wheel 5종, 공식 GEPA Git SHA 및 `--no-build-isolation` 설치를 유지한다.
+- Docker를 두 단계로 분리한다. 첫 단계에서만 APT와 Git 및 GEPA wheel 빌드를 수행하며, 최종 실행 이미지는 **동일한 고정 Python 기반 이미지에서 새로 시작**해 설치된 Python 패키지 디렉터리만 복사한다. 빌드용 Git 실행 파일과 빌드 단계의 APT 스냅샷 설정 및 캐시는 최종 이미지에 포함하지 않는다.
+- 집 PC Docker 실빌드와 `--network none --read-only` 실행에 성공했고, 공식 GEPA 커밋/빌드 wheel 신원 확인 및 가상 두 캐릭터 최적화가 포함된 Python 8건을 통과했다. 기존 CI에는 Git 실행 파일이 없는 최종 이미지 검증과 실 GEPA 합성 실행이 연결돼 있다.
+- **아직 완전한 OS 의존성 바이트 잠금이라고 주장하지 않는다.** 저장소에 각 Debian 전이 패키지 .deb의 해시를 개별 기록하거나 다중 플랫폼의 설치 파일 집합을 독립 증명한 것은 아니다. 고정 시점 스냅샷은 의도적 갱신 전까지 오래된 보안 패키지를 사용하게 되며, 만료일 검사를 비활성화하는 대신 Debian 서명 검사를 유지한다. 실제 운영 이미지나 사용자 실측 GEPA 모델 송신에 사용하지 않는다.
+- 합성 오프라인 재현성 향상은 사실이지만 사용자 원본 288건 사람 검토·새 독립 최종평가·신뢰 가능한 유료 승인 및 실제 응답 품질 개선을 입증하지 않는다. 총 500원 상한과 실제 유료 호출·운영 반영 0건 유지.

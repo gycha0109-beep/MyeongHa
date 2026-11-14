@@ -150,6 +150,10 @@ jobs:
           set -euo pipefail
           docker build --pull --file research/character-optimization-gepa/Dockerfile.pinned-offline \
             --tag myeongha-gepa-pinned-offline:verify research/character-optimization-gepa
+          # APT/Git are build-time only; the runtime is the original pinned Python base.
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --user 65534:65534 \
+            myeongha-gepa-pinned-offline:verify sh -c '! command -v git'
           docker run --rm --network none --read-only --cap-drop ALL --security-opt no-new-privileges \
             --user 65534:65534 --pids-limit 64 --tmpfs /tmp:rw,nosuid,nodev,size=64m \
             --mount "type=bind,src=$GITHUB_WORKSPACE/research/character-optimization-gepa,dst=/opt/myeongha,readonly" \
