@@ -8,8 +8,10 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { handleCurrentSubjectBirthProfileRequestV1 } from '../apps/api/src/current-subject-birth-profile-http.js';
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../apps/api/src/current-subject-saju-calculation-http.js';
+import { handleCurrentSubjectSajuPreviewReadingRequestV1 } from '../apps/api/src/current-subject-saju-preview-reading-http.js';
 import { createCurrentSubjectSajuCalculationRouteV1 } from '../api/me/saju/calculation.js';
 import { createSajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
+import { createSajuPreviewReadingHttpAdapterV1 } from '../apps/api/src/saju-production-reading-http-adapter.js';
 import type { IdentityEvidenceVerificationPortV1 } from '../apps/api/src/current-subject-profile-http.js';
 import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
 
@@ -90,6 +92,14 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
         });
       },
     });
+    const previewAdapter = createSajuPreviewReadingHttpAdapterV1({
+      baseUrl: trustedOrigin,
+      bearerToken: process.env.MYEONGHA_SAJU_CROSS_SERVICE_BEARER!,
+      fetchImpl(url, init) {
+        expect(url).toBe(trustedOrigin + '/api/preview/readings');
+        return fetch(sajuOrigin + '/api/preview/readings', init);
+      },
+    });
     server = createServer(async (req, res) => {
       try {
         if (!req.url?.startsWith('/api/')) {
@@ -116,7 +126,9 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
           serverTime: new Date().toISOString(), pool, identityEvidenceVerifier };
         const response = req.url === '/api/me/birth-profile'
           ? await handleCurrentSubjectBirthProfileRequestV1(input)
-          : await calculationRoute.fetch(request);
+          : req.url === '/api/me/saju/preview-reading'
+            ? await handleCurrentSubjectSajuPreviewReadingRequestV1({ ...input, sajuAdapter: previewAdapter })
+            : await calculationRoute.fetch(request);
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(await response.text());
       } catch { res.writeHead(500); res.end(); }
@@ -181,7 +193,7 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
     expect((await calculate()).status).toBe(200);
   });
 
-  it.skipIf(!process.env.CHROME_BIN)('renders the real current Birth and Saju calculation in Chrome', async () => {
+  it.skipIf(!process.env.CHROME_BIN)('renders the current Birth, real chart and Korean interpretation in Chrome', async () => {
     // Same headless Chrome/CDP mechanism as verify-web-saju-auth-browser-core.mjs.
     // Only the local member identity proof is seeded; API/DB/engine responses are real.
     const profile = await mkdtemp(join(tmpdir(), 'myeongha-current-saju-browser-'));
@@ -248,6 +260,37 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
       expect(state.day).toBe(`${stem.hanja || ''}${stem.value || ''}`);
       expect(result.data.calculation.birthRevisionRef).toBe(R2);
       expect(upstreamRequests).toBeGreaterThan(count + 1);
+
+      const previewRequest = await fetch(origin + '/api/me/saju/preview-reading', {
+        method: 'POST',
+        headers: { authorization: 'Bearer fixture-owner', 'content-type': 'application/json' },
+        body: JSON.stringify({ readingText: '재물운' }),
+      });
+      expect(previewRequest.status).toBe(200);
+      const preview = await previewRequest.json();
+      const paragraphs: string[] = preview.data.reading.reading.sections
+        .filter((section: { sectionType: string }) => section.sectionType === 'wealth')
+        .flatMap((section: { blocks: { type: string; text?: string; items?: string[] }[] }) =>
+          section.blocks.flatMap(block => block.type === 'paragraph' ? [block.text] : block.items ?? []));
+      expect(paragraphs.some(text => /[가-힣]{2}/u.test(text))).toBe(true);
+
+      const wealthLink = await evaluate(`document.querySelector(
+        '#saju-hub a[href="reading-detail.html?topic=money"]')?.href ?? ''`);
+      expect(wealthLink).toBe(origin + '/reading-detail.html?topic=money');
+      await send('Page.navigate', { url: wealthLink });
+      let body = '';
+      for (let i = 0; i < 150; i += 1) {
+        body = await evaluate(`document.body?.dataset.readingRouteState === 'preview' &&
+          document.querySelector('[data-reading-stage]')?.hidden === false ?
+          document.querySelector('[data-reading-step-body]')?.textContent?.trim() : ''`);
+        if (body) break;
+        await sleep(50);
+      }
+      const detailState = await evaluate(`({ path: location.pathname,
+        state: document.body?.dataset.readingRouteState,
+        title: document.querySelector('[data-reading-state-title]')?.textContent })`);
+      expect(body, JSON.stringify(detailState)).not.toBe('');
+      expect(paragraphs).toContain(body);
     } finally {
       ws?.close();
       chrome.kill();

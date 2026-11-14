@@ -117,7 +117,7 @@ psql -U postgres -d myeongha_saju_subject_local_verify -v ON_ERROR_STOP=1 -v sub
     PGPASSWORD: dbPassword, MYEONGHA_LOCAL_SUBJECT_DB_PASSWORD: runtimePassword,
     MYEONGHA_SAJU_CROSS_SERVICE_ORIGIN: 'http://127.0.0.1:' + sajuServer.address().port,
     MYEONGHA_SAJU_CROSS_SERVICE_BEARER: bearer, ...(chromeBin ? { CHROME_BIN: chromeBin } : {}) };
-  console.log(chromeBin ? 'Running all 5 cases including real Chrome rendering.'
+  console.log(chromeBin ? 'Running all 5 cases including real chart and Korean interpretation in Chrome.'
     : 'CHROME_BIN absent: running 4 service cases; browser rendering is SKIPPED.');
   const child = spawn(process.execPath, [join(root, 'node_modules/vitest/vitest.mjs'), 'run',
     'test/current-subject-saju-calculation-postgres.e2e.test.ts'],
