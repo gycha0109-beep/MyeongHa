@@ -9,6 +9,8 @@
 > Parent runtime track: PR #3068
 > Baseline commit: `29f58f4d7dcac0f00ea21c0f0ed32d3ede68a9bd`
 
+**2026-11-14 최초 웹 공개 기준:** [공통 출시 게이트](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)의 **여섯 명(세연·라현·백헌·여울·윤호·태겸) 채팅 동시 공개**가 출시 목표다. 기존 PR #3068의 다섯 명 실행 기반선과 Phase 8의 윤호 제외 기술 상태는 역사적 범위로 유지한다. 실제 모델·Guard·ACK/비용·권한·배포는 여섯 명 각각 검증해야 한다. 수동 기억 정책과 자동 기억 OFF는 변경하지 않는다. 전체 고급 Memory 기능의 별도 로드맵 종료는 웹 최초 출시와 구별한다.
+
 ## 1. Goal
 
 Build a shared, provider-neutral Memory and Context Engine for MyeongHa Character Chat. The engine must preserve long-term conversational continuity while sending each model only the information required for the current turn, within a measured model-specific token budget.
@@ -398,12 +400,12 @@ Run offline fixtures and database tests first. Paid model evaluation remains loc
 3. Wire the Dynamic Context Composer and permission-first retrieval into the real Provider request path.
 4. Add prompt caching only after correctness and token accounting are proven. Keep stable Character/system prefixes separate from user-private dynamic context; measure cache hit rate and actual cached-token usage. Caching must not broaden access or mix Subjects.
 5. Connect each Character's own Output Guard, transactional persistence, secure receipt and Worker/browser ACK.
-6. Verify independently approved/published content bundles and source hashes for Baekheon, Yeoul, Rahyeon and Taegyeom. Preserve the existing six visible cards and Yunho exclusion.
+6. Verify independently approved/published content bundles and source hashes for Baekheon, Yeoul, Rahyeon and Taegyeom. Preserve the six visible discovery cards; add Yunho as an independently validated sixth chat runtime before the first web launch. His exclusion in PR #3068 is historical baseline only.
 7. Complete the required source/content publication and browser compatibility gates before activation.
-8. Roll out one Character at a time with hard cost limits, bounded canary, rollback/hold path and evidence review. No production activation by merge alone.
+8. Validate and internally canary each Character independently with hard cost limits and rollback/hold path. Public opening is **simultaneous for all six** only after every individual gate passes; no Production activation by merge alone.
 
 **Exit criteria:**
-- all five intended chat targets have independent, source-approved runtime and Provider/Guard wiring;
+- all six owner-selected first-launch chat targets (including Yunho) have independent, source-approved runtime and Provider/Guard wiring;
 - real user messages are stored, generated, guarded, committed and ACKed exactly once;
 - actual input/output/cached token usage and cost reconcile with reservations/settlement;
 - context and memory access boundaries pass tenant and Character isolation tests;
