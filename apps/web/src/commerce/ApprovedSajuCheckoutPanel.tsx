@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   APPROVED_SAJU_CATALOG_V1, getApprovedSajuOfferV1, SAJU_READING_COMPONENTS_V1,
 } from '../../../../packages/contracts/src/approved-saju-catalog.js';
@@ -21,8 +21,11 @@ const GROUPS = [
 const PRICE = new Intl.NumberFormat('ko-KR');
 
 /** Mounted only by the isolated runtime, which supplies authenticated ports. */
-export function ApprovedSajuCheckoutPanel({ ports }: { ports: ApprovedSajuCheckoutPanelPorts }) {
-  const [offerId, setOfferId] = useState('');
+export function ApprovedSajuCheckoutPanel({ ports, selection }: {
+  ports: ApprovedSajuCheckoutPanelPorts;
+  selection?: Readonly<{ offerId: string; sequence: number }>;
+}) {
+  const [offerId, setOfferId] = useState(selection?.offerId ?? '');
   const [targetId, setTargetId] = useState('');
   const [binding, setBinding] = useState<Binding | null>(null);
   const [verified, setVerified] = useState(false);
@@ -32,6 +35,20 @@ export function ApprovedSajuCheckoutPanel({ ports }: { ports: ApprovedSajuChecko
   const [message, setMessage] = useState('');
   const inFlight = useRef(false);
   const retryKey = useRef<string | null>(null);
+  const appliedSelection = useRef<number | null>(null);
+  useEffect(() => {
+    if (!selection || inFlight.current || appliedSelection.current === selection.sequence
+      || !getApprovedSajuOfferV1(selection.offerId)) return;
+    appliedSelection.current = selection.sequence;
+    setOfferId(selection.offerId);
+    setTargetId('');
+    setBinding(null);
+    setVerified(false);
+    setVerifyOnly(false);
+    setArchive([]);
+    setMessage('');
+    retryKey.current = null;
+  }, [selection?.sequence, busy]);
   const offer = getApprovedSajuOfferV1(offerId);
   const needsTarget = offer?.counterpartOrder !== undefined;
 
