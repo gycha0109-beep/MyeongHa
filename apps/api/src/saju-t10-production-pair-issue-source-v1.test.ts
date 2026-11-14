@@ -62,6 +62,16 @@ function fixture(offerId: 'first-counterpart' | 'additional-counterpart' |
       birthRevisionId: i === 0 ? scope.birthRevisionId : scope.targetBirthRevisionId,
       birthInputHash: i === 0 ? scope.sourceBirthInputHash : scope.targetBirthInputHash,
     })),
+    chartDisplays: [
+      { role: 'self', pillars: {
+        year: { status: 'resolved', value: '庚午' }, month: { status: 'resolved', value: '辛巳' },
+        day: { status: 'resolved', value: '庚辰' }, hour: { status: 'resolved', value: '癸未' },
+      } },
+      { role: 'partner', pillars: {
+        year: { status: 'resolved', value: '丙子' }, month: { status: 'resolved', value: '甲午' },
+        day: { status: 'resolved', value: '丁酉' }, hour: { status: 'unavailable' },
+      } },
+    ],
     units, materialHash: hashJson(material),
   };
   const acceptedAtMs = Date.now();
