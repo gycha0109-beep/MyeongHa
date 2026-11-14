@@ -198,7 +198,7 @@ for (const fragment of [
   "SET LOCAL log_statement='none'",
   "Buffer.from(JSON.stringify(packet),'utf8').toString('base64')",
   '/*__SOURCE_PACKET_COPY_DATA__*/',
-  "sourceBytes.toString('utf8').trimEnd()",
+  "Buffer.from(JSON.stringify(packet),'utf8').toString('base64')",
   'DISPOSABLE_LEDGER_NOT_EMPTY',
 ]) requireFragment(disposableLedger,fragment,disposableLedgerPath);
 for (const fragment of [
