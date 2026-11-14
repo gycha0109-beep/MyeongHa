@@ -16,7 +16,7 @@
     "dev": "npm run dev -w @myeongha/web",
     "start": "npm run build:web && npm run preview -w @myeongha/web",
     "typecheck": "tsc -p tsconfig.json --noEmit && npm run typecheck -w @myeongha/api-client && npm run typecheck -w @myeongha/web && npm run typecheck -w @myeongha/mobile && npm run typecheck -w @myeongha/admin",
-    "test": "vitest run && node --test scripts/character-optimization/*.test.mjs",
+    "test": "vitest run && node --test scripts/character-optimization/*.test.mjs && node --test scripts/character-runtime-lab/*.test.mjs",
     "verify:cloudflare-db-handoff": "node scripts/operations/verify-cloudflare-db-handoff.mjs",
     "stage:cloudflare-db-credential": "node scripts/operations/stage-cloudflare-db-credential-version.mjs",
     "build": "tsc -p tsconfig.build.json",

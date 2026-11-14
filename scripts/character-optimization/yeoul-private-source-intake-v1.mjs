@@ -55,6 +55,20 @@ function excludeKnownLegacyAutoDiscrimination(source) {
   return Object.freeze({source:copy, excludedRows, excludedGroups});
 }
 
+/** Private in-process bridge for historic review pipelines. The original input is never modified.
+ * The special archival mode accepts only the already-known 36-row/9-group auto fields,
+ * removes those fields on a cloned object, and then applies the strict 288-row validator.
+ * This function must never be used to serialize the private source into public artifacts.
+ */
+export function preparePrivateYeoulForResearch(source, { knownOriginalAutoFields = false } = {}) {
+  if (typeof knownOriginalAutoFields !== 'boolean') error('explicit_source_mode_required');
+  const prepared = knownOriginalAutoFields
+    ? excludeKnownLegacyAutoDiscrimination(source).source
+    : source;
+  validatePrivateYeoul288(prepared);
+  return prepared;
+}
+
 /** Validate the complete original matrix; no scoring, normalization of ratings, or source rewriting. */
 export function validatePrivateYeoul288(source) {
   if (!isObject(source) || source.schemaVersion !== 'yeoul-evaluation-export-v1'
