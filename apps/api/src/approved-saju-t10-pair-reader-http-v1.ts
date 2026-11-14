@@ -19,7 +19,7 @@ export function createApprovedSajuT10PairReaderHttpV1(input: Readonly<{
   origin:string;
   pool:PostgresSubjectPoolV1;
   trusts:readonly SajuT10ProductionPairTrustV1[];
-  verifyRequestIdentity:(request:Request)=>Promise<VerifiedSubjectIdentityEvidenceV1 | null>;
+  verifyRequestIdentity:(request:Request)=>VerifiedSubjectIdentityEvidenceV1 | null | Promise<VerifiedSubjectIdentityEvidenceV1 | null>;
 }>) {
   const origin=new URL(input.origin);
   if(origin.origin!==input.origin ||
