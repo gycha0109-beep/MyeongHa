@@ -17,6 +17,19 @@ export type OfficialReaderRuntimeIdV1 = (typeof OFFICIAL_READER_RUNTIME_IDS_V1)[
 export const READER_RUNTIME_INTERNAL_PREVIEW_CANDIDATES_V1 =
   Object.freeze(['seyeon'] as const);
 
+/**
+ * Owner-approved first web launch Reader scope (2026-11-14).
+ * All six must have independently proven content, model/guard, official
+ * Reading evidence, entitlement and follow-up persistence before activation.
+ * This target list never grants Reader access or changes the preview cohort.
+ */
+export const FIRST_WEB_LAUNCH_READER_TARGET_IDS_V1 = Object.freeze([
+  'seyeon', 'rahyeon', 'baekheon', 'yeoul', 'yunho', 'taegyeom',
+] as const);
+
+export type FirstWebLaunchReaderTargetIdV1 =
+  (typeof FIRST_WEB_LAUNCH_READER_TARGET_IDS_V1)[number];
+
 /** Public paid Reader Interpretation is still unavailable. */
 export const READER_RUNTIME_PUBLIC_ACTIVATED_V1 = false as const;
 
