@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { inspectApprovedSajuPairSourceV1 } from './postgres-approved-saju-issuance-v1.js';
+import { inspectApprovedSajuPairSourceV1, verifyApprovedSajuPreparedPairIssueV1 } from './postgres-approved-saju-issuance-v1.js';
+import type { createSajuT10ProductionPairIssueSourceV1 } from './saju-t10-production-pair-issue-source-v1.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 const SUBJECT = '11111111-1111-4111-8111-111111111111';
@@ -33,7 +34,7 @@ function scope(offer: Offer) {
   };
 }
 
-function pool(initial: ReturnType<typeof scope>, changed = initial) {
+function pool(initial: ReturnType<typeof scope>, changed = initial, admitted = true) {
   let pairReads = 0;
   const actions: string[] = [];
   const database: PostgresSubjectPoolV1 = {
@@ -43,6 +44,11 @@ function pool(initial: ReturnType<typeof scope>, changed = initial) {
           actions.push(sql.trim().split(/\s+/u).slice(0, 4).join(' '));
           if (sql.includes('begin_member_subject_context_v1')) {
             return { rows: [{ subjectId: SUBJECT, subjectKind: 'member' }] as unknown as Row[] };
+          }
+          if (sql.includes('admit_approved_saju_issue_attempt_v1')) {
+            expect(args?.[2]).toBe('compatibility');
+            expect(args?.[8]).toBe(TARGET_REVISION);
+            return { rows: [{ admitted }] as unknown as Row[] };
           }
           if (sql.includes('qry_approved_saju_pair_issue_scope_v1')) {
             expect(args).toEqual([SUBJECT, PURCHASE]);
@@ -134,5 +140,60 @@ describe('purchase-locked pair source review for 3 approved offers', () => {
     expect(result).toBeNull();
     expect(source).not.toHaveBeenCalled();
     expect(a.reads()).toBe(0);
+  });
+});
+
+describe('prepared pair official source checks current purchase and consent both ways', () => {
+  const READING = '66666666-6666-4666-8666-666666666666';
+  const SESSION = '77777777-7777-4777-8777-777777777777';
+  const ATTEMPT = '88888888-8888-4888-8888-888888888888';
+  const sourceFixture = () => {
+    const issuePreparedPair = vi.fn(async () => ({
+      state: 'production_pair_source_verified' as const,
+      responseHash: 'sha256:v1:' + 'a'.repeat(64),
+      proofFingerprint: 'sha256:v1:' + 'b'.repeat(64),
+      materialHash: 'c'.repeat(64), body: {}, proof: {},
+    }));
+    const source = { issuePreparedPair } as unknown as
+      ReturnType<typeof createSajuT10ProductionPairIssueSourceV1>;
+    return { source, issuePreparedPair };
+  };
+  const input = (database: PostgresSubjectPoolV1,
+    source: ReturnType<typeof createSajuT10ProductionPairIssueSourceV1>) => ({
+    pool: database, source,
+    verifiedEvidence: { kind: 'member' as const, verifiedAuthUserId: SUBJECT },
+    subjectId: SUBJECT, purchaseIntentId: PURCHASE,
+    readingId: READING, readingSessionId: SESSION, executionAttemptId: ATTEMPT,
+    expectedReleaseRef: 't10-release-candidate',
+  });
+
+  it.each(['first-counterpart', 'additional-counterpart', 'relationship-plus-first'] as const)(
+    'admits only an already running pair attempt for %s', async offer => {
+      const a = pool(scope(offer));
+      const b = sourceFixture();
+      const verified = await verifyApprovedSajuPreparedPairIssueV1(input(a.database, b.source));
+      expect(verified?.state).toBe('source_verified_not_committed');
+      expect(a.reads()).toBe(2);
+      expect(b.issuePreparedPair).toHaveBeenCalledTimes(1);
+      expect(b.issuePreparedPair.mock.calls[0]?.[0]).toMatchObject({
+        purchaseIntentId: PURCHASE, executionAttemptId: ATTEMPT, readingId: READING,
+        scope: { paidComparison: { offerId: offer, useApprovalRef: 'approved-consent-ref' } },
+      });
+    },
+  );
+
+  it('does not call Production Source unless the actual DB attempt is admitted', async () => {
+    const a = pool(scope('first-counterpart'), scope('first-counterpart'), false);
+    const b = sourceFixture();
+    expect(await verifyApprovedSajuPreparedPairIssueV1(input(a.database, b.source))).toBeNull();
+    expect(b.issuePreparedPair).not.toHaveBeenCalled();
+  });
+
+  it('refuses an official source after consent or counterpart drift', async () => {
+    const before = scope('first-counterpart');
+    const a = pool(before, { ...before, useApprovalRef: 'revoked-or-replaced-consent' });
+    const b = sourceFixture();
+    expect(await verifyApprovedSajuPreparedPairIssueV1(input(a.database, b.source))).toBeNull();
+    expect(b.issuePreparedPair).toHaveBeenCalledTimes(1);
   });
 });
