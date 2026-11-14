@@ -10,8 +10,9 @@ if (!(readingRoot instanceof HTMLElement)) {
 const root = createRoot(readingRoot);
 root.render(<ReadingPage />);
 
-if (new URLSearchParams(window.location.search).get('checkout') === 'test') {
-  void Promise.all([
+// The server reveals sandbox ports only to the authenticated Owner.
+// Do not require a hidden query parameter to make the existing 14 cards usable.
+void Promise.all([
     import('../commerce/approved-saju-sandbox-browser-runtime.js'),
     import('../../product-auth.js'),
   ]).then(async ([{ loadApprovedSajuSandboxCheckoutPortsV1 }, { getActiveBearer, readMemberSession, PRODUCT_AUTH_STORAGE_V1 }]) => {
@@ -35,4 +36,3 @@ if (new URLSearchParams(window.location.search).get('checkout') === 'test') {
     window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, hideAfterOwnerChange);
     root.render(<ReadingPage approvedCheckout={approvedCheckout} />);
   }).catch(() => { /* The ordinary Reading page remains available. */ });
-}
