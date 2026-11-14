@@ -50,9 +50,12 @@ import { createApprovedSajuT10PairIssuanceWorkerV1 } from './approved-saju-t10-p
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 const key=generateKeyPairSync('ed25519').publicKey;
+const issuerPool={} as PostgresSubjectPoolV1;
+const pairReaderPool={} as PostgresSubjectPoolV1;
 const config=()=>{
   return {
-    pool:{} as PostgresSubjectPoolV1,
+    pool:issuerPool,
+    pairReaderPool,
     sourceOrigin:'https://saju.example',
     sourceBearerToken:'t'.repeat(32),
     trust:{issuer:'saju',audience:'myeongha',keyId:'test-key',
@@ -94,6 +97,13 @@ beforeEach(()=>{
 afterEach(()=>vi.clearAllMocks());
 
 describe('dedicated T10 purchased pair worker',()=>{
+  it('requires a separate read-only Reader DB pool before issuing or recovering',()=>{
+    expect(()=>createApprovedSajuT10PairIssuanceWorkerV1({
+      ...config(),pairReaderPool:issuerPool,
+    })).toThrow('separate archive Reader pool');
+    expect(mocks.source).not.toHaveBeenCalled();
+  });
+
   it('allocates one attempt, checks signed source, commits and completes one lease',async()=>{
     const worker=createApprovedSajuT10PairIssuanceWorkerV1(config());
     expect(await worker.runNext()).toEqual({state:'issued'});
@@ -137,9 +147,10 @@ describe('dedicated T10 purchased pair worker',()=>{
     expect(mocks.signed).not.toHaveBeenCalled();
     expect(mocks.commit).not.toHaveBeenCalled();
     expect(mocks.reader).toHaveBeenCalledWith(expect.objectContaining({
-      subjectId:SUBJECT,purchaseIntentId:PURCHASE,readingId:READING,
+      pool:pairReaderPool,subjectId:SUBJECT,purchaseIntentId:PURCHASE,readingId:READING,
       readerCharacterId:'seyeon',
     }));
+    expect(mocks.reader.mock.calls[0]?.[0]?.pool).not.toBe(issuerPool);
     expect(mocks.query.mock.calls.filter(args=>
       String(args[0]).includes('cmd_complete_approved_saju_issue_job_v1'))).toHaveLength(1);
   });
