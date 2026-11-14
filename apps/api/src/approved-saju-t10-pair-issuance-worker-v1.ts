@@ -95,6 +95,14 @@ export function createApprovedSajuT10PairIssuanceWorkerV1(input: Readonly<{
               subjectId:job.subject_id,purchaseIntentId:job.purchase_intent_id,
             });
             if(scope===null||scope.releaseRef!==input.releaseRef)return null;
+            const existing=await client.query<{attempt_no:number|null;signed_commit:boolean}>(`
+              select attempt_no,signed_commit
+              from public.qry_approved_saju_issue_job_status_v1($1::uuid,$2::uuid,'compatibility')
+            `,[job.subject_id,job.purchase_intent_id]);
+            if(existing.rows.length>1)throw new Error('Pair attempt status is ambiguous.');
+            if(existing.rows[0]?.signed_commit===true ||
+                existing.rows[0]?.attempt_no!==null && existing.rows[0]?.attempt_no!==undefined)
+              return {state:'existing_attempt' as const};
             const r=await client.query<{readingId:string;sessionId:string}>(`
               select reading_id::text as "readingId",session_id::text as "sessionId"
               from public.prepare_approved_component_reading_v1(
@@ -129,6 +137,9 @@ export function createApprovedSajuT10PairIssuanceWorkerV1(input: Readonly<{
           },
         });
         if(prepared===null)return {state:'held',reason:'invalid_scope',jobId:job.job_id};
+        if('state' in prepared)return {
+          state:'held',reason:'existing_attempt_reconciliation',jobId:job.job_id,
+        };
         if(!prepared.sourceCallAllowed)return {
           state:'held',reason:'existing_attempt_reconciliation',jobId:job.job_id,
         };
