@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { APPROVED_SAJU_SANDBOX_ROUTES_V1 as ROUTES } from '../../../packages/contracts/src/approved-saju-sandbox-routes.js';
 import { createApprovedSajuSandboxLoopbackHostV1 } from './approved-saju-sandbox-loopback-host-v1.js';
 import { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
+import { MyeongHaApiClientV1 } from '../../../packages/api-client/src/http.js';
+import { readApprovedSajuPurchaseReadingsV1 } from '../../../packages/api-client/src/records.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 const port = 48673;
@@ -134,5 +136,100 @@ describe('real owner-only sandbox adapter exposed through the isolated host', ()
     } finally {
       await host.close();
     }
+  });
+});
+
+describe('purchased Reading / comparison target reads on isolated test host', () => {
+  const otherOrigin = 'http://127.0.0.1:48675';
+  const purchaseId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const readingId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const targets = vi.fn(async (request: Request) =>
+    Response.json({ ok: true, data: [{
+      targetPersonId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      displayLabel: '합성 대상', relationshipLabel: '비교 대상',
+    }] }));
+  const readings = vi.fn(async (request: Request) =>
+    Response.json({ ok: true, data: {
+      purchaseIntentId: new URL(request.url).searchParams.get('purchaseIntentId') ?? purchaseId,
+      readings: [{ component: 'wealth', state: 'pending' }],
+    }, meta: { apiContractVersion: 'v0.9' } }));
+  const ownerRuntime = {
+    handleRequest: vi.fn(async (request: Request) => {
+      if (request.headers.get('Authorization') !== 'Bearer owner') {
+        return Response.json({ ok: false }, { status: 404 });
+      }
+      return Response.json({ ok: true, data: { environment: 'sandbox' } });
+    }),
+  };
+  let host: ReturnType<typeof createApprovedSajuSandboxLoopbackHostV1>;
+  beforeAll(async () => {
+    host = createApprovedSajuSandboxLoopbackHostV1({
+      origin: otherOrigin, staticRoot: root,
+      runtime: ownerRuntime,
+      ownerReads: { targets, readings },
+    });
+    await host.start();
+  });
+  afterAll(async () => { await host?.close(); });
+
+  it('rejects unverified members before calling private RLS archive and targets', async () => {
+    readings.mockClear(); targets.mockClear();
+    expect((await fetch(otherOrigin + '/api/readings?purchaseIntentId=' + purchaseId)).status).toBe(404);
+    expect((await fetch(otherOrigin + '/api/target-persons', {
+      headers: { Authorization: 'Bearer other-member' },
+    })).status).toBe(404);
+    expect(readings).not.toHaveBeenCalled();
+    expect(targets).not.toHaveBeenCalled();
+  });
+
+  it('lets only the verified Owner reach existing target and archive read authorities', async () => {
+    const headers = { Authorization: 'Bearer owner' };
+    const target = await fetch(otherOrigin + '/api/target-persons', { headers });
+    expect(target.status).toBe(200);
+    expect((await target.json()).data[0].displayLabel).toBe('합성 대상');
+
+    const archive = await fetch(otherOrigin + '/api/readings?purchaseIntentId=' + purchaseId, { headers });
+    expect(archive.status).toBe(200);
+    expect((await archive.json()).data.readings).toEqual([{ component: 'wealth', state: 'pending' }]);
+    expect(readings).toHaveBeenCalled();
+    expect((readings.mock.lastCall?.[0] as Request).headers.get('Authorization')).toBe('Bearer owner');
+
+    const detail = await fetch(otherOrigin + '/api/readings?readingId=' + readingId, { headers });
+    expect(detail.status).toBe(200);
+    expect((await fetch(otherOrigin + '/api/readings', { headers })).status).toBe(200);
+  });
+
+  it('blocks purchase-ID ambiguity, unscoped query fields and writes', async () => {
+    const headers = { Authorization: 'Bearer owner' };
+    const beforeReads = readings.mock.calls.length;
+    const reject = [
+      '/api/readings?purchaseIntentId=' + purchaseId + '&readingId=' + readingId,
+      '/api/readings?purchaseIntentId=not-a-uuid',
+      '/api/readings?purchaseIntentId=' + purchaseId + '&purchaseIntentId=' + purchaseId,
+      '/api/readings?filter=all',
+      '/api/target-persons?cursor=1',
+    ];
+    for (const url of reject) {
+      expect((await fetch(otherOrigin + url, { headers })).status, url).toBe(404);
+    }
+    expect((await fetch(otherOrigin + '/api/readings?purchaseIntentId=' + purchaseId, {
+      method: 'POST', headers, body: '{}',
+    })).status).toBe(405);
+    expect(readings.mock.calls.length).toBe(beforeReads);
+  });
+
+  it('delivers the real purchased-reading browser-client contract through localhost HTTP', async () => {
+    const client = new MyeongHaApiClientV1({ origin: otherOrigin });
+    await expect(readApprovedSajuPurchaseReadingsV1(client, 'owner', purchaseId))
+      .resolves.toEqual([{ component: 'wealth', state: 'pending' }]);
+    await expect(readApprovedSajuPurchaseReadingsV1(client, 'other-member', purchaseId))
+      .rejects.toMatchObject({ status: 404 });
+  });
+
+  it('does not serve unrecognized API files even if present in the static root', async () => {
+    const { mkdir, writeFile } = await import('node:fs/promises');
+    await mkdir(join(root, 'api'), { recursive: true });
+    await writeFile(join(root, 'api', 'hidden.json'), '{ "secret": true }');
+    expect((await fetch(otherOrigin + '/api/hidden.json')).status).toBe(404);
   });
 });
