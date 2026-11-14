@@ -59,6 +59,10 @@ declare
   issue_scope jsonb;
   pair_issue_scope jsonb;
   paid_pair_admission jsonb;
+  v_pair_body jsonb;
+  v_pair_payload jsonb;
+  v_pair_snapshot jsonb;
+  v_pair_receipt jsonb;
   prepared record;
 begin
   select * into strict authorized
@@ -166,13 +170,80 @@ begin
       if sqlerrm <> 'Approved Saju pair source did not match the verified issued Reading' then raise; end if;
     end;
   end if;
-  perform 1 from public.cmd_finalize_reading_transport_success_v1(actor,reading_id,attempt_id,gen_random_uuid(),
-    'isolated-ref','isolated-approved-v1','isolated-native',
+  if field='compatibility' then
+    v_pair_body := jsonb_build_object(
+      'version','saju-t10-official-pair-reading-v1','state','issued','readingId',reading_id,
+      'readingDomain','compatibility','policyId','myeongha-t10-internal-relational-explanation-v1',
+      'policyVersion','2026-11-13','materialHash',repeat('e',64),
+      'charts',jsonb_build_array(
+        jsonb_build_object('role','self','birthRevisionId',authorized.source_birth_revision_id,
+          'birthInputHash',(select input_hash from public.birth_profile_revisions
+            where id=authorized.source_birth_revision_id)),
+        jsonb_build_object('role','partner','birthRevisionId',authorized.target_birth_revision_id,
+          'birthInputHash',(select input_hash from public.birth_profile_revisions
+            where id=authorized.target_birth_revision_id))),
+      'chartDisplays',jsonb_build_array(jsonb_build_object('role','self'),
+        jsonb_build_object('role','partner')),
+      'units',jsonb_build_array(
+        jsonb_build_object('paragraph','두 명식의 접점을 설명합니다.'),
+        jsonb_build_object('paragraph','두 명식의 조율 지점을 설명합니다.'),
+        jsonb_build_object('paragraph','미지원 결과는 단정하지 않습니다.'))
+    );
+    v_pair_payload := jsonb_build_object(
+      'version','myeongha-t10-production-pair-issue-v1',
+      'executionAttemptId',attempt_id,'purchaseIntentId',intent_id,'readingId',reading_id,
+      'offerId',pair_issue_scope->>'approvedOfferId',
+      'counterpartOrder',pair_issue_scope->>'counterpartOrder',
+      'targetPersonId',pair_issue_scope->>'targetPersonId',
+      'useApprovalRef',pair_issue_scope->>'useApprovalRef',
+      'admissionHash',pair_issue_scope->>'admissionHash',
+      'birthRevisionId',authorized.source_birth_revision_id,
+      'targetBirthRevisionId',authorized.target_birth_revision_id,
+      'sourceRequestHash',source_hash,'engineVersion','isolated-approved-v1',
+      'sourceBirthInputHash',(select input_hash from public.birth_profile_revisions
+        where id=authorized.source_birth_revision_id),
+      'targetBirthInputHash',(select input_hash from public.birth_profile_revisions
+        where id=authorized.target_birth_revision_id),
+      'releaseRef',pair_issue_scope->>'releaseRef',
+      'materialHash',repeat('e',64),'responseBodyHash',repeat('d',64),
+      'issuedAtMs',floor(extract(epoch from clock_timestamp())*1000)::bigint);
+    v_pair_snapshot := jsonb_build_object(
+      'responseVersion','myeonghwa-product-reading-response-v2',
+      'state','delivered','messageCode','READING_DELIVERED','requiredAction','none',
+      'reading',jsonb_build_object('readingId',reading_id,
+        'sections',jsonb_build_array(
+          jsonb_build_object('sectionType','structure',
+            'blocks',jsonb_build_array(jsonb_build_object('type','fact_table',
+              'rows',jsonb_build_array()))),
+          jsonb_build_object('sectionType','compatibility','blocks',jsonb_build_array(
+            jsonb_build_object('type','paragraph','text','두 명식의 접점을 설명합니다.'),
+            jsonb_build_object('type','paragraph','text','두 명식의 조율 지점을 설명합니다.'),
+            jsonb_build_object('type','paragraph','text','미지원 결과는 단정하지 않습니다.'))))));
+    perform 1 from public.cmd_finalize_approved_saju_pair_reading_v1(
+      actor,intent_id,reading_id,attempt_id,gen_random_uuid(),source_hash,
+      'isolated-ref','isolated-approved-v1',
+      (select input_hash from public.birth_profile_revisions
+        where id=authorized.source_birth_revision_id),
+      (select input_hash from public.birth_profile_revisions
+        where id=authorized.target_birth_revision_id),
+      v_pair_snapshot,response_hash,
+      jsonb_build_object('payload',v_pair_payload,'sourceBody',v_pair_body,'signature',repeat('A',86)));
+    v_pair_receipt := public.qry_approved_saju_source_issue_proof_v1(actor,reading_id);
+    if v_pair_receipt#>>'{proof,payload,readingId}' is distinct from reading_id::text
+      or v_pair_receipt#>>'{proof,payload,targetBirthRevisionId}'
+        is distinct from authorized.target_birth_revision_id::text
+      or v_pair_receipt->>'storedResponseHash' is distinct from response_hash then
+      raise exception 'Pair source proof and two Revision identities were not archived';
+    end if;
+  else
+    perform 1 from public.cmd_finalize_reading_transport_success_v1(actor,reading_id,attempt_id,gen_random_uuid(),
+      'isolated-ref','isolated-approved-v1','isolated-native',
     (select input_hash from public.birth_profile_revisions where id=authorized.source_birth_revision_id),
     (select input_hash from public.birth_profile_revisions where id=authorized.target_birth_revision_id),
     'myeonghwa-product-reading-response-v2','delivered',null,null,null,
     coalesce(snapshot_body,jsonb_build_object('responseVersion','myeonghwa-product-reading-response-v2','state','delivered',
       'reading',jsonb_build_object('readingId',reading_id))),response_hash);
+  end if;
   set constraints ct_reading_session_authority,ct_reading_request_authority,ct_reading_finalize_from_reading,
     ct_reading_finalize_from_ref,ct_reading_finalize_from_execution immediate;
   set constraints ct_reading_session_authority,ct_reading_request_authority,ct_reading_finalize_from_reading,
