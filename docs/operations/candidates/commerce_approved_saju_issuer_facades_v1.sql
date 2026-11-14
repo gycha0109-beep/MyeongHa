@@ -3,6 +3,10 @@
 -- facade role. No membership is assigned to a serving login here.
 create role myeongha_approved_saju_issuer_executor nologin noinherit
   nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
+-- Read-only T10 Reader is separately provisioned: issuer HOLD cannot
+-- revoke a customer's already purchased, still-authorized archive.
+create role myeongha_approved_saju_pair_reader_executor nologin noinherit
+  nosuperuser nocreatedb nocreaterole noreplication nobypassrls;
 
 create function public.qry_approved_saju_issue_scope_v1(uuid,uuid,text)
 returns jsonb
@@ -323,6 +327,17 @@ revoke all on function public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)
   from public,anon,authenticated,service_role,myeongha_api_executor,myeongha_commerce_internal_executor;
 grant execute on function public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)
   to myeongha_approved_saju_issuer_executor;
+
+-- This role has *no* checkout, Source dispatch, job or finalize privileges.
+-- The member resolver binds the current authenticated subject per transaction.
+grant execute on function
+  public.begin_member_subject_context_v1(uuid),
+  public.current_myeongha_subject_id(),
+  public.assert_myeongha_subject_context_v1(uuid),
+  public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
+  public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean),
+  public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)
+  to myeongha_approved_saju_pair_reader_executor;
 
 -- Only the dedicated issuer may claim these exact jobs. A fresh lease ID
 -- prevents an expired worker from completing a claim that was taken over.
