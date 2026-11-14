@@ -1379,8 +1379,10 @@ begin
     ),'empty'))
     into current_count,current_fingerprint
   from commerce_saju_private.approved_source_issue_proofs_v1;
-  if (current_count,current_fingerprint) is distinct from (
-    select proof_count,proof_fingerprint from pg_temp.saju_pair_hold_snapshot
+  if current_count is distinct from (
+    select proof_count from pg_temp.saju_pair_hold_snapshot
+  ) or current_fingerprint is distinct from (
+    select proof_fingerprint from pg_temp.saju_pair_hold_snapshot
   ) then raise exception 'T10 HOLD modified a previously issued signed archive'; end if;
 end
 $pair_hold_after$;
