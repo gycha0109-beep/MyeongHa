@@ -193,15 +193,13 @@ for (const fragment of [
   "drReady:false,serviceResumptionAllowed:false",
   'jsonb_to_recordset',
   'COPY ops_private_source_base64(encoded) FROM STDIN',
-  "SET LOCAL log_min_error_statement='panic'",
-  "SET LOCAL log_error_verbosity='terse'",
-  "SET LOCAL log_statement='none'",
   "Buffer.from(JSON.stringify(packet),'utf8').toString('base64')",
   '/*__SOURCE_PACKET_COPY_DATA__*/',
   "Buffer.from(JSON.stringify(packet),'utf8').toString('base64')",
   'DISPOSABLE_LEDGER_NOT_EMPTY',
 ]) requireFragment(disposableLedger,fragment,disposableLedgerPath);
 for (const fragment of [
+  '--log-driver none',
   'restore_disposable_provider_ledger:',
   'SCOPED_PROVIDER_REPLAY: ${{ inputs.restore_disposable_provider_ledger }}',
   "if [[ \"$SCOPED_PROVIDER_REPLAY\" == 'true' ]]; then",
