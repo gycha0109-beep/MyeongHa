@@ -4,6 +4,7 @@ import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-ve
 import { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
 import { createApprovedSajuSandboxLoopbackHostV1 } from './approved-saju-sandbox-loopback-host-v1.js';
 import { handleTargetPersonReadRequestV1 } from './target-person-read-http.js';
+import { handleSupabaseAuthRequestV1 } from './supabase-auth-http.js';
 import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import {
@@ -55,6 +56,13 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
     staticRoot: input.staticRoot,
     runtime: checkout,
     ...(input.sdkFetch === undefined ? {} : { sdkFetch: input.sdkFetch }),
+    memberAuth: (request, action) => handleSupabaseAuthRequestV1({
+      request, action,
+      env: {
+        MYEONGHA_SUPABASE_URL: input.supabaseOrigin,
+        MYEONGHA_SUPABASE_API_KEY: input.supabaseApiKey,
+      },
+    }),
     ownerReads: {
       targets: request => handleTargetPersonReadRequestV1(shared(request)),
       readings: request => {
