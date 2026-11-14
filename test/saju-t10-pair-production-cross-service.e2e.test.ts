@@ -31,7 +31,8 @@ type ServerFactory = (host: { requestReading: () => Promise<never> }, options: {
 
 let server: Server;
 let actualOrigin: string;
-beforeAll(async () => {
+function startHost() {
+  return async () => {
   const moduleUrl = new URL('../.cross-service/saju/dist/host/http-server.js', import.meta.url);
   const module = await import(moduleUrl.href) as {createMyeonghwaProductionProductHostServer: ServerFactory};
   server = module.createMyeonghwaProductionProductHostServer(
@@ -48,11 +49,14 @@ beforeAll(async () => {
   );
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   actualOrigin = 'http://127.0.0.1:' + (server.address() as AddressInfo).port;
-});
-afterAll(async () => {
+  };
+}
+function stopHost() {
+  return async () => {
   if (server?.listening) await new Promise<void>((resolve, reject) =>
     server.close(error => error ? reject(error) : resolve()));
-});
+  };
+}
 
 function scopeFor(offerId: (typeof offerIds)[number], targetPersonId = randomUUID()): Scope {
   const request = {birth: own, partnerBirth: partner};
@@ -89,6 +93,8 @@ function source() {
 }
 
 suite('real pinned Saju T10 Production issuer to MyeongHa Reading contract', () => {
+  beforeAll(startHost());
+  afterAll(stopHost());
   it.each(offerIds)('preserves signed two-chart Korean source for %s', async offerId => {
     const scope = scopeFor(offerId);
     const purchaseIntentId = randomUUID();
