@@ -3,6 +3,7 @@ import { createServer } from 'node:http';
 import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { APPROVED_SAJU_SANDBOX_ROUTES_V1 } from '../../../packages/contracts/src/approved-saju-sandbox-routes.js';
 import type { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
+import { OWNER_PORTONE_SDK_PATH, serveOwnerPortOneSdkV1 } from '../../../cloudflare/owner-portone-sdk-proxy.mjs';
 
 const ROUTES = new Set(Object.values(APPROVED_SAJU_SANDBOX_ROUTES_V1));
 const ARCHIVE_PATH = '/api/readings';
@@ -20,6 +21,7 @@ function allowedReadQuery(url: URL) {
 }
 const MAX_REQUEST_BYTES = 1024;
 const MAX_RESPONSE_BYTES = 128 * 1024;
+const MAX_SDK_BYTES = 2 * 1024 * 1024;
 const TYPES: Readonly<Record<string, string>> = Object.freeze({
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -49,6 +51,8 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   origin: string;
   staticRoot: string;
   runtime: Runtime;
+  /** Trusted fixed-CDN test injection; never selected by a client URL. */
+  sdkFetch?: typeof fetch;
   /** Existing RLS/entitlement-verifying GET runtimes. No write routes. */
   ownerReads?: Readonly<{ targets: OwnerReadHandler; readings: OwnerReadHandler }>;
 }>) {
@@ -75,6 +79,34 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
     catch { req.resume(); reply(400); return; }
     if (requestUrl.origin !== input.origin || requestUrl.hash) {
       req.resume(); reply(404); return;
+    }
+
+    if (requestUrl.pathname === OWNER_PORTONE_SDK_PATH) {
+      req.resume();
+      if (req.method !== 'GET' || requestUrl.search !== '') { reply(404); return; }
+      try {
+        // Reuse the existing fixed PortOne V2 SDK relay. It never forwards
+        // browser cookies/authorization or accepts a caller-provided URL.
+        const sdk = await serveOwnerPortOneSdkV1(input.sdkFetch ?? fetch);
+        if (sdk.status !== 200 || sdk.body === null) { reply(503); return; }
+        const reader = sdk.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        try {
+          while (true) {
+            const step = await reader.read();
+            if (step.done) break;
+            total += step.value.byteLength;
+            if (total > MAX_SDK_BYTES) { reply(503); return; }
+            chunks.push(step.value);
+          }
+        } finally { try { await reader.cancel(); } catch {} }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+        reply(200, bytes, 'application/javascript; charset=utf-8');
+      } catch { reply(503); }
+      return;
     }
 
     if (input.ownerReads !== undefined

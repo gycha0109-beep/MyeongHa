@@ -9,6 +9,10 @@ import { MyeongHaApiClientV1 } from '../../../packages/api-client/src/http.js';
 import { readApprovedSajuPurchaseReadingsV1 } from '../../../packages/api-client/src/records.js';
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
+const sdkFetch = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => new Response(
+  'window.PortOne={requestPayment(){}};',
+  { status: 200, headers: { 'Content-Type': 'application/javascript' } },
+));
 const port = 48673;
 const origin = `http://127.0.0.1:${port}`;
 const handler = vi.fn(async (request: Request): Promise<Response | null> => {
@@ -32,7 +36,9 @@ beforeAll(async () => {
   await mkdir(join(root, 'assets'));
   await writeFile(join(root, 'reading.html'), '<html><title>사주 상품</title></html>');
   await writeFile(join(root, 'assets', 'test.js'), 'console.log("saju");');
-  server = createApprovedSajuSandboxLoopbackHostV1({ origin, staticRoot: root, runtime: { handleRequest: handler } });
+  server = createApprovedSajuSandboxLoopbackHostV1({
+    origin, staticRoot: root, runtime: { handleRequest: handler }, sdkFetch,
+  });
   await server.start();
 });
 afterAll(async () => {
@@ -51,6 +57,20 @@ describe('approved Saju isolated localhost web / checkout HTTP host', () => {
     expect((await fetch(origin + '/admin.html')).status).toBe(404);
     expect((await fetch(origin + '/%2e%2e/.env')).status).toBe(404);
   });
+  it('serves only the fixed official PortOne test SDK through its existing validated relay', async () => {
+    sdkFetch.mockClear();
+    const response = await fetch(origin + '/owner-portone-sdk-v2.js');
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('javascript');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toContain('window.PortOne');
+    expect(sdkFetch).toHaveBeenCalledOnce();
+    expect(sdkFetch.mock.calls[0]?.[0]).toBe('https://cdn.portone.io/v2/browser-sdk.js');
+    expect((await fetch(origin + '/owner-portone-sdk-v2.js?v=other')).status).toBe(404);
+    expect((await fetch(origin + '/owner-portone-sdk-v2.js', { method: 'POST' })).status).toBe(404);
+    expect(sdkFetch).toHaveBeenCalledOnce();
+  });
+
   it('preserves member-only checks for the existing sandbox API', async () => {
     expect((await fetch(origin + ROUTES.access)).status).toBe(404);
     const response = await fetch(origin + ROUTES.access, {
