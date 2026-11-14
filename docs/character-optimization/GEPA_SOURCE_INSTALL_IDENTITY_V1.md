@@ -21,3 +21,12 @@
 또한 `pip freeze --all`은 설치 상태를 기록할 뿐 그 자체가 완전한 해시 기반 잠금 파일이 아니다. 후속 환경 재현성은 이 한계를 유지한 채 판정한다. 공식 pip 참조: https://pip.pypa.io/en/stable/cli/pip_freeze/ 및 https://pip.pypa.io/en/stable/topics/repeatable-installs/ .
 
 이 신원 확인은 실제 대화 품질, 사람 검토, 독립 최종평가, 네트워크 송신 승인, 실결제 게이트의 충족을 증명하지 않는다. **유료 모델 호출·크레딧 충전 0회, 누적 예산 상한 500원, Canon/사주/기억/관계/운영 변경 없음.**
+
+## 2026-11-14 — 공식 GEPA 빌드 도구의 해시 잠금 및 분리된 설치
+
+- 기존 GEPA Git 소스 SHA `ce5b0d6e3d6af6c6dbec6de2c54536bbb961d309`과 Python 3.14.10 기반 이미지 고정은 그대로 둔다.
+- 해당 소스의 실제 `pyproject.toml` 빌드 요구사항(setuptools>=77.0.1, wheel, build)을 확인했다. Python 3.14에서 필요한 5개 순수 Python wheel(빌드 도구 3종+의존성 packaging, pyproject_hooks)을 PyPI에서 다운로드하여 각 파일 SHA-256을 확인하고 `build-requirements-hashed.lock`에 버전과 파일 해시로 고정했다.
+- Dockerfile/오프라인 GitHub 워크플로는 `pip --require-hashes --only-binary=:all: --no-deps`로 이 5종을 설치한 후, GEPA VCS 커밋을 `--no-deps --no-build-isolation --check-build-dependencies`로 설치한다. 즉, pip의 자동 격리 빌드 환경에서 가변 패키지를 다시 내려받는 경로를 제거했다.
+- 런타임 검증은 잠금 파일의 정확한 5개 해시·버전 목록, 설치된 배포 패키지의 버전과 기존 GEPA Git 출처/소스 커밋을 대조한다. **이 검증만으로 실제 빌드 당시 설치 옵션을 증명할 수 없으므로** 결과에는 `buildIsolationRuntimeAttested=false`를 유지한다.
+- Windows 집 PC Docker 실빌드 성공, `--network none`/읽기전용 소스/제한된 tmpfs에서 신원 검증과 실제 공식 GEPA 합성 실행 포함 Python 8건 성공. 유료 모델 요청·기존 사용자 원본·대화 데이터 사용은 0건.
+- **미충족:** apt 패키지 버전·다운로드 아티팩트의 전체 해시 잠금, 공식 Git 소스에서 생성되는 wheel 결과 바이트의 독립 고정, OS 전이 패키지 증빙 및 실제 사람 평가/품질·운영 승인. 따라서 `transitiveDependenciesFullyLocked=false`는 계속 유지한다.
