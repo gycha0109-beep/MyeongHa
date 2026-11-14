@@ -1,5 +1,9 @@
 # 명하 기록 · 공식 사주 보고서 구현 로드맵 (2026-10-27)
 
+## 현행 최초 웹 공개 — 2026-11-14 정합성 정정
+
+[현재 출시 범위](../LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md) · [실행/검증 통합표](../LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)를 우선한다. **승인 구매 Offer 14개**, 해당 **7개 해석 구성요소**, 과거 **12개 화면상 사주 주제**, Saju 품질 **8개 표본 메뉴**는 서로 다른 집합이다. 아래 '첫 유료 정밀 원국 보고서' 및 '12개 상품 동등 화면'의 과거 작업 기록은 현재 판매 SKU를 1개/12개로 제한하지 않는다. 기록 페이지는 계속 '사주 보고서/현세록' 2탭이며 14개 Offer의 각각 발급 결과를 권한 검증해 보관·재열람해야 한다. 기존 Reading/기록 권한·환불 차단 계약은 보존한다.
+
 ## 2026-10-30 확정된 Records 범위 — 명식록·대리가 기억 중복 제거
 
 - **최신 사용자 결정:** 기록 페이지는 `사주 보고서`와 `현세록`만 제공한다. 기존 기록 페이지의 `명식록`과 `대리가 기억`은 마이페이지에 이미 존재하므로 기록 페이지에서 **탭·본문·전용 상태·렌더러·조회 호출을 제거**한다. 아래의 4탭·명식록/기억 보존 서술은 과거 단계의 설계 기록이며 재도입 지시가 아니다.
@@ -31,7 +35,7 @@
 - **실행 증거:** 일회용 `myeongha_ci_case_2901`에서 201개 유효 마이그레이션 적용 후 카탈로그 SHA-256 `116ef373f647baccc9fc53386129d444fa83e5577fdbb86392e44ff1af90d38e` 산출·검증. `api_role_acl_negative`, `schema_usage_authority_model_negative` PASS. 실제 PostgreSQL 연동 HTTP E2E는 무권한 401, 철회된 권한 404, 활성 구매권 원본 재열람, 명식 revision 1→2 변경 시 공식 원본 불변, 재철회 404를 검증했다. 관련 Vitest 35개 PASS. GitHub Actions 최신 HEAD 결과는 별도 확인 대상이다.
 - **배포 기준:** 사용자 확정 Cloudflare Worker이며 과거 배포 사업자의 검사를 이 트랙 블로커로 취급하지 않는다. Saju Production issuer와 Commerce 유료 활성화 HOLD는 그대로다.
 
-## 2026-10-29 이어서 구현 — 12개 상품 동일 진입 화면
+## 2026-10-29 역사적 구현 — 12개 **표시 주제** 동일 진입 화면 (14개 구매 Offer와 별개)
 
 - `apps/web/src/reading/ReadingPage.tsx`의 4개 주력 상품 + 접힌 8개 추가 상품 구조를 없애고 **12개 상품을 하나의 `sajuProductTopics` 카탈로그·동일 카드 그리드**에 표시한다. 이는 판매 활성화 순서나 Saju 연구 8메뉴의 우선순위가 아니다.
 - 기존 12개 주제별 정확한 URL과 현재 Preview 허용 목록을 유지한다. **실제 허용된 Preview 5개만 읽기 링크를 제공**하고 나머지 7개는 서비스 준비 중으로 표시해 미지원 경로를 상품 구매 동작처럼 제시하지 않는다.
@@ -39,7 +43,7 @@
 - 관련 구현·레이아웃: `apps/web/src/reading/ReadingPage.tsx`, `apps/web/saju-preview-landing.css`; 화면·라우트 표면 검사: `apps/web/saju-reading-readiness.test.ts`, `test/web-reading-availability-ux.test.ts`, `test/web-golden-master-layout.test.ts`.
 - Saju 정본 `docs/product/22-production-interpretation-authority-audit.md`는 2026-10-29 재확인 기준 **NO_BUILD / Production BLOCKED**다. 운영 발행 활성화나 중간 main 병합은 수행하지 않는다.
 
-## 2026-10-28 제품 확정 기준 — 12개 사주 상품 동일 레이어
+## 2026-10-28 당시 제품 화면 기준 — 12개 **표시 주제** (현행 14 Offer와 구분)
 
 > 이 절은 아래에 남긴 과거 첫 SKU·연애 우선·8메뉴 확대 후보 문구보다 **최신 제품 의사결정으로 우선한다**. 이전 서술은 당시 구현 이력을 설명할 뿐 현재 상품 계층이나 출시 우선순위를 결정하지 않는다.
 
