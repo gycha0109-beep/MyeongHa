@@ -1,5 +1,7 @@
 # 명하 캐릭터 공통 GEPA 최적화 — 구현 로드맵
 
+> **2026-11-14 현재 출시 범위:** [로드맵 공통 실행 정본](../LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md) 기준, GEPA의 유료 파일럿·9명 확대·최종 최적화는 최초 웹 출시 선행조건이 아니다. 여섯 명 실제 모델 기본 품질·예산·보안 검증은 캐릭터/보안 트랙이 첫 출시 전에 완료한다. 기존 GEPA 독립 로드맵 목표와 예산 제한은 유지한다.
+
 > 기준: `MyeongHa_Character_GEPA_Optimization_Architecture_v0.3` · 연구용 · 사용자 승인 없는 유료 API 호출 금지
 > 구현 트랙: `character-runtime-lab` / PR #3208. 코드 검증과 실제 응답 품질 증명을 반드시 구분한다.
 
