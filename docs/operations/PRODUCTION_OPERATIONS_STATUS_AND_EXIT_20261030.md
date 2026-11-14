@@ -1,3 +1,13 @@
+### 2026-11-14 23:28 KST — 현재 main 연동 Worker의 운영 수용 14항목 재실측
+
+- [PR #3315](https://github.com/gycha0109-beep/MyeongHa/pull/3315) 병합, [통합 CI #43599753824](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43599753824) SUCCESS. Phase 11 느린 DB/연결 획득 대기 초과의 격리 실측 PASS는 공식 로드맵에 반영 완료; 추가 재시험 불필요.
+- 최신 관측시 Cloudflare `myeongha` 100% Worker version `a3f08d90-7034-4a1b-b339-0cec91e74325` (UTC 14:28:46), 성공 Build `507047e2-a861-4f84-9148-c5cbdbc7b867`의 정확한 GitHub `main=333dc44b314ca6f8da6c0d2cd84295d0eb913e5b`에 연동. 기존 read-only Phase 13 collector에서 동일 SHA가 현재 main, CI·Governance·Web Browser Smoke·Supabase Production 성공, `deploy-migrations=SKIPPED`, `acceptanceDecision=NOT_EVALUATED_BY_COLLECTOR` 확인.
+- live 무자격 HTTP: `GET /api/health=200`, `GET /api/readiness=200`(설정 수준), `GET /api/me=401`, `GET /api/me/shared-memory=404`(경로 미연결), `GET /api/me/saju/calculation=405`, `POST /api/me/saju/calculation=401`. 전부 해당 Worker 버전 헤더·`no-store` 일치. 세션/DB/Auth/Saju 실제 양성 호출, 개인정보·요금·트래픽·운영 설정 변경 없음.
+- §33 14항목 상세 확인은 [Phase 13 수용 증거](MAIN_OPERATIONS_ACCEPTANCE_PHASE13_20261030.md)의 이번 날짜 버전별 행렬에 기록. **소스/Worker 상태/Health/제한 음성인증/no-store 일부만 관측**. 완전한 config·authenticated synthetic·실제 dependency/Saju·private positive/cache·secret/log/metrics·rollback 검증은 여전히 HOLD. 이전 Worker `bb6b06aa-c842-40ed-86eb-93e86863e697`는 후보만 식별, 전환·호환성 실증 아님.
+- Production DB 정합화·Hosted Auth/Storage·삭제/철회/환불 연속성·RPO/RTO는 이번 검사로 변경되지 않음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-14 — 느린 DB·연결 획득 대기 초과 실제 보호 격리 시험 성공
 
 - [PR #3310](https://github.com/gycha0109-beep/MyeongHa/pull/3310) 병합 및 최종 [CI #43594107224](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43594107224) SUCCESS 후, 정본 `main=5ad56e5775644e656db6b1029612c3911c5032a8`에서 [실증 #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780) SUCCESS. 첫 실패 #43592572032는 실패 이력으로 보존.
