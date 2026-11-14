@@ -1,3 +1,13 @@
+## 2026-11-14 — Phase 11 느린 DB·연결 획득 대기 초과 실제 격리 검증 PASS
+
+- **정본 실행:** [보호 Linux 실행 #43597769780](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43597769780) `SUCCESS`, `main=5ad56e5775644e656db6b1029612c3911c5032a8`, 수동 `workerd_db_slow_pool`. [PR #3310](https://github.com/gycha0109-beep/MyeongHa/pull/3310) `MERGED` 및 [정확한 수정 HEAD 통합 CI #43594107224](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43594107224) `SUCCESS`. 이전 실패 실행 [#43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032)은 역사적 실패 증거로 보존하며 완료로 승격하지 않음.
+- **원본 비식별 증거:** `isolated-real-product-chain-phase11-43597769780` artifact `14115168226` (만료 2026-11-28 13:04:15 UTC), 내부 `myeongha-ops-real-product-chain-phase11-proof.json` SHA-256 `2c5768e300090d6d9bfa230793e4df26a4b3b42cf4a761ed5af7c931678e2c14`; 기본 PG18 격리 증거 artifact `14115073288` (만료 2026-11-28 13:03:25 UTC), JSON SHA-256 `dc014b4c4e13bf293754ce16f85726b5fe6e1959d3fe21354945c6bca3405d15`.
+- **실측 수용:** 실제 일회용 GoTrue JWT, PostgreSQL 18 RLS, pinned Saju 엔진, Wrangler `4.152.0`/workerd `1.20261019.1` 통합. 기준선 `12/12 HTTP 200`; 합성 DB 테이블 실제 `ACCESS EXCLUSIVE` 잠금 중 `4/4 HTTP 503`, 기타 응답 `0`; fixture 슬롯 획득 시도 `16`, 획득 실패 `2`, 대기 초과 `2`, 설정 한도 `2`, 최고 동시 슬롯 `2`, 로컬 획득 대기 `125ms`; 장애 중 Health `200`; 잠금 해제 후 `4/4 HTTP 200`(p95 `279.819ms`). 익명 거절·요청별 신규 DB client·runtime 및 Docker 정리 PASS. 증거의 `outputContainsIdentifiers=false` 확인. PG18 별도 기본 RLS·합성 압력도 PASS.
+- **판정:** **이번에 부족했던 Phase 11 DB slow/pool-acquisition 재현 조합은 격리 환경에서 실증 수용됨.** 이미 완료된 DB process outage [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024)와 900초 overlap [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347)를 다시 실행하지 않음. 이는 **fixture의 숫자 슬롯 제한** 실험이며 Hosted Hyperdrive·Production Worker pool 성능이 아님. `productionWorkerAdmissionMeasured=false`, `hostedHyperdriveMeasured=false`, `productionCapacityProven=false`, `productionScalingThresholdApproved=false`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false` 유지.
+- **다음:** 로드맵 Gate 3 / Phase 12의 기존 수동 확장·축소 판단 근거에 이 측정만 추가하고 새로운 Production 임계치는 승인하지 않음. Gate 1(Production DB 최소 정합화)·Hosted DR/개인정보 연속성·Gate 4 최종 수용은 독립 필수 차단으로 유지. 변경 승인 전 Production SQL/이력·실사용자 데이터·유료 Hosted·트래픽 무변경.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 Phase 11 workerd 느린 DB 격리 실증 — 첫 실행 실패, 요청별 연결로 수정
 
 - **첫 실증:** [보호 실행 #43592572032](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43592572032), 병합된 `main=fdd8b65514f7fed601e252c975611d471ded35ed`, `experiment=workerd_db_slow_pool`. PostgreSQL 18 RLS·합성 압력 단계 PASS(별도 증거 `14113300753`), GoTrue·PG18·Saju의 workerd 제품 측정은 `workerd_requests`에서 FAIL, 비식별 증거 `14113415610`의 `status=BLOCKED_INCOMPLETE`. 4/4 제한 실패·연결 대기 초과·정상 복구 증거는 **아직 없음**.
