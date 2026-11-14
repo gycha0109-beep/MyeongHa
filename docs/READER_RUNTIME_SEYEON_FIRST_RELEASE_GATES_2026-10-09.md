@@ -1,6 +1,8 @@
-# Standard Reading → Character Reader Runtime: Seyeon-first staging
+# Standard Reading → Character Reader Runtime: historical Seyeon-first staging
 
-Status: **server-side internal-preview admission added; public paid Reader remains OFF**.
+Status: **historical Seyeon-only internal preview; 2026-11-14 target is six Readers together; public paid Reader remains OFF**.
+
+> **Current first Web launch authority:** [owner decision](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md) and [integration gate](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md) require **세연·라현·백헌·여울·윤호·태겸** all to support paid Official Reading viewing, a first question, and follow-up questions at initial launch, subject to individual approved Content Releases, models/Guards, exact Reader×Offer support, grants and end-to-end verification. This document records the older Seyeon-first **preview implementation**, not the first-release product target. The fail-closed preview cohort and public OFF remain until actual verified release. Unsupported combinations must not silently fall back to Seyeon.
 
 ## Seams, not duplicate authorities
 
@@ -9,7 +11,7 @@ Status: **server-side internal-preview admission added; public paid Reader remai
 - **Character/Reader owns** the chosen Reader's published content bundle, active single-character Thread, existing Reader grant, live Relationship/Memory, perspective and exact-context rendering.
 - **App/Web own** the navigation, states, guarded rendering, error recovery and reading history re-entry. URL `reader` parameters are presentation hints only.
 
-## First release stage
+## Historical Seyeon-first preview stage (not current first Web launch scope)
 
 Nine Reader identities remain supported in the shared runtime contract. Production internal-preview release admission recognizes **only `seyeon`** after server-side `prepareCharacterStandardReadingServerRuntimeV1` has resolved and checked the active Thread / delivered Official Reading / content bundle. Other eight Readers (and unknown identities) fail closed **before Saju grounding transport and text realization**, even if their display cards exist.
 
@@ -24,13 +26,13 @@ The public paid Reader API rewrite is still absent, Production activation defaul
 5. Server-side candidate release admission. Only after admission: bounded grounding projection → Character-specific interpretation → semantic preservation/guard → protected fallback or output.
 6. Persist generated outcome through the explicitly approved fulfillment/Reading lifecycle, then re-open **the same** official record. Preview output is **not** silently persisted as paid fulfillment.
 
-## Per-character expansion gates
+## Per-character verification gates for the six-Reader first launch
 
-To promote any future Reader, the owning Character track must first deliver approved Character Bible/voice/behavior boundary, content bundle publication, pinned perspective, server-side grant test, semantic preservation benchmark, memory/relationship gates, and runtime canary. Commerce/Reading must separately validate paid fulfillment and re-entry for that Reader. Only then add that exact ID to the server-side internal-preview candidate set and update rollout presentation; **do not** enable all Reader IDs at once.
+To activate each of the six approved launch Readers, the owning Character track must first deliver approved Character Bible/voice/behavior boundary, content bundle publication, pinned perspective, server-side grant test, semantic preservation benchmark, memory/relationship gates, and runtime canary. Commerce/Reading must separately validate paid fulfillment and re-entry for that Reader. Only after individual acceptance may the implementation expand its authorized set. **Do not** treat adding a candidate preview ID as a public paid release or grant all six automatically. Six-Reader simultaneous launch is the product target; activation remains OFF until all six pass.
 
 ## Acceptance & remaining blockers
 
-- Nine canonical IDs in runtime contract, only Seyeon candidate; unknown IDs fail closed.
+- Historical implementation: nine canonical IDs in runtime contract, only Seyeon preview candidate; unknown IDs fail closed. Current launch target: six individually verified Readers, not a Seyeon-only public release.
 - No browser Reader hint, payment claim or entitlement enters the Reader HTTP request.
 - Candidate admission is after server Reader/Official Reading authority but before grounding/renderer.
 - Production mode off + public route absent remain unchanged.
