@@ -1,4 +1,5 @@
 import { createServer, type Server } from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -9,6 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { handleCurrentSubjectBirthProfileRequestV1 } from '../apps/api/src/current-subject-birth-profile-http.js';
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../apps/api/src/current-subject-saju-calculation-http.js';
 import { handleCurrentSubjectSajuPreviewReadingRequestV1 } from '../apps/api/src/current-subject-saju-preview-reading-http.js';
+import { handleBirthProfileCreateRequestV1 } from '../apps/api/src/birth-profile-create-http.js';
+import { createProductionBirthInputFingerprintPortV1 } from '../apps/api/src/production-birth-input-fingerprint.js';
 import { createCurrentSubjectSajuCalculationRouteV1 } from '../api/me/saju/calculation.js';
 import { createSajuProductionCalculationHttpAdapterV1 } from '../apps/api/src/saju-production-calculation-http-adapter.js';
 import { createSajuPreviewReadingHttpAdapterV1 } from '../apps/api/src/saju-production-reading-http-adapter.js';
@@ -72,7 +75,8 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
       async verifyRequestIdentity(request) {
         const token = request.headers.get('authorization');
         return token === 'Bearer fixture-owner' || token === 'Bearer fixture.owner.signature' ? { kind: 'member', verifiedAuthUserId: OWNER }
-          : token === 'Bearer fixture-other' ? { kind: 'member', verifiedAuthUserId: OTHER } : null;
+          : token === 'Bearer fixture-other' || token === 'Bearer fixture.new.signature'
+            ? { kind: 'member', verifiedAuthUserId: OTHER } : null;
       },
     };
     const sajuAdapter = createSajuProductionCalculationHttpAdapterV1({
@@ -100,6 +104,7 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
         return fetch(sajuOrigin + '/api/preview/readings', init);
       },
     });
+    const fingerprintPort = createProductionBirthInputFingerprintPortV1('synthetic-birth-fingerprint-key-disposable-only');
     server = createServer(async (req, res) => {
       try {
         if (!req.url?.startsWith('/api/')) {
@@ -124,7 +129,12 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
         });
         const input = { request, requestId: 'disposable-current-birth-e2e',
           serverTime: new Date().toISOString(), pool, identityEvidenceVerifier };
-        const response = req.url === '/api/me/birth-profile'
+        const response = req.url === '/api/birth-profiles'
+          ? await handleBirthProfileCreateRequestV1({
+            ...input, fingerprintPort,
+            idPort: { nextBirthProfileId: randomUUID, nextBirthRevisionId: randomUUID },
+          })
+          : req.url === '/api/me/birth-profile'
           ? await handleCurrentSubjectBirthProfileRequestV1(input)
           : req.url === '/api/me/saju/preview-reading'
             ? await handleCurrentSubjectSajuPreviewReadingRequestV1({ ...input, sajuAdapter: previewAdapter })
@@ -193,7 +203,7 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
     expect((await calculate()).status).toBe(200);
   });
 
-  it.skipIf(!process.env.CHROME_BIN)('renders the current Birth, real chart and Korean interpretation in Chrome', async () => {
+  it.skipIf(!process.env.CHROME_BIN)('registers a Birth and renders the real chart and Korean interpretation in Chrome', async () => {
     // Same headless Chrome/CDP mechanism as verify-web-saju-auth-browser-core.mjs.
     // Only the local member identity proof is seeded; API/DB/engine responses are real.
     const profile = await mkdtemp(join(tmpdir(), 'myeongha-current-saju-browser-'));
@@ -237,14 +247,28 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
         return result.result?.value;
       };
       await send('Page.enable');
-      const member = { accessToken: 'fixture.owner.signature', tokenType: 'bearer',
+      const member = { accessToken: 'fixture.new.signature', tokenType: 'bearer',
         expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
-        user: { id: OWNER, email: 'disposable-current-birth@example.invalid' } };
+        user: { id: OTHER, email: 'disposable-current-birth@example.invalid' } };
       await send('Page.addScriptToEvaluateOnNewDocument', {
         source: `localStorage.setItem('myeongha.memberSession.v1', ${JSON.stringify(JSON.stringify(member))});`,
       });
       const count = upstreamRequests;
       await send('Page.navigate', { url: origin + '/reading.html' });
+      let formReady = false;
+      for (let i = 0; i < 150; i += 1) {
+        formReady = await evaluate(`document.querySelector('#saju-empty')?.hidden === false`);
+        if (formReady) break;
+        await sleep(50);
+      }
+      expect(formReady).toBe(true);
+      await evaluate(`(() => {
+        document.querySelector('#saju-birth-year').value = '1967';
+        document.querySelector('#saju-birth-month').value = '08';
+        document.querySelector('#saju-birth-day').value = '22';
+        document.querySelector('#saju-birth-time').value = '10:28';
+        document.querySelector('#saju-birth-form').requestSubmit();
+      })()`);
       let state: any;
       for (let i = 0; i < 150; i += 1) {
         state = await evaluate(`({ visible: document.querySelector('#saju-hub')?.hidden === false,
@@ -253,17 +277,21 @@ describe.skipIf(!enabled)('current Birth -> real PostgreSQL -> real Saju calcula
         if (state?.visible && state.day && state.day !== '—') break;
         await sleep(50);
       }
-      expect(state).toMatchObject({ visible: true });
-      expect(state.birth).toContain('2024.03.10');
-      const result = await (await calculate()).json();
+      expect(state, await evaluate(`document.querySelector('#saju-form-error')?.textContent`))
+        .toMatchObject({ visible: true });
+      expect(state.birth).toContain('1967.08.22');
+      const result = await (await calculate('fixture.new.signature')).json();
       const stem = result.data.calculation.snapshot.pillars.day.value.stem;
       expect(state.day).toBe(`${stem.hanja || ''}${stem.value || ''}`);
-      expect(result.data.calculation.birthRevisionRef).toBe(R2);
+      const birth = await (await fetch(origin + '/api/me/birth-profile', {
+        headers: { authorization: 'Bearer fixture.new.signature' },
+      })).json();
+      expect(result.data.calculation.birthRevisionRef).toBe(birth.data.birthProfile.currentRevision.revisionId);
       expect(upstreamRequests).toBeGreaterThan(count + 1);
 
       const previewRequest = await fetch(origin + '/api/me/saju/preview-reading', {
         method: 'POST',
-        headers: { authorization: 'Bearer fixture-owner', 'content-type': 'application/json' },
+        headers: { authorization: 'Bearer fixture.new.signature', 'content-type': 'application/json' },
         body: JSON.stringify({ readingText: '재물운' }),
       });
       expect(previewRequest.status).toBe(200);
