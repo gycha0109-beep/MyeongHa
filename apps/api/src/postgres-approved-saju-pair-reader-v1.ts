@@ -1,4 +1,4 @@
-import { executePostgresApprovedSajuIssuerTransactionV1,
+import { executePostgresApprovedSajuPairReaderTransactionV1,
   type PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { VerifiedSubjectIdentityEvidenceV1 } from './subject-identity-resolver.js';
 import { readApprovedSajuPairIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
@@ -38,7 +38,7 @@ export async function readPostgresApprovedSajuT10PairReaderV1(input: Readonly<{
       ![input.purchaseIntentId,input.readingId].every(value => UUID.test(value)) ||
       (input.subjectId !== undefined && !UUID.test(input.subjectId)) ||
       !input.readerCharacterId || input.readerCharacterId.length > 128) return null;
-  return executePostgresApprovedSajuIssuerTransactionV1({
+  return executePostgresApprovedSajuPairReaderTransactionV1({
     pool:input.pool,verifiedEvidence:input.verifiedEvidence,
     execute:async ({client,resolvedSubject}) => {
       if (resolvedSubject.subjectKind !== 'member' ||
