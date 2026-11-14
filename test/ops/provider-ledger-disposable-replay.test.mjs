@@ -1,7 +1,7 @@
 // Watchtower-Track: ops
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import test from 'node:test';
+import { test } from 'vitest';
 import {
   assertReplaySource, buildDisposableLedgerReplaySql, assessDisposableLedgerReplay,
 } from '../../scripts/operations/replay-disposable-provider-migration-ledger.mjs';
