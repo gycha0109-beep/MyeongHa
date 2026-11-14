@@ -137,7 +137,7 @@ begin
   insert into commerce_saju_private.approved_source_issue_proofs_v1(
     reading_id,execution_attempt_id,subject_id,proof_envelope,accepted_at
   ) values(p_reading,p_attempt,p_subject,p_signed_pair,v_now)
-  on conflict(reading_id) do nothing;
+  on conflict on constraint approved_source_issue_proofs_v1_pkey do nothing;
 
   if not exists (
     select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
