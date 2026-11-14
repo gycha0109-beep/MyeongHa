@@ -7,6 +7,7 @@ import { executePostgresApprovedSajuIssuerJobTransactionV1,
 import { readApprovedSajuPairIssueScopeV1 } from './postgres-approved-saju-issue-scope-v1.js';
 import { verifyApprovedSajuPreparedPairIssueV1 } from './postgres-approved-saju-issuance-v1.js';
 import { commitApprovedSajuT10OfficialPairReadingV1 } from './postgres-approved-saju-pair-official-commit-v1.js';
+import { readPostgresApprovedSajuT10PairReaderV1 } from './postgres-approved-saju-pair-reader-v1.js';
 import { createSajuT10ProductionPairIssueSourceV1,
   type SajuT10ProductionPairTrustV1 } from './saju-t10-production-pair-issue-source-v1.js';
 import { SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1 } from './saju-production-reading-http-adapter.js';
@@ -21,7 +22,8 @@ interface Job {
 }
 type Result = Readonly<{state:'idle'|'issued'|'lease_expired'}> |
   Readonly<{state:'held';reason:'invalid_scope'|'existing_attempt_reconciliation'|
-    'source_unverified'|'commit_unavailable'|'missing_signed_receipt';
+    'source_unverified'|'commit_unavailable'|'missing_signed_receipt'|
+    'archive_recovery_unverified';
     jobId:string}>;
 
 /**
@@ -85,6 +87,35 @@ export function createApprovedSajuT10PairIssuanceWorkerV1(input: Readonly<{
         const receipt=await status();
         if(receipt?.signed_commit!==true)return {
           state:'held',reason:'missing_signed_receipt',jobId:job.job_id,
+        };
+        // A crash after the DB commit but before the outbox ACK must not
+        // re-dispatch Source. The archived Reading and its original signature
+        // must be verifiable under the *current* purchase, consent and Reader.
+        const pointer=await executePostgresApprovedSajuIssuerTransactionV1({
+          pool,verifiedEvidence,execute:async({client,resolvedSubject})=>{
+            if(resolvedSubject.subjectKind!=='member'||
+                resolvedSubject.subjectId!==job.subject_id)return null;
+            const r=await client.query<{readingId:string;readerCharacterId:string}>(`
+              select reading_id::text as "readingId",
+                reader_character_id as "readerCharacterId"
+              from public.qry_approved_saju_pair_recovery_record_v1($1::uuid,$2::uuid)
+            `,[job.subject_id,job.purchase_intent_id]);
+            if(r.rows.length!==1||!UUID.test(r.rows[0]?.readingId??'')||
+                r.rows[0]?.readerCharacterId!==input.readerCharacterId)return null;
+            return r.rows[0];
+          },
+        });
+        if(pointer===null)return {
+          state:'held',reason:'archive_recovery_unverified',jobId:job.job_id,
+        };
+        const reopened=await readPostgresApprovedSajuT10PairReaderV1({
+          pool,verifiedEvidence,subjectId:job.subject_id,
+          purchaseIntentId:job.purchase_intent_id,readingId:pointer.readingId,
+          readerCharacterId:input.readerCharacterId,trusts:[input.trust],
+        });
+        if(reopened?.state!=='signed_pair_archive_reopened'||
+            reopened.readingId!==pointer.readingId)return {
+          state:'held',reason:'archive_recovery_unverified',jobId:job.job_id,
         };
       } else {
         const readingId=randomUUID(),sessionId=randomUUID(),attemptId=randomUUID();
