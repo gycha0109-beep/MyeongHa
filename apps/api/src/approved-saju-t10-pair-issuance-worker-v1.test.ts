@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks=vi.hoisted(()=>({
   query:vi.fn(),scope:vi.fn(),source:vi.fn(),signed:vi.fn(),commit:vi.fn(),
+  reader:vi.fn(),
 }));
 const SUBJECT='11111111-1111-4111-8111-111111111111';
 const AUTH='22222222-2222-4222-8222-222222222222';
@@ -39,6 +40,9 @@ vi.mock('./postgres-approved-saju-issuance-v1.js',()=>({
 vi.mock('./postgres-approved-saju-pair-official-commit-v1.js',()=>({
   commitApprovedSajuT10OfficialPairReadingV1:mocks.commit,
 }));
+vi.mock('./postgres-approved-saju-pair-reader-v1.js',()=>({
+  readPostgresApprovedSajuT10PairReaderV1:mocks.reader,
+}));
 vi.mock('./saju-t10-production-pair-issue-source-v1.js',()=>({
   createSajuT10ProductionPairIssueSourceV1:mocks.source,
 }));
@@ -70,6 +74,7 @@ beforeEach(()=>{
     source:{body:{state:'issued'},proof:{payload:{},signature:'authentic-source-proof'}},
   });
   mocks.commit.mockResolvedValue({state:'committed'});
+  mocks.reader.mockResolvedValue({state:'signed_pair_archive_reopened',readingId:READING});
   mocks.query.mockImplementation(async(sql:string,args:readonly unknown[])=>{
     if(sql.includes('cmd_claim_approved_saju_issue_job_v1'))
       return {rows:[job]};
@@ -79,6 +84,8 @@ beforeEach(()=>{
       return {rows:[{readingId:READING,sessionId:SESSION}]};
     if(sql.includes('cmd_prepare_approved_saju_attempt_v1'))
       return {rows:[{executionAttemptId:ATTEMPT,attemptState:'running',replayed:false}]};
+    if(sql.includes('qry_approved_saju_pair_recovery_record_v1'))
+      return {rows:[{readingId:READING,readerCharacterId:'seyeon'}]};
     if(sql.includes('cmd_complete_approved_saju_issue_job_v1'))
       return {rows:[{completed:true}]};
     throw new Error('Unexpected test query: '+sql+' '+String(args));
@@ -121,10 +128,71 @@ describe('dedicated T10 purchased pair worker',()=>{
       if(sql.includes('cmd_claim_approved_saju_issue_job_v1'))return {rows:[once]};
       if(sql.includes('qry_approved_saju_issue_job_status_v1'))
         return {rows:[{attempt_no:1,signed_commit:true}]};
+      if(sql.includes('qry_approved_saju_pair_recovery_record_v1'))
+        return {rows:[{readingId:READING,readerCharacterId:'seyeon'}]};
       if(sql.includes('cmd_complete_approved_saju_issue_job_v1'))return {rows:[{completed:true}]};
       throw Error('Unexpected query');
     });
     expect(await worker.runNext()).toEqual({state:'issued'});
+    expect(mocks.signed).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+    expect(mocks.reader).toHaveBeenCalledWith(expect.objectContaining({
+      subjectId:SUBJECT,purchaseIntentId:PURCHASE,readingId:READING,
+      readerCharacterId:'seyeon',
+    }));
+    expect(mocks.query.mock.calls.filter(args=>
+      String(args[0]).includes('cmd_complete_approved_saju_issue_job_v1'))).toHaveLength(1);
+  });
+
+  it('holds a recovered attempt if its signed archive cannot be reopened',async()=>{
+    mocks.reader.mockResolvedValue(null);
+    mocks.query.mockImplementation(async(sql:string)=>{
+      if(sql.includes('cmd_claim_approved_saju_issue_job_v1'))
+        return {rows:[{...job,already_issued:true}]};
+      if(sql.includes('qry_approved_saju_issue_job_status_v1'))
+        return {rows:[{attempt_no:1,signed_commit:true}]};
+      if(sql.includes('qry_approved_saju_pair_recovery_record_v1'))
+        return {rows:[{readingId:READING,readerCharacterId:'seyeon'}]};
+      throw Error('Recovery must not complete or issue without a valid archive');
+    });
+    expect(await createApprovedSajuT10PairIssuanceWorkerV1(config()).runNext()).toEqual({
+      state:'held',reason:'archive_recovery_unverified',jobId:JOB,
+    });
+    expect(mocks.reader).toHaveBeenCalledOnce();
+    expect(mocks.signed).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+
+  it('holds an existing signed attempt when current consent or Reader mapping has changed',async()=>{
+    mocks.query.mockImplementation(async(sql:string)=>{
+      if(sql.includes('cmd_claim_approved_saju_issue_job_v1'))
+        return {rows:[{...job,already_issued:true}]};
+      if(sql.includes('qry_approved_saju_issue_job_status_v1'))
+        return {rows:[{attempt_no:1,signed_commit:true}]};
+      if(sql.includes('qry_approved_saju_pair_recovery_record_v1'))
+        return {rows:[]};
+      throw Error('Invalid recovery must not change the outbox');
+    });
+    expect(await createApprovedSajuT10PairIssuanceWorkerV1(config()).runNext()).toEqual({
+      state:'held',reason:'archive_recovery_unverified',jobId:JOB,
+    });
+    expect(mocks.reader).not.toHaveBeenCalled();
+    expect(mocks.signed).not.toHaveBeenCalled();
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+
+  it('holds if committed claim has lost its signed proof',async()=>{
+    mocks.query.mockImplementation(async(sql:string)=>{
+      if(sql.includes('cmd_claim_approved_saju_issue_job_v1'))
+        return {rows:[{...job,already_issued:true}]};
+      if(sql.includes('qry_approved_saju_issue_job_status_v1'))
+        return {rows:[{attempt_no:1,signed_commit:false}]};
+      throw Error('Missing receipt must not be repaired by another dispatch');
+    });
+    expect(await createApprovedSajuT10PairIssuanceWorkerV1(config()).runNext()).toEqual({
+      state:'held',reason:'missing_signed_receipt',jobId:JOB,
+    });
+    expect(mocks.reader).not.toHaveBeenCalled();
     expect(mocks.signed).not.toHaveBeenCalled();
     expect(mocks.commit).not.toHaveBeenCalled();
   });
