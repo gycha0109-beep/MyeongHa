@@ -28,6 +28,7 @@ export interface SajuHeldSourceProofIssuePortV1 {
   issuePreviewProof(input: Readonly<{
     nonce: string;
     request: SajuProductionReadingRequestV1;
+    includeTemporalEvidence?: true;
   }>): Promise<unknown>;
 }
 

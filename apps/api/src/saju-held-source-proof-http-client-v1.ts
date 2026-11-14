@@ -100,10 +100,14 @@ function exactKeys(value: unknown, keys: readonly string[]): value is Record<str
 }
 
 function outboundBody(input: Parameters<SajuHeldSourceProofIssuePortV1['issuePreviewProof']>[0]): string {
+  const includeTemporalEvidence = input.includeTemporalEvidence === true;
   if (!NONCE.test(input.nonce)
     || !exactKeys(input.request, ['birth', 'reading'])
-    || !exactKeys(input.request.reading, ['text'])
-    || !ALLOWED_READING_TEXTS.has(input.request.reading.text as string)
+    || !(includeTemporalEvidence
+      ? exactKeys(input.request.reading, ['text', 'periodReferenceDateTime'])
+        && (input.request.reading.text === '올해' || input.request.reading.text === '이번 달')
+        && typeof input.request.reading.periodReferenceDateTime === 'string'
+      : exactKeys(input.request.reading, ['text']) && ALLOWED_READING_TEXTS.has(input.request.reading.text as string))
     || typeof input.request.birth !== 'object' || input.request.birth === null
     || Array.isArray(input.request.birth)
     || Object.keys(input.request.birth).some(key =>
@@ -111,7 +115,9 @@ function outboundBody(input: Parameters<SajuHeldSourceProofIssuePortV1['issuePre
     return fail('INVALID_REQUEST');
   }
 
-  const body = JSON.stringify({ nonce: input.nonce, request: input.request });
+  const body = JSON.stringify({
+    nonce: input.nonce, request: input.request, ...(includeTemporalEvidence ? { includeTemporalEvidence } : {}),
+  });
   if (Buffer.byteLength(body, 'utf8') > SAJU_HELD_SOURCE_PROOF_HTTP_REQUEST_MAXIMUM_BYTES_V1) {
     return fail('INVALID_REQUEST');
   }

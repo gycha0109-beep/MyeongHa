@@ -1,5 +1,9 @@
 import { fulfillVerifiedReaderReceiptV1 } from './commerce-verified-reader-fulfillment.js';
 import {
+  fulfillVerifiedApprovedSajuReceiptV1,
+  type ApprovedSajuReceiptFulfillmentV1,
+} from './commerce-verified-approved-saju-fulfillment.js';
+import {
   continuationFromVerifiedReaderBindV1,
   type CommerceReaderReceiptContinuationV1,
 } from './commerce-reader-product-continuity-v1.js';
@@ -33,6 +37,7 @@ export interface SubjectOwnedCommercePaymentCompletionV1 {
   readonly receiptId: string;
   readonly providerEventId: string;
   readonly replayed: boolean;
+  readonly sajuFulfillment?: ApprovedSajuReceiptFulfillmentV1;
   readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
   /**
    * Safe product navigation ONLY, not live entitlement or an interpretation.
@@ -51,12 +56,19 @@ export interface SubjectOwnedCommercePaymentCompletionV1 {
  */
 export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   readonly pool: PostgresSubjectPoolV1;
+  readonly commercePool?: PostgresSubjectPoolV1;
+  readonly approvedSajuSandbox?: true;
   readonly verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
   readonly paymentAttemptId: unknown;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
   /** Explicit internal S2 only; public subject completion remains inactive. */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: boolean;
 }): Promise<SubjectOwnedCommercePaymentCompletionV1> {
+  if (input.approvedSajuSandbox === true && (input.commercePool === undefined || input.commercePool === input.pool)) {
+    throw new Error('Approved Saju sandbox verification requires separate receipt persistence authority.');
+  }
+  const commercePool = input.commercePool ?? input.pool;
   const verificationContext = await executePostgresSubjectTransactionV1({
     pool: input.pool,
     verifiedEvidence: input.verifiedEvidence,
@@ -64,6 +76,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
       loadCommercePaymentVerificationContextV1({
         scope,
         paymentAttemptId: input.paymentAttemptId,
+        ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
       }),
   });
 
@@ -78,7 +91,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
   });
 
   const persisted = await executePostgresCommerceInternalTransactionV1({
-    pool: input.pool,
+    pool: commercePool,
     execute: async (scope) =>
       persistVerifiedPaymentEvidenceV1({
         scope,
@@ -87,9 +100,13 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
       }),
   });
 
+  const sajuFulfillment = input.privateApprovedSajuReceiptFulfillmentEnabled === true
+    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: commercePool, receiptId: persisted.receiptId, evidence })
+    : undefined;
   const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
+    && (sajuFulfillment === undefined || sajuFulfillment === 'not_approved_saju')
     ? await fulfillVerifiedReaderReceiptV1({
-        pool: input.pool,
+        pool: commercePool,
         receiptId: persisted.receiptId,
       })
     : undefined;
@@ -99,6 +116,7 @@ export async function executeSubjectOwnedCommercePaymentCompletionV1(input: {
     receiptId: persisted.receiptId,
     providerEventId: persisted.providerEventId,
     replayed: persisted.replayed,
+    ...(sajuFulfillment === undefined ? {} : { sajuFulfillment }),
     ...(input.privateReaderReceiptFulfillmentEnabled === true
       ? { readerFulfillment: readerFulfillment?.kind ?? 'not_reader' as const }
       : {}),

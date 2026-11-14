@@ -58,6 +58,7 @@ function fakePool(input: {
   queriedSql?: string[];
   replayed?: boolean;
   contextConstraint?: string;
+  environment?: 'sandbox' | 'production';
 } = {}): PostgresSubjectPoolV1 {
   return {
     async connect(): Promise<PostgresSubjectConnectionV1> {
@@ -85,7 +86,8 @@ function fakePool(input: {
             };
           }
 
-          if (text.includes('qry_commerce_payment_verification_context_v1')) {
+          if (text.includes('qry_commerce_payment_verification_context_v1')
+            || text.includes('qry_approved_saju_sandbox_verification_context_v1')) {
             expect(values).toEqual([SUBJECT_ID, PAYMENT_ATTEMPT_ID]);
             if (input.contextConstraint !== undefined) {
               throw Object.assign(new Error('private verification-context detail'), {
@@ -98,7 +100,7 @@ function fakePool(input: {
                 purchaseIntentId: PURCHASE_INTENT_ID,
                 provider: 'portone_v2',
                 platform: 'web',
-                environment: 'sandbox',
+                environment: input.environment ?? 'sandbox',
                 providerRequestId: PROVIDER_REQUEST_ID,
                 expectedProviderTransactionId: null,
                 expectedExternalProductId: EXTERNAL_PRODUCT_ID,
@@ -113,7 +115,7 @@ function fakePool(input: {
             expect(values?.[1]).toBe(PURCHASE_INTENT_ID);
             expect(values?.[2]).toBe('portone_v2');
             expect(values?.[3]).toBe('web');
-            expect(values?.[4]).toBe('sandbox');
+            expect(values?.[4]).toBe(input.environment ?? 'sandbox');
             expect(values?.[5]).toBe(PROVIDER_TRANSACTION_ID);
             expect(values?.[8]).toBe(EXTERNAL_PRODUCT_ID);
             expect(values?.[9]).toBe('active');
@@ -126,6 +128,10 @@ function fakePool(input: {
                 replayed: input.replayed ?? false,
               } as Row],
             };
+          }
+          if (text.includes('internal_fulfill_verified_approved_saju_receipt_v1') && input.environment === 'production') {
+            expect(values).toEqual([RECEIPT_ID]);
+            return { rows: [{ outcome: 'replayed', grant_count: 5 } as Row] };
           }
 
           throw new Error(`Unexpected SQL in subject payment completion test: ${text}`);
@@ -140,6 +146,8 @@ function invoke(input: {
   pool?: PostgresSubjectPoolV1;
   verificationAdapter?: CommercePaymentVerificationAdapterV1;
   paymentAttemptId?: unknown;
+  approvedSaju?: boolean;
+  reader?: boolean;
 } = {}) {
   return executeSubjectOwnedCommercePaymentCompletionV1({
     pool: input.pool ?? fakePool(),
@@ -149,10 +157,55 @@ function invoke(input: {
     },
     paymentAttemptId: input.paymentAttemptId ?? PAYMENT_ATTEMPT_ID,
     verificationAdapter: input.verificationAdapter ?? adapter(),
+    privateApprovedSajuReceiptFulfillmentEnabled: input.approvedSaju ?? false,
+    privateReaderReceiptFulfillmentEnabled: input.reader ?? false,
   });
 }
 
 describe('subject-owned Commerce payment completion orchestration', () => {
+  it('reads only an approved sandbox attempt and writes its receipt through the separate pool', async () => {
+    const subjectQueries: string[] = [];
+    const commerceQueries: string[] = [];
+    const result = await executeSubjectOwnedCommercePaymentCompletionV1({
+      pool: fakePool({ queriedSql: subjectQueries }),
+      commercePool: fakePool({ queriedSql: commerceQueries }),
+      approvedSajuSandbox: true,
+      verifiedEvidence: { kind: 'member', verifiedAuthUserId: AUTH_USER_ID },
+      paymentAttemptId: PAYMENT_ATTEMPT_ID,
+      verificationAdapter: adapter(),
+    });
+    expect(result).toMatchObject({ receiptId: RECEIPT_ID });
+    expect(subjectQueries.some(sql => sql.includes('qry_approved_saju_sandbox_verification_context_v1'))).toBe(true);
+    expect(subjectQueries).not.toContain('SET LOCAL ROLE myeongha_commerce_internal_executor');
+    expect(commerceQueries.some(sql => sql.includes('cmd_persist_verified_payment_evidence_v1'))).toBe(true);
+    expect(commerceQueries).not.toContain('SET LOCAL ROLE myeongha_api_executor');
+  });
+
+  it('fulfills the persisted Saju Receipt once through Commerce and skips the separate Reader purchase path', async () => {
+    const queriedSql: string[] = [];
+    const result = await invoke({
+      pool: fakePool({ queriedSql, environment: 'production', replayed: true }),
+      verificationAdapter: adapter(vi.fn(async (request: CommercePaymentVerificationContextV1) => ({
+        providerRequestId: request.providerRequestId,
+        evidence: { ...VERIFIED_EVIDENCE, environment: 'production' },
+      }))),
+      approvedSaju: true,
+      reader: true,
+    });
+    const persistence = queriedSql.findIndex(sql => sql.includes('cmd_persist_verified_payment_evidence_v1'));
+    const fulfillment = queriedSql.findIndex(sql => sql.includes('internal_fulfill_verified_approved_saju_receipt_v1'));
+    expect(persistence).toBeGreaterThanOrEqual(0);
+    expect(fulfillment).toBeGreaterThan(persistence);
+    expect(queriedSql.slice(persistence + 1, fulfillment)).toContain('COMMIT');
+    expect(result).toMatchObject({ receiptId: RECEIPT_ID, replayed: true, sajuFulfillment: 'replayed' });
+  });
+
+  it('does not dispatch approved Saju fulfillment for a sandbox verification', async () => {
+    const queriedSql: string[] = [];
+    const result = await invoke({ pool: fakePool({ queriedSql }), approvedSaju: true });
+    expect(result).not.toHaveProperty('sajuFulfillment');
+    expect(queriedSql.some(sql => sql.includes('internal_fulfill_verified_approved_saju_receipt_v1'))).toBe(false);
+  });
   it('loads server-owned verification context, verifies provider-side, and persists only verified evidence', async () => {
     const queriedSql: string[] = [];
     const verificationAdapter = adapter();

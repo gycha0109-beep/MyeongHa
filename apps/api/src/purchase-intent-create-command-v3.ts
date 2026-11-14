@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import { canonicalJson } from '../../../packages/domain/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import {
+  resolveApprovedSajuPurchaseAdmissionV1,
+  type ApprovedSajuPurchaseAuthorityPortV1,
+} from './commerce-approved-saju-purchase-admission-v1.js';
 import type {
   PurchaseIntentIdPortV1,
   PurchaseIntentOfferSnapshotPortV1,
@@ -117,6 +121,12 @@ export interface CreatePurchaseIntentInputV3 {
   readonly authorityPort: PurchaseIntentCreateAuthorityPortV3;
   /** Server-resolved Saju Record context; never accepts an entitlement or scope key. */
   readonly sajuOrigin?: SajuPurchaseOriginInputV1;
+  /** Server-only selection for the November catalog. Requires a scoped atomic writer. */
+  readonly approvedSaju?: {
+    readonly offerId: string;
+    readonly targetPersonId?: string;
+    readonly authority: ApprovedSajuPurchaseAuthorityPortV1;
+  };
 }
 
 export interface CreatePurchaseIntentResponseV3 {
@@ -458,11 +468,32 @@ export async function createPurchaseIntentV3(
   const capabilitySnapshot = normalizeCapabilitySnapshot(resolvedCapabilitySnapshot);
 
   const sajuOrigin=input.sajuOrigin===undefined?undefined:normalizeSajuPurchaseOriginV1(input.sajuOrigin);
+  const approved = input.approvedSaju;
+  if (approved !== undefined && (sajuOrigin === undefined
+    || typeof approved.authority?.resolveAdmission !== 'function'
+    || typeof approved.authority?.createPurchaseIntent !== 'function')) {
+    throw new ApiCommandError('NOT_FOUND', 'Selected product offer is unavailable.');
+  }
+  const approvedAdmission = approved === undefined || sajuOrigin === undefined
+    ? undefined
+    : await resolveApprovedSajuPurchaseAdmissionV1({
+        approvedOfferId: approved.offerId,
+        subjectId,
+        sajuRecordId: sajuOrigin.sajuRecordId,
+        birthRevisionId: sajuOrigin.birthRevisionId,
+        offer: offerSnapshot,
+        capability: capabilitySnapshot,
+        idempotencyKey: request.idempotencyKey,
+        ...(approved.targetPersonId === undefined ? {} : { targetPersonId: approved.targetPersonId }),
+      }, approved.authority).catch(mapAuthorityError);
   const purchaseIntentId = requireServerString(
     'generated purchase intent id',
     await input.idPort.nextPurchaseIntentId(),
   );
-  const requestHash = hashCanonical(canonicalPurchaseRequest(request,sajuOrigin));
+  const canonicalRequest = canonicalPurchaseRequest(request, sajuOrigin);
+  const approvedAdmissionHash = approvedAdmission === undefined ? undefined : hashCanonical(approvedAdmission);
+  const requestHash = hashCanonical(approvedAdmissionHash === undefined
+    ? canonicalRequest : { ...canonicalRequest, approvedAdmissionHash });
   const offerSnapshotHash = hashCanonical(offerSnapshot);
   const capabilitySnapshotHash = hashCanonical(capabilitySnapshot);
 
@@ -479,6 +510,25 @@ export async function createPurchaseIntentV3(
       capabilitySnapshotJsonb: capabilitySnapshot,
       capabilitySnapshotHash,
     };
+    if (approved !== undefined) {
+      if (sajuOrigin === undefined || approvedAdmission === undefined || approvedAdmissionHash === undefined) {
+        throw new Error('Approved Saju purchase requires its scoped admission.');
+      }
+      const [row, ...extra] = await approved.authority.createPurchaseIntent({
+        ...authorityInput,
+        sajuOrigin,
+        approvedSajuAdmission: approvedAdmission,
+        approvedSajuAdmissionHash: approvedAdmissionHash,
+      });
+      if (row === undefined || extra.length !== 0
+        || row.approvedSajuAdmissionHash !== approvedAdmissionHash
+        || row.expectedAmountMinor !== approvedAdmission.amountMinor
+        || row.expectedCurrency !== approvedAdmission.currency) {
+        throw new Error('Purchase Intent v3 authority did not bind the approved Saju admission.');
+      }
+      return assembleResponse(row, request, purchaseIntentId, offerSnapshot, offerSnapshotHash,
+        capabilitySnapshot, capabilitySnapshotHash);
+    }
     const rows = sajuOrigin===undefined
       ? await input.authorityPort.createPurchaseIntent(authorityInput)
       : input.authorityPort.createSajuPurchaseIntent===undefined

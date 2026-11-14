@@ -10,6 +10,10 @@ import type {
 import type {
   SajuOfficialCurrentAuthorityPortV1,
 } from './saju-official-reading-issuer-db-persistence-v1.js';
+import {
+  admitApprovedSajuIssueAttemptV1,
+  type ApprovedSajuIssueAttemptBindingV1,
+} from './postgres-approved-saju-issue-scope-v1.js';
 
 // Neither boundary reads private Commerce, Birth or Reading tables as the API
 // role. The DB-owner RPC checks the exact pending attempt and initial purchase
@@ -80,20 +84,24 @@ export function createPostgresSajuOfficialIssuancePreflightPortV1(input: Readonl
  */
 export function createPostgresSajuOfficialCurrentAuthorityPortV1(
   client: PostgresTransactionQueryV1,
+  approvedPurchase?: ApprovedSajuIssueAttemptBindingV1,
 ): SajuOfficialCurrentAuthorityPortV1 {
   return Object.freeze({
     async admitCurrentIssue(input: Parameters<SajuOfficialCurrentAuthorityPortV1['admitCurrentIssue']>[0]) {
       if (!HASH.test(input.sourceResponseHash) || !HASH.test(input.storedResponseHash)) {
         return false;
       }
-      return checkCurrentIssue(client, {
+      const attempt = {
         subjectId: input.subjectId,
         readingId: input.dbReadingId,
         readingSessionId: input.readingSessionId,
         // A prepared attempt is independently pinned by the issuer transaction.
         executionAttemptId: input.executionAttemptId,
         sourceBirthRevisionId: input.sourceBirthRevisionId,
-      });
+      };
+      return approvedPurchase === undefined
+        ? checkCurrentIssue(client, attempt)
+        : admitApprovedSajuIssueAttemptV1(client, approvedPurchase, attempt);
     },
   });
 }

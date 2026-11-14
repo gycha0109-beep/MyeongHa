@@ -68,7 +68,7 @@ describe('server-side first tranche for the shared Character Reader runtime', ()
     const [production, http, runtime, web] = await Promise.all([
       source('apps/api/src/production-reader-interpretation-activation.ts'),
       source('apps/api/src/reader-interpretation-preview-http.ts'),
-      source('apps/api/src/reader-interpretation-preview-runtime-v1.ts'),
+      source('apps/api/src/reader-interpretation-preview-runtime-v1.ts').then(text => text.replaceAll('\r\n', '\n')),
       source('apps/web/reader-rollout-policy.js'),
     ]);
     expect(production).toContain('admitServerReader: assertReaderRuntimeInternalPreviewCandidateV1');

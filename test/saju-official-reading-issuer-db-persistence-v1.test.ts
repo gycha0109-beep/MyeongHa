@@ -19,6 +19,7 @@ import type {
   PostgresSubjectConnectionV1, PostgresSubjectPoolV1,
 } from '../apps/api/src/postgres-subject-execution.js';
 import { createPostgresSajuOfficialIssuedDbTransactionPortV1 } from '../apps/api/src/postgres-saju-official-issued-db-transaction-v1.js';
+import { executeApprovedSajuOfficialReadingV1 } from '../apps/api/src/postgres-approved-saju-issuance-v1.js';
 
 const subjectId = '11111111-1111-4111-8111-111111111111';
 const readingId = '22222222-2222-4222-8222-222222222222';
@@ -57,9 +58,10 @@ const executedRequest = {
 
 function ports() {
   const sourceVerifier = {
-    verifyProductionIssue: vi.fn(async (_input: Parameters<SajuOfficialSourceVerificationPortV1['verifyProductionIssue']>[0]) => ({
+    verifyProductionIssue: vi.fn(async (proofInput: Parameters<SajuOfficialSourceVerificationPortV1['verifyProductionIssue']>[0]) => ({
       state: 'production_source_verified' as const,
       nativeReadingId,
+      sourceRequestHash: hashSajuHeldSourceProofRequestV1(proofInput.executedRequest),
       sourceResponseHash: sourceHash,
       sourceBirthRevisionId,
       sourceBirthInputHash: 'sha256:v1:' + 'b'.repeat(64),
@@ -127,9 +129,11 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
       rows = [{ subjectId: this.resolvedSubjectId, subjectKind: 'member' }];
     } else if (sql.includes('public.qry_saju_official_issuance_preflight_v1(')) {
       rows = [{ admitted: this.currentIssueAdmitted }];
-    } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')) {
+    } else if (sql.includes('from public.cmd_finalize_reading_transport_success_v1(')
+      || sql.includes('from public.cmd_finalize_approved_saju_reading_v1(')) {
       rows = [{ readingId, executionAttemptId, responseHash: storedHash, replayed: false }];
-    } else if (sql.includes('from public.qry_saju_official_stored_lineage_v3(')) {
+    } else if (sql.includes('from public.qry_saju_official_stored_lineage_v3(')
+      || sql.includes('from public.qry_approved_saju_stored_lineage_v1(')) {
       rows = [{
         nativeReadingId: this.storedNativeId,
         externalRequestRef: 'internal-only-ref',
@@ -148,6 +152,94 @@ class FakeIssuedDbConnection implements PostgresSubjectConnectionV1 {
 }
 
 describe('Saju issued official Reading -> DB immutable commit boundary', () => {
+  it('holds a fallback response for an approved paid component before source or mapping verification', async () => {
+    const p = ports();
+    const result = await persistIssuedSajuOfficialReadingV1({
+      ...input(p, { ...native, state: 'delivered_with_fallback' }),
+      requireCompleteResponse: true,
+    });
+    expect(result).toMatchObject({ state: 'held', reason: 'production_source_unverified' });
+    expect(p.sourceVerifier.verifyProductionIssue).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
+  it('does not commit an otherwise approved response if its wording changes during mapping verification', async () => {
+    const p = ports();
+    const response = structuredClone(native);
+    const map = p.mappingVerifier.verifyIssuedReadingMapping.getMockImplementation();
+    p.mappingVerifier.verifyIssuedReadingMapping.mockImplementationOnce(async request => {
+      response.reading.sections[0]!.blocks[0]!.text = '검증 이후 바뀐 풀이';
+      return map!(request);
+    });
+    await expect(persistIssuedSajuOfficialReadingV1(input(p, response))).resolves.toMatchObject({
+      state: 'held', reason: 'db_mapping_unverified',
+    });
+    expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
+  });
+
+  it('dispatches the paid monthly request from DB scope and binds it before final transaction commit', async () => {
+    const period = '2026-10-31T15:00:00.000Z';
+    const purchaseIntentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const request = { ...executedRequest, reading: { text: '이번 달', periodReferenceDateTime: period } };
+    const requestHash = hashSajuHeldSourceProofRequestV1(request);
+    const events: string[] = [];
+    class ApprovedConnection extends FakeIssuedDbConnection {
+      override async query<Row>(sql: string, params: readonly unknown[] = []): Promise<PostgresQueryResultV1<Row>> {
+        let rows: unknown[];
+        if (sql.includes('qry_approved_saju_issue_scope_v1(')) {
+          expect(params).toEqual([subjectId, purchaseIntentId, 'month']);
+          rows = [{ scope: { birthRevisionId: sourceBirthRevisionId, periodReferenceDateTime: period,
+            birth: { calendarType: 'solar', birthDate: '2001-07-14', birthTime: '15:20',
+              timeKnown: true, isLeapMonth: false, sex: 'female' } } }];
+        } else if (sql.includes('prepare_approved_component_reading_v1(')) {
+          expect(params.at(-1)).toBe(requestHash);
+          rows = [{ readingId, readingSessionId }];
+        } else if (sql.includes('admit_approved_saju_issue_attempt_v1(')) {
+          expect(params.at(-1)).toBe(requestHash);
+          events.push('check-attempt');
+          rows = [{ admitted: true }];
+        } else if (sql.includes('cmd_prepare_approved_saju_attempt_v1(')) {
+          expect(params.slice(0,8)).toEqual([subjectId, purchaseIntentId, 'month', readingId,
+            readingSessionId, executionAttemptId, sourceBirthRevisionId, requestHash]);
+          events.push('prepare-approved');
+          rows = [{ executionAttemptId, executionAttemptNo: 1, attemptState: 'running', replayed: false }];
+        } else {
+          if (sql.includes('cmd_finalize_approved_saju_reading_v1(')) {
+            expect(params.slice(0,7)).toEqual([subjectId, purchaseIntentId, 'month', readingId,
+              executionAttemptId, outboxEventId, requestHash]);
+            expect(params.at(-1)).toBe(storedHash);
+            events.push('finalize-and-bind');
+          }
+          if (sql.includes('qry_approved_saju_stored_lineage_v1(')) events.push('read-back');
+          return super.query<Row>(sql, params);
+        }
+        return { rows: rows as Row[] };
+      }
+    }
+    const requestReading = vi.fn(async () => {
+      events.push('source');
+      return native;
+    });
+    const connection = new ApprovedConnection();
+    const result = await executeApprovedSajuOfficialReadingV1({
+      ...ports(),
+      pool: { connect: () => connection },
+      verifiedEvidence: { kind: 'member', verifiedAuthUserId: purchaseIntentId },
+      subjectId, readingId, readingSessionId, executionAttemptId, outboxEventId,
+      purchaseIntentId, component: 'month', readerCharacterId: 'test-standard-reader',
+      transportKey: 'source', sajuEngineKey: 'saju', requestedEngineVersion: null,
+      adapter: { requestReading },
+    });
+    expect(result).toMatchObject({ state: 'committed', readingId });
+    expect(requestReading).toHaveBeenCalledWith(request, { executionAttemptId });
+    expect(events).toEqual(['prepare-approved', 'source', 'check-attempt', 'check-attempt', 'finalize-and-bind', 'read-back']);
+    expect(connection.calls.filter(sql => sql.startsWith('SET LOCAL ROLE'))).toEqual(
+      Array(3).fill('SET LOCAL ROLE myeongha_approved_saju_issuer_executor'),
+    );
+    expect(connection.calls.at(-1)).toBe('COMMIT');
+  });
+
   it('executes Saju fetch before one canonical Subject DB transaction and verifies stored provenance before COMMIT', async () => {
     const p = ports();
     const connection = new FakeIssuedDbConnection();
@@ -438,7 +530,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
     expect(requestReading).toHaveBeenCalledWith({
       birth: { calendarType: 'solar', date: '2001-07-14', time: '15:20', sex: 'female' },
       reading: { text: '전체 사주' },
-    });
+    }, { executionAttemptId });
     expect(p.commitPort.finalizeSuccess).toHaveBeenCalledTimes(1);
   });
 
@@ -746,7 +838,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       const p = ports();
       const original = await p.sourceVerifier.verifyProductionIssue({
         sourceResponse: native, executedRequest, subjectId, dbReadingId: readingId,
-        readingSessionId, sourceBirthRevisionId,
+        readingSessionId, sourceBirthRevisionId, executionAttemptId,
       });
       p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({ ...original, ...wrong });
       const result = await persistIssuedSajuOfficialReadingV1(input(p));
@@ -765,7 +857,7 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       const p = ports();
       const verified = await p.sourceVerifier.verifyProductionIssue({
         sourceResponse: native, executedRequest, subjectId, dbReadingId: readingId,
-        readingSessionId, sourceBirthRevisionId,
+        readingSessionId, sourceBirthRevisionId, executionAttemptId,
       });
       p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce({
         ...verified, sourceBirthInputHash: badHash,
@@ -779,6 +871,29 @@ describe('Saju issued official Reading -> DB immutable commit boundary', () => {
       expect(p.currentAuthority.admitCurrentIssue).not.toHaveBeenCalled();
       expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
     }
+  });
+
+  it('rejects an otherwise valid issuer result for a different purchased month', async () => {
+    const p = ports();
+    const novemberRequest = {
+      ...executedRequest,
+      reading: { text: '이번 달', periodReferenceDateTime: '2026-11-30T14:59:59.999Z' },
+    };
+    const verified = await p.sourceVerifier.verifyProductionIssue({
+      sourceResponse: native, executedRequest: novemberRequest, subjectId,
+      dbReadingId: readingId, readingSessionId, sourceBirthRevisionId, executionAttemptId,
+    });
+    p.sourceVerifier.verifyProductionIssue.mockResolvedValueOnce(verified);
+    const result = await persistIssuedSajuOfficialReadingV1({
+      ...input(p),
+      executedRequest: {
+        ...novemberRequest,
+        reading: { ...novemberRequest.reading, periodReferenceDateTime: '2026-11-30T15:00:00.000Z' },
+      },
+    });
+    expect(result).toMatchObject({ state: 'held', reason: 'production_source_unverified' });
+    expect(p.mappingVerifier.verifyIssuedReadingMapping).not.toHaveBeenCalled();
+    expect(p.commitPort.finalizeSuccess).not.toHaveBeenCalled();
   });
 
   it('rejects non-ID payload changes or DB mapping with a different subject, hash or session', async () => {

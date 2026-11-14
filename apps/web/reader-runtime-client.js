@@ -16,6 +16,8 @@ import {
 
 export const READER_RUNTIME_ENDPOINT_V1 =
   '/api/me/readings/reader-interpretation/preview';
+export const APPROVED_SAJU_READER_QUESTION_ENDPOINT_V1 =
+  '/api/me/readings/reader-questions';
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -168,7 +170,61 @@ export function createReaderRuntimeClientV1(options = {}) {
   return Object.freeze({
     enabled,
     endpoint,
+    async askPurchasedReading(input) {
+      if (!enabled) {
+        throw new ReaderRuntimeClientErrorV1('READER_FEATURE_UNAVAILABLE', 'Reader questions are unavailable.');
+      }
+      const threadId = requireUuidIdentifier(input?.threadId, 'threadId');
+      const readingId = requireUuidIdentifier(input?.officialReadingId, 'officialReadingId');
+      const clientTurnId = requireUuidIdentifier(input?.clientTurnId, 'clientTurnId');
+      const text = requireIdentifier(input?.text, 'text');
+      if (text.length > 240) {
+        throw new ReaderRuntimeClientErrorV1('READER_REQUEST_INVALID', 'Reader question is too long.');
+      }
+      const scene = input.firstSceneQuestion;
+      if (scene !== undefined && (!scene || !/^sha256:v1:[a-f0-9]{64}$/u.test(scene.interpretationHash) ||
+          !Number.isSafeInteger(scene.segmentIndex) || scene.segmentIndex < 0 || scene.segmentIndex >= 64)) {
+        throw new ReaderRuntimeClientErrorV1('READER_REQUEST_INVALID', 'Reader Scene selection is invalid.');
+      }
+
+      const bearer = await resolveBearer();
+      if (bearer?.kind !== 'member' || typeof bearer.token !== 'string' || !bearer.token.trim()) {
+        throw new ReaderRuntimeClientErrorV1('READER_SESSION_REQUIRED', 'Reader questions require membership.');
+      }
+      const response = await fetchImpl(APPROVED_SAJU_READER_QUESTION_ENDPOINT_V1, {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store', signal: input.signal,
+        headers: { Accept: 'application/json', Authorization: 'Bearer ' + bearer.token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          threadId, readingId, clientTurnId, text,
+          ...(scene === undefined ? {} : { firstSceneQuestion: {
+            interpretationHash: scene.interpretationHash, segmentIndex: scene.segmentIndex,
+          } }),
+        }),
+      });
+      const payload = await readPayload(response);
+      if (!response.ok) {
+        if (response.status === 401) invalidateRejectedBearer(bearer, invalidators);
+        if (response.status === 409 && payload?.error?.code === 'QUESTION_IN_PROGRESS') {
+          throw new ReaderRuntimeClientErrorV1('READER_REQUEST_FAILED', 'Reader question is in progress.', true);
+        }
+        throw mapPublicFailure(response, payload);
+      }
+      const data = payload?.ok === true ? payload.data : null;
+      if (!data || data.threadId !== threadId || typeof data.safeMessageId !== 'string' ||
+          !UUID_V1.test(data.safeMessageId) || Object.keys(data).length !== 2) {
+        throw new ReaderRuntimeClientErrorV1('READER_MALFORMED_RESPONSE', 'Reader response marker is invalid.');
+      }
+      return Object.freeze({ threadId, safeMessageId: data.safeMessageId });
+    },
     async readReaderScene(input) {
+      return (await readScene(input, false)).scene;
+    },
+    readPurchasedReaderScene(input) {
+      return readScene(input, true);
+    },
+  });
+
+  async function readScene(input, purchased) {
       if (!enabled) {
         throw new ReaderRuntimeClientErrorV1(
           'READER_FEATURE_UNAVAILABLE',
@@ -195,7 +251,7 @@ export function createReaderRuntimeClientV1(options = {}) {
       }
       if (
         !bearer ||
-        (bearer.kind !== 'member' && bearer.kind !== 'guest') ||
+        (bearer.kind !== 'member' && (purchased || bearer.kind !== 'guest')) ||
         typeof bearer.token !== 'string' ||
         bearer.token.trim().length === 0
       ) {
@@ -268,7 +324,15 @@ export function createReaderRuntimeClientV1(options = {}) {
             'Reader Scene response officialReadingId does not match the requested Reading.',
           );
         }
-        return scene;
+        if (!purchased) return { scene };
+        const reply = payload.meta.latestPaidReply;
+        if (reply !== null && (!reply || typeof reply.safeMessageId !== 'string' ||
+            !UUID_V1.test(reply.safeMessageId) || typeof reply.canContinue !== 'boolean' ||
+            Object.keys(reply).length !== 2)) {
+          throw new ReaderSceneContractErrorV1('Latest purchased Reader marker is invalid.');
+        }
+        return { scene, latestPaidReply: reply === null ? null
+          : Object.freeze({ safeMessageId: reply.safeMessageId, canContinue: reply.canContinue }) };
       } catch (error) {
         if (error instanceof ReaderSceneContractErrorV1) {
           throw new ReaderRuntimeClientErrorV1(
@@ -280,6 +344,5 @@ export function createReaderRuntimeClientV1(options = {}) {
         }
         throw error;
       }
-    },
-  });
+  }
 }

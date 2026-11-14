@@ -43,6 +43,9 @@ from public.cmd_create_payment_attempt_v1(
   $6::text
 )
 `.trim();
+const APPROVED_SAJU_CREATE_SQL = CREATE_SQL.replace(
+  'public.cmd_create_payment_attempt_v1', 'public.create_approved_saju_sandbox_attempt_v1',
+);
 
 function requireString(name: string, value: unknown): string {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -94,6 +97,7 @@ function mapAuthorityError(error: unknown): never {
     case 'ct_paid_checkout_member_required_v1':
       return mapped('SUBJECT_INELIGIBLE', 'Paid checkout requires an active authenticated Member.');
     case 'cmd_payment_attempt_v1_intent_not_found':
+    case 'approved_saju_payment_unavailable':
       return mapped('INTENT_NOT_FOUND', 'Owner-matched Purchase Intent was not found.');
     case 'cmd_payment_attempt_v1_intent_terminal':
       return mapped('INTENT_TERMINAL', 'Purchase Intent cannot accept a new Payment Attempt.');
@@ -143,13 +147,13 @@ function mapAuthorityRows(
 
 class PostgresPaymentAttemptCreateAuthorityPortV1
 implements PaymentAttemptCreateAuthorityPortV1 {
-  constructor(private readonly client: PostgresTransactionQueryV1) {}
+  constructor(private readonly client: PostgresTransactionQueryV1, private readonly createSql: string) {}
 
   async createPaymentAttempt(
     input: Parameters<PaymentAttemptCreateAuthorityPortV1['createPaymentAttempt']>[0],
   ): Promise<readonly PaymentAttemptCreateAuthorityRowV1[]> {
     try {
-      const result = await this.client.query<AuthorityQueryRowV1>(CREATE_SQL, [
+      const result = await this.client.query<AuthorityQueryRowV1>(this.createSql, [
         input.subjectId,
         input.paymentAttemptId,
         input.purchaseIntentId,
@@ -166,6 +170,7 @@ implements PaymentAttemptCreateAuthorityPortV1 {
 
 export function createPostgresPaymentAttemptCreateAuthorityPortV1(
   client: PostgresTransactionQueryV1,
+  approvedSajuSandbox?: true,
 ): PaymentAttemptCreateAuthorityPortV1 {
-  return new PostgresPaymentAttemptCreateAuthorityPortV1(client);
+  return new PostgresPaymentAttemptCreateAuthorityPortV1(client, approvedSajuSandbox === true ? APPROVED_SAJU_CREATE_SQL : CREATE_SQL);
 }

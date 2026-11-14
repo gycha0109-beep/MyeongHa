@@ -60,6 +60,7 @@ export function ReadingDetailPage() {
           <h2>해석의 적용 범위</h2>
           <p data-official-report-notice-text />
         </aside>
+        <section className="official-report-reader-consultation" data-purchased-saju-reader hidden aria-label="연결자와 사주 상담" />
         <footer className="official-report-actions">
           <button type="button" data-official-report-step-mode>단계별 읽기</button>
           <a href="records.html?tab=saju">사주 보고서 보관함으로 돌아가기</a>

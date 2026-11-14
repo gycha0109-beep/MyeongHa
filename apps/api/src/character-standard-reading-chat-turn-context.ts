@@ -14,6 +14,8 @@ import type {
   CharacterStandardReadingArtifactAuthorityPortV1,
   CharacterStandardReadingKnowledgeSourceV1,
 } from './character-standard-reading-knowledge.js';
+import { createPostgresApprovedSajuReadingAccessV1 } from './postgres-approved-saju-reading-access-v1.js';
+import type { PostgresTransactionQueryV1 } from './postgres-subject-execution.js';
 
 export interface PrepareCharacterStandardReadingThreadRuntimeInputV1 {
   readonly resolvedSubjectId?: string;
@@ -101,5 +103,23 @@ export async function prepareCharacterStandardReadingThreadRuntimeV1(
     threadBinding,
     source: plan.source,
     context,
+  });
+}
+
+/** Protected approved-purchase composition. The same verified subject
+ * transaction supplies the Records-compatible metadata and exact Reader source. */
+export function prepareApprovedSajuReaderThreadRuntimeV1(
+  input: Omit<PrepareCharacterStandardReadingThreadRuntimeInputV1,
+    'accessAuthorityPort' | 'artifactAuthorityPort' | 'readingId'> & {
+    readonly client: PostgresTransactionQueryV1;
+    readonly readingId: string;
+  },
+): Promise<CharacterStandardReadingThreadRuntimeV1> {
+  const { client, ...request } = input;
+  const { accessPort, artifactPort } = createPostgresApprovedSajuReadingAccessV1(client, input.readingId);
+  return prepareCharacterStandardReadingThreadRuntimeV1({
+    ...request,
+    accessAuthorityPort: accessPort,
+    artifactAuthorityPort: artifactPort,
   });
 }

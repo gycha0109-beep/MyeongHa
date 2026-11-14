@@ -19,6 +19,7 @@ import { readingStepSourceCategoriesV1 } from './reading-step-source-categories.
 import { readingDomainPresentationV1 } from './reading-domain-presentation.js';
 import { blockTexts, issuedSectionSourcePartsV1 } from './reading-issued-source-projection.js';
 import { resolveReaderPresentationCandidateV1 } from './reader-rollout-policy.js';
+import { mountPurchasedSajuReaderPanelV1 } from './purchased-saju-reader-panel.js';
 
 const readerCatalog = {
   baekheon: {
@@ -155,6 +156,7 @@ renderReaderLocalePresentation();
 document.addEventListener('myeongha:localechange', renderReaderLocalePresentation);
 
 let activeReadingOwner = null;
+let unmountPurchasedSajuReader;
 
 function currentReadingOwnerEvidence() {
   return { memberSession: readMemberSession(), guestCredential: readGuestBearer() };
@@ -232,6 +234,8 @@ function renderInvalidRoute() {
 }
 
 function clearPersistedReadingPresentation() {
+  unmountPurchasedSajuReader?.();
+  unmountPurchasedSajuReader = undefined;
   const report = document.querySelector('[data-official-report]');
   if (report) report.hidden = true;
   document.querySelector('[data-official-report-toc]')?.replaceChildren();
@@ -1038,6 +1042,16 @@ async function loadPersistedReading() {
     }
 
     activatePreviewReading({ ...readingView, source: 'record', record });
+    const purchasedReader = document.querySelector('[data-purchased-saju-reader]');
+    if (purchasedReader && record.approvedComponent && activeBearer.kind === 'member') {
+      unmountPurchasedSajuReader = mountPurchasedSajuReaderPanelV1(purchasedReader, record, async () => {
+        if (!ensureResponseOwnerCurrent(owner)) return null;
+        const bearer = await getActiveBearer();
+        if (!ensureResponseOwnerCurrent(owner)) return null;
+        const currentOwner = captureActiveReadingOwner(bearer);
+        return currentOwner?.kind === 'member' && currentOwner.key === owner.key ? bearer : null;
+      });
+    }
   } catch {
     renderPersistedReadingFailure(
       '저장된 풀이를 잠시 불러올 수 없습니다.',

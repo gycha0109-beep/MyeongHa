@@ -22,9 +22,13 @@ import {
 } from '../apps/api/src/reader-production-rollout-policy-v1.js';
 
 const httpPreviewStub = vi.hoisted(() => vi.fn());
+const approvedCanonicalSource = vi.hoisted(() => vi.fn());
 
 vi.mock('../apps/api/src/reader-interpretation-preview-http.js', () => ({
   runReaderInterpretationPreviewHttpV1: httpPreviewStub,
+}));
+vi.mock('../apps/api/src/postgres-approved-saju-reading-access-v1.js', () => ({
+  readPostgresApprovedSajuCanonicalReaderV1: approvedCanonicalSource,
 }));
 
 const SUBJECT_ID = '11111111-1111-4111-8111-111111111111';
@@ -126,6 +130,43 @@ describe('Reader Interpretation PostgreSQL execution first tranche', () => {
     expect(database.release).toHaveBeenCalledTimes(1);
     // The mocked HTTP boundary does not execute the real guarded source read.
     expect(resolveContext).not.toHaveBeenCalled();
+    expect(groundingProjectionPort.projectGrounding).not.toHaveBeenCalled();
+  });
+
+  it('uses only the signed archive projection for an approved purchased scene', async () => {
+    const database = transactionFixture();
+    const signedAuthority = { pool: transactionFixture().pool, trusts: [{} as never] };
+    const groundingProjectionPort = { projectGrounding: vi.fn() };
+    const verifiedEvidence = { kind: 'member' as const, verifiedAuthUserId: USER_ID };
+    const input = {
+      pool: database.pool, verifiedEvidence,
+      effectiveAt: '2026-09-22T00:00:00.000Z',
+      body: { threadId: THREAD_ID, officialReadingId: READING_ID },
+      activationEnv: approvedInternalPreviewEnv(),
+      contentReleaseRuntime: {} as ContentReleaseRuntime,
+      createContextAuthorityPort: vi.fn(() => ({ resolveContext: vi.fn() })),
+      privateApprovedSajuReaderEnabled: true as const, groundingProjectionPort,
+    };
+    httpPreviewStub.mockClear();
+    await expect(executeReaderInterpretationPreviewPostgresV1(input))
+      .rejects.toThrow('separate signed source connection');
+    expect(httpPreviewStub).not.toHaveBeenCalled();
+
+    const artifact = { readingId: READING_ID } as never;
+    const signedProjection = { groundingHash: 'synthetic-signed-projection' };
+    approvedCanonicalSource.mockResolvedValueOnce({ grounding: signedProjection });
+    httpPreviewStub.mockImplementationOnce(async (
+      request: Parameters<typeof runReaderInterpretationPreviewHttpV1>[0],
+    ) => {
+      expect(request.approvedSajuScope?.resolvedSubject.subjectId).toBe(SUBJECT_ID);
+      return request.groundingProjectionPort.projectGrounding(artifact);
+    });
+    expect(await executeReaderInterpretationPreviewPostgresV1({
+      ...input, approvedSajuCanonicalReaderAuthority: signedAuthority,
+    })).toBe(signedProjection);
+    expect(approvedCanonicalSource).toHaveBeenCalledWith({
+      authority: signedAuthority, subjectId: SUBJECT_ID, verifiedEvidence, artifact,
+    });
     expect(groundingProjectionPort.projectGrounding).not.toHaveBeenCalled();
   });
 });

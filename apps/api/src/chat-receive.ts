@@ -4,13 +4,17 @@ import {
   parseChatRequestV1,
   type ChatRequestV1,
 } from '../../../packages/contracts/src/chat-request.js';
-import { canonicalJson } from '../../../packages/domain/src/index.js';
+import {
+  canonicalJson, evaluateCharacterContentCompatibilityV1,
+  type CharacterClientCompatibilityProfileV1,
+} from '../../../packages/domain/src/index.js';
 import {
   ContentReleaseRuntime,
   ContentReleaseRuntimeError,
   type ContentReleaseRuntimeEntry,
 } from '../../../packages/world-content/src/index.js';
 import { ApiCommandError } from './api-error.js';
+import type { ContentBundleManifestReadResponseV1 } from './content-bundle-manifest-read.js';
 
 export { ApiCommandError } from './api-error.js';
 
@@ -341,6 +345,45 @@ export function prepareChatReceiveCommand(
     }
   }
 
+  return mintChatReceivePlan(request, entry, isNewThread);
+}
+
+/** A paid Reader question uses the manifest of the already-owned, pinned thread. */
+export function preparePinnedPurchasedReaderReceivePlanV1(input: Readonly<{
+  text: string;
+  clientTurnId: string;
+  trustedThread: TrustedThreadBinding;
+  releaseRuntime: ContentReleaseRuntime;
+  bundleManifest: ContentBundleManifestReadResponseV1;
+  clientProfile: CharacterClientCompatibilityProfileV1;
+}>): ChatReceivePlan {
+  const { bundleManifest, trustedThread } = input;
+  const entry = input.releaseRuntime.resolvePinned(trustedThread.pinnedReleaseId);
+  const reader = trustedThread.participantCharacterIds[0];
+  if (!reader || trustedThread.participantCharacterIds.length !== 1 ||
+      entry.release.releaseId !== trustedThread.pinnedReleaseId ||
+      bundleManifest.contentBundleId !== entry.release.bundleId ||
+      bundleManifest.manifest.contentVersion !== entry.release.contentVersion ||
+      bundleManifest.manifest.minClientCapability !== entry.release.minClientCapability ||
+      !bundleManifest.manifest.characterIds.includes(reader) || !findCharacter(entry, reader)) {
+    throw new ApiCommandError('CONTENT_INCOMPATIBLE', 'Purchased Reader content binding is unavailable.');
+  }
+  const decision = evaluateCharacterContentCompatibilityV1({
+    manifest: bundleManifest.manifest, clientProfile: input.clientProfile,
+  });
+  if (!decision.compatible || decision.action !== 'activate') {
+    throw new ApiCommandError('CONTENT_INCOMPATIBLE', 'Purchased Reader content is unavailable for this client.');
+  }
+  const request = parseChatRequestV1({
+    threadId: trustedThread.threadId, clientTurnId: input.clientTurnId,
+    text: input.text, clientCapability: bundleManifest.manifest.minClientCapability,
+  });
+  return mintChatReceivePlan(request, entry, false);
+}
+
+function mintChatReceivePlan(
+  request: ChatRequestV1, entry: ContentReleaseRuntimeEntry, isNewThread: boolean,
+): ChatReceivePlan {
   const plan = Object.freeze({
     normalizedRequest: request,
     requestHash: hashRequest(request),
@@ -350,7 +393,7 @@ export function prepareChatReceiveCommand(
       bundleId: entry.release.bundleId,
       contentVersion: entry.release.contentVersion,
     }),
-    ...(characterId === undefined ? {} : { requestedCharacterId: characterId }),
+    ...(request.characterId === undefined ? {} : { requestedCharacterId: request.characterId }),
   });
 
   serverPreparedChatReceivePlansV1.add(plan);

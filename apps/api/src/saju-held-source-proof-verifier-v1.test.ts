@@ -49,7 +49,7 @@ function readingResponse() {
     },
   };
 }
-function envelope() {
+function envelope(request: unknown = expectedRequest, proofNonce = nonce, temporal?: Record<string, unknown>) {
   const response = readingResponse();
   const material = {
     snapshotId: 'synthetic-snapshot', interpretationRunId: 'synthetic-run',
@@ -65,18 +65,32 @@ function envelope() {
     version: 'myeonghwa-source-reading-transport-proof-v1',
     lifecycle: 'preview',
     issuer: 'saju-preview-service', audience: 'myeongha-api-service',
-    keyId: 'preview-key-v1', nonce, issuedAtMs, expiresAtMs: issuedAtMs + 60_000,
-    requestBodyHash: hash(expectedRequest), responseBodyHash: hash(response), material,
+    keyId: 'preview-key-v1', nonce: proofNonce, issuedAtMs, expiresAtMs: issuedAtMs + 60_000,
+    requestBodyHash: hash(request), responseBodyHash: hash(response), material,
     productionInterpretationAuthority: 'NOT_EVALUATED',
     releaseAuthorization: 'NOT_EVALUATED',
     canExecute: false, canPublish: false, canSell: false,
   };
+  const temporalMaterial = temporal === undefined ? undefined : {
+    version: 'myeonghwa-temporal-reader-evidence-v1',
+    snapshotId: material.snapshotId, responseBodyHash: material.responseBodyHash, calculationHash: 'a'.repeat(64),
+    interpretationStatus: 'insufficient_authorized_semantics', timeZone: 'Asia/Seoul',
+    segments: [{ id: 'after_jeol' }], dayunOverlap: { status: 'resolved' },
+    ...temporal,
+  };
+  const temporalEvidence = temporalMaterial === undefined ? undefined : {
+    ...temporalMaterial, evidenceHash: hash(temporalMaterial),
+  };
+  const signedPayload = temporalEvidence === undefined ? payload : {
+    ...payload, temporalEvidenceHash: temporalEvidence.evidenceHash,
+  };
   const signatureHex = createHmac('sha256', keyBytes)
-    .update(DOMAIN).update(hash(payload)).digest('hex');
+    .update(DOMAIN).update(hash(signedPayload)).digest('hex');
   return {
     schemaVersion: 'myeonghwa-source-reading-proof-http-v1',
     lifecycle: 'preview', state: 'held', response,
-    proof: { payload, signatureHex },
+    proof: { payload: signedPayload, signatureHex },
+    ...(temporalEvidence === undefined ? {} : { temporalEvidence }),
     productionInterpretationAuthority: 'NOT_EVALUATED',
     releaseAuthorization: 'NOT_EVALUATED',
     canExecute: false, canPublish: false, canSell: false,
@@ -109,6 +123,30 @@ function mutate(source: unknown, path: readonly string[], value: unknown, remove
   else (target as Record<string, unknown>)[key] = value;
 }
 describe('2B-3C-3 MyeongHa source proof verification, Preview HOLD only', () => {
+  it('binds the optional evidence to the signed response and the purchased Seoul period', async () => {
+    const referenceDateTime = '2026-11-30T15:00:00.000Z';
+    const request = { ...expectedRequest, reading: { text: '이번 달', periodReferenceDateTime: referenceDateTime } };
+    const signal = { claimId: 'fixture-claim-1', segmentId: 'after_jeol', kind: 'primary',
+      headline: '검토용 기간 풀이', statement: '검토용 근거입니다.', epistemicType: 'future_tendency' };
+    const temporal = { scope: 'monthly', referenceDateTime, targetYear: 2026, targetMonth: 12, researchSignals: [signal] };
+    const input = { ...context(), expectedRequestBody: request, expectTemporalEvidence: true as const };
+    const valid = envelope(request, nonce, temporal);
+    const altered = structuredClone(valid);
+    mutate(altered, ['temporalEvidence', 'segments', '0', 'id'], 'before_jeol');
+    for (const proof of [
+      envelope(request), altered, envelope(request, nonce, { ...temporal, targetMonth: 11 }),
+      envelope(request, nonce, { ...temporal, researchSignals: [{ ...signal, segmentId: 'outside_period' }] }),
+    ]) {
+      const authority = trust();
+      expect(await verifySajuHeldSourceProofV1(proof, authority, input)).toMatchObject({ state: 'blocked' });
+      expect(authority.claimNonceOnce).not.toHaveBeenCalled();
+    }
+    expect(await verifySajuHeldSourceProofV1(valid, trust(), { ...context(), expectedRequestBody: request }))
+      .toMatchObject({ state: 'blocked' });
+    expect(await verifySajuHeldSourceProofV1(valid, trust(), input)).toMatchObject({
+      state: 'held', canSell: false, verifiedSource: { temporalEvidence: temporal },
+    });
+  });
   it('verifies Saju-compatible signed source payload without elevating authority', async () => {
     const source = envelope(), t = trust();
     const actual = await verifySajuHeldSourceProofV1(source, t, context());

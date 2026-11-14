@@ -85,6 +85,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
   const body = document.createElement('div');
   body.className = 'conversation-paid-reader-revealed-body';
   body.hidden = true;
+  body.dataset.officialReading = '';
   body.dataset.readerPaidAriaSource = '현재 구매권으로 확인된 사주 해설';
   body.setAttribute('aria-label', paidReaderUi('현재 구매권으로 확인된 사주 해설'));
 
@@ -154,7 +155,9 @@ export function appendProtectedReaderChatRevealV1(card, input) {
           || data.safeMessageId !== input.safeMessageId
           || typeof data.officialReadingId !== 'string'
           || !ID.test(data.officialReadingId)
+          || (input.officialReadingId !== undefined && data.officialReadingId !== input.officialReadingId)
           || typeof data.readerCharacterId !== 'string'
+          || (input.readerCharacterId !== undefined && data.readerCharacterId !== input.readerCharacterId)
           || typeof data.committedAt !== 'string'
           || !Number.isFinite(Date.parse(data.committedAt))
           || typeof data.body !== 'string'
@@ -259,7 +262,10 @@ export function appendProtectedReaderChatRevealV1(card, input) {
             : '해설이 표시되었으나 기기 수신 확인은 기록되지 않았습니다.');
           retry.hidden = acknowledged;
           retry.disabled = false;
-          if (acknowledged) retry.onclick = null;
+          if (acknowledged) {
+            retry.onclick = null;
+            input.onAcknowledged?.();
+          }
         }
       }
       retry.onclick = () => {
@@ -280,6 +286,7 @@ export function appendProtectedReaderChatRevealV1(card, input) {
   });
 
   card.append(button, status, retry, body);
+  if (input.openImmediately === true) button.click();
 }
 
 document.addEventListener('visibilitychange', () => {

@@ -7,4 +7,32 @@ if (!(readingRoot instanceof HTMLElement)) {
   throw new Error('Missing Saju Reading page element: reading-react-root');
 }
 
-createRoot(readingRoot).render(<ReadingPage />);
+const root = createRoot(readingRoot);
+root.render(<ReadingPage />);
+
+// The server reveals sandbox ports only to the authenticated Owner.
+// Do not require a hidden query parameter to make the existing 14 cards usable.
+void Promise.all([
+    import('../commerce/approved-saju-sandbox-browser-runtime.js'),
+    import('../../product-auth.js'),
+  ]).then(async ([{ loadApprovedSajuSandboxCheckoutPortsV1 }, { getActiveBearer, readMemberSession, PRODUCT_AUTH_STORAGE_V1 }]) => {
+    const ownerId = readMemberSession()?.user.id;
+    if (!ownerId) return;
+    const approvedCheckout = await loadApprovedSajuSandboxCheckoutPortsV1(async () => {
+      const bearer = await getActiveBearer();
+      if (bearer?.kind !== 'member' || readMemberSession()?.user.id !== ownerId) {
+        throw new Error('The checkout member changed.');
+      }
+      return bearer.token;
+    });
+    if (approvedCheckout === null || readMemberSession()?.user.id !== ownerId) return;
+    function hideAfterOwnerChange() {
+      if (readMemberSession()?.user.id === ownerId) return;
+      root.render(<ReadingPage />);
+      window.removeEventListener('storage', hideAfterOwnerChange);
+      window.removeEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, hideAfterOwnerChange);
+    }
+    window.addEventListener('storage', hideAfterOwnerChange);
+    window.addEventListener(PRODUCT_AUTH_STORAGE_V1.changedEvent, hideAfterOwnerChange);
+    root.render(<ReadingPage approvedCheckout={approvedCheckout} />);
+  }).catch(() => { /* The ordinary Reading page remains available. */ });

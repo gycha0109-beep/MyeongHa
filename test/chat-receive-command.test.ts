@@ -5,6 +5,9 @@ import {
 } from '../apps/api/src/index.js';
 import { buildCharacterContentManifest } from '../packages/character-content/src/index.js';
 import {
+  getServerPreparedChatReceiveContentEntryV1, preparePinnedPurchasedReaderReceivePlanV1,
+} from '../apps/api/src/chat-receive.js';
+import {
   buildCoherentContentRelease,
   buildWorldContentManifest,
   ContentReleaseRuntime,
@@ -56,6 +59,40 @@ function expectApiCode(fn: () => unknown, code: string): void {
 }
 
 describe('chat receive command planner', () => {
+  it('prepares a purchased Reader question using the exact pinned release and approved client profile', () => {
+    const release = releaseEntry('active-v1', 'active');
+    const input = {
+      clientTurnId: 'turn-purchased',
+      text: '그 부분을 더 설명해 주세요.',
+      trustedThread: { threadId: 'thread-1', pinnedReleaseId: release.release.releaseId,
+        participantCharacterIds: [release.characters.characters[0]!.characterId] },
+      releaseRuntime: runtime([release]),
+      bundleManifest: {
+        contentBundleId: release.release.bundleId,
+        manifest: { contentVersion: release.release.contentVersion,
+          minClientCapability: release.release.minClientCapability,
+          characterIds: [release.characters.characters[0]!.characterId],
+          assetManifestHash: 'isolated-asset-manifest', cueSchemaVersion: 'isolated-cues' },
+      },
+      clientProfile: {
+        profileKey: 'isolated-web',
+        supportedClientCapabilities: [release.release.minClientCapability],
+        supportedAssetManifestHashes: ['isolated-asset-manifest'],
+        supportedCueSchemaVersions: ['isolated-cues'],
+      },
+    };
+    const plan = preparePinnedPurchasedReaderReceivePlanV1(input);
+    expect(plan.isNewThread).toBe(false);
+    expect(getServerPreparedChatReceiveContentEntryV1(plan)).toEqual(release);
+    expect(plan.normalizedRequest.threadId).toBe(input.trustedThread.threadId);
+    expectApiCode(() => preparePinnedPurchasedReaderReceivePlanV1({
+      ...input, clientProfile: { ...input.clientProfile, supportedAssetManifestHashes: ['different'] },
+    }), 'CONTENT_INCOMPATIBLE');
+    expectApiCode(() => preparePinnedPurchasedReaderReceivePlanV1({
+      ...input, bundleManifest: { ...input.bundleManifest, contentBundleId: 'different' },
+    }), 'CONTENT_INCOMPATIBLE');
+  });
+
   it('fails closed for a new thread while SRC-15 compatibility authority is unresolved', () => {
     expectApiCode(
       () =>

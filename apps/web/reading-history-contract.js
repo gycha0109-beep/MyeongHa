@@ -1,4 +1,5 @@
 import { normalizeSajuDomainV1 } from './saju-domain-contract.js';
+import { SAJU_READING_COMPONENTS_V1 } from '../../packages/contracts/src/approved-saju-catalog.js';
 
 const UUID_V1 = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -55,10 +56,18 @@ function parseReading(value) {
     fail('reading item is invalid');
   }
 
+  const sajuDomain = requireSajuDomain(value.sajuDomain, 'sajuDomain');
+  const component = value.approvedComponent;
+  if (component !== undefined && (typeof component !== 'string'
+    || !Object.hasOwn(SAJU_READING_COMPONENTS_V1, component)
+    || SAJU_READING_COMPONENTS_V1[component].domain !== sajuDomain)) {
+    fail('approvedComponent is invalid');
+  }
   return Object.freeze({
     readingId: requireUuid(value.readingId, 'readingId'),
     readingSessionId: requireUuid(value.readingSessionId, 'readingSessionId'),
-    sajuDomain: requireSajuDomain(value.sajuDomain, 'sajuDomain'),
+    sajuDomain,
+    ...(component === undefined ? {} : { approvedComponent: component }),
     readingContractVersion: requireString(
       value.readingContractVersion,
       'readingContractVersion',

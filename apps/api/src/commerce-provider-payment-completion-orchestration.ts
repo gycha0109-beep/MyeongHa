@@ -1,6 +1,10 @@
 import { ApiCommandError } from './api-error.js';
 import { fulfillVerifiedReaderReceiptV1 } from './commerce-verified-reader-fulfillment.js';
 import {
+  fulfillVerifiedApprovedSajuReceiptV1,
+  type ApprovedSajuReceiptFulfillmentV1,
+} from './commerce-verified-approved-saju-fulfillment.js';
+import {
   continuationFromVerifiedReaderBindV1,
   type CommerceReaderReceiptContinuationV1,
 } from './commerce-reader-product-continuity-v1.js';
@@ -35,6 +39,7 @@ export interface AuthenticatedCommerceProviderPaymentCompletionV1 {
   readonly receiptId: string;
   readonly providerEventId: string;
   readonly replayed: boolean;
+  readonly sajuFulfillment?: ApprovedSajuReceiptFulfillmentV1;
   /** Present only when trusted internal Reader fulfillment is explicitly enabled. */
   readonly readerFulfillment?: 'issued' | 'already_bound' | 'not_reader';
   /**
@@ -191,6 +196,7 @@ export async function executeAuthenticatedCommerceProviderPaymentCompletionV1(in
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
   /** Private, disabled-by-default S2 issuance. Not a paid-response activation. */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: boolean;
 }): Promise<AuthenticatedCommerceProviderPaymentCompletionV1> {
   const authenticatedIngress = await authenticateProviderIngress({
     ingress: input.ingress,
@@ -216,7 +222,11 @@ export async function executeAuthenticatedCommerceProviderPaymentCompletionV1(in
   // Persisting verified payment evidence commits first. If private Reader
   // fulfillment fails, the provider can retry the same canonical Receipt;
   // replay is idempotent and does not manufacture a second Purchase/Grant.
+  const sajuFulfillment = input.privateApprovedSajuReceiptFulfillmentEnabled === true
+    ? await fulfillVerifiedApprovedSajuReceiptV1({ pool: input.pool, receiptId: persisted.receiptId, evidence })
+    : undefined;
   const readerFulfillment = input.privateReaderReceiptFulfillmentEnabled === true
+    && (sajuFulfillment === undefined || sajuFulfillment === 'not_approved_saju')
     ? await fulfillVerifiedReaderReceiptV1({
         pool: input.pool,
         receiptId: persisted.receiptId,
@@ -228,6 +238,7 @@ export async function executeAuthenticatedCommerceProviderPaymentCompletionV1(in
     receiptId: persisted.receiptId,
     providerEventId: persisted.providerEventId,
     replayed: persisted.replayed,
+    ...(sajuFulfillment === undefined ? {} : { sajuFulfillment }),
     ...(input.privateReaderReceiptFulfillmentEnabled === true
       ? { readerFulfillment: readerFulfillment?.kind ?? 'not_reader' as const }
       : {}),

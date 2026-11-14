@@ -1,5 +1,9 @@
 import { createHash } from 'node:crypto';
 import {
+  assertServerPreparedStandardChatGroundingV2,
+  type CharacterStandardChatGroundingV2,
+} from './character-standard-reading-chat-grounding-v2.js';
+import {
   SAJU_CHARACTER_GROUNDING_PROJECTION_VERSION_V1,
   SAJU_CHARACTER_GROUNDING_SCHEMA_VERSION_V1,
   SAJU_GROUNDING_AXIS_REGISTRY_VERSION_V1,
@@ -11,6 +15,9 @@ import {
   renderCharacterSajuBoundedExactCoreV2,
   resolveCharacterSajuCommonPerspectiveV1,
   type CharacterSajuGroundingRefV1,
+  type CharacterRuntimeContextWithGroundingV2,
+  type CharacterSajuGroundingBundleViewV1,
+  type CharacterReadingPerspectiveRefV1,
 } from '../../../packages/domain/src/index.js';
 import {
   getChatThreadRuntimeBinding,
@@ -38,7 +45,7 @@ import {
 } from './reader-interpretation-preview-runtime-v1.js';
 
 /** Only a V2 server-rendered, semantic-guard-passed Scene may nominate Chat source Units. */
-const mintedGuardedReaderSceneV2 = new WeakSet<object>();
+const mintedGuardedReaderSceneV2 = new WeakMap<object, CharacterReadingPerspectiveRefV1>();
 
 export function assertServerGuardedReaderInterpretationSceneV2(
   value: unknown,
@@ -50,6 +57,11 @@ export function assertServerGuardedReaderInterpretationSceneV2(
       'Server guarded Reader Scene is required for source handoff.',
     );
   }
+}
+
+export function getGuardedReaderSceneProfileV2(scene: ReaderInterpretationPreviewEnvelopeV1): CharacterReadingPerspectiveRefV1 {
+  assertServerGuardedReaderInterpretationSceneV2(scene);
+  return mintedGuardedReaderSceneV2.get(scene)!;
 }
 
 function deny(code: ReaderInterpretationPreviewRuntimeErrorV1['code']): never {
@@ -82,7 +94,7 @@ function hashEnvelope(value: unknown): string {
  * A2 premium/withheld rules cannot issue the standard V2 proof.
  */
 export async function runThreadBoundReaderInterpretationPreviewV2(
-  input: RunThreadBoundReaderInterpretationPreviewInputV1,
+  input: RunThreadBoundReaderInterpretationPreviewInputV1 & { readonly requireExactSourceHash?: true },
 ): Promise<ReaderInterpretationPreviewEnvelopeV1> {
   // Caller-provided Character, Memory, Saju and Release authority are rejected
   // before consulting access, Product policy or the raw Official artifact.
@@ -193,15 +205,12 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
       sourceResponseHash: record.sourceResponseHash,
       groundingHash: record.groundingHash,
     });
+    if (input.requireExactSourceHash === true && (current.source.productResponseState !== 'delivered' ||
+        'sha256:v1:' + record.sourceResponseHash !== current.source.responseHash)) deny('SOURCE_MISMATCH');
     grounding = admitCharacterSajuGroundingBundleViewV1({ candidate, expectedRef });
     grounded = admitCharacterRuntimeSajuGroundingV2({ context, groundingRef: expectedRef });
   } catch { deny('SOURCE_MISMATCH'); }
 
-  const perspective = resolveCharacterSajuCommonPerspectiveV1({
-    characterId: grounded.characterId,
-    contentVersion: grounded.contentVersion,
-    sajuProfile: grounded.sajuProfile,
-  });
   if (grounded.saju.eligibility.readerCharacterId !== reader ||
       grounded.saju.eligibility.subjectId !== subjectId ||
       grounded.saju.eligibility.contentReleaseId !== current.scope.contentReleaseId ||
@@ -211,15 +220,42 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
       grounding.engineVersion !== current.source.sajuEngineVersion ||
       grounding.productResponseVersion !== current.source.readingContractVersion) deny('SOURCE_MISMATCH');
 
+  if (input.requireExactSourceHash === true) {
+    const refreshed = await prepareOfficialReadingReaderAdmissionV1(admissionInput);
+    if (!sameScope(current.scope, refreshed.scope) ||
+        current.source.responseHash !== refreshed.source.responseHash) deny('SOURCE_MISMATCH');
+  }
+  return renderGuardedReaderSceneV2(current.scope, grounded, grounding, input.requireExactSourceHash);
+}
+
+/** Rebuild the same scene shown to the buyer from current, server-admitted Chat grounding. */
+export function renderGroundedStandardReaderSceneV2(
+  grounded: CharacterStandardChatGroundingV2,
+): ReaderInterpretationPreviewEnvelopeV1 {
+  assertServerPreparedStandardChatGroundingV2(grounded);
+  return renderGuardedReaderSceneV2(grounded.scope, grounded.context, grounded.grounding, true);
+}
+
+function renderGuardedReaderSceneV2(
+  scope: OfficialReadingReaderAdmissionScopeV1,
+  grounded: CharacterRuntimeContextWithGroundingV2,
+  grounding: CharacterSajuGroundingBundleViewV1,
+  allowQualifiersInExactCore?: true,
+): ReaderInterpretationPreviewEnvelopeV1 {
+  const perspective = resolveCharacterSajuCommonPerspectiveV1({
+    characterId: grounded.characterId,
+    contentVersion: grounded.contentVersion,
+    sajuProfile: grounded.sajuProfile,
+  });
   const common = {
     schemaVersion: READER_INTERPRETATION_PREVIEW_SCHEMA_VERSION_V1,
     contractVersion: READER_INTERPRETATION_PREVIEW_CONTRACT_VERSION_V1,
     lifecycle: 'preview' as const,
-    officialReadingId: readingId,
-    readerCharacterId: reader,
-    readerContentBundleId: current.scope.readerContentBundleId,
-    requestedDomain: current.scope.sajuDomain,
-    officialArtifactResponseHash: current.source.responseHash,
+    officialReadingId: scope.readingId,
+    readerCharacterId: scope.readerCharacterId,
+    readerContentBundleId: scope.readerContentBundleId,
+    requestedDomain: scope.sajuDomain,
+    officialArtifactResponseHash: scope.officialArtifactResponseHash,
     sourceResponseHash: grounding.sourceResponseHash,
     groundingHash: grounding.groundingHash,
   };
@@ -228,7 +264,7 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
   let rendered: ReturnType<typeof renderCharacterSajuBoundedExactCoreV2>;
   try {
     rendered = renderCharacterSajuBoundedExactCoreV2({
-      context: grounded, grounding, perspective, requestedDomain: current.scope.sajuDomain,
+      context: grounded, grounding, perspective, requestedDomain: scope.sajuDomain,
     });
   } catch {
     const envelope = { ...common, mode: 'protected_fallback' as const,
@@ -244,7 +280,8 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
   try {
     guarded = guardCharacterSajuSemanticPreservationV2({
       candidate: rendered.utterance,
-      context: grounded, grounding, perspective, requestedDomain: current.scope.sajuDomain,
+      ...(allowQualifiersInExactCore === true ? { allowQualifiersInExactCore } : {}),
+      context: grounded, grounding, perspective, requestedDomain: scope.sajuDomain,
     });
   } catch {
     const envelope = { ...common, mode: 'protected_fallback' as const,
@@ -259,6 +296,6 @@ export async function runThreadBoundReaderInterpretationPreviewV2(
   const envelope = { ...common, mode: 'reader_interpretation' as const,
     utterance: guarded.utterance };
   const scene = Object.freeze({ ...envelope, interpretationHash: hashEnvelope(envelope) });
-  mintedGuardedReaderSceneV2.add(scene);
+  mintedGuardedReaderSceneV2.set(scene, rendered.planDecision.plan.perspectiveProfileRef);
   return scene;
 }

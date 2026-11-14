@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { handleApprovedSajuReaderQuestionHttpV1 } from '../apps/api/src/approved-saju-reader-question-http-v1.js';
 
 import {
   ReaderRuntimeClientErrorV1,
@@ -49,6 +50,87 @@ function errorResponse(status: number, code: string, retryable = false) {
 }
 
 describe('web Reader runtime client', () => {
+  it('connects to the private HTTP route and fails closed before identity lookup for invalid scope', async () => {
+    const origin = 'http://localhost';
+    const path = origin + '/api/me/readings/reader-questions';
+    const body = { threadId: '33333333-3333-4333-8333-333333333333',
+      readingId: '44444444-4444-4444-8444-444444444444',
+      clientTurnId: '66666666-6666-4666-8666-666666666666', text: '그 부분을 더 설명해 주세요.' };
+    const makeRequest = (value: unknown, requestOrigin = origin) => new Request(path, {
+      method: 'POST', headers: { Origin: requestOrigin, 'Content-Type': 'application/json' },
+      body: JSON.stringify(value),
+    });
+    const verifyRequestIdentity = vi.fn(async () => null);
+    const runtime = { identityEvidenceVerifier: { verifyRequestIdentity } } as never;
+    expect((await handleApprovedSajuReaderQuestionHttpV1({ request: makeRequest(body) }))?.status).toBe(503);
+    expect((await handleApprovedSajuReaderQuestionHttpV1({
+      runtime, request: makeRequest(body, 'https://example.invalid'),
+    }))?.status).toBe(403);
+    expect((await handleApprovedSajuReaderQuestionHttpV1({
+      runtime, request: makeRequest({ ...body, sourceUnitRefs: ['untrusted'] }),
+    }))?.status).toBe(400);
+    expect(verifyRequestIdentity).not.toHaveBeenCalled();
+    const client = createReaderRuntimeClientV1({
+      enabled: true, resolveBearer: () => ({ kind: 'member', token: 'isolated' }),
+      fetchImpl: async (endpoint, init) => {
+        const headers = new Headers(init?.headers);
+        headers.set('Origin', origin);
+        return (await handleApprovedSajuReaderQuestionHttpV1({
+          runtime, request: new Request(new URL(String(endpoint), origin), { ...init, headers }),
+        }))!;
+      },
+      invalidateMember: () => {},
+    });
+    await expect(client.askPurchasedReading({
+      ...body, officialReadingId: body.readingId,
+    })).rejects.toMatchObject({ code: 'READER_SESSION_REQUIRED' });
+    expect(verifyRequestIdentity).toHaveBeenCalledOnce();
+  });
+
+  it('sends the selected scene and reuses the same question identity on retry', async () => {
+    const threadId = '33333333-3333-4333-8333-333333333333';
+    const readingId = '44444444-4444-4444-8444-444444444444';
+    const safeMessageId = '55555555-5555-4555-8555-555555555555';
+    const clientTurnId = '66666666-6666-4666-8666-666666666666';
+    const firstSceneQuestion = { interpretationHash: sceneData().interpretationHash, segmentIndex: 2 };
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(errorResponse(409, 'QUESTION_IN_PROGRESS'))
+      .mockResolvedValueOnce(Response.json({ ok: true, data: { threadId, safeMessageId } }));
+    const client = createReaderRuntimeClientV1({
+      enabled: true, fetchImpl, resolveBearer: () => ({ kind: 'member', token: 'buyer-token' }),
+    });
+    const input = { threadId, officialReadingId: readingId, clientTurnId,
+      text: '그 부분을 더 설명해 주세요.', firstSceneQuestion };
+    await expect(client.askPurchasedReading(input)).rejects.toMatchObject({ retryable: true });
+    await expect(client.askPurchasedReading(input)).resolves.toEqual({ threadId, safeMessageId });
+    expect(fetchImpl.mock.calls[0]).toEqual(fetchImpl.mock.calls[1]);
+    const [endpoint, init] = fetchImpl.mock.calls[1]!;
+    expect(endpoint).toBe('/api/me/readings/reader-questions');
+    expect(init).toMatchObject({ credentials: 'same-origin', cache: 'no-store',
+      headers: { Authorization: 'Bearer buyer-token' } });
+    expect(JSON.parse(init.body)).toEqual({ threadId, readingId, clientTurnId, text: input.text, firstSceneQuestion });
+  });
+
+  it('denies guests and rejects unexpected paid plaintext in a question response', async () => {
+    const input = {
+      threadId: '33333333-3333-4333-8333-333333333333',
+      officialReadingId: '44444444-4444-4444-8444-444444444444',
+      clientTurnId: '66666666-6666-4666-8666-666666666666', text: '그 부분을 더 설명해 주세요.',
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json({ ok: true, data: {
+      threadId: input.threadId, safeMessageId: '55555555-5555-4555-8555-555555555555', body: 'unexpected',
+    } }));
+    const guest = createReaderRuntimeClientV1({
+      enabled: true, fetchImpl, resolveBearer: () => ({ kind: 'guest', token: 'guest-token' }),
+    });
+    await expect(guest.askPurchasedReading(input)).rejects.toMatchObject({ code: 'READER_SESSION_REQUIRED' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+    const member = createReaderRuntimeClientV1({
+      enabled: true, fetchImpl, resolveBearer: () => ({ kind: 'member', token: 'member-token' }),
+    });
+    await expect(member.askPurchasedReading(input)).rejects.toMatchObject({ code: 'READER_MALFORMED_RESPONSE' });
+  });
+
   it('keeps the Production Reader transport disabled by default', async () => {
     const fetchImpl = vi.fn();
     const client = createReaderRuntimeClientV1({

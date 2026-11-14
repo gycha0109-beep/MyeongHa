@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  selectPrivateApprovedSajuCiphertextQueryV1,
   selectPrivateOfficialReaderCiphertextQueryV1,
   type OfficialReaderPrivateCiphertextSelectorV1,
 } from './official-reader-private-paid-answer-query-v1.js';
@@ -50,6 +51,19 @@ describe('S6 private paid Reader selector is bound to exact DB function', () => 
     expect(body.sql.split('\nfrom public.')[0]).toBe(
       marker.sql.split('\nfrom public.')[0],
     );
+  });
+
+  it('looks up an approved Saju marker only through its scoped ciphertext function', () => {
+    const found = selectPrivateApprovedSajuCiphertextQueryV1(SUBJECT, {
+      kind: 'chat_marker', threadId: THREAD, safeMessageId: SAFE_MARKER,
+    });
+    expect(found.values).toEqual([SUBJECT, THREAD, SAFE_MARKER]);
+    expect(found.sql).toContain('public.qry_approved_saju_paid_answer_ciphertext_v1($1::uuid, $2::uuid, $3::uuid)');
+    expect(found.sql).not.toContain('internal_qry_official_reader_paid');
+    expect(found.sql).toContain('encrypted_body as "encryptedBody"');
+    expect(() => selectPrivateApprovedSajuCiphertextQueryV1(SUBJECT, {
+      kind: 'body', bodyId: BODY,
+    } as never)).toThrow('Invalid approved Saju selector.');
   });
 
   it('fails closed on missing, extra, malformed or type-confused selectors', () => {

@@ -29,6 +29,8 @@ export interface HandlePaymentAttemptServerVerificationRequestInputV1 {
   readonly serverTime: string;
   readonly identityEvidenceVerifier: IdentityEvidenceVerificationPortV1;
   readonly pool: PostgresSubjectPoolV1;
+  readonly commercePool?: PostgresSubjectPoolV1;
+  readonly approvedSajuSandbox?: true;
   readonly verificationAdapter: CommercePaymentVerificationAdapterV1;
   /** Server-only optional observer, called after the receipt transaction commits.
    * It must independently validate Member consent and the verified receipt.
@@ -38,6 +40,7 @@ export interface HandlePaymentAttemptServerVerificationRequestInputV1 {
   }) => Promise<void>;
   /** Server-injected private S2, never sourced from the request payload. */
   readonly privateReaderReceiptFulfillmentEnabled?: boolean;
+  readonly privateApprovedSajuReceiptFulfillmentEnabled?: true;
 }
 
 type PaymentAttemptServerVerificationResponseV1 = Readonly<
@@ -264,6 +267,8 @@ export async function handlePaymentAttemptServerVerificationRequestV1(
   try {
     const result = await executeSubjectOwnedCommercePaymentCompletionV1({
       pool: input.pool,
+      ...(input.commercePool === undefined ? {} : { commercePool: input.commercePool }),
+      ...(input.approvedSajuSandbox === true ? { approvedSajuSandbox: true } : {}),
       verifiedEvidence,
       paymentAttemptId: requestBody.paymentAttemptId,
       verificationAdapter: input.verificationAdapter,
@@ -271,6 +276,8 @@ export async function handlePaymentAttemptServerVerificationRequestV1(
       // the current production payment verification route remains unmounted.
       privateReaderReceiptFulfillmentEnabled:
         input.privateReaderReceiptFulfillmentEnabled === true,
+      ...(input.privateApprovedSajuReceiptFulfillmentEnabled === true
+        ? { privateApprovedSajuReceiptFulfillmentEnabled: true } : {}),
     });
     // A committed payment must not become an error if optional telemetry is
     // unconfigured, consent is unavailable, or collection is offline. Even a

@@ -11,6 +11,15 @@
 
 ---
 
+## 2026-11-13 현행 상용 해석 판단 정정 (원래 2026-09-12 기록 보존)
+
+> [명하 Saju 내부 상용 해석 인계 정책](SAJU_INTERNAL_COMMERCIAL_INTERPRETATION_HANDOFF_20261113.md) 적용. 본 문서의 이전 `Production Interpretation Authority = HOLD` 및 과거 Saju commit pin은 **당시 상태 기록**이다. 과거 판단을 최신 실제 구현 상태로 오해하지 않는다.
+
+- **외부 학술 감수·추가 원전·학계 승인 자체는 출시 차단이 아니다.** 명하 내부 채택 해석 규칙의 실제 계산·한국어 문단·기간/상대 결속을 검증한다.
+- **현재 유효한 기술적 검증은 그대로 유지한다:** canonical source admission, 정확한 원국/기간, 서명·해시 검증, Release, 구매/Grant, 상대 동의·철회, Reader 재열람, 환불 후 접근 제어. 설명 정책만으로 기존 Production 발급·결제 스위치를 켜지 않는다.
+- Saju [연·월운 #2762](https://github.com/gycha0109-beep/Saju/pull/2762), [T10 #2763](https://github.com/gycha0109-beep/Saju/pull/2763), MyeongHa [구매·발급 #3174](https://github.com/gycha0109-beep/MyeongHa/pull/3174)에서 각 **실제 인계/CI 상태를 따로 확인**한다. 세 PR의 기존 Green은 운영 판매가 가능하다는 뜻이 아니다.
+- Saju 원본의 추가 학술 자료 미확보로 인해 원국·T9·T10의 다른 채택된 내부 의미 규칙 전부를 일괄 차단하지 않는다. 단, **실제 소비자 의미가 없는 부분은 구현해야 하며**, 보호 발급 및 동의/운영 미충족은 계속 차단한다.
+
 ## 1. 목적
 
 기존 `Saju` repository의 semantic authority를 보존하면서 명하 Product가 안정적으로 소비하는 경계를 정의한다.
