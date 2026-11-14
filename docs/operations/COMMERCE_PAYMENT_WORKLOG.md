@@ -1191,3 +1191,8 @@
 - 14개 상품의 결제 요청 계약을 포함한 관련 검사 28건, 웹 타입 검사·빌드 통과. #3174의 PG17 격리 후보 구매·발급·회수 흐름도 실제 DB에서 확인했다. 실결제와 14개 전체의 실제 발급 증거는 별도로 필요하다.
 
 Watchtower-Track: commerce
+
+### 2026-11-15 — 14 approved Saju Owner TEST checkout executable runtime
+- Implemented npm run start:saju-owner-test with separate loopback PostgreSQL TEST principals, existing verified member login, 14-offer checkout, purchased-reading archive, counterpart reads, and pinned PortOne TEST SDK. PR #3322, development branch only; production sale remains OFF.
+- Read-only linked Supabase production check: commerce_saju_private.approved_purchase_scope_v1, approved_component_reading_v1, source issue proof and issuer role are absent. No production DDL or payment was executed.
+- TEST PG roles / provider credentials are not configured in the accessible local environment. Real 14-offer payment-to-issuance-to-refund is blocked, not claimed complete.
