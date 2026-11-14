@@ -118,3 +118,10 @@
 - **권한/Reader:** 읽기 전용 DB 역할은 이제 발급용 Scope를 사용할 수 없고 조회 전용 Scope·보관 Reading·원본 증거만 읽는다. `readPostgresApprovedSajuT10PairReaderV1`도 정확한 조회 함수를 호출한다. 세 상품의 같은 구매 원본과 취소·철회 이후의 무권한 상태를 검증한다.
 - **증거:** 격리 PostgreSQL 17은 발급 중단을 적용한 후 해당 Reader 역할에서 유효한 구매의 서명 원본/Reading 재열람을 검사하고, 이후 상대 동의 철회 시 조회를 거부하는 별도 롤백 시험을 실행한다. 기존 실제 Saju Ed25519 E2E의 조회 모의 계약도 새 함수로 맞췄다.
 - **범위:** 운영 DB·별도 로그인/Pool 구성·실결제·판매 활성화는 수행하지 않았다. `ROADMAP_IN_PROGRESS`, 판매 HOLD.
+
+## 2026-11-14 — T10 중단 복구 작업자의 읽기 전용 DB 연결 분리
+
+- **원인:** 기존 `approved-saju-t10-pair-issuance-worker-v1.ts`는 서명된 기존 발급을 재조정할 때 `readPostgresApprovedSajuT10PairReaderV1`에 발급용 Pool을 전달했다. 이전 단계에서 Reader 전용 DB 역할을 분리했으므로 실제 분리 로그인 환경에서는 `SET LOCAL ROLE myeongha_approved_saju_pair_reader_executor`가 허용되지 않을 수 있었다.
+- **실구현:** 발급 작업자의 필수 입력으로 `pairReaderPool`을 추가했다. 동일한 Pool 객체나 연결 메서드가 없는 설정은 생성 시 거부한다. 이미 발급된 Reading의 보관 원본 재검증만 별도 Reader Pool로 수행하고, 신규 발급 준비·서명 확정·작업 완료는 기존 전용 Issuer Pool을 유지한다.
+- **검증:** 작업자 검사에서 두 Pool 재사용 차단, 이미 발급된 Reading을 재조정할 때 Reader Pool만 전달하는지 확인한다. 대상 보관 원본·현재 구매·상대 동의 검증이 실패하면 종전처럼 재발급 없이 보류한다.
+- **현실 적용 범위:** 전용 Reader 로그인/Pool 프로비저닝과 운영 배포는 진행하지 않았다. 기존 승인 전 후보와 격리 CI만 다루며 판매 HOLD, `ROADMAP_IN_PROGRESS`.
