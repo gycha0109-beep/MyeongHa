@@ -1,5 +1,7 @@
 # Character Gate B Production Publication Blocker Evidence
 
+> **2026-11-14 현재 실행 기준:** [6명 정식 게시와 9명 후속 분류](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)을 따른다. 9명 집합 패킷의 기존 BLOCKED 증거는 보존하되 첫 웹 출시는 여섯 명이다. 실제 6명 Canon·콘텐츠 자산·서명/권한·독립 실행이 증명되지 않으면 9명 조건을 단순 끄거나 더미로 대체할 수 없다.
+
 > **2026-11-13 최초 출시 범위 정정:** [현행 6명 동시 공개 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md)에 따라 기존 정확히 9명의 **집합 배포 완성**은 최초 웹 공개에 불필요한 범위라면 후속 확장으로 구분한다. 그러나 이 문서의 9명 배포 기술 계약·과거 차단 근거는 역사로 보존한다. 6명 각각 정식 승인된 원본·자산·콘텐츠 배포·실제 채팅 실행이 필요하며, 현재 윤호는 [#3068](https://github.com/gycha0109-beep/MyeongHa/pull/3068)의 실행 대상에서 제외돼 있어 추가 구현·검증이 필수다. 임시 배포·권한 우회 또는 미승인 자산으로 여섯 명을 채울 수 없다.
 
 
