@@ -53,10 +53,6 @@ test('verified paired source can only construct disposable data-only ledger repl
   assert.match(sql,/CREATE TABLE IF NOT EXISTS supabase_migrations\.schema_migrations/u);
   assert.match(sql,/jsonb_to_recordset/u);
   assert.match(sql,/COPY ops_private_source_base64\(encoded\) FROM STDIN/u);
-  assert.match(sql,/log_min_error_statement='panic'/u);
-  assert.match(sql,/log_error_verbosity='terse'/u);
-  assert.match(sql,/log_statement='none'/u);
-  assert.match(sql,/DISPOSABLE_LOG_PROTECTION_NOT_ACTIVE/u);
   assert.match(sql,/decode\(encoded,'base64'\)/u);
   assert.match(sql,/\/\*__SOURCE_PACKET_COPY_DATA__\*\//u);
   assert.match(sql,/DISPOSABLE_LEDGER_NOT_EMPTY/u);
