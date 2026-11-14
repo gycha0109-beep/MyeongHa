@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>여울 신규 8가족 의미 중복 검토 · 비공개</title>
+<style>
+:root{color-scheme:light;font:15px/1.6 system-ui,Malgun Gothic,sans-serif;background:#f7f8fa;color:#222e3b}
+body{max-width:1040px;margin:auto;padding:24px 16px 100px}h1{font-size:1.6rem}
+h2{margin-top:40px;font-size:1.2rem}h3{font-size:1rem;margin-bottom:8px}
+section{background:white;border:1px solid #dfe5ec;border-radius:10px;margin:12px 0;padding:16px}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f9;padding:14px;border-radius:7px}
+label{display:block;margin-top:12px;font-weight:600}input,select,textarea{box-sizing:border-box;display:block;width:100%;padding:10px;border:1px solid #bbc6d4;border-radius:6px;background:white;font:inherit}
+textarea{min-height:72px;resize:vertical}button{border:0;background:#234870;color:white;border-radius:7px;padding:11px 16px;font:inherit;cursor:pointer}
+.toolbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#eaf0f6;padding:16px;border-radius:10px;margin:18px 0}
+.toolbar label{margin:0;font-weight:400}.toolbar input{width:240px;max-width:100%}
+.notice{background:#fff9ee;border-left:4px solid #a07428;padding:12px 16px}
+small{color:#516273}#status{font-weight:600}
+</style>
+</head>
+<body>
+<h1>여울 신규 8가족 의미 중복 검토</h1>
+<p class="notice">이 화면에는 비공개 사용자 질문이 포함됩니다. 생성된 HTML과 검토 JSON을 GitHub·CI·외부 모델에 올리지 마세요. 표시된 질문은 기존 개발 자료이며 새로운 독립 최종평가가 아닙니다.</p>
+<p>아래의 기존 질문 12개와 신규 개발·검증 후보 8개를 직접 비교하세요. 문장 형태가 달라도 같은 상황·의도·평가 능력을 측정한다면 의미상 중복입니다. 자동 어휘 검사 결과만으로 판정하지 마세요.</p>
+<div class="toolbar">
+<button id="save" type="button">검토 초안 JSON 저장</button>
+<label>기존 초안 불러오기 <input id="load" type="file" accept=".json,application/json"></label>
+<span id="status" role="status">8개 모두 미검토</span>
+</div>
+<h2>기존 평가 질문 Y01~Y12 (읽기 전용)</h2>
+<div id="originals">
+<!-- PRIVATE_QUESTIONS -->
+</div>
+<h2>신규 개발 4가족 / 최적화 검증 4가족</h2>
+<small>각 질문군을 기존 질문 전체와 비교해 판정 1개·근거를 입력하세요. 중복이면 기존 질문 ID를 입력합니다. '판단 보류'도 근거를 남겨야 접수됩니다.</small>
+<div id="candidates">
+<!-- DRAFT_FAMILIES -->
+</div>
+<div class="toolbar">
+<button id="save-bottom" type="button">검토 초안 JSON 저장</button>
+<small>초안 저장은 신원 확인·사용자 승인·품질 개선·운영 적용이 아닙니다. 저장 후 원본 파일과 함께 기존 검증기로 접수해야 합니다.</small>
+</div>
+<script>
+'use strict';
+const all=[...document.querySelectorAll('.candidate')];
+const schemaVersion='yeoul-private-semantic-review-draft-v1';
+const $= (parent, selector) => parent.querySelector(selector);
+function getCases(){
+  return all.map(el=>({
+    familyId:el.dataset.family,
+    decision:$(el,'.decision').value,
+    overlapIds:$(el,'.overlaps').value.split(',').map(x=>x.trim()).filter(Boolean),
+    evidence:$(el,'.evidence').value
+  }));
+}
+function refresh(){
+  const cases=getCases();
+  const done=cases.filter(x=>x.decision==='distinct'||x.decision==='overlap').length;
+  const hold=cases.filter(x=>x.decision==='hold').length;
+  $('#status',document).textContent=done+'건 판정 · '+hold+'건 보류 · '+(8-done-hold)+'건 미검토';
+}
+for(const el of all){
+  for(const name of ['change','input'])el.addEventListener(name,refresh);
+}
+function save(){
+  const content=JSON.stringify({schemaVersion,cases:getCases()},null,2)+'\n';
+  const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
+  const link=document.createElement('a');
+  link.href=url; link.download='yeoul-semantic-review-draft.json';
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+$('#save',document).addEventListener('click',save);
+$('#save-bottom',document).addEventListener('click',save);
+$('#load',document).addEventListener('change',async(event)=>{
+  const file=event.target.files[0]; if(!file)return;
+  try{
+    if(file.size>65536)throw Error('초안 크기 초과');
+    const draft=JSON.parse(await file.text());
+    if(draft.schemaVersion!==schemaVersion||!Array.isArray(draft.cases)||draft.cases.length!==8)
+      throw Error('서식 불일치');
+    for(let i=0;i<8;i++){
+      const row=draft.cases[i],el=all[i];
+      if(!row||row.familyId!==el.dataset.family||
+        !['pending','distinct','overlap','hold'].includes(row.decision)||
+        !Array.isArray(row.overlapIds)||row.overlapIds.some(id=>typeof id!=='string')||
+        typeof row.evidence!=='string')throw Error('항목 불일치');
+    }
+    draft.cases.forEach((item,i)=>{
+      $(all[i],'.decision').value=item.decision;
+      $(all[i],'.overlaps').value=item.overlapIds.join(',');
+      $(all[i],'.evidence').value=item.evidence;
+    });
+    refresh();
+  }catch(e){alert('초안을 불러올 수 없습니다: '+e.message);}
+  event.target.value='';
+});
+refresh();
+</script>
+</body></html>
