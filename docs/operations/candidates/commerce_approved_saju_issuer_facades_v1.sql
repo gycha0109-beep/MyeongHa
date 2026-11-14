@@ -434,6 +434,17 @@ begin
     select 1 from public.outbox_events event
     join commerce_saju_private.approved_component_reading_v1 binding
       on binding.purchase_intent_id::text=event.aggregate_id and binding.component=event.dedupe_key
+    join public.readings reading on reading.id=binding.reading_id
+      and reading.subject_id=binding.subject_id
+      and reading.request_idempotency_key='approved-saju:' || binding.purchase_intent_id::text || ':' || binding.component
+      and reading.request_contract_version='approved-saju-reading-component-v1'
+      and reading.execution_status='succeeded'
+    join public.reading_execution_attempts attempt on attempt.id=reading.committed_execution_attempt_id
+      and attempt.reading_id=reading.id and attempt.subject_id=reading.subject_id
+      and attempt.state='succeeded'
+    join commerce_saju_private.approved_source_issue_proofs_v1 proof
+      on proof.reading_id=reading.id and proof.subject_id=reading.subject_id
+      and proof.execution_attempt_id=attempt.id
     where event.id=p_job and event.aggregate_type='purchase_intent'
       and event.event_type='approved_saju.reading_requested'
       and event.event_schema_version='approved-saju-reading-request-v1'
