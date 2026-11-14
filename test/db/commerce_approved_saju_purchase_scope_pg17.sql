@@ -1354,6 +1354,8 @@ begin
     or not has_function_privilege('myeongha_approved_saju_issuer_executor',
        'public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text)','EXECUTE')
     or not has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_pair_reader_scope_v1(uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_pair_reader_executor',
        'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
     or has_function_privilege('myeongha_approved_saju_pair_reader_executor',
        'public.cmd_finalize_approved_saju_pair_reading_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,text,jsonb)','EXECUTE')
@@ -1380,6 +1382,10 @@ begin
        'public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text)','EXECUTE')
     or not has_function_privilege('myeongha_approved_saju_issuer_executor',
        'public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_pair_reader_scope_v1(uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
   then raise exception 'T10 HOLD leaked issuer authority or disabled unrelated Saju/Reader access'; end if;
   select count(*)::bigint,
     md5(coalesce(string_agg(
@@ -1427,7 +1433,7 @@ begin
   execute 'set local role myeongha_approved_saju_pair_reader_executor';
   perform 1 from public.begin_member_subject_context_v1(live.auth_user_id);
   perform public.assert_myeongha_subject_context_v1(live.subject_id);
-  pair_scope := public.qry_approved_saju_pair_issue_scope_v1(
+  pair_scope := public.qry_approved_saju_pair_reader_scope_v1(
     live.subject_id,live.purchase_intent_id
   );
   signed_receipt := public.qry_approved_saju_source_issue_proof_v1(
@@ -1443,6 +1449,46 @@ begin
   execute 'reset role';
 end
 $pair_reader_hold$;
+
+-- The passive Reader must also lose its exact purchase scope if consent is
+-- withdrawn, even while the original signed proof remains in the archive.
+do $pair_reader_withdrawal$
+declare
+  live record;
+begin
+  select proof.subject_id,owner.auth_user_id,
+    binding.purchase_intent_id,scope.admission->'counterpart'->>'useApprovalRef' as approval_ref
+  into live
+  from commerce_saju_private.approved_source_issue_proofs_v1 proof
+  join commerce_saju_private.approved_component_reading_v1 binding
+    on binding.reading_id=proof.reading_id and binding.subject_id=proof.subject_id
+  join public.subjects owner on owner.id=proof.subject_id and owner.kind='member'
+  join public.entitlement_grants grant_row on grant_row.id=binding.entitlement_grant_id
+    and grant_row.status='active'
+  join commerce_saju_private.approved_purchase_scope_v1 scope
+    on scope.purchase_intent_id=binding.purchase_intent_id
+  where binding.component='compatibility'
+  order by proof.reading_id limit 1;
+  if not found then raise exception 'T10 consent drill requires an active paid comparison'; end if;
+  begin
+    update commerce_saju_private.comparison_use_approval_v1 approval
+      set revoked_at=clock_timestamp()
+    where approval.subject_id=live.subject_id
+      and approval.approval_ref=live.approval_ref;
+    if not found then raise exception 'T10 consent drill cannot withdraw the selected approval'; end if;
+    execute 'set local role myeongha_approved_saju_pair_reader_executor';
+    perform public.begin_member_subject_context_v1(live.auth_user_id);
+    if public.qry_approved_saju_pair_reader_scope_v1(
+      live.subject_id,live.purchase_intent_id
+    ) is not null then
+      raise exception 'T10 passive Reader kept access after consent withdrawal';
+    end if;
+    execute 'reset role';
+    raise sqlstate 'ZX003' using message='Restore isolated T10 reader consent';
+  exception when sqlstate 'ZX003' then null;
+  end;
+end
+$pair_reader_withdrawal$;
 
 rollback;
 select 'PASS_APPROVED_SAJU_PURCHASE_SCOPE_PG17';
