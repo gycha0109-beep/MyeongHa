@@ -1,3 +1,14 @@
+## 2026-11-14 실제 현재 백업 격리 개인정보 마이그레이션 실증 — 제한 PASS, 전체 DR HOLD
+
+- **보호 실행:** [PostgreSQL Isolated Restore Drill #43553728311](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43553728311) **SUCCESS**, 정확한 `main` SHA `986cc1cc2e2b095350158990cb7660ed2de0692d`. 비식별 증거 artifact `14097053341` (`postgres-isolated-restore-drill-43553728311`, 만료 2026-12-14 UTC).
+- **소스 검증:** 백업·암호화 Provider 원장 **동일 실행 #43424903445**, 백업 소스 `6eab97337811128282f5f5ec6320e4608d5f9c09`, 프로젝트 `cnsfpcdiyofqvhpcegfc`, 원격 이력 **245개**, frontier `20261113062455`, catalog SHA256 `405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 일치. 암호화 원장 복호화·원본 무결성 **PASS**, 원본 SQL 본문 12개 미보유/전체 Provider migration ledger 대상 복구 **HOLD**.
+- **일회용 DB의 실제 결과:** 백업 원본에 대한 이전 스키마/역할/ACL 관측을 먼저 수행한 다음, **PG17 loopback 복원 클론에만** 고정 SQL `2360→2370→2380`을 **단일 트랜잭션**으로 적용. `disposable-shared-memory-privacy-rehearsal.json`: 세 버전 적용 및 메타데이터/권한 검사 PASS, `productionDatabaseChanged=false`, `cloneStillMatchesOriginalProductionSchema=false`, `drReady=false`. 기존 합성 개인정보 삭제·복구 검사 **PASS** (5개 합성 이벤트, 동일 원장 두 번째 재생 멱등 PASS, 공유 메모리 재노출 차단·계정 삭제·Commerce 보존 가드 PASS). **실제 Production 데이터 삭제/Privacy Canary는 실행하지 않음.**
+- **복원 범위의 한계:** 원본/복원 public 스키마 catalog 비교는 범위 한정 관측이며 공유 MVCC snapshot 동등성은 미증명. Provider-managed 141 COPY block 중 112 replay, 3 column projection, 29 skip; **full Provider restore=false**. Hosted `auth.identities`/`auth.sessions`/Storage, 로그인·갱신·객체 바이트 및 전체 RPO 24h/RTO 6h 실측 **미완료**. `recovered-serving-admission.json`은 `gate=BLOCKED`, `serviceResumptionAllowed=false`, `drReady=false`.
+- **직접 운영 재확인:** 2026-11-14 읽기 전용 Supabase에서 migration **245개/frontier `20261113062455` 유지**, 세 공유 메모리 객체/삭제 재생 함수 **부재**. 이번 실증은 **세 SQL의 현재 백업 기준 격리 정방향 적용 가능성만** 입증한다. 운영 이력 45/82·원격 전용 두 버전·실배포 의존성을 구분한 최소 변경안을 마련하고, 운영 DB SQL 적용 전 대상/순서/보존/롤백/재검증 근거와 사용자 명시 승인을 받는다.
+- **판정:** #1887 OPEN / `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false`. 합성 복구 결과를 실제 Production 개인정보 원장 연속성이나 서비스 재개로 승격하지 않는다.
+
+Watchtower-Track: ops
+
 ## 2026-11-13 현재 운영 백업의 개인정보 복구 선행 마이그레이션 — 격리 적용 경로 구현
 
 - 보호된 [백업 #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)는 실측한 현재 원격 이력 **245건 / frontier `20261113062455`**를 암호화 원장과 함께 보존한다. 현재 Production에는 수동 공유 메모리 `2360`, 계정 삭제시 메모리 소거 `2370`, 삭제 이벤트 재생 `2380`의 테이블·함수/원장이 존재하지 않는다. 그러므로 백업 무결성만으로 최신 승인된 **개인정보 복구 기능까지 검증됐다고 선언할 수 없다**.
