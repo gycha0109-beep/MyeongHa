@@ -1,5 +1,7 @@
 # Mobile Release Readiness v1
 
+> **2026-11-14 현재 실행 기준:** [현행 웹 우선 출시 결정](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)으로 이 네이티브 앱 출시·실기기·스토어/푸시/앱결제 조건은 첫 웹 상용 공개 이후 독립 앱 출시 전에 완료한다. 실제 앱 공개 시 기존 안전·품질 수용 조건은 생략하지 않는다.
+
 > Track: `applizing`  
 > Status: **M11-A4 IMPLEMENTED / local release-variant APK workflow configured / EXACT MAIN ARTIFACT + STANDALONE PHYSICAL DEVICE ACCEPTANCE UNVERIFIED / SIGNING EXTERNAL**  
 > Initial baseline: **2026-10-03** / implementation facts refreshed **2026-11-05**
