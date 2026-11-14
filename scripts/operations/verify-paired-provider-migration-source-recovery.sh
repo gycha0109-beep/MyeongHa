@@ -119,6 +119,37 @@ jq -e '.schemaVersion == "ops-sealed-common-migration-body-parity-v1"
   and .fullHostedProviderRecoveryProven == false
   and .drReady == false and .serviceResumptionAllowed == false' \
   "$MIGRATION_BODY_PARITY_EVIDENCE_PATH" >/dev/null || fail
+# Optional exact-history row reconstruction on this same ephemeral PostgreSQL.
+# Do not execute any historical statement; source SQL remains in this private dir
+# and is removed by the same trap. Existing negative Hosted DR flags remain.
+if [[ "${MH_OPS_DISPOSABLE_LEDGER_REPLAY:-false}" == 'true' ]]; then
+  [[ "${BACKUP_RUN_ID:-}" == '43424903445' &&
+     "${GITHUB_EVENT_NAME:-}" == 'workflow_dispatch' &&
+     "${GITHUB_REF:-}" == 'refs/heads/main' ]] || fail
+  [[ -n "${DISPOSABLE_PROVIDER_LEDGER_EVIDENCE_PATH:-}" &&
+     "$DISPOSABLE_PROVIDER_LEDGER_EVIDENCE_PATH" == "$RUNNER_TEMP/"* ]] || fail
+  [[ "${PGHOST:-}" == '127.0.0.1' &&
+     "${PGPORT:-}" == '5432' &&
+     "${PGUSER:-}" == 'postgres' &&
+     "${PGDATABASE:-}" == 'postgres' ]] || fail
+  node scripts/operations/replay-disposable-provider-migration-ledger.mjs \
+    --source "$private/source-provider-migration-ledger.json" \
+    --paired-proof "$PAIRED_PROVIDER_SOURCE_EVIDENCE_PATH" \
+    --output "$DISPOSABLE_PROVIDER_LEDGER_EVIDENCE_PATH" || fail
+  jq -e '.schemaVersion == "ops-disposable-provider-migration-history-replay-v1"
+    and .backupRunId == 43424903445
+    and .restoredHistoryRowCount == 245
+    and .restoredAllSixHistoryFieldsExact == true
+    and .restoredSourceHistoryWithoutExecutingMigrationSql == true
+    and .productionDatabaseChanged == false
+    and .historicalSqlExecuted == false
+    and .sourceSqlStatementsPublished == false
+    and .providerManagedDataFullRestore == false
+    and .fullProviderMigrationLedgerRestored == false
+    and .drReady == false
+    and .serviceResumptionAllowed == false' \
+    "$DISPOSABLE_PROVIDER_LEDGER_EVIDENCE_PATH" >/dev/null || fail
+fi
 echo 'SAME_VERSION_SOURCE_SQL_BYTE_COMPARISON_OBSERVED DR_HOLD'
 
 echo 'EXACT_MAIN_MIGRATION_FILE_LINEAGE_OBSERVED DR_HOLD'
