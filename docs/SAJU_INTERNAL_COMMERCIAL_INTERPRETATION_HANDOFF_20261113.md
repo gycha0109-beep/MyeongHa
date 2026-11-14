@@ -103,3 +103,10 @@
 - **보존 조건:** 공용 서명 원본 조회 및 한 명식 발급 역할은 유지하고, 고객 구매·기존 Signed Reading·Grant·대기 작업은 삭제하지 않는다. 작업자를 먼저 멈추는 절차는 `docs/operations/SAJU_T10_PAIR_ISSUER_HOLD_REHEARSAL_20261114.md`에 기록했다.
 - **실제 검사:** 기존 PostgreSQL 17 격리 구매·환불·Reader 시나리오 뒤 동일 트랜잭션에서 권한 철회 후보를 적용하고, T10 신규 발급 권한 차단·한 명식/서명 조회 권한 보존·서명 원본 내용 지문 불변을 점검한 다음 ROLLBACK한다. **운영 DB 변경/판매/배포는 수행하지 않는다.**
 - **남은 것:** 실제 운영 환경에서의 승인된 실행·복구 절차와 PortOne 실결제, 개인정보·권한·운영 관측 증거는 별도. `ROADMAP_IN_PROGRESS`, 판매 HOLD.
+
+## 2026-11-14 — T10 유료 Reader와 발급 중단 역할의 독립성
+
+- 발급 역할을 재사용하던 T10 Reader는 발급 중단 시 서명 재열람까지 중단되는 권한 결합 문제가 있었다. 이를 `myeongha_approved_saju_pair_reader_executor` 전용 **읽기 전용 DB 역할 및 독립 Pool**로 분리했다.
+- 발급용 `qry_approved_saju_pair_issue_scope_v1` 권한을 철회해도 별도 Reader 역할에는 현재 결제·상대 동의·Grant 및 기존 보관 서명 조회만 허용한다. 원본 증거 재생성·새 Source 호출·Outbox ACK·발급 최종 확정 권한은 없다.
+- PostgreSQL 17에서 HOLD 이후 실제 구매자 인증으로 살아 있는 비교 Reading과 서명 원본을 열람하고, 발급 역할 철회·개별 Reader 역할 제한을 검증한다. TypeScript HTTP는 발급/답변 Pool 재사용을 거부한다.
+- 운영 로그인 별도 프로비저닝/실서비스 설치·결제·배포는 진행하지 않았다. `ROADMAP_IN_PROGRESS`, 판매 HOLD.
