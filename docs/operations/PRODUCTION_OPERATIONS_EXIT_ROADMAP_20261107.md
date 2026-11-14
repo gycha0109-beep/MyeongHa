@@ -1,3 +1,12 @@
+## 2026-11-14 Gate 2 / Phase 11: isolated workerd slow-DB and bounded pool proof (implementation; execution pending)
+
+- Preserve prior actual workerd outage/health/recovery PASS [#42402515024](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42402515024) and 3,600/3,600 overlap PASS [#42244701347](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42244701347); do not rerun those scenarios.
+- A separate manual workerd_db_slow_pool option is now implemented in the existing main-only synthetic PostgreSQL 18 workflow. This mode alone configures the local workerd fixture pool with maximum two connections and 125ms acquisition timeout. It holds a real ACCESS EXCLUSIVE lock on the disposable synthetic PG18 table, requires four concurrent authenticated calculations to fail bounded and at least one measured pool acquisition timeout, verifies independent Health 200, releases the lock, and requires 4/4 successful recovery. All existing modes retain their previous behavior.
+- Only Linux loopback workerd, disposable GoTrue, PG18 RLS and pinned Saju calculation are used. The fixture-only diagnostic route reports numeric counts. No user rows, Production workload, Hosted Hyperdrive, deployed Worker, SQL repair, provider settings or paid resources.
+- Node/Bash syntax plus nine existing workflow contract tests PASS locally. Actual protected Linux execution is NOT_OBSERVED until the merged source runs and its artifact is inspected; do not infer success. Preserve productionWorkerAdmissionMeasured=false, hostedHyperdriveMeasured=false, productionCapacityProven=false, productionScalingThresholdApproved=false, drReady=false, serviceResumptionAllowed=false, ROADMAP_COMPLETE=false.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 실제 Provider migration 원장 245행 격리 재구성 실증 — 로컬 복원 PASS, Hosted DR HOLD
 
 - **정본 실행:** [보호 격리 복구 #43575005715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43575005715) **SUCCESS**, workflow SHA `fa0c36e7a47e371a6096d31724765a0a42fc7814`, 동일 실행 백업·봉인 Provider 원장 [#43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445). 비식별 증거 artifact `14105687545` (`postgres-isolated-restore-drill-43575005715`, 2026-12-14 08:17 UTC 만료).
