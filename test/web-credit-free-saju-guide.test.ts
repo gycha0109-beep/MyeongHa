@@ -53,9 +53,9 @@ describe('Web credit guidance and free Saju contract', () => {
     expect(page).toContain('saju-design-birth-fields');
     expect(page).toContain('saju-design-chart-tabs');
     expect(page).toContain('사주 해석 상품');
-    expect(page).toContain('sajuProductTopics.map');
+    expect(page).toContain('APPROVED_SAJU_CATALOG_V1.filter((offer) => offer.type === group.id)');
     expect(page).toContain('보고서 구성 미리보기');
-    expect(page).toContain('상품별 제공 조건과 가격은 실제 상품 계약을 따릅니다.');
+    expect(page).toContain('2026년 11월 6일 확정된 단품·관계 비교·패키지 구성과 가격입니다.');
     expect(page).toContain('reading-detail.html?topic=love');
     expect(page).toContain('reading-topic-availability is-');
     expect(page).not.toContain('requestPayment(');
