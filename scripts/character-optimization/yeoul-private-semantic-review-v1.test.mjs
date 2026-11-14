@@ -27,8 +27,14 @@ const fixture=({archived=true}={})=>{
   }
   return result;
 };
-const blank=()=>({schemaVersion:'yeoul-private-semantic-review-draft-v1',
-  cases:YEOUL_NEW_FAMILY_DRAFTS.map(f=>({familyId:f.familyId,decision:'pending',overlapIds:[],evidence:''}))});
+const blank=(original=fixture())=>{
+  // Only the locally generated private HTML can supply the source-bound review fingerprint.
+  const html=buildPrivateSemanticReviewHtml(original,{knownOriginalAutoFields:true});
+  const binding=html.match(/data-review-binding="([a-f0-9]{64})"/u)?.[1];
+  assert.ok(binding);
+  return {schemaVersion:'yeoul-private-semantic-review-draft-v1',sourceBinding:binding,
+    cases:YEOUL_NEW_FAMILY_DRAFTS.map(f=>({familyId:f.familyId,decision:'pending',overlapIds:[],evidence:''}))};
+};
 
 test('private 12×8 review has escaped source and no external resources',()=>{
   const source=fixture();
@@ -124,4 +130,24 @@ test('local file IO rejects overwrite and keeps original private source unchange
     await assert.rejects(()=>runPrivateSemanticReview({input,output:insideRepo,draft,knownOriginalAutoFields:true}),/unsafe_output/);
     if(process.platform!=='win32')assert.equal((await stat(result)).mode&0o077,0);
   }finally{await rm(folder,{recursive:true,force:true});}
+});
+
+test('private drafts are bound to the exact legacy question set and current candidate manifest',()=>{
+  const source=fixture();
+  const draft=blank(source);
+  const report=inspectPrivateSemanticReviewDraft(source,draft,{knownOriginalAutoFields:true});
+  assert.equal(report.draftBoundToCurrentLocalQuestionSet,true);
+  assert.equal(report.sourceBytesAuthenticated,false);
+  assert.ok(!JSON.stringify(report).includes(draft.sourceBinding),
+    'private question binding must never be serialized to the metadata summary');
+
+  const altered=fixture();
+  for(const row of altered.responses)if(row.id==='Y01')row.input='변경된 가상 원본 질문';
+  assert.throws(()=>inspectPrivateSemanticReviewDraft(altered,draft,{knownOriginalAutoFields:true}),
+    /source_binding_mismatch/);
+  assert.doesNotThrow(()=>inspectPrivateSemanticReviewDraft(altered,blank(altered),{knownOriginalAutoFields:true}));
+  assert.throws(()=>inspectPrivateSemanticReviewDraft(source,{...draft,sourceBinding:'0'.repeat(64)},
+    {knownOriginalAutoFields:true}),/source_binding_mismatch/);
+  const missing=structuredClone(draft);delete missing.sourceBinding;
+  assert.throws(()=>inspectPrivateSemanticReviewDraft(source,missing,{knownOriginalAutoFields:true}),/draft_schema/);
 });

@@ -2,6 +2,7 @@
  * No provider transport, approval, dataset promotion, or public private-text output.
  */
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { readFile, lstat, realpath, writeFile } from 'node:fs/promises';
 import { resolve, dirname, basename, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,13 +30,20 @@ function archivedQuestions(original, knownOriginalAutoFields) {
   const screen = screenPrivateYeoulOverlap(IDS.map(id => ({id,turns:[questions.get(id)]})));
   const plan = makeNewYeoulScenarioPlan();
   if (screen.candidateFamiliesScreened !== 8 || plan.metadata.length !== 8) fail('family_plan');
-  return questions;
+  // This deterministic fingerprint is stored only in private HTML/JSON, never in the metadata summary.
+  // It detects accidental mixing of review files; it is not source authenticity or reviewer identity.
+  const sourceBinding = createHash('sha256').update(JSON.stringify({
+    schemaVersion: 'yeoul-private-semantic-source-binding-v1',
+    familyManifestSha256: plan.familyManifestSha256,
+    questions: IDS.map(id => ({id, input: questions.get(id)})),
+  })).digest('hex');
+  return {questions, sourceBinding};
 }
 
 /** The HTML is private and standalone: escaped original text and no external resources. */
 export function buildPrivateSemanticReviewHtml(original, {knownOriginalAutoFields=false}={}) {
   if (typeof knownOriginalAutoFields !== 'boolean') fail('source_mode');
-  const questions = archivedQuestions(original, knownOriginalAutoFields);
+  const {questions, sourceBinding} = archivedQuestions(original, knownOriginalAutoFields);
   const originals = IDS.map(id => '<section><h3>'+id+'</h3><pre>'+escape(questions.get(id))+'</pre></section>').join('\n');
   const families = YEOUL_NEW_FAMILY_DRAFTS.map((f,i) =>
     '<section class="candidate" data-family="'+escape(f.familyId)+'"><h3>'+(i+1)+'. '+escape(f.familyId)+'</h3>'
@@ -47,18 +55,21 @@ export function buildPrivateSemanticReviewHtml(original, {knownOriginalAutoField
     +'<label>겹치는 기존 질문 ID (중복일 때만, 예: Y01,Y02)<input class="overlaps" placeholder="Y01,Y02"></label>'
     +'<label>판정 근거 (판정·보류 시 필수)<textarea class="evidence" maxlength="1500"></textarea></label></section>'
   ).join('\n');
-  if (!TEMPLATE.includes('<!-- PRIVATE_QUESTIONS -->') || !TEMPLATE.includes('<!-- DRAFT_FAMILIES -->'))
-    fail('template_markers');
+  if (!TEMPLATE.includes('<!-- PRIVATE_QUESTIONS -->') || !TEMPLATE.includes('<!-- DRAFT_FAMILIES -->')
+      || !TEMPLATE.includes('<!-- PRIVATE_REVIEW_BINDING -->')) fail('template_markers');
   return TEMPLATE.replace('<!-- PRIVATE_QUESTIONS -->', originals)
-    .replace('<!-- DRAFT_FAMILIES -->', families);
+    .replace('<!-- DRAFT_FAMILIES -->', families)
+    .replace('<!-- PRIVATE_REVIEW_BINDING -->', sourceBinding);
 }
 
 /** Accept human decisions only. Neither form completeness nor selected text authenticates the reviewer. */
 export function inspectPrivateSemanticReviewDraft(original, draft, {knownOriginalAutoFields=false}={}) {
-  archivedQuestions(original, knownOriginalAutoFields);
-  if (!exactly(draft,['schemaVersion','cases']) ||
+  const {sourceBinding} = archivedQuestions(original, knownOriginalAutoFields);
+  if (!exactly(draft,['schemaVersion','sourceBinding','cases']) ||
     draft.schemaVersion !== 'yeoul-private-semantic-review-draft-v1' ||
     !Array.isArray(draft.cases) || draft.cases.length !== 8) fail('draft_schema');
+  if (typeof draft.sourceBinding !== 'string' || !/^[a-f0-9]{64}$/u.test(draft.sourceBinding)
+      || draft.sourceBinding !== sourceBinding) fail('source_binding_mismatch');
   const counts={pending:0,distinct:0,overlap:0,hold:0};
   const overlapFamilies=[];
   for (const [index,item] of draft.cases.entries()) {
@@ -83,6 +94,7 @@ export function inspectPrivateSemanticReviewDraft(original, draft, {knownOrigina
     counts, overlapFamilyIds:overlapFamilies,
     reviewEntriesRecorded:counts.distinct+counts.overlap,
     unresolvedFamilies:counts.pending+counts.hold,
+    draftBoundToCurrentLocalQuestionSet:true,
     sourceBytesAuthenticated:false, reviewerIdentityVerified:false,
     independentSemanticReviewVerified:false, independentFinalHoldoutReady:false,
     optimizerInputAuthorized:false, ownerApprovalVerified:false,

@@ -18,7 +18,7 @@ textarea{min-height:72px;resize:vertical}button{border:0;background:#234870;colo
 small{color:#516273}#status{font-weight:600}
 </style>
 </head>
-<body>
+<body data-review-binding="<!-- PRIVATE_REVIEW_BINDING -->">
 <h1>여울 신규 8가족 의미 중복 검토</h1>
 <p class="notice">이 화면에는 비공개 사용자 질문이 포함됩니다. 생성된 HTML과 검토 JSON을 GitHub·CI·외부 모델에 올리지 마세요. 표시된 질문은 기존 개발 자료이며 새로운 독립 최종평가가 아닙니다.</p>
 <p>아래의 기존 질문 12개와 신규 개발·검증 후보 8개를 직접 비교하세요. 문장 형태가 달라도 같은 상황·의도·평가 능력을 측정한다면 의미상 중복입니다. 자동 어휘 검사 결과만으로 판정하지 마세요.</p>
@@ -44,6 +44,7 @@ small{color:#516273}#status{font-weight:600}
 'use strict';
 const all=[...document.querySelectorAll('.candidate')];
 const schemaVersion='yeoul-private-semantic-review-draft-v1';
+const sourceBinding=document.body.dataset.reviewBinding;
 const $= (parent, selector) => parent.querySelector(selector);
 function getCases(){
   return all.map(el=>({
@@ -63,7 +64,7 @@ for(const el of all){
   for(const name of ['change','input'])el.addEventListener(name,refresh);
 }
 function save(){
-  const content=JSON.stringify({schemaVersion,cases:getCases()},null,2)+'\n';
+  const content=JSON.stringify({schemaVersion,sourceBinding,cases:getCases()},null,2)+'\n';
   const url=URL.createObjectURL(new Blob([content],{type:'application/json'}));
   const link=document.createElement('a');
   link.href=url; link.download='yeoul-semantic-review-draft.json';
@@ -77,7 +78,8 @@ $('#load',document).addEventListener('change',async(event)=>{
   try{
     if(file.size>65536)throw Error('초안 크기 초과');
     const draft=JSON.parse(await file.text());
-    if(draft.schemaVersion!==schemaVersion||!Array.isArray(draft.cases)||draft.cases.length!==8)
+    if(draft.schemaVersion!==schemaVersion||draft.sourceBinding!==sourceBinding||
+      !Array.isArray(draft.cases)||draft.cases.length!==8)
       throw Error('서식 불일치');
     for(let i=0;i<8;i++){
       const row=draft.cases[i],el=all[i];
