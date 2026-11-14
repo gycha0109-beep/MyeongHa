@@ -103,7 +103,7 @@ export async function readPostgresApprovedSajuT10PairReaderV1(input: Readonly<{
           readingId:input.readingId,
           readerCharacterId:input.readerCharacterId,
           originatingGrantId:receipt.originatingGrantId,
-          sourceProofFingerprint:projection.originalSignedBodyHash,
+          sourceProofFingerprint:'sha256:v1:' + hashJson(receipt.proof),
           materialHash:projection.materialHash,
           display,
           // Grounding owner remains Saju; protected original paragraphs are exposed
