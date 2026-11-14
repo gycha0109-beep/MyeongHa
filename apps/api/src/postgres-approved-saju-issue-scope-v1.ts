@@ -26,7 +26,7 @@ interface ScopeRow {
 
 interface PairScopeRow extends ScopeRow {
   readonly admissionHash: string;
-  /** Exact immutable purchase choice returned by the consent-locked SQL facade. */
+  /** Exact immutable purchase choice returned by the authorized DB facade. */
   readonly approvedOfferId: string;
   readonly counterpartOrder: 'first' | 'additional';
   readonly targetPersonId: string;
@@ -36,13 +36,29 @@ interface PairScopeRow extends ScopeRow {
   readonly targetBirth: ScopeRow['birth'];
 }
 
-/** Issuer-only input, scoped to the current paid comparison and target use. */
-export async function readApprovedSajuPairIssueScopeV1(
+/** Issuer-only input, locking current paid pair consent around issuance. */
+export function readApprovedSajuPairIssueScopeV1(
   client: PostgresTransactionQueryV1,
   input: { readonly subjectId: string; readonly purchaseIntentId: string },
 ) {
+  return readApprovedSajuPairScopeV1(client,input,'qry_approved_saju_pair_issue_scope_v1');
+}
+
+/** Purchased archive scope, with no issuance lock or issuer-role dependency. */
+export function readApprovedSajuPairReaderScopeV1(
+  client: PostgresTransactionQueryV1,
+  input: { readonly subjectId: string; readonly purchaseIntentId: string },
+) {
+  return readApprovedSajuPairScopeV1(client,input,'qry_approved_saju_pair_reader_scope_v1');
+}
+
+async function readApprovedSajuPairScopeV1(
+  client: PostgresTransactionQueryV1,
+  input: { readonly subjectId: string; readonly purchaseIntentId: string },
+  facade: 'qry_approved_saju_pair_issue_scope_v1' | 'qry_approved_saju_pair_reader_scope_v1',
+) {
   const { rows } = await client.query<{ scope: PairScopeRow | null }>(
-    'select public.qry_approved_saju_pair_issue_scope_v1($1::uuid,$2::uuid) as scope',
+    `select public.${facade}($1::uuid,$2::uuid) as scope`,
     [input.subjectId, input.purchaseIntentId],
   );
   if (rows.length !== 1 || rows[0] === undefined) {
