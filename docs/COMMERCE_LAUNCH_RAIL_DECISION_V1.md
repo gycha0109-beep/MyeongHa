@@ -1,5 +1,7 @@
 # 명하 Commerce Launch Rail Decision v1
 
+> **2026-11-14 현재 실행 기준:** [현행 통합 제품 범위](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)는 웹 PortOne V2와 승인된 **14개 Offer 모두** 최초 출시를 목표로 한다. 아래 초기 PSP/단일 SKU 결정 전 상태는 역사 기록이며 현재 상품 활성화·PG 계약·실결제/환불 완료 증거가 아니다. 기존 결제 검증과 유료 Grant 보호는 유지한다.
+
 > Product: **명하 (MyeongHa)**  
 > Date: **2026-09-05**  
 > Repository baseline: `871289f16da2b0a41784dfffc50950ce14f40bb3`  
