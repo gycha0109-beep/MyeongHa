@@ -34,6 +34,8 @@ export function shouldClearAdminSessionAfterVerificationFailureV1(error: unknown
 
 export interface AdminReadResponse {
   readonly kind: string;
+  /** Exact server-issued request ID for audit correlation; absent if the response header is invalid. */
+  readonly requestId?: string | null;
   readonly rows: readonly Readonly<Record<string, string | number | boolean | null>>[];
   readonly nextCursor: string | null;
 }
@@ -145,10 +147,14 @@ export async function fetchAdminReadV1(
     }
     return row as Record<string, string | number | boolean | null>;
   });
+  const headerRequestId = response.headers.get('X-Request-Id');
+  const requestId = headerRequestId && /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu.test(headerRequestId)
+    ? headerRequestId.toLowerCase() : null;
   return {
     kind: typeof payload.kind === 'string' ? payload.kind : '',
     rows,
     nextCursor: payload.nextCursor,
+    requestId,
   };
 }
 
