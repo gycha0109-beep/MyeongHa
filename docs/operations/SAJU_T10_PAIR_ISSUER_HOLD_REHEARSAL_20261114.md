@@ -28,3 +28,11 @@
 - 이 시나리오는 **단일 트랜잭션 ROLLBACK**으로 종료한다. 운영 DB·운영 Grant·PortOne 실결제와는 연결되지 않으며 실제 적용·재개·재해 복구의 완료 증명이 아니다.
 
 **상태:** `ROADMAP_IN_PROGRESS`, 운영 배포/판매 HOLD.
+
+## 2026-11-14 — 발급 중단과 유료 Reader 권한 분리 보완
+
+- 발급 중단 SQL은 전용 발급 역할의 T10 Scope/확정/복구 조회 권한을 철회한다. **해당 발급 역할을 Reader에도 사용하면 기존 고객 재열람까지 차단되는 결함**이 있어, T10 Reader는 `myeongha_approved_saju_pair_reader_executor`라는 별도 읽기 전용 역할로 분리했다.
+- 신규 Reader 역할은 로그인한 회원의 현재 Subject 해석·T10 구매/상대 동의 Scope 확인·현재 유료 Grant에 연결된 Reading·원본 서명 조회 **세 가지 조회 권한과 Subject 확인 함수만** 갖는다. Source 발급·Outbox 청구·최종 확정·복구 조회 권한은 부여하지 않는다.
+- `readPostgresApprovedSajuT10PairReaderV1`는 독립된 Reader 역할 트랜잭션을 사용하고, HTTP 활성화 시에도 발급/일반 API/유료 답변 DB 연결과 다른 **별도 제공된 읽기 전용 Pool**을 요구한다. 실제 운영 로그인에 이 역할을 부여하거나 엔드포인트를 활성화하지는 않았다.
+- 격리 PostgreSQL 17은 HOLD 후 실존하는 유료·미환불 비교의 구매자 인증 Subject로 역할을 변경해 **동일한 서명 원본과 Reading이 재열람되는지**, 반대로 발급·복구 권한은 여전히 없는지 검증한다.
+- 운영 전용 DB Role 생성·로그인/권한 격리·사고 시 Reader 이용 권한은 별도 승인·현장 검증이 필요하다. 이 후보는 실제 설치/배포/판매 승인이 아니다.
