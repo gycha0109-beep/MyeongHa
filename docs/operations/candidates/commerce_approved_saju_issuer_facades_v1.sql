@@ -334,10 +334,11 @@ grant execute on function
   public.begin_member_subject_context_v1(uuid),
   public.current_myeongha_subject_id(),
   public.assert_myeongha_subject_context_v1(uuid),
-  public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid),
   public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean),
   public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)
   to myeongha_approved_saju_pair_reader_executor;
+-- The independent, consent-aware Reader scope grant is installed later with
+-- the pair candidate. Issuer scope is intentionally never a Reader privilege.
 
 -- Only the dedicated issuer may claim these exact jobs. A fresh lease ID
 -- prevents an expired worker from completing a claim that was taken over.
