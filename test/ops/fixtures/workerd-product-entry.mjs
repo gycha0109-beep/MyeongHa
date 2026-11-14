@@ -1,4 +1,9 @@
-import { Client } from 'pg';
+import { Client, Pool } from 'pg';
+
+let isolatedBoundedPool;
+let boundedAcquireAttempts=0;
+let boundedAcquireFailures=0;
+let boundedAcquireTimeouts=0;
 import { handleCurrentSubjectSajuCalculationRequestV1 } from '../../../apps/api/src/current-subject-saju-calculation-http.ts';
 import { SupabaseMemberIdentityEvidenceVerifierV1 } from '../../../apps/api/src/supabase-member-identity-verifier.ts';
 import { createSajuProductionCalculationHttpAdapterV1 } from '../../../apps/api/src/saju-production-calculation-http-adapter.ts';
@@ -26,6 +31,15 @@ function isolatedDatabaseConfig(binding) {
 export default {
   async fetch(request, env, ctx) {
     const path = new URL(request.url).pathname;
+    const boundedMode=env.MH_OPS_WORKERD_DB_POOL_MODE==='bounded';
+    if (path==='/__ops/db-pool' && boundedMode && request.method==='GET') {
+      return Response.json({
+        max:2,connectionTimeoutMillis:125,
+        acquireAttempts:boundedAcquireAttempts,acquireFailures:boundedAcquireFailures,
+        acquireTimeouts:boundedAcquireTimeouts,
+        waiting:isolatedBoundedPool?.waitingCount??0,
+      },{headers:{'cache-control':'no-store'}});
+    }
     if (path === '/health' && request.method === 'GET') {
       return Response.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
     }
@@ -47,11 +61,26 @@ export default {
     let client;
     const pool = {
       async connect() {
-        client = new Client(dbConfig);
-        await client.connect();
-        const principal = await client.query('SELECT session_user AS role');
-        if (principal.rows[0]?.role !== 'myeongha_ops_phase11_login') throw Error('Unexpected fixture login');
-        return { query: (sql, values) => client.query(sql, values ? [...values] : []), release() {} };
+        if (boundedMode) {
+          if (!isolatedBoundedPool) {
+            isolatedBoundedPool=new Pool({...dbConfig,max:2,connectionTimeoutMillis:125,
+              query_timeout:1100,statement_timeout:1000,idleTimeoutMillis:1000,
+              allowExitOnIdle:true});
+            isolatedBoundedPool.on('error',()=>undefined);
+          }
+          boundedAcquireAttempts++;
+          client=await isolatedBoundedPool.connect().catch(error=>{
+            boundedAcquireFailures++;
+            if (/timeout/i.test(String(error.message))) boundedAcquireTimeouts++;
+            throw error;
+          });
+        } else {
+          client=new Client(dbConfig);
+          await client.connect();
+        }
+        const principal=await client.query('SELECT session_user AS role');
+        if(principal.rows[0]?.role!=='myeongha_ops_phase11_login') throw Error('Unexpected fixture login');
+        return {query:(sql,values)=>client.query(sql,values?[...values]:[]),release(){}};
       },
     };
     try {
@@ -63,7 +92,10 @@ export default {
       headers.set('cache-control', 'no-store');
       return new Response(result.body, { status: result.status, headers });
     } finally {
-      if (client) ctx.waitUntil(client.end().catch(() => {}));
+      if(client) {
+        if(boundedMode) client.release();
+        else ctx.waitUntil(client.end().catch(()=>{}));
+      }
     }
   },
 };

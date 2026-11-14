@@ -95,6 +95,25 @@ async function startIsolatedPg18() {
         serverRunning=true;
         await admin.query('SELECT 1');
       },
+      async holdSyntheticTableLock(){
+        if (!serverRunning) throw Error('Isolated database is stopped');
+        const blocker=await admin.connect();
+        try {
+          await blocker.query('BEGIN');
+          await blocker.query('LOCK TABLE public.ops_phase11_birth IN ACCESS EXCLUSIVE MODE');
+          let released=false;
+          return async()=>{
+            if(released) throw Error('Synthetic table lock already released');
+            released=true;
+            try { await blocker.query('ROLLBACK'); }
+            finally { blocker.release(); }
+          };
+        } catch(error) {
+          await blocker.query('ROLLBACK').catch(()=>undefined);
+          blocker.release();
+          throw error;
+        }
+      },
       // Real disposable GoTrue UUIDs are generated at test runtime and are never written to proofs.
       async bindRealMembers(members) {
         if (!Array.isArray(members) || members.length !== 4 ||
@@ -603,7 +622,8 @@ const cpuExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'saju_cpu';
 const constrainedSajuExperiment = sustainedExperiment || cpuExperiment;
 const workerdOverlapExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_overlap';
 const workerdDbFailoverExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_db_failover';
-const workerdExperiment = workerdOverlapExperiment || workerdDbFailoverExperiment ||
+const workerdDbSlowPoolExperiment = process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd_db_slow_pool';
+const workerdExperiment = workerdOverlapExperiment || workerdDbFailoverExperiment || workerdDbSlowPoolExperiment ||
   process.env.MH_OPS_REAL_PRODUCT_EXPERIMENT === 'workerd';
 isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju calculation',()=>{
   it.skipIf(!actualChainEnabled)('measures four authenticated synthetic members through the real calculation path',async()=>{
@@ -640,6 +660,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         const worker=await startIsolatedWorkerdProduct({
           repoRoot:process.cwd(), wranglerEntry:process.env.MH_OPS_WORKERD_WRANGLER_ENTRY,
           authOrigin:process.env.MH_OPS_REAL_GOTRUE_LOCAL_ORIGIN, sajuOrigin:saju.origin, pgPort:database.port,
+          dbPoolMode:workerdDbSlowPoolExperiment?'bounded':'separate',
         });
         servers.push(worker);
         phase='workerd_requests';
@@ -687,8 +708,46 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         await denied.arrayBuffer();
         await health.arrayBuffer();
 
-        let sajuOutage,dbOutage;
-        if (workerdDbFailoverExperiment) {
+        let sajuOutage,dbOutage,dbSlowPool;
+        if (workerdDbSlowPoolExperiment) {
+          // No fake Node error: block genuine disposable PostgreSQL table reads.
+          // The bounded two-connection workerd pool must time out safely.
+          phase='workerd_db_slow_pool';
+          const unlock=await database.holdSyntheticTableLock();
+          let failed,metrics,healthStatus;
+          try {
+            failed=await measuredBatch(worker.origin,4,4,tokens);
+            expect(failed).toMatchObject({requested:4,successful:0,unavailable:4,unexpected:0});
+            const healthDuring=await fetch(worker.origin+'/health',{
+              redirect:'error',signal:AbortSignal.timeout(3000),
+            });
+            healthStatus=healthDuring.status;
+            await healthDuring.arrayBuffer();
+            expect(healthStatus).toBe(200);
+            const diagnostics=await fetch(worker.origin+'/__ops/db-pool',{
+              redirect:'error',signal:AbortSignal.timeout(3000),
+            });
+            expect(diagnostics.status).toBe(200);
+            metrics=await diagnostics.json();
+            expect(metrics).toMatchObject({max:2,connectionTimeoutMillis:125});
+            expect(metrics.acquireTimeouts).toBeGreaterThan(0);
+          } finally {
+            await unlock();
+          }
+          phase='workerd_db_slow_recovery';
+          const recovery=await measuredBatch(worker.origin,4,4,tokens);
+          expect(recovery).toMatchObject({requested:4,successful:4,unavailable:0,unexpected:0});
+          dbSlowPool={
+            realPostgresTableLock:true,disposablePoolMax:metrics.max,
+            localAcquireTimeoutMillis:metrics.connectionTimeoutMillis,
+            acquisitionAttempts:metrics.acquireAttempts,
+            acquisitionFailures:metrics.acquireFailures,
+            acquisitionTimeouts:metrics.acquireTimeouts,
+            requested:failed.requested,unavailable:failed.unavailable,unexpected:failed.unexpected,
+            healthStatus,recovery,afterUnlockRecovered:true,
+            localPoolOnlyNoHostedHyperdrive:true,
+          };
+        } else if (workerdDbFailoverExperiment) {
           // Exercise the real disposable PostgreSQL 18 process rather than
           // injecting a fake Node gateway failure; keep GoTrue and Saju up.
           phase='workerd_db_outage';
@@ -754,6 +813,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           actualGoTrueJwtVerified:true, actualPostgres18Rls:true,
           actualPinnedSajuProductionEngine:true, localWorkerdProductPathMeasured:true,
           ...(sajuOutage && {sajuOutage}),...(dbOutage && {dbOutage}),
+          ...(dbSlowPool && {dbSlowPool}),
           anonymousDenied:true, healthUnaffected:true, runtimeCleanupVerified:true,
           productionWorkerAdmissionMeasured:false, hostedHyperdriveMeasured:false,
           productionCapacityProven:false, productionScalingThresholdApproved:false,
