@@ -8,6 +8,8 @@
 - 기준: 2026-10-10, 기존 병합 경계 PR #1849 / #1853 / #1860. 진행 시 항상 latest main / CI / 운영 상태를 다시 확인한다.
 - 추적 규칙: 각 실행 PR 본문에는 `Watchtower-Track: reader-runtime` 정확히 한 번. 모든 작업은 구현 → 권한·위조 부정 검증 → basic CI → integration CI → 병합 → postmerge main CI와 해당 Production SHA 확인. 녹색 CI는 공개 Chat 승인 아님.
 
+> **현행 최초 공개 범위(2026-11-14):** [로드맵 공통 실행 정본](../LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)에 따라 웹에서 승인된 14개 Offer의 구매 Reading 열람·재열람과 **기본 첫 질문/후속 질문**을 제공한다. RR-01~RR-12의 실제 필수 권한·근거·저장·모델 조건은 유지한다. RR-13의 *9×9 전체* 및 RR-15 *전체 트랙 종료*는 최초 Reader 최소 제공 범위와 별도 판정한다. 6명 채팅 공개가 6명 유료 Reader 권한을 자동 생성하지 않는다.
+
 ## 0. 실제 발견된 경계와 설계 결정
 
 1. 기존 `apps/api/src/reader-interpretation-preview-runtime-v2.ts`는 Saju-owned Grounding으로 생성·Semantic Guard 통과한 Reader 해설을 **Preview** 형태로 반환한다. 내부 세그먼트에는 `sourceUnitRefs`가 있다. 그러나 `reader-interpretation-preview-http.ts`는 UI에 `kind/text`만 노출하여 provenance를 전달하지 않는다.
@@ -34,7 +36,7 @@
 | RR-10 | Reader/DB | 중복 클릭/Retry/동시성/Timeout/Idempotency/Revocation race 복구 | RR-09 |
 | RR-11 | Backend | 독립 Reader Chat HTTP read/send/receive 안전 실행, 인증, rate-limit, 구형 클라이언트 호환. V1 불변 | RR-09,10 |
 | RR-12 | Web/Product | 공식 Reading Scene → 동일 Reader Thread → 대화 및 Records 재조회. Preview CTA는 증명 전 활성화 금지 | RR-01,11 |
-| RR-13 | QA/Commerce/Saju | 승인 가능한 Reader×Domain 9×9 지원 matrix, cross-subject/Reader/Reading/Refund, 추가 Reader 결제, 실제 DB·Saju E2E | RR-09~12, 상품 |
+| RR-13 | QA/Commerce/Saju | **최초 공개:** 실제 지원하는 Reader×구매 Reading/7개 해석 구성요소의 지원·미지원 행렬, cross-subject/Reader/Reading/Refund 및 실제 DB·Saju E2E. **후속:** 9×9 전체 가능한 조합·추가 Reader 결제 | RR-09~12, 상품 |
 | RR-14 | Ops/Release | 기능 OFF → 내부 제한 → 점진 배포; 측정, guard fallback, 비활성화, rollback, exact-SHA 확인 | RR-13, 출시 정책 |
 | RR-15 | Reader+총괄 | 전체 이력/테스트/운영 Runbook/소유권 인계, 미해결 P0=0, TRACK CLOSED 검증 | RR-14 |
 
@@ -56,7 +58,7 @@
 - **정합성:** 동일 요청 단일 Commit, 재전송 안전, 검증 전 reveal 0, 같은 Reader의 이전 답변 재사용 시 정확한 검증 Anchor만 참조.
 - **캐릭터:** 실제 채택 Reader 간 어조·관점 차이 검증, 명리 의미 drift 0; 강제 fallback은 내부 기록과 사용자 메시지에서 구분.
 - **배포:** 실제 API → PostgreSQL → 공식 Saju → Reader Chat → Records 경로를 완성하고, Production exact commit SHA·관측·OFF switch·Rollback 확인.
-- **TRACK CLOSED:** RR-01~15 모두 merged-main 검증 PASS, 정책/실제 서비스 Blocker 0, Runbook/인수인계 및 운영 책임 소유자 지정. CI/Vercel READY만으로 종료 불가.
+- **전체 Reader 트랙 종료:** RR-01~15의 원래 종료 조건을 적용. **첫 웹 출시 Reader 합격:** 구매 풀이 보호 열람·첫/후속 질문 및 실제 제공 조합에 필요한 구현·운영 검증 별도 PASS. 전체 9×9 확장은 첫 출시와 분리하며 그 기능을 제공하기 전 검증한다. CI/Vercel READY만으로 종료 불가.
 - **STOP/HOLD:** Unsupported Domain/Unapproved Product/DB Query missing/AI Owner undecided/정책 미승인/권한 격리 결함 → 공개 OFF 유지.
 
 진행 보고는 간단히 `완료 / 문제 / 다음 작업`만 기록한다. 매 PR은 세연 운영 V1·기존 Revenue/DB/Content 도메인 무변경 확인을 포함한다.
