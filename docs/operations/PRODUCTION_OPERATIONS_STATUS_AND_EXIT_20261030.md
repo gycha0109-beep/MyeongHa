@@ -1,6 +1,6 @@
 ### 2026-11-14 KST — Cloudflare 실제 배포·공유 메모리 운영 선행조건 및 최소 변경안
 
-- 실제 Cloudflare Worker `myeongha`는 2026-11-14 03:58 UTC 버전 `1d995e41-8c91-40c4-97dc-ebe958d678af`를 100% 배포 중. GitHub 최신 확인 `main=f4027f9cdb2a08d132a2425116d561b00bcb7509`; Worker Git SHA 연결은 별도 입증 필요. 기존 Vercel Hobby 기록만으로 현재 운영 배포를 판정하지 않음.
+- 실제 Cloudflare Worker `myeongha`는 2026-11-14 03:58 UTC 버전 `1d995e41-8c91-40c4-97dc-ebe958d678af`를 100% 배포 중. GitHub 최신 확인 `main=f4027f9cdb2a08d132a2425116d561b00bcb7509`; Cloudflare Workers Builds 버전-빌드 `df4efe5b-505b-478a-9100-304e612e30da`의 `build_trigger_metadata.commit_hash`와 일치하고 빌드 `success`이므로 **배포 source SHA 연결 확인**. 기존 Vercel Hobby 기록만으로 현재 운영 배포를 판정하지 않음.
 - `/api/me/shared-memory` 구현은 저장소에 있으나 현재 `main` Cloudflare allowlist에 경로가 없어 **기능 활성화에 앞서 별도 배포 의존성 확인**이 필요. DB의 세 테이블/함수/원장 부재를 현재 채팅 오류의 직접 원인으로 단정하지 않음. 세연 pinned RPC는 현 DB에서 존재/권한 통제 확인.
 - 신규 [Production 공유 메모리 읽기 전용 preflight](../../scripts/operations/production-shared-memory-forward-preflight-readonly.sql)는 실제 Supabase에 **SELECT로 실행 PASS** (`baselineMatchesExpected=true`, 245/frontier `20261113062455`, 두 과거 원격 이력 보존, 2360/2370/2380 부재, finalizer owner postgres, API non-BYPASSRLS). SQL/이력 쓰기 없음.
 - `#43553728311` 격리 적용 성공을 재사용해 정본 로드맵 상단에 **단일 조건부 운영 변경안·선행 백업·이력 등록·중복 방지·실패 시 중단·사용자 승인 조건**을 명시. 현재 활성 기능이 필요로 하는지 입증 전 무조건 적용하지 않으며 전체 DR/서비스 수용 HOLD 유지.
