@@ -1,0 +1,205 @@
+import { describe, expect, it, vi } from 'vitest';
+import {
+  runPublishedSixCharacterChatTurnV1,
+  type SixCharacterChatTurnExecutorV1,
+} from '../apps/api/src/six-character-chat-turn-gateway-v1.js';
+import {
+  CharacterChatExecutorUnavailableV1,
+} from '../apps/api/src/five-character-chat-executor-selection-v1.js';
+
+const subjectId = '12faeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const threadId = '13faeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const releaseId = '14faeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const bundleId = '15faeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+const liveTargets = ['seyeon','baekheon','yeoul','rahyeon','taegyeom','yunho'] as const;
+
+function fixture(characterId: string, options?: {
+  readonly participants?: readonly string[];
+  readonly charactersInManifest?: readonly string[];
+  readonly returnedThreadId?: string;
+  readonly returnedBundleId?: string;
+}) {
+  const readRuntimeBinding = vi.fn(async () => [{
+    threadId: options?.returnedThreadId ?? threadId,
+    status: 'active',
+    activeContentReleaseId: releaseId,
+    activeContentBundleId: bundleId,
+    contentRevision: 0,
+    participantCharacterIds: options?.participants ?? [characterId],
+  }]);
+  const readBundleManifest = vi.fn(async () => ({
+    contentVersion: 'published-v1',
+    minClientCapability: 'web-v1',
+    characterIds: options?.charactersInManifest ?? [characterId],
+    assetManifestHash: 'approved-asset-manifest',
+    cueSchemaVersion: 'v1',
+  }));
+  return {
+    resolvedSubjectId: subjectId,
+    threadId,
+    clientTurnId: 'client-turn-001',
+    text: '오늘은 어땠어요?',
+    replyLocale: 'ko-KR' as const,
+    bindingAuthorityPort: { readRuntimeBinding },
+    manifestAuthorityPort: { readBundleManifest },
+    compatibilityProfiles: Object.freeze(Object.fromEntries(
+      liveTargets.map(id => [id, {
+        profileKey: 'approved-test-' + id,
+        supportedClientCapabilities: ['web-v1'],
+        supportedAssetManifestHashes: ['approved-asset-manifest'],
+        supportedCueSchemaVersions: ['v1'],
+      }]),
+    )),
+    readRuntimeBinding,
+    readBundleManifest,
+  };
+}
+
+describe('owner-pinned six-Character execution gateway', () => {
+  it.each(liveTargets)('executes only the installed %s runtime after authoritative reads', async characterId => {
+    const owner = fixture(characterId);
+    const executor = vi.fn<SixCharacterChatTurnExecutorV1<{
+      observedCharacterId: string;
+      observedReleaseId: string;
+      observedBundleId: string;
+    }>>(async (turn) => ({
+      observedCharacterId: turn.characterId,
+      observedReleaseId: turn.pinnedReleaseId,
+      observedBundleId: turn.pinnedBundleId,
+    }));
+    const result = await runPublishedSixCharacterChatTurnV1({
+      ...owner,
+      registeredExecutors: { [characterId]: executor },
+    });
+    expect(result.characterId).toBe(characterId);
+    expect(executor).toHaveBeenCalledTimes(1);
+    expect(result.execution).toEqual({
+      observedCharacterId: characterId,
+      observedReleaseId: releaseId,
+      observedBundleId: bundleId,
+    });
+    expect(executor.mock.calls[0]?.[0]).toMatchObject({
+      characterId, subjectId, threadId,
+      clientTurnId: 'client-turn-001',
+      pinnedReleaseId: releaseId, pinnedBundleId: bundleId,
+      text: '오늘은 어땠어요?',
+    });
+    expect(owner.readRuntimeBinding).toHaveBeenCalledWith({ subjectId, threadId });
+    expect(owner.readBundleManifest).toHaveBeenCalledWith({ contentBundleId: bundleId });
+  });
+
+  it.each(liveTargets.slice(1))('does not call Se-yeon when %s executor is unavailable', async characterId => {
+    const seyeon = vi.fn(async () => 'should-not-run');
+    const { readRuntimeBinding, readBundleManifest, ...input } = fixture(characterId);
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...input,
+      registeredExecutors: { seyeon },
+    })).rejects.toThrow(CharacterChatExecutorUnavailableV1);
+    expect(seyeon).not.toHaveBeenCalled();
+    expect(readRuntimeBinding).toHaveBeenCalledOnce();
+    expect(readBundleManifest).toHaveBeenCalledOnce();
+  });
+
+  it('rejects unrequested Seorin even when a caller attempts to register her', async () => {
+    const forbidden = vi.fn(async () => 'should-not-run');
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...fixture('seorin'),
+      registeredExecutors: { seorin: forbidden } as never,
+    })).rejects.toThrow(CharacterChatExecutorUnavailableV1);
+    expect(forbidden).not.toHaveBeenCalled();
+  });
+
+  it('rejects foreign-Subject/mismatched-thread reads before any model work', async () => {
+    const runtime = vi.fn(async () => 'should-not-run');
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...fixture('yeoul', { returnedThreadId: 'foreign-thread' }),
+      registeredExecutors: { yeoul: runtime },
+    })).rejects.toThrow('different thread identity');
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('rejects multi-Character participants or missing pinned manifest identity', async () => {
+    const runtime = vi.fn(async () => 'should-not-run');
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...fixture('baekheon', { participants: ['baekheon','seyeon'] }),
+      registeredExecutors: { baekheon: runtime },
+    })).rejects.toThrow(CharacterChatExecutorUnavailableV1);
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...fixture('baekheon', { charactersInManifest: ['seyeon'] }),
+      registeredExecutors: { baekheon: runtime },
+    })).rejects.toThrow(CharacterChatExecutorUnavailableV1);
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing Character-specific server-approved compatibility before provider work', async () => {
+    const runtime = vi.fn(async () => 'should-not-run');
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...fixture('rahyeon'),
+      compatibilityProfiles: {},
+      registeredExecutors: { rahyeon: runtime },
+    })).rejects.toMatchObject({ code: 'CAPABILITY_UNAVAILABLE' });
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported published asset hashes, cues and client capability', async () => {
+    const runtime = vi.fn(async () => 'should-not-run');
+    const baseline = fixture('baekheon');
+    for (const profile of [
+      { ...baseline.compatibilityProfiles.baekheon!, supportedAssetManifestHashes: ['different'] },
+      { ...baseline.compatibilityProfiles.baekheon!, supportedCueSchemaVersions: ['different'] },
+      { ...baseline.compatibilityProfiles.baekheon!, supportedClientCapabilities: ['different'] },
+    ]) {
+      await expect(runPublishedSixCharacterChatTurnV1({
+        ...baseline,
+        compatibilityProfiles: { baekheon: profile },
+        registeredExecutors: { baekheon: runtime },
+      })).rejects.toMatchObject({ code: 'CONTENT_INCOMPATIBLE' });
+    }
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid text before DB reads or execution', async () => {
+    const owner = fixture('rahyeon');
+    const runtime = vi.fn(async () => 'should-not-run');
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...owner, text: ' '.repeat(40), registeredExecutors: { rahyeon: runtime },
+    })).rejects.toThrow('text is outside allowed bounds');
+    expect(owner.readRuntimeBinding).not.toHaveBeenCalled();
+    expect(owner.readBundleManifest).not.toHaveBeenCalled();
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+  it('accepts exactly 8,000 UTF-16 code units and forwards the message unchanged', async () => {
+    const owner = fixture('rahyeon');
+    const text = '😀'.repeat(4000);
+    expect(text.length).toBe(8000);
+    const runtime = vi.fn<SixCharacterChatTurnExecutorV1<string>>(async turn => turn.text);
+
+    const result = await runPublishedSixCharacterChatTurnV1({
+      ...owner,
+      text,
+      registeredExecutors: { rahyeon: runtime },
+    });
+
+    expect(result.execution).toBe(text);
+    expect(runtime).toHaveBeenCalledWith(expect.objectContaining({ text }));
+  });
+
+  it('rejects messages above 8,000 UTF-16 code units before authoritative reads', async () => {
+    const owner = fixture('rahyeon');
+    const text = '😀'.repeat(4001);
+    expect(text.length).toBe(8002);
+    const runtime = vi.fn<SixCharacterChatTurnExecutorV1<string>>(async () => 'should-not-run');
+
+    await expect(runPublishedSixCharacterChatTurnV1({
+      ...owner,
+      text,
+      registeredExecutors: { rahyeon: runtime },
+    })).rejects.toThrow('text is outside allowed bounds');
+
+    expect(owner.readRuntimeBinding).not.toHaveBeenCalled();
+    expect(owner.readBundleManifest).not.toHaveBeenCalled();
+    expect(runtime).not.toHaveBeenCalled();
+  });
+
+});
