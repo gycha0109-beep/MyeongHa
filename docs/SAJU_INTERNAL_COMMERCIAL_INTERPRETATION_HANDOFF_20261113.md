@@ -58,3 +58,10 @@
 - Saju #2763에서 두 명식의 일간·일지 및 타주 합충을 독립 원본 경로와 연결해 조건부 **고객 한국어 풀이**를 보강하고, `saju-t10-pair-reading-material-v1`에 두 원국 식별값·각 문장/규칙/근거의 해시·전체 자료 해시를 결합했다.
 - `apps/api/src/saju-held-pair-review-v1.ts`에서 이 자료를 기존 Bearer/Ed25519 서명 검증에 이어 확인한다. 잘못된 명식 대응, 문장·해시 변경, 원본 미첨부, 연구용 결과의 자의적 발급 승격을 거부한다.
 - **현재의 한계:** 계약은 **비공개 서명 검토/정식 발급 준비 자료**이지 Saju Production Pair Issue Proof나 고객 저장/Reader 결과가 아니다. 최초·추가·결합 구매의 정식 전용 Issuer/서명/DB 연결은 구현하지 않았으며 실제 구매·동의/환불·복구 무결성 미충족 상태에서 판매를 열지 않는다.
+
+## 2026-11-14 — T10 정식 두 명식 Source 서명·구매 재검증 구현 경계
+
+- Saju #2763에서 Preview와 별도 Production Pair Issue Proof 계약 및 인증된 두 명식 발급 경로를 구현했다. 해석 정책·각자의 Canonical 계산·고객 한국어 문장별 근거·실제 발급 시도·구매/상대 동의·Revision·Release 전체를 Ed25519로 결속한다.
+- 명하 #3174의 `saju-t10-production-pair-issue-source-v1.ts`는 전용 공개키·서명 영역·만료·구매/동의/출생 Revision·원본 내용·문장 해시를 검증한다. `verifyApprovedSajuPreparedPairIssueV1`는 DB에 존재하는 발급 시도를 요구하며 출처 호출 전후 현재 구매/동의를 재확인한다. 세 관계 비교 상품별 분리와 교체 거부 테스트를 추가했다.
+- **여전히 미발급 상태:** 이 시점의 정식 Source 검증은 DB에 공식 Reading을 확정·보관하거나 Reader 접근 권한을 부여하지 않는다. 별도 두 명식 DB 확정/서명 아카이브/Reader 복원·묶음 T8/T10·중복/환불/철회 통합 검증이 필요하다.
+- 기존 자기 명식 발급 Worker의 `compatibility` 차단을 유지한다. 후보 SQL을 운영 반영으로 간주하지 않고 판매·실결제·배포는 HOLD. 외부 학술 감수는 별도 승인 조건으로 요구하지 않는다. `ROADMAP_IN_PROGRESS`.
