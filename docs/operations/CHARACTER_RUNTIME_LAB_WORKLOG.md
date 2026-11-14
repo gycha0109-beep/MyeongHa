@@ -109,3 +109,10 @@
 - Added future private-turn-evidence validator rejecting missing/duplicate/cross-candidate/fallback/wrong prompt hash/changed dataset, while explicitly returning qualityReviewed=false, qualityGainEstablished=false, productionEligible=false. It does not authenticate provider receipts or replayed conversation messages.
 - 6 new Node offline tests PASS; no new paid API, no owner-review approval, no change to runtime, Canon, relationship, memory, DB or production.
 - Next: confirm exact new-head CI; actual optimization and 104-call evaluation require explicit owner review of candidate content plus separate user budget/call-limit approval. No ROADMAP_COMPLETE.
+
+## 2026-11-14 — 기존 30건 검토 PR을 최신 main과 정렬하고 비공개 원본 경로 연결
+
+- PR #3187의 기존 17개 변경 파일을 검토해 16개 신규 파일과 현재 main에 그대로 포함된 Worklog 본문을 확인했다. 100개 이상 뒤처진 연구 브랜치를 현 main과 병합했으며 다른 트랙 변경 및 30건 미승인 상태를 보존했다.
+- 과거 정제본 전용 오프라인 분석·30건 검토 접수에 명시적 원본 모드를 추가하여, 기존 원본 검증기의 알려진 자동 변별력 36행·9그룹 처리만 메모리에서 재사용한다. 기본 정제본 검사는 변경하지 않는다.
+- 합성 검사에는 기본 모드 거부, 실제 원본 바이트 불변, 24개 대사 후보·6개 규칙 미승인, 사람 검토 위조 방지 경계를 포함한다. 원본 288건의 실사용 검토와 독립 평가·실제 품질 개선·외부 모델/유료 승인·운영 반영은 미완료다. 유료 호출 0건 및 전체 500원 상한 유지.
+- PR 현재 커밋의 CI 및 통합 검사가 성공하기 전에는 병합·기능 완료를 선언하지 않는다. Academy 원본이 있는 PC는 현재 접근 불가.

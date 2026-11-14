@@ -152,3 +152,14 @@ node scripts/character-runtime-lab/yeoul-review-packet-import-v1.mjs \
 - 두 번째 턴은 동일 상황·후보·반복의 첫 턴만 참조하며 다른 후보의 답변을 공유하지 않는다. 누락·중복·모델 변경·프롬프트 해시 불일치·공급자 fallback·변경된 홀드아웃·비정상 비용·빈 응답을 거부한다.
 - 실행 계획에는 질문·응답 본문을 넣지 않고, 미승인 상태를 강제한다. 향후 실제 104개 응답이 모두 있는 경우에도 결과는 **형식·완결성 검증**일 뿐이며, 원문 출처·모델 사용 영수증·다중 턴의 실제 전송 맥락·사람의 품질 판정이 검증되었다고 주장하지 않는다.
 - 로컬 테스트 6개 PASS(Node 22)이며 CI의 Node 24 검증은 별도다. 외부 호출·유료 실험·운영 변경·대사 승인 0건.
+
+## 2026-11-14 — 실제 비공개 원본과 기존 30건 사람 검토 연결
+
+기존 학원 PC의 원본 288행에는 사람이 검토하지 않은 자동 변별력 항목 36행·9그룹이 남아 있다. 기본 정제본 입력 검사는 이를 계속 거부한다. **해당 원본임을 명시한 비공개 로컬 실행에 한해서** 이미 검증된 `yeoul-private-source-intake-v1.mjs`의 원본 처리 규칙을 재사용한다. 정확한 개수와 구조를 벗어나면 중단하며, 입력 파일을 수정하거나 정제된 개인 대화를 새 공개 파일로 만들지 않는다.
+
+```sh
+node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input /private/yeoul-evaluations-all-288.json --out /private/new-empty-review-workdir --known-original-unreviewed-auto-fields
+node scripts/character-runtime-lab/yeoul-review-packet-import-v1.mjs --packet /private/review-30.md --queue /private/new-empty-review-workdir/example-review-queue.json --proposals /private/new-empty-review-workdir/feedback-revision-proposals.json --evaluations /private/yeoul-evaluations-all-288.json --out /private/review-30-summary.json --known-original-unreviewed-auto-fields
+```
+
+출력은 모두 Git 저장소 밖의 개인 보관 폴더에 한정한다. 기존 사람 평가·메모·답변은 그대로 유지한다. 6개 규칙·24개 대사 후보는 사람이 작성한 체크와 근거가 실제 들어오기 전에는 30개 모두 미승인이다. 서식 완료 표시는 검토자 신원이나 운영·유료 승인 증명이 아니다. 이는 Y07의 별도 기존 실패 6건 검토와 혼합하지 않는다. CI는 합성 36/9 구조만 검사하며 실제 원본 검토나 품질 향상을 대체하지 않는다.

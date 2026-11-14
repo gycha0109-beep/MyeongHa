@@ -4,6 +4,7 @@ import { mkdtemp, readFile, writeFile, symlink, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preparePrivateYeoulForResearch } from '../character-optimization/yeoul-private-source-intake-v1.mjs';
 import {
   MODELS, VARIANTS, diagnose, validateEvaluationExport, transformForOffline,
   retrieveReviewedExamples, buildResearchPromptPlan, runOffline,
@@ -139,4 +140,31 @@ test('private results use restrictive permissions, do not overwrite, and block s
     await symlink(repoDocs, alias, 'dir');
     await assert.rejects(() => runOffline({ inputPath: input, outputDir: alias }), /PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY/);
   }
+});
+
+test('known 36-row/9-group original is usable in private research only by explicit opt-in', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'yeoul-original-research-'));
+  const source = fixture();
+  source.surveyState.groups = Object.fromEntries(Array.from({ length: 9 }, (_, i) =>
+    ['group-' + i, { discrimination: 'unreviewed_auto_candidate' }]));
+  source.responses.forEach((row, i) => {
+    if (i % 8 === 0) row.questionDiscrimination = 'unreviewed_auto_candidate';
+  });
+  const untouched = JSON.stringify(source);
+  assert.throws(() => validateEvaluationExport(source), /unevaluated_discrimination/);
+  assert.throws(() => preparePrivateYeoulForResearch(source), /private_row_contract/);
+  const prepared = preparePrivateYeoulForResearch(source, { knownOriginalAutoFields: true });
+  assert.equal(prepared.responses.length, 288);
+  assert.equal(prepared.responses.filter(row => row.questionDiscrimination !== null).length, 0);
+  assert.equal(transformForOffline(prepared).summary.count, 288);
+  assert.equal(JSON.stringify(source), untouched, 'original source unchanged');
+  const input = join(dir, 'original.json');
+  await writeFile(input, untouched);
+  await assert.rejects(() => runOffline({ inputPath: input, outputDir: join(dir, 'strict') }), /unevaluated_discrimination/);
+  const result = await runOffline({ inputPath: input, outputDir: join(dir, 'private'), knownOriginalAutoFields: true });
+  assert.equal(result.queuedForHumanReview, 24);
+  assert.equal(JSON.stringify(JSON.parse(await readFile(input, 'utf8'))), untouched);
+  const queue = JSON.parse(await readFile(join(dir, 'private', 'example-review-queue.json'), 'utf8'));
+  assert.equal(queue.humanApprovedCount, 0);
+  assert.equal(queue.productionEligible, false);
 });

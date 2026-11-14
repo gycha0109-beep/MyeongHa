@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ingestYeoulReviewPacket } from './yeoul-review-packet-import-v1.mjs';
+import { preparePrivateYeoulForResearch } from '../character-optimization/yeoul-private-source-intake-v1.mjs';
 
 const deepseek = 'deepseek/deepseek-v4.1-flash-1017';
 const mini = 'minimax/minimax-m3.1-flash';
@@ -119,4 +120,23 @@ test('review decision notes are captured without rewriting original text or prom
   assert.equal(r.rules[0].note, '말투 검토 요청');
   assert.equal(r.rules[0].choice, 'revision_requested');
   assert.equal(r.rules[0].sourceStatus, 'pending_character_owner_review');
+});
+
+test('archival auto fields can be prepared in memory without granting any of 30 review decisions', () => {
+  const original = structuredClone(evaluationExport);
+  original.sourceExperiment = { attemptedCalls: 288, successfulCalls: 288 };
+  original.surveyState = { groups: Object.fromEntries(Array.from({ length: 9 }, (_, i) =>
+    ['group-' + i, { discrimination: 'auto_unreviewed' }])) };
+  original.responses.forEach((row, i) => { if (i % 8 === 0) row.questionDiscrimination = 'auto_unreviewed'; });
+  const snapshot = JSON.stringify(original);
+  assert.throws(() => ingestYeoulReviewPacket({ markdown: producePacket(), exampleQueue, proposalPack,
+    evaluationExport: original }), /evaluation_matrix_or_rating/);
+  const prepared = preparePrivateYeoulForResearch(original, { knownOriginalAutoFields: true });
+  const result = ingestYeoulReviewPacket({ markdown: producePacket(), exampleQueue, proposalPack, evaluationExport: prepared });
+  assert.deepEqual(result.count, { rules: 6, examples: 24 });
+  assert.equal(result.decisions.pending, 30);
+  assert.equal(result.ownerApprovalVerified, false);
+  assert.equal(result.readyForPaidExperiment, false);
+  assert.equal(result.externalCalls, 0);
+  assert.equal(JSON.stringify(original), snapshot);
 });

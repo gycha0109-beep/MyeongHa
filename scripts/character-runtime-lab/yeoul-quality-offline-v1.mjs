@@ -4,6 +4,7 @@ import { resolve, join, basename, dirname, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { proposeFeedbackRevisions, createOptimizationPreflight, makeApprovalEstimate } from './yeoul-offline-optimizer-v1.mjs';
 import { buildExampleReviewQueue } from './yeoul-example-review-queue-v1.mjs';
+import { preparePrivateYeoulForResearch } from '../character-optimization/yeoul-private-source-intake-v1.mjs';
 
 export const MODELS = Object.freeze([
   'z-ai/glm-5.3-flash',
@@ -215,7 +216,7 @@ export function buildResearchPromptPlan({ variant, pinnedCoreAnchor, languageRul
 }
 
 const jsonl = (items) => items.map(item => JSON.stringify(item)).join('\n') + '\n';
-export async function runOffline({ inputPath, outputDir }) {
+export async function runOffline({ inputPath, outputDir, knownOriginalAutoFields = false }) {
   if (!nonempty(inputPath) || !nonempty(outputDir)) throw new Error('INPUT_AND_OUTPUT_REQUIRED');
   const input = resolve(inputPath);
   const out = resolve(outputDir);
@@ -225,7 +226,12 @@ export async function runOffline({ inputPath, outputDir }) {
   if ([checkout, actualRepoRoot].some(dir => out === dir || out.startsWith(dir + sep))) throw new Error('PRIVATE_OUTPUT_MUST_BE_OUTSIDE_REPOSITORY');
   if (/holdout/i.test(basename(input))) throw new Error('HOLDOUT_NOT_TRAINING_DATA');
   const bytes = await readFile(input);
-  const data = JSON.parse(bytes.toString('utf8'));
+  const original = JSON.parse(bytes.toString('utf8'));
+  // Only explicit local archival mode may exclude the known unreviewed auto fields.
+  // The original bytes, ratings, notes and responses remain unchanged.
+  const data = knownOriginalAutoFields
+    ? preparePrivateYeoulForResearch(original, { knownOriginalAutoFields: true })
+    : original;
   const result = transformForOffline(data);
   const feedback = proposeFeedbackRevisions(result.records);
   const preflight = createOptimizationPreflight({ proposalPack: feedback, selectedRuleIds: feedback.proposals.map(p => p.ruleId) });
@@ -257,12 +263,14 @@ export async function runOffline({ inputPath, outputDir }) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const flags = process.argv.slice(2);
-  const inputPath = flags[flags.indexOf('--input') + 1];
-  const outputDir = flags[flags.indexOf('--out') + 1];
-  if (!flags.includes('--input') || !flags.includes('--out') || !inputPath || !outputDir) {
-    console.error('Usage: node scripts/character-runtime-lab/yeoul-quality-offline-v1.mjs --input <private-clean.json> --out <private-output-dir>');
+  const archived = flags.length === 5 && flags[4] === '--known-original-unreviewed-auto-fields';
+  const normal = flags.length === 4;
+  if ((!archived && !normal) || flags[0] !== '--input' || flags[2] !== '--out' || !flags[1] || !flags[3]) {
+    console.error('Usage: node yeoul-quality-offline-v1.mjs --input PRIVATE_JSON --out PRIVATE_OUTPUT_DIR [--known-original-unreviewed-auto-fields]');
     process.exitCode = 2;
   } else {
-    runOffline({ inputPath, outputDir }).then(value => console.log(JSON.stringify(value, null, 2))).catch(error => { console.error(error.message); process.exitCode = 1; });
+    runOffline({ inputPath: flags[1], outputDir: flags[3], knownOriginalAutoFields: archived })
+      .then(value => console.log(JSON.stringify(value, null, 2)))
+      .catch(error => { console.error(error.message); process.exitCode = 1; });
   }
 }

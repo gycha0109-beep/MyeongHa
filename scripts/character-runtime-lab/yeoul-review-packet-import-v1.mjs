@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFile, writeFile, realpath } from 'node:fs/promises';
 import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { preparePrivateYeoulForResearch } from '../character-optimization/yeoul-private-source-intake-v1.mjs';
 
 const REVIEWER_SOURCE_REFS = Object.freeze([
   'docs/character/YEOUL_CHARACTER_BIBLE_DRAFT_V0_3.md',
@@ -185,11 +186,17 @@ const run = async () => {
   const args = process.argv.slice(2);
   const get = key => args[args.indexOf(key) + 1];
   const keys = ['--packet', '--queue', '--proposals', '--evaluations', '--out'];
-  if (args.length !== 10 || keys.some(key => args.filter(x => x === key).length !== 1 || !hasText(get(key)))) invalid('cli_usage');
+  const archived = args.length === 11 && args[10] === '--known-original-unreviewed-auto-fields';
+  if ((!archived && args.length !== 10) ||
+      keys.some(key => args.filter(x => x === key).length !== 1 || !hasText(get(key)))) invalid('cli_usage');
   const [packet, queue, proposals, evaluations] = await Promise.all([
     readFile(get('--packet'), 'utf8'), readFile(get('--queue'), 'utf8'), readFile(get('--proposals'), 'utf8'), readFile(get('--evaluations'), 'utf8'),
   ]);
-  const result = ingestYeoulReviewPacket({ markdown: packet, exampleQueue: JSON.parse(queue), proposalPack: JSON.parse(proposals), evaluationExport: JSON.parse(evaluations) });
+  const original = JSON.parse(evaluations);
+  const evaluationExport = archived
+    ? preparePrivateYeoulForResearch(original, { knownOriginalAutoFields: true })
+    : original;
+  const result = ingestYeoulReviewPacket({ markdown: packet, exampleQueue: JSON.parse(queue), proposalPack: JSON.parse(proposals), evaluationExport });
   const output = resolve(get('--out'));
   const parent = await realpath(dirname(output));
   const actualOutput = resolve(parent, output.split(sep).at(-1));
