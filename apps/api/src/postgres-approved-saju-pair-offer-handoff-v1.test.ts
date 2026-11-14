@@ -148,7 +148,7 @@ describe('prepared pair official source checks current purchase and consent both
   const SESSION = '77777777-7777-4777-8777-777777777777';
   const ATTEMPT = '88888888-8888-4888-8888-888888888888';
   const sourceFixture = () => {
-    const issuePreparedPair = vi.fn(async () => ({
+    const issuePreparedPair = vi.fn(async (_request: Parameters<ReturnType<typeof createSajuT10ProductionPairIssueSourceV1>['issuePreparedPair']>[0]) => ({
       state: 'production_pair_source_verified' as const,
       responseHash: 'sha256:v1:' + 'a'.repeat(64),
       proofFingerprint: 'sha256:v1:' + 'b'.repeat(64),
