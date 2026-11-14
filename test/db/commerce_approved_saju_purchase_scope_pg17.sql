@@ -244,7 +244,9 @@ begin
     if exists (
       select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
       where proof.reading_id=reading_id
-    ) then raise exception 'Rejected Korean text left a persisted signed pair proof'; end if;
+    ) or exists (
+      select 1 from public.qry_approved_saju_pair_recovery_record_v1(actor,intent_id)
+    ) then raise exception 'Rejected Korean text left an actionable pair recovery pointer'; end if;
 
     perform 1 from public.cmd_finalize_approved_saju_pair_reading_v1(
       actor,intent_id,reading_id,attempt_id,gen_random_uuid(),source_hash,
@@ -277,6 +279,21 @@ begin
       ) then
       raise exception 'Pair Reading/Reader archive lost its exact signed two-person material';
     end if;
+
+    -- Only a committed, currently entitled pair has a recovery pointer.
+    if (select count(*) from public.qry_approved_saju_pair_recovery_record_v1(actor,intent_id) r
+        where r.reading_id=reading_id and r.reader_character_id='test-standard-reader')<>1
+    then raise exception 'Committed pair cannot be reconciled to its exact Reader'; end if;
+    begin
+      update commerce_saju_private.comparison_use_approval_v1 approval
+        set revoked_at=clock_timestamp()
+        where approval.subject_id=actor and approval.birth_revision_id=authorized.source_birth_revision_id
+          and approval.target_birth_revision_id=authorized.target_birth_revision_id;
+      if exists(select 1 from public.qry_approved_saju_pair_recovery_record_v1(actor,intent_id))
+      then raise exception 'Withdrawn pair consent still authorized outbox recovery'; end if;
+      raise sqlstate 'ZX001' using message='Rollback synthetic recovery consent change';
+    exception when sqlstate 'ZX001' then null;
+    end;
 
     -- Same Reading/attempt cannot substitute another signed source. A failed
     -- replay must not alter the previously archived proof or delivered response.
@@ -899,8 +916,9 @@ begin
           or exists(select 1 from public.qry_approved_saju_purchase_readings_v1(actor,intent_id))
           or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,bundle_pair_reading,null,true))
           or exists(select 1 from public.qry_approved_saju_component_record_v1(actor,bundle_self_reading,null,true))
-          or public.qry_approved_saju_source_issue_proof_v1(actor,bundle_pair_reading) is not null then
-          raise exception 'Cancelled combined T8/T10 purchase retained its Reader or pair proof access';
+          or public.qry_approved_saju_source_issue_proof_v1(actor,bundle_pair_reading) is not null
+          or exists(select 1 from public.qry_approved_saju_pair_recovery_record_v1(actor,intent_id)) then
+          raise exception 'Cancelled combined T8/T10 purchase retained its Reader or pair recovery access';
         end if;
       end if;
       if offer_key='basic-month' then
@@ -965,6 +983,9 @@ begin
            or not exists(select 1 from public.qry_approved_saju_component_record_v1(actor,additional_reading,null,true))
            or public.qry_approved_saju_source_issue_proof_v1(actor,first_reading) is not null
            or public.qry_approved_saju_source_issue_proof_v1(actor,additional_reading) is null
+           or exists(select 1 from public.qry_approved_saju_pair_recovery_record_v1(actor,first_intent))
+           or (select count(*) from public.qry_approved_saju_pair_recovery_record_v1(actor,intent_id) r
+               where r.reading_id=additional_reading and r.reader_character_id='test-standard-reader')<>1
            or not exists(
              select 1 from commerce_saju_private.approved_source_issue_proofs_v1 proof
              where proof.reading_id=first_reading and proof.subject_id=actor
