@@ -1,5 +1,7 @@
 # 사주 브릿지 최종 완료 실행 계획 — 8C-2B-2D (2026-10-10)
 
+> **2026-11-14 현재 출시 범위:** [현재 제품 출시와 독립 스테이징 완료의 분리 기준](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md): 별도 고격리 3DB/R01~R14 전체 인수는 첫 웹 상품 연결의 자동 선행조건이 아니다. 기존 Saju Member/Guest·Birth/보안·실제 연결 필수 검증은 유지한다. 승인된 0원 추가비용 제한 및 트랙 자체 종료조건도 보존한다.
+
 > **2026-11-14 현행 실행 분류:** [최초 출시/후속/독립 종료 기준](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md): 이 문서의 별도 고격리 스테이징·독립 3DB·전체 R01~R14 인수는 **그 트랙의 본래 완료 목표**이며 일반 MyeongHa 사주 웹 상품 연결의 자동 선행조건이 아니다. 최초 공개에 실제 필요한 Member/Birth/Saju HTTPS·권한·운영 검증은 해당 소유 트랙에서 진행한다. 기존 0원 추가비용 결정과 합성 PASS≠Production PASS는 유지한다.
 
 > **2026-10-16 사주 브릿지 제품 연결 경로 수정:** Owner 지시에 따라 [EXISTING_AUTHORITIES_V2](./SAJU_BRIDGE_EXISTING_AUTHORITIES_NO_NEW_ROLES_V2_20261016.md)를 제품 통합의 **활성 경로**로 채택한다. **신규 Supabase DB 계정/역할 0개**, 새 Permit 스키마/테이블/issuer 0개. 명하의 기존 회원 Auth → `myeongha_runtime` → `SET LOCAL ROLE myeongha_api_executor` → 현재 Birth 조회 → 기존 사주 HTTPS 어댑터를 재사용한다. 이전 S3A/1730 역할 생성 절차는 **제품 기능의 선행조건에서 제외된 중단된 부가 운영 프로브**이다. 아래 S3A 자동 ADMIN 장애 기록은 그대로 사실이지만 제품 연결을 차단하는 필수 게이트로 **더는 적용하지 않는다**. 실제 사주 서비스 endpoint·preview 외부 라우트·제품 출시/결제/격리 스테이징은 여전히 별도 검증·승인 대상이며 `canRunOnce/canExecute/canPublish/canSell=false`, R01–R14 `NOT_VERIFIED` 유지.
