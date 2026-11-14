@@ -3,11 +3,18 @@
 ARG PYTHON_BASE=python:3.14-slim@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f
 FROM ${PYTHON_BASE} AS gepa-build
 COPY apt-snapshot.sources /etc/apt/sources.list.d/debian.sources
+COPY apt-amd64-20261104.sha256 /tmp/myeongha-gepa-apt-archives.sha256
+COPY verify_apt_archives.py /tmp/verify_gepa_apt_archives.py
 COPY requirements.lock /tmp/myeongha-gepa-requirements.lock
 COPY build-requirements-hashed.lock /tmp/myeongha-gepa-build-requirements.lock
 RUN set -eu; \
+    test "$(dpkg --print-architecture)" = amd64; \
     apt-get update; \
-    apt-get install --no-install-recommends -y \
+    apt-get install --download-only --no-install-recommends -y \
+      git=1:2.47.3-0+deb13u1 ca-certificates=20250419+deb13u1; \
+    python /tmp/verify_gepa_apt_archives.py \
+      /tmp/myeongha-gepa-apt-archives.sha256 /var/cache/apt/archives; \
+    apt-get install --no-download --no-install-recommends -y \
       git=1:2.47.3-0+deb13u1 ca-certificates=20250419+deb13u1; \
     test "$(dpkg-query -W -f='${Version}' git)" = '1:2.47.3-0+deb13u1'; \
     python -m pip --isolated install --disable-pip-version-check --no-cache-dir \
