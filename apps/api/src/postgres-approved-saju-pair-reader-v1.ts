@@ -27,21 +27,26 @@ function record(value: unknown): value is Record<string, unknown> {
 export async function readPostgresApprovedSajuT10PairReaderV1(input: Readonly<{
   pool: PostgresSubjectPoolV1;
   verifiedEvidence: VerifiedSubjectIdentityEvidenceV1;
-  subjectId: string;
+  /** Optional internal expectation; the actual subject always comes from verified DB identity. */
+  subjectId?: string;
   purchaseIntentId: string;
   readingId: string;
   readerCharacterId: string;
   trusts: readonly SajuT10ProductionPairTrustV1[];
 }>) {
   if (input.verifiedEvidence.kind !== 'member' || input.trusts.length === 0 ||
-      ![input.subjectId,input.purchaseIntentId,input.readingId].every(value => UUID.test(value)) ||
+      ![input.purchaseIntentId,input.readingId].every(value => UUID.test(value)) ||
+      (input.subjectId !== undefined && !UUID.test(input.subjectId)) ||
       !input.readerCharacterId || input.readerCharacterId.length > 128) return null;
   return executePostgresApprovedSajuIssuerTransactionV1({
     pool:input.pool,verifiedEvidence:input.verifiedEvidence,
     execute:async ({client,resolvedSubject}) => {
-      if (resolvedSubject.subjectId !== input.subjectId ||
-          resolvedSubject.subjectKind !== 'member') return null;
-      const scope=await readApprovedSajuPairIssueScopeV1(client,input);
+      if (resolvedSubject.subjectKind !== 'member' ||
+          (input.subjectId !== undefined && resolvedSubject.subjectId !== input.subjectId)) return null;
+      const subjectId=resolvedSubject.subjectId;
+      const scope=await readApprovedSajuPairIssueScopeV1(client,{
+        subjectId,purchaseIntentId:input.purchaseIntentId,
+      });
       if (scope === null) return null;
       const result=await client.query<RecordRow>(`
         select reading_id::text as "readingId",component,response_hash as "responseHash",
@@ -50,7 +55,7 @@ export async function readPostgresApprovedSajuT10PairReaderV1(input: Readonly<{
           reader_character_id as "readerCharacterId",saju_domain as "sajuDomain",
           reading_contract_version as "readingContractVersion"
         from public.qry_approved_saju_component_record_v1($1::uuid,$2::uuid,$3::text,true)
-      `,[input.subjectId,input.readingId,input.readerCharacterId]);
+      `,[subjectId,input.readingId,input.readerCharacterId]);
       const row=result.rows[0];
       if (result.rows.length !== 1 || !row ||
           row.readingId !== input.readingId ||
@@ -63,7 +68,7 @@ export async function readPostgresApprovedSajuT10PairReaderV1(input: Readonly<{
 
       const archived=await client.query<ReceiptRow>(
         'select public.qry_approved_saju_source_issue_proof_v1($1::uuid,$2::uuid) as receipt',
-        [input.subjectId,input.readingId],
+        [subjectId,input.readingId],
       );
       const receipt=archived.rows[0]?.receipt;
       if (archived.rows.length !== 1 || !record(receipt) ||
