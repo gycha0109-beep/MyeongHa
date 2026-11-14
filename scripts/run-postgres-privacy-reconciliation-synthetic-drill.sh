@@ -12,7 +12,8 @@ event_1_at="$(date -u -d "@$((backup_epoch + 1))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 event_2_at="$(date -u -d "@$((backup_epoch + 2))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 event_3_at="$(date -u -d "@$((backup_epoch + 3))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 event_4_at="$(date -u -d "@$((backup_epoch + 4))" +'%Y-%m-%dT%H:%M:%S.000Z')"
-incident_reference_at="$(date -u -d "@$((backup_epoch + 5))" +'%Y-%m-%dT%H:%M:%S.000Z')"
+event_5_at="$(date -u -d "@$((backup_epoch + 5))" +'%Y-%m-%dT%H:%M:%S.000Z')"
+incident_reference_at="$(date -u -d "@$((backup_epoch + 6))" +'%Y-%m-%dT%H:%M:%S.000Z')"
 
 psql_base=(psql -X -v ON_ERROR_STOP=1)
 tmp_dir=$(mktemp -d)
@@ -40,6 +41,17 @@ reading_id="a8300000-0000-0000-0000-000000000001"
 share_id="a8400000-0000-0000-0000-000000000001"
 notification_id="a8500000-0000-0000-0000-000000000001"
 commerce_link_id="a8600000-0000-0000-0000-000000000001"
+shared_memory_item_id="a8700000-0000-4000-8000-000000000001"
+
+# An older restored backup must fail before writing fixtures. The replay
+# helper and the event table are supplied only by governed migration 2380.
+shared_note_recovery_schema_ready="$("${psql_base[@]}" -Atc "
+select (pg_catalog.to_regclass('public.subject_shared_memory_items_v1') is not null)::int || '|' ||
+       (pg_catalog.to_regclass('public.subject_shared_memory_delete_events_v1') is not null)::int || '|' ||
+       (pg_catalog.to_regprocedure('public.internal_replay_shared_memory_note_deletion_v1(uuid,uuid,timestamptz)') is not null)::int;
+")"
+[[ "$shared_note_recovery_schema_ready" == "1|1|1" ]] || fail "restored DB is missing governed shared-memory deletion replay migration"
+pass "restored DB has the approved manual-note deletion recovery schema"
 
 collision_count="$("${psql_base[@]}" -Atc "
 select
@@ -72,7 +84,9 @@ select
   (select count(*) from public.readings where id='a8300000-0000-0000-0000-000000000001') +
   (select count(*) from public.share_artifacts where id='a8400000-0000-0000-0000-000000000001') +
   (select count(*) from public.notifications where id='a8500000-0000-0000-0000-000000000001') +
-  (select count(*) from public.commerce_account_links where id='a8600000-0000-0000-0000-000000000001');
+  (select count(*) from public.commerce_account_links where id='a8600000-0000-0000-0000-000000000001') +
+  (select count(*) from public.subject_shared_memory_items_v1 where id='a8700000-0000-4000-8000-000000000001') +
+  (select count(*) from public.subject_shared_memory_delete_events_v1 where item_id='a8700000-0000-4000-8000-000000000001');
 ")"
 [[ "$collision_count" == "0" ]] || fail "synthetic privacy replay fixture collides with existing restored data"
 pass "synthetic privacy replay fixture identifiers are absent from target"
@@ -86,6 +100,11 @@ on conflict do nothing;
 insert into public.subjects(id,kind,auth_user_id,status,merged_into_subject_id,created_at,updated_at) values
   ('a2000000-0000-0000-0000-000000000001','member','a1000000-0000-0000-0000-000000000001','active',null,clock_timestamp(),clock_timestamp()),
   ('a2000000-0000-0000-0000-000000000002','member','a1000000-0000-0000-0000-000000000002','deletion_pending',null,clock_timestamp(),clock_timestamp());
+
+-- These rows model a backup made before the owner's later deletion.
+-- The recovered plaintext must disappear only after the governed replay.
+insert into public.subject_shared_memory_items_v1(id,subject_id,body_text) values
+  ('a8700000-0000-4000-8000-000000000001','a2000000-0000-0000-0000-000000000001','SYNTHETIC RESTORED NOTE');
 
 insert into public.characters(character_id,created_at,retired_at)
 values ('privacy-replay-character',clock_timestamp(),null)
@@ -185,6 +204,12 @@ cat > "$raw_source" <<JSON
     },
     {
       "occurredAt": "$event_4_at",
+      "type": "SHARED_MEMORY_NOTE_DELETED",
+      "subjectId": "a2000000-0000-0000-0000-000000000001",
+      "sharedMemoryItemId": "a8700000-0000-4000-8000-000000000001"
+    },
+    {
+      "occurredAt": "$event_5_at",
       "type": "ACCOUNT_DELETION_STARTED",
       "subjectId": "a2000000-0000-0000-0000-000000000001",
       "deletionJobId": "a6000000-0000-0000-0000-000000000001",
@@ -219,7 +244,10 @@ node - "$ledger_summary" <<'NODE'
 import { readFile } from 'node:fs/promises';
 
 const summary = JSON.parse(await readFile(process.argv[2], 'utf8'));
-if (summary.eventCount !== 4) throw new Error('non-zero ledger fixture eventCount mismatch');
+if (summary.eventCount !== 5) throw new Error('non-zero ledger fixture eventCount mismatch');
+if (summary.eventTypeCounts?.SHARED_MEMORY_NOTE_DELETED !== 1) {
+  throw new Error('manual note deletion event was not included in the privacy ledger');
+}
 if (summary.replayPlannerAccepted !== true) throw new Error('ledger replay planner did not accept non-zero fixture');
 if (summary.sourceAuthorityClass !== 'AUTHORITATIVE_CAPTURED_WINDOW_V1') {
   throw new Error('ledger source authority class mismatch');
@@ -254,6 +282,7 @@ for identifier in \
   'a5000000-0000-0000-0000-000000000001' \
   'a6000000-0000-0000-0000-000000000001' \
   'a7000000-0000-0000-0000-000000000001' \
+  'a8700000-0000-4000-8000-000000000001' \
   'privacy-replay-good-account'; do
   if grep -aFq "$identifier" "$encrypted_manifest"; then
     fail "encrypted privacy ledger exposed plaintext fixture identifier"
@@ -271,6 +300,14 @@ decrypted_sha256="$(sha256sum "$decrypted_manifest" | awk '{print $1}')"
 cmp -s "$manifest" "$decrypted_manifest" || fail "encrypted ledger roundtrip bytes mismatch"
 pass "non-zero encrypted ledger decrypts byte-for-byte to the planner manifest"
 
+[[ "$("${psql_base[@]}" -Atc "
+select count(*) from public.subject_shared_memory_items_v1
+where id='$shared_memory_item_id'
+  and subject_id='a2000000-0000-0000-0000-000000000001'
+  and body_text='SYNTHETIC RESTORED NOTE';
+")" == "1" ]] || fail "restored manual note must be present before the privacy replay"
+pass "synthetic backup-restored personal text is present only before the replay"
+
 node scripts/build-postgres-privacy-reconciliation-plan.mjs \
   --input "$decrypted_manifest" \
   --output "$plan" \
@@ -285,16 +322,21 @@ select
   (select case when revoked_at is not null then '1' else '0' end from public.life_facts where id='a4000000-0000-0000-0000-000000000001')||'|'||
   (select case when revoked_at is not null then '1' else '0' end from public.device_installations where id='a5000000-0000-0000-0000-000000000001')||'|'||
   (select count(*) from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001' and status='running')||'|'||
-  (select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001');
+  (select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001')||'|'||
+  (select count(*) from public.subject_shared_memory_items_v1 where id='$shared_memory_item_id')||'|'||
+  (select count(*) from public.subject_shared_memory_delete_events_v1
+     where item_id='$shared_memory_item_id' and subject_id='a2000000-0000-0000-0000-000000000001'
+       and deleted_at='$event_4_at'::timestamptz);
 ")
-[[ "$state" == "deletion_pending|1|1|1|1|1" ]] || fail "first replay state mismatch: $state"
-pass "first replay establishes revocation and account-deletion-start state"
+[[ "$state" == "deletion_pending|1|1|1|1|1|0|1" ]] || fail "first replay state mismatch: $state"
+pass "first replay physically erases restored note text and establishes exact timestamped marker"
 
 before=$("${psql_base[@]}" -Atc "
 select
   (select revoked_at::text from public.memory_items where id='a3000000-0000-0000-0000-000000000001')||'|'||
   (select revoked_at::text from public.life_facts where id='a4000000-0000-0000-0000-000000000001')||'|'||
-  (select revoked_at::text from public.device_installations where id='a5000000-0000-0000-0000-000000000001');
+  (select revoked_at::text from public.device_installations where id='a5000000-0000-0000-0000-000000000001')||'|'||
+  (select deleted_at::text from public.subject_shared_memory_delete_events_v1 where item_id='$shared_memory_item_id');
 ")
 
 "${psql_base[@]}" -f "$plan" >/dev/null
@@ -303,9 +345,12 @@ after=$("${psql_base[@]}" -Atc "
 select
   (select revoked_at::text from public.memory_items where id='a3000000-0000-0000-0000-000000000001')||'|'||
   (select revoked_at::text from public.life_facts where id='a4000000-0000-0000-0000-000000000001')||'|'||
-  (select revoked_at::text from public.device_installations where id='a5000000-0000-0000-0000-000000000001');
+  (select revoked_at::text from public.device_installations where id='a5000000-0000-0000-0000-000000000001')||'|'||
+  (select deleted_at::text from public.subject_shared_memory_delete_events_v1 where item_id='$shared_memory_item_id');
 ")
-[[ "$after" == "$before" ]] || fail "second replay rewrote terminal timestamps"
+[[ "$after" == "$before" ]] || fail "second replay rewrote terminal timestamps, including note deletion"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.subject_shared_memory_items_v1 where id='$shared_memory_item_id'")" == "0" ]] || fail "second replay resurrected personal note text"
+[[ "$("${psql_base[@]}" -Atc "select count(*) from public.subject_shared_memory_delete_events_v1 where item_id='$shared_memory_item_id'")" == "1" ]] || fail "second replay duplicated note deletion marker"
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.data_deletion_jobs where id='a6000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated deletion job"
 [[ "$("${psql_base[@]}" -Atc "select count(*) from public.outbox_events where id='a7000000-0000-0000-0000-000000000001';")" == "1" ]] || fail "second replay duplicated outbox event"
 pass "second identical replay is idempotent after subject becomes deletion_pending"
@@ -446,7 +491,9 @@ node - "$report" <<'NODE'
 import { readFile } from 'node:fs/promises';
 
 const report = JSON.parse(await readFile(process.argv[2], 'utf8'));
-if (report.eventCount !== 4) throw new Error('unexpected replay report eventCount');
+if (report.eventCount !== 5 || report.eventTypeCounts?.SHARED_MEMORY_NOTE_DELETED !== 1) {
+  throw new Error('unexpected replay report manual-note deletion count');
+}
 if (report.drReady !== false) throw new Error('replay report must remain drReady=false');
 if (report.outputContainsIdentifiers !== false) throw new Error('replay report identifier flag mismatch');
 if (report.replayIdempotency !== 'transactional-terminal-state-validated') {
@@ -459,7 +506,8 @@ for (const forbidden of [
   'a4000000-0000-0000-0000-000000000001',
   'a5000000-0000-0000-0000-000000000001',
   'a6000000-0000-0000-0000-000000000001',
-  'a7000000-0000-0000-0000-000000000001'
+  'a7000000-0000-0000-0000-000000000001',
+  'a8700000-0000-4000-8000-000000000001'
 ]) {
   if (serialized.includes(forbidden)) throw new Error('sanitized report leaked an execution identifier');
 }
@@ -528,7 +576,9 @@ const backupCompletedAtUtc = process.argv[5];
 if (!Number.isSafeInteger(backupRunId) || backupRunId <= 0) {
   throw new Error('synthetic restored-db privacy evidence backupRunId is invalid');
 }
-if (report.eventCount !== 4 || report.drReady !== false) {
+if (report.eventCount !== 5 ||
+    report.eventTypeCounts?.SHARED_MEMORY_NOTE_DELETED !== 1 ||
+    report.drReady !== false) {
   throw new Error('synthetic restored-db privacy evidence report contract mismatch');
 }
 if (report.outputContainsIdentifiers !== false || report.outputContainsRowPayloads !== false) {
@@ -553,6 +603,7 @@ const evidence = {
   event_type_counts: report.eventTypeCounts,
   replay_result: 'pass',
   second_identical_replay: 'idempotent-pass',
+  shared_memory_note_non_resurrection: 'synthetic-recovered-db-pass',
   negative_terminal_state_guard: 'fail-closed-pass',
   replay_idempotency: report.replayIdempotency,
   account_deletion_finalization: report.accountDeletionFinalization,

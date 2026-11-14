@@ -180,8 +180,18 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
   // The immutable finalize transaction independently rechecks the grant,
   // current Birth and issuer provenance before any report can be stored.
   let response: AdmittedResponse;
+  let authenticatedTransportSourceRef: string | undefined;
   try {
-    response = await input.adapter.requestReading(executedRequest);
+    const prepared = { executionAttemptId: input.executionAttemptId };
+    if (typeof input.adapter.requestReadingWithSourceRef === 'function') {
+      const attested = await input.adapter.requestReadingWithSourceRef(executedRequest, prepared);
+      response = attested.response;
+      authenticatedTransportSourceRef = attested.externalRequestRef;
+    } else {
+      // Existing non-HTTP test ports remain subject to the independent
+      // Production Source + DB mapping authorities; no header is fabricated.
+      response = await input.adapter.requestReading(executedRequest, prepared);
+    }
   } catch (error) {
     // A transport error cannot prove whether the Saju issuer already generated
     // a result. Do not finalize a failed attempt as retryable/final, reissue the
@@ -204,6 +214,9 @@ export async function executeAndPersistCurrentBirthSajuOfficialReadingV1<Admitte
         sourceBirthRevisionId: input.sourceBirthRevisionId,
         sourceResponse: response,
         executedRequest,
+        ...(authenticatedTransportSourceRef === undefined
+          ? {}
+          : { authenticatedTransportSourceRef }),
         sourceVerifier,
         mappingVerifier,
         currentAuthority,

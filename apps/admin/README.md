@@ -1,5 +1,8 @@
 # @myeongha/admin
 
+> **2026-11-13 A4 상태 갱신:** 이전 2026-11-06 상태 기록의 'Saju #2739 열림'은 당시의 기록입니다. 현재 [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739)와 [명하 #3228](https://github.com/gycha0109-beep/MyeongHa/pull/3228), Saju [#2781–#2784](https://github.com/gycha0109-beep/Saju/pull/2784)까지 모두 병합됐으며, Source 요청 전 기록·서명 영수증 결속·권한 사전 검사·미결 기록 조회는 오프라인 구현됐습니다. **운영 적용/실제 수집은 보류**입니다. 개인정보 증명 보존·삭제 정책, 전용 DB/인증/TLS, Production 해석 권한과 공급사 독립 청구 대조는 완료되지 않았습니다. 상세 근거: [A4 운영 준비 기록](../../docs/operations/ADMIN_A4_OPERATIONAL_READINESS_EVIDENCE_20261112.md). 비용 수집 OFF / `completeCostCoverage=false` / `invoiceReconciled=false`.
+
+
 ## Owner 사용자 관리 개선 — 2026-11-07 데이터 확인 / PR #3100
 
 - Production MyengHa DB를 **SELECT-only**로 확인했습니다. `subjects` 총 105행 중 현재 활성 `member` 3행, 활성 `guest` 95행, 삭제 완료 `member` 6행, 삭제 대기 `member` 1행입니다. 내부 Subject 수는 사람 수 또는 가입자 수가 아닙니다.

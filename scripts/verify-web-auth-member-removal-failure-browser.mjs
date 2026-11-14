@@ -253,16 +253,25 @@ async function navigate(client, origin, pathname, selector, timeout = 10_000) {
   const cleanPath = pathname.split('?')[0];
   const selectorLiteral = JSON.stringify(selector);
   const deadline = Date.now() + timeout;
+  let lastState = null;
   while (Date.now() < deadline) {
     const state = await client.evaluate(`(() => ({
       pathname: location.pathname,
       readyState: document.readyState,
       found: Boolean(document.querySelector(${selectorLiteral})),
     }))()`);
+    lastState = state;
     if (state?.pathname === cleanPath && state.readyState === 'complete' && state.found) return;
     await sleep(50);
   }
-  throw new Error(`Timed out waiting for ${cleanPath} ${selector}`);
+  // Include only page-readiness booleans: no URLs with tokens, credentials,
+  // DOM content, or browser console in the CI failure diagnostic.
+  throw new Error(
+    `Timed out waiting for ${cleanPath} ${selector}: ` +
+    `pathMatched=${lastState?.pathname === cleanPath} ` +
+    `documentReady=${lastState?.readyState === 'complete'} ` +
+    `selectorFound=${lastState?.found === true}`,
+  );
 }
 
 async function waitFor(client, expression, message, timeout = 8_000) {
@@ -310,7 +319,9 @@ let client;
 try {
   const port = await devtoolsPort(profile, chrome);
   client = await connectCdp(port);
-  await navigate(client, origin, '/hall.html', '.product-profile');
+  // Allow cold Chrome + Vite asset initialization on a loaded CI runner.
+  // This does not relax the required path, load completion, or selector.
+  await navigate(client, origin, '/hall.html', '.product-profile', 30_000);
 
   const signedIn = await client.evaluate(`(async () => {
     sessionStorage.setItem(${JSON.stringify(guestTokenKey)}, ${JSON.stringify(pendingGuestBearer)});

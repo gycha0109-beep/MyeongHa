@@ -8,6 +8,11 @@ import { buildRestoredReadOnlyQuery, compareApplicationCatalog,
 
 const source = JSON.parse(await readFile(
   'docs/operations/POSTGRES_FULL_APP_SCHEMA_FINGERPRINT_20261107.json', 'utf8'));
+const strictDump = await readFile(
+  'scripts/operations/run-production-postgres-strict-dump.sh', 'utf8');
+assert.ok(strictDump.includes(
+  "reserved_roles='anon|authenticated|authenticator|cli_login_.*|dashboard_user|pgbouncer|postgres|service_role|supabase_.*|pgsodium_keyholder|pgsodium_keyiduser|pgsodium_keymaker|pgtle_admin'"),
+'External membership recipient classifier must match reviewed strict dump filtering');
 const query = await readFile(
   'scripts/operations/production-app-schema-fingerprint-readonly.sql', 'utf8');
 const restoredQuery = buildRestoredReadOnlyQuery(query);
@@ -104,6 +109,8 @@ assert.deepEqual(boundarySame.details, {
   sourceReferencedExternalRoleCount: 2, restoredReferencedExternalRoleCount: 2,
   missingMembershipOptionEntryCount: 0, addedMembershipOptionEntryCount: 0,
   grantorAttributionDifferenceGroupCount: 0,
+  missingReservedRecipientPolicyCandidateCount: 0,
+  missingOtherRecipientCount: 0,
 });
 assert.equal(boundarySame.observedDirectMembershipOptionParity, true);
 assert.equal(boundarySame.observedGrantorAttributionParity, true);
@@ -118,6 +125,8 @@ assert.equal(boundaryMissing.observedDirectMembershipOptionParity, false);
 assert.equal(boundaryMissing.observedGrantorAttributionParity, false);
 assert.equal(boundaryMissing.details.missingMembershipOptionEntryCount, 2);
 assert.equal(boundaryMissing.details.addedMembershipOptionEntryCount, 0);
+assert.equal(boundaryMissing.details.missingReservedRecipientPolicyCandidateCount, 1);
+assert.equal(boundaryMissing.details.missingOtherRecipientCount, 1);
 
 const changedBoundaryGrantor = boundaryFixture([
   { ...edgeToExternal, grantor_name: 'supabase_admin' }, edgeFromExternal,
@@ -127,6 +136,8 @@ const boundaryGrantorDrift = observeApplicationExternalRoleBoundary(
 assert.equal(boundaryGrantorDrift.observedDirectMembershipOptionParity, true);
 assert.equal(boundaryGrantorDrift.observedGrantorAttributionParity, false);
 assert.equal(boundaryGrantorDrift.details.grantorAttributionDifferenceGroupCount, 1);
+assert.equal(boundaryGrantorDrift.details.missingReservedRecipientPolicyCandidateCount, 0);
+assert.equal(boundaryGrantorDrift.details.missingOtherRecipientCount, 0);
 
 const changedBoundaryOption = boundaryFixture([
   { ...edgeToExternal, inherit_option: false }, edgeFromExternal,
@@ -136,6 +147,8 @@ const boundaryOptionDrift = observeApplicationExternalRoleBoundary(
 assert.equal(boundaryOptionDrift.observedDirectMembershipOptionParity, false);
 assert.equal(boundaryOptionDrift.details.missingMembershipOptionEntryCount, 1);
 assert.equal(boundaryOptionDrift.details.addedMembershipOptionEntryCount, 1);
+assert.equal(boundaryOptionDrift.details.missingReservedRecipientPolicyCandidateCount, 1);
+assert.equal(boundaryOptionDrift.details.missingOtherRecipientCount, 0);
 
 assert.throws(() => observeApplicationExternalRoleBoundary(
   sourceBoundary, boundaryFixture([{ ...edgeToExternal,

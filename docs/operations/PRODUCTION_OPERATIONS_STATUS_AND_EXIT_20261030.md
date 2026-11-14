@@ -1,3 +1,358 @@
+### 2026-11-13 KST — 최신 DB 백업의 공유 메모리 삭제 복구 마이그레이션, 운영 변경 없는 격리 리허설 구현
+
+- **현 상태:** 원격 `245`/frontier `20261113062455`를 포함한 최신 암호화 백업·원장 #43424903445 보관 성공. 반면 현재 Production의 수동 공유 메모리 `2360`/계정 삭제 연동 `2370`/삭제 이벤트 재생 `2380` 미적용. 이전 백업 복구 #43418694784는 2380 부재 때문에 정상 fail-closed 종료. 같은 실패를 생산 복구 성공으로 꾸미지 않는다.
+- **이번 구현:** 기존 PG17 임시 복구 워크플로에 정확한 최신 backup/incident/source SHA만 받는 `restore_clone_shared_memory_rehearsal` 입력 추가. 원본 복제본을 **먼저** 기존 스키마·역할·원장 기준으로 읽기 전용 비교한 뒤, 검토된 `2360→2370→2380` SQL의 Git 객체 해시를 확인하고 **일회용 복원 DB 한 곳에만 원자적 트랜잭션으로 적용**한다. 메타데이터와 권한 검사 후 원래 합성 개인정보 소거·재생 테스트를 계속한다. 개인정보 테스트를 생략하거나 Production SQL/이력 변경·Hosted 자원·개인정보 canary를 호출하지 않는다.
+- **안전 경계:** 새 JSON에는 `cloneStillMatchesOriginalProductionSchema=false`, `productionDatabaseChanged=false`, `drReady=false`, `serviceResumptionAllowed=false`를 강제한다. 이는 **미적용 기능의 격리 가능성 테스트**이지 운영 DB 정합화·서비스 재개 수용이 아니다. 합성 결과도 실제 실행 전에는 성공·실패를 추정하지 않음. 신규 CI·실제 격리 실증이 다음 필수 작업이며, 사용자 승인 필요한 Production write 전까지 격리 증거를 먼저 확보한다.
+- **로드맵 목표 유지:** 과거 동일 SQL 미세 차이 무한 재분석보다 현재 DB에 필요한 변경만 선별. 기존 RPO/RTO·Hosted Auth/Storage·개인정보 원장·원격 전용 이력 보호 조건 모두 유지. #1887 OPEN, `NOT_ACCEPTED`, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — 최신 운영 DB 암호화 백업·원장 성공과 기존 KCP 동일성 증거 재확인
+
+- **현재 운영 백업·원장:** [수동 보호 실행 #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445) SUCCESS, 기준 main `6eab97337811128282f5f5ec6320e4608d5f9c09`. 백업 ZIP artifact ID `14037181099` digest `27f2d0536ec2f3e7a92823b1cb7a0a451c41cd3b6fc6521aa404da5630ffe60b`; 원장 ZIP artifact `14037056434` digest `217b7dae06d5f5d6a0365b1df64e0fc90e039420b835596d5a5105e913b613b3`, 두 artifact 만료 2026-12-13. 각 공개 manifest의 암호문 SHA256과 내려받은 암호문의 지문 **모두 일치**, 원문 SQL·개인정보·시크릿 조회·복호화 없음. 원장/백업 manifest의 `migrationFrontier/migration_frontier=20261113062455`, `migrationCount/migration_catalog_version_count=245`, `migrationCatalogSha256=405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 세 항목 **일치**. 백업 출처와 암호문 무결성만 관측; 독립 복원·개인정보·Provider 관리형 Auth/Storage·전체 RPO/RTO는 HOLD. 원장 역사적 실행자 미입증, SQL 본문 12개 누락.
+- **원격 KCP 소스 재확인 (과거 2026-11-07 완료 재사용):** 기존 [정확한 버전쌍 비교 문서](POSTGRES_OWNER_KCP_SANDBOX_MIGRATION_BYTE_PARITY_20261107.md)와 [기존 테스트](../../test/ops/owner-kcp-sandbox-migration-terminator-parity.test.mjs)를 먼저 확인. 운영 이력 `20261028011357` 원본 9,260바이트의 SHA256 `e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4`; 현재 Git `20261028110500` 9,270바이트 중 종료 `\n\ncommit;\n` 10바이트 제거 후 SHA256 정확히 같음. 동일 함수 실제 body 7,710바이트 MD5 `20ef63f5d2b99d7c2cc917df76482f6d`도 원격·Git 일치. 기존 출처 및 ACL의 해석 범위를 유지하고 새로운 마이그레이션 리네임·body patch·원격 이력 repair를 만들지 않았다. 현재 전체 버전 불일치 45/82는 여전히 존재.
+- **판정 및 다음:** 현재 frontier 대응 백업 산출물 확보/원장 지문 무결성은 완료. 보호 격리 복구에서 실제 현재 owner/role/ACL/Privacy parity와 Hosted 복원 범위를 입증해야 한다. 운영 DB 정합화는 현재 배포에 필요한 차이만 선별 후 **독립 격리 검증 및 구체적 사용자 승인** 전까지 쓰기 금지. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — 원격 전용 결제 SQL 후보의 실제 DB 객체/권한 확인 (읽기 전용)
+
+- 원격 이력 `20261028011357`(원본 SQL 9,260 bytes)과 저장소 `20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql`(9,270문자)의 논리 이름은 유사하지만, **파일·적용 이력이 바이트·구문·실행 인과까지 동일하다는 증거는 없다**.
+- 저장소 SQL에 기술된 `commerce_private.owner_sandbox_receipt_attestation_v1` 테이블과 `public.cmd_persist_owner_kcp_signed_sandbox_receipt_v1` 함수는 **현재 실제 운영 DB에 존재**한다. 함수는 네 인자 `(uuid,uuid,text,text)`, `SECURITY DEFINER`, owner `postgres`이고, `myeongha_api_executor` 실행 **true**, `anon` 및 `authenticated` 실행 **false**를 read-only pg_catalog에서 확인했다.
+- **처분 경계:** 객체 존재 및 표면 권한 일치만으로 양쪽 원본 SQL과 함수 본문·실제 데이터·RLS/의존성까지 동등하다고 판정하지 않는다. Production migration `repair`나 재실행은 금지. 사용자 승인 전 가능한 객체/본문 지문 및 격리 검증을 우선한다.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — 현재 Production frontier 이후 백업/원장 수집 수동 실행 등록
+
+- 현재 실제 최종 migration `20261113062455`에 맞춘 백업을 확보하기 위해 기존 보호된 `production-postgres-backup.yml`을 [run #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)로 `main` `6eab97337811128282f5f5ec6320e4608d5f9c09`에서 `capture_provider_ledger=true`로 **수동 dispatch**했다. 활성 중복 실행이 없음을 먼저 확인했다.
+- 기존 Workflow가 Production을 읽고 암호화 백업/Provider 원장 아티팩트를 생성하는 **기존 기능만 사용**. 이 기록 시점에는 **실행 결과·실제 백업 시각·manifest 무결성·최종 migration 포함 여부 미확정**. CI/백업 성공이나 DR 완료를 추정하지 않는다. Production migration repair/DDL/DML/개인정보 canary·유료 Hosted 변경 없음.
+- 이후 단계: 완료 결과, 정확한 artifact·manifest·원장 쌍 및 `20261113062455` 대응 여부를 확인한 뒤 현재 스키마 격리 복구를 **필수 개인정보/권한 차단을 유지한 상태로** 실행; 그때도 전체 서비스 복구 증거와 구분한다.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — 총괄 우선순위 반영 및 현재 Production DB 직접 읽기 전용 재실측
+
+- **목적/결정:** 기존 Phase 8/11/12/13의 안전·수용 조건은 유지하면서, 차단 해소 실행 순서를 **현재 운영 DB 이력/DDL·실제 배포 호환성 → 최소 정합화 격리 검증 → 필요 시 승인된 운영 적용 → 최신 백업/Hosted/Privacy/서비스 재개**로 재정렬했다. 이전 187개 byte-exact 미입증 SQL 전수 처분을 독립적인 선행조건으로 만들지 않는다. 기존 증거 재사용. 운영 변경·유료 호스팅·개인정보 canary 없음.
+- **실제 Supabase 연결 및 권한:** 명하 프로젝트 `cnsfpcdiyofqvhpcegfc`, PostgreSQL **17.6**에 **SELECT 기반 읽기 전용 조회** 수행. 2026-11-13 기준 repo `main=6eab97337811128282f5f5ec6320e4608d5f9c09`의 Git tree 전체 `supabase/migrations/*.sql`과 원격 `supabase_migrations.schema_migrations`의 version/name을 실제로 분류. 원격 **245개**, 저장소 **282개**, 공통 **200개**, 원격 전용 **45개**, 저장소 전용 **82개**; 원격 최종 `20261113062455` (`admin_a4_proof_retention_safety_window_29_days_20261113`). 원격 전용 45개는 과거 42개 원장 증거와 시점 차이가 있으므로 동일한 모집단으로 오인하지 않는다.
+- **#1887의 기존 핵심 불일치 실재:** 원격 `20261008090417`(`seyeon_runtime_1460_1510_acl_before_owner_recovery`, 1 statement, 104,021 bytes), `20261028011357`(`owner_sandbox_signed_receipt_persistence_v1_20261028`, 1 statement, 9,260 bytes)는 실제 원격 이력에 존재한다. 저장소 `20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql`은 존재하지만 그 version은 운영 이력에 **없다**. 저장소 텍스트 9,270문자. 내용/실행/현재 DDL의 완전 동등성은 **미입증**; 이름 유사성·길이만으로 repair나 DDL 재적용 불가. 원본 SQL 텍스트·사용자/행 데이터·실행자 정보를 출력하지 않았다.
+- **#2200 관련 최신 실제 함수·권한:** remote migration `1640` 기록 **존재**. `public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)`는 실제 pg_proc에 **존재**, `SECURITY DEFINER`, owner `myeongha_seyeon_chat_runtime_owner`, `myeongha_api_executor` EXECUTE **true**, `anon`/ `authenticated` **false**. `public.cmd_mark_seyeon_chat_context_ready_runtime_v1(uuid,uuid,uuid)`는 존재하지만 API EXECUTE **false**. 과거 '1640 함수 미적용' **하위 원인은 현재 사실과 맞지 않는다**. 단, 현재 실제 배포 SHA·채팅 송수신·원래 P0001 retry/idempotency는 **미검증**이므로 #2200 전체 **OPEN** 유지. 초기 임시 조회에서 `pg_get_function_identity_arguments`의 **인자명까지 포함한 문자열을 인자 타입만의 텍스트와 비교**하여 존재=false가 나왔으나, 올바른 pg_proc 직접 조회와 `to_regprocedure`에서 존재=true로 교정 확인했다. 오판 결과를 정본으로 사용하지 않는다.
+- **현재 개인정보/복구 차이:** Production 이력 `2380` 없음. `public.subject_shared_memory_items_v1`, `public.subject_shared_memory_delete_events_v1`, `public.internal_replay_shared_memory_note_deletion_v1(uuid,uuid,timestamptz)`도 현재 없음. 옛 백업에서 해당 기능의 합성 복구가 실패한 [#43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784)와 부합하지만, 실제 적용 필요 범위는 현재 배포/호출 의존성으로 판단해야 한다. 이전 한정된 source-only 실증을 현재 전체 DR 승인으로 승격하지 않음.
+- **가장 최근 확인한 백업:** Github Actions `production-postgres-backup.yml`의 최신 성공 [#43330215791](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43330215791) 시작 `2026-11-12T23:36:01Z`. 원격 최종 마이그레이션 버전 `20261113062455`의 시각보다 빠르다. **현재 전체 스키마가 포함된 백업/독립 복원 증거로 수용할 수 없음**; 이후 생성된 실제 backup artifact·복호화 지문·원장 및 현재 스키마 기준 복원 확인 필요. 기존 `43174606843`은 과거 차이 비교 출처로만 재사용.
+- **별도 차단:** #1887 OPEN / #2200 OPEN / #2025 OPEN 확인. 상업 호스팅 #2025는 병렬 비교 대상으로만 관리하고 우선 DB 정합화를 지연시키지 않는다. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+- **구현/남은 것/다음:** 기존 승인 로드맵 맨 위에 실행 우선순위·5단계 실제 출구 조건·승인 경계를 갱신하고 이 워크로그에 정본 읽기 전용 관측을 기록. **다음**은 현재 배포 버전/원격 전용 실제 기능의 출처를 연결하고 특히 `20261008090417`, `20261028011357` ↔ `20261028110500`의 실제 DB 객체/권한 효과를 비교해 **운영 DB 최소 정합화 SQL과 롤백/격리검증 계획**을 만드는 것. 사용자가 그 구체적 계획을 승인하기 전에는 Production `db push`, `migration repair`, DDL/DML, 데이터 이동, Hosted 생성, 요금제/DNS 변경을 실행하지 않음.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Phase 8-A: 개인정보 신형 마이그레이션이 없는 원본 백업 차단·SQL 출처만 제한 실증하는 경로 추가
+
+- [기존 격리 복구 실행 #43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784) **FAILURE**. `main` `e1ed546bef1b368f74b27515379bfb98ba1f9a88`, 원본 run `43174606843`. 로그상 원장 복호화/버전·바이트/코드 토큰 분류 단계는 통과했으나 **결과 JSON 업로드 전** 합성 개인정보 재생 preflight에서 `governed shared-memory deletion replay migration` 부재로 차단됐다. 저장소의 뒤늦은 개인정보 migration `2380`이 없는 **옛 백업에서 예상되는 필수 차단**이다. 따라서 12개 실제 코드 차이 수량을 추측·확정하지 않는다.
+- 복구 작업의 본래 개인정보 fail-closed 검사는 그대로 보존하면서 **`migration_source_only_diagnostic=true`**인 경우만 위 신형 개인정보 합성 검사를 미실행하도록 구현했다. 이 경로는 `backup_run_id=43174606843`, `incident_reference_utc=2026-11-12T07:25:00Z`, `main`, paired source verification 필수, privacy ledger/canary 없음, S0=false로 **정확히 제한**한다. 재사용 원본은 기존 암호화 백업/원장 한 쌍만이다.
+- 격리 DB 복원·원장 복호화·원본 무결성·같은 버전 SQL 분류·스키마 비교·48개 역할 연결 provenance·복구 evidence envelope·서비스 재개 차단은 그대로 수행. 별도 진단용 비식별 JSON에 개인정보 재생 **미실행** 및 `drReady=false`를 명시한다. 정상 전체 DR workflow는 기존 개인정보 검사를 계속 실행·요구한다.
+- **현재 상태:** 구현 제출/합성 검사 전 또는 완료 시점과 실제 실행을 구분한다. 새로운 실제 SQL 코드 토큰 분류 결과가 나오기 전에는 12개 결과 미확정. Production SQL/DDL·migration repair·Hosted 자원·개인정보 canary 변경 없음. #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Phase 8-A: 보호 환경의 실제 SQL 코드 차이 분류 도구 (실증 전)
+
+- 이전 보호 복구 #43406911458의 원문 242/저장소 276/공통 200 실증과 21개 바이트 차이 위치(9개 repo 종결자 추가, 2개 source suffix, 10개 내부 상이) 및 12개 저장소 선언 조사 결과를 재사용한다.
+- 기존 원본 원장 복호화·버전/해시 대조를 통과한 **보호된 임시 runner 안에서만** 단일 statement 바이트가 다른 경우 원본·저장소 SQL의 코드 토큰을 비교하도록 실제 구현했다. 주석과 공백을 보수적으로 건너뛰고, SQL 문자열·quoted identifier·dollar-quoted body를 그대로 취급한다. 인용 형식이 불명확하면 안전하게 분류 보류. **SQL 원문, 바뀐 명령, 토큰/리터럴·작성자·시크릿은 결과에 포함되지 않는다.**
+- 제한적 결과는 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA` / `CODE_TOKEN_BYTES_DIFFER` / `LEXICAL_SCAN_INDETERMINATE` 셋 중 하나만 출력. 이 분류는 SQL parser나 역사적 실행 증거가 아니고 현재 함수/역할/권한·RLS 동등성을 보증하지 않는다. 기존 byte-exact 13개/미입증 187개와 Provider ledger/Hosted/privacy DR HOLD 판정 유지.
+- Node 24 기준 새·기존 합성 검사 총 7건 통과. **아직 12개 원본의 코드 토큰 비교를 실제 실행하지 않았다**. 병합 후 암호화 backup run #43174606843을 기존 보호 격리 워크플로로 재사용하여 실행 증거를 별도로 남긴다.
+- 상태: Production 변경·migration replay/repair·privacy canary 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Phase 8-A: 공통 SQL 21개 실제 원문 바이트 차이 위치 실증 완료
+
+- **실제 실행 성공:** [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458), checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`, source run `43174606843`, artifact ID `14026803978` (ZIP SHA-256 `b9f779ae4360cf8b13ee85e79c43b0c3c1a4b6da98ad57205b1b47bc0ef2fe0c`). 원본 `paired-provider-common-migration-body-parity.json` SHA-256 `a30da4e0554a77f6bffb87f1aeeebc0da4eb2adccef9f87128c75b1325cfa0a5` 실측. 이전 구현 PR #3281까지 병합 완료.
+- **실측 분류 불변:** 원본 242개 / 저장소 파일 276개 / 공통 200개 / remote-only 42개 / repository-only 76개. 단일 byte-exact 13 / 단일 bytes differ 21 / 다중 framing unproven 148 / 다중 reconstructed match unproven 6 / 원문 부재 12 = 공통 200개. 21개 전부 raw byte difference 위치 결과 존재.
+- **새 관측:** repo 끝의 `;`+LF 종결자 2바이트만 추가 **9개**; source 끝에 저장소보다 바이트가 추가된 **2개**(`1600`, `1630`, 각 source extra 76바이트); 내부 다른 구간 **10개**(`1580`, `1590`, `1610`, `1620`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`). 특히 `1650`·`1670`·`1680`·`1690`은 각 구간 수천 바이트 달라 단순 `;`+LF 차이라고 판정하지 않는다.
+- **영구 증거:** [21개 비식별 바이트 비교 결과](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json)에는 21개 원본/파일 해시와 바이트 공통 접두·접미 길이, 다른 길이, 분류, 원장/checkout/아티팩트 SHA 및 DR HOLD만 보존. SQL 원문, 변경 조각·실행자 메타데이터 비출력. 기존 문서의 '실증 대기'는 과거 구현 상태로 구분.
+- **남은 일:** 12개 SQL의 실제 명령/권한 영향과 현재 DB 일치 범위를 근거별 처분, 다중 statement 154개 프레이밍/원본 SQL NULL 12개는 계속 HOLD, Provider 원장 대상·전체 역할/ACL/Hosted Auth/Storage·독립 개인정보·전체 RPO/RTO 수용 불가. Production SQL/DDL·재적용·repair·canary·유료 Hosted 작업 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN, `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Phase 8-A: 단일 원문 SQL 바이트 차이 위치 실측 기능 추가 (실제 실증 대기)
+
+- 기존 보호 격리 복구 #43372543611에서 200개 원장 본문 전수 비교·21개 단일 SQL 불일치를 실측했고, PR #3279에서 9개 exact-prefix hash 일치 및 12개 미확정 근거를 별도로 보존했다. 9개도 전체 저장소 파일 byte-exact으로 승격하지 않는다.
+- 이번 구현은 기존 암호화된 원장과 정확한 `main` SQL을 보호된 임시 runner 안에서 대조하여 **일치하는 시작/끝 구간의 바이트 수·양쪽 차이 바이트 수·차이 위치·`0x3b0a` 종결자 추가 여부**만 기존 비식별 결과에 부착한다. SQL 실행자·원문·차이 텍스트·변경 토큰을 외부 출력하지 않는다. Synthetic fixture로 원문 비노출·기존 byte-exact 집계 보존을 검사한다.
+- **아직 실제 12개 차이 위치를 실증하지 않았다.** 병합 후 같은 source backup #43174606843으로 정확한 main에서 수동 격리 실행한 뒤 결과를 해시·아티팩트 ID·main SHA와 묶어 증거화할 것. 대상 원장 복원·Hosted Auth/Storage·개인정보 연속성·RPO/RTO는 별개 미완료. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / #1887 OPEN.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 단일 statement 21개 불일치 지문 추가 대조
+
+- **실제 조사:** 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) 산출물의 원본 SQL SHA-256/길이와 같은 실행의 exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`의 저장소 SQL 원문 파일 지문 비교. **9개(`0130`, `0160`, `0195`, `0221`, `0271`, `0800`, `0961`, `0981`, `1380`)는 source SQL statement가 repo 파일에서 마지막 semicolon+LF 2바이트를 제외한 내용과 SHA-256까지 정확히 일치**. 나머지 12개(`1580`, `1590`, `1600`, `1610`, `1620`, `1630`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`)는 bounded format fingerprint 검사로 미확정.
+- **독립 증거:** [21개 비식별 버전별 해시 조사 결과](POSTGRES_COMMON_VERSION_MIGRATION_SINGLE_STATEMENT_FINGERPRINT_TRIAGE_20261113.json) 및 앞선 [200개 본문 전수 실증](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json). 추가 9개는 파일 바이트 완전 일치가 아니므로 13개 byte-exact 집계 변경 없음. 실제 SQL 의미/현재 객체·권한 동등성은 계속 미입증. 원본 12개 NULL 및 다중 SQL 154개 framing 보류도 유지한다.
+- **다음:** 기존 DB 객체/권한 비교 증거를 연결하여 9개 framing 대응의 영향 범위를 정확히 처분하고, 남은 12개 단일 mismatch 및 154개 multi-statement 정합성 조사. 원본 SQL 복구·재실행, 운영 migration repair, Hosted 생성, canary 실행 없음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Phase 8-A: 공통 마이그레이션 본문 원장 실제 전수 비교
+
+- **완료 근거:** protected main 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS / source backup `43174606843` / exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`. 결과 artifact `14012916977` (ZIP SHA-256 `1aa91ac0b1273263b1452f4c6a26da724c8dea99003260fe4381d2ea9860f078`); 본문 원본 결과 JSON SHA-256 `42be852ab426edc70e89cc0b018e88594bfa341b29f323ebb4816a7a1c05b005`.
+- **실측 분류:** source 242 / repo 276 / common 200 / remote-only 42 / repo-only 76. byte-exact single **13**, single source/repo bytes differ **21**, multi framing unproven **148**, multi reconstructed match yet source original unproven **6**, source SQL absent **12**. **187개 미입증이 곧 SQL 의미 불일치 187개를 뜻하지는 않는다.**
+- **증거:** [187개 비일치·보류 버전과 해시를 포함한 비식별 증거](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json). 과거 구현 당시 '실측 대기' 단락은 역사적 상태다. 원본 SQL·실행자·시크릿 미출력.
+- **남은 일:** 21개 single bytes differ, 154개 multi-framing의 실제 근거별 처분, 12개 NULL 원문의 위험 보류; 전체 Provider schema/role/ownership/RLS·Hosted Auth/Storage·privacy·RPO/RTO 실증. 원격 전용 기존 41개와 A4 ACL 관측은 재사용하며 재조사 반복 없음. Production SQL/migration/replay/privacy canary/Hosted 생성 없음.
+- 상태 `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / #1887 OPEN / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 공통 버전 원장 SQL 본문 raw-byte 대조 구현 (실측 대기)
+
+- **선행 완료:** PR [#3267](https://github.com/gycha0109-beep/MyeongHa/pull/3267) 필수 통합 CI [#43354735084](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43354735084) SUCCESS·merge `a9b920e697746542b441f7ba143d431bfa6e978c`. 원격 버전 242/저장소 파일 276/공통 200/원격-only 42/저장소-only 76 및 신규 A4 현재 권한 효과 처분 기존 근거 재사용.
+- **이번 구현:** 수동 보호 격리 복구 `verify_provider_migration_source=true`에서 복호화·SHA 검증된 원본 원장과 정확한 main SQL 파일을 **동일 버전 기준 raw bytes**로 대조하는 `scripts/operations/assess-sealed-common-migration-body-parity.mjs` 추가. 단일 statement만 완전 byte equality 인정, 원문 누락·다중 statement framing·이름 상이·본문 불일치는 구분하고 버전/해시/길이만 산출. 비공개 SQL·작업자·개인정보 미출력. 합성 테스트 3개 및 Bash/Node 문법 검증 PASS.
+- **실측 경계:** 코드는 기존 격리 워크플로에 연결했으나, 새 PR의 통합 CI·병합 전에는 실제 200개 SQL 본문 일치 개수는 미확정이다. 이전 버전 ID 대조 SUCCESS가 원문 SQL byte parity를 입증한 것으로 취급하지 않는다. 관련 [설계와 수용 범위](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_20261113.md).
+- **운영 게이트:** Production SQL/DDL, migration repair·replay, 시크릿/Hosted 유료 생성 및 synthetic privacy canary 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 신규 A4 원격 전용 SQL·현재 역할/권한 대조
+
+- **상태:** [PR #3261](https://github.com/gycha0109-beep/MyeongHa/pull/3261) 필수 통합 검사 [#43351167715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43351167715) SUCCESS, 병합 `e3c5185ed3df1b7bf883c3babc2ec4d2f3b5c09b`. 현재 source ledger 242개 / frontier `20261109071019` / 저장소 파일 276개 / 원격-only 42개·repo-only 76개.
+- **원본 적용 기록 SELECT-only:** source-only `20261109071019`, 이름 `admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109`, SQL 1 statement 5,512 bytes, SHA256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8`; `created_by` metadata 있음, rollback/idempotency 없음. 원본 SQL을 공개하거나 실행하지 않음.
+- **현재 객체·직접 ACL 실측:** `myeongha_reading_ai_cost_binding_reader_v1`은 LOGIN 가능하지만 password NULL, NOINHERIT/비관리자 권한 제한. `public.reading_execution_attempts` 13개 열 중 정확히 `external_request_ref,id,reading_id,state,subject_id` 5개만 SELECT 가능; table-wide SELECT 및 INSERT/UPDATE/DELETE 없음. `public` USAGE=true, 관리자 role membership 1개(ADMIN=true, INHERIT=false, SET=false), 테이블 RLS OFF·정책 정의 2개. 해당 SQL이 선언한 현재 role/schema/column-ACL 목표 상태에 부합함. [읽기전용 SQL](../../scripts/operations/production-admin-a4-reader-current-readonly.sql) 및 [비식별 증거](POSTGRES_A4_READER_REMOTE_ONLY_MIGRATION_EFFECT_20261113.json) 저장.
+- **차단 유지:** 2026-11-07 기존 원격-only 41개 기록 불변; 새 1개에는 현재 object/ACL 효과 관측만 덧붙임. SQL 실행 원인·과거 실행자 인증, snapshot 동일성, Provider history target/Hosted 복원, 실제 Worker credential·binding, 독립 개인정보·RPO/RTO 미입증. Production DB 변경·권한 부여·마이그레이션 재적용·유료 DR·privacy canary 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Gate 1 / Phase 8-A: 봉인 원장 242개 vs 정확한 main 파일 버전 전수 실측
+
+- **병합·실증:** PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259) 필수 통합 CI [#43347035879](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43347035879) SUCCESS / merge `78f53d3fe6a2749795b4219254b3494f94c763ce`. 최신 보호 main 격리 복구 [#43350336600](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350336600) SUCCESS / workflow commit `9a5f903d8c3498a18363286000525f8114671b9e`. 원본 source backup #43174606843, artifact #14003143450 / ZIP SHA-256 `b481bedef267b2edba757ad826d66f316e74c2580cd76da5b790aa3ef7f6e667`.
+- **원본·현재 저장소 버전 실측:** 원본 242개 / 저장소 migration 파일 276개 / 공통 버전 200개 / Production에만 있는 버전 **42개** / 저장소에만 있는 버전 **76개**. 기존 11/07 원격 전용 41개 모두 여전히 원격 전용이고, 새로운 원격 전용 `20261109071019` 1개를 확인. 12개 null statement, 원본 전체 catalog SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47` 유지. 타 버전에서 동일 이름인 migration `20261029012948`↔`20261029012000` 1쌍은 identity 불일치로 보존.
+- **처분 근거:** 구 41개 버전 및 당시 SQL/영향 기록은 역사적 관측으로 유지하고 [기존 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)에 현재 frontier 대조 항목만 추가. 새 [전체 실측 파일](POSTGRES_SEALED_PROVIDER_MIGRATION_FILE_LINEAGE_PROOF_20261113.json)에서 누락 ID 확인 가능. 신규 `20261109071019`의 실제 적용 SQL·현재 객체 영향 및 provenance는 아직 미처분.
+- **차단:** source 원장 봉인·복호화와 이름/버전 비교는 실제 Supabase migration ledger 대상 복원 또는 현재 DDL·ACL parity의 대체물이 아니다. 추가 Production 쓰기 없음, Hosted DR/개인정보 canary/유료 생성 없음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN.
+
+Watchtower-Track: ops
+
+### 2026-11-13 KST — Gate 1 / Phase 8-A·8-B: disposable Provider role replay 실측 SUCCESS
+
+- **선행 코드 병합:** PR #3252·#3255 필수 통합 CI 성공 및 보호된 `main` 병합. 역할 증거 검증 구현을 기존 수동 격리 복구에 결합했고, 개인 정보나 원문 SQL을 아티팩트에 공개하지 않음.
+- **실제 실행:** [#43343813577](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43343813577) SUCCESS, source backup #43174606843, 백업·원장 동일 실행 출처. 증거 artifact #14000940857, ZIP SHA-256 `009f41101fd0fa388266141ffb181c587a6c3e1e93a6232bc5e985e20f5f8654`. 원본 앱→외부 역할 멤버십 48개 / 격리 GRANT 재현 48개 / 대상 관측 48개, 권한 옵션 및 grantor 일치. `directRoleMembershipTargetRehearsalProven=true`.
+- **남은 정합성 차단:** filtered `roles.sql`의 경계 멤버십 48개 제외는 변함없다. Source 원장 242개 복호화 검증 성공이나 NULL statement 12개, target 원장 미복원. 원본 catalog가 dump와 단일 MVCC 스냅샷인지는 미증명. Provider 소유권·상속 유효 접근권한, Hosted Auth/Storage·독립 개인정보 연속성·전체 RPO/RTO 미증명. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN. 상세 [POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json](POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json).
+- **Production 영향:** 읽기/수동 격리 검증만 수행. Production SQL·권한·Secret 변경, 유료 Hosted provisioning, 개인정보 canary 없음.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-A·8-B: 원장 복호화 실증 성공, 복원 정합성 HOLD
+
+- **실제 보호 main 격리 실행:** 원본 source capture [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) 및 원장 복호화 포함 격리 복구 [#43179685582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582) 모두 SUCCESS. PR #3251 병합 `073c26063eccc5b5adbe146d8c09f1c0e8f29b72`. 동일 백업 실행의 원장 ciphertext SHA `4a9c94ed42896d623a1cb519376601d7bf02851fc0eb9258c63cb8a44aff1054`, 원본 packet SHA `e5a2285acc6f44c29f981d3f9c1d2567d5794b845ec3217ee2869243482af686`, 242개 version / frontier `20261109071019` / catalog SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`를 **실제 복호화 후 재검증**. 원장 SQL 누락 12개·created_by 존재 46개 유지. 원본 SQL·작성자·개인정보를 공개 artifact에 포함하지 않음.
+- **정확한 격리 근거:** 복구 evidence artifact #13925513219 (ZIP SHA `a5588a9c6b553e4820d6bdf3a3ef5db2a8659421d12164316388812a32441d8f`). 앱 객체 수 schema 3/3, table 94/94, function 322/322; 2개 schema·8개 table·19개 routine에서 기존 ACL/구조 해시 차이가 기록되나 해당 보고 차이의 직접 수신자 권한 및 canonical grantor 차이 수는 0이다. 앱 내부 역할 43/43·멤버십 7/7 옵션 일치, grantor 표시 7그룹 차이(기존 portable rewrite 양립); 앱↔외부 역할 멤버십 관찰 48/48 옵션·grantor 일치지만 filtered roles.sql에서는 해당 48개 경계가 모두 제외되어 Provider 책임·실제 Hosted 복원은 별도 미입증. 원본 catalog와 dump는 공통 MVCC snapshot 미증명.
+- **수용 차단:** 원장 ciphertext 복호화는 정상이나 대상 `supabase_migrations` 원장 row 재생·SQL 적용은 수행하지 않음. 전체 application/full schema equivalence=false, Hosted Auth/Storage·독립 개인정보 연속성·whole-service RPO/RTO 미입증. 근거 [POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json](POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json). 기존 Provider 93행·Auth FK 실증은 재사용하고 재시험하지 않음. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-A·8-B: 현재 frontier 원장 암호화 수집 및 격리 복원 실측
+
+- **보호된 백업:** PR #3241/#3245 통합 CI 통과·병합 후 수동 read-only source 봉인 [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) SUCCESS. Provider 원장 암호화 아티팩트 #13923871638, 동일 실행 백업 #13923088346; 실제 ciphertext SHA-256 `4a9c94ed42896d623a1cb519376601d7bf02851fc0eb9258c63cb8a44aff1054`와 manifest/checksum 일치. 242개·frontier 20261109071019·catalog hash `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`·SQL NULL 12개·created_by populated 46개. [봉인 증거](POSTGRES_PROVIDER_LEDGER_SEALED_CAPTURE_REAL_RUN_20261112.json).
+- **같은 실행 백업 격리 복원:** [#43176401912](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43176401912) SUCCESS / artifact #13924790522, frontier 20261109071019. 애플리케이션 전체 스키마 동등성 `false`, supabase migration ledger 복원 `false`, 외부 역할 GRANT 누락 증거 `HOLD`, serving gate `BLOCKED`. [격리 실측](POSTGRES_CURRENT_FRONTIER_ISOLATED_RESTORE_20261112.json).
+- **별도 후속 구현:** 기존 복구 워크플로에 *같은 실행의* 암호화 원장을 선택적으로 다운로드하여 임시 복호화·전체 SQL 지문 대조 후 비식별 증거만 업로드하는 경로 추가. 초기 구현이며 보호된 실제 실행 결과 확인 전까지 복호화 검증 성공은 주장하지 않음. 대상 DB 이력 INSERT/CREATE, Production SQL/권한 변경, privacy canary, 신규 유료 Hosted 없음.
+- **수용 경계:** Provider 원장 원본 봉인 성공 != 격리 원장 복원/Hosted Auth·Storage 서비스 복원. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-A·8-B: Provider 마이그레이션 원장 부재 실측 SUCCESS 및 차단 보존
+
+- **GitHub 검증:** PR [#3239](https://github.com/gycha0109-beep/MyeongHa/pull/3239) MERGED, merge SHA 515ee5badae659c3c5bc64045499dbdf1d7ea28f. 필수 통합 [#43157525886](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43157525886) SUCCESS, 병합 후 해당 SHA 실제 격리 [#43158737963](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963) SUCCESS, 일반 main CI [#43158738087](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158738087) SUCCESS. 2026-11-12 14시 KST 조회 최신 main은 다른 트랙 추가 변경을 포함한 510be175c07e3ca849d1d3a087cc7e21c05fd5e2. 이 SHA 자체의 Provider 새 검증으로 과거 성공 결과를 승격하지 않는다.
+- **원장 실측:** 기존 봉인 백업 [#42752268638](https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638) 원본 migration 242개, frontier 20261109071019, statement-hash catalog SHA-256 91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47. 대상 disposable Supabase CLI 3.1.0/PostgreSQL17에는 supabase_migrations.schema_migrations 테이블 및 필수 컬럼이 존재하지 않았다. 대상 건수, numeric count, frontier, catalog digest는 모두 null(관측 불가)이며 0이 아니다. allMetadataFingerprintsMatch=false; verdict=HOLD_DISPOSABLE_PROVIDER_MIGRATION_LEDGER_TABLE_ABSENT.
+- **증거:** 실제 run #43158737963의 migration ledger artifact 13917530822, 내부 파일 myeongha-provider-migration-ledger-parity.json SHA-256 4ceb5cf97f01c000828755834783b2dc3d23445e8b22bc27ce50db34d536e256 (이전 직접 검증 기록), GitHub artifact ZIP digest sha256:a7df6561cde5886f4d2d01779063febd956a3d7129a37759797d543fdaddeb2f (내부 파일 digest와 구분). 같은 run에 Auth integrity artifact 13917480949, COPY preflight artifact 13917441017, Provider 93행 artifact 13916562984가 확인된다. 정규화한 비식별 근거 [POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json](POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json).
+- **source authority 차이:** 기존 [POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md](POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md)의 2026-11-01 항목은 봉인 SQL 백업에서 실제 supabase_migrations.schema_migrations 전체 이력은 제외하고 count/frontier 및 read-only catalog fingerprint만 manifest에 저장한다고 명시한다. 따라서 기존 봉인 파일만으로 242개 원장 row/statement를 복원할 수 없다. current CI는 임시 디렉터리에서 supabase init / start를 수행하고 app migrations를 재생하지 않는다. CLI 초기화가 원장 부재의 유일한 원인인지까지는 확인되지 않았다. Supabase 공식 문서는 파일 기반 local migrations와 대상 DB 원장, 첫 db push의 이력 생성 동작을 구분하지만 이 문서는 이를 원장 복구 승인으로 취급하지 않는다.
+- **기존 source/version 격차:** 2026-11-11 SELECT-only 버전 인벤토리 [POSTGRES_MIGRATION_FRONTIER_OBSERVATION_20261111.json](POSTGRES_MIGRATION_FRONTIER_OBSERVATION_20261111.json) 원격 242개 / repo 파일 276개 / 공통 ID 200개 / 원격 전용 42개 / repo 전용 76개. SQL·배포 provenance와 DB 객체·owner·role membership·GRANT·RLS/policy·function 동등성은 미증명. CREATE TABLE, INSERT, migration repair, 허위 기록 재구성만으로 원장/Hosted 동등성에 도달할 수 없다.
+- **기존 실증 유지:** Provider COPY 33블록, 93/93행 실제 격리 복원 [#43136341133](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43136341133) PASS; Auth 관계 FK 및 참조 무결성 [#43142832141](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43142832141) PASS. 반복 실행하지 않음. Hosted Auth 로그인/세션 갱신·폐기/Storage 바이트/current frontier/개인정보 독립 연속성/전체 RPO·RTO는 미증명.
+- **다음 구현:** 현재 백업에 누락된 원장의 별도 권위 source와 복구 가능 경계를 읽기 전용으로 확인하고 migration version/statement fingerprint 및 schema/role/ACL parity를 결속. 권위 있는 원장 원문이 없으면 HOLD 유지; 자동 역사 생성·복제/수정 금지. Production 변경·유료 Hosted DR·개인정보 Canary 별도 승인 없이 금지. 최신 privacy eventCount=0/freshness RED/futureSafePrivacyReconciliation=false 유지.
+- **수용:** NOT_ACCEPTED, drReady=false, serviceResumptionAllowed=false, #1887 OPEN, ROADMAP_COMPLETE 미선언.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-B: 격리 Provider 원장 조회 RED — 부재 선검사 적용
+
+- **확인된 RED:** PR #3236 필수 통합 검사 [#43148300651](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43148300651) 성공, `main d88b5342d24a78cd2518dbf880c4c4b84346b898` 병합. 일회성 격리 [#43150641399](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43150641399)에서 백업 출처·원본 Provider COPY·93/93행 적재·Auth 연결 무결성 및 이전 증거 업로드 성공. **새 마이그레이션 원장 SQL 조회 단계만 실패**했으며, 공개 CI 로그는 `Disposable Provider migration ledger read-only query unavailable`까지이므로 테이블 부재/컬럼 불일치/쿼리 오류 중 정확한 원인은 판정하지 않음. 해당 시도에서 원장 지문 일치를 추정하거나 Provider 복구를 완료 선언하지 않음.
+- **개정 구현:** Supabase CLI 3.1.0 신규 일회성 격리 DB에서 `supabase_migrations.schema_migrations` 테이블과 `version/name/statements` 3개 필수 컬럼의 존재를 먼저 READ ONLY `pg_catalog`에서 확인. 테이블/컬럼이 없으면 **원장 건수 0이라고 조작하지 않고 null(관측불가)**로 비식별 결과를 기록하고 `HOLD`를 표시. 모두 있을 때에만 기존 SELECT-only 버전수·frontier·statement SHA 비교를 수행. 실제 source 백업 #42752268638의 공개 manifest와 ciphertext checksum은 그대로 고정. 타겟 원장에 CREATE/INSERT/`migration repair`/복제/재적용을 하지 않음. **이번 수정의 실제 결과는 신규 CI 실행 전까지 미확인**.
+- **안전:** 사용 완료한 main one-shot marker는 재사용하지 않음. 개인 식별자·raw migration statements·토큰·SQL 에러 내용을 결과 artifact에 올리지 않음. Production SQL/Role, Hosted Auth/Storage, 유료 자원, Privacy Canary 변경 없음. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-B: Auth 연결 실측 PASS 및 Provider migration 원장 비교 구현
+
+- **병합 및 실측:** PR #3234 필수 통합 검사 [#43141494629](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43141494629) 성공, `main e6e7f5ca5eba7c465f956b5a18acb614d3ce2db9` 병합. 일회성 보호 main [#43142832141](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43142832141) 성공. 최신 Supabase CLI 3.1.0 / PG17 무료 격리 대상에서 봉인 source 백업 #42752268638의 실제 Auth 관계 검사: 사용자 4/4, 식별 4/4, 세션 16/16, 갱신 토큰 23/23, MFA-AMR 16/16; 고아 참조 4종 각각 0, Provider FK 33개 중 NOT VALID 0, 내부 비활성 FK 트리거 0. 집계 결과 artifact #13910092446 내부 파일 SHA-256 `36c5effc28909f9b90964e11d5dee8e84aa91c3beb8640624a39f8509487bc98`. 별도 `POSTGRES_PROVIDER_AUTH_REFERENCE_INTEGRITY_20261112.json`에 범위 고정.
+- **원장 비교 후속 구현:** 봉인 백업 공개 manifest를 정확한 encrypted SHA와 source SHA에 결속해 원본 `supabase_migrations.schema_migrations` 242개, frontier `20261109071019`, 전체 statement-hash catalog `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`로 고정. 격리 로컬의 numeric/all version 수, frontier, 해당 방식으로 계산한 catalog SHA-256을 READ ONLY 트랜잭션으로 확인하고 비식별 metadata만 집계한다. 인과적으로 원본과 동일한 Provider migration ledger가 재생됐다는 증명은 **실제 결과 대조 전까지 없음**. 원장 mismatch 자체를 CI 실패나 자동 migration repair로 처리하지 않고 `HOLD`로 보존하며, source fingerprint가 우연히 일치하더라도 Hosted/DR 승격 금지.
+- **안전:** 사주/상업/다른 트랙 코드, Production SQL·migration deploy/repair/GRANT, 개인정보 canary, 실제 Hosted Auth/Storage 및 유료 자원 변경 없음. 기존 한 번 사용한 marker 대신 새 보호 main 1회 실행을 사용한다. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, P0 #1887 OPEN 유지.
+- **남은 것:** 원장 실측 결과, 실제 Hosted Auth 로그인·refresh·폐기, Storage 바이트, 현재 backup frontier 서비스 정합성, 독립 개인정보 연속성, 전체 RPO/RTO. 이들이 확보되기 전까지 Gate 1 종료 불가.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-B: 봉인 Provider Auth 연결관계 격리 정합성 검증 구현
+
+- **구현:** 기존 봉인 백업 #42752268638의 Provider 33블록/93행 실제 격리 복원 #43136341133 성공 증거를 재사용한다. 이번 작업은 동일 출처의 격리 로컬 PostgreSQL17에서 `auth.users`·`auth.identities`·`auth.sessions`·`auth.refresh_tokens`·`auth.mfa_amr_claims`의 원본 행 수(4/4/16/23/16)를 대조하고 참조 누락 4종, Provider FK `NOT VALID` 및 내부 트리거 비활성 건수를 **읽기 전용 집계**로 관측하는 후속 실증이다.
+- **안전 경계:** `scripts/operations/local-provider-auth-reference-integrity-readonly.sql`, `assess-provider-auth-reference-integrity.mjs` 및 전용 합성 테스트를 추가했다. 기존 무료 격리 데이터 복원 후 원본 사용자의 ID·토큰·이메일·객체 바이트는 조회/업로드하지 않고 집계 및 차단 여부만 결과 파일로 남긴다. 이전에 사용된 일회성 marker는 재사용하지 않고 새 1회 파일을 요구한다. 부정합 시 fail-closed. 로컬 코드 테스트 6건 통과; 실제 DB 실행 결과는 병합 후 CI artifact 확인 전까지 **미검증**.
+- **미완료:** 이 테스트는 FK/기초 참조 무결성만 다루며 로그인·refresh·MFA·삭제된 계정의 세션 폐기, Hosted JWT signing, 실제 Storage object bytes, Supabase provider migration ledger, source same-MVCC, 독립 개인정보 연속성 및 전체 RPO/RTO를 입증하지 못한다. Production DB/토큰·권한·Secret/유료 Hosted 대상 변경 없음. Gate=BLOCKED, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-C: 최신 백업과 0건 개인정보 원장의 정확한 관측 결속
+
+- **새 봉인 원본:** Scheduled Production PostgreSQL 백업 [#43128832121](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43128832121) / artifact 13904856784 성공. 공개 manifest `2026-11-12T00:42:44Z`, source `d046d06c9e90c047d17978b4dbf4deeed45b8490`, migration frontier `20261109071019` / 242개로 확인. source catalog bracket stable이나 **same-MVCC snapshot 아님**. 앞서 93/93행을 적재한 백업 #42752268638과 동일 frontier이지만 별도 백업이므로 실제 데이터 동일성이나 최신 Provider 복원을 추정 금지.
+- **원장 출처 결속:** 개인정보 암호화 캡처 [#43131250378](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43131250378) / artifact 13905665420 성공. 공개 manifest에서 source backup #43128832121와 source SHA 일치, backup 완료 `00:42:44Z` / captured `00:59:27Z` / coverage through `00:59:27Z` 확인. **eventCount=0**, `AUTHORITATIVE_CAPTURED_WINDOW_V1`, `futureSafePrivacyReconciliation=false`. 실 사용자 이벤트 내용·암호화 payload는 조회하거나 복호화하지 않음. 별도 비식별 근거 `POSTGRES_CURRENT_BACKUP_PRIVACY_LEDGER_PAIR_20261112.json`.
+- **감시 RED 보존:** 이전 freshness watch [#43114630966](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43114630966)는 이전 성공 캡처 #43073831947 이후 **17,082초** 경과로 `CAPTURE_COMPLETION_STALE` RED(7,200초 한계). 이후 원장 캡처가 성공해도 새 watcher 성공·지속적인 외부 이벤트 연속성을 인증한 것은 아님. freshness 경계 완화 금지.
+- **다음 및 차단:** 실제 non-zero 개인정보 replay와 사고까지의 독립 durable source continuity는 미증명. 정확한 문자열 `RUN_SYNTHETIC_PRODUCTION_PRIVACY_CANARY` 승인 없이 Production Privacy Canary 실행 금지. 새 Hosted DR/유료 리소스/Production SQL·권한 변경도 별도 명시 승인 필요. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / P0 #1887 OPEN 유지.
+
+Watchtower-Track: ops
+
+### 2026-11-12 KST — Gate 1 / Phase 8-B: 기존 봉인 백업 Provider 93/93행 실제 격리 복원 성공
+
+- **병합·실행:** 실제 데이터 복원 구현 [PR #3221](https://github.com/gycha0109-beep/MyeongHa/pull/3221), 첫 일회성 호출 [PR #3224](https://github.com/gycha0109-beep/MyeongHa/pull/3224)의 실행 #43132816493은 Git 이전 커밋을 포함하지 않은 checkout으로 **백업 다운로드 전에 실패**. 부모 이력 `fetch-depth: 2`와 새 1회 표식으로 수정한 [PR #3226](https://github.com/gycha0109-beep/MyeongHa/pull/3226)이 필수 통합 검사 #43134615884 성공 후 `main 553c0c90aae09c303c060be4203fd19acddd15ed`에 병합. **동일 `main`의 격리 재실행 #43136341133 SUCCESS**. 이전 RED를 실제 복원 성공으로 승격하지 않음.
+- **원본·대상:** 기존 암호화 Production 백업 #42752268638 / artifact 13734401337 / source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`; 새 Production 백업이나 변경 없음. 무료 GitHub Actions 내부 일회성 Supabase CLI 3.1.0 / PostgreSQL17, 로컬 API/Auth/Storage 서비스 중지 후 비공개 SQL로 PostgreSQL 단일 트랜잭션 적재. Source COPY 33개 블록 총 **93행 / 격리 대상 전후 실제 증가 93행**; 테이블별 행 수 일치, 데이터 적재 중 제약조건 활성. 과거 누락 29/29 관계와 투영 3/3 관계의 COPY 컬럼 수준 정확 일치. CI 로그에 `SEALED_PROVIDER_REPLAY_VERIFIED isolated_rows=93 DR_BLOCKED` 기록.
+- **확인된 비식별 증거:** run [#43136341133](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43136341133), 적재 집계 artifact **13907413085** 내부 `myeongha-provider-isolated-row-replay.json` SHA-256 `0b086178e9a6d3e2ebff2e4d1b5089844934471a605667a08fa119785041e9f1`; COPY header artifact **13907378335**, 내부 `myeongha-provider-sealed-copy-preflight.json` SHA-256 `49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989`. 파일 본문 직접 확인. SQL·원본 사용자 행·토큰·객체 바이트는 증거에 포함하지 않음. 별도 `POSTGRES_PROVIDER_SEALED_ISOLATED_ROW_RESTORE_20261112.json`에 권한 경계와 증명 범위를 고정.
+- **정확한 한계:** 93/93은 **2026-11-10 기준 해당 백업**의 Provider COPY 데이터가 격리 DB에 적재된 증거이지, 현재 frontier의 Hosted Auth/Storage 전체 복구·세션 갱신/폐기·객체 실제 바이트·Provider 전체 migration ledger·전체 앱 스키마/ACL·동일 MVCC snapshot·독립 개인정보 이벤트 연속성·서비스 RPO PT24H / RTO PT6H의 증거가 아님. 기존 운영 DB·권한·실서비스·Secret·유료 DR 환경 미변경. Gate 1 / Phase 8 **BLOCKED**, P0 #1887 OPEN, `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`.
+- **다음:** 승인된 Phase 8-B Provider migration ledger와 Hosted Auth/Storage 복구 정합성의 잔여 차이부터 분류하고, 기존 무료 격리·비식별 증거를 재사용한다. 신규 유료 Hosted DR, 운영 SQL/권한, Production Privacy Canary는 별도 명시 승인 전 실행 금지.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-B: 실제 봉인 백업의 Provider 전용 행 복원 경로 구현
+
+- **사전검증 증거:** 봉인 Production 백업 #42752268638 / source artifact 13734401337에 대해 CLI 3.1.0 무료 격리 스키마에서 실제 Provider COPY 33개·93행을 확인. #42987584238 SUCCESS, artifact 13839928483, SHA-256 `49789677e69ae8747bad1a3a8cf7a185d245a03118f4d63c6e56dbc299dd8989`. 과거 누락 관계 29/29, 부분 복원 관계 3/3 모두 COPY 헤더·컬럼 수준 exact. 이는 **행 삽입 성공 증거가 아님**.
+- **이번 변경:** 같은 신뢰 경계의 수동 GitHub 실행 옵션으로 Provider 전용 원본 COPY를 비공개 임시 파일로 추출한다. 가동된 로컬 Auth/Storage 및 기타 서비스 컨테이너를 중단하고, localhost 일회성 PostgreSQL에 제약조건 유지 상태로 1개 트랜잭션에서 삽입한 뒤 테이블별 행 수 전후 차이를 대조한다. 오류 SQL·COPY 내용은 업로드하지 않고 비식별 집계만 CI 증거로 남긴다. 원본 애플리케이션 테이블, Production SQL/권한, 호스팅 프로젝트는 변경하지 않는다.
+- **검증 상태:** 합성 코드 테스트 3건 통과 및 GitHub CI 권한·책임 검사 통과. 실제 봉인 백업의 93행 적재 여부는 본 커밋 병합 후 정확한 main에서 별도 실행·증거 확인 전까지 **미검증**. 사전검증과 적재 검증의 판정을 혼동하지 않는다.
+- **미해결:** 전체 Supabase migration ledger, Auth 세션·refresh token, Storage object bytes, 동일 원본 snapshot 검증, 개인정보 독립 연속성, RPO/RTO 미증명. Issue #1887 OPEN, NOT_ACCEPTED, `drReady=false`, `serviceResumptionAllowed=false` 유지.
+
+Watchtower-Track: ops
+### 2026-11-11 KST — Gate 1 / Phase 8-B: CLI 3.1.0 Provider 전체 구조 확인 및 암호화 백업 적재 구문 사전검증
+
+- **실측 결과:** 기존 백업 #42752268638에서 누락됐던 Provider 테이블 29/29개(Auth 22, Storage 7), 제외됐던 18/18 컬럼 모두 무료 Supabase CLI 3.1.0/PostgreSQL17 격리 스키마에 존재. 실행 #42983135911 SUCCESS, artifact 13838168533, SHA-256 `37f75702037caf3d224d74541fd201aef4eed7b50d0545cb51a7353bc9a532ba`; 2.122.0 대비 Storage lifecycle 테이블 2개가 추가 확인됨. 실제 Provider 원본 행 삽입은 0건.
+- **다음 구현:** 동일 암호화 백업의 실제 Provider COPY 헤더·행 개수와 새 로컬 스키마의 필수값/컬럼 메타데이터를 대조하는 별도 무료 격리 사전검증 경로 추가. 비공개 RUNNER_TEMP에서만 복호화하며 CI artifact에는 컬럼 및 개수 기반 비식별 검사 결과만 남김. 실제 데이터 복원·Auth 세션 검증·Hosted 동등성 증거는 아직 없음.
+- **안전 차단:** Production DDL/SQL/권한/Secret 변경 없음. Provider ledger·개인정보 독립 연속성·전체 RPO/RTO 미증명, Issue #1887 OPEN. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` 유지.
+
+Watchtower-Track: ops
+### 2026-11-11 KST — Gate 1 / Phase 8-B: 무료 격리 Provider 스키마 실측
+
+- **실제 검사:** PR #3213의 필수 통합 검사 #42977371860 성공, main 병합 30e6c9c03835c5fd9b215125e9b42315fc2cc0ed. 무료 GitHub Actions 격리 Supabase CLI 2.122.0/PostgreSQL17 읽기 전용 스키마 검사 #42979219119 성공, artifact 13836926312, 파일 SHA-256 4f0553fd002221423acb56e41100cb4b5a0be4d487accac458eec4b884657bbc.
+- **비식별 실측:** 백업 #42752268638의 복원 증거 #42967203704에 있던 누락 Provider COPY 29블록/66행 중 Auth 테이블 22/22개, Storage 테이블 5/7개를 로컬에서 확인. 없는 테이블은 storage.bucket_lifecycle_states와 storage.lifecycle_abandoned_artifacts이며 해당 원본 행은 0개. 과거 제외 컬럼은 18/18개가 로컬에 존재. 실제 Provider 원본 행은 복원하지 않았고 로그에 개인정보·토큰·실제 데이터 저장 없음.
+- **한계와 다음:** 구조 존재만 입증. CLI v3.1.0 안정판의 새 격리 스키마를 별도 비교하고, 그 결과를 토대로 Provider 호환 복원 가능성을 판단. 현재 Hosted Auth/Storage, 독립 개인정보 연속성, RPO/RTO 및 서비스 재개는 미증명. Production SQL/권한/유료 프로젝트 변경 없음. P0 #1887 OPEN / NOT_ACCEPTED / drReady=false / serviceResumptionAllowed=false.
+
+Watchtower-Track: ops
+### 2026-11-11 KST — Gate 1 / Phase 8-A: sealed-backup external-role recovery proven (48/48), broader DR blocked
+
+- **실행:** 실패 #42965479758의 비공개 임시 경로 불일치를 PR #3211로 수정·병합(main 3fbd8f8017f367258ca74ea2c2a0bc5e35a61f02). 필수 CI SUCCESS 후 기존 암호화 Production 백업 #42752268638 (artifact 13734401337, source 4de4e050e1e9393850a34eb68f8fa60973dc9f63, migration 20261109071019, 242개)을 새 코드로 격리 Supabase PostgreSQL 17에 복원: https://github.com/gycha0109-beep/MyeongHa/actions/runs/42967203704 SUCCESS, 비식별 artifact 13830933913. 신규 Production 백업·SQL·권한·canary 변경 없음.
+- **원본 대비 복원 실측:** 봉인 source 앱→외부 postgres 직접 membership 원본 48/복원 48, 옵션 기준 누락 0·추가 0, 원본 grantor 차이 0. ADMIN=true 43, INHERIT=true 3, SET=true 2. 역할 복구 SQL은 비공개 임시 경로에서만 실행하고 공개 artifact로 내보내지 않음. 기존 필터링 roles.sql 자체의 누락 48개는 유지: 원래 dump 누락과 별도 재생 후 target 성공을 혼동 금지. 원본 source catalog는 백업 전후 bracket witness이며 same-MVCC snapshot 보증이 아님.
+- **잔여 HOLD:** 앱 내부 7개 직접 membership은 원본/복원 수와 옵션이 일치하지만 portable grantor 재작성 7건으로 exact grantor parity는 false. 현재 3 schema/94 table/322 function 중 legacy ACL hash-only 차이 2/8/19개 때문에 applicationScopeVerdict=HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH. Provider COPY 29블록/66행 skipped, 3블록/27행 projected(284행 replayed 중 일부), full Supabase migration ledger·실제 Hosted Auth/Storage 및 객체 바이트·독립 개인정보 연속성·서비스 전체 RPO/RTO 미증명. gate=BLOCKED / NOT_ACCEPTED / drReady=false / serviceResumptionAllowed=false, Issue #1887 OPEN 유지. 증거 파일별 SHA-256과 정확한 값은 외부 역할 복원 관측 JSON에 비식별 기록.
+- **다음:** 기존 무료 Supabase CLI/Docker 검증기와 PostgreSQL 복원 대상의 Provider 스키마 차이를 확인하고 29개 Provider COPY 누락 원인을 분류한 뒤 호환되는 격리 복원 경로를 구현한다. Hosted 동등성은 별도 검증까지 미승인.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 무료 Docker Supabase PostgreSQL17 역할 연결 복구 구현·합성 실증
+
+- **실제 원인:** 기존 `scripts/operations/run-production-postgres-strict-dump.sh`의 예약된 수신 역할 GRANT 필터 때문에 봉인 백업의 `roles.sql`에 앱 역할→`postgres` 직접 연결이 포함되지 않음. 최신 격리 복원 #42945204368에서 원본 48/복원 0으로 확정. 운영 DB `pg_auth_members` SELECT-only 메타 집계 재확인: 앱 역할 43개→`postgres` 수신 직접 GRANT 48개, grantor 분류 `supabase_admin`·`postgres`만 존재, admin true 43/inherit true 3/set true 2. 실제 원본 행·역할명은 비공개.
+- **이번 Docker 구현:** 봉인된 암호화 백업 안 `source-app-catalog.json`의 원본 직접 권한 연결만 허용 목록(앱 역할→`postgres`, grantor 2종, 3개 옵션 boolean) 검증 후 개인 `RUNNER_TEMP` 안에 SQL을 생성하고, `scripts/run-postgres-isolated-restore-drill.sh`에서 기존 격리 PostgreSQL17 `supabase_admin`으로만 트랜잭션 복원하도록 연결. 다른 Provider 역할을 만들거나 운영 SQL/권한을 변경하지 않으며, SQL·이름·개인정보는 GitHub 로그/아티팩트 업로드 금지. 실패 시 전체 복원 단계 HOLD, 원본 filtered dump는 그대로 보존. 결과는 기존 정확한 source↔target 카탈로그 비교에서 별도 평가.
+- **실제 무료 Docker 실증:** Windows Docker Desktop Engine 29.8.2, 자체 네트워크 없음/포트 공개 없음/영속 볼륨 없는 임시 `public.ecr.aws/supabase/postgres@sha256:6942962433a569e87f228b4d4ab7e11db5deca64e43babb3a038443ad6c4f1bb` (PG17.6.1.167)에서 **합성 역할 43개·연결 48개** 복원 옵션/부여자 48/48 일치, 누락 역할 시 트랜잭션 전체 롤백, 두 번째 실행 시 중복·변형 없음. 검사기 `scripts/verify-isolated-postgres-external-role-replay.mjs --docker` 실제 PASS. 일반 PostgreSQL 17 이미지는 Supabase 전용 bootstrap admin grantor와 달라 실패했으므로 실환경에 가까운 Supabase Docker 이미지만 사용. 기밀 데이터 원본은 투입하지 않음.
+- **증거 및 한계:** `docs/operations/POSTGRES_DOCKER_EXTERNAL_ROLE_REPLAY_PROOF_20261111.json`은 합성 원본/대상 결과만 비식별 보존. 원본 봉인 백업 #42752268638의 48건을 수정된 복원 경로에서 **아직 실제 재생·검증하지 않았으므로** 원본 복구 성공으로 보고하지 않음. source catalog는 dump 이전/이후 안정 관측이지만 같은 MVCC snapshot 증거 아님. Provider 객체/ACL legacy 29, Provider COPY skipped 29/projected 3, 전체 migration ledger, 실제 Hosted Auth/Storage, 개인정보 독립 연속성, full-service RPO PT24H/RTO PT6H 미증명. P0 #1887 OPEN, `drReady=false`, `serviceResumptionAllowed=false`, `NOT_ACCEPTED`.
+- **다음:** PR 필수 Integration PASS 및 `main` 병합 뒤 기존 encrypted backup #42752268638을 한 번만 Docker 기반 격리 PG17에 재복원해 원본 48건 grantor/options parity 실측, 안전한 비식별 JSON만 기록. 유료 Hosted 환경 생성·운영 SQL/DDL/DML/GRANT·개인정보 canary 실행 없음.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 새 운영 전용 Admin A4 migration 현재 ACL 효과 SELECT-only 실측
+
+- **근거:** PR #3205 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42947155405 SUCCESS, main `28e71e125ab3be814db5b002502467224da6f746` 병합. 운영 PostgreSQL 17 `supabase_migrations.schema_migrations` 현재 적용 242개 / main SQL 276개, 공통 200, 원격 전용 42(기존 41+1), 저장소 전용 76. 새 원격 전용 버전 `20261109071019` Admin A4 reading AI cost binding reader에 대한 원격 저장 SQL 1개, 5,512 bytes, SHA256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8` (원문은 공개하지 않음).
+- **읽기 전용 실제 효과:** `scripts/operations/production-admin-a4-reading-cost-reader-acl-readonly.sql`을 **BEGIN TRANSACTION READ ONLY**로 현재 Production 카탈로그에 실행하여 `2026-11-11T02:53:10Z`에 실측. `myeongha_reading_ai_cost_binding_reader_v1` 역할/대상 `public.reading_execution_attempts` 테이블 존재 1/1, 해당 역할 LOGIN/NOINHERIT/NOBYPASSRLS 등 제한 플래그 일치. 관리자 전용 `postgres` membership (grantor `supabase_admin`, ADMIN=true, INHERIT/SET=false) 정확히 1건, 기타 관련 연결 0. `public` 스키마 USAGE true, 대상 테이블의 명시적 전체 SELECT ACL 0, 예상 5컬럼의 SELECT 권한 5/5, 예상 외 허용 0, 테이블 변경 권한 없음. 테이블 RLS는 **비활성**, 정책 정의 2건(현재 restrictive 0건)이 존재하므로 이를 행 단위 RLS 수용 또는 서비스 권한 보안 승격으로 해석하지 않음.
+- **결속/한계:** `docs/operations/POSTGRES_ADMIN_A4_READER_CURRENT_ACL_OBSERVATION_20261111.json`에 정확한 원격 SQL digest, 현재 catalog 출력, 관측 시각, source main commit 및 비인증 범위를 비식별 고정. 확인 내용은 **현재 운영 카탈로그의 관측 상태**이며 적용된 SQL의 실행자 인증·완전한 DDL/권한 인과관계·same-MVCC 백업/복구 역할 parity·비밀번호/토큰 및 Provider Auth·Storage 복원을 입증하지 않음. 운영 전용 버전은 여전히 main 원본 파일이 없고 migration version identity / restore parity 미해결. 이전 41개의 역사 disposition은 보존. Admin 트랙 소스·migration을 수정하지 않음.
+- **다음 / 수용 차단:** Gate 1/8-A의 새 버전 원격 ACL 현황은 관측했으나 Provider 권한 및 Hosted 호환 복구 target은 여전히 미존재. 격리 백업의 앱↔외부 direct membership 48/0, Provider COPY skipped 29/projected 3, full migration ledger, Hosted Auth/Storage, 독립 privacy 원장 연속성, 서비스 전체 RPO PT24H/RTO PT6H 미증명. P0 #1887 OPEN / `drReady=false` / `serviceResumptionAllowed=false` / `NOT_ACCEPTED`. 새 유료 DR Hosted 프로젝트는 금액·대상·외부 부작용 보고 후 사용자 명시적 승인 필요. 운영 GRANT/DDL/DML, migration repair, IAM·비밀·원본 백업/개인정보 canary 추가 실행 없음.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 봉인된 백업 역할 SQL 전수 인식 및 외부 연결 48건 미복구 확정 범위 고정
+
+- **코드·실행 결속:** PR #3202, 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42943059052 SUCCESS, merge `a53678d3962ea93ba1ded8e8d17747d322641043`. 기존 암호화 Production 백업 #42752268638 (source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, migration frontier `20261109071019`)만 사용하여 격리 PostgreSQL 17 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42945204368 SUCCESS (artifact 13822446594, run HEAD = merge SHA). Production 백업 추가 실행·GRANT/role/DDL/DML·환경설정·Hosted 생성 없음.
+- **실측 새 결론:** 봉인 source에서 직접 앱↔비앱 역할 멤버십 **48건**, 복원본 **0건**. 해당 격리 runner의 실제 filtered `roles.sql` 중 GRANT 문장 **8개**; quote-safe 비인용 `ON`→`TO` clause-order로 역할 멤버십과 구조적으로 분리되는 **1개**, 미해석 **0개**. 정확한 객체 privilege grammar로 인정된 문장은 0이며, 구조가 분리된 1개는 객체 권한 의미·유효성·복원 parity 검증이 아님. 인식된 역할 GRANT 문장에 source 48건에 대응하는 granted→member 쌍 **0/48**, 백업 역할 SQL에서 누락된 direct source 멤버십 **48/48**. 기존 reserved-recipient 제외 패턴의 누락 후보 48 / 기타 0; 복원 원인으로 해당 필터가 각 행을 실제로 삭제했는지까지 개별 증명한 것은 아님. Coverage verdict=`HOLD_SOURCE_EXTERNAL_ROLE_GRANT_PAIRS_MISSING_FROM_FILTERED_DUMP`. **미해석 오류는 해소됐지만 권한 복구 정합성은 미수용/HOLD**.
+- **무결성·비공개:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`의 `quoteSafeClauseOrderRestore`에 run/artifact/source SHA 및 다섯 비식별 증거 파일 hash 고정. `role-dump-coverage.json` SHA256 `d836a23ca3809e87ec8d74e6ae82e5bde202c971ddcc4dd685975581b23f07b2`, `app-schema-parity.json` `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `f1af2fe44302c0a4b8dfd0a4885f12a32127a58aeedaf141d54979e9a4ee8ee7`. 원본 앱/외부 역할명, SQL 구문, 개인정보·비밀은 공개하지 않음.
+- **엄격한 수용 한계:** 기존 앱 내부 roles 43/43·direct memberships 7/7·expected portable grantor rewrite 7/7과 교차 경계 48/0은 별도 scope. source bracket 관측과 `pg_dump`의 정확히 같은 MVCC snapshot 증거 없음; granted→member 쌍 부재만 입증되며 grantor/options·effective/inherited privilege·provider role 소유권 동등성 미입증. Legacy ACL hash 29 objects, Provider COPY 29 skipped/3 projected, 전체 Provider migration ledger, Hosted Auth/Storage, 독립 개인정보 이벤트 원장 continuity, 전체 서비스 RPO PT24H/RTO PT6H가 미입증. `roleMembershipParityProven=false`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN, `NOT_ACCEPTED`.
+- **다음 로드맵 Gate 1 Phase 8-B:** SQL 파서 추가 반복은 필요 근거가 없으므로 중단한다. **Provider-compatible isolated Hosted target**이 없는 상태에서는 관리형 역할·Auth/Storage·migration ledger를 온전히 복구할 수 없으며 기존 두 프로젝트를 복구 타깃으로 재사용하지 않는다. 추가 유료 Hosted 환경이 필요하면 사용자에게 비용·대상·부작용을 명시한 뒤 별도 승인 받고 진행한다. Production migration repair/권한/설정 수정이나 Privacy canary는 사전 승인 없이 수행하지 않는다. 현재 로드맵/수용 완료 미달로 ROADMAP_COMPLETE 선언 금지.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 엄격 객체 GRANT 분리 실측 및 인용 식별자 안전 구조 진단 추가
+
+- **현재 복원 실행 결속:** PR #3200 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42939897059 SUCCESS, merge `5a2615d9f2b423a0b6d845858885f6e1f4d7aeaa`. main `231c657dba354ea1800ee5c7a73c4953a2069e4b`에서 기존 암호화 source backup #42752268638 (source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, frontier `20261109071019`)을 사용해 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42942053576 SUCCESS, artifact 13821281666. 새로운 Production 백업/권한 변경은 없었다.
+- **실제 권한 관측:** 봉인 source 앱↔비앱 직접 membership 48개, 격리 복원 0개; filtered roles.sql의 GRANT 8문장 중 정확한 객체 권한 문법으로 인정된 0개, 미해석 1개. 미해석 범주는 `unquoted_or_unexpected_granted_roles:1`이며, 이전 `object_privilege_grant:1` 휴리스틱 분류를 **확정적인 객체 권한 진단으로 승격할 수 없음을 확인**했다. 인식한 역할 쌍에 source 48개 중 발견 0/부재 48, 누락 수신자 필터 후보 48/48·기타 0. `HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED` 유지. 실제 SQL의 1문장이 역할 membership이 아니라고 아직 입증되지 않았다.
+- **비식별 출처:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`의 `strictObjectGrantSeparationRestore`에 해당 run, SHA, artifact 및 수용 차단을 추가. `role-dump-coverage.json` SHA256 `3a62e58a650f156d76da0aacbc4d3dca93d7cf6bd8115a4636dfb6e16f6dfc41`, `restore-evidence.json` `af9c236614a8d4effa0f7941209bf48699a4396264818d1f91509b203d5d01ed`, `app-schema-parity.json` `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`; raw role 이름/GRANT SQL/사용자 데이터는 공개하지 않음.
+- **이번 구현:** SQL 구조 토큰에서 인용 식별자와 문자 리터럴을 제거한 뒤 비인용 `ON` 키워드가 비인용 `TO`보다 앞선 경우에만 **역할 membership GRANT와 구조적으로 구별되는 객체 GRANT**로 분류·집계한다. 정확한 PostgreSQL 객체 권한 유효성, owner/grantor, 효과 권한 증명은 아님. `ON`이 인용된 역할명 안에 있거나 `TO`가 없으면 단순 객체 분리를 허용하지 않고 HOLD. 빈/미완성/알 수 없는 역할 SQL은 계속 HOLD. Node24 verifier와 기존 schema parity verifier PASS, `git diff --check` PASS. 새 구조 구분기를 적용한 실제 격리 SQL 관측은 **이번 PR 병합 전 아직 없음**.
+- **회복 차단 유지:** roleMembershipParityProven=false, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN / `NOT_ACCEPTED`. 동일 MVCC source snapshot·Provider role grant 동등성·legacy ACL 29 objects·Provider COPY 29 skipped/3 projected·full migration ledger·Hosted Auth/Storage·개인정보 원장 독립 연속성·RPO PT24H/RTO PT6H 미입증. Production DDL/DML/GRANT, IAM, secrets, Hosted 리소스, 승인 전 canary를 수정하거나 생성하지 않음.
+- **다음:** 별도 PR CI/Integration 성공·병합 후 기존 sealed backup #42752268638로 격리 PG17 복원 **1회**하여 미해석 구문이 객체 GRANT 구조로 구별되는지 확인하고 누락된 원본 48개를 출처와 결속. 그 이후 추가 파서 반복 대신 approved Gate 1의 Provider 호환 복구 조건과 승인 필요 자원·권한 범위를 근거 중심으로 정리. ROADMAP_COMPLETE 선언 금지.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 미해석 GRANT 1문장 객체 권한 후보 실측·역할 권한과 보수적 분리
+
+- **실측 결속:** PR #3199 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42937180237 SUCCESS / main 병합 `5ae1d39397ee576e2a78deccc896ec87a29958e6`. 기존 암호화 백업 #42752268638, source SHA `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, migration frontier `20261109071019`를 재사용한 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42938743906 SUCCESS, artifact 13819433379; 새 Production 백업/권한 변경 없이 실행.
+- **실제 대조:** source 앱↔비앱 직접 멤버십 48건, target 0. filtered roles.sql GRANT 8문장 중 정상 인식한 7개에서 source 권한 쌍 0건, 관측 누락 48/48건 중 reserved recipient 패턴 후보 48건/기타 0. 미해석 1문장의 비식별 유형은 `object_privilege_grant: 1`. 기존 분류기는 단순 `ON` 토큰을 기준으로 삼았으므로 이 유형만으로 확정적 객체 GRANT 판정·전체 역할 부재를 증명하지 않음. verdict=`HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED`.
+- **증거:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`의 `classifiedUnparsedGrantRestore`에 실행·아티팩트·SHA·보류 범위를 추가. `role-dump-coverage.json` SHA256 `787be7d1df98fe39a8043d86360df060bee5b5b3ce078a53ea21d5de78190f0a`, `app-schema-parity.json` `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `c86248eae4c3d7cc9b414b2a99f2e1385d5f201b9813a8a6fe9029aeee8d4595`. 원본 role 이름·권한 GRANT tuple·개인정보는 공개하지 않음.
+- **이번 구현:** 기존 `observe-postgres-sealed-role-dump-coverage.mjs`에서 `ON`의 무차별 탐색 대신 고정된 PostgreSQL 객체 GRANT의 privilege list + ON + object class 문법을 엄격히 식별하며, 인식된 객체 GRANT는 직접 역할 membership 미해석 건수와 별도로 비식별 집계한다. 실제 SQL이 이 문법에 부합하지 않으면 계속 미해석 HOLD. 합성 단일/다중 role GRANT, 객체 GRANT, 역할명 `ON` 경계, 미지원 문법에 대한 Node24 verifier PASS.
+- **남은 수용 차단:** 정확한 filtered SQL 객체 grant 해석은 본 코드 병합 후 재격리 관측 필요. 이를 해소해도 source와 pg_dump 같은 MVCC snapshot이 아니고, provider-compatible cross-boundary role/restored privilege 동등성이 미입증. 기존 legacy ACL 해시 29 objects, Provider COPY 29 skipped/3 projected, migration ledger, Hosted Auth/Storage, 독립 privacy continuity, full RPO/RTO 모두 HOLD. P0 #1887 OPEN, `drReady=false`, `serviceResumptionAllowed=false`, `NOT_ACCEPTED`. Production GRANT/DDL/DML·IAM·비밀·Hosted·canary 변경 없음.
+- **다음:** PR 승인된 CI/Integration 성공 후 자동 병합되면 동일 backup #42752268638의 격리 PG17 복원 1회로 객체 GRANT 인식·역할 쌍 누락 건수를 실측한다. Provider 범위·서비스 재개 승인으로 승격 금지. ROADMAP_COMPLETE 선언 불가.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-A: 개선된 GRANT 분석기의 동일 백업 격리 실측 및 미해석 1문장 원인 유형 진단
+
+- **실행 결속:** 이전 PR #3195·#3196·#3198 모두 필수 Integration SUCCESS 후 병합 완료. 기존 암호화 백업 #42752268638 (source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, frontier `20261109071019`) 재사용, 신규 Production 백업 없음. 개선된 multiline/multi-recipient 분석기 포함 main `f91a9f1773bad0c7d6424cb27248e6ae1b1233b7`에서 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42935870383 SUCCESS, artifact 13816869352; 중간에 병합된 Admin 코드 변경은 운영 복원 SQL을 수정하지 않음.
+- **실측 결론:** 암호화 source의 앱↔비앱 직접 멤버십 원본 48건 / 격리 복원 0건. 실제 filtered `roles.sql` GRANT 문장 8개, 정상 인식 7개, **미해석 1개 유지**. 정상 인식된 구문에 source 역할 쌍 0/48, 부재 후보 48/48은 reserved-recipient 수신자 필터 해당, 기타 0. 미해석 문장이 source edge와 관련됐는지 증명되지 않아 `HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED` 유지. 복원 SUCCESS를 Provider full parity 또는 Phase 8 수용으로 승격 금지.
+- **근거 해시:** `app-schema-parity.json` SHA256 `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `6295892fe53ea296f2758aa937a4744afd3ff81ca006e03ee5d492a23e4326b4`, `role-dump-coverage.json` `d6474c2240c381fd0da8e95b8ee38a4a323d3828542666dddbd4438239c0db19`; 이전 원본 복원 분석은 보존하고 `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`에 본 실행을 `refinedParserRestore`로 별도 결속.
+- **추가 미완료 진단 구현:** `scripts/operations/observe-postgres-sealed-role-dump-coverage.mjs`가 미해석 GRANT를 원문·역할명 없이 **미종결/일반 객체 권한/TO 누락/역할 식별자 형식/옵션 형식**의 고정된 범주별 건수로만 공개하도록 보강. 범주 구분은 실제 누락 48건의 권한 복구나 원본과 동일 MVCC 스냅샷·grantor/options·Provider 소유·상속/실효 권한 증명이 아니다. 합성 검증 PASS, 기존 schema parity 검증 PASS. PR/격리 실측 전까지 이 신규 원인 유형 분류를 실제 결과로 주장하지 않는다.
+- **계속 차단:** ACL legacy hash 29 objects, Provider COPY 29 skipped/3 projected, full Provider migration ledger, Hosted Auth/Storage, 개인정보 독립 source continuity와 future safe replay, 전체 서비스 RPO PT24H/RTO PT6H 미입증. P0 #1887 OPEN, `drReady=false`, `serviceResumptionAllowed=false`, `NOT_ACCEPTED`. Production SQL/GRANT/DDL/DML·IAM·비밀·운영 설정·유료 Hosted·승인 전 canary 변경 없음.
+- **다음:** 현재 승인 범위의 코드 PR 필수 CI/Integration 통과 및 병합 후 기존 source #42752268638로 필요 시 격리 복원 1회 실행하여 남은 GRANT 1개 구문의 비식별 범주를 확인, 이후 실제 수용 근거로 엄격 분리한다. 완료 조건 미충족, ROADMAP_COMPLETE 금지.
+
+Watchtower-Track: ops
+
+### 2026-11-11 KST — Gate 1 / Phase 8-C: 최신 정기 백업 성공·개인정보 원장 freshness GREEN, 독립 연속성 미입증
+
+- **현재 기준:** main `97a0e88f36b68838a9d608e3a209d5099e3db7b1`에서 정기 암호화 Production PostgreSQL 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42922087061 SUCCESS (`2026-11-10T23:17:17Z` 시작 / `23:20:57Z` 완료, artifact 13811234154, migration frontier `20261109071019`). 이 백업은 기존 11/10 원본 #42752268638과 다른 실행이며 아직 PostgreSQL 격리·Hosted 전체 복구 또는 최신 원장 일대일 결속이 입증되지 않았다.
+- **원장·감시:** 최근 암호화 개인정보 원장 캡처 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42915280991 SUCCESS (artifact 13809665641; `2026-11-10T22:31:37Z` 완료), **이 원장이 참조한 백업은 최신 #42922087061이 아닌 기존 #42752268638**. 후속 신선도 감시 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42923909478 SUCCESS, `RECENT_CAPTURE_COMPLETION_OBSERVED`, 최근 원장 완료 후 3,534초 경과로 허용 7,200초 이내. 하지만 원장 캡처 작업 자체가 이전 암호화 캡처와 **18,845초 간격**(정상 예정 3,600초 간격의 두 배 7,200초 초과분 15,245초)을 경고했다. 이는 개인정보 이벤트 누락을 입증하는 것도 아니며, 누락이 없음을 입증하는 것도 아니다.
+- **명시적 미수용:** 현재 일치하는 최신 백업+독립 개인정보 원장 조합은 미입증, encrypted 원장의 eventCount도 미확인. Watcher 자체가 `sourceContinuityProven=false`, `futureSafePrivacyReconciliation=false`, `approvedRpoProven=false`, `drReady=false`, `serviceResumptionAllowed=false`로 보고한다. 무중단 외부 durable 개인정보 이벤트 원장, approved canary nonzero replay, Hosted Auth·Storage 및 PT24H/PT6H end-to-end 복구 증거는 없다. P0 #1887 OPEN / `NOT_ACCEPTED`.
+- **근거 기록:** 각 실행 ID·artifact ID·source SHA·보존 원장 연결·캡처 간격·watcher 실측·수용 차단을 비식별 `docs/operations/POSTGRES_BACKUP_PRIVACY_FRESHNESS_20261111.json`에 별도 고정. 공개 파일에 사용자 행, 삭제 이벤트 payload, 토큰 또는 개인정보를 기록하지 않음. 새로운 백업·canary·Provider/Hosted 자원 생성 및 Production SQL/권한·환경 변경은 하지 않았다.
+- **다음 로드맵:** Phase 8-A 최신 필터 GRANT 분석기 PR #3196 병합은 확인됐으나 같은 backup #42752268638로 새 comparator를 실행한 격리 복원 결과는 아직 없음. 재실행 시 미해석 GRANT 1개 해소 여부와 원본 직접 멤버십 48건의 actual filtered SQL 포함/부재 건수 검증; Phase 8-C의 최신 원장/백업 정확한 결속과 snapshot 구간 연속성·nonzero event 입증은 별도 필요. Privacy canary 승인 문자열 없이 실행 금지, Phase 8 완료 및 ROADMAP_COMPLETE 불가.
+
+Watchtower-Track: ops
+
+### 2026-11-10 KST — Gate 1 / Phase 8-A: 실제 필터링된 roles.sql 대조, GRANT 1문장 미해석으로 HOLD 유지
+
+- **기준 결속:** PR #3193 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42765406281 SUCCESS, 병합 main `5144bc873983b06c44f5ef813fd17df2a3c2d13d`. 기존 암호화 원본 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638 (artifact 13734401337; source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`; frontier `20261109071019`) 재사용. 격리 PostgreSQL 17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42767722985 SUCCESS, artifact 13740043509, incident reference `2026-11-10T03:56:30Z`; Production 재백업·SQL·권한 설정·IAM·Hosted 변경 없음.
+- **실측:** 봉인 source 앱↔비앱 직접 membership 48개. 격리 러너의 **실제 필터된 `roles.sql`** 에서 GRANT로 시작하는 문장 8개 중 정상 문법 인식 7개, **미해석 1개**. 인식한 문장에 원본 역할 쌍 존재 0 / 부재 48, 전부 현재 reserved-recipient 필터 후보 48 / 기타 0. 미해석 GRANT 1문장의 수신자·대상 역할을 판별하지 못했으므로 **48개 연결이 백업 SQL에서 전부 확실히 제거됐다는 근거는 아직 부족**. 진단 verdict=`HOLD_FILTERED_DUMP_GRANT_GRAMMAR_UNRECOGNIZED`이며 이 HOLD를 우회하지 않음.
+- **기존 비교 병존:** isolated source→restored catalog 앱 내부 역할 43/43, 직접 멤버십 7/7, 예상 grantor portable rewrite 7/7, 외부 역할 연결 48/0 유지. 앱 스키마 legacy ACL hash 29 objects 차이, Provider COPY 29 skipped/3 projected, migration ledger 및 Hosted Auth/Storage 미복구. `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN, `NOT_ACCEPTED`, ROADMAP_COMPLETE 금지.
+- **비식별 증거:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`의 `actualFilteredRolesSqlObservation`에 기존 원본 복원 관측은 유지하면서 백업/실행/아티팩트 결속과 hash를 추가. `role-dump-coverage.json` SHA256 `d6474c2240c381fd0da8e95b8ee38a4a323d3828542666dddbd4438239c0db19`, `app-schema-parity.json` `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`, `restore-evidence.json` `8caf28f1bcdf194820fce9d053a73a71675cb180f2f3c5aea2062da64240292d`. 공개 자료에 raw role names, GRANT tuples, 개인정보, 토큰 없음.
+- **다음 Gate 1 작업:** 보안 경계를 유지한 채 기존 PostgreSQL 17 roles-only GRANT 구문의 미해석 1건을 정확히 분류하도록 파서를 보강한 뒤 동일 암호화 백업의 격리 복원 1회로 coverage 판정을 재확인. 원본과 같은 DB 스냅샷·grantor/options/Provider 소유·실효권한 동등성은 별도 미증명으로 둔다. 임의 권한 생성/복구·Migration repair·유료 Hosted·Privacy canary는 하지 않는다.
+
+Watchtower-Track: ops
+
+### 2026-11-10 KST — Gate 1 / Phase 8-A: 암호화 원본과 실제 필터링된 roles.sql 직접 연결 포함 여부 비교 추가
+
+- **전체 목표·기준:** 기존 운영 종료 집중 로드맵 Gate 1 / Phase 8-A #6의 권한 복구 동등성 검증을 계속한다. PR #3191 필수 Integration #42761495378 성공 후 main `c6c3374fe4cb541892146a5dc9e8a4975adcf67b` 병합. 기존 암호화 백업 #42752268638, 같은 source의 격리 복원 #42759540674에서 앱↔외부 역할 직접 membership 48건 중 48건 누락, 모두 기존 strict roles-only reserved-recipient 필터 후보였음. 이 수치는 **실제 roles.sql 행별 부재를 인증하지 않으므로** 추가 진단이 필요하다.
+- **이번 구현:** `scripts/operations/observe-postgres-sealed-role-dump-coverage.mjs`를 추가. 격리 복원 runner의 비공개 복호화 직후 암호화 source catalog에서 앱↔비앱 역할 직접 membership을 읽고, 아카이브의 **실제 필터링된 roles.sql**에 동일 역할 쌍의 GRANT 구문이 있는지 비교한다. source 원본 개수 / 백업 SQL 쌍 존재·부재 건수 / 기존 reserved-recipient 제외 필터 해당 후보 / 그 밖의 수신자 / SQL 구문 파싱 불가 건수만 `role-dump-coverage.json`에 출력. 이름·GRANT 원문·grantor·개인정보·비밀은 공개 산출물에 쓰지 않는다.
+- **보안·판정 경계:** 기존 `scripts/run-postgres-isolated-restore-drill.sh`의 사설 복호화 임시 경로에서만 관측하며 역할 생성·권한 부여·복구 데이터 변경 없음. 오래된 백업에 source 경계 필드가 없으면 관측 증명 없음. 예약 수신자 필터와 소스 비교가 일치하더라도 원본 pg_dump 전처리 이전 SQL/동일 MVCC snapshot·grantor/options·Provider 소유권·상속/실효 접근권한 동등성은 **미증명**. SQL에 미해석 GRANT가 있으면 HOLD 처리. 출력에는 `drReady=false`, `serviceResumptionAllowed=false` 고정.
+- **검증:** 합성 48건 전부 백업 SQL 부재, 일부 존재, reserved/일반 수신자 분리, SQL 문법 누락, 잘못된 source 역할, 구버전 증거 부재, 보존 정책 변경 및 원본 식별자 비노출을 Node24 verifier로 검증 PASS. 기존 PostgreSQL 격리 복원 workflow verifier PASS, 앱 스키마 parity verifier PASS, diff --check PASS. **새 코드로 실제 복원 CI를 실행한 증거는 아직 없음**.
+- **다음·차단:** HEAD CI/필수 Integration GREEN 및 main 병합 뒤 기존 sealed backup #42752268638을 **새 Production 백업 없이 한 번** 격리 복원하여 실제 `roles.sql` 포함 여부 건수와 artifact SHA를 별도 비식별 증거에 결속한다. 계속 Provider COPY 29 skipped/3 projected, full migration ledger, Hosted Auth/Storage, 개인정보 독립 연속성·full RPO PT24H/RTO PT6H 미입증; P0 #1887 OPEN, `NOT_ACCEPTED`, `roleMembershipParityProven=false`, `drReady=false`, `serviceResumptionAllowed=false`, ROADMAP_COMPLETE 미충족. Production GRANT/DDL/DML, migration repair, IAM·비밀·Hosted 유료자원·canary 변경 없음.
+
+Watchtower-Track: ops
+
+### 2026-11-10 KST — Gate 1 / Phase 8-A: 앱↔외부 역할 48건 누락의 예약된 GRANT 수신자 필터 후보 48/48 실측
+
+- **정확한 코드·출처 결속:** PR #3189 (merge main `4ebd0ca78f089bdb9a743c6663dbae45564b7fa6`), 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42758285919 SUCCESS. 앞선 봉인 암호화 Production 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638 (artifact 13734401337, source `4de4e050e1e9393850a34eb68f8fa60973dc9f63`, frontier `20261109071019`, migration 242건) **재사용**, 추가 Production 백업 없음. 최신 comparator 포함 main `4ebd0ca78f089bdb9a743c6663dbae45564b7fa6`에서 동일 백업 격리 PostgreSQL 17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42759540674 SUCCESS, artifact 13736534480, incident reference `2026-11-10T03:56:30Z`. 동일 백업을 사용한 최초 복원 #42757061875와 source 결속 일치.
+- **권한 분류 실측:** source 앱↔비앱 직접 역할 연결 48건, isolated target 0건, 누락 48/추가 0. 누락된 직접 권한의 **수신자(member)** 를 기존 strict `pg_dumpall --roles-only`의 예약된 역할 수신자 패턴과 비교한 후보는 48건, 그 밖의 수신자 0건. `observedDirectMembershipOptionParity=false`, `observedGrantorAttributionParity=false`, source 외부 역할 참조 1개·restored 0개. 후보 48/48은 정책상 제외될 수 있는 범위 일치이지 실제 `roles.sql` GRANT 줄별 제거 사실·권한 복구 실패의 완전 인과관계, Provider 소유 분류 또는 상속/실효 권한 상태를 증명하지 않음. 역할명과 원본 GRANT tuple은 공개 산출물에 포함하지 않음.
+- **앱 내부와 HOLD 분리:** 앱 내부 roles 43/43, direct memberships 7/7, grantor portability `postgres→supabase_admin` 7/7 예상 규칙/규칙 밖 0, 원본 grantor 동일성 false. 봉인 source 카탈로그와 복원이 같은 DB MVCC snapshot이라는 증거 없음. Canonical direct ACL 비교 true이나 기존 legacy ACL hash 29 objects 차이로 `HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH`. Provider COPY 29 skip/3 projected, provider 전체 migration ledger, Hosted Auth/Storage, 독립 Privacy 원장 연속성, 서비스 RPO PT24H/RTO PT6H는 계속 미입증. `roleMembershipParityProven=false`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN, `NOT_ACCEPTED`.
+- **산출물 무결성:** 신규 `app-schema-parity.json` SHA256 `96fea0c24762bbd8092d2304dc901cc90bf2148c8bb8e938e54cd2383b6cb3b3`; `restore-evidence.json` `9877035244757beaabf3c8c9479daceaa36ab5b084015a0753431682119647cf`; `privacy-reconciliation-evidence.json` `a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e`; `recovered-serving-admission.json` `cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595`. 기존 `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json` 원본 restore 세트는 보존하고 `followUpRestore`로 동일 source comparator 재실측을 추가.
+- **다음/차단:** 본 증거를 PR 필수 CI/Integration 통과 뒤 병합한다. Gate 1 / Phase 8-A·8-B의 다음 목표는 누락 48건의 재현 가능한 full provider-compatible role/membership 복구 가능성 및 migration/provider ledger/Hosted Auth·Storage 정합성이다. 현재 승인된 격리 Postgres 타깃은 해당 역할/권한 full fidelity를 충족하지 못하므로 숫자를 0으로 만드는 임의 role 생성·Production GRANT/DDL/DML·migration repair·보안 설정/비밀/유료 Hosted 신설은 수행하지 않는다. canary는 별도 정확한 승인 문자열 없이는 불가. Phase 8 완료·ROADMAP_COMPLETE 선언 불가.
+
+Watchtower-Track: ops
+
+### 2026-11-10 KST — Gate 1 / Phase 8-A 앱↔외부 역할 48건 격리 복원 누락 실측, HOLD 유지
+
+- **기준 및 실행 결속:** PR #3186 필수 Integration https://github.com/gycha0109-beep/MyeongHa/actions/runs/42747768365 SUCCESS / 병합 `e648758acab6eb30bc83a1fd04a6906fee307456`; 실행 main `4de4e050e1e9393850a34eb68f8fa60973dc9f63`. 암호화 Production 읽기 전용 백업 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42752268638 SUCCESS, artifact 13734401337, 생성시각 `2026-11-10T03:56:30Z`, 원격 migration frontier `20261109071019`, catalog 242건. 동일 백업을 이용한 격리 PG17 복원 https://github.com/gycha0109-beep/MyeongHa/actions/runs/42757061875 SUCCESS, artifact 13736645297, incident reference 동일 생성시각. Production DDL/DML/role/GRANT·기존 데이터·IAM·비밀·Hosted 설정 변경 없음.
+- **새 실측 결함:** Source의 정확히 한 끝점만 앱(`myeongha_*`) 역할인 직접 membership **48건**, source에서 참조하는 비앱 역할 **1개**; 격리 복원본 직접 연결 **0건**, 누락 48 / 추가 0. `observedDirectMembershipOptionParity=false`, `observedGrantorAttributionParity=false`. 비교기는 외부 역할의 Provider 소유권을 인증하지 않으며, 관측된 외부 role 이름·grant tuple·권한 원문을 공개하지 않음. 이것은 격리 복원 workflow 성공과 별개인 복구 정합성 **미달**.
+- **기존 내부 앱 영역:** roles 43/43, 앱→앱 직접 memberships 7/7, 속성/옵션 누락·변경 0. grantor provenance 차이 7 groups 중 `postgres`→`supabase_admin` 예상 portable 변환 7/7, 규칙 밖 0, 기존 attribution identical=false 및 `roleMembershipParityProven=false`. Catalog 3 schema / 94 table / 322 routine 원본·복원 개수는 동일, canonical direct ACL parity true이지만 legacy ACL hash 차이 2/8/19로 applicationScopeVerdict=`HOLD_APPLICATION_SCHEMA_PARITY_MISMATCH` 유지.
+- **원인 탐색의 한계:** `scripts/operations/run-production-postgres-strict-dump.sh`의 roles dump는 일부 예약된 role 수신자에 대한 GRANT 문을 주석 처리하며 `scripts/run-postgres-isolated-restore-drill.sh`는 운영 Provider 역할을 임의로 만들지 않음. 이는 48건 누락을 설명할 수 있는 **기존 이식 정책의 후보**이지, 봉인된 원본 48개 edge 전체와 규칙의 개별 인과 대응을 증명한 것은 아님. 운영 권한·복구 기준을 임의 수정하거나 누락을 PASS로 바꾸지 않음.
+- **비식별 무결성 증거:** `docs/operations/POSTGRES_APP_EXTERNAL_ROLE_BOUNDARY_RESTORE_20261110.json`에 backup/run/artifact/SHA 결속, 카탈로그·권한 차이 건수, 정책 보류와 근거 한계를 기록. 원본 `app-schema-parity.json` SHA256 `c9c00b13ad28da178ab78ac9dc6ded7d22eb90b3fb9d903ede249fc7d216bd09`, `restore-evidence.json` `aa87a3f93a263649208ba1e0e720929734eedaefb3941114e73dc5187b459be2`, `privacy-reconciliation-evidence.json` `a6ccfd8bfe2f1bd86c1cdbf1a76c05247959e7b86747fb826d523d780a913d3e`, `recovered-serving-admission.json` `cb30cd41efb22121125770c5afd9decbd3c30757752ea93584d4ca3b9be7e595`.
+- **미완료/다음:** 실제 Provider cross-boundary grant 복구, inherited/effective privileges, full migration ledger, Provider COPY 29 skipped/3 projected, Hosted Auth/Storage, 독립 nonzero 개인정보 연속성, future-safe replay, 전체 RPO PT24H/RTO PT6H 미증명. Synthetic 개인정보 4건은 독립 Production 연속성 아님. PR CI/Integration·병합 완료 후에도 P0 #1887 OPEN / `drReady=false` / `serviceResumptionAllowed=false` / `NOT_ACCEPTED`. 원인 검증 및 Provider-compatible 격리 복구 범위는 기존 Phase 8-A/8-B 내에서 계속 검토하되 Production GRANT/DDL/DML/Hosted 유료자원 변경은 사용자 승인 없이 실행하지 않음. ROADMAP_COMPLETE 미충족.
+
+Watchtower-Track: ops
+
 ### 2026-11-10 KST — Gate 1 / Phase 8-A: 앱↔외부 역할 직접 멤버십 비식별 복구 관측 경계 구현
 
 - **근거/우선순위:** 기존 승인된 종료 집중 로드맵 Gate 1 / Phase 8-A #6의 미입증 교차 역할 권한 범위를 좁힌다. 앞선 PR #3183 / merge main `60e63a7d9409b50b4968a77e7134ebfffee644c7`는 앱 내부 직접 멤버십 7/7 및 grantor 이식 규칙 7/7을 실측했으나, 앱 역할↔비앱 역할 경계는 의도적으로 제외했다. Provider-owned로 역할 소유를 분류하거나 상속/실효 권한 전체를 증명하지 않는다.

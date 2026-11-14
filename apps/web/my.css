@@ -419,3 +419,20 @@ html[data-theme="dark"] .my-settings-section::before { opacity: .07; }
 }
 
 .my-setting-link{color:var(--mh-ink-strong);text-decoration:none;transition:background .16s ease}.my-setting-link:hover,.my-setting-link:focus-visible{background:color-mix(in srgb,var(--mh-brass) 9%,transparent)}.my-setting-link .my-setting-chevron{color:var(--mh-brass-strong)}
+
+
+/* Owner-managed shared memory; same paper palette as My dashboard. */
+.my-shared-memory { display: grid; gap: 12px; max-width: 820px; }
+.my-shared-memory-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.my-shared-memory-item { border: 1px solid var(--my-line); border-radius: 10px; padding: 14px 16px; background: var(--my-paper); }
+.my-shared-memory-text { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0 0 10px !important; }
+.my-shared-memory-editor { display: grid; gap: 8px; }
+.my-shared-memory-editor label { color: var(--my-wine); font-size: 14px; font-weight: 650; }
+.my-shared-memory-editor textarea { min-height: 76px; width: 100%; resize: vertical; padding: 12px; border: 1px solid var(--my-line); border-radius: 9px; color: var(--my-wine); background: var(--my-paper-strong); font: inherit; line-height: 1.6; box-sizing: border-box; }
+.my-shared-memory-editor textarea:focus-visible { outline: 2px solid var(--mh-brass-strong); outline-offset: 1px; }
+.my-shared-memory-actions { display: flex; align-items: center; justify-content: flex-end; gap: 9px; flex-wrap: wrap; }
+.my-shared-memory-actions small { color: var(--my-text); margin-right: auto; }
+.my-shared-memory-actions button { padding: 8px 16px; border: 1px solid var(--my-line); border-radius: 8px; background: var(--my-paper-strong); color: var(--my-wine); font: inherit; font-size: 13px; cursor: pointer; }
+.my-shared-memory-actions button:hover:not(:disabled) { border-color: var(--my-wine); }
+.my-shared-memory-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.my-shared-memory-error { color: #a02c3f; font-weight: 650; }

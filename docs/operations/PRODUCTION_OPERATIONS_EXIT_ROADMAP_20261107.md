@@ -1,4 +1,137 @@
+## 2026-11-13 현재 운영 백업의 개인정보 복구 선행 마이그레이션 — 격리 적용 경로 구현
+
+- 보호된 [백업 #43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)는 실측한 현재 원격 이력 **245건 / frontier `20261113062455`**를 암호화 원장과 함께 보존한다. 현재 Production에는 수동 공유 메모리 `2360`, 계정 삭제시 메모리 소거 `2370`, 삭제 이벤트 재생 `2380`의 테이블·함수/원장이 존재하지 않는다. 그러므로 백업 무결성만으로 최신 승인된 **개인정보 복구 기능까지 검증됐다고 선언할 수 없다**.
+- 기존 격리 복구의 원본 스키마 비교를 **먼저 수행한 후**, 오직 복구 실행의 `restore_clone_shared_memory_rehearsal=true`에서만 위 세 기존 SQL 파일을 일회용 loopback PG17에 `--single-transaction`으로 순차 적용하고, 함수·RLS·브라우저·API 역할 분리 및 삭제 이벤트 트리거를 검사하게 했다. 실행은 **정확한 backup run `43424903445` / source SHA `6eab97337811128282f5f5ec6320e4608d5f9c09` / reference `2026-11-13T12:29:12Z` / 보호된 `main` / Provider 봉인 원장 동시 검증 필수 / Production canary·실제 개인정보 원장 없음**에만 허용한다.
+- 이 뒤의 기존 **합성 개인정보 삭제·복구 재검증은 생략하지 않으며**, clone에만 변경을 적용했다는 JSON을 별도 보존한다. 실측 통과 여부는 병합 후 실제 보호 워크플로 결과로만 판정한다. **통과하더라도 Production에 세 SQL이 적용됐다는 뜻이 아니며, 원본 현재 스키마 복구 동등성·Hosted Auth/Storage·실제 삭제 원장 재생·RPO/RTO·서비스 재개 판정은 모두 HOLD**. 정상 모드의 개인정보 검사/차단은 그대로 유지한다.
+- **다음:** 보호된 PR CI·병합 → 정확한 최신 백업 복구 + 클론 한정 3개 SQL 적용·권한·합성 프라이버시 실증 → 그 결과로만 **Production 적용 필요 여부, 원격 이력 45건 보존 전략, 단일 변경 계획·롤백**을 확정한다. Production 변경은 구체적 사용자 승인 후에만. #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+
+## 2026-11-13 최신 스키마 백업 출처·암호화 무결성 PASS, 복구 검증은 별도 HOLD
+
+- **현재 적용 이력 포함 백업:** [#43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445) SUCCESS, Git checkout `6eab97337811128282f5f5ec6320e4608d5f9c09`. 백업 artifact `14037181099` (GitHub ZIP SHA256 `27f2d0536ec2f3e7a92823b1cb7a0a451c41cd3b6fc6521aa404da5630ffe60b`), 암호화 Provider 원장 `14037056434` (ZIP SHA256 `217b7dae06d5f5d6a0365b1df64e0fc90e039420b835596d5a5105e913b613b3`), 만료 `2026-12-13`. 각 암호문 SHA256을 공개 manifest의 `encrypted_sha256` / `encryptedArchiveSha256`과 실제 파일 해시로 독립 일치 확인. 양쪽 manifest에 현재 원격 frontier `20261113062455`, 적용 원장 **245개**, catalog SHA256 `405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 동일. Backed-up schema catalog bracket 안정 표시는 **같은 pg_dump snapshot 보장이나 독립 복원 결과는 아님**. 암호화 원장에는 SQL 본문 12개 누락·역사적 실행자 미인증 경계가 남아 있음.
+- **이전 검증 재활용:** [기존 2026-11-07 KCP 버전 쌍 SHA 테스트](POSTGRES_OWNER_KCP_SANDBOX_MIGRATION_BYTE_PARITY_20261107.md)가 이미 증명한 원격 `20261028011357` ↔ 저장소 `20261028110500`의 `\n\ncommit;\n` 마지막 10바이트 차이를 11/13 **현재 원격 SQL SHA256 `e248ae6880f6765305274c4541763a3a93d12ab6822540ef6f1b2f3e1e0967c4`**로 재확인. 저장소 파일에서 해당 종결자만 제외한 지문 정확히 동일. 현재 `cmd_persist_owner_kcp_signed_sandbox_receipt_v1(uuid,uuid,text,text)` 함수 본문 7,710바이트 MD5도 저장소 본문과 정확히 일치. **이미 확정된 바이트 비교를 다시 수행하지 않음**; 버전 불일치·배포 주체는 여전히 별개 미입증, Production `migration repair`·과거 파일 리네임·재적용 승인 없음.
+- **최단 후속:** 정상화가 필요한 다른 실제 변경과 현재 배포 요구사항만 선별해 최소 정합화안을 격리 검증한다. 최근 백업은 현재 마이그레이션 frontier의 봉인 증거일 뿐, `2380` 및 개인정보 삭제 복구/Hosted Auth·Storage/RPO·RTO가 없는 Production 상태에서 full DR PASS가 될 수 없다. **부분 백업 성공 ≠ 전체 복구 성공**. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, #1887 OPEN, `ROADMAP_COMPLETE=false`.
+
+# 2026-11-13 운영 트랙 우선순위 재정렬 — 실제 출시 차단 최단 해소
+
+> **현재 실행 기준(최우선).** 총괄 트랙 지시에 따라 `현재 운영 DB 정합화 → 최소 변경안 격리 검증 → 승인된 운영 반영 → 현재 스키마 기준 복구/서비스 수용` 순서로 진행한다. 아래의 기존 Phase 8–13 수용조건·날짜별 증거는 유지하지만, 과거 200개 SQL 비교·12개 단일 SQL·154개 다중 SQL을 **모두 해명해야 다음 단계로 넘어간다**는 식으로 해석하지 않는다. 현재 실제 운영 차단에 직접 연관된 변경과 개인정보·권한 안전 위험을 우선 조사한다. 이미 검증한 부분은 재검증보다 재사용한다.
+
+## 0.1 2026-11-13 실제 Production DB 읽기 전용 기준선
+
+- **접근 대상:** Supabase 프로젝트 `cnsfpcdiyofqvhpcegfc`, PostgreSQL 17.6. 민감 데이터나 원본 SQL 본문을 조회·출력하지 않고 메타데이터, 객체 존재 여부, 함수 실행 권한, 마이그레이션명·버전·개수만 조회. 기준 저장소 `main` SHA `6eab97337811128282f5f5ec6320e4608d5f9c09`.
+- **실제 운영 이력 245개 / 저장소 SQL 파일 282개 / 공통 버전 200개 / 운영 전용 45개 / 저장소 전용 82개.** 현재 원격 최종 버전 `20261113062455` (`admin_a4_proof_retention_safety_window_29_days_20261113`). 이는 이전 봉인 원장 242개/저장소 276개 기준과 **다른 시점의 최신 관측**으로, 숫자 차이를 단순 적용 실패나 127개 의미적 SQL 불일치로 간주하지 않는다.
+- #1887 역사적 충돌 **계속 유효:** 운영 전용 `20261008090417`(원격 SQL 본문 104,021 bytes, 1 statement), 운영 전용 `20261028011357`(9,260 bytes, 1 statement)는 그대로 기록되어 있으며, 저장소의 동일 논리명 후보 `20261028110500_owner_sandbox_signed_receipt_persistence_v1.sql`은 원격 적용 이력에 없음. 후자의 저장소 텍스트는 9,270문자이며 **이름 유사성만으로 원본/DDL 동등성 또는 안전한 repair를 단정하지 않는다**.
+- #2200에서 과거 없었던 `1640` 이력과 `public.cmd_mark_seyeon_chat_context_ready_pinned_v1(uuid,uuid,uuid,jsonb)`가 **지금은 실제 존재**한다. 함수 소유자는 `myeongha_seyeon_chat_runtime_owner`; `SECURITY DEFINER`이며 `myeongha_api_executor` EXECUTE=true, `anon` 및 `authenticated` EXECUTE=false. 옛 `cmd_mark_seyeon_chat_context_ready_runtime_v1`의 API 실행 권한은 false. **함수/권한 부재라는 과거 하위 원인은 해결 관측, 실제 채팅 송·수신과 P0001 재시도/idempotency는 아직 미검증**. #2200 전체 이슈는 OPEN.
+- `2380` shared-memory note deletion recovery 이력, 대응 공유 메모리·삭제 이벤트 테이블, 삭제 재생 함수는 **현재 Production에 없음**. 옛 복구 시도 [#43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784)의 개인정보 단계 실패는 이 차단을 정상 감지한 것이다. 현재 필요한 기능/배포 의존성과 선행 schema를 점검하지 않고 `2380`만 임의 적용하지 않는다.
+- **백업 시점 차단:** 가장 최근 확인한 성공 backup run [#43330215791](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43330215791)은 `2026-11-12T23:36:01Z`에 시작되어 원격 최종 버전 `2026-11-13T06:24:55Z`보다 이르다. 따라서 **현재 전체 스키마를 포함하는 최신 검증 완료 백업/복구 증거가 아님**. 이후 backup의 존재/시점/무결성·독립 개인정보 원장 연속성을 실제로 검증해야 한다.
+- 현재 `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 [#1887](https://github.com/gycha0109-beep/MyeongHa/issues/1887) OPEN, `ROADMAP_COMPLETE=false`. #2025 상업 호스팅 조건은 **별도 병렬 확인**하며 DB 조사·정합화를 지연시키지 않는다.
+
+## 0.2 실제 남은 작업과 실행 순서 (기존 로드맵 Phase 8 / 11 / 12 / 13에 매핑)
+
+| 순서 | 사용자에게 필요한 실제 결과 | 현재 증거 / 구체적인 다음 작업 | 승인 경계 |
+|---|---|---|---|
+| **1 — 현재 운영 DB 원인 확정** | 배포에 영향을 주는 원격/저장소 차이의 목록 및 원인 | **진행 중:** 원격 245·파일 282 전수 버전 분류 완료. 운영 전용 45·저장소 전용 82를 릴리스 필수/정상적인 별도 배포/진짜 충돌로 구분하고, 우선 #1887의 `20261008090417`, `20261028011357` ↔ `20261028110500`의 SQL·DDL·권한·실제 사용 여부 확인. 현재 배포 코드 SHA 및 RPC·로그를 연결 | 읽기 전용 자율 수행 |
+| **2 — 최소 정합화 설계·격리 검증** | 데이터/권한 보존하는 *단일* 정방향/정본화/이력 정합화 방안과 롤백 | **미완료:** 45개 모두 삭제하거나 82개 모두 적용하지 않음. 원격 전용 유효 기능 보존, `migration repair`는 실제 SQL/객체 동등성 입증 전 금지. 현재 배포에 필요한 변경만 격리 PG17에서 순서·idempotency·권한·데이터 보존 검증 | 격리 구현 자율, Production 적용 전 사용자 명시 승인 |
+| **3 — 현재 스키마에 맞는 백업·복구** | 정확한 최종 적용 버전/시점의 암호화 백업 및 격리 검증 | **미완료:** `20261113062455` 이후 생성/원장 결합된 백업 확인; 기존 복구 도구 재사용. 삭제·철회·환불 후 비재노출, Owner/Role/GRANT/RLS, Auth 로그인·세션·토큰·Storage 객체/정책의 필요한 범위, RPO PT24H/RTO PT6H 실제 측정. 과거 43174606843 source-only 증거는 현재 복구 승인 대신 사용 불가 | 읽기 전용/안전 격리 자율; 유료 Hosted·실데이터 이동·Production canary는 비용/데이터 보호 계획 제시 후 사용자 승인 |
+| **4 — 실제 장애·출시 의존성** | 채팅·결제/Reader 차단 및 서비스 재개 최소 검증 | **일부 해소:** #2200 pinned RPC 및 제한된 실행 권한 확인. 남은 P0001/재시도·현재 API 배포 호환성·수신 E2E를 개인정보·실결제 무부작용 범위에서 확인; Commerce·사주 기능 중복 개발 금지 | 운영 데이터 쓰기/사용자 상태 변경·배포는 구체적 승인 후 |
+| **5 — 승인 적용 및 운영 수용** | 현재 DB 정합화 실제 반영, 관련 CI/복구/서비스 상태의 재확인 | **미완료:** 단일 변경안의 영향, 순서, 롤백, 복구 증거를 사용자에게 제시. 승인받은 범위만 Production 변경. 기존 Phase 11·12·13 종료 조건은 실제 남은 조건만 수행 | Production DB·배포·요금제/DNS/Hosted 전환은 사용자 승인 |
+
+### 0.3 중단·완료 규칙
+
+1. 1인 개발 프로젝트의 내부 의사결정은 **사용자 단독**이다. 존재하지 않는 다른 책임자·위원회·승인자를 만들지 않는다. 실행 환경·증거·자동화 검사의 독립성은 유지한다.
+2. **운영 DB에 쓰기 전** 실제 변경 SQL/대상/순서, 예상 영향·권한, 사전 백업, 실패 시 되돌릴 방법, 격리 테스트 결과를 제시하고 **사용자의 명시 승인**을 받는다. 무승인 migration history 삭제·repair·db push·데이터 변경 금지.
+3. 현재 릴리스에 필요하지 않은 과거 SQL 187개 전체의 개별 해명·중복 문서/검사를 **출시 차단 해소의 선행 조건으로 확대하지 않는다**. 단, 실제 차이·권한·개인정보 위험은 미입증으로 표기하고 필요한 안전 검증은 생략하지 않는다.
+4. DR Ready와 서비스 재개는 현재 스키마·Auth/Storage·Privacy·RPO/RTO의 실제 수용이 충족될 때만 선언한다. 운영 DB 정합화 완료와 **명하 전체 출시 가능 여부**는 별도 판단한다.
+5. 관련 CI가 단지 실행 중이라는 이유로 다른 독립 작업을 중지하지 않는다. 모든 기존 종료조건이 충족될 때만 `ROADMAP_COMPLETE` 선언. 과거 기록은 아래에 그대로 보존하며, 상단 현재 기준선이 **실행 우선순위**를 결정한다.
+
+---
+
+## 2026-11-13 Gate 1 / Phase 8-A — 옛 백업에서 최신 개인정보 마이그레이션 차단 확인 및 출처 전용 검증 분리 (실증 대기)
+
+- [격리 복구 #43418694784](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43418694784)는 **FAILURE**다. 봉인 원장 복호화·버전 SQL 내용 비교는 로그상 완료했으나 결과 아티팩트가 없으므로 **새 12개 코드 토큰 분류는 실증 완료가 아니다**. 이후 개인정보 합성 재생 단계에서 `FAIL restored DB is missing governed shared-memory deletion replay migration`으로 중단됐다. 옛 백업 `43174606843`에는 뒤에 추가된 shared-memory 삭제 재생 테이블·함수(저장소 migration `2380`)가 없다. 이는 **정상적인 fail-closed 차단**이며 운영 복구 성공으로 승격하지 않는다.
+- 최신 정상 전체 DR 절차의 개인정보 preflight나 필수 검증을 제거하지 않고, **Phase 8-A 전용 `migration_source_only_diagnostic`** 수동 모드를 추가했다. 오직 보호된 `main`, 원본 run `43174606843`, incident `2026-11-12T07:25:00Z`, `verify_provider_migration_source=true`, 개인정보 원장/canary 입력 없음, S0=false에서만 허용한다. PostgreSQL 격리 복원·암호화 출처 복호화·원본 SHA·버전 SQL 비교·스키마/역할 관측은 계속 실행하되 **새 schema 부재로 수행 불가능한 합성 개인정보 재생은 이 진단 모드에서만 미실행**한다.
+- 출처 전용 실행은 별도 **비식별 제한 증거 `migration-source-only-diagnostic-boundary.json`**을 반드시 남겨 원장/checkout/backup 출처와 `syntheticPrivacyReconciliationExercised=false`, `authoritativePrivacyReconciliationExercised=false`, `serviceResumptionAllowed=false`, `drReady=false`를 함께 입증하도록 했다. 전체 복구 실행은 기존 synthetic privacy 검사를 그대로 통과해야 한다.
+- **다음:** PR 병합 이후 *동일 원본 백업*으로 제한된 진단을 1회 실행해 이전 미처분 12개 단일 SQL의 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA` / `CODE_TOKEN_BYTES_DIFFER` / `LEXICAL_SCAN_INDETERMINATE` 실제 분류와 결과 SHA·아티팩트 ID를 보존한다. 이 결과도 SQL 의미·권한·RLS 동등성이나 DR Ready 입증은 아니다. 기존 다중 SQL 154개·원문 NULL 12개 및 Provider/Hosted/독립 개인정보/RPO/RTO 미입증 유지. P0 #1887 OPEN / `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 12개 SQL 실제 코드 차이 검증 경로 구현 (보호 실증 대기)
+
+- 이전 보호된 복구 [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458)의 정확한 결과와 [21개 바이트 차이 실측](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json) 및 [12개 저장소 SQL 대상 객체 조사](POSTGRES_COMMON_VERSION_MIGRATION_12_REPO_OBJECT_EFFECT_SCOPE_20261113.json)를 재활용한다. 바이트가 다른 단일 SQL 21개 중 9개는 저장소 끝 `;`+LF 추가, 2개는 원본 끝 76바이트 추가, 10개는 내부 상이 구간이다. 실제 SQL 의미/권한 영향은 여전히 미입증.
+- 승인된 기존 격리 원장 복호화 단계에서만 **원본 SQL과 정확한 checkout SQL의 실행 코드 토큰을 보수적으로 대조**하도록 구현했다. 주석·토큰 사이 공백만 무시하며 문자열·인용 식별자·달러 인용 함수 본문은 원문 바이트 그대로 보존한다. 불확실한 인용/이스케이프/주석은 `LEXICAL_SCAN_INDETERMINATE`로 보류한다. 출력은 `CODE_TOKENS_IDENTICAL_IGNORING_TRIVIA`, `CODE_TOKEN_BYTES_DIFFER`, `LEXICAL_SCAN_INDETERMINATE`의 **비식별 분류만** 추가하고 SQL 토큰·내용·실행자·민감값은 저장하지 않는다.
+- **중요 수용 경계:** 코드 토큰 일치 후보도 SQL 의미·역사적 실행·현재 DDL/권한/RLS 동등성 **증명이 아니다**. 단일 byte-exact 13·나머지 187 및 전체 DR HOLD를 유지하고, 154개 다중 statement framing과 원문 누락 12개는 새 분류 대상에 포함하지 않는다. 합성 단위 검사 7건 통과. **새 보호 실행 결과 전에는 12개의 새 분류 개수를 추정하지 않는다.**
+- **다음:** PR 병합 이후 보호된 main에서 **기존 백업 #43174606843만** 사용해 `verify_provider_migration_source=true` 격리 복구를 1회 실행하고 분류·실제 SHA·아티팩트·실행 번호를 증거로 보존한다. 원본 코드 토큰이 실제로 다르면 기존 객체·권한·역할·RLS 관측과 연결해 버전별 미입증 범위를 처분한다. Production DDL/DML·재적용·repair·유료 Hosted 생성·privacy canary 금지. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false`, #1887 OPEN.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 단일 SQL 21개 실제 차이 위치 실증 (12개 내용/영향 처분 HOLD)
+
+- 보호된 `main` 격리 복구 [#43406911458](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43406911458) **SUCCESS** (원본 백업 #43174606843 재사용, checkout `b88fde700f8fcc40ee7c224f3a0d7ffc3a04603a`, artifact `14026803978`, ZIP SHA-256 `b9f779ae4360cf8b13ee85e79c43b0c3c1a4b6da98ad57205b1b47bc0ef2fe0c`, 원본 parity JSON SHA-256 `a30da4e0554a77f6bffb87f1aeeebc0da4eb2adccef9f87128c75b1325cfa0a5`).
+- 실제 원장/저장소/공통 분류 **242/276/200**, source-only **42**, repo-only **76**. 기존 완전 일치 **13**, 전체 byte-exact 미입증 **187** 유지. 단일 statement bytes 불일치 21개를 봉인된 격리 runner에서 실제 바이트로 조사하여 **저장소 `;`+LF 2바이트 추가 9개**, **원본 source 끝부분 추가 2개(`1600`, `1630`)**, **원본·저장소 내부 상이 구간 10개(`1580`, `1590`, `1610`, `1620`, `1640`, `1650`, `1670`, `1680`, `1690`, `1710`)**를 관측했다.
+- **실제 비식별 21개 전수 측정값:** [POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json](POSTGRES_COMMON_VERSION_MIGRATION_BYTE_DIFFERENCE_REAL_PROOF_20261113.json). 원문 SQL/변경 구간/작성자·개인정보는 공개하지 않았고, 바이트 길이·위치·해시 및 실행 출처만 보존했다. 파일 일부가 다르다는 사실은 SQL 의미 차이, 역사적 실행 인과나 복원된 객체/권한 영향까지 입증하지 않는다.
+- **다음 Phase 8-A 실제 미완료:** 12개 SQL의 끝부분/내부 차이가 실행 명령·권한·RLS에 미치는 영향을 안전한 원본 증거와 현재 객체 실측으로 처분한다. 다중 statement 154개 framing 보류, 원문 NULL 12개, Provider migration ledger 대상 복원 및 전체 DDL/owner/role/GRANT/RLS 동등성은 별도 HOLD. 기존 41개 source-only 처분·A4 실측을 반복하지 않는다. Production 변경·migration repair/replay·Hosted 생성·privacy canary 없음. #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 미해결 단일 SQL 12개의 봉인 공간 차이 위치 실측 도구 (실증 대기)
+
+- [PR #3279](https://github.com/gycha0109-beep/MyeongHa/pull/3279)까지 기존 21개 단일 SQL 불일치 중 9개의 *원본 statement = 저장소 파일 prefix* SHA 일치(저장소 뒤에 `0x3b0a`)만 확인했고, **12개는 실제 내용 차이의 범위를 확인하지 못했다**. 스키마 94개·함수 322개·기존 48개 역할 연결의 격리 관측은 버전별 SQL 실행 인과 증거가 아니다.
+- 이를 위한 승인 범위 내 추가 구현: 기존 `verify_provider_migration_source=true` 격리 복호화와 exact checked-out main SQL을 사용해, 단일 원본 불일치의 **공통 시작·끝 바이트 길이, 양측 상이 구간 길이, 변경 위치 분류, 저장소 2바이트 종결자 추가 여부**만 산출한다. 원본 SQL 구문/부분 문자열·작성자·자격증명은 저장하거나 공개하지 않는다. 기존 raw-byte exact 판단과 200개 분류 수량은 변경하지 않는다.
+- **실제 실행 전에는 12개 결과·의미적 동등성·현재 객체/권한 효과를 추정하지 않는다.** PR 병합 후 기존 백업 `43174606843`을 재사용해 보호된 main 격리 복구로 실증하고, 관련 JSON을 바이트 무결성·실행 SHA와 묶어 보존한다. Production 변경·원문 재실행·migration repair·privacy canary·유료 Hosted 대상 생성 없음. P0 #1887 OPEN, `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` 유지.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 21개 단일 SQL 바이트 불일치의 지문 기반 처분 진전
+
+- 보호된 격리 복구 [#43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611)의 비식별 SQL 지문 및 그 실행에서 체크아웃한 exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`의 저장소 파일을 독립적으로 대조했다. **단일 statement bytes 불일치 21개 중 9개는 원본 statement SHA-256과 저장소 파일 앞부분 SHA-256이 정확히 동일**하고, 저장소 쪽에 2바이트 `;` + LF가 추가된 사실을 확인. 나머지 **12개는 제한된 형식 변환 검사에서 원인을 확인하지 못했다**.
+- [21개 버전별 분류 및 검사 한계](./POSTGRES_COMMON_VERSION_MIGRATION_SINGLE_STATEMENT_FINGERPRINT_TRIAGE_20261113.json)를 증거로 보존한다. 9개를 기존 byte-exact 13개에 합산하지 않으며, 원본 파일 동등성·SQL 의미·역사적 실행 인과·현재 객체/권한 동등성으로 승격하지 않는다. 154개 다중 statement 구성 보류 및 12개 원문 NULL은 별도로 유지한다.
+- **남은 Phase 8-A:** 단일 미확정 12개와 다중 SQL 154개의 source framing/실제 SQL 영향 처분, 현재 schema·owner·role·GRANT·RLS 및 Provider ledger target 복구 검증. 기존 원격 전용 41개/신규 A4 조사 재활용. P0 #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`; Production 변경·migration repair 없음.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 공통 SQL 원문 200개 실제 비교 성공 (후속 처분 미완료)
+
+- [실제 격리 복구 #43372543611](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43372543611) SUCCESS, exact main `ccf52e1132f9afb6b956ebb399dc380154719d74`, source run `43174606843`, artifact `14012916977` (ZIP SHA-256 `1aa91ac0b1273263b1452f4c6a26da724c8dea99003260fe4381d2ea9860f078`).
+- 원장 242개 / 저장소 276개 / 공통 200개 / 원격 전용 42개 / 저장소 전용 76개. **단일 원문 바이트 일치 13개, 단일 바이트 불일치 21개, 다중 SQL framing 보류 148개, 다중 SQL 재구성 일치·원문 증명 보류 6개, 원문 누락 12개.** 총 187개 byte-exact 미입증. 전체 분류와 각 지문은 [실제 비식별 증거](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_REAL_PROOF_20261113.json) 참조.
+- 다음은 21개 단일 불일치와 154개 다중 statement의 실제 근거별 처분 및 원문 없는 12개 위험 보류. 자동 정규화로 동등 판정하거나 SQL을 재실행·repair하지 않는다. 이전 source-only 41개 처분과 신규 A4 권한 실측 재활용.
+- 아직 Provider ledger 대상 복원·전체 스키마/권한·Hosted Auth/Storage·개인정보·전체 RPO/RTO는 미입증. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / #1887 OPEN / `ROADMAP_COMPLETE=false`. 아래 '실측 대기'는 이 실행 이전의 역사 기록.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 공통 원장 버전 200개 SQL raw-byte 대조 경로 구현 (실측 대기)
+
+- PR #3267 필수 통합 CI [#43354735084](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43354735084) SUCCESS·보호된 main 병합, 신규 원격 전용 A4 버전 `20261109071019`의 현재 전용 역할·5개 열 SELECT 권한 실측 기록 완료. 기존 원격 버전 242/저장소 276/공통 200, 원격 전용 42·저장소 전용 76의 당시 비교는 별도 실증으로 보존한다.
+- **다음 승인 범위 내 구현:** 기존 원장 봉인·복호화·정확한 main 버전 대조를 재활용해 공통 200개 버전의 SQL *저장 원문*과 저장소 파일 bytes를 대조하는 격리 검증 도구를 추가했다. 단일 statement만 raw-byte equality로 인정한다. NULL, 부분 NULL, 다중 statement의 재구성, 동일 버전에서 이름 상이, raw bytes 불일치를 구분하며 원문 SQL·작성자·개인정보를 아티팩트에 출력하지 않는다.
+- 이 기능은 기존 수동 격리 복구의 `verify_provider_migration_source=true`인 경우에만 추가된다. `sourcePacketSha256`, 원장 frontier와 repository HEAD가 맞지 않으면 거부한다. 합성 테스트 3개·Node/Bash 문법 확인 완료. **보호된 main에 병합한 뒤 실측하기 전에는 본문 일치 건수를 새로 확정하거나 DR 게이트를 승격하지 않는다.** 세부 설계 [공통 버전 SQL 본문 비교](POSTGRES_COMMON_VERSION_MIGRATION_BODY_PARITY_20261113.md).
+- 이 작업은 roadmap 8-A의 적용된 SQL 출처 정합성 근거만 보강한다. Source SQL 일부 일치가 역사적 실행 인과관계, 전체 객체 DDL/ACL parity, 실제 Provider ledger 복원, Hosted Auth/Storage 및 개인정보 연속성이나 RPO/RTO 달성을 보장하지 않는다. 원본 이력 덮어쓰기·재적용 없음. `NOT_ACCEPTED`·`drReady=false`·`serviceResumptionAllowed=false`, #1887 OPEN 유지.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 신규 원격 전용 A4 20261109071019의 현재 객체·권한 효과 점검
+
+- PR [#3261](https://github.com/gycha0109-beep/MyeongHa/pull/3261) 필수 통합 CI [#43351167715](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43351167715) SUCCESS 및 병합. 정확한 원장·main 버전 차이는 **242 / 276 / 공통 200 / 원격 전용 42 / 저장소 전용 76**이며, 신규 원격 전용은 `20261109071019` 단 1개.
+- **실제 Production SELECT-only 점검**: source 원장 이름 `admin_a4_reading_ai_cost_binding_reader_rls_off_managed_v1_20261109`; 원문 statement **1개·5,512바이트·SHA-256 `974840e6f7ef77717983ed2baec7e2f08712b9ea2048456f2f907f06388992e8`**. SQL은 dedicated 비밀번호 없는 LOGIN 역할 생성, `public` USAGE, `public.reading_execution_attempts`의 5개 열 SELECT만 부여하며 새 RLS 정책·Worker credential을 설치하지 않는다.
+- 같은 날 현재 DB에서 dedicated 역할 존재·LOGIN=true·password NULL·NOINHERIT/NOBYPASSRLS 등 제한, 관리자 멤버십 1개(`supabase_admin` grantor → `postgres` 수신, ADMIN=true/INHERIT=false/SET=false), 테이블 13개 열 중 `external_request_ref,id,reading_id,state,subject_id` 다섯 열만 SELECT 가능, 추가 열·테이블 전체 SELECT·INSERT/UPDATE/DELETE 불가, `public` USAGE=true 확인. 테이블 RLS OFF이고 정책 정의 2개가 존재한다(비활성). 현재 역할·직접 ACL은 source SQL의 선언된 목표와 부합한다.
+- [재실행 가능한 읽기 전용 관측 SQL](../../scripts/operations/production-admin-a4-reader-current-readonly.sql)과 [비식별 실측 증거](POSTGRES_A4_READER_REMOTE_ONLY_MIGRATION_EFFECT_20261113.json)를 보존했다. 기존 [41개 역사적 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)의 내용은 변경하지 않고, 최신 reconciliation 항목에 신규 1개 적용 목적과 현 상태만 기록했다.
+- **수용 경계:** 원장 `created_by` 값의 존재는 과거 실행자 인증 증명이 아니며, 현재 객체/ACL 일치는 과거 SQL 인과관계·정확한 snapshot·전체 Provider 원장 대상 복원·실제 Hosted 재해복구·Worker binding·독립 개인정보·전체 RPO/RTO를 입증하지 않는다. 기존 12개 NULL 원문 SQL도 미해결. `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
+## 2026-11-13 Gate 1 / Phase 8-A — 정확한 본원 원장 242개와 main 버전 정합성 실측
+
+- PR [#3259](https://github.com/gycha0109-beep/MyeongHa/pull/3259)의 필수 통합 CI SUCCESS 후 main 병합. 실제 보호 main [#43350336600](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43350336600) SUCCESS (백업 source [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843)). 동일 원장 복호화·SHA/catalog 지문을 다시 확인한 뒤 exact checked-out `main` SHA `9a5f903d8c3498a18363286000525f8114671b9e`의 파일 버전과 대조: Production 원장 **242**, 저장소 파일 **276**, 공통 200, 원격 전용 **42**, 저장소 전용 **76**.
+- 기존 2026-11-07 처분표의 원격 전용 **41개 모두 보존**; 이후 새 원격 전용 버전은 `20261109071019` **1개**. 정확한 버전 일치 상태의 이름 불일치 0개, 동일 이름·다른 버전 쌍 `20261029012948` ↔ `20261029012000`은 계속 별도로 표시. SQL body NULL 12개, 원격 원장의 원문 적용 SQL 동등성 및 대상 migration ledger 복구 미증명.
+- 원본 [41개 처분표](POSTGRES_REMOTE_ONLY_MIGRATION_DISPOSITION_20261107.json)의 역사적 항목은 그대로 두고 새 `currentFrontierReconciliation`에 실측 범위를 추가했다. [전체 실제 증거](POSTGRES_SEALED_PROVIDER_MIGRATION_FILE_LINEAGE_PROOF_20261113.json)에는 42개 원격 전용·76개 저장소 전용 버전 ID가 포함되어 있으며, SQL 본문·작성자·개인정보는 없다.
+- Phase 8-A 다음 미완료 항목은 신규 원격 전용 `20261109071019`의 *적용 SQL·현재 객체/권한 효과*를 원본과 독립적으로 검증하는 것(실행자 인증 및 기존 누락 12개 SQL 본문은 검증 불가능 상태로 별도 HOLD). **원본 기록 자동 수정, SQL 재실행, Hosted DR 수용 승격 금지.** `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, P0 #1887 OPEN.
+
+## 2026-11-13 Gate 1 / Phase 8-A·8-B — direct role replay observed in isolation
+
+- PR [#3255](https://github.com/gycha0109-beep/MyeongHa/pull/3255) merged. Protected main [#43343813577](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43343813577) actual disposable PG17 restore and sealed-source verification SUCCESS. The guarded independent proof confirms source cross-boundary role edges **48**, executed isolated replay **48**, observed target edges **48**, and directly observed grant options/grantor attribution match. The source filtered roles.sql still excludes all 48; this is a staged disposable replay, **not** a portable Provider/Hosted restore guarantee. [Exact evidence](POSTGRES_ISOLATED_PROVIDER_ROLE_REPLAY_REAL_PROOF_20261113.json).
+- Previously proven same-run source ledger decryption remains valid (242 history entries / 12 NULL statement bodies). Target Provider migration ledger was not restored. No new Hosted DR target or Production writes were performed. Full application/Provider equivalence and Auth/Storage/privacy/RPO/RTO remain Phase 8-A through 8-D blockers; #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. The approved roadmap's scope does not change.
+
+## 2026-11-12 Gate 1 Phase 8-A/8-B: actual paired Provider source decryption proof
+
+- [PR #3251](https://github.com/gycha0109-beep/MyeongHa/pull/3251) merged. Protected main isolated restore [#43179685582](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43179685582) SUCCESS using same-run backup and encrypted Provider history from source backup [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843). **Actual decryption and SHA/full original statement-history fingerprint verification pass** for 242 versions and frontier `20261109071019`; historical SQL bodies are missing for 12 entries.
+- Isolated application comparison: 3/3 schemas, 94/94 tables and 322/322 routines present, with 2 schema + 8 table + 19 routine legacy ACL-digest differences, although observed direct recipient privileges and canonical grantor entries match for those objects. Application internal role graph: 43/43 roles and 7/7 edges (portable grantor rewrites); app↔external boundary edges: observed 48/48 on isolated target but original filtered `roles.sql` excludes all 48. **This does not prove Provider role ownership, inherited access, full schema/permission or Hosted service parity.** A shared source/dump MVCC snapshot is unproven. Detailed [paired decryption evidence](POSTGRES_PAIRED_PROVIDER_LEDGER_DECRYPTION_PROOF_20261112.json).
+- This closes only the optional **source-ledger decryption/integrity subtask**, not Phase 8-A/8-B/Gate 1. No target migration ledger replay, no repair, no Hosted Auth/Storage restoration, no Production writes, no privacy canary. P0 #1887 remains open, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. Approved remaining Gate 1 tasks remain exactly as enumerated below; no scope additions.
+
 # Production Operations — 종료 집중 로드맵
+
+## 2026-11-12 current-frontier Provider source capture + isolated restore evidence
+
+- Production SELECT-only encrypted Provider source run [#43174606843](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43174606843) SUCCESS: 242 original history rows, catalog SHA `91f24b544486d2cd9af2ef8694278c80e9a2a40a7e93a3aeedf14250d08e3a47`, 12 NULL statement bodies. Archive ciphertext integrity matches public manifest and checksum; see [sealed-source evidence](POSTGRES_PROVIDER_LEDGER_SEALED_CAPTURE_REAL_RUN_20261112.json).
+- Matching backup isolated restore [#43176401912](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43176401912) SUCCESS; entire schema/role/Provider migration equivalence **not** passed, service gate BLOCKED. See [current-frontier isolated evidence](POSTGRES_CURRENT_FRONTIER_ISOLATED_RESTORE_20261112.json).
+- Phase 8-A/8-B next boundary: verify that exact same-run encrypted original history can be independently decrypted and re-fingerprinted **in disposable isolation only**. No target migration-history write, schema repair, or historical SQL replay is permitted. That verification alone will not close Phase 8 or alter Gate 1/P0 conditions. Whole roadmap scope unchanged.
+
+## 2026-11-12 evidence addendum — Gate 1 migration ledger source HOLD (no roadmap scope change)
+
+- PR [#3239](https://github.com/gycha0109-beep/MyeongHa/pull/3239) merged; exact-main isolated [#43158737963](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43158737963) completed successfully. The observed local Provider migration history table is **absent** in disposable CLI 3.1.0/PostgreSQL17; source 242 entries/frontier 20261109071019 **cannot be compared to target null metadata**. Evidence: [POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json](POSTGRES_PROVIDER_MIGRATION_LEDGER_ABSENCE_20261112.json).
+- The existing sealed backup deliberately **excludes full migration history rows**, retaining count/frontier/fingerprint only (see [Backup Runbook](POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md)). This does not supply reconstructable Provider migration records. Phase 8-A/8-B therefore requires a separately authorized source and read-only identity/SQL/object/permissions equivalence before any supported isolated recovery route.
+- Existing 93/93 Provider row and Auth FK proofs are **reused**, not repeated. Hosted Auth/Storage, current-frontier service restore, privacy continuity and service RPO/RTO remain unproven; P0 #1887 OPEN, `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`. Phase 8 and full roadmap remain incomplete.
+
 
 > 기준일: 2026-11-07 KST  
 > 트랙: `ops` / 저장소: `gycha0109-beep/MyeongHa`  

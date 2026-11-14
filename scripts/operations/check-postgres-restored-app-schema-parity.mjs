@@ -341,6 +341,11 @@ export function observeApplicationDirectRoleGraph(source, restored) {
 // are deliberately outside this diagnostic and remain unproven.
 const externalBoundaryScope =
   'myeongha_to_non_myeongha_direct_membership_only_v1';
+// Mirrors the reserved recipient list in run-production-postgres-strict-dump.sh.
+// Matching a recipient is a possible omission mechanism, NOT proof that any
+// specific raw grant was emitted/filtered or that provider access is restored.
+const reservedRoleRecipientPattern =
+  /^(?:anon|authenticated|authenticator|cli_login_.*|dashboard_user|pgbouncer|postgres|service_role|supabase_.*|pgsodium_keyholder|pgsodium_keyiduser|pgsodium_keymaker|pgtle_admin)$/u;
 
 function validateApplicationExternalRoleBoundary(graph, side) {
   assert.ok(graph && typeof graph === 'object' && !Array.isArray(graph),
@@ -403,10 +408,21 @@ export function observeApplicationExternalRoleBoundary(source, restored) {
   let missingMembershipOptionEntryCount = 0;
   let addedMembershipOptionEntryCount = 0;
   let grantorAttributionDifferenceGroupCount = 0;
+  let missingReservedRecipientPolicyCandidateCount = 0;
+  let missingOtherRecipientCount = 0;
   for (const [key, grantors] of before.core) {
     const next = after.core.get(key) ?? [];
-    missingMembershipOptionEntryCount += Math.max(0, grantors.length - next.length);
+    const missing = Math.max(0, grantors.length - next.length);
+    missingMembershipOptionEntryCount += missing;
     addedMembershipOptionEntryCount += Math.max(0, next.length - grantors.length);
+    // Exact option-group identity is already validated. Only the recipient
+    // category is counted; the raw role, grantor and tuple never leave here.
+    const memberRole = JSON.parse(key)[1];
+    if (reservedRoleRecipientPattern.test(memberRole)) {
+      missingReservedRecipientPolicyCandidateCount += missing;
+    } else {
+      missingOtherRecipientCount += missing;
+    }
     if (grantors.length === next.length &&
       JSON.stringify(grantors) !== JSON.stringify(next)) {
       grantorAttributionDifferenceGroupCount++;
@@ -436,6 +452,8 @@ export function observeApplicationExternalRoleBoundary(source, restored) {
       missingMembershipOptionEntryCount,
       addedMembershipOptionEntryCount,
       grantorAttributionDifferenceGroupCount,
+      missingReservedRecipientPolicyCandidateCount,
+      missingOtherRecipientCount,
     },
   };
 }

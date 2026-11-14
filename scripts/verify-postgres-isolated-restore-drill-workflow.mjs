@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const workflowPath = '.github/workflows/postgres-isolated-restore-drill.yml';
 const sourceResolverPath = 'scripts/operations/resolve-postgres-restore-source.sh';
+const providerSourceRunnerPath = 'scripts/operations/verify-paired-provider-migration-source-recovery.sh';
 const privacyRunnerPath = 'scripts/operations/run-restored-postgres-privacy-drill.sh';
 const authoritativePrivacySourcePath =
   'scripts/operations/resolve-postgres-authoritative-privacy-replay-source.sh';
@@ -14,16 +15,20 @@ const relationshipProofPath = 'scripts/operations/seyeon-relationship-isolated-r
 const creatorDefaultAclPath = 'scripts/operations/prepare-postgres-isolated-restore-function-defaults.sql';
 const portableReplayPath = 'scripts/build-postgres-portable-data-replay.mjs';
 const privacySyntheticPath = 'scripts/run-postgres-privacy-reconciliation-synthetic-drill.sh';
+const cloneRehearsalPath =
+  'scripts/operations/rehearse-current-backup-shared-memory-privacy-chain.sh';
 const runbookPath = 'docs/operations/POSTGRES_BACKUP_RESTORE_RUNBOOK_V1.md';
 
 for (const script of [
   sourceResolverPath,
+  providerSourceRunnerPath,
   privacyRunnerPath,
   authoritativePrivacySourcePath,
   authoritativePrivacyRunnerPath,
   evidenceRunnerPath,
   harnessPath,
   privacySyntheticPath,
+  cloneRehearsalPath,
 ]) {
   execFileSync('bash', ['-n', script], { stdio: 'inherit' });
 }
@@ -38,6 +43,7 @@ const [
   harness,
   portableReplay,
   privacySynthetic,
+  cloneRehearsal,
   runbook,
   relationshipProof,
   creatorDefaultAcl,
@@ -51,6 +57,7 @@ const [
   readFile(harnessPath, 'utf8'),
   readFile(portableReplayPath, 'utf8'),
   readFile(privacySyntheticPath, 'utf8'),
+  readFile(cloneRehearsalPath, 'utf8'),
   readFile(runbookPath, 'utf8'),
   readFile(relationshipProofPath, 'utf8'),
   readFile(creatorDefaultAclPath, 'utf8'),
@@ -101,6 +108,184 @@ for (const fragment of [
 }
 forbidFragment(workflow, 'path: ${{ runner.temp }}/source-app-catalog.json', workflowPath);
 
+for (const fragment of [
+  'VERIFY_PROVIDER_MIGRATION_SOURCE',
+  'expected_provider_artifact=',
+  'provider_source_artifact_id=',
+  '"$run_event" == \'workflow_dispatch\'',
+]) requireFragment(sourceResolver, fragment, sourceResolverPath);
+
+const roleProofPath = 'scripts/operations/assess-isolated-provider-role-replay-proof.mjs';
+const roleProof = await readFile(roleProofPath, 'utf8');
+for (const fragment of [
+  'providerMigrationLedgerRestored: false',
+  'fullProviderCompatibleRestoreProven: false',
+  'hostedAuthStorageEquivalent: false',
+  'sourcePairsExcludedFromPortableRolesDump',
+  'observedDirectMembershipOptionParity, true',
+  'observedGrantorAttributionParity, true',
+]) requireFragment(roleProof, fragment, roleProofPath);
+
+const migrationLineagePath = 'scripts/operations/assess-sealed-provider-migration-file-lineage.mjs';
+const migrationLineage = await readFile(migrationLineagePath, 'utf8');
+for (const fragment of [
+  'sourcePacketSha256',
+  'compareMigrationCatalogs',
+  'baselineRemoteOnlyStillAbsentCount',
+  'newRemoteOnlySinceBaselineIds',
+  'sourceLedgerHistoryRowsRestored: false',
+  'migrationHistoryRepaired: false',
+  'hostedProviderRestoreProven: false',
+  'drReady: false',
+  'serviceResumptionAllowed: false',
+]) requireFragment(migrationLineage, fragment, migrationLineagePath);
+const sealedRunner = await readFile(providerSourceRunnerPath, 'utf8');
+for (const fragment of [
+  'MIGRATION_LINEAGE_EVIDENCE_PATH',
+  '--source "$private/source-provider-migration-ledger.json"',
+  'assess-sealed-provider-migration-file-lineage.mjs',
+  'originalSqlBodiesPublished == false',
+  'migrationHistoryRepaired == false',
+]) requireFragment(sealedRunner, fragment, providerSourceRunnerPath);
+
+const bodyParityPath = 'scripts/operations/assess-sealed-common-migration-body-parity.mjs';
+const bodyParity = await readFile(bodyParityPath, 'utf8');
+for (const fragment of [
+  "sourcePacketSha256",
+  "sourceMigrationCatalogSha256",
+  "currentRepositoryCommitSha",
+  "SINGLE_STATEMENT_BYTE_EXACT",
+  "SINGLE_STATEMENT_BYTES_DIFFER",
+  "SOURCE_STATEMENTS_ABSENT",
+  "MULTI_STATEMENT_RECONSTRUCTED_MATCH_UNPROVEN",
+  "sourceSqlStatementsPublished: false",
+  "sourceOperatorMetadataPublished: false",
+  "multipleStatementReconstructionPromotedToExact: false",
+  "migrationHistoryReplayed: false",
+  "migrationHistoryRepaired: false",
+  "appliedSqlAndCurrentDdlEquivalenceProven: false",
+  "drReady: false",
+  "serviceResumptionAllowed: false",
+]) requireFragment(bodyParity, fragment, bodyParityPath);
+for (const fragment of [
+  "MIGRATION_BODY_PARITY_EVIDENCE_PATH",
+  "assess-sealed-common-migration-body-parity.mjs",
+  '--source "$private/source-provider-migration-ledger.json"',
+  "sourceSqlStatementsPublished == false",
+  "migrationHistoryRepaired == false",
+]) requireFragment(sealedRunner, fragment, providerSourceRunnerPath);
+
+// The old same-run sealed backup predates governed shared-memory migration
+// 2380. A Phase 8-A diagnostic may omit the later privacy mechanics test, but
+// only for the exact source, never as a full-service/DR success.
+for (const fragment of [
+  'migration_source_only_diagnostic:',
+  'SCOPED_SOURCE_DIAGNOSTIC: ${{ inputs.migration_source_only_diagnostic }}',
+  'SCOPED_SOURCE_BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
+  'SCOPED_INCIDENT_REFERENCE: ${{ inputs.incident_reference_utc }}',
+  'SCOPED_PROVIDER_VERIFY: ${{ inputs.verify_provider_migration_source }}',
+  'SCOPED_PRIVACY_LEDGER_RUN_ID: ${{ inputs.privacy_ledger_run_id }}',
+  'SCOPED_PRIVACY_CANARY_RUN_ID: ${{ inputs.production_privacy_canary_run_id }}',
+  'SCOPED_SEYEON_S0: ${{ inputs.seyeon_security_s0_rehearsal }}',
+  'if [[ "$SCOPED_SOURCE_DIAGNOSTIC" == \'true\' ]]; then',
+  '[[ "$SCOPED_SOURCE_BACKUP_RUN_ID" == \'43174606843\' ]]',
+  '[[ "$SCOPED_INCIDENT_REFERENCE" == \'2026-11-12T07:25:00Z\' ]]',
+  '[[ -z "$SCOPED_PRIVACY_LEDGER_RUN_ID" &&',
+  '-z "$SCOPED_PRIVACY_CANARY_RUN_ID" ]]',
+  '[[ "$SCOPED_PROVIDER_VERIFY" == \'true\' ]]',
+  '[[ "$SCOPED_SEYEON_S0" == \'false\' ]]',
+  'SOURCE_DIAGNOSTIC_OBSERVED_PRIVACY_NOT_EXERCISED_DR_HOLD',
+  'migration-source-only-diagnostic-boundary.json',
+  'syntheticPrivacyReconciliationExercised: false',
+  'authoritativePrivacyReconciliationExercised: false',
+  'serviceResumptionAllowed: false',
+  'drReady: false',
+]) requireFragment(workflow, fragment, workflowPath);
+const privacyExercise = section(workflow,
+  '      - name: Exercise synthetic privacy reconciliation and finalization on restored database',
+  '      - name: Replay authoritative Production privacy ledger on restored database');
+requireFragment(privacyExercise,
+  "if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic) }}",
+  workflowPath);
+const diagnosticProof = section(workflow,
+  '      - name: Record scoped sealed migration source diagnostic boundary',
+  '      - name: Build self-contained restore evidence envelope');
+requireFragment(diagnosticProof,
+  "if: ${{ github.event_name == 'workflow_dispatch' && inputs.migration_source_only_diagnostic }}",
+  workflowPath);
+requireFragment(diagnosticProof, 'and .exactRepositoryCommitSha == env.GITHUB_SHA', workflowPath);
+requireFragment(diagnosticProof, 'and .notByteExactOrUnprovenCount == 187', workflowPath);
+requireFragment(diagnosticProof, 'and .drReady == false', workflowPath);
+requireFragment(diagnosticProof, 'syntheticPrivacyReconciliationExercised: false', workflowPath);
+// No change to normal full-drill synthetic privacy requirement or final DR HOLD.
+
+// Exact current backup clone-only test never bypasses the full privacy gate.
+// The restored original catalog must be assessed BEFORE adding new objects.
+for (const fragment of [
+  'restore_clone_shared_memory_rehearsal:',
+  'SCOPED_CLONE_REHEARSAL: ${{ inputs.restore_clone_shared_memory_rehearsal }}',
+  'if [[ "$SCOPED_CLONE_REHEARSAL" == \'true\' ]]; then',
+  '[[ "$SCOPED_SOURCE_BACKUP_RUN_ID" == \'43424903445\' ]]',
+  '[[ "$SCOPED_INCIDENT_REFERENCE" == \'2026-11-13T12:29:12Z\' ]]',
+  '[[ "$SCOPED_SOURCE_DIAGNOSTIC" == \'false\' &&',
+  '"$SCOPED_PROVIDER_VERIFY" == \'true\' ]]',
+  'SCOPED_DISPOSABLE_PRIVACY_FORWARD_REHEARSAL__PRODUCTION_UNCHANGED__DR_HOLD',
+  'Rehearse missing shared-memory privacy chain only on isolated current-backup clone',
+  'run: bash scripts/operations/rehearse-current-backup-shared-memory-privacy-chain.sh',
+  'disposable-shared-memory-privacy-rehearsal.json',
+  'shared_memory_privacy_chain=forward_applied_on_disposable_clone_only',
+  'clone_post_rehearsal_production_schema_equivalence=false',
+]) requireFragment(workflow, fragment, workflowPath);
+const cloneStep = section(workflow,
+  '      - name: Rehearse missing shared-memory privacy chain only on isolated current-backup clone',
+  '      - name: Exercise synthetic privacy reconciliation and finalization on restored database');
+requireFragment(cloneStep,
+  "if: ${{ github.event_name == 'workflow_dispatch' && inputs.restore_clone_shared_memory_rehearsal }}",
+  workflowPath);
+for (const fragment of [
+  'BACKUP_RUN_ID: ${{ inputs.backup_run_id }}',
+  'EXPECTED_SOURCE_SHA: ${{ steps.source.outputs.source_sha }}',
+  'PGHOST: 127.0.0.1',
+  'PGUSER: supabase_admin',
+]) requireFragment(cloneStep, fragment, workflowPath);
+const rolePosition = workflow.indexOf(
+  '      - name: Attribute isolated Provider role replay to sealed source and observed target');
+const clonePosition = workflow.indexOf(
+  '      - name: Rehearse missing shared-memory privacy chain only on isolated current-backup clone');
+const comparePosition = workflow.indexOf(
+  '      - name: Compare current-frontier application schema with isolated restored catalog');
+const privacyPosition = workflow.indexOf(
+  '      - name: Exercise synthetic privacy reconciliation and finalization on restored database');
+if (!(0 <= comparePosition && comparePosition < rolePosition &&
+  rolePosition < clonePosition && clonePosition < privacyPosition)) {
+  throw new Error('Clone-only SQL must execute after original source-catalog parity and before synthetic privacy');
+}
+for (const fragment of [
+  '43424903445',
+  '6eab97337811128282f5f5ec6320e4608d5f9c09',
+  '2026-11-13T12:29:12Z',
+  'github-actions-loopback-supabase-postgres',
+  'supabase/migrations/2360_subject_shared_memory_owner_managed_v1.sql',
+  'supabase/migrations/2370_subject_shared_memory_account_finalization_erasure_v1.sql',
+  'supabase/migrations/2380_subject_shared_memory_note_deletion_recovery_v1.sql',
+  '--single-transaction',
+  "SET ROLE postgres",
+  "pg_get_userbyid(proowner)",
+  'git hash-object',
+  'REHEARSAL_EVIDENCE_PATH',
+  'cloneStillMatchesOriginalProductionSchema: false',
+  'productionDatabaseChanged: false',
+  'serviceResumptionAllowed: false',
+  'drReady: false',
+]) requireFragment(cloneRehearsal, fragment, cloneRehearsalPath);
+for (const forbidden of [
+  'supabase db push',
+  'supabase migration repair',
+  'supabase db reset',
+  'curl ',
+  'gh api',
+]) forbidFragment(cloneRehearsal, forbidden, cloneRehearsalPath);
+
 const onSection = section(workflow, 'on:\n', '\npermissions:');
 const permissionsSection = section(workflow, 'permissions:\n', '\nconcurrency:');
 
@@ -109,6 +294,13 @@ for (const fragment of [
   'workflow_dispatch:',
   'backup_run_id:',
   'incident_reference_utc:',
+  'verify_provider_migration_source:',
+  'Download paired encrypted Provider migration source',
+  'artifact-ids: ${{ steps.source.outputs.provider_source_artifact_id }}',
+  'Verify paired Provider source decryptability without target history replay',
+  'run: bash scripts/operations/verify-paired-provider-migration-source-recovery.sh',
+  'MIGRATION_LINEAGE_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-migration-file-lineage.json',
+  'MIGRATION_BODY_PARITY_EVIDENCE_PATH: ${{ runner.temp }}/restore-evidence/paired-provider-common-migration-body-parity.json',
   'privacy_ledger_run_id:',
   'production_privacy_canary_run_id:',
   'watchtower_track:',
@@ -128,6 +320,12 @@ for (const fragment of [
   'artifact-ids: ${{ steps.privacy-source.outputs.ledger_artifact_id }}',
   'artifact-ids: ${{ steps.privacy-source.outputs.canary_artifact_id }}',
   'run: bash scripts/operations/run-restored-postgres-authoritative-privacy-replay.sh',
+  'Attribute isolated Provider role replay to sealed source and observed target',
+  'inputs.verify_provider_migration_source',
+  'node scripts/operations/assess-isolated-provider-role-replay-proof.mjs',
+  'isolated-provider-role-replay-provenance.json',
+  '.directRoleMembershipTargetRehearsalProven == true',
+  '.fullProviderCompatibleRestoreProven == false',
   'Record fail-closed recovered service admission',
   'node scripts/build-postgres-recovered-serving-admission.mjs',
   'recovered-serving-admission.json',

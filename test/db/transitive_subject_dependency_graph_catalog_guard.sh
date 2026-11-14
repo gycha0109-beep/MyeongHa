@@ -129,6 +129,15 @@ if [[ "$wallet_edges" != "$expected_wallet_edges" ]]; then
   echo "$wallet_edges" >&2
   exit 1
 fi
+# Independently approved shared-memory lane adds one exact direct Subject
+# FK with physical deletion covered by ON DELETE CASCADE (direct guard).
+# Preserve the historical 140-edge P0-PR-01 graph unchanged.
+shared_memory_edge='1|subjects|subject_shared_memory_items_v1|subject_shared_memory_items_v1_subject_id_fkey|subject_id|id'
+if ! printf '%s\n' "$actual" | grep -Fxq "$shared_memory_edge"; then
+  echo 'Expected shared-memory Subject dependency is absent or changed.' >&2
+  exit 1
+fi
+actual="$(printf '%s\n' "$actual" | grep -Fxv "$shared_memory_edge")"
 actual="$(printf '%s\n' "$actual" | awk -F '|' '$3 !~ /^chat_credit_/' )"
 if [[ "$actual" != "$expected" ]]; then
   echo "Transitive Subject dependency graph inventory drifted." >&2
