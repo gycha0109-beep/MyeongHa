@@ -1,7 +1,5 @@
 # Reader Runtime V2 — TRACK CLOSED 실행 정본 (RR-01~RR-15)
 
-> **2026-11-13 최초 출시 최소 제공 범위:** [현행 제품 소유자 결정](../LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md)은 구매한 공식 풀이 열람·재열람 + 기본 첫 질문·후속 질문을 웹에서 제공하는 것이다. 이 사용 흐름에 실제 필요한 원자 저장·권한·서명·근거·출력 검증과 실제 모델 품질은 출시 전 필수다. 다중 Reader 관점 차별화·기본 범위 밖 확장 기능은 최초 출시와 구분해 판정한다. 이 주석은 기존 Reader 트랙의 미완료 안전/권한 과제를 임의 완료·삭제하거나 공개 전환을 승인하지 않는다.
-
 
 - 상태: **CONTINUE / PUBLIC OFF**. 독립 Reader 공식 사주 후속 Chat은 운영 공개 불가.
 - 트랙: `reader-runtime` — 공식 Reading × 구매 검증 Grant × 고정 Thread × Reader × 원본 Saju Grounding 기반 Chat.
