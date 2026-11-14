@@ -32,6 +32,14 @@ const storedReading = Object.freeze({
       readingId: reading.readingId,
       sections: Object.freeze([
         Object.freeze({
+          sectionType: 'structure',
+          title: '계산 근거',
+          state: 'available',
+          blocks: Object.freeze([
+            Object.freeze({ type: 'source_hint', text: '발행 당시 저장된 계산 근거입니다.' }),
+          ]),
+        }),
+        Object.freeze({
           sectionType: 'core',
           title: '직업 흐름',
           state: 'available',
@@ -394,7 +402,9 @@ try {
     reportHidden: document.querySelector('[data-official-report]')?.hidden ?? true,
     reportSections: document.querySelectorAll('.official-report-section').length,
     reportTitle: document.querySelector('.official-report-section h2')?.textContent?.trim() ?? '',
-    reportBody: document.querySelector('.official-report-primary')?.textContent?.trim() ?? '',
+    reportBody: document.querySelector('.official-report-primary:not([hidden])')?.textContent?.trim() ?? '',
+    reportEvidence: document.querySelector('.official-report-section details p')?.textContent?.trim() ?? '',
+    highlight: document.querySelector('[data-official-report-first-text]')?.textContent?.trim() ?? '',
     reportDate: document.querySelector('[data-official-report-date]')?.textContent?.trim() ?? '',
     reportVersion: document.querySelector('[data-official-report-version]')?.textContent?.trim() ?? '',
     stepTitle: document.querySelector('[data-reading-step-title]')?.textContent?.trim() ?? '',
@@ -405,12 +415,12 @@ try {
   assert(archiveState.reader === '' && archiveState.readerAuthority === '', `Archive mode retained Reader authority: ${JSON.stringify(archiveState)}`);
   assert(archiveState.readerSceneHidden && archiveState.characterBlockHidden, `Archive mode exposed Reader presentation: ${JSON.stringify(archiveState)}`);
   assert(archiveState.stageHidden && !archiveState.reportHidden, `Full official report was not the default: ${JSON.stringify(archiveState)}`);
-  assert(archiveState.reportSections === 1, `Unexpected number of owner-authorized report sections: ${JSON.stringify(archiveState)}`);
-  assert(archiveState.reportTitle === '직업 흐름', `Stored report title was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportSections === 2, `Unexpected number of owner-authorized report sections: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.reportTitle === '계산 근거' && archiveState.reportEvidence === '발행 당시 저장된 계산 근거입니다.', 'The evidence-only section was lost');
   assert(archiveState.reportBody.includes('저장된 공식 풀이의 직업 흐름'), `Stored report body was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.highlight === archiveState.reportBody, 'The archive highlight must come from the first interpretation');
   assert(archiveState.reportDate.length > 0 && archiveState.reportVersion.length > 0, `Stored report provenance was omitted: ${JSON.stringify(archiveState)}`);
-  assert(archiveState.stepTitle === '직업 흐름', `Stored Reading title was not rendered: ${JSON.stringify(archiveState)}`);
-  assert(archiveState.stepBody.includes('저장된 공식 풀이의 직업 흐름'), `Stored Reading body was not rendered: ${JSON.stringify(archiveState)}`);
+  assert(archiveState.stepTitle === '계산 근거' && archiveState.stepBody === '', 'The evidence-only step must have no interpretation');
   assert(archiveState.backHref === 'records.html?tab=saju', `Archive back action escaped Records: ${archiveState.backHref}`);
   assert(archiveState.chatHref === 'chat-hub.html', `Archive mode invented a direct Chat continuation: ${archiveState.chatHref}`);
 
@@ -428,6 +438,12 @@ try {
   );
   await client.evaluate(`document.querySelector('[data-official-report-step-mode]')?.click()`);
 
+  await client.evaluate(`document.querySelector('[data-reading-next]')?.click()`);
+  await waitFor(
+    client,
+    `document.querySelector('[data-reading-step-body]')?.textContent?.includes('저장된 공식 풀이의 직업 흐름')`,
+    'The interpretation after the evidence-only step was not rendered',
+  );
   await client.evaluate(`document.querySelector('[data-reading-next]')?.click()`);
   await waitFor(
     client,
