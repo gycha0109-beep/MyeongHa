@@ -32,6 +32,8 @@ type Result = Readonly<{state:'idle'|'issued'|'lease_expired'}> |
  */
 export function createApprovedSajuT10PairIssuanceWorkerV1(input: Readonly<{
   pool:PostgresSubjectPoolV1;
+  /** Independently provisioned read-only T10 Reader login for signed archive recovery. */
+  pairReaderPool:PostgresSubjectPoolV1;
   sourceOrigin:string;
   sourceBearerToken:string;
   trust:SajuT10ProductionPairTrustV1;
@@ -41,11 +43,13 @@ export function createApprovedSajuT10PairIssuanceWorkerV1(input: Readonly<{
   engineVersion:string;
   fetchImpl?:typeof fetch;
 }>) {
-  if (!allowedReaders.has(input.readerCharacterId) ||
+  if (input.pairReaderPool===input.pool ||
+      typeof input.pairReaderPool?.connect!=='function' ||
+      !allowedReaders.has(input.readerCharacterId) ||
       !SAJU_PRODUCTION_ISSUE_RELEASE_REF_V1.test(input.releaseRef) ||
       !TOKEN.test(input.engineKey) || !TOKEN.test(input.engineVersion) ||
       input.engineVersion !== input.trust.engineVersion) {
-    throw new TypeError('Pair issuer requires pinned Reader, Release and engine.');
+    throw new TypeError('Pair issuer requires a separate archive Reader pool, pinned Reader, Release and engine.');
   }
   const source=createSajuT10ProductionPairIssueSourceV1({
     origin:input.sourceOrigin,bearerToken:input.sourceBearerToken,
@@ -109,7 +113,7 @@ export function createApprovedSajuT10PairIssuanceWorkerV1(input: Readonly<{
           state:'held',reason:'archive_recovery_unverified',jobId:job.job_id,
         };
         const reopened=await readPostgresApprovedSajuT10PairReaderV1({
-          pool,verifiedEvidence,subjectId:job.subject_id,
+          pool:input.pairReaderPool,verifiedEvidence,subjectId:job.subject_id,
           purchaseIntentId:job.purchase_intent_id,readingId:pointer.readingId,
           readerCharacterId:input.readerCharacterId,trusts:[input.trust],
         });
