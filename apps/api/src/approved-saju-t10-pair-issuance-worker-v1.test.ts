@@ -50,8 +50,10 @@ import { createApprovedSajuT10PairIssuanceWorkerV1 } from './approved-saju-t10-p
 import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 const key=generateKeyPairSync('ed25519').publicKey;
-const issuerPool={} as PostgresSubjectPoolV1;
-const pairReaderPool={} as PostgresSubjectPoolV1;
+// The transaction boundary is mocked above, but worker configuration still
+// requires two distinct, connect-capable DB pools before it may run.
+const issuerPool={connect:vi.fn()} as unknown as PostgresSubjectPoolV1;
+const pairReaderPool={connect:vi.fn()} as unknown as PostgresSubjectPoolV1;
 const config=()=>{
   return {
     pool:issuerPool,
