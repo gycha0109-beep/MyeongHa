@@ -1,3 +1,23 @@
+### 2026-11-14 KST — Cloudflare 실제 배포·공유 메모리 운영 선행조건 및 최소 변경안
+
+- 실제 Cloudflare Worker `myeongha`는 2026-11-14 03:58 UTC 버전 `1d995e41-8c91-40c4-97dc-ebe958d678af`를 100% 배포 중. GitHub 최신 확인 `main=f4027f9cdb2a08d132a2425116d561b00bcb7509`; Cloudflare Workers Builds 버전-빌드 `df4efe5b-505b-478a-9100-304e612e30da`의 `build_trigger_metadata.commit_hash`와 일치하고 빌드 `success`이므로 **배포 source SHA 연결 확인**. 기존 Vercel Hobby 기록만으로 현재 운영 배포를 판정하지 않음.
+- `/api/me/shared-memory` 구현은 저장소에 있으나 현재 `main` Cloudflare allowlist에 경로가 없어 **기능 활성화에 앞서 별도 배포 의존성 확인**이 필요. DB의 세 테이블/함수/원장 부재를 현재 채팅 오류의 직접 원인으로 단정하지 않음. 세연 pinned RPC는 현 DB에서 존재/권한 통제 확인.
+- 신규 [Production 공유 메모리 읽기 전용 preflight](../../scripts/operations/production-shared-memory-forward-preflight-readonly.sql)는 실제 Supabase에 **SELECT로 실행 PASS** (`baselineMatchesExpected=true`, 245/frontier `20261113062455`, 두 과거 원격 이력 보존, 2360/2370/2380 부재, finalizer owner postgres, API non-BYPASSRLS). SQL/이력 쓰기 없음.
+- `#43553728311` 격리 적용 성공을 재사용해 정본 로드맵 상단에 **단일 조건부 운영 변경안·선행 백업·이력 등록·중복 방지·실패 시 중단·사용자 승인 조건**을 명시. 현재 활성 기능이 필요로 하는지 입증 전 무조건 적용하지 않으며 전체 DR/서비스 수용 HOLD 유지.
+
+Watchtower-Track: ops
+
+## 2026-11-14 실제 현재 백업 격리 개인정보 마이그레이션 실증 — 제한 PASS, 전체 DR HOLD
+
+- **보호 실행:** [PostgreSQL Isolated Restore Drill #43553728311](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43553728311) **SUCCESS**, 정확한 `main` SHA `986cc1cc2e2b095350158990cb7660ed2de0692d`. 비식별 증거 artifact `14097053341` (`postgres-isolated-restore-drill-43553728311`, 만료 2026-12-14 UTC).
+- **소스 검증:** 백업·암호화 Provider 원장 **동일 실행 #43424903445**, 백업 소스 `6eab97337811128282f5f5ec6320e4608d5f9c09`, 프로젝트 `cnsfpcdiyofqvhpcegfc`, 원격 이력 **245개**, frontier `20261113062455`, catalog SHA256 `405e10e50f47cb123f94babf57aff2ef40db3c61da185cc60cbe6581f0c43dba` 일치. 암호화 원장 복호화·원본 무결성 **PASS**, 원본 SQL 본문 12개 미보유/전체 Provider migration ledger 대상 복구 **HOLD**.
+- **일회용 DB의 실제 결과:** 백업 원본에 대한 이전 스키마/역할/ACL 관측을 먼저 수행한 다음, **PG17 loopback 복원 클론에만** 고정 SQL `2360→2370→2380`을 **단일 트랜잭션**으로 적용. `disposable-shared-memory-privacy-rehearsal.json`: 세 버전 적용 및 메타데이터/권한 검사 PASS, `productionDatabaseChanged=false`, `cloneStillMatchesOriginalProductionSchema=false`, `drReady=false`. 기존 합성 개인정보 삭제·복구 검사 **PASS** (5개 합성 이벤트, 동일 원장 두 번째 재생 멱등 PASS, 공유 메모리 재노출 차단·계정 삭제·Commerce 보존 가드 PASS). **실제 Production 데이터 삭제/Privacy Canary는 실행하지 않음.**
+- **복원 범위의 한계:** 원본/복원 public 스키마 catalog 비교는 범위 한정 관측이며 공유 MVCC snapshot 동등성은 미증명. Provider-managed 141 COPY block 중 112 replay, 3 column projection, 29 skip; **full Provider restore=false**. Hosted `auth.identities`/`auth.sessions`/Storage, 로그인·갱신·객체 바이트 및 전체 RPO 24h/RTO 6h 실측 **미완료**. `recovered-serving-admission.json`은 `gate=BLOCKED`, `serviceResumptionAllowed=false`, `drReady=false`.
+- **직접 운영 재확인:** 2026-11-14 읽기 전용 Supabase에서 migration **245개/frontier `20261113062455` 유지**, 세 공유 메모리 객체/삭제 재생 함수 **부재**. 이번 실증은 **세 SQL의 현재 백업 기준 격리 정방향 적용 가능성만** 입증한다. 운영 이력 45/82·원격 전용 두 버전·실배포 의존성을 구분한 최소 변경안을 마련하고, 운영 DB SQL 적용 전 대상/순서/보존/롤백/재검증 근거와 사용자 명시 승인을 받는다.
+- **판정:** #1887 OPEN / `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false`. 합성 복구 결과를 실제 Production 개인정보 원장 연속성이나 서비스 재개로 승격하지 않는다.
+
+Watchtower-Track: ops
+
 ### 2026-11-13 KST — 최신 DB 백업의 공유 메모리 삭제 복구 마이그레이션, 운영 변경 없는 격리 리허설 구현
 
 - **현 상태:** 원격 `245`/frontier `20261113062455`를 포함한 최신 암호화 백업·원장 #43424903445 보관 성공. 반면 현재 Production의 수동 공유 메모리 `2360`/계정 삭제 연동 `2370`/삭제 이벤트 재생 `2380` 미적용. 이전 백업 복구 #43418694784는 2380 부재 때문에 정상 fail-closed 종료. 같은 실패를 생산 복구 성공으로 꾸미지 않는다.
