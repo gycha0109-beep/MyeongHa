@@ -13,6 +13,7 @@ import {
   APPROVED_SAJU_PAIR_READER_PATH_V1,
 } from './approved-saju-t10-pair-reader-http-v1.js';
 import type { SajuT10ProductionPairTrustV1 } from './saju-t10-production-pair-issue-source-v1.js';
+import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 
 type SceneRuntime = Parameters<typeof executeReaderInterpretationPreviewPostgresV1>[0];
 type QuestionRuntime = NonNullable<Parameters<typeof handleApprovedSajuReaderQuestionHttpV1>[0]['runtime']>;
@@ -43,7 +44,7 @@ export function createApprovedSajuReaderHttpRuntimeV1(input: Readonly<{
     'createProductReaderEligibilityAuthorityPort'>;
   delivery: DeliveryRuntime;
   /** Explicitly opt in to T10 archive re-read; paid product activation remains separate. */
-  pairReader?: Readonly<{ trusts: readonly SajuT10ProductionPairTrustV1[] }>;
+  pairReader?: Readonly<{ pool: PostgresSubjectPoolV1; trusts: readonly SajuT10ProductionPairTrustV1[] }>;
 }>) {
   const origin = new URL(input.origin);
   const { question, scene, delivery } = input;
@@ -58,10 +59,14 @@ export function createApprovedSajuReaderHttpRuntimeV1(input: Readonly<{
       delivery.deliveryTokenSecret.byteLength !== 32) {
     throw new Error('Approved Saju Reader HTTP authority is incomplete.');
   }
+  if(input.pairReader !== undefined &&
+      [pool,protectedPool,issuanceProofPool].includes(input.pairReader.pool)) {
+    throw new Error('T10 Reader requires an independently provisioned read-only DB pool.');
+  }
   const deliveryTokenSecret = new Uint8Array(delivery.deliveryTokenSecret);
   const t10PairReader = input.pairReader === undefined ? undefined :
     createApprovedSajuT10PairReaderHttpV1({
-      origin: input.origin, pool: issuanceProofPool, trusts: input.pairReader.trusts,
+      origin: input.origin, pool: input.pairReader.pool, trusts: input.pairReader.trusts,
       verifyRequestIdentity: (request) => identityEvidenceVerifier.verifyRequestIdentity(request),
     });
 
