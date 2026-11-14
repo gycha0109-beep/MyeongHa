@@ -1,4 +1,5 @@
 import { MyeongHaApiClientV1 } from '../../../../packages/api-client/src/http.js';
+import { readApprovedSajuPurchaseReadingsV1 } from '../../../../packages/api-client/src/records.js';
 import { listTargetPersonsV1 } from '../../../../packages/api-client/src/target-persons.js';
 import { APPROVED_SAJU_SANDBOX_ROUTES_V1 as ROUTES } from '../../../../packages/contracts/src/approved-saju-sandbox-routes.js';
 import type { ApprovedSajuCheckoutPanelPorts } from './approved-saju-sandbox-checkout.js';
@@ -74,6 +75,13 @@ export async function loadApprovedSajuSandboxCheckoutPortsV1(
       sdk: { async requestPayment(input) { await memberToken(); return sdk.requestPayment(input); } },
       orders: post(ROUTES.order), attempts: post(ROUTES.attempt),
       handoff: post(ROUTES.handoff), verification: post(ROUTES.verify),
+      async readArchive(purchaseIntentId) {
+        const readings = await readApprovedSajuPurchaseReadingsV1(
+          client, await memberToken(), purchaseIntentId,
+        );
+        await memberToken();
+        return readings;
+      },
     };
   } catch {
     return null;
