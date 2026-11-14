@@ -65,3 +65,11 @@
 - 명하 #3174의 `saju-t10-production-pair-issue-source-v1.ts`는 전용 공개키·서명 영역·만료·구매/동의/출생 Revision·원본 내용·문장 해시를 검증한다. `verifyApprovedSajuPreparedPairIssueV1`는 DB에 존재하는 발급 시도를 요구하며 출처 호출 전후 현재 구매/동의를 재확인한다. 세 관계 비교 상품별 분리와 교체 거부 테스트를 추가했다.
 - **여전히 미발급 상태:** 이 시점의 정식 Source 검증은 DB에 공식 Reading을 확정·보관하거나 Reader 접근 권한을 부여하지 않는다. 별도 두 명식 DB 확정/서명 아카이브/Reader 복원·묶음 T8/T10·중복/환불/철회 통합 검증이 필요하다.
 - 기존 자기 명식 발급 Worker의 `compatibility` 차단을 유지한다. 후보 SQL을 운영 반영으로 간주하지 않고 판매·실결제·배포는 HOLD. 외부 학술 감수는 별도 승인 조건으로 요구하지 않는다. `ROADMAP_IN_PROGRESS`.
+
+## 2026-11-14 추가 — 별도 T10 발급 작업자·서명 보관·Reader 재열람 구현
+
+- T10은 개인 명식용 기존 Worker에서 compatibility 차단을 유지하고, `approved-saju-t10-pair-issuance-worker-v1.ts`로 별도 발급을 준비·검증한다. 이전 발급 시도가 존재하면 새 Source 호출을 중지하고 재조정 대상으로 보류한다.
+- `commerce_approved_saju_pair_issuer_v1.sql`은 **운영 미적용 후보**로, 구매·상대 동의·양쪽 출생 Revision·해석 문장 대조와 기존 Reading 확정 및 Ed25519 서명 원본 보관을 하나의 DB 트랜잭션으로 연결한다. 정식 서명 자체는 TypeScript에서 검증하며 DB는 확인된 원본과 거래 범위를 다시 대조한다.
+- `postgres-approved-saju-pair-official-commit-v1.ts`, `postgres-approved-saju-pair-reader-v1.ts`가 저장된 원본과 두 사람 해시를 재확인하고 환불/철회 등 현재 Grant가 없는 접근을 거부한다. `approved-saju-t10-pair-reader-http-v1.ts`는 기존 Reader HTTP 호스트의 명시적 opt-in에서만 활성화하며 로그인한 구매자와 해당 Reader에 한정한다.
+- 관계운+첫 비교 구매는 관계운(T8) 발급과 궁합(T10) 발급을 다른 Reading으로 유지한다. 새로운 가격·상품은 추가하지 않았다.
+- 추가 검증·운영 DB 적용/복구·배포·실결제는 남아 있다. 운영 결제와 판매 활성화는 HOLD, `ROADMAP_IN_PROGRESS`.
