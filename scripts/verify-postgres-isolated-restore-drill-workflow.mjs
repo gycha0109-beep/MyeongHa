@@ -192,6 +192,9 @@ for (const fragment of [
   "fullProviderMigrationLedgerRestored:false",
   "drReady:false,serviceResumptionAllowed:false",
   'jsonb_to_recordset',
+  'COPY ops_private_source_packet(packet) FROM STDIN',
+  '/*__SOURCE_PACKET_COPY_DATA__*/',
+  "sourceBytes.toString('utf8').trimEnd()",
   'DISPOSABLE_LEDGER_NOT_EMPTY',
 ]) requireFragment(disposableLedger,fragment,disposableLedgerPath);
 for (const fragment of [
