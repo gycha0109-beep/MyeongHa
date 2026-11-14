@@ -23,8 +23,8 @@
 | `P0-CM-02` | Web payment provider / PSP | **DECIDED** | PortOne V2; canonical provider key `portone_v2`; server lookup authority at `api.portone.io`; live merchant/credential/Production activation remains separately gated |
 | `P0-CM-03` | Saju-page-wide launch scope / paid Product & Capability catalog | **OPEN-P0 (activation)** | 2026-11-06 approved 14 Offer IDs/prices and 7 shared components supersede the historical single `standard.love_relationship` candidate for launch scope; P0-CM-03 remains OPEN-P0 only for actual sale/Charge Terms/fulfillment/Production activation. The 5 package Offers are included; Reader eligibility remains separately gated. Historical `standard.love_relationship` KRW 8,900 and retired deep candidate remain historical, not the 14-Offer pricing baseline |
 | `P0-CM-04` | Guest purchase ownership / continuity | **DECIDED** | active Guest 구매 허용; canonical `subjects.id` 소유; 새 Member promotion은 same-subject; 기존 Member merge 후 direct merged-Guest lineage로 권리 조합; historical Commerce owner rewrite 금지 |
-| `P0-AI-01` | AI provider/model/fallback | **OPEN-P0** | provider, model family, fallback, grounded-response validation implementation |
-| `P0-AGE-01` | Minimum age / character content policy | **OPEN-P0** | 최소 이용 연령, 미성년 허용 여부, 표현 강도/제한; content bundle policy-tag slot은 미리 두되 threshold/matrix는 미확정 |
+| `P0-AI-01` | AI provider/model/fallback | **DECIDED (selection policy); implementation/model pin HOLD** | Preserve existing DeepSeek-based GEPA track; compare actual implemented candidates on quality, latency and cost before selecting production provider/model. Only a verified same-provider standby model may be retried; if unavailable or validation fails, fail closed. No unapproved cross-provider fallback or external paid GEPA calls. |
+| `P0-AGE-01` | Minimum age / character content policy | **DECIDED (product policy); enforcement HOLD** | 만 19세 이상 성인 전용. 성인 대상 몰입형 로맨스·플러팅 허용, 노골적인 성적 묘사는 제외. 연령 확인·콘텐츠 분류·캐릭터별 실제 적용/검증 전 공개 금지. |
 | `P0-PR-01` | Retention / backup / legal retention | **DECIDED** | service/personalization DELETE; 4 structural tombstones ANONYMIZE; 9 Commerce evidence/history tables RETAIN `P5Y`; existing encrypted backup lifecycle `P30D` + restore reconciliation before serviceability |
 | `P0-PR-02` | Official Reader paid interpretation privacy | **DECIDED — PRODUCT POLICY ONLY** | [기본 브랜치 제품 개인정보 정책 정본](OFFICIAL_READER_S4_PRIVACY_POLICY_DECISION_V1.md); 24h 본 DB 삭제 목표/90d 일반 로그 상한, 정확한 유료 권한, 원문 격리. 법무·기술·저장·운영 승인은 별도 HOLD |
 | `P0-PR-01A` | Guest bearer/session authentication TTL | **DECIDED** | 7 days / 604800 seconds for newly issued Guest credentials; does not decide expired-Guest data deletion or parent retention policy |
@@ -33,6 +33,13 @@
 
 
 > **2026-11-14 후속 제품 소유자 결정 적용 (현행 범위, 역사 보존):** 2026-09-05 P0-CM-01의 웹·1회성 결제 및 구독·네이티브 스토어 결제 제외는 유지한다. 당시 *bundle billing 제외*는 현재 승인된 **1회성 묶음 Offer 5개**를 제외하는 정책으로 더 이상 적용하지 않는다. 묶음은 구독·정기결제가 아닌 단일 구매이고 구성요소별 발급/권한·환불 검증이 필수다. P0-CM-03의 예전 8,900원 연애 상품과 미정 가격 문구는 당시 후보 기록이며 현행 14개 상품 가격의 근거가 아니다. **상품 구성·정가 승인과 실제 Offer/Charge Terms 발행·실판매 허가는 별개**이므로 P0-CM-03의 운영 활성화는 OPEN-P0/HOLD를 유지한다. [최신 범위 결정](LAUNCH_SCOPE_OWNER_DECISION_AND_TRACK_CLASSIFICATION_20261113.md) · [승인 카탈로그 코드(PR #3174)](https://github.com/gycha0109-beep/MyeongHa/blob/feat/saju-approved-checkout-admission-20261109/packages/contracts/src/approved-saju-catalog.ts).
+
+### 2026-11-14 제품 소유자 AI·연령·Reader 범위 추가 결정
+
+- **AI 공급자/모델:** 현재 **DeepSeek 기반 GEPA 연구**를 진행 중인 기존 구현을 출발점으로 유지한다. OpenAI/Gemini/Claude 등 다른 공급자를 임의로 기본값으로 지정하거나 기존 GEPA를 대체하지 않는다. 운영 공급자·정확한 모델 ID는 **기존 구현의 실제 품질·응답 속도·비용 비교 후 선정**하며, 아직 선정/승인/운영 배포되었다고 기록하지 않는다. 장애 시에는 사전 검증된 **동일 공급자의 예비 모델만** 재시도하고, 없거나 검증 실패 시 중단한다. Saju 원본·권한·근거/출력 Guard는 우회하지 않는다. 기존 GEPA 연구의 별도 500원 상한·유료 송신 HOLD는 유지한다.
+- **연령/콘텐츠:** **만 19세 이상** 성인 전용. 성인 몰입형 로맨스와 플러팅을 허용하되 **노골적인 성적 묘사는 제외**한다. 연령 확인 방식, 캐릭터별 정책 태그, 실제 필터·검증은 구현/출시 게이트이며 결정만으로 기능을 공개하지 않는다.
+- **Reader 범위:** 최초 공개 여섯 명(세연·라현·백헌·여울·윤호·태겸) **전원이 7개 해석 구성요소 모두 지원**하도록 제품 범위를 승인한다(6×7=42 조합). 구매 Offer 14개와 묶음상품은 이 7개 구성요소의 권한 있는 조합으로 처리한다. 42개 지원은 **목표**이지 현재 구현·콘텐츠·모델·Grant·T9/T10/발급·환불 검증 통과를 의미하지 않는다. 각 조합이 실제로 안전하게 구현·검증되기 전에는 차단하고, 임의의 다른 Reader/모델로 대체하지 않는다.
+- **남은 승인/증거:** 운영 모델의 정확한 선택 및 가격·품질 증거, 동일 공급자 예비 모델의 실증, 연령·표현 정책 적용, 42조합과 14개 Offer의 실제 종단 검증. 새 공급자·모델을 사용한다는 결정은 아직 없음.
 
 ### 현재 승인된 14개 Offer 및 정가 (판매 비활성)
 
