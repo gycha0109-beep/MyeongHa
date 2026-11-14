@@ -1,0 +1,60 @@
+name: Saju T10 Pair Production Cross-Service E2E
+
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/saju-t10-production-pair-issue-source-v1.ts'
+      - 'apps/api/src/saju-t10-pair-official-product-reading-v1.ts'
+      - 'test/saju-t10-pair-production-cross-service.e2e.test.ts'
+      - '.github/workflows/saju-t10-pair-production-cross-service-e2e.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/api/src/saju-t10-production-pair-issue-source-v1.ts'
+      - 'apps/api/src/saju-t10-pair-official-product-reading-v1.ts'
+      - 'test/saju-t10-pair-production-cross-service.e2e.test.ts'
+      - '.github/workflows/saju-t10-pair-production-cross-service-e2e.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  signed-pair:
+    name: Pinned Saju Production pair → MyeongHa official Reader
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Checkout MyeongHa
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Checkout pinned approved T10 Saju authority
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: gycha0109-beep/Saju
+          ref: 8278c8cb72ae6dcbb7bd7edb8fb44b07c47c53b9
+          path: .cross-service/saju
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install MyeongHa pinned dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Build pinned Saju issuer
+        working-directory: .cross-service/saju
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund --workspaces=false
+          npm run build
+
+      - name: Verify three Production pair signatures and Reading projection
+        env:
+          MYEONGHA_RUN_SAJU_T10_PAIR_CROSS_SERVICE_E2E: '1'
+        run: npx vitest run test/saju-t10-pair-production-cross-service.e2e.test.ts
