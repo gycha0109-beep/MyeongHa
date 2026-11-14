@@ -2,7 +2,7 @@
 
 - 첫 실제 행 복원 [#43571674258](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43571674258): 암호화 원장 무결성·소스 SQL 지문 검증 PASS, 일회용 대상의 JSON COPY 변환 FAIL. 245행 완전 복원 및 최종 개인정보 재검증 불가. Production DB 원장 245개·frontier 유지.
 - 운영 이슈: 일회용 DB 오류가 GitHub job 로그에 보호 대상 마이그레이션 SQL 일부를 포함시킴. 해당 실행 로그 삭제 요청 **HTTP 204** 확인(실행 결과·상태는 유지), 사용자 데이터 행 유출은 입증되지 않았으며 모든 외부 복제본 부재도 미증명. 원문 재인용 금지.
-- 복구: SQL 원문 직접 COPY를 검증된 JSON의 base64 ASCII 전송으로 대체, DB 세션의 SQL 오류/상세/문장 로깅을 개인정보 전송 전 억제. Vitest 2개 PASS + workflow 보호 검증 PASS + 로컬 PG17 합성 2행 완전 일치 PASS. **실제 245행 보호 복구 재검증 및 전체 DR/Hosted/개인정보 연속성 HOLD**.
+- 복구: SQL 원문 직접 COPY를 검증된 JSON의 base64 ASCII 전송으로 대체, Supabase PostgreSQL `postgres`의 로깅 설정 변경 권한 부재를 확인하여 해당 설계는 제거. 대신 격리 PostgreSQL 서비스 Docker 로그 수집을 `none`으로 차단하고 SQL 원문 대신 base64 ASCII를 COPY 데이터로 전송. 스크립트 psql 오류 출력은 계속 차단. Vitest 2개 PASS + workflow 보호 검증 PASS + 로컬 PG17 합성 2행 완전 일치 PASS. **실제 245행 보호 복구 재검증 및 전체 DR/Hosted/개인정보 연속성 HOLD**.
 - 판정: `NOT_ACCEPTED`, `drReady=false`, `serviceResumptionAllowed=false`, `ROADMAP_COMPLETE=false`. Production DB 변경·이력 repair·Canary 실행 없음.
 
 Watchtower-Track: ops
