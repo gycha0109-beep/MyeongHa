@@ -52,6 +52,8 @@ test('verified paired source can only construct disposable data-only ledger repl
   assert.match(sql,/^BEGIN;/u);
   assert.match(sql,/CREATE TABLE IF NOT EXISTS supabase_migrations\.schema_migrations/u);
   assert.match(sql,/jsonb_to_recordset/u);
+  assert.match(sql,/COPY ops_private_source_packet\(packet\) FROM STDIN/u);
+  assert.match(sql,/\/\*__SOURCE_PACKET_COPY_DATA__\*\//u);
   assert.match(sql,/DISPOSABLE_LEDGER_NOT_EMPTY/u);
   assert.match(sql,/^COMMIT;\s*$/mu);
   assert.ok(!sql.includes(statement),'no private SQL text embedded in replay script');
