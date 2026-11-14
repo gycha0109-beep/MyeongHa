@@ -1,6 +1,8 @@
 import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { hashSajuHeldSourceProofRequestV1 as hashJson } from './saju-held-source-proof-verifier-v1.js';
+import { projectProductReadingResponseV2 } from '../../../packages/api-client/src/product-reading-display.js';
+import { projectSignedSajuT10PairProductReadingV1 } from './saju-t10-pair-official-product-reading-v1.js';
 import {
   verifySajuT10ProductionPairIssueV1,
 } from './saju-t10-production-pair-issue-source-v1.js';
@@ -110,6 +112,18 @@ describe('official T10 two-chart signature and purchased pair verification', () 
       const result = verifySajuT10ProductionPairIssueV1(input);
       expect(result?.state).toBe('production_pair_source_verified');
       expect(result?.materialHash).toBe(input.body.materialHash);
+      const projected = projectSignedSajuT10PairProductReadingV1(input);
+      expect(projected?.state).toBe('verified_pair_display_candidate');
+      expect(projected?.originalSignedBodyHash).toBe('sha256:v1:' + hashJson(input.body));
+      const display = projectProductReadingResponseV2(projected?.response);
+      expect(display.kind).toBe('delivered');
+      if (display.kind === 'delivered') {
+        expect(display.readingId).toBe(input.readingId);
+        expect(display.steps[0]?.title).toBe('두 사람의 명식');
+        expect(display.steps[1]?.primary).toBe(input.body.units[0]?.paragraph);
+        expect(display.steps[1]?.supporting).toEqual(input.body.units.slice(1).map(unit => unit.paragraph));
+      }
+
     },
   );
   it('rejects source tampering, another counterpart, admission drift, retry reuse and an expired signature', () => {
@@ -117,6 +131,10 @@ describe('official T10 two-chart signature and purchased pair verification', () 
     expect(verifySajuT10ProductionPairIssueV1({
       ...input, body: { ...input.body, state: 'held' },
     })).toBeNull();
+    expect(projectSignedSajuT10PairProductReadingV1({
+      ...input, body: { ...input.body, state: 'held' },
+    })).toBeNull();
+
     expect(verifySajuT10ProductionPairIssueV1({
       ...input, scope: {
         ...input.scope, paidComparison: {
