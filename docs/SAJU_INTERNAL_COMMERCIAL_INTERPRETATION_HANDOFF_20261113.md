@@ -73,3 +73,11 @@
 - `postgres-approved-saju-pair-official-commit-v1.ts`, `postgres-approved-saju-pair-reader-v1.ts`가 저장된 원본과 두 사람 해시를 재확인하고 환불/철회 등 현재 Grant가 없는 접근을 거부한다. `approved-saju-t10-pair-reader-http-v1.ts`는 기존 Reader HTTP 호스트의 명시적 opt-in에서만 활성화하며 로그인한 구매자와 해당 Reader에 한정한다.
 - 관계운+첫 비교 구매는 관계운(T8) 발급과 궁합(T10) 발급을 다른 Reading으로 유지한다. 새로운 가격·상품은 추가하지 않았다.
 - 추가 검증·운영 DB 적용/복구·배포·실결제는 남아 있다. 운영 결제와 판매 활성화는 HOLD, `ROADMAP_IN_PROGRESS`.
+
+## 2026-11-14 — 실제 Saju 정식 서명과 명하 T10 Reading·Reader 저장물 계약 교차 검증
+
+- **기준:** Saju [#2763](https://github.com/gycha0109-beep/Saju/pull/2763)에서 3종 검사 통과가 확인된 정확한 커밋 `8278c8cb72ae6dcbb7bd7edb8fb44b07c47c53b9`을 별도 저장소 체크아웃으로 고정한다. 명하 자체 서명 모의값 대신 **실제 Saju Production 호스트**가 두 개의 Canonical 명식과 한국어 원본 자료를 계산·Ed25519 서명한다.
+- **새 전용 CI:** `.github/workflows/saju-t10-pair-production-cross-service-e2e.yml`은 실제 Saju 호스트를 로컬 격리 프로세스로 띄워 `test/saju-t10-pair-production-cross-service.e2e.test.ts`를 실행한다. 서명한 원본을 명하 Production Pair Source 검증기에 통과시켜 첫 상대·추가 상대·본인 관계운+첫 비교 **3개 구매 구성**별 양쪽 출생 Revision·원본 해시·조건부 한국어 문단의 동치를 확인한다.
+- **별도 서명 보관 재열람 경계:** 동일 원본을 저장하는 상황을 DB 조회 모의로 구성하여 실제 `readPostgresApprovedSajuT10PairReaderV1` 경로에서 서명·구매 식별·Reader·반환 문단을 재검증한다. 구매/상대 동의 범위가 소멸하거나 Reader가 다르거나 보관 서명이 바뀐 경우 재열람 불가를 확인한다. 이는 **운영 DB 연결 테스트가 아니라 서명 원본을 사용한 Reader 계약 검증**이다.
+- **이미 있는 PostgreSQL 17 후보 검증과 범위 차이:** `test/db/commerce_approved_saju_purchase_scope_pg17.sql`은 별도로 후보 DB의 저장·구성·취소/철회 구조를 검사한다. 두 검증을 결합해도 실제 운영 결제·운영 DB 설치·복구/계정 삭제·민감정보 정책 및 공개 판매의 증명으로 자동 승격하지 않는다.
+- **상태:** T10 로드맵 5단계 실발급 교차 검증을 일부 전진시켰으며, 전체 운영과 판매는 HOLD, `ROADMAP_IN_PROGRESS`. 신규 CI의 성공 여부는 해당 커밋 결과를 별도 확인한다.
