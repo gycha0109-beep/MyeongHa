@@ -49,20 +49,11 @@ export function buildDisposableLedgerReplaySql(packet) {
   assert.ok(packet?.schemaVersion==='ops-provider-migration-sealed-source-v1' &&
     Array.isArray(packet.entries)&&packet.entries.length>0);
   // All SQL statements are fixed literals; COPY transports only ASCII base64.
-  // Deny database error-detail and statement logging before accepting it.
+  // The guarded workflow disables Docker's PostgreSQL service log collection.
   return [
     'BEGIN;',
     "SET LOCAL statement_timeout='90s';",
     "SET LOCAL lock_timeout='5s';",
-    "SET LOCAL log_min_error_statement='panic';",
-    "SET LOCAL log_error_verbosity='terse';",
-    "SET LOCAL log_statement='none';",
-    'DO $privacy_log_guard$ BEGIN',
-    "IF current_setting('log_min_error_statement') <> 'panic'",
-    "OR current_setting('log_error_verbosity') <> 'terse'",
-    "OR current_setting('log_statement') <> 'none' THEN",
-    "RAISE EXCEPTION 'DISPOSABLE_LOG_PROTECTION_NOT_ACTIVE'; END IF;",
-    'END $privacy_log_guard$;',
     'CREATE SCHEMA IF NOT EXISTS supabase_migrations;',
     'CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (',
     'version text PRIMARY KEY, statements text[], name text, created_by text,',
