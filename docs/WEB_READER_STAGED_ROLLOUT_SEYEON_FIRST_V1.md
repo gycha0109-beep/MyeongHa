@@ -2,7 +2,7 @@
 
 > **2026-11-14 추가 제품 결정:** 최초 웹 정식 공개 시 세연·라현·백헌·여울·윤호·태겸 여섯 명 모두 구매 풀이의 기본 Reader 첫 질문·후속 질문을 함께 제공한다. 세연 우선은 내부 시험 순서일 뿐 공개 범위가 아니다. 각 캐릭터의 실제 Reader 콘텐츠·모델/Guard·공식 Reading·Grant/권한·환불/철회 검증 전에는 운영 활성화하지 않는다.
 
-> **2026-11-14 현재 실행 기준:** [통합 출시 기준](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)에서 '세연 우선'은 이전 Preview 표시 범위다. 최초 정식 공개는 여섯 명 일반 채팅 동시 공개와 구매 Reading 열람·기본 질문이다. 여섯 명 채팅 가용성이 여섯 명 유료 Reader 권한을 자동 부여하지 않는다.
+> **2026-11-14 현재 실행 기준:** [통합 출시 기준](LAUNCH_ROADMAP_CANONICAL_GATE_MATRIX_20261114.md)에서 '세연 우선'은 이전 Preview 표시 범위다. 최초 정식 공개는 여섯 명 일반 채팅 동시 공개와 구매 Reading 열람·기본 질문이다. 여섯 명 모두 Reader 기능을 제공하되, 각 사용자별 유료 권한은 검증된 Grant로만 부여한다.
 
 
 Status: **Seyeon Preview presentation candidate only. Paid Reader interpretation is NOT publicly activated.**
