@@ -1,3 +1,12 @@
+### 2026-11-14 KST — Provider migration 원장 전체 행의 격리 재구성 경로 구현, 실백업 실행 전
+
+- 기존 #43553728311은 같은 실행 #43424903445의 원장 봉인 SHA 및 SQL 본문 무결성만 확인한 상태. `supabase_migrations.schema_migrations`의 **실제 대상 행 복원은 미실행**이어서 Phase 8-B HOLD였음.
+- `scripts/operations/replay-disposable-provider-migration-ledger.mjs` 신설 및 `verify-paired-provider-migration-source-recovery.sh`, `postgres-isolated-restore-drill.yml`, 워크플로 보호 검증 수정. 새 선택 input은 정확한 #43424903445 + 기존 2360→2370→2380 복원 클론 조건에만 허용. 행 6필드를 검증된 원본 기록에서 재구성하며 SQL *실행*·운영 DB 접속·원문 로그는 차단. 원본/복원 JSONB 완전 동일성 실패 시 전체 트랜잭션 중단.
+- 단위 테스트 **2/2 PASS**, Bash/Workflow 정적 보호 검사 **PASS**, 별도 로컬 PG17에서 합성 2개 history row 실행/전체 필드 정확성 **PASS**, 임시 컨테이너 정리. 새 실제 백업 보호 실행 및 PR 최종 CI는 **아직 미확인**.
+- 이는 복원 DB의 이력 **행** 검증이며 Supabase Hosted Provider 운영 서비스의 이력 복원 수용이 아님. Provider 스키마·권한·Auth/Storage·12개 누락 SQL·privacy continuity·RPO/RTO 및 서비스 재개 HOLD. `NOT_ACCEPTED` / `drReady=false` / `serviceResumptionAllowed=false` / `ROADMAP_COMPLETE=false`.
+
+Watchtower-Track: ops
+
 ### 2026-11-14 KST — Cloudflare 실제 배포·공유 메모리 운영 선행조건 및 최소 변경안
 
 - 실제 Cloudflare Worker `myeongha`는 2026-11-14 03:58 UTC 버전 `1d995e41-8c91-40c4-97dc-ebe958d678af`를 100% 배포 중. GitHub 최신 확인 `main=f4027f9cdb2a08d132a2425116d561b00bcb7509`; Cloudflare Workers Builds 버전-빌드 `df4efe5b-505b-478a-9100-304e612e30da`의 `build_trigger_metadata.commit_hash`와 일치하고 빌드 `success`이므로 **배포 source SHA 연결 확인**. 기존 Vercel Hobby 기록만으로 현재 운영 배포를 판정하지 않음.

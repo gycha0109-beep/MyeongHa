@@ -1,3 +1,13 @@
+## 2026-11-14 Provider 원장 행의 일회용 DB 재구성 경로 구현 — 실제 원본 실행 대기
+
+- **정확한 작업 대상:** 기존 암호화 Production 백업과 같은 실행으로 봉인된 Provider migration source [#43424903445](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43424903445)(245개/frontier `20261113062455`). 이전 [격리 복구 #43553728311](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43553728311)에서는 원본 SQL 포함 원장을 복호화·지문 검증만 했고 **복원 대상 `supabase_migrations.schema_migrations`에 245행을 재구성하지 않았음**. 이 차단만 한정해 새 선택 경로를 추가.
+- **신규 보호 경로:** `restore_disposable_provider_ledger=true`는 `verify_provider_migration_source=true` 및 `restore_clone_shared_memory_rehearsal=true`, 정확한 백업·사고기준 시각·`main`에서만 허용. 기존 복구 후 동일 보호 runner 내 원장 원문을 임시 복호화하고 **오직 loopback PG17**에 원본 기록의 6개 필드(`version`, `name`, `statements`, `created_by`, `idempotency_key`, `rollback`)를 행 단위로 원자적 재구성. **기록된 과거 SQL 문장은 절대 실행하지 않음.** 원문·운영자 메타데이터·DB 오류를 CI 로그·아티팩트에 출력하지 않음. 원본 봉인 해시 검증과 6개 필드 JSONB 완전 동일성, 행수/frontier 확인이 실패하면 HOLD.
+- **실제 완료 범위:** `test/ops/provider-ledger-disposable-replay.test.mjs` 2개 PASS, 워크플로 정적 보호 검사 PASS, 2026-11-14 *로컬 별도 PostgreSQL 17*의 합성 2행 replay 실제 DB 입력·일치 결과 (`allFieldsExact=true`, `countMatch=true`, `frontierMatch=true`) PASS 후 컨테이너 정리. **실제 봉인 245행의 새 보호 workflow 실행은 아직 전**. SQL 텍스트 재실행 없이 원장 기록 보존만 실증; Source SQL 미보유 12개/역사적 실행자 미인증은 해소하지 않음.
+- **최종 수용 제한:** 실제 245행 격리 재생이 성공하더라도 *Provider 서비스가 관리하는 원장 복구·Auth 세션·Storage 객체·권한 계승*을 입증하지는 못함. `fullProviderMigrationLedgerRestored=false`, `drReady=false`, `serviceResumptionAllowed=false`; 새 evidence `disposable-provider-migration-ledger-restore.json`은 일회용 기록 재구성 결과로만 판정. Production SQL/repair/Canary/Hosted 변경 없음.
+- **다음:** PR 정확한 HEAD의 일반/통합 CI 통과 및 `main` 병합 후, 이전과 같은 짝지어진 백업 #43424903445로 새 flag를 설정해 보호 격리 실행 **1회**. 실제 아티팩트 6필드 정확성·privacy 검증·DR HOLD 결과를 보고 Phase 8-B의 남은 Provider-compatible Hosted target 범위와 구분.
+
+Watchtower-Track: ops
+
 ## 2026-11-14 현재 배포 의존성·최소 Production 정합화 변경안 — 읽기 전용 검증, 적용 보류
 
 > **아직 사용자 승인 요청 전의 단일 조건부 변경 후보**이며, 이 기록은 Production SQL 실행이나 migration history 수정 권한을 발급하지 않는다. 2026-11-14 보호 격리 복구 [#43553728311](https://github.com/gycha0109-beep/MyeongHa/actions/runs/43553728311)의 실제 결과를 사용한다.

@@ -175,6 +175,45 @@ for (const fragment of [
   "migrationHistoryRepaired == false",
 ]) requireFragment(sealedRunner, fragment, providerSourceRunnerPath);
 
+// Reconstruct only the sealed row values on the disposable loopback target;
+// source SQL is never executed, and all Hosted/DR authority flags stay false.
+const disposableLedgerPath='scripts/operations/replay-disposable-provider-migration-ledger.mjs';
+const disposableLedger=await readFile(disposableLedgerPath,'utf8');
+for (const fragment of [
+  'EXPECTED_BACKUP_RUN_ID=43424903445',
+  "EXPECTED_SOURCE_SHA='6eab97337811128282f5f5ec6320e4608d5f9c09'",
+  "process.env.GITHUB_ACTIONS,'true'",
+  "process.env.GITHUB_EVENT_NAME,'workflow_dispatch'",
+  "process.env.GITHUB_REF,'refs/heads/main'",
+  "process.env.PGHOST,'127.0.0.1'",
+  "process.env.PGUSER,'postgres'",
+  "sourceSqlStatementsPublished:false",
+  "historicalSqlExecuted:false",
+  "fullProviderMigrationLedgerRestored:false",
+  "drReady:false,serviceResumptionAllowed:false",
+  'jsonb_to_recordset',
+  'COPY ops_private_source_packet(packet) FROM STDIN',
+  '/*__SOURCE_PACKET_COPY_DATA__*/',
+  "sourceBytes.toString('utf8').trimEnd()",
+  'DISPOSABLE_LEDGER_NOT_EMPTY',
+]) requireFragment(disposableLedger,fragment,disposableLedgerPath);
+for (const fragment of [
+  'restore_disposable_provider_ledger:',
+  'SCOPED_PROVIDER_REPLAY: ${{ inputs.restore_disposable_provider_ledger }}',
+  "if [[ \"$SCOPED_PROVIDER_REPLAY\" == 'true' ]]; then",
+  '"$SCOPED_CLONE_REHEARSAL" == \'true\'',
+  "MH_OPS_DISPOSABLE_LEDGER_REPLAY: ${{ inputs.restore_disposable_provider_ledger && 'true' || 'false' }}",
+  'DISPOSABLE_PROVIDER_LEDGER_EVIDENCE_PATH:',
+  'disposable-provider-migration-ledger-restore.json',
+]) requireFragment(workflow,fragment,workflowPath);
+for (const fragment of [
+  'MH_OPS_DISPOSABLE_LEDGER_REPLAY',
+  'replay-disposable-provider-migration-ledger.mjs',
+  'restoredAllSixHistoryFieldsExact == true',
+  'fullProviderMigrationLedgerRestored == false',
+  'sourceSqlStatementsPublished == false',
+]) requireFragment(sealedRunner,fragment,providerSourceRunnerPath);
+
 // The old same-run sealed backup predates governed shared-memory migration
 // 2380. A Phase 8-A diagnostic may omit the later privacy mechanics test, but
 // only for the exact source, never as a full-service/DR success.
