@@ -1,7 +1,7 @@
 import { generateKeyPairSync, randomUUID, type KeyObject } from 'node:crypto';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { hashSajuHeldSourceProofRequestV1 as hashJson } from '../apps/api/src/saju-held-source-proof-verifier-v1.js';
 import {
   createSajuT10ProductionPairIssueSourceV1,
@@ -9,6 +9,23 @@ import {
 } from '../apps/api/src/saju-t10-production-pair-issue-source-v1.js';
 import { projectSignedSajuT10PairProductReadingV1 } from '../apps/api/src/saju-t10-pair-official-product-reading-v1.js';
 import { projectProductReadingResponseV2 } from '../packages/api-client/src/product-reading-display.js';
+import { readPostgresApprovedSajuT10PairReaderV1 } from '../apps/api/src/postgres-approved-saju-pair-reader-v1.js';
+import type { PostgresSubjectPoolV1 } from '../apps/api/src/postgres-subject-execution.js';
+
+const db = vi.hoisted(() => ({ query: vi.fn(), scope: vi.fn() }));
+const subjectId = '11223344-5566-4788-899a-aabbccddeeff';
+// Only DB access is simulated; the Saju issuer, Ed25519 signature and
+// MyeongHa verification/projection are the actual implementation.
+vi.mock('../apps/api/src/postgres-subject-execution.js', () => ({
+  executePostgresApprovedSajuIssuerTransactionV1: async (
+    input: {execute: (context: unknown) => Promise<unknown>},
+  ) => input.execute({
+    client: {query: db.query},resolvedSubject: {subjectKind: 'member',subjectId},
+  }),
+}));
+vi.mock('../apps/api/src/postgres-approved-saju-issue-scope-v1.js', () => ({
+  readApprovedSajuPairIssueScopeV1: db.scope,
+}));
 
 const enabled = process.env.MYEONGHA_RUN_SAJU_T10_PAIR_CROSS_SERVICE_E2E === '1';
 const suite = enabled ? describe : describe.skip;
@@ -144,6 +161,72 @@ suite('real pinned Saju T10 Production issuer to MyeongHa Reading contract', () 
     })).toBeNull();
     expect(verifySajuT10ProductionPairIssueV1({
       ...bound, executionAttemptId: randomUUID(),
+    })).toBeNull();
+  });
+
+  it('reopens the actual signed pair from a private Reader archive and blocks scope or proof changes', async () => {
+    const scope = scopeFor('relationship-plus-first');
+    const purchaseIntentId = randomUUID();
+    const executionAttemptId = randomUUID();
+    const readingId = randomUUID();
+    const readerCharacterId = 'seyeon';
+    const signed = await source().issuePreparedPair({
+      scope, purchaseIntentId, executionAttemptId, readingId,
+    });
+    expect(signed?.state).toBe('production_pair_source_verified');
+    if (!signed) throw Error('Actual Production source did not issue.');
+    const projected = projectSignedSajuT10PairProductReadingV1({
+      scope, purchaseIntentId, executionAttemptId, readingId,
+      body: signed.body, proof: signed.proof, trust: sourceTrust(), acceptedAtMs: Date.now(),
+    });
+    expect(projected).not.toBeNull();
+    if (!projected) throw Error('Real source could not be projected.');
+    const row = {
+      readingId,component: 'compatibility',sajuDomain: 'compatibility',
+      responseHash: projected.storedResponseHash,
+      responseSnapshotJsonb: projected.response,
+      productResponseState: 'delivered',readerCharacterId,
+      readingContractVersion: 'myeonghwa-product-reading-response-v2',
+    };
+    const receipt = {
+      component: 'compatibility',sourceRequestHash: scope.sourceRequestHash,
+      releaseRef: scope.releaseRef,storedResponseHash: projected.storedResponseHash,
+      acceptedAt: new Date().toISOString(),executionAttemptId,
+      originatingGrantId: randomUUID(),
+      proof: {payload: (signed.proof as {payload: unknown}).payload,
+        signature: (signed.proof as {signature: string}).signature,
+        sourceBody: signed.body},
+    };
+    db.scope.mockResolvedValue(scope);
+    db.query.mockImplementation(async (sql: string) => {
+      if (sql.includes('qry_approved_saju_component_record_v1')) return {rows: [row]};
+      if (sql.includes('qry_approved_saju_source_issue_proof_v1')) return {rows: [{receipt}]};
+      throw Error('Unexpected Reader DB statement');
+    });
+    const params = {
+      pool: {} as PostgresSubjectPoolV1,
+      verifiedEvidence: {kind: 'member' as const,verifiedAuthUserId: randomUUID()},
+      subjectId,purchaseIntentId,readingId,readerCharacterId,trusts: [sourceTrust()],
+    };
+    const opened = await readPostgresApprovedSajuT10PairReaderV1(params);
+    expect(opened?.state).toBe('signed_pair_archive_reopened');
+    expect(opened?.sourceUnits).toEqual((signed.body as {units: unknown[]}).units);
+    expect(opened?.display.kind).toBe('delivered');
+    expect((opened?.display as {steps?: {primary: string}[]})?.steps?.[1]?.primary)
+      .toBe((signed.body as {units: {paragraph: string}[]}).units[0]?.paragraph);
+
+    db.scope.mockResolvedValue(null);
+    expect(await readPostgresApprovedSajuT10PairReaderV1(params)).toBeNull();
+    db.scope.mockResolvedValue(scope);
+    expect(await readPostgresApprovedSajuT10PairReaderV1({
+      ...params,readerCharacterId: 'baekheon',
+    })).toBeNull();
+    const originalSignature = receipt.proof.signature;
+    receipt.proof.signature = 'A'.repeat(86);
+    expect(await readPostgresApprovedSajuT10PairReaderV1(params)).toBeNull();
+    receipt.proof.signature = originalSignature;
+    expect(await readPostgresApprovedSajuT10PairReaderV1({
+      ...params,purchaseIntentId: randomUUID(),
     })).toBeNull();
   });
 
