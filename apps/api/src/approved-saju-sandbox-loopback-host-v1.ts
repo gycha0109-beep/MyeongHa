@@ -126,12 +126,14 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
         || req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json') {
         req.resume(); reply(403); return;
       }
-      // A bounded in-process admission limit protects the dedicated localhost
-      // password proxy; the sandbox never exposes signup or password reset.
-      const now = Date.now();
-      while (authAttempts.length && authAttempts[0]! < now - 15 * 60_000) authAttempts.shift();
-      if (authAttempts.length >= 8) { req.resume(); reply(429); return; }
-      authAttempts.push(now);
+      const action = AUTH_ROUTES[requestUrl.pathname as keyof typeof AUTH_ROUTES];
+      // Only password sign-in is rate-limited; refresh/sign-out must remain usable.
+      if (action === 'sign-in') {
+        const now = Date.now();
+        while (authAttempts.length && authAttempts[0]! < now - 15 * 60_000) authAttempts.shift();
+        if (authAttempts.length >= 8) { req.resume(); reply(429); return; }
+        authAttempts.push(now);
+      }
       try {
         const chunks: Buffer[] = [];
         let length = 0;
@@ -145,7 +147,6 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
         for (const [key, value] of Object.entries(req.headers)) {
           if (typeof value === 'string') headers.set(key, value);
         }
-        const action = AUTH_ROUTES[requestUrl.pathname as keyof typeof AUTH_ROUTES];
         const result = await input.memberAuth(new Request(requestUrl.href, {
           method: 'POST', headers, body: Buffer.concat(chunks),
         }), action);
