@@ -3,10 +3,25 @@ import { createServer } from 'node:http';
 import { extname, isAbsolute, resolve, sep } from 'node:path';
 import { APPROVED_SAJU_SANDBOX_ROUTES_V1 } from '../../../packages/contracts/src/approved-saju-sandbox-routes.js';
 import type { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
+import { OWNER_PORTONE_SDK_PATH, serveOwnerPortOneSdkV1 } from '../../../cloudflare/owner-portone-sdk-proxy.mjs';
 
 const ROUTES = new Set(Object.values(APPROVED_SAJU_SANDBOX_ROUTES_V1));
+const ARCHIVE_PATH = '/api/readings';
+const TARGETS_PATH = '/api/target-persons';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
+function allowedReadQuery(url: URL) {
+  if (url.pathname === TARGETS_PATH) return url.search === '';
+  if (url.pathname !== ARCHIVE_PATH) return false;
+  if (url.search === '') return true; // Owner-only purchased reading list
+  const entries = [...url.searchParams.entries()];
+  return entries.length === 1
+    && (entries[0]?.[0] === 'purchaseIntentId' || entries[0]?.[0] === 'readingId')
+    && UUID.test(entries[0]?.[1] ?? '');
+}
 const MAX_REQUEST_BYTES = 1024;
 const MAX_RESPONSE_BYTES = 128 * 1024;
+const MAX_SDK_BYTES = 2 * 1024 * 1024;
 const TYPES: Readonly<Record<string, string>> = Object.freeze({
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -20,6 +35,7 @@ const TYPES: Readonly<Record<string, string>> = Object.freeze({
 });
 
 type Runtime = Pick<ReturnType<typeof createApprovedSajuSandboxHttpRuntimeV1>, 'handleRequest'>;
+type OwnerReadHandler = (request: Request) => Promise<Response>;
 function closedHeaders() {
   return { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff',
     'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY' };
@@ -35,6 +51,10 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   origin: string;
   staticRoot: string;
   runtime: Runtime;
+  /** Trusted fixed-CDN test injection; never selected by a client URL. */
+  sdkFetch?: typeof fetch;
+  /** Existing RLS/entitlement-verifying GET runtimes. No write routes. */
+  ownerReads?: Readonly<{ targets: OwnerReadHandler; readings: OwnerReadHandler }>;
 }>) {
   const url = new URL(input.origin);
   if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1'
@@ -59,6 +79,66 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
     catch { req.resume(); reply(400); return; }
     if (requestUrl.origin !== input.origin || requestUrl.hash) {
       req.resume(); reply(404); return;
+    }
+
+    if (requestUrl.pathname === OWNER_PORTONE_SDK_PATH) {
+      req.resume();
+      if (req.method !== 'GET' || requestUrl.search !== '') { reply(404); return; }
+      try {
+        // Reuse the existing fixed PortOne V2 SDK relay. It never forwards
+        // browser cookies/authorization or accepts a caller-provided URL.
+        const sdk = await serveOwnerPortOneSdkV1(input.sdkFetch ?? fetch);
+        if (sdk.status !== 200 || sdk.body === null) { reply(503); return; }
+        const reader = sdk.body.getReader();
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        try {
+          while (true) {
+            const step = await reader.read();
+            if (step.done) break;
+            total += step.value.byteLength;
+            if (total > MAX_SDK_BYTES) { reply(503); return; }
+            chunks.push(step.value);
+          }
+        } finally { try { await reader.cancel(); } catch {} }
+        const bytes = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+        reply(200, bytes, 'application/javascript; charset=utf-8');
+      } catch { reply(503); }
+      return;
+    }
+
+    if (input.ownerReads !== undefined
+      && (requestUrl.pathname === ARCHIVE_PATH || requestUrl.pathname === TARGETS_PATH)) {
+      req.resume();
+      if (req.method !== 'GET') { reply(405); return; }
+      if (!allowedReadQuery(requestUrl)) { reply(404); return; }
+      try {
+        const authorization = req.headers.authorization;
+        if (typeof authorization !== 'string') { reply(404); return; }
+        // An owner READ must never bypass the same verified member + Owner ACL
+        // used by sandbox checkout. Each actual read handler then repeats RLS.
+        const owner = await input.runtime.handleRequest(new Request(
+          input.origin + APPROVED_SAJU_SANDBOX_ROUTES_V1.access,
+          { headers: { Authorization: authorization } },
+        ));
+        if (owner?.status !== 200) { reply(404); return; }
+        const headers = new Headers({ Authorization: authorization });
+        const read = requestUrl.pathname === ARCHIVE_PATH
+          ? input.ownerReads.readings : input.ownerReads.targets;
+        const result = await read(new Request(requestUrl.href, { headers }));
+        if (!(result instanceof Response) || result.status >= 300 && result.status < 400
+          || result.headers.has('set-cookie') || result.headers.has('location')) {
+          reply(503); return;
+        }
+        const body = new Uint8Array(await result.arrayBuffer());
+        if (body.byteLength > MAX_RESPONSE_BYTES || !result.headers.get('content-type')?.startsWith('application/json')) {
+          reply(503); return;
+        }
+        reply(result.status, body, result.headers.get('content-type') ?? 'application/json');
+      } catch { reply(503); }
+      return;
     }
 
     if (ROUTES.has(requestUrl.pathname)) {
@@ -96,6 +176,10 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
       return;
     }
     req.resume();
+    // Unknown API paths are never static files, even if a matching JSON file exists.
+    if (requestUrl.pathname === '/api' || requestUrl.pathname.startsWith('/api/')) {
+      reply(404); return;
+    }
     if (req.method !== 'GET' && req.method !== 'HEAD') { reply(405); return; }
     if (requestUrl.search !== '') { reply(404); return; }
     let pathname: string;
