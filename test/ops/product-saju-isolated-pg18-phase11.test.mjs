@@ -665,8 +665,25 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
         servers.push(worker);
         phase='workerd_requests';
         const tokens=members.map(member=>member.token);
+        phase='workerd_baseline';
         const baseline=await measuredBatch(worker.origin,12,1,tokens);
+        if(workerdDbSlowPoolExperiment && baseline.successful!==12) {
+          // Only bounded counters, never HTTP bodies/JWTs/identity fields.
+          const diagnostics=await fetch(worker.origin+'/__ops/db-pool',{
+            redirect:'error',signal:AbortSignal.timeout(3000),
+          });
+          if(diagnostics.status===200) {
+            const counters=await diagnostics.json();
+            console.error('ISOLATED_BOUNDED_BASELINE_COUNTS '+JSON.stringify({
+              successful:baseline.successful,unavailable:baseline.unavailable,
+              unexpected:baseline.unexpected,acquireAttempts:counters.acquireAttempts,
+              acquireTimeouts:counters.acquireTimeouts,
+              connectionFailures:counters.connectionFailures,peak:counters.peak,
+            }));
+          }
+        }
         expect(baseline).toMatchObject({requested:12,successful:12,unavailable:0,unexpected:0});
+        phase='workerd_anonymous_health';
         let workerdWindow;
         if (workerdOverlapExperiment) {
           // Fixed 900 x four-request local-only waves; the in-flight count is a
@@ -729,7 +746,10 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
             });
             expect(diagnostics.status).toBe(200);
             metrics=await diagnostics.json();
-            expect(metrics).toMatchObject({max:2,connectionTimeoutMillis:125});
+            expect(metrics).toMatchObject({
+              max:2,connectionTimeoutMillis:125,requestLocalClient:true,
+            });
+            expect(metrics.peak).toBeLessThanOrEqual(2);
             expect(metrics.acquireTimeouts).toBeGreaterThan(0);
           } finally {
             await unlock();
@@ -740,6 +760,7 @@ isolated('Phase 11 disposable real GoTrue + PostgreSQL18 + pinned actual Saju ca
           dbSlowPool={
             realPostgresTableLock:true,disposablePoolMax:metrics.max,
             localAcquireTimeoutMillis:metrics.connectionTimeoutMillis,
+            requestLocalDbConnections:true,observedLocalPeak:metrics.peak,
             acquisitionAttempts:metrics.acquireAttempts,
             acquisitionFailures:metrics.acquireFailures,
             acquisitionTimeouts:metrics.acquireTimeouts,
