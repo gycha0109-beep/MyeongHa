@@ -28,7 +28,7 @@ function fieldList(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(x => typeof x === 'string');
 }
 function validateOfficialBody(body: unknown, scope: Scope, readingId: string): boolean {
-  if (!record(body) || Object.keys(body).length !== 10 ||
+  if (!record(body) || Object.keys(body).length !== 11 ||
       body.version !== 'saju-t10-official-pair-reading-v1' ||
       body.state !== 'issued' || body.readingId !== readingId ||
       body.readingDomain !== 'compatibility' ||
@@ -36,6 +36,7 @@ function validateOfficialBody(body: unknown, scope: Scope, readingId: string): b
       body.policyVersion !== '2026-11-13' ||
       body.sourceScope !== 'two_canonical_natal_charts' ||
       !Array.isArray(body.charts) || body.charts.length !== 2 ||
+      !Array.isArray(body.chartDisplays) || body.chartDisplays.length !== 2 ||
       !Array.isArray(body.units) || body.units.length < 3 || body.units.length > 7 ||
       typeof body.materialHash !== 'string' || !HASH.test(body.materialHash)) return false;
   const charts = body.charts;
@@ -47,6 +48,21 @@ function validateOfficialBody(body: unknown, scope: Scope, readingId: string): b
         chart.birthInputHash !== (i === 0 ? scope.sourceBirthInputHash : scope.targetBirthInputHash) ||
         typeof chart.snapshotId !== 'string' || chart.snapshotId.trim() === '' ||
         typeof chart.calculationHash !== 'string' || !HASH.test(chart.calculationHash)) return false;
+  }
+  for (let i = 0; i < 2; i++) {
+    const chart = body.chartDisplays[i];
+    if (!record(chart) || Object.keys(chart).length !== 2 ||
+        chart.role !== (i === 0 ? 'self' : 'partner') ||
+        !record(chart.pillars) ||
+        Object.keys(chart.pillars).length !== 4) return false;
+    for (const slot of ['year', 'month', 'day', 'hour']) {
+      const pillar = chart.pillars[slot];
+      if (!record(pillar) ||
+          (pillar.status === 'resolved' && (Object.keys(pillar).length !== 2 ||
+            typeof pillar.value !== 'string' || !/^[^\\s]{2,4}$/u.test(pillar.value))) ||
+          (pillar.status === 'unavailable' && Object.keys(pillar).length !== 1) ||
+          (pillar.status !== 'resolved' && pillar.status !== 'unavailable')) return false;
+    }
   }
   const ruleIds = new Set<string>();
   let hasDay = false;
