@@ -1,7 +1,10 @@
 # @myeongha/admin
 
-> **2026-11-13 A4 상태 갱신:** 이전 2026-11-06 상태 기록의 'Saju #2739 열림'은 당시의 기록입니다. 현재 [Saju #2739](https://github.com/gycha0109-beep/Saju/pull/2739)와 [명하 #3228](https://github.com/gycha0109-beep/MyeongHa/pull/3228), Saju [#2781–#2784](https://github.com/gycha0109-beep/Saju/pull/2784)까지 모두 병합됐으며, Source 요청 전 기록·서명 영수증 결속·권한 사전 검사·미결 기록 조회는 오프라인 구현됐습니다. **운영 적용/실제 수집은 보류**입니다. 개인정보 증명 보존·삭제 정책, 전용 DB/인증/TLS, Production 해석 권한과 공급사 독립 청구 대조는 완료되지 않았습니다. 상세 근거: [A4 운영 준비 기록](../../docs/operations/ADMIN_A4_OPERATIONAL_READINESS_EVIDENCE_20261112.md). 비용 수집 OFF / `completeCostCoverage=false` / `invoiceReconciled=false`.
-
+> **2026-11-14 최신 로드맵:** [관리자 A0–A7 구현·종료 경계 정본](../../docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md). 기존 단계 외의 신규 기능을 추가하지 않으며, 어드민 자체 기능과 Saju·Commerce·분석 원천·운영 배포의 의존성을 분리합니다.
+>
+> **A0–A3 실제 수용:** 2026-11-08 Owner 브라우저의 회원/Reading/결제 조회 및 감사 발생이 확인됐습니다. 브라우저 요청 ID와 감사 ID의 직접 문자열 대조는 미실증입니다. 비Owner 앱 수준 거부 로그인 **추가 재현은 Owner 결정으로 생략**됐으며, 통과로 표시하지 않습니다. [작업 로그](../../docs/operations/ADMIN_READONLY_ACTIVATION_WORKLOG_20261105.md).
+>
+> **A4 최신 상태:** Saju #2739·#2781–#2792 및 명하 #3228·#3301의 관련 구현·증거 기록은 병합됐습니다. 명하의 사전 승인 증명 보존·삭제 정책(최대 30일)과 운영 저장소/29일 정리 작업은 적용·실측됐습니다. 별개인 Saju Source 기록 보존 정책, 실제 Saju 서비스 결속·Production 해석 권한, 공급사 호출 전수·청구·환율 검증은 미충족입니다. 비용 수집 OFF / `completeCostCoverage=false` / `invoiceReconciled=false`. [A4 운영 증거](../../docs/operations/ADMIN_A4_OPERATIONAL_READINESS_EVIDENCE_20261112.md).
 
 ## Owner 사용자 관리 개선 — 2026-11-07 데이터 확인 / PR #3100
 
@@ -117,7 +120,7 @@ React 19와 기존 web 워크스페이스에서 설치하는 Vite 8 빌드 도�
 
 로딩, 데이터 없음, 접근 거부, 오류에 공통 StatusPanel을 사용합니다. 뒤로 가기/앞으로 가기와 키보드 내비게이션을 지원합니다.
 
-기존 `docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md` 참조는 현재 브랜치와 조회한 Git 이력에서 파일을 찾을 수 없습니다. 아래 기존 A0–A7 구현 기록과 `docs/operations/ADMIN_OPERATING_POLICY_20261027_V1.md`의 확정 범위를 따르며 새 단계를 만들지 않습니다.
+기존 A0–A7의 현재 종료 경계는 [관리자 구현 로드맵](../../docs/ADMIN_IMPLEMENTATION_ROADMAP_V1.md)에 정리했습니다. 아래 2026-10-27 구현 기록과 이후 날짜별 작업 로그는 당시 상태의 증거로 보존하며, 최신 수용·승인 상태는 로드맵과 운영 정책을 우선합니다.
 
 ## 연속 구현 현황 (2026-10-27)
 
