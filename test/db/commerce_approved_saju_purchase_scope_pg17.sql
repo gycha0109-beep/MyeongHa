@@ -1353,7 +1353,15 @@ begin
        'public.qry_approved_saju_pair_recovery_record_v1(uuid,uuid)','EXECUTE')
     or not has_function_privilege('myeongha_approved_saju_issuer_executor',
        'public.cmd_finalize_approved_saju_reading_v1(uuid,uuid,text,uuid,uuid,uuid,text,text,text,text,text,jsonb,text)','EXECUTE')
-  then raise exception 'T10 hold rehearsal did not start with signed proofs and separate active grants'; end if;
+    or not has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_pair_issue_scope_v1(uuid,uuid)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.cmd_finalize_approved_saju_pair_reading_v1(uuid,uuid,uuid,uuid,uuid,text,text,text,text,text,jsonb,text,jsonb)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb)','EXECUTE')
+    or has_schema_privilege('myeongha_approved_saju_pair_reader_executor',
+       'commerce_saju_private','USAGE')
+  then raise exception 'T10 hold rehearsal did not start with independent read-only Reader authority'; end if;
 end
 $pair_hold_before$;
 \ir ../../docs/operations/candidates/commerce_approved_saju_pair_issuer_hold_v1.sql
@@ -1386,6 +1394,55 @@ begin
   ) then raise exception 'T10 HOLD modified a previously issued signed archive'; end if;
 end
 $pair_hold_after$;
+
+-- The issuance role is now suspended. A *different*, read-only member role
+-- must still reopen the exact already-paid pair and its original signed proof.
+do $pair_reader_hold$
+declare
+  live record;
+  pair_scope jsonb;
+  signed_receipt jsonb;
+begin
+  select owner.auth_user_id,proof.subject_id,binding.purchase_intent_id,
+    proof.reading_id,reading.requested_character_id as reader_character_id
+  into live
+  from commerce_saju_private.approved_source_issue_proofs_v1 proof
+  join commerce_saju_private.approved_component_reading_v1 binding
+    on binding.reading_id=proof.reading_id and binding.subject_id=proof.subject_id
+  join public.readings reading on reading.id=proof.reading_id and reading.subject_id=proof.subject_id
+  join public.subjects owner on owner.id=proof.subject_id and owner.kind='member'
+  join public.entitlement_grants g on g.id=binding.entitlement_grant_id and g.status='active'
+  join public.commerce_receipts receipt on receipt.id=g.source_receipt_id
+    and receipt.verification_status='verified'
+  where binding.component='compatibility' and owner.auth_user_id is not null
+  order by proof.reading_id limit 1;
+  if not found then raise exception 'T10 HOLD fixture has no active paid pair to reopen'; end if;
+  if not has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_source_issue_proof_v1(uuid,uuid)','EXECUTE')
+    or not has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_component_record_v1(uuid,uuid,text,boolean)','EXECUTE')
+    or has_function_privilege('myeongha_approved_saju_pair_reader_executor',
+       'public.qry_approved_saju_pair_recovery_record_v1(uuid,uuid)','EXECUTE')
+  then raise exception 'T10 archived Reader gained issuance/recovery privileges'; end if;
+  execute 'set local role myeongha_approved_saju_pair_reader_executor';
+  perform 1 from public.begin_member_subject_context_v1(live.auth_user_id);
+  perform public.assert_myeongha_subject_context_v1(live.subject_id);
+  pair_scope := public.qry_approved_saju_pair_issue_scope_v1(
+    live.subject_id,live.purchase_intent_id
+  );
+  signed_receipt := public.qry_approved_saju_source_issue_proof_v1(
+    live.subject_id,live.reading_id
+  );
+  if pair_scope is null or signed_receipt is null
+    or signed_receipt->>'component' is distinct from 'compatibility'
+    or not exists(select 1 from public.qry_approved_saju_component_record_v1(
+      live.subject_id,live.reading_id,live.reader_character_id,true
+    ) where component='compatibility' and product_response_state='delivered'
+      and response_snapshot_jsonb is not null)
+  then raise exception 'T10 HOLD interrupted a still-paid, consent-bound signed Reader'; end if;
+  execute 'reset role';
+end
+$pair_reader_hold$;
 
 rollback;
 select 'PASS_APPROVED_SAJU_PURCHASE_SCOPE_PG17';
