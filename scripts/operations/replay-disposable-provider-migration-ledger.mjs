@@ -42,13 +42,14 @@ export function assertReplaySource({sourceBytes,paired}) {
   return packet;
 }
 
-// Base64 contains only [A-Za-z0-9+/=] and cannot alter SQL structure.
-// This exact JSON source is read solely in the protected runner; never logged.
+// Recreate the sealed history only as COPY-ed base64 data on the disposable target.
+// The server must never receive original SQL text inside the COPY stream: its
+// error logger can print malformed JSON and disclose historical statements.
 export function buildDisposableLedgerReplaySql(packet) {
   assert.ok(packet?.schemaVersion==='ops-provider-migration-sealed-source-v1' &&
     Array.isArray(packet.entries)&&packet.entries.length>0);
-  // Historical SQL never appears in a SQL statement. COPY STDIN transports
-  // the original private, single-line JSON packet as data, not query text.
+  // All SQL statements are fixed literals; COPY transports only ASCII base64.
+  // The guarded workflow disables Docker's PostgreSQL service log collection.
   return [
     'BEGIN;',
     "SET LOCAL statement_timeout='90s';",
@@ -66,9 +67,13 @@ export function buildDisposableLedgerReplaySql(packet) {
     'IF EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations) THEN',
     " RAISE EXCEPTION 'DISPOSABLE_LEDGER_NOT_EMPTY'; END IF;",
     'END $guard$;',
-    'CREATE TEMP TABLE ops_private_source_packet(packet jsonb) ON COMMIT DROP;',
-    "COPY ops_private_source_packet(packet) FROM STDIN WITH (FORMAT csv, DELIMITER E'\\x01', QUOTE E'\\x02', ESCAPE E'\\x02');",
+    'CREATE TEMP TABLE ops_private_source_base64(encoded text) ON COMMIT DROP;',
+    'COPY ops_private_source_base64(encoded) FROM STDIN WITH (FORMAT text);',
     '/*__SOURCE_PACKET_COPY_DATA__*/',
+    'CREATE TEMP TABLE ops_private_source_packet(packet jsonb) ON COMMIT DROP;',
+    "INSERT INTO ops_private_source_packet(packet) SELECT",
+    "convert_from(decode(encoded,'base64'),'UTF8')::jsonb",
+    'FROM ops_private_source_base64;',
     'INSERT INTO supabase_migrations.schema_migrations',
     '(version,name,statements,created_by,idempotency_key,"rollback")',
     'SELECT r.version,r.name,r.statements,r."createdBy",r."idempotencyKey",r."rollbackStatements"',
@@ -159,11 +164,11 @@ async function main(){
   ]);
   const packet=assertReplaySource({sourceBytes,paired});
   const run=spawnSync('psql',['-X','-qAt','-v','ON_ERROR_STOP=1','-f','-'],{
-    // The JSON packet is copied as PostgreSQL COPY data. Neither the SQL
-    // query string nor any printed error contains original statement bodies.
+    // Transport canonical JSON as ASCII base64, not raw JSON. Even a COPY
+    // failure therefore cannot print original SQL or operator provenance.
     input:buildDisposableLedgerReplaySql(packet).replace(
       '/*__SOURCE_PACKET_COPY_DATA__*/',
-      sourceBytes.toString('utf8').trimEnd()+'\n\\.\n'
+      Buffer.from(JSON.stringify(packet),'utf8').toString('base64')+'\n\\.\n'
     ),
     encoding:'utf8',timeout:110000,maxBuffer:1024*1024,
     env:process.env,windowsHide:true,
