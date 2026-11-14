@@ -69,3 +69,57 @@ export function selectPublishedFiveCharacterChatExecutorV1<T>(
 
   return Object.freeze({ characterId, executor });
 }
+
+
+// Product-owner-approved first-web-launch target set (2026-11-14).
+// This is an admission contract, not publication or a runtime activation.
+// Existing five-character callers remain unchanged until the independently
+// approved Yunho executor and content release are installed.
+export const SIX_CHARACTER_WEB_LAUNCH_CHAT_TARGETS_V1 = Object.freeze([
+  ...FIVE_CHARACTER_CHAT_TARGETS_V1,
+  'yunho',
+] as const);
+
+export type SixCharacterWebLaunchChatTargetV1 =
+  (typeof SIX_CHARACTER_WEB_LAUNCH_CHAT_TARGETS_V1)[number];
+
+/**
+ * Six-character launch admission. An absent Yunho executor or unpublished
+ * source-backed manifest MUST fail closed; no Se-yeon fallback is allowed.
+ */
+export function selectPublishedSixCharacterWebLaunchChatExecutorV1<T>(
+  binding: ChatThreadRuntimeBindingV1,
+  manifest: ContentBundleManifestReadResponseV1,
+  registeredExecutors: Readonly<Partial<Record<SixCharacterWebLaunchChatTargetV1, T>>>,
+): Readonly<{ characterId: SixCharacterWebLaunchChatTargetV1; executor: T }> {
+  const participantIds = binding.participantCharacterIds;
+  if (
+    participantIds.length !== 1 ||
+    !SIX_CHARACTER_WEB_LAUNCH_CHAT_TARGETS_V1.some(id => id === participantIds[0])
+  ) {
+    throw new CharacterChatExecutorUnavailableV1(
+      'Thread does not have exactly one approved first-launch Character.',
+    );
+  }
+  const characterId = participantIds[0] as SixCharacterWebLaunchChatTargetV1;
+  if (
+    binding.activeContentBundleId !== manifest.contentBundleId ||
+    !manifest.manifest.characterIds.includes(characterId)
+  ) {
+    throw new CharacterChatExecutorUnavailableV1(
+      'Server-pinned content does not publish this Character.',
+    );
+  }
+  if (!Object.hasOwn(registeredExecutors, characterId)) {
+    throw new CharacterChatExecutorUnavailableV1(
+      'No independently installed production executor for this Character.',
+    );
+  }
+  const executor = registeredExecutors[characterId];
+  if (executor === undefined || executor === null) {
+    throw new CharacterChatExecutorUnavailableV1(
+      'Registered production executor is unavailable.',
+    );
+  }
+  return Object.freeze({ characterId, executor });
+}
