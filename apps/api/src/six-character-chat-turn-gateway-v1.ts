@@ -15,7 +15,7 @@ import {
 import {
   selectPublishedSixCharacterWebLaunchChatExecutorV1,
   type SixCharacterWebLaunchChatTargetV1,
-} from './six-character-chat-executor-selection-v1.js';
+} from './five-character-chat-executor-selection-v1.js';
 import type { RequestUiLocaleV1 } from './request-ui-locale-v1.js';
 import {
   evaluateCharacterContentCompatibilityV1,
