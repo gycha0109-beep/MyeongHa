@@ -8,6 +8,11 @@ import {
 } from './reader-interpretation-preview-http.js';
 import { executeReaderInterpretationPreviewPostgresV1 } from './reader-interpretation-preview-postgres-execution.js';
 import { readBoundedUpstreamJsonTextV1 } from './upstream-json-response-resource.js';
+import {
+  createApprovedSajuT10PairReaderHttpV1,
+  APPROVED_SAJU_PAIR_READER_PATH_V1,
+} from './approved-saju-t10-pair-reader-http-v1.js';
+import type { SajuT10ProductionPairTrustV1 } from './saju-t10-production-pair-issue-source-v1.js';
 
 type SceneRuntime = Parameters<typeof executeReaderInterpretationPreviewPostgresV1>[0];
 type QuestionRuntime = NonNullable<Parameters<typeof handleApprovedSajuReaderQuestionHttpV1>[0]['runtime']>;
@@ -37,6 +42,8 @@ export function createApprovedSajuReaderHttpRuntimeV1(input: Readonly<{
     'contentReleaseRuntime' | 'privateApprovedSajuReaderEnabled' | 'approvedSajuCanonicalReaderAuthority' |
     'createProductReaderEligibilityAuthorityPort'>;
   delivery: DeliveryRuntime;
+  /** Explicitly opt in to T10 archive re-read; paid product activation remains separate. */
+  pairReader?: Readonly<{ trusts: readonly SajuT10ProductionPairTrustV1[] }>;
 }>) {
   const origin = new URL(input.origin);
   const { question, scene, delivery } = input;
@@ -52,11 +59,20 @@ export function createApprovedSajuReaderHttpRuntimeV1(input: Readonly<{
     throw new Error('Approved Saju Reader HTTP authority is incomplete.');
   }
   const deliveryTokenSecret = new Uint8Array(delivery.deliveryTokenSecret);
+  const t10PairReader = input.pairReader === undefined ? undefined :
+    createApprovedSajuT10PairReaderHttpV1({
+      origin: input.origin, pool: issuanceProofPool, trusts: input.pairReader.trusts,
+      verifyRequestIdentity: (request) => identityEvidenceVerifier.verifyRequestIdentity(request),
+    });
 
   return Object.freeze({
     async handleRequest(context: { request: Request; requestId: string; serverTime: string }): Promise<Response | null> {
       const { request, requestId, serverTime } = context;
       const url = new URL(request.url);
+      if (url.pathname === APPROVED_SAJU_PAIR_READER_PATH_V1) {
+        return t10PairReader === undefined ? failure(404,'NOT_FOUND') :
+          t10PairReader.handleRequest(request);
+      }
       const isScene = url.pathname === READER_INTERPRETATION_PREVIEW_HTTP_PATH_V1;
       const isQuestion = url.pathname === APPROVED_SAJU_READER_QUESTION_PATH_V1;
       const paid = PAID_REPLY.exec(url.pathname);
