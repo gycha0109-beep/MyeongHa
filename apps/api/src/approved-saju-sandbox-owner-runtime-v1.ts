@@ -3,6 +3,7 @@ import type { PostgresSubjectPoolV1 } from './postgres-subject-execution.js';
 import type { CommercePaymentVerificationAdapterV1 } from './commerce-payment-verification-execution.js';
 import { createApprovedSajuSandboxHttpRuntimeV1 } from './approved-saju-sandbox-http-runtime-v1.js';
 import { createApprovedSajuOwnerTestRefundReconcileV1 } from './approved-saju-owner-test-refund-reconcile-v1.js';
+import { createApprovedSajuOwnerTestRefundRequestV1 } from './approved-saju-owner-test-refund-request-v1.js';
 import { createApprovedSajuSandboxLoopbackHostV1 } from './approved-saju-sandbox-loopback-host-v1.js';
 import { createApprovedSajuT10PairReaderHttpV1 } from './approved-saju-t10-pair-reader-http-v1.js';
 import type { SajuT10ProductionPairTrustV1 } from './saju-t10-production-pair-issue-source-v1.js';
@@ -82,6 +83,11 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
     staticRoot: input.staticRoot,
     runtime: checkout,
     ...(input.testRefund === undefined ? {} : {
+      refundRequester: createApprovedSajuOwnerTestRefundRequestV1({
+        commercePool: input.commercePool,
+        apiSecret: input.testRefund.apiSecret,
+        evidenceHmacSecret: input.testRefund.evidenceHmacSecret,
+      }),
       refundReconciler: createApprovedSajuOwnerTestRefundReconcileV1({
         commercePool: input.commercePool,
         apiSecret: input.testRefund.apiSecret,

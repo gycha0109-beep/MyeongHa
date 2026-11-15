@@ -29,6 +29,9 @@ export type ApprovedSajuCheckoutPanelPorts = Pick<Parameters<typeof prepareAppro
   'handoff' | 'verification' | 'sdk' | 'channel'> & Readonly<{
     targets: readonly Readonly<{ id: string; label: string }>[];
     readArchive?(purchaseIntentId: string): Promise<readonly ApprovedSajuPurchaseReadingV1[]>;
+    /** Server-only Owner TEST cancellation request; never trusts a client amount. */
+    requestRefund?(purchaseIntentId: string): Promise<
+      Readonly<{ state: 'not_fully_cancelled' | 'reconciliation_required' | 'request_submitted' | 'refund_reconciled' }>>;
     /** Check a refund ALREADY completed by PortOne. Never requests a refund. */
     reconcileRefund?(purchaseIntentId: string): Promise<
       Readonly<{ state: 'not_fully_cancelled' | 'refund_reconciled'; revokedComponentCount?: number }>>;
