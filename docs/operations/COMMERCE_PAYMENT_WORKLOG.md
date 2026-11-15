@@ -1211,3 +1211,9 @@ Watchtower-Track: commerce
 - 기존 격리 PostgreSQL 17의 승인 상품 14개·서명 발급 SQL에 회원 조회, Commerce, 공식 사주 발급, 궁합 보관함 전용 로그인 네 개를 별도로 연결. 각 계정은 해당 실행 역할 하나만 `SET ROLE` 할 수 있으며 관리자 권한·DB 생성·RLS 우회 권한을 갖지 않는다.
 - 로컬 비밀번호는 실행시 임시 환경변수에서만 받아 DB에 반영하고 저장소/로그에는 기록하지 않는다. 운영 Supabase 역할·데이터·판매 설정은 변경하지 않았다.
 - 실제 로컬 PostgreSQL TCP 연결에서 4계정 모두 인증·역할 전환 성공, 회원 계정의 Commerce 역할 전환은 권한 거부를 확인했다. PortOne TEST·공식 Source 키가 없어 결제→실발급 종단은 아직 HOLD.
+
+### 2026-11-15 — Windows PC ↔ 폐기형 사주 14상품 DB 실제 연결
+- `npm run saju:local:db`: 로컬 Docker PG17을 PC의 127.0.0.1 임시 포트에만 연결, 기존 14상품 SQL/Release 등록, 별도 4계정 권한을 일괄 적용하고 Node.js PostgreSQL 연결 확인 후 자동 폐기.
+- 실제 Windows 실행: `SAJU14_LOCAL_HOST_DB_READY` (14개 Offer 및 분리된 4개 실행 역할의 TCP 연결 성공, 임시 DB 컨테이너 자동 정리).
+- `npm run start:saju-owner-local-test`: 테스트 PortOne·Supabase Auth 자격증명이 준비된 경우에만 격리 결제 호스트를 실행하도록 진입점 추가. 운영 판매는 계속 비활성, 고객 데이터/운영 DB 미접촉.
+- 초기 실행에서 확인된 PG initdb 중간 기동과 Windows CRLF 문제는 최종 PostgreSQL 준비 신호 및 `scripts/local/*.sh` LF 고정으로 해결.

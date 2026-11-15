@@ -53,7 +53,10 @@ for migration in supabase/migrations/*.sql; do
   fi
 done
 fi
-stage_installed="$(psql -X -U postgres -d "$db" -Atqc "select to_regclass('commerce_saju_private.approved_purchase_scope_v1') is not null")"
+stage_installed="$(psql -X -U postgres -d "$db" -Atqc "select
+  to_regclass('commerce_saju_private.approved_fulfillment_release_v1') is not null
+  and to_regclass('commerce_saju_private.approved_component_reading_v1') is not null
+  and to_regprocedure('public.cmd_claim_approved_saju_issue_job_v1(uuid,jsonb)') is not null")"
 if [[ "$stage_installed" != 't' ]]; then
 echo 'Installing reviewed 14-offer checkout, signed issuer, Reader and refund authority...'
 psql -X -U postgres -d "$db" -v ON_ERROR_STOP=1 \
