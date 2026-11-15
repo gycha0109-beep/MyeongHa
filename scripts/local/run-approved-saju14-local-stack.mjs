@@ -37,6 +37,30 @@ const issuerRequired = [
   'MYEONGHA_SAJU_PAIR_VERIFY_PEM_B64', 'MYEONGHA_SAJU_ISSUER_RELEASES_JSON',
   'MYEONGHA_SAJU_PAIR_RELEASE_REF', 'MYEONGHA_SAJU_PAIR_READER_ID',
 ];
+const PINNED_COMPONENTS = ['career', 'business', 'wealth', 'relationship',
+  'year', 'month'];
+const RELEASE_REF = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,127}$/u;
+
+function readExactSignedReleasePins() {
+  const input = JSON.parse(process.env.MYEONGHA_SAJU_ISSUER_RELEASES_JSON);
+  if (!input || typeof input !== 'object' || Array.isArray(input) ||
+    Object.keys(input).length !== PINNED_COMPONENTS.length ||
+    PINNED_COMPONENTS.some(component =>
+      !input[component] || typeof input[component] !== 'object' ||
+      Array.isArray(input[component]) || Object.keys(input[component]).length !== 2 ||
+      !RELEASE_REF.test(input[component].releaseRef) ||
+      typeof input[component].readerCharacterId !== 'string')) {
+    throw Error('Exact six official individual Saju release pins are required.');
+  }
+  const pairRelease = process.env.MYEONGHA_SAJU_PAIR_RELEASE_REF;
+  if (!RELEASE_REF.test(pairRelease)) {
+    throw Error('Exact official compatibility release pin is required.');
+  }
+  return Object.freeze(Object.fromEntries([
+    ...PINNED_COMPONENTS.map(component => [component, input[component].releaseRef]),
+    ['compatibility', pairRelease],
+  ]));
+}
 
 function rebuildCurrentCheckout() {
   // The local host serves /public, not Vite's dev server. Always compile the
@@ -155,6 +179,7 @@ function cleanup() {
   created = false;
 }
 const mode = process.argv[2];
+let exactReleasePins;
 if (mode !== '--check' && mode !== '--serve') {
   console.error('Specify --check or --serve. Never targets Production.');
   process.exitCode = 2;
@@ -168,6 +193,7 @@ if (mode !== '--check' && mode !== '--serve') {
         ...issuerRequired];
       const missing = required.filter(key => !process.env[key]?.trim());
       if (missing.length) throw Error('PortOne TEST / Auth settings are missing: ' + missing.join(', '));
+      exactReleasePins = readExactSignedReleasePins();
       rebuildCurrentCheckout();
     }
     const context = docker(['context', 'show']);
@@ -207,6 +233,20 @@ if (mode !== '--check' && mode !== '--serve') {
       '-e', 'PGHOST=/var/run/postgresql', name, 'bash',
       '/app/scripts/local/install-approved-saju14-isolated-pg17.sh']);
     if (!stage.includes('STAGED_SAJU14_LOCAL_READY')) throw Error('14-offer schema was not installed.');
+    if (mode === '--serve') {
+      // Only the isolated disposable registry may be pinned to the actual
+      // official individual and T10 Source versions before the first order.
+      // No synthetic ReleaseRef is promoted to a production release.
+      const encoded = Buffer.from(JSON.stringify(exactReleasePins), 'utf8').toString('base64');
+      const state = docker(['exec', '-e', 'PGHOST=/var/run/postgresql',
+        '-e', 'SAJU14_LOCAL_SIGNED_RELEASE_REFS_B64=' + encoded,
+        name, 'psql', '-X', '-U', 'postgres', '-d', database,
+        '-v', 'ON_ERROR_STOP=1', '-At',
+        '-f', '/app/scripts/local/pin-approved-saju14-isolated-releases.psql']);
+      if (!state.includes('SAJU14_SOURCE_RELEASE_PINS_READY')) {
+        throw Error('14-offer official Source release pinning was not admitted.');
+      }
+    }
     const credentials = roles.flatMap(([key]) => ['-e', key + '=' + pw[key]]);
     const rolesOutput = docker(['exec',
       '-e', 'MYEONGHA_DISPOSABLE_SAJU14=explicit-local-only',

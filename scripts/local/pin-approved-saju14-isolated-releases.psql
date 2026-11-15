@@ -1,0 +1,76 @@
+\set ON_ERROR_STOP on
+-- Disposable PostgreSQL 17 only. Pins exact configured OFFICIAL ReleaseRefs
+-- to the already-reviewed 14-offer local registry before the first checkout.
+-- This does NOT authorize a sandbox receipt to become a production grant.
+\getenv local_release_pins_b64 SAJU14_LOCAL_SIGNED_RELEASE_REFS_B64
+begin;
+select set_config(
+  'myeongha.saju14_local_release_refs',
+  convert_from(decode(:'local_release_pins_b64','base64'),'UTF8'),
+  true
+);
+do $pin$
+declare
+  pins jsonb := current_setting('myeongha.saju14_local_release_refs')::jsonb;
+  valid_count integer;
+  updated_count integer;
+begin
+  if current_database() <> 'myeongha_saju_sandbox_v1'
+    or current_setting('server_version_num')::integer < 170000
+    or current_setting('server_version_num')::integer >= 180000
+    or inet_server_addr() is not null then
+    raise exception 'HOLD_DISPOSABLE_SAJU14_RELEASE_PIN_ONLY';
+  end if;
+  if jsonb_typeof(pins) is distinct from 'object'
+    or (select count(*) from jsonb_object_keys(pins)) <> 7 then
+    raise exception 'HOLD_EXACT_SEVEN_SOURCE_RELEASE_PINS_REQUIRED';
+  end if;
+  select count(*) into valid_count
+  from (values
+    ('career'),('business'),('wealth'),('relationship'),
+    ('year'),('month'),('compatibility')
+  ) as valid(component)
+  where jsonb_typeof(pins->valid.component) = 'string'
+    and pins->>valid.component ~ '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$';
+  if valid_count <> 7 then
+    raise exception 'HOLD_INVALID_SOURCE_RELEASE_PIN';
+  end if;
+  if exists (
+    select 1 from public.purchase_intents intent
+    join public.product_offers offer on offer.id=intent.product_offer_id
+    join public.products product on product.id=offer.product_id
+    where product.product_key='isolated.saju14.review'
+  ) then
+    raise exception 'HOLD_CANNOT_REPIN_AFTER_PURCHASE';
+  end if;
+  if (
+    select count(*) from commerce_saju_private.approved_fulfillment_release_v1 release
+    join public.product_offers offer on offer.id=release.product_offer_id
+    join public.products product on product.id=offer.product_id
+    where product.product_key='isolated.saju14.review' and release.revoked_at is null
+  ) <> 14 then
+    raise exception 'HOLD_SAJU14_OFFER_REGISTRY_INCOMPLETE';
+  end if;
+  update commerce_saju_private.approved_fulfillment_release_v1 release
+  set components=(
+    select jsonb_agg(jsonb_build_object(
+      'component',field,'authority','official_fulfillment',
+      'releaseRef',pins->>field) order by field)
+    from unnest((
+      select approved.fields
+      from commerce_saju_private.approved_offer_v1(release.approved_offer_id) approved
+    )) field
+  )
+  from public.product_offers offer
+  join public.products product on product.id=offer.product_id
+  where release.product_offer_id=offer.id
+    and product.product_key='isolated.saju14.review'
+    and release.revoked_at is null;
+  get diagnostics updated_count = row_count;
+  if updated_count <> 14 then
+    raise exception 'HOLD_SAJU14_SOURCE_RELEASE_PIN_MISMATCH: %', updated_count;
+  end if;
+end
+$pin$;
+commit;
+select 'SAJU14_SOURCE_RELEASE_PINS_READY' as state;
