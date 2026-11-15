@@ -82,6 +82,23 @@ async function assertRole(pool, user, role) {
 }
 
 let issuerPool, pairReaderPool, runner;
+let shutdownPromise;
+// If source signing, the lease authority or its database fails AFTER startup,
+// the issuer must EXIT. The supervising checkout process then closes payments.
+function shutdown(failed = false) {
+  if (failed) process.exitCode = 1;
+  if (shutdownPromise) return shutdownPromise;
+  shutdownPromise = (async () => {
+    try {
+      await runner?.close();
+    } catch {
+      process.exitCode = 1;
+    } finally {
+      await Promise.allSettled([issuerPool?.end(), pairReaderPool?.end()].filter(Boolean));
+    }
+  })();
+  return shutdownPromise;
+}
 try {
   if (required('MYEONGHA_SAJU_ISSUER_STAGE') !== 'local-only') {
     throw new Error('Official Saju paid issuance is not activated for a production database.');
@@ -159,7 +176,9 @@ try {
     },
     onError: () => {
       console.error('Paid Saju issuance stopped after a source/DB authority error.');
-      process.exitCode = 1;
+      // Closing both pools releases the process so the supervised checkout
+      // shuts down rather than continuing to take paid orders without issuing.
+      void shutdown(true);
     },
   });
   const first = await runner.runOnce();
@@ -167,23 +186,13 @@ try {
   if (process.argv.includes('--serve')) {
     runner.start();
     console.log('Isolated paid-issuance consumer active; no public sales routes enabled.');
-    let shuttingDown = false;
-    const stop = async () => {
-      if (shuttingDown) return;
-      shuttingDown = true;
-      await runner.close();
-      await Promise.all([issuerPool.end(), pairReaderPool.end()]);
-    };
-    process.once('SIGINT', () => { void stop(); });
-    process.once('SIGTERM', () => { void stop(); });
+    process.once('SIGINT', () => { void shutdown(); });
+    process.once('SIGTERM', () => { void shutdown(); });
   } else {
-    await runner.close();
-    await Promise.all([issuerPool.end(), pairReaderPool.end()]);
+    await shutdown();
   }
 } catch (error) {
   console.error('Paid Saju issuer cannot start without approved staged authority: ' +
     (error instanceof Error ? error.message : 'unknown error'));
-  await runner?.close().catch(() => {});
-  await Promise.allSettled([issuerPool?.end(), pairReaderPool?.end()].filter(Boolean));
-  process.exitCode = 1;
+  await shutdown(true);
 }

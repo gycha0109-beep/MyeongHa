@@ -63,6 +63,9 @@ async function startVerifiedIssuer(env) {
   const proc = spawn(process.execPath, [script, '--serve'], {
     env, cwd: root, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
   });
+  // An unattended stderr pipe can fill up and stall the actual issuer.
+  // Never print Source tokens, database URLs or provider diagnostics here.
+  proc.stderr.resume();
   await new Promise((resolveReady, rejectReady) => {
     let output = '';
     let finished = false;
@@ -77,6 +80,8 @@ async function startVerifiedIssuer(env) {
       if (finished) return;
       finished = true;
       detach();
+      // Drain ongoing issue-cycle stdout without exposing sensitive source data.
+      proc.stdout.resume();
       resolveReady();
     }
     function fail(message) {
