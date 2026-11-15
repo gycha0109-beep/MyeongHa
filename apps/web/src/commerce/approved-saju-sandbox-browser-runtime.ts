@@ -82,6 +82,42 @@ export async function loadApprovedSajuSandboxCheckoutPortsV1(
         await memberToken();
         return readings;
       },
+      async readSignedPair(selection) {
+        const token = await memberToken();
+        const response = await fetch('/api/approved-saju/pair/reader', {
+          method: 'POST',
+          headers: { Accept: 'application/json', 'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + token },
+          body: JSON.stringify(selection),
+          credentials: 'same-origin', cache: 'no-store', redirect: 'error',
+        });
+        if (!response.ok) throw Error('Signed compatibility Reading is not available.');
+        const envelope: unknown = await response.json();
+        if (!envelope || typeof envelope !== 'object' || !('data' in envelope)
+          || !('ok' in envelope) || envelope.ok !== true) throw Error('Invalid signed Reading response.');
+        const pair = envelope.data;
+        if (!pair || typeof pair !== 'object' ||
+          !('state' in pair) || pair.state !== 'signed_pair_archive_reopened' ||
+          !('readingId' in pair) || pair.readingId !== selection.readingId ||
+          !('readerCharacterId' in pair) || pair.readerCharacterId !== selection.readerCharacterId ||
+          !('display' in pair) || !pair.display || typeof pair.display !== 'object' ||
+          !('kind' in pair.display) || pair.display.kind !== 'delivered' ||
+          !('steps' in pair.display) || !Array.isArray(pair.display.steps) ||
+          !pair.display.steps.every((step: unknown) =>
+            step !== null && typeof step === 'object' &&
+            'title' in step && typeof step.title === 'string' &&
+            'primary' in step && typeof step.primary === 'string' &&
+            'supporting' in step && Array.isArray(step.supporting) &&
+            step.supporting.every((part: unknown) => typeof part === 'string') &&
+            'structure' in step && Array.isArray(step.structure) &&
+            step.structure.every((part: unknown) => typeof part === 'string')) ||
+          !('notices' in pair.display) || !Array.isArray(pair.display.notices) ||
+          !pair.display.notices.every((notice: unknown) => typeof notice === 'string')) {
+          throw Error('Signed compatibility payload is invalid.');
+        }
+        await memberToken();
+        return pair as Awaited<ReturnType<NonNullable<ApprovedSajuCheckoutPanelPorts['readSignedPair']>>>;
+      },
     };
   } catch {
     return null;

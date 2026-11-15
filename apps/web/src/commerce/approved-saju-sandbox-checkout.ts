@@ -3,6 +3,7 @@ import {
   type ApprovedSajuOfferIdV1,
 } from '../../../../packages/contracts/src/approved-saju-catalog.js';
 import type { ApprovedSajuPurchaseReadingV1 } from '../../../../packages/api-client/src/records.js';
+import type { ProductReadingDisplayResultV2 } from '../../../../packages/api-client/src/product-reading-display.js';
 import type { PaymentAttemptHandoffFetchPortV1 } from './payment-attempt-browser-handoff-transport.js';
 import {
   fetchPaymentAttemptServerVerificationV1,
@@ -16,11 +17,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const TARGET_ID = /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/iu;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{8,128}$/u;
 
+export type ApprovedSajuSignedPairArchiveV1 = Readonly<{
+  state: 'signed_pair_archive_reopened';
+  readingId: string;
+  readerCharacterId: string;
+  display: Extract<ProductReadingDisplayResultV2, { kind: 'delivered' }>;
+}>;
+
 export type ApprovedSajuCheckoutPanelPorts = Pick<Parameters<typeof prepareApprovedSajuSandboxCheckoutV1>[0],
   'orders' | 'attempts'> & Pick<Parameters<typeof requestApprovedSajuSandboxPaymentV1>[0],
   'handoff' | 'verification' | 'sdk' | 'channel'> & Readonly<{
     targets: readonly Readonly<{ id: string; label: string }>[];
     readArchive?(purchaseIntentId: string): Promise<readonly ApprovedSajuPurchaseReadingV1[]>;
+    readSignedPair?(selection: Readonly<{
+      purchaseIntentId: string; readingId: string; readerCharacterId: string;
+    }>): Promise<ApprovedSajuSignedPairArchiveV1>;
   }>;
 
 function asRecord(value: unknown): Record<string, unknown> | null {

@@ -6,7 +6,7 @@ import type { ApprovedSajuPurchaseReadingV1 } from '../../../../packages/api-cli
 import { buildPersistedReadingHandoffUrlV1 } from '../../reading-history-handoff.js';
 import {
   prepareApprovedSajuSandboxCheckoutV1, requestApprovedSajuSandboxPaymentV1,
-  type ApprovedSajuCheckoutPanelPorts,
+  type ApprovedSajuCheckoutPanelPorts, type ApprovedSajuSignedPairArchiveV1,
 } from './approved-saju-sandbox-checkout.js';
 import {
   fetchPaymentAttemptServerVerificationV1, PaymentAttemptBrowserServerVerificationTransportErrorV1,
@@ -31,6 +31,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   const [verified, setVerified] = useState(false);
   const [verifyOnly, setVerifyOnly] = useState(false);
   const [archive, setArchive] = useState<readonly ApprovedSajuPurchaseReadingV1[]>([]);
+  const [signedPair, setSignedPair] = useState<ApprovedSajuSignedPairArchiveV1 | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const inFlight = useRef(false);
@@ -97,6 +98,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
   }, [verified, binding?.purchaseIntentId, archive, ports]);
 
   async function loadArchive(purchaseIntentId: string) {
+    setSignedPair(null);
     if (ports.readArchive === undefined) {
       setMessage('테스트 결제를 확인했습니다.');
       return;
@@ -110,6 +112,28 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     } catch {
       setArchive([]);
       setMessage('보관함을 아직 열 수 없습니다. 발급 상태를 다시 확인해 주세요.');
+    }
+  }
+
+  async function openSignedPair(item: ApprovedSajuPurchaseReadingV1) {
+    if (!binding || item.state !== 'ready' || item.component !== 'compatibility'
+      || !ports.readSignedPair || inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    const purchaseIntentId = binding.purchaseIntentId;
+    try {
+      const result = await ports.readSignedPair({
+        purchaseIntentId, readingId: item.readingId,
+        readerCharacterId: item.readerCharacterId,
+      });
+      setSignedPair(result);
+      setMessage('구매 권한과 원본 서명을 확인한 궁합 풀이입니다.');
+    } catch {
+      setSignedPair(null);
+      setMessage('서명된 궁합 원문을 열 수 없습니다. 구매 권한과 상대 동의를 확인해 주세요.');
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
     }
   }
 
@@ -159,6 +183,7 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
     setVerified(false);
     setVerifyOnly(false);
     setArchive([]);
+    setSignedPair(null);
     setMessage('');
     retryKey.current = null;
   }
@@ -214,9 +239,28 @@ export function ApprovedSajuCheckoutPanel({ ports, selection }: {
               {item.state === 'ready'
                 ? <a href={buildPersistedReadingHandoffUrlV1(item)}>저장된 풀이 열기</a>
                 : <span>발급 대기</span>}
+              {item.state === 'ready' && item.component === 'compatibility' && ports.readSignedPair && (
+                <button type="button" disabled={busy} onClick={() => { void openSignedPair(item); }}>
+                  원본 서명 확인하고 궁합 보기
+                </button>
+              )}
             </li>
           ))}
         </ul>
+      )}
+      {signedPair && (
+        <section aria-label="원본 서명 확인된 궁합 풀이">
+          <h3>원본 서명이 확인된 궁합 풀이</h3>
+          {signedPair.display.steps.map((step, index) => (
+            <div key={index}>
+              <h4>{step.title}</h4>
+              <p>{step.primary}</p>
+              {step.supporting.map((paragraph, i) => <p key={i}>{paragraph}</p>)}
+              {step.structure.map((evidence, i) => <p key={i}>{evidence}</p>)}
+            </div>
+          ))}
+          {signedPair.display.notices.map((notice, index) => <p key={index}>{notice}</p>)}
+        </section>
       )}
     </section>
   );
