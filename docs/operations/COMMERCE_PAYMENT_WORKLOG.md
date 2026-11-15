@@ -1201,3 +1201,8 @@ Watchtower-Track: commerce
 - 구매 영수증 검증으로 발생한 기존 승인 사주 발급 큐를 개인 사주/궁합 발급 작업자가 함께 처리하는 독립 실행기를 추가. `npm run start:saju-issuer`.
 - 구매 권한·기간·상대 동의·고정 Release·서명 Source·발급 완료 DB 검증을 유지하며, 확인되지 않은 결제 요청은 발급하지 않는다.
 - 실제 운영 DB·판매는 수정하지 않았다. 발급 전용 로컬 DB와 독립 궁합 보관함 역할·서명 검증 키가 없으면 실행하지 않는다. 실제 구매 발급은 아직 차단 상태다.
+
+### 2026-11-15 — Approved 14-offer disposable PostgreSQL 17 deployment
+- Installed the existing approved-Saju purchase, receipt, issue, pair-reader, archive and cancellation SQL candidates into a new zero-network-exposure disposable PostgreSQL 17 database; no Production schema was changed.
+- Added a guarded isolated installer plus 14 synthetic Offer/Charge Terms/Capability Set/Release registrations derived from the approved November 6 catalog, with no synthetic paid receipts or signed Reading artifacts.
+- Actual local result: `STAGED_SAJU14_LOCAL_READY`; 14 Offer mappings and 14 distinct Release registrations, repeat-safe. Owner authentication, PortOne TEST secrets, real Source signing and hosted release remain separate unfulfilled gates.
