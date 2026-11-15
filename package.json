@@ -22,6 +22,7 @@
     "build": "tsc -p tsconfig.build.json",
     "build:web": "node scripts/build-web-static.mjs && npm run build -w @myeongha/web",
     "start:saju-owner-test": "node scripts/local/start-approved-saju-owner-sandbox.mjs",
+    "start:saju-issuer": "node scripts/local/start-approved-saju-issuers.mjs --serve",
     "verify:deployment-config": "node scripts/verify-web-deployment.mjs",
     "verify:supabase-deployment-config": "node scripts/verify-supabase-deployment.mjs",
     "verify:saju-abuse-admission-policy-candidate": "node scripts/verify-saju-abuse-admission-policy-candidate.mjs",
