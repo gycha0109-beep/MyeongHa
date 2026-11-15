@@ -12,7 +12,7 @@
  * MYEONGHA_SUPABASE_API_KEY
  */
 import { access } from 'node:fs/promises';
-import { createPublicKey } from 'node:crypto';
+import { createPublicKey, randomBytes } from 'node:crypto';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
@@ -122,6 +122,12 @@ try {
     staticRoot: webRoot,
     supabaseOrigin: expectedAuthOrigin,
     supabaseApiKey: process.env.MYEONGHA_SUPABASE_API_KEY,
+    birthInputHmacSecret: randomBytes(48).toString('base64url'),
+    ...(process.env.MYEONGHA_SAJU_SOURCE_ORIGIN && process.env.MYEONGHA_SAJU_SOURCE_TOKEN
+      ? { sajuCalculation: {
+          origin: process.env.MYEONGHA_SAJU_SOURCE_ORIGIN,
+          bearerToken: process.env.MYEONGHA_SAJU_SOURCE_TOKEN,
+        } } : {}),
     memberPool, commercePool, verificationAdapter,
     pairReader: { pool: pairReaderPool, trust: {
       issuer: process.env.MYEONGHA_SAJU_PAIR_PROOF_ISSUER,

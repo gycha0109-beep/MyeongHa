@@ -7,6 +7,11 @@ import { createApprovedSajuT10PairReaderHttpV1 } from './approved-saju-t10-pair-
 import type { SajuT10ProductionPairTrustV1 } from './saju-t10-production-pair-issue-source-v1.js';
 import { handleTargetPersonReadRequestV1 } from './target-person-read-http.js';
 import { handleSupabaseAuthRequestV1 } from './supabase-auth-http.js';
+import { handleBirthProfileCreateRequestV1 } from './birth-profile-create-http.js';
+import { handleCurrentSubjectBirthProfileRequestV1 } from './current-subject-birth-profile-http.js';
+import { createProductionBirthInputFingerprintPortV1 } from './production-birth-input-fingerprint.js';
+import { handleCurrentSubjectSajuCalculationRequestV1 } from './current-subject-saju-calculation-http.js';
+import { createSajuProductionCalculationHttpAdapterV1 } from './saju-production-calculation-http-adapter.js';
 import { handleReadingHistoryRequestV1 } from './reading-history-http.js';
 import { handleOfficialReadingRecordRequestV1 } from './official-reading-record-http.js';
 import {
@@ -25,6 +30,10 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
   staticRoot: string;
   supabaseOrigin: string;
   supabaseApiKey: string;
+  /** Random local-only 32+ byte signing material. Never shared with clients. */
+  birthInputHmacSecret?: string;
+  /** Existing private Saju calculation Source, separate from payment claims. */
+  sajuCalculation?: Readonly<{ origin: string; bearerToken: string }>;
   channel: Readonly<{ environment: 'sandbox'; storeId: string; channelKey: string }>;
   memberPool: PostgresSubjectPoolV1;
   commercePool: PostgresSubjectPoolV1;
@@ -54,6 +63,13 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
     identityEvidenceVerifier: memberAuth,
     verificationAdapter: input.verificationAdapter,
   });
+  const birthFingerprint = input.birthInputHmacSecret === undefined ? undefined
+    : createProductionBirthInputFingerprintPortV1(input.birthInputHmacSecret);
+  const calculationAdapter = input.sajuCalculation === undefined ? undefined
+    : createSajuProductionCalculationHttpAdapterV1({
+      baseUrl: input.sajuCalculation.origin,
+      bearerToken: input.sajuCalculation.bearerToken,
+    });
   const shared = (request: Request) => ({
     request, requestId: randomUUID(), serverTime: new Date().toISOString(),
     identityEvidenceVerifier: memberAuth, pool: input.memberPool,
@@ -69,6 +85,21 @@ export function createApprovedSajuSandboxOwnerRuntimeV1(input: Readonly<{
         trusts: [input.pairReader.trust],
         verifyRequestIdentity: request => memberAuth.verifyRequestIdentity(request),
       }),
+    }),
+    ...(birthFingerprint === undefined ? {} : {
+      ownerBirth: {
+        create: (request: Request) => handleBirthProfileCreateRequestV1({
+          ...shared(request),
+          idPort: { nextBirthProfileId: randomUUID, nextBirthRevisionId: randomUUID },
+          fingerprintPort: birthFingerprint,
+        }),
+        current: (request: Request) => handleCurrentSubjectBirthProfileRequestV1(shared(request)),
+        ...(calculationAdapter === undefined ? {} : {
+          calculate: (request: Request) => handleCurrentSubjectSajuCalculationRequestV1({
+            ...shared(request), sajuAdapter: calculationAdapter,
+          }),
+        }),
+      },
     }),
     memberAuth: (request, action) => handleSupabaseAuthRequestV1({
       request, action,

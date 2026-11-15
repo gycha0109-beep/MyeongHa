@@ -14,6 +14,10 @@ const AUTH_ROUTES = Object.freeze({
 } as const);
 type LocalAuthAction = typeof AUTH_ROUTES[keyof typeof AUTH_ROUTES];
 const ARCHIVE_PATH = '/api/readings';
+const BIRTH_CREATE_PATH = '/api/birth-profiles';
+const BIRTH_CURRENT_PATH = '/api/me/birth-profile';
+const SAJU_CALCULATION_PATH = '/api/me/saju/calculation';
+const MAX_BIRTH_BODY_BYTES = 4096;
 const TARGETS_PATH = '/api/target-persons';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
 
@@ -65,6 +69,8 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
   memberAuth?: LocalAuthHandler;
   /** Existing RLS/entitlement-verifying GET runtimes. No write routes. */
   ownerReads?: Readonly<{ targets: OwnerReadHandler; readings: OwnerReadHandler }>;
+  /** Existing member-scoped Birth handlers; local Owner only. */
+  ownerBirth?: Readonly<{ create: OwnerReadHandler; current: OwnerReadHandler; calculate?: OwnerReadHandler }>;
   /** Dedicated read-only, signed T10 archive. Never an issue/write authority. */
   signedPairReader?: Readonly<{ handleRequest: (request: Request) => Promise<Response | null> }>;
 }>) {
@@ -168,6 +174,73 @@ export function createApprovedSajuSandboxLoopbackHostV1(input: Readonly<{
           ...(cookie === null ? {} : { 'Set-Cookie': cookie }),
         });
         res.end(body);
+      } catch { reply(503); }
+      return;
+    }
+
+    if (requestUrl.pathname === BIRTH_CREATE_PATH || requestUrl.pathname === BIRTH_CURRENT_PATH ||
+      requestUrl.pathname === SAJU_CALCULATION_PATH) {
+      const calculating = requestUrl.pathname === SAJU_CALCULATION_PATH;
+      if (input.ownerBirth === undefined || (calculating && input.ownerBirth.calculate === undefined)) {
+        req.resume(); reply(404); return;
+      }
+      const creating = requestUrl.pathname === BIRTH_CREATE_PATH;
+      const expectedMethod = creating || calculating ? 'POST' : 'GET';
+      if (req.method !== expectedMethod) { req.resume(); reply(405); return; }
+      if (requestUrl.search !== '' || ((creating || calculating) && req.headers.origin !== input.origin)
+        || (creating &&
+          req.headers['content-type']?.split(';')[0]?.trim().toLowerCase() !== 'application/json')) {
+        req.resume(); reply(403); return;
+      }
+      const authorization = req.headers.authorization;
+      if (typeof authorization !== 'string') { req.resume(); reply(404); return; }
+      try {
+        const owner = await input.runtime.handleRequest(new Request(
+          input.origin + APPROVED_SAJU_SANDBOX_ROUTES_V1.access,
+          { headers: { Authorization: authorization } },
+        ));
+        if (owner?.status !== 200) { req.resume(); reply(404); return; }
+        let body: string | undefined;
+        if (creating) {
+          const contentLength = Number(req.headers['content-length'] ?? 0);
+          if (!Number.isSafeInteger(contentLength) || contentLength > MAX_BIRTH_BODY_BYTES) {
+            req.resume(); reply(413); return;
+          }
+          const chunks: Buffer[] = [];
+          let total = 0;
+          for await (const chunk of req) {
+            const part = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array);
+            total += part.length;
+            if (total > MAX_BIRTH_BODY_BYTES) { reply(413); return; }
+            chunks.push(part);
+          }
+          body = Buffer.concat(chunks).toString('utf8');
+        } else {
+          req.resume();
+        }
+        const routed = new Request(requestUrl.href, {
+          method: expectedMethod,
+          headers: {
+            Authorization: authorization,
+            ...(creating ? { Origin: input.origin, 'Content-Type': 'application/json' } : {}),
+          },
+          ...(body === undefined ? {} : { body }),
+        });
+        const response = creating
+          ? await input.ownerBirth.create(routed)
+          : calculating ? await input.ownerBirth.calculate!(routed)
+          : await input.ownerBirth.current(routed);
+        if (!(response instanceof Response) ||
+          (response.status >= 300 && response.status < 400) ||
+          response.headers.has('set-cookie') || response.headers.has('location')) {
+          reply(503); return;
+        }
+        const output = new Uint8Array(await response.arrayBuffer());
+        if (output.byteLength > MAX_RESPONSE_BYTES ||
+          !response.headers.get('content-type')?.startsWith('application/json')) {
+          reply(503); return;
+        }
+        reply(response.status, output, 'application/json; charset=utf-8');
       } catch { reply(503); }
       return;
     }
